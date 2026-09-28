@@ -81,8 +81,14 @@ test('App bridge rejects malformed replies and event values', async () => {
     /Dynamic route props have an invalid value/,
   );
   await assert.rejects(
-    bridgeModule.writeProjectPageRaw('/project/src/pages/index.astro', 'Hello'),
-    /OkResult\.ok: expected true/,
+    bridgeModule.writeProjectPageRaw('/project/src/pages/index.astro', 'Hello', 'a'.repeat(64)),
+    /PageWriteError: expected object/,
+  );
+  // A malformed base checksum is caught before anything crosses to main.
+  assert.throws(
+    () =>
+      bridgeModule.writeProjectPageRaw('/project/src/pages/index.astro', 'Hello', 'A'.repeat(64)),
+    /Digest: expected 64 lowercase hex characters/,
   );
 
   let external = false;

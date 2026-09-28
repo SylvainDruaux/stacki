@@ -5,6 +5,7 @@ import type { ParsePageResult } from '../shared/page-node';
 import type { ScanResult } from '../shared/scan';
 import type { AssetRequest } from './assetPick';
 import { adoptNodeIds } from './modelAdoption';
+import type { SaveState } from './saveState';
 import type { VariableSelection } from './variablesBridge';
 import {
   cloneEditorModel,
@@ -44,7 +45,8 @@ export type CurrentPage = OpenFile | OpenRoute;
 
 interface PageStateBase {
   readonly source: string;
-  readonly dirty: boolean;
+  /** Where this state stands against the file on disk (plan §7). */
+  readonly save: SaveState;
 }
 
 export interface EditablePageState extends PageStateBase {
@@ -207,11 +209,12 @@ export function findEditorParentList(
 
 export function toEditorPageState(
   input: ParsePageResult & { readonly source: string },
+  save: SaveState,
 ): EditorPageState {
   if (!input.editable) {
-    return { ...input, dirty: false };
+    return { editable: false, reason: input.reason, bail: input.bail, source: input.source, save };
   }
-  return { ...input, model: cloneEditorModel(input.model), dirty: false };
+  return { editable: true, model: cloneEditorModel(input.model), source: input.source, save };
 }
 
 /** Re-key a freshly parsed page onto the session's node ids (see

@@ -1,13 +1,24 @@
-// Serialize writes and drain edits made while a write is pending. A successful
-// write acknowledges its exact state object, never a newer edit or another file.
+// Serialize page writes and drain edits made while a write is pending. A
+// write acknowledges its exact state object, never a newer edit or another
+// file. Every write names the checksum it was authored against, and a refusal
+// (the file changed on disk) stops autosave instead of retrying (plan §7).
 
+import { assert } from '../shared/assert';
+import type { Digest } from '../shared/brand';
 import { LIMITS } from '../shared/limits';
 import type { ScanResult } from '../shared/scan';
+import {
+  saveStateBase,
+  saveStateFailed,
+  saveStateNeedsWrite,
+  saveStateStarted,
+  type SaveState,
+} from './saveState';
 
-/** The page state as the saver needs it: a dirty flag on an object whose
- * identity is the ack token (the WeakSet tracks exact state objects). */
+/** The page state as the saver needs it: an object whose identity is the ack
+ * token, carrying its save state. */
 interface PageStateHandle {
-  readonly dirty?: boolean;
+  readonly save: SaveState;
 }
 
 interface CurrentSnapshot<State extends PageStateHandle> {
@@ -15,55 +26,175 @@ interface CurrentSnapshot<State extends PageStateHandle> {
   readonly pageState?: State | null;
 }
 
-interface PageSaverDeps<State extends PageStateHandle, Acknowledgement> {
+/** What one write did. Failures other than a conflict reject the promise. */
+export type PageWriteOutcome<State> =
+  | { readonly tag: 'written'; readonly state: State; readonly checksum: Digest }
+  | { readonly tag: 'conflict'; readonly diskChecksum: Digest };
+
+interface PageSaverDeps<State extends PageStateHandle> {
   readonly readCurrent: () => CurrentSnapshot<State>;
-  readonly write: (path: string, pageState: State) => Promise<Acknowledgement>;
-  readonly markSaved: (
+  readonly write: (
+    path: string,
     pageState: State,
-    acknowledgement: Acknowledgement | undefined,
-  ) => void;
+    baseChecksum: Digest,
+  ) => Promise<PageWriteOutcome<State>>;
+  /** A copy of `pageState` with another save state; identity is the ack token. */
+  readonly withSave: (pageState: State, save: SaveState) => State;
+  /** Install `next` if `previous` is still the current page state. */
+  readonly replace: (previous: State, next: State) => void;
+  /** The file refused a write: mark whatever state is current as conflicted. */
+  readonly markConflicted: (baseChecksum: Digest, diskChecksum: Digest) => void;
 }
 
-export function createPageSaver<State extends PageStateHandle, Acknowledgement>({
-  readCurrent,
-  write,
-  markSaved,
-}: PageSaverDeps<State, Acknowledgement>): () => Promise<void> {
-  let pending: Promise<void> = Promise.resolve();
-  const saved = new WeakMap<State, Acknowledgement>();
-  const flush = async (): Promise<void> => {
-    const path = readCurrent().currentPage?.path;
+/** Where a flush left the page: its edits are on disk (or there were none), or
+ * a refused save is holding them back until the user decides (plan §7). */
+export type FlushOutcome = 'settled' | 'conflicted';
+
+export interface PageSaver {
+  readonly flush: () => Promise<FlushOutcome>;
+  /** The checksum a write of this save state must name right now. */
+  readonly baseFor: (path: string, save: SaveState) => Digest;
+  /** True while a write is on its way to disk; its outcome is authoritative. */
+  readonly writing: () => boolean;
+}
+
+interface Acknowledgement<State> {
+  readonly outcome: PageWriteOutcome<State>;
+  readonly baseChecksum: Digest;
+  /** The state written and the `saving` copy published for it. */
+  readonly copies: readonly State[];
+}
+
+// Why a base can advance: every unsaved state keeps the base of the clean
+// state it grew from. While the user types through a save, the next state is
+// still based on the bytes before that save, yet the disk now holds the bytes
+// the saver itself wrote. `lineage` records that one step — "states based on
+// `from` are now based on `to`" — so the app never conflicts with itself.
+interface Lineage {
+  readonly path: string;
+  readonly from: Digest;
+  readonly to: Digest;
+}
+
+export function createPageSaver<State extends PageStateHandle>(
+  deps: PageSaverDeps<State>,
+): PageSaver {
+  const saver = new SerialPageSaver(deps);
+  let pending: Promise<unknown> = Promise.resolve();
+  return {
+    flush: () => {
+      const result = pending.then(() => saver.flush());
+      // A failed save is reported to its caller and leaves future saves usable.
+      pending = result.then(
+        () => undefined,
+        () => undefined,
+      );
+      return result;
+    },
+    baseFor: (path, save) => saver.baseFor(path, save),
+    writing: () => saver.writing(),
+  };
+}
+
+// One flush at a time (createPageSaver chains them); this class owns the
+// state that must survive between flushes and never hands it out.
+class SerialPageSaver<State extends PageStateHandle> {
+  readonly #deps: PageSaverDeps<State>;
+  readonly #acknowledged = new WeakMap<State, Acknowledgement<State>>();
+  #lineage: Lineage | undefined;
+  #inFlight = false;
+
+  constructor(deps: PageSaverDeps<State>) {
+    this.#deps = deps;
+  }
+
+  writing(): boolean {
+    return this.#inFlight;
+  }
+
+  baseFor(path: string, save: SaveState): Digest {
+    assert(save.tag !== 'clean', 'A clean page state has nothing to write');
+    const lineage = this.#lineage;
+    if (lineage !== undefined && lineage.path === path && lineage.from === save.baseChecksum) {
+      return lineage.to;
+    }
+    return save.baseChecksum;
+  }
+
+  async flush(): Promise<FlushOutcome> {
+    const path = this.#deps.readCurrent().currentPage?.path;
     if (!path) {
+      return 'settled';
+    }
+    // Each pass past the first needs a strictly newer edit; hitting the cap
+    // means edits arrive faster than writes can ever drain — a bug.
+    for (let drain = 0; drain < LIMITS.saveDrainMax; drain++) {
+      const { currentPage, pageState } = this.#deps.readCurrent();
+      if (currentPage?.path !== path || !pageState) {
+        return 'settled';
+      }
+      let acknowledgement = this.#acknowledged.get(pageState);
+      if (acknowledgement === undefined) {
+        if (pageState.save.tag === 'clean') {
+          this.#lineage = undefined; // every later edit grows from this checksum
+          return 'settled';
+        }
+        if (pageState.save.tag === 'conflicted') {
+          return 'conflicted'; // autosave stays off until the user decides (plan §7)
+        }
+        assert(saveStateNeedsWrite(pageState.save), 'Only a dirty page state is written');
+        acknowledgement = await this.#write(path, pageState);
+      }
+      this.#settle(acknowledgement);
+      if (acknowledgement.outcome.tag === 'conflict') {
+        return 'conflicted';
+      }
+      // The ref updates on render; until then it still shows a copy just settled.
+      const latest = this.#deps.readCurrent().pageState;
+      if (!latest || acknowledgement.copies.includes(latest)) {
+        return 'settled';
+      }
+    }
+    throw new Error(`save drain exceeded ${LIMITS.saveDrainMax} passes for ${path}`);
+  }
+
+  async #write(path: string, pageState: State): Promise<Acknowledgement<State>> {
+    const baseChecksum = this.baseFor(path, pageState.save);
+    const saving = this.#deps.withSave(pageState, saveStateStarted(pageState.save));
+    this.#deps.replace(pageState, saving);
+    this.#inFlight = true;
+    let outcome: PageWriteOutcome<State>;
+    try {
+      outcome = await this.#deps.write(path, pageState, baseChecksum);
+    } catch (error: unknown) {
+      // Back to unsaved; if a newer edit superseded the copy, it already is.
+      this.#deps.replace(saving, this.#deps.withSave(saving, saveStateFailed(saving.save)));
+      throw error;
+    } finally {
+      this.#inFlight = false;
+    }
+    if (outcome.tag === 'written') {
+      const written = outcome.state.save;
+      assert(written.tag === 'clean', 'A written page state is clean');
+      assert(written.checksum === outcome.checksum, 'A written state carries the written checksum');
+      this.#lineage = { path, from: saveStateBase(pageState.save), to: outcome.checksum };
+    }
+    const acknowledgement = { outcome, baseChecksum, copies: [pageState, saving] };
+    this.#acknowledged.set(pageState, acknowledgement);
+    this.#acknowledged.set(saving, acknowledgement);
+    return acknowledgement;
+  }
+
+  #settle(acknowledgement: Acknowledgement<State>): void {
+    const { outcome } = acknowledgement;
+    if (outcome.tag === 'conflict') {
+      this.#deps.markConflicted(acknowledgement.baseChecksum, outcome.diskChecksum);
       return;
     }
-    let drain = 0;
-    while (true) {
-      drain += 1;
-      // Each pass past this point needs a strictly newer dirty state; hitting
-      // the cap means edits arrive faster than writes can ever drain — a bug.
-      if (drain > LIMITS.saveDrainMax) {
-        throw new Error(`save drain exceeded ${LIMITS.saveDrainMax} passes for ${path}`);
-      }
-      const { currentPage, pageState } = readCurrent();
-      if (currentPage?.path !== path || !pageState?.dirty) {
-        return;
-      }
-      if (!saved.has(pageState)) {
-        const acknowledgement = await write(path, pageState);
-        saved.set(pageState, acknowledgement);
-      }
-      markSaved(pageState, saved.get(pageState));
-      if (readCurrent().pageState === pageState) {
-        return;
-      }
+    for (const copy of acknowledgement.copies) {
+      this.#deps.replace(copy, outcome.state);
     }
-  };
-  return () => {
-    const result = pending.then(flush);
-    // A failed save is reported to its caller and leaves future saves usable.
-    pending = result.catch(() => {});
-    return result;
-  };
+  }
 }
 
 export function scanContainsFile(scan: ScanResult | null | undefined, path: string): boolean {

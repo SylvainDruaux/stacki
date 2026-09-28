@@ -1,3 +1,9 @@
+// Goal: page navigation, watcher reloads and saves never let an older read or
+// an outside edit replace the user's current edit, and a refused save keeps the
+// edit, stops autosave and asks the user (plan §7).
+// Method: render the real App in jsdom with stub panels that capture their
+// props, drive it through those callbacks, and hold every disk read on a
+// deferred so each interleaving is chosen by the test.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -11,9 +17,12 @@ const nodeId = (label) =>
     (hash, character) => (hash * 31 + character.charCodeAt(0)) % 1_000_000_007,
     7,
   )}`;
+// Every page read reports the checksum of the bytes it read (plan §11 step 0).
+const diskChecksum = 'a'.repeat(64);
 const pageState = (label) => ({
   editable: true,
   source: '',
+  checksum: diskChecksum,
   model: {
     imports: [],
     frontmatterLead: '',
@@ -59,6 +68,7 @@ test('out-of-order page reads and external reads cannot replace the current edit
   let deferScans = false;
   const writes = [];
   let writeError = null;
+  let refuseWrites = null; // the checksum on disk when main refuses a write
   let onFsChanged;
   const bridge = new Proxy({
     pendingProject: async () => null,
@@ -75,8 +85,14 @@ test('out-of-order page reads and external reads cannot replace the current edit
     writePage: async (payload) => {
       if (writeError) {throw writeError;}
       writes.push(payload);
-      return { ok: true };
+      if (refuseWrites) {
+        const error = { code: 'conflict', message: 'changed', diskChecksum: refuseWrites };
+        return { ok: false, error };
+      }
+      const checksum = String(writes.length % 10).repeat(64);
+      return { ok: true, editable: true, source: '', model: payload.model, checksum };
     },
+    serializePage: async () => ({ source: '<div>local</div>\n' }),
     onFsChanged: (cb) => { onFsChanged = cb; return () => {}; },
     gitInfo: async () => ({ isRepo: false }),
     onCssChanged: () => () => {},
@@ -146,6 +162,7 @@ test('out-of-order page reads and external reads cannot replace the current edit
   await act(async () => { await new Promise((resolve) => setTimeout(resolve, 350)); });
   assert.equal(writes.at(-1).pagePath, pages[2].path);
   assert.equal(writes.at(-1).model.nodes[0].props.title.value, 'keep this');
+  assert.equal(writes.at(-1).baseChecksum, diskChecksum, 'the save names the bytes it edited');
   let openComponent;
   await act(async () => { openComponent = __panels.StructurePanel.onOpenComponent('Card'); await tick(); });
   assert.equal(reads[6].path, scan.components[0].path);
@@ -202,6 +219,77 @@ test('out-of-order page reads and external reads cannot replace the current edit
   assert.equal(__panels.PropsPanel.node.id, nodeId('second-retry'));
   await act(async () => { reads[11].resolve(pageState('latest-after-unrelated')); await unrelatedEvent; await tick(); });
   assert.equal(__panels.PropsPanel.node.id, nodeId('second-retry'));
+
+  // --- A refused save (plan §7) ---------------------------------------------
+  // Main refuses the write: the page turns conflicted, the notice appears, and
+  // the edit stays on screen. Later edits apply locally but never autosave.
+  // Separate acts: the save timer relies on React committing the edit first.
+  const typeTitle = async (value) => {
+    await act(async () => {
+      __panels.PropsPanel.onSetProp('title', { type: 'string', value });
+      await tick();
+    });
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 350)); });
+  };
+  refuseWrites = 'd'.repeat(64);
+  const attempted = writes.length;
+  delete __panels.SaveConflictNotice;
+  await typeTitle('mine');
+  assert.equal(writes.length, attempted + 1);
+  assert.equal(__panels.SaveConflictNotice.fileName, pages[1].name);
+  assert.equal(__panels.SaveConflictNotice.reviewing, false);
+  await typeTitle('mine, again');
+  assert.equal(writes.length, attempted + 1, 'autosave stays off while conflicted');
+  assert.equal(__panels.PropsPanel.node.props.title.value, 'mine, again');
+  // Leaving would drop the edits, so navigation stops and says why.
+  await navigate('/third');
+  assert.equal(reads.length, 12, 'a conflicted page blocks navigation before any read');
+  assert.match(
+    document.querySelector('.toast.error').textContent,
+    /conflict with a change on disk/,
+  );
+  // Review shows the local text in code; keeping it saves against the disk bytes.
+  await act(async () => { __panels.SaveConflictNotice.onReview(); await tick(); });
+  assert.equal(__panels.SaveConflictNotice.reviewing, true);
+  refuseWrites = null;
+  // A synchronous act commits the click's state before the zero-delay save
+  // timer runs, as a real discrete event does.
+  act(() => { __panels.SaveConflictNotice.onKeep(); });
+  await act(async () => { await new Promise((resolve) => setTimeout(resolve, 50)); });
+  assert.equal(writes.length, attempted + 2);
+  assert.equal(writes.at(-1).baseChecksum, 'd'.repeat(64));
+  assert.equal(writes.at(-1).model.nodes[0].props.title.value, 'mine, again');
+  delete __panels.SaveConflictNotice;
+  await typeTitle('clean again');
+  assert.equal(__panels.SaveConflictNotice, undefined, 'the notice leaves with the conflict');
+  assert.equal(writes.length, attempted + 3);
+
+  // An outside edit while the page has unsaved edits is surfaced, not dropped:
+  // the pending save must not overwrite it, and the watcher must not discard
+  // the user's input by reloading.
+  // Typing batches for 300 ms; the outside edit lands inside that window.
+  let dirtyEvent;
+  await act(async () => {
+    __panels.PropsPanel.onSetProp('title', { type: 'string', value: 'typing' });
+    await tick();
+  });
+  await act(async () => { dirtyEvent = onFsChanged({ files: [pages[1].path] }); await tick(); });
+  assert.equal(reads[12].path, pages[1].path);
+  await act(async () => {
+    reads[12].resolve({ ...pageState('outside'), checksum: 'e'.repeat(64) });
+    await dirtyEvent;
+  });
+  await act(async () => { await new Promise((resolve) => setTimeout(resolve, 350)); });
+  assert.equal(writes.length, attempted + 3, 'the pending save never reached disk');
+  assert.equal(__panels.SaveConflictNotice.fileName, pages[1].name);
+  assert.equal(__panels.PropsPanel.node.props.title.value, 'typing');
+  // Reload from disk is the deliberate way out; it discards the local edit.
+  await act(async () => { __panels.SaveConflictNotice.onReload(); await tick(); });
+  assert.equal(reads[13].path, pages[1].path);
+  delete __panels.SaveConflictNotice;
+  await act(async () => { reads[13].resolve(pageState('reloaded')); await tick(); });
+  assert.equal(__panels.SaveConflictNotice, undefined);
+  assert.equal(writes.length, attempted + 3, 'reloading writes nothing');
   await act(async () => root.unmount());
   dom.window.close();
 });

@@ -1,5 +1,6 @@
 // Small bounded parsers shared by IPC and disk readers. Parsers construct typed
 // values; no library or assertion is needed to trust a field after this boundary.
+import { toDigest, type Digest } from './brand';
 import { toArray, toRecord } from './record';
 
 export const BOUNDARY_LIMITS = {
@@ -35,6 +36,13 @@ export function pathText(input: unknown): string {
     throw new Error('Path contains NUL');
   }
   return value;
+}
+
+export function digest(input: unknown): Digest {
+  if (typeof input !== 'string') {
+    throw new Error('Expected digest string');
+  }
+  return toDigest(input);
 }
 
 export function boolean(input: unknown): boolean {

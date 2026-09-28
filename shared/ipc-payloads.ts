@@ -12,6 +12,7 @@ import {
   list,
   dictionary,
   data,
+  digest,
 } from './boundary';
 import type { Parsed } from './boundary';
 import { toArray } from './record';
@@ -182,9 +183,17 @@ export const IPC_PAYLOADS = {
   'page:move': object({ ...project, from: pathText, to: pathText }),
   'page:parse': object({ pagePath: pathText, source: text }),
   'page:read': pathText,
+  // The text a model write would produce, for reviewing unsaved edits in code.
+  'page:serialize': object({ pagePath: pathText, model: (input: unknown) => input }),
   'page:rebaseImport': object({ fromPagePath: maybePath, toPagePath: maybePath, spec: text }),
-  'page:write': object({ pagePath: pathText, model: (input: unknown) => input }),
-  'page:writeRaw': object({ pagePath: pathText, source: text }),
+  // baseChecksum names the disk bytes the edit was authored against; main
+  // refuses the write with `conflict` when the file no longer holds them.
+  'page:write': object({
+    pagePath: pathText,
+    model: (input: unknown) => input,
+    baseChecksum: digest,
+  }),
+  'page:writeRaw': object({ pagePath: pathText, source: text, baseChecksum: digest }),
   'pagefolder:create': object({ ...project, dir: pathText }),
   'pagefolder:delete': object({ ...project, dir: pathText }),
   'pagefolder:rename': object({ ...project, from: pathText, to: pathText }),

@@ -1,7 +1,14 @@
 import { loadComponentProperties, updateComponentProperties } from './componentProperties';
 import { renderComponentPreviewPage } from './componentPreview.js';
 import { createIpcRegistrar } from './ipc.js';
-import { MAIN_LIMITS, readSource, directoryBudget } from './main.bounds.js';
+import { MAIN_LIMITS, readSource, readSourceBytes, directoryBudget } from './main.bounds.js';
+import {
+  digestOf,
+  isAtomicTemporary,
+  isMissing,
+  readSourceSnapshot,
+  writeFileAtomic,
+} from './atomicWrite.js';
 import { definedFields } from '../shared/boundary.js';
 import { gitErrorDetail } from './git.js';
 import {
@@ -25,7 +32,10 @@ import type { ChildProcess, ExecFileOptions } from 'child_process';
 import { toRecord, toArray } from '../shared/record.js';
 import { assert } from '../shared/assert.js';
 import type { IpcPayloads } from '../shared/ipc-payloads.js';
-import type { IpcResults } from '../shared/ipc-results.js';
+import type { IpcResults, WirePageWriteError } from '../shared/ipc-results.js';
+import type { Digest } from '../shared/brand.js';
+import { LIMITS } from '../shared/limits.js';
+import { err, ok, type Result } from '../shared/result.js';
 import type { ParserNode, ParserPageModel, SchemaField } from './astroParser.types.js';
 import { parseSerializePage } from './astroParser.validation.js';
 import { parseMarkdownModel } from './main.validation.js';
@@ -2136,8 +2146,14 @@ function markSelfWrite(p: string, text: string | null = null) {
 }
 
 // Whether a watcher event is the app hearing its own write come back — see
-// electron/selfWrites.js.
-const isSelfWrite = (full: string) => selfWrites.isEcho(path.resolve(full));
+// electron/selfWrites.js. A save's temporary file (atomicWrite.ts) is the app's
+// own too: it exists only between staging and the rename.
+const isSelfWrite = (full: string): boolean => {
+  if (isAtomicTemporary(full)) {
+    return true;
+  }
+  return selfWrites.isEcho(path.resolve(full));
+};
 
 ipcMain.handle('watch:start', async (_e, projectPath) => {
   stopWatchingProject();
@@ -2969,38 +2985,49 @@ ipcMain.handle('cms:delete', async (_e, { projectPath, rel }) => {
 
 // Writes any edited chunk subtrees back to their .html files. Compares
 // normalized (reparsed) forms so untouched chunks aren't rewritten just for
-// formatting differences.
-function writeChunks(model: ParserPageModel) {
-  const walk = (list: readonly ParserNode[]): void => {
-    for (const node of list) {
-      if (node.chunkFile && Array.isArray(node.children)) {
-        const next = serializeNodes(node.children);
-        let unchanged = false;
-        try {
-          const disk = readSource(node.chunkFile);
-          const parsed = parseTemplate(disk);
-          unchanged = parsed.clean && serializeNodes(parsed.nodes) === next;
-        } catch {
-          /* file missing — write it */
-        }
-        if (!unchanged) {
-          markSelfWrite(node.chunkFile, next);
-          fs.writeFileSync(node.chunkFile, next, 'utf8');
-        }
-      }
-      if (Array.isArray(node.children)) {
-        walk(node.children);
+// formatting differences. Chunk nesting follows the page tree, which the
+// wire parser already bounded, so the walk visits at most treeNodesMax nodes.
+function writeChunks(model: ParserPageModel): Result<void, WirePageWriteError> {
+  const pending: ParserNode[] = [...model.nodes];
+  for (let visited = 0; visited < pending.length; visited++) {
+    assert(visited < LIMITS.treeNodesMax, 'Chunk walk stays within the page tree bound');
+    const node = pending[visited];
+    assert(node !== undefined, 'Chunk walk index is within the pending list');
+    if (!Array.isArray(node.children)) {
+      continue;
+    }
+    if (node.chunkFile) {
+      const written = writeChunk(node.chunkFile, serializeNodes(node.children));
+      if (!written.ok) {
+        return written;
       }
     }
-  };
-  walk(model.nodes);
+    pending.push(...node.children);
+  }
+  return ok(undefined);
+}
+
+function writeChunk(chunkFile: string, next: string): Result<void, WirePageWriteError> {
+  let unchanged = false;
+  try {
+    const parsed = parseTemplate(readSource(chunkFile));
+    unchanged = parsed.clean && serializeNodes(parsed.nodes) === next;
+  } catch {
+    /* file missing — write it */
+  }
+  if (unchanged) {
+    return ok(undefined);
+  }
+  markSelfWrite(chunkFile, next);
+  const written = writeFileAtomic(chunkFile, next);
+  return written.ok ? ok(undefined) : err(written.error);
 }
 
 // ---------------------------------------------------------------------------
 // Page IPC
 // ---------------------------------------------------------------------------
 
-function parsePageSource(pagePath: string, source: string): IpcResults['page:read'] {
+function parsePageSource(pagePath: string, source: string): IpcResults['page:parse'] {
   if (isMarkdownPage(pagePath)) {
     return { ...parseMarkdownPage(source, { mdx: isMdx(pagePath) }), source };
   }
@@ -3010,16 +3037,57 @@ function parsePageSource(pagePath: string, source: string): IpcResults['page:rea
 }
 
 ipcMain.handle('page:read', async (_e, pagePath) => {
-  const source = readSource(pagePath);
+  const snapshot = readSourceSnapshot(pagePath);
   // Markdown builds the same tree from a different syntax, so everything
   // downstream — navigator, props, text editing, undo — is unchanged. Only
   // the writer has to know which one it is; model.format carries that.
-  return parsePageSource(pagePath, source);
+  return { ...parsePageSource(pagePath, snapshot.text), checksum: snapshot.checksum };
 });
 
 ipcMain.handle('page:parse', async (_e, { pagePath, source }) => {
   return parsePageSource(pagePath, source);
 });
+
+// The overwrite guard (plan §11 step 0). A save names the checksum of the bytes
+// it was authored against; if the file holds anything else, somebody changed
+// it since, and writing now would silently destroy their edit. Refuse without
+// touching the disk and let the renderer ask the user. The window between this
+// read and the rename is the OS limit the plan calls `write-race` (§5.2).
+function checkPageBase(
+  pagePath: string,
+  baseChecksum: Digest,
+): Result<{ readonly bom: boolean }, WirePageWriteError> {
+  let bytes: Buffer;
+  try {
+    bytes = readSourceBytes(pagePath);
+  } catch (error: unknown) {
+    const name = path.basename(pagePath);
+    if (isMissing(error)) {
+      return err({ code: 'missing', message: `${name} no longer exists on disk.` });
+    }
+    return err({ code: 'filesystem', message: `Could not read ${name}: ${String(error)}` });
+  }
+  const diskChecksum = digestOf(bytes);
+  if (diskChecksum === baseChecksum) {
+    return ok({ bom: hasByteOrderMark(bytes) });
+  }
+  return err({
+    code: 'conflict',
+    message: `${path.basename(pagePath)} changed on disk since it was opened.`,
+    diskChecksum,
+  });
+}
+
+// The page model has no BOM field: parsers read past a leading BOM (§3.2), so
+// a model write puts back the one the file on disk had. Raw writes carry their
+// own text and are written verbatim.
+function hasByteOrderMark(bytes: Buffer): boolean {
+  return bytes.length >= 3 && bytes[0] === 0xef && bytes[1] === 0xbb && bytes[2] === 0xbf;
+}
+
+function withByteOrderMark(text: string): string {
+  return text.startsWith('﻿') ? text : `﻿${text}`;
+}
 
 // Astro's dev server serves a page's <style> block ONE EDIT BEHIND: after the file
 // changes it re-renders the HTML correctly, but hands the browser the *previous*
@@ -3031,8 +3099,9 @@ ipcMain.handle('page:parse', async (_e, { pagePath, source }) => {
 const STYLE_NUDGE_MS = 150;
 const styleNudges = new Map<string, ReturnType<typeof setTimeout>>(); // path -> pending timer
 
-function writePageText(pagePath: string, text: string) {
-  if (/<style[\s>]/i.test(text)) {
+function writePageText(pagePath: string, text: string): IpcResults['page:write'] {
+  const styled = /<style[\s>]/i.test(text);
+  if (styled) {
     if (styleNudges.size >= MAIN_LIMITS.styleNudgesMax) {
       if (!styleNudges.has(pagePath)) {
         throw new Error('Pending style writes exceed limit');
@@ -3040,45 +3109,80 @@ function writePageText(pagePath: string, text: string) {
     }
   }
   markSelfWrite(pagePath, text);
-  fs.writeFileSync(pagePath, text, 'utf8');
-  if (!/<style[\s>]/i.test(text)) {
-    return;
+  const written = writeFileAtomic(pagePath, text);
+  if (!written.ok) {
+    return { ok: false as const, error: written.error };
   }
-  clearTimeout(styleNudges.get(pagePath)); // a newer edit supersedes this one's nudge
-  styleNudges.set(
-    pagePath,
-    setTimeout(() => {
-      styleNudges.delete(pagePath);
-      try {
+  const checksum = written.value;
+  assert(checksum === digestOf(text), 'A page write reports the checksum of the text it wrote');
+  if (styled) {
+    clearTimeout(styleNudges.get(pagePath)); // a newer edit supersedes this one's nudge
+    styleNudges.set(
+      pagePath,
+      setTimeout(() => {
+        styleNudges.delete(pagePath);
         // Skip it if anything has changed the file since — the nudge must never
         // resurrect text that's already been superseded.
-        if (readSource(pagePath) !== text) {
+        let current: Digest;
+        try {
+          current = digestOf(readSourceBytes(pagePath));
+        } catch {
+          return; // file moved or deleted — nothing to flush
+        }
+        if (current !== checksum) {
           return;
         }
         markSelfWrite(pagePath, text);
-        fs.writeFileSync(pagePath, text, 'utf8');
-      } catch {
-        /* file moved or deleted — nothing to flush */
-      }
-    }, STYLE_NUDGE_MS),
-  );
+        // A failed nudge leaves the correct bytes on disk; only the dev server's
+        // style cache stays one edit behind, so there is nothing to report.
+        writeFileAtomic(pagePath, text);
+      }, STYLE_NUDGE_MS),
+    );
+  }
+  return { ok: true as const, ...parsePageSource(pagePath, text), checksum };
 }
 
-ipcMain.handle('page:write', async (_e, { pagePath, model }) => {
-  let source: string;
-  if (isMarkdownPage(pagePath)) {
-    source = serializeMarkdownPage(parseMarkdownModel(model));
-  } else {
-    source = serializePage(model);
-    writeChunks(parseSerializePage(model));
+ipcMain.handle('page:write', async (_e, { pagePath, model, baseChecksum }) => {
+  // Serialize first: a malformed model throws before anything reads or writes.
+  const markdown = isMarkdownPage(pagePath);
+  const serialized = markdown
+    ? serializeMarkdownPage(parseMarkdownModel(model))
+    : serializePage(model);
+  const base = checkPageBase(pagePath, baseChecksum);
+  if (!base.ok) {
+    return { ok: false as const, error: base.error };
   }
-  writePageText(pagePath, source);
-  return { ok: true as const, ...parsePageSource(pagePath, source) };
+  if (!markdown) {
+    const chunks = writeChunks(parseSerializePage(model));
+    if (!chunks.ok) {
+      return { ok: false as const, error: chunks.error };
+    }
+  }
+  return writePageText(pagePath, base.value.bom ? withByteOrderMark(serialized) : serialized);
 });
 
-ipcMain.handle('page:writeRaw', async (_e, { pagePath, source }) => {
-  writePageText(pagePath, source);
-  return { ok: true as const, ...parsePageSource(pagePath, source) };
+// What page:write would put on disk for this model, without writing it: the
+// renderer shows it when the user reviews a conflicted page in code.
+ipcMain.handle('page:serialize', async (_e, { pagePath, model }) => {
+  const markdown = isMarkdownPage(pagePath);
+  const serialized = markdown
+    ? serializeMarkdownPage(parseMarkdownModel(model))
+    : serializePage(model);
+  let bom = false;
+  try {
+    bom = hasByteOrderMark(readSourceBytes(pagePath));
+  } catch {
+    /* gone or unreadable: the review shows the text without a BOM */
+  }
+  return { source: bom ? withByteOrderMark(serialized) : serialized };
+});
+
+ipcMain.handle('page:writeRaw', async (_e, { pagePath, source, baseChecksum }) => {
+  const base = checkPageBase(pagePath, baseChecksum);
+  if (!base.ok) {
+    return { ok: false as const, error: base.error };
+  }
+  return writePageText(pagePath, source);
 });
 
 ipcMain.handle('page:create', async (_e, { projectPath, name, layout }) => {

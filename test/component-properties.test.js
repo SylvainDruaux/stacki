@@ -427,6 +427,76 @@ test('failed writes restore all files already written', () => {
   });
 });
 
+// Plan §3.3: rollback restores a file only while it still holds the bytes the
+// batch wrote. The file written first is changed by "another program" in the
+// middle of the batch, then the next write fails.
+test('rollback leaves a file another program changed and names it', () => {
+  project(({ root, component, page }) => {
+    const before = new Map([[component, source], [page, fs.readFileSync(page, 'utf8')]]);
+    const write = fs.writeFileSync;
+    const rename = fs.renameSync;
+    const replaced = [];
+    let writes = 0;
+    fs.renameSync = (from, to) => {
+      replaced.push(to);
+      return rename(from, to);
+    };
+    fs.writeFileSync = (...argumentsList) => {
+      writes += 1;
+      if (writes === 2) {
+        write(replaced[0], 'EXTERNAL');
+        throw new Error('Simulated disk failure');
+      }
+      return write(...argumentsList);
+    };
+    try {
+      const result = updateComponentProperties(
+        { projectPath: root, file: component, source, change: save({ name: 'heading' }) },
+        () => {}
+      );
+      assert.equal(result.ok, false);
+      assert.equal(result.error.code, 'rollback');
+      assert.match(result.error.message, /changed by another program, left as is: /);
+      assert.ok(result.error.message.includes(replaced[0]), result.error.message);
+      assert.equal(fs.readFileSync(replaced[0], 'utf8'), 'EXTERNAL');
+      const untouched = replaced[0] === component ? page : component;
+      assert.equal(fs.readFileSync(untouched, 'utf8'), before.get(untouched));
+    } finally {
+      fs.writeFileSync = write;
+      fs.renameSync = rename;
+    }
+  });
+});
+
+test('a read-back mismatch is a write-race that rolls back instead of asserting', () => {
+  project(({ root, component, page }) => {
+    const before = new Map([[component, source], [page, fs.readFileSync(page, 'utf8')]]);
+    const rename = fs.renameSync;
+    const replaced = [];
+    fs.renameSync = (from, to) => {
+      rename(from, to);
+      replaced.push(to);
+      if (replaced.length === 2) {
+        fs.writeFileSync(to, 'RACER'); // another writer lands right after ours
+      }
+    };
+    try {
+      const result = updateComponentProperties(
+        { projectPath: root, file: component, source, change: save({ name: 'heading' }) },
+        () => {}
+      );
+      assert.equal(result.ok, false);
+      assert.equal(result.error.code, 'write-race');
+      assert.match(result.error.message, /changes restored/);
+      assert.equal(fs.readFileSync(replaced[0], 'utf8'), before.get(replaced[0]));
+      // The other writer keeps its bytes.
+      assert.equal(fs.readFileSync(replaced[1], 'utf8'), 'RACER');
+    } finally {
+      fs.renameSync = rename;
+    }
+  });
+});
+
 test('composite props trace their own declarations and literal defaults', () => {
   const composite = `---
 type Unrelated = { element: number };

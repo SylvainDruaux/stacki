@@ -1,10 +1,10 @@
-import { randomUUID } from 'node:crypto';
 import { readPropertyConsumers, readBoundedSource, filesystemError } from './propertyConsumers';
 // Plan against exact source revisions, then commit as one synchronous batch.
 // Failed writes restore earlier files so a rename cannot leave half the site on the old API.
 import fs from 'node:fs';
 import path from 'node:path';
 import { assert } from '../shared/assert';
+import type { Digest } from '../shared/brand';
 import { PROPERTY_LIMITS } from '../shared/component-properties';
 import type {
   ComponentProperties,
@@ -14,6 +14,8 @@ import type {
 import { err, ok, type Result } from '../shared/result';
 import { literalOptions } from '../shared/property-options';
 import { sameFilesystemPath } from './platform';
+import { digestOf, writeFileAtomic, type AtomicWriteError } from './atomicWrite';
+import { readSourceBytes } from './main.bounds';
 import { editPropertyDefinition, readComponentProperties } from './propertyDefinitions';
 import { renameComponentOptionValues, renameComponentReferences } from './propertyRename';
 
@@ -237,42 +239,66 @@ function commitPropertyChanges(
   const written: FileChange[] = [];
   for (const change of changes) {
     noteWrite(change.file, change.after);
-    const result = writePropertyFile(change.file, change.after);
+    const result = writeFileAtomic(change.file, change.after);
     if (!result.ok) {
-      return rollbackPropertyChanges(written, result.error.message, noteWrite);
+      // Neither failure leaves this file holding our bytes: a filesystem error
+      // never replaced it, and a write-race means another writer replaced it
+      // after us. Only the files written before it are ours to restore.
+      return rollbackPropertyChanges(written, result.error, noteWrite);
     }
+    assert(result.value === digestOf(change.after), 'Property write reports the planned bytes');
     written.push(change);
-    const current = readBoundedSource(change.file);
-    if (!current.ok) {
-      return rollbackPropertyChanges(written, current.error.message, noteWrite);
-    }
-    assert(current.value === change.after, 'Property write readback matches planned source');
   }
   return ok(undefined);
 }
+
+// Best-effort, not atomic (plan §3.3): each file is restored only while it
+// still holds exactly the bytes this batch wrote. A file somebody changed since
+// is theirs now; restoring it would destroy their edit, so it is named instead.
 function rollbackPropertyChanges(
   written: readonly FileChange[],
-  reason: unknown,
+  cause: AtomicWriteError,
   noteWrite: (file: string, source: string) => void
 ): Result<never> {
+  assert(written.length <= PROPERTY_LIMITS.filesMax, 'Rollback is bounded by the batch');
   const failed: string[] = [];
+  const changed: string[] = [];
   for (const change of [...written].reverse()) {
-    noteWrite(change.file, change.before);
-    const result = writePropertyFile(change.file, change.before);
-    if (!result.ok) {
+    const restored = restorePropertyFile(change, noteWrite);
+    if (restored === 'changed') {
+      changed.push(change.file);
+    } else if (restored === 'failed') {
       failed.push(change.file);
     }
   }
-  if (failed.length) {
+  if (failed.length > 0 || changed.length > 0) {
+    const parts = [
+      failed.length > 0 ? `recovery failed for: ${failed.join(', ')}` : '',
+      changed.length > 0 ? `changed by another program, left as is: ${changed.join(', ')}` : '',
+    ].filter((part) => part !== '');
     return err({
       code: 'rollback',
-      message: `Save failed and recovery failed for: ${failed.join(', ')}. ${String(reason)}`,
+      message: `Save failed and ${parts.join('; ')}. ${cause.message}`,
     });
   }
-  return err({
-    code: 'filesystem',
-    message: `Save failed; changes restored. ${String(reason)}`,
-  });
+  return err({ code: cause.code, message: `Save failed; changes restored. ${cause.message}` });
+}
+
+function restorePropertyFile(
+  change: FileChange,
+  noteWrite: (file: string, source: string) => void
+): 'restored' | 'changed' | 'failed' {
+  let current: Digest;
+  try {
+    current = digestOf(readSourceBytes(change.file));
+  } catch {
+    return 'failed';
+  }
+  if (current !== digestOf(change.after)) {
+    return 'changed';
+  }
+  noteWrite(change.file, change.before);
+  return writeFileAtomic(change.file, change.before).ok ? 'restored' : 'failed';
 }
 
 function planPropertyRemoval(
@@ -304,25 +330,4 @@ function planPropertyRemoval(
     }
   }
   return ok([change]);
-}
-
-function writePropertyFile(file: string, source: string): Result<void> {
-  const temporary = path.join(path.dirname(file), `.stacki-properties-${randomUUID()}.tmp`);
-  try {
-    const mode = fs.statSync(file).mode;
-    // Same-directory replacement is atomic: failed writes never truncate authored source.
-    fs.writeFileSync(temporary, source, { encoding: 'utf8', flag: 'wx', mode });
-    fs.renameSync(temporary, file);
-  } catch (error: unknown) {
-    try {
-      fs.rmSync(temporary, { force: true });
-    } catch {
-      return err({
-        code: 'filesystem',
-        message: `Could not save ${file} or remove temporary file ${temporary}: ${String(error)}`,
-      });
-    }
-    return filesystemError(error);
-  }
-  return ok(undefined);
 }

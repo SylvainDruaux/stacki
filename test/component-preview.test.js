@@ -1,8 +1,15 @@
+// Goal: drilling into a component and saving keep the real preview iframe and
+// inspector mounted, and never let a stale read replace the edited model.
+// Method: render the real App in jsdom over a bridge whose disk replies are
+// held on deferreds; saves record their payload and answer like main does.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const esbuild = require('esbuild');
+const { createHash } = require('node:crypto');
+// Disk replies carry the SHA-256 of the bytes, as main's do.
+const sha256 = (text) => createHash('sha256').update(text).digest('hex');
 const { parsePage } = require('../dist/electron/astroParser.js');
 const settle = () => new Promise((resolve) => setTimeout(resolve, 15));
 const deferred = () => {
@@ -50,7 +57,7 @@ test('component navigation keeps the real iframe and inspector mounted while loa
   const card = { name: 'Card', path: '/project/src/components/Card.astro', folder: '' };
   const pageSource = "---\nimport Card from '../components/Card.astro';\n---\n<main><Card /></main>";
   const cardSource = '<section class="card"><p>Card content</p></section>';
-  const pageRead = (source) => ({ ...parsePage(source), source });
+  const pageRead = (source) => ({ ...parsePage(source), source, checksum: sha256(source) });
   const states = new Map([
     [page.path, pageRead(pageSource)],
     [card.path, pageRead(cardSource)],
@@ -69,8 +76,14 @@ test('component navigation keeps the real iframe and inspector mounted while loa
     writePage: async ({ pagePath, model }) => {
       if (writeError) {throw writeError;}
       writes.push({ pagePath, model });
-      states.set(pagePath, { editable: true, model: structuredClone(model), source: '' });
-      return { ok: true };
+      const written = {
+        editable: true,
+        model: structuredClone(model),
+        source: '',
+        checksum: sha256(`${pagePath}#${writes.length}`),
+      };
+      states.set(pagePath, written);
+      return { ok: true, ...structuredClone(written) };
     },
     gitInfo: async () => ({ isRepo: false }),
     onCssChanged: () => () => {},

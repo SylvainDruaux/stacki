@@ -605,6 +605,8 @@ Corrected from the previous draft:
 - Property-batch rollback restores blindly, and a read-back race asserts instead of rolling
   back (§3.3).
 - The markdown round-trip tests its parser header claims do not exist (§11 step 0).
+- Found by the step-0 fixtures and fixed there: a CRLF Markdown page with a multi-line
+  frontmatter gained a CR per frontmatter line on every save.
 
 ## 14. Honest risks and open decisions
 

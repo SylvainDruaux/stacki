@@ -11,6 +11,7 @@ import type { PreloadBridge } from '../shared/preload-api';
 import { toProjectPath, toFilePath } from '../shared/brand';
 import { parseScanResult, type ScanResult } from '../shared/scan';
 import { parsePageReadResult, type ParsePageResult } from '../shared/page-node';
+import { parsePageDiskRead, type PageDiskRead } from '../shared/page-save';
 import {
   parseSymbolReadResult,
   parseResolvePathResult,
@@ -32,9 +33,9 @@ export async function scanProject(projectPath: string): Promise<ScanResult> {
   return parseScanResult(result);
 }
 
-export async function readPage(path: string): Promise<ParsePageResult & { readonly source: string }> {
+export async function readPage(path: string): Promise<PageDiskRead> {
   const result = await window.avb.readPage(toFilePath(path));
-  return parsePageReadResult(result);
+  return parsePageDiskRead(result);
 }
 
 export async function parsePageSource(

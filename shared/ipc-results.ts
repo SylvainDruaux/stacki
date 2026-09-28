@@ -14,6 +14,21 @@ export type WirePageRead =
       readonly bail: null | WireParseBail;
     };
 
+/** A page read from disk: the parse plus the SHA-256 of the exact bytes read. */
+export type WirePageDiskRead = WirePageRead & { readonly checksum: string };
+
+/** Why main refused a page write. Every variant left the page file untouched,
+ * except `write-race`, where another writer replaced it after Stacki's write. */
+export type WirePageWriteError =
+  | { readonly code: 'conflict'; readonly message: string; readonly diskChecksum: string }
+  | { readonly code: 'missing'; readonly message: string }
+  | { readonly code: 'filesystem'; readonly message: string }
+  | { readonly code: 'write-race'; readonly message: string };
+
+export type WirePageWrite =
+  | ({ readonly ok: true } & WirePageDiskRead)
+  | { readonly ok: false; readonly error: WirePageWriteError };
+
 export interface IpcResults {
   readonly 'component:properties': Result<ComponentProperties>;
   readonly 'component:editProperties': Result<ComponentProperties>;
@@ -413,12 +428,15 @@ export interface IpcResults {
     readonly newPath: string;
   };
   readonly 'page:parse': WirePageRead;
-  readonly 'page:read': WirePageRead;
+  readonly 'page:read': WirePageDiskRead;
   readonly 'page:rebaseImport': {
     readonly path: string;
   };
-  readonly 'page:write': { readonly ok: true } & WirePageRead;
-  readonly 'page:writeRaw': { readonly ok: true } & WirePageRead;
+  readonly 'page:serialize': {
+    readonly source: string;
+  };
+  readonly 'page:write': WirePageWrite;
+  readonly 'page:writeRaw': WirePageWrite;
   readonly 'pagefolder:create': {
     readonly ok: true;
   };

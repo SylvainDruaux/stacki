@@ -45,7 +45,23 @@ import { onAssetRequest, clearAssetRequest } from './assetPick.js';
 import { isDataBound } from './bindings.js';
 import { thenBranch } from './branches.js';
 import { keepsSlot } from './slotAttr.js';
-import { createFileSaver, createPageSaver, scanContainsFile } from './pagePersistence.js';
+import {
+  createFileSaver,
+  createPageSaver,
+  scanContainsFile,
+  type PageSaver,
+  type PageWriteOutcome,
+} from './pagePersistence.js';
+import {
+  saveStateAccepted,
+  saveStateClean,
+  saveStateEdited,
+  saveStateRefused,
+} from './saveState.js';
+import SaveConflictNotice from './panels/SaveConflictNotice';
+import type { PageDiskRead, PageWriteError } from '../shared/page-save';
+import type { Result } from '../shared/result';
+import type { Digest } from '../shared/brand';
 import { ancestorChain, createTreeIndex, isDescendantOf, nodeAtPath, pathOfNode } from './editorTree.js';
 import { readFrontmatter, writeFrontmatter } from '../electron/frontmatter';
 import { renameLoopVar, parseLoopHead, disconnectDependentLoops, loopVarsAt, stripLostBindings } from './loopBindings.js';
@@ -188,6 +204,7 @@ import {
   writeProjectFile,
   writeProjectPage,
   writeProjectPageRaw,
+  serializeProjectPage,
   type AppCollection,
 } from './appBridge';
 
@@ -411,6 +428,37 @@ function codeText(model: PageModel): string {
 }
 
 // How long a pending save waits, by urgency. See scheduleSave.
+// A conflict is the one refusal the saver handles itself: it stops autosave and
+// shows the notice. Every other failure rejects, surfaces as a "Save failed"
+// toast, and leaves the edit unsaved for the next attempt.
+function pageWriteOutcome(
+  state: EditorPageState,
+  written: Result<PageDiskRead, PageWriteError>,
+): PageWriteOutcome<EditorPageState> {
+  if (written.ok) {
+    // The write returns the file re-parsed (current structure and source ranges
+    // for the code panel), with node ids the parser regenerated. Re-key it onto
+    // the session ids, or every editor keyed by node id remounts after each
+    // save and drops focus mid-typing (issue #29).
+    const { checksum } = written.value;
+    const page = adoptParsedModel(state, written.value);
+    return { tag: 'written', state: toEditorPageState(page, saveStateClean(checksum)), checksum };
+  }
+  const error = written.error;
+  switch (error.code) {
+    case 'conflict':
+      return { tag: 'conflict', diskChecksum: error.diskChecksum };
+    case 'missing':
+    case 'filesystem':
+    case 'write-race':
+      throw new Error(error.message);
+    default: {
+      const exhaustive: never = error;
+      return exhaustive;
+    }
+  }
+}
+
 function saveDelay(urgency: boolean | 'live'): number {
   if (urgency === true) {
     return 0;
@@ -935,46 +983,62 @@ export default function App() {
       onError: (err) => showToast(`Save failed: ${cleanError(err)}`, 'error'),
     });
   }
-  const pageSaverRef = useRef<(() => Promise<void>) | null>(null);
+  const pageSaverRef = useRef<PageSaver | null>(null);
   if (!pageSaverRef.current) {
-    pageSaverRef.current = createPageSaver({
+    pageSaverRef.current = createPageSaver<EditorPageState>({
       readCurrent: () => pageStateRef.current,
-      write: async (pagePath, state) => {
-        if (state.editable) {
-          const written = await writeProjectPage(pagePath, state.model);
-          // The write returns the file re-parsed (current structure and source
-          // ranges for the code panel), with node ids the parser regenerated.
-          // Re-key it onto the session ids, or every editor keyed by node id
-          // remounts after each save and drops focus mid-typing (issue #29).
-          return written ? toEditorPageState(adoptParsedModel(state, written)) : undefined;
-        }
-        const written = await writeProjectPageRaw(pagePath, state.source);
-        return written ? toEditorPageState(written) : undefined;
+      write: async (pagePath, state, baseChecksum) => {
+        const written = state.editable
+          ? await writeProjectPage(pagePath, state.model, baseChecksum)
+          : await writeProjectPageRaw(pagePath, state.source, baseChecksum);
+        return pageWriteOutcome(state, written);
       },
-      markSaved: (saved, written) => {
-        if (pageStateRef.current.pageState !== saved) {
-          return;
-        }
-        if (written?.editable && saved.editable) {
+      withSave: (state, save) => ({ ...state, save }),
+      replace: (previous, next) => {
+        if (pageStateRef.current.pageState === previous && next.editable && previous.editable) {
+          // The written file arrives re-parsed; keep the selection on the node
+          // at the same tree position.
           const selected = selectedIdRef.current;
-          const trail = selected ? pathOfNode(saved.model.nodes, selected) : null;
-          const next = trail ? nodeAtPath(written.model.nodes, trail) : null;
-          if (selected === 'frontmatter') {
-            setSelectedId('frontmatter');
-          } else {
-            setSelectedId(next?.id ?? null);
+          const trail = selected ? pathOfNode(previous.model.nodes, selected) : null;
+          const target = trail ? nodeAtPath(next.model.nodes, trail) : null;
+          if (selected !== 'frontmatter' && previous.model !== next.model) {
+            setSelectedId(target?.id ?? null);
           }
         }
-        setPageState(written ? { ...written, dirty: false } : { ...saved, dirty: false });
+        setPageState((current) => (current === previous ? next : current));
+      },
+      markConflicted: (baseChecksum, diskChecksum) => {
+        setPageState((current) => {
+          if (!current || current.save.tag === 'clean') {
+            return current;
+          }
+          return { ...current, save: saveStateRefused(current.save, baseChecksum, diskChecksum) };
+        });
       },
     });
   }
   const fileSaver = fileSaverRef.current;
   const pageSaver = pageSaverRef.current;
-  const flushSave = useCallback(() => {
+  // Autosave: a conflicted page simply stays unsaved (plan §7).
+  const autosave = useCallback(
+    () => Promise.all([pageSaver.flush(), fileSaver.flush()]),
+    [fileSaver, pageSaver],
+  );
+  // Everything else that flushes needs the edits on disk before it goes on:
+  // navigating away, committing, reading lines back off the file. A conflicted
+  // page's edits are not there, so the caller must stop rather than discard or
+  // ignore them — they are only ever given up by "Reload from disk".
+  const flushSave = useCallback(async () => {
     clearTimeout(saveTimer.current);
-    return Promise.all([pageSaver(), fileSaver.flush()]);
-  }, [fileSaver, pageSaver]);
+    const [page] = await autosave();
+    if (page === 'conflicted') {
+      const name = pageStateRef.current.currentPage?.name ?? 'This page';
+      throw new Error(
+        `${name} has unsaved edits that conflict with a change on disk. ` +
+          'Reload it or review it in code first.',
+      );
+    }
+  }, [autosave]);
 
   // Only the most recent navigation is allowed to install its read result.
   const pageLoadRef = useRef(0);
@@ -988,10 +1052,15 @@ export default function App() {
   // reload has to survive it. Anything unsaved goes to disk first.
   const leaveProject = useCallback(
     async (next: string | null = null) => {
-      await flushSave();
+      try {
+        await flushSave();
+      } catch (err) {
+        showToast(`Couldn’t close the project: ${cleanError(err)}`, 'error');
+        return;
+      }
       await closeProject(next);
     },
-    [flushSave]
+    [flushSave, showToast]
   );
 
   useEffect(() => {
@@ -1032,7 +1101,8 @@ export default function App() {
       const beforeRead = pageStateRef.current;
       let result: EditorPageState;
       try {
-        result = toEditorPageState(await readPage(entry.path));
+        const read = await readPage(entry.path);
+        result = toEditorPageState(read, saveStateClean(read.checksum));
       } catch (err) {
         if (request === pageLoadRef.current) {showToast(`Couldn’t open ${entry.name}: ${cleanError(err)}`, 'error');}
         return;
@@ -1092,7 +1162,14 @@ export default function App() {
   const selectRoute = useCallback(
     async (entry: WireInjectedRoute) => {
       const request = ++pageLoadRef.current;
-      await flushSave();
+      try {
+        await flushSave();
+      } catch (err) {
+        if (request === pageLoadRef.current) {
+          showToast(`Save failed: ${cleanError(err)}`, 'error');
+        }
+        return;
+      }
       if (request !== pageLoadRef.current) {return;}
       setEditStack([]);
       setCurrentPage({ kind: 'route', name: entry.route, route: entry.route, from: entry.from });
@@ -1100,7 +1177,7 @@ export default function App() {
       setSelectedId(null);
       setHoverNodeId(null);
     },
-    [flushSave]
+    [flushSave, showToast]
   );
 
   // Enter in the URL bar. A route names a page file, so this switches the
@@ -1148,9 +1225,10 @@ export default function App() {
     // The open file may not exist on the branch just switched to.
     const stillThere = scanContainsFile(result, open.path);
     if (stillThere) {
-      const fresh = toEditorPageState(await readPage(open.path));
+      const read = await readPage(open.path);
       if (!stillCurrent()) {return;}
-      setPageState({ ...fresh, dirty: false });
+      // Deliberate: this discards local edits, including a conflicted page's.
+      setPageState(toEditorPageState(read, saveStateClean(read.checksum)));
       setSelectedId(null);
       dropPageHistory(); // page snapshots don't apply to another page; commands stay
     } else {
@@ -1427,9 +1505,10 @@ export default function App() {
     setPageState((s) => {
       if (!s) {return s;}
       if (entry.kind === 'model') {
-        return { ...s, editable: true, model: cloneEditorModel(entry.model), dirty: true };
+        const model = cloneEditorModel(entry.model);
+        return { ...s, editable: true, model, save: saveStateEdited(s.save) };
       }
-      return { ...s, source: entry.source, dirty: true };
+      return { ...s, source: entry.source, save: saveStateEdited(s.save) };
     });
     // Clear selection if the restored model no longer has the selected node.
     if (entry.kind === 'model') {
@@ -1510,14 +1589,48 @@ export default function App() {
       clearTimeout(saveTimer.current);
       saveTimer.current = setTimeout(
         () => {
-          flushSave().catch((err) => showToast(`Save failed: ${cleanError(err)}`, 'error'));
+          autosave().catch((err) => showToast(`Save failed: ${cleanError(err)}`, 'error'));
         },
         saveDelay(immediate)
       );
     },
-    [flushSave, showToast]
+    [autosave, showToast]
   );
   scheduleSaveRef.current = scheduleSave;
+
+  // The conflict notice's actions (plan §7). Reload lives in reloadFromDisk.
+  // Review shows the unsaved version as text: an editable page's `source` is
+  // the last text written, so the model is serialized for the review first.
+  const reviewConflictInCode = useCallback(async () => {
+    const { currentPage: open, pageState: state } = pageStateRef.current;
+    if (!open?.path || state?.save.tag !== 'conflicted') {
+      return;
+    }
+    if (state.editable) {
+      let source: string;
+      try {
+        source = await serializeProjectPage(open.path, state.model);
+      } catch (err) {
+        showToast(`Couldn’t show your version: ${cleanError(err)}`, 'error');
+        return;
+      }
+      setPageState((current) =>
+        current?.editable && current.model === state.model ? { ...current, source } : current,
+      );
+    }
+    setLeftTab('code');
+  }, [showToast]);
+
+  // Deliberate: the user saw the conflict and keeps the local text, so it now
+  // saves over what is on disk (and conflicts again if the disk moves again).
+  const keepLocalVersion = useCallback(() => {
+    setPageState((current) =>
+      current?.save.tag === 'conflicted'
+        ? { ...current, save: saveStateAccepted(current.save) }
+        : current,
+    );
+    scheduleSave(true);
+  }, [scheduleSave]);
 
   const mutateModel = useCallback(
     (
@@ -1531,7 +1644,7 @@ export default function App() {
       setPageState((s) => {
         if (!s || !s.editable) {return s;}
         const model = fn(cloneEditorModel(s.model));
-        return { ...s, model, dirty: true };
+        return { ...s, model, save: saveStateEdited(s.save) };
       });
       scheduleSave(immediate);
     },
@@ -1543,7 +1656,7 @@ export default function App() {
       if (propertySave.saving.current) { return; }
       codeEditVersionRef.current += 1
       pushHistory('raw-source');
-      setPageState((s) => (s ? { ...s, source, dirty: true } : s));
+      setPageState((s) => (s ? { ...s, source, save: saveStateEdited(s.save) } : s));
       scheduleSave();
     },
     [scheduleSave, pushHistory, propertySave.saving]
@@ -1568,8 +1681,13 @@ export default function App() {
         // The parse reflects the typed source (fresh structure and offsets);
         // re-key it onto the session ids so the editors it feeds don't remount
         // per keystroke (issue #29).
+        const local = pageStateRef.current.pageState;
+        if (!local) {
+          return;
+        }
         const result = toEditorPageState(
-          adoptParsedModel(pageStateRef.current.pageState, parsed),
+          adoptParsedModel(local, parsed),
+          saveStateEdited(local.save),
         );
         pushHistory('code-source');
         if (result.editable) {
@@ -1580,7 +1698,11 @@ export default function App() {
         } else {
           setSelectedId(null);
         }
-        setPageState({ ...result, dirty: true });
+        // The save state comes from whatever is current when this lands: a
+        // conflicted page stays conflicted, and autosave stays off.
+        setPageState((current) =>
+          current ? { ...result, save: saveStateEdited(current.save) } : current,
+        );
         scheduleSave('live');
       } catch (error: unknown) {
         if (version === codeEditVersionRef.current) {
@@ -1594,6 +1716,41 @@ export default function App() {
   // ----------------------------------------------------------------
   // External file changes → refresh panels
   // ----------------------------------------------------------------
+
+  // An outside edit to a page with unsaved edits. Dropping it (the old
+  // behaviour) let the pending save overwrite it; reloading would discard the
+  // user's input. Neither is ours to decide, so it becomes a conflict and the
+  // notice asks (plan §7). A write in flight is left to main's own guard.
+  const surfaceOutsideEdit = useCallback(async (pagePath: string): Promise<void> => {
+    const saver = pageSaverRef.current;
+    const before = pageStateRef.current.pageState;
+    assert(saver !== null, 'The page saver exists before any file event');
+    if (!before || before.save.tag !== 'dirty' || saver.writing()) {
+      return;
+    }
+    const baseBefore = saver.baseFor(pagePath, before.save);
+    let diskChecksum: Digest;
+    try {
+      diskChecksum = (await readPage(pagePath)).checksum;
+    } catch {
+      return; // gone or unreadable: the next save reports it
+    }
+    const latest = pageStateRef.current;
+    if (latest.currentPage?.path !== pagePath || latest.pageState?.save.tag !== 'dirty') {
+      return;
+    }
+    // A save that started or finished during the read moved the base, and its
+    // own guard in main compares against the disk authoritatively.
+    const base = saver.baseFor(pagePath, latest.pageState.save);
+    if (saver.writing() || base !== baseBefore || diskChecksum === base) {
+      return;
+    }
+    setPageState((current) =>
+      current?.save.tag === 'dirty'
+        ? { ...current, save: saveStateRefused(current.save, base, diskChecksum) }
+        : current,
+    );
+  }, []);
 
   useEffect(() => {
     let changeVersion = 0;
@@ -1632,9 +1789,15 @@ export default function App() {
         return;
       }
 
-      // Hot-reload the current page's model unless the user has unsaved
-      // edits in flight (their pending save would win anyway).
-      if (!state || state.dirty) { pendingFiles.clear(); return; }
+      if (!state) { pendingFiles.clear(); return; }
+      // Hot-reload only a clean page. Unsaved edits are never overwritten by
+      // the disk, nor the disk by them: a dirty page surfaces a conflict, and
+      // a saving or conflicted one already has main's verdict coming or shown.
+      if (state.save.tag !== 'clean') {
+        pendingFiles.clear();
+        void surfaceOutsideEdit(page.path);
+        return;
+      }
 
       let result: EditorPageState;
       try {
@@ -1643,7 +1806,10 @@ export default function App() {
         // onto the session ids so aligned nodes keep their identity and the
         // trail remap below only has to cover genuinely changed regions
         // (issue #29).
-        result = toEditorPageState(adoptParsedModel(state, parsed));
+        result = toEditorPageState(
+          adoptParsedModel(state, parsed),
+          saveStateClean(parsed.checksum),
+        );
       } catch {
         return;
       }
@@ -1671,9 +1837,12 @@ export default function App() {
       codeEditVersionRef.current += 1
       setPageState(result);
       setSelectedId(nextSelected);
+      // Undo snapshots describe the bytes before the outside edit; replaying one
+      // would silently revert it, and the guard cannot see that (plan §11).
+      dropPageHistory();
     });
     return () => { changeVersion++; off(); };
-  }, [rescan]);
+  }, [rescan, surfaceOutsideEdit, dropPageHistory]);
 
   // ----------------------------------------------------------------
   // Model operations
@@ -2581,7 +2750,12 @@ export default function App() {
       window.avb.onMenu('copySelection', async () => {
         // The lines are read off the file on disk, and typing is saved on a
         // 300 ms debounce — land the pending edit first or they're one edit old.
-        await flushSave();
+        try {
+          await flushSave();
+        } catch (err) {
+          showToast(`Couldn’t copy the selection: ${cleanError(err)}`, 'error');
+          return;
+        }
         const projectPath = projectRef.current?.path;
         if (!projectPath) {return;}
         const copied = await copyEditorSelection(projectPath, [...selectionKeysRef.current]);
@@ -3821,7 +3995,8 @@ export default function App() {
     let dropped = false;
     void (async () => {
       try {
-        const read = toEditorPageState(await readPage(hostFile.path));
+        const disk = await readPage(hostFile.path);
+        const read = toEditorPageState(disk, saveStateClean(disk.checksum));
         if (dropped || !read.editable) {
           return;
         }
@@ -5252,6 +5427,19 @@ export default function App() {
         />
       )}
 
+      {pageState?.save.tag === 'conflicted' && currentPage?.path && (
+        <SaveConflictNotice
+          fileName={currentPage.name}
+          reviewing={leftTab === 'code'}
+          onReload={() => {
+            void reloadFromDisk();
+          }}
+          onReview={() => {
+            void reviewConflictInCode();
+          }}
+          onKeep={keepLocalVersion}
+        />
+      )}
       {busy && <BusyOverlay message={busy} />}
       {toast && <Toast toast={toast} />}
       <ConfirmHost />

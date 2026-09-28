@@ -20,7 +20,13 @@ import {
 } from '../shared/boundary';
 import { parseIpcPayload } from '../shared/ipc-payloads';
 import { parseOkResult } from '../shared/ipc';
-import { parsePageReadResult, type ParsePageResult } from '../shared/page-node';
+import type { Digest } from '../shared/brand';
+import {
+  parsePageWriteResult,
+  type PageDiskRead,
+  type PageWriteError,
+} from '../shared/page-save';
+import type { Result } from '../shared/result';
 
 export interface PageChangeEvent {
   readonly external: boolean;
@@ -109,29 +115,24 @@ export function watchProject(projectPath: string): Promise<boolean> {
 export function writeProjectPage(
   pagePath: string,
   model: unknown,
-): Promise<(ParsePageResult & { readonly source: string }) | undefined> {
-  const payload = parseIpcPayload('page:write', { pagePath, model });
-  return window.avb.writePage(payload).then(parseWrittenPage);
+  baseChecksum: Digest,
+): Promise<Result<PageDiskRead, PageWriteError>> {
+  const payload = parseIpcPayload('page:write', { pagePath, model, baseChecksum });
+  return window.avb.writePage(payload).then(parsePageWriteResult);
 }
 
 export function writeProjectPageRaw(
   pagePath: string,
   source: string,
-): Promise<(ParsePageResult & { readonly source: string }) | undefined> {
-  const payload = parseIpcPayload('page:writeRaw', { pagePath, source });
-  return window.avb.writePageRaw(payload).then(parseWrittenPage);
+  baseChecksum: Digest,
+): Promise<Result<PageDiskRead, PageWriteError>> {
+  const payload = parseIpcPayload('page:writeRaw', { pagePath, source, baseChecksum });
+  return window.avb.writePageRaw(payload).then(parsePageWriteResult);
 }
 
-function parseWrittenPage(
-  input: unknown,
-): (ParsePageResult & { readonly source: string }) | undefined {
-  parseOkResult(input);
-  if (typeof input !== 'object' || input === null || !('source' in input)) {
-    // Older development bridges only acknowledge the write. The production
-    // bridge returns the parsed file so source ranges stay current.
-    return undefined;
-  }
-  return parsePageReadResult(input);
+export function serializeProjectPage(pagePath: string, model: unknown): Promise<string> {
+  const payload = parseIpcPayload('page:serialize', { pagePath, model });
+  return window.avb.serializePage(payload).then((input) => text(record(input)['source']));
 }
 
 export function closeProject(nextProjectPath: string | null): Promise<void> {

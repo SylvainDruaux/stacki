@@ -8,6 +8,8 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const esbuild = require('esbuild');
+const { createHash } = require('node:crypto');
+const sha256 = (text) => createHash('sha256').update(text).digest('hex');
 const { JSDOM } = require('jsdom');
 const { parsePage, serializePage } = require('../dist/electron/astroParser.js');
 
@@ -327,14 +329,20 @@ function createBridge() {
     hasNodeModules: async () => true,
     startDevServer: async () => ({ url: 'http://localhost:4321' }),
     listProjectClasses: async () => [],
-    readPage: async () => ({ ...parsePage(source, { locs: true }), source }),
+    // Disk replies carry the SHA-256 of the bytes, as main's do.
+    readPage: async () => ({
+      ...parsePage(source, { locs: true }),
+      source,
+      checksum: sha256(source),
+    }),
     parsePageSource: async ({ source: next }) => ({
       ...parsePage(next, { locs: true }),
       source: next,
     }),
     writePage: async ({ model }) => {
       const next = serializePage(model);
-      return { ok: true, ...parsePage(next, { locs: true }), source: next };
+      const parsed = parsePage(next, { locs: true });
+      return { ok: true, ...parsed, source: next, checksum: sha256(next) };
     },
     gitInfo: async () => ({ isRepo: false }),
     onCssChanged: () => () => {},

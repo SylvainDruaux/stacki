@@ -16,16 +16,22 @@ export const MAIN_LIMITS = {
 } as const;
 
 export function readSource(file: string): string {
+  return readSourceBytes(file).toString('utf8');
+}
+
+/** The exact bytes of a source file, bounded before and after the read. A
+ * checksum must be taken over these bytes, never over decoded text. */
+export function readSourceBytes(file: string): Buffer {
   const size = fs.statSync(file).size;
   if (size > MAIN_LIMITS.sourceBytesMax) {
     throw new Error('Source file exceeds 10 MB limit');
   }
-  const text = fs.readFileSync(file, 'utf8');
+  const bytes = fs.readFileSync(file);
   // A writer may grow the file between stat and read, so check both sides.
-  if (Buffer.byteLength(text, 'utf8') > MAIN_LIMITS.sourceBytesMax) {
+  if (bytes.length > MAIN_LIMITS.sourceBytesMax) {
     throw new Error('Source file exceeds 10 MB limit');
   }
-  return text;
+  return bytes;
 }
 
 export function directoryBudget(root: string): (directory: string, entries: number) => void {

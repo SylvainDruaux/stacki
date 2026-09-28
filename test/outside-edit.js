@@ -166,6 +166,74 @@ const settle = (ms = 20) => new Promise((r) => setTimeout(r, ms));
     'the fast path is gone'
   );
 
+  // --- an outside edit while the page has unsaved edits ---------------------------
+  // The pending save used to win: the watcher dropped the change while the page
+  // was dirty, and page:write overwrote the file without looking. Now the save
+  // names the bytes it was authored against, and main refuses when they are
+  // gone (plan §11 step 0). The real handlers run in the windowless harness.
+  {
+    const os = require('os');
+    const { createHash } = require('crypto');
+    const { mainHarness } = await import('./contracts/main-harness.ts');
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'stacki-outside-edit-'));
+    fs.mkdirSync(path.join(root, 'src', 'pages'), { recursive: true });
+    fs.mkdirSync(path.join(root, 'user'));
+    const harness = mainHarness(path.join(root, 'user'));
+    try {
+      const file = path.join(root, 'src', 'pages', 'index.astro');
+      fs.writeFileSync(file, '<main>\n  <h1>Opened</h1>\n</main>\n');
+      const read = await harness.invoke('page:read', file);
+      // The user edits in the app; the page is dirty and its save is pending.
+      const edited = structuredClone(read.model);
+      edited.nodes[0].children[0].children[0].value = 'Typed in the app';
+      // Meanwhile an editor saves the same file.
+      const outside = '<main>\n  <h1>Saved in an editor</h1>\n</main>\n';
+      fs.writeFileSync(file, outside);
+      const saved = await harness.invoke('page:write', {
+        pagePath: file,
+        model: edited,
+        baseChecksum: read.checksum,
+      });
+      check(
+        'the pending save is refused as a conflict',
+        saved.ok === false && saved.error.code === 'conflict',
+        JSON.stringify(saved),
+      );
+      check(
+        'naming the bytes now on disk',
+        saved.error?.diskChecksum === createHash('sha256').update(outside).digest('hex'),
+        saved.error?.diskChecksum,
+      );
+      check(
+        'and the outside edit is still on disk, byte for byte',
+        fs.readFileSync(file, 'utf8') === outside,
+      );
+      check(
+        'with no temporary file left beside it',
+        !fs.readdirSync(path.dirname(file)).some((name) => name.startsWith('.stacki-write-')),
+      );
+      // Saving over it is still possible, but only as a deliberate act against
+      // the checksum the user was shown.
+      const kept = await harness.invoke('page:write', {
+        pagePath: file,
+        model: edited,
+        baseChecksum: saved.error.diskChecksum,
+      });
+      check(
+        'keeping the local version writes against the disk checksum',
+        kept.ok === true,
+        JSON.stringify(kept.error),
+      );
+      check(
+        'and puts the local edit on disk',
+        fs.readFileSync(file, 'utf8').includes('Typed in the app'),
+      );
+    } finally {
+      harness.dispose();
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  }
+
   if (failures.length) {
     console.error(`\noutside-edit: ${failures.length} failed, ${checked - failures.length} passed\n`);
     console.error(failures.join('\n') + '\n');

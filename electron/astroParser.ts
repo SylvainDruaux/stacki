@@ -1170,10 +1170,14 @@ function parsePage(source: string, opts: { readonly locs?: boolean } = {}): Pars
   // Try the empty block first.
   // Otherwise `---\n---\n--- prose` consumes the real close as code and
   // mistakes the start of the prose for a second closing fence.
-  const fm = source.match(/^---\r?\n(?:---|([\s\S]*?\r?\n)---)\r?\n?/);
+  // A leading byte-order mark is an encoding signal, not content (plan §3.2):
+  // the fences are matched past it, and offsets still count it so they index
+  // the file as read. The page writer puts it back (see page:write in main).
+  const bom = source.startsWith('\uFEFF') ? 1 : 0;
+  const fm = source.slice(bom).match(/^---\r?\n(?:---|([\s\S]*?\r?\n)---)\r?\n?/);
   const frontmatter = fm ? fm[1] || '' : '';
   const hadFrontmatter = !!fm;
-  const bodyStart = fm ? fm[0].length : 0;
+  const bodyStart = bom + (fm ? fm[0].length : 0);
   const body = source.slice(bodyStart);
   const eol = source.includes('\r\n') ? '\r\n' : '\n';
 

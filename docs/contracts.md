@@ -50,10 +50,35 @@ Expected operating failures use `Result` or an explicit result union. A shape
 that violates the declared wire contract is a programmer error and throws at
 the boundary. Do not catch that assertion and turn it into an operating result.
 
+## Page saves
+
+`shared/page-save.ts` is the save contract (plan §11 step 0). `page:read`,
+`page:write` and `page:writeRaw` results carry `checksum`: the SHA-256 of the
+exact bytes read or written, as 64 lowercase hex characters (`Digest` in
+`shared/brand.ts`, built only by `toDigest`). Both write payloads carry
+`baseChecksum`, the checksum the edit was authored against. Main re-reads the
+file first and, if it no longer holds those bytes, returns
+`{ ok: false, error: { code: 'conflict', diskChecksum } }` without writing. A
+deleted file is `missing`, never a conflict; `filesystem` and `write-race`
+cover the rest. The renderer's `SaveState` union (`src/saveState.ts`) turns a
+conflict into `conflicted`: autosave stops, the edits stay, and only "Reload
+from disk" or a reviewed "Save this version" leaves that state.
+
+Every page, chunk, style re-write and component-property write goes through
+`electron/atomicWrite.ts`: a same-directory temporary file (`wx`, the target's
+mode, fsync), one rename, then a read-back that reports another writer as
+`write-race`. Encoding: files are UTF-8; page reads decode strictly (invalid
+UTF-8 is an error, never a lossy replacement); line endings round-trip
+untouched; a leading byte-order mark is read past by the parsers and restored
+by the model writers.
+`page:serialize` returns the text a model write would produce, for reviewing
+unsaved edits in code. `test/fixtures/round-trip/` holds the byte-exact
+Astro, Markdown and MDX fixtures (CRLF, BOM) the save path must reproduce.
+
 ## Other shared contracts
 
-- `brand.ts` constructs `NodeId`, `FilePath`, and `ProjectPath` after validating
-  the primitive value.
+- `brand.ts` constructs `NodeId`, `FilePath`, `ProjectPath`, and `Digest` after
+  validating the primitive value.
 - `scan.ts` validates project pages, layouts, components, schemas, and scan
   collection limits.
 - `prop-schema.ts` validates component field schemas and their nested options.

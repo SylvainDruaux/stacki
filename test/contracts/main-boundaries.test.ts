@@ -7,6 +7,7 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import * as net from 'node:net';
+import { createHash } from 'node:crypto';
 import { mainHarness } from './main-harness.ts';
 import { IPC_PAYLOADS } from '../../dist/shared/ipc-payloads.js';
 import { toRecord } from '../../dist/shared/record.js';
@@ -47,7 +48,7 @@ test('the complete channel inventory matches real main and terminal registration
   const terminalChannels = [...terminal.matchAll(/ipcMain\.handle\(['"]([^'"]+)['"]/g)].map(
     (match) => match[1],
   );
-  assert.equal(harness.handlers.size, 114);
+  assert.equal(harness.handlers.size, 115);
   assert.equal(terminalChannels.length, 4);
   assert.deepEqual(
     [...Object.keys(IPC_PAYLOADS)].sort(),
@@ -69,10 +70,21 @@ test('malformed writes fail before altering disk; valid writes still work', asyn
     }),
     /Expected string/,
   );
-  await assert.rejects(harness.invoke('page:write', { pagePath: file, model: { nodes: false } }));
+  const baseChecksum = createHash('sha256').update('<h1>Before</h1>\n').digest('hex');
+  await assert.rejects(
+    harness.invoke('page:write', { pagePath: file, model: { nodes: false }, baseChecksum }),
+  );
+  await assert.rejects(
+    harness.invoke('page:writeRaw', { pagePath: file, source: 'x', baseChecksum: 'nope' }),
+    /Digest: expected 64 lowercase hex characters/,
+  );
   assert.equal(fs.readFileSync(file, 'utf8'), '<h1>Before</h1>\n');
   const written = toRecord(
-    await harness.invoke('page:writeRaw', { pagePath: file, source: '<h1>After</h1>\n' }),
+    await harness.invoke('page:writeRaw', {
+      pagePath: file,
+      source: '<h1>After</h1>\n',
+      baseChecksum,
+    }),
   );
   assert.equal(fs.readFileSync(file, 'utf8'), '<h1>After</h1>\n');
   assert.equal(written?.['source'], '<h1>After</h1>\n');

@@ -15,12 +15,13 @@ lands it.
   against the code that day: new step 0 (overwrite guard), corrected facts
   in plan §13. Since `d515fcc`, commit `3686761` added `src/modelAdoption.ts`
   (positional id adoption across reparse — UI keying only, see plan §4).
-- **No editor-core step has started.** The repo still runs the legacy write
-  path: renderer `mutateModel` → `page:write` payload → `serializePage` →
-  direct `fs.writeFileSync` with no disk comparison (a dirty page's pending
-  save overwrites external edits: `src/App.tsx:1636`); watcher echo via
-  `selfWrites`; renderer rescan chain; saver acks by `WeakMap` object
-  identity.
+- **Step 0 landed (2026-09-28); steps 1–10 have not started.** The legacy
+  write path still serializes whole files (`mutateModel` → `page:write` →
+  `serializePage`), but every page write now names the checksum it was
+  authored against and main refuses a stale one with `conflict`; all page,
+  chunk, style and property writes go through `electron/atomicWrite.ts`.
+  Still legacy: watcher echo via `selfWrites`, the renderer rescan chain,
+  saver acks by `WeakMap` object identity.
 - **A partial precedent landed in the window (v0.1.29).**
   `electron/componentProperties.ts` validates a whole-file expected-source
   (`source.value !== request.source` → typed `conflict` rejection), then
@@ -46,7 +47,7 @@ lands it.
 Gates are per the plan's implementation sequence (§11). Ratchet counters
 (adapter surface) go down only; nothing grows a cap or retries forever.
 
-### Step 0 — Overwrite guard on the legacy path ⬜
+### Step 0 — Overwrite guard on the legacy path ✅
 
 **Deliverables.** SHA-256 `checksum` on `page:read` / `page:write` /
 `page:writeRaw` results and `baseChecksum` on the write payloads; main
@@ -71,6 +72,51 @@ reload leaves no snapshot to undo into; externally changed batch file is
 reported, not restored; markdown round-trips byte-exact; manual in-app
 check recorded. Step 0 is also the
 fallback if step 4 fails.
+
+**Landed 2026-09-28** on `refactor/architecture-consolidation` (commit in the
+verification record). Gate `env -u ELECTRON_RUN_AS_NODE npm test`: 153/153
+test commands, 336.1 s, exit 0. Where each deliverable lives:
+
+- Contract: `Digest` (`shared/brand.ts`), `digest` parser (`shared/boundary.ts`),
+  `shared/page-save.ts` (`parsePageDiskRead`, `parsePageWriteResult`;
+  `conflict` | `missing` | `filesystem` | `write-race`), payloads and results
+  in `shared/ipc-payloads.ts` / `shared/ipc-results.ts`. Tests:
+  `test/contracts/page-save.test.ts` (10 tests).
+- Main: `checkPageBase` guard and BOM restore in `electron/main.ts`
+  (`page:read` / `page:write` / `page:writeRaw`); `electron/atomicWrite.ts`
+  (`wx` temp in the same directory, `fchmod` to the target's mode, fsync,
+  rename, read-back → `write-race`, symlinks written through, strict UTF-8
+  snapshot reads). Page, chunk, style re-write (now compares checksums) and
+  property writes all use it. Tests: `test/atomic-write.test.js` (8 tests).
+- Renderer: `src/saveState.ts` (`SaveState` union, pure transitions),
+  `src/pagePersistence.ts` (saver names each write's base; a lineage step
+  keeps it from conflicting with its own writes; `conflicted` stops autosave;
+  explicit flushes — navigation, git, copy, close — fail loudly instead of
+  discarding the edits), `src/panels/SaveConflictNotice.tsx`, watcher
+  dirty-page branch surfaces the conflict, hot reload calls
+  `dropPageHistory`. Tests: `test/save-state.test.js` (8, every transition
+  and refused transition pinned), `test/renderer-core.test.js` saver cases,
+  `test/page-navigation.test.js` App-level conflict flow.
+- Property batch: checked rollback (restores only files still holding the
+  batch's bytes, names the rest) and `write-race` instead of the read-back
+  `assert` (`electron/componentProperties.ts`). Tests: two new cases in
+  `test/component-properties.test.js`.
+- BOM, Markdown, MDX: parsers read past a leading BOM; model writes restore
+  it. `test/fixtures/round-trip/` (4 `.md`, 3 `.mdx`, 2 `.astro`: CRLF, BOM,
+  lists, fences, setext, JSX blocks) round-trips byte for byte through
+  `page:read` → `page:write`. The fixtures found a live bug, now fixed: a
+  CRLF Markdown page with a multi-line frontmatter gained a CR per
+  frontmatter line on every save (`serializeMarkdownPage` split on LF only).
+- `test/outside-edit.js` gains the external-edit-while-dirty case (6 checks).
+
+Deviations, with reasons: a new channel `page:serialize` (main handlers
+114 → 115) — "Review in code" must show the unsaved local text, and an
+editable page's `source` is the last text written, not the model; the
+notice's accept action is "Save this version", shown once the code panel is
+open (the plan's "accepts a merged text"). Left for later steps, by design:
+chunk files are written atomically but not checksum-guarded (their own
+actors, step 5); "Review in code" shows the local text only, not the disk
+text beside it; there is still no flush on app quit (pre-existing).
 
 ### Step 1 — Contracts and simulator skeleton ⬜
 
@@ -367,6 +413,21 @@ update on every step):
     left open: `scripts/afterPack.ts:6-7` imports both packages without
     declaring them, relying on npm hoisting; if it recurs, declare them as
     exact devDependencies pinned to the `electron-builder` versions.
+- 2026-09-28, step 0 (PROMPT-0A), on top of `1172b31`:
+  - `env -u ELECTRON_RUN_AS_NODE npm test` — **pass, 153/153 test commands in
+    336.1 s, exit 0** (static gates: tsc, eslint 0 errors, ratchet 0).
+  - `npm run test:contracts` includes `page-save.test.ts` (10/10) and the
+    channel inventory at 115 main handlers.
+  - In-app check on the real Electron app (WSLg display), driven over the
+    Chrome DevTools protocol from a throwaway script rather than by hand:
+    scratch project open on `index.astro`, code panel focused, text typed in
+    the app and the same file written by an outside process in the same tick.
+    Result: the notice "index.astro changed on disk while you were editing"
+    appeared; the file kept the outside bytes (sha256 unchanged after more
+    typing, local text never written); "Reload from disk" showed the outside
+    version and cleared the notice; the next edit saved normally; no
+    `.stacki-write-*` file remained. Screenshot evidence was inspected, not
+    committed.
 
 ## How to work this tracker
 

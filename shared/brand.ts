@@ -18,6 +18,12 @@ export type FilePath = Brand<string, 'FilePath'>;
  * scan request can never be pointed at a stray file path. */
 export type ProjectPath = Brand<string, 'ProjectPath'>;
 
+/** SHA-256 of a file's exact bytes as 64 lowercase hex characters: the token that
+ * names which version of a file a read returned or an edit was authored against
+ * (plan §3.1). Built only by toDigest — the wire parser and the main-process hash
+ * function both go through it, so an unchecked string can never pose as one. */
+export type Digest = Brand<string, 'Digest'>;
+
 const NODE_ID_RE = /^(?:[nmc]\d+|layout|chunk\d+)$/;
 
 export function toNodeId(value: string): NodeId {
@@ -27,6 +33,15 @@ export function toNodeId(value: string): NodeId {
     );
   }
   return value as NodeId;
+}
+
+const DIGEST_RE = /^[0-9a-f]{64}$/;
+
+export function toDigest(value: string): Digest {
+  if (!DIGEST_RE.test(value)) {
+    throw new Error('Digest: expected 64 lowercase hex characters');
+  }
+  return value as Digest;
 }
 
 export function toFilePath(value: string): FilePath {

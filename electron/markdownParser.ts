@@ -643,10 +643,13 @@ function parseMarkdownPage(source: string, { mdx = false }: { readonly mdx?: boo
   readonly editable: true;
   readonly model: MarkdownModel;
 } {
-  const { frontmatter, body } = splitFrontmatter(source);
+  // A leading byte-order mark is not content (plan §3.2); the page writer in
+  // main restores it, so the model never carries it.
+  const text = source.startsWith('\uFEFF') ? source.slice(1) : source;
+  const { frontmatter, body } = splitFrontmatter(text);
   const imports: { name: string; path: string }[] = [];
   const esm: string[] = [];
-  const eol = source.includes('\r\n') ? '\r\n' : '\n';
+  const eol = text.includes('\r\n') ? '\r\n' : '\n';
   const lines = body.split(/\r?\n/);
   // A trailing newline shows up as one empty final element; it is the file's
   // line ending, not a blank line, so it is dropped here and added back on
@@ -680,7 +683,9 @@ function serializeMarkdownPage(model: MarkdownModel): string {
   if (model.mdHasFrontmatter || fm.trim()) {
     out.push('---');
     if (fm !== '') {
-      out.push(...fm.split('\n'));
+      // The block keeps the file's own line breaks; splitting on LF alone left
+      // each CR in place, so a CRLF page gained a CR per line (CR CR LF).
+      out.push(...fm.split(/\r?\n/));
     }
     out.push('---');
   }
