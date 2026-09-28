@@ -1,0 +1,165 @@
+// Goal: the projection and snapshot contracts (plan §3.1, §3.6, §6). A page
+// projects to byte spans with structural paths and a capability per node and
+// attribute; invalid source is the `parse-error` variant, not an exception; a
+// snapshot's checksum is computed from its own bytes and its projection must
+// describe bytes of that length. Capabilities are a closed, exhaustive set.
+// Method: project small pages written to hit each capability rule, then build
+// snapshots with the real SHA-256 and break each precondition once.
+import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
+import { test } from 'node:test';
+import { parsePage } from '../../dist/electron/astroParser.js';
+import { toDigest, toFilePath } from '../../dist/shared/brand.js';
+import {
+  CAPABILITIES,
+  capabilityAcceptsVisualIntent,
+  describeCapability,
+  parseCapability,
+} from '../../dist/shared/capability.js';
+import { parsePageResult } from '../../dist/shared/page-node.js';
+import { createSnapshot } from '../../dist/shared/snapshot.js';
+import {
+  projectionAcceptsVisualIntents,
+  projectOpaqueDocument,
+  projectPage,
+  type ProjectedNode,
+} from '../../dist/shared/source-projection.js';
+import { encodeUtf8, type ByteString } from '../../dist/shared/span.js';
+
+const project = (text: string) => projectPage(text, parsePageResult(parsePage(text, { locs: true })));
+const sha256 = (bytes: ByteString) => toDigest(createHash('sha256').update(bytes).digest('hex'));
+
+function valid(text: string): readonly ProjectedNode[] {
+  const projection = project(text);
+  assert.equal(projection.tag, 'valid');
+  return projection.tag === 'valid' ? projection.nodes : [];
+}
+
+test('capabilities are a closed set with a visual-edit answer and notice for each', () => {
+  assert.deepEqual(CAPABILITIES, [
+    'editable',
+    'read-only-opaque',
+    'repeated-source-node',
+    'runtime-aggregate',
+    'unsupported',
+  ]);
+  assert.deepEqual(CAPABILITIES.filter(capabilityAcceptsVisualIntent), ['editable']);
+  assert.equal(new Set(CAPABILITIES.map(describeCapability)).size, CAPABILITIES.length);
+  assert.equal(parseCapability('editable'), 'editable');
+  assert.throws(() => parseCapability('writable'), /unknown value/);
+});
+
+test('each node is classified by plan §6: loops repeat, code is opaque, the rest is editable', () => {
+  const nodes = valid(
+    [
+      '---',
+      'const items = [1];',
+      '---',
+      '<main class="page" {...rest}>',
+      '  <p set:html={html}></p>',
+      '  {items.map((item) => (<li>{item}</li>))}',
+      '  {value}',
+      '  <!-- note -->',
+      '</main>',
+      '<script>let a = 1;</script>',
+    ].join('\n'),
+  );
+  const byPath = new Map(nodes.map((node) => [node.path.join('/'), node]));
+  assert.equal(byPath.get('0')?.capability, 'editable');
+  assert.deepEqual(
+    byPath.get('0')?.attributes.map((attribute) => [attribute.name, attribute.capability]),
+    [
+      ['class', 'editable'],
+      ['...rest', 'read-only-opaque'],
+    ],
+  );
+  assert.equal(byPath.get('0/0')?.capability, 'read-only-opaque', 'set:html writes children at runtime');
+  assert.equal(byPath.get('0/1')?.kind, 'map');
+  assert.equal(byPath.get('0/1')?.capability, 'editable', 'the loop itself is the source node');
+  assert.equal(byPath.get('0/1/0')?.capability, 'repeated-source-node');
+  assert.equal(byPath.get('0/1/0/0')?.capability, 'repeated-source-node');
+  assert.equal(byPath.get('0/2')?.capability, 'read-only-opaque');
+  assert.equal(byPath.get('0/3')?.capability, 'editable');
+  assert.equal(byPath.get('1')?.capability, 'read-only-opaque');
+});
+
+test('spans are bytes: paths are preorder, and attribute parts are exact', () => {
+  const text = '---\nconst a = "é";\n---\n<p title="Zoë 🎉" hidden>x</p>\n';
+  const projection = project(text);
+  assert.equal(projection.tag, 'valid');
+  if (projection.tag !== 'valid') {
+    return;
+  }
+  const bytes = Buffer.from(text, 'utf8');
+  assert.equal(projection.byteLength, bytes.length);
+  assert.deepEqual(projection.frontmatter, { start: 0, end: 24 });
+  assert.equal(bytes.subarray(0, 24).toString(), '---\nconst a = "é";\n---\n');
+  const [paragraph, child] = projection.nodes;
+  assert.deepEqual(paragraph?.path, [0]);
+  assert.deepEqual(child?.path, [0, 0]);
+  const [title, hidden] = paragraph?.attributes ?? [];
+  const slice = (span: { start: number; end: number } | undefined) =>
+    span === undefined ? undefined : bytes.subarray(span.start, span.end).toString();
+  assert.equal(slice(title?.valueSpan), 'Zoë 🎉');
+  assert.equal(slice(title?.nameSpan), 'title');
+  assert.equal(slice(hidden?.span), 'hidden');
+  assert.equal(hidden?.valueSpan, undefined, 'a bare attribute has no value span');
+});
+
+test('a byte-order mark is inside the frontmatter span; its absence means no frontmatter', () => {
+  const projection = project('﻿---\r\nconst a = 1;\r\n---\r\n<p>x</p>\r\n');
+  assert.equal(projection.tag, 'valid');
+  if (projection.tag === 'valid') {
+    assert.deepEqual(projection.frontmatter, { start: 3, end: 27 });
+  }
+  const bare = project('<p>x</p>\n');
+  assert.equal(bare.tag === 'valid' ? bare.frontmatter : 'missing', undefined);
+});
+
+test('invalid source is a parse-error projection that visual intents cannot target', () => {
+  const projection = project('<div>\n  <span>unclosed\n</div>\n');
+  assert.equal(projection.tag, 'parse-error');
+  assert.equal(projectionAcceptsVisualIntents(projection), false);
+  if (projection.tag === 'parse-error') {
+    assert.equal(projection.diagnostics.length, 1);
+    assert.match(projection.diagnostics[0]?.message ?? '', /unclosed <span>/);
+  }
+  assert.equal(projectionAcceptsVisualIntents(project('<p>x</p>')), true);
+});
+
+test('only .astro pages are projected; a stylesheet is an opaque document', () => {
+  const markdown = { editable: true as const, model: { ...fakeModel(), format: 'md' as const } };
+  assert.throws(() => projectPage('# Hi\n', markdown), /Only \.astro pages/);
+  const unlocated = parsePageResult(parsePage('<p>x</p>'));
+  assert.throws(() => projectPage('<p>x</p>', unlocated), /recorded source offsets/);
+  const css = projectOpaqueDocument('.card { color: red; }\n');
+  assert.deepEqual(css, { tag: 'valid', byteLength: 22, frontmatter: undefined, nodes: [] });
+});
+
+test('a snapshot computes its checksum from its bytes and matches its projection', () => {
+  const text = '<p title="é">x</p>\n';
+  const bytes = encodeUtf8(text);
+  const path = toFilePath('/site/src/pages/index.astro');
+  const snapshot = createSnapshot({ path, bytes, projection: project(text) }, sha256);
+  assert.equal(snapshot.checksum, createHash('sha256').update(text, 'utf8').digest('hex'));
+  assert.equal(snapshot.bytes, bytes);
+  assert.deepEqual(Object.keys(snapshot).sort(), ['bytes', 'checksum', 'path', 'projection'], 'no version field');
+  assert.throws(
+    () => createSnapshot({ path, bytes: encodeUtf8(`${text} `), projection: project(text) }, sha256),
+    /derived from bytes of this length/,
+  );
+});
+
+function fakeModel() {
+  return {
+    imports: [],
+    frontmatterLead: '',
+    extraFrontmatter: '',
+    extraFrontmatterSpaced: false,
+    frontmatterLayout: { extra: '', slots: [] },
+    hadFrontmatter: false,
+    trailingBlank: 0,
+    nodes: [],
+    bodyStart: 0,
+  };
+}

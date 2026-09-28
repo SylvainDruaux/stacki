@@ -75,10 +75,72 @@ by the model writers.
 unsaved edits in code. `test/fixtures/round-trip/` holds the byte-exact
 Astro, Markdown and MDX fixtures (CRLF, BOM) the save path must reproduce.
 
+## Editor core (plan step 1)
+
+The contract layer of `docs/stacki-editor-core-plan.md`. Nothing in the app
+submits intents yet; these types and parsers are what steps 2–10 build on.
+
+- `span.ts` — `ByteSpan` and `Utf16Span` over the branded `ByteOffset` and
+  `Utf16Offset` (`brand.ts`); mixing them is a compile error. The only
+  conversion is `utf16ToByteOffsets` (one linear pass; an offset inside a
+  surrogate pair asserts). `ByteString` is a private copy of a file's bytes;
+  `decodeUtf8` is strict and returns `invalid-utf8` instead of replacing.
+- `ref.ts` — `AnchorRef`: a byte span, a structural path of `ChildIndex`es, and
+  the expected kind (a page-tree kind, `frontmatter`, or `document`). Node
+  anchors have a path; the other two do not; a document anchor starts at 0.
+- `intent.ts` — `Intent` (id, file, `authoredChecksum`, anchor, operation), the
+  closed `Operation` union (including the migration-only `replace-source`),
+  `SubmissionResult` (`accepted` | `backpressured`), the terminal `Outcome`
+  (`applied` | `rejected` | `uncertain`) and the nine `REJECTION_REASONS`, each
+  with notice text. `parseIntent` checks every anchor/operation pairing,
+  multi-span sites (inside the anchor, ascending, disjoint, at most
+  `splicesPerIntentMax`) and the summed UTF-8 payload.
+- `capability.ts` — `editable` | `read-only-opaque` | `repeated-source-node` |
+  `runtime-aggregate` | `unsupported`; only `editable` accepts visual intents.
+- `source-projection.ts` — the `Projection` sum (`valid` with byte-addressed
+  nodes, paths, attribute spans and capabilities; or `parse-error` with bounded
+  diagnostics). Named so nothing in it can be confused with the `page-node.ts`
+  wire model. `.astro` only until step 10; stylesheets project as opaque
+  documents.
+- `snapshot.ts` — `createSnapshot` computes the checksum from the bytes through
+  an injected hash (the renderer has no `node:crypto`) and asserts the
+  projection measured the same bytes. There is no version field.
+
+The parser (`parsePage(text, { locs: true })`) reports `start`/`end` on every
+node — branches and inline-run gap spaces included — and `attrSpans` on every
+tag: the whole attribute, its name and its value, in UTF-16 offsets.
+`parsePageNode` validates them against the node's range and its props record.
+The span-integrity suite (`test/contracts/span-integrity.test.ts`) slices every
+node and attribute of every corpus, round-trip, editor-core and large fixture
+and requires the reported text back, in UTF-16 and in bytes.
+
+Every bound lives in `limits.ts`, including `sourceBytesMax` (merged up from
+`electron/main.bounds.ts`) and the engine bounds of plan §8.
+
+Fixtures: `test/fixtures/editor-core/` is the hostile corpus (loop rename,
+kind-changing move, page + stylesheet, frontmatter slot, identical siblings,
+BOM/CRLF/astral text, conditionals, a malformed page), each with a
+hand-written `*.expected.*` output; `test/simulator/oracles.ts` holds the
+hand-derived splices. `test/fixtures/large/manifest.json` pins the generated
+large fixtures (`npm run fixtures:large` writes the files).
+
+The simulator (`test/simulator/`, `npm run test:simulator`) drives the real
+parser, a reference planner and a step-wise actor over a fake disk with a
+seeded PRNG, and checks the nine invariants after every event.
+`STACKI_SIMULATOR_SEEDS=<n>` raises the seed count for a long run.
+
+Lint fences (`eslint.config.mjs`): `serializePage`, `serializeNodes` and
+`serializeMarkdownPage` may be imported or called only inside the legacy writer
+boundary (`electron/astroParser.ts`, `main.ts`, `markdownParser.ts`,
+`componentFile.ts`) and tests. The simulator core and the engine contract
+modules may not use timers, clocks, promises, `Math.random`, `process` or I/O
+modules. `scripts/adapter-surface.ts` runs in the gate as a ratchet on the
+legacy tree-mutation surface (method in its header).
+
 ## Other shared contracts
 
-- `brand.ts` constructs `NodeId`, `FilePath`, `ProjectPath`, and `Digest` after
-  validating the primitive value.
+- `brand.ts` constructs `NodeId`, `FilePath`, `ProjectPath`, `Digest`,
+  `ByteOffset`, `Utf16Offset`, and `IntentId` after validating the primitive value.
 - `scan.ts` validates project pages, layouts, components, schemas, and scan
   collection limits.
 - `prop-schema.ts` validates component field schemas and their nested options.
@@ -94,9 +156,10 @@ renderer, runs strict `tsc --noEmit`, ESLint, the migration ratchet, and every
 `test:*` command. Generated JavaScript belongs only in `dist/`; source folders
 must contain TypeScript and source assets.
 
-The builds run in order; `tsc --noEmit`, ESLint and the ratchet then run side
-by side, and the test commands run in a bounded pool (`scripts/test-pool.ts`,
-default one fewer than the CPUs, `npm test -- --jobs=<n>` to change it,
+The builds run in order; `tsc --noEmit`, ESLint and the two ratchets
+(`ratchet-check`, `adapter-surface`) then run side by side, and the test
+commands run in a bounded pool (`scripts/test-pool.ts`, default one fewer than
+the CPUs, `npm test -- --jobs=<n>` to change it,
 `--jobs=1` for a serial run). A passing command prints one line; a failing one
 prints its full output. `test:contracts` runs first and alone because it
 rebuilds `dist/shared`, which the others read. `test:hovercost`,

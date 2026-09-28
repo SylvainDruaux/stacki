@@ -4,10 +4,11 @@
 // emits and rejects everything else — the boundary is where malformed data
 // dies, and inward code never re-validates.
 
-import type { NodeId } from './brand';
-import { toNodeId } from './brand';
+import type { NodeId, Utf16Offset } from './brand';
+import { toNodeId, toUtf16Offset } from './brand';
 import { LIMITS } from './limits';
 import { parseImportSlots, type ImportSlot } from './frontmatter';
+import { parseUtf16Span, spanContains, spansAscending, type Utf16Span } from './span';
 
 export type Attr =
   | { readonly type: 'string'; readonly value: string }
@@ -116,9 +117,40 @@ export interface MarkdownNodeMetadata {
   readonly mdEsm?: boolean;
 }
 
+/** Where one attribute was written (plan §3.2), in the file's UTF-16 offsets.
+ * `span` covers the whole attribute (`name="v"`, `{...rest}`, `hidden`); the
+ * name span slices to the name and the value span to the value exactly as the
+ * props record reports it — inside the quotes, or the trimmed expression inside
+ * the braces. Each field exists only on the variants that have it. */
+export type AttrSpan =
+  | {
+      readonly type: 'string' | 'expr';
+      readonly name: string;
+      readonly span: Utf16Span;
+      readonly nameSpan: Utf16Span;
+      readonly valueSpan: Utf16Span;
+    }
+  | {
+      readonly type: 'bare';
+      readonly name: string;
+      readonly span: Utf16Span;
+      readonly nameSpan: Utf16Span;
+    }
+  | {
+      readonly type: 'spread';
+      readonly name: string;
+      readonly span: Utf16Span;
+      readonly valueSpan: Utf16Span;
+    };
+
+/** Source offsets, present only on a parse that asked for them (`locs`): they
+ * describe the file as read and go stale the moment the model is edited. */
 export interface SourceNodeMetadata {
-  readonly start?: number;
-  readonly end?: number;
+  readonly start?: Utf16Offset;
+  readonly end?: Utf16Offset;
+  /** Every attribute occurrence in source order — a duplicated name appears
+   * twice here and once in props, where the last occurrence wins. */
+  readonly attrSpans?: readonly AttrSpan[];
 }
 
 export type PageNode = (
@@ -234,14 +266,16 @@ function parseProps(input: unknown, where: string): Readonly<Record<string, Attr
   if (names.length > LIMITS.attrsPerNodeMax) {
     fail(where, `exceeds ${LIMITS.attrsPerNodeMax} attrs`);
   }
-  const out: Record<string, Attr> = {};
-  for (const name of names) {
+  const entries = names.map((name): [string, Attr] => {
     if (name.length > LIMITS.attrCharsMax) {
       fail(where, `attr name ${JSON.stringify(name)} exceeds ${LIMITS.attrCharsMax} chars`);
     }
-    out[name] = parseAttr(record[name], `${where}.${name}`);
-  }
-  return out;
+    return [name, parseAttr(record[name], `${where}.${name}`)];
+  });
+  // Object.fromEntries defines `__proto__` as an ordinary attribute; assigning
+  // it would invoke the inherited setter and silently drop it (the parser's
+  // parseAttrs keeps it the same way).
+  return Object.fromEntries(entries);
 }
 
 function parseChildren(
@@ -499,11 +533,13 @@ export function parsePageNode(
     fail(where, `exceeds ${LIMITS.treeNodesMax} nodes`);
   }
   const record = asRecord(input, where);
-  return {
+  const node: PageNode = {
     ...parseByKind(record, where, depth, context),
     ...markdownExtras(record, where),
     ...sourceNodeMetadata(record, where),
   };
+  checkAttrSpanNames(node, where);
+  return node;
 }
 
 function sourceNodeMetadata(
@@ -512,7 +548,12 @@ function sourceNodeMetadata(
 ): SourceNodeMetadata {
   const start = record['start'];
   const end = record['end'];
-  if (start === undefined && end === undefined) {return {};}
+  if (start === undefined && end === undefined) {
+    if (record['attrSpans'] !== undefined) {
+      fail(where, 'attrSpans: requires the node source range');
+    }
+    return {};
+  }
   if (!Number.isSafeInteger(start) || !Number.isSafeInteger(end)) {
     fail(where, 'source range: expected safe integer offsets');
   }
@@ -520,7 +561,90 @@ function sourceNodeMetadata(
   if (Number(end) < Number(start)) {
     fail(where, 'source range: end must not precede start');
   }
-  return { start: Number(start), end: Number(end) };
+  const range = { start: toUtf16Offset(Number(start)), end: toUtf16Offset(Number(end)) };
+  if (record['attrSpans'] === undefined) {
+    return range;
+  }
+  return { ...range, attrSpans: parseAttrSpans(record['attrSpans'], `${where}.attrSpans`, range) };
+}
+
+function parseAttrSpans(input: unknown, where: string, node: Utf16Span): readonly AttrSpan[] {
+  if (!Array.isArray(input)) {
+    fail(where, 'expected array');
+  }
+  if (input.length > LIMITS.attrsPerNodeMax) {
+    fail(where, `exceeds ${LIMITS.attrsPerNodeMax} attrs`);
+  }
+  const spans = input.map((entry: unknown, index) => parseAttrSpan(entry, `${where}[${index}]`));
+  for (const entry of spans) {
+    if (!spanContains(node, entry.span)) {
+      fail(where, `${JSON.stringify(entry.name)} lies outside its node`);
+    }
+  }
+  if (!spansAscending(spans.map((entry) => entry.span))) {
+    fail(where, 'expected ascending, disjoint attribute spans');
+  }
+  return spans;
+}
+
+function parseAttrSpan(input: unknown, where: string): AttrSpan {
+  const record = asRecord(input, where);
+  const name = asString(record['name'], `${where}.name`, LIMITS.attrCharsMax);
+  const span = parseUtf16Span(record['span'], `${where}.span`);
+  const type = record['type'];
+  const inner = (field: 'nameSpan' | 'valueSpan'): Utf16Span => {
+    const value = parseUtf16Span(record[field], `${where}.${field}`);
+    if (!spanContains(span, value)) {
+      fail(where, `${field} lies outside the attribute`);
+    }
+    return value;
+  };
+  const absent = (field: 'nameSpan' | 'valueSpan'): void => {
+    if (record[field] !== undefined) {
+      fail(where, `${field}: not allowed on a ${String(type)} attribute`);
+    }
+  };
+  switch (type) {
+    case 'string':
+    case 'expr': {
+      const nameSpan = inner('nameSpan');
+      const valueSpan = inner('valueSpan');
+      if (valueSpan.start < nameSpan.end) {
+        fail(where, 'valueSpan must follow nameSpan');
+      }
+      return { type, name, span, nameSpan, valueSpan };
+    }
+    case 'bare':
+      absent('valueSpan');
+      return { type, name, span, nameSpan: inner('nameSpan') };
+    case 'spread':
+      absent('nameSpan');
+      return { type, name, span, valueSpan: inner('valueSpan') };
+    default:
+      fail(where, `unknown attr type ${JSON.stringify(type)}`);
+  }
+}
+
+// The spans and the props record describe the same tag: the same names, and the
+// last occurrence of each name has the type props kept for it.
+function checkAttrSpanNames(node: PageNode, where: string): void {
+  if (node.attrSpans === undefined) {
+    return;
+  }
+  const props = 'props' in node ? (node.props ?? {}) : undefined;
+  if (props === undefined) {
+    fail(where, `attrSpans: a ${node.kind} node has no attributes`);
+  }
+  const last = new Map(node.attrSpans.map((entry) => [entry.name, entry.type]));
+  const names = Object.keys(props);
+  if (last.size !== names.length) {
+    fail(where, 'attrSpans: names differ from props');
+  }
+  for (const name of names) {
+    if (last.get(name) !== props[name]?.type) {
+      fail(where, `attrSpans: ${JSON.stringify(name)} differs from props`);
+    }
+  }
 }
 
 /** Parse a whole tree (a page model's nodes array). */

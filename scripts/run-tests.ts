@@ -109,6 +109,11 @@ const staticChecks: readonly TestCommand[] = [
     command: node,
     argumentsList: [path.join(root, 'dist', 'scripts', 'ratchet-check.js')],
   },
+  {
+    name: 'adapter-surface',
+    command: node,
+    argumentsList: [path.join(root, 'dist', 'scripts', 'adapter-surface.js')],
+  },
 ];
 
 for (const [label, command, argumentsList] of staticGates) {

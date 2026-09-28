@@ -1,0 +1,62 @@
+[
+  {
+    "name": "nodes-25",
+    "axis": "nodes",
+    "percent": 25,
+    "target": 5000,
+    "bytes": 176648,
+    "utf16Units": 176588,
+    "nodes": 5000,
+    "sha256": "b70efe6f2e7b81ce2edb106825735a554a64abde1c28e0a9f5886b59cd74a55f"
+  },
+  {
+    "name": "nodes-50",
+    "axis": "nodes",
+    "percent": 50,
+    "target": 10000,
+    "bytes": 355403,
+    "utf16Units": 355283,
+    "nodes": 10000,
+    "sha256": "71a2115c9c6482abfbc7a0031f8e81503b77b34092ddda82f9996424a37ea823"
+  },
+  {
+    "name": "nodes-100",
+    "axis": "nodes",
+    "percent": 100,
+    "target": 20000,
+    "bytes": 712786,
+    "utf16Units": 712548,
+    "nodes": 20000,
+    "sha256": "8855fa591130105e754a6cf8b2e41d1d53d51c986ea5cf6d2208c913e032eb33"
+  },
+  {
+    "name": "bytes-25",
+    "axis": "bytes",
+    "percent": 25,
+    "target": 2621440,
+    "bytes": 2621440,
+    "utf16Units": 2370027,
+    "nodes": 3490,
+    "sha256": "6f5d7e8f4cf789580a6ad5d22e63ca7e6b3bbba472fdee2824e98e44ff6e22a2"
+  },
+  {
+    "name": "bytes-50",
+    "axis": "bytes",
+    "percent": 50,
+    "target": 5242880,
+    "bytes": 5242880,
+    "utf16Units": 4729320,
+    "nodes": 3490,
+    "sha256": "eba55fe31b4e65399c02250beb3e94c1713e5ffba5261de99349a978bbb55b82"
+  },
+  {
+    "name": "bytes-100",
+    "axis": "bytes",
+    "percent": 100,
+    "target": 10485760,
+    "bytes": 10485760,
+    "utf16Units": 9447850,
+    "nodes": 3490,
+    "sha256": "8b00580de0c86b728d57a0e83142b8d560096fe59cd5cb02d95fba4c67d7635d"
+  }
+]

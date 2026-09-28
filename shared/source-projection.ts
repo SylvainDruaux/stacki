@@ -1,0 +1,314 @@
+// The projection: a disposable, byte-addressed view of one version of a file
+// (plan §3.6, §2 Layer 1). It is derived from the bytes, never edited, and
+// replaced whole when the bytes change. Named so that nothing in it can be
+// mistaken for the page tree in page-node.ts, which stays the wire model until
+// step 9: a ProjectedNode has a byte span, a structural path and a capability,
+// and no id — identity is resolved at use time (plan §4).
+//
+// Invalid source is a first-class state, not an exception: the code editor and
+// external writers may leave a file that does not parse, and visual intents
+// then reject with `source-invalid` while the bytes stay in the snapshot.
+import { assert } from './assert';
+import { toUtf16Offset, type Utf16Offset } from './brand';
+import type { Capability } from './capability';
+import { LIMITS } from './limits';
+import type { Attr, AttrSpan, PageModel, PageNode, ParsePageResult } from './page-node';
+import { toChildIndex, type NodeKind, type StructuralPath } from './ref';
+import {
+  spanContains,
+  spansAscending,
+  toByteSpan,
+  utf16ToByteOffsets,
+  utf8ByteLength,
+  type ByteSpan,
+  type Utf16Span,
+} from './span';
+
+export interface ProjectedAttribute {
+  readonly name: string;
+  readonly type: Attr['type'];
+  readonly span: ByteSpan;
+  /** Absent on a spread, which has no name of its own. */
+  readonly nameSpan: ByteSpan | undefined;
+  /** Absent on a bare attribute, which has no value. */
+  readonly valueSpan: ByteSpan | undefined;
+  readonly capability: Capability;
+}
+
+export interface ProjectedNode {
+  readonly kind: NodeKind;
+  readonly path: StructuralPath;
+  readonly span: ByteSpan;
+  readonly attributes: readonly ProjectedAttribute[];
+  readonly capability: Capability;
+}
+
+export interface Diagnostic {
+  readonly message: string;
+  /** The source text the parser stopped on, when it named one. */
+  readonly near: string | undefined;
+}
+
+export type Projection =
+  | {
+      readonly tag: 'valid';
+      /** Length of the bytes this was derived from: the snapshot checks it. */
+      readonly byteLength: number;
+      /** The fenced frontmatter block, `---` to `---` inclusive, when present. */
+      readonly frontmatter: ByteSpan | undefined;
+      /** Every node in document order (preorder). */
+      readonly nodes: readonly ProjectedNode[];
+    }
+  | {
+      readonly tag: 'parse-error';
+      readonly byteLength: number;
+      readonly diagnostics: readonly Diagnostic[];
+    };
+
+/** Whether visual intents can be planned against this projection at all. */
+export function projectionAcceptsVisualIntents(projection: Projection): boolean {
+  switch (projection.tag) {
+    case 'valid':
+      return true;
+    case 'parse-error':
+      return false;
+    default: {
+      const exhaustive: never = projection;
+      return exhaustive;
+    }
+  }
+}
+
+/** Project one `.astro` file. `result` is the validated output of the parser
+ * run on exactly `text` with source offsets on (`parsePage(text, { locs })`).
+ * Markdown and MDX are outside the engine until step 10 (plan §6). */
+export function projectPage(text: string, result: ParsePageResult): Projection {
+  const byteLength = utf8ByteLength(text);
+  assert(byteLength <= LIMITS.sourceBytesMax, 'Projected source is inside the file bound');
+  if (!result.editable) {
+    const near = result.bail === null ? undefined : clip(result.bail.near);
+    return { tag: 'parse-error', byteLength, diagnostics: [{ message: clip(result.reason), near }] };
+  }
+  const model = result.model;
+  assert(model.format === undefined, 'Only .astro pages are projected before step 10');
+  assert(model.bodyStart !== undefined, 'The projected parse recorded source offsets');
+  const pending = collectNodes(model.nodes);
+  const frontmatter = frontmatterSpan(text, model);
+  const converter = spanConverter(text, pending, frontmatter);
+  const nodes = pending.map((entry) => projectNode(entry, converter));
+  assert(nodes.length === pending.length, 'Every collected node is projected');
+  return {
+    tag: 'valid',
+    byteLength,
+    frontmatter: frontmatter === undefined ? undefined : converter(frontmatter),
+    nodes,
+  };
+}
+
+/** Project a file the engine addresses only as a whole document — a stylesheet
+ * written through its own actor (plan §3.3). Valid, with no nodes: document
+ * anchors and code patches may target it, visual node intents may not. */
+export function projectOpaqueDocument(text: string): Projection {
+  const byteLength = utf8ByteLength(text);
+  assert(byteLength <= LIMITS.sourceBytesMax, 'Projected source is inside the file bound');
+  assert(byteLength >= text.length, 'UTF-8 never takes fewer bytes than UTF-16 units');
+  return { tag: 'valid', byteLength, frontmatter: undefined, nodes: [] };
+}
+
+// --- Internal ----------------------------------------------------------------
+
+interface PendingNode {
+  readonly node: PageNode;
+  readonly path: StructuralPath;
+  readonly span: Utf16Span;
+  /** Inside a loop body: rendered once per item from one source node. */
+  readonly repeated: boolean;
+}
+
+type SpanConverter = (span: Utf16Span) => ByteSpan;
+
+// Iterative preorder walk: the depth bound is the tree's, not the call stack's.
+function collectNodes(roots: readonly PageNode[]): readonly PendingNode[] {
+  const out: PendingNode[] = [];
+  const stack: { node: PageNode; path: StructuralPath; repeated: boolean }[] = [];
+  const pushChildren = (children: readonly PageNode[], path: StructuralPath, repeated: boolean) => {
+    for (let index = children.length - 1; index >= 0; index--) {
+      const child = children[index];
+      assert(child !== undefined, 'Child index lies inside its list');
+      stack.push({ node: child, path: [...path, toChildIndex(index)], repeated });
+    }
+  };
+  pushChildren(roots, [], false);
+  while (stack.length > 0) {
+    assert(out.length < LIMITS.treeNodesMax, 'Projection stays inside the tree node bound');
+    const entry = stack.pop();
+    assert(entry !== undefined, 'The stack is non-empty inside the loop');
+    assert(entry.path.length <= LIMITS.treeDepthMax + 1, 'Projection stays inside the depth bound');
+    const span = nodeSpan(entry.node);
+    out.push({ ...entry, span });
+    const children = childrenOf(entry.node);
+    if (children.length > 0) {
+      checkChildSpans(span, children);
+      pushChildren(children, entry.path, entry.repeated || entry.node.kind === 'map');
+    }
+  }
+  return out;
+}
+
+function childrenOf(node: PageNode): readonly PageNode[] {
+  if ('children' in node) {
+    return node.children ?? [];
+  }
+  return [];
+}
+
+function nodeSpan(node: PageNode): Utf16Span {
+  assert(node.start !== undefined, `A projected ${node.kind} node has a start offset`);
+  assert(node.end !== undefined, `A projected ${node.kind} node has an end offset`);
+  return { start: node.start, end: node.end };
+}
+
+// Children sit inside their parent, in order, without overlapping: the property
+// the anchor resolver's structural path relies on (paired with the span-integrity
+// contract test, which checks the same on every corpus file).
+function checkChildSpans(parent: Utf16Span, children: readonly PageNode[]): void {
+  const spans = children.map(nodeSpan);
+  for (const span of spans) {
+    assert(spanContains(parent, span), 'A child span lies inside its parent');
+  }
+  assert(spansAscending(spans), 'Sibling spans ascend without overlapping');
+}
+
+function frontmatterSpan(text: string, model: PageModel): Utf16Span | undefined {
+  if (!model.hadFrontmatter) {
+    return undefined;
+  }
+  const bodyStart = model.bodyStart;
+  assert(bodyStart !== undefined, 'A located parse records where the body starts');
+  const start = text.startsWith('﻿') ? 1 : 0;
+  assert(start < bodyStart, 'The frontmatter block is not empty');
+  return { start: toUtf16Offset(start), end: toUtf16Offset(bodyStart) };
+}
+
+// Every offset the projection needs is converted in one sorted pass, so the
+// cost is linear in the file however many spans it has.
+function spanConverter(
+  text: string,
+  pending: readonly PendingNode[],
+  frontmatter: Utf16Span | undefined,
+): SpanConverter {
+  const offsets = new Set<Utf16Offset>();
+  const add = (span: Utf16Span): void => {
+    offsets.add(span.start);
+    offsets.add(span.end);
+  };
+  if (frontmatter !== undefined) {
+    add(frontmatter);
+  }
+  for (const entry of pending) {
+    add(entry.span);
+    for (const attribute of attrSpansOf(entry.node)) {
+      forEachAttrSpan(attribute, add);
+    }
+  }
+  const sorted = [...offsets].sort((left, right) => left - right);
+  const converted = utf16ToByteOffsets(text, sorted);
+  const table = new Map(sorted.map((offset, index) => [offset, converted[index]]));
+  return (span) => {
+    const start = table.get(span.start);
+    const end = table.get(span.end);
+    assert(start !== undefined, 'Span start was collected for conversion');
+    assert(end !== undefined, 'Span end was collected for conversion');
+    return toByteSpan(start, end);
+  };
+}
+
+function attrSpansOf(node: PageNode): readonly AttrSpan[] {
+  return node.attrSpans ?? [];
+}
+
+function forEachAttrSpan(attribute: AttrSpan, visit: (span: Utf16Span) => void): void {
+  visit(attribute.span);
+  switch (attribute.type) {
+    case 'string':
+    case 'expr':
+      visit(attribute.nameSpan);
+      visit(attribute.valueSpan);
+      return;
+    case 'bare':
+      visit(attribute.nameSpan);
+      return;
+    case 'spread':
+      visit(attribute.valueSpan);
+      return;
+    default: {
+      const exhaustive: never = attribute;
+      throw new Error(`Unknown attribute span ${JSON.stringify(exhaustive)}`);
+    }
+  }
+}
+
+function projectNode(entry: PendingNode, convert: SpanConverter): ProjectedNode {
+  const capability = classifyNode(entry.node, entry.repeated);
+  const attributes = attrSpansOf(entry.node).map((attribute) => ({
+    name: attribute.name,
+    type: attribute.type,
+    span: convert(attribute.span),
+    nameSpan: attribute.type === 'spread' ? undefined : convert(attribute.nameSpan),
+    valueSpan: attribute.type === 'bare' ? undefined : convert(attribute.valueSpan),
+    capability: classifyAttribute(attribute, capability),
+  }));
+  return { kind: entry.node.kind, path: entry.path, span: convert(entry.span), attributes, capability };
+}
+
+/** Plan §6: native elements, component invocations, text, comments and the
+ * structural nodes are visually editable; opaque code is not; anything inside a
+ * loop body is one source node rendered many times. */
+export function classifyNode(node: PageNode, repeated: boolean): Capability {
+  if (repeated) {
+    return 'repeated-source-node';
+  }
+  switch (node.kind) {
+    case 'component':
+    case 'element':
+      return writesChildrenAtRuntime(node.props) ? 'read-only-opaque' : 'editable';
+    case 'expr':
+    case 'raw':
+    case 'raw-line':
+      return 'read-only-opaque';
+    case 'chunk-group':
+      return 'runtime-aggregate';
+    case 'text':
+    case 'comment':
+    case 'map':
+    case 'cond':
+    case 'branch':
+      return 'editable';
+    default: {
+      const exhaustive: never = node;
+      return exhaustive;
+    }
+  }
+}
+
+// `set:html` and `set:text` replace the children at render time, so the source
+// children are not what the page shows.
+function writesChildrenAtRuntime(props: Readonly<Record<string, Attr>> | undefined): boolean {
+  if (props === undefined) {
+    return false;
+  }
+  return Object.hasOwn(props, 'set:html') || Object.hasOwn(props, 'set:text');
+}
+
+function classifyAttribute(attribute: AttrSpan, node: Capability): Capability {
+  if (node !== 'editable') {
+    return node;
+  }
+  return attribute.type === 'spread' ? 'read-only-opaque' : 'editable';
+}
+
+function clip(message: string): string {
+  return message.length <= LIMITS.diagnosticCharsMax
+    ? message
+    : message.slice(0, LIMITS.diagnosticCharsMax);
+}

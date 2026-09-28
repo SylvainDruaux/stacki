@@ -3,9 +3,11 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { assert } from '../shared/assert.js';
+import { LIMITS } from '../shared/limits.js';
 
+// The source-file bound lives in shared/limits.ts (plan §8), because the actor,
+// the renderer and these readers must all refuse the same file.
 export const MAIN_LIMITS = {
-  sourceBytesMax: 10 * 1024 * 1024,
   directoryEntriesMax: 100000,
   directoryDepthMax: 64,
   portAttemptsMax: 100,
@@ -23,12 +25,12 @@ export function readSource(file: string): string {
  * checksum must be taken over these bytes, never over decoded text. */
 export function readSourceBytes(file: string): Buffer {
   const size = fs.statSync(file).size;
-  if (size > MAIN_LIMITS.sourceBytesMax) {
+  if (size > LIMITS.sourceBytesMax) {
     throw new Error('Source file exceeds 10 MB limit');
   }
   const bytes = fs.readFileSync(file);
   // A writer may grow the file between stat and read, so check both sides.
-  if (bytes.length > MAIN_LIMITS.sourceBytesMax) {
+  if (bytes.length > LIMITS.sourceBytesMax) {
     throw new Error('Source file exceeds 10 MB limit');
   }
   return bytes;

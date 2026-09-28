@@ -20,7 +20,8 @@ import { decodeEntities, encodeText } from './htmlText.js';
 import { readFrontmatter, writeFrontmatter } from './frontmatter.js';
 import type { FrontmatterModel, ImportMember } from './frontmatter.js';
 import { assertTreeInvariants } from '../shared/page-node.js';
-import type { Attr } from '../shared/page-node.js';
+import type { Attr, AttrSpan } from '../shared/page-node.js';
+import { toUtf16Span } from '../shared/span.js';
 import { assert } from '../shared/assert.js';
 import { LIMITS } from '../shared/limits.js';
 import type {
@@ -100,40 +101,102 @@ const makeId = (): string => {
 // `<Foo {...rest} />` into `<Foo ...rest />`, which does not compile. Spreads
 // are everywhere in Astro, so this corrupts real components.
 function parseAttrs(attrString: string): Record<string, Attr> {
-  const entries: [string, Attr][] = [];
-  // The spread body takes one level of nested braces, the same depth the
-  // value form below allows — `{...cond ? { href } : { type: "button" }}` is
-  // ordinary Astro, and stopping at the first inner brace would truncate it.
-  const re = new RegExp(
-    '\\{\\s*\\.\\.\\.((?:[^{}]|\\{[^{}]*\\})*)\\}|([\\w@:.-]+)' +
-      '(?:\\s*=\\s*(?:"([^"]*)"|\'([^\']*)\'|\\{((?:[^{}]|\\{[' +
-      '^{}]*\\})*)\\}))?',
-    'g',
-  );
+  // Object.fromEntries treats __proto__ as an ordinary attribute. Assigning
+  // it on an object invokes the inherited setter and silently drops it.
+  return Object.fromEntries(scanAttrs(attrString).map((found) => [found.name, found.attr]));
+}
+
+// One attribute as written: its props entry plus where each part sits in the
+// attribute string. The positions are relative to that string; attrSpansOf
+// moves them into file offsets.
+interface ScannedAttr {
+  readonly name: string;
+  readonly attr: Attr;
+  readonly from: number;
+  readonly to: number;
+  readonly nameAt: readonly [number, number] | undefined;
+  readonly valueAt: readonly [number, number] | undefined;
+}
+
+// The spread body takes one level of nested braces, the same depth the value
+// form allows — `{...cond ? { href } : { type: "button" }}` is ordinary Astro,
+// and stopping at the first inner brace would truncate it. The `d` flag reports
+// where each group matched, which is what the attribute spans are built from:
+// one pattern answers both "what does this tag say" and "where does it say it".
+const ATTR_PATTERN =
+  '\\{\\s*\\.\\.\\.((?:[^{}]|\\{[^{}]*\\})*)\\}|([\\w@:.-]+)' +
+  '(?:\\s*=\\s*(?:"([^"]*)"|\'([^\']*)\'|\\{((?:[^{}]|\\{[' +
+  '^{}]*\\})*)\\}))?';
+
+function scanAttrs(attrString: string): readonly ScannedAttr[] {
+  const found: ScannedAttr[] = [];
+  const re = new RegExp(ATTR_PATTERN, 'dg');
   let m;
   while ((m = re.exec(attrString)) !== null) {
     if (!m[0].trim()) {
       continue;
     }
-    if (m[1] !== undefined) {
-      // Keyed by the spread's own text, so two different spreads on one tag
-      // stay separate and the order round-trips.
-      const expr = m[1].trim();
-      entries.push([`...${expr}`, { type: 'spread', value: expr }]);
-      continue;
-    }
-    const name = required(m[2], 'Attribute name capture');
-    const value: Attr =
-      m[3] !== undefined || m[4] !== undefined
-        ? { type: 'string', value: required(m[3] ?? m[4], 'Quoted attribute capture') }
-        : m[5] !== undefined
-          ? { type: 'expr', value: m[5].trim() }
-          : { type: 'bare' };
-    entries.push([name, value]);
+    assert(found.length <= attrString.length, 'Each attribute consumes at least one character');
+    found.push(scanAttr(m));
   }
-  // Object.fromEntries treats __proto__ as an ordinary attribute. Assigning
-  // it on an object invokes the inherited setter and silently drops it.
-  return Object.fromEntries(entries);
+  return found;
+}
+
+function scanAttr(m: RegExpExecArray): ScannedAttr {
+  const indices = required(m.indices, 'Attribute match indices');
+  const from = m.index;
+  const to = from + m[0].length;
+  const trimmed = (group: number): readonly [number, number] => {
+    const [start] = required(indices[group], 'Attribute value indices');
+    const raw = required(m[group], 'Attribute value capture');
+    const lead = raw.length - raw.trimStart().length;
+    return [start + lead, start + lead + raw.trim().length];
+  };
+  if (m[1] !== undefined) {
+    // Keyed by the spread's own text, so two different spreads on one tag
+    // stay separate and the order round-trips.
+    const expr = m[1].trim();
+    const attr: Attr = { type: 'spread', value: expr };
+    return { name: `...${expr}`, attr, from, to, nameAt: undefined, valueAt: trimmed(1) };
+  }
+  const name = required(m[2], 'Attribute name capture');
+  const nameAt = required(indices[2], 'Attribute name indices');
+  if (m[3] !== undefined || m[4] !== undefined) {
+    const group = m[3] !== undefined ? 3 : 4;
+    const valueAt = required(indices[group], 'Quoted attribute indices');
+    const attr: Attr = { type: 'string', value: required(m[group], 'Quoted attribute capture') };
+    return { name, attr, from, to, nameAt, valueAt };
+  }
+  if (m[5] !== undefined) {
+    const attr: Attr = { type: 'expr', value: m[5].trim() };
+    return { name, attr, from, to, nameAt, valueAt: trimmed(5) };
+  }
+  return { name, attr: { type: 'bare' }, from, to, nameAt, valueAt: undefined };
+}
+
+// File offsets for every attribute of a tag whose attribute string starts at
+// `base`. Built from the same scan as the props, so the two cannot disagree.
+function attrSpansOf(attrString: string, base: number): AttrSpan[] {
+  const at = ([start, end]: readonly [number, number]) => toUtf16Span(base + start, base + end);
+  return scanAttrs(attrString).map((found): AttrSpan => {
+    const span = toUtf16Span(base + found.from, base + found.to);
+    const { name, attr } = found;
+    switch (attr.type) {
+      case 'string':
+      case 'expr':
+        return {
+          type: attr.type,
+          name,
+          span,
+          nameSpan: at(required(found.nameAt, 'Named attribute has a name')),
+          valueSpan: at(required(found.valueAt, 'Valued attribute has a value')),
+        };
+      case 'bare':
+        return { type: 'bare', name, span, nameSpan: at(required(found.nameAt, 'Bare name')) };
+      case 'spread':
+        return { type: 'spread', name, span, valueSpan: at(required(found.valueAt, 'Spread body')) };
+    }
+  });
 }
 
 // A tag whose attributes were written across several lines keeps them there,
@@ -157,13 +220,20 @@ function attrsAsWritten(node: ParserNode): string | null {
 // exactly that — and then it returns at the end, behind everything it used to
 // sit in front of. One line reordered against the four like it underneath is a
 // diff about nothing. So the order is written down when the file is read.
-function tagProps(attrs: string): { props: Record<string, Attr>; attrOrder?: string[] } {
+//
+// `attrsAt` is where the attribute string starts in the file, or null when no
+// offsets were asked for; with it, every attribute also reports its spans.
+function tagProps(
+  attrs: string,
+  attrsAt: number | null,
+): { props: Record<string, Attr>; attrOrder?: string[]; attrSpans?: AttrSpan[] } {
   const props = parseAttrs(attrs);
   const attrOrder = Object.keys(props);
+  const spans = attrsAt === null ? {} : { attrSpans: attrSpansOf(attrs, attrsAt) };
   // props is always present — even empty — because writers mutate node.props
   // in place (e.g. fragment tests and panel edits). attrOrder only exists
   // when there is something to order.
-  return attrOrder.length ? { props, attrOrder } : { props };
+  return attrOrder.length ? { props, attrOrder, ...spans } : { props, ...spans };
 }
 
 // What the file had, where it had it, then anything added since.
@@ -705,11 +775,28 @@ function branchNodes(raw: string, base: number | null = null): ParserNode[] | nu
   // `a ? (…) : b ? (…) : (…)` — an else-if chain, which reads as a condition
   // nested in the else branch.
   const nested = parseCondSource(t, at);
+  if (nested && at !== null) {
+    nested.start = at;
+    nested.end = at + t.length;
+  }
   return nested ? [nested] : null;
 }
 
-function makeBranch(name: 'then' | 'else', children: ParserNode[]): BranchNode {
-  return { id: makeId(), kind: 'branch', name, children };
+// A branch spans its side of the conditional as written, whitespace trimmed:
+// `( <p/> )` after the `?`, or the markup after the `&&`.
+function makeBranch(
+  name: 'then' | 'else',
+  children: ParserNode[],
+  raw: string,
+  base: number | null,
+): BranchNode {
+  const branch: BranchNode = { id: makeId(), kind: 'branch', name, children };
+  if (base !== null) {
+    const start = base + (raw.length - raw.trimStart().length);
+    branch.start = start;
+    branch.end = Math.max(start, base + raw.trimEnd().length);
+  }
+  return branch;
 }
 
 // Whether a branch renders markup, as opposed to a value.
@@ -809,7 +896,10 @@ function parseCondSourceBody(src: string, base: number | null): CondNode | null 
       kind: 'cond',
       op: '?',
       test,
-      children: [makeBranch('then', thenKids), makeBranch('else', elseKids)],
+      children: [
+        makeBranch('then', thenKids, thenRaw, from === null ? null : from + ternary.at + 1),
+        makeBranch('else', elseKids, elseRaw, from === null ? null : from + colon.at + 1),
+      ],
     };
   }
   // `a && b && (<x/>)`: everything up to the LAST && is the test.
@@ -822,7 +912,9 @@ function parseCondSourceBody(src: string, base: number | null): CondNode | null 
   if (!test) {
     return null;
   }
-  const kids = branchNodes(text.slice(and.at + 2), from === null ? null : from + and.at + 2);
+  const thenRaw = text.slice(and.at + 2);
+  const thenAt = from === null ? null : from + and.at + 2;
+  const kids = branchNodes(thenRaw, thenAt);
   if (!kids || !kids.length) {
     return null;
   } // `x && null` is not worth a node
@@ -831,7 +923,7 @@ function parseCondSourceBody(src: string, base: number | null): CondNode | null 
     kind: 'cond',
     op: '&&',
     test,
-    children: [makeBranch('then', kids)],
+    children: [makeBranch('then', kids, thenRaw, thenAt)],
   };
 }
 
@@ -923,7 +1015,7 @@ function parseTemplateBody(str: string, base: number | null): ParsedTemplate {
   // between `</a>` and `<span>` is the space the page shows between them. The
   // run's shape isn't known until every sibling is in, so the positions are
   // noted here and the spaces put back at the end.
-  const gaps = [];
+  const gaps: { readonly index: number; readonly from: number; readonly to: number }[] = [];
   const emit = (node: ParserNode) => {
     if (pendingBlank) {
       node.blankBefore = pendingBlank;
@@ -959,7 +1051,7 @@ function parseTemplateBody(str: string, base: number | null): ParsedTemplate {
         pendingBlank = Math.max(pendingBlank, breaks - 1);
       }
       if (nodes.length) {
-        gaps.push(nodes.length);
+        gaps.push({ index: nodes.length, from: pos, to: textEnd });
       }
     }
     if (text.trim()) {
@@ -1017,7 +1109,7 @@ function parseTemplateBody(str: string, base: number | null): ParsedTemplate {
   // line — closed the words up into `Docs/`, on the page as well as in the
   // panel. A gap after the last node is the indent before the closing tag and
   // renders as nothing, so it is left out.
-  parseTemplateGaps(nodes, gaps);
+  parseTemplateGaps(nodes, gaps, base);
   return { nodes, clean: true, trailingBlank: pendingBlank };
 }
 
@@ -3565,7 +3657,7 @@ function parseTemplateTag(str: string, lt: number, base: number | null): Templat
           id: makeId(),
           kind,
           name,
-          ...tagProps(attrs),
+          ...tagProps(attrs, base === null ? null : base + lt + 1 + name.length),
           ...(attrs && attrs.includes('\n') ? { attrSource: attrs } : {}),
           // `<x/>` and `<x />` mean the same thing and are not the same text.
           ...(selfClose === '/' && !/\s\/>$/.test(full) ? { tightClose: true } : {}),
@@ -3596,7 +3688,7 @@ function parseTemplateTag(str: string, lt: number, base: number | null): Templat
           id: makeId(),
           kind: 'raw',
           name,
-          ...tagProps(attrs),
+          ...tagProps(attrs, base === null ? null : base + lt + 1 + name.length),
           ...(attrs && attrs.includes('\n') ? { attrSource: attrs } : {}),
           inner: str.slice(afterOpen, close),
         },
@@ -3823,14 +3915,21 @@ function parseTemplateMarkup(str: string, lt: number, base: number | null): Temp
   return parseTemplateTag(str, lt, base);
 }
 
-function parseTemplateGaps(nodes: ParserNode[], gaps: readonly number[]): void {
+// Each gap keeps the whitespace it stands for as its source range, so a
+// located parse places it like any other node.
+function parseTemplateGaps(
+  nodes: ParserNode[],
+  gaps: readonly { readonly index: number; readonly from: number; readonly to: number }[],
+  base: number | null,
+): void {
   if (gaps.length && isInlineRun(nodes)) {
     for (let i = gaps.length - 1; i >= 0; i--) {
       const gap = required(gaps[i], 'Inline gap index is in bounds');
-      if (gap >= nodes.length) {
+      if (gap.index >= nodes.length) {
         continue;
       }
-      nodes.splice(gap, 0, { id: makeId(), kind: 'text', value: ' ' });
+      const space: ParserNode = { id: makeId(), kind: 'text', value: ' ' };
+      nodes.splice(gap.index, 0, parseTemplateAt(space, base, gap.from, gap.to));
     }
   }
 }
@@ -3932,7 +4031,7 @@ function parseTemplateTagPaired(open: TemplateTagOpen): TemplateTagResult {
         ...(shorthand ? { shorthand: true } : {}),
         ...(source === undefined ? {} : { source }),
         ...(blankAfter ? { blankAfter } : {}),
-        ...tagProps(attrs),
+        ...tagProps(attrs, base === null || shorthand ? null : base + lt + 1 + name.length),
         ...(attrs && attrs.includes('\n') ? { attrSource: attrs } : {}),
         ...(closeText.includes('\n') ? { closeSource: closeText } : {}),
         children: innerResult.nodes,

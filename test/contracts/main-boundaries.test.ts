@@ -23,6 +23,7 @@ import {
   parseAstroLock,
 } from '../../dist/electron/main.validation.js';
 import { directoryBudget, MAIN_LIMITS } from '../../dist/electron/main.bounds.js';
+import { LIMITS } from '../../dist/shared/limits.js';
 
 function fixture() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'stacki-main-contract-'));
@@ -202,7 +203,7 @@ test('Markdown array metadata and source-file size have explicit bounds', async 
   assert.throws(() => parseMarkdownModel(model), /blank lines exceed limit/);
   const file = path.join(harness.root, 'src/pages/large.astro');
   fs.writeFileSync(file, '');
-  fs.truncateSync(file, MAIN_LIMITS.sourceBytesMax + 1);
+  fs.truncateSync(file, LIMITS.sourceBytesMax + 1);
   await assert.rejects(harness.invoke('page:read', file), /Source file exceeds 10 MB limit/);
 });
 

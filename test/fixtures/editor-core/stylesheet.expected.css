@@ -1,0 +1,7 @@
+.card {
+  padding: 1rem;
+}
+
+.card--featured {
+  border: 2px solid gold;
+}

@@ -227,3 +227,64 @@ test('parsePageModel preserves Markdown source metadata and rejects malformed me
     /mdNumbers\[0\]: expected integer/,
   );
 });
+
+// Attribute spans (plan §3.2): present only on a located parse, validated
+// against the node's own range and against its props record.
+const located = {
+  kind: 'element',
+  id: 'n1',
+  name: 'p',
+  children: null,
+  props: { title: { type: 'string', value: 'Old' }, hidden: { type: 'bare' } },
+  start: 0,
+  end: 25,
+  attrSpans: [
+    {
+      type: 'string',
+      name: 'title',
+      span: { start: 3, end: 14 },
+      nameSpan: { start: 3, end: 8 },
+      valueSpan: { start: 10, end: 13 },
+    },
+    { type: 'bare', name: 'hidden', span: { start: 15, end: 21 }, nameSpan: { start: 15, end: 21 } },
+  ],
+};
+
+test('attribute spans: a located tag passes with its spans intact', () => {
+  const node = parsePageNode(located);
+  assert.deepEqual(node.attrSpans, located.attrSpans);
+  assert.equal(node.start, 0);
+});
+
+test('attribute spans: every wrong shape fails with a pinned message', () => {
+  const [title, hidden] = located.attrSpans;
+  const withSpans = (attrSpans: unknown, extra: object = {}) => ({ ...located, attrSpans, ...extra });
+  const cases: readonly [unknown, RegExp][] = [
+    [withSpans([title, hidden], { start: undefined, end: undefined }), /requires the node source range/],
+    [withSpans({}), /attrSpans: expected array/],
+    [withSpans([{ ...title, span: { start: 3, end: 30 } }, hidden]), /lies outside its node/],
+    [withSpans([hidden, title]), /ascending, disjoint attribute spans/],
+    [withSpans([{ ...title, valueSpan: { start: 2, end: 4 } }, hidden]), /valueSpan lies outside the attribute/],
+    [withSpans([{ ...title, valueSpan: { start: 5, end: 6 } }, hidden]), /valueSpan must follow nameSpan/],
+    [withSpans([{ ...title, valueSpan: undefined }, hidden]), /valueSpan: expected span object/],
+    [withSpans([title, { ...hidden, valueSpan: { start: 15, end: 16 } }]), /valueSpan: not allowed on a bare/],
+    [withSpans([title, { ...hidden, type: 'spread' }]), /nameSpan: not allowed on a spread/],
+    [withSpans([title, { ...hidden, type: 'flag' }]), /unknown attr type/],
+    [withSpans([title]), /names differ from props/],
+    [withSpans([title, { ...hidden, name: 'shown' }]), /"hidden" differs from props/],
+    [withSpans([{ ...title, type: 'expr' }, hidden]), /"title" differs from props/],
+    [withSpans(Array.from({ length: LIMITS.attrsPerNodeMax + 1 }, () => hidden)), /exceeds/],
+    [{ kind: 'text', id: 'n2', value: 'x', start: 0, end: 1, attrSpans: [] }, /a text node has no attributes/],
+  ];
+  for (const [input, message] of cases) {
+    assert.throws(() => parsePageNode(input), message);
+  }
+});
+
+test('an attribute named __proto__ survives the wire parser as an ordinary attribute', () => {
+  const props = Object.fromEntries([['__proto__', { type: 'string', value: 'kept' }]]);
+  const node = parsePageNode({ kind: 'element', id: 'n1', name: 'p', children: null, props });
+  assert.ok(node.kind === 'element');
+  assert.deepEqual(Object.keys(node.props ?? {}), ['__proto__']);
+  assert.equal(Object.getPrototypeOf(node.props), Object.prototype, 'the prototype is untouched');
+});

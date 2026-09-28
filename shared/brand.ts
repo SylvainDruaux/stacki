@@ -57,3 +57,46 @@ export function toProjectPath(value: string): ProjectPath {
   }
   return value as ProjectPath;
 }
+
+/** A position in a file's UTF-8 bytes: what splices, witnesses and anchors use
+ * (plan §3.2). Distinct from Utf16Offset so the two can never be mixed; the one
+ * conversion between them is utf16ToByteOffsets in shared/span.ts. */
+export type ByteOffset = Brand<number, 'ByteOffset'>;
+
+/** A position in a decoded source string, as JavaScript indexes it (UTF-16
+ * code units): what the parser reports. */
+export type Utf16Offset = Brand<number, 'Utf16Offset'>;
+
+/** Names one submitted intent from authoring to its terminal outcome. Minted by
+ * the submitting client; the pattern keeps it printable and bounded, so it can
+ * appear in a log line without escaping (plan §9a). */
+export type IntentId = Brand<string, 'IntentId'>;
+
+const INTENT_ID_RE = /^[A-Za-z0-9_-]{1,64}$/;
+
+export function toByteOffset(value: number): ByteOffset {
+  if (!Number.isSafeInteger(value)) {
+    throw new Error('ByteOffset: expected safe integer');
+  }
+  if (value < 0) {
+    throw new Error('ByteOffset: expected nonnegative integer');
+  }
+  return value as ByteOffset;
+}
+
+export function toUtf16Offset(value: number): Utf16Offset {
+  if (!Number.isSafeInteger(value)) {
+    throw new Error('Utf16Offset: expected safe integer');
+  }
+  if (value < 0) {
+    throw new Error('Utf16Offset: expected nonnegative integer');
+  }
+  return value as Utf16Offset;
+}
+
+export function toIntentId(value: string): IntentId {
+  if (!INTENT_ID_RE.test(value)) {
+    throw new Error('IntentId: expected 1 to 64 characters from [A-Za-z0-9_-]');
+  }
+  return value as IntentId;
+}

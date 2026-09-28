@@ -15,7 +15,11 @@ lands it.
   against the code that day: new step 0 (overwrite guard), corrected facts
   in plan §13. Since `d515fcc`, commit `3686761` added `src/modelAdoption.ts`
   (positional id adoption across reparse — UI keying only, see plan §4).
-- **Step 0 landed (2026-09-28); steps 1–10 have not started.** The legacy
+- **Step 1 landed (2026-09-28); steps 2–10 have not started.** The contract
+  layer, parser spans, hostile corpus, large fixtures, simulator skeleton,
+  adapter ratchet and lint fences exist (see Step 1 below); nothing in the app
+  submits intents yet.
+- **Step 0 landed (2026-09-28).** The legacy
   write path still serializes whole files (`mutateModel` → `page:write` →
   `serializePage`), but every page write now names the checksum it was
   authored against and main refuses a stale one with `conflict`; all page,
@@ -31,10 +35,10 @@ lands it.
   `component:editProperties` gesture in step-5 parity runs. Two write paths
   now exist (`page:*` and `component:editProperties`), and two new IPC
   channels arrived (`component:properties`, `component:editProperties`).
-- Nothing of the new core exists as named modules: no `intent.ts`, `ref.ts`,
-  `snapshot.ts`, `projection.ts`, `diff.ts`, `mapSpan.ts`, capability model,
-  actor rejection enum, or bounded intent queue (verified by `rg`, 2026-09-18;
-  re-verified at `b642efa`, 2026-09-28).
+- Since step 1: `shared/intent.ts`, `ref.ts`, `snapshot.ts`, `span.ts`,
+  `capability.ts` and `source-projection.ts` exist; `diff.ts`, `mapSpan.ts`, the
+  shipping actor and its bounded queue do not (the simulator's step-wise actor
+  in `test/simulator/actor.ts` is the reference the step-5 actor must match).
 - What the plan builds on: the `shared/` contract parsers and bounds; the
   parser's internal source offsets (`electron/astroParser.ts` `start`/`end`);
   `serialQueue`, `selfWrites`, `projectWatcher`; `shared/limits.ts` plus
@@ -117,7 +121,7 @@ chunk files are written atomically but not checksum-guarded (their own
 actors, step 5); "Review in code" shows the local text only, not the disk
 text beside it; there is still no flush on app quit (pre-existing).
 
-### Step 1 — Contracts and simulator skeleton ⬜
+### Step 1 — Contracts and simulator skeleton ✅
 
 **Deliverables.** `shared/intent.ts`, `shared/ref.ts`, `shared/snapshot.ts`,
 the capability model, the rejection enum, the extended limits, and the
@@ -144,6 +148,96 @@ anchor survival; oracle scenarios carry hand-derived expected splices.
 
 **Gate proof.** Contract tests green; deterministic scheduler in place;
 corpus diversity is a failed gate if it is thin, not a passed one.
+
+**Landed 2026-09-28** on `refactor/architecture-consolidation` in COMMIT_SHA.
+Gate `env -u ELECTRON_RUN_AS_NODE npm test`: 154/154
+test commands, 200.0 s, exit 0 (static gates: tsc, eslint 0 errors, `ratchet-check` 0,
+`adapter-surface` at baseline). Where each deliverable lives:
+
+- Contracts (`shared/`): `span.ts` (`ByteSpan`, `Utf16Span`, `ByteString`,
+  the single conversion `utf16ToByteOffsets`, strict `decodeUtf8`); brands
+  `ByteOffset`, `Utf16Offset`, `IntentId` (`brand.ts`); `ref.ts` (`AnchorRef` =
+  byte span + structural path + expected kind; `NODE_KINDS` compile-checked
+  against `PageNode['kind']`); `intent.ts` (nine operations incl. migration-only
+  `replace-source`, `SubmissionResult`, `Outcome`, nine `REJECTION_REASONS`
+  with notice text, anchor/operation pairing, multi-span site rules, UTF-8
+  payload bound); `capability.ts`; `source-projection.ts` (`Projection` =
+  `valid` | `parse-error`, byte spans, paths, per-node and per-attribute
+  capability); `snapshot.ts` (checksum computed from the bytes, no version).
+  Limits: `sourceBytesMax` merged up from `MAIN_LIMITS`; added
+  `intentsPendingMax` 64, `intentPayloadBytesMax` 10 MB, `splicesPerIntentMax`
+  4 096, `diffWorkMax` 5·10⁷, `parseTasksInFlightMax` 2, `snapshotsRetainedMax`
+  2, `watcherFilesPerTickMax` 1 024, `previewMarkersMax` 20 000,
+  `diagnosticsMax` 64, `diagnosticCharsMax` 4 096. Projection nodes and depth
+  reuse `treeNodesMax` / `treeDepthMax` (one name, one meaning).
+- Parser spans: `electron/astroParser.ts` emits `attrSpans` (whole, name,
+  value; one regex scan with match indices feeds both props and spans) and
+  now places branch nodes, else-if conditions and inline-run gap spaces, which
+  had no offsets. `shared/page-node.ts` validates the spans against the node
+  range and the props record. Tests: `test/contracts/span-integrity.test.ts`
+  (50 corpus/round-trip/editor-core files, 350 nodes, 152 attribute spans,
+  UTF-16 and byte slices; plus all six large fixtures), `page-node.test.ts`
+  (15 malformed `attrSpans` shapes), `span.test.ts` (conversion vs a
+  brute-force `Buffer.byteLength` reference at every offset).
+- Hostile corpus: `test/fixtures/editor-core/` — loop rename (multi-span, with
+  a shadowing second loop and substring decoys), strip bindings
+  (kind-changing move out of a loop), page + stylesheet (multi-file,
+  outcome-gated), frontmatter slot, identical siblings (wrong-site), BOM + CRLF
+  + astral text (encoding), conditionals with duplicate attributes and
+  `set:html`, inline-run gaps, a malformed page — each with a hand-written
+  `*.expected.*`. `test/simulator/oracles.ts` holds the hand-derived byte
+  splices; `oracles.test.ts` checks witnesses, exact results, post-kinds, and
+  that the reference planner reproduces every splice it plans exactly (the
+  move is pinned as `unsupported-operation` until step 6).
+- Large fixtures: `scripts/large-fixtures.ts` builds `nodes-25/50/100`
+  (5 000 / 10 000 / 20 000 nodes; 176 648 / 355 403 / 712 786 bytes) and
+  `bytes-25/50/100` (2 621 440 / 5 242 880 / 10 485 760 bytes; 3 490 nodes)
+  from corpus pieces, deterministically; `test/fixtures/large/manifest.json`
+  pins sizes and SHA-256; `npm run fixtures:large` writes the files
+  (gitignored, 17.5 MB).
+- Simulator: `test/simulator/` — xoshiro128** PRNG (pinned stream), fake disk
+  with write generations, identity-mapping reference planner, step-wise actor
+  (idle → planned → written, §5.2 steps 1–10), twelve event kinds (visual,
+  stale preview, oracle gesture, code save, manual edit, AI rewrite, git
+  replace, watcher tick, actor step, crash, write failure, backpressure
+  burst), invariants 1–8 checked from outside after every event, invariant 9
+  by running each seed twice. Gate: 24 seeds × 400 steps; the seeds must reach
+  12 outcome classes or the suite fails. Long run:
+  `STACKI_SIMULATOR_SEEDS=400` — 400 seeds, 27.6 s, green.
+- Ratchet: `scripts/adapter-surface.ts` in the gate's static checks, method in
+  its header, unit-tested in `test/contracts/adapter-surface.test.ts`.
+- Lint: `serializePage` / `serializeNodes` / `serializeMarkdownPage` may be
+  imported or called only in `electron/astroParser.ts`, `main.ts`,
+  `markdownParser.ts`, `componentFile.ts` and tests; `test/simulator/**`
+  (entry points excepted) and the six engine contract modules may not use
+  timers, `Date`, `performance`, `process`, promises, async, `Math.random` or
+  I/O modules. Both fences were checked against probe files.
+
+Found by step 1 and fixed:
+
+- `parseProps` (`shared/page-node.ts`) assigned `out[name]`, so an attribute
+  named `__proto__` hit the inherited setter and vanished at the IPC boundary;
+  the attrSpans cross-check caught it on `test/corpus/prototype-attribute.astro`.
+- Branch nodes, else-if conditions and inline-run gap spaces had no source
+  offsets; the gap case reached the simulator only through an external edit.
+- The simulator's first run found a planner bug class: a new attribute value
+  containing its own quote re-parses as a different tree. The reference
+  planner now refuses it (`unsupported-operation`); step 6 owns re-quoting.
+
+Found and left open (outside step 1): the wire parser drops `source` on
+`text` and `cond` nodes (`parseByKind`, `shared/page-node.ts`), so a model that
+crosses `parsePageReadResult` serializes a hand-wrapped paragraph onto one line,
+`&copy;` as `©`, and `{x && <p/>}` reflowed. Reproduced with
+`serializePage(parsePageResult(parsePage(src)).model)`; not yet confirmed
+through the app's save path. Whole-file regeneration is the legacy path until
+step 9, so this matters now.
+
+Deviations, with reasons: the actor, planner and splice primitive live in the
+test tree as step-1 references, not in `shared/` or `electron/` — steps 2–5
+design the shipping ones and must pass the same invariants; the large fixture
+files are generated, not committed (the manifest pins them); adapter counts
+are the script's (70 / 9 / 28 / 4), not the hand count (67 / 10 / 28 / 4) —
+see the table below.
 
 ### Step 2 — Diff and mapping ⬜
 
@@ -283,19 +377,31 @@ max projection nodes, max nesting depth, max pending intents, max intent
 payload bytes, max diff work, max parse tasks in flight, max retained
 snapshots, max watcher work per tick, max preview markers; at step 6,
 `undoEntriesMax` (100, today's `AppHistory` cap). Exceeding a limit
-returns `resource-limit` or `queue-full` — the system never grows a drain
-cap, retries forever, or reduces fidelity to cope.
+returns `resource-limit`, or `backpressured` at submission (there is no
+`queue-full` reason) — the system never grows a drain cap, retries forever, or
+reduces fidelity to cope. **Step 1 added all of them except `undoEntriesMax`**
+(see Step 1 above); projection nodes and depth reuse `treeNodesMax` and
+`treeDepthMax`.
 
 ## Adapter surface (ratchet, scripted at step 1)
 
-| Point | Count | State |
+| Point | Hand, 2026-09-28 | Script, step 1 (baseline) |
 |---|---|---|
-| Direct node-mutation sites in `src/` | 67 (47 in `App.tsx`) | hand-measured 2026-09-28 |
-| Prop-index writes | 10 | hand-measured 2026-09-28 |
-| `mutateModel(` call sites | 28 | hand-measured 2026-09-28 |
-| `applyEdit(` call sites | 4 | hand-measured 2026-09-28 |
+| Direct node-mutation sites in `src/` | 67 (47 in `App.tsx`) | 70 |
+| Prop-index writes | 10 | 9 |
+| `mutateModel(` call sites | 28 | 28 |
+| `applyEdit(` call sites (style panel) | 4 | 4 |
 
-Method (to be encoded in `scripts/adapter-surface.ts`): grep `src/**/*.ts{,x}`
+`node dist/scripts/adapter-surface.js --files` prints the per-file split
+(step 1: `App.tsx` 58, `loopBindings.ts` 12, `dataSuggest.ts` 6,
+`attrOrder.ts` 2, `ui/richContentModel.ts` 1, mutations and prop-index writes
+together). The script is the authority from step 1; the hand count's exact
+rules were not written down, so the small differences are not reconcilable
+line by line.
+
+Method (encoded in `scripts/adapter-surface.ts` at step 1, which adds the
+`findParentList` sibling-list alias and a written receiver exclusion list for
+DOM and CMS objects): grep `src/**/*.ts{,x}`
 excluding `src/style-panel/` for field assignments, array mutators and
 `delete` on node fields (`props`, `children`, `attrOrder`, `attrSource`,
 `kind`, `name`, `value`, `id`, `dynamicTag`, `slots`, `body`, `test`,
@@ -435,6 +541,23 @@ update on every step):
   stylesheet read restored `red` after an edit), so it runs alone until that
   read-ordering race is understood; open question for the style panel, not
   for this program.
+
+- 2026-09-28, step 1 (PROMPT-1), COMMIT_SHA on top of `c5ca3c9`:
+  - `env -u ELECTRON_RUN_AS_NODE npm test` — **pass, 154/154 test commands in
+    200.0 s, exit 0** (153 + the new `test:simulator`; static checks tsc, eslint
+    0 errors, `ratchet-check` 0, `adapter-surface` 70 / 9 / 28 / 4 at baseline).
+  - `npm run test:contracts` — **203/203** (163 before): new suites
+    `span`, `intent`, `source-projection`, `span-integrity`, `editor-core-types`
+    (14 `@ts-expect-error` brand and exhaustiveness checks), `adapter-surface`,
+    plus `attrSpans` and `__proto__` cases in `page-node`.
+  - `npm run test:simulator` — oracle suite 9/9; seeded suite 24 seeds × 400
+    steps, each run twice with identical trace digests, 2.6 s.
+    `STACKI_SIMULATOR_SEEDS=400` — green in 27.6 s.
+  - Lint fences probed with throwaway files (a `serializePage` import in `src/`;
+    `setTimeout`, `Date`, `Math.random`, `await`, `Promise`, `node:fs` under
+    `test/simulator/`): every one reported, probes deleted.
+  - `node dist/scripts/large-fixtures.js` — six fixtures in 2.1 s, targets hit
+    exactly; manifest committed.
 
 ## How to work this tracker
 

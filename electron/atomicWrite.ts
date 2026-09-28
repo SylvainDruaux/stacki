@@ -17,8 +17,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { assert } from '../shared/assert';
 import { toDigest, type Digest } from '../shared/brand';
+import { LIMITS } from '../shared/limits';
 import { err, ok, type Result } from '../shared/result';
-import { MAIN_LIMITS, readSourceBytes } from './main.bounds';
+import { readSourceBytes } from './main.bounds';
 
 export type AtomicWriteError =
   | { readonly code: 'filesystem'; readonly message: string }
@@ -75,7 +76,7 @@ export function readSourceSnapshot(file: string): SourceSnapshot {
 /** Replace `file` with `text` atomically and return the checksum on disk. */
 export function writeFileAtomic(file: string, text: string): Result<Digest, AtomicWriteError> {
   const bytes = Buffer.from(text, 'utf8');
-  if (bytes.length > MAIN_LIMITS.sourceBytesMax) {
+  if (bytes.length > LIMITS.sourceBytesMax) {
     return err({ code: 'filesystem', message: `${file} would exceed the 10 MB source limit` });
   }
   const expected = digestOf(bytes);

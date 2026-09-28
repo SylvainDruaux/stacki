@@ -34,4 +34,35 @@ export const LIMITS = {
   ipcFieldCharsMax: 10_000_000,
   /** TextMate highlighting is synchronous CPU work after grammar startup. */
   syntaxHighlightCharsMax: 1_000_000,
+
+  // Editor core (plan §8). The projection reuses treeNodesMax and treeDepthMax:
+  // a projected node is a page-tree node, so one name keeps one meaning.
+  /** Bytes of one source file. Merged up from electron/main.bounds.ts so the
+   * renderer, the actor and the disk readers answer to one number. */
+  sourceBytesMax: 10 * 1024 * 1024,
+  /** Intents accepted by one document actor and not yet terminal. Past this,
+   * submission returns `backpressured`; the persistence layer holds the draft. */
+  intentsPendingMax: 64,
+  /** UTF-8 bytes of every string an intent carries, summed. A `replace-source`
+   * intent carries a whole file, so the bound is the file bound itself. */
+  intentPayloadBytesMax: 10 * 1024 * 1024,
+  /** Splices one intent may plan, and sites one multi-span operation may name.
+   * A loop rename in a generated page touches hundreds of sites, not millions. */
+  splicesPerIntentMax: 4_096,
+  /** Work units one diff may spend (step 2 defines the unit). Exhaustion is a
+   * `resource-limit` rejection, never a silent fallback. */
+  diffWorkMax: 50_000_000,
+  /** Parses one actor may have in flight: the current read plus one newer. */
+  parseTasksInFlightMax: 2,
+  /** Snapshots one actor retains: the committed one plus the candidate under
+   * verification. Pending intents keep only their authored preconditions. */
+  snapshotsRetainedMax: 2,
+  /** Files one watcher tick may mark dirty. Events coalesce into a set, so the
+   * bound caps a burst like `git checkout`, not the event count. */
+  watcherFilesPerTickMax: 1_024,
+  /** Source markers one preview render may carry — one per projected node. */
+  previewMarkersMax: 20_000,
+  /** Diagnostics one parse-error projection carries, and the length of each. */
+  diagnosticsMax: 64,
+  diagnosticCharsMax: 4_096,
 } as const satisfies Record<string, number>;

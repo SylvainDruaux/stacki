@@ -1,0 +1,40 @@
+// Bytes → snapshot, through the real parser (plan §10: the simulator drives the
+// real parser, not a model of it). `.astro` files get a page projection; every
+// other file is an opaque document addressed only whole. Invalid UTF-8 is a
+// parse-error projection, never a lossy decode (plan §3.2).
+import { createHash } from 'node:crypto';
+import { parsePage } from '../../dist/electron/astroParser.js';
+import { assert } from '../../dist/shared/assert.js';
+import { toDigest, type Digest, type FilePath } from '../../dist/shared/brand.js';
+import { parsePageResult } from '../../dist/shared/page-node.js';
+import { createSnapshot, type Snapshot } from '../../dist/shared/snapshot.js';
+import {
+  projectOpaqueDocument,
+  projectPage,
+  type Projection,
+} from '../../dist/shared/source-projection.js';
+import { decodeUtf8, type ByteString } from '../../dist/shared/span.js';
+
+export function sha256(bytes: ByteString): Digest {
+  return toDigest(createHash('sha256').update(bytes).digest('hex'));
+}
+
+export function projectBytes(path: FilePath, bytes: ByteString): Projection {
+  const decoded = decodeUtf8(bytes);
+  if (!decoded.ok) {
+    const diagnostic = { message: decoded.error.message, near: undefined };
+    return { tag: 'parse-error', byteLength: bytes.length, diagnostics: [diagnostic] };
+  }
+  const text = decoded.value;
+  const projection = path.endsWith('.astro')
+    ? projectPage(text, parsePageResult(parsePage(text, { locs: true })))
+    : projectOpaqueDocument(text);
+  assert(projection.byteLength === bytes.length, 'The projection measures the bytes it read');
+  return projection;
+}
+
+export function snapshotOf(path: FilePath, bytes: ByteString): Snapshot {
+  const snapshot = createSnapshot({ path, bytes, projection: projectBytes(path, bytes) }, sha256);
+  assert(snapshot.bytes === bytes, 'The snapshot keeps the bytes it was built from');
+  return snapshot;
+}

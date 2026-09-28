@@ -15,6 +15,13 @@ directly, reporting all failures. Add a new standalone test command there once;
 there is no second list to update. Files named `*.test.js` are already included by
 the Node test runner. Individual `npm run test:...` commands remain available.
 
+`test:simulator` runs the editor-core simulator (`simulator/`): seeded runs of
+the step-wise actor over a fake disk, checked against the nine invariants of
+plan §10, plus the oracle scenarios over the hostile corpus in
+`fixtures/editor-core/`. `STACKI_SIMULATOR_SEEDS=2000 npm run test:simulator` is
+the long run. Everything under `simulator/` except its `*.test.ts` entry points
+is lint-fenced: no timers, clocks, promises, `Math.random` or I/O.
+
 The optional `integration:dev` test installs a pinned Astro version into a temporary
 project and starts real Electron and Astro processes. It needs network access on
 the first install and uses isolated app data; it does not modify an existing site.
