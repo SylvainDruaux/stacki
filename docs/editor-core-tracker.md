@@ -580,6 +580,179 @@ Any continuation is a new plan revision: pick the mechanism, re-register
 thresholds with their written reason **before** the next measurement, then
 re-run step 3's bench. This record does not choose among those.
 
+#### Revision proposal — 2026-09-28, branch `editor-core/step4-revision` (awaiting the owner)
+
+The decision above stands. This proposal is input for the plan revision that
+decision calls for, and it moves no threshold. The thresholds under
+"Proposed re-registration" are proposals: the owner registers them, with
+their reasons, before the next measurement counts. **Disclosure:** they were
+written after the prototype numbers below were seen. Their reasons were
+chosen to hold without those numbers: the disk floor, the legacy baseline and
+real page sizes. Judge them on that basis.
+
+**1. Baselines, measured with no editor-core code**
+(`node test/simulator/baseline.bench.ts`; same machine as step 3).
+
+| Fixture | §5.2 disk floor p95 | Legacy `page:write` p95 | Legacy round trip |
+|---|---|---|---|
+| nodes-25 | 12.3 | 133.3 | changed, 176 648 → 188 373 B |
+| nodes-50 | 18.9 | 204.0 | changed, 355 403 → 379 012 B |
+| nodes-100 | 33.6 | 430.0 | changed, 712 786 → 760 148 B |
+| bytes-25 | 91.7 | 191.8 | changed, +6 368 B |
+| bytes-50 | 157.1 | 302.2 | changed, +6 368 B |
+| bytes-100 | 312.2 | cannot write | grows past `sourceBytesMax` |
+
+- **Floor.** Read + SHA-256, then `writeFileAtomic` (temp, fsync, rename,
+  read-back): the work §5.2 mandates, and nothing else. On bytes-* it exceeds
+  50 ms before any engine code runs. A second run measured 76 / 137 / 263 ms
+  on bytes-25/50/100: this is WSL2 disk variance.
+- **Legacy.** The path that ships today misses the same thresholds, and it
+  does not round-trip these fixtures. On nodes-25 it rewrites 5 368 lines. It
+  re-indents every line, and it splits `&copy; {expr}. All rights reserved.`
+  onto three lines, which adds a visible space before the period. This is on
+  the generated fixtures; it was not checked on real pages. It is a lower
+  bound: chunk writes and IPC are excluded.
+- **Real page sizes.** The 1 052 `.astro` files on the development machine
+  outside `node_modules` and `test/` have a median of 1.6 KB, a p95 of
+  15 KB and a max of 93 KB. The smallest named fixture (nodes-25, 176 KB) is
+  about 2× the largest real page.
+
+**2. Correctness: the uniqueness guard** (`shared/byteSearch.ts`,
+`shared/planner.ts`). The rule: when the diff is non-empty and the mapper
+resolves, refuse with `anchor-ambiguous` unless the resolved bytes occur
+exactly once in the current file. The identity fast path is untouched.
+
+| Variant | Seeds | Wrong site | Applied, correct | Conservative |
+|---|---|---|---|---|
+| Step-2 mapper | 400 | 2 | 3 123 | 1 404 |
+| Step-2 mapper | 2 000 | **14** (3 files) | 16 181 | 7 319 |
+| Count-increase guard | 400 | 1 | 3 123 | 1 417 |
+| **Uniqueness guard** | 400 | **0** | 2 682 (−14 %) | 1 986 |
+| **Uniqueness guard** | 2 000 | **0** | 14 122 (−13 %) | 10 059 |
+
+- **The 400-seed corpus hid 12 of 14 wrong-site plans**, in two more files
+  (`nested-components`, `slots-named`). The gate should run 2 000 seeds;
+  it passes there with `wrongSite: 'fail'` (1 014 s).
+- **Invariant.** A resolved region's bytes equal the authored identity
+  region. If the true element's region survives, it is an occurrence of those
+  bytes, so a unique occurrence is the true element.
+- **Residual, not closable from bytes.** A copy of the target is pasted while
+  another writer rewrites the original. Identical bytes arise from an
+  insertion above an untouched target, where the plan would be right. It is
+  pinned as "BYTES CANNOT TELL" in `planner.test.ts` and was never produced in
+  2 000 seeds. Only history closes it: see the step-5 splice log (4 below).
+- **Cost on repetitive pages.** On the large fixtures a stale edit is refused
+  29–30 / 30 times on nodes-* and 17 / 30 on bytes-*: generated pages repeat
+  identical elements. The refusal is typed and visible; the next edit,
+  authored on the fresh snapshot, applies.
+
+**3. Latency: the projection patch, parser fixes and word-wise compare.**
+- **Projection patch** (`shared/projection-patch.ts`). It derives the
+  candidate projection of a quoted-value splice by shifting spans, instead of
+  reparsing. The rule is a positive allowlist, argued from `astroParser.ts`
+  in its header. Anything outside it falls back to a full reparse.
+- **Checked against the full reparse:** 384 patched candidates on the large
+  fixtures and every patched candidate in the simulator. Every one was
+  deep-equal.
+- **Parser** (`astroParser.ts`, `source-projection.ts`, `span.ts`). One
+  attribute scan per tag, a cached close-tag regex, a typed-array span
+  converter, and a cheaper whitespace collapse. Full parse is 1.2–2.0×
+  faster. The digests of the parser, projection and serializer output are
+  identical on all 1 250 `.astro` files on the machine.
+- **`byteStringsEqual`** now compares word by word: 167 → 5.4 ms on 10 MB.
+
+`node test/simulator/patch.bench.ts` interleaves the two variants on one
+file. "Engine" is intent → applied minus the refresh and the §5.2 disk work
+(read, verify re-read, atomic write). All values are p95 in milliseconds:
+
+| Fixture | Fresh, reparse | Fresh, patch | Engine, fresh | Stale − refresh, patch | Engine, stale |
+|---|---|---|---|---|---|
+| nodes-25 | 158.1 | **31.6** | 6.2 | 34.3 | 11.1 |
+| nodes-50 | 226.1 | **32.5** | 7.7 | 32.3 | 14.7 |
+| nodes-100 | 485.4 | 52.3 | 20.4 | 425.5 | 399.5 |
+| bytes-25 | 276.6 | 122.6 | 18.7 | 193.4 | 80.8 |
+| bytes-50 | 517.8 | 225.2 | 42.0 | 369.8 | 173.4 |
+| bytes-100 | 1 141.0 | 560.3 | 128.1 | 761.1 | 357.5 |
+
+The "reparse" column already includes the parser fixes. The stale refresh (a
+full reparse of the other writer's bytes) is 104–620 ms p50 and is excluded.
+
+**4. What remains, by stage (p50 from the same run)**
+- **bytes-* disk work:** read 10–49 ms, verify 11–63 ms, write 75–288 ms.
+  That is the floor.
+- **bytes-100 engine: 128 ms.**
+  - 45 ms is an exact UTF-16 recount, because the file is over
+    `ipcFieldCharsMax`. The projection can carry its unit count instead.
+  - 41 ms is the candidate SHA-256, which `writeFileAtomic` computes again
+    on read-back. Reuse that one.
+- **nodes-100 stale tail:** two refused patches (the hosts sit inside `{…}`)
+  paid a full reparse.
+- **Stale plan:** 5–16 ms on nodes-*, 51–226 ms on bytes-*. That is the diff
+  plus the occurrence count. The count asserts per byte in its hot loop; move
+  those checks out of the data plane.
+
+**5. Proposed re-registration: options for the owner.**
+
+- **A. Recommended.** Separate what the engine controls from what the disk
+  imposes, and add a realistic-size tier. Each item changes a registered
+  number or its definition, so each carries its reason:
+  - **W — correctness.** Zero wrong-site plans across the corpus at
+    **2 000 seeds**, where 400 was registered. Stricter than before, because
+    400 seeds hid 12 of 14.
+  - **E — engine.** Engine p95 ≤ 50 ms, fresh, on all six named fixtures.
+    - This changes the definition. §11.4 labels intent → applied "the engine"
+      but measures it end to end, disk included.
+    - The disk floor alone is 92–312 ms p95 on bytes-*, so no engine can meet
+      the old definition there on this machine.
+    - Prototype status: 5 of 6 pass. bytes-100 fails at 128 ms (see 4).
+  - **U — user-visible.** Intent → applied p95 ≤ 50 ms end to end, and last
+    keystroke → disk ≤ 350 ms, on nodes-25 and nodes-50.
+    - These are 2–4× the largest real page, and they are where the typing
+      experience is judged.
+    - Prototype status: intent → applied passes (31.6, 32.5). Keystroke →
+      disk was not measured with the patch.
+  - **S — stale.** The owner chooses either of these:
+    - (i) No latency number until step 5 moves the refresh to the watcher
+      tick. The stale engine p95 above is recorded, and correctness stays
+      gated.
+    - (ii) Engine, stale ≤ 50 ms on nodes-25/50 (prototype: 11, 15).
+    Dropping a latency number is a negotiation, so it must be the owner's call.
+- **B. Keep the registered numbers verbatim.** bytes-* cannot pass on this
+  hardware, so B is a permanent no-go. The project stays on the legacy path.
+- **C. Stop the engine.** Land the parser fixes on the legacy path only.
+  Legacy stays at 133–430 ms p95 and keeps rewriting formatting on these
+  fixtures.
+
+**6. Inputs for step 5 (if A).**
+- **Splice log.** The actor maps an intent authored against one of its own
+  earlier snapshots through the splices it applied. The mapping is exact,
+  runs no diff and needs no guard. It closes the residual for self-caused
+  staleness and recovers the guard's conservatism there. The share of stale
+  intents that are self-caused has not been measured; measure it in the
+  simulator first.
+- **Refresh on the watcher tick**, off the intent's path.
+- **The renderer's model after an applied intent.** The patch keeps the
+  engine's projection off the reparse path, but the UI still consumes the
+  legacy `PageModel` that `parsePageSource` builds. Step 5 must say how that
+  tree updates, or the reparse returns on the save path.
+- **Four full SHA-256 passes per intent.** Deduplicate the candidate hash.
+- **Contingent, on telemetry (§9a):**
+  - Extend the patch allowlist to hosts inside expressions.
+  - Context-extended uniqueness, if `anchor-ambiguous` rejections are
+    frequent in the field.
+
+**Branch `editor-core/step4-revision`** (on top of `6b0f7a8`; not merged,
+nothing ships to the app except the output-identical parser fixes):
+- `shared/byteSearch.ts` and the guard in `shared/planner.ts`.
+- `shared/projection-patch.ts`, and the word-wise compare in `shared/span.ts`.
+- The parser fixes.
+- Tests: `byte-search.test.ts`, `projection-patch.test.ts`, and the flipped
+  and extended `planner.test.ts`. The simulator actor checks every patched
+  candidate against a full reparse.
+- Benches: `patch.bench.ts` and `baseline.bench.ts`.
+- Gate: 154/154 test commands, 248.8 s, exit 0. `test:simulator` 50/50.
+  2 000 seeds with `wrongSite: 'fail'`: pass.
+
 ### Step 5 — Actor and write protocol ⬜
 
 **Deliverables.** Bounded intent queue, per-intent typed outcomes
