@@ -101,11 +101,18 @@ import { projectRelativePath } from './projectPath.js';
 import { currentDesktopPlatform, shortcutLabel } from './shortcutLabel.js';
 import { sourceNodeAtOffset } from './codePanelModel.js'
 import {
+  codeWindowFor,
+  FRONTMATTER_SUBJECT,
+  type CodeSubject,
+  type FrontmatterSubject,
+} from './codeWindowTarget';
+import {
   cloneEditorModel,
   findEditorNodeById as findNodeById,
   findEditorParentList as findParentList,
   nodeId,
   toEditorPageState,
+  adoptParsedModel,
   type AppHistory,
   type AssetPick,
   type CodeWindowState,
@@ -935,7 +942,11 @@ export default function App() {
       write: async (pagePath, state) => {
         if (state.editable) {
           const written = await writeProjectPage(pagePath, state.model);
-          return written ? toEditorPageState(written) : undefined;
+          // The write returns the file re-parsed (current structure and source
+          // ranges for the code panel), with node ids the parser regenerated.
+          // Re-key it onto the session ids, or every editor keyed by node id
+          // remounts after each save and drops focus mid-typing (issue #29).
+          return written ? toEditorPageState(adoptParsedModel(state, written)) : undefined;
         }
         const written = await writeProjectPageRaw(pagePath, state.source);
         return written ? toEditorPageState(written) : undefined;
@@ -1547,23 +1558,29 @@ export default function App() {
       const version = codeEditVersionRef.current + 1;
       codeEditVersionRef.current = version;
       try {
-        const parsed = toEditorPageState(await parseSourcePage(open.path, source));
+        const parsed = await parseSourcePage(open.path, source);
         if (version !== codeEditVersionRef.current) {
           return;
         }
         if (pageStateRef.current.currentPage?.path !== open.path) {
           return;
         }
+        // The parse reflects the typed source (fresh structure and offsets);
+        // re-key it onto the session ids so the editors it feeds don't remount
+        // per keystroke (issue #29).
+        const result = toEditorPageState(
+          adoptParsedModel(pageStateRef.current.pageState, parsed),
+        );
         pushHistory('code-source');
-        if (parsed.editable) {
+        if (result.editable) {
           const inFrontmatter =
-            parsed.model.bodyStart !== undefined && position < parsed.model.bodyStart;
-          const selected = sourceNodeAtOffset(parsed.model.nodes, position);
+            result.model.bodyStart !== undefined && position < result.model.bodyStart;
+          const selected = sourceNodeAtOffset(result.model.nodes, position);
           setSelectedId(inFrontmatter ? 'frontmatter' : selected?.id ?? null);
         } else {
           setSelectedId(null);
         }
-        setPageState({ ...parsed, dirty: true });
+        setPageState({ ...result, dirty: true });
         scheduleSave('live');
       } catch (error: unknown) {
         if (version === codeEditVersionRef.current) {
@@ -1621,7 +1638,12 @@ export default function App() {
 
       let result: EditorPageState;
       try {
-        result = toEditorPageState(await readPage(page.path));
+        const parsed = await readPage(page.path);
+        // The disk snapshot arrives with regenerated parser ids; re-key it
+        // onto the session ids so aligned nodes keep their identity and the
+        // trail remap below only has to cover genuinely changed regions
+        // (issue #29).
+        result = toEditorPageState(adoptParsedModel(state, parsed));
       } catch {
         return;
       }
@@ -1633,7 +1655,9 @@ export default function App() {
       pendingFiles.clear();
       if (latest.currentPage?.path !== page.path || latest.pageState !== state) {return;}
 
-      // Re-select the node at the same tree position (ids regenerate).
+      // Re-select the node at the same tree position — the fallback for
+      // regions whose ids genuinely regenerated (nodes added or removed
+      // externally); aligned regions kept their session ids above.
       const selId = selectedIdRef.current;
       let nextSelected = selId;
       if (selId && selId !== 'layout' && selId !== 'frontmatter') {
@@ -3592,7 +3616,7 @@ export default function App() {
   };
 
   const selectedNode:
-    | EditorNode | { readonly id: 'frontmatter'; readonly kind: 'frontmatter'; readonly value: string } | null =
+    | EditorNode | (FrontmatterSubject & { readonly value: string }) | null =
     model && selectedId
       ? selectedId === 'frontmatter'
         ? { id: 'frontmatter', kind: 'frontmatter', value: frontmatterCode }
@@ -3944,29 +3968,22 @@ export default function App() {
     ? codeWinNode.inner
     : null;
 
-  // Returns whether the selection actually has a code editor, so the Enter
+  // Returns whether the subject actually has a code editor, so the Enter
   // shortcut below knows whether it handled the key.
-  const openCodeWindow = () => {
-    if (!selectedNode) {
+  const openCodeWindowFor = (subject: CodeSubject | null): boolean => {
+    const codeWindow = subject === null ? undefined : codeWindowFor(subject);
+    if (codeWindow === undefined) {
       return false;
     }
-    if (selectedNode.kind === 'frontmatter') {
-      setCodeWin({
-        targetId: 'frontmatter',
-        title: 'Frontmatter',
-        language: 'javascript',
-      });
-      return true;
-    }
-    if (selectedNode.kind === 'raw') {
-      setCodeWin({
-        targetId: selectedNode.id,
-        title: `<${selectedNode.name}>`,
-        language: selectedNode.name === 'style' ? 'css' : 'javascript',
-      });
-      return true;
-    }
-    return false;
+    setCodeWin(codeWindow);
+    return true;
+  };
+  const openCodeWindow = (): boolean => openCodeWindowFor(selectedNode);
+  // A navigator double-click names its row instead of reading `selectedNode`
+  // (see `openCode` in StructureTree). An id the tree no longer holds, a row
+  // removed between the click and the render, opens nothing.
+  const openCodeWindowById = (id: string): void => {
+    openCodeWindowFor(id === 'frontmatter' ? FRONTMATTER_SUBJECT : tree.node(id));
   };
   // Read by the keydown effect, which is set up long before this exists.
   openCodeWindowRef.current = openCodeWindow;
@@ -4619,6 +4636,7 @@ export default function App() {
                 onSelect={setSelectedId}
                 onHoverNode={setHoverNodeId}
                 onOpenComponent={(name, id) => openComponent(name, pathFor(id))}
+                onOpenCode={openCodeWindowById}
                 onChangeLayout={changeLayout}
                 onDropComponent={addComponent}
                 onMoveNode={moveNode}

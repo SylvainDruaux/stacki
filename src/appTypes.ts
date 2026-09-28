@@ -4,6 +4,7 @@ import type { IpcResults, WireGitInfo, WireInjectedRoute } from '../shared/ipc-r
 import type { ParsePageResult } from '../shared/page-node';
 import type { ScanResult } from '../shared/scan';
 import type { AssetRequest } from './assetPick';
+import { adoptNodeIds } from './modelAdoption';
 import type { VariableSelection } from './variablesBridge';
 import {
   cloneEditorModel,
@@ -211,6 +212,24 @@ export function toEditorPageState(
     return { ...input, dirty: false };
   }
   return { ...input, model: cloneEditorModel(input.model), dirty: false };
+}
+
+/** Re-key a freshly parsed page onto the session's node ids (see
+ * modelAdoption.ts). The parser regenerates every id on each parse, and the UI
+ * keys editors by node id, so installing a fresh parse wholesale re-keyed
+ * every editor and dropped field focus mid-typing (issue #29). Returns
+ * `parsed` unchanged when either side lacks an editable page model. */
+export function adoptParsedModel(
+  local: EditorPageState | null,
+  parsed: ParsePageResult & { readonly source: string },
+): ParsePageResult & { readonly source: string } {
+  if (!isEditableState(local) || !parsed.editable) {
+    return parsed;
+  }
+  return {
+    ...parsed,
+    model: { ...parsed.model, nodes: adoptNodeIds(local.model.nodes, parsed.model.nodes) },
+  };
 }
 
 export function isOpenFile(page: CurrentPage | null): page is OpenFile {
