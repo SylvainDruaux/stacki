@@ -24,6 +24,10 @@ lands it.
   intent→applied p95 of 147–1 728 ms against 50 ms (see Step 3). **Step 4
   decided fail (2026-09-28)**: step 0's guarded legacy path stays the shipped
   write path, and step 5 does not start without a written plan revision.
+  **Revision A** (registered `d3b825b`, measured at `2982961`) **also failed**,
+  on keystroke → disk only (400.8 / 470.9 ms against 350). Every other
+  threshold passed. See Thresholds, "Revision A decision". Step 5 has still
+  not started.
 - **Step 0 landed (2026-09-28).** The legacy
   write path still serializes whole files (`mutateModel` → `page:write` →
   `serializePage`), but every page write now names the checksum it was
@@ -498,7 +502,7 @@ asserts no threshold; the fixture loader moved to `fixtures.entry.ts` so the
 gate suite and the bench run the same scenarios, and the simulator lint fence
 now also excepts `*.bench.ts` and `*.entry.ts`.
 
-### Step 4 — Threshold decision ✅ (decided: **fail**; step 5 not started)
+### Step 4 — Threshold decision ✅ (decided: **fail**; revision A: **fail**, U2; step 5 not started)
 
 **Deliverables.** A recorded decision, not code.
 
@@ -940,6 +944,63 @@ Reasons, in full:
 5. **Decision rule.** Go only if W, E, U1, U2, S and P all pass on the run
    that counts. Otherwise the result is no-go: the legacy path stays, it is
    reported, and nothing is renegotiated.
+
+### Revision A decision — 2026-09-28, code `2982961`: FAIL (U2). No-go.
+
+**The run that counts.** The first complete run of `patch.bench.ts` after
+`2982961`, with the load average at 1.10 at start. It ran after
+`npm run fixtures:large`, which left the manifest unchanged. W ran separately
+afterwards, as the protocol names it.
+
+| Id | Measure | Result, ms | Threshold | Verdict |
+|---|---|---|---|---|
+| W | wrong-site plans, 2 000 seeds, `wrongSite: 'fail'` | 0 (795 s) | 0 | pass |
+| E | fresh engine p95: nodes-25/50/100 | 5.1 / 4.7 / 35.3 | ≤ 50 | pass |
+| E | fresh engine p95: bytes-25/50/100 | 5.2 / 17.9 / 27.2 | ≤ 50 | pass |
+| U1 | fresh end to end p95: nodes-25 / nodes-50 | 30.8 / 24.1 | ≤ 50 | pass |
+| U2 | last keystroke → disk p95: nodes-25 / nodes-50 | **400.8 / 470.9** | ≤ 350 | **FAIL** |
+| S | stale engine p95: nodes-25 / nodes-50 | 7.9 / 13.6 | ≤ 50 | pass |
+| P | patch-variant candidates equal to a full reparse | 428 of 428 | all | pass |
+| — | adapter surface | 70 / 9 / 28 / 4 | recorded | — |
+
+**Recorded, not gated** (p95 unless marked):
+- Fresh end to end on bytes-25/50/100: 117.2 / 192.6 / 443.2. Of the
+  bytes-100 figure, protocol work at p50 is read 38.0, hash 33.7, verify
+  52.9 and write 247.4.
+- Stale engine on nodes-100: 339.2. On bytes-*: 51.9 / 119.2 / 229.9.
+- Patch refusals: 9 of 428 candidates, all hosts inside `{…}`.
+
+**Cause.** This was diagnosed after the verdict, in a run that timed nothing
+and does not count.
+- The keystroke series (seed 3) drew targets inside `{…}` expressions: at
+  samples 13 and 14 on nodes-25, and at 9 and 13 on nodes-50.
+- The patch refuses those hosts, so the pipeline falls back to a full
+  reparse: 85 / 154 ms p50 on these fixtures.
+- Two refused samples in 20 put a reparse at the nearest-rank p95, the 19th
+  value. So U2 measures the fallback, not the patch.
+- U1 passed on the same edge. Its series had 1 refusal in 30, and the p95 of
+  30 is the 29th value.
+- The engine is not the cost: the fresh end-to-end p95 is 24–31 ms. The
+  refusal rate is. Across the 428 draws it was 2.1 %, but it was 10 % in
+  each keystroke series.
+
+**Consequences, per the rule:**
+- Step 0's guarded legacy path remains the shipped write path.
+- Step 5 does not start.
+- The numbers do not move.
+
+**Inputs for a revision B** (not decided here):
+- **Take the fallback off the p95.** Extend the patch to hosts inside
+  expressions. It needs its own argument from the JavaScript scanners (the
+  header of `projection-patch.ts` names what they react to) and the same
+  brute-force reference.
+- **Measure how often real edits hit such hosts** on real pages. The
+  fixtures' rate is a property of the generator, not of users.
+
+**Found after the verdict and fixed separately:** `projectPage` asserted
+instead of returning `parse-error` on text over `ipcFieldCharsMax` units but
+under `sourceBytesMax` bytes. No fixture reaches that size, so it could not
+affect any number above.
 
 ## Limits work (§8)
 
