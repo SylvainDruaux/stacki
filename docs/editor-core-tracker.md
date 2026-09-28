@@ -347,7 +347,7 @@ correctness, reproject-plus-diff latency, and the **adapter surface** from
 see Thresholds below). The numbers may not change between the spike and the
 step-4 decision without a written reason.
 
-**Landed 2026-09-28** on `refactor/architecture-consolidation` in `<pending>`.
+**Landed 2026-09-28** on `refactor/architecture-consolidation` in `46e9fc6`.
 Gate `env -u ELECTRON_RUN_AS_NODE npm test`: 154/154 test commands, 235.2 s,
 exit 0. Report: `npm run spike:editor-core` (after `npm run fixtures:large`);
 the numbers below are one run of it on an Intel i7-4820K (2013, 8 threads),
@@ -820,7 +820,7 @@ update on every step):
     (npx cache, `--print-width 100 --single-quote --trailing-comma all`; no
     dependency added); every new line is ≤ 100 columns.
 
-- 2026-09-28, step 3 (PROMPT-3), `<pending>` on top of `43c9739`:
+- 2026-09-28, step 3 (PROMPT-3), `46e9fc6` on top of `43c9739`:
   - `env -u ELECTRON_RUN_AS_NODE npm test` — **pass, 154/154 test commands in
     235.2 s, exit 0** (static checks: tsc, eslint 0 errors, `ratchet-check` 0,
     `adapter-surface` 70 / 9 / 28 / 4 at baseline). The first gate run failed
