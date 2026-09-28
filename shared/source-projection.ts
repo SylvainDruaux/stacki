@@ -15,6 +15,7 @@ import { LIMITS } from './limits';
 import type { Attr, AttrSpan, PageModel, PageNode, ParsePageResult } from './page-node';
 import { toChildIndex, type NodeKind, type StructuralPath } from './ref';
 import {
+  encodeUtf8,
   spanContains,
   spansAscending,
   toByteSpan,
@@ -87,6 +88,10 @@ export function projectionAcceptsVisualIntents(projection: Projection): boolean 
  * run on exactly `text` with source offsets on (`parsePage(text, { locs })`).
  * Markdown and MDX are outside the engine until step 10 (plan §6). */
 export function projectPage(text: string, result: ParsePageResult): Projection {
+  if (LIMITS.ipcFieldCharsMax < text.length) {
+    assert(!result.editable, 'The parser refuses a page past its UTF-16 bound');
+    return overlong(text);
+  }
   const byteLength = utf8ByteLength(text);
   assert(byteLength <= LIMITS.sourceBytesMax, 'Projected source is inside the file bound');
   if (!result.editable) {
@@ -114,6 +119,9 @@ export function projectPage(text: string, result: ParsePageResult): Projection {
  * written through its own actor (plan §3.3). Valid, with no nodes: document
  * anchors and code patches may target it, visual node intents may not. */
 export function projectOpaqueDocument(text: string): Projection {
+  if (LIMITS.ipcFieldCharsMax < text.length) {
+    return overlong(text);
+  }
   const byteLength = utf8ByteLength(text);
   assert(byteLength <= LIMITS.sourceBytesMax, 'Projected source is inside the file bound');
   assert(byteLength >= text.length, 'UTF-8 never takes fewer bytes than UTF-16 units');
@@ -121,6 +129,17 @@ export function projectOpaqueDocument(text: string): Projection {
 }
 
 // --- Internal ----------------------------------------------------------------
+
+// A file inside the byte bound can still exceed the UTF-16 bound the parser and
+// the offset converter keep: 10 MB of ASCII is 10 485 760 units, over
+// ipcFieldCharsMax. That is user input, so it projects as a parse error; before
+// this check it reached the converter's assertion and crashed (found at step 4).
+function overlong(text: string): Projection {
+  const byteLength = encodeUtf8(text).length;
+  assert(byteLength >= text.length, 'UTF-8 never takes fewer bytes than UTF-16 units');
+  const message = `Source exceeds ${LIMITS.ipcFieldCharsMax} UTF-16 units.`;
+  return { tag: 'parse-error', byteLength, diagnostics: [{ message, near: undefined }] };
+}
 
 interface PendingNode {
   readonly node: PageNode;

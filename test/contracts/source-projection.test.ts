@@ -16,6 +16,7 @@ import {
   describeCapability,
   parseCapability,
 } from '../../dist/shared/capability.js';
+import { LIMITS } from '../../dist/shared/limits.js';
 import { parsePageResult } from '../../dist/shared/page-node.js';
 import { createSnapshot } from '../../dist/shared/snapshot.js';
 import {
@@ -135,6 +136,21 @@ test('only .astro pages are projected; a stylesheet is an opaque document', () =
   const css = projectOpaqueDocument('.card { color: red; }\n');
   const opaque = { tag: 'valid', byteLength: 22, utf16Length: 22, frontmatter: undefined };
   assert.deepEqual(css, { ...opaque, nodes: [] });
+});
+
+// Inside the byte bound but past the UTF-16 bound: 10 MB of ASCII. The parser
+// refuses it, and the projection must too — as a parse error, not the offset
+// converter's assertion (a crash before step 4 found it). One unit less passes.
+test('a page past the UTF-16 bound projects as a parse error, not a crash', () => {
+  const over = 'x'.repeat(LIMITS.ipcFieldCharsMax + 1);
+  assert.ok(Buffer.byteLength(over) <= LIMITS.sourceBytesMax, 'The file fits the byte bound');
+  const page = projectPage(over, parsePageResult(parsePage(over, { locs: true })));
+  assert.equal(page.tag, 'parse-error');
+  assert.equal(page.byteLength, LIMITS.ipcFieldCharsMax + 1);
+  assert.match(page.tag === 'parse-error' ? (page.diagnostics[0]?.message ?? '') : '', /UTF-16/);
+  assert.equal(projectOpaqueDocument(over).tag, 'parse-error');
+  const at = over.slice(1);
+  assert.equal(projectOpaqueDocument(at).tag, 'valid', 'Exactly at the bound is valid');
 });
 
 test('a snapshot computes its checksum from its bytes and matches its projection', () => {
