@@ -15,14 +15,15 @@ lands it.
   against the code that day: new step 0 (overwrite guard), corrected facts
   in plan §13. Since `d515fcc`, commit `3686761` added `src/modelAdoption.ts`
   (positional id adoption across reparse — UI keying only, see plan §4).
-- **Steps 1–3 landed (2026-09-28); steps 4–10 have not started.** The
+- **Steps 1–4 landed (2026-09-28); steps 5–10 have not started.** The
   contract layer, parser spans, hostile corpus, large fixtures, simulator
   skeleton, adapter ratchet and lint fences exist (Step 1), and so do the byte
   diff, the span mapper and the pure `set-attribute` planner (Step 2); nothing
   in the app submits intents yet. **The step-3 spike missed every
   pre-registered threshold** — two wrong-site applications in 400 seeds, and
-  intent→applied p95 of 147–1 728 ms against 50 ms (see Step 3). Step 4 decides
-  on those numbers; they do not move.
+  intent→applied p95 of 147–1 728 ms against 50 ms (see Step 3). **Step 4
+  decided fail (2026-09-28)**: step 0's guarded legacy path stays the shipped
+  write path, and step 5 does not start without a written plan revision.
 - **Step 0 landed (2026-09-28).** The legacy
   write path still serializes whole files (`mutateModel` → `page:write` →
   `serializePage`), but every page write now names the checksum it was
@@ -85,8 +86,9 @@ reported, not restored; markdown round-trips byte-exact; manual in-app
 check recorded. Step 0 is also the
 fallback if step 4 fails.
 
-**Landed 2026-09-28** on `refactor/architecture-consolidation` in `d10e9c5`. Gate `env -u ELECTRON_RUN_AS_NODE npm test`: 153/153
-test commands, 336.1 s, exit 0. Where each deliverable lives:
+**Landed 2026-09-28** on `refactor/architecture-consolidation` in `d10e9c5`.
+Gate `env -u ELECTRON_RUN_AS_NODE npm test`: 153/153 test commands, 336.1 s,
+exit 0. Where each deliverable lives:
 
 - Contract: `Digest` (`shared/brand.ts`), `digest` parser (`shared/boundary.ts`),
   `shared/page-save.ts` (`parsePageDiskRead`, `parsePageWriteResult`;
@@ -496,7 +498,7 @@ asserts no threshold; the fixture loader moved to `fixtures.entry.ts` so the
 gate suite and the bench run the same scenarios, and the simulator lint fence
 now also excepts `*.bench.ts` and `*.entry.ts`.
 
-### Step 4 — Threshold decision ⬜
+### Step 4 — Threshold decision ✅ (decided: **fail**; step 5 not started)
 
 **Deliverables.** A recorded decision, not code.
 
@@ -504,6 +506,79 @@ now also excepts `*.bench.ts` and `*.entry.ts`.
 count recorded; intent→applied and last keystroke→disk within the
 Thresholds below. Fail → report; step 0's guarded
 legacy path remains the shipped write path.
+
+**Decision record — 2026-09-28, HEAD `b387086`: FAIL. No-go.**
+
+Decided against the thresholds exactly as pre-registered (see Thresholds
+below). No number moved between the spike and this decision, so no reason
+for a move is owed; none is offered after the fact.
+
+Evidence: the step-3 report (`46e9fc6`) and a confirming re-run of
+`npm run spike:editor-core` at `b387086` on the same machine (i7-4820K,
+Node 24.18.0, WSL2 ext4), after `npm run fixtures:large` (manifest
+unchanged).
+
+| Criterion | Registered | Step 3 (`46e9fc6`) | Re-run (`b387086`) | Result |
+|---|---|---|---|---|
+| Wrong-site applications, corpus | 0 | 2 / 13 614 stale | 2 / 13 614 stale | **fail** |
+| Intent → applied p95, fresh | ≤ 50 ms | 147.1–1 061.1 | 153.0–1 117.4 | **fail, 6 of 6** |
+| Intent → applied p95, stale | ≤ 50 ms | 273.8–1 727.5 | 290.7–1 679.9 | **fail, 6 of 6** |
+| Last keystroke → disk p95 | ≤ 350 ms | 450.4–1 339.0 | 492.9–1 590.9 | **fail, 6 of 6** |
+| Adapter surface | recorded | 70 / 9 / 28 / 4 | 70 / 9 / 28 / 4 | recorded |
+
+The wrong-site plans reproduce exactly (deterministic simulator): seed 36,
+`i177` planned at byte 128, element at 107; seed 240, `i92` planned at byte
+51, element at 28 — both `duplicate-siblings.astro`. The re-run's p95 per
+fixture, milliseconds (intent → applied fresh / stale; keystroke → disk):
+
+| Fixture | Fresh | Stale | Keystroke → disk |
+|---|---|---|---|
+| nodes-25 | 153.0 | 290.7 | 492.9 |
+| nodes-50 | 428.2 | 628.6 | 652.0 |
+| nodes-100 | 816.8 | 1 312.2 | 931.1 |
+| bytes-25 | 378.8 | 547.5 | 644.9 |
+| bytes-50 | 602.8 | 896.3 | 928.5 |
+| bytes-100 | 1 117.4 | 1 679.9 | 1 590.9 |
+
+Run-to-run spread is wide (nodes-50 fresh p95 278 → 428 ms) but never
+approaches a threshold: the closest misses are 3.1× the engine budget
+(nodes-25 fresh) and 1.4× the keystroke budget (nodes-25).
+
+Consequences, per plan §11 step 4 ("Fail → keep step 0's guarded legacy
+path, report, and stop"):
+
+- **Step 0's guarded legacy path remains the shipped write path.** Whole-file
+  `serializePage` behind the checksum guard and `atomicWrite.ts`; an
+  external edit is a visible `conflict`, never an overwrite. Nothing the
+  steps 1–3 work added ships to the app.
+- **Step 5 is not started, nor anything after it.** Steps 5–10 stay ⬜ and
+  are blocked on a written plan revision, not on more work under this plan.
+- Steps 1–3 stay in the tree as test-only contracts, simulator and bench;
+  they gate nothing in `src/` and cost 43 s of gate time (`test:simulator`).
+
+What §12 says fires, and what the evidence says about it (inputs for the
+revision; nothing below is decided or built here):
+
+- **Fingerprint verifier** — its trigger (a simulated wrong-site
+  application) has fired, but it would not catch either case: the pasted
+  copy is byte-identical to the target, so a hash of the mapped slice
+  matches (Step 3). A fix must reason about the minimum edit script's
+  choice, not the mapped bytes.
+- **Incremental reparse** — its trigger (a failed latency threshold) has
+  fired, and it is the only §12 lever aimed at the dominant stage: reparse
+  + reproject is 120–644 ms p50 in the re-run, and one full reprojection of
+  nodes-25 alone is 2.4× the whole 50 ms budget. It would have to replace
+  the full reparse, not trim it.
+- **Cached diffs** — trigger fired, but the diff is not the cost: `plan` is
+  ≤ 172 ms p50 and only on bytes-*, most of it `byteStringsEqual` on the
+  fresh identity path (Step 3). Low value against these numbers.
+- Unmeasured, and needed before any threshold is re-registered: the legacy
+  path's own save latency on the same six fixtures. Without it there is no
+  evidence whether 50 ms was reachable by any path that reparses.
+
+Any continuation is a new plan revision: pick the mechanism, re-register
+thresholds with their written reason **before** the next measurement, then
+re-run step 3's bench. This record does not choose among those.
 
 ### Step 5 — Actor and write protocol ⬜
 
@@ -603,6 +678,9 @@ decision; revising them later requires a written reason.
 **Spike result (2026-09-28, Step 3): all three missed** — 2 wrong-site
 applications; intent→applied p95 147–1 728 ms; last keystroke→disk p95
 450–1 339 ms. Not renegotiated.
+
+**Step-4 decision (2026-09-28): fail, no-go** — confirmed by a re-run at
+`b387086`; the thresholds did not move. See Step 4.
 
 ## Limits work (§8)
 
@@ -835,6 +913,16 @@ update on every step):
   - Fixtures regenerated with `npm run fixtures:large`; manifest unchanged.
   - Formatting: new modules through Prettier 3.9.9 (npx cache, as step 2);
     every added line ≤ 100 columns.
+
+- 2026-09-28, step 4 (PROMPT-4), decision recorded on top of `b387086`; no
+  source changed:
+  - `npm run fixtures:large` then `npm run spike:editor-core` — one full
+    re-run, exit 0: wrong-site 2 (seeds 36, 240, identical to step 3); every
+    latency series FAIL; numbers in Step 4.
+  - `node dist/scripts/adapter-surface.js` — 70 / 9 / 28 / 4, at baseline.
+  - `env -u ELECTRON_RUN_AS_NODE npm test` — **pass, 154/154 test commands in
+    232.7 s, exit 0.**
+  - Every line of this file ≤ 100 columns (one step-0 line rewrapped).
 
 ## How to work this tracker
 
