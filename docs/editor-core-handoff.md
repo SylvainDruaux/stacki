@@ -26,7 +26,13 @@ artifacts and the executor workflow are committed.
 
 ## Where the work stands
 
-- Docs committed; zero plan code. Steps 1–9 all ⬜ in the tracker.
+- **2026-09-28:** the plan was re-verified against the code at `6c2f1a2` and
+  rewritten. New **step 0** ships a checksum guard and an atomic write on the
+  legacy `page:*` path first, closing the live overwrite bug; steps 1–10
+  (including diff-mapping) follow unchanged in intent. Corrections are
+  listed in plan §13.
+- Zero plan code. Steps 0–10 all ⬜ in the tracker. Run PROMPT-0A after
+  PROMPT-0.
 - The plan requires the determinism gate (no real timers in the simulator) and
   the hostile corpus (multi-span loop rename, kind-changing strip-bindings,
   multi-file CSS, frontmatter slots) from day one.
@@ -40,20 +46,24 @@ artifacts and the executor workflow are committed.
    each step's contracts are the next step's input.
 2. Every step ends with the full gate and a tracker update. AGENTS.md is
    normative; the gate command is `env -u ELECTRON_RUN_AS_NODE npm test`.
-3. The adapter surface (direct node-mutation sites in `src/`, plan estimate
-   ~123 + ~15) is a ratchet: counting starts at step 3, down only from step 6.
+3. The adapter surface (hand-measured 2026-09-28: 67 direct node-mutation
+   sites, 10 prop-index writes, 28 `mutateModel` + 4 `applyEdit` call sites)
+   is a ratchet: scripted at step 1, down only from step 6.
 4. Verify before claiming: record what you actually ran in the tracker's
    verification record, with the commit sha.
 
 ## First actions (PROMPT-0)
 
 1. Re-verify the tracker's handoff facts.
-2. Delete the stale `shared/dist/` (gitignored leftover; the
-   `test/contracts/build-layout.test.ts` gate fails while it exists).
-3. Resolve or record the `app-builder-lib` typing failure below.
-4. Start step 1 only when the contract suite is green.
+2. Confirm `shared/dist/` is still absent (it was gone by 2026-09-28).
+3. Resolve or record the `app-builder-lib` typing failure below, checking the
+   tracker's latest verification record first.
+4. Start step 0 (PROMPT-0A) only when the contract suite is green.
 
 ## Known environment facts (re-verified 2026-09-18 at `7053ccf`)
+
+**Update 2026-09-28 at `6c2f1a2`:** the full gate passes (153/153) and
+`shared/dist/` is gone; the two blockers below are historical.
 
 - `npm run build:scripts` fails: `scripts/afterPack.ts` TS2307 on
   `app-builder-lib` (installed but extraneous — declared in no

@@ -11,10 +11,16 @@ lands it.
 
 - TypeScript migration complete (Phases 0–4). First tracker stamp: `v0.1.28`,
   HEAD `21efec2`. Current: `v0.1.30`, HEAD `d515fcc` (2026-09-18).
+- **Re-verified 2026-09-28 at `6c2f1a2` (v0.1.34).** The plan was rewritten
+  against the code that day: new step 0 (overwrite guard), corrected facts
+  in plan §13. Since `d515fcc`, commit `3686761` added `src/modelAdoption.ts`
+  (positional id adoption across reparse — UI keying only, see plan §4).
 - **No editor-core step has started.** The repo still runs the legacy write
   path: renderer `mutateModel` → `page:write` payload → `serializePage` →
-  direct `fs.writeFileSync`; watcher echo via `selfWrites`; renderer rescan
-  chain; saver acks by `WeakSet` object identity.
+  direct `fs.writeFileSync` with no disk comparison (a dirty page's pending
+  save overwrites external edits: `src/App.tsx:1636`); watcher echo via
+  `selfWrites`; renderer rescan chain; saver acks by `WeakMap` object
+  identity.
 - **A partial precedent landed in the window (v0.1.29).**
   `electron/componentProperties.ts` validates a whole-file expected-source
   (`source.value !== request.source` → typed `conflict` rejection), then
@@ -31,23 +37,55 @@ lands it.
   parser's internal source offsets (`electron/astroParser.ts` `start`/`end`);
   `serialQueue`, `selfWrites`, `projectWatcher`; `shared/limits.ts` plus
   `electron/main.bounds.ts` and `shared/component-properties.ts` (`PROPERTY_LIMITS`).
-- The plan document itself is untracked (`?? docs/stacki-editor-core-plan.md`);
-  commit it before starting step 1.
+- The plan's current revision is uncommitted until the next docs commit;
+  commit it before starting step 0.
 
 ## Steps
 
 Gates are per the plan's implementation sequence (§11). Ratchet counters
 (adapter surface) go down only; nothing grows a cap or retries forever.
 
+### Step 0 — Overwrite guard on the legacy path ⬜
+
+**Deliverables.** SHA-256 `checksum` on `page:read` / `page:write` /
+`page:writeRaw` results and `baseChecksum` on the write payloads; main
+re-reads and returns a typed `conflict` on mismatch without writing;
+`electron/atomicWrite.ts` extracted from `writePropertyFile`
+(`electron/componentProperties.ts`) and used by page, chunk, style
+re-write, and component-properties writes; renderer `SaveState` union
+(`clean` | `dirty` | `saving` | `conflicted`) replacing `dirty?: boolean`, with
+autosave off while `conflicted` and a notice that never discards input;
+every page type covered (`.astro`, Markdown, MDX, raw); BOM detection and
+preservation. Also (decided 2026-09-28): the watcher hot reload drops page
+undo snapshots (today Undo after an external reload reverts the external
+edit); `component:editProperties` rollback checks each file before restoring
+and a read-back race becomes a `write-race` result, not an `assert`; `.md` /
+`.mdx` fixtures with byte-exact round-trip tests.
+
+**Gate proof.** Contract tests for good and bad checksum shapes; external
+edit between read and write returns `conflict` with disk bytes unchanged
+(`test/outside-edit.js`); failed atomic write leaves no temp file; BOM +
+CRLF fixtures round-trip; every `SaveState` transition pinned; external
+reload leaves no snapshot to undo into; externally changed batch file is
+reported, not restored; markdown round-trips byte-exact; manual in-app
+check recorded. Step 0 is also the
+fallback if step 4 fails.
+
 ### Step 1 — Contracts and simulator skeleton ⬜
 
 **Deliverables.** `shared/intent.ts`, `shared/ref.ts`, `shared/snapshot.ts`,
 the capability model, the rejection enum, the extended limits, and the
-hostile fixture corpus. The deterministic simulator skeleton lands with the
-determinism constraint (§10): the actor is driven as pure steps by a
-deterministic scheduler — no real timers, no OS async, disk I/O behind an
-interface the simulator fakes. The `shared/projection.ts` /
-`shared/page-node.ts` rename lands in this step's commit. A lint rule bans
+hostile fixture corpus. The parser emits attribute name and value spans
+(today it has none: `shared/page-node.ts:12-16`), with a span-integrity
+contract test on every corpus and large fixture. A deterministic generator
+builds named large fixtures (about 25/50/100 % of `sourceBytesMax` and
+`treeNodesMax`) for the step-4 thresholds. The deterministic
+simulator skeleton lands with the determinism constraint (§10): the actor is
+driven as pure steps by a deterministic scheduler — no real timers, no OS
+async, disk I/O behind an interface the simulator fakes, a hand-rolled
+seeded PRNG. New projection types take a name that cannot collide with
+`shared/page-node.ts` (no `shared/projection.ts` exists; nothing to
+rename). `scripts/adapter-surface.ts` joins the gate as a ratchet. A lint rule bans
 whole-file regeneration calls (mechanically enforces the no-`toSource()`
 invariant; today that means confining `serializePage` / `serializeNodes`
 call sites to the writer boundary).
@@ -72,10 +110,11 @@ corpus diversity is a failed gate if it is thin, not a passed one.
 
 **Deliverables.** Intent → map → witness-check → splice → reparse →
 reproject against the simulator's seeded scenarios. Record mapping
-correctness, reproject-plus-diff latency, and the **adapter surface** — the
-direct node-mutation sites in `src/`. The plan's measured estimate is ~123
-mutation sites plus ~15 prop-index writes (~138 total, §13); re-measure and
-record the count here, then track it downward.
+correctness, reproject-plus-diff latency, and the **adapter surface** from
+`scripts/adapter-surface.ts` (step 1). Hand-measured baseline 2026-09-28:
+67 direct mutation sites, 10 prop-index writes, 28 `mutateModel` and 4
+`applyEdit` call sites. The keystroke→disk threshold is reconciled with the
+300 ms typing save delay before the spike starts.
 
 **Gate proof.** Results published against the pre-registered numbers (§11.4,
 see Thresholds below). The numbers may not change between the spike and the
@@ -86,8 +125,9 @@ step-4 decision without a written reason.
 **Deliverables.** A recorded decision, not code.
 
 **Gate proof.** Zero wrong-site applications across the corpus; adapter
-count recorded; latency within budget. Fail → report and fall back to the
-anchor plan, which the author keeps intact (not on file in this repo).
+count recorded; intent→applied and last keystroke→disk within the
+Thresholds below. Fail → report; step 0's guarded
+legacy path remains the shipped write path.
 
 ### Step 5 — Actor and write protocol ⬜
 
@@ -95,7 +135,9 @@ anchor plan, which the author keeps intact (not on file in this repo).
 (`accepted` / `backpressured`; terminal `applied` / `rejected` /
 `uncertain`), expected-bytes witnesses, atomic write (temp file in the same
 directory, flush, atomic replace), re-read-and-verify, new snapshot commit.
-Platform integration suite against real filesystems — the simulator cannot
+**Single writer:** the legacy save path submits the migration-only
+`ReplaceSource` intent through the actor; one actor per chunk file (plan
+§3.3, §5.2). Platform integration suite against real filesystems — the simulator cannot
 test the real write protocol. Single-gesture parallel run with parity checks
 against the legacy path.
 
@@ -105,17 +147,22 @@ durability, Windows replacement semantics, symlinks, writer interference,
 and the crash-between-replace-and-verify reconciliation that produces
 `uncertain`. The OS-facing contract is pinned: what "flush" means, how mode
 and metadata are preserved, symlink policy, canonical paths on
-case-insensitive filesystems.
+case-insensitive filesystems. `component:editProperties` runs through the
+actors as a batch, acquired in sorted canonical-path order.
 
 ### Step 6 — Gesture expansion ⬜
 
 **Deliverables.** Single-file operations ship in order: attribute → prop →
 insert/remove → move → inline CSS → frontmatter slots. Stylesheet intents
 (multi-file) follow the §3.3 outcome-gated composition rule once a real
-gesture needs them. New features enter through intents only.
+gesture needs them. New features enter through intents only. Undo on the
+engine: each `applied` outcome records inverse splices; Undo submits them as
+an intent against the post-apply checksum; `LIMITS.undoEntriesMax` (100)
+bounds the stack. The property batch gains an inverse batch.
 
-**Gate proof.** Adapter surface shrinks monotonically. Undo semantics must
-be decided before this step (see Open questions).
+**Gate proof.** Adapter surface shrinks monotonically. Undo after an
+external edit maps through the diff or rejects — never reverts the external
+change (simulator scenario).
 
 ### Step 7 — Capabilities and preview bridge ⬜
 
@@ -140,9 +187,11 @@ resumes automatically once it parses again.
 ### Step 9 — Deletion ⬜
 
 **Deliverables.** Compat adapter, legacy mutable tree
-(`shared/editor-model.ts`), `WeakSet` acks (`src/pagePersistence.ts`),
-version counters, `n\d+` parser ids — plus three special cases the actor
-dissolves:
+(`shared/editor-model.ts`), `WeakMap` acks (`src/pagePersistence.ts`),
+version counters, `n<N>` parser ids and `c<N>` renderer ids,
+`src/modelAdoption.ts`, `PageSnapshot` and the snapshot branch of
+`AppHistory`, `ReplaceSource` for `.astro` (Markdown and MDX keep it until
+step 10) — plus three special cases the actor dissolves:
 
 - `electron/selfWrites.ts` — the actor's own write is a watcher tick whose
   read matches the committed checksum; the suppression machinery evaporates.
@@ -153,10 +202,23 @@ dissolves:
 **End state.** Snapshots, projections, intents, splices. The file on disk is
 the only persisted state.
 
+### Step 10 — Markdown and MDX on the engine ⬜
+
+**Deliverables.** Spans with the span-integrity property in
+`electron/markdownParser.ts`; markdown gestures as intents; `ReplaceSource`
+and `serializeMarkdownPage` retired as write paths.
+
+**Gate proof.** Same simulator and gate rules as steps 1–6, run against the
+step-0 markdown fixtures.
+
 ## Thresholds (pre-registered, §11.4)
 
-- Intent → applied p95 ≤ 50 ms on a representative large file.
-- Keystroke → disk p95 ≤ 150 ms on a representative large file.
+- Intent → applied p95 ≤ 50 ms on the named large fixtures (the engine).
+- Last keystroke → disk p95 ≤ 350 ms on the same fixtures: 300 ms typing
+  batch + 50 ms engine. Re-registered 2026-09-28 from ≤ 150 ms. Reason: the
+  batch exists because every save costs the preview a server re-render,
+  fetch, and DOM diff (`src/App.tsx:1498-1507`); it is persistence-layer
+  policy, not engine cost (plan §7).
 - Zero wrong-site applications across the corpus.
 
 Published before the spike; may not move between the spike and the step-4
@@ -173,18 +235,27 @@ Every bound lives in `shared/limits.ts`. Existing and usable:
 To add at step 1: max file bytes (merge up from `MAIN_LIMITS.sourceBytesMax`),
 max projection nodes, max nesting depth, max pending intents, max intent
 payload bytes, max diff work, max parse tasks in flight, max retained
-snapshots, max watcher work per tick, max preview markers. Exceeding a limit
+snapshots, max watcher work per tick, max preview markers; at step 6,
+`undoEntriesMax` (100, today's `AppHistory` cap). Exceeding a limit
 returns `resource-limit` or `queue-full` — the system never grows a drain
 cap, retries forever, or reduces fidelity to cope.
 
-## Adapter surface (ratchet, counted at step 3)
+## Adapter surface (ratchet, scripted at step 1)
 
 | Point | Count | State |
 |---|---|---|
-| Direct node-mutation sites in `src/` | ~123 (plan estimate) | to re-measure at step 3 |
-| Prop-index writes | ~15 (plan estimate) | to re-measure at step 3 |
+| Direct node-mutation sites in `src/` | 67 (47 in `App.tsx`) | hand-measured 2026-09-28 |
+| Prop-index writes | 10 | hand-measured 2026-09-28 |
+| `mutateModel(` call sites | 28 | hand-measured 2026-09-28 |
+| `applyEdit(` call sites | 4 | hand-measured 2026-09-28 |
 
-Record the real numbers at step 3. From step 6 the count goes down only.
+Method (to be encoded in `scripts/adapter-surface.ts`): grep `src/**/*.ts{,x}`
+excluding `src/style-panel/` for field assignments, array mutators and
+`delete` on node fields (`props`, `children`, `attrOrder`, `attrSource`,
+`kind`, `name`, `value`, `id`, `dynamicTag`, `slots`, `body`, `test`,
+`nodes`, `mdRaw`, `mdSource`), plus aliased-list mutators. The earlier
+~123 + ~15 estimate likely counted wrapper call sites. From step 6 the
+count goes down only.
 
 ## Open questions
 
@@ -196,12 +267,20 @@ consolidated plan:
   new snapshot per applied intent (§5.10); pending intents carry compact
   authored preconditions (§3.1). Confirm the interleaving behavior in the
   step-5 simulator runs.
-- **Undo semantics** — open. Under file-as-state, undo is an inverse intent
-  or a byte-level restore; the renderer's current snapshot/command
-  `AppHistory` is the legacy model to replace. Decide before step 6.
+- **Undo semantics** — resolved 2026-09-28: drop page snapshots on external
+  reload at step 0; inverse splices submitted as intents at step 6; snapshot
+  history deleted at step 9.
+- **Keystroke → disk threshold** — resolved 2026-09-28: split into engine
+  (≤ 50 ms) and last keystroke → disk (≤ 350 ms); see Thresholds.
 - **Morph move-blindness** — partially addressed: morph-without-reload from
   a projection diff capped by a limit, honest reload past the cap (§9).
   Confirm the moved-node case at steps 6–7.
+- **`component:editProperties`** — resolved 2026-09-28: hardened batch
+  (checked rollback and `write-race` at step 0; actors in sorted path order
+  at step 5; inverse batch at step 6). Best-effort rollback goes in product
+  requirements.
+- **Markdown and MDX** — resolved 2026-09-28: guarded and round-trip tested
+  at step 0; on the engine at step 10.
 
 ## Telemetry (§9a)
 
@@ -244,6 +323,26 @@ update on every step):
     above (`electron/componentProperties.ts`, `shared/component-properties.ts`).
   - `npm run build:scripts` still fails on `app-builder-lib`/`builder-util`
     TS2307. Blocker unchanged by the window.
+- 2026-09-28, HEAD `6c2f1a2` (v0.1.34), plan rewrite (docs only):
+  - `env -u ELECTRON_RUN_AS_NODE npm test` — **pass, 153/153 test commands
+    in 341.9 s, exit 0.** The `app-builder-lib` blocker no longer reproduces;
+    `shared/dist/` is absent.
+  - Plan facts re-verified by reading the cited `file:line`s (plan §13).
+    Adapter surface hand-measured (table above).
+  - Same day, after reviewing an external architecture chat (Doom, database
+    and SpacetimeDB techniques): spatial and B-tree indexes rejected (plan
+    §12); plan amended for the step-5 two-writer hole (`ReplaceSource`), the
+    step-0 `SaveState` union, multi-file writes, Markdown/MDX scope, large
+    fixtures, parser decision, pure planner, brute-force oracle rule. Checked
+    `electron/preload.ts:1524` (hit-testing via `elementFromPoint`) and corpus
+    sizes (max 2.7 KB). Docs only; no gate re-run.
+  - Same day, open decisions settled with the owner (plan §14): latency
+    split, hardened property batch, undo as inverse splices, Markdown at
+    step 10. Found and scheduled into step 0: undo reverting external edits
+    after a watcher reload (`src/App.tsx:1600-1671` lacks `dropPageHistory`),
+    blind batch rollback and assert-on-race
+    (`electron/componentProperties.ts:249,253-276`), missing markdown
+    round-trip tests. Docs only.
 
 ## How to work this tracker
 

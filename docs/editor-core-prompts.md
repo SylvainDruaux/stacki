@@ -21,12 +21,11 @@ All prompts share the same standing rules:
   code.
 - Verify before claiming. Record what you actually ran in the tracker.
 
-Known environment blockers (state them when they bite; do not hack around
-them): `scripts/afterPack.ts` currently fails `tsc` with TS2307 on
-`app-builder-lib` (present but extraneous in `node_modules`), and a stale
-generated `shared/dist/` fails one build-layout contract test. Both are
-tracked in `docs/editor-core-tracker.md`; removal of `shared/dist` is a
-pre-flight item below.
+Known environment state (state it when it bites; do not hack around it):
+the stale `shared/dist/` is gone (verified 2026-09-28). The `app-builder-lib`
+TS2307 failure in `scripts/afterPack.ts` was recorded on 2026-09-18; the
+tracker's verification record holds the latest gate result — trust it over
+this paragraph.
 
 ---
 
@@ -46,12 +45,11 @@ READ FIRST
 ACTIONS
 1. Re-verify the handoff facts in the tracker: no `shared/intent.ts`,
    `ref.ts`, `snapshot.ts`, `projection.ts`, `diff.ts`, `mapSpan.ts` exists;
-   the legacy write path (`pagePersistence` / `WeakSet` acks, `serializePage`
+   the legacy write path (`pagePersistence` / `WeakMap` acks, `serializePage`
    in `electron/main.ts`, `selfWrites`, `rescanChainMax`) is present. If any
    fact is wrong, fix the tracker, not the code.
-2. Remove the stale generated tree `shared/dist/` (leftover from an earlier
-   compiler config; `shared/tsconfig.json` emits to `dist/shared`) and
-   confirm `npm run test:contracts` goes green on the build-layout suite.
+2. Confirm `shared/dist/` is still absent and `npm run test:contracts` is
+   green on the build-layout suite.
 3. Investigate the `app-builder-lib` TS2307 failure long enough to either
    fix it in `package.json`/the lockfile (only if the fix is a declared
    devDependency, nothing else) or record the finding in the tracker's
@@ -65,6 +63,72 @@ ACTIONS
 DEFINITION OF DONE
 Working tree clean except your own commits; contract suite green;
 verification record updated; you can name the first step and its gate.
+
+---
+
+## PROMPT-0A — Step 0: overwrite guard on the legacy path
+
+TASK
+Land Step 0 of `docs/stacki-editor-core-plan.md` (§11 step 0): a checksum
+guard and an atomic write on the existing `page:*` save path, so a pending
+save can never silently overwrite an external edit. Nothing of the new
+engine yet.
+
+READ FIRST
+- Plan §5.1 (what one save writes today), §7 (rejection UX contract), §3.2
+  (encoding contract, BOM), §11 step 0
+- `electron/main.ts` (`writeChunks`, `writePageText`, `page:read`,
+  `page:write`, `page:writeRaw`), `electron/componentProperties.ts`
+  (`writePropertyFile` — the precedent), `electron/main.bounds.ts`
+  (`readSource`)
+- `shared/ipc-payloads.ts`, `shared/ipc-results.ts`, `shared/preload-api.ts`,
+  `docs/contracts.md` (new-channel and changed-channel rules)
+- `src/pagePersistence.ts`, `src/App.tsx` save flow (`flushSave`,
+  `markSaved`, the watcher handler's dirty-page branch)
+
+SCOPE
+- `checksum` (SHA-256 hex via `node:crypto`) on `page:read`, `page:write`,
+  `page:writeRaw` results; `baseChecksum` on the two write payloads. Parsers
+  accept exactly 64 lowercase hex characters.
+- Main re-reads the file before writing; mismatch → `err({ code: 'conflict' })`
+  and no write. A missing file is its own typed error, not a conflict.
+- `electron/atomicWrite.ts`: extracted from `writePropertyFile`; same-
+  directory temp file, `wx`, preserved mode, fsync, rename, cleanup,
+  `Result`. Page, chunk, style re-write, and component-properties writes all
+  use it; the style re-write compares checksums.
+- Renderer: replace `dirty?: boolean` (`src/pagePersistence.ts`) with the
+  plan §7 `SaveState` union (`clean` | `dirty` | `saving` | `conflicted`).
+  On `conflict`, enter `conflicted`, stop autosave, keep the model, and
+  show a non-blocking notice with "Reload from disk" and "Review in code";
+  never overwrite automatically. The watcher's dirty-page branch surfaces
+  the conflict instead of dropping the change.
+- Every page type: `.astro`, Markdown, MDX, and raw pages share the guard.
+- BOM: detect, parse frontmatter past it, preserve it on write.
+- Undo: the watcher hot-reload path in `src/App.tsx` calls
+  `dropPageHistory`, as `openFile` and `reloadFromDisk` already do. Today
+  Undo after an external reload silently reverts the external edit.
+- `component:editProperties` (plan §3.3): rollback re-reads each written
+  file and restores only if it still holds the bytes Stacki wrote, listing
+  the others in the `rollback` error; a read-back mismatch returns
+  `write-race` and rolls back instead of asserting.
+- Markdown/MDX: `.md` and `.mdx` fixtures (headings, lists, fences, CRLF,
+  BOM, MDX JSX blocks) with byte-exact parse→serialize round-trip tests.
+
+ENGINEERING STANDARDS (AGENTS.md)
+- `conflict` is an expected failure (`Result`); a malformed checksum on the
+  wire is a boundary parse failure; a violated write invariant asserts.
+- Pair assertions: assert the checksum before writing and after re-reading.
+- `Digest` is a branded type in `shared/brand.ts`, constructed only by the
+  parser and the hash function.
+
+DEFINITION OF DONE
+Contract tests pin good and bad checksum shapes on every changed channel;
+`test/outside-edit.js` gains the external-edit-while-dirty case (disk bytes
+unchanged, `conflict` returned); a failed atomic write leaves no temp file;
+every `SaveState` transition pinned, including autosave staying off while
+`conflicted`; BOM + CRLF fixtures round-trip; manual check recorded (edit in app, edit
+externally, save → notice, external edit intact); full gate green; tracker
+step 0 ✅.
 
 ---
 
@@ -91,12 +155,27 @@ SCOPE
   projection; no version field), the capability model (`editable` |
   `read-only-opaque` | `repeated-source-node` | `runtime-aggregate` |
   `unsupported`), extend `shared/limits.ts` with every §8 bound that does
-  not exist, plus a hostile fixture corpus (multi-span loop rename,
-  kind-changing strip-bindings, multi-file CSS intent, frontmatter slot
-  edit) and a deterministic simulator skeleton.
-- The `shared/projection.ts` / `shared/page-node.ts` name unification lands
-  in this commit. The `Projection` sum (`valid` | `parse-error`) is
-  first-class from day one (§3.6).
+  not exist (merge `MAIN_LIMITS.sourceBytesMax` up), plus a hostile fixture
+  corpus (multi-span loop rename, kind-changing strip-bindings, multi-file
+  CSS intent, frontmatter slot edit) and a deterministic simulator skeleton
+  with a hand-rolled seeded PRNG (no fast-check).
+- Parser attribute spans: `electron/astroParser.ts` emits name and value
+  spans per attribute (`Utf16Offset`), validated in `shared/page-node.ts`,
+  with a span-integrity contract test (plan §3.2): slicing the source at
+  each node and attribute span reproduces the reported text on every corpus
+  and large fixture.
+- Large fixtures: a deterministic script generates named fixtures from
+  corpus pieces at about 25/50/100 % of `sourceBytesMax` and `treeNodesMax`
+  and records their sizes (plan §10). Step 4's thresholds use them.
+- New projection types live in a module whose name cannot collide with
+  `shared/page-node.ts` (there is no `shared/projection.ts` today; nothing
+  to rename). The `Projection` sum (`valid` | `parse-error`) is first-class
+  from day one (§3.6).
+- `scripts/adapter-surface.ts`: counts direct node-mutation sites,
+  prop-index writes, and `mutateModel` / `applyEdit` call sites with the
+  grep method written in its header; runs in the gate as a ratchet beside
+  `scripts/ratchet-check.ts`. Baseline measured by hand 2026-09-28:
+  67 / 10 / 28 / 4.
 - Add a lint rule banning whole-file regeneration outside the writer
   boundary (today: confine `serializePage` / `serializeNodes` call sites).
 - New contract suites under `test/contracts/` in the existing style.
@@ -142,6 +221,10 @@ SCOPE
   nodes are typed rejections, never "the third matching node" (§4). The
   mapper never guesses.
 - One operation only: `SetAttribute`, resolved against its witness.
+- The planner is pure (plan §5.2): `planIntent(snapshot, intent) →
+  Result<readonly Splice[]>` with no I/O, clock, or randomness.
+- Every fast path in `diff.ts` / `mapSpan.ts` ships with a brute-force
+  reference, and a test asserts they agree (plan §10).
 
 ENGINEERING STANDARDS (AGENTS.md)
 - Pure functions; every declared input type produces a declared output
@@ -168,17 +251,20 @@ Run the spike: intent → map → witness-check → splice → reparse →
 reproject against the simulator's seeded scenarios (§11.3).
 
 READ FIRST
-- Plan §11.3 (spike), §11.4 (thresholds, published before this prompt),
-  §13 (the measured ~123 mutation sites + ~15 prop-index writes)
+- Plan §11 steps 3–4 (spike, thresholds), §13
 - `docs/editor-core-tracker.md` step 3 and the §Thresholds section
+
+PRECONDITION
+The thresholds in the tracker are the registered ones (2026-09-28):
+intent→applied p95 ≤ 50 ms and last keystroke→disk p95 ≤ 350 ms on the
+named large fixtures. Measure against them; do not renegotiate.
 
 SCOPE
 - Wire the step-1/2 modules end to end in the simulator.
 - Measure and record: mapping correctness per scenario, reproject-plus-diff
-  latency, and the adapter surface — count the direct node-mutation sites
-  in `src/` (search for `mutateModel`, in-place `props` writes, `loopBindings`
-  live readers, panels that edit trees) and compare with the plan's ~123 +
-  ~15 estimate. Put the real numbers in the tracker's adapter table.
+  latency, and the adapter surface from `scripts/adapter-surface.ts`
+  (baseline 67 / 10 / 28 / 4). Put the numbers in the tracker's adapter
+  table.
 - Publish intent→applied p95 and keystroke→disk p95 against the
   pre-registered thresholds (§11.4). These numbers are pre-registered; if
   the spike misses them, report, do not renegotiate.
@@ -207,8 +293,8 @@ READ FIRST
 SCOPE
 - Zero wrong-site applications across the corpus; latency within the
   pre-registered budget; adapter count recorded. Pass → proceed to step 5.
-  Fail → report and retain the anchor plan as the fallback (off-file, kept
-  by the author) — do not start step 5.
+  Fail → report; step 0's guarded legacy path remains the shipped write
+  path — do not start step 5.
 - If any threshold must move, the reason is written before it moves; a
   number that can move after measurement is a number that can be negotiated
   (§11.4).
@@ -234,10 +320,10 @@ READ FIRST
   the `uncertain` crash semantics), §3.5 (submission vs outcome, no
   retries, reconciliation is comparison), §7 (external writers), §9a
   (telemetry), §11.5 (gate)
-- `electron/main.ts` (`writePageText`, `page:write` handlers),
-  `electron/componentProperties.ts` (the v0.1.29 proto of the §5 write:
-  whole-file expected-source check, temp-file batch commit with rollback —
-  reuse its patterns, then delete it at step 9),
+- `electron/main.ts` (`writePageText`, `writeChunks`, `page:write`
+  handlers), `electron/atomicWrite.ts` (from step 0 — the actor writes
+  through it), `electron/componentProperties.ts` (whole-file expected-source
+  check, multi-file commit with rollback — include it in parity runs),
   `electron/serialQueue.ts`, `electron/selfWrites.ts`,
   `electron/projectWatcher.ts`, `src/pagePersistence.ts`
 - Tracker step 5
@@ -262,6 +348,15 @@ SCOPE
   and indexer interference, cooperating writers, crashes between
   replacement and verification (§10). The `uncertain` reconciliation is
   exercised here.
+- Single writer (plan §3.3, §5.2): the legacy save path submits the
+  migration-only `ReplaceSource` intent through the actor; each chunk file
+  has its own actor. A test proves nothing outside the actors writes a
+  page, chunk, or stylesheet. Every `applied` outcome returns the new
+  checksum and the persistence layer adopts it as the next baseline.
+- `component:editProperties` runs through the actors as a batch: take the
+  involved actors in sorted canonical-path order (no deadlock between two
+  batches), each file witnessed by its `before` checksum, bounded by
+  `PROPERTY_LIMITS.filesMax`. Keep the checked rollback from step 0.
 - Parity: the same gesture through the legacy path and the actor must
   produce identical files on the corpus.
 
@@ -309,8 +404,12 @@ SCOPE
   owns debounce, coalescing, the flush timer for held values, and the
   re-review affordance; a rejected intent never destroys user input (§7,
   rejection UX contract).
-- Decide undo semantics before this step ships and record the decision
-  (tracker open questions): inverse intent vs byte-level restore.
+- Undo on the engine (decided 2026-09-28): each `applied` outcome records
+  its inverse splices (same ranges, expected and replacement bytes
+  swapped); Undo submits them as an intent against the post-apply
+  checksum. Add `LIMITS.undoEntriesMax` (100). The property batch gains an
+  inverse batch. Simulator scenario: undo after an external edit maps or
+  rejects, never reverts the external change.
 
 ENGINEERING STANDARDS (AGENTS.md)
 - One name per concept; operations extend the union, not the writer
@@ -415,7 +514,8 @@ the corpus, plan §3.6); tracker step 8 ✅.
 
 TASK
 Delete the legacy layer the actor replaces (§11.9): compat adapter, legacy
-mutable tree, `WeakSet` acks, version counters, `n\d+` ids — plus
+mutable tree, `WeakMap` acks, version counters, `n<N>` / `c<N>` ids,
+`src/modelAdoption.ts` — plus
 `selfWrites.ts`, `saveDrainMax`, and `rescanChainMax`. End state: snapshots,
 projections, intents, splices. The file on disk is the only persisted state.
 
@@ -435,6 +535,10 @@ SCOPE
   mapping as every edit (§4, §12 — the ⇧⌘C trail payoff).
 - `n\d+` parser ids: verify nothing keys on parse-order ids across
   snapshots; session restart re-resolves everything from bytes.
+- Delete `ReplaceSource` for `.astro` pages (Markdown and MDX keep it until
+  step 10, plan §6).
+- Delete `PageSnapshot` and the snapshot branch of `AppHistory`; undo is
+  inverse splices only.
 - Delete `selfWrites` machinery, the drain caps, and the rescan chain, and
   remove their limits from `shared/limits.ts` only after the actor's
   equivalent behavior is proven by the full suite.
@@ -449,8 +553,33 @@ ENGINEERING STANDARDS (AGENTS.md)
 
 DEFINITION OF DONE
 Full gate green; `rg` confirms zero remaining mutation-of-model call sites
-outside the intent pipeline; tracker step 9 ✅ and the whole plan row set
-⏺ closed.
+outside the intent pipeline; tracker step 9 ✅.
+
+---
+
+## PROMPT-10 — Step 10: Markdown and MDX on the engine
+
+TASK
+Move `.md` and `.mdx` pages onto the engine (plan §6, §11 step 10).
+
+READ FIRST
+- Plan §3.2 (spans, span integrity), §6 (scope), §10 (simulator), §11
+  step 10
+- `electron/markdownParser.ts`, the step-0 markdown fixtures and round-trip
+  tests, tracker step 10
+
+SCOPE
+- Node and attribute spans in the markdown parser, with the span-integrity
+  property on every markdown fixture.
+- Markdown gestures as intents through the same actor, planner and
+  simulator; oracle scenarios for markdown-specific shapes (lists, fences,
+  MDX JSX blocks).
+- Retire `ReplaceSource` and `serializeMarkdownPage` as write paths.
+
+DEFINITION OF DONE
+Simulator invariants hold on the markdown corpus; byte-exact round trips
+still pass; no whole-file write path remains; tracker step 10 ✅ and the
+whole plan row set closed.
 
 ---
 
@@ -518,8 +647,9 @@ changed — no blanket "clean" claims without the run evidence.
 
 1. Feed PROMPT-0 first, in a session with repo access and the workflow's
    commit rights.
-2. Then PROMPT-1..9 strictly in order. Do not parallelize: each step's
-   contracts are the next step's input.
+2. Then PROMPT-0A (step 0 ships on its own and is worth shipping even if
+   the program stops there), then PROMPT-1..10 strictly in order. Do not
+   parallelize: each step's contracts are the next step's input.
 3. Run PROMPT-ALIGN last, or as a checkpoint before any release while the
    program is mid-flight.
 4. After each prompt: read the tracker's updated verification record before

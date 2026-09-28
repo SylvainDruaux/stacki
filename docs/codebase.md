@@ -139,7 +139,7 @@ edit → mutate tree → debounce 300ms → save queue → write .astro
 - `src/pagePersistence.ts` (`createPageSaver` / `createFileSaver`) debounces,
   serializes writes per file, and **drains edits made while a write is
   pending**. A successful write acknowledges its exact state — currently by
-  `WeakSet` object identity (see "live model vs boundary", below); drain
+  `WeakMap` object identity (see "live model vs boundary", below); drain
   loops are capped at `LIMITS.saveDrainMax` (each pass past the cap means
   edits arrive faster than writes can drain — a bug, not a load).
 - `electron/serialQueue.ts` orders file writes in the main process.
@@ -247,7 +247,7 @@ pain, in priority order:
    Remaining renderer conversions can adopt those payload/result types directly.
 2. **One mutable tree wears two hats.** The live editor model is mutated in
    place (`loopBindings` even rewrites node `kind`s), while the boundary
-   contract is `readonly`; saves ack by `WeakSet` identity as a workaround
+   contract is `readonly`; saves ack by `WeakMap` identity as a workaround
    for "which version of the file is this?". **Superseded by
    `docs/stacki-editor-core-plan.md`** (tracked in
    `docs/editor-core-tracker.md`): the long-term fix is the editor core —
@@ -266,7 +266,7 @@ pain, in priority order:
    hotspots (`App` ccx 1,026, `parsePropSchema` 334, `PropField` 288,
    `ClipPath` 776) split **after** conversion, never in the same commit.
 
-Explicit non-changes: no state library (the WeakSet issue is
+Explicit non-changes: no state library (the WeakMap ack issue is
 identity-vs-version, not missing stores), no `.astro` AST dependency (loses
 the text fidelity the slots exist to keep), no churning of the
 batching/queueing write path (already the right shape).
