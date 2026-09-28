@@ -10,7 +10,7 @@ lands it.
 ## Handoff state (read this first)
 
 - TypeScript migration complete (Phases 0–4). First tracker stamp: `v0.1.28`,
-  HEAD `21efec2`. Current: `v0.1.30`, HEAD `d515fcc` (2026-09-18).
+  HEAD `21efec2`. Current: `v0.1.34`, HEAD `b642efa` (2026-09-28, pre-flight).
 - **Re-verified 2026-09-28 at `6c2f1a2` (v0.1.34).** The plan was rewritten
   against the code that day: new step 0 (overwrite guard), corrected facts
   in plan §13. Since `d515fcc`, commit `3686761` added `src/modelAdoption.ts`
@@ -32,13 +32,14 @@ lands it.
   channels arrived (`component:properties`, `component:editProperties`).
 - Nothing of the new core exists as named modules: no `intent.ts`, `ref.ts`,
   `snapshot.ts`, `projection.ts`, `diff.ts`, `mapSpan.ts`, capability model,
-  actor rejection enum, or bounded intent queue (verified by `rg`, 2026-09-18).
+  actor rejection enum, or bounded intent queue (verified by `rg`, 2026-09-18;
+  re-verified at `b642efa`, 2026-09-28).
 - What the plan builds on: the `shared/` contract parsers and bounds; the
   parser's internal source offsets (`electron/astroParser.ts` `start`/`end`);
   `serialQueue`, `selfWrites`, `projectWatcher`; `shared/limits.ts` plus
   `electron/main.bounds.ts` and `shared/component-properties.ts` (`PROPERTY_LIMITS`).
-- The plan's current revision is uncommitted until the next docs commit;
-  commit it before starting step 0.
+- The plan, tracker, prompt pack and cross-links are committed (`40817fb`,
+  `b642efa`); step 0 starts from a clean docs tree.
 
 ## Steps
 
@@ -343,6 +344,29 @@ update on every step):
     blind batch rollback and assert-on-race
     (`electron/componentProperties.ts:249,253-276`), missing markdown
     round-trip tests. Docs only.
+- 2026-09-28, HEAD `b642efa` (v0.1.34), PROMPT-0 pre-flight (no source change):
+  - Handoff facts re-verified: no `shared/{intent,ref,snapshot,projection,
+    diff,mapSpan}.ts` and no such module anywhere in the tree; no capability
+    model, rejection enum or intent queue. The legacy path is present:
+    `WeakMap` acks (`src/pagePersistence.ts:33`), `serializePage` in
+    `page:write` (`electron/main.ts:3067-3076`, direct write via
+    `writePageText`), `electron/selfWrites.ts`, `LIMITS.rescanChainMax`
+    (`shared/limits.ts:31`, used at `src/App.tsx:816`), the dirty-page
+    watcher drop (`src/App.tsx:1636`), and `writePropertyFile`
+    (`electron/componentProperties.ts:309-328`). One stale fact fixed: the
+    plan revision was already committed in `b642efa`.
+  - `shared/dist/` absent. `npm run test:contracts` — **163/163 pass**;
+    build-layout suite 3/3 (`all compiler output lives under dist` green).
+  - `app-builder-lib` TS2307: **does not reproduce.** `npm run build:scripts`
+    exits 0; `npm ls` shows `app-builder-lib@25.1.8` and `builder-util@25.1.7`
+    under the declared devDependency `electron-builder@25.1.8`, zero
+    extraneous packages. The lockfile held the same versions at `21efec2` and
+    `d515fcc`, so the 2026-09-17/18 failure was local `node_modules` drift
+    (the "extraneous" report means the tree no longer required the package),
+    not a manifest defect. No `package.json` or lockfile change. Latent risk
+    left open: `scripts/afterPack.ts:6-7` imports both packages without
+    declaring them, relying on npm hoisting; if it recurs, declare them as
+    exact devDependencies pinned to the `electron-builder` versions.
 
 ## How to work this tracker
 
