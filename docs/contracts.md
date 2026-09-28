@@ -93,3 +93,15 @@ rebuilds `dist/`, compiles Electron, preload, and shared contracts, builds the
 renderer, runs strict `tsc --noEmit`, ESLint, the migration ratchet, and every
 `test:*` command. Generated JavaScript belongs only in `dist/`; source folders
 must contain TypeScript and source assets.
+
+The builds run in order; `tsc --noEmit`, ESLint and the ratchet then run side
+by side, and the test commands run in a bounded pool (`scripts/test-pool.ts`,
+default one fewer than the CPUs, `npm test -- --jobs=<n>` to change it,
+`--jobs=1` for a serial run). A passing command prints one line; a failing one
+prints its full output. `test:contracts` runs first and alone because it
+rebuilds `dist/shared`, which the others read. `test:hovercost`,
+`test:popoverdropdown`, `test:selectorwell` and `test:thumbs` run last and
+alone because they measure timing, depend on read ordering, or drive a real
+window. A new test must write only to its own scratch path under
+`node_modules/.stacki-test/` (or a `mkdtemp` directory) and bind no fixed
+port, so it can share the pool.

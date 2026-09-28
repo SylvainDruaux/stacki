@@ -73,8 +73,7 @@ reported, not restored; markdown round-trips byte-exact; manual in-app
 check recorded. Step 0 is also the
 fallback if step 4 fails.
 
-**Landed 2026-09-28** on `refactor/architecture-consolidation` (commit in the
-verification record). Gate `env -u ELECTRON_RUN_AS_NODE npm test`: 153/153
+**Landed 2026-09-28** on `refactor/architecture-consolidation` in `d10e9c5`. Gate `env -u ELECTRON_RUN_AS_NODE npm test`: 153/153
 test commands, 336.1 s, exit 0. Where each deliverable lives:
 
 - Contract: `Digest` (`shared/brand.ts`), `digest` parser (`shared/boundary.ts`),
@@ -413,7 +412,7 @@ update on every step):
     left open: `scripts/afterPack.ts:6-7` imports both packages without
     declaring them, relying on npm hoisting; if it recurs, declare them as
     exact devDependencies pinned to the `electron-builder` versions.
-- 2026-09-28, step 0 (PROMPT-0A), on top of `1172b31`:
+- 2026-09-28, step 0 (PROMPT-0A), `d10e9c5` on top of `1172b31`:
   - `env -u ELECTRON_RUN_AS_NODE npm test` — **pass, 153/153 test commands in
     336.1 s, exit 0** (static gates: tsc, eslint 0 errors, ratchet 0).
   - `npm run test:contracts` includes `page-save.test.ts` (10/10) and the
@@ -428,6 +427,14 @@ update on every step):
     version and cleared the notice; the next edit saved normally; no
     `.stacki-write-*` file remained. Screenshot evidence was inspected, not
     committed.
+- 2026-09-28, gate runner (not an editor-core step): test commands now run in
+  a bounded parallel pool and the static checks side by side
+  (`scripts/test-pool.ts`, `docs/contracts.md` Required gate). Full gate
+  336.1 s serial → 195.9 / 203.6 / 197.8 s on three consecutive green runs
+  (8 CPUs, 7 jobs). `test:selectorwell` failed twice under load (a stale
+  stylesheet read restored `red` after an edit), so it runs alone until that
+  read-ordering race is understood; open question for the style panel, not
+  for this program.
 
 ## How to work this tracker
 

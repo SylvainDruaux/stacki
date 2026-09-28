@@ -4,7 +4,15 @@
 
 import { spawnSync } from 'node:child_process';
 import fs = require('node:fs');
+import os = require('node:os');
 import path = require('node:path');
+import {
+  parseJobs,
+  runTestPool,
+  stopTestPool,
+  type TestCommand,
+  type TestOutcome,
+} from './test-pool';
 
 interface PackageScripts {
   readonly [name: string]: string;
@@ -33,9 +41,20 @@ function readScripts(packagePath: string): PackageScripts {
 
 const root = path.join(__dirname, '..', '..');
 const scripts = readScripts(path.join(root, 'package.json'));
-const requested = process.argv.slice(2).map((name) =>
-  name.startsWith('test:') ? name : `test:${name}`,
+const flags = process.argv.slice(2).filter((argument) => argument.startsWith('--'));
+const unknownFlags = flags.filter((flag) => !flag.startsWith('--jobs='));
+if (unknownFlags.length > 0) {
+  console.error(`Unknown flag: ${unknownFlags.join(', ')} (supported: --jobs=<n>)`);
+  process.exit(1);
+}
+const jobs = parseJobs(
+  flags.find((flag) => flag.startsWith('--jobs='))?.slice('--jobs='.length),
+  os.availableParallelism(),
 );
+const requested = process.argv
+  .slice(2)
+  .filter((argument) => !argument.startsWith('--'))
+  .map((name) => (name.startsWith('test:') ? name : `test:${name}`));
 const names =
   requested.length > 0
     ? requested
@@ -76,13 +95,25 @@ const staticGates: readonly GateCommand[] = [
     [path.join(root, 'dist', 'scripts', 'stage-runtime.js')],
   ],
   ['build:web', node, [path.join(root, 'node_modules', 'vite', 'bin', 'vite.js'), 'build']],
-  ['tsc --noEmit', node, [typeScript, '--noEmit']],
-  ['eslint', node, [path.join(root, 'node_modules', 'eslint', 'bin', 'eslint.js'), '.']],
-  ['ratchet-check', node, [path.join(root, 'dist', 'scripts', 'ratchet-check.js')]],
+];
+// The checks only read what the builds produced, so they run side by side.
+const staticChecks: readonly TestCommand[] = [
+  { name: 'tsc --noEmit', command: node, argumentsList: [typeScript, '--noEmit'] },
+  {
+    name: 'eslint',
+    command: node,
+    argumentsList: [path.join(root, 'node_modules', 'eslint', 'bin', 'eslint.js'), '.'],
+  },
+  {
+    name: 'ratchet-check',
+    command: node,
+    argumentsList: [path.join(root, 'dist', 'scripts', 'ratchet-check.js')],
+  },
 ];
 
 for (const [label, command, argumentsList] of staticGates) {
   console.log(`\n[gate] ${label}`);
+  const gateStartedMs = Date.now();
   const result = spawnSync(command, argumentsList, {
     cwd: root,
     env: environment,
@@ -95,42 +126,100 @@ for (const [label, command, argumentsList] of staticGates) {
     console.error(`\nStatic gate failed: ${label}`);
     process.exit(1);
   }
+  console.log(`[gate] ${label} done in ${((Date.now() - gateStartedMs) / 1000).toFixed(1)}s`);
 }
 
-for (const [index, name] of names.entries()) {
-  console.log(`\n[${index + 1}/${names.length}] ${name}`);
+// Three phases. Exclusive commands rebuild output the others read, so they run
+// first and alone. Load-sensitive commands measure timing or drive a real
+// window, so they run last and alone. Everything else shares the pool.
+// selectorwell is here because a stylesheet read that starts before an edit can
+// land after it under load and restore the old value; until that race is
+// understood, it runs where its timing assumptions hold.
+const exclusive = ['test:contracts'];
+const alone = ['test:hovercost', 'test:popoverdropdown', 'test:selectorwell', 'test:thumbs'];
+const toCommand = (name: string): TestCommand => {
   const command = scripts[name];
   if (command === undefined) {
     throw new Error(`Missing validated test command ${name}`);
   }
-  const result = spawnSync(command, {
-    cwd: root,
-    env: environment,
-    shell: true,
-    stdio: 'inherit',
-  });
-  if (result.signal === 'SIGINT' || result.signal === 'SIGTERM') {
-    process.exit(130);
+  return { name, command };
+};
+const phases: readonly (readonly TestCommand[])[] = [
+  names.filter((name) => exclusive.includes(name)).map(toCommand),
+  names.filter((name) => !exclusive.includes(name) && !alone.includes(name)).map(toCommand),
+  names.filter((name) => alone.includes(name)).map(toCommand),
+];
+process.on('SIGINT', () => {
+  stopTestPool();
+  process.exit(130);
+});
+let testsStartedMs = Date.now();
+let finished = 0;
+const report = (outcome: TestOutcome): void => {
+  finished += 1;
+  const seconds = (outcome.durationMs / 1000).toFixed(1);
+  const verdict = outcome.passed ? 'ok  ' : 'FAIL';
+  console.log(`[${finished}/${names.length}] ${verdict} ${outcome.name} (${seconds}s)`);
+  if (!outcome.passed) {
+    failed.push(outcome.name);
+    console.log(outcome.output);
   }
-  if (result.status !== 0 || result.error) {
-    failed.push(name);
-    if (result.error) {
-      console.error(result.error.message);
-    }
+};
+// Every check's output is shown (lint warnings included); any failure stops the
+// gate before the tests, as a failed build does.
+async function runStaticChecks(): Promise<void> {
+  const options = { cwd: root, environment, jobs: Math.min(jobs, staticChecks.length) };
+  const outcomes = await runTestPool(staticChecks, options, (outcome) => {
+    const seconds = (outcome.durationMs / 1000).toFixed(1);
+    console.log(`\n[gate] ${outcome.name} ${outcome.passed ? 'done' : 'FAILED'} in ${seconds}s`);
+    console.log(outcome.output);
+  });
+  const failures = outcomes.filter((outcome) => !outcome.passed);
+  if (failures.length > 0) {
+    console.error(`\nStatic gate failed: ${failures.map((outcome) => outcome.name).join(', ')}`);
+    process.exit(1);
   }
 }
 
-const quarantined: readonly string[] = [];
-const flaky = ['test:hovercost', 'test:popoverdropdown'] as const;
-const durationSeconds = ((Date.now() - startedMs) / 1000).toFixed(1);
-console.log(`\n${names.length - failed.length}/${names.length} test commands passed in ${durationSeconds}s.`);
-if (failed.length > 0) {
-  console.error(`Failed: ${failed.join(', ')}`);
+async function runPhases(): Promise<readonly TestOutcome[]> {
+  await runStaticChecks();
+  testsStartedMs = Date.now();
+  console.log(`\n[gate] ${names.length} test commands, ${jobs} at a time`);
+  const outcomes: TestOutcome[] = [];
+  for (const [index, phase] of phases.entries()) {
+    const phaseJobs = index === 1 ? jobs : 1;
+    const options = { cwd: root, environment, jobs: phaseJobs };
+    outcomes.push(...(await runTestPool(phase, options, report)));
+  }
+  return outcomes;
 }
-const tolerated = [...quarantined, ...flaky];
-const unexpected = failed.filter((name) => !tolerated.includes(name));
-const healed = quarantined.filter((name) => !failed.includes(name) && names.includes(name));
-if (healed.length > 0) {
-  console.error(`\nQuarantined tests now pass — remove them: ${healed.join(', ')}`);
+
+function summarize(outcomes: readonly TestOutcome[]): void {
+  const slowest = [...outcomes].sort((left, right) => right.durationMs - left.durationMs);
+  const named = slowest
+    .slice(0, 5)
+    .map((outcome) => `${outcome.name} ${(outcome.durationMs / 1000).toFixed(1)}s`);
+  const testSeconds = ((Date.now() - testsStartedMs) / 1000).toFixed(1);
+  console.log(`\nTest commands took ${testSeconds}s. Slowest: ${named.join(', ')}`);
+
+  const quarantined: readonly string[] = [];
+  const flaky = ['test:hovercost', 'test:popoverdropdown'] as const;
+  const durationSeconds = ((Date.now() - startedMs) / 1000).toFixed(1);
+  const passed = names.length - failed.length;
+  console.log(`\n${passed}/${names.length} test commands passed in ${durationSeconds}s.`);
+  if (failed.length > 0) {
+    console.error(`Failed: ${failed.join(', ')}`);
+  }
+  const tolerated = [...quarantined, ...flaky];
+  const unexpected = failed.filter((name) => !tolerated.includes(name));
+  const healed = quarantined.filter((name) => !failed.includes(name) && names.includes(name));
+  if (healed.length > 0) {
+    console.error(`\nQuarantined tests now pass — remove them: ${healed.join(', ')}`);
+  }
+  process.exitCode = unexpected.length > 0 || healed.length > 0 ? 1 : 0;
 }
-process.exitCode = unexpected.length > 0 || healed.length > 0 ? 1 : 0;
+
+runPhases().then(summarize, (error: unknown) => {
+  console.error(error);
+  process.exit(1);
+});
