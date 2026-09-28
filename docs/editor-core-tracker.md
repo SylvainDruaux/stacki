@@ -249,8 +249,8 @@ see the table below.
 **Gate proof.** Ambiguity resolves to a typed rejection, never a fallback to
 "the third matching node"; a missing node is a rejection, never a guess.
 
-**Landed 2026-09-28** on `refactor/architecture-consolidation` (commit recorded
-in the verification record below). Gate `env -u ELECTRON_RUN_AS_NODE npm
+**Landed 2026-09-28** on `refactor/architecture-consolidation` in `4eb4815`.
+Gate `env -u ELECTRON_RUN_AS_NODE npm
 test`: 154/154 test commands, 229.6 s, exit 0. Where each deliverable lives:
 
 - Line-diff evaluation (plan §11 step 2): `electron/conflicts.ts:54` does not
@@ -645,7 +645,7 @@ update on every step):
   - `node dist/scripts/large-fixtures.js` — six fixtures in 2.1 s, targets hit
     exactly; manifest committed.
 
-- 2026-09-28, step 2 (PROMPT-2), on top of `164e323`:
+- 2026-09-28, step 2 (PROMPT-2), `4eb4815` on top of `164e323`:
   - `env -u ELECTRON_RUN_AS_NODE npm test` — **pass, 154/154 test commands in
     229.6 s, exit 0** (static checks: tsc, eslint 0 errors, `ratchet-check` 0,
     `adapter-surface` 70 / 9 / 28 / 4 at baseline).
