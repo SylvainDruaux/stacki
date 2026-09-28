@@ -1,15 +1,17 @@
 // The step-1 reference planner: identity mapping only. It plans an intent when
 // the file still holds exactly the bytes the intent was authored against, and
-// rejects everything else — it never maps a span through a diff. Step 2 adds
-// the mapper; this planner then stays as the brute-force reference for the
-// zero-diff case, which every fast path must agree with (plan §10).
+// rejects everything else — it never maps a span through a diff. Step 2's
+// planner (shared/planner.ts) maps set-attribute through the diff; this one
+// stays as the reference for the zero-diff case, which the shipping planner
+// must agree with (plan §10), and plans the other operations in the simulator
+// until their steps ship them.
 //
 // Pure (plan §5.2): snapshot and intent in, Result out. No disk, no clock.
 import { assert } from '../../dist/shared/assert.js';
 import { capabilityAcceptsVisualIntent } from '../../dist/shared/capability.js';
 import type { Intent, RejectionReason } from '../../dist/shared/intent.js';
 import { LIMITS } from '../../dist/shared/limits.js';
-import type { AnchorRef, NodeKind, StructuralPath } from '../../dist/shared/ref.js';
+import type { AnchorRef, StructuralPath } from '../../dist/shared/ref.js';
 import { err, ok, type Result } from '../../dist/shared/result.js';
 import type { Snapshot } from '../../dist/shared/snapshot.js';
 import type { ProjectedNode, Projection } from '../../dist/shared/source-projection.js';
@@ -20,26 +22,13 @@ import {
   type ByteSpan,
   type ByteString,
 } from '../../dist/shared/span.js';
+import type { CandidatePolicy, Plan, PostKind } from '../../dist/shared/planner.js';
 import type { Splice } from './splice.ts';
 
 const QUOTE_DOUBLE = 0x22;
 const QUOTE_SINGLE = 0x27;
 
-export interface PostKind {
-  readonly path: StructuralPath;
-  readonly kind: NodeKind;
-}
-
-/** What the candidate must satisfy after the splices apply (plan §5.2 step 6).
- * Visual intents need a parsing candidate; the code editor and the legacy save
- * may write invalid bytes (plan §3.6). */
-export type CandidatePolicy = 'must-parse' | 'may-be-invalid';
-
-export interface Plan {
-  readonly splices: readonly Splice[];
-  readonly postKinds: readonly PostKind[];
-  readonly candidate: CandidatePolicy;
-}
+export type { CandidatePolicy, Plan, PostKind };
 
 export type Planner = (snapshot: Snapshot, intent: Intent) => Result<Plan, RejectionReason>;
 

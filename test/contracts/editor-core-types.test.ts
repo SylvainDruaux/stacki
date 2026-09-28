@@ -14,7 +14,10 @@ import {
   type IntentId,
 } from '../../dist/shared/brand.js';
 import type { Capability } from '../../dist/shared/capability.js';
+import type { ByteDiff, DiffOutcome } from '../../dist/shared/diff.js';
 import type { Outcome, RejectionReason, SubmissionResult } from '../../dist/shared/intent.js';
+import type { SpanMapping } from '../../dist/shared/mapSpan.js';
+import type { Plan, PlanningBase } from '../../dist/shared/planner.js';
 import type { AnchorRef } from '../../dist/shared/ref.js';
 import type { Snapshot } from '../../dist/shared/snapshot.js';
 import type { Projection } from '../../dist/shared/source-projection.js';
@@ -37,6 +40,47 @@ function describe(outcome: Outcome): string {
       return exhaustive;
     }
   }
+}
+
+// A mapping outcome has no default: adding a variant is a compile error here
+// and in the planner, which must decide what the new outcome rejects with.
+function mappingReason(mapping: SpanMapping): RejectionReason | undefined {
+  switch (mapping.tag) {
+    case 'resolved':
+      return undefined;
+    case 'ambiguous':
+      return 'anchor-ambiguous';
+    case 'gone':
+      return 'anchor-moved';
+    case 'too-costly':
+      return 'resource-limit';
+    default: {
+      const exhaustive: never = mapping;
+      return exhaustive;
+    }
+  }
+}
+
+export function mappingTypeChecks(
+  mapping: SpanMapping,
+  outcome: DiffOutcome,
+  diff: ByteDiff,
+  base: PlanningBase,
+  plan: Plan,
+): void {
+  // @ts-expect-error Only a resolved mapping carries a span: no "best guess" on the others.
+  void mapping.span;
+  // @ts-expect-error A too-costly diff carries no partial diff to map through.
+  void outcome.diff;
+  // @ts-expect-error The frontiers stay private to the diff; callers read distances.
+  void diff.forward;
+  // @ts-expect-error A diff is immutable once computed.
+  diff.distance = 0;
+  // @ts-expect-error Planning needs the authored snapshot, not only the current one (plan §4).
+  const currentOnly: PlanningBase = { current: base.current };
+  // @ts-expect-error A plan's splices are read-only.
+  plan.splices.length = 0;
+  void currentOnly;
 }
 
 export function typeChecks(snapshot: Snapshot, projection: Projection, reason: RejectionReason): void {
@@ -73,4 +117,6 @@ export function typeChecks(snapshot: Snapshot, projection: Projection, reason: R
 test('type-level contracts compile only as intended', () => {
   assert.equal(typeof typeChecks, 'function');
   assert.equal(describe({ tag: 'rejected', intentId: toIntentId('i1'), reason: 'write-race' }), 'write-race');
+  assert.equal(typeof mappingTypeChecks, 'function');
+  assert.equal(mappingReason({ tag: 'ambiguous' }), 'anchor-ambiguous');
 });

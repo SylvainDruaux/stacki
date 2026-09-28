@@ -1,9 +1,11 @@
-// Splices, the only write primitive (plan §3.4), in their step-1 reference
-// form. The expected bytes are the witness: a splice applies only where the
-// range still holds exactly the bytes the plan saw. Step 3 promotes this into
-// the engine; until then the simulator owns the one implementation.
+// Applying splices, the only write primitive (plan §3.4), in their step-1
+// reference form. The expected bytes are the witness: a splice applies only
+// where the range still holds exactly the bytes the plan saw. The Splice type
+// is the planner's (shared/planner.ts, step 2); step 3 promotes applying into
+// the engine, until then the simulator owns the one implementation.
 import { assert } from '../../dist/shared/assert.js';
 import { LIMITS } from '../../dist/shared/limits.js';
+import type { Splice } from '../../dist/shared/planner.js';
 import {
   byteStringsEqual,
   toByteSpan,
@@ -12,11 +14,7 @@ import {
   type ByteString,
 } from '../../dist/shared/span.js';
 
-export interface Splice {
-  readonly range: ByteSpan;
-  readonly expectedBytes: ByteString;
-  readonly replacementBytes: ByteString;
-}
+export type { Splice };
 
 /** Whether every splice's range holds its expected bytes (plan §5.2 step 4). */
 export function witnessesHold(bytes: ByteString, splices: readonly Splice[]): boolean {

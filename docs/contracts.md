@@ -75,10 +75,11 @@ by the model writers.
 unsaved edits in code. `test/fixtures/round-trip/` holds the byte-exact
 Astro, Markdown and MDX fixtures (CRLF, BOM) the save path must reproduce.
 
-## Editor core (plan step 1)
+## Editor core (plan steps 1–2)
 
-The contract layer of `docs/stacki-editor-core-plan.md`. Nothing in the app
-submits intents yet; these types and parsers are what steps 2–10 build on.
+The contract layer of `docs/stacki-editor-core-plan.md`, and since step 2 the
+diff, the span mapper and the pure planner. Nothing in the app submits
+intents yet; these modules are what steps 3–10 build on.
 
 - `span.ts` — `ByteSpan` and `Utf16Span` over the branded `ByteOffset` and
   `Utf16Offset` (`brand.ts`); mixing them is a compile error. The only
@@ -105,6 +106,25 @@ submits intents yet; these types and parsers are what steps 2–10 build on.
 - `snapshot.ts` — `createSnapshot` computes the checksum from the bytes through
   an injected hash (the renderer has no `node:crypto`) and asserts the
   projection measured the same bytes. There is no version field.
+- `diff.ts` (step 2) — `diffBytes(source, target, budget)`: Myers' O(ND) byte
+  diff run in both directions, so `distanceBefore` / `distanceAfter` give the
+  prefix and suffix edit distance of any grid point; `diffHunks` prints one
+  minimum script. Budget: `LIMITS.diffWorkMax` (byte comparisons plus frontier
+  cells) and `LIMITS.diffDistanceMax` (frontier memory); exhaustion is the
+  typed `too-costly`, never a partial diff.
+- `mapSpan.ts` (step 2) — `mapSpan(lastKnown, current, span, budget)` →
+  `resolved` (every minimum edit script keeps the span whole at one place) |
+  `gone` (none keeps it whole) | `ambiguous` (they disagree) | `too-costly`.
+  Decided from two columns of the span; `test/simulator/reference-diff.ts`
+  checks every column and the suites assert they agree.
+- `planner.ts` (step 2) — `Splice`, `Plan`, and the pure
+  `planIntent({ authored, current }, intent)` → `Result<Plan, RejectionReason>`.
+  Plans `set-attribute` only: it maps the element's name-through-last-attribute
+  region through the diff and splices the mapped value, with the authored value
+  as its witness; `ambiguous` → `anchor-ambiguous`, `gone` → `anchor-moved`,
+  `too-costly` → `resource-limit`. Other operations are `unsupported-operation`
+  until their steps. Equal checksums skip the diff; `planIntentThroughDiff` is
+  that fast path's reference.
 
 The parser (`parsePage(text, { locs: true })`) reports `start`/`end` on every
 node — branches and inline-run gap spaces included — and `attrSpans` on every
@@ -126,7 +146,9 @@ large fixtures (`npm run fixtures:large` writes the files).
 
 The simulator (`test/simulator/`, `npm run test:simulator`) drives the real
 parser, a reference planner and a step-wise actor over a fake disk with a
-seeded PRNG, and checks the nine invariants after every event.
+seeded PRNG, and checks the nine invariants after every event. Its
+`diff`, `map-span` and `planner` suites hold the step-2 modules to their
+brute-force references and to hand-derived byte ranges.
 `STACKI_SIMULATOR_SEEDS=<n>` raises the seed count for a long run.
 
 Lint fences (`eslint.config.mjs`): `serializePage`, `serializeNodes` and

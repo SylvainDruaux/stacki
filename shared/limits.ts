@@ -49,9 +49,18 @@ export const LIMITS = {
   /** Splices one intent may plan, and sites one multi-span operation may name.
    * A loop rename in a generated page touches hundreds of sites, not millions. */
   splicesPerIntentMax: 4_096,
-  /** Work units one diff may spend (step 2 defines the unit). Exhaustion is a
-   * `resource-limit` rejection, never a silent fallback. */
+  /** Work units one diff may spend, and each span mapping through it: one unit
+   * is one byte comparison or one frontier cell (shared/diff.ts). A 10 MB file
+   * with a small edit costs about 4·10⁷ — both directions scan it once — so the
+   * bound admits the largest file and refuses quadratic blow-ups. Exhaustion is
+   * a `resource-limit` rejection, never a silent fallback. */
   diffWorkMax: 50_000_000,
+  /** Edit distance (bytes deleted plus bytes inserted) one diff searches to.
+   * The frontiers it keeps grow with its square: 2·(D + 1)² 32-bit cells, about
+   * 34 MB at this bound. An external change larger than this, racing a pending
+   * intent, rejects with `resource-limit`; the renderer re-authors against the
+   * refreshed snapshot, where no diff is needed. */
+  diffDistanceMax: 2_048,
   /** Parses one actor may have in flight: the current read plus one newer. */
   parseTasksInFlightMax: 2,
   /** Snapshots one actor retains: the committed one plus the candidate under

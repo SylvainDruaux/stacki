@@ -15,10 +15,11 @@ lands it.
   against the code that day: new step 0 (overwrite guard), corrected facts
   in plan §13. Since `d515fcc`, commit `3686761` added `src/modelAdoption.ts`
   (positional id adoption across reparse — UI keying only, see plan §4).
-- **Step 1 landed (2026-09-28); steps 2–10 have not started.** The contract
-  layer, parser spans, hostile corpus, large fixtures, simulator skeleton,
-  adapter ratchet and lint fences exist (see Step 1 below); nothing in the app
-  submits intents yet.
+- **Steps 1 and 2 landed (2026-09-28); steps 3–10 have not started.** The
+  contract layer, parser spans, hostile corpus, large fixtures, simulator
+  skeleton, adapter ratchet and lint fences exist (Step 1), and so do the byte
+  diff, the span mapper and the pure `set-attribute` planner (Step 2); nothing
+  in the app submits intents yet.
 - **Step 0 landed (2026-09-28).** The legacy
   write path still serializes whole files (`mutateModel` → `page:write` →
   `serializePage`), but every page write now names the checksum it was
@@ -36,9 +37,11 @@ lands it.
   now exist (`page:*` and `component:editProperties`), and two new IPC
   channels arrived (`component:properties`, `component:editProperties`).
 - Since step 1: `shared/intent.ts`, `ref.ts`, `snapshot.ts`, `span.ts`,
-  `capability.ts` and `source-projection.ts` exist; `diff.ts`, `mapSpan.ts`, the
-  shipping actor and its bounded queue do not (the simulator's step-wise actor
-  in `test/simulator/actor.ts` is the reference the step-5 actor must match).
+  `capability.ts` and `source-projection.ts` exist; since step 2, `diff.ts`,
+  `mapSpan.ts` and `planner.ts`. The shipping actor and its bounded queue do
+  not (the simulator's step-wise actor in `test/simulator/actor.ts` is the
+  reference the step-5 actor must match); the simulator still plans with the
+  step-1 reference planner — wiring the step-2 planner in is step 3.
 - What the plan builds on: the `shared/` contract parsers and bounds; the
   parser's internal source offsets (`electron/astroParser.ts` `start`/`end`);
   `serialQueue`, `selfWrites`, `projectWatcher`; `shared/limits.ts` plus
@@ -239,12 +242,91 @@ files are generated, not committed (the manifest pins them); adapter counts
 are the script's (70 / 9 / 28 / 4), not the hand count (67 / 10 / 28 / 4) —
 see the table below.
 
-### Step 2 — Diff and mapping ⬜
+### Step 2 — Diff and mapping ✅
 
 **Deliverables.** `diff.ts`, `mapSpan.ts`, `set-attribute` only.
 
 **Gate proof.** Ambiguity resolves to a typed rejection, never a fallback to
 "the third matching node"; a missing node is a rejection, never a guess.
+
+**Landed 2026-09-28** on `refactor/architecture-consolidation` (commit recorded
+in the verification record below). Gate `env -u ELECTRON_RUN_AS_NODE npm
+test`: 154/154 test commands, 229.6 s, exit 0. Where each deliverable lives:
+
+- Line-diff evaluation (plan §11 step 2): `electron/conflicts.ts:54` does not
+  generalize — it fills an n·m table and, past 250 000 cells, silently returns
+  the region whole. Replaced for this purpose, not reused.
+- `shared/diff.ts`: Myers' O(ND) byte diff, run forward and over the reversed
+  bytes, keeping every frontier row, so `distanceBefore(x, y)` /
+  `distanceAfter(x, y)` give exact prefix and suffix edit distances at any grid
+  point (binary search over rows, O(log D)); `diffHunks` prints one minimum
+  script. Budget at the entry point: `LIMITS.diffWorkMax` (now defined: one
+  unit per byte comparison or frontier cell) and the new
+  `LIMITS.diffDistanceMax` 2 048 (frontier memory 2·(D + 1)² cells, ≈ 34 MB at
+  the bound; a size change past it is refused without searching). Exhaustion is
+  `too-costly`, never a partial diff. No recursion.
+- `shared/mapSpan.ts`: `resolved` only when **every** minimum edit script keeps
+  the span whole at the same place; `gone` when none keeps it whole;
+  `ambiguous` otherwise; `too-costly` on the budget. Decided exactly from two
+  columns (the span's first and last byte, via the distance sums) — a proof in
+  the module header, and the brute-force reference
+  `test/simulator/reference-diff.ts` checks every column instead.
+- `shared/planner.ts`: `Splice`, `Plan` (moved from the simulator, which now
+  imports them), and the pure `planIntent({ authored, current }, intent)` →
+  `Result<Plan, RejectionReason>`. `set-attribute` resolves the anchor in the
+  authored bytes, maps the element's **name-through-last-attribute** region
+  (`Hero title="Old"`) through the diff, re-finds the node there in the current
+  projection, and splices the mapped value with the authored value as its
+  witness. `ambiguous` → `anchor-ambiguous`, `gone` → `anchor-moved`,
+  `too-costly` → `resource-limit`; every other operation is
+  `unsupported-operation` until its step. Equal checksums skip the diff (the
+  fast path); `planIntentThroughDiff` is its reference.
+- Tests (`test/simulator/`, in `test:simulator`): `diff.test.ts` (6: exact
+  distances at every grid point and valid hunks vs full DP tables on 1 500
+  seeded inputs, edge cases, each budget at / under / past its bound, pinned
+  assertion messages, a 1 MB file); `map-span.test.ts` (9: fast vs reference on
+  every span of 2 000 seeded inputs, each outcome > 1 000 times; pinned
+  hand-derived ranges for hero/footer sharing `title="Old"`, identical
+  siblings, moved and duplicated blocks, edits around and inside the span, a
+  wrapped and re-indented page); `planner.test.ts` (8: the three set-attribute
+  oracles exactly, through both paths and the step-1 reference; the wrong-site
+  fixture against hand-edited current files with hand-written expected output
+  and offsets; every rejection reason; a sweep of 49 `.astro` fixtures where
+  all 81 planned attributes agree across fast path, reference and diff path,
+  and re-plan at exactly the shifted range after an insertion above). Type
+  level: `editor-core-types.test.ts` gains 6 `@ts-expect-error` checks (no span
+  on a non-resolved mapping, no diff on `too-costly`, private frontiers,
+  immutable diff and plan, planning needs the authored snapshot).
+
+Found by step 2 and settled in the design:
+
+- Mapping the whole opening tag is too strict: every tag starts with `<`, so
+  inserting `<div>` before `<Hero` ties a script that matches Hero's `<` to the
+  div's, and the tag is `ambiguous`. The planner maps the name through the last
+  attribute instead; the `<div>` case is pinned both ways in `map-span.test.ts`.
+  Loosening the mapper's rule instead ("one place keeps it whole") would map
+  both of two identical cards onto the survivor after one is deleted — the
+  wrong-site case the rule exists for.
+- Byte-level conservatism the simulator must judge (plan §14), pinned as
+  rejections: a near-copy block inserted above the target (other text or
+  class), a heading that spells the target's tag name (`<h1>Cards</h1>` above
+  `<Card`), and an attribute appended after the target's last attribute
+  (`anchor-ambiguous`); any external edit inside the region (`anchor-moved`).
+
+Handed to step 3:
+
+- **The planner needs the authored snapshot** (`PlanningBase.authored`), not
+  only the current one — the §4 resolution function takes last-known bytes.
+  Which snapshots the actor retains for pending intents is the open
+  `lastKnownBytes` chaining question below; `snapshotsRetainedMax` (2) may not
+  cover an intent authored two commits back.
+- **Diff latency on the largest fixture.** Measured by hand with a throwaway
+  script (not committed): a small edit in a 1 MB page diffs in ≈ 12 ms, in a
+  10 MB page in ≈ 90–115 ms (both directions scan the whole file once). Only a
+  stale intent pays it — equal checksums skip the diff — but the step-4
+  intent→applied p95 (≤ 50 ms) is measured on the large fixtures, so step 3
+  must report it. A search that exhausts `diffDistanceMax` costs ≈ 150–250 ms
+  before rejecting. Plan §12's cached-diff upgrade is the lever if it fails.
 
 ### Step 3 — Spike ⬜
 
@@ -415,10 +497,14 @@ Carried from the removed diff-mapping plan; resolved or still open per the
 consolidated plan:
 
 - **Threshold timing** — resolved: pre-registered at §11.4, decided at step 4.
-- **`lastKnownBytes` chaining** — addressed by design: the actor commits a
-  new snapshot per applied intent (§5.10); pending intents carry compact
-  authored preconditions (§3.1). Confirm the interleaving behavior in the
-  step-5 simulator runs.
+- **`lastKnownBytes` chaining** — reopened by step 2 (2026-09-28). The
+  actor commits a new snapshot per applied intent (§5.10), but mapping a stale
+  intent needs the *bytes* it was authored against (`PlanningBase.authored`),
+  not only compact preconditions (§3.1 says the latter). Decide at step 5, with
+  the simulator's interleavings: which authored snapshots the actor keeps
+  (bounded by `snapshotsRetainedMax`, today 2), or whether the renderer's
+  last-known bytes travel with the intent (bounded by `intentPayloadBytesMax`).
+  An intent whose authored bytes are gone rejects `anchor-moved`, as today.
 - **Undo semantics** — resolved 2026-09-28: drop page snapshots on external
   reload at step 0; inverse splices submitted as intents at step 6; snapshot
   history deleted at step 9.
@@ -558,6 +644,20 @@ update on every step):
     `test/simulator/`): every one reported, probes deleted.
   - `node dist/scripts/large-fixtures.js` — six fixtures in 2.1 s, targets hit
     exactly; manifest committed.
+
+- 2026-09-28, step 2 (PROMPT-2), on top of `164e323`:
+  - `env -u ELECTRON_RUN_AS_NODE npm test` — **pass, 154/154 test commands in
+    229.6 s, exit 0** (static checks: tsc, eslint 0 errors, `ratchet-check` 0,
+    `adapter-surface` 70 / 9 / 28 / 4 at baseline).
+  - `npm run test:contracts` — **206/206** (incl. the 6 new type-level checks).
+  - `npm run test:simulator` — **34/34** (11 before + `diff` 6, `map-span` 9,
+    `planner` 8). `STACKI_SIMULATOR_SEEDS=400 npm run test:simulator` — green
+    in 31 s.
+  - Diff timing by hand (see Step 2): 1 MB ≈ 12 ms, 10 MB ≈ 90–115 ms per
+    stale-intent diff.
+  - Formatting: the new modules and suites were run through Prettier 3.9.9
+    (npx cache, `--print-width 100 --single-quote --trailing-comma all`; no
+    dependency added); every new line is ≤ 100 columns.
 
 ## How to work this tracker
 

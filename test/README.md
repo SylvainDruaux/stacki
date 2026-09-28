@@ -18,7 +18,10 @@ the Node test runner. Individual `npm run test:...` commands remain available.
 `test:simulator` runs the editor-core simulator (`simulator/`): seeded runs of
 the step-wise actor over a fake disk, checked against the nine invariants of
 plan §10, plus the oracle scenarios over the hostile corpus in
-`fixtures/editor-core/`. `STACKI_SIMULATOR_SEEDS=2000 npm run test:simulator` is
+`fixtures/editor-core/`, and the step-2 suites (`diff`, `map-span`, `planner`)
+that hold `shared/diff.ts`, `shared/mapSpan.ts` and `shared/planner.ts` to the
+brute-force references in `simulator/reference-diff.ts`.
+`STACKI_SIMULATOR_SEEDS=2000 npm run test:simulator` is
 the long run. Everything under `simulator/` except its `*.test.ts` entry points
 is lint-fenced: no timers, clocks, promises, `Math.random` or I/O.
 
