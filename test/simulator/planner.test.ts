@@ -12,9 +12,10 @@
 // string attribute, the identity fast path agrees with the step-1 reference
 // planner and with planning through the diff (plan §10), and after an
 // unrelated insertion above the body every plan moves by exactly the inserted
-// length. (5) A wrong-site application the step-3 spike found, pinned as a
-// known failure: it must keep failing until the planner is fixed, and then
-// this test goes red and is rewritten as a rejection.
+// length, or is refused when its region repeats. (5) The wrong-site
+// applications the step-3 spike found, now refused because the resolved bytes
+// repeat (plan §4), and the one case no byte rule can decide, pinned as a
+// stated limit.
 import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
@@ -124,44 +125,73 @@ function againstCurrent(current: string): { readonly result: string; readonly ba
   return { result: planned(base, intent), base };
 }
 
-test('stale intent, edit elsewhere: the second card is retitled at its new offset', () => {
-  // A nav line above: 8 bytes down, the splice at 86.
-  const nav = againstCurrent(`<Nav />\n${SIBLINGS}`);
+// The footer's region `Footer title="Old"` occurs once, so an edit elsewhere
+// moves the plan by exactly the bytes inserted or deleted above it; its `Old` is
+// [36, 39) in SIBLINGS. The two cards' regions are byte-identical, so after any
+// edit their remap is refused: a unique minimum script onto one of two identical
+// copies is not proof of which one the intent meant (see KNOWN WRONG SITE).
+function footerAgainst(current: string): { readonly result: string; readonly base: PlanningBase } {
+  const authored = snapshotText(SIBLINGS);
+  const intent = intentOn(authored, anchorAt(authored, [1]), setAttribute('title', 'New'));
+  const base = { authored, current: snapshotText(current) };
+  assert.deepEqual(planIntent(base, intent), planIntentThroughDiff(base, intent));
+  return { result: planned(base, intent), base };
+}
+
+function footerSplice(current: string): readonly number[] {
+  const authored = snapshotText(SIBLINGS);
+  const intent = intentOn(authored, anchorAt(authored, [1]), setAttribute('title', 'New'));
+  return spliceStarts({ authored, current: snapshotText(current) }, intent);
+}
+
+test('stale intent, edit elsewhere: a unique region is retitled at its new offset', () => {
+  // A nav line above: 8 bytes down, the splice at 44.
+  const nav = `<Nav />\n${SIBLINGS}`;
+  assert.equal(footerAgainst(nav).result, `<Nav />\n${HERO}<Footer title="New" />\n${CARD}${CARD}`);
+  assert.deepEqual(footerSplice(nav), [44]);
+  // The hero deleted: 21 bytes up, the splice at 15.
+  const noHero = `${FOOTER}${CARD}${CARD}`;
+  assert.equal(footerAgainst(noHero).result, `<Footer title="New" />\n${CARD}${CARD}`);
+  assert.deepEqual(footerSplice(noHero), [15]);
+  // A sibling inserted below the target: nothing above moved, the splice stays at 36.
+  const below = `${HERO}${FOOTER}<hr />\n${CARD}${CARD}`;
   assert.equal(
-    nav.result,
-    '<Nav />\n<Hero title="Old" />\n<Footer title="Old" />\n' +
-      '<Card title="Old" />\n<Card title="New" />\n',
+    footerAgainst(below).result,
+    `${HERO}<Footer title="New" />\n<hr />\n${CARD}${CARD}`,
   );
-  assert.deepEqual(spliceStarts(nav.base, secondCardIntent().intent), [86]);
-  // The hero deleted: 21 bytes up, the splice at 57.
-  const noHero = againstCurrent(`${FOOTER}${CARD}${CARD}`);
+  assert.deepEqual(footerSplice(below), [36]);
+  // Wrapped and re-indented: `<main>\n` 7 bytes, two spaces, the hero, two spaces: 47.
+  const wrapped = `<main>\n  ${HERO}  ${FOOTER}  ${CARD}  ${CARD}</main>\n`;
   assert.equal(
-    noHero.result,
-    '<Footer title="Old" />\n<Card title="Old" />\n<Card title="New" />\n',
+    footerAgainst(wrapped).result,
+    `<main>\n  ${HERO}  <Footer title="New" />\n  ${CARD}  ${CARD}</main>\n`,
   );
-  assert.deepEqual(spliceStarts(noHero.base, secondCardIntent().intent), [57]);
-  // The first card retitled outside Stacki: same length, the splice stays at 78.
+  assert.deepEqual(footerSplice(wrapped), [47]);
+});
+
+test('stale intent, edit elsewhere: one of two identical cards is refused, not guessed', () => {
+  // The same four edits, aimed at the second card: its bytes repeat in every one.
+  assert.equal(againstCurrent(`<Nav />\n${SIBLINGS}`).result, 'rejected: anchor-ambiguous');
+  assert.equal(againstCurrent(`${FOOTER}${CARD}${CARD}`).result, 'rejected: anchor-ambiguous');
+  assert.equal(
+    againstCurrent(`${HERO}${FOOTER}${CARD}<hr />\n${CARD}`).result,
+    'rejected: anchor-ambiguous',
+  );
+  assert.equal(
+    againstCurrent(`<main>\n  ${HERO}  ${FOOTER}  ${CARD}  ${CARD}</main>\n`).result,
+    'rejected: anchor-ambiguous',
+  );
+  // The first card retitled outside Stacki: the second card's bytes are now
+  // unique, so it resolves; same length, the splice stays at 78.
   const mid = againstCurrent(`${HERO}${FOOTER}<Card title="Mid" />\n${CARD}`);
   assert.equal(
     mid.result,
     '<Hero title="Old" />\n<Footer title="Old" />\n<Card title="Mid" />\n<Card title="New" />\n',
   );
   assert.deepEqual(spliceStarts(mid.base, secondCardIntent().intent), [78]);
-  // A sibling inserted directly above the target, sharing its `<` and `/>`.
-  const between = againstCurrent(`${HERO}${FOOTER}${CARD}<hr />\n${CARD}`);
-  assert.equal(
-    between.result,
-    '<Hero title="Old" />\n<Footer title="Old" />\n' +
-      '<Card title="Old" />\n<hr />\n<Card title="New" />\n',
-  );
-  // Wrapped and re-indented: `<main>\n` 7 bytes, then two spaces per line.
-  const wrapped = againstCurrent(`<main>\n  ${HERO}  ${FOOTER}  ${CARD}  ${CARD}</main>\n`);
-  assert.equal(
-    wrapped.result,
-    '<main>\n  <Hero title="Old" />\n  <Footer title="Old" />\n' +
-      '  <Card title="Old" />\n  <Card title="New" />\n</main>\n',
-  );
-  assert.deepEqual(spliceStarts(wrapped.base, secondCardIntent().intent), [93]);
+  // Nothing changed: the identity path plans the second card; repetition is
+  // only refused where a diff had to explain the file.
+  assert.equal(againstCurrent(SIBLINGS).result, `${HERO}${FOOTER}${CARD}<Card title="New" />\n`);
 });
 
 test('stale intent, the target itself in question: typed rejections, never another card', () => {
@@ -184,16 +214,22 @@ test('stale intent, the target itself in question: typed rejections, never anoth
     againstCurrent(`${HERO}${FOOTER}${CARD}<Card title="Old" data-x="1" />\n`).result,
     'rejected: anchor-ambiguous',
   );
-  // Commented out: the bytes survive, the element does not.
+  // Commented out: the bytes survive, the element does not. The commented
+  // copy repeats the first card's bytes, so the remap is refused before the
+  // parse would find no element there.
   assert.equal(
     againstCurrent(`${HERO}${FOOTER}${CARD}<!-- <Card title="Old" /> -->\n`).result,
-    'rejected: anchor-moved',
+    'rejected: anchor-ambiguous',
   );
-  // Moved into a loop: one source node, many rendered cards.
+  // Moved into a loop: one source node, many rendered cards. The loop body
+  // repeats the first card's bytes, so the remap is refused as repeated first.
   assert.equal(
     againstCurrent(`${HERO}${FOOTER}${CARD}{[1, 2].map(() => <Card title="Old" />)}\n`).result,
-    'rejected: unsupported-operation',
+    'rejected: anchor-ambiguous',
   );
+  // The footer moved into a loop, its bytes unique: the capability refuses it.
+  const looped = footerAgainst(`${HERO}{[1, 2].map(() => <Footer title="Old" />)}\n${CARD}${CARD}`);
+  assert.equal(looped.result, 'rejected: unsupported-operation');
   // The whole file deleted.
   assert.equal(againstCurrent('').result, 'rejected: anchor-moved');
 });
@@ -205,30 +241,57 @@ test('stale intent, the target itself in question: typed rejections, never anoth
 // edits (6 for the retitle, 23 for the paste); inserting the 23 bytes
 // `New" />\n<Footer title="` after `<Hero title="` explains the same bytes for
 // 23, and that script is the only minimum one — so the mapper, which only
-// refuses ties, resolves the footer onto the pasted copy, and the planner
-// splices at 59. Byte-identical copies are the wrong-site case plan §4 exists
-// for; the minimum edit script is not the edit history.
-test('KNOWN WRONG SITE: an edit above plus a pasted copy maps the target onto the copy', () => {
+// refuses ties, resolves the footer onto the pasted copy at 59. The minimum
+// edit script is not the edit history. The planner refuses it: the resolved
+// bytes occur twice in the current file, so they do not prove which footer the
+// intent meant. Before the uniqueness rule this planned at 59, the copy.
+test('a pasted copy after an edit above: mapped onto the copy, refused by the planner', () => {
   const { authored } = secondCardIntent();
   const footer = intentOn(authored, anchorAt(authored, [1]), setAttribute('title', 'New'));
   const current = snapshotText(`<Hero title="New" />\n${FOOTER}${FOOTER}${CARD}${CARD}`);
   const base = { authored, current };
-  assert.deepEqual(spliceStarts(base, footer), [59], 'known wrong: the pasted copy is edited');
-  // The brute-force reference agrees: 23 is the distance, and every minimum
-  // script keeps the footer's region `Footer title="Old"` [22, 40) whole at 45.
+  // The brute-force reference agrees with the mapper: 23 is the distance, and
+  // every minimum script keeps the footer's region `Footer title="Old"` [22, 40)
+  // whole at 45 — the copy.
   const tables = referenceTables(authored.bytes, current.bytes);
   assert.equal(tables.distance, 23);
   assert.deepEqual(referenceMapSpan(tables, toByteSpan(22, 40)), {
     tag: 'resolved',
     span: toByteSpan(45, 63),
   });
-  assert.equal(
-    planned(base, footer),
-    '<Hero title="New" />\n<Footer title="Old" />\n<Footer title="New" />\n' + `${CARD}${CARD}`,
-  );
+  assert.equal(planned(base, footer), 'rejected: anchor-ambiguous');
   // With nothing edited above, the paste alone is a tie, and the mapper refuses.
   const pasteOnly = { authored, current: snapshotText(`${HERO}${FOOTER}${FOOTER}${CARD}${CARD}`) };
   assert.equal(planned(pasteOnly, footer), 'rejected: anchor-ambiguous');
+  // The copy pasted far away, past both cards: still two occurrences, still refused.
+  const far = snapshotText(`<Hero title="New" />\n${FOOTER}${CARD}${CARD}${FOOTER}`);
+  assert.equal(planned({ authored, current: far }, footer), 'rejected: anchor-ambiguous');
+  // An attribute appended to the original keeps the old region as a prefix of
+  // its own: two occurrences again, though only one is a whole region.
+  const appended = snapshotText(
+    `<Hero title="New" />\n<Footer title="Old" data-x="1" />\n${FOOTER}${CARD}${CARD}`,
+  );
+  assert.equal(planned({ authored, current: appended }, footer), 'rejected: anchor-ambiguous');
+});
+
+// The limit of any rule that sees only bytes, pinned so it stays a stated
+// limit and not a surprise. Two histories give these exact current bytes:
+// (a) a footer `Zed` is inserted above the untouched footer — the intent means
+// the second footer, at 59; (b) the footer is copied below, then another writer
+// retitles the original to `Zed` — the intent means the first, which no longer
+// holds the authored value. The region `Footer title="Old"` occurs once, so the
+// planner plans at 59: right for (a), wrong for (b), and no function of the two
+// byte strings can be right for both. Closing (b) needs history (the actor's own
+// splice log for its own writes), not a stricter byte rule; a rule refusing (a)
+// too — any second element with the same tag and attribute names — kept 17 %
+// fewer correct plans in the simulator and still misses a cut-and-paste.
+test('BYTES CANNOT TELL: a unique region planned where only history could object', () => {
+  const { authored } = secondCardIntent();
+  const footer = intentOn(authored, anchorAt(authored, [1]), setAttribute('title', 'New'));
+  const current = snapshotText(
+    `<Hero title="New" />\n<Footer title="Zed" />\n${FOOTER}${CARD}${CARD}`,
+  );
+  assert.deepEqual(spliceStarts({ authored, current }, footer), [59]);
 });
 
 test('stale intent past the diff bound, or into a file that no longer parses', () => {
@@ -391,9 +454,22 @@ function withInsertion(
   return { text: joined.toString('utf8'), at };
 }
 
+/** Whether the node's identity region — tag name through its last attribute,
+ * read from the authored bytes — occurs more than once in the current bytes. */
+function regionRepeats(authored: Snapshot, current: Snapshot, node: ProjectedNode): boolean {
+  const text = decodeUtf8(current.bytes);
+  assert.ok(text.ok);
+  const end = Math.max(...node.attributes.map((attribute) => attribute.span.end));
+  const region = Buffer.from(authored.bytes.subarray(node.span.start + 1, end)).toString('utf8');
+  const first = text.value.indexOf(region);
+  assert.ok(first >= 0, 'an insertion above keeps every region whole');
+  return text.value.indexOf(region, first + 1) >= 0;
+}
+
 test('corpus sweep: fast = reference = diff path; an insertion above shifts every plan', (t) => {
   let plannedCount = 0;
   let shiftedCount = 0;
+  let repeatedCount = 0;
   let fileCount = 0;
   for (const file of corpusFiles()) {
     const authored = snapshotText(file.text, toFilePath(`/project/${path.basename(file.name)}`));
@@ -424,6 +500,12 @@ test('corpus sweep: fast = reference = diff path; an insertion above shifts ever
         const stale = planIntent({ authored, current }, intent);
         if (fast.ok) {
           plannedCount += 1;
+          if (regionRepeats(authored, current, node)) {
+            // Checked here by a plain string search, apart from the planner's own.
+            assert.deepEqual(stale, { ok: false, error: 'anchor-ambiguous' }, `${file.name}`);
+            repeatedCount += 1;
+            continue;
+          }
           assert.ok(
             stale.ok,
             `${file.name} ${node.path.join('/')} ${attribute.name}: plans after the insertion`,
@@ -447,7 +529,11 @@ test('corpus sweep: fast = reference = diff path; an insertion above shifts ever
       }
     }
   }
-  t.diagnostic(`${fileCount} files, ${plannedCount} attributes planned, ${shiftedCount} shifted`);
+  t.diagnostic(
+    `${fileCount} files, ${plannedCount} attributes planned, ${shiftedCount} shifted, ` +
+      `${repeatedCount} refused as repeated`,
+  );
+  assert.ok(repeatedCount > 0, 'the sweep meets repeated regions, so the refusal is exercised');
   assert.ok(plannedCount > 60, `the sweep plans many real attributes (${plannedCount})`);
   assert.ok(shiftedCount > 60, `most of them sit below the insertion (${shiftedCount})`);
 });

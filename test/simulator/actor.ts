@@ -30,6 +30,7 @@ import { LIMITS } from '../../dist/shared/limits.js';
 import type { Plan, PlanningBase } from '../../dist/shared/planner.js';
 import type { Result } from '../../dist/shared/result.js';
 import type { Snapshot } from '../../dist/shared/snapshot.js';
+import { candidateSnapshot } from './candidate.ts';
 import type { DocumentDisk } from './fake-disk.ts';
 import { sha256, snapshotOf } from './project.ts';
 import { applySplices, changedRanges, witnessesHold } from './splice.ts';
@@ -208,7 +209,7 @@ function stepIdle(state: ActorState, disk: DocumentDisk, planner: Planner): Acto
   if (bytes.length > LIMITS.sourceBytesMax) {
     return reject(current, intent, 'resource-limit', parses, refreshed.step.effects);
   }
-  const candidate = snapshotOf(state.path, bytes);
+  const candidate = candidateSnapshot(state.path, base, plan, bytes);
   if (plan.candidate === 'must-parse') {
     if (candidate.projection.tag === 'parse-error') {
       return reject(current, intent, 'source-invalid', parses + 1, refreshed.step.effects);

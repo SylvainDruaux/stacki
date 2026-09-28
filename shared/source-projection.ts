@@ -191,16 +191,18 @@ function frontmatterSpan(text: string, model: PageModel): Utf16Span | undefined 
 }
 
 // Every offset the projection needs is converted in one sorted pass, so the
-// cost is linear in the file however many spans it has.
+// cost is linear in the file however many spans it has. The offsets are
+// collected in a typed array and sorted natively: a Set, a spread and a
+// comparator sort over a few hundred thousand offsets cost more than the
+// conversion itself. Lookups are a binary search over the unique offsets.
 function spanConverter(
   text: string,
   pending: readonly PendingNode[],
   frontmatter: Utf16Span | undefined,
 ): SpanConverter {
-  const offsets = new Set<Utf16Offset>();
+  const collected: number[] = [];
   const add = (span: Utf16Span): void => {
-    offsets.add(span.start);
-    offsets.add(span.end);
+    collected.push(span.start, span.end);
   };
   if (frontmatter !== undefined) {
     add(frontmatter);
@@ -211,16 +213,60 @@ function spanConverter(
       forEachAttrSpan(attribute, add);
     }
   }
-  const sorted = [...offsets].sort((left, right) => left - right);
-  const converted = utf16ToByteOffsets(text, sorted);
-  const table = new Map(sorted.map((offset, index) => [offset, converted[index]]));
-  return (span) => {
-    const start = table.get(span.start);
-    const end = table.get(span.end);
-    assert(start !== undefined, 'Span start was collected for conversion');
-    assert(end !== undefined, 'Span end was collected for conversion');
-    return toByteSpan(start, end);
+  const unique = sortedUniqueOffsets(collected, text.length);
+  const converted = utf16ToByteOffsets(
+    text,
+    Array.from(unique, (offset) => toUtf16Offset(offset)),
+  );
+  assert(converted.length === unique.length, 'Conversion returns one offset per input');
+  const lookup = (offset: Utf16Offset): number => {
+    const index = offsetIndex(unique, offset);
+    assert(index !== undefined, 'Span offset was collected for conversion');
+    const bytes = converted[index];
+    assert(bytes !== undefined, 'Every collected offset was converted');
+    return bytes;
   };
+  return (span) => toByteSpan(lookup(span.start), lookup(span.end));
+}
+
+// Ascending, without duplicates. Offsets index the text, so they fit 32 bits
+// (the text is bounded by the source limit, far below 2³²).
+function sortedUniqueOffsets(offsets: readonly number[], textLength: number): Uint32Array {
+  assert(textLength < 2 ** 32, 'Text offsets fit an unsigned 32-bit integer');
+  const sorted = Uint32Array.from(offsets).sort();
+  let count = 0;
+  for (let index = 0; index < sorted.length; index++) {
+    const offset = sorted[index];
+    assert(offset !== undefined, 'The index lies inside the sorted offsets');
+    assert(offset <= textLength, 'A collected offset lies inside the text');
+    const previous = count === 0 ? undefined : sorted[count - 1];
+    if (previous !== offset) {
+      sorted[count] = offset;
+      count++;
+    }
+  }
+  return sorted.subarray(0, count);
+}
+
+function offsetIndex(unique: Uint32Array, offset: number): number | undefined {
+  let low = 0;
+  let high = unique.length;
+  // Binary search: the range halves every pass, so it ends within 33 of them.
+  for (let pass = 0; pass <= 33; pass++) {
+    if (low < high) {
+      const middle = low + Math.floor((high - low) / 2);
+      const found = unique[middle];
+      assert(found !== undefined, 'The middle lies inside the range');
+      if (found < offset) {
+        low = middle + 1;
+      } else {
+        high = middle;
+      }
+    } else {
+      return unique[low] === offset ? low : undefined;
+    }
+  }
+  throw new Error('Assertion failed: binary search ends within 33 passes');
 }
 
 function attrSpansOf(node: PageNode): readonly AttrSpan[] {

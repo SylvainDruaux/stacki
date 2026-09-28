@@ -131,12 +131,21 @@ export function utf16ToByteOffsets(
     if (previous !== undefined) {
       assert(previous <= offset, 'UTF-16 offsets are converted in ascending order');
     }
+    // The hot loop of every projection: one branch per unit, no call for the
+    // one- and two-byte cases. A pair that straddles the offset walks one unit
+    // past it, which the assertion after the loop reports.
     while (unit < offset) {
-      const width = utf16PointUnits(text, unit);
-      assert(unit + width <= offset, 'UTF-16 offset does not split a surrogate pair');
-      bytes += width === 2 ? 4 : utf8UnitBytes(text.charCodeAt(unit));
-      unit += width;
+      const code = text.charCodeAt(unit);
+      if (code < 0x800) {
+        bytes += code < 0x80 ? 1 : 2;
+        unit += 1;
+      } else {
+        const width = utf16PointUnits(text, unit);
+        bytes += width === 2 ? 4 : utf8UnitBytes(code);
+        unit += width;
+      }
     }
+    assert(unit <= offset, 'UTF-16 offset does not split a surrogate pair');
     assert(unit === offset, 'Conversion walked exactly to the requested offset');
     result.push(toByteOffset(bytes));
   }
@@ -182,11 +191,40 @@ export function decodeUtf8(bytes: ByteString): Result<string, DecodeError> {
   }
 }
 
+/** Byte equality. A plain loop, 32 bits at a time where both strings start on
+ * a word boundary (toByteString copies into a fresh buffer, so they do): the
+ * step-3 spike found `every` with a closure at ~200 ms per 10 MB, most of the
+ * identity fast path's cost. */
 export function byteStringsEqual(left: ByteString, right: ByteString): boolean {
   if (left.length === right.length) {
-    return left.every((byte, index) => byte === right[index]);
+    return sameLengthBytesEqual(left, right);
   }
   return false;
+}
+
+function sameLengthBytesEqual(left: ByteString, right: ByteString): boolean {
+  assert(left.length === right.length, 'Compared bytes have one length');
+  assert(left.length <= LIMITS.sourceBytesMax, 'Compared bytes are inside the file bound');
+  let index = 0;
+  if (left.byteOffset % 4 === 0) {
+    if (right.byteOffset % 4 === 0) {
+      const words = Math.floor(left.length / 4);
+      const leftWords = new Uint32Array(left.buffer, left.byteOffset, words);
+      const rightWords = new Uint32Array(right.buffer, right.byteOffset, words);
+      for (let word = 0; word < words; word++) {
+        if (leftWords[word] !== rightWords[word]) {
+          return false;
+        }
+      }
+      index = words * 4;
+    }
+  }
+  for (; index < left.length; index++) {
+    if (left[index] !== right[index]) {
+      return false;
+    }
+  }
+  return true;
 }
 
 /** Code units of the code point at `unit`: 2 for a surrogate pair, else 1. */

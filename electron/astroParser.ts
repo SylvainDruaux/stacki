@@ -101,9 +101,13 @@ const makeId = (): string => {
 // `<Foo {...rest} />` into `<Foo ...rest />`, which does not compile. Spreads
 // are everywhere in Astro, so this corrupts real components.
 function parseAttrs(attrString: string): Record<string, Attr> {
+  return propsOf(scanAttrs(attrString));
+}
+
+function propsOf(scanned: readonly ScannedAttr[]): Record<string, Attr> {
   // Object.fromEntries treats __proto__ as an ordinary attribute. Assigning
   // it on an object invokes the inherited setter and silently drops it.
-  return Object.fromEntries(scanAttrs(attrString).map((found) => [found.name, found.attr]));
+  return Object.fromEntries(scanned.map((found) => [found.name, found.attr]));
 }
 
 // One attribute as written: its props entry plus where each part sits in the
@@ -128,9 +132,16 @@ const ATTR_PATTERN =
   '(?:\\s*=\\s*(?:"([^"]*)"|\'([^\']*)\'|\\{((?:[^{}]|\\{[' +
   '^{}]*\\})*)\\}))?';
 
+// Compiled once: the `d` flag makes every match report its group indices, and
+// building the pattern per tag cost a compile-cache lookup on every element.
+// Only scanAttrs uses it, and it runs each scan to completion before returning,
+// so the shared lastIndex never interleaves.
+const ATTR_RE = new RegExp(ATTR_PATTERN, 'dg');
+
 function scanAttrs(attrString: string): readonly ScannedAttr[] {
   const found: ScannedAttr[] = [];
-  const re = new RegExp(ATTR_PATTERN, 'dg');
+  const re = ATTR_RE;
+  re.lastIndex = 0;
   let m;
   while ((m = re.exec(attrString)) !== null) {
     if (!m[0].trim()) {
@@ -176,9 +187,9 @@ function scanAttr(m: RegExpExecArray): ScannedAttr {
 
 // File offsets for every attribute of a tag whose attribute string starts at
 // `base`. Built from the same scan as the props, so the two cannot disagree.
-function attrSpansOf(attrString: string, base: number): AttrSpan[] {
+function attrSpansOf(scanned: readonly ScannedAttr[], base: number): AttrSpan[] {
   const at = ([start, end]: readonly [number, number]) => toUtf16Span(base + start, base + end);
-  return scanAttrs(attrString).map((found): AttrSpan => {
+  return scanned.map((found): AttrSpan => {
     const span = toUtf16Span(base + found.from, base + found.to);
     const { name, attr } = found;
     switch (attr.type) {
@@ -227,9 +238,12 @@ function tagProps(
   attrs: string,
   attrsAt: number | null,
 ): { props: Record<string, Attr>; attrOrder?: string[]; attrSpans?: AttrSpan[] } {
-  const props = parseAttrs(attrs);
+  // One scan serves both the props and their spans: scanning twice doubled the
+  // cost of every tag with attributes.
+  const scanned = scanAttrs(attrs);
+  const props = propsOf(scanned);
   const attrOrder = Object.keys(props);
-  const spans = attrsAt === null ? {} : { attrSpans: attrSpansOf(attrs, attrsAt) };
+  const spans = attrsAt === null ? {} : { attrSpans: attrSpansOf(scanned, attrsAt) };
   // props is always present — even empty — because writers mutate node.props
   // in place (e.g. fragment tests and panel edits). attrOrder only exists
   // when there is something to order.
@@ -1031,13 +1045,15 @@ function parseTemplateBody(str: string, base: number | null): ParsedTemplate {
   const at = (node: ParserNode, from: number, to: number): ParserNode =>
     parseTemplateAt(node, base, from, to);
 
+  // Searching afresh every iteration rescanned the same text once per tag
+  // whenever the next brace was far away — quadratic in a brace-free region.
+  let found = NOT_YET_FOUND;
   while (pos < str.length) {
     if (parseState.nodes >= LIMITS.treeNodesMax) {
       return bail(nodes, str, pos, 'markup exceeding the node limit');
     }
-    const lt = str.indexOf('<', pos);
-    const br = str.indexOf('{', pos);
-    const next = lt === -1 ? br : br === -1 ? lt : Math.min(lt, br);
+    found = nextDelimiters(str, pos, found);
+    const { lt, br, next } = found;
 
     // Trailing / inter-tag text. Boundary whitespace collapses to a single
     // space rather than vanishing — "people <strong>" must keep its space
@@ -1113,6 +1129,46 @@ function parseTemplateBody(str: string, base: number | null): ParsedTemplate {
   return { nodes, clean: true, trailingBlank: pendingBlank };
 }
 
+// Where the next `<` and `{` are at or after a position, and the nearer of the
+// two; -1 for none.
+interface Delimiters {
+  readonly lt: number;
+  readonly br: number;
+  readonly next: number;
+}
+
+const NOT_SEARCHED = -2;
+const NOT_YET_FOUND: Delimiters = { lt: NOT_SEARCHED, br: NOT_SEARCHED, next: NOT_SEARCHED };
+
+// The delimiters at or after `from`, reusing the previous answer: the parse
+// position only moves forward, so a found index stays valid until the position
+// passes it, and "none" (-1) stays none.
+function nextDelimiters(str: string, from: number, previous: Delimiters): Delimiters {
+  const lt = nextIndexOf(str, '<', from, previous.lt);
+  const br = nextIndexOf(str, '{', from, previous.br);
+  if (lt === -1) {
+    return { lt, br, next: br };
+  }
+  if (br === -1) {
+    return { lt, br, next: lt };
+  }
+  return { lt, br, next: Math.min(lt, br) };
+}
+
+// `str.indexOf(needle, from)`, reusing `previous` — the answer for an earlier
+// `from` — while it is still at or after `from`.
+function nextIndexOf(str: string, needle: string, from: number, previous: number): number {
+  assert(previous >= NOT_SEARCHED, 'A cached index is a position, -1, or not searched');
+  if (previous === -1) {
+    return -1;
+  }
+  if (previous >= from) {
+    assert(str.charAt(previous) === needle, 'A cached index still names its needle');
+    return previous;
+  }
+  return str.indexOf(needle, from);
+}
+
 // Index of the close tag matching an already-consumed open tag, handling
 // nested same-name tags.
 //
@@ -1129,12 +1185,7 @@ function parseTemplateBody(str: string, base: number | null): ParsedTemplate {
 // scan carries on past the opener and whatever is really wrong with the page
 // is reported by the parse itself.
 function findMatchingClose(str: string, from: number, name: string): number {
-  const tag = escapeRe(name);
-  const re = new RegExp(
-    `<!--|<(script|style)(?=[\\s/>])|<${tag}(?=[\\s/>])` +
-      `(?:[^>"']|"[^"]*"|'[^']*')*?(/?)>|</${tag}\\s*>`,
-    'g',
-  );
+  const re = closeTagPattern(name);
   re.lastIndex = from;
   let depth = 1;
   let m;
@@ -1161,6 +1212,36 @@ function findMatchingClose(str: string, from: number, name: string): number {
     }
   }
   return -1;
+}
+
+// A page names few distinct tags, so their close-tag patterns are compiled once
+// per parse process instead of once per element (with escapeRe run each time).
+// The cache is bounded: past the cap a pattern is compiled and not kept. A
+// cached pattern is shared, which is safe because findMatchingClose runs each
+// scan to completion — it never recurses — and resets lastIndex first.
+const CLOSE_TAG_PATTERNS_MAX = 512;
+const closeTagPatterns = new Map<string, RegExp>();
+
+function closeTagPattern(name: string): RegExp {
+  const cached = closeTagPatterns.get(name);
+  if (cached !== undefined) {
+    return cached;
+  }
+  const tag = escapeRe(name);
+  const re = new RegExp(
+    `<!--|<(script|style)(?=[\\s/>])|<${tag}(?=[\\s/>])` +
+      `(?:[^>"']|"[^"]*"|'[^']*')*?(/?)>|</${tag}\\s*>`,
+    'g',
+  );
+  if (closeTagPatterns.size < CLOSE_TAG_PATTERNS_MAX) {
+    closeTagPatterns.set(name, re);
+  } else {
+    assert(
+      closeTagPatterns.size === CLOSE_TAG_PATTERNS_MAX,
+      'The pattern cache never exceeds its cap',
+    );
+  }
+  return re;
 }
 
 // Fragment delimiters can also occur in quoted attributes, expressions and
@@ -1215,8 +1296,11 @@ function escapeRe(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
+// Same result as replacing every `\s+` run with one space, but a run that is
+// already one plain space is left unmatched: prose has one at every word gap,
+// and rewriting each of them rebuilt long paragraphs thousands of times over.
 function collapseWhitespace(text: string): string {
-  return text.replace(/\s+/g, ' ').trim();
+  return text.replace(/\s{2,}|[^\S ]/g, ' ').trim();
 }
 
 // The words, with every run of whitespace inside them squeezed to one space,
@@ -1237,7 +1321,10 @@ function collapseText(raw: string): string {
 // Shared with the serializer, which recomputes it to tell an edited node from
 // an untouched one.
 function textValue(raw: string): string {
-  return decodeEntities(collapseText(raw));
+  const collapsed = collapseText(raw);
+  // Every entity starts with `&`; without one there is nothing to decode, and
+  // the check is far cheaper than a regex pass over a long paragraph.
+  return collapsed.includes('&') ? decodeEntities(collapsed) : collapsed;
 }
 
 // ---------------------------------------------------------------------------

@@ -24,6 +24,7 @@
 // `unsupported-operation` here until its step (6 and 8); the simulator's
 // reference planner plans the zero-diff cases of the rest until then.
 import { assert } from './assert';
+import { countOccurrences } from './byteSearch';
 import { capabilityAcceptsVisualIntent } from './capability';
 import { diffBytes, DIFF_BUDGET } from './diff';
 import type { Intent, Operation, RejectionReason } from './intent';
@@ -104,7 +105,11 @@ export function planIntentThroughDiff(
     computed ??= diffBytes(base.authored.bytes, base.current.bytes, DIFF_BUDGET);
     switch (computed.tag) {
       case 'computed':
-        return mapSpanThroughDiff(computed.diff, span);
+        return uniqueOrAmbiguous(
+          base,
+          computed.diff.distance,
+          mapSpanThroughDiff(computed.diff, span),
+        );
       case 'too-costly':
         return { tag: 'too-costly' };
       default: {
@@ -116,6 +121,36 @@ export function planIntentThroughDiff(
 }
 
 // --- Internal ----------------------------------------------------------------
+
+// A resolved remap names bytes equal to the authored identity region. Those
+// bytes are only proof of identity if they occur once in the current file: if
+// the target's region survives intact, it is an occurrence, so a unique
+// occurrence is the target (the invariant). Where they repeat, the minimum edit
+// script can still be unique and wrong — edit above, paste a copy of the target,
+// and the cheapest script maps the target onto the copy (the step-3 wrong-site
+// plans, planner.test.ts). The minimum script is not the history, so repeated
+// bytes are ambiguous whatever the script says. A distance of zero maps by
+// identity and holds nothing to guess, so the fast path and this one agree.
+//
+// Not covered, and not coverable from bytes: a copy of the target pasted while
+// another writer rewrites the original's region. The same bytes arise from an
+// element inserted above the untouched target; only history tells them apart.
+function uniqueOrAmbiguous(base: PlanningBase, distance: number, mapped: SpanMapping): SpanMapping {
+  assert(Number.isSafeInteger(distance), 'The diff distance is an integer');
+  if (mapped.tag === 'resolved') {
+    if (distance > 0) {
+      const region = base.current.bytes.subarray(mapped.span.start, mapped.span.end);
+      const occurrences = countOccurrences(base.current.bytes, toByteString(region), 2);
+      assert(occurrences >= 1, 'The resolved region occurs where it was mapped');
+      if (occurrences === 1) {
+        return mapped;
+      }
+      return { tag: 'ambiguous' };
+    }
+    return mapped; // Identical files: the identity mapping guesses nothing.
+  }
+  return mapped;
+}
 
 type SpanMapper = (span: ByteSpan) => SpanMapping;
 
