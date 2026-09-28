@@ -30,8 +30,6 @@ const QUOTE_SINGLE = 0x27;
 
 export type { CandidatePolicy, Plan, PostKind };
 
-export type Planner = (snapshot: Snapshot, intent: Intent) => Result<Plan, RejectionReason>;
-
 export function planByIdentity(snapshot: Snapshot, intent: Intent): Result<Plan, RejectionReason> {
   assert(snapshot.path === intent.file, 'An intent is planned against its own file');
   const operation = intent.operation;

@@ -12,7 +12,9 @@
 // string attribute, the identity fast path agrees with the step-1 reference
 // planner and with planning through the diff (plan §10), and after an
 // unrelated insertion above the body every plan moves by exactly the inserted
-// length.
+// length. (5) A wrong-site application the step-3 spike found, pinned as a
+// known failure: it must keep failing until the planner is fixed, and then
+// this test goes red and is rewritten as a rejection.
 import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
@@ -23,10 +25,11 @@ import { planIntent, planIntentThroughDiff, type PlanningBase } from '../../dist
 import type { AnchorRef } from '../../dist/shared/ref.js';
 import type { Snapshot } from '../../dist/shared/snapshot.js';
 import type { ProjectedNode } from '../../dist/shared/source-projection.js';
-import { decodeUtf8, encodeUtf8, type ByteString } from '../../dist/shared/span.js';
+import { decodeUtf8, encodeUtf8, toByteSpan, type ByteString } from '../../dist/shared/span.js';
 import { anchorAt, oracleIntent, oracleSplices } from './oracle-intent.ts';
 import { ORACLE_SCENARIOS } from './oracles.ts';
 import { snapshotOf } from './project.ts';
+import { referenceMapSpan, referenceTables } from './reference-diff.ts';
 import { planByIdentity } from './reference-planner.ts';
 import { applySplices } from './splice.ts';
 
@@ -193,6 +196,39 @@ test('stale intent, the target itself in question: typed rejections, never anoth
   );
   // The whole file deleted.
   assert.equal(againstCurrent('').result, 'rejected: anchor-moved');
+});
+
+// Found by the step-3 spike (seeds 36 and 240 of 400; tracker Step 3). The
+// history: the hero is retitled `Old` → `New`, then someone pastes a copy of the
+// footer line below it. The authored intent retitles the footer — the original,
+// the first footer, whose `Old` is now [36, 39). The true history costs 29 byte
+// edits (6 for the retitle, 23 for the paste); inserting the 23 bytes
+// `New" />\n<Footer title="` after `<Hero title="` explains the same bytes for
+// 23, and that script is the only minimum one — so the mapper, which only
+// refuses ties, resolves the footer onto the pasted copy, and the planner
+// splices at 59. Byte-identical copies are the wrong-site case plan §4 exists
+// for; the minimum edit script is not the edit history.
+test('KNOWN WRONG SITE: an edit above plus a pasted copy maps the target onto the copy', () => {
+  const { authored } = secondCardIntent();
+  const footer = intentOn(authored, anchorAt(authored, [1]), setAttribute('title', 'New'));
+  const current = snapshotText(`<Hero title="New" />\n${FOOTER}${FOOTER}${CARD}${CARD}`);
+  const base = { authored, current };
+  assert.deepEqual(spliceStarts(base, footer), [59], 'known wrong: the pasted copy is edited');
+  // The brute-force reference agrees: 23 is the distance, and every minimum
+  // script keeps the footer's region `Footer title="Old"` [22, 40) whole at 45.
+  const tables = referenceTables(authored.bytes, current.bytes);
+  assert.equal(tables.distance, 23);
+  assert.deepEqual(referenceMapSpan(tables, toByteSpan(22, 40)), {
+    tag: 'resolved',
+    span: toByteSpan(45, 63),
+  });
+  assert.equal(
+    planned(base, footer),
+    '<Hero title="New" />\n<Footer title="Old" />\n<Footer title="New" />\n' + `${CARD}${CARD}`,
+  );
+  // With nothing edited above, the paste alone is a tie, and the mapper refuses.
+  const pasteOnly = { authored, current: snapshotText(`${HERO}${FOOTER}${FOOTER}${CARD}${CARD}`) };
+  assert.equal(planned(pasteOnly, footer), 'rejected: anchor-ambiguous');
 });
 
 test('stale intent past the diff bound, or into a file that no longer parses', () => {

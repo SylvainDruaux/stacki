@@ -84,7 +84,9 @@ intents yet; these modules are what steps 3–10 build on.
 - `span.ts` — `ByteSpan` and `Utf16Span` over the branded `ByteOffset` and
   `Utf16Offset` (`brand.ts`); mixing them is a compile error. The only
   conversion is `utf16ToByteOffsets` (one linear pass; an offset inside a
-  surrogate pair asserts). `ByteString` is a private copy of a file's bytes;
+  surrogate pair asserts). `ByteString` is a private copy of a file's bytes,
+  always a plain `Uint8Array` — never a Node `Buffer`, whose `slice` is a view
+  (a `Buffer` from `fs.readFileSync` is copied, not aliased);
   `decodeUtf8` is strict and returns `invalid-utf8` instead of replacing.
 - `ref.ts` — `AnchorRef`: a byte span, a structural path of `ChildIndex`es, and
   the expected kind (a page-tree kind, `frontmatter`, or `document`). Node
@@ -145,18 +147,25 @@ hand-derived splices. `test/fixtures/large/manifest.json` pins the generated
 large fixtures (`npm run fixtures:large` writes the files).
 
 The simulator (`test/simulator/`, `npm run test:simulator`) drives the real
-parser, a reference planner and a step-wise actor over a fake disk with a
-seeded PRNG, and checks the nine invariants after every event. Its
+parser, the planner and a step-wise actor over a fake disk with a seeded PRNG,
+and checks the nine invariants after every event. The actor plans
+`set-attribute` with `shared/planner.ts` (mapped through the diff when stale)
+and the other operations with the step-1 reference planner; each queued intent
+carries the snapshot it was authored against. Every stale `set-attribute`
+decision is judged against byte origins the simulator records for every writer
+(`provenance.ts`, `remap-judge.ts`): a wrong-site plan fails the run. Its
 `diff`, `map-span` and `planner` suites hold the step-2 modules to their
 brute-force references and to hand-derived byte ranges.
-`STACKI_SIMULATOR_SEEDS=<n>` raises the seed count for a long run.
+`STACKI_SIMULATOR_SEEDS=<n>` raises the seed count for a long run;
+`npm run spike:editor-core` prints the step-3 spike report (not in the gate).
 
 Lint fences (`eslint.config.mjs`): `serializePage`, `serializeNodes` and
 `serializeMarkdownPage` may be imported or called only inside the legacy writer
 boundary (`electron/astroParser.ts`, `main.ts`, `markdownParser.ts`,
-`componentFile.ts`) and tests. The simulator core and the engine contract
-modules may not use timers, clocks, promises, `Math.random`, `process` or I/O
-modules. `scripts/adapter-surface.ts` runs in the gate as a ratchet on the
+`componentFile.ts`) and tests. The simulator core (all but its `*.test.ts` and
+`*.bench.ts` entry points and the `*.entry.ts` modules they import) and the
+engine contract modules may not use timers, clocks, promises, `Math.random`,
+`process` or I/O modules. `scripts/adapter-surface.ts` runs in the gate as a ratchet on the
 legacy tree-mutation surface (method in its header).
 
 ## Other shared contracts

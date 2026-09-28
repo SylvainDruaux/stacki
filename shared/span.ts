@@ -150,13 +150,17 @@ export function utf8ByteLength(text: string): number {
   return end;
 }
 
-/** A private copy of `bytes`, refused past the source-file bound. */
+/** A private copy of `bytes`, refused past the source-file bound. Always a
+ * plain Uint8Array: `slice` on a Node Buffer returns a view, not a copy, so a
+ * byte string built with it from `fs.readFileSync` would alias the caller's
+ * buffer (found by the step-3 spike). */
 export function toByteString(bytes: Uint8Array): ByteString {
   if (bytes.length > LIMITS.sourceBytesMax) {
     throw new Error(`ByteString: exceeds ${LIMITS.sourceBytesMax} bytes`);
   }
-  const copy = bytes.slice();
+  const copy = new Uint8Array(bytes);
   assert(copy.length === bytes.length, 'Copied bytes keep their length');
+  assert(copy.buffer !== bytes.buffer, 'A byte string shares no memory with its input');
   return copy as ByteString;
 }
 

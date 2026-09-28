@@ -22,8 +22,19 @@ plan §10, plus the oracle scenarios over the hostile corpus in
 that hold `shared/diff.ts`, `shared/mapSpan.ts` and `shared/planner.ts` to the
 brute-force references in `simulator/reference-diff.ts`.
 `STACKI_SIMULATOR_SEEDS=2000 npm run test:simulator` is
-the long run. Everything under `simulator/` except its `*.test.ts` entry points
-is lint-fenced: no timers, clocks, promises, `Math.random` or I/O.
+the long run. From step 3 the simulator's actor plans `set-attribute` with the
+shipping planner, and every stale plan is judged against the byte origins the
+simulator recorded (`simulator/provenance.ts`, `simulator/remap-judge.ts`); a
+wrong-site plan fails the run. Everything under `simulator/` except its
+entry points (`*.test.ts`, `*.bench.ts`) and the `*.entry.ts` modules only they
+import is lint-fenced: no timers, clocks, promises, `Math.random` or I/O.
+
+`npm run spike:editor-core` (after `npm run fixtures:large`) prints the step-3
+spike report: remap verdicts per fixture over 400 seeds, and intent→applied and
+last keystroke→disk latency on the six large fixtures, on a real disk, against
+the pre-registered thresholds. It measures and asserts no threshold, so it is
+not in the gate. `STACKI_SPIKE_SEEDS`, `STACKI_SPIKE_SAMPLES` and
+`STACKI_SPIKE_KEYSTROKES` change the sample counts.
 
 The optional `integration:dev` test installs a pinned Astro version into a temporary
 project and starts real Electron and Astro processes. It needs network access on

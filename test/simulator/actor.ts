@@ -11,6 +11,13 @@
 //
 // The shipping actor (step 5) replaces this one and must keep the same
 // invariants. No timers, no promises, no OS: the disk is an interface.
+//
+// From step 3 an intent is queued with the snapshot it was authored against
+// (a Submission), because the step-2 planner maps a stale intent from those
+// bytes (PlanningBase.authored). The actor cannot keep them itself: its own
+// snapshot bound, LIMITS.snapshotsRetainedMax (2), is spent on the current
+// snapshot and the in-flight candidate. Carrying them is one answer to the
+// open `lastKnownBytes` question, not the decision — step 5 decides.
 import { assert } from '../../dist/shared/assert.js';
 import type { FilePath } from '../../dist/shared/brand.js';
 import type {
@@ -20,11 +27,20 @@ import type {
   SubmissionResult,
 } from '../../dist/shared/intent.js';
 import { LIMITS } from '../../dist/shared/limits.js';
+import type { Plan, PlanningBase } from '../../dist/shared/planner.js';
+import type { Result } from '../../dist/shared/result.js';
 import type { Snapshot } from '../../dist/shared/snapshot.js';
 import type { DocumentDisk } from './fake-disk.ts';
 import { sha256, snapshotOf } from './project.ts';
-import type { Plan, Planner } from './reference-planner.ts';
 import { applySplices, changedRanges, witnessesHold } from './splice.ts';
+
+export type Planner = (base: PlanningBase, intent: Intent) => Result<Plan, RejectionReason>;
+
+/** A queued intent and the snapshot it was authored against. */
+export interface Submission {
+  readonly intent: Intent;
+  readonly authored: Snapshot;
+}
 
 /** An intent between planning and commit, with everything the next step needs. */
 interface InFlight {
@@ -47,7 +63,7 @@ export interface ActorState {
   readonly snapshot: Snapshot | undefined;
   /** Disk generation the snapshot was read at (FakeDisk stamps every write). */
   readonly generation: number;
-  readonly queue: readonly Intent[];
+  readonly queue: readonly Submission[];
   readonly phase: ActorPhase;
   readonly hint: WatcherHint;
 }
@@ -71,12 +87,18 @@ export function createActor(path: FilePath): ActorState {
 /** Accept the intent or push back: a full queue is backpressure, not rejection. */
 export function submitIntent(
   state: ActorState,
-  intent: Intent,
+  submission: Submission,
 ): { readonly state: ActorState; readonly result: SubmissionResult } {
+  const intent = submission.intent;
   assert(intent.file === state.path, 'An intent is submitted to its own file actor');
+  assert(submission.authored.path === intent.file, 'The authored snapshot is of the intent file');
+  assert(
+    submission.authored.checksum === intent.authoredChecksum,
+    'The authored snapshot is the one the intent names',
+  );
   assert(state.queue.length <= LIMITS.intentsPendingMax, 'The queue never exceeds its bound');
   if (state.queue.length < LIMITS.intentsPendingMax) {
-    const next = { ...state, queue: [...state.queue, intent] };
+    const next = { ...state, queue: [...state.queue, submission] };
     return { state: next, result: { tag: 'accepted', intentId: intent.id } };
   }
   return { state, result: { tag: 'backpressured' } };
@@ -124,7 +146,7 @@ export function crashActor(state: ActorState): ActorStep {
     };
     effects.push({ tag: 'outcome', outcome });
   }
-  for (const intent of state.queue) {
+  for (const { intent } of state.queue) {
     const outcome: Outcome = { tag: 'uncertain', intentId: intent.id, candidateChecksum: undefined };
     effects.push({ tag: 'outcome', outcome });
   }
@@ -159,10 +181,11 @@ function refresh(state: ActorState, disk: DocumentDisk): { state: ActorState; st
 
 function stepIdle(state: ActorState, disk: DocumentDisk, planner: Planner): ActorStep {
   const refreshed = refresh(state, disk);
-  const [intent, ...rest] = state.queue;
-  if (intent === undefined) {
+  const [submission, ...rest] = state.queue;
+  if (submission === undefined) {
     return typeof refreshed === 'string' ? { state, effects: [], parses: 0 } : refreshed.step;
   }
+  const { intent, authored } = submission;
   if (typeof refreshed === 'string') {
     return reject({ ...state, queue: rest }, intent, refreshed, 0);
   }
@@ -170,7 +193,7 @@ function stepIdle(state: ActorState, disk: DocumentDisk, planner: Planner): Acto
   const base = current.snapshot;
   assert(base !== undefined, 'A successful refresh leaves a snapshot');
   const parses = refreshed.step.parses;
-  const planned = planner(base, intent);
+  const planned = planner({ authored, current: base }, intent);
   if (!planned.ok) {
     return reject(current, intent, planned.error, parses, refreshed.step.effects);
   }

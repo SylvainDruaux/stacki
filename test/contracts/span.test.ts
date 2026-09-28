@@ -116,6 +116,12 @@ test('decoding is strict and keeps a byte-order mark; byte strings are private c
   const copy = toByteString(source);
   source[0] = 9;
   assert.equal(copy[0], 1, 'the byte string does not alias its input');
+  // A Node Buffer's `slice` is a view: the copy must not be one (step-3 spike).
+  const buffer = Buffer.from([1, 2, 3]);
+  const fromBuffer = toByteString(buffer);
+  buffer[0] = 9;
+  assert.equal(fromBuffer[0], 1, 'a byte string does not alias a Buffer input');
+  assert.equal(Buffer.isBuffer(fromBuffer), false, 'a byte string is a plain Uint8Array');
   assert.equal(byteStringsEqual(copy, toByteString(Uint8Array.from([1, 2, 3]))), true);
   assert.equal(byteStringsEqual(copy, toByteString(Uint8Array.from([1, 2]))), false);
   assert.throws(() => toByteString(new Uint8Array(LIMITS.sourceBytesMax + 1)), /exceeds/);

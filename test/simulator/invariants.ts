@@ -8,7 +8,8 @@
 //   3. Bytes outside splice ranges are unchanged.             (checkCommitted)
 //   4. No anchor resolves to the wrong node kind.             (checkCommitted)
 //   5. Ambiguous anchors never apply.                         (checkCommitted)
-//   6. A stale preview cannot submit a silently remapped edit.(checkCommitted)
+//   6. A stale preview cannot submit a silently remapped edit.(checkCommitted,
+//      and world.ts judges every remap against the recorded byte origins)
 //   7. The actor never commits an older snapshot over a newer one. (checkGeneration)
 //   8. Queue, parser, diff and snapshot bounds hold.          (checkBounds)
 //   9. The same seed produces the same results.               (the suite runs seeds twice)
@@ -63,14 +64,20 @@ export function checkCommitted(effect: Committed): void {
   }
   assert(equalBytes(before.subarray(cursorBefore), after.subarray(cursorAfter)), 'Invariant 3: the tail is unchanged');
   checkTarget(effect);
-  // Step 1 maps nothing, so an applied intent was authored against exactly the
-  // bytes it changed. From step 2 a mapped intent records its mapping instead.
-  assert(effect.intent.authoredChecksum === effect.base.checksum, 'Invariant 6: no silent remap');
+  // Invariant 6, the part checkable here: only set-attribute is mapped at step
+  // 3, so any other intent applied to bytes it was not authored against is a
+  // silent remap. A mapped set-attribute is judged in world.ts, against where
+  // the authored bytes really went — not against the planner's own claim.
+  if (effect.intent.authoredChecksum !== effect.base.checksum) {
+    assert(effect.intent.operation.tag === 'set-attribute', 'Invariant 6: no silent remap');
+  }
   checkGeneration(effect.previousGeneration, effect.generation);
 }
 
 // Invariants 4 and 5, from the projections alone: the anchored node had the
 // expected kind before and after, and an attribute edit named one attribute.
+// The target in the base is found from the splice, not from the anchor path: a
+// remapped intent's authored path can name another node in the base.
 function checkTarget(effect: Committed): void {
   const anchor = effect.intent.anchor;
   if (!isNodeKind(anchor.expectedKind)) {
@@ -80,8 +87,9 @@ function checkTarget(effect: Committed): void {
   const after = effect.candidate.projection;
   assert(before.tag === 'valid', 'A node intent applied to a parsing file');
   assert(after.tag === 'valid', 'A node intent produced a parsing file');
-  const same = (path: readonly number[]) =>
-    path.length === anchor.path.length && path.every((step, index) => step === anchor.path[index]);
+  const path = targetPath(effect);
+  const same = (candidate: readonly number[]) =>
+    candidate.length === path.length && candidate.every((step, index) => step === path[index]);
   const target = before.nodes.find((node) => same(node.path));
   const result = after.nodes.find((node) => same(node.path));
   assert(target?.kind === anchor.expectedKind, 'Invariant 4: the anchor held the expected kind');
@@ -91,6 +99,34 @@ function checkTarget(effect: Committed): void {
     const named = target.attributes.filter((attribute) => attribute.name === operation.name);
     assert(named.length === 1, 'Invariant 5: an ambiguous attribute never applies');
   }
+}
+
+// The anchor path for an unmapped intent; for a set-attribute, the path of the
+// base node whose attribute value the splice replaces — which, unmapped, must
+// be the anchor's own node.
+function targetPath(effect: Committed): readonly number[] {
+  const operation = effect.intent.operation;
+  const anchorPath = effect.intent.anchor.path;
+  if (operation.tag !== 'set-attribute') {
+    return anchorPath;
+  }
+  const before = effect.base.projection;
+  assert(before.tag === 'valid', 'A set-attribute applied to a parsing file');
+  const [splice] = effect.plan.splices;
+  assert(splice !== undefined, 'A set-attribute plan has a splice');
+  const owner = before.nodes.find((node) =>
+    node.attributes.some((attribute) => attribute.valueSpan?.start === splice.range.start),
+  );
+  assert(owner !== undefined, 'The splice replaces an attribute value of a base node');
+  if (effect.intent.authoredChecksum === effect.base.checksum) {
+    const unmoved = owner.path.length === anchorPath.length;
+    assert(unmoved, 'Invariant 6: an unmapped intent edits its own node');
+    assert(
+      owner.path.every((step, index) => step === anchorPath[index]),
+      'Invariant 6: an unmapped intent edits its own node',
+    );
+  }
+  return owner.path;
 }
 
 export function checkGeneration(previous: number, next: number): void {

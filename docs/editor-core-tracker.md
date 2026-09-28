@@ -15,11 +15,14 @@ lands it.
   against the code that day: new step 0 (overwrite guard), corrected facts
   in plan §13. Since `d515fcc`, commit `3686761` added `src/modelAdoption.ts`
   (positional id adoption across reparse — UI keying only, see plan §4).
-- **Steps 1 and 2 landed (2026-09-28); steps 3–10 have not started.** The
+- **Steps 1–3 landed (2026-09-28); steps 4–10 have not started.** The
   contract layer, parser spans, hostile corpus, large fixtures, simulator
   skeleton, adapter ratchet and lint fences exist (Step 1), and so do the byte
   diff, the span mapper and the pure `set-attribute` planner (Step 2); nothing
-  in the app submits intents yet.
+  in the app submits intents yet. **The step-3 spike missed every
+  pre-registered threshold** — two wrong-site applications in 400 seeds, and
+  intent→applied p95 of 147–1 728 ms against 50 ms (see Step 3). Step 4 decides
+  on those numbers; they do not move.
 - **Step 0 landed (2026-09-28).** The legacy
   write path still serializes whole files (`mutateModel` → `page:write` →
   `serializePage`), but every page write now names the checksum it was
@@ -40,8 +43,10 @@ lands it.
   `capability.ts` and `source-projection.ts` exist; since step 2, `diff.ts`,
   `mapSpan.ts` and `planner.ts`. The shipping actor and its bounded queue do
   not (the simulator's step-wise actor in `test/simulator/actor.ts` is the
-  reference the step-5 actor must match); the simulator still plans with the
-  step-1 reference planner — wiring the step-2 planner in is step 3.
+  reference the step-5 actor must match). Since step 3 the simulator's actor
+  plans `set-attribute` with `shared/planner.ts` and judges every remap against
+  recorded byte origins; the other operations still use the step-1 reference
+  planner.
 - What the plan builds on: the `shared/` contract parsers and bounds; the
   parser's internal source offsets (`electron/astroParser.ts` `start`/`end`);
   `serialQueue`, `selfWrites`, `projectWatcher`; `shared/limits.ts` plus
@@ -328,7 +333,7 @@ Handed to step 3:
   must report it. A search that exhausts `diffDistanceMax` costs ≈ 150–250 ms
   before rejecting. Plan §12's cached-diff upgrade is the lever if it fails.
 
-### Step 3 — Spike ⬜
+### Step 3 — Spike ✅ (report recorded; thresholds missed)
 
 **Deliverables.** Intent → map → witness-check → splice → reparse →
 reproject against the simulator's seeded scenarios. Record mapping
@@ -341,6 +346,155 @@ correctness, reproject-plus-diff latency, and the **adapter surface** from
 **Gate proof.** Results published against the pre-registered numbers (§11.4,
 see Thresholds below). The numbers may not change between the spike and the
 step-4 decision without a written reason.
+
+**Landed 2026-09-28** on `refactor/architecture-consolidation` in `<pending>`.
+Gate `env -u ELECTRON_RUN_AS_NODE npm test`: 154/154 test commands, 235.2 s,
+exit 0. Report: `npm run spike:editor-core` (after `npm run fixtures:large`);
+the numbers below are one run of it on an Intel i7-4820K (2013, 8 threads),
+Node 24.18.0, WSL2 ext4, the machine otherwise idle.
+
+**Verdict against the pre-registered thresholds: every one missed.**
+
+| Threshold (§11.4) | Registered | Spike | Result |
+|---|---|---|---|
+| Wrong-site applications, corpus | 0 | 2 in 13 614 stale decisions | **miss** |
+| Intent → applied p95 | ≤ 50 ms | 147–675 fresh, 274–1 728 stale | **miss, all 12** |
+| Last keystroke → disk p95 | ≤ 350 ms | 450–1 339 ms | **miss, all 6** |
+| Adapter surface recorded | — | 70 / 9 / 28 / 4 (unchanged) | recorded |
+
+What was wired (test tree only; nothing ships to the app):
+
+- The simulator's actor queues each intent with the snapshot it was authored
+  against (`Submission`, `test/simulator/actor.ts`) and plans through
+  `test/simulator/engine-planner.ts`: `shared/planner.ts` for `set-attribute`
+  (the diff path when stale), the step-1 reference planner for the rest. The
+  actor cannot retain authored snapshots itself: `snapshotsRetainedMax` (2) is
+  spent on the current snapshot and the in-flight candidate. Carrying them is
+  what the spike measured, not the step-5 decision.
+- Ground truth that owes nothing to the diff: every simulated writer records
+  each byte's origin (`test/simulator/provenance.ts`), and every stale
+  `set-attribute` decision is judged again from those origins
+  (`test/simulator/remap-judge.ts`). An element is identified by its own `<`
+  byte. The judge also holds the fast mapper to the brute-force reference on
+  the scenario's real bytes (files up to ~1 KB) and checks the planner's
+  decision follows the mapping. Invariant 6 now allows a remap only for
+  `set-attribute`; the target is located from the splice, not the anchor path.
+- Two new outside writers, so the step-2 conservatism cases are exercised, not
+  assumed: a copy-pasted line (a byte-identical sibling appears) and an
+  attribute appended to an element in another editor.
+- `wrongSite: 'fail' | 'count'`: the gate fails at the event; the report counts.
+
+**Mapping correctness** — 400 seeds × 400 steps over the 16 simulator files:
+
+| Verdict | Count | Meaning |
+|---|---|---|
+| Applied, correct | 3 123 | planned at the element the authored one became |
+| **Wrong site** | **2** | seeds 36 and 240, both `duplicate-siblings.astro` |
+| Conservative | 1 404 | element and value survived; mapper refused (1 201 / 203) |
+| Rejected, conflict | 1 862 | another writer rewrote the very value being edited |
+| Rejected, gone | 0 | no simulated writer deletes an element (gap, below) |
+| Other | 6 127 | not a mapping decision (loop body, quote in value, invalid source…) |
+| Unjudged | 1 096 | a git-style whole-file replace in between: no ground truth |
+
+Conservative splits 1 201 `anchor-ambiguous` / 203 `anchor-moved`. Per file,
+the stale decisions split the same way everywhere except
+`map-loop.astro` (all 834 "other": every attribute sits in a loop body, which
+is read-only). Fresh decisions (identity, no diff): 6 792. The brute-force
+reference agreed on all 10 809 decisions it could check (2 805 skipped: file
+over the table bound, or rejected before mapping) — **the mapper is exact by
+its own definition, and the wrong-site plans are the definition's**.
+
+**The wrong-site mechanism**, pinned in `test/simulator/planner.test.ts`
+("KNOWN WRONG SITE", hand-derived, cross-checked with the brute-force
+reference): retitle the hero `Old` → `New`, then paste a copy of the footer
+line below it. A stale "retitle the footer" intent is planned at byte 59, the
+copy, not 36, the original. The true history costs 29 byte edits; inserting
+`New" />\n<Footer title="` after `<Hero title="` explains the same bytes for
+23, and it is the only minimum script — so the mapper, which refuses ties but
+not minimal mis-explanations, resolves. Without the edit above, the paste alone
+is a tie and rejects `anchor-ambiguous`, as step 2 pinned. The minimum edit
+script is not the edit history. The §12 fingerprint verifier does not catch
+this: the copy is byte-identical. The test pins the wrong result so a fix turns
+it red.
+
+**Engine latency** — the §5.2 pipeline on a real disk: read + hash, rebuild
+the snapshot if the bytes changed, plan (diffing when stale), witnesses,
+splice, reparse + reproject the candidate, re-read + hash, write through
+`electron/atomicWrite.ts` (temp, fsync, rename, read-back). 30 samples per
+series after 2 warm-ups, nearest-rank p95; edits keep byte length (bytes-100
+sits exactly at `sourceBytesMax`). `stale`: another attribute was changed on
+disk first. Every intent in every series applied.
+
+| Fixture | Scenario | p50 | p95 | refresh | plan | reproject | write |
+|---|---|---|---|---|---|---|---|
+| nodes-25 | fresh | 131.7 | 147.1 | — | 3.2 | 115.4 | 10.1 |
+| nodes-25 | stale | 241.1 | 273.8 | 113.5 | 2.1 | 113.7 | 9.6 |
+| nodes-50 | fresh | 256.8 | 278.3 | — | 6.5 | 234.3 | 13.3 |
+| nodes-50 | stale | 528.6 | 639.5 | 253.8 | 4.4 | 250.7 | 14.1 |
+| nodes-100 | fresh | 542.8 | 675.2 | — | 13.4 | 500.7 | 21.0 |
+| nodes-100 | stale | 1 045.2 | 1 198.1 | 496.8 | 8.9 | 510.3 | 21.1 |
+| bytes-25 | fresh | 311.7 | 334.0 | — | 41.4 | 185.0 | 60.0 |
+| bytes-25 | stale | 479.5 | 507.9 | 182.4 | 24.4 | 179.5 | 64.5 |
+| bytes-50 | fresh | 604.5 | 751.3 | — | 88.4 | 317.6 | 134.4 |
+| bytes-50 | stale | 789.8 | 942.0 | 279.9 | 49.8 | 286.7 | 120.1 |
+| bytes-100 | fresh | 1 003.1 | 1 061.1 | — | 164.5 | 502.5 | 243.7 |
+| bytes-100 | stale | 1 451.5 | 1 727.5 | 492.4 | 106.0 | 498.7 | 254.6 |
+
+Milliseconds; stage columns are p50. Where the reprojection goes (p50 of 5):
+`parsePage` 72–310 ms, `parsePageResult` 12–85 ms, `projectPage` 23–178 ms,
+decode ≤ 29 ms, SHA-256 ≤ 38 ms. **Reparse + reproject alone is 115–510 ms, so
+no diff-side lever reaches 50 ms**; §12's cached diff addresses a cost the
+spike did not find (plan is ≤ 165 ms, and only on bytes-*). Incremental
+reparse is the only §12 lever aimed at the dominant stage, and at 25 % of the
+node bound one full reprojection is already 2.3× the whole budget. A stale
+intent pays the reparse twice (refresh + candidate).
+
+**Last keystroke → disk** — the 300 ms typing batch as a real timer, then the
+fresh pipeline; 20 samples per fixture: p95 450.4 / 659.5 / 892.2 (nodes-25,
+-50, -100) and 710.2 / 1 037.9 / 1 339.0 ms (bytes-25, -50, -100). Timer
+lateness p95 ≤ 19 ms, so the result is 300 ms + the engine number above.
+
+**Adapter surface** (`scripts/adapter-surface.ts`, gate run): 70 / 9 / 28 / 4,
+unchanged from the step-1 baseline — the spike touches nothing in `src/`.
+
+Found by step 3 and fixed:
+
+- **`ByteString` aliased Node `Buffer`s.** `toByteString` (`shared/span.ts`)
+  copied with `slice()`, which on a `Buffer` is a view; `diffBytes`'s
+  `reversed()` (`shared/diff.ts`) then reversed the caller's snapshot bytes in
+  place. The simulator never saw it (its bytes come from `TextEncoder`); the
+  first stale intent on bytes read with `fs.readFileSync` — the step-5 actor's
+  input — tripped the planner's assertions. Both now copy with
+  `new Uint8Array` and assert the copy shares no memory. Pinned in
+  `test/contracts/span.test.ts` and a new `diff.test.ts` case; both fail on the
+  old code.
+
+Found and left open (inputs to step 4; not fixed, so the spike measures the
+engine as step 2 shipped it):
+
+- **The two wrong-site applications** (above). A fix is a design question for
+  step 4 — for example, refusing a remap when the authored element's bytes
+  also occur elsewhere near the mapped site — not a spike change.
+- **`byteStringsEqual` costs ~200 ms per 10 MB** (`every` with a closure). The
+  identity fast path asserts equal bytes behind equal checksums with it, which
+  is most of `plan` on the fresh bytes-* rows (164.5 ms on bytes-100). Removing
+  it would not change a single verdict.
+- **Corpus gaps**: no simulated writer deletes an element, so "rejected, gone"
+  is never reached; no text-edit operation exists yet, so `set-attribute`
+  stands in for typing in both latency measures; renderer → main IPC is not
+  modelled.
+- **`lastKnownBytes`**: of 13 614 stale decisions, the authored snapshot was 1
+  actor snapshot old in 8 024, 2 in 2 930, 3 or more in 1 699, and never held
+  by the actor in 961 (the client read the disk itself). An actor keeping one
+  earlier snapshot would have covered 59 %.
+- `test:simulator` now takes 13 s alone, 43 s in the parallel gate (was 2.6 s):
+  the stale diffs and the brute-force reference on every judgeable remap.
+
+Deviations, with reasons: the report is a bench (`test/simulator/spike.bench.ts`,
+`npm run spike:editor-core`), not a gate test, because it measures latency and
+asserts no threshold; the fixture loader moved to `fixtures.entry.ts` so the
+gate suite and the bench run the same scenarios, and the simulator lint fence
+now also excepts `*.bench.ts` and `*.entry.ts`.
 
 ### Step 4 — Threshold decision ⬜
 
@@ -446,6 +600,10 @@ step-0 markdown fixtures.
 Published before the spike; may not move between the spike and the step-4
 decision; revising them later requires a written reason.
 
+**Spike result (2026-09-28, Step 3): all three missed** — 2 wrong-site
+applications; intent→applied p95 147–1 728 ms; last keystroke→disk p95
+450–1 339 ms. Not renegotiated.
+
 ## Limits work (§8)
 
 Every bound lives in `shared/limits.ts`. Existing and usable:
@@ -467,12 +625,12 @@ reduces fidelity to cope. **Step 1 added all of them except `undoEntriesMax`**
 
 ## Adapter surface (ratchet, scripted at step 1)
 
-| Point | Hand, 2026-09-28 | Script, step 1 (baseline) |
-|---|---|---|
-| Direct node-mutation sites in `src/` | 67 (47 in `App.tsx`) | 70 |
-| Prop-index writes | 10 | 9 |
-| `mutateModel(` call sites | 28 | 28 |
-| `applyEdit(` call sites (style panel) | 4 | 4 |
+| Point | Hand, 2026-09-28 | Script, step 1 (baseline) | Script, step 3 (spike) |
+|---|---|---|---|
+| Direct node-mutation sites in `src/` | 67 (47 in `App.tsx`) | 70 | 70 |
+| Prop-index writes | 10 | 9 | 9 |
+| `mutateModel(` call sites | 28 | 28 | 28 |
+| `applyEdit(` call sites (style panel) | 4 | 4 | 4 |
 
 `node dist/scripts/adapter-surface.js --files` prints the per-file split
 (step 1: `App.tsx` 58, `loopBindings.ts` 12, `dataSuggest.ts` 6,
@@ -505,6 +663,9 @@ consolidated plan:
   (bounded by `snapshotsRetainedMax`, today 2), or whether the renderer's
   last-known bytes travel with the intent (bounded by `intentPayloadBytesMax`).
   An intent whose authored bytes are gone rejects `anchor-moved`, as today.
+  Spike data (Step 3): the authored snapshot was one actor snapshot old in
+  59 % of stale decisions, two in 22 %, three or more in 12 %, never held by
+  the actor in 7 %.
 - **Undo semantics** — resolved 2026-09-28: drop page snapshots on external
   reload at step 0; inverse splices submitted as intents at step 6; snapshot
   history deleted at step 9.
@@ -658,6 +819,22 @@ update on every step):
   - Formatting: the new modules and suites were run through Prettier 3.9.9
     (npx cache, `--print-width 100 --single-quote --trailing-comma all`; no
     dependency added); every new line is ≤ 100 columns.
+
+- 2026-09-28, step 3 (PROMPT-3), `<pending>` on top of `43c9739`:
+  - `env -u ELECTRON_RUN_AS_NODE npm test` — **pass, 154/154 test commands in
+    235.2 s, exit 0** (static checks: tsc, eslint 0 errors, `ratchet-check` 0,
+    `adapter-surface` 70 / 9 / 28 / 4 at baseline). The first gate run failed
+    `test:simulator` on a required tally that no longer exists after the
+    judge's redesign (`rejected-gone`); the list was corrected, not the judge.
+  - `npm run test:contracts` — **206/206**. `npm run test:simulator` —
+    **36/36** (34 + the `Buffer` diff case + the known wrong-site case).
+  - `npm run spike:editor-core` — the report in Step 3, one full run on an idle
+    machine. An earlier run found a false wrong-site from the judge itself (an
+    element whose attribute was rewritten counted as gone); the rule became
+    "an element is its own `<` byte", and seeds 36 and 240 remained.
+  - Fixtures regenerated with `npm run fixtures:large`; manifest unchanged.
+  - Formatting: new modules through Prettier 3.9.9 (npx cache, as step 2);
+    every added line ≤ 100 columns.
 
 ## How to work this tracker
 

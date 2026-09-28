@@ -1,50 +1,25 @@
-// Goal: the step-1 simulator skeleton runs seeded scenarios over the hostile
-// corpus and a slice of the round-trip corpus, every invariant holds after every
-// event, and a seed reproduces its run exactly (plan §10, invariant 9).
-// Method: this file is the only one under test/simulator/ that touches the
-// filesystem — it loads fixture texts and hands them to runSimulation, which
-// is pure. Each gate seed runs twice and the trace digests must match; the
-// seeds together must reach every outcome class the skeleton can produce, so a
-// thin run fails instead of passing quietly. Nightly: STACKI_SIMULATOR_SEEDS
-// raises the seed count (up to SEEDS_MAX) without changing the gate.
+// Goal: the simulator runs seeded scenarios over the hostile corpus and a
+// slice of the round-trip corpus, every invariant holds after every event, and
+// a seed reproduces its run exactly (plan §10, invariant 9). From step 3 the
+// actor plans set-attribute with the shipping planner, so stale intents are
+// remapped through the diff, and every remap is judged against the byte
+// origins the simulator recorded: a wrong-site plan fails the run at the event.
+// Method: the entry points are the only files under test/simulator/ that touch
+// the filesystem — fixtures.entry.ts loads the fixture texts and hands them to
+// runSimulation, which is pure. Each gate seed runs twice and the trace digests
+// must match; the seeds together must reach every outcome class the simulator
+// can produce, remap judgements included, so a thin run fails instead of
+// passing quietly. Nightly: STACKI_SIMULATOR_SEEDS raises the seed count (up to
+// SEEDS_MAX) without changing the gate; spike.bench.ts reports the judgements.
 import assert from 'node:assert/strict';
-import * as fs from 'node:fs';
-import * as path from 'node:path';
 import { test } from 'node:test';
+import { loadSimulationFixtures } from './fixtures.entry.ts';
 import { Prng } from './prng.ts';
-import { runSimulation, type SimulationFile, type SimulationReport } from './world.ts';
+import { runSimulation, type SimulationReport } from './world.ts';
 
-const HOSTILE = path.resolve('test/fixtures/editor-core');
-const CORPUS = path.resolve('test/corpus');
-const CORPUS_SLICE = [
-  'map-loop.astro',
-  'nested-components.astro',
-  'spread-props.astro',
-  'slots-named.astro',
-  'style-and-script.astro',
-  'why-a-loop-exists.astro',
-] as const;
 const GATE_SEEDS = 24;
 const SEEDS_MAX = 100_000;
 const STEPS = 400;
-
-function load(): { files: readonly SimulationFile[]; alternates: Map<string, readonly string[]> } {
-  const read = (directory: string, name: string) => fs.readFileSync(path.join(directory, name), 'utf8');
-  const inputs = fs.readdirSync(HOSTILE).filter((name) => !name.includes('.expected.')).sort();
-  const files = [
-    ...inputs.map((name) => ({ name, text: read(HOSTILE, name) })),
-    ...CORPUS_SLICE.map((name) => ({ name, text: read(CORPUS, name) })),
-  ];
-  const alternates = new Map<string, readonly string[]>();
-  for (const name of inputs) {
-    const expected = name.replace(/\.(\w+)$/, '.expected.$1');
-    if (fs.existsSync(path.join(HOSTILE, expected))) {
-      alternates.set(name, [read(HOSTILE, name), read(HOSTILE, expected)]);
-    }
-  }
-  alternates.set('malformed.astro', [read(HOSTILE, 'malformed.astro'), '<div>\n  <span>closed</span>\n</div>\n']);
-  return { files, alternates };
-}
 
 function seedCount(): number {
   const raw = process.env['STACKI_SIMULATOR_SEEDS'];
@@ -58,8 +33,9 @@ function seedCount(): number {
   return seeds;
 }
 
-const fixtures = load();
-const run = (seed: number): SimulationReport => runSimulation({ seed, steps: STEPS, ...fixtures });
+const fixtures = loadSimulationFixtures();
+const run = (seed: number): SimulationReport =>
+  runSimulation({ seed, steps: STEPS, wrongSite: 'fail', ...fixtures });
 
 test('the PRNG is pinned: the same seed yields the same stream on every machine', () => {
   const stream = (seed: number) => {
@@ -116,6 +92,15 @@ const REQUIRED_TALLIES = [
   'submit:backpressured',
   'gesture:completed',
   'gesture:cancelled',
+  // Step 3: stale set-attribute intents mapped through the diff and judged.
+  'mapping:identity',
+  'remap:applied-correct',
+  'remap:conservative anchor-ambiguous',
+  'remap:conservative anchor-moved',
+  'remap:rejected-conflict anchor-moved',
+  'reference:agreed',
+  // Not required: `rejected-gone` — no simulated writer deletes an element yet
+  // (tracker Step 3, corpus gaps).
 ] as const;
 
 const PINNED_SEED_1 = [2442144158, 3238099751, 3819917871, 2104621829] as const;

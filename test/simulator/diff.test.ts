@@ -8,7 +8,8 @@
 // target and cost exactly the distance; (2) hand-built edge cases — empty
 // files, identical files, pure insertions and deletions; (3) each budget at,
 // just under and just past its bound; (4) the preconditions assert with pinned
-// messages; (5) a 1 MB file with a small edit stays far inside the budget.
+// messages; (5) a 1 MB file with a small edit stays far inside the budget;
+// (6) diffing leaves its inputs untouched, bytes read from disk included.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
@@ -188,4 +189,17 @@ test('a 1 MB page with a small edit stays far inside the budget', () => {
   assert.ok(diff.workSpent < 2 * (page.length + edited.length), `work ${diff.workSpent}`);
   assert.ok(diff.workSpent < LIMITS.diffWorkMax / 10);
   assert.deepEqual(rebuild(diff).bytes, encodeUtf8(edited));
+});
+
+// Found by the step-3 spike: bytes read with fs are a Buffer, whose `slice` is
+// a view, so the backward run once reversed the caller's snapshot in place.
+test('diffing never mutates its inputs, bytes that came from a Buffer included', () => {
+  const page = '<section class="card">\n  <h2 title="Old">Heading</h2>\n</section>\n'.repeat(64);
+  const edited = page.replace('title="Old"', 'title="New"');
+  const source = toByteString(Buffer.from(page, 'utf8'));
+  const target = toByteString(Buffer.from(edited, 'utf8'));
+  const diff = computed(source, target);
+  assert.equal(diff.distance, 6);
+  assert.deepEqual(source, encodeUtf8(page), 'the source bytes are unchanged');
+  assert.deepEqual(target, encodeUtf8(edited), 'the target bytes are unchanged');
 });

@@ -343,8 +343,11 @@ function frontierDistance(
   return undefined;
 }
 
+// `new Uint8Array` always copies; `slice` on a Node Buffer is a view, and
+// reversing that reverses the caller's snapshot in place (step-3 spike).
 function reversed(bytes: Uint8Array): Uint8Array {
-  const copy = bytes.slice().reverse();
+  const copy = new Uint8Array(bytes).reverse();
   assert(copy.length === bytes.length, 'Reversing keeps the length');
+  assert(copy.buffer !== bytes.buffer, 'The reversed copy shares no memory with its input');
   return copy;
 }

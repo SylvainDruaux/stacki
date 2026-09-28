@@ -9,6 +9,7 @@
   "scripts": {
     "roundtrip:report": "npm run build:runtime && node dist/scripts/roundtrip-report.js",
     "fixtures:large": "npm run build:runtime && node dist/scripts/large-fixtures.js --write",
+    "spike:editor-core": "npm run build:runtime && node test/simulator/spike.bench.ts",
     "release": "npm run build:scripts && node dist/scripts/release.js",
     "build:contracts": "tsc -p shared/tsconfig.json",
     "build:electron": "tsc -p electron/tsconfig.json && npm run build:renderer-runtime",

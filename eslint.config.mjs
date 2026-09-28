@@ -245,10 +245,16 @@ export default [
     },
   },
   {
-    // The simulator core. Its *.test.ts entry points load fixtures from disk and
-    // read the nightly seed count, then hand plain values in.
+    // The simulator core. Its entry points — the *.test.ts suites and the
+    // *.bench.ts spike measurement — and the *.entry.ts modules only they import
+    // load fixtures from disk, read the environment and (the bench) the clock,
+    // then hand plain values in.
     files: ['test/simulator/**/*.ts'],
-    ignores: ['test/simulator/**/*.test.ts'],
+    ignores: [
+      'test/simulator/**/*.test.ts',
+      'test/simulator/**/*.bench.ts',
+      'test/simulator/**/*.entry.ts',
+    ],
     rules: {
       ...DETERMINISM_RULES,
       'no-restricted-syntax': ['error', ...NO_ASSERTIONS, ...NO_WHOLE_FILE_REGENERATION, ...NO_ASYNC],
