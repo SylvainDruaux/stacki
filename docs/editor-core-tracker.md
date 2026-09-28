@@ -1002,6 +1002,41 @@ instead of returning `parse-error` on text over `ipcFieldCharsMax` units but
 under `sourceBytesMax` bytes. No fixture reaches that size, so it could not
 affect any number above.
 
+### Re-registered 2026-09-28 — revision B (owner's decision), before measurement
+
+The owner chose revision B: extend the projection patch to hosts inside
+`{…}` expressions, the one cause of revision A's failure.
+
+**Thresholds: identical to revision A. No number, fixture or definition
+moves.** W, E, U1, U2, S and P keep A's thresholds and fixtures. The harness,
+the seeds, the sample counts, the void rule (load above 1.5 at start) and the
+decision rule are all A's. A's failure stands in the record; B is a new
+attempt, measured on new code.
+
+Why nothing moves: A failed on the fallback path, not on a threshold that
+was wrong. The reasons written for A (see above) still hold.
+
+**Code under test.** The implementation commit that follows this one. Only
+these land in it:
+- The expression-host extension to `shared/projection-patch.ts`.
+- Its argument, written in that module's header.
+- Its brute-force reference: the fixture sweep, a seeded property test over
+  generated pages with expressions, and the simulator's full-reparse
+  comparison.
+- A census script for real pages.
+
+**Recorded, not gated:** a census of real pages. For every editable string
+attribute site in the `.astro` files on the development machine, outside
+`node_modules` and `test/`, it counts:
+- the share of sites whose host is inside an expression;
+- the share of sites the patch refuses, under A's rule and under B's rule.
+Only aggregate counts are recorded; no file content or path is.
+
+**Decision rule, unchanged.** Go only if W, E, U1, U2, S and P all pass on
+the first complete run of `patch.bench.ts` after the implementation commit.
+Otherwise the result is no-go: the legacy path stays, and nothing is
+renegotiated.
+
 ## Limits work (§8)
 
 Every bound lives in `shared/limits.ts`. Existing and usable:
