@@ -21,7 +21,11 @@ import { parsePage } from '../../dist/electron/astroParser.js';
 import { toFilePath } from '../../dist/shared/brand.js';
 import { LIMITS } from '../../dist/shared/limits.js';
 import type { Splice } from '../../dist/shared/planner.js';
-import { projectValueSplice, valueBytesNeutral } from '../../dist/shared/projection-patch.js';
+import {
+  hostContext,
+  projectValueSplice,
+  valueBytesNeutral,
+} from '../../dist/shared/projection-patch.js';
 import type { ProjectedNode, Projection } from '../../dist/shared/source-projection.js';
 import {
   decodeUtf8,
@@ -32,6 +36,7 @@ import {
   type ByteString,
 } from '../../dist/shared/span.js';
 import { patchCounts } from './candidate.ts';
+import { Prng } from './prng.ts';
 import { loadSimulationFixtures } from './fixtures.entry.ts';
 import { projectBytes } from './project.ts';
 import { applySplices } from './splice.ts';
@@ -118,9 +123,12 @@ test('the patched projection is the reparsed one on every fixture value', () => 
         const splice = valueSplice(fixture.bytes, range, value);
         const patched = projectValueSplice(projection, fixture.bytes, splice);
         if (patched === undefined) {
-          if (valueBytesNeutral(splice.expectedBytes)) {
+          const context = hostContext(projection, range);
+          if (context === 'refused') {
             refusedByHost++;
           } else {
+            // The fast path is never silently narrower than its stated rule.
+            assert.ok(!allNeutral(splice, context), `${fixture.name} @${range.start} ← ${value}`);
             refusedByBytes++;
           }
           continue;
@@ -132,8 +140,8 @@ test('the patched projection is the reparsed one on every fixture value', () => 
     }
   }
   console.log(
-    `compared ${compared}; refused: host under a condition/loop or not markup ` +
-      `${refusedByHost}, old value outside the allowlist ${refusedByBytes}`,
+    `compared ${compared}; refused: host context ${refusedByHost}, ` +
+      `a value outside its context's bytes ${refusedByBytes}`,
   );
   assert.ok(compared > 500, `the sweep compared a real sample (${compared})`);
 });
@@ -178,18 +186,57 @@ test('why `<` is refused: a value can change the parse, pinned', () => {
   assert.equal(projectBytes(PAGE, applySplices(bytes, [splice])).tag, 'parse-error');
 });
 
-test('a host under a condition or a loop is refused whole', () => {
-  const pages = [
-    '{show && <a title="x">y</a>}\n<p>z</p>\n',
-    '{show ? (<a title="x">y</a>) : null}\n',
-    '{items.map((item) => (<a title="x">y</a>))}\n',
-  ];
-  for (const page of pages) {
-    const { projection, bytes, splice } = titleSplice(page, 'ok');
+const EXPRESSION_PAGES = [
+  '{show && <a title="x">y</a>}\n<p>z</p>\n',
+  '{show ? (<a title="x">y</a>) : null}\n',
+  '{items.map((item) => (<a title="x">y</a>))}\n',
+  // The value in each JavaScript-scanner mode: a string, code (the text's quote
+  // closes at the value's opening quote), a block comment, a template literal,
+  // after a line comment, and after a URL's `//`.
+  "{show && <p>it's <a title=\"x\">y</a></p>}\n",
+  '{show && <p>say "hi <a title="x">y</a></p>}\n',
+  '{show && <p>x /* y <a title="x">y</a> z */ w</p>}\n',
+  '{show && <p>tick ` a <a title="x">y</a> b ` tock</p>}\n',
+  '{show && <p>a // b\n<a title="x">y</a></p>}\n',
+  '{show && <p>see http://x.test/ <a title="x">y</a></p>}\n',
+];
+
+// Revision B: hosts inside conditions and loops patch, with the stricter
+// table, and the patch equals the reparse.
+test('a host under a condition or a loop patches values inert to the JS scanners', () => {
+  for (const page of EXPRESSION_PAGES) {
+    const { projection, bytes, splice } = titleSplice(page, 'New value 2 é');
     assert.equal(projection.tag, 'valid', page);
-    assert.equal(projectValueSplice(projection, bytes, splice), undefined, page);
+    assert.equal(hostContext(projection, splice.range), 'expression', page);
+    const patched = projectValueSplice(projection, bytes, splice);
+    assert.notEqual(patched, undefined, page);
+    assert.deepStrictEqual(patched, projectBytes(PAGE, applySplices(bytes, [splice])), page);
   }
 });
+
+test('inside an expression, each byte the JS scanners react to refuses the patch', () => {
+  const [page] = EXPRESSION_PAGES;
+  assert.ok(page !== undefined);
+  for (const byte of '()[]?:&;/*') {
+    const inNew = titleSplice(page, `a${byte}b`);
+    assert.equal(projectValueSplice(inNew.projection, inNew.bytes, inNew.splice), undefined, byte);
+    const inOld = titleSplice(page.replace('"x"', `"a${byte}b"`), 'ok');
+    assert.equal(inOld.projection.tag, 'valid', `the page with ${byte} parses`);
+    assert.equal(projectValueSplice(inOld.projection, inOld.bytes, inOld.splice), undefined, byte);
+    const markup = titleSplice(NESTED, `a${byte}b`); // The same byte is inert in markup.
+    assert.notEqual(projectValueSplice(markup.projection, markup.bytes, markup.splice), undefined);
+  }
+});
+
+function allNeutral(splice: Splice, context: 'markup' | 'expression'): boolean {
+  if (splice.replacementBytes.length > LIMITS.attrCharsMax) {
+    return false;
+  }
+  if (valueBytesNeutral(splice.expectedBytes, context)) {
+    return valueBytesNeutral(splice.replacementBytes, context);
+  }
+  return false;
+}
 
 test('a splice that is not a string value, or a file that does not parse, is refused', () => {
   const bytes = encodeUtf8(NESTED);
@@ -237,6 +284,115 @@ test('the UTF-16 bound is kept from the projection count, on both sides of it', 
   assert.ok(grownText.ok, 'The grown page is UTF-8');
   const reparsed = parsePage(grownText.value, { locs: true });
   assert.equal(reparsed.editable, false, 'The parser refuses one unit past the bound too');
+});
+
+// Pages built to drive the JavaScript scanners into every mode around a value:
+// JSX text carrying apostrophes, quotes, `//`, `/*`, backticks, URLs and
+// operators, hosts in conditions, ternaries and loops, nested. Every value is
+// replaced by random bytes from all of printable ASCII plus multi-byte UTF-8;
+// an accepted patch must equal the reparse, and a refusal must follow from the
+// rule. Bounded: PROPERTY_PAGES pages, PROPERTY_EDITS edits per value site.
+const PROPERTY_PAGES = 1500;
+const PROPERTY_EDITS = 3;
+const PROPERTY_DEPTH_MAX = 2;
+const TEXTS = [
+  'plain words',
+  "it's",
+  'say "hi',
+  'a // b\n',
+  'x /* y',
+  'z */ w',
+  'http://x.test/a',
+  'tick ` here',
+  'a ? b : c',
+  'p && q',
+  '(open',
+  'close)',
+  '[x]',
+  'semi; colon',
+  'café 漢字',
+] as const;
+// Openers and their closers, placed around a host so the value sits inside a
+// block comment or a template literal as the scanners read it.
+const AROUND: readonly (readonly [string, string])[] = [
+  ['', ''],
+  ['x /* y', 'z */ w'],
+  ['tick ` a', 'b ` tock'],
+  ['a // b\n', ''],
+];
+const ORIGINALS = ['x', 'Old title', 'a-b_c', 'é', "it's", 'a/b', 'q?r', ''] as const;
+const ALPHABET = [
+  ...Array.from({ length: 0x7f - 0x20 }, (_, index) => String.fromCharCode(0x20 + index)),
+  'é',
+  '漢',
+  '😀',
+];
+
+function propertyBody(prng: Prng, depth: number): string {
+  const text = (): string => prng.pick(TEXTS);
+  const value = (): string => prng.pick(ORIGINALS).replace('"', '');
+  const host = `<a title="${value()}" data-x="${value()}">${text()}</a>`;
+  const [before, after] = prng.pick(AROUND);
+  const element = `<p>${text()} ${before} ${host} ${after} ${text()}</p>`;
+  if (depth >= PROPERTY_DEPTH_MAX) {
+    return element;
+  }
+  const inner = (): string => propertyBody(prng, depth + 1);
+  switch (prng.below(5)) {
+    case 0:
+      return `{show && ${inner()}}`;
+    case 1:
+      return `{show && (${inner()})}`;
+    case 2:
+      return `{ok ? (${inner()}) : (${inner()})}`;
+    case 3:
+      return `{items.map((item) => (${inner()}))}`;
+    default:
+      return `<div class="c">${inner()}</div>`;
+  }
+}
+
+function randomValue(prng: Prng): string {
+  const length = prng.below(12);
+  return Array.from({ length }, () => prng.pick(ALPHABET)).join('');
+}
+
+test('property: every accepted patch equals the reparse, around every scanner mode', () => {
+  const prng = new Prng(20260928);
+  const accepted = { markup: 0, expression: 0 };
+  let refused = 0;
+  let pagesValid = 0;
+  for (let index = 0; index < PROPERTY_PAGES; index++) {
+    const page = `${propertyBody(prng, 0)}\n${propertyBody(prng, 0)}\n`;
+    const bytes = encodeUtf8(page);
+    const projection = projectBytes(PAGE, bytes);
+    if (projection.tag !== 'valid') {
+      continue;
+    }
+    pagesValid++;
+    for (const { range } of stringValues(projection)) {
+      const context = hostContext(projection, range);
+      for (let edit = 0; edit < PROPERTY_EDITS; edit++) {
+        const splice = valueSplice(bytes, range, randomValue(prng));
+        const patched = projectValueSplice(projection, bytes, splice);
+        const where = `${JSON.stringify(page)} @${range.start}`;
+        if (patched === undefined) {
+          assert.ok(context === 'refused' || !allNeutral(splice, context), where);
+          refused++;
+          continue;
+        }
+        assert.ok(context !== 'refused', where);
+        assert.deepStrictEqual(patched, projectBytes(PAGE, applySplices(bytes, [splice])), where);
+        accepted[context]++;
+      }
+    }
+  }
+  const tallies = `accepted ${JSON.stringify(accepted)}, refused ${refused}`;
+  const counts = `${pagesValid} valid pages, ${tallies}`;
+  console.log(`property: ${counts}`);
+  assert.ok(pagesValid > PROPERTY_PAGES / 4, `most generated pages parse (${counts})`);
+  assert.ok(accepted.expression > 200, `expression hosts were exercised (${counts})`);
+  assert.ok(accepted.markup > 200, `markup hosts were exercised (${counts})`);
 });
 
 test('seeded simulator runs: every patched candidate matched its reparse', () => {

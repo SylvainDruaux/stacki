@@ -5,9 +5,11 @@
 // byte offset at or after the edited value.
 //
 // The claim this module rests on: replacing the bytes of a quoted attribute
-// value with other bytes from VALUE_BYTES leaves the parser's tokenization
-// unchanged, when the host element's ancestors are all markup (element or
-// component). Why, from electron/astroParser.ts:
+// value with other bytes from the host's table leaves the parser's tokenization
+// unchanged. A host whose ancestors are all markup (element or component) uses
+// MARKUP_VALUE_BYTES; one inside a condition or a loop (cond, branch, map, with
+// markup between) uses EXPRESSION_VALUE_BYTES; any other ancestor is refused.
+// Why, from electron/astroParser.ts, first for markup:
 //
 //   - The tag is read by TAG_RE and its attributes by ATTR_PATTERN; both take
 //     a quoted value as `"[^"]*"` or `'[^']*'`, so any byte but the quote is
@@ -16,14 +18,30 @@
 //     raw text, and every alternative it matches starts with `<`. Refused.
 //   - The nested-brace bail on a tag's attribute string and
 //     findMatchingFragmentClose react to `{` and `}`. Refused.
-//   - The JavaScript scanners (findMatchingDelimiter, topLevelOps, and the
-//     string rule in skipStringOrComment) read markup only inside `{ … }`
-//     expressions: conditions and loops. They react to quotes, backticks,
-//     backslashes, line breaks, `/`, `*`, brackets, `?`, `:` and `&`, so a
-//     host under a cond, branch or map is refused whole, not byte by byte.
 //   - The frontmatter fence and the line-ending sniff need a line break;
 //     control bytes are refused. `>` is refused too: inert by the argument
 //     above, but excluding it costs nothing and needs no argument.
+//
+// Inside an expression the markup is also read as JavaScript, by the scanners
+// that find the expression's end and split it (findMatchingDelimiter,
+// topLevelOps, topLevelStatements, the map recognizer), all built on
+// skipStringOrComment. Revision B of step 4 extends the patch to these hosts,
+// because refusing them put a full reparse on the keystroke p95. The scanners
+// do not see markup as markup, so the value can sit in any of their modes, and
+// it must be inert in every one:
+//   - Code. The opening quote normally starts a string that ends at the
+//     closing one, but a quote in earlier JSX text can close its own "string"
+//     exactly there, leaving the value in code. Code reacts to brackets
+//     `( ) [ ] { }`, `?`, `:`, `&` (topLevelOps), `;` (topLevelStatements),
+//     `/` and `*` (comment openers), `<` before a letter, and `.map(`, which
+//     needs `(`.
+//   - A quoted string: ends at its quote or a line break; `\` skips a byte.
+//   - A template literal: ends at a backtick; `\` skips a byte.
+//   - A line comment: ends at a line break.
+//   - A block comment: ends at `*/`.
+// EXPRESSION_VALUE_BYTES is the markup table without `( ) [ ] ? : & ; / *`,
+// which leaves none of those bytes. The neighbours of the value are its own
+// quotes, so no pair (`//`, `*/`, `?.`) can form across its edges.
 //
 // Both the old and the new bytes must pass. A value the parser was fooled by
 // (`</div>` inside one) produced the current projection; removing it changes
@@ -61,10 +79,14 @@ export function projectValueSplice(
   if (projection.tag !== 'valid') {
     return undefined;
   }
-  if (!valueBytesNeutral(splice.expectedBytes)) {
+  const context = hostContext(projection, splice.range);
+  if (context === 'refused') {
     return undefined;
   }
-  if (!valueBytesNeutral(splice.replacementBytes)) {
+  if (!valueBytesNeutral(splice.expectedBytes, context)) {
+    return undefined;
+  }
+  if (!valueBytesNeutral(splice.replacementBytes, context)) {
     return undefined;
   }
   if (splice.replacementBytes.length > LIMITS.attrCharsMax) {
@@ -84,9 +106,6 @@ export function projectValueSplice(
   if (utf16Length > LIMITS.ipcFieldCharsMax) {
     return undefined;
   }
-  if (!hostUnderMarkupOnly(projection, splice.range)) {
-    return undefined;
-  }
   const patched = shiftProjection(projection, splice.range, { bytes: delta, units: unitDelta });
   assert(patched.nodes.length === projection.nodes.length, 'A value edit keeps every node');
   assert(patched.byteLength === byteLength, 'The patch measures the spliced bytes');
@@ -94,19 +113,56 @@ export function projectValueSplice(
   return patched;
 }
 
-/** Bytes that are inert inside a quoted value (see the header): printable
- * ASCII except quotes, backtick, backslash, angle brackets and braces, and any
- * byte of a multi-byte UTF-8 sequence. */
-export function valueBytesNeutral(bytes: ByteString): boolean {
+/** Where a value's host sits, which decides the bytes it may hold. */
+export type HostContext = 'markup' | 'expression' | 'refused';
+
+/** Bytes that are inert inside a quoted value in `context` (see the header):
+ * printable ASCII except quotes, backtick, backslash, angle brackets and
+ * braces, and any byte of a multi-byte UTF-8 sequence; inside an expression,
+ * also none of `( ) [ ] ? : & ; / *`. */
+export function valueBytesNeutral(
+  bytes: ByteString,
+  context: Exclude<HostContext, 'refused'>,
+): boolean {
   assert(bytes.length <= LIMITS.sourceBytesMax, 'Checked bytes are inside the file bound');
+  const table = context === 'markup' ? MARKUP_VALUE_BYTES : EXPRESSION_VALUE_BYTES;
   for (let index = 0; index < bytes.length; index++) {
     const byte = bytes[index];
     assert(byte !== undefined, 'The index lies inside the bytes');
-    if (!VALUE_BYTES[byte]) {
+    if (!table[byte]) {
       return false;
     }
   }
   return true;
+}
+
+/** The context of the host of the one string value at exactly `range`:
+ * `refused` when no string value is there, or when an ancestor is neither
+ * markup nor a condition or loop. */
+export function hostContext(projection: Projection, range: ByteSpan): HostContext {
+  if (projection.tag !== 'valid') {
+    return 'refused';
+  }
+  const containing = projection.nodes.filter((node) => contains(node.span, range));
+  const host = containing.at(-1);
+  if (host === undefined) {
+    return 'refused';
+  }
+  const values = host.attributes.filter((attribute) => isValueAt(attribute, range));
+  if (values.length === 0) {
+    return 'refused'; // Not a value edit: the caller reparses.
+  }
+  assert(values.length === 1, 'One attribute value occupies one range');
+  assertOneChain(containing);
+  if (!MARKUP_KINDS.has(host.kind)) {
+    return 'refused'; // Only an element or a component carries an edited value.
+  }
+  if (containing.every((node) => MARKUP_KINDS.has(node.kind))) {
+    return 'markup';
+  }
+  const known = (node: ProjectedNode): boolean =>
+    MARKUP_KINDS.has(node.kind) || EXPRESSION_KINDS.has(node.kind);
+  return containing.every(known) ? 'expression' : 'refused';
 }
 
 // --- Internal ----------------------------------------------------------------
@@ -126,37 +182,33 @@ function utf16Units(bytes: ByteString): number {
   return units;
 }
 
-const REFUSED_ASCII = '"\'`\\<>{}';
+const MARKUP_REFUSED_ASCII = '"\'`\\<>{}';
+const EXPRESSION_REFUSED_ASCII = `${MARKUP_REFUSED_ASCII}()[]?:&;/*`;
 
-const VALUE_BYTES: readonly boolean[] = Array.from({ length: 256 }, (_, byte) => {
-  if (byte >= 0x80) {
-    return true;
-  }
-  if (byte < 0x20) {
-    return false;
-  }
-  if (byte === 0x7f) {
-    return false;
-  }
-  return !REFUSED_ASCII.includes(String.fromCharCode(byte));
-});
+const MARKUP_VALUE_BYTES = valueTable(MARKUP_REFUSED_ASCII);
+const EXPRESSION_VALUE_BYTES = valueTable(EXPRESSION_REFUSED_ASCII);
+
+function valueTable(refused: string): readonly boolean[] {
+  return Array.from({ length: 256 }, (_, byte) => {
+    if (byte >= 0x80) {
+      return true; // A byte of a multi-byte UTF-8 sequence: no scanner reads one.
+    }
+    if (byte < 0x20) {
+      return false;
+    }
+    if (byte === 0x7f) {
+      return false;
+    }
+    return !refused.includes(String.fromCharCode(byte));
+  });
+}
 
 const MARKUP_KINDS: ReadonlySet<ProjectedNode['kind']> = new Set(['element', 'component']);
+const EXPRESSION_KINDS: ReadonlySet<ProjectedNode['kind']> = new Set(['cond', 'branch', 'map']);
 
-// The one string attribute whose value is exactly the range, and every node
-// that contains it: the host and its ancestors. All must be markup.
-function hostUnderMarkupOnly(projection: ValidProjection, range: ByteSpan): boolean {
-  const containing = projection.nodes.filter((node) => contains(node.span, range));
-  const host = containing.at(-1);
-  if (host === undefined) {
-    return false;
-  }
-  const values = host.attributes.filter((attribute) => isValueAt(attribute, range));
-  if (values.length === 0) {
-    return false; // Not a value edit: the caller reparses.
-  }
-  assert(values.length === 1, 'One attribute value occupies one range');
-  // Preorder: every node containing the range is an ancestor of the next one.
+// Preorder: every node containing a range is an ancestor of the next one.
+function assertOneChain(containing: readonly ProjectedNode[]): void {
+  assert(containing.length <= LIMITS.treeDepthMax + 1, 'The chain is inside the depth bound');
   for (let index = 1; index < containing.length; index++) {
     const parent = containing[index - 1];
     const child = containing[index];
@@ -164,7 +216,6 @@ function hostUnderMarkupOnly(projection: ValidProjection, range: ByteSpan): bool
     assert(child !== undefined, 'The child lies inside the chain');
     assert(isPrefix(parent.path, child.path), 'Nodes containing a range form one chain');
   }
-  return containing.every((node) => MARKUP_KINDS.has(node.kind));
 }
 
 function isValueAt(attribute: ProjectedAttribute, range: ByteSpan): boolean {

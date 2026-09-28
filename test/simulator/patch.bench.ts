@@ -28,7 +28,11 @@ import { capabilityAcceptsVisualIntent } from '../../dist/shared/capability.js';
 import { toIntent, type Intent } from '../../dist/shared/intent.js';
 import { LIMITS } from '../../dist/shared/limits.js';
 import { planIntent, type Splice } from '../../dist/shared/planner.js';
-import { projectValueSplice, valueBytesNeutral } from '../../dist/shared/projection-patch.js';
+import {
+  hostContext,
+  projectValueSplice,
+  valueBytesNeutral,
+} from '../../dist/shared/projection-patch.js';
 import { toAnchorRef, toChildIndex } from '../../dist/shared/ref.js';
 import { createSnapshot, type Snapshot } from '../../dist/shared/snapshot.js';
 import type { ProjectedNode } from '../../dist/shared/source-projection.js';
@@ -70,7 +74,7 @@ type Stages = Readonly<Record<Stage | 'total', number>>;
 
 // A report counter: which patch-variant candidates were patched, and why the
 // others were refused (and reparsed instead). Nothing in the bench reads it back.
-const refusals = { patched: 0, 'old value': 0, 'host under an expression': 0 };
+const refusals = { patched: 0, host: 0, 'old value': 0, 'new value': 0 };
 
 interface Target {
   readonly node: ProjectedNode;
@@ -275,7 +279,7 @@ function runPipeline(
   const patched =
     variant === 'patch' ? projectValueSplice(current.projection, current.bytes, only) : undefined;
   if (variant === 'patch') {
-    refusals[patched === undefined ? refusalReason(only) : 'patched']++;
+    refusals[patched === undefined ? refusalReason(current, only) : 'patched']++;
   }
   const projection = patched ?? projectBytes(held.path, candidateBytes);
   const project = clock();
@@ -293,8 +297,14 @@ function runPipeline(
   return { stages, snapshot: candidate, patched: patched !== undefined };
 }
 
-function refusalReason(splice: Splice): 'old value' | 'host under an expression' {
-  return valueBytesNeutral(splice.expectedBytes) ? 'host under an expression' : 'old value';
+// Report only: why the patch refused, by the rule's own parts (revision B's
+// host contexts replaced revision A's single "host under an expression").
+function refusalReason(current: Snapshot, splice: Splice): 'host' | 'old value' | 'new value' {
+  const context = hostContext(current.projection, splice.range);
+  if (context === 'refused') {
+    return 'host';
+  }
+  return valueBytesNeutral(splice.expectedBytes, context) ? 'new value' : 'old value';
 }
 
 function seriesRow(name: string, scenario: Scenario, variant: string, runs: readonly Stages[]) {
