@@ -515,6 +515,16 @@ Ratchet counts only decrease.
    the reason in §7: the batch window protects the preview and is policy, not engine cost. After
    the spike starts, the numbers may not move. Fail → keep step 0's guarded legacy path, report,
    and stop.
+   **Decided 2026-09-28: fail.** Revised the same day by the owner (option A of the tracker's
+   step-4 revision proposal), before measurement. Changes:
+   - Wrong-site plans are gated at 2 000 seeds.
+   - "Engine" means planning, splicing and projection. The §5.2 disk work and the snapshot's
+     SHA-256 are protocol work. They are recorded, not gated: they cost more than 50 ms on the
+     bytes-* fixtures before any engine code runs.
+   - End-to-end intent→applied ≤ 50 ms and keystroke→disk ≤ 350 ms remain, on nodes-25 and
+     nodes-50.
+   - Stale engine ≤ 50 ms applies on those two fixtures.
+   Definitions, reasons, the harness and the decision rule are in the tracker, Thresholds.
 5. **Actor and write protocol.** Bounded queue, §5.2 protocol on `atomicWrite.ts`,
    external-writer handling, one actor per chunk file. **Single writer:** the legacy save path
    submits `ReplaceSource` through the actor from this step on (§3.3); a test proves no code

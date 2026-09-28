@@ -855,6 +855,92 @@ applications; intent→applied p95 147–1 728 ms; last keystroke→disk p95
 **Step-4 decision (2026-09-28): fail, no-go** — confirmed by a re-run at
 `b387086`; the thresholds did not move. See Step 4.
 
+### Re-registered 2026-09-28 — revision A (owner's decision), before measurement
+
+The owner chose option A of the step-4 revision proposal (Step 4). For the
+stale path the owner chose (ii). The candidate checksum counts as protocol
+work. The thresholds above are superseded, not deleted: they were measured,
+and they failed.
+
+These numbers, their definitions and the protocol are committed before any
+measurement under them counts. The prototype numbers in the proposal were seen
+first. That is disclosed there, and it is why each reason below is one that
+does not depend on them.
+
+**Stage terms.** Stages are the columns of `test/simulator/patch.bench.ts`.
+- **Disk work:** read, verify and write, as §5.2 mandates.
+- **Protocol work:** the disk work plus `hash`, the candidate's SHA-256. The
+  snapshot contract (§3.1, `shared/snapshot.ts`) computes that hash from the
+  full bytes.
+- **Engine:** plan + splice + project, summed per sample. This is everything
+  the engine decides, and nothing the protocol mandates.
+- **End to end:** every stage, including the refresh on a stale intent.
+
+| Id | Threshold | Fixtures |
+|---|---|---|
+| W | 0 wrong-site plans | simulator corpus, 2 000 seeds |
+| E | engine p95 ≤ 50 ms, fresh | all six named |
+| U1 | end-to-end intent → applied p95 ≤ 50 ms, fresh | nodes-25, nodes-50 |
+| U2 | last keystroke → disk p95 ≤ 350 ms | nodes-25, nodes-50 |
+| S | engine p95 ≤ 50 ms, stale | nodes-25, nodes-50 |
+| P | every patched candidate equals its full reparse | every measured run |
+
+Reasons, in full:
+- **W.** The 400-seed corpus produced 2 wrong-site plans. The same code
+  produced 14 at 2 000 seeds, in two more files. A count that grows with
+  seeds is not measured by the smaller run.
+- **E.** The old number was intent → applied, labelled "the engine" but
+  measured end to end. With no engine code at all, the protocol costs more
+  than 50 ms on bytes-*:
+  - Disk floor: 92–312 ms p95 (`baseline.bench.ts`).
+  - SHA-256 of 10 MB: 37.5 ms p50 and 46 ms p95 on this CPU.
+  No engine can meet the old definition there on this machine. The engine's
+  own share is what the engine's design can change, so that is what E gates.
+- **U1 and U2.** Ungating the disk must not hide what a user waits for on
+  real pages. The 1 052 real `.astro` files on the development machine have a
+  p95 of 15 KB and a max of 93 KB. nodes-25 and nodes-50 (176 and 355 KB)
+  are the named fixtures closest above them. The budgets are the old ones,
+  unchanged.
+- **S.** Stale intents were in the old intent → applied number. The owner
+  kept a latency gate for them, not a recorded-only figure, on the same
+  realistic tier. The refresh (a full reparse of another writer's bytes) is
+  excluded: step 5 moves it to the watcher tick.
+
+**Recorded, not gated:**
+- Protocol stages, and the hash, per fixture.
+- End to end on nodes-100 and bytes-*.
+- Stale end to end.
+- Stale engine on nodes-100 and bytes-*.
+- Patch refusals per series.
+- `anchor-ambiguous` counts.
+- The adapter surface.
+
+**Protocol, fixed before measuring:**
+1. **Code under test.** The implementation commit that follows this one.
+   Only the harness and the fixes named in the proposal (§4 there) land in
+   it.
+2. **Machine.** The i7-4820K, Node 24.18.0, WSL2 ext4, after
+   `npm run fixtures:large` (manifest unchanged).
+3. **Harness.**
+   - E, U1, S and P: `node test/simulator/patch.bench.ts`, patch variant. The
+     seeds are the ones in the file at `aa2fe2f` (fresh 1, stale 2). There
+     are 30 samples per series after 2 warm-ups, and p95 is nearest-rank.
+     Stale targets are elements whose identity region is unique in the file.
+     The uniqueness guard refuses the others by design; their refusal is
+     counted under W's corpus instead.
+   - U2: the same file's keystroke section. It runs the 300 ms batch as a
+     real timer, then the fresh patch pipeline, with 20 samples per fixture,
+     as in step 3.
+   - W: `STACKI_SIMULATOR_SEEDS=2000 node --test
+     test/simulator/simulator.test.ts`, with `wrongSite: 'fail'`.
+4. **Which run counts.** The first complete run counts. A run is void only
+   if the bench's printed load average (1 minute, taken at start) is above
+   1.5. The bench prints it before any result. A void run is recorded as
+   void, with its load, and the next complete run counts.
+5. **Decision rule.** Go only if W, E, U1, U2, S and P all pass on the run
+   that counts. Otherwise the result is no-go: the legacy path stays, it is
+   reported, and nothing is renegotiated.
+
 ## Limits work (§8)
 
 Every bound lives in `shared/limits.ts`. Existing and usable:
