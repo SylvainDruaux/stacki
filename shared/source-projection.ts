@@ -54,6 +54,10 @@ export type Projection =
       readonly tag: 'valid';
       /** Length of the bytes this was derived from: the snapshot checks it. */
       readonly byteLength: number;
+      /** UTF-16 code units of the same text. The parser bounds a page in these
+       * (`ipcFieldCharsMax`), so a projection derived without reparsing
+       * (projection-patch.ts) carries them to stay inside the parser's bound. */
+      readonly utf16Length: number;
       /** The fenced frontmatter block, `---` to `---` inclusive, when present. */
       readonly frontmatter: ByteSpan | undefined;
       /** Every node in document order (preorder). */
@@ -100,6 +104,7 @@ export function projectPage(text: string, result: ParsePageResult): Projection {
   return {
     tag: 'valid',
     byteLength,
+    utf16Length: text.length,
     frontmatter: frontmatter === undefined ? undefined : converter(frontmatter),
     nodes,
   };
@@ -112,7 +117,7 @@ export function projectOpaqueDocument(text: string): Projection {
   const byteLength = utf8ByteLength(text);
   assert(byteLength <= LIMITS.sourceBytesMax, 'Projected source is inside the file bound');
   assert(byteLength >= text.length, 'UTF-8 never takes fewer bytes than UTF-16 units');
-  return { tag: 'valid', byteLength, frontmatter: undefined, nodes: [] };
+  return { tag: 'valid', byteLength, utf16Length: text.length, frontmatter: undefined, nodes: [] };
 }
 
 // --- Internal ----------------------------------------------------------------

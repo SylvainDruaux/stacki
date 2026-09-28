@@ -75,20 +75,22 @@ export function projectValueSplice(
   if (byteLength > LIMITS.sourceBytesMax) {
     return undefined;
   }
-  if (byteLength > LIMITS.ipcFieldCharsMax) {
-    // The parser bounds the text in UTF-16 units. Bytes bound units from above,
-    // so only a file this large needs the exact count, which walks it once.
-    const units = utf16Units(bytes) - utf16Units(splice.expectedBytes);
-    if (units + utf16Units(splice.replacementBytes) > LIMITS.ipcFieldCharsMax) {
-      return undefined;
-    }
+  // The parser bounds the text in UTF-16 units. The projection carries its
+  // count, so only the two values are counted, never the file: walking 10 MB
+  // twice was 45 ms of every edit on the largest fixture.
+  const unitDelta = utf16Units(splice.replacementBytes) - utf16Units(splice.expectedBytes);
+  const utf16Length = projection.utf16Length + unitDelta;
+  assert(utf16Length <= byteLength, 'UTF-16 never takes more units than UTF-8 takes bytes');
+  if (utf16Length > LIMITS.ipcFieldCharsMax) {
+    return undefined;
   }
   if (!hostUnderMarkupOnly(projection, splice.range)) {
     return undefined;
   }
-  const patched = shiftProjection(projection, splice.range, delta);
+  const patched = shiftProjection(projection, splice.range, { bytes: delta, units: unitDelta });
   assert(patched.nodes.length === projection.nodes.length, 'A value edit keeps every node');
   assert(patched.byteLength === byteLength, 'The patch measures the spliced bytes');
+  assert(patched.utf16Length === utf16Length, 'The patch counts the spliced units');
   return patched;
 }
 
@@ -179,8 +181,9 @@ function isValueAt(attribute: ProjectedAttribute, range: ByteSpan): boolean {
 function shiftProjection(
   projection: ValidProjection,
   range: ByteSpan,
-  delta: number,
+  lengths: { readonly bytes: number; readonly units: number },
 ): ValidProjection {
+  const delta = lengths.bytes;
   const frontmatter = projection.frontmatter;
   if (frontmatter !== undefined) {
     assert(frontmatter.end <= range.start, 'The frontmatter lies before every attribute value');
@@ -192,7 +195,9 @@ function shiftProjection(
     }
     return shiftNode(node, range, delta);
   });
-  return { tag: 'valid', byteLength: projection.byteLength + delta, frontmatter, nodes };
+  const byteLength = projection.byteLength + delta;
+  const utf16Length = projection.utf16Length + lengths.units;
+  return { tag: 'valid', byteLength, utf16Length, frontmatter, nodes };
 }
 
 function shiftNode(node: ProjectedNode, range: ByteSpan, delta: number): ProjectedNode {

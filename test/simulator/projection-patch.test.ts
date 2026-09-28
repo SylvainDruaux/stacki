@@ -17,12 +17,14 @@ import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { test } from 'node:test';
+import { parsePage } from '../../dist/electron/astroParser.js';
 import { toFilePath } from '../../dist/shared/brand.js';
 import { LIMITS } from '../../dist/shared/limits.js';
 import type { Splice } from '../../dist/shared/planner.js';
 import { projectValueSplice, valueBytesNeutral } from '../../dist/shared/projection-patch.js';
 import type { ProjectedNode, Projection } from '../../dist/shared/source-projection.js';
 import {
+  decodeUtf8,
   encodeUtf8,
   toByteSpan,
   toByteString,
@@ -205,6 +207,36 @@ test('a splice that is not a string value, or a file that does not parse, is ref
 test('a value over the attribute bound is refused', () => {
   const { projection, bytes, splice } = titleSplice(NESTED, 'w'.repeat(LIMITS.attrCharsMax + 1));
   assert.equal(projectValueSplice(projection, bytes, splice), undefined);
+});
+
+// The parser bounds a page in UTF-16 units (ipcFieldCharsMax), and the patch
+// keeps that bound from the projection's own count, never by walking the file.
+// A page exactly at the bound: an edit that keeps the units patches and equals
+// the reparse; one that adds a unit is refused, and the parser refuses it too.
+test('the UTF-16 bound is kept from the projection count, on both sides of it', () => {
+  const head = '<div title="ab">\n';
+  const tail = '</div>\n';
+  // Paragraphs of 100 000 characters: a text node has its own bound.
+  const paragraph = `<p>${'x'.repeat(100_000 - 8)}</p>\n`;
+  const room = LIMITS.ipcFieldCharsMax - head.length - tail.length;
+  const last = room % paragraph.length;
+  assert.ok(last > 8, 'The remainder holds a paragraph of its own');
+  const filler = paragraph.repeat(Math.floor(room / paragraph.length));
+  const text = head + filler + `<p>${'x'.repeat(last - 8)}</p>\n` + tail;
+  assert.equal(text.length, LIMITS.ipcFieldCharsMax, 'The page sits exactly at the bound');
+  for (const value of ['cd', 'é']) {
+    const { projection, bytes, splice } = titleSplice(text, value);
+    assert.equal(projection.tag, 'valid', 'A page at the bound parses');
+    const patched = projectValueSplice(projection, bytes, splice);
+    assert.notEqual(patched, undefined, `${value} keeps the page inside the bound`);
+    assert.deepEqual(patched, projectBytes(PAGE, applySplices(bytes, [splice])));
+  }
+  const grown = titleSplice(text, 'abc');
+  assert.equal(projectValueSplice(grown.projection, grown.bytes, grown.splice), undefined);
+  const grownText = decodeUtf8(applySplices(grown.bytes, [grown.splice]));
+  assert.ok(grownText.ok, 'The grown page is UTF-8');
+  const reparsed = parsePage(grownText.value, { locs: true });
+  assert.equal(reparsed.editable, false, 'The parser refuses one unit past the bound too');
 });
 
 test('seeded simulator runs: every patched candidate matched its reparse', () => {

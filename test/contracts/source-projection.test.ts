@@ -133,7 +133,8 @@ test('only .astro pages are projected; a stylesheet is an opaque document', () =
   const unlocated = parsePageResult(parsePage('<p>x</p>'));
   assert.throws(() => projectPage('<p>x</p>', unlocated), /recorded source offsets/);
   const css = projectOpaqueDocument('.card { color: red; }\n');
-  assert.deepEqual(css, { tag: 'valid', byteLength: 22, frontmatter: undefined, nodes: [] });
+  const opaque = { tag: 'valid', byteLength: 22, utf16Length: 22, frontmatter: undefined };
+  assert.deepEqual(css, { ...opaque, nodes: [] });
 });
 
 test('a snapshot computes its checksum from its bytes and matches its projection', () => {

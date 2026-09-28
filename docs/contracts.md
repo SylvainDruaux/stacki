@@ -101,8 +101,8 @@ intents yet; these modules are what steps 3–10 build on.
 - `capability.ts` — `editable` | `read-only-opaque` | `repeated-source-node` |
   `runtime-aggregate` | `unsupported`; only `editable` accepts visual intents.
 - `source-projection.ts` — the `Projection` sum (`valid` with byte-addressed
-  nodes, paths, attribute spans and capabilities; or `parse-error` with bounded
-  diagnostics). Named so nothing in it can be confused with the `page-node.ts`
+  nodes, paths, attribute spans and capabilities, and the text's UTF-16 length,
+  which the parser bounds; or `parse-error` with bounded diagnostics). Named so nothing in it can be confused with the `page-node.ts`
   wire model. `.astro` only until step 10; stylesheets project as opaque
   documents.
 - `snapshot.ts` — `createSnapshot` computes the checksum from the bytes through

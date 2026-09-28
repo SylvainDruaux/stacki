@@ -10,6 +10,12 @@
 // `stale` changes another attribute on disk first; its refresh (a full reparse
 // of the other writer's bytes) is reported apart, because an actor that
 // refreshes on the watcher tick takes it off the intent's path.
+// Step 4, revision A: this bench is the registered harness for E, U1, U2, S and
+// P (tracker, Thresholds). It prints the 1-minute load average before any
+// result (a run above 1.5 is void), then the stage table, the keystroke table,
+// and the verdicts, computed here rather than read off by eye. "Engine" is
+// plan + splice + project per sample; the refresh, the §5.2 disk work and the
+// candidate's SHA-256 are protocol work, recorded beside it.
 // Run: npm run build:runtime && node test/simulator/patch.bench.ts.
 import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
@@ -45,6 +51,14 @@ const NAMES = ALL.filter((name) =>
   (process.env['STACKI_PATCH_FIXTURES'] ?? ALL.join(',')).split(',').includes(name),
 );
 const SAMPLES = 30;
+const KEYSTROKE_SAMPLES = 20;
+const TYPING_BATCH_MS = 300;
+const LOAD_VOID_ABOVE = 1.5;
+// The registered thresholds (tracker, Thresholds, revision A), in milliseconds.
+const ENGINE_MS_MAX = 50;
+const END_TO_END_MS_MAX = 50;
+const KEYSTROKE_MS_MAX = 350;
+const REALISTIC: readonly string[] = ['nodes-25', 'nodes-50'];
 const WARMUP = 2;
 const EQUAL_RUNS = 7;
 const STAGES = ['read', 'refresh', 'plan', 'splice', 'project', 'hash', 'verify', 'write'] as const;
@@ -64,12 +78,24 @@ interface Target {
   readonly valueBytes: number;
 }
 
-main();
+// Per fixture and scenario, the patch variant's registered p95s.
+interface Measured {
+  readonly engine: number;
+  readonly endToEnd: number;
+}
 
-function main(): void {
+await main();
+
+async function main(): Promise<void> {
+  const [load] = os.loadavg();
+  assert.ok(load !== undefined, 'The platform reports a load average');
+  const verdict = load > LOAD_VOID_ABOVE ? 'VOID (protocol: above 1.5)' : 'counts';
+  console.log(`Load average (1 min) at start: ${load.toFixed(2)} — this run ${verdict}.`);
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'stacki-patch-'));
   const rows: string[] = [];
   const equalRows: string[] = [];
+  const measured = new Map<string, Measured>();
+  const keystrokes = new Map<string, number>();
   let compared = 0;
   try {
     for (const name of NAMES) {
@@ -79,8 +105,14 @@ function main(): void {
       for (const scenario of ['fresh', 'stale'] as const) {
         const series = runSeries(file, scenario);
         compared += series.compared;
+        measured.set(`${name} ${scenario}`, registered(series.patch));
         rows.push(seriesRow(name, scenario, 'reparse', series.reparse));
         rows.push(seriesRow(name, scenario, `patch (${series.patched}/${SAMPLES})`, series.patch));
+      }
+      if (REALISTIC.includes(name)) {
+        const keystroke = await keystrokeSeries(file);
+        compared += keystroke.compared;
+        keystrokes.set(name, percentile(keystroke.latencies, 95));
       }
     }
   } finally {
@@ -97,6 +129,78 @@ function main(): void {
   console.log('\n| Fixture | byteStringsEqual `every` p50 | word loop p50 |');
   console.log('|---|---|---|');
   console.log(equalRows.join('\n'));
+  printVerdicts(measured, keystrokes, compared);
+}
+
+function registered(runs: readonly Stages[]): Measured {
+  const engine = runs.map((stages) => engineOf(stages));
+  const endToEnd = runs.map((stages) => stages.total);
+  return { engine: percentile(engine, 95), endToEnd: percentile(endToEnd, 95) };
+}
+
+function engineOf(stages: Stages): number {
+  return stages.plan + stages.splice + stages.project;
+}
+
+// Every registered row, and "incomplete" when a narrowed run leaves one
+// unmeasured: a verdict is never computed from a partial run.
+function printVerdicts(
+  measured: ReadonlyMap<string, Measured>,
+  keystrokes: ReadonlyMap<string, number>,
+  compared: number,
+): void {
+  const rows: string[] = [];
+  const row = (id: string, where: string, value: number | undefined, max: number): void => {
+    if (value === undefined) {
+      rows.push(`| ${id} | ${where} | — | ≤ ${max} | incomplete |`);
+    } else {
+      const verdict = value <= max ? 'pass' : 'FAIL';
+      rows.push(`| ${id} | ${where} | ${format(value)} | ≤ ${max} | ${verdict} |`);
+    }
+  };
+  for (const name of ALL) {
+    row('E', `${name} fresh, engine p95`, measured.get(`${name} fresh`)?.engine, ENGINE_MS_MAX);
+  }
+  for (const name of REALISTIC) {
+    const endToEnd = measured.get(`${name} fresh`)?.endToEnd;
+    row('U1', `${name} fresh, end-to-end p95`, endToEnd, END_TO_END_MS_MAX);
+    row('U2', `${name} keystroke → disk p95`, keystrokes.get(name), KEYSTROKE_MS_MAX);
+    row('S', `${name} stale, engine p95`, measured.get(`${name} stale`)?.engine, ENGINE_MS_MAX);
+  }
+  console.log('\n| Id | Measure | ms | Threshold | Verdict |');
+  console.log('|---|---|---|---|---|');
+  console.log(rows.join('\n'));
+  // A mismatch asserts at the event, so reaching here with a count means P held.
+  console.log(`| P | patch-variant candidates equal to a reparse | ${compared} | all | pass |`);
+}
+
+interface KeystrokeSeries {
+  readonly latencies: readonly number[];
+  readonly compared: number;
+}
+
+// U2: the 300 ms typing batch as a real timer, then the fresh patch pipeline,
+// as step 3 measured it (spike.bench.ts keystrokeRow); seed 3, as there.
+async function keystrokeSeries(file: string): Promise<KeystrokeSeries> {
+  const prng = new Prng(3);
+  let snapshot = snapshotOf(toFilePath(file), readBounded(file));
+  const latencies: number[] = [];
+  let compared = 0;
+  for (let index = 0; index < WARMUP + KEYSTROKE_SAMPLES; index++) {
+    const intent = setAttributeIntent(snapshot, pickTarget(prng, snapshot, undefined), index);
+    const keystroke = performance.now();
+    await new Promise((resolve) => setTimeout(resolve, TYPING_BATCH_MS));
+    const result = runPipeline(file, snapshot, intent, 'patch');
+    const landed = performance.now();
+    snapshot = result.snapshot;
+    const reference = projectBytes(snapshot.path, snapshot.bytes); // Off the clock.
+    assert.deepStrictEqual(snapshot.projection, reference, 'A patched candidate is the reparse');
+    compared++;
+    if (index >= WARMUP) {
+      latencies.push(landed - keystroke);
+    }
+  }
+  return { latencies, compared };
 }
 
 interface Series {
@@ -196,9 +300,7 @@ function refusalReason(splice: Splice): 'old value' | 'host under an expression'
 function seriesRow(name: string, scenario: Scenario, variant: string, runs: readonly Stages[]) {
   const totals = runs.map((stages) => stages.total);
   const offPath = runs.map((stages) => stages.total - stages.refresh);
-  // The engine's own share: everything but the refresh and the §5.2 disk work
-  // (read, verify re-read, atomic write), whose floor no engine change can move.
-  const engine = runs.map((s) => s.total - s.refresh - s.read - s.verify - s.write);
+  const engine = runs.map((stages) => engineOf(stages));
   const medians = STAGES.map((stage) => format(percentile(runs.map((s) => s[stage]), 50)));
   const cells = [format(percentile(totals, 50)), format(percentile(totals, 95))];
   const offCells = [format(percentile(offPath, 95)), format(percentile(engine, 95))];
