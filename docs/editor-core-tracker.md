@@ -149,7 +149,7 @@ anchor survival; oracle scenarios carry hand-derived expected splices.
 **Gate proof.** Contract tests green; deterministic scheduler in place;
 corpus diversity is a failed gate if it is thin, not a passed one.
 
-**Landed 2026-09-28** on `refactor/architecture-consolidation` in COMMIT_SHA.
+**Landed 2026-09-28** on `refactor/architecture-consolidation` in `2be1fb3`.
 Gate `env -u ELECTRON_RUN_AS_NODE npm test`: 154/154
 test commands, 200.0 s, exit 0 (static gates: tsc, eslint 0 errors, `ratchet-check` 0,
 `adapter-surface` at baseline). Where each deliverable lives:
@@ -542,7 +542,7 @@ update on every step):
   read-ordering race is understood; open question for the style panel, not
   for this program.
 
-- 2026-09-28, step 1 (PROMPT-1), COMMIT_SHA on top of `c5ca3c9`:
+- 2026-09-28, step 1 (PROMPT-1), `2be1fb3` on top of `c5ca3c9`:
   - `env -u ELECTRON_RUN_AS_NODE npm test` — **pass, 154/154 test commands in
     200.0 s, exit 0** (153 + the new `test:simulator`; static checks tsc, eslint
     0 errors, `ratchet-check` 0, `adapter-surface` 70 / 9 / 28 / 4 at baseline).
