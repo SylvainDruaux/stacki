@@ -35,7 +35,7 @@ const check = (what, condition, detail) => {
 };
 
 const ROOT = path.join(__dirname, '..');
-const ENTRIES = ['astroParser.js', 'componentPreview.js'].map((name) =>
+const ENTRIES = ['astroParser.js', 'componentPreview.js', 'previewMarkers.js'].map((name) =>
   path.join('dist', 'electron', name)
 );
 

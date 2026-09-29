@@ -4,12 +4,15 @@ import {
   boolean,
   count,
   dictionary,
+  digest,
   list,
   nullable,
   optional,
   pathText,
   record,
 } from '../shared/boundary';
+import type { Digest } from '../shared/brand';
+import { parsePreviewRender, type PreviewRender } from '../shared/preview-token';
 
 export type PreviewMessage =
   | {
@@ -29,16 +32,21 @@ export type PreviewMessage =
       readonly inert: readonly string[];
     }
   | { readonly kind: 'modifiers'; readonly shiftKey: boolean; readonly altKey: boolean }
-  | { readonly kind: 'hover-node'; readonly path: string | null; readonly occurrence: number }
-  | {
-      readonly kind: 'click-node';
-      readonly path: string | null;
-      readonly occurrence: number;
-      readonly outside: boolean;
-    }
-  | { readonly kind: 'open-node'; readonly path: string | null; readonly occurrence: number }
+  | ({ readonly kind: 'hover-node' } & LocatedEvent)
+  | ({ readonly kind: 'click-node'; readonly outside: boolean } & LocatedEvent)
+  | ({ readonly kind: 'open-node' } & LocatedEvent)
   | { readonly kind: 'canvas-ready' }
+  /** The rendering the canvas shows: its manifest and token (plan §9, step 7). */
+  | { readonly kind: 'render'; readonly render: PreviewRender }
   | { readonly kind: 'query-result'; readonly input: unknown };
+
+/** Where on the canvas an event landed, and which rendering it landed on: the
+ * token is absent until the frame has digested its rendering's manifest. */
+export interface LocatedEvent {
+  readonly path: string | null;
+  readonly occurrence: number;
+  readonly token: Digest | undefined;
+}
 
 export function parsePreviewMessage(input: unknown): PreviewMessage | undefined {
   let value: Readonly<Record<string, unknown>>;
@@ -84,6 +92,8 @@ function parseKnownMessage(value: Readonly<Record<string, unknown>>): PreviewMes
       return { kind: 'open-node', ...parseLocatedMessage(value) };
     case 'avb:canvas-ready':
       return { kind: 'canvas-ready' };
+    case 'avb:render':
+      return { kind: 'render', render: parsePreviewRender(value) };
     case 'avb:query-result':
       return { kind: 'query-result', input: value };
     default:
@@ -100,10 +110,12 @@ function parseRects(value: Readonly<Record<string, unknown>>): PreviewMessage {
   };
 }
 
-function parseLocatedMessage(value: Readonly<Record<string, unknown>>) {
+function parseLocatedMessage(value: Readonly<Record<string, unknown>>): LocatedEvent {
+  const token = nullable(optional(digest))(value['token']);
   return {
     path: nullable(pathText)(value['path']),
     occurrence: count(value['occurrence']),
+    token: token ?? undefined,
   };
 }
 

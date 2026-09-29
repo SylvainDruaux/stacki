@@ -9,6 +9,19 @@ import { forgetComputedColors } from '../style-panel/lib/computed-color';
 import { forgetComputedStyles } from '../style-panel/lib/computed-style';
 import { setModifiers } from '../style-panel/lib/host';
 import { noteCanvasReady, receiveCanvasReply, setCanvasFrame } from '../canvasQuery';
+import type { Digest } from '../../shared/brand';
+import {
+  judgeEventToken,
+  type PreviewRender,
+  type PreviewVerdict,
+} from '../../shared/preview-token';
+
+/** Whether a click or double-click on the canvas may select what it names
+ * (src/previewGate.ts). Hover needs only the token to be the latest. */
+export type JudgeCanvasEvent = (
+  token: Digest | undefined,
+  render: PreviewRender | undefined,
+) => Promise<PreviewVerdict>;
 
 export interface PreviewRuntimeProps {
   readonly selPath: string | null;
@@ -27,6 +40,10 @@ export interface PreviewRuntimeProps {
     readonly inert: readonly string[];
   }) => void;
   readonly onNodeClasses?: (classes: Readonly<Record<string, readonly string[]>>) => void;
+  /** The preview-token gate (step 7): an event from a stale rendering never
+   * selects, and the refusal is shown, never swallowed. */
+  readonly judgeEvent: JudgeCanvasEvent;
+  readonly onStaleEvent: (verdict: Extract<PreviewVerdict, { readonly tag: 'stale' }>) => void;
 }
 
 export interface PreviewRuntime {
@@ -98,6 +115,8 @@ interface RuntimeRefs {
   readonly clickedPath: React.MutableRefObject<string | null | undefined>;
   readonly lastClick: React.MutableRefObject<{ readonly path: string | null } | null>;
   readonly cameFrom: React.MutableRefObject<string | null>;
+  /** The rendering the frame last announced, and its token. */
+  readonly render: React.MutableRefObject<PreviewRender | undefined>;
 }
 
 function useRuntimeRefs(props: PreviewRuntimeProps, selOcc: number | null): RuntimeRefs {
@@ -109,6 +128,7 @@ function useRuntimeRefs(props: PreviewRuntimeProps, selOcc: number | null): Runt
   const clickedPath = useRef<string | null | undefined>(undefined);
   const lastClick = useRef<{ readonly path: string | null } | null>(null);
   const cameFrom = useRef<string | null>(null);
+  const render = useRef<PreviewRender | undefined>(undefined);
   useEffect(() => {
     selectedClasses.current = null;
   }, [props.selPath, selOcc]);
@@ -120,6 +140,7 @@ function useRuntimeRefs(props: PreviewRuntimeProps, selOcc: number | null): Runt
       clickedPath,
       lastClick,
       cameFrom,
+      render,
     }),
     [],
   );
@@ -195,11 +216,19 @@ function applyMessage(message: PreviewMessage, refs: RuntimeRefs, setters: Runti
       setModifiers(message.shiftKey, message.altKey);
       break;
     case 'hover-node':
-      setters.setCanvasHover(message.path);
-      setters.setHoverOcc(message.occurrence);
+      // A picture, not a selection: only the rendering has to be the latest.
+      if (judgeEventToken(message.token, refs.render.current).tag === 'current') {
+        setters.setCanvasHover(message.path);
+        setters.setHoverOcc(message.occurrence);
+      } else {
+        setters.setCanvasHover(null);
+      }
       break;
     case 'click-node':
-      applyClick(message, refs, setters);
+      gateEvent(message.token, refs, () => applyClick(message, refs, setters));
+      break;
+    case 'render':
+      refs.render.current = message.render;
       break;
     case 'canvas-ready':
       noteCanvasReady();
@@ -210,9 +239,32 @@ function applyMessage(message: PreviewMessage, refs: RuntimeRefs, setters: Runti
       receiveCanvasReply(message.input);
       break;
     case 'open-node':
-      refs.props.current.onOpenPath?.(message.path, message.occurrence);
+      gateEvent(message.token, refs, () =>
+        refs.props.current.onOpenPath?.(message.path, message.occurrence),
+      );
       break;
   }
+}
+
+// The gate answers after main has read the stamped files; the rendering judged
+// is the one the event named, and `apply` runs only on `current`.
+function gateEvent(token: Digest | undefined, refs: RuntimeRefs, apply: () => void): void {
+  const render = refs.render.current;
+  refs.props.current.judgeEvent(token, render).then(
+    (verdict) => {
+      if (verdict.tag === 'current') {
+        apply();
+      } else {
+        refs.props.current.onStaleEvent(verdict);
+      }
+    },
+    (error: unknown) => {
+      // The check itself failed (main unreachable): nothing vouches for the
+      // rendering, so the event does not select — and says why.
+      console.error('[stacki] preview check failed:', error);
+      refs.props.current.onStaleEvent({ tag: 'stale', reason: 'no-render', file: undefined });
+    },
+  );
 }
 
 function publishSelectedClasses(
@@ -300,6 +352,7 @@ function useResetOnReload(
     refs.selectedClasses.current = null;
     refs.clickedPath.current = undefined;
     refs.lastClick.current = null;
+    refs.render.current = undefined; // A reloaded frame announces its rendering again.
   }, [canvasMode, props.refreshKey, refs, setters, url]);
 }
 

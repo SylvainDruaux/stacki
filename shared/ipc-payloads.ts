@@ -1,5 +1,6 @@
 import { parsePropertyChange, propertySource } from './component-properties';
 import { parseEditRequest } from './edit-request';
+import { parsePreviewRender } from './preview-token';
 // Complete invoke-channel inventory. Every main-process listener receives the
 // parsed shape below; payload field names retain the existing renderer protocol.
 import {
@@ -205,6 +206,8 @@ export const IPC_PAYLOADS = {
   'pagefolder:delete': object({ ...project, dir: pathText }),
   'pagefolder:rename': object({ ...project, from: pathText, to: pathText }),
   'preview:atCommit': object({ ...reference }),
+  // A canvas rendering's manifest and token, checked against the disk (step 7).
+  'preview:check': object({ ...project, render: parsePreviewRender }),
   'preview:stop': object({ ...project }),
   'project:classes': pathText,
   'project:close': maybePath,

@@ -61,6 +61,8 @@
     "formats/json.ts",
     "formats/toml.ts",
     "astroParser.ts",
+    "previewMarkers.ts",
+    "previewCheck.ts",
     "main.ts"
   ]
 }

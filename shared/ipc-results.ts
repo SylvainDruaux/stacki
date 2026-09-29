@@ -1,4 +1,5 @@
 import type { ComponentProperties } from './component-properties';
+import type { PreviewVerdict } from './preview-token';
 import type { Result } from './result';
 // Invoke results mirror the handlers' wire shapes, including legacy null sentinels.
 // Main's typed registrar checks every handler against this inventory.
@@ -488,6 +489,8 @@ export interface IpcResults {
         readonly ref: string;
         readonly reused: false;
       };
+  // Whether a canvas rendering's files are still the bytes its stamps name (step 7).
+  readonly 'preview:check': PreviewVerdict;
   readonly 'preview:stop': {
     readonly ok: true;
   };

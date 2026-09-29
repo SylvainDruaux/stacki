@@ -478,6 +478,78 @@ if (!process.isMainFrame) {
     } catch {
       /* no parent to tell */
     }
+    announceRender();
+  };
+
+  // --- The preview token (plan §9, step 7) ----------------------------------
+  // Every file the dev plugin marks carries one stamp, <!--avb-d:<sha256>:<file>-->,
+  // naming the bytes it was marked from. The stamps on the page are the
+  // manifest of this rendering, and its token — the SHA-256 of the manifest's
+  // canonical text — rides on every located event, so the app can refuse a
+  // click from a rendering the files have since moved past. Mirrors
+  // shared/preview-token.ts, which this sandboxed preload cannot require; the
+  // contract test (test/contracts/preview-bridge.test.ts) pins the two to each
+  // other. The patcher gathers the stamps at the document's end after each
+  // patch; the page arrives with them wherever each file rendered.
+  const STAMP_PREFIX = 'avb-d:';
+  const STAMPS_MAX = 20000; // LIMITS.previewMarkersMax
+  const MANIFEST_FILES_MAX = 512; // LIMITS.previewManifestFilesMax
+  let renderToken: string | null = null;
+  let renderSeq = 0;
+  // Null when the page's stamps cannot form one manifest: too many, or one
+  // file stamped with two checksums (a rendering mixing versions of it).
+  const readManifest = (): { file: string; checksum: string }[] | null => {
+    const byFile = new Map<string, string>();
+    let stamps = 0;
+    const stack: Node[] = [document];
+    while (stack.length) {
+      const parent = stack.pop();
+      if (!parent) {break;}
+      for (let n = parent.firstChild; n; n = n.nextSibling) {
+        if (isElement(n)) {
+          stack.push(n);
+          continue;
+        }
+        if (!isComment(n) || !n.data.startsWith(STAMP_PREFIX)) {continue;}
+        stamps += 1;
+        if (stamps > STAMPS_MAX) {return null;}
+        const rest = n.data.slice(STAMP_PREFIX.length);
+        const checksum = rest.slice(0, 64);
+        const file = rest.slice(65);
+        if (!/^[0-9a-f]{64}$/.test(checksum) || rest[64] !== ':' || !file) {continue;}
+        const seen = byFile.get(file);
+        if (seen !== undefined && seen !== checksum) {return null;}
+        byFile.set(file, checksum);
+      }
+    }
+    if (byFile.size > MANIFEST_FILES_MAX) {return null;}
+    return [...byFile.keys()]
+      .sort((a, b) => (a < b ? -1 : a === b ? 0 : 1))
+      .map((file) => ({ file, checksum: byFile.get(file) ?? '' }));
+  };
+  const announceRender = () => {
+    renderSeq += 1;
+    const seq = renderSeq;
+    renderToken = null; // Until this rendering's digest is known, events carry none.
+    const stamps = readManifest();
+    const subtle = globalThis.crypto?.subtle;
+    if (!stamps || !subtle) {return;}
+    const canonical = stamps.map((stamp) => `${stamp.checksum} ${stamp.file}\n`).join('');
+    subtle.digest('SHA-256', new TextEncoder().encode(canonical)).then(
+      (digest) => {
+        if (seq !== renderSeq) {return;} // A newer rendering has announced itself.
+        const bytes = Array.from(new Uint8Array(digest));
+        renderToken = bytes.map((b) => b.toString(16).padStart(2, '0')).join('');
+        try {
+          window.parent.postMessage({ type: 'avb:render', token: renderToken, stamps }, '*');
+        } catch {
+          /* no parent to tell */
+        }
+      },
+      () => {
+        /* no digest, no token: the app refuses this rendering's events */
+      }
+    );
   };
 
   // Element nodes also carry their path as an attribute, because the node
@@ -1592,7 +1664,10 @@ if (!process.isMainFrame) {
       if (p !== lastHoverPath || occurrence !== lastHoverOcc) {
         lastHoverPath = p;
         lastHoverOcc = occurrence;
-        window.parent.postMessage({ type: 'avb:hover-node', path: p, occurrence }, '*');
+        window.parent.postMessage(
+          { type: 'avb:hover-node', path: p, occurrence, token: renderToken },
+          '*'
+        );
       }
     });
     document.documentElement.addEventListener('mouseleave', startOutlinesClearHover);
@@ -1611,7 +1686,7 @@ if (!process.isMainFrame) {
         // item, and opening it means the one under the cursor.
         const { path: p, occurrence } = nodeAtEvent(e);
         window.parent.postMessage(
-          { type: 'avb:open-node', path: p || null, occurrence },
+          { type: 'avb:open-node', path: p || null, occurrence, token: renderToken },
           '*'
         );
       },
@@ -1633,7 +1708,13 @@ if (!process.isMainFrame) {
         // doesn't own — which is what the app backs out of a component on.
         const { path: p, occurrence, outside } = nodeAtEvent(e);
         window.parent.postMessage(
-          { type: 'avb:click-node', path: p || null, occurrence, outside: !!outside },
+          {
+            type: 'avb:click-node',
+            path: p || null,
+            occurrence,
+            outside: !!outside,
+            token: renderToken,
+          },
           '*'
         );
       },
@@ -1646,7 +1727,10 @@ if (!process.isMainFrame) {
       lastHoverPath = null;
       lastHoverOcc = 0;
       // Clear messages use the same located-message contract as hover hits.
-      window.parent.postMessage({ type: 'avb:hover-node', path: null, occurrence: 0 }, '*');
+      window.parent.postMessage(
+        { type: 'avb:hover-node', path: null, occurrence: 0, token: renderToken },
+        '*'
+      );
     }
   }
 
@@ -2039,6 +2123,7 @@ contextBridge.exposeInMainWorld('avb', {
   gitCheckout: invoke('git:checkout'),
   previewAtCommit: invoke('preview:atCommit'),
   previewStop: invoke('preview:stop'),
+  checkPreview: invoke('preview:check'),
   gitLog: invoke('git:log'),
   gitCommitFiles: invoke('git:commitFiles'),
   gitAllFiles: invoke('git:allFiles'),

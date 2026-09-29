@@ -1,0 +1,77 @@
+// The dev preview's source markers, made in memory (plan §9, step 7).
+//
+// The generated preview config (main.ts, MARKER_CONFIG_PARTS) hands Astro a
+// marked copy of every .astro file under src as Vite loads it: each node sits
+// between <!--avb-s:path--> / <!--avb-e:path--> comments, and each file carries
+// one stamp, <!--avb-d:<checksum>:<file>-->, naming the exact bytes it was
+// marked from (shared/preview-token.ts). The marked text exists only as the
+// module Vite compiles. This module reads project files and returns strings; it
+// never writes, and nothing that writes project text imports it — so no marker
+// can change what the project itself builds or serves. The single-writer
+// contract test holds both halves.
+//
+// It runs inside the project's dev server, a plain Node process, so it is
+// unpacked beside the archive (package.json build.asarUnpack) and requires only
+// modules that are.
+import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
+import { assert } from '../shared/assert.js';
+import { toDigest } from '../shared/brand.js';
+import { LIMITS } from '../shared/limits.js';
+import { stampComment, stampPathProblem } from '../shared/preview-token.js';
+import { markChunkHtml, parsePage, resolveChunks, serializePageMarked } from './astroParser.js';
+
+export interface MarkedSource {
+  /** The marked template Vite compiles in place of the file. */
+  readonly code: string;
+  /** The file's own text, for the dev plugin's style-block comparison. */
+  readonly source: string;
+  /** A page under src/pages: it also gets the canvas patcher. */
+  readonly page: boolean;
+}
+
+/** The marked copy of `file`, or null when it is not a project .astro file the
+ * parser can mark — Vite then loads it unchanged, with no markers and no stamp,
+ * and nothing on the canvas can address a node inside it. */
+export function markSourceFile(file: string, projectDirs: readonly string[]): MarkedSource | null {
+  if (!file.endsWith('.astro')) {
+    return null;
+  }
+  // Pages mark with bare paths; every other .astro under src — components and
+  // layouts — with its own namespace, so selecting inside one outlines too.
+  const projectDir = projectDirs.find((root) => file.startsWith(`${root}/src/`));
+  if (projectDir === undefined) {
+    return null;
+  }
+  const bytes = readFileSync(file);
+  if (LIMITS.sourceBytesMax < bytes.length) {
+    return null; // Past the file bound: the editor shows it as code, not nodes.
+  }
+  const source = bytes.toString('utf8');
+  const parsed = parsePage(source);
+  if (!parsed.editable) {
+    return null;
+  }
+  resolveChunks(parsed.model, file);
+  const rel = file.slice(projectDir.length + 1);
+  assert(stampPathProblem(rel) === undefined, 'A file under src has a project-relative path');
+  const page = file.startsWith(`${projectDir}/src/pages/`);
+  const marked = page
+    ? serializePageMarked(parsed.model)
+    : serializePageMarked(parsed.model, `${rel}|`);
+  assert(marked.endsWith('\n'), 'The marked serializer ends on a line of its own');
+  // Last, at the top level of the file's template, where the compiler keeps a
+  // plain comment: after `</html>` for a page, which leaves the doctype alone.
+  const checksum = toDigest(createHash('sha256').update(bytes).digest('hex'));
+  return { code: `${marked}${stampComment({ file: rel, checksum })}\n`, source, page };
+}
+
+/** The marked copy of a chunk imported as `?raw` (see serializePageMarked's
+ * chunk marks), or null when it cannot be marked. */
+export function markChunkFile(file: string, prefix: string, group: boolean): string | null {
+  const bytes = readFileSync(file);
+  if (LIMITS.sourceBytesMax < bytes.length) {
+    return null;
+  }
+  return markChunkHtml(bytes.toString('utf8'), prefix, group);
+}

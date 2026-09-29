@@ -7,7 +7,8 @@ import type { PreviewCrumb, PreviewDevice } from './PreviewToolbar';
 import { DevOffline } from './DevOffline';
 import { PreviewOverlays } from './PreviewOverlays';
 import { PreviewToolbar, deviceForWidth, deviceWidth } from './PreviewToolbar';
-import { usePreviewRuntime } from './previewRuntime';
+import { usePreviewRuntime, type JudgeCanvasEvent } from './previewRuntime';
+import type { PreviewVerdict } from '../../shared/preview-token';
 import { PREVIEW_WIDTH_LIMITS, previewViewport } from './previewViewport';
 import './previewViewport.css';
 
@@ -31,6 +32,8 @@ interface PreviewPaneProps {
   readonly overlayInfo?: (path: string) => OverlayInfo | null;
   readonly onSelectPath?: (path: string | null, info: { readonly outside: boolean }) => void;
   readonly onOpenPath?: (path: string | null, occurrence: number) => void;
+  readonly judgeEvent: JudgeCanvasEvent;
+  readonly onStaleEvent: (verdict: Extract<PreviewVerdict, { readonly tag: 'stale' }>) => void;
   readonly onSelectedClasses?: (classes: readonly string[]) => void;
   readonly onRenderedPaths?: (paths: readonly string[]) => void;
   readonly onNodeStates?: (states: {

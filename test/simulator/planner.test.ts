@@ -417,7 +417,10 @@ test('duplicate attributes are refused, loop bodies edit their one source node, 
   // Nothing is placed beside it or taken from it: the list it sits in is the
   // loop body's code.
   assert.deepEqual(
-    planIntent(base, intentOn(page, repeated, { tag: 'insert-node', placement: 'after', source: '<p />' })),
+    planIntent(
+      base,
+      intentOn(page, repeated, { tag: 'insert-node', placement: 'after', source: '<p />' }),
+    ),
     { ok: false, error: 'unsupported-operation' },
   );
   assert.deepEqual(planIntent(base, intentOn(page, repeated, { tag: 'remove-node' })), {

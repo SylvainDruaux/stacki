@@ -44,9 +44,9 @@ const source = fs.readFileSync(
 );
 const start = source.indexOf('const isAnchor =');
 const end = source.indexOf('// A script that CHANGED, or one that is GONE');
-const { patchChildren, findLive } = new Function(
+const { patchChildren, findLive, syncAnchors, syncStamps } = new Function(
   'document',
-  `${source.slice(start, end)}\nreturn { patchChildren, findLive };`
+  `${source.slice(start, end)}\nreturn { patchChildren, findLive, syncAnchors, syncStamps };`
 )(dom.window.document);
 
 // The other half of the same decision: whether to patch at all. Lifted the same
@@ -312,6 +312,72 @@ const LIVE_TABS = (labels, active) =>
     runScripts(Array.isArray(added) ? added : []);
     check('and not put there twice', ran().length === 1, `${ran().length} tags`);
   }
+}
+
+// Stamps (step 7): each marked file's <!--avb-d:<checksum>:<file>--> names the
+// bytes the rendering came from. They take no part in the diff, and after a
+// patch the live page holds exactly the new rendering's stamps — gathered at
+// the document's end, wherever each was — or the canvas would vouch for a
+// rendering it no longer shows.
+{
+  const { JSDOM: Dom } = require('jsdom');
+  const OLD = 'a'.repeat(64);
+  const NEW = 'b'.repeat(64);
+  const stamp = (sum, file) => `<!--avb-d:${sum}:${file}-->`;
+  const html = (sum) =>
+    `${stamp(sum, 'src/pages/index.astro')}<!doctype html><html>` +
+    `<head>${stamp(sum, 'src/components/Seo.astro')}</head><body><!--avb-s:0--><p>One</p>` +
+    `${stamp(sum, 'src/components/Card.astro')}<!--avb-e:0--></body></html>`;
+  const live = new Dom(html(OLD)).window.document;
+  const prev = new Dom(html(OLD)).window.document;
+  const next = new Dom(html(NEW).replace('One', 'Two')).window.document;
+  const stampsOf = (doc) => {
+    const out = [];
+    const walk = (parent) => {
+      for (let n = parent.firstChild; n; n = n.nextSibling) {
+        if (n.nodeType === 8 && n.data.startsWith('avb-d:')) {out.push(n.data);}
+        if (n.nodeType === 1) {walk(n);}
+      }
+    };
+    walk(doc);
+    return out.sort();
+  };
+  const wanted = stampsOf(next);
+  // The diff sees neither stamps nor markers: the clean copies lose them.
+  for (const doc of [prev, next]) {
+    for (const n of [...doc.body.childNodes]) {
+      if (n.nodeType === 8 && /^avb-[sed]:/.test(n.data)) {n.remove();}
+    }
+  }
+  const threw = patch(live.body, prev.body, next.body);
+  check('a stamp in the live body does not stop the patch', threw === null, threw);
+  check(
+    'and the text is patched past it',
+    live.body.textContent.includes('Two'),
+    live.body.innerHTML
+  );
+  const withAnchors = new Dom(html(NEW).replace('One', 'Two')).window.document;
+  syncAnchors(live.body, withAnchors.body);
+  syncStamps(live, withAnchors);
+  check(
+    'the live page holds the new rendering’s stamps, and only them',
+    JSON.stringify(stampsOf(live)) === JSON.stringify(wanted),
+    stampsOf(live).join('\n')
+  );
+  check(
+    'none of the old ones survived, in <head> or before <html>',
+    !stampsOf(live).some((d) => d.includes(OLD))
+  );
+  check(
+    'the node markers are back where they were',
+    /<!--avb-s:0--><p>Two<\/p><!--avb-e:0-->/.test(live.body.innerHTML),
+    live.body.innerHTML
+  );
+  check(
+    'and no stamp is put back beside them',
+    !/avb-d:/.test(live.body.innerHTML),
+    live.body.innerHTML
+  );
 }
 
 if (failures.length) {

@@ -50,9 +50,24 @@ function stripTemplateMarkers(root: ParentNode): void {
   }
 }
 
+// Every comment the editor puts in a page: the node markers (`avb-s:`,
+// `avb-e:`) and each marked file's stamp (`avb-d:`, the bytes it was marked
+// from — shared/preview-token.ts). None of them is content, and none takes part
+// in the comparison.
 const isAnchor = (n: Node | null | undefined): boolean => {
   const comment = n !== undefined && n !== null && asComment(n) ? n : null;
-  return comment !== null && /^avb-[se]:/.test(comment.data);
+  return comment !== null && /^avb-[sed]:/.test(comment.data);
+};
+
+// A stamp says which rendering the page is, not where a node is, so it is not
+// put back beside its neighbours: the patch gathers every stamp of the new
+// rendering at the document's end (syncStamps), where the canvas reads its
+// manifest from. Left where it was, a stamp in <head> or before <html> would
+// outlive the rendering it named, and the canvas would vouch for bytes the
+// page no longer shows.
+const isStamp = (n: Node | null | undefined): boolean => {
+  const comment = n !== undefined && n !== null && asComment(n) ? n : null;
+  return comment !== null && comment.data.startsWith('avb-d:');
 };
 
 const asElement = (n: Node): n is Element => n.nodeType === 1;
@@ -119,7 +134,9 @@ function syncAnchors(liveRoot: ParentNode, serverRoot: ParentNode): void {
     for (let sv = server.firstChild; sv; sv = sv.nextSibling) {
       const marker = asComment(sv) && isAnchor(sv) ? sv : null;
       if (marker) {
-        live.insertBefore(document.createComment(marker.data), l);
+        if (!isStamp(marker)) {
+          live.insertBefore(document.createComment(marker.data), l);
+        }
         continue;
       }
       if (blank(sv)) {
@@ -139,6 +156,39 @@ function syncAnchors(liveRoot: ParentNode, serverRoot: ParentNode): void {
     }
   };
   walk(liveRoot, serverRoot);
+}
+
+// Every stamp in the live document goes, wherever it was — before <html>, in
+// <head>, in the body — and the new rendering's stamps, from anywhere in it,
+// are appended to the document itself. A comment is a legal child of a
+// document, and no selector, layout or script counts it.
+function syncStamps(liveDoc: Document, serverDoc: Document): void {
+  const gone: Comment[] = [];
+  const found: string[] = [];
+  const collect = (root: Node, into: (comment: Comment) => void): void => {
+    const stack: Node[] = [root];
+    while (stack.length) {
+      const parent = stack.pop();
+      if (!parent) {
+        break;
+      }
+      for (let n = parent.firstChild; n; n = n.nextSibling) {
+        if (asComment(n) && isStamp(n)) {
+          into(n);
+        } else if (asElement(n)) {
+          stack.push(n);
+        }
+      }
+    }
+  };
+  collect(liveDoc, (comment) => gone.push(comment));
+  collect(serverDoc, (comment) => found.push(comment.data));
+  for (const n of gone) {
+    n.remove();
+  }
+  for (const data of found) {
+    liveDoc.appendChild(liveDoc.createComment(data));
+  }
 }
 
 // Never looked inside. A dev stylesheet belongs to Vite, which swaps it in by
@@ -750,6 +800,7 @@ async function update(): Promise<void> {
       throw new Error('missing <body> in one of the renderings');
     }
     syncAnchors(liveBody, serverBody);
+    syncStamps(document, next.withAnchors);
     document.dispatchEvent(new CustomEvent('avb:morphed'));
   } catch (err) {
     // Whatever went wrong, the page must still end up showing what the file

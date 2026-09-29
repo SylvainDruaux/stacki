@@ -83,9 +83,10 @@ test('a node a loop repeats is repeated-source-node and says so', () => {
 });
 
 test('only plain editable nodes go without a notice', () => {
-  assert.deepEqual(CAPABILITIES.filter((capability) => !capabilityNeedsNotice(capability)), [
-    'editable',
-  ]);
+  assert.deepEqual(
+    CAPABILITIES.filter((capability) => !capabilityNeedsNotice(capability)),
+    ['editable'],
+  );
 });
 
 test('Markdown is unsupported, never read-only; an absent node has no capability', () => {

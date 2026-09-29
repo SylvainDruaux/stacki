@@ -6,6 +6,7 @@ const assert = require('node:assert/strict');
 const { parsePreviewMessage } = require('./renderer-module')('previewMessages.ts');
 
 const box = { x: -1.5, y: 2, w: 30, h: 40 };
+const TOKEN = 'a'.repeat(64);
 const spacing = {
   padding: { top: 2, right: 3, bottom: 4, left: 5 },
   margin: { top: 1 },
@@ -29,6 +30,11 @@ test('preview message parser preserves every supported message variant', () => {
     { type: 'avb:open-node', path: '0', occurrence: 2 },
     { type: 'avb:canvas-ready' },
     { type: 'avb:query-result', id: 1, found: false },
+    {
+      type: 'avb:render',
+      token: TOKEN,
+      stamps: [{ file: 'src/pages/index.astro', checksum: TOKEN }],
+    },
   ];
   assert.deepEqual(
     messages.map((message) => parsePreviewMessage(message)?.kind),
@@ -43,9 +49,27 @@ test('preview message parser preserves every supported message variant', () => {
       'open-node',
       'canvas-ready',
       'query-result',
+      'render',
     ],
   );
   assert.deepEqual(parsePreviewMessage(messages[0]).spacing['0'], [spacing]);
+});
+
+test('located events carry the rendering token they landed on (step 7)', () => {
+  const click = { type: 'avb:click-node', path: '0', occurrence: 0, outside: false };
+  assert.equal(parsePreviewMessage({ ...click, token: TOKEN }).token, TOKEN);
+  // Before the frame has digested its rendering, events carry none — absent to
+  // the gate, which refuses them.
+  assert.equal(parsePreviewMessage({ ...click, token: null }).token, undefined);
+  assert.equal(parsePreviewMessage(click).token, undefined);
+  assert.equal(
+    parsePreviewMessage({ type: 'avb:hover-node', path: null, occurrence: 0, token: TOKEN }).token,
+    TOKEN,
+  );
+  assert.equal(
+    parsePreviewMessage({ type: 'avb:open-node', path: '1', occurrence: 2, token: TOKEN }).token,
+    TOKEN,
+  );
 });
 
 test('preview message parser ignores unknown and malformed project messages', () => {
@@ -63,6 +87,17 @@ test('preview message parser ignores unknown and malformed project messages', ()
     { type: 'avb:click-node', path: '0', occurrence: -1, outside: false },
     { type: 'avb:modifiers', shiftKey: 'yes', altKey: false },
     { type: 'avb:rendered-nodes', paths: Array(100_001).fill('0') },
+    { type: 'avb:click-node', path: '0', occurrence: 0, outside: false, token: 'not-a-digest' },
+    { type: 'avb:render', token: 'x', stamps: [] },
+    { type: 'avb:render', token: TOKEN, stamps: [{ file: '../escape.astro', checksum: TOKEN }] },
+    {
+      type: 'avb:render',
+      token: TOKEN,
+      stamps: [
+        { file: 'b.astro', checksum: TOKEN },
+        { file: 'a.astro', checksum: TOKEN },
+      ],
+    },
   ]) {
     assert.equal(parsePreviewMessage(value), undefined);
   }

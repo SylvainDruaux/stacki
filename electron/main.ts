@@ -146,6 +146,7 @@ const { probeUrl } = devProbeModule;
 import * as gitHistory from './gitHistory';
 import * as gitSnapshot from './gitSnapshot';
 import * as previewWorktree from './previewWorktree';
+import { checkPreviewRender } from './previewCheck';
 import * as terminalModule from './terminal';
 const { registerTerminalHandlers, cleanupTerminals } = terminalModule;
 import * as selfWritesModule from './selfWrites';
@@ -3942,8 +3943,8 @@ function writeMarkerConfig(projectPath: string) {
     // preview down. build.asarUnpack keeps a real copy on disk beside the
     // archive; this points at that copy. Unpacked in dev too (no asar in the
     // path), so the replace is a no-op there.
-    const parserPath = path
-      .join(__dirname, 'astroParser.js')
+    const markersPath = path
+      .join(__dirname, 'previewMarkers.js')
       .replace(`app.asar${path.sep}`, `app.asar.unpacked${path.sep}`);
     const previewHelperPath = path
       .join(__dirname, 'componentPreview.js')
@@ -3956,7 +3957,7 @@ function writeMarkerConfig(projectPath: string) {
     ];
     const cfg = renderMarkerConfig([
       userCfg ? `import userConfig from '../../${userCfg}';` : 'const userConfig = {};',
-      JSON.stringify(parserPath),
+      JSON.stringify(markersPath),
       JSON.stringify(previewHelperPath),
       JSON.stringify(projectDirs),
       JSON.stringify(MORPH_CLIENT),
@@ -4974,6 +4975,13 @@ ipcMain.handle('preview:atCommit', async (_e, { projectPath, ref }) => {
   );
 });
 
+// The canvas's preview token (plan §9, step 7): a click on the canvas selects
+// a node only while every file its rendering came from still holds the bytes
+// the rendering's stamps name. Read from disk here, never from the watcher.
+ipcMain.handle('preview:check', (_e, { projectPath, render }) =>
+  checkPreviewRender(projectPath, render),
+);
+
 ipcMain.handle('preview:stop', async (_e, { projectPath }) => {
   await stopPreview(projectPath);
   return { ok: true as const };
@@ -5413,7 +5421,9 @@ import { readFileSync, writeFileSync } from 'node:fs';
   `
 
 const require = createRequire(import.meta.url);
-const { parsePage, serializePageMarked, resolveChunks, markChunkHtml } = require(`,
+// Marking happens in electron/previewMarkers.js, in memory: it reads project
+// files and returns strings, and nothing it returns is ever written back.
+const { markSourceFile, markChunkFile } = require(`,
   `);
 const { componentPreviewPlugin } = require(`,
   `);
@@ -5533,8 +5543,8 @@ const avbMarkers = {
       const m = /(?:^|&)avb=([^&]+)/.exec(query);
       if (!m) return null;
       try {
-        const marked = markChunkHtml(
-          readFileSync(file, 'utf8'),
+        const marked = markChunkFile(
+          file,
           decodeURIComponent(m[1]),
           /(?:^|&)avbg=1(?:&|$)/.test(query)
         );
@@ -5543,30 +5553,18 @@ const avbMarkers = {
         return null;
       }
     }
-    if (!file.endsWith('.astro')) return null;
-    // Pages mark with bare paths. Every other .astro under src — components
-    // and layouts — marks with its own namespace, so opening one and
-    // selecting inside it outlines on the canvas like a page does. Without
-    // this a component’s internals have no markers at all.
-    const projectDir = PROJECT_DIRS.find((root) => file.startsWith(root + '/src/'));
-    if (!projectDir) return null;
-    const isPage = file.startsWith(projectDir + '/src/pages/');
+    // Pages mark with bare paths, every other .astro under src with its own
+    // namespace, and each marked file carries its stamp — the checksum of the
+    // bytes it was marked from, which the canvas's preview token is made of.
     try {
-      const source = readFileSync(file, 'utf8');
+      const marked = markSourceFile(file, PROJECT_DIRS);
+      if (!marked) return null;
       // Seeded here so the very first edit already has something to compare
       // against, rather than spending one stylesheet rewrite learning it.
-      if (!avbStyleText.has(file)) avbStyleText.set(file, avbStyleTextOf(source));
-      const parsed = parsePage(source);
-      if (!parsed.editable) return null;
-      resolveChunks(parsed.model, file);
-      // Project-relative, matching what the app derives from the open file.
-      const rel = file.slice(projectDir.length + 1);
-      const marked = isPage
-        ? serializePageMarked(parsed.model)
-        : serializePageMarked(parsed.model, rel + '|');
+      if (!avbStyleText.has(file)) avbStyleText.set(file, avbStyleTextOf(marked.source));
       // The patcher rides along with a page — Astro hoists it into <head>,
       // so this adds a module to the page and no node to its markup.
-      return isPage ? marked + AVB_MORPH_TAG : marked;
+      return marked.page ? marked.code + AVB_MORPH_TAG : marked.code;
     } catch {
       return null;
     }

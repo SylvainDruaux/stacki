@@ -223,6 +223,37 @@ The renderer's half (`src/pageEdits.ts`, `src/editGestures.ts`) and the gesture
 parity suite (`test/gesture-parity.test.js`) are described in the tracker,
 Step 6.
 
+## Preview bridge (step 7)
+
+The canvas is the project's own dev server in an iframe. Its source markers
+exist only in memory: the generated preview config's Vite plugin hands Astro
+`electron/previewMarkers.ts`'s marked copy of each `.astro` file under `src`,
+and that module reads and returns strings — it writes nothing, and no app
+module imports it (`test/contracts/preview-bridge.test.ts` holds both, and runs
+the real generated plugin over a project whose bytes it compares before and
+after). The generated config itself lives in `node_modules/.avb`.
+
+- `preview-token.ts` — every marked file also carries one stamp,
+  `<!--avb-d:<sha256>:<project-relative path>-->`, for the exact bytes it was
+  marked from. The frame collects a rendering's stamps into a manifest (sorted
+  by path, one entry per file, at most `previewManifestFilesMax`; one file with
+  two checksums is no manifest) and its token is the SHA-256 of
+  `canonicalManifest`. The frame announces `avb:render` `{ token, stamps }`;
+  `avb:hover-node`, `avb:click-node` and `avb:open-node` carry `token` (null
+  until the digest is known). `parsePreviewRender` and `parseStampData` reject
+  forged shapes: page code can write any comment.
+- `preview:check` `{ projectPath, render }` → `PreviewVerdict`: main re-derives
+  the token from the manifest, then reads every stamped file from disk
+  (`electron/previewCheck.ts`; a path outside the project is `missing`, a file
+  past `sourceBytesMax` changed) and answers `current` or `stale` with one of
+  `PREVIEW_STALE_REASONS`.
+- The renderer (`src/previewGate.ts`) accepts a click or double-click only when
+  the event's token is the frame's latest, the open file's stamp is the bytes
+  the editor shows (the clean checksum, or the origin while unsaved edits keep
+  every path), and main answers `current` — judged again after main answers. A
+  refusal is a notice; nothing is selected. Hover needs the latest token only.
+  Markdown and MDX pages carry no stamp until step 10.
+
 ## Document actors (step 5)
 
 `electron/documentActors.ts` hosts one actor per canonical file in the main

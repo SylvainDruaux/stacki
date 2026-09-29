@@ -93,8 +93,16 @@ export const LIMITS = {
   /** Files one watcher tick may mark dirty. Events coalesce into a set, so the
    * bound caps a burst like `git checkout`, not the event count. */
   watcherFilesPerTickMax: 1_024,
-  /** Source markers one preview render may carry — one per projected node. */
+  /** Source markers one preview render may carry — one per projected node. The
+   * frame counts the stamps of one render against it too (every rendered copy
+   * of a component stamps once), and the morph reloads past it (step 7). */
   previewMarkersMax: 20_000,
+  /** Distinct files one preview render's manifest may name: the page, its
+   * layouts and every component that rendered (shared/preview-token.ts). A
+   * render past it has no token, and its events are refused. */
+  previewManifestFilesMax: 512,
+  /** UTF-16 units of one project-relative path in a preview stamp. */
+  previewStampPathCharsMax: 1_024,
   /** Diagnostics one parse-error projection carries, and the length of each. */
   diagnosticsMax: 64,
   diagnosticCharsMax: 4_096,

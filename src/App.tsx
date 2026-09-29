@@ -194,6 +194,7 @@ import {
   type ToastMessage,
   type TrailingSlash,
   type UndoCommand,
+  isOpenFile,
 } from './appTypes';
 import {
   addRecentProject,
@@ -243,8 +244,12 @@ import {
   writeProjectPageRaw,
   serializeProjectPage,
   editProjectPage,
+  checkPreviewRender,
   type AppCollection,
 } from './appBridge';
+import { judgeCanvasEvent, type ShownFile } from './previewGate';
+import { describePreviewStale, type PreviewVerdict } from '../shared/preview-token';
+import type { JudgeCanvasEvent } from './panels/previewRuntime';
 
 // Each optional editor owns its loading boundary so opening it keeps the
 // canvas and neighboring panels visible and interactive.
@@ -4527,6 +4532,38 @@ export default function App() {
     }
   }, [codeWin, isFileWin, codeWinValue]);
 
+  // The preview-token gate (plan §9, step 7): a click selects only when the
+  // canvas's rendering is the bytes the editor shows and the disk still holds
+  // every file it came from. Read through refs at decision time, not captured.
+  const judgeEvent = useCallback<JudgeCanvasEvent>((token, render) => {
+    const shown = (): ShownFile | undefined => {
+      const { currentPage: open, pageState: state } = pageStateRef.current;
+      const projectPath = projectRef.current?.path;
+      if (!isOpenFile(open) || !state || !projectPath) {
+        return undefined;
+      }
+      return {
+        file: projectRelativePath(projectPath, open.path, window.avb.platform),
+        state,
+      };
+    };
+    const projectPath = projectRef.current?.path;
+    return judgeCanvasEvent(token, render, shown, (checked) =>
+      projectPath
+        ? checkPreviewRender(projectPath, checked)
+        : Promise.resolve<PreviewVerdict>({ tag: 'stale', reason: 'no-render', file: undefined })
+    );
+  }, []);
+  const onStaleEvent = useCallback(
+    (verdict: Extract<PreviewVerdict, { readonly tag: 'stale' }>) => {
+      // Visible, never silent — and never a claim that anything was lost: the
+      // click simply did not select. The canvas catches up on its own.
+      const where = verdict.file ? ` (${verdict.file})` : '';
+      showToast(`Click not applied: ${describePreviewStale(verdict.reason)}${where}`);
+    },
+    [showToast]
+  );
+
   const editedRel =
     editStack.length > 1 && project?.path
       ? projectRelativePath(
@@ -5362,6 +5399,8 @@ export default function App() {
             focusWhole={focusWhole}
             device={device}
             onDevice={setDevice}
+            judgeEvent={judgeEvent}
+            onStaleEvent={onStaleEvent}
             onSelectPath={(p, info) => {
               // What the click MEANT — see canvasClick.js. The canvas answers
               // with a path or with null, and null has two causes that want

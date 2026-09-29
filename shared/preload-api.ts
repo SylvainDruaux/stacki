@@ -96,6 +96,7 @@ interface InvokeChannels {
   readonly gitCheckout: 'git:checkout';
   readonly previewAtCommit: 'preview:atCommit';
   readonly previewStop: 'preview:stop';
+  readonly checkPreview: 'preview:check';
   readonly gitLog: 'git:log';
   readonly gitCommitFiles: 'git:commitFiles';
   readonly gitAllFiles: 'git:allFiles';

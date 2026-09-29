@@ -106,6 +106,10 @@ const fields = {
     target: { path: [0], kind: 'element', span: { start: 0, end: 5 } },
   },
   devUrl: 'http://127.0.0.1:4321',
+  render: {
+    token: 'a'.repeat(64),
+    stamps: [{ file: 'src/pages/index.astro', checksum: 'b'.repeat(64) }],
+  },
   keys: ['src/pages/index.astro#0'],
   branch: 'feature',
   ref: 'HEAD',

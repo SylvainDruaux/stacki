@@ -30,6 +30,11 @@ import {
   type PageEdited,
   type PageWriteError,
 } from '../shared/page-save';
+import {
+  parsePreviewVerdict,
+  type PreviewRender,
+  type PreviewVerdict,
+} from '../shared/preview-token';
 import type { Result } from '../shared/result';
 
 export interface PageChangeEvent {
@@ -148,6 +153,16 @@ export function serializeProjectPage(pagePath: string, model: unknown): Promise<
 export function closeProject(nextProjectPath: string | null): Promise<void> {
   const payload = parseIpcPayload('project:close', nextProjectPath);
   return window.avb.closeProject(payload).then((input) => void parseOkResult(input));
+}
+
+/** Whether every file a canvas rendering came from still holds the bytes its
+ * stamps name (step 7): main reads them from disk. */
+export function checkPreviewRender(
+  projectPath: string,
+  render: PreviewRender,
+): Promise<PreviewVerdict> {
+  const payload = parseIpcPayload('preview:check', { projectPath, render });
+  return window.avb.checkPreview(payload).then(parsePreviewVerdict);
 }
 
 export function stopProjectCommitPreview(projectPath: string): Promise<void> {
