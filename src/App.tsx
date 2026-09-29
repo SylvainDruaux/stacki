@@ -72,12 +72,14 @@ import {
 import { describeRejection, type RejectionReason } from '../shared/intent';
 import {
   duplicateGesture,
+  frontmatterGesture,
   inlineStyleGesture,
   insertGesture,
+  loopRenameGesture,
   moveGesture,
   propsGesture,
   removalGesture,
-  withoutNodes,
+  sequence,
 } from './editGestures';
 import { ok } from '../shared/result';
 import {
@@ -2122,25 +2124,26 @@ export default function App() {
         children: takesText ? [{ id: newId(), kind: 'text', value: 'Text' }] : null,
       };
       const state = pageStateRef.current.pageState;
-      if (state?.editable && state.model.imports.some((i) => i.name === comp.name)) {
-        // Step 6, insert: already imported, so the node is the whole edit.
-        commitEdit(insertGesture(state.model, node, target, { urgency: true }));
+      if (!state?.editable) {return;}
+      // Step 6, insert and frontmatter: the import when the page lacks it,
+      // then the node — two requests, one undo step.
+      const insert = insertGesture(state.model, node, target, { urgency: true });
+      if (state.model.imports.some((i) => i.name === comp.name)) {
+        commitEdit(insert);
       } else {
-        mutateModel((model) => {
-          if (!model.imports.some((i) => i.name === comp.name)) {
-            model.imports.push({
-              name: comp.name,
-              path: chooseImportPath(model, paths),
-              quote: "'",
-            });
-          }
-          insertIntoModel(model, node, target);
-          return model;
-        }, true);
+        const imported = (model: EditorModel): EditorModel => ({
+          ...model,
+          imports: [
+            ...model.imports,
+            { name: comp.name, path: chooseImportPath(model, paths), quote: "'" },
+          ],
+        });
+        const options = { coalesceKey: null, urgency: true };
+        commitEdit(sequence(frontmatterGesture(state.model, imported, options), insert));
       }
       setSelectedId(id);
     },
-    [insertables, mutateModel, commitEdit, resolveImportPath]
+    [insertables, commitEdit, resolveImportPath]
   );
 
   // The page values a subtree reads — the props it would need once it's a file
@@ -2313,13 +2316,16 @@ export default function App() {
       const noteAt = found ? noteIndexAbove(found.list, found.index) : -1;
       const note = found && noteAt !== -1 ? found.list[noteAt] : undefined;
       const ids = note ? [note.id, nodeId] : [nodeId];
-      const removed = removalEffect(state.model, ids);
-      // Step 6, remove: the nodes go as requests; when the removal also
-      // prunes the frontmatter, the whole model is saved (until the
-      // frontmatter step gives that part its request).
-      const apply = (model: EditorModel): EditorModel => removalEffect(model, ids).model;
-      const changesMore = frontmatterOf(removed.model) !== frontmatterOf(state.model);
-      commitEdit(removalGesture(ids, { apply, changesMore }, { urgency: true }));
+      const removal = removalGesture(ids, { urgency: true });
+      const afterRemoval = removal.apply(state.model);
+      const removed = prunedAfterRemoval(afterRemoval);
+      // Step 6: the nodes go as requests, and what they leave unused in the
+      // frontmatter as a frontmatter request after them (one undo step).
+      const changed = frontmatterOf(removed.model) !== frontmatterOf(state.model);
+      const prune = (model: EditorModel): EditorModel => prunedAfterRemoval(model).model;
+      const options = { coalesceKey: null, urgency: true };
+      const pruning = frontmatterGesture(afterRemoval, prune, options);
+      commitEdit(changed ? sequence(removal, pruning) : removal);
       if (removed.dropped.length) {
         const names = removed.dropped;
         showToast(
@@ -2672,21 +2678,25 @@ export default function App() {
           props: { ...PLACEHOLDER_PROPS },
           children: null,
         };
+        // Step 6, insert and frontmatter: the import when the page lacks it,
+        // then the node.
+        const insert = insertGesture(state.model, asset, target, { urgency: true });
         if (state.model.imports.some((i) => i.name === item.name && !i.typeOnly)) {
-          // Step 6, insert: already imported, so the node is the whole edit.
-          commitEdit(insertGesture(state.model, asset, target, { urgency: true }));
+          commitEdit(insert);
         } else {
-          mutateModel((model) => {
-            model.imports.push({
-              name: item.name,
-              imported: item.name,
-              path: ASTRO_ASSETS_MODULE,
-              named: true,
-              quote: "'",
-            });
-            insertIntoModel(model, asset, target);
-            return model;
-          }, true);
+          const named = {
+            name: item.name,
+            imported: item.name,
+            path: ASTRO_ASSETS_MODULE,
+            named: true,
+            quote: "'",
+          };
+          const imported = (model: EditorModel): EditorModel => ({
+            ...model,
+            imports: [...model.imports, named],
+          });
+          const options = { coalesceKey: null, urgency: true };
+          commitEdit(sequence(frontmatterGesture(state.model, imported, options), insert));
         }
         setSelectedId(assetId);
         return;
@@ -3183,23 +3193,27 @@ export default function App() {
         return !word.test(elsewhere) && !word.test(markup);
       });
       if (!dead.length) {return;}
-      mutateModel((m) => {
+      // Step 6, frontmatter: the dead queries, and the import only they needed.
+      const cleaned = (m: EditorModel): EditorModel => {
         let next = m.extraFrontmatter || '';
         for (const q of dead) {next = removeMarkedQuery(next, q.name);}
-        m.extraFrontmatter = next;
         // The import goes with the last query that needed it — but only when
         // nothing else in the file mentions it, so an import someone else put
         // there and still uses stays put.
-        if (!/\bgetCollection\b/.test(next) && !/\bgetCollection\b/.test(JSON.stringify(m.nodes || []))) {
-          m.imports = m.imports.filter(
-            (i) => !(i.name === 'getCollection' && i.path === 'astro:content')
-          );
+        const mentions = (text: string) => /\bgetCollection\b/.test(text);
+        let imports = m.imports;
+        if (!mentions(next)) {
+          if (!mentions(JSON.stringify(m.nodes || []))) {
+            const needed = (i: ImportDecl) => !(i.name === 'getCollection' && i.path === 'astro:content');
+            imports = m.imports.filter(needed);
+          }
         }
-        return m;
-      });
+        return { ...m, extraFrontmatter: next, imports };
+      };
+      commitEdit(frontmatterGesture(current, cleaned, { coalesceKey: null, urgency: false }));
     }, 2000);
     return () => clearTimeout(timer);
-  }, [pageState?.editable ? pageState.model : undefined, mutateModel]);
+  }, [pageState?.editable ? pageState.model : undefined, commitEdit]);
 
   // The welcome screen's thumbnails are taken in the main process now, from
   // the project's home page rendered in a window of its own (see
@@ -3233,9 +3247,7 @@ export default function App() {
       if (!body) {
         if (existing) {
           // Step 6, remove: clearing the field takes the note out.
-          const gone = [existing.id];
-          const effect = { apply: (model: EditorModel) => withoutNodes(model, gone), changesMore: false };
-          commitEdit(removalGesture(gone, effect, { urgency: false }));
+          commitEdit(removalGesture([existing.id], { urgency: false }));
         }
         return;
       }
@@ -3343,34 +3355,46 @@ export default function App() {
       if (!projectPath) {return;}
       const abs = picked.abs || `${projectPath}/${picked.rel}`;
       const paths = await findImportPath(projectPath, page.path, abs);
-      mutateModel((model) => {
-        const node = findNodeById(model.nodes, nodeId);
-        if (!node) {return model;}
-        const spec = chooseImportPath(model, paths);
-        // Reuse the binding if this file is already imported — importing the
-        // same asset twice under two names is just noise.
-        let local = (model.imports || []).find((i) => !i.named && i.path === spec)?.name;
-        if (!local) {
-          const base = withoutRoot.split('/').pop()?.replace(/\.[^.]+$/, '') ?? 'asset';
-          let candidate = base.replace(/[^A-Za-z0-9_$]/g, '_').replace(/^(\d)/, '_$1') || 'asset';
-          const taken = new Set((model.imports || []).map((i) => i.name));
-          let n = 2;
-          while (taken.has(candidate)) {candidate = `${base}${n++}`;}
-          local = candidate;
-          model.imports.push({ name: local, path: spec, quote: "'" });
-        }
-        if (!node.props) {node.props = {};}
-        node.props[propName] = {
-          type: 'expr',
-          value: node.kind === 'element' ? `${local}.src` : local,
-        };
+      const latest = pageStateRef.current.pageState;
+      if (!latest?.editable) {return;}
+      const model = latest.model;
+      const node = findNodeById(model.nodes, nodeId);
+      if (!node) {return;}
+      const spec = chooseImportPath(model, paths);
+      // Reuse the binding if this file is already imported — importing the
+      // same asset twice under two names is just noise.
+      let local = (model.imports || []).find((i) => !i.named && i.path === spec)?.name;
+      const added = local === undefined;
+      if (!local) {
+        const base = withoutRoot.split('/').pop()?.replace(/\.[^.]+$/, '') ?? 'asset';
+        let candidate = base.replace(/[^A-Za-z0-9_$]/g, '_').replace(/^(\d)/, '_$1') || 'asset';
+        const taken = new Set((model.imports || []).map((i) => i.name));
+        // Ends within taken.size + 1 passes: each tries a name not yet tried.
+        let n = 2;
+        while (taken.has(candidate)) {candidate = `${base}${n++}`;}
+        local = candidate;
+      }
+      const binding = local;
+      // Step 6, prop and frontmatter: the prop as a request, then the import
+      // it needs and the one a replaced image leaves behind — one undo step.
+      const reference = node.kind === 'element' ? `${binding}.src` : binding;
+      const value = { type: 'expr' as const, value: reference };
+      const options = { coalesceKey: null, urgency: true };
+      const prop = propsGesture(nodeId, { [propName]: value }, options);
+      const imported = (current: EditorModel): EditorModel => {
+        const entry = { name: binding, path: spec, quote: "'" };
+        const imports = added ? [...current.imports, entry] : current.imports;
         // Picking a second image over a first leaves the first one's import
         // behind with nothing pointing at it.
-        pruneImports(model);
-        return model;
-      }, true);
+        const next = cloneEditorModel({ ...current, imports });
+        pruneImports(next);
+        return next;
+      };
+      const afterProp = prop.apply(model);
+      const changed = frontmatterOf(imported(afterProp)) !== frontmatterOf(afterProp);
+      commitEdit(changed ? sequence(prop, frontmatterGesture(afterProp, imported, options)) : prop);
     },
-    [mutateModel, setProp]
+    [commitEdit, setProp]
   );
 
   // Renames an attribute in place, preserving its value and position.
@@ -3503,6 +3527,20 @@ export default function App() {
       immediate: boolean | 'live' = false,
     ) => {
       const renaming = (renames || []).some((r) => r.from && r.to && r.from !== r.to);
+      const state = pageStateRef.current.pageState;
+      if (renaming && state?.editable) {
+        // Step 6, loop rename (multi-span): the parameters and every reference
+        // below, as rename-binding requests, when the head changed nothing else.
+        const pairs = (renames || []).flatMap((r) =>
+          r.from && r.to ? [{ from: r.from, to: r.to }] : [],
+        );
+        const change = { head: value, renames: pairs };
+        const gesture = loopRenameGesture(state.model, nodeId, change, { urgency: true });
+        if (gesture) {
+          commitEdit(gesture);
+          return;
+        }
+      }
       mutateModel(
         (model) => {
           const node = findNodeById(model.nodes, nodeId);
@@ -3532,23 +3570,24 @@ export default function App() {
         renaming ? undefined : `text:${nodeId}`
       );
     },
-    [mutateModel]
+    [mutateModel, commitEdit]
   );
 
   // The code editor and file writer share the same frontmatter model, so
   // editing code preserves named imports, interleaved statements and spacing.
+  // Step 6, frontmatter: the block the code describes, as a request whose
+  // slot is only what differs.
   const setFrontmatter = useCallback(
     (code: string) => {
-      mutateModel(
-        (model) => {
-          Object.assign(model, readFrontmatter(code));
-          return model;
-        },
-        false,
-        'frontmatter'
-      );
+      const state = pageStateRef.current.pageState;
+      if (!state?.editable) {return;}
+      // Object.assign, as the legacy setFrontmatter did: the block's fields replace the model's.
+      const written = (model: EditorModel): EditorModel =>
+        Object.assign({}, model, readFrontmatter(code));
+      const options = { coalesceKey: 'frontmatter', urgency: false };
+      commitEdit(frontmatterGesture(state.model, written, options));
     },
-    [mutateModel]
+    [commitEdit]
   );
 
   // Adds or removes a condition's else branch. Removing keeps the markup that
@@ -3590,16 +3629,13 @@ export default function App() {
   // need re-extracting.
   const setExtraFrontmatter = useCallback(
     (code: string) => {
-      mutateModel(
-        (model) => {
-          model.extraFrontmatter = code;
-          return model;
-        },
-        false,
-        'frontmatter'
-      );
+      const state = pageStateRef.current.pageState;
+      if (!state?.editable) {return;}
+      const written = (model: EditorModel): EditorModel => ({ ...model, extraFrontmatter: code });
+      const options = { coalesceKey: 'frontmatter', urgency: false };
+      commitEdit(frontmatterGesture(state.model, written, options));
     },
-    [mutateModel]
+    [commitEdit]
   );
 
   // Sets the text content of a component (single text child convenience).
@@ -5634,14 +5670,13 @@ export default function App() {
   );
 }
 
-// What a delete leaves: the page without the nodes, and without the imports
-// and declarations only they were reading (the legacy removeNode's rule). The
-// clone is this function's own, so pruneImports edits nothing it was given.
-function removalEffect(
+// What a delete leaves unused: the imports and declarations only the removed
+// nodes were reading (the legacy removeNode's rule). The clone is this
+// function's own, so pruneImports edits nothing it was given.
+function prunedAfterRemoval(
   model: EditorModel,
-  ids: readonly string[],
 ): { readonly model: EditorModel; readonly dropped: readonly string[] } {
-  const next = cloneEditorModel(withoutNodes(model, ids));
+  const next = cloneEditorModel(model);
   pruneImports(next);
   // The code the deleted markup was the only reader of goes with it: a
   // `const jobs = […]` nothing lists any more is left behind otherwise, and a
@@ -5679,24 +5714,6 @@ function keepsAcrossPages(entry: HistoryEntry): boolean {
       return exhaustive;
     }
   }
-}
-
-function insertIntoModel(model: EditorModel, node: EditorNode, target: InsertTarget | null): void {
-  if (!target || target.parentId == null) {
-    const index = target ? Math.min(target.index, model.nodes.length) : model.nodes.length;
-    model.nodes.splice(index, 0, node);
-    return;
-  }
-  const parent = findNodeById(model.nodes, target.parentId);
-  if (!parent) {
-    model.nodes.push(node);
-    return;
-  }
-  if (!Array.isArray(parent.children)) {
-    parent.children = [];
-  }
-  const index = Math.min(target.index, parent.children.length);
-  parent.children.splice(index, 0, node);
 }
 
 function BusyOverlay({ message }: { readonly message: string }) {

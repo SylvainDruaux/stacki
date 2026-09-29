@@ -13,7 +13,7 @@
 import { assert } from '../shared/assert';
 import { toUtf16Offset } from '../shared/brand';
 import type { Edit, NodeRef } from '../shared/edit-request';
-import type { IntentDraft } from './documentActors';
+import type { BuiltEdit, EditBase, IntentDraft } from './documentActors';
 import type { Operation, Placement, RejectionReason } from '../shared/intent';
 import { renameSites } from '../shared/loopScope';
 import { lineIndent, nodeAtPath, type ValidProjection } from '../shared/planSupport';
@@ -33,6 +33,22 @@ interface Authored {
   readonly snapshot: Snapshot;
   readonly text: string;
   readonly projection: ValidProjection;
+}
+
+/** The intent an edit is. Every edit is built against the snapshot it names,
+ * except a frontmatter request after the app's own commits: it states the
+ * whole block the model now describes, and that model already holds what
+ * those commits did, so it is compared with the block on disk now — against
+ * the authored block it would do their part a second time. */
+export function buildEdit(edit: Edit, base: EditBase): Result<BuiltEdit, RejectionReason> {
+  if (edit.tag === 'set-frontmatter') {
+    if (base.history === 'own-commits') {
+      const built = buildEditIntent(edit, base.current);
+      return built.ok ? ok({ draft: built.value, basis: 'current' }) : built;
+    }
+  }
+  const built = buildEditIntent(edit, base.authored);
+  return built.ok ? ok({ draft: built.value, basis: 'authored' }) : built;
 }
 
 /** The intent an edit is, against the snapshot it names. */

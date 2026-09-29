@@ -93,6 +93,25 @@ export type EditReport =
  * the host adds the id, the file and the checksum. */
 export type IntentDraft = Pick<Intent, 'anchor' | 'operation'>;
 
+/** What an edit is built against (step 6). `history` says what lies between
+ * the bytes it was authored against and the bytes on disk now: nothing, only
+ * this actor's own commits (which it can rebase through exactly), or a write
+ * from outside. */
+export interface EditBase {
+  readonly authored: Snapshot;
+  readonly current: Snapshot;
+  readonly history: 'unchanged' | 'own-commits' | 'outside';
+}
+
+/** A built edit, and which of the two snapshots it names. An edit that states
+ * a whole region's new content (the frontmatter the model now describes) is
+ * built against the current bytes when only the app's own commits came
+ * between: the model that stated it already holds what they did. */
+export interface BuiltEdit {
+  readonly draft: IntentDraft;
+  readonly basis: 'authored' | 'current';
+}
+
 export type HostDisk = Pick<
   NodeDocumentDisk,
   'read' | 'lock' | 'unlock' | 'replace' | 'create' | 'canonical'
@@ -206,7 +225,7 @@ export class DocumentActors {
   submitEdit(
     file: string,
     authoredChecksum: Digest,
-    build: (authored: Snapshot) => Result<IntentDraft, RejectionReason>,
+    build: (base: EditBase) => Result<BuiltEdit, RejectionReason>,
   ): EditReport {
     assert(this.#options.drain === 'immediate', 'A deferred host takes submitDeferred');
     const entry = this.#entry(file);
@@ -454,7 +473,7 @@ export class DocumentActors {
   #editSubmission(
     entry: Entry,
     authoredChecksum: Digest,
-    build: (authored: Snapshot) => Result<IntentDraft, RejectionReason>,
+    build: (base: EditBase) => Result<BuiltEdit, RejectionReason>,
   ): Result<{ readonly intent: Intent; readonly authored: Snapshot | undefined }, RejectionReason> {
     const current = entry.state.snapshot;
     assert(current !== undefined, 'A refreshed actor holds a snapshot');
@@ -465,25 +484,29 @@ export class DocumentActors {
     if (authored === undefined) {
       return err('anchor-moved'); // The authored bytes are gone: re-read, never guess.
     }
-    const draft = build(authored);
-    if (!draft.ok) {
-      return draft;
+    const chain =
+      authored === current ? [] : commitChain(entry.log, authoredChecksum, current.checksum);
+    const history = editHistory(authored === current, chain);
+    const built = build({ authored, current, history });
+    if (!built.ok) {
+      return built;
     }
     this.#intents += 1;
     assert(Number.isSafeInteger(this.#intents), 'Intent ids stay safe integers');
+    const basis = built.value.basis === 'current' ? current : authored;
     const intent = toIntent({
       id: toIntentId(`main-${this.#intents}`),
       file: entry.document.path,
-      authoredChecksum,
-      ...draft.value,
+      authoredChecksum: basis.checksum,
+      ...built.value.draft,
     });
-    if (authored === current) {
+    if (basis === current) {
       return ok({ intent, authored: undefined });
     }
-    const chain = commitChain(entry.log, authoredChecksum, current.checksum);
     if (chain === undefined) {
       return ok({ intent, authored }); // An outside write between: the planner maps.
     }
+    assert(chain.length > 0, 'Own commits between the snapshots form a chain');
     const rebased = rebaseIntent(intent, chain, current);
     return rebased.ok ? ok({ intent: rebased.value, authored: undefined }) : rebased;
   }
@@ -776,6 +799,17 @@ export class DocumentActors {
     }
     this.#dirty.clear();
   }
+}
+
+// What lies between an edit's authored bytes and the bytes on disk now.
+function editHistory(
+  same: boolean,
+  chain: readonly CommitRecord[] | undefined,
+): EditBase['history'] {
+  if (same) {
+    return 'unchanged';
+  }
+  return chain === undefined ? 'outside' : 'own-commits';
 }
 
 // Every byte an actor's entry keeps: its snapshot and the retained ones.

@@ -389,3 +389,32 @@ test('an edit authored before more commits than the host retains is refused', as
   assert.equal(!late.ok && late.error.code === 'rejected' && late.error.reason, 'anchor-moved');
   assert.ok(fs.readFileSync(file, 'utf8').includes('Round 17'), 'the refusal wrote nothing');
 });
+
+test('two frontmatter requests against one read add each import once', async (context) => {
+  // The second request's model already holds the first import: after the
+  // app's own commit, main compares it with the block on disk now, or it would
+  // write that import a second time.
+  const harness = fixture();
+  context.after(harness.dispose);
+  const file = path.join(harness.root, 'src/pages/index.astro');
+  fs.writeFileSync(file, "---\nimport A from './A.astro';\n---\n<A />\n");
+  const page = await read(harness, file);
+  assert.ok(page.editable);
+  const B = { name: 'B', path: './B.astro', quote: "'" };
+  const C = { name: 'C', path: './C.astro', quote: "'" };
+  for (const imports of [
+    [...page.model.imports, B],
+    [...page.model.imports, B, C],
+  ]) {
+    const applied = await edit(harness, file, page.checksum, {
+      tag: 'set-frontmatter',
+      model: { ...page.model, imports, nodes: [] },
+    });
+    assert.ok(applied.ok, 'each request applies');
+  }
+  assert.equal(
+    fs.readFileSync(file, 'utf8'),
+    "---\nimport A from './A.astro';\nimport B from './B.astro';\n" +
+      "import C from './C.astro';\n---\n<A />\n",
+  );
+});

@@ -420,3 +420,93 @@ test('parity, inline CSS: one declaration set, changed, added or removed in plac
   assert.ok(tally.compared >= 15, `the sweep compares every style gesture (${tally.compared})`);
   assert.ok(inPlace >= 10, `most of them in place (${inPlace})`);
 });
+
+test('parity, frontmatter: imports added and removed, declarations, with an insert', (t) => {
+  const seen = new Set();
+  const tally = sweep('frontmatter', (node, model) => {
+    if (seen.has(model) || !model.hadFrontmatter) {
+      return [];
+    }
+    seen.add(model); // Once per page: these gestures do not depend on the node.
+    const options = { coalesceKey: null, urgency: true };
+    const card = { name: 'ZCard', path: '../components/ZCard.astro', quote: "'" };
+    const addImport = (current) => ({ ...current, imports: [...current.imports, card] });
+    const declare = (current) => ({
+      ...current,
+      extraFrontmatter: [current.extraFrontmatter, 'const added = 1;'].filter(Boolean).join('\n'),
+    });
+    const cases = [
+      gestures.frontmatterGesture(model, addImport, options),
+      gestures.frontmatterGesture(model, declare, options),
+      gestures.frontmatterGesture(model, (current) => declare(addImport(current)), options),
+      ...model.imports.map((imported) =>
+        gestures.frontmatterGesture(
+          model,
+          (current) => ({
+            ...current,
+            imports: current.imports.filter(
+              (entry) => entry !== imported && entry.name !== imported.name,
+            ),
+          }),
+          options,
+        ),
+      ),
+    ];
+    const first = model.nodes.find((candidate) => candidate.kind !== 'text');
+    if (first !== undefined) {
+      const node = { id: 'fm-card', kind: 'component', name: 'ZCard', props: {}, children: null };
+      const insert = gestures.insertGesture(
+        model,
+        node,
+        { parentId: null, index: model.nodes.indexOf(first) },
+        options,
+      );
+      cases.push(gestures.sequence(gestures.frontmatterGesture(model, addImport, options), insert));
+    }
+    return cases;
+  });
+  report(t, tally);
+  assert.ok(
+    tally.compared > 60,
+    `the sweep compares many frontmatter gestures (${tally.compared})`,
+  );
+});
+
+test('parity, loop rename: each loop parameter renamed, every reference with it', (t) => {
+  const tally = sweep('loop rename', (node, page) => {
+    if (node.kind !== 'map') {
+      return [];
+    }
+    const match =
+      /^([\s\S]+?)\.map\(\(\s*([\w$]+)\s*(?:,\s*([\w$]+)\s*)?\)\s*=>\s*\($/.exec(
+        node.head.trim(),
+      );
+    if (match === null) {
+      return [];
+    }
+    const [, data, item, index] = match;
+    const head = (nextItem, nextIndex) =>
+      `${data}.map((${nextItem}${nextIndex ? `, ${nextIndex}` : ''}) => (`;
+    const cases = [
+      gestures.loopRenameGesture(
+        page,
+        node.id,
+        { head: head('renamed', index), renames: [{ from: item, to: 'renamed' }] },
+        { urgency: true },
+      ),
+    ];
+    if (index) {
+      cases.push(
+        gestures.loopRenameGesture(
+          page,
+          node.id,
+          { head: head(item, 'position'), renames: [{ from: index, to: 'position' }] },
+          { urgency: true },
+        ),
+      );
+    }
+    return cases.filter((gesture) => gesture !== undefined);
+  });
+  report(t, tally);
+  assert.ok(tally.compared >= 4, `the sweep renames every loop it can read (${tally.compared})`);
+});

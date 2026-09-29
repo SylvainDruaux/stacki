@@ -11,7 +11,7 @@ import type { Edit, NodeRef } from '../shared/edit-request';
 import { singleDeclarationChange } from '../shared/inlineStyle';
 import { LIMITS } from '../shared/limits';
 import type { Attr } from '../shared/page-node';
-import { loopVarsAt, stripLostBindings } from './loopBindings';
+import { loopVarsAt, parseLoopHead, renameLoopVar, stripLostBindings } from './loopBindings';
 import type { EditGesture, StreamedEdit } from './pageEdits';
 
 type Urgency = boolean | 'live';
@@ -242,21 +242,16 @@ export function duplicateGesture(
 }
 
 /** Remove nodes, in the order given (a note before the node it annotates).
- * `apply` is the whole effect — it may also prune what the removal leaves
- * unused — and `changesMore` says whether it does anything the removals
- * alone do not, in which case the gesture has no intent form yet. */
+ * What the removal leaves unused in the frontmatter is its own gesture,
+ * sequenced after this one (App.tsx, removeNode). */
 export function removalGesture(
   nodeIds: readonly string[],
-  effect: { readonly apply: (model: EditorModel) => EditorModel; readonly changesMore: boolean },
   options: { readonly urgency: Urgency },
 ): EditGesture {
   return {
     coalesceKey: null,
     urgency: options.urgency,
     request: (refOf) => {
-      if (effect.changesMore) {
-        return undefined;
-      }
       const edits: StreamedEdit[] = [];
       for (const id of nodeIds) {
         const target = refOf(id);
@@ -267,7 +262,7 @@ export function removalGesture(
       }
       return edits;
     },
-    apply: effect.apply,
+    apply: (model) => withoutNodes(model, nodeIds),
   };
 }
 
@@ -592,4 +587,118 @@ function findWithList(
     }
   }
   return undefined;
+}
+
+// --- Frontmatter slots (the §11.6 frontmatter step) ------------------------------------
+
+/** A change to what the frontmatter says — imports, declarations, the code
+ * editor's text. The request carries the frontmatter the changed model
+ * describes; main prints that block with the legacy printer and writes only
+ * the slot where it differs from the block on disk (editRequests.ts), so a new
+ * import touches its own line and nothing else. */
+export function frontmatterGesture(
+  model: EditorModel,
+  change: (model: EditorModel) => EditorModel,
+  options: { readonly coalesceKey: string | null; readonly urgency: Urgency },
+): EditGesture {
+  const after = change(model);
+  return {
+    coalesceKey: options.coalesceKey,
+    urgency: options.urgency,
+    request: () => {
+      // The block alone: main prints it from a model without nodes.
+      const edit: Edit = { tag: 'set-frontmatter', model: { ...after, nodes: [] } };
+      return [{ edit, stream: 'frontmatter' }];
+    },
+    apply: change,
+  };
+}
+
+/** Two gestures as one undo step: the requests of both, in order, or none
+ * when either has no intent form; the effects one after the other. */
+export function sequence(first: EditGesture, second: EditGesture): EditGesture {
+  return {
+    coalesceKey: first.coalesceKey,
+    urgency: first.urgency,
+    request: (refOf) => {
+      const before = first.request(refOf);
+      const after = second.request(refOf);
+      if (before === undefined || after === undefined) {
+        return undefined;
+      }
+      return [...before, ...after];
+    },
+    apply: (model) => second.apply(first.apply(model)),
+  };
+}
+
+// --- Loop rename (multi-span, plan §3.3) ------------------------------------------------
+
+export interface LoopRename {
+  readonly from: string;
+  readonly to: string;
+}
+
+/** The loop editor's rename: a new head that renames the loop's parameters and
+ * nothing else becomes one rename-binding request per name — main finds every
+ * site (shared/loopScope.ts) — and the effect is the legacy one
+ * (renameLoopVar). A head that also changes its data or its shape has no
+ * intent form yet and saves the whole model. */
+export function loopRenameGesture(
+  model: EditorModel,
+  nodeId: string,
+  change: { readonly head: string; readonly renames: readonly LoopRename[] },
+  options: { readonly urgency: Urgency },
+): EditGesture | undefined {
+  const node = findNode(model.nodes, nodeId);
+  if (node?.kind !== 'map' || node.head === undefined) {
+    return undefined;
+  }
+  const renames = change.renames.filter((rename) => rename.from !== rename.to);
+  if (!onlyRenames(node.head, change.head, renames)) {
+    return undefined;
+  }
+  return {
+    coalesceKey: null,
+    urgency: options.urgency,
+    request: (refOf) => {
+      const target = refOf(nodeId);
+      if (target === undefined) {
+        return undefined;
+      }
+      return renames.map(({ from, to }) => ({
+        edit: { tag: 'rename-binding' as const, target, from, to },
+        stream: null,
+      }));
+    },
+    apply: (current) =>
+      withNode(current, nodeId, (loop) => {
+        const copy: EditorNode = structuredClone(loop);
+        Object.assign(copy, { head: change.head });
+        for (const { from, to } of renames) {
+          renameLoopVar(copy.children ?? [], from, to);
+        }
+        return copy;
+      }),
+  };
+}
+
+// The new head is the old one with the parameters renamed, the data the same.
+function onlyRenames(before: string, after: string, renames: readonly LoopRename[]): boolean {
+  if (renames.length === 0) {
+    return false;
+  }
+  const old = parseLoopHead(before);
+  const next = parseLoopHead(after);
+  if (old === null) {
+    return false; // A hand-written head: the rename is best effort, in the model.
+  }
+  if (next === null) {
+    return false;
+  }
+  const renamed = (name: string) => renames.find((rename) => rename.from === name)?.to ?? name;
+  if (old.data !== next.data) {
+    return false;
+  }
+  return renamed(old.item) === next.item && renamed(old.index) === next.index;
 }

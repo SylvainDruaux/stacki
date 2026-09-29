@@ -58,9 +58,9 @@ const REPLACE_SOURCE_BASELINE = 23;
 /** Measured 2026-09-28 by this script at step 1, lowered at each step-6
  * expansion (the tracker's adapter table). Lower these; never raise them. */
 const BASELINE: Counts = {
-  mutations: 53,
-  propIndexWrites: 3,
-  mutateModelCalls: 21,
+  mutations: 48,
+  propIndexWrites: 2,
+  mutateModelCalls: 15,
   applyEditCalls: 4,
   /** Measured at step 5, when the legacy writers moved onto the actors. */
   replaceSourceCalls: REPLACE_SOURCE_BASELINE,

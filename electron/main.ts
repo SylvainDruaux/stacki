@@ -4,7 +4,7 @@ import { createIpcRegistrar } from './ipc.js';
 import { MAIN_LIMITS, readSource, readSourceBytes, directoryBudget } from './main.bounds.js';
 import { digestOf, isAtomicTemporary } from './atomicWrite.js';
 import { createNodeDocumentActors, type EditReport, type WriteReport } from './documentActors.js';
-import { buildEditIntent } from './editRequests.js';
+import { buildEdit } from './editRequests.js';
 import {
   createProjectText,
   describeWriteReport,
@@ -3275,9 +3275,7 @@ ipcMain.handle('page:edit', async (_e, { pagePath, authoredChecksum, edit }) => 
     const error = { code: 'rejected' as const, reason, message, diskChecksum: null };
     return { ok: false as const, error };
   }
-  const report = documents.submitEdit(pagePath, authoredChecksum, (authored) =>
-    buildEditIntent(edit, authored),
-  );
+  const report = documents.submitEdit(pagePath, authoredChecksum, (base) => buildEdit(edit, base));
   if (report.tag !== 'applied') {
     return { ok: false as const, error: pageEditError(pagePath, report) };
   }
