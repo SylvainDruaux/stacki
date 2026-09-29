@@ -311,7 +311,21 @@ test('markers live in memory only; the token follows the rendering chain', async
     );
     const module: unknown = await import(pathToFileURL(configPath).href);
     assert.ok(typeof module === 'object' && module !== null && 'default' in module);
-    const plugin = markerPlugin(module.default);
+    const plugin = markerPlugin(module.default, 'avb-node-markers');
+    // The canvas patcher, as the config serves it: its bounds are LIMITS'.
+    const patcher = markerPlugin(module.default, 'avb-morph').load('\0virtual:avb-morph');
+    assert.equal(typeof patcher, 'string');
+    assert.ok(
+      String(patcher).startsWith(
+        'const AVB_PREVIEW_LIMITS = Object.freeze(' +
+          JSON.stringify({
+            previewMarkersMax: LIMITS.previewMarkersMax,
+            previewMorphWorkMax: LIMITS.previewMorphWorkMax,
+          }) +
+          ');\n',
+      ),
+      'the served patcher opens with the bounds from shared/limits.ts',
+    );
     const load = (rel: string): string => {
       const code = plugin.load(`${root}/${rel}`);
       assert.equal(typeof code, 'string', `${rel} is marked`);
@@ -407,7 +421,7 @@ interface MarkerPlugin {
   readonly load: (id: string) => unknown;
 }
 
-function markerPlugin(config: unknown): MarkerPlugin {
+function markerPlugin(config: unknown, name: string): MarkerPlugin {
   assert.ok(typeof config === 'object' && config !== null && 'vite' in config);
   const vite: unknown = config.vite;
   assert.ok(typeof vite === 'object' && vite !== null && 'plugins' in vite);
@@ -418,7 +432,7 @@ function markerPlugin(config: unknown): MarkerPlugin {
       typeof plugin === 'object' &&
       plugin !== null &&
       'name' in plugin &&
-      plugin.name === 'avb-node-markers',
+      plugin.name === name,
   );
   assert.ok(typeof found === 'object' && found !== null && 'load' in found);
   const load: unknown = found.load;

@@ -38,7 +38,37 @@ export type PreviewMessage =
   | { readonly kind: 'canvas-ready' }
   /** The rendering the canvas shows: its manifest and token (plan §9, step 7). */
   | { readonly kind: 'render'; readonly render: PreviewRender }
+  /** The canvas reloaded instead of patching, and why (step 7). */
+  | { readonly kind: 'preview-reload'; readonly reason: PreviewReloadReason }
   | { readonly kind: 'query-result'; readonly input: unknown };
+
+/** Why the canvas patcher reloaded (electron/morphClient.ts): past one of its
+ * caps, or for the reasons a patch was never possible. */
+export const PREVIEW_RELOAD_REASONS = [
+  'markers-over-cap',
+  'diff-over-cap',
+  'scripts-changed',
+  'patch-failed',
+] as const;
+export type PreviewReloadReason = (typeof PREVIEW_RELOAD_REASONS)[number];
+
+/** The notice for a reload a cap caused, or undefined for one the canvas could
+ * never have avoided (those stay quiet, as they always were). */
+export function describePreviewReload(reason: PreviewReloadReason): string | undefined {
+  switch (reason) {
+    case 'markers-over-cap':
+      return 'The canvas reloaded: this page has more elements than it updates in place.';
+    case 'diff-over-cap':
+      return 'The canvas reloaded: the change was too large to update in place.';
+    case 'scripts-changed':
+    case 'patch-failed':
+      return undefined;
+    default: {
+      const exhaustive: never = reason;
+      return exhaustive;
+    }
+  }
+}
 
 /** Where on the canvas an event landed, and which rendering it landed on: the
  * token is absent until the frame has digested its rendering's manifest. */
@@ -94,6 +124,8 @@ function parseKnownMessage(value: Readonly<Record<string, unknown>>): PreviewMes
       return { kind: 'canvas-ready' };
     case 'avb:render':
       return { kind: 'render', render: parsePreviewRender(value) };
+    case 'avb:preview-reload':
+      return { kind: 'preview-reload', reason: parseReloadReason(value['reason']) };
     case 'avb:query-result':
       return { kind: 'query-result', input: value };
     default:
@@ -108,6 +140,14 @@ function parseRects(value: Readonly<Record<string, unknown>>): PreviewMessage {
     classes: dictionary(list(list(pathText)))(value['classes']),
     spacing: dictionary(list(nullable(parseSpacing)))(value['spacing']),
   };
+}
+
+function parseReloadReason(input: unknown): PreviewReloadReason {
+  const found = PREVIEW_RELOAD_REASONS.find((reason) => reason === input);
+  if (found === undefined) {
+    throw new Error('Preview reload: unknown reason');
+  }
+  return found;
 }
 
 function parseLocatedMessage(value: Readonly<Record<string, unknown>>): LocatedEvent {

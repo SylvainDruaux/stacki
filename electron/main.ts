@@ -3888,9 +3888,19 @@ const json = (body) =>
 // stay readable — and it is read rather than required, since it runs in the
 // browser and not in this process. If it cannot be read, pages simply reload
 // the way they always did.
+//
+// Its bounds come from shared/limits.ts, prepended here — the bridge boundary —
+// so the patcher in the page answers to the same numbers as the rest of the app
+// (step 7). The patcher declares the constant and reads nothing else.
 let MORPH_CLIENT = '';
 try {
-  MORPH_CLIENT = readSource(path.join(__dirname, 'morphClient.js'));
+  const bounds = {
+    previewMarkersMax: LIMITS.previewMarkersMax,
+    previewMorphWorkMax: LIMITS.previewMorphWorkMax,
+  };
+  MORPH_CLIENT =
+    `const AVB_PREVIEW_LIMITS = Object.freeze(${JSON.stringify(bounds)});\n` +
+    readSource(path.join(__dirname, 'morphClient.js'));
 } catch {
   MORPH_CLIENT = '';
 }

@@ -250,6 +250,7 @@ import {
 import { judgeCanvasEvent, type ShownFile } from './previewGate';
 import { describePreviewStale, type PreviewVerdict } from '../shared/preview-token';
 import type { JudgeCanvasEvent } from './panels/previewRuntime';
+import { describePreviewReload, type PreviewReloadReason } from './previewMessages';
 
 // Each optional editor owns its loading boundary so opening it keeps the
 // canvas and neighboring panels visible and interactive.
@@ -4564,6 +4565,20 @@ export default function App() {
     [showToast]
   );
 
+  // Past the patcher's caps the canvas reloads instead of patching (step 7):
+  // honest about it, so a scroll position or an open menu lost to a reload is
+  // explained. The reloads a patch could never avoid — a script that changed —
+  // are what the canvas always did, and stay quiet.
+  const onPreviewReload = useCallback(
+    (reason: PreviewReloadReason) => {
+      const why = describePreviewReload(reason);
+      if (why !== undefined) {
+        showToast(why);
+      }
+    },
+    [showToast]
+  );
+
   const editedRel =
     editStack.length > 1 && project?.path
       ? projectRelativePath(
@@ -5401,6 +5416,7 @@ export default function App() {
             onDevice={setDevice}
             judgeEvent={judgeEvent}
             onStaleEvent={onStaleEvent}
+            onPreviewReload={onPreviewReload}
             onSelectPath={(p, info) => {
               // What the click MEANT — see canvasClick.js. The canvas answers
               // with a path or with null, and null has two causes that want

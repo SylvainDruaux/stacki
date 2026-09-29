@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type React from 'react';
 import type { RectMap, SpacingMap } from './PreviewOverlays';
 import type { PreviewDevice } from './PreviewToolbar';
-import type { PreviewMessage } from '../previewMessages';
+import type { PreviewMessage, PreviewReloadReason } from '../previewMessages';
 import { parsePreviewMessage } from '../previewMessages';
 import { sameCopy } from '../outlineBoxes';
 import { forgetComputedColors } from '../style-panel/lib/computed-color';
@@ -44,6 +44,8 @@ export interface PreviewRuntimeProps {
    * selects, and the refusal is shown, never swallowed. */
   readonly judgeEvent: JudgeCanvasEvent;
   readonly onStaleEvent: (verdict: Extract<PreviewVerdict, { readonly tag: 'stale' }>) => void;
+  /** The canvas reloaded instead of patching (step 7): past a cap, it says so. */
+  readonly onPreviewReload?: (reason: PreviewReloadReason) => void;
 }
 
 export interface PreviewRuntime {
@@ -229,6 +231,10 @@ function applyMessage(message: PreviewMessage, refs: RuntimeRefs, setters: Runti
       break;
     case 'render':
       refs.render.current = message.render;
+      break;
+    case 'preview-reload':
+      refs.render.current = undefined; // The reloaded page announces its own.
+      refs.props.current.onPreviewReload?.(message.reason);
       break;
     case 'canvas-ready':
       noteCanvasReady();

@@ -44,10 +44,21 @@ const source = fs.readFileSync(
 );
 const start = source.indexOf('const isAnchor =');
 const end = source.indexOf('// A script that CHANGED, or one that is GONE');
-const { patchChildren, findLive, syncAnchors, syncStamps } = new Function(
-  'document',
-  `${source.slice(start, end)}\nreturn { patchChildren, findLive, syncAnchors, syncStamps };`
-)(dom.window.document);
+// Main prepends the patcher's bounds from shared/limits.ts (step 7); the lifted
+// half takes them as a parameter, so the cap tests below can shrink them.
+const { LIMITS } = require('../dist/shared/limits.js');
+const lift = (limits) =>
+  new Function(
+    'document',
+    'AVB_PREVIEW_LIMITS',
+    `${source.slice(start, end)}\n` +
+      'return { patchChildren, findLive, syncAnchors, syncStamps, checkMarkerCap, ' +
+      'refillMorphWork, OverCap };'
+  )(dom.window.document, limits);
+const { patchChildren, findLive, syncAnchors, syncStamps } = lift({
+  previewMarkersMax: LIMITS.previewMarkersMax,
+  previewMorphWorkMax: LIMITS.previewMorphWorkMax,
+});
 
 // The other half of the same decision: whether to patch at all. Lifted the same
 // way, from the comment that introduces it to the fetch below it.
@@ -377,6 +388,97 @@ const LIVE_TABS = (labels, active) =>
     'and no stamp is put back beside them',
     !/avb-d:/.test(live.body.innerHTML),
     live.body.innerHTML
+  );
+}
+
+// A moved node (step 6 ships moves as relocated bytes; the open question was
+// left to step 7). The canvas patches from the two renderings, which see a move
+// as a removal and an insertion: the page ends up exactly as the new rendering
+// says, without a reload, and the siblings that stayed are the same live
+// elements. The moved one is rebuilt — its client state is not carried along.
+{
+  const html = (order) => order.map((id) => `<section id="${id}"><p>${id}</p></section>`).join('');
+  const live = tree(html(['a', 'b', 'c']));
+  const [a, b, c] = [...live.children];
+  const threw = patch(live, tree(html(['a', 'b', 'c'])), tree(html(['b', 'c', 'a'])));
+  check('a moved node patches without a reload', threw === null, threw);
+  check(
+    'and the page is the new rendering',
+    live.innerHTML === tree(html(['b', 'c', 'a'])).innerHTML,
+    live.innerHTML
+  );
+  check('the first sibling that stayed is the same element', live.children[0] === b);
+  check('and so is the second', live.children[1] === c);
+  check('the moved one is rebuilt, not carried', live.children[2] !== a && !a.isConnected);
+}
+
+// The caps (step 7). Past the marker cap or the diff-work cap the patch throws
+// the cap's own reason, and update() turns that into an announced reload; under
+// them it patches as before. A shrunken copy of the patcher shows both edges.
+{
+  const tiny = lift({ previewMarkersMax: 3, previewMorphWorkMax: 40 });
+  const reasonOf = (run) => {
+    try {
+      run();
+      return null;
+    } catch (err) {
+      return err instanceof tiny.OverCap ? err.reason : `not a cap: ${err.message}`;
+    }
+  };
+  const marked = (i) => `<!--avb-s:${i}--><p>${i}</p><!--avb-e:${i}-->`;
+  const markers = (count) => tree(Array.from({ length: count }, (_, i) => marked(i)).join(''));
+  check(
+    'a rendering at the marker cap patches',
+    reasonOf(() => tiny.checkMarkerCap(markers(3))) === null
+  );
+  check(
+    'one marker past it reloads, and says why',
+    reasonOf(() => tiny.checkMarkerCap(markers(4))) === 'markers-over-cap'
+  );
+  // A middle edit in a list of n children builds an (n+1)² matrix after the
+  // shared prefix: five children changed at the head cost 36 cells, under 40.
+  const list = (items) => items.map((item) => `<i id="${item}">${item}</i>`).join('');
+  const five = ['a', 'b', 'c', 'd', 'e'];
+  const small = [tree(list(five)), tree(list(five)), tree(list(['z', ...five.slice(1)]))];
+  tiny.refillMorphWork();
+  check(
+    'a diff inside the work cap patches',
+    reasonOf(() => tiny.patchChildren(...small)) === null
+  );
+  check(
+    'and the live list shows the edit',
+    small[0].firstElementChild.id === 'z',
+    small[0].innerHTML
+  );
+  const names = Array.from({ length: 8 }, (_, i) => `n${i}`);
+  const large = [tree(list(names)), tree(list(names)), tree(list(['x', ...names.slice(1)]))];
+  tiny.refillMorphWork();
+  check(
+    'a diff past the work cap reloads, and says why',
+    reasonOf(() => tiny.patchChildren(...large)) === 'diff-over-cap'
+  );
+  // The budget is per patch: refilled, the small edit fits again.
+  tiny.refillMorphWork();
+  const again = [tree(list(['a', 'b'])), tree(list(['a', 'b'])), tree(list(['q', 'b']))];
+  check(
+    'the next patch starts with the whole budget',
+    reasonOf(() => tiny.patchChildren(...again)) === null
+  );
+  // The shipped bounds are the ones in shared/limits.ts, prepended by main.
+  const main = fs.readFileSync(path.join(__dirname, '..', 'dist', 'electron', 'main.js'), 'utf8');
+  check(
+    'main prepends the patcher its bounds from LIMITS',
+    /const AVB_PREVIEW_LIMITS = Object\.freeze\(\$\{JSON\.stringify\(bounds\)\}\)/.test(main) &&
+      /previewMarkersMax: (limits_js_1\.)?LIMITS\.previewMarkersMax/.test(main) &&
+      /previewMorphWorkMax: (limits_js_1\.)?LIMITS\.previewMorphWorkMax/.test(main)
+  );
+  check(
+    'the patcher declares the bounds, never defines its own',
+    !/AVB_PREVIEW_LIMITS\s*=/.test(source)
+  );
+  check(
+    'and announces a reload before it happens',
+    /postMessage\(\{ type: 'avb:preview-reload', reason \}/.test(source)
   );
 }
 

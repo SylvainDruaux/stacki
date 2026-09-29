@@ -9,6 +9,7 @@ import { PreviewOverlays } from './PreviewOverlays';
 import { PreviewToolbar, deviceForWidth, deviceWidth } from './PreviewToolbar';
 import { usePreviewRuntime, type JudgeCanvasEvent } from './previewRuntime';
 import type { PreviewVerdict } from '../../shared/preview-token';
+import type { PreviewReloadReason } from '../previewMessages';
 import { PREVIEW_WIDTH_LIMITS, previewViewport } from './previewViewport';
 import './previewViewport.css';
 
@@ -34,6 +35,7 @@ interface PreviewPaneProps {
   readonly onOpenPath?: (path: string | null, occurrence: number) => void;
   readonly judgeEvent: JudgeCanvasEvent;
   readonly onStaleEvent: (verdict: Extract<PreviewVerdict, { readonly tag: 'stale' }>) => void;
+  readonly onPreviewReload?: (reason: PreviewReloadReason) => void;
   readonly onSelectedClasses?: (classes: readonly string[]) => void;
   readonly onRenderedPaths?: (paths: readonly string[]) => void;
   readonly onNodeStates?: (states: {

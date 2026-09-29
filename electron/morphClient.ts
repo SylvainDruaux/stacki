@@ -31,6 +31,17 @@ declare global {
   }
 }
 
+// The patcher's bounds (plan §9, step 7), from shared/limits.ts: main prepends
+// this constant when it hands the source to the dev plugin — the bridge
+// boundary — so the page and the app answer to one number. Past either, the
+// page reloads instead of patching, and tells the app why.
+declare const AVB_PREVIEW_LIMITS: {
+  /** Node markers one rendering may carry. */
+  readonly previewMarkersMax: number;
+  /** Child-list matrix cells one patch may spend lining renderings up. */
+  readonly previewMorphWorkMax: number;
+};
+
 // A <template> marker is an element, and the page removes those from itself on
 // load, so they are taken out of the fetched copies too — otherwise they are
 // nodes on one side with nothing to match on the other.
@@ -69,6 +80,57 @@ const isStamp = (n: Node | null | undefined): boolean => {
   const comment = n !== undefined && n !== null && asComment(n) ? n : null;
   return comment !== null && comment.data.startsWith('avb-d:');
 };
+
+// Why the page reloaded instead of patching. The first two are the caps: a
+// rendering with more nodes than the canvas may map, or two renderings too far
+// apart to line up within the work bound. The others were always reloads.
+type ReloadReason = 'markers-over-cap' | 'diff-over-cap' | 'scripts-changed' | 'patch-failed';
+
+// Thrown where a cap is hit, caught by update(), which reloads for its reason.
+class OverCap extends Error {
+  readonly reason: 'markers-over-cap' | 'diff-over-cap';
+  constructor(reason: 'markers-over-cap' | 'diff-over-cap') {
+    super(`the canvas patch is over its cap (${reason})`);
+    this.reason = reason;
+  }
+}
+
+// The work one patch may still spend. update() refills it before each patch;
+// diffChildren draws on it before it allocates a matrix, so the cap is hit
+// before the memory is taken, never after.
+let morphWorkLeft = AVB_PREVIEW_LIMITS.previewMorphWorkMax;
+function refillMorphWork(): void {
+  morphWorkLeft = AVB_PREVIEW_LIMITS.previewMorphWorkMax;
+}
+function spendMorphWork(cells: number): void {
+  if (morphWorkLeft < cells) {
+    throw new OverCap('diff-over-cap');
+  }
+  morphWorkLeft -= cells;
+}
+
+// The node markers a rendering carries — one pair per rendered copy of a node.
+// Counted by walking, and the walk stops at the cap: it is a bound, not a size.
+function checkMarkerCap(root: ParentNode): void {
+  let markers = 0;
+  const stack: ParentNode[] = [root];
+  while (stack.length) {
+    const parent = stack.pop();
+    if (!parent) {
+      break;
+    }
+    for (let n = parent.firstChild; n; n = n.nextSibling) {
+      if (asComment(n) && /^avb-s:/.test(n.data)) {
+        markers++;
+        if (markers > AVB_PREVIEW_LIMITS.previewMarkersMax) {
+          throw new OverCap('markers-over-cap');
+        }
+      } else if (asElement(n)) {
+        stack.push(n);
+      }
+    }
+  }
+}
 
 const asElement = (n: Node): n is Element => n.nodeType === 1;
 const asText = (n: Node): n is Text => n.nodeType === 3;
@@ -277,6 +339,7 @@ function diffChildren(a: readonly string[], b: readonly string[]): DiffOp[] {
   const start = i;
   const dp: Int32Array[] = [];
   if (i < n && j < m) {
+    spendMorphWork((n - start + 1) * (m - start + 1));
     for (let row = 0; row <= n - start; row++) {
       dp.push(new Int32Array(m - start + 1));
     }
@@ -760,6 +823,18 @@ const ready = fetchDoc().then(
   },
 );
 
+// A reload is honest: the app hears why before the page goes, and shows it when
+// a cap was the reason — the canvas lost its running state on purpose, not by
+// accident.
+function reloadFor(reason: ReloadReason): void {
+  try {
+    window.parent.postMessage({ type: 'avb:preview-reload', reason }, '*');
+  } catch {
+    /* no parent to tell */
+  }
+  location.reload();
+}
+
 let busy = false;
 let again = false;
 
@@ -775,11 +850,13 @@ async function update(): Promise<void> {
       throw new Error('no baseline rendering to compare against');
     }
     const next = await fetchDoc();
+    checkMarkerCap(next.withAnchors);
     const added = addedScripts(prevDoc, next.clean);
     if (added === null) {
-      location.reload();
+      reloadFor('scripts-changed');
       return;
     }
+    refillMorphWork();
     const liveRoot = document.documentElement;
     const prevRoot = prevDoc.documentElement;
     const nextRoot = next.clean.documentElement;
@@ -809,7 +886,7 @@ async function update(): Promise<void> {
     // throw it caused skipped the reload line below, which is the whole point
     // of the catch. Log and reload.
     console.error('[stacki] could not patch the page, reloading:', err);
-    location.reload();
+    reloadFor(err instanceof OverCap ? err.reason : 'patch-failed');
     return;
   } finally {
     busy = false;

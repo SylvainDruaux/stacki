@@ -3,7 +3,8 @@
 // numeric, nested, discriminant, and collection fields at the boundary.
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { parsePreviewMessage } = require('./renderer-module')('previewMessages.ts');
+const { parsePreviewMessage, describePreviewReload, PREVIEW_RELOAD_REASONS } =
+  require('./renderer-module')('previewMessages.ts');
 
 const box = { x: -1.5, y: 2, w: 30, h: 40 };
 const TOKEN = 'a'.repeat(64);
@@ -70,6 +71,19 @@ test('located events carry the rendering token they landed on (step 7)', () => {
     parsePreviewMessage({ type: 'avb:open-node', path: '1', occurrence: 2, token: TOKEN }).token,
     TOKEN,
   );
+});
+
+test('a reload names its reason; only the caps are announced to the user (step 7)', () => {
+  for (const reason of PREVIEW_RELOAD_REASONS) {
+    assert.deepEqual(parsePreviewMessage({ type: 'avb:preview-reload', reason }), {
+      kind: 'preview-reload',
+      reason,
+    });
+  }
+  assert.equal(parsePreviewMessage({ type: 'avb:preview-reload', reason: 'bored' }), undefined);
+  assert.equal(parsePreviewMessage({ type: 'avb:preview-reload' }), undefined);
+  const announced = PREVIEW_RELOAD_REASONS.filter((reason) => describePreviewReload(reason));
+  assert.deepEqual(announced, ['markers-over-cap', 'diff-over-cap']);
 });
 
 test('preview message parser ignores unknown and malformed project messages', () => {
