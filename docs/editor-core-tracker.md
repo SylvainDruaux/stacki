@@ -38,7 +38,12 @@ lands it.
   (2026-09-29)**: capabilities are shown beside the selection and a node a loop
   repeats edits its one source node; canvas events carry a preview token and a
   stale rendering never selects; the canvas patch is capped and reloads, saying
-  why, past the cap (see Step 7). Steps 8–10 have not started.
+  why, past the cap (see Step 7). **Step 8 landed (2026-09-29)**: the code
+  editor saves the byte diff from the text it read through `page:edit`, the one
+  write path (`page:writeRaw` is retired); invalid intermediates are written
+  and the navigator shows the parse error with the code editor until the text
+  parses; overlapping outside edits come back `merge-conflict`, never an
+  overwrite (see Step 8). Steps 9–10 have not started.
 - **Step 0 landed (2026-09-28).** The legacy
   write path still serializes whole files (`mutateModel` → `page:write` →
   `serializePage`), but every page write now names the checksum it was
@@ -1334,13 +1339,175 @@ Left open, carried:
 - Placement beside a repeated node (insert, duplicate, remove) is refused and
   falls back to the whole-page save; a fragment-wrapping insert would lift it.
 
-### Step 8 — Code editor on the actor ⬜
+### Step 8 — Code editor on the actor ✅
 
 **Deliverables.** Diff-based patches through the same actor; `parse-error`
 projections persist invalid intermediates; overlapping external changes
 surface a visible `merge-conflict`, never an overwrite; visual intents
 reject with `source-invalid` while the file stays broken, and visual editing
 resumes automatically once it parses again.
+
+**Landed 2026-09-29** on `refactor/architecture-consolidation`: `979061e` (the
+code patch), `dc8156a` (the actor's refusal and the simulator's code saves),
+`720928e` (the code editor on `page:edit`; `page:writeRaw` retired), then this
+record. Every commit gated alone (Verification record).
+
+How a code save reaches disk now (plan §3.6, §7):
+
+- **The patch** (`979061e`, `shared/code-patch.ts`, engine-fenced). The code
+  editor never sends its text: `diffCodePatch(baseline, text)` is the byte diff
+  from the text it read to the text it holds — Myers (`shared/diff.ts`) inside
+  the common prefix and suffix, widened to whole code points, islands under 8
+  bytes joined, one region past the diff budget or past `splicesPerIntentMax`
+  hunks. Every hunk carries the baseline text it replaces (`expected`), its
+  witness. A text past `sourceBytesMax` (or `ipcFieldCharsMax`) is
+  `resource-limit`; the replacement bytes are bounded by
+  `intentPayloadBytesMax`; nothing is ever truncated. The postcondition
+  (applying the patch gives the text back) is asserted on every patch.
+- **Main** (`720928e`). `page:edit` takes a `code-patch` edit
+  (`shared/edit-request.ts`: at least one hunk, ascending, disjoint, bounded).
+  `electron/editRequests.ts` checks every hunk against the named bytes — inside
+  them, on code-point boundaries, holding `expected` — before the projection is
+  read, so a page that does not parse takes a patch like any other; a hunk that
+  fails is `merge-conflict` (its text is not a diff of these bytes). The host
+  (`electron/documentActors.ts`) now refuses an over-bound payload as
+  `resource-limit` instead of letting `toIntent` throw, and takes the reason
+  for "authored bytes gone" from the request (`EditStatement.gone`):
+  `merge-conflict` for a code patch, `anchor-moved` for a node reference. The
+  planner (step 6's `planCodePatch`) already wrote invalid candidates
+  (`may-be-invalid`) and mapped stale hunks with 64 bytes of context, stale →
+  `merge-conflict`. **`page:writeRaw` is retired**: the channel, its payload
+  and result, the preload method and `writeProjectPageRaw` are gone; the
+  handler count drops from 118 to 117.
+- **Rebase, tightened** (`979061e`, `shared/rebase.ts`). A code patch rebased
+  through the actor's own commits keeps only hunks no commit touched
+  (`shiftUntouched`). `rebaseSpan` let a hunk hold a commit made inside it —
+  right for a `set-attribute` (the user's latest word), wrong for a patch: the
+  step-8 contract suite caught a patch typed before a visual edit silently
+  replacing that edit's bytes.
+- **The renderer** (`720928e`, `src/pageEdits.ts`, `src/codeEdits.ts`). Typing
+  puts the page's queue into `code` with a baseline: the checksum and text the
+  typing descends from, taken from the page as shown (a refused page's text may
+  be a review of the model, so its baseline is the disk, read at the save, and
+  only after "Save this version"). The save (`sendCode`) diffs the baseline to
+  the text and sends the patch; an applied reply becomes the next baseline, and
+  when it holds more than was sent (an outside edit mapped in) while the user
+  kept typing, the typing is merged into it first (`mergeTyping`, three-way,
+  touching changes refused `merge-conflict`) so the next save never takes the
+  merged edit back out. Every refusal keeps the text: over changed bytes it is
+  the conflict notice with the actor's reason; over unchanged bytes (a size
+  limit) or a transient failure, a failed save and the same patch next time.
+  `App.tsx`: typed text is set on the page state at once (a save's reply can
+  never be installed over a newer keystroke), the parse follows, and gestures
+  wait for it (`typedCodeUnparsed`); typed text never carries an edit origin;
+  Undo of typed text is code too; the watcher's dirty branch leaves a code
+  queue to merge or refuse, like edit requests.
+- **Invalid intermediates, first-class.** The navigator switches over the
+  page's projection (`structureProjection`: `valid` | `parse-error`,
+  exhaustive): a page that does not parse shows the parser's diagnostic and
+  where it stopped, "Open in the code panel", Astro's own output (the dev
+  server's log; the canvas shows Astro's error page), and the code editor
+  itself — the raw `<textarea>` and its handler (`setRawSource`) are gone. When
+  a later patch parses, the reply is `editable` and the navigator returns with
+  no reload.
+- **The code editor** applies an outside value as the one change between its
+  document and the value, in a layout effect: a merged outside edit elsewhere
+  leaves the caret where the user put it, and no keystroke lands between a
+  render and the sync.
+
+**Found by the step-8 long run and fixed** (`dc8156a`):
+- **An actor assertion reachable from outside bytes.** Seed 139: outside edits
+  had left a comment inside two tags, which the parser reads as bare
+  attributes; a `set-attribute` appended where the planner saw the `<img>`'s
+  tag end — inside the comment's `-->` — and the candidate still parsed, but
+  the loop around the target now read as code. The actor asserted that the
+  target survives; it now refuses `unsupported-operation` (plan §5.2 step 6,
+  amended), and the renderer saves such an edit whole, as for any refused
+  request. Pinned by the reduced file in `document-actor.test.ts`. Pre-existing:
+  the new event mix only reached it.
+- **A judge artifact, not a wrong site.** Seed 271: a code save deleted one of
+  two identical `<Card>` lines. Its text is byte-identical whichever the user
+  meant, and the diff places the deletion on the last copy; the simulator took
+  its provenance from that placement, so a later stale edit of the other Card,
+  mapped (correctly, after an outside CRLF rewrite made the scripts agree) to
+  the survivor, was judged a wrong site. Such a patch is slidable — it could
+  move along equal bytes — and remaps across it are now unjudged, like a
+  git-style replacement (`slidable`, `rewrittenBetween` in `world.ts`).
+
+**Tests** (the step's gate proof):
+- `test/contracts/code-patch.test.ts` (9): hunks and witnesses by hand; code
+  points (`é` → `è` shares a lead byte), BOM and CRLF offsets; a seeded sweep of
+  12 edits × every corpus, editor-core and round-trip fixture, each patch
+  giving the text back exactly; one region past the diff budget; the file
+  bound refused in units and in bytes, never truncated; witnesses checked;
+  `mergeTyping` merging disjoint changes and refusing touching ones and two
+  insertions at one place; `shiftUntouched` at every edge.
+- `test/contracts/code-editor.test.ts` (9), main's real handlers: the wire
+  parser's negative space; a save writes only its hunks; **an invalid
+  intermediate is written, a visual edit against the page before it is refused
+  `source-invalid` with the disk untouched, and after a repairing patch a visual
+  edit applies**; an outside edit elsewhere merges, an overlapping one is
+  `merge-conflict` with the disk untouched; a patch behind the app's own visual
+  edit rebases, or conflicts where they overlap; bad witnesses, split
+  characters, spans past the end and unknown checksums refused; a payload past
+  `intentPayloadBytesMax` refused `resource-limit`; Markdown takes patches (CRLF
+  kept) while its gestures stay refused; **every corpus page takes a malformed
+  intermediate and its repair, byte for byte** (a third or more do not parse:
+  the parser is lenient).
+- `test/code-edits.test.js` (8): the `code` queue's transitions; `sendCode`'s
+  outcome table against fakes (the patch is the typing; refusals keep the
+  baseline; the typing merged into a reply that held more, or refused when it
+  touches it; the disk baseline read and re-asked if it moved; the size bound
+  before sending); end to end through main — invalid, repaired, merged, typed
+  on during a save, refused, then kept by "Save this version".
+- Moved, not dropped: `page-save.test.ts` (the overwrite guard and the atomic,
+  mode-keeping write now proven through code patches; the channel is gone),
+  `main-boundaries.test.ts`, `app-bridge.test.js`, `lazy-panels.test.js` (the
+  app's typed code reaches a fake disk as one patch, exactly the typed text).
+- `test/navigator.js` (the parse-error panel: diagnostic, where, Astro's
+  output, the code editor, no textarea, the code panel one click away);
+  `test/code-editor-lifecycle.js` (the caret stays through a merged outside
+  change and moves with one before it).
+- Simulator (`world.ts`): code saves are `apply-code-patch` from
+  `diffCodePatch` over seeded typing — an unfinished tag or expression, a
+  finished element, a line rewritten or deleted; whole-model saves are their
+  own event. Stale code patches are judged by byte origin like Undo: each
+  replaced range must hold the bytes it was typed against. Required tallies
+  added: `code:planned`, `code:invalid`, `code:mapped`, `code:rejected
+  merge-conflict`, `outcome:rejected merge-conflict`. Over the 24 gate seeds:
+  428 code saves: 126 planned on unchanged bytes, 68 mapped through other
+  writes (each judged on its own bytes), 186 refused `merge-conflict`, 101
+  malformed intermediates written (candidates that do not parse), 36 slidable,
+  10 unjudged, 0 wrong sites; visual intents against a file left broken were
+  refused `source-invalid` 147 times.
+
+Deviations, with reasons:
+- Code patches apply to Markdown and MDX pages (plan §6 scoped steps 1–8 to
+  `.astro`): a patch is bytes, not nodes, and the raw path it retires wrote
+  every page type. Their gestures still wait for step 10.
+- Requests queued before typing starts are dropped (their undo steps fall back
+  to snapshots): the text typed into does not hold them, and the whole-model
+  save that carried typed code before dropped them the same way.
+- The reason for a code patch whose bytes the host no longer holds is
+  `merge-conflict`, not `anchor-moved`: from the code editor it cannot be
+  merged. `describeRejection('merge-conflict')` now reads "Your code edit
+  overlaps another change to the file, so it was not merged."
+- The renderer computes the diff (it holds the baseline text), and main checks
+  every hunk's witness; the renderer still sends no bytes beyond the patch.
+- "Astro's own error output" is the dev server's log beside the parse error,
+  and Astro's error page on the canvas; Stacki does not parse Astro's errors.
+
+Left open, carried:
+- A visual gesture made after typed code whose save came back holding an
+  outside edit, before that reply is installed, is a whole-model save of a
+  model without the outside edit (its base has advanced past it): the step-6
+  class of "a whole-model save after a mapped reply". Rare; step 9 removes
+  whole-model saves.
+- 64 bytes of hunk context make nearby outside edits conflict (the planner's
+  step-6 trade-off): on a small file, edits within a line or two of each other
+  are refused `merge-conflict` rather than merged.
+- `codeEditVersionRef` still orders parses (step 9 deletes it); the parse
+  result is installed only over the text it parsed.
 
 ### Step 9 — Deletion ⬜
 
@@ -1692,6 +1859,7 @@ stamps a frame reads and the markers a patched rendering may carry.
 | Step 6, inline CSS `d49b426` | 53 | 3 | 21 | 4 | 23 |
 | Step 6, frontmatter `6da4741` | 48 | 2 | 15 | 4 | 23 |
 | Step 7 `a625992` (no gesture moved) | 48 | 2 | 15 | 4 | 23 |
+| Step 8 `720928e` (typed code is a patch) | 48 | 2 | 15 | 4 | 23 |
 
 Mutations: direct node-mutation sites in `src/`; prop-index: prop-index writes;
 `applyEdit(`: the style panel's; replace-source: submission sites in
@@ -2013,6 +2181,32 @@ update on every step):
   - Formatting: new modules through Prettier (`--print-width 100
     --single-quote`, which every file this step touched and that was clean
     before still passes); every added line ≤ 100 columns.
+
+- 2026-09-29, step 8 (PROMPT-8), `979061e`..HEAD on top of `85a6021`:
+  - Commits: `979061e` (the code patch; code-patch rebases only through
+    untouched hunks), `dc8156a` (simulator code saves; the actor refuses a lost
+    target; slidable patches unjudged), `720928e` (the code editor on
+    `page:edit`; `page:writeRaw` retired), then this record.
+  - Each commit gated alone, the later work stashed: `979061e` **155/155 in
+    207.1 s**; `dc8156a` **155/155 in 203.9 s**; `720928e` **155/155 in
+    208.6 s, exit 0** — tsc, eslint 0 errors (115 warnings, the baseline's
+    count), `ratchet-check` 0, `adapter-surface` 48 / 2 / 15 / 4 / 23. The
+    first whole-tree run failed one command (154/155): `lazy-panels` awaited
+    the code panel's `onChange` for the parse, which now follows the text; the
+    handler returns the parse, and the run exposed a real race it fixed — a
+    parse that beat the render was dropped (`parseTypedCode` now decides at
+    install time).
+  - Suites at `720928e`: `test:contracts` 250/250 (with `code-patch.test.ts`
+    9 and `code-editor.test.ts` 9); `test:simulator` 83/83; `test:roundtrip`
+    490 passed, 1 skipped, of 491 (with `code-edits.test.js` 8).
+  - Long run: `STACKI_SIMULATOR_SEEDS=2000 node --test
+    test/simulator/simulator.test.ts` — green in 14 min 8 s, 2/2, exit 0,
+    `wrongSite: 'fail'`. Two earlier long runs failed and are recorded in Step
+    8: seed 139 (an actor assertion outside bytes could reach; now a refusal)
+    and seed 271 (a judge artifact of a slidable code patch; now unjudged).
+  - Formatting: new modules through Prettier (`--single-quote --print-width
+    100 --trailing-comma all`; `es5` commas on `CodeEditor.tsx`, which predates
+    them); every added line ≤ 100 columns.
 
 ## How to work this tracker
 

@@ -278,7 +278,10 @@ step 0's helper.
 3. Plan splices with witnesses.
 4. Verify every witness against current bytes.
 5. Apply splices in memory (descending offset, non-overlapping — asserted).
-6. Re-parse the candidate; assert it parses and the target keeps its expected kind.
+6. Re-parse the candidate; require it to parse (else `source-invalid`) and the target to keep
+   its expected kind (else `unsupported-operation`). Step 8 turned the second from an assertion
+   into a refusal: outside bytes the parser reads leniently can make a correct splice
+   restructure the page around its target (tracker, Step 8).
 7. Take an advisory lock where available; re-read under it; verify checksum and witnesses again.
 8. Write a temp file in the same directory, fsync, rename over the target.
 9. Re-read the target; verify the checksum.
@@ -569,6 +572,18 @@ Ratchet counts only decrease.
    with its reason. Adapter surface unchanged at 48 / 2 / 15 / 4 / 23.
 8. **Code editor on the actor.** Diff-based patches, `parse-error` projections,
    `merge-conflict` surfacing.
+   **Landed 2026-09-29** (tracker, Step 8). The code editor sends the byte diff from the text
+   it read to the text it holds (`shared/code-patch.ts`: every hunk witnessed by the text it
+   replaces, bounded by `intentPayloadBytesMax`, `resource-limit` past it) as a `code-patch`
+   edit request through `page:edit` — the one write path; `page:writeRaw` is retired. The
+   patch may leave the page invalid; the navigator then shows the parse error, the code editor
+   and Astro's output, and comes back when the text parses. A patch stale behind an outside
+   edit maps through it with context or is refused `merge-conflict`; behind the app's own
+   commits it rebases only where no commit touched a hunk. A save that lands while the user
+   kept typing is merged into the typing before the next patch (`mergeTyping`). Decided there:
+   code patches apply to Markdown and MDX pages too (bytes, not nodes); requests queued before
+   typing starts are dropped, as the whole-model save dropped them. Adapter surface unchanged
+   at 48 / 2 / 15 / 4 / 23.
 9. **Deletion.** Compat adapter, `shared/editor-model.ts`, the `WeakMap` acks in
    `src/pagePersistence.ts`, version counters (`changeVersion`, `codeEditVersionRef`), `n<N>` and
    `c<N>` ids, `src/modelAdoption.ts`, `PageSnapshot` and the snapshot branch of `AppHistory`,

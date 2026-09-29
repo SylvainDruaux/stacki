@@ -52,11 +52,12 @@ the boundary. Do not catch that assertion and turn it into an operating result.
 
 ## Page saves
 
-`shared/page-save.ts` is the save contract (plan §11 step 0). `page:read`,
-`page:write` and `page:writeRaw` results carry `checksum`: the SHA-256 of the
-exact bytes read or written, as 64 lowercase hex characters (`Digest` in
-`shared/brand.ts`, built only by `toDigest`). Both write payloads carry
-`baseChecksum`, the checksum the edit was authored against. Main re-reads the
+`shared/page-save.ts` is the save contract (plan §11 step 0). `page:read` and
+`page:write` results carry `checksum`: the SHA-256 of the exact bytes read or
+written, as 64 lowercase hex characters (`Digest` in `shared/brand.ts`, built
+only by `toDigest`). The write payload carries `baseChecksum`, the checksum the
+edit was authored against. (`page:writeRaw`, the code editor's whole-text save,
+was retired at step 8: see Code editor below.) Main re-reads the
 file first and, if it no longer holds those bytes, returns
 `{ ok: false, error: { code: 'conflict', diskChecksum } }` without writing. A
 deleted file is `missing`, never a conflict; `filesystem` and `write-race`
@@ -223,6 +224,26 @@ The renderer's half (`src/pageEdits.ts`, `src/editGestures.ts`) and the gesture
 parity suite (`test/gesture-parity.test.js`) are described in the tracker,
 Step 6.
 
+## Code editor (step 8)
+
+The code editor saves through `page:edit` too: a `code-patch` edit carries the
+byte diff from the text it read (named by `authoredChecksum`) to the text it
+holds, as ascending, disjoint hunks `{ span, expected, text }` of those bytes
+(`shared/code-patch.ts`, `diffCodePatch`; the wire parser in
+`shared/edit-request.ts` checks the shape and bounds). Main checks every hunk
+against the named bytes — inside them, on code-point boundaries, holding
+`expected` — and submits `apply-code-patch`. The patch may leave the page
+invalid (plan §3.6): the reply is then `editable: false`, and visual edits are
+refused `source-invalid` until a later patch makes it parse. Bytes past
+`intentPayloadBytesMax` are refused `resource-limit` (the renderer's diff
+refuses them first); a stale patch maps through an outside edit with context
+or is refused `merge-conflict`, as is one whose bytes the host no longer holds
+or whose witness does not hold; behind the app's own commits it rebases only
+where no commit touched a hunk (`shared/rebase.ts`, `shiftUntouched`). Code
+patches apply to `.md` and `.mdx` pages too. The renderer's side
+(`src/codeEdits.ts`, the `code` queue in `src/pageEdits.ts`) is described in
+the tracker, Step 8.
+
 ## Preview bridge (step 7)
 
 The canvas is the project's own dev server in an iframe. Its source markers
@@ -267,9 +288,8 @@ process and steps each submission to its outcome before returning (main's
 handlers run one at a time; the queue bound still holds). `documentWrites.ts`
 installs the process's host and is the only entry point for writing project
 text: `writeProjectText` (witnessed by the bytes on disk now; a missing file is
-created) and `createProjectText` (never overwrites). `page:write` and
-`page:writeRaw` submit `replace-source` witnessed by the renderer's
-`baseChecksum`; each chunk file has its own actor; `component:editProperties`
+created) and `createProjectText` (never overwrites). `page:write` submits
+`replace-source` witnessed by the renderer's `baseChecksum`; each chunk file has its own actor; `component:editProperties`
 leases its files' actors in sorted canonical order and witnesses each by its
 `before` checksum, with the checked rollback as intents too.
 `documentDisk.ts` is the real disk: bounded reads, a lock file beside the
