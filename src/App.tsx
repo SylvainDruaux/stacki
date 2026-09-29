@@ -61,6 +61,7 @@ import {
   type PageSaver,
   type PageWriteOutcome,
 } from './pagePersistence.js';
+import { createCoalescedRun } from './coalescedRun';
 import {
   EditDrafts,
   nodeRefIn,
@@ -191,7 +192,7 @@ import {
   type ProjectIdentity,
   type RightTab,
   type RightTabIndicator,
-  type ScanRequest,
+  type ProjectScans,
   type ToastKind,
   type ToastMessage,
   type TrailingSlash,
@@ -976,49 +977,36 @@ export default function App() {
   // Project lifecycle
   // ----------------------------------------------------------------
 
-  const scanRequestRef = useRef<ScanRequest | null>(null);
-  const rescan = useCallback(async (projectPath: string): Promise<ScanResult> => {
-    // The bridge parses the payload against the scan contract before any of
-    // this code sees it.
-    let request = { projectPath, promise: scanProject(projectPath), applied: false };
-    scanRequestRef.current = request;
-    let chain = 0;
-    while (true) {
-      chain += 1;
-      // Each continue requires a strictly newer request for the same project;
-      // a live cap hit means the chain stopped converging — a bug, not load.
-      if (chain > LIMITS.rescanChainMax) {
-        throw new Error(`rescan chain exceeded ${LIMITS.rescanChainMax} hops for ${projectPath}`);
-      }
-      let result: ScanResult | undefined;
-      let failure: unknown;
-      try {
-        result = await request.promise;
-      } catch (err) {
-        failure = err;
-      }
-      const latest = scanRequestRef.current;
-      // Mutations and watcher events can scan together. Older callers need
-      // the latest snapshot too, especially before deciding a file was deleted.
-      if (latest !== request && latest?.projectPath === projectPath) {
-        request = latest;
-        continue;
-      }
-      if (failure !== undefined) {throw failure;}
-      if (!result) {
-        throw new Error('Project scan completed without a result');
-      }
-      if (latest === request && !request.applied) {
-        request.applied = true;
-        setScan(result);
-        if (result.trailingSlash) {setTrailingSlash(parseTrailingSlash(result.trailingSlash));}
-        const appliedRequest = request;
-        readProjectClasses(projectPath).then((classes) => {
-          if (scanRequestRef.current === appliedRequest) {setProjectClasses(classes || []);}
-        }).catch(() => {});
-      }
-      return result;
+  // One scan in flight per project and at most one waiting (src/coalescedRun.ts):
+  // mutations and watcher events that ask together share the scan after them,
+  // so every caller — above all one deciding a file was deleted — sees a scan
+  // that began after it asked. A scan is applied only when nothing newer waits
+  // behind it, and never for a project closed since.
+  const projectScansRef = useRef<ProjectScans | null>(null);
+  const rescan = useCallback((projectPath: string): Promise<ScanResult> => {
+    let scans = projectScansRef.current;
+    if (scans?.projectPath !== projectPath) {
+      const opened: ProjectScans = {
+        projectPath,
+        // The bridge parses the payload against the scan contract before any of
+        // this code sees it.
+        scans: createCoalescedRun(async () => {
+          const result = await scanProject(projectPath);
+          if (projectScansRef.current === opened && !opened.scans.superseded()) {
+            setScan(result);
+            if (result.trailingSlash) {setTrailingSlash(parseTrailingSlash(result.trailingSlash));}
+            readProjectClasses(projectPath).then((classes) => {
+              if (projectScansRef.current === opened) {setProjectClasses(classes || []);}
+            }).catch(() => {});
+          }
+          return result;
+        }),
+      };
+      scans = opened;
+      projectScansRef.current = opened;
     }
+    assert(scans.projectPath === projectPath, 'A rescan asks its own project');
+    return scans.scans.request();
   }, []);
 
   const startPreview = useCallback(

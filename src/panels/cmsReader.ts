@@ -5,7 +5,7 @@ import type { createCmsWriter } from './cmsWriter';
 import { collectionOf } from '../cmsSchema';
 import { readCms, readCmsMeta } from '../cmsBridge';
 import { assert } from '../../shared/assert';
-import { LIMITS } from '../../shared/limits';
+import { createCoalescedRun } from '../coalescedRun';
 
 export interface CmsSnapshot {
   readonly collection: Collection;
@@ -19,13 +19,7 @@ interface ReaderOptions {
   readonly publish: (result: Result<CmsSnapshot, string>) => void;
   readonly report: (message: string) => void;
 }
-type ReadState =
-  | { readonly kind: 'idle' | 'disposed' }
-  | {
-      readonly kind: 'reading';
-      readonly promise: Promise<void>;
-      pending: boolean;
-    };
+type ReadState = { readonly kind: 'open' | 'disposed' };
 
 export function createCmsReader(options: ReaderOptions) {
   return new CmsReader(options);
@@ -36,22 +30,19 @@ export function cmsCollection(rel: string, data: unknown, error?: string): Colle
   return error === undefined ? collectionOf({ ...file, data }) : collectionOf({ ...file, error });
 }
 
-// One active read and one pending refresh bound watcher bursts. The writer's
+// One active read and one pending refresh bound watcher bursts
+// (src/coalescedRun.ts: a burst costs at most two reads). The writer's
 // revision prevents a read that started before an edit from replacing that edit.
 class CmsReader {
-  private state: ReadState = { kind: 'idle' };
+  private state: ReadState = { kind: 'open' };
+  private readonly reads = createCoalescedRun(() => this.flushThenRead());
   constructor(private readonly options: ReaderOptions) {}
   refresh(): Promise<void> {
     if (this.state.kind === 'disposed') {
       return Promise.resolve();
     }
-    if (this.state.kind === 'reading') {
-      this.state.pending = true;
-      return this.state.promise;
-    }
-    const promise = Promise.resolve().then(() => this.drain());
-    this.state = { kind: 'reading', promise, pending: false };
-    return promise;
+    assert(this.state.kind === 'open', 'CMS read: an open reader reads');
+    return this.reads.request();
   }
   dispose(): void {
     this.state = { kind: 'disposed' };
@@ -59,37 +50,19 @@ class CmsReader {
   private disposed(): boolean {
     return this.state.kind === 'disposed';
   }
-  private async drain(): Promise<void> {
-    for (let iteration = 0; iteration < LIMITS.rescanChainMax; iteration++) {
-      if (this.disposed()) {
-        return;
-      }
-      assert(this.state.kind === 'reading', 'CMS read: drain requires a request');
-      this.state.pending = false;
-      if (!(await this.options.writer.flush())) {
-        this.state = { kind: 'idle' };
-        return;
-      }
-      if (this.disposed()) {
-        return;
-      }
-      await this.read();
-      if (this.disposed()) {
-        return;
-      }
-      assert(this.state.kind === 'reading', 'CMS read: request lost during read');
-      if (!this.state.pending) {
-        this.state = { kind: 'idle' };
-        return;
-      }
+  // One tick: unsaved edits reach disk first — a failed save is never replaced
+  // by a reload — then one read.
+  private async flushThenRead(): Promise<void> {
+    if (this.disposed()) {
+      return;
     }
-    // A sustained watcher stream yields after a bounded batch and retains one refresh.
-    this.state = { kind: 'idle' };
-    queueMicrotask(() => {
-      if (!this.disposed()) {
-        void this.refresh();
-      }
-    });
+    if (!(await this.options.writer.flush())) {
+      return;
+    }
+    if (this.disposed()) {
+      return;
+    }
+    await this.read();
   }
   private async read(): Promise<void> {
     const { writer, projectPath, rel, publish, report } = this.options;

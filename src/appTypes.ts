@@ -4,6 +4,7 @@ import type { IpcResults, WireGitInfo, WireInjectedRoute } from '../shared/ipc-r
 import type { ParsePageResult } from '../shared/page-node';
 import type { ScanResult } from '../shared/scan';
 import type { AssetRequest } from './assetPick';
+import type { CoalescedRun } from './coalescedRun';
 import { adoptNodeIds } from './modelAdoption';
 import type { EditsRecord, PageOrigin } from './pageEdits';
 import type { SaveState } from './saveState';
@@ -155,10 +156,10 @@ export type VariablesGroup = VariableSelection;
 export type RightTabIndicator = Pick<CSSProperties, 'left' | 'width'>;
 export type AssetPick = AssetRequest;
 
-export interface ScanRequest {
+/** The open project's scans: one in flight, at most one waiting. */
+export interface ProjectScans {
   readonly projectPath: string;
-  readonly promise: Promise<ScanResult>;
-  applied: boolean;
+  readonly scans: CoalescedRun<ScanResult>;
 }
 
 export interface NodeClipboard {

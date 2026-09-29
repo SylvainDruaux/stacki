@@ -185,25 +185,30 @@ test('out-of-order page reads and external reads cannot replace the current edit
   assert.equal(reads[8].path, pages[1].path);
   await act(async () => { reads[8].resolve(pageState('second-retry')); await tick(); });
   assert.equal(__panels.PropsPanel.node.id, nodeId('second-retry'));
-  // A relevant page change is followed by an unrelated file change while
-  // both scans are pending. The latest scan owns the accumulated paths.
+  // A relevant page change is followed by an unrelated file change while the
+  // first scan is pending. One scan runs at a time (src/coalescedRun.ts): the
+  // later event waits for the scan after it, and that scan owns the
+  // accumulated paths.
   deferScans = true;
   let earlierScanEvent, laterScanEvent;
   await act(async () => { earlierScanEvent = onFsChanged({ files: [pages[1].path] }); await tick(); });
   await act(async () => { laterScanEvent = onFsChanged({ files: ['/project/src/components/New.astro'] }); await tick(); });
-  assert.equal(scans.length, 2);
-  const latestScan = { ...scan, layouts: [{ name: 'NewLayout', path: '/project/src/layouts/NewLayout.astro', folder: 'layouts' }] };
-  await act(async () => { scans[1].resolve(latestScan); await tick(); });
-  assert.equal(reads[9].path, pages[1].path, 'the unrelated later event keeps the earlier page change');
-  await act(async () => { reads[9].resolve(pageState('after-newest-scan')); await laterScanEvent; await tick(); });
-  assert.equal(__panels.PropsPanel.node.id, nodeId('second-retry'));
-  // The earlier snapshot says the page was deleted. It must neither replace
-  // the panel lists nor clear the recreated page the newer scan already read.
+  assert.equal(scans.length, 1, 'the later event waits behind the scan in flight');
+  // The earlier snapshot says the page was deleted. A newer scan waits behind
+  // it, so it must neither replace the panel lists nor clear the page.
+  const layoutsBefore = __panels.StructurePanel.layouts;
   await act(async () => {
     scans[0].resolve({ ...scan, pages: pages.filter((page) => page.path !== pages[1].path) });
     await earlierScanEvent;
     await tick();
   });
+  assert.equal(__panels.StructurePanel.currentPage.path, pages[1].path);
+  assert.equal(__panels.StructurePanel.layouts, layoutsBefore, 'a superseded scan is never applied');
+  assert.equal(scans.length, 2, 'the waiting scan starts once the first ends');
+  const latestScan = { ...scan, layouts: [{ name: 'NewLayout', path: '/project/src/layouts/NewLayout.astro', folder: 'layouts' }] };
+  await act(async () => { scans[1].resolve(latestScan); await tick(); });
+  assert.equal(reads[9].path, pages[1].path, 'the unrelated later event keeps the earlier page change');
+  await act(async () => { reads[9].resolve(pageState('after-newest-scan')); await laterScanEvent; await tick(); });
   assert.equal(__panels.StructurePanel.currentPage.path, pages[1].path);
   assert.equal(__panels.PropsPanel.node.id, nodeId('second-retry'));
   assert.deepEqual(__panels.StructurePanel.layouts, latestScan.layouts);

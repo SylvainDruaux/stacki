@@ -3,7 +3,7 @@ import { reassemble } from '../cmsSchema';
 import { writeCms } from '../cmsBridge';
 import { assert } from '../../shared/assert';
 import { BOUNDARY_LIMITS } from '../../shared/boundary';
-import { LIMITS } from '../../shared/limits';
+import { createCoalescedRun } from '../coalescedRun';
 
 export interface CmsUndo {
   readonly label: string;
@@ -26,14 +26,15 @@ type Snapshot =
       readonly collection: Collection;
       readonly data: unknown;
     };
+/** What the next write puts on disk: the panel's items, reassembled into the
+ * file's shape, or a whole value an undo restores. */
+type QueuedWrite =
+  | { readonly kind: 'items'; readonly items: readonly unknown[] }
+  | { readonly kind: 'data'; readonly data: unknown };
 type WriteState =
   | { readonly kind: 'idle' }
-  | { readonly kind: 'queued'; readonly items: readonly unknown[] }
-  | {
-      readonly kind: 'writing';
-      readonly promise: Promise<boolean>;
-      pending: readonly unknown[] | undefined;
-    };
+  | { readonly kind: 'queued'; readonly write: QueuedWrite }
+  | { readonly kind: 'writing'; pending: QueuedWrite | undefined };
 const SAVE_DELAY_MS = 400;
 
 export function createCmsWriter(options: WriterOptions) {
@@ -41,12 +42,16 @@ export function createCmsWriter(options: WriterOptions) {
 }
 
 // One writer belongs to one file. Mutation stays private here. A burst replaces
-// one queued snapshot; serialized writes cannot overwrite a newer edit on disk.
+// one queued write; writes run one at a time (src/coalescedRun.ts), so a write
+// can never overwrite a newer edit on disk, and a flush is answered by a write
+// that began after it was asked — every edit queued before it is on disk, or a
+// write failed and kept it queued.
 class CmsWriter {
   private snapshot: Snapshot = { kind: 'empty' };
   private state: WriteState = { kind: 'idle' };
   private timer: ReturnType<typeof setTimeout> | undefined;
   private editRevision = 0;
+  private readonly writes = createCoalescedRun(() => this.writeQueued());
   constructor(private readonly options: WriterOptions) {}
 
   accept(collection: Collection, data: unknown): void {
@@ -62,11 +67,7 @@ class CmsWriter {
     assert(items.length <= BOUNDARY_LIMITS.itemsMax, 'CMS edit: item limit exceeded');
     this.editRevision++;
     assert(Number.isSafeInteger(this.editRevision), 'CMS edit: revision limit exceeded');
-    if (this.state.kind === 'writing') {
-      this.state.pending = items;
-    } else {
-      this.state = { kind: 'queued', items };
-    }
+    this.enqueue({ kind: 'items', items });
     clearTimeout(this.timer);
     this.timer = setTimeout(() => {
       void this.flush();
@@ -78,38 +79,44 @@ class CmsWriter {
     if (this.state.kind === 'idle') {
       return Promise.resolve(true);
     }
-    if (this.state.kind === 'writing') {
-      return this.state.promise;
-    }
-    const items = this.state.items;
-    const promise = Promise.resolve().then(() => this.drain(items));
-    this.state = { kind: 'writing', promise, pending: undefined };
-    return promise;
+    return this.writes.request();
   }
-  private async drain(initial: readonly unknown[]): Promise<boolean> {
-    let items = initial;
-    for (let iteration = 0; iteration < LIMITS.saveDrainMax; iteration++) {
-      assert(this.snapshot.kind === 'ready', 'CMS save: a loaded snapshot is required');
-      const before = this.snapshot.data;
-      const after = reassemble(this.snapshot.collection, items);
-      const result = await writeCms(this.options.projectPath, this.options.rel, after);
-      assert(this.state.kind === 'writing', 'CMS save: active write lost its state');
-      if (!result.ok) {
-        this.state = { kind: 'queued', items: this.state.pending ?? items };
-        this.report(result.error);
-        return false;
-      }
-      this.snapshot = { ...this.snapshot, data: after };
+  // The newest write replaces whatever waits: each is the file's whole content.
+  private enqueue(write: QueuedWrite): void {
+    if (this.state.kind === 'writing') {
+      this.state.pending = write;
+    } else {
+      this.state = { kind: 'queued', write };
+    }
+  }
+  // One tick of the write slot: what is queued now, once. Edits made during it
+  // wait as `pending` for the next tick, which their own flush requests.
+  private async writeQueued(): Promise<boolean> {
+    if (this.state.kind === 'idle') {
+      return true;
+    }
+    assert(this.state.kind === 'queued', 'CMS save: writes run one at a time');
+    assert(this.snapshot.kind === 'ready', 'CMS save: a loaded snapshot is required');
+    const write = this.state.write;
+    const before = this.snapshot.data;
+    const after =
+      write.kind === 'items' ? reassemble(this.snapshot.collection, write.items) : write.data;
+    this.state = { kind: 'writing', pending: undefined };
+    const result = await writeCms(this.options.projectPath, this.options.rel, after);
+    assert(this.state.kind === 'writing', 'CMS save: active write lost its state');
+    const pending = this.state.pending;
+    if (!result.ok) {
+      this.state = { kind: 'queued', write: pending ?? write };
+      this.report(result.error);
+      return false;
+    }
+    this.state = pending === undefined ? { kind: 'idle' } : { kind: 'queued', write: pending };
+    this.snapshot = { ...this.snapshot, data: after };
+    if (write.kind === 'items') {
       this.record(before, after);
       this.options.saved();
-      if (this.state.pending === undefined) {
-        this.state = { kind: 'idle' };
-        return true;
-      }
-      items = this.state.pending;
-      this.state.pending = undefined;
     }
-    assert(false, 'CMS save: drain limit exceeded');
+    return true;
   }
   private record(before: unknown, after: unknown): void {
     this.options.record({
@@ -119,39 +126,19 @@ class CmsWriter {
       redo: () => this.restore(after),
     });
   }
+  // Undo shares the write slot with edits. The edits made before it reach disk
+  // first; the restored value then replaces anything queued since, which it
+  // would have overwritten on disk anyway.
   private async restore(value: unknown): Promise<void> {
-    // Undo shares the write slot with edits. An edit arriving during a restore
-    // becomes the next snapshot, rather than racing another disk write.
-    for (let attempt = 0; attempt < LIMITS.saveDrainMax; attempt++) {
-      if (!(await this.flush())) {
-        return;
-      }
-      if (this.state.kind !== 'idle') {
-        continue;
-      }
-      const promise = Promise.resolve().then(() => this.restoreSnapshot(value));
-      this.state = { kind: 'writing', promise, pending: undefined };
-      if (!(await promise)) {
-        return;
-      }
-      await this.options.refresh();
-      this.options.saved();
+    if (!(await this.flush())) {
       return;
     }
-    assert(false, 'CMS restore: drain limit exceeded');
-  }
-  private async restoreSnapshot(value: unknown): Promise<boolean> {
-    const result = await writeCms(this.options.projectPath, this.options.rel, value);
-    assert(this.state.kind === 'writing', 'CMS restore: active write lost its state');
-    const pending = this.state.pending;
-    this.state = pending === undefined ? { kind: 'idle' } : { kind: 'queued', items: pending };
-    if (!result.ok) {
-      this.report(result.error);
-      return false;
+    this.enqueue({ kind: 'data', data: value });
+    if (!(await this.flush())) {
+      return;
     }
-    assert(this.snapshot.kind === 'ready', 'CMS restore: loaded snapshot is required');
-    this.snapshot = { ...this.snapshot, data: value };
-    return this.flush();
+    await this.options.refresh();
+    this.options.saved();
   }
   private report(error: string): void {
     // A collection deliberately deleted during a pending edit needs no toast.

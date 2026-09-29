@@ -41,7 +41,11 @@ test('CMS writes serialize, coalesce pending snapshots, and record exact inverse
   await tick();
   state.writer.queue([{ title: 'Discarded intermediate' }]);
   state.writer.queue(last);
-  assert.equal(state.writer.flush(), pending);
+  // A flush asked during a write is answered by the one write after it, which
+  // every flush asked meanwhile shares (src/coalescedRun.ts).
+  const follow = state.writer.flush();
+  assert.notEqual(follow, pending);
+  assert.equal(state.writer.flush(), follow);
   assert.equal(writes.length, 1);
   assert.throws(
     () => state.writer.accept(cmsCollection('data.json', []), []),
@@ -51,8 +55,9 @@ test('CMS writes serialize, coalesce pending snapshots, and record exact inverse
   await tick();
   assert.equal(writes.length, 2);
   assert.deepEqual(writes[1].payload.data, last);
-  writes[1].resolve({ ok: true });
   assert.equal(await pending, true);
+  writes[1].resolve({ ok: true });
+  assert.equal(await follow, true);
   assert.equal(state.saves(), 2);
   assert.equal(state.records.length, 2);
   assert.equal(state.records[0].coalesceKey, 'cms:data.json');
@@ -152,13 +157,16 @@ test('read bursts coalesce and stale reads cannot replace an edit', async () => 
     publish: (result) => published.push(result),
     report: (error) => state.errors.push(error),
   });
-  const pending = reader.refresh();
+  const first = reader.refresh();
   await tick();
+  // A burst during a read shares the one read after it: two reads in all.
+  const pending = reader.refresh();
   for (let index = 0; index < 50; index++) {
     assert.equal(reader.refresh(), pending);
   }
   assert.equal(reads.length, 1);
   reads[0]({ data: original });
+  await first;
   await tick();
   assert.equal(reads.length, 2);
   state.writer.queue([{ title: 'Locally changed' }]);
