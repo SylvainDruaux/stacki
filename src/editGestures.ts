@@ -1,10 +1,11 @@
-// Gestures in their intent form (plan §11 step 6, the compat adapter): each
-// is the edit requests it becomes against the page's origin, and its effect
-// on the shown model. The effect builds a new model and never edits one in
-// place — the old model is the undo snapshot and, until the page is clean
-// again, the origin's lineage — so the adapter-surface ratchet counts none of
-// it. Gestures join in the §11.6 order; one without an intent form yet keeps
-// saving the whole model (App.tsx, mutateModel).
+// Gestures in their intent form (plan §11 step 6; every .astro gesture since
+// step 9): each is the edit requests it becomes against the page's origin,
+// and its effect on the shown model — the prediction the page shows until the
+// reply lands, and whose new nodes pair with the reply's (src/nodeHandles.ts).
+// The effect builds a new model and never edits one in place (the model is
+// readonly, src/pageView.ts). A gesture with no request against the origin is
+// refused up front or, once sent, taken back with a notice — never saved some
+// other way (src/pageSender.ts).
 import { assert } from '../shared/assert';
 import type { EditorModel, EditorNode } from './pageView';
 import type { Edit, NodeRef } from '../shared/edit-request';

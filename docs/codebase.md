@@ -129,26 +129,41 @@ The path from source to canvas, per REFACTOR.md:
 
 ## The write path
 
-Editing is a serialized pipeline with explicit convergence:
+Since editor-core step 9 (`docs/editor-core-tracker.md`), an existing file
+changes only by splices, and the file on disk is the only persisted state:
 
 ```
-edit → mutate tree → debounce 300ms → save queue → write .astro
-                                   ↘ morph preview DOM (no reload)
+gesture → edit requests (page:edit) → main: intent → document actor
+        → splices witnessed by the bytes they replace → atomic write
+        → reply: the page as written + its inverse (Undo)
 ```
 
-- `src/pagePersistence.ts` (`createPageSaver` / `createFileSaver`) debounces,
-  serializes writes per file, and **drains edits made while a write is
-  pending**. A successful write acknowledges its exact state — currently by
-  `WeakMap` object identity (see "live model vs boundary", below); drain
-  loops are capped at `LIMITS.saveDrainMax` (each pass past the cap means
-  edits arrive faster than writes can drain — a bug, not a load).
-- `electron/serialQueue.ts` orders file writes in the main process.
+- `src/editGestures.ts` states each gesture as edit requests against the
+  page's origin (the bytes of the last reply) and predicts its effect on the
+  shown model; the model is readonly (`src/pageView.ts`), so the prediction
+  is a new model. `electron/editRequests.ts` turns a request into an intent
+  against main's own snapshot of those bytes; the planner
+  (`shared/planner.ts`) and the page's actor (`electron/documentActors.ts`)
+  do the rest.
+- `src/pageEdits.ts` holds the open page's queue — gestures, typed code (a
+  byte diff, `shared/code-patch.ts`), or a Markdown page's whole model until
+  step 10 — and `src/pagePersistence.ts` sends it one entry at a time; a flush
+  sends only the entries present when it starts, so there is no drain loop.
+  `src/pageSender.ts` installs each reply: node handles are carried from the
+  origin through the write's own splices (`src/nodeHandles.ts`), so selection
+  survives every edit. A refused save turns the page conflicted; reviewing it
+  in code shows the queued gestures planned as splices and never written
+  (`page:previewEdit`).
+- Undo is the inverse splices a write returned, submitted as a `revert`.
 - The file watcher tells the app's own saves from outside edits by bytes:
   a tick is the app's echo only while the file holds exactly what its
   document actor last wrote (`DocumentActors.echoes`, plan §11.9).
 - `electron/projectWatcher.ts` detects genuine outside edits (AI assistants,
-  editors, git operations) and triggers a rescan; the renderer re-pulls the
-  file, bounded by `LIMITS.rescanChainMax`.
+  editors, git operations) and triggers a rescan; each rescan, panel read and
+  panel write is one run of `src/coalescedRun.ts` (one in flight, one
+  waiting), so a burst costs at most two.
+- Printing a whole file is fenced by lint to new files (`componentFile.ts`)
+  and Markdown's whole save (`eslint.config.mjs`).
 
 ## Data model
 
@@ -161,9 +176,8 @@ now the authoritative description:
   `PageModel` envelope (nodes, imports, layout chain, frontmatter slots), and
   hand-rolled parsers. Invariants the types can't express are asserted:
   unique ids, paired nodes own `children`, `children: null` means
-  self-closing. **Idioms the writers depend on:** `props` is always present
-  on paired nodes (possibly `{}`) because writers mutate it in place; branch
-  and map nodes always carry their children arrays (possibly empty).
+  self-closing. Branch and map nodes always carry their children arrays
+  (possibly empty). Nothing edits a tree in place (editor-core step 9).
 - `shared/prop-schema.ts` — the prop-field model the props panel generates
   from, including `readonly` as a value shape (a `const`-initialized string
   is an exact value, not a default).
@@ -171,8 +185,8 @@ now the authoritative description:
   IPC contract (`IpcContract`, per-channel request/response pairs, the
   `AvbBridge` surface).
 - `shared/limits.ts` — every runtime bound (parser depth/size, component
-  nesting, save drain, rescan chain) in one importable module, enforced at
-  boundaries.
+  nesting, pending intents, retained snapshots) in one importable module,
+  enforced at boundaries.
 - `shared/assert.ts`, `shared/result.ts`, `shared/brand.ts`,
   `shared/record.ts` — the invariant/Result/branding/unknown-narrowing
   primitives.
@@ -250,13 +264,11 @@ pain, in priority order:
 2. **One mutable tree wears two hats.** The live editor model is mutated in
    place (`loopBindings` even rewrites node `kind`s), while the boundary
    contract is `readonly`; saves ack by `WeakMap` identity as a workaround
-   for "which version of the file is this?". **Superseded by
-   `docs/stacki-editor-core-plan.md`** (tracked in
-   `docs/editor-core-tracker.md`): the long-term fix is the editor core —
-   edit intents over expected-bytes witnesses (the file is the only state;
-   identity is a span mapped through a diff at apply time), which removes the
-   ack machinery entirely rather than polishing it. Until that lands,
-   mutating modules convert with minimal-fidelity local mirrors.
+   for "which version of the file is this?". **Resolved by the editor core**
+   (`docs/stacki-editor-core-plan.md`, step 9 in
+   `docs/editor-core-tracker.md`): edit intents over expected-bytes witnesses,
+   the file the only state, identity a span mapped through a diff. The tree is
+   readonly and the ack machinery is deleted.
 3. **The style-panel sections are one abstraction written six times.**
    Layout/Size/Typography/Grid/Gap/Background/Embed co-change at ~1.0 with no
    static link — parallel hand-rolled field rows over `css.ts` (the clone

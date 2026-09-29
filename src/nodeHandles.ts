@@ -170,11 +170,14 @@ interface Entry {
 
 type SpanMap = (span: ByteSpan) => ByteSpan | undefined;
 
+/** Whose text a node's ranges index: this page's, or — inside a chunk group —
+ * another file's, which no span of this page can reach. */
+type RangeHome = 'page' | 'chunk';
+
 interface Ordered {
   readonly node: PageNode;
   readonly key: string;
-  /** False inside a chunk group: its ranges are another file's. */
-  readonly own: boolean;
+  readonly home: RangeHome;
 }
 
 // Every node in document order, with its byte span.
@@ -186,14 +189,14 @@ function entriesOf(parsed: ParsedText): readonly Entry[] {
 function inOrder(model: PageModel): readonly Ordered[] {
   const found: Ordered[] = [];
   const pending: Ordered[] = [];
-  const push = (list: readonly PageNode[], prefix: string, own: boolean): void => {
+  const push = (list: readonly PageNode[], prefix: string, home: RangeHome): void => {
     for (let index = list.length - 1; index >= 0; index--) {
       const node = list[index];
       assert(node !== undefined, 'A listed node exists');
-      pending.push({ node, key: prefix === '' ? String(index) : `${prefix}.${index}`, own });
+      pending.push({ node, key: prefix === '' ? String(index) : `${prefix}.${index}`, home });
     }
   };
-  push(model.nodes, '', true);
+  push(model.nodes, '', 'page');
   while (pending.length > 0) {
     assert(found.length < LIMITS.treeNodesMax, 'A tree stays inside its node bound');
     const entry = pending.pop();
@@ -201,7 +204,8 @@ function inOrder(model: PageModel): readonly Ordered[] {
     found.push(entry);
     const node = entry.node;
     if ('children' in node && Array.isArray(node.children)) {
-      push(node.children, entry.key, entry.own && node.kind !== 'chunk-group');
+      const home = node.kind === 'chunk-group' ? 'chunk' : entry.home;
+      push(node.children, entry.key, home);
     }
   }
   return found;
@@ -210,8 +214,8 @@ function inOrder(model: PageModel): readonly Ordered[] {
 // UTF-16 ranges to bytes in one ascending pass over the text.
 function withByteSpans(source: string, found: readonly Ordered[]): readonly Entry[] {
   const offsets = new Set<number>();
-  for (const { node, own } of found) {
-    if (own && node.start !== undefined && node.end !== undefined) {
+  for (const { node, home } of found) {
+    if (home === 'page' && node.start !== undefined && node.end !== undefined) {
       offsets.add(node.start);
       offsets.add(node.end);
     }
@@ -219,8 +223,8 @@ function withByteSpans(source: string, found: readonly Ordered[]): readonly Entr
   const ascending = [...offsets].sort((left, right) => left - right);
   const converted = utf16ToByteOffsets(source, ascending.map(toUtf16Offset));
   const bytes = new Map(ascending.map((offset, index) => [offset, converted[index]]));
-  return found.map(({ node, key, own }) => {
-    if (!own || node.start === undefined || node.end === undefined) {
+  return found.map(({ node, key, home }) => {
+    if (home === 'chunk' || node.start === undefined || node.end === undefined) {
       return { node, key, span: undefined };
     }
     const start = bytes.get(node.start);

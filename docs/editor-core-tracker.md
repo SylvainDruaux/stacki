@@ -43,7 +43,12 @@ lands it.
   write path (`page:writeRaw` is retired); invalid intermediates are written
   and the navigator shows the parse error with the code editor until the text
   parses; overlapping outside edits come back `merge-conflict`, never an
-  overwrite (see Step 8). Steps 9–10 have not started.
+  overwrite (see Step 8). **Step 9 landed (2026-09-29)**: an existing
+  `.astro` file changes only by splices — every gesture is edit requests, the
+  page tree is readonly, undo is inverse splices, node handles are carried by
+  span mapping; `selfWrites`, the rescan chain and drains, `mutateModel`,
+  `PageSnapshot`, `WeakMap` acks, `modelAdoption`, the mutable tree and
+  parse-order ids are deleted (see Step 9). Step 10 has not started.
 - **Step 0 landed (2026-09-28).** The legacy
   write path still serializes whole files (`mutateModel` → `page:write` →
   `serializePage`), but every page write now names the checksum it was
@@ -1509,7 +1514,7 @@ Left open, carried:
 - `codeEditVersionRef` still orders parses (step 9 deletes it); the parse
   result is installed only over the text it parsed.
 
-### Step 9 — Deletion ⬜
+### Step 9 — Deletion ✅
 
 **Deliverables.** Compat adapter, legacy mutable tree
 (`shared/editor-model.ts`), `WeakMap` acks (`src/pagePersistence.ts`),
@@ -1526,6 +1531,128 @@ step 10) — plus three special cases the actor dissolves:
 
 **End state.** Snapshots, projections, intents, splices. The file on disk is
 the only persisted state.
+
+**Landed 2026-09-29** on `refactor/architecture-consolidation`, one commit per
+removal group, each gated alone (Verification record): `81432ef`
+(selfWrites), `c8bf423` (rescan chain and panel drains), `b9f92ec` (the last
+three operations), `fe38bb5` (every `.astro` gesture as edit requests;
+`mutateModel` gone), `126847b` (the queue carries handles; snapshots,
+adoption and page ids go), `b5d2802` (the page tree is readonly), `616b71d`
+(no `.astro` file printed whole; the fence), then this record with the
+forbidden-pattern scan's fixes.
+
+What went, and what replaced it:
+
+- **`electron/selfWrites.ts`** (`81432ef`). `DocumentActors.echoes(file)`: one
+  read, one hash, compared with the checksum the actor last created or
+  committed. No clock, no second map of "what we wrote". Moves, renames and
+  deletes are heard like outside changes; a clean page whose re-read holds the
+  checksum it shows is left alone (Undo keeps its entries).
+- **The rescan chain, the panel drains, `rescanChainMax`** (`c8bf423`).
+  `src/coalescedRun.ts`: one run in flight, at most one waiting; a request is
+  answered by a run that began no earlier than it, so a burst of any size
+  costs at most two runs, and `superseded()` lets a run skip publishing what a
+  newer one replaces. Project rescans, the CMS reader and writer and the
+  CSS-variable refresh all use it.
+- **`mutateModel` and every whole-model `.astro` save** (`b9f92ec`,
+  `fe38bb5`). Three operations cover the gestures that still carried one:
+  `rename-tag`, `rename-attribute`, `rewrite-node` (wire: `replace-node`,
+  where main places the printer's change on the node's own bytes and refuses
+  where the printer's formatting differs at the change); plus `wrap-nodes`,
+  `unwrap-node` (layouts) and `append-body` (an insertion into an empty page
+  body). Fifteen gestures converted; import pruning and attribute renames are
+  pure.
+- **`PageSnapshot`, the snapshot branch of `AppHistory`, `WeakMap` acks,
+  `saveDrainMax`, `src/modelAdoption.ts`, `codeEditVersionRef`, `n<N>` /
+  `c<N>` ids, `page:write` for `.astro`, chunk whole-writes** (`126847b`).
+  The open page's unsaved work is its queue (`src/pageEdits.ts`): gesture,
+  typed-code and (Markdown) model entries, stated at send time against the
+  origin — the bytes of the last reply — and sent one at a time
+  (`src/pagePersistence.ts`); a flush sends only the entries present when it
+  starts, and an entry that is refused, fails or whose transport throws goes
+  back to the head of the queue. `src/pageSender.ts` installs each reply:
+  handles carried from the origin through the write's own splices
+  (`src/nodeHandles.ts`; created nodes pair with the gesture's own prediction,
+  only inside its own inserted ranges; the mapper never guesses), so the
+  selection follows its node by handle and, when the node's own bytes changed,
+  moves to the node at the same place, of the same kind. Undo is inverse
+  splices only (`EditsRecord`: pending / applied / folded / dropped). The
+  parser assigns structural path ids (`n0.2.1`) in a final pass, so a parse is
+  a pure function of its text; renderer-created nodes take `g<32 hex>`, and a
+  node first seen in a snapshot `s<16 hex>.<path>`. Parses of typed code are
+  ordered by identity tokens and `superseded()`, not a counter.
+- **The mutable tree** (`b5d2802`, `616b71d`). `EditorModel` is the parsed
+  `PageModel`, read through a readonly view (`src/pageView.ts`, renderer-only;
+  `shared/editor-model.ts` is deleted). `Mutable<>`, `cloneEditorModel` and its
+  cast are gone; the loop tools (`renamedLoopVar`, `disconnectedLoops`,
+  `strippedBindings`), `withNewIds`, the data-suggest shapes and RichContent's
+  props build values.
+- **Whole-file printing of an `.astro` page** (`616b71d`). The conflict
+  review printed queued gestures from the model and saved that text as a
+  patch; it now plans them as splices of the bytes they were stated on and
+  writes nothing (`page:previewEdit`, `electron/editPreview.ts`,
+  `previewGestures`). `page:serialize` is Markdown-only. The lint fence is
+  split: `serializePage`/`serializeNodes` only in `astroParser.ts`,
+  `componentFile.ts` (new files: an extracted component, a new page),
+  `editRequests.ts` (only what an edit adds) and `markdownParser.ts`;
+  `serializeMarkdownPage` only in `markdownParser.ts` and `main.ts`. `main.ts`
+  can no longer print an `.astro` page.
+
+Forbidden-pattern scan (after the last deletion):
+
+- Mutation of the page model outside the intent pipeline: `scripts/
+  adapter-surface.ts` counts 0 node mutations, 0 prop-index writes, 0
+  `mutateModel(` sites (baselines lowered to 0). The four `applyEdit(` sites
+  are the style panel's CSS-rule edits, not the tree. `rg` for
+  `mutateModel|cloneEditorModel|modelAdoption|selfWrites|saveDrainMax|
+  rescanChainMax|PageSnapshot|changeVersion|codeEditVersionRef` finds only
+  comments giving history.
+- Parse-order ids: nothing keys on `n\d+` (the only `n0` is the parser's
+  pending id, replaced before a tree is returned).
+- Boolean flags encoding state: one found and fixed — the span carrier's
+  "inside a chunk" boolean (also a second meaning of "own") is the union
+  `RangeHome = 'page' | 'chunk'`. The saver's phase, the sender's outcomes and
+  the queue's entries are unions.
+- Version counters: none on the page path. Four counters remain elsewhere,
+  none keyed to page identity: `astroHighlight`'s debounce token, the preview
+  bridge's render sequence, CSS rule ids in the style panel, and
+  `CmsWriter.editRevision` (below).
+
+Deviations, with reasons:
+
+- **The edit-request layer stays as the renderer's intent front end**
+  (`src/editGestures.ts` → `page:edit` → `electron/editRequests.ts`). The
+  renderer names nodes by the path, kind and UTF-16 range of the parse it
+  shows; only main holds the bytes and projection those become. What the plan
+  called the compat adapter — legacy gestures mutating a model saved whole,
+  adopted back by position — is gone.
+- **Chunk (`.html` fragment) content is read-only-opaque on the canvas**: it
+  has no splice target in the page file, and writing chunks whole was a
+  regeneration path.
+- **A gesture the engine cannot plan over unchanged bytes is taken back with
+  a notice** (plan §6: a fallback is visible), never saved some other way.
+- **`replace-source` remains at 22 sites in `electron/`** — component
+  property batches, stylesheets, CMS and asset edits, Markdown — none an
+  `.astro` page edit; step 10 and later retire them.
+- **A scan superseded while it runs is not applied**: the lists show the
+  previous scan until the newer one lands.
+- Channel count 117 → 118 (`page:previewEdit`).
+
+Left open, carried:
+
+- `CmsWriter.editRevision` orders a CMS panel read against that panel's own
+  queued edits. Not node identity, and CMS files are outside the page engine;
+  retiring it means the CMS reader comparing checksums with the writer's
+  last committed bytes.
+- `test:previewrecovery` has a wall-clock case ("again once the quiet spell
+  is over") that failed once under a load average of ~5 during a gate and
+  once in three standalone runs, then passed 10/10; the module
+  (`src/previewRecovery.ts`) is untouched by step 9.
+- `test:selectorwell` has wall-clock cases that fail under load (one gate at
+  a load average of 11): the pre-step-9 commit `e089902` fails the same
+  cases standalone (2 of 5 runs, against 3 of 5 at HEAD), so the flake
+  predates this step.
+- Markdown and MDX: whole-model save, `page:serialize`, `m<N>` ids — step 10.
 
 ### Step 10 — Markdown and MDX on the engine ⬜
 
@@ -1842,7 +1969,12 @@ authored before an outside write can still be mapped). Step 7 added
 `previewManifestFilesMax` (512, files one canvas rendering's manifest names),
 `previewStampPathCharsMax` (1 024) and `previewMorphWorkMax` (4·10⁶ matrix
 cells one canvas patch may spend); `previewMarkersMax` (step 1) now bounds the
-stamps a frame reads and the markers a patched rendering may carry.
+stamps a frame reads and the markers a patched rendering may carry. Step 9
+removed `rescanChainMax` and `saveDrainMax` (256 each): a coalesced run has one
+request in flight and one waiting, and a flush sends only the entries present
+when it starts, so neither loop exists to cap. The page queue stays bounded by
+`intentsPendingMax` (plus one code or model entry), asserted where it is
+flushed.
 
 ## Adapter surface (ratchet, scripted at step 1)
 
@@ -1860,11 +1992,17 @@ stamps a frame reads and the markers a patched rendering may carry.
 | Step 6, frontmatter `6da4741` | 48 | 2 | 15 | 4 | 23 |
 | Step 7 `a625992` (no gesture moved) | 48 | 2 | 15 | 4 | 23 |
 | Step 8 `720928e` (typed code is a patch) | 48 | 2 | 15 | 4 | 23 |
+| Step 9 `fe38bb5` (every gesture an intent) | 18 | 2 | 0 | 4 | 23 |
+| Step 9 `126847b` (queue, handles; `page:write` `.astro` gone) | 18 | 2 | 0 | 4 | 22 |
+| Step 9 `b5d2802` (readonly tree) | 0 | 0 | 0 | 4 | 22 |
+| Step 9 `616b71d` (printing fenced) | 0 | 0 | 0 | 4 | 22 |
 
 Mutations: direct node-mutation sites in `src/`; prop-index: prop-index writes;
 `applyEdit(`: the style panel's; replace-source: submission sites in
 `electron/`. Step 6 says why prop and inline CSS left the surface unchanged.
-`scripts/adapter-surface.ts` holds the last row as its baseline.
+`scripts/adapter-surface.ts` holds the last row as its baseline. At step 9
+the tree became readonly, so no node is edited in place anywhere in `src/`;
+the four `applyEdit(` sites left are the style panel's CSS-rule edits.
 
 `node dist/scripts/adapter-surface.js --files` prints the per-file split
 (step 1: `App.tsx` 58, `loopBindings.ts` 12, `dataSuggest.ts` 6,
@@ -2207,6 +2345,29 @@ update on every step):
   - Formatting: new modules through Prettier (`--single-quote --print-width
     100 --trailing-comma all`; `es5` commas on `CodeEditor.tsx`, which predates
     them); every added line ≤ 100 columns.
+
+- 2026-09-29, step 9 (PROMPT-9), `81432ef`..HEAD on top of `e089902`:
+  - Commits: `81432ef` (selfWrites), `c8bf423` (rescan chain, panel drains),
+    `b9f92ec` (rename-tag, rename-attribute, rewrite-node), `fe38bb5` (every
+    `.astro` gesture as edit requests), `126847b` (queue, handles, inverse-only
+    undo, path ids), `b5d2802` (readonly tree), `616b71d` (previews, printer
+    fence, `shared/editor-model.ts` deleted), then this record with the
+    scan's fixes.
+  - Each gated alone, 154/154, exit 0: tsc, eslint 0 errors (116 warnings,
+    all pre-existing `max-lines-per-function` and hook-dependency warnings;
+    none in a module step 9 created), `ratchet-check` 0, `adapter-surface`
+    0 / 0 / 0 / 4 / 22 at the end. Two runs of the last group failed one
+    command each, both wall-clock suites under load and unrelated to the
+    change (`test:previewrecovery`, `test:selectorwell`; Step 9, left open);
+    the reruns were green.
+  - Suites at the end: `test:contracts` 254/254 (with the `page:previewEdit`
+    contract); `test:simulator` 91/91; `test:roundtrip` 497 passed, 1
+    skipped, of 498 (with `node-handles`, `page-sender`, `coalesced-run`,
+    `step9-gestures`).
+  - Long run: `STACKI_SIMULATOR_SEEDS=2000 node --test
+    test/simulator/simulator.test.ts` — green in 17 min 19 s, 2/2, exit 0.
+  - Formatting: every line step 9 added is ≤ 100 columns (checked by
+    character count over the diff from `e089902`).
 
 ## How to work this tracker
 

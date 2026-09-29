@@ -593,6 +593,17 @@ Ratchet counts only decrease.
    read matches the committed checksum), `saveDrainMax` (the bounded queue replaces drains), and
    `rescanChainMax` (one read plus one parse per tick). End state: snapshots, projections,
    intents, splices.
+   **Landed 2026-09-29** (tracker, Step 9). Every `.astro` gesture is edit requests (three
+   operations added for the last ones: `rename-tag`, `rename-attribute`, `rewrite-node`; plus
+   `wrap-nodes`, `unwrap-node`, `append-body`); the page's queue is sent one entry at a time
+   against the last reply, and handles are carried by span mapping through each write's own
+   splices (`src/nodeHandles.ts`); undo is inverse splices only; the tree is readonly
+   (`src/pageView.ts`); parser ids are structural paths. A conflicted page's review plans its
+   gestures as splices without writing (`page:previewEdit`); the printers are fenced to new
+   files and Markdown. Decided there: the edit-request layer stays as the renderer's intent
+   front end (only main holds the bytes a node reference becomes); chunk content is read-only
+   on the canvas; a gesture the engine cannot plan is taken back with a notice. Adapter surface
+   0 / 0 / 0 / 4 / 22.
 10. **Markdown and MDX on the engine.** The markdown parser (`electron/markdownParser.ts`) gains
    node and attribute spans with the span-integrity property; its gestures move to intents;
    `ReplaceSource` and `serializeMarkdownPage` retire as write paths. Same gate and simulator
