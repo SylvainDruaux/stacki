@@ -49,6 +49,13 @@ const settle = (ms = 20) => new Promise((r) => setTimeout(r, ms));
     // The page gets this from Vite; here there is no socket at all, which is
     // the situation being tested.
     define: { 'import.meta.hot': 'undefined' },
+    // Main prepends the patcher's bounds from shared/limits.ts (step 7).
+    banner: {
+      js: `const AVB_PREVIEW_LIMITS = Object.freeze(${JSON.stringify({
+        previewMarkersMax: require('../dist/shared/limits.js').LIMITS.previewMarkersMax,
+        previewMorphWorkMax: require('../dist/shared/limits.js').LIMITS.previewMorphWorkMax,
+      })});`,
+    },
     logLevel: 'silent',
   });
 

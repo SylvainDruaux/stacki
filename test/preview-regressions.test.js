@@ -7,10 +7,12 @@ const { JSDOM } = require('jsdom');
 const source = fs.readFileSync(path.join(__dirname, '../dist/electron/morphClient.js'), 'utf8');
 const dom = new JSDOM('<!doctype html><html><head></head><body></body></html>');
 const document = dom.window.document;
-const morph = new Function('document', `${source.slice(
+// Main prepends the patcher's bounds from shared/limits.ts (step 7).
+const { LIMITS } = require('../dist/shared/limits.js');
+const morph = new Function('document', 'AVB_PREVIEW_LIMITS', `${source.slice(
   source.indexOf('const isAnchor ='),
   source.indexOf('function fetchDoc')
-)}\nreturn { diffChildren, findLive, patchChildren, addedScripts, runScripts };`)(document);
+)}\nreturn { diffChildren, findLive, patchChildren, addedScripts, runScripts };`)(document, LIMITS);
 
 const tree = (html) => {
   const root = document.createElement('div');

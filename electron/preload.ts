@@ -1664,10 +1664,7 @@ if (!process.isMainFrame) {
       if (p !== lastHoverPath || occurrence !== lastHoverOcc) {
         lastHoverPath = p;
         lastHoverOcc = occurrence;
-        window.parent.postMessage(
-          { type: 'avb:hover-node', path: p, occurrence, token: renderToken },
-          '*'
-        );
+        postLocated('avb:hover-node', { path: p, occurrence });
       }
     });
     document.documentElement.addEventListener('mouseleave', startOutlinesClearHover);
@@ -1685,10 +1682,7 @@ if (!process.isMainFrame) {
         // With the occurrence: a component inside a loop renders once per
         // item, and opening it means the one under the cursor.
         const { path: p, occurrence } = nodeAtEvent(e);
-        window.parent.postMessage(
-          { type: 'avb:open-node', path: p || null, occurrence, token: renderToken },
-          '*'
-        );
+        postLocated('avb:open-node', { path: p || null, occurrence });
       },
       true
     );
@@ -1707,16 +1701,7 @@ if (!process.isMainFrame) {
         // `outside` saying whether it landed on something the open file simply
         // doesn't own — which is what the app backs out of a component on.
         const { path: p, occurrence, outside } = nodeAtEvent(e);
-        window.parent.postMessage(
-          {
-            type: 'avb:click-node',
-            path: p || null,
-            occurrence,
-            outside: !!outside,
-            token: renderToken,
-          },
-          '*'
-        );
+        postLocated('avb:click-node', { path: p || null, occurrence, outside: !!outside });
       },
       true
     );
@@ -1727,11 +1712,14 @@ if (!process.isMainFrame) {
       lastHoverPath = null;
       lastHoverOcc = 0;
       // Clear messages use the same located-message contract as hover hits.
-      window.parent.postMessage(
-        { type: 'avb:hover-node', path: null, occurrence: 0, token: renderToken },
-        '*'
-      );
+      postLocated('avb:hover-node', { path: null, occurrence: 0 });
     }
+  }
+
+  // Every located event names the rendering it landed on (step 7): the app
+  // acts on it only while that rendering is still what the files hold.
+  function postLocated(type: string, located: Record<string, unknown>): void {
+    window.parent.postMessage({ type, ...located, token: renderToken }, '*');
   }
 
   let designMode = false;

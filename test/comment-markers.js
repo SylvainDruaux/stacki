@@ -232,7 +232,7 @@ const marked = (body, frontmatter = 'import Split from "./Split.astro";\nimport 
     check('no cleanup script is injected', !/AVB_CLEANUP/.test(main), 'the cleanup script is still there');
     check(
       'and nothing but the patcher rides along with a page',
-      /return isPage \? marked \+ AVB_MORPH_TAG : marked;/.test(main),
+      /return marked\.page \? marked\.code \+ AVB_MORPH_TAG : marked\.code;/.test(main),
       'something else is appended to the page'
     );
   }

@@ -68,10 +68,13 @@ const FOOTER = `
     );
     const start = source.indexOf('const isAnchor =');
     const end = source.indexOf('// Never looked inside.');
+    // Main prepends the patcher's bounds from shared/limits.ts (step 7).
+    const { LIMITS } = require('../dist/shared/limits.js');
     const syncAnchors = new Function(
       'document',
+      'AVB_PREVIEW_LIMITS',
       `${source.slice(start, end)}\nreturn syncAnchors;`
-    )(dom.window.document);
+    )(dom.window.document, LIMITS);
 
     const server = dom.window.document.createElement('div');
     server.innerHTML = FOOTER;

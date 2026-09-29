@@ -46,14 +46,23 @@ test('canvas hover measures and outlines the active copy, then clears on leave',
       type: 'avb:rects', classes: {}, spacing: {},
       rects: Object.fromEntries(tracked.at(-1).map((nodePath) => [nodePath, boxes])),
     });
-    await send({ type: 'avb:hover-node', path: '1', occurrence: 1 });
+    // The frame announces its rendering first (step 7): hover from any other
+    // rendering is not drawn.
+    const token = 'a'.repeat(64);
+    const hovered = () => tracked.some((paths) => paths.includes('1'));
+    await send({ type: 'avb:hover-node', path: '1', occurrence: 1, token });
+    assert.equal(hovered(), false, 'A hover before the rendering is announced is not drawn');
+    await send({ type: 'avb:render', token, stamps: [] });
+    await send({ type: 'avb:hover-node', path: '1', occurrence: 1, token: 'b'.repeat(64) });
+    assert.equal(hovered(), false, 'A hover from another rendering is not drawn');
+    await send({ type: 'avb:hover-node', path: '1', occurrence: 1, token });
     assert.deepEqual(tracked.at(-1), ['0', '1', '2'], 'Hover joins selection and focus tracking');
     await measure();
     assert.equal(document.querySelectorAll('.node-outline.hover').length, 1);
     assert.equal(document.querySelector('.node-outline.hover').style.top, '90px');
     assert.equal(document.querySelectorAll('.node-outline.sel').length, 2);
     const trackCount = tracked.length;
-    await send({ type: 'avb:hover-node', path: '1', occurrence: 0 });
+    await send({ type: 'avb:hover-node', path: '1', occurrence: 0, token });
     assert.equal(tracked.length, trackCount, 'Moving between copies reuses their measurements');
     assert.equal(document.querySelector('.node-outline.hover').style.top, '30px');
     props.navHoverPath = '3';
@@ -65,9 +74,9 @@ test('canvas hover measures and outlines the active copy, then clears on leave',
     await render();
     assert.deepEqual(tracked.at(-1), ['0', '1', '2'], 'Canvas hover resumes after navigator hover');
     await measure();
-    await send({ type: 'avb:hover-node', path: null, occurrence: 0 }, window);
+    await send({ type: 'avb:hover-node', path: null, occurrence: 0, token }, window);
     assert.equal(document.querySelectorAll('.node-outline.hover').length, 1);
-    await send({ type: 'avb:hover-node', path: null, occurrence: 0 });
+    await send({ type: 'avb:hover-node', path: null, occurrence: 0, token });
     assert.deepEqual(tracked.at(-1), ['0', '2']);
     assert.equal(document.querySelector('.node-outline.hover'), null);
     assert.equal(document.querySelectorAll('.node-outline.sel').length, 2);
@@ -95,6 +104,7 @@ function hoverPreviewProps() {
   return {
     devUrl: 'http://localhost:4321', route: '/', devStatus: 'on', device: 'desktop',
     selPath: '0', navHoverPath: null, focusPath: '2', crumbs: [], onDevice() {},
+    judgeEvent: async () => ({ tag: 'current' }), onStaleEvent() {},
     overlayInfo: () => ({
       label: 'Card', kind: 'element', tag: 'div', nodeKind: 'element',
       astroAsset: false, dynamicTag: false, isLayout: false, bound: false,

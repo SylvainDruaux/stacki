@@ -63,6 +63,7 @@ test('component navigation keeps the real iframe and inspector mounted while loa
     [card.path, pageRead(cardSource)],
   ]);
   const heldReads = new Map();
+  const previewChecks = [];
   const writes = [];
   let writeError = null;
   const bridge = new Proxy({
@@ -86,6 +87,12 @@ test('component navigation keeps the real iframe and inspector mounted while loa
       return { ok: true, ...structuredClone(written) };
     },
     gitInfo: async () => ({ isRepo: false }),
+    // Main's disk check of a canvas rendering (step 7): the files are the ones
+    // this fake holds, so every stamped file is current.
+    checkPreview: async ({ render }) => {
+      previewChecks.push(render);
+      return { tag: 'current' };
+    },
     onCssChanged: () => () => {},
   }, { get: (target, name) => name in target ? target[name] : String(name).startsWith('on') ? () => () => {} : async () => null });
   window.avb = bridge;
@@ -117,10 +124,26 @@ test('component navigation keeps the real iframe and inspector mounted while loa
       assert.equal(frame.src, src, 'component edits keep the same preview page URL');
       assert.equal(document.querySelector('.panel.right'), inspector, 'the inspector stays mounted so the page cannot expand and reflow');
     };
-    const openCard = async () => act(async () => {
-      window.dispatchEvent(new dom.window.MessageEvent('message', { source: frameWindow, data: { type: 'avb:open-node', path: '0.0', occurrence: 0 } }));
+    // The frame announces the rendering it shows — stamped with the page's
+    // bytes as they are now — and the double-click carries its token (step 7).
+    const announce = async () => {
+      const checksum = states.get(page.path).checksum;
+      const canonical = `${checksum} src/pages/index.astro\n`;
+      const token = sha256(canonical);
+      const stamps = [{ file: 'src/pages/index.astro', checksum }];
+      await act(async () => {
+        const data = { type: 'avb:render', token, stamps };
+        window.dispatchEvent(new dom.window.MessageEvent('message', { source: frameWindow, data }));
+        await settle();
+      });
+      return token;
+    };
+    const dblclick = async (token) => act(async () => {
+      const data = { type: 'avb:open-node', path: '0.0', occurrence: 0, token };
+      window.dispatchEvent(new dom.window.MessageEvent('message', { source: frameWindow, data }));
       await settle();
     });
+    const openCard = async () => dblclick(await announce());
     const back = async () => act(async () => {
       document.querySelector('button.comp-back').click();
       await settle();
@@ -131,7 +154,14 @@ test('component navigation keeps the real iframe and inspector mounted while loa
     });
 
     const entering = hold(card.path);
+    // No rendering announced yet: the double-click opens nothing, and main is
+    // never asked.
+    await dblclick(undefined);
+    const backButton = document.querySelector('button.comp-back');
+    assert.equal(backButton, null, 'a tokenless event opens nothing');
+    assert.equal(previewChecks.length, 0);
     await openCard();
+    assert.equal(previewChecks.length, 1, 'main checked the rendering before the card opened');
     unchanged();
     assert.equal(__componentPanels.PropsPanel.filePath, page.path, 'the old file remains paired with its own model while reading');
     await editTitle('page edit during read');
