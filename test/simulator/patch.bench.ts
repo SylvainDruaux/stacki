@@ -21,7 +21,7 @@ import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { writeFileAtomic } from '../../dist/electron/atomicWrite.js';
+import { writeVerified } from './verified-write.entry.ts';
 import { toFilePath, toIntentId } from '../../dist/shared/brand.js';
 import { countOccurrences } from '../../dist/shared/byteSearch.js';
 import { capabilityAcceptsVisualIntent } from '../../dist/shared/capability.js';
@@ -45,7 +45,7 @@ import {
 } from '../../dist/shared/span.js';
 import { Prng } from './prng.ts';
 import { projectBytes, sha256, snapshotOf } from './project.ts';
-import { applySplices, witnessesHold } from './splice.ts';
+import { applySplices, witnessesHold } from '../../dist/shared/splice.js';
 
 // A fixture with no unique element in this many draws fails the bench loudly.
 const UNIQUE_DRAWS_MAX = 500;
@@ -289,7 +289,7 @@ function runPipeline(
   const verify = clock();
   const text = decodeUtf8(candidate.bytes);
   assert.ok(text.ok, 'A candidate is UTF-8');
-  const written = writeFileAtomic(file, text.value);
+  const written = writeVerified(file, text.value);
   assert.ok(written.ok, 'The bench write succeeds');
   const write = clock();
   const total = read + refresh + plan + splice + project + hash + verify + write;

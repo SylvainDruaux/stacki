@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import postcss from 'postcss';
+import { writeProjectText } from './documentWrites.js';
 import type { Declaration, Rule as PostcssRule } from 'postcss';
 
 // Reading a project's CSS custom properties as something an editor can show.
@@ -920,7 +921,7 @@ function setVariable(projectPath: string, { file, valueStart, valueEnd, expect, 
     return { ok: false, stale: true, error: 'This file changed since the panel read it.' };
   }
   const next = text.slice(0, valueStart) + value + text.slice(valueEnd);
-  fs.writeFileSync(abs, next, 'utf8');
+  writeProjectText(abs, next);
   return { ok: true };
 }
 
@@ -958,7 +959,7 @@ function setSectionTitle(projectPath: string, { file, start, end, expect, title 
   if (expect !== undefined && current !== expect) {
     return { ok: false, stale: true, error: 'This file changed since the panel read it.' };
   }
-  fs.writeFileSync(abs, text.slice(0, start) + next + text.slice(end), 'utf8');
+  writeProjectText(abs, text.slice(0, start) + next + text.slice(end));
   return { ok: true };
 }
 
@@ -997,7 +998,7 @@ function removeSection(projectPath: string, { file, start, end, expect }: Sectio
     from = lineStart;
     to = lineEnd === -1 ? text.length : lineEnd + 1;
   }
-  fs.writeFileSync(abs, text.slice(0, from) + text.slice(to), 'utf8');
+  writeProjectText(abs, text.slice(0, from) + text.slice(to));
   return { ok: true };
 }
 
@@ -1077,7 +1078,7 @@ function moveHeading(projectPath: string, { file, selector, start, end, expect, 
     }
   }
   const indent = cut.slice(cut.lastIndexOf('\n', at - 1) + 1, at).match(/^\s*/)?.[0] || '  ';
-  fs.writeFileSync(abs, `${cut.slice(0, at)}${indent}${comment}\n${cut.slice(at)}`, 'utf8');
+  writeProjectText(abs, `${cut.slice(0, at)}${indent}${comment}\n${cut.slice(at)}`);
   return { ok: true };
 }
 
@@ -1139,7 +1140,8 @@ function addSection(projectPath: string, { file, selector, title, before, at }: 
 
   const lineStart = text.lastIndexOf('\n', sane - 1) + 1;
   const indent = text.slice(lineStart, sane).match(/^\s*/)?.[0] ?? '';
-  fs.writeFileSync(abs, `${text.slice(0, lineStart)}${indent}/* ${next} */\n${text.slice(lineStart)}`, 'utf8');
+  const heading = `${indent}/* ${next} */\n`;
+  writeProjectText(abs, `${text.slice(0, lineStart)}${heading}${text.slice(lineStart)}`);
   return { ok: true, title: next };
 }
 
@@ -1230,7 +1232,7 @@ function moveVariable(projectPath: string, { file, selector, name, target, at: l
   if (next === text) {
     return { ok: true, changed: false };
   }
-  fs.writeFileSync(abs, next, 'utf8');
+  writeProjectText(abs, next);
   return { ok: true, changed: true };
 }
 
@@ -1327,7 +1329,7 @@ function moveSection(projectPath: string, { file, selector, names, target }: Mov
   if (next === text) {
     return { ok: true, changed: false };
   }
-  fs.writeFileSync(abs, next, 'utf8');
+  writeProjectText(abs, next);
   return { ok: true, changed: true };
 }
 
@@ -1384,7 +1386,7 @@ function addVariable(projectPath: string, { file, selector, name, value = 'unset
     at = text.indexOf('{', openOffset) + 2;
   }
 
-  fs.writeFileSync(abs, text.slice(0, at) + line + text.slice(at), 'utf8');
+  writeProjectText(abs, text.slice(0, at) + line + text.slice(at));
   return { ok: true, name };
 }
 
@@ -1467,14 +1469,13 @@ interface Rename {
  * Renames custom properties across the project — declarations and references
  * alike, in one pass.
  *
- * `renames` is [{ from, to }]; `markWrite` is called with each file about to be
- * written. Everything is checked before anything is written:
+ * `renames` is [{ from, to }]. Everything is checked before anything is written:
  * a rename that would land on a name already in use, or that is not a name at
  * all, takes the whole batch down rather than leaving a group half renamed.
  */
 function renameVariables(
   projectPath: string,
-  { renames, markWrite }: { readonly renames?: readonly Rename[]; readonly markWrite?: (abs: string) => void },
+  { renames }: { readonly renames?: readonly Rename[] },
 ): { ok: boolean; files?: number; occurrences?: number; error?: string } {
   const list = (renames || []).filter((r) => r && r.from !== r.to);
   if (!list.length) {
@@ -1557,12 +1558,11 @@ function renameVariables(
   }
 
   // Written only once every file has been read and rewritten in memory: a
-  // half-applied rename is worse than a refused one. Each file is announced as
-  // the app's own write just before it happens, so the watcher does not read it
-  // back as somebody editing the project from outside.
+  // half-applied rename is worse than a refused one. Each write goes through
+  // the file's document actor (documentWrites.ts), which also announces it as
+  // the app's own, so the watcher does not read it back as an outside edit.
   for (const [abs, next] of writes) {
-    markWrite?.(abs);
-    fs.writeFileSync(abs, next, 'utf8');
+    writeProjectText(abs, next);
   }
   return { ok: true, files: writes.length, occurrences };
 }

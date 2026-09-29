@@ -39,7 +39,7 @@ import { patchCounts } from './candidate.ts';
 import { Prng } from './prng.ts';
 import { loadSimulationFixtures } from './fixtures.entry.ts';
 import { projectBytes } from './project.ts';
-import { applySplices } from './splice.ts';
+import { applySplices } from '../../dist/shared/splice.js';
 import { runSimulation } from './world.ts';
 
 const DIRECTORIES = ['test/corpus', 'test/fixtures/round-trip', 'test/fixtures/editor-core'];

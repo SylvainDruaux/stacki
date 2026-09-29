@@ -18,12 +18,17 @@ export type WirePageRead =
 export type WirePageDiskRead = WirePageRead & { readonly checksum: string };
 
 /** Why main refused a page write. Every variant left the page file untouched,
- * except `write-race`, where another writer replaced it after Stacki's write. */
+ * except `write-race`, where another writer replaced it after Stacki's write,
+ * and `uncertain`, where the write may have landed and a comparison could not
+ * tell (plan §3.5). `backpressured` means the page's actor queue was full: the
+ * edit was never accepted and stays unsaved (plan §7). */
 export type WirePageWriteError =
   | { readonly code: 'conflict'; readonly message: string; readonly diskChecksum: string }
   | { readonly code: 'missing'; readonly message: string }
   | { readonly code: 'filesystem'; readonly message: string }
-  | { readonly code: 'write-race'; readonly message: string };
+  | { readonly code: 'write-race'; readonly message: string }
+  | { readonly code: 'uncertain'; readonly message: string }
+  | { readonly code: 'backpressured'; readonly message: string };
 
 export type WirePageWrite =
   | ({ readonly ok: true } & WirePageDiskRead)

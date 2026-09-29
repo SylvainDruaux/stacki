@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 
 import { toRecord, toArray } from '../shared/record.js';
+import { writeProjectText } from './documentWrites.js';
 import * as frontmatter from './formats/frontmatter.js';
 import * as jsonFormat from './formats/json.js';
 import * as yamlFormat from './formats/yaml.js';
@@ -419,7 +420,7 @@ function writeEntry(
   if (next === text) {
     return { ok: true, changed: false };
   }
-  fs.writeFileSync(abs, next, 'utf8');
+  writeProjectText(abs, next);
   return { ok: true, changed: true };
 }
 

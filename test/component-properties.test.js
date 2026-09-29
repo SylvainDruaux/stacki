@@ -19,6 +19,37 @@ const {
   updateComponentProperties,
 } = require('../dist/electron/componentProperties');
 const { applySourceEdits } = require('../dist/electron/propertySyntax');
+const { documentHost } = require('../dist/electron/documentWrites');
+
+// Every batch write goes through the document actors (plan §3.3, step 5).
+const writer = { documents: documentHost().documents, noteWrite: () => {} };
+
+// Fail the `failAt`-th replace of a batch at its rename — the moment a save
+// either lands or does not — calling `before(targets)` first with the targets
+// replaced so far. Only the write protocol's own temporary files count.
+function failNthReplace(failAt, message, run, before = () => {}) {
+  const rename = fs.renameSync;
+  const targets = [];
+  let attempts = 0;
+  fs.renameSync = (from, to) => {
+    if (path.basename(from).startsWith('.stacki-write-')) {
+      attempts += 1;
+      if (attempts === failAt) {
+        before(targets);
+        throw new Error(message);
+      }
+      rename(from, to);
+      targets.push(to);
+      return undefined;
+    }
+    return rename(from, to);
+  };
+  try {
+    run(targets);
+  } finally {
+    fs.renameSync = rename;
+  }
+}
 const {
   parseComponentProperties,
   parsePropertyChange,
@@ -277,7 +308,7 @@ test('project-wide rename follows import aliases and does not touch unrelated co
         source,
         change: save({ name: 'heading' }),
       },
-      () => {}
+      writer
     );
     assert.equal(value(result).properties[0].name, 'heading');
     const content = fs.readFileSync(page, 'utf8');
@@ -315,7 +346,7 @@ test('project-wide option rename updates every static instance value and the def
           optionRenames: [{ from: "'solid'", to: "'filled'" }],
         },
       },
-      () => {}
+      writer
     );
     assert.equal(
       value(result).properties.find((field) => field.name === 'variant').type,
@@ -337,16 +368,7 @@ test('failed option rename writes restore the component and its instances', () =
     const variant = readComponentProperties(source).properties.find(
       (field) => field.name === 'variant'
     );
-    const write = fs.writeFileSync;
-    let writes = 0;
-    fs.writeFileSync = (...argumentsList) => {
-      writes += 1;
-      if (writes === 2) {
-        throw new Error('Simulated option write failure');
-      }
-      return write(...argumentsList);
-    };
-    try {
+    failNthReplace(2, 'Simulated option write failure', () => {
       const result = updateComponentProperties(
         {
           projectPath: root,
@@ -363,15 +385,13 @@ test('failed option rename writes restore the component and its instances', () =
             optionRenames: [{ from: "'solid'", to: "'filled'" }],
           },
         },
-        () => {}
+        writer
       );
       assert.equal(result.ok, false);
       assert.match(result.error.message, /restored/);
       assert.equal(fs.readFileSync(component, 'utf8'), source);
       assert.equal(fs.readFileSync(page, 'utf8'), beforePage);
-    } finally {
-      fs.writeFileSync = write;
-    }
+    });
   });
 });
 
@@ -385,11 +405,11 @@ test('source conflicts and unresolved spreads leave every project file untouched
       change: save({ name: 'heading' }),
     };
     assert.equal(
-      updateComponentProperties({ ...request, source: source + '\n' }, () => {}).ok,
+      updateComponentProperties({ ...request, source: source + '\n' }, writer).ok,
       false
     );
     fs.writeFileSync(page, before + '<Alias {...props}/>');
-    assert.equal(updateComponentProperties(request, () => {}).ok, false);
+    assert.equal(updateComponentProperties(request, writer).ok, false);
     assert.equal(fs.readFileSync(component, 'utf8'), source);
     assert.equal(fs.readFileSync(page, 'utf8'), before + '<Alias {...props}/>');
   });
@@ -398,16 +418,7 @@ test('source conflicts and unresolved spreads leave every project file untouched
 test('failed writes restore all files already written', () => {
   project(({ root, component, page }) => {
     const before = fs.readFileSync(page, 'utf8');
-    const write = fs.writeFileSync;
-    let writes = 0;
-    fs.writeFileSync = (...args) => {
-      writes += 1;
-      if (writes === 2) {
-        throw new Error('Simulated disk failure');
-      }
-      return write(...args);
-    };
-    try {
+    failNthReplace(2, 'Simulated disk failure', () => {
       const result = updateComponentProperties(
         {
           projectPath: root,
@@ -415,15 +426,13 @@ test('failed writes restore all files already written', () => {
           source,
           change: save({ name: 'heading' }),
         },
-        () => {}
+        writer
       );
       assert.equal(result.ok, false);
       assert.match(result.error.message, /restored/);
       assert.equal(fs.readFileSync(component, 'utf8'), source);
       assert.equal(fs.readFileSync(page, 'utf8'), before);
-    } finally {
-      fs.writeFileSync = write;
-    }
+    });
   });
 });
 
@@ -433,26 +442,11 @@ test('failed writes restore all files already written', () => {
 test('rollback leaves a file another program changed and names it', () => {
   project(({ root, component, page }) => {
     const before = new Map([[component, source], [page, fs.readFileSync(page, 'utf8')]]);
-    const write = fs.writeFileSync;
-    const rename = fs.renameSync;
-    const replaced = [];
-    let writes = 0;
-    fs.renameSync = (from, to) => {
-      replaced.push(to);
-      return rename(from, to);
-    };
-    fs.writeFileSync = (...argumentsList) => {
-      writes += 1;
-      if (writes === 2) {
-        write(replaced[0], 'EXTERNAL');
-        throw new Error('Simulated disk failure');
-      }
-      return write(...argumentsList);
-    };
-    try {
+    const external = (targets) => fs.writeFileSync(targets[0], 'EXTERNAL');
+    failNthReplace(2, 'Simulated disk failure', (replaced) => {
       const result = updateComponentProperties(
         { projectPath: root, file: component, source, change: save({ name: 'heading' }) },
-        () => {}
+        writer
       );
       assert.equal(result.ok, false);
       assert.equal(result.error.code, 'rollback');
@@ -461,10 +455,7 @@ test('rollback leaves a file another program changed and names it', () => {
       assert.equal(fs.readFileSync(replaced[0], 'utf8'), 'EXTERNAL');
       const untouched = replaced[0] === component ? page : component;
       assert.equal(fs.readFileSync(untouched, 'utf8'), before.get(untouched));
-    } finally {
-      fs.writeFileSync = write;
-      fs.renameSync = rename;
-    }
+    }, external);
   });
 });
 
@@ -483,7 +474,7 @@ test('a read-back mismatch is a write-race that rolls back instead of asserting'
     try {
       const result = updateComponentProperties(
         { projectPath: root, file: component, source, change: save({ name: 'heading' }) },
-        () => {}
+        writer
       );
       assert.equal(result.ok, false);
       assert.equal(result.error.code, 'write-race');
@@ -679,7 +670,7 @@ test('renaming a common prop updates its instances, runtime binding and related 
             property: { ...eyebrow, name: 'kicker' },
           },
         },
-        () => {}
+        writer
       )
     );
     assert.equal(updated.properties.find((p) => p.name === 'kicker').editing.kind, 'editable');
@@ -1046,7 +1037,7 @@ test('renames resolve tsconfig aliases and MDX instances', () => {
         source,
         change: save({ name: 'heading' }),
       },
-      () => {}
+      writer
     );
     value(result);
     assert.match(fs.readFileSync(mdx, 'utf8'), /<Feature heading="Story"/);
@@ -1069,7 +1060,7 @@ test('re-exports, runtime aliases, and dynamic imports cannot cause partial rena
           source,
           change: save({ name: 'heading' }),
         },
-        () => {}
+        writer
       );
       assert.equal(result.ok, false);
       assert.equal(fs.readFileSync(component, 'utf8'), source);
@@ -1089,7 +1080,7 @@ test('deleting a property refuses live instance values', () => {
         source: input,
         change: { kind: 'remove', name: 'title' },
       },
-      () => {}
+      writer
     );
     assert.equal(result.ok, false);
     assert.match(result.error.message, /still passes title/);
@@ -1196,7 +1187,7 @@ test('renaming a local prop on inherited Props updates website instances', () =>
           source: input,
           change: save({ name: 'heading' }),
         },
-        () => {}
+        writer
       )
     );
     assert.match(fs.readFileSync(component, 'utf8'), /Props extends HTMLAttributes/);

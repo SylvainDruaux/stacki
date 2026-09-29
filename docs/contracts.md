@@ -60,14 +60,21 @@ exact bytes read or written, as 64 lowercase hex characters (`Digest` in
 file first and, if it no longer holds those bytes, returns
 `{ ok: false, error: { code: 'conflict', diskChecksum } }` without writing. A
 deleted file is `missing`, never a conflict; `filesystem` and `write-race`
-cover the rest. The renderer's `SaveState` union (`src/saveState.ts`) turns a
-conflict into `conflicted`: autosave stops, the edits stay, and only "Reload
-from disk" or a reviewed "Save this version" leaves that state.
+cover the rest, `uncertain` is a write that may have landed and could not be
+verified (plan §3.5), and `backpressured` a full actor queue (the edit was
+never accepted). The renderer keeps the edits unsaved on every code but a
+conflict, and the next save names the same base. The renderer's `SaveState`
+union (`src/saveState.ts`) turns a conflict into `conflicted`: autosave stops,
+the edits stay, and only "Reload from disk" or a reviewed "Save this version"
+leaves that state.
 
-Every page, chunk, style re-write and component-property write goes through
-`electron/atomicWrite.ts`: a same-directory temporary file (`wx`, the target's
-mode, fsync), one rename, then a read-back that reports another writer as
-`write-race`. Encoding: files are UTF-8; page reads decode strictly (invalid
+Since step 5 every write of project text — page, chunk, style re-write,
+stylesheet, code window, CMS and asset edits, component-property batches — is
+an intent to the file's document actor (see Document actors below), which
+writes through `electron/atomicWrite.ts`: a same-directory temporary file
+(`wx`, the target's mode and owner, fsync), one rename, a directory fsync, then
+the actor's own read-back, which reports another writer as `write-race`.
+Encoding: files are UTF-8; page reads decode strictly (invalid
 UTF-8 is an error, never a lossy replacement); line endings round-trip
 untouched; a leading byte-order mark is read past by the parsers and restored
 by the model writers.
@@ -75,11 +82,12 @@ by the model writers.
 unsaved edits in code. `test/fixtures/round-trip/` holds the byte-exact
 Astro, Markdown and MDX fixtures (CRLF, BOM) the save path must reproduce.
 
-## Editor core (plan steps 1–2)
+## Editor core (plan steps 1–5)
 
-The contract layer of `docs/stacki-editor-core-plan.md`, and since step 2 the
-diff, the span mapper and the pure planner. Nothing in the app submits
-intents yet; these modules are what steps 3–10 build on.
+The contract layer of `docs/stacki-editor-core-plan.md`, since step 2 the
+diff, the span mapper and the pure planner, and since step 5 the document
+actor. The app submits one operation so far: the migration-only
+`replace-source`, from every legacy writer.
 
 - `span.ts` — `ByteSpan` and `Utf16Span` over the branded `ByteOffset` and
   `Utf16Offset` (`brand.ts`); mixing them is a compile error. The only
@@ -124,9 +132,23 @@ intents yet; these modules are what steps 3–10 build on.
   Plans `set-attribute` only: it maps the element's name-through-last-attribute
   region through the diff and splices the mapped value, with the authored value
   as its witness; `ambiguous` → `anchor-ambiguous`, `gone` → `anchor-moved`,
-  `too-costly` → `resource-limit`. Other operations are `unsupported-operation`
+  `too-costly` → `resource-limit`. Since step 5 it also plans `replace-source`:
+  one whole-file splice witnessed by the authored bytes, never mapped (stale →
+  `region-externally-modified`). Other operations are `unsupported-operation`
   until their steps. Equal checksums skip the diff; `planIntentThroughDiff` is
   that fast path's reference.
+- `splice.ts` (step 5) — `witnessesHold`, `applySplices`, `changedRanges`:
+  the one implementation of the write primitive, shared by the actor and the
+  simulator.
+- `documentActor.ts` (step 5) — the actor as pure steps (idle → planned →
+  written → idle, plan §5.2) over an injected `DocumentDisk` (read, advisory
+  lock, atomic replace), planner and `Projector`. `submitIntent` answers
+  `accepted` or, at `intentsPendingMax`, `backpressured`; every accepted intent
+  reaches one `Outcome`; a replace whose directory could not be flushed, or
+  whose read-back fails, is `uncertain` with the candidate checksum;
+  `reconcileUncertain` resolves one by comparison. The actor never retries and
+  never merges. `createLazySnapshot` (`snapshot.ts`) derives a projection on
+  first read.
 
 The parser (`parsePage(text, { locs: true })`) reports `start`/`end` on every
 node — branches and inline-run gap spaces included — and `attrSpans` on every
@@ -167,6 +189,37 @@ boundary (`electron/astroParser.ts`, `main.ts`, `markdownParser.ts`,
 engine contract modules may not use timers, clocks, promises, `Math.random`,
 `process` or I/O modules. `scripts/adapter-surface.ts` runs in the gate as a ratchet on the
 legacy tree-mutation surface (method in its header).
+
+## Document actors (step 5)
+
+`electron/documentActors.ts` hosts one actor per canonical file in the main
+process and steps each submission to its outcome before returning (main's
+handlers run one at a time; the queue bound still holds). `documentWrites.ts`
+installs the process's host and is the only entry point for writing project
+text: `writeProjectText` (witnessed by the bytes on disk now; a missing file is
+created) and `createProjectText` (never overwrites). `page:write` and
+`page:writeRaw` submit `replace-source` witnessed by the renderer's
+`baseChecksum`; each chunk file has its own actor; `component:editProperties`
+leases its files' actors in sorted canonical order and witnesses each by its
+`before` checksum, with the checked rollback as intents too.
+`documentDisk.ts` is the real disk: bounded reads, a lock file beside the
+target (dead or old owners broken), the atomic replace, exclusive creation,
+and canonical keys (directory identity plus the name, case-folded where a probe
+shows the directory ignores case). Bounds: `documentActorsMax`,
+`documentBytesRetainedMax`, `intentsPendingMax`, `parseTasksInFlightMax`,
+`watcherFilesPerTickMax`. Telemetry (`documentTelemetry.ts`, plan §9a): one
+JSON line per outcome, backpressure, save-guard conflict and leaked lock, with
+a running count, the intent id and a 16-hex-character path hash — never a path
+or source bytes.
+
+Proofs: `test/contracts/single-writer.test.ts` inventories every file-writing
+call in `electron/` against a reasoned allowlist and pins one owner each for
+the write primitives, the disk and the host; `test/platform/` runs the write
+protocol on real filesystems and processes (modes, ownership, flush order,
+symlinks, continuous readers, cooperating writers, crashes between replace and
+verify, NTFS replacement semantics and case-insensitive names where a Windows
+filesystem is reachable); `test/legacy-parity.bench.js` is the parallel run
+against the pre-step-5 build (not in the gate; it needs that build).
 
 ## Other shared contracts
 

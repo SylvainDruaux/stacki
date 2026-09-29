@@ -111,6 +111,7 @@ const DETERMINISM_RULES = {
 const ENGINE_CONTRACTS = [
   'shared/capability.ts',
   'shared/diff.ts',
+  'shared/documentActor.ts',
   'shared/intent.ts',
   'shared/mapSpan.ts',
   'shared/planner.ts',
@@ -118,6 +119,7 @@ const ENGINE_CONTRACTS = [
   'shared/snapshot.ts',
   'shared/source-projection.ts',
   'shared/span.ts',
+  'shared/splice.ts',
 ];
 
 export default [

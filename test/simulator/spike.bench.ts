@@ -26,7 +26,7 @@ import { createHash } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { writeFileAtomic } from '../../dist/electron/atomicWrite.js';
+import { writeVerified } from './verified-write.entry.ts';
 import { parsePage } from '../../dist/electron/astroParser.js';
 import { toFilePath, toIntentId } from '../../dist/shared/brand.js';
 import { capabilityAcceptsVisualIntent } from '../../dist/shared/capability.js';
@@ -41,7 +41,7 @@ import { decodeUtf8, encodeUtf8, toByteString, type ByteString } from '../../dis
 import { loadSimulationFixtures } from './fixtures.entry.ts';
 import { Prng } from './prng.ts';
 import { sha256, snapshotOf } from './project.ts';
-import { applySplices, witnessesHold } from './splice.ts';
+import { applySplices, witnessesHold } from '../../dist/shared/splice.js';
 import { runSimulation } from './world.ts';
 
 const THRESHOLD_INTENT_MS = 50;
@@ -270,7 +270,7 @@ function runPipeline(file: string, held: Snapshot, intent: Intent): PipelineResu
   if (!text.ok) {
     throw new Error('Assertion failed: a candidate that parsed is UTF-8');
   }
-  const written = writeFileAtomic(file, text.value); // Steps 8–9.
+  const written = writeVerified(file, text.value); // Steps 8–9.
   if (!written.ok) {
     return { tag: 'rejected', reason: written.error.code, snapshot: current };
   }

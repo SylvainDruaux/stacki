@@ -534,6 +534,11 @@ Ratchet counts only decrease.
    path outside the actors calls `atomicWrite` for a page, chunk, or stylesheet. Platform suite.
    `component:editProperties` runs through the actors as a batch in sorted path order (§3.3).
    Single-gesture parallel run with parity checks against the legacy path, including it.
+   **Landed 2026-09-28** (tracker, Step 5). Decided there: the host steps each intent to its
+   outcome synchronously; the lock is a lock file (Node has no portable `flock`); a replace
+   whose directory cannot be flushed is `uncertain`; snapshots derive projections on first
+   read; the renderer sends no authored bytes, so a stale `replace-source` is refused, never
+   mapped. The single-writer rule covers every write of project text, not only pages.
 6. **Gesture expansion.** Attribute → prop → insert/remove → move → inline CSS → frontmatter
    slots. Stylesheet intents follow §3.3 once a real gesture needs them. **Undo on the engine:**
    every `applied` outcome records its inverse splices (same ranges, expected and replacement

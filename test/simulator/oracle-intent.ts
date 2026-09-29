@@ -8,7 +8,7 @@ import { isNodeKind, toAnchorRef, toChildIndex, type AnchorRef } from '../../dis
 import type { Snapshot } from '../../dist/shared/snapshot.js';
 import { encodeUtf8, toByteSpan, utf8ByteLength, type ByteSpan } from '../../dist/shared/span.js';
 import type { OracleStep } from './oracles.ts';
-import type { Splice } from './splice.ts';
+import type { Splice } from '../../dist/shared/planner.js';
 
 export function oracleSpans(step: OracleStep): readonly ByteSpan[] {
   return step.splices.map((splice) =>

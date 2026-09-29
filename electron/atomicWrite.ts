@@ -1,17 +1,38 @@
-// One write primitive for every file Stacki rewrites in place: pages, chunk
-// files, the style re-write, and component-property batches (plan §11 step 0).
+// The OS-facing write primitives under the document actor's disk
+// (electron/documentDisk.ts, plan §5.2 steps 7–8). Nothing else may import the
+// writing functions here: the actor is the only writer of a page, chunk or
+// stylesheet (plan §3.3), and eslint.config.mjs fences the names.
 //
 // Why atomic: a plain writeFileSync truncates the target first, so a crash, a
 // full disk or a concurrent reader can observe a half-written page. Here the
-// bytes go to a temporary file in the same directory (same filesystem, so the
-// rename is atomic), are flushed, and replace the target in one rename. The
-// target either holds the old bytes or the new ones, never a mixture.
+// bytes go to a temporary file in the target's own directory (same filesystem,
+// so the rename is atomic), are flushed, and replace the target in one rename.
+// The target holds the old bytes or the new ones, never a mixture.
 //
-// Why verify: the temporary file is created exclusively (`wx`), so nobody else
-// can have written it; its bytes are asserted. The target is shared with every
-// other writer on the machine, so a mismatch after the rename is an expected
-// failure (`write-race`), not an assertion — no portable API offers
-// compare-and-swap on a pathname (plan §5.2).
+// The OS-facing contract, pinned by the platform suite (test/platform/):
+// - Flush: `fsync` on the temporary file before the rename, then `fsync` on the
+//   directory after it, so the rename itself survives a power loss. On Windows
+//   Node cannot open a directory for flushing; NTFS journals the rename, and
+//   that is the platform's whole promise. Where a filesystem refuses to flush a
+//   directory (EINVAL and friends), the same applies. On macOS `fsync` reaches
+//   the drive but not its cache (F_FULLFSYNC is not exposed by Node) — the
+//   honest limit of the platform, not of this module.
+// - A directory flush that fails with a real I/O error leaves the file replaced
+//   but not promised durable: `not-durable`, which the actor reports as
+//   `uncertain` (plan §3.5), never as success.
+// - Mode: the permission bits of the target survive (the umask cannot narrow
+//   them). Ownership: the replacement is created by this process; where the
+//   target belongs to another owner or group, the temporary file is given
+//   theirs, and when the OS refuses, the write is refused — silently handing a
+//   user's file to another owner is a change nobody asked for.
+// - Symlinks: a link to a file is written through to the file it names, so the
+//   link survives; a dangling link is refused, because creating its target
+//   would be a guess about where the user meant the file to live.
+// - Windows replacement: the rename is MoveFileEx with REPLACE_EXISTING. A
+//   target held open without delete sharing (an antivirus scan, an indexer)
+//   fails the rename with EPERM, EBUSY or EACCES; the target is untouched, the
+//   temporary file is removed, and the actor reports `write-failed`. It never
+//   retries (plan §3.5).
 import { createHash, randomUUID } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -21,9 +42,11 @@ import { LIMITS } from '../shared/limits';
 import { err, ok, type Result } from '../shared/result';
 import { readSourceBytes } from './main.bounds';
 
+/** Why a write did not happen, or did without a durability promise. */
 export type AtomicWriteError =
   | { readonly code: 'filesystem'; readonly message: string }
-  | { readonly code: 'write-race'; readonly message: string };
+  | { readonly code: 'exists'; readonly message: string }
+  | { readonly code: 'not-durable'; readonly message: string };
 
 /** A file's exact bytes decoded as UTF-8, with the checksum of those bytes. */
 export interface SourceSnapshot {
@@ -33,8 +56,13 @@ export interface SourceSnapshot {
 
 const TEMPORARY_PREFIX = '.stacki-write-';
 const TEMPORARY_SUFFIX = '.tmp';
+export const LOCK_PREFIX = '.stacki-lock-';
+export const LOCK_SUFFIX = '.lock';
 /** Permission bits a replacement keeps; file-type bits are not settable. */
 const MODE_BITS = 0o7777;
+/** Directory-flush errors that mean "this filesystem does not flush
+ * directories", not "the flush failed". */
+const FLUSH_UNSUPPORTED = new Set(['EINVAL', 'ENOTSUP', 'EOPNOTSUPP', 'EISDIR', 'EPERM', 'EBADF']);
 
 // Strict decoding: invalid UTF-8 is an error, never a lossy replacement, and a
 // leading BOM stays in the text so writing the text back reproduces it (§3.2).
@@ -42,16 +70,19 @@ const UTF8 = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true });
 
 /** SHA-256 of the exact bytes, the only constructor of a Digest outside the
  * wire parser. A string is hashed as its UTF-8 encoding. */
-export function digestOf(bytes: Buffer | string): Digest {
+export function digestOf(bytes: Uint8Array | string): Digest {
   return toDigest(createHash('sha256').update(bytes).digest('hex'));
 }
 
-/** True for the temporary files this module creates, so the project watcher
- * can ignore them instead of reporting an outside edit. */
+/** True for the temporary and lock files the write protocol creates, so the
+ * project watcher can ignore them instead of reporting an outside edit. */
 export function isAtomicTemporary(name: string): boolean {
   const base = path.basename(name);
   if (base.startsWith(TEMPORARY_PREFIX)) {
     return base.endsWith(TEMPORARY_SUFFIX);
+  }
+  if (base.startsWith(LOCK_PREFIX)) {
+    return base.endsWith(LOCK_SUFFIX);
   }
   return false;
 }
@@ -73,67 +104,104 @@ export function readSourceSnapshot(file: string): SourceSnapshot {
   return { text, checksum };
 }
 
-/** Replace `file` with `text` atomically and return the checksum on disk. */
-export function writeFileAtomic(file: string, text: string): Result<Digest, AtomicWriteError> {
-  const bytes = Buffer.from(text, 'utf8');
+/** Where a write to `file` lands: the file a symlink names, or the path itself
+ * for a regular or missing file. A dangling symlink is refused (see header). */
+export function writeTargetOf(file: string): Result<string, AtomicWriteError> {
+  const absolute = path.resolve(file);
+  let link: fs.Stats;
+  try {
+    link = fs.lstatSync(absolute);
+  } catch (error: unknown) {
+    return isMissing(error) ? ok(absolute) : filesystemError(file, error);
+  }
+  if (!link.isSymbolicLink()) {
+    return ok(absolute);
+  }
+  try {
+    return ok(fs.realpathSync(absolute));
+  } catch (error: unknown) {
+    if (isMissing(error)) {
+      return err({ code: 'filesystem', message: `${file} is a symlink to a missing file` });
+    }
+    return filesystemError(file, error);
+  }
+}
+
+/** Replace the existing `file` with `bytes` atomically. The caller verifies
+ * what the file holds afterwards; this reports only what it did. */
+export function replaceFileAtomic(file: string, bytes: Uint8Array): Result<void, AtomicWriteError> {
   if (bytes.length > LIMITS.sourceBytesMax) {
     return err({ code: 'filesystem', message: `${file} would exceed the 10 MB source limit` });
   }
-  const expected = digestOf(bytes);
-  const target = resolveTarget(file);
+  const target = writeTargetOf(file);
   if (!target.ok) {
     return target;
   }
+  let stats: fs.Stats;
+  try {
+    stats = fs.statSync(target.value);
+  } catch (error: unknown) {
+    return filesystemError(file, error);
+  }
   const temporary = path.join(
-    path.dirname(target.value.path),
+    path.dirname(target.value),
     `${TEMPORARY_PREFIX}${randomUUID()}${TEMPORARY_SUFFIX}`,
   );
-  const staged = stageTemporary(temporary, bytes, target.value.mode);
+  const staged = stageTemporary(temporary, bytes, stats);
   if (!staged.ok) {
     return discardTemporary(temporary, file, staged.error.message);
   }
   // Created exclusively above: nobody else can have written these bytes.
-  assert(digestOf(fs.readFileSync(temporary)) === expected, 'Temporary file holds planned bytes');
+  assert(digestOf(fs.readFileSync(temporary)) === digestOf(bytes), 'The temporary holds the plan');
   try {
-    fs.renameSync(temporary, target.value.path);
+    fs.renameSync(temporary, target.value);
   } catch (error: unknown) {
     return discardTemporary(temporary, file, errorMessage(error));
   }
-  return verifyTarget(target.value.path, expected);
+  return flushDirectory(path.dirname(target.value), file);
 }
 
-interface WriteTarget {
-  readonly path: string;
-  /** Permission bits to keep, or undefined for a new file. */
-  readonly mode: number | undefined;
-}
-
-// A symlinked page is written through to the file it names; renaming over the
-// link itself would silently turn it into a regular file.
-function resolveTarget(file: string): Result<WriteTarget, AtomicWriteError> {
-  try {
-    const real = fs.realpathSync(file);
-    return ok({ path: real, mode: fs.statSync(real).mode & MODE_BITS });
-  } catch (error: unknown) {
-    if (isMissing(error)) {
-      return ok({ path: path.resolve(file), mode: undefined });
-    }
-    return err({ code: 'filesystem', message: errorMessage(error) });
+/** Create `file` with `bytes`, failing with `exists` if anything is there: a
+ * creation can never overwrite. A crash mid-creation can leave a partial new
+ * file; no existing bytes are ever at risk. */
+export function createFileExclusive(
+  file: string,
+  bytes: Uint8Array,
+): Result<void, AtomicWriteError> {
+  if (bytes.length > LIMITS.sourceBytesMax) {
+    return err({ code: 'filesystem', message: `${file} would exceed the 10 MB source limit` });
   }
+  const target = path.resolve(file);
+  let descriptor: number | undefined;
+  try {
+    descriptor = fs.openSync(target, 'wx', 0o666);
+    fs.writeFileSync(descriptor, bytes);
+    fs.fsyncSync(descriptor);
+  } catch (error: unknown) {
+    if (errorCode(error) === 'EEXIST') {
+      return err({ code: 'exists', message: `${file} already exists` });
+    }
+    return filesystemError(file, error);
+  } finally {
+    if (descriptor !== undefined) {
+      fs.closeSync(descriptor);
+    }
+  }
+  return flushDirectory(path.dirname(target), file);
 }
 
 function stageTemporary(
   temporary: string,
-  bytes: Buffer,
-  mode: number | undefined,
+  bytes: Uint8Array,
+  target: fs.Stats,
 ): Result<void, AtomicWriteError> {
+  const mode = target.mode & MODE_BITS;
   let descriptor: number | undefined;
   try {
-    descriptor = fs.openSync(temporary, 'wx', mode ?? 0o666);
-    if (mode !== undefined) {
-      // The umask applied at open time must not narrow the file's permissions.
-      fs.fchmodSync(descriptor, mode);
-    }
+    descriptor = fs.openSync(temporary, 'wx', mode);
+    // The umask applied at open time must not narrow the file's permissions.
+    fs.fchmodSync(descriptor, mode);
+    keepOwner(descriptor, target);
     fs.writeFileSync(descriptor, bytes);
     fs.fsyncSync(descriptor);
   } catch (error: unknown) {
@@ -146,23 +214,53 @@ function stageTemporary(
   return ok(undefined);
 }
 
-function verifyTarget(target: string, expected: Digest): Result<Digest, AtomicWriteError> {
-  let actual: Digest;
+// Give the replacement the target's owner and group. Throws (and so refuses the
+// write) when the OS will not; Windows has no POSIX owner to keep.
+function keepOwner(descriptor: number, target: fs.Stats): void {
+  if (process.platform === 'win32') {
+    return;
+  }
+  const staged = fs.fstatSync(descriptor);
+  if (staged.uid === target.uid) {
+    if (staged.gid === target.gid) {
+      return;
+    }
+  }
   try {
-    actual = digestOf(readSourceBytes(target));
+    fs.fchownSync(descriptor, target.uid, target.gid);
   } catch (error: unknown) {
+    throw new Error(
+      `Saving would change the file's owner (${target.uid}:${target.gid}), ` +
+        `and it cannot be kept: ${errorMessage(error)}`,
+    );
+  }
+}
+
+function flushDirectory(directory: string, file: string): Result<void, AtomicWriteError> {
+  if (process.platform === 'win32') {
+    return ok(undefined); // See the header: NTFS journals the rename.
+  }
+  let descriptor: number | undefined;
+  try {
+    descriptor = fs.openSync(directory, 'r');
+    fs.fsyncSync(descriptor);
+  } catch (error: unknown) {
+    const code = errorCode(error);
+    if (code !== undefined) {
+      if (FLUSH_UNSUPPORTED.has(code)) {
+        return ok(undefined);
+      }
+    }
     return err({
-      code: 'write-race',
-      message: `${target} vanished after writing: ${errorMessage(error)}`,
+      code: 'not-durable',
+      message: `${file} was saved, but its folder could not be flushed: ${errorMessage(error)}`,
     });
+  } finally {
+    if (descriptor !== undefined) {
+      fs.closeSync(descriptor);
+    }
   }
-  if (actual === expected) {
-    return ok(actual);
-  }
-  return err({
-    code: 'write-race',
-    message: `${target} was changed by another writer during the save`,
-  });
+  return ok(undefined);
 }
 
 function discardTemporary(
@@ -183,15 +281,23 @@ function discardTemporary(
   return err({ code: 'filesystem', message: `Could not save ${file}: ${reason}` });
 }
 
-export function isMissing(error: unknown): boolean {
-  if (error instanceof Error) {
-    if ('code' in error) {
-      return error.code === 'ENOENT';
-    }
-  }
-  return false;
+function filesystemError(file: string, error: unknown): Result<never, AtomicWriteError> {
+  return err({ code: 'filesystem', message: `Could not save ${file}: ${errorMessage(error)}` });
 }
 
-function errorMessage(error: unknown): string {
+export function isMissing(error: unknown): boolean {
+  return errorCode(error) === 'ENOENT';
+}
+
+export function errorCode(error: unknown): string | undefined {
+  if (error instanceof Error) {
+    if ('code' in error) {
+      return typeof error.code === 'string' ? error.code : undefined;
+    }
+  }
+  return undefined;
+}
+
+export function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }

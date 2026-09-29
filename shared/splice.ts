@@ -1,20 +1,13 @@
-// Applying splices, the only write primitive (plan §3.4), in their step-1
-// reference form. The expected bytes are the witness: a splice applies only
-// where the range still holds exactly the bytes the plan saw. The Splice type
-// is the planner's (shared/planner.ts, step 2); step 3 promotes applying into
-// the engine, until then the simulator owns the one implementation.
-import { assert } from '../../dist/shared/assert.js';
-import { LIMITS } from '../../dist/shared/limits.js';
-import type { Splice } from '../../dist/shared/planner.js';
-import {
-  byteStringsEqual,
-  toByteSpan,
-  toByteString,
-  type ByteSpan,
-  type ByteString,
-} from '../../dist/shared/span.js';
-
-export type { Splice };
+// Applying splices, the only write primitive (plan §3.4). The expected bytes are
+// the witness: a splice applies only where its range still holds exactly the
+// bytes the plan saw. Promoted from the simulator at step 5, so the document
+// actor and the simulator apply splices through one implementation.
+//
+// Pure: bytes in, bytes out. Nothing here touches a disk or a clock.
+import { assert } from './assert';
+import { LIMITS } from './limits';
+import type { Splice } from './planner';
+import { byteStringsEqual, toByteSpan, toByteString, type ByteSpan, type ByteString } from './span';
 
 /** Whether every splice's range holds its expected bytes (plan §5.2 step 4). */
 export function witnessesHold(bytes: ByteString, splices: readonly Splice[]): boolean {
@@ -31,6 +24,7 @@ export function witnessesHold(bytes: ByteString, splices: readonly Splice[]): bo
 /** Splices sorted by start, checked disjoint. Overlapping splices would make the
  * result depend on application order — a planner bug, so it asserts. */
 export function orderedSplices(splices: readonly Splice[]): readonly Splice[] {
+  assert(splices.length <= LIMITS.splicesPerIntentMax, 'Splice count is inside its bound');
   const ordered = [...splices].sort((left, right) => left.range.start - right.range.start);
   for (let index = 1; index < ordered.length; index++) {
     const previous = ordered[index - 1];
@@ -43,25 +37,30 @@ export function orderedSplices(splices: readonly Splice[]): readonly Splice[] {
 }
 
 /** Apply splices in memory (plan §5.2 step 5). Witnesses were verified by the
- * caller; they are asserted again here, the pair on the other side. */
+ * caller; they are asserted again here, the pair on the other side.
+ *
+ * The plan says "descending offset": applied in place, a later splice must land
+ * first so earlier offsets do not shift. This builds a new buffer instead, by
+ * copying the untouched gaps between ascending, disjoint ranges of the original
+ * — no offset ever shifts, so the result is the descending in-place result. */
 export function applySplices(bytes: ByteString, splices: readonly Splice[]): ByteString {
   assert(witnessesHold(bytes, splices), 'Every witness holds at apply time');
   const ordered = orderedSplices(splices);
-  const parts: Uint8Array[] = [];
-  let cursor = 0;
-  for (const splice of ordered) {
-    parts.push(bytes.subarray(cursor, splice.range.start), splice.replacementBytes);
-    cursor = splice.range.end;
-  }
-  parts.push(bytes.subarray(cursor));
-  const size = parts.reduce((total, part) => total + part.length, 0);
-  assert(size === bytes.length + sizeDelta(ordered), 'Result size is the sum of the splices');
+  const size = bytes.length + sizeDelta(ordered);
+  assert(size >= 0, 'A result has a nonnegative size');
   const result = new Uint8Array(size);
-  let offset = 0;
-  for (const part of parts) {
-    result.set(part, offset);
-    offset += part.length;
+  let cursorSource = 0;
+  let cursorTarget = 0;
+  for (const splice of ordered) {
+    const gap = bytes.subarray(cursorSource, splice.range.start);
+    result.set(gap, cursorTarget);
+    cursorTarget += gap.length;
+    result.set(splice.replacementBytes, cursorTarget);
+    cursorTarget += splice.replacementBytes.length;
+    cursorSource = splice.range.end;
   }
+  result.set(bytes.subarray(cursorSource), cursorTarget);
+  assert(cursorTarget + bytes.length - cursorSource === size, 'The result is exactly filled');
   return toByteString(result);
 }
 

@@ -32,6 +32,11 @@
 //      alias) and `delete <receiver>.props[<key>]`.
 //   3. `mutateModel(` call sites, the definition excluded.
 //   4. `applyEdit(` call sites, the definition excluded.
+//   5. From step 5: whole-file `replace-source` submissions, the migration-only
+//      operation (plan §3.3) — call sites of `replaceSource(`, `writeCurrent(`
+//      and `writeProjectText(` in electron/**/*.ts, definitions excluded, and
+//      the host's own plumbing (documentActors.ts, documentWrites.ts) not
+//      counted. Step 9 deletes them for `.astro`; step 10 for the rest.
 //
 // Comment lines (starting with //, * or /*) are skipped. Hand count on
 // 2026-09-28 was 67 / 10 / 28 / 4; this method is the authority from step 1 on,
@@ -45,7 +50,10 @@ interface Counts {
   readonly propIndexWrites: number;
   readonly mutateModelCalls: number;
   readonly applyEditCalls: number;
+  readonly replaceSourceCalls: number;
 }
+
+const REPLACE_SOURCE_BASELINE = 23;
 
 /** Measured 2026-09-28 by this script at step 1. Lower these; never raise them. */
 const BASELINE: Counts = {
@@ -53,6 +61,8 @@ const BASELINE: Counts = {
   propIndexWrites: 9,
   mutateModelCalls: 28,
   applyEditCalls: 4,
+  /** Measured at step 5, when the legacy writers moved onto the actors. */
+  replaceSourceCalls: REPLACE_SOURCE_BASELINE,
 };
 
 const FILES_MAX = 20_000;
@@ -71,6 +81,11 @@ const PROP_INDEX_RE = /(?:\bprops\[[^\]]+\]\s*=(?![=>]))|(?:delete\s+[\w$.?]+\.p
 const MUTATE_MODEL_RE = /\bmutateModel\(/g;
 const APPLY_EDIT_RE = /\bapplyEdit\(/g;
 const DEFINITION_RE = /(?:function\s+(?:mutateModel|applyEdit)\b|(?:const|let)\s+(?:mutateModel|applyEdit)\s*=)/;
+const REPLACE_SOURCE_RE = /\b(?:replaceSource|writeCurrent|writeProjectText)\(/g;
+const REPLACE_SOURCE_DEFINITION_RE =
+  /(?:function\s+(?:replaceSource|writeCurrent|writeProjectText)\b|^\s*(?:replaceSource|writeCurrent)\()/;
+/** The host's plumbing: it defines the submissions, it does not make them. */
+const REPLACE_SOURCE_PLUMBING = new Set(['documentActors.ts', 'documentWrites.ts']);
 
 export function sourceFiles(directory: string): readonly string[] {
   const found: string[] = [];
@@ -145,6 +160,28 @@ export function countWrapperCalls(text: string): { readonly mutateModelCalls: nu
   return { mutateModelCalls, applyEditCalls };
 }
 
+/** Whole-file `replace-source` submission sites in one file's text. */
+export function countReplaceSourceCalls(text: string): number {
+  let calls = 0;
+  for (const line of codeLines(text)) {
+    if (REPLACE_SOURCE_DEFINITION_RE.test(line)) {
+      continue;
+    }
+    calls += [...line.matchAll(REPLACE_SOURCE_RE)].length;
+  }
+  return calls;
+}
+
+function measureReplaceSource(root: string): number {
+  let calls = 0;
+  for (const file of sourceFiles(path.join(root, 'electron'))) {
+    if (!REPLACE_SOURCE_PLUMBING.has(path.basename(file))) {
+      calls += countReplaceSourceCalls(fs.readFileSync(file, 'utf8'));
+    }
+  }
+  return calls;
+}
+
 function measure(root: string): { readonly counts: Counts; readonly byFile: ReadonlyMap<string, number> } {
   const source = path.join(root, 'src');
   const stylePanel = path.join(source, 'style-panel') + path.sep;
@@ -168,7 +205,9 @@ function measure(root: string): { readonly counts: Counts; readonly byFile: Read
       byFile.set(path.relative(root, file), edits.mutations + edits.propIndexWrites);
     }
   }
-  return { counts: { mutations, propIndexWrites, mutateModelCalls, applyEditCalls }, byFile };
+  const replaceSourceCalls = measureReplaceSource(root);
+  const counts = { mutations, propIndexWrites, mutateModelCalls, applyEditCalls, replaceSourceCalls };
+  return { counts, byFile };
 }
 
 function main(): void {
@@ -179,9 +218,16 @@ function main(): void {
     propIndexWrites: 'prop-index writes',
     mutateModelCalls: 'mutateModel( call sites',
     applyEditCalls: 'applyEdit( call sites',
+    replaceSourceCalls: 'replace-source submission sites (electron/)',
   };
   let slipped = false;
-  const keys = ['mutations', 'propIndexWrites', 'mutateModelCalls', 'applyEditCalls'] as const;
+  const keys = [
+    'mutations',
+    'propIndexWrites',
+    'mutateModelCalls',
+    'applyEditCalls',
+    'replaceSourceCalls',
+  ] as const;
   for (const key of keys) {
     const now = counts[key];
     const baseline = BASELINE[key];

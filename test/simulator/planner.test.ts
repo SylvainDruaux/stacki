@@ -32,7 +32,7 @@ import { ORACLE_SCENARIOS } from './oracles.ts';
 import { snapshotOf } from './project.ts';
 import { referenceMapSpan, referenceTables } from './reference-diff.ts';
 import { planByIdentity } from './reference-planner.ts';
-import { applySplices } from './splice.ts';
+import { applySplices } from '../../dist/shared/splice.js';
 
 const FIXTURES = path.resolve('test/fixtures/editor-core');
 const DIRECTORIES = ['test/corpus', 'test/fixtures/round-trip', 'test/fixtures/editor-core'];
@@ -537,3 +537,47 @@ test('corpus sweep: fast = reference = diff path; an insertion above shifts ever
   assert.ok(plannedCount > 60, `the sweep plans many real attributes (${plannedCount})`);
   assert.ok(shiftedCount > 60, `most of them sit below the insertion (${shiftedCount})`);
 });
+
+// Step 5: the migration-only replace-source is planned by the shipping planner.
+// It never maps, so the fast path, the diff path and the step-1 reference must
+// agree on every fixture: fresh (one whole-file splice, the authored bytes as its
+// witness), stale (`region-externally-modified`), and an anchor whose length is
+// not the file's (`anchor-moved`).
+test('replace-source: whole-file splice fresh, rejected stale, agreeing with the reference', () => {
+  let checked = 0;
+  for (const directory of DIRECTORIES) {
+    for (const name of fs.readdirSync(directory).sort()) {
+      const text = fs.readFileSync(path.join(directory, name), 'utf8');
+      const authored = snapshotText(text, toFilePath(`/project/${name}`));
+      const replacement = `${text}\n<!-- replaced -->\n`;
+      const whole = replaceSourceIntent(authored, authored.bytes.length, replacement);
+      const fresh = { authored, current: authored };
+      assert.deepEqual(planByIdentity(authored, whole), planIntent(fresh, whole), name);
+      assert.equal(planned(fresh, whole), replacement, `${name}: fresh replaces the file`);
+      const [splice] = planIntent(fresh, whole).ok ? spliceList(fresh, whole) : [];
+      assert.deepEqual(splice?.expectedBytes, authored.bytes, `${name}: witness is the file`);
+      const current = snapshotText(`${text} `, authored.path);
+      const stale = { authored, current };
+      assert.deepEqual(planByIdentity(current, whole), planIntent(stale, whole), name);
+      assert.equal(planned(stale, whole), 'rejected: region-externally-modified', name);
+      if (authored.bytes.length > 0) {
+        const short = replaceSourceIntent(authored, authored.bytes.length - 1, replacement);
+        assert.deepEqual(planByIdentity(authored, short), planIntent(fresh, short), name);
+        assert.equal(planned(fresh, short), 'rejected: anchor-moved', name);
+      }
+      checked += 1;
+    }
+  }
+  assert.ok(checked > 50, `every fixture directory is swept (${checked} files)`);
+});
+
+function replaceSourceIntent(authored: Snapshot, length: number, text: string): Intent {
+  const anchor = { span: toByteSpan(0, length), path: [], expectedKind: 'document' as const };
+  return intentOn(authored, anchor, { tag: 'replace-source', text });
+}
+
+function spliceList(base: PlanningBase, intent: Intent) {
+  const result = planIntent(base, intent);
+  assert.ok(result.ok, 'the intent plans');
+  return result.value.splices;
+}

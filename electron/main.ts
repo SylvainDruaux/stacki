@@ -2,13 +2,15 @@ import { loadComponentProperties, updateComponentProperties } from './componentP
 import { renderComponentPreviewPage } from './componentPreview.js';
 import { createIpcRegistrar } from './ipc.js';
 import { MAIN_LIMITS, readSource, readSourceBytes, directoryBudget } from './main.bounds.js';
+import { digestOf, isAtomicTemporary, readSourceSnapshot } from './atomicWrite.js';
+import { createNodeDocumentActors, type WriteReport } from './documentActors.js';
 import {
-  digestOf,
-  isAtomicTemporary,
-  isMissing,
-  readSourceSnapshot,
-  writeFileAtomic,
-} from './atomicWrite.js';
+  createProjectText,
+  describeWriteReport,
+  documentHost,
+  installDocumentHost,
+  writeProjectText,
+} from './documentWrites.js';
 import { definedFields } from '../shared/boundary.js';
 import { gitErrorDetail } from './git.js';
 import {
@@ -2145,6 +2147,18 @@ function markSelfWrite(p: string, text: string | null = null) {
   notePageMayHaveChanged();
 }
 
+// The main process's document actors (plan §2 layer 2): from step 5 every
+// write of project text goes through them (documentWrites.ts). Telemetry (plan
+// §9a) is one structured line per outcome on stdout, with hashed paths.
+installDocumentHost({
+  documents: createNodeDocumentActors({
+    log: (line) => console.info(line),
+    schedule: (task) => setImmediate(task),
+  }),
+  noteWrite: markSelfWrite,
+});
+const documents = documentHost().documents;
+
 // Whether a watcher event is the app hearing its own write come back — see
 // electron/selfWrites.js. A save's temporary file (atomicWrite.ts) is the app's
 // own too: it exists only between staging and the rename.
@@ -2165,6 +2179,7 @@ ipcMain.handle('watch:start', async (_e, projectPath) => {
     projectPath,
     send,
     isSelfWrite,
+    noteExternalChange: (changed) => documents.noteExternalChange(changed),
     notePageMayHaveChanged,
     scheduleThumb,
     mediaPattern: MEDIA_EXT,
@@ -2186,6 +2201,7 @@ function stopWatchingProject() {
   styleNudges.clear();
   captureEra++;
   selfWrites.clear();
+  documents.clear();
 }
 
 // ---------------------------------------------------------------------------
@@ -2385,8 +2401,7 @@ ipcMain.handle('assets:readText', async (_e, { projectPath, rel }) => {
 
 ipcMain.handle('assets:writeText', async (_e, { projectPath, rel, text }) => {
   const abs = assetAbs(projectPath, rel);
-  markSelfWrite(abs, text);
-  fs.writeFileSync(abs, text, 'utf8');
+  writeProjectText(abs, text);
   return { ok: true as const };
 });
 
@@ -2596,8 +2611,7 @@ ipcMain.handle('cms:assetRef', async (_e, { projectPath, rel, assetRel }) => {
   );
   const next = addImport(source, name, spec);
   const written = span ? file.slice(0, span.start) + next + file.slice(span.end) : next;
-  markSelfWrite(abs, written);
-  fs.writeFileSync(abs, written, 'utf8');
+  writeProjectText(abs, written);
   return { name, asset: clean };
 });
 
@@ -2634,8 +2648,7 @@ ipcMain.handle('cms:write', async (_e, { projectPath, rel, data }) => {
       throw new Error(`Couldn't write ${exportName} back into src/${fileRel}.`);
     }
     const next = span ? file.slice(0, span.start) + written + file.slice(span.end) : written;
-    markSelfWrite(abs, next);
-    fs.writeFileSync(abs, next, 'utf8');
+    writeProjectText(abs, next);
     // Editing a page's own frontmatter changes a file the editor may have
     // open. Our writes are invisible to the watcher, so say so directly —
     // otherwise the model would keep the old data and write it back over this.
@@ -2659,8 +2672,7 @@ ipcMain.handle('cms:write', async (_e, { projectPath, rel, data }) => {
   }
   trailingNewline = /\n$/.test(before);
   const json = JSON.stringify(data, null, indent) + (trailingNewline ? '\n' : '');
-  markSelfWrite(abs, json);
-  fs.writeFileSync(abs, json, 'utf8');
+  writeProjectText(abs, json);
   return { ok: true as const };
 });
 
@@ -2681,9 +2693,8 @@ ipcMain.handle('cms:create', async (_e, { projectPath, name }) => {
   if (fs.existsSync(abs)) {
     throw new Error(`src/${rel} already exists.`);
   }
-  markSelfWrite(abs);
   fs.mkdirSync(path.dirname(abs), { recursive: true });
-  fs.writeFileSync(abs, '[]\n', 'utf8');
+  createProjectText(abs, '[]\n');
   send('cms:changed', {});
   return { rel };
 });
@@ -2817,7 +2828,7 @@ ipcMain.handle('css:addSection', async (_e, { projectPath, ...edit }) => {
 // than one per file: the panel says which names become which, and either all of
 // them move or none does.
 ipcMain.handle('css:renameVariables', async (_e, { projectPath, renames }) => {
-  const result = cssVars.renameVariables(projectPath, { renames, markWrite: markSelfWrite });
+  const result = cssVars.renameVariables(projectPath, { renames });
   if (result.ok) {
     send('css:changed', {});
   }
@@ -2960,8 +2971,7 @@ ipcMain.handle('cms:delete', async (_e, { projectPath, rel }) => {
   const abs = cmsAbs(projectPath, rel);
   const hits = importersOf(projectPath, abs);
   for (const hit of hits) {
-    markSelfWrite(hit.file, hit.next);
-    fs.writeFileSync(hit.file, hit.next, 'utf8');
+    writeProjectText(hit.file, hit.next);
   }
   await shell.trashItem(abs);
   const meta = readCmsMeta(projectPath);
@@ -3007,20 +3017,25 @@ function writeChunks(model: ParserPageModel): Result<void, WirePageWriteError> {
   return ok(undefined);
 }
 
+// Each chunk file is a document with its own actor (plan §3.3). The renderer
+// names no base for a chunk, so the witness is the chunk as read here: the
+// actor refuses to write over bytes that change between that read and its
+// write, but a chunk edited outside Stacki since the page was opened is still
+// replaced, as before step 5 (tracker, step 5: left open).
 function writeChunk(chunkFile: string, next: string): Result<void, WirePageWriteError> {
   let unchanged = false;
   try {
     const parsed = parseTemplate(readSource(chunkFile));
     unchanged = parsed.clean && serializeNodes(parsed.nodes) === next;
   } catch {
-    /* file missing — write it */
+    /* file missing — the actor creates it */
   }
   if (unchanged) {
     return ok(undefined);
   }
   markSelfWrite(chunkFile, next);
-  const written = writeFileAtomic(chunkFile, next);
-  return written.ok ? ok(undefined) : err(written.error);
+  const report = documents.writeCurrent(chunkFile, next);
+  return report.tag === 'applied' ? ok(undefined) : err(pageWriteError(chunkFile, report));
 }
 
 // ---------------------------------------------------------------------------
@@ -3048,40 +3063,90 @@ ipcMain.handle('page:parse', async (_e, { pagePath, source }) => {
   return parsePageSource(pagePath, source);
 });
 
-// The overwrite guard (plan §11 step 0). A save names the checksum of the bytes
-// it was authored against; if the file holds anything else, somebody changed
-// it since, and writing now would silently destroy their edit. Refuse without
-// touching the disk and let the renderer ask the user. The window between this
-// read and the rename is the OS limit the plan calls `write-race` (§5.2).
+// The overwrite guard (plan §11 step 0), now asked of the page's actor. A save
+// names the checksum of the bytes it was authored against; if the file holds
+// anything else, somebody changed it since, and writing now would silently
+// destroy their edit. Refuse before any chunk is written and let the renderer
+// ask the user. The actor checks again under its lock (plan §5.2 step 7).
 function checkPageBase(
   pagePath: string,
   baseChecksum: Digest,
 ): Result<{ readonly bom: boolean }, WirePageWriteError> {
-  let bytes: Buffer;
-  try {
-    bytes = readSourceBytes(pagePath);
-  } catch (error: unknown) {
-    const name = path.basename(pagePath);
-    if (isMissing(error)) {
+  const name = path.basename(pagePath);
+  const current = documents.current(pagePath);
+  if (!current.ok) {
+    if (current.error.code === 'missing') {
       return err({ code: 'missing', message: `${name} no longer exists on disk.` });
     }
-    return err({ code: 'filesystem', message: `Could not read ${name}: ${String(error)}` });
+    return err({ code: 'filesystem', message: `Could not read ${name}: ${current.error.message}` });
   }
-  const diskChecksum = digestOf(bytes);
-  if (diskChecksum === baseChecksum) {
-    return ok({ bom: hasByteOrderMark(bytes) });
+  if (current.value.checksum === baseChecksum) {
+    return ok({ bom: hasByteOrderMark(current.value.bytes) });
   }
+  documents.noteConflict(pagePath);
   return err({
     code: 'conflict',
-    message: `${path.basename(pagePath)} changed on disk since it was opened.`,
-    diskChecksum,
+    message: `${name} changed on disk since it was opened.`,
+    diskChecksum: current.value.checksum,
   });
+}
+
+// What a write that did not apply means to the renderer's save state (plan §7).
+function pageWriteError(
+  file: string,
+  report: Exclude<WriteReport, { readonly tag: 'applied' }>,
+): WirePageWriteError {
+  const name = path.basename(file);
+  switch (report.tag) {
+    case 'rejected':
+      return rejectedPageWrite(name, report);
+    case 'uncertain':
+      return {
+        code: 'uncertain',
+        message: `${name} may not have been saved (${report.reconciliation ?? 'unreadable'}).`,
+      };
+    case 'backpressured':
+      return { code: 'backpressured', message: describeWriteReport(name, report) };
+    default: {
+      const exhaustive: never = report;
+      return exhaustive;
+    }
+  }
+}
+
+function rejectedPageWrite(
+  name: string,
+  report: Extract<WriteReport, { readonly tag: 'rejected' }>,
+): WirePageWriteError {
+  switch (report.reason) {
+    case 'region-externally-modified':
+      if (report.diskChecksum !== undefined) {
+        const message = `${name} changed on disk since it was opened.`;
+        return { code: 'conflict', message, diskChecksum: report.diskChecksum };
+      }
+      // Changed, and now unreadable: not known to be gone, so not `missing`.
+      return { code: 'filesystem', message: `${name} changed and could not be read again.` };
+    case 'write-race':
+      return { code: 'write-race', message: `${name} was changed by another program as it saved.` };
+    case 'anchor-moved':
+    case 'anchor-ambiguous':
+    case 'source-invalid':
+    case 'unsupported-operation':
+    case 'resource-limit':
+    case 'write-failed':
+    case 'merge-conflict':
+      return { code: 'filesystem', message: describeWriteReport(name, report) };
+    default: {
+      const exhaustive: never = report.reason;
+      return exhaustive;
+    }
+  }
 }
 
 // The page model has no BOM field: parsers read past a leading BOM (§3.2), so
 // a model write puts back the one the file on disk had. Raw writes carry their
 // own text and are written verbatim.
-function hasByteOrderMark(bytes: Buffer): boolean {
+function hasByteOrderMark(bytes: Uint8Array): boolean {
   return bytes.length >= 3 && bytes[0] === 0xef && bytes[1] === 0xbb && bytes[2] === 0xbf;
 }
 
@@ -3099,7 +3164,14 @@ function withByteOrderMark(text: string): string {
 const STYLE_NUDGE_MS = 150;
 const styleNudges = new Map<string, ReturnType<typeof setTimeout>>(); // path -> pending timer
 
-function writePageText(pagePath: string, text: string): IpcResults['page:write'] {
+// A page save is a `replace-source` intent on the page's actor (plan §3.3): the
+// actor is the only writer from step 5, and the checksum it returns is the
+// persistence layer's next baseline (plan §5.2).
+function writePageText(
+  pagePath: string,
+  text: string,
+  baseChecksum: Digest,
+): IpcResults['page:write'] {
   const styled = /<style[\s>]/i.test(text);
   if (styled) {
     if (styleNudges.size >= MAIN_LIMITS.styleNudgesMax) {
@@ -3109,11 +3181,12 @@ function writePageText(pagePath: string, text: string): IpcResults['page:write']
     }
   }
   markSelfWrite(pagePath, text);
-  const written = writeFileAtomic(pagePath, text);
-  if (!written.ok) {
-    return { ok: false as const, error: written.error };
+  const report = documents.replaceSource(pagePath, text, baseChecksum);
+  const checksum = appliedChecksum(report);
+  if (checksum === undefined) {
+    assert(report.tag !== 'applied', 'Only a write that did not apply lacks a checksum');
+    return { ok: false as const, error: pageWriteError(pagePath, report) };
   }
-  const checksum = written.value;
   assert(checksum === digestOf(text), 'A page write reports the checksum of the text it wrote');
   if (styled) {
     clearTimeout(styleNudges.get(pagePath)); // a newer edit supersedes this one's nudge
@@ -3121,25 +3194,31 @@ function writePageText(pagePath: string, text: string): IpcResults['page:write']
       pagePath,
       setTimeout(() => {
         styleNudges.delete(pagePath);
-        // Skip it if anything has changed the file since — the nudge must never
-        // resurrect text that's already been superseded.
-        let current: Digest;
-        try {
-          current = digestOf(readSourceBytes(pagePath));
-        } catch {
-          return; // file moved or deleted — nothing to flush
-        }
-        if (current !== checksum) {
-          return;
-        }
+        // The same bytes again, witnessed by their own checksum: the actor
+        // refuses if anything changed the file since, so the nudge never
+        // resurrects superseded text. A refused or failed nudge leaves the
+        // correct bytes on disk; only the dev server's style cache stays one
+        // edit behind, so there is nothing to report beyond telemetry.
         markSelfWrite(pagePath, text);
-        // A failed nudge leaves the correct bytes on disk; only the dev server's
-        // style cache stays one edit behind, so there is nothing to report.
-        writeFileAtomic(pagePath, text);
+        documents.replaceSource(pagePath, text, checksum);
       }, STYLE_NUDGE_MS),
     );
   }
   return { ok: true as const, ...parsePageSource(pagePath, text), checksum };
+}
+
+// The checksum a write left on disk: an applied one, or an uncertain one whose
+// comparison found the candidate there (plan §3.5, reconciliation).
+function appliedChecksum(report: WriteReport): Digest | undefined {
+  if (report.tag === 'applied') {
+    return report.checksum;
+  }
+  if (report.tag === 'uncertain') {
+    if (report.reconciliation === 'applied') {
+      return report.candidateChecksum;
+    }
+  }
+  return undefined;
 }
 
 ipcMain.handle('page:write', async (_e, { pagePath, model, baseChecksum }) => {
@@ -3158,7 +3237,8 @@ ipcMain.handle('page:write', async (_e, { pagePath, model, baseChecksum }) => {
       return { ok: false as const, error: chunks.error };
     }
   }
-  return writePageText(pagePath, base.value.bom ? withByteOrderMark(serialized) : serialized);
+  const text = base.value.bom ? withByteOrderMark(serialized) : serialized;
+  return writePageText(pagePath, text, baseChecksum);
 });
 
 // What page:write would put on disk for this model, without writing it: the
@@ -3182,7 +3262,7 @@ ipcMain.handle('page:writeRaw', async (_e, { pagePath, source, baseChecksum }) =
   if (!base.ok) {
     return { ok: false as const, error: base.error };
   }
-  return writePageText(pagePath, source);
+  return writePageText(pagePath, source, baseChecksum);
 });
 
 ipcMain.handle('page:create', async (_e, { projectPath, name, layout }) => {
@@ -3220,8 +3300,7 @@ ipcMain.handle('page:create', async (_e, { projectPath, name, layout }) => {
     });
   }
   const created = serializePage(model);
-  markSelfWrite(pagePath, created);
-  fs.writeFileSync(pagePath, created, 'utf8');
+  createProjectText(pagePath, created);
   return { pagePath };
 });
 
@@ -3265,8 +3344,7 @@ ipcMain.handle('page:move', async (_e, { projectPath, from, to }) => {
     );
   }
   markSelfWrite(from);
-  markSelfWrite(dest);
-  fs.writeFileSync(dest, source, 'utf8');
+  createProjectText(dest, source);
   fs.rmSync(from);
   return { newPath: dest };
 });
@@ -3396,15 +3474,14 @@ ipcMain.handle('content:sampleEntry', async (_e, { devUrl, name, id }) => {
 ipcMain.handle('component:create', async (_e, opts) => {
   const { path: target, rel, text } = componentFile(opts);
   fs.mkdirSync(path.dirname(target), { recursive: true });
-  markSelfWrite(target);
-  fs.writeFileSync(target, text, 'utf8');
+  createProjectText(target, text);
   return { path: target, rel, name: opts.name };
 });
 
 // Component property edits validate their revision before updating project sources.
 ipcMain.handle('component:properties', (_event, location) => loadComponentProperties(location));
 ipcMain.handle('component:editProperties', (_event, request) =>
-  updateComponentProperties(request, markSelfWrite),
+  updateComponentProperties(request, { documents, noteWrite: markSelfWrite }),
 );
 
 // Which files hold instances of a component — the palette’s instance count.
@@ -4150,8 +4227,7 @@ ipcMain.handle('style:readFile', async (_e, filePath) => {
 
 ipcMain.handle('style:writeFile', async (_e, { filePath, css }) => {
   const abs = assertInProject(filePath);
-  markSelfWrite(abs); // the watcher must not treat our own write as external
-  fs.writeFileSync(abs, css, 'utf8');
+  writeProjectText(abs, css); // notes the write, so the watcher does not see it as external
   return { ok: true as const };
 });
 
@@ -4382,8 +4458,7 @@ ipcMain.handle('src:readText', async (_e, { projectPath, rel }) => {
 
 ipcMain.handle('src:writeText', async (_e, { projectPath, rel, text }) => {
   const abs = assertInProject(path.resolve(projectPath, rel));
-  markSelfWrite(abs);
-  fs.writeFileSync(abs, text, 'utf8');
+  writeProjectText(abs, text);
   return { ok: true as const };
 });
 

@@ -10,7 +10,7 @@
 import { assert } from '../../dist/shared/assert.js';
 import type { Splice } from '../../dist/shared/planner.js';
 import { toByteSpan, type ByteSpan, type ByteString } from '../../dist/shared/span.js';
-import { orderedSplices } from './splice.ts';
+import { orderedSplices } from '../../dist/shared/splice.js';
 
 /** One origin per byte of one version of a file. */
 export type Origins = readonly number[];

@@ -20,9 +20,10 @@
 // the mapper, which never picks between tied scripts, would call it ambiguous.
 //
 // The witness guards staleness, not identity (plan §3.4); identity comes from
-// the mapping, which rejects on ambiguity. Every other operation is
-// `unsupported-operation` here until its step (6 and 8); the simulator's
-// reference planner plans the zero-diff cases of the rest until then.
+// the mapping, which rejects on ambiguity. From step 5 the migration-only
+// `replace-source` is planned too, without mapping (planReplaceSource). Every
+// other operation is `unsupported-operation` here until its step (6 and 8); the
+// simulator's reference planner plans the zero-diff cases of the rest until then.
 import { assert } from './assert';
 import { countOccurrences } from './byteSearch';
 import { capabilityAcceptsVisualIntent } from './capability';
@@ -183,10 +184,11 @@ function planWith(
     case 'set-inline-style':
     case 'edit-frontmatter-slot':
     case 'apply-code-patch':
-    case 'replace-source':
       // Planned from step 6 (gestures) and step 8 (code editor); rejected
       // visibly until then.
       return err('unsupported-operation');
+    case 'replace-source':
+      return planReplaceSource(base, intent.anchor, operation.text);
     default: {
       const exhaustive: never = operation;
       throw new Error(`Unknown operation ${JSON.stringify(exhaustive)}`);
@@ -252,6 +254,35 @@ function planSetAttribute(
       return exhaustive;
     }
   }
+}
+
+// The migration-only whole-file replacement (plan §3.3), which the legacy save
+// path submits from step 5 so the actor is the only writer. It never maps: its
+// witness is the authored checksum itself, so any change since it was authored
+// is a rejection, and a whole-file replacement is written as one splice whose
+// expected bytes are the whole authored file. The result may not parse — a raw
+// page, a code-panel save, Markdown — so the candidate is not required to.
+// Agrees exactly with the step-1 reference (test/simulator/reference-planner.ts).
+function planReplaceSource(
+  base: PlanningBase,
+  anchor: AnchorRef,
+  text: string,
+): Result<Plan, RejectionReason> {
+  assert(anchor.expectedKind === 'document', 'A replacement anchors the whole document');
+  assert(anchor.span.start === 0, 'A document anchor starts at byte 0');
+  if (base.current.checksum !== base.authored.checksum) {
+    return err('region-externally-modified');
+  }
+  if (anchor.span.end !== base.current.bytes.length) {
+    return err('anchor-moved'); // The anchor names bytes of another length.
+  }
+  const splice: Splice = {
+    range: anchor.span,
+    expectedBytes: base.current.bytes,
+    replacementBytes: encodeUtf8(text),
+  };
+  assert(splice.replacementBytes.length <= LIMITS.intentPayloadBytesMax, 'Payload is bounded');
+  return ok({ splices: [splice], postKinds: [], candidate: 'may-be-invalid' });
 }
 
 interface RegionMapping {

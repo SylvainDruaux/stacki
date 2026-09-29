@@ -43,13 +43,16 @@ import {
   crashActor,
   createActor,
   markDirty,
+  reconcileUncertain,
   stepActor,
   submitIntent,
+  type ActorDependencies,
   type ActorEffect,
   type ActorState,
   type ActorStep,
   type Submission,
-} from './actor.ts';
+} from '../../dist/shared/documentActor.js';
+import { SIMULATOR_PROJECTOR } from './candidate.ts';
 import { planEngine } from './engine-planner.ts';
 import { FakeDisk } from './fake-disk.ts';
 import { checkBounds, checkCommitted, checkGeneration, checkOutcome, checkQuiescent } from './invariants.ts';
@@ -123,6 +126,7 @@ const EVENTS = [
   ['ai-rewrite', 2],
   ['crash', 1],
   ['write-failure', 1],
+  ['lock-contended', 1],
   ['burst', 1],
 ] as const;
 
@@ -142,21 +146,15 @@ export function runSimulation(input: SimulationInput): SimulationReport {
   return world.report();
 }
 
-/** After a crash, compare the disk with the in-flight candidate (plan §3.5):
- * reconciliation is a comparison, not a guess, and needs no intent journal. */
-function reconcile(current: Digest, base: Snapshot, candidate: Snapshot): string {
-  if (current === candidate.checksum) {
-    return 'applied';
-  }
-  if (current === base.checksum) {
-    return 'not-applied';
-  }
-  return 'changed-again';
-}
-
 class World {
   private readonly prng: Prng;
   private readonly disk = new FakeDisk();
+  // The shipped actor (shared/documentActor.ts), on the fake disk.
+  private readonly dependencies: ActorDependencies = {
+    disk: this.disk,
+    planner: planEngine,
+    projector: SIMULATOR_PROJECTOR,
+  };
   private readonly actors = new Map<FilePath, ActorState>();
   private readonly accepted = new Map<string, Intent>();
   private readonly terminal = new Map<string, Outcome>();
@@ -262,8 +260,13 @@ class World {
         return this.tickWatcher();
       case 'crash':
         return this.crash();
-      case 'write-failure':
-        return this.disk.failNextReplace(this.pickPath());
+      case 'write-failure': {
+        const failure = this.prng.pick(['failed', 'not-durable'] as const);
+        this.count(`replace:${failure}`);
+        return this.disk.failNextReplace(this.pickPath(), failure);
+      }
+      case 'lock-contended':
+        return this.disk.contendNextLock(this.pickPath());
       case 'burst':
         return this.burst(this.pickPath());
       default: {
@@ -278,7 +281,7 @@ class World {
   private runActor(actor: ActorState): void {
     const head = actor.phase.tag === 'idle' ? actor.queue[0] : undefined;
     const generationBefore = this.disk.generationOf(actor.path);
-    const result = stepActor(actor, this.disk, planEngine);
+    const result = stepActor(actor, this.dependencies);
     this.actors.set(actor.path, result.state);
     checkBounds(this.actors.values(), result.parses);
     this.trackActorWrite(actor, result.state, generationBefore);
@@ -298,7 +301,8 @@ class World {
       return;
     }
     assert(before.phase.tag === 'planned', 'Only a planned actor writes the disk');
-    assert(after.phase.tag === 'written', 'A write moves the actor to written');
+    // Written, or idle after a replace that landed but could not be flushed.
+    assert(after.phase.tag !== 'planned', 'A write moves the actor on');
     const origins = this.origins.get(generationBefore);
     if (origins !== undefined) {
       const splices = before.phase.plan.splices;
@@ -308,11 +312,14 @@ class World {
 
   // Every stale set-attribute decision is judged against the origins; fresh
   // ones are the identity mapping and only counted.
-  private judgePlanning(head: Submission, result: ActorStep): void {
-    const intent = head.intent;
+  private judgePlanning(submission: Submission, result: ActorStep): void {
+    const intent = submission.intent;
     if (intent.operation.tag !== 'set-attribute') {
       return;
     }
+    // The simulated client always sends the snapshot it authored against.
+    assert(submission.authored !== undefined, 'Simulated intents carry their authored bytes');
+    const head = { intent, authored: submission.authored };
     const decision = decisionFor(intent, result);
     const current = result.state.snapshot;
     if (decision === undefined || current === undefined) {
@@ -403,6 +410,11 @@ class World {
         this.holdCurrent(path);
         this.log(`  refresh ${path} gen ${effect.generation}`);
         return;
+      case 'disk-error':
+        this.log(`  disk error for ${effect.intentId}`);
+        return;
+      case 'lock-leaked':
+        throw new Error('Assertion failed: the fake disk never fails to release a lock');
       default: {
         const exhaustive: never = effect;
         throw new Error(`Unknown effect ${JSON.stringify(exhaustive)}`);
@@ -717,10 +729,17 @@ class World {
     assert(phase.tag !== 'idle', 'A crash is injected mid-intent');
     const result = crashActor(actor);
     this.actors.set(actor.path, result.state);
+    if (phase.tag === 'written') {
+      this.disk.breakLock(actor.path); // The real disk breaks a dead owner's lock.
+    }
     for (const effect of result.effects) {
       this.absorb(effect, actor.path);
     }
-    const verdict = reconcile(sha256(this.diskBytes(actor.path)), phase.base, phase.candidate);
+    const verdict = reconcileUncertain({
+      baseChecksum: phase.base.checksum,
+      candidateChecksum: phase.candidate.checksum,
+      currentChecksum: sha256(this.diskBytes(actor.path)),
+    });
     this.count(`reconcile:${verdict}`);
     this.log(`  crash ${actor.path} in ${phase.tag}: reconciled ${verdict}`);
   }

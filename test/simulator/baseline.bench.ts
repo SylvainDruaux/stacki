@@ -1,10 +1,10 @@
 // Goal: the two baselines the step-4 revision needs, on the six named large
 // fixtures, measured with no editor-core code at all. A measurement, not a test.
 //   floor   — the plan §5.2 disk work alone: read + SHA-256, then
-//             writeFileAtomic (temp file, fsync, rename, read-back). No engine
+//             writeVerified (temp file, fsync, rename, directory flush, read-back). No engine
 //             change can go below it on this machine.
 //   legacy  — the shipped page:write path, lower bound: serializePage(model),
-//             the base-checksum read, writeFileAtomic, then parsePage(locs) of
+//             the base-checksum read, writeVerified, then parsePage(locs) of
 //             the written text (main.ts writePageText → parsePageSource).
 //             Chunk writes and the IPC transfer are left out.
 // Method: 2 warm-ups then SAMPLES samples per fixture, nearest-rank p95, on a
@@ -15,7 +15,7 @@ import { createHash } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { writeFileAtomic } from '../../dist/electron/atomicWrite.js';
+import { writeVerified } from './verified-write.entry.ts';
 import { parsePage, serializePage } from '../../dist/electron/astroParser.js';
 import { LIMITS } from '../../dist/shared/limits.js';
 
@@ -71,7 +71,7 @@ function editableModel(text: string): unknown {
 function floorOnce(file: string, text: string): number {
   const started = performance.now();
   createHash('sha256').update(fs.readFileSync(file)).digest('hex');
-  const written = writeFileAtomic(file, text);
+  const written = writeVerified(file, text);
   if (!written.ok) {
     throw new Error(`Assertion failed: the floor write succeeds: ${written.error.message}`);
   }
@@ -82,7 +82,7 @@ function legacyOnce(file: string, model: unknown): number {
   const started = performance.now();
   const serialized = serializePage(model);
   createHash('sha256').update(fs.readFileSync(file)).digest('hex');
-  const written = writeFileAtomic(file, serialized);
+  const written = writeVerified(file, serialized);
   if (!written.ok) {
     throw new Error(`Assertion failed: the legacy write succeeds: ${written.error.message}`);
   }

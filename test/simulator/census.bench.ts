@@ -32,7 +32,7 @@ import {
   type ByteString,
 } from '../../dist/shared/span.js';
 import { projectBytes } from './project.ts';
-import { applySplices } from './splice.ts';
+import { applySplices } from '../../dist/shared/splice.js';
 
 const PAGE = toFilePath('/project/page.astro');
 const FILES_MAX = 10_000;

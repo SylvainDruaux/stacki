@@ -14,8 +14,14 @@ export interface MainHarness {
   readonly dispose: () => void;
 }
 
-export function mainHarness(userData: string, sourcePath?: string): MainHarness {
-  const entry = path.resolve('dist/electron/main.js');
+/** `entryPath` loads another build's main — the step-5 parity run drives the
+ * legacy build's handlers beside the current ones. */
+export function mainHarness(
+  userData: string,
+  sourcePath?: string,
+  entryPath = path.resolve('dist/electron/main.js'),
+): MainHarness {
+  const entry = entryPath;
   const require = createRequire(entry);
   const handlers = new Map<string, (event: unknown, input?: unknown) => unknown>();
   const timers = new Set<ReturnType<typeof setTimeout>>();

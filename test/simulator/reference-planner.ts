@@ -23,7 +23,7 @@ import {
   type ByteString,
 } from '../../dist/shared/span.js';
 import type { CandidatePolicy, Plan, PostKind } from '../../dist/shared/planner.js';
-import type { Splice } from './splice.ts';
+import type { Splice } from '../../dist/shared/planner.js';
 
 const QUOTE_DOUBLE = 0x22;
 const QUOTE_SINGLE = 0x27;

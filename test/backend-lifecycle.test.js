@@ -200,11 +200,13 @@ test('project watchers route batched edits once and cancel all pending events on
   const events = [];
   const checks = [];
   const pokes = [];
+  const hints = [];
   const watcher = watchProject({
     projectPath,
     watch: (dir, _options, handler) => { handlers.set(path.basename(dir), handler); return { close: () => closed.push(dir) }; },
     send: (channel, payload) => events.push({ channel, payload }),
     isSelfWrite: (file) => { checks.push(file); return file.endsWith('ours.astro'); },
+    noteExternalChange: (file) => hints.push(path.basename(file)),
     notePageMayHaveChanged: (external) => pokes.push(external),
     scheduleThumb: () => {},
     mediaPattern: /\.png$/,
@@ -214,6 +216,9 @@ test('project watchers route batched edits once and cancel all pending events on
   await sleep(250);
   assert.equal(checks.length, 7, 'each event reads its self-write contents at most once');
   assert.equal(pokes.length, 6, 'every external source type nudges preview recovery');
+  // The document actors hear every outside change as a hint to re-read (plan §7);
+  // the app's own write is not one.
+  assert.deepEqual(hints, ['page.astro', 'page.astro', 'info.json', 'hero.png', 'style.css', 'code.ts']);
   assert.equal(events.length, 4);
   assert.deepEqual(events.find((event) => event.channel === 'fs:changed').payload.files, [path.join(projectPath, 'src', 'page.astro')]);
   for (const name of ['next.astro', 'next.json', 'next.png', 'next.css']) {emit(name);}

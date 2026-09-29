@@ -89,6 +89,10 @@ const REQUIRED_TALLIES = [
   'outcome:rejected write-failed',
   'outcome:rejected write-race',
   'outcome:uncertain',
+  // Step 5: the shipped actor's lock and its two replace failures.
+  'lock-contended',
+  'replace:failed',
+  'replace:not-durable',
   'submit:backpressured',
   'gesture:completed',
   'gesture:cancelled',

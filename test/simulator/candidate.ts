@@ -6,6 +6,7 @@
 // one byte fails the run at the event.
 import assert from 'node:assert/strict';
 import type { FilePath } from '../../dist/shared/brand.js';
+import type { Projector } from '../../dist/shared/documentActor.js';
 import type { Plan } from '../../dist/shared/planner.js';
 import { projectValueSplice } from '../../dist/shared/projection-patch.js';
 import { createSnapshot, type Snapshot } from '../../dist/shared/snapshot.js';
@@ -49,3 +50,11 @@ export function candidateSnapshot(
   counts.patched++;
   return createSnapshot({ path, bytes, projection: patched }, sha256);
 }
+
+/** The actor's parser and hash in the simulator: the real parser, and every
+ * patched candidate checked against a full reparse. */
+export const SIMULATOR_PROJECTOR: Projector = {
+  hash: sha256,
+  snapshot: snapshotOf,
+  candidate: candidateSnapshot,
+};

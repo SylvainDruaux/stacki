@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 
 import { toArray } from '../shared/record.js';
+import { writeProjectText } from './documentWrites.js';
 import { parseConflict, renderResolved } from './conflicts.js';
 import type { ConflictPart } from './conflicts.js';
 import { gitErrorDetail, gitErrorFull } from './git.js';
@@ -94,7 +95,7 @@ async function resolveMerge(
       const perHunk = toArray(choice);
       if (perHunk) {
         const parts = parseConflict(fs.readFileSync(path.join(projectPath, file), 'utf8'));
-        fs.writeFileSync(path.join(projectPath, file), renderResolved(parts, perHunk));
+        writeProjectText(path.join(projectPath, file), renderResolved(parts, perHunk));
       } else {
         // One answer for the whole file. Defaults to keeping what is on this
         // branch: a missing choice must never silently prefer the incoming

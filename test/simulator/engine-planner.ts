@@ -1,6 +1,7 @@
 // The planner the simulator's actor runs from step 3 (the spike): the shipping
-// planner, shared/planner.ts, for the one operation it plans — set-attribute,
-// mapped through the diff when the intent is stale — and the step-1 reference
+// planner, shared/planner.ts, for the operations it plans — set-attribute,
+// mapped through the diff when the intent is stale, and from step 5 the
+// migration-only replace-source, never mapped — and the step-1 reference
 // planner for every operation whose step has not shipped yet (6 and 8), which
 // plans them against unchanged bytes only. Pure, like both halves (plan §5.2).
 import type { Intent, RejectionReason } from '../../dist/shared/intent.js';
@@ -12,6 +13,7 @@ export function planEngine(base: PlanningBase, intent: Intent): Result<Plan, Rej
   const operation = intent.operation;
   switch (operation.tag) {
     case 'set-attribute':
+    case 'replace-source':
       return planIntent(base, intent);
     case 'remove-attribute':
     case 'insert-node':
@@ -20,7 +22,6 @@ export function planEngine(base: PlanningBase, intent: Intent): Result<Plan, Rej
     case 'set-inline-style':
     case 'edit-frontmatter-slot':
     case 'apply-code-patch':
-    case 'replace-source':
       return planByIdentity(base.current, intent);
     default: {
       const exhaustive: never = operation;

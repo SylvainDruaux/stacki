@@ -29,14 +29,17 @@ lands it.
   threshold passed. See Thresholds, "Revision A decision".
   **Revision B** (registered `a1ceffa` with A's thresholds unchanged, measured
   at `3352742`) **passed every threshold: go** (2026-09-28). See Thresholds,
-  "Revision B decision". Step 5 is unblocked and has not started.
+  "Revision B decision". **Step 5 landed (2026-09-28)**: every write of
+  project text goes through a document actor (see Step 5); steps 6–10 have
+  not started.
 - **Step 0 landed (2026-09-28).** The legacy
   write path still serializes whole files (`mutateModel` → `page:write` →
   `serializePage`), but every page write now names the checksum it was
-  authored against and main refuses a stale one with `conflict`; all page,
-  chunk, style and property writes go through `electron/atomicWrite.ts`.
-  Still legacy: watcher echo via `selfWrites`, the renderer rescan chain,
-  saver acks by `WeakMap` object identity.
+  authored against and main refuses a stale one with `conflict`. Since step 5
+  that write is a `replace-source` intent to the page's document actor, and
+  so is every other write of project text. Still legacy: watcher echo via
+  `selfWrites`, the renderer rescan chain, saver acks by `WeakMap` object
+  identity.
 - **A partial precedent landed in the window (v0.1.29).**
   `electron/componentProperties.ts` validates a whole-file expected-source
   (`source.value !== request.source` → typed `conflict` rejection), then
@@ -48,9 +51,9 @@ lands it.
   channels arrived (`component:properties`, `component:editProperties`).
 - Since step 1: `shared/intent.ts`, `ref.ts`, `snapshot.ts`, `span.ts`,
   `capability.ts` and `source-projection.ts` exist; since step 2, `diff.ts`,
-  `mapSpan.ts` and `planner.ts`. The shipping actor and its bounded queue do
-  not (the simulator's step-wise actor in `test/simulator/actor.ts` is the
-  reference the step-5 actor must match). Since step 3 the simulator's actor
+  `mapSpan.ts` and `planner.ts`; since step 5, `splice.ts` and
+  `documentActor.ts` — the shipping actor, which the simulator now drives
+  (`test/simulator/actor.ts` is gone). Since step 3 the simulator's actor
   plans `set-attribute` with `shared/planner.ts` and judges every remap against
   recorded byte origins; the other operations still use the step-1 reference
   planner.
@@ -1137,16 +1140,19 @@ returns `resource-limit`, or `backpressured` at submission (there is no
 `queue-full` reason) — the system never grows a drain cap, retries forever, or
 reduces fidelity to cope. **Step 1 added all of them except `undoEntriesMax`**
 (see Step 1 above); projection nodes and depth reuse `treeNodesMax` and
-`treeDepthMax`.
+`treeDepthMax`. Step 5 added `documentActorsMax` (512) and
+`documentBytesRetainedMax` (64 MB): the host's actor count and retained
+snapshot bytes.
 
 ## Adapter surface (ratchet, scripted at step 1)
 
-| Point | Hand, 2026-09-28 | Script, step 1 (baseline) | Script, step 3 (spike) |
-|---|---|---|---|
-| Direct node-mutation sites in `src/` | 67 (47 in `App.tsx`) | 70 | 70 |
-| Prop-index writes | 10 | 9 | 9 |
-| `mutateModel(` call sites | 28 | 28 | 28 |
-| `applyEdit(` call sites (style panel) | 4 | 4 | 4 |
+| Point | Hand, 2026-09-28 | Script, step 1 (baseline) | Script, step 3 (spike) | Script, step 5 |
+|---|---|---|---|---|
+| Direct node-mutation sites in `src/` | 67 (47 in `App.tsx`) | 70 | 70 | 70 |
+| Prop-index writes | 10 | 9 | 9 | 9 |
+| `mutateModel(` call sites | 28 | 28 | 28 | 28 |
+| `applyEdit(` call sites (style panel) | 4 | 4 | 4 | 4 |
+| `replace-source` submission sites (`electron/`) | — | — | — | 23 (baseline) |
 
 `node dist/scripts/adapter-surface.js --files` prints the per-file split
 (step 1: `App.tsx` 58, `loopBindings.ts` 12, `dataSuggest.ts` 6,
@@ -1171,7 +1177,13 @@ Carried from the removed diff-mapping plan; resolved or still open per the
 consolidated plan:
 
 - **Threshold timing** — resolved: pre-registered at §11.4, decided at step 4.
-- **`lastKnownBytes` chaining** — reopened by step 2 (2026-09-28). The
+- **`lastKnownBytes` chaining** — decided at step 5 (2026-09-28): the
+  renderer sends no bytes and the actor keeps its current snapshot only; a
+  stale intent without its authored bytes is refused with its operation's
+  stale reason. `Submission.authored` stays optional so the simulator (and
+  step 6's visual gestures, if they carry bytes) can still map. The splice log
+  for self-caused staleness is step 6's, when a mapped intent first ships.
+  History: reopened by step 2 (2026-09-28). The
   actor commits a new snapshot per applied intent (§5.10), but mapping a stale
   intent needs the *bytes* it was authored against (`PlanningBase.authored`),
   not only compact preconditions (§3.1 says the latter). Decide at step 5, with
@@ -1204,6 +1216,13 @@ reason, emitted with the intent id and a hashed or redacted file path. No
 source bytes ever enter logs. No metrics pipeline, no dashboard, no new
 dependency. The rejection distribution is the production signal for
 everything the corpus cannot cover.
+
+**In place since step 5** (`electron/documentTelemetry.ts`): one JSON line on
+main's stdout per terminal outcome, backpressured submission, save-guard
+conflict and leaked lock — `{"event":"stacki.document","file":<16 hex of
+SHA-256(path)>,"intent":…,"outcome":…,"reason":…,"count":…}`, where `count`
+is the running total for that outcome or reason. Pinned: no path, no bytes
+(`test/document-actors.test.js`).
 
 ## Verification record
 

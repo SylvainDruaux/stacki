@@ -21,7 +21,7 @@ import { oracleIntent, oracleSplices } from './oracle-intent.ts';
 import { ORACLE_SCENARIOS, type IntentClass } from './oracles.ts';
 import { snapshotOf } from './project.ts';
 import { planByIdentity } from './reference-planner.ts';
-import { applySplices } from './splice.ts';
+import { applySplices } from '../../dist/shared/splice.js';
 
 const FIXTURES = path.resolve('test/fixtures/editor-core');
 const snapshotFile = (name: string) =>

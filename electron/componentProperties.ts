@@ -1,10 +1,14 @@
 import { readPropertyConsumers, readBoundedSource, filesystemError } from './propertyConsumers';
 // Plan against exact source revisions, then commit as one synchronous batch.
 // Failed writes restore earlier files so a rename cannot leave half the site on the old API.
+//
+// From step 5 the batch runs through the document actors (plan §3.3): their
+// actors are leased in sorted canonical-path order, each file is witnessed by
+// the checksum of its `before` text, and every write — rollback included — is
+// a `replace-source` intent, so an outside edit is refused, never overwritten.
 import fs from 'node:fs';
 import path from 'node:path';
 import { assert } from '../shared/assert';
-import type { Digest } from '../shared/brand';
 import { PROPERTY_LIMITS } from '../shared/component-properties';
 import type {
   ComponentProperties,
@@ -14,8 +18,8 @@ import type {
 import { err, ok, type Result } from '../shared/result';
 import { literalOptions } from '../shared/property-options';
 import { sameFilesystemPath } from './platform';
-import { digestOf, writeFileAtomic, type AtomicWriteError } from './atomicWrite';
-import { readSourceBytes } from './main.bounds';
+import { digestOf } from './atomicWrite';
+import type { DocumentActors, WriteReport } from './documentActors';
 import { editPropertyDefinition, readComponentProperties } from './propertyDefinitions';
 import { renameComponentOptionValues, renameComponentReferences } from './propertyRename';
 
@@ -33,6 +37,19 @@ interface FileChange {
   readonly after: string;
 }
 
+/** Where a batch writes: the document actors, and the self-write note the
+ * watcher needs until step 9 (electron/selfWrites.ts). */
+export interface PropertyWriter {
+  readonly documents: DocumentActors;
+  readonly noteWrite: (file: string, source: string) => void;
+}
+
+/** Why a batch write failed, before the rollback decides what to report. */
+interface WriteFailure {
+  readonly code: 'conflict' | 'filesystem' | 'write-race';
+  readonly message: string;
+}
+
 export function loadComponentProperties(location: PropertyLocation): Result<ComponentProperties> {
   const target = validateLocation(location);
   if (!target.ok) {
@@ -47,7 +64,7 @@ export function loadComponentProperties(location: PropertyLocation): Result<Comp
 
 export function updateComponentProperties(
   request: PropertyEditRequest,
-  noteWrite: (file: string, source: string) => void
+  writer: PropertyWriter
 ): Result<ComponentProperties> {
   const target = validateLocation(request);
   if (!target.ok) {
@@ -71,7 +88,7 @@ export function updateComponentProperties(
   if (!plan.ok) {
     return plan;
   }
-  const result = commitPropertyChanges(plan.value, noteWrite);
+  const result = commitPropertyChanges(plan.value, writer);
   if (!result.ok) {
     return result;
   }
@@ -217,19 +234,30 @@ function validateOptionRenames(
 
 function commitPropertyChanges(
   changes: readonly FileChange[],
-  noteWrite: (file: string, source: string) => void
+  writer: PropertyWriter
 ): Result<void> {
   assert(changes.length <= PROPERTY_LIMITS.filesMax, 'Property transaction is bounded');
   assert(
     new Set(changes.map((change) => change.file)).size === changes.length,
     'Property transaction writes each file once'
   );
+  const leased = writer.documents.withLeases(changes, (ordered) =>
+    commitLeased(ordered, writer)
+  );
+  if (!leased.ok) {
+    return err({ code: 'filesystem', message: leased.error });
+  }
+  return leased.value;
+}
+
+// Holding every actor of the batch: check all, then write each in order.
+function commitLeased(changes: readonly FileChange[], writer: PropertyWriter): Result<void> {
   for (const change of changes) {
-    const current = readBoundedSource(change.file);
+    const current = writer.documents.current(change.file);
     if (!current.ok) {
-      return current;
+      return err({ code: 'filesystem', message: current.error.message });
     }
-    if (current.value !== change.before) {
+    if (current.value.checksum !== digestOf(change.before)) {
       return err({
         code: 'conflict',
         message: `${change.file} changed during the rename. Try again.`,
@@ -238,33 +266,73 @@ function commitPropertyChanges(
   }
   const written: FileChange[] = [];
   for (const change of changes) {
-    noteWrite(change.file, change.after);
-    const result = writeFileAtomic(change.file, change.after);
-    if (!result.ok) {
-      // Neither failure leaves this file holding our bytes: a filesystem error
-      // never replaced it, and a write-race means another writer replaced it
-      // after us. Only the files written before it are ours to restore.
-      return rollbackPropertyChanges(written, result.error, noteWrite);
+    writer.noteWrite(change.file, change.after);
+    const report = writer.documents.replaceSource(
+      change.file,
+      change.after,
+      digestOf(change.before)
+    );
+    if (report.tag !== 'applied') {
+      // An uncertain write may hold the batch's bytes; the rollback's witness
+      // restores it only if it does. A refused one was never written.
+      const mine = report.tag === 'uncertain' ? [...written, change] : written;
+      return rollbackPropertyChanges(mine, failureOf(change.file, report), writer);
     }
-    assert(result.value === digestOf(change.after), 'Property write reports the planned bytes');
+    assert(report.checksum === digestOf(change.after), 'Property write reports the planned bytes');
     written.push(change);
   }
   return ok(undefined);
 }
 
+function failureOf(file: string, report: Exclude<WriteReport, { tag: 'applied' }>): WriteFailure {
+  switch (report.tag) {
+    case 'rejected':
+      switch (report.reason) {
+        case 'region-externally-modified':
+          return { code: 'conflict', message: `${file} changed during the rename.` };
+        case 'write-race':
+          return {
+            code: 'write-race',
+            message: report.message || `${file} was changed by another writer during the save`,
+          };
+        case 'anchor-moved':
+        case 'anchor-ambiguous':
+        case 'source-invalid':
+        case 'unsupported-operation':
+        case 'resource-limit':
+        case 'write-failed':
+        case 'merge-conflict':
+          return { code: 'filesystem', message: report.message || `Could not save ${file}` };
+        default: {
+          const exhaustive: never = report.reason;
+          return exhaustive;
+        }
+      }
+    case 'uncertain':
+      return { code: 'filesystem', message: `${file} may not have been saved. ${report.message}` };
+    case 'backpressured':
+      throw new Error('Assertion failed: a leased actor holds no other intent to push back with');
+    default: {
+      const exhaustive: never = report;
+      return exhaustive;
+    }
+  }
+}
+
 // Best-effort, not atomic (plan §3.3): each file is restored only while it
-// still holds exactly the bytes this batch wrote. A file somebody changed since
-// is theirs now; restoring it would destroy their edit, so it is named instead.
+// still holds exactly the bytes this batch wrote — the restore is an intent
+// witnessed by their checksum. A file somebody changed since is theirs now;
+// restoring it would destroy their edit, so it is named instead.
 function rollbackPropertyChanges(
   written: readonly FileChange[],
-  cause: AtomicWriteError,
-  noteWrite: (file: string, source: string) => void
+  cause: WriteFailure,
+  writer: PropertyWriter
 ): Result<never> {
   assert(written.length <= PROPERTY_LIMITS.filesMax, 'Rollback is bounded by the batch');
   const failed: string[] = [];
   const changed: string[] = [];
   for (const change of [...written].reverse()) {
-    const restored = restorePropertyFile(change, noteWrite);
+    const restored = restorePropertyFile(change, writer);
     if (restored === 'changed') {
       changed.push(change.file);
     } else if (restored === 'failed') {
@@ -286,19 +354,23 @@ function rollbackPropertyChanges(
 
 function restorePropertyFile(
   change: FileChange,
-  noteWrite: (file: string, source: string) => void
+  writer: PropertyWriter
 ): 'restored' | 'changed' | 'failed' {
-  let current: Digest;
-  try {
-    current = digestOf(readSourceBytes(change.file));
-  } catch {
-    return 'failed';
+  writer.noteWrite(change.file, change.before);
+  const report = writer.documents.replaceSource(change.file, change.before, digestOf(change.after));
+  switch (report.tag) {
+    case 'applied':
+      return 'restored';
+    case 'rejected':
+      return report.reason === 'region-externally-modified' ? 'changed' : 'failed';
+    case 'uncertain':
+    case 'backpressured':
+      return 'failed';
+    default: {
+      const exhaustive: never = report;
+      return exhaustive;
+    }
   }
-  if (current !== digestOf(change.after)) {
-    return 'changed';
-  }
-  noteWrite(change.file, change.before);
-  return writeFileAtomic(change.file, change.before).ok ? 'restored' : 'failed';
 }
 
 function planPropertyRemoval(

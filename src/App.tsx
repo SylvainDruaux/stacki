@@ -451,6 +451,11 @@ function pageWriteOutcome(
     case 'missing':
     case 'filesystem':
     case 'write-race':
+    case 'uncertain':
+    case 'backpressured':
+      // The edits stay unsaved (dirty) and the next save names the same base,
+      // so a write that did land comes back as a visible conflict, never as
+      // a silent overwrite (plan §3.5, §7).
       throw new Error(error.message);
     default: {
       const exhaustive: never = error;

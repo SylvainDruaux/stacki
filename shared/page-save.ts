@@ -19,7 +19,11 @@ export type PageWriteError =
   | { readonly code: 'conflict'; readonly message: string; readonly diskChecksum: Digest }
   | { readonly code: 'missing'; readonly message: string }
   | { readonly code: 'filesystem'; readonly message: string }
-  | { readonly code: 'write-race'; readonly message: string };
+  | { readonly code: 'write-race'; readonly message: string }
+  /** The write may have landed; the file's actor could not verify it (§3.5). */
+  | { readonly code: 'uncertain'; readonly message: string }
+  /** The file's actor queue was full; the edit was never accepted (§7). */
+  | { readonly code: 'backpressured'; readonly message: string };
 
 export function parsePageDiskRead(input: unknown): PageDiskRead {
   const page = parsePageReadResult(input);
@@ -67,6 +71,8 @@ function parsePageWriteError(input: unknown): PageWriteError {
     case 'missing':
     case 'filesystem':
     case 'write-race':
+    case 'uncertain':
+    case 'backpressured':
       return { code, message };
     default:
       throw new Error('PageWriteError.code: unknown value');

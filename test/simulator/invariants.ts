@@ -17,8 +17,8 @@ import { assert } from '../../dist/shared/assert.js';
 import type { Intent, Outcome } from '../../dist/shared/intent.js';
 import { LIMITS } from '../../dist/shared/limits.js';
 import { isNodeKind } from '../../dist/shared/ref.js';
-import type { ActorEffect, ActorState } from './actor.ts';
-import { orderedSplices } from './splice.ts';
+import type { ActorEffect, ActorState } from '../../dist/shared/documentActor.js';
+import { orderedSplices } from '../../dist/shared/splice.js';
 
 type Committed = Extract<ActorEffect, { tag: 'committed' }>;
 

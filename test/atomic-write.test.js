@@ -1,7 +1,11 @@
-// Goal: electron/atomicWrite.ts replaces a file all at once or not at all,
-// never leaves its temporary file behind, keeps the target's mode, writes
-// through symlinks, and reports another writer landing after it as a
-// `write-race` instead of claiming success (plan §5.2, §11 step 0).
+// Goal: electron/atomicWrite.ts, the primitives under the document actor's
+// disk, replaces a file all at once or not at all, never leaves its temporary
+// file behind, keeps the target's mode, writes through symlinks and refuses a
+// dangling one, creates without ever overwriting, and reports a directory it
+// could not flush as `not-durable` rather than success (plan §5.2). Verifying
+// the bytes afterwards is the actor's step 9, tested with the host
+// (test/document-actors.test.js); the real-filesystem contract is the platform
+// suite's (test/platform/).
 // Method: real files in a temporary directory; filesystem failures are
 // injected by wrapping one `fs` function at a time, since the module calls the
 // shared `fs` object.
@@ -12,10 +16,11 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const {
+  createFileExclusive,
   digestOf,
   isAtomicTemporary,
   readSourceSnapshot,
-  writeFileAtomic,
+  replaceFileAtomic,
 } = require('../dist/electron/atomicWrite.js');
 
 const sha256 = (bytes) => createHash('sha256').update(bytes).digest('hex');
@@ -42,13 +47,13 @@ function withFailure(name, replacement, run) {
   }
 }
 
-test('a write replaces the file, keeps its mode and returns the checksum', () => {
+test('a replace swaps the file, keeps its mode and reports nothing but success', () => {
   directory((root) => {
     const file = path.join(root, 'page.astro');
     fs.writeFileSync(file, 'old\n');
     fs.chmodSync(file, 0o640);
-    const result = writeFileAtomic(file, 'new é\n');
-    assert.deepEqual(result, { ok: true, value: sha256(Buffer.from('new é\n', 'utf8')) });
+    const result = replaceFileAtomic(file, Buffer.from('new é\n', 'utf8'));
+    assert.deepEqual(result, { ok: true, value: undefined });
     assert.equal(fs.readFileSync(file, 'utf8'), 'new é\n');
     if (process.platform !== 'win32') {
       assert.equal(fs.statSync(file).mode & 0o777, 0o640);
@@ -57,26 +62,31 @@ test('a write replaces the file, keeps its mode and returns the checksum', () =>
   });
 });
 
-test('a missing target is created', () => {
+test('a creation makes a missing file and never overwrites one', () => {
   directory((root) => {
     const file = path.join(root, 'chunk.html');
-    assert.equal(writeFileAtomic(file, '<p/>').ok, true);
+    const created = createFileExclusive(file, Buffer.from('<p/>'));
+    assert.deepEqual(created, { ok: true, value: undefined });
     assert.equal(fs.readFileSync(file, 'utf8'), '<p/>');
+    const again = createFileExclusive(file, Buffer.from('<div/>'));
+    assert.equal(again.ok, false);
+    assert.equal(again.error.code, 'exists');
+    assert.equal(fs.readFileSync(file, 'utf8'), '<p/>', 'the existing bytes stand');
   });
 });
 
-test('a failed write leaves the target untouched and no temporary file', () => {
+test('a failed replace leaves the target untouched and no temporary file', () => {
   directory((root) => {
     const file = path.join(root, 'page.astro');
     fs.writeFileSync(file, 'authored\n');
-    for (const name of ['writeFileSync', 'fsyncSync', 'renameSync']) {
+    for (const name of ['writeFileSync', 'fsyncSync', 'renameSync', 'fchmodSync']) {
       withFailure(
         name,
         () => {
           throw new Error(`Simulated ${name} failure`);
         },
         () => {
-          const result = writeFileAtomic(file, 'replacement\n');
+          const result = replaceFileAtomic(file, Buffer.from('replacement\n'));
           assert.equal(result.ok, false, name);
           assert.equal(result.error.code, 'filesystem');
           assert.match(result.error.message, new RegExp(`Simulated ${name} failure`));
@@ -94,7 +104,7 @@ test('a failed cleanup names the temporary file it could not remove', () => {
     fs.writeFileSync(file, 'authored\n');
     withFailure('renameSync', () => { throw new Error('no rename'); }, () => {
       withFailure('rmSync', () => { throw new Error('no remove'); }, () => {
-        const result = writeFileAtomic(file, 'replacement\n');
+        const result = replaceFileAtomic(file, Buffer.from('replacement\n'));
         assert.equal(result.error.code, 'filesystem');
         assert.match(result.error.message, /or remove temporary file .*\.stacki-write-.*\.tmp/);
       });
@@ -103,36 +113,77 @@ test('a failed cleanup names the temporary file it could not remove', () => {
   });
 });
 
-test('another writer landing right after the rename is a write-race', () => {
+const posixOnly = { skip: process.platform === 'win32' };
+
+// The flush after the rename: an I/O error means the new bytes are in place but
+// not promised durable — `not-durable`, which the actor reports as uncertain.
+// A filesystem that cannot flush directories at all is the platform's promise.
+test('a folder flush: EIO is not-durable, an unsupported flush is the platform', posixOnly, () => {
   directory((root) => {
     const file = path.join(root, 'page.astro');
     fs.writeFileSync(file, 'authored\n');
-    withFailure(
-      'renameSync',
-      (rename, from, to) => {
-        rename(from, to);
-        fs.writeFileSync(to, 'theirs\n');
-      },
-      () => {
-        const result = writeFileAtomic(file, 'mine\n');
-        assert.equal(result.ok, false);
-        assert.equal(result.error.code, 'write-race');
-      },
-    );
-    assert.equal(fs.readFileSync(file, 'utf8'), 'theirs\n');
+    const directoryFlush = (code) => (fsync, descriptor) => {
+      if (fs.fstatSync(descriptor).isDirectory()) {
+        throw Object.assign(new Error(`Simulated ${code}`), { code });
+      }
+      return fsync(descriptor);
+    };
+    withFailure('fsyncSync', directoryFlush('EIO'), () => {
+      const result = replaceFileAtomic(file, Buffer.from('mine\n'));
+      assert.equal(result.ok, false);
+      assert.equal(result.error.code, 'not-durable');
+    });
+    assert.equal(fs.readFileSync(file, 'utf8'), 'mine\n', 'the bytes are in place');
+    withFailure('fsyncSync', directoryFlush('EINVAL'), () => {
+      const again = replaceFileAtomic(file, Buffer.from('again\n'));
+      assert.deepEqual(again, { ok: true, value: undefined });
+    });
+    assert.deepEqual(leftovers(root), []);
   });
 });
 
-const posixOnly = { skip: process.platform === 'win32' };
-test('a symlinked page is written through, and the link stays a link', posixOnly, () => {
+test('a symlinked page is written through; a dangling link is refused', posixOnly, () => {
   directory((root) => {
     const real = path.join(root, 'real.astro');
     const link = path.join(root, 'link.astro');
     fs.writeFileSync(real, 'old\n');
     fs.symlinkSync(real, link);
-    assert.equal(writeFileAtomic(link, 'new\n').ok, true);
+    assert.equal(replaceFileAtomic(link, Buffer.from('new\n')).ok, true);
     assert.equal(fs.lstatSync(link).isSymbolicLink(), true);
     assert.equal(fs.readFileSync(real, 'utf8'), 'new\n');
+    const dangling = path.join(root, 'dangling.astro');
+    fs.symlinkSync(path.join(root, 'missing.astro'), dangling);
+    const result = replaceFileAtomic(dangling, Buffer.from('x\n'));
+    assert.equal(result.ok, false);
+    assert.match(result.error.message, /symlink to a missing file/);
+    assert.equal(fs.lstatSync(dangling).isSymbolicLink(), true, 'the link is left alone');
+    assert.equal(fs.existsSync(path.join(root, 'missing.astro')), false);
+  });
+});
+
+// Ownership: a replacement keeps the target's owner and group, and when the OS
+// will not allow that, the save is refused rather than silently handing the
+// file to another owner. Changing a file's real owner needs root, so the
+// target's owner is faked through statSync and the refusal through fchownSync.
+test('a replace that cannot keep the owner is refused', posixOnly, () => {
+  directory((root) => {
+    const file = path.join(root, 'page.astro');
+    fs.writeFileSync(file, 'authored\n');
+    withFailure('statSync', (stat, ...args) => {
+      const stats = stat(...args);
+      const other = Object.create(Object.getPrototypeOf(stats));
+      return Object.assign(other, stats, { uid: stats.uid + 1 });
+    }, () => {
+      withFailure('fchownSync', () => {
+        throw Object.assign(new Error('EPERM: operation not permitted'), { code: 'EPERM' });
+      }, () => {
+        const result = replaceFileAtomic(file, Buffer.from('mine\n'));
+        assert.equal(result.ok, false);
+        assert.match(result.error.message, /would change the file's owner/);
+      });
+    });
+    assert.equal(fs.readFileSync(file, 'utf8'), 'authored\n');
+    assert.deepEqual(leftovers(root), []);
   });
 });
 
@@ -150,8 +201,10 @@ test('snapshots keep a BOM in the text and reject invalid UTF-8', () => {
   });
 });
 
-test('only the module’s own temporary names are treated as temporary', () => {
+test('only the module’s own temporary and lock names are treated as temporary', () => {
   assert.equal(isAtomicTemporary('/p/src/pages/.stacki-write-1b2c.tmp'), true);
+  assert.equal(isAtomicTemporary('/p/src/pages/.stacki-lock-0123abcd.lock'), true);
+  assert.equal(isAtomicTemporary('.stacki-lock-0123abcd.astro'), false);
   assert.equal(isAtomicTemporary('.stacki-write-1b2c.tmp'), true);
   assert.equal(isAtomicTemporary('.stacki-write-1b2c.astro'), false);
   assert.equal(isAtomicTemporary('page.tmp'), false);

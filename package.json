@@ -17,6 +17,7 @@
     "test:contracts": "npm run build:contracts && node --test 'test/contracts/*.test.ts'",
     "test:roundtrip": "node --test 'test/*.test.js'",
     "test:simulator": "node --test 'test/simulator/*.test.ts'",
+    "test:platform": "node --test 'test/platform/*.test.js'",
     "postinstall": "npm run fix:install && npm run build:runtime",
     "dev": "npm run build:runtime && npm run dev:launch",
     "build": "npm run build:runtime && vite build",

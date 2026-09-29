@@ -105,7 +105,7 @@ test('write refusals parse per code; unknown or malformed ones throw', () => {
     ok: false,
     error: { code: 'conflict', message: 'changed', diskChecksum },
   });
-  for (const code of ['missing', 'filesystem', 'write-race']) {
+  for (const code of ['missing', 'filesystem', 'write-race', 'uncertain', 'backpressured']) {
     assert.deepEqual(parsePageWriteResult({ ok: false, error: { code, message: 'm' } }), {
       ok: false,
       error: { code, message: 'm' },

@@ -4,7 +4,11 @@
 // the forms that must not count (comparisons, arrows, DOM writes, comments).
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { countTreeEdits, countWrapperCalls } from '../../dist/scripts/adapter-surface.js';
+import {
+  countReplaceSourceCalls,
+  countTreeEdits,
+  countWrapperCalls,
+} from '../../dist/scripts/adapter-surface.js';
 
 test('each rule of the written method counts one site', () => {
   const cases: readonly [string, number, number][] = [
@@ -48,4 +52,19 @@ test('wrapper call sites exclude their own definitions', () => {
     'void applyEdit(rule, () => {});',
   ].join('\n');
   assert.deepEqual(countWrapperCalls(text), { mutateModelCalls: 1, applyEditCalls: 2 });
+});
+
+// Step 5: whole-file replace-source submissions (plan §3.3) are counted at
+// their call sites; the host's method definitions and comments are not.
+test('replace-source submission sites exclude definitions and comments', () => {
+  const text = [
+    'export function writeProjectText(file: string, text: string): Digest {',
+    '  replaceSource(file: string, text: string, baseChecksum: Digest): WriteReport {',
+    '  writeCurrent(file: string, text: string): WriteReport {',
+    '// writeProjectText(abs, next) in a comment',
+    'writeProjectText(abs, next);',
+    'const report = documents.replaceSource(pagePath, text, base);',
+    'documents.writeCurrent(chunkFile, next); writeProjectText(a, b);',
+  ].join('\n');
+  assert.equal(countReplaceSourceCalls(text), 4);
 });

@@ -38,3 +38,36 @@ export function createSnapshot(
     projection: input.projection,
   };
 }
+
+/** A snapshot whose projection is derived when first read (plan §3.1: the
+ * projection is disposable and derived). The write protocol never reads the
+ * projection of a whole-file `replace-source` candidate — it has no target
+ * kind to check and may be invalid (§3.6) — so the legacy save path, which
+ * submits only those, never pays for a parse it does not use; a visual
+ * intent's planner reads it, and pays exactly what an eager snapshot costs.
+ * The derivation is pure over bytes the snapshot owns, so deriving later can
+ * never see newer bytes than the snapshot names. */
+export function createLazySnapshot(
+  input: Pick<Snapshot, 'path' | 'bytes'>,
+  project: (bytes: ByteString) => Projection,
+  hash: (bytes: ByteString) => Digest,
+): Snapshot {
+  assert(input.bytes.length <= LIMITS.sourceBytesMax, 'Snapshot bytes are inside the file bound');
+  let derived: Projection | undefined; // Memo, owned by this snapshot alone.
+  return {
+    path: input.path,
+    checksum: hash(input.bytes),
+    bytes: input.bytes,
+    get projection(): Projection {
+      if (derived === undefined) {
+        const projection = project(input.bytes);
+        assert(
+          projection.byteLength === input.bytes.length,
+          'The projection was derived from bytes of this length',
+        );
+        derived = projection;
+      }
+      return derived;
+    },
+  };
+}
