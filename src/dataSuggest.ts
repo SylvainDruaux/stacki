@@ -3,6 +3,7 @@
 // reading object literals — the keys nested inside them, so `service`
 // suggests `service.tags` without executing any code.
 
+import { assert } from '../shared/assert';
 import { toRecord, toArray } from '../shared/record';
 
 function skipString(code: string, i: number): number {
@@ -213,7 +214,7 @@ export function objectEntries(text: string | null | undefined): ObjectEntry[] {
   if (!t.startsWith('{')) {
     return [];
   }
-  const entries: ObjectEntry[] = [];
+  const pairs: ObjectEntry[] = [];
   let depth = 0;
   let i = 0;
   while (i < t.length) {
@@ -237,7 +238,7 @@ export function objectEntries(text: string | null | undefined): ObjectEntry[] {
       const key = m?.[1];
       if (m && key !== undefined && (m[2] || /^[\w$]+\s*[,}]/.test(t.slice(i)))) {
         if (!m[2]) {
-          entries.push({ key, value: '' });
+          pairs.push({ key, value: '' });
           i += key.length;
           continue;
         }
@@ -262,14 +263,14 @@ export function objectEntries(text: string | null | undefined): ObjectEntry[] {
           }
           j++;
         }
-        entries.push({ key, value: t.slice(vs, j).trim() });
+        pairs.push({ key, value: t.slice(vs, j).trim() });
         i = j;
         continue;
       }
     }
     i++;
   }
-  return entries;
+  return pairs;
 }
 
 function kindOf(value: string | null | undefined): string {
@@ -1237,13 +1238,17 @@ function buildValueNodes(
 
 // A value that is another value narrowed — `headings.filter(…)` — gets that
 // value's fields. Done after everything else is in, so it doesn't matter
-// which was declared first.
-function applyDerivedShapes(decls: ReadonlyMap<string, string>, props: readonly TreeNode[], values: readonly TreeNode[]): void {
+// which was declared first. Returns new lists; a value derived from one
+// derived earlier sees the fields it was given (the lookup is updated as it
+// goes, in declaration order).
+function withDerivedShapes(
+  decls: ReadonlyMap<string, string>,
+  props: readonly TreeNode[],
+  values: readonly TreeNode[],
+): { readonly props: TreeNode[]; readonly values: TreeNode[] } {
   const byName = new Map<string, TreeNode>();
-  for (const n of props) {
-    byName.set(n.path, n);
-  }
-  for (const n of values) {
+  const replaced = new Map<TreeNode, TreeNode>(); // By identity: a prop and a value may share a path.
+  for (const n of [...props, ...values]) {
     byName.set(n.path, n);
   }
   for (const [name, value] of decls) {
@@ -1251,33 +1256,48 @@ function applyDerivedShapes(decls: ReadonlyMap<string, string>, props: readonly 
     if (!node || node.children) {
       continue;
     }
-    const src = String(value).trim();
-    const m = src.match(KEEPS_SHAPE);
-    const baseName = m?.[1];
-    const base = baseName !== undefined ? byName.get(baseName) : undefined;
-    if (base?.children) {
-      node.kind = base.kind;
-      node.preview = base.preview;
-      node.children = rebase(base.children, base.path, name);
-      continue;
+    const shaped = derivedShape(node, String(value).trim(), byName);
+    if (shaped !== undefined) {
+      byName.set(name, shaped);
+      replaced.set(node, shaped);
     }
-    // One OF a list is one of whatever the list holds, so the fields to show
-    // are the item's — `featured` opens onto the same fields as `portfolio`'s
-    // first entry, because that is what it is.
-    const one = src.match(PICKS_ONE);
-    const oneName = one?.[1];
-    const from = oneName !== undefined ? byName.get(oneName) : undefined;
-    const item = from?.kind === 'list' && from.children?.length === 1 ? from.children[0] : null;
-    if (!item?.children) {
-      continue;
-    }
-    node.kind = item.kind;
-    // "portfolio entries" describes the list; this is one of them.
-    node.preview = /\bentries$/.test(from?.preview ?? '')
-      ? (from?.preview ?? '').replace(/\bentries$/, 'entry')
-      : item.preview || '';
-    node.children = rebase(item.children, item.path, name);
   }
+  const latest = (n: TreeNode): TreeNode => replaced.get(n) ?? n;
+  const derived = { props: props.map(latest), values: values.map(latest) };
+  assert(derived.props.length === props.length, 'Deriving shapes keeps every prop');
+  assert(derived.values.length === values.length, 'Deriving shapes keeps every value');
+  return derived;
+}
+
+// The fields `node` takes from the value its declaration narrows or picks
+// from, or undefined when it reads no known shape.
+function derivedShape(
+  node: TreeNode,
+  declaration: string,
+  byName: ReadonlyMap<string, TreeNode>,
+): TreeNode | undefined {
+  const name = node.path;
+  const m = declaration.match(KEEPS_SHAPE);
+  const baseName = m?.[1];
+  const base = baseName !== undefined ? byName.get(baseName) : undefined;
+  if (base?.children) {
+    return { ...node, kind: base.kind, preview: base.preview, children: rebase(base.children, base.path, name) };
+  }
+  // One OF a list is one of whatever the list holds, so the fields to show
+  // are the item's — `featured` opens onto the same fields as `portfolio`'s
+  // first entry, because that is what it is.
+  const one = declaration.match(PICKS_ONE);
+  const oneName = one?.[1];
+  const from = oneName !== undefined ? byName.get(oneName) : undefined;
+  const item = from?.kind === 'list' && from.children?.length === 1 ? from.children[0] : null;
+  if (!item?.children) {
+    return undefined;
+  }
+  // "portfolio entries" describes the list; this is one of them.
+  const preview = /\bentries$/.test(from?.preview ?? '')
+    ? (from?.preview ?? '').replace(/\bentries$/, 'entry')
+    : item.preview || '';
+  return { ...node, kind: item.kind, preview, children: rebase(item.children, item.path, name) };
 }
 
 // 4. Every other collection in the project, whether or not this page reads
@@ -1440,10 +1460,16 @@ export function dataTree(context: DataContext | null | undefined): TreeNode[] {
   const imports = context?.imports ?? [];
   const seen = new Set<string>();
 
-  const props = buildPropNodes(destructures, schema, sample, seen);
-  const values = buildValueNodes(decls, destructures, imports, samples, sample, seen);
-  applyDerivedShapes(decls, props, values);
-  values.push(...buildCollectionNodes(context?.collections ?? [], fm, imports, samples, seen));
+  const derived = withDerivedShapes(
+    decls,
+    buildPropNodes(destructures, schema, sample, seen),
+    buildValueNodes(decls, destructures, imports, samples, sample, seen),
+  );
+  const props = derived.props;
+  const values = [
+    ...derived.values,
+    ...buildCollectionNodes(context?.collections ?? [], fm, imports, samples, seen),
+  ];
   const loops = buildLoopNodes(context?.ancestorHeads ?? [], props, values, context?.itemIndex, seen);
 
   // The loop item leads: inside a loop, it is what the markup is FOR — every

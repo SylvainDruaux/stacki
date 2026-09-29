@@ -3,8 +3,8 @@
 // loop — a multi-span intent — and a move out of a loop leaves references to
 // the loop's item behind, which the move replaces with placeholder text, so an
 // expression node becomes text (a kind-changing intent). The renderer's model
-// version of both rules is src/loopBindings.ts (renameLoopVar,
-// stripLostBindings); this module reads the same things off the bytes, so the
+// version of both rules is src/loopBindings.ts (renamedLoopVar,
+// strippedBindings); this module reads the same things off the bytes, so the
 // byte edit and the model edit agree, and the gesture parity suite holds them
 // to each other on the corpus.
 //
@@ -149,7 +149,7 @@ export function scopeAt(
 
 /** Every place a rename of the loop's parameter `from` must touch: the
  * declaration, then each reference below the loop, skipping loops that
- * declare the name again (they shadow it). The model rule is renameLoopVar. */
+ * declare the name again (they shadow it). The model rule is renamedLoopVar. */
 export function renameSites(
   projection: ValidProjection,
   bytes: ByteString,
@@ -244,7 +244,7 @@ function referencesIn(
 }
 
 /** The edits that keep a subtree valid once it leaves the loops declaring
- * `lost`: the byte form of stripLostBindings. Undefined when a reading of a
+ * `lost`: the byte form of strippedBindings. Undefined when a reading of a
  * lost name sits somewhere this cannot rewrite (a statement body, a head or a
  * test it cannot delimit). */
 export function stripEdits(

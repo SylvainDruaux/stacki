@@ -12,7 +12,7 @@ import { singleDeclarationChange } from '../shared/inlineStyle';
 import { LIMITS } from '../shared/limits';
 import type { Attr } from '../shared/page-node';
 import { renamedAttr } from './attrOrder';
-import { loopVarsAt, parseLoopHead, renameLoopVar, stripLostBindings } from './loopBindings';
+import { loopVarsAt, parseLoopHead, renamedLoopVar, strippedBindings } from './loopBindings';
 import type { EditGesture } from './pageEdits';
 
 type Urgency = boolean | 'live';
@@ -128,11 +128,11 @@ export function withNode(
 
 // Recursion bounded by the tree's depth bound, asserted.
 function replacedIn(
-  list: EditorNode[],
+  list: readonly EditorNode[],
   nodeId: string,
   update: (node: EditorNode) => EditorNode,
   depth: number,
-): EditorNode[] {
+): readonly EditorNode[] {
   assert(depth <= LIMITS.treeDepthMax, 'A model is no deeper than its bound');
   for (const [index, node] of list.entries()) {
     if (node.id === nodeId) {
@@ -286,7 +286,7 @@ export function withoutNodes(model: EditorModel, nodeIds: readonly string[]): Ed
   return nodes === model.nodes ? model : { ...model, nodes };
 }
 
-function filteredList(list: EditorNode[], gone: ReadonlySet<string>, depth: number): EditorNode[] {
+function filteredList(list: readonly EditorNode[], gone: ReadonlySet<string>, depth: number): readonly EditorNode[] {
   assert(depth <= LIMITS.treeDepthMax, 'A model is no deeper than its bound');
   let changed = false;
   const next: EditorNode[] = [];
@@ -324,7 +324,7 @@ export function withInserted(
   }
   const index = place?.index ?? 0;
   return withNode(model, parentId, (parent) => {
-    const children = Array.isArray(parent.children) ? parent.children : [];
+    const children = (parent.children ?? []);
     return withChildren(parent, spliced(children, Math.min(index, children.length), node));
   });
 }
@@ -335,11 +335,11 @@ function withInsertedAfter(model: EditorModel, anchorId: string, node: EditorNod
 }
 
 function afterIn(
-  list: EditorNode[],
+  list: readonly EditorNode[],
   anchorId: string,
   node: EditorNode,
   depth: number,
-): EditorNode[] {
+): readonly EditorNode[] {
   assert(depth <= LIMITS.treeDepthMax, 'A model is no deeper than its bound');
   for (const [index, candidate] of list.entries()) {
     if (candidate.id === anchorId) {
@@ -363,7 +363,7 @@ function afterIn(
  * element without children (to keep `<div>\n</div>` as written), so a stale
  * one would put the removed child back (found by the parity sweep: a moved
  * node was written twice, a deleted one stayed). */
-export function withChildren(node: EditorNode, children: EditorNode[]): EditorNode {
+export function withChildren(node: EditorNode, children: readonly EditorNode[]): EditorNode {
   const copy = Object.assign({}, node, { children });
   if (children.length === 0) {
     Reflect.deleteProperty(copy, 'source');
@@ -371,7 +371,7 @@ export function withChildren(node: EditorNode, children: EditorNode[]): EditorNo
   return copy;
 }
 
-function spliced(list: readonly EditorNode[], index: number, node: EditorNode): EditorNode[] {
+function spliced(list: readonly EditorNode[], index: number, node: EditorNode): readonly EditorNode[] {
   return [...list.slice(0, index), node, ...list.slice(index)];
 }
 
@@ -402,7 +402,7 @@ function besidePlace(
   const parentId = place?.parentId ?? null;
   const parent = parentId === null ? undefined : findNode(model.nodes, parentId);
   const list =
-    parent === undefined ? model.nodes : Array.isArray(parent.children) ? parent.children : [];
+    parent === undefined ? model.nodes : (parent.children ?? []);
   const index =
     parent === undefined && parentId !== null
       ? list.length
@@ -451,7 +451,7 @@ export interface MoveRules {
 /** Move a node, and the note above it, to a place. The requests relocate the
  * original bytes (plan §3.4); leaving a loop, the planner turns what read the
  * loop's item into placeholder text, as the effect here does with
- * stripLostBindings. A `slot` that means nothing where the node lands goes
+ * strippedBindings. A `slot` that means nothing where the node lands goes
  * first, while the node is still where the request names it. */
 export function moveGesture(
   model: EditorModel,
@@ -520,11 +520,7 @@ export function moveGesture(
       }
       const moved = relocated(current, again, moving, place, (node) => {
         const props = dropSlot ? patchedProps(node.props, { slot: undefined }) : node.props;
-        const copy: EditorNode = structuredClone(
-          Object.assign({}, node, props === undefined ? {} : { props }),
-        );
-        stripLostBindings(copy, lost);
-        return copy;
+        return strippedBindings(props === undefined ? node : { ...node, props }, lost).node;
       });
       return moved.model;
     },
@@ -576,17 +572,17 @@ function relocated(
 }
 
 function findWithList(
-  list: EditorNode[],
+  list: readonly EditorNode[],
   nodeId: string,
 ):
   | {
-      readonly list: EditorNode[];
+      readonly list: readonly EditorNode[];
       readonly index: number;
       readonly node: EditorNode;
       readonly parentId: string | null;
     }
   | undefined {
-  const pending: { readonly list: EditorNode[]; readonly parentId: string | null }[] = [
+  const pending: { readonly list: readonly EditorNode[]; readonly parentId: string | null }[] = [
     { list, parentId: null },
   ];
   for (let visited = 0; visited < pending.length; visited++) {
@@ -660,7 +656,7 @@ export interface LoopRename {
 /** The loop editor's rename: a new head that renames the loop's parameters and
  * nothing else becomes one rename-binding request per name — main finds every
  * site (shared/loopScope.ts) — and the effect is the legacy one
- * (renameLoopVar). A head that also changes its data or its shape has no
+ * (renamedLoopVar). A head that also changes its data or its shape has no
  * intent form yet and saves the whole model. */
 export function loopRenameGesture(
   model: EditorModel,
@@ -689,12 +685,11 @@ export function loopRenameGesture(
     },
     apply: (current) =>
       withNode(current, nodeId, (loop) => {
-        const copy: EditorNode = structuredClone(loop);
-        Object.assign(copy, { head: change.head });
-        for (const { from, to } of renames) {
-          renameLoopVar(copy.children ?? [], from, to);
-        }
-        return copy;
+        const children = renames.reduce(
+          (list, { from, to }) => renamedLoopVar(list, from, to),
+          loop.children ?? [],
+        );
+        return withChildren({ ...loop, head: change.head }, children);
       }),
   };
 }
@@ -868,10 +863,14 @@ export function unwrapGesture(nodeId: string): EditGesture {
 
 // The list with the node replaced by its children; recursion bounded by the
 // tree's depth bound, asserted.
-function unwrappedIn(list: EditorNode[], nodeId: string, depth: number): EditorNode[] {
+function unwrappedIn(
+  list: readonly EditorNode[],
+  nodeId: string,
+  depth: number,
+): readonly EditorNode[] {
   assert(depth <= LIMITS.treeDepthMax, 'A model is no deeper than its bound');
   for (const [index, node] of list.entries()) {
-    const children = Array.isArray(node.children) ? node.children : [];
+    const children = node.children ?? [];
     if (node.id === nodeId) {
       return [...list.slice(0, index), ...children, ...list.slice(index + 1)];
     }

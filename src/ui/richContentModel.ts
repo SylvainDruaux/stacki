@@ -239,14 +239,16 @@ function richReadElement(node: Element, budget: Budget, depth: number): InlineNo
   if (!INLINE_TAGS.has(name)) {
     return children;
   }
-  const props: Record<string, Attr> = {};
-  for (const attribute of ['href', 'class', 'target', 'rel']) {
-    const value = node.getAttribute(attribute);
-    if (value != null && value !== '') {
+  const props = Object.fromEntries(
+    ['href', 'class', 'target', 'rel'].flatMap((attribute): [string, Attr][] => {
+      const value = node.getAttribute(attribute);
+      if (value === null || value === '') {
+        return [];
+      }
       assert(value.length <= LIMITS.attrCharsMax, 'RichContent: attribute limit exceeded');
-      props[attribute] = { type: 'string', value };
-    }
-  }
+      return [[attribute, { type: 'string', value }]];
+    }),
+  );
   return [{ kind: 'element', name, props, children }];
 }
 export function isDOMElement(node: Node | null | undefined): node is Element {

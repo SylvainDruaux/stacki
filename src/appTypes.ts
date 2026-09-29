@@ -11,12 +11,11 @@ import type { EditsRecord, PageOrigin } from './pageEdits';
 import { saveStateClean, type SaveState } from './saveState';
 import type { VariableSelection } from './variablesBridge';
 import {
-  cloneEditorModel,
   type EditorModel,
   type EditorNode,
 } from '../shared/editor-model';
 
-export { cloneEditorModel, nodeId } from '../shared/editor-model';
+export { nodeId } from '../shared/editor-model';
 export type { EditorModel, EditorNode } from '../shared/editor-model';
 
 export interface ProjectIdentity {
@@ -197,8 +196,8 @@ export function findEditorNodeById(
 export function findEditorParentList(
   model: EditorModel,
   id: string,
-): { readonly list: EditorNode[]; readonly index: number } | null {
-  const pending: EditorNode[][] = [model.nodes];
+): { readonly list: readonly EditorNode[]; readonly index: number } | null {
+  const pending: (readonly EditorNode[])[] = [model.nodes];
   let visited = 0;
   while (pending.length > 0) {
     visited += 1;
@@ -232,7 +231,7 @@ export function toEditorPageState(
   if (!input.editable) {
     return { editable: false, reason: input.reason, bail: input.bail, source, save };
   }
-  const model = cloneEditorModel(input.model);
+  const model: EditorModel = input.model;
   const origin =
     input.model.format === undefined
       ? { checksum: input.checksum, source, model: input.model }

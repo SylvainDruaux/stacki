@@ -62,14 +62,34 @@ test('loop renames preserve dollar identifiers, property names and nested shadow
     { kind: 'map', head: '$item.children.map(($item) => (', body: ['const title = $item.title;'], children: [{ kind: 'expr', value: '{$item.title}' }] },
     { kind: 'map', head: '$item.children.map((child) => (', body: ['const title = $item.title;'], children: [{ kind: 'expr', value: '{$item.title}' }] },
   ];
-  loops.renameLoopVar(nodes, '$item', 'next$');
-  assert.equal(nodes[0].value, '{next$.label + $items.label + other.$item}');
-  assert.equal(nodes[1].value, '$item prose {next$.label}');
-  assert.equal(nodes[2].head, 'next$.children.map(($item) => (');
-  assert.equal(nodes[2].body[0], 'const title = $item.title;');
-  assert.equal(nodes[2].children[0].value, '{$item.title}');
-  assert.equal(nodes[3].body[0], 'const title = next$.title;');
-  assert.equal(nodes[3].children[0].value, '{next$.title}');
+  const before = structuredClone(nodes);
+  const renamed = loops.renamedLoopVar(nodes, '$item', 'next$');
+  assert.deepEqual(nodes, before, 'the nodes passed in are left as they were');
+  assert.equal(renamed[0].value, '{next$.label + $items.label + other.$item}');
+  assert.equal(renamed[1].value, '$item prose {next$.label}');
+  assert.equal(renamed[2].head, 'next$.children.map(($item) => (');
+  assert.equal(renamed[2].body[0], 'const title = $item.title;');
+  assert.equal(renamed[2].children[0].value, '{$item.title}');
+  assert.equal(renamed[3].body[0], 'const title = next$.title;');
+  assert.equal(renamed[3].children[0].value, '{next$.title}');
+  assert.throws(() => loops.renamedLoopVar(nodes, 'x', 'x'), /A rename changes the name/);
+});
+
+test('switching a loop\'s data points the loops reading its item at an empty array', () => {
+  const nodes = [
+    { kind: 'map', head: 'item.tags.map((tag) => (', children: [
+      { kind: 'cond', test: 'item.show', children: [{ kind: 'branch', name: 'then', children: [] }] },
+    ] },
+    { kind: 'map', head: 'other.map((item) => (', children: [
+      { kind: 'map', head: 'item.more.map((x) => (', children: [] },
+    ] },
+  ];
+  const before = structuredClone(nodes);
+  const disconnected = loops.disconnectedLoops(nodes, ['item']);
+  assert.deepEqual(nodes, before, 'the nodes passed in are left as they were');
+  assert.equal(disconnected[0].head, '[].map((tag) => (');
+  assert.equal(disconnected[0].children[0].test, 'false');
+  assert.equal(disconnected[1].children[0].head, 'item.more.map((x) => (', 'shadowed below');
 });
 
 test('moving from a loop drops lost bindings without rewriting nested local variables', () => {
@@ -80,13 +100,29 @@ test('moving from a loop drops lost bindings without rewriting nested local vari
     { kind: 'expr', value: '{item$.label}' },
     { kind: 'map', head: 'item$.children.map((item$) => (', body: ['const title = item$.title;'], children: [{ kind: 'expr', value: '{item$.label}' }] },
   ] };
-  assert.equal(loops.stripLostBindings(node, ['item$']), 3);
-  assert.equal(node.props.href, undefined);
-  assert.equal(node.props.title.value, 'other.item$');
-  assert.equal(node.children[0].value, 'content');
-  assert.equal(node.children[1].head, '[].map((item$) => (');
-  assert.equal(node.children[1].body[0], 'const title = item$.title;');
-  assert.equal(node.children[1].children[0].value, '{item$.label}');
+  const before = structuredClone(node);
+  const stripped = loops.strippedBindings(node, ['item$']);
+  assert.deepEqual(node, before, 'the node passed in is left as it was');
+  assert.equal(stripped.removed, 3);
+  assert.equal(stripped.node.props.href, undefined);
+  assert.equal(stripped.node.props.title.value, 'other.item$');
+  assert.equal(stripped.node.children[0].kind, 'text');
+  assert.equal(stripped.node.children[0].value, 'content');
+  assert.equal(stripped.node.children[1].head, '[].map((item$) => (');
+  assert.equal(stripped.node.children[1].body[0], 'const title = item$.title;');
+  assert.equal(stripped.node.children[1].children[0].value, '{item$.label}');
+  assert.deepEqual(loops.strippedBindings(node, []), { node, removed: 0 });
+});
+
+test('a loop still running keeps its declarations, reading a placeholder instead', () => {
+  const node = { kind: 'map', head: 'list.map((row) => (', body: [
+    'const a = item.title;',
+    'const b = row.title;',
+  ], children: [{ kind: 'text', value: 'x {item.y} {row.z}' }] };
+  const stripped = loops.strippedBindings(node, ['item']);
+  assert.equal(stripped.removed, 2);
+  assert.deepEqual(stripped.node.body, ["const a = 'content';", 'const b = row.title;']);
+  assert.equal(stripped.node.children[0].value, 'x content {row.z}');
 });
 
 // Page saver harness: a real queue (src/pageEdits.ts) and a send held on a

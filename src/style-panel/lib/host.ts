@@ -6,13 +6,15 @@
 // answers the panel's questions from it. One panel, one selection, so a
 // module-level record is enough.
 
+// A page node as the panel reads it: the panel never edits the tree (its
+// class and style changes go through App's gestures), so the view is readonly.
 export type HostNode = {
-  id: string
-  kind: string
-  name?: string
-  props?: Record<string, { type: string; value?: string } | null>
-  children?: HostNode[] | null
-  inner?: string
+  readonly id: string
+  readonly kind: string
+  readonly name?: string
+  readonly props?: Readonly<Record<string, { readonly type: string; readonly value?: string } | null>>
+  readonly children?: readonly HostNode[] | null
+  readonly inner?: string
 }
 
 /** Which sides of which box the spacing control is pointing at, and what each
@@ -33,7 +35,7 @@ export type ClassOutcome =
 export type HostState = {
   projectPath: string | null
   /** The page (or open component) being edited. */
-  nodes: HostNode[]
+  nodes: readonly HostNode[]
   selectedId: string | null
   /** Canvas breakpoint: desktop | tablet | phone. */
   device: string
@@ -193,7 +195,7 @@ export function onHostChange(fn: () => void): () => void {
 
 // Depth-first walk of the page model.
 export function walkNodes(
-  nodes: HostNode[] | null | undefined,
+  nodes: readonly HostNode[] | null | undefined,
   visit: (node: HostNode, parent: HostNode | null) => void,
   parent: HostNode | null = null,
 ) {
@@ -203,7 +205,7 @@ export function walkNodes(
   }
 }
 
-export function findNode(nodes: HostNode[] | null | undefined, id: string): HostNode | null {
+export function findNode(nodes: readonly HostNode[] | null | undefined, id: string): HostNode | null {
   for (const node of nodes || []) {
     if (node.id === id) {return node}
     const found = node.children && findNode(node.children, id)

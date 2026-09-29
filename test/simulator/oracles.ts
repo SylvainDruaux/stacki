@@ -6,7 +6,7 @@
 //
 // The corpus carries the hard intent classes from day one (tracker step 1),
 // even where shipping is deferred: a multi-span loop rename, a kind-changing
-// move out of a loop (stripLostBindings), a multi-file page + stylesheet
+// move out of a loop (strippedBindings), a multi-file page + stylesheet
 // gesture, a frontmatter slot edit, a wrong-site trap (identical bytes at
 // several ranges) and an encoding trap (BOM, CRLF, astral characters, so byte
 // offsets differ from UTF-16 offsets).

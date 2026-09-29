@@ -103,7 +103,7 @@ import type { PageEdited } from '../shared/page-save';
 import type { Digest } from '../shared/brand';
 import { ancestorChain, createTreeIndex, nodeAtPath, pathOfNode } from './editorTree.js';
 import { readFrontmatter, writeFrontmatter } from '../electron/frontmatter';
-import { renameLoopVar, parseLoopHead, disconnectDependentLoops, loopVarsAt, stripLostBindings } from './loopBindings.js';
+import { renamedLoopVar, parseLoopHead, disconnectedLoops, loopVarsAt, strippedBindings } from './loopBindings.js';
 import {
   namesUsedIn,
   neededFrontmatter,
@@ -162,7 +162,6 @@ import {
   type FrontmatterSubject,
 } from './codeWindowTarget';
 import {
-  cloneEditorModel,
   findEditorNodeById as findNodeById,
   findEditorParentList as findParentList,
   nodeId,
@@ -270,6 +269,22 @@ const CodePanel = lazyPanel(() => import('./panels/CodePanel'))
 // unique without a counter, and carried onto the reply that first contains it
 // (src/nodeHandles.ts). It never reaches main.
 const newId = () => nodeId(`g${crypto.randomUUID().replace(/-/g, '')}`);
+
+// A copy of `node` in which it and every node below it take fresh ids: a
+// pasted or duplicated node is a new node, and must never answer to the
+// handle of the one it was copied from.
+function withNewIds(node: EditorNode, depth = 0): EditorNode {
+  // A copied node came from a parse, which caps nesting.
+  assert(depth <= LIMITS.treeDepthMax, `withNewIds: depth ${depth} exceeds the tree cap`);
+  const id = newId();
+  assert(id !== node.id, 'A copy never keeps the handle it was copied from');
+  const children = node.children;
+  if (children === undefined || children === null) {
+    return { ...node, id };
+  }
+  // Object.assign keeps the node's own variant, where a spread would widen it.
+  return Object.assign({}, node, { id, children: children.map((child) => withNewIds(child, depth + 1)) });
+}
 
 // Placeholder copy for newly inserted text elements, so they're visible on the
 // canvas straight away instead of collapsing to a zero-height box.
@@ -531,20 +546,19 @@ function restatedText(
 ): EditorNode | undefined {
   switch (node.kind) {
     case 'map': {
-      const loop: EditorNode = structuredClone(node);
-      const children = loop.children ?? [];
-      for (const { from, to } of renames || []) {
-        if (from && to && from !== to) {renameLoopVar(children, from, to);}
-      }
+      const renamed = (renames || []).reduce(
+        (children, { from, to }) =>
+          from && to && from !== to ? renamedLoopVar(children, from, to) : children,
+        node.children,
+      );
       // Renames above already re-pointed the children, so compare the data
       // sources and orphan-proof what reads from this item.
       const before = parseLoopHead(node.head);
       const after = parseLoopHead(value);
-      if (before && after && before.data !== after.data) {
-        const vars = [after.item, after.index].filter(Boolean);
-        if (vars.length) {disconnectDependentLoops(children, vars);}
-      }
-      return { ...loop, head: value };
+      const vars = after ? [after.item, after.index].filter(Boolean) : [];
+      const moved = before && after && before.data !== after.data && vars.length > 0;
+      const children = moved ? disconnectedLoops(renamed, vars) : renamed;
+      return { ...node, head: value, children };
     }
     case 'cond':
       return { ...node, test: value };
@@ -1723,13 +1737,13 @@ export default function App() {
         return { editable: false, reason: carried.reason, bail: carried.bail, source, save: current.save };
       }
       const origin = current.editable ? current.origin : undefined;
-      const model = cloneEditorModel(carried.model);
+      const model: EditorModel = carried.model;
       return { editable: true, model, source, parsedFrom: source, save: current.save, origin };
     };
     if (carried.editable) {
       const inFrontmatter =
         carried.model.bodyStart !== undefined && position < carried.model.bodyStart;
-      const selected = sourceNodeAtOffset(cloneEditorModel(carried.model).nodes, position);
+      const selected = sourceNodeAtOffset(carried.model.nodes, position);
       setSelectedId(inFrontmatter ? 'frontmatter' : selected?.id ?? null);
     } else {
       setSelectedId(null);
@@ -2347,7 +2361,7 @@ export default function App() {
       const after = loopVarsAt(gesture.apply(state.model).nodes, nodeId);
       const lost = before.filter((v) => !after.includes(v));
       const node = findNodeById(state.model.nodes, nodeId);
-      const removed = node && lost.length ? stripLostBindings(structuredClone(node), lost) : 0;
+      const removed = node && lost.length ? strippedBindings(node, lost).removed : 0;
       commitEdit(gesture);
       if (removed) {
         showToast(
@@ -2409,17 +2423,6 @@ export default function App() {
 
   const nodeClipboardRef = useRef<NodeClipboard | null>(null);
 
-  const cloneWithNewIds = (node: EditorNode): EditorNode => {
-    const clone = structuredClone(node);
-    const walk = (n: EditorNode): void => {
-      n.id = newId();
-      if (Array.isArray(n.children)) {
-        n.children.forEach(walk);
-      }
-    };
-    walk(clone);
-    return clone;
-  };
 
   const copyNode = useCallback(
     (nodeId: string) => {
@@ -2432,7 +2435,7 @@ export default function App() {
         return;
       }
       nodeClipboardRef.current = {
-        node: structuredClone(node),
+        node, // Readonly: later edits build new nodes and leave this one as copied.
         // The loop variables this subtree may reference; pasting somewhere
         // they don't exist has to drop those bindings.
         vars: loopVarsAt(state.model.nodes, nodeId),
@@ -2469,7 +2472,7 @@ export default function App() {
         );
         return;
       }
-      const clone = cloneWithNewIds(src);
+      const clone = withNewIds(src);
       // Step 6, insert: the copy is the node's own bytes, spliced after it.
       commitEdit(duplicateGesture(nodeId, clone, { urgency: true }));
       setSelectedId(clone.id);
@@ -2541,7 +2544,7 @@ export default function App() {
       });
     }
 
-    const clone = cloneWithNewIds(clip.node);
+    const clone = withNewIds(clip.node);
     const selId = selectedIdRef.current;
     const acceptsChildren = (n: EditorNode): boolean => {
       if (n.id === 'layout') {
@@ -2589,8 +2592,7 @@ export default function App() {
     const landed = insertGesture(withImports, clone, place, { urgency: true }).apply(withImports);
     const inScope = loopVarsAt(landed.nodes, clone.id);
     const lost = (clip.vars || []).filter((v) => !inScope.includes(v));
-    const pasted: EditorNode = lost.length ? structuredClone(clone) : clone;
-    const removed = lost.length ? stripLostBindings(pasted, lost) : 0;
+    const { node: pasted, removed } = strippedBindings(clone, lost);
     if (removed) {
       showToast(
         `Removed ${removed} binding${removed === 1 ? '' : 's'} that referenced ${lost.join(', ')}.`,
@@ -3667,7 +3669,7 @@ export default function App() {
       const node = model ? findNodeById(model.nodes, nodeId) : null;
       if (!model || !node || node.kind === 'text') {return;}
       const options = { coalesceKey: `content:${nodeId}`, urgency: false };
-      const children = Array.isArray(node.children) ? node.children : null;
+      const children = node.children ?? null;
       const at = children ? children.findIndex((c) => c.kind === 'text') : -1;
       const textNode = children?.[at];
       // Emptying the field takes the text node out rather than leaving an

@@ -16,7 +16,7 @@ const ENTRY_MODULES: ReadonlyArray<{ readonly path: string; readonly exportName:
   { path: '/src/cleanError.ts', exportName: 'cleanError' },
   { path: '/src/bridge.ts', exportName: 'scanProject' },
   { path: '/src/dataSuggest.ts', exportName: 'dataTree' },
-  { path: '/src/loopBindings.ts', exportName: 'renameLoopVar' },
+  { path: '/src/loopBindings.ts', exportName: 'renamedLoopVar' },
   { path: '/src/pagePersistence.ts', exportName: 'createPageSaver' },
 ];
 

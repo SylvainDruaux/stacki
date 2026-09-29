@@ -53,14 +53,17 @@ interface Counts {
   readonly replaceSourceCalls: number;
 }
 
-const REPLACE_SOURCE_BASELINE = 23;
+const REPLACE_SOURCE_BASELINE = 22;
 
 /** Measured 2026-09-28 by this script at step 1, lowered at each step-6
  * expansion and at step 9 (the tracker's adapter table). Lower these; never
- * raise them. */
+ * raise them. Step 9 ends with the page tree readonly (shared/editor-model.ts):
+ * no node is edited in place, anywhere in src/. The four applyEdit( sites left
+ * are the style panel's CSS-rule edits (src/style-panel/EmbedEditor.tsx), which
+ * never touch the page tree. */
 const BASELINE: Counts = {
-  mutations: 18,
-  propIndexWrites: 2,
+  mutations: 0,
+  propIndexWrites: 0,
   mutateModelCalls: 0,
   applyEditCalls: 4,
   /** Measured at step 5, when the legacy writers moved onto the actors. */

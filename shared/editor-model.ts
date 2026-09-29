@@ -1,49 +1,32 @@
-// The renderer owns one mutable clone of a parsed page. Keeping the conversion
-// here confines the single assertion to a validated-constructor layer.
+// The page model as the renderer reads it: the parsed PageModel itself, with
+// the fields any node kind may carry readable on every node. It is readonly —
+// a gesture's effect builds a new model (src/editGestures.ts), and the bytes
+// change only through intents (plan §11.9) — so a parse is shown as it came,
+// without a private copy to keep in step.
 import type { Attr, PageModel, PageNode } from './page-node';
 import type { NodeId } from './brand';
 import { toNodeId } from './brand';
 
-type Atomic =
-  | undefined
-  | null
-  | boolean
-  | number
-  | string
-  | bigint
-  | symbol
-  | ((...args: never[]) => unknown);
-type Mutable<Value> = Value extends Atomic
-  ? Value
-  : Value extends readonly (infer Item)[]
-    ? Mutable<Item>[]
-    : Value extends object
-      ? { -readonly [Key in keyof Value]: Mutable<Value[Key]> }
-      : Value;
-
-type MutablePageNode = Mutable<PageNode>;
-type EditorNodeCommon = {
-  name?: string;
-  children?: EditorNode[] | null;
-  props?: Record<string, Mutable<Attr>>;
-  attrOrder?: string[];
-  value?: string;
-  chunkFile?: string;
-  dynamicTag?: boolean;
-  astroAsset?: boolean;
-  head?: string;
-  test?: string;
-  inner?: string;
-  source?: string;
-};
-
-export type EditorNode = MutablePageNode & EditorNodeCommon;
-export type EditorModel = Omit<Mutable<PageModel>, 'nodes'> & { nodes: EditorNode[] };
-
-export function cloneEditorModel(model: PageModel): EditorModel {
-  // The page parser established the complete shape before this private clone.
-  return structuredClone(model) as EditorModel;
+// The fields every node kind may carry, readable on any node without first
+// narrowing its kind: panels read `node.props` or `node.children` whatever
+// the node is, and absent means the kind has none.
+interface EditorNodeCommon {
+  readonly name?: string;
+  readonly children?: readonly EditorNode[] | null;
+  readonly props?: Readonly<Record<string, Attr>>;
+  readonly attrOrder?: readonly string[];
+  readonly value?: string;
+  readonly chunkFile?: string;
+  readonly dynamicTag?: boolean;
+  readonly astroAsset?: boolean;
+  readonly head?: string;
+  readonly test?: string;
+  readonly inner?: string;
+  readonly source?: string;
 }
+
+export type EditorNode = PageNode & EditorNodeCommon;
+export type EditorModel = Omit<PageModel, 'nodes'> & { readonly nodes: readonly EditorNode[] };
 
 export function nodeId(value: string): NodeId {
   return toNodeId(value);

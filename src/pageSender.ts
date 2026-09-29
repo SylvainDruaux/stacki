@@ -23,7 +23,6 @@ import type {
 import type { Result } from '../shared/result';
 import {
   carriedParse,
-  cloneEditorModel,
   toEditorPageState,
   type EditablePageState,
   type EditorPageState,
@@ -142,7 +141,7 @@ function advanced(
   replies: readonly PageEdited[],
   gesture: EditGesture,
 ): PageOrigin {
-  const predicted = gesture.apply(cloneEditorModel(origin.model));
+  const predicted = gesture.apply(origin.model);
   return replies.reduce<PageOrigin>((before, reply) => {
     assert(reply.editable, 'A visual edit leaves a page that parses');
     const after = { source: reply.source, seed: seedOf(reply.checksum), model: reply.model };
@@ -336,7 +335,7 @@ function withdraw(
     }
     const model = queued.reduce(
       (shown, entry) => (entry.tag === 'gesture' ? entry.gesture.apply(shown) : shown),
-      cloneEditorModel(origin.model),
+      origin.model,
     );
     const save: SaveState =
       queued.length === 0 ? { tag: 'clean', checksum: origin.checksum } : { tag: 'dirty', baseChecksum: origin.checksum };
