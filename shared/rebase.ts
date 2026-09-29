@@ -256,6 +256,8 @@ function rebaseOperation(
     case 'insert-node':
     case 'remove-node':
     case 'set-inline-style':
+    case 'rename-tag':
+    case 'rename-attribute':
     case 'replace-source':
       return ok(operation);
     case 'move-node': {
@@ -271,13 +273,16 @@ function rebaseOperation(
       return slot === undefined ? err('region-externally-modified') : ok({ ...operation, slot });
     }
     case 'apply-code-patch':
-    case 'revert-splices': {
+    case 'revert-splices':
+    case 'rewrite-node': {
       // A code patch replaces only the bytes it was written against: a commit
       // inside a hunk or at its edge is a merge conflict, never overwritten
-      // (step 8). Reverts keep step 6's images.
+      // (step 8). A node rewrite states the node's whole new text, so any
+      // commit that touched its hunks is the node changed under it (step 9).
+      // Reverts keep step 6's images.
       const spans = rebaseSpans(
         operation.hunks.map((hunk) => hunk.span),
-        operation.tag === 'apply-code-patch' ? images.untouched : through,
+        operation.tag === 'revert-splices' ? through : images.untouched,
       );
       if (spans === undefined) {
         return err(

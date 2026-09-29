@@ -26,6 +26,7 @@ import { toFilePath, toIntentId, type Digest, type FilePath } from '../../dist/s
 import {
   toIntent,
   type Intent,
+  type Operation,
   type Outcome,
   type RejectionReason,
   type SourceEdit,
@@ -35,7 +36,9 @@ import { diffCodePatch } from '../../dist/shared/code-patch.js';
 import { LIMITS } from '../../dist/shared/limits.js';
 import { toAnchorRef, toChildIndex } from '../../dist/shared/ref.js';
 import type { Snapshot } from '../../dist/shared/snapshot.js';
+import type { ProjectedNode } from '../../dist/shared/source-projection.js';
 import {
+  type ByteString,
   decodeUtf8,
   encodeUtf8,
   toByteSpan,
@@ -378,7 +381,8 @@ class World {
       return this.judgeCodePatch(submission, result);
     }
     const gesture = this.gestures.get(intent.id);
-    if (intent.operation.tag !== 'set-attribute') {
+    const survival = judgedBySurvival(intent.operation.tag);
+    if (!survival) {
       if (gesture === undefined) {
         return; // A whole-model save: never mapped, so never judged.
       }
@@ -408,13 +412,15 @@ class World {
       decision,
     };
     this.countAge(intent.file, head.authored.checksum, current.checksum);
-    if (intent.operation.tag !== 'set-attribute') {
+    if (!survival) {
       const step = gesture?.scenario.steps[gesture.next - 1];
       assert(step !== undefined, 'A judged gesture intent is one of its scenario steps');
       this.countVerdict(intent.file, judgeOracleRemap(input, oracleSplices(step)));
       return;
     }
-    this.count(checkMappingReference(input) ? 'reference:agreed' : 'reference:skipped');
+    if (intent.operation.tag === 'set-attribute') {
+      this.count(checkMappingReference(input) ? 'reference:agreed' : 'reference:skipped');
+    }
     this.countVerdict(intent.file, judgeRemap(input));
   }
 
@@ -740,23 +746,39 @@ class World {
       return;
     }
     const { node, attribute } = this.prng.pick(targets);
-    const name = this.prng.chance(1, 10) ? 'data-absent' : attribute.name;
     const anchor = toAnchorRef({
       span: node.span,
       path: node.path.map(toChildIndex),
       expectedKind: node.kind,
     });
+    const intent = toIntent({
+      id: this.nextIntentId(),
+      file: snapshot.path,
+      authoredChecksum: snapshot.checksum,
+      anchor,
+      operation: this.visualOperation(snapshot.bytes, node, attribute.name),
+    });
+    this.count(`visual:${intent.operation.tag}`);
+    this.submit(intent, view);
+  }
+
+  // Mostly the step-3 set-attribute; from step 9 also the renames that took
+  // over gestures the whole-model save carried: an attribute's name, and the
+  // tag's own (a raw `<style>` or `<script>` is never renamed).
+  private visualOperation(bytes: ByteString, node: ProjectedNode, name: string): Operation {
+    const roll = this.prng.below(10);
+    if (roll === 0) {
+      return { tag: 'rename-attribute', from: name, to: `${name}-renamed` };
+    }
+    if (roll === 1) {
+      const tag = tagNameText(bytes, node);
+      if (tag !== '' && (node.kind === 'element' || node.kind === 'component')) {
+        return { tag: 'rename-tag', from: tag, to: `${tag}x` };
+      }
+    }
+    const target = this.prng.chance(1, 10) ? 'data-absent' : name;
     const value = { type: 'string' as const, value: this.prng.pick(ATTRIBUTE_VALUES) };
-    this.submit(
-      toIntent({
-        id: this.nextIntentId(),
-        file: snapshot.path,
-        authoredChecksum: snapshot.checksum,
-        anchor,
-        operation: { tag: 'set-attribute', name, value },
-      }),
-      view,
-    );
+    return { tag: 'set-attribute', name: target, value };
   }
 
   /** The legacy whole-model save (`replace-source`, plan §3.3): the file's
@@ -1164,4 +1186,16 @@ function verdictDetail(verdict: RemapVerdict): string {
       return exhaustive;
     }
   }
+}
+
+// Tags whose planned stale intents are judged by whether their element survived
+// (remap-judge.ts): every operation that edits one tag's name or attributes.
+function judgedBySurvival(tag: Intent['operation']['tag']): boolean {
+  return tag === 'set-attribute' || tag === 'rename-attribute' || tag === 'rename-tag';
+}
+
+// A tag's name as written, from its `<` to the first space, `/` or `>`.
+function tagNameText(bytes: ByteString, node: ProjectedNode): string {
+  const text = Buffer.from(bytes.subarray(node.span.start + 1, node.span.end)).toString('utf8');
+  return /^[^\s/>]*/.exec(text)?.[0] ?? '';
 }

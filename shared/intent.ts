@@ -38,7 +38,14 @@ export type StyleDeclaration =
  * an applied outcome that Undo submits (plan §11 step 6). A revert is not a
  * code patch: a code patch is text the user wrote and may leave the file
  * invalid (§3.6); a revert restores bytes an applied intent replaced, keeps a
- * parsing file parsing, and a stale one is a moved region, not a merge. */
+ * parsing file parsing, and a stale one is a moved region, not a merge.
+ *
+ * Added at step 9, so the gestures that only a whole-model save could carry
+ * reach disk as splices: `rename-tag` (the name in the opening and closing
+ * tags), `rename-attribute` (one attribute's name, in place) and
+ * `rewrite-node` (hunks inside one node the node's own bytes witness, for an
+ * edit the printer states as the node's new text — a note reworded, a text
+ * set, a branch added). None of them ever writes outside its node. */
 export type Operation =
   | { readonly tag: 'set-attribute'; readonly name: string; readonly value: AttributeValue }
   | { readonly tag: 'remove-attribute'; readonly name: string }
@@ -59,6 +66,9 @@ export type Operation =
   | { readonly tag: 'apply-code-patch'; readonly hunks: readonly SourceEdit[] }
   | { readonly tag: 'edit-frontmatter-slot'; readonly slot: ByteSpan; readonly text: string }
   | { readonly tag: 'revert-splices'; readonly hunks: readonly SourceEdit[] }
+  | { readonly tag: 'rename-tag'; readonly from: string; readonly to: string }
+  | { readonly tag: 'rename-attribute'; readonly from: string; readonly to: string }
+  | { readonly tag: 'rewrite-node'; readonly hunks: readonly SourceEdit[] }
   | { readonly tag: 'replace-source'; readonly text: string };
 
 export type OperationTag = Operation['tag'];
@@ -109,6 +119,9 @@ export type Outcome =
 
 const ATTRIBUTE_NAME_RE = /^[\w@:.-]+$/;
 const IDENTIFIER_RE = /^[A-Za-z_$][\w$]*$/;
+/** A tag or component name as the parser reads one: a letter, then name
+ * characters — `div`, `my-card`, `Card`, `Icons.Arrow`, `svg:path`. */
+export const TAG_NAME_RE = /^[A-Za-z][\w.:-]*$/;
 const STYLE_PROPERTY_RE = /^(?:--[\w-]+|-?[a-z][a-z-]*)$/;
 
 /** The notice text for a rejection (plan §7): names the reason, never blames
@@ -168,6 +181,8 @@ function operationTexts(operation: Operation): readonly string[] {
     case 'move-node':
       return [];
     case 'rename-binding':
+    case 'rename-tag':
+    case 'rename-attribute':
       return [operation.from, operation.to];
     case 'set-inline-style':
       return operation.declaration.tag === 'set'
@@ -175,6 +190,7 @@ function operationTexts(operation: Operation): readonly string[] {
         : [operation.property];
     case 'apply-code-patch':
     case 'revert-splices':
+    case 'rewrite-node':
       return operation.hunks.map((hunk) => hunk.text);
     case 'edit-frontmatter-slot':
     case 'replace-source':
@@ -204,7 +220,22 @@ function checkOperationAnchor(operation: Operation, anchor: AnchorRef): void {
     case 'set-attribute':
     case 'remove-attribute':
     case 'set-inline-style':
+    case 'rename-attribute':
       requireKind(operation.tag, isAttributeHost(kind));
+      return;
+    case 'rename-tag':
+      // A `<style>` or `<script>` is raw text by its name: renaming one
+      // changes how everything inside it parses, which is code, not a tag.
+      requireKind(operation.tag, kind === 'element' || kind === 'component');
+      requireNewName(operation.tag, operation.from, operation.to);
+      return;
+    case 'rewrite-node':
+      requireKind(operation.tag, isNodeKind(kind));
+      requireSites(
+        operation.tag,
+        anchor.span,
+        operation.hunks.map((hunk) => hunk.span),
+      );
       return;
     case 'insert-node':
     case 'remove-node':
@@ -266,6 +297,12 @@ function isAttributeHost(kind: AnchorKind): boolean {
   }
 }
 
+function requireNewName(tag: OperationTag, from: string, to: string): void {
+  if (from === to) {
+    throw new Error(`Intent: ${tag} must change the name`);
+  }
+}
+
 function requireKind(tag: OperationTag, allowed: boolean): void {
   if (!allowed) {
     throw new Error(`Intent: ${tag} cannot target this anchor kind`);
@@ -315,11 +352,11 @@ function parseOperation(input: unknown): Operation {
     case 'set-attribute':
       return {
         tag,
-        name: attributeName(record['name']),
+        name: attributeName(record['name'], 'Operation.name'),
         value: parseAttributeValue(record['value']),
       };
     case 'remove-attribute':
-      return { tag, name: attributeName(record['name']) };
+      return { tag, name: attributeName(record['name'], 'Operation.name') };
     case 'insert-node':
       return {
         tag,
@@ -340,7 +377,22 @@ function parseOperation(input: unknown): Operation {
       return parseSetInlineStyle(record);
     case 'apply-code-patch':
     case 'revert-splices':
+    case 'rewrite-node':
       return { tag, hunks: parseHunks(record['hunks']) };
+    case 'rename-tag':
+      return {
+        tag,
+        from: tagName(record['from'], 'Operation.from'),
+        to: tagName(record['to'], 'Operation.to'),
+      };
+    case 'rename-attribute': {
+      const from = attributeName(record['from'], 'Operation.from');
+      const to = attributeName(record['to'], 'Operation.to');
+      if (from === to) {
+        throw new Error('Operation.to: a rename must change the name');
+      }
+      return { tag, from, to };
+    }
     case 'edit-frontmatter-slot':
       return {
         tag,
@@ -518,10 +570,18 @@ function payloadText(input: unknown, where: string): string {
   return boundedText(input, where, LIMITS.intentPayloadBytesMax);
 }
 
-function attributeName(input: unknown): string {
-  const name = boundedText(input, 'Operation.name', LIMITS.attrCharsMax);
+function attributeName(input: unknown, where: string): string {
+  const name = boundedText(input, where, LIMITS.attrCharsMax);
   if (!ATTRIBUTE_NAME_RE.test(name)) {
-    throw new Error('Operation.name: expected an attribute name');
+    throw new Error(`${where}: expected an attribute name`);
+  }
+  return name;
+}
+
+function tagName(input: unknown, where: string): string {
+  const name = boundedText(input, where, LIMITS.tagNameCharsMax);
+  if (!TAG_NAME_RE.test(name)) {
+    throw new Error(`${where}: expected a tag name`);
   }
   return name;
 }

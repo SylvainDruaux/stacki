@@ -17,7 +17,7 @@ import type { Digest } from './brand';
 import { digest, pathText } from './boundary';
 import type { CodeHunk } from './code-patch';
 import type { AttributeValue, Placement, SourceEdit, StyleDeclaration } from './intent';
-import { PLACEMENTS } from './intent';
+import { PLACEMENTS, TAG_NAME_RE } from './intent';
 import { LIMITS } from './limits';
 import { parsePageModel, parsePageNode, type PageModel, type PageNode } from './page-node';
 import { toArray, toRecord } from './record';
@@ -70,6 +70,19 @@ export type Edit =
       readonly from: string;
       readonly to: string;
     }
+  /** Step 9: a tag's name, in its opening and closing tags. */
+  | { readonly tag: 'rename-tag'; readonly target: NodeRef; readonly to: string }
+  /** Step 9: one attribute's name, in place. */
+  | {
+      readonly tag: 'rename-attribute';
+      readonly target: NodeRef;
+      readonly from: string;
+      readonly to: string;
+    }
+  /** Step 9: the node as it should now read. Main prints the old and the new
+   * node, and writes only what the printer says changed, placed on the node's
+   * own bytes (a `rewrite-node` intent) — never a reprint of the node. */
+  | { readonly tag: 'replace-node'; readonly target: NodeRef; readonly node: PageNode }
   /** The frontmatter the page model now describes; main prints it and writes
    * only the slot that differs (an edit-frontmatter-slot intent). */
   | { readonly tag: 'set-frontmatter'; readonly model: PageModel }
@@ -115,14 +128,14 @@ export function parseEdit(input: unknown): Edit {
       return {
         tag,
         target: parseNodeRef(record['target'], 'Edit.target'),
-        name: attributeName(record['name']),
+        name: attributeName(record['name'], 'Edit.name'),
         value: parseAttributeValue(record['value']),
       };
     case 'remove-attribute':
       return {
         tag,
         target: parseNodeRef(record['target'], 'Edit.target'),
-        name: attributeName(record['name']),
+        name: attributeName(record['name'], 'Edit.name'),
       };
     case 'set-inline-style':
       return {
@@ -149,6 +162,21 @@ export function parseEdit(input: unknown): Edit {
       };
     case 'rename-binding':
       return parseRename(record);
+    case 'rename-tag':
+      return {
+        tag,
+        target: parseNodeRef(record['target'], 'Edit.target'),
+        to: tagName(record['to'], 'Edit.to'),
+      };
+    case 'rename-attribute':
+      return parseAttributeRename(record);
+    case 'replace-node':
+      return {
+        tag,
+        target: parseNodeRef(record['target'], 'Edit.target'),
+        // One counter bounds the node like one page tree.
+        node: parsePageNode(record['node'], 'Edit.node', 0, { nodes: 0 }),
+      };
     case 'set-frontmatter':
       return { tag, model: parsePageModel(record['model']) };
     case 'revert':
@@ -230,6 +258,16 @@ function parseRename(record: Record<string, unknown>): Edit {
     throw new Error('Edit.to: a rename must change the name');
   }
   return { tag: 'rename-binding', target: parseNodeRef(record['target'], 'Edit.target'), from, to };
+}
+
+function parseAttributeRename(record: Record<string, unknown>): Edit {
+  const from = attributeName(record['from'], 'Edit.from');
+  const to = attributeName(record['to'], 'Edit.to');
+  if (from === to) {
+    throw new Error('Edit.to: a rename must change the name');
+  }
+  const target = parseNodeRef(record['target'], 'Edit.target');
+  return { tag: 'rename-attribute', target, from, to };
 }
 
 function parseHunks(input: unknown): readonly SourceEdit[] {
@@ -315,10 +353,18 @@ function parsePlacement(input: unknown): Placement {
   throw new Error(`Edit.placement: unknown value ${JSON.stringify(input)}`);
 }
 
-function attributeName(input: unknown): string {
-  const name = boundedText(input, 'Edit.name', LIMITS.attrCharsMax);
+function attributeName(input: unknown, where: string): string {
+  const name = boundedText(input, where, LIMITS.attrCharsMax);
   if (!ATTRIBUTE_NAME_RE.test(name)) {
-    throw new Error('Edit.name: expected an attribute name');
+    throw new Error(`${where}: expected an attribute name`);
+  }
+  return name;
+}
+
+function tagName(input: unknown, where: string): string {
+  const name = boundedText(input, where, LIMITS.tagNameCharsMax);
+  if (!TAG_NAME_RE.test(name)) {
+    throw new Error(`${where}: expected a tag name`);
   }
   return name;
 }

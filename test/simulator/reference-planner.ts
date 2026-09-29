@@ -70,7 +70,11 @@ export function planByIdentity(snapshot: Snapshot, intent: Intent): Result<Plan,
     case 'remove-node':
     case 'move-node':
     case 'set-inline-style':
-      // Planned from step 6 by the shipping planner only; this reference stays
+    case 'rename-tag':
+    case 'rename-attribute':
+    case 'rewrite-node':
+      // Planned from step 6 (step 9 for the renames and rewrites) by the
+      // shipping planner only; this reference stays
       // the step-1 identity planner for the operations it was written for.
       return err('unsupported-operation');
     default: {
@@ -94,6 +98,9 @@ function isVisual(tag: Intent['operation']['tag']): boolean {
     case 'rename-binding':
     case 'set-inline-style':
     case 'edit-frontmatter-slot':
+    case 'rename-tag':
+    case 'rename-attribute':
+    case 'rewrite-node':
       return true;
     default: {
       const exhaustive: never = tag;
@@ -117,6 +124,9 @@ function staleReason(tag: Intent['operation']['tag']): RejectionReason {
     case 'rename-binding':
     case 'set-inline-style':
     case 'edit-frontmatter-slot':
+    case 'rename-tag':
+    case 'rename-attribute':
+    case 'rewrite-node':
       return 'anchor-moved';
     default: {
       const exhaustive: never = tag;

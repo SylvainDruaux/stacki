@@ -1,6 +1,7 @@
 // Planning the operations that name byte ranges directly (plan §3.3): a loop
 // rename's sites, a frontmatter slot, a code patch's hunks, a revert's hunks,
-// and the migration-only whole-file replacement. The ranges were authored
+// a node rewrite's hunks (step 9), and the migration-only whole-file
+// replacement. The ranges were authored
 // against the intent's own snapshot; stale ones are mapped through the diff
 // with the region they sit in, and only exactly.
 import { assert } from './assert';
@@ -9,6 +10,7 @@ import { LIMITS } from './limits';
 import type { CandidatePolicy, Plan, Splice } from './planner';
 import {
   nodeEditable,
+  nodeUnchanged,
   resolveTarget,
   sameSpan,
   slice,
@@ -64,6 +66,42 @@ export function planRenameBinding(
   }
   const postKinds = [{ path: target.current.path, kind: target.current.kind }];
   return ok({ splices, postKinds, candidate: 'must-parse' });
+}
+
+/** A node rewrite (step 9): hunks inside one node, stated against its authored
+ * bytes. The node is found again through its identity region and must hold
+ * exactly the bytes it was authored with — the hunks were computed from the
+ * whole node's text, so any change inside it is someone else's edit, refused
+ * rather than merged — and then every hunk moved with it. */
+export function planRewriteNode(
+  context: PlanContext,
+  anchor: AnchorRef,
+  operation: Extract<Operation, { tag: 'rewrite-node' }>,
+): Result<Plan, RejectionReason> {
+  const resolved = resolveTarget(context, anchor);
+  if (!resolved.ok) {
+    return resolved;
+  }
+  const target = resolved.value;
+  if (!nodeEditable(target.current)) {
+    return err('unsupported-operation');
+  }
+  if (!nodeUnchanged(context, target)) {
+    return err('region-externally-modified');
+  }
+  const shift = target.current.span.start - target.authored.span.start;
+  assert(shift === target.shift, 'An unchanged node moved with its identity region');
+  const splices = operation.hunks.map((hunk) => {
+    const moved = toByteSpan(hunk.span.start + shift, hunk.span.end + shift);
+    const splice = spliceAt(context.current.bytes, moved, hunk.text);
+    assert(
+      byteStringsEqual(splice.expectedBytes, slice(context.authored.bytes, hunk.span)),
+      'A rewritten range holds its authored bytes',
+    );
+    return splice;
+  });
+  assert(spansAscending(splices.map((splice) => splice.range)), 'Moved hunks keep their order');
+  return ok({ splices, postKinds: [], candidate: 'must-parse' });
 }
 
 /** A frontmatter slot: the fenced block must be the one authored, found again

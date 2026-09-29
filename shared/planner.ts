@@ -21,10 +21,11 @@
 // The witness guards staleness, not identity (plan §3.4); identity comes from
 // the mapping, which rejects on ambiguity. This module holds the dispatch and
 // the attribute family (`set-attribute`, `remove-attribute`,
-// `set-inline-style`); planTree.ts plans insertions, removals and moves, and
-// planText.ts the operations that name byte ranges directly (a loop rename's
-// sites, a frontmatter slot, code patches, reverts, the whole-file
-// replacement). Step 6 (plan §11) ships them all.
+// `set-inline-style`, and step 9's `rename-attribute`) with the tag rename;
+// planTree.ts plans insertions, removals and moves, and planText.ts the
+// operations that name byte ranges directly (a loop rename's sites, a
+// frontmatter slot, code patches, reverts, node rewrites, the whole-file
+// replacement). Step 6 (plan §11) shipped the first set; step 9 the rest.
 import { assert } from './assert';
 import { countOccurrences } from './byteSearch';
 import { diffBytes, DIFF_BUDGET } from './diff';
@@ -34,9 +35,12 @@ import { LIMITS } from './limits';
 import { mapSpanThroughDiff, type SpanMapping } from './mapSpan';
 import {
   byteOffsetsIn,
+  closeTagStart,
   containsNewline,
+  isWhitespace,
   lineIndent,
   nodeEditable,
+  openTagEnd,
   resolveTarget,
   tagNameEnd,
   textOf,
@@ -52,6 +56,7 @@ import {
   planRenameBinding,
   planReplaceSource,
   planRevertSplices,
+  planRewriteNode,
 } from './planText';
 import type { AnchorRef, NodeKind, StructuralPath } from './ref';
 import { err, ok, type Result } from './result';
@@ -211,6 +216,12 @@ function planWith(
       return planCodePatch(context, anchor, operation);
     case 'revert-splices':
       return planRevertSplices(context, anchor, operation);
+    case 'rename-tag':
+      return planRenameTag(context, anchor, operation);
+    case 'rename-attribute':
+      return planRenameAttribute(context, anchor, operation);
+    case 'rewrite-node':
+      return planRewriteNode(context, anchor, operation);
     case 'replace-source':
       return planReplaceSource(context, anchor, operation.text);
     default: {
@@ -261,6 +272,111 @@ function planAttributeOperation(
   }
   const postKinds = [{ path: target.current.path, kind: target.current.kind }];
   return ok({ splices: splices.value, postKinds, candidate: 'must-parse' });
+}
+
+/** `rename-attribute` (step 9): the name alone, in place — its value and its
+ * place among the attributes stay. The attribute must be there, once, and the
+ * new name must not be: renaming onto a name the tag already has would leave
+ * two, and which one the page uses would be a guess. */
+function planRenameAttribute(
+  context: PlanContext,
+  anchor: AnchorRef,
+  operation: Extract<Operation, { tag: 'rename-attribute' }>,
+): Result<Plan, RejectionReason> {
+  const resolved = resolveTarget(context, anchor);
+  if (!resolved.ok) {
+    return resolved;
+  }
+  const target = resolved.value;
+  if (!nodeEditable(target.current)) {
+    return err('unsupported-operation');
+  }
+  const found = soleAttribute(target, operation.from);
+  if (!found.ok) {
+    return found;
+  }
+  const attribute = found.value;
+  if (attribute === undefined) {
+    return err('anchor-moved'); // Nothing named so: the page is not what was authored.
+  }
+  if (!nodeEditable(attributeAsNode(attribute, target.current))) {
+    return err('unsupported-operation');
+  }
+  const clash = target.current.attributes.some((candidate) => candidate.name === operation.to);
+  if (clash) {
+    return err('unsupported-operation');
+  }
+  const nameSpan = attribute.nameSpan;
+  assert(nameSpan !== undefined, 'A named attribute has a name span');
+  assert(textOf(context.current.bytes, nameSpan) === operation.from, 'The name span holds it');
+  const splice = spliceAt(context.current.bytes, nameSpan, operation.to);
+  const postKinds = [{ path: target.current.path, kind: target.current.kind }];
+  return ok({ splices: [splice], postKinds, candidate: 'must-parse' });
+}
+
+/** `rename-tag` (step 9): the name in the opening tag and, for a paired tag,
+ * in its closing tag — nothing between them. The closing tag is found in the
+ * current node, so content someone else changed inside it is kept. A tag
+ * without a name (`<>`), or one neither self-closing nor closed (a void
+ * `<img>`), has no rename that keeps the page's structure: refused. The kind
+ * may change with the name (`div` → `Card`), so none is promised. */
+function planRenameTag(
+  context: PlanContext,
+  anchor: AnchorRef,
+  operation: Extract<Operation, { tag: 'rename-tag' }>,
+): Result<Plan, RejectionReason> {
+  const resolved = resolveTarget(context, anchor);
+  if (!resolved.ok) {
+    return resolved;
+  }
+  const node = resolved.value.current;
+  const bytes = context.current.bytes;
+  if (!nodeEditable(node)) {
+    return err('unsupported-operation');
+  }
+  const name = toByteSpan(node.span.start + 1, tagNameEnd(bytes, node));
+  if (name.start === name.end) {
+    return err('unsupported-operation'); // `<>`: a fragment is named in code.
+  }
+  if (textOf(bytes, name) !== operation.from) {
+    return err('anchor-moved'); // Not the tag the client saw.
+  }
+  const splices = [spliceAt(bytes, name, operation.to)];
+  const open = openTagEnd(bytes, node);
+  if (!open.selfClosing) {
+    const closing = closingName(bytes, node, open.end, operation.from);
+    if (closing === undefined) {
+      return err('unsupported-operation');
+    }
+    splices.push(spliceAt(bytes, closing, operation.to));
+  }
+  assert(splices.length <= 2, 'A tag has at most an opening and a closing name');
+  return ok({ splices, postKinds: [], candidate: 'must-parse' });
+}
+
+// The name in the `</name>` that ends a paired tag's node, when it is `name`.
+function closingName(
+  bytes: ByteString,
+  node: ProjectedNode,
+  openEnd: number,
+  name: string,
+): ByteSpan | undefined {
+  const start = closeTagStart(bytes, node, openEnd);
+  if (start === undefined) {
+    return undefined;
+  }
+  const span = toByteSpan(start + 2, start + 2 + encodeUtf8(name).length);
+  if (span.end > node.span.end) {
+    return undefined;
+  }
+  if (textOf(bytes, span) !== name) {
+    return undefined;
+  }
+  const after = bytes[span.end];
+  if (after === undefined) {
+    return undefined;
+  }
+  return after === 0x3e || isWhitespace(after) ? span : undefined; // `>` or a space before it
 }
 
 function attributeSplices(

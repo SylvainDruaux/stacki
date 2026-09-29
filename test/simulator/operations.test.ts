@@ -1,4 +1,5 @@
-// Goal: every operation step 6 ships (plan §11 step 6) plans the right bytes,
+// Goal: every operation step 6 ships (plan §11 step 6), and the renames and
+// node rewrites step 9 adds, plans the right bytes,
 // fresh and stale, and its inverse restores exactly what it replaced — the
 // engine half of Undo.
 // Method: (1) every oracle scenario through the shipping planner: the planned
@@ -315,6 +316,105 @@ test('frontmatter slots and code patches: stale ones map whole or reject', () =>
   });
 });
 
+test('rename-tag renames the opening and closing tag and nothing between them', () => {
+  const page = snapshotText(
+    '<section class="a">\n  <p>section</p>\n</section>\n<Card />\n<img src="x">\n',
+  );
+  const rename = (from: string, to: string): Operation => ({ tag: 'rename-tag', from, to });
+  assert.equal(
+    run(page, rename('section', 'article'), anchorAt(page, [0])),
+    '<article class="a">\n  <p>section</p>\n</article>\n<Card />\n<img src="x">\n',
+  );
+  assert.equal(
+    run(page, rename('Card', 'Panel'), anchorAt(page, [1])),
+    '<section class="a">\n  <p>section</p>\n</section>\n<Panel />\n<img src="x">\n',
+  );
+  assert.equal(
+    run(page, rename('img', 'picture'), anchorAt(page, [2])),
+    'rejected: unsupported-operation',
+    'a void tag has no closing tag to rename with it',
+  );
+  assert.equal(
+    run(page, rename('div', 'article'), anchorAt(page, [0])),
+    'rejected: anchor-moved',
+    'the name the client saw is its witness',
+  );
+  // Stale: someone rewrote the paragraph inside. The rename still lands on the
+  // tag's two names, and the outside edit is kept.
+  const current = snapshotText(
+    '<section class="a">\n  <p>edited outside</p>\n</section>\n<Card />\n<img src="x">\n',
+  );
+  const intent = intentOn(page, anchorAt(page, [0]), rename('section', 'article'));
+  const mapped = planIntent({ authored: page, current }, intent);
+  assert.ok(mapped.ok, mapped.ok ? '' : mapped.error);
+  assert.equal(
+    textOf(applySplices(current.bytes, mapped.value.splices)),
+    '<article class="a">\n  <p>edited outside</p>\n</article>\n<Card />\n<img src="x">\n',
+  );
+});
+
+test('rename-attribute renames in place; a missing name or a clash is refused', () => {
+  const page = snapshotText('<a href="/x" title={t} data-a data-b="1">x</a>\n');
+  const rename = (from: string, to: string): Operation => ({ tag: 'rename-attribute', from, to });
+  const anchor = anchorAt(page, [0]);
+  assert.equal(
+    run(page, rename('title', 'aria-label'), anchor),
+    '<a href="/x" aria-label={t} data-a data-b="1">x</a>\n',
+  );
+  assert.equal(
+    run(page, rename('data-a', 'hidden'), anchor),
+    '<a href="/x" title={t} hidden data-b="1">x</a>\n',
+  );
+  assert.equal(run(page, rename('alt', 'title'), anchor), 'rejected: anchor-moved');
+  assert.equal(run(page, rename('href', 'title'), anchor), 'rejected: unsupported-operation');
+  const twice = snapshotText('<a x="1" x="2">x</a>\n');
+  assert.equal(
+    run(twice, rename('x', 'y'), anchorAt(twice, [0])),
+    'rejected: anchor-ambiguous',
+  );
+});
+
+test('rewrite-node writes its hunks inside the node, and only while the node is unchanged', () => {
+  const text = '<!-- old note -->\n<p>kept</p>\n';
+  const page = snapshotText(text);
+  const start = text.indexOf('old');
+  const hunk = { span: toByteSpan(start, start + 3), text: 'new' };
+  const rewrite: Operation = { tag: 'rewrite-node', hunks: [hunk] };
+  assert.equal(run(page, rewrite, anchorAt(page, [0])), '<!-- new note -->\n<p>kept</p>\n');
+  // Stale, the node untouched: the hunk moves with it. (Text above, not a tag:
+  // a tag's `<` beside the note's own would tie the diff's scripts, and the
+  // mapper refuses ties as ambiguous.)
+  const above = snapshotText(`Intro\n${text}`);
+  const intent = intentOn(page, anchorAt(page, [0]), rewrite);
+  const mapped = planIntent({ authored: page, current: above }, intent);
+  assert.ok(mapped.ok, mapped.ok ? '' : mapped.error);
+  assert.equal(
+    textOf(applySplices(above.bytes, mapped.value.splices)),
+    'Intro\n<!-- new note -->\n<p>kept</p>\n',
+  );
+  // Stale, the node changed inside: the rewrite was computed from other text.
+  const element = snapshotText('<p class="a">one <b>two</b></p>\n');
+  const inside = snapshotText('<p class="a">one <b>three</b></p>\n');
+  const retitle: Operation = {
+    tag: 'rewrite-node',
+    hunks: [{ span: toByteSpan(13, 16), text: 'uno' }],
+  };
+  const refused = planIntent(
+    { authored: element, current: inside },
+    intentOn(element, anchorAt(element, [0]), retitle),
+  );
+  assert.deepEqual(refused, { ok: false, error: 'region-externally-modified' });
+  assert.throws(
+    () =>
+      intentOn(page, anchorAt(page, [0]), {
+        tag: 'rewrite-node',
+        hunks: [{ span: toByteSpan(20, 22), text: 'x' }],
+      }),
+    /site lies outside its anchor/,
+    'a hunk outside its node is refused at construction',
+  );
+});
+
 // --- (3) The corpus sweep ------------------------------------------------------------
 
 function corpusFiles(): readonly { readonly name: string; readonly text: string }[] {
@@ -376,7 +476,41 @@ const SWEEPS: Readonly<Record<string, Sweep>> = {
     TAGS.has(node.kind)
       ? { tag: 'set-inline-style', property: 'color', declaration: { tag: 'set', value: 'red' } }
       : undefined,
+  // Step 9: the operations that replaced the whole-model save.
+  'rename-tag': (node, page) => {
+    const name = tagNameOf(node, page);
+    if (node.kind !== 'element' && node.kind !== 'component') {
+      return undefined;
+    }
+    return name === '' ? undefined : { tag: 'rename-tag', from: name, to: `${name}x` };
+  },
+  'rename-attribute': (node) => {
+    const named = node.attributes.find((attribute) => attribute.type !== 'spread');
+    return TAGS.has(node.kind) && named !== undefined
+      ? { tag: 'rename-attribute', from: named.name, to: `${named.name}-renamed` }
+      : undefined;
+  },
+  'rewrite-node': (node, page) => {
+    if (node.kind === 'text') {
+      return { tag: 'rewrite-node', hunks: [{ span: node.span, text: 'rewritten' }] };
+    }
+    const name = tagNameOf(node, page);
+    if (!TAGS.has(node.kind) || name === '') {
+      return undefined;
+    }
+    const at = node.span.start + 1 + encodeUtf8(name).length;
+    return { tag: 'rewrite-node', hunks: [{ span: toByteSpan(at, at), text: ' data-rewritten' }] };
+  },
 };
+
+// A tag's name as written: from its `<` to the first space, `/` or `>`.
+function tagNameOf(node: ProjectedNode, page: Snapshot): string {
+  if (!TAGS.has(node.kind)) {
+    return '';
+  }
+  const text = Buffer.from(page.bytes.subarray(node.span.start + 1, node.span.end)).toString();
+  return /^[^\s/>]*/.exec(text)?.[0] ?? '';
+}
 
 // Every rejection a sweep may meet, per operation; anything else fails.
 const ALLOWED: ReadonlySet<string> = new Set([

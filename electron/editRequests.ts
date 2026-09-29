@@ -3,8 +3,10 @@
 // snapshot it was authored against. Here the renderer's node references are
 // checked against main's own projection of the same bytes, UTF-16 ranges
 // become byte spans, new nodes and frontmatter are printed by the legacy
-// printer (only what is new — never the file), and a loop rename's sites are
-// found (shared/loopScope.ts). Everything else is the planner's.
+// printer (only what is new — never the file), a node's new text is turned
+// into hunks placed on its own bytes (step 9, `replace-node`), and a loop
+// rename's sites are found (shared/loopScope.ts). Everything else is the
+// planner's.
 //
 // On the legacy writer boundary (eslint.config.mjs) because it prints: new
 // nodes with serializeNodes, and the frontmatter block with serializePage over
@@ -12,11 +14,22 @@
 // deletes this module with the rest of the adapter.
 import { assert } from '../shared/assert';
 import { toUtf16Offset } from '../shared/brand';
+import { diffCodePatch } from '../shared/code-patch';
+import { DIFF_BUDGET, diffBytes, type ByteDiff } from '../shared/diff';
 import type { Edit, NodeRef } from '../shared/edit-request';
+import { mapSpanThroughDiff } from '../shared/mapSpan';
 import type { BuiltEdit, EditBase, IntentDraft } from './documentActors';
-import type { Operation, Placement, RejectionReason } from '../shared/intent';
+import { TAG_NAME_RE } from '../shared/intent';
+import type { Operation, Placement, RejectionReason, SourceEdit } from '../shared/intent';
 import { renameSites } from '../shared/loopScope';
-import { lineIndent, nodeAtPath, type ValidProjection } from '../shared/planSupport';
+import {
+  lineIndent,
+  nodeAtPath,
+  tagNameEnd,
+  textOf,
+  type ValidProjection,
+} from '../shared/planSupport';
+import { parsePageResult, type PageNode } from '../shared/page-node';
 import { toAnchorRef, toChildIndex, type AnchorRef } from '../shared/ref';
 import { err, ok, type Result } from '../shared/result';
 import type { Snapshot } from '../shared/snapshot';
@@ -30,7 +43,7 @@ import {
   utf16ToByteOffsets,
   type ByteSpan,
 } from '../shared/span';
-import { serializeNodes, serializePage } from './astroParser';
+import { parsePage, serializeNodes, serializePage } from './astroParser';
 
 interface Authored {
   readonly snapshot: Snapshot;
@@ -90,6 +103,20 @@ export function buildEditIntent(
       );
     case 'rename-binding':
       return withAnchor(authored, edit.target, (anchor) => renameDraft(authored, anchor, edit));
+    case 'rename-tag':
+      return withAnchor(authored, edit.target, (anchor) =>
+        tagRenameDraft(authored, anchor, edit.to),
+      );
+    case 'rename-attribute':
+      return withAnchor(authored, edit.target, (anchor) =>
+        tagAnchor(anchor)
+          ? ok({ anchor, operation: { tag: 'rename-attribute', from: edit.from, to: edit.to } })
+          : err('unsupported-operation'),
+      );
+    case 'replace-node':
+      return withAnchor(authored, edit.target, (anchor) =>
+        replaceDraft(authored, anchor, edit.node),
+      );
     case 'set-frontmatter':
       return frontmatterDraft(authored, edit.model);
     default: {
@@ -190,6 +217,149 @@ function renameDraft(
     return err('unsupported-operation'); // A head or a test the rename cannot read.
   }
   return ok({ anchor, operation: { tag: 'rename-binding', from: edit.from, to: edit.to, sites } });
+}
+
+// A tag's new name: the old one is read off the authored bytes, where the
+// planner will find it again (its witness). A `<style>` or `<script>` is raw
+// text by its name, and `<>` has none: neither is renamed visually.
+function tagRenameDraft(
+  authored: Authored,
+  anchor: AnchorRef,
+  to: string,
+): Result<IntentDraft, RejectionReason> {
+  const node = nodeAtPath(authored.projection, anchor.path);
+  assert(node !== undefined, 'A checked anchor names a projected node');
+  if (node.kind !== 'element' && node.kind !== 'component') {
+    return err('unsupported-operation');
+  }
+  const bytes = authored.snapshot.bytes;
+  const from = textOf(bytes, toByteSpan(node.span.start + 1, tagNameEnd(bytes, node)));
+  if (!TAG_NAME_RE.test(from)) {
+    return err('unsupported-operation');
+  }
+  if (from === to) {
+    return err('unsupported-operation'); // Nothing to write; the gesture had no change.
+  }
+  return ok({ anchor, operation: { tag: 'rename-tag', from, to } });
+}
+
+// A node as it should now read (step 9). The printer renders the node as it is
+// and as it should be; the difference is the edit. The node's own bytes may be
+// written differently from the printer's rendering — spacing, line breaks,
+// entities the parser kept — so each changed range of the rendering is placed
+// on the bytes through a diff between the two (the span mapper, which refuses
+// rather than guesses). A range the formatting itself changed has no place:
+// the edit is refused, and the node is never reprinted.
+function replaceDraft(
+  authored: Authored,
+  anchor: AnchorRef,
+  next: PageNode,
+): Result<IntentDraft, RejectionReason> {
+  const projected = nodeAtPath(authored.projection, anchor.path);
+  assert(projected !== undefined, 'A checked anchor names a projected node');
+  const previous = pageNodeAt(authored.text, anchor.path);
+  if (previous === undefined) {
+    return err('anchor-moved');
+  }
+  const bytes = authored.snapshot.bytes;
+  const eol = authored.text.includes('\r\n') ? '\r\n' : '\n';
+  const indent = lineIndent(bytes, projected.span.start);
+  const print = (node: PageNode): string =>
+    serializeNodes([node]).replace(/\r?\n$/, '').split(/\r?\n/).join(`${eol}${indent}`);
+  const own = textOf(bytes, projected.span);
+  const hunks = placedHunks(print(previous), print(next), own);
+  if (!hunks.ok) {
+    return hunks;
+  }
+  const shift = projected.span.start;
+  const moved = hunks.value.map((hunk) => ({
+    span: toByteSpan(hunk.span.start + shift, hunk.span.end + shift),
+    text: hunk.text,
+  }));
+  return ok({ anchor, operation: { tag: 'rewrite-node', hunks: moved } });
+}
+
+// The printer's change from `before` to `after`, as hunks of `own` — the
+// node's bytes. Equal renderings mean the printer and the bytes agree, and the
+// change applies as it is; otherwise each hunk is placed on `own` through the
+// diff from `before`.
+function placedHunks(
+  before: string,
+  after: string,
+  own: string,
+): Result<readonly SourceEdit[], RejectionReason> {
+  const change = diffCodePatch(before, after);
+  if (!change.ok) {
+    return change;
+  }
+  if (change.value.length === 0) {
+    return err('unsupported-operation'); // The gesture changed nothing the printer writes.
+  }
+  if (before === own) {
+    return ok(change.value.map((hunk) => ({ span: hunk.span, text: hunk.text })));
+  }
+  const diff = diffBytes(encodeUtf8(before), encodeUtf8(own), DIFF_BUDGET);
+  if (diff.tag === 'too-costly') {
+    return err('resource-limit');
+  }
+  const placed: SourceEdit[] = [];
+  for (const hunk of change.value) {
+    const span = placedSpan(diff.diff, hunk.span);
+    if (span === undefined) {
+      return err('unsupported-operation');
+    }
+    placed.push({ span, text: hunk.text });
+  }
+  if (!spansAscending(placed.map((hunk) => hunk.span))) {
+    return err('unsupported-operation');
+  }
+  return ok(placed);
+}
+
+// A range of the rendering on the node's bytes: its own bytes kept whole, or,
+// for an insertion, a neighbouring byte kept whole beside it.
+function placedSpan(diff: ByteDiff, span: ByteSpan): ByteSpan | undefined {
+  if (span.start < span.end) {
+    const mapped = mapSpanThroughDiff(diff, span);
+    return mapped.tag === 'resolved' ? mapped.span : undefined;
+  }
+  if (span.start > 0) {
+    const before = mapSpanThroughDiff(diff, toByteSpan(span.start - 1, span.start));
+    if (before.tag === 'resolved') {
+      return toByteSpan(before.span.end, before.span.end);
+    }
+  }
+  if (span.start < diff.source.length) {
+    const after = mapSpanThroughDiff(diff, toByteSpan(span.start, span.start + 1));
+    if (after.tag === 'resolved') {
+      return toByteSpan(after.span.start, after.span.start);
+    }
+  }
+  return undefined;
+}
+
+// Attributes live on tags: elements, component invocations, `<style>`/`<script>`.
+function tagAnchor(anchor: AnchorRef): boolean {
+  const kind = anchor.expectedKind;
+  return kind === 'element' || kind === 'component' || kind === 'raw';
+}
+
+// The parsed node at a projection path: projections index the same tree.
+function pageNodeAt(text: string, path: readonly number[]): PageNode | undefined {
+  const parsed = parsePageResult(parsePage(text, { locs: true }));
+  if (!parsed.editable) {
+    return undefined;
+  }
+  let list: readonly PageNode[] = parsed.model.nodes;
+  let node: PageNode | undefined;
+  for (const step of path) {
+    node = list[step];
+    if (node === undefined) {
+      return undefined;
+    }
+    list = 'children' in node && Array.isArray(node.children) ? node.children : [];
+  }
+  return node;
 }
 
 // The frontmatter the model describes, printed by the legacy printer, against

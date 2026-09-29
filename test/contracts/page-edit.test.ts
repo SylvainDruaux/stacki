@@ -49,6 +49,23 @@ function fixture() {
 
 type Harness = ReturnType<typeof fixture>;
 
+type PageEdited = Extract<ReturnType<typeof parsePageEditResult>, { ok: true }>['value'];
+type PageEditInverse = PageEdited['inverse'];
+
+/** The node at `at` in the renderer's parse. */
+function nodeAt(read: PageDiskRead, at: readonly number[]): PageNode {
+  assert.ok(read.editable, 'the page parses');
+  let list: readonly PageNode[] = read.model.nodes;
+  let node: PageNode | undefined;
+  for (const step of at) {
+    node = list[step];
+    assert.ok(node !== undefined, `a node at ${at.join('/')}`);
+    list = 'children' in node && Array.isArray(node.children) ? node.children : [];
+  }
+  assert.ok(node !== undefined, 'the path names a node');
+  return node;
+}
+
 /** The reference the renderer sends for the node at `at` in its parse. */
 function refAt(read: PageDiskRead, at: readonly number[]): NodeRef {
   assert.ok(read.editable, 'the page parses');
@@ -99,6 +116,9 @@ test('parseEditRequest takes every edit and refuses each malformed shape', () =>
     { tag: 'move-node', target: REF, destination: REF, placement: 'before' },
     { tag: 'rename-binding', target: { ...REF, kind: 'map' }, from: 'item', to: 'entry' },
     { tag: 'revert', hunks: [{ span: { start: 1, end: 2 }, text: 'x' }] },
+    { tag: 'rename-tag', target: REF, to: 'Icons.Arrow' },
+    { tag: 'rename-attribute', target: REF, from: 'title', to: 'aria-label' },
+    { tag: 'replace-node', target: REF, node: { id: 'c1', kind: 'text', value: 'Hi' } },
   ];
   for (const request of good) {
     assert.doesNotThrow(() =>
@@ -130,6 +150,13 @@ test('parseEditRequest takes every edit and refuses each malformed shape', () =>
       /placement/,
     ],
     [{ tag: 'revert', hunks: [{ span: { start: 2, end: 1 }, text: '' }] }, /end must not precede/],
+    [{ tag: 'rename-tag', target: REF, to: 'my card' }, /tag name/],
+    [{ tag: 'rename-tag', target: REF, to: '1div' }, /tag name/],
+    [{ tag: 'rename-tag', target: REF, to: 'x'.repeat(129) }, /exceeds 128/],
+    [{ tag: 'rename-attribute', target: REF, from: 'title', to: 'title' }, /must change/],
+    [{ tag: 'rename-attribute', target: REF, from: 'a b', to: 'c' }, /attribute name/],
+    [{ tag: 'replace-node', target: REF }, /Edit.node/],
+    [{ tag: 'replace-node', target: REF, node: { id: 'c1', kind: 'paint' } }, /kind/],
   ];
   for (const [request, message] of bad) {
     assert.throws(
@@ -211,6 +238,75 @@ test('an edit writes only its splice; its inverse restores every byte', async (c
   });
   assert.ok(undone.ok, 'the inverse applies');
   assert.equal(fs.readFileSync(file, 'utf8'), SIBLINGS);
+});
+
+test('renames and node rewrites write only their bytes; inverses restore them', async (context) => {
+  const harness = fixture();
+  context.after(harness.dispose);
+  const file = path.join(harness.root, 'src/pages/index.astro');
+  const before =
+    '<section title="a">\n    <p>Hello   <b>world</b></p>\n  <!-- note -->\n</section>\n';
+  fs.writeFileSync(file, before);
+  const steps: readonly ((page: PageDiskRead) => Edit)[] = [
+    (page) => ({ tag: 'rename-tag', target: refAt(page, [0]), to: 'article' }),
+    (page) => ({
+      tag: 'rename-attribute',
+      target: refAt(page, [0]),
+      from: 'title',
+      to: 'aria-label',
+    }),
+    (page) => {
+      const target = refAt(page, [0, 0, 0]);
+      return { tag: 'replace-node', target, node: { ...nodeAt(page, [0, 0, 0]), value: 'Hi' } };
+    },
+    (page) => {
+      const note = nodeAt(page, [0, 1]);
+      assert.ok(note.kind === 'comment', 'the note is a comment');
+      // The parsed value keeps its own spaces: `<!-- note -->` reads ' note '.
+      const value = note.value?.replace('note', 'kept');
+      return { tag: 'replace-node', target: refAt(page, [0, 1]), node: { ...note, value } };
+    },
+  ];
+  const expected = [
+    '<article title="a">\n    <p>Hello   <b>world</b></p>\n  <!-- note -->\n</article>\n',
+    '<article aria-label="a">\n    <p>Hello   <b>world</b></p>\n  <!-- note -->\n</article>\n',
+    // The text's own trailing spaces are kept: only what the printer says
+    // changed is written, placed on the node's bytes.
+    '<article aria-label="a">\n    <p>Hi   <b>world</b></p>\n  <!-- note -->\n</article>\n',
+    '<article aria-label="a">\n    <p>Hi   <b>world</b></p>\n  <!-- kept -->\n</article>\n',
+  ];
+  const inverses: { readonly checksum: string; readonly hunks: PageEditInverse }[] = [];
+  for (const [index, step] of steps.entries()) {
+    const page = await read(harness, file);
+    const applied = await edit(harness, file, page.checksum, step(page));
+    assert.ok(applied.ok, `step ${index} applies`);
+    assert.equal(fs.readFileSync(file, 'utf8'), expected[index], `step ${index}`);
+    inverses.push({ checksum: applied.value.checksum, hunks: applied.value.inverse });
+  }
+  for (const inverse of [...inverses].reverse()) {
+    const revert: Edit = { tag: 'revert', hunks: inverse.hunks };
+    const undone = await edit(harness, file, inverse.checksum, revert);
+    assert.ok(undone.ok, 'every inverse applies in turn');
+  }
+  assert.equal(fs.readFileSync(file, 'utf8'), before, 'undo restores every byte');
+  // Refusals leave the disk untouched: a void tag has no closing tag to rename
+  // with it, and renaming onto a name the tag has would leave two.
+  fs.writeFileSync(file, '<img src="a" alt="b">\n');
+  const image = await read(harness, file);
+  const renamed = await edit(harness, file, image.checksum, {
+    tag: 'rename-tag',
+    target: refAt(image, [0]),
+    to: 'picture',
+  });
+  assert.equal(renamed.ok ? 'applied' : renamed.error.code, 'rejected');
+  const clash = await edit(harness, file, image.checksum, {
+    tag: 'rename-attribute',
+    target: refAt(image, [0]),
+    from: 'src',
+    to: 'alt',
+  });
+  assert.equal(clash.ok ? 'applied' : clash.error.code, 'rejected');
+  assert.equal(fs.readFileSync(file, 'utf8'), '<img src="a" alt="b">\n');
 });
 
 test("an edit authored before the app's own last edit is rebased exactly", async (context) => {

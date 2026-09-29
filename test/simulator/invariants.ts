@@ -145,6 +145,7 @@ function staysInPlace(tag: Intent['operation']['tag']): boolean {
     case 'remove-attribute':
     case 'set-inline-style':
     case 'rename-binding':
+    case 'rename-attribute':
       return true;
     case 'insert-node':
     case 'remove-node':
@@ -153,6 +154,10 @@ function staysInPlace(tag: Intent['operation']['tag']): boolean {
     case 'apply-code-patch':
     case 'revert-splices':
     case 'replace-source':
+    // A tag rename may change its node's kind (`div` → `Card`); a rewrite
+    // states the node's new text, which may parse as another node.
+    case 'rename-tag':
+    case 'rewrite-node':
       return false;
     default: {
       const exhaustive: never = tag;

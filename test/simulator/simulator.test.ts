@@ -114,6 +114,10 @@ const REQUIRED_TALLIES = [
   'code:mapped',
   'code:rejected merge-conflict',
   'outcome:rejected merge-conflict',
+  // Step 9: the renames that replaced whole-model saves, submitted and judged
+  // stale by their element's survival like set-attribute.
+  'visual:rename-tag',
+  'visual:rename-attribute',
   // Not required: `rejected-gone` — no simulated writer deletes an element yet
   // (tracker Step 3, corpus gaps).
 ] as const;

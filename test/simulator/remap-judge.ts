@@ -72,10 +72,39 @@ const MAPPING_REASONS: readonly RejectionReason[] = [
 
 type ValidProjection = Extract<Projection, { tag: 'valid' }>;
 
+/** The attribute a judged intent edits by name: a set's, a rename's old name;
+ * none for a tag rename, which edits the tag's name (step 9). */
+function judgedAttribute(operation: Intent['operation']): string | undefined {
+  switch (operation.tag) {
+    case 'set-attribute':
+      return operation.name;
+    case 'rename-attribute':
+      return operation.from;
+    case 'rename-tag':
+      return undefined;
+    case 'remove-attribute':
+    case 'set-inline-style':
+    case 'insert-node':
+    case 'remove-node':
+    case 'move-node':
+    case 'rename-binding':
+    case 'apply-code-patch':
+    case 'edit-frontmatter-slot':
+    case 'revert-splices':
+    case 'rewrite-node':
+    case 'replace-source':
+      throw new Error(`Assertion failed: ${operation.tag} is not judged by element survival`);
+    default: {
+      const exhaustive: never = operation;
+      return exhaustive;
+    }
+  }
+}
+
 export function judgeRemap(input: RemapCase): RemapVerdict {
   assert(input.authored.checksum !== input.current.checksum, 'Only stale intents are judged');
   const operation = input.intent.operation;
-  assert(operation.tag === 'set-attribute', 'Only set-attribute is mapped at step 3');
+  const attributeName = judgedAttribute(operation);
   const decision = input.decision;
   const authored = input.authored.projection;
   const current = input.current.projection;
@@ -86,7 +115,7 @@ export function judgeRemap(input: RemapCase): RemapVerdict {
     return otherRejection(decision);
   }
   const node = anchoredNode(authored, input.intent);
-  const named = node.attributes.filter((attribute) => attribute.name === operation.name);
+  const named = node.attributes.filter((attribute) => attribute.name === attributeName);
   if (decision.tag === 'rejected') {
     if (!MAPPING_REASONS.includes(decision.reason)) {
       return { tag: 'other', reason: decision.reason };
@@ -116,7 +145,7 @@ export function judgeRemap(input: RemapCase): RemapVerdict {
     const [attribute] = named;
     assert(attribute !== undefined, 'The named attribute exists');
     const kept = survivingSpan(input.authoredOrigins, attribute.span, input.currentOrigins);
-    const now = survivor.attributes.find((candidate) => candidate.name === operation.name);
+    const now = survivor.attributes.find((candidate) => candidate.name === attributeName);
     if (kept !== undefined && kept.start === now?.span.start) {
       return { tag: 'conservative', reason };
     }
@@ -309,8 +338,12 @@ function survivingElement(
 // whole re-quoted attribute, or a new one after the last. A tag's attribute
 // region runs from its `<` to its last attribute (or its name); nested tags'
 // regions never overlap, so exactly one contains the splice.
+// The tag whose name-and-attributes region holds the plan's first splice: the
+// one splice of an attribute edit, or a tag rename's opening name (its second
+// splice, the closing name, lies in that tag's content).
 function plannedTarget(current: ValidProjection, bytes: ByteString, plan: Plan): ProjectedNode {
-  assert(plan.splices.length === 1, 'A set-attribute plan is one splice');
+  assert(plan.splices.length >= 1, 'A judged plan has a splice');
+  assert(plan.splices.length <= 2, 'A judged plan edits one attribute or one tag name');
   const [splice] = plan.splices;
   assert(splice !== undefined, 'The splice exists');
   const owners = current.nodes.filter((node) => {

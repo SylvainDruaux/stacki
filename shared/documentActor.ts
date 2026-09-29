@@ -412,6 +412,9 @@ function staleWithoutBytes(intent: Intent): RejectionReason {
     case 'rename-binding':
     case 'set-inline-style':
     case 'edit-frontmatter-slot':
+    case 'rename-tag':
+    case 'rename-attribute':
+    case 'rewrite-node':
       return 'anchor-moved';
     default: {
       const exhaustive: never = operation;
