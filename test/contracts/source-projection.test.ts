@@ -9,6 +9,7 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { test } from 'node:test';
 import { parsePage } from '../../dist/electron/astroParser.js';
+import { parseMarkdownPage } from '../../dist/electron/markdownParser.js';
 import { toDigest, toFilePath } from '../../dist/shared/brand.js';
 import {
   CAPABILITIES,
@@ -131,9 +132,43 @@ test('invalid source is a parse-error projection that visual intents cannot targ
   assert.equal(projectionAcceptsVisualIntents(project('<p>x</p>')), true);
 });
 
-test('only .astro pages are projected; a stylesheet is an opaque document', () => {
-  const markdown = { editable: true as const, model: { ...fakeModel(), format: 'md' as const } };
-  assert.throws(() => projectPage('# Hi\n', markdown), /Only \.astro pages/);
+test('a Markdown page projects its blocks, items and text, and its JSX as markup', () => {
+  const text = '---\ntitle: x\n---\n# Hi\n\n- one\n- two\n\n<Card title="a" />\n\n![alt](a.png)\n';
+  const projection = projectPage(text, parsePageResult(parseMarkdownPage(text, { mdx: true })));
+  assert.equal(projection.tag, 'valid');
+  if (projection.tag !== 'valid') {
+    return;
+  }
+  assert.deepEqual(projection.frontmatter, { start: 0, end: 17 });
+  const shape = projection.nodes.map((node) => [node.path.join('/'), node.syntax, node.list]);
+  assert.deepEqual(shape, [
+    ['0', 'markdown', 'blocks'],
+    ['0/0', 'markdown', 'inline'],
+    ['1', 'markdown', 'blocks'],
+    ['1/0', 'markdown', 'items'],
+    ['1/0/0', 'markdown', 'blocks'],
+    ['1/0/0/0', 'markdown', 'inline'],
+    ['1/1', 'markdown', 'items'],
+    ['1/1/0', 'markdown', 'blocks'],
+    ['1/1/0/0', 'markdown', 'inline'],
+    ['2', 'markup', 'blocks'],
+    ['3', 'markdown', 'blocks'],
+  ]);
+  const attributes = (path: string) =>
+    projection.nodes
+      .find((node) => node.path.join('/') === path)
+      ?.attributes.map((attribute) => [attribute.name, attribute.type]);
+  assert.deepEqual(attributes('2'), [['title', 'string']]);
+  assert.deepEqual(attributes('3'), [
+    ['alt', 'markdown'],
+    ['src', 'markdown'],
+  ]);
+  assert.ok(projection.nodes.every((node) => node.capability === 'editable'));
+});
+
+test('an .astro page is markup throughout; a stylesheet is an opaque document', () => {
+  assert.ok(valid('<ul><li>x</li></ul>').every((node) => node.syntax === 'markup'));
+  assert.ok(valid('<ul><li>x</li></ul>').every((node) => node.list === 'markup'));
   const unlocated = parsePageResult(parsePage('<p>x</p>'));
   assert.throws(() => projectPage('<p>x</p>', unlocated), /recorded source offsets/);
   const css = projectOpaqueDocument('.card { color: red; }\n');
@@ -169,17 +204,3 @@ test('a snapshot computes its checksum from its bytes and matches its projection
     /derived from bytes of this length/,
   );
 });
-
-function fakeModel() {
-  return {
-    imports: [],
-    frontmatterLead: '',
-    extraFrontmatter: '',
-    extraFrontmatterSpaced: false,
-    frontmatterLayout: { extra: '', slots: [] },
-    hadFrontmatter: false,
-    trailingBlank: 0,
-    nodes: [],
-    bodyStart: 0,
-  };
-}

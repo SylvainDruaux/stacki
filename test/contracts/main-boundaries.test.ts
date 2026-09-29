@@ -125,7 +125,9 @@ test('malformed writes fail before altering disk; valid writes still work', asyn
 
 test('Markdown boundary preserves source metadata and rejects corrupted fields', () => {
   for (const source of ['# Title\n\nParagraph.\n\n', '---\r\ntitle: Title\r\n---\r\nHello\r\n']) {
-    const { model } = parseMarkdownPage(source);
+    const parsed = parseMarkdownPage(source);
+    assert.ok(parsed.editable);
+    const { model } = parsed;
     assert.equal(serializeMarkdownPage(parseMarkdownModel(model)), serializeMarkdownPage(model));
     assert.throws(() => parseMarkdownModel({ ...model, mdEndsWithNewline: 'yes' }), /boolean/);
     assert.throws(
@@ -217,7 +219,9 @@ test('port search skips busy sockets and rejects invalid starts', async (context
 test('Markdown array metadata and source-file size have explicit bounds', async (context) => {
   const harness = fixture();
   context.after(harness.dispose);
-  const { model } = parseMarkdownPage('Hello\n');
+  const parsed = parseMarkdownPage('Hello\n');
+  assert.ok(parsed.editable);
+  const { model } = parsed;
   model.nodes.mdTrailingBlanks = Number.MAX_SAFE_INTEGER;
   assert.throws(() => parseMarkdownModel(model), /blank lines exceed limit/);
   const file = path.join(harness.root, 'src/pages/large.astro');

@@ -106,10 +106,10 @@ function checkAttributes(text: string, node: ParserNode, where: string): number 
     const [name, attr] = reparsed[0] ?? [];
     assert.equal(name, entry.name, `${where}: ${entry.name} span re-parses to its name`);
     assert.equal(attr?.type, entry.type, `${where}: ${entry.name} keeps its type`);
-    if (entry.type !== 'spread') {
+    if ('nameSpan' in entry) {
       assert.equal(text.slice(entry.nameSpan.start, entry.nameSpan.end), entry.name, `${where}: name span`);
     }
-    if (entry.type !== 'bare') {
+    if ('valueSpan' in entry) {
       const value = attr !== undefined && 'value' in attr ? attr.value : undefined;
       assert.equal(text.slice(entry.valueSpan.start, entry.valueSpan.end), value, `${where}: value span`);
     }

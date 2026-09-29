@@ -142,6 +142,7 @@ const ENGINE_CONTRACTS = [
   'shared/mapSpan.ts',
   'shared/inlineStyle.ts',
   'shared/loopScope.ts',
+  'shared/markdownLayout.ts',
   'shared/planner.ts',
   'shared/planSupport.ts',
   'shared/planText.ts',

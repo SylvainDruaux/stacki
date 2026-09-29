@@ -47,6 +47,8 @@
 // (`</div>` inside one) produced the current projection; removing it changes
 // the structure, so patching over it would copy the mistake.
 //
+// A Markdown page is never patched: see hostContext.
+//
 // This is an argument, not a proof. The brute-force reference — a full reparse
 // deep-equal to every patched projection — runs on every applied intent in the
 // simulator and on the large fixtures (test/simulator/projection-patch.test.ts).
@@ -141,6 +143,13 @@ export function valueBytesNeutral(
  * markup nor a condition or loop. */
 export function hostContext(projection: Projection, range: ByteSpan): HostContext {
   if (projection.tag !== 'valid') {
+    return 'refused';
+  }
+  // Markdown reads structure from text that is values here: a line typed as
+  // `- ` makes a list, a blank line ends a JSX block. The argument above is
+  // about the .astro parser only, so a Markdown page always reparses (step
+  // 10). Its roots are blocks; one root answers for all.
+  if (projection.nodes[0]?.list === 'blocks') {
     return 'refused';
   }
   const containing = projection.nodes.filter((node) => contains(node.span, range));

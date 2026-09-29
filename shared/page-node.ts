@@ -121,7 +121,12 @@ export interface MarkdownNodeMetadata {
  * `span` covers the whole attribute (`name="v"`, `{...rest}`, `hidden`); the
  * name span slices to the name and the value span to the value exactly as the
  * props record reports it — inside the quotes, or the trimmed expression inside
- * the braces. Each field exists only on the variants that have it. */
+ * the braces. Each field exists only on the variants that have it.
+ *
+ * A `markdown` attribute (step 10) is one Markdown writes in its own syntax,
+ * with no name in the source: an image's alt text between its brackets, its
+ * source and title in its parentheses, a fence's language, an ordered list's
+ * first number. The props record holds it as a string. */
 export type AttrSpan =
   | {
       readonly type: 'string' | 'expr';
@@ -138,6 +143,12 @@ export type AttrSpan =
     }
   | {
       readonly type: 'spread';
+      readonly name: string;
+      readonly span: Utf16Span;
+      readonly valueSpan: Utf16Span;
+    }
+  | {
+      readonly type: 'markdown';
       readonly name: string;
       readonly span: Utf16Span;
       readonly valueSpan: Utf16Span;
@@ -618,6 +629,7 @@ function parseAttrSpan(input: unknown, where: string): AttrSpan {
       absent('valueSpan');
       return { type, name, span, nameSpan: inner('nameSpan') };
     case 'spread':
+    case 'markdown':
       absent('nameSpan');
       return { type, name, span, valueSpan: inner('valueSpan') };
     default:
@@ -635,7 +647,10 @@ function checkAttrSpanNames(node: PageNode, where: string): void {
   if (props === undefined) {
     fail(where, `attrSpans: a ${node.kind} node has no attributes`);
   }
-  const last = new Map(node.attrSpans.map((entry) => [entry.name, entry.type]));
+  // A Markdown attribute is a string the syntax places, not a typed attribute.
+  const last = new Map(
+    node.attrSpans.map((entry) => [entry.name, entry.type === 'markdown' ? 'string' : entry.type]),
+  );
   const names = Object.keys(props);
   if (last.size !== names.length) {
     fail(where, 'attrSpans: names differ from props');
@@ -768,7 +783,15 @@ function parseMarkdownPageModel(record: Record<string, unknown>): PageModel {
   for (const field of ['mdEndsWithNewline', 'mdHasFrontmatter'] as const) {
     if (typeof record[field] !== 'boolean') {fail(`model.${field}`, 'expected boolean');}
   }
+  const bodyStart = record['bodyStart'];
+  if (bodyStart !== undefined) {
+    if (!Number.isSafeInteger(bodyStart) || Number(bodyStart) < 0) {
+      fail('model.bodyStart', 'expected nonnegative integer');
+    }
+  }
+  const located = bodyStart === undefined ? {} : { bodyStart: Number(bodyStart) };
   return {
+    ...located,
     imports,
     frontmatterLead: '',
     extraFrontmatter: asString(

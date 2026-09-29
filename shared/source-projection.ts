@@ -27,7 +27,7 @@ import {
 
 export interface ProjectedAttribute {
   readonly name: string;
-  readonly type: Attr['type'];
+  readonly type: AttrSpan['type'];
   readonly span: ByteSpan;
   /** Absent on a spread, which has no name of its own. */
   readonly nameSpan: ByteSpan | undefined;
@@ -36,12 +36,26 @@ export interface ProjectedAttribute {
   readonly capability: Capability;
 }
 
+/** How a node itself is written (step 10): as markup — a tag, text or code of
+ * an .astro template, or JSX and HTML inside Markdown — or in Markdown's own
+ * syntax, where a paragraph has no tag and an image no attribute names. */
+export type NodeSyntax = 'markup' | 'markdown';
+
+/** The list a node sits in, which decides what separates it from its
+ * siblings (step 10): markup (whitespace), Markdown blocks (a blank line, and
+ * the prefix of the container they are in), a Markdown list's items (a line
+ * break), or the inline text of a Markdown block, which has no siblings to
+ * place beside. */
+export type NodeList = 'markup' | 'blocks' | 'items' | 'inline';
+
 export interface ProjectedNode {
   readonly kind: NodeKind;
   readonly path: StructuralPath;
   readonly span: ByteSpan;
   readonly attributes: readonly ProjectedAttribute[];
   readonly capability: Capability;
+  readonly syntax: NodeSyntax;
+  readonly list: NodeList;
 }
 
 export interface Diagnostic {
@@ -84,9 +98,9 @@ export function projectionAcceptsVisualIntents(projection: Projection): boolean 
   }
 }
 
-/** Project one `.astro` file. `result` is the validated output of the parser
- * run on exactly `text` with source offsets on (`parsePage(text, { locs })`).
- * Markdown and MDX are outside the engine until step 10 (plan §6). */
+/** Project one page. `result` is the validated output of the parser run on
+ * exactly `text` with source offsets on: `parsePage(text, { locs })` for an
+ * `.astro` page, `parseMarkdownPage(text)` for Markdown and MDX (step 10). */
 export function projectPage(text: string, result: ParsePageResult): Projection {
   if (LIMITS.ipcFieldCharsMax < text.length) {
     assert(!result.editable, 'The parser refuses a page past its UTF-16 bound');
@@ -99,9 +113,8 @@ export function projectPage(text: string, result: ParsePageResult): Projection {
     return { tag: 'parse-error', byteLength, diagnostics: [{ message: clip(result.reason), near }] };
   }
   const model = result.model;
-  assert(model.format === undefined, 'Only .astro pages are projected before step 10');
   assert(model.bodyStart !== undefined, 'The projected parse recorded source offsets');
-  const pending = collectNodes(model.nodes);
+  const pending = collectNodes(model.nodes, model.format === undefined ? undefined : text);
   const frontmatter = frontmatterSpan(text, model);
   const converter = spanConverter(text, pending, frontmatter);
   const nodes = pending.map((entry) => projectNode(entry, converter));
@@ -147,22 +160,35 @@ interface PendingNode {
   readonly span: Utf16Span;
   /** Inside a loop body: rendered once per item from one source node. */
   readonly repeated: boolean;
+  readonly syntax: NodeSyntax;
+  readonly list: NodeList;
 }
 
 type SpanConverter = (span: Utf16Span) => ByteSpan;
 
 // Iterative preorder walk: the depth bound is the tree's, not the call stack's.
-function collectNodes(roots: readonly PageNode[]): readonly PendingNode[] {
+// `markdown` is the page's text when it is a Markdown page: its root nodes are
+// blocks, and what a node's children are depends on how the node is written.
+function collectNodes(
+  roots: readonly PageNode[],
+  markdown: string | undefined,
+): readonly PendingNode[] {
   const out: PendingNode[] = [];
-  const stack: { node: PageNode; path: StructuralPath; repeated: boolean }[] = [];
-  const pushChildren = (children: readonly PageNode[], path: StructuralPath, repeated: boolean) => {
+  const stack: Omit<PendingNode, 'span'>[] = [];
+  const pushChildren = (
+    children: readonly PageNode[],
+    parent: Pick<PendingNode, 'path' | 'repeated'>,
+    list: NodeList,
+  ) => {
     for (let index = children.length - 1; index >= 0; index--) {
       const child = children[index];
       assert(child !== undefined, 'Child index lies inside its list');
-      stack.push({ node: child, path: [...path, toChildIndex(index)], repeated });
+      const path = [...parent.path, toChildIndex(index)];
+      const syntax = syntaxIn(list, child, markdown);
+      stack.push({ node: child, path, repeated: parent.repeated, syntax, list });
     }
   };
-  pushChildren(roots, [], false);
+  pushChildren(roots, { path: [], repeated: false }, markdown === undefined ? 'markup' : 'blocks');
   while (stack.length > 0) {
     assert(out.length < LIMITS.treeNodesMax, 'Projection stays inside the tree node bound');
     const entry = stack.pop();
@@ -173,10 +199,59 @@ function collectNodes(roots: readonly PageNode[]): readonly PendingNode[] {
     const children = childrenOf(entry.node);
     if (children.length > 0) {
       checkChildSpans(span, children);
-      pushChildren(children, entry.path, entry.repeated || entry.node.kind === 'map');
+      const repeated = entry.repeated || entry.node.kind === 'map';
+      pushChildren(children, { path: entry.path, repeated }, childList(entry));
     }
   }
   return out;
+}
+
+// A node in a list of Markdown blocks is written in Markdown unless it is
+// markup standing as a block: JSX or HTML opens with `<`, and no Markdown
+// block does (a line opening with one is always a markup block).
+function syntaxIn(list: NodeList, node: PageNode, markdown: string | undefined): NodeSyntax {
+  switch (list) {
+    case 'markup':
+      return 'markup';
+    case 'items':
+    case 'inline':
+      return 'markdown';
+    case 'blocks': {
+      assert(markdown !== undefined, 'Only a Markdown page has blocks');
+      if (node.kind === 'raw-line') {
+        return 'markdown';
+      }
+      if (node.kind !== 'element') {
+        return 'markup';
+      }
+      const start = nodeSpan(node).start;
+      return markdown.charCodeAt(start) === 0x3c ? 'markup' : 'markdown';
+    }
+    default: {
+      const exhaustive: never = list;
+      return exhaustive;
+    }
+  }
+}
+
+// The list a node's children sit in: markup inside markup; a Markdown list
+// holds items, an item or a quote holds blocks, and every other Markdown block
+// holds its inline text.
+function childList(parent: Omit<PendingNode, 'span'>): NodeList {
+  if (parent.syntax === 'markup') {
+    return 'markup';
+  }
+  const name = 'name' in parent.node ? parent.node.name : '';
+  switch (name) {
+    case 'ul':
+    case 'ol':
+      return 'items';
+    case 'li':
+    case 'blockquote':
+      return 'blocks';
+    default:
+      return 'inline';
+  }
 }
 
 function childrenOf(node: PageNode): readonly PageNode[] {
@@ -309,6 +384,7 @@ function forEachAttrSpan(attribute: AttrSpan, visit: (span: Utf16Span) => void):
       visit(attribute.nameSpan);
       return;
     case 'spread':
+    case 'markdown':
       visit(attribute.valueSpan);
       return;
     default: {
@@ -324,11 +400,19 @@ function projectNode(entry: PendingNode, convert: SpanConverter): ProjectedNode 
     name: attribute.name,
     type: attribute.type,
     span: convert(attribute.span),
-    nameSpan: attribute.type === 'spread' ? undefined : convert(attribute.nameSpan),
-    valueSpan: attribute.type === 'bare' ? undefined : convert(attribute.valueSpan),
+    nameSpan: 'nameSpan' in attribute ? convert(attribute.nameSpan) : undefined,
+    valueSpan: 'valueSpan' in attribute ? convert(attribute.valueSpan) : undefined,
     capability: classifyAttribute(attribute, capability),
   }));
-  return { kind: entry.node.kind, path: entry.path, span: convert(entry.span), attributes, capability };
+  return {
+    kind: entry.node.kind,
+    path: entry.path,
+    span: convert(entry.span),
+    attributes,
+    capability,
+    syntax: entry.syntax,
+    list: entry.list,
+  };
 }
 
 /** Plan §6: native elements, component invocations, text, comments and the

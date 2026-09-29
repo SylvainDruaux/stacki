@@ -132,7 +132,7 @@ export function parseSampleEntry(input: unknown): {
   return { entry: data(source['entry'] ?? null), ...(error === undefined ? {} : { error }) };
 }
 
-export function parseMarkdownModel(input: unknown): MarkdownModel {
+export function parseMarkdownModel(input: unknown): Omit<MarkdownModel, 'bodyStart'> {
   const source = record(input);
   const format = source['format'];
   if (format !== 'md' && format !== 'mdx') {
