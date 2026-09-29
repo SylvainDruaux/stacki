@@ -99,6 +99,11 @@ const fields = {
   nodes: [{ kind: 'text', id: 'one', value: 'Hello' }],
   model: { imports: [], nodes: [{ kind: 'text', id: 'one', value: 'Hello' }] },
   baseChecksum: 'a'.repeat(64),
+  authoredChecksum: 'a'.repeat(64),
+  edit: {
+    tag: 'remove-node',
+    target: { path: [0], kind: 'element', span: { start: 0, end: 5 } },
+  },
   devUrl: 'http://127.0.0.1:4321',
   keys: ['src/pages/index.astro#0'],
   branch: 'feature',

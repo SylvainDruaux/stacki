@@ -2,8 +2,9 @@ import { loadComponentProperties, updateComponentProperties } from './componentP
 import { renderComponentPreviewPage } from './componentPreview.js';
 import { createIpcRegistrar } from './ipc.js';
 import { MAIN_LIMITS, readSource, readSourceBytes, directoryBudget } from './main.bounds.js';
-import { digestOf, isAtomicTemporary, readSourceSnapshot } from './atomicWrite.js';
-import { createNodeDocumentActors, type WriteReport } from './documentActors.js';
+import { digestOf, isAtomicTemporary } from './atomicWrite.js';
+import { createNodeDocumentActors, type EditReport, type WriteReport } from './documentActors.js';
+import { buildEditIntent } from './editRequests.js';
 import {
   createProjectText,
   describeWriteReport,
@@ -34,7 +35,9 @@ import type { ChildProcess, ExecFileOptions } from 'child_process';
 import { toRecord, toArray } from '../shared/record.js';
 import { assert } from '../shared/assert.js';
 import type { IpcPayloads } from '../shared/ipc-payloads.js';
-import type { IpcResults, WirePageWriteError } from '../shared/ipc-results.js';
+import type { IpcResults, WirePageEditError, WirePageWriteError } from '../shared/ipc-results.js';
+import { describeRejection } from '../shared/intent.js';
+import { decodeUtf8 } from '../shared/span.js';
 import type { Digest } from '../shared/brand.js';
 import { LIMITS } from '../shared/limits.js';
 import { err, ok, type Result } from '../shared/result.js';
@@ -3051,13 +3054,29 @@ function parsePageSource(pagePath: string, source: string): IpcResults['page:par
   return { ...parsed, source };
 }
 
+// Read through the page's actor (step 6): the bytes the renderer is shown are
+// the bytes its edits will name, so the host must hold them — as its current
+// snapshot, and retained once an outside write replaces them — or an edit
+// authored against them could only be refused.
 ipcMain.handle('page:read', async (_e, pagePath) => {
-  const snapshot = readSourceSnapshot(pagePath);
+  const snapshot = readThroughActor(pagePath);
   // Markdown builds the same tree from a different syntax, so everything
   // downstream — navigator, props, text editing, undo — is unchanged. Only
   // the writer has to know which one it is; model.format carries that.
   return { ...parsePageSource(pagePath, snapshot.text), checksum: snapshot.checksum };
 });
+
+function readThroughActor(pagePath: string): { readonly text: string; readonly checksum: Digest } {
+  const current = documents.current(pagePath);
+  if (!current.ok) {
+    throw new Error(current.error.message);
+  }
+  const decoded = decodeUtf8(current.value.bytes);
+  if (!decoded.ok) {
+    throw new Error(`${path.basename(pagePath)} is not valid UTF-8`);
+  }
+  return { text: decoded.value, checksum: current.value.checksum };
+}
 
 ipcMain.handle('page:parse', async (_e, { pagePath, source }) => {
   return parsePageSource(pagePath, source);
@@ -3189,22 +3208,26 @@ function writePageText(
   }
   assert(checksum === digestOf(text), 'A page write reports the checksum of the text it wrote');
   if (styled) {
-    clearTimeout(styleNudges.get(pagePath)); // a newer edit supersedes this one's nudge
-    styleNudges.set(
-      pagePath,
-      setTimeout(() => {
-        styleNudges.delete(pagePath);
-        // The same bytes again, witnessed by their own checksum: the actor
-        // refuses if anything changed the file since, so the nudge never
-        // resurrects superseded text. A refused or failed nudge leaves the
-        // correct bytes on disk; only the dev server's style cache stays one
-        // edit behind, so there is nothing to report beyond telemetry.
-        markSelfWrite(pagePath, text);
-        documents.replaceSource(pagePath, text, checksum);
-      }, STYLE_NUDGE_MS),
-    );
+    nudgeStyle(pagePath, text, checksum);
   }
   return { ok: true as const, ...parsePageSource(pagePath, text), checksum };
+}
+
+function nudgeStyle(pagePath: string, text: string, checksum: Digest): void {
+  clearTimeout(styleNudges.get(pagePath)); // a newer edit supersedes this one's nudge
+  styleNudges.set(
+    pagePath,
+    setTimeout(() => {
+      styleNudges.delete(pagePath);
+      // The same bytes again, witnessed by their own checksum: the actor
+      // refuses if anything changed the file since, so the nudge never
+      // resurrects superseded text. A refused or failed nudge leaves the
+      // correct bytes on disk; only the dev server's style cache stays one
+      // edit behind, so there is nothing to report beyond telemetry.
+      markSelfWrite(pagePath, text);
+      documents.replaceSource(pagePath, text, checksum);
+    }, STYLE_NUDGE_MS),
+  );
 }
 
 // The checksum a write left on disk: an applied one, or an uncertain one whose
@@ -3240,6 +3263,50 @@ ipcMain.handle('page:write', async (_e, { pagePath, model, baseChecksum }) => {
   const text = base.value.bom ? withByteOrderMark(serialized) : serialized;
   return writePageText(pagePath, text, baseChecksum);
 });
+
+// A visual edit (plan §11 step 6): the renderer states it against the page it
+// shows; editRequests.ts makes it an intent against that snapshot, and the
+// page's actor plans and writes it — splices, never a reprint of the file.
+// The reply is the page as written plus the inverse Undo will submit.
+ipcMain.handle('page:edit', async (_e, { pagePath, authoredChecksum, edit }) => {
+  if (isMarkdownPage(pagePath)) {
+    const reason = 'unsupported-operation' as const; // Markdown joins the engine at step 10.
+    const message = describeRejection(reason);
+    const error = { code: 'rejected' as const, reason, message, diskChecksum: null };
+    return { ok: false as const, error };
+  }
+  const report = documents.submitEdit(pagePath, authoredChecksum, (authored) =>
+    buildEditIntent(edit, authored),
+  );
+  if (report.tag !== 'applied') {
+    return { ok: false as const, error: pageEditError(pagePath, report) };
+  }
+  const decoded = decodeUtf8(report.bytes);
+  assert(decoded.ok, 'The actor wrote UTF-8');
+  const text = decoded.value;
+  // Noted after the write: main runs this handler to its end before the
+  // watcher's event for it can run, and the note compares contents.
+  markSelfWrite(pagePath, text);
+  if (/<style[\s>]/i.test(text)) {
+    nudgeStyle(pagePath, text, report.checksum);
+  }
+  const reply = { ...parsePageSource(pagePath, text), checksum: report.checksum };
+  return { ok: true as const, ...reply, inverse: report.inverse };
+});
+
+function pageEditError(
+  file: string,
+  report: Exclude<EditReport, { readonly tag: 'applied' }>,
+): WirePageEditError {
+  if (report.tag === 'rejected') {
+    const { reason, diskChecksum } = report;
+    const message = report.message === '' ? describeRejection(reason) : report.message;
+    return { code: 'rejected', reason, message, diskChecksum: diskChecksum ?? null };
+  }
+  const error = pageWriteError(file, report);
+  assert(error.code !== 'conflict', 'Only a rejection becomes a conflict');
+  return error;
+}
 
 // What page:write would put on disk for this model, without writing it: the
 // renderer shows it when the user reviews a conflicted page in code.

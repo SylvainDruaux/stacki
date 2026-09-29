@@ -40,19 +40,12 @@ import { assert } from '../shared/assert';
 import { toDigest, type Digest } from '../shared/brand';
 import { LIMITS } from '../shared/limits';
 import { err, ok, type Result } from '../shared/result';
-import { readSourceBytes } from './main.bounds';
 
 /** Why a write did not happen, or did without a durability promise. */
 export type AtomicWriteError =
   | { readonly code: 'filesystem'; readonly message: string }
   | { readonly code: 'exists'; readonly message: string }
   | { readonly code: 'not-durable'; readonly message: string };
-
-/** A file's exact bytes decoded as UTF-8, with the checksum of those bytes. */
-export interface SourceSnapshot {
-  readonly text: string;
-  readonly checksum: Digest;
-}
 
 const TEMPORARY_PREFIX = '.stacki-write-';
 const TEMPORARY_SUFFIX = '.tmp';
@@ -64,9 +57,6 @@ const MODE_BITS = 0o7777;
  * directories", not "the flush failed". */
 const FLUSH_UNSUPPORTED = new Set(['EINVAL', 'ENOTSUP', 'EOPNOTSUPP', 'EISDIR', 'EPERM', 'EBADF']);
 
-// Strict decoding: invalid UTF-8 is an error, never a lossy replacement, and a
-// leading BOM stays in the text so writing the text back reproduces it (§3.2).
-const UTF8 = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true });
 
 /** SHA-256 of the exact bytes, the only constructor of a Digest outside the
  * wire parser. A string is hashed as its UTF-8 encoding. */
@@ -85,23 +75,6 @@ export function isAtomicTemporary(name: string): boolean {
     return base.endsWith(LOCK_SUFFIX);
   }
   return false;
-}
-
-/** Read a source file as a snapshot. Throws like readSource on missing,
- * oversized or undecodable files — callers already surface those as errors. */
-export function readSourceSnapshot(file: string): SourceSnapshot {
-  const bytes = readSourceBytes(file);
-  let text: string;
-  try {
-    text = UTF8.decode(bytes);
-  } catch {
-    throw new Error(`${path.basename(file)} is not valid UTF-8`);
-  }
-  const checksum = digestOf(bytes);
-  // Strict decoding is lossless, so the text re-encodes to the bytes it came
-  // from; the checksum therefore names the text as well as the file.
-  assert(digestOf(text) === checksum, 'Decoded source re-encodes to the bytes read');
-  return { text, checksum };
 }
 
 /** Where a write to `file` lands: the file a symlink names, or the path itself

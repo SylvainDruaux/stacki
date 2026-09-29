@@ -1,4 +1,5 @@
 import { parsePropertyChange, propertySource } from './component-properties';
+import { parseEditRequest } from './edit-request';
 // Complete invoke-channel inventory. Every main-process listener receives the
 // parsed shape below; payload field names retain the existing renderer protocol.
 import {
@@ -175,6 +176,9 @@ export const IPC_PAYLOADS = {
   }),
   'page:delete': pathText,
   'page:dynamicPaths': object({ ...project, pagePath: pathText, devUrl: maybeText }),
+  // A visual edit in the renderer's terms, authored against the checksum of
+  // the page it shows; main turns it into an intent (step 6).
+  'page:edit': parseEditRequest,
   'page:importPathFor': object({
     pagePath: pathText,
     targetPath: pathText,

@@ -34,6 +34,30 @@ export type WirePageWrite =
   | ({ readonly ok: true } & WirePageDiskRead)
   | { readonly ok: false; readonly error: WirePageWriteError };
 
+/** Why a visual edit did not apply (step 6). `rejected` carries the actor's
+ * reason, for the notice (plan §7), and the checksum on disk when it could be
+ * read; the rest are the page-write failures, a conflict being `rejected`. */
+export type WirePageEditError =
+  | {
+      readonly code: 'rejected';
+      readonly reason: string;
+      readonly message: string;
+      readonly diskChecksum: string | null;
+    }
+  | Exclude<WirePageWriteError, { readonly code: 'conflict' }>;
+
+/** An applied edit: the page as written, and the inverse hunks Undo submits
+ * against its checksum (byte spans of these bytes). */
+export type WirePageEdit =
+  | ({
+      readonly ok: true;
+      readonly inverse: ReadonlyArray<{
+        readonly span: { readonly start: number; readonly end: number };
+        readonly text: string;
+      }>;
+    } & WirePageDiskRead)
+  | { readonly ok: false; readonly error: WirePageEditError };
+
 export interface IpcResults {
   readonly 'component:properties': Result<ComponentProperties>;
   readonly 'component:editProperties': Result<ComponentProperties>;
@@ -425,6 +449,7 @@ export interface IpcResults {
         }>;
         readonly error: null | string;
       };
+  readonly 'page:edit': WirePageEdit;
   readonly 'page:importPathFor': {
     readonly relative: string;
     readonly srcRelative: null | string;

@@ -35,7 +35,17 @@ import {
   type Projector,
   type Reconciliation,
 } from '../shared/documentActor';
-import { toIntent, type Intent, type Outcome, type RejectionReason } from '../shared/intent';
+import {
+  describeRejection,
+  toIntent,
+  type Intent,
+  type Outcome,
+  type RejectionReason,
+  type SourceEdit,
+} from '../shared/intent';
+import { commitChain, minimalSplices, rebaseIntent, type CommitRecord } from '../shared/rebase';
+import type { Snapshot } from '../shared/snapshot';
+import { inverseEdits } from '../shared/splice';
 import { LIMITS } from '../shared/limits';
 import { err, ok, type Result } from '../shared/result';
 import { encodeUtf8, toByteSpan, type ByteString } from '../shared/span';
@@ -67,6 +77,21 @@ export type WriteReport =
       readonly reconciliation: Reconciliation | undefined;
     }
   | { readonly tag: 'backpressured' };
+
+/** What a visual edit came to (step 6): an applied one hands back the bytes
+ * it left and the inverse Undo submits, against the returned checksum. */
+export type EditReport =
+  | {
+      readonly tag: 'applied';
+      readonly checksum: Digest;
+      readonly bytes: ByteString;
+      readonly inverse: readonly SourceEdit[];
+    }
+  | Exclude<WriteReport, { readonly tag: 'applied' }>;
+
+/** The anchor and operation of an intent, built against the snapshot it names;
+ * the host adds the id, the file and the checksum. */
+export type IntentDraft = Pick<Intent, 'anchor' | 'operation'>;
 
 export type HostDisk = Pick<
   NodeDocumentDisk,
@@ -118,6 +143,21 @@ interface Entry {
   readonly document: CanonicalDocument;
   state: ActorState;
   used: number;
+  /** Snapshots the actor held before its current one, newest last, bounded by
+   * LIMITS.authoredSnapshotsMax: the bytes an edit may have been authored
+   * against when an outside write replaced them since (step 6). */
+  retained: Snapshot[];
+  /** The actor's recent commits, oldest first, bounded by
+   * LIMITS.commitLogEntriesMax: an edit authored before them rebases exactly. */
+  log: CommitRecord[];
+}
+
+/** An outcome with what the host learned beside it. */
+interface Settled {
+  readonly outcome: Outcome;
+  readonly message: string;
+  /** The applied intent's splices, from its commit. */
+  readonly committed: Extract<ActorEffect, { tag: 'committed' }> | undefined;
 }
 
 /** Steps one intent can take: idle → planned → written → idle. */
@@ -155,6 +195,67 @@ export class DocumentActors {
       };
     }
     return this.#submitReplace(entry.value, text, baseChecksum);
+  }
+
+  /** A visual edit (step 6): `build` states it as an intent against the
+   * snapshot the renderer authored it against — the current one, or one the
+   * host retained. An edit authored before the actor's own recent commits is
+   * rebased through them exactly; one authored before an outside write is
+   * submitted with its authored snapshot and mapped through the diff by the
+   * planner. Without the authored bytes, it is refused: never guessed. */
+  submitEdit(
+    file: string,
+    authoredChecksum: Digest,
+    build: (authored: Snapshot) => Result<IntentDraft, RejectionReason>,
+  ): EditReport {
+    assert(this.#options.drain === 'immediate', 'A deferred host takes submitDeferred');
+    const entry = this.#entry(file);
+    if (!entry.ok) {
+      return {
+        tag: 'rejected',
+        reason: 'write-failed',
+        message: entry.error,
+        diskChecksum: undefined,
+      };
+    }
+    const current = this.#current(entry.value);
+    if (!current.ok) {
+      return {
+        tag: 'rejected',
+        reason: 'write-failed',
+        message: current.error.message,
+        diskChecksum: undefined,
+      };
+    }
+    const submission = this.#editSubmission(entry.value, authoredChecksum, build);
+    if (!submission.ok) {
+      const reason = submission.error;
+      return {
+        tag: 'rejected',
+        reason,
+        message: describeRejection(reason),
+        diskChecksum: current.value,
+      };
+    }
+    const intent = submission.value.intent;
+    if (this.#enqueue(entry.value, intent, submission.value.authored) === 'backpressured') {
+      return { tag: 'backpressured' };
+    }
+    const settled = this.#settle(entry.value).get(intent.id);
+    assert(settled !== undefined, 'A settled actor reported the intent it accepted');
+    if (settled.outcome.tag === 'applied') {
+      const commit = settled.committed;
+      assert(commit !== undefined, 'An applied intent was committed');
+      return {
+        tag: 'applied',
+        checksum: settled.outcome.checksum,
+        bytes: commit.candidate.bytes,
+        inverse: inverseEdits(commit.plan.splices),
+      };
+    }
+    const report = this.#report(entry.value, intent, settled.outcome, settled.message);
+    assert(report.tag !== 'applied', 'Only an applied outcome is reported as applied');
+    return report;
   }
 
   /** The bytes on disk now and their checksum, through the file's actor
@@ -348,8 +449,51 @@ export class DocumentActors {
     return this.#report(entry, intent, outcome.outcome, outcome.message);
   }
 
-  #enqueue(entry: Entry, intent: Intent): 'accepted' | 'backpressured' {
-    const submitted = submitIntent(entry.state, { intent, authored: undefined });
+  // The intent an edit becomes against the bytes on disk now, and the
+  // snapshot to map it from when it is stale.
+  #editSubmission(
+    entry: Entry,
+    authoredChecksum: Digest,
+    build: (authored: Snapshot) => Result<IntentDraft, RejectionReason>,
+  ): Result<{ readonly intent: Intent; readonly authored: Snapshot | undefined }, RejectionReason> {
+    const current = entry.state.snapshot;
+    assert(current !== undefined, 'A refreshed actor holds a snapshot');
+    const authored =
+      current.checksum === authoredChecksum
+        ? current
+        : entry.retained.find((snapshot) => snapshot.checksum === authoredChecksum);
+    if (authored === undefined) {
+      return err('anchor-moved'); // The authored bytes are gone: re-read, never guess.
+    }
+    const draft = build(authored);
+    if (!draft.ok) {
+      return draft;
+    }
+    this.#intents += 1;
+    assert(Number.isSafeInteger(this.#intents), 'Intent ids stay safe integers');
+    const intent = toIntent({
+      id: toIntentId(`main-${this.#intents}`),
+      file: entry.document.path,
+      authoredChecksum,
+      ...draft.value,
+    });
+    if (authored === current) {
+      return ok({ intent, authored: undefined });
+    }
+    const chain = commitChain(entry.log, authoredChecksum, current.checksum);
+    if (chain === undefined) {
+      return ok({ intent, authored }); // An outside write between: the planner maps.
+    }
+    const rebased = rebaseIntent(intent, chain, current);
+    return rebased.ok ? ok({ intent: rebased.value, authored: undefined }) : rebased;
+  }
+
+  #enqueue(
+    entry: Entry,
+    intent: Intent,
+    authored: Snapshot | undefined = undefined,
+  ): 'accepted' | 'backpressured' {
+    const submitted = submitIntent(entry.state, { intent, authored });
     entry.state = submitted.state;
     if (submitted.result.tag === 'backpressured') {
       this.#options.telemetry.record(entry.document.path, { tag: 'backpressured' });
@@ -386,9 +530,10 @@ export class DocumentActors {
 
   // Step until the actor holds nothing, and collect every outcome. The bound is
   // the queue bound times the steps one intent takes, plus one refresh.
-  #settle(entry: Entry): Map<string, { outcome: Outcome; message: string }> {
-    const outcomes = new Map<string, { outcome: Outcome; message: string }>();
+  #settle(entry: Entry): Map<string, Settled> {
+    const outcomes = new Map<string, Settled>();
     const messages = new Map<string, string>();
+    const commits = new Map<string, Extract<ActorEffect, { tag: 'committed' }>>();
     const stepsMax = (LIMITS.intentsPendingMax + 1) * STEPS_PER_INTENT + 1;
     for (let step = 0; step < stepsMax; step++) {
       if (actorQuiescent(entry.state)) {
@@ -396,9 +541,9 @@ export class DocumentActors {
       }
       const result = stepActor(entry.state, this.#dependencies);
       assert(result.parses <= LIMITS.parseTasksInFlightMax, 'A step parses within its bound');
-      entry.state = result.state;
+      this.#adopt(entry, result.state);
       for (const effect of result.effects) {
-        this.#absorb(entry, effect, outcomes, messages);
+        this.#absorb(entry, effect, { outcomes, messages, commits });
       }
     }
     throw new Error(`Assertion failed: the actor settles within ${stepsMax} steps`);
@@ -407,24 +552,33 @@ export class DocumentActors {
   #absorb(
     entry: Entry,
     effect: ActorEffect,
-    outcomes: Map<string, { outcome: Outcome; message: string }>,
-    messages: Map<string, string>,
+    seen: {
+      readonly outcomes: Map<string, Settled>;
+      readonly messages: Map<string, string>;
+      readonly commits: Map<string, Extract<ActorEffect, { tag: 'committed' }>>;
+    },
   ): void {
     switch (effect.tag) {
-      case 'outcome':
+      case 'outcome': {
+        const id = effect.outcome.intentId;
         this.#options.telemetry.record(entry.document.path, effect);
-        outcomes.set(effect.outcome.intentId, {
+        seen.outcomes.set(id, {
           outcome: effect.outcome,
-          message: messages.get(effect.outcome.intentId) ?? '',
+          message: seen.messages.get(id) ?? '',
+          committed: seen.commits.get(id),
         });
         return;
+      }
       case 'disk-error':
-        messages.set(effect.intentId, effect.message);
+        seen.messages.set(effect.intentId, effect.message);
         return;
       case 'lock-leaked':
         this.#options.telemetry.record(entry.document.path, { tag: 'lock-leaked' });
         return;
       case 'committed':
+        seen.commits.set(effect.intent.id, effect);
+        this.#logCommit(entry, effect);
+        return;
       case 'refreshed':
         return;
       default: {
@@ -470,7 +624,7 @@ export class DocumentActors {
     if (!refreshed.ok) {
       return err(refreshed.error);
     }
-    entry.state = refreshed.value.state;
+    this.#adopt(entry, refreshed.value.state);
     const snapshot = entry.state.snapshot;
     assert(snapshot !== undefined, 'A refresh after a good read holds a snapshot');
     return ok(snapshot.checksum);
@@ -529,6 +683,8 @@ export class DocumentActors {
       document: document.value,
       state: createActor(document.value.path),
       used: this.#clock,
+      retained: [],
+      log: [],
     };
     this.#entries.set(document.value.key, entry);
     assert(
@@ -551,7 +707,7 @@ export class DocumentActors {
       if (underCount && retained <= LIMITS.documentBytesRetainedMax) {
         return;
       }
-      retained -= entry.state.snapshot?.bytes.length ?? 0;
+      retained -= entryBytes(entry);
       this.#entries.delete(key);
       this.#dirty.delete(key);
     }
@@ -561,9 +717,46 @@ export class DocumentActors {
   #retainedBytes(): number {
     let total = 0;
     for (const entry of this.#entries.values()) {
-      total += entry.state.snapshot?.bytes.length ?? 0;
+      total += entryBytes(entry);
     }
     return total;
+  }
+
+  // Take the actor's next state; the snapshot it replaces is retained, so an
+  // edit authored against it can still be mapped (LIMITS.authoredSnapshotsMax).
+  #adopt(entry: Entry, next: ActorState): void {
+    const previous = entry.state.snapshot;
+    entry.state = next;
+    if (previous === undefined) {
+      return;
+    }
+    if (previous.checksum === next.snapshot?.checksum) {
+      return;
+    }
+    const retained = [
+      ...entry.retained.filter((snapshot) => snapshot.checksum !== previous.checksum),
+      previous,
+    ].slice(-LIMITS.authoredSnapshotsMax);
+    // Oldest first out, until the bytes fit too; the loop ends because each
+    // pass drops one snapshot.
+    let bytes = retained.reduce((total, snapshot) => total + snapshot.bytes.length, 0);
+    while (bytes > LIMITS.authoredBytesRetainedMax) {
+      const oldest = retained.shift();
+      assert(oldest !== undefined, 'Bytes over the bound come from some snapshot');
+      bytes -= oldest.bytes.length;
+    }
+    entry.retained = retained;
+    assert(entry.retained.length <= LIMITS.authoredSnapshotsMax, 'Retained snapshots are bounded');
+  }
+
+  #logCommit(entry: Entry, commit: Extract<ActorEffect, { tag: 'committed' }>): void {
+    const record: CommitRecord = {
+      from: commit.base.checksum,
+      to: commit.candidate.checksum,
+      splices: minimalSplices(commit.plan.splices),
+    };
+    entry.log = [...entry.log, record].slice(-LIMITS.commitLogEntriesMax);
+    assert(entry.log.length <= LIMITS.commitLogEntriesMax, 'The commit log is bounded');
   }
 
   #refreshDirty(): void {
@@ -575,12 +768,20 @@ export class DocumentActors {
         if (actorQuiescent(entry.state)) {
           // A failed read leaves the snapshot; the next intent reports it.
           const refreshed = refreshActor(entry.state, this.#dependencies);
-          entry.state = refreshed.ok ? refreshed.value.state : entry.state;
+          if (refreshed.ok) {
+            this.#adopt(entry, refreshed.value.state);
+          }
         }
       }
     }
     this.#dirty.clear();
   }
+}
+
+// Every byte an actor's entry keeps: its snapshot and the retained ones.
+function entryBytes(entry: Entry): number {
+  const current = entry.state.snapshot?.bytes.length ?? 0;
+  return entry.retained.reduce((total, snapshot) => total + snapshot.bytes.length, current);
 }
 
 // Canonical keys compare by UTF-16 code unit: a total order that does not

@@ -73,6 +73,23 @@ export const LIMITS = {
   /** Snapshots one actor retains: the committed one plus the candidate under
    * verification. Pending intents keep only their authored preconditions. */
   snapshotsRetainedMax: 2,
+  /** Earlier snapshots a host keeps per actor (step 6): the bytes the renderer
+   * authored an edit against, once the actor's own writes or an outside one
+   * replaced them. The renderer keeps authoring against the page it shows
+   * until a save lands with nothing newer typed, so a run of saves under a
+   * busy keyboard needs as many as the commit log holds. Past either bound,
+   * such an edit is refused, never guessed, and the page asks to be reloaded. */
+  authoredSnapshotsMax: 16,
+  /** Bytes of those earlier snapshots per actor, so sixteen copies of a 10 MB
+   * page never pile up; the oldest go first. */
+  authoredBytesRetainedMax: 16 * 1024 * 1024,
+  /** Commits a host remembers per actor — the bytes before, the bytes after,
+   * the splices between — so an edit authored before the actor's own recent
+   * writes is rebased exactly, without a diff (shared/rebase.ts). */
+  commitLogEntriesMax: 16,
+  /** Undo entries one session keeps (the renderer's history; step 6 moves the
+   * bound here from a literal in App.tsx, where it was already 100). */
+  undoEntriesMax: 100,
   /** Files one watcher tick may mark dirty. Events coalesce into a set, so the
    * bound caps a burst like `git checkout`, not the event count. */
   watcherFilesPerTickMax: 1_024,

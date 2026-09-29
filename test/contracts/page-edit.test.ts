@@ -1,0 +1,391 @@
+// Goal: the visual edit contract (plan §11 step 6) holds end to end. A request
+// states a gesture against the checksum of the page the renderer shows; main
+// checks its node references against its own projection, plans the intent,
+// and writes splices — every byte outside them untouched. An edit authored
+// before the app's own previous edit is rebased exactly (the host's commit
+// log), one authored before an outside write is mapped through the diff (the
+// retained snapshot), and one whose bytes are gone or that names a node the
+// page does not have is refused with the disk untouched. The reply's inverse,
+// sent back as a revert, is Undo: it restores the bytes, and after an outside
+// edit it maps or is refused — it never reverts that edit.
+// Method: the wire parsers get known-good and known-bad shapes; the real
+// main-process handlers run in the windowless harness on temporary files, with
+// outside edits made directly on disk between requests.
+import assert from 'node:assert/strict';
+import { test } from 'node:test';
+import { createHash } from 'node:crypto';
+import * as fs from 'node:fs';
+import * as os from 'node:os';
+import * as path from 'node:path';
+import { mainHarness } from './main-harness.ts';
+import { parseEditRequest, type Edit, type NodeRef } from '../../dist/shared/edit-request.js';
+import {
+  parsePageDiskRead,
+  parsePageEditResult,
+  type PageDiskRead,
+} from '../../dist/shared/page-save.js';
+import { parsePageNode, type PageNode } from '../../dist/shared/page-node.js';
+import { toUtf16Span } from '../../dist/shared/span.js';
+
+const sha256 = (bytes: string | Buffer): string => createHash('sha256').update(bytes).digest('hex');
+const DIGEST = 'a'.repeat(64);
+const REF = { path: [0], kind: 'element', span: { start: 0, end: 4 } };
+
+function fixture() {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'stacki-page-edit-'));
+  fs.mkdirSync(path.join(root, 'src/pages'), { recursive: true });
+  fs.mkdirSync(path.join(root, 'user'));
+  fs.writeFileSync(path.join(root, 'package.json'), '{"dependencies":{"astro":"*"}}');
+  const harness = mainHarness(path.join(root, 'user'));
+  return {
+    root,
+    ...harness,
+    dispose: () => {
+      harness.dispose();
+      fs.rmSync(root, { recursive: true, force: true });
+    },
+  };
+}
+
+type Harness = ReturnType<typeof fixture>;
+
+/** The reference the renderer sends for the node at `at` in its parse. */
+function refAt(read: PageDiskRead, at: readonly number[]): NodeRef {
+  assert.ok(read.editable, 'the page parses');
+  let list: readonly PageNode[] = read.model.nodes;
+  let node: PageNode | undefined;
+  for (const step of at) {
+    node = list[step];
+    assert.ok(node !== undefined, `a node at ${at.join('/')}`);
+    list = 'children' in node && Array.isArray(node.children) ? node.children : [];
+  }
+  assert.ok(node?.start !== undefined && node.end !== undefined, 'the parse carries source ranges');
+  return { path: at, kind: node.kind, span: { start: node.start, end: node.end } };
+}
+
+async function read(harness: Harness, file: string): Promise<PageDiskRead> {
+  return parsePageDiskRead(await harness.invoke('page:read', file));
+}
+
+async function edit(harness: Harness, file: string, authoredChecksum: string, request: Edit) {
+  return parsePageEditResult(
+    await harness.invoke('page:edit', { pagePath: file, authoredChecksum, edit: request }),
+  );
+}
+
+const title = (target: NodeRef, value: string): Edit => ({
+  tag: 'set-attribute',
+  target,
+  name: 'title',
+  value: { type: 'string', value },
+});
+
+// --- Wire ---------------------------------------------------------------------------
+
+test('parseEditRequest takes every edit and refuses each malformed shape', () => {
+  const good: readonly unknown[] = [
+    { tag: 'set-attribute', target: REF, name: 'title', value: { type: 'string', value: 'x' } },
+    { tag: 'set-attribute', target: REF, name: 'disabled', value: { type: 'bare' } },
+    { tag: 'remove-attribute', target: REF, name: 'title' },
+    { tag: 'set-inline-style', target: REF, property: 'color', declaration: { tag: 'remove' } },
+    { tag: 'insert-node', target: REF, placement: 'after', content: { tag: 'copy', source: REF } },
+    {
+      tag: 'insert-node',
+      target: REF,
+      placement: 'first-child',
+      content: { tag: 'nodes', nodes: [{ id: 'c1', kind: 'text', value: 'Hi' }] },
+    },
+    { tag: 'remove-node', target: REF },
+    { tag: 'move-node', target: REF, destination: REF, placement: 'before' },
+    { tag: 'rename-binding', target: { ...REF, kind: 'map' }, from: 'item', to: 'entry' },
+    { tag: 'revert', hunks: [{ span: { start: 1, end: 2 }, text: 'x' }] },
+  ];
+  for (const request of good) {
+    assert.doesNotThrow(() =>
+      parseEditRequest({ pagePath: '/p.astro', authoredChecksum: DIGEST, edit: request }),
+    );
+  }
+  const bad: readonly (readonly [unknown, RegExp])[] = [
+    [{ tag: 'paint' }, /unknown edit/],
+    [{ tag: 'remove-node', target: { ...REF, path: [] } }, /at least one step/],
+    [{ tag: 'remove-node', target: { ...REF, path: [-1] } }, /child index/],
+    [{ tag: 'remove-node', target: { ...REF, kind: 'frontmatter' } }, /unknown node kind/],
+    [{ tag: 'remove-attribute', target: REF, name: 'a b' }, /attribute name/],
+    [
+      { tag: 'set-inline-style', target: REF, property: 'Color!', declaration: { tag: 'remove' } },
+      /CSS property/,
+    ],
+    [{ tag: 'rename-binding', target: REF, from: 'a', to: 'a' }, /must change/],
+    [
+      { tag: 'insert-node', target: REF, placement: 'after', content: { tag: 'nodes', nodes: [] } },
+      /at least one/,
+    ],
+    [
+      {
+        tag: 'insert-node',
+        target: REF,
+        placement: 'inside',
+        content: { tag: 'copy', source: REF },
+      },
+      /placement/,
+    ],
+    [{ tag: 'revert', hunks: [{ span: { start: 2, end: 1 }, text: '' }] }, /end must not precede/],
+  ];
+  for (const [request, message] of bad) {
+    assert.throws(
+      () => parseEditRequest({ pagePath: '/p.astro', authoredChecksum: DIGEST, edit: request }),
+      message,
+    );
+  }
+  assert.throws(() =>
+    parseEditRequest({ pagePath: '/p.astro', authoredChecksum: 'x', edit: good[0] }),
+  );
+});
+
+test('parsePageEditResult: an applied edit carries its inverse; a conflict is a rejection', () => {
+  const page = { source: 'x', editable: false, reason: 'r', bail: null, checksum: DIGEST };
+  const applied = parsePageEditResult({
+    ok: true,
+    ...page,
+    inverse: [{ span: { start: 0, end: 1 }, text: 'y' }],
+  });
+  assert.ok(applied.ok);
+  assert.deepEqual(applied.value.inverse, [{ span: { start: 0, end: 1 }, text: 'y' }]);
+  const rejected = parsePageEditResult({
+    ok: false,
+    error: { code: 'rejected', reason: 'anchor-moved', message: 'm', diskChecksum: null },
+  });
+  assert.deepEqual(rejected, {
+    ok: false,
+    error: { code: 'rejected', reason: 'anchor-moved', message: 'm', diskChecksum: undefined },
+  });
+  assert.throws(
+    () =>
+      parsePageEditResult({
+        ok: true,
+        ...page,
+        inverse: [
+          { span: { start: 1, end: 2 }, text: 'a' },
+          { span: { start: 0, end: 1 }, text: 'b' },
+        ],
+      }),
+    /ascending/,
+  );
+  assert.throws(
+    () =>
+      parsePageEditResult({
+        ok: false,
+        error: { code: 'rejected', reason: 'nope', message: 'm', diskChecksum: null },
+      }),
+    /rejection reason/,
+  );
+  assert.throws(
+    () =>
+      parsePageEditResult({
+        ok: false,
+        error: { code: 'conflict', message: 'm', diskChecksum: DIGEST },
+      }),
+    /rejected/,
+  );
+});
+
+// --- End to end --------------------------------------------------------------------------
+
+const SIBLINGS = '<Hero title="Old" />\n<Card title="Old" />\n<Card title="Old" />\n';
+
+test('an edit writes only its splice; its inverse restores every byte', async (context) => {
+  const harness = fixture();
+  context.after(harness.dispose);
+  const file = path.join(harness.root, 'src/pages/index.astro');
+  fs.writeFileSync(file, SIBLINGS);
+  const page = await read(harness, file);
+  const applied = await edit(harness, file, page.checksum, title(refAt(page, [2]), 'New'));
+  assert.ok(applied.ok, 'the edit applies');
+  const after = '<Hero title="Old" />\n<Card title="Old" />\n<Card title="New" />\n';
+  assert.equal(fs.readFileSync(file, 'utf8'), after);
+  assert.equal(applied.value.checksum, sha256(after));
+  assert.equal(applied.value.source, after, 'the reply is the page as written');
+  const undone = await edit(harness, file, applied.value.checksum, {
+    tag: 'revert',
+    hunks: applied.value.inverse,
+  });
+  assert.ok(undone.ok, 'the inverse applies');
+  assert.equal(fs.readFileSync(file, 'utf8'), SIBLINGS);
+});
+
+test("an edit authored before the app's own last edit is rebased exactly", async (context) => {
+  const harness = fixture();
+  context.after(harness.dispose);
+  const file = path.join(harness.root, 'src/pages/index.astro');
+  fs.writeFileSync(file, SIBLINGS);
+  const page = await read(harness, file);
+  // Both authored against the same read. The second card's bytes repeat, so a
+  // diff could not tell the cards apart; the commit log knows what moved.
+  const first = await edit(
+    harness,
+    file,
+    page.checksum,
+    title(refAt(page, [0]), 'A much longer hero title'),
+  );
+  assert.ok(first.ok);
+  const second = await edit(harness, file, page.checksum, title(refAt(page, [2]), 'Second'));
+  assert.ok(second.ok, 'rebased through the first edit');
+  const third = await edit(harness, file, page.checksum, title(refAt(page, [0]), 'Hero again'));
+  assert.ok(third.ok, 'the same attribute again: the latest word wins');
+  assert.equal(
+    fs.readFileSync(file, 'utf8'),
+    '<Hero title="Hero again" />\n<Card title="Old" />\n<Card title="Second" />\n',
+  );
+});
+
+test('an outside edit elsewhere maps; one on the same value is refused', async (context) => {
+  const harness = fixture();
+  context.after(harness.dispose);
+  const file = path.join(harness.root, 'src/pages/index.astro');
+  const text = '<h1 title="Heading">Hi</h1>\n<p class="lead">Words</p>\n';
+  fs.writeFileSync(file, text);
+  const page = await read(harness, file);
+  const lead = refAt(page, [1]);
+  // The editor has not seen this read's outcome yet: the actor retains the
+  // bytes it read, so the edit maps through the outside write.
+  fs.writeFileSync(file, text.replace('Hi', 'Hello there'));
+  const mapped = await edit(harness, file, page.checksum, {
+    tag: 'set-attribute',
+    target: lead,
+    name: 'class',
+    value: { type: 'string', value: 'intro' },
+  });
+  assert.ok(mapped.ok, `mapped (${mapped.ok ? '' : mapped.error.code})`);
+  assert.equal(
+    fs.readFileSync(file, 'utf8'),
+    '<h1 title="Heading">Hello there</h1>\n<p class="intro">Words</p>\n',
+  );
+  const now = fs.readFileSync(file, 'utf8');
+  fs.writeFileSync(file, now.replace('class="intro"', 'class="theirs"'));
+  const refused = await edit(harness, file, mapped.value.checksum, {
+    tag: 'set-attribute',
+    target: refAt(mapped.value, [1]),
+    name: 'class',
+    value: { type: 'string', value: 'mine' },
+  });
+  assert.equal(refused.ok, false);
+  assert.equal(!refused.ok && refused.error.code, 'rejected');
+  assert.ok(fs.readFileSync(file, 'utf8').includes('class="theirs"'), 'the outside edit stays');
+});
+
+test('unknown bytes, or a node the page lacks, are refused', async (context) => {
+  const harness = fixture();
+  context.after(harness.dispose);
+  const file = path.join(harness.root, 'src/pages/index.astro');
+  fs.writeFileSync(file, SIBLINGS);
+  const page = await read(harness, file);
+  const unknown = await edit(harness, file, DIGEST, title(refAt(page, [0]), 'x'));
+  assert.deepEqual(
+    !unknown.ok && [unknown.error.code, unknown.error.code === 'rejected' && unknown.error.reason],
+    ['rejected', 'anchor-moved'],
+  );
+  const wrong = await edit(
+    harness,
+    file,
+    page.checksum,
+    title({ ...refAt(page, [0]), span: toUtf16Span(1, 5) }, 'x'),
+  );
+  assert.equal(!wrong.ok && wrong.error.code === 'rejected' && wrong.error.reason, 'anchor-moved');
+  assert.equal(fs.readFileSync(file, 'utf8'), SIBLINGS, 'nothing was written');
+});
+
+test('new nodes print where they land; the frontmatter changes its slot', async (context) => {
+  const harness = fixture();
+  context.after(harness.dispose);
+  const file = path.join(harness.root, 'src/pages/index.astro');
+  const text =
+    "---\nimport Hero from '../components/Hero.astro';\nconst title = 'T';\n---\n" +
+    '<main>\n  <Hero />\n</main>\n';
+  fs.writeFileSync(file, text);
+  const page = await read(harness, file);
+  assert.ok(page.editable);
+  // As it crosses the wire: validated by the same parser main uses.
+  const card = parsePageNode({
+    id: 'c1',
+    kind: 'component',
+    name: 'Card',
+    props: {},
+    children: null,
+  });
+  const inserted = await edit(harness, file, page.checksum, {
+    tag: 'insert-node',
+    target: refAt(page, [0, 0]),
+    placement: 'after',
+    content: { tag: 'nodes', nodes: [card] },
+  });
+  assert.ok(inserted.ok, 'the node inserts');
+  const imports = [
+    ...page.model.imports,
+    { name: 'Card', path: '../components/Card.astro', quote: "'" },
+  ];
+  const withImport = await edit(harness, file, page.checksum, {
+    tag: 'set-frontmatter',
+    model: { ...page.model, imports, nodes: [] },
+  });
+  assert.ok(
+    withImport.ok,
+    `the import lands (${withImport.ok ? '' : JSON.stringify(withImport.error)})`,
+  );
+  assert.equal(
+    fs.readFileSync(file, 'utf8'),
+    [
+      '---',
+      "import Hero from '../components/Hero.astro';",
+      "import Card from '../components/Card.astro';",
+      "const title = 'T';",
+      '---',
+      '<main>',
+      '  <Hero />',
+      '  <Card />',
+      '</main>',
+      '',
+    ].join('\n'),
+  );
+});
+
+test('undo after an outside edit maps through it and never reverts it', async (context) => {
+  const harness = fixture();
+  context.after(harness.dispose);
+  const file = path.join(harness.root, 'src/pages/index.astro');
+  const filler =
+    '<p>A paragraph long enough to keep the two edits out of each other’s context.</p>\n';
+  fs.writeFileSync(file, `<h1 title="One">Hi</h1>\n${filler}<footer>Old</footer>\n`);
+  const page = await read(harness, file);
+  const applied = await edit(harness, file, page.checksum, title(refAt(page, [0]), 'Two'));
+  assert.ok(applied.ok);
+  fs.writeFileSync(file, fs.readFileSync(file, 'utf8').replace('Old', 'Theirs'));
+  const undone = await edit(harness, file, applied.value.checksum, {
+    tag: 'revert',
+    hunks: applied.value.inverse,
+  });
+  assert.ok(undone.ok, `undo maps (${undone.ok ? '' : JSON.stringify(undone.error)})`);
+  assert.equal(
+    fs.readFileSync(file, 'utf8'),
+    `<h1 title="One">Hi</h1>\n${filler}<footer>Theirs</footer>\n`,
+  );
+});
+
+test('an edit authored before more commits than the host retains is refused', async (context) => {
+  const harness = fixture();
+  context.after(harness.dispose);
+  const file = path.join(harness.root, 'src/pages/index.astro');
+  fs.writeFileSync(file, SIBLINGS);
+  const page = await read(harness, file);
+  const hero = refAt(page, [0]);
+  // Every edit is authored against the first read; each commit pushes that
+  // snapshot one place further back. Sixteen earlier snapshots are kept
+  // (LIMITS.authoredSnapshotsMax), and the log holds sixteen commits, so the
+  // seventeenth edit still rebases and the eighteenth has nothing to map from.
+  for (let round = 1; round <= 17; round++) {
+    const applied = await edit(harness, file, page.checksum, title(hero, `Round ${round}`));
+    assert.ok(applied.ok, `round ${round} is rebased`);
+  }
+  const late = await edit(harness, file, page.checksum, title(hero, 'Too late'));
+  assert.equal(!late.ok && late.error.code === 'rejected' && late.error.reason, 'anchor-moved');
+  assert.ok(fs.readFileSync(file, 'utf8').includes('Round 17'), 'the refusal wrote nothing');
+});

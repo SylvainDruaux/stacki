@@ -19,7 +19,6 @@ const {
   createFileExclusive,
   digestOf,
   isAtomicTemporary,
-  readSourceSnapshot,
   replaceFileAtomic,
 } = require('../dist/electron/atomicWrite.js');
 
@@ -184,20 +183,6 @@ test('a replace that cannot keep the owner is refused', posixOnly, () => {
     });
     assert.equal(fs.readFileSync(file, 'utf8'), 'authored\n');
     assert.deepEqual(leftovers(root), []);
-  });
-});
-
-test('snapshots keep a BOM in the text and reject invalid UTF-8', () => {
-  directory((root) => {
-    const file = path.join(root, 'page.md');
-    const bytes = Buffer.concat([Buffer.from([0xef, 0xbb, 0xbf]), Buffer.from('# Hi\r\n')]);
-    fs.writeFileSync(file, bytes);
-    const snapshot = readSourceSnapshot(file);
-    assert.equal(snapshot.text, '﻿# Hi\r\n');
-    assert.equal(snapshot.checksum, sha256(bytes));
-    assert.equal(digestOf(snapshot.text), snapshot.checksum, 'the text re-encodes to the bytes');
-    fs.writeFileSync(file, Buffer.from([0x23, 0x20, 0xc3, 0x28]));
-    assert.throws(() => readSourceSnapshot(file), /page\.md is not valid UTF-8/);
   });
 });
 

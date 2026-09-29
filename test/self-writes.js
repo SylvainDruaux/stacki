@@ -119,6 +119,14 @@ check(
     (writer.match(/markSelfWrite\(pagePath, text\)/g) || []).length === 2,
     `${(writer.match(/markSelfWrite\(pagePath[^)]*\)/g) || []).join(' , ')}`
   );
+  // Step 6: a visual edit writes splices through the page's actor, and says
+  // what the file now holds as well.
+  const edit = main.slice(main.indexOf("ipcMain.handle('page:edit'"), main.indexOf('function pageEditError'));
+  check(
+    'a visual edit says what it wrote',
+    (edit.match(/markSelfWrite\(pagePath, text\)/g) || []).length === 1,
+    edit.slice(0, 200)
+  );
 }
 
 if (failures.length) {

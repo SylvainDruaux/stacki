@@ -2002,6 +2002,7 @@ contextBridge.exposeInMainWorld('avb', {
   serializePage: invoke('page:serialize'),
   writePage: invoke('page:write'),
   writePageRaw: invoke('page:writeRaw'),
+  editPage: invoke('page:edit'),
   createPage: invoke('page:create'),
   deletePage: invoke('page:delete'),
   movePage: invoke('page:move'),

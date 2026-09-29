@@ -21,9 +21,13 @@ import {
 import { parseIpcPayload } from '../shared/ipc-payloads';
 import { parseOkResult } from '../shared/ipc';
 import type { Digest } from '../shared/brand';
+import type { EditRequest } from '../shared/edit-request';
 import {
+  parsePageEditResult,
   parsePageWriteResult,
   type PageDiskRead,
+  type PageEditError,
+  type PageEdited,
   type PageWriteError,
 } from '../shared/page-save';
 import type { Result } from '../shared/result';
@@ -128,6 +132,12 @@ export function writeProjectPageRaw(
 ): Promise<Result<PageDiskRead, PageWriteError>> {
   const payload = parseIpcPayload('page:writeRaw', { pagePath, source, baseChecksum });
   return window.avb.writePageRaw(payload).then(parsePageWriteResult);
+}
+
+/** A visual edit (step 6), stated against the checksum of the page shown. */
+export function editProjectPage(request: EditRequest): Promise<Result<PageEdited, PageEditError>> {
+  const payload = parseIpcPayload('page:edit', request);
+  return window.avb.editPage(payload).then(parsePageEditResult);
 }
 
 export function serializeProjectPage(pagePath: string, model: unknown): Promise<string> {

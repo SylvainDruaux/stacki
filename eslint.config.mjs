@@ -50,6 +50,9 @@ const NO_WHOLE_FILE_REGENERATION = [
 ];
 const WRITER_BOUNDARY = [
   'electron/astroParser.ts',
+  // Step 6: prints only what an edit adds (new nodes, a frontmatter block),
+  // never a file; deleted with the compat adapter at step 9.
+  'electron/editRequests.ts',
   'electron/main.ts',
   'electron/markdownParser.ts',
   'electron/componentFile.ts',
@@ -120,6 +123,7 @@ const ENGINE_CONTRACTS = [
   'shared/planSupport.ts',
   'shared/planText.ts',
   'shared/planTree.ts',
+  'shared/rebase.ts',
   'shared/ref.ts',
   'shared/snapshot.ts',
   'shared/source-projection.ts',
