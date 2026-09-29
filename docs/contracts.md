@@ -116,9 +116,9 @@ actor. The app submits one operation so far: the migration-only
   beside the selection (`src/nodeCapability.ts`, `CapabilityNotice`).
 - `source-projection.ts` — the `Projection` sum (`valid` with byte-addressed
   nodes, paths, attribute spans and capabilities, and the text's UTF-16 length,
-  which the parser bounds; or `parse-error` with bounded diagnostics). Named so nothing in it can be confused with the `page-node.ts`
-  wire model. `.astro` only until step 10; stylesheets project as opaque
-  documents.
+  which the parser bounds; or `parse-error` with bounded diagnostics). Named so
+  nothing in it can be confused with the `page-node.ts` wire model. `.astro`
+  only until step 10; stylesheets project as opaque documents.
 - `snapshot.ts` — `createSnapshot` computes the checksum from the bytes through
   an injected hash (the renderer has no `node:crypto`) and asserts the
   projection measured the same bytes. There is no version field.
@@ -253,6 +253,12 @@ after). The generated config itself lives in `node_modules/.avb`.
   every path), and main answers `current` — judged again after main answers. A
   refusal is a notice; nothing is selected. Hover needs the latest token only.
   Markdown and MDX pages carry no stamp until step 10.
+- The canvas patch (`electron/morphClient.ts`) is bounded by
+  `previewMarkersMax` markers per rendering and `previewMorphWorkMax`
+  child-list matrix cells per patch; main prepends `AVB_PREVIEW_LIMITS` from
+  `shared/limits.ts` to the source it serves. Past either the page reloads and
+  first posts `avb:preview-reload` `{ reason }` (`markers-over-cap`,
+  `diff-over-cap`, `scripts-changed`, `patch-failed`); the app shows the caps.
 
 ## Document actors (step 5)
 

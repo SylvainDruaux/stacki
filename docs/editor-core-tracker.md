@@ -34,8 +34,11 @@ lands it.
   (2026-09-29)**: the planner plans every operation; attribute, prop,
   insert/remove, move, inline CSS, frontmatter and loop-rename gestures reach
   disk as edit requests (`page:edit`) spliced by the actor; Undo reverts them on
-  the engine; property batches are undoable (see Step 6). Steps 7–10 have not
-  started.
+  the engine; property batches are undoable (see Step 6). **Step 7 landed
+  (2026-09-29)**: capabilities are shown beside the selection and a node a loop
+  repeats edits its one source node; canvas events carry a preview token and a
+  stale rendering never selects; the canvas patch is capped and reloads, saying
+  why, past the cap (see Step 7). Steps 8–10 have not started.
 - **Step 0 landed (2026-09-28).** The legacy
   write path still serializes whole files (`mutateModel` → `page:write` →
   `serializePage`), but every page write now names the checksum it was
@@ -1196,7 +1199,7 @@ Left open, carried:
   undo; a random generator for every operation is not built (the corpus sweep
   in `operations.test.ts` covers each operation fresh and stale instead).
 
-### Step 7 — Capabilities and preview bridge ⬜
+### Step 7 — Capabilities and preview bridge ✅
 
 **Deliverables.** Read-only fallbacks visible, never silent; dev-only source
 markers injected in memory; the preview token (digest over the sorted
@@ -1207,6 +1210,129 @@ reload past the cap.
 **Gate proof.** A preview event is accepted only if the source file and
 dependency state that produced it are still current; no marker that could
 change observable project behavior is ever written into the project.
+
+**Landed 2026-09-29** on `refactor/architecture-consolidation`: `2fa3f0f`
+(capabilities), `3af4dbd` (the preview token), `a625992` (the capped patch),
+`28bb8bb` (the suites the first gate run caught), then this record. The full
+gate ran on the result (Verification record).
+
+**Capabilities — the step-6 question decided** (`2fa3f0f`). The canvas
+addresses a node a loop repeats as its one source node: a click on any rendered
+copy selects that node, and the occurrence only picks which copy is outlined —
+no instance identity is minted (plan §6). An edit of it is an edit of the
+source, and so of every copy; the engine can do that, so refusing it would be
+the read-only downgrade the prompt forbids, and `repeated-source-node` now
+accepts visual intents (`shared/capability.ts`). Placing nodes beside it or
+removing it stays refused: the list it sits in is the loop body's code, and a
+second root there does not build. Moving it out works as in step 6.
+- New guard, found by the simulator's oracle for "the footer moved into a loop
+  outside Stacki": the same bytes then mean one source node rendered many
+  times, and an edit authored against one element would change every copy.
+  `resolveTarget` refuses a stale intent whose node's capability changed since
+  it was authored, `region-externally-modified` (`shared/planSupport.ts`).
+- The renderer classifies the selection with the projection's own
+  `classifyNode` (`src/nodeCapability.ts`; the test compares both on every node
+  of every corpus page) and shows every capability but `editable` beside the
+  selection's panels (`CapabilityNotice`): repeated ("an edit here changes every
+  item"), opaque code, runtime aggregates, and Markdown/MDX as `unsupported` —
+  never `read-only`, since the whole-page save still edits them until step 10.
+- Parity (`test/gesture-parity.test.js`) after the decision: **4 207 gestures
+  compared, all the same page, 2 083 byte-identical** (step 6: 3 933 / 2 078).
+  Attribute gestures refused 140 → 40, prop 228 → 63: the repeated nodes.
+
+| Gestures | Compared | Byte-identical | Refused (fallback) |
+|---|---|---|---|
+| attribute | 610 | 357 | 40 |
+| prop | 829 | 462 | 63 |
+| insert/remove | 1 297 | 668 | 320 |
+| move | 1 234 | 423 | 339 (+68 with nothing to stand beside) |
+| inline CSS | 16 | 0 | 0 |
+| frontmatter | 211 | 173 | 0 |
+| loop rename | 10 | 0 | 2 |
+
+**The preview token** (`3af4dbd`, `shared/preview-token.ts`). A click names a
+node by its index path in the rendering the frame shows; the editor selected
+that path in the model it shows, and the next edit — authored against the
+editor's page — applied to whatever node now sat there. That is invariant 6's
+silent remap. Now:
+- *Stamps.* Every `.astro` file the dev plugin marks carries one stamp comment,
+  `<!--avb-d:<sha256>:<project-relative path>-->`, for the exact bytes it was
+  marked from, at the end of its template (after `</html>` on a page, so the
+  doctype is untouched). A stamp is part of its own file's compiled module, so
+  it changes exactly when the dev server re-loads that file: a component edit
+  restamps the component, and the page's next rendering carries the new stamp
+  though the page's bytes never changed. A page-level manifest computed at load
+  time would not: Vite soft-invalidates importers and does not re-run their
+  load, so it would name the old component forever.
+- *Manifest and token.* The frame reads the stamps of the rendering it shows
+  (anywhere in the document) into a manifest — sorted by path, one entry per
+  file, at most `previewManifestFilesMax` (512); one file with two checksums is
+  a rendering of two versions and has no manifest — and its token is the
+  SHA-256 of `canonicalManifest`, by Web Crypto. The sandboxed preload cannot
+  require `shared/`, so it keeps a mirror that `test/preview-token-frame.test.js`
+  pins to the original. It announces `avb:render` `{ token, stamps }`; hover,
+  click and double-click carry `token` (null until the digest is known).
+- *Acceptance* (`src/previewGate.ts`). A click or double-click selects only
+  when (1) its token is the frame's latest; (2) the open file's stamp is the
+  bytes the editor shows — a clean page's checksum, or its origin while unsaved
+  edits leave every path the same node (text typed, not a node moved); and (3)
+  `preview:check` answers `current`: main re-derives the token from the
+  manifest and reads every stamped file from disk (`electron/previewCheck.ts`;
+  never the watcher; a path outside the project is missing, a file past
+  `sourceBytesMax` changed). The page is judged again after main answers. A
+  refusal is a notice naming the reason, never a silent drop. Hover is a
+  picture, not a selection: it needs (1) only.
+- *Markers stay in memory.* The generated plugin's `load` hook now calls
+  `electron/previewMarkers.ts`, which reads project files and returns strings;
+  nothing imports it (the dev server requires it by path, unpacked beside the
+  archive) and only it calls the marked serializers. The morph client gathers
+  each new rendering's stamps at the document's end, so no stamp outlives the
+  rendering it named.
+- *Tests* (`test/contracts/preview-bridge.test.ts`): the real generated config,
+  imported as Astro would, over a temporary project; every project byte
+  compared before and after, and no project file holds a marker. Stale-token
+  rejection both ways, through the real handler: a component edit makes the
+  page's rendering `file-changed` with the page's bytes unchanged; an unrelated
+  page's edit leaves it `current`. Plus forged tokens, forged paths, missing
+  files, the parsers' negative space, and the fence.
+
+**The capped patch** (`a625992`). The canvas still morphs from the difference
+between the server's previous and new renderings — the projection of a
+rendering is its marker-delimited nodes, and this is the diff of two of them.
+Nothing bounded it: each child list builds an LCS matrix of its lengths. Two
+caps, both in `LIMITS`, handed to the patcher at the bridge boundary (main
+prepends `AVB_PREVIEW_LIMITS` to the source it serves; the patcher declares it
+and defines no numbers): `previewMarkersMax` (20 000) node markers per
+rendering, and `previewMorphWorkMax` (4·10⁶ matrix cells, 16 MB) per patch,
+drawn before a matrix is allocated. Past either, the page reloads and first
+posts `avb:preview-reload` with its reason; the app shows the cap reasons, and
+the reloads a patch never could avoid (a changed script, a failed patch) stay
+quiet, as before. `test/morph.js` pins both edges with a shrunken patcher and
+checks the served source carries the `LIMITS` values.
+
+Deviations, with reasons:
+- The morph diff is between two renderings, not between two engine
+  projections of the source. The engine's projection diff would count source
+  nodes, but what the patch spends is DOM work; a second, engine-side bound
+  would duplicate the one that measures the actual cost.
+- Markdown and MDX pages carry no stamp (their markers come from a Markdown
+  processor plugin, not the `.astro` load hook): the open-file check is skipped
+  for them until step 10; their layouts' stamps are still checked on disk.
+- A file the plugin cannot parse renders unmarked, with no stamp and no
+  addressable node, so no event can name a node inside it; its changes do not
+  make the rendering stale.
+- Stylesheets, content and config carry no stamp: they change no index path,
+  and events address nodes only by path. A content change that alters how many
+  copies a loop renders changes only which copy is outlined.
+
+Left open, carried:
+- The moved-node case (open question, "Morph move-blindness"), confirmed: a
+  move patches without a reload, the page ends up exactly as the new rendering,
+  the siblings that stayed are the same live elements, and the moved element is
+  rebuilt — its client state is not carried. Carrying it would need the
+  engine's move to reach the patcher; not built.
+- Placement beside a repeated node (insert, duplicate, remove) is refused and
+  falls back to the whole-page save; a fragment-wrapping insert would lift it.
 
 ### Step 8 — Code editor on the actor ⬜
 
@@ -1545,7 +1671,11 @@ snapshot bytes. Step 6 added `undoEntriesMax` (100, the history bound, a
 literal in `App.tsx` before), `commitLogEntriesMax` (16, commits the host
 remembers per actor for exact rebases), `authoredSnapshotsMax` (16) and
 `authoredBytesRetainedMax` (16 MB) (earlier snapshots per actor, so an edit
-authored before an outside write can still be mapped).
+authored before an outside write can still be mapped). Step 7 added
+`previewManifestFilesMax` (512, files one canvas rendering's manifest names),
+`previewStampPathCharsMax` (1 024) and `previewMorphWorkMax` (4·10⁶ matrix
+cells one canvas patch may spend); `previewMarkersMax` (step 1) now bounds the
+stamps a frame reads and the markers a patched rendering may carry.
 
 ## Adapter surface (ratchet, scripted at step 1)
 
@@ -1561,6 +1691,7 @@ authored before an outside write can still be mapped).
 | Step 6, move `c07db4c` | 53 | 3 | 21 | 4 | 23 |
 | Step 6, inline CSS `d49b426` | 53 | 3 | 21 | 4 | 23 |
 | Step 6, frontmatter `6da4741` | 48 | 2 | 15 | 4 | 23 |
+| Step 7 `a625992` (no gesture moved) | 48 | 2 | 15 | 4 | 23 |
 
 Mutations: direct node-mutation sites in `src/`; prop-index: prop-index writes;
 `applyEdit(`: the style panel's; replace-source: submission sites in
@@ -1619,11 +1750,12 @@ consolidated plan:
   batches (Step 6, "Undo on the engine").
 - **Keystroke → disk threshold** — resolved 2026-09-28: split into engine
   (≤ 50 ms) and last keystroke → disk (≤ 350 ms); see Thresholds.
-- **Morph move-blindness** — partially addressed: morph-without-reload from
-  a projection diff capped by a limit, honest reload past the cap (§9).
-  Confirm the moved-node case at steps 6–7. Step 6 ships moves as relocated
-  bytes; the canvas still morphs from the re-rendered page, so the check
-  moves to step 7.
+- **Morph move-blindness** — confirmed at step 7 (2026-09-29): the patch is
+  capped with an honest reload past the cap (§9), and a moved node patches
+  without a reload into exactly the new rendering, its unmoved siblings the
+  same live elements; the moved element itself is rebuilt, so its client state
+  is lost. Carrying it would need the engine's move to reach the patcher — not
+  built, no user report asks for it. `test/morph.js` pins the behaviour.
 - **`component:editProperties`** — resolved 2026-09-28: hardened batch
   (checked rollback and `write-race` at step 0; actors in sorted path order
   at step 5; inverse batch at step 6). Best-effort rollback goes in product
@@ -1851,6 +1983,36 @@ update on every step):
     hits a copy while the edit's own bytes survive elsewhere (Step 6).
   - Formatting: new modules through Prettier 3.9.9 (npx cache, as step 2);
     every added line ≤ 100 columns.
+
+- 2026-09-29, step 7 (PROMPT-7), `2fa3f0f`..HEAD on top of `5af4177`:
+  - Baseline at `5af4177` before any change: `env -u ELECTRON_RUN_AS_NODE npm
+    test` 155/155 in 230.3 s.
+  - Commits: `2fa3f0f` (capabilities; repeated nodes edit their source),
+    `3af4dbd` (stamps, token, `preview:check`, the gate), `a625992` (capped
+    patch, honest reload), `28bb8bb` (suites that load the patcher or drive the
+    canvas), then this record.
+  - The first gate run on `a625992` failed four commands (151/155): three
+    suites lifted or bundled the patcher without the bounds main now prepends,
+    one pinned the plugin's old load line, and two app suites sent canvas
+    events without a token (`28bb8bb` says how each was fixed). Second run:
+    **155/155 test commands in 204.8 s, exit 0** — tsc, eslint 0 errors (115
+    warnings, the baseline's count, after `28bb8bb` pulled `startOutlines` back
+    under 70 lines), `ratchet-check` 0, `adapter-surface` 48 / 2 / 15 / 4 / 23.
+    Final run on `28bb8bb` plus this record: **155/155 in 220.0 s, exit 0**,
+    115 warnings.
+  - Suites: `test:contracts` 232/232 (with `preview-bridge.test.ts`, 8 tests:
+    the real generated config over a temporary project, stale-token rejection
+    both ways through the real handler); `test:simulator` 82/82;
+    `test:roundtrip` 482/482 (with `node-capability`, `preview-gate`,
+    `preview-token-frame`, and `gesture-parity`: 4 207 gestures, all the same
+    page, 2 083 byte-identical); `test:morph` 61 checks (the caps, stamp sync,
+    the moved node).
+  - Long run: `STACKI_SIMULATOR_SEEDS=2000 node --test
+    test/simulator/simulator.test.ts` — green in 14 min 51 s, 2/2 tests,
+    exit 0.
+  - Formatting: new modules through Prettier (`--print-width 100
+    --single-quote`, which every file this step touched and that was clean
+    before still passes); every added line ≤ 100 columns.
 
 ## How to work this tracker
 

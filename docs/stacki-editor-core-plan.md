@@ -559,6 +559,14 @@ Ratchet counts only decrease.
    renames, paste) keep the whole-model save until their operations exist.
 7. **Capabilities and preview bridge.** Visible read-only fallbacks, preview token, stale-token
    rejection, capped morph.
+   **Landed 2026-09-29** (tracker, Step 7). Decided there: a node a loop repeats is addressed as
+   its one source node and accepts visual intents (an edit changes every copy; nothing is placed
+   beside it); a stale intent whose node changed capability is refused. The token is the SHA-256
+   of the sorted manifest of per-file stamps — each marked file's checksum, emitted by its own
+   compiled module, so a component edit restamps the rendering; main checks every stamp against
+   the disk before a click selects. The patch is capped by `previewMarkersMax` and
+   `previewMorphWorkMax`, handed to the patcher at the bridge boundary, and past either reloads
+   with its reason. Adapter surface unchanged at 48 / 2 / 15 / 4 / 23.
 8. **Code editor on the actor.** Diff-based patches, `parse-error` projections,
    `merge-conflict` surfacing.
 9. **Deletion.** Compat adapter, `shared/editor-model.ts`, the `WeakMap` acks in
