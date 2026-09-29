@@ -45,7 +45,10 @@ export type StyleDeclaration =
  * tags), `rename-attribute` (one attribute's name, in place) and
  * `rewrite-node` (hunks inside one node the node's own bytes witness, for an
  * edit the printer states as the node's new text — a note reworded, a text
- * set, a branch added). None of them ever writes outside its node. */
+ * set, a branch added). None of them ever writes outside its node. And
+ * `wrap-nodes`, a run of siblings put inside a new tag (a layout picked for a
+ * page without one): its opening before the first, its closing after the
+ * last, every byte of the run kept. */
 export type Operation =
   | { readonly tag: 'set-attribute'; readonly name: string; readonly value: AttributeValue }
   | { readonly tag: 'remove-attribute'; readonly name: string }
@@ -69,6 +72,12 @@ export type Operation =
   | { readonly tag: 'rename-tag'; readonly from: string; readonly to: string }
   | { readonly tag: 'rename-attribute'; readonly from: string; readonly to: string }
   | { readonly tag: 'rewrite-node'; readonly hunks: readonly SourceEdit[] }
+  | {
+      readonly tag: 'wrap-nodes';
+      readonly last: AnchorRef;
+      readonly open: string;
+      readonly close: string;
+    }
   | { readonly tag: 'replace-source'; readonly text: string };
 
 export type OperationTag = Operation['tag'];
@@ -195,6 +204,8 @@ function operationTexts(operation: Operation): readonly string[] {
     case 'edit-frontmatter-slot':
     case 'replace-source':
       return [operation.text];
+    case 'wrap-nodes':
+      return [operation.open, operation.close];
     default: {
       const exhaustive: never = operation;
       return exhaustive;
@@ -244,6 +255,10 @@ function checkOperationAnchor(operation: Operation, anchor: AnchorRef): void {
     case 'move-node':
       requireKind(operation.tag, isNodeKind(kind));
       requireKind(operation.tag, isNodeKind(operation.destination.expectedKind));
+      return;
+    case 'wrap-nodes':
+      requireKind(operation.tag, isNodeKind(kind));
+      requireKind(operation.tag, isNodeKind(operation.last.expectedKind));
       return;
     case 'rename-binding':
       requireKind(operation.tag, kind === 'map');
@@ -384,6 +399,13 @@ function parseOperation(input: unknown): Operation {
         tag,
         from: tagName(record['from'], 'Operation.from'),
         to: tagName(record['to'], 'Operation.to'),
+      };
+    case 'wrap-nodes':
+      return {
+        tag,
+        last: parseAnchorRef(record['last'], 'Operation.last'),
+        open: payloadText(record['open'], 'Operation.open'),
+        close: payloadText(record['close'], 'Operation.close'),
       };
     case 'rename-attribute': {
       const from = attributeName(record['from'], 'Operation.from');

@@ -25,7 +25,6 @@ import { liveClassesById as classesByNodeId, rendersOwnElement } from './liveCla
 import { setSoundEnabled } from './ui/sound.js';
 import { createPreviewWatch } from './previewRecovery.js';
 import { tellCanvas } from './canvasQuery.js';
-import { renameAttr } from './attrOrder.js';
 import { parsePageSource as parseSourcePage, readPage, readSymbol, scanProject } from './bridge';
 import { checkoutGitBranch, readGitInfo } from './gitChipBridge';
 import { LIMITS } from '../shared/limits';
@@ -74,15 +73,23 @@ import {
 } from './pageEdits';
 import { describeRejection, type RejectionReason } from '../shared/intent';
 import {
+  type InsertPlace,
+  attributeRenameGesture,
   duplicateGesture,
   frontmatterGesture,
   inlineStyleGesture,
   insertGesture,
   loopRenameGesture,
   moveGesture,
+  nodeGesture,
   propsGesture,
   removalGesture,
   sequence,
+  markdownGesture,
+  tagRenameGesture,
+  unwrapGesture,
+  withChildren,
+  wrapGesture,
 } from './editGestures';
 import { ok } from '../shared/result';
 import {
@@ -578,6 +585,98 @@ async function writeCode(
   }
 }
 
+type BranchNode = Extract<EditorNode, { readonly kind: 'branch' }>;
+
+/** A tag's new name and kind, and the attributes the new name does not keep. */
+interface TagChange {
+  readonly kind: 'element' | 'component';
+  readonly name: string;
+  readonly asset: boolean;
+  readonly dropped: readonly string[];
+}
+
+// A tag renamed (step 9): the attributes the new name does not keep removed
+// first — removals anchor on the node as authored, and a rename may change
+// its kind, which the next request's anchor would no longer match — then the
+// name, then the imports the new name needs and the old one leaves unused, all
+// one undo step. Void tags keep no children: `<img>` holds none.
+function tagChangeGesture(
+  model: EditorModel,
+  node: EditorNode,
+  change: TagChange,
+  imports: (model: EditorModel) => EditorModel,
+): EditGesture {
+  const options = { coalesceKey: null, urgency: true };
+  const patch = Object.fromEntries(change.dropped.map((attr) => [attr, undefined]));
+  const removal = propsGesture(node.id, patch, options);
+  const kept = change.dropped.length > 0 ? removal.apply(model) : model;
+  const before = findNodeById(kept.nodes, node.id);
+  assert(before !== null, 'The renamed node survives its attribute removals');
+  const children = VOID_TAGS.has(change.name) ? null : before.children ?? null;
+  // A fresh copy, so taking the old tag's flags off it edits nothing shown.
+  const next: EditorNode = Object.assign({}, before, {
+    kind: change.kind,
+    name: change.name,
+    children,
+  });
+  Reflect.deleteProperty(next, 'dynamicTag');
+  Reflect.deleteProperty(next, 'astroAsset');
+  if (change.asset) {Object.assign(next, { astroAsset: true });}
+  const rename = tagRenameGesture(node, next, options);
+  const renamed = rename.apply(kept);
+  const named = change.dropped.length > 0 ? sequence(removal, rename) : rename;
+  if (frontmatterOf(imports(renamed)) === frontmatterOf(renamed)) {return named;}
+  return sequence(named, frontmatterGesture(renamed, imports, options));
+}
+
+// The node as a text field states it (step 9): a loop's head — the renames
+// followed below it, and loops reading an item whose data changed disconnected
+// — a condition's test, a style or script body, or the value of a text, an
+// expression or a note. A new node; the shown one is left as it was, and the
+// loop helpers edit a private copy of the loop only.
+function restatedText(
+  node: EditorNode,
+  value: string,
+  renames: readonly Rename[] | undefined,
+): EditorNode | undefined {
+  switch (node.kind) {
+    case 'map': {
+      const loop: EditorNode = structuredClone(node);
+      const children = loop.children ?? [];
+      for (const { from, to } of renames || []) {
+        if (from && to && from !== to) {renameLoopVar(children, from, to);}
+      }
+      // Renames above already re-pointed the children, so compare the data
+      // sources and orphan-proof what reads from this item.
+      const before = parseLoopHead(node.head);
+      const after = parseLoopHead(value);
+      if (before && after && before.data !== after.data) {
+        const vars = [after.item, after.index].filter(Boolean);
+        if (vars.length) {disconnectDependentLoops(children, vars);}
+      }
+      return { ...loop, head: value };
+    }
+    case 'cond':
+      return { ...node, test: value };
+    case 'raw':
+      return { ...node, inner: value };
+    case 'text':
+    case 'expr':
+    case 'comment':
+      return { ...node, value };
+    case 'element':
+    case 'component':
+    case 'branch':
+    case 'raw-line':
+    case 'chunk-group':
+      return undefined; // No text field states these.
+    default: {
+      const exhaustive: never = node;
+      return exhaustive;
+    }
+  }
+}
+
 function saveDelay(urgency: boolean | 'live'): number {
   if (urgency === true) {
     return 0;
@@ -627,7 +726,7 @@ function prunableImport(i: ImportDecl): boolean {
   );
 }
 
-function pruneImports(model: EditorModel): void {
+function withPrunedImports(model: EditorModel): EditorModel {
   const used = collectUsedNames(model);
   // A name can be referenced as code rather than as a tag — inside a
   // `<Fragment set:html>` chunk, a frontmatter const, a prop expression. The
@@ -637,9 +736,10 @@ function pruneImports(model: EditorModel): void {
   const code = codeText(model);
   const mentioned = (name: string): boolean =>
     new RegExp(`\\b${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`).test(code);
-  model.imports = model.imports.filter(
+  const imports = model.imports.filter(
     (i) => !prunableImport(i) || used.has(i.name) || mentioned(i.name)
   );
+  return imports.length === model.imports.length ? model : { ...model, imports };
 }
 
 // Chooses an import path matching the page's existing style: if it already
@@ -1952,30 +2052,6 @@ export default function App() {
     scheduleSave(true);
   }, [scheduleSave, editDrafts]);
 
-  const mutateModel = useCallback(
-    (
-      fn: (model: EditorModel) => EditorModel,
-      immediate: boolean | 'live' = false,
-      coalesceKey: string | null = null,
-    ) => {
-      if (propertySave.saving.current) { return; }
-      if (!pageStateRef.current.pageState?.editable || typedCodeUnparsed()) { return; }
-      codeEditVersionRef.current += 1
-      pushHistory(coalesceKey);
-      // A gesture without an intent form yet: the whole model is saved, and
-      // carries every unsaved request with it, until the page is clean.
-      const path = pageStateRef.current.currentPage?.path;
-      if (path) {editDrafts.markModel(path);}
-      setPageState((s) => {
-        if (!s || !s.editable) {return s;}
-        const model = fn(cloneEditorModel(s.model));
-        return { ...s, model, save: saveStateEdited(s.save) };
-      });
-      scheduleSave(immediate);
-    },
-    [scheduleSave, pushHistory, propertySave.saving, editDrafts, typedCodeUnparsed]
-  );
-
   // A gesture in its intent form (step 6, editGestures.ts): it goes to disk as
   // edit requests against the page's origin, and its effect shows at once.
   // Where a request cannot be stated — no origin (typed code, a restored
@@ -2332,24 +2408,39 @@ export default function App() {
       }
       const paths = await findImportPath(projectPath, page.path, created.path);
       const id = newId();
-      mutateModel((m) => {
-        const found = findParentList(m, node.id);
-        if (!found) {return m;}
-        if (!m.imports.some((i) => i.name === name)) {
-          m.imports.push({ name, path: chooseImportPath(m, paths), quote: "'" });
-        }
-        // The instance passes each value straight back in under its own name.
-        // That's what reconnects it: `title` meant the page's title where this
-        // markup used to sit, and it still does, one level out.
-        found.list[found.index] = {
-          id,
-          kind: 'component',
-          name,
-          props: Object.fromEntries(props.map((p) => [p, { type: 'expr', value: p }])),
-          children: null,
-        };
-        return m;
-      }, true);
+      // Step 9: the instance goes in before the markup, the markup comes out,
+      // and the import follows — one undo step, the markup's bytes moved to
+      // the new file rather than reprinted in the page.
+      const now = pageStateRef.current.pageState;
+      const shown = now?.editable ? now.model : null;
+      const found = shown ? findWithParent(shown.nodes, node.id) : null;
+      if (!shown || !found) {return;}
+      // The instance passes each value straight back in under its own name.
+      // That's what reconnects it: `title` meant the page's title where this
+      // markup used to sit, and it still does, one level out.
+      const instance: EditorNode = {
+        id,
+        kind: 'component',
+        name,
+        props: Object.fromEntries(props.map((p) => [p, { type: 'expr', value: p }])),
+        children: null,
+      };
+      const urgent = { coalesceKey: null, urgency: true };
+      const place = { parentId: found.parent?.id ?? null, index: found.index };
+      const replaced = sequence(
+        insertGesture(shown, instance, place, urgent),
+        removalGesture([node.id], urgent),
+      );
+      const after = replaced.apply(shown);
+      const imports = (m: EditorModel): EditorModel =>
+        m.imports.some((i) => i.name === name)
+          ? m
+          : { ...m, imports: [...m.imports, { name, path: chooseImportPath(m, paths), quote: "'" }] };
+      commitEdit(
+        frontmatterOf(imports(after)) === frontmatterOf(after)
+          ? replaced
+          : sequence(replaced, frontmatterGesture(after, imports, urgent)),
+      );
       setSelectedId(id);
       await rescan(projectPath);
       // Anything left reading the page's scope can't be reconnected on its own
@@ -2364,7 +2455,7 @@ export default function App() {
             : `Created ${created.rel}`
       );
     },
-    [mutateModel, propsNeededFor, rescan, showToast]
+    [commitEdit, propsNeededFor, rescan, showToast]
   );
 
   // Step 6, move: the node's own bytes are relocated, its note with it; a
@@ -2601,60 +2692,55 @@ export default function App() {
       }
       return false;
     };
-    mutateModel((model) => {
+    // Step 9: the imports and declarations it needs, then the node itself —
+    // one undo step. The model is the one shown now: the lookups above
+    // awaited, and edits made meanwhile are part of it.
+    const now = pageStateRef.current.pageState;
+    if (!now?.editable) {return;}
+    const shown = now.model;
+    const imported = (model: EditorModel): EditorModel => {
+      let imports = model.imports;
       for (const r of resolved) {
-        if (!model.imports.some((i) => i.name === r.name)) {
-          model.imports.push({
-            name: r.name,
-            path: chooseImportPath(model, r.paths),
-            quote: "'",
-          });
+        if (!imports.some((i) => i.name === r.name)) {
+          imports = [...imports, { name: r.name, path: chooseImportPath(model, r.paths), quote: "'" }];
         }
       }
       for (const imp of carriedImports) {
-        if (!model.imports.some((i) => i.name === imp.name)) {
-          model.imports.push(imp);
-        }
+        if (!imports.some((i) => i.name === imp.name)) {imports = [...imports, imp];}
       }
-      if (carried.statements.length) {
-        model.extraFrontmatter = withStatements(model.extraFrontmatter, carried.statements);
-      }
-      if (selId) {
-        const sel = findNodeById(model.nodes, selId);
-        if (sel && acceptsChildren(sel)) {
-          if (!Array.isArray(sel.children)) {
-            sel.children = [];
-          }
-          sel.children.push(clone);
-          return model;
-        }
-        const found = findParentList(model, selId);
-        if (found) {
-          found.list.splice(found.index + 1, 0, clone);
-          return model;
-        }
-      }
-      model.nodes.push(clone);
-      return model;
-    }, true);
-
+      const extraFrontmatter = carried.statements.length
+        ? withStatements(model.extraFrontmatter, carried.statements)
+        : model.extraFrontmatter;
+      return { ...model, imports, extraFrontmatter };
+    };
+    const withImports = imported(shown);
+    const sel = selId ? findNodeById(withImports.nodes, selId) : null;
+    const found = selId ? findWithParent(withImports.nodes, selId) : null;
+    const place: InsertPlace =
+      sel && acceptsChildren(sel)
+        ? { parentId: sel.id, index: Array.isArray(sel.children) ? sel.children.length : 0 }
+        : found
+          ? { parentId: found.parent?.id ?? null, index: found.index + 1 }
+          : { parentId: null, index: withImports.nodes.length };
     // Pasted outside the loop it was copied from? Its bindings would throw.
-    mutateModel((model) => {
-      const landed = findNodeById(model.nodes, clone.id);
-      if (!landed) {
-        return model;
-      }
-      const inScope = loopVarsAt(model.nodes, clone.id);
-      const lost = (clip.vars || []).filter((v) => !inScope.includes(v));
-      const removed = stripLostBindings(landed, lost);
-      if (removed) {
-        showToast(
-          `Removed ${removed} binding${removed === 1 ? '' : 's'} that referenced ${lost.join(', ')}.`,
-          'info'
-        );
-      }
-      return model;
-    }, true);
+    const landed = insertGesture(withImports, clone, place, { urgency: true }).apply(withImports);
+    const inScope = loopVarsAt(landed.nodes, clone.id);
+    const lost = (clip.vars || []).filter((v) => !inScope.includes(v));
+    const pasted: EditorNode = lost.length ? structuredClone(clone) : clone;
+    const removed = lost.length ? stripLostBindings(pasted, lost) : 0;
+    if (removed) {
+      showToast(
+        `Removed ${removed} binding${removed === 1 ? '' : 's'} that referenced ${lost.join(', ')}.`,
+        'info'
+      );
+    }
+    const insert = insertGesture(withImports, pasted, place, { urgency: true });
+    const options = { coalesceKey: null, urgency: true };
+    commitEdit(
+      frontmatterOf(withImports) === frontmatterOf(shown)
+        ? insert
+        : sequence(frontmatterGesture(shown, imported, options), insert),
+    );
     setSelectedId(clone.id);
     const brought = [
       ...carriedImports.map((i) => i.name),
@@ -2666,7 +2752,7 @@ export default function App() {
         'info'
       );
     }
-  }, [mutateModel, insertables, resolveImportPath, showToast]);
+  }, [commitEdit, insertables, resolveImportPath, showToast]);
 
   // ----------------------------------------------------------------
   // Insert palette (⌘F / ⌘E) — quick-add components, tags, loops, …
@@ -2862,7 +2948,7 @@ export default function App() {
       commitEdit(insertGesture(state.model, node, target, { urgency: true }));
       setSelectedId(id);
     },
-    [insertTargetFor, addComponent, mutateModel, commitEdit]
+    [insertTargetFor, addComponent, commitEdit]
   );
 
   // True while the CMS covers the canvas: the page-editing shortcuts below
@@ -3372,18 +3458,13 @@ export default function App() {
         commitEdit(insertGesture(state.model, note, place, { urgency: false }));
         return;
       }
-      // Rewording a note has no intent form yet: its text is a node value.
-      mutateModel(
-        (model) => {
-          const landed = findNodeById(model.nodes, existing.id);
-          if (landed) {landed.value = value;}
-          return model;
-        },
-        false,
-        `comment:${nodeId}`
-      );
+      // Step 9, rewording: the note restated, its new words placed on its bytes.
+      const note = findNodeById(state.model.nodes, existing.id);
+      if (note?.kind !== 'comment') {return;}
+      const options = { coalesceKey: `comment:${nodeId}`, urgency: false };
+      commitEdit(nodeGesture(note.id, { ...note, value }, options));
     },
-    [mutateModel, commitEdit]
+    [commitEdit]
   );
 
   // Typing a bare class in the style panel's selector box puts it on the
@@ -3510,9 +3591,7 @@ export default function App() {
         const imports = added ? [...current.imports, entry] : current.imports;
         // Picking a second image over a first leaves the first one's import
         // behind with nothing pointing at it.
-        const next = cloneEditorModel({ ...current, imports });
-        pruneImports(next);
-        return next;
+        return withPrunedImports({ ...current, imports });
       };
       const afterProp = prop.apply(model);
       const changed = frontmatterOf(imported(afterProp)) !== frontmatterOf(afterProp);
@@ -3521,16 +3600,17 @@ export default function App() {
     [commitEdit, setProp]
   );
 
-  // Renames an attribute in place, preserving its value and position.
+  // Renames an attribute in place, preserving its value and position (step 9:
+  // a rename-attribute request, the name's bytes alone).
   const renameProp = useCallback(
     (nodeId: string, oldName: string, newName: string) => {
-      mutateModel((model) => {
-        const node = findNodeById(model.nodes, nodeId);
-        renameAttr(node, oldName, newName);
-        return model;
-      }, true);
+      const state = pageStateRef.current.pageState;
+      if (!state?.editable) {return;}
+      const names = { from: oldName, to: newName };
+      const gesture = attributeRenameGesture(state.model, nodeId, names);
+      if (gesture) {commitEdit(gesture);}
     },
-    [mutateModel]
+    [commitEdit]
   );
 
   // Switches a plain element's tag. Attributes that belonged to the old
@@ -3553,87 +3633,61 @@ export default function App() {
       const asset = ASTRO_ASSETS.some((a) => a.name === name);
       if (!already && !comp && !asset) {return false;} // nothing provides it
       const paths = comp && !already ? await resolveImportPath(comp.path) : null;
-      mutateModel((model) => {
-        const node = findNodeById(model.nodes, nodeId);
-        if (!node || node.name === name) {return model;}
-        if (!model.imports.some((i) => i.name === name)) {
-          if (paths) {
-            model.imports.push({ name, path: chooseImportPath(model, paths), quote: "'" });
-          }
-          else if (asset) {
-            model.imports.push({
-              name,
-              imported: name,
-              path: ASTRO_ASSETS_MODULE,
-              quote: "'",
-              named: true,
-            });
-          }
-        }
-        // Attributes that belonged to the old element's tag mean nothing to a
-        // component; class, data- and aria- carry over the way they do for a
-        // tag change.
-        if (node.kind === 'element') {
-          const oldNames = new Set(getElementSchema(node.name).map((f) => f.name));
-          for (const attr of Object.keys(node.props || {})) {
-            if (oldNames.has(attr) && !GLOBAL_ATTRS.has(attr) && !/^(data-|aria-)/.test(attr)) {
-              delete node.props?.[attr];
-            }
-          }
-        }
-        node.kind = 'component';
-        node.name = name;
-        delete node.dynamicTag;
-        if (asset) {node.astroAsset = true;}
-        else {delete node.astroAsset;}
-        if (node.children === null) {node.children = [];}
-        pruneImports(model);
-        return model;
-      }, true);
+      const current = pageStateRef.current.pageState;
+      const model = current?.editable ? current.model : null;
+      const node = model ? findNodeById(model.nodes, nodeId) : null;
+      if (!model || !node) {return false;}
+      if (node.name === name) {return true;}
+      // Attributes that belonged to the old element's tag mean nothing to a
+      // component; class, data- and aria- carry over the way they do for a
+      // tag change.
+      const oldNames =
+        node.kind === 'element' ? new Set(getElementSchema(node.name).map((f) => f.name)) : null;
+      const dropped = Object.keys(node.props || {}).filter(
+        (attr) => oldNames?.has(attr) && !GLOBAL_ATTRS.has(attr) && !/^(data-|aria-)/.test(attr),
+      );
+      const imported = (m: EditorModel): EditorModel => {
+        if (m.imports.some((i) => i.name === name)) {return withPrunedImports(m);}
+        const entry = paths
+          ? { name, path: chooseImportPath(m, paths), quote: "'" }
+          : asset
+            ? { name, imported: name, path: ASTRO_ASSETS_MODULE, quote: "'", named: true }
+            : null;
+        return withPrunedImports(entry ? { ...m, imports: [...m.imports, entry] } : m);
+      };
+      commitEdit(tagChangeGesture(model, node, { kind: 'component', name, asset, dropped }, imported));
       return true;
     },
-    [insertables, mutateModel, resolveImportPath]
+    [insertables, commitEdit, resolveImportPath]
   );
 
   const changeElementTag = useCallback(
     (nodeId: string, newTag: string) => {
       const tag = String(newTag || '').trim().toLowerCase();
       if (!/^[a-z][a-z0-9-]*$/.test(tag)) {return;}
-      mutateModel((model) => {
-        const node = findNodeById(model.nodes, nodeId);
-        if (!node || node.name === tag) {return model;}
-        // A component becoming a plain tag keeps only what a tag understands:
-        // its props were the component's API, and they'd serialize as junk
-        // attributes on a <div>.
-        const wasComponent = node.kind !== 'element';
-        const oldNames = wasComponent
-          ? new Set(Object.keys(node.props || {}))
-          : new Set(getElementSchema(node.name).map((f) => f.name));
-        if (wasComponent) {
-          node.kind = 'element';
-          delete node.astroAsset;
-          delete node.dynamicTag;
-        }
-        const newNames = new Set(getElementSchema(tag).map((f) => f.name));
-        for (const attr of Object.keys(node.props || {})) {
-          if (
-            oldNames.has(attr) &&
-            !newNames.has(attr) &&
-            !GLOBAL_ATTRS.has(attr) &&
-            !/^(data-|aria-)/.test(attr)
-          ) {
-            delete node.props?.[attr];
-          }
-        }
-        node.name = tag;
-        // Void elements can't have children; paired tags serialize as a pair.
-        if (VOID_TAGS.has(tag)) {node.children = null;}
-        else if (node.children === null) {node.children = [];}
-        pruneImports(model);
-        return model;
-      }, true);
+      const state = pageStateRef.current.pageState;
+      const model = state?.editable ? state.model : null;
+      const node = model ? findNodeById(model.nodes, nodeId) : null;
+      if (!model || !node || node.name === tag) {return;}
+      // A component becoming a plain tag keeps only what a tag understands:
+      // its props were the component's API, and they'd be junk attributes on
+      // a <div>.
+      const wasComponent = node.kind !== 'element';
+      const oldNames = wasComponent
+        ? new Set(Object.keys(node.props || {}))
+        : new Set(getElementSchema(node.name).map((f) => f.name));
+      const newNames = new Set(getElementSchema(tag).map((f) => f.name));
+      const dropped = Object.keys(node.props || {}).filter(
+        (attr) =>
+          oldNames.has(attr) &&
+          !newNames.has(attr) &&
+          !GLOBAL_ATTRS.has(attr) &&
+          !/^(data-|aria-)/.test(attr),
+      );
+      const change = { kind: 'element' as const, name: tag, asset: false, dropped };
+      commitEdit(tagChangeGesture(model, node, change, withPrunedImports));
     },
-    [mutateModel]
+    [commitEdit]
   );
 
   // `renames` (loop editor only) carries the variable names this edit is
@@ -3665,36 +3719,14 @@ export default function App() {
           return;
         }
       }
-      mutateModel(
-        (model) => {
-          const node = findNodeById(model.nodes, nodeId);
-          if (!node) {return model;}
-          if (node.kind === 'map') {
-            const prev = parseLoopHead(node.head);
-            node.head = value;
-            for (const { from, to } of renames || []) {
-              if (from && to && from !== to) {renameLoopVar(node.children || [], from, to);}
-            }
-            // Renames above already re-pointed the children, so compare the
-            // data sources and orphan-proof what reads from this item.
-            const next = parseLoopHead(value);
-            if (prev && next && prev.data !== next.data) {
-              const vars = [next.item, next.index].filter(Boolean);
-              if (vars.length) {disconnectDependentLoops(node.children || [], vars);}
-            }
-          } else if (node.kind === 'cond') {
-            node.test = value;
-          } else if (node.kind === 'raw') {node.inner = value;}
-          else if (node.kind === 'text' || node.kind === 'expr' || node.kind === 'comment') {
-            node.value = value;
-          }
-          return model;
-        },
-        renaming || immediate,
-        renaming ? undefined : `text:${nodeId}`
-      );
+      // Step 9: everything else the field says is the node restated.
+      const node = state?.editable ? findNodeById(state.model.nodes, nodeId) : null;
+      const next = node ? restatedText(node, value, renames) : undefined;
+      if (!next) {return;}
+      const coalesceKey = renaming ? null : `text:${nodeId}`;
+      commitEdit(nodeGesture(nodeId, next, { coalesceKey, urgency: renaming || immediate }));
     },
-    [mutateModel, commitEdit]
+    [commitEdit]
   );
 
   // The code editor and file writer share the same frontmatter model, so
@@ -3717,34 +3749,30 @@ export default function App() {
   // Adds or removes a condition's else branch. Removing keeps the markup that
   // was in it — it moves to the then branch rather than being deleted — so the
   // button can't quietly throw work away.
+  // Step 9: the condition restated with its branches.
   const toggleElseBranch = useCallback(
     (nodeId: string, want: boolean) => {
-      mutateModel(
-        (model) => {
-          const node = findNodeById(model.nodes, nodeId);
-          if (!node || node.kind !== 'cond') {return model;}
-          const kids = node.children || (node.children = []);
-          if (!kids[0]) {kids[0] = { id: newId(), kind: 'branch', name: 'then', children: [] };}
-          if (want && kids.length < 2) {
-            kids[1] = { id: newId(), kind: 'branch', name: 'else', children: [] };
-            node.op = '?';
-          } else if (!want && kids.length > 1) {
-            const elseBranch = kids[1];
-            const thenBranchNode = kids[0];
-            assert(elseBranch !== undefined, 'Else branch exists before removal');
-            assert(thenBranchNode !== undefined, 'Then branch exists before merging');
-            const rescued = elseBranch.children || [];
-            kids.length = 1;
-            thenBranchNode.children = [...(thenBranchNode.children || []), ...rescued];
-            node.op = '&&';
-          }
-          return model;
-        },
-        true,
-        undefined
-      );
+      const state = pageStateRef.current.pageState;
+      const node = state?.editable ? findNodeById(state.model.nodes, nodeId) : null;
+      if (!node || node.kind !== 'cond') {return;}
+      const kids = node.children;
+      const thenBranch: BranchNode =
+        kids[0] ?? { id: newId(), kind: 'branch', name: 'then', children: [] };
+      let next: EditorNode | undefined;
+      if (want && kids.length < 2) {
+        const elseBranch: BranchNode = { id: newId(), kind: 'branch', name: 'else', children: [] };
+        next = { ...node, op: '?', children: [thenBranch, elseBranch] };
+      } else if (!want && kids.length > 1) {
+        const elseBranch = kids[1];
+        assert(elseBranch !== undefined, 'Else branch exists before removal');
+        const rescued = elseBranch.children || [];
+        const merged = { ...thenBranch, children: [...(thenBranch.children || []), ...rescued] };
+        next = { ...node, op: '&&', children: [merged] };
+      }
+      if (!next) {return;}
+      commitEdit(nodeGesture(nodeId, next, { coalesceKey: null, urgency: true }));
     },
-    [mutateModel]
+    [commitEdit]
   );
 
   // Replaces the frontmatter's non-import code (its declarations), leaving the
@@ -3767,40 +3795,45 @@ export default function App() {
   // typing again restores its place rather than appending.
   const textSlotRef = useRef<Record<string, number>>({});
 
+  // Step 9: the text child restated, removed, or inserted where it last sat —
+  // or, for a tag with no children yet (`<Card />`), the tag restated with it.
   const setNodeContent = useCallback(
     (nodeId: string, value: string) => {
-      mutateModel(
-        (model) => {
-          const node = findNodeById(model.nodes, nodeId);
-          if (!node || node.kind === 'text') {return model;}
-          if (!Array.isArray(node.children)) {node.children = [];}
-          const at = node.children.findIndex((c) => c.kind === 'text');
-          // Emptying the field takes the text node out rather than leaving an
-          // empty one behind for the serializer to puzzle over — but where it
-          // sat is remembered, so clearing the field and typing again puts the
-          // words back among the children instead of after all of them.
-          if (at !== -1 && !value) {
-            textSlotRef.current[nodeId] = at;
-            node.children.splice(at, 1);
-          } else if (at !== -1) {
-            const textNode = node.children[at];
-            assert(textNode !== undefined, 'Text child index remains valid');
-            textNode.value = value;
-          } else if (value) {
-            const back = textSlotRef.current[nodeId];
-            const idx =
-              back !== undefined && Number.isInteger(back) && back <= node.children.length
-                ? back
-                : node.children.length;
-            node.children.splice(idx, 0, { id: newId(), kind: 'text', value });
-          }
-          return model;
-        },
-        false,
-        `content:${nodeId}`
-      );
+      const state = pageStateRef.current.pageState;
+      const model = state?.editable ? state.model : null;
+      const node = model ? findNodeById(model.nodes, nodeId) : null;
+      if (!model || !node || node.kind === 'text') {return;}
+      const options = { coalesceKey: `content:${nodeId}`, urgency: false };
+      const children = Array.isArray(node.children) ? node.children : null;
+      const at = children ? children.findIndex((c) => c.kind === 'text') : -1;
+      const textNode = children?.[at];
+      // Emptying the field takes the text node out rather than leaving an
+      // empty one behind — but where it sat is remembered, so clearing the
+      // field and typing again puts the words back among the children
+      // instead of after all of them.
+      if (textNode) {
+        if (value) {
+          commitEdit(nodeGesture(textNode.id, { ...textNode, value }, options));
+        } else {
+          textSlotRef.current[nodeId] = at;
+          commitEdit(removalGesture([textNode.id], { urgency: false }));
+        }
+        return;
+      }
+      if (!value) {return;}
+      const text: EditorNode = { id: newId(), kind: 'text', value };
+      if (!children) {
+        commitEdit(nodeGesture(nodeId, withChildren(node, [text]), options));
+        return;
+      }
+      const back = textSlotRef.current[nodeId];
+      const index =
+        back !== undefined && Number.isInteger(back) && back <= children.length
+          ? back
+          : children.length;
+      commitEdit(insertGesture(model, text, { parentId: nodeId, index }, { urgency: false }));
     },
-    [mutateModel]
+    [commitEdit]
   );
 
   // Replaces a node's inline children wholesale (rich Content field edits).
@@ -3825,18 +3858,14 @@ export default function App() {
             children: node.children === null ? null : withIds(node.children),
           };
         });
-      mutateModel(
-        (model) => {
-          const node = findNodeById(model.nodes, nodeId);
-          if (!node || node.kind === 'text') {return model;}
-          node.children = withIds(kids);
-          return model;
-        },
-        false,
-        `content:${nodeId}`
-      );
+      // Step 9: the node restated with its new inline children.
+      const state = pageStateRef.current.pageState;
+      const node = state?.editable ? findNodeById(state.model.nodes, nodeId) : null;
+      if (!node || node.kind === 'text') {return;}
+      const next = withChildren(node, withIds(kids));
+      commitEdit(nodeGesture(nodeId, next, { coalesceKey: `content:${nodeId}`, urgency: false }));
     },
-    [mutateModel]
+    [commitEdit]
   );
 
   // Set/replace/remove the `layout:` key in a markdown page's YAML
@@ -3875,26 +3904,30 @@ export default function App() {
         // configured `@/…`.
         const rel = layout ? (await resolveImportPath(layout.path)).relative : null;
         if (seq !== layoutSeq.current) {return;}
-        mutateModel((model) => {
-          model.extraFrontmatter = withLayoutField(model.extraFrontmatter, rel);
-          model.layoutPath = rel;
-          return model;
-        }, true);
+        const framed = (model: EditorModel): EditorModel => ({
+          ...model,
+          extraFrontmatter: withLayoutField(model.extraFrontmatter, rel),
+          layoutPath: rel,
+        });
+        commitEdit(markdownGesture(framed, { coalesceKey: null, urgency: true }));
         return;
       }
+      const state = pageStateRef.current.pageState;
+      const model = state?.editable ? state.model : null;
+      if (!model) {return;}
+      const options = { coalesceKey: null, urgency: true };
+      // The imports the wrapper change needs, and those it leaves unused, as
+      // the same undo step (step 9: a frontmatter slot).
+      const withImports = (gesture: EditGesture, imports: (m: EditorModel) => EditorModel) => {
+        const after = gesture.apply(model);
+        return frontmatterOf(imports(after)) === frontmatterOf(after)
+          ? gesture
+          : sequence(gesture, frontmatterGesture(after, imports, options));
+      };
+      const wrapper = findNodeById(model.nodes, 'layout');
       if (!layoutName) {
-        // Unwrap: replace the wrapper node with its children.
-        mutateModel((model) => {
-          const found = findParentList(model, 'layout');
-          if (found) {
-            const node = found.list[found.index];
-            assert(node !== undefined, 'Layout index identifies a node');
-            const kids = Array.isArray(node.children) ? node.children : [];
-            found.list.splice(found.index, 1, ...kids);
-          }
-          pruneImports(model);
-          return model;
-        }, true);
+        // Unwrap: the wrapper's tags go, its children stay where they are.
+        if (wrapper) {commitEdit(withImports(unwrapGesture('layout'), withPrunedImports));}
         setSelectedId((id) => (id === 'layout' ? null : id));
         return;
       }
@@ -3902,34 +3935,36 @@ export default function App() {
       if (!layout) {return;}
       const paths = await resolveImportPath(layout.path);
       if (seq !== layoutSeq.current) {return;} // superseded by a newer change
-      mutateModel((model) => {
-        const existing = findNodeById(model.nodes, 'layout');
-        if (existing) {
-          existing.name = layout.name;
-        } else {
-          // No wrapper yet — wrap the whole page in the new layout.
-          model.nodes = [
-            {
-              id: nodeId('layout'),
-              kind: 'component',
-              name: layout.name,
-              props: {},
-              children: model.nodes,
-            },
-          ];
-        }
-        if (!model.imports.some((i) => i.name === layout.name)) {
-          model.imports.push({
-            name: layout.name,
-            path: chooseImportPath(model, paths),
-            quote: "'",
-          });
-        }
-        pruneImports(model);
-        return model;
-      }, true);
+      const imports = (m: EditorModel): EditorModel =>
+        withPrunedImports(
+          m.imports.some((i) => i.name === layout.name)
+            ? m
+            : {
+                ...m,
+                imports: [
+                  ...m.imports,
+                  { name: layout.name, path: chooseImportPath(m, paths), quote: "'" },
+                ],
+              },
+        );
+      if (wrapper) {
+        if (wrapper.kind !== 'component' && wrapper.kind !== 'element') {return;}
+        if (wrapper.name === layout.name) {return;}
+        const renamed: EditorNode = { ...wrapper, name: layout.name };
+        commitEdit(withImports(tagRenameGesture(wrapper, renamed, options), imports));
+        return;
+      }
+      // No wrapper yet — wrap the whole page in the new layout.
+      const created: EditorNode = {
+        id: nodeId('layout'),
+        kind: 'component',
+        name: layout.name,
+        props: {},
+        children: [],
+      };
+      commitEdit(withImports(wrapGesture(model, created), imports));
     },
-    [scan.layouts, mutateModel, resolveImportPath]
+    [scan.layouts, commitEdit, resolveImportPath]
   );
 
   // ----------------------------------------------------------------
@@ -4115,23 +4150,27 @@ export default function App() {
     const existing = queriesInScope(fm).get(collection);
     if (existing) {return existing;}
     const name = autoQueryName(collection, namesInScope(fm, model?.imports));
-    mutateModel((m) => {
-      if (!m.imports.some((i) => i.name === 'getCollection' && i.path === 'astro:content')) {
-        m.imports.push({
-          name: 'getCollection',
-          imported: 'getCollection',
-          path: 'astro:content',
-          quote: "'",
-          named: true,
-        });
-      }
+    if (!model) {return name;}
+    // Step 9: the frontmatter gesture — the import and the query line, as the
+    // slot of the block that differs.
+    const queried = (m: EditorModel): EditorModel => {
+      const reads = m.imports.some((i) => i.name === 'getCollection' && i.path === 'astro:content');
+      const entry = {
+        name: 'getCollection',
+        imported: 'getCollection',
+        path: 'astro:content',
+        quote: "'",
+        named: true,
+      };
       const cur = m.extraFrontmatter || '';
       const gap = cur && !cur.endsWith('\n') ? '\n' : '';
-      // No trailing newline: the serializer ends the line, and one added here
+      // No trailing newline: the printer ends the line, and one added here
       // would be left behind as a blank line when the query is taken back.
-      m.extraFrontmatter = `${cur}${gap}const ${name} = await getCollection('${collection}'); // ${QUERY_MARK}`;
-      return m;
-    });
+      const query = `const ${name} = await getCollection('${collection}'); // ${QUERY_MARK}`;
+      const imports = reads ? m.imports : [...m.imports, entry];
+      return { ...m, imports, extraFrontmatter: `${cur}${gap}${query}` };
+    };
+    commitEdit(frontmatterGesture(model, queried, { coalesceKey: null, urgency: false }));
     return name;
   };
 
@@ -5852,13 +5891,11 @@ export default function App() {
 }
 
 // What a delete leaves unused: the imports and declarations only the removed
-// nodes were reading (the legacy removeNode's rule). The clone is this
-// function's own, so pruneImports edits nothing it was given.
+// nodes were reading (the legacy removeNode's rule). Pure: a new model.
 function prunedAfterRemoval(
   model: EditorModel,
 ): { readonly model: EditorModel; readonly dropped: readonly string[] } {
-  const next = cloneEditorModel(model);
-  pruneImports(next);
+  const next = withPrunedImports(model);
   // The code the deleted markup was the only reader of goes with it: a
   // `const jobs = […]` nothing lists any more is left behind otherwise, and a
   // page collects them one deletion at a time. Only what nothing else
@@ -5866,7 +5903,8 @@ function prunedAfterRemoval(
   // the page's own interface to Astro.
   const dead = unusedDeclarations(next).map((d) => d.name);
   if (dead.length) {
-    next.extraFrontmatter = withoutDeclarations(next.extraFrontmatter, dead);
+    const extraFrontmatter = withoutDeclarations(next.extraFrontmatter, dead);
+    return { model: { ...next, extraFrontmatter }, dropped: dead };
   }
   return { model: next, dropped: dead };
 }

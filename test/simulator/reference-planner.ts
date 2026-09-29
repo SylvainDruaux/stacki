@@ -73,6 +73,7 @@ export function planByIdentity(snapshot: Snapshot, intent: Intent): Result<Plan,
     case 'rename-tag':
     case 'rename-attribute':
     case 'rewrite-node':
+    case 'wrap-nodes':
       // Planned from step 6 (step 9 for the renames and rewrites) by the
       // shipping planner only; this reference stays
       // the step-1 identity planner for the operations it was written for.
@@ -101,6 +102,7 @@ function isVisual(tag: Intent['operation']['tag']): boolean {
     case 'rename-tag':
     case 'rename-attribute':
     case 'rewrite-node':
+    case 'wrap-nodes':
       return true;
     default: {
       const exhaustive: never = tag;
@@ -127,6 +129,7 @@ function staleReason(tag: Intent['operation']['tag']): RejectionReason {
     case 'rename-tag':
     case 'rename-attribute':
     case 'rewrite-node':
+    case 'wrap-nodes':
       return 'anchor-moved';
     default: {
       const exhaustive: never = tag;

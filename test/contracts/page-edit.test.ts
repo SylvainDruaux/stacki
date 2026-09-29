@@ -309,6 +309,40 @@ test('renames and node rewrites write only their bytes; inverses restore them', 
   assert.equal(fs.readFileSync(file, 'utf8'), '<img src="a" alt="b">\n');
 });
 
+test('a layout picked wraps the page; removed, its tags go and the page stays', async (context) => {
+  const harness = fixture();
+  context.after(harness.dispose);
+  const file = path.join(harness.root, 'src/pages/index.astro');
+  const body = '<main>\n  <p>m</p>\n</main>\n<footer>f</footer>\n';
+  fs.writeFileSync(file, body);
+  const page = await read(harness, file);
+  const wrapped = await edit(harness, file, page.checksum, {
+    tag: 'wrap-nodes',
+    target: refAt(page, [0]),
+    last: refAt(page, [1]),
+    name: 'Base',
+  });
+  assert.ok(wrapped.ok, 'the wrap applies');
+  const inside = '<Base>\n<main>\n  <p>m</p>\n</main>\n<footer>f</footer>\n</Base>\n';
+  assert.equal(fs.readFileSync(file, 'utf8'), inside);
+  const again = await read(harness, file);
+  const unwrapped = await edit(harness, file, again.checksum, {
+    tag: 'unwrap-node',
+    target: refAt(again, [0]),
+  });
+  assert.ok(unwrapped.ok, 'the unwrap applies');
+  assert.equal(fs.readFileSync(file, 'utf8'), body, 'the page is as it was');
+  // An indented wrapper whose closing tag shares a line with content keeps it.
+  fs.writeFileSync(file, '<Base title="x">\n  <p>a</p></Base>\n');
+  const inline = await read(harness, file);
+  const kept = await edit(harness, file, inline.checksum, {
+    tag: 'unwrap-node',
+    target: refAt(inline, [0]),
+  });
+  assert.ok(kept.ok, 'the unwrap applies');
+  assert.equal(fs.readFileSync(file, 'utf8'), '  <p>a</p>\n');
+});
+
 test("an edit authored before the app's own last edit is rebased exactly", async (context) => {
   const harness = fixture();
   context.after(harness.dispose);

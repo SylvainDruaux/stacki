@@ -40,13 +40,14 @@ try {
   clearDrag();
   assert.equal(getDrag(), null);
 
-  const { renameAttr } = load('attrOrder');
+  const { renamedAttr } = load('attrOrder');
   const value = { type: 'expr', value: 'someCall()', metadata: 'preserve' };
   const node = { props: { old: value }, attrOrder: ['old'] };
-  assert.equal(renameAttr(node, 'old', 'new'), true);
-  assert.equal(node.props.new, value);
-  assert.deepEqual(node.attrOrder, ['new']);
-  assert.throws(() => renameAttr(node, 'new', 'x'.repeat(8193)), /Attribute name exceeds limit/);
+  const renamed = renamedAttr(node, 'old', 'new');
+  assert.equal(renamed.props.new, value);
+  assert.deepEqual(renamed.attrOrder, ['new']);
+  assert.deepEqual(node, { props: { old: value }, attrOrder: ['old'] }, 'the node is not edited');
+  assert.throws(() => renamedAttr(renamed, 'new', 'x'.repeat(8193)), /Attribute name exceeds limit/);
 
   const { checkStatement } = load('jsCheck');
   assert.equal(checkStatement(' '.repeat(1_000_000)).ok, true);

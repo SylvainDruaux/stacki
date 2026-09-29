@@ -415,6 +415,7 @@ function staleWithoutBytes(intent: Intent): RejectionReason {
     case 'rename-tag':
     case 'rename-attribute':
     case 'rewrite-node':
+    case 'wrap-nodes':
       return 'anchor-moved';
     default: {
       const exhaustive: never = operation;

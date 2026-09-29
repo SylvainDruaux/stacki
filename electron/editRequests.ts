@@ -23,8 +23,10 @@ import { TAG_NAME_RE } from '../shared/intent';
 import type { Operation, Placement, RejectionReason, SourceEdit } from '../shared/intent';
 import { renameSites } from '../shared/loopScope';
 import {
+  closeTagStart,
   lineIndent,
   nodeAtPath,
+  openTagEnd,
   tagNameEnd,
   textOf,
   type ValidProjection,
@@ -117,6 +119,12 @@ export function buildEditIntent(
       return withAnchor(authored, edit.target, (anchor) =>
         replaceDraft(authored, anchor, edit.node),
       );
+    case 'wrap-nodes':
+      return withAnchor(authored, edit.target, (anchor) =>
+        withAnchor(authored, edit.last, (last) => wrapDraft(authored, anchor, last, edit.name)),
+      );
+    case 'unwrap-node':
+      return withAnchor(authored, edit.target, (anchor) => unwrapDraft(authored, anchor));
     case 'set-frontmatter':
       return frontmatterDraft(authored, edit.model);
     default: {
@@ -342,6 +350,81 @@ function placedSpan(diff: ByteDiff, span: ByteSpan): ByteSpan | undefined {
 function tagAnchor(anchor: AnchorRef): boolean {
   const kind = anchor.expectedKind;
   return kind === 'element' || kind === 'component' || kind === 'raw';
+}
+
+// A run of siblings inside a new tag: the opening tag on its own line before
+// the first, the closing tag on its own line after the last, at the first
+// one's indentation. The run's own bytes are not re-indented.
+function wrapDraft(
+  authored: Authored,
+  anchor: AnchorRef,
+  last: AnchorRef,
+  name: string,
+): Result<IntentDraft, RejectionReason> {
+  const eol = authored.text.includes('\r\n') ? '\r\n' : '\n';
+  const indent = lineIndent(authored.snapshot.bytes, anchor.span.start);
+  const operation: Operation = {
+    tag: 'wrap-nodes',
+    last,
+    open: `<${name}>${eol}${indent}`,
+    close: `${eol}${indent}</${name}>`,
+  };
+  return ok({ anchor, operation });
+}
+
+// A paired tag taken away, its children kept as they are written: the opening
+// tag, with the rest of its line when that is only whitespace, and the closing
+// tag, with the line break and indentation before it when it stands on its own
+// line. A rewrite of the node, so it applies only while the node is unchanged.
+function unwrapDraft(authored: Authored, anchor: AnchorRef): Result<IntentDraft, RejectionReason> {
+  const node = nodeAtPath(authored.projection, anchor.path);
+  assert(node !== undefined, 'A checked anchor names a projected node');
+  if (node.kind !== 'element' && node.kind !== 'component') {
+    return err('unsupported-operation');
+  }
+  const bytes = authored.snapshot.bytes;
+  const open = openTagEnd(bytes, node);
+  const close = closeTagStart(bytes, node, open.end);
+  if (open.selfClosing || close === undefined) {
+    return err('unsupported-operation'); // Nothing inside to keep.
+  }
+  const openEnd = lineEndAfter(bytes, open.end, close) ?? open.end;
+  const closeStart = lineStartBefore(bytes, close, openEnd) ?? close;
+  const hunks: SourceEdit[] = [
+    { span: toByteSpan(node.span.start, openEnd), text: '' },
+    { span: toByteSpan(closeStart, node.span.end), text: '' },
+  ];
+  return ok({ anchor, operation: { tag: 'rewrite-node', hunks } });
+}
+
+// One past the line break ending the line at `from`, when only spaces and tabs
+// stand between them; undefined when anything else does.
+function lineEndAfter(bytes: Uint8Array, from: number, ceiling: number): number | undefined {
+  for (let at = from; at < ceiling; at++) {
+    const byte = bytes[at];
+    if (byte === 0x0a) {
+      return at + 1;
+    }
+    if (byte !== 0x20 && byte !== 0x09 && byte !== 0x0d) {
+      return undefined;
+    }
+  }
+  return undefined;
+}
+
+// The line break (its `\r\n` whole) that starts the line holding `to`, when
+// only spaces and tabs stand between them; undefined when anything else does.
+function lineStartBefore(bytes: Uint8Array, to: number, floor: number): number | undefined {
+  for (let at = to - 1; at >= floor; at--) {
+    const byte = bytes[at];
+    if (byte === 0x0a) {
+      return at > floor && bytes[at - 1] === 0x0d ? at - 1 : at;
+    }
+    if (byte !== 0x20 && byte !== 0x09) {
+      return undefined;
+    }
+  }
+  return undefined;
 }
 
 // The parsed node at a projection path: projections index the same tree.

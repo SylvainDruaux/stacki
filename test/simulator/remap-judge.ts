@@ -92,6 +92,7 @@ function judgedAttribute(operation: Intent['operation']): string | undefined {
     case 'edit-frontmatter-slot':
     case 'revert-splices':
     case 'rewrite-node':
+    case 'wrap-nodes':
     case 'replace-source':
       throw new Error(`Assertion failed: ${operation.tag} is not judged by element survival`);
     default: {

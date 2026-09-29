@@ -56,11 +56,12 @@ interface Counts {
 const REPLACE_SOURCE_BASELINE = 23;
 
 /** Measured 2026-09-28 by this script at step 1, lowered at each step-6
- * expansion (the tracker's adapter table). Lower these; never raise them. */
+ * expansion and at step 9 (the tracker's adapter table). Lower these; never
+ * raise them. */
 const BASELINE: Counts = {
-  mutations: 48,
+  mutations: 18,
   propIndexWrites: 2,
-  mutateModelCalls: 15,
+  mutateModelCalls: 0,
   applyEditCalls: 4,
   /** Measured at step 5, when the legacy writers moved onto the actors. */
   replaceSourceCalls: REPLACE_SOURCE_BASELINE,

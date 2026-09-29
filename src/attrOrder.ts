@@ -14,41 +14,49 @@ import { LIMITS } from '../shared/limits';
 // has to change there too, or the prop leaves for the end of the tag on its
 // way to being called something else.
 
-// Renames a prop in place. A name the tag already had gives up its slot to the
-// rename — that is what overwriting it means. Returns whether anything moved.
-// This mutator owns an in-session edit, matching the existing editor API.
+// A prop renamed in place: the props and their order after the rename, or
+// undefined when there is nothing to rename. A name the tag already had gives
+// up its slot to the rename — that is what overwriting it means. Pure: the
+// node is left as it was (plan §11.9 — the model is never edited in place).
 // Values are opaque: renaming must retain all serializer metadata by identity.
 export interface AttributeOwner<T> {
-  props?: Record<string, T>;
-  attrOrder?: readonly string[];
+  readonly props?: Readonly<Record<string, T>> | undefined;
+  readonly attrOrder?: readonly string[] | undefined;
 }
 
-export function renameAttr<T>(
-  node: AttributeOwner<T> | null | undefined,
+export interface RenamedAttributes<T> {
+  readonly props: Record<string, T>;
+  readonly attrOrder?: string[];
+}
+
+export function renamedAttr<T>(
+  node: AttributeOwner<T>,
   oldName: string,
   newName: string,
-): boolean {
-  if (!node?.props || !(oldName in node.props)) {
-    return false;
+): RenamedAttributes<T> | undefined {
+  const props = node.props;
+  if (props === undefined || !Object.hasOwn(props, oldName)) {
+    return undefined;
   }
   if (!newName || newName === oldName) {
-    return false;
+    return undefined;
   }
-  assert(Object.keys(node.props).length <= LIMITS.attrsPerNodeMax, 'Attribute count exceeds limit');
+  assert(Object.keys(props).length <= LIMITS.attrsPerNodeMax, 'Attribute count exceeds limit');
   assert(newName.length <= LIMITS.attrCharsMax, 'Attribute name exceeds limit');
-  const next: Record<string, T> = {};
-  for (const [k, v] of Object.entries(node.props)) {
-    if (k === oldName) {
-      next[newName] = v;
-    } else if (k !== newName) {
-      next[k] = v;
-    }
+  const next = Object.fromEntries(
+    Object.entries(props).flatMap(([name, value]): [string, T][] => {
+      if (name === oldName) {
+        return [[newName, value]];
+      }
+      return name === newName ? [] : [[name, value]];
+    }),
+  );
+  const order = node.attrOrder;
+  if (order === undefined) {
+    return { props: next };
   }
-  node.props = next;
-  if (node.attrOrder !== undefined) {
-    node.attrOrder = node.attrOrder
-      .filter((k) => k !== newName)
-      .map((k) => (k === oldName ? newName : k));
-  }
-  return true;
+  const attrOrder = order
+    .filter((name) => name !== newName)
+    .map((name) => (name === oldName ? newName : name));
+  return { props: next, attrOrder };
 }

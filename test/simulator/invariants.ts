@@ -158,6 +158,7 @@ function staysInPlace(tag: Intent['operation']['tag']): boolean {
     // states the node's new text, which may parse as another node.
     case 'rename-tag':
     case 'rewrite-node':
+    case 'wrap-nodes':
       return false;
     default: {
       const exhaustive: never = tag;

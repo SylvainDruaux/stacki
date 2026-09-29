@@ -13,6 +13,31 @@ const sha256 = (text) => createHash('sha256').update(text).digest('hex');
 const { JSDOM } = require('jsdom');
 const { parsePage, serializePage } = require('../dist/electron/astroParser.js');
 const { applyCodePatch } = require('../dist/shared/code-patch.js');
+const { NODE_PROJECTOR } = require('../dist/electron/documentDisk.js');
+const { buildEditIntent } = require('../dist/electron/editRequests.js');
+const { toIntent } = require('../dist/shared/intent.js');
+const { planIntent } = require('../dist/shared/planner.js');
+const { applySplices, inverseEdits } = require('../dist/shared/splice.js');
+
+// A visual edit request as main's handler applies it, on the fake's disk: the
+// real translation and planner, against the bytes it names (step 9 — every
+// gesture of an .astro page reaches disk this way).
+function applyEditRequest(text, edit) {
+  const snapshot = NODE_PROJECTOR.snapshot('/project/src/pages/index.astro', Buffer.from(text));
+  const draft = buildEditIntent(edit, snapshot);
+  assert.ok(draft.ok, `the edit is built (${draft.ok ? '' : draft.error})`);
+  const intent = toIntent({
+    id: 'lazy-panels',
+    file: snapshot.path,
+    authoredChecksum: snapshot.checksum,
+    ...draft.value,
+  });
+  const planned = planIntent({ authored: snapshot, current: snapshot }, intent);
+  assert.ok(planned.ok, `the edit plans (${planned.ok ? '' : planned.error})`);
+  const bytes = applySplices(snapshot.bytes, planned.value.splices);
+  const written = Buffer.from(bytes).toString('utf8');
+  return { text: written, inverse: inverseEdits(planned.value.splices) };
+}
 
 const PANEL_PATHS = [
   './panels/PropsPanel',
@@ -140,6 +165,8 @@ async function checkCodePanel(context) {
     /<h1>Visual edit<\/h1>/,
     'visual edits serialize back into the code panel'
   );
+  const shown = __lazyPanels.CodePanel.source;
+  assert.equal(context.bridge.disk(), shown, 'as the request left the disk');
   context.stable();
 }
 
@@ -352,13 +379,18 @@ function createBridge() {
       disk = serializePage(model);
       return { ok: true, ...onDisk(disk) };
     },
-    // Typed code arrives as a patch against the checksum it was typed from.
+    // Typed code arrives as a patch against the checksum it was typed from;
+    // a visual edit as a request main applies with the engine.
     editPage: async ({ authoredChecksum, edit }) => {
-      assert.equal(edit.tag, 'code-patch', 'this test sends only typed code as requests');
-      assert.equal(authoredChecksum, sha256(disk), 'the patch names the bytes on disk');
-      disk = applyCodePatch(disk, edit.hunks);
-      bridge.codeSaves += 1;
-      return { ok: true, ...onDisk(disk), inverse: [] };
+      assert.equal(authoredChecksum, sha256(disk), 'the request names the bytes on disk');
+      if (edit.tag === 'code-patch') {
+        disk = applyCodePatch(disk, edit.hunks);
+        bridge.codeSaves += 1;
+        return { ok: true, ...onDisk(disk), inverse: [] };
+      }
+      const applied = applyEditRequest(disk, edit);
+      disk = applied.text;
+      return { ok: true, ...onDisk(disk), inverse: applied.inverse };
     },
     gitInfo: async () => ({ isRepo: false }),
     onCssChanged: () => () => {},

@@ -52,7 +52,14 @@ require('esbuild').buildSync({
   platform: 'node',
   logLevel: 'silent',
 });
-const { renameAttr } = require(bundled);
+const { renamedAttr } = require(bundled);
+// The rename as the app applies it: a new node, the old one untouched.
+const renameAttr = (node, from, to) => {
+  const renamed = renamedAttr(node, from, to);
+  if (renamed === undefined) {return false;}
+  Object.assign(node, renamed);
+  return true;
+};
 
 const page = (body) => `---\n---\n${body}\n`;
 const S = (value) => ({ type: 'string', value });
@@ -199,11 +206,11 @@ const INPUT = '<Input variant="first-name" required />';
   check('and renaming to the same name does nothing', renameAttr(node, 'id', 'id') === false, 'it did something');
 }
 
-// The app's rename goes through it — a second copy of the rule in App.tsx would
+// The app's rename goes through it — a second copy of the rule elsewhere would
 // be a second answer to where a renamed prop lives.
 {
-  const app = fs.readFileSync(path.join(__dirname, '..', 'src', 'App.tsx'), 'utf8');
-  check('the app renames props through that module', /renameAttr\(node, oldName, newName\)/.test(app), 'App.tsx renames props its own way');
+  const gestures = fs.readFileSync(path.join(__dirname, '..', 'src', 'editGestures.ts'), 'utf8');
+  check('the app renames props through that module', /renamedAttr\(found, names\.from, names\.to\)/.test(gestures), 'the rename gesture renames props its own way');
 }
 
 // --- what has no order to keep -------------------------------------------------

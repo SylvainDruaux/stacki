@@ -264,6 +264,10 @@ function rebaseOperation(
       const destination = rebaseAnchor(operation.destination, through, current);
       return destination.ok ? ok({ ...operation, destination: destination.value }) : destination;
     }
+    case 'wrap-nodes': {
+      const last = rebaseAnchor(operation.last, through, current);
+      return last.ok ? ok({ ...operation, last: last.value }) : last;
+    }
     case 'rename-binding': {
       const sites = rebaseSpans(operation.sites, through);
       return sites === undefined ? err('anchor-moved') : ok({ ...operation, sites });

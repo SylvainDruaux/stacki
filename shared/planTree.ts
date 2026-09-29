@@ -1,5 +1,5 @@
-// Planning the tree operations (plan §3.3, §3.4): `insert-node`, `remove-node`
-// and `move-node`. A removal takes the node's bytes and the whitespace that
+// Planning the tree operations (plan §3.3, §3.4): `insert-node`, `remove-node`,
+// `move-node` and step 9's `wrap-nodes`. A removal takes the node's bytes and the whitespace that
 // set it apart; an insertion is a zero-width splice beside or inside a
 // resolved node, separated the way that node is separated from what precedes
 // it; a move is the two at once, and relocates the node's original bytes —
@@ -24,6 +24,7 @@ import {
   openTagEnd,
   parentPath,
   resolveTarget,
+  samePath,
   siblingsOf,
   slice,
   startsWith,
@@ -109,6 +110,47 @@ export function planInsertNode(
     { path: insertion.value.anchorPath.map(toChildIndex), kind: target.current.kind },
   ];
   return ok({ splices: [splice], postKinds, candidate: 'must-parse' });
+}
+
+/** `wrap-nodes` (step 9): a run of siblings, the anchor through `last`, put
+ * inside a new tag — its opening before the first, its closing after the
+ * last. Both ends are resolved like any anchor; what lies between them is
+ * kept whole, whoever wrote it, and nothing is re-indented. Siblings of one
+ * list only, in order, and never code a loop or a condition owns. */
+export function planWrapNodes(
+  context: PlanContext,
+  anchor: AnchorRef,
+  operation: Extract<Operation, { tag: 'wrap-nodes' }>,
+): Result<Plan, RejectionReason> {
+  const first = resolveTarget(context, anchor);
+  if (!first.ok) {
+    return first;
+  }
+  const last = resolveTarget(context, operation.last);
+  if (!last.ok) {
+    return last;
+  }
+  const start = first.value.current;
+  const end = last.value.current;
+  if (!movable(start.kind) || !movable(end.kind)) {
+    return err('unsupported-operation');
+  }
+  if (!nodePlaceable(start) || !nodePlaceable(end)) {
+    return err('unsupported-operation');
+  }
+  if (!samePath(parentPath(start.path), parentPath(end.path))) {
+    return err('unsupported-operation'); // Not one run of siblings.
+  }
+  if (end.span.start < start.span.start) {
+    return err('unsupported-operation');
+  }
+  const bytes = context.current.bytes;
+  const splices = [
+    spliceAt(bytes, toByteSpan(start.span.start, start.span.start), operation.open),
+    spliceAt(bytes, toByteSpan(end.span.end, end.span.end), operation.close),
+  ];
+  assert(start.span.start < end.span.end, 'A run of nodes covers at least one byte');
+  return ok({ splices, postKinds: [], candidate: 'must-parse' });
 }
 
 // A node inside a loop is one source node the loop repeats (plan §6). Its own

@@ -11,6 +11,7 @@ import type { Edit, NodeRef } from '../shared/edit-request';
 import { singleDeclarationChange } from '../shared/inlineStyle';
 import { LIMITS } from '../shared/limits';
 import type { Attr } from '../shared/page-node';
+import { renamedAttr } from './attrOrder';
 import { loopVarsAt, parseLoopHead, renameLoopVar, stripLostBindings } from './loopBindings';
 import type { EditGesture, StreamedEdit } from './pageEdits';
 
@@ -350,7 +351,7 @@ function afterIn(
  * element without children (to keep `<div>\n</div>` as written), so a stale
  * one would put the removed child back (found by the parity sweep: a moved
  * node was written twice, a deleted one stayed). */
-function withChildren(node: EditorNode, children: EditorNode[]): EditorNode {
+export function withChildren(node: EditorNode, children: EditorNode[]): EditorNode {
   const copy = Object.assign({}, node, { children });
   if (children.length === 0) {
     Reflect.deleteProperty(copy, 'source');
@@ -701,4 +702,173 @@ function onlyRenames(before: string, after: string, renames: readonly LoopRename
     return false;
   }
   return renamed(old.item) === next.item && renamed(old.index) === next.index;
+}
+
+// --- Step 9: the gestures the whole-model save carried --------------------------------
+
+/** A node restated: the request is the node as it should now read — main
+ * places what the printer says changed on the node's own bytes (a
+ * `rewrite-node`, never a reprint) — and the effect is that node in the shown
+ * model. Rewording a note, typing a text, a loop head or a condition, the
+ * style panel's `<style>` body, a branch added or removed. Restatements of one
+ * node coalesce while unsent: each states the whole node, so the last wins. */
+export function nodeGesture(
+  nodeId: string,
+  next: EditorNode,
+  options: { readonly coalesceKey: string | null; readonly urgency: Urgency },
+): EditGesture {
+  assert(next.id === nodeId, 'A restated node keeps its id');
+  return {
+    coalesceKey: options.coalesceKey,
+    urgency: options.urgency,
+    request: (refOf) => {
+      const target = refOf(nodeId);
+      if (target === undefined) {
+        return undefined;
+      }
+      const edit: Edit = { tag: 'replace-node', target, node: next };
+      return [{ edit, stream: `node:${target.path.join('.')}` }];
+    },
+    apply: (model) => withNode(model, nodeId, () => next),
+  };
+}
+
+/** A prop renamed in place, keeping its value and its slot. A name the tag
+ * already has gives up its slot to the rename (renamedAttr): its removal goes
+ * first, since the engine never renames onto a name that is taken. */
+export function attributeRenameGesture(
+  model: EditorModel,
+  nodeId: string,
+  names: { readonly from: string; readonly to: string },
+): EditGesture | undefined {
+  const node = findNode(model.nodes, nodeId);
+  const renamed = node === undefined ? undefined : renamedAttr(node, names.from, names.to);
+  if (node === undefined || renamed === undefined) {
+    return undefined;
+  }
+  const taken = Object.hasOwn(node.props ?? {}, names.to);
+  return {
+    coalesceKey: null,
+    urgency: true,
+    request: (refOf) => {
+      const target = refOf(nodeId);
+      if (target === undefined) {
+        return undefined;
+      }
+      const rename: Edit = { tag: 'rename-attribute', target, ...names };
+      const edits: StreamedEdit[] = [{ edit: rename, stream: null }];
+      if (!taken) {
+        return edits;
+      }
+      const removal: Edit = { tag: 'remove-attribute', target, name: names.to };
+      return [{ edit: removal, stream: null }, ...edits];
+    },
+    apply: (current) =>
+      withNode(current, nodeId, (found) => ({
+        ...found,
+        ...renamedAttr(found, names.from, names.to),
+      })),
+  };
+}
+
+/** A tag renamed: the name in its opening and closing tags (`rename-tag`),
+ * the rest of its bytes untouched; `next` is the node as the model shows it
+ * after (its kind may change with the name). A tag with no children on either
+ * side — void or self-closing, before or after — is restated instead:
+ * renaming `<img>` to `<Image />` must close it, and a `<div>` becoming an
+ * `<img>` loses its content, which only the printer knows how to write. */
+export function tagRenameGesture(
+  node: EditorNode,
+  next: EditorNode,
+  options: { readonly urgency: Urgency },
+): EditGesture {
+  const nodeId = node.id;
+  assert(next.id === nodeId, 'A renamed node keeps its id');
+  const name = next.name;
+  assert(name !== undefined, 'A renamed tag has a name');
+  if (!Array.isArray(node.children) || !Array.isArray(next.children)) {
+    return nodeGesture(nodeId, next, { coalesceKey: null, urgency: options.urgency });
+  }
+  return {
+    coalesceKey: null,
+    urgency: options.urgency,
+    request: (refOf) => {
+      const target = refOf(nodeId);
+      if (target === undefined) {
+        return undefined;
+      }
+      return [{ edit: { tag: 'rename-tag', target, to: name }, stream: null }];
+    },
+    apply: (model) => withNode(model, nodeId, () => next),
+  };
+}
+
+/** The page's root nodes put inside a new wrapper (a layout picked for a page
+ * without one): the request wraps the first through the last root node that
+ * is not blank text, as they are written (`wrap-nodes`); the effect is the
+ * wrapper holding every root node. A page with nothing to wrap has no request. */
+export function wrapGesture(model: EditorModel, wrapper: EditorNode): EditGesture {
+  const name = wrapper.name;
+  assert(name !== undefined, 'A wrapper is a named tag');
+  const standing = model.nodes.filter((node) => !blank(node));
+  const first = standing[0];
+  const last = standing[standing.length - 1];
+  return {
+    coalesceKey: null,
+    urgency: true,
+    request: (refOf) => {
+      const target = first === undefined ? undefined : refOf(first.id);
+      const end = last === undefined ? undefined : refOf(last.id);
+      if (target === undefined || end === undefined) {
+        return undefined;
+      }
+      return [{ edit: { tag: 'wrap-nodes', target, last: end, name }, stream: null }];
+    },
+    apply: (current) => ({ ...current, nodes: [withChildren(wrapper, current.nodes)] }),
+  };
+}
+
+/** A wrapper taken away, its children left in its place (a layout removed). */
+export function unwrapGesture(nodeId: string): EditGesture {
+  return {
+    coalesceKey: null,
+    urgency: true,
+    request: (refOf) => {
+      const target = refOf(nodeId);
+      if (target === undefined) {
+        return undefined;
+      }
+      return [{ edit: { tag: 'unwrap-node', target }, stream: null }];
+    },
+    apply: (model) => {
+      const nodes = unwrappedIn(model.nodes, nodeId, 0);
+      return nodes === model.nodes ? model : { ...model, nodes };
+    },
+  };
+}
+
+// The list with the node replaced by its children; recursion bounded by the
+// tree's depth bound, asserted.
+function unwrappedIn(list: EditorNode[], nodeId: string, depth: number): EditorNode[] {
+  assert(depth <= LIMITS.treeDepthMax, 'A model is no deeper than its bound');
+  for (const [index, node] of list.entries()) {
+    const children = Array.isArray(node.children) ? node.children : [];
+    if (node.id === nodeId) {
+      return [...list.slice(0, index), ...children, ...list.slice(index + 1)];
+    }
+    const inner = unwrappedIn(children, nodeId, depth + 1);
+    if (inner !== children) {
+      return list.map((item, at) => (at === index ? withChildren(node, inner) : item));
+    }
+  }
+  return list;
+}
+
+/** A Markdown or MDX page's gesture (plan §6): these pages have no intents
+ * until step 10, so the effect is saved as the whole model (`page:write`). */
+export function markdownGesture(
+  apply: (model: EditorModel) => EditorModel,
+  options: { readonly coalesceKey: string | null; readonly urgency: Urgency },
+): EditGesture {
+  return { ...options, request: () => undefined, apply };
 }

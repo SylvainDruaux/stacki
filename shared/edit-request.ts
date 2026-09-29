@@ -83,6 +83,17 @@ export type Edit =
    * node, and writes only what the printer says changed, placed on the node's
    * own bytes (a `rewrite-node` intent) — never a reprint of the node. */
   | { readonly tag: 'replace-node'; readonly target: NodeRef; readonly node: PageNode }
+  /** Step 9: the siblings from `target` through `last` put inside a new
+   * `<name>` tag (a layout picked for a page without one). */
+  | {
+      readonly tag: 'wrap-nodes';
+      readonly target: NodeRef;
+      readonly last: NodeRef;
+      readonly name: string;
+    }
+  /** Step 9: a tag taken away, its children left where they are (a layout
+   * removed from a page). */
+  | { readonly tag: 'unwrap-node'; readonly target: NodeRef }
   /** The frontmatter the page model now describes; main prints it and writes
    * only the slot that differs (an edit-frontmatter-slot intent). */
   | { readonly tag: 'set-frontmatter'; readonly model: PageModel }
@@ -170,6 +181,15 @@ export function parseEdit(input: unknown): Edit {
       };
     case 'rename-attribute':
       return parseAttributeRename(record);
+    case 'wrap-nodes':
+      return {
+        tag,
+        target: parseNodeRef(record['target'], 'Edit.target'),
+        last: parseNodeRef(record['last'], 'Edit.last'),
+        name: tagName(record['name'], 'Edit.name'),
+      };
+    case 'unwrap-node':
+      return { tag, target: parseNodeRef(record['target'], 'Edit.target') };
     case 'replace-node':
       return {
         tag,

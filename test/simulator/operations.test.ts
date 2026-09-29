@@ -415,6 +415,35 @@ test('rewrite-node writes its hunks inside the node, and only while the node is 
   );
 });
 
+test('wrap-nodes puts a run of siblings in a new tag and keeps every byte of the run', () => {
+  const text = '<header>h</header>\n<main>\n  <p>m</p>\n</main>\n<footer>f</footer>\n';
+  const page = snapshotText(text);
+  const wrap = (last: readonly number[]): Operation => ({
+    tag: 'wrap-nodes',
+    last: anchorAt(page, last),
+    open: '<Layout>\n',
+    close: '\n</Layout>',
+  });
+  assert.equal(
+    run(page, wrap([2]), anchorAt(page, [0])),
+    '<Layout>\n<header>h</header>\n<main>\n  <p>m</p>\n</main>\n<footer>f</footer>\n</Layout>\n',
+  );
+  assert.equal(
+    run(page, wrap([1]), anchorAt(page, [1])),
+    '<header>h</header>\n<Layout>\n<main>\n  <p>m</p>\n</main>\n</Layout>\n<footer>f</footer>\n',
+  );
+  assert.equal(
+    run(page, wrap([1, 0]), anchorAt(page, [0])),
+    'rejected: unsupported-operation',
+    'not one run of siblings',
+  );
+  assert.equal(
+    run(page, wrap([0]), anchorAt(page, [2])),
+    'rejected: unsupported-operation',
+    'the run ends after it starts',
+  );
+});
+
 // --- (3) The corpus sweep ------------------------------------------------------------
 
 function corpusFiles(): readonly { readonly name: string; readonly text: string }[] {

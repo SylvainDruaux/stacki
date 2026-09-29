@@ -46,6 +46,11 @@ const GOOD: readonly (readonly [object, object])[] = [
   [documentAnchor, { tag: 'apply-code-patch', hunks: [{ span: { start: 3, end: 5 }, text: 'x' }] }],
   [frontmatter, { tag: 'edit-frontmatter-slot', slot: { start: 4, end: 20 }, text: 'const a = 1;' }],
   [documentAnchor, { tag: 'replace-source', text: '<h1>Hi</h1>\n' }],
+  // Step 9.
+  [element, { tag: 'rename-tag', from: 'div', to: 'Card' }],
+  [element, { tag: 'rename-attribute', from: 'title', to: 'aria-label' }],
+  [element, { tag: 'rewrite-node', hunks: [{ span: { start: 21, end: 24 }, text: 'x' }] }],
+  [element, { tag: 'wrap-nodes', last: { ...element, path: [0, 3] }, open: '<A>', close: '</A>' }],
 ];
 
 test('one known-good intent per operation parses to itself', () => {
@@ -55,7 +60,7 @@ test('one known-good intent per operation parses to itself', () => {
     assert.deepEqual(parsed.anchor, anchor);
   }
   const tags = new Set(GOOD.map(([, operation]): unknown => Reflect.get(operation, 'tag')));
-  assert.equal(tags.size, 9, 'every operation in the closed union is covered');
+  assert.equal(tags.size, 13, 'every operation in the closed union is covered');
 });
 
 test('malformed intents fail at the field that is wrong', () => {
@@ -76,6 +81,11 @@ test('malformed intents fail at the field that is wrong', () => {
     [wire(loop, { tag: 'rename-binding', from: 'item', to: 'item', sites: [{ start: 12, end: 16 }] }), /must change/],
     [wire(loop, { tag: 'rename-binding', from: 'it em', to: 'x', sites: [] }), /expected an identifier/],
     [wire(documentAnchor, { tag: 'apply-code-patch', hunks: {} }), /hunks: expected array/],
+    [wire(element, { tag: 'rename-tag', from: 'div', to: 'my div' }), /expected a tag name/],
+    [wire(element, { tag: 'rename-tag', from: 'div', to: 'div' }), /must change the name/],
+    [wire(element, { tag: 'rename-attribute', from: 'a', to: 'a' }), /must change/],
+    [wire(element, { tag: 'rewrite-node', hunks: [{ span: { start: 0, end: 1 }, text: '' }] }), /outside its anchor/],
+    [wire(element, { tag: 'wrap-nodes', last: frontmatter, open: '', close: '' }), /wrap-nodes cannot/],
     [wire({ ...element, path: 'x' }, set), /path: expected array/],
     [wire({ ...element, expectedKind: 'widget' }, set), /unknown anchor kind/],
   ];

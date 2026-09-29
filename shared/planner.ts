@@ -49,7 +49,7 @@ import {
   type SpanMapper,
   type Target,
 } from './planSupport';
-import { planInsertNode, planMoveNode, planRemoveNode } from './planTree';
+import { planInsertNode, planMoveNode, planRemoveNode, planWrapNodes } from './planTree';
 import {
   planCodePatch,
   planFrontmatterSlot,
@@ -208,6 +208,8 @@ function planWith(
       return planRemoveNode(context, anchor);
     case 'move-node':
       return planMoveNode(context, anchor, operation);
+    case 'wrap-nodes':
+      return planWrapNodes(context, anchor, operation);
     case 'rename-binding':
       return planRenameBinding(context, anchor, operation);
     case 'edit-frontmatter-slot':
