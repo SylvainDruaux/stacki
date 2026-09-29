@@ -417,6 +417,7 @@ function staleWithoutBytes(intent: Intent): RejectionReason {
     case 'rewrite-node':
     case 'wrap-nodes':
     case 'append-body':
+    case 'insert-frontmatter':
       return 'anchor-moved';
     default: {
       const exhaustive: never = operation;

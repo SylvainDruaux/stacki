@@ -160,6 +160,7 @@ function staysInPlace(tag: Intent['operation']['tag']): boolean {
     case 'rewrite-node':
     case 'wrap-nodes':
     case 'append-body':
+    case 'insert-frontmatter':
       return false;
     default: {
       const exhaustive: never = tag;

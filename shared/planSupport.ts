@@ -134,14 +134,11 @@ function currentTarget(
   const found = current.nodes.filter(
     (node) => node.span.start === start && node.kind === authored.kind,
   );
-  const [node] = found;
+  const [node, ...others] = found.length > 1 ? atDepthOf(found, authored) : found;
   if (node === undefined) {
-    return err('anchor-moved');
+    return err(found.length > 1 ? 'anchor-ambiguous' : 'anchor-moved');
   }
-  // A tag opens one element: two same-kind nodes cannot start on one byte,
-  // except a node and its own first descendant of the same kind, which a
-  // text-only span could share — refused rather than chosen.
-  if (found.length > 1) {
+  if (others.length > 0) {
     return err('anchor-ambiguous');
   }
   if (!sameSpan(identityRegion(context.current.bytes, node), mappedRegion)) {
@@ -158,13 +155,38 @@ function currentTarget(
   return ok({ authored, current: node, shift });
 }
 
+// A tag opens one element: two same-kind nodes cannot start on one byte,
+// except a node and its own first descendant of the same kind. A text-only
+// span could share one; a Markdown list always shares its first line with its
+// first item (step 10). One holds the other, so they differ in depth: the node
+// at the anchor's depth is the one it named, and anything else is refused
+// rather than chosen.
+function atDepthOf(
+  found: readonly ProjectedNode[],
+  authored: ProjectedNode,
+): readonly ProjectedNode[] {
+  assert(found.length > 1, 'Only several candidates need their depth compared');
+  return found.filter((node) => node.path.length === authored.path.length);
+}
+
+/** Whether a node is written as a tag: an element, component or raw block of
+ * markup. A Markdown block has no tag — a paragraph, a heading, a list — and
+ * the attributes Markdown writes (an image's alt) are its own syntax. */
+export function writtenAsTag(node: ProjectedNode): boolean {
+  if (node.syntax === 'markup') {
+    return isTagKind(node.kind);
+  }
+  return false;
+}
+
 /** For a tag with attributes, the name through the end of the last one; for
  * anything else — a bare tag included — the whole node. A bare tag's name is
  * shared by every tag of that name (`p`), so alone it identifies nothing; its
  * bytes with its content usually do, at the price of refusing a stale intent
- * whose node someone edited inside. The first byte of a tag is its `<`. */
+ * whose node someone edited inside. The first byte of a tag is its `<`. A
+ * Markdown block is its whole node: it has no name to start from. */
 export function identityRegion(bytes: ByteString, node: ProjectedNode): ByteSpan {
-  if (isTagKind(node.kind)) {
+  if (writtenAsTag(node)) {
     assert(bytes[node.span.start] === TAG_OPEN, 'A tag opens with `<`');
     const nameEnd = tagNameEnd(bytes, node);
     const end = node.attributes.reduce<number>(

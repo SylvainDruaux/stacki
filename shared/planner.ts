@@ -45,6 +45,7 @@ import {
   tagNameEnd,
   textOf,
   whitespaceBefore,
+  writtenAsTag,
   type PlanContext,
   type SpanMapper,
   type Target,
@@ -59,6 +60,7 @@ import {
 import {
   planCodePatch,
   planFrontmatterSlot,
+  planInsertFrontmatter,
   planRenameBinding,
   planReplaceSource,
   planRevertSplices,
@@ -222,6 +224,8 @@ function planWith(
       return planRenameBinding(context, anchor, operation);
     case 'edit-frontmatter-slot':
       return planFrontmatterSlot(context, anchor, operation);
+    case 'insert-frontmatter':
+      return planInsertFrontmatter(context, anchor, operation);
     case 'apply-code-patch':
       return planCodePatch(context, anchor, operation);
     case 'revert-splices':
@@ -262,6 +266,11 @@ function planAttributeOperation(
   if (!nodeEditable(target.current)) {
     return err('unsupported-operation'); // In a loop, given `set:html`, or code.
   }
+  if (!writtenAsTag(target.current)) {
+    // Markdown writes no attributes in tags; the ones it has (an image's alt)
+    // are its syntax, rewritten as the node's text (electron/markdownEdits.ts).
+    return err('unsupported-operation');
+  }
   if (tagNameEnd(context.current.bytes, target.current) === target.current.span.start + 1) {
     return err('unsupported-operation'); // `<>` takes no attributes; it must be named first.
   }
@@ -300,6 +309,9 @@ function planRenameAttribute(
   const target = resolved.value;
   if (!nodeEditable(target.current)) {
     return err('unsupported-operation');
+  }
+  if (!writtenAsTag(target.current)) {
+    return err('unsupported-operation'); // A Markdown attribute has no name to rename.
   }
   const found = soleAttribute(target, operation.from);
   if (!found.ok) {
@@ -343,6 +355,9 @@ function planRenameTag(
   const bytes = context.current.bytes;
   if (!nodeEditable(node)) {
     return err('unsupported-operation');
+  }
+  if (!writtenAsTag(node)) {
+    return err('unsupported-operation'); // A Markdown block's kind is its text: a rewrite.
   }
   const name = toByteSpan(node.span.start + 1, tagNameEnd(bytes, node));
   if (name.start === name.end) {

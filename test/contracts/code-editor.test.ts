@@ -284,7 +284,7 @@ test('a patch past intentPayloadBytesMax is a resource-limit, never truncated', 
   assert.deepEqual(diffCodePatch(before.source, wide), { ok: false, error: 'resource-limit' });
 });
 
-test('Markdown and MDX pages take code patches; their gestures still wait', async (context) => {
+test('Markdown pages take code patches, and gestures on what they wrote', async (context) => {
   const harness = fixture();
   context.after(harness.dispose);
   const text = '---\ntitle: Post\n---\n\n# Heading\r\n\nBody.\n';
@@ -294,11 +294,16 @@ test('Markdown and MDX pages take code patches; their gestures still wait', asyn
   const saved = await saveCode(harness, file, before, next);
   assert.ok(saved.ok);
   assert.equal(fs.readFileSync(file, 'utf8'), next, 'CRLF and all');
+  // Step 10: the reply's parse names the heading; removing it is a splice.
+  assert.ok(saved.value.editable);
+  const heading = saved.value.model.nodes[0];
+  assert.ok(heading?.start !== undefined && heading.end !== undefined);
   const gesture = await send(harness, file, saved.value.checksum, {
     tag: 'remove-node',
-    target: { path: [0], kind: 'element', span: toUtf16Span(0, 1) },
+    target: { path: [0], kind: 'element', span: toUtf16Span(heading.start, heading.end) },
   });
-  assert.equal(rejection(gesture), 'unsupported-operation');
+  assert.ok(gesture.ok, 'the gesture applies');
+  assert.equal(fs.readFileSync(file, 'utf8'), next.replace('# Heading\r\n\n', ''));
 });
 
 test('every corpus page survives a malformed intermediate and its repair', async (context) => {

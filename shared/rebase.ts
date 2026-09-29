@@ -260,6 +260,7 @@ function rebaseOperation(
     case 'rename-attribute':
     case 'replace-source':
     case 'append-body':
+    case 'insert-frontmatter':
       return ok(operation);
     case 'move-node': {
       const destination = rebaseAnchor(operation.destination, through, current);

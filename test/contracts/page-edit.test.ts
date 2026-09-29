@@ -466,18 +466,21 @@ test('a preview plans against the bytes it is sent and writes nothing', async (c
     /./,
     'a preview without its bytes or its edit never reaches the planner',
   );
+  // Step 10: a Markdown page's gestures are previewed as splices too.
   const markdown = path.join(harness.root, 'src/pages/notes.md');
   fs.writeFileSync(markdown, '# Notes\n');
-  const refused = parsePageEditResult(
+  const notes = parsePageDiskRead(await harness.invoke('page:read', markdown));
+  const heading: Edit = { tag: 'rename-tag', target: refAt(notes, [0]), to: 'h2' };
+  const previewed = parsePageEditResult(
     await harness.invoke('page:previewEdit', {
       pagePath: markdown,
       authoredChecksum: sha256('# Notes\n'),
-      edit: title(refAt(page, [0]), 'x'),
+      edit: heading,
       source: '# Notes\n',
     }),
   );
-  const reason = !refused.ok && refused.error.code === 'rejected' && refused.error.reason;
-  assert.equal(reason, 'unsupported-operation', 'Markdown gestures join at step 10');
+  assert.equal(previewed.ok && previewed.value.source, '## Notes\n', 'planned, not written');
+  assert.equal(fs.readFileSync(markdown, 'utf8'), '# Notes\n');
 });
 
 test('new nodes print where they land; the frontmatter changes its slot', async (context) => {

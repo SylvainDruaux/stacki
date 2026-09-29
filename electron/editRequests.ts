@@ -6,7 +6,9 @@
 // printer (only what is new — never the file), a node's new text is turned
 // into hunks placed on its own bytes (step 9, `replace-node`), and a loop
 // rename's sites are found (shared/loopScope.ts). Everything else is the
-// planner's.
+// planner's. A Markdown or MDX page's own nodes are drafted by
+// markdownEdits.ts (step 10); its markup, and the operations the planner
+// places alike in both — removals, moves, copies — are drafted here.
 //
 // On the .astro printer boundary (eslint.config.mjs) because it prints only
 // what an edit adds: new nodes with serializeNodes, and the frontmatter block
@@ -15,11 +17,7 @@
 // nodes by the path, kind and UTF-16 range of the parse it shows, and only main
 // holds the bytes those become, so the translation stays here.
 import { assert } from '../shared/assert';
-import { toUtf16Offset } from '../shared/brand';
-import { diffCodePatch } from '../shared/code-patch';
-import { DIFF_BUDGET, diffBytes, type ByteDiff } from '../shared/diff';
 import type { Edit, NodeRef } from '../shared/edit-request';
-import { mapSpanThroughDiff } from '../shared/mapSpan';
 import type { BuiltEdit, EditBase, IntentDraft } from './documentActors';
 import { TAG_NAME_RE } from '../shared/intent';
 import type { Operation, Placement, RejectionReason, SourceEdit } from '../shared/intent';
@@ -31,10 +29,9 @@ import {
   openTagEnd,
   tagNameEnd,
   textOf,
-  type ValidProjection,
 } from '../shared/planSupport';
 import { parsePageResult, type PageNode } from '../shared/page-node';
-import { toAnchorRef, toChildIndex, type AnchorRef } from '../shared/ref';
+import { toAnchorRef, type AnchorRef } from '../shared/ref';
 import { err, ok, type Result } from '../shared/result';
 import type { Snapshot } from '../shared/snapshot';
 import {
@@ -44,16 +41,17 @@ import {
   spansAscending,
   toByteSpan,
   toByteString,
-  utf16ToByteOffsets,
-  type ByteSpan,
 } from '../shared/span';
 import { parsePage, serializeNodes, serializePage } from './astroParser';
-
-interface Authored {
-  readonly snapshot: Snapshot;
-  readonly text: string;
-  readonly projection: ValidProjection;
-}
+import {
+  frontmatterSlot,
+  pageFormat,
+  placedHunks,
+  resolveRef,
+  shiftedHunks,
+  type Authored,
+} from './editAnchors';
+import { markdownEditDraft, markdownPageNodes } from './markdownEdits';
 
 /** The intent an edit is. Every edit is built against the snapshot it names,
  * except a frontmatter request after the app's own commits: it states the
@@ -88,7 +86,25 @@ export function buildEditIntent(
   if (projection.tag === 'parse-error') {
     return err('source-invalid');
   }
-  const authored = { snapshot, text: decoded.value, projection };
+  const format = pageFormat(snapshot.path);
+  const authored: Authored = { snapshot, text: decoded.value, projection, format };
+  if (format !== 'astro') {
+    // Markdown's own drafts first (markdownEdits.ts); what it leaves — markup
+    // inside MDX, and the operations the planner places alike — is stated
+    // below as it is for an .astro page.
+    const drafted = markdownEditDraft(edit, authored);
+    if (drafted !== undefined) {
+      return drafted;
+    }
+  }
+  return nodeEditDraft(edit, authored);
+}
+
+// A gesture's edit of the page's nodes, stated against their parse.
+function nodeEditDraft(
+  edit: Exclude<Edit, { readonly tag: 'revert' | 'code-patch' }>,
+  authored: Authored,
+): Result<IntentDraft, RejectionReason> {
   switch (edit.tag) {
     case 'set-attribute':
     case 'remove-attribute':
@@ -127,19 +143,8 @@ export function buildEditIntent(
       );
     case 'unwrap-node':
       return withAnchor(authored, edit.target, (anchor) => unwrapDraft(authored, anchor));
-    case 'append-body': {
-      // The body's first nodes, printed as a new node is; the planner refuses
-      // them once the body has any node (they must stand beside it then).
-      const source = serializeNodes(edit.nodes).replace(/\r?\n$/, '');
-      const eol = authored.text.includes('\r\n') ? '\r\n' : '\n';
-      const anchor = toAnchorRef({
-        span: toByteSpan(0, authored.snapshot.bytes.length),
-        path: [],
-        expectedKind: 'document',
-      });
-      const lines = source.split(/\r?\n/).join(eol);
-      return ok({ anchor, operation: { tag: 'append-body', source: lines } });
-    }
+    case 'append-body':
+      return ok(appendDraft(authored, edit.nodes));
     case 'set-frontmatter':
       return frontmatterDraft(authored, edit.model);
     default: {
@@ -149,53 +154,30 @@ export function buildEditIntent(
   }
 }
 
+// The body's first nodes, printed as a new node is; the planner refuses them
+// once the body has any node (they must stand beside it then).
+function appendDraft(authored: Authored, nodes: readonly PageNode[]): IntentDraft {
+  const source = serializeNodes(nodes).replace(/\r?\n$/, '');
+  const eol = authored.text.includes('\r\n') ? '\r\n' : '\n';
+  const anchor = toAnchorRef({
+    span: toByteSpan(0, authored.snapshot.bytes.length),
+    path: [],
+    expectedKind: 'document',
+  });
+  const lines = source.split(/\r?\n/).join(eol);
+  return { anchor, operation: { tag: 'append-body', source: lines } };
+}
+
 // The renderer's node reference, checked against the projection of the same
-// bytes: the node at that path must have that kind and that range. A
-// mismatch means the renderer's parse is not of these bytes.
+// bytes (editAnchors.ts): a mismatch means the renderer's parse is not of
+// these bytes.
 function withAnchor(
   authored: Authored,
   ref: NodeRef,
   next: (anchor: AnchorRef) => Result<IntentDraft, RejectionReason>,
 ): Result<IntentDraft, RejectionReason> {
-  const node = nodeAtPath(authored.projection, ref.path.map(toChildIndex));
-  if (node === undefined) {
-    return err('anchor-moved');
-  }
-  if (node.kind !== ref.kind) {
-    return err('anchor-moved');
-  }
-  const span = byteSpanOf(authored.text, ref.span.start, ref.span.end);
-  if (span === undefined) {
-    return err('anchor-moved');
-  }
-  if (span.start !== node.span.start || span.end !== node.span.end) {
-    return err('anchor-moved');
-  }
-  return next(toAnchorRef({ span, path: node.path, expectedKind: node.kind }));
-}
-
-// UTF-16 offsets from the wire: inside the text and on code-point boundaries,
-// or no span at all.
-function byteSpanOf(text: string, start: number, end: number): ByteSpan | undefined {
-  if (end > text.length) {
-    return undefined;
-  }
-  if (splitsPair(text, start) || splitsPair(text, end)) {
-    return undefined;
-  }
-  const [first, last] = utf16ToByteOffsets(text, [toUtf16Offset(start), toUtf16Offset(end)]);
-  assert(first !== undefined, 'The start was converted');
-  assert(last !== undefined, 'The end was converted');
-  return toByteSpan(first, last);
-}
-
-function splitsPair(text: string, offset: number): boolean {
-  if (offset === 0 || offset >= text.length) {
-    return false;
-  }
-  const before = text.charCodeAt(offset - 1);
-  const at = text.charCodeAt(offset);
-  return before >= 0xd800 && before <= 0xdbff && at >= 0xdc00 && at <= 0xdfff;
+  const resolved = resolveRef(authored, ref);
+  return resolved.ok ? next(resolved.value.anchor) : resolved;
 }
 
 // New nodes print with the legacy printer, their continuation lines indented
@@ -280,7 +262,7 @@ function replaceDraft(
 ): Result<IntentDraft, RejectionReason> {
   const projected = nodeAtPath(authored.projection, anchor.path);
   assert(projected !== undefined, 'A checked anchor names a projected node');
-  const previous = pageNodeAt(authored.text, anchor.path);
+  const previous = pageNodeAt(authored, anchor.path);
   if (previous === undefined) {
     return err('anchor-moved');
   }
@@ -294,71 +276,8 @@ function replaceDraft(
   if (!hunks.ok) {
     return hunks;
   }
-  const shift = projected.span.start;
-  const moved = hunks.value.map((hunk) => ({
-    span: toByteSpan(hunk.span.start + shift, hunk.span.end + shift),
-    text: hunk.text,
-  }));
+  const moved = shiftedHunks(hunks.value, projected.span.start);
   return ok({ anchor, operation: { tag: 'rewrite-node', hunks: moved } });
-}
-
-// The printer's change from `before` to `after`, as hunks of `own` — the
-// node's bytes. Equal renderings mean the printer and the bytes agree, and the
-// change applies as it is; otherwise each hunk is placed on `own` through the
-// diff from `before`.
-function placedHunks(
-  before: string,
-  after: string,
-  own: string,
-): Result<readonly SourceEdit[], RejectionReason> {
-  const change = diffCodePatch(before, after);
-  if (!change.ok) {
-    return change;
-  }
-  if (change.value.length === 0) {
-    return err('unsupported-operation'); // The gesture changed nothing the printer writes.
-  }
-  if (before === own) {
-    return ok(change.value.map((hunk) => ({ span: hunk.span, text: hunk.text })));
-  }
-  const diff = diffBytes(encodeUtf8(before), encodeUtf8(own), DIFF_BUDGET);
-  if (diff.tag === 'too-costly') {
-    return err('resource-limit');
-  }
-  const placed: SourceEdit[] = [];
-  for (const hunk of change.value) {
-    const span = placedSpan(diff.diff, hunk.span);
-    if (span === undefined) {
-      return err('unsupported-operation');
-    }
-    placed.push({ span, text: hunk.text });
-  }
-  if (!spansAscending(placed.map((hunk) => hunk.span))) {
-    return err('unsupported-operation');
-  }
-  return ok(placed);
-}
-
-// A range of the rendering on the node's bytes: its own bytes kept whole, or,
-// for an insertion, a neighbouring byte kept whole beside it.
-function placedSpan(diff: ByteDiff, span: ByteSpan): ByteSpan | undefined {
-  if (span.start < span.end) {
-    const mapped = mapSpanThroughDiff(diff, span);
-    return mapped.tag === 'resolved' ? mapped.span : undefined;
-  }
-  if (span.start > 0) {
-    const before = mapSpanThroughDiff(diff, toByteSpan(span.start - 1, span.start));
-    if (before.tag === 'resolved') {
-      return toByteSpan(before.span.end, before.span.end);
-    }
-  }
-  if (span.start < diff.source.length) {
-    const after = mapSpanThroughDiff(diff, toByteSpan(span.start, span.start + 1));
-    if (after.tag === 'resolved') {
-      return toByteSpan(after.span.start, after.span.start);
-    }
-  }
-  return undefined;
 }
 
 // Attributes live on tags: elements, component invocations, `<style>`/`<script>`.
@@ -442,13 +361,15 @@ function lineStartBefore(bytes: Uint8Array, to: number, floor: number): number |
   return undefined;
 }
 
-// The parsed node at a projection path: projections index the same tree.
-function pageNodeAt(text: string, path: readonly number[]): PageNode | undefined {
-  const parsed = parsePageResult(parsePage(text, { locs: true }));
-  if (!parsed.editable) {
+// The parsed node at a projection path: projections index the same tree. A
+// Markdown page's markup is found in the Markdown parse, which holds it.
+function pageNodeAt(authored: Authored, path: readonly number[]): PageNode | undefined {
+  const roots =
+    authored.format === 'astro' ? astroPageNodes(authored.text) : markdownPageNodes(authored);
+  if (roots === undefined) {
     return undefined;
   }
-  let list: readonly PageNode[] = parsed.model.nodes;
+  let list: readonly PageNode[] = roots;
   let node: PageNode | undefined;
   for (const step of path) {
     node = list[step];
@@ -463,47 +384,40 @@ function pageNodeAt(text: string, path: readonly number[]): PageNode | undefined
 // The frontmatter the model describes, printed by the legacy printer, against
 // the block on disk: only the differing middle becomes the slot, so a new
 // import touches its line and nothing else.
+function astroPageNodes(text: string): readonly PageNode[] | undefined {
+  const parsed = parsePageResult(parsePage(text, { locs: true }));
+  return parsed.editable ? parsed.model.nodes : undefined;
+}
+
 function frontmatterDraft(
   authored: Authored,
   model: Extract<Edit, { tag: 'set-frontmatter' }>['model'],
 ): Result<IntentDraft, RejectionReason> {
   const block = authored.projection.frontmatter;
+  const page = serializePage({ ...model, nodes: [] });
   if (block === undefined) {
-    return err('unsupported-operation'); // Creating a block is a whole-file change.
+    // A page without a block gains one at its top (step 10).
+    const printed = printedBlock(page, '\n');
+    if (printed === undefined) {
+      return err('unsupported-operation'); // The model describes no block either.
+    }
+    const anchor = toAnchorRef({
+      span: toByteSpan(0, authored.snapshot.bytes.length),
+      path: [],
+      expectedKind: 'document',
+    });
+    return ok({ anchor, operation: { tag: 'insert-frontmatter', source: printed } });
   }
   const before = Buffer.from(authored.snapshot.bytes.subarray(block.start, block.end)).toString(
     'utf8',
   );
-  const printed = printedBlock(serializePage({ ...model, nodes: [] }), before);
+  const printed = printedBlock(page, before);
   if (printed === undefined) {
     return err('unsupported-operation');
   }
-  let prefix = 0;
-  const shorter = Math.min(before.length, printed.length);
-  while (prefix < shorter && before.charCodeAt(prefix) === printed.charCodeAt(prefix)) {
-    prefix++;
-  }
-  let suffix = 0;
-  while (
-    suffix < shorter - prefix &&
-    before.charCodeAt(before.length - 1 - suffix) ===
-      printed.charCodeAt(printed.length - 1 - suffix)
-  ) {
-    suffix++;
-  }
-  // Whole code points only: a boundary inside a pair moves out of it.
-  if (splitsPair(before, prefix) || splitsPair(printed, prefix)) {
-    prefix--;
-  }
-  if (splitsPair(before, before.length - suffix) || splitsPair(printed, printed.length - suffix)) {
-    suffix--;
-  }
-  const slot = byteSpanOf(before, prefix, before.length - suffix);
-  assert(slot !== undefined, 'The slot lies inside the block on code-point boundaries');
+  const { slot, text } = frontmatterSlot(block, before, printed);
   const anchor = toAnchorRef({ span: block, path: [], expectedKind: 'frontmatter' });
-  const shifted = toByteSpan(block.start + slot.start, block.start + slot.end);
-  const text = printed.slice(prefix, printed.length - suffix);
-  return ok({ anchor, operation: { tag: 'edit-frontmatter-slot', slot: shifted, text } });
+  return ok({ anchor, operation: { tag: 'edit-frontmatter-slot', slot, text } });
 }
 
 // The fenced block of a printed page without nodes, ending as the block on

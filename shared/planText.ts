@@ -150,6 +150,42 @@ export function planFrontmatterSlot(
   }
 }
 
+/** `insert-frontmatter` (step 10): the block of a page that has none, at its
+ * top — after a byte-order mark, which opens the file, not the block. A block
+ * in either version means the edit that stated a new one is not about this
+ * file any more: refused. */
+export function planInsertFrontmatter(
+  context: PlanContext,
+  anchor: AnchorRef,
+  operation: Extract<Operation, { tag: 'insert-frontmatter' }>,
+): Result<Plan, RejectionReason> {
+  assert(anchor.expectedKind === 'document', 'A new frontmatter block anchors the document');
+  const projections = validProjections(context);
+  if (!projections.ok) {
+    return projections;
+  }
+  if (projections.value.authored.frontmatter !== undefined) {
+    return err('anchor-moved');
+  }
+  if (projections.value.current.frontmatter !== undefined) {
+    return err('anchor-moved');
+  }
+  const bytes = context.current.bytes;
+  const at = hasByteOrderMark(bytes) ? 3 : 0;
+  const splice = spliceAt(bytes, toByteSpan(at, at), operation.source);
+  assert(splice.expectedBytes.length === 0, 'A new block replaces nothing');
+  return ok({ splices: [splice], postKinds: [], candidate: 'must-parse' });
+}
+
+function hasByteOrderMark(bytes: ByteString): boolean {
+  if (bytes[0] === 0xef) {
+    if (bytes[1] === 0xbb) {
+      return bytes[2] === 0xbf;
+    }
+  }
+  return false;
+}
+
 /** A code patch (the code editor from step 8; a stylesheet rule at step 6):
  * text may leave the file invalid (plan §3.6); a stale hunk that cannot be
  * found whole is a merge conflict. */

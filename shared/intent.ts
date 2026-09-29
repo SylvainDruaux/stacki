@@ -49,7 +49,11 @@ export type StyleDeclaration =
  * `wrap-nodes`, a run of siblings put inside a new tag (a layout picked for a
  * page without one): its opening before the first, its closing after the
  * last, every byte of the run kept. And `append-body`: the first node of a
- * page whose body is empty, which has no node to stand beside. */
+ * page whose body is empty, which has no node to stand beside.
+ *
+ * Added at step 10: `insert-frontmatter`, the frontmatter block of a page that
+ * has none, written at its top (a layout picked for a Markdown post without
+ * one). An edit of an existing block stays a slot. */
 export type Operation =
   | { readonly tag: 'set-attribute'; readonly name: string; readonly value: AttributeValue }
   | { readonly tag: 'remove-attribute'; readonly name: string }
@@ -74,6 +78,7 @@ export type Operation =
   | { readonly tag: 'rename-attribute'; readonly from: string; readonly to: string }
   | { readonly tag: 'rewrite-node'; readonly hunks: readonly SourceEdit[] }
   | { readonly tag: 'append-body'; readonly source: string }
+  | { readonly tag: 'insert-frontmatter'; readonly source: string }
   | {
       readonly tag: 'wrap-nodes';
       readonly last: AnchorRef;
@@ -188,6 +193,7 @@ function operationTexts(operation: Operation): readonly string[] {
       return [operation.name];
     case 'insert-node':
     case 'append-body':
+    case 'insert-frontmatter':
       return [operation.source];
     case 'remove-node':
     case 'move-node':
@@ -282,6 +288,7 @@ function checkOperationAnchor(operation: Operation, anchor: AnchorRef): void {
       return;
     case 'replace-source':
     case 'append-body':
+    case 'insert-frontmatter':
       requireKind(operation.tag, kind === 'document');
       return;
     default: {
@@ -405,6 +412,7 @@ function parseOperation(input: unknown): Operation {
         to: tagName(record['to'], 'Operation.to'),
       };
     case 'append-body':
+    case 'insert-frontmatter':
       return { tag, source: payloadText(record['source'], 'Operation.source') };
     case 'wrap-nodes':
       return {

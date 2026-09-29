@@ -32,6 +32,7 @@ import type {
   ReplaceError,
 } from '../shared/documentActor';
 import { parsePageResult } from '../shared/page-node';
+import { parseMarkdownPage } from './markdownParser';
 import type { Plan } from '../shared/planner';
 import { projectValueSplice } from '../shared/projection-patch';
 import { toRecord } from '../shared/record';
@@ -255,9 +256,10 @@ export class NodeDocumentDisk implements DocumentDisk {
 // --- Projection ------------------------------------------------------------------
 
 /** Bytes → projection, through the real parser (plan §2 layer 1). `.astro`
- * pages get a page projection; every other document — Markdown, MDX, a chunk,
- * a stylesheet — is opaque until its step (plan §6). Invalid UTF-8 is a
- * parse-error projection, never a lossy decode (plan §3.2). */
+ * pages get a page projection, and so — since step 10 — do Markdown and MDX
+ * pages, through the Markdown parser; every other document — a chunk, a
+ * stylesheet — is opaque (plan §6). Invalid UTF-8 is a parse-error
+ * projection, never a lossy decode (plan §3.2). */
 export function projectDocument(file: FilePath, bytes: ByteString): Projection {
   const decoded = decodeUtf8(bytes);
   if (!decoded.ok) {
@@ -265,11 +267,20 @@ export function projectDocument(file: FilePath, bytes: ByteString): Projection {
     return { tag: 'parse-error', byteLength: bytes.length, diagnostics: [diagnostic] };
   }
   const text = decoded.value;
-  const projection = /\.astro$/i.test(file)
-    ? projectPage(text, parsePageResult(parsePage(text, { locs: true })))
-    : projectOpaqueDocument(text);
+  const projection = projectText(file, text);
   assert(projection.byteLength === bytes.length, 'The projection measures the bytes it read');
   return projection;
+}
+
+function projectText(file: FilePath, text: string): Projection {
+  if (/\.astro$/i.test(file)) {
+    return projectPage(text, parsePageResult(parsePage(text, { locs: true })));
+  }
+  if (/\.mdx?$/i.test(file)) {
+    const mdx = /\.mdx$/i.test(file);
+    return projectPage(text, parsePageResult(parseMarkdownPage(text, { mdx })));
+  }
+  return projectOpaqueDocument(text);
 }
 
 const hashBytes = (bytes: ByteString) => digestOf(bytes);

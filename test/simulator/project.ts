@@ -1,9 +1,11 @@
-// Bytes → snapshot, through the real parser (plan §10: the simulator drives the
-// real parser, not a model of it). `.astro` files get a page projection; every
-// other file is an opaque document addressed only whole. Invalid UTF-8 is a
-// parse-error projection, never a lossy decode (plan §3.2).
+// Bytes → snapshot, through the real parsers (plan §10: the simulator drives
+// the real parser, not a model of it). `.astro` files get a page projection,
+// and so do Markdown and MDX pages (step 10), through the Markdown parser;
+// every other file is an opaque document addressed only whole. Invalid UTF-8
+// is a parse-error projection, never a lossy decode (plan §3.2).
 import { createHash } from 'node:crypto';
 import { parsePage } from '../../dist/electron/astroParser.js';
+import { parseMarkdownPage } from '../../dist/electron/markdownParser.js';
 import { assert } from '../../dist/shared/assert.js';
 import { toDigest, type Digest, type FilePath } from '../../dist/shared/brand.js';
 import { parsePageResult } from '../../dist/shared/page-node.js';
@@ -26,11 +28,20 @@ export function projectBytes(path: FilePath, bytes: ByteString): Projection {
     return { tag: 'parse-error', byteLength: bytes.length, diagnostics: [diagnostic] };
   }
   const text = decoded.value;
-  const projection = path.endsWith('.astro')
-    ? projectPage(text, parsePageResult(parsePage(text, { locs: true })))
-    : projectOpaqueDocument(text);
+  const projection = projectText(path, text);
   assert(projection.byteLength === bytes.length, 'The projection measures the bytes it read');
   return projection;
+}
+
+function projectText(path: FilePath, text: string): Projection {
+  if (path.endsWith('.astro')) {
+    return projectPage(text, parsePageResult(parsePage(text, { locs: true })));
+  }
+  if (path.endsWith('.md') || path.endsWith('.mdx')) {
+    const mdx = path.endsWith('.mdx');
+    return projectPage(text, parsePageResult(parseMarkdownPage(text, { mdx })));
+  }
+  return projectOpaqueDocument(text);
 }
 
 export function snapshotOf(path: FilePath, bytes: ByteString): Snapshot {

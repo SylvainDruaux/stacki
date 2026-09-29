@@ -38,14 +38,24 @@ import {
 } from './planSupport';
 import { toChildIndex, type AnchorRef } from './ref';
 import { err, ok, type Result } from './result';
-import type { ProjectedNode } from './source-projection';
+import { markdownPrefix } from './markdownLayout';
+import {
+  itemMarker,
+  markdownBeside,
+  markdownInsertion,
+  markdownRemoval,
+  markdownRemoved,
+  reprefixed,
+} from './planMarkdown';
+import type { NodeList, ProjectedNode } from './source-projection';
 import { encodeUtf8, toByteSpan, toByteString, type ByteSpan, type ByteString } from './span';
 
 const NEWLINE = 0x0a;
 
-/** A zero-width point and the text that goes there. */
+/** What an insertion writes: a zero-width point, or in Markdown the gap it
+ * rewrites (planMarkdown.ts), and the text that goes there. */
 interface Insertion {
-  readonly at: number;
+  readonly range: ByteSpan;
   readonly text: string;
   /** Where the anchor node sits once the text is in: an insertion before it
    * shifts it one sibling on. */
@@ -71,16 +81,45 @@ export function planRemoveNode(
     return err('region-externally-modified');
   }
   const current = currentProjection(context);
-  if (leavesCodeEmpty(context.current.bytes, current, target.current)) {
-    return err('unsupported-operation');
+  const node = target.current;
+  switch (node.list) {
+    case 'markup': {
+      if (leavesCodeEmpty(context.current.bytes, current, node)) {
+        return err('unsupported-operation');
+      }
+      return ok(removalPlan(context.current.bytes, current, node, removalRange));
+    }
+    case 'blocks':
+    case 'items': {
+      const removed = markdownRemoved(current, node);
+      if (!nodePlaceable(removed)) {
+        return err('unsupported-operation'); // The list an only item takes is not placeable.
+      }
+      const removal = markdownRemoval(context.current.bytes, current, removed);
+      if (removal === undefined) {
+        return err('unsupported-operation'); // No prefix to write the blank line with.
+      }
+      const splice = spliceAt(context.current.bytes, removal.range, removal.text);
+      const postKinds = parentKind(current, removed);
+      return ok({ splices: [splice], postKinds, candidate: 'must-parse' });
+    }
+    case 'inline':
+      return err('unsupported-operation'); // A block's own text: edited, never removed.
+    default: {
+      const exhaustive: never = node.list;
+      return exhaustive;
+    }
   }
-  const range = removalRange(context.current.bytes, current, target.current);
-  const splice = spliceAt(context.current.bytes, range, '');
-  return ok({
-    splices: [splice],
-    postKinds: parentKind(current, target.current),
-    candidate: 'must-parse',
-  });
+}
+
+function removalPlan(
+  bytes: ByteString,
+  projection: ValidProjection,
+  node: ProjectedNode,
+  range: (bytes: ByteString, projection: ValidProjection, node: ProjectedNode) => ByteSpan,
+): Plan {
+  const splice = spliceAt(bytes, range(bytes, projection, node), '');
+  return { splices: [splice], postKinds: parentKind(projection, node), candidate: 'must-parse' };
 }
 
 export function planInsertNode(
@@ -107,8 +146,7 @@ export function planInsertNode(
   if (!insertion.ok) {
     return insertion;
   }
-  const at = toByteSpan(insertion.value.at, insertion.value.at);
-  const splice = spliceAt(context.current.bytes, at, insertion.value.text);
+  const splice = spliceAt(context.current.bytes, insertion.value.range, insertion.value.text);
   const postKinds = [
     { path: insertion.value.anchorPath.map(toChildIndex), kind: target.current.kind },
   ];
@@ -143,6 +181,9 @@ export function planWrapNodes(
   }
   if (!samePath(parentPath(start.path), parentPath(end.path))) {
     return err('unsupported-operation'); // Not one run of siblings.
+  }
+  if (start.list !== 'markup') {
+    return err('unsupported-operation'); // A tag around Markdown blocks is not Markdown.
   }
   if (end.span.start < start.span.start) {
     return err('unsupported-operation');
@@ -227,10 +268,65 @@ export function planMoveNode(
   if (!nodeUnchanged(context, source.value)) {
     return err('region-externally-modified');
   }
-  if (leavesCodeEmpty(context.current.bytes, currentProjection(context), moved)) {
+  const current = currentProjection(context);
+  const list = listAt(current, destination.value.current, operation.placement);
+  if (list !== moved.list) {
+    return err('unsupported-operation'); // A block among items, markup among blocks: not a move.
+  }
+  switch (list) {
+    case 'markup':
+      if (leavesCodeEmpty(context.current.bytes, current, moved)) {
+        return err('unsupported-operation');
+      }
+      return planRelocation(context, source.value, destination.value, operation.placement);
+    case 'blocks':
+    case 'items':
+      return planMarkdownRelocation(context, moved, destination.value.current, operation.placement);
+    case 'inline':
+      return err('unsupported-operation');
+    default: {
+      const exhaustive: never = list;
+      return exhaustive;
+    }
+  }
+}
+
+// A Markdown block or item moved: its bytes, their continuation lines carrying
+// the destination's prefix, separated there as its neighbours are; its old
+// place removed as a removal would. An item keeps its marker, so it moves only
+// among items written with the same one — another starts a new list.
+function planMarkdownRelocation(
+  context: PlanContext,
+  moved: ProjectedNode,
+  destination: ProjectedNode,
+  placement: Placement,
+): Result<Plan, RejectionReason> {
+  const bytes = context.current.bytes;
+  const current = currentProjection(context);
+  const beside = markdownBeside(current, destination, placement);
+  if (beside === undefined) {
     return err('unsupported-operation');
   }
-  return planRelocation(context, source.value, destination.value, operation.placement);
+  if (moved.list === 'items') {
+    if (itemMarker(bytes, moved) !== itemMarker(bytes, beside.node)) {
+      return err('unsupported-operation');
+    }
+  }
+  const prefix = markdownPrefix(bytes, beside.node.span.start);
+  const text = prefix === undefined ? undefined : reprefixed(bytes, moved, prefix);
+  if (text === undefined) {
+    return err('unsupported-operation'); // A line whose container is not written out.
+  }
+  const anchorPath = placement === 'before' ? shifted(destination.path) : destination.path;
+  const insertion = markdownInsertion(bytes, current, beside, anchorPath, text);
+  if (insertion === undefined) {
+    return err('unsupported-operation');
+  }
+  const removal = markdownRemoval(bytes, current, markdownRemoved(current, moved));
+  if (removal === undefined) {
+    return err('unsupported-operation');
+  }
+  return relocationSplices(bytes, insertion, removal);
 }
 
 function planRelocation(
@@ -249,19 +345,47 @@ function planRelocation(
   if (!insertion.ok) {
     return insertion;
   }
-  const removal = removalRange(bytes, current, source.current);
-  const at = insertion.value.at;
-  if (removal.start < at) {
-    if (at < removal.end) {
-      return err('unsupported-operation'); // Beside itself: a move that goes nowhere.
-    }
+  const removal = { range: removalRange(bytes, current, source.current), text: '' };
+  return relocationSplices(bytes, insertion.value, removal);
+}
+
+// The insertion and the removal of one move, refused when the new place lies
+// inside the old one (or, in Markdown, rewrites a gap the removal takes).
+function relocationSplices(
+  bytes: ByteString,
+  insertion: Pick<Insertion, 'range' | 'text'>,
+  removal: { readonly range: ByteSpan; readonly text: string },
+): Result<Plan, RejectionReason> {
+  const into = insertion.range;
+  const out = removal.range;
+  if (overlaps(into, out)) {
+    return err('unsupported-operation'); // Beside itself: a move that goes nowhere.
   }
   // Ascending, the insertion first when both start at one byte (orderedSplices
   // keeps that order, and the zero-width splice ends where the removal starts).
-  const insert = spliceAt(bytes, toByteSpan(at, at), insertion.value.text);
-  const remove = spliceAt(bytes, removal, '');
-  const splices = at <= removal.start ? [insert, remove] : [remove, insert];
+  const insert = spliceAt(bytes, into, insertion.text);
+  const remove = spliceAt(bytes, out, removal.text);
+  const splices = into.end <= out.start ? [insert, remove] : [remove, insert];
   return ok({ splices, postKinds: [], candidate: 'must-parse' });
+}
+
+// Whether an insertion lands inside a removal: a point strictly inside it, or
+// a rewritten gap sharing any byte with it. Touching at an edge is not.
+function overlaps(into: ByteSpan, out: ByteSpan): boolean {
+  if (into.start === into.end) {
+    if (out.start < into.start) {
+      return into.start < out.end;
+    }
+    return false;
+  }
+  if (out.start < into.end) {
+    return into.start < out.end;
+  }
+  return false;
+}
+
+function point(at: number): ByteSpan {
+  return toByteSpan(at, at);
 }
 
 // The moved bytes, minus the loop references the destination cannot satisfy.
@@ -376,6 +500,9 @@ function insertionAt(
   placement: Placement,
   text: string,
 ): Result<Insertion, RejectionReason> {
+  if (listAt(projection, anchor, placement) !== 'markup') {
+    return markdownInsertionAt(bytes, projection, anchor, placement, text);
+  }
   if (inside(placement)) {
     return insertionInside(bytes, projection, anchor, placement, text);
   }
@@ -391,13 +518,58 @@ function insertionAt(
   }
   const separator = separatorBefore(bytes, projection, anchor);
   if (placement === 'after') {
-    return ok({ at: anchor.span.end, text: `${separator}${text}`, anchorPath: anchor.path });
+    const at = toByteSpan(anchor.span.end, anchor.span.end);
+    return ok({ range: at, text: `${separator}${text}`, anchorPath: anchor.path });
   }
   return ok({
-    at: anchor.span.start,
+    range: toByteSpan(anchor.span.start, anchor.span.start),
     text: `${text}${separator}`,
     anchorPath: shifted(anchor.path),
   });
+}
+
+// Beside a Markdown block or item, or inside a quote, an item or a list next
+// to its first or last child (planMarkdown.ts). A block's inline text has no
+// siblings, and an empty container no line to take a prefix from.
+function markdownInsertionAt(
+  bytes: ByteString,
+  projection: ValidProjection,
+  anchor: ProjectedNode,
+  placement: Placement,
+  text: string,
+): Result<Insertion, RejectionReason> {
+  const beside = markdownBeside(projection, anchor, placement);
+  if (beside === undefined) {
+    return err('unsupported-operation');
+  }
+  if (beside.node.list === 'inline') {
+    return err('unsupported-operation');
+  }
+  if (beside.node.list === 'markup') {
+    return err('unsupported-operation'); // Markup inside a Markdown container: its own rules.
+  }
+  const anchorPath = placement === 'before' ? shifted(anchor.path) : anchor.path;
+  const insertion = markdownInsertion(bytes, projection, beside, anchorPath, text);
+  return insertion === undefined ? err('unsupported-operation') : ok(insertion);
+}
+
+/** The list a node placed at `placement` of `anchor` joins: the anchor's own
+ * beside it; inside it, the list its children sit in — markup inside markup,
+ * and inside a Markdown node whatever its first child says (an empty one says
+ * nothing Markdown can place into: `inline`). */
+function listAt(
+  projection: ValidProjection,
+  anchor: ProjectedNode,
+  placement: Placement,
+): NodeList {
+  if (!inside(placement)) {
+    return anchor.list;
+  }
+  if (anchor.syntax === 'markup') {
+    return 'markup';
+  }
+  const [first] = childrenOf(projection, anchor);
+  return first === undefined ? 'inline' : first.list;
 }
 
 // Inside a tag: beside its first or last child, or, when it has none, right
@@ -422,9 +594,11 @@ function insertionInside(
     if (last !== undefined) {
       const beside = placement === 'first-child' ? first : last;
       const separator = separatorBefore(bytes, projection, beside);
-      return placement === 'first-child'
-        ? ok({ at: first.span.start, text: `${text}${separator}`, anchorPath: parent.path })
-        : ok({ at: last.span.end, text: `${separator}${text}`, anchorPath: parent.path });
+      const anchorPath = parent.path;
+      if (placement === 'first-child') {
+        return ok({ range: point(first.span.start), text: `${text}${separator}`, anchorPath });
+      }
+      return ok({ range: point(last.span.end), text: `${separator}${text}`, anchorPath });
     }
   }
   const open = openTagEnd(bytes, parent);
@@ -437,7 +611,7 @@ function insertionInside(
   }
   const lined = containsNewline(bytes, toByteSpan(open.end, close));
   const lead = lined ? `\n${lineIndent(bytes, parent.span.start)}  ` : '';
-  return ok({ at: open.end, text: `${lead}${text}`, anchorPath: parent.path });
+  return ok({ range: point(open.end), text: `${lead}${text}`, anchorPath: parent.path });
 }
 
 // How the node is set apart from what precedes it: the whitespace run between

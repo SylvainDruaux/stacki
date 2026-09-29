@@ -3223,17 +3223,10 @@ ipcMain.handle('page:write', async (_e, { pagePath, model, baseChecksum }) => {
 // The reply is the page as written plus the inverse Undo will submit.
 //
 // The code editor's saves arrive here too (step 8): a code patch is bytes, not
-// nodes, so it applies to Markdown and MDX pages as well, and to a page that
-// does not parse — before or after.
+// nodes, so it applies to a page that does not parse — before or after.
+// Markdown and MDX pages take every edit since step 10 (markdownEdits.ts).
 ipcMain.handle('page:edit', async (_e, { pagePath, authoredChecksum, edit }) => {
   const code = edit.tag === 'code-patch';
-  // A code patch or an Undo's revert is bytes, not nodes: Markdown takes them.
-  if (isMarkdownPage(pagePath) && !code && edit.tag !== 'revert') {
-    const reason = 'unsupported-operation' as const; // Markdown gestures join at step 10.
-    const message = describeRejection(reason);
-    const error = { code: 'rejected' as const, reason, message, diskChecksum: null };
-    return { ok: false as const, error };
-  }
   const gone = code ? ('merge-conflict' as const) : ('anchor-moved' as const);
   const stated = { authoredChecksum, gone };
   const report = documents.submitEdit(pagePath, stated, (base) => buildEdit(edit, base));
@@ -3275,9 +3268,6 @@ ipcMain.handle('page:previewEdit', async (_e, { pagePath, authoredChecksum, edit
     const error = { code: 'rejected' as const, reason, message: describeRejection(reason) };
     return { ok: false as const, error: { ...error, diskChecksum: null } };
   };
-  if (isMarkdownPage(pagePath)) {
-    return refused('unsupported-operation'); // Markdown gestures join at step 10.
-  }
   const planned = previewEdit(pagePath, encodeUtf8(source), authoredChecksum, edit);
   if (!planned.ok) {
     return refused(planned.error);
