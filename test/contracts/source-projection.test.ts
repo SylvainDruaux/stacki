@@ -44,7 +44,10 @@ test('capabilities are a closed set with a visual-edit answer and notice for eac
     'runtime-aggregate',
     'unsupported',
   ]);
-  assert.deepEqual(CAPABILITIES.filter(capabilityAcceptsVisualIntent), ['editable']);
+  assert.deepEqual(CAPABILITIES.filter(capabilityAcceptsVisualIntent), [
+    'editable',
+    'repeated-source-node',
+  ]);
   assert.equal(new Set(CAPABILITIES.map(describeCapability)).size, CAPABILITIES.length);
   assert.equal(parseCapability('editable'), 'editable');
   assert.throws(() => parseCapability('writable'), /unknown value/);

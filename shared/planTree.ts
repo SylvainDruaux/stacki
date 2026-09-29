@@ -111,10 +111,11 @@ export function planInsertNode(
   return ok({ splices: [splice], postKinds, candidate: 'must-parse' });
 }
 
-// A node inside a loop is one source node the loop repeats (plan §6). Visual
-// intents leave it to step 7, with one exception: moving it. That gesture
-// exists to take a node out of its loop, and the move rewrites exactly what
-// would break (the kind-changing class of plan §3.3).
+// A node inside a loop is one source node the loop repeats (plan §6). Its own
+// content is edited like any node's (step 7), but the list it sits in is the
+// loop body's code, so nothing is removed from it or placed beside it — with one
+// exception: moving it. That gesture exists to take a node out of its loop, and
+// the move rewrites exactly what would break (the kind-changing class of §3.3).
 export function planMoveNode(
   context: PlanContext,
   anchor: AnchorRef,

@@ -8,7 +8,10 @@ export const CAPABILITIES = [
   /** Code the engine keeps verbatim: expressions, spreads, `<script>`, `set:html`. */
   'read-only-opaque',
   /** One source node rendered many times — inside a loop. Clicking a rendered
-   * instance targets the source loop node; it never mints an instance id. */
+   * instance selects this source node (the occurrence only picks which copy is
+   * outlined); it never mints an instance id. An edit changes the source, and so
+   * every copy (step 7). Placing nodes beside it stays refused: a loop body is
+   * code, and a second root there does not build. */
   'repeated-source-node',
   /** One runtime element assembled from several sources (a chunk group). */
   'runtime-aggregate',
@@ -29,13 +32,15 @@ export function parseCapability(input: unknown): Capability {
 
 /** Whether visual intents may target a node with this capability. Written as an
  * exhaustive switch so a new capability must decide, at compile time, whether
- * it is visually editable. */
+ * it is visually editable. A repeated node is: its one source node is what the
+ * canvas addresses, and editing it is what the model can actually do — refusing
+ * it would be a read-only downgrade (decided at step 7). */
 export function capabilityAcceptsVisualIntent(capability: Capability): boolean {
   switch (capability) {
     case 'editable':
+    case 'repeated-source-node':
       return true;
     case 'read-only-opaque':
-    case 'repeated-source-node':
     case 'runtime-aggregate':
     case 'unsupported':
       return false;
@@ -54,7 +59,7 @@ export function describeCapability(capability: Capability): string {
     case 'read-only-opaque':
       return 'Code — edit it in the code panel';
     case 'repeated-source-node':
-      return 'Repeated by a loop — select the loop to edit its template';
+      return 'Repeated by a loop — an edit here changes every item';
     case 'runtime-aggregate':
       return 'Assembled from several files — edit each source file';
     case 'unsupported':

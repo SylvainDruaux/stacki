@@ -147,6 +147,14 @@ function currentTarget(
   if (!sameSpan(identityRegion(context.current.bytes, node), mappedRegion)) {
     return err('anchor-moved');
   }
+  // The same bytes can mean a different node once the file around them changed:
+  // an element someone wrapped in a loop outside Stacki is now one source node
+  // rendered many times, and an edit authored against one element would change
+  // every copy. What the user saw is the authored capability; a different one
+  // now is a change they have not seen (step 7).
+  if (node.capability !== authored.capability) {
+    return err('region-externally-modified');
+  }
   return ok({ authored, current: node, shift });
 }
 
@@ -446,8 +454,9 @@ export function nodePlaceable(node: ProjectedNode): boolean {
 }
 
 /** Whether visual intents may edit this node. A node repeated by a loop is
- * one source node shown many times (plan §6); step 7 decides how the canvas
- * addresses it, and until then only a move may take one out (planTree.ts). */
+ * one source node shown many times (plan §6): since step 7 the canvas addresses
+ * that source node, and an edit of it changes every copy. Only a move may take
+ * one out of its loop (planTree.ts); nothing is placed beside it. */
 export function nodeEditable(node: ProjectedNode): boolean {
   return capabilityAcceptsVisualIntent(node.capability);
 }

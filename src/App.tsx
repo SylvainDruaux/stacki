@@ -91,6 +91,8 @@ import {
   saveStateRefused,
 } from './saveState.js';
 import SaveConflictNotice from './panels/SaveConflictNotice';
+import CapabilityNotice from './panels/CapabilityNotice';
+import { nodeCapability } from './nodeCapability';
 import type { PageDiskRead, PageEdited, PageWriteError } from '../shared/page-save';
 import type { Result } from '../shared/result';
 import type { Digest } from '../shared/brand';
@@ -5521,6 +5523,13 @@ export default function App() {
                 </button>
               ))}
             </div>
+            <CapabilityNotice
+              capability={
+                model && selectedId && selectedId !== 'frontmatter'
+                  ? nodeCapability(model, selectedId)
+                  : undefined
+              }
+            />
             {rightTab === 'style' && (
               <StylePanel
                 project={project}

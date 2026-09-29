@@ -107,7 +107,13 @@ actor. The app submits one operation so far: the migration-only
   multi-span sites (inside the anchor, ascending, disjoint, at most
   `splicesPerIntentMax`) and the summed UTF-8 payload.
 - `capability.ts` — `editable` | `read-only-opaque` | `repeated-source-node` |
-  `runtime-aggregate` | `unsupported`; only `editable` accepts visual intents.
+  `runtime-aggregate` | `unsupported`; `editable` and (since step 7)
+  `repeated-source-node` accept visual intents: a node a loop repeats is one
+  source node, and an edit of it changes every copy. Nothing is placed beside
+  it (the loop body is code), and a stale intent whose node changed capability
+  since it was authored — wrapped in a loop outside Stacki — is refused
+  `region-externally-modified`. The renderer shows every other capability
+  beside the selection (`src/nodeCapability.ts`, `CapabilityNotice`).
 - `source-projection.ts` — the `Projection` sum (`valid` with byte-addressed
   nodes, paths, attribute spans and capabilities, and the text's UTF-16 length,
   which the parser bounds; or `parse-error` with bounded diagnostics). Named so nothing in it can be confused with the `page-node.ts`

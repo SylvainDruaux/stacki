@@ -46,7 +46,7 @@ export function planRenameBinding(
   }
   const target = resolved.value;
   if (!nodeEditable(target.current)) {
-    return err('unsupported-operation'); // A loop inside a loop: step 7.
+    return err('unsupported-operation'); // Code the engine keeps verbatim.
   }
   const from = encodeUtf8(operation.from);
   const splices: Splice[] = [];

@@ -227,9 +227,11 @@ test('stale intent, the target itself in question: typed rejections, never anoth
     againstCurrent(`${HERO}${FOOTER}${CARD}{[1, 2].map(() => <Card title="Old" />)}\n`).result,
     'rejected: anchor-ambiguous',
   );
-  // The footer moved into a loop, its bytes unique: the capability refuses it.
+  // The footer moved into a loop, its bytes unique: it is now one source node
+  // rendered many times, which the user never saw, so the edit is refused —
+  // never applied to every copy (step 7).
   const looped = footerAgainst(`${HERO}{[1, 2].map(() => <Footer title="Old" />)}\n${CARD}${CARD}`);
-  assert.equal(looped.result, 'rejected: unsupported-operation');
+  assert.equal(looped.result, 'rejected: region-externally-modified');
   // The whole file deleted.
   assert.equal(againstCurrent('').result, 'rejected: anchor-moved');
 });
@@ -365,7 +367,7 @@ test('rejections that need no diff: the anchor, the attribute, the value, the op
   assert.deepEqual(plan({ tag: 'move-node', destination: hero, placement: 'after' }).ok, true);
 });
 
-test('duplicate attributes and loop bodies are refused; an expression attribute is replaced whole', () => {
+test('duplicate attributes are refused, loop bodies edit their one source node, and an expression attribute is replaced whole', () => {
   const page = snapshotText(readFixture('conditional-template.astro'));
   const projection = page.projection;
   assert.equal(projection.tag, 'valid');
@@ -403,7 +405,22 @@ test('duplicate attributes and loop bodies are refused; an expression attribute 
     }
     return false;
   });
-  assert.deepEqual(planIntent(base, intentOn(page, repeated, setAttribute('class', 'b'))), {
+  // Step 7: a node a loop repeats is one source node, and an edit of it edits
+  // that source — every copy the loop renders — never one runtime instance.
+  const edited = planIntent(base, intentOn(page, repeated, setAttribute('data-step', '7')));
+  assert.ok(edited.ok, 'an attribute of a repeated node plans against its source node');
+  const [splice, ...others] = edited.value.splices;
+  assert.equal(others.length, 0, 'one splice: the source node is written once');
+  assert.ok(splice !== undefined);
+  assert.ok(repeated.span.start <= splice.range.start, 'the splice lands in the source node');
+  assert.ok(splice.range.end <= repeated.span.end, 'and stays inside it');
+  // Nothing is placed beside it or taken from it: the list it sits in is the
+  // loop body's code.
+  assert.deepEqual(
+    planIntent(base, intentOn(page, repeated, { tag: 'insert-node', placement: 'after', source: '<p />' })),
+    { ok: false, error: 'unsupported-operation' },
+  );
+  assert.deepEqual(planIntent(base, intentOn(page, repeated, { tag: 'remove-node' })), {
     ok: false,
     error: 'unsupported-operation',
   });
