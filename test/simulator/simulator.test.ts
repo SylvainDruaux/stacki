@@ -107,6 +107,13 @@ const REQUIRED_TALLIES = [
   'undo:planned',
   'undo:mapped',
   'undo:rejected region-externally-modified',
+  // Step 8: code-editor saves as patches — malformed intermediates written,
+  // stale patches merged through other writes, and overlaps refused.
+  'code:planned',
+  'code:invalid',
+  'code:mapped',
+  'code:rejected merge-conflict',
+  'outcome:rejected merge-conflict',
   // Not required: `rejected-gone` — no simulated writer deletes an element yet
   // (tracker Step 3, corpus gaps).
 ] as const;

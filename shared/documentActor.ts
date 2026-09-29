@@ -377,7 +377,9 @@ function stepIdle(state: ActorState, dependencies: ActorDependencies): ActorStep
     if (candidate.projection.tag === 'parse-error') {
       return reject(current, intent, 'source-invalid', parses + 1, earlier);
     }
-    assertPostKinds(candidate, plan);
+    if (!postKindsHold(candidate, plan)) {
+      return reject(current, intent, 'unsupported-operation', parses + 1, earlier);
+    }
   }
   const phase: ActorPhase = { tag: 'planned', intent, base, plan, candidate };
   return { state: { ...current, phase }, effects: earlier, parses: parses + 1 };
@@ -418,9 +420,15 @@ function staleWithoutBytes(intent: Intent): RejectionReason {
   }
 }
 
-// The target keeps its expected kind (§5.2 step 6). A planner that produced a
-// candidate where it does not is broken, so this asserts rather than rejects.
-function assertPostKinds(candidate: Snapshot, plan: Plan): void {
+// The target is still there, with its expected kind (§5.2 step 6). Until step 8
+// this asserted: a candidate without it meant a broken planner. The step-8 long
+// run found bytes that reach it with a correct plan: outside edits had left
+// comments inside two tags, which the parser reads leniently as attributes, and
+// an attribute appended where the planner saw a tag end cut one of them open —
+// the candidate still parsed, but the loop around the target now read as code.
+// Outside bytes are input, not invariants, so this is a refusal: the edit is
+// not one this file can take visually (the renderer saves it whole instead).
+function postKindsHold(candidate: Snapshot, plan: Plan): boolean {
   const projection = candidate.projection;
   assert(projection.tag === 'valid', 'Post-kinds are checked on a parsing candidate');
   for (const expected of plan.postKinds) {
@@ -430,9 +438,14 @@ function assertPostKinds(candidate: Snapshot, plan: Plan): void {
       }
       return false;
     });
-    assert(found !== undefined, 'The planned target still exists in the candidate');
-    assert(found.kind === expected.kind, 'The planned target keeps its expected kind');
+    if (found === undefined) {
+      return false;
+    }
+    if (found.kind !== expected.kind) {
+      return false;
+    }
   }
+  return true;
 }
 
 // §5.2 steps 7–8. The lock is taken first, so the re-read and the replace see

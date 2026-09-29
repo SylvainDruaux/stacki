@@ -1,7 +1,8 @@
 // The deterministic simulation (plan §10). One World holds a fake disk, one
 // actor per file, and the client's view of each file. Every step the seeded
 // PRNG picks one event — a visual intent, a stale preview intent, an oracle
-// gesture, a code-editor save, an external manual edit, a pasted copy of a
+// gesture, a code-editor save (a patch, since step 8, often leaving the file
+// invalid), a whole-model save, an external manual edit, a pasted copy of a
 // line, an attribute added in another editor, an AI-style rewrite, a git-style
 // atomic replacement, a watcher tick, an actor step, a crash, a disk failure, a
 // submission burst — applies it, and checks the invariants.
@@ -30,6 +31,7 @@ import {
   type SourceEdit,
 } from '../../dist/shared/intent.js';
 import { changedRanges, inverseEdits } from '../../dist/shared/splice.js';
+import { diffCodePatch } from '../../dist/shared/code-patch.js';
 import { LIMITS } from '../../dist/shared/limits.js';
 import { toAnchorRef, toChildIndex } from '../../dist/shared/ref.js';
 import type { Snapshot } from '../../dist/shared/snapshot.js';
@@ -142,6 +144,7 @@ const EVENTS = [
   ['copy-paste', 3],
   ['attribute-append', 3],
   ['code-save', 4],
+  ['model-save', 2],
   ['git-replace', 3],
   ['ai-rewrite', 2],
   ['crash', 1],
@@ -192,11 +195,17 @@ class World {
   private readonly origins = new Map<number, Origins>();
   private readonly originSource = new OriginSource();
   private readonly replacedWhole = new Map<FilePath, number[]>();
+  // Step 8: generations a code patch wrote whose hunks could slide along equal
+  // bytes (see slidable): which copy of a repeated run the user removed or
+  // typed beside is not in the bytes, so origins after it are not ground truth.
+  private readonly slidPatches = new Map<FilePath, number[]>();
   private readonly authoredAt = new Map<string, number>();
   private readonly held = new Map<FilePath, Digest[]>();
   // Step 6: applied edits Undo may revert, and the reverts in flight.
   private undoable: Undoable[] = [];
   private readonly undoing = new Map<string, Undoable>();
+  // Step 8: code-editor saves in flight, judged by byte origin like undo.
+  private readonly patching = new Set<string>();
   private intents = 0;
 
   constructor(input: SimulationInput) {
@@ -269,7 +278,9 @@ class World {
       case 'oracle-gesture':
         return this.startGesture(this.prng.pick(ORACLE_SCENARIOS));
       case 'code-save':
-        return this.submitCodeSave(this.pickPath());
+        return this.submitCodePatch(this.pickPath());
+      case 'model-save':
+        return this.submitModelSave(this.pickPath());
       case 'external-edit':
         return this.editExternally(this.pickPath());
       case 'copy-paste':
@@ -334,6 +345,25 @@ class World {
       const splices = before.phase.plan.splices;
       this.keepOrigins(generation, spliceOrigins(origins, splices, this.originSource));
     }
+    const phase = before.phase;
+    if (phase.intent.operation.tag === 'apply-code-patch') {
+      if (phase.plan.splices.some((splice) => slidable(phase.base.bytes, splice))) {
+        this.count('code:slidable');
+        this.slidPatches.set(before.path, [
+          ...(this.slidPatches.get(before.path) ?? []),
+          generation,
+        ]);
+      }
+    }
+  }
+
+  /** Whether origins between two generations of a file are ground truth: no
+   * git-style replacement re-originated it, and no code patch was placed on
+   * one copy of a repeated run it could as well have been placed on. */
+  private rewrittenBetween(path: FilePath, after: number, through: number): boolean {
+    const inside = (generation: number) => generation > after && generation <= through;
+    const whole = (this.replacedWhole.get(path) ?? []).some(inside);
+    return whole || (this.slidPatches.get(path) ?? []).some(inside);
   }
 
   // Every stale set-attribute decision is judged against the origins; fresh
@@ -344,10 +374,13 @@ class World {
     if (undone !== undefined) {
       return this.judgeUndo(undone, intent, result);
     }
+    if (this.patching.delete(intent.id)) {
+      return this.judgeCodePatch(submission, result);
+    }
     const gesture = this.gestures.get(intent.id);
     if (intent.operation.tag !== 'set-attribute') {
       if (gesture === undefined) {
-        return; // A code save: never mapped, so never judged.
+        return; // A whole-model save: never mapped, so never judged.
       }
     }
     // The simulated client always sends the snapshot it authored against.
@@ -371,9 +404,7 @@ class World {
       current,
       authoredOrigins: this.origins.get(authoredGeneration),
       currentOrigins: this.origins.get(baseGeneration),
-      replacedWhole: (this.replacedWhole.get(intent.file) ?? []).some(
-        (generation) => generation > authoredGeneration && generation <= baseGeneration,
-      ),
+      replacedWhole: this.rewrittenBetween(intent.file, authoredGeneration, baseGeneration),
       decision,
     };
     this.countAge(intent.file, head.authored.checksum, current.checksum);
@@ -539,8 +570,10 @@ class World {
       return;
     }
     const origins = this.origins.get(result.state.generation);
-    const replaced = (this.replacedWhole.get(entry.file) ?? []).some(
-      (generation) => generation > entry.view.generation && generation <= result.state.generation,
+    const replaced = this.rewrittenBetween(
+      entry.file,
+      entry.view.generation,
+      result.state.generation,
     );
     if (origins === undefined || replaced) {
       this.count('undo:unjudged');
@@ -563,6 +596,53 @@ class World {
     }
     const stale = result.state.snapshot?.checksum !== entry.view.snapshot.checksum;
     this.count(stale ? 'undo:mapped' : 'undo:planned');
+  }
+
+  // A planned code patch replaces what each hunk held when it was typed —
+  // equal bytes, by its witness — so, as for undo, what can go wrong is where:
+  // at a copy of those bytes while the ones it was typed against survive
+  // elsewhere. Judged by origin: each replaced range must hold the authored
+  // range's own bytes (an insertion: its authored neighbours). A range of
+  // other origins fails the run when the authored bytes survive outside the
+  // plan; when they do not (rewritten identically under new origins), no byte
+  // rule can tell the two apart and it is counted unjudged. An applied patch
+  // whose candidate does not parse is a malformed intermediate (plan §3.6).
+  private judgeCodePatch(submission: Submission, result: ActorStep): void {
+    const intent = submission.intent;
+    const decision = decisionFor(intent, result);
+    if (decision === undefined) {
+      return;
+    }
+    if (decision.tag === 'rejected') {
+      this.count(`code:rejected ${decision.reason}`);
+      return;
+    }
+    const phase = result.state.phase;
+    assert(phase.tag === 'planned', 'A planned decision leaves the actor planned');
+    if (phase.candidate.projection.tag === 'parse-error') {
+      this.count('code:invalid');
+    }
+    const authored = submission.authored;
+    assert(authored !== undefined, 'Simulated intents carry their authored bytes');
+    if (authored.checksum === phase.base.checksum) {
+      this.count('code:planned');
+      return;
+    }
+    const authoredAt = this.authoredAt.get(intent.id);
+    assert(authoredAt !== undefined, 'Every submitted intent has an authored generation');
+    const before = this.origins.get(authoredAt);
+    const now = this.origins.get(result.state.generation);
+    const replaced = this.rewrittenBetween(intent.file, authoredAt, result.state.generation);
+    if (before === undefined || now === undefined || replaced) {
+      this.count('code:unjudged');
+      return;
+    }
+    const operation = intent.operation;
+    assert(operation.tag === 'apply-code-patch', 'Only code patches are judged here');
+    const verdict = codePatchVerdict(operation.hunks, decision.plan.splices, before, now);
+    const where = `seed ${this.input.seed}`;
+    assert(verdict !== 'wrong-site', `A code patch replaces its own bytes (${where})`);
+    this.count(`code:${verdict}`);
   }
 
   private holdCurrent(path: FilePath): void {
@@ -679,7 +759,9 @@ class World {
     );
   }
 
-  private submitCodeSave(path: FilePath): void {
+  /** The legacy whole-model save (`replace-source`, plan §3.3): the file's
+   * text, reprinted, witnessed by the checksum it was read at. */
+  private submitModelSave(path: FilePath): void {
     const view = this.clientView(path);
     const decoded = decodeUtf8(view.snapshot.bytes);
     assert(decoded.ok, 'Simulated writers only write UTF-8');
@@ -701,10 +783,62 @@ class World {
     );
   }
 
+  /** The code editor's save (step 8): the byte diff from the text it shows to
+   * what the user typed — often a malformed intermediate (plan §3.6). */
+  private submitCodePatch(path: FilePath): void {
+    const view = this.clientView(path);
+    const decoded = decodeUtf8(view.snapshot.bytes);
+    assert(decoded.ok, 'Simulated writers only write UTF-8');
+    const typed = this.typeInto(decoded.value);
+    const patch = diffCodePatch(decoded.value, typed);
+    assert(patch.ok, 'Simulated typing stays inside the bounds');
+    if (patch.value.length === 0) {
+      this.count('code:unchanged');
+      return;
+    }
+    const intent = toIntent({
+      id: this.nextIntentId(),
+      file: path,
+      authoredChecksum: view.snapshot.checksum,
+      anchor: toAnchorRef({
+        span: toByteSpan(0, view.snapshot.bytes.length),
+        path: [],
+        expectedKind: 'document',
+      }),
+      operation: {
+        tag: 'apply-code-patch',
+        hunks: patch.value.map((hunk) => ({ span: hunk.span, text: hunk.text })),
+      },
+    });
+    if (this.submit(intent, view)) {
+      this.patching.add(intent.id);
+    }
+  }
+
+  // One burst of typing at a line: an unfinished tag or expression (the file
+  // stops parsing), a finished element, a line rewritten, or one deleted.
+  private typeInto(text: string): string {
+    const lines = text.split('\n');
+    const at = this.prng.below(lines.length);
+    const line = lines[at] ?? '';
+    const typed = this.prng.pick(['<div', '{', '<p title="', '<p>typed</p>', 'rewrite', 'delete']);
+    switch (typed) {
+      case 'rewrite':
+        lines[at] = `${line} edited`;
+        break;
+      case 'delete':
+        lines.splice(at, 1);
+        break;
+      default:
+        lines[at] = `${typed}${line}`;
+    }
+    return lines.join('\n');
+  }
+
   /** More intents than the queue holds, at once: the tail must be backpressured. */
   private burst(path: FilePath): void {
     for (let index = 0; index < LIMITS.intentsPendingMax + 4; index++) {
-      this.submitCodeSave(path);
+      this.submitModelSave(path);
     }
   }
 
@@ -920,6 +1054,76 @@ class World {
 /** What the planner decided for the head intent in one idle step: the plan now
  * in flight, or the rejection among the step's outcomes; undefined when the
  * step rejected before planning (a failed read). */
+// Whether a splice could move one byte along the file and write the same bytes:
+// deleting one of two equal lines, or typing a character beside its twin. A
+// diff places such a change on one copy by convention (shared/code-patch.ts
+// trims the common prefix first, so it takes the last); the user may have
+// meant the other, and no byte rule can tell (planner.test.ts, BYTES CANNOT
+// TELL). Found by the step-8 long run: a deletion placed on the last of two
+// identical <Card> lines made the judge call the survivor a wrong site.
+function slidable(
+  base: Uint8Array,
+  splice: {
+    readonly range: { readonly start: number; readonly end: number };
+    readonly expectedBytes: Uint8Array;
+    readonly replacementBytes: Uint8Array;
+  },
+): boolean {
+  const { start, end } = splice.range;
+  const removed = splice.expectedBytes;
+  const typed = splice.replacementBytes;
+  const before = base[start - 1];
+  const after = base[end];
+  // Left: the byte before could end both runs instead; right: the byte after
+  // could start both.
+  const left = before !== undefined && lastIs(removed, before) && lastIs(typed, before);
+  const right = after !== undefined && firstIs(removed, after) && firstIs(typed, after);
+  return left || right;
+}
+
+// An empty run takes any byte at its edge; a run ends (or starts) with it.
+function lastIs(run: Uint8Array, byte: number): boolean {
+  return run.length === 0 || run[run.length - 1] === byte;
+}
+
+function firstIs(run: Uint8Array, byte: number): boolean {
+  return run.length === 0 || run[0] === byte;
+}
+
+// Whether a stale code patch's planned splices sit on the bytes its hunks were
+// typed against, by origin (see judgeCodePatch).
+function codePatchVerdict(
+  hunks: readonly SourceEdit[],
+  splices: readonly { readonly range: { readonly start: number; readonly end: number } }[],
+  before: Origins,
+  now: Origins,
+): 'mapped' | 'unjudged' | 'wrong-site' {
+  assert(hunks.length === splices.length, 'A code patch plans one splice per hunk');
+  const inside = (at: number) =>
+    splices.some((splice) => splice.range.start <= at && at < splice.range.end);
+  let unjudged = false;
+  for (const [index, hunk] of hunks.entries()) {
+    const splice = splices[index];
+    assert(splice !== undefined, 'Every hunk has its splice');
+    // A range, or an insertion's two neighbours, compared as origin sequences.
+    const width = hunk.span.end - hunk.span.start;
+    const from = width === 0 ? hunk.span.start - 1 : hunk.span.start;
+    const to = width === 0 ? hunk.span.end + 1 : hunk.span.end;
+    const shift = splice.range.start - hunk.span.start;
+    const expected = before.slice(Math.max(0, from), to);
+    const found = now.slice(Math.max(0, from + shift), to + shift);
+    if (expected.every((origin, at) => found[at] === origin)) {
+      continue;
+    }
+    const survives = now.some((origin, at) => !inside(at) && expected.includes(origin));
+    if (width > 0 && survives) {
+      return 'wrong-site';
+    }
+    unjudged = true;
+  }
+  return unjudged ? 'unjudged' : 'mapped';
+}
+
 function decisionFor(intent: Intent, result: ActorStep): RemapDecision | undefined {
   const phase = result.state.phase;
   if (phase.tag === 'planned') {
