@@ -19,7 +19,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { test } from 'node:test';
 import { toFilePath, toIntentId } from '../../dist/shared/brand.js';
-import { editInlineStyle } from '../../dist/shared/inlineStyle.js';
+import { editInlineStyle, singleDeclarationChange } from '../../dist/shared/inlineStyle.js';
 import { toIntent, type Intent, type Operation } from '../../dist/shared/intent.js';
 import { renameSites } from '../../dist/shared/loopScope.js';
 import { planIntent, planIntentThroughDiff, type Plan } from '../../dist/shared/planner.js';
@@ -532,4 +532,22 @@ test('code around markup: an emptied branch, and a node beside one in a branch, 
     '{show && (\n  <p>One</p>\n)}\n',
     'one of several may go',
   );
+});
+
+test('singleDeclarationChange finds the one declaration a Style field edit changed', () => {
+  assert.deepEqual(singleDeclarationChange('a: 1; b: 2', 'a: 1; b: 3'), {
+    property: 'b',
+    declaration: { tag: 'set', value: '3' },
+  });
+  assert.deepEqual(singleDeclarationChange('a: 1; b: 2', 'a: 1;'), {
+    property: 'b',
+    declaration: { tag: 'remove' },
+  });
+  assert.deepEqual(singleDeclarationChange('a: 1', 'a: 1; c: 0'), {
+    property: 'c',
+    declaration: { tag: 'set', value: '0' },
+  });
+  assert.equal(singleDeclarationChange('a: 1; b: 2', 'a: 2; b: 3'), undefined, 'two changes');
+  assert.equal(singleDeclarationChange('a: 1; b: 2', 'b: 2; a: 1'), undefined, 'a reorder');
+  assert.equal(singleDeclarationChange('a:1', 'a: 1'), undefined, 'only spacing');
 });

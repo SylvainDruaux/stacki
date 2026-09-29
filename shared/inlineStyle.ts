@@ -61,6 +61,46 @@ export function editInlineStyle(
   return { tag: 'edited', edits, text: applyStyleEdits(text, edits) };
 }
 
+/** The one declaration that turns `before` into `after` — set to a value, or
+ * removed — when there is exactly one and editInlineStyle writes exactly
+ * `after` for it; undefined for anything else (several changes, a reordered
+ * or reformatted list), which is then a whole-attribute edit. */
+export function singleDeclarationChange(
+  before: string,
+  after: string,
+): { readonly property: string; readonly declaration: StyleDeclaration } | undefined {
+  const old = scanDeclarations(before);
+  const next = scanDeclarations(after);
+  if (old === undefined || next === undefined) {
+    return undefined;
+  }
+  // A property's one value, or undefined when it is absent or declared twice.
+  const value = (list: readonly Declaration[], text: string, property: string) => {
+    const found = list.filter((entry) => sameProperty(entry.property, property));
+    if (found.length !== 1) {
+      return undefined;
+    }
+    const [only] = found;
+    return only === undefined ? undefined : text.slice(only.valueStart, only.valueEnd);
+  };
+  const properties = [...new Set([...old, ...next].map((entry) => entry.property))];
+  const changed = properties.filter(
+    (property) => value(old, before, property) !== value(next, after, property),
+  );
+  const [property] = changed;
+  if (changed.length !== 1 || property === undefined) {
+    return undefined;
+  }
+  const set = value(next, after, property);
+  const declaration: StyleDeclaration =
+    set === undefined ? { tag: 'remove' } : { tag: 'set', value: set };
+  const edited = editInlineStyle(before, property, declaration);
+  if (edited.tag !== 'edited') {
+    return undefined;
+  }
+  return edited.text === after ? { property, declaration } : undefined;
+}
+
 export function applyStyleEdits(text: string, edits: readonly StyleTextEdit[]): string {
   let result = '';
   let cursor = 0;

@@ -8,6 +8,7 @@
 import { assert } from '../shared/assert';
 import type { EditorModel, EditorNode } from '../shared/editor-model';
 import type { Edit, NodeRef } from '../shared/edit-request';
+import { singleDeclarationChange } from '../shared/inlineStyle';
 import { LIMITS } from '../shared/limits';
 import type { Attr } from '../shared/page-node';
 import { loopVarsAt, stripLostBindings } from './loopBindings';
@@ -143,6 +144,37 @@ function replacedIn(
     }
   }
   return list;
+}
+
+// --- Inline CSS (the §11.6 inline CSS step) ---------------------------------------------
+
+/** A Style field edit: when it changes exactly one declaration, the request
+ * edits that declaration in place (set-inline-style) and every other byte of
+ * the attribute stays as written; otherwise — several changes, a reformatted
+ * list, a quote in the new text — the whole value is set (the attribute step).
+ * The effect on the model is the same either way: the new style string. */
+export function inlineStyleGesture(
+  nodeId: string,
+  styles: { readonly before: string; readonly after: string },
+  options: { readonly coalesceKey: string | null; readonly urgency: Urgency },
+): EditGesture {
+  const whole = propsGesture(nodeId, { style: { type: 'string', value: styles.after } }, options);
+  const change = singleDeclarationChange(styles.before, styles.after);
+  return {
+    ...whole,
+    request: (refOf) => {
+      if (change === undefined || /["']/.test(styles.after)) {
+        return whole.request(refOf);
+      }
+      const target = refOf(nodeId);
+      if (target === undefined) {
+        return undefined;
+      }
+      const { property, declaration } = change;
+      const edit: Edit = { tag: 'set-inline-style', target, property, declaration };
+      return [{ edit, stream: `style:${target.path.join('.')}:${property}` }];
+    },
+  };
 }
 
 // --- Insert and remove (the §11.6 insert/remove step) --------------------------------

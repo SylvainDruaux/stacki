@@ -72,6 +72,7 @@ import {
 import { describeRejection, type RejectionReason } from '../shared/intent';
 import {
   duplicateGesture,
+  inlineStyleGesture,
   insertGesture,
   moveGesture,
   propsGesture,
@@ -3295,7 +3296,17 @@ export default function App() {
   const setProp = useCallback(
     (nodeId: string, propName: string, value: Attr | undefined, immediate = false) => {
       const coalesceKey = `prop:${nodeId}:${propName}`;
-      commitEdit(propsGesture(nodeId, { [propName]: value }, { coalesceKey, urgency: immediate }));
+      const options = { coalesceKey, urgency: immediate };
+      const state = pageStateRef.current.pageState;
+      const node = state?.editable ? findNodeById(state.model.nodes, nodeId) : null;
+      const previous = propName === 'style' ? node?.props?.['style'] : undefined;
+      if (previous?.type === 'string' && value?.type === 'string') {
+        // Step 6, inline CSS: one declaration changed is one declaration edited.
+        const styles = { before: previous.value, after: value.value };
+        commitEdit(inlineStyleGesture(nodeId, styles, options));
+        return;
+      }
+      commitEdit(propsGesture(nodeId, { [propName]: value }, options));
     },
     [commitEdit]
   );

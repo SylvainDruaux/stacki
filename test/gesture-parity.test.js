@@ -134,7 +134,11 @@ function meaning(value) {
     }
     return out;
   }
-  return typeof value === 'string' ? value.replace(/\s+/g, '') : value;
+  // `&quot;` is how the legacy printer writes a double quote inside any value
+  // it reprints — even a single-quoted one on a tag no gesture touched, so a
+  // whole-file save rewrites `style='font-family: "Inter"'`. HTML decodes the
+  // entity back in an attribute value, so the two mean the same.
+  return typeof value === 'string' ? value.replace(/&quot;/g, '"').replace(/\s+/g, '') : value;
 }
 
 /** Plan a gesture's requests the way the host does: each against the bytes
@@ -327,7 +331,7 @@ function withNewIds(node) {
   return copy;
 }
 
-test('parity, insert and remove: beside and inside every node, a copy of each, each removed', (t) => {
+test('parity, insert and remove: beside, inside, a copy of each node, each removed', (t) => {
   const byNode = new Map();
   const tally = sweep('insert/remove', (node, model) => {
     if (!byNode.has(model)) {
@@ -384,4 +388,35 @@ test('parity, move: every node before the first root, after the last, into each 
   });
   report(t, tally);
   assert.ok(tally.compared > 500, `the sweep compares many real moves (${tally.compared})`);
+});
+
+test('parity, inline CSS: one declaration set, changed, added or removed in place', (t) => {
+  let inPlace = 0;
+  const tally = sweep('inline CSS', (node) => {
+    const style = node.props?.style;
+    if (style?.type !== 'string') {
+      return [];
+    }
+    const before = style.value;
+    const first = before.split(';')[0] ?? '';
+    const property = first.split(':')[0]?.trim();
+    const afters = [
+      `${before}${before.trim().endsWith(';') || !before.trim() ? '' : ';'} outline: 0`.trim(),
+    ];
+    if (property) {
+      afters.push(before.replace(/:[^;]*/, ': 7px'));
+      afters.push(before.replace(/^[^;]*;?\s*/, ''));
+    }
+    return afters.map((after) => {
+      const gesture = gestures.inlineStyleGesture(node.id, { before, after }, options);
+      const [request] =
+        gesture.request(() => ({ path: [0], kind: 'element', span: { start: 0, end: 1 } })) ?? [];
+      inPlace += request?.edit.tag === 'set-inline-style' ? 1 : 0;
+      return gesture;
+    });
+  });
+  report(t, tally);
+  t.diagnostic(`${inPlace} of them edit one declaration in place`);
+  assert.ok(tally.compared >= 15, `the sweep compares every style gesture (${tally.compared})`);
+  assert.ok(inPlace >= 10, `most of them in place (${inPlace})`);
 });
