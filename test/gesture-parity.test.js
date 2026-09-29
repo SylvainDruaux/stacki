@@ -242,3 +242,27 @@ test('parity, attribute: set a new attribute, set and remove each string one', (
   report(t, tally);
   assert.ok(tally.compared > 300, `the sweep compares many real gestures (${tally.compared})`);
 });
+
+test('parity, prop: expressions and bare props, new and replacing any value', (t) => {
+  const tally = sweep('prop', (node) => {
+    if (!TAGS.has(node.kind)) {
+      return [];
+    }
+    const named = Object.entries(node.props ?? {}).filter(([, value]) => value.type !== 'spread');
+    return [
+      gestures.propsGesture(
+        node.id,
+        { items: { type: 'expr', value: 'list.slice(0, 3)' } },
+        options,
+      ),
+      gestures.propsGesture(node.id, { hidden: { type: 'bare' } }, options),
+      ...named.flatMap(([name]) => [
+        gestures.propsGesture(node.id, { [name]: { type: 'expr', value: 'value ?? 1' } }, options),
+        gestures.propsGesture(node.id, { [name]: { type: 'bare' } }, options),
+        gestures.propsGesture(node.id, { [name]: { type: 'string', value: 'plain' } }, options),
+      ]),
+    ];
+  });
+  report(t, tally);
+  assert.ok(tally.compared > 500, `the sweep compares many real gestures (${tally.compared})`);
+});

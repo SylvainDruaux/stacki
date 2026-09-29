@@ -203,7 +203,7 @@ test('nodeRefIn names nodes of the origin by path, kind and range, and nothing e
   assert.equal(edits.nodeRefIn(origin, 'zz'), undefined);
 });
 
-test('propsGesture: string values and removals are requests; the effect copies', () => {
+test('propsGesture: values of every type but a spread are requests; the effect copies', () => {
   const refOf = (id) => (id === 'a' ? REF : undefined);
   const set = gestures.propsGesture(
     'a',
@@ -228,6 +228,15 @@ test('propsGesture: string values and removals are requests; the effect copies',
       .request(refOf),
     undefined,
   );
+  const options = { coalesceKey: null, urgency: true };
+  const expr = gestures
+    .propsGesture('a', { n: { type: 'expr', value: 'x' } }, options)
+    .request(refOf);
+  assert.deepEqual(expr?.[0]?.edit.value, { type: 'expr', value: 'x' }, 'the prop step');
+  const bare = gestures.propsGesture('a', { hidden: { type: 'bare' } }, options).request(refOf);
+  assert.deepEqual(bare?.[0]?.edit.value, { type: 'bare' });
+  const spread = gestures.propsGesture('a', { rest: { type: 'spread', value: 'rest' } }, options);
+  assert.equal(spread.request(refOf), undefined, 'a spread is code: the whole model carries it');
   const node = {
     id: 'a',
     kind: 'element',

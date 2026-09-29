@@ -17,8 +17,9 @@ type Urgency = boolean | 'live';
 /** Props to set (a value) or remove (undefined), by name. */
 export type PropPatch = Readonly<Record<string, Attr | undefined>>;
 
-/** Set or remove attributes and props of one node. The attribute step ships
- * string values and removals; every other value type still saves the model. */
+/** Set or remove attributes and props of one node: string values and
+ * removals (the attribute step), expressions and bare props (the prop step).
+ * A spread is code of its own and still saves the whole model. */
 export function propsGesture(
   nodeId: string,
   patch: PropPatch,
@@ -55,9 +56,10 @@ function attributeEdit(target: NodeRef, name: string, value: Attr | undefined): 
   }
   switch (value.type) {
     case 'string':
-      return { tag: 'set-attribute', target, name, value };
     case 'expr':
+      return { tag: 'set-attribute', target, name, value };
     case 'bare':
+      return { tag: 'set-attribute', target, name, value: { type: 'bare' } };
     case 'spread':
       return undefined;
     default: {
