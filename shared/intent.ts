@@ -132,7 +132,7 @@ export function describeRejection(reason: RejectionReason): string {
     case 'write-race':
       return 'Another program wrote the file at the same moment.';
     case 'merge-conflict':
-      return 'Your edit overlaps a change made outside Stacki.';
+      return 'Your code edit overlaps another change to the file, so it was not merged.';
     default: {
       const exhaustive: never = reason;
       return exhaustive;

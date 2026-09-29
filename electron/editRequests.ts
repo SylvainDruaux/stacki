@@ -21,9 +21,12 @@ import { toAnchorRef, toChildIndex, type AnchorRef } from '../shared/ref';
 import { err, ok, type Result } from '../shared/result';
 import type { Snapshot } from '../shared/snapshot';
 import {
+  byteStringsEqual,
   decodeUtf8,
+  encodeUtf8,
   spansAscending,
   toByteSpan,
+  toByteString,
   utf16ToByteOffsets,
   type ByteSpan,
 } from '../shared/span';
@@ -60,6 +63,9 @@ export function buildEditIntent(
   assert(decoded.ok, 'A page the renderer read decodes');
   if (edit.tag === 'revert') {
     return revertDraft(snapshot, edit.hunks);
+  }
+  if (edit.tag === 'code-patch') {
+    return codePatchDraft(snapshot, edit.hunks); // Text, not nodes: a broken file takes it too.
   }
   const projection = snapshot.projection;
   if (projection.tag === 'parse-error') {
@@ -259,6 +265,47 @@ function revertDraft(
     expectedKind: 'document',
   });
   return ok({ anchor, operation: { tag: 'revert-splices', hunks } });
+}
+
+// The code editor's patch (step 8), checked against the bytes it names: every
+// hunk inside them, on code-point boundaries, holding the text it says it
+// replaces. A hunk that does not is not a diff of these bytes — the editor's
+// text descends from some other version — and it cannot be merged.
+function codePatchDraft(
+  snapshot: Snapshot,
+  hunks: Extract<Edit, { tag: 'code-patch' }>['hunks'],
+): Result<IntentDraft, RejectionReason> {
+  assert(hunks.length > 0, 'The wire parser requires a hunk');
+  assert(spansAscending(hunks.map((hunk) => hunk.span)), 'The wire parser orders the hunks');
+  const bytes = snapshot.bytes;
+  for (const hunk of hunks) {
+    if (bytes.length < hunk.span.end) {
+      return err('merge-conflict');
+    }
+    if (continuesCodePoint(bytes, hunk.span.start) || continuesCodePoint(bytes, hunk.span.end)) {
+      return err('merge-conflict');
+    }
+    const held = bytes.subarray(hunk.span.start, hunk.span.end);
+    if (!byteStringsEqual(toByteString(held), encodeUtf8(hunk.expected))) {
+      return err('merge-conflict');
+    }
+  }
+  const anchor = toAnchorRef({
+    span: toByteSpan(0, bytes.length),
+    path: [],
+    expectedKind: 'document',
+  });
+  const edits = hunks.map((hunk) => ({ span: hunk.span, text: hunk.text }));
+  return ok({ anchor, operation: { tag: 'apply-code-patch', hunks: edits } });
+}
+
+// A UTF-8 continuation byte at `offset`: a span edge there splits a character.
+function continuesCodePoint(bytes: Uint8Array, offset: number): boolean {
+  const byte = bytes[offset];
+  if (byte === undefined) {
+    return false; // The end of the file is a boundary.
+  }
+  return byte >= 0x80 && byte < 0xc0;
 }
 
 function inside(placement: Placement): boolean {

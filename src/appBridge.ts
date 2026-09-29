@@ -130,15 +130,6 @@ export function writeProjectPage(
   return window.avb.writePage(payload).then(parsePageWriteResult);
 }
 
-export function writeProjectPageRaw(
-  pagePath: string,
-  source: string,
-  baseChecksum: Digest,
-): Promise<Result<PageDiskRead, PageWriteError>> {
-  const payload = parseIpcPayload('page:writeRaw', { pagePath, source, baseChecksum });
-  return window.avb.writePageRaw(payload).then(parsePageWriteResult);
-}
-
 /** A visual edit (step 6), stated against the checksum of the page shown. */
 export function editProjectPage(request: EditRequest): Promise<Result<PageEdited, PageEditError>> {
   const payload = parseIpcPayload('page:edit', request);

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useLayoutEffect, useRef } from 'react';
 import { basicSetup, EditorView } from 'codemirror';
 import type { MutableRefObject } from 'react';
 import type { LanguageSupport } from '@codemirror/language';
@@ -185,16 +185,21 @@ export default function CodeEditor(props: CodeEditorProps) {
     };
   }, [language]);
 
-  // External reloads and app undo must not echo as user edits or enter local history.
-  useEffect(() => {
+  // External reloads, app undo and saved text must not echo as user edits or
+  // enter local history. Only the region that differs is replaced, so an
+  // outside edit merged into the file elsewhere (step 8) leaves the cursor
+  // and selection where the user put them. A layout effect: it runs before
+  // the browser can deliver another keystroke, so no typing lands on a
+  // document the new value has already replaced.
+  useLayoutEffect(() => {
     const view = viewRef.current;
     if (!view) {
       return;
     }
-    const current = view.state.doc.toString();
-    if ((value ?? '') !== current) {
+    const change = externalChange(view.state.doc.toString(), value ?? '');
+    if (change !== undefined) {
       view.dispatch({
-        changes: { from: 0, to: current.length, insert: value ?? '' },
+        changes: change,
         annotations: [externalValue.of(true), Transaction.addToHistory.of(false)],
       });
     }
@@ -214,6 +219,40 @@ export default function CodeEditor(props: CodeEditorProps) {
     view.focus();
   }, [revealLine, language]);
   return <div ref={hostRef} className="cm-host" />;
+}
+
+/** The one change that turns `current` into `next`: the region between their
+ * common prefix and suffix, or undefined when they are equal. */
+export function externalChange(
+  current: string,
+  next: string
+): { readonly from: number; readonly to: number; readonly insert: string } | undefined {
+  if (current === next) {
+    return undefined;
+  }
+  const shorter = Math.min(current.length, next.length);
+  let prefix = 0;
+  while (prefix < shorter && current.charCodeAt(prefix) === next.charCodeAt(prefix)) {
+    prefix++;
+  }
+  let suffix = 0;
+  while (
+    suffix < shorter - prefix &&
+    current.charCodeAt(current.length - 1 - suffix) === next.charCodeAt(next.length - 1 - suffix)
+  ) {
+    suffix++;
+  }
+  const change = {
+    from: prefix,
+    to: current.length - suffix,
+    insert: next.slice(prefix, next.length - suffix),
+  };
+  assert(change.from <= change.to, 'The changed region keeps its order');
+  assert(
+    current.slice(0, change.from) + change.insert + current.slice(change.to) === next,
+    'The change turns the document into the value'
+  );
+  return change;
 }
 
 function useCodeDecorations(

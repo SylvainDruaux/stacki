@@ -86,7 +86,8 @@ async function checkFragment(syntax) {
       onOpenComponent: (name, id) => opened.push({ name, id }),
       onHoverNode: () => {}, onDropComponent: () => {}, onMoveNode: () => {},
       onRemoveNode: () => {}, onCopyNode: () => {}, onDuplicateNode: () => {},
-      onPasteNode: () => {}, onChangeLayout: () => {}, onRawChange: () => {}, hasClipboard: () => false,
+      onPasteNode: () => {}, onChangeLayout: () => {}, hasClipboard: () => false,
+      onCodeChange: () => {}, onOpenCodePanel: () => {},
     });
   }
   const container = document.getElementById('root');

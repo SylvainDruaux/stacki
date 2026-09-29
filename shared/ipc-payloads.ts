@@ -201,7 +201,6 @@ export const IPC_PAYLOADS = {
     model: (input: unknown) => input,
     baseChecksum: digest,
   }),
-  'page:writeRaw': object({ pagePath: pathText, source: text, baseChecksum: digest }),
   'pagefolder:create': object({ ...project, dir: pathText }),
   'pagefolder:delete': object({ ...project, dir: pathText }),
   'pagefolder:rename': object({ ...project, from: pathText, to: pathText }),

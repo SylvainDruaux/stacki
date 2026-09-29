@@ -22,6 +22,11 @@
 //     included, until the page is clean again.
 //   - A refusal never destroys input: the edits stay in the model, and the
 //     page's conflict notice names the reason (plan §7, rejection contract).
+//   - Typing in the code editor turns the queue into `code` (step 8): the
+//     page's unsaved edits are its text, saved as one patch from the baseline
+//     the text descends from (src/codeEdits.ts) until the page is clean.
+//     Requests queued before the typing are dropped, as the whole-model save
+//     dropped them before: the text the user typed into does not hold them.
 import { assert } from '../shared/assert';
 import type { Digest } from '../shared/brand';
 import type { EditorModel } from '../shared/editor-model';
@@ -31,6 +36,7 @@ import { LIMITS } from '../shared/limits';
 import type { PageEditError, PageEdited } from '../shared/page-save';
 import type { PageModel, PageNode } from '../shared/page-node';
 import type { Result } from '../shared/result';
+import type { SaveState } from './saveState';
 
 /** The parse a shown model was cloned from, and the checksum of its bytes. */
 export interface PageOrigin {
@@ -67,8 +73,33 @@ export interface EditDraft {
   readonly record: EditsRecord;
 }
 
+/** The bytes a code save is a patch of (step 8). */
+export type CodeBaseline =
+  /** A version the page's actor holds: its checksum and text, and the text
+   * the editor's typing descends from. The two texts are one unless a save
+   * came back holding more than it sent — an outside edit merged, a request
+   * rebased — and then the next save merges the typing into it first. */
+  | {
+      readonly tag: 'known';
+      readonly checksum: Digest;
+      readonly source: string;
+      readonly typedFrom: string;
+    }
+  /** "Save this version" over a refused save: the patch is of whatever the
+   * disk holds at the page's base, read when the save is sent. */
+  | { readonly tag: 'disk' };
+
 export type DraftQueue =
-  { readonly tag: 'edits'; readonly pending: readonly EditDraft[] } | { readonly tag: 'model' };
+  | { readonly tag: 'edits'; readonly pending: readonly EditDraft[] }
+  | { readonly tag: 'model' }
+  | { readonly tag: 'code'; readonly baseline: CodeBaseline };
+
+/** A page as the code editor showed it when the user typed: its save state
+ * and the text its editor held. */
+export interface TypedFrom {
+  readonly save: SaveState;
+  readonly source: string;
+}
 
 /** The reference main needs for a node of the origin, or undefined when the
  * node is not one main can name in the page's own bytes: created since the
@@ -136,6 +167,54 @@ export class EditDrafts {
     return path === this.#path ? this.#queue : { tag: 'model' };
   }
 
+  /** The user typed in the code editor (or Undo put text back): from now
+   * until the page is clean its edits are its text. The baseline is the page
+   * as shown before the change — the text the typing descends from and the
+   * checksum of those bytes — kept while the queue already holds code. A
+   * refused page's shown text may be a review of the model rather than
+   * bytes on disk, so its baseline is the disk, read at the save. */
+  typeCode(path: string, shown: TypedFrom): void {
+    const save = shown.save;
+    const fresh = path !== this.#path || save.tag === 'clean';
+    const queue = this.queue(path);
+    if (!fresh && queue.tag === 'code') {
+      return;
+    }
+    if (!fresh && queue.tag === 'edits') {
+      for (const draft of queue.pending) {
+        subsume(draft.record);
+      }
+    }
+    this.#path = path;
+    this.#origin = undefined; // Requests start over once the page is clean.
+    this.#queue = { tag: 'code', baseline: typedBaseline(shown) };
+    assert(this.queue(path).tag === 'code', 'Typing leaves the page in code');
+  }
+
+  /** The baseline of the page's code queue. */
+  codeBaseline(path: string): CodeBaseline {
+    const queue = this.queue(path);
+    assert(queue.tag === 'code', 'Only a code queue has a baseline');
+    return queue.baseline;
+  }
+
+  /** A code save applied: the disk holds `checksum`, whose text is `source`,
+   * and the typing since descends from `typedFrom`, the text the save sent. */
+  codeSaved(path: string, saved: Omit<Extract<CodeBaseline, { tag: 'known' }>, 'tag'>): void {
+    if (this.queue(path).tag !== 'code') {
+      return; // A whole-model save took over meanwhile; it carries the text.
+    }
+    this.#queue = { tag: 'code', baseline: { tag: 'known', ...saved } };
+  }
+
+  /** The user keeps their text over a refused save ("Save this version"):
+   * a code queue now patches whatever the disk holds at the new base. */
+  acceptDisk(path: string): void {
+    if (this.queue(path).tag === 'code') {
+      this.#queue = { tag: 'code', baseline: { tag: 'disk' } };
+    }
+  }
+
   /** Queue a request; false when the page saves whole models until clean. */
   record(path: string, draft: EditDraft): boolean {
     if (path !== this.#path || draft.authoredChecksum !== this.#origin) {
@@ -146,7 +225,11 @@ export class EditDrafts {
       this.#queue = { tag: 'edits', pending: [] };
     }
     const queue = this.#queue;
-    if (queue.tag === 'model') {
+    if (queue.tag !== 'edits') {
+      // Code typed since the origin was read never keeps that origin (App's
+      // changeCodeSource drops it), so a code queue reaches here only through
+      // a bug; the whole-model save is the one that carries both.
+      assert(queue.tag === 'model', 'A request is never recorded over typed code');
       subsume(draft.record);
       return false;
     }
@@ -185,7 +268,7 @@ export class EditDrafts {
   /** Take every unsent request, oldest first, to send now. */
   take(path: string): readonly EditDraft[] {
     const queue = this.queue(path);
-    if (queue.tag === 'model') {
+    if (queue.tag !== 'edits') {
       return [];
     }
     this.#queue = { tag: 'edits', pending: [] };
@@ -195,13 +278,42 @@ export class EditDrafts {
   /** Put back requests a failed save did not send, ahead of newer ones. */
   restore(path: string, drafts: readonly EditDraft[]): void {
     const queue = this.queue(path);
-    if (queue.tag === 'model') {
+    if (queue.tag !== 'edits') {
       for (const draft of drafts) {
         subsume(draft.record);
       }
       return;
     }
     this.#queue = { tag: 'edits', pending: [...drafts, ...queue.pending] };
+  }
+}
+
+function typedBaseline(shown: TypedFrom): CodeBaseline {
+  const save = shown.save;
+  switch (save.tag) {
+    case 'clean':
+      return {
+        tag: 'known',
+        checksum: save.checksum,
+        source: shown.source,
+        typedFrom: shown.source,
+      };
+    case 'dirty':
+    case 'saving':
+      // Visual edits change the model, never `source`: it is still the text
+      // of the bytes the page's edits were authored against.
+      return {
+        tag: 'known',
+        checksum: save.baseChecksum,
+        source: shown.source,
+        typedFrom: shown.source,
+      };
+    case 'conflicted':
+      return { tag: 'disk' };
+    default: {
+      const exhaustive: never = save;
+      return exhaustive;
+    }
   }
 }
 

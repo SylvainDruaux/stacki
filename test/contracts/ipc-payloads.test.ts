@@ -262,7 +262,7 @@ test('clipboard payloads accept bytes without truncation and reject invalid byte
 type Assignable<Source, Target> = [Source] extends [Target] ? true : false;
 const channelsStayDistinct: Assignable<
   IpcContract['style:writeFile']['payload'],
-  IpcContract['page:writeRaw']['payload']
+  IpcContract['page:write']['payload']
 > = false;
 const terminalSuccessNeedsId: Assignable<
   { readonly ok: true },

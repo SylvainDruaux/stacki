@@ -178,7 +178,7 @@ const WORDS = el('words', 'p', [{ id: 'w-text', kind: 'expr', value: '{heading}'
           onDuplicateNode: () => {},
           onPasteNode: () => {},
           onChangeLayout: () => {},
-          onRawChange: () => {},
+          onCodeChange: () => {}, onOpenCodePanel: () => {},
           onHoverNode: () => {},
           onOpenComponent: () => {},
           hasClipboard: false,
@@ -290,7 +290,7 @@ const WORDS = el('words', 'p', [{ id: 'w-text', kind: 'expr', value: '{heading}'
             onDuplicateNode: () => {},
             onPasteNode: () => {},
             onChangeLayout: () => {},
-            onRawChange: () => {},
+            onCodeChange: () => {}, onOpenCodePanel: () => {},
             onHoverNode: () => {},
             onOpenComponent: () => {},
             hasClipboard: false,
@@ -374,6 +374,65 @@ const WORDS = el('words', 'p', [{ id: 'w-text', kind: 'expr', value: '{heading}'
       on(greenRow) > grey(greenRow),
       `${on(greenRow).toFixed(2)} vs ${grey(greenRow).toFixed(2)}`
     );
+  }
+
+  // --- a page that does not parse (plan §3.6, step 8) ----------------------------
+  // Not an error to dismiss: the navigator says what the parser stopped on,
+  // offers the code panel and Astro's own output, and holds the code editor.
+  {
+    global.Window = dom.window.Window; // CodeMirror measures through it.
+    global.MutationObserver = dom.window.MutationObserver;
+    global.getComputedStyle = dom.window.getComputedStyle;
+    global.requestAnimationFrame = dom.window.requestAnimationFrame.bind(dom.window);
+    global.cancelAnimationFrame = dom.window.cancelAnimationFrame.bind(dom.window);
+    dom.window.Range.prototype.getClientRects = () => [];
+    dom.window.Range.prototype.getBoundingClientRect = () => ({
+      top: 0, left: 0, bottom: 0, right: 0, width: 0, height: 0,
+    });
+    const opened = [];
+    await act(async () => {
+      reactRoot.render(
+        React.createElement(StructurePanel, {
+          pageState: {
+            editable: false,
+            source: '<main>\n  <div\n</main>\n',
+            reason: 'Unclosed tag',
+            bail: { what: 'tag', near: '<div' },
+          },
+          layouts: [],
+          currentLayoutName: '',
+          selectedId: null,
+          onSelect: () => {},
+          onDropComponent: () => {},
+          onMoveNode: () => {},
+          onRemoveNode: () => {},
+          onCopyNode: () => {},
+          onDuplicateNode: () => {},
+          onPasteNode: () => {},
+          onChangeLayout: () => {},
+          onCodeChange: () => {},
+          onOpenCodePanel: () => opened.push('code'),
+          devLog: '[astro] Unable to render index.astro',
+          hasClipboard: false,
+        })
+      );
+      await settle(20);
+    });
+    const note = container.querySelector('.code-note')?.textContent ?? '';
+    check('the parse error says so', /doesn’t parse/.test(note), note);
+    check('with the parser’s diagnostic', /Unclosed tag/.test(note), note);
+    check('and where it stopped', /Near <div/.test(note), note);
+    check('no tree is drawn', rows().length === 0);
+    const output = container.querySelector('.parse-error-output pre')?.textContent;
+    const astro = '[astro] Unable to render index.astro';
+    check('Astro’s own output is offered', output === astro, output);
+    const held = container.querySelector('.cm-content')?.textContent ?? '';
+    check('the code editor is there, holding the text', /<main>/.test(held), held);
+    check('no raw textarea is left', !container.querySelector('textarea'));
+    await act(async () => {
+      container.querySelector('.parse-error-open').click();
+    });
+    check('the code panel is one click away', opened.length === 1);
   }
 
   if (failures.length) {

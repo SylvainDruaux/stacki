@@ -86,10 +86,12 @@ import {
 import { ok } from '../shared/result';
 import {
   saveStateAccepted,
+  saveStateBase,
   saveStateClean,
   saveStateEdited,
   saveStateRefused,
 } from './saveState.js';
+import { sendCode } from './codeEdits';
 import SaveConflictNotice from './panels/SaveConflictNotice';
 import CapabilityNotice from './panels/CapabilityNotice';
 import { nodeCapability } from './nodeCapability';
@@ -241,7 +243,6 @@ import {
   watchProject,
   writeProjectFile,
   writeProjectPage,
-  writeProjectPageRaw,
   serializeProjectPage,
   editProjectPage,
   checkPreviewRender,
@@ -539,6 +540,43 @@ async function writeEdits(
   }
 }
 
+// A save of typed code (step 8): the patch from the text's baseline through the
+// page's actor, the one write path. A refusal is the conflict notice with the
+// actor's reason (a `merge-conflict` for an overlapping outside edit); any
+// other failure keeps the text unsaved and is reported as a failed save.
+async function writeCode(
+  store: EditDrafts,
+  pagePath: string,
+  state: EditorPageState,
+  base: Digest,
+): Promise<PageWriteOutcome<EditorPageState>> {
+  const sent = await sendCode({
+    path: pagePath,
+    text: state.source,
+    base,
+    stateBase: saveStateBase(state.save),
+    store,
+    send: editProjectPage,
+    read: readPage,
+  });
+  switch (sent.tag) {
+    case 'applied':
+      return pageWriteOutcome(state, ok(sent.last));
+    case 'refused': {
+      const { diskChecksum, baseChecksum } = sent;
+      return sent.reason === undefined
+        ? { tag: 'conflict', diskChecksum, baseChecksum }
+        : { tag: 'conflict', diskChecksum, baseChecksum, reason: sent.reason };
+    }
+    case 'failed':
+      throw new Error(sent.message);
+    default: {
+      const exhaustive: never = sent;
+      return exhaustive;
+    }
+  }
+}
+
 function saveDelay(urgency: boolean | 'live'): number {
   if (urgency === true) {
     return 0;
@@ -780,6 +818,14 @@ export default function App() {
   const devLogRef = useRef('');
   const pageStateRef = useRef<PageStateSnapshot>({ currentPage: null, pageState: null });
   pageStateRef.current = { currentPage, pageState };
+  // Typed code waiting for its parse (step 8). While the page shows that text,
+  // its model is the parse of older text, and a gesture on it would save that
+  // model over the typing: gestures wait until the parse lands.
+  const typedSourceRef = useRef<string | null>(null);
+  const typedCodeUnparsed = useCallback((): boolean => {
+    const typed = typedSourceRef.current;
+    return typed !== null && typed === pageStateRef.current.pageState?.source;
+  }, []);
   const selectedIdRef = useRef<string | null>(null);
   selectedIdRef.current = selectedId;
 
@@ -1074,10 +1120,12 @@ export default function App() {
     pageSaverRef.current = createPageSaver<EditorPageState>({
       readCurrent: () => pageStateRef.current,
       write: async (pagePath, state, baseChecksum) => {
-        if (!state.editable) {
-          const raw = await writeProjectPageRaw(pagePath, state.source, baseChecksum);
-          return pageWriteOutcome(state, raw);
+        if (editDrafts.queue(pagePath).tag === 'code') {
+          return writeCode(editDrafts, pagePath, state, baseChecksum);
         }
+        // Text that does not parse changes only through the code editor, so
+        // its page is in code; anything else would write a model it lacks.
+        assert(state.editable, 'A page that does not parse is saved as code');
         const drafts = editDrafts.take(pagePath);
         if (drafts.length > 0) {
           return writeEdits(editDrafts, pagePath, state, baseChecksum, drafts);
@@ -1645,10 +1693,66 @@ export default function App() {
     h.lastPush = 0;
   }, []);
 
+  // The typed text's parse: a model to show when it parses, the parse-error
+  // panel when it does not (plan §3.6). Installed only over the same text.
+  const parseTypedCode = useCallback(async (
+    pagePath: string,
+    source: string,
+    position: number,
+    version: number,
+  ): Promise<void> => {
+    let parsed: Awaited<ReturnType<typeof parseSourcePage>>;
+    try {
+      parsed = await parseSourcePage(pagePath, source);
+    } catch (error: unknown) {
+      if (version === codeEditVersionRef.current) {
+        typedSourceRef.current = null;
+        showToast(`Couldn’t update code: ${cleanError(error)}`, 'error');
+      }
+      return;
+    }
+    if (version !== codeEditVersionRef.current) {return;}
+    if (pageStateRef.current.currentPage?.path !== pagePath) {return;}
+    typedSourceRef.current = null;
+    // The rendered state may not show the typed text yet (a fast parse beats
+    // the render); it serves only to re-key the parse onto the session ids so
+    // the editors it feeds don't remount per keystroke (issue #29). Whether
+    // the parse is still of the page's text is decided when it is installed.
+    const local = pageStateRef.current.pageState;
+    if (!local) {return;}
+    // Never clean: typed text is no parse of bytes on disk, so it has no origin
+    // to author requests against (plan §4), even if the render still shows the
+    // clean page it was typed into.
+    const result = toEditorPageState(adoptParsedModel(local, parsed), saveStateEdited(local.save));
+    assert(!result.editable || result.origin === undefined, 'Typed code has no edit origin');
+    if (result.editable) {
+      const inFrontmatter =
+        result.model.bodyStart !== undefined && position < result.model.bodyStart;
+      const selected = sourceNodeAtOffset(result.model.nodes, position);
+      setSelectedId(inFrontmatter ? 'frontmatter' : selected?.id ?? null);
+    } else {
+      setSelectedId(null);
+    }
+    // The save state is whatever is current when this lands: a conflicted
+    // page stays conflicted, and a save that landed meanwhile keeps its base.
+    setPageState((current) =>
+      current && current.source === source ? { ...result, save: current.save } : current,
+    );
+  }, [showToast]);
+
   const applySnapshot = useCallback((entry: PageSnapshot) => {
     codeEditVersionRef.current += 1
-    const path = pageStateRef.current.currentPage?.path;
-    if (path) {editDrafts.markModel(path);}
+    const { currentPage, pageState: shown } = pageStateRef.current;
+    const path = currentPage?.path;
+    // A restored model is saved whole; restored text is code, patched from
+    // the text shown now (step 8).
+    if (path && shown && entry.kind === 'source') {
+      editDrafts.typeCode(path, shown);
+      typedSourceRef.current = entry.source;
+      void parseTypedCode(path, entry.source, 0, codeEditVersionRef.current);
+    } else if (path) {
+      editDrafts.markModel(path);
+    }
     setPageState((s) => {
       if (!s) {return s;}
       if (entry.kind === 'model') {
@@ -1666,7 +1770,7 @@ export default function App() {
       );
     }
     scheduleSaveRef.current?.(true);
-  }, [editDrafts]);
+  }, [editDrafts, parseTypedCode]);
 
   const scheduleSaveRef = useRef<((urgency?: boolean | 'live') => void) | null>(null);
 
@@ -1850,13 +1954,15 @@ export default function App() {
   // saves over what is on disk (and conflicts again if the disk moves again).
   const keepLocalVersion = useCallback(() => {
     setConflictReason(undefined);
+    const path = pageStateRef.current.currentPage?.path;
+    if (path) {editDrafts.acceptDisk(path);} // typed code now patches the disk's text
     setPageState((current) =>
       current?.save.tag === 'conflicted'
         ? { ...current, save: saveStateAccepted(current.save) }
         : current,
     );
     scheduleSave(true);
-  }, [scheduleSave]);
+  }, [scheduleSave, editDrafts]);
 
   const mutateModel = useCallback(
     (
@@ -1865,6 +1971,7 @@ export default function App() {
       coalesceKey: string | null = null,
     ) => {
       if (propertySave.saving.current) { return; }
+      if (!pageStateRef.current.pageState?.editable || typedCodeUnparsed()) { return; }
       codeEditVersionRef.current += 1
       pushHistory(coalesceKey);
       // A gesture without an intent form yet: the whole model is saved, and
@@ -1878,7 +1985,7 @@ export default function App() {
       });
       scheduleSave(immediate);
     },
-    [scheduleSave, pushHistory, propertySave.saving, editDrafts]
+    [scheduleSave, pushHistory, propertySave.saving, editDrafts, typedCodeUnparsed]
   );
 
   // A gesture in its intent form (step 6, editGestures.ts): it goes to disk as
@@ -1891,7 +1998,7 @@ export default function App() {
       if (propertySave.saving.current) { return; }
       const { currentPage, pageState: state } = pageStateRef.current;
       const path = currentPage?.path;
-      if (!path || !state?.editable) {return;}
+      if (!path || !state?.editable || typedCodeUnparsed()) {return;}
       codeEditVersionRef.current += 1;
       const record = pushEditHistory(gesture.coalesceKey);
       const origin = state.origin;
@@ -1910,73 +2017,44 @@ export default function App() {
       );
       scheduleSave(gesture.urgency);
     },
-    [scheduleSave, pushEditHistory, propertySave.saving, editDrafts]
+    [scheduleSave, pushEditHistory, propertySave.saving, editDrafts, typedCodeUnparsed]
   );
 
-  const setRawSource = useCallback(
-    (source: string) => {
-      if (propertySave.saving.current) { return; }
-      codeEditVersionRef.current += 1
-      pushHistory('raw-source');
-      const path = pageStateRef.current.currentPage?.path;
-      if (path) {editDrafts.markModel(path);}
-      setPageState((s) => (s ? { ...s, source, save: saveStateEdited(s.save) } : s));
-      scheduleSave();
-    },
-    [scheduleSave, pushHistory, propertySave.saving, editDrafts]
-  );
-
+  // Typed code (step 8). The text is the page's edit: it is set at once, so a
+  // save sends exactly what the editor holds and a save's reply can never be
+  // installed over a newer keystroke. The model follows when main has parsed
+  // the text; until then a gesture would edit a model the text has left, so
+  // gestures wait (typedCodeUnparsed) — a window of one IPC round trip.
+  // Returns the parse, for a caller that needs the model to have followed.
   const changeCodeSource = useCallback(
-    async (source: string, position: number) => {
-      const open = pageStateRef.current.currentPage;
-      if (!open || open.kind === 'route') {
-        return;
+    (source: string, position: number): Promise<void> => {
+      // No property-save guard, as before: the editor already shows the text,
+      // so refusing it here would leave typing on screen that never saves.
+      const { currentPage: open, pageState: shown } = pageStateRef.current;
+      if (!open || open.kind === 'route' || !shown) {
+        return Promise.resolve();
       }
+      pushHistory('code-source');
+      editDrafts.typeCode(open.path, shown);
       const version = codeEditVersionRef.current + 1;
       codeEditVersionRef.current = version;
-      try {
-        const parsed = await parseSourcePage(open.path, source);
-        if (version !== codeEditVersionRef.current) {
-          return;
-        }
-        if (pageStateRef.current.currentPage?.path !== open.path) {
-          return;
-        }
-        // The parse reflects the typed source (fresh structure and offsets);
-        // re-key it onto the session ids so the editors it feeds don't remount
-        // per keystroke (issue #29).
-        const local = pageStateRef.current.pageState;
-        if (!local) {
-          return;
-        }
-        const result = toEditorPageState(
-          adoptParsedModel(local, parsed),
-          saveStateEdited(local.save),
-        );
-        pushHistory('code-source');
-        // Typed code is saved whole (step 8 brings code patches).
-        editDrafts.markModel(open.path);
-        if (result.editable) {
-          const inFrontmatter =
-            result.model.bodyStart !== undefined && position < result.model.bodyStart;
-          const selected = sourceNodeAtOffset(result.model.nodes, position);
-          setSelectedId(inFrontmatter ? 'frontmatter' : selected?.id ?? null);
-        } else {
-          setSelectedId(null);
-        }
-        // The save state comes from whatever is current when this lands: a
-        // conflicted page stays conflicted, and autosave stays off.
-        setPageState((current) =>
-          current ? { ...result, save: saveStateEdited(current.save) } : current,
-        );
-        scheduleSave('live');
-      } catch (error: unknown) {
-        if (version === codeEditVersionRef.current) {
-          showToast(`Couldn’t update code: ${cleanError(error)}`, 'error');
-        }
-      }
+      typedSourceRef.current = source;
+      // The model no longer descends from a parse on disk: requests wait for
+      // the page to be clean again (plan §4).
+      setPageState((current) =>
+        current
+          ? {
+              ...current,
+              source,
+              save: saveStateEdited(current.save),
+              ...(current.editable ? { origin: undefined } : {}),
+            }
+          : current,
+      );
+      scheduleSave('live');
+      return parseTypedCode(open.path, source, position, version);
     },
-    [pushHistory, scheduleSave, showToast, editDrafts],
+    [pushHistory, scheduleSave, editDrafts, parseTypedCode],
   );
 
   // ----------------------------------------------------------------
@@ -1997,7 +2075,10 @@ export default function App() {
     // Unsaved edits that are all requests map through an outside change or
     // are refused one by one, each with its reason (step 6): no page-wide
     // conflict for them.
-    if (editDrafts.queue(pagePath).tag === 'edits') {
+    // Typed code is a patch too (step 8): it merges with the outside change
+    // or comes back `merge-conflict` — also not a page-wide conflict here.
+    const queued = editDrafts.queue(pagePath).tag;
+    if (queued === 'edits' || queued === 'code') {
       return;
     }
     const baseBefore = saver.baseFor(pagePath, before.save);
@@ -5135,7 +5216,9 @@ export default function App() {
                 onDuplicateNode={duplicateNode}
                 onPasteNode={pasteNode}
                 hasClipboard={() => !!nodeClipboardRef.current}
-                onRawChange={setRawSource}
+                onCodeChange={changeCodeSource}
+                onOpenCodePanel={() => setLeftTab('code')}
+                devLog={devLog}
               />
             )}
             {leftTab === 'components' && (
@@ -5215,9 +5298,7 @@ export default function App() {
                 relativePath={openRel ?? currentPage.name}
                 model={model}
                 selectedId={selectedId}
-                onChange={(source, position) => {
-                  void changeCodeSource(source, position);
-                }}
+                onChange={changeCodeSource}
                 onSelect={setSelectedId}
                 onOpenComponent={(name, id) => {
                   void openComponent(name, pathFor(id));

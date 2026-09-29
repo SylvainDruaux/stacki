@@ -15,13 +15,14 @@
 // projections and authors intents directly.
 import type { Digest } from './brand';
 import { digest, pathText } from './boundary';
+import type { CodeHunk } from './code-patch';
 import type { AttributeValue, Placement, SourceEdit, StyleDeclaration } from './intent';
 import { PLACEMENTS } from './intent';
 import { LIMITS } from './limits';
 import { parsePageModel, parsePageNode, type PageModel, type PageNode } from './page-node';
 import { toArray, toRecord } from './record';
 import { NODE_KINDS, STRUCTURAL_PATH_STEPS_MAX, type NodeKind } from './ref';
-import { parseByteSpan, parseUtf16Span, type Utf16Span } from './span';
+import { parseByteSpan, parseUtf16Span, spansAscending, type Utf16Span } from './span';
 
 /** A node of the parse the request was authored against. */
 export interface NodeRef {
@@ -74,7 +75,12 @@ export type Edit =
   | { readonly tag: 'set-frontmatter'; readonly model: PageModel }
   /** Undo and redo: byte hunks a previous reply handed back, against the
    * checksum that reply named. */
-  | { readonly tag: 'revert'; readonly hunks: readonly SourceEdit[] };
+  | { readonly tag: 'revert'; readonly hunks: readonly SourceEdit[] }
+  /** The code editor (step 8): the byte diff from the text of the named
+   * checksum to the editor's text (shared/code-patch.ts). Each hunk names the
+   * bytes it replaces, and main checks them against that checksum's bytes.
+   * The result may not parse (plan §3.6). */
+  | { readonly tag: 'code-patch'; readonly hunks: readonly CodeHunk[] };
 
 export type EditTag = Edit['tag'];
 
@@ -147,6 +153,8 @@ export function parseEdit(input: unknown): Edit {
       return { tag, model: parsePageModel(record['model']) };
     case 'revert':
       return { tag, hunks: parseHunks(record['hunks']) };
+    case 'code-patch':
+      return { tag, hunks: parseCodeHunks(record['hunks']) };
     default:
       throw new Error(`Edit.tag: unknown edit ${JSON.stringify(tag)}`);
   }
@@ -239,6 +247,36 @@ function parseHunks(input: unknown): readonly SourceEdit[] {
       text: boundedText(record['text'], `Edit.hunks[${index}].text`, LIMITS.intentPayloadBytesMax),
     };
   });
+}
+
+// The shape only: at least one hunk, ascending and disjoint, each text inside
+// the payload bound. Whether the witnesses hold, whether the hunks sit on code
+// points, and whether the summed payload fits are main's to check against the
+// bytes (electron/editRequests.ts, the host) — a typed refusal, not a throw.
+function parseCodeHunks(input: unknown): readonly CodeHunk[] {
+  const hunks = toArray(input);
+  if (hunks === undefined) {
+    throw new Error('Edit.hunks: expected array');
+  }
+  if (hunks.length === 0) {
+    throw new Error('Edit.hunks: a code patch has at least one hunk');
+  }
+  if (hunks.length > LIMITS.splicesPerIntentMax) {
+    throw new Error(`Edit.hunks: exceeds ${LIMITS.splicesPerIntentMax} items`);
+  }
+  const parsed = hunks.map((hunk, index) => {
+    const where = `Edit.hunks[${index}]`;
+    const record = requireRecord(hunk, where);
+    return {
+      span: parseByteSpan(record['span'], `${where}.span`),
+      expected: boundedText(record['expected'], `${where}.expected`, LIMITS.intentPayloadBytesMax),
+      text: boundedText(record['text'], `${where}.text`, LIMITS.intentPayloadBytesMax),
+    };
+  });
+  if (!spansAscending(parsed.map((hunk) => hunk.span))) {
+    throw new Error('Edit.hunks: expected ascending disjoint spans');
+  }
+  return parsed;
 }
 
 function parseAttributeValue(input: unknown): AttributeValue {

@@ -145,7 +145,7 @@ const check = (what, condition, detail) => {
         onDuplicateNode: () => {},
         onPasteNode: () => {},
         onChangeLayout: () => {},
-        onRawChange: () => {},
+        onCodeChange: () => {}, onOpenCodePanel: () => {},
         onHoverNode: () => {},
         onOpenComponent: () => {},
         hasClipboard: false,

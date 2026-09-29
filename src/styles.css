@@ -3117,12 +3117,6 @@ body > .embed-editor_provenance {
   min-height: 0;
   padding: 10px;
 }
-.code-editor textarea {
-  flex: 1;
-  user-select: text;
-  font-family: var(--mono);
-  font-size: 11.5px;
-}
 .code-note {
   padding: 8px 12px;
   margin-bottom: 8px;
@@ -5842,3 +5836,30 @@ textarea::selection {
   box-shadow: 0 3px 10px rgba(0, 0, 0, 0.4);
 }
 .term-scroll-btn:hover:not(:disabled) { background: var(--bg-active); color: var(--text); }
+
+/* The navigator of a page that does not parse (plan §3.6, step 8). */
+.parse-error-diagnostic {
+  margin-top: 6px;
+  color: var(--text);
+}
+.parse-error-diagnostic code {
+  font-family: var(--mono);
+  word-break: break-all;
+}
+.parse-error-open {
+  display: block;
+  margin-top: 8px;
+}
+.parse-error-output {
+  margin-bottom: 8px;
+  font-size: 11.5px;
+  color: var(--text-dim);
+}
+.parse-error-output pre {
+  max-height: 160px;
+  overflow: auto;
+  margin: 6px 0 0;
+  font-family: var(--mono);
+  font-size: 11px;
+  white-space: pre-wrap;
+}

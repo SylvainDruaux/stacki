@@ -63,7 +63,7 @@ test('App bridge rejects malformed replies and event values', async () => {
       dynamicPaths: async () => ({
         entries: [{ params: {}, props: false, route: '/bad', label: 'Bad' }],
       }),
-      writePageRaw: async () => ({ ok: false }),
+      editPage: async () => ({ ok: false }),
       onPageMaybeChanged: (callback) => {
         pageCallback = callback;
         return () => {};
@@ -80,16 +80,21 @@ test('App bridge rejects malformed replies and event values', async () => {
     bridgeModule.readDynamicPaths('/project', '/project/src/pages/[id].astro', ''),
     /Dynamic route props have an invalid value/,
   );
-  await assert.rejects(
-    bridgeModule.writeProjectPageRaw('/project/src/pages/index.astro', 'Hello', 'a'.repeat(64)),
-    /PageWriteError: expected object/,
-  );
-  // A malformed base checksum is caught before anything crosses to main.
+  // A code save (step 8) is an edit request: a malformed reply is refused...
+  const hunk = { span: { start: 0, end: 5 }, expected: 'Hello', text: 'Hi' };
+  const codeSave = (authoredChecksum, hunks) =>
+    bridgeModule.editProjectPage({
+      pagePath: '/project/src/pages/index.astro',
+      authoredChecksum,
+      edit: { tag: 'code-patch', hunks },
+    });
+  await assert.rejects(codeSave('a'.repeat(64), [hunk]), /PageEditError: expected object/);
+  // ...and a malformed checksum or patch is caught before anything crosses to main.
   assert.throws(
-    () =>
-      bridgeModule.writeProjectPageRaw('/project/src/pages/index.astro', 'Hello', 'A'.repeat(64)),
+    () => codeSave('A'.repeat(64), [hunk]),
     /Digest: expected 64 lowercase hex characters/,
   );
+  assert.throws(() => codeSave('a'.repeat(64), [hunk, hunk]), /ascending disjoint spans/);
 
   let external = false;
   bridgeModule.onPageMaybeChanged((event) => {

@@ -121,7 +121,7 @@ async function checkNavigator(StructurePanel) {
         onCopyNode: () => {},
         onDuplicateNode: () => {},
         onPasteNode: () => {},
-        onRawChange: () => {},
+        onCodeChange: () => {}, onOpenCodePanel: () => {},
         hasClipboard: false,
       }),
     );

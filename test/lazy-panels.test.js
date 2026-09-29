@@ -12,6 +12,7 @@ const { createHash } = require('node:crypto');
 const sha256 = (text) => createHash('sha256').update(text).digest('hex');
 const { JSDOM } = require('jsdom');
 const { parsePage, serializePage } = require('../dist/electron/astroParser.js');
+const { applyCodePatch } = require('../dist/shared/code-patch.js');
 
 const PANEL_PATHS = [
   './panels/PropsPanel',
@@ -56,7 +57,7 @@ test('all optional editors load without hiding the app or replacing its preview'
     );
     await act(() => __lazyPanels.WelcomeScreen.onOpen('/project'));
     const stable = captureEditor();
-    const context = { act, gates, stable };
+    const context = { act, gates, stable, bridge: window.avb };
     assertPending(context, 'StylePanel');
     assertPending(context, 'PropsPanel');
     await releasePanel(context, 'StylePanel');
@@ -123,6 +124,9 @@ async function checkCodePanel(context) {
     await __lazyPanels.CodePanel.onChange(changed, changed.indexOf('<h1>') + 2);
   });
   assert.equal(__lazyPanels.PropsPanel.node.name, 'h1', 'code selection reaches the inspector');
+  await context.act(() => new Promise((resolve) => setTimeout(resolve, 200)));
+  assert.equal(context.bridge.codeSaves, 1, 'typed code is saved as a patch (step 8)');
+  assert.equal(context.bridge.disk(), changed, 'the patch leaves exactly the typed text');
   assert.equal(
     document.querySelector('.property-saving-overlay'),
     null,
@@ -318,7 +322,16 @@ function createBridge() {
     route: '/',
   };
   const source = '---\nconst title = "Home";\n---\n<main>Content</main>';
+  // One file on a fake disk: whole-model saves write it, code saves patch it.
+  let disk = source;
+  const onDisk = (text) => ({
+    ...parsePage(text, { locs: true }),
+    source: text,
+    checksum: sha256(text),
+  });
   const bridge = {
+    disk: () => disk,
+    codeSaves: 0,
     pendingProject: async () => null,
     scanProject: async () => ({
       pages: [page],
@@ -330,19 +343,22 @@ function createBridge() {
     startDevServer: async () => ({ url: 'http://localhost:4321' }),
     listProjectClasses: async () => [],
     // Disk replies carry the SHA-256 of the bytes, as main's do.
-    readPage: async () => ({
-      ...parsePage(source, { locs: true }),
-      source,
-      checksum: sha256(source),
-    }),
+    readPage: async () => onDisk(disk),
     parsePageSource: async ({ source: next }) => ({
       ...parsePage(next, { locs: true }),
       source: next,
     }),
     writePage: async ({ model }) => {
-      const next = serializePage(model);
-      const parsed = parsePage(next, { locs: true });
-      return { ok: true, ...parsed, source: next, checksum: sha256(next) };
+      disk = serializePage(model);
+      return { ok: true, ...onDisk(disk) };
+    },
+    // Typed code arrives as a patch against the checksum it was typed from.
+    editPage: async ({ authoredChecksum, edit }) => {
+      assert.equal(edit.tag, 'code-patch', 'this test sends only typed code as requests');
+      assert.equal(authoredChecksum, sha256(disk), 'the patch names the bytes on disk');
+      disk = applyCodePatch(disk, edit.hunks);
+      bridge.codeSaves += 1;
+      return { ok: true, ...onDisk(disk), inverse: [] };
     },
     gitInfo: async () => ({ isRepo: false }),
     onCssChanged: () => () => {},

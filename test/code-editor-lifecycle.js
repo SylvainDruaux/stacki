@@ -112,6 +112,16 @@ const path = require('node:path');
     await render('external\nupdated\nsource');
     assert.equal(view.state.doc.toString(), 'external\nupdated\nsource');
     assert.equal(changes.length, 1, 'external reloads and app undo do not echo a new edit');
+    // A saved text that came back with an outside edit merged into it (step 8)
+    // replaces only what differs: the caret stays where the user put it, and
+    // moves with text inserted before it.
+    await React.act(async () => view.dispatch({ selection: { anchor: 2 } }));
+    await render('external\nupdated\nsource, merged');
+    assert.equal(view.state.selection.main.head, 2, 'a change after the caret leaves it');
+    await render('an external\nupdated\nsource, merged');
+    assert.equal(view.state.selection.main.head, 5, 'a change before the caret carries it');
+    assert.equal(changes.length, 1, 'neither echoes as an edit');
+    await render('external\nupdated\nsource');
     await render('external\nupdated\nsource', 3);
     assert.equal(
       view.state.selection.main.head,

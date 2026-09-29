@@ -3276,14 +3276,21 @@ ipcMain.handle('page:write', async (_e, { pagePath, model, baseChecksum }) => {
 // shows; editRequests.ts makes it an intent against that snapshot, and the
 // page's actor plans and writes it — splices, never a reprint of the file.
 // The reply is the page as written plus the inverse Undo will submit.
+//
+// The code editor's saves arrive here too (step 8): a code patch is bytes, not
+// nodes, so it applies to Markdown and MDX pages as well, and to a page that
+// does not parse — before or after.
 ipcMain.handle('page:edit', async (_e, { pagePath, authoredChecksum, edit }) => {
-  if (isMarkdownPage(pagePath)) {
-    const reason = 'unsupported-operation' as const; // Markdown joins the engine at step 10.
+  const code = edit.tag === 'code-patch';
+  if (isMarkdownPage(pagePath) && !code) {
+    const reason = 'unsupported-operation' as const; // Markdown gestures join at step 10.
     const message = describeRejection(reason);
     const error = { code: 'rejected' as const, reason, message, diskChecksum: null };
     return { ok: false as const, error };
   }
-  const report = documents.submitEdit(pagePath, authoredChecksum, (base) => buildEdit(edit, base));
+  const gone = code ? ('merge-conflict' as const) : ('anchor-moved' as const);
+  const stated = { authoredChecksum, gone };
+  const report = documents.submitEdit(pagePath, stated, (base) => buildEdit(edit, base));
   if (report.tag !== 'applied') {
     return { ok: false as const, error: pageEditError(pagePath, report) };
   }
@@ -3328,14 +3335,6 @@ ipcMain.handle('page:serialize', async (_e, { pagePath, model }) => {
     /* gone or unreadable: the review shows the text without a BOM */
   }
   return { source: bom ? withByteOrderMark(serialized) : serialized };
-});
-
-ipcMain.handle('page:writeRaw', async (_e, { pagePath, source, baseChecksum }) => {
-  const base = checkPageBase(pagePath, baseChecksum);
-  if (!base.ok) {
-    return { ok: false as const, error: base.error };
-  }
-  return writePageText(pagePath, source, baseChecksum);
 });
 
 ipcMain.handle('page:create', async (_e, { projectPath, name, layout }) => {

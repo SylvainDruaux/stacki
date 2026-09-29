@@ -152,7 +152,7 @@ const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
           onDuplicateNode: () => {},
           onPasteNode: () => {},
           onChangeLayout: () => {},
-          onRawChange: () => {},
+          onCodeChange: () => {}, onOpenCodePanel: () => {},
           onHoverNode: () => {},
           onOpenComponent: () => {},
           hasClipboard: false,
@@ -190,7 +190,8 @@ const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
           inertNodeIds: new Set(),
           onSelect: () => {}, onDropComponent: () => {}, onMoveNode: () => {}, onRemoveNode: () => {},
           onCopyNode: () => {}, onDuplicateNode: () => {}, onPasteNode: () => {}, onChangeLayout: () => {},
-          onRawChange: () => {}, onHoverNode: () => {}, onOpenComponent: () => {}, hasClipboard: false,
+          onCodeChange: () => {}, onOpenCodePanel: () => {},
+          onHoverNode: () => {}, onOpenComponent: () => {}, hasClipboard: false,
         })
       );
       await settle(20);

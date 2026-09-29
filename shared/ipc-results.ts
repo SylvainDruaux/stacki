@@ -468,7 +468,6 @@ export interface IpcResults {
     readonly source: string;
   };
   readonly 'page:write': WirePageWrite;
-  readonly 'page:writeRaw': WirePageWrite;
   readonly 'pagefolder:create': {
     readonly ok: true;
   };

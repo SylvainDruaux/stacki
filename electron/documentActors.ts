@@ -37,6 +37,7 @@ import {
 } from '../shared/documentActor';
 import {
   describeRejection,
+  intentPayloadBytes,
   toIntent,
   type Intent,
   type Outcome,
@@ -101,6 +102,15 @@ export interface EditBase {
   readonly authored: Snapshot;
   readonly current: Snapshot;
   readonly history: 'unchanged' | 'own-commits' | 'outside';
+}
+
+/** What an edit request states besides its content: the checksum it was
+ * authored against, and the reason to refuse it with when the host no longer
+ * holds those bytes — a node reference can no longer be found (`anchor-moved`),
+ * a code patch can no longer be merged (`merge-conflict`). */
+export interface EditStatement {
+  readonly authoredChecksum: Digest;
+  readonly gone: RejectionReason;
 }
 
 /** A built edit, and which of the two snapshots it names. An edit that states
@@ -224,7 +234,7 @@ export class DocumentActors {
    * planner. Without the authored bytes, it is refused: never guessed. */
   submitEdit(
     file: string,
-    authoredChecksum: Digest,
+    stated: EditStatement,
     build: (base: EditBase) => Result<BuiltEdit, RejectionReason>,
   ): EditReport {
     assert(this.#options.drain === 'immediate', 'A deferred host takes submitDeferred');
@@ -246,7 +256,7 @@ export class DocumentActors {
         diskChecksum: undefined,
       };
     }
-    const submission = this.#editSubmission(entry.value, authoredChecksum, build);
+    const submission = this.#editSubmission(entry.value, stated, build);
     if (!submission.ok) {
       const reason = submission.error;
       return {
@@ -472,9 +482,10 @@ export class DocumentActors {
   // snapshot to map it from when it is stale.
   #editSubmission(
     entry: Entry,
-    authoredChecksum: Digest,
+    stated: EditStatement,
     build: (base: EditBase) => Result<BuiltEdit, RejectionReason>,
   ): Result<{ readonly intent: Intent; readonly authored: Snapshot | undefined }, RejectionReason> {
+    const { authoredChecksum } = stated;
     const current = entry.state.snapshot;
     assert(current !== undefined, 'A refreshed actor holds a snapshot');
     const authored =
@@ -482,7 +493,7 @@ export class DocumentActors {
         ? current
         : entry.retained.find((snapshot) => snapshot.checksum === authoredChecksum);
     if (authored === undefined) {
-      return err('anchor-moved'); // The authored bytes are gone: re-read, never guess.
+      return err(stated.gone); // The authored bytes are gone: re-read, never guess.
     }
     const chain =
       authored === current ? [] : commitChain(entry.log, authoredChecksum, current.checksum);
@@ -493,6 +504,12 @@ export class DocumentActors {
     }
     this.#intents += 1;
     assert(Number.isSafeInteger(this.#intents), 'Intent ids stay safe integers');
+    // The payload bound (plan §8) is an expected failure here, not a throw:
+    // a code patch as large as a file is the user's input, never truncated.
+    const payloadBytes = intentPayloadBytes(built.value.draft.operation);
+    if (payloadBytes > LIMITS.intentPayloadBytesMax) {
+      return err('resource-limit');
+    }
     const basis = built.value.basis === 'current' ? current : authored;
     const intent = toIntent({
       id: toIntentId(`main-${this.#intents}`),

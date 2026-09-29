@@ -1,4 +1,5 @@
 import type { PageModel, PageNode } from '../../shared/page-node';
+import type { Diagnostic } from '../../shared/source-projection';
 import { treeBudget } from '../treeView';
 import { rowChildren, rowHost } from '../branches';
 
@@ -15,7 +16,28 @@ export type StructurePageState =
       readonly editable: false;
       readonly source: string;
       readonly reason?: string;
+      readonly bail?: { readonly what: string; readonly near: string } | null;
     };
+
+/** The page as the navigator draws it (plan §3.6): a tree to edit visually, or
+ * a parse error, which is a state of the page like any other — the navigator
+ * switches over it exhaustively and offers the code editor. */
+export type StructureProjection =
+  | { readonly tag: 'valid'; readonly state: Extract<StructurePageState, { editable: true }> }
+  | {
+      readonly tag: 'parse-error';
+      readonly state: Extract<StructurePageState, { editable: false }>;
+      readonly diagnostics: readonly Diagnostic[];
+    };
+
+export function structureProjection(state: StructurePageState): StructureProjection {
+  if (state.editable) {
+    return { tag: 'valid', state };
+  }
+  const message = state.reason ?? 'This page cannot be parsed.';
+  const near = state.bail?.near;
+  return { tag: 'parse-error', state, diagnostics: [{ message, near: near || undefined }] };
+}
 
 export type DropLocation = {
   readonly parentId: string | null;

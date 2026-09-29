@@ -39,6 +39,10 @@ export type PageWriteOutcome<State> =
       readonly diskChecksum: Digest;
       /** Why an edit request was refused; absent for a whole-model save. */
       readonly reason?: RejectionReason;
+      /** The base the refusal compared, when not the one the write named: a
+       * code save refused for typing that cannot merge with what the app's
+       * own last save left (src/codeEdits.ts). */
+      readonly baseChecksum?: Digest;
     }
   | { readonly tag: 'advanced'; readonly checksum: Digest; readonly error: Error };
 
@@ -212,7 +216,8 @@ class SerialPageSaver<State extends PageStateHandle> {
     const { outcome } = acknowledgement;
     if (outcome.tag === 'conflict') {
       const { diskChecksum, reason } = outcome;
-      this.#deps.markConflicted(acknowledgement.baseChecksum, diskChecksum, reason);
+      const base = outcome.baseChecksum ?? acknowledgement.baseChecksum;
+      this.#deps.markConflicted(base, diskChecksum, reason);
       return;
     }
     assert(outcome.tag === 'written', 'Only a written or refused save is acknowledged');

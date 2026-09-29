@@ -13,9 +13,15 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { mainHarness } from './main-harness.ts';
-import { parseIpcPayload } from '../../dist/shared/ipc-payloads.js';
-import { parsePageDiskRead, parsePageWriteResult } from '../../dist/shared/page-save.js';
+import { IPC_PAYLOADS, parseIpcPayload } from '../../dist/shared/ipc-payloads.js';
+import {
+  parsePageDiskRead,
+  parsePageEditResult,
+  parsePageWriteResult,
+} from '../../dist/shared/page-save.js';
+import { diffCodePatch } from '../../dist/shared/code-patch.js';
 import { toDigest } from '../../dist/shared/brand.js';
+import type { PageDiskRead } from '../../dist/shared/page-save.js';
 import { toRecord } from '../../dist/shared/record.js';
 
 const sha256 = (bytes: string | Buffer): string => createHash('sha256').update(bytes).digest('hex');
@@ -51,6 +57,8 @@ function fixture() {
   };
 }
 
+type Harness = ReturnType<typeof fixture>;
+
 function temporaries(directory: string): readonly string[] {
   return fs.readdirSync(directory).filter((name) => name.startsWith('.stacki-write-'));
 }
@@ -65,20 +73,32 @@ test('Digest accepts exactly 64 lowercase hex characters', () => {
 test('write payloads require a well-formed base checksum', () => {
   const base = 'b'.repeat(64);
   const pagePath = '/p.astro';
-  const raw = parseIpcPayload('page:writeRaw', { pagePath, source: 'x', baseChecksum: base });
-  assert.equal(raw.baseChecksum, base);
   const model = parseIpcPayload('page:write', { pagePath, model: {}, baseChecksum: base });
   assert.equal(model.baseChecksum, base);
-  for (const channel of ['page:write', 'page:writeRaw'] as const) {
-    const payload = { pagePath: '/p.astro', source: 'x', model: {} };
-    assert.throws(() => parseIpcPayload(channel, payload), /Expected digest string/);
-    assert.throws(() => parseIpcPayload(channel, { ...payload, baseChecksum: 42 }), /digest/);
-    assert.throws(
-      () => parseIpcPayload(channel, { ...payload, baseChecksum: 'B'.repeat(64) }),
-      /Digest: expected 64 lowercase hex characters/,
-    );
-  }
+  const payload = { pagePath: '/p.astro', model: {} };
+  assert.throws(() => parseIpcPayload('page:write', payload), /Expected digest string/);
+  assert.throws(() => parseIpcPayload('page:write', { ...payload, baseChecksum: 42 }), /digest/);
+  assert.throws(
+    () => parseIpcPayload('page:write', { ...payload, baseChecksum: 'B'.repeat(64) }),
+    /Digest: expected 64 lowercase hex characters/,
+  );
 });
+
+test('the raw-source channel is retired: code saves are patches through page:edit', () => {
+  // Step 8: `page:writeRaw` wrote the code editor's whole text; the code editor
+  // now sends a byte diff through the page's actor, the one path for edits.
+  assert.equal(Object.hasOwn(IPC_PAYLOADS, 'page:writeRaw'), false);
+  assert.equal(Object.hasOwn(IPC_PAYLOADS, 'page:edit'), true);
+});
+
+/** Save `next` as the code editor does: the patch from the text it read. */
+async function saveCode(harness: Harness, file: string, read: PageDiskRead, next: string) {
+  const hunks = diffCodePatch(read.source, next);
+  assert.ok(hunks.ok, 'the text is inside the bounds');
+  const edit = { tag: 'code-patch', hunks: hunks.value };
+  const payload = { pagePath: file, authoredChecksum: read.checksum, edit };
+  return parsePageEditResult(await harness.invoke('page:edit', payload));
+}
 
 test('page read and write replies parse only with a valid checksum', () => {
   const checksum = 'c'.repeat(64);
@@ -143,19 +163,22 @@ test('an outside edit between read and write is refused and left on disk', async
   const read = parsePageDiskRead(await harness.invoke('page:read', file));
   assert.ok(read.editable);
   fs.writeFileSync(file, '<h1>Outside</h1>\n');
-  for (const [channel, payload] of [
-    ['page:write', { pagePath: file, model: read.model, baseChecksum: read.checksum }],
-    ['page:writeRaw', { pagePath: file, source: '<h1>Mine</h1>\n', baseChecksum: read.checksum }],
-  ] as const) {
-    const result = parsePageWriteResult(await harness.invoke(channel, payload));
-    assert.equal(result.ok, false, channel);
-    assert.equal(!result.ok && result.error.code, 'conflict');
-    assert.equal(
-      !result.ok && result.error.code === 'conflict' && result.error.diskChecksum,
-      sha256('<h1>Outside</h1>\n'),
-    );
-    assert.equal(fs.readFileSync(file, 'utf8'), '<h1>Outside</h1>\n', `${channel} left disk alone`);
-  }
+  const payload = { pagePath: file, model: read.model, baseChecksum: read.checksum };
+  const result = parsePageWriteResult(await harness.invoke('page:write', payload));
+  assert.equal(!result.ok && result.error.code, 'conflict');
+  assert.equal(
+    !result.ok && result.error.code === 'conflict' && result.error.diskChecksum,
+    sha256('<h1>Outside</h1>\n'),
+  );
+  assert.equal(fs.readFileSync(file, 'utf8'), '<h1>Outside</h1>\n', 'page:write left disk alone');
+  // The code editor's save of the same word overlaps the outside edit.
+  const code = await saveCode(harness, file, read, '<h1>Mine</h1>\n');
+  assert.equal(!code.ok && code.error.code === 'rejected' && code.error.reason, 'merge-conflict');
+  assert.equal(
+    !code.ok && code.error.code === 'rejected' && code.error.diskChecksum,
+    sha256('<h1>Outside</h1>\n'),
+  );
+  assert.equal(fs.readFileSync(file, 'utf8'), '<h1>Outside</h1>\n', 'the patch left disk alone');
   assert.deepEqual(temporaries(path.dirname(file)), []);
 });
 
@@ -167,24 +190,18 @@ test('a write against current bytes lands atomically with its checksum', async (
   fs.chmodSync(file, 0o640);
   const read = parsePageDiskRead(await harness.invoke('page:read', file));
   const source = '<h1>After</h1>\n';
-  const written = parsePageWriteResult(
-    await harness.invoke('page:writeRaw', { pagePath: file, source, baseChecksum: read.checksum }),
-  );
-  assert.equal(written.ok && written.value.checksum, sha256(source));
+  const written = await saveCode(harness, file, read, source);
+  assert.ok(written.ok, 'the code save applied');
+  assert.equal(written.value.checksum, sha256(source));
   assert.equal(fs.readFileSync(file, 'utf8'), source);
   if (process.platform !== 'win32') {
     assert.equal(fs.statSync(file).mode & 0o777, 0o640, 'the replacement keeps the mode');
   }
   assert.deepEqual(temporaries(path.dirname(file)), []);
   // The next save names the checksum the last one returned.
-  const again = parsePageWriteResult(
-    await harness.invoke('page:writeRaw', {
-      pagePath: file,
-      source: '<h1>Again</h1>\n',
-      baseChecksum: written.ok ? written.value.checksum : '',
-    }),
-  );
+  const again = await saveCode(harness, file, written.value, '<h1>Again</h1>\n');
   assert.equal(again.ok, true);
+  assert.equal(fs.readFileSync(file, 'utf8'), '<h1>Again</h1>\n');
 });
 
 test('a page deleted since it was read is missing, not a conflict', async (context) => {
@@ -195,13 +212,15 @@ test('a page deleted since it was read is missing, not a conflict', async (conte
   const read = parsePageDiskRead(await harness.invoke('page:read', file));
   fs.rmSync(file);
   const result = parsePageWriteResult(
-    await harness.invoke('page:writeRaw', {
+    await harness.invoke('page:write', {
       pagePath: file,
-      source: '<p/>\n',
+      model: read.editable ? read.model : {},
       baseChecksum: read.checksum,
     }),
   );
   assert.equal(!result.ok && result.error.code, 'missing');
+  const code = await saveCode(harness, file, read, '<p>x</p>\n');
+  assert.equal(code.ok, false, 'a code save does not recreate the file either');
   assert.equal(fs.existsSync(file), false, 'a refused write does not recreate the file');
 });
 

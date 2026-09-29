@@ -64,7 +64,6 @@ interface InvokeChannels {
   readonly parsePageSource: 'page:parse';
   readonly serializePage: 'page:serialize';
   readonly writePage: 'page:write';
-  readonly writePageRaw: 'page:writeRaw';
   readonly editPage: 'page:edit';
   readonly createPage: 'page:create';
   readonly deletePage: 'page:delete';

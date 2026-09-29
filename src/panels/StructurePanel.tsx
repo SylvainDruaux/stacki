@@ -1,5 +1,11 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import type { NavigatorNode, StructurePageState, DropLocation, DropTarget } from './structureModel';
+import type {
+  NavigatorNode,
+  StructurePageState,
+  StructureProjection,
+  DropLocation,
+  DropTarget,
+} from './structureModel';
 import type { ContextAction, ContextPosition, StructureTreeContext } from './StructureTree';
 import { CollapseVerticalIcon, CodeIcon, DragIcon, ExpandVerticalIcon } from '../ui/Icons';
 import { hidesChildRows } from '../treeSelection';
@@ -10,7 +16,9 @@ import {
   findVisibleNode,
   navigatorAncestors,
   navigatorChildren,
+  structureProjection,
 } from './structureModel';
+import CodeEditor from '../ui/CodeEditor.jsx';
 import { ContextMenu, NodeList } from './StructureTree';
 
 interface StructurePanelProps {
@@ -44,17 +52,28 @@ interface StructurePanelProps {
   readonly onDuplicateNode: (id: string) => void;
   readonly onPasteNode: () => void;
   readonly hasClipboard?: (() => boolean) | false;
-  readonly onRawChange: (source: string) => void;
+  /** Typed code (step 8): the same handler as the code panel's. */
+  readonly onCodeChange: (source: string, position: number) => void;
+  readonly onOpenCodePanel: () => void;
+  /** The dev server's recent output: Astro's own account of the page. */
+  readonly devLog?: string | undefined;
 }
 
 export default function StructurePanel(props: StructurePanelProps) {
   if (!props.pageState) {
     return <MissingPage currentPage={props.currentPage} />;
   }
-  if (!props.pageState.editable) {
-    return <CodePage pageState={props.pageState} onRawChange={props.onRawChange} />;
+  const projection = structureProjection(props.pageState);
+  switch (projection.tag) {
+    case 'valid':
+      return <EditableStructurePanel {...props} pageState={projection.state} />;
+    case 'parse-error':
+      return <ParseErrorPage projection={projection} {...props} />;
+    default: {
+      const exhaustive: never = projection;
+      return exhaustive;
+    }
   }
-  return <EditableStructurePanel {...props} pageState={props.pageState} />;
 }
 
 function MissingPage({ currentPage }: Pick<StructurePanelProps, 'currentPage'>) {
@@ -80,28 +99,53 @@ function MissingPage({ currentPage }: Pick<StructurePanelProps, 'currentPage'>) 
   );
 }
 
-function CodePage({
-  pageState,
-  onRawChange,
-}: {
-  readonly pageState: Extract<StructurePageState, { readonly editable: false }>;
-  readonly onRawChange: (source: string) => void;
+// A page that does not parse (plan §3.6): not an error to dismiss but a state
+// of the page. The code editor writes it — invalid text included, as a patch
+// through the page's actor — and the navigator comes back on its own once the
+// text parses. What went wrong is said twice: the parser's diagnostic here, and
+// Astro's own output, which the canvas shows as Astro's error page too.
+function ParseErrorPage({
+  projection,
+  devLog,
+  onCodeChange,
+  onOpenCodePanel,
+}: Pick<StructurePanelProps, 'devLog' | 'onCodeChange' | 'onOpenCodePanel'> & {
+  readonly projection: Extract<StructureProjection, { readonly tag: 'parse-error' }>;
 }) {
+  const [diagnostic] = projection.diagnostics;
   return (
     <div className="panel-section grow">
       <div className="panel-header">
         <h2>Code</h2>
       </div>
       <div className="code-editor">
-        <div className="code-note">
-          {pageState.reason ?? 'This page cannot be edited visually.'} You can still edit the source
-          here — the preview updates live.
+        <div className="code-note" role="status">
+          This page doesn’t parse, so it can’t be edited visually. Fix it here or in the code panel:
+          it saves as you type, and the navigator comes back as soon as it parses.
+          {diagnostic && (
+            <div className="parse-error-diagnostic">
+              {diagnostic.message}
+              {diagnostic.near && (
+                <>
+                  {' '}
+                  Near <code>{diagnostic.near}</code>
+                </>
+              )}
+            </div>
+          )}
+          <button className="ghost parse-error-open" onClick={onOpenCodePanel}>
+            Open in the code panel
+          </button>
         </div>
-        <textarea
-          spellCheck={false}
-          value={pageState.source}
-          onChange={(event) => onRawChange(event.currentTarget.value)}
-        />
+        {devLog ? (
+          <details className="parse-error-output">
+            <summary>Astro’s output</summary>
+            <pre>{devLog}</pre>
+          </details>
+        ) : null}
+        <div className="code-panel-editor">
+          <CodeEditor language="astro" value={projection.state.source} onChange={onCodeChange} />
+        </div>
       </div>
     </div>
   );
