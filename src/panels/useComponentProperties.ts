@@ -11,6 +11,8 @@ export interface ComponentPropertiesPanelProps {
   readonly flushSave: () => Promise<unknown>;
   readonly onSavePhase: (phase: 'idle' | 'saving') => void;
   readonly onSaved: () => Promise<void>;
+  /** An applied batch can be undone with this token (step 6). */
+  readonly onRecordUndo?: (token: string) => void;
 }
 type PanelState =
   | { readonly kind: 'loading' }
@@ -56,6 +58,7 @@ export function useComponentProperties(props: ComponentPropertiesPanelProps) {
       if (snapshot.active.current) {
         snapshot.accept(result.value);
       }
+      props.onRecordUndo?.(result.value.undo);
       await props.onSaved();
       return true;
     } catch (caught: unknown) {

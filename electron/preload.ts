@@ -2014,6 +2014,7 @@ contextBridge.exposeInMainWorld('avb', {
   createComponent: invoke('component:create'),
   componentProperties: invoke('component:properties'),
   editComponentProperties: invoke('component:editProperties'),
+  revertComponentProperties: invoke('component:revertProperties'),
   componentUsage: invoke('component:usage'),
   dynamicPaths: invoke('page:dynamicPaths'),
   injectedRoutes: invoke('project:injectedRoutes'),

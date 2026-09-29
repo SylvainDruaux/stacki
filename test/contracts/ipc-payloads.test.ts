@@ -100,6 +100,7 @@ const fields = {
   model: { imports: [], nodes: [{ kind: 'text', id: 'one', value: 'Hello' }] },
   baseChecksum: 'a'.repeat(64),
   authoredChecksum: 'a'.repeat(64),
+  token: '00000000-0000-4000-8000-000000000000',
   edit: {
     tag: 'remove-node',
     target: { path: [0], kind: 'element', span: { start: 0, end: 5 } },

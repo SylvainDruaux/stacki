@@ -138,6 +138,7 @@ test('component properties lifecycle and controls', async () => {
   let finishSave = async () => {};
   let failure = { code: 'write', message: 'Write failed. Try again.' };
   let applyDefinition;
+  const UNDO_TOKEN = '00000000-0000-4000-8000-000000000000';
   window.avb = {
     onFsChanged: (callback) => {
       notifyFiles = callback;
@@ -150,7 +151,13 @@ test('component properties lifecycle and controls', async () => {
       reads++;
       return readProperties();
     },
+    // Step 6: main answers an applied batch with the token of its inverse.
     editComponentProperties: async (request) => {
+      const result = await window.avb.__editProperties(request);
+      return result.ok ? { ...result, value: { ...result.value, undo: UNDO_TOKEN } } : result;
+    },
+    revertComponentProperties: async () => ({ ok: true, value: { undo: UNDO_TOKEN } }),
+    __editProperties: async (request) => {
       edits.push(request);
       order.push('write');
       if (request.change.kind === 'options') {

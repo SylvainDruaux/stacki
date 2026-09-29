@@ -1,5 +1,6 @@
 import { usePropertySaveGuard } from './usePropertySaveGuard';
 import ComponentPropertiesPanel from './panels/ComponentPropertiesPanel';
+import { revertComponentProperties } from './componentPropertiesBridge';
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { SetStateAction } from 'react';
 import type { Attr, ImportDecl, PageModel, PageNode, PairedNode } from '../shared/page-node';
@@ -1602,6 +1603,26 @@ export default function App() {
   }, []);
   const pushCommandRef = useRef<((command: Omit<UndoCommand, 'kind'>) => void) | null>(null);
   pushCommandRef.current = pushCommand;
+
+  // Step 6: a property batch's undo is its inverse batch, held by main under a
+  // token; applying one returns the token of the batch that redoes it. A file
+  // changed since refuses the whole undo, naming it (componentProperties.ts).
+  const recordPropertyUndo = useCallback(
+    (token: string) => {
+      let next = token;
+      const step = async (): Promise<void> => {
+        const reverted = await revertComponentProperties(next);
+        if (!reverted.ok) {
+          throw new Error(reverted.error.message);
+        }
+        next = reverted.value.undo;
+        // As after the edit itself: the panel, the page and the scan re-read.
+        await completePropertySave();
+      };
+      pushCommand({ label: 'the property change', undo: step, redo: step });
+    },
+    [pushCommand, completePropertySave],
+  );
 
   // Snapshots belong to one page, so they're dropped when that page closes;
   // commands carry their own inverse and stay, and so do applied edits: their
@@ -4996,6 +5017,7 @@ export default function App() {
                 flushSave={flushSave}
                 onSavePhase={propertySave.changePhase}
                 onSaved={completePropertySave}
+                onRecordUndo={recordPropertyUndo}
               />
             )}
             {leftTab === 'pages' && (

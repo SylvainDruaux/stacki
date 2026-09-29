@@ -77,6 +77,7 @@ interface InvokeChannels {
   readonly createComponent: 'component:create';
   readonly componentProperties: 'component:properties';
   readonly editComponentProperties: 'component:editProperties';
+  readonly revertComponentProperties: 'component:revertProperties';
   readonly componentUsage: 'component:usage';
   readonly dynamicPaths: 'page:dynamicPaths';
   readonly injectedRoutes: 'project:injectedRoutes';

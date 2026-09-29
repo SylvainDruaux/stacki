@@ -97,6 +97,9 @@ export const IPC_PAYLOADS = {
     props: optional(list(data)),
   }),
   'component:properties': object({ ...project, file: pathText }),
+  // Undo of a property batch (step 6): the token its edit returned. Main
+  // holds the inverse batch; the renderer can apply only what an edit wrote.
+  'component:revertProperties': object({ token: text }),
   'component:editProperties': object({ ...project, file: pathText,
     source: propertySource, change: parsePropertyChange }),
   'component:usage': object({ ...named, exclude: optional(text) }),

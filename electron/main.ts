@@ -1,4 +1,11 @@
-import { loadComponentProperties, updateComponentProperties } from './componentProperties';
+import {
+  inverseBatch,
+  loadComponentProperties,
+  PropertyUndoStore,
+  revertComponentProperties,
+  updateComponentProperties,
+  type FileChange,
+} from './componentProperties';
 import { renderComponentPreviewPage } from './componentPreview.js';
 import { createIpcRegistrar } from './ipc.js';
 import { MAIN_LIMITS, readSource, readSourceBytes, directoryBudget } from './main.bounds.js';
@@ -3545,8 +3552,27 @@ ipcMain.handle('component:create', async (_e, opts) => {
 
 // Component property edits validate their revision before updating project sources.
 ipcMain.handle('component:properties', (_event, location) => loadComponentProperties(location));
-ipcMain.handle('component:editProperties', (_event, request) =>
-  updateComponentProperties(request, { documents, noteWrite: markSelfWrite }),
+// Step 6: every applied property batch leaves its inverse here, and the reply
+// carries the token Undo sends back (componentProperties.ts).
+const propertyUndo = new PropertyUndoStore();
+ipcMain.handle('component:editProperties', (_event, request) => {
+  let undo: string | undefined;
+  const onCommitted = (changes: readonly FileChange[]) => {
+    undo = propertyUndo.record(inverseBatch(changes));
+  };
+  const result = updateComponentProperties(request, {
+    documents,
+    noteWrite: markSelfWrite,
+    onCommitted,
+  });
+  if (!result.ok) {
+    return result;
+  }
+  assert(undo !== undefined, 'An applied batch recorded its inverse');
+  return ok({ ...result.value, undo });
+});
+ipcMain.handle('component:revertProperties', (_event, { token }) =>
+  revertComponentProperties(token, propertyUndo, { documents, noteWrite: markSelfWrite }),
 );
 
 // Which files hold instances of a component — the palette’s instance count.

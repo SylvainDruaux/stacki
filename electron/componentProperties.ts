@@ -6,9 +6,11 @@ import { readPropertyConsumers, readBoundedSource, filesystemError } from './pro
 // actors are leased in sorted canonical-path order, each file is witnessed by
 // the checksum of its `before` text, and every write — rollback included — is
 // a `replace-source` intent, so an outside edit is refused, never overwritten.
+import { randomUUID } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { assert } from '../shared/assert';
+import { LIMITS } from '../shared/limits';
 import { PROPERTY_LIMITS } from '../shared/component-properties';
 import type {
   ComponentProperties,
@@ -31,17 +33,79 @@ interface PropertyEditRequest extends PropertyLocation {
   readonly source: string;
   readonly change: PropertyChange;
 }
-interface FileChange {
+export interface FileChange {
   readonly file: string;
   readonly before: string;
   readonly after: string;
 }
 
 /** Where a batch writes: the document actors, and the self-write note the
- * watcher needs until step 9 (electron/selfWrites.ts). */
+ * watcher needs until step 9 (electron/selfWrites.ts). `onCommitted` hears
+ * every batch that applied, with what it changed (step 6: its inverse batch
+ * is Undo). */
 export interface PropertyWriter {
   readonly documents: DocumentActors;
   readonly noteWrite: (file: string, source: string) => void;
+  readonly onCommitted?: (changes: readonly FileChange[]) => void;
+}
+
+/** A batch's inverse (plan §3.3, §11 step 6): each file back from what the
+ * batch wrote to what it replaced. Applied as a batch of its own — every file
+ * checked against the bytes the batch left before any is written, the checked
+ * rollback on a failure — so a file changed since refuses the whole undo,
+ * naming it, and a half-undone rename cannot happen. */
+export function inverseBatch(changes: readonly FileChange[]): readonly FileChange[] {
+  assert(changes.length <= PROPERTY_LIMITS.filesMax, 'A batch is bounded');
+  return changes.map((change) => ({
+    file: change.file,
+    before: change.after,
+    after: change.before,
+  }));
+}
+
+/** Inverse batches waiting for Undo, kept in main so the renderer holds a
+ * token, never a writable batch: the channel that applies one can write only
+ * what a property edit wrote. Bounded by LIMITS.undoEntriesMax, oldest first
+ * out; an expired token is refused. */
+export class PropertyUndoStore {
+  readonly #batches = new Map<string, readonly FileChange[]>();
+
+  record(changes: readonly FileChange[]): string {
+    const token = randomUUID();
+    this.#batches.set(token, changes);
+    for (const oldest of this.#batches.keys()) {
+      if (this.#batches.size <= LIMITS.undoEntriesMax) {
+        break;
+      }
+      this.#batches.delete(oldest);
+    }
+    assert(this.#batches.size <= LIMITS.undoEntriesMax, 'Undo batches are bounded');
+    return token;
+  }
+
+  take(token: string): readonly FileChange[] | undefined {
+    const changes = this.#batches.get(token);
+    this.#batches.delete(token);
+    return changes;
+  }
+}
+
+/** Apply a recorded inverse batch; the batch undoing it is recorded in turn
+ * (Redo), and its token returned. */
+export function revertComponentProperties(
+  token: string,
+  store: PropertyUndoStore,
+  writer: PropertyWriter,
+): Result<{ readonly undo: string }> {
+  const changes = store.take(token);
+  if (changes === undefined) {
+    return err({ code: 'expired', message: 'This property change can no longer be undone.' });
+  }
+  const committed = commitPropertyChanges(changes, writer);
+  if (!committed.ok) {
+    return committed;
+  }
+  return ok({ undo: store.record(inverseBatch(changes)) });
 }
 
 /** Why a batch write failed, before the rollback decides what to report. */
@@ -64,7 +128,7 @@ export function loadComponentProperties(location: PropertyLocation): Result<Comp
 
 export function updateComponentProperties(
   request: PropertyEditRequest,
-  writer: PropertyWriter
+  writer: PropertyWriter,
 ): Result<ComponentProperties> {
   const target = validateLocation(request);
   if (!target.ok) {
@@ -92,6 +156,7 @@ export function updateComponentProperties(
   if (!result.ok) {
     return result;
   }
+  writer.onCommitted?.(plan.value);
   const updated = plan.value.find((entry) => sameFilesystemPath(entry.file, target.value.file));
   assert(updated !== undefined, 'Property transaction includes the component');
   return ok(readComponentProperties(updated.after));
@@ -117,7 +182,7 @@ function validateLocation(location: PropertyLocation): Result<PropertyLocation> 
 }
 function planPropertyChanges(
   request: PropertyEditRequest,
-  source: string
+  source: string,
 ): Result<readonly FileChange[]> {
   const change = request.change;
   const first = { file: request.file, before: request.source, after: source };
@@ -125,7 +190,7 @@ function planPropertyChanges(
     return planPropertyRemoval(request, first, change.name);
   }
   const propertyRename = propertyRenameForChange(change);
-  const optionRenames = change.kind === 'save' ? change.optionRenames ?? [] : [];
+  const optionRenames = change.kind === 'save' ? (change.optionRenames ?? []) : [];
   if (!propertyRename && optionRenames.length === 0) {
     return ok([first]);
   }
@@ -165,13 +230,13 @@ function planPropertyChanges(
   }
   assert(
     changes.some((entry) => sameFilesystemPath(entry.file, request.file)),
-    'Rename plan includes the definition'
+    'Rename plan includes the definition',
   );
   return ok(changes);
 }
 
 function propertyRenameForChange(
-  change: PropertyChange
+  change: PropertyChange,
 ): { readonly from: string; readonly to: string } | undefined {
   if (change.kind !== 'save' || !change.originalName) {
     return undefined;
@@ -187,7 +252,7 @@ function planConsumerChange(
   change: Extract<PropertyChange, { readonly kind: 'save' }>,
   propertyRename: { readonly from: string; readonly to: string } | undefined,
   optionRenames: readonly PropertyOptionRename[],
-  own: boolean
+  own: boolean,
 ): Result<string> {
   const renamed = propertyRename
     ? renameComponentReferences(source, names, propertyRename, own ? 'definition' : 'consumer')
@@ -202,16 +267,16 @@ function validateOptionRenames(
   beforeSource: string,
   afterSource: string,
   change: Extract<PropertyChange, { readonly kind: 'save' }>,
-  renames: readonly PropertyOptionRename[]
+  renames: readonly PropertyOptionRename[],
 ): Result<void> {
   if (renames.length === 0) {
     return ok(undefined);
   }
   const before = readComponentProperties(beforeSource).properties.find(
-    (property) => property.name === change.originalName
+    (property) => property.name === change.originalName,
   );
   const after = readComponentProperties(afterSource).properties.find(
-    (property) => property.name === change.property.name
+    (property) => property.name === change.property.name,
   );
   const beforeOptions = before ? literalOptions(before.type) : undefined;
   const afterOptions = after ? literalOptions(after.type) : undefined;
@@ -234,16 +299,14 @@ function validateOptionRenames(
 
 function commitPropertyChanges(
   changes: readonly FileChange[],
-  writer: PropertyWriter
+  writer: PropertyWriter,
 ): Result<void> {
   assert(changes.length <= PROPERTY_LIMITS.filesMax, 'Property transaction is bounded');
   assert(
     new Set(changes.map((change) => change.file)).size === changes.length,
-    'Property transaction writes each file once'
+    'Property transaction writes each file once',
   );
-  const leased = writer.documents.withLeases(changes, (ordered) =>
-    commitLeased(ordered, writer)
-  );
+  const leased = writer.documents.withLeases(changes, (ordered) => commitLeased(ordered, writer));
   if (!leased.ok) {
     return err({ code: 'filesystem', message: leased.error });
   }
@@ -270,7 +333,7 @@ function commitLeased(changes: readonly FileChange[], writer: PropertyWriter): R
     const report = writer.documents.replaceSource(
       change.file,
       change.after,
-      digestOf(change.before)
+      digestOf(change.before),
     );
     if (report.tag !== 'applied') {
       // An uncertain write may hold the batch's bytes; the rollback's witness
@@ -326,7 +389,7 @@ function failureOf(file: string, report: Exclude<WriteReport, { tag: 'applied' }
 function rollbackPropertyChanges(
   written: readonly FileChange[],
   cause: WriteFailure,
-  writer: PropertyWriter
+  writer: PropertyWriter,
 ): Result<never> {
   assert(written.length <= PROPERTY_LIMITS.filesMax, 'Rollback is bounded by the batch');
   const failed: string[] = [];
@@ -354,7 +417,7 @@ function rollbackPropertyChanges(
 
 function restorePropertyFile(
   change: FileChange,
-  writer: PropertyWriter
+  writer: PropertyWriter,
 ): 'restored' | 'changed' | 'failed' {
   writer.noteWrite(change.file, change.before);
   const report = writer.documents.replaceSource(change.file, change.before, digestOf(change.after));
@@ -376,7 +439,7 @@ function restorePropertyFile(
 function planPropertyRemoval(
   request: PropertyEditRequest,
   change: FileChange,
-  name: string
+  name: string,
 ): Result<readonly FileChange[]> {
   const consumers = readPropertyConsumers(request);
   if (!consumers.ok) {
@@ -387,7 +450,7 @@ function planPropertyRemoval(
       consumer.source,
       consumer.names,
       { from: name, to: '_stackiDeletedProperty' },
-      'consumer'
+      'consumer',
     );
     if (!result.ok) {
       return result;

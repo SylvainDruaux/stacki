@@ -60,7 +60,8 @@ export type WirePageEdit =
 
 export interface IpcResults {
   readonly 'component:properties': Result<ComponentProperties>;
-  readonly 'component:editProperties': Result<ComponentProperties>;
+  readonly 'component:editProperties': Result<ComponentProperties & { readonly undo: string }>;
+  readonly 'component:revertProperties': Result<{ readonly undo: string }>;
   readonly 'assets:delete':
     | {
         readonly ok: false;
