@@ -10,6 +10,7 @@ import type { EditorModel, EditorNode } from '../shared/editor-model';
 import type { Edit, NodeRef } from '../shared/edit-request';
 import { LIMITS } from '../shared/limits';
 import type { Attr } from '../shared/page-node';
+import { loopVarsAt, stripLostBindings } from './loopBindings';
 import type { EditGesture, StreamedEdit } from './pageEdits';
 
 type Urgency = boolean | 'live';
@@ -136,8 +137,7 @@ function replacedIn(
     if (Array.isArray(children)) {
       const replaced = replacedIn(children, nodeId, update, depth + 1);
       if (replaced !== children) {
-        // Object.assign keeps the node's own variant; a spread widens it.
-        const parent = Object.assign({}, node, { children: replaced });
+        const parent = withChildren(node, replaced);
         return list.map((candidate, at) => (at === index ? parent : candidate));
       }
     }
@@ -260,7 +260,7 @@ function filteredList(list: EditorNode[], gone: ReadonlySet<string>, depth: numb
       const kept = filteredList(children, gone, depth + 1);
       if (kept !== children) {
         changed = true;
-        next.push(Object.assign({}, node, { children: kept }));
+        next.push(withChildren(node, kept));
         continue;
       }
     }
@@ -285,9 +285,7 @@ export function withInserted(
   const index = place?.index ?? 0;
   return withNode(model, parentId, (parent) => {
     const children = Array.isArray(parent.children) ? parent.children : [];
-    return Object.assign({}, parent, {
-      children: spliced(children, Math.min(index, children.length), node),
-    });
+    return withChildren(parent, spliced(children, Math.min(index, children.length), node));
   });
 }
 
@@ -311,12 +309,26 @@ function afterIn(
     if (Array.isArray(children)) {
       const replaced = afterIn(children, anchorId, node, depth + 1);
       if (replaced !== children) {
-        const parent = Object.assign({}, candidate, { children: replaced });
+        const parent = withChildren(candidate, replaced);
         return list.map((item, at) => (at === index ? parent : item));
       }
     }
   }
   return list;
+}
+
+/** A node with other children. Object.assign keeps the node's own variant; a
+ * spread widens it. An element emptied of children loses the inner source the
+ * parser stored for it: the legacy printer writes that source back for an
+ * element without children (to keep `<div>\n</div>` as written), so a stale
+ * one would put the removed child back (found by the parity sweep: a moved
+ * node was written twice, a deleted one stayed). */
+function withChildren(node: EditorNode, children: EditorNode[]): EditorNode {
+  const copy = Object.assign({}, node, { children });
+  if (children.length === 0) {
+    Reflect.deleteProperty(copy, 'source');
+  }
+  return copy;
 }
 
 function spliced(list: readonly EditorNode[], index: number, node: EditorNode): EditorNode[] {
@@ -345,6 +357,7 @@ function containsNode(list: readonly EditorNode[], nodeId: string): boolean {
 function besidePlace(
   model: EditorModel,
   place: InsertPlace | null,
+  moving: ReadonlySet<string> = new Set(),
 ): { readonly anchorId: string; readonly placement: Placement } | undefined {
   const parentId = place?.parentId ?? null;
   const parent = parentId === null ? undefined : findNode(model.nodes, parentId);
@@ -354,14 +367,13 @@ function besidePlace(
     parent === undefined && parentId !== null
       ? list.length
       : Math.min(place?.index ?? list.length, list.length);
-  const at = list.slice(index).find((node) => !blank(node));
+  // Neither a separator nor what is moving is a neighbour to stand beside.
+  const standing = (node: EditorNode) => !blank(node) && !moving.has(node.id);
+  const at = list.slice(index).find(standing);
   if (at !== undefined) {
     return { anchorId: at.id, placement: 'before' };
   }
-  const last = list
-    .slice(0, index)
-    .filter((node) => !blank(node))
-    .pop();
+  const last = list.slice(0, index).filter(standing).pop();
   if (last !== undefined) {
     return { anchorId: last.id, placement: 'after' };
   }
@@ -383,6 +395,168 @@ function findNode(list: readonly EditorNode[], nodeId: string): EditorNode | und
     }
     if (Array.isArray(node.children)) {
       pending.push(...node.children);
+    }
+  }
+  return undefined;
+}
+
+// --- Move (the §11.6 move step) ---------------------------------------------------------
+
+/** What a move decides beside the relocation: whether the node's `slot`
+ * still means anything where it lands (asked of the model after the move). */
+export interface MoveRules {
+  readonly keepsSlot: (model: EditorModel, nodeId: string) => boolean;
+}
+
+/** Move a node, and the note above it, to a place. The requests relocate the
+ * original bytes (plan §3.4); leaving a loop, the planner turns what read the
+ * loop's item into placeholder text, as the effect here does with
+ * stripLostBindings. A `slot` that means nothing where the node lands goes
+ * first, while the node is still where the request names it. */
+export function moveGesture(
+  model: EditorModel,
+  nodeId: string,
+  place: InsertPlace | null,
+  rules: MoveRules,
+  options: { readonly urgency: Urgency },
+): EditGesture | undefined {
+  const found = findWithList(model.nodes, nodeId);
+  if (found === undefined) {
+    return undefined;
+  }
+  if (
+    place?.parentId === nodeId ||
+    (place?.parentId != null && containsNode(found.node.children ?? [], place.parentId))
+  ) {
+    return undefined; // Into itself: nothing to do.
+  }
+  const previous = found.list[found.index - 1];
+  const note = previous?.kind === 'comment' ? previous : undefined;
+  const moving = note === undefined ? [nodeId] : [note.id, nodeId];
+  const landing = relocated(model, found, moving, place);
+  const slot = found.node.props?.['slot'];
+  const dropSlot = slot?.type === 'string' ? !rules.keepsSlot(landing.model, nodeId) : false;
+  const beside = besidePlace(model, place, new Set(moving));
+  const lost = lostVariables(model, landing.model, nodeId);
+  return {
+    coalesceKey: null,
+    urgency: options.urgency,
+    request: (refOf) => {
+      const target = refOf(nodeId);
+      const noteRef = note === undefined ? undefined : refOf(note.id);
+      const destination = beside === undefined ? undefined : refOf(beside.anchorId);
+      if (target === undefined || beside === undefined || destination === undefined) {
+        return undefined;
+      }
+      if (note !== undefined && noteRef === undefined) {
+        return undefined;
+      }
+      const edits: StreamedEdit[] = [];
+      if (dropSlot) {
+        edits.push({ edit: { tag: 'remove-attribute', target, name: 'slot' }, stream: null });
+      }
+      const move = (ref: NodeRef): StreamedEdit => ({
+        edit: { tag: 'move-node', target: ref, destination, placement: beside.placement },
+        stream: null,
+      });
+      // Before a node, the note goes first and the node after it; after a node
+      // or into a parent, the node goes first and the note lands in front of it.
+      const order =
+        noteRef === undefined
+          ? [target]
+          : beside.placement === 'before'
+            ? [noteRef, target]
+            : [target, noteRef];
+      edits.push(...order.map(move));
+      return edits;
+    },
+    apply: (current) => {
+      const again = findWithList(current.nodes, nodeId);
+      if (again === undefined) {
+        return current;
+      }
+      const moved = relocated(current, again, moving, place, (node) => {
+        const props = dropSlot ? patchedProps(node.props, { slot: undefined }) : node.props;
+        const copy: EditorNode = structuredClone(
+          Object.assign({}, node, props === undefined ? {} : { props }),
+        );
+        stripLostBindings(copy, lost);
+        return copy;
+      });
+      return moved.model;
+    },
+  };
+}
+
+/** The loop variables the node reads at its old place and not at its new one. */
+function lostVariables(before: EditorModel, after: EditorModel, nodeId: string): readonly string[] {
+  const now = loopVarsAt(after.nodes, nodeId);
+  return loopVarsAt(before.nodes, nodeId).filter((name) => !now.includes(name));
+}
+
+// The legacy moveNode's placement: the drop index counts the list as it was,
+// so a drop past the node's own place in the same list moves back by what was
+// taken out; a drop between a note and its node collapses onto the pair.
+function relocated(
+  model: EditorModel,
+  found: {
+    readonly list: readonly EditorNode[];
+    readonly index: number;
+    readonly node: EditorNode;
+  },
+  moving: readonly string[],
+  place: InsertPlace | null,
+  reshape: (node: EditorNode) => EditorNode = (node) => node,
+): { readonly model: EditorModel } {
+  const removeAt = found.index - (moving.length - 1);
+  const without = withoutNodes(model, moving);
+  const parentId = place?.parentId ?? null;
+  const sameList =
+    parentId === null
+      ? found.list === model.nodes
+      : findNode(model.nodes, parentId)?.children === found.list;
+  let index = place?.index ?? Number.MAX_SAFE_INTEGER;
+  if (sameList && index > removeAt) {
+    index = Math.max(removeAt, index - moving.length);
+  }
+  const node = reshape(found.node);
+  const landed = withInserted(without, node, place === null ? null : { parentId, index });
+  if (moving.length === 1) {
+    return { model: landed };
+  }
+  const noteNode = found.list[found.index - 1];
+  assert(noteNode !== undefined, 'A moved note sits above its node');
+  const at = findWithList(landed.nodes, node.id);
+  assert(at !== undefined, 'The moved node landed');
+  const noteParent = at.parentId;
+  return { model: withInserted(landed, noteNode, { parentId: noteParent, index: at.index }) };
+}
+
+function findWithList(
+  list: EditorNode[],
+  nodeId: string,
+):
+  | {
+      readonly list: EditorNode[];
+      readonly index: number;
+      readonly node: EditorNode;
+      readonly parentId: string | null;
+    }
+  | undefined {
+  const pending: { readonly list: EditorNode[]; readonly parentId: string | null }[] = [
+    { list, parentId: null },
+  ];
+  for (let visited = 0; visited < pending.length; visited++) {
+    assert(visited < LIMITS.treeNodesMax, 'A model stays inside its node bound');
+    const entry = pending[visited];
+    assert(entry !== undefined, 'The visit index lies inside the list');
+    for (const [index, node] of entry.list.entries()) {
+      if (node.id === nodeId) {
+        return { list: entry.list, index, node, parentId: entry.parentId };
+      }
+      if (Array.isArray(node.children)) {
+        pending.push({ list: node.children, parentId: node.id });
+      }
     }
   }
   return undefined;

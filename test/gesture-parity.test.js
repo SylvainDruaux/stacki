@@ -364,3 +364,24 @@ test('parity, insert and remove: beside and inside every node, a copy of each, e
   report(t, tally);
   assert.ok(tally.compared > 1000, `the sweep compares many real gestures (${tally.compared})`);
 });
+
+test('parity, move: every node before the first root, after the last, into each element', (t) => {
+  const rules = { keepsSlot: () => true };
+  const tally = sweep('move', (node, model) => {
+    const roots = model.nodes;
+    const elements = placesOf(model)
+      .map((entry) => entry.node)
+      .filter((candidate) => candidate.kind === 'element' && Array.isArray(candidate.children))
+      .slice(0, 4);
+    const places = [
+      { parentId: null, index: 0 },
+      { parentId: null, index: roots.length },
+      ...elements.map((parent) => ({ parentId: parent.id, index: parent.children.length })),
+    ];
+    return places
+      .map((place) => gestures.moveGesture(model, node.id, place, rules, { urgency: true }))
+      .filter((gesture) => gesture !== undefined);
+  });
+  report(t, tally);
+  assert.ok(tally.compared > 500, `the sweep compares many real moves (${tally.compared})`);
+});

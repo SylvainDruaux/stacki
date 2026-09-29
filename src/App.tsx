@@ -73,6 +73,7 @@ import { describeRejection, type RejectionReason } from '../shared/intent';
 import {
   duplicateGesture,
   insertGesture,
+  moveGesture,
   propsGesture,
   removalGesture,
   withoutNodes,
@@ -88,7 +89,7 @@ import SaveConflictNotice from './panels/SaveConflictNotice';
 import type { PageDiskRead, PageEdited, PageWriteError } from '../shared/page-save';
 import type { Result } from '../shared/result';
 import type { Digest } from '../shared/brand';
-import { ancestorChain, createTreeIndex, isDescendantOf, nodeAtPath, pathOfNode } from './editorTree.js';
+import { ancestorChain, createTreeIndex, nodeAtPath, pathOfNode } from './editorTree.js';
 import { readFrontmatter, writeFrontmatter } from '../electron/frontmatter';
 import { renameLoopVar, parseLoopHead, disconnectDependentLoops, loopVarsAt, stripLostBindings } from './loopBindings.js';
 import {
@@ -2254,78 +2255,44 @@ export default function App() {
     [mutateModel, propsNeededFor, rescan, showToast]
   );
 
+  // Step 6, move: the node's own bytes are relocated, its note with it; a
+  // `slot` that means nothing where it lands is dropped, and leaving a loop,
+  // what read the loop's item becomes placeholder text (editGestures.ts).
   const moveNode = useCallback(
     (nodeId: string, target: InsertTarget | null) => {
-      mutateModel((model) => {
-        const found = findParentList(model, nodeId);
-        if (!found) {return model;}
-        const node = found.list[found.index];
-        assert(node, 'Moved node must exist in its parent list');
-
-        // Prevent dropping a node into its own subtree.
-        if (target?.parentId) {
-          if (target.parentId === nodeId) {return model;}
-          if (isDescendantOf(node, target.parentId)) {return model;}
-        }
-
-        // Capture target list before removal to fix up indices.
-        const sameList =
-          (target?.parentId == null && found.list === model.nodes) ||
-          (target?.parentId != null &&
-            findNodeById(model.nodes, target.parentId)?.children === found.list);
-
-        const before = loopVarsAt(model.nodes, nodeId);
-
-        // Take the node's note with it. Both come out in one splice, so the
-        // drop index has to be shifted by however many were actually removed.
-        const noteAt = noteIndexAbove(found.list, found.index);
-        const note = noteAt === -1 ? null : found.list[noteAt];
-        const removeAt = note ? noteAt : found.index;
-        const removedCount = note ? 2 : 1;
-
-        found.list.splice(removeAt, removedCount);
-        let index = target?.index ?? Number.MAX_SAFE_INTEGER;
-        if (sameList && index > removeAt) {
-          // A drop that landed *between* the note and its element collapses
-          // onto where the pair used to start.
-          index = Math.max(removeAt, index - removedCount);
-        }
-        insertIntoModel(model, node, target ? { ...target, index } : null);
-        // Put the note back directly above wherever the node landed — let
-        // insertIntoModel decide placement, then follow it.
-        if (note) {
-          const landed = findParentList(model, nodeId);
-          if (landed) {landed.list.splice(landed.index, 0, note);}
-        }
-
-        // `slot` is a word addressed to the component the node sat inside, and
-        // means nothing anywhere else (src/slotAttr.js).
-        const slot = node.props?.['slot'];
-        const slotName = slot?.type === 'string' ? slot.value : null;
-        if (slotName) {
-          const host = slotHostOf(model, nodeId);
+      const state = pageStateRef.current.pageState;
+      if (!state?.editable) {return;}
+      // `slot` is a word addressed to the component the node sat inside, and
+      // means nothing anywhere else (src/slotAttr.js).
+      const rules = {
+        keepsSlot: (model: EditorModel, id: string): boolean => {
+          const slot = findNodeById(model.nodes, id)?.props?.['slot'];
+          const slotName = slot?.type === 'string' ? slot.value : null;
+          const host = slotHostOf(model, id);
           const definition = host ? definitionOf(model, host, insertables) : null;
-          if (!keepsSlot({ slotName, host, definition }) && node.props) {
-            delete node.props['slot'];
-          }
-        }
-
-        // Left a loop? Anything still reading its item would throw.
-        const after = loopVarsAt(model.nodes, nodeId);
-        const lost = before.filter((v) => !after.includes(v));
-        const removed = stripLostBindings(node, lost);
-        if (removed) {
-          showToast(
-            `Removed ${removed} binding${removed === 1 ? '' : 's'} that referenced ${lost.join(
-              ', '
-            )}.`,
-            'info'
-          );
-        }
-        return model;
-      }, true);
+          return keepsSlot({ slotName, host, definition });
+        },
+      };
+      const gesture = moveGesture(state.model, nodeId, target, rules, { urgency: true });
+      if (!gesture) {return;}
+      // Left a loop? Anything still reading its item would throw; say what
+      // the move replaced.
+      const before = loopVarsAt(state.model.nodes, nodeId);
+      const after = loopVarsAt(gesture.apply(state.model).nodes, nodeId);
+      const lost = before.filter((v) => !after.includes(v));
+      const node = findNodeById(state.model.nodes, nodeId);
+      const removed = node && lost.length ? stripLostBindings(structuredClone(node), lost) : 0;
+      commitEdit(gesture);
+      if (removed) {
+        showToast(
+          `Removed ${removed} binding${removed === 1 ? '' : 's'} that referenced ${lost.join(
+            ', '
+          )}.`,
+          'info'
+        );
+      }
     },
-    [insertables, mutateModel, showToast]
+    [insertables, commitEdit, showToast]
   );
 
   const removeNode = useCallback(
