@@ -5,9 +5,17 @@
 //
 // Pure: bytes in, bytes out. Nothing here touches a disk or a clock.
 import { assert } from './assert';
+import type { SourceEdit } from './intent';
 import { LIMITS } from './limits';
 import type { Splice } from './planner';
-import { byteStringsEqual, toByteSpan, toByteString, type ByteSpan, type ByteString } from './span';
+import {
+  byteStringsEqual,
+  decodeUtf8,
+  toByteSpan,
+  toByteString,
+  type ByteSpan,
+  type ByteString,
+} from './span';
 
 /** Whether every splice's range holds its expected bytes (plan §5.2 step 4). */
 export function witnessesHold(bytes: ByteString, splices: readonly Splice[]): boolean {
@@ -71,6 +79,25 @@ export function changedRanges(splices: readonly Splice[]): readonly ByteSpan[] {
     const start = splice.range.start + delta;
     delta += splice.replacementBytes.length - splice.expectedBytes.length;
     return toByteSpan(start, start + splice.replacementBytes.length);
+  });
+}
+
+/** The inverse of applied splices (plan §11 step 6, Undo on the engine): in
+ * the bytes they produced, each changed range goes back to the bytes it
+ * replaced. Same ranges, expected and replacement swapped — submitted as a
+ * `revert-splices` intent authored against the post-apply checksum, whose
+ * planner reads the witness (the replacement bytes) off that snapshot. */
+export function inverseEdits(splices: readonly Splice[]): readonly SourceEdit[] {
+  const ordered = orderedSplices(splices);
+  const ranges = changedRanges(ordered);
+  return ordered.map((splice, index) => {
+    const span = ranges[index];
+    assert(span !== undefined, 'Every splice has a changed range');
+    const text = decodeUtf8(splice.expectedBytes);
+    // Splices cut at code-point boundaries (spans come from the parser), so
+    // the bytes they replaced are text.
+    assert(text.ok, 'Replaced bytes decode');
+    return { span, text: text.value };
   });
 }
 

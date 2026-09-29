@@ -3,38 +3,60 @@
 // no clock, no randomness — so the simulator calls it directly and the actor
 // wraps it with the disk (plan §5.2, invariant 9 by construction).
 //
-// Step 2 plans one operation, `set-attribute`, against an intent that may be
-// stale: its anchor is resolved in the bytes it was authored against, the
-// element's identity region is mapped through the diff to the bytes on disk now
-// (mapSpan.ts), and the splice is planned at the mapped value, with the authored
-// value bytes as its witness.
-//
-// The identity region runs from the tag name through the end of the last
+// Every operation plans against an intent that may be stale: its anchor is
+// resolved in the bytes it was authored against, the node's identity region is
+// mapped through the diff to the bytes on disk now (mapSpan.ts, planSupport.ts),
+// and the splices are planned at the mapped place, witnessed by the authored
+// bytes. The identity region runs from the tag name through the end of the last
 // attribute: `Hero title="Old"` in `<Hero title="Old" />`. It carries the
-// element's identity and holds the value being replaced. Smaller fails: the
-// value alone repeats everywhere (`title="Old"` on the hero and the footer).
+// element's identity and holds every attribute an edit replaces. Smaller fails:
+// the value alone repeats everywhere (`title="Old"` on the hero and the footer).
 // Larger fails too: the whole element would refuse an attribute edit whenever
 // someone edits text inside it, and the tag's own `<` and `/>` are bytes every
 // neighbouring tag shares — insert `<div>` before `<Hero`, and a script that
 // matches Hero's `<` to the div's costs exactly as little as the true one, so
 // the mapper, which never picks between tied scripts, would call it ambiguous.
+// A node that is not a tag — text, an expression, a loop — is its whole span.
 //
 // The witness guards staleness, not identity (plan §3.4); identity comes from
-// the mapping, which rejects on ambiguity. From step 5 the migration-only
-// `replace-source` is planned too, without mapping (planReplaceSource). Every
-// other operation is `unsupported-operation` here until its step (6 and 8); the
-// simulator's reference planner plans the zero-diff cases of the rest until then.
+// the mapping, which rejects on ambiguity. This module holds the dispatch and
+// the attribute family (`set-attribute`, `remove-attribute`,
+// `set-inline-style`); planTree.ts plans insertions, removals and moves, and
+// planText.ts the operations that name byte ranges directly (a loop rename's
+// sites, a frontmatter slot, code patches, reverts, the whole-file
+// replacement). Step 6 (plan §11) ships them all.
 import { assert } from './assert';
 import { countOccurrences } from './byteSearch';
-import { capabilityAcceptsVisualIntent } from './capability';
 import { diffBytes, DIFF_BUDGET } from './diff';
-import type { Intent, Operation, RejectionReason } from './intent';
+import { editInlineStyle } from './inlineStyle';
+import type { AttributeValue, Intent, Operation, RejectionReason } from './intent';
 import { LIMITS } from './limits';
 import { mapSpanThroughDiff, type SpanMapping } from './mapSpan';
+import {
+  byteOffsetsIn,
+  containsNewline,
+  lineIndent,
+  nodeEditable,
+  resolveTarget,
+  tagNameEnd,
+  textOf,
+  whitespaceBefore,
+  type PlanContext,
+  type SpanMapper,
+  type Target,
+} from './planSupport';
+import { planInsertNode, planMoveNode, planRemoveNode } from './planTree';
+import {
+  planCodePatch,
+  planFrontmatterSlot,
+  planRenameBinding,
+  planReplaceSource,
+  planRevertSplices,
+} from './planText';
 import type { AnchorRef, NodeKind, StructuralPath } from './ref';
 import { err, ok, type Result } from './result';
 import type { Snapshot } from './snapshot';
-import type { ProjectedAttribute, ProjectedNode, Projection } from './source-projection';
+import type { ProjectedAttribute, ProjectedNode } from './source-projection';
 import {
   byteStringsEqual,
   encodeUtf8,
@@ -45,7 +67,11 @@ import {
 } from './span';
 
 /** The only write primitive (plan §3.4): replace `range` with
- * `replacementBytes`, but only while it still holds `expectedBytes`. */
+ * `replacementBytes`, but only while it still holds `expectedBytes`. An
+ * insertion is a zero-width range: its identity was proven by resolving the
+ * node it sits beside, and the actor re-verifies the whole file under its lock.
+ * Keeping insertions zero-width keeps every other span outside them, so the
+ * inverse is exact and later rebases never have to cut through a neighbour. */
 export interface Splice {
   readonly range: ByteSpan;
   readonly expectedBytes: ByteString;
@@ -71,8 +97,7 @@ export interface Plan {
 
 export interface PlanningBase {
   /** The snapshot the intent was authored against: its checksum is the
-   * intent's `authoredChecksum`. Which snapshots the actor keeps for this is
-   * the step-5 retention question (tracker, open questions). */
+   * intent's `authoredChecksum`. */
   readonly authored: Snapshot;
   /** The snapshot of the bytes on disk now (plan §5.2 step 1). */
   readonly current: Snapshot;
@@ -153,15 +178,6 @@ function uniqueOrAmbiguous(base: PlanningBase, distance: number, mapped: SpanMap
   return mapped;
 }
 
-type SpanMapper = (span: ByteSpan) => SpanMapping;
-
-type SetAttribute = Extract<Operation, { tag: 'set-attribute' }>;
-
-type ValidProjection = Extract<Projection, { tag: 'valid' }>;
-
-const QUOTES: readonly number[] = [0x22, 0x27]; // `"` and `'`
-const TAG_OPEN = 0x3c; // `<`
-
 function planWith(
   base: PlanningBase,
   intent: Intent,
@@ -173,22 +189,30 @@ function planWith(
     base.authored.checksum === intent.authoredChecksum,
     'The authored snapshot is the one the intent names',
   );
+  const context: PlanContext = { authored: base.authored, current: base.current, mapSpan };
+  const anchor = intent.anchor;
   const operation = intent.operation;
   switch (operation.tag) {
     case 'set-attribute':
-      return planSetAttribute(base, intent.anchor, operation, mapSpan);
     case 'remove-attribute':
-    case 'insert-node':
-    case 'move-node':
-    case 'rename-binding':
     case 'set-inline-style':
+      return planAttributeOperation(context, anchor, operation);
+    case 'insert-node':
+      return planInsertNode(context, anchor, operation);
+    case 'remove-node':
+      return planRemoveNode(context, anchor);
+    case 'move-node':
+      return planMoveNode(context, anchor, operation);
+    case 'rename-binding':
+      return planRenameBinding(context, anchor, operation);
     case 'edit-frontmatter-slot':
+      return planFrontmatterSlot(context, anchor, operation);
     case 'apply-code-patch':
-      // Planned from step 6 (gestures) and step 8 (code editor); rejected
-      // visibly until then.
-      return err('unsupported-operation');
+      return planCodePatch(context, anchor, operation);
+    case 'revert-splices':
+      return planRevertSplices(context, anchor, operation);
     case 'replace-source':
-      return planReplaceSource(base, intent.anchor, operation.text);
+      return planReplaceSource(context, anchor, operation.text);
     default: {
       const exhaustive: never = operation;
       throw new Error(`Unknown operation ${JSON.stringify(exhaustive)}`);
@@ -196,256 +220,262 @@ function planWith(
   }
 }
 
-// The control flow of one set-attribute plan: every rejection is decided here
-// and in planAtMappedRegion; the helpers below compute and do not branch on
-// outcomes. Rejections that need no diff come first, so they cost none.
-function planSetAttribute(
-  base: PlanningBase,
+type AttributeOperation = Extract<
+  Operation,
+  { tag: 'set-attribute' | 'remove-attribute' | 'set-inline-style' }
+>;
+
+// The control flow of the attribute family: every rejection is decided here;
+// the helpers below compute and do not branch on outcomes. Rejections that need
+// no diff come first, so they cost none.
+function planAttributeOperation(
+  context: PlanContext,
   anchor: AnchorRef,
-  operation: SetAttribute,
-  mapSpan: SpanMapper,
+  operation: AttributeOperation,
 ): Result<Plan, RejectionReason> {
-  const authored = base.authored.projection;
-  if (base.current.projection.tag === 'parse-error') {
-    return err('source-invalid'); // Fix it in code first, stale or not.
+  const resolved = resolveTarget(context, anchor);
+  if (!resolved.ok) {
+    return resolved;
   }
-  if (authored.tag === 'parse-error') {
-    return err('source-invalid'); // No node was ever there to anchor.
+  const target = resolved.value;
+  if (!nodeEditable(target.current)) {
+    return err('unsupported-operation'); // In a loop, given `set:html`, or code.
   }
-  const authoredNode = authoredAnchorNode(authored, anchor);
-  if (authoredNode === undefined) {
-    return err('anchor-moved');
+  if (tagNameEnd(context.current.bytes, target.current) === target.current.span.start + 1) {
+    return err('unsupported-operation'); // `<>` takes no attributes; it must be named first.
   }
-  if (!capabilityAcceptsVisualIntent(authoredNode.capability)) {
-    return err('unsupported-operation');
+  const name = operation.tag === 'set-inline-style' ? 'style' : operation.name;
+  const found = soleAttribute(target, name);
+  if (!found.ok) {
+    return found;
   }
-  const authoredValue = soleAttribute(authoredNode, operation.name);
-  if (!authoredValue.ok) {
-    return authoredValue;
+  const attribute = found.value;
+  if (attribute !== undefined) {
+    if (!nodeEditable(attributeAsNode(attribute, target.current))) {
+      return err('unsupported-operation'); // A spread: no name of its own to edit.
+    }
   }
-  if (operation.value.type !== 'string') {
-    return err('unsupported-operation'); // Expressions and bare values arrive at step 6.
+  const splices = attributeSplices(context, target, attribute, operation);
+  if (!splices.ok) {
+    return splices;
   }
-  const authoredRegion = identityRegion(base.authored.bytes, authoredNode);
-  assert(authoredRegion !== undefined, 'A node with the attribute has an identity region');
-  assert(authoredRegion.start <= authoredValue.value.start, 'The region holds the value');
-  assert(authoredValue.value.end <= authoredRegion.end, 'The region holds the whole value');
-  const mapped = mapSpan(authoredRegion);
-  switch (mapped.tag) {
-    case 'resolved':
-      // The consumer side of the mapper's postcondition: a region moves whole.
-      assert(
-        mapped.span.end - mapped.span.start === authoredRegion.end - authoredRegion.start,
-        'A resolved region keeps its length',
-      );
-      return planAtMappedRegion(base, anchor, operation.name, operation.value.value, {
-        authoredRegion,
-        currentRegion: mapped.span,
-        authoredValue: authoredValue.value,
-      });
-    case 'ambiguous':
-      return err('anchor-ambiguous');
-    case 'gone':
-      return err('anchor-moved');
-    case 'too-costly':
-      return err('resource-limit');
+  const postKinds = [{ path: target.current.path, kind: target.current.kind }];
+  return ok({ splices: splices.value, postKinds, candidate: 'must-parse' });
+}
+
+function attributeSplices(
+  context: PlanContext,
+  target: Target,
+  attribute: ProjectedAttribute | undefined,
+  operation: AttributeOperation,
+): Result<readonly Splice[], RejectionReason> {
+  switch (operation.tag) {
+    case 'set-attribute':
+      return ok([setAttributeSplice(context.current.bytes, target.current, attribute, operation)]);
+    case 'remove-attribute':
+      if (attribute === undefined) {
+        return err('anchor-moved'); // Nothing named so: the page is not what was authored.
+      }
+      return ok([removalSplice(context.current.bytes, target.current, attribute)]);
+    case 'set-inline-style':
+      return inlineStyleSplices(context.current.bytes, target.current, attribute, operation);
     default: {
-      const exhaustive: never = mapped;
+      const exhaustive: never = operation;
       return exhaustive;
     }
   }
 }
 
-// The migration-only whole-file replacement (plan §3.3), which the legacy save
-// path submits from step 5 so the actor is the only writer. It never maps: its
-// witness is the authored checksum itself, so any change since it was authored
-// is a rejection, and a whole-file replacement is written as one splice whose
-// expected bytes are the whole authored file. The result may not parse — a raw
-// page, a code-panel save, Markdown — so the candidate is not required to.
-// Agrees exactly with the step-1 reference (test/simulator/reference-planner.ts).
-function planReplaceSource(
-  base: PlanningBase,
-  anchor: AnchorRef,
-  text: string,
-): Result<Plan, RejectionReason> {
-  assert(anchor.expectedKind === 'document', 'A replacement anchors the whole document');
-  assert(anchor.span.start === 0, 'A document anchor starts at byte 0');
-  if (base.current.checksum !== base.authored.checksum) {
-    return err('region-externally-modified');
-  }
-  if (anchor.span.end !== base.current.bytes.length) {
-    return err('anchor-moved'); // The anchor names bytes of another length.
-  }
-  const splice: Splice = {
-    range: anchor.span,
-    expectedBytes: base.current.bytes,
-    replacementBytes: encodeUtf8(text),
-  };
-  assert(splice.replacementBytes.length <= LIMITS.intentPayloadBytesMax, 'Payload is bounded');
-  return ok({ splices: [splice], postKinds: [], candidate: 'may-be-invalid' });
-}
-
-interface RegionMapping {
-  readonly authoredRegion: ByteSpan;
-  readonly currentRegion: ByteSpan;
-  readonly authoredValue: ByteSpan;
-}
-
-// The mapped bytes are the authored name and attributes; the node found there
-// must still parse as them — the context can change around unchanged bytes (a
-// comment opened above turns the element into comment text).
-function planAtMappedRegion(
-  base: PlanningBase,
-  anchor: AnchorRef,
+/** The one attribute named `name`, or undefined when there is none. Duplicate
+ * names are ambiguous — which one the page uses is a guess. The attribute is
+ * read in the current bytes, where the resolved region moved whole, so it is
+ * the authored attribute shifted (asserted). */
+function soleAttribute(
+  target: Target,
   name: string,
-  value: string,
-  mapping: RegionMapping,
-): Result<Plan, RejectionReason> {
-  const current = base.current.projection;
-  assert(current.tag === 'valid', 'Only a parsing current file reaches the mapped tag');
-  const node = nodeStartingAt(current, mapping.currentRegion.start - 1, anchor.expectedKind);
-  if (!node.ok) {
-    return node;
-  }
-  // Bytes someone else wrote: a region that parses differently is a rejection.
-  const currentRegion = identityRegion(base.current.bytes, node.value);
-  if (currentRegion === undefined) {
-    return err('anchor-moved');
-  }
-  if (!sameSpan(currentRegion, mapping.currentRegion)) {
-    return err('anchor-moved');
-  }
-  if (!capabilityAcceptsVisualIntent(node.value.capability)) {
-    return err('unsupported-operation'); // Moved into a loop, or given `set:html`.
-  }
-  const attribute = soleAttribute(node.value, name);
-  if (!attribute.ok) {
-    return attribute;
-  }
-  const shift = mapping.currentRegion.start - mapping.authoredRegion.start;
-  const authoredValue = mapping.authoredValue;
-  const expectedValue = toByteSpan(authoredValue.start + shift, authoredValue.end + shift);
-  if (!sameSpan(attribute.value, expectedValue)) {
-    return err('anchor-moved');
-  }
-  const splice = valueSplice(base.current.bytes, attribute.value, value);
-  if (splice === undefined) {
-    return err('unsupported-operation');
-  }
-  const authoredBytes = base.authored.bytes.subarray(authoredValue.start, authoredValue.end);
-  const witness = toByteString(authoredBytes);
-  assert(byteStringsEqual(splice.expectedBytes, witness), 'The witness is the authored value');
-  const postKinds = [{ path: node.value.path, kind: node.value.kind }];
-  return ok({ splices: [splice], postKinds, candidate: 'must-parse' });
-}
-
-/** The node the anchor names in the bytes it was authored against: the path,
- * the span and the kind must all agree, or the intent names nothing. */
-function authoredAnchorNode(
-  projection: ValidProjection,
-  anchor: AnchorRef,
-): ProjectedNode | undefined {
-  assert(projection.nodes.length <= LIMITS.treeNodesMax, 'The projection is inside its bound');
-  const node = projection.nodes.find((candidate) => samePath(candidate.path, anchor.path));
-  if (node === undefined) {
-    return undefined;
-  }
-  if (node.kind === anchor.expectedKind) {
-    return sameSpan(node.span, anchor.span) ? node : undefined;
-  }
-  return undefined;
-}
-
-/** The value span of the one attribute named `name`, when it is a quoted
- * string. Duplicate names are ambiguous — which one the page uses is a guess;
- * a missing one needs insertion, which is step 6. */
-function soleAttribute(node: ProjectedNode, name: string): Result<ByteSpan, RejectionReason> {
+): Result<ProjectedAttribute | undefined, RejectionReason> {
+  const node = target.current;
   assert(node.attributes.length <= LIMITS.attrsPerNodeMax, 'Attributes are inside their bound');
   const found = node.attributes.filter((attribute) => attribute.name === name);
-  const [attribute] = found;
-  if (attribute === undefined) {
-    return err('unsupported-operation');
-  }
   if (found.length > 1) {
     return err('anchor-ambiguous');
   }
-  if (!attributeEditable(attribute)) {
-    return err('unsupported-operation');
+  const [attribute] = found;
+  const authored = target.authored.attributes.filter((candidate) => candidate.name === name);
+  assert(authored.length === found.length, 'A region moved whole keeps its attributes');
+  const [before] = authored;
+  if (attribute !== undefined) {
+    assert(before !== undefined, 'The authored node had the attribute');
+    assert(attribute.span.start === before.span.start + target.shift, 'The attribute moved whole');
   }
-  assert(attribute.valueSpan !== undefined, 'A string attribute has a value span');
-  return ok(attribute.valueSpan);
+  return ok(attribute);
 }
 
-function attributeEditable(attribute: ProjectedAttribute): boolean {
-  if (attribute.type === 'string') {
-    return capabilityAcceptsVisualIntent(attribute.capability);
-  }
-  return false;
+// An attribute carries its node's capability, narrowed: a spread is opaque.
+function attributeAsNode(attribute: ProjectedAttribute, node: ProjectedNode): ProjectedNode {
+  return { ...node, capability: attribute.capability };
 }
 
-function nodeStartingAt(
-  projection: ValidProjection,
-  start: number,
-  kind: AnchorRef['expectedKind'],
-): Result<ProjectedNode, RejectionReason> {
-  const found = projection.nodes.filter((node) => {
-    if (node.span.start === start) {
-      return node.kind === kind;
+/** `set-attribute`: the value alone when its delimiters can stay, the whole
+ * attribute when its type or quoting changes, a new attribute when absent. */
+function setAttributeSplice(
+  bytes: ByteString,
+  node: ProjectedNode,
+  attribute: ProjectedAttribute | undefined,
+  operation: Extract<Operation, { tag: 'set-attribute' }>,
+): Splice {
+  if (attribute === undefined) {
+    return insertionSplice(bytes, node, attributeText(operation.name, operation.value));
+  }
+  const value = operation.value;
+  const valueSpan = attribute.valueSpan;
+  if (valueSpan !== undefined) {
+    if (attribute.type === 'string') {
+      if (value.type === 'string') {
+        const quote = bytes[valueSpan.start - 1];
+        assert(quote === 0x22 || quote === 0x27, 'A string value sits in quotes');
+        assert(bytes[valueSpan.end] === quote, 'A string value closes with its opening quote');
+        if (!value.value.includes(String.fromCharCode(quote))) {
+          return spliceAt(bytes, valueSpan, value.value); // The step-2 value splice.
+        }
+      }
     }
-    return false;
-  });
-  const [node] = found;
-  if (node === undefined) {
-    return err('anchor-moved');
+    if (attribute.type === 'expr') {
+      if (value.type === 'expr') {
+        return spliceAt(bytes, valueSpan, value.value);
+      }
+    }
   }
-  // A tag opens one element: two same-kind nodes cannot start on one byte.
-  assert(found.length === 1, 'One node of a kind starts at a byte');
-  return ok(node);
+  // The name keeps its bytes; the rest is written anew.
+  assert(attribute.nameSpan !== undefined, 'A named attribute has a name span');
+  const name = textOf(bytes, attribute.nameSpan);
+  return spliceAt(bytes, attribute.span, attributeText(name, value));
 }
 
-/** The tag name through the end of the last attribute, or undefined for a tag
- * without attributes. The node's first byte is the `<` that opens its tag. */
-function identityRegion(bytes: ByteString, node: ProjectedNode): ByteSpan | undefined {
-  assert(bytes[node.span.start] === TAG_OPEN, 'An attribute host opens with `<`');
-  const attributesEnd = node.attributes.reduce<number>(
-    (end, attribute) => Math.max(end, attribute.span.end),
-    node.span.start,
+/** How an attribute is written: the legacy serializer's form (astroParser.ts,
+ * serializeAttrs), except that a value holding a double quote but no single
+ * one is single-quoted — the parser reads it back exactly, where `&quot;`
+ * reads back as those six characters. */
+export function attributeText(name: string, value: AttributeValue): string {
+  switch (value.type) {
+    case 'bare':
+      return name;
+    case 'expr':
+      return `${name}={${value.value}}`;
+    case 'string':
+      return `${name}=${quoted(value.value)}`;
+    default: {
+      const exhaustive: never = value;
+      return exhaustive;
+    }
+  }
+}
+
+function quoted(value: string): string {
+  if (!value.includes('"')) {
+    return `"${value}"`;
+  }
+  if (!value.includes("'")) {
+    return `'${value}'`;
+  }
+  return `"${value.replace(/"/g, '&quot;')}"`;
+}
+
+/** A new attribute after the last one, or after the tag name: on its own line
+ * when the tag writes its attributes a line each, else after one space. */
+function insertionSplice(bytes: ByteString, node: ProjectedNode, text: string): Splice {
+  const nameEnd = tagNameEnd(bytes, node);
+  const last = node.attributes.reduce<ProjectedAttribute | undefined>(
+    (latest, attribute) =>
+      latest === undefined || attribute.span.end > latest.span.end ? attribute : latest,
+    undefined,
   );
-  assert(attributesEnd <= node.span.end, 'Attributes lie inside their node');
-  if (attributesEnd > node.span.start + 1) {
-    return toByteSpan(node.span.start + 1, attributesEnd);
+  if (last === undefined) {
+    return spliceAt(bytes, toByteSpan(nameEnd, nameEnd), ` ${text}`);
   }
-  return undefined;
+  const lined = containsNewline(bytes, toByteSpan(nameEnd, last.span.start));
+  const separator = lined ? `\n${lineIndent(bytes, last.span.start)}` : ' ';
+  return spliceAt(bytes, toByteSpan(last.span.end, last.span.end), `${separator}${text}`);
 }
 
-// The value sits between quotes the splice keeps. A new value containing that
-// quote would end the attribute early and re-parse as another tree; re-quoting
-// is a step-6 gesture, so until then the edit is refused, visibly.
-function valueSplice(bytes: ByteString, range: ByteSpan, value: string): Splice | undefined {
-  const quote = bytes[range.start - 1];
-  assert(quote !== undefined, 'A string value has an opening quote before it');
-  assert(QUOTES.includes(quote), 'A string value sits in quotes');
-  assert(bytes[range.end] === quote, 'A string value closes with its opening quote');
-  if (value.includes(String.fromCharCode(quote))) {
-    return undefined;
+/** The attribute and the whitespace before it, back to the previous attribute
+ * or the tag name, so no gap is left behind. */
+function removalSplice(
+  bytes: ByteString,
+  node: ProjectedNode,
+  attribute: ProjectedAttribute,
+): Splice {
+  const floor = tagNameEnd(bytes, node);
+  const start = whitespaceBefore(bytes, attribute.span.start, floor);
+  assert(start < attribute.span.start, 'An attribute is separated from what precedes it');
+  return spliceAt(bytes, toByteSpan(start, attribute.span.end), '');
+}
+
+// One declaration inside `style="…"`; without a style attribute, setting a
+// property adds one. The value keeps its quotes, so a quote in the new value
+// is refused — the renderer then sets the whole attribute instead.
+function inlineStyleSplices(
+  bytes: ByteString,
+  node: ProjectedNode,
+  attribute: ProjectedAttribute | undefined,
+  operation: Extract<Operation, { tag: 'set-inline-style' }>,
+): Result<readonly Splice[], RejectionReason> {
+  const declaration = operation.declaration;
+  if (attribute === undefined) {
+    if (declaration.tag === 'set') {
+      const text = `${operation.property}: ${declaration.value}`;
+      return ok([
+        insertionSplice(bytes, node, attributeText('style', { type: 'string', value: text })),
+      ]);
+    }
+    return ok([]); // Removing from no style at all: nothing to do.
   }
+  const valueSpan = attribute.valueSpan;
+  if (attribute.type !== 'string') {
+    return err('unsupported-operation'); // `style={…}` is code.
+  }
+  assert(valueSpan !== undefined, 'A string attribute has a value span');
+  const quote = bytes[valueSpan.start - 1];
+  if (declaration.tag === 'set') {
+    if (declaration.value.includes(String.fromCharCode(quote ?? 0x22))) {
+      return err('unsupported-operation');
+    }
+  }
+  const text = textOf(bytes, valueSpan);
+  const edited = editInlineStyle(text, operation.property, declaration);
+  switch (edited.tag) {
+    case 'edited': {
+      const offsets = byteOffsetsIn(
+        text,
+        edited.edits.flatMap((edit) => [edit.start, edit.end]),
+      );
+      return ok(
+        edited.edits.map((edit, index) => {
+          const start = offsets[index * 2];
+          const end = offsets[index * 2 + 1];
+          assert(start !== undefined, 'Every edit start was converted');
+          assert(end !== undefined, 'Every edit end was converted');
+          const range = toByteSpan(valueSpan.start + start, valueSpan.start + end);
+          return spliceAt(bytes, range, edit.text);
+        }),
+      );
+    }
+    case 'ambiguous':
+      return err('anchor-ambiguous');
+    case 'unreadable':
+      return err('unsupported-operation');
+    default: {
+      const exhaustive: never = edited;
+      return exhaustive;
+    }
+  }
+}
+
+export function spliceAt(bytes: ByteString, range: ByteSpan, replacement: string): Splice {
+  assert(range.end <= bytes.length, 'A planned range lies inside the file');
   return {
     range,
     expectedBytes: toByteString(bytes.subarray(range.start, range.end)),
-    replacementBytes: encodeUtf8(value),
+    replacementBytes: encodeUtf8(replacement),
   };
-}
-
-function sameSpan(left: ByteSpan, right: ByteSpan): boolean {
-  if (left.start === right.start) {
-    return left.end === right.end;
-  }
-  return false;
-}
-
-function samePath(left: StructuralPath, right: StructuralPath): boolean {
-  if (left.length === right.length) {
-    return left.every((step, index) => step === right[index]);
-  }
-  return false;
 }

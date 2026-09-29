@@ -1,0 +1,517 @@
+// Goal: every operation step 6 ships (plan §11 step 6) plans the right bytes,
+// fresh and stale, and its inverse restores exactly what it replaced — the
+// engine half of Undo.
+// Method: (1) every oracle scenario through the shipping planner: the planned
+// splices produce the hand-written expected file byte for byte, and are the
+// hand-derived splices themselves wherever the oracle's are the minimal ones;
+// then the same intents after an unrelated insertion above the body, which
+// must produce the expected file with that insertion. (2) Hand-written cases
+// for each operation's whitespace and placement rules and each refusal. (3) A
+// sweep over every `.astro` fixture: each operation on every node it applies
+// to either plans a candidate that parses, whose inverse (inverseEdits,
+// planned as `revert-splices` against the result) gives the input back byte
+// for byte, or rejects with a pinned reason; stale, it plans the same edit
+// shifted by the insertion or is refused as ambiguous — never anything else.
+// (4) Undo after an outside edit maps or rejects, and never reverts the
+// outside edit. (5) The inline-style declaration editor on its own.
+import assert from 'node:assert/strict';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import { test } from 'node:test';
+import { toFilePath, toIntentId } from '../../dist/shared/brand.js';
+import { editInlineStyle } from '../../dist/shared/inlineStyle.js';
+import { toIntent, type Intent, type Operation } from '../../dist/shared/intent.js';
+import { renameSites } from '../../dist/shared/loopScope.js';
+import { planIntent, planIntentThroughDiff, type Plan } from '../../dist/shared/planner.js';
+import { toAnchorRef, type AnchorRef } from '../../dist/shared/ref.js';
+import type { Snapshot } from '../../dist/shared/snapshot.js';
+import type { ProjectedNode } from '../../dist/shared/source-projection.js';
+import { decodeUtf8, encodeUtf8, toByteSpan } from '../../dist/shared/span.js';
+import { applySplices, inverseEdits } from '../../dist/shared/splice.js';
+import { anchorAt, oracleIntent, oracleSplices } from './oracle-intent.ts';
+import { ORACLE_SCENARIOS } from './oracles.ts';
+import { snapshotOf } from './project.ts';
+
+const FIXTURES = path.resolve('test/fixtures/editor-core');
+const DIRECTORIES = ['test/corpus', 'test/fixtures/round-trip', 'test/fixtures/editor-core'];
+const PAGE = toFilePath('/project/page.astro');
+const INSERTED = '<!-- 0 -->\n';
+
+const snapshotText = (text: string, file = PAGE): Snapshot => snapshotOf(file, encodeUtf8(text));
+
+function intentOn(authored: Snapshot, anchor: AnchorRef, operation: Operation): Intent {
+  return toIntent({
+    id: toIntentId('operations-test'),
+    file: authored.path,
+    authoredChecksum: authored.checksum,
+    anchor,
+    operation,
+  });
+}
+
+function textOf(bytes: Uint8Array): string {
+  const decoded = decodeUtf8(encodeUtf8(Buffer.from(bytes).toString('utf8')));
+  assert.ok(decoded.ok, 'written bytes are UTF-8');
+  return decoded.value;
+}
+
+type Placement = 'before' | 'after' | 'first-child' | 'last-child';
+
+/** Plan fresh through both paths (they must agree) and return the written text. */
+function run(authored: Snapshot, operation: Operation, anchor: AnchorRef): string {
+  const intent = intentOn(authored, anchor, operation);
+  const base = { authored, current: authored };
+  const planned = planIntent(base, intent);
+  assert.deepEqual(planIntentThroughDiff(base, intent), planned, 'fast path and diff path agree');
+  if (!planned.ok) {
+    return `rejected: ${planned.error}`;
+  }
+  return textOf(applySplices(authored.bytes, planned.value.splices));
+}
+
+/** The body offset: after the frontmatter block, or a leading byte-order mark. */
+function bodyStart(snapshot: Snapshot): number {
+  const projection = snapshot.projection;
+  assert.equal(projection.tag, 'valid');
+  if (projection.tag !== 'valid') {
+    return 0;
+  }
+  if (projection.frontmatter !== undefined) {
+    return projection.frontmatter.end;
+  }
+  return snapshot.bytes[0] === 0xef ? 3 : 0;
+}
+
+function withInsertion(snapshot: Snapshot): { readonly bytes: Uint8Array; readonly at: number } {
+  const at = bodyStart(snapshot);
+  const bytes = Buffer.concat([
+    snapshot.bytes.subarray(0, at),
+    Buffer.from(INSERTED),
+    snapshot.bytes.subarray(at),
+  ]);
+  return { bytes, at };
+}
+
+/** Undo, planned: the inverse of `plan` as a revert against the bytes it wrote. */
+function revert(
+  after: Snapshot,
+  plan: Plan,
+  current: Snapshot = after,
+): ReturnType<typeof planIntent> {
+  const hunks = inverseEdits(plan.splices);
+  const anchor = toAnchorRef({
+    span: toByteSpan(0, after.bytes.length),
+    path: [],
+    expectedKind: 'document',
+  });
+  const intent = intentOn(after, anchor, { tag: 'revert-splices', hunks });
+  return planIntent({ authored: after, current }, intent);
+}
+
+// --- (1) Oracles through the shipping planner ---------------------------------------
+
+test('every oracle scenario plans its expected file with the shipping planner, fresh, stale', () => {
+  let exact = 0;
+  for (const step of ORACLE_SCENARIOS.flatMap((scenario) => scenario.steps)) {
+    const input = snapshotOf(
+      toFilePath(`/project/${step.file}`),
+      encodeUtf8(fs.readFileSync(path.join(FIXTURES, step.file), 'utf8')),
+    );
+    const expected = fs.readFileSync(path.join(FIXTURES, step.expectedFile));
+    const intent = oracleIntent(step, input, toIntentId('oracle'));
+    const planned = planIntent({ authored: input, current: input }, intent);
+    assert.ok(planned.ok, `${step.file}: plans (${planned.ok ? '' : planned.error})`);
+    assert.deepEqual(
+      Buffer.from(applySplices(input.bytes, planned.value.splices)),
+      expected,
+      step.file,
+    );
+    if (step.reference === 'agrees') {
+      assert.deepEqual(planned.value.splices, oracleSplices(step), `${step.file}: exact splices`);
+      exact += 1;
+    }
+    const inverse = revert(
+      snapshotOf(input.path, applySplices(input.bytes, planned.value.splices)),
+      planned.value,
+    );
+    assert.ok(inverse.ok, `${step.file}: the inverse plans`);
+    if (!step.file.endsWith('.astro')) {
+      continue;
+    }
+    // Stale: an unrelated comment above the body. The same edit, moved.
+    const stale = withInsertion(input);
+    const current = snapshotOf(input.path, encodeUtf8(Buffer.from(stale.bytes).toString('utf8')));
+    const mapped = planIntent({ authored: input, current }, intent);
+    if (!mapped.ok) {
+      // A moved region whose bytes repeat is refused, never guessed (plan §4).
+      assert.equal(mapped.error, 'anchor-ambiguous', `${step.file}: stale`);
+      continue;
+    }
+    const want = Buffer.concat([
+      expected.subarray(0, stale.at),
+      Buffer.from(INSERTED),
+      expected.subarray(stale.at),
+    ]);
+    assert.deepEqual(
+      Buffer.from(applySplices(current.bytes, mapped.value.splices)),
+      want,
+      `${step.file} stale`,
+    );
+  }
+  assert.ok(exact >= 4, 'the minimal oracle splices are matched exactly');
+});
+
+test('a loop rename finds exactly the oracle sites: the declaration and its two uses', () => {
+  const page = snapshotText(fs.readFileSync(path.join(FIXTURES, 'loop-rename.astro'), 'utf8'));
+  assert.equal(page.projection.tag, 'valid');
+  if (page.projection.tag !== 'valid') {
+    return;
+  }
+  const loop = page.projection.nodes.find((node) => node.path.join() === '0,0');
+  assert.ok(loop !== undefined);
+  const sites = renameSites(page.projection, page.bytes, loop, 'item');
+  assert.deepEqual(
+    sites?.map((site) => site.start),
+    [148, 189, 201],
+  );
+  assert.equal(
+    renameSites(page.projection, page.bytes, loop, 'items'),
+    undefined,
+    'not a parameter',
+  );
+});
+
+// --- (2) Hand-written cases --------------------------------------------------------
+
+const LIST = '<ul>\n  <li>a</li>\n  <li>b</li>\n</ul>\n';
+
+test('remove-node takes the node and its line, never a sibling', () => {
+  const page = snapshotText(LIST);
+  assert.equal(
+    run(page, { tag: 'remove-node' }, anchorAt(page, [0, 0])),
+    '<ul>\n  <li>b</li>\n</ul>\n',
+  );
+  assert.equal(
+    run(page, { tag: 'remove-node' }, anchorAt(page, [0, 1])),
+    '<ul>\n  <li>a</li>\n</ul>\n',
+  );
+  assert.equal(run(page, { tag: 'remove-node' }, anchorAt(page, [0])), '');
+  const inline = snapshotText('<p>a <b>x</b> c</p>\n');
+  assert.equal(run(inline, { tag: 'remove-node' }, anchorAt(inline, [0, 1])), '<p>a  c</p>\n');
+  const fenced = snapshotText('---\nconst a = 1;\n---\n<a />\n<b />\n');
+  assert.equal(
+    run(fenced, { tag: 'remove-node' }, anchorAt(fenced, [0])),
+    '---\nconst a = 1;\n---\n<b />\n',
+  );
+});
+
+test('insert-node beside a node copies its separator; inside, it fills an empty tag', () => {
+  const page = snapshotText(LIST);
+  const insert = (placement: Placement, at: readonly number[]) =>
+    run(page, { tag: 'insert-node', placement, source: '<li>n</li>' }, anchorAt(page, at));
+  assert.equal(insert('after', [0, 0]), '<ul>\n  <li>a</li>\n  <li>n</li>\n  <li>b</li>\n</ul>\n');
+  assert.equal(insert('before', [0, 0]), '<ul>\n  <li>n</li>\n  <li>a</li>\n  <li>b</li>\n</ul>\n');
+  assert.equal(
+    insert('first-child', [0]),
+    '<ul>\n  <li>n</li>\n  <li>a</li>\n  <li>b</li>\n</ul>\n',
+  );
+  assert.equal(
+    insert('last-child', [0]),
+    '<ul>\n  <li>a</li>\n  <li>b</li>\n  <li>n</li>\n</ul>\n',
+  );
+  const empty = snapshotText('<div>\n</div>\n<aside></aside>\n<hr />\n');
+  const into = (at: readonly number[]) =>
+    run(
+      empty,
+      { tag: 'insert-node', placement: 'first-child', source: '<p>x</p>' },
+      anchorAt(empty, at),
+    );
+  assert.equal(into([0]), '<div>\n  <p>x</p>\n</div>\n<aside></aside>\n<hr />\n');
+  assert.equal(into([1]), '<div>\n</div>\n<aside><p>x</p></aside>\n<hr />\n');
+  assert.equal(into([2]), 'rejected: unsupported-operation', 'a self-closing tag has no inside');
+});
+
+test('move-node relocates the original bytes; into itself is refused', () => {
+  const page = snapshotText('<ul>\n  <li class="a">a</li>\n  <li>b</li>\n</ul>\n<ol></ol>\n');
+  const move = (from: readonly number[], to: readonly number[], placement: Placement) =>
+    run(
+      page,
+      { tag: 'move-node', destination: anchorAt(page, to), placement },
+      anchorAt(page, from),
+    );
+  assert.equal(
+    move([0, 0], [0, 1], 'after'),
+    '<ul>\n  <li>b</li>\n  <li class="a">a</li>\n</ul>\n<ol></ol>\n',
+  );
+  assert.equal(
+    move([0, 1], [0, 0], 'before'),
+    '<ul>\n  <li>b</li>\n  <li class="a">a</li>\n</ul>\n<ol></ol>\n',
+  );
+  assert.equal(
+    move([0, 0], [1], 'first-child'),
+    '<ul>\n  <li>b</li>\n</ul>\n<ol><li class="a">a</li></ol>\n',
+  );
+  assert.equal(move([0], [0, 0], 'after'), 'rejected: unsupported-operation');
+});
+
+test('attribute operations keep every byte they do not own', () => {
+  const page = snapshotText(
+    '<a\n  href="/x"\n  class="c"\n>x</a>\n<b style="color: red; margin: 0">y</b>\n',
+  );
+  const set = (at: readonly number[], name: string, value: string) =>
+    run(page, { tag: 'set-attribute', name, value: { type: 'string', value } }, anchorAt(page, at));
+  assert.equal(
+    set([0], 'title', 't'),
+    '<a\n  href="/x"\n  class="c"\n  title="t"\n>x</a>\n<b style="color: red; margin: 0">y</b>\n',
+  );
+  assert.equal(
+    run(page, { tag: 'remove-attribute', name: 'href' }, anchorAt(page, [0])),
+    '<a\n  class="c"\n>x</a>\n<b style="color: red; margin: 0">y</b>\n',
+  );
+  const style = (
+    property: string,
+    declaration: { readonly tag: 'set'; readonly value: string } | { readonly tag: 'remove' },
+  ) => run(page, { tag: 'set-inline-style', property, declaration }, anchorAt(page, [2]));
+  assert.equal(
+    style('margin', { tag: 'set', value: '4px' }),
+    '<a\n  href="/x"\n  class="c"\n>x</a>\n<b style="color: red; margin: 4px">y</b>\n',
+  );
+  assert.equal(
+    style('color', { tag: 'remove' }),
+    '<a\n  href="/x"\n  class="c"\n>x</a>\n<b style="margin: 0">y</b>\n',
+  );
+  assert.equal(
+    style('padding', { tag: 'set', value: '1px' }),
+    '<a\n  href="/x"\n  class="c"\n>x</a>\n<b style="color: red; margin: 0; padding: 1px">y</b>\n',
+  );
+  assert.equal(style('content', { tag: 'set', value: '"x"' }), 'rejected: unsupported-operation');
+});
+
+test('frontmatter slots and code patches: stale ones map whole or reject', () => {
+  const text = '---\nconst title = "Old";\n---\n<h1>{title}</h1>\n';
+  const page = snapshotText(text);
+  assert.equal(page.projection.tag, 'valid');
+  if (page.projection.tag !== 'valid' || page.projection.frontmatter === undefined) {
+    return;
+  }
+  const anchor = toAnchorRef({
+    span: page.projection.frontmatter,
+    path: [],
+    expectedKind: 'frontmatter',
+  });
+  const slot = toByteSpan(18, 23);
+  const intent = intentOn(page, anchor, { tag: 'edit-frontmatter-slot', slot, text: '"New"' });
+  const elsewhere = snapshotText(`${text}<p>more</p>\n`);
+  const mapped = planIntent({ authored: page, current: elsewhere }, intent);
+  assert.ok(mapped.ok);
+  assert.equal(
+    textOf(applySplices(elsewhere.bytes, mapped.value.splices)),
+    '---\nconst title = "New";\n---\n<h1>{title}</h1>\n<p>more</p>\n',
+  );
+  const inside = snapshotText(text.replace('const', 'let'));
+  assert.deepEqual(planIntent({ authored: page, current: inside }, intent), {
+    ok: false,
+    error: 'region-externally-modified',
+  });
+});
+
+// --- (3) The corpus sweep ------------------------------------------------------------
+
+function corpusFiles(): readonly { readonly name: string; readonly text: string }[] {
+  return DIRECTORIES.flatMap((directory) =>
+    fs
+      .readdirSync(directory)
+      .filter((name) => name.endsWith('.astro'))
+      .sort()
+      .map((name) => ({
+        name: `${directory}/${name}`,
+        text: fs.readFileSync(path.join(directory, name), 'utf8'),
+      })),
+  );
+}
+
+type Sweep = (node: ProjectedNode, page: Snapshot) => Operation | undefined;
+
+const TAGS = new Set(['element', 'component', 'raw']);
+const MOVABLE = (node: ProjectedNode) => node.kind !== 'branch' && node.kind !== 'chunk-group';
+
+const SWEEPS: Readonly<Record<string, Sweep>> = {
+  'remove-node': (node) => (MOVABLE(node) ? { tag: 'remove-node' } : undefined),
+  'insert-node': (node) =>
+    MOVABLE(node) ? { tag: 'insert-node', placement: 'after', source: '<hr />' } : undefined,
+  duplicate: (node, page) =>
+    MOVABLE(node)
+      ? {
+          tag: 'insert-node',
+          placement: 'after',
+          source: Buffer.from(page.bytes.subarray(node.span.start, node.span.end)).toString('utf8'),
+        }
+      : undefined,
+  'set-attribute': (node) =>
+    TAGS.has(node.kind)
+      ? { tag: 'set-attribute', name: 'data-step', value: { type: 'string', value: '6' } }
+      : undefined,
+  'remove-attribute': (node) => {
+    const named = node.attributes.find((attribute) => attribute.type !== 'spread');
+    return TAGS.has(node.kind) && named !== undefined
+      ? { tag: 'remove-attribute', name: named.name }
+      : undefined;
+  },
+  'move-node': (node, page) => {
+    const projection = page.projection;
+    if (projection.tag !== 'valid' || !MOVABLE(node)) {
+      return undefined;
+    }
+    // After the last root: out of every loop and condition the node sits in.
+    const roots = projection.nodes.filter(
+      (candidate) => candidate.path.length === 1 && candidate.kind !== 'text',
+    );
+    const last = roots[roots.length - 1];
+    if (last === undefined || node.path[0] === last.path[0]) {
+      return undefined;
+    }
+    return { tag: 'move-node', destination: anchorAt(page, last.path), placement: 'after' };
+  },
+  'set-inline-style': (node) =>
+    TAGS.has(node.kind)
+      ? { tag: 'set-inline-style', property: 'color', declaration: { tag: 'set', value: 'red' } }
+      : undefined,
+};
+
+// Every rejection a sweep may meet, per operation; anything else fails.
+const ALLOWED: ReadonlySet<string> = new Set([
+  'unsupported-operation',
+  'anchor-ambiguous',
+  'source-invalid',
+]);
+
+for (const [label, sweep] of Object.entries(SWEEPS)) {
+  test(`corpus sweep: ${label} plans a parsing candidate whose inverse restores the input`, (t) => {
+    let planned = 0;
+    let shifted = 0;
+    const refused = new Map<string, number>();
+    const refuse = (reason: string) => refused.set(reason, (refused.get(reason) ?? 0) + 1);
+    for (const file of corpusFiles()) {
+      const page = snapshotText(file.text, toFilePath(`/project/${path.basename(file.name)}`));
+      if (page.projection.tag !== 'valid') {
+        continue;
+      }
+      const stale = withInsertion(page);
+      const current = snapshotOf(page.path, encodeUtf8(Buffer.from(stale.bytes).toString('utf8')));
+      for (const node of page.projection.nodes) {
+        const operation = sweep(node, page);
+        if (operation === undefined) {
+          continue;
+        }
+        const where = `${file.name} ${node.path.join('/')} ${label}`;
+        const intent = intentOn(page, anchorAt(page, node.path), operation);
+        const fresh = planIntent({ authored: page, current: page }, intent);
+        if (!fresh.ok) {
+          assert.ok(ALLOWED.has(fresh.error), `${where}: ${fresh.error}`);
+          refuse(fresh.error);
+          continue;
+        }
+        const written = snapshotOf(page.path, applySplices(page.bytes, fresh.value.splices));
+        if (written.projection.tag !== 'valid') {
+          // The actor refuses these as source-invalid (must-parse); counted so
+          // the sweep shows how rare they are.
+          refuse('candidate does not parse');
+          continue;
+        }
+        planned += 1;
+        const back = revert(written, fresh.value);
+        assert.ok(back.ok, `${where}: the inverse plans`);
+        assert.deepEqual(
+          applySplices(written.bytes, back.value.splices),
+          page.bytes,
+          `${where}: undo`,
+        );
+        const mapped = planIntent({ authored: page, current }, intent);
+        if (!mapped.ok) {
+          assert.equal(mapped.error, 'anchor-ambiguous', `${where}: stale`);
+          continue;
+        }
+        // The stale plan reads its separators off the current bytes, so beside
+        // the outside insertion it may take another whitespace run; what it
+        // writes is the fresh result with that insertion kept, up to spacing.
+        const staleText = textOf(applySplices(current.bytes, mapped.value.splices));
+        assert.ok(staleText.includes(INSERTED.trim()), `${where}: the outside edit survives`);
+        const spacing = (text: string) =>
+          text.replace(INSERTED.trim(), '').replace(/\s+/g, ' ').trim();
+        assert.equal(spacing(staleText), spacing(textOf(written.bytes)), `${where}: stale`);
+        shifted += 1;
+      }
+    }
+    const reasons = [...refused].map(([reason, count]) => `${count} ${reason}`).join(', ');
+    t.diagnostic(`${planned} planned, ${shifted} mapped stale; refused: ${reasons || 'none'}`);
+    assert.ok(planned > 60, `the sweep plans many real edits (${planned})`);
+    assert.ok(shifted > 30, `and maps many of them stale (${shifted})`);
+  });
+}
+
+// --- (4) Undo after an outside edit ----------------------------------------------------
+
+test('undo after an outside edit maps through it, or rejects — never reverts it', () => {
+  // The outside edit sits farther from the reverted hunk than the context a
+  // hunk is mapped with (planText.ts, HUNK_CONTEXT_BYTES).
+  const filler = '<p>Unique paragraph text, long enough to keep the footer out of reach.</p>\n';
+  const page = snapshotText(`<Hero title="Old" />\n${filler}<Footer title="Old" />\n`);
+  const set = intentOn(page, anchorAt(page, [0]), {
+    tag: 'set-attribute',
+    name: 'title',
+    value: { type: 'string', value: 'Brand new' },
+  });
+  const applied = planIntent({ authored: page, current: page }, set);
+  assert.ok(applied.ok);
+  const after = snapshotOf(page.path, applySplices(page.bytes, applied.value.splices));
+  // Elsewhere: the footer's title is edited outside Stacki. Undo maps.
+  const outside = snapshotText(
+    textOf(after.bytes).replace('<Footer title="Old"', '<Footer title="Theirs"'),
+  );
+  const undone = revert(after, applied.value, outside);
+  assert.ok(undone.ok, 'undo maps through an unrelated outside edit');
+  assert.equal(
+    textOf(applySplices(outside.bytes, undone.value.splices)),
+    `<Hero title="Old" />\n${filler}<Footer title="Theirs" />\n`,
+  );
+  // On top of it: the hero's own title changed outside Stacki. Undo rejects.
+  const over = snapshotText(textOf(after.bytes).replace('Brand new', 'Theirs'));
+  assert.deepEqual(revert(after, applied.value, over), {
+    ok: false,
+    error: 'region-externally-modified',
+  });
+});
+
+// --- (5) The inline-style editor ---------------------------------------------------------
+
+test('editInlineStyle edits one declaration and keeps the rest of the text', () => {
+  const set = (text: string, property: string, value: string) => {
+    const result = editInlineStyle(text, property, { tag: 'set', value });
+    return result.tag === 'edited' ? result.text : result.tag;
+  };
+  const remove = (text: string, property: string) => {
+    const result = editInlineStyle(text, property, { tag: 'remove' });
+    return result.tag === 'edited' ? result.text : result.tag;
+  };
+  assert.equal(set('color: red;  margin:0', 'margin', '4px'), 'color: red;  margin:4px');
+  assert.equal(set('color: red;', 'margin', '0'), 'color: red; margin: 0;');
+  assert.equal(set('color: red', 'margin', '0'), 'color: red; margin: 0');
+  assert.equal(set('', 'margin', '0'), 'margin: 0');
+  assert.equal(set('COLOR: red', 'color', 'blue'), 'COLOR: blue', 'property names ignore case');
+  assert.equal(
+    set('--Gap: 1px', '--gap', '2px'),
+    '--Gap: 1px; --gap: 2px',
+    'custom properties do not',
+  );
+  assert.equal(
+    set('background: url(a;b); color: red', 'color', 'blue'),
+    'background: url(a;b); color: blue',
+  );
+  assert.equal(remove('a: 1; b: 2; c: 3', 'b'), 'a: 1; c: 3');
+  assert.equal(remove('a: 1; b: 2', 'b'), 'a: 1;');
+  assert.equal(remove('a: 1', 'a'), '');
+  assert.equal(remove('a: 1', 'z'), 'a: 1');
+  assert.equal(set('a: 1; a: 2', 'a', '3'), 'ambiguous');
+  assert.equal(set('a: (1', 'a', '3'), 'unreadable');
+  assert.equal(set('just words', 'a', '3'), 'unreadable');
+});

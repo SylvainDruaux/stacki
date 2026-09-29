@@ -19,6 +19,7 @@ import { LIMITS } from '../../dist/shared/limits.js';
 import { isNodeKind } from '../../dist/shared/ref.js';
 import type { ActorEffect, ActorState } from '../../dist/shared/documentActor.js';
 import { orderedSplices } from '../../dist/shared/splice.js';
+import { tagNameEnd } from '../../dist/shared/planSupport.js';
 
 type Committed = Extract<ActorEffect, { tag: 'committed' }>;
 
@@ -53,7 +54,10 @@ export function checkCommitted(effect: Committed): void {
     assert(equalBytes(found, splice.expectedBytes), 'Invariant 2: the splice matched its witness');
     const gap = splice.range.start - cursorBefore;
     assert(
-      equalBytes(before.subarray(cursorBefore, splice.range.start), after.subarray(cursorAfter, cursorAfter + gap)),
+      equalBytes(
+        before.subarray(cursorBefore, splice.range.start),
+        after.subarray(cursorAfter, cursorAfter + gap),
+      ),
       'Invariant 3: bytes before a splice are unchanged',
     );
     cursorAfter += gap;
@@ -62,14 +66,18 @@ export function checkCommitted(effect: Committed): void {
     cursorAfter += splice.replacementBytes.length;
     cursorBefore = splice.range.end;
   }
-  assert(equalBytes(before.subarray(cursorBefore), after.subarray(cursorAfter)), 'Invariant 3: the tail is unchanged');
+  assert(
+    equalBytes(before.subarray(cursorBefore), after.subarray(cursorAfter)),
+    'Invariant 3: the tail is unchanged',
+  );
   checkTarget(effect);
-  // Invariant 6, the part checkable here: only set-attribute is mapped at step
-  // 3, so any other intent applied to bytes it was not authored against is a
-  // silent remap. A mapped set-attribute is judged in world.ts, against where
-  // the authored bytes really went — not against the planner's own claim.
+  // Invariant 6, the part checkable here: the whole-file replacement is never
+  // mapped, so one applied to bytes it was not authored against is a silent
+  // remap. Every other operation maps from step 6, and world.ts judges each
+  // mapped one against where the authored bytes really went — not against the
+  // planner's own claim.
   if (effect.intent.authoredChecksum !== effect.base.checksum) {
-    assert(effect.intent.operation.tag === 'set-attribute', 'Invariant 6: no silent remap');
+    assert(effect.intent.operation.tag !== 'replace-source', 'Invariant 6: no silent remap');
   }
   checkGeneration(effect.previousGeneration, effect.generation);
 }
@@ -87,23 +95,77 @@ function checkTarget(effect: Committed): void {
   const after = effect.candidate.projection;
   assert(before.tag === 'valid', 'A node intent applied to a parsing file');
   assert(after.tag === 'valid', 'A node intent produced a parsing file');
+  const operation = effect.intent.operation;
+  if (effect.intent.authoredChecksum !== effect.base.checksum) {
+    if (operation.tag !== 'set-attribute') {
+      // A mapped gesture step's authored path may name another node in the
+      // base; world.ts judges where it landed, and its post-kinds hold below.
+      checkPostKinds(effect, after);
+      return;
+    }
+  }
   const path = targetPath(effect);
   const same = (candidate: readonly number[]) =>
     candidate.length === path.length && candidate.every((step, index) => step === path[index]);
   const target = before.nodes.find((node) => same(node.path));
-  const result = after.nodes.find((node) => same(node.path));
   assert(target?.kind === anchor.expectedKind, 'Invariant 4: the anchor held the expected kind');
-  assert(result?.kind === anchor.expectedKind, 'Invariant 4: the target kept its kind');
-  const operation = effect.intent.operation;
+  if (staysInPlace(operation.tag)) {
+    const result = after.nodes.find((node) => same(node.path));
+    assert(result?.kind === anchor.expectedKind, 'Invariant 4: the target kept its kind');
+  }
+  checkPostKinds(effect, after);
   if (operation.tag === 'set-attribute') {
     const named = target.attributes.filter((attribute) => attribute.name === operation.name);
-    assert(named.length === 1, 'Invariant 5: an ambiguous attribute never applies');
+    // None: step 6 inserts it. Two or more: which one the page uses is a guess.
+    assert(named.length <= 1, 'Invariant 5: an ambiguous attribute never applies');
+  }
+}
+
+// What the plan promised about the candidate, checked on this side too.
+function checkPostKinds(
+  effect: Committed,
+  after: Extract<Committed['candidate']['projection'], { tag: 'valid' }>,
+): void {
+  for (const post of effect.plan.postKinds) {
+    const found = after.nodes.find(
+      (node) =>
+        node.path.length === post.path.length &&
+        node.path.every((step, index) => step === post.path[index]),
+    );
+    assert(found?.kind === post.kind, 'Invariant 4: every planned post-kind holds');
+  }
+}
+
+// A removal takes its target away and a move (step 6) puts it elsewhere, out
+// of a loop perhaps as another kind; an insertion before it shifts it. Their
+// candidates are checked through the plan's post-kinds instead.
+function staysInPlace(tag: Intent['operation']['tag']): boolean {
+  switch (tag) {
+    case 'set-attribute':
+    case 'remove-attribute':
+    case 'set-inline-style':
+    case 'rename-binding':
+      return true;
+    case 'insert-node':
+    case 'remove-node':
+    case 'move-node':
+    case 'edit-frontmatter-slot':
+    case 'apply-code-patch':
+    case 'revert-splices':
+    case 'replace-source':
+      return false;
+    default: {
+      const exhaustive: never = tag;
+      return exhaustive;
+    }
   }
 }
 
 // The anchor path for an unmapped intent; for a set-attribute, the path of the
-// base node whose attribute value the splice replaces — which, unmapped, must
-// be the anchor's own node.
+// base tag whose attributes the splice edits — a value, a whole attribute, or
+// a new one after the last (step 6) — which, unmapped, must be the anchor's
+// own node. A tag's attribute region runs from its `<` through its last
+// attribute; nested tags' regions never overlap, so the owner is unique.
 function targetPath(effect: Committed): readonly number[] {
   const operation = effect.intent.operation;
   const anchorPath = effect.intent.anchor.path;
@@ -114,10 +176,20 @@ function targetPath(effect: Committed): readonly number[] {
   assert(before.tag === 'valid', 'A set-attribute applied to a parsing file');
   const [splice] = effect.plan.splices;
   assert(splice !== undefined, 'A set-attribute plan has a splice');
-  const owner = before.nodes.find((node) =>
-    node.attributes.some((attribute) => attribute.valueSpan?.start === splice.range.start),
-  );
-  assert(owner !== undefined, 'The splice replaces an attribute value of a base node');
+  const bytes = effect.base.bytes;
+  const owners = before.nodes.filter((node) => {
+    if (node.kind !== 'element' && node.kind !== 'component' && node.kind !== 'raw') {
+      return false;
+    }
+    const end = node.attributes.reduce(
+      (last, attribute) => Math.max(last, attribute.span.end),
+      tagNameEnd(bytes, node),
+    );
+    return node.span.start < splice.range.start && splice.range.end <= end;
+  });
+  const [owner] = owners;
+  assert(owners.length === 1, 'The splice edits the attributes of exactly one base tag');
+  assert(owner !== undefined, 'The splice edits the attributes of a base tag');
   if (effect.intent.authoredChecksum === effect.base.checksum) {
     const unmoved = owner.path.length === anchorPath.length;
     assert(unmoved, 'Invariant 6: an unmapped intent edits its own node');

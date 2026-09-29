@@ -334,39 +334,38 @@ test('rejections that need no diff: the anchor, the attribute, the value, the op
       error: 'anchor-moved',
     },
   );
-  assert.deepEqual(plan(setAttribute('data-missing', 'x')), {
-    ok: false,
-    error: 'unsupported-operation',
-  });
-  assert.deepEqual(
-    plan({ tag: 'set-attribute', name: 'title', value: { type: 'expr', value: 'x' } }),
-    {
-      ok: false,
-      error: 'unsupported-operation',
-    },
+  // Step 6: what step 2 refused now plans; each result is written out by hand.
+  const text = (operation: Operation): string =>
+    planned(base, intentOn(authored, intent.anchor, operation));
+  const card = (tag: string) => `${HERO}${FOOTER}${CARD}${tag}\n`;
+  assert.equal(
+    text(setAttribute('data-missing', 'x')),
+    card('<Card title="Old" data-missing="x" />'),
   );
-  assert.deepEqual(plan({ tag: 'set-attribute', name: 'title', value: { type: 'bare' } }), {
-    ok: false,
-    error: 'unsupported-operation',
-  });
-  // A double quote would close the double-quoted value early.
-  assert.deepEqual(plan(setAttribute('title', 'say "hi"')), {
-    ok: false,
-    error: 'unsupported-operation',
-  });
-  assert.ok(plan(setAttribute('title', "it's")).ok, 'the other quote is fine inside double quotes');
-  const others: readonly Operation[] = [
-    { tag: 'remove-attribute', name: 'title' },
-    { tag: 'insert-node', placement: 'after', source: '<p />' },
-    { tag: 'move-node', destination: hero, placement: 'after' },
-    { tag: 'set-inline-style', property: 'color', declaration: { tag: 'set', value: 'red' } },
-  ];
-  for (const operation of others) {
-    assert.deepEqual(plan(operation), { ok: false, error: 'unsupported-operation' }, operation.tag);
-  }
+  assert.equal(
+    text({ tag: 'set-attribute', name: 'title', value: { type: 'expr', value: 'x' } }),
+    card('<Card title={x} />'),
+  );
+  assert.equal(
+    text({ tag: 'set-attribute', name: 'title', value: { type: 'bare' } }),
+    card('<Card title />'),
+  );
+  // A double quote closes a double-quoted value: the value is re-quoted.
+  assert.equal(text(setAttribute('title', 'say "hi"')), card(`<Card title='say "hi"' />`));
+  assert.equal(text(setAttribute('title', "it's")), card(`<Card title="it's" />`));
+  assert.equal(text({ tag: 'remove-attribute', name: 'title' }), card('<Card />'));
+  assert.equal(
+    text({ tag: 'set-inline-style', property: 'color', declaration: { tag: 'set', value: 'red' } }),
+    card('<Card title="Old" style="color: red" />'),
+  );
+  assert.equal(
+    text({ tag: 'insert-node', placement: 'after', source: '<p />' }),
+    `${HERO}${FOOTER}${CARD}<Card title="Old" />\n<p />\n`,
+  );
+  assert.deepEqual(plan({ tag: 'move-node', destination: hero, placement: 'after' }).ok, true);
 });
 
-test('duplicate attributes, expression attributes and loop bodies are refused', () => {
+test('duplicate attributes and loop bodies are refused; an expression attribute is replaced whole', () => {
   const page = snapshotText(readFixture('conditional-template.astro'));
   const projection = page.projection;
   assert.equal(projection.tag, 'valid');
@@ -391,11 +390,13 @@ test('duplicate attributes, expression attributes and loop bodies are refused', 
     ok: false,
     error: 'anchor-ambiguous',
   });
+  // An expression attribute is set as a whole: `data-x={ 1 + 2 }` → `data-x="3"`.
   const expression = nodeWith((node) => node.attributes.some((a) => a.name === 'data-x'));
-  assert.deepEqual(planIntent(base, intentOn(page, expression, setAttribute('data-x', '3'))), {
-    ok: false,
-    error: 'unsupported-operation',
-  });
+  const set = planIntent(base, intentOn(page, expression, setAttribute('data-x', '3')));
+  assert.ok(set.ok, 'a type change plans');
+  const written = decodeUtf8(applySplices(page.bytes, set.value.splices));
+  assert.ok(written.ok);
+  assert.match(written.value, /\n  data-x="3"\n/);
   const repeated = nodeWith((node) => {
     if (node.capability === 'repeated-source-node') {
       return node.kind === 'element';

@@ -27,16 +27,23 @@ export interface SourceEdit {
 }
 
 export type StyleDeclaration =
-  | { readonly tag: 'set'; readonly value: string }
-  | { readonly tag: 'remove' };
+  { readonly tag: 'set'; readonly value: string } | { readonly tag: 'remove' };
 
 /** The closed operation set (plan §3.3). New operations extend this union; they
  * never extend a writer. `replace-source` is migration-only: the legacy save
- * path submits it from step 5, and step 9 deletes it for `.astro`. */
+ * path submits it from step 5, and step 9 deletes it for `.astro`.
+ *
+ * Added at step 6: `remove-node` (the plan's "insert/remove" gesture needs a
+ * removal, which the initial list lacked) and `revert-splices`, the inverse of
+ * an applied outcome that Undo submits (plan §11 step 6). A revert is not a
+ * code patch: a code patch is text the user wrote and may leave the file
+ * invalid (§3.6); a revert restores bytes an applied intent replaced, keeps a
+ * parsing file parsing, and a stale one is a moved region, not a merge. */
 export type Operation =
   | { readonly tag: 'set-attribute'; readonly name: string; readonly value: AttributeValue }
   | { readonly tag: 'remove-attribute'; readonly name: string }
   | { readonly tag: 'insert-node'; readonly placement: Placement; readonly source: string }
+  | { readonly tag: 'remove-node' }
   | { readonly tag: 'move-node'; readonly destination: AnchorRef; readonly placement: Placement }
   | {
       readonly tag: 'rename-binding';
@@ -51,6 +58,7 @@ export type Operation =
     }
   | { readonly tag: 'apply-code-patch'; readonly hunks: readonly SourceEdit[] }
   | { readonly tag: 'edit-frontmatter-slot'; readonly slot: ByteSpan; readonly text: string }
+  | { readonly tag: 'revert-splices'; readonly hunks: readonly SourceEdit[] }
   | { readonly tag: 'replace-source'; readonly text: string };
 
 export type OperationTag = Operation['tag'];
@@ -66,8 +74,7 @@ export interface Intent {
 }
 
 export type SubmissionResult =
-  | { readonly tag: 'accepted'; readonly intentId: IntentId }
-  | { readonly tag: 'backpressured' };
+  { readonly tag: 'accepted'; readonly intentId: IntentId } | { readonly tag: 'backpressured' };
 
 export const REJECTION_REASONS = [
   'anchor-moved',
@@ -157,6 +164,7 @@ function operationTexts(operation: Operation): readonly string[] {
       return [operation.name];
     case 'insert-node':
       return [operation.source];
+    case 'remove-node':
     case 'move-node':
       return [];
     case 'rename-binding':
@@ -166,6 +174,7 @@ function operationTexts(operation: Operation): readonly string[] {
         ? [operation.property, operation.declaration.value]
         : [operation.property];
     case 'apply-code-patch':
+    case 'revert-splices':
       return operation.hunks.map((hunk) => hunk.text);
     case 'edit-frontmatter-slot':
     case 'replace-source':
@@ -198,6 +207,7 @@ function checkOperationAnchor(operation: Operation, anchor: AnchorRef): void {
       requireKind(operation.tag, isAttributeHost(kind));
       return;
     case 'insert-node':
+    case 'remove-node':
       requireKind(operation.tag, isNodeKind(kind));
       return;
     case 'move-node':
@@ -209,8 +219,13 @@ function checkOperationAnchor(operation: Operation, anchor: AnchorRef): void {
       requireSites(operation.tag, anchor.span, operation.sites);
       return;
     case 'apply-code-patch':
+    case 'revert-splices':
       requireKind(operation.tag, kind === 'document');
-      requireSites(operation.tag, anchor.span, operation.hunks.map((hunk) => hunk.span));
+      requireSites(
+        operation.tag,
+        anchor.span,
+        operation.hunks.map((hunk) => hunk.span),
+      );
       return;
     case 'edit-frontmatter-slot':
       requireKind(operation.tag, kind === 'frontmatter');
@@ -311,6 +326,8 @@ function parseOperation(input: unknown): Operation {
         placement: parsePlacement(record['placement']),
         source: payloadText(record['source'], 'Operation.source'),
       };
+    case 'remove-node':
+      return { tag };
     case 'move-node':
       return {
         tag,
@@ -322,6 +339,7 @@ function parseOperation(input: unknown): Operation {
     case 'set-inline-style':
       return parseSetInlineStyle(record);
     case 'apply-code-patch':
+    case 'revert-splices':
       return { tag, hunks: parseHunks(record['hunks']) };
     case 'edit-frontmatter-slot':
       return {
@@ -368,7 +386,11 @@ function parseSetInlineStyle(record: Record<string, unknown>): Operation {
     return { tag: 'set-inline-style', property, declaration: { tag } };
   }
   if (tag === 'set') {
-    const value = boundedText(declaration['value'], 'Operation.declaration.value', LIMITS.attrCharsMax);
+    const value = boundedText(
+      declaration['value'],
+      'Operation.declaration.value',
+      LIMITS.attrCharsMax,
+    );
     return { tag: 'set-inline-style', property, declaration: { tag, value } };
   }
   throw new Error(`Operation.declaration.tag: unknown value ${JSON.stringify(tag)}`);
@@ -392,7 +414,10 @@ function parseAttributeValue(input: unknown): AttributeValue {
     return { type };
   }
   if (type === 'string' || type === 'expr') {
-    return { type, value: boundedText(record['value'], 'Operation.value.value', LIMITS.attrCharsMax) };
+    return {
+      type,
+      value: boundedText(record['value'], 'Operation.value.value', LIMITS.attrCharsMax),
+    };
   }
   throw new Error(`Operation.value.type: unknown value ${JSON.stringify(type)}`);
 }
@@ -424,7 +449,11 @@ export function parseOutcome(input: unknown): Outcome {
   const tag = record['tag'];
   switch (tag) {
     case 'applied': {
-      const ranges = boundedArray(record['changedRanges'], 'Outcome.changedRanges', LIMITS.splicesPerIntentMax);
+      const ranges = boundedArray(
+        record['changedRanges'],
+        'Outcome.changedRanges',
+        LIMITS.splicesPerIntentMax,
+      );
       const changedRanges = ranges.map((range, index) =>
         parseByteSpan(range, `Outcome.changedRanges[${index}]`),
       );
@@ -437,7 +466,11 @@ export function parseOutcome(input: unknown): Outcome {
       return { tag, intentId, reason: parseRejectionReason(record['reason'], 'Outcome.reason') };
     case 'uncertain': {
       const candidate = record['candidateChecksum'];
-      return { tag, intentId, candidateChecksum: candidate === undefined ? undefined : digest(candidate) };
+      return {
+        tag,
+        intentId,
+        candidateChecksum: candidate === undefined ? undefined : digest(candidate),
+      };
     }
     default:
       throw new Error(`Outcome.tag: unknown value ${JSON.stringify(tag)}`);

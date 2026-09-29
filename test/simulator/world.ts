@@ -55,8 +55,14 @@ import {
 import { SIMULATOR_PROJECTOR } from './candidate.ts';
 import { planEngine } from './engine-planner.ts';
 import { FakeDisk } from './fake-disk.ts';
-import { checkBounds, checkCommitted, checkGeneration, checkOutcome, checkQuiescent } from './invariants.ts';
-import { oracleIntent } from './oracle-intent.ts';
+import {
+  checkBounds,
+  checkCommitted,
+  checkGeneration,
+  checkOutcome,
+  checkQuiescent,
+} from './invariants.ts';
+import { oracleIntent, oracleSplices } from './oracle-intent.ts';
 import { ORACLE_SCENARIOS, type OracleScenario } from './oracles.ts';
 import { Prng } from './prng.ts';
 import { sha256, snapshotOf } from './project.ts';
@@ -69,6 +75,7 @@ import {
 } from './provenance.ts';
 import {
   checkMappingReference,
+  judgeOracleRemap,
   judgeRemap,
   type RemapDecision,
   type RemapVerdict,
@@ -314,8 +321,11 @@ class World {
   // ones are the identity mapping and only counted.
   private judgePlanning(submission: Submission, result: ActorStep): void {
     const intent = submission.intent;
+    const gesture = this.gestures.get(intent.id);
     if (intent.operation.tag !== 'set-attribute') {
-      return;
+      if (gesture === undefined) {
+        return; // A code save: never mapped, so never judged.
+      }
     }
     // The simulated client always sends the snapshot it authored against.
     assert(submission.authored !== undefined, 'Simulated intents carry their authored bytes');
@@ -343,8 +353,14 @@ class World {
       ),
       decision,
     };
-    this.count(checkMappingReference(input) ? 'reference:agreed' : 'reference:skipped');
     this.countAge(intent.file, head.authored.checksum, current.checksum);
+    if (intent.operation.tag !== 'set-attribute') {
+      const step = gesture?.scenario.steps[gesture.next - 1];
+      assert(step !== undefined, 'A judged gesture intent is one of its scenario steps');
+      this.countVerdict(intent.file, judgeOracleRemap(input, oracleSplices(step)));
+      return;
+    }
+    this.count(checkMappingReference(input) ? 'reference:agreed' : 'reference:skipped');
     this.countVerdict(intent.file, judgeRemap(input));
   }
 
@@ -508,7 +524,9 @@ class World {
       return;
     }
     const targets = projection.nodes.flatMap((node) =>
-      node.attributes.filter((attribute) => attribute.type === 'string').map((attribute) => ({ node, attribute })),
+      node.attributes
+        .filter((attribute) => attribute.type === 'string')
+        .map((attribute) => ({ node, attribute })),
     );
     if (targets.length === 0) {
       this.log('  skip: no string attribute in view');
@@ -516,7 +534,11 @@ class World {
     }
     const { node, attribute } = this.prng.pick(targets);
     const name = this.prng.chance(1, 10) ? 'data-absent' : attribute.name;
-    const anchor = toAnchorRef({ span: node.span, path: node.path.map(toChildIndex), expectedKind: node.kind });
+    const anchor = toAnchorRef({
+      span: node.span,
+      path: node.path.map(toChildIndex),
+      expectedKind: node.kind,
+    });
     const value = { type: 'string' as const, value: this.prng.pick(ATTRIBUTE_VALUES) };
     this.submit(
       toIntent({
@@ -565,7 +587,11 @@ class World {
 
   // A gesture's next step goes out only after the previous one is applied, and
   // only while its own file still holds the oracle's input bytes (plan §3.3).
-  private continueGesture(scenario: OracleScenario, index: number, previous: Outcome | undefined): void {
+  private continueGesture(
+    scenario: OracleScenario,
+    index: number,
+    previous: Outcome | undefined,
+  ): void {
     if (previous !== undefined) {
       if (previous.tag !== 'applied') {
         this.log(`  gesture cancelled after ${previous.tag}`);
@@ -627,7 +653,10 @@ class World {
     if (line === lines.length) {
       this.insertExternally(path, utf8ByteLength(text), `\n${inserted}`, 'external-edit');
     } else {
-      const before = lines.slice(0, line).map((kept) => `${kept}\n`).join('');
+      const before = lines
+        .slice(0, line)
+        .map((kept) => `${kept}\n`)
+        .join('');
       this.insertExternally(path, utf8ByteLength(before), `${inserted}\n`, 'external-edit');
     }
   }

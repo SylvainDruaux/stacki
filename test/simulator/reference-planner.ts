@@ -55,15 +55,23 @@ export function planByIdentity(snapshot: Snapshot, intent: Intent): Result<Plan,
       const splices = operation.hunks.map((hunk) => spliceAt(snapshot.bytes, hunk.span, hunk.text));
       return ok({ splices, postKinds: [], candidate: 'may-be-invalid' });
     }
+    case 'revert-splices': {
+      // Step 6: a revert restores bytes, so a parsing file must keep parsing.
+      const splices = operation.hunks.map((hunk) => spliceAt(snapshot.bytes, hunk.span, hunk.text));
+      const candidate = snapshot.projection.tag === 'valid' ? 'must-parse' : 'may-be-invalid';
+      return ok({ splices, postKinds: [], candidate });
+    }
     case 'set-attribute':
     case 'rename-binding':
     case 'edit-frontmatter-slot':
       return planVisual(snapshot, intent);
     case 'remove-attribute':
     case 'insert-node':
+    case 'remove-node':
     case 'move-node':
     case 'set-inline-style':
-      // Planned from step 6 (gesture expansion); rejected visibly until then.
+      // Planned from step 6 by the shipping planner only; this reference stays
+      // the step-1 identity planner for the operations it was written for.
       return err('unsupported-operation');
     default: {
       const exhaustive: never = operation;
@@ -76,10 +84,12 @@ function isVisual(tag: Intent['operation']['tag']): boolean {
   switch (tag) {
     case 'replace-source':
     case 'apply-code-patch':
+    case 'revert-splices':
       return false;
     case 'set-attribute':
     case 'remove-attribute':
     case 'insert-node':
+    case 'remove-node':
     case 'move-node':
     case 'rename-binding':
     case 'set-inline-style':
@@ -95,12 +105,14 @@ function isVisual(tag: Intent['operation']['tag']): boolean {
 function staleReason(tag: Intent['operation']['tag']): RejectionReason {
   switch (tag) {
     case 'replace-source':
+    case 'revert-splices':
       return 'region-externally-modified';
     case 'apply-code-patch':
       return 'merge-conflict';
     case 'set-attribute':
     case 'remove-attribute':
     case 'insert-node':
+    case 'remove-node':
     case 'move-node':
     case 'rename-binding':
     case 'set-inline-style':

@@ -398,12 +398,14 @@ function staleWithoutBytes(intent: Intent): RejectionReason {
   const operation = intent.operation;
   switch (operation.tag) {
     case 'replace-source':
+    case 'revert-splices':
       return 'region-externally-modified';
     case 'apply-code-patch':
       return 'merge-conflict';
     case 'set-attribute':
     case 'remove-attribute':
     case 'insert-node':
+    case 'remove-node':
     case 'move-node':
     case 'rename-binding':
     case 'set-inline-style':

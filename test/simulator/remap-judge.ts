@@ -30,7 +30,9 @@ import { mapSpan, type SpanMapping } from '../../dist/shared/mapSpan.js';
 import type { Plan } from '../../dist/shared/planner.js';
 import type { Snapshot } from '../../dist/shared/snapshot.js';
 import type { ProjectedNode, Projection } from '../../dist/shared/source-projection.js';
-import { toByteSpan, type ByteSpan } from '../../dist/shared/span.js';
+import { toByteSpan, type ByteSpan, type ByteString } from '../../dist/shared/span.js';
+import { applySplices } from '../../dist/shared/splice.js';
+import type { Splice } from '../../dist/shared/planner.js';
 import { survivingSpan, type Origins } from './provenance.ts';
 import { referenceMapSpan, referenceTables } from './reference-diff.ts';
 
@@ -105,6 +107,11 @@ export function judgeRemap(input: RemapCase): RemapVerdict {
     if (survivor === undefined) {
       return { tag: 'rejected-gone', reason };
     }
+    if (named.length === 0) {
+      // Step 6: an absent attribute is inserted; the element survived, so a
+      // refusal kept it from nothing it could conflict with.
+      return { tag: 'conservative', reason };
+    }
     assert(named.length === 1, 'A mapping decision was reached for one named attribute');
     const [attribute] = named;
     assert(attribute !== undefined, 'The named attribute exists');
@@ -115,7 +122,7 @@ export function judgeRemap(input: RemapCase): RemapVerdict {
     }
     return { tag: 'rejected-conflict', reason };
   }
-  const target = plannedTarget(current, operation.name, decision.plan);
+  const target = plannedTarget(current, input.current.bytes, decision.plan);
   if (survivor === undefined) {
     return { tag: 'wrong-site', detail: `${describe(input, target)}; the element is gone` };
   }
@@ -124,6 +131,64 @@ export function judgeRemap(input: RemapCase): RemapVerdict {
   }
   const detail = `${describe(input, target)}; the element is at ${survivor.span.start}`;
   return { tag: 'wrong-site', detail };
+}
+
+/** Judging a stale oracle gesture step (step 6: every operation maps). The
+ * oracle's hand-derived splices name the authored bytes the edit replaces; if
+ * the origins show each of those ranges survived whole, the right result is
+ * the current file with the same replacements at the surviving ranges, and the
+ * plan must write exactly that. Where a range did not survive, there is no
+ * ground truth to compare with: unjudged. */
+export function judgeOracleRemap(
+  input: RemapCase,
+  authoredSplices: readonly Splice[],
+): RemapVerdict {
+  assert(input.authored.checksum !== input.current.checksum, 'Only stale intents are judged');
+  const decision = input.decision;
+  if (input.authoredOrigins === undefined || input.currentOrigins === undefined) {
+    return { tag: 'unjudged', decision: decision.tag };
+  }
+  if (input.replacedWhole) {
+    return { tag: 'unjudged', decision: decision.tag };
+  }
+  const authoredOrigins = input.authoredOrigins;
+  const currentOrigins = input.currentOrigins;
+  const survived = authoredSplices.map((splice) => ({
+    splice,
+    span: survivingSpan(authoredOrigins, splice.range, currentOrigins),
+  }));
+  const whole = survived.every((entry) => entry.span !== undefined);
+  if (decision.tag === 'rejected') {
+    if (!MAPPING_REASONS.includes(decision.reason)) {
+      return { tag: 'other', reason: decision.reason };
+    }
+    return whole
+      ? { tag: 'conservative', reason: decision.reason }
+      : { tag: 'rejected-conflict', reason: decision.reason };
+  }
+  if (!whole) {
+    return { tag: 'unjudged', decision: decision.tag };
+  }
+  const moved: Splice[] = survived.map(({ splice, span }) => {
+    assert(span !== undefined, 'Every range survived');
+    return { ...splice, range: span };
+  });
+  const expected = applySplices(input.current.bytes, moved);
+  const actual = applySplices(input.current.bytes, decision.plan.splices);
+  // Up to whitespace runs: a removal range that starts at a line break keeps
+  // its origin when another writer turns LF into CRLF, and replaying it leaves
+  // the new `\r` behind, where the planner — reading the current bytes — takes
+  // it too (seed 5). Which element was edited, and how, survives the collapse.
+  if (collapsed(expected) === collapsed(actual)) {
+    return { tag: 'applied-correct' };
+  }
+  const { id, file, operation } = input.intent;
+  const detail = `${id} ${operation.tag} on ${file}: another result`;
+  return { tag: 'wrong-site', detail };
+}
+
+function collapsed(bytes: ByteString): string {
+  return Buffer.from(bytes).toString('utf8').replace(/\s+/g, ' ');
 }
 
 /** Fast mapper and brute-force reference agree on the planner's region, and
@@ -167,10 +232,19 @@ function checkDecisionFollowsMapping(
     assert(mapping.tag === 'resolved', 'A stale plan follows a resolved mapping');
     const [splice] = decision.plan.splices;
     assert(splice !== undefined, 'A set-attribute plan has a splice');
-    const value = node.attributes.find((attribute) => attribute.name === name)?.valueSpan;
-    assert(value !== undefined, 'A planned attribute had a value when authored');
     const shift = mapping.span.start - region.start;
-    assert(splice.range.start === value.start + shift, 'The splice sits at the mapped value');
+    const value = node.attributes.find((attribute) => attribute.name === name)?.valueSpan;
+    if (value !== undefined) {
+      if (splice.range.end - splice.range.start === value.end - value.start) {
+        if (splice.expectedBytes.length === value.end - value.start) {
+          assert(splice.range.start === value.start + shift, 'The splice sits at the mapped value');
+          return;
+        }
+      }
+    }
+    // A re-quoted or a new attribute: inside the mapped region, its end included.
+    assert(splice.range.start >= mapping.span.start, 'The splice lies in the mapped region');
+    assert(splice.range.end <= mapping.span.end, 'The splice ends in the mapped region');
     return;
   }
   const reason = decision.reason;
@@ -231,20 +305,44 @@ function survivingElement(
   });
 }
 
-function plannedTarget(current: ValidProjection, name: string, plan: Plan): ProjectedNode {
+// The current tag whose attributes the splice edits: from step 6 a value, a
+// whole re-quoted attribute, or a new one after the last. A tag's attribute
+// region runs from its `<` to its last attribute (or its name); nested tags'
+// regions never overlap, so exactly one contains the splice.
+function plannedTarget(current: ValidProjection, bytes: ByteString, plan: Plan): ProjectedNode {
   assert(plan.splices.length === 1, 'A set-attribute plan is one splice');
   const [splice] = plan.splices;
   assert(splice !== undefined, 'The splice exists');
-  const target = current.nodes.find((node) =>
-    node.attributes.some((attribute) => {
-      if (attribute.name === name) {
-        return attribute.valueSpan?.start === splice.range.start;
-      }
-      return false;
-    }),
-  );
-  assert(target !== undefined, 'The splice lands on an attribute value of a current node');
+  const owners = current.nodes.filter((node) => {
+    const end = attributesEnd(bytes, node);
+    return node.span.start < splice.range.start && splice.range.end <= end;
+  });
+  const [target] = owners;
+  assert(owners.length === 1, 'The splice edits the attributes of one current tag');
+  assert(target !== undefined, 'The splice lands in the attributes of a current tag');
   return target;
+}
+
+// Rebuilt from the definition, not borrowed from the planner.
+function attributesEnd(bytes: ByteString, node: ProjectedNode): number {
+  if (node.kind !== 'element' && node.kind !== 'component' && node.kind !== 'raw') {
+    return -1;
+  }
+  let nameEnd = node.span.start + 1;
+  for (; nameEnd < node.span.end; nameEnd++) {
+    const byte = bytes[nameEnd];
+    if (
+      byte === 0x20 ||
+      byte === 0x09 ||
+      byte === 0x0a ||
+      byte === 0x0d ||
+      byte === 0x2f ||
+      byte === 0x3e
+    ) {
+      break;
+    }
+  }
+  return node.attributes.reduce((last, attribute) => Math.max(last, attribute.span.end), nameEnd);
 }
 
 function otherRejection(decision: RemapDecision): RemapVerdict {
