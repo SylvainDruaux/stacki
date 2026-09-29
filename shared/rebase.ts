@@ -140,11 +140,16 @@ export function rebaseIntent(
       (image, record) => (image === undefined ? undefined : rebaseSpan(image, record.splices)),
       span,
     );
+  const untouched = (span: ByteSpan): ByteSpan | undefined =>
+    chain.reduce<ByteSpan | undefined>(
+      (image, record) => (image === undefined ? undefined : shiftUntouched(image, record.splices)),
+      span,
+    );
   const anchor = rebaseAnchor(intent.anchor, through, current);
   if (!anchor.ok) {
     return anchor;
   }
-  const operation = rebaseOperation(intent.operation, through, current);
+  const operation = rebaseOperation(intent.operation, { through, untouched }, current);
   if (!operation.ok) {
     return operation;
   }
@@ -160,6 +165,32 @@ export function rebaseIntent(
 }
 
 type Through = (span: ByteSpan) => ByteSpan | undefined;
+
+/** Images through the chain: `through` lets a span hold a change made inside
+ * it (a value edited inside an element leaves the same element); `untouched`
+ * gives an image only to a span no commit changed or touched. */
+interface Images {
+  readonly through: Through;
+  readonly untouched: Through;
+}
+
+/** The image of `span` after `splices` that changed none of its bytes and
+ * none at its edges; undefined when one did. A code patch's hunk replaces the
+ * bytes it was authored against: a commit inside it changed those bytes, and
+ * one at its edge cannot be ordered against it (shared/code-patch.ts). */
+export function shiftUntouched(span: ByteSpan, splices: readonly Splice[]): ByteSpan | undefined {
+  for (const splice of splices) {
+    if (splice.range.start <= span.end) {
+      if (span.start <= splice.range.end) {
+        return undefined;
+      }
+    }
+  }
+  const image = rebaseSpan(span, splices);
+  assert(image !== undefined, 'A span no splice touches has an image');
+  assert(image.end - image.start === span.end - span.start, 'An untouched span keeps its length');
+  return image;
+}
 
 function rebaseAnchor(
   anchor: AnchorRef,
@@ -215,9 +246,10 @@ function rebaseAnchor(
 
 function rebaseOperation(
   operation: Operation,
-  through: Through,
+  images: Images,
   current: Snapshot,
 ): Result<Operation, RejectionReason> {
+  const { through } = images;
   switch (operation.tag) {
     case 'set-attribute':
     case 'remove-attribute':
@@ -240,9 +272,12 @@ function rebaseOperation(
     }
     case 'apply-code-patch':
     case 'revert-splices': {
+      // A code patch replaces only the bytes it was written against: a commit
+      // inside a hunk or at its edge is a merge conflict, never overwritten
+      // (step 8). Reverts keep step 6's images.
       const spans = rebaseSpans(
         operation.hunks.map((hunk) => hunk.span),
-        through,
+        operation.tag === 'apply-code-patch' ? images.untouched : through,
       );
       if (spans === undefined) {
         return err(

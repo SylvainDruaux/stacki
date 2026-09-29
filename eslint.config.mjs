@@ -113,6 +113,7 @@ const DETERMINISM_RULES = {
 // Pure engine contracts, fenced like the simulator: they will run inside it.
 const ENGINE_CONTRACTS = [
   'shared/capability.ts',
+  'shared/code-patch.ts',
   'shared/diff.ts',
   'shared/documentActor.ts',
   'shared/intent.ts',
