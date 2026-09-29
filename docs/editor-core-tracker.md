@@ -762,7 +762,7 @@ nothing ships to the app except the output-identical parser fixes):
 - Gate: 154/154 test commands, 248.8 s, exit 0. `test:simulator` 50/50.
   2 000 seeds with `wrongSite: 'fail'`: pass.
 
-### Step 5 — Actor and write protocol ⬜
+### Step 5 — Actor and write protocol ✅
 
 **Deliverables.** Bounded intent queue, per-intent typed outcomes
 (`accepted` / `backpressured`; terminal `applied` / `rejected` /
@@ -782,6 +782,194 @@ and the crash-between-replace-and-verify reconciliation that produces
 and metadata are preserved, symlink policy, canonical paths on
 case-insensitive filesystems. `component:editProperties` runs through the
 actors as a batch, acquired in sorted canonical-path order.
+
+**Landed 2026-09-28** on `editor-core/step4-revision` in `0411fe6`.
+Gate `env -u ELECTRON_RUN_AS_NODE npm test`: 155/155
+test commands, 213.6 s, exit 0 (154 + the new `test:platform`; static checks
+tsc, eslint 0 errors, `ratchet-check` 0, `adapter-surface` at baseline). Simulator long run
+(`STACKI_SIMULATOR_SEEDS=2000`, `wrongSite: 'fail'`): 2 000 seeds × 400
+steps, every seed twice, 0 wrong-site plans, 702 s — W still holds with the
+shipped actor and the new lock and replace-failure events. Where each
+deliverable lives:
+
+- **The actor** (`shared/documentActor.ts`, engine-fenced like the planner):
+  the simulator's step-wise actor promoted, so the simulator now drives the
+  state machine that ships. idle → planned → written → idle over an injected
+  `DocumentDisk` (read, advisory lock, atomic replace), planner and
+  `Projector`. `submitIntent` returns `backpressured` at `intentsPendingMax`
+  (never a drop); every accepted intent reaches one `Outcome`; the actor never
+  retries or merges. New since the simulator's version: the §5.2 step-7 lock,
+  held from the re-read through the verifying read; `uncertain` with the
+  candidate checksum when a replace landed without a flushed directory or its
+  read-back fails; `refreshActor` (the watcher-tick read); a pure
+  `reconcileUncertain` (applied / not applied / changed again). The honest-
+  limit product contract is the module header, at the write site.
+- **Splices and planning:** `shared/splice.ts` (moved from the simulator: one
+  implementation for both); `shared/planner.ts` plans `replace-source` — one
+  whole-file splice witnessed by the authored bytes, never mapped — and agrees
+  with the step-1 reference on all 60 fixture files, fresh, stale and with a wrong
+  anchor length (`planner.test.ts`).
+- **The real disk** (`electron/documentDisk.ts` over `electron/atomicWrite.ts`):
+  bounded reads; the lock is a lock file beside the target (Node has no
+  portable `flock`), naming pid, host and token, broken when its owner process
+  is gone or it is older than 10 s; replace = `wx` temp in the target's
+  directory, mode and owner kept (refused if the owner cannot be kept), fsync,
+  rename, directory fsync (EIO → `not-durable`; EINVAL and kin, and Windows →
+  the platform's promise); a dangling symlink is refused; creation is
+  exclusive. Canonical key: directory identity (device, inode) plus the name,
+  case-folded where a probe shows the directory ignores case; a key whose path
+  changed replaces its idle actor (found by the suite: see below).
+  `writeFileAtomic` is deleted, not left unused.
+- **The host** (`electron/documentActors.ts`, `electron/documentWrites.ts`): one
+  per main process, stepping each submission to its outcome before returning
+  (main's handlers run one at a time; this keeps the check-to-use window as
+  narrow as the protocol allows and the write order the legacy order).
+  Bounded by `documentActorsMax` 512 and `documentBytesRetainedMax` 64 MB
+  (new, `shared/limits.ts`; least recently used idle actors dropped). The
+  watcher's outside changes mark actors dirty and refresh them on the next
+  tick, off the intent path (§7; carried from step 4). `withLeases` takes a
+  batch's actors in sorted canonical order.
+- **Single writer.** `page:write` / `page:writeRaw` submit `replace-source`
+  witnessed by the renderer's `baseChecksum`, and the style re-write is one
+  more, witnessed by the checksum just written; every chunk file has its own
+  actor. Beyond the plan's page / chunk / stylesheet, every other writer of
+  project text moved too — `style:writeFile`, `src:writeText`,
+  `assets:writeText`, the CMS and asset handlers that edit pages, `cms:delete`
+  importer rewrites, `cssVars` (9 sites), content entries, git conflict
+  resolution — through `writeProjectText` (witnessed by the bytes on disk at
+  that moment) or `createProjectText` (`page:create`, `page:move`,
+  `component:create`, `cms:create`: never overwrites). Reason: any of them
+  writing a page outside the actor is the two-writer hole of §3.3.
+  `test/contracts/single-writer.test.ts` inventories every file-writing call
+  in `electron/` against an allowlist with a reason per entry (userData state,
+  `.stacki` metadata, the generated preview harness, new-project scaffolding,
+  moves) and pins one owner each for the write primitives, the disk and the
+  host. Every `applied` outcome returns the checksum the renderer's saver
+  already adopts as its next baseline (`src/App.tsx` `pageWriteOutcome`).
+- **Property batches** (`electron/componentProperties.ts`): leased in sorted
+  canonical order, each file witnessed by its `before` checksum, bounded by
+  `PROPERTY_LIMITS.filesMax`; the checked rollback is intents too, witnessed
+  by the batch's own bytes, so a file changed since is named, not restored.
+- **Wire contract:** `page:write` errors gain `uncertain` (the host reconciles
+  at once; only an unreadable file reaches the renderer) and `backpressured`
+  (`shared/page-save.ts`, `shared/ipc-results.ts`); the renderer keeps the
+  edits unsaved for both, so a write that did land returns as a visible
+  conflict on the next save.
+- **Telemetry** (`electron/documentTelemetry.ts`, §9a): one counter and one
+  JSON line on stdout per outcome, backpressure, save-guard conflict and
+  leaked lock — event, 16-hex path hash, intent id, outcome, reason, running
+  count; no path, no bytes (pinned in `test/document-actors.test.js`).
+- **Adapter surface:** a fifth ratchet counter, `replace-source` submission
+  sites in `electron/` (plan §3.3), baseline **23**; the other four unchanged
+  at 70 / 9 / 28 / 4.
+
+**Platform suite** (`test/platform/`, `npm run test:platform`, in the gate):
+12 tests, 0 skipped on this machine — WSL2 ext4, and NTFS through drvfs with
+Windows interop.
+
+- `filesystem.test.js`: permission bits kept (0644, 0600, 0755, 0640, 0664)
+  under umask 077, owner and group kept, a new inode; flush order — fsync of
+  the staged file, the rename, fsync of the directory; the directory entry
+  replaced in place with nothing staged left; a symlink written through with
+  the link kept, a symlinked folder reaching one actor, a dangling link
+  refused; a second process reading continuously through 60 saves sees only
+  whole versions; two names differing in case are two files on ext4.
+- `processes.test.js`: 4 processes × 40 rounds lose no update, and every
+  refusal is a race; SIGKILL after the rename reconciles to `applied`, before
+  it to `not-applied`, and after an outside write to `changed-again`; the dead
+  writer's lock is broken by the next writer.
+- `windows.test.js`: on NTFS, a file held open by a Windows process without
+  delete sharing makes the save `write-failed` with the target untouched and
+  nothing left behind; with delete sharing it applies; every spelling of a
+  name is one actor and one lock.
+
+A cooperating-writers run for the record: 34 applied, 126 refused of 160
+rounds (a held lock is `write-race`; the actor never retries).
+
+**Parity run** (`test/legacy-parity.bench.js`, not in the gate: it needs the
+legacy build). The legacy main process of `a881aee` compiled in a scratch
+worktree, loaded by the windowless harness beside the current one; each
+gesture runs through both builds' real IPC handlers on twin project copies,
+then every file is compared byte for byte, and the replies by outcome.
+**213 of 213 gestures identical**: 52 fixtures (corpus, round-trip,
+editor-core; `.astro`, `.md`, `.mdx`) × save / raw save / stale save / no-op
+save, plus a chunk page edited inside its `.html` chunk, a stylesheet save, a
+code-window save, and `component:editProperties` (a prop rename across a
+component and two consumers, and an option rename). What they did: 42 saves
+and 52 raw saves changed bytes, 52 stale saves were refused as conflicts
+alike, 10 saves and 46 no-op saves changed nothing, 6 no-op saves reformatted
+(the legacy serializer, reproduced identically by both), and the five project
+scenarios all changed bytes.
+
+**Save latency** (`test/save-latency.bench.js`, `page:write` through both
+builds, interleaved, 20 samples, load 1.23 at start), p50 / p95 ms:
+
+| File | Legacy | Actor |
+|---|---|---|
+| largest corpus page (2.7 KB) | 6.8 / 10.7 | 11.9 / 14.2 |
+| nodes-25 | 101.6 / 111.6 | 108.3 / 119.6 |
+| nodes-50 | 198.2 / 206.8 | 208.0 / 226.1 |
+
+The first version cost 2× (nodes-25 246.6 p50): the actor projected every
+candidate, which nothing reads for a `replace-source`. Snapshots in the app now
+derive their projection on first read (`createLazySnapshot`,
+`shared/snapshot.ts`; a visual intent's planner reads it and pays as before).
+The remaining difference is the directory flush, the lock file and the extra
+reads — the protocol's durability and exclusion.
+
+Found by step 5 and fixed:
+
+- **Actor identity across a reused inode.** The component-properties suite
+  deletes each temp project; the next `mkdtemp` directory reused the inode, so
+  a directory-identity key reached an actor for the deleted path. A key whose
+  path changed now replaces its idle actor (the actor holds only a cache).
+- **No directory flush.** The step-0 write fsynced the file but not the
+  directory, so the rename itself could be lost to a power cut.
+- **Ownership and dangling links.** A rename-replace silently gave another
+  user's file to the saver, and a dangling symlink was replaced by a regular
+  file; both are now refused.
+- **Raw writers.** The style panel's stylesheet save, code windows, CMS and
+  asset edits into pages, and `cssVars` wrote with truncating `writeFileSync`,
+  unguarded; `page:create` checked existence, then wrote. All go through
+  actors now; creation is exclusive.
+
+Deviations, with reasons:
+- The single-writer rule covers all project text, not only page / chunk /
+  stylesheet (above). Moves, renames and deletes stay outside the actors: they
+  write no bytes; a moved file's next write re-keys its actor.
+- `lastKnownBytes`, decided: the renderer sends no bytes; the actor keeps its
+  current snapshot only, and a stale intent without authored bytes is refused
+  with its operation's stale reason. The simulator still sends authored
+  snapshots (`Submission.authored` is optional) so stale visual intents stay
+  mapped there. The splice log is not built (no mapped intent ships yet).
+- The host is synchronous, so production never queues; backpressure is
+  reached by the simulator and by the host's deferred mode in tests.
+- No lint fence on the write primitives: `no-restricted-syntax` lists replace
+  each other per block; the static inventory enforces more (every write API,
+  every file) and names its reasons.
+- Files over `sourceBytesMax` are no longer written by git conflict resolution
+  or the CMS editors (the actor's bounded read refuses them); the legacy
+  writers had no bound.
+- Bench write stages now include the directory flush
+  (`test/simulator/verified-write.entry.ts`); re-runs are not comparable
+  one-to-one with the step-3/4 numbers.
+- `cssVars.renameVariables` lost its `markWrite` option: `writeProjectText`
+  notes the self-write itself.
+
+Left open, carried to step 6 and later:
+- Chunk files are witnessed by their bytes at write time, not by a renderer
+  checksum; an outside edit to a chunk since the page opened is still replaced.
+- The save path reparses for its reply (the legacy `PageModel`), as before.
+- SHA-256 passes per save grew (guard, refresh, lock re-read, verify,
+  candidate); measured cheap above; dedupe carried.
+- A crash before the rename leaves an inert `.stacki-write-*.tmp` (ignored by
+  the watcher); nothing sweeps it.
+- The platform suite ran on Linux (ext4) and NTFS via WSL; macOS and native
+  Windows are unrun here. macOS `fsync` does not reach the drive cache
+  (`F_FULLFSYNC` is not exposed by Node).
+- Telemetry counts live in the process and its log; nothing aggregates them.
+- The stale-plan per-byte assertions and code-mode `/ ? :` hosts (step 4) are
+  untouched.
 
 ### Step 6 — Gesture expansion ⬜
 
@@ -1380,6 +1568,26 @@ update on every step):
   - `env -u ELECTRON_RUN_AS_NODE npm test` — **pass, 154/154 test commands in
     232.7 s, exit 0.**
   - Every line of this file ≤ 100 columns (one step-0 line rewrapped).
+
+- 2026-09-28, step 5 (PROMPT-5), `0411fe6` on top of `a881aee`:
+  - `env -u ELECTRON_RUN_AS_NODE npm test` — **pass, 155/155 test commands in
+    213.6 s, exit 0** (static checks: tsc, eslint 0 errors, `ratchet-check` 0,
+    `adapter-surface` 70 / 9 / 28 / 4 and the new replace-source counter at
+    its baseline, 23). A first gate run failed three commands (151/154): the
+    harness loads main twice per process (the host install now replaces an
+    idle host), and two tests pinned the watcher's text before the new hint.
+  - `npm run test:contracts` **211/211**, `npm run test:simulator` **64/64**,
+    `npm run test:platform` **12/12, 0 skipped** (ext4 and NTFS via WSL
+    interop). `STACKI_SIMULATOR_SEEDS=2000 node --test
+    test/simulator/simulator.test.ts` — green in 702 s, `wrongSite: 'fail'`.
+  - Parallel run: `STACKI_LEGACY_DIST=<worktree at a881aee>/dist node
+    test/legacy-parity.bench.js` — 213 of 213 gestures identical. The legacy
+    build: `git worktree add --detach <dir> a881aee`, `node_modules`
+    symlinked, `tsc -p shared/tsconfig.json` and `tsc -p
+    electron/tsconfig.json` there. `test/save-latency.bench.js` against the
+    same build, twice (before and after lazy projections), numbers in Step 5.
+  - Formatting: new modules through Prettier 3.9.9 (npx cache, as step 2);
+    every added line ≤ 100 columns.
 
 ## How to work this tracker
 
