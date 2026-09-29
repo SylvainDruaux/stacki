@@ -103,6 +103,10 @@ const REQUIRED_TALLIES = [
   'remap:conservative anchor-moved',
   'remap:rejected-conflict anchor-moved',
   'reference:agreed',
+  // Step 6: undo on the engine, fresh and after other writes, and refused.
+  'undo:planned',
+  'undo:mapped',
+  'undo:rejected region-externally-modified',
   // Not required: `rejected-gone` — no simulated writer deletes an element yet
   // (tracker Step 3, corpus gaps).
 ] as const;

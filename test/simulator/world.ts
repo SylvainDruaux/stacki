@@ -27,7 +27,9 @@ import {
   type Intent,
   type Outcome,
   type RejectionReason,
+  type SourceEdit,
 } from '../../dist/shared/intent.js';
+import { changedRanges, inverseEdits } from '../../dist/shared/splice.js';
 import { LIMITS } from '../../dist/shared/limits.js';
 import { toAnchorRef, toChildIndex } from '../../dist/shared/ref.js';
 import type { Snapshot } from '../../dist/shared/snapshot.js';
@@ -112,6 +114,17 @@ const HISTORY_MAX = 8;
 const ORIGINS_RETAINED_MAX = 512;
 /** Snapshots per file whose checksums the run remembers the actor holding. */
 const HELD_MAX = 16;
+/** Applied edits the run can undo (step 6): the most recent ones. */
+const UNDOABLE_MAX = 8;
+
+/** An applied edit and what Undo needs: its inverse, the bytes it left, and
+ * the origins of the bytes it wrote — the only bytes a revert may replace. */
+interface Undoable {
+  readonly file: FilePath;
+  readonly view: View;
+  readonly inverse: readonly SourceEdit[];
+  readonly written: ReadonlySet<number>;
+}
 
 /** A snapshot as the client saw it, with the disk generation it was read at. */
 interface View {
@@ -135,6 +148,7 @@ const EVENTS = [
   ['write-failure', 1],
   ['lock-contended', 1],
   ['burst', 1],
+  ['undo', 4],
 ] as const;
 
 type EventKind = (typeof EVENTS)[number][0];
@@ -180,6 +194,9 @@ class World {
   private readonly replacedWhole = new Map<FilePath, number[]>();
   private readonly authoredAt = new Map<string, number>();
   private readonly held = new Map<FilePath, Digest[]>();
+  // Step 6: applied edits Undo may revert, and the reverts in flight.
+  private undoable: Undoable[] = [];
+  private readonly undoing = new Map<string, Undoable>();
   private intents = 0;
 
   constructor(input: SimulationInput) {
@@ -276,6 +293,8 @@ class World {
         return this.disk.contendNextLock(this.pickPath());
       case 'burst':
         return this.burst(this.pickPath());
+      case 'undo':
+        return this.undo();
       default: {
         const exhaustive: never = kind;
         throw new Error(`Unknown event ${String(exhaustive)}`);
@@ -321,6 +340,10 @@ class World {
   // ones are the identity mapping and only counted.
   private judgePlanning(submission: Submission, result: ActorStep): void {
     const intent = submission.intent;
+    const undone = this.undoing.get(intent.id);
+    if (undone !== undefined) {
+      return this.judgeUndo(undone, intent, result);
+    }
     const gesture = this.gestures.get(intent.id);
     if (intent.operation.tag !== 'set-attribute') {
       if (gesture === undefined) {
@@ -417,6 +440,7 @@ class World {
         return this.record(effect.outcome);
       case 'committed':
         checkCommitted(effect);
+        this.rememberUndoable(effect, path);
         this.hold(path, effect.candidate.checksum);
         this.remember({ snapshot: effect.candidate, generation: effect.generation });
         this.log(`  commit ${effect.intent.id} ${effect.plan.splices.length} splice(s)`);
@@ -436,6 +460,102 @@ class World {
         throw new Error(`Unknown effect ${JSON.stringify(exhaustive)}`);
       }
     }
+  }
+
+  // --- Undo (step 6) ----------------------------------------------------------
+
+  // Every applied edit but a whole-file save or a revert can be undone: its
+  // inverse, authored against the bytes it left (plan §11 step 6).
+  private rememberUndoable(
+    effect: Extract<ActorEffect, { tag: 'committed' }>,
+    path: FilePath,
+  ): void {
+    const tag = effect.intent.operation.tag;
+    if (tag === 'replace-source' || tag === 'revert-splices') {
+      return;
+    }
+    const origins = this.origins.get(effect.generation);
+    if (origins === undefined) {
+      return;
+    }
+    const written = new Set<number>();
+    for (const range of changedRanges(effect.plan.splices)) {
+      for (let at = range.start; at < range.end; at++) {
+        const origin = origins[at];
+        assert(origin !== undefined, 'A changed byte has an origin');
+        written.add(origin);
+      }
+    }
+    const view = { snapshot: effect.candidate, generation: effect.generation };
+    const entry = { file: path, view, inverse: inverseEdits(effect.plan.splices), written };
+    this.undoable = [...this.undoable, entry].slice(-UNDOABLE_MAX);
+  }
+
+  // Undo one of them, whatever happened to its file since.
+  private undo(): void {
+    const entry = this.undoable.length === 0 ? undefined : this.prng.pick(this.undoable);
+    if (entry === undefined) {
+      this.log('  skip: nothing to undo');
+      return;
+    }
+    this.undoable = this.undoable.filter((candidate) => candidate !== entry);
+    if (entry.inverse.length === 0) {
+      return;
+    }
+    const snapshot = entry.view.snapshot;
+    const anchor = toAnchorRef({
+      span: toByteSpan(0, snapshot.bytes.length),
+      path: [],
+      expectedKind: 'document',
+    });
+    const intent = toIntent({
+      id: this.nextIntentId(),
+      file: entry.file,
+      authoredChecksum: snapshot.checksum,
+      anchor,
+      operation: { tag: 'revert-splices', hunks: entry.inverse },
+    });
+    if (this.submit(intent, entry.view)) {
+      this.undoing.set(intent.id, entry);
+    }
+  }
+
+  // A planned revert may replace only bytes the undone edit wrote: a byte of
+  // any other origin is an outside change the undo would revert (plan §11
+  // step 6 — maps or rejects, never reverts the outside change).
+  private judgeUndo(entry: Undoable, intent: Intent, result: ActorStep): void {
+    this.undoing.delete(intent.id);
+    const decision = decisionFor(intent, result);
+    if (decision === undefined) {
+      return;
+    }
+    if (decision.tag === 'rejected') {
+      this.count(`undo:rejected ${decision.reason}`);
+      return;
+    }
+    const origins = this.origins.get(result.state.generation);
+    // A git-style replacement since the edit re-originates every byte, and
+    // may write the very bytes the edit left: no byte rule can tell those
+    // apart (planner.test.ts, BYTES CANNOT TELL), so there is no ground truth.
+    const replaced = (this.replacedWhole.get(entry.file) ?? []).some(
+      (generation) => generation > entry.view.generation && generation <= result.state.generation,
+    );
+    if (origins === undefined || replaced) {
+      this.count('undo:unjudged');
+      return;
+    }
+    const stale = result.state.snapshot?.checksum !== entry.view.snapshot.checksum;
+    for (const splice of decision.plan.splices) {
+      for (let at = splice.range.start; at < splice.range.end; at++) {
+        const origin = origins[at];
+        assert(origin !== undefined, 'A reverted byte has an origin');
+        assert(
+          entry.written.has(origin),
+          `Undo reverts only its own bytes (seed ${this.input.seed})`,
+        );
+      }
+    }
+    this.count(stale ? 'undo:mapped' : 'undo:planned');
   }
 
   private holdCurrent(path: FilePath): void {
