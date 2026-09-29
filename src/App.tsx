@@ -10,7 +10,14 @@ import PagesPanel from './panels/PagesPanel';
 import PalettePanel from './panels/PalettePanel';
 import StructurePanel from './panels/StructurePanel';
 import { isFragmentNode } from './panels/structureModel';
-import { isInlineRun, noteIndexAbove, noteText, noteValue, selectionAfterDelete } from './treeSelection.js';
+import {
+  findWithParent,
+  isInlineRun,
+  noteIndexAbove,
+  noteText,
+  noteValue,
+  selectionAfterDelete,
+} from './treeSelection.js';
 import { canvasClickAction } from './canvasClick.js';
 import { liveClassesById as classesByNodeId, rendersOwnElement } from './liveClasses.js';
 import { setSoundEnabled } from './ui/sound.js';
@@ -63,7 +70,13 @@ import {
   type EditsRecord,
 } from './pageEdits';
 import { describeRejection, type RejectionReason } from '../shared/intent';
-import { propsGesture } from './editGestures';
+import {
+  duplicateGesture,
+  insertGesture,
+  propsGesture,
+  removalGesture,
+  withoutNodes,
+} from './editGestures';
 import { ok } from '../shared/result';
 import {
   saveStateAccepted,
@@ -2094,32 +2107,38 @@ export default function App() {
       if (!comp || !page) {return;}
       const paths = await resolveImportPath(comp.path);
       const id = newId();
-      mutateModel((model) => {
-        if (!model.imports.some((i) => i.name === comp.name)) {
-          model.imports.push({
-            name: comp.name,
-            path: chooseImportPath(model, paths),
-            quote: "'",
-          });
-        }
-        // A component whose default slot sits in a text context arrives with a
-        // word in it, the way an inserted <h1> or <p> does — something on the
-        // canvas to aim at. A wrapper whose slot holds blocks (ButtonWrapper,
-        // Section) comes in empty: a stray "Text" there is only ever deleted.
-        const takesText = (comp.slots || []).includes('default') && !!comp.slotText;
-        const node: EditorNode = {
-          id,
-          kind: 'component',
-          name: comp.name,
-          props: {},
-          children: takesText ? [{ id: newId(), kind: 'text', value: 'Text' }] : null,
-        };
-        insertIntoModel(model, node, target);
-        return model;
-      }, true);
+      // A component whose default slot sits in a text context arrives with a
+      // word in it, the way an inserted <h1> or <p> does — something on the
+      // canvas to aim at. A wrapper whose slot holds blocks (ButtonWrapper,
+      // Section) comes in empty: a stray "Text" there is only ever deleted.
+      const takesText = (comp.slots || []).includes('default') && !!comp.slotText;
+      const node: EditorNode = {
+        id,
+        kind: 'component',
+        name: comp.name,
+        props: {},
+        children: takesText ? [{ id: newId(), kind: 'text', value: 'Text' }] : null,
+      };
+      const state = pageStateRef.current.pageState;
+      if (state?.editable && state.model.imports.some((i) => i.name === comp.name)) {
+        // Step 6, insert: already imported, so the node is the whole edit.
+        commitEdit(insertGesture(state.model, node, target, { urgency: true }));
+      } else {
+        mutateModel((model) => {
+          if (!model.imports.some((i) => i.name === comp.name)) {
+            model.imports.push({
+              name: comp.name,
+              path: chooseImportPath(model, paths),
+              quote: "'",
+            });
+          }
+          insertIntoModel(model, node, target);
+          return model;
+        }, true);
+      }
       setSelectedId(id);
     },
-    [insertables, mutateModel, resolveImportPath]
+    [insertables, mutateModel, commitEdit, resolveImportPath]
   );
 
   // The page values a subtree reads — the props it would need once it's a file
@@ -2309,49 +2328,32 @@ export default function App() {
     [insertables, mutateModel, showToast]
   );
 
-  // What the last delete took out of the frontmatter, to say so once the model
-  // has settled — a toast raised inside a mutation would fire twice under
-  // StrictMode and once per retry.
-  const droppedRef = useRef<readonly string[] | null>(null);
-
   const removeNode = useCallback(
     (nodeId: string) => {
       const state = pageStateRef.current.pageState;
-      const target = state?.editable ? findNodeById(state.model.nodes, nodeId) : null;
+      if (!state?.editable) {return;}
+      const target = findNodeById(state.model.nodes, nodeId);
       if (target?.kind === 'chunk-group') {
         showToast('This section comes from the page frontmatter — remove it from the code instead.', 'error');
         return;
       }
       // Worked out against the tree as it stands, before the node is gone.
-      const nextId = state?.editable ? selectionAfterDelete(state.model, nodeId) : null;
-      mutateModel((model) => {
-        const found = findParentList(model, nodeId);
-        if (found) {
-          // Delete the node's note with it, or it would re-attach to whatever
-          // now follows and read as that element's description.
-          const noteAt = noteIndexAbove(found.list, found.index);
-          if (noteAt === -1) {found.list.splice(found.index, 1);}
-          else {found.list.splice(noteAt, 2);}
-        }
-        pruneImports(model);
-        // The code the deleted markup was the only reader of goes with it: a
-        // `const jobs = […]` nothing lists any more is left behind otherwise,
-        // and a page collects them one deletion at a time. Only what nothing
-        // else mentions — another declaration included — and never an export,
-        // which is the page's own interface to Astro.
-        const dead = unusedDeclarations(model);
-        if (dead.length) {
-          model.extraFrontmatter = withoutDeclarations(
-            model.extraFrontmatter,
-            dead.map((d) => d.name)
-          );
-          droppedRef.current = dead.map((d) => d.name);
-        }
-        return model;
-      }, true);
-      if (droppedRef.current?.length) {
-        const names = droppedRef.current;
-        droppedRef.current = null;
+      const nextId = selectionAfterDelete(state.model, nodeId);
+      // Delete the node's note with it, or it would re-attach to whatever now
+      // follows and read as that element's description. The note goes first.
+      const found = findParentList(state.model, nodeId);
+      const noteAt = found ? noteIndexAbove(found.list, found.index) : -1;
+      const note = found && noteAt !== -1 ? found.list[noteAt] : undefined;
+      const ids = note ? [note.id, nodeId] : [nodeId];
+      const removed = removalEffect(state.model, ids);
+      // Step 6, remove: the nodes go as requests; when the removal also
+      // prunes the frontmatter, the whole model is saved (until the
+      // frontmatter step gives that part its request).
+      const apply = (model: EditorModel): EditorModel => removalEffect(model, ids).model;
+      const changesMore = frontmatterOf(removed.model) !== frontmatterOf(state.model);
+      commitEdit(removalGesture(ids, { apply, changesMore }, { urgency: true }));
+      if (removed.dropped.length) {
+        const names = removed.dropped;
         showToast(
           `Also removed ${names
             .map((n) => `\`${n}\``).join(', ')} from the frontmatter — nothing was reading ${names.length === 1 ? 'it' : 'them'} any more.`,
@@ -2362,7 +2364,7 @@ export default function App() {
       // (navigator menu, canvas) leaves what you were working on alone.
       setSelectedId((id) => (id === nodeId ? nextId : id));
     },
-    [mutateModel, showToast]
+    [commitEdit, showToast]
   );
 
   // ----------------------------------------------------------------
@@ -2432,17 +2434,11 @@ export default function App() {
         return;
       }
       const clone = cloneWithNewIds(src);
-      mutateModel((model) => {
-        const found = findParentList(model, nodeId);
-        if (!found) {
-          return model;
-        }
-        found.list.splice(found.index + 1, 0, clone);
-        return model;
-      }, true);
+      // Step 6, insert: the copy is the node's own bytes, spliced after it.
+      commitEdit(duplicateGesture(nodeId, clone, { urgency: true }));
       setSelectedId(clone.id);
     },
-    [mutateModel]
+    [commitEdit]
   );
 
   // Pastes into the current selection when it can host children (a non-void
@@ -2698,8 +2694,21 @@ export default function App() {
       // way a project component's is.
       if (item.type === 'astroAsset') {
         const assetId = newId();
-        mutateModel((model) => {
-          if (!model.imports.some((i) => i.name === item.name && !i.typeOnly)) {
+        // Self-closing, and already valid: Astro throws on an <Image> with no
+        // src, so a bare one would swap the canvas for a stack trace the
+        // moment it landed. See PLACEHOLDER_PROPS.
+        const asset: EditorNode = {
+          id: assetId,
+          kind: 'component',
+          name: item.name,
+          props: { ...PLACEHOLDER_PROPS },
+          children: null,
+        };
+        if (state.model.imports.some((i) => i.name === item.name && !i.typeOnly)) {
+          // Step 6, insert: already imported, so the node is the whole edit.
+          commitEdit(insertGesture(state.model, asset, target, { urgency: true }));
+        } else {
+          mutateModel((model) => {
             model.imports.push({
               name: item.name,
               imported: item.name,
@@ -2707,23 +2716,10 @@ export default function App() {
               named: true,
               quote: "'",
             });
-          }
-          insertIntoModel(
-            model,
-            // Self-closing, and already valid: Astro throws on an <Image>
-            // with no src, so a bare one would swap the canvas for a stack
-            // trace the moment it landed. See PLACEHOLDER_PROPS.
-            {
-              id: assetId,
-              kind: 'component',
-              name: item.name,
-              props: { ...PLACEHOLDER_PROPS },
-              children: null,
-            },
-            target
-          );
-          return model;
-        }, true);
+            insertIntoModel(model, asset, target);
+            return model;
+          }, true);
+        }
         setSelectedId(assetId);
         return;
       }
@@ -2776,13 +2772,11 @@ export default function App() {
         node = { id, kind: 'raw', name: item.type, props: {}, inner: '' };
       }
       if (!node) {return;}
-      mutateModel((model) => {
-        insertIntoModel(model, node, target);
-        return model;
-      }, true);
+      // Step 6, insert: a new node needs no import, so it is one request.
+      commitEdit(insertGesture(state.model, node, target, { urgency: true }));
       setSelectedId(id);
     },
-    [insertTargetFor, addComponent, mutateModel]
+    [insertTargetFor, addComponent, mutateModel, commitEdit]
   );
 
   // True while the CMS covers the canvas: the page-editing shortcuts below
@@ -3261,33 +3255,47 @@ export default function App() {
   // clearing the field doesn't leave `<!---->` behind.
   const setComment = useCallback(
     (nodeId: string, text: string) => {
+      const state = pageStateRef.current.pageState;
+      if (!state?.editable) {return;}
+      const found = findWithParent(state.model.nodes, nodeId);
+      if (!found) {return;}
+      const prev = found.index > 0 ? found.siblings[found.index - 1] : null;
+      const existing = prev && prev.kind === 'comment' ? prev : null;
+      const body = String(text ?? '').trim();
+      if (!body) {
+        if (existing) {
+          // Step 6, remove: clearing the field takes the note out.
+          const gone = [existing.id];
+          const effect = { apply: (model: EditorModel) => withoutNodes(model, gone), changesMore: false };
+          commitEdit(removalGesture(gone, effect, { urgency: false }));
+        }
+        return;
+      }
+      // The parser keeps the raw text between the delimiters, so it is padded
+      // to serialize as `<!-- text -->` the way a hand-written one reads — and
+      // a note written as a divider keeps its rule, to the same width, so a
+      // column of them stays lined up.
+      const value = noteValue(existing?.value, body);
+      assert(value !== null, 'A nonempty comment produces a serialized value');
+      if (!existing) {
+        // Step 6, insert: a new note, right above its node.
+        const note: EditorNode = { id: newId(), kind: 'comment', value };
+        const place = { parentId: found.parent?.id ?? null, index: found.index };
+        commitEdit(insertGesture(state.model, note, place, { urgency: false }));
+        return;
+      }
+      // Rewording a note has no intent form yet: its text is a node value.
       mutateModel(
         (model) => {
-          const found = findParentList(model, nodeId);
-          if (!found) {return model;}
-          const { list, index } = found;
-          const prev = index > 0 ? list[index - 1] : null;
-          const existing = prev && prev.kind === 'comment' ? prev : null;
-          const body = String(text ?? '').trim();
-          if (!body) {
-            if (existing) {list.splice(index - 1, 1);}
-            return model;
-          }
-          // The parser keeps the raw text between the delimiters, so it is
-          // padded to serialize as `<!-- text -->` the way a hand-written one
-          // reads — and a note written as a divider keeps its rule, to the
-          // same width, so a column of them stays lined up.
-          const value = noteValue(existing?.value, body);
-          assert(value !== null, 'A nonempty comment produces a serialized value');
-          if (existing) {existing.value = value;}
-          else {list.splice(index, 0, { id: newId(), kind: 'comment', value });}
+          const landed = findNodeById(model.nodes, existing.id);
+          if (landed) {landed.value = value;}
           return model;
         },
         false,
         `comment:${nodeId}`
       );
     },
-    [mutateModel]
+    [mutateModel, commitEdit]
   );
 
   // Typing a bare class in the style panel's selector box puts it on the
@@ -5646,6 +5654,32 @@ export default function App() {
       <ConfirmHost />
     </div>
   );
+}
+
+// What a delete leaves: the page without the nodes, and without the imports
+// and declarations only they were reading (the legacy removeNode's rule). The
+// clone is this function's own, so pruneImports edits nothing it was given.
+function removalEffect(
+  model: EditorModel,
+  ids: readonly string[],
+): { readonly model: EditorModel; readonly dropped: readonly string[] } {
+  const next = cloneEditorModel(withoutNodes(model, ids));
+  pruneImports(next);
+  // The code the deleted markup was the only reader of goes with it: a
+  // `const jobs = […]` nothing lists any more is left behind otherwise, and a
+  // page collects them one deletion at a time. Only what nothing else
+  // mentions — another declaration included — and never an export, which is
+  // the page's own interface to Astro.
+  const dead = unusedDeclarations(next).map((d) => d.name);
+  if (dead.length) {
+    next.extraFrontmatter = withoutDeclarations(next.extraFrontmatter, dead);
+  }
+  return { model: next, dropped: dead };
+}
+
+// The frontmatter a model describes, compared as data.
+function frontmatterOf(model: PageModel): string {
+  return JSON.stringify([model.imports, model.extraFrontmatter]);
 }
 
 // What survives the page's history being dropped (dropPageHistory).

@@ -104,10 +104,23 @@ const LAYOUT = new Set([
   'extraFrontmatterSpaced',
   'frontmatterLead',
 ]);
+// Text is compared with adjacent text nodes merged and whitespace removed:
+// the legacy printer puts each node of a reflowed inline run on its own line
+// (duplicate the `.` closing a sentence and it writes `.` twice, a line each,
+// which even renders as `. .`), where the engine keeps the bytes (`..`).
+// Which words, in which nodes and order, is what the comparison holds equal.
 function meaning(value) {
   if (Array.isArray(value)) {
-    // Whitespace-only text between nodes is layout too: the reprint decides it.
-    return value
+    const merged = [];
+    for (const item of value) {
+      const last = merged[merged.length - 1];
+      if (item && item.kind === 'text' && last && last.kind === 'text') {
+        merged[merged.length - 1] = { ...last, value: `${last.value}${item.value}` };
+      } else {
+        merged.push(item);
+      }
+    }
+    return merged
       .filter((item) => !(item && item.kind === 'text' && /^\s*$/.test(item.value)))
       .map(meaning);
   }
@@ -121,7 +134,7 @@ function meaning(value) {
     }
     return out;
   }
-  return typeof value === 'string' ? value.replace(/\s+/g, ' ').trim() : value;
+  return typeof value === 'string' ? value.replace(/\s+/g, '') : value;
 }
 
 /** Plan a gesture's requests the way the host does: each against the bytes
@@ -182,13 +195,13 @@ function sweep(label, casesFor) {
     const snapshot = snapshotOf(`/project/${path.basename(page.name)}`, page.text);
     const origin = { checksum: snapshot.checksum, model };
     for (const node of nodesOf(model)) {
-      for (const gesture of casesFor(node, model)) {
+      for (const [caseIndex, gesture] of casesFor(node, model).entries()) {
         const requests = gesture.request((id) => edits.nodeRefIn(origin, id));
         if (requests === undefined) {
           tally.legacyOnly += 1;
           continue;
         }
-        const where = `${page.name} ${node.id} ${label}`;
+        const where = `${page.name} ${node.id} ${label} #${caseIndex}`;
         const result = engine(snapshot.path, snapshot, requests);
         if (result.tag === 'rejected') {
           tally.refused.set(result.reason, (tally.refused.get(result.reason) ?? 0) + 1);
@@ -199,6 +212,12 @@ function sweep(label, casesFor) {
         const theirs = parsePage(reprinted, { locs: false });
         assert.ok(mine.editable, `${where}: the engine's result parses`);
         assert.ok(theirs.editable, `${where}: the legacy result parses`);
+        if (
+          process.env.PARITY_DEBUG &&
+          JSON.stringify(meaning(mine.model)) !== JSON.stringify(meaning(theirs.model))
+        ) {
+          console.log(`--- ${where}\nENGINE\n${result.text}\nLEGACY\n${reprinted}`);
+        }
         assert.deepEqual(meaning(mine.model), meaning(theirs.model), `${where}: same page`);
         tally.compared += 1;
         tally.identical += result.text === reprinted ? 1 : 0;
@@ -265,4 +284,83 @@ test('parity, prop: expressions and bare props, new and replacing any value', (t
   });
   report(t, tally);
   assert.ok(tally.compared > 500, `the sweep compares many real gestures (${tally.compared})`);
+});
+
+// Every node with its parent's id (null at the root) and its index there.
+function placesOf(model) {
+  const found = [];
+  const pending = model.nodes.map((node, index) => ({ node, parentId: null, index }));
+  for (let at = 0; at < pending.length; at++) {
+    const entry = pending[at];
+    found.push(entry);
+    const children = entry.node.children;
+    if (Array.isArray(children) && entry.node.kind !== 'chunk-group') {
+      children.forEach((child, index) =>
+        pending.push({ node: child, parentId: entry.node.id, index }),
+      );
+    }
+  }
+  return found;
+}
+
+let fresh = 0;
+const newNode = (kind) =>
+  kind === 'comment'
+    ? { id: `x${++fresh}`, kind: 'comment', value: ' Note ' }
+    : {
+        id: `x${++fresh}`,
+        kind: 'element',
+        name: 'p',
+        props: {},
+        children: [{ id: `x${++fresh}`, kind: 'text', value: 'Text' }],
+      };
+
+function withNewIds(node) {
+  const copy = structuredClone(node);
+  const pending = [copy];
+  for (let at = 0; at < pending.length; at++) {
+    pending[at].id = `d${++fresh}`;
+    if (Array.isArray(pending[at].children)) {
+      pending.push(...pending[at].children);
+    }
+  }
+  return copy;
+}
+
+test('parity, insert and remove: beside and inside every node, a copy of each, each removed', (t) => {
+  const byNode = new Map();
+  const tally = sweep('insert/remove', (node, model) => {
+    if (!byNode.has(model)) {
+      byNode.set(model, new Map(placesOf(model).map((entry) => [entry.node.id, entry])));
+    }
+    const entry = byNode.get(model).get(node.id);
+    const urgency = { urgency: true };
+    const cases = [
+      gestures.insertGesture(
+        model,
+        newNode('element'),
+        { parentId: entry.parentId, index: entry.index },
+        urgency,
+      ),
+      gestures.insertGesture(
+        model,
+        newNode('comment'),
+        { parentId: entry.parentId, index: entry.index + 1 },
+        urgency,
+      ),
+      gestures.duplicateGesture(node.id, withNewIds(node), urgency),
+      gestures.removalGesture(
+        [node.id],
+        { apply: (current) => gestures.withoutNodes(current, [node.id]), changesMore: false },
+        urgency,
+      ),
+    ];
+    if ((node.kind === 'element' || node.kind === 'component') && Array.isArray(node.children)) {
+      const inside = { parentId: node.id, index: node.children.length };
+      cases.push(gestures.insertGesture(model, newNode('element'), inside, urgency));
+    }
+    return cases;
+  });
+  report(t, tally);
+  assert.ok(tally.compared > 1000, `the sweep compares many real gestures (${tally.compared})`);
 });

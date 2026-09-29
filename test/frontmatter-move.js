@@ -227,7 +227,7 @@ const check = (what, condition, detail) => {
 
   // --- the app asks for both ----------------------------------------------------------
   const app = fs.readFileSync(path.join(__dirname, '..', 'src', 'App.tsx'), 'utf8');
-  check('deleting prunes what it made dead', /const dead = unusedDeclarations\(model\);/.test(app), 'nothing prunes declarations');
+  check('deleting prunes what it made dead', /const dead = unusedDeclarations\(next\)/.test(app), 'nothing prunes declarations');
   check('and says which lines went', /from the frontmatter/.test(app), 'the deletion is silent about it');
   check('copying takes the page’s code with it', /frontmatter: state\.model\.extraFrontmatter/.test(app), 'the clipboard holds markup only');
   check('pasting brings what the markup reads', /neededFrontmatter\(\{/.test(app), 'the paste carries nothing');

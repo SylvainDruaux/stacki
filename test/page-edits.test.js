@@ -318,3 +318,73 @@ test('requests reach the page as splices; the undo step restores every byte', as
   }
   assert.equal(fs.readFileSync(file, 'utf8'), text, 'undone on the engine, byte for byte');
 });
+
+test('insertGesture stands the new node beside the one at its place, or inside an empty parent', () => {
+  const refOf = (id) => ({ path: [id.length], kind: 'element', span: { start: 0, end: 1 } });
+  const text = (id, value) => ({ id, kind: 'text', value });
+  const node = { id: 'new', kind: 'element', name: 'p', props: {}, children: [] };
+  const model = {
+    imports: [],
+    nodes: [
+      { id: 'a', kind: 'element', name: 'div', props: {}, children: [] },
+      text('gap', '\n'),
+      {
+        id: 'bb',
+        kind: 'element',
+        name: 'ul',
+        props: {},
+        children: [{ id: 'ccc', kind: 'element', name: 'li', props: {}, children: null }],
+      },
+    ],
+  };
+  const options = { urgency: true };
+  const placed = (place) => {
+    const [first] = gestures.insertGesture(model, node, place, options).request(refOf) ?? [];
+    return first && [first.edit.placement, first.edit.target.path[0]];
+  };
+  assert.deepEqual(
+    placed({ parentId: null, index: 0 }),
+    ['before', 1],
+    'before the node at the place',
+  );
+  assert.deepEqual(
+    placed({ parentId: null, index: 1 }),
+    ['before', 2],
+    'blank text is not a neighbour',
+  );
+  assert.deepEqual(
+    placed({ parentId: null, index: 9 }),
+    ['after', 2],
+    'past the end: after the last',
+  );
+  assert.deepEqual(
+    placed({ parentId: 'a', index: 0 }),
+    ['first-child', 1],
+    'inside an empty parent',
+  );
+  assert.deepEqual(placed({ parentId: 'bb', index: 1 }), ['after', 3]);
+  assert.equal(
+    gestures.insertGesture({ imports: [], nodes: [] }, node, null, options).request(refOf),
+    undefined,
+    'an empty page saves whole',
+  );
+  const inserted = gestures
+    .insertGesture(model, node, { parentId: 'bb', index: 0 }, options)
+    .apply(model);
+  assert.deepEqual(
+    inserted.nodes[2].children.map((child) => child.id),
+    ['new', 'ccc'],
+  );
+  assert.deepEqual(
+    model.nodes[2].children.map((child) => child.id),
+    ['ccc'],
+    'the old model is untouched',
+  );
+  const without = gestures.withoutNodes(model, ['ccc', 'gap']);
+  assert.deepEqual(
+    without.nodes.map((n) => n.id),
+    ['a', 'bb'],
+  );
+  assert.deepEqual(without.nodes[1].children, []);
+  assert.equal(model.nodes.length, 3);
+});

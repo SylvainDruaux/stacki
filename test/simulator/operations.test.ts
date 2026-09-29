@@ -515,3 +515,21 @@ test('editInlineStyle edits one declaration and keeps the rest of the text', () 
   assert.equal(set('a: (1', 'a', '3'), 'unreadable');
   assert.equal(set('just words', 'a', '3'), 'unreadable');
 });
+
+test('code around markup: an emptied branch, and a node beside one in a branch, are refused', () => {
+  // `cond && ( )` and `: <p/>other ? …` parse, but no JavaScript engine runs
+  // them; the legacy printer rewrites both, so the app saves those whole.
+  const page = snapshotText('{show && (\n  <p>Only</p>\n)}\n{show ? <em>a</em> : <b>b</b>}\n');
+  assert.equal(
+    run(page, { tag: 'remove-node' }, anchorAt(page, [0, 0, 0])),
+    'rejected: unsupported-operation',
+  );
+  const beside = { tag: 'insert-node' as const, placement: 'after' as const, source: '<i />' };
+  assert.equal(run(page, beside, anchorAt(page, [1, 1, 0])), 'rejected: unsupported-operation');
+  const twice = snapshotText('{show && (\n  <p>One</p>\n  <p>Two</p>\n)}\n');
+  assert.equal(
+    run(twice, { tag: 'remove-node' }, anchorAt(twice, [0, 0, 1])),
+    '{show && (\n  <p>One</p>\n)}\n',
+    'one of several may go',
+  );
+});

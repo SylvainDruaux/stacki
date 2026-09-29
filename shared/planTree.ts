@@ -67,6 +67,9 @@ export function planRemoveNode(
     return err('region-externally-modified');
   }
   const current = currentProjection(context);
+  if (leavesCodeEmpty(context.current.bytes, current, target.current)) {
+    return err('unsupported-operation');
+  }
   const range = removalRange(context.current.bytes, current, target.current);
   const splice = spliceAt(context.current.bytes, range, '');
   return ok({
@@ -142,6 +145,9 @@ export function planMoveNode(
   }
   if (!nodeUnchanged(context, source.value)) {
     return err('region-externally-modified');
+  }
+  if (leavesCodeEmpty(context.current.bytes, currentProjection(context), moved)) {
+    return err('unsupported-operation');
   }
   return planRelocation(context, source.value, destination.value, operation.placement);
 }
@@ -230,6 +236,36 @@ function withReplacements(
   return toByteString(joined);
 }
 
+function inCode(projection: ValidProjection, node: ProjectedNode): boolean {
+  if (node.path.length === 1) {
+    return false;
+  }
+  const parent = nodeAtPath(projection, parentPath(node.path));
+  assert(parent !== undefined, 'A nested node has a parent');
+  return parent.kind === 'branch' || parent.kind === 'map';
+}
+
+// A condition's branch and a loop's body are JavaScript around markup: taking
+// out the only node leaves `cond && ( )`, which the parser reads but no
+// JavaScript engine will run. The legacy printer writes `null` there; until a
+// planner rule does, such a removal is refused and the page saved whole.
+function leavesCodeEmpty(
+  bytes: ByteString,
+  projection: ValidProjection,
+  node: ProjectedNode,
+): boolean {
+  if (node.path.length === 1) {
+    return false;
+  }
+  if (!inCode(projection, node)) {
+    return false;
+  }
+  const others = siblingsOf(projection, node).filter(
+    (sibling) => sibling !== node && !blankText(bytes, sibling),
+  );
+  return others.length === 0;
+}
+
 /** What a removal takes: the node, and the whitespace run before it when that
  * run holds a line break (the node's own line); otherwise the whitespace after
  * it through the first line break, so no blank line is left; otherwise the
@@ -264,6 +300,13 @@ function insertionAt(
   }
   if (!movable(anchor.kind)) {
     return err('unsupported-operation'); // Beside a branch is inside its condition.
+  }
+  if (inCode(projection, anchor)) {
+    // A condition's branch or a loop's body is JavaScript around markup: a
+    // second node beside the first can land outside the parentheses (a bare
+    // `: other ? …` branch) and break the expression. The legacy printer
+    // rewraps it; until a planner rule does, the page is saved whole.
+    return err('unsupported-operation');
   }
   const separator = separatorBefore(bytes, projection, anchor);
   if (placement === 'after') {
