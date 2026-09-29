@@ -114,6 +114,9 @@ interface Intent {
 Operations (initial): `SetAttribute`, `RemoveAttribute`, `InsertNode`, `MoveNode`,
 `RenameBinding` (multi-span), `SetInlineStyle`, `ApplyCodePatch` (code editor),
 `EditFrontmatterSlot`. New operations extend the union; they never extend a writer.
+Step 6 added `RemoveNode` (the list had no removal) and `RevertSplices` (Undo's
+inverse of an applied outcome: not a code patch — it keeps a parsing file parsing,
+and a stale one is a moved region, not a merge).
 
 **Migration-only operation: `ReplaceSource`.** A whole-file replacement whose anchor is the
 whole-file span and whose witness is `authoredChecksum` itself. From step 5 the legacy save path
@@ -547,6 +550,13 @@ Ratchet counts only decrease.
    full-model snapshots; the stack bound moves to `LIMITS.undoEntriesMax` (100, today's cap).
    The property batch gains its inverse batch. Adapter surface shrinks monotonically; new
    features enter through intents only.
+   **Landed 2026-09-29** (tracker, Step 6): the planner plans every operation; the six
+   gestures reach disk as edit requests (`page:edit`, stated against the page the renderer
+   shows and translated by main); the host rebases an edit exactly through its own recent
+   commits and maps one across an outside write; Undo reverts on the engine; property
+   batches undo as inverse batches; a class's stylesheet rule waits for the page edit.
+   Adapter surface 70 / 9 / 28 → 48 / 2 / 15. Gestures with no operation (text, tag
+   renames, paste) keep the whole-model save until their operations exist.
 7. **Capabilities and preview bridge.** Visible read-only fallbacks, preview token, stale-token
    rejection, capped morph.
 8. **Code editor on the actor.** Diff-based patches, `parse-error` projections,

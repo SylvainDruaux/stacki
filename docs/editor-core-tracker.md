@@ -30,8 +30,12 @@ lands it.
   **Revision B** (registered `a1ceffa` with A's thresholds unchanged, measured
   at `3352742`) **passed every threshold: go** (2026-09-28). See Thresholds,
   "Revision B decision". **Step 5 landed (2026-09-28)**: every write of
-  project text goes through a document actor (see Step 5); steps 6–10 have
-  not started.
+  project text goes through a document actor (see Step 5). **Step 6 landed
+  (2026-09-29)**: the planner plans every operation; attribute, prop,
+  insert/remove, move, inline CSS, frontmatter and loop-rename gestures reach
+  disk as edit requests (`page:edit`) spliced by the actor; Undo reverts them on
+  the engine; property batches are undoable (see Step 6). Steps 7–10 have not
+  started.
 - **Step 0 landed (2026-09-28).** The legacy
   write path still serializes whole files (`mutateModel` → `page:write` →
   `serializePage`), but every page write now names the checksum it was
@@ -971,19 +975,226 @@ Left open, carried to step 6 and later:
 - The stale-plan per-byte assertions and code-mode `/ ? :` hosts (step 4) are
   untouched.
 
-### Step 6 — Gesture expansion ⬜
+### Step 6 — Gesture expansion ✅
 
 **Deliverables.** Single-file operations ship in order: attribute → prop →
 insert/remove → move → inline CSS → frontmatter slots. Stylesheet intents
 (multi-file) follow the §3.3 outcome-gated composition rule once a real
 gesture needs them. New features enter through intents only. Undo on the
-engine: each `applied` outcome records inverse splices; Undo submits them as
-an intent against the post-apply checksum; `LIMITS.undoEntriesMax` (100)
-bounds the stack. The property batch gains an inverse batch.
+engine: each `applied` outcome records inverse splices; Undo submits them as an
+intent against the post-apply checksum; `LIMITS.undoEntriesMax` (100) bounds the
+stack. The property batch gains an inverse batch.
 
-**Gate proof.** Adapter surface shrinks monotonically. Undo after an
-external edit maps through the diff or rejects — never reverts the external
-change (simulator scenario).
+**Gate proof.** Adapter surface shrinks monotonically. Undo after an external
+edit maps through the diff or rejects — never reverts the external change
+(simulator scenario).
+
+**Landed 2026-09-29** on `refactor/architecture-consolidation`, eleven commits
+`ff030a5`..`a3456ba` (listed below) plus the printer fix and this record.
+Every commit gated: `env -u ELECTRON_RUN_AS_NODE npm test` 155/155 (the gate's
+command count is unchanged; the new suites run inside `test:contracts`,
+`test:simulator` and `test:roundtrip`).
+
+How a gesture reaches disk now (the design; plan §2 layer 3, §4, §7):
+
+- **The engine plans every operation** (`ff030a5`). `shared/planner.ts` (dispatch
+  and the attribute family), `planTree.ts` (insert, remove, move),
+  `planText.ts` (rename sites, frontmatter slots, code patches, reverts,
+  replace-source), `planSupport.ts` (anchor resolution, generalized from step
+  2: a tag with attributes is identified by its name through its last
+  attribute, anything else — a bare tag included — by its whole span),
+  `loopScope.ts` (loop parameters, rename sites, the byte form of
+  `stripLostBindings`), `inlineStyle.ts` (one declaration edited in place, the
+  same code on both sides). Two operations join the union: `remove-node` (the
+  initial list had no removal) and `revert-splices` (Undo's inverse: restores
+  bytes, keeps a parsing file parsing; stale → `region-externally-modified`).
+  Insertions are zero-width splices, so inverses are exact and later rebases
+  never cut through a neighbour. Stale intents of every operation map through
+  the diff with the step-2 uniqueness guard; hunks map with 64 bytes of context.
+- **`page:edit` and the compat adapter's electron half** (`127b818`,
+  `shared/edit-request.ts`, `electron/editRequests.ts`). The renderer states a
+  gesture in the terms of the page it shows — node references are the path,
+  kind and UTF-16 range of its parse — against that parse's checksum. Main
+  checks each reference against its own projection of the same bytes, converts
+  ranges to bytes, prints only what an edit adds (new nodes at their
+  indentation, the frontmatter block of which only the differing slot is
+  written), finds a loop rename's sites, and submits the intent. The reply is
+  the page as written plus the inverse hunks. `page:read` now reads through
+  the page's actor, so the host holds the bytes the renderer authors against.
+- **Staleness the app caused itself is rebased exactly; an outside write is
+  mapped.** The host keeps per actor a commit log (`commitLogEntriesMax` 16:
+  from, to, minimal splices — a whole-file save logged as the region it
+  changed) and earlier snapshots (`authoredSnapshotsMax` 16,
+  `authoredBytesRetainedMax` 16 MB). An edit authored before the actor's own
+  commits is restated against the current bytes through them
+  (`shared/rebase.ts`: a span a commit cut through has no image and is
+  refused); one authored before an outside write goes to the planner with its
+  authored snapshot and maps through the diff; one whose bytes are gone is
+  refused, never guessed. A frontmatter request states the whole block's
+  meaning, so after the app's own commits it is compared with the block on
+  disk now (`EditBase.history`, `buildEdit`), or it would do their part twice.
+- **The persistence layer** (`e964f57`, `src/pageEdits.ts`, successor of the
+  whole-model saver). The page state keeps its origin — the disk parse the
+  shown model was cloned from — and requests name the origin's nodes (ids are
+  shared by cloning, never by reparse: `modelAdoption.ts` still only keys UI).
+  `EditDrafts` queues requests per page and origin: a burst in one stream of
+  one undo step coalesces while unsent (a set is idempotent), structural
+  requests never do, a gesture without an intent form turns the queue into
+  whole-model saves until the page is clean, and the queue is bounded by
+  `intentsPendingMax`. `sendDrafts` sends them one at a time (the host rebases
+  each later one), falls back to the whole-model save for an unsupported
+  request or a refusal over unchanged bytes, turns a refusal over changed bytes
+  into the conflict notice — which now names the actor's reason — and sends
+  again only what was refused before anything was written (never a write that
+  may have landed). The saver gains an `advanced` outcome: requests that reached
+  disk before a later one failed make their bytes the next base. The watcher no
+  longer raises a page-wide conflict over unsent requests: they map through an
+  outside change, or are refused one by one.
+- **Gestures** (`src/editGestures.ts`): each is its requests against the origin
+  and its effect on the shown model — a new model, never one edited in place,
+  so the adapter's edits are centralized and the ratchet counts none of them.
+  `commitEdit` in `App.tsx` sends a gesture as requests when it can be stated,
+  else saves the whole model exactly as `mutateModel` does.
+
+The gestures, in the §11.6 order, with the adapter surface after each
+(mutations / prop-index writes / `mutateModel` / `applyEdit` / replace-source):
+
+| Step | Commit | Surface after it |
+|---|---|---|
+| (step 5) | `0411fe6` | 70 / 9 / 28 / 4 / 23 |
+| attribute | `e964f57` | 67 / 4 / 25 / 4 / 23 |
+| prop | `06bbc6c` | 67 / 4 / 25 / 4 / 23 |
+| insert/remove | `e14012e` | 55 / 4 / 22 / 4 / 23 |
+| move | `c07db4c` | 53 / 3 / 21 / 4 / 23 |
+| inline CSS | `d49b426` | 53 / 3 / 21 / 4 / 23 |
+| frontmatter | `6da4741` | 48 / 2 / 15 / 4 / 23 |
+
+What each step sends as requests:
+- attribute: `setProp`/`setProps` string values and removals; `addClassToNode`.
+- prop: expression and bare values, and type changes.
+- insert/remove: palette inserts; component and asset inserts already
+  imported; duplicate (the node's own bytes); delete with its note; notes
+  created and cleared.
+- move: `moveNode` — relocated bytes, the note with it, a stale `slot` dropped
+  first, loop references stripped when it leaves a loop.
+- inline CSS: a Style edit of one declaration, as `set-inline-style`.
+- frontmatter: the frontmatter and declarations editors; imports added by
+  inserts; a delete's pruning; asset imports; the dead-query cleanup; loop
+  renames (multi-span `rename-binding`).
+
+Why two steps left the surface unchanged: prop and inline CSS share
+`setProp`'s call site with the attribute step, so they widen what that site
+sends as requests rather than removing a site. No step grew it. `applyEdit`
+(the style panel's rule writes) and the replace-source sites in `electron/`
+are later steps' (8, 9).
+
+**Parity vs the legacy path** (`test/gesture-parity.test.js`, in the gate):
+every gesture over every node of every `.astro` fixture, once through the
+legacy path (the adapter's effect on the model, reprinted by `serializePage`)
+and once through the engine (the adapter's requests through main's translator
+and the shipping planner, later requests rebased as the host does), both
+parsed and compared with layout metadata removed. **3 933 compared, all the
+same page, 2 078 byte-identical**; requests the planner refuses fall back to
+the whole-model save in the app and are counted, not compared.
+
+| Gestures | Compared | Byte-identical | Refused (fallback) |
+|---|---|---|---|
+| attribute | 510 | 357 | 140 |
+| prop | 664 | 462 | 228 |
+| insert/remove | 1 296 | 668 | 321 |
+| move | 1 226 | 418 | 347 (+68 with nothing to stand beside) |
+| inline CSS | 16 (11 one declaration in place) | 0 | 0 |
+| frontmatter | 211 | 173 | 0 |
+| loop rename | 10 | 0 | 2 |
+
+The comparison merges adjacent text and ignores whitespace inside it, and reads
+`&quot;` as `"`: the legacy printer reflows an inline run a node per line (a
+duplicated `.` renders `. .` there, `..` through the engine), and rewrites a
+double quote inside any value it reprints, even on a tag no gesture touched.
+Inline CSS and loop renames are never byte-identical because the legacy side
+always reprints the tag or the loop.
+
+Found by the parity sweep and fixed:
+- **Legacy printer: an emptied element wrote its removed child back.** The
+  printer reused an element's stored inner source whenever its children list
+  was empty, so a delete or a move of an element's last child through the
+  whole-model path left the child in place (a move wrote it twice). The
+  adapter's effects drop the stale source (`e14012e`/`c07db4c`), and the printer
+  now reuses only a whitespace inner (`electron/astroParser.ts`), which fixes the
+  gestures still on the whole-model path too. Round-trip 470/470 with it.
+- **Code around markup.** Removing the only node of a condition's branch or a
+  loop body leaves `cond && ( )`, and inserting beside a node in a branch can
+  land outside its parentheses (`: <p/>other ? …`): both parse, neither runs.
+  The planner refuses both; the app saves those whole.
+
+**Undo on the engine — the decision on record** (plan §11 step 6, decided
+2026-09-28, landed here):
+- A gesture sent as requests pushes an edits entry whose record collects each
+  applied request's inverse (`inverseEdits`: same ranges, expected and
+  replacement swapped). Undo reverts them newest first as `revert-splices`
+  requests, each authored against the checksum it came back with, and pushes
+  the inverses of the reverts as the redo step. A file changed since maps
+  through the diff (64 bytes of context per hunk) or the revert is refused with
+  its reason — an outside edit is never reverted. A refusal stops there and
+  keeps what is left undone.
+- Where a whole-model save carried the gesture (no intent form, or a queue in
+  whole-model mode), its snapshot undoes it, as before; snapshot entries are
+  step 9's to delete.
+- Applied edits entries survive an outside reload (`dropPageHistory`); snapshot
+  entries still do not (step 0's rule).
+- `LIMITS.undoEntriesMax` (100) bounds the history (was a literal).
+- **The property batch's inverse batch** (`d396033`): each applied
+  `component:editProperties` batch leaves its inverse in main
+  (`PropertyUndoStore`, bounded by `undoEntriesMax`); `component:revertProperties`
+  applies it as a batch — leased in sorted order, every file checked against
+  the bytes the batch left before any is written, the checked rollback on a
+  failure — so a changed file refuses the whole undo, naming it. The renderer
+  holds tokens, never batches. Property edits were not undoable before.
+
+**Simulator scenario** (`4d62807`): an `undo` event reverts one of the eight
+most recent applied edits, authored against the bytes that edit left, whatever
+happened since. A planned revert is judged against byte provenance: it must
+replace the edit's own bytes, not a copy of them while the originals survive
+elsewhere. Gate seeds must reach `undo:planned`, `undo:mapped` and
+`undo:rejected region-externally-modified`; over the 24 gate seeds 415 undo
+events: 45 planned on unchanged bytes, 17 mapped through other writes, 88
+refused, 6 source-invalid, the rest unjudged or with nothing to undo — none
+reverting an outside write. Every stale oracle gesture is judged the same way
+(`judgeOracleRemap`): the result must be the oracle's edit on the surviving
+bytes.
+
+**Stylesheet intents, outcome-gated** (`a3456ba`): typing a lone class in the
+style panel's selector box puts it on the element as a page request; the rule
+the panel then writes for it waits for that request's outcome — written with
+its own file's witness once the class applied, never submitted when it was
+refused, and each file's outcome shown (the page's notice, the panel's error).
+
+Deviations, with reasons:
+- Gestures with no operation stay on the whole-model save: text and content
+  edits (there is no set-text operation in the plan's list), tag and component
+  renames, attribute renames (`renameProp`), the else-branch toggle, layout
+  wrap/unwrap, paste, extract-to-component, rewording a note. 15 `mutateModel`
+  sites remain for them.
+- Nodes a loop repeats accept only a move (the gesture exists to take a node
+  out of its loop); other gestures on them save the whole model until step 7
+  decides how the canvas addresses them. Nodes inside chunk files, Markdown and
+  MDX pages (step 10), and pages whose model descends from typed code keep the
+  whole-model save.
+- The renderer sends no bytes (step 5's decision stands): the host keeps what
+  it needs. The "splice log for self-caused staleness" of step 5's open
+  question is the commit log above.
+- A frontmatter block that does not exist yet is not created by a request
+  (it would be a whole-file change); such a page saves whole.
+
+Left open, carried:
+- Text editing as an operation (plan §3.3 lists none; a `set-text` would move
+  the largest remaining group of gestures).
+- `modelAdoption.ts` still keys UI after every reply; it feeds no anchor.
+- Morph move-blindness (open questions): moves now ship; the canvas still
+  morphs from the page's re-render. Step 7.
+- The simulator generates set-attribute, replace-source, oracle gestures and
+  undo; a random generator for every operation is not built (the corpus sweep
+  in `operations.test.ts` covers each operation fresh and stale instead).
 
 ### Step 7 — Capabilities and preview bridge ⬜
 
@@ -1330,17 +1541,31 @@ reduces fidelity to cope. **Step 1 added all of them except `undoEntriesMax`**
 (see Step 1 above); projection nodes and depth reuse `treeNodesMax` and
 `treeDepthMax`. Step 5 added `documentActorsMax` (512) and
 `documentBytesRetainedMax` (64 MB): the host's actor count and retained
-snapshot bytes.
+snapshot bytes. Step 6 added `undoEntriesMax` (100, the history bound, a
+literal in `App.tsx` before), `commitLogEntriesMax` (16, commits the host
+remembers per actor for exact rebases), `authoredSnapshotsMax` (16) and
+`authoredBytesRetainedMax` (16 MB) (earlier snapshots per actor, so an edit
+authored before an outside write can still be mapped).
 
 ## Adapter surface (ratchet, scripted at step 1)
 
-| Point | Hand, 2026-09-28 | Script, step 1 (baseline) | Script, step 3 (spike) | Script, step 5 |
-|---|---|---|---|---|
-| Direct node-mutation sites in `src/` | 67 (47 in `App.tsx`) | 70 | 70 | 70 |
-| Prop-index writes | 10 | 9 | 9 | 9 |
-| `mutateModel(` call sites | 28 | 28 | 28 | 28 |
-| `applyEdit(` call sites (style panel) | 4 | 4 | 4 | 4 |
-| `replace-source` submission sites (`electron/`) | — | — | — | 23 (baseline) |
+| Point | Mutations | Prop-index | `mutateModel(` | `applyEdit(` | replace-source |
+|---|---|---|---|---|---|
+| Hand, 2026-09-28 | 67 (47 in `App.tsx`) | 10 | 28 | 4 | — |
+| Script, step 1 (baseline) | 70 | 9 | 28 | 4 | — |
+| Script, step 3 (spike) | 70 | 9 | 28 | 4 | — |
+| Script, step 5 | 70 | 9 | 28 | 4 | 23 (baseline) |
+| Step 6, attribute `e964f57` | 67 | 4 | 25 | 4 | 23 |
+| Step 6, prop `06bbc6c` | 67 | 4 | 25 | 4 | 23 |
+| Step 6, insert/remove `e14012e` | 55 | 4 | 22 | 4 | 23 |
+| Step 6, move `c07db4c` | 53 | 3 | 21 | 4 | 23 |
+| Step 6, inline CSS `d49b426` | 53 | 3 | 21 | 4 | 23 |
+| Step 6, frontmatter `6da4741` | 48 | 2 | 15 | 4 | 23 |
+
+Mutations: direct node-mutation sites in `src/`; prop-index: prop-index writes;
+`applyEdit(`: the style panel's; replace-source: submission sites in
+`electron/`. Step 6 says why prop and inline CSS left the surface unchanged.
+`scripts/adapter-surface.ts` holds the last row as its baseline.
 
 `node dist/scripts/adapter-surface.js --files` prints the per-file split
 (step 1: `App.tsx` 58, `loopBindings.ts` 12, `dataSuggest.ts` 6,
@@ -1365,7 +1590,11 @@ Carried from the removed diff-mapping plan; resolved or still open per the
 consolidated plan:
 
 - **Threshold timing** — resolved: pre-registered at §11.4, decided at step 4.
-- **`lastKnownBytes` chaining** — decided at step 5 (2026-09-28): the
+- **`lastKnownBytes` chaining** — closed at step 6 (2026-09-29): the renderer
+  still sends no bytes; the host keeps a commit log per actor (exact rebases
+  through its own commits) and up to 16 earlier snapshots (diff mapping across
+  an outside write); an edit whose authored bytes are gone is refused. See
+  Step 6. Earlier: decided at step 5 (2026-09-28): the
   renderer sends no bytes and the actor keeps its current snapshot only; a
   stale intent without its authored bytes is refused with its operation's
   stale reason. `Submission.authored` stays optional so the simulator (and
@@ -1384,12 +1613,17 @@ consolidated plan:
   the actor in 7 %.
 - **Undo semantics** — resolved 2026-09-28: drop page snapshots on external
   reload at step 0; inverse splices submitted as intents at step 6; snapshot
-  history deleted at step 9.
+  history deleted at step 9. **Landed at step 6** (2026-09-29): edits entries
+  revert on the engine and survive an outside reload, snapshot entries remain
+  for gestures a whole-model save carried, property batches undo as inverse
+  batches (Step 6, "Undo on the engine").
 - **Keystroke → disk threshold** — resolved 2026-09-28: split into engine
   (≤ 50 ms) and last keystroke → disk (≤ 350 ms); see Thresholds.
 - **Morph move-blindness** — partially addressed: morph-without-reload from
   a projection diff capped by a limit, honest reload past the cap (§9).
-  Confirm the moved-node case at steps 6–7.
+  Confirm the moved-node case at steps 6–7. Step 6 ships moves as relocated
+  bytes; the canvas still morphs from the re-rendered page, so the check
+  moves to step 7.
 - **`component:editProperties`** — resolved 2026-09-28: hardened batch
   (checked rollback and `write-race` at step 0; actors in sorted path order
   at step 5; inverse batch at step 6). Best-effort rollback goes in product
@@ -1586,6 +1820,35 @@ update on every step):
     symlinked, `tsc -p shared/tsconfig.json` and `tsc -p
     electron/tsconfig.json` there. `test/save-latency.bench.js` against the
     same build, twice (before and after lazy projections), numbers in Step 5.
+  - Formatting: new modules through Prettier 3.9.9 (npx cache, as step 2);
+    every added line ≤ 100 columns.
+
+- 2026-09-29, step 6 (PROMPT-6), `ff030a5`..HEAD on top of `ddda134`:
+  - Commits: `ff030a5` (the planner plans every operation), `127b818`
+    (`page:edit`, commit log, retained snapshots), `e964f57` (attribute),
+    `06bbc6c` (prop), `e14012e` (insert/remove), `c07db4c` (move), `d49b426`
+    (inline CSS), `6da4741` (frontmatter slots, loop rename), `4d62807`
+    (simulator undo scenario), `d396033` (property inverse batch), `a3456ba`
+    (outcome-gated class and rule), then the printer fix and this record.
+  - `env -u ELECTRON_RUN_AS_NODE npm test` on every commit: **155/155**. Final
+    run: **155/155 test commands in 220.0 s, exit 0** (tsc, eslint 0 errors,
+    `ratchet-check` 0, `adapter-surface` 48 / 2 / 15 / 4 / 23 at its lowered
+    baseline). Three commits needed a second run for source-pinning tests that
+    followed code into new modules (`test:frontmattermove`, `test:slotmove`,
+    `test:selfwrites`) or a fake main without an undo token
+    (`component-properties-panel`); each second run is the one recorded.
+  - Suites: `test:simulator` 82/82 (with `operations.test.ts`, 18 tests: seven
+    corpus sweeps, each candidate parsing and its inverse restoring the input);
+    `test:contracts` 221/221 (with `page-edit.test.ts`, 11 end-to-end tests
+    through main's handlers); `test:roundtrip` 470/470 (with
+    `page-edits.test.js` and `gesture-parity.test.js`: 3 933 gestures, all the
+    same page, 2 078 byte-identical).
+  - Long run: `STACKI_SIMULATOR_SEEDS=2000 node --test
+    test/simulator/simulator.test.ts` — green in 14 min 49 s, `wrongSite:
+    'fail'`, every seed twice. A first long run failed at seed 38: the undo
+    judge flagged a revert whose bytes had been rewritten, identical, by a later
+    edit; the planner was right, and the judge now fails only a revert that
+    hits a copy while the edit's own bytes survive elsewhere (Step 6).
   - Formatting: new modules through Prettier 3.9.9 (npx cache, as step 2);
     every added line ≤ 100 columns.
 

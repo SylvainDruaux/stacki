@@ -190,6 +190,33 @@ engine contract modules may not use timers, clocks, promises, `Math.random`,
 `process` or I/O modules. `scripts/adapter-surface.ts` runs in the gate as a ratchet on the
 legacy tree-mutation surface (method in its header).
 
+## Visual edits (step 6)
+
+`page:edit` carries an `EditRequest` (`shared/edit-request.ts`): a gesture in
+the terms of the page the renderer shows — node references are the path, kind
+and UTF-16 range of its parse — against that parse's checksum. Main turns it
+into an intent (`electron/editRequests.ts`: references checked against its own
+projection, ranges converted to bytes, new nodes and the frontmatter block
+printed, loop-rename sites found) and the page's actor plans and writes
+splices. The reply (`shared/page-save.ts`, `parsePageEditResult`) is the page
+as written and the inverse hunks Undo sends back as a `revert` request; a
+refusal is `rejected` with the actor's reason and the checksum on disk. An edit
+authored before the actor's own recent commits is rebased exactly
+(`shared/rebase.ts`); one authored before an outside write is mapped through the
+diff from a retained snapshot; one whose bytes are gone is refused. Every
+operation is planned (`shared/planner.ts`, `planTree.ts`, `planText.ts`,
+`planSupport.ts`, `loopScope.ts`, `inlineStyle.ts`); `remove-node` and
+`revert-splices` joined the union. `page:read` reads through the page's actor.
+
+Property batches are undoable: `component:editProperties` answers with an undo
+token, and `component:revertProperties` applies that batch's inverse — every
+file checked against the bytes the batch left — and answers with the redo
+token. Main keeps the batches; the renderer holds tokens only.
+
+The renderer's half (`src/pageEdits.ts`, `src/editGestures.ts`) and the gesture
+parity suite (`test/gesture-parity.test.js`) are described in the tracker,
+Step 6.
+
 ## Document actors (step 5)
 
 `electron/documentActors.ts` hosts one actor per canonical file in the main
