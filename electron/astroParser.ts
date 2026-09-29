@@ -3655,8 +3655,14 @@ function serializeNodeElement(
     openTag(`>${inlineString(node.children).trim()}${closeTag}`);
     return;
   }
+  // No children: the stored inner keeps `<div>\n</div>` as written — but only
+  // while it is whitespace. An element whose last child was taken out still
+  // carries the inner it was read with, and writing that back put the removed
+  // child back (found by the step-6 gesture parity sweep: a deleted element's
+  // only child stayed, a moved one appeared twice).
   if (node.children.length === 0) {
-    openTag(`>${node.source ? reindentRun(node.source, indent) : ''}${closeTag}`);
+    const inner = node.source !== undefined && node.source.trim() === '' ? node.source : '';
+    openTag(`>${inner ? reindentRun(inner, indent) : ''}${closeTag}`);
     return;
   }
   openTag('>');

@@ -520,9 +520,14 @@ class World {
     }
   }
 
-  // A planned revert may replace only bytes the undone edit wrote: a byte of
-  // any other origin is an outside change the undo would revert (plan §11
-  // step 6 — maps or rejects, never reverts the outside change).
+  // A planned revert replaces bytes equal to what the undone edit wrote (its
+  // witness), so what can go wrong is where: at a copy of them while the
+  // edit's own bytes survive elsewhere — a wrong site — or over an outside
+  // change. Judged by origin: a replaced byte of another origin fails the run
+  // when the edit's own bytes are still in the file; when none of them is
+  // (another writer rewrote that text, identical, under new origins), no byte
+  // rule can tell the two apart (planner.test.ts, BYTES CANNOT TELL): counted
+  // unjudged. A git-style replacement in between re-originates everything.
   private judgeUndo(entry: Undoable, intent: Intent, result: ActorStep): void {
     this.undoing.delete(intent.id);
     const decision = decisionFor(intent, result);
@@ -534,9 +539,6 @@ class World {
       return;
     }
     const origins = this.origins.get(result.state.generation);
-    // A git-style replacement since the edit re-originates every byte, and
-    // may write the very bytes the edit left: no byte rule can tell those
-    // apart (planner.test.ts, BYTES CANNOT TELL), so there is no ground truth.
     const replaced = (this.replacedWhole.get(entry.file) ?? []).some(
       (generation) => generation > entry.view.generation && generation <= result.state.generation,
     );
@@ -544,17 +546,22 @@ class World {
       this.count('undo:unjudged');
       return;
     }
-    const stale = result.state.snapshot?.checksum !== entry.view.snapshot.checksum;
-    for (const splice of decision.plan.splices) {
-      for (let at = splice.range.start; at < splice.range.end; at++) {
-        const origin = origins[at];
-        assert(origin !== undefined, 'A reverted byte has an origin');
-        assert(
-          entry.written.has(origin),
-          `Undo reverts only its own bytes (seed ${this.input.seed})`,
-        );
-      }
+    const inside = (at: number) =>
+      decision.plan.splices.some((splice) => splice.range.start <= at && at < splice.range.end);
+    const foreign = origins.some((origin, at) => inside(at) && !entry.written.has(origin));
+    if (foreign) {
+      // The edit's own bytes surviving outside what the revert replaces means
+      // it replaced a copy; surviving only inside it, the place is right.
+      const elsewhere = origins.some((origin, at) => !inside(at) && entry.written.has(origin));
+      assert(
+        !elsewhere,
+        `Undo reverts its own bytes, not a copy of them (seed ${this.input.seed})`,
+      );
+      const own = origins.some((origin, at) => inside(at) && entry.written.has(origin));
+      this.count(own ? 'undo:planned-over-rewrite' : 'undo:unjudged');
+      return;
     }
+    const stale = result.state.snapshot?.checksum !== entry.view.snapshot.checksum;
     this.count(stale ? 'undo:mapped' : 'undo:planned');
   }
 
