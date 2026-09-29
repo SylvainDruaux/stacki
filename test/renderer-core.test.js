@@ -264,3 +264,16 @@ test('failed code window writes are retained for an explicit retry', async () =>
   await saver.flush();
   assert.equal(attempts, 2);
 });
+
+test('a save that advanced part-way makes its bytes the next base and reports its error', async () => {
+  // Step 6: edit requests go one at a time; when a later one fails, the ones
+  // before it are on disk, and the next save must name the bytes they left.
+  const page = saverHarness({ save: dirty(sum(0)), model: { version: 1 } });
+  const flush = page.save.flush();
+  await tick();
+  page.gates[0].resolve({ tag: 'advanced', checksum: sum(5), error: new Error('busy') });
+  await assert.rejects(flush, /busy/);
+  assert.equal(page.current.pageState.save.tag, 'dirty', 'the rest is still unsaved');
+  assert.equal(page.save.baseFor('/page.astro', page.current.pageState.save), sum(5));
+  assert.equal(page.save.writing(), false);
+});

@@ -166,7 +166,7 @@ const { class: className } = Astro.props;
   check('the app adds classes through this rule', /withClass\(node\.props, clean\)/.test(app));
   check(
     'and says so when it cannot',
-    /refused[\s\S]{0,200}showToast/.test(app),
+    /if \(!edit\) \{\s*showToast/.test(app),
     'an element whose class is code fails silently again'
   );
 

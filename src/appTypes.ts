@@ -5,6 +5,7 @@ import type { ParsePageResult } from '../shared/page-node';
 import type { ScanResult } from '../shared/scan';
 import type { AssetRequest } from './assetPick';
 import { adoptNodeIds } from './modelAdoption';
+import type { EditsRecord, PageOrigin } from './pageEdits';
 import type { SaveState } from './saveState';
 import type { VariableSelection } from './variablesBridge';
 import {
@@ -52,6 +53,10 @@ interface PageStateBase {
 export interface EditablePageState extends PageStateBase {
   readonly editable: true;
   readonly model: EditorModel;
+  /** The parse `model` was cloned from, when it is a parse of bytes on disk
+   * (step 6): edit requests name its nodes. Absent once the model stops
+   * descending from a disk parse — typed code, a restored undo snapshot. */
+  readonly origin: PageOrigin | undefined;
 }
 
 export interface RawPageState extends PageStateBase {
@@ -79,7 +84,17 @@ export interface UndoCommand {
   readonly coalesceKey?: string | null;
 }
 
-export type HistoryEntry = PageSnapshot | UndoCommand;
+/** A gesture that went out as edit requests (step 6). Undo submits the
+ * inverses its record collects, against the checksums they were returned
+ * with; the snapshot undoes it when a whole-model save carried it instead.
+ * The record is mutable: answers arrive after the entry is pushed. */
+export interface EditsEntry {
+  readonly kind: 'edits';
+  readonly snapshot: PageSnapshot;
+  readonly record: EditsRecord;
+}
+
+export type HistoryEntry = PageSnapshot | UndoCommand | EditsEntry;
 export interface AppHistory {
   past: HistoryEntry[];
   future: HistoryEntry[];
@@ -214,7 +229,23 @@ export function toEditorPageState(
   if (!input.editable) {
     return { editable: false, reason: input.reason, bail: input.bail, source: input.source, save };
   }
-  return { editable: true, model: cloneEditorModel(input.model), source: input.source, save };
+  const model = cloneEditorModel(input.model);
+  return { editable: true, model, source: input.source, save, origin: originOf(input, save) };
+}
+
+// A clean state of an .astro page is a parse of the bytes its checksum names;
+// the origin is its own clone, so nothing done to the shown model reaches it.
+function originOf(
+  input: Extract<ParsePageResult, { readonly editable: true }>,
+  save: SaveState,
+): PageOrigin | undefined {
+  if (save.tag !== 'clean') {
+    return undefined;
+  }
+  if (input.model.format !== undefined) {
+    return undefined; // Markdown and MDX join the engine at step 10.
+  }
+  return { checksum: save.checksum, model: cloneEditorModel(input.model) };
 }
 
 /** Re-key a freshly parsed page onto the session's node ids (see

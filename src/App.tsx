@@ -53,13 +53,26 @@ import {
   type PageWriteOutcome,
 } from './pagePersistence.js';
 import {
+  EditDrafts,
+  nodeRefIn,
+  sendDrafts,
+  subsume,
+  type AppliedEdit,
+  type EditDraft,
+  type EditGesture,
+  type EditsRecord,
+} from './pageEdits';
+import { describeRejection, type RejectionReason } from '../shared/intent';
+import { propsGesture } from './editGestures';
+import { ok } from '../shared/result';
+import {
   saveStateAccepted,
   saveStateClean,
   saveStateEdited,
   saveStateRefused,
 } from './saveState.js';
 import SaveConflictNotice from './panels/SaveConflictNotice';
-import type { PageDiskRead, PageWriteError } from '../shared/page-save';
+import type { PageDiskRead, PageEdited, PageWriteError } from '../shared/page-save';
 import type { Result } from '../shared/result';
 import type { Digest } from '../shared/brand';
 import { ancestorChain, createTreeIndex, isDescendantOf, nodeAtPath, pathOfNode } from './editorTree.js';
@@ -136,6 +149,9 @@ import {
   type CurrentPage,
   type DevStatus,
   type DynamicEntry,
+  type EditablePageState,
+  type EditsEntry,
+  type HistoryEntry,
   type EditorModel,
   type EditorNode,
   type EditorPageState,
@@ -205,6 +221,7 @@ import {
   writeProjectPage,
   writeProjectPageRaw,
   serializeProjectPage,
+  editProjectPage,
   type AppCollection,
 } from './appBridge';
 
@@ -459,6 +476,37 @@ function pageWriteOutcome(
       throw new Error(error.message);
     default: {
       const exhaustive: never = error;
+      return exhaustive;
+    }
+  }
+}
+
+// A save of queued edit requests (step 6): one at a time, each answered before
+// the next goes, so main rebases the later ones through the earlier ones
+// exactly. What cannot go as a request after all is saved as the whole model;
+// a refusal becomes the conflict notice, with the actor's reason (plan §7).
+async function writeEdits(
+  store: EditDrafts,
+  pagePath: string,
+  state: EditablePageState,
+  base: Digest,
+  drafts: readonly EditDraft[],
+): Promise<PageWriteOutcome<EditorPageState>> {
+  const sent = await sendDrafts({ path: pagePath, drafts, base, send: editProjectPage, store });
+  switch (sent.tag) {
+    case 'applied':
+      return pageWriteOutcome(state, ok(sent.last));
+    case 'fallback':
+      return pageWriteOutcome(state, await writeProjectPage(pagePath, state.model, sent.base));
+    case 'refused':
+      return { tag: 'conflict', diskChecksum: sent.diskChecksum, reason: sent.reason };
+    case 'failed':
+      if (sent.advanced !== undefined) {
+        return { tag: 'advanced', checksum: sent.advanced, error: new Error(sent.message) };
+      }
+      throw new Error(sent.message);
+    default: {
+      const exhaustive: never = sent;
       return exhaustive;
     }
   }
@@ -988,15 +1036,26 @@ export default function App() {
       onError: (err) => showToast(`Save failed: ${cleanError(err)}`, 'error'),
     });
   }
+  // The open page's unsent edit requests (step 6, pageEdits.ts).
+  const editDraftsRef = useRef<EditDrafts | null>(null);
+  editDraftsRef.current ??= new EditDrafts();
+  const editDrafts = editDraftsRef.current;
+  // Why the last edit request was refused, for the conflict notice (plan §7).
+  const [conflictReason, setConflictReason] = useState<RejectionReason | undefined>(undefined);
   const pageSaverRef = useRef<PageSaver | null>(null);
   if (!pageSaverRef.current) {
     pageSaverRef.current = createPageSaver<EditorPageState>({
       readCurrent: () => pageStateRef.current,
       write: async (pagePath, state, baseChecksum) => {
-        const written = state.editable
-          ? await writeProjectPage(pagePath, state.model, baseChecksum)
-          : await writeProjectPageRaw(pagePath, state.source, baseChecksum);
-        return pageWriteOutcome(state, written);
+        if (!state.editable) {
+          const raw = await writeProjectPageRaw(pagePath, state.source, baseChecksum);
+          return pageWriteOutcome(state, raw);
+        }
+        const drafts = editDrafts.take(pagePath);
+        if (drafts.length > 0) {
+          return writeEdits(editDrafts, pagePath, state, baseChecksum, drafts);
+        }
+        return pageWriteOutcome(state, await writeProjectPage(pagePath, state.model, baseChecksum));
       },
       withSave: (state, save) => ({ ...state, save }),
       replace: (previous, next) => {
@@ -1012,7 +1071,8 @@ export default function App() {
         }
         setPageState((current) => (current === previous ? next : current));
       },
-      markConflicted: (baseChecksum, diskChecksum) => {
+      markConflicted: (baseChecksum, diskChecksum, reason) => {
+        setConflictReason(reason);
         setPageState((current) => {
           if (!current || current.save.tag === 'clean') {
             return current;
@@ -1456,11 +1516,42 @@ export default function App() {
       coalesceKey !== null && coalesceKey === h.lastKey && now - h.lastPush < 800 && h.past.length > 0;
     if (!coalesce) {
       h.past.push(snapshotOf(state));
-      if (h.past.length > 100) {h.past.shift();}
+      if (h.past.length > LIMITS.undoEntriesMax) {h.past.shift();}
     }
     h.future = [];
     h.lastKey = coalesceKey;
     h.lastPush = now;
+  }, []);
+
+  // The undo step of a gesture sent as edit requests (step 6): its record
+  // collects each applied request's inverse. Coalesces like pushHistory; a
+  // gesture folded into a step that is not an edits entry is undone by that
+  // step's snapshot, so its own record only says so.
+  const pushEditHistory = useCallback((coalesceKey: string | null): EditsRecord => {
+    const state = pageStateRef.current.pageState;
+    const record: EditsRecord = { outcome: { tag: 'applied', applied: [] } };
+    if (!state) {
+      subsume(record);
+      return record;
+    }
+    const h = historyRef.current;
+    const now = Date.now();
+    const previous = h.past[h.past.length - 1];
+    const coalesce =
+      coalesceKey !== null && coalesceKey === h.lastKey && now - h.lastPush < 800 && previous;
+    h.future = [];
+    h.lastKey = coalesceKey;
+    h.lastPush = now;
+    if (coalesce) {
+      if (previous.kind === 'edits') {
+        return previous.record;
+      }
+      subsume(record);
+      return record;
+    }
+    h.past.push({ kind: 'edits', snapshot: snapshotOf(state), record });
+    if (h.past.length > LIMITS.undoEntriesMax) {h.past.shift();}
+    return record;
   }, []);
 
   // Records an already-performed change from outside the page model. `undo`
@@ -1486,7 +1577,7 @@ export default function App() {
       }
     } else {
       h.past.push({ kind: 'cmd', ...cmd });
-      if (h.past.length > 100) {h.past.shift();}
+      if (h.past.length > LIMITS.undoEntriesMax) {h.past.shift();}
     }
     h.future = [];
     h.lastKey = cmd.coalesceKey ?? null;
@@ -1496,22 +1587,28 @@ export default function App() {
   pushCommandRef.current = pushCommand;
 
   // Snapshots belong to one page, so they're dropped when that page closes;
-  // commands carry their own inverse and stay.
+  // commands carry their own inverse and stay, and so do applied edits: their
+  // inverses name the checksums they apply to, so after an outside edit they
+  // map through it or are refused — they never revert it (step 6).
   const dropPageHistory = useCallback(() => {
     const h = historyRef.current;
-    h.past = h.past.filter((e) => e.kind === 'cmd');
-    h.future = h.future.filter((e) => e.kind === 'cmd');
+    h.past = h.past.filter(keepsAcrossPages);
+    h.future = h.future.filter(keepsAcrossPages);
     h.lastKey = null;
     h.lastPush = 0;
   }, []);
 
   const applySnapshot = useCallback((entry: PageSnapshot) => {
     codeEditVersionRef.current += 1
+    const path = pageStateRef.current.currentPage?.path;
+    if (path) {editDrafts.markModel(path);}
     setPageState((s) => {
       if (!s) {return s;}
       if (entry.kind === 'model') {
+        // A restored model descends from no parse on disk: requests wait for
+        // the page to be clean again (plan §4 — no ids across versions).
         const model = cloneEditorModel(entry.model);
-        return { ...s, editable: true, model, save: saveStateEdited(s.save) };
+        return { ...s, editable: true, model, save: saveStateEdited(s.save), origin: undefined };
       }
       return { ...s, source: entry.source, save: saveStateEdited(s.save) };
     });
@@ -1522,7 +1619,7 @@ export default function App() {
       );
     }
     scheduleSaveRef.current?.(true);
-  }, []);
+  }, [editDrafts]);
 
   const scheduleSaveRef = useRef<((urgency?: boolean | 'live') => void) | null>(null);
 
@@ -1530,6 +1627,74 @@ export default function App() {
   // them; bumping this tells the style panel to re-read rather than wait for
   // its own polling to notice.
   const [historyTick, setHistoryTick] = useState(0);
+
+  // Undo or redo one gesture sent as edit requests (step 6): its inverses go
+  // out as reverts, newest first, each against the checksum it came back with,
+  // so an outside edit since is mapped through or refused — never reverted.
+  // What was undone becomes the step in the other direction; a refusal stops
+  // there, keeps what is left where it was, and says why (plan §7).
+  const stepEdits = useCallback(
+    async (entry: EditsEntry, direction: 'undo' | 'redo') => {
+      const h = historyRef.current;
+      const back = (next: EditsEntry) => (direction === 'undo' ? h.past : h.future).push(next);
+      const forth = (next: HistoryEntry) => (direction === 'undo' ? h.future : h.past).push(next);
+      try {
+        await autosave(); // Its own requests' answers first.
+      } catch {
+        /* reported by the save itself; the checks below decide */
+      }
+      const path = pageStateRef.current.currentPage?.path;
+      const state = pageStateRef.current.pageState;
+      if (!path || !state) {return;} // its page is gone — nothing to restore onto
+      const outcome = entry.record.outcome;
+      if (outcome.tag !== 'applied' || outcome.applied.length === 0 || state.save.tag !== 'clean') {
+        // Carried by a whole-model save, or the page has unsaved or refused
+        // edits: the snapshot is the undo, as before step 6.
+        forth(snapshotOf(state));
+        applySnapshot(entry.snapshot);
+        return;
+      }
+      const done: AppliedEdit[] = [];
+      let written: PageEdited | undefined;
+      for (const step of [...outcome.applied].reverse()) {
+        const hunks = step.inverse;
+        const answer = await editProjectPage({
+          pagePath: path,
+          authoredChecksum: step.checksum,
+          edit: { tag: 'revert', hunks },
+        });
+        if (!answer.ok) {
+          const error = answer.error;
+          const why = error.code === 'rejected' ? describeRejection(error.reason) : error.message;
+          showToast(`Couldn’t ${direction}: ${why}`, 'error');
+          break;
+        }
+        done.push({ checksum: answer.value.checksum, inverse: answer.value.inverse });
+        written = answer.value;
+      }
+      const left = outcome.applied.slice(0, outcome.applied.length - done.length);
+      if (left.length > 0) {
+        const outcome = { tag: 'applied' as const, applied: left };
+        back({ kind: 'edits', snapshot: entry.snapshot, record: { outcome } });
+      }
+      if (written === undefined) {return;}
+      const undone = { tag: 'applied' as const, applied: done };
+      forth({ kind: 'edits', snapshot: snapshotOf(state), record: { outcome: undone } });
+      const clean = saveStateClean(written.checksum);
+      const next = toEditorPageState(adoptParsedModel(state, written), clean);
+      codeEditVersionRef.current += 1;
+      // Installed only over the state the undo started from: a newer edit
+      // made meanwhile keeps its model, and main rebases it past the revert.
+      setPageState((current) => (current === state ? next : current));
+      if (next.editable) {
+        const model = next.model;
+        const named = (id: string) => id === 'layout' || id === 'frontmatter';
+        const gone = (id: string) => !named(id) && !findNodeById(model.nodes, id);
+        setSelectedId((id) => (id && gone(id) ? null : id));
+      }
+    },
+    [applySnapshot, autosave, showToast],
+  );
 
   const undo = useCallback(async () => {
     if (propertySave.saving.current) { return; }
@@ -1549,11 +1714,15 @@ export default function App() {
       }
       return;
     }
+    if (entry.kind === 'edits') {
+      await stepEdits(entry, 'undo');
+      return;
+    }
     const state = pageStateRef.current.pageState;
     if (!state) {return;} // its page is gone — nothing to restore onto
     h.future.push(snapshotOf(state));
     applySnapshot(entry);
-  }, [applySnapshot, showToast, propertySave.saving]);
+  }, [applySnapshot, showToast, propertySave.saving, stepEdits]);
 
   const redo = useCallback(async () => {
     if (propertySave.saving.current) { return; }
@@ -1573,11 +1742,15 @@ export default function App() {
       }
       return;
     }
+    if (entry.kind === 'edits') {
+      await stepEdits(entry, 'redo');
+      return;
+    }
     const state = pageStateRef.current.pageState;
     if (!state) {return;}
     h.past.push(snapshotOf(state));
     applySnapshot(entry);
-  }, [applySnapshot, showToast, propertySave.saving]);
+  }, [applySnapshot, showToast, propertySave.saving, stepEdits]);
 
   // Discrete edits (dropdown, checkbox, drag, delete) save immediately;
   // typing batches keystrokes for 300 ms so the preview doesn't rebuild
@@ -1629,6 +1802,7 @@ export default function App() {
   // Deliberate: the user saw the conflict and keeps the local text, so it now
   // saves over what is on disk (and conflicts again if the disk moves again).
   const keepLocalVersion = useCallback(() => {
+    setConflictReason(undefined);
     setPageState((current) =>
       current?.save.tag === 'conflicted'
         ? { ...current, save: saveStateAccepted(current.save) }
@@ -1646,6 +1820,10 @@ export default function App() {
       if (propertySave.saving.current) { return; }
       codeEditVersionRef.current += 1
       pushHistory(coalesceKey);
+      // A gesture without an intent form yet: the whole model is saved, and
+      // carries every unsaved request with it, until the page is clean.
+      const path = pageStateRef.current.currentPage?.path;
+      if (path) {editDrafts.markModel(path);}
       setPageState((s) => {
         if (!s || !s.editable) {return s;}
         const model = fn(cloneEditorModel(s.model));
@@ -1653,7 +1831,39 @@ export default function App() {
       });
       scheduleSave(immediate);
     },
-    [scheduleSave, pushHistory, propertySave.saving]
+    [scheduleSave, pushHistory, propertySave.saving, editDrafts]
+  );
+
+  // A gesture in its intent form (step 6, editGestures.ts): it goes to disk as
+  // edit requests against the page's origin, and its effect shows at once.
+  // Where a request cannot be stated — no origin (typed code, a restored
+  // undo), a node created since, a queue already saving whole models — the
+  // effect is saved as the whole model instead, exactly as mutateModel does.
+  const commitEdit = useCallback(
+    (gesture: EditGesture) => {
+      if (propertySave.saving.current) { return; }
+      const { currentPage, pageState: state } = pageStateRef.current;
+      const path = currentPage?.path;
+      if (!path || !state?.editable) {return;}
+      codeEditVersionRef.current += 1;
+      const record = pushEditHistory(gesture.coalesceKey);
+      const origin = state.origin;
+      const requests =
+        origin === undefined ? undefined : gesture.request((id) => nodeRefIn(origin, id));
+      if (origin === undefined || requests === undefined || requests.length === 0) {
+        editDrafts.markModel(path);
+        subsume(record);
+      } else {
+        for (const { edit, stream } of requests) {
+          editDrafts.record(path, { edit, stream, record, authoredChecksum: origin.checksum });
+        }
+      }
+      setPageState((s) =>
+        s?.editable ? { ...s, model: gesture.apply(s.model), save: saveStateEdited(s.save) } : s,
+      );
+      scheduleSave(gesture.urgency);
+    },
+    [scheduleSave, pushEditHistory, propertySave.saving, editDrafts]
   );
 
   const setRawSource = useCallback(
@@ -1661,10 +1871,12 @@ export default function App() {
       if (propertySave.saving.current) { return; }
       codeEditVersionRef.current += 1
       pushHistory('raw-source');
+      const path = pageStateRef.current.currentPage?.path;
+      if (path) {editDrafts.markModel(path);}
       setPageState((s) => (s ? { ...s, source, save: saveStateEdited(s.save) } : s));
       scheduleSave();
     },
-    [scheduleSave, pushHistory, propertySave.saving]
+    [scheduleSave, pushHistory, propertySave.saving, editDrafts]
   );
 
   const changeCodeSource = useCallback(
@@ -1695,6 +1907,8 @@ export default function App() {
           saveStateEdited(local.save),
         );
         pushHistory('code-source');
+        // Typed code is saved whole (step 8 brings code patches).
+        editDrafts.markModel(open.path);
         if (result.editable) {
           const inFrontmatter =
             result.model.bodyStart !== undefined && position < result.model.bodyStart;
@@ -1715,7 +1929,7 @@ export default function App() {
         }
       }
     },
-    [pushHistory, scheduleSave, showToast],
+    [pushHistory, scheduleSave, showToast, editDrafts],
   );
 
   // ----------------------------------------------------------------
@@ -1731,6 +1945,12 @@ export default function App() {
     const before = pageStateRef.current.pageState;
     assert(saver !== null, 'The page saver exists before any file event');
     if (!before || before.save.tag !== 'dirty' || saver.writing()) {
+      return;
+    }
+    // Unsaved edits that are all requests map through an outside change or
+    // are refused one by one, each with its reason (step 6): no page-wide
+    // conflict for them.
+    if (editDrafts.queue(pagePath).tag === 'edits') {
       return;
     }
     const baseBefore = saver.baseFor(pagePath, before.save);
@@ -1750,12 +1970,13 @@ export default function App() {
     if (saver.writing() || base !== baseBefore || diskChecksum === base) {
       return;
     }
+    setConflictReason(undefined);
     setPageState((current) =>
       current?.save.tag === 'dirty'
         ? { ...current, save: saveStateRefused(current.save, base, diskChecksum) }
         : current,
     );
-  }, []);
+  }, [editDrafts]);
 
   useEffect(() => {
     let changeVersion = 0;
@@ -3078,66 +3299,40 @@ export default function App() {
   const addClassToNode = useCallback(
     (nodeId: string, className: string) => {
       const clean = String(className || '').trim();
-      if (!nodeId || !clean) {return;}
-      let refused = false;
-      mutateModel((model) => {
-        const node = findNodeById(model.nodes, nodeId);
-        if (!node) {return model;}
-        if (hasClass(node.props, clean)) {return model;}
-        const edit = withClass(node.props, clean);
-        if (!edit) {
-          refused = true;
-          return model;
-        }
-        if (!node.props) {node.props = {};}
-        node.props[edit.key] = edit.value;
-        return model;
-      }, true);
-      if (refused) {
+      const state = pageStateRef.current.pageState;
+      if (!nodeId || !clean || !state?.editable) {return;}
+      const node = findNodeById(state.model.nodes, nodeId);
+      if (!node || hasClass(node.props, clean)) {return;}
+      const edit = withClass(node.props, clean);
+      if (!edit) {
         showToast(`Add ${clean} to this element yourself — its class comes from code Stacki can't edit safely.`);
+        return;
       }
+      // Step 6, attribute: the class attribute, as its own edit request.
+      const patch = { [edit.key]: edit.value };
+      commitEdit(propsGesture(nodeId, patch, { coalesceKey: null, urgency: true }));
     },
-    [mutateModel, showToast]
+    [commitEdit, showToast]
   );
 
+  // Step 6, attribute: set or remove one prop, as an edit request when it has
+  // an intent form (editGestures.ts), else as a whole-model save.
   const setProp = useCallback(
     (nodeId: string, propName: string, value: Attr | undefined, immediate = false) => {
-      mutateModel(
-        (model) => {
-          const node = findNodeById(model.nodes, nodeId);
-          if (!node) {return model;}
-          if (!node.props) {node.props = {};}
-          if (value === undefined) {delete node.props[propName];}
-          else {node.props[propName] = value;}
-          return model;
-        },
-        immediate,
-        `prop:${nodeId}:${propName}`
-      );
+      const coalesceKey = `prop:${nodeId}:${propName}`;
+      commitEdit(propsGesture(nodeId, { [propName]: value }, { coalesceKey, urgency: immediate }));
     },
-    [mutateModel]
+    [commitEdit]
   );
 
   // Several props in one edit, so picking an image and getting its width and
   // height back is a single undo rather than three.
   const setProps = useCallback(
     (nodeId: string, patch: PropValues, immediate = true) => {
-      mutateModel(
-        (model) => {
-          const node = findNodeById(model.nodes, nodeId);
-          if (!node) {return model;}
-          if (!node.props) {node.props = {};}
-          for (const [name, value] of Object.entries(patch)) {
-            if (value === undefined) {delete node.props[name];}
-            else {node.props[name] = value;}
-          }
-          return model;
-        },
-        immediate,
-        `props:${nodeId}:${Object.keys(patch).join(',')}`
-      );
+      const coalesceKey = `props:${nodeId}:${Object.keys(patch).join(',')}`;
+      commitEdit(propsGesture(nodeId, patch, { coalesceKey, urgency: immediate }));
     },
-    [mutateModel]
+    [commitEdit]
   );
 
   // Writes an asset pick into a prop. The root decides the form:
@@ -5435,6 +5630,7 @@ export default function App() {
       {pageState?.save.tag === 'conflicted' && currentPage?.path && (
         <SaveConflictNotice
           fileName={currentPage.name}
+          reason={conflictReason}
           reviewing={leftTab === 'code'}
           onReload={() => {
             void reloadFromDisk();
@@ -5450,6 +5646,27 @@ export default function App() {
       <ConfirmHost />
     </div>
   );
+}
+
+// What survives the page's history being dropped (dropPageHistory).
+function keepsAcrossPages(entry: HistoryEntry): boolean {
+  switch (entry.kind) {
+    case 'cmd':
+      return true;
+    case 'edits':
+      // Only an applied one: its inverses are all it needs.
+      if (entry.record.outcome.tag === 'applied') {
+        return entry.record.outcome.applied.length > 0;
+      }
+      return false;
+    case 'model':
+    case 'source':
+      return false;
+    default: {
+      const exhaustive: never = entry;
+      return exhaustive;
+    }
+  }
 }
 
 function insertIntoModel(model: EditorModel, node: EditorNode, target: InsertTarget | null): void {

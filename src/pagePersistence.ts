@@ -5,6 +5,7 @@
 
 import { assert } from '../shared/assert';
 import type { Digest } from '../shared/brand';
+import type { RejectionReason } from '../shared/intent';
 import { LIMITS } from '../shared/limits';
 import type { ScanResult } from '../shared/scan';
 import {
@@ -26,10 +27,20 @@ interface CurrentSnapshot<State extends PageStateHandle> {
   readonly pageState?: State | null;
 }
 
-/** What one write did. Failures other than a conflict reject the promise. */
+/** What one write did. Failures other than a conflict reject the promise,
+ * except `advanced`: some of the edits reached disk through the app's own
+ * writes (step 6, edit requests go one at a time) and the rest did not. The
+ * disk now holds `checksum`, which later writes must name as their base, and
+ * the error is reported like any other failure. */
 export type PageWriteOutcome<State> =
   | { readonly tag: 'written'; readonly state: State; readonly checksum: Digest }
-  | { readonly tag: 'conflict'; readonly diskChecksum: Digest };
+  | {
+      readonly tag: 'conflict';
+      readonly diskChecksum: Digest;
+      /** Why an edit request was refused; absent for a whole-model save. */
+      readonly reason?: RejectionReason;
+    }
+  | { readonly tag: 'advanced'; readonly checksum: Digest; readonly error: Error };
 
 interface PageSaverDeps<State extends PageStateHandle> {
   readonly readCurrent: () => CurrentSnapshot<State>;
@@ -42,8 +53,13 @@ interface PageSaverDeps<State extends PageStateHandle> {
   readonly withSave: (pageState: State, save: SaveState) => State;
   /** Install `next` if `previous` is still the current page state. */
   readonly replace: (previous: State, next: State) => void;
-  /** The file refused a write: mark whatever state is current as conflicted. */
-  readonly markConflicted: (baseChecksum: Digest, diskChecksum: Digest) => void;
+  /** The file refused a write: mark whatever state is current as conflicted,
+   * with the actor's reason when an edit request was refused. */
+  readonly markConflicted: (
+    baseChecksum: Digest,
+    diskChecksum: Digest,
+    reason: RejectionReason | undefined,
+  ) => void;
 }
 
 /** Where a flush left the page: its edits are on disk (or there were none), or
@@ -173,6 +189,13 @@ class SerialPageSaver<State extends PageStateHandle> {
     } finally {
       this.#inFlight = false;
     }
+    if (outcome.tag === 'advanced') {
+      // Part of the edit reached disk through our own writes: later states
+      // are based on those bytes, and the rest stays unsaved (dirty).
+      this.#lineage = { path, from: saveStateBase(pageState.save), to: outcome.checksum };
+      this.#deps.replace(saving, this.#deps.withSave(saving, saveStateFailed(saving.save)));
+      throw outcome.error;
+    }
     if (outcome.tag === 'written') {
       const written = outcome.state.save;
       assert(written.tag === 'clean', 'A written page state is clean');
@@ -188,9 +211,11 @@ class SerialPageSaver<State extends PageStateHandle> {
   #settle(acknowledgement: Acknowledgement<State>): void {
     const { outcome } = acknowledgement;
     if (outcome.tag === 'conflict') {
-      this.#deps.markConflicted(acknowledgement.baseChecksum, outcome.diskChecksum);
+      const { diskChecksum, reason } = outcome;
+      this.#deps.markConflicted(acknowledgement.baseChecksum, diskChecksum, reason);
       return;
     }
+    assert(outcome.tag === 'written', 'Only a written or refused save is acknowledged');
     for (const copy of acknowledgement.copies) {
       this.#deps.replace(copy, outcome.state);
     }
