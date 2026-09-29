@@ -26,8 +26,10 @@ lands it.
   write path, and step 5 does not start without a written plan revision.
   **Revision A** (registered `d3b825b`, measured at `2982961`) **also failed**,
   on keystroke → disk only (400.8 / 470.9 ms against 350). Every other
-  threshold passed. See Thresholds, "Revision A decision". Step 5 has still
-  not started.
+  threshold passed. See Thresholds, "Revision A decision".
+  **Revision B** (registered `a1ceffa` with A's thresholds unchanged, measured
+  at `3352742`) **passed every threshold: go** (2026-09-28). See Thresholds,
+  "Revision B decision". Step 5 is unblocked and has not started.
 - **Step 0 landed (2026-09-28).** The legacy
   write path still serializes whole files (`mutateModel` → `page:write` →
   `serializePage`), but every page write now names the checksum it was
@@ -502,7 +504,7 @@ asserts no threshold; the fixture loader moved to `fixtures.entry.ts` so the
 gate suite and the bench run the same scenarios, and the simulator lint fence
 now also excepts `*.bench.ts` and `*.entry.ts`.
 
-### Step 4 — Threshold decision ✅ (decided: **fail**; revision A: **fail**, U2; step 5 not started)
+### Step 4 — Threshold decision ✅ (**fail**; revision A **fail** on U2; revision B **go**)
 
 **Deliverables.** A recorded decision, not code.
 
@@ -1036,6 +1038,87 @@ Only aggregate counts are recorded; no file content or path is.
 the first complete run of `patch.bench.ts` after the implementation commit.
 Otherwise the result is no-go: the legacy path stays, and nothing is
 renegotiated.
+
+### Revision B decision — 2026-09-28, code `3352742`: PASS. Go.
+
+**The run that counts.** The first complete run of `patch.bench.ts` after
+`3352742`, with the load average at 1.10 at start. It ran after
+`npm run fixtures:large`, which left the manifest unchanged. W ran separately
+afterwards.
+
+| Id | Measure | Result, ms | Threshold | Verdict |
+|---|---|---|---|---|
+| W | wrong-site plans, 2 000 seeds, `wrongSite: 'fail'` | 0 (774 s) | 0 | pass |
+| E | fresh engine p95: nodes-25/50/100 | 3.7 / 5.1 / 12.6 | ≤ 50 | pass |
+| E | fresh engine p95: bytes-25/50/100 | 8.1 / 17.7 / 27.1 | ≤ 50 | pass |
+| U1 | fresh end to end p95: nodes-25 / nodes-50 | 16.4 / 22.1 | ≤ 50 | pass |
+| U2 | last keystroke → disk p95: nodes-25 / nodes-50 | 329.8 / 332.9 | ≤ 350 | pass |
+| S | stale engine p95: nodes-25 / nodes-50 | 5.9 / 11.2 | ≤ 50 | pass |
+| P | patch-variant candidates equal to a full reparse | 428 of 428 | all | pass |
+| — | adapter surface | 70 / 9 / 28 / 4 | recorded | — |
+
+**Recorded, not gated** (p95 unless marked):
+- Patch refusals: 0 of 428. Revision A refused 9.
+- Fresh end to end on nodes-100: 39.8. On bytes-25/50/100: 112.3 / 206.9 /
+  422.7. Of the bytes-100 figure, protocol work at p50 is read 37.6, hash
+  33.8, verify 51.3 and write 254.0.
+- Stale engine on nodes-100: 22.9. On bytes-*: 55.1 / 115.0 / 198.2, mostly
+  the diff plus the occurrence count. That is the stale-plan lever named in
+  the proposal.
+- Stale end to end, refresh included: 103.8 / 211.8 / 424.7 on nodes-*.
+  Step 5 moves the refresh to the watcher tick.
+
+**Real-page census** (`node test/simulator/census.bench.ts <roots>`, the
+development machine's project directories). There are 254 distinct `.astro`
+files; 292 duplicates were skipped, and every file parsed. They hold 3 851
+editable string-value sites.
+
+| Share of sites | Value |
+|---|---|
+| Host in markup | 58.4 % |
+| Host in a condition or loop | 41.6 % |
+| Falls back, `"New title"`, revision A | 41.8 % |
+| Falls back, `"New title"`, revision B | 2.2 % |
+| Falls back, `"/about/team?x=1"`, revision A | 41.8 % |
+| Falls back, `"/about/team?x=1"`, revision B | 41.8 % |
+
+- Real pages put far more edits in expressions than the fixtures do: 41.6 %
+  of sites, against 2–10 % of draws. Revision A would have fallen back on
+  almost half of real edits.
+- Under B, a URL-like value in an expression host still falls back. `?` and
+  `:` can split a ternary when the value sits in code mode (see the header of
+  `projection-patch.ts`).
+- On real pages a fallback is cheap. A full reparse per file takes 0.6 ms
+  p50, 3.4 ms p95 and 21.9 ms max, against 85–154 ms on the fixtures the
+  thresholds use.
+- All 6 005 patches B made on real pages were equal to their full reparse.
+
+**Correction to earlier evidence.** The proposal's size census (1 052 files:
+median 1.6 KB, p95 15 KB, max 93 KB) counted duplicates. `/mnt/wslg/distro`
+mirrors the WSL filesystem, and `/tmp` held test scratch copies. The distinct
+set is 254 files: median 2.4 KB, p95 21 KB, max 92 750 B.
+- The maximum is unchanged, so the reason given for U1 and U2 holds: nodes-25
+  (176 KB) is still about 2× the largest real page.
+- No threshold was set from the corrected figures.
+
+**Consequences:**
+- Step 4 is decided **go**, and step 5 is unblocked.
+- The legacy path remains the shipped write path until step 5's actor
+  replaces it. Nothing in this step ships to the app except the parser fixes,
+  which have identical output.
+
+**Carried into step 5** (from the proposal, §6, updated):
+- **The splice log** for self-caused staleness. It closes the "BYTES CANNOT
+  TELL" residual for the app's own edits.
+- **The refresh on the watcher tick.**
+- **How the renderer's `PageModel` updates without a reparse.** Otherwise the
+  legacy reparse returns on the save path.
+- **Deduplicate the full SHA-256 passes per intent.**
+- **The stale-plan cost on bytes-*:** move the per-byte assertions in the
+  occurrence count out of its hot loop.
+- **Contingent, on telemetry:**
+  - Code-mode-safe handling of `/ ? :` in expression hosts.
+  - Context-extended uniqueness, if `anchor-ambiguous` is frequent.
 
 ## Limits work (§8)
 

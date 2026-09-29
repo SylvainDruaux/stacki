@@ -525,6 +525,9 @@ Ratchet counts only decrease.
      nodes-50.
    - Stale engine ≤ 50 ms applies on those two fixtures.
    Definitions, reasons, the harness and the decision rule are in the tracker, Thresholds.
+   Revision A failed on keystroke→disk: hosts inside `{…}` fell back to a full reparse.
+   **Revision B** (the same thresholds; the projection patch extended to hosts in conditions
+   and loops) **passed every threshold on 2026-09-28: go.**
 5. **Actor and write protocol.** Bounded queue, §5.2 protocol on `atomicWrite.ts`,
    external-writer handling, one actor per chunk file. **Single writer:** the legacy save path
    submits `ReplaceSource` through the actor from this step on (§3.3); a test proves no code
