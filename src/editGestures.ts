@@ -6,7 +6,7 @@
 // it. Gestures join in the §11.6 order; one without an intent form yet keeps
 // saving the whole model (App.tsx, mutateModel).
 import { assert } from '../shared/assert';
-import type { EditorModel, EditorNode } from '../shared/editor-model';
+import type { EditorModel, EditorNode } from './pageView';
 import type { Edit, NodeRef } from '../shared/edit-request';
 import { singleDeclarationChange } from '../shared/inlineStyle';
 import { LIMITS } from '../shared/limits';
@@ -286,7 +286,11 @@ export function withoutNodes(model: EditorModel, nodeIds: readonly string[]): Ed
   return nodes === model.nodes ? model : { ...model, nodes };
 }
 
-function filteredList(list: readonly EditorNode[], gone: ReadonlySet<string>, depth: number): readonly EditorNode[] {
+function filteredList(
+  list: readonly EditorNode[],
+  gone: ReadonlySet<string>,
+  depth: number,
+): readonly EditorNode[] {
   assert(depth <= LIMITS.treeDepthMax, 'A model is no deeper than its bound');
   let changed = false;
   const next: EditorNode[] = [];
@@ -371,7 +375,11 @@ export function withChildren(node: EditorNode, children: readonly EditorNode[]):
   return copy;
 }
 
-function spliced(list: readonly EditorNode[], index: number, node: EditorNode): readonly EditorNode[] {
+function spliced(
+  list: readonly EditorNode[],
+  index: number,
+  node: EditorNode,
+): readonly EditorNode[] {
   return [...list.slice(0, index), node, ...list.slice(index)];
 }
 

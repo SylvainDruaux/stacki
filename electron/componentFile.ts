@@ -1,4 +1,9 @@
-// Making a component file out of a piece of a page.
+// Making new files from a model: a component out of a piece of a page, and a
+// new page. Printing a whole file happens only here, for a file that does not
+// exist yet; an existing file changes only by splices (plan §11.9, the
+// no-whole-file-regeneration fence in eslint.config.mjs).
+//
+// A component made out of a piece of a page:
 //
 // The markup MOVES — the page keeps `<Card />` where the element was — so what
 // lands in the new file has to be everything that piece needed to render. Two
@@ -15,6 +20,7 @@
 import fs from 'fs';
 import path from 'path';
 
+import { assert } from '../shared/assert.js';
 import { serializePage, serializeNodes } from './astroParser.js';
 
 const toPosix = (p: string): string => p.split(path.sep).join('/');
@@ -109,4 +115,37 @@ function componentFile({
   return { path: target, rel: toPosix(path.relative(projectPath, target)), text };
 }
 
-export { componentFile };
+interface NewPageLayout {
+  readonly name: string;
+  readonly path: string;
+}
+
+/** The text of a new, empty page: a frontmatter block, and the layout wrapper
+ * when one is picked (imported relative to the page). */
+function newPageText(input: {
+  readonly pagePath: string;
+  readonly layout: NewPageLayout | undefined;
+  readonly eol: '\n' | '\r\n';
+}): string {
+  const layout = input.layout;
+  const base = {
+    extraFrontmatter: '',
+    frontmatterLead: '',
+    extraFrontmatterSpaced: true,
+    hadFrontmatter: true,
+    trailingBlank: 0,
+    eol: input.eol,
+  };
+  if (layout === undefined) {
+    return serializePage({ ...base, imports: [], nodes: [] });
+  }
+  const rel = toPosix(path.relative(path.dirname(input.pagePath), layout.path));
+  const wrapper = { id: 'layout', kind: 'component', name: layout.name, props: {}, children: [] };
+  const imports = [{ name: layout.name, path: rel.startsWith('.') ? rel : './' + rel }];
+  const text = serializePage({ ...base, imports, nodes: [wrapper] });
+  assert(text.includes(`<${layout.name}`), 'A new page prints its layout wrapper');
+  assert(text.includes(rel), 'A new page imports its layout');
+  return text;
+}
+
+export { componentFile, newPageText };

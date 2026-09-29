@@ -1247,7 +1247,8 @@ function withDerivedShapes(
   values: readonly TreeNode[],
 ): { readonly props: TreeNode[]; readonly values: TreeNode[] } {
   const byName = new Map<string, TreeNode>();
-  const replaced = new Map<TreeNode, TreeNode>(); // By identity: a prop and a value may share a path.
+  // By identity: a prop and a value may share a path.
+  const replaced = new Map<TreeNode, TreeNode>();
   for (const n of [...props, ...values]) {
     byName.set(n.path, n);
   }
@@ -1281,7 +1282,8 @@ function derivedShape(
   const baseName = m?.[1];
   const base = baseName !== undefined ? byName.get(baseName) : undefined;
   if (base?.children) {
-    return { ...node, kind: base.kind, preview: base.preview, children: rebase(base.children, base.path, name) };
+    const children = rebase(base.children, base.path, name);
+    return { ...node, kind: base.kind, preview: base.preview, children };
   }
   // One OF a list is one of whatever the list holds, so the fields to show
   // are the item's — `featured` opens onto the same fields as `portfolio`'s

@@ -210,7 +210,11 @@ const INPUT = '<Input variant="first-name" required />';
 // be a second answer to where a renamed prop lives.
 {
   const gestures = fs.readFileSync(path.join(__dirname, '..', 'src', 'editGestures.ts'), 'utf8');
-  check('the app renames props through that module', /renamedAttr\(found, names\.from, names\.to\)/.test(gestures), 'the rename gesture renames props its own way');
+  check(
+    'the app renames props through that module',
+    /renamedAttr\(found, names\.from, names\.to\)/.test(gestures),
+    'the rename gesture renames props its own way',
+  );
 }
 
 // --- what has no order to keep -------------------------------------------------

@@ -449,7 +449,8 @@ test('append-body gives an empty body its first node, and only an empty one', ()
     toAnchorRef({ span: toByteSpan(0, page.bytes.length), path: [], expectedKind: 'document' });
   const append: Operation = { tag: 'append-body', source: '<main></main>' };
   const empty = snapshotText('---\nconst a = 1;\n---\n');
-  assert.equal(run(empty, append, documentAnchor(empty)), '---\nconst a = 1;\n---\n<main></main>\n');
+  const appended = '---\nconst a = 1;\n---\n<main></main>\n';
+  assert.equal(run(empty, append, documentAnchor(empty)), appended);
   const bare = snapshotText('');
   assert.equal(run(bare, append, documentAnchor(bare)), '<main></main>\n');
   const crlf = snapshotText('---\r\n---');

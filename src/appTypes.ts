@@ -13,10 +13,10 @@ import type { VariableSelection } from './variablesBridge';
 import {
   type EditorModel,
   type EditorNode,
-} from '../shared/editor-model';
+} from './pageView';
 
-export { nodeId } from '../shared/editor-model';
-export type { EditorModel, EditorNode } from '../shared/editor-model';
+export { nodeId } from './pageView';
+export type { EditorModel, EditorNode } from './pageView';
 
 export interface ProjectIdentity {
   readonly path: string;
@@ -260,7 +260,8 @@ export function carriedParse<Parsed extends ParsePageResult & { readonly source:
   const checksum = parsed.checksum;
   const seed = checksum === undefined ? randomSeed() : seedOf(checksum);
   const after = { source: parsed.source, seed, model: parsed.model };
-  return { ...parsed, model: carryHandles({ before, after, own: undefined, predicted: undefined }) };
+  const model = carryHandles({ before, after, own: undefined, predicted: undefined });
+  return { ...parsed, model };
 }
 
 export function isOpenFile(page: CurrentPage | null): page is OpenFile {

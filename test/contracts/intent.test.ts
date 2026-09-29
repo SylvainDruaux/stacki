@@ -85,8 +85,14 @@ test('malformed intents fail at the field that is wrong', () => {
     [wire(element, { tag: 'rename-tag', from: 'div', to: 'my div' }), /expected a tag name/],
     [wire(element, { tag: 'rename-tag', from: 'div', to: 'div' }), /must change the name/],
     [wire(element, { tag: 'rename-attribute', from: 'a', to: 'a' }), /must change/],
-    [wire(element, { tag: 'rewrite-node', hunks: [{ span: { start: 0, end: 1 }, text: '' }] }), /outside its anchor/],
-    [wire(element, { tag: 'wrap-nodes', last: frontmatter, open: '', close: '' }), /wrap-nodes cannot/],
+    [
+      wire(element, { tag: 'rewrite-node', hunks: [{ span: { start: 0, end: 1 }, text: '' }] }),
+      /outside its anchor/,
+    ],
+    [
+      wire(element, { tag: 'wrap-nodes', last: frontmatter, open: '', close: '' }),
+      /wrap-nodes cannot/,
+    ],
     [wire({ ...element, path: 'x' }, set), /path: expected array/],
     [wire({ ...element, expectedKind: 'widget' }, set), /unknown anchor kind/],
   ];

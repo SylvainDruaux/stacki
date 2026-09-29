@@ -249,10 +249,15 @@ test('opening and saving every round-trip fixture reproduces its bytes', async (
     const read = parsePageDiskRead(await harness.invoke('page:read', file));
     assert.ok(read.editable, `${name} opens in the visual editor`);
     assert.equal(read.checksum, sha256(original));
-    const serialized = toRecord(
-      await harness.invoke('page:serialize', { pagePath: file, model: read.model }),
-    );
-    assert.equal(serialized?.['source'], original.toString('utf8'), `${name} reviews exactly`);
+    const review = harness.invoke('page:serialize', { pagePath: file, model: read.model });
+    if (name.endsWith('.astro')) {
+      // Step 9: an .astro page's unsaved edits are previewed as splices
+      // (page:previewEdit, page-edit.test.ts), never printed whole.
+      await assert.rejects(review, /previewed as edits/, `${name} is never printed for review`);
+    } else {
+      const serialized = toRecord(await review);
+      assert.equal(serialized?.['source'], original.toString('utf8'), `${name} reviews exactly`);
+    }
     const written = parsePageWriteResult(
       await harness.invoke('page:write', {
         pagePath: file,

@@ -1,5 +1,5 @@
-// The electron half of the compat adapter (plan §2 layer 3; step 6): an edit
-// request, stated in the renderer's terms, becomes an intent against the
+// The renderer's intent front end, main's half (plan §2 layer 3; step 6): an
+// edit request, stated in the renderer's terms, becomes an intent against the
 // snapshot it was authored against. Here the renderer's node references are
 // checked against main's own projection of the same bytes, UTF-16 ranges
 // become byte spans, new nodes and frontmatter are printed by the legacy
@@ -8,10 +8,12 @@
 // rename's sites are found (shared/loopScope.ts). Everything else is the
 // planner's.
 //
-// On the legacy writer boundary (eslint.config.mjs) because it prints: new
-// nodes with serializeNodes, and the frontmatter block with serializePage over
-// a model without nodes. Step 9 moves node printing into the engine and
-// deletes this module with the rest of the adapter.
+// On the .astro printer boundary (eslint.config.mjs) because it prints only
+// what an edit adds: new nodes with serializeNodes, and the frontmatter block
+// with serializePage over a model without nodes — never an existing file. It
+// outlived the compat adapter at step 9 (tracker, Step 9): the renderer names
+// nodes by the path, kind and UTF-16 range of the parse it shows, and only main
+// holds the bytes those become, so the translation stays here.
 import { assert } from '../shared/assert';
 import { toUtf16Offset } from '../shared/brand';
 import { diffCodePatch } from '../shared/code-patch';

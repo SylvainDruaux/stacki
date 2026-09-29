@@ -27,20 +27,21 @@ const NO_ASSERTIONS = [
   },
 ];
 
-// Whole-file regeneration is the legacy write path (plan §12: rejected as the
-// steady state). Its serializers may be called only inside the writer boundary
-// listed in WRITER_BOUNDARY; everything else edits through intents and splices.
-// Importing the name is what is banned, so an alias cannot slip past.
+// Whole-file regeneration (plan §12: rejected as the steady state; §11.9: gone
+// for existing .astro files). An existing file changes only by splices, so the
+// printers may be imported or called only where a file is printed that does not
+// exist yet, or where an edit prints just what it adds. Importing the name is
+// what is banned, so an alias cannot slip past.
 const WHOLE_FILE_REGENERATION_MESSAGE =
-  'Whole-file regeneration is confined to the legacy writer boundary (plan §11 step 1); ' +
-  'new edits go through intents and splices.';
-const NO_WHOLE_FILE_REGENERATION = [
+  'Whole-file regeneration is confined to the printer boundaries (plan §11.9); ' +
+  'an existing file changes only through intents and splices.';
+const NO_ASTRO_PRINTING = [
   {
-    selector: 'ImportSpecifier[imported.name=/^serialize(Page|Nodes|MarkdownPage)$/]',
+    selector: 'ImportSpecifier[imported.name=/^serialize(Page|Nodes)$/]',
     message: WHOLE_FILE_REGENERATION_MESSAGE,
   },
   {
-    selector: 'CallExpression[callee.name=/^serialize(Page|Nodes|MarkdownPage)$/]',
+    selector: 'CallExpression[callee.name=/^serialize(Page|Nodes)$/]',
     message: WHOLE_FILE_REGENERATION_MESSAGE,
   },
   {
@@ -48,15 +49,36 @@ const NO_WHOLE_FILE_REGENERATION = [
     message: WHOLE_FILE_REGENERATION_MESSAGE,
   },
 ];
-const WRITER_BOUNDARY = [
-  'electron/astroParser.ts',
-  // Step 6: prints only what an edit adds (new nodes, a frontmatter block),
-  // never a file; deleted with the compat adapter at step 9.
-  'electron/editRequests.ts',
-  'electron/main.ts',
-  'electron/markdownParser.ts',
-  'electron/componentFile.ts',
+const NO_MARKDOWN_PRINTING = [
+  {
+    selector: 'ImportSpecifier[imported.name=/^serializeMarkdownPage$/]',
+    message: WHOLE_FILE_REGENERATION_MESSAGE,
+  },
+  {
+    selector: 'CallExpression[callee.name=/^serializeMarkdownPage$/]',
+    message: WHOLE_FILE_REGENERATION_MESSAGE,
+  },
+  {
+    selector:
+      "ImportDeclaration[source.value=/markdownParser(\\.js)?$/] > ImportNamespaceSpecifier",
+    message: WHOLE_FILE_REGENERATION_MESSAGE,
+  },
 ];
+const NO_WHOLE_FILE_REGENERATION = [...NO_ASTRO_PRINTING, ...NO_MARKDOWN_PRINTING];
+// Where the .astro printers may run: their definitions; new files (a component
+// made from a piece of a page, a new page); the nodes and the frontmatter block
+// an edit adds, printed alone (editRequests.ts); and Markdown's HTML blocks.
+const ASTRO_PRINTER_BOUNDARY = [
+  'electron/astroParser.ts',
+  'electron/componentFile.ts',
+  'electron/editRequests.ts',
+];
+// Where the Markdown printer may run: its definition, and main's whole save and
+// review of a Markdown or MDX page, until those pages join the engine (step 10).
+const MARKDOWN_PRINTER_BOUNDARY = ['electron/main.ts'];
+// Markdown's parser module holds its printer and prints its HTML blocks with
+// the .astro printer: both, until step 10.
+const PRINTER_BOUNDARY = ['electron/markdownParser.ts'];
 
 // Determinism is structural (plan §10): the simulator and the engine contracts
 // run on no clock, no timer, no promise and no OS. A real timer sneaking in is
@@ -243,8 +265,20 @@ export default [
     },
   },
   {
-    // The legacy writer boundary, and the tests that pin its round trip.
-    files: [...WRITER_BOUNDARY, 'test/**/*.ts'],
+    files: ASTRO_PRINTER_BOUNDARY,
+    rules: {
+      'no-restricted-syntax': ['error', ...NO_ASSERTIONS, ...NO_MARKDOWN_PRINTING],
+    },
+  },
+  {
+    files: MARKDOWN_PRINTER_BOUNDARY,
+    rules: {
+      'no-restricted-syntax': ['error', ...NO_ASSERTIONS, ...NO_ASTRO_PRINTING],
+    },
+  },
+  {
+    // Both printers, and the tests that pin their round trips.
+    files: [...PRINTER_BOUNDARY, 'test/**/*.ts'],
     rules: {
       'no-restricted-syntax': ['error', ...NO_ASSERTIONS],
     },

@@ -82,7 +82,15 @@ test('out-of-order page reads and external reads cannot replace the current edit
   const url = 'http://localhost/';
   const dom = new JSDOM('<!doctype html><div id="root"></div>', { url, pretendToBeVisual: true });
   const { window } = dom;
-  const shared = ['window', 'document', 'navigator', 'HTMLElement', 'Element', 'Node', 'MutationObserver'];
+  const shared = [
+    'window',
+    'document',
+    'navigator',
+    'HTMLElement',
+    'Element',
+    'Node',
+    'MutationObserver',
+  ];
   for (const key of shared) {global[key] = key === 'window' ? window : window[key];}
   global.getComputedStyle = window.getComputedStyle;
   global.requestAnimationFrame = (fn) => setTimeout(fn, 0);
@@ -106,6 +114,7 @@ test('out-of-order page reads and external reads cannot replace the current edit
   // answered by the test; answering one with a label puts that text on disk.
   const disk = new Map();
   const edits = [];
+  const previews = [];
   let editError = null;
   let onFsChanged;
   const refused = (reason, diskChecksum) => ({
@@ -142,13 +151,27 @@ test('out-of-order page reads and external reads cannot replace the current edit
       };
       return { ok: true, ...page, inverse: applied.inverse };
     },
-    serializePage: async () => ({ source: textOf('local') }),
+    // Review plans the queued gestures against the bytes they were stated
+    // on, and writes nothing (page:previewEdit).
+    previewPageEdit: async ({ pagePath, authoredChecksum, edit, source }) => {
+      assert.equal(sha256(source), authoredChecksum, 'a preview sends the bytes it names');
+      previews.push({ pagePath, edit });
+      const applied = applyEdit(pagePath, source, edit);
+      const page = {
+        ...parsePage(applied.text, { locs: true }),
+        source: applied.text,
+        checksum: sha256(applied.text),
+      };
+      return { ok: true, ...page, inverse: applied.inverse };
+    },
     onFsChanged: (cb) => { onFsChanged = cb; return () => {}; },
     gitInfo: async () => ({ isRepo: false }),
     onCssChanged: () => () => {},
   }, {
-    get: (target, key) =>
-      key in target ? target[key] : String(key).startsWith('on') ? () => () => {} : async () => null,
+    get: (target, key) => {
+      if (key in target) {return target[key];}
+      return String(key).startsWith('on') ? () => () => {} : async () => null;
+    },
   });
   window.avb = bridge;
   global.avb = bridge;
@@ -163,7 +186,8 @@ test('out-of-order page reads and external reads cannot replace the current edit
     reads[index].resolve(pageState(label));
   };
   const shown = () => __panels.PropsPanel.node?.props?.['data-label']?.value;
-  const wait = (ms) => act(async () => { await new Promise((resolve) => setTimeout(resolve, ms)); });
+  const wait = (ms) =>
+    act(async () => { await new Promise((resolve) => setTimeout(resolve, ms)); });
   await act(async () => { root.render(React.createElement(App)); await tick(); });
   await act(async () => { await __panels.WelcomeScreen.onOpen('/project'); await tick(); });
   assert.equal(reads[0].path, pages[0].path);
@@ -179,7 +203,8 @@ test('out-of-order page reads and external reads cannot replace the current edit
   const navigate = async (route) => {
     const input = document.querySelector('.url-bar input, input[spellcheck="false"]');
     assert.ok(input, 'URL input is available');
-    const setValue = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+    const prototype = window.HTMLInputElement.prototype;
+    const setValue = Object.getOwnPropertyDescriptor(prototype, 'value').set;
     await act(async () => {
       setValue.call(input, route);
       input.dispatchEvent(new window.Event('input', { bubbles: true }));
@@ -282,10 +307,14 @@ test('out-of-order page reads and external reads cannot replace the current edit
   // the latest asked for when it ended); its verdict on the page decides nothing.
   assert.equal(__panels.StructurePanel.currentPage.path, pages[1].path, 'the page stays open');
   assert.equal(scans.length, 2, 'the reconcile the later event asked for scans again');
-  const newLayout = { name: 'NewLayout', path: '/project/src/layouts/NewLayout.astro', folder: 'layouts' };
+  const newLayout = {
+    name: 'NewLayout',
+    path: '/project/src/layouts/NewLayout.astro',
+    folder: 'layouts',
+  };
   const latestScan = { ...scan, layouts: [newLayout] };
   await act(async () => { scans[1].resolve(latestScan); await tick(); });
-  assert.equal(reads[9].path, pages[1].path, 'the unrelated later event keeps the earlier page change');
+  assert.equal(reads[9].path, pages[1].path, 'a later unrelated event keeps the page change');
   await act(async () => { answer(9, 'after-newest-scan'); await laterScanEvent; await tick(); });
   assert.equal(__panels.StructurePanel.currentPage.path, pages[1].path);
   assert.equal(shown(), 'after-newest-scan');
@@ -300,7 +329,12 @@ test('out-of-order page reads and external reads cannot replace the current edit
     unrelatedEvent = onFsChanged({ files: ['/project/src/components/New.astro'] });
     await tick();
   });
-  await act(async () => { answer(10, 'page-change'); await pendingReadEvent; await unrelatedEvent; await tick(); });
+  await act(async () => {
+    answer(10, 'page-change');
+    await pendingReadEvent;
+    await unrelatedEvent;
+    await tick();
+  });
   assert.equal(shown(), 'page-change');
   assert.equal(reads.length, 11, 'the unrelated event reads no page');
 
@@ -341,6 +375,10 @@ test('out-of-order page reads and external reads cannot replace the current edit
   // never as a whole model.
   await act(async () => { await __panels.SaveConflictNotice.onReview(); await tick(); });
   assert.equal(__panels.SaveConflictNotice.reviewing, true);
+  assert.ok(previews.length > 0, 'the queued gestures were planned as splices');
+  assert.equal(disk.get(pages[1].path), theirs, 'a review writes nothing');
+  // The page the gestures were stated on, with them spliced in.
+  const reviewed = '<div data-label="page-change" title="mine, again"></div>\n';
   // A synchronous act commits the click's state before the zero-delay save
   // timer runs, as a real discrete event does.
   act(() => { __panels.SaveConflictNotice.onKeep(); });
@@ -352,12 +390,13 @@ test('out-of-order page reads and external reads cannot replace the current edit
   assert.equal(edits.length, attempted + 2);
   assert.equal(edits.at(-1).edit.tag, 'code-patch');
   assert.equal(edits.at(-1).authoredChecksum, sha256(theirs), 'against the bytes on disk');
-  assert.equal(disk.get(pages[1].path), textOf('local'), 'the reviewed text is on disk');
+  assert.equal(disk.get(pages[1].path), reviewed, 'the reviewed text is on disk');
   delete __panels.SaveConflictNotice;
   await typeTitle('clean again');
   assert.equal(__panels.SaveConflictNotice, undefined, 'the notice leaves with the conflict');
   assert.equal(edits.length, attempted + 3);
-  assert.equal(disk.get(pages[1].path), '<div data-label="local" title="clean again"></div>\n');
+  const cleanAgain = '<div data-label="page-change" title="clean again"></div>\n';
+  assert.equal(disk.get(pages[1].path), cleanAgain);
 
   // An outside edit while the page has unsaved edits: the pending edit names
   // the bytes the app read, and main refuses it over bytes that changed — the

@@ -137,6 +137,17 @@ export function editProjectPage(request: EditRequest): Promise<Result<PageEdited
   return window.avb.editPage(payload).then(parsePageEditResult);
 }
 
+/** The page `request` would leave, planned against `source` (the bytes at its
+ * authoredChecksum) and never written: an .astro page's unsaved gestures
+ * shown for review. The reply has page:edit's shape. */
+export function previewProjectPageEdit(
+  request: EditRequest,
+  source: string,
+): Promise<Result<PageEdited, PageEditError>> {
+  const payload = parseIpcPayload('page:previewEdit', { ...request, source });
+  return window.avb.previewPageEdit(payload).then(parsePageEditResult);
+}
+
 export function serializeProjectPage(pagePath: string, model: unknown): Promise<string> {
   const payload = parseIpcPayload('page:serialize', { pagePath, model });
   return window.avb.serializePage(payload).then((input) => text(record(input)['source']));

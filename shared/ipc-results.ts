@@ -468,6 +468,7 @@ export interface IpcResults {
     readonly newPath: string;
   };
   readonly 'page:parse': WirePageRead;
+  readonly 'page:previewEdit': WirePageEdit;
   readonly 'page:read': WirePageDiskRead;
   readonly 'page:rebaseImport': {
     readonly path: string;

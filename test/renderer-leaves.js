@@ -47,7 +47,8 @@ try {
   assert.equal(renamed.props.new, value);
   assert.deepEqual(renamed.attrOrder, ['new']);
   assert.deepEqual(node, { props: { old: value }, attrOrder: ['old'] }, 'the node is not edited');
-  assert.throws(() => renamedAttr(renamed, 'new', 'x'.repeat(8193)), /Attribute name exceeds limit/);
+  const tooLong = 'x'.repeat(8193);
+  assert.throws(() => renamedAttr(renamed, 'new', tooLong), /Attribute name exceeds limit/);
 
   const { checkStatement } = load('jsCheck');
   assert.equal(checkStatement(' '.repeat(1_000_000)).ok, true);

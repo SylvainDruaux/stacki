@@ -59,7 +59,7 @@ import {
   scanContainsFile,
   type PageSaver,
 } from './pagePersistence.js';
-import { createEntrySender } from './pageSender';
+import { createEntrySender, previewGestures } from './pageSender';
 import { createCoalescedRun } from './coalescedRun';
 import { carryHandles, seedOf } from './nodeHandles';
 import {
@@ -69,6 +69,7 @@ import {
   type PageOrigin,
   type EditGesture,
   type EditsRecord,
+  type QueueEntry,
 } from './pageEdits';
 import { describeRejection, type RejectionReason } from '../shared/intent';
 import {
@@ -103,7 +104,13 @@ import type { PageEdited } from '../shared/page-save';
 import type { Digest } from '../shared/brand';
 import { ancestorChain, createTreeIndex, nodeAtPath, pathOfNode } from './editorTree.js';
 import { readFrontmatter, writeFrontmatter } from '../electron/frontmatter';
-import { renamedLoopVar, parseLoopHead, disconnectedLoops, loopVarsAt, strippedBindings } from './loopBindings.js';
+import {
+  renamedLoopVar,
+  parseLoopHead,
+  disconnectedLoops,
+  loopVarsAt,
+  strippedBindings,
+} from './loopBindings.js';
 import {
   namesUsedIn,
   neededFrontmatter,
@@ -174,6 +181,7 @@ import {
   type CurrentPage,
   type DevStatus,
   type DynamicEntry,
+  type EditablePageState,
   type EditsEntry,
   type HistoryEntry,
   type EditorModel,
@@ -244,6 +252,7 @@ import {
   writeProjectFile,
   writeProjectPage,
   serializeProjectPage,
+  previewProjectPageEdit,
   editProjectPage,
   checkPreviewRender,
   type AppCollection,
@@ -283,7 +292,8 @@ function withNewIds(node: EditorNode, depth = 0): EditorNode {
     return { ...node, id };
   }
   // Object.assign keeps the node's own variant, where a spread would widen it.
-  return Object.assign({}, node, { id, children: children.map((child) => withNewIds(child, depth + 1)) });
+  const copies = children.map((child) => withNewIds(child, depth + 1));
+  return Object.assign({}, node, { id, children: copies });
 }
 
 // Placeholder copy for newly inserted text elements, so they're visible on the
@@ -532,6 +542,43 @@ function tagChangeGesture(
   const named = change.dropped.length > 0 ? sequence(removal, rename) : rename;
   if (frontmatterOf(imports(renamed)) === frontmatterOf(renamed)) {return named;}
   return sequence(named, frontmatterGesture(renamed, imports, options));
+}
+
+// The unsaved version of a conflicted page as text, for review (plan §7). An
+// .astro page's queued gestures are planned as the splices they would write,
+// against the bytes they were stated on (page:previewEdit) — never printed
+// whole; a Markdown page saves its whole model until step 10, and shows it so.
+type Reviewed =
+  | { readonly tag: 'shown'; readonly source: string; readonly withdrawn: number }
+  | { readonly tag: 'failed'; readonly message: string };
+
+async function reviewedSource(
+  path: string,
+  state: EditablePageState,
+  queued: readonly QueueEntry[],
+): Promise<Reviewed> {
+  if (state.origin === undefined) {
+    assert(state.model.format !== undefined, 'Only a Markdown page has no origin');
+    return { tag: 'shown', source: await serializeProjectPage(path, state.model), withdrawn: 0 };
+  }
+  const gestures = queued.flatMap((entry) => (entry.tag === 'gesture' ? [entry.gesture] : []));
+  assert(gestures.length === queued.length, 'Typed code is reviewed as it was typed');
+  const shown = await previewGestures({
+    path,
+    origin: state.origin,
+    gestures,
+    preview: previewProjectPageEdit,
+  });
+  switch (shown.tag) {
+    case 'previewed':
+      return { tag: 'shown', source: shown.origin.source, withdrawn: shown.withdrawn };
+    case 'failed':
+      return shown;
+    default: {
+      const exhaustive: never = shown;
+      return exhaustive;
+    }
+  }
 }
 
 // The node as a text field states it (step 9): a loop's head — the renames
@@ -1734,7 +1781,8 @@ export default function App() {
     const carried = carriedParse(local, parsed);
     const installed = (current: EditorPageState): EditorPageState => {
       if (!carried.editable) {
-        return { editable: false, reason: carried.reason, bail: carried.bail, source, save: current.save };
+        const { reason, bail } = carried;
+        return { editable: false, reason, bail, source, save: current.save };
       }
       const origin = current.editable ? current.origin : undefined;
       const model: EditorModel = carried.model;
@@ -1750,7 +1798,9 @@ export default function App() {
     }
     // The save state is whatever is current when this lands: a conflicted
     // page stays conflicted, and a save that landed meanwhile keeps its base.
-    setPageState((current) => (current && current.source === source ? installed(current) : current));
+    setPageState((current) =>
+      current && current.source === source ? installed(current) : current,
+    );
   }, [showToast]);
 
   const scheduleSaveRef = useRef<((urgency?: boolean | 'live') => void) | null>(null);
@@ -1921,7 +1971,17 @@ export default function App() {
     if (state.editable && !typed) {
       let source: string;
       try {
-        source = await serializeProjectPage(open.path, state.model);
+        const shown = await reviewedSource(open.path, state, editDrafts.entries(open.path));
+        if (shown.tag === 'failed') {
+          showToast(`Couldn’t show your version: ${shown.message}`, 'error');
+          return;
+        }
+        source = shown.source;
+        if (shown.withdrawn > 0) {
+          const edits = shown.withdrawn === 1 ? 'One edit' : `${shown.withdrawn} edits`;
+          const verb = shown.withdrawn === 1 ? 'is' : 'are';
+          showToast(`${edits} can’t be made visually and ${verb} left out.`, 'info');
+        }
       } catch (err) {
         showToast(`Couldn’t show your version: ${cleanError(err)}`, 'error');
         return;
@@ -1929,7 +1989,8 @@ export default function App() {
       const latest = pageStateRef.current.pageState;
       if (latest?.editable && latest.model === state.model) {
         const record = pushEditHistory('code-source');
-        editDrafts.typeCode(open.path, { save: latest.save, source, origin: latest.origin }, record);
+        const typed = { save: latest.save, source, origin: latest.origin };
+        editDrafts.typeCode(open.path, typed, record);
         setPageState((current) =>
           current?.editable && current.model === state.model ? { ...current, source } : current,
         );
@@ -1969,7 +2030,8 @@ export default function App() {
       const origin = state.origin;
       if (!markdown) {
         assert(origin !== undefined, 'An editable .astro page has an origin');
-        if (editDrafts.empty(path) && gesture.request((id) => nodeRefIn(origin, id)) === undefined) {
+        const unreachable = gesture.request((id) => nodeRefIn(origin, id)) === undefined;
+        if (editDrafts.empty(path) && unreachable) {
           // Nothing queued could have made its node: it is out of reach.
           showToast('That edit can’t be made visually here — edit it in the code panel.', 'error');
           return;
@@ -2312,7 +2374,10 @@ export default function App() {
       const imports = (m: EditorModel): EditorModel =>
         m.imports.some((i) => i.name === name)
           ? m
-          : { ...m, imports: [...m.imports, { name, path: chooseImportPath(m, paths), quote: "'" }] };
+          : {
+              ...m,
+              imports: [...m.imports, { name, path: chooseImportPath(m, paths), quote: "'" }],
+            };
       commitEdit(
         frontmatterOf(imports(after)) === frontmatterOf(after)
           ? replaced
@@ -2568,7 +2633,8 @@ export default function App() {
       let imports = model.imports;
       for (const r of resolved) {
         if (!imports.some((i) => i.name === r.name)) {
-          imports = [...imports, { name: r.name, path: chooseImportPath(model, r.paths), quote: "'" }];
+          const spec = chooseImportPath(model, r.paths);
+          imports = [...imports, { name: r.name, path: spec, quote: "'" }];
         }
       }
       for (const imp of carriedImports) {
@@ -3520,7 +3586,8 @@ export default function App() {
             : null;
         return withPrunedImports(entry ? { ...m, imports: [...m.imports, entry] } : m);
       };
-      commitEdit(tagChangeGesture(model, node, { kind: 'component', name, asset, dropped }, imported));
+      const change = { kind: 'component' as const, name, asset, dropped };
+      commitEdit(tagChangeGesture(model, node, change, imported));
       return true;
     },
     [insertables, commitEdit, resolveImportPath]

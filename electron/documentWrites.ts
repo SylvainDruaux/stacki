@@ -1,8 +1,9 @@
 // The one document host of the main process, and the entry points every module
 // uses to write project text (plan §3.3, §5.2: one writer per file). main.ts
 // installs the host at startup with its telemetry log and the note that the app
-// wrote a file (the canvas may need to hear of it); modules that are also loaded without main (tests, the CSS
-// variable tools) get a quiet default host, so their writes still go through
+// wrote a file (the canvas may need to hear of it); modules that are also
+// loaded without main (tests, the CSS variable tools) get a quiet default
+// host, so their writes still go through
 // actors. The app loads main once. The test harness loads it several times in
 // one process, so a later install replaces an earlier host — only while that
 // host holds no intent: hosts run each intent to its outcome synchronously, so

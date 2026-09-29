@@ -31,9 +31,11 @@ enforce these invariants:
 - Every tree, depth, attribute collection, import list, string, and Markdown
   metadata collection is bounded by `shared/limits.ts`.
 
-The renderer edits a `structuredClone` through `shared/editor-model.ts`. That
-module is the sole constructor for the mutable mirror; IPC and disk contracts
-remain readonly.
+The renderer reads the parsed model itself, readonly, through
+`src/pageView.ts` (a renderer-only view in which any node's optional fields can be
+read without narrowing its kind). Nothing edits a tree in place: a gesture's
+effect builds a new model, and the file changes only through intents (step 9;
+`scripts/adapter-surface.ts` holds the in-place edit count at zero).
 
 ## IPC
 
@@ -83,8 +85,15 @@ Encoding: files are UTF-8; page reads decode strictly (invalid
 UTF-8 is an error, never a lossy replacement); line endings round-trip
 untouched; a leading byte-order mark is read past by the parsers and restored
 by the model writers.
-`page:serialize` returns the text a model write would produce, for reviewing
-unsaved edits in code. `test/fixtures/round-trip/` holds the byte-exact
+Reviewing a conflicted page's unsaved edits in code (plan §7): an `.astro`
+page's queued gestures go through `page:previewEdit` — an `EditRequest` plus
+`source`, the bytes at its `authoredChecksum` — which main plans exactly as
+`page:edit` would and never writes (`electron/editPreview.ts`); the reply has
+`page:edit`'s shape, so the next request is stated against it. A request that
+names other bytes than it sends is a broken caller and throws. The reviewed
+text is the origin's bytes spliced, never a reprint. `page:serialize` returns
+the text a Markdown or MDX model write would produce (those pages save whole
+until step 10) and throws for an `.astro` page. `test/fixtures/round-trip/` holds the byte-exact
 Astro, Markdown and MDX fixtures (CRLF, BOM) the save path must reproduce.
 
 ## Editor core (plan steps 1–5)
@@ -192,10 +201,14 @@ brute-force references and to hand-derived byte ranges.
 `STACKI_SIMULATOR_SEEDS=<n>` raises the seed count for a long run;
 `npm run spike:editor-core` prints the step-3 spike report (not in the gate).
 
-Lint fences (`eslint.config.mjs`): `serializePage`, `serializeNodes` and
-`serializeMarkdownPage` may be imported or called only inside the legacy writer
-boundary (`electron/astroParser.ts`, `main.ts`, `markdownParser.ts`,
-`componentFile.ts`) and tests. The simulator core (all but its `*.test.ts` and
+Lint fences (`eslint.config.mjs`): an existing file changes only by splices,
+so the printers are fenced. `serializePage` and `serializeNodes` may be
+imported or called only in `electron/astroParser.ts`, `componentFile.ts` (new
+files: a component made from a piece of a page, a new page),
+`editRequests.ts` (only the nodes and frontmatter block an edit adds) and
+`markdownParser.ts`; `serializeMarkdownPage` only in `markdownParser.ts` and
+`main.ts` (a Markdown page's whole save and review, until step 10). Tests may
+use both. The simulator core (all but its `*.test.ts` and
 `*.bench.ts` entry points and the `*.entry.ts` modules they import) and the
 engine contract modules may not use timers, clocks, promises, `Math.random`,
 `process` or I/O modules. `scripts/adapter-surface.ts` runs in the gate as a ratchet on the

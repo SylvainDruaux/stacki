@@ -10,6 +10,7 @@
 // When nothing more is queued, the page shows the reply itself: clean, and
 // every node the user was looking at under the handle it had.
 import { assert } from '../shared/assert';
+import { LIMITS } from '../shared/limits';
 import type { Digest } from '../shared/brand';
 import type { EditRequest } from '../shared/edit-request';
 import { describeRejection, type RejectionReason } from '../shared/intent';
@@ -66,7 +67,9 @@ export interface SenderDeps {
   readonly read: (path: string) => Promise<PageDiskRead>;
 }
 
-export function createEntrySender(deps: SenderDeps): (path: string, entry: QueueEntry) => Promise<EntrySent> {
+export function createEntrySender(
+  deps: SenderDeps,
+): (path: string, entry: QueueEntry) => Promise<EntrySent> {
   return async (path, entry) => {
     const state = deps.state();
     assert(state !== null, 'An entry is sent for an open page');
@@ -173,6 +176,67 @@ async function uncertain(
   }
   refuse(deps, path, 'write-race', origin.checksum, disk);
   return { tag: 'conflicted' };
+}
+
+// --- Previewing gestures ----------------------------------------------------------
+
+/** What an .astro page's queued gestures would leave, planned and never
+ * written, and how many had no form the engine can plan (saving would have
+ * taken those back: see withdraw). */
+export type GesturesPreviewed =
+  | { readonly tag: 'previewed'; readonly origin: PageOrigin; readonly withdrawn: number }
+  | { readonly tag: 'failed'; readonly message: string };
+
+/** The page's unsaved gestures as the bytes they would write (plan §7: the
+ * reviewed version of a conflicted page), each planned by main against the
+ * bytes the one before left (`preview`, page:previewEdit) and keyed as a save
+ * would key it. The text is the origin's bytes spliced — never a reprint. */
+export async function previewGestures(input: {
+  readonly path: string;
+  readonly origin: PageOrigin;
+  readonly gestures: readonly EditGesture[];
+  readonly preview: (
+    request: EditRequest,
+    source: string,
+  ) => Promise<Result<PageEdited, PageEditError>>;
+}): Promise<GesturesPreviewed> {
+  assert(input.gestures.length <= LIMITS.intentsPendingMax, 'The queue stays inside its bound');
+  let origin = input.origin; // The bytes the next request is stated against.
+  let withdrawn = 0;
+  for (const gesture of input.gestures) {
+    let source = origin.source; // A gesture's later requests name its earlier replies.
+    const send = async (request: EditRequest): Promise<Result<PageEdited, PageEditError>> => {
+      const answer = await input.preview(request, source);
+      if (answer.ok) {
+        source = answer.value.source;
+      }
+      return answer;
+    };
+    // A preview has no undo step: a dropped record takes no answers.
+    const record: EditsRecord = { outcome: { tag: 'dropped' } };
+    const sent = await sendGesture({ path: input.path, origin, gesture, record, send });
+    switch (sent.tag) {
+      case 'applied':
+        origin = advanced(origin, sent.replies, gesture);
+        continue;
+      case 'refused':
+        // Nothing changes under a preview, so a refusal is the gesture's own:
+        // as a save would, it keeps any request that applied and takes the
+        // gesture back.
+        origin = advanced(origin, sent.replies, gesture);
+        withdrawn += 1;
+        continue;
+      case 'retry':
+      case 'uncertain':
+        return { tag: 'failed', message: sent.message };
+      default: {
+        const exhaustive: never = sent;
+        return exhaustive;
+      }
+    }
+  }
+  assert(withdrawn <= input.gestures.length, 'Only queued gestures are withdrawn');
+  return { tag: 'previewed', origin, withdrawn };
 }
 
 // --- Typed code ----------------------------------------------------------------------
@@ -293,8 +357,8 @@ function settleRead(deps: SenderDeps, path: string, read: PageDiskRead): void {
 }
 
 function movedOn(current: EditablePageState, origin: PageOrigin): EditorPageState {
-  const save: SaveState =
-    current.save.tag === 'conflicted' ? current.save : { tag: 'dirty', baseChecksum: origin.checksum };
+  const dirty: SaveState = { tag: 'dirty', baseChecksum: origin.checksum };
+  const save = current.save.tag === 'conflicted' ? current.save : dirty;
   return { ...current, origin, save };
 }
 
@@ -311,7 +375,9 @@ function refuse(
 ): void {
   deps.conflict(reason);
   deps.update(path, (current) =>
-    current.save.tag === 'clean' ? current : withSave(current, saveStateRefused(current.save, base, disk)),
+    current.save.tag === 'clean'
+      ? current
+      : withSave(current, saveStateRefused(current.save, base, disk)),
   );
 }
 
@@ -338,7 +404,9 @@ function withdraw(
       origin.model,
     );
     const save: SaveState =
-      queued.length === 0 ? { tag: 'clean', checksum: origin.checksum } : { tag: 'dirty', baseChecksum: origin.checksum };
+      queued.length === 0
+        ? { tag: 'clean', checksum: origin.checksum }
+        : { tag: 'dirty', baseChecksum: origin.checksum };
     return { ...current, model, parsedFrom: origin.source, source: origin.source, origin, save };
   });
 }

@@ -34,7 +34,7 @@ import { LIMITS } from '../shared/limits';
 import type { PageEditError, PageEdited } from '../shared/page-save';
 import type { PageModel, PageNode } from '../shared/page-node';
 import type { Result } from '../shared/result';
-import type { EditorModel } from '../shared/editor-model';
+import type { EditorModel } from './pageView';
 import type { SaveState } from './saveState';
 
 /** The page as the app's last read or reply left it: its checksum, its text,
@@ -110,7 +110,11 @@ export type QueueEntry =
       /** The stream of every request it states, when they share one. */
       readonly stream: string | null;
     }
-  | { readonly tag: 'code'; readonly baseline: CodeBaseline; readonly records: readonly EditsRecord[] }
+  | {
+      readonly tag: 'code';
+      readonly baseline: CodeBaseline;
+      readonly records: readonly EditsRecord[];
+    }
   | { readonly tag: 'model'; readonly records: readonly EditsRecord[] };
 
 /** A page as the code editor showed it when the user typed: its save state,
@@ -151,7 +155,8 @@ export class EditDrafts {
         return 'queued';
       }
     }
-    assert(!this.#entries.some((entry) => entry.tag === 'model'), 'A Markdown page queues no gestures');
+    const markdown = this.#entries.some((entry) => entry.tag === 'model');
+    assert(!markdown, 'A Markdown page queues no gestures');
     if (this.#entries.length >= LIMITS.intentsPendingMax) {
       return 'full';
     }
@@ -219,7 +224,8 @@ export class EditDrafts {
   markModel(path: string, record: EditsRecord): void {
     this.#own(path);
     const model = this.#entries.find((entry) => entry.tag === 'model');
-    assert(this.#entries.every((entry) => entry.tag !== 'gesture'), 'A Markdown page has no gestures');
+    const gestures = this.#entries.some((entry) => entry.tag === 'gesture');
+    assert(!gestures, 'A Markdown page has no gestures');
     const records = model === undefined ? [] : model.records;
     if (!records.includes(record)) {
       owe(record);
@@ -250,7 +256,8 @@ export class EditDrafts {
     }
     if (entry.tag === 'code' && first?.tag === 'code') {
       // Typed on during the save: one entry, the newer text, every step.
-      const records = [...entry.records, ...first.records.filter((r) => !entry.records.includes(r))];
+      const older = first.records.filter((record) => !entry.records.includes(record));
+      const records = [...entry.records, ...older];
       this.#entries[0] = { ...first, baseline: entry.baseline, records };
       return;
     }
@@ -412,7 +419,11 @@ export type GestureSent =
   /** Some requests may have landed (a write race, an uncertain write) or
    * applied before a transient failure: sending again could apply twice, so
    * the page asks the user (reload or review). */
-  | { readonly tag: 'uncertain'; readonly message: string; readonly replies: readonly PageEdited[] };
+  | {
+      readonly tag: 'uncertain';
+      readonly message: string;
+      readonly replies: readonly PageEdited[];
+    };
 
 /** State a gesture against `origin` and send its requests one at a time, in
  * order, each authored against the origin's checksum: main rebases the later
@@ -437,7 +448,8 @@ export async function sendGesture(input: {
     const request = { pagePath: input.path, authoredChecksum: origin.checksum, edit };
     const answer = await input.send(request);
     if (answer.ok) {
-      recordApplied(input.record, { checksum: answer.value.checksum, inverse: answer.value.inverse });
+      const { checksum, inverse } = answer.value;
+      recordApplied(input.record, { checksum, inverse });
       replies.push(answer.value);
       continue;
     }
@@ -448,7 +460,11 @@ export async function sendGesture(input: {
 }
 
 // A request did not apply: refused over changed bytes, or not written.
-function stopped(error: PageEditError, authored: Digest, replies: readonly PageEdited[]): GestureSent {
+function stopped(
+  error: PageEditError,
+  authored: Digest,
+  replies: readonly PageEdited[],
+): GestureSent {
   const disk = replies[replies.length - 1]?.checksum ?? authored;
   switch (error.code) {
     case 'rejected':

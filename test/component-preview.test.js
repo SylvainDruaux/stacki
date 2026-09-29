@@ -99,7 +99,7 @@ test('component navigation keeps the real iframe and inspector mounted while loa
     editPage: async ({ pagePath, authoredChecksum, edit }) => {
       if (writeError) {throw writeError;}
       const held = states.get(pagePath);
-      assert.equal(authoredChecksum, held.checksum, 'an edit names the bytes it was stated against');
+      assert.equal(authoredChecksum, held.checksum, 'an edit names the bytes it is stated on');
       const applied = applyEditRequest(pagePath, held.source, edit);
       const written = pageRead(applied.text);
       writes.push({ pagePath, model: written.model });

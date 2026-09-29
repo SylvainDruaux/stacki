@@ -12,6 +12,7 @@ import { MAIN_LIMITS, readSource, readSourceBytes, directoryBudget } from './mai
 import { digestOf, isAtomicTemporary } from './atomicWrite.js';
 import { createNodeDocumentActors, type EditReport, type WriteReport } from './documentActors.js';
 import { buildEdit } from './editRequests.js';
+import { previewEdit } from './editPreview.js';
 import {
   createProjectText,
   describeWriteReport,
@@ -43,12 +44,12 @@ import { toRecord, toArray } from '../shared/record.js';
 import { assert } from '../shared/assert.js';
 import type { IpcPayloads } from '../shared/ipc-payloads.js';
 import type { IpcResults, WirePageEditError, WirePageWriteError } from '../shared/ipc-results.js';
-import { describeRejection } from '../shared/intent.js';
-import { decodeUtf8 } from '../shared/span.js';
+import { describeRejection, type RejectionReason } from '../shared/intent.js';
+import { decodeUtf8, encodeUtf8 } from '../shared/span.js';
 import type { Digest } from '../shared/brand.js';
 import { LIMITS } from '../shared/limits.js';
 import { err, ok, type Result } from '../shared/result.js';
-import type { ParserPageModel, SchemaField } from './astroParser.types.js';
+import type { SchemaField } from './astroParser.types.js';
 import { parseMarkdownModel } from './main.validation.js';
 import {
   parseData,
@@ -95,18 +96,16 @@ import * as net from 'net';
 import * as childprocessModule from 'child_process';
 const { spawn, spawnSync, execFile, execFileSync } = childprocessModule;
 
-import * as astroParserModule from './astroParser';
-const {
+import {
   parsePage,
   locateSelection,
-  serializePage,
   resolveChunks,
   parsePropSchema,
   parseExtendsTag,
   parseSlots,
   defaultSlotInline,
   rootTag,
-} = astroParserModule;
+} from './astroParser';
 import * as markdownParserModule from './markdownParser';
 const { parseMarkdownPage, serializeMarkdownPage } = markdownParserModule;
 import * as scaffoldModule from './scaffold';
@@ -129,7 +128,7 @@ const { createStarter } = starterModule;
 import * as windowBoundsModule from './windowBounds';
 const { openingBounds } = windowBoundsModule;
 import * as componentFileModule from './componentFile';
-const { componentFile } = componentFileModule;
+const { componentFile, newPageText } = componentFileModule;
 import * as componentUsageModule from './componentUsage';
 const { componentUsage, instancesIn } = componentUsageModule;
 import * as contentEntriesModule from './contentEntries';
@@ -3266,13 +3265,38 @@ function pageEditError(
   return error;
 }
 
-// What page:write would put on disk for this model, without writing it: the
-// renderer shows it when the user reviews a conflicted page in code.
+// A visual edit planned against the bytes the renderer sends and never
+// written (electron/editPreview.ts): reviewing a conflicted .astro page in code
+// shows its unsaved gestures as the splices they are. The reply has page:edit's
+// shape, so the renderer states the next request against it as it would
+// against a write.
+ipcMain.handle('page:previewEdit', async (_e, { pagePath, authoredChecksum, edit, source }) => {
+  const refused = (reason: RejectionReason) => {
+    const error = { code: 'rejected' as const, reason, message: describeRejection(reason) };
+    return { ok: false as const, error: { ...error, diskChecksum: null } };
+  };
+  if (isMarkdownPage(pagePath)) {
+    return refused('unsupported-operation'); // Markdown gestures join at step 10.
+  }
+  const planned = previewEdit(pagePath, encodeUtf8(source), authoredChecksum, edit);
+  if (!planned.ok) {
+    return refused(planned.error);
+  }
+  const decoded = decodeUtf8(planned.value.bytes);
+  assert(decoded.ok, 'A plan of UTF-8 text is UTF-8');
+  const reply = { ...parsePageSource(pagePath, decoded.value), checksum: planned.value.checksum };
+  return { ok: true as const, ...reply, inverse: planned.value.inverse };
+});
+
+// What page:write would put on disk for a Markdown or MDX page's model, without
+// writing it: the renderer shows it when the user reviews a conflicted page in
+// code. Markdown saves whole until step 10; an .astro page's unsaved edits are
+// previewed as splices (page:previewEdit), never printed.
 ipcMain.handle('page:serialize', async (_e, { pagePath, model }) => {
-  const markdown = isMarkdownPage(pagePath);
-  const serialized = markdown
-    ? serializeMarkdownPage(parseMarkdownModel(model))
-    : serializePage(model);
+  if (!isMarkdownPage(pagePath)) {
+    throw new Error(`${path.basename(pagePath)} is previewed as edits, never printed whole.`);
+  }
+  const serialized = serializeMarkdownPage(parseMarkdownModel(model));
   let bom = false;
   try {
     bom = hasByteOrderMark(readSourceBytes(pagePath));
@@ -3295,28 +3319,8 @@ ipcMain.handle('page:create', async (_e, { projectPath, name, layout }) => {
   }
   fs.mkdirSync(path.dirname(pagePath), { recursive: true });
 
-  const model: ParserPageModel & { imports: { name: string; path: string }[] } = {
-    imports: [],
-    extraFrontmatter: '',
-    nodes: [],
-    frontmatterLead: '',
-    extraFrontmatterSpaced: true,
-    hadFrontmatter: true,
-    trailingBlank: 0,
-    eol: process.platform === 'win32' ? '\r\n' : '\n',
-  };
-  if (layout) {
-    const rel = toPosix(path.relative(path.dirname(pagePath), layout.path));
-    model.imports.push({ name: layout.name, path: rel.startsWith('.') ? rel : './' + rel });
-    model.nodes.push({
-      id: 'layout',
-      kind: 'component',
-      name: layout.name,
-      props: {},
-      children: [],
-    });
-  }
-  const created = serializePage(model);
+  const eol = process.platform === 'win32' ? ('\r\n' as const) : ('\n' as const);
+  const created = newPageText({ pagePath, layout: layout ?? undefined, eol });
   createProjectText(pagePath, created);
   return { pagePath };
 });

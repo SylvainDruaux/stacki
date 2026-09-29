@@ -1,5 +1,5 @@
 import { parsePropertyChange, propertySource } from './component-properties';
-import { parseEditRequest } from './edit-request';
+import { parseEdit, parseEditRequest } from './edit-request';
 import { parsePreviewRender } from './preview-token';
 // Complete invoke-channel inventory. Every main-process listener receives the
 // parsed shape below; payload field names retain the existing renderer protocol.
@@ -190,8 +190,17 @@ export const IPC_PAYLOADS = {
   }),
   'page:move': object({ ...project, from: pathText, to: pathText }),
   'page:parse': object({ pagePath: pathText, source: text }),
+  // An edit request planned against `source` (the bytes at authoredChecksum)
+  // and never written: reviewing an .astro page's unsaved gestures in code.
+  'page:previewEdit': object({
+    pagePath: pathText,
+    authoredChecksum: digest,
+    edit: parseEdit,
+    source: text,
+  }),
   'page:read': pathText,
-  // The text a model write would produce, for reviewing unsaved edits in code.
+  // The text a Markdown model write would produce, for reviewing unsaved
+  // edits in code (an .astro page's are previewed as edits instead).
   'page:serialize': object({ pagePath: pathText, model: (input: unknown) => input }),
   'page:rebaseImport': object({ fromPagePath: maybePath, toPagePath: maybePath, spec: text }),
   // baseChecksum names the disk bytes the edit was authored against; main

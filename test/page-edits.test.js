@@ -135,7 +135,9 @@ async function sent(answers, count = answers.length, refOk = true) {
   const many = {
     ...gesture(null, refOk),
     request: () =>
-      refOk ? Array.from({ length: count }, () => ({ tag: 'remove-node', target: REF })) : undefined,
+      refOk
+        ? Array.from({ length: count }, () => ({ tag: 'remove-node', target: REF }))
+        : undefined,
   };
   const origin = { checksum: sum(1), source: '', model: { imports: [], nodes: [] } };
   const outcome = await edits.sendGesture({
@@ -305,7 +307,8 @@ test('requests reach the page as splices; the undo step restores every byte', as
   let outcome;
   for (let entry = store.shift(file); entry !== undefined; entry = store.shift(file)) {
     assert.equal(entry.tag, 'gesture');
-    outcome = await edits.sendGesture({ path: file, origin, gesture: entry.gesture, record: step, send });
+    const gesture = entry.gesture;
+    outcome = await edits.sendGesture({ path: file, origin, gesture, record: step, send });
     assert.equal(outcome.tag, 'applied');
   }
   assert.equal(outcome.tag, 'applied');

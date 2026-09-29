@@ -427,6 +427,59 @@ test('unknown bytes, or a node the page lacks, are refused', async (context) => 
   assert.equal(fs.readFileSync(file, 'utf8'), SIBLINGS, 'nothing was written');
 });
 
+test('a preview plans against the bytes it is sent and writes nothing', async (context) => {
+  const harness = fixture();
+  context.after(harness.dispose);
+  const file = path.join(harness.root, 'src/pages/index.astro');
+  fs.writeFileSync(file, SIBLINGS);
+  const page = await read(harness, file);
+  // The disk moves on: a preview is of the bytes the gestures were stated on.
+  const outside = SIBLINGS.replace('<Hero', '<Hero id="x"');
+  fs.writeFileSync(file, outside);
+  const preview = (authoredChecksum: string, source: string, request: Edit) =>
+    harness.invoke('page:previewEdit', { pagePath: file, authoredChecksum, edit: request, source });
+  const first = parsePageEditResult(
+    await preview(page.checksum, SIBLINGS, title(refAt(page, [2]), 'New')),
+  );
+  assert.ok(first.ok, 'the preview plans');
+  const after = '<Hero title="Old" />\n<Card title="Old" />\n<Card title="New" />\n';
+  assert.equal(first.value.source, after, 'the bytes the edit would write: a splice');
+  assert.equal(first.value.checksum, sha256(after));
+  assert.equal(fs.readFileSync(file, 'utf8'), outside, 'nothing was written');
+  // The next request names the reply, as it would after a write.
+  const next = parsePageDiskRead(first.value);
+  const second = parsePageEditResult(
+    await preview(first.value.checksum, after, title(refAt(next, [0]), 'Top')),
+  );
+  assert.ok(second.ok, 'a preview chains on the one before');
+  assert.equal(second.value.source, after.replace('Old', 'Top'));
+  const moved = { ...refAt(page, [0]), span: toUtf16Span(1, 5) };
+  const gone = parsePageEditResult(await preview(page.checksum, SIBLINGS, title(moved, 'x')));
+  assert.equal(!gone.ok && gone.error.code === 'rejected' && gone.error.reason, 'anchor-moved');
+  await assert.rejects(
+    preview(DIGEST, SIBLINGS, title(refAt(page, [0]), 'x')),
+    /A preview names the bytes it is sent/,
+    'a request naming other bytes than it sends is a broken caller',
+  );
+  await assert.rejects(
+    harness.invoke('page:previewEdit', { pagePath: file, authoredChecksum: page.checksum }),
+    /./,
+    'a preview without its bytes or its edit never reaches the planner',
+  );
+  const markdown = path.join(harness.root, 'src/pages/notes.md');
+  fs.writeFileSync(markdown, '# Notes\n');
+  const refused = parsePageEditResult(
+    await harness.invoke('page:previewEdit', {
+      pagePath: markdown,
+      authoredChecksum: sha256('# Notes\n'),
+      edit: title(refAt(page, [0]), 'x'),
+      source: '# Notes\n',
+    }),
+  );
+  const reason = !refused.ok && refused.error.code === 'rejected' && refused.error.reason;
+  assert.equal(reason, 'unsupported-operation', 'Markdown gestures join at step 10');
+});
+
 test('new nodes print where they land; the frontmatter changes its slot', async (context) => {
   const harness = fixture();
   context.after(harness.dispose);

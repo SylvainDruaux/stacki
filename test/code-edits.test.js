@@ -74,7 +74,13 @@ test('typing takes its baseline from the page as shown, and keeps it while owed'
 test('typing over unsent gestures drops them, and a Markdown page’s model the same', () => {
   const store = new edits.EditDrafts();
   const step = record();
-  const gesture = { coalesceKey: null, urgency: false, stream: null, request: () => [], apply: (m) => m };
+  const gesture = {
+    coalesceKey: null,
+    urgency: false,
+    stream: null,
+    request: () => [],
+    apply: (m) => m,
+  };
   store.addGesture('/p', gesture, step);
   assert.equal(step.outcome.tag, 'pending');
   store.typeCode('/p', shown(dirty(1), 'text of 1'), record());

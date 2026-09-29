@@ -49,7 +49,8 @@ function reply(before, edit) {
   const snapshot = NODE_PROJECTOR.snapshot('/p/page.astro', Buffer.from(before.source));
   const draft = buildEditIntent(edit, snapshot);
   assert.ok(draft.ok, `built (${draft.ok ? '' : draft.error})`);
-  const intent = toIntent({ id: 't', file: snapshot.path, authoredChecksum: snapshot.checksum, ...draft.value });
+  const authoredChecksum = snapshot.checksum;
+  const intent = toIntent({ id: 't', file: snapshot.path, authoredChecksum, ...draft.value });
   const planned = planIntent({ authored: snapshot, current: snapshot }, intent);
   assert.ok(planned.ok, `planned (${planned.ok ? '' : planned.error})`);
   const source = Buffer.from(applySplices(snapshot.bytes, planned.value.splices)).toString('utf8');
@@ -65,6 +66,14 @@ function refOf(model, path) {
   }
   return { path, kind: node.kind, span: { start: node.start, end: node.end } };
 }
+
+// The first node of the first element gets class="big": an edit of its own bytes.
+const bigClass = (page) => ({
+  tag: 'set-attribute',
+  target: refOf(page.model, [0, 0]),
+  name: 'class',
+  value: { type: 'string', value: 'big' },
+});
 
 const ids = (model) => {
   const out = [];
@@ -92,10 +101,10 @@ const PAGE = '<main>\n  <h1 class="t">Title</h1>\n  <p>One</p>\n  <p>Two</p>\n</
 
 test('the app’s own edit carries every handle, the edited node’s included', () => {
   const before = session(PAGE);
-  const edit = { tag: 'set-attribute', target: refOf(before.model, [0, 0]), name: 'class', value: { type: 'string', value: 'big' } };
-  const { source, own } = reply(before, edit);
+  const { source, own } = reply(before, bigClass(before));
   assert.deepEqual(ids(carried(before, source, own, undefined)), ids(before.model));
-  const renamed = reply(before, { tag: 'rename-tag', target: refOf(before.model, [0, 1]), to: 'Card' });
+  const retag = { tag: 'rename-tag', target: refOf(before.model, [0, 1]), to: 'Card' };
+  const renamed = reply(before, retag);
   const after = carried(before, renamed.source, renamed.own, undefined);
   assert.deepEqual(ids(after), ids(before.model), 'a tag renamed to a component keeps its handle');
   assert.equal(after.nodes[0].children[1].kind, 'component');
@@ -110,7 +119,10 @@ test('a removal drops only the removed handles; an insertion takes the gesture�
     tag: 'insert-node',
     target: refOf(before.model, [0, 2]),
     placement: 'before',
-    content: { tag: 'nodes', nodes: [{ id: NEW, kind: 'element', name: 'hr', props: {}, children: null }] },
+    content: {
+      tag: 'nodes',
+      nodes: [{ id: NEW, kind: 'element', name: 'hr', props: {}, children: null }],
+    },
   });
   // The gesture predicted the new node with its own handle, where it lands.
   const predicted = { ...before.model, nodes: [{ ...before.model.nodes[0], children: [
@@ -131,7 +143,8 @@ test('a moved node keeps its handle at its new place', () => {
     placement: 'before',
   });
   const main = before.model.nodes[0];
-  const predicted = { ...before.model, nodes: [{ ...main, children: [main.children[2], main.children[0], main.children[1]] }] };
+  const reordered = [main.children[2], main.children[0], main.children[1]];
+  const predicted = { ...before.model, nodes: [{ ...main, children: reordered }] };
   const after = carried(before, moved.source, moved.own, predicted);
   assert.equal(after.nodes[0].children[0].id, h(5), 'the moved paragraph');
   assert.equal(after.nodes[0].children[0].children[0].id, h(6), 'and its text');
@@ -168,8 +181,7 @@ test('a tie between minimum scripts carries nothing: the mapper never guesses', 
 
 test('an own reply that merged an outside edit maps through the diff, never the splices', () => {
   const before = session(PAGE);
-  const edit = { tag: 'set-attribute', target: refOf(before.model, [0, 0]), name: 'class', value: { type: 'string', value: 'big' } };
-  const { source, own } = reply(before, edit);
+  const { source, own } = reply(before, bigClass(before));
   const merged = source.replace('<p>Two</p>', '<p>Two</p>\n  <p>Three</p>');
   const after = carried(before, merged, own, undefined);
   const handles = ids(after);

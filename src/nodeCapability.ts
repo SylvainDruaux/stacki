@@ -6,7 +6,7 @@
 // editable and saving some other way.
 import { assert } from '../shared/assert';
 import type { Capability } from '../shared/capability';
-import type { EditorModel, EditorNode } from '../shared/editor-model';
+import type { EditorModel, EditorNode } from './pageView';
 import { LIMITS } from '../shared/limits';
 import { classifyNode } from '../shared/source-projection';
 

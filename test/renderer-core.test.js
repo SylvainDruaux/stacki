@@ -78,7 +78,11 @@ test('loop renames preserve dollar identifiers, property names and nested shadow
 test('switching a loop\'s data points the loops reading its item at an empty array', () => {
   const nodes = [
     { kind: 'map', head: 'item.tags.map((tag) => (', children: [
-      { kind: 'cond', test: 'item.show', children: [{ kind: 'branch', name: 'then', children: [] }] },
+      {
+        kind: 'cond',
+        test: 'item.show',
+        children: [{ kind: 'branch', name: 'then', children: [] }],
+      },
     ] },
     { kind: 'map', head: 'other.map((item) => (', children: [
       { kind: 'map', head: 'item.more.map((x) => (', children: [] },

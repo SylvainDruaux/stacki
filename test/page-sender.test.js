@@ -3,8 +3,10 @@
 // nothing more is owed, the page is the reply itself, clean, every handle
 // carried; a gesture refused over unchanged bytes (no form the engine can plan)
 // is taken back and said out loud, never saved some other way; one refused
-// over changed bytes is the conflict notice with its reason; and a write that
-// may have landed is never sent again blind — the disk decides.
+// over changed bytes is the conflict notice with its reason; a write that
+// may have landed is never sent again blind — the disk decides; and a preview
+// of the queue (the reviewed version of a conflicted page) is those gestures
+// planned as splices of the bytes they were stated on, nothing written.
 // Method: a real page parsed by the real parser, replies made by main's real
 // translation and planner (so their inverse hunks are main's), and the page
 // state held in a plain object the sender updates.
@@ -19,13 +21,16 @@ const { buildEditIntent } = require('../dist/electron/editRequests.js');
 const { toIntent } = require('../dist/shared/intent.js');
 const { planIntent } = require('../dist/shared/planner.js');
 const { applySplices, inverseEdits } = require('../dist/shared/splice.js');
-const { createEntrySender } = load('pageSender.ts');
+const { createEntrySender, previewGestures } = load('pageSender.ts');
 const edits = load('pageEdits.ts');
-const gestures = load('editGestures.ts');
+const editGestures = load('editGestures.ts');
 
 const sha256 = (text) => createHash('sha256').update(text).digest('hex');
 const PATH = '/project/src/pages/index.astro';
 const PAGE = '<main>\n  <h1 class="t">Title</h1>\n  <p>One</p>\n</main>\n';
+const HEADING_TITLED = PAGE.replace('class="t"', 'class="t" title="a"');
+const BOTH_TITLED = HEADING_TITLED.replace('<p>', '<p title="b">');
+const titled = (value) => ({ title: { type: 'string', value } });
 
 function read(source) {
   const parsed = parsePageResult(parsePage(source, { locs: true }));
@@ -52,19 +57,22 @@ function engine(disk) {
   return async ({ authoredChecksum, edit }) => {
     const snapshot = NODE_PROJECTOR.snapshot(PATH, Buffer.from(disk.text));
     if (snapshot.checksum !== authoredChecksum) {
-      const error = { code: 'rejected', reason: 'region-externally-modified', message: 'x', diskChecksum: snapshot.checksum };
+      const reason = 'region-externally-modified';
+      const error = { code: 'rejected', reason, message: 'x', diskChecksum: snapshot.checksum };
       return { ok: false, error };
     }
     const draft = buildEditIntent(edit, snapshot);
     if (!draft.ok) {
-      const error = { code: 'rejected', reason: draft.error, message: draft.error, diskChecksum: snapshot.checksum };
+      const reason = draft.error;
+      const error = { code: 'rejected', reason, message: reason, diskChecksum: snapshot.checksum };
       return { ok: false, error };
     }
     const intent = toIntent({ id: 't', file: PATH, authoredChecksum, ...draft.value });
     const planned = planIntent({ authored: snapshot, current: snapshot }, intent);
     assert.ok(planned.ok, `planned (${planned.ok ? '' : planned.error})`);
     disk.text = Buffer.from(applySplices(snapshot.bytes, planned.value.splices)).toString('utf8');
-    return { ok: true, value: { ...read(disk.text), inverse: inverseEdits(planned.value.splices) } };
+    const inverse = inverseEdits(planned.value.splices);
+    return { ok: true, value: { ...read(disk.text), inverse } };
   };
 }
 
@@ -96,10 +104,8 @@ test('an applied gesture: the page is the reply, clean, with every handle carrie
   const { disk, box, queue, send } = harness(PAGE);
   const heading = box.state.model.nodes[0].children[0];
   const record = step();
-  const retitle = gestures.propsGesture(heading.id, { class: { type: 'string', value: 'big' } }, {
-    coalesceKey: null,
-    urgency: true,
-  });
+  const big = { class: { type: 'string', value: 'big' } };
+  const retitle = editGestures.propsGesture(heading.id, big, { coalesceKey: null, urgency: true });
   queue.addGesture(PATH, retitle, record);
   box.state = { ...box.state, model: retitle.apply(box.state.model) };
   const outcome = await send(PATH, queue.shift(PATH));
@@ -111,25 +117,25 @@ test('an applied gesture: the page is the reply, clean, with every handle carrie
   assert.equal(record.outcome.tag, 'applied');
 });
 
-test('with more queued, only the origin moves on; the shown model keeps the newer edit', async () => {
+test('with more queued, only the origin moves on; the model shows the newer edit', async () => {
   const { disk, box, queue, send } = harness(PAGE);
   const [heading, paragraph] = box.state.model.nodes[0].children;
   const options = { coalesceKey: null, urgency: true };
-  const first = gestures.propsGesture(heading.id, { title: { type: 'string', value: 'a' } }, options);
-  const second = gestures.propsGesture(paragraph.id, { title: { type: 'string', value: 'b' } }, options);
+  const first = editGestures.propsGesture(heading.id, titled('a'), options);
+  const second = editGestures.propsGesture(paragraph.id, titled('b'), options);
   queue.addGesture(PATH, first, step());
   queue.addGesture(PATH, second, step());
   box.state = { ...box.state, model: second.apply(first.apply(box.state.model)) };
   await send(PATH, queue.shift(PATH));
   assert.equal(box.state.save.tag, 'dirty');
-  assert.equal(box.state.save.baseChecksum, sha256(disk.text), 'the next request names these bytes');
+  assert.equal(box.state.save.baseChecksum, sha256(disk.text), 'the next request names these');
   assert.equal(box.state.model.nodes[0].children[1].props.title.value, 'b', 'the newer edit shows');
   await send(PATH, queue.shift(PATH));
-  assert.equal(disk.text, PAGE.replace('class="t"', 'class="t" title="a"').replace('<p>', '<p title="b">'));
+  assert.equal(disk.text, BOTH_TITLED);
   assert.equal(box.state.save.tag, 'clean');
 });
 
-test('a gesture the engine cannot plan is taken back and said, never saved another way', async () => {
+test('a gesture the engine cannot plan is taken back and said, never saved otherwise', async () => {
   const { disk, box, queue, send } = harness(PAGE);
   const record = step();
   const unplannable = {
@@ -153,7 +159,8 @@ test('refused over changed bytes: the conflict notice with the reason', async ()
   const { disk, box, queue, send } = harness(PAGE);
   const heading = box.state.model.nodes[0].children[0];
   const options = { coalesceKey: null, urgency: true };
-  queue.addGesture(PATH, gestures.propsGesture(heading.id, { title: undefined }, options), step());
+  const untitle = editGestures.propsGesture(heading.id, { title: undefined }, options);
+  queue.addGesture(PATH, untitle, step());
   disk.text = PAGE.replace('Title', 'Outside');
   assert.deepEqual(await send(PATH, queue.shift(PATH)), { tag: 'conflicted' });
   assert.deepEqual(box.conflicts, ['region-externally-modified']);
@@ -166,7 +173,7 @@ test('a write that may have landed is never sent again blind: the disk decides',
   const untouched = harness(PAGE, { edit: uncertain });
   const heading = untouched.box.state.model.nodes[0].children[0];
   const options = { coalesceKey: null, urgency: true };
-  const drop = gestures.propsGesture(heading.id, { class: undefined }, options);
+  const drop = editGestures.propsGesture(heading.id, { class: undefined }, options);
   untouched.queue.addGesture(PATH, drop, step());
   const again = await untouched.send(PATH, untouched.queue.shift(PATH));
   assert.equal(again.tag, 'failed', 'the disk holds the bytes it was stated against: send again');
@@ -175,4 +182,36 @@ test('a write that may have landed is never sent again blind: the disk decides',
   moved.disk.text = PAGE.replace(' class="t"', '');
   assert.deepEqual(await moved.send(PATH, moved.queue.shift(PATH)), { tag: 'conflicted' });
   assert.deepEqual(moved.box.conflicts, ['write-race'], 'it changed: the user decides');
+});
+
+test('a preview plans every queued gesture as splices, chained, and writes nothing', async () => {
+  const disk = { text: PAGE.replace('One', 'Outside') }; // The disk moved on.
+  const origin = pageState(PAGE).origin;
+  const [heading, paragraph] = origin.model.nodes[0].children;
+  const options = { coalesceKey: null, urgency: true };
+  const unplannable = {
+    ...options,
+    stream: null,
+    request: () => undefined,
+    apply: (model) => model,
+  };
+  const queued = [
+    editGestures.propsGesture(heading.id, titled('a'), options),
+    unplannable,
+    editGestures.propsGesture(paragraph.id, titled('b'), options),
+  ];
+  const planned = [];
+  const preview = async (request, source) => {
+    planned.push(request.authoredChecksum);
+    const held = { text: source };
+    return engine(held)(request); // Planned against the bytes sent, never the disk.
+  };
+  const shown = await previewGestures({ path: PATH, origin, gestures: queued, preview });
+  assert.equal(shown.tag, 'previewed');
+  assert.equal(shown.withdrawn, 1, 'the gesture a save would take back is left out');
+  assert.equal(shown.origin.source, BOTH_TITLED);
+  assert.equal(shown.origin.checksum, sha256(BOTH_TITLED));
+  assert.deepEqual(planned, [sha256(PAGE), sha256(HEADING_TITLED)]);
+  assert.equal(disk.text, PAGE.replace('One', 'Outside'), 'nothing written');
+  assert.equal(shown.origin.model.nodes[0].children[1].id, paragraph.id, 'handles carried');
 });

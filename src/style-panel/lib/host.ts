@@ -6,13 +6,15 @@
 // answers the panel's questions from it. One panel, one selection, so a
 // module-level record is enough.
 
+type HostAttr = { readonly type: string; readonly value?: string }
+
 // A page node as the panel reads it: the panel never edits the tree (its
 // class and style changes go through App's gestures), so the view is readonly.
 export type HostNode = {
   readonly id: string
   readonly kind: string
   readonly name?: string
-  readonly props?: Readonly<Record<string, { readonly type: string; readonly value?: string } | null>>
+  readonly props?: Readonly<Record<string, HostAttr | null>>
   readonly children?: readonly HostNode[] | null
   readonly inner?: string
 }
@@ -205,7 +207,10 @@ export function walkNodes(
   }
 }
 
-export function findNode(nodes: readonly HostNode[] | null | undefined, id: string): HostNode | null {
+export function findNode(
+  nodes: readonly HostNode[] | null | undefined,
+  id: string,
+): HostNode | null {
   for (const node of nodes || []) {
     if (node.id === id) {return node}
     const found = node.children && findNode(node.children, id)

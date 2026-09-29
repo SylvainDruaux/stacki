@@ -13,7 +13,7 @@
 
 import { LIMITS } from '../shared/limits';
 import { assert } from '../shared/assert';
-import type { EditorNode } from '../shared/editor-model';
+import type { EditorNode } from './pageView';
 import type { Attr } from '../shared/page-node';
 
 const MAP_HEAD_RE = /^([\s\S]+?)\.map\(\s*\(\s*([A-Za-z_$][\w$]*)\s*(?:,\s*([A-Za-z_$][\w$]*)\s*)?\)\s*=>\s*\($/;
@@ -300,7 +300,10 @@ function strippedProps(node: EditorNode, reads: (code: string) => boolean): Stri
   );
   const removed = Object.keys(props).length - kept.length;
   assert(removed >= 0, 'Dropping attributes never adds one');
-  return removed === 0 ? { node, removed } : { node: { ...node, props: Object.fromEntries(kept) }, removed };
+  if (removed === 0) {
+    return { node, removed };
+  }
+  return { node: { ...node, props: Object.fromEntries(kept) }, removed };
 }
 
 // The node's own code, rewritten; `below` is the variables still lost for its
