@@ -2153,9 +2153,18 @@ export default function App() {
         return;
       }
 
+      // Only the page itself changed: a read holding the bytes this clean page
+      // already shows is the app's own write heard late (its actor was dropped
+      // past LIMITS.documentActorsMax) or an outside save of identical bytes.
+      // Nothing changed, so nothing reloads and Undo keeps its entries.
+      const onlyPage = pendingFiles.size === 1 && pendingFiles.has(page.path);
       let result: EditorPageState;
       try {
         const parsed = await readPage(page.path);
+        if (onlyPage && parsed.checksum === state.save.checksum) {
+          if (request === changeVersion) {pendingFiles.clear();}
+          return;
+        }
         // The disk snapshot arrives with regenerated parser ids; re-key it
         // onto the session ids so aligned nodes keep their identity and the
         // trail remap below only has to cover genuinely changed regions

@@ -25,7 +25,6 @@
   "files": [
     "htmlText.ts",
     "serialQueue.ts",
-    "selfWrites.ts",
     "windowBounds.ts",
     "platform.ts",
     "assetRefs.ts",

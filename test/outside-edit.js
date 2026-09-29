@@ -152,7 +152,7 @@ const settle = (ms = 20) => new Promise((r) => setTimeout(r, ms));
   );
   check(
     'and the app’s own writes are not',
-    /function markSelfWrite\(p[^)]*\) \{[\s\S]*?notePageMayHaveChanged\(\);/.test(main),
+    /function noteAppWrite\(\)[^{]*\{[\s\S]*?notePageMayHaveChanged\(\);/.test(main),
     'every keystroke would ask the canvas for a fetch of its own'
   );
   check(

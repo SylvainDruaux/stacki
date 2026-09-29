@@ -89,7 +89,7 @@ Four cooperating processes, each with one job:
   capabilities; leaf modules do the work (`astroParser`, `frontmatter`,
   `htmlText`, `assetRefs`, `cssVars`, `gitBranches`, `gitHistory`,
   `projectWatcher`, `terminal` via node-pty, `previewWorktree`,
-  `serialQueue`, `selfWrites`, `windowBounds`, content-collection tooling in
+  `serialQueue`, `windowBounds`, content-collection tooling in
   `electron/content/`, data-format parsers in `electron/formats/`).
 - **Preload** (`electron/preload.js`): a sandboxed bridge exposing an
   allowlisted `window.avb` API via `contextBridge`. Must stay CommonJS
@@ -143,9 +143,9 @@ edit → mutate tree → debounce 300ms → save queue → write .astro
   loops are capped at `LIMITS.saveDrainMax` (each pass past the cap means
   edits arrive faster than writes can drain — a bug, not a load).
 - `electron/serialQueue.ts` orders file writes in the main process.
-- `electron/selfWrites.ts` keeps the file watcher from treating the app's own
-  saves as external edits (with a shared `fs.watch` mitigation for a known
-  Chokidar/macOS issue).
+- The file watcher tells the app's own saves from outside edits by bytes:
+  a tick is the app's echo only while the file holds exactly what its
+  document actor last wrote (`DocumentActors.echoes`, plan §11.9).
 - `electron/projectWatcher.ts` detects genuine outside edits (AI assistants,
   editors, git operations) and triggers a rescan; the renderer re-pulls the
   file, bounded by `LIMITS.rescanChainMax`.

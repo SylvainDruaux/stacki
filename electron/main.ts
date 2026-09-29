@@ -149,8 +149,6 @@ import * as previewWorktree from './previewWorktree';
 import { checkPreviewRender } from './previewCheck';
 import * as terminalModule from './terminal';
 const { registerTerminalHandlers, cleanupTerminals } = terminalModule;
-import * as selfWritesModule from './selfWrites';
-const { createSelfWrites } = selfWritesModule;
 import * as projectWatcherModule from './projectWatcher';
 const { watchProject } = projectWatcherModule;
 import * as serialQueueModule from './serialQueue';
@@ -2124,10 +2122,6 @@ function resolveIdentifierDefaults(
 // ---------------------------------------------------------------------------
 
 let watcher: ReturnType<typeof watchProject> | undefined;
-// What the app itself has written, so the watcher can tell its own echo from
-// somebody else's edit — see electron/selfWrites.js for why that is a question
-// about bytes and not about elapsed time.
-const selfWrites = createSelfWrites({ read: (p) => readSource(p) });
 
 // A compile error replaces the site with the dev server's own error screen, and
 // that screen carries no HMR client — so when the mistake is fixed, nothing in
@@ -2153,8 +2147,9 @@ function notePageMayHaveChanged(external = false) {
   }, 200);
 }
 
-function markSelfWrite(p: string, text: string | null = null) {
-  selfWrites.note(path.resolve(p), text);
+// The app changed a project file: its own text write (through the file's
+// actor), or a move, rename or delete. The canvas may need to hear of it.
+function noteAppWrite(): void {
   notePageMayHaveChanged();
 }
 
@@ -2166,18 +2161,22 @@ installDocumentHost({
     log: (line) => console.info(line),
     schedule: (task) => setImmediate(task),
   }),
-  noteWrite: markSelfWrite,
+  noteWrite: noteAppWrite,
 });
 const documents = documentHost().documents;
 
-// Whether a watcher event is the app hearing its own write come back — see
-// electron/selfWrites.js. A save's temporary file (atomicWrite.ts) is the app's
-// own too: it exists only between staging and the rename.
+// Whether a watcher event is the app hearing its own write come back (plan
+// §11.9): the file holds exactly the bytes its actor last wrote. That is a
+// question about bytes, never about elapsed time — an editor's save a moment
+// after the app's holds other bytes, and is heard. A save's temporary file and
+// its lock file (atomicWrite.ts) are the app's own too: they exist only while
+// the actor writes. A move, rename or delete is heard like an outside change;
+// the one read each listener then makes finds what the app already has.
 const isSelfWrite = (full: string): boolean => {
   if (isAtomicTemporary(full)) {
     return true;
   }
-  return selfWrites.isEcho(path.resolve(full));
+  return documents.echoes(path.resolve(full));
 };
 
 ipcMain.handle('watch:start', async (_e, projectPath) => {
@@ -2211,7 +2210,6 @@ function stopWatchingProject() {
   }
   styleNudges.clear();
   captureEra++;
-  selfWrites.clear();
   documents.clear();
 }
 
@@ -2322,7 +2320,7 @@ function copyAssetsIn(projectPath: string, destRel: string, filePaths: readonly 
   for (const src of filePaths) {
     try {
       const dest = uniqueDest(destDir, path.basename(src));
-      markSelfWrite(dest);
+      noteAppWrite();
       fs.cpSync(src, dest, { recursive: true });
       added++;
     } catch {
@@ -2355,8 +2353,8 @@ ipcMain.handle('assets:move', async (_e, { projectPath, fromRel, toDirRel }) => 
     throw new Error('Cannot move a folder into itself.');
   }
   const dest = uniqueDest(toDir, path.basename(from));
-  markSelfWrite(from);
-  markSelfWrite(dest);
+  noteAppWrite();
+  noteAppWrite();
   fs.mkdirSync(toDir, { recursive: true });
   fs.renameSync(from, dest);
   send('assets:changed', {});
@@ -2376,8 +2374,8 @@ ipcMain.handle('assets:rename', async (_e, { projectPath, rel, newName }) => {
   if (fs.existsSync(dest)) {
     throw new Error('Something with that name already exists.');
   }
-  markSelfWrite(from);
-  markSelfWrite(dest);
+  noteAppWrite();
+  noteAppWrite();
   fs.renameSync(from, dest);
   send('assets:changed', {});
   return { ok: true as const };
@@ -2392,7 +2390,7 @@ ipcMain.handle('assets:delete', async (_e, { projectPath, rel }) => {
   if (!fs.existsSync(abs)) {
     return { ok: false as const };
   }
-  markSelfWrite(abs);
+  noteAppWrite();
   await shell.trashItem(abs);
   send('assets:changed', {});
   return { ok: true as const };
@@ -2422,7 +2420,7 @@ ipcMain.handle('assets:mkdir', async (_e, { projectPath, parentRel, name }) => {
     throw new Error('Invalid folder name');
   }
   const dir = path.join(assetAbs(projectPath, parentRel), clean);
-  markSelfWrite(dir);
+  noteAppWrite();
   fs.mkdirSync(dir, { recursive: true });
   send('assets:changed', {});
   return { ok: true as const };
@@ -2762,7 +2760,6 @@ ipcMain.handle('css:variables', async (_e, projectPath) => {
 ipcMain.handle('css:addVariables', async (_e, { projectPath, adds }) => {
   let last: { ok: boolean; error?: string; name?: string; changed?: boolean } = { ok: true };
   for (const add of adds || []) {
-    markSelfWrite(path.resolve(projectPath, add.file));
     last = cssVars.addVariable(projectPath, add);
     if (!last.ok) {
       break;
@@ -2779,7 +2776,6 @@ ipcMain.handle('css:addVariables', async (_e, { projectPath, adds }) => {
 ipcMain.handle('css:moveVariables', async (_e, { projectPath, moves }) => {
   let last: { ok: boolean; error?: string; name?: string; changed?: boolean } = { ok: true };
   for (const move of moves || []) {
-    markSelfWrite(path.resolve(projectPath, move.file));
     // A group carries its heading and every line under it; a row is one line.
     last =
       'names' in move
@@ -2798,7 +2794,6 @@ ipcMain.handle('css:moveVariables', async (_e, { projectPath, moves }) => {
 // A heading that is a comment rather than a shared name: renaming it rewrites
 // the comment, in place, the same way a value is written.
 ipcMain.handle('css:setSectionTitle', async (_e, { projectPath, ...edit }) => {
-  markSelfWrite(path.resolve(projectPath, edit.file));
   const result = cssVars.setSectionTitle(projectPath, edit);
   if (result.ok) {
     send('css:changed', {});
@@ -2809,7 +2804,6 @@ ipcMain.handle('css:setSectionTitle', async (_e, { projectPath, ...edit }) => {
 // A heading is a line between declarations: removing it joins the runs either
 // side, and adding one splits them.
 ipcMain.handle('css:removeSection', async (_e, { projectPath, ...edit }) => {
-  markSelfWrite(path.resolve(projectPath, edit.file));
   const result = cssVars.removeSection(projectPath, edit);
   if (result.ok) {
     send('css:changed', {});
@@ -2818,7 +2812,6 @@ ipcMain.handle('css:removeSection', async (_e, { projectPath, ...edit }) => {
 });
 
 ipcMain.handle('css:moveHeading', async (_e, { projectPath, ...edit }) => {
-  markSelfWrite(path.resolve(projectPath, edit.file));
   const result = cssVars.moveHeading(projectPath, edit);
   if (result.ok) {
     send('css:changed', {});
@@ -2827,7 +2820,6 @@ ipcMain.handle('css:moveHeading', async (_e, { projectPath, ...edit }) => {
 });
 
 ipcMain.handle('css:addSection', async (_e, { projectPath, ...edit }) => {
-  markSelfWrite(path.resolve(projectPath, edit.file));
   const result = cssVars.addSection(projectPath, edit);
   if (result.ok) {
     send('css:changed', {});
@@ -2850,8 +2842,6 @@ ipcMain.handle('css:renameVariables', async (_e, { projectPath, renames }) => {
 // one: if the file no longer says what the panel was showing, somebody else has
 // edited it and the offsets are meaningless.
 ipcMain.handle('css:setVariable', async (_e, { projectPath, ...edit }) => {
-  const abs = path.resolve(projectPath, edit.file);
-  markSelfWrite(abs);
   const result = cssVars.setVariable(projectPath, edit);
   if (result.ok) {
     send('css:changed', {});
@@ -2889,7 +2879,7 @@ ipcMain.handle('content:entries', async (_e, { projectPath, name }) => {
 // contentEntries.js and ./formats for what that protects.
 ipcMain.handle('content:writeEntry', async (_e, { projectPath, entry, edits, body }) => {
   const result = writeEntry(projectPath, entry, edits || [], definedFields({ body }));
-  markSelfWrite(path.resolve(projectPath, entry.file));
+  noteAppWrite();
   send('cms:changed', {});
   return result;
 });
@@ -2928,8 +2918,8 @@ ipcMain.handle('content:rename', async (_e, { projectPath, name, from, to }) => 
     { collection: name, from, to },
   );
   const result = applyRename(projectPath, plan);
-  for (const file of result.files) {
-    markSelfWrite(path.resolve(projectPath, file));
+  if (result.files.length > 0) {
+    noteAppWrite();
   }
   send('cms:changed', {});
   return result;
@@ -3044,7 +3034,7 @@ function writeChunk(chunkFile: string, next: string): Result<void, WirePageWrite
   if (unchanged) {
     return ok(undefined);
   }
-  markSelfWrite(chunkFile, next);
+  noteAppWrite();
   const report = documents.writeCurrent(chunkFile, next);
   return report.tag === 'applied' ? ok(undefined) : err(pageWriteError(chunkFile, report));
 }
@@ -3207,7 +3197,7 @@ function writePageText(
       }
     }
   }
-  markSelfWrite(pagePath, text);
+  noteAppWrite();
   const report = documents.replaceSource(pagePath, text, baseChecksum);
   const checksum = appliedChecksum(report);
   if (checksum === undefined) {
@@ -3232,7 +3222,7 @@ function nudgeStyle(pagePath: string, text: string, checksum: Digest): void {
       // resurrects superseded text. A refused or failed nudge leaves the
       // correct bytes on disk; only the dev server's style cache stays one
       // edit behind, so there is nothing to report beyond telemetry.
-      markSelfWrite(pagePath, text);
+      noteAppWrite();
       documents.replaceSource(pagePath, text, checksum);
     }, STYLE_NUDGE_MS),
   );
@@ -3297,9 +3287,7 @@ ipcMain.handle('page:edit', async (_e, { pagePath, authoredChecksum, edit }) => 
   const decoded = decodeUtf8(report.bytes);
   assert(decoded.ok, 'The actor wrote UTF-8');
   const text = decoded.value;
-  // Noted after the write: main runs this handler to its end before the
-  // watcher's event for it can run, and the note compares contents.
-  markSelfWrite(pagePath, text);
+  noteAppWrite();
   if (/<style[\s>]/i.test(text)) {
     nudgeStyle(pagePath, text, report.checksum);
   }
@@ -3377,7 +3365,7 @@ ipcMain.handle('page:create', async (_e, { projectPath, name, layout }) => {
 });
 
 ipcMain.handle('page:delete', async (_e, pagePath) => {
-  markSelfWrite(pagePath);
+  noteAppWrite();
   fs.rmSync(pagePath);
   return { ok: true as const };
 });
@@ -3415,7 +3403,7 @@ ipcMain.handle('page:move', async (_e, { projectPath, from, to }) => {
       },
     );
   }
-  markSelfWrite(from);
+  noteAppWrite();
   createProjectText(dest, source);
   fs.rmSync(from);
   return { newPath: dest };
@@ -3562,7 +3550,7 @@ ipcMain.handle('component:editProperties', (_event, request) => {
   };
   const result = updateComponentProperties(request, {
     documents,
-    noteWrite: markSelfWrite,
+    noteWrite: noteAppWrite,
     onCommitted,
   });
   if (!result.ok) {
@@ -3572,7 +3560,7 @@ ipcMain.handle('component:editProperties', (_event, request) => {
   return ok({ ...result.value, undo });
 });
 ipcMain.handle('component:revertProperties', (_event, { token }) =>
-  revertComponentProperties(token, propertyUndo, { documents, noteWrite: markSelfWrite }),
+  revertComponentProperties(token, propertyUndo, { documents, noteWrite: noteAppWrite }),
 );
 
 // Which files hold instances of a component — the palette’s instance count.

@@ -7,7 +7,8 @@
 // answers `backpressured` (§3.5); a batch leases its actors in sorted canonical
 // order whatever order it names them in (§3.3); two spellings of one file meet
 // at one actor; the actor count stays inside its bound; the watcher's hint
-// refreshes off the intent path (§7); and the telemetry line carries a hashed
+// refreshes off the intent path (§7); a watcher tick is the app's own echo only
+// while the file holds the bytes its actor wrote (§11.9); and the telemetry line carries a hashed
 // path and no source bytes (§9a).
 // Method: real files under a mkdtemp directory, a host built from the real
 // disk, planner and projector; filesystem failures injected by wrapping one
@@ -279,5 +280,35 @@ test('the watcher hint refreshes the actor on the next tick, off the intent path
     assert.equal(documents.current(file).value.checksum, sha256('v2\n'));
     documents.noteExternalChange(path.join(root, 'unknown.astro'));
     assert.equal(scheduled.length, 1, 'a file without an actor schedules nothing');
+  });
+});
+
+// The watcher's question (plan §11.9, formerly electron/selfWrites.ts): is this
+// tick the app hearing its own write? The actor knows the bytes it wrote, so the
+// answer is a comparison of bytes, never of elapsed time.
+test('a watcher tick echoes only while the file holds the bytes its actor wrote', () => {
+  directory((root) => {
+    const file = path.join(root, 'page.astro');
+    fs.writeFileSync(file, 'v1\n');
+    const { documents } = host();
+    assert.equal(documents.echoes(file), false, 'a file the app never wrote is nobody’s echo');
+    documents.current(file);
+    assert.equal(documents.echoes(file), false, 'reading a file is not writing it');
+    assert.equal(documents.replaceSource(file, 'v2\n', sha256('v1\n')).tag, 'applied');
+    assert.equal(documents.echoes(file), true, 'the app’s own write comes back as its echo');
+    assert.equal(documents.echoes(file), true, 'and stays one while the bytes are ours');
+    // The case a stopwatch never got right: an editor's save right after ours.
+    fs.writeFileSync(file, 'v3\n');
+    assert.equal(documents.echoes(file), false, 'an outside write a moment later is heard');
+    fs.writeFileSync(file, 'v2\n');
+    assert.equal(documents.echoes(file), true, 'bytes identical to ours change nothing');
+    fs.rmSync(file);
+    assert.equal(documents.echoes(file), false, 'a file gone since holds no write of ours');
+    const created = path.join(root, 'new.astro');
+    assert.equal(documents.create(created, 'fresh\n').ok, true);
+    assert.equal(documents.echoes(created), true, 'a created file is the app’s own write too');
+    assert.equal(documents.echoes(path.join(root, 'gone', 'x.astro')), false, 'no folder, no echo');
+    documents.clear();
+    assert.equal(documents.echoes(created), false, 'closing the project forgets every write');
   });
 });

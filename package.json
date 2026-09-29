@@ -120,7 +120,6 @@
     "test:unpackedparser": "node test/unpacked-parser.js",
     "test:pressscroll": "node test/press-does-not-scroll.js",
     "test:hoverwithin": "node test/hover-within.js",
-    "test:selfwrites": "node test/self-writes.js",
     "test:objectfield": "node test/object-field.js",
     "test:insertsearch": "node test/insert-search.js",
     "test:varconnectopen": "node test/varconnect-open.js",

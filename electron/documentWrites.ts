@@ -1,7 +1,7 @@
 // The one document host of the main process, and the entry points every module
 // uses to write project text (plan §3.3, §5.2: one writer per file). main.ts
-// installs the host at startup with its telemetry log and the watcher's
-// self-write note; modules that are also loaded without main (tests, the CSS
+// installs the host at startup with its telemetry log and the note that the app
+// wrote a file (the canvas may need to hear of it); modules that are also loaded without main (tests, the CSS
 // variable tools) get a quiet default host, so their writes still go through
 // actors. The app loads main once. The test harness loads it several times in
 // one process, so a later install replaces an earlier host — only while that
@@ -14,7 +14,8 @@ import { createNodeDocumentActors, type DocumentActors, type WriteReport } from 
 
 interface DocumentHost {
   readonly documents: DocumentActors;
-  readonly noteWrite: (file: string, text: string | null) => void;
+  /** The app wrote `file` (main tells the canvas it may have changed). */
+  readonly noteWrite: (file: string) => void;
 }
 
 // The module's single piece of state: the process's host, set once.
@@ -41,7 +42,7 @@ export function documentHost(): DocumentHost {
  * but `applied` throws like the `fs.writeFileSync` it replaces did. */
 export function writeProjectText(file: string, text: string): Digest {
   const host = documentHost();
-  host.noteWrite(file, text);
+  host.noteWrite(file);
   const report = host.documents.writeCurrent(file, text);
   if (report.tag === 'applied') {
     return report.checksum;
@@ -52,7 +53,7 @@ export function writeProjectText(file: string, text: string): Digest {
 /** Create a new project file through its actor; never overwrites. */
 export function createProjectText(file: string, text: string): Digest {
   const host = documentHost();
-  host.noteWrite(file, text);
+  host.noteWrite(file);
   const created = host.documents.create(file, text);
   if (created.ok) {
     return created.value;

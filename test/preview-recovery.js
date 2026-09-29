@@ -275,8 +275,8 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
       handler.slice(0, 400)
     );
     check(
-      'a write the app makes says it through markSelfWrite',
-      /function markSelfWrite\(p[^)]*\) \{[\s\S]{0,160}notePageMayHaveChanged\(\);/.test(main),
+      'a write the app makes says it through noteAppWrite',
+      /function noteAppWrite\(\)[^{]*\{[\s\S]{0,160}notePageMayHaveChanged\(\);/.test(main),
       'an in-app write would go unannounced'
     );
   }

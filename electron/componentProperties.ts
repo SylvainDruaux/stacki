@@ -39,13 +39,14 @@ export interface FileChange {
   readonly after: string;
 }
 
-/** Where a batch writes: the document actors, and the self-write note the
- * watcher needs until step 9 (electron/selfWrites.ts). `onCommitted` hears
- * every batch that applied, with what it changed (step 6: its inverse batch
- * is Undo). */
+/** Where a batch writes: the document actors, and the note that the app
+ * wrote a file (the canvas may need to hear of it). The watcher tells the
+ * app's own writes from outside ones by the actors' committed bytes (plan
+ * §11.9). `onCommitted` hears every batch that applied, with what it changed
+ * (step 6: its inverse batch is Undo). */
 export interface PropertyWriter {
   readonly documents: DocumentActors;
-  readonly noteWrite: (file: string, source: string) => void;
+  readonly noteWrite: (file: string) => void;
   readonly onCommitted?: (changes: readonly FileChange[]) => void;
 }
 
@@ -329,7 +330,7 @@ function commitLeased(changes: readonly FileChange[], writer: PropertyWriter): R
   }
   const written: FileChange[] = [];
   for (const change of changes) {
-    writer.noteWrite(change.file, change.after);
+    writer.noteWrite(change.file);
     const report = writer.documents.replaceSource(
       change.file,
       change.after,
@@ -419,7 +420,7 @@ function restorePropertyFile(
   change: FileChange,
   writer: PropertyWriter,
 ): 'restored' | 'changed' | 'failed' {
-  writer.noteWrite(change.file, change.before);
+  writer.noteWrite(change.file);
   const report = writer.documents.replaceSource(change.file, change.before, digestOf(change.after));
   switch (report.tag) {
     case 'applied':

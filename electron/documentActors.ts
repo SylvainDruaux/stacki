@@ -179,6 +179,9 @@ interface Entry {
   /** The actor's recent commits, oldest first, bounded by
    * LIMITS.commitLogEntriesMax: an edit authored before them rebases exactly. */
   log: CommitRecord[];
+  /** The checksum of the bytes this actor last wrote, created or committed;
+   * undefined until it writes. A watcher tick asks it (plan §11.9). */
+  written: Digest | undefined;
 }
 
 /** An outcome with what the host learned beside it. */
@@ -407,6 +410,28 @@ export class DocumentActors {
         this.#leased.delete(key);
       }
     }
+  }
+
+  /** Whether a watcher tick for `file` is this host hearing its own write
+   * (plan §11.9): the file holds exactly the bytes its actor last wrote. One
+   * read per tick, no clock — an outside write a millisecond later holds other
+   * bytes, and a file gone since holds none. A file whose actor was dropped
+   * (LIMITS.documentActorsMax) is answered `false`: the tick is then treated
+   * as an outside change, whose one read finds the bytes the app already has. */
+  echoes(file: string): boolean {
+    const document = this.#options.disk.canonical(file);
+    if (!document.ok) {
+      return false; // Its folder is gone: whatever happened, it was not a write of ours.
+    }
+    const written = this.#entries.get(document.value.key)?.written;
+    if (written === undefined) {
+      return false;
+    }
+    const read = this.#options.disk.read(document.value.path);
+    if (!read.ok) {
+      return false;
+    }
+    return this.#options.projector.hash(read.value.bytes) === written;
   }
 
   /** The watcher saw an outside change (plan §7): a hint, not an authority.
@@ -696,6 +721,7 @@ export class DocumentActors {
         diskChecksum: current.value,
       };
     }
+    entry.written = checksum;
     return { tag: 'applied', checksum };
   }
 
@@ -725,6 +751,7 @@ export class DocumentActors {
       used: this.#clock,
       retained: [],
       log: [],
+      written: undefined,
     };
     this.#entries.set(document.value.key, entry);
     assert(
@@ -796,7 +823,9 @@ export class DocumentActors {
       splices: minimalSplices(commit.plan.splices),
     };
     entry.log = [...entry.log, record].slice(-LIMITS.commitLogEntriesMax);
+    entry.written = record.to;
     assert(entry.log.length <= LIMITS.commitLogEntriesMax, 'The commit log is bounded');
+    assert(entry.state.snapshot?.checksum === record.to, 'The commit is the actor snapshot');
   }
 
   #refreshDirty(): void {

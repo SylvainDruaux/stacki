@@ -8,7 +8,6 @@ const { createRequire } = require('node:module');
 const { EventEmitter } = require('node:events');
 const { createSerialQueue } = require('../dist/electron/serialQueue');
 const { watchProject } = require('../dist/electron/projectWatcher');
-const { createSelfWrites } = require('../dist/electron/selfWrites');
 
 const tick = () => new Promise((resolve) => setImmediate(resolve));
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -229,15 +228,6 @@ test('project watchers route batched edits once and cancel all pending events on
   await sleep(250);
   assert.equal(events.length, 4, 'the next project receives no old notifications');
   assert.equal(closed.length, 2, 'both watched directories close together');
-});
-
-test('closing a project releases retained self-write file contents', () => {
-  const selfWrites = createSelfWrites({ read: () => 'before' });
-  selfWrites.note('/project/page.astro', 'before');
-  assert.equal(selfWrites.isEcho('/project/page.astro'), true);
-  selfWrites.clear();
-  assert.equal(selfWrites.lastWrite('/project/page.astro'), null);
-  assert.equal(selfWrites.isEcho('/project/page.astro'), false);
 });
 
 test('dev starts share a result only for the same project and serialize different projects', async () => {
