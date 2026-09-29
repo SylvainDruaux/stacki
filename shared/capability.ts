@@ -15,7 +15,9 @@ export const CAPABILITIES = [
   'repeated-source-node',
   /** One runtime element assembled from several sources (a chunk group). */
   'runtime-aggregate',
-  /** Outside the engine's scope today (Markdown and MDX until step 10). */
+  /** No operation writes it: kept so a new node kind decides, at compile time,
+   * what the editor may do with it (Markdown and MDX pages carried it until
+   * step 10; nothing is classified so today). */
   'unsupported',
 ] as const;
 

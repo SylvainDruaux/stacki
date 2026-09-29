@@ -1,8 +1,9 @@
-// The page save contract (plan §11 step 0). A page read carries the checksum of
-// the exact bytes it returned; a write names the checksum it was authored
-// against, and main refuses it when the file no longer holds those bytes. That
-// refusal is an expected operating failure, so it arrives as a Result value. A
-// reply that breaks this shape is a programmer error and throws here.
+// The page save contract (plan §11 step 0; since step 10 every page save is an
+// edit). A page read carries the checksum of the exact bytes it returned; an
+// edit names the checksum it was authored against, and main refuses it when
+// it cannot be placed on the bytes the file holds now. That refusal is an
+// expected operating failure, so it arrives as a Result value. A reply that
+// breaks this shape is a programmer error and throws here.
 import { toDigest, type Digest } from './brand';
 import { parseRejectionReason, type RejectionReason, type SourceEdit } from './intent';
 import { LIMITS } from './limits';
@@ -17,8 +18,9 @@ export type PageDiskRead = ParsePageResult & {
   readonly checksum: Digest;
 };
 
-export type PageWriteError =
-  | { readonly code: 'conflict'; readonly message: string; readonly diskChecksum: Digest }
+/** A write that did not happen, or may have: none of these is a refusal of
+ * the edit's content, which is `rejected` (PageEditError). */
+export type PageWriteFailure =
   | { readonly code: 'missing'; readonly message: string }
   | { readonly code: 'filesystem'; readonly message: string }
   | { readonly code: 'write-race'; readonly message: string }
@@ -40,7 +42,7 @@ export type PageEditError =
       readonly message: string;
       readonly diskChecksum: Digest | undefined;
     }
-  | Exclude<PageWriteError, { readonly code: 'conflict' }>;
+  | PageWriteFailure;
 
 export function parsePageEditResult(input: unknown): Result<PageEdited, PageEditError> {
   const record = toRecord(input);
@@ -102,11 +104,7 @@ function parsePageEditError(input: unknown): PageEditError {
       diskChecksum: disk === null ? undefined : checksumField(disk, 'PageEditError.diskChecksum'),
     };
   }
-  const error = parsePageWriteError(input);
-  if (error.code === 'conflict') {
-    throw new Error('PageEditError.code: a refused edit is `rejected`, not `conflict`');
-  }
-  return error;
+  return parsePageWriteFailure(input);
 }
 
 export function parsePageDiskRead(input: unknown): PageDiskRead {
@@ -118,42 +116,20 @@ export function parsePageDiskRead(input: unknown): PageDiskRead {
   return { ...page, checksum: checksumField(record['checksum'], 'PageDiskRead.checksum') };
 }
 
-/** A whole save's reply (a Markdown or MDX page): the page as written and
- * the inverse Undo submits, like an edit's (step 9). */
-export function parsePageWriteResult(input: unknown): Result<PageEdited, PageWriteError> {
+function parsePageWriteFailure(input: unknown): PageWriteFailure {
   const record = toRecord(input);
   if (record === undefined) {
-    throw new Error('PageWriteResult: expected object');
-  }
-  if (record['ok'] === true) {
-    return ok({ ...parsePageDiskRead(input), inverse: parseInverse(record['inverse']) });
-  }
-  if (record['ok'] === false) {
-    return err(parsePageWriteError(record['error']));
-  }
-  throw new Error('PageWriteResult.ok: expected boolean');
-}
-
-function parsePageWriteError(input: unknown): PageWriteError {
-  const record = toRecord(input);
-  if (record === undefined) {
-    throw new Error('PageWriteError: expected object');
+    throw new Error('PageWriteFailure: expected object');
   }
   const message = record['message'];
   if (typeof message !== 'string') {
-    throw new Error('PageWriteError.message: expected string');
+    throw new Error('PageWriteFailure.message: expected string');
   }
   if (message.length > LIMITS.attrCharsMax) {
-    throw new Error('PageWriteError.message: exceeds limit');
+    throw new Error('PageWriteFailure.message: exceeds limit');
   }
   const code = record['code'];
   switch (code) {
-    case 'conflict':
-      return {
-        code,
-        message,
-        diskChecksum: checksumField(record['diskChecksum'], 'PageWriteError.diskChecksum'),
-      };
     case 'missing':
     case 'filesystem':
     case 'write-race':
@@ -161,7 +137,7 @@ function parsePageWriteError(input: unknown): PageWriteError {
     case 'backpressured':
       return { code, message };
     default:
-      throw new Error('PageWriteError.code: unknown value');
+      throw new Error('PageWriteFailure.code: unknown value');
   }
 }
 

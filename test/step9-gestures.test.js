@@ -2,8 +2,8 @@
 // requests (plan §11 step 9): rewording a note, renaming a prop, changing a
 // tag or a component, setting content, a condition's test and its else
 // branch, and picking, renaming or removing a layout — each writes only its
-// own bytes, `page:write` is never called for an .astro page, and undoing
-// every gesture restores the file byte for byte.
+// own bytes (the whole-model save no longer exists: step 10 retired
+// `page:write`), and undoing every gesture restores the file byte for byte.
 // Method: the real App in jsdom with stub panels that capture their props, as
 // in page-navigation.test.js. The bridge serves a real file in a temporary
 // folder: `page:read` parses it with the real parser, and `page:edit` does
@@ -16,18 +16,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { createHash } = require('node:crypto');
-const esbuild = require('esbuild');
-const { JSDOM } = require('jsdom');
-const { parsePage } = require('../dist/electron/astroParser.js');
-const { createNodeDocumentActors } = require('../dist/electron/documentActors.js');
-const { buildEdit } = require('../dist/electron/editRequests.js');
-const { decodeUtf8 } = require('../dist/shared/span.js');
-
-const sha256 = (text) => createHash('sha256').update(text).digest('hex');
-const tick = () => new Promise((resolve) => setTimeout(resolve, 10));
-// Past the typing batch (300 ms) and the save that follows it.
-const saved = () => new Promise((resolve) => setTimeout(resolve, 450));
+const { gesture, mountApp, nodeAt, select, tick, undo } = require('./app-gestures.js');
 
 const PAGE = [
   '---',
@@ -55,180 +44,6 @@ const LAYOUT_PAGE = [
   '',
 ].join('\n');
 
-// A panel that records its props and renders nothing.
-const panelStub = (name) =>
-  "export const relativeTime = () => ''; " +
-  'export default function Panel(props) { ' +
-  `globalThis.__panels[${JSON.stringify(name)}] = props; return null; }`;
-
-async function mountApp(root, files) {
-  const dir = path.join(__dirname, '..', 'node_modules', '.stacki-test', 'step9-gestures');
-  fs.mkdirSync(dir, { recursive: true });
-  await esbuild.build({
-    entryPoints: [path.join(__dirname, '..', 'src', 'App.tsx')],
-    outfile: path.join(dir, 'app.js'),
-    bundle: true,
-    format: 'cjs',
-    platform: 'node',
-    jsx: 'automatic',
-    external: ['react', 'react-dom', 'react-dom/client', 'react/jsx-runtime'],
-    loader: { '.css': 'empty', '.svg': 'empty', '.png': 'empty' },
-    logLevel: 'silent',
-    plugins: [
-      {
-        name: 'capture-panels',
-        setup(build) {
-          build.onLoad({ filter: /\/src\/panels\/[^/]+\.[jt]sx$/ }, (args) => {
-            const name = path.basename(args.path, path.extname(args.path));
-            return {
-              contents: panelStub(name),
-              loader: 'jsx',
-            };
-          });
-        },
-      },
-    ],
-  });
-  const dom = new JSDOM('<!doctype html><div id="root"></div>', {
-    url: 'http://localhost/',
-    pretendToBeVisual: true,
-  });
-  const { window } = dom;
-  for (const key of [
-    'window',
-    'document',
-    'navigator',
-    'HTMLElement',
-    'Element',
-    'Node',
-    'MutationObserver',
-    'KeyboardEvent',
-  ]) {
-    global[key] = key === 'window' ? window : window[key];
-  }
-  global.getComputedStyle = window.getComputedStyle;
-  global.requestAnimationFrame = (fn) => setTimeout(fn, 0);
-  global.cancelAnimationFrame = clearTimeout;
-  global.ResizeObserver = class {
-    observe() {}
-    disconnect() {}
-  };
-  window.ResizeObserver = global.ResizeObserver;
-  window.matchMedia = () => ({ matches: false, addEventListener() {}, removeEventListener() {} });
-  global.__panels = {};
-  global.IS_REACT_ACT_ENVIRONMENT = true;
-  const documents = createNodeDocumentActors({
-    log: () => {},
-    schedule: (task) => setImmediate(task),
-  });
-  const calls = { writePage: 0, edits: [] };
-  const read = (file) => {
-    const text = fs.readFileSync(file, 'utf8');
-    return { ...parsePage(text, { locs: true }), source: text, checksum: sha256(text) };
-  };
-  const bridge = new Proxy(
-    {
-      pendingProject: async () => null,
-      scanProject: async () => files.scan,
-      hasNodeModules: async () => true,
-      startDevServer: async () => ({ url: 'http://localhost:4321' }),
-      listProjectClasses: async () => [],
-      readPage: async (file) => read(file),
-      // The whole-model save: an .astro page must never reach it.
-      writePage: async () => {
-        calls.writePage += 1;
-        throw new Error('page:write was called for an .astro page');
-      },
-      editPage: async ({ pagePath, authoredChecksum, edit }) => {
-        calls.edits.push(edit.tag);
-        const stated = { authoredChecksum, gone: 'anchor-moved' };
-        const report = documents.submitEdit(pagePath, stated, (base) => buildEdit(edit, base));
-        if (report.tag !== 'applied') {
-          const error =
-            report.tag === 'rejected'
-              ? {
-                  code: 'rejected',
-                  reason: report.reason,
-                  message: report.message,
-                  diskChecksum: report.diskChecksum ?? null,
-                }
-              : { code: 'filesystem', message: report.tag };
-          return { ok: false, error };
-        }
-        const decoded = decodeUtf8(report.bytes);
-        assert.ok(decoded.ok);
-        return { ok: true, ...read(pagePath), inverse: report.inverse };
-      },
-      importPathFor: async ({ targetPath }) => ({
-        relative: `../${path.relative(path.join(root, 'src'), targetPath)}`,
-        srcRelative: null,
-      }),
-      onFsChanged: () => () => {},
-      gitInfo: async () => ({ isRepo: false }),
-      onCssChanged: () => () => {},
-    },
-    {
-      get: (target, key) =>
-        key in target
-          ? target[key]
-          : String(key).startsWith('on')
-            ? () => () => {}
-            : async () => null,
-    },
-  );
-  window.avb = bridge;
-  global.avb = bridge;
-  const React = require('react');
-  const { createRoot } = require('react-dom/client');
-  const { act } = React;
-  const reactRoot = createRoot(document.getElementById('root'));
-  const App = require(path.join(dir, 'app.js')).default;
-  await act(async () => {
-    reactRoot.render(React.createElement(App));
-    await tick();
-  });
-  await act(async () => {
-    await __panels.WelcomeScreen.onOpen(root);
-    await tick();
-  });
-  return { act, calls, window, unmount: () => act(() => reactRoot.unmount()) };
-}
-
-// The shown node at a path of the page's model, through the navigator's props.
-function nodeAt(pathSteps) {
-  let list = __panels.StructurePanel.pageState.model.nodes;
-  let node;
-  for (const step of pathSteps) {
-    node = list[step];
-    assert.ok(node, `a node at ${pathSteps.join('/')}`);
-    list = Array.isArray(node.children) ? node.children : [];
-  }
-  return node;
-}
-
-async function select(app, pathSteps) {
-  await app.act(async () => {
-    __panels.StructurePanel.onSelect(nodeAt(pathSteps).id);
-    await tick();
-  });
-}
-
-// A gesture, then its save. React commits the gesture's state when the act
-// scope ends — in the app it commits before an urgent save's zero-delay timer
-// fires, which is what that timer is for — so the wait is its own scope.
-async function gesture(app, run) {
-  await app.act(run);
-  await app.act(() => saved());
-}
-
-async function undo(app) {
-  await gesture(app, async () => {
-    document.dispatchEvent(
-      new app.window.KeyboardEvent('keydown', { key: 'z', metaKey: true, bubbles: true }),
-    );
-  });
-}
-
 test('each converted gesture writes only its bytes; undo restores every byte', async (context) => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'stacki-step9-'));
   context.after(() => fs.rmSync(root, { recursive: true, force: true }));
@@ -244,7 +59,7 @@ test('each converted gesture writes only its bytes; undo restores every byte', a
     layouts: [],
     pageFolders: [],
   };
-  const app = await mountApp(root, { scan });
+  const app = await mountApp(root, { scan }, 'step9-gestures');
   context.after(app.unmount);
   const disk = () => fs.readFileSync(file, 'utf8');
   const expectDisk = (lines, what) => assert.equal(disk(), lines.join('\n'), what);
@@ -330,13 +145,11 @@ test('each converted gesture writes only its bytes; undo restores every byte', a
     __panels.PropsPanel.onToggleElse(true);
   });
   assert.match(disk(), /\{visible \? \(/, 'the else branch is added');
-  assert.equal(app.calls.writePage, 0, 'no gesture saved the whole model');
   // Undo every gesture, newest first: the file comes back byte for byte.
   for (let step = 0; step < 7; step++) {
     await undo(app);
   }
   assert.equal(disk(), PAGE, 'undo restores every byte');
-  assert.equal(app.calls.writePage, 0, 'undo never saved the whole model either');
 });
 
 test('paste and extract-to-component insert, remove and import as requests', async (context) => {
@@ -353,7 +166,7 @@ test('paste and extract-to-component insert, remove and import as requests', asy
     layouts: [],
     pageFolders: [],
   };
-  const app = await mountApp(root, { scan });
+  const app = await mountApp(root, { scan }, 'step9-gestures');
   context.after(app.unmount);
   const disk = () => fs.readFileSync(file, 'utf8');
   // Copy the paragraph, select the div, paste: a new node after the div.
@@ -396,7 +209,6 @@ test('paste and extract-to-component insert, remove and import as requests', asy
       '<main>\n  <p class="a">One</p>\n  <Two />\n</main>\n',
     'extract: an instance where the markup was, and its import',
   );
-  assert.equal(app.calls.writePage, 0, 'neither saved the whole model');
 });
 
 test('a layout renamed, removed and picked again reaches disk as requests', async (context) => {
@@ -419,7 +231,7 @@ test('a layout renamed, removed and picked again reaches disk as requests', asyn
     ],
     pageFolders: [],
   };
-  const app = await mountApp(root, { scan });
+  const app = await mountApp(root, { scan }, 'step9-gestures');
   context.after(app.unmount);
   const disk = () => fs.readFileSync(file, 'utf8');
   await gesture(app, async () => {
@@ -446,5 +258,4 @@ test('a layout renamed, removed and picked again reaches disk as requests', asyn
     "---\nimport Base from '../layouts/Base.astro';\n---\n  <Base>\n  <main>m</main>\n  </Base>\n",
     'picked again: the page is wrapped as written, and the import added',
   );
-  assert.equal(app.calls.writePage, 0, 'no layout change saved the whole model');
 });

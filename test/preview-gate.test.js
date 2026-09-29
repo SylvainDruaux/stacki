@@ -115,7 +115,8 @@ test('the open file must have rendered from the bytes the editor shows', () => {
     reason: 'unstamped-file',
     file: 'src/pages/about.astro',
   });
-  // Markdown carries no stamp until step 10; its layout is still checked on disk.
+  // Markdown carries no stamp (its markers are the processor's, not the file's
+  // bytes); its layout is still checked on disk.
   const markdown = { ...clean(B), model: { format: 'md', nodes: [] } };
   assert.deepEqual(judgeLocally(T, render, { file: 'src/pages/post.md', state: markdown }), {
     tag: 'current',

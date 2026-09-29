@@ -11,9 +11,9 @@ import { createHash } from 'node:crypto';
 import { mainHarness } from './main-harness.ts';
 import { IPC_PAYLOADS } from '../../dist/shared/ipc-payloads.js';
 import { toRecord } from '../../dist/shared/record.js';
-import { parseMarkdownPage, serializeMarkdownPage } from '../../dist/electron/markdownParser.js';
+import { parseMarkdownPage } from '../../dist/electron/markdownParser.js';
+import { parsePageModel } from '../../dist/shared/page-node.js';
 import {
-  parseMarkdownModel,
   parseContentConfig,
   parseDynamicPaths,
   parseSampleEntry,
@@ -24,6 +24,8 @@ import {
 } from '../../dist/electron/main.validation.js';
 import { directoryBudget, MAIN_LIMITS } from '../../dist/electron/main.bounds.js';
 import { LIMITS } from '../../dist/shared/limits.js';
+
+const sha256 = (text: string): string => createHash('sha256').update(text).digest('hex');
 
 function fixture() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'stacki-main-contract-'));
@@ -49,8 +51,9 @@ test('the complete channel inventory matches real main and terminal registration
   const terminalChannels = [...terminal.matchAll(/ipcMain\.handle\(['"]([^'"]+)['"]/g)].map(
     (match) => match[1],
   );
-  // Step 8 retired page:writeRaw; step 9 added page:previewEdit.
-  assert.equal(harness.handlers.size, 118);
+  // Step 8 retired page:writeRaw; step 9 added page:previewEdit; step 10
+  // retired page:write and page:serialize, the Markdown whole-model save.
+  assert.equal(harness.handlers.size, 116);
   assert.equal(terminalChannels.length, 4);
   assert.deepEqual(
     [...Object.keys(IPC_PAYLOADS)].sort(),
@@ -72,24 +75,6 @@ test('malformed writes fail before altering disk; valid writes still work', asyn
     }),
     /Expected string/,
   );
-  const baseChecksum = createHash('sha256').update('<h1>Before</h1>\n').digest('hex');
-  // An .astro page is never saved whole (step 9): refused, typed, unwritten.
-  const whole = toRecord(
-    await harness.invoke('page:write', { pagePath: file, model: { nodes: [] }, baseChecksum }),
-  );
-  assert.equal(whole?.['ok'], false, 'an .astro page takes edits, not a model');
-  // A Markdown page still saves whole until step 10; a malformed model throws.
-  const notes = path.join(harness.root, 'src/pages/notes.md');
-  fs.writeFileSync(notes, '# Notes\n');
-  const notesChecksum = createHash('sha256').update('# Notes\n').digest('hex');
-  await assert.rejects(
-    harness.invoke('page:write', {
-      pagePath: notes,
-      model: { nodes: false },
-      baseChecksum: notesChecksum,
-    }),
-  );
-  assert.equal(fs.readFileSync(notes, 'utf8'), '# Notes\n');
   const patch = {
     tag: 'code-patch',
     hunks: [{ span: { start: 4, end: 10 }, expected: 'Before', text: 'After' }],
@@ -99,6 +84,7 @@ test('malformed writes fail before altering disk; valid writes still work', asyn
     /Digest: expected 64 lowercase hex characters/,
   );
   assert.equal(fs.readFileSync(file, 'utf8'), '<h1>Before</h1>\n');
+  const baseChecksum = sha256('<h1>Before</h1>\n');
   const written = toRecord(
     await harness.invoke('page:edit', {
       pagePath: file,
@@ -123,18 +109,18 @@ test('malformed writes fail before altering disk; valid writes still work', asyn
   );
 });
 
-test('Markdown boundary preserves source metadata and rejects corrupted fields', () => {
+test('the Markdown wire model keeps source metadata and rejects corrupted fields', () => {
   for (const source of ['# Title\n\nParagraph.\n\n', '---\r\ntitle: Title\r\n---\r\nHello\r\n']) {
     const parsed = parseMarkdownPage(source);
     assert.ok(parsed.editable);
     const { model } = parsed;
-    assert.equal(serializeMarkdownPage(parseMarkdownModel(model)), serializeMarkdownPage(model));
-    assert.throws(() => parseMarkdownModel({ ...model, mdEndsWithNewline: 'yes' }), /boolean/);
-    assert.throws(
-      () =>
-        parseMarkdownModel({ ...model, nodes: [{ kind: 'text', value: 'a', mdBlanksBefore: -1 }] }),
-      /nonnegative/,
-    );
+    const wire = parsePageModel(model);
+    assert.equal(wire.mdEol, model.mdEol);
+    assert.equal(wire.bodyStart, model.bodyStart);
+    assert.throws(() => parsePageModel({ ...model, mdEndsWithNewline: 'yes' }), /boolean/);
+    const blank = { id: 'n0', kind: 'text', value: 'a', mdBlanksBefore: -1 };
+    assert.throws(() => parsePageModel({ ...model, nodes: [blank] }), /nonnegative/);
+    assert.throws(() => parsePageModel({ ...model, bodyStart: -1 }), /nonnegative/);
   }
 });
 
@@ -223,7 +209,7 @@ test('Markdown array metadata and source-file size have explicit bounds', async 
   assert.ok(parsed.editable);
   const { model } = parsed;
   model.nodes.mdTrailingBlanks = Number.MAX_SAFE_INTEGER;
-  assert.throws(() => parseMarkdownModel(model), /blank lines exceed limit/);
+  assert.throws(() => parsePageModel(model), /exceeds blank-line limit/);
   const file = path.join(harness.root, 'src/pages/large.astro');
   fs.writeFileSync(file, '');
   fs.truncateSync(file, LIMITS.sourceBytesMax + 1);

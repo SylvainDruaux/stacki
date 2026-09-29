@@ -19,7 +19,7 @@
 // one thread two batches cannot interleave today; the sorted order is what
 // keeps them from deadlocking once acquisition can wait.
 import { assert } from '../shared/assert';
-import { toFilePath, toIntentId, type Digest } from '../shared/brand';
+import { toIntentId, type Digest } from '../shared/brand';
 import {
   actorQuiescent,
   createActor,
@@ -307,14 +307,6 @@ export class DocumentActors {
     const snapshot = entry.value.state.snapshot;
     assert(snapshot?.checksum === current.value, 'The answer is the refreshed snapshot');
     return ok({ checksum: snapshot.checksum, bytes: snapshot.bytes });
-  }
-
-  /** The save guard refused a stale write before any intent (telemetry). */
-  noteConflict(file: string): void {
-    const entry = this.#entry(file);
-    this.#options.telemetry.record(entry.ok ? entry.value.document.path : toFilePath(file), {
-      tag: 'conflict',
-    });
   }
 
   /** Writers that never named a base (the style panel's stylesheet save, a

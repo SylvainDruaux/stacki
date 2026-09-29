@@ -172,7 +172,7 @@ test('parseEditRequest takes every edit and refuses each malformed shape', () =>
   );
 });
 
-test('parsePageEditResult: an applied edit carries its inverse; a conflict is a rejection', () => {
+test('parsePageEditResult: an applied edit carries its inverse; a refusal is a rejection', () => {
   const page = { source: 'x', editable: false, reason: 'r', bail: null, checksum: DIGEST };
   const applied = parsePageEditResult({
     ok: true,
@@ -215,7 +215,8 @@ test('parsePageEditResult: an applied edit carries its inverse; a conflict is a 
         ok: false,
         error: { code: 'conflict', message: 'm', diskChecksum: DIGEST },
       }),
-    /rejected/,
+    // Step 10: no save is refused as a whole-file conflict any more.
+    /PageWriteFailure\.code: unknown value/,
   );
 });
 

@@ -85,7 +85,6 @@ import {
   propsGesture,
   removalGesture,
   sequence,
-  markdownGesture,
   tagRenameGesture,
   unwrapGesture,
   withChildren,
@@ -250,8 +249,6 @@ import {
   stopProjectCommitPreview,
   watchProject,
   writeProjectFile,
-  writeProjectPage,
-  serializeProjectPage,
   previewProjectPageEdit,
   editProjectPage,
   checkPreviewRender,
@@ -544,10 +541,10 @@ function tagChangeGesture(
   return sequence(named, frontmatterGesture(renamed, imports, options));
 }
 
-// The unsaved version of a conflicted page as text, for review (plan §7). An
-// .astro page's queued gestures are planned as the splices they would write,
-// against the bytes they were stated on (page:previewEdit) — never printed
-// whole; a Markdown page saves its whole model until step 10, and shows it so.
+// The unsaved version of a conflicted page as text, for review (plan §7). The
+// page's queued gestures are planned as the splices they would write, against
+// the bytes they were stated on (page:previewEdit) — never printed whole, on
+// any page since step 10.
 type Reviewed =
   | { readonly tag: 'shown'; readonly source: string; readonly withdrawn: number }
   | { readonly tag: 'failed'; readonly message: string };
@@ -557,10 +554,9 @@ async function reviewedSource(
   state: EditablePageState,
   queued: readonly QueueEntry[],
 ): Promise<Reviewed> {
-  if (state.origin === undefined) {
-    assert(state.model.format !== undefined, 'Only a Markdown page has no origin');
-    return { tag: 'shown', source: await serializeProjectPage(path, state.model), withdrawn: 0 };
-  }
+  // Only typed code leaves a page without an origin, and typed code is
+  // reviewed as it was typed (the caller's branch).
+  assert(state.origin !== undefined, 'A page with only gestures queued has an origin');
   const gestures = queued.flatMap((entry) => (entry.tag === 'gesture' ? [entry.gesture] : []));
   assert(gestures.length === queued.length, 'Typed code is reviewed as it was typed');
   const shown = await previewGestures({
@@ -1231,7 +1227,6 @@ export default function App() {
         conflict: (reason) => setConflictReason(reason),
         notice: (message) => showToast(message, 'error'),
         edit: editProjectPage,
-        writeWhole: writeProjectPage,
         read: readPage,
       }),
     });
@@ -2026,28 +2021,24 @@ export default function App() {
       const { currentPage, pageState: state } = pageStateRef.current;
       const path = currentPage?.path;
       if (!path || !state?.editable || typedCodeUnparsed()) {return;}
-      const markdown = state.model.format !== undefined;
+      // Every page's gestures are edit requests (step 10: Markdown and MDX
+      // too). Without an origin — typed code made the page parse and is not
+      // saved yet — no node can be named until that save replies.
       const origin = state.origin;
-      if (!markdown) {
-        assert(origin !== undefined, 'An editable .astro page has an origin');
-        const unreachable = gesture.request((id) => nodeRefIn(origin, id)) === undefined;
-        if (editDrafts.empty(path) && unreachable) {
-          // Nothing queued could have made its node: it is out of reach.
-          showToast('That edit can’t be made visually here — edit it in the code panel.', 'error');
-          return;
-        }
-        if (editDrafts.entries(path).length >= LIMITS.intentsPendingMax) {
-          showToast('Too many edits are waiting to be saved — try again in a moment.', 'error');
-          return;
-        }
+      const unreachable =
+        origin === undefined || gesture.request((id) => nodeRefIn(origin, id)) === undefined;
+      if (editDrafts.empty(path) && unreachable) {
+        // Nothing queued could have made its node: it is out of reach.
+        showToast('That edit can’t be made visually here — edit it in the code panel.', 'error');
+        return;
+      }
+      if (editDrafts.entries(path).length >= LIMITS.intentsPendingMax) {
+        showToast('Too many edits are waiting to be saved — try again in a moment.', 'error');
+        return;
       }
       const record = pushEditHistory(gesture.coalesceKey);
-      if (markdown) {
-        editDrafts.markModel(path, record);
-      } else {
-        const queued = editDrafts.addGesture(path, gesture, record);
-        assert(queued === 'queued', 'A gesture inside the bound is queued');
-      }
+      const queued = editDrafts.addGesture(path, gesture, record);
+      assert(queued === 'queued', 'A gesture inside the bound is queued');
       setPageState((s) =>
         s?.editable ? { ...s, model: gesture.apply(s.model), save: saveStateEdited(s.save) } : s,
       );
@@ -2105,7 +2096,7 @@ export default function App() {
     // conflict for them.
     // Typed code is a patch too (step 8): it merges with the outside change
     // or comes back `merge-conflict` — also not a page-wide conflict here.
-    if (editDrafts.entries(pagePath).some((entry) => entry.tag !== 'model')) {
+    if (!editDrafts.empty(pagePath)) {
       return;
     }
     const baseBefore = saveStateBase(before.save);
@@ -3843,7 +3834,11 @@ export default function App() {
           extraFrontmatter: withLayoutField(model.extraFrontmatter, rel),
           layoutPath: rel,
         });
-        commitEdit(markdownGesture(framed, { coalesceKey: null, urgency: true }));
+        const shown = pageStateRef.current.pageState;
+        if (!shown?.editable) {return;}
+        // The YAML block the model now holds, written as the slot that
+        // differs — or, on a post without one, a new block at its top.
+        commitEdit(frontmatterGesture(shown.model, framed, { coalesceKey: null, urgency: true }));
         return;
       }
       const state = pageStateRef.current.pageState;

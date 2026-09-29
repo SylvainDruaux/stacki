@@ -107,12 +107,13 @@ test('answers fill the undo step in order; a step is applied when nothing is owe
       { checksum: sum(3), inverse: [] },
     ],
   });
-  // One write for several steps (typing, a Markdown page): the newest learns
-  // the inverse, the older ones are folded into it.
+  // One write for several steps (typing): the newest learns the inverse, the
+  // older ones are folded into it.
   const older = record();
   const newer = record();
-  store.markModel('/md', older);
-  store.markModel('/md', newer);
+  const typed = { save: { tag: 'dirty', baseChecksum: sum(1) }, source: 'one', origin: undefined };
+  store.typeCode('/typed', typed, older);
+  store.typeCode('/typed', typed, newer);
   edits.recordWrite([older, newer], { checksum: sum(4), inverse: [] });
   assert.deepEqual(older.outcome, { tag: 'folded' });
   assert.equal(newer.outcome.tag, 'applied');

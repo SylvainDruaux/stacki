@@ -1,4 +1,3 @@
-import { LIMITS } from '../shared/limits.js';
 // Disk and dev-server data are untrusted, even when a previous app run wrote
 // them. Keep bounds and parsing separate from handlers so failures are testable.
 import {
@@ -14,11 +13,9 @@ import {
   record,
   text,
 } from '../shared/boundary.js';
-import { toArray, toRecord } from '../shared/record.js';
+import { toRecord } from '../shared/record.js';
 import type { Data } from '../shared/boundary.js';
 import type { ContentCollection } from './contentEntries.js';
-import type { MarkdownModel } from './markdownParser.js';
-import { parseSerializeNodes } from './astroParser.validation.js';
 import type { DynamicEntry } from './main.types.js';
 
 export { data as parseData, record as parseRecord, text as parseString };
@@ -132,58 +129,6 @@ export function parseSampleEntry(input: unknown): {
   return { entry: data(source['entry'] ?? null), ...(error === undefined ? {} : { error }) };
 }
 
-export function parseMarkdownModel(input: unknown): Omit<MarkdownModel, 'bodyStart'> {
-  const source = record(input);
-  const format = source['format'];
-  if (format !== 'md' && format !== 'mdx') {
-    throw new Error('Expected Markdown format');
-  }
-  const parsed = object({
-    extraFrontmatter: text,
-    layoutPath: nullable(text),
-    mdEol: text,
-    mdEndsWithNewline: boolean,
-    mdHasFrontmatter: boolean,
-    imports: list(object({ name: text, path: text })),
-  })(source);
-  const nodes = parseSerializeNodes(source['nodes']);
-  // Metadata controls lossless Markdown output, so validate every extra field
-  // used by that writer before preserving the original node objects.
-  parseMarkdownBlanks(Reflect.get(nodes, 'mdTrailingBlanks'));
-  const pending: unknown[] = [...nodes];
-  for (let index = 0; index < pending.length; index++) {
-    const node = record(pending[index]);
-    parseMarkdownMetadata(node);
-    const children = toArray(node['children']);
-    if (children) {
-      parseMarkdownBlanks(Reflect.get(children, 'mdTrailingBlanks'));
-      pending.push(...children);
-    }
-  }
-  return { ...parsed, format, frontmatterLang: 'yaml', nodes };
-}
-
-function parseMarkdownMetadata(node: Record<string, unknown>): void {
-  for (const name of [
-    'mdIndent',
-    'mdFence',
-    'mdInfo',
-    'mdRaw',
-    'mdGap',
-    'mdTrail',
-    'mdSetext',
-    'mdMarker',
-    'mdSource',
-  ]) {
-    optional(text)(node[name]);
-  }
-  for (const name of ['mdUnclosed', 'mdImage', 'mdLoose', 'mdEsm']) {
-    optional(boolean)(node[name]);
-  }
-  parseMarkdownBlanks(node['mdBlanksBefore']);
-  optional(list(count))(node['mdNumbers']);
-}
-
 export const parseValidationResult = object({
   issues: list(
     object({
@@ -197,10 +142,3 @@ export const parseValidationResult = object({
   unchecked: optional(boolean),
   error: optional(text),
 });
-
-function parseMarkdownBlanks(input: unknown): void {
-  const blanks = optional(count)(input);
-  if (blanks !== undefined && blanks > LIMITS.treeNodesMax) {
-    throw new Error('Markdown blank lines exceed limit');
-  }
-}

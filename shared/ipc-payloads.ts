@@ -199,17 +199,7 @@ export const IPC_PAYLOADS = {
     source: text,
   }),
   'page:read': pathText,
-  // The text a Markdown model write would produce, for reviewing unsaved
-  // edits in code (an .astro page's are previewed as edits instead).
-  'page:serialize': object({ pagePath: pathText, model: (input: unknown) => input }),
   'page:rebaseImport': object({ fromPagePath: maybePath, toPagePath: maybePath, spec: text }),
-  // baseChecksum names the disk bytes the edit was authored against; main
-  // refuses the write with `conflict` when the file no longer holds them.
-  'page:write': object({
-    pagePath: pathText,
-    model: (input: unknown) => input,
-    baseChecksum: digest,
-  }),
   'pagefolder:create': object({ ...project, dir: pathText }),
   'pagefolder:delete': object({ ...project, dir: pathText }),
   'pagefolder:rename': object({ ...project, from: pathText, to: pathText }),

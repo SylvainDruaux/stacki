@@ -2071,8 +2071,6 @@ contextBridge.exposeInMainWorld('avb', {
   // Pages
   readPage: invoke('page:read'),
   parsePageSource: invoke('page:parse'),
-  serializePage: invoke('page:serialize'),
-  writePage: invoke('page:write'),
   editPage: invoke('page:edit'),
   previewPageEdit: invoke('page:previewEdit'),
   createPage: invoke('page:create'),

@@ -2,9 +2,9 @@
 // open page owes the disk, in the order the user made it, and how each part
 // reaches the page's actor.
 //
-// Three kinds of entry, never mixed up:
-//   - a gesture (an .astro page): the edit requests it becomes, stated when it
-//     is sent — against the page as the app's last reply left it (the origin),
+// Two kinds of entry, never mixed up:
+//   - a gesture (any page — .astro, Markdown or MDX since step 10): the edit
+//     requests it becomes, stated when it is sent — against the page as the app's last reply left it (the origin),
 //     so a node an earlier gesture created a moment ago is already there to
 //     name. A request names nodes by the facts of that parse (path, kind,
 //     source range), and main checks them against its own projection of the
@@ -14,8 +14,6 @@
 //     baseline the typing descends from (src/codeEdits.ts). At most one, and
 //     first: typing replaces the unsent gestures, which the text it was typed
 //     into does not hold.
-//   - a Markdown or MDX page's whole model (plan §6): these pages join the
-//     engine at step 10, and until then save whole through their actor.
 //
 // The rules (plan §7): gestures coalesce within one stream (one field of one
 // node) and one undo step while unsent — the last value wins; the queue is
@@ -24,8 +22,8 @@
 // page's conflict notice names the reason.
 //
 // Undo steps (EditsRecord) learn their inverses as replies arrive. An entry
-// carrying several steps' bytes in one write (typing, a Markdown page) gives
-// its inverse to the newest step; the older ones are `folded` into it.
+// carrying several steps' bytes in one write (typing) gives its inverse to the
+// newest step; the older ones are `folded` into it.
 import { assert } from '../shared/assert';
 import type { Digest } from '../shared/brand';
 import type { Edit, EditRequest, NodeRef } from '../shared/edit-request';
@@ -114,8 +112,7 @@ export type QueueEntry =
       readonly tag: 'code';
       readonly baseline: CodeBaseline;
       readonly records: readonly EditsRecord[];
-    }
-  | { readonly tag: 'model'; readonly records: readonly EditsRecord[] };
+    };
 
 /** A page as the code editor showed it when the user typed: its save state,
  * the text its editor held, and the origin that text descends from. */
@@ -155,8 +152,6 @@ export class EditDrafts {
         return 'queued';
       }
     }
-    const markdown = this.#entries.some((entry) => entry.tag === 'model');
-    assert(!markdown, 'A Markdown page queues no gestures');
     if (this.#entries.length >= LIMITS.intentsPendingMax) {
       return 'full';
     }
@@ -217,24 +212,6 @@ export class EditDrafts {
     if (code?.tag === 'code') {
       this.#entries[at] = { ...code, baseline: { tag: 'disk' } };
     }
-  }
-
-  /** A Markdown or MDX gesture: the page's whole model is owed, and `record`
-   * with it. Every step since the last save is one write. */
-  markModel(path: string, record: EditsRecord): void {
-    this.#own(path);
-    const model = this.#entries.find((entry) => entry.tag === 'model');
-    const gestures = this.#entries.some((entry) => entry.tag === 'gesture');
-    assert(!gestures, 'A Markdown page has no gestures');
-    const records = model === undefined ? [] : model.records;
-    if (!records.includes(record)) {
-      owe(record);
-    }
-    const kept = records.includes(record) ? records : [...records, record];
-    this.#entries = [
-      ...this.#entries.filter((entry) => entry.tag !== 'model'),
-      { tag: 'model', records: kept },
-    ];
   }
 
   /** Take the oldest entry to send now. */
@@ -314,7 +291,6 @@ export function recordsOf(entry: QueueEntry): readonly EditsRecord[] {
     case 'gesture':
       return [entry.record];
     case 'code':
-    case 'model':
       return entry.records;
     default: {
       const exhaustive: never = entry;
@@ -373,7 +349,6 @@ function owe(record: EditsRecord): void {
  * node is not one main can name in the page's own bytes: not in this parse,
  * inside a chunk file, or without a source range. */
 export function nodeRefIn(origin: PageOrigin, nodeId: string): NodeRef | undefined {
-  assert(origin.model.format === undefined, 'Only .astro pages have an origin');
   const pending: { readonly node: PageNode; readonly path: readonly number[] }[] = [];
   origin.model.nodes.forEach((node, index) => pending.push({ node, path: [index] }));
   // Preorder over at most the tree's own bound.

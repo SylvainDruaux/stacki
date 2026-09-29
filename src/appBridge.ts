@@ -20,15 +20,8 @@ import {
 } from '../shared/boundary';
 import { parseIpcPayload } from '../shared/ipc-payloads';
 import { parseOkResult } from '../shared/ipc';
-import type { Digest } from '../shared/brand';
 import type { EditRequest } from '../shared/edit-request';
-import {
-  parsePageEditResult,
-  parsePageWriteResult,
-  type PageEditError,
-  type PageEdited,
-  type PageWriteError,
-} from '../shared/page-save';
+import { parsePageEditResult, type PageEditError, type PageEdited } from '../shared/page-save';
 import {
   parsePreviewVerdict,
   type PreviewRender,
@@ -120,17 +113,6 @@ export function watchProject(projectPath: string): Promise<boolean> {
   return window.avb.watchProject(payload).then((input) => boolean(record(input)['ok']));
 }
 
-/** A Markdown or MDX page's whole save (until step 10): the page as written,
- * and the inverse Undo submits. */
-export function writeProjectPage(
-  pagePath: string,
-  model: unknown,
-  baseChecksum: Digest,
-): Promise<Result<PageEdited, PageWriteError>> {
-  const payload = parseIpcPayload('page:write', { pagePath, model, baseChecksum });
-  return window.avb.writePage(payload).then(parsePageWriteResult);
-}
-
 /** A visual edit (step 6), stated against the checksum of the page shown. */
 export function editProjectPage(request: EditRequest): Promise<Result<PageEdited, PageEditError>> {
   const payload = parseIpcPayload('page:edit', request);
@@ -138,19 +120,14 @@ export function editProjectPage(request: EditRequest): Promise<Result<PageEdited
 }
 
 /** The page `request` would leave, planned against `source` (the bytes at its
- * authoredChecksum) and never written: an .astro page's unsaved gestures
- * shown for review. The reply has page:edit's shape. */
+ * authoredChecksum) and never written: a page's unsaved gestures shown for
+ * review. The reply has page:edit's shape. */
 export function previewProjectPageEdit(
   request: EditRequest,
   source: string,
 ): Promise<Result<PageEdited, PageEditError>> {
   const payload = parseIpcPayload('page:previewEdit', { ...request, source });
   return window.avb.previewPageEdit(payload).then(parsePageEditResult);
-}
-
-export function serializeProjectPage(pagePath: string, model: unknown): Promise<string> {
-  const payload = parseIpcPayload('page:serialize', { pagePath, model });
-  return window.avb.serializePage(payload).then((input) => text(record(input)['source']));
 }
 
 export function closeProject(nextProjectPath: string | null): Promise<void> {

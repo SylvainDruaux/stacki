@@ -62,8 +62,6 @@ interface InvokeChannels {
   readonly refreshThumb: 'recents:refreshThumb';
   readonly readPage: 'page:read';
   readonly parsePageSource: 'page:parse';
-  readonly serializePage: 'page:serialize';
-  readonly writePage: 'page:write';
   readonly editPage: 'page:edit';
   readonly previewPageEdit: 'page:previewEdit';
   readonly createPage: 'page:create';

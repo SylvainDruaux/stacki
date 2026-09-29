@@ -22,12 +22,9 @@
 // A node nothing carries gets a fresh handle named by the snapshot it came
 // from — its checksum and its path — so no counter is kept and two snapshots
 // never mint the same one. Handles never reach main: requests name nodes by
-// path, kind and range (src/pageEdits.ts), and main checks those.
-//
-// Markdown and MDX have no source ranges until step 10. Their only reparse is
-// the reply to a whole-model save — a round trip of the very model the
-// renderer sent — so its tree is that model's, node for node, and handles are
-// carried by position exactly when every node matches (carryRoundTrip).
+// path, kind and range (src/pageEdits.ts), and main checks those. Markdown and
+// MDX pages are carried the same way: since step 10 every node of theirs has
+// its source range too.
 import { assert } from '../shared/assert';
 import { toNodeId, toUtf16Offset, type Digest } from '../shared/brand';
 import { DIFF_BUDGET, diffBytes } from '../shared/diff';
@@ -109,53 +106,6 @@ export function carryHandles(input: CarryInput): PageModel {
   }
   assert(handles.size === afters.length, 'Every node of the fresh parse has a handle');
   return rekeyed(input.after.model, handles);
-}
-
-/** `after`'s model with `before`'s handles, when `after` is a round trip of
- * `before` — every node the same kind, name and child count, in the same place.
- * Undefined when any differs: then nothing is carried. */
-export function carryRoundTrip(before: PageModel, after: PageModel): PageModel | undefined {
-  const visit = (
-    left: readonly PageNode[],
-    right: readonly PageNode[],
-    depth: number,
-  ): PageNode[] | undefined => {
-    assert(depth <= LIMITS.treeDepthMax, 'A tree stays inside its depth bound');
-    if (left.length !== right.length) {
-      return undefined;
-    }
-    const nodes: PageNode[] = [];
-    for (const [index, node] of right.entries()) {
-      const was = left[index];
-      assert(was !== undefined, 'Lists of one length pair every node');
-      const children = sameSlot(was, node) ? childrenOf(was, node, depth) : undefined;
-      if (children === undefined) {
-        return undefined;
-      }
-      nodes.push(Object.assign({}, node, { id: was.id }, children));
-    }
-    return nodes;
-  };
-  const childrenOf = (was: PageNode, node: PageNode, depth: number) => {
-    const left = 'children' in was && Array.isArray(was.children) ? was.children : null;
-    const right = 'children' in node && Array.isArray(node.children) ? node.children : null;
-    if (left === null || right === null) {
-      return left === right ? {} : undefined;
-    }
-    const inner = visit(left, right, depth + 1);
-    return inner === undefined ? undefined : { children: inner };
-  };
-  const nodes = visit(before.nodes, after.nodes, 0);
-  return nodes === undefined ? undefined : { ...after, nodes };
-}
-
-function sameSlot(left: PageNode, right: PageNode): boolean {
-  if (left.kind !== right.kind) {
-    return false;
-  }
-  const leftName = 'name' in left ? left.name : undefined;
-  const rightName = 'name' in right ? right.name : undefined;
-  return leftName === rightName;
 }
 
 // --- Internal ------------------------------------------------------------------

@@ -179,10 +179,10 @@ const settle = (ms = 20) => new Promise((r) => setTimeout(r, ms));
 
   // --- an outside edit while the page has unsaved edits ---------------------------
   // The pending save used to win: the watcher dropped the change while the page
-  // was dirty, and page:write overwrote the file without looking. Now every
-  // edit names the bytes it was stated against (plan §11 step 0, step 9: an
-  // .astro page's edits are requests), and main refuses the ones whose bytes
-  // are gone. The real handlers run in the windowless harness.
+  // was dirty, and the whole-model save overwrote the file without looking.
+  // Now every edit names the bytes it was stated against (plan §11 step 0; a
+  // page's edits are requests since step 9, a Markdown page's since step 10),
+  // and main refuses the ones whose bytes are gone. The real handlers run in the windowless harness.
   {
     const os = require('os');
     const { createHash } = require('crypto');
@@ -242,15 +242,9 @@ const settle = (ms = 20) => new Promise((r) => setTimeout(r, ms));
         JSON.stringify(kept.error),
       );
       check('and puts the local edit on disk', fs.readFileSync(file, 'utf8') === mine);
-      const whole = await harness.invoke('page:write', {
-        pagePath: file,
-        model: read.model,
-        baseChecksum: kept.checksum,
-      });
       check(
-        'and never as a whole model (step 9)',
-        whole.ok === false && fs.readFileSync(file, 'utf8') === mine,
-        JSON.stringify(whole),
+        'and never as a whole model: no such channel exists (step 10)',
+        !harness.handlers.has('page:write') && !harness.handlers.has('page:serialize'),
       );
     } finally {
       harness.dispose();

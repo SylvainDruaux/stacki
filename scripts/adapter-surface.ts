@@ -53,7 +53,7 @@ interface Counts {
   readonly replaceSourceCalls: number;
 }
 
-const REPLACE_SOURCE_BASELINE = 22;
+const REPLACE_SOURCE_BASELINE = 21;
 
 /** Measured 2026-09-28 by this script at step 1, lowered at each step-6
  * expansion and at step 9 (the tracker's adapter table). Lower these; never
@@ -66,7 +66,8 @@ const BASELINE: Counts = {
   propIndexWrites: 0,
   mutateModelCalls: 0,
   applyEditCalls: 4,
-  /** Measured at step 5, when the legacy writers moved onto the actors. */
+  /** Measured at step 5, when the legacy writers moved onto the actors;
+   * lowered at step 10, when the Markdown whole-model save went. */
   replaceSourceCalls: REPLACE_SOURCE_BASELINE,
 };
 

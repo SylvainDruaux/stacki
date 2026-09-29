@@ -11,7 +11,7 @@ const esbuild = require('esbuild');
 const { createHash } = require('node:crypto');
 const sha256 = (text) => createHash('sha256').update(text).digest('hex');
 const { JSDOM } = require('jsdom');
-const { parsePage, serializePage } = require('../dist/electron/astroParser.js');
+const { parsePage } = require('../dist/electron/astroParser.js');
 const { applyCodePatch } = require('../dist/shared/code-patch.js');
 const { NODE_PROJECTOR } = require('../dist/electron/documentDisk.js');
 const { buildEditIntent } = require('../dist/electron/editRequests.js');
@@ -375,10 +375,6 @@ function createBridge() {
       ...parsePage(next, { locs: true }),
       source: next,
     }),
-    writePage: async ({ model }) => {
-      disk = serializePage(model);
-      return { ok: true, ...onDisk(disk) };
-    },
     // Typed code arrives as a patch against the checksum it was typed from;
     // a visual edit as a request main applies with the engine.
     editPage: async ({ authoredChecksum, edit }) => {

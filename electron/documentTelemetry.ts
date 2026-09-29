@@ -1,5 +1,5 @@
 // Is the wall holding? (plan §9a.) One counter and one structured log line per
-// terminal outcome, backpressured submission and save-guard conflict. The
+// terminal outcome, backpressured submission and leaked lock. The
 // rejection distribution is the production signal for everything the
 // simulator's corpus cannot cover; the counts are read from the log.
 //
@@ -11,12 +11,11 @@ import { assert } from '../shared/assert';
 import type { FilePath, IntentId } from '../shared/brand';
 import { REJECTION_REASONS, type Outcome, type RejectionReason } from '../shared/intent';
 
-/** What one line records. `conflict` is the step-0 save guard refusing a stale
- * page write before any intent exists (counted since step 0, plan §9a). */
+/** What one line records. (The step-0 save guard's `conflict` went with the
+ * last whole-file save at step 10: a stale edit is an outcome, `rejected`.) */
 export type TelemetryEvent =
   | { readonly tag: 'outcome'; readonly outcome: Outcome }
   | { readonly tag: 'backpressured' }
-  | { readonly tag: 'conflict' }
   /** An actor could not release its lock (documentDisk.ts breaks it later). */
   | { readonly tag: 'lock-leaked' };
 
@@ -24,7 +23,6 @@ export interface TelemetryCounts {
   readonly applied: number;
   readonly uncertain: number;
   readonly backpressured: number;
-  readonly conflict: number;
   readonly lockLeaked: number;
   readonly rejected: Readonly<Record<RejectionReason, number>>;
 }
@@ -43,7 +41,7 @@ export const TELEMETRY_EVENT = 'stacki.document';
 export function createDocumentTelemetry(log: (line: string) => void): DocumentTelemetry {
   // The one mutable state of this module: counts owned by this closure.
   const rejected = Object.fromEntries(REJECTION_REASONS.map((reason) => [reason, 0]));
-  const totals: Totals = { applied: 0, uncertain: 0, backpressured: 0, conflict: 0, lockLeaked: 0 };
+  const totals: Totals = { applied: 0, uncertain: 0, backpressured: 0, lockLeaked: 0 };
   return {
     record(file, event) {
       const line = countEvent(event, totals, rejected);
@@ -65,7 +63,6 @@ interface Totals {
   applied: number;
   uncertain: number;
   backpressured: number;
-  conflict: number;
   lockLeaked: number;
 }
 
@@ -82,9 +79,6 @@ function countEvent(event: TelemetryEvent, totals: Totals, rejected: Record<stri
     case 'backpressured':
       totals.backpressured += 1;
       return { outcome: 'backpressured', count: totals.backpressured };
-    case 'conflict':
-      totals.conflict += 1;
-      return { outcome: 'conflict', count: totals.conflict };
     case 'lock-leaked':
       totals.lockLeaked += 1;
       return { outcome: 'lock-leaked', count: totals.lockLeaked };

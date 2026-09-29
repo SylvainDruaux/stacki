@@ -14,13 +14,7 @@ import { LIMITS } from '../shared/limits';
 import type { Digest } from '../shared/brand';
 import type { EditRequest } from '../shared/edit-request';
 import { describeRejection, type RejectionReason } from '../shared/intent';
-import type { PageModel } from '../shared/page-node';
-import type {
-  PageDiskRead,
-  PageEditError,
-  PageEdited,
-  PageWriteError,
-} from '../shared/page-save';
+import type { PageDiskRead, PageEditError, PageEdited } from '../shared/page-save';
 import type { Result } from '../shared/result';
 import {
   carriedParse,
@@ -59,11 +53,6 @@ export interface SenderDeps {
   /** An edit that cannot reach disk visually, taken back: say why. */
   readonly notice: (message: string) => void;
   readonly edit: (request: EditRequest) => Promise<Result<PageEdited, PageEditError>>;
-  readonly writeWhole: (
-    path: string,
-    model: PageModel,
-    base: Digest,
-  ) => Promise<Result<PageEdited, PageWriteError>>;
   readonly read: (path: string) => Promise<PageDiskRead>;
 }
 
@@ -79,8 +68,6 @@ export function createEntrySender(
         return sendGestureEntry(deps, path, entry);
       case 'code':
         return sendCodeEntry(deps, path, entry);
-      case 'model':
-        return sendModelEntry(deps, path, entry.records);
       default: {
         const exhaustive: never = entry;
         return exhaustive;
@@ -99,7 +86,12 @@ async function sendGestureEntry(
   const state = deps.state();
   assert(state?.editable === true, 'A gesture is sent for an editable page');
   const origin = state.origin;
-  assert(origin !== undefined, 'A gesture is sent for an .astro page');
+  if (origin === undefined) {
+    // Typed code made the page parse and its save has not replied: nothing
+    // names a node yet. The gesture waits, unsent, for the next save.
+    deps.update(path, (current) => withSave(current, failed(current.save)));
+    return { tag: 'failed', error: new Error('The page’s text is not saved yet.') };
+  }
   const sent = await sendGesture({
     path,
     origin,
@@ -284,45 +276,6 @@ async function sendCodeEntry(
   }
 }
 
-// --- A Markdown page's whole model ------------------------------------------------
-
-async function sendModelEntry(
-  deps: SenderDeps,
-  path: string,
-  records: readonly EditsRecord[],
-): Promise<EntrySent> {
-  const state = deps.state();
-  assert(state?.editable === true, 'A model is saved for an editable page');
-  assert(state.model.format !== undefined, 'Only a Markdown page saves its whole model');
-  const base = saveStateBase(state.save);
-  const written = await deps.writeWhole(path, state.model, base);
-  if (written.ok) {
-    recordWrite(records, { checksum: written.value.checksum, inverse: written.value.inverse });
-    settleRead(deps, path, written.value);
-    return { tag: 'sent' };
-  }
-  const error = written.error;
-  switch (error.code) {
-    case 'conflict':
-      refuse(deps, path, undefined, base, error.diskChecksum);
-      return { tag: 'conflicted' };
-    case 'missing':
-    case 'filesystem':
-    case 'write-race':
-    case 'uncertain':
-    case 'backpressured':
-      // The edits stay unsaved (dirty) and the next save names the same base,
-      // so a write that did land comes back as a visible conflict, never as a
-      // silent overwrite (plan §3.5, §7).
-      deps.update(path, (current) => withSave(current, failed(current.save)));
-      return { tag: 'failed', error: new Error(error.message) };
-    default: {
-      const exhaustive: never = error;
-      return exhaustive;
-    }
-  }
-}
-
 // --- Installing outcomes ------------------------------------------------------------
 
 // A gesture applied: the page is the reply when nothing more is owed; else the
@@ -340,9 +293,8 @@ function settle(deps: SenderDeps, path: string, origin: PageOrigin): void {
   });
 }
 
-// A code or whole save applied: its reply, carried from the page shown by the
-// diff (typed text and a Markdown round trip keep their handles), is the page
-// when nothing more is owed.
+// A code save applied: its reply, carried from the page shown by the diff
+// (typed text keeps its handles), is the page when nothing more is owed.
 function settleRead(deps: SenderDeps, path: string, read: PageDiskRead): void {
   deps.update(path, (current) => {
     const page = toEditorPageState(carriedParse(current, read));

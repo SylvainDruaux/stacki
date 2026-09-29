@@ -18,34 +18,22 @@ export type WirePageRead =
 /** A page read from disk: the parse plus the SHA-256 of the exact bytes read. */
 export type WirePageDiskRead = WirePageRead & { readonly checksum: string };
 
-/** Why main refused a page write. Every variant left the page file untouched,
- * except `write-race`, where another writer replaced it after Stacki's write,
- * and `uncertain`, where the write may have landed and a comparison could not
- * tell (plan §3.5). `backpressured` means the page's actor queue was full: the
- * edit was never accepted and stays unsaved (plan §7). */
-export type WirePageWriteError =
-  | { readonly code: 'conflict'; readonly message: string; readonly diskChecksum: string }
+/** A page write that did not happen, or may have. Every variant left the page
+ * file untouched, except `write-race`, where another writer replaced it after
+ * Stacki's write, and `uncertain`, where the write may have landed and a
+ * comparison could not tell (plan §3.5). `backpressured` means the page's
+ * actor queue was full: the edit was never accepted and stays unsaved (plan
+ * §7). A refusal of the edit itself is `rejected` (WirePageEditError). */
+export type WirePageWriteFailure =
   | { readonly code: 'missing'; readonly message: string }
   | { readonly code: 'filesystem'; readonly message: string }
   | { readonly code: 'write-race'; readonly message: string }
   | { readonly code: 'uncertain'; readonly message: string }
   | { readonly code: 'backpressured'; readonly message: string };
 
-/** A Markdown or MDX page's whole save (plan §6, until step 10): the page as
- * written, and the inverse of what the write changed — Undo (step 9). */
-export type WirePageWrite =
-  | ({
-      readonly ok: true;
-      readonly inverse: ReadonlyArray<{
-        readonly span: { readonly start: number; readonly end: number };
-        readonly text: string;
-      }>;
-    } & WirePageDiskRead)
-  | { readonly ok: false; readonly error: WirePageWriteError };
-
 /** Why a visual edit did not apply (step 6). `rejected` carries the actor's
  * reason, for the notice (plan §7), and the checksum on disk when it could be
- * read; the rest are the page-write failures, a conflict being `rejected`. */
+ * read; the rest are the page-write failures. */
 export type WirePageEditError =
   | {
       readonly code: 'rejected';
@@ -53,7 +41,7 @@ export type WirePageEditError =
       readonly message: string;
       readonly diskChecksum: string | null;
     }
-  | Exclude<WirePageWriteError, { readonly code: 'conflict' }>;
+  | WirePageWriteFailure;
 
 /** An applied edit: the page as written, and the inverse hunks Undo submits
  * against its checksum (byte spans of these bytes). */
@@ -473,10 +461,6 @@ export interface IpcResults {
   readonly 'page:rebaseImport': {
     readonly path: string;
   };
-  readonly 'page:serialize': {
-    readonly source: string;
-  };
-  readonly 'page:write': WirePageWrite;
   readonly 'pagefolder:create': {
     readonly ok: true;
   };

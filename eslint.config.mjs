@@ -73,11 +73,9 @@ const ASTRO_PRINTER_BOUNDARY = [
   'electron/componentFile.ts',
   'electron/editRequests.ts',
 ];
-// Where the Markdown printer may run: its definition, and main's whole save and
-// review of a Markdown or MDX page, until those pages join the engine (step 10).
-const MARKDOWN_PRINTER_BOUNDARY = ['electron/main.ts'];
-// Markdown's parser module holds its printer and prints its HTML blocks with
-// the .astro printer: both, until step 10.
+// Markdown's parser module holds the page printer — the round-trip oracle the
+// tests hold it to, never a write path (step 10: a Markdown page reaches disk
+// only as splices) — and prints its HTML blocks with the .astro printer.
 const PRINTER_BOUNDARY = ['electron/markdownParser.ts'];
 
 // Determinism is structural (plan §10): the simulator and the engine contracts
@@ -270,12 +268,6 @@ export default [
     files: ASTRO_PRINTER_BOUNDARY,
     rules: {
       'no-restricted-syntax': ['error', ...NO_ASSERTIONS, ...NO_MARKDOWN_PRINTING],
-    },
-  },
-  {
-    files: MARKDOWN_PRINTER_BOUNDARY,
-    rules: {
-      'no-restricted-syntax': ['error', ...NO_ASSERTIONS, ...NO_ASTRO_PRINTING],
     },
   },
   {

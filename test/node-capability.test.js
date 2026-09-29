@@ -4,8 +4,9 @@
 // panels instead of looking plainly editable.
 // Method: parse corpus pages with the real parser, bundle src/nodeCapability.ts,
 // and compare its answer for every node with the projection's capability at the
-// same path (shared/source-projection.ts run on the same bytes). Markdown pages
-// and absent ids are the negative space.
+// same path (shared/source-projection.ts run on the same bytes), for .astro
+// corpus pages and Markdown and MDX pages alike. Absent ids are the negative
+// space.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const path = require('node:path');
@@ -89,13 +90,29 @@ test('only plain editable nodes go without a notice', () => {
   );
 });
 
-test('Markdown is unsupported, never read-only; an absent node has no capability', () => {
-  const parsed = parseMarkdownPage('# Title\n\nSome text.\n');
-  assert.ok(parsed.editable, 'the markdown page parses');
-  assert.ok(parsed.model.nodes.length > 0);
-  for (const node of parsed.model.nodes) {
-    assert.equal(nodeCapability(parsed.model, node.id), 'unsupported');
+test('a Markdown page gets its projection capability; an absent node has none', () => {
+  // Step 10: Markdown and MDX are classified like any page — a table or an ESM
+  // block is kept verbatim, everything else is editable.
+  const roundTrip = path.join(__dirname, 'fixtures', 'round-trip');
+  let compared = 0;
+  for (const name of ['post.md', 'components.mdx']) {
+    const text = fs.readFileSync(path.join(roundTrip, name), 'utf8');
+    const parsed = parseMarkdownPage(text, { mdx: name.endsWith('.mdx') });
+    assert.ok(parsed.editable, `${name} parses`);
+    const projection = projectPage(text, parsed);
+    assert.equal(projection.tag, 'valid', name);
+    const byPath = new Map(projection.nodes.map((node) => [node.path.join('/'), node.capability]));
+    for (const { node, path: at } of nodesWithPaths(parsed.model.nodes)) {
+      const expected = byPath.get(at.join('/'));
+      assert.ok(expected !== undefined, `${name} ${at.join('/')} is projected`);
+      assert.equal(nodeCapability(parsed.model, node.id), expected, `${name} ${at.join('/')}`);
+      compared++;
+    }
   }
+  assert.ok(compared > 40, `compared ${compared} nodes`);
+  const table = parseMarkdownPage('| a |\n|---|\n| 1 |\n');
+  assert.ok(table.editable);
+  assert.equal(nodeCapability(table.model, table.model.nodes[0].id), 'read-only-opaque');
   const text = fs.readFileSync(path.join(corpus, 'map-loop.astro'), 'utf8');
   const astro = parsePage(text);
   assert.ok(astro.editable);

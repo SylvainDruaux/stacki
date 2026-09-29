@@ -8,8 +8,8 @@ import {
 } from './componentProperties';
 import { renderComponentPreviewPage } from './componentPreview.js';
 import { createIpcRegistrar } from './ipc.js';
-import { MAIN_LIMITS, readSource, readSourceBytes, directoryBudget } from './main.bounds.js';
-import { digestOf, isAtomicTemporary } from './atomicWrite.js';
+import { MAIN_LIMITS, readSource, directoryBudget } from './main.bounds.js';
+import { isAtomicTemporary } from './atomicWrite.js';
 import { createNodeDocumentActors, type EditReport, type WriteReport } from './documentActors.js';
 import { buildEdit } from './editRequests.js';
 import { previewEdit } from './editPreview.js';
@@ -43,14 +43,17 @@ import type { ChildProcess, ExecFileOptions } from 'child_process';
 import { toRecord, toArray } from '../shared/record.js';
 import { assert } from '../shared/assert.js';
 import type { IpcPayloads } from '../shared/ipc-payloads.js';
-import type { IpcResults, WirePageEditError, WirePageWriteError } from '../shared/ipc-results.js';
+import type {
+  IpcResults,
+  WirePageEditError,
+  WirePageWriteFailure,
+} from '../shared/ipc-results.js';
 import { describeRejection, type RejectionReason } from '../shared/intent.js';
 import { decodeUtf8, encodeUtf8 } from '../shared/span.js';
 import type { Digest } from '../shared/brand.js';
 import { LIMITS } from '../shared/limits.js';
-import { err, ok, type Result } from '../shared/result.js';
+import { ok } from '../shared/result.js';
 import type { SchemaField } from './astroParser.types.js';
-import { parseMarkdownModel } from './main.validation.js';
 import {
   parseData,
   parseRecord,
@@ -106,8 +109,7 @@ import {
   defaultSlotInline,
   rootTag,
 } from './astroParser';
-import * as markdownParserModule from './markdownParser';
-const { parseMarkdownPage, serializeMarkdownPage } = markdownParserModule;
+import { parseMarkdownPage } from './markdownParser';
 import * as scaffoldModule from './scaffold';
 const { scaffoldProject } = scaffoldModule;
 import * as jsCollectionsModule from './jsCollections';
@@ -3034,43 +3036,14 @@ ipcMain.handle('page:parse', async (_e, { pagePath, source }) => {
   return parsePageSource(pagePath, source);
 });
 
-// The overwrite guard (plan §11 step 0), now asked of the page's actor. A save
-// names the checksum of the bytes it was authored against; if the file holds
-// anything else, somebody changed it since, and writing now would silently
-// destroy their edit. Refuse before any chunk is written and let the renderer
-// ask the user. The actor checks again under its lock (plan §5.2 step 7).
-function checkPageBase(
-  pagePath: string,
-  baseChecksum: Digest,
-): Result<{ readonly bom: boolean }, WirePageWriteError> {
-  const name = path.basename(pagePath);
-  const current = documents.current(pagePath);
-  if (!current.ok) {
-    if (current.error.code === 'missing') {
-      return err({ code: 'missing', message: `${name} no longer exists on disk.` });
-    }
-    return err({ code: 'filesystem', message: `Could not read ${name}: ${current.error.message}` });
-  }
-  if (current.value.checksum === baseChecksum) {
-    return ok({ bom: hasByteOrderMark(current.value.bytes) });
-  }
-  documents.noteConflict(pagePath);
-  return err({
-    code: 'conflict',
-    message: `${name} changed on disk since it was opened.`,
-    diskChecksum: current.value.checksum,
-  });
-}
-
-// What a write that did not apply means to the renderer's save state (plan §7).
-function pageWriteError(
+// What a write that did not happen, or may have, means to the renderer's save
+// state (plan §7). A refusal is the edit's own (`rejected`, pageEditError).
+function pageWriteFailure(
   file: string,
-  report: Exclude<WriteReport, { readonly tag: 'applied' }>,
-): WirePageWriteError {
+  report: Extract<WriteReport, { readonly tag: 'uncertain' | 'backpressured' }>,
+): WirePageWriteFailure {
   const name = path.basename(file);
   switch (report.tag) {
-    case 'rejected':
-      return rejectedPageWrite(name, report);
     case 'uncertain':
       return {
         code: 'uncertain',
@@ -3085,46 +3058,6 @@ function pageWriteError(
   }
 }
 
-function rejectedPageWrite(
-  name: string,
-  report: Extract<WriteReport, { readonly tag: 'rejected' }>,
-): WirePageWriteError {
-  switch (report.reason) {
-    case 'region-externally-modified':
-      if (report.diskChecksum !== undefined) {
-        const message = `${name} changed on disk since it was opened.`;
-        return { code: 'conflict', message, diskChecksum: report.diskChecksum };
-      }
-      // Changed, and now unreadable: not known to be gone, so not `missing`.
-      return { code: 'filesystem', message: `${name} changed and could not be read again.` };
-    case 'write-race':
-      return { code: 'write-race', message: `${name} was changed by another program as it saved.` };
-    case 'anchor-moved':
-    case 'anchor-ambiguous':
-    case 'source-invalid':
-    case 'unsupported-operation':
-    case 'resource-limit':
-    case 'write-failed':
-    case 'merge-conflict':
-      return { code: 'filesystem', message: describeWriteReport(name, report) };
-    default: {
-      const exhaustive: never = report.reason;
-      return exhaustive;
-    }
-  }
-}
-
-// The page model has no BOM field: parsers read past a leading BOM (§3.2), so
-// a model write puts back the one the file on disk had. Raw writes carry their
-// own text and are written verbatim.
-function hasByteOrderMark(bytes: Uint8Array): boolean {
-  return bytes.length >= 3 && bytes[0] === 0xef && bytes[1] === 0xbb && bytes[2] === 0xbf;
-}
-
-function withByteOrderMark(text: string): string {
-  return text.startsWith('﻿') ? text : `﻿${text}`;
-}
-
 // Astro's dev server serves a page's <style> block ONE EDIT BEHIND: after the file
 // changes it re-renders the HTML correctly, but hands the browser the *previous*
 // transform of `…?astro&type=style&…`, and that module overwrites the (correct) CSS
@@ -3135,39 +3068,12 @@ function withByteOrderMark(text: string): string {
 const STYLE_NUDGE_MS = 150;
 const styleNudges = new Map<string, ReturnType<typeof setTimeout>>(); // path -> pending timer
 
-// A page save is a `replace-source` intent on the page's actor (plan §3.3): the
-// actor is the only writer from step 5, and the checksum it returns is the
-// persistence layer's next baseline (plan §5.2).
-function writePageText(
-  pagePath: string,
-  text: string,
-  baseChecksum: Digest,
-): IpcResults['page:write'] {
-  const styled = /<style[\s>]/i.test(text);
-  if (styled) {
+function nudgeStyle(pagePath: string, text: string, checksum: Digest): void {
+  if (!styleNudges.has(pagePath)) {
     if (styleNudges.size >= MAIN_LIMITS.styleNudgesMax) {
-      if (!styleNudges.has(pagePath)) {
-        throw new Error('Pending style writes exceed limit');
-      }
+      return; // Past the bound only the dev server's style cache stays one edit behind.
     }
   }
-  noteAppWrite();
-  const report = documents.replaceSource(pagePath, text, baseChecksum);
-  const checksum = appliedChecksum(report);
-  if (checksum === undefined) {
-    assert(report.tag !== 'applied', 'Only a write that did not apply lacks a checksum');
-    return { ok: false as const, error: pageWriteError(pagePath, report) };
-  }
-  assert(checksum === digestOf(text), 'A page write reports the checksum of the text it wrote');
-  if (styled) {
-    nudgeStyle(pagePath, text, checksum);
-  }
-  // A write reconciled after an uncertain rename has no commit to invert.
-  const inverse = report.tag === 'applied' ? report.inverse : [];
-  return { ok: true as const, ...parsePageSource(pagePath, text), checksum, inverse };
-}
-
-function nudgeStyle(pagePath: string, text: string, checksum: Digest): void {
   clearTimeout(styleNudges.get(pagePath)); // a newer edit supersedes this one's nudge
   styleNudges.set(
     pagePath,
@@ -3183,39 +3089,6 @@ function nudgeStyle(pagePath: string, text: string, checksum: Digest): void {
     }, STYLE_NUDGE_MS),
   );
 }
-
-// The checksum a write left on disk: an applied one, or an uncertain one whose
-// comparison found the candidate there (plan §3.5, reconciliation).
-function appliedChecksum(report: WriteReport): Digest | undefined {
-  if (report.tag === 'applied') {
-    return report.checksum;
-  }
-  if (report.tag === 'uncertain') {
-    if (report.reconciliation === 'applied') {
-      return report.candidateChecksum;
-    }
-  }
-  return undefined;
-}
-
-// A Markdown or MDX page's whole save (plan §6): these pages join the engine at
-// step 10, and until then their model is printed whole and written through the
-// page's actor. An .astro page never saves whole (step 9): every edit of it is
-// splices (`page:edit`), and a model sent here for one is refused unwritten.
-ipcMain.handle('page:write', async (_e, { pagePath, model, baseChecksum }) => {
-  if (!isMarkdownPage(pagePath)) {
-    const message = `${path.basename(pagePath)} is saved as edits, never as a whole model.`;
-    return { ok: false as const, error: { code: 'filesystem' as const, message } };
-  }
-  // Print first: a malformed model throws before anything reads or writes.
-  const serialized = serializeMarkdownPage(parseMarkdownModel(model));
-  const base = checkPageBase(pagePath, baseChecksum);
-  if (!base.ok) {
-    return { ok: false as const, error: base.error };
-  }
-  const text = base.value.bom ? withByteOrderMark(serialized) : serialized;
-  return writePageText(pagePath, text, baseChecksum);
-});
 
 // A visual edit (plan §11 step 6): the renderer states it against the page it
 // shows; editRequests.ts makes it an intent against that snapshot, and the
@@ -3253,13 +3126,11 @@ function pageEditError(
     const message = report.message === '' ? describeRejection(reason) : report.message;
     return { code: 'rejected', reason, message, diskChecksum: diskChecksum ?? null };
   }
-  const error = pageWriteError(file, report);
-  assert(error.code !== 'conflict', 'Only a rejection becomes a conflict');
-  return error;
+  return pageWriteFailure(file, report);
 }
 
 // A visual edit planned against the bytes the renderer sends and never
-// written (electron/editPreview.ts): reviewing a conflicted .astro page in code
+// written (electron/editPreview.ts): reviewing a conflicted page in code
 // shows its unsaved gestures as the splices they are. The reply has page:edit's
 // shape, so the renderer states the next request against it as it would
 // against a write.
@@ -3276,24 +3147,6 @@ ipcMain.handle('page:previewEdit', async (_e, { pagePath, authoredChecksum, edit
   assert(decoded.ok, 'A plan of UTF-8 text is UTF-8');
   const reply = { ...parsePageSource(pagePath, decoded.value), checksum: planned.value.checksum };
   return { ok: true as const, ...reply, inverse: planned.value.inverse };
-});
-
-// What page:write would put on disk for a Markdown or MDX page's model, without
-// writing it: the renderer shows it when the user reviews a conflicted page in
-// code. Markdown saves whole until step 10; an .astro page's unsaved edits are
-// previewed as splices (page:previewEdit), never printed.
-ipcMain.handle('page:serialize', async (_e, { pagePath, model }) => {
-  if (!isMarkdownPage(pagePath)) {
-    throw new Error(`${path.basename(pagePath)} is previewed as edits, never printed whole.`);
-  }
-  const serialized = serializeMarkdownPage(parseMarkdownModel(model));
-  let bom = false;
-  try {
-    bom = hasByteOrderMark(readSourceBytes(pagePath));
-  } catch {
-    /* gone or unreadable: the review shows the text without a BOM */
-  }
-  return { source: bom ? withByteOrderMark(serialized) : serialized };
 });
 
 ipcMain.handle('page:create', async (_e, { projectPath, name, layout }) => {

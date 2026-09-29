@@ -1,8 +1,9 @@
-// Goal: the page save contract (plan §11 step 0) holds end to end. Reads report
-// the SHA-256 of the exact bytes; a write names the checksum it was authored
-// against, and main refuses it — leaving the disk untouched — when the file no
-// longer holds those bytes. Opening and saving a page unchanged reproduces
-// every byte, byte-order mark and line endings included.
+// Goal: the page save contract (plan §11 step 0; every save an edit since step
+// 10) holds end to end. Reads report the SHA-256 of the exact bytes; an edit
+// names the checksum it was authored against, and main refuses it — leaving
+// the disk untouched — when it cannot be placed on the bytes the file holds
+// now. Opening a page writes nothing; an edit of any page, byte-order mark and
+// line endings included, changes exactly its own bytes.
 // Method: the wire parsers get one known-good and each known-bad shape; the
 // real main-process handlers run in the windowless harness against temporary
 // files, with outside edits made directly on disk between read and write.
@@ -14,11 +15,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { mainHarness } from './main-harness.ts';
 import { IPC_PAYLOADS, parseIpcPayload } from '../../dist/shared/ipc-payloads.js';
-import {
-  parsePageDiskRead,
-  parsePageEditResult,
-  parsePageWriteResult,
-} from '../../dist/shared/page-save.js';
+import { parsePageDiskRead, parsePageEditResult } from '../../dist/shared/page-save.js';
 import { diffCodePatch } from '../../dist/shared/code-patch.js';
 import { toDigest } from '../../dist/shared/brand.js';
 import type { PageDiskRead } from '../../dist/shared/page-save.js';
@@ -70,24 +67,28 @@ test('Digest accepts exactly 64 lowercase hex characters', () => {
   }
 });
 
-test('write payloads require a well-formed base checksum', () => {
+test('edit payloads require a well-formed authored checksum', () => {
   const base = 'b'.repeat(64);
-  const pagePath = '/p.astro';
-  const model = parseIpcPayload('page:write', { pagePath, model: {}, baseChecksum: base });
-  assert.equal(model.baseChecksum, base);
-  const payload = { pagePath: '/p.astro', model: {} };
-  assert.throws(() => parseIpcPayload('page:write', payload), /Expected digest string/);
-  assert.throws(() => parseIpcPayload('page:write', { ...payload, baseChecksum: 42 }), /digest/);
+  const edit = { tag: 'revert', hunks: [{ span: { start: 0, end: 1 }, text: 'x' }] };
+  const payload = { pagePath: '/p.md', edit };
+  const parsed = parseIpcPayload('page:edit', { ...payload, authoredChecksum: base });
+  assert.equal(parsed.authoredChecksum, base);
+  assert.throws(() => parseIpcPayload('page:edit', payload), /Expected digest string/);
+  assert.throws(() => parseIpcPayload('page:edit', { ...payload, authoredChecksum: 42 }), /digest/);
   assert.throws(
-    () => parseIpcPayload('page:write', { ...payload, baseChecksum: 'B'.repeat(64) }),
+    () => parseIpcPayload('page:edit', { ...payload, authoredChecksum: 'B'.repeat(64) }),
     /Digest: expected 64 lowercase hex characters/,
   );
 });
 
-test('the raw-source channel is retired: code saves are patches through page:edit', () => {
+test('the whole-file channels are retired: every save is an edit through page:edit', () => {
   // Step 8: `page:writeRaw` wrote the code editor's whole text; the code editor
-  // now sends a byte diff through the page's actor, the one path for edits.
-  assert.equal(Object.hasOwn(IPC_PAYLOADS, 'page:writeRaw'), false);
+  // sends a byte diff through the page's actor. Step 10: `page:write` saved a
+  // Markdown page's whole model and `page:serialize` printed it for review;
+  // Markdown gestures are splices too, previewed as splices.
+  for (const retired of ['page:writeRaw', 'page:write', 'page:serialize']) {
+    assert.equal(Object.hasOwn(IPC_PAYLOADS, retired), false, retired);
+  }
   assert.equal(Object.hasOwn(IPC_PAYLOADS, 'page:edit'), true);
 });
 
@@ -100,7 +101,7 @@ async function saveCode(harness: Harness, file: string, read: PageDiskRead, next
   return parsePageEditResult(await harness.invoke('page:edit', payload));
 }
 
-test('page read and write replies parse only with a valid checksum', () => {
+test('page read and edit replies parse only with a valid checksum', () => {
   const checksum = 'c'.repeat(64);
   assert.equal(parsePageDiskRead({ ...page, checksum }).checksum, checksum);
   assert.throws(() => parsePageDiskRead(page), /PageDiskRead\.checksum: expected string/);
@@ -108,47 +109,46 @@ test('page read and write replies parse only with a valid checksum', () => {
     () => parsePageDiskRead({ ...page, checksum: 'c'.repeat(63) }),
     /PageDiskRead\.checksum: Digest/,
   );
-  // A whole save's reply carries the inverse Undo submits (step 9).
-  const written = parsePageWriteResult({ ok: true, ...page, checksum, inverse: [] });
+  // An edit's reply carries the inverse Undo submits (step 9).
+  const written = parsePageEditResult({ ok: true, ...page, checksum, inverse: [] });
   assert.equal(written.ok && written.value.checksum, checksum);
   assert.throws(
-    () => parsePageWriteResult({ ok: true, ...page, inverse: [] }),
+    () => parsePageEditResult({ ok: true, ...page, inverse: [] }),
     /PageDiskRead\.checksum/,
   );
   assert.throws(
-    () => parsePageWriteResult({ ok: true, ...page, checksum }),
+    () => parsePageEditResult({ ok: true, ...page, checksum }),
     /PageEdited\.inverse: expected array/,
   );
-  assert.throws(() => parsePageWriteResult(null), /PageWriteResult: expected object/);
-  assert.throws(() => parsePageWriteResult({ ok: 'yes' }), /PageWriteResult\.ok/);
+  assert.throws(() => parsePageEditResult(null), /PageEditResult: expected object/);
+  assert.throws(() => parsePageEditResult({ ok: 'yes' }), /PageEditResult\.ok/);
 });
 
-test('write refusals parse per code; unknown or malformed ones throw', () => {
+test('edit refusals parse per code; unknown or malformed ones throw', () => {
   const diskChecksum = 'd'.repeat(64);
-  const conflict = parsePageWriteResult({
+  const refusal = { code: 'rejected', reason: 'anchor-moved', message: 'moved', diskChecksum };
+  assert.deepEqual(parsePageEditResult({ ok: false, error: refusal }), {
     ok: false,
-    error: { code: 'conflict', message: 'changed', diskChecksum },
-  });
-  assert.deepEqual(conflict, {
-    ok: false,
-    error: { code: 'conflict', message: 'changed', diskChecksum },
+    error: refusal,
   });
   for (const code of ['missing', 'filesystem', 'write-race', 'uncertain', 'backpressured']) {
-    assert.deepEqual(parsePageWriteResult({ ok: false, error: { code, message: 'm' } }), {
+    assert.deepEqual(parsePageEditResult({ ok: false, error: { code, message: 'm' } }), {
       ok: false,
       error: { code, message: 'm' },
     });
   }
   const bad = [
-    [{ code: 'conflict', message: 'changed' }, /PageWriteError\.diskChecksum: expected string/],
-    [{ code: 'conflict', message: 'changed', diskChecksum: 'x' }, /diskChecksum: Digest/],
-    [{ code: 'teapot', message: 'm' }, /PageWriteError\.code: unknown value/],
-    [{ code: 'missing' }, /PageWriteError\.message: expected string/],
-    [{ code: 'missing', message: 'm'.repeat(9000) }, /PageWriteError\.message: exceeds limit/],
-    [undefined, /PageWriteError: expected object/],
+    // Step 10: no save is refused as a whole-file `conflict` any more.
+    [{ code: 'conflict', message: 'changed', diskChecksum }, /PageWriteFailure\.code: unknown/],
+    [{ ...refusal, diskChecksum: 'x' }, /diskChecksum: Digest/],
+    [{ ...refusal, reason: 'teapot' }, /unknown rejection reason/],
+    [{ code: 'teapot', message: 'm' }, /PageWriteFailure\.code: unknown value/],
+    [{ code: 'missing' }, /PageWriteFailure\.message: expected string/],
+    [{ code: 'missing', message: 'm'.repeat(9000) }, /PageWriteFailure\.message: exceeds limit/],
+    [undefined, /PageEditError: expected object/],
   ] as const;
   for (const [error, message] of bad) {
-    assert.throws(() => parsePageWriteResult({ ok: false, error }), message);
+    assert.throws(() => parsePageEditResult({ ok: false, error }), message);
   }
 });
 
@@ -166,20 +166,24 @@ test('a read reports the checksum of the exact bytes on disk', async (context) =
 test('an outside edit between read and write is refused and left on disk', async (context) => {
   const harness = fixture();
   context.after(harness.dispose);
-  // The whole save is a Markdown page's until step 10; its guard is the step-0 one.
+  // A Markdown gesture on the heading someone rewrote outside Stacki.
   const notes = path.join(harness.root, 'src/pages/notes.md');
   fs.writeFileSync(notes, '# Before\n');
   const before = parsePageDiskRead(await harness.invoke('page:read', notes));
   assert.ok(before.editable);
+  const heading = before.model.nodes[0];
+  assert.ok(heading?.start !== undefined && heading.end !== undefined);
   fs.writeFileSync(notes, '# Outside\n');
-  const payload = { pagePath: notes, model: before.model, baseChecksum: before.checksum };
-  const result = parsePageWriteResult(await harness.invoke('page:write', payload));
-  assert.equal(!result.ok && result.error.code, 'conflict');
+  const target = { path: [0], kind: 'element', span: { start: heading.start, end: heading.end } };
+  const level = { tag: 'rename-tag', target, to: 'h2' };
+  const payload = { pagePath: notes, authoredChecksum: before.checksum, edit: level };
+  const result = parsePageEditResult(await harness.invoke('page:edit', payload));
+  assert.equal(!result.ok && result.error.code, 'rejected');
   assert.equal(
-    !result.ok && result.error.code === 'conflict' && result.error.diskChecksum,
+    !result.ok && result.error.code === 'rejected' && result.error.diskChecksum,
     sha256('# Outside\n'),
   );
-  assert.equal(fs.readFileSync(notes, 'utf8'), '# Outside\n', 'page:write left disk alone');
+  assert.equal(fs.readFileSync(notes, 'utf8'), '# Outside\n', 'the gesture left disk alone');
   const file = path.join(harness.root, 'src/pages/index.astro');
   fs.writeFileSync(file, '<h1>Before</h1>\n');
   const read = parsePageDiskRead(await harness.invoke('page:read', file));
@@ -224,20 +228,12 @@ test('a page deleted since it was read is missing, not a conflict', async (conte
   fs.writeFileSync(file, 'Gone.\n');
   const read = parsePageDiskRead(await harness.invoke('page:read', file));
   fs.rmSync(file);
-  const result = parsePageWriteResult(
-    await harness.invoke('page:write', {
-      pagePath: file,
-      model: read.editable ? read.model : {},
-      baseChecksum: read.checksum,
-    }),
-  );
-  assert.equal(!result.ok && result.error.code, 'missing');
   const code = await saveCode(harness, file, read, 'Still here.\n');
   assert.equal(code.ok, false, 'a code save does not recreate the file either');
   assert.equal(fs.existsSync(file), false, 'a refused write does not recreate the file');
 });
 
-test('opening and saving every round-trip fixture reproduces its bytes', async (context) => {
+test('every round-trip fixture opens as read and takes an edit of its bytes', async (context) => {
   const harness = fixture();
   context.after(harness.dispose);
   const names = fs.readdirSync(FIXTURES).filter((name) => /\.(astro|mdx?)$/.test(name));
@@ -249,31 +245,24 @@ test('opening and saving every round-trip fixture reproduces its bytes', async (
     const read = parsePageDiskRead(await harness.invoke('page:read', file));
     assert.ok(read.editable, `${name} opens in the visual editor`);
     assert.equal(read.checksum, sha256(original));
-    const review = harness.invoke('page:serialize', { pagePath: file, model: read.model });
+    assert.ok(fs.readFileSync(file).equals(original), `${name}: opening writes nothing`);
     if (name.endsWith('.astro')) {
-      // Step 9: an .astro page's unsaved edits are previewed as splices
-      // (page:previewEdit, page-edit.test.ts), never printed whole.
-      await assert.rejects(review, /previewed as edits/, `${name} is never printed for review`);
-    } else {
-      const serialized = toRecord(await review);
-      assert.equal(serialized?.['source'], original.toString('utf8'), `${name} reviews exactly`);
+      continue; // .astro gestures on these bytes: page-edit.test.ts.
     }
-    const written = parsePageWriteResult(
-      await harness.invoke('page:write', {
-        pagePath: file,
-        model: read.model,
-        baseChecksum: read.checksum,
-      }),
-    );
-    if (name.endsWith('.astro')) {
-      // Step 9: an .astro page is edited as splices and never saved whole.
-      assert.equal(!written.ok && written.error.code, 'filesystem', `${name} is not saved whole`);
-    } else {
-      assert.equal(written.ok, true, name);
-      assert.equal(written.ok && written.value.checksum, sha256(original));
-      assert.deepEqual(written.ok && written.value.inverse, [], `${name}: nothing to undo`);
-    }
-    assert.ok(fs.readFileSync(file).equals(original), `${name} round-trips byte for byte`);
+    // A Markdown page's first heading one level down: `#` becomes `##`, and
+    // every other byte — the mark, the line endings — stays.
+    const at = read.model.nodes.findIndex((node) => node.kind === 'element' && node.name === 'h1');
+    const heading = read.model.nodes[at];
+    assert.ok(heading?.start !== undefined && heading.end !== undefined, `${name} has a heading`);
+    const span = { start: heading.start, end: heading.end };
+    const target = { path: [at], kind: 'element', span };
+    const edit = { tag: 'rename-tag', target, to: 'h2' };
+    const payload = { pagePath: file, authoredChecksum: read.checksum, edit };
+    const written = parsePageEditResult(await harness.invoke('page:edit', payload));
+    assert.ok(written.ok, `${name}: the gesture applies`);
+    const text = original.toString('utf8');
+    const expected = `${text.slice(0, heading.start)}#${text.slice(heading.start)}`;
+    assert.equal(fs.readFileSync(file, 'utf8'), expected, `${name}: one byte inserted`);
   }
 });
 

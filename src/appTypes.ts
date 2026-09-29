@@ -6,7 +6,7 @@ import type { ParsePageResult } from '../shared/page-node';
 import type { ScanResult } from '../shared/scan';
 import type { AssetRequest } from './assetPick';
 import type { CoalescedRun } from './coalescedRun';
-import { carryHandles, carryRoundTrip, randomSeed, seedOf } from './nodeHandles';
+import { carryHandles, randomSeed, seedOf } from './nodeHandles';
 import type { EditsRecord, PageOrigin } from './pageEdits';
 import { saveStateClean, type SaveState } from './saveState';
 import type { VariableSelection } from './variablesBridge';
@@ -58,8 +58,10 @@ export interface EditablePageState extends PageStateBase {
    * the parse the gesture was applied to. Its source ranges index this text,
    * and handles are carried from it onto the next parse (src/nodeHandles.ts). */
   readonly parsedFrom: string;
-  /** The page as the app's last read or reply left it (an .astro page): edit
-   * requests are stated against it when they are sent. */
+  /** The page as the app's last read or reply left it: edit requests are
+   * stated against it when they are sent. Undefined only while typed code has
+   * made a page parse whose bytes on disk did not: until the code is saved,
+   * there are no bytes to state a request against. */
   readonly origin: PageOrigin | undefined;
 }
 
@@ -221,8 +223,7 @@ export function findEditorParentList(
   return null;
 }
 
-/** A page as a read or a reply left it: clean, and — an .astro page — its
- * own origin. */
+/** A page as a read or a reply left it: clean, and its own origin. */
 export function toEditorPageState(
   input: ParsePageResult & { readonly source: string; readonly checksum: Digest },
 ): EditorPageState {
@@ -232,29 +233,22 @@ export function toEditorPageState(
     return { editable: false, reason: input.reason, bail: input.bail, source, save };
   }
   const model: EditorModel = input.model;
-  const origin =
-    input.model.format === undefined
-      ? { checksum: input.checksum, source, model: input.model }
-      : undefined; // Markdown and MDX join the engine at step 10.
+  const origin = { checksum: input.checksum, source, model: input.model };
   return { editable: true, model, source, parsedFrom: source, save, origin };
 }
 
 /** A fresh parse with the session's handles, carried from the page state it
  * replaces by the byte diff (src/nodeHandles.ts): a reload, typed code's
- * parse, a code save's reply. A Markdown reply is a round trip of the model
- * sent. Replies to the app's own gestures are carried from the origin by the
- * saver, with the gesture's own prediction — never from the view, which also
- * holds newer gestures' nodes. Unchanged when either side is not editable. */
+ * parse, a code save's reply. Replies to the app's own gestures are carried
+ * from the origin by the saver, with the gesture's own prediction — never
+ * from the view, which also holds newer gestures' nodes. Unchanged when
+ * either side is not editable. */
 export function carriedParse<Parsed extends ParsePageResult & { readonly source: string }>(
   local: EditorPageState | null,
   parsed: Parsed & { readonly checksum?: Digest },
 ): Parsed {
   if (!isEditableState(local) || !parsed.editable) {
     return parsed;
-  }
-  if (parsed.model.format !== undefined) {
-    const model = carryRoundTrip(local.model, parsed.model);
-    return model === undefined ? parsed : { ...parsed, model };
   }
   const before = { source: local.parsedFrom, model: local.model };
   const checksum = parsed.checksum;

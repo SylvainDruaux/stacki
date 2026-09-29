@@ -890,12 +890,3 @@ function unwrappedIn(
   }
   return list;
 }
-
-/** A Markdown or MDX page's gesture (plan §6): these pages have no intents
- * until step 10, so the effect is saved as the whole model (`page:write`). */
-export function markdownGesture(
-  apply: (model: EditorModel) => EditorModel,
-  options: { readonly coalesceKey: string | null; readonly urgency: Urgency },
-): EditGesture {
-  return { ...options, stream: null, request: () => undefined, apply };
-}

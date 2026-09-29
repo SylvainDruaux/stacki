@@ -71,7 +71,7 @@ test('typing takes its baseline from the page as shown, and keeps it while owed'
   assert.equal(store.entries('/p').length, 0, 'one page at a time, as before');
 });
 
-test('typing over unsent gestures drops them, and a Markdown page’s model the same', () => {
+test('typing over unsent gestures drops them', () => {
   const store = new edits.EditDrafts();
   const step = record();
   const gesture = {
@@ -87,11 +87,6 @@ test('typing over unsent gestures drops them, and a Markdown page’s model the 
   assert.deepEqual(step.outcome, { tag: 'dropped' }, 'its undo step has nothing of its own');
   assert.deepEqual(store.codeBaseline('/p'), known(1, 'text of 1'));
   assert.deepEqual(store.entries('/p').map((entry) => entry.tag), ['code'], 'nothing else is sent');
-  const model = record();
-  store.markModel('/m', model);
-  store.typeCode('/m', shown(dirty(1), 'text of 1'), record());
-  assert.deepEqual(model.outcome, { tag: 'dropped' });
-  assert.deepEqual(store.entries('/m').map((entry) => entry.tag), ['code']);
 });
 
 test('a refused page patches the disk only after the user keeps their text', () => {

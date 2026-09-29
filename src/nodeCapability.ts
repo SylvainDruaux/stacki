@@ -12,16 +12,12 @@ import { classifyNode } from '../shared/source-projection';
 
 /** The capability of node `nodeId` in `model`, or undefined when the model has
  * no such node (the frontmatter subject, a node already gone). Markdown and MDX
- * pages are outside the engine until step 10: every node there is
- * `unsupported`, never downgraded to read-only (the whole-model save still
- * edits them). */
+ * pages are classified like any page since step 10: a table or an ESM block
+ * is kept verbatim (read-only), everything else is editable. */
 export function nodeCapability(model: EditorModel, nodeId: string): Capability | undefined {
   const found = findWithAncestry(model.nodes, nodeId);
   if (found === undefined) {
     return undefined;
-  }
-  if (model.format !== undefined) {
-    return 'unsupported';
   }
   if (found.insideChunk) {
     // Another file's markup (a Fragment's .html chunk): the page's actor

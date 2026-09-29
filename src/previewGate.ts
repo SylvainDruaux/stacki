@@ -75,9 +75,11 @@ export function judgeLocally(
     return latest; // Nothing open for editing: no node is selected from this.
   }
   if (shown.state.editable && shown.state.model.format !== undefined) {
-    // Markdown and MDX pages are outside the engine until step 10 (plan §6):
-    // their markers are block indexes and they carry no stamp. Their layout's
-    // stamps are still checked on disk.
+    // A Markdown or MDX page carries no stamp: its markers come from the
+    // Markdown processor's tree (main.ts, avbSatteriMarkers), which never sees
+    // the file's bytes, so no marker can name them. Its layout's stamps are
+    // still checked on disk, and every edit is stated against the editor's own
+    // parse and checked by main (tracker, step 10: carried).
     return latest;
   }
   return judgeShownFile(render, shown.file, shownChecksum(shown.state));
