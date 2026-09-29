@@ -29,6 +29,7 @@ import {
   slice,
   startsWith,
   textOf,
+  validProjections,
   whitespaceAfter,
   whitespaceBefore,
   type PlanContext,
@@ -39,6 +40,8 @@ import { toChildIndex, type AnchorRef } from './ref';
 import { err, ok, type Result } from './result';
 import type { ProjectedNode } from './source-projection';
 import { encodeUtf8, toByteSpan, toByteString, type ByteSpan, type ByteString } from './span';
+
+const NEWLINE = 0x0a;
 
 /** A zero-width point and the text that goes there. */
 interface Insertion {
@@ -151,6 +154,41 @@ export function planWrapNodes(
   ];
   assert(start.span.start < end.span.end, 'A run of nodes covers at least one byte');
   return ok({ splices, postKinds: [], candidate: 'must-parse' });
+}
+
+/** `append-body` (step 9): the first node of a page whose body is empty — no
+ * node to stand beside, so the anchor is the document. It goes at the end of
+ * the file, on a line of its own. A body that gained a node since was written
+ * by someone else; the insertion is refused, to be stated beside a node. */
+export function planAppendBody(
+  context: PlanContext,
+  anchor: AnchorRef,
+  operation: Extract<Operation, { tag: 'append-body' }>,
+): Result<Plan, RejectionReason> {
+  assert(anchor.expectedKind === 'document', 'An append anchors the whole document');
+  const projections = validProjections(context);
+  if (!projections.ok) {
+    return projections;
+  }
+  if (projections.value.current.nodes.length > 0) {
+    return err('anchor-moved');
+  }
+  const bytes = context.current.bytes;
+  const end = bytes.length;
+  const crlf = end > 1 && bytes[end - 2] === 0x0d && bytes[end - 1] === NEWLINE;
+  const eol = crlf || bytesHaveCrlf(bytes) ? '\r\n' : '\n';
+  const lead = end === 0 || bytes[end - 1] === NEWLINE ? '' : eol;
+  const splice = spliceAt(bytes, toByteSpan(end, end), `${lead}${operation.source}${eol}`);
+  return ok({ splices: [splice], postKinds: [], candidate: 'must-parse' });
+}
+
+function bytesHaveCrlf(bytes: ByteString): boolean {
+  for (let index = 1; index < bytes.length; index++) {
+    if (bytes[index] === NEWLINE) {
+      return bytes[index - 1] === 0x0d; // The file's first line break decides.
+    }
+  }
+  return false;
 }
 
 // A node inside a loop is one source node the loop repeats (plan §6). Its own

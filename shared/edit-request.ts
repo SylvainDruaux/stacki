@@ -13,6 +13,7 @@
 //
 // The adapter half in main dies at step 9, when the renderer holds
 // projections and authors intents directly.
+import { assert } from './assert';
 import type { Digest } from './brand';
 import { digest, pathText } from './boundary';
 import type { CodeHunk } from './code-patch';
@@ -94,6 +95,9 @@ export type Edit =
   /** Step 9: a tag taken away, its children left where they are (a layout
    * removed from a page). */
   | { readonly tag: 'unwrap-node'; readonly target: NodeRef }
+  /** Step 9: the first nodes of a page whose body is empty — nothing to stand
+   * beside. Main prints them at the end of the file. */
+  | { readonly tag: 'append-body'; readonly nodes: readonly PageNode[] }
   /** The frontmatter the page model now describes; main prints it and writes
    * only the slot that differs (an edit-frontmatter-slot intent). */
   | { readonly tag: 'set-frontmatter'; readonly model: PageModel }
@@ -190,6 +194,11 @@ export function parseEdit(input: unknown): Edit {
       };
     case 'unwrap-node':
       return { tag, target: parseNodeRef(record['target'], 'Edit.target') };
+    case 'append-body': {
+      const content = parseContent({ tag: 'nodes', nodes: record['nodes'] });
+      assert(content.tag === 'nodes', 'Parsed as nodes');
+      return { tag, nodes: content.nodes };
+    }
     case 'replace-node':
       return {
         tag,

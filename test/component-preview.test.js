@@ -11,6 +11,24 @@ const { createHash } = require('node:crypto');
 // Disk replies carry the SHA-256 of the bytes, as main's do.
 const sha256 = (text) => createHash('sha256').update(text).digest('hex');
 const { parsePage } = require('../dist/electron/astroParser.js');
+const { NODE_PROJECTOR } = require('../dist/electron/documentDisk.js');
+const { buildEditIntent } = require('../dist/electron/editRequests.js');
+const { toIntent } = require('../dist/shared/intent.js');
+const { planIntent } = require('../dist/shared/planner.js');
+const { applySplices, inverseEdits } = require('../dist/shared/splice.js');
+
+// A visual edit request as main's handler applies it (step 9: every edit of an
+// .astro file is splices): main's translation and planner, on the text held.
+function applyEditRequest(file, text, edit) {
+  const snapshot = NODE_PROJECTOR.snapshot(file, Buffer.from(text));
+  const draft = buildEditIntent(edit, snapshot);
+  assert.ok(draft.ok, `the edit is built (${draft.ok ? '' : draft.error})`);
+  const intent = toIntent({ id: 't', file, authoredChecksum: snapshot.checksum, ...draft.value });
+  const planned = planIntent({ authored: snapshot, current: snapshot }, intent);
+  assert.ok(planned.ok, `the edit plans (${planned.ok ? '' : planned.error})`);
+  const written = Buffer.from(applySplices(snapshot.bytes, planned.value.splices)).toString('utf8');
+  return { text: written, inverse: inverseEdits(planned.value.splices) };
+}
 const settle = () => new Promise((resolve) => setTimeout(resolve, 15));
 const deferred = () => {
   let resolve, reject;
@@ -57,7 +75,11 @@ test('component navigation keeps the real iframe and inspector mounted while loa
   const card = { name: 'Card', path: '/project/src/components/Card.astro', folder: '' };
   const pageSource = "---\nimport Card from '../components/Card.astro';\n---\n<main><Card /></main>";
   const cardSource = '<section class="card"><p>Card content</p></section>';
-  const pageRead = (source) => ({ ...parsePage(source), source, checksum: sha256(source) });
+  const pageRead = (source) => ({
+    ...parsePage(source, { locs: true }),
+    source,
+    checksum: sha256(source),
+  });
   const states = new Map([
     [page.path, pageRead(pageSource)],
     [card.path, pageRead(cardSource)],
@@ -74,17 +96,15 @@ test('component navigation keeps the real iframe and inspector mounted while loa
     listProjectClasses: async () => [],
     resolveImport: async () => ({ path: card.path }),
     readPage: async (file) => heldReads.get(file)?.promise ?? structuredClone(states.get(file)),
-    writePage: async ({ pagePath, model }) => {
+    editPage: async ({ pagePath, authoredChecksum, edit }) => {
       if (writeError) {throw writeError;}
-      writes.push({ pagePath, model });
-      const written = {
-        editable: true,
-        model: structuredClone(model),
-        source: '',
-        checksum: sha256(`${pagePath}#${writes.length}`),
-      };
+      const held = states.get(pagePath);
+      assert.equal(authoredChecksum, held.checksum, 'an edit names the bytes it was stated against');
+      const applied = applyEditRequest(pagePath, held.source, edit);
+      const written = pageRead(applied.text);
+      writes.push({ pagePath, model: written.model });
       states.set(pagePath, written);
-      return { ok: true, ...structuredClone(written) };
+      return { ok: true, ...structuredClone(written), inverse: applied.inverse };
     },
     gitInfo: async () => ({ isRepo: false }),
     // Main's disk check of a canvas rendering (step 7): the files are the ones

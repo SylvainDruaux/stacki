@@ -25,7 +25,6 @@ import type { EditRequest } from '../shared/edit-request';
 import {
   parsePageEditResult,
   parsePageWriteResult,
-  type PageDiskRead,
   type PageEditError,
   type PageEdited,
   type PageWriteError,
@@ -121,11 +120,13 @@ export function watchProject(projectPath: string): Promise<boolean> {
   return window.avb.watchProject(payload).then((input) => boolean(record(input)['ok']));
 }
 
+/** A Markdown or MDX page's whole save (until step 10): the page as written,
+ * and the inverse Undo submits. */
 export function writeProjectPage(
   pagePath: string,
   model: unknown,
   baseChecksum: Digest,
-): Promise<Result<PageDiskRead, PageWriteError>> {
+): Promise<Result<PageEdited, PageWriteError>> {
   const payload = parseIpcPayload('page:write', { pagePath, model, baseChecksum });
   return window.avb.writePage(payload).then(parsePageWriteResult);
 }

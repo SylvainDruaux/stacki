@@ -118,13 +118,15 @@ export function parsePageDiskRead(input: unknown): PageDiskRead {
   return { ...page, checksum: checksumField(record['checksum'], 'PageDiskRead.checksum') };
 }
 
-export function parsePageWriteResult(input: unknown): Result<PageDiskRead, PageWriteError> {
+/** A whole save's reply (a Markdown or MDX page): the page as written and
+ * the inverse Undo submits, like an edit's (step 9). */
+export function parsePageWriteResult(input: unknown): Result<PageEdited, PageWriteError> {
   const record = toRecord(input);
   if (record === undefined) {
     throw new Error('PageWriteResult: expected object');
   }
   if (record['ok'] === true) {
-    return ok(parsePageDiskRead(input));
+    return ok({ ...parsePageDiskRead(input), inverse: parseInverse(record['inverse']) });
   }
   if (record['ok'] === false) {
     return err(parsePageWriteError(record['error']));

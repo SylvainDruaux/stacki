@@ -49,64 +49,61 @@ const known = (digit, source, typedFrom = source) => ({
 const record = () => ({ outcome: { tag: 'applied', applied: [] } });
 const REF = { path: [0], kind: 'element', span: { start: 0, end: 4 } };
 
-test('typing takes its baseline from the page as shown, and keeps it until clean', () => {
+const shown = (save, source) => ({ save, source, origin: undefined });
+const shownPage = (read) => shown({ tag: 'clean', checksum: read.checksum }, read.source);
+
+test('typing takes its baseline from the page as shown, and keeps it while owed', () => {
   const store = new edits.EditDrafts();
-  store.typeCode('/p', { save: clean(1), source: 'one' });
-  assert.deepEqual(store.queue('/p'), { tag: 'code', baseline: known(1, 'one') });
-  store.typeCode('/p', { save: dirty(1), source: 'one!' });
+  const step = record();
+  store.typeCode('/p', shown(clean(1), 'one'), step);
+  assert.deepEqual(store.codeBaseline('/p'), known(1, 'one'));
+  store.typeCode('/p', shown(dirty(1), 'one!'), step);
   assert.deepEqual(store.codeBaseline('/p'), known(1, 'one'), 'more typing keeps the baseline');
   store.codeSaved('/p', { checksum: sum(2), source: 'one!', typedFrom: 'one!' });
   assert.deepEqual(store.codeBaseline('/p'), known(2, 'one!'));
-  // Clean again (the save was installed): the next keystroke starts over.
-  store.typeCode('/p', { save: clean(3), source: 'three' });
+  // Sent and saved, the entry is gone: the next keystroke starts over.
+  store.shift('/p');
+  store.typeCode('/p', shown(clean(3), 'three'), record());
   assert.deepEqual(store.codeBaseline('/p'), known(3, 'three'));
   // Another page starts over too.
-  store.typeCode('/q', { save: dirty(4), source: 'four' });
+  store.typeCode('/q', shown(dirty(4), 'four'), record());
   assert.deepEqual(store.codeBaseline('/q'), known(4, 'four'));
-  assert.deepEqual(store.queue('/p'), { tag: 'model' }, 'one page at a time, as before');
+  assert.equal(store.entries('/p').length, 0, 'one page at a time, as before');
 });
 
-test('typing over unsent requests drops them; over a whole-model queue, the model', () => {
+test('typing over unsent gestures drops them, and a Markdown page’s model the same', () => {
   const store = new edits.EditDrafts();
   const step = record();
-  const draft = { edit: { tag: 'remove-node', target: REF }, stream: null, record: step };
-  store.record('/p', { ...draft, authoredChecksum: sum(1) });
+  const gesture = { coalesceKey: null, urgency: false, stream: null, request: () => [], apply: (m) => m };
+  store.addGesture('/p', gesture, step);
   assert.equal(step.outcome.tag, 'pending');
-  store.typeCode('/p', { save: dirty(1), source: 'text of 1' });
-  assert.deepEqual(step.outcome, { tag: 'subsumed' }, 'its undo step falls back to the snapshot');
+  store.typeCode('/p', shown(dirty(1), 'text of 1'), record());
+  assert.deepEqual(step.outcome, { tag: 'dropped' }, 'its undo step has nothing of its own');
   assert.deepEqual(store.codeBaseline('/p'), known(1, 'text of 1'));
-  assert.deepEqual(store.take('/p'), [], 'nothing is sent as a request');
-  store.markModel('/p');
-  store.typeCode('/p', { save: dirty(1), source: 'text of 1' });
-  assert.equal(store.queue('/p').tag, 'code');
-  // A gesture without an intent form after typing: the whole model carries all.
-  store.markModel('/p');
-  assert.deepEqual(store.queue('/p'), { tag: 'model' });
-  // A request after the page was clean again starts a fresh queue.
-  store.typeCode('/p', { save: clean(5), source: 'five' });
-  store.record('/p', { ...draft, record: record(), authoredChecksum: sum(6) });
-  assert.equal(store.queue('/p').tag, 'edits');
+  assert.deepEqual(store.entries('/p').map((entry) => entry.tag), ['code'], 'nothing else is sent');
+  const model = record();
+  store.markModel('/m', model);
+  store.typeCode('/m', shown(dirty(1), 'text of 1'), record());
+  assert.deepEqual(model.outcome, { tag: 'dropped' });
+  assert.deepEqual(store.entries('/m').map((entry) => entry.tag), ['code']);
 });
 
 test('a refused page patches the disk only after the user keeps their text', () => {
   const store = new edits.EditDrafts();
   const refused = { tag: 'conflicted', baseChecksum: sum(1), diskChecksum: sum(2) };
-  store.typeCode('/p', { save: refused, source: 'a review of the model' });
+  store.typeCode('/p', shown(refused, 'a review of the model'), record());
   assert.deepEqual(store.codeBaseline('/p'), { tag: 'disk' }, 'its text is not bytes on disk');
-  store.typeCode('/q', { save: clean(1), source: 'mine' });
+  store.typeCode('/q', shown(clean(1), 'mine'), record());
   store.acceptDisk('/q');
   assert.deepEqual(store.codeBaseline('/q'), { tag: 'disk' });
-  store.markModel('/q');
-  store.acceptDisk('/q');
-  assert.deepEqual(store.queue('/q'), { tag: 'model' }, 'a model queue is saved whole');
-  assert.throws(() => store.codeBaseline('/q'), /Only a code queue has a baseline/);
+  assert.throws(() => store.codeBaseline('/z'), /Only a code entry has a baseline/);
 });
 
 // --- sendCode against fakes ---------------------------------------------------------
 
 function harness(baseline, answers = []) {
   const store = new edits.EditDrafts();
-  store.typeCode('/p', { save: clean(1), source: 'unused' });
+  store.typeCode('/p', { save: clean(1), source: 'unused', origin: undefined }, record());
   if (baseline.tag === 'disk') {
     store.acceptDisk('/p');
   } else {
@@ -149,6 +146,7 @@ async function save(fake, text, base = sum(1), stateBase = sum(1)) {
   return code.sendCode({
     path: '/p',
     text,
+    baseline: fake.store.codeBaseline('/p'),
     base,
     stateBase,
     store: fake.store,
@@ -275,9 +273,19 @@ test('typed code reaches the page as patches: invalid, merged, refused, kept', a
   const store = new edits.EditDrafts();
   const shown = await read();
   const saveText = (value, base, stateBase = base) =>
-    code.sendCode({ path: file, text: value, base, stateBase, store, send, read });
+    code.sendCode({
+      path: file,
+      text: value,
+      baseline: store.codeBaseline(file),
+      base,
+      stateBase,
+      store,
+      send,
+      read,
+    });
   // An unclosed tag mid-typing is written; the page reads as a parse error.
-  store.typeCode(file, { save: { tag: 'clean', checksum: shown.checksum }, source: shown.source });
+  const typing = shownPage(shown);
+  store.typeCode(file, typing, record());
   const broken = text.replace('</p>', '</p>\n  <div');
   const first = await saveText(broken, shown.checksum);
   assert.equal(first.tag, 'applied');

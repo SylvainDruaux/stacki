@@ -23,6 +23,11 @@ export function nodeCapability(model: EditorModel, nodeId: string): Capability |
   if (model.format !== undefined) {
     return 'unsupported';
   }
+  if (found.insideChunk) {
+    // Another file's markup (a Fragment's .html chunk): the page's actor
+    // cannot edit it, and no chunk has node intents yet (step 9).
+    return 'read-only-opaque';
+  }
   // The projection's own rule: a node inside a loop body is one source node
   // rendered once per item, whatever its kind.
   const capability = classifyNode(found.node, found.insideLoop);
@@ -54,16 +59,17 @@ export function capabilityNeedsNotice(capability: Capability): boolean {
 interface Found {
   readonly node: EditorNode;
   readonly insideLoop: boolean;
+  readonly insideChunk: boolean;
 }
 
-// Iterative preorder walk carrying whether a `map` encloses each node: the depth
-// bound is the tree's, not the call stack's.
+// Iterative preorder walk carrying whether a `map` or a chunk file encloses
+// each node: the depth bound is the tree's, not the call stack's.
 function findWithAncestry(roots: readonly EditorNode[], nodeId: string): Found | undefined {
-  const stack: { node: EditorNode; insideLoop: boolean }[] = [];
+  const stack: Found[] = [];
   for (let index = roots.length - 1; index >= 0; index--) {
     const root = roots[index];
     assert(root !== undefined, 'A root index lies inside the list');
-    stack.push({ node: root, insideLoop: false });
+    stack.push({ node: root, insideLoop: false, insideChunk: false });
   }
   for (let visited = 0; visited <= LIMITS.treeNodesMax; visited++) {
     const entry = stack.pop();
@@ -75,10 +81,11 @@ function findWithAncestry(roots: readonly EditorNode[], nodeId: string): Found |
     }
     const children = entry.node.children ?? [];
     const insideLoop = entry.insideLoop || entry.node.kind === 'map';
+    const insideChunk = entry.insideChunk || entry.node.chunkFile !== undefined;
     for (let index = children.length - 1; index >= 0; index--) {
       const child = children[index];
       assert(child !== undefined, 'A child index lies inside the list');
-      stack.push({ node: child, insideLoop });
+      stack.push({ node: child, insideLoop, insideChunk });
     }
   }
   throw new Error('Assertion failed: a page tree stays inside its node bound');

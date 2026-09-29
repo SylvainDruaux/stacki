@@ -24,12 +24,20 @@ export type ProjectPath = Brand<string, 'ProjectPath'>;
  * function both go through it, so an unchecked string can never pose as one. */
 export type Digest = Brand<string, 'Digest'>;
 
-const NODE_ID_RE = /^(?:[nmc]\d+|layout|chunk\d+)$/;
+/** Node ids name nodes within one tree (plan §4: nothing keys on them across
+ * snapshots). `n<path>` is the Astro parser's structural path (`n0.2.1`);
+ * `m<N>` the Markdown parser's, until step 10; `layout` the layout wrapper.
+ * The renderer carries its own handles across parses (src/nodeHandles.ts):
+ * `s<16 hex>.<path>` names a node by the snapshot it first appeared in, and
+ * `g<32 hex>` a node a gesture created, before any parse has seen it. */
+const NODE_ID_RE =
+  /^(?:n\d+(?:\.\d+)*|m\d+|layout|s[0-9a-f]{16}\.\d+(?:\.\d+)*(?:~\d+)?|g[0-9a-f]{32})$/;
 
 export function toNodeId(value: string): NodeId {
   if (!NODE_ID_RE.test(value)) {
     throw new Error(
-      `NodeId: expected 'n<N>', 'm<N>', 'c<N>', 'layout', or 'chunk<N>', got ${JSON.stringify(value)}`,
+      `NodeId: expected 'n<path>', 'm<N>', 'layout', 's<snapshot>.<path>' or 'g<gesture>', ` +
+        `got ${JSON.stringify(value)}`,
     );
   }
   return value as NodeId;

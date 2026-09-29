@@ -17,15 +17,21 @@ import { assert } from '../shared/assert';
 import type { Digest } from '../shared/brand';
 import { diffCodePatch, mergeTyping } from '../shared/code-patch';
 import type { EditRequest } from '../shared/edit-request';
-import { describeRejection, type RejectionReason } from '../shared/intent';
+import { describeRejection, type RejectionReason, type SourceEdit } from '../shared/intent';
 import type { PageDiskRead, PageEditError, PageEdited } from '../shared/page-save';
 import type { Result } from '../shared/result';
-import type { EditDrafts } from './pageEdits';
+import type { CodeBaseline, EditDrafts } from './pageEdits';
 
 /** How one code save ended. */
 export type CodeSaveOutcome =
-  /** The disk holds the page's text; `last` is the page as it is now. */
-  | { readonly tag: 'applied'; readonly last: PageDiskRead }
+  /** The disk holds the page's text; `last` is the page as it is now, and
+   * `inverse` what Undo reverts — undefined when nothing was written (the
+   * text was already the disk's). */
+  | {
+      readonly tag: 'applied';
+      readonly last: PageDiskRead;
+      readonly inverse: readonly SourceEdit[] | undefined;
+    }
   /** The file is not what the text descends from, and the two could not be
    * merged. `baseChecksum` is the base the refusal is relative to. */
   | {
@@ -41,11 +47,13 @@ export interface CodeSaveInput {
   readonly path: string;
   /** The page's text: what the disk should hold. */
   readonly text: string;
-  /** The checksum a write must name now: the saver's base, advanced past
-   * the app's own saves (src/pagePersistence.ts, lineage). */
+  /** The bytes the text is a patch of: the code entry's baseline. */
+  readonly baseline: CodeBaseline;
+  /** The checksum the page's edits name now: the app's last reply's. */
   readonly base: Digest;
-  /** The checksum the page's save state itself names, before any advance. */
+  /** The checksum the typing began from, for a refusal's notice. */
   readonly stateBase: Digest;
+  /** Where the baseline of typing done during the save is advanced. */
   readonly store: EditDrafts;
   readonly send: (request: EditRequest) => Promise<Result<PageEdited, PageEditError>>;
   /** The page as on disk now, for a baseline the user rebased onto it. */
@@ -83,9 +91,8 @@ export async function sendCode(input: CodeSaveInput): Promise<CodeSaveOutcome> {
     // Every hunk replaces bytes with other bytes, so an applied patch always
     // leaves a new version; the text it aimed at is in it unless merged away.
     assert(checksum !== plan.checksum, 'An applied patch changes the bytes');
-    assert(input.store.queue(input.path).tag === 'code', 'Only typed code is sent as a patch');
     input.store.codeSaved(input.path, { checksum, source, typedFrom: plan.target });
-    return { tag: 'applied', last: answer.value };
+    return { tag: 'applied', last: answer.value, inverse: answer.value.inverse };
   }
   return codeRefusal(answer.error, plan.checksum);
 }
@@ -95,7 +102,7 @@ export async function sendCode(input: CodeSaveInput): Promise<CodeSaveOutcome> {
 async function planCode(
   input: CodeSaveInput,
 ): Promise<{ readonly tag: 'plan'; readonly plan: Plan } | CodeSaveOutcome> {
-  const baseline = input.store.codeBaseline(input.path);
+  const baseline = input.baseline;
   switch (baseline.tag) {
     case 'known': {
       const merged = mergeTyping(baseline.typedFrom, input.text, baseline.source);
@@ -149,7 +156,7 @@ async function unchanged(input: CodeSaveInput, plan: Plan): Promise<CodeSaveOutc
       source: disk.source,
       typedFrom: plan.target,
     });
-    return { tag: 'applied', last: disk };
+    return { tag: 'applied', last: disk, inverse: undefined };
   }
   return {
     tag: 'refused',

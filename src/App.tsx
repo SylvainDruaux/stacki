@@ -58,16 +58,15 @@ import {
   createPageSaver,
   scanContainsFile,
   type PageSaver,
-  type PageWriteOutcome,
 } from './pagePersistence.js';
+import { createEntrySender } from './pageSender';
 import { createCoalescedRun } from './coalescedRun';
+import { carryHandles, seedOf } from './nodeHandles';
 import {
   EditDrafts,
   nodeRefIn,
-  sendDrafts,
-  subsume,
   type AppliedEdit,
-  type EditDraft,
+  type PageOrigin,
   type EditGesture,
   type EditsRecord,
 } from './pageEdits';
@@ -91,20 +90,16 @@ import {
   withChildren,
   wrapGesture,
 } from './editGestures';
-import { ok } from '../shared/result';
 import {
   saveStateAccepted,
   saveStateBase,
-  saveStateClean,
   saveStateEdited,
   saveStateRefused,
 } from './saveState.js';
-import { sendCode } from './codeEdits';
 import SaveConflictNotice from './panels/SaveConflictNotice';
 import CapabilityNotice from './panels/CapabilityNotice';
 import { nodeCapability } from './nodeCapability';
-import type { PageDiskRead, PageEdited, PageWriteError } from '../shared/page-save';
-import type { Result } from '../shared/result';
+import type { PageEdited } from '../shared/page-save';
 import type { Digest } from '../shared/brand';
 import { ancestorChain, createTreeIndex, nodeAtPath, pathOfNode } from './editorTree.js';
 import { readFrontmatter, writeFrontmatter } from '../electron/frontmatter';
@@ -172,7 +167,7 @@ import {
   findEditorParentList as findParentList,
   nodeId,
   toEditorPageState,
-  adoptParsedModel,
+  carriedParse,
   type AppHistory,
   type AssetPick,
   type CodeWindowState,
@@ -180,7 +175,6 @@ import {
   type CurrentPage,
   type DevStatus,
   type DynamicEntry,
-  type EditablePageState,
   type EditsEntry,
   type HistoryEntry,
   type EditorModel,
@@ -193,7 +187,6 @@ import {
   type NodeStates,
   type NodeClipboard,
   type OpenFile,
-  type PageSnapshot,
   type PageStateSnapshot,
   type PreviewCommitInfo,
   type ProjectIdentity,
@@ -273,8 +266,10 @@ const VariablesPanel = lazyPanel(() => import('./panels/VariablesPanel'));
 const VariablesView = lazyPanel(() => import('./panels/VariablesView'));
 const CodePanel = lazyPanel(() => import('./panels/CodePanel'))
 
-let idCounter = 1000;
-const newId = () => nodeId(`c${idCounter++}`);
+// A node a gesture creates has no parse yet to name it: its handle is random,
+// unique without a counter, and carried onto the reply that first contains it
+// (src/nodeHandles.ts). It never reaches main.
+const newId = () => nodeId(`g${crypto.randomUUID().replace(/-/g, '')}`);
 
 // Placeholder copy for newly inserted text elements, so they're visible on the
 // canvas straight away instead of collapsing to a zero-height box.
@@ -480,111 +475,6 @@ function codeText(model: PageModel): string {
   return parts.join('\n');
 }
 
-// How long a pending save waits, by urgency. See scheduleSave.
-// A conflict is the one refusal the saver handles itself: it stops autosave and
-// shows the notice. Every other failure rejects, surfaces as a "Save failed"
-// toast, and leaves the edit unsaved for the next attempt.
-function pageWriteOutcome(
-  state: EditorPageState,
-  written: Result<PageDiskRead, PageWriteError>,
-): PageWriteOutcome<EditorPageState> {
-  if (written.ok) {
-    // The write returns the file re-parsed (current structure and source ranges
-    // for the code panel), with node ids the parser regenerated. Re-key it onto
-    // the session ids, or every editor keyed by node id remounts after each
-    // save and drops focus mid-typing (issue #29).
-    const { checksum } = written.value;
-    const page = adoptParsedModel(state, written.value);
-    return { tag: 'written', state: toEditorPageState(page, saveStateClean(checksum)), checksum };
-  }
-  const error = written.error;
-  switch (error.code) {
-    case 'conflict':
-      return { tag: 'conflict', diskChecksum: error.diskChecksum };
-    case 'missing':
-    case 'filesystem':
-    case 'write-race':
-    case 'uncertain':
-    case 'backpressured':
-      // The edits stay unsaved (dirty) and the next save names the same base,
-      // so a write that did land comes back as a visible conflict, never as
-      // a silent overwrite (plan §3.5, §7).
-      throw new Error(error.message);
-    default: {
-      const exhaustive: never = error;
-      return exhaustive;
-    }
-  }
-}
-
-// A save of queued edit requests (step 6): one at a time, each answered before
-// the next goes, so main rebases the later ones through the earlier ones
-// exactly. What cannot go as a request after all is saved as the whole model;
-// a refusal becomes the conflict notice, with the actor's reason (plan §7).
-async function writeEdits(
-  store: EditDrafts,
-  pagePath: string,
-  state: EditablePageState,
-  base: Digest,
-  drafts: readonly EditDraft[],
-): Promise<PageWriteOutcome<EditorPageState>> {
-  const sent = await sendDrafts({ path: pagePath, drafts, base, send: editProjectPage, store });
-  switch (sent.tag) {
-    case 'applied':
-      return pageWriteOutcome(state, ok(sent.last));
-    case 'fallback':
-      return pageWriteOutcome(state, await writeProjectPage(pagePath, state.model, sent.base));
-    case 'refused':
-      return { tag: 'conflict', diskChecksum: sent.diskChecksum, reason: sent.reason };
-    case 'failed':
-      if (sent.advanced !== undefined) {
-        return { tag: 'advanced', checksum: sent.advanced, error: new Error(sent.message) };
-      }
-      throw new Error(sent.message);
-    default: {
-      const exhaustive: never = sent;
-      return exhaustive;
-    }
-  }
-}
-
-// A save of typed code (step 8): the patch from the text's baseline through the
-// page's actor, the one write path. A refusal is the conflict notice with the
-// actor's reason (a `merge-conflict` for an overlapping outside edit); any
-// other failure keeps the text unsaved and is reported as a failed save.
-async function writeCode(
-  store: EditDrafts,
-  pagePath: string,
-  state: EditorPageState,
-  base: Digest,
-): Promise<PageWriteOutcome<EditorPageState>> {
-  const sent = await sendCode({
-    path: pagePath,
-    text: state.source,
-    base,
-    stateBase: saveStateBase(state.save),
-    store,
-    send: editProjectPage,
-    read: readPage,
-  });
-  switch (sent.tag) {
-    case 'applied':
-      return pageWriteOutcome(state, ok(sent.last));
-    case 'refused': {
-      const { diskChecksum, baseChecksum } = sent;
-      return sent.reason === undefined
-        ? { tag: 'conflict', diskChecksum, baseChecksum }
-        : { tag: 'conflict', diskChecksum, baseChecksum, reason: sent.reason };
-    }
-    case 'failed':
-      throw new Error(sent.message);
-    default: {
-      const exhaustive: never = sent;
-      return exhaustive;
-    }
-  }
-}
-
 type BranchNode = Extract<EditorNode, { readonly kind: 'branch' }>;
 
 /** A tag's new name and kind, and the attributes the new name does not keep. */
@@ -677,6 +567,35 @@ function restatedText(
   }
 }
 
+// An undo step with nothing of its own to undo.
+function voided(outcome: EditsRecord['outcome']): boolean {
+  switch (outcome.tag) {
+    case 'folded':
+    case 'dropped':
+      return true;
+    case 'applied':
+      return outcome.applied.every((write) => write.inverse.length === 0);
+    case 'pending':
+      return false;
+    default: {
+      const exhaustive: never = outcome;
+      return exhaustive;
+    }
+  }
+}
+
+// The origin after an Undo's revert: its reply, carried from the origin
+// through the revert's own splices (an .astro page; undefined otherwise).
+function revertedOrigin(origin: PageOrigin | undefined, reply: PageEdited): PageOrigin | undefined {
+  if (origin === undefined || !reply.editable) {
+    return undefined;
+  }
+  const after = { source: reply.source, seed: seedOf(reply.checksum), model: reply.model };
+  const model = carryHandles({ before: origin, after, own: reply.inverse, predicted: undefined });
+  return { checksum: reply.checksum, source: reply.source, model };
+}
+
+// How long a pending save waits, by urgency. See scheduleSave.
 function saveDelay(urgency: boolean | 'live'): number {
   if (urgency === true) {
     return 0;
@@ -867,7 +786,6 @@ export default function App() {
   const livePathRef = useRef<string | null>(null);
   const [termOpen, setTermOpen] = useState(false); // bottom terminal dock
   const [codeWin, setCodeWin] = useState<CodeWindowState | null>(null);
-  const codeEditVersionRef = useRef(0)
   const openCodeWindowRef = useRef<(() => boolean) | null>(null);
   const selectionKeysRef = useRef<readonly string[]>([]);
   const [fileText, setFileText] = useState(''); // loaded text for kind:'file'
@@ -919,6 +837,28 @@ export default function App() {
   const devLogRef = useRef('');
   const pageStateRef = useRef<PageStateSnapshot>({ currentPage: null, pageState: null });
   pageStateRef.current = { currentPage, pageState };
+
+  // The selection follows the node it names across every model the page
+  // shows: by its handle, which parses carry by span mapping (plan §4). A
+  // selected node whose own bytes changed has no handle left to carry, and the
+  // selection moves to the node at the same place, of the same kind. Selection
+  // is interaction state, and never names a node to main.
+  const shownModelRef = useRef<EditorModel | null>(null);
+  useEffect(() => {
+    const model = pageState?.editable ? pageState.model : null;
+    const before = shownModelRef.current;
+    shownModelRef.current = model;
+    if (!model || !before || before === model) {return;}
+    setSelectedId((id) => {
+      if (!id || id === 'layout' || id === 'frontmatter' || findNodeById(model.nodes, id)) {
+        return id;
+      }
+      const was = findNodeById(before.nodes, id);
+      const trail = pathOfNode(before.nodes, id);
+      const now = trail ? nodeAtPath(model.nodes, trail) : null;
+      return now && was && now.kind === was.kind ? now.id : null;
+    });
+  }, [pageState]);
   // Typed code waiting for its parse (step 8). While the page shows that text,
   // its model is the parse of older text, and a gesture on it would save that
   // model over the typing: gestures wait until the parse lands.
@@ -1205,44 +1145,34 @@ export default function App() {
   const [conflictReason, setConflictReason] = useState<RejectionReason | undefined>(undefined);
   const pageSaverRef = useRef<PageSaver | null>(null);
   if (!pageSaverRef.current) {
-    pageSaverRef.current = createPageSaver<EditorPageState>({
-      readCurrent: () => pageStateRef.current,
-      write: async (pagePath, state, baseChecksum) => {
-        if (editDrafts.queue(pagePath).tag === 'code') {
-          return writeCode(editDrafts, pagePath, state, baseChecksum);
-        }
-        // Text that does not parse changes only through the code editor, so
-        // its page is in code; anything else would write a model it lacks.
-        assert(state.editable, 'A page that does not parse is saved as code');
-        const drafts = editDrafts.take(pagePath);
-        if (drafts.length > 0) {
-          return writeEdits(editDrafts, pagePath, state, baseChecksum, drafts);
-        }
-        return pageWriteOutcome(state, await writeProjectPage(pagePath, state.model, baseChecksum));
-      },
-      withSave: (state, save) => ({ ...state, save }),
-      replace: (previous, next) => {
-        if (pageStateRef.current.pageState === previous && next.editable && previous.editable) {
-          // The written file arrives re-parsed; keep the selection on the node
-          // at the same tree position.
-          const selected = selectedIdRef.current;
-          const trail = selected ? pathOfNode(previous.model.nodes, selected) : null;
-          const target = trail ? nodeAtPath(next.model.nodes, trail) : null;
-          if (selected !== 'frontmatter' && previous.model !== next.model) {
-            setSelectedId(target?.id ?? null);
-          }
-        }
-        setPageState((current) => (current === previous ? next : current));
-      },
-      markConflicted: (baseChecksum, diskChecksum, reason) => {
-        setConflictReason(reason);
-        setPageState((current) => {
-          if (!current || current.save.tag === 'clean') {
-            return current;
-          }
-          return { ...current, save: saveStateRefused(current.save, baseChecksum, diskChecksum) };
-        });
-      },
+    // A change to the open page's state from the saver: seen at once through
+    // the ref (the next entry is stated against the origin it installs), and
+    // applied to whatever React holds by then.
+    const updatePage = (
+      path: string,
+      change: (current: EditorPageState) => EditorPageState,
+    ): void => {
+      const now = pageStateRef.current;
+      if (now.currentPage?.path !== path || !now.pageState) {
+        return; // Another page opened meanwhile: this one's outcome is not shown.
+      }
+      pageStateRef.current = { currentPage: now.currentPage, pageState: change(now.pageState) };
+      setPageState((current) => (current ? change(current) : current));
+    };
+    pageSaverRef.current = createPageSaver({
+      queue: editDrafts,
+      currentPath: () => pageStateRef.current.currentPage?.path,
+      conflicted: () => pageStateRef.current.pageState?.save.tag === 'conflicted',
+      send: createEntrySender({
+        queue: editDrafts,
+        state: () => pageStateRef.current.pageState,
+        update: updatePage,
+        conflict: (reason) => setConflictReason(reason),
+        notice: (message) => showToast(message, 'error'),
+        edit: editProjectPage,
+        writeWhole: writeProjectPage,
+        read: readPage,
+      }),
     });
   }
   const fileSaver = fileSaverRef.current;
@@ -1269,7 +1199,9 @@ export default function App() {
   }, [autosave]);
 
   // Only the most recent navigation is allowed to install its read result.
-  const pageLoadRef = useRef(0);
+  // The latest navigation, as an identity token: a read that finds another
+  // token here was superseded, and installs nothing. No counter is kept.
+  const pageLoadRef = useRef<object>({});
 
   // Leaving a project. Main lets go of everything the project had running and
   // starts the window over — forty pieces of state, an undo stack, a canvas
@@ -1317,8 +1249,8 @@ export default function App() {
   // navigator, and the props panel all follow without special cases.
   const openFile = useCallback(
     async (entry: OpenFile, options: OpenFileOptions) => {
-      codeEditVersionRef.current += 1
-      const request = ++pageLoadRef.current;
+      const request = {};
+      pageLoadRef.current = request;
       try {
         await flushSave();
       } catch (err) {
@@ -1330,7 +1262,7 @@ export default function App() {
       let result: EditorPageState;
       try {
         const read = await readPage(entry.path);
-        result = toEditorPageState(read, saveStateClean(read.checksum));
+        result = toEditorPageState(read);
       } catch (err) {
         if (request === pageLoadRef.current) {showToast(`Couldn’t open ${entry.name}: ${cleanError(err)}`, 'error');}
         return;
@@ -1389,7 +1321,8 @@ export default function App() {
   // empty rather than pretending there is a model behind it.
   const selectRoute = useCallback(
     async (entry: WireInjectedRoute) => {
-      const request = ++pageLoadRef.current;
+      const request = {};
+      pageLoadRef.current = request;
       try {
         await flushSave();
       } catch (err) {
@@ -1456,8 +1389,10 @@ export default function App() {
       const read = await readPage(open.path);
       if (!stillCurrent()) {return;}
       // Deliberate: this discards local edits, including a conflicted page's.
-      setPageState(toEditorPageState(read, saveStateClean(read.checksum)));
-      setSelectedId(null);
+      // Handles still carry where the bytes allow, so the selection stays.
+      editDrafts.discard(open.path);
+      setConflictReason(undefined);
+      setPageState((current) => toEditorPageState(carriedParse(current, read)));
       dropPageHistory(); // page snapshots don't apply to another page; commands stay
     } else {
       const next = result.pages[0] || null;
@@ -1662,57 +1597,29 @@ export default function App() {
 
   const historyRef = useRef<AppHistory>({ past: [], future: [], lastPush: 0, lastKey: null });
 
-  const snapshotOf = (state: EditorPageState): PageSnapshot =>
-    state.editable
-      ? { kind: 'model', model: cloneEditorModel(state.model) }
-      : { kind: 'source', source: state.source };
-
-  // Records the state *before* a mutation. Consecutive edits with the same
-  // coalesceKey within 800 ms collapse into one undo step (typing bursts,
-  // dropdown hover-scrubs); structural edits (no key) always get their own.
-  const pushHistory = useCallback((coalesceKey: string | null = null) => {
-    const state = pageStateRef.current.pageState;
-    if (!state) {return;}
-    const h = historyRef.current;
-    const now = Date.now();
-    const coalesce =
-      coalesceKey !== null && coalesceKey === h.lastKey && now - h.lastPush < 800 && h.past.length > 0;
-    if (!coalesce) {
-      h.past.push(snapshotOf(state));
-      if (h.past.length > LIMITS.undoEntriesMax) {h.past.shift();}
-    }
-    h.future = [];
-    h.lastKey = coalesceKey;
-    h.lastPush = now;
-  }, []);
-
-  // The undo step of a gesture sent as edit requests (step 6): its record
-  // collects each applied request's inverse. Coalesces like pushHistory; a
-  // gesture folded into a step that is not an edits entry is undone by that
-  // step's snapshot, so its own record only says so.
+  // The undo step of an edit of the open page (step 9: undo is inverse
+  // splices only): its record collects each applied write's inverse.
+  // Consecutive edits with the same coalesceKey within 800 ms share one step
+  // (typing bursts, dropdown hover-scrubs); structural edits (no key) always
+  // get their own.
   const pushEditHistory = useCallback((coalesceKey: string | null): EditsRecord => {
-    const state = pageStateRef.current.pageState;
     const record: EditsRecord = { outcome: { tag: 'applied', applied: [] } };
-    if (!state) {
-      subsume(record);
+    if (!pageStateRef.current.pageState) {
+      record.outcome = { tag: 'dropped' };
       return record;
     }
     const h = historyRef.current;
     const now = Date.now();
     const previous = h.past[h.past.length - 1];
     const coalesce =
-      coalesceKey !== null && coalesceKey === h.lastKey && now - h.lastPush < 800 && previous;
+      coalesceKey !== null && coalesceKey === h.lastKey && now - h.lastPush < 800;
     h.future = [];
     h.lastKey = coalesceKey;
     h.lastPush = now;
-    if (coalesce) {
-      if (previous.kind === 'edits') {
-        return previous.record;
-      }
-      subsume(record);
-      return record;
+    if (coalesce && previous?.kind === 'edits') {
+      return previous.record;
     }
-    h.past.push({ kind: 'edits', snapshot: snapshotOf(state), record });
+    h.past.push({ kind: 'edits', record });
     if (h.past.length > LIMITS.undoEntriesMax) {h.past.shift();}
     return record;
   }, []);
@@ -1782,83 +1689,55 @@ export default function App() {
   }, []);
 
   // The typed text's parse: a model to show when it parses, the parse-error
-  // panel when it does not (plan §3.6). Installed only over the same text.
+  // panel when it does not (plan §3.6). Installed only over the same text: the
+  // text orders parses, so no counter does — a parse of text typed over since
+  // is dropped, and the parse of the newest text is on its way.
   const parseTypedCode = useCallback(async (
     pagePath: string,
     source: string,
     position: number,
-    version: number,
   ): Promise<void> => {
     let parsed: Awaited<ReturnType<typeof parseSourcePage>>;
     try {
       parsed = await parseSourcePage(pagePath, source);
     } catch (error: unknown) {
-      if (version === codeEditVersionRef.current) {
+      if (typedSourceRef.current === source) {
         typedSourceRef.current = null;
         showToast(`Couldn’t update code: ${cleanError(error)}`, 'error');
       }
       return;
     }
-    if (version !== codeEditVersionRef.current) {return;}
     if (pageStateRef.current.currentPage?.path !== pagePath) {return;}
-    typedSourceRef.current = null;
-    // The rendered state may not show the typed text yet (a fast parse beats
-    // the render); it serves only to re-key the parse onto the session ids so
-    // the editors it feeds don't remount per keystroke (issue #29). Whether
-    // the parse is still of the page's text is decided when it is installed.
+    if (typedSourceRef.current === source) {typedSourceRef.current = null;}
+    // The ref may not show the typed text yet (a fast parse beats the render);
+    // the page it shows is what handles are carried from, and whether this
+    // parse is still of the page's text is decided when it is installed.
     const local = pageStateRef.current.pageState;
     if (!local) {return;}
-    // Never clean: typed text is no parse of bytes on disk, so it has no origin
-    // to author requests against (plan §4), even if the render still shows the
-    // clean page it was typed into.
-    const result = toEditorPageState(adoptParsedModel(local, parsed), saveStateEdited(local.save));
-    assert(!result.editable || result.origin === undefined, 'Typed code has no edit origin');
-    if (result.editable) {
+    // Handles carried from the page shown by the text diff, so the editors it
+    // feeds keep their keys and focus per keystroke (issue #29). Typed text is
+    // no bytes on disk: the origin stays the last one a save left.
+    const carried = carriedParse(local, parsed);
+    const installed = (current: EditorPageState): EditorPageState => {
+      if (!carried.editable) {
+        return { editable: false, reason: carried.reason, bail: carried.bail, source, save: current.save };
+      }
+      const origin = current.editable ? current.origin : undefined;
+      const model = cloneEditorModel(carried.model);
+      return { editable: true, model, source, parsedFrom: source, save: current.save, origin };
+    };
+    if (carried.editable) {
       const inFrontmatter =
-        result.model.bodyStart !== undefined && position < result.model.bodyStart;
-      const selected = sourceNodeAtOffset(result.model.nodes, position);
+        carried.model.bodyStart !== undefined && position < carried.model.bodyStart;
+      const selected = sourceNodeAtOffset(cloneEditorModel(carried.model).nodes, position);
       setSelectedId(inFrontmatter ? 'frontmatter' : selected?.id ?? null);
     } else {
       setSelectedId(null);
     }
     // The save state is whatever is current when this lands: a conflicted
     // page stays conflicted, and a save that landed meanwhile keeps its base.
-    setPageState((current) =>
-      current && current.source === source ? { ...result, save: current.save } : current,
-    );
+    setPageState((current) => (current && current.source === source ? installed(current) : current));
   }, [showToast]);
-
-  const applySnapshot = useCallback((entry: PageSnapshot) => {
-    codeEditVersionRef.current += 1
-    const { currentPage, pageState: shown } = pageStateRef.current;
-    const path = currentPage?.path;
-    // A restored model is saved whole; restored text is code, patched from
-    // the text shown now (step 8).
-    if (path && shown && entry.kind === 'source') {
-      editDrafts.typeCode(path, shown);
-      typedSourceRef.current = entry.source;
-      void parseTypedCode(path, entry.source, 0, codeEditVersionRef.current);
-    } else if (path) {
-      editDrafts.markModel(path);
-    }
-    setPageState((s) => {
-      if (!s) {return s;}
-      if (entry.kind === 'model') {
-        // A restored model descends from no parse on disk: requests wait for
-        // the page to be clean again (plan §4 — no ids across versions).
-        const model = cloneEditorModel(entry.model);
-        return { ...s, editable: true, model, save: saveStateEdited(s.save), origin: undefined };
-      }
-      return { ...s, source: entry.source, save: saveStateEdited(s.save) };
-    });
-    // Clear selection if the restored model no longer has the selected node.
-    if (entry.kind === 'model') {
-      setSelectedId((id) =>
-        id && id !== 'layout' && !findNodeById(entry.model.nodes || [], id) ? null : id
-      );
-    }
-    scheduleSaveRef.current?.(true);
-  }, [editDrafts, parseTypedCode]);
 
   const scheduleSaveRef = useRef<((urgency?: boolean | 'live') => void) | null>(null);
 
@@ -1878,7 +1757,7 @@ export default function App() {
       const back = (next: EditsEntry) => (direction === 'undo' ? h.past : h.future).push(next);
       const forth = (next: HistoryEntry) => (direction === 'undo' ? h.future : h.past).push(next);
       try {
-        await autosave(); // Its own requests' answers first.
+        await autosave(); // Its own writes' answers first.
       } catch {
         /* reported by the save itself; the checks below decide */
       }
@@ -1886,17 +1765,21 @@ export default function App() {
       const state = pageStateRef.current.pageState;
       if (!path || !state) {return;} // its page is gone — nothing to restore onto
       const outcome = entry.record.outcome;
-      if (outcome.tag !== 'applied' || outcome.applied.length === 0 || state.save.tag !== 'clean') {
-        // Carried by a whole-model save, or the page has unsaved or refused
-        // edits: the snapshot is the undo, as before step 6.
-        forth(snapshotOf(state));
-        applySnapshot(entry.snapshot);
+      if (outcome.tag !== 'applied' || !editDrafts.empty(path) || state.save.tag !== 'clean') {
+        // Edits that have not reached disk (refused, or failing) come first:
+        // an inverse names the bytes its write left, and the page is not there.
+        back(entry);
+        showToast(`Couldn’t ${direction}: this page has edits that are not saved yet.`, 'error');
         return;
       }
       const done: AppliedEdit[] = [];
+      let origin = state.editable ? state.origin : undefined;
       let written: PageEdited | undefined;
       for (const step of [...outcome.applied].reverse()) {
         const hunks = step.inverse;
+        if (hunks.length === 0) {
+          continue; // A write that changed nothing has nothing to revert.
+        }
         const answer = await editProjectPage({
           pagePath: path,
           authoredChecksum: step.checksum,
@@ -1910,39 +1793,49 @@ export default function App() {
         }
         done.push({ checksum: answer.value.checksum, inverse: answer.value.inverse });
         written = answer.value;
+        origin = revertedOrigin(origin, answer.value);
       }
       const left = outcome.applied.slice(0, outcome.applied.length - done.length);
       if (left.length > 0) {
-        const outcome = { tag: 'applied' as const, applied: left };
-        back({ kind: 'edits', snapshot: entry.snapshot, record: { outcome } });
+        back({ kind: 'edits', record: { outcome: { tag: 'applied', applied: left } } });
       }
       if (written === undefined) {return;}
-      const undone = { tag: 'applied' as const, applied: done };
-      forth({ kind: 'edits', snapshot: snapshotOf(state), record: { outcome: undone } });
-      const clean = saveStateClean(written.checksum);
-      const next = toEditorPageState(adoptParsedModel(state, written), clean);
-      codeEditVersionRef.current += 1;
+      forth({ kind: 'edits', record: { outcome: { tag: 'applied', applied: done } } });
+      const reply = written;
+      const shown =
+        origin === undefined
+          ? toEditorPageState(carriedParse(state, reply))
+          : toEditorPageState({ ...reply, editable: true, model: origin.model });
       // Installed only over the state the undo started from: a newer edit
       // made meanwhile keeps its model, and main rebases it past the revert.
-      setPageState((current) => (current === state ? next : current));
-      if (next.editable) {
-        const model = next.model;
+      setPageState((current) => (current === state ? shown : current));
+      if (shown.editable) {
+        const model = shown.model;
         const named = (id: string) => id === 'layout' || id === 'frontmatter';
         const gone = (id: string) => !named(id) && !findNodeById(model.nodes, id);
         setSelectedId((id) => (id && gone(id) ? null : id));
       }
     },
-    [applySnapshot, autosave, showToast],
+    [autosave, editDrafts, showToast],
   );
+
+  // Pass over the steps with nothing of their own to undo (folded into a
+  // newer step's write, dropped before they were sent): bounded by the history.
+  const effective = (list: HistoryEntry[]): HistoryEntry | undefined => {
+    let entry = list.pop();
+    while (entry?.kind === 'edits' && voided(entry.record.outcome)) {
+      entry = list.pop();
+    }
+    return entry;
+  };
 
   const undo = useCallback(async () => {
     if (propertySave.saving.current) { return; }
     setHistoryTick((n) => n + 1);
     const h = historyRef.current;
-    if (!h.past.length) {return;}
     h.lastKey = null;
     h.lastPush = 0;
-    const entry = h.past.pop();
+    const entry = effective(h.past);
     if (!entry) {return;}
     if (entry.kind === 'cmd') {
       h.future.push(entry);
@@ -1953,24 +1846,16 @@ export default function App() {
       }
       return;
     }
-    if (entry.kind === 'edits') {
-      await stepEdits(entry, 'undo');
-      return;
-    }
-    const state = pageStateRef.current.pageState;
-    if (!state) {return;} // its page is gone — nothing to restore onto
-    h.future.push(snapshotOf(state));
-    applySnapshot(entry);
-  }, [applySnapshot, showToast, propertySave.saving, stepEdits]);
+    await stepEdits(entry, 'undo');
+  }, [showToast, propertySave.saving, stepEdits]);
 
   const redo = useCallback(async () => {
     if (propertySave.saving.current) { return; }
     setHistoryTick((n) => n + 1);
     const h = historyRef.current;
-    if (!h.future.length) {return;}
     h.lastKey = null;
     h.lastPush = 0;
-    const entry = h.future.pop();
+    const entry = effective(h.future);
     if (!entry) {return;}
     if (entry.kind === 'cmd') {
       h.past.push(entry);
@@ -1981,15 +1866,8 @@ export default function App() {
       }
       return;
     }
-    if (entry.kind === 'edits') {
-      await stepEdits(entry, 'redo');
-      return;
-    }
-    const state = pageStateRef.current.pageState;
-    if (!state) {return;}
-    h.past.push(snapshotOf(state));
-    applySnapshot(entry);
-  }, [applySnapshot, showToast, propertySave.saving, stepEdits]);
+    await stepEdits(entry, 'redo');
+  }, [showToast, propertySave.saving, stepEdits]);
 
   // Discrete edits (dropdown, checkbox, drag, delete) save immediately;
   // typing batches keystrokes for 300 ms so the preview doesn't rebuild
@@ -2016,14 +1894,17 @@ export default function App() {
   scheduleSaveRef.current = scheduleSave;
 
   // The conflict notice's actions (plan §7). Reload lives in reloadFromDisk.
-  // Review shows the unsaved version as text: an editable page's `source` is
-  // the last text written, so the model is serialized for the review first.
+  // Review shows the unsaved version as text. Typed code already is text;
+  // unsaved gestures are a model, printed for the review, and from then on the
+  // page's edits are that text — kept, it is saved as a patch of whatever the
+  // disk holds (plan §3.6), never as a whole model.
   const reviewConflictInCode = useCallback(async () => {
     const { currentPage: open, pageState: state } = pageStateRef.current;
     if (!open?.path || state?.save.tag !== 'conflicted') {
       return;
     }
-    if (state.editable) {
+    const typed = editDrafts.entries(open.path).some((entry) => entry.tag === 'code');
+    if (state.editable && !typed) {
       let source: string;
       try {
         source = await serializeProjectPage(open.path, state.model);
@@ -2031,12 +1912,17 @@ export default function App() {
         showToast(`Couldn’t show your version: ${cleanError(err)}`, 'error');
         return;
       }
-      setPageState((current) =>
-        current?.editable && current.model === state.model ? { ...current, source } : current,
-      );
+      const latest = pageStateRef.current.pageState;
+      if (latest?.editable && latest.model === state.model) {
+        const record = pushEditHistory('code-source');
+        editDrafts.typeCode(open.path, { save: latest.save, source, origin: latest.origin }, record);
+        setPageState((current) =>
+          current?.editable && current.model === state.model ? { ...current, source } : current,
+        );
+      }
     }
     setLeftTab('code');
-  }, [showToast]);
+  }, [editDrafts, pushEditHistory, showToast]);
 
   // Deliberate: the user saw the conflict and keeps the local text, so it now
   // saves over what is on disk (and conflicts again if the disk moves again).
@@ -2052,36 +1938,46 @@ export default function App() {
     scheduleSave(true);
   }, [scheduleSave, editDrafts]);
 
-  // A gesture in its intent form (step 6, editGestures.ts): it goes to disk as
-  // edit requests against the page's origin, and its effect shows at once.
-  // Where a request cannot be stated — no origin (typed code, a restored
-  // undo), a node created since, a queue already saving whole models — the
-  // effect is saved as the whole model instead, exactly as mutateModel does.
+  // A gesture (step 9: every gesture has an intent form, editGestures.ts): its
+  // effect shows at once, and it is queued to go to disk as edit requests,
+  // stated when sent against the page the app's last reply left — so a node a
+  // gesture just created is there to name. A Markdown or MDX page saves its
+  // whole model until step 10. Past the queue's bound a gesture is refused,
+  // never queued (plan §8); one the engine cannot reach at all (a node another
+  // file holds) is refused before it shows.
   const commitEdit = useCallback(
     (gesture: EditGesture) => {
       if (propertySave.saving.current) { return; }
       const { currentPage, pageState: state } = pageStateRef.current;
       const path = currentPage?.path;
       if (!path || !state?.editable || typedCodeUnparsed()) {return;}
-      codeEditVersionRef.current += 1;
-      const record = pushEditHistory(gesture.coalesceKey);
+      const markdown = state.model.format !== undefined;
       const origin = state.origin;
-      const requests =
-        origin === undefined ? undefined : gesture.request((id) => nodeRefIn(origin, id));
-      if (origin === undefined || requests === undefined || requests.length === 0) {
-        editDrafts.markModel(path);
-        subsume(record);
-      } else {
-        for (const { edit, stream } of requests) {
-          editDrafts.record(path, { edit, stream, record, authoredChecksum: origin.checksum });
+      if (!markdown) {
+        assert(origin !== undefined, 'An editable .astro page has an origin');
+        if (editDrafts.empty(path) && gesture.request((id) => nodeRefIn(origin, id)) === undefined) {
+          // Nothing queued could have made its node: it is out of reach.
+          showToast('That edit can’t be made visually here — edit it in the code panel.', 'error');
+          return;
         }
+        if (editDrafts.entries(path).length >= LIMITS.intentsPendingMax) {
+          showToast('Too many edits are waiting to be saved — try again in a moment.', 'error');
+          return;
+        }
+      }
+      const record = pushEditHistory(gesture.coalesceKey);
+      if (markdown) {
+        editDrafts.markModel(path, record);
+      } else {
+        const queued = editDrafts.addGesture(path, gesture, record);
+        assert(queued === 'queued', 'A gesture inside the bound is queued');
       }
       setPageState((s) =>
         s?.editable ? { ...s, model: gesture.apply(s.model), save: saveStateEdited(s.save) } : s,
       );
       scheduleSave(gesture.urgency);
     },
-    [scheduleSave, pushEditHistory, propertySave.saving, editDrafts, typedCodeUnparsed]
+    [scheduleSave, pushEditHistory, propertySave.saving, editDrafts, typedCodeUnparsed, showToast]
   );
 
   // Typed code (step 8). The text is the page's edit: it is set at once, so a
@@ -2098,27 +1994,19 @@ export default function App() {
       if (!open || open.kind === 'route' || !shown) {
         return Promise.resolve();
       }
-      pushHistory('code-source');
-      editDrafts.typeCode(open.path, shown);
-      const version = codeEditVersionRef.current + 1;
-      codeEditVersionRef.current = version;
+      const record = pushEditHistory('code-source');
+      const origin = shown.editable ? shown.origin : undefined;
+      editDrafts.typeCode(open.path, { save: shown.save, source: shown.source, origin }, record);
       typedSourceRef.current = source;
-      // The model no longer descends from a parse on disk: requests wait for
-      // the page to be clean again (plan §4).
+      // The origin stays: typed text is no bytes on disk, and the code save's
+      // reply moves the origin on.
       setPageState((current) =>
-        current
-          ? {
-              ...current,
-              source,
-              save: saveStateEdited(current.save),
-              ...(current.editable ? { origin: undefined } : {}),
-            }
-          : current,
+        current ? { ...current, source, save: saveStateEdited(current.save) } : current,
       );
       scheduleSave('live');
-      return parseTypedCode(open.path, source, position, version);
+      return parseTypedCode(open.path, source, position);
     },
-    [pushHistory, scheduleSave, editDrafts, parseTypedCode],
+    [pushEditHistory, scheduleSave, editDrafts, parseTypedCode],
   );
 
   // ----------------------------------------------------------------
@@ -2141,11 +2029,10 @@ export default function App() {
     // conflict for them.
     // Typed code is a patch too (step 8): it merges with the outside change
     // or comes back `merge-conflict` — also not a page-wide conflict here.
-    const queued = editDrafts.queue(pagePath).tag;
-    if (queued === 'edits' || queued === 'code') {
+    if (editDrafts.entries(pagePath).some((entry) => entry.tag !== 'model')) {
       return;
     }
-    const baseBefore = saver.baseFor(pagePath, before.save);
+    const baseBefore = saveStateBase(before.save);
     let diskChecksum: Digest;
     try {
       diskChecksum = (await readPage(pagePath)).checksum;
@@ -2158,7 +2045,7 @@ export default function App() {
     }
     // A save that started or finished during the read moved the base, and its
     // own guard in main compares against the disk authoritatively.
-    const base = saver.baseFor(pagePath, latest.pageState.save);
+    const base = saveStateBase(latest.pageState.save);
     if (saver.writing() || base !== baseBefore || diskChecksum === base) {
       return;
     }
@@ -2171,104 +2058,80 @@ export default function App() {
   }, [editDrafts]);
 
   useEffect(() => {
-    let changeVersion = 0;
+    // Every file an event named since the last reconcile read them. A burst
+    // of events shares one reconcile after it (src/coalescedRun.ts): one scan
+    // and one read per tick, and a reconcile begun after the last event sees
+    // every file — no counter decides which answer wins.
     const pendingFiles = new Set<string>();
-    const off = onFilesChanged(async ({ files }) => {
+    let closed = false;
+    const reconcile = createCoalescedRun(async (): Promise<void> => {
       const proj = projectRef.current;
-      if (!proj) {return;}
-      for (const file of files) {pendingFiles.add(file);}
-      const request = ++changeVersion;
-
-      // Retain all paths until the latest scan AND read finish. A newer event
-      // for another file must not cancel a still-unread change to this page.
+      if (closed || !proj) {return;}
       let scanResult;
       try {
         scanResult = await rescan(proj.path);
       } catch {
         return;
       }
-      if (request !== changeVersion) {return;}
-
+      // A newer event waits behind this run: its reconcile scans again, and
+      // decides on every file named so far — a superseded scan never decides
+      // that a page was deleted.
+      if (reconcile.superseded()) {return;}
+      const files = new Set(pendingFiles);
+      pendingFiles.clear();
       const { currentPage: page, pageState: state } = pageStateRef.current;
-      if (!page || page.kind === 'route') { pendingFiles.clear(); return; }
+      if (closed || !page || page.kind === 'route') {return;}
       // Chunk .html files feed the open page's Fragment subtrees — treat a
       // change to any of them like a change to the page itself.
-      const affectsPage =
-        pendingFiles.has(page.path) || [...pendingFiles].some((f) => f.toLowerCase().endsWith('.html'));
-      if (!affectsPage) { pendingFiles.clear(); return; }
-
+      const chunk = [...files].some((f) => f.toLowerCase().endsWith('.html'));
+      if (!files.has(page.path) && !chunk) {return;}
       // Current page deleted externally.
       if (!scanContainsFile(scanResult, page.path)) {
-        pendingFiles.clear();
-        pageLoadRef.current++;
+        pageLoadRef.current = {};
         setCurrentPage(null);
         setPageState(null);
         setSelectedId(null);
         return;
       }
-
-      if (!state) { pendingFiles.clear(); return; }
+      if (!state) {return;}
       // Hot-reload only a clean page. Unsaved edits are never overwritten by
       // the disk, nor the disk by them: a dirty page surfaces a conflict, and
       // a saving or conflicted one already has main's verdict coming or shown.
       if (state.save.tag !== 'clean') {
-        pendingFiles.clear();
         void surfaceOutsideEdit(page.path);
         return;
       }
-
-      // Only the page itself changed: a read holding the bytes this clean page
-      // already shows is the app's own write heard late (its actor was dropped
-      // past LIMITS.documentActorsMax) or an outside save of identical bytes.
-      // Nothing changed, so nothing reloads and Undo keeps its entries.
-      const onlyPage = pendingFiles.size === 1 && pendingFiles.has(page.path);
-      let result: EditorPageState;
+      let parsed;
       try {
-        const parsed = await readPage(page.path);
-        if (onlyPage && parsed.checksum === state.save.checksum) {
-          if (request === changeVersion) {pendingFiles.clear();}
-          return;
-        }
-        // The disk snapshot arrives with regenerated parser ids; re-key it
-        // onto the session ids so aligned nodes keep their identity and the
-        // trail remap below only has to cover genuinely changed regions
-        // (issue #29).
-        result = toEditorPageState(
-          adoptParsedModel(state, parsed),
-          saveStateClean(parsed.checksum),
-        );
+        parsed = await readPage(page.path);
       } catch {
         return;
       }
-
-      // The read may finish after a selection switch or a fresh edit. Neither
-      // may be overwritten by the disk snapshot requested before it.
+      // Only the page itself changed and the read holds the bytes this clean
+      // page already shows: the app's own write heard late (its actor was
+      // dropped past LIMITS.documentActorsMax), or an outside save of the same
+      // bytes. Nothing changed, so nothing reloads and Undo keeps its entries.
+      if (!chunk && parsed.checksum === state.save.checksum) {return;}
+      // The read may finish after another page opened or a fresh edit. Neither
+      // may be overwritten by the disk read requested before it: only the same
+      // page, still clean, takes it.
       const latest = pageStateRef.current;
-      if (request !== changeVersion) {return;}
-      pendingFiles.clear();
-      if (latest.currentPage?.path !== page.path || latest.pageState !== state) {return;}
-
-      // Re-select the node at the same tree position — the fallback for
-      // regions whose ids genuinely regenerated (nodes added or removed
-      // externally); aligned regions kept their session ids above.
-      const selId = selectedIdRef.current;
-      let nextSelected = selId;
-      if (selId && selId !== 'layout' && selId !== 'frontmatter') {
-        if (state?.editable && result.editable) {
-          const trail = pathOfNode(state.model.nodes, selId);
-          nextSelected = trail ?nodeAtPath(result.model.nodes, trail)?.id ?? null : null;
-        } else {
-          nextSelected = null;
-        }
+      const shownPage = latest.pageState;
+      if (closed || latest.currentPage?.path !== page.path || shownPage?.save.tag !== 'clean') {
+        return;
       }
-      codeEditVersionRef.current += 1
-      setPageState(result);
-      setSelectedId(nextSelected);
-      // Undo snapshots describe the bytes before the outside edit; replaying one
-      // would silently revert it, and the guard cannot see that (plan §11).
+      // The nodes the outside edit left alone keep their handles — the
+      // selection with them — by the byte diff (plan §4, src/nodeHandles.ts).
+      setPageState(toEditorPageState(carriedParse(shownPage, parsed)));
+      // Undo steps keep their inverses: after an outside edit they map
+      // through it or are refused — they never revert it (plan §11).
       dropPageHistory();
     });
-    return () => { changeVersion++; off(); };
+    const off = onFilesChanged(({ files }) => {
+      for (const file of files) {pendingFiles.add(file);}
+      return reconcile.request();
+    });
+    return () => { closed = true; off(); };
   }, [rescan, surfaceOutsideEdit, dropPageHistory]);
 
   // ----------------------------------------------------------------
@@ -3889,10 +3752,12 @@ export default function App() {
     pageState?.editable === true &&
     (pageState.model.format === 'md' || pageState.model.format === 'mdx');
 
-  const layoutSeq = useRef(0);
+  // The latest layout change, as an identity token (see pageLoadRef).
+  const layoutSeq = useRef<object>({});
   const changeLayout = useCallback(
     async (layoutName: string) => {
-      const seq = ++layoutSeq.current;
+      const seq = {};
+      layoutSeq.current = seq;
       // A markdown page has no wrapper node to swap — Astro reads its layout
       // from the `layout:` frontmatter key, as a path relative to the file.
       // Same picker, different place to write the answer.
@@ -4381,7 +4246,7 @@ export default function App() {
     void (async () => {
       try {
         const disk = await readPage(hostFile.path);
-        const read = toEditorPageState(disk, saveStateClean(disk.checksum));
+        const read = toEditorPageState(disk);
         if (dropped || !read.editable) {
           return;
         }
@@ -5924,9 +5789,6 @@ function keepsAcrossPages(entry: HistoryEntry): boolean {
       if (entry.record.outcome.tag === 'applied') {
         return entry.record.outcome.applied.length > 0;
       }
-      return false;
-    case 'model':
-    case 'source':
       return false;
     default: {
       const exhaustive: never = entry;

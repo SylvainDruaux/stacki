@@ -1,13 +1,14 @@
 import type { CSSProperties } from 'react';
 import type { Data } from '../shared/boundary';
 import type { IpcResults, WireGitInfo, WireInjectedRoute } from '../shared/ipc-results';
+import type { Digest } from '../shared/brand';
 import type { ParsePageResult } from '../shared/page-node';
 import type { ScanResult } from '../shared/scan';
 import type { AssetRequest } from './assetPick';
 import type { CoalescedRun } from './coalescedRun';
-import { adoptNodeIds } from './modelAdoption';
+import { carryHandles, carryRoundTrip, randomSeed, seedOf } from './nodeHandles';
 import type { EditsRecord, PageOrigin } from './pageEdits';
-import type { SaveState } from './saveState';
+import { saveStateClean, type SaveState } from './saveState';
 import type { VariableSelection } from './variablesBridge';
 import {
   cloneEditorModel,
@@ -54,9 +55,12 @@ interface PageStateBase {
 export interface EditablePageState extends PageStateBase {
   readonly editable: true;
   readonly model: EditorModel;
-  /** The parse `model` was cloned from, when it is a parse of bytes on disk
-   * (step 6): edit requests name its nodes. Absent once the model stops
-   * descending from a disk parse — typed code, a restored undo snapshot. */
+  /** The text `model` is a parse of — for nodes a gesture changed or made,
+   * the parse the gesture was applied to. Its source ranges index this text,
+   * and handles are carried from it onto the next parse (src/nodeHandles.ts). */
+  readonly parsedFrom: string;
+  /** The page as the app's last read or reply left it (an .astro page): edit
+   * requests are stated against it when they are sent. */
   readonly origin: PageOrigin | undefined;
 }
 
@@ -73,10 +77,6 @@ export interface PageStateSnapshot {
   readonly pageState: EditorPageState | null;
 }
 
-export type PageSnapshot =
-  | { readonly kind: 'model'; readonly model: EditorModel }
-  | { readonly kind: 'source'; readonly source: string };
-
 export interface UndoCommand {
   readonly kind: 'cmd';
   readonly undo: () => unknown | Promise<unknown>;
@@ -85,17 +85,16 @@ export interface UndoCommand {
   readonly coalesceKey?: string | null;
 }
 
-/** A gesture that went out as edit requests (step 6). Undo submits the
- * inverses its record collects, against the checksums they were returned
- * with; the snapshot undoes it when a whole-model save carried it instead.
- * The record is mutable: answers arrive after the entry is pushed. */
+/** An undo step of the open page: its writes' inverses, which Undo submits
+ * against the checksums they were returned with (plan §11.9: undo is inverse
+ * splices only). The record is mutable: answers arrive after the entry is
+ * pushed. */
 export interface EditsEntry {
   readonly kind: 'edits';
-  readonly snapshot: PageSnapshot;
   readonly record: EditsRecord;
 }
 
-export type HistoryEntry = PageSnapshot | UndoCommand | EditsEntry;
+export type HistoryEntry = UndoCommand | EditsEntry;
 export interface AppHistory {
   past: HistoryEntry[];
   future: HistoryEntry[];
@@ -223,48 +222,46 @@ export function findEditorParentList(
   return null;
 }
 
+/** A page as a read or a reply left it: clean, and — an .astro page — its
+ * own origin. */
 export function toEditorPageState(
-  input: ParsePageResult & { readonly source: string },
-  save: SaveState,
+  input: ParsePageResult & { readonly source: string; readonly checksum: Digest },
 ): EditorPageState {
+  const save = saveStateClean(input.checksum);
+  const source = input.source;
   if (!input.editable) {
-    return { editable: false, reason: input.reason, bail: input.bail, source: input.source, save };
+    return { editable: false, reason: input.reason, bail: input.bail, source, save };
   }
   const model = cloneEditorModel(input.model);
-  return { editable: true, model, source: input.source, save, origin: originOf(input, save) };
+  const origin =
+    input.model.format === undefined
+      ? { checksum: input.checksum, source, model: input.model }
+      : undefined; // Markdown and MDX join the engine at step 10.
+  return { editable: true, model, source, parsedFrom: source, save, origin };
 }
 
-// A clean state of an .astro page is a parse of the bytes its checksum names;
-// the origin is its own clone, so nothing done to the shown model reaches it.
-function originOf(
-  input: Extract<ParsePageResult, { readonly editable: true }>,
-  save: SaveState,
-): PageOrigin | undefined {
-  if (save.tag !== 'clean') {
-    return undefined;
-  }
-  if (input.model.format !== undefined) {
-    return undefined; // Markdown and MDX join the engine at step 10.
-  }
-  return { checksum: save.checksum, model: cloneEditorModel(input.model) };
-}
-
-/** Re-key a freshly parsed page onto the session's node ids (see
- * modelAdoption.ts). The parser regenerates every id on each parse, and the UI
- * keys editors by node id, so installing a fresh parse wholesale re-keyed
- * every editor and dropped field focus mid-typing (issue #29). Returns
- * `parsed` unchanged when either side lacks an editable page model. */
-export function adoptParsedModel(
+/** A fresh parse with the session's handles, carried from the page state it
+ * replaces by the byte diff (src/nodeHandles.ts): a reload, typed code's
+ * parse, a code save's reply. A Markdown reply is a round trip of the model
+ * sent. Replies to the app's own gestures are carried from the origin by the
+ * saver, with the gesture's own prediction — never from the view, which also
+ * holds newer gestures' nodes. Unchanged when either side is not editable. */
+export function carriedParse<Parsed extends ParsePageResult & { readonly source: string }>(
   local: EditorPageState | null,
-  parsed: ParsePageResult & { readonly source: string },
-): ParsePageResult & { readonly source: string } {
+  parsed: Parsed & { readonly checksum?: Digest },
+): Parsed {
   if (!isEditableState(local) || !parsed.editable) {
     return parsed;
   }
-  return {
-    ...parsed,
-    model: { ...parsed.model, nodes: adoptNodeIds(local.model.nodes, parsed.model.nodes) },
-  };
+  if (parsed.model.format !== undefined) {
+    const model = carryRoundTrip(local.model, parsed.model);
+    return model === undefined ? parsed : { ...parsed, model };
+  }
+  const before = { source: local.parsedFrom, model: local.model };
+  const checksum = parsed.checksum;
+  const seed = checksum === undefined ? randomSeed() : seedOf(checksum);
+  const after = { source: parsed.source, seed, model: parsed.model };
+  return { ...parsed, model: carryHandles({ before, after, own: undefined, predicted: undefined }) };
 }
 
 export function isOpenFile(page: CurrentPage | null): page is OpenFile {

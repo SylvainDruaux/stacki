@@ -11,7 +11,9 @@ const esbuild = require('esbuild');
 const buildDir = path.join(__dirname, '..', 'node_modules', '.stacki-test', 'renderer-core');
 fs.mkdirSync(buildDir, { recursive: true });
 esbuild.buildSync({
-  entryPoints: ['editorTree', 'loopBindings', 'pagePersistence'].map((name) => path.join(__dirname, '..', 'src', `${name}.js`)),
+  entryPoints: ['editorTree', 'loopBindings', 'pagePersistence', 'pageEdits'].map((name) =>
+    path.join(__dirname, '..', 'src', `${name}.ts`),
+  ),
   outdir: buildDir, bundle: true, format: 'cjs', platform: 'node', logLevel: 'silent',
 });
 const tree = require(path.join(buildDir, 'editorTree.js'));
@@ -87,140 +89,104 @@ test('moving from a loop drops lost bindings without rewriting nested local vari
   assert.equal(node.children[1].children[0].value, '{item$.label}');
 });
 
-// Page saver harness: `replace` and `markConflicted` update `current` at once,
-// the way App's ref catches up on the next render. Writes are held on gates so
-// each test decides exactly when disk answers.
-const sum = (digit) => String(digit).repeat(64);
-const dirty = (base) => ({ tag: 'dirty', baseChecksum: base });
-const clean = (checksum) => ({ tag: 'clean', checksum });
-function saverHarness(pageState, path = '/page.astro') {
-  const harness = { current: { currentPage: { path }, pageState }, writes: [], gates: [] };
+// Page saver harness: a real queue (src/pageEdits.ts) and a send held on a
+// gate per entry, so each test decides exactly when disk answers.
+const edits = require(path.join(buildDir, 'pageEdits.js'));
+const step = () => ({ outcome: { tag: 'applied', applied: [] } });
+const gesture = (name) => ({
+  coalesceKey: null,
+  urgency: true,
+  stream: null,
+  request: () => [],
+  apply: (model) => model,
+  name,
+});
+function saverHarness(path = '/page.astro') {
+  const harness = { path, queue: new edits.EditDrafts(), sent: [], gates: [], conflicted: false };
   harness.save = createPageSaver({
-    readCurrent: () => harness.current,
-    write: (writePath, state, baseChecksum) => {
-      harness.writes.push({ path: writePath, state, baseChecksum });
+    queue: harness.queue,
+    currentPath: () => harness.path,
+    conflicted: () => harness.conflicted,
+    send: (sentPath, entry) => {
+      harness.sent.push({ path: sentPath, name: entry.gesture.name });
       const gate = deferred();
       harness.gates.push(gate);
       return gate.promise;
     },
-    withSave: (state, save) => ({ ...state, save }),
-    replace: (previous, next) => {
-      if (harness.current.pageState === previous) {
-        harness.current = { ...harness.current, pageState: next };
-      }
-    },
-    markConflicted: (baseChecksum, diskChecksum) => {
-      const state = harness.current.pageState;
-      if (state && state.save.tag !== 'clean') {
-        const save = { tag: 'conflicted', baseChecksum, diskChecksum };
-        harness.current = { ...harness.current, pageState: { ...state, save } };
-      }
-    },
   });
-  harness.edit = (fields) => {
-    const state = harness.current.pageState;
-    const base = state.save.baseChecksum ?? state.save.checksum;
-    const save = state.save.tag === 'conflicted' ? state.save : dirty(base);
-    harness.current = { ...harness.current, pageState: { ...state, ...fields, save } };
-  };
-  harness.written = (index, checksum, fields = {}) =>
-    harness.gates[index].resolve({
-      tag: 'written',
-      state: { ...harness.writes[index].state, ...fields, save: clean(checksum) },
-      checksum,
-    });
+  harness.add = (name) => harness.queue.addGesture(harness.path, gesture(name), step());
+  harness.answer = (index, outcome) => harness.gates[index].resolve(outcome);
   return harness;
 }
 
-test('saving serializes concurrent writes and drains newer edits before navigation', async () => {
-  const page = saverHarness({ save: dirty(sum(0)), model: { version: 1 } });
+test('the saver sends the queued entries in order, one at a time; later ones wait', async () => {
+  const page = saverHarness();
+  page.add('a');
+  page.add('b');
   const one = page.save.flush();
   await tick();
-  assert.equal(page.current.pageState.save.tag, 'saving');
+  assert.deepEqual(page.sent.map((entry) => entry.name), ['a']);
   assert.equal(page.save.writing(), true);
-  page.edit({ model: { version: 2 } });
+  page.add('c'); // Made while the flush runs: the next flush sends it.
   const two = page.save.flush();
+  page.answer(0, { tag: 'sent' });
   await tick();
-  assert.equal(page.writes.length, 1);
-  page.written(0, sum(1));
+  assert.deepEqual(page.sent.map((entry) => entry.name), ['a', 'b'], 'one at a time, in order');
+  page.answer(1, { tag: 'sent' });
+  assert.equal(await one, 'settled', 'a flush sends what it found, and no more');
   await tick();
-  assert.equal(page.current.pageState.save.tag, 'saving');
-  assert.equal(page.writes.length, 2);
-  assert.deepEqual(page.writes[1].state.model, { version: 2 });
-  // The second state was authored against the bytes before the first save;
-  // the saver advances it to the checksum it wrote itself.
-  assert.equal(page.writes[1].state.save.baseChecksum, sum(0));
-  assert.equal(page.writes[1].baseChecksum, sum(1));
-  page.written(1, sum(2));
-  assert.deepEqual(await Promise.all([one, two]), ['settled', 'settled']);
-  assert.deepEqual(page.current.pageState.save, clean(sum(2)));
-  assert.equal(page.writes.length, 2);
+  assert.deepEqual(page.sent.map((entry) => entry.name), ['a', 'b', 'c'], 'the flush asked later');
+  page.answer(2, { tag: 'sent' });
+  assert.equal(await two, 'settled');
   assert.equal(page.save.writing(), false);
+  assert.equal(page.queue.empty(page.path), true);
 });
 
-test('failed saves can retry and completing an old save never cleans another page', async () => {
-  const page = saverHarness({ save: dirty(sum(0)) }, '/first.astro');
-  const first = page.current.pageState;
+test('a failed send puts its entry back in front and rejects; a retry sends it again', async () => {
+  const page = saverHarness();
+  page.add('a');
+  page.add('b');
   const failed = page.save.flush();
   await tick();
-  page.gates[0].reject(new Error('disk full'));
+  page.answer(0, { tag: 'failed', error: new Error('disk full') });
   await assert.rejects(failed, /disk full/);
-  assert.deepEqual(page.current.pageState, first, 'the edit is unsaved again');
+  assert.equal(page.queue.entries(page.path).length, 2, 'nothing was lost');
   const retry = page.save.flush();
   await tick();
-  assert.deepEqual(page.writes[1].state, first);
-  page.current = { currentPage: { path: '/second.astro' }, pageState: { save: dirty(sum(5)) } };
-  page.written(1, sum(1));
+  assert.equal(page.sent[1].name, 'a', 'the failed entry goes first');
+  page.answer(1, { tag: 'sent' });
+  await tick();
+  page.answer(2, { tag: 'sent' });
   assert.equal(await retry, 'settled');
-  assert.deepEqual(page.current.pageState.save, dirty(sum(5)));
 });
 
-test('a refused save marks the page conflicted and autosave stays off', async () => {
-  const page = saverHarness({ save: dirty(sum(0)), model: { version: 1 } });
+test('a refused send stops autosave until the user decides', async () => {
+  const page = saverHarness();
+  page.add('a');
+  page.add('b');
   const refused = page.save.flush();
   await tick();
-  page.gates[0].resolve({ tag: 'conflict', diskChecksum: sum(9) });
+  page.conflicted = true; // The sender marks the page conflicted with its reason.
+  page.answer(0, { tag: 'conflicted' });
   assert.equal(await refused, 'conflicted');
-  assert.deepEqual(page.current.pageState.save, {
-    tag: 'conflicted',
-    baseChecksum: sum(0),
-    diskChecksum: sum(9),
-  });
-  // Edits keep applying locally, but nothing reaches disk.
-  page.edit({ model: { version: 2 } });
-  assert.equal(await page.save.flush(), 'conflicted');
-  assert.equal(await page.save.flush(), 'conflicted');
-  assert.equal(page.writes.length, 1);
-  assert.deepEqual(page.current.pageState.model, { version: 2 });
-  // Keeping the local version is a deliberate edit against the disk's bytes.
-  page.current = {
-    ...page.current,
-    pageState: { ...page.current.pageState, save: dirty(sum(9)) },
-  };
+  assert.equal(page.queue.entries(page.path).length, 2, 'the refused entry is kept');
+  assert.equal(await page.save.flush(), 'conflicted', 'nothing reaches disk');
+  assert.equal(page.sent.length, 1);
+  page.conflicted = false; // "Review in code" and "Keep", or "Reload".
   const kept = page.save.flush();
   await tick();
-  assert.equal(page.writes[1].baseChecksum, sum(9));
-  page.written(1, sum(3));
+  page.answer(1, { tag: 'sent' });
+  await tick();
+  page.answer(2, { tag: 'sent' });
   assert.equal(await kept, 'settled');
-  assert.deepEqual(page.current.pageState.save, clean(sum(3)));
 });
 
-test('a clean page resets the lineage so an old base is never advanced again', async () => {
-  const page = saverHarness({ save: dirty(sum(0)), model: { version: 1 } });
-  const saving = page.save.flush();
-  await tick();
-  page.edit({ model: { version: 2 } });
-  page.written(0, sum(1));
-  await tick();
-  // Mid-drain: the pending edit still names sum(0), which the saver replaced.
-  assert.equal(page.save.baseFor('/page.astro', dirty(sum(0))), sum(1));
-  assert.equal(page.save.baseFor('/other.astro', dirty(sum(0))), sum(0));
-  page.written(1, sum(2));
-  assert.equal(await saving, 'settled');
-  // Once a clean state is current every later edit grows from its checksum. A
-  // file reverted outside to the old bytes and reloaded must name those bytes.
-  assert.equal(page.save.baseFor('/page.astro', dirty(sum(0))), sum(0));
-  assert.throws(() => page.save.baseFor('/page.astro', clean(sum(0))), /nothing to write/);
+test('no open file: nothing to send', async () => {
+  const page = saverHarness();
+  page.add('a');
+  page.path = undefined;
+  assert.equal(await page.save.flush(), 'settled');
+  assert.equal(page.sent.length, 0);
 });
 
 test('external edits recognize pages, components and layouts as editable files', () => {
@@ -263,17 +229,4 @@ test('failed code window writes are retained for an explicit retry', async () =>
   fail = false;
   await saver.flush();
   assert.equal(attempts, 2);
-});
-
-test('a save that advanced part-way makes its bytes the next base and reports its error', async () => {
-  // Step 6: edit requests go one at a time; when a later one fails, the ones
-  // before it are on disk, and the next save must name the bytes they left.
-  const page = saverHarness({ save: dirty(sum(0)), model: { version: 1 } });
-  const flush = page.save.flush();
-  await tick();
-  page.gates[0].resolve({ tag: 'advanced', checksum: sum(5), error: new Error('busy') });
-  await assert.rejects(flush, /busy/);
-  assert.equal(page.current.pageState.save.tag, 'dirty', 'the rest is still unsaved');
-  assert.equal(page.save.baseFor('/page.astro', page.current.pageState.save), sum(5));
-  assert.equal(page.save.writing(), false);
 });

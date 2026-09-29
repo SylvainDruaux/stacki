@@ -13,7 +13,7 @@ import { LIMITS } from '../shared/limits';
 import type { Attr } from '../shared/page-node';
 import { renamedAttr } from './attrOrder';
 import { loopVarsAt, parseLoopHead, renameLoopVar, stripLostBindings } from './loopBindings';
-import type { EditGesture, StreamedEdit } from './pageEdits';
+import type { EditGesture } from './pageEdits';
 
 type Urgency = boolean | 'live';
 
@@ -28,21 +28,24 @@ export function propsGesture(
   patch: PropPatch,
   options: { readonly coalesceKey: string | null; readonly urgency: Urgency },
 ): EditGesture {
+  const names = Object.keys(patch);
+  const [only] = names;
   return {
     coalesceKey: options.coalesceKey,
     urgency: options.urgency,
+    stream: names.length === 1 && only !== undefined ? `attribute:${nodeId}:${only}` : null,
     request: (refOf) => {
       const target = refOf(nodeId);
       if (target === undefined) {
         return undefined;
       }
-      const edits: StreamedEdit[] = [];
+      const edits: Edit[] = [];
       for (const [name, value] of Object.entries(patch)) {
         const edit = attributeEdit(target, name, value);
         if (edit === undefined) {
           return undefined; // All or nothing: one gesture, one way to disk.
         }
-        edits.push({ edit, stream: `attribute:${target.path.join('.')}:${name}` });
+        edits.push(edit);
       }
       return edits;
     },
@@ -161,10 +164,14 @@ export function inlineStyleGesture(
 ): EditGesture {
   const whole = propsGesture(nodeId, { style: { type: 'string', value: styles.after } }, options);
   const change = singleDeclarationChange(styles.before, styles.after);
+  const single = change !== undefined && !/["']/.test(styles.after);
   return {
     ...whole,
+    // One declaration is its own stream: coalescing it with another property's
+    // edit would lose that one on disk.
+    stream: single ? `style:${nodeId}:${change.property}` : whole.stream,
     request: (refOf) => {
-      if (change === undefined || /["']/.test(styles.after)) {
+      if (!single) {
         return whole.request(refOf);
       }
       const target = refOf(nodeId);
@@ -172,8 +179,7 @@ export function inlineStyleGesture(
         return undefined;
       }
       const { property, declaration } = change;
-      const edit: Edit = { tag: 'set-inline-style', target, property, declaration };
-      return [{ edit, stream: `style:${target.path.join('.')}:${property}` }];
+      return [{ tag: 'set-inline-style', target, property, declaration }];
     },
   };
 }
@@ -191,8 +197,8 @@ type Placement = 'before' | 'after' | 'first-child' | 'last-child';
 
 /** Insert one new node. The request places it beside the node now at that
  * position (before it, or after the last one), or inside an empty parent;
- * main prints it at its indentation. An empty page has nothing to stand
- * beside, so that insertion saves the whole model. */
+ * main prints it at its indentation. On a page whose body is empty there is
+ * nothing to stand beside: it is the body's first node (`append-body`). */
 export function insertGesture(
   model: EditorModel,
   node: EditorNode,
@@ -203,7 +209,11 @@ export function insertGesture(
   return {
     coalesceKey: null,
     urgency: options.urgency,
+    stream: null,
     request: (refOf) => {
+      if (beside === undefined && model.nodes.every(blank)) {
+        return [{ tag: 'append-body', nodes: [node] }];
+      }
       const target = beside === undefined ? undefined : refOf(beside.anchorId);
       if (beside === undefined || target === undefined) {
         return undefined;
@@ -214,7 +224,7 @@ export function insertGesture(
         placement: beside.placement,
         content: { tag: 'nodes', nodes: [node] },
       };
-      return [{ edit, stream: null }];
+      return [edit];
     },
     apply: (current) => withInserted(current, node, place),
   };
@@ -230,13 +240,14 @@ export function duplicateGesture(
   return {
     coalesceKey: null,
     urgency: options.urgency,
+    stream: null,
     request: (refOf) => {
       const target = refOf(nodeId);
       if (target === undefined) {
         return undefined;
       }
       const content = { tag: 'copy' as const, source: target };
-      return [{ edit: { tag: 'insert-node', target, placement: 'after', content }, stream: null }];
+      return [{ tag: 'insert-node', target, placement: 'after', content }];
     },
     apply: (current) => withInsertedAfter(current, nodeId, clone),
   };
@@ -252,14 +263,15 @@ export function removalGesture(
   return {
     coalesceKey: null,
     urgency: options.urgency,
+    stream: null,
     request: (refOf) => {
-      const edits: StreamedEdit[] = [];
+      const edits: Edit[] = [];
       for (const id of nodeIds) {
         const target = refOf(id);
         if (target === undefined) {
           return undefined;
         }
-        edits.push({ edit: { tag: 'remove-node', target }, stream: null });
+        edits.push({ tag: 'remove-node', target });
       }
       return edits;
     },
@@ -469,6 +481,7 @@ export function moveGesture(
   return {
     coalesceKey: null,
     urgency: options.urgency,
+    stream: null,
     request: (refOf) => {
       const target = refOf(nodeId);
       const noteRef = note === undefined ? undefined : refOf(note.id);
@@ -479,13 +492,15 @@ export function moveGesture(
       if (note !== undefined && noteRef === undefined) {
         return undefined;
       }
-      const edits: StreamedEdit[] = [];
+      const edits: Edit[] = [];
       if (dropSlot) {
-        edits.push({ edit: { tag: 'remove-attribute', target, name: 'slot' }, stream: null });
+        edits.push({ tag: 'remove-attribute', target, name: 'slot' });
       }
-      const move = (ref: NodeRef): StreamedEdit => ({
-        edit: { tag: 'move-node', target: ref, destination, placement: beside.placement },
-        stream: null,
+      const move = (ref: NodeRef): Edit => ({
+        tag: 'move-node',
+        target: ref,
+        destination,
+        placement: beside.placement,
       });
       // Before a node, the note goes first and the node after it; after a node
       // or into a parent, the node goes first and the note lands in front of it.
@@ -606,10 +621,11 @@ export function frontmatterGesture(
   return {
     coalesceKey: options.coalesceKey,
     urgency: options.urgency,
+    stream: 'frontmatter',
     request: () => {
       // The block alone: main prints it from a model without nodes.
       const edit: Edit = { tag: 'set-frontmatter', model: { ...after, nodes: [] } };
-      return [{ edit, stream: 'frontmatter' }];
+      return [edit];
     },
     apply: change,
   };
@@ -621,6 +637,7 @@ export function sequence(first: EditGesture, second: EditGesture): EditGesture {
   return {
     coalesceKey: first.coalesceKey,
     urgency: first.urgency,
+    stream: null,
     request: (refOf) => {
       const before = first.request(refOf);
       const after = second.request(refOf);
@@ -662,15 +679,13 @@ export function loopRenameGesture(
   return {
     coalesceKey: null,
     urgency: options.urgency,
+    stream: null,
     request: (refOf) => {
       const target = refOf(nodeId);
       if (target === undefined) {
         return undefined;
       }
-      return renames.map(({ from, to }) => ({
-        edit: { tag: 'rename-binding' as const, target, from, to },
-        stream: null,
-      }));
+      return renames.map(({ from, to }): Edit => ({ tag: 'rename-binding', target, from, to }));
     },
     apply: (current) =>
       withNode(current, nodeId, (loop) => {
@@ -721,13 +736,14 @@ export function nodeGesture(
   return {
     coalesceKey: options.coalesceKey,
     urgency: options.urgency,
+    stream: `node:${nodeId}`,
     request: (refOf) => {
       const target = refOf(nodeId);
       if (target === undefined) {
         return undefined;
       }
       const edit: Edit = { tag: 'replace-node', target, node: next };
-      return [{ edit, stream: `node:${target.path.join('.')}` }];
+      return [edit];
     },
     apply: (model) => withNode(model, nodeId, () => next),
   };
@@ -750,18 +766,18 @@ export function attributeRenameGesture(
   return {
     coalesceKey: null,
     urgency: true,
+    stream: null,
     request: (refOf) => {
       const target = refOf(nodeId);
       if (target === undefined) {
         return undefined;
       }
       const rename: Edit = { tag: 'rename-attribute', target, ...names };
-      const edits: StreamedEdit[] = [{ edit: rename, stream: null }];
       if (!taken) {
-        return edits;
+        return [rename];
       }
       const removal: Edit = { tag: 'remove-attribute', target, name: names.to };
-      return [{ edit: removal, stream: null }, ...edits];
+      return [removal, rename];
     },
     apply: (current) =>
       withNode(current, nodeId, (found) => ({
@@ -792,12 +808,13 @@ export function tagRenameGesture(
   return {
     coalesceKey: null,
     urgency: options.urgency,
+    stream: null,
     request: (refOf) => {
       const target = refOf(nodeId);
       if (target === undefined) {
         return undefined;
       }
-      return [{ edit: { tag: 'rename-tag', target, to: name }, stream: null }];
+      return [{ tag: 'rename-tag', target, to: name }];
     },
     apply: (model) => withNode(model, nodeId, () => next),
   };
@@ -816,13 +833,14 @@ export function wrapGesture(model: EditorModel, wrapper: EditorNode): EditGestur
   return {
     coalesceKey: null,
     urgency: true,
+    stream: null,
     request: (refOf) => {
       const target = first === undefined ? undefined : refOf(first.id);
       const end = last === undefined ? undefined : refOf(last.id);
       if (target === undefined || end === undefined) {
         return undefined;
       }
-      return [{ edit: { tag: 'wrap-nodes', target, last: end, name }, stream: null }];
+      return [{ tag: 'wrap-nodes', target, last: end, name }];
     },
     apply: (current) => ({ ...current, nodes: [withChildren(wrapper, current.nodes)] }),
   };
@@ -833,12 +851,13 @@ export function unwrapGesture(nodeId: string): EditGesture {
   return {
     coalesceKey: null,
     urgency: true,
+    stream: null,
     request: (refOf) => {
       const target = refOf(nodeId);
       if (target === undefined) {
         return undefined;
       }
-      return [{ edit: { tag: 'unwrap-node', target }, stream: null }];
+      return [{ tag: 'unwrap-node', target }];
     },
     apply: (model) => {
       const nodes = unwrappedIn(model.nodes, nodeId, 0);
@@ -870,5 +889,5 @@ export function markdownGesture(
   apply: (model: EditorModel) => EditorModel,
   options: { readonly coalesceKey: string | null; readonly urgency: Urgency },
 ): EditGesture {
-  return { ...options, request: () => undefined, apply };
+  return { ...options, stream: null, request: () => undefined, apply };
 }

@@ -51,6 +51,7 @@ const GOOD: readonly (readonly [object, object])[] = [
   [element, { tag: 'rename-attribute', from: 'title', to: 'aria-label' }],
   [element, { tag: 'rewrite-node', hunks: [{ span: { start: 21, end: 24 }, text: 'x' }] }],
   [element, { tag: 'wrap-nodes', last: { ...element, path: [0, 3] }, open: '<A>', close: '</A>' }],
+  [documentAnchor, { tag: 'append-body', source: '<main></main>' }],
 ];
 
 test('one known-good intent per operation parses to itself', () => {
@@ -60,7 +61,7 @@ test('one known-good intent per operation parses to itself', () => {
     assert.deepEqual(parsed.anchor, anchor);
   }
   const tags = new Set(GOOD.map(([, operation]): unknown => Reflect.get(operation, 'tag')));
-  assert.equal(tags.size, 13, 'every operation in the closed union is covered');
+  assert.equal(tags.size, 14, 'every operation in the closed union is covered');
 });
 
 test('malformed intents fail at the field that is wrong', () => {

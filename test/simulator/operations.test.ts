@@ -444,6 +444,20 @@ test('wrap-nodes puts a run of siblings in a new tag and keeps every byte of the
   );
 });
 
+test('append-body gives an empty body its first node, and only an empty one', () => {
+  const documentAnchor = (page: Snapshot) =>
+    toAnchorRef({ span: toByteSpan(0, page.bytes.length), path: [], expectedKind: 'document' });
+  const append: Operation = { tag: 'append-body', source: '<main></main>' };
+  const empty = snapshotText('---\nconst a = 1;\n---\n');
+  assert.equal(run(empty, append, documentAnchor(empty)), '---\nconst a = 1;\n---\n<main></main>\n');
+  const bare = snapshotText('');
+  assert.equal(run(bare, append, documentAnchor(bare)), '<main></main>\n');
+  const crlf = snapshotText('---\r\n---');
+  assert.equal(run(crlf, append, documentAnchor(crlf)), '---\r\n---\r\n<main></main>\r\n');
+  const full = snapshotText('<p>x</p>\n');
+  assert.equal(run(full, append, documentAnchor(full)), 'rejected: anchor-moved', 'not empty');
+});
+
 // --- (3) The corpus sweep ------------------------------------------------------------
 
 function corpusFiles(): readonly { readonly name: string; readonly text: string }[] {

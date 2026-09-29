@@ -125,6 +125,19 @@ export function buildEditIntent(
       );
     case 'unwrap-node':
       return withAnchor(authored, edit.target, (anchor) => unwrapDraft(authored, anchor));
+    case 'append-body': {
+      // The body's first nodes, printed as a new node is; the planner refuses
+      // them once the body has any node (they must stand beside it then).
+      const source = serializeNodes(edit.nodes).replace(/\r?\n$/, '');
+      const eol = authored.text.includes('\r\n') ? '\r\n' : '\n';
+      const anchor = toAnchorRef({
+        span: toByteSpan(0, authored.snapshot.bytes.length),
+        path: [],
+        expectedKind: 'document',
+      });
+      const lines = source.split(/\r?\n/).join(eol);
+      return ok({ anchor, operation: { tag: 'append-body', source: lines } });
+    }
     case 'set-frontmatter':
       return frontmatterDraft(authored, edit.model);
     default: {

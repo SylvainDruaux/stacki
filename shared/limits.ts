@@ -26,9 +26,6 @@ export const LIMITS = {
   propOptionsMax: 256,
   /** Import declarations in one frontmatter block. */
   importsMax: 256,
-  /** Cap on the page saver's drain (src/pagePersistence.ts): each pass needs a
-   * strictly newer request; a live cap hit means a bug. */
-  saveDrainMax: 256,
   /** Length of one IPC payload string field. */
   ipcFieldCharsMax: 10_000_000,
   /** TextMate highlighting is synchronous CPU work after grammar startup. */

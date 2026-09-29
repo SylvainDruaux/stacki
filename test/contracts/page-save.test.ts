@@ -108,9 +108,17 @@ test('page read and write replies parse only with a valid checksum', () => {
     () => parsePageDiskRead({ ...page, checksum: 'c'.repeat(63) }),
     /PageDiskRead\.checksum: Digest/,
   );
-  const written = parsePageWriteResult({ ok: true, ...page, checksum });
+  // A whole save's reply carries the inverse Undo submits (step 9).
+  const written = parsePageWriteResult({ ok: true, ...page, checksum, inverse: [] });
   assert.equal(written.ok && written.value.checksum, checksum);
-  assert.throws(() => parsePageWriteResult({ ok: true, ...page }), /PageDiskRead\.checksum/);
+  assert.throws(
+    () => parsePageWriteResult({ ok: true, ...page, inverse: [] }),
+    /PageDiskRead\.checksum/,
+  );
+  assert.throws(
+    () => parsePageWriteResult({ ok: true, ...page, checksum }),
+    /PageEdited\.inverse: expected array/,
+  );
   assert.throws(() => parsePageWriteResult(null), /PageWriteResult: expected object/);
   assert.throws(() => parsePageWriteResult({ ok: 'yes' }), /PageWriteResult\.ok/);
 });
@@ -158,19 +166,24 @@ test('a read reports the checksum of the exact bytes on disk', async (context) =
 test('an outside edit between read and write is refused and left on disk', async (context) => {
   const harness = fixture();
   context.after(harness.dispose);
-  const file = path.join(harness.root, 'src/pages/index.astro');
-  fs.writeFileSync(file, '<h1>Before</h1>\n');
-  const read = parsePageDiskRead(await harness.invoke('page:read', file));
-  assert.ok(read.editable);
-  fs.writeFileSync(file, '<h1>Outside</h1>\n');
-  const payload = { pagePath: file, model: read.model, baseChecksum: read.checksum };
+  // The whole save is a Markdown page's until step 10; its guard is the step-0 one.
+  const notes = path.join(harness.root, 'src/pages/notes.md');
+  fs.writeFileSync(notes, '# Before\n');
+  const before = parsePageDiskRead(await harness.invoke('page:read', notes));
+  assert.ok(before.editable);
+  fs.writeFileSync(notes, '# Outside\n');
+  const payload = { pagePath: notes, model: before.model, baseChecksum: before.checksum };
   const result = parsePageWriteResult(await harness.invoke('page:write', payload));
   assert.equal(!result.ok && result.error.code, 'conflict');
   assert.equal(
     !result.ok && result.error.code === 'conflict' && result.error.diskChecksum,
-    sha256('<h1>Outside</h1>\n'),
+    sha256('# Outside\n'),
   );
-  assert.equal(fs.readFileSync(file, 'utf8'), '<h1>Outside</h1>\n', 'page:write left disk alone');
+  assert.equal(fs.readFileSync(notes, 'utf8'), '# Outside\n', 'page:write left disk alone');
+  const file = path.join(harness.root, 'src/pages/index.astro');
+  fs.writeFileSync(file, '<h1>Before</h1>\n');
+  const read = parsePageDiskRead(await harness.invoke('page:read', file));
+  fs.writeFileSync(file, '<h1>Outside</h1>\n');
   // The code editor's save of the same word overlaps the outside edit.
   const code = await saveCode(harness, file, read, '<h1>Mine</h1>\n');
   assert.equal(!code.ok && code.error.code === 'rejected' && code.error.reason, 'merge-conflict');
@@ -207,8 +220,8 @@ test('a write against current bytes lands atomically with its checksum', async (
 test('a page deleted since it was read is missing, not a conflict', async (context) => {
   const harness = fixture();
   context.after(harness.dispose);
-  const file = path.join(harness.root, 'src/pages/gone.astro');
-  fs.writeFileSync(file, '<p/>\n');
+  const file = path.join(harness.root, 'src/pages/gone.md');
+  fs.writeFileSync(file, 'Gone.\n');
   const read = parsePageDiskRead(await harness.invoke('page:read', file));
   fs.rmSync(file);
   const result = parsePageWriteResult(
@@ -219,7 +232,7 @@ test('a page deleted since it was read is missing, not a conflict', async (conte
     }),
   );
   assert.equal(!result.ok && result.error.code, 'missing');
-  const code = await saveCode(harness, file, read, '<p>x</p>\n');
+  const code = await saveCode(harness, file, read, 'Still here.\n');
   assert.equal(code.ok, false, 'a code save does not recreate the file either');
   assert.equal(fs.existsSync(file), false, 'a refused write does not recreate the file');
 });
@@ -247,9 +260,15 @@ test('opening and saving every round-trip fixture reproduces its bytes', async (
         baseChecksum: read.checksum,
       }),
     );
-    assert.equal(written.ok, true, name);
+    if (name.endsWith('.astro')) {
+      // Step 9: an .astro page is edited as splices and never saved whole.
+      assert.equal(!written.ok && written.error.code, 'filesystem', `${name} is not saved whole`);
+    } else {
+      assert.equal(written.ok, true, name);
+      assert.equal(written.ok && written.value.checksum, sha256(original));
+      assert.deepEqual(written.ok && written.value.inverse, [], `${name}: nothing to undo`);
+    }
     assert.ok(fs.readFileSync(file).equals(original), `${name} round-trips byte for byte`);
-    assert.equal(written.ok && written.value.checksum, sha256(original));
   }
 });
 

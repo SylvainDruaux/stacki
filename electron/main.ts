@@ -48,8 +48,7 @@ import { decodeUtf8 } from '../shared/span.js';
 import type { Digest } from '../shared/brand.js';
 import { LIMITS } from '../shared/limits.js';
 import { err, ok, type Result } from '../shared/result.js';
-import type { ParserNode, ParserPageModel, SchemaField } from './astroParser.types.js';
-import { parseSerializePage } from './astroParser.validation.js';
+import type { ParserPageModel, SchemaField } from './astroParser.types.js';
 import { parseMarkdownModel } from './main.validation.js';
 import {
   parseData,
@@ -101,8 +100,6 @@ const {
   parsePage,
   locateSelection,
   serializePage,
-  parseTemplate,
-  serializeNodes,
   resolveChunks,
   parsePropSchema,
   parseExtendsTag,
@@ -2991,53 +2988,11 @@ ipcMain.handle('cms:delete', async (_e, { projectPath, rel }) => {
 
 // ---------------------------------------------------------------------------
 // HTML chunks — resolution lives in astroParser so the dev server's marker
-// config can reuse it (see writeMarkerConfig).
+// config can reuse it (see writeMarkerConfig). The page editor shows a
+// chunk's markup in the navigator and never writes it: no page save is a whole
+// model any more (step 9), and a chunk file has no node intents of its own
+// yet — its content is edited in code (src/nodeCapability.ts).
 // ---------------------------------------------------------------------------
-
-// Writes any edited chunk subtrees back to their .html files. Compares
-// normalized (reparsed) forms so untouched chunks aren't rewritten just for
-// formatting differences. Chunk nesting follows the page tree, which the
-// wire parser already bounded, so the walk visits at most treeNodesMax nodes.
-function writeChunks(model: ParserPageModel): Result<void, WirePageWriteError> {
-  const pending: ParserNode[] = [...model.nodes];
-  for (let visited = 0; visited < pending.length; visited++) {
-    assert(visited < LIMITS.treeNodesMax, 'Chunk walk stays within the page tree bound');
-    const node = pending[visited];
-    assert(node !== undefined, 'Chunk walk index is within the pending list');
-    if (!Array.isArray(node.children)) {
-      continue;
-    }
-    if (node.chunkFile) {
-      const written = writeChunk(node.chunkFile, serializeNodes(node.children));
-      if (!written.ok) {
-        return written;
-      }
-    }
-    pending.push(...node.children);
-  }
-  return ok(undefined);
-}
-
-// Each chunk file is a document with its own actor (plan §3.3). The renderer
-// names no base for a chunk, so the witness is the chunk as read here: the
-// actor refuses to write over bytes that change between that read and its
-// write, but a chunk edited outside Stacki since the page was opened is still
-// replaced, as before step 5 (tracker, step 5: left open).
-function writeChunk(chunkFile: string, next: string): Result<void, WirePageWriteError> {
-  let unchanged = false;
-  try {
-    const parsed = parseTemplate(readSource(chunkFile));
-    unchanged = parsed.clean && serializeNodes(parsed.nodes) === next;
-  } catch {
-    /* file missing — the actor creates it */
-  }
-  if (unchanged) {
-    return ok(undefined);
-  }
-  noteAppWrite();
-  const report = documents.writeCurrent(chunkFile, next);
-  return report.tag === 'applied' ? ok(undefined) : err(pageWriteError(chunkFile, report));
-}
 
 // ---------------------------------------------------------------------------
 // Page IPC
@@ -3208,7 +3163,9 @@ function writePageText(
   if (styled) {
     nudgeStyle(pagePath, text, checksum);
   }
-  return { ok: true as const, ...parsePageSource(pagePath, text), checksum };
+  // A write reconciled after an uncertain rename has no commit to invert.
+  const inverse = report.tag === 'applied' ? report.inverse : [];
+  return { ok: true as const, ...parsePageSource(pagePath, text), checksum, inverse };
 }
 
 function nudgeStyle(pagePath: string, text: string, checksum: Digest): void {
@@ -3242,21 +3199,20 @@ function appliedChecksum(report: WriteReport): Digest | undefined {
   return undefined;
 }
 
+// A Markdown or MDX page's whole save (plan §6): these pages join the engine at
+// step 10, and until then their model is printed whole and written through the
+// page's actor. An .astro page never saves whole (step 9): every edit of it is
+// splices (`page:edit`), and a model sent here for one is refused unwritten.
 ipcMain.handle('page:write', async (_e, { pagePath, model, baseChecksum }) => {
-  // Serialize first: a malformed model throws before anything reads or writes.
-  const markdown = isMarkdownPage(pagePath);
-  const serialized = markdown
-    ? serializeMarkdownPage(parseMarkdownModel(model))
-    : serializePage(model);
+  if (!isMarkdownPage(pagePath)) {
+    const message = `${path.basename(pagePath)} is saved as edits, never as a whole model.`;
+    return { ok: false as const, error: { code: 'filesystem' as const, message } };
+  }
+  // Print first: a malformed model throws before anything reads or writes.
+  const serialized = serializeMarkdownPage(parseMarkdownModel(model));
   const base = checkPageBase(pagePath, baseChecksum);
   if (!base.ok) {
     return { ok: false as const, error: base.error };
-  }
-  if (!markdown) {
-    const chunks = writeChunks(parseSerializePage(model));
-    if (!chunks.ok) {
-      return { ok: false as const, error: chunks.error };
-    }
   }
   const text = base.value.bom ? withByteOrderMark(serialized) : serialized;
   return writePageText(pagePath, text, baseChecksum);
@@ -3272,7 +3228,8 @@ ipcMain.handle('page:write', async (_e, { pagePath, model, baseChecksum }) => {
 // does not parse — before or after.
 ipcMain.handle('page:edit', async (_e, { pagePath, authoredChecksum, edit }) => {
   const code = edit.tag === 'code-patch';
-  if (isMarkdownPage(pagePath) && !code) {
+  // A code patch or an Undo's revert is bytes, not nodes: Markdown takes them.
+  if (isMarkdownPage(pagePath) && !code && edit.tag !== 'revert') {
     const reason = 'unsupported-operation' as const; // Markdown gestures join at step 10.
     const message = describeRejection(reason);
     const error = { code: 'rejected' as const, reason, message, diskChecksum: null };

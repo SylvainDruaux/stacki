@@ -12,9 +12,13 @@ that boundary check succeeds.
 `parsePageNode`, `parsePageTree`, `parsePageModel`, and `parsePageReadResult`
 enforce these invariants:
 
-- Node ids are unique within a tree. Parser ids use `n<N>` for Astro and
-  `m<N>` for Markdown; editor-created ids use `c<N>`. `layout` and `chunk<N>`
-  are the only named ids.
+- Node ids are unique within a tree, and nothing keys on them across
+  snapshots (plan §4). The Astro parser's ids are structural paths — `n0`,
+  `n0.2.1` — assigned once a tree is complete, so a parse is a pure function
+  of its text; Markdown's are `m<N>` until step 10. `layout` names the layout
+  wrapper. The renderer carries its own handles from one parse to the next by
+  span mapping (`src/nodeHandles.ts`): `s<16 hex>.<path>` for a node first
+  seen in that snapshot, `g<32 hex>` for a node a gesture created.
 - `text`, `expr`, `raw-line`, `comment`, and `raw` nodes are leaves.
   Components and elements may use `children: null` only when self-closing.
   Branches, loops, conditions, and chunk groups always carry child arrays.

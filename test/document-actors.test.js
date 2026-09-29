@@ -72,7 +72,12 @@ test('a replace applies, returns the new checksum, and the actor holds it', () =
       '<h1 title="New">Hi</h1>\n',
       sha256(fs.readFileSync(file)),
     );
-    assert.deepEqual(report, { tag: 'applied', checksum: sha256('<h1 title="New">Hi</h1>\n') });
+    // The inverse is the replacement's changed region only (minimal splices).
+    assert.deepEqual(report, {
+      tag: 'applied',
+      checksum: sha256('<h1 title="New">Hi</h1>\n'),
+      inverse: [{ span: { start: 11, end: 14 }, text: 'Old' }],
+    });
     assert.equal(fs.readFileSync(file, 'utf8'), '<h1 title="New">Hi</h1>\n');
     const current = documents.current(file);
     assert.equal(current.ok, true);
@@ -168,6 +173,7 @@ test('a missing file: replace-source refuses, writeCurrent and create make it', 
     assert.deepEqual(documents.writeCurrent(file, '<p/>'), {
       tag: 'applied',
       checksum: sha256('<p/>'),
+      inverse: [], // A created file has no bytes to go back to.
     });
     assert.equal(documents.writeCurrent(file, '<div/>').tag, 'applied', 'then it is replaced');
     const created = documents.create(file, '<b/>');

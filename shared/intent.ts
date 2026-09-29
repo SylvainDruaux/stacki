@@ -48,7 +48,8 @@ export type StyleDeclaration =
  * set, a branch added). None of them ever writes outside its node. And
  * `wrap-nodes`, a run of siblings put inside a new tag (a layout picked for a
  * page without one): its opening before the first, its closing after the
- * last, every byte of the run kept. */
+ * last, every byte of the run kept. And `append-body`: the first node of a
+ * page whose body is empty, which has no node to stand beside. */
 export type Operation =
   | { readonly tag: 'set-attribute'; readonly name: string; readonly value: AttributeValue }
   | { readonly tag: 'remove-attribute'; readonly name: string }
@@ -72,6 +73,7 @@ export type Operation =
   | { readonly tag: 'rename-tag'; readonly from: string; readonly to: string }
   | { readonly tag: 'rename-attribute'; readonly from: string; readonly to: string }
   | { readonly tag: 'rewrite-node'; readonly hunks: readonly SourceEdit[] }
+  | { readonly tag: 'append-body'; readonly source: string }
   | {
       readonly tag: 'wrap-nodes';
       readonly last: AnchorRef;
@@ -185,6 +187,7 @@ function operationTexts(operation: Operation): readonly string[] {
     case 'remove-attribute':
       return [operation.name];
     case 'insert-node':
+    case 'append-body':
       return [operation.source];
     case 'remove-node':
     case 'move-node':
@@ -278,6 +281,7 @@ function checkOperationAnchor(operation: Operation, anchor: AnchorRef): void {
       requireSites(operation.tag, anchor.span, [operation.slot]);
       return;
     case 'replace-source':
+    case 'append-body':
       requireKind(operation.tag, kind === 'document');
       return;
     default: {
@@ -400,6 +404,8 @@ function parseOperation(input: unknown): Operation {
         from: tagName(record['from'], 'Operation.from'),
         to: tagName(record['to'], 'Operation.to'),
       };
+    case 'append-body':
+      return { tag, source: payloadText(record['source'], 'Operation.source') };
     case 'wrap-nodes':
       return {
         tag,

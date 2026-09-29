@@ -72,9 +72,23 @@ test('malformed writes fail before altering disk; valid writes still work', asyn
     /Expected string/,
   );
   const baseChecksum = createHash('sha256').update('<h1>Before</h1>\n').digest('hex');
-  await assert.rejects(
-    harness.invoke('page:write', { pagePath: file, model: { nodes: false }, baseChecksum }),
+  // An .astro page is never saved whole (step 9): refused, typed, unwritten.
+  const whole = toRecord(
+    await harness.invoke('page:write', { pagePath: file, model: { nodes: [] }, baseChecksum }),
   );
+  assert.equal(whole?.['ok'], false, 'an .astro page takes edits, not a model');
+  // A Markdown page still saves whole until step 10; a malformed model throws.
+  const notes = path.join(harness.root, 'src/pages/notes.md');
+  fs.writeFileSync(notes, '# Notes\n');
+  const notesChecksum = createHash('sha256').update('# Notes\n').digest('hex');
+  await assert.rejects(
+    harness.invoke('page:write', {
+      pagePath: notes,
+      model: { nodes: false },
+      baseChecksum: notesChecksum,
+    }),
+  );
+  assert.equal(fs.readFileSync(notes, 'utf8'), '# Notes\n');
   const patch = {
     tag: 'code-patch',
     hunks: [{ span: { start: 4, end: 10 }, expected: 'Before', text: 'After' }],

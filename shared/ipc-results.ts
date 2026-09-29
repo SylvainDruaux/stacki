@@ -31,8 +31,16 @@ export type WirePageWriteError =
   | { readonly code: 'uncertain'; readonly message: string }
   | { readonly code: 'backpressured'; readonly message: string };
 
+/** A Markdown or MDX page's whole save (plan §6, until step 10): the page as
+ * written, and the inverse of what the write changed — Undo (step 9). */
 export type WirePageWrite =
-  | ({ readonly ok: true } & WirePageDiskRead)
+  | ({
+      readonly ok: true;
+      readonly inverse: ReadonlyArray<{
+        readonly span: { readonly start: number; readonly end: number };
+        readonly text: string;
+      }>;
+    } & WirePageDiskRead)
   | { readonly ok: false; readonly error: WirePageWriteError };
 
 /** Why a visual edit did not apply (step 6). `rejected` carries the actor's

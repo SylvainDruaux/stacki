@@ -62,7 +62,7 @@ test('every kind round-trips through the parser', () => {
         { kind: 'branch', id: 'n14', name: 'else', children: [{ kind: 'text', id: 'n15', value: 'bye' }] },
       ],
     },
-    { kind: 'chunk-group', id: 'chunk0', name: 'Card', chunkFile: '/chunks/card.astro', children: [] },
+    { kind: 'chunk-group', id: 'n5', name: 'Card', chunkFile: '/chunks/card.astro', children: [] },
   ];
   for (const node of good) {
     assert.doesNotThrow(() => parsePageNode(node));

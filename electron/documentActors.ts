@@ -61,7 +61,10 @@ import { createDocumentTelemetry, type DocumentTelemetry } from './documentTelem
 
 /** What one write came to, for the IPC layer to report. */
 export type WriteReport =
-  | { readonly tag: 'applied'; readonly checksum: Digest }
+  /** `inverse` restores what the write replaced, in the bytes it left (Undo of
+   * a Markdown page's whole save, step 9): the replacement's changed region
+   * only. Empty for a file the write created. */
+  | { readonly tag: 'applied'; readonly checksum: Digest; readonly inverse: readonly SourceEdit[] }
   | {
       readonly tag: 'rejected';
       readonly reason: RejectionReason;
@@ -285,7 +288,7 @@ export class DocumentActors {
         inverse: inverseEdits(commit.plan.splices),
       };
     }
-    const report = this.#report(entry.value, intent, settled.outcome, settled.message);
+    const report = this.#report(entry.value, intent, settled);
     assert(report.tag !== 'applied', 'Only an applied outcome is reported as applied');
     return report;
   }
@@ -500,7 +503,7 @@ export class DocumentActors {
     const outcomes = this.#settle(entry);
     const outcome = outcomes.get(intent.id);
     assert(outcome !== undefined, 'A settled actor reported the intent it accepted');
-    return this.#report(entry, intent, outcome.outcome, outcome.message);
+    return this.#report(entry, intent, outcome);
   }
 
   // The intent an edit becomes against the bytes on disk now, and the
@@ -653,11 +656,19 @@ export class DocumentActors {
     }
   }
 
-  #report(entry: Entry, intent: Intent, outcome: Outcome, message: string): WriteReport {
+  #report(entry: Entry, intent: Intent, settled: Settled): WriteReport {
+    const { outcome, message } = settled;
     switch (outcome.tag) {
-      case 'applied':
+      case 'applied': {
         assert(entry.state.snapshot?.checksum === outcome.checksum, 'The commit is the snapshot');
-        return { tag: 'applied', checksum: outcome.checksum };
+        const commit = settled.committed;
+        assert(commit !== undefined, 'An applied intent was committed');
+        // A replacement of bytes with the same bytes changes nothing: no hunk.
+        const changed = minimalSplices(commit.plan.splices).filter(
+          (splice) => splice.range.start < splice.range.end || splice.replacementBytes.length > 0,
+        );
+        return { tag: 'applied', checksum: outcome.checksum, inverse: inverseEdits(changed) };
+      }
       case 'rejected': {
         const disk = this.#current(entry);
         const diskChecksum = disk.ok ? disk.value : undefined;
@@ -722,7 +733,7 @@ export class DocumentActors {
       };
     }
     entry.written = checksum;
-    return { tag: 'applied', checksum };
+    return { tag: 'applied', checksum, inverse: [] };
   }
 
   #entry(file: string): Result<Entry, string> {

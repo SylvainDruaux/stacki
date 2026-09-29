@@ -1,11 +1,12 @@
-// Goal: the renderer's half of step 6 — the edit-request queue that succeeds
-// createPageSaver's whole-model writes (src/pageEdits.ts) and the gesture
-// adapter (src/editGestures.ts) — keeps plan §7's rules: requests coalesce
-// within one stream of one undo step while unsent; a gesture without an intent
-// form turns the queue into whole-model saves until the page is clean; a
-// refusal never loses input and names its reason; a transient failure sends
-// the same requests again, a write that may have landed never does; and every
-// applied request leaves its undo step the inverse that restores the file.
+// Goal: the renderer's edit queue (src/pageEdits.ts) and gestures
+// (src/editGestures.ts) keep plan §7's rules as step 9 left them: gestures
+// coalesce within one stream of one undo step while unsent; typing drops the
+// gestures its text does not hold; the queue is bounded, and a gesture past it
+// is refused, never queued; a gesture is stated when it is sent, and one that
+// cannot be stated is refused — nothing is ever saved as a whole model; a
+// transient failure sends it again, a write that may have landed never blind;
+// and every applied write leaves its undo step the inverse that restores the
+// file (several steps in one write: the newest, the rest folded).
 // Method: the real modules, bundled with esbuild, driven directly; the send
 // function is a fake for the outcome table, then main's real handlers in the
 // windowless harness for the end-to-end run, undo included, on a temporary
@@ -36,65 +37,66 @@ const gestures = require(path.join(buildDir, 'editGestures.js'));
 const sum = (digit) => String(digit).repeat(64);
 const REF = { path: [0], kind: 'element', span: { start: 0, end: 4 } };
 const record = () => ({ outcome: { tag: 'applied', applied: [] } });
-const draft = (stream, owner = record(), origin = sum(1)) => ({
-  edit: { tag: 'remove-node', target: REF },
+// A gesture of one stream: its request removes the node REF names.
+const gesture = (stream, refOk = true) => ({
+  coalesceKey: null,
+  urgency: false,
   stream,
-  record: owner,
-  authoredChecksum: origin,
+  request: () => (refOk ? [{ tag: 'remove-node', target: REF }] : undefined),
+  apply: (model) => model,
 });
 
 test('the queue coalesces one stream of one undo step, and nothing else', () => {
   const store = new edits.EditDrafts();
   const step = record();
-  assert.equal(store.record('/p', draft('title', step)), true);
-  assert.equal(store.record('/p', draft('title', step)), true);
-  assert.equal(store.queue('/p').pending.length, 1, 'the newer value replaced the older');
+  assert.equal(store.addGesture('/p', gesture('title'), step), 'queued');
+  assert.equal(store.addGesture('/p', gesture('title'), step), 'queued');
+  assert.equal(store.entries('/p').length, 1, 'the newer value replaced the older');
   assert.deepEqual(step.outcome, { tag: 'pending', waiting: 1, applied: [] });
-  store.record('/p', draft('title', record()));
-  store.record('/p', draft(null, step));
-  store.record('/p', draft(null, step));
-  assert.equal(
-    store.queue('/p').pending.length,
-    4,
-    'another step, and structural requests, stay apart',
-  );
+  store.addGesture('/p', gesture('title'), record());
+  store.addGesture('/p', gesture(null), step);
+  store.addGesture('/p', gesture(null), step);
+  assert.equal(store.entries('/p').length, 4, 'another step, and structural gestures, stay apart');
   assert.deepEqual(step.outcome, { tag: 'pending', waiting: 3, applied: [] });
-  assert.equal(store.take('/p').length, 4);
-  assert.deepEqual(store.take('/p'), [], 'taken requests are gone from the queue');
+  assert.equal(store.entries('/elsewhere').length, 0, 'another page owes nothing here');
+  const first = store.shift('/p');
+  assert.equal(first.tag, 'gesture');
+  assert.equal(store.entries('/p').length, 3, 'a sent entry is gone from the queue');
+  store.unshift('/p', first);
+  assert.equal(store.entries('/p')[0], first, 'one that failed goes back in front');
 });
 
-test('a gesture without an intent form saves whole models until the page is clean', () => {
+test('typing drops the unsent gestures: the text typed into does not hold them', () => {
   const store = new edits.EditDrafts();
   const early = record();
-  store.record('/p', draft('a', early));
-  store.markModel('/p');
-  assert.deepEqual(early.outcome, { tag: 'subsumed' }, 'the queued request is carried whole');
-  const late = record();
-  assert.equal(store.record('/p', draft('b', late)), false);
-  assert.deepEqual(late.outcome, { tag: 'subsumed' });
-  assert.deepEqual(store.take('/p'), []);
-  // A clean page has another origin: requests go out again.
-  assert.equal(store.record('/p', draft('c', record(), sum(2))), true);
-  assert.equal(store.queue('/p').tag, 'edits');
-  assert.equal(store.queue('/elsewhere').tag, 'model', 'another page queues nothing here');
+  store.addGesture('/p', gesture('a'), early);
+  const typing = record();
+  const shown = { save: { tag: 'clean', checksum: sum(1) }, source: 'x', origin: undefined };
+  store.typeCode('/p', shown, typing);
+  assert.deepEqual(early.outcome, { tag: 'dropped' });
+  assert.equal(store.entries('/p').length, 1);
+  assert.equal(store.entries('/p')[0].tag, 'code');
+  // A gesture after typing waits behind the code, stated when it is sent.
+  assert.equal(store.addGesture('/p', gesture('b'), record()), 'queued');
+  assert.deepEqual(store.entries('/p').map((entry) => entry.tag), ['code', 'gesture']);
 });
 
-test('the queue is bounded: past it, the whole model carries the requests', () => {
+test('the queue is bounded: past it, a gesture is refused, never queued', () => {
   const store = new edits.EditDrafts();
   for (let index = 0; index < 64; index++) {
-    assert.equal(store.record('/p', draft(null)), true);
+    assert.equal(store.addGesture('/p', gesture(null), record()), 'queued');
   }
   const over = record();
-  assert.equal(store.record('/p', draft(null, over)), false);
-  assert.equal(store.queue('/p').tag, 'model');
-  assert.deepEqual(over.outcome, { tag: 'subsumed' });
+  assert.equal(store.addGesture('/p', gesture(null), over), 'full');
+  assert.equal(store.entries('/p').length, 64);
+  assert.deepEqual(over.outcome, { tag: 'applied', applied: [] }, 'nothing is owed for it');
 });
 
 test('answers fill the undo step in order; a step is applied when nothing is owed', () => {
   const step = record();
   const store = new edits.EditDrafts();
-  store.record('/p', draft(null, step));
-  store.record('/p', draft(null, step));
+  store.addGesture('/p', gesture(null), step);
+  store.addGesture('/p', gesture(null), step);
   edits.recordApplied(step, { checksum: sum(2), inverse: [] });
   assert.equal(step.outcome.tag, 'pending');
   edits.recordApplied(step, { checksum: sum(3), inverse: [] });
@@ -105,6 +107,15 @@ test('answers fill the undo step in order; a step is applied when nothing is owe
       { checksum: sum(3), inverse: [] },
     ],
   });
+  // One write for several steps (typing, a Markdown page): the newest learns
+  // the inverse, the older ones are folded into it.
+  const older = record();
+  const newer = record();
+  store.markModel('/md', older);
+  store.markModel('/md', newer);
+  edits.recordWrite([older, newer], { checksum: sum(4), inverse: [] });
+  assert.deepEqual(older.outcome, { tag: 'folded' });
+  assert.equal(newer.outcome.tag, 'applied');
 });
 
 const PAGE_OK = (checksum) => ({
@@ -116,56 +127,55 @@ const refusal = (reason, diskChecksum) => ({
   error: { code: 'rejected', reason, message: reason, diskChecksum },
 });
 
-async function sent(answers, count = answers.length) {
-  const store = new edits.EditDrafts();
-  const steps = Array.from({ length: count }, () => record());
-  const drafts = steps.map((step) => draft(null, step));
-  for (const one of drafts) {
-    store.record('/p', one);
-  }
-  const queued = store.take('/p');
+// One gesture of `count` requests, stated against an origin and sent.
+async function sent(answers, count = answers.length, refOk = true) {
+  const step = record();
+  step.outcome = { tag: 'pending', waiting: 1, applied: [] };
   let index = 0;
-  const outcome = await edits.sendDrafts({
+  const many = {
+    ...gesture(null, refOk),
+    request: () =>
+      refOk ? Array.from({ length: count }, () => ({ tag: 'remove-node', target: REF })) : undefined,
+  };
+  const origin = { checksum: sum(1), source: '', model: { imports: [], nodes: [] } };
+  const outcome = await edits.sendGesture({
     path: '/p',
-    drafts: queued,
-    base: sum(1),
-    store,
+    origin,
+    gesture: many,
+    record: step,
     send: async () => answers[index++],
   });
-  return { outcome, store, steps };
+  return { outcome, step, sent: index };
 }
 
-test('a save of requests: every outcome, and what happens to the rest', async () => {
+test('sending a gesture: every outcome, and what the answers mean', async () => {
   const applied = await sent([PAGE_OK(sum(2)), PAGE_OK(sum(3))]);
   assert.equal(applied.outcome.tag, 'applied');
-  assert.equal(applied.outcome.last.checksum, sum(3));
+  assert.deepEqual(applied.outcome.replies.map((reply) => reply.checksum), [sum(2), sum(3)]);
 
-  const fallback = await sent([PAGE_OK(sum(2)), refusal('unsupported-operation', sum(2))]);
-  assert.deepEqual(fallback.outcome, { tag: 'fallback', base: sum(2) });
-  assert.equal(fallback.store.queue('/p').tag, 'model', 'the whole model carries the rest');
-  assert.deepEqual(fallback.steps[1].outcome, { tag: 'subsumed' });
-
-  const unchanged = await sent([refusal('anchor-moved', sum(1))]);
-  assert.deepEqual(unchanged.outcome, { tag: 'fallback', base: sum(1) }, 'nothing moved under it');
+  const unstated = await sent([], 1, false);
+  assert.deepEqual(
+    unstated.outcome,
+    { tag: 'refused', reason: 'unsupported-operation', diskChecksum: sum(1), replies: [] },
+    'a gesture with no request is refused, never saved another way',
+  );
+  assert.equal(unstated.sent, 0);
 
   const refused = await sent([PAGE_OK(sum(2)), refusal('region-externally-modified', sum(9))]);
-  assert.deepEqual(refused.outcome, {
-    tag: 'refused',
-    reason: 'region-externally-modified',
-    diskChecksum: sum(9),
-    advanced: sum(2),
-  });
+  assert.equal(refused.outcome.tag, 'refused');
+  assert.equal(refused.outcome.reason, 'region-externally-modified');
+  assert.equal(refused.outcome.diskChecksum, sum(9));
+  assert.equal(refused.outcome.replies.length, 1, 'the one that applied is reported');
 
   const busy = await sent([{ ok: false, error: { code: 'backpressured', message: 'busy' } }], 2);
-  assert.deepEqual(busy.outcome, { tag: 'failed', message: 'busy', advanced: undefined });
-  assert.equal(busy.store.queue('/p').pending.length, 2, 'never accepted: sent again later');
+  assert.deepEqual(busy.outcome, { tag: 'retry', message: 'busy' }, 'never accepted: sent again');
 
   const maybe = await sent([
     PAGE_OK(sum(2)),
     { ok: false, error: { code: 'uncertain', message: '?' } },
   ]);
-  assert.deepEqual(maybe.outcome, { tag: 'failed', message: '?', advanced: sum(2) });
-  assert.equal(maybe.store.queue('/p').tag, 'model', 'may have landed: never sent twice');
+  assert.equal(maybe.outcome.tag, 'uncertain', 'may have landed: never sent twice blind');
+  assert.equal(maybe.outcome.replies.length, 1);
 });
 
 test('nodeRefIn names nodes of the origin by path, kind and range, and nothing else', () => {
@@ -192,7 +202,7 @@ test('nodeRefIn names nodes of the origin by path, kind and range, and nothing e
       { id: 'e', kind: 'element', name: 'p', children: [] },
     ],
   };
-  const origin = { checksum: sum(1), model };
+  const origin = { checksum: sum(1), source: '', model };
   assert.deepEqual(edits.nodeRefIn(origin, 'b'), {
     path: [0, 0],
     kind: 'text',
@@ -211,17 +221,16 @@ test('propsGesture: values of every type but a spread are requests; the effect c
     { coalesceKey: 'k', urgency: false },
   );
   assert.deepEqual(set.request(refOf), [
-    {
-      edit: {
-        tag: 'set-attribute',
-        target: REF,
-        name: 'title',
-        value: { type: 'string', value: 'T' },
-      },
-      stream: 'attribute:0:title',
-    },
-    { edit: { tag: 'remove-attribute', target: REF, name: 'alt' }, stream: 'attribute:0:alt' },
+    { tag: 'set-attribute', target: REF, name: 'title', value: { type: 'string', value: 'T' } },
+    { tag: 'remove-attribute', target: REF, name: 'alt' },
   ]);
+  assert.equal(set.stream, null, 'two fields are no one stream');
+  const one = { coalesceKey: null, urgency: true };
+  assert.equal(
+    gestures.propsGesture('a', { title: undefined }, one).stream,
+    'attribute:a:title',
+    'one field of one node, by its handle',
+  );
   assert.equal(
     gestures
       .propsGesture('b', { title: undefined }, { coalesceKey: null, urgency: true })
@@ -232,11 +241,11 @@ test('propsGesture: values of every type but a spread are requests; the effect c
   const expr = gestures
     .propsGesture('a', { n: { type: 'expr', value: 'x' } }, options)
     .request(refOf);
-  assert.deepEqual(expr?.[0]?.edit.value, { type: 'expr', value: 'x' }, 'the prop step');
+  assert.deepEqual(expr?.[0]?.value, { type: 'expr', value: 'x' }, 'the prop step');
   const bare = gestures.propsGesture('a', { hidden: { type: 'bare' } }, options).request(refOf);
-  assert.deepEqual(bare?.[0]?.edit.value, { type: 'bare' });
+  assert.deepEqual(bare?.[0]?.value, { type: 'bare' });
   const spread = gestures.propsGesture('a', { rest: { type: 'spread', value: 'rest' } }, options);
-  assert.equal(spread.request(refOf), undefined, 'a spread is code: the whole model carries it');
+  assert.equal(spread.request(refOf), undefined, 'a spread is code: it cannot be stated');
   const node = {
     id: 'a',
     kind: 'element',
@@ -276,7 +285,7 @@ test('requests reach the page as splices; the undo step restores every byte', as
   fs.writeFileSync(file, text);
   const read = parsePageDiskRead(await harness.invoke('page:read', file));
   assert.ok(read.editable);
-  const origin = { checksum: read.checksum, model: read.model };
+  const origin = { checksum: read.checksum, source: read.source, model: read.model };
   const image = read.model.nodes[0]?.children?.[0];
   assert.ok(image !== undefined);
   const store = new edits.EditDrafts();
@@ -286,19 +295,19 @@ test('requests reach the page as splices; the undo step restores every byte', as
     { alt: { type: 'string', value: 'Newer' } },
     { loading: { type: 'string', value: 'lazy' } },
   ]) {
-    const gesture = gestures.propsGesture(image.id, patch, { coalesceKey: 'k', urgency: false });
-    for (const { edit, stream } of gesture.request((id) => edits.nodeRefIn(origin, id))) {
-      store.record(file, { edit, stream, record: step, authoredChecksum: origin.checksum });
-    }
+    const made = gestures.propsGesture(image.id, patch, { coalesceKey: 'k', urgency: false });
+    assert.equal(store.addGesture(file, made, step), 'queued');
   }
+  assert.equal(store.entries(file).length, 2, 'the two values of one field coalesced');
   const send = async (request) => parsePageEditResult(await harness.invoke('page:edit', request));
-  const outcome = await edits.sendDrafts({
-    path: file,
-    drafts: store.take(file),
-    base: read.checksum,
-    store,
-    send,
-  });
+  // Each entry is stated against the same origin and sent in order: main
+  // rebases the second through the first's commit exactly.
+  let outcome;
+  for (let entry = store.shift(file); entry !== undefined; entry = store.shift(file)) {
+    assert.equal(entry.tag, 'gesture');
+    outcome = await edits.sendGesture({ path: file, origin, gesture: entry.gesture, record: step, send });
+    assert.equal(outcome.tag, 'applied');
+  }
   assert.equal(outcome.tag, 'applied');
   const written =
     '<main>\n  <img\n    src="/a.png"\n    alt="Newer"\n    loading="lazy"\n  />\n</main>\n';
@@ -340,7 +349,7 @@ test('insertGesture stands the new node beside the one at its place, or inside a
   const options = { urgency: true };
   const placed = (place) => {
     const [first] = gestures.insertGesture(model, node, place, options).request(refOf) ?? [];
-    return first && [first.edit.placement, first.edit.target.path[0]];
+    return first && [first.placement, first.target.path[0]];
   };
   assert.deepEqual(
     placed({ parentId: null, index: 0 }),
@@ -363,10 +372,10 @@ test('insertGesture stands the new node beside the one at its place, or inside a
     'inside an empty parent',
   );
   assert.deepEqual(placed({ parentId: 'bb', index: 1 }), ['after', 3]);
-  assert.equal(
+  assert.deepEqual(
     gestures.insertGesture({ imports: [], nodes: [] }, node, null, options).request(refOf),
-    undefined,
-    'an empty page saves whole',
+    [{ tag: 'append-body', nodes: [node] }],
+    'an empty body takes its first node',
   );
   const inserted = gestures
     .insertGesture(model, node, { parentId: 'bb', index: 0 }, options)
@@ -411,7 +420,7 @@ test('moveGesture: a note travels with its node, a stale slot goes first, nothin
     gestures
       .moveGesture(model, 'x', place, rules, { urgency: true })
       .request(refOf)
-      .map(({ edit }) => [edit.tag, edit.target.path[0], edit.placement]);
+      .map((edit) => [edit.tag, edit.target.path[0], edit.placement]);
   const [n, x, z] = ['n', 'x', 'z'].map((id) => id.charCodeAt(0));
   assert.deepEqual(
     tags({ parentId: null, index: 3 }),

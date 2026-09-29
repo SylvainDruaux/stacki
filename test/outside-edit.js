@@ -179,12 +179,14 @@ const settle = (ms = 20) => new Promise((r) => setTimeout(r, ms));
 
   // --- an outside edit while the page has unsaved edits ---------------------------
   // The pending save used to win: the watcher dropped the change while the page
-  // was dirty, and page:write overwrote the file without looking. Now the save
-  // names the bytes it was authored against, and main refuses when they are
-  // gone (plan §11 step 0). The real handlers run in the windowless harness.
+  // was dirty, and page:write overwrote the file without looking. Now every
+  // edit names the bytes it was stated against (plan §11 step 0, step 9: an
+  // .astro page's edits are requests), and main refuses the ones whose bytes
+  // are gone. The real handlers run in the windowless harness.
   {
     const os = require('os');
     const { createHash } = require('crypto');
+    const { diffCodePatch } = require('../dist/shared/code-patch.js');
     const { mainHarness } = await import('./contracts/main-harness.ts');
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'stacki-outside-edit-'));
     fs.mkdirSync(path.join(root, 'src', 'pages'), { recursive: true });
@@ -194,20 +196,21 @@ const settle = (ms = 20) => new Promise((r) => setTimeout(r, ms));
       const file = path.join(root, 'src', 'pages', 'index.astro');
       fs.writeFileSync(file, '<main>\n  <h1>Opened</h1>\n</main>\n');
       const read = await harness.invoke('page:read', file);
-      // The user edits in the app; the page is dirty and its save is pending.
-      const edited = structuredClone(read.model);
-      edited.nodes[0].children[0].children[0].value = 'Typed in the app';
-      // Meanwhile an editor saves the same file.
+      // The user edits the heading in the app: a request against these bytes.
+      const text = read.model.nodes[0].children[0].children[0];
+      const target = { path: [0, 0, 0], kind: 'text', span: { start: text.start, end: text.end } };
+      const node = { ...text, value: 'Typed in the app' };
+      // Meanwhile an editor saves the same heading.
       const outside = '<main>\n  <h1>Saved in an editor</h1>\n</main>\n';
       fs.writeFileSync(file, outside);
-      const saved = await harness.invoke('page:write', {
+      const saved = await harness.invoke('page:edit', {
         pagePath: file,
-        model: edited,
-        baseChecksum: read.checksum,
+        authoredChecksum: read.checksum,
+        edit: { tag: 'replace-node', target, node },
       });
       check(
-        'the pending save is refused as a conflict',
-        saved.ok === false && saved.error.code === 'conflict',
+        'the pending edit is refused',
+        saved.ok === false && saved.error.code === 'rejected',
         JSON.stringify(saved),
       );
       check(
@@ -223,21 +226,31 @@ const settle = (ms = 20) => new Promise((r) => setTimeout(r, ms));
         'with no temporary file left beside it',
         !fs.readdirSync(path.dirname(file)).some((name) => name.startsWith('.stacki-write-')),
       );
-      // Saving over it is still possible, but only as a deliberate act against
-      // the checksum the user was shown.
-      const kept = await harness.invoke('page:write', {
+      // Keeping the local version is still possible, but only as a deliberate
+      // act: the user reviews it as text and saves that text as a patch of the
+      // bytes they were shown (the conflict notice's review, step 8).
+      const mine = '<main>\n  <h1>Typed in the app</h1>\n</main>\n';
+      const patch = diffCodePatch(outside, mine);
+      const kept = await harness.invoke('page:edit', {
         pagePath: file,
-        model: edited,
-        baseChecksum: saved.error.diskChecksum,
+        authoredChecksum: saved.error.diskChecksum,
+        edit: { tag: 'code-patch', hunks: patch.value },
       });
       check(
-        'keeping the local version writes against the disk checksum',
+        'keeping the local version patches the bytes on disk',
         kept.ok === true,
         JSON.stringify(kept.error),
       );
+      check('and puts the local edit on disk', fs.readFileSync(file, 'utf8') === mine);
+      const whole = await harness.invoke('page:write', {
+        pagePath: file,
+        model: read.model,
+        baseChecksum: kept.checksum,
+      });
       check(
-        'and puts the local edit on disk',
-        fs.readFileSync(file, 'utf8').includes('Typed in the app'),
+        'and never as a whole model (step 9)',
+        whole.ok === false && fs.readFileSync(file, 'utf8') === mine,
+        JSON.stringify(whole),
       );
     } finally {
       harness.dispose();

@@ -1,76 +1,89 @@
-// The renderer half of the compat adapter and the persistence layer's edit
-// queue (plan §2 layer 3, §7; step 6). A gesture that has an intent form is
-// sent as an edit request — main writes splices, never the whole file — and
-// every other gesture still saves the whole model (`replace-source`) until its
-// turn in the §11.6 order.
+// The persistence layer's edit queue (plan §2 layer 3, §7, §11.9): what the
+// open page owes the disk, in the order the user made it, and how each part
+// reaches the page's actor.
 //
-// Where a request's node references come from: the page's origin, the parse
-// the shown model was cloned from. The shown model and its origin share node
-// ids because one is a clone of the other, not because an id survived a
-// reparse (plan §4: modelAdoption.ts keys the UI and never feeds an anchor).
-// The reference is that parse's own facts — a path, a kind, a source range —
-// and main checks them against its projection of the same bytes. After the
-// app's own saves the origin stays put until the page is clean again; main
-// rebases requests authored against it through its commit log, exactly.
+// Three kinds of entry, never mixed up:
+//   - a gesture (an .astro page): the edit requests it becomes, stated when it
+//     is sent — against the page as the app's last reply left it (the origin),
+//     so a node an earlier gesture created a moment ago is already there to
+//     name. A request names nodes by the facts of that parse (path, kind,
+//     source range), and main checks them against its own projection of the
+//     same bytes. Nothing is saved as a whole model: a gesture that cannot be
+//     stated — its node is gone, or lives in another file — is refused.
+//   - typed code (step 8): the page's text, saved as one patch from the
+//     baseline the typing descends from (src/codeEdits.ts). At most one, and
+//     first: typing replaces the unsent gestures, which the text it was typed
+//     into does not hold.
+//   - a Markdown or MDX page's whole model (plan §6): these pages join the
+//     engine at step 10, and until then save whole through their actor.
 //
-// The queue's rules (plan §7):
-//   - Requests coalesce within a stream (one field of one node) while unsent:
-//     the latest value wins, and a set is idempotent. Structural requests
-//     carry no stream and never coalesce. The actor never merges.
-//   - A gesture without an intent form turns the queue into `model`: the
-//     whole-model save then carries every unsaved edit, the queued ones
-//     included, until the page is clean again.
-//   - A refusal never destroys input: the edits stay in the model, and the
-//     page's conflict notice names the reason (plan §7, rejection contract).
-//   - Typing in the code editor turns the queue into `code` (step 8): the
-//     page's unsaved edits are its text, saved as one patch from the baseline
-//     the text descends from (src/codeEdits.ts) until the page is clean.
-//     Requests queued before the typing are dropped, as the whole-model save
-//     dropped them before: the text the user typed into does not hold them.
+// The rules (plan §7): gestures coalesce within one stream (one field of one
+// node) and one undo step while unsent — the last value wins; the queue is
+// bounded (LIMITS.intentsPendingMax), and a gesture past it is refused, never
+// queued; a refusal never destroys input — the entry stays queued and the
+// page's conflict notice names the reason.
+//
+// Undo steps (EditsRecord) learn their inverses as replies arrive. An entry
+// carrying several steps' bytes in one write (typing, a Markdown page) gives
+// its inverse to the newest step; the older ones are `folded` into it.
 import { assert } from '../shared/assert';
 import type { Digest } from '../shared/brand';
-import type { EditorModel } from '../shared/editor-model';
 import type { Edit, EditRequest, NodeRef } from '../shared/edit-request';
 import type { RejectionReason, SourceEdit } from '../shared/intent';
 import { LIMITS } from '../shared/limits';
 import type { PageEditError, PageEdited } from '../shared/page-save';
 import type { PageModel, PageNode } from '../shared/page-node';
 import type { Result } from '../shared/result';
+import type { EditorModel } from '../shared/editor-model';
 import type { SaveState } from './saveState';
 
-/** The parse a shown model was cloned from, and the checksum of its bytes. */
+/** The page as the app's last read or reply left it: its checksum, its text,
+ * and that text's parse, keyed by the session's node handles
+ * (src/nodeHandles.ts). Requests are stated against it. */
 export interface PageOrigin {
   readonly checksum: Digest;
+  readonly source: string;
   readonly model: PageModel;
 }
 
-/** One applied edit, as Undo needs it: the inverse hunks and the checksum of
+/** One applied write, as Undo needs it: the inverse hunks and the checksum of
  * the bytes they are hunks of. */
 export interface AppliedEdit {
   readonly checksum: Digest;
   readonly inverse: readonly SourceEdit[];
 }
 
-/** What became of a gesture's requests, for its undo entry. `sent` counts the
- * requests still owed an answer; `subsumed` means a whole-model save carried
- * the gesture, so only the entry's snapshot can undo it. */
+/** What became of an undo step's writes. */
 export type EditsOutcome =
+  /** `waiting` writes are still owed an answer. */
   | { readonly tag: 'pending'; readonly waiting: number; readonly applied: readonly AppliedEdit[] }
   | { readonly tag: 'applied'; readonly applied: readonly AppliedEdit[] }
-  | { readonly tag: 'subsumed' };
+  /** A newer step's write carried this one's bytes; that step's undo reverts
+   * both, and this one has nothing of its own to undo. */
+  | { readonly tag: 'folded' }
+  /** Never written: typing replaced it before it was sent. */
+  | { readonly tag: 'dropped' };
 
-/** The undo entry of a gesture that went out as requests. Its outcome is
- * written as answers arrive: the one field of it that changes. */
+/** An undo step. Its outcome is written as answers arrive: the one field of it
+ * that changes, owned by this queue and the undo that reads it. */
 export interface EditsRecord {
   outcome: EditsOutcome;
 }
 
-export interface EditDraft {
-  readonly edit: Edit;
-  readonly authoredChecksum: Digest;
-  /** Coalescing key; null for a request that must go out on its own. */
+/** A gesture as edit requests, stated against a parse (`refOf` names the parse's
+ * nodes), and its effect on the shown model. The effect is a pure function —
+ * a new model, the old one untouched. `request` is undefined when a node it
+ * names has no place in the parse: gone, or in another file. */
+export interface EditGesture {
+  readonly request: (refOf: (nodeId: string) => NodeRef | undefined) => readonly Edit[] | undefined;
+  readonly apply: (model: EditorModel) => EditorModel;
+  /** Groups undo steps and coalesces bursts. */
+  readonly coalesceKey: string | null;
+  readonly urgency: boolean | 'live';
+  /** One field of one node, by the session's handle: an unsent gesture of the
+   * same stream and undo step is replaced by this one. Null for a gesture that
+   * must go out on its own. */
   readonly stream: string | null;
-  readonly record: EditsRecord;
 }
 
 /** The bytes a code save is a patch of (step 8). */
@@ -89,23 +102,271 @@ export type CodeBaseline =
    * disk holds at the page's base, read when the save is sent. */
   | { readonly tag: 'disk' };
 
-export type DraftQueue =
-  | { readonly tag: 'edits'; readonly pending: readonly EditDraft[] }
-  | { readonly tag: 'model' }
-  | { readonly tag: 'code'; readonly baseline: CodeBaseline };
+export type QueueEntry =
+  | {
+      readonly tag: 'gesture';
+      readonly gesture: EditGesture;
+      readonly record: EditsRecord;
+      /** The stream of every request it states, when they share one. */
+      readonly stream: string | null;
+    }
+  | { readonly tag: 'code'; readonly baseline: CodeBaseline; readonly records: readonly EditsRecord[] }
+  | { readonly tag: 'model'; readonly records: readonly EditsRecord[] };
 
-/** A page as the code editor showed it when the user typed: its save state
- * and the text its editor held. */
+/** A page as the code editor showed it when the user typed: its save state,
+ * the text its editor held, and the origin that text descends from. */
 export interface TypedFrom {
   readonly save: SaveState;
   readonly source: string;
+  readonly origin: PageOrigin | undefined;
+}
+
+/** The unsent entries of the open page. Private, mutable state with one owner
+ * (AGENTS.md §7): the page saver sends entries in order, and the gestures of
+ * the open page add them. Keyed by path: another page's entries are never
+ * owed (the saver flushes before a page changes). */
+export class EditDrafts {
+  #path: string | undefined;
+  #entries: QueueEntry[] = [];
+
+  entries(path: string): readonly QueueEntry[] {
+    return path === this.#path ? this.#entries : [];
+  }
+
+  /** Nothing is owed the disk for `path`. */
+  empty(path: string): boolean {
+    return this.entries(path).length === 0;
+  }
+
+  /** Queue a gesture; 'full' past the bound, and then it is not queued. A
+   * gesture of the stream and undo step the last unsent one had replaces it:
+   * each states its field's whole value, so only the last reaches disk. */
+  addGesture(path: string, gesture: EditGesture, record: EditsRecord): 'queued' | 'full' {
+    this.#own(path);
+    const stream = gesture.stream;
+    const last = this.#entries[this.#entries.length - 1];
+    if (last?.tag === 'gesture' && stream !== null) {
+      if (last.stream === stream && last.record === record) {
+        this.#entries[this.#entries.length - 1] = { tag: 'gesture', gesture, record, stream };
+        return 'queued';
+      }
+    }
+    assert(!this.#entries.some((entry) => entry.tag === 'model'), 'A Markdown page queues no gestures');
+    if (this.#entries.length >= LIMITS.intentsPendingMax) {
+      return 'full';
+    }
+    owe(record);
+    this.#entries.push({ tag: 'gesture', gesture, record, stream });
+    return 'queued';
+  }
+
+  /** The user typed in the code editor (or Undo put text back): from now on
+   * the page's edits are its text, saved as one patch. Unsent gestures go —
+   * the text typed into does not hold them. The baseline is the page as shown
+   * before the change: the text the typing descends from and the checksum of
+   * those bytes. A refused page's shown text may be a review of the model
+   * rather than bytes on disk, so its baseline is the disk, read at the save. */
+  typeCode(path: string, shown: TypedFrom, record: EditsRecord): void {
+    this.#own(path);
+    const code = this.#entries.find((entry) => entry.tag === 'code');
+    for (const entry of this.#entries) {
+      if (entry.tag !== 'code') {
+        for (const replaced of recordsOf(entry)) {
+          replaced.outcome = { tag: 'dropped' };
+        }
+      }
+    }
+    const records = code === undefined ? [] : code.records;
+    const baseline = code === undefined ? typedBaseline(shown) : code.baseline;
+    const kept = records.includes(record) ? records : [...records, record];
+    if (!records.includes(record)) {
+      owe(record);
+    }
+    this.#entries = [{ tag: 'code', baseline, records: kept }];
+    assert(this.#entries.length === 1, 'Typing leaves the page one patch to save');
+  }
+
+  /** The baseline of the page's code entry. */
+  codeBaseline(path: string): CodeBaseline {
+    const code = this.entries(path).find((entry) => entry.tag === 'code');
+    assert(code?.tag === 'code', 'Only a code entry has a baseline');
+    return code.baseline;
+  }
+
+  /** A code save applied: the disk holds `checksum`, whose text is `source`,
+   * and any typing since descends from `typedFrom`, the text the save sent. */
+  codeSaved(path: string, saved: Omit<Extract<CodeBaseline, { tag: 'known' }>, 'tag'>): void {
+    const at = this.entries(path).findIndex((entry) => entry.tag === 'code');
+    const code = this.#entries[at];
+    if (code?.tag !== 'code') {
+      return; // Taken by the save that is reporting now.
+    }
+    this.#entries[at] = { ...code, baseline: { tag: 'known', ...saved } };
+  }
+
+  /** The user keeps their text over a refused save ("Save this version"):
+   * the code entry now patches whatever the disk holds at the new base. */
+  acceptDisk(path: string): void {
+    const at = this.entries(path).findIndex((entry) => entry.tag === 'code');
+    const code = this.#entries[at];
+    if (code?.tag === 'code') {
+      this.#entries[at] = { ...code, baseline: { tag: 'disk' } };
+    }
+  }
+
+  /** A Markdown or MDX gesture: the page's whole model is owed, and `record`
+   * with it. Every step since the last save is one write. */
+  markModel(path: string, record: EditsRecord): void {
+    this.#own(path);
+    const model = this.#entries.find((entry) => entry.tag === 'model');
+    assert(this.#entries.every((entry) => entry.tag !== 'gesture'), 'A Markdown page has no gestures');
+    const records = model === undefined ? [] : model.records;
+    if (!records.includes(record)) {
+      owe(record);
+    }
+    const kept = records.includes(record) ? records : [...records, record];
+    this.#entries = [
+      ...this.#entries.filter((entry) => entry.tag !== 'model'),
+      { tag: 'model', records: kept },
+    ];
+  }
+
+  /** Take the oldest entry to send now. */
+  shift(path: string): QueueEntry | undefined {
+    if (path !== this.#path) {
+      return undefined;
+    }
+    return this.#entries.shift();
+  }
+
+  /** Put back an entry a save did not send, ahead of newer ones. Typing
+   * since replaced an unsent gesture, so that one is dropped instead. */
+  unshift(path: string, entry: QueueEntry): void {
+    this.#own(path);
+    const [first] = this.#entries;
+    if (entry.tag === 'gesture' && first?.tag === 'code') {
+      entry.record.outcome = { tag: 'dropped' };
+      return;
+    }
+    if (entry.tag === 'code' && first?.tag === 'code') {
+      // Typed on during the save: one entry, the newer text, every step.
+      const records = [...entry.records, ...first.records.filter((r) => !entry.records.includes(r))];
+      this.#entries[0] = { ...first, baseline: entry.baseline, records };
+      return;
+    }
+    this.#entries.unshift(entry);
+  }
+
+  /** Forget everything owed (a reload discards local edits). */
+  discard(path: string): void {
+    for (const entry of this.entries(path)) {
+      for (const record of recordsOf(entry)) {
+        record.outcome = { tag: 'dropped' };
+      }
+    }
+    if (path === this.#path) {
+      this.#entries = [];
+    }
+  }
+
+  // The queue belongs to one page; another page's entries were flushed or
+  // discarded before it opened, so switching forgets them.
+  #own(path: string): void {
+    if (path !== this.#path) {
+      this.#path = path;
+      this.#entries = [];
+    }
+  }
+}
+
+function typedBaseline(shown: TypedFrom): CodeBaseline {
+  const save = shown.save;
+  switch (save.tag) {
+    case 'clean':
+    case 'dirty':
+    case 'saving': {
+      // Visual edits change the model, never `source`: it is the text of the
+      // origin, the bytes the page's edits were stated against.
+      const origin = shown.origin;
+      const checksum = save.tag === 'clean' ? save.checksum : save.baseChecksum;
+      assert(origin === undefined || origin.checksum === checksum, 'The shown text is the origin');
+      return { tag: 'known', checksum, source: shown.source, typedFrom: shown.source };
+    }
+    case 'conflicted':
+      return { tag: 'disk' };
+    default: {
+      const exhaustive: never = save;
+      return exhaustive;
+    }
+  }
+}
+
+/** The undo steps an entry writes for. */
+export function recordsOf(entry: QueueEntry): readonly EditsRecord[] {
+  switch (entry.tag) {
+    case 'gesture':
+      return [entry.record];
+    case 'code':
+    case 'model':
+      return entry.records;
+    default: {
+      const exhaustive: never = entry;
+      return exhaustive;
+    }
+  }
+}
+
+/** An entry's one write applied: the newest step learns the inverse, the rest
+ * are folded into it. */
+export function recordWrite(records: readonly EditsRecord[], applied: AppliedEdit): void {
+  const newest = records[records.length - 1];
+  assert(newest !== undefined, 'A write is made for at least one step');
+  for (const record of records.slice(0, -1)) {
+    record.outcome = { tag: 'folded' };
+  }
+  recordApplied(newest, applied);
+}
+
+/** One request went out and applied: the undo step learns its inverse. */
+export function recordApplied(record: EditsRecord, applied: AppliedEdit): void {
+  const outcome = record.outcome;
+  if (outcome.tag !== 'pending') {
+    return; // Dropped or folded meanwhile: nothing of its own to undo.
+  }
+  assert(outcome.waiting > 0, 'An answer arrives for a write the step waits on');
+  const done = [...outcome.applied, applied];
+  record.outcome =
+    outcome.waiting === 1
+      ? { tag: 'applied', applied: done }
+      : { tag: 'pending', waiting: outcome.waiting - 1, applied: done };
+}
+
+// The step is owed one more write.
+function owe(record: EditsRecord): void {
+  const outcome = record.outcome;
+  switch (outcome.tag) {
+    case 'pending':
+      record.outcome = { ...outcome, waiting: outcome.waiting + 1 };
+      return;
+    case 'applied':
+      record.outcome = { tag: 'pending', waiting: 1, applied: outcome.applied };
+      return;
+    case 'folded':
+    case 'dropped':
+      record.outcome = { tag: 'pending', waiting: 1, applied: [] };
+      return;
+    default: {
+      const exhaustive: never = outcome;
+      return exhaustive;
+    }
+  }
 }
 
 /** The reference main needs for a node of the origin, or undefined when the
- * node is not one main can name in the page's own bytes: created since the
- * origin was read, inside a chunk file, or without a source range. */
+ * node is not one main can name in the page's own bytes: not in this parse,
+ * inside a chunk file, or without a source range. */
 export function nodeRefIn(origin: PageOrigin, nodeId: string): NodeRef | undefined {
-  assert(origin.model.format === undefined, 'Only .astro pages have an edit origin');
+  assert(origin.model.format === undefined, 'Only .astro pages have an origin');
   const pending: { readonly node: PageNode; readonly path: readonly number[] }[] = [];
   origin.model.nodes.forEach((node, index) => pending.push({ node, path: [index] }));
   // Preorder over at most the tree's own bound.
@@ -133,339 +394,81 @@ export function nodeRefIn(origin: PageOrigin, nodeId: string): NodeRef | undefin
   return undefined;
 }
 
-/** A gesture as the adapter states it (step 6): the requests it is, against
- * the origin's nodes, or undefined when it has no intent form yet; and its
- * effect on the shown model, applied at once. The effect is a pure function —
- * a new model, the old one untouched — so the adapter's edit is centralized
- * here instead of spread over mutation sites (the adapter-surface ratchet). */
-export interface EditGesture {
-  readonly request: (
-    refOf: (nodeId: string) => NodeRef | undefined,
-  ) => readonly StreamedEdit[] | undefined;
-  readonly apply: (model: EditorModel) => EditorModel;
-  /** Groups undo steps and coalesces bursts, as mutateModel's key did. */
-  readonly coalesceKey: string | null;
-  readonly urgency: boolean | 'live';
-}
-
-export interface StreamedEdit {
-  readonly edit: Edit;
-  /** One field of one node; null when the request must go out on its own. */
-  readonly stream: string | null;
-}
-
-/** The unsent requests of the open page, and the rules above. Keyed by the
- * page and its origin: a new origin means the page was clean in between, so
- * nothing from before is owed. Private, mutable state with one owner
- * (AGENTS.md §7): the page saver's write. */
-export class EditDrafts {
-  #path: string | undefined;
-  #origin: Digest | undefined;
-  #queue: DraftQueue = { tag: 'edits', pending: [] };
-
-  queue(path: string): DraftQueue {
-    return path === this.#path ? this.#queue : { tag: 'model' };
-  }
-
-  /** The user typed in the code editor (or Undo put text back): from now
-   * until the page is clean its edits are its text. The baseline is the page
-   * as shown before the change — the text the typing descends from and the
-   * checksum of those bytes — kept while the queue already holds code. A
-   * refused page's shown text may be a review of the model rather than
-   * bytes on disk, so its baseline is the disk, read at the save. */
-  typeCode(path: string, shown: TypedFrom): void {
-    const save = shown.save;
-    const fresh = path !== this.#path || save.tag === 'clean';
-    const queue = this.queue(path);
-    if (!fresh && queue.tag === 'code') {
-      return;
-    }
-    if (!fresh && queue.tag === 'edits') {
-      for (const draft of queue.pending) {
-        subsume(draft.record);
-      }
-    }
-    this.#path = path;
-    this.#origin = undefined; // Requests start over once the page is clean.
-    this.#queue = { tag: 'code', baseline: typedBaseline(shown) };
-    assert(this.queue(path).tag === 'code', 'Typing leaves the page in code');
-  }
-
-  /** The baseline of the page's code queue. */
-  codeBaseline(path: string): CodeBaseline {
-    const queue = this.queue(path);
-    assert(queue.tag === 'code', 'Only a code queue has a baseline');
-    return queue.baseline;
-  }
-
-  /** A code save applied: the disk holds `checksum`, whose text is `source`,
-   * and the typing since descends from `typedFrom`, the text the save sent. */
-  codeSaved(path: string, saved: Omit<Extract<CodeBaseline, { tag: 'known' }>, 'tag'>): void {
-    if (this.queue(path).tag !== 'code') {
-      return; // A whole-model save took over meanwhile; it carries the text.
-    }
-    this.#queue = { tag: 'code', baseline: { tag: 'known', ...saved } };
-  }
-
-  /** The user keeps their text over a refused save ("Save this version"):
-   * a code queue now patches whatever the disk holds at the new base. */
-  acceptDisk(path: string): void {
-    if (this.queue(path).tag === 'code') {
-      this.#queue = { tag: 'code', baseline: { tag: 'disk' } };
-    }
-  }
-
-  /** Queue a request; false when the page saves whole models until clean. */
-  record(path: string, draft: EditDraft): boolean {
-    if (path !== this.#path || draft.authoredChecksum !== this.#origin) {
-      // Clean since: whatever was queued for the old origin went to disk, or
-      // was discarded by a reload.
-      this.#path = path;
-      this.#origin = draft.authoredChecksum;
-      this.#queue = { tag: 'edits', pending: [] };
-    }
-    const queue = this.#queue;
-    if (queue.tag !== 'edits') {
-      // Code typed since the origin was read never keeps that origin (App's
-      // changeCodeSource drops it), so a code queue reaches here only through
-      // a bug; the whole-model save is the one that carries both.
-      assert(queue.tag === 'model', 'A request is never recorded over typed code');
-      subsume(draft.record);
-      return false;
-    }
-    const last = queue.pending[queue.pending.length - 1];
-    if (coalesces(last, draft)) {
-      this.#queue = { tag: 'edits', pending: [...queue.pending.slice(0, -1), draft] };
-      return true;
-    }
-    if (queue.pending.length >= LIMITS.intentsPendingMax) {
-      // More unsent requests than one actor queues: the whole-model save
-      // carries them instead of growing the queue (plan §8).
-      this.markModel(path);
-      subsume(draft.record);
-      return false;
-    }
-    owe(draft.record);
-    this.#queue = { tag: 'edits', pending: [...queue.pending, draft] };
-    return true;
-  }
-
-  /** A gesture without an intent form: whole models until clean. */
-  markModel(path: string): void {
-    const queue = this.queue(path);
-    if (queue.tag === 'edits') {
-      for (const draft of queue.pending) {
-        subsume(draft.record);
-      }
-    }
-    if (path !== this.#path) {
-      this.#origin = undefined;
-    }
-    this.#path = path;
-    this.#queue = { tag: 'model' };
-  }
-
-  /** Take every unsent request, oldest first, to send now. */
-  take(path: string): readonly EditDraft[] {
-    const queue = this.queue(path);
-    if (queue.tag !== 'edits') {
-      return [];
-    }
-    this.#queue = { tag: 'edits', pending: [] };
-    return queue.pending;
-  }
-
-  /** Put back requests a failed save did not send, ahead of newer ones. */
-  restore(path: string, drafts: readonly EditDraft[]): void {
-    const queue = this.queue(path);
-    if (queue.tag !== 'edits') {
-      for (const draft of drafts) {
-        subsume(draft.record);
-      }
-      return;
-    }
-    this.#queue = { tag: 'edits', pending: [...drafts, ...queue.pending] };
-  }
-}
-
-function typedBaseline(shown: TypedFrom): CodeBaseline {
-  const save = shown.save;
-  switch (save.tag) {
-    case 'clean':
-      return {
-        tag: 'known',
-        checksum: save.checksum,
-        source: shown.source,
-        typedFrom: shown.source,
-      };
-    case 'dirty':
-    case 'saving':
-      // Visual edits change the model, never `source`: it is still the text
-      // of the bytes the page's edits were authored against.
-      return {
-        tag: 'known',
-        checksum: save.baseChecksum,
-        source: shown.source,
-        typedFrom: shown.source,
-      };
-    case 'conflicted':
-      return { tag: 'disk' };
-    default: {
-      const exhaustive: never = save;
-      return exhaustive;
-    }
-  }
-}
-
-// One stream, one undo entry, still unsent: the newer value replaces the
-// older. A set is idempotent, so only the last value matters on disk.
-function coalesces(last: EditDraft | undefined, draft: EditDraft): boolean {
-  if (last === undefined || draft.stream === null) {
-    return false;
-  }
-  if (last.stream === draft.stream) {
-    return last.record === draft.record;
-  }
-  return false;
-}
-
-/** The request went out and applied: the undo entry learns its inverse. */
-export function recordApplied(record: EditsRecord, applied: AppliedEdit): void {
-  const outcome = record.outcome;
-  if (outcome.tag !== 'pending') {
-    return; // Subsumed by a whole-model save: the snapshot undoes it.
-  }
-  assert(outcome.waiting > 0, 'An answer arrives for a request the record waits on');
-  const done = [...outcome.applied, applied];
-  record.outcome =
-    outcome.waiting === 1
-      ? { tag: 'applied', applied: done }
-      : { tag: 'pending', waiting: outcome.waiting - 1, applied: done };
-}
-
-export function subsume(record: EditsRecord): void {
-  record.outcome = { tag: 'subsumed' };
-}
-
-function owe(record: EditsRecord): void {
-  const outcome = record.outcome;
-  switch (outcome.tag) {
-    case 'pending':
-      record.outcome = { ...outcome, waiting: outcome.waiting + 1 };
-      return;
-    case 'applied':
-      record.outcome = { tag: 'pending', waiting: 1, applied: outcome.applied };
-      return;
-    case 'subsumed':
-      return;
-    default: {
-      const exhaustive: never = outcome;
-      return exhaustive;
-    }
-  }
-}
-
-/** How a save of queued requests ended (the saver turns it into a
- * PageWriteOutcome). */
-export type DraftsOutcome =
-  /** Every request applied; the last reply is the page as written. */
-  | { readonly tag: 'applied'; readonly last: PageEdited }
-  /** A request cannot be planned (no intent form after all): save the whole
-   * model instead, against the bytes the applied ones left. */
-  | { readonly tag: 'fallback'; readonly base: Digest }
-  /** Refused because the file is not what the requests were written against
-   * (plan §7): the page is conflicted, and says why. */
+/** How sending one gesture ended. */
+export type GestureSent =
+  /** Every request applied; the replies, in order. */
+  | { readonly tag: 'applied'; readonly replies: readonly PageEdited[] }
+  /** Refused: the page is not what the gesture was stated against, or a
+   * request has no form the engine can plan (plan §7: the notice says why).
+   * `replies` are those applied before it. */
   | {
       readonly tag: 'refused';
       readonly reason: RejectionReason;
       readonly diskChecksum: Digest;
-      readonly advanced: Digest | undefined;
+      readonly replies: readonly PageEdited[];
     }
-  /** Could not save now; the unsent requests are queued again. `advanced` is
-   * the checksum the applied ones left, when any did. */
-  | { readonly tag: 'failed'; readonly message: string; readonly advanced: Digest | undefined };
+  /** Not sent now: nothing applied, safe to send again. */
+  | { readonly tag: 'retry'; readonly message: string }
+  /** Some requests may have landed (a write race, an uncertain write) or
+   * applied before a transient failure: sending again could apply twice, so
+   * the page asks the user (reload or review). */
+  | { readonly tag: 'uncertain'; readonly message: string; readonly replies: readonly PageEdited[] };
 
-/** Send requests one at a time, in order. Each is answered before the next
- * goes, so the actor's own commit log rebases the later ones exactly. */
-export async function sendDrafts(input: {
+/** State a gesture against `origin` and send its requests one at a time, in
+ * order, each authored against the origin's checksum: main rebases the later
+ * ones through the earlier ones' commits exactly. */
+export async function sendGesture(input: {
   readonly path: string;
-  readonly drafts: readonly EditDraft[];
-  readonly base: Digest;
+  readonly origin: PageOrigin;
+  readonly gesture: EditGesture;
+  readonly record: EditsRecord;
   readonly send: (request: EditRequest) => Promise<Result<PageEdited, PageEditError>>;
-  /** Where unsent drafts go back to, or turn into whole-model saves. */
-  readonly store: EditDrafts;
-}): Promise<DraftsOutcome> {
-  assert(input.drafts.length > 0, 'A save of requests has requests');
-  let last: PageEdited | undefined;
-  for (const [index, draft] of input.drafts.entries()) {
-    const answer = await input.send({
-      pagePath: input.path,
-      authoredChecksum: draft.authoredChecksum,
-      edit: draft.edit,
-    });
+}): Promise<GestureSent> {
+  const { origin } = input;
+  const requests = input.gesture.request((nodeId) => nodeRefIn(origin, nodeId));
+  if (requests === undefined || requests.length === 0) {
+    // A node it names is not in the page the app last read: another file's,
+    // or gone. Never saved some other way.
+    const reason = 'unsupported-operation';
+    return { tag: 'refused', reason, diskChecksum: origin.checksum, replies: [] };
+  }
+  const replies: PageEdited[] = [];
+  for (const edit of requests) {
+    const request = { pagePath: input.path, authoredChecksum: origin.checksum, edit };
+    const answer = await input.send(request);
     if (answer.ok) {
-      recordApplied(draft.record, {
-        checksum: answer.value.checksum,
-        inverse: answer.value.inverse,
-      });
-      last = answer.value;
+      recordApplied(input.record, { checksum: answer.value.checksum, inverse: answer.value.inverse });
+      replies.push(answer.value);
       continue;
     }
-    const rest = input.drafts.slice(index);
-    const stop = { rest, disk: last?.checksum ?? input.base, advanced: last?.checksum };
-    return stopped(answer.error, stop, input.path, input.store);
+    return stopped(answer.error, origin.checksum, replies);
   }
-  assert(last !== undefined, 'Every request applied, so there was a last');
-  return { tag: 'applied', last };
+  assert(replies.length === requests.length, 'Every request applied');
+  return { tag: 'applied', replies };
 }
 
-// The control flow of a save that stopped: which drafts go back to be sent
-// again, which a whole-model save carries instead, and what the page is told.
-function stopped(
-  error: PageEditError,
-  stop: {
-    readonly rest: readonly EditDraft[];
-    readonly disk: Digest;
-    readonly advanced: Digest | undefined;
-  },
-  path: string,
-  store: EditDrafts,
-): DraftsOutcome {
-  const { rest, disk, advanced } = stop;
-  const carryWhole = (): void => {
-    for (const draft of rest) {
-      subsume(draft.record);
-    }
-    store.markModel(path);
-  };
+// A request did not apply: refused over changed bytes, or not written.
+function stopped(error: PageEditError, authored: Digest, replies: readonly PageEdited[]): GestureSent {
+  const disk = replies[replies.length - 1]?.checksum ?? authored;
   switch (error.code) {
     case 'rejected':
-      carryWhole();
-      if (error.reason === 'unsupported-operation') {
-        return { tag: 'fallback', base: disk };
-      }
-      if (error.diskChecksum === undefined) {
-        return { tag: 'failed', message: error.message, advanced };
-      }
-      if (error.diskChecksum === disk) {
-        // Nothing changed under the requests: the model is still an edit of
-        // exactly these bytes, so the whole-model save is safe.
-        return { tag: 'fallback', base: disk };
-      }
-      return { tag: 'refused', reason: error.reason, diskChecksum: error.diskChecksum, advanced };
+      return {
+        tag: 'refused',
+        reason: error.reason,
+        diskChecksum: error.diskChecksum ?? disk,
+        replies,
+      };
     case 'missing':
     case 'filesystem':
     case 'backpressured':
-      // Refused before anything was written: safe to send again.
-      store.restore(path, rest);
-      return { tag: 'failed', message: error.message, advanced };
+      // Refused before anything was written: safe to send again, when none of
+      // the gesture's requests applied yet.
+      return replies.length === 0
+        ? { tag: 'retry', message: error.message }
+        : { tag: 'uncertain', message: error.message, replies };
     case 'write-race':
     case 'uncertain':
-      // The write may have landed, or another writer replaced it: sending an
-      // insertion again could insert twice. The whole-model save carries
-      // these, and its checksum guard turns any surprise into a conflict.
-      carryWhole();
-      return { tag: 'failed', message: error.message, advanced };
+      return { tag: 'uncertain', message: error.message, replies };
     default: {
       const exhaustive: never = error;
       return exhaustive;

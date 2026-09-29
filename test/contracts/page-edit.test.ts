@@ -29,6 +29,8 @@ import { toUtf16Span } from '../../dist/shared/span.js';
 
 const sha256 = (bytes: string | Buffer): string => createHash('sha256').update(bytes).digest('hex');
 const DIGEST = 'a'.repeat(64);
+// A node a gesture created: the renderer's own handle (shared/brand.ts).
+const GESTURE_ID = `g${'1'.repeat(32)}`;
 const REF = { path: [0], kind: 'element', span: { start: 0, end: 4 } };
 
 function fixture() {
@@ -110,7 +112,7 @@ test('parseEditRequest takes every edit and refuses each malformed shape', () =>
       tag: 'insert-node',
       target: REF,
       placement: 'first-child',
-      content: { tag: 'nodes', nodes: [{ id: 'c1', kind: 'text', value: 'Hi' }] },
+      content: { tag: 'nodes', nodes: [{ id: GESTURE_ID, kind: 'text', value: 'Hi' }] },
     },
     { tag: 'remove-node', target: REF },
     { tag: 'move-node', target: REF, destination: REF, placement: 'before' },
@@ -118,7 +120,8 @@ test('parseEditRequest takes every edit and refuses each malformed shape', () =>
     { tag: 'revert', hunks: [{ span: { start: 1, end: 2 }, text: 'x' }] },
     { tag: 'rename-tag', target: REF, to: 'Icons.Arrow' },
     { tag: 'rename-attribute', target: REF, from: 'title', to: 'aria-label' },
-    { tag: 'replace-node', target: REF, node: { id: 'c1', kind: 'text', value: 'Hi' } },
+    { tag: 'replace-node', target: REF, node: { id: GESTURE_ID, kind: 'text', value: 'Hi' } },
+    { tag: 'append-body', nodes: [{ id: GESTURE_ID, kind: 'text', value: 'Hi' }] },
   ];
   for (const request of good) {
     assert.doesNotThrow(() =>
@@ -156,7 +159,7 @@ test('parseEditRequest takes every edit and refuses each malformed shape', () =>
     [{ tag: 'rename-attribute', target: REF, from: 'title', to: 'title' }, /must change/],
     [{ tag: 'rename-attribute', target: REF, from: 'a b', to: 'c' }, /attribute name/],
     [{ tag: 'replace-node', target: REF }, /Edit.node/],
-    [{ tag: 'replace-node', target: REF, node: { id: 'c1', kind: 'paint' } }, /kind/],
+    [{ tag: 'replace-node', target: REF, node: { id: GESTURE_ID, kind: 'paint' } }, /kind/],
   ];
   for (const [request, message] of bad) {
     assert.throws(
@@ -436,7 +439,7 @@ test('new nodes print where they land; the frontmatter changes its slot', async 
   assert.ok(page.editable);
   // As it crosses the wire: validated by the same parser main uses.
   const card = parsePageNode({
-    id: 'c1',
+    id: GESTURE_ID,
     kind: 'component',
     name: 'Card',
     props: {},

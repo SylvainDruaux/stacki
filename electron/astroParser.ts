@@ -81,12 +81,29 @@ const VOID_ELEMENTS = new Set([
 ]);
 const RAW_ELEMENTS = new Set(['style', 'script']);
 
-let nextId = 1;
-const makeId = (): string => {
-  assert(Number.isSafeInteger(nextId), 'Parser node counter is a safe integer');
-  assert(nextId > 0, 'Parser node counter is positive');
-  return `n${nextId++}`;
-};
+// Node ids are structural paths — `n0`, `n0.2`, `n0.2.1` — assigned in one
+// pass once a tree is complete (assignPathIds), so a parse is a pure function
+// of its text: no counter survives between parses, and nothing can key on
+// parse order (plan §4, §11.9). Nodes are built with this placeholder; the
+// parser itself never reads an id.
+const PENDING_ID = 'n0';
+const makeId = (): string => PENDING_ID;
+
+// Give every node of a finished tree its path id; the layout wrapper keeps its
+// well-known `layout`. The tree is the parser's own, just built, so this is
+// the one place its ids are written. Depth is the tree's bound (asserted).
+function assignPathIds(nodes: readonly ParserNode[], prefix: string, depth: number): void {
+  assert(depth <= LIMITS.treeDepthMax, 'Path ids are assigned within the depth bound');
+  nodes.forEach((node, index) => {
+    const path = prefix === '' ? String(index) : `${prefix}.${index}`;
+    if (node.id !== 'layout') {
+      node.id = `n${path}`;
+    }
+    if (Array.isArray(node.children)) {
+      assignPathIds(node.children, path, depth + 1);
+    }
+  });
+}
 
 // ---------------------------------------------------------------------------
 // Attribute (prop) parsing
@@ -1009,6 +1026,9 @@ function parseTemplate(str: string, base: number | null = null): ParsedTemplate 
     if (parseState.depth === 1 && result.clean && !parseTemplateWithinBounds(result.nodes)) {
       return bail([], str, 0, 'markup exceeding the tree limits');
     }
+    if (parseState.depth === 1) {
+      assignPathIds(result.nodes, '', 0); // A template on its own is a tree too.
+    }
     return result;
   } finally {
     parseState.depth--;
@@ -1422,6 +1442,7 @@ function parsePage(source: string, opts: { readonly locs?: boolean } = {}): Pars
   // they have no file to open and no props of their own.
   parsePageMarkDynamic(topNodes, importsByName);
 
+  assignPathIds(topNodes, '', 0);
   // Producer-side invariant check (paired with parsePageResult at the IPC
   // boundary): a tree that violates this never leaves the parser.
   assertTreeInvariants(topNodes);
@@ -3248,8 +3269,6 @@ function serializeNodes(input: readonly unknown[]): string {
 // is parsed into the Fragment's children so it's editable in the navigator;
 // edits are written back to the chunk file, never the page.
 
-let chunkGroupId = 1;
-
 function resolveChunks(
   model: ParserPageModel,
   pagePath: string,
@@ -3299,7 +3318,7 @@ function resolveChunks(
             const children = resolveChunksParseFile(file, opts);
             if (children) {
               groups.push({
-                id: `chunk${chunkGroupId++}`,
+                id: makeId(),
                 kind: 'chunk-group',
                 name: ident,
                 chunkFile: file,
@@ -3320,6 +3339,7 @@ function resolveChunks(
     }
   };
   walk(model.nodes);
+  assignPathIds(model.nodes, '', 0); // The chunks' nodes joined the tree.
 }
 
 // Marker path each chunk import's content occupies in the tree, keyed by the

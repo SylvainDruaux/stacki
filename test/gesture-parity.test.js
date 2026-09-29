@@ -146,7 +146,7 @@ function meaning(value) {
 function engine(file, snapshot, requests) {
   let current = snapshot;
   const log = [];
-  for (const [index, { edit }] of requests.entries()) {
+  for (const [index, edit] of requests.entries()) {
     const draft = buildEditIntent(edit, snapshot);
     if (!draft.ok) {
       return { tag: 'rejected', reason: draft.error };
@@ -411,7 +411,7 @@ test('parity, inline CSS: one declaration set, changed, added or removed in plac
       const gesture = gestures.inlineStyleGesture(node.id, { before, after }, options);
       const [request] =
         gesture.request(() => ({ path: [0], kind: 'element', span: { start: 0, end: 1 } })) ?? [];
-      inPlace += request?.edit.tag === 'set-inline-style' ? 1 : 0;
+      inPlace += request?.tag === 'set-inline-style' ? 1 : 0;
       return gesture;
     });
   });
