@@ -25,6 +25,11 @@ export type SpacingHover = {
   labels: Record<string, string>
 }
 
+/** What became of a class added to the page, for the rule that depends on it. */
+export type ClassOutcome =
+  | { readonly tag: 'applied' }
+  | { readonly tag: 'refused'; readonly message: string }
+
 export type HostState = {
   projectPath: string | null
   /** The page (or open component) being edited. */
@@ -73,8 +78,10 @@ export type HostState = {
   selectNode: ((nodeId: string) => void) | null
   /** Put a class on the selected element. Typing a bare class in the selector
    *  box should land it on the element, the way a class field would — a rule
-   *  for a class the element doesn't carry would never apply. */
-  addClass: ((className: string) => void) | null
+   *  for a class the element doesn't carry would never apply. Resolves once the
+   *  page edit reached disk or was refused: the stylesheet rule for that class
+   *  is written only after it applied (step 6, plan §3.3 — outcome-gated). */
+  addClass: ((className: string) => Promise<ClassOutcome>) | null
   /** What the spacing box is pointing at, for the canvas to draw over the
    *  selected element: hovering `padding-top` lights the strip of the page that
    *  padding-top holds open. Null when the pointer leaves it. */

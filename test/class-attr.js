@@ -170,6 +170,30 @@ const { class: className } = Astro.props;
     'an element whose class is code fails silently again'
   );
 
+  // Step 6 (plan §3.3): the class is a page edit, the rule a stylesheet edit
+  // that depends on it — written only after the page edit applied, and never
+  // submitted when it was refused.
+  const embedFile = path.join(__dirname, '..', 'src', 'style-panel', 'EmbedEditor.tsx');
+  const embed = fs.readFileSync(embedFile, 'utf8');
+  check(
+    'the class answers with the page edit\'s outcome',
+    /await flushSave\(\);\s*return \{ tag: 'applied' \};/.test(app),
+    'the style panel cannot tell whether the class reached the page'
+  );
+  check(
+    'a typed class gates its rule',
+    /classGatesRef\.current\.set\(trimmed, gate\)/.test(embed),
+    'the rule is written whatever became of the class'
+  );
+  check(
+    'and a refused class cancels the rule before it is written',
+    new RegExp(
+      "if \\(outcome\\.tag === 'refused'\\) \\{[\\s\\S]{0,400}?return" +
+        '[\\s\\S]{0,1600}?writeEmbedDoc\\(doc\\)',
+    ).test(embed),
+    'the rule is still written after the page refused the class'
+  );
+
   if (failures.length) {
     console.error(`\nclass-attr: ${failures.length} failed, ${checked - failures.length} passed\n`);
     console.error(failures.join('\n') + '\n');

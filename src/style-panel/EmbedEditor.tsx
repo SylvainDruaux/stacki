@@ -68,7 +68,7 @@ import {
   selectorDependsOnAncestor,
   type MatchTarget,
 } from './lib/selectors'
-import { findNode, getHost, onHostChange, propText } from './lib/host'
+import { findNode, getHost, onHostChange, propText, type ClassOutcome } from './lib/host'
 import {
   applyNativePropertyAt,
   applyNativeToNewBaseClass,
@@ -3523,10 +3523,27 @@ export default function EmbedEditor() {
     return { rule: editRule, remap }
   }, [])
 
+  // Classes typed into the selector box whose page edit has not answered yet,
+  // by selector: the rule for one is written only once its class is on the
+  // element (step 6, plan §3.3 — the dependent write is outcome-gated).
+  const classGatesRef = useRef(new Map<string, Promise<ClassOutcome>>())
+
   // Run a synchronous AST mutation, refresh the model, then persist the embed.
   const applyEdit = useCallback(async (rule: ParsedRule, mutate: () => boolean | void) => {
     const doc = docByKey.get(rule.embedKey)
     if (!doc) { setStatus('Lost track of the source embed — try Rescan.'); return }
+    const gate = classGatesRef.current.get(rule.selectorText)
+    if (gate) {
+      const outcome = await gate
+      classGatesRef.current.delete(rule.selectorText)
+      if (outcome.tag === 'refused') {
+        // Never submitted: a rule for a class the element does not carry would
+        // be half a gesture. The page's own notice says why its edit failed.
+        const why = `${rule.selectorText} is not on the element (${outcome.message})`
+        setSaveError(`${why}, so its rule was not written.`)
+        return
+      }
+    }
     setBusyBoth(true)
     setStatus('Saving…')
     // try/finally so `busy` ALWAYS clears — a throw here (e.g. materializing a complex
@@ -3893,7 +3910,10 @@ export default function EmbedEditor() {
       canon.tokens.length === 1 &&
       (canon.tokens[0] ?? '').startsWith('class:')
     ) {
-      getHost().addClass?.((canon.tokens[0] ?? '').slice('class:'.length))
+      const gate = getHost().addClass?.((canon.tokens[0] ?? '').slice('class:'.length))
+      // The rule this selector will get depends on the page edit: its first
+      // write waits for that edit's outcome (step 6, plan §3.3).
+      if (gate) {classGatesRef.current.set(trimmed, gate)}
       // The element itself changed, so the matches the canvas gave us for these
       // same selectors no longer hold — ask again on the next refresh.
       primedRef.current = null

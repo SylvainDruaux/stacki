@@ -1,6 +1,7 @@
 import { usePropertySaveGuard } from './usePropertySaveGuard';
 import ComponentPropertiesPanel from './panels/ComponentPropertiesPanel';
 import { revertComponentProperties } from './componentPropertiesBridge';
+import type { ClassOutcome } from './style-panel/lib/host';
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { SetStateAction } from 'react';
 import type { Attr, ImportDecl, PageModel, PageNode, PairedNode } from '../shared/page-node';
@@ -3305,23 +3306,39 @@ export default function App() {
   // plain `class`, a `class:list`, a template literal (see classAttr.js). An
   // element whose class is some other expression is code we would have to
   // understand to extend, so that one is said out loud rather than dropped.
+  // Resolves with the page edit's outcome, once it reached disk or was
+  // refused: the style panel writes the class's rule only after it applied
+  // (step 6, plan §3.3 — outcome-gated, never a fabricated atomicity).
   const addClassToNode = useCallback(
-    (nodeId: string, className: string) => {
+    async (nodeId: string, className: string): Promise<ClassOutcome> => {
       const clean = String(className || '').trim();
       const state = pageStateRef.current.pageState;
-      if (!nodeId || !clean || !state?.editable) {return;}
+      if (!nodeId || !clean || !state?.editable) {
+        return { tag: 'refused', message: 'no element is selected' };
+      }
       const node = findNodeById(state.model.nodes, nodeId);
-      if (!node || hasClass(node.props, clean)) {return;}
+      if (!node) {
+        return { tag: 'refused', message: 'the element is gone' };
+      }
+      if (hasClass(node.props, clean)) {
+        return { tag: 'applied' };
+      }
       const edit = withClass(node.props, clean);
       if (!edit) {
         showToast(`Add ${clean} to this element yourself — its class comes from code Stacki can't edit safely.`);
-        return;
+        return { tag: 'refused', message: 'its class comes from code' };
       }
       // Step 6, attribute: the class attribute, as its own edit request.
       const patch = { [edit.key]: edit.value };
       commitEdit(propsGesture(nodeId, patch, { coalesceKey: null, urgency: true }));
+      try {
+        await flushSave();
+        return { tag: 'applied' };
+      } catch (error: unknown) {
+        return { tag: 'refused', message: cleanError(error) };
+      }
     },
-    [commitEdit, showToast]
+    [commitEdit, flushSave, showToast]
   );
 
   // Step 6, attribute: set or remove one prop, as an edit request when it has
@@ -5524,11 +5541,11 @@ export default function App() {
                 }}
                 onSelectNode={setSelectedId}
                 onRecordUndo={pushCommand}
-                onAddClass={(name) => {
-                  if (selectedId) {
-                    addClassToNode(selectedId, name);
-                  }
-                }}
+                onAddClass={(name) =>
+                  selectedId
+                    ? addClassToNode(selectedId, name)
+                    : Promise.resolve({ tag: 'refused', message: 'no element is selected' })
+                }
                 onSpacingHover={setSpacingHover}
                 pathOf={pathFor}
                 renderedClasses={selectedClasses}
