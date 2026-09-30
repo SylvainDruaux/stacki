@@ -14,7 +14,11 @@ const cell = (name) => ({
   valueEnd: 13,
   line: 1,
 });
-const first = { label: 'primary', name: '--color-primary', cells: [cell('--color-primary'), null] };
+const first = {
+  label: 'primary',
+  name: '--color-primary',
+  cells: [cell('--color-primary'), undefined],
+};
 const second = {
   label: 'secondary',
   name: '--color-secondary',
@@ -43,7 +47,7 @@ assert.equal(rows.sectionPrefix(matrix), null);
 assert.deepEqual(
   rows.rowRenames(
     matrix,
-    { label: 'size', cells: [cell('--h1-size'), null, cell('--h3-size')] },
+    { label: 'size', cells: [cell('--h1-size'), undefined, cell('--h3-size')] },
     'weight',
   ),
   [

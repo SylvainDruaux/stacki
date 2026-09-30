@@ -19,7 +19,7 @@ const status = {
 const switched = {
   ok: true,
   restored: false,
-  parkedFrom: null,
+  parkedFrom: undefined,
   from: 'main',
   parked: false,
 };
@@ -53,6 +53,8 @@ test('GitChip parsers cover status and checkout variants', () => {
     {},
     { ...blocked, blocked: false },
     { ...switched, parkedFrom: 1 },
+    // Absence is `undefined` (AGENTS.md §6): main never sends a null origin.
+    { ...switched, parkedFrom: null },
     { ...blocked, files: Array(100001).fill('file') },
   ]) {
     assert.throws(() => bridge.parseGitCheckout(value));

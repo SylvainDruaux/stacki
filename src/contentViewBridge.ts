@@ -15,7 +15,6 @@ import {
   count,
   data,
   list,
-  nullable,
   object,
   optional,
   pathText,
@@ -85,12 +84,12 @@ export function parseContentEntries(input: unknown): ContentEntries {
     readOnly: boolean(value['readOnly']),
     collection: parseContentCollection(value['collection']),
     ...optionalFields({
-      reason: optional(nullable(text))(value['reason']),
+      reason: optional(text)(value['reason']),
       idsAreGuesses: optional(boolean)(value['idsAreGuesses']),
-      idNote: optional(nullable(text))(value['idNote']),
+      idNote: optional(text)(value['idNote']),
       shape: optional(text)(value['shape']),
       parsed: optional(boolean)(value['parsed']),
-      parserNote: optional(nullable(text))(value['parserNote']),
+      parserNote: optional(text)(value['parserNote']),
     }),
   };
 }

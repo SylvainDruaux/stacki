@@ -16,7 +16,7 @@ export type StructurePageState =
       readonly editable: false;
       readonly source: string;
       readonly reason?: string;
-      readonly bail?: { readonly what: string; readonly near: string } | null;
+      readonly bail?: { readonly what: string; readonly near: string } | undefined;
     };
 
 /** The page as the navigator draws it (plan §3.6): a tree to edit visually, or

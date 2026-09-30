@@ -25,7 +25,6 @@ const entries = {
   entries: [entry],
   readOnly: false,
   collection,
-  parserNote: null,
 };
 const plan = {
   entry: { id: 'hello', file: entry.file },
@@ -61,6 +60,8 @@ test('content parsers reject malformed nested data and collection bounds', () =>
   for (const value of [
     null,
     { ...entries, entries: null },
+    // Absence is `undefined` (AGENTS.md §6): main never sends a null note.
+    { ...entries, parserNote: null },
     { ...entries, entries: [{ ...entry, locator: [-1] }] },
     { ...entries, entries: [{ ...entry, data: Number.NaN }] },
     { ...entries, collection: { ...collection, name: 1 } },

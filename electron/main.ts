@@ -441,24 +441,24 @@ ipcMain.handle('project:pending', () => {
     return asked;
   }
   if (!isDev) {
-    return null;
+    return undefined;
   }
   if (openProjectRoot && fs.existsSync(openProjectRoot)) {
     return openProjectRoot;
   }
-  let p = null;
+  let p: string | undefined = undefined;
   try {
     const input: unknown = JSON.parse(readSource(reopenFile()));
-    p = parseOptionalString(toRecord(input)?.['path']) || null;
+    p = parseOptionalString(toRecord(input)?.['path']) || undefined;
   } catch {
-    return null;
+    return undefined;
   }
   try {
     fs.rmSync(reopenFile(), { force: true });
   } catch {
     /* non-fatal */
   }
-  return p && fs.existsSync(p) ? p : null;
+  return p && fs.existsSync(p) ? p : undefined;
 });
 
 // Native clipboard actions on the focused element, requested by the renderer
@@ -1280,9 +1280,9 @@ ipcMain.handle('recents:list', async () => {
     // so on the card instead of showing last month's homepage as if it were
     // today's.
     let stale = true;
-    let thumb = null;
+    let thumb: string | undefined = undefined;
     try {
-      thumb = thumbs.readThumb(userData, r.path);
+      thumb = thumbs.readThumb(userData, r.path) ?? undefined;
       stale = thumbs.isStale(userData, r.path);
     } catch {
       /* card renders a placeholder */
@@ -1490,7 +1490,7 @@ ipcMain.handle('recents:refreshThumb', async (_e, projectPath) => {
   const userData = app.getPath('userData');
   return {
     ...result,
-    thumb: thumbs.readThumb(userData, projectPath),
+    thumb: thumbs.readThumb(userData, projectPath) ?? undefined,
     stale: thumbs.isStale(userData, projectPath),
   };
 });
@@ -1960,14 +1960,14 @@ function safeSchema(filePath: string, projectPath: string) {
     const schema = resolveIdentifierDefaults(fields, source, filePath, projectPath);
     return {
       schema,
-      extendsTag: parseExtendsTag(source),
+      extendsTag: parseExtendsTag(source) ?? undefined,
       slots: parseSlots(source),
       // Where that default slot sits decides whether a fresh instance
       // arrives holding a word or empty — see defaultSlotInline.
       slotText: defaultSlotInline(source),
       // The HTML tag it renders as, so nesting rules apply through a
       // component the same way they do through a plain element.
-      renderTag: rootTag(source),
+      renderTag: rootTag(source) ?? undefined,
       // A `...rest` spread on Astro.props means the component forwards
       // arbitrary attributes — the UI offers a free-form Attributes section.
       // Anchored to the end of the destructure rather than scanning forward
@@ -1979,10 +1979,10 @@ function safeSchema(filePath: string, projectPath: string) {
   } catch {
     return {
       schema: [],
-      extendsTag: null,
+      extendsTag: undefined,
       slots: [],
       slotText: false,
-      renderTag: null,
+      renderTag: undefined,
       hasRest: false,
     };
   }
@@ -2858,7 +2858,7 @@ ipcMain.handle('content:collections', async (_e, projectPath) => {
     loader: collection.loader,
     hasSchema: !!collection.schema,
     freeform: !!collection.freeform,
-    error: collection.error || null,
+    error: collection.error || undefined,
     count: countEntries(projectPath, collection),
   }));
   return {
@@ -2936,7 +2936,7 @@ ipcMain.handle('content:targets', async (_e, { projectPath, name }) => {
 // <Layout> — so drilling into a component has to follow the import, not the
 // name.
 ipcMain.handle('project:resolveImport', async (_e, { projectPath, fromFile, spec }) => ({
-  path: resolveImport(projectPath, fromFile, spec),
+  path: resolveImport(projectPath, fromFile, spec) ?? undefined,
 }));
 
 ipcMain.handle('cms:setMeta', async (_e, { projectPath, rel, fields }) => {
@@ -3126,7 +3126,7 @@ function pageEditError(
   if (report.tag === 'rejected') {
     const { reason, diskChecksum } = report;
     const message = report.message === '' ? describeRejection(reason) : report.message;
-    return { code: 'rejected', reason, message, diskChecksum: diskChecksum ?? null };
+    return { code: 'rejected', reason, message, diskChecksum };
   }
   return pageWriteFailure(file, report);
 }
@@ -3139,7 +3139,7 @@ function pageEditError(
 ipcMain.handle('page:previewEdit', async (_e, { pagePath, authoredChecksum, edit, source }) => {
   const refused = (reason: RejectionReason) => {
     const error = { code: 'rejected' as const, reason, message: describeRejection(reason) };
-    return { ok: false as const, error: { ...error, diskChecksum: null } };
+    return { ok: false as const, error: { ...error, diskChecksum: undefined } };
   };
   const planned = previewEdit(pagePath, encodeUtf8(source), authoredChecksum, edit);
   if (!planned.ok) {
@@ -3303,13 +3303,13 @@ ipcMain.handle('page:dynamicPaths', async (_e, { projectPath, pagePath, devUrl }
       const params = e.params;
       return {
         params,
-        props: (e && e.props) || null,
+        props: (e && e.props) || undefined,
         route: fillRoute(pattern, params),
         // The values themselves read better in a picker than "slug=hello-world".
         label: Object.values(params).map(String).join(' / ') || pattern,
       };
     });
-    return { entries, error: data.error || null };
+    return { entries, error: data.error || undefined };
   } catch (err) {
     return { entries: [], error: errorMessage(err) };
   }
@@ -3377,7 +3377,7 @@ ipcMain.handle('component:usage', async (_e, { projectPath, name, exclude }) =>
 ipcMain.handle('page:importPathFor', async (_e, { pagePath, targetPath, projectPath }) => {
   const rel = toPosix(path.relative(path.dirname(pagePath), targetPath));
   const relative = rel.startsWith('.') ? rel : './' + rel;
-  let srcRelative = null;
+  let srcRelative: string | undefined = undefined;
   if (projectPath) {
     const srcDir = path.join(projectPath, 'src');
     if (isPathDescendant(srcDir, targetPath)) {
@@ -4343,7 +4343,7 @@ function imageSizeOf(abs: string) {
 
 ipcMain.handle('assets:dimensions', async (_e, { projectPath, rel }) => {
   const abs = assertInProject(path.resolve(projectPath, rel));
-  return { dims: imageSizeOf(abs) };
+  return { dims: imageSizeOf(abs) ?? undefined };
 });
 
 ipcMain.handle('src:readText', async (_e, { projectPath, rel }) => {
@@ -4375,7 +4375,7 @@ ipcMain.handle('dev:stop', async () => {
 // >=22.0.0", ">=22.12.0"). Anything this can't parse counts as satisfied:
 // the point is to explain a failure that already happened, never to block a
 // launch over a range we couldn't read.
-function satisfiesRange(version: string | null, range: string | null) {
+function satisfiesRange(version: string | undefined, range: string | undefined) {
   if (!version || !range) {
     return true;
   }
@@ -4419,24 +4419,24 @@ function nodeVersionOf(bin: string) {
       stdio: ['ignore', 'pipe', 'ignore'],
     }).trim();
   } catch {
-    return null;
+    return undefined;
   }
 }
 
 ipcMain.handle('dev:probe', (_e, url) => probeUrl(url));
 
 ipcMain.handle('dev:diagnose', async (_e, projectPath) => {
-  const nodePath = resolveNodeBin();
-  const nodeVersion = nodePath ? nodeVersionOf(nodePath) : null;
+  const nodePath = resolveNodeBin() ?? undefined;
+  const nodeVersion = nodePath ? nodeVersionOf(nodePath) : undefined;
 
-  let astroVersion = null;
-  let requires = null;
+  let astroVersion: string | undefined = undefined;
+  let requires: string | undefined = undefined;
   try {
     const pkg = parseRecord(
       readJson(path.join(projectPath, 'node_modules', 'astro', 'package.json')),
     );
-    astroVersion = parseOptionalString(pkg['version']) || null;
-    requires = parseOptionalString(toRecord(pkg['engines'])?.['node']) || null;
+    astroVersion = parseOptionalString(pkg['version']) || undefined;
+    requires = parseOptionalString(toRecord(pkg['engines'])?.['node']) || undefined;
   } catch {
     /* astro not installed — reported as its own kind below */
   }
@@ -4477,7 +4477,7 @@ ipcMain.handle('git:info', async (_e, projectPath) => {
     isRepo: true as const,
     branch: '',
     branches: [],
-    remote: null,
+    remote: undefined,
     dirty: false,
     ahead: 0,
     // Branches holding work that was left behind on the way out, so the
@@ -4502,14 +4502,15 @@ ipcMain.handle('git:info', async (_e, projectPath) => {
     // other branch — `git branch -d main` succeeds the moment main is merged
     // into whatever you are standing on — and the branch everything comes back
     // to is not one to lose to a stray click.
-    info.trunk = trunk || null;
+    info.trunk = trunk || undefined;
   } catch {
     /* empty repo */
   }
   try {
-    info.remote = (await git(projectPath, ['remote', 'get-url', 'origin'])).stdout.trim() || null;
+    info.remote =
+      (await git(projectPath, ['remote', 'get-url', 'origin'])).stdout.trim() || undefined;
   } catch {
-    info.remote = null;
+    info.remote = undefined;
   }
   try {
     const out = (await git(projectPath, ['status', '--porcelain'])).stdout;
@@ -4562,7 +4563,7 @@ ipcMain.handle('git:ghStatus', async (_e, projectPath) => {
     const r = await run('gh', ['auth', 'status'], projectPath);
     const out = `${r.stdout}${r.stderr}`;
     const m = out.match(/(?:account|as)\s+([\w-]+)/i);
-    return { installed: true as const, authed: true as const, user: m ? capture(m, 1) : null };
+    return { installed: true as const, authed: true as const, user: m ? capture(m, 1) : undefined };
   } catch {
     return { installed: true as const, authed: false as const };
   }
@@ -4660,7 +4661,7 @@ ipcMain.handle('git:checkout', async (_e, { projectPath, branch, create, parkFir
   // Whatever was last left on this branch comes back out, however the switch
   // was made — that half is always wanted.
   const back = await unpark(projectPath, branch);
-  return { ...r, parkedFrom: r.parked ? r.from : null, ...back };
+  return { ...r, parkedFrom: r.parked ? r.from : undefined, ...back };
 });
 
 async function currentBranch(projectPath: string) {
@@ -4836,7 +4837,7 @@ ipcMain.handle('git:worktrees', async (_e, { projectPath }) =>
 ipcMain.handle('git:park', async (_e, { projectPath }) => {
   const branch = await currentBranch(projectPath);
   const parked = await park(projectPath, branch);
-  return { ok: true as const, parked, branch };
+  return { ok: true as const, parked, branch: branch ?? undefined };
 });
 
 ipcMain.handle('git:unpark', async (_e, { projectPath }) => {
@@ -4905,10 +4906,10 @@ ipcMain.handle('git:publish', async (_e, { projectPath, repoName, isPrivate }) =
   const result = await run('gh', args, projectPath, { timeout: 180000 });
   const output = result.stdout + result.stderr;
   // gh prints the new repo's URL; fall back to the remote it just set.
-  let url = (output.match(/https:\/\/github\.com\/[^\s"']+/) || [])[0] || null;
+  let url = (output.match(/https:\/\/github\.com\/[^\s"']+/) || [])[0] || undefined;
   if (!url) {
     try {
-      url = (await git(projectPath, ['remote', 'get-url', 'origin'])).stdout.trim() || null;
+      url = (await git(projectPath, ['remote', 'get-url', 'origin'])).stdout.trim() || undefined;
     } catch {
       /* no remote — caller just won't get a link */
     }
@@ -5186,10 +5187,10 @@ function imageSizeWebP(buf: Buffer) {
 }
 
 async function readGitIdentity(projectPath: string) {
-  const identity: { branch: string; head: string | null; userEmail: string | null } = {
+  const identity: { branch: string; head: string | undefined; userEmail: string | undefined } = {
     branch: '',
-    head: null,
-    userEmail: null,
+    head: undefined,
+    userEmail: undefined,
   };
   try {
     identity.branch = (await git(projectPath, ['rev-parse', '--abbrev-ref', 'HEAD'])).stdout.trim();
@@ -5202,15 +5203,16 @@ async function readGitIdentity(projectPath: string) {
     // without the panel having to know the chip exists.
     identity.head = (await git(projectPath, ['rev-parse', 'HEAD'])).stdout.trim();
   } catch {
-    identity.head = null; // no commits yet
+    identity.head = undefined; // no commits yet
   }
   try {
     // Whose commits are "yours". Git records an author on every commit, and on
     // your own machine that is nearly always you — "Timothy Ricks changed the
     // hero" reads oddly about yourself.
-    identity.userEmail = (await git(projectPath, ['config', 'user.email'])).stdout.trim() || null;
+    identity.userEmail =
+      (await git(projectPath, ['config', 'user.email'])).stdout.trim() || undefined;
   } catch {
-    identity.userEmail = null;
+    identity.userEmail = undefined;
   }
   return identity;
 }

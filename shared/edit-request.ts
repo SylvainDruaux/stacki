@@ -140,41 +140,16 @@ export function parseEdit(input: unknown): Edit {
   const tag = record['tag'];
   switch (tag) {
     case 'set-attribute':
-      return {
-        tag,
-        target: parseNodeRef(record['target'], 'Edit.target'),
-        name: attributeName(record['name'], 'Edit.name'),
-        value: parseAttributeValue(record['value']),
-      };
     case 'remove-attribute':
-      return {
-        tag,
-        target: parseNodeRef(record['target'], 'Edit.target'),
-        name: attributeName(record['name'], 'Edit.name'),
-      };
     case 'set-inline-style':
-      return {
-        tag,
-        target: parseNodeRef(record['target'], 'Edit.target'),
-        property: styleProperty(record['property']),
-        declaration: parseDeclaration(record['declaration']),
-      };
+      return parseAttributeEdit(record, tag);
     case 'insert-node':
-      return {
-        tag,
-        target: parseNodeRef(record['target'], 'Edit.target'),
-        placement: parsePlacement(record['placement']),
-        content: parseContent(record['content']),
-      };
     case 'remove-node':
-      return { tag, target: parseNodeRef(record['target'], 'Edit.target') };
     case 'move-node':
-      return {
-        tag,
-        target: parseNodeRef(record['target'], 'Edit.target'),
-        destination: parseNodeRef(record['destination'], 'Edit.destination'),
-        placement: parsePlacement(record['placement']),
-      };
+    case 'wrap-nodes':
+    case 'unwrap-node':
+    case 'replace-node':
+      return parseStructureEdit(record, tag);
     case 'rename-binding':
       return parseRename(record);
     case 'rename-tag':
@@ -185,27 +160,11 @@ export function parseEdit(input: unknown): Edit {
       };
     case 'rename-attribute':
       return parseAttributeRename(record);
-    case 'wrap-nodes':
-      return {
-        tag,
-        target: parseNodeRef(record['target'], 'Edit.target'),
-        last: parseNodeRef(record['last'], 'Edit.last'),
-        name: tagName(record['name'], 'Edit.name'),
-      };
-    case 'unwrap-node':
-      return { tag, target: parseNodeRef(record['target'], 'Edit.target') };
     case 'append-body': {
       const content = parseContent({ tag: 'nodes', nodes: record['nodes'] });
       assert(content.tag === 'nodes', 'Parsed as nodes');
       return { tag, nodes: content.nodes };
     }
-    case 'replace-node':
-      return {
-        tag,
-        target: parseNodeRef(record['target'], 'Edit.target'),
-        // One counter bounds the node like one page tree.
-        node: parsePageNode(record['node'], 'Edit.node', 0, { nodes: 0 }),
-      };
     case 'set-frontmatter':
       return { tag, model: parsePageModel(record['model']) };
     case 'revert':
@@ -214,6 +173,81 @@ export function parseEdit(input: unknown): Edit {
       return { tag, hunks: parseCodeHunks(record['hunks']) };
     default:
       throw new Error(`Edit.tag: unknown edit ${JSON.stringify(tag)}`);
+  }
+}
+
+// The edits that change one attribute or declaration of the target tag.
+function parseAttributeEdit(
+  record: Record<string, unknown>,
+  tag: 'set-attribute' | 'remove-attribute' | 'set-inline-style',
+): Edit {
+  // Paired with parseEdit's dispatch: the record is the edit it was routed as.
+  assert(record['tag'] === tag, 'parseAttributeEdit: record tag matches its dispatch');
+  const target = parseNodeRef(record['target'], 'Edit.target');
+  switch (tag) {
+    case 'set-attribute':
+      return {
+        tag,
+        target,
+        name: attributeName(record['name'], 'Edit.name'),
+        value: parseAttributeValue(record['value']),
+      };
+    case 'remove-attribute':
+      return { tag, target, name: attributeName(record['name'], 'Edit.name') };
+    case 'set-inline-style':
+      return {
+        tag,
+        target,
+        property: styleProperty(record['property']),
+        declaration: parseDeclaration(record['declaration']),
+      };
+    default: {
+      const exhaustive: never = tag;
+      return exhaustive;
+    }
+  }
+}
+
+// The edits that add, remove, move or replace whole nodes around the target.
+function parseStructureEdit(
+  record: Record<string, unknown>,
+  tag: 'insert-node' | 'remove-node' | 'move-node' | 'wrap-nodes' | 'unwrap-node' | 'replace-node',
+): Edit {
+  // Paired with parseEdit's dispatch: the record is the edit it was routed as.
+  assert(record['tag'] === tag, 'parseStructureEdit: record tag matches its dispatch');
+  const target = parseNodeRef(record['target'], 'Edit.target');
+  switch (tag) {
+    case 'insert-node':
+      return {
+        tag,
+        target,
+        placement: parsePlacement(record['placement']),
+        content: parseContent(record['content']),
+      };
+    case 'remove-node':
+    case 'unwrap-node':
+      return { tag, target };
+    case 'move-node':
+      return {
+        tag,
+        target,
+        destination: parseNodeRef(record['destination'], 'Edit.destination'),
+        placement: parsePlacement(record['placement']),
+      };
+    case 'wrap-nodes':
+      return {
+        tag,
+        target,
+        last: parseNodeRef(record['last'], 'Edit.last'),
+        name: tagName(record['name'], 'Edit.name'),
+      };
+    case 'replace-node':
+      // One counter bounds the node like one page tree.
+      return { tag, target, node: parsePageNode(record['node'], 'Edit.node', 0, { nodes: 0 }) };
+    default: {
+      const exhaustive: never = tag;
+      return exhaustive;
+    }
   }
 }
 

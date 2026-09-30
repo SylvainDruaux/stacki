@@ -656,7 +656,7 @@ function TableRowNames({ state }: { readonly state: ReturnType<typeof useVariabl
             <DragIcon size={11} />
           </span>
           <div className="vars-name" title={row.name || row.label}>
-            <VariableTypeIcon kind={row.cells.find((cell) => cell !== null)?.kind ?? ''} />
+            <VariableTypeIcon kind={row.cells.find((cell) => cell !== undefined)?.kind ?? ''} />
             <EditableName
               className="vars-name-text"
               value={row.label}

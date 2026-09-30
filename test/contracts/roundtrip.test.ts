@@ -54,7 +54,7 @@ interface GeneratedNode {
   readonly inner?: string;
   readonly props?: Readonly<Record<string, unknown>>;
   readonly attrOrder?: readonly string[];
-  readonly children?: readonly GeneratedNode[] | null;
+  readonly children?: readonly GeneratedNode[] | undefined;
 }
 
 function pick(rand: () => number, options: readonly string[]): string {
@@ -126,7 +126,7 @@ function generateNode(rand: () => number, nextId: () => string, depth: number): 
     kind: /^[A-Z]/.test(name) ? 'component' : 'element',
     id: nextId(),
     name,
-    children: rand() < 0.15 ? null : children,
+    children: rand() < 0.15 ? undefined : children,
     ...(attrOrder.length ? { props, attrOrder } : {}),
   };
   return node;
@@ -153,7 +153,7 @@ function loose(node: GeneratedNode): unknown {
         name: node.name,
         props,
         children,
-        selfClosing: node.children === null,
+        selfClosing: node.children === undefined,
       };
     }
     default:
@@ -185,7 +185,8 @@ test('serialize ∘ parse roundtrip: generated trees survive the real parser', (
       assert.deepEqual(
         actual,
         expected,
-        `seed ${seed} drifted\nSOURCE: ${source}\nACTUAL: ${JSON.stringify(actual)}\nEXPECTED: ${JSON.stringify(expected)}`,
+        `seed ${seed} drifted\nSOURCE: ${source}\nACTUAL: ${JSON.stringify(actual)}\n` +
+          `EXPECTED: ${JSON.stringify(expected)}`,
       );
     }
   }

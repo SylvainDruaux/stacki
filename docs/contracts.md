@@ -20,8 +20,12 @@ enforce these invariants:
   span mapping (`src/nodeHandles.ts`): `s<16 hex>.<path>` for a node first
   seen in that snapshot, `g<32 hex>` for a node a gesture created.
 - `text`, `expr`, `raw-line`, `comment`, and `raw` nodes are leaves.
-  Components and elements may use `children: null` only when self-closing.
+  Components and elements carry `children: undefined` only when self-closing.
   Branches, loops, conditions, and chunk groups always carry child arrays.
+  JSON cannot say `undefined`, so the wire parser also reads a missing
+  `children` key, and the `null` written before the absence convention
+  (AGENTS.md §6), as self-closing; it always emits `undefined`. The same holds
+  for a page result's `bail` and a Markdown model's `layoutPath`.
 - Attribute variants are `string`, `expr`, `bare`, or `spread`. The value field
   exists only on variants that need it.
 - Import slots, attribute order, original tag text, line endings, blank lines, Markdown
@@ -51,6 +55,16 @@ component. Shared parsers cover common records; feature boundary modules such as
 `src/appBridge.ts`, `src/historyBridge.ts`, and `src/terminalBridge.ts` preserve
 only the fields their consumers use while still validating nested values and
 bounds.
+
+Absence is `undefined`, never `null` (AGENTS.md §6): an invoke result states a
+value that is not there as `undefined` (a missing thumbnail, an unknown remote,
+a deleted side of a merge clash, an empty grid cell). Structured clone keeps
+`undefined`, including as an array element, so the renderer's parsers accept
+`undefined` and refuse `null` for these fields. A value that was ever written
+as JSON — a file on disk, a child process's or dev server's reply — is read
+with `null` accepted as absent, at the reader that parses it, because JSON
+cannot say `undefined`. JSON's own `null` inside project data (`Data` in
+`shared/boundary.ts`) is a value and round-trips as `null`.
 
 Expected operating failures use `Result` or an explicit result union. A shape
 that violates the declared wire contract is a programmer error and throws at

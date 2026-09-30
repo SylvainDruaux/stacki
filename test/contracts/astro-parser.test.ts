@@ -81,7 +81,7 @@ test('serializer rejects malformed node kinds and their required payloads', () =
 });
 
 test('serializer validates optional source metadata and every attribute variant', () => {
-  const node = { kind: 'element', name: 'div', children: null };
+  const node = { kind: 'element', name: 'div', children: undefined };
   const valid = {
     ...node,
     props: {

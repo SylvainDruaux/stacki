@@ -22,7 +22,7 @@ type NodeFields =
   | {
       kind: 'component' | 'element';
       name: string;
-      children: ParserNode[] | null;
+      children: ParserNode[] | undefined;
       shorthand?: boolean;
       tightClose?: boolean;
       closeSource?: string;
@@ -76,7 +76,7 @@ export interface ParserPageModel extends FrontmatterModel {
 }
 export type ParsedPage =
   | { readonly editable: true; readonly model: ParserPageModel }
-  | { readonly editable: false; readonly reason: string; readonly bail: ParseBail | null };
+  | { readonly editable: false; readonly reason: string; readonly bail: ParseBail | undefined };
 
 export interface NumberRules {
   min?: number;

@@ -19,7 +19,7 @@ const content = {
       loader: { kind: 'glob', base: 'src/content/posts' },
       hasSchema: true,
       freeform: false,
-      error: null,
+      error: undefined,
       count: 1,
     },
   ],
@@ -35,7 +35,7 @@ test('CMS panel parsers preserve the fields used by the panel', () => {
         name: 'posts',
         editable: true,
         loader: { kind: 'glob', base: 'src/content/posts' },
-        error: null,
+        error: undefined,
         count: 1,
       },
     ],
@@ -60,6 +60,8 @@ test('CMS panel parsers reject malformed paths, counts, data, and bounds', () =>
   }
   for (const value of [
     { ...content, collections: [{ ...content.collections[0], count: -1 }] },
+    // Absence is `undefined` (AGENTS.md §6): main never sends a null error.
+    { ...content, collections: [{ ...content.collections[0], error: null }] },
     { ...content, covered: { files: null, dirs: [] } },
     { collections: [{ ...content.collections[0] }] },
     { collections: [], missing: false },

@@ -13,7 +13,7 @@ export interface InlineCandidate {
   readonly props?: Readonly<
     Record<string, { readonly type: string; readonly value?: string } | null>
   >;
-  readonly children?: readonly InlineCandidate[] | null;
+  readonly children?: readonly InlineCandidate[] | undefined;
 }
 export interface InlineExpression {
   readonly kind: 'expr';
@@ -26,7 +26,7 @@ export type InlineNode =
       readonly kind: 'element';
       readonly name: string;
       readonly props?: Readonly<Record<string, Attr | null>>;
-      readonly children: readonly InlineNode[] | null;
+      readonly children: readonly InlineNode[] | undefined;
     };
 
 export const INLINE_TAGS: ReadonlySet<string> = new Set([
@@ -85,7 +85,9 @@ export function isInlineOnly<T extends InlineCandidate>(
     ) {
       return false;
     }
-    if (node.children === undefined) {
+    // A void element (`<br>`) carries `children: undefined`; a node with no
+    // `children` key at all is malformed (shared/page-node.ts: PairedNode).
+    if (!('children' in node)) {
       return false;
     }
     assert(
@@ -163,7 +165,7 @@ function richSerialize(
         )
         .join('');
       out +=
-        n.children === null || n.children.length === 0
+        n.children === undefined || n.children.length === 0
           ? n.name === 'br'
             ? '<br>'
             : `<${n.name}${attrs}></${n.name}>`
@@ -240,7 +242,7 @@ function richReadElement(node: Element, budget: Budget, depth: number): InlineNo
     name = 'em';
   }
   if (name === 'br') {
-    return [{ kind: 'element', name: 'br', props: {}, children: null }];
+    return [{ kind: 'element', name: 'br', props: {}, children: undefined }];
   }
   const children = richReadDOM(node, budget, depth + 1);
   if (!INLINE_TAGS.has(name)) {

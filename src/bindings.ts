@@ -6,7 +6,7 @@ import type { Attr } from '../shared/page-node';
 
 interface BindableNode {
   readonly props?: Record<string, { readonly type?: string } | undefined> | null;
-  readonly children?: readonly { readonly kind?: string; readonly value?: string }[] | null;
+  readonly children?: readonly { readonly kind?: string; readonly value?: string }[] | undefined;
 }
 
 export function isDataBound(node: BindableNode | null | undefined): boolean {

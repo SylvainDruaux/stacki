@@ -60,7 +60,7 @@ const check = (what, condition, detail) => {
       },
       { id: 'p', kind: 'element', name: 'p', props: {}, children: [] },
       { id: 'head', kind: 'component', name: 'Heading', props: {}, children: [] },
-      { id: 'hr', kind: 'element', name: 'hr', props: {}, children: null },
+      { id: 'hr', kind: 'element', name: 'hr', props: {}, children: undefined },
     ],
   };
   const DIV = { type: 'element', tag: 'div' };

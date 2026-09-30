@@ -20,6 +20,7 @@
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
+const { sourceBlock } = require('./source-text.js');
 
 const failures = [];
 let checked = 0;
@@ -262,7 +263,7 @@ const check = (what, condition, detail) => {
         kind: 'component',
         name: 'Button',
         props: { label: { type: 'string', value: 'Go' } },
-        children: null,
+        children: undefined,
       },
     ],
   };
@@ -308,7 +309,7 @@ const check = (what, condition, detail) => {
     projectPath: project,
     pagePath,
     name: 'Aliased',
-    nodes: [{ id: 'x', kind: 'component', name: 'Icon', props: {}, children: null }],
+    nodes: [{ id: 'x', kind: 'component', name: 'Icon', props: {}, children: undefined }],
     imports,
   });
   check(
@@ -322,7 +323,7 @@ const check = (what, condition, detail) => {
     projectPath: project,
     pagePath: path.join(project, 'src', 'pages', 'blog', 'post.astro'),
     name: 'FromDeep',
-    nodes: [{ id: 'y', kind: 'component', name: 'Button', props: {}, children: null }],
+    nodes: [{ id: 'y', kind: 'component', name: 'Button', props: {}, children: undefined }],
     imports: [{ name: 'Button', path: '../../components/Button.astro' }],
   });
   check(
@@ -898,9 +899,10 @@ const check = (what, condition, detail) => {
 
     // The press itself is bound in the app, which this can only read.
     const appSource = fs.readFileSync(path.join(__dirname, '..', 'src', 'App.tsx'), 'utf8');
-    const binding = appSource.slice(
-      appSource.indexOf("e.key.toLowerCase() === 'a'") - 200,
-      appSource.indexOf("e.key.toLowerCase() === 'a'") + 400,
+    // The whole `if` that tests for the key, body included, however it is wrapped.
+    const binding = sourceBlock(
+      appSource,
+      appSource.lastIndexOf('if (', appSource.indexOf("e.key.toLowerCase() === 'a'")),
     );
     check('⌘⇧A is bound', /mod && e\.shiftKey[\s\S]*'a'/.test(binding), binding.slice(0, 120));
     check('to the Components panel', /setLeftTab\('components'\)/.test(binding), binding);

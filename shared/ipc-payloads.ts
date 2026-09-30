@@ -27,7 +27,16 @@ const nothing = (input: unknown): undefined => {
 };
 const maybeText = optional(nullable(text));
 const maybePath = optional(nullable(pathText));
-const cssTarget = (input: unknown) => (input == null ? undefined : text(input));
+// The renderer sends no target as a missing field or as `null`.
+const cssTarget = (input: unknown): string | undefined => {
+  if (input === undefined) {
+    return undefined;
+  }
+  if (input === null) {
+    return undefined;
+  }
+  return text(input);
+};
 const maybeFlag = optional(boolean);
 const strings = list(text);
 const project = { projectPath: pathText };

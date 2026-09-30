@@ -41,6 +41,23 @@ test('a full scan passes intact', () => {
   assert.equal(parsed.trailingSlash, 'ignore');
 });
 
+// Absence is `undefined` (AGENTS.md §6): a component with no extended tag or no
+// root tag says so with `undefined`, and `null` is not part of the contract.
+test('a component without an extended or root tag carries undefined, never null', () => {
+  const bare = { path: '/x', name: 'X', folder: '', extendsTag: undefined, renderTag: undefined };
+  const parsed = parseScanResult({ ...goodScan, components: [bare] });
+  assert.equal(parsed.components[0]?.extendsTag, undefined);
+  assert.equal(parsed.components[0]?.renderTag, undefined);
+  assert.throws(
+    () => parseScanResult({ ...goodScan, components: [{ ...bare, extendsTag: null }] }),
+    /extendsTag: expected string/,
+  );
+  assert.throws(
+    () => parseScanResult({ ...goodScan, components: [{ ...bare, renderTag: null }] }),
+    /renderTag: expected object/,
+  );
+});
+
 test('negative space: wrong entry shapes fail with pinned messages', () => {
   assert.throws(() => parseScanResult(null), /expected object/);
   assert.throws(() => parseScanResult({ ...goodScan, pages: {} }), /pages: expected array/);

@@ -25,10 +25,10 @@ export interface ScanComponent {
   readonly instances?: number;
   // safeSchema output — absent when the component's source could not be read.
   readonly schema?: readonly PropField[];
-  readonly extendsTag?: string | null;
+  readonly extendsTag?: string | undefined;
   readonly slots?: readonly string[];
   readonly slotText?: boolean;
-  readonly renderTag?: RenderTag | null;
+  readonly renderTag?: RenderTag | undefined;
   readonly hasRest?: boolean;
 }
 
@@ -118,30 +118,19 @@ function parseComponent(input: unknown, where: string): ScanComponent {
     out['schema'] = parseSchemaArray(record['schema'], `${where}.schema`);
   }
   if (record['extendsTag'] !== undefined) {
-    const value = record['extendsTag'];
-    if (value !== null && typeof value !== 'string') {
-      fail(where, 'extendsTag: expected string or null');
-    }
-    out['extendsTag'] = value;
+    out['extendsTag'] = asString(record['extendsTag'], `${where}.extendsTag`);
   }
   if (record['renderTag'] !== undefined) {
-    const value = record['renderTag'];
-    if (value === null) {
-      out['renderTag'] = null;
-    } else if (typeof value !== 'object' || Array.isArray(value)) {
-      fail(where, 'renderTag: expected object or null');
-    } else {
-      const record2 = value as Record<string, unknown>;
-      const tag = record2['tag'];
-      if (tag !== undefined && typeof tag !== 'string') {
-        fail(where, 'renderTag.tag: expected string');
-      }
-      const prop = record2['prop'];
-      if (prop !== undefined && typeof prop !== 'string') {
-        fail(where, 'renderTag.prop: expected string');
-      }
-      out['renderTag'] = { tag, prop };
+    const renderTag = asRecord(record['renderTag'], `${where}.renderTag`);
+    const tag = renderTag['tag'];
+    if (tag !== undefined && typeof tag !== 'string') {
+      fail(where, 'renderTag.tag: expected string');
     }
+    const prop = renderTag['prop'];
+    if (prop !== undefined && typeof prop !== 'string') {
+      fail(where, 'renderTag.prop: expected string');
+    }
+    out['renderTag'] = { tag, prop };
   }
   if (record['slots'] !== undefined) {
     const slots = asArray(record['slots'], `${where}.slots`, LIMITS.propOptionsMax);

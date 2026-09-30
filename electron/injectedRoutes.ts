@@ -20,22 +20,22 @@ import path from 'path';
 import { toRecord, toArray } from '../shared/record.js';
 
 /** The package an entrypoint belongs to, when it is inside one. */
-function packageOf(entrypoint: unknown): string | null {
+function packageOf(entrypoint: unknown): string | undefined {
   // Resolve the innermost package, including Windows paths and pnpm's
   // node_modules/.pnpm/.../node_modules/<package> layout.
   const normalized = '/' + String(entrypoint || '').replace(/\\/g, '/');
   const at = normalized.lastIndexOf('/node_modules/');
   if (at === -1) {
-    return null;
+    return undefined;
   }
   const m = normalized.slice(at + '/node_modules/'.length).match(/^((?:@[^/]+\/)?[^/]+)/);
-  return m?.[1] ?? null;
+  return m?.[1];
 }
 
 export interface InjectedRoute {
   readonly route: string;
-  readonly entrypoint: string | null;
-  readonly from: string | null;
+  readonly entrypoint: string | undefined;
+  readonly from: string | undefined;
   readonly params: readonly unknown[];
 }
 
@@ -77,8 +77,8 @@ function readInjectedRoutes(projectPath: string): InjectedRoute[] {
     injected.push({
       route: pattern,
       // Astro writes a string here or omits it; anything else is not a route
-      // entrypoint this editor can open, so the boundary drops it to null.
-      entrypoint: typeof entrypoint === 'string' ? entrypoint : null,
+      // entrypoint this editor can open, so the boundary drops it.
+      entrypoint: typeof entrypoint === 'string' ? entrypoint : undefined,
       from: packageOf(entrypoint),
       params: toArray(params) ?? [],
     });

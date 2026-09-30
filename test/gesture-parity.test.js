@@ -454,7 +454,13 @@ test('parity, frontmatter: imports added and removed, declarations, with an inse
     ];
     const first = model.nodes.find((candidate) => candidate.kind !== 'text');
     if (first !== undefined) {
-      const node = { id: 'fm-card', kind: 'component', name: 'ZCard', props: {}, children: null };
+      const node = {
+        id: 'fm-card',
+        kind: 'component',
+        name: 'ZCard',
+        props: {},
+        children: undefined,
+      };
       const insert = gestures.insertGesture(
         model,
         node,

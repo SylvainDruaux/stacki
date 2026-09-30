@@ -229,9 +229,13 @@ function parseSerializeVariant(record: Record<string, unknown>): void {
 }
 
 function parseSerializeChildren(record: Record<string, unknown>): void {
-  if (record['children'] === null) {
-    if (record['kind'] === 'component' || record['kind'] === 'element') {
-      return;
+  // A self-closing tag says so with a present `children: undefined`; a missing
+  // key is still a malformed node.
+  if (Object.hasOwn(record, 'children')) {
+    if (record['children'] === undefined) {
+      if (record['kind'] === 'component' || record['kind'] === 'element') {
+        return;
+      }
     }
   }
   const children = toArray(record['children']);

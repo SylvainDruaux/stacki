@@ -87,7 +87,7 @@ const caught = async (fn) => {
     write(dir, 'a.txt', 'one\n');
     write(dir, 'b.txt', 'two\n');
     const r = await snap.commit(git, { projectPath: dir, message: 'everything' });
-    check('saving with no picks saves all of it', r.files === null, JSON.stringify(r));
+    check('saving with no picks saves all of it', r.files === undefined, JSON.stringify(r));
     check('and the tree is clean after', (await sh(dir, 'status', '--porcelain')) === '');
     check('with the message given', (await sh(dir, 'log', '-1', '--format=%s')) === 'everything');
   }

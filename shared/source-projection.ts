@@ -109,7 +109,7 @@ export function projectPage(text: string, result: ParsePageResult): Projection {
   const byteLength = utf8ByteLength(text);
   assert(byteLength <= LIMITS.sourceBytesMax, 'Projected source is inside the file bound');
   if (!result.editable) {
-    const near = result.bail === null ? undefined : clip(result.bail.near);
+    const near = result.bail === undefined ? undefined : clip(result.bail.near);
     return {
       tag: 'parse-error',
       byteLength,
@@ -399,7 +399,7 @@ function forEachAttrSpan(attribute: AttrSpan, visit: (span: Utf16Span) => void):
 }
 
 function projectNode(entry: PendingNode, convert: SpanConverter): ProjectedNode {
-  const capability = classifyNode(entry.node, entry.repeated);
+  const capability = classifyNode(entry.node, { repeated: entry.repeated });
   const attributes = attrSpansOf(entry.node).map((attribute) => ({
     name: attribute.name,
     type: attribute.type,
@@ -422,8 +422,11 @@ function projectNode(entry: PendingNode, convert: SpanConverter): ProjectedNode 
 /** Plan §6: native elements, component invocations, text, comments and the
  * structural nodes are visually editable; opaque code is not; anything inside a
  * loop body is one source node rendered many times. */
-export function classifyNode(node: PageNode, repeated: boolean): Capability {
-  if (repeated) {
+export function classifyNode(
+  node: PageNode,
+  placement: { readonly repeated: boolean },
+): Capability {
+  if (placement.repeated) {
     return 'repeated-source-node';
   }
   switch (node.kind) {

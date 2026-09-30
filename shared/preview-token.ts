@@ -228,8 +228,8 @@ export function judgeShownFile(
  * disk still holds the stamped bytes. `current` has an entry for every stamp. */
 export function judgePreviewRender(
   render: PreviewRender,
-  tokenOf: (canonical: string) => Digest,
   current: ReadonlyMap<string, StampedFileState>,
+  tokenOf: (canonical: string) => Digest,
 ): PreviewVerdict {
   if (tokenOf(canonicalManifest(render.stamps)) !== render.token) {
     return stale('token-mismatch', undefined);

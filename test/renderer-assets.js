@@ -53,10 +53,12 @@ assert.throws(
 );
 assert.throws(() => parseAssetEntries({ entries: null }), /Expected array/);
 assert.deepEqual(parseAssetDimensions({ dims: { w: 640, h: 480 } }), { w: 640, h: 480 });
-assert.equal(parseAssetDimensions({ dims: null }), null);
+// Absence is `undefined` (AGENTS.md §6): an image whose size is unknown sends
+// `dims: undefined`, which structured clone keeps, and never `null`.
+assert.equal(parseAssetDimensions({ dims: undefined }), undefined);
 for (const invalid of [
   null,
-  {},
+  { dims: null },
   { dims: [] },
   { dims: { w: 1 } },
   ...[0, -1, 1.5, NaN, Infinity, '20', 0x1_0000_0000].flatMap((value) => [
@@ -109,8 +111,11 @@ assert.deepEqual(parseAssetDimensions({ dims: { w: 0xffff_ffff, h: 1 } }), {
     ok: true,
     value: { w: 640, h: 480 },
   });
-  window.avb.assetDimensions = async () => ({ dims: null });
-  assert.deepEqual(await readAssetDimensions('/p', 'public/hero.png'), { ok: true, value: null });
+  window.avb.assetDimensions = async () => ({ dims: undefined });
+  assert.deepEqual(await readAssetDimensions('/p', 'public/hero.png'), {
+    ok: true,
+    value: undefined,
+  });
   window.avb.assetDimensions = async () => {
     throw new Error('unavailable');
   };

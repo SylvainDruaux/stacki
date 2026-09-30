@@ -128,7 +128,9 @@ export function mergeTyping(
       }
     }
   }
-  const both = [...mine.value, ...other.value].sort((a, b) => a.span.start - b.span.start);
+  const both = [...mine.value, ...other.value].sort(
+    (left, right) => left.span.start - right.span.start,
+  );
   const merged = applyCodePatch(base, both);
   assert(merged !== base, 'Two changes merged are a change');
   return ok(merged);

@@ -24,7 +24,9 @@ const check = (what, condition, detail) => {
 const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const PIXEL =
-  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
+  'data:image/png;base64,' +
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk' +
+  'YAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
 
 (async () => {
   const esbuild = require('esbuild');
@@ -70,8 +72,22 @@ const PIXEL =
   const recents = [
     { path: '/p/fresh', name: 'fresh', thumb: PIXEL, stale: false, canRefresh: true, openedAt: 4 },
     { path: '/p/stale', name: 'stale', thumb: PIXEL, stale: true, canRefresh: true, openedAt: 3 },
-    { path: '/p/never', name: 'never', thumb: null, stale: true, canRefresh: true, openedAt: 2 },
-    { path: '/p/nodeps', name: 'nodeps', thumb: null, stale: true, canRefresh: false, openedAt: 1 },
+    {
+      path: '/p/never',
+      name: 'never',
+      thumb: undefined,
+      stale: true,
+      canRefresh: true,
+      openedAt: 2,
+    },
+    {
+      path: '/p/nodeps',
+      name: 'nodeps',
+      thumb: undefined,
+      stale: true,
+      canRefresh: false,
+      openedAt: 1,
+    },
   ];
 
   // Each refresh waits to be released, so the order and the overlap are

@@ -6,7 +6,7 @@ const assert = require('node:assert/strict');
 const welcome = require('./renderer-module')('welcomeBridge.ts');
 
 const recent = {
-  thumb: null,
+  thumb: undefined,
   stale: true,
   canRefresh: true,
   path: '/project',
@@ -25,11 +25,11 @@ test('welcome parsers preserve valid recent, thumbnail, and dialog variants', ()
     },
   );
   assert.deepEqual(
-    welcome.parseRefreshThumb({ ok: false, error: 'failed', thumb: null, stale: true }),
+    welcome.parseRefreshThumb({ ok: false, error: 'failed', thumb: undefined, stale: true }),
     {
       ok: false,
       error: 'failed',
-      thumb: null,
+      thumb: undefined,
       stale: true,
     },
   );
@@ -54,11 +54,13 @@ test('welcome parsers reject missing, duplicate, invalid, and oversized records'
     [{ ...recent, openedAt: -1 }],
     [{ ...recent, path: 'bad\0path' }],
     [recent, recent],
+    // Absence is `undefined` (AGENTS.md §6); main never sends a null thumbnail.
+    [{ ...recent, thumb: null }],
     Array(100_001).fill(recent),
   ]) {
     assert.throws(() => welcome.parseRecentProjects(value));
   }
-  assert.throws(() => welcome.parseRefreshThumb({ ok: false, thumb: null, stale: true }));
+  assert.throws(() => welcome.parseRefreshThumb({ ok: false, thumb: undefined, stale: true }));
   assert.throws(() => welcome.parseProjectDialog({ canceled: false }));
   assert.throws(() => welcome.parseParentDialog({ canceled: false, parentPath: null }));
 });
@@ -67,7 +69,7 @@ test('welcome operations validate replies and preserve expected transport failur
   global.window = {
     avb: {
       listRecents: async () => [recent],
-      refreshThumb: async () => ({ ok: true, thumb: null, stale: false }),
+      refreshThumb: async () => ({ ok: true, thumb: undefined, stale: false }),
       removeRecent: async () => {
         throw new Error('disk unavailable');
       },

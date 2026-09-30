@@ -131,7 +131,7 @@ block(matrix).titleStart = 30;
 block(matrix).titleEnd = 20;
 assert.throws(() => parseCSSVariables(matrix), /reversed title range/);
 const holes = good();
-row(holes).cells[0] = null;
+row(holes).cells[0] = undefined;
 assert.equal(parseCSSVariables(holes).ok, true, 'matrix holes are valid');
 for (const invalid of [null, [], {}, { files: [] }, { files: [], error: false }]) {
   assert.throws(() => parseCSSVariables(invalid));

@@ -8,7 +8,7 @@
 //   comment   — <!-- ... -->
 //   raw       — <style>/<script> blocks whose inner content is kept verbatim
 //
-// children: null = self-closing, [] = paired-but-empty, [nodes] otherwise.
+// children: undefined = self-closing, [] = paired-but-empty, [nodes] otherwise.
 //
 // Pages whose template can't be represented (stray '<', unclosed tags) are
 // reported as not editable so the UI falls back to code view.
@@ -1339,7 +1339,7 @@ function parsePage(source: string, opts: { readonly locs?: boolean } = {}): Pars
     return {
       editable: false,
       reason: 'Page source is invalid or exceeds the size limit.',
-      bail: null,
+      bail: undefined,
     };
   }
   // Try the empty block first.
@@ -1394,7 +1394,7 @@ function parsePage(source: string, opts: { readonly locs?: boolean } = {}): Pars
       reason: `Page contains markup the visual editor cannot represent.${where}`,
       bail: parseState.lastBail
         ? { what: parseState.lastBail.what, near: parseState.lastBail.near }
-        : null,
+        : undefined,
     };
   }
 
@@ -1507,7 +1507,7 @@ function isInlineRun(nodes: readonly ParserNode[]): boolean {
         isSimpleExpr(n) ||
         (n.kind === 'element' &&
           INLINE_TAGS.has(n.name.toLowerCase()) &&
-          (n.children === null || n.children.length === 0 || isInlineRun(n.children))),
+          (n.children === undefined || n.children.length === 0 || isInlineRun(n.children))),
     )
   );
 }
@@ -1524,7 +1524,7 @@ function inlineString(nodes: readonly ParserNode[]): string {
       out += n.value;
     } else if (n.kind !== 'element') {
       assert(false, 'Inline runs contain only text, expressions, and elements');
-    } else if (n.children === null) {
+    } else if (n.children === undefined) {
       out += n.name === 'br' ? '<br />' : `<${n.name}${serializeAttrs(n.props, n.attrOrder)} />`;
     } else if (n.children.length === 0) {
       // Written as a pair with nothing between them. Closing it as `<span />`
@@ -3627,7 +3627,7 @@ function serializeNodeElement(
       lines.push(line);
     }
   };
-  if (node.children === null) {
+  if (node.children === undefined) {
     openTag(node.tightClose ? '/>' : ' />');
     return;
   }
@@ -3756,7 +3756,7 @@ function parseTemplateTag(str: string, lt: number, base: number | null): Templat
           ...(attrs && attrs.includes('\n') ? { attrSource: attrs } : {}),
           // `<x/>` and `<x />` mean the same thing and are not the same text.
           ...(selfClose === '/' && !/\s\/>$/.test(full) ? { tightClose: true } : {}),
-          children: null,
+          children: undefined,
         },
         base,
         lt,
@@ -4041,7 +4041,7 @@ function parsePageLayout(
     significantFirst !== undefined &&
     significantFirst.kind === 'component' &&
     significantFirst.name !== 'Fragment' &&
-    significantFirst.children !== null &&
+    significantFirst.children !== undefined &&
     !!importsByName[significantFirst.name]
   ) {
     wrapper = significantFirst;
@@ -4049,7 +4049,7 @@ function parsePageLayout(
     const layoutish = significant.filter(
       (n) =>
         n.kind === 'component' &&
-        n.children !== null &&
+        n.children !== undefined &&
         /layout/i.test(importsByName[n.name]?.path || ''),
     );
     if (layoutish.length === 1) {
@@ -4332,7 +4332,7 @@ function serializeNodeMarkedInline(
     base.children.length > 0 &&
     isInlineRun(base.children);
   if (inlineKids && (base.kind === 'element' || base.kind === 'component')) {
-    assert(base.children !== null, 'Inline run has children');
+    assert(base.children !== undefined, 'Inline run has children');
     serializeNode(
       {
         ...base,

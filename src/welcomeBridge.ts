@@ -1,6 +1,6 @@
 import type { IpcResults } from '../shared/ipc-results';
 import type { Parser } from '../shared/boundary';
-import { boolean, count, list, nullable, pathText, record, text } from '../shared/boundary';
+import { boolean, count, list, optional, pathText, record, text } from '../shared/boundary';
 import { parseIpcPayload } from '../shared/ipc-payloads';
 import type { Result } from '../shared/result';
 import { cleanError } from './cleanError';
@@ -31,7 +31,7 @@ export function parseRecentProjects(input: unknown): readonly RecentProject[] {
 export function parseRefreshThumb(input: unknown): IpcResults['recents:refreshThumb'] {
   const value = record(input);
   const common = {
-    thumb: nullable(text)(value['thumb']),
+    thumb: optional(text)(value['thumb']),
     stale: boolean(value['stale']),
   };
   if (boolean(value['ok'])) {
@@ -116,7 +116,7 @@ export function subscribeCreateLog(append: (chunk: string) => void): () => void 
 function parseRecentProject(input: unknown): RecentProject {
   const value = record(input);
   return {
-    thumb: nullable(text)(value['thumb']),
+    thumb: optional(text)(value['thumb']),
     stale: boolean(value['stale']),
     canRefresh: boolean(value['canRefresh']),
     path: pathText(value['path']),

@@ -1,17 +1,7 @@
 import type { IpcResults, WireFileKind, WireGitInfo } from '../shared/ipc-results';
 import type { Result } from '../shared/result';
 import type { Parser } from '../shared/boundary';
-import {
-  boolean,
-  count,
-  list,
-  nullable,
-  object,
-  optional,
-  pathText,
-  record,
-  text,
-} from '../shared/boundary';
+import { boolean, count, list, object, optional, pathText, record, text } from '../shared/boundary';
 import { parseIpcPayload } from '../shared/ipc-payloads';
 import { cleanError } from './cleanError';
 import { parseMergeResult } from './gitBridge';
@@ -19,13 +9,12 @@ import { parseMergeResult } from './gitBridge';
 const repository = object({
   branch: text,
   branches: list(text),
-  remote: nullable(text),
   dirty: boolean,
   ahead: count,
   parked: list(text),
-  head: optional(nullable(text)),
-  userEmail: optional(nullable(text)),
-  trunk: optional(nullable(text)),
+  head: optional(text),
+  userEmail: optional(text),
+  trunk: optional(text),
   dirtyFiles: optional(list(pathText)),
   hasUpstream: optional(boolean),
 });
@@ -62,18 +51,22 @@ function statusFile(input: unknown) {
 export function parseGitInfo(input: unknown): IpcResults['git:info'] {
   const value = record(input);
   return boolean(value['isRepo'])
-    ? ({ isRepo: true, ...repository(value) } satisfies WireGitInfo)
+    ? ({
+        isRepo: true,
+        remote: optional(text)(value['remote']),
+        ...repository(value),
+      } satisfies WireGitInfo)
     : { isRepo: false };
 }
 export function parseGitCommit(input: unknown): IpcResults['git:commit'] {
   const value = record(input);
   parseGitSuccess(value);
-  return { ok: true, files: nullable(count)(value['files']) };
+  return { ok: true, files: optional(count)(value['files']) };
 }
 export function parseGitPublish(input: unknown): IpcResults['git:publish'] {
   const value = record(input);
   parseGitSuccess(value);
-  return { ok: true, url: nullable(text)(value['url']), output: text(value['output']) };
+  return { ok: true, url: optional(text)(value['url']), output: text(value['output']) };
 }
 export function parseGitSuccess(input: unknown): void {
   if (!boolean(record(input)['ok'])) {
@@ -100,7 +93,7 @@ export function parseGitCheckout(input: unknown): IpcResults['git:checkout'] {
   }
   const common = {
     restored: boolean(value['restored']),
-    parkedFrom: nullable(text)(value['parkedFrom']),
+    parkedFrom: optional(text)(value['parkedFrom']),
     from: text(value['from']),
     parked: boolean(value['parked']),
   };

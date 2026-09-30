@@ -33,7 +33,7 @@ async function commit(
     readonly message?: string;
     readonly paths?: readonly unknown[];
   },
-): Promise<{ ok: true; files: number | null }> {
+): Promise<{ ok: true; files: number | undefined }> {
   const subject = message || 'Update from Stacki';
   const chosen = Array.isArray(paths) ? paths.filter(Boolean).map(String) : null;
   if (chosen && !chosen.length) {
@@ -42,7 +42,7 @@ async function commit(
   if (!chosen) {
     await git(projectPath, ['add', '-A']);
     await git(projectPath, ['commit', '-m', subject]);
-    return { ok: true, files: null };
+    return { ok: true, files: undefined };
   }
   // `--all` on the pathspec so a file the user DELETED is staged as a
   // deletion. Plain `git add` on a path that is no longer there is an error,

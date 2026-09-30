@@ -14,7 +14,7 @@ const conflict = {
   conflicted: true,
   from: 'topic',
   branch: 'main',
-  files: [{ path: 'a.astro', ours: 'one', theirs: 'two', parts: null }],
+  files: [{ path: 'a.astro', ours: 'one', theirs: 'two', parts: undefined }],
 };
 for (const result of [success, dirty, conflict]) {
   assert.deepEqual(parseMergeResult(result), result);
@@ -25,7 +25,9 @@ for (const result of [
   { ok: true },
   { ok: false },
   { ...dirty, files: [1] },
-  { ...conflict, files: [{ path: 'a', ours: 1, theirs: null, parts: null }] },
+  { ...conflict, files: [{ path: 'a', ours: 1, theirs: undefined, parts: undefined }] },
+  // Absence is `undefined` (AGENTS.md §6): a deleted side is never sent as null.
+  { ...conflict, files: [{ path: 'a', ours: 'x', theirs: null, parts: undefined }] },
 ]) {
   assert.throws(() => parseMergeResult(result));
 }

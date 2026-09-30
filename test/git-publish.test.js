@@ -15,7 +15,7 @@ test('GitHub preflight parses each state and rejects impossible or oversized dat
   for (const status of [
     { installed: false, authed: false },
     { installed: true, authed: false },
-    { installed: true, authed: true, user: null },
+    { installed: true, authed: true, user: undefined },
     { installed: true, authed: true, user: 'user' },
   ]) {
     assert.deepEqual(parseGitHubStatus(status), status);
@@ -24,7 +24,8 @@ test('GitHub preflight parses each state and rejects impossible or oversized dat
     null,
     {},
     { installed: false, authed: true },
-    { installed: true, authed: true },
+    // Absence is `undefined` (AGENTS.md §6): an unknown user is never sent as null.
+    { installed: true, authed: true, user: null },
     { installed: 1, authed: false },
     { installed: true, authed: true, user: 'x'.repeat(BOUNDARY_LIMITS.textLengthMax + 1) },
   ]) {

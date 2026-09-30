@@ -569,8 +569,11 @@ const isUncomputableColor = (resolved: unknown): boolean =>
 // What kind of thing a variable holds, which is what picks its glyph — the same
 // four the style panel's variable picker uses, so a colour is a droplet in both
 // places and a bare number is a number in both.
-const FONT_WORDS =
-  /(serif|sans-serif|monospace|cursive|system-ui|uppercase|lowercase|capitalize|balance|pretty|italic|normal|inherit)/i;
+const FONT_WORDS = new RegExp(
+  '(serif|sans-serif|monospace|cursive|system-ui|uppercase|lowercase|capitalize|' +
+    'balance|pretty|italic|normal|inherit)',
+  'i',
+);
 
 function kindOf(value: unknown, resolved: unknown): string {
   const text = String(resolved ?? value).trim();
@@ -621,12 +624,12 @@ interface Row {
   readonly label: string;
   readonly name?: string;
   // Reassigned centrally in readVariables once cells are described.
-  cells: (Cell | null)[];
+  cells: (Cell | undefined)[];
 }
 
 interface Block {
   readonly kind: 'rows' | 'matrix';
-  readonly title: string | null;
+  readonly title: string | undefined;
   readonly titleStart?: number;
   readonly titleEnd?: number;
   readonly rows: Row[];
@@ -673,11 +676,11 @@ function buildGroup(members: readonly Rule[], file: string): Group {
     return map;
   });
 
-  const cellsFor = (name: string): (Cell | null)[] =>
+  const cellsFor = (name: string): (Cell | undefined)[] =>
     byName.map((map, index) => {
       const entry = map.get(name);
       if (!entry) {
-        return null;
+        return undefined;
       }
       return {
         name,
@@ -710,7 +713,7 @@ function buildGroup(members: readonly Rule[], file: string): Group {
     if (loose.length) {
       blocks.push({
         kind: 'rows',
-        title: null,
+        title: undefined,
         rows: loose.map((n) => ({ label: shortLabel(n), name: n, cells: cellsFor(n) })),
       });
     }
@@ -737,13 +740,18 @@ function buildGroup(members: readonly Rule[], file: string): Group {
     return { kind: 'single', label: '', columns, blocks };
   }
   const sections: {
-    title: string | null;
+    title: string | undefined;
     titleStart?: number;
     titleEnd?: number;
     names: string[];
   }[] = [];
-  let current: { title: string | null; titleStart?: number; titleEnd?: number; names: string[] } = {
-    title: null,
+  let current: {
+    title: string | undefined;
+    titleStart?: number;
+    titleEnd?: number;
+    names: string[];
+  } = {
+    title: undefined,
     names: [],
   };
   for (const entry of rule.entries) {
@@ -818,7 +826,7 @@ function buildGroup(members: readonly Rule[], file: string): Group {
     if (leftovers.length || (!families.length && section.title != null)) {
       blocks.push({
         kind: 'rows',
-        title: families.length ? null : section.title,
+        title: families.length ? undefined : section.title,
         rows: leftovers.map((n) => ({
           label: shortLabel(n),
           name: n,
@@ -837,10 +845,10 @@ function cellFor(
   name: string,
   file: string,
   column: string,
-): Cell | null {
+): Cell | undefined {
   const entry = map?.get(name);
   if (!entry) {
-    return null;
+    return undefined;
   }
   return {
     name,
@@ -864,9 +872,9 @@ interface DescribedCell extends Cell {
 
 // A cell's value said three ways: what the file holds, what it comes out as,
 // and what colour to draw beside it (if any).
-function describeCell(cell: Cell | null, map: Map<string, string>): DescribedCell | null {
+function describeCell(cell: Cell | undefined, map: Map<string, string>): DescribedCell | undefined {
   if (!cell) {
-    return null;
+    return undefined;
   }
   const single = String(cell.value)
     .trim()

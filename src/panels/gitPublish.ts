@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { IpcResults } from '../../shared/ipc-results';
 import type { Result } from '../../shared/result';
-import { boolean, nullable, record, text } from '../../shared/boundary';
+import { boolean, optional, record, text } from '../../shared/boundary';
 import { parseIpcPayload } from '../../shared/ipc-payloads';
 import { assert } from '../../shared/assert';
 import { cleanError } from '../cleanError';
@@ -23,7 +23,7 @@ export function parseGitHubStatus(input: unknown): GitHubStatus {
     return { installed: false, authed: false };
   }
   return authed
-    ? { installed: true, authed: true, user: nullable(text)(value['user']) }
+    ? { installed: true, authed: true, user: optional(text)(value['user']) }
     : { installed: true, authed: false };
 }
 export async function readGitHubStatus(projectPath: string): Promise<Result<GitHubStatus, string>> {

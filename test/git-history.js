@@ -308,7 +308,11 @@ const commit = async (dir, subject) => {
       ref: first,
       path: 'src/pages/later.astro',
     });
-    check('a file that did not exist yet reads as null', missing === null, JSON.stringify(missing));
+    check(
+      'a file that did not exist yet reads as undefined',
+      missing === undefined,
+      JSON.stringify(missing),
+    );
   }
 
   // --- Paging --------------------------------------------------------------
@@ -365,7 +369,7 @@ const commit = async (dir, subject) => {
     // A detached worktree is exactly what commit preview creates, so this is
     // the shape the panel will actually be rendering.
     check('a detached one is marked detached', det?.detached === true, JSON.stringify(det));
-    check('and has no branch', det?.branch === null, JSON.stringify(det));
+    check('and has no branch', det?.branch === undefined, JSON.stringify(det));
     await sh(dir, 'worktree', 'remove', '--force', extra);
     check(
       'and it is gone once removed',

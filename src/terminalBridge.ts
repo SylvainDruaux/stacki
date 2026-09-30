@@ -60,7 +60,7 @@ export function requestNativePaste(): void {
 
 export function terminalFilePath(file: File): string {
   const value = window.avb.getFilePath(file);
-  return value === null ? '' : pathText(value);
+  return value === undefined ? '' : pathText(value);
 }
 
 export function onTerminalData(callback: (event: TerminalDataEvent) => void): () => void {

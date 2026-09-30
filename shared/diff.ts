@@ -194,29 +194,29 @@ function runFrontiers(
   const rows: Int32Array[] = [];
   let work = workStart;
   const endDiagonal = source.length - target.length;
-  for (let d = 0; d <= budget.distanceMax; d++) {
-    work += 2 * d + 1;
+  for (let distance = 0; distance <= budget.distanceMax; distance++) {
+    work += 2 * distance + 1;
     if (work > budget.workMax) {
       return undefined;
     }
-    const row = new Int32Array(2 * d + 1).fill(-1);
-    for (let k = -d; k <= d; k += 2) {
-      const start = frontierStart(rows, d, k, source.length, target.length);
+    const row = new Int32Array(2 * distance + 1).fill(-1);
+    for (let diagonal = -distance; diagonal <= distance; diagonal += 2) {
+      const start = frontierStart(rows, distance, diagonal, source.length, target.length);
       if (start < 0) {
         continue;
       }
-      const end = snake(source, target, start, start - k, budget.workMax - work);
+      const end = snake(source, target, start, start - diagonal, budget.workMax - work);
       if (end === undefined) {
         return undefined;
       }
       work += end - start;
-      row[k + d] = end;
+      row[diagonal + distance] = end;
     }
     rows.push(row);
-    assert(rows.length === d + 1, 'One frontier row per distance');
-    if (row[endDiagonal + d] === source.length) {
-      assert(Math.abs(endDiagonal) <= d, 'The end diagonal is inside the final row');
-      return { rows, distance: d, workSpent: work };
+    assert(rows.length === distance + 1, 'One frontier row per distance');
+    if (row[endDiagonal + distance] === source.length) {
+      assert(Math.abs(endDiagonal) <= distance, 'The end diagonal is inside the final row');
+      return { rows, distance, workSpent: work };
     }
   }
   return undefined;
@@ -230,50 +230,50 @@ function runFrontiers(
 // room for it, not only from the frontier itself.
 function frontierStart(
   rows: Frontiers,
-  d: number,
-  k: number,
+  distance: number,
+  diagonal: number,
   sourceLength: number,
   targetLength: number,
 ): number {
-  if (d === 0) {
+  if (distance === 0) {
     return 0;
   }
-  if (k > sourceLength) {
+  if (diagonal > sourceLength) {
     return -1; // The diagonal starts right of the grid.
   }
-  if (k < -targetLength) {
+  if (diagonal < -targetLength) {
     return -1; // The diagonal starts below the grid.
   }
-  let best = frontierAt(rows, d - 2, k);
-  const above = frontierAt(rows, d - 1, k + 1);
+  let best = frontierAt(rows, distance - 2, diagonal);
+  const above = frontierAt(rows, distance - 1, diagonal + 1);
   if (above >= 0) {
     // Insert target[y]: the point needs y < targetLength before the move.
-    const from = Math.min(above, targetLength + k);
-    best = from >= Math.max(0, k + 1) ? Math.max(best, from) : best;
+    const from = Math.min(above, targetLength + diagonal);
+    best = from >= Math.max(0, diagonal + 1) ? Math.max(best, from) : best;
   }
-  const left = frontierAt(rows, d - 1, k - 1);
+  const left = frontierAt(rows, distance - 1, diagonal - 1);
   if (left >= 0) {
     // Delete source[x]: the point needs x < sourceLength before the move.
     const from = Math.min(left, sourceLength - 1);
-    best = from >= Math.max(0, k - 1) ? Math.max(best, from + 1) : best;
+    best = from >= Math.max(0, diagonal - 1) ? Math.max(best, from + 1) : best;
   }
   assert(best <= sourceLength, 'A frontier start lies inside the source');
   if (best >= 0) {
-    assert(best - k <= targetLength, 'A frontier start lies inside the target');
+    assert(best - diagonal <= targetLength, 'A frontier start lies inside the target');
   }
   return best;
 }
 
-function frontierAt(rows: Frontiers, d: number, k: number): number {
-  if (d < 0) {
+function frontierAt(rows: Frontiers, distance: number, diagonal: number): number {
+  if (distance < 0) {
     return -1;
   }
-  if (Math.abs(k) > d) {
+  if (Math.abs(diagonal) > distance) {
     return -1;
   }
-  const row = rows[d];
+  const row = rows[distance];
   assert(row !== undefined, 'Earlier frontier rows are kept');
-  const x = row[k + d];
+  const x = row[diagonal + distance];
   assert(x !== undefined, 'The diagonal lies inside its row');
   return x;
 }
@@ -311,8 +311,8 @@ function frontierDistance(
   x: number,
   y: number,
 ): number | undefined {
-  const k = x - y;
-  const first = Math.abs(k);
+  const diagonal = x - y;
+  const first = Math.abs(diagonal);
   if (first > distance) {
     return undefined;
   }
@@ -323,7 +323,7 @@ function frontierDistance(
   for (let probe = 0; probe < probesMax; probe++) {
     if (low < high) {
       const middle = Math.floor((low + high) / 2);
-      if (frontierAt(rows, first + 2 * middle, k) >= x) {
+      if (frontierAt(rows, first + 2 * middle, diagonal) >= x) {
         high = middle;
       } else {
         low = middle + 1;
@@ -336,8 +336,8 @@ function frontierDistance(
   if (low < candidates) {
     const found = first + 2 * low;
     // The postcondition, both sides: this row reaches x and the one before does not.
-    assert(frontierAt(rows, found, k) >= x, 'The found row reaches the point');
-    assert(frontierAt(rows, found - 2, k) < x, 'No cheaper row reaches the point');
+    assert(frontierAt(rows, found, diagonal) >= x, 'The found row reaches the point');
+    assert(frontierAt(rows, found - 2, diagonal) < x, 'No cheaper row reaches the point');
     return found;
   }
   return undefined;

@@ -130,7 +130,7 @@ async function mountApp(root, files, build) {
       },
       importPathFor: async ({ targetPath }) => ({
         relative: `../${path.relative(path.join(root, 'src'), targetPath)}`,
-        srcRelative: null,
+        srcRelative: undefined,
       }),
       onFsChanged: () => () => {},
       gitInfo: async () => ({ isRepo: false }),

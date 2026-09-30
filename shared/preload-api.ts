@@ -134,7 +134,7 @@ type InvokeSurface = {
 
 export type PreloadBridge = InvokeSurface & {
   readonly platform: NodeJS.Platform;
-  readonly getFilePath: (file: File) => string | null;
+  readonly getFilePath: (file: File) => string | undefined;
   readonly terminalInput: (id: string, data: string) => void;
   readonly terminalAck: (id: string, count: number) => void;
   readonly terminalClipboardImage: (bytes: Uint8Array, mime: string) => Promise<unknown>;

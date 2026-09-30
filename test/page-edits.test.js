@@ -260,7 +260,7 @@ test('propsGesture: values of every type but a spread are requests; the effect c
     kind: 'element',
     name: 'img',
     props: { alt: { type: 'string', value: 'x' }, src: { type: 'string', value: 's' } },
-    children: null,
+    children: undefined,
   };
   const model = {
     imports: [],
@@ -338,133 +338,144 @@ test('requests reach the page as splices; the undo step restores every byte', as
   assert.equal(fs.readFileSync(file, 'utf8'), text, 'undone on the engine, byte for byte');
 });
 
-test('insertGesture stands the new node beside the one at its place, or inside an empty parent', () => {
-  const refOf = (id) => ({ path: [id.length], kind: 'element', span: { start: 0, end: 1 } });
-  const text = (id, value) => ({ id, kind: 'text', value });
-  const node = { id: 'new', kind: 'element', name: 'p', props: {}, children: [] };
-  const model = {
-    imports: [],
-    nodes: [
-      { id: 'a', kind: 'element', name: 'div', props: {}, children: [] },
-      text('gap', '\n'),
-      {
-        id: 'bb',
-        kind: 'element',
-        name: 'ul',
-        props: {},
-        children: [{ id: 'ccc', kind: 'element', name: 'li', props: {}, children: null }],
-      },
-    ],
-  };
-  const options = { urgency: true };
-  const placed = (place) => {
-    const [first] = gestures.insertGesture(model, node, place, options).request(refOf) ?? [];
-    return first && [first.placement, first.target.path[0]];
-  };
-  assert.deepEqual(
-    placed({ parentId: null, index: 0 }),
-    ['before', 1],
-    'before the node at the place',
-  );
-  assert.deepEqual(
-    placed({ parentId: null, index: 1 }),
-    ['before', 2],
-    'blank text is not a neighbour',
-  );
-  assert.deepEqual(
-    placed({ parentId: null, index: 9 }),
-    ['after', 2],
-    'past the end: after the last',
-  );
-  assert.deepEqual(
-    placed({ parentId: 'a', index: 0 }),
-    ['first-child', 1],
-    'inside an empty parent',
-  );
-  assert.deepEqual(placed({ parentId: 'bb', index: 1 }), ['after', 3]);
-  assert.deepEqual(
-    gestures.insertGesture({ imports: [], nodes: [] }, node, null, options).request(refOf),
-    [{ tag: 'append-body', nodes: [node] }],
-    'an empty body takes its first node',
-  );
-  const inserted = gestures
-    .insertGesture(model, node, { parentId: 'bb', index: 0 }, options)
-    .apply(model);
-  assert.deepEqual(
-    inserted.nodes[2].children.map((child) => child.id),
-    ['new', 'ccc'],
-  );
-  assert.deepEqual(
-    model.nodes[2].children.map((child) => child.id),
-    ['ccc'],
-    'the old model is untouched',
-  );
-  const without = gestures.withoutNodes(model, ['ccc', 'gap']);
-  assert.deepEqual(
-    without.nodes.map((n) => n.id),
-    ['a', 'bb'],
-  );
-  assert.deepEqual(without.nodes[1].children, []);
-  assert.equal(model.nodes.length, 3);
-});
+test(
+  'insertGesture stands the new node beside the ' + 'one at its place, or inside an empty parent',
+  () => {
+    const refOf = (id) => ({ path: [id.length], kind: 'element', span: { start: 0, end: 1 } });
+    const text = (id, value) => ({ id, kind: 'text', value });
+    const node = { id: 'new', kind: 'element', name: 'p', props: {}, children: [] };
+    const model = {
+      imports: [],
+      nodes: [
+        { id: 'a', kind: 'element', name: 'div', props: {}, children: [] },
+        text('gap', '\n'),
+        {
+          id: 'bb',
+          kind: 'element',
+          name: 'ul',
+          props: {},
+          children: [{ id: 'ccc', kind: 'element', name: 'li', props: {}, children: undefined }],
+        },
+      ],
+    };
+    const options = { urgency: true };
+    const placed = (place) => {
+      const [first] = gestures.insertGesture(model, node, place, options).request(refOf) ?? [];
+      return first && [first.placement, first.target.path[0]];
+    };
+    assert.deepEqual(
+      placed({ parentId: null, index: 0 }),
+      ['before', 1],
+      'before the node at the place',
+    );
+    assert.deepEqual(
+      placed({ parentId: null, index: 1 }),
+      ['before', 2],
+      'blank text is not a neighbour',
+    );
+    assert.deepEqual(
+      placed({ parentId: null, index: 9 }),
+      ['after', 2],
+      'past the end: after the last',
+    );
+    assert.deepEqual(
+      placed({ parentId: 'a', index: 0 }),
+      ['first-child', 1],
+      'inside an empty parent',
+    );
+    assert.deepEqual(placed({ parentId: 'bb', index: 1 }), ['after', 3]);
+    assert.deepEqual(
+      gestures.insertGesture({ imports: [], nodes: [] }, node, null, options).request(refOf),
+      [{ tag: 'append-body', nodes: [node] }],
+      'an empty body takes its first node',
+    );
+    const inserted = gestures
+      .insertGesture(model, node, { parentId: 'bb', index: 0 }, options)
+      .apply(model);
+    assert.deepEqual(
+      inserted.nodes[2].children.map((child) => child.id),
+      ['new', 'ccc'],
+    );
+    assert.deepEqual(
+      model.nodes[2].children.map((child) => child.id),
+      ['ccc'],
+      'the old model is untouched',
+    );
+    const without = gestures.withoutNodes(model, ['ccc', 'gap']);
+    assert.deepEqual(
+      without.nodes.map((n) => n.id),
+      ['a', 'bb'],
+    );
+    assert.deepEqual(without.nodes[1].children, []);
+    assert.equal(model.nodes.length, 3);
+  },
+);
 
-test('moveGesture: a note travels with its node, a stale slot goes first, nothing moves into itself', () => {
-  const refOf = (id) => ({ path: [id.charCodeAt(0)], kind: 'element', span: { start: 0, end: 1 } });
-  const model = {
-    imports: [],
-    nodes: [
-      { id: 'n', kind: 'comment', value: ' note ' },
-      {
-        id: 'x',
-        kind: 'element',
-        name: 'p',
-        source: '\n  <b>kept</b>\n',
-        props: { slot: { type: 'string', value: 's' } },
-        children: [{ id: 'b', kind: 'element', name: 'b', props: {}, children: [] }],
-      },
-      { id: 'z', kind: 'element', name: 'div', props: {}, children: [] },
-    ],
-  };
-  const rules = { keepsSlot: () => false };
-  const tags = (place) =>
-    gestures
-      .moveGesture(model, 'x', place, rules, { urgency: true })
-      .request(refOf)
-      .map((edit) => [edit.tag, edit.target.path[0], edit.placement]);
-  const [n, x, z] = ['n', 'x', 'z'].map((id) => id.charCodeAt(0));
-  assert.deepEqual(
-    tags({ parentId: null, index: 3 }),
-    [
-      ['remove-attribute', x, undefined],
-      ['move-node', x, 'after'],
-      ['move-node', n, 'after'],
-    ],
-    'after a node: the node, then its note in front of it',
-  );
-  assert.deepEqual(tags({ parentId: 'z', index: 0 }).slice(1), [
-    ['move-node', x, 'first-child'],
-    ['move-node', n, 'first-child'],
-  ]);
-  const moved = gestures
-    .moveGesture(model, 'x', { parentId: 'z', index: 0 }, rules, { urgency: true })
-    .apply(model);
-  assert.deepEqual(
-    moved.nodes.map((node) => node.id),
-    ['z'],
-  );
-  assert.deepEqual(
-    moved.nodes[0].children.map((node) => node.id),
-    ['n', 'x'],
-    'the note lands above',
-  );
-  assert.equal(moved.nodes[0].children[1].props.slot, undefined, 'the slot meant nothing there');
-  assert.equal(
-    gestures.moveGesture(model, 'x', { parentId: 'b', index: 0 }, rules, { urgency: true }),
-    undefined,
-  );
-  // Emptied of its only child, an element forgets the inner source the legacy
-  // printer would otherwise write back.
-  const emptied = gestures.withoutNodes(model, ['b']);
-  assert.equal(Object.hasOwn(emptied.nodes[1], 'source'), false);
-  assert.equal(model.nodes[1].source, '\n  <b>kept</b>\n', 'the old model keeps its own');
-});
+test(
+  'moveGesture: a note travels with its node, a ' +
+    'stale slot goes first, nothing moves into itself',
+  () => {
+    const refOf = (id) => ({
+      path: [id.charCodeAt(0)],
+      kind: 'element',
+      span: { start: 0, end: 1 },
+    });
+    const model = {
+      imports: [],
+      nodes: [
+        { id: 'n', kind: 'comment', value: ' note ' },
+        {
+          id: 'x',
+          kind: 'element',
+          name: 'p',
+          source: '\n  <b>kept</b>\n',
+          props: { slot: { type: 'string', value: 's' } },
+          children: [{ id: 'b', kind: 'element', name: 'b', props: {}, children: [] }],
+        },
+        { id: 'z', kind: 'element', name: 'div', props: {}, children: [] },
+      ],
+    };
+    const rules = { keepsSlot: () => false };
+    const tags = (place) =>
+      gestures
+        .moveGesture(model, 'x', place, rules, { urgency: true })
+        .request(refOf)
+        .map((edit) => [edit.tag, edit.target.path[0], edit.placement]);
+    const [n, x, z] = ['n', 'x', 'z'].map((id) => id.charCodeAt(0));
+    assert.deepEqual(
+      tags({ parentId: null, index: 3 }),
+      [
+        ['remove-attribute', x, undefined],
+        ['move-node', x, 'after'],
+        ['move-node', n, 'after'],
+      ],
+      'after a node: the node, then its note in front of it',
+    );
+    assert.deepEqual(tags({ parentId: 'z', index: 0 }).slice(1), [
+      ['move-node', x, 'first-child'],
+      ['move-node', n, 'first-child'],
+    ]);
+    const moved = gestures
+      .moveGesture(model, 'x', { parentId: 'z', index: 0 }, rules, { urgency: true })
+      .apply(model);
+    assert.deepEqual(
+      moved.nodes.map((node) => node.id),
+      ['z'],
+    );
+    assert.deepEqual(
+      moved.nodes[0].children.map((node) => node.id),
+      ['n', 'x'],
+      'the note lands above',
+    );
+    assert.equal(moved.nodes[0].children[1].props.slot, undefined, 'the slot meant nothing there');
+    assert.equal(
+      gestures.moveGesture(model, 'x', { parentId: 'b', index: 0 }, rules, { urgency: true }),
+      undefined,
+    );
+    // Emptied of its only child, an element forgets the inner source the legacy
+    // printer would otherwise write back.
+    const emptied = gestures.withoutNodes(model, ['b']);
+    assert.equal(Object.hasOwn(emptied.nodes[1], 'source'), false);
+    assert.equal(model.nodes[1].source, '\n  <b>kept</b>\n', 'the old model keeps its own');
+  },
+);

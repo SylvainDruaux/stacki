@@ -17,7 +17,7 @@
 export interface BranchTree {
   readonly kind: string;
   readonly name?: string;
-  readonly children?: readonly this[] | null;
+  readonly children?: readonly this[] | undefined;
 }
 
 const branchNamed = <Node extends BranchTree>(

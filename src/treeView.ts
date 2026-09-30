@@ -12,7 +12,7 @@ export interface TreeView {
   readonly test?: string;
   readonly body?: readonly string[];
   readonly props?: Readonly<Record<string, { readonly type: string; readonly value?: string }>>;
-  readonly children?: readonly TreeView[] | null;
+  readonly children?: readonly TreeView[] | undefined;
 }
 
 // Each traversal owns its counter. Depth and work are bounded independently so

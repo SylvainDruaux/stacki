@@ -37,13 +37,13 @@ export interface GitInfo {
   isRepo: true;
   branch: string;
   branches: string[];
-  remote: string | null;
+  remote: string | undefined;
   dirty: boolean;
   ahead: number;
   parked: string[];
-  head?: string | null;
-  userEmail?: string | null;
-  trunk?: string | null;
+  head?: string | undefined;
+  userEmail?: string | undefined;
+  trunk?: string | undefined;
   dirtyFiles?: string[];
   hasUpstream?: boolean;
 }

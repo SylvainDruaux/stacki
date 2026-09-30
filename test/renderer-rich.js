@@ -12,7 +12,7 @@ assert.deepEqual(nodes, [
   { kind: 'text', value: 'Hello ' },
   { kind: 'element', name: 'strong', props: {}, children: [{ kind: 'text', value: 'world' }] },
   { kind: 'expr', value: '{post.title}' },
-  { kind: 'element', name: 'br', props: {}, children: null },
+  { kind: 'element', name: 'br', props: {}, children: undefined },
 ]);
 assert.equal(isInlineOnly(nodes), true);
 assert.match(nodesToHtml(nodes), /data-expr="\{post.title\}"/);

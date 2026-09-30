@@ -155,7 +155,7 @@ function ConflictDetail({ model }: ModelProps) {
   const { file, working, conflict, setAll, hunks } = model;
   return (
     <div className="conflict-detail">
-      {file.parts === null ? (
+      {file.parts === undefined ? (
         <ConflictWhole model={model} />
       ) : (
         <>

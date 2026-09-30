@@ -4,6 +4,7 @@
 // emits and rejects everything else — the boundary is where malformed data
 // dies, and inward code never re-validates.
 
+import { assert } from './assert';
 import type { NodeId, Utf16Offset } from './brand';
 import { toNodeId, toUtf16Offset } from './brand';
 import { LIMITS } from './limits';
@@ -16,14 +17,14 @@ export type Attr =
   | { readonly type: 'bare' }
   | { readonly type: 'spread'; readonly value: string };
 
-/** Fields a component or element tag can carry. children is null exactly when
- * the tag is self-closing; layout fields preserve how the source was written
- * so serialization round-trips. */
+/** Fields a component or element tag can carry. children is undefined exactly
+ * when the tag is self-closing; layout fields preserve how the source was
+ * written so serialization round-trips. */
 export interface PairedNode {
   readonly kind: 'component' | 'element';
   readonly id: NodeId;
   readonly name: string;
-  readonly children: readonly PageNode[] | null;
+  readonly children: readonly PageNode[] | undefined;
   readonly props?: Readonly<Record<string, Attr>>;
   readonly attrOrder?: readonly string[];
   readonly attrSource?: string;
@@ -201,7 +202,7 @@ export interface PageModel {
   readonly bodyStart?: number;
   readonly format?: 'md' | 'mdx';
   readonly frontmatterLang?: 'yaml';
-  readonly layoutPath?: string | null;
+  readonly layoutPath?: string | undefined;
   readonly mdEol?: string;
   readonly mdEndsWithNewline?: boolean;
   readonly mdHasFrontmatter?: boolean;
@@ -211,7 +212,7 @@ export type ParsePageResult =
   | {
       readonly editable: false;
       readonly reason: string;
-      readonly bail: { readonly what: string; readonly near: string } | null;
+      readonly bail: { readonly what: string; readonly near: string } | undefined;
     }
   | { readonly editable: true; readonly model: PageModel };
 
@@ -234,12 +235,12 @@ function asRecord(input: unknown, where: string): Record<string, unknown> {
   return input as Record<string, unknown>;
 }
 
-function asString(value: unknown, where: string, maxChars: number): string {
+function asString(value: unknown, where: string, charsMax: number): string {
   if (typeof value !== 'string') {
     fail(where, 'expected string');
   }
-  if (value.length > maxChars) {
-    fail(where, `exceeds ${maxChars} chars`);
+  if (value.length > charsMax) {
+    fail(where, `exceeds ${charsMax} chars`);
   }
   return value;
 }
@@ -375,7 +376,7 @@ function tagExtras(
   if (record['attrOrder'] !== undefined) {
     if (
       !Array.isArray(record['attrOrder']) ||
-      !record['attrOrder'].every((n) => typeof n === 'string')
+      !record['attrOrder'].every((name) => typeof name === 'string')
     ) {
       fail(where, 'attrOrder: expected string array');
     }
@@ -405,6 +406,24 @@ function tagExtras(
   return out as Pick<PairedNode, 'attrOrder' | 'attrSource' | 'blankBefore' | 'blankAfter'>;
 }
 
+// A self-closing tag has no children list. JSON cannot say `undefined`, so a
+// stored `null` (the sentinel before AGENTS.md §6) and a missing key both mean
+// self-closing.
+function parsePairedChildren(
+  input: unknown,
+  where: string,
+  depth: number,
+  context: ParseContext,
+): PageNodeList | undefined {
+  if (input === undefined) {
+    return undefined;
+  }
+  if (input === null) {
+    return undefined;
+  }
+  return parseChildren(input, where, depth, context);
+}
+
 function parsePaired(
   record: Record<string, unknown>,
   where: string,
@@ -415,10 +434,7 @@ function parsePaired(
   if (kind !== 'component' && kind !== 'element') {
     fail(where, `parsePaired called for kind ${JSON.stringify(kind)}`);
   }
-  const children =
-    record['children'] === null
-      ? null
-      : parseChildren(record['children'], `${where}.children`, depth, context);
+  const children = parsePairedChildren(record['children'], `${where}.children`, depth, context);
   const out: Record<string, unknown> = {
     kind,
     id: asNodeId(record['id'], `${where}.id`),
@@ -443,19 +459,8 @@ function parseByKind(
     case 'component':
     case 'element':
       return parsePaired(record, where, depth, context);
-    case 'raw': {
-      const out: Record<string, unknown> = {
-        kind,
-        id: asNodeId(record['id'], `${where}.id`),
-        name: asString(record['name'], `${where}.name`, LIMITS.tagNameCharsMax),
-        inner: asString(record['inner'], `${where}.inner`, LIMITS.nodeValueCharsMax),
-        ...tagExtras(record, where),
-      };
-      if (record['props'] !== undefined) {
-        out['props'] = parseProps(record['props'], `${where}.props`);
-      }
-      return out as unknown as RawNode;
-    }
+    case 'raw':
+      return parseRaw(record, where);
     case 'text':
     case 'expr':
     case 'raw-line':
@@ -476,57 +481,10 @@ function parseByKind(
         ...(jsx === undefined ? {} : { jsx }),
       };
     }
-    case 'map': {
-      const out: Record<string, unknown> = {
-        kind,
-        id: asNodeId(record['id'], `${where}.id`),
-        head: asString(record['head'], `${where}.head`, LIMITS.attrCharsMax),
-        children: parseChildren(record['children'], `${where}.children`, depth, context),
-      };
-      for (const field of ['headSource', 'source'] as const) {
-        if (record[field] !== undefined) {
-          out[field] = asString(record[field], `${where}.${field}`, LIMITS.nodeValueCharsMax);
-        }
-      }
-      if (record['body'] !== undefined) {
-        const body: unknown = record['body'];
-        if (!Array.isArray(body)) {
-          fail(where, 'body: expected statement array');
-        }
-        if (body.length > LIMITS.treeNodesMax) {
-          fail(where, 'body: exceeds statement limit');
-        }
-        out['body'] = body.map((line: unknown, index) =>
-          asString(line, `${where}.body[${index}]`, LIMITS.nodeValueCharsMax),
-        );
-      }
-      if (record['bare'] !== undefined) {
-        if (typeof record['bare'] !== 'boolean') {
-          fail(where, 'bare: expected boolean');
-        }
-        out['bare'] = record['bare'];
-      }
-      return out as unknown as MapNode;
-    }
-    case 'cond': {
-      const op = record['op'];
-      if (op !== '?' && op !== '&&') {
-        fail(where, `unknown cond op ${JSON.stringify(op)}`);
-      }
-      const branches = parseChildren(record['children'], `${where}.children`, depth, context);
-      for (const branch of branches) {
-        if (branch.kind !== 'branch') {
-          fail(where, 'cond children must be branch nodes');
-        }
-      }
-      return {
-        kind,
-        id: asNodeId(record['id'], `${where}.id`),
-        op,
-        test: asString(record['test'], `${where}.test`, LIMITS.attrCharsMax),
-        children: branches as readonly BranchNode[],
-      };
-    }
+    case 'map':
+      return parseMap(record, where, depth, context);
+    case 'cond':
+      return parseCond(record, where, depth, context);
     case 'branch': {
       const name = record['name'];
       if (name !== 'then' && name !== 'else') {
@@ -550,6 +508,90 @@ function parseByKind(
     default:
       fail(where, `unknown kind ${JSON.stringify(kind)}`);
   }
+}
+
+function parseRaw(record: Record<string, unknown>, where: string): RawNode {
+  assert(record['kind'] === 'raw', 'parseRaw: dispatched on its kind');
+  const out: Record<string, unknown> = {
+    kind: 'raw',
+    id: asNodeId(record['id'], `${where}.id`),
+    name: asString(record['name'], `${where}.name`, LIMITS.tagNameCharsMax),
+    inner: asString(record['inner'], `${where}.inner`, LIMITS.nodeValueCharsMax),
+    ...tagExtras(record, where),
+  };
+  if (record['props'] !== undefined) {
+    out['props'] = parseProps(record['props'], `${where}.props`);
+  }
+  return out as unknown as RawNode;
+}
+
+function parseMap(
+  record: Record<string, unknown>,
+  where: string,
+  depth: number,
+  context: ParseContext,
+): MapNode {
+  // Paired with parsePageNode, which dispatched on the kind and bounded the depth.
+  assert(record['kind'] === 'map', 'parseMap: dispatched on its kind');
+  assert(depth <= LIMITS.treeDepthMax, 'parseMap: depth was bounded by the caller');
+  const out: Record<string, unknown> = {
+    kind: 'map',
+    id: asNodeId(record['id'], `${where}.id`),
+    head: asString(record['head'], `${where}.head`, LIMITS.attrCharsMax),
+    children: parseChildren(record['children'], `${where}.children`, depth, context),
+  };
+  for (const field of ['headSource', 'source'] as const) {
+    if (record[field] !== undefined) {
+      out[field] = asString(record[field], `${where}.${field}`, LIMITS.nodeValueCharsMax);
+    }
+  }
+  if (record['body'] !== undefined) {
+    const body: unknown = record['body'];
+    if (!Array.isArray(body)) {
+      fail(where, 'body: expected statement array');
+    }
+    if (body.length > LIMITS.treeNodesMax) {
+      fail(where, 'body: exceeds statement limit');
+    }
+    out['body'] = body.map((line: unknown, index) =>
+      asString(line, `${where}.body[${index}]`, LIMITS.nodeValueCharsMax),
+    );
+  }
+  if (record['bare'] !== undefined) {
+    if (typeof record['bare'] !== 'boolean') {
+      fail(where, 'bare: expected boolean');
+    }
+    out['bare'] = record['bare'];
+  }
+  return out as unknown as MapNode;
+}
+
+function parseCond(
+  record: Record<string, unknown>,
+  where: string,
+  depth: number,
+  context: ParseContext,
+): CondNode {
+  // Paired with parsePageNode, which dispatched on the kind and bounded the depth.
+  assert(record['kind'] === 'cond', 'parseCond: dispatched on its kind');
+  assert(depth <= LIMITS.treeDepthMax, 'parseCond: depth was bounded by the caller');
+  const op = record['op'];
+  if (op !== '?' && op !== '&&') {
+    fail(where, `unknown cond op ${JSON.stringify(op)}`);
+  }
+  const branches = parseChildren(record['children'], `${where}.children`, depth, context);
+  for (const branch of branches) {
+    if (branch.kind !== 'branch') {
+      fail(where, 'cond children must be branch nodes');
+    }
+  }
+  return {
+    kind: 'cond',
+    id: asNodeId(record['id'], `${where}.id`),
+    op,
+    test: asString(record['test'], `${where}.test`, LIMITS.attrCharsMax),
+    children: branches as readonly BranchNode[],
+  };
 }
 
 /** Parse one node subtree. Throws on any violation — boundary code decides
@@ -794,6 +836,22 @@ function parsePageEol(input: unknown): '\n' | '\r\n' {
   fail('model.eol', 'expected LF or CRLF');
 }
 
+// A Markdown page without a layout has no layout path. JSON cannot say
+// `undefined`, so a stored `null` (the sentinel before AGENTS.md §6) and a
+// missing key both mean none.
+function parseLayoutPath(input: unknown): string | undefined {
+  if (input === undefined) {
+    return undefined;
+  }
+  if (input === null) {
+    return undefined;
+  }
+  if (typeof input !== 'string') {
+    fail('model.layoutPath', 'expected string or nothing');
+  }
+  return input;
+}
+
 function parseMarkdownPageModel(record: Record<string, unknown>): PageModel {
   const format = record['format'];
   if (format !== 'md' && format !== 'mdx') {
@@ -813,10 +871,7 @@ function parseMarkdownPageModel(record: Record<string, unknown>): PageModel {
       quote: "'",
     };
   });
-  const layoutPath = record['layoutPath'];
-  if (layoutPath !== null && typeof layoutPath !== 'string') {
-    fail('model.layoutPath', 'expected string or null');
-  }
+  const layoutPath = parseLayoutPath(record['layoutPath']);
   for (const field of ['mdEndsWithNewline', 'mdHasFrontmatter'] as const) {
     if (typeof record[field] !== 'boolean') {
       fail(`model.${field}`, 'expected boolean');
@@ -852,6 +907,23 @@ function parseMarkdownPageModel(record: Record<string, unknown>): PageModel {
   };
 }
 
+// Why a page is not editable, when the parser could say. JSON cannot say
+// `undefined`: a stored `null` bail (the sentinel before AGENTS.md §6) and a
+// missing key both mean none.
+function parseBail(input: unknown): { readonly what: string; readonly near: string } | undefined {
+  if (input === undefined) {
+    return undefined;
+  }
+  if (input === null) {
+    return undefined;
+  }
+  const record = asRecord(input, 'result.bail');
+  return {
+    what: asString(record['what'], 'result.bail.what', LIMITS.attrCharsMax),
+    near: asString(record['near'], 'result.bail.near', LIMITS.attrCharsMax),
+  };
+}
+
 /** Parse the parsePage result envelope: not-editable is data, not an error. */
 export function parsePageResult(input: unknown): ParsePageResult {
   const record = asRecord(input, 'result');
@@ -859,19 +931,10 @@ export function parsePageResult(input: unknown): ParsePageResult {
     return { editable: true, model: parsePageModel(record['model']) };
   }
   if (record['editable'] === false) {
-    const bailInput = record['bail'];
-    let bail = null;
-    if (bailInput !== null && bailInput !== undefined) {
-      const bailRecord = asRecord(bailInput, 'result.bail');
-      bail = {
-        what: asString(bailRecord['what'], 'result.bail.what', LIMITS.attrCharsMax),
-        near: asString(bailRecord['near'], 'result.bail.near', LIMITS.attrCharsMax),
-      };
-    }
     return {
       editable: false,
       reason: asString(record['reason'], 'result.reason', LIMITS.attrCharsMax),
-      bail,
+      bail: parseBail(record['bail']),
     };
   }
   fail('result.editable', 'expected boolean');
@@ -888,7 +951,7 @@ export function parsePageReadResult(input: unknown): ParsePageResult & { readonl
 interface TreeInvariantNode {
   readonly id?: string;
   readonly kind: string;
-  readonly children?: readonly TreeInvariantNode[] | null;
+  readonly children?: readonly TreeInvariantNode[] | undefined;
 }
 
 /** Check the producer's own tree without cloning it or claiming it has already

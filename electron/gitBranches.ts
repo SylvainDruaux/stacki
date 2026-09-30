@@ -27,54 +27,54 @@ import type { Git } from './git.js';
 /** Whether the working tree has anything uncommitted in it. — removed during
  * conversion: `isDirty` was defined here in HEAD but never called or exported.
  */
-async function currentBranch(git: Git, projectPath: string): Promise<string | null> {
+async function currentBranch(git: Git, projectPath: string): Promise<string | undefined> {
   try {
     return (await git(projectPath, ['rev-parse', '--abbrev-ref', 'HEAD'])).stdout.trim();
   } catch {
-    return null;
+    return undefined;
   }
 }
 
 export interface MergeClash {
   readonly path: string;
-  readonly ours: string | null;
-  readonly theirs: string | null;
-  readonly parts: readonly ConflictPart[] | null;
+  readonly ours: string | undefined;
+  readonly theirs: string | undefined;
+  readonly parts: readonly ConflictPart[] | undefined;
 }
 
 export type MergeOutcome =
   | {
       readonly ok: true;
-      readonly into: string | null;
+      readonly into: string | undefined;
       readonly changed: boolean;
       readonly resolved?: number;
     }
   | {
       readonly ok: false;
       readonly conflicted: true;
-      readonly from: string | null;
+      readonly from: string | undefined;
       readonly branch: string;
       readonly files: readonly MergeClash[];
     }
   | {
       readonly ok: false;
       readonly dirty: true;
-      readonly from: string | null;
+      readonly from: string | undefined;
       readonly branch: string;
       readonly files: readonly string[];
     };
 
-/** One side of a conflicted file, or null when that side deleted it. */
+/** One side of a conflicted file, or undefined when that side deleted it. */
 async function stage(
   git: Git,
   projectPath: string,
   n: number,
   file: string,
-): Promise<string | null> {
+): Promise<string | undefined> {
   try {
     return (await git(projectPath, ['show', `:${n}:${file}`])).stdout;
   } catch {
-    return null;
+    return undefined;
   }
 }
 
@@ -217,13 +217,13 @@ async function mergeBranch(
         // and each disagreement comes back separately, so a page whose heading
         // should come from one branch and whose footer should come from the
         // other can say so.
-        let parts: readonly ConflictPart[] | null = null;
+        let parts: readonly ConflictPart[] | undefined = undefined;
         try {
           parts = parseConflict(fs.readFileSync(path.join(projectPath, file), 'utf8'));
         } catch {
           // A binary file, or one side deleted it: there is no marked-up text
           // to read, and the choice is the whole file or nothing.
-          parts = null;
+          parts = undefined;
         }
         clashes.push({
           path: file,
@@ -313,7 +313,8 @@ async function deleteBranch(
   // always somewhere for the trunk's work to have gone — no need to check.)
   if (!allowTrunk && (branch === 'main' || branch === 'master')) {
     throw new Error(
-      `"${branch}" is the branch everything comes back to. Deleting it would leave the project without its main line of work.`,
+      `"${branch}" is the branch everything comes back to. ` +
+        'Deleting it would leave the project without its main line of work.',
     );
   }
   try {
@@ -334,7 +335,8 @@ async function deleteBranch(
     const where = worktree?.[1];
     if (where !== undefined) {
       throw new Error(
-        `"${branch}" is checked out in another worktree (${where}). Close or switch that one first.`,
+        `"${branch}" is checked out in another worktree (${where}). ` +
+          'Close or switch that one first.',
       );
     }
     throw new Error(detail.trim() || `Could not delete "${branch}".`);

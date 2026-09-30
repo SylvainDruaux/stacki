@@ -523,7 +523,7 @@ async function resolveConflict(
     resolveGitMerge(props.project.path, props.conflict.branch, choices),
   );
   assert(result.ok, 'Merge resolution must complete');
-  assert(result.into !== null, 'Merge resolution requires a target branch');
+  assert(result.into !== undefined, 'Merge resolution requires a target branch');
   if (props.conflict.deleteAfter) {
     await tidyUp({
       projectPath: props.project.path,
@@ -560,7 +560,7 @@ function CheckoutModal(props: ModalProps & { readonly switchTo: SwitchTarget }) 
 }
 
 function GitPublishModal(props: ModalProps) {
-  const publish = async (request: PublishRequest): Promise<Result<string | null, string>> => {
+  const publish = async (request: PublishRequest): Promise<Result<string | undefined, string>> => {
     props.setBusy('Publishing…');
     try {
       try {

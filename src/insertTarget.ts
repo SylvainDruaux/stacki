@@ -4,7 +4,8 @@ import { LIMITS } from '../shared/limits';
 interface Insertable {
   readonly name: string;
   readonly slots?: readonly string[];
-  readonly renderTag?: { readonly tag?: string | null; readonly prop?: string | null } | null;
+  readonly renderTag?:
+    { readonly tag?: string | null; readonly prop?: string | null } | null | undefined;
 }
 interface InsertItem {
   readonly type: string;

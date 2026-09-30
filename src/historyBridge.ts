@@ -5,7 +5,7 @@ import type {
   WireWorktreeInfo,
 } from '../shared/ipc-results';
 import type { Parser } from '../shared/boundary';
-import { boolean, list, nullable, optional, pathText, record, text } from '../shared/boundary';
+import { boolean, list, optional, pathText, record, text } from '../shared/boundary';
 import { parseIpcPayload } from '../shared/ipc-payloads';
 import type { Result } from '../shared/result';
 import { cleanError } from './cleanError';
@@ -108,7 +108,7 @@ function parseHistoryFile(input: unknown): HistoryFile {
   const value = record(input);
   return {
     path: pathText(value['path']),
-    status: nullable(text)(value['status']),
+    status: optional(text)(value['status']),
     staged: boolean(value['staged']),
     from: optional(pathText)(value['from']),
     kind: parseFileKind(value['kind']),
@@ -120,8 +120,8 @@ function parseWorktree(input: unknown): WireWorktreeInfo {
   const value = record(input);
   return {
     path: pathText(value['path']),
-    head: nullable(text)(value['head']),
-    branch: nullable(text)(value['branch']),
+    head: optional(text)(value['head']),
+    branch: optional(text)(value['branch']),
     detached: boolean(value['detached']),
     bare: boolean(value['bare']),
   };

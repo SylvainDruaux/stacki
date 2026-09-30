@@ -12,7 +12,6 @@ import {
   data,
   dictionary,
   list,
-  nullable,
   optional,
   pathText,
   record,
@@ -39,7 +38,7 @@ export interface FileChangeEvent {
 
 export interface ImportPaths {
   readonly relative: string;
-  readonly srcRelative: string | null;
+  readonly srcRelative: string | undefined;
 }
 
 export interface AppCollection {
@@ -81,8 +80,8 @@ export function projectHasNodeModules(projectPath: string): Promise<boolean> {
   return window.avb.hasNodeModules(payload).then(boolean);
 }
 
-export function pendingProject(): Promise<string | null> {
-  return window.avb.pendingProject().then((input) => (input === null ? null : pathText(input)));
+export function pendingProject(): Promise<string | undefined> {
+  return window.avb.pendingProject().then((input) => optional(pathText)(input));
 }
 
 export function openProject(): Promise<IpcResults['project:openDialog']> {
@@ -199,11 +198,11 @@ export function resolveProjectImport(
   projectPath: string,
   fromFile: string,
   spec: string,
-): Promise<string | null> {
+): Promise<string | undefined> {
   const payload = parseIpcPayload('project:resolveImport', { projectPath, fromFile, spec });
   return window.avb
     .resolveImport(payload)
-    .then((input) => nullable(pathText)(record(input)['path']));
+    .then((input) => optional(pathText)(record(input)['path']));
 }
 
 export function readInjectedRoutes(projectPath: string): Promise<readonly WireInjectedRoute[]> {
@@ -291,7 +290,7 @@ export function findImportPath(
     const value = record(input);
     return {
       relative: text(value['relative']),
-      srcRelative: nullableText(value['srcRelative']),
+      srcRelative: optional(text)(value['srcRelative']),
     };
   });
 }
@@ -421,10 +420,10 @@ function parseDevDiagnosis(input: unknown): IpcResults['dev:diagnose'] {
   const value = record(input);
   return {
     kind: text(value['kind']),
-    nodePath: nullableText(value['nodePath']),
-    nodeVersion: nullableText(value['nodeVersion']),
-    astroVersion: nullableText(value['astroVersion']),
-    requires: nullableText(value['requires']),
+    nodePath: optional(text)(value['nodePath']),
+    nodeVersion: optional(text)(value['nodeVersion']),
+    astroVersion: optional(text)(value['astroVersion']),
+    requires: optional(text)(value['requires']),
     launchedFromGui: boolean(value['launchedFromGui']),
   };
 }
@@ -491,8 +490,8 @@ function parseInjectedRoute(input: unknown): WireInjectedRoute {
   const value = record(input);
   return {
     route: text(value['route']),
-    entrypoint: nullable(pathText)(value['entrypoint']),
-    from: nullable(pathText)(value['from']),
+    entrypoint: optional(pathText)(value['entrypoint']),
+    from: optional(pathText)(value['from']),
     params: list(data)(value['params']),
   };
 }
@@ -503,7 +502,7 @@ function parseDynamicPaths(input: unknown): IpcResults['page:dynamicPaths'] {
   if (entries.length === 0 && value['error'] === undefined) {
     return { entries: [] };
   }
-  return { entries, error: nullable(text)(value['error']) };
+  return { entries, error: optional(text)(value['error']) };
 }
 
 function parseDynamicEntry(input: unknown): IpcResults['page:dynamicPaths']['entries'][number] {
@@ -522,9 +521,12 @@ function parseRouteParams(input: unknown): WireRouteParams {
 
 function parseDynamicProps(
   input: unknown,
-): null | string | number | true | readonly Data[] | WireDataRecord {
+): undefined | string | number | true | readonly Data[] | WireDataRecord {
   const value = data(input);
-  if (value === undefined || value === false) {
+  if (value === null) {
+    throw new Error('Dynamic route props have an invalid value');
+  }
+  if (value === false) {
     throw new Error('Dynamic route props have an invalid value');
   }
   return value;

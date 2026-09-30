@@ -122,10 +122,11 @@ function parseDynamicEntry(input: unknown): DynamicEntry {
 
 export function parseSampleEntry(input: unknown): {
   readonly entry: Data;
-  readonly error?: string | null;
+  readonly error?: string;
 } {
   const source = record(input);
-  const error = optional(nullable(text))(source['error']);
+  // The dev server's JSON writes `null` for no error; absence is `undefined` here.
+  const error = optional(nullable(text))(source['error']) ?? undefined;
   return { entry: data(source['entry'] ?? null), ...(error === undefined ? {} : { error }) };
 }
 

@@ -42,7 +42,9 @@ const check = (what, condition, detail) => {
   const bundlePath = path.join(buildDir, 'vars-drop.bundle.js');
   await esbuild.build({
     stdin: {
-      contents: `export { movesForDrop, dropPlan, friendlyError } from './src/panels/VariablesView.jsx'`,
+      contents:
+        `export { movesForDrop, dropPlan, friendlyError } ` +
+        `from './src/panels/VariablesView.jsx'`,
       resolveDir: path.join(__dirname, '..'),
       loader: 'js',
     },
@@ -198,7 +200,7 @@ const check = (what, condition, detail) => {
     const partial = {
       title: 'a',
       rows: [
-        { name: '--only-light', label: 'only-light', cells: [cell('--only-light'), null] },
+        { name: '--only-light', label: 'only-light', cells: [cell('--only-light'), undefined] },
         {
           name: '--both',
           label: 'both',
@@ -232,7 +234,8 @@ const check = (what, condition, detail) => {
   {
     const missing = friendlyError(
       new Error(
-        "Error invoking remote method 'css:moveHeading': Error: No handler registered for 'css:moveHeading'",
+        "Error invoking remote method 'css:moveHeading': Error: No handler registered for " +
+          "'css:moveHeading'",
       ),
     );
     check('a missing handler says to restart', /restarted/i.test(missing), missing);

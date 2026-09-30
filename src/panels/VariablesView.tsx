@@ -128,7 +128,7 @@ function VariablesViewBody({ state }: { readonly state: ReturnType<typeof useVar
 }
 
 function headingRange(block: VariableBlock) {
-  if (block.titleStart === undefined || block.titleEnd === undefined || block.title === null) {
+  if (block.titleStart === undefined || block.titleEnd === undefined || block.title === undefined) {
     return undefined;
   }
   assert(block.titleEnd >= block.titleStart, 'Variable heading: range is reversed');

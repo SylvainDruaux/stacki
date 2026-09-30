@@ -6,7 +6,7 @@ import type { Attr, PageNode } from '../shared/page-node';
 interface TreeNodeLike<Node> {
   readonly id: string;
   readonly kind: string;
-  readonly children?: readonly Node[] | null;
+  readonly children?: readonly Node[] | undefined;
   readonly props?: Readonly<Record<string, Attr>>;
 }
 

@@ -12,7 +12,7 @@ import { toNodeId, type NodeId } from '../shared/brand';
 // the node is, and absent means the kind has none.
 interface EditorNodeCommon {
   readonly name?: string;
-  readonly children?: readonly EditorNode[] | null;
+  readonly children?: readonly EditorNode[] | undefined;
   readonly props?: Readonly<Record<string, Attr>>;
   readonly attrOrder?: readonly string[];
   readonly value?: string;

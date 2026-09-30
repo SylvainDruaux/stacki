@@ -183,7 +183,7 @@ test('parsePageEditResult: an applied edit carries its inverse; a refusal is a r
   assert.deepEqual(applied.value.inverse, [{ span: { start: 0, end: 1 }, text: 'y' }]);
   const rejected = parsePageEditResult({
     ok: false,
-    error: { code: 'rejected', reason: 'anchor-moved', message: 'm', diskChecksum: null },
+    error: { code: 'rejected', reason: 'anchor-moved', message: 'm', diskChecksum: undefined },
   });
   assert.deepEqual(rejected, {
     ok: false,
@@ -205,9 +205,18 @@ test('parsePageEditResult: an applied edit carries its inverse; a refusal is a r
     () =>
       parsePageEditResult({
         ok: false,
-        error: { code: 'rejected', reason: 'nope', message: 'm', diskChecksum: null },
+        error: { code: 'rejected', reason: 'nope', message: 'm', diskChecksum: undefined },
       }),
     /rejection reason/,
+  );
+  // Absence is `undefined` (AGENTS.md §6): an unread disk checksum is never null.
+  assert.throws(
+    () =>
+      parsePageEditResult({
+        ok: false,
+        error: { code: 'rejected', reason: 'anchor-moved', message: 'm', diskChecksum: null },
+      }),
+    /diskChecksum: expected string/,
   );
   assert.throws(
     () =>
@@ -539,7 +548,7 @@ test('new nodes print where they land; the frontmatter changes its slot', async 
     kind: 'component',
     name: 'Card',
     props: {},
-    children: null,
+    children: undefined,
   });
   const inserted = await edit(harness, file, page.checksum, {
     tag: 'insert-node',

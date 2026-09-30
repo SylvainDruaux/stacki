@@ -382,7 +382,7 @@ function ContentCollectionList({
   return collections.map((collection) => (
     <div
       key={collection.name}
-      className={collectionClass(collection.name === selected, collection.error !== null)}
+      className={collectionClass(collection.name === selected, collection.error !== undefined)}
       onClick={() => onSelect(collection.name)}
       title={contentCollectionTitle(collection)}
     >
@@ -461,7 +461,7 @@ function collectionCount(countValue: number): string {
 }
 
 function contentEntryCount(collection: CmsPanelContentCollection): string {
-  if (collection.error !== null) {
+  if (collection.error !== undefined) {
     return 'unreadable';
   }
   return collection.count === 1 ? '1 entry' : `${collection.count} entries`;

@@ -20,7 +20,7 @@ import { LIMITS } from '../../dist/shared/limits.js';
 
 // Helpers return producer-shaped plain data; branding happens in the parser.
 const text = (id: string, value: string): unknown => ({ kind: 'text', id, value });
-const element = (id: string, name: string, children: readonly unknown[] | null): unknown => ({
+const element = (id: string, name: string, children: readonly unknown[] | undefined): unknown => ({
   kind: 'element',
   id,
   name,
@@ -34,7 +34,7 @@ test('every kind round-trips through the parser', () => {
     { kind: 'raw-line', id: 'n3', value: '<hr>' },
     { kind: 'comment', id: 'n4', value: 'note', jsx: true },
     { kind: 'raw', id: 'n5', name: 'style', inner: '.a { color: red }' },
-    { kind: 'component', id: 'n6', name: 'Hero', children: null, tightClose: true },
+    { kind: 'component', id: 'n6', name: 'Hero', children: undefined, tightClose: true },
     {
       kind: 'element',
       id: 'n7',
@@ -49,7 +49,7 @@ test('every kind round-trips through the parser', () => {
       kind: 'map',
       id: 'n9',
       head: 'items.map((item) => (',
-      children: [{ kind: 'element', id: 'n10', name: 'li', children: null }],
+      children: [{ kind: 'element', id: 'n10', name: 'li', children: undefined }],
       bare: true,
     },
     {
@@ -163,7 +163,7 @@ test('bounds: depth and node count fail at LIMITS, not at stack depth', () => {
     kind: 'element',
     id: 'n1',
     name: 'div',
-    children: null,
+    children: undefined,
     props: Object.fromEntries(
       Array.from({ length: LIMITS.attrsPerNodeMax + 1 }, (_, i) => [`a${i}`, { type: 'bare' }]),
     ),
@@ -192,7 +192,7 @@ test('parsePageModel and parsePageResult: the envelope is data, including not-ed
     frontmatterLayout: { extra: '', slots: [] },
     hadFrontmatter: true,
     trailingBlank: 0,
-    nodes: [{ kind: 'element', id: 'n1', name: 'div', children: null }],
+    nodes: [{ kind: 'element', id: 'n1', name: 'div', children: undefined }],
   };
   assert.equal(parsePageResult({ editable: true, model }).editable, true);
   assert.equal(parsePageModel({ ...model, eol: '\r\n' }).eol, '\r\n');
@@ -236,7 +236,7 @@ test('parsePageModel preserves Markdown source metadata and rejects malformed me
     imports: [],
     extraFrontmatter: 'title: Example',
     frontmatterLang: 'yaml',
-    layoutPath: null,
+    layoutPath: undefined,
     nodes,
     mdEol: '\n',
     mdEndsWithNewline: true,
@@ -265,13 +265,49 @@ test('parsePageModel preserves Markdown source metadata and rejects malformed me
   );
 });
 
+// Absence is `undefined` (AGENTS.md §6). JSON cannot say `undefined`, so data
+// written before that convention holds `null`, and JSON drops the key
+// altogether: the parser reads both as absent and emits `undefined`.
+test('a self-closing tag, a missing bail and no layout read the same in every spelling', () => {
+  for (const spelling of [{ children: undefined }, { children: null }, {}]) {
+    const node = parsePageNode({ kind: 'element', id: 'n1', name: 'br', ...spelling });
+    assert.ok(node.kind === 'element');
+    assert.equal(node.children, undefined);
+    assert.ok(Object.hasOwn(node, 'children'), 'the parsed tag states it has no children');
+  }
+  const refused = { editable: false, reason: 'r' };
+  for (const spelling of [{ bail: undefined }, { bail: null }, {}]) {
+    const result = parsePageResult({ ...refused, ...spelling });
+    assert.ok(!result.editable);
+    assert.equal(result.bail, undefined);
+  }
+  assert.throws(() => parsePageResult({ ...refused, bail: 'x' }), /result\.bail: expected object/);
+  const markdown = {
+    format: 'md',
+    imports: [],
+    extraFrontmatter: '',
+    nodes: [],
+    mdEol: '\n',
+    mdEndsWithNewline: true,
+    mdHasFrontmatter: false,
+  };
+  for (const spelling of [{ layoutPath: undefined }, { layoutPath: null }, {}]) {
+    assert.equal(parsePageModel({ ...markdown, ...spelling }).layoutPath, undefined);
+  }
+  assert.equal(parsePageModel({ ...markdown, layoutPath: 'L.astro' }).layoutPath, 'L.astro');
+  assert.throws(
+    () => parsePageModel({ ...markdown, layoutPath: 3 }),
+    /model\.layoutPath: expected string or nothing/,
+  );
+});
+
 // Attribute spans (plan §3.2): present only on a located parse, validated
 // against the node's own range and against its props record.
 const located = {
   kind: 'element',
   id: 'n1',
   name: 'p',
-  children: null,
+  children: undefined,
   props: { title: { type: 'string', value: 'Old' }, hidden: { type: 'bare' } },
   start: 0,
   end: 25,
@@ -344,7 +380,7 @@ test('attribute spans: every wrong shape fails with a pinned message', () => {
 
 test('an attribute named __proto__ survives the wire parser as an ordinary attribute', () => {
   const props = Object.fromEntries([['__proto__', { type: 'string', value: 'kept' }]]);
-  const node = parsePageNode({ kind: 'element', id: 'n1', name: 'p', children: null, props });
+  const node = parsePageNode({ kind: 'element', id: 'n1', name: 'p', children: undefined, props });
   assert.ok(node.kind === 'element');
   assert.deepEqual(Object.keys(node.props ?? {}), ['__proto__']);
   assert.equal(Object.getPrototypeOf(node.props), Object.prototype, 'the prototype is untouched');

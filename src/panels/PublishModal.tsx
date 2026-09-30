@@ -14,13 +14,13 @@ interface Props {
   readonly defaultName: string;
   readonly branch: string;
   readonly onClose: () => void;
-  readonly onPublish: (request: PublishRequest) => Promise<Result<string | null, string>>;
+  readonly onPublish: (request: PublishRequest) => Promise<Result<string | undefined, string>>;
   readonly openExternal: (url: string) => void;
 }
 type PublishState =
   | { readonly kind: 'form'; readonly error?: string }
   | { readonly kind: 'publishing'; readonly step: string }
-  | { readonly kind: 'done'; readonly url: string | null };
+  | { readonly kind: 'done'; readonly url: string | undefined };
 type Preflight = ReturnType<typeof useGitHubStatus>;
 
 // Project ownership resets both the form and any pending publication callbacks.
@@ -117,7 +117,7 @@ function PublishDone({
   onClose,
 }: Pick<Props, 'branch' | 'openExternal' | 'onClose'> & {
   readonly name: string;
-  readonly url: string | null;
+  readonly url: string | undefined;
 }) {
   return (
     <>

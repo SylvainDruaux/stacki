@@ -149,19 +149,19 @@ function decodeEntities(text: unknown): string {
  * its own habits.
  */
 function encodeText(text: unknown): string {
-  return String(text ?? '').replace(/[&<>    ‌‍­]/g, (c: string): string => {
-    if (c === '&') {
+  return String(text ?? '').replace(/[&<>    ‌‍­]/g, (character: string): string => {
+    if (character === '&') {
       return '&amp;';
     }
-    if (c === '<') {
+    if (character === '<') {
       return '&lt;';
     }
-    if (c === '>') {
+    if (character === '>') {
       return '&gt;';
     }
-    const code = c.codePointAt(0);
+    const code = character.codePointAt(0);
     if (code === undefined) {
-      return c;
+      return character;
     }
     return `&#${code};`;
   });

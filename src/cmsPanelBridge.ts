@@ -1,16 +1,6 @@
 import type { Data, Parser } from '../shared/boundary';
 import type { Result } from '../shared/result';
-import {
-  boolean,
-  count,
-  data,
-  list,
-  nullable,
-  optional,
-  pathText,
-  record,
-  text,
-} from '../shared/boundary';
+import { boolean, count, data, list, optional, pathText, record, text } from '../shared/boundary';
 import { parseIpcPayload } from '../shared/ipc-payloads';
 import { cleanError } from './cleanError';
 
@@ -30,7 +20,7 @@ export interface CmsPanelContentCollection {
     readonly base?: string;
     readonly file?: string;
   };
-  readonly error: string | null;
+  readonly error: string | undefined;
   readonly count: number;
 }
 
@@ -117,7 +107,7 @@ function parseContentCollection(input: unknown): CmsPanelContentCollection {
     name: text(value['name']),
     editable: value['editable'] === undefined ? false : boolean(value['editable']),
     ...(loader === undefined ? {} : { loader }),
-    error: nullable(text)(value['error']),
+    error: optional(text)(value['error']),
     count: count(value['count']),
   };
 }

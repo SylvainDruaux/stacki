@@ -34,7 +34,7 @@ test('real conflict output survives the renderer parser and preserves each choic
   ]);
   assert.deepEqual(initialConflictPicks(automatic), { 'a.astro': ['theirs', 'merged'] });
   assert.throws(() => choicesForSend(automatic, { 'a.astro': ['ours'] }), /choice count changed/);
-  assert.deepEqual(choicesForSend(conflict([file(null)]), { 'a.astro': ['theirs'] }), {
+  assert.deepEqual(choicesForSend(conflict([file(undefined)]), { 'a.astro': ['theirs'] }), {
     'a.astro': 'theirs',
   });
 });
@@ -105,7 +105,7 @@ test('merge dialog sends exact selected choices and locks binary choices while b
   const root = createRoot(document.getElementById('root'));
   const value = conflict([
     file([clash, { ...clash, merged: 'combined' }]),
-    { ...file(null), path: 'image.png' },
+    { ...file(undefined), path: 'image.png' },
   ]);
   const resolutions = [];
   let cancellations = 0;

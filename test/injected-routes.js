@@ -138,7 +138,7 @@ const { readInjectedRoutes, packageOf } = require('../dist/electron/injectedRout
         '@fivedogs/presencia-core',
     );
     check('an unscoped one too', packageOf('node_modules/presencia/src/x.astro') === 'presencia');
-    check('and a path outside a package names none', packageOf('/tmp/.avb/paths.js') === null);
+    check('and a path outside a package names none', packageOf('/tmp/.avb/paths.js') === undefined);
   }
 
   if (failures.length) {

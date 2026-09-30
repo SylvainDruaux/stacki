@@ -26,7 +26,7 @@ export function checkPreviewRender(projectPath: string, render: PreviewRender): 
     current.set(stamp.file, stampedFileState(root, stamp.file));
   }
   assert(current.size === render.stamps.length, 'One state per stamped file');
-  return judgePreviewRender(render, sha256Text, current);
+  return judgePreviewRender(render, current, sha256Text);
 }
 
 /** The token of a canonical manifest: SHA-256 of its UTF-8 bytes. */

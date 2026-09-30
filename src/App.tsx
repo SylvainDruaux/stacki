@@ -568,7 +568,7 @@ function tagChangeGesture(
   const kept = change.dropped.length > 0 ? removal.apply(model) : model;
   const before = findNodeById(kept.nodes, node.id);
   assert(before !== null, 'The renamed node survives its attribute removals');
-  const children = VOID_TAGS.has(change.name) ? null : (before.children ?? null);
+  const children = VOID_TAGS.has(change.name) ? undefined : before.children;
   // A fresh copy, so taking the old tag's flags off it edits nothing shown.
   const next: EditorNode = Object.assign({}, before, {
     kind: change.kind,
@@ -777,7 +777,7 @@ function withPrunedImports(model: EditorModel): EditorModel {
 // root for the new import; otherwise fall back to a relative path.
 function chooseImportPath(
   model: Pick<PageModel, 'imports'>,
-  paths: { readonly relative: string; readonly srcRelative: string | null },
+  paths: { readonly relative: string; readonly srcRelative: string | undefined },
 ): string {
   const { relative, srcRelative } = paths;
   if (srcRelative) {
@@ -1206,7 +1206,8 @@ export default function App() {
         setDevDiag(null);
         if ('external' in started && started.external) {
           showToast(
-            `Reusing the dev server already running for this project (${url}) — canvas outlines need the app's own server, so stop that one to enable them.`,
+            `Reusing the dev server already running for this project (${url}) — ` +
+              "canvas outlines need the app's own server, so stop that one to enable them.",
             'info',
           );
         }
@@ -2421,7 +2422,7 @@ export default function App() {
         kind: 'component',
         name: comp.name,
         props: {},
-        children: takesText ? [{ id: newId(), kind: 'text', value: 'Text' }] : null,
+        children: takesText ? [{ id: newId(), kind: 'text', value: 'Text' }] : undefined,
       };
       const state = pageStateRef.current.pageState;
       if (!state?.editable) {
@@ -2557,7 +2558,7 @@ export default function App() {
         kind: 'component',
         name,
         props: Object.fromEntries(props.map((p) => [p, { type: 'expr', value: p }])),
-        children: null,
+        children: undefined,
       };
       const urgent = { coalesceKey: null, urgency: true };
       const place = { parentId: found.parent?.id ?? null, index: found.index };
@@ -2674,11 +2675,8 @@ export default function App() {
       if (removed.dropped.length) {
         const names = removed.dropped;
         showToast(
-          `Also removed ${names
-            .map((n) => `\`${n}\``)
-            .join(
-              ', ',
-            )} from the frontmatter — nothing was reading ${names.length === 1 ? 'it' : 'them'} any more.`,
+          `Also removed ${names.map((n) => `\`${n}\``).join(', ')} from the frontmatter — ` +
+            `nothing was reading ${names.length === 1 ? 'it' : 'them'} any more.`,
           'info',
         );
       }
@@ -2889,7 +2887,8 @@ export default function App() {
     ];
     if (brought.length) {
       showToast(
-        `Brought ${brought.map((n) => `\`${n}\``).join(', ')} across from the page it was copied from.`,
+        `Brought ${brought.map((n) => `\`${n}\``).join(', ')} ` +
+          'across from the page it was copied from.',
         'info',
       );
     }
@@ -3037,7 +3036,7 @@ export default function App() {
           kind: 'component',
           name: item.name,
           props: { ...PLACEHOLDER_PROPS },
-          children: null,
+          children: undefined,
         };
         // Step 6, insert and frontmatter: the import when the page lacks it,
         // then the node.
@@ -3073,7 +3072,7 @@ export default function App() {
           name: item.tag,
           props: {},
           children: VOID_TAGS.has(item.tag)
-            ? null
+            ? undefined
             : placeholder
               ? [{ id: newId(), kind: 'text', value: placeholder }]
               : [],
@@ -3757,7 +3756,8 @@ export default function App() {
       const edit = withClass(node.props, clean);
       if (!edit) {
         showToast(
-          `Add ${clean} to this element yourself — its class comes from code Stacki can't edit safely.`,
+          `Add ${clean} to this element yourself — ` +
+            "its class comes from code Stacki can't edit safely.",
         );
         return { tag: 'refused', message: 'its class comes from code' };
       }
@@ -4176,7 +4176,7 @@ export default function App() {
             kind: 'element',
             name: node.name,
             props,
-            children: node.children === null ? null : withIds(node.children),
+            children: node.children === undefined ? undefined : withIds(node.children),
           };
         });
       // Step 9: the node restated with its new inline children.
@@ -4195,7 +4195,7 @@ export default function App() {
   // frontmatter, leaving every other key and its formatting alone. The
   // frontmatter text stays the single source of truth — editing it by hand in
   // the frontmatter editor and picking a layout here write to the same place.
-  const withLayoutField = (frontmatter: string, layoutPath: string | null): string => {
+  const withLayoutField = (frontmatter: string, layoutPath: string | undefined): string => {
     const fm = frontmatter ?? '';
     if (/^[ \t]*layout[ \t]*:/m.test(fm)) {
       return layoutPath
@@ -4231,7 +4231,7 @@ export default function App() {
         // A file-relative path, not an alias: `layout:` is resolved by Astro
         // against the page, and every project has that whether or not it has
         // configured `@/…`.
-        const rel = layout ? (await resolveImportPath(layout.path)).relative : null;
+        const rel = layout ? (await resolveImportPath(layout.path)).relative : undefined;
         if (seq !== layoutSeq.current) {
           return;
         }
@@ -4347,7 +4347,9 @@ export default function App() {
       if (
         !(await confirmDialog({
           title: `Delete ${page.name}?`,
-          body: 'This removes the file from disk. It can be brought back from History if it was saved in a version.',
+          body:
+            'This removes the file from disk. ' +
+            'It can be brought back from History if it was saved in a version.',
           confirmLabel: 'Delete page',
           danger: true,
         }))
@@ -5742,7 +5744,10 @@ export default function App() {
                   if (
                     !(await confirmDialog({
                       title: `Put ${file.label} back?`,
-                      body: `It goes back to how it was in “${commit.subject}”, and lands as an unsaved change — so you can look at it and undo it like any other edit.`,
+                      body:
+                        `It goes back to how it was in “${commit.subject}”, ` +
+                        'and lands as an unsaved change — ' +
+                        'so you can look at it and undo it like any other edit.',
                       confirmLabel: 'Put it back',
                     }))
                   ) {
@@ -5769,9 +5774,9 @@ export default function App() {
                     !(await confirmDialog({
                       title: `Take everything back to “${commit.subject}”?`,
                       body:
-                        'Anything you haven’t saved is put aside first, so nothing is lost. Your saved ' +
-                        'history stays exactly as it is — this lands as a set of unsaved changes you can ' +
-                        'look over, keep, or undo.',
+                        'Anything you haven’t saved is put aside first, so nothing is lost. ' +
+                        'Your saved history stays exactly as it is — ' +
+                        'this lands as a set of unsaved changes you can look over, keep, or undo.',
                       confirmLabel: 'Take it back',
                     }))
                   ) {
@@ -5811,12 +5816,10 @@ export default function App() {
                     const r = result.value;
                     if (!r.ok) {
                       showToast(
-                        `${
-                          repository?.branch ?? 'This branch'
-                        } and ${b} have different versions of ` +
-                          `${
-                            r.files[0] || 'a file'
-                          } you have unsaved work in — switch from the branch button to decide what to do with it.`,
+                        `${repository?.branch ?? 'This branch'} and ${b} ` +
+                          `have different versions of ${r.files[0] || 'a file'} ` +
+                          'you have unsaved work in — ' +
+                          'switch from the branch button to decide what to do with it.',
                         'error',
                       );
                       return;

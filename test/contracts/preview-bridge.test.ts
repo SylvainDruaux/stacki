@@ -149,33 +149,33 @@ test('the judge: token first, then every stamped file, each state named', () => 
       ['src/components/Card.astro', card],
       ['src/pages/index.astro', page],
     ]);
-  assert.deepEqual(judgePreviewRender(render, tokenOf, now(present(A), present(B))), {
+  assert.deepEqual(judgePreviewRender(render, now(present(A), present(B)), tokenOf), {
     tag: 'current',
   });
-  assert.deepEqual(judgePreviewRender(render, tokenOf, now(present(B), present(B))), {
+  assert.deepEqual(judgePreviewRender(render, now(present(B), present(B)), tokenOf), {
     tag: 'stale',
     reason: 'file-changed',
     file: 'src/components/Card.astro',
   });
-  assert.deepEqual(judgePreviewRender(render, tokenOf, now({ tag: 'missing' }, present(B))), {
+  assert.deepEqual(judgePreviewRender(render, now({ tag: 'missing' }, present(B)), tokenOf), {
     tag: 'stale',
     reason: 'file-missing',
     file: 'src/components/Card.astro',
   });
-  assert.deepEqual(judgePreviewRender(render, tokenOf, now(present(A), { tag: 'over-limit' })), {
+  assert.deepEqual(judgePreviewRender(render, now(present(A), { tag: 'over-limit' }), tokenOf), {
     tag: 'stale',
     reason: 'file-changed',
     file: 'src/pages/index.astro',
   });
   // A token that is not the manifest's digest vouches for nothing.
   const forged = { ...render, token: A };
-  assert.deepEqual(judgePreviewRender(forged, tokenOf, now(present(A), present(B))), {
+  assert.deepEqual(judgePreviewRender(forged, now(present(A), present(B)), tokenOf), {
     tag: 'stale',
     reason: 'token-mismatch',
     file: undefined,
   });
   // Main must have read every stamped file: a missing entry is a bug.
-  assert.throws(() => judgePreviewRender(render, tokenOf, new Map()), /read every stamped file/);
+  assert.throws(() => judgePreviewRender(render, new Map(), tokenOf), /read every stamped file/);
 });
 
 test('the event token and the shown file', () => {

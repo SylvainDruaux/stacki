@@ -52,6 +52,6 @@ test('package attribution handles Windows, nested dependencies, and pnpm', () =>
     packageOf('/site/node_modules/.pnpm/@scope+cards@1.0/node_modules/@scope/cards/Page.astro'),
     '@scope/cards',
   );
-  assert.equal(packageOf('/site/mynode_modules/not-a-package/Page.astro'), null);
+  assert.equal(packageOf('/site/mynode_modules/not-a-package/Page.astro'), undefined);
   assert.equal(packageOf('node_modules/package/Page.astro'), 'package');
 });

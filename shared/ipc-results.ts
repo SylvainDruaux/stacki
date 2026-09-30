@@ -1,7 +1,7 @@
 import type { ComponentProperties } from './component-properties';
 import type { PreviewVerdict } from './preview-token';
 import type { Result } from './result';
-// Invoke results mirror the handlers' wire shapes, including legacy null sentinels.
+// Invoke results mirror the handlers' wire shapes; absence is `undefined` (AGENTS.md §6).
 // Main's typed registrar checks every handler against this inventory.
 import type { Data } from './boundary';
 
@@ -12,7 +12,7 @@ export type WirePageRead =
       readonly source: string;
       readonly editable: false;
       readonly reason: string;
-      readonly bail: null | WireParseBail;
+      readonly bail: undefined | WireParseBail;
     };
 
 /** A page read from disk: the parse plus the SHA-256 of the exact bytes read. */
@@ -39,7 +39,7 @@ export type WirePageEditError =
       readonly code: 'rejected';
       readonly reason: string;
       readonly message: string;
-      readonly diskChecksum: string | null;
+      readonly diskChecksum: string | undefined;
     }
   | WirePageWriteFailure;
 
@@ -67,10 +67,12 @@ export interface IpcResults {
         readonly ok: true;
       };
   readonly 'assets:dimensions': {
-    readonly dims: null | {
-      readonly w: number;
-      readonly h: number;
-    };
+    readonly dims:
+      | undefined
+      | {
+          readonly w: number;
+          readonly h: number;
+        };
   };
   readonly 'assets:list': {
     readonly entries: ReadonlyArray<WireAssetEntry>;
@@ -163,7 +165,7 @@ export interface IpcResults {
           readonly loader: undefined | (WireLoaderInfo & { readonly kind: string });
           readonly hasSchema: boolean;
           readonly freeform: boolean;
-          readonly error: null | string;
+          readonly error: undefined | string;
           readonly count: number;
         }>;
         readonly covered: {
@@ -176,12 +178,12 @@ export interface IpcResults {
   readonly 'content:entries': {
     readonly entries: ReadonlyArray<WireEntry>;
     readonly readOnly: boolean;
-    readonly reason?: null | string;
+    readonly reason?: undefined | string;
     readonly idsAreGuesses?: boolean;
-    readonly idNote?: null | string;
+    readonly idNote?: undefined | string;
     readonly shape?: string;
     readonly parsed?: boolean;
-    readonly parserNote?: null | string;
+    readonly parserNote?: undefined | string;
     readonly collection: WireCollection;
   };
   readonly 'content:rename': {
@@ -203,7 +205,7 @@ export interface IpcResults {
   };
   readonly 'content:sampleEntry': {
     readonly entry: Data;
-    readonly error?: null | string;
+    readonly error?: undefined | string;
   };
   readonly 'content:targets': {
     readonly targets: ReadonlyArray<{
@@ -273,10 +275,10 @@ export interface IpcResults {
       };
   readonly 'dev:diagnose': {
     readonly kind: string;
-    readonly nodePath: null | string;
-    readonly nodeVersion: null | string;
-    readonly astroVersion: null | string;
-    readonly requires: null | string;
+    readonly nodePath: undefined | string;
+    readonly nodeVersion: undefined | string;
+    readonly astroVersion: undefined | string;
+    readonly requires: undefined | string;
     readonly launchedFromGui: boolean;
   };
   readonly 'dev:probe': {
@@ -322,7 +324,7 @@ export interface IpcResults {
     | {
         readonly restored: boolean;
         readonly error?: never;
-        readonly parkedFrom: null | string;
+        readonly parkedFrom: undefined | string;
         readonly ok: true;
         readonly from: string;
         readonly parked: boolean;
@@ -330,14 +332,14 @@ export interface IpcResults {
     | {
         readonly restored: boolean;
         readonly error: string;
-        readonly parkedFrom: null | string;
+        readonly parkedFrom: undefined | string;
         readonly ok: true;
         readonly from: string;
         readonly parked: boolean;
       };
   readonly 'git:commit': {
     readonly ok: true;
-    readonly files: null | number;
+    readonly files: undefined | number;
   };
   readonly 'git:commitFiles': ReadonlyArray<
     WireFileChange &
@@ -346,7 +348,7 @@ export interface IpcResults {
       }
   >;
   readonly 'git:deleteBranch': WireDeleteOutcome;
-  readonly 'git:fileAt': null | string;
+  readonly 'git:fileAt': undefined | string;
   readonly 'git:ghStatus':
     | {
         readonly installed: false;
@@ -356,7 +358,7 @@ export interface IpcResults {
     | {
         readonly installed: true;
         readonly authed: true;
-        readonly user: null | string;
+        readonly user: undefined | string;
       }
     | {
         readonly installed: true;
@@ -379,11 +381,11 @@ export interface IpcResults {
   readonly 'git:park': {
     readonly ok: true;
     readonly parked: boolean;
-    readonly branch: null | string;
+    readonly branch: undefined | string;
   };
   readonly 'git:publish': {
     readonly ok: true;
-    readonly url: null | string;
+    readonly url: undefined | string;
     readonly output: string;
   };
   readonly 'git:push': {
@@ -441,16 +443,16 @@ export interface IpcResults {
     | {
         readonly entries: ReadonlyArray<{
           readonly params: WireRouteParams;
-          readonly props: null | string | number | true | ReadonlyArray<Data> | WireDataRecord;
+          readonly props: undefined | string | number | true | ReadonlyArray<Data> | WireDataRecord;
           readonly route: string;
           readonly label: string;
         }>;
-        readonly error: null | string;
+        readonly error: undefined | string;
       };
   readonly 'page:edit': WirePageEdit;
   readonly 'page:importPathFor': {
     readonly relative: string;
-    readonly srcRelative: null | string;
+    readonly srcRelative: undefined | string;
   };
   readonly 'page:move': {
     readonly newPath: string;
@@ -546,9 +548,9 @@ export interface IpcResults {
         readonly canceled: false;
         readonly parentPath: undefined | string;
       };
-  readonly 'project:pending': null | string;
+  readonly 'project:pending': undefined | string;
   readonly 'project:resolveImport': {
-    readonly path: null | string;
+    readonly path: undefined | string;
   };
   readonly 'project:scaffold': {
     readonly ok: true;
@@ -561,11 +563,11 @@ export interface IpcResults {
     }>;
     readonly layouts: ReadonlyArray<{
       readonly schema: ReadonlyArray<WireSchemaField>;
-      readonly extendsTag: null | string;
+      readonly extendsTag: undefined | string;
       readonly slots: ReadonlyArray<string>;
       readonly slotText: boolean;
       readonly renderTag:
-        | null
+        | undefined
         | {
             readonly tag: string;
             readonly prop?: string;
@@ -585,11 +587,11 @@ export interface IpcResults {
     }>;
     readonly components: ReadonlyArray<{
       readonly schema: ReadonlyArray<WireSchemaField>;
-      readonly extendsTag: null | string;
+      readonly extendsTag: undefined | string;
       readonly slots: ReadonlyArray<string>;
       readonly slotText: boolean;
       readonly renderTag:
-        | null
+        | undefined
         | {
             readonly tag: string;
             readonly prop?: string;
@@ -613,7 +615,7 @@ export interface IpcResults {
     readonly ok: true;
   };
   readonly 'recents:list': ReadonlyArray<{
-    readonly thumb: null | string;
+    readonly thumb: undefined | string;
     readonly stale: boolean;
     readonly canRefresh: boolean;
     readonly path: string;
@@ -622,12 +624,12 @@ export interface IpcResults {
   }>;
   readonly 'recents:refreshThumb':
     | {
-        readonly thumb: null | string;
+        readonly thumb: undefined | string;
         readonly stale: boolean;
         readonly ok: true;
       }
     | {
-        readonly thumb: null | string;
+        readonly thumb: undefined | string;
         readonly stale: boolean;
         readonly ok: false;
         readonly error: string;
@@ -857,7 +859,7 @@ export type WireFileModel = {
 
 export type WireProjectFile = {
   readonly path: string;
-  readonly status: null | string;
+  readonly status: undefined | string;
   readonly staged: boolean;
 };
 
@@ -887,13 +889,13 @@ export type WireGitInfo = {
   readonly isRepo: true;
   readonly branch: string;
   readonly branches: ReadonlyArray<string>;
-  readonly remote: null | string;
+  readonly remote: undefined | string;
   readonly dirty: boolean;
   readonly ahead: number;
   readonly parked: ReadonlyArray<string>;
-  readonly head?: null | string;
-  readonly userEmail?: null | string;
-  readonly trunk?: null | string;
+  readonly head?: undefined | string;
+  readonly userEmail?: undefined | string;
+  readonly trunk?: undefined | string;
   readonly dirtyFiles?: ReadonlyArray<string>;
   readonly hasUpstream?: boolean;
 };
@@ -916,21 +918,21 @@ export type WireCommitInfo = {
 export type WireMergeOutcome =
   | {
       readonly ok: true;
-      readonly into: null | string;
+      readonly into: undefined | string;
       readonly changed: boolean;
       readonly resolved?: number;
     }
   | {
       readonly ok: false;
       readonly conflicted: true;
-      readonly from: null | string;
+      readonly from: undefined | string;
       readonly branch: string;
       readonly files: ReadonlyArray<WireMergeClash>;
     }
   | {
       readonly ok: false;
       readonly dirty: true;
-      readonly from: null | string;
+      readonly from: undefined | string;
       readonly branch: string;
       readonly files: ReadonlyArray<string>;
     };
@@ -945,8 +947,8 @@ export type WireStatusFile = {
 
 export type WireWorktreeInfo = {
   readonly path: string;
-  readonly head: null | string;
-  readonly branch: null | string;
+  readonly head: undefined | string;
+  readonly branch: undefined | string;
   readonly detached: boolean;
   readonly bare: boolean;
 };
@@ -967,7 +969,7 @@ export type WireMarkdownModel = {
   }>;
   readonly extraFrontmatter: string;
   readonly frontmatterLang: 'yaml';
-  readonly layoutPath: null | string;
+  readonly layoutPath: undefined | string;
   readonly nodes: WireMarkdownNodeList;
   readonly mdEol: string;
   readonly mdEndsWithNewline: boolean;
@@ -993,8 +995,8 @@ export type WireParseBail = {
 
 export type WireInjectedRoute = {
   readonly route: string;
-  readonly entrypoint: null | string;
-  readonly from: null | string;
+  readonly entrypoint: undefined | string;
+  readonly from: undefined | string;
   readonly params: ReadonlyArray<unknown>;
 };
 
@@ -1070,14 +1072,14 @@ export type WireConflictPart =
       readonly ours: string;
       readonly theirs: string;
       readonly changedBy: 'ours' | 'theirs' | 'both';
-      readonly merged?: string | null;
+      readonly merged?: string | undefined;
     };
 
 export type WireMergeClash = {
   readonly path: string;
-  readonly ours: null | string;
-  readonly theirs: null | string;
-  readonly parts: null | ReadonlyArray<WireConflictPart>;
+  readonly ours: undefined | string;
+  readonly theirs: undefined | string;
+  readonly parts: undefined | ReadonlyArray<WireConflictPart>;
 };
 
 export type WireMarkdownNodeList = ReadonlyArray<WireMdNodeLike> & {
@@ -1088,7 +1090,7 @@ export type WireParserNode =
   | (WireNodeMetadata & {
       readonly kind: 'component' | 'element';
       readonly name: string;
-      readonly children: null | ReadonlyArray<WireParserNode>;
+      readonly children: undefined | ReadonlyArray<WireParserNode>;
       readonly shorthand?: boolean;
       readonly tightClose?: boolean;
       readonly closeSource?: string;
@@ -1292,7 +1294,7 @@ export type WireColumn = {
 
 export type WireBlock = {
   readonly kind: 'rows' | 'matrix';
-  readonly title: null | string;
+  readonly title: undefined | string;
   readonly titleStart?: number;
   readonly titleEnd?: number;
   readonly rows: ReadonlyArray<WireRow>;
@@ -1312,7 +1314,7 @@ export type WireMdNodeLike = {
     | {
         readonly [key: string]: WirePropValue;
       };
-  readonly children?: null | ReadonlyArray<WireMdNodeLike>;
+  readonly children?: undefined | ReadonlyArray<WireMdNodeLike>;
   readonly mdBlanksBefore?: number;
   readonly mdIndent?: string;
   readonly mdFence?: string;
@@ -1367,7 +1369,7 @@ export type WireUnionBranch = {
 export type WireRow = {
   readonly label: string;
   readonly name?: string;
-  readonly cells: ReadonlyArray<null | WireCell>;
+  readonly cells: ReadonlyArray<undefined | WireCell>;
 };
 
 export type WireVarEntry = {

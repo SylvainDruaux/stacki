@@ -170,12 +170,12 @@ export interface EntryEdit {
 export interface ListResult {
   readonly entries: Entry[];
   readonly readOnly: boolean;
-  readonly reason?: string | null;
+  readonly reason?: string | undefined;
   readonly idsAreGuesses?: boolean;
-  readonly idNote?: string | null;
+  readonly idNote?: string | undefined;
   readonly shape?: string;
   readonly parsed?: boolean;
-  readonly parserNote?: string | null;
+  readonly parserNote?: string | undefined;
 }
 
 /**
@@ -192,12 +192,16 @@ function listEntries(projectPath: string, collection: ContentCollection): ListRe
   return { entries: [], readOnly: true, reason: readOnlyReason(collection) };
 }
 
-function readOnlyReason(collection: ContentCollection): string | null {
+function readOnlyReason(collection: ContentCollection): string | undefined {
   const loader = collection.loader ?? {};
   if (loader.kind === 'custom') {
-    return `${collection.name} is built by a loader in this project, not stored in a file. Its entries are rebuilt from scratch on every sync, so anything written here would be overwritten.`;
+    return (
+      `${collection.name} is built by a loader in this project, not stored in a file. ` +
+      'Its entries are rebuilt from scratch on every sync, so anything written here would be ' +
+      'overwritten.'
+    );
   }
-  return null;
+  return undefined;
 }
 
 const patternsOf = (pattern: LoaderInfo['pattern']): RegExp[] => {
@@ -259,8 +263,9 @@ function globEntries(projectPath: string, collection: ContentCollection): ListRe
     // not what renames the entry.
     idsAreGuesses: !!generated,
     idNote: generated
-      ? `${collection.name} builds its ids in the loader, from the entry's own fields. The ids shown are the file paths, which is not what other collections reference.`
-      : null,
+      ? `${collection.name} builds its ids in the loader, from the entry's own fields. ` +
+        'The ids shown are the file paths, which is not what other collections reference.'
+      : undefined,
   };
 }
 
@@ -398,8 +403,10 @@ function fileEntries(projectPath: string, collection: ContentCollection): ListRe
     // written back through it.
     parsed: !!loader.parser,
     parserNote: loader.parser
-      ? `${collection.name} is parsed by a function in the content config before Astro sees it. Fields that are not in the file itself were made by that parser: they are shown, but editing one here would have nowhere to go.`
-      : null,
+      ? `${collection.name} is parsed by a function in the content config before Astro sees it. ` +
+        'Fields that are not in the file itself were made by that parser: they are shown, ' +
+        'but editing one here would have nowhere to go.'
+      : undefined,
   };
 }
 

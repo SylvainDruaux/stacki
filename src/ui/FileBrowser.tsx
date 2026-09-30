@@ -7,7 +7,7 @@ const FILE_LIMITS = { entriesMax: 100_000, pathCharsMax: 8_192, depthMax: 64 } a
 export interface BrowserFile {
   readonly path: string;
   readonly name?: string;
-  readonly status?: string | null;
+  readonly status?: string | undefined;
 }
 interface FileTree<T extends BrowserFile> {
   readonly dirs: ReadonlyMap<string, FileTree<T>>;

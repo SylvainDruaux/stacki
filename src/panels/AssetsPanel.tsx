@@ -403,7 +403,7 @@ function dropPayload(transfer: DataTransfer): Result<DropPayload | null, string>
   }
   const paths = [...transfer.files]
     .map((file) => window.avb.getFilePath(file))
-    .filter((path): path is string => path !== null && path !== '')
+    .filter((path): path is string => path !== undefined && path !== '')
     .map(pathText);
   return paths.length === 0
     ? { ok: true, value: null }

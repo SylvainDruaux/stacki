@@ -16,6 +16,9 @@ export const BOUNDARY_LIMITS = {
 
 export type Parser<T> = (input: unknown) => T;
 export type Parsed<P> = P extends Parser<infer T> ? T : never;
+// `null` here is a JSON value a project's data files hold, not absence: a content
+// entry's `null` field must round-trip to the file as `null`.
+// eslint-disable-next-line stacki/no-null -- JSON null is data in project files, not absence
 export type Data = undefined | null | boolean | number | string | Data[] | DataRecord;
 export interface DataRecord {
   readonly [key: string]: Data;
@@ -73,8 +76,11 @@ export function optional<T>(parse: Parser<T>): Parser<T | undefined> {
   return (input) => (input === undefined ? undefined : parse(input));
 }
 
+// For external producers that write `null` themselves (a project iframe's
+// messages, legacy payloads). Our own results say absence with `undefined`.
+// eslint-disable-next-line stacki/no-null -- parses producers outside our types that send null
 export function nullable<T>(parse: Parser<T>): Parser<T | null> {
-  return (input) => (input === null ? null : parse(input));
+  return (input) => (input === null ? input : parse(input));
 }
 
 export function list<T>(parse: Parser<T>): Parser<T[]> {
@@ -143,7 +149,10 @@ export function data(input: unknown): Data {
     if (depth > BOUNDARY_LIMITS.depthMax) {
       throw new Error('Data exceeds depth limit');
     }
-    if (value == null) {
+    if (value === undefined) {
+      return value;
+    }
+    if (value === null) {
       return value;
     }
     if (typeof value === 'boolean') {

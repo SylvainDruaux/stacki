@@ -252,7 +252,7 @@ const unquote = (s: string): string => (s.startsWith('"') && s.endsWith('"') ? s
 
 export interface ProjectFile {
   readonly path: string;
-  readonly status: string | null;
+  readonly status: string | undefined;
   readonly staged: boolean;
 }
 
@@ -298,11 +298,11 @@ async function allFiles(
   }
   return paths.sort().map((p) => {
     const c = changed.get(p);
-    return { path: p, status: c ? c.status : null, staged: c ? c.staged : false };
+    return { path: p, status: c ? c.status : undefined, staged: c ? c.staged : false };
   });
 }
 
-/** A file's contents as they were at `ref`, or null when it wasn't there. */
+/** A file's contents as they were at `ref`, or undefined when it wasn't there. */
 async function fileAt(
   git: Git,
   {
@@ -310,7 +310,7 @@ async function fileAt(
     ref,
     path: filePath,
   }: { readonly projectPath: string; readonly ref: string; readonly path: string },
-): Promise<string | null> {
+): Promise<string | undefined> {
   try {
     const { stdout } = await git(projectPath, ['show', `${ref}:${filePath}`]);
     return stdout;
@@ -322,7 +322,7 @@ async function fileAt(
     if (
       /does not exist|exists on disk, but not in/i.test(typeof stderr === 'string' ? stderr : '')
     ) {
-      return null;
+      return undefined;
     }
     throw err;
   }
@@ -330,8 +330,8 @@ async function fileAt(
 
 export interface WorktreeInfo {
   readonly path: string;
-  readonly head: string | null;
-  readonly branch: string | null;
+  readonly head: string | undefined;
+  readonly branch: string | undefined;
   readonly detached: boolean;
   readonly bare: boolean;
 }
@@ -350,15 +350,15 @@ async function worktrees(
     .filter(Boolean)
     .map((rec) => {
       const out: {
-        path: string | null;
-        head: string | null;
-        branch: string | null;
+        path: string | undefined;
+        head: string | undefined;
+        branch: string | undefined;
         detached: boolean;
         bare: boolean;
       } = {
-        path: null,
-        head: null,
-        branch: null,
+        path: undefined,
+        head: undefined,
+        branch: undefined,
         detached: false,
         bare: false,
       };
@@ -380,7 +380,7 @@ async function worktrees(
       }
       return out;
     })
-    .filter((w): w is WorktreeInfo => w.path !== null);
+    .filter((w): w is WorktreeInfo => w.path !== undefined);
 }
 
 // --- Saying what a file is -------------------------------------------------

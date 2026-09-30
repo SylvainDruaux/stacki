@@ -245,16 +245,16 @@ function checkOperationAnchor(operation: Operation, anchor: AnchorRef): void {
     case 'remove-attribute':
     case 'set-inline-style':
     case 'rename-attribute':
-      requireKind(operation.tag, isAttributeHost(kind));
+      requireKind(operation.tag, { allowed: isAttributeHost(kind) });
       return;
     case 'rename-tag':
       // A `<style>` or `<script>` is raw text by its name: renaming one
       // changes how everything inside it parses, which is code, not a tag.
-      requireKind(operation.tag, kind === 'element' || kind === 'component');
+      requireKind(operation.tag, { allowed: kind === 'element' || kind === 'component' });
       requireNewName(operation.tag, operation.from, operation.to);
       return;
     case 'rewrite-node':
-      requireKind(operation.tag, isNodeKind(kind));
+      requireKind(operation.tag, { allowed: isNodeKind(kind) });
       requireSites(
         operation.tag,
         anchor.span,
@@ -263,24 +263,24 @@ function checkOperationAnchor(operation: Operation, anchor: AnchorRef): void {
       return;
     case 'insert-node':
     case 'remove-node':
-      requireKind(operation.tag, isNodeKind(kind));
+      requireKind(operation.tag, { allowed: isNodeKind(kind) });
       return;
     case 'move-node':
-      requireKind(operation.tag, isNodeKind(kind));
-      requireKind(operation.tag, isNodeKind(operation.destination.expectedKind));
+      requireKind(operation.tag, { allowed: isNodeKind(kind) });
+      requireKind(operation.tag, { allowed: isNodeKind(operation.destination.expectedKind) });
       return;
     case 'wrap-nodes':
-      requireKind(operation.tag, isNodeKind(kind));
-      requireKind(operation.tag, isNodeKind(operation.last.expectedKind));
+      requireKind(operation.tag, { allowed: isNodeKind(kind) });
+      requireKind(operation.tag, { allowed: isNodeKind(operation.last.expectedKind) });
       return;
     case 'rename-binding':
-      requireKind(operation.tag, kind === 'map');
+      requireKind(operation.tag, { allowed: kind === 'map' });
       requireSites(operation.tag, anchor.span, operation.sites);
       return;
     case 'apply-code-patch':
     case 'revert-splices':
     case 'rewrite-text':
-      requireKind(operation.tag, kind === 'document');
+      requireKind(operation.tag, { allowed: kind === 'document' });
       requireSites(
         operation.tag,
         anchor.span,
@@ -288,12 +288,12 @@ function checkOperationAnchor(operation: Operation, anchor: AnchorRef): void {
       );
       return;
     case 'edit-frontmatter-slot':
-      requireKind(operation.tag, kind === 'frontmatter');
+      requireKind(operation.tag, { allowed: kind === 'frontmatter' });
       requireSites(operation.tag, anchor.span, [operation.slot]);
       return;
     case 'append-body':
     case 'insert-frontmatter':
-      requireKind(operation.tag, kind === 'document');
+      requireKind(operation.tag, { allowed: kind === 'document' });
       return;
     default: {
       const exhaustive: never = operation;
@@ -333,8 +333,8 @@ function requireNewName(tag: OperationTag, from: string, to: string): void {
   }
 }
 
-function requireKind(tag: OperationTag, allowed: boolean): void {
-  if (!allowed) {
+function requireKind(tag: OperationTag, check: { readonly allowed: boolean }): void {
+  if (!check.allowed) {
     throw new Error(`Intent: ${tag} cannot target this anchor kind`);
   }
 }

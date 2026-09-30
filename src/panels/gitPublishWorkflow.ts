@@ -9,7 +9,7 @@ import { commitGitChanges, createGitHubRepository, readGitInfo } from '../gitChi
 export async function publishGitProject(
   projectPath: string,
   request: PublishRequest,
-): Promise<Result<string | null, string>> {
+): Promise<Result<string | undefined, string>> {
   // Validate the complete request before committing anything on disk.
   const payload = parseIpcPayload('git:publish', { projectPath, ...request });
   if (payload.repoName.trim().length === 0) {

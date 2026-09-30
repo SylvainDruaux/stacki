@@ -71,8 +71,7 @@ function imageDimension(input: unknown): number {
 }
 const dimensions = object({ w: imageDimension, h: imageDimension });
 export function parseAssetDimensions(input: unknown) {
-  const value = record(input)['dims'];
-  return value === null ? null : dimensions(value);
+  return optional(dimensions)(record(input)['dims']);
 }
 
 export async function readAssetDimensions(

@@ -2361,7 +2361,7 @@ if (!process.isMainFrame) {
       } catch {
         // Ourselves before Electron 29: the file carried its path as a
         // non-standard property that the shipped typings never declare.
-        return 'path' in file && typeof file['path'] === 'string' ? file['path'] : null;
+        return 'path' in file && typeof file['path'] === 'string' ? file['path'] : undefined;
       }
     },
     onAssetsChanged: (cb: () => void) => {

@@ -7,7 +7,6 @@ import {
   BOUNDARY_LIMITS,
   pathText,
   list,
-  nullable,
   object,
   optional,
   record,
@@ -16,9 +15,9 @@ import {
 import type { IpcPayloads } from '../shared/ipc-payloads';
 import type { WireMergeOutcome, WireDeleteOutcome, WireConflictPart } from '../shared/ipc-results';
 
-const mergeFile = object({ path: pathText, ours: nullable(text), theirs: nullable(text) });
+const mergeFile = object({ path: pathText });
 const commonPart = object({ text });
-const changedPart = object({ ours: text, theirs: text, merged: optional(nullable(text)) });
+const changedPart = object({ ours: text, theirs: text, merged: optional(text) });
 
 export function parseConflictPart(input: unknown): WireConflictPart {
   const value = record(input);
@@ -41,7 +40,7 @@ function parseMergeFiles(input: unknown) {
       throw new Error('Merge files: item limit exceeded');
     }
     const value = record(entry);
-    const parts = nullable(
+    const parts = optional(
       list((part) => {
         if (--remaining < 0) {
           throw new Error('Merge files: item limit exceeded');
@@ -49,20 +48,23 @@ function parseMergeFiles(input: unknown) {
         return parseConflictPart(part);
       }),
     )(value['parts']);
-    return { ...mergeFile(value), parts };
+    // A side that deleted the file has no text: the key stays, its value undefined.
+    const ours = optional(text)(value['ours']);
+    const theirs = optional(text)(value['theirs']);
+    return { ...mergeFile(value), ours, theirs, parts };
   })(input);
   if (files.length === 0) {
     throw new Error('Merge files: at least one conflict is required');
   }
   return files;
 }
-const mergeSuccess = object({ into: nullable(text), changed: boolean, resolved: optional(count) });
-const mergeConflict = object({ from: nullable(text), branch: text, files: parseMergeFiles });
-const mergeDirty = object({ from: nullable(text), branch: text, files: list(text) });
+const mergeSuccess = object({ changed: boolean, resolved: optional(count) });
+const mergeConflict = object({ branch: text, files: parseMergeFiles });
+const mergeDirty = object({ branch: text, files: list(text) });
 const parkResult = object({
   ok: boolean,
   parked: optional(boolean),
-  branch: optional(nullable(text)),
+  branch: optional(text),
   error: optional(text),
 });
 const unparkResult = object({ restored: boolean, error: optional(text) });
@@ -70,16 +72,17 @@ const unparkResult = object({ restored: boolean, error: optional(text) });
 export function parseMergeResult(input: unknown): WireMergeOutcome {
   const value = record(input);
   if (value['ok'] === true) {
-    return { ok: true, ...mergeSuccess(value) };
+    return { ok: true, into: optional(text)(value['into']), ...mergeSuccess(value) };
   }
   if (value['ok'] !== false) {
     throw new Error('Merge result must declare success or failure');
   }
+  const from = optional(text)(value['from']);
   if (value['conflicted'] === true) {
-    return { ok: false, conflicted: true, ...mergeConflict(value) };
+    return { ok: false, conflicted: true, from, ...mergeConflict(value) };
   }
   if (value['dirty'] === true) {
-    return { ok: false, dirty: true, ...mergeDirty(value) };
+    return { ok: false, dirty: true, from, ...mergeDirty(value) };
   }
   throw new Error('Merge failure must identify dirty files or conflicts');
 }

@@ -173,7 +173,7 @@ function refreshQueue(
 function updateThumbnail(
   projects: readonly RecentProject[],
   projectPath: string,
-  result: { readonly thumb: string | null; readonly stale: boolean },
+  result: { readonly thumb: string | undefined; readonly stale: boolean },
 ): readonly RecentProject[] {
   return projects.map((project) =>
     project.path === projectPath

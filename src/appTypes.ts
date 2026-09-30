@@ -37,7 +37,7 @@ export interface OpenRoute {
   readonly kind: 'route';
   readonly name: string;
   readonly route: string;
-  readonly from: string | null;
+  readonly from: string | undefined;
   readonly path?: undefined;
 }
 
@@ -66,7 +66,7 @@ export interface EditablePageState extends PageStateBase {
 export interface RawPageState extends PageStateBase {
   readonly editable: false;
   readonly reason: string;
-  readonly bail: { readonly what: string; readonly near: string } | null;
+  readonly bail: { readonly what: string; readonly near: string } | undefined;
 }
 
 export type EditorPageState = EditablePageState | RawPageState;

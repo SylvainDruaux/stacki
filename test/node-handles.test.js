@@ -123,7 +123,7 @@ test('a removal drops only the removed handles; an insertion takes the gestureâ€
     placement: 'before',
     content: {
       tag: 'nodes',
-      nodes: [{ id: NEW, kind: 'element', name: 'hr', props: {}, children: null }],
+      nodes: [{ id: NEW, kind: 'element', name: 'hr', props: {}, children: undefined }],
     },
   });
   // The gesture predicted the new node with its own handle, where it lands.
@@ -135,7 +135,7 @@ test('a removal drops only the removed handles; an insertion takes the gestureâ€
         children: [
           before.model.nodes[0].children[0],
           before.model.nodes[0].children[1],
-          { id: NEW, kind: 'element', name: 'hr', props: {}, children: null },
+          { id: NEW, kind: 'element', name: 'hr', props: {}, children: undefined },
           before.model.nodes[0].children[2],
         ],
       },

@@ -11,7 +11,7 @@ const cleanInfo = {
   isRepo: true,
   branch: 'main',
   branches: ['main'],
-  remote: null,
+  remote: undefined,
   dirty: false,
   ahead: 0,
   parked: [],
@@ -29,6 +29,8 @@ test('Git publish response parsers reject malformed and oversized data', () => {
     {},
     { ...cleanInfo, ahead: -1 },
     { ...cleanInfo, branch: 1 },
+    // Absence is `undefined` (AGENTS.md §6): main never sends a null remote.
+    { ...cleanInfo, remote: null },
     { ...cleanInfo, branches: Array(100001).fill('main') },
   ]) {
     assert.throws(() => parseGitInfo(value));
@@ -74,7 +76,7 @@ test('dirty publishing commits before creating the repository', async () => {
       gitInfo: async () => ({ ...cleanInfo, dirty: true }),
       gitCommit: async (payload) => {
         calls.push(['commit', payload]);
-        return { ok: true, files: null };
+        return { ok: true, files: undefined };
       },
       gitPublish: async (payload) => {
         calls.push(['publish', payload]);

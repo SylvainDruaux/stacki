@@ -63,7 +63,7 @@ interface MdNode {
   value?: string;
   inner?: string;
   props?: Record<string, Attr> | undefined;
-  children?: MdNode[] | null;
+  children?: MdNode[] | undefined;
   start?: number;
   end?: number;
   attrSpans?: readonly AttrSpan[];
@@ -94,7 +94,7 @@ export interface PrintNode {
   readonly value?: string;
   readonly inner?: string;
   readonly props?: Readonly<Record<string, Attr>> | undefined;
-  readonly children?: readonly PrintNode[] | null;
+  readonly children?: readonly PrintNode[] | undefined;
   readonly mdBlanksBefore?: number;
   readonly mdIndent?: string;
   readonly mdFence?: string;
@@ -168,15 +168,15 @@ function splitFrontmatter(source: string): {
 // The `layout:` value from YAML frontmatter, unquoted. Markdown pages pick
 // their layout here rather than by importing it, so the app's layout picker
 // reads and writes this field.
-function layoutFromFrontmatter(frontmatter: string | null | undefined): string | null {
+function layoutFromFrontmatter(frontmatter: string | null | undefined): string | undefined {
   if (!frontmatter) {
-    return null;
+    return undefined;
   }
   const m = frontmatter.match(/^[ \t]*layout[ \t]*:[ \t]*(.+?)[ \t]*$/m);
   if (!m) {
-    return null;
+    return undefined;
   }
-  return (m[1] ?? '').replace(/^['"]|['"]$/g, '') || null;
+  return (m[1] ?? '').replace(/^['"]|['"]$/g, '') || undefined;
 }
 
 // ---------------------------------------------------------------------------
@@ -535,7 +535,7 @@ function readRule(lines: readonly Line[], index: number): BlockRead | undefined 
     kind: 'element',
     name: 'hr',
     props: {},
-    children: null,
+    children: undefined,
     mdRaw: line.text,
   };
   return { nodes: [node], next: index + 1 };
@@ -917,7 +917,7 @@ function imageNode(
     kind: 'element',
     name: 'img',
     props,
-    children: null,
+    children: undefined,
     mdImage: true,
     attrSpans: spans,
   };
@@ -1143,7 +1143,7 @@ export interface MarkdownModel {
   // surfaced separately so the layout picker can drive it.
   readonly extraFrontmatter: string;
   readonly frontmatterLang: 'yaml';
-  readonly layoutPath: string | null;
+  readonly layoutPath: string | undefined;
   readonly nodes: MarkdownNodeList;
   readonly mdEol: string;
   readonly mdEndsWithNewline: boolean;
@@ -1154,7 +1154,7 @@ export interface MarkdownModel {
 
 export type MarkdownParse =
   | { readonly editable: true; readonly model: MarkdownModel }
-  | { readonly editable: false; readonly reason: string; readonly bail: null };
+  | { readonly editable: false; readonly reason: string; readonly bail: undefined };
 
 /** Parse a Markdown or MDX page. Every node has its source range; a page whose
  * tree exceeds the wire model's bounds is not editable (the code panel still
@@ -1164,7 +1164,7 @@ function parseMarkdownPage(
   { mdx = false }: { readonly mdx?: boolean } = {},
 ): MarkdownParse {
   if (source.length > LIMITS.ipcFieldCharsMax) {
-    return { editable: false, reason: 'The page exceeds the source limit.', bail: null };
+    return { editable: false, reason: 'The page exceeds the source limit.', bail: undefined };
   }
   // A leading byte-order mark is not content (plan §3.2); it stays in the
   // file, and offsets count it.
@@ -1183,7 +1183,7 @@ function parseMarkdownPage(
   const nodes = parseBlocks(lines, env, 0);
   const size = assignPathIds(nodes);
   if (size.nodes > LIMITS.treeNodesMax || size.depth > LIMITS.treeDepthMax) {
-    return { editable: false, reason: 'The page exceeds the tree limits.', bail: null };
+    return { editable: false, reason: 'The page exceeds the tree limits.', bail: undefined };
   }
   return {
     editable: true,

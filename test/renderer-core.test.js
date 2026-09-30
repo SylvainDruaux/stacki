@@ -34,7 +34,11 @@ const deferred = () => {
 const tick = () => new Promise(setImmediate);
 
 test('tree index preserves locations, ancestry and anchors after moves', () => {
-  const leaf = { id: 'leaf', props: { id: { type: 'string', value: 'anchor' } }, children: null };
+  const leaf = {
+    id: 'leaf',
+    props: { id: { type: 'string', value: 'anchor' } },
+    children: undefined,
+  };
   const nodes = [
     { id: 'first', children: [leaf] },
     { id: 'second', children: [] },

@@ -29,10 +29,10 @@ export interface VariableCell extends WireCell {
 export interface VariableRow {
   readonly label: string;
   readonly name?: string;
-  readonly cells: readonly (VariableCell | null)[];
+  readonly cells: readonly (VariableCell | undefined)[];
 }
 interface VariableBlockBase {
-  readonly title: string | null;
+  readonly title: string | undefined;
   readonly titleStart?: number;
   readonly titleEnd?: number;
   readonly rows: readonly VariableRow[];
@@ -119,7 +119,7 @@ function variableGroupCount(group: VariableGroup): number {
     (blockTotal, block) =>
       blockTotal +
       block.rows.reduce(
-        (rowTotal, row) => rowTotal + row.cells.filter((cell) => cell !== null).length,
+        (rowTotal, row) => rowTotal + row.cells.filter((cell) => cell !== undefined).length,
         0,
       ),
     0,
@@ -141,9 +141,9 @@ function variableBlockForPanel(block: VariableBlock): VariableBlock | undefined 
 
 function variableRowForPanel(row: VariableRow): VariableRow | undefined {
   const cells = row.cells.map((cell) =>
-    cell?.name.startsWith(PRIVATE_VARIABLE_PREFIX) ? null : cell,
+    cell?.name.startsWith(PRIVATE_VARIABLE_PREFIX) ? undefined : cell,
   );
-  if (!cells.some((cell) => cell !== null)) {
+  if (!cells.some((cell) => cell !== undefined)) {
     return undefined;
   }
   return { ...row, cells };
@@ -228,11 +228,11 @@ function variableFileParser(budget: VariablesBudget): Parser<VariableFile> {
   const row = object({
     label: variableText,
     name: optional(variableText),
-    cells: budget.list(nullable(parseVariableCell)),
+    cells: budget.list(optional(parseVariableCell)),
   });
   const blockShape = object({
     kind: blockKind,
-    title: nullable(variableText),
+    title: optional(variableText),
     titleStart: optional(sourceOffset),
     titleEnd: optional(sourceOffset),
     rows: budget.list(row),
@@ -249,9 +249,10 @@ function variableFileParser(budget: VariablesBudget): Parser<VariableFile> {
       if (parsed.columns === undefined) {
         throw new Error('CSSVariables: matrix columns are required');
       }
-      return { ...parsed, kind: 'matrix', columns: parsed.columns };
+      return { ...parsed, title: parsed.title, kind: 'matrix', columns: parsed.columns };
     }
-    return { ...parsed, kind: 'rows' };
+    // An untitled block keeps its `title` key, as the wire states it.
+    return { ...parsed, title: parsed.title, kind: 'rows' };
   };
   const group = object({
     kind: groupKind,

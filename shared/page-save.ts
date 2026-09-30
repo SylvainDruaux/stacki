@@ -101,7 +101,8 @@ function parsePageEditError(input: unknown): PageEditError {
       code: 'rejected',
       reason: parseRejectionReason(record['reason'], 'PageEditError.reason'),
       message,
-      diskChecksum: disk === null ? undefined : checksumField(disk, 'PageEditError.diskChecksum'),
+      diskChecksum:
+        disk === undefined ? undefined : checksumField(disk, 'PageEditError.diskChecksum'),
     };
   }
   return parsePageWriteFailure(input);

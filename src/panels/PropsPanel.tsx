@@ -718,7 +718,7 @@ function elementFieldLayout(props: ElementPropsPanelProps) {
   // element does. Without this an empty one — everything the insert palette
   // adds, since a fresh instance is self-closing — has no Content field, and
   // so no way to be given its first words.
-  const isEmpty = node.children === null || node.children.length === 0;
+  const isEmpty = node.children === undefined || node.children.length === 0;
   const canHoldText =
     (node.kind === 'element' && !VOID_TAGS.has(String(node.name).toLowerCase())) || !!takesSlotText;
   const showContentField = isInlineOnly(node.children) || (isEmpty && canHoldText);
