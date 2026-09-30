@@ -1,6 +1,7 @@
 // Goal: electron/documentActors.ts, the host of the main process's document
-// actors, keeps the plan's promises on a real disk: a `replace-source` applies
-// and hands back the checksum the persistence layer adopts (§5.2); a stale
+// actors, keeps the plan's promises on a real disk: a program's text write (a
+// `rewrite-text` of the diff, since step 10) applies and hands back the
+// checksum the persistence layer adopts (§5.2); a stale
 // base, another writer after the rename, and a missing file are typed
 // rejections, never overwrites; a replace whose folder could not be flushed is
 // `uncertain` and reconciled at once by comparison (§3.5); a full queue
@@ -67,7 +68,7 @@ test('a replace applies, returns the new checksum, and the actor holds it', () =
     const file = path.join(root, 'index.astro');
     fs.writeFileSync(file, '<h1 title="Old">Hi</h1>\n');
     const { documents, lines } = host();
-    const report = documents.replaceSource(
+    const report = documents.writeText(
       file,
       '<h1 title="New">Hi</h1>\n',
       sha256(fs.readFileSync(file)),
@@ -92,6 +93,21 @@ test('a replace applies, returns the new checksum, and the actor holds it', () =
   });
 });
 
+test('a text identical to the file rewrites it unchanged, as one empty hunk', () => {
+  directory((root) => {
+    const file = path.join(root, 'index.astro');
+    fs.writeFileSync(file, '<h1>Hi</h1>\n');
+    const { documents } = host();
+    const report = documents.writeText(file, '<h1>Hi</h1>\n', sha256('<h1>Hi</h1>\n'));
+    assert.deepEqual(report, {
+      tag: 'applied',
+      checksum: sha256('<h1>Hi</h1>\n'),
+      inverse: [], // Nothing changed, so there is nothing to undo.
+    });
+    assert.equal(fs.readFileSync(file, 'utf8'), '<h1>Hi</h1>\n');
+  });
+});
+
 test('a stale base is refused with the disk checksum and nothing is written', () => {
   directory((root) => {
     const file = path.join(root, 'index.astro');
@@ -99,7 +115,7 @@ test('a stale base is refused with the disk checksum and nothing is written', ()
     const base = sha256('authored\n');
     fs.writeFileSync(file, 'outside\n');
     const { documents } = host();
-    assert.deepEqual(documents.replaceSource(file, 'mine\n', base), {
+    assert.deepEqual(documents.writeText(file, 'mine\n', base), {
       tag: 'rejected',
       reason: 'region-externally-modified',
       message: '',
@@ -123,7 +139,7 @@ test('another writer landing right after the rename is a write-race', () => {
         }
       },
       () => {
-        const report = documents.replaceSource(file, 'mine\n', sha256('authored\n'));
+        const report = documents.writeText(file, 'mine\n', sha256('authored\n'));
         assert.equal(report.tag, 'rejected');
         assert.equal(report.reason, 'write-race');
       },
@@ -151,7 +167,7 @@ test(
           return fsync(descriptor);
         },
         () => {
-          const report = documents.replaceSource(file, 'mine\n', sha256('authored\n'));
+          const report = documents.writeText(file, 'mine\n', sha256('authored\n'));
           assert.equal(report.tag, 'uncertain');
           assert.equal(report.candidateChecksum, sha256('mine\n'));
           assert.equal(report.reconciliation, 'applied', 'the candidate is on disk');
@@ -162,11 +178,11 @@ test(
   },
 );
 
-test('a missing file: replace-source refuses, writeCurrent and create make it', () => {
+test('a missing file: writeText refuses, writeCurrent and create make it', () => {
   directory((root) => {
     const file = path.join(root, 'chunk.html');
     const { documents } = host();
-    const refused = documents.replaceSource(file, '<p/>', sha256(''));
+    const refused = documents.writeText(file, '<p/>', sha256(''));
     assert.equal(refused.tag, 'rejected');
     assert.equal(refused.reason, 'write-failed');
     assert.equal(fs.existsSync(file), false);
@@ -265,7 +281,7 @@ test('the actor count stays inside its bound; idle actors are dropped first', ()
     );
     const first = path.join(root, 'f0.css');
     assert.equal(
-      documents.replaceSource(first, 'y\n', sha256('/* 0 */\n')).tag,
+      documents.writeText(first, 'y\n', sha256('/* 0 */\n')).tag,
       'applied',
       'a dropped actor re-reads',
     );
@@ -300,7 +316,7 @@ test('a watcher tick echoes only while the file holds the bytes its actor wrote'
     assert.equal(documents.echoes(file), false, 'a file the app never wrote is nobody’s echo');
     documents.current(file);
     assert.equal(documents.echoes(file), false, 'reading a file is not writing it');
-    assert.equal(documents.replaceSource(file, 'v2\n', sha256('v1\n')).tag, 'applied');
+    assert.equal(documents.writeText(file, 'v2\n', sha256('v1\n')).tag, 'applied');
     assert.equal(documents.echoes(file), true, 'the app’s own write comes back as its echo');
     assert.equal(documents.echoes(file), true, 'and stays one while the bytes are ours');
     // The case a stopwatch never got right: an editor's save right after ours.

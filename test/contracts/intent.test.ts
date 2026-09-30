@@ -15,6 +15,7 @@ import {
   parseRejectionReason,
   parseSubmissionResult,
   REJECTION_REASONS,
+  type OperationTag,
 } from '../../dist/shared/intent.js';
 import { LIMITS } from '../../dist/shared/limits.js';
 import { parseAnchorRef, STRUCTURAL_PATH_STEPS_MAX } from '../../dist/shared/ref.js';
@@ -39,20 +40,46 @@ const GOOD: readonly (readonly [object, object])[] = [
   [element, { tag: 'set-attribute', name: 'hidden', value: { type: 'bare' } }],
   [element, { tag: 'remove-attribute', name: 'data-x' }],
   [element, { tag: 'insert-node', placement: 'after', source: '<p>Hi</p>' }],
+  [element, { tag: 'remove-node' }],
   [element, { tag: 'move-node', destination: { ...element, path: [0] }, placement: 'first-child' }],
   [loop, { tag: 'rename-binding', from: 'item', to: 'entry', sites: [{ start: 12, end: 16 }, { start: 40, end: 44 }] }],
   [element, { tag: 'set-inline-style', property: '--gap', declaration: { tag: 'set', value: '1rem' } }],
   [element, { tag: 'set-inline-style', property: 'color', declaration: { tag: 'remove' } }],
   [documentAnchor, { tag: 'apply-code-patch', hunks: [{ span: { start: 3, end: 5 }, text: 'x' }] }],
+  [documentAnchor, { tag: 'revert-splices', hunks: [{ span: { start: 3, end: 5 }, text: 'x' }] }],
   [frontmatter, { tag: 'edit-frontmatter-slot', slot: { start: 4, end: 20 }, text: 'const a = 1;' }],
-  [documentAnchor, { tag: 'replace-source', text: '<h1>Hi</h1>\n' }],
+  [documentAnchor, { tag: 'rewrite-text', hunks: [{ span: { start: 3, end: 5 }, text: 'x' }] }],
   // Step 9.
   [element, { tag: 'rename-tag', from: 'div', to: 'Card' }],
   [element, { tag: 'rename-attribute', from: 'title', to: 'aria-label' }],
   [element, { tag: 'rewrite-node', hunks: [{ span: { start: 21, end: 24 }, text: 'x' }] }],
   [element, { tag: 'wrap-nodes', last: { ...element, path: [0, 3] }, open: '<A>', close: '</A>' }],
   [documentAnchor, { tag: 'append-body', source: '<main></main>' }],
+  // Step 10.
+  [documentAnchor, { tag: 'insert-frontmatter', source: '---\nlayout: ../L.astro\n---\n' }],
 ];
+
+// Every operation of the closed union, by name: a new operation is a compile
+// error here until it has a known-good intent above.
+const OPERATIONS: Readonly<Record<OperationTag, true>> = {
+  'append-body': true,
+  'apply-code-patch': true,
+  'edit-frontmatter-slot': true,
+  'insert-frontmatter': true,
+  'insert-node': true,
+  'move-node': true,
+  'remove-attribute': true,
+  'remove-node': true,
+  'rename-attribute': true,
+  'rename-binding': true,
+  'rename-tag': true,
+  'revert-splices': true,
+  'rewrite-node': true,
+  'rewrite-text': true,
+  'set-attribute': true,
+  'set-inline-style': true,
+  'wrap-nodes': true,
+};
 
 test('one known-good intent per operation parses to itself', () => {
   for (const [anchor, operation] of GOOD) {
@@ -61,7 +88,7 @@ test('one known-good intent per operation parses to itself', () => {
     assert.deepEqual(parsed.anchor, anchor);
   }
   const tags = new Set(GOOD.map(([, operation]): unknown => Reflect.get(operation, 'tag')));
-  assert.equal(tags.size, 14, 'every operation in the closed union is covered');
+  assert.deepEqual([...tags].sort(), Object.keys(OPERATIONS).sort(), 'every operation is covered');
 });
 
 test('malformed intents fail at the field that is wrong', () => {
@@ -106,7 +133,10 @@ test('the operation must fit its anchor', () => {
   const cases: readonly [object, object, RegExp][] = [
     [{ ...element, expectedKind: 'text' }, set, /set-attribute cannot target/],
     [documentAnchor, set, /set-attribute cannot target/],
-    [element, { tag: 'replace-source', text: '' }, /replace-source cannot target/],
+    [element, { tag: 'rewrite-text', hunks: [] }, /rewrite-text cannot target/],
+    [element, { tag: 'insert-frontmatter', source: '---\n---\n' }, /insert-frontmatter cannot/],
+    // Step 10 retired the whole-file replacement: no such operation parses.
+    [documentAnchor, { tag: 'replace-source', text: '' }, /unknown operation/],
     [element, { tag: 'apply-code-patch', hunks: [{ span: { start: 0, end: 1 }, text: '' }] }, /apply-code-patch cannot/],
     [element, { tag: 'rename-binding', from: 'a', to: 'b', sites: [{ start: 12, end: 13 }] }, /rename-binding cannot/],
     [documentAnchor, { tag: 'insert-node', placement: 'after', source: '' }, /insert-node cannot/],
@@ -133,7 +163,8 @@ test('multi-span sites lie inside the anchor, ascend, do not overlap, and are bo
 test('the summed payload is bounded in UTF-8 bytes, not characters', () => {
   const text = '🎉'.repeat(Math.floor(LIMITS.intentPayloadBytesMax / 4) + 1);
   assert.ok(text.length <= LIMITS.intentPayloadBytesMax, 'the character count alone fits');
-  assert.throws(() => parseIntent(wire(documentAnchor, { tag: 'replace-source', text })), /payload exceeds/);
+  const rewrite = { tag: 'rewrite-text', hunks: [{ span: { start: 0, end: 0 }, text }] };
+  assert.throws(() => parseIntent(wire(documentAnchor, rewrite)), /payload exceeds/);
   const intent = parseIntent(wire(element, { tag: 'set-attribute', name: 'title', value: { type: 'string', value: 'é' } }));
   assert.equal(intentPayloadBytes(intent.operation), 'title'.length + 2);
 });

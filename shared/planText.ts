@@ -1,7 +1,7 @@
 // Planning the operations that name byte ranges directly (plan §3.3): a loop
 // rename's sites, a frontmatter slot, a code patch's hunks, a revert's hunks,
-// a node rewrite's hunks (step 9), and the migration-only whole-file
-// replacement. The ranges were authored
+// a node rewrite's hunks (step 9), a new frontmatter block and a program's
+// text rewrite (step 10). The ranges were authored
 // against the intent's own snapshot; stale ones are mapped through the diff
 // with the region they sit in, and only exactly.
 import { assert } from './assert';
@@ -216,19 +216,20 @@ export function planRevertSplices(
   });
 }
 
-// The migration-only whole-file replacement (plan §3.3), which the legacy save
-// path submits from step 5 so the actor is the only writer. It never maps: its
-// witness is the authored checksum itself, so any change since it was authored
-// is a rejection, and a whole-file replacement is written as one splice whose
-// expected bytes are the whole authored file. The result may not parse — a raw
-// page, a code-panel save, Markdown — so the candidate is not required to.
-// Agrees exactly with the step-1 reference (test/simulator/reference-planner.ts).
-export function planReplaceSource(
+/** `rewrite-text` (step 10, replacing the whole-file `replace-source`): a
+ * program's change to a file's text as hunks of the bytes it read — a
+ * stylesheet rule, a CMS entry, a property batch. It never maps: its witness
+ * is the authored checksum itself, so any change since it was read is a
+ * rejection, and every hunk is written at its own range with its authored
+ * bytes as the witness. The result may not parse — a raw page, a stylesheet —
+ * so the candidate is not required to. Agrees exactly with the step-1
+ * reference (test/simulator/reference-planner.ts). */
+export function planRewriteText(
   context: PlanContext,
   anchor: AnchorRef,
-  text: string,
+  operation: Extract<Operation, { tag: 'rewrite-text' }>,
 ): Result<Plan, RejectionReason> {
-  assert(anchor.expectedKind === 'document', 'A replacement anchors the whole document');
+  assert(anchor.expectedKind === 'document', 'A rewrite anchors the whole document');
   assert(anchor.span.start === 0, 'A document anchor starts at byte 0');
   if (context.current.checksum !== context.authored.checksum) {
     return err('region-externally-modified');
@@ -236,13 +237,10 @@ export function planReplaceSource(
   if (anchor.span.end !== context.current.bytes.length) {
     return err('anchor-moved'); // The anchor names bytes of another length.
   }
-  const splice: Splice = {
-    range: anchor.span,
-    expectedBytes: context.current.bytes,
-    replacementBytes: encodeUtf8(text),
-  };
-  assert(splice.replacementBytes.length <= LIMITS.intentPayloadBytesMax, 'Payload is bounded');
-  return ok({ splices: [splice], postKinds: [], candidate: 'may-be-invalid' });
+  const bytes = context.current.bytes;
+  const splices = operation.hunks.map((hunk) => spliceAt(bytes, hunk.span, hunk.text));
+  assert(splices.length <= LIMITS.splicesPerIntentMax, 'A rewrite fits one intent');
+  return ok({ splices, postKinds: [], candidate: 'may-be-invalid' });
 }
 
 interface HunkPolicy {

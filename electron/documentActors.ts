@@ -1,9 +1,11 @@
 // The document actors of one Electron main process (plan §2 layer 2, §5.2): one
-// actor per canonical file, driven by this host. From step 5 every write of a
-// page, chunk or stylesheet is an intent submitted here — the legacy save path
-// submits the migration-only `replace-source` (plan §3.3) — so the actor is the
-// only writer, and every `applied` outcome hands the new checksum back for the
-// persistence layer to adopt as its next baseline (plan §5.2).
+// actor per canonical file, driven by this host. From step 5 every write of
+// project text is an intent submitted here, so the actor is the only writer,
+// and every `applied` outcome hands the new checksum back for the persistence
+// layer to adopt as its next baseline (plan §5.2). Since step 10 every write is
+// splices: a page's edits are planned intents, and a program's change to a
+// file's text (a stylesheet, a CMS entry, a property batch) is its diff from
+// the bytes it read, a `rewrite-text` — no intent replaces a whole file.
 //
 // Scheduling. Main's IPC handlers run one at a time to completion on one
 // thread, and so does this host: a submission is stepped to its terminal
@@ -49,7 +51,8 @@ import type { Snapshot } from '../shared/snapshot';
 import { inverseEdits } from '../shared/splice';
 import { LIMITS } from '../shared/limits';
 import { err, ok, type Result } from '../shared/result';
-import { encodeUtf8, toByteSpan, type ByteString } from '../shared/span';
+import { decodeUtf8, encodeUtf8, toByteSpan, type ByteString } from '../shared/span';
+import { diffCodePatch } from '../shared/code-patch';
 import { planIntent } from '../shared/planner';
 import {
   NODE_PROJECTOR,
@@ -198,6 +201,42 @@ interface Settled {
 /** Steps one intent can take: idle → planned → written → idle. */
 const STEPS_PER_INTENT = 3;
 
+/** What a program's rewrite writes: the text the file should read, or —
+ * `undefined` — its bytes again, unchanged; and the checksum of the bytes it
+ * was computed from. */
+interface Rewrite {
+  readonly text: string | undefined;
+  readonly baseChecksum: Digest;
+}
+
+// A rewrite that changes nothing: one empty hunk at the top, so the intent
+// names a site (every rewrite does) and the file is written unchanged.
+const UNCHANGED: readonly SourceEdit[] = [{ span: toByteSpan(0, 0), text: '' }];
+
+// The hunks from `bytes` to `text`: the code patch between them (its bounds
+// and its coarsening past the diff budget are shared/code-patch.ts's). No text,
+// or the bytes' own text, is the bytes themselves: UNCHANGED.
+function rewriteHunks(
+  bytes: ByteString,
+  text: string | undefined,
+): Result<readonly SourceEdit[], RejectionReason> {
+  if (text === undefined) {
+    return ok(UNCHANGED);
+  }
+  const decoded = decodeUtf8(bytes);
+  if (!decoded.ok) {
+    return err('write-failed'); // Not text: a writer's text cannot be diffed with it.
+  }
+  const patch = diffCodePatch(decoded.value, text);
+  if (!patch.ok) {
+    return err(patch.error);
+  }
+  if (patch.value.length === 0) {
+    return ok(UNCHANGED);
+  }
+  return ok(patch.value.map((hunk) => ({ span: hunk.span, text: hunk.text })));
+}
+
 export class DocumentActors {
   readonly #options: DocumentActorsOptions;
   readonly #dependencies: ActorDependencies;
@@ -217,9 +256,13 @@ export class DocumentActors {
     };
   }
 
-  /** The legacy save path (plan §3.3): replace the whole file, witnessed by
-   * the checksum the edit was authored against. */
-  replaceSource(file: string, text: string, baseChecksum: Digest): WriteReport {
+  /** A program's change to a file's text (plan §3.4; step 10): `text` is what
+   * the file should read, computed from the bytes of `baseChecksum`. Written
+   * as the hunks where the two differ — a `rewrite-text`, never a whole-file
+   * replacement — and only while the file holds exactly those bytes; anything
+   * else is refused, never merged. Text that equals the file's is written
+   * again unchanged. */
+  writeText(file: string, text: string, baseChecksum: Digest): WriteReport {
     const entry = this.#entry(file);
     if (!entry.ok) {
       return {
@@ -229,7 +272,23 @@ export class DocumentActors {
         diskChecksum: undefined,
       };
     }
-    return this.#submitReplace(entry.value, text, baseChecksum);
+    return this.#submitRewrite(entry.value, { text, baseChecksum });
+  }
+
+  /** Write the bytes of `checksum` again, unchanged: one empty hunk, so the file
+   * is replaced by itself (main.ts: Astro's dev server serves a `<style>` block
+   * one write behind). Refused when the file holds anything else. */
+  rewriteUnchanged(file: string, checksum: Digest): WriteReport {
+    const entry = this.#entry(file);
+    if (!entry.ok) {
+      return {
+        tag: 'rejected',
+        reason: 'write-failed',
+        message: entry.error,
+        diskChecksum: undefined,
+      };
+    }
+    return this.#submitRewrite(entry.value, { text: undefined, baseChecksum: checksum });
   }
 
   /** A visual edit (step 6): `build` states it as an intent against the
@@ -310,9 +369,10 @@ export class DocumentActors {
   }
 
   /** Writers that never named a base (the style panel's stylesheet save, a
-   * code window, a CMS or asset edit into a page): the witness is the file as
-   * it is now, so the actor still refuses to write over bytes that change
-   * under it, and a missing file is created, never overwritten. */
+   * code window, a CMS or asset edit into a page): the base is the file as it
+   * is now, so the diff is of those bytes and the actor still refuses to write
+   * over bytes that change under it; a missing file is created, never
+   * overwritten. */
   writeCurrent(file: string, text: string): WriteReport {
     const entry = this.#entry(file);
     if (!entry.ok) {
@@ -325,7 +385,7 @@ export class DocumentActors {
     }
     const current = this.#current(entry.value);
     if (current.ok) {
-      return this.#submitReplace(entry.value, text, current.value);
+      return this.#submitRewrite(entry.value, { text, baseChecksum: current.value });
     }
     if (current.error.code === 'missing') {
       return this.#create(entry.value, text);
@@ -479,15 +539,22 @@ export class DocumentActors {
     assert(this.#options.drain === 'deferred', 'Only a deferred host queues without stepping');
     const entry = this.#entry(file);
     assert(entry.ok, 'A deferred submission names an available file');
-    const intent = this.#replaceIntent(entry.value, text, baseChecksum);
-    return this.#enqueue(entry.value, intent);
+    const intent = this.#rewriteIntent(entry.value, { text, baseChecksum });
+    assert(intent.ok, 'A deferred submission names text the host can diff');
+    return this.#enqueue(entry.value, intent.value);
   }
 
   // --- Internal -----------------------------------------------------------------
 
-  #submitReplace(entry: Entry, text: string, baseChecksum: Digest): WriteReport {
+  #submitRewrite(entry: Entry, rewrite: Rewrite): WriteReport {
     assert(this.#options.drain === 'immediate', 'A deferred host takes submitDeferred');
-    const intent = this.#replaceIntent(entry, text, baseChecksum);
+    const built = this.#rewriteIntent(entry, rewrite);
+    if (!built.ok) {
+      const current = entry.state.snapshot?.checksum;
+      const reason = built.error;
+      return { tag: 'rejected', reason, message: describeRejection(reason), diskChecksum: current };
+    }
+    const intent = built.value;
     const submitted = this.#enqueue(entry, intent);
     if (submitted === 'backpressured') {
       return { tag: 'backpressured' };
@@ -563,29 +630,39 @@ export class DocumentActors {
     return 'accepted';
   }
 
-  #replaceIntent(entry: Entry, text: string, baseChecksum: Digest): Intent {
+  // The rewrite as an intent against the base: the hunks from its bytes to the
+  // text. When the disk no longer holds the base, there are no bytes to diff:
+  // the intent names the UNCHANGED hunk and a whole-file span of no length, and
+  // the planner refuses it as stale before it reads either (planRewriteText
+  // checks the checksum first). A base that is not UTF-8 is not text a writer may
+  // diff (write-failed); a diff past the payload bound is a resource limit.
+  #rewriteIntent(entry: Entry, rewrite: Rewrite): Result<Intent, RejectionReason> {
+    const { text, baseChecksum } = rewrite;
     if (entry.state.snapshot?.checksum !== baseChecksum) {
       if (actorQuiescent(entry.state)) {
-        // Learn the authored length if the disk still holds the base; a failed
-        // read is the actor's to report, on its own read.
+        // Learn the base if the disk still holds it; a failed read is the
+        // actor's to report, on its own read.
         this.#current(entry);
       }
     }
+    const snapshot = entry.state.snapshot;
+    const base = snapshot?.checksum === baseChecksum ? snapshot : undefined;
+    const hunks = base === undefined ? ok(UNCHANGED) : rewriteHunks(base.bytes, text);
+    if (!hunks.ok) {
+      return hunks;
+    }
     this.#intents += 1;
     assert(Number.isSafeInteger(this.#intents), 'Intent ids stay safe integers');
-    // The whole-file span of the authored bytes. Their length is known when
-    // the actor's snapshot is the authored one; otherwise the disk no longer
-    // holds them, and the planner rejects the intent as stale before it reads
-    // the span (planReplaceSource checks the checksum first).
-    const snapshot = entry.state.snapshot;
-    const length = snapshot?.checksum === baseChecksum ? snapshot.bytes.length : 0;
-    return toIntent({
-      id: toIntentId(`main-${this.#intents}`),
-      file: entry.document.path,
-      authoredChecksum: baseChecksum,
-      anchor: { span: toByteSpan(0, length), path: [], expectedKind: 'document' },
-      operation: { tag: 'replace-source', text },
-    });
+    const length = base === undefined ? 0 : base.bytes.length;
+    return ok(
+      toIntent({
+        id: toIntentId(`main-${this.#intents}`),
+        file: entry.document.path,
+        authoredChecksum: baseChecksum,
+        anchor: { span: toByteSpan(0, length), path: [], expectedKind: 'document' },
+        operation: { tag: 'rewrite-text', hunks: hunks.value },
+      }),
+    );
   }
 
   // Step until the actor holds nothing, and collect every outcome. The bound is

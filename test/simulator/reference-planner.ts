@@ -44,12 +44,12 @@ export function planByIdentity(snapshot: Snapshot, intent: Intent): Result<Plan,
     return err(staleReason(operation.tag));
   }
   switch (operation.tag) {
-    case 'replace-source': {
+    case 'rewrite-text': {
       if (intent.anchor.span.end !== snapshot.bytes.length) {
         return err('anchor-moved');
       }
-      const splice = spliceAt(snapshot.bytes, intent.anchor.span, operation.text);
-      return ok({ splices: [splice], postKinds: [], candidate: 'may-be-invalid' });
+      const splices = operation.hunks.map((hunk) => spliceAt(snapshot.bytes, hunk.span, hunk.text));
+      return ok({ splices, postKinds: [], candidate: 'may-be-invalid' });
     }
     case 'apply-code-patch': {
       const splices = operation.hunks.map((hunk) => spliceAt(snapshot.bytes, hunk.span, hunk.text));
@@ -89,7 +89,7 @@ export function planByIdentity(snapshot: Snapshot, intent: Intent): Result<Plan,
 
 function isVisual(tag: Intent['operation']['tag']): boolean {
   switch (tag) {
-    case 'replace-source':
+    case 'rewrite-text':
     case 'apply-code-patch':
     case 'revert-splices':
       return false;
@@ -117,7 +117,7 @@ function isVisual(tag: Intent['operation']['tag']): boolean {
 
 function staleReason(tag: Intent['operation']['tag']): RejectionReason {
   switch (tag) {
-    case 'replace-source':
+    case 'rewrite-text':
     case 'revert-splices':
       return 'region-externally-modified';
     case 'apply-code-patch':

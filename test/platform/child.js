@@ -5,8 +5,8 @@
 //
 // Jobs:
 // - { mode: 'cooperate', file, id, rounds } — each round reads the file through
-//   its actor, appends a line naming this process and round, and submits that
-//   as a `replace-source` witnessed by what it read. Prints every outcome.
+//   its actor, appends a line naming this process and round, and writes that
+//   through writeText, witnessed by what it read. Prints every outcome.
 // - { mode: 'crash', file, text, at: 'before-rename' | 'after-rename' } —
 //   prints the base and the deterministic candidate checksum, then submits,
 //   and kills itself with SIGKILL just before or just after the atomic rename:
@@ -27,7 +27,7 @@ function cooperate() {
       continue;
     }
     const text = `${Buffer.from(current.value.bytes).toString('utf8')}${job.id}:${round}\n`;
-    const report = documents.replaceSource(job.file, text, current.value.checksum);
+    const report = documents.writeText(job.file, text, current.value.checksum);
     print({ tag: report.tag, reason: report.reason, round });
   }
 }
@@ -46,7 +46,7 @@ function crash() {
     }
     return rename(from, to);
   };
-  documents.replaceSource(job.file, job.text, base);
+  documents.writeText(job.file, job.text, base);
   print({ tag: 'survived' }); // Never printed: the process dies inside the write.
 }
 

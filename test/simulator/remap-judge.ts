@@ -95,7 +95,7 @@ function judgedAttribute(operation: Intent['operation']): string | undefined {
     case 'wrap-nodes':
     case 'append-body':
     case 'insert-frontmatter':
-    case 'replace-source':
+    case 'rewrite-text':
       throw new Error(`Assertion failed: ${operation.tag} is not judged by element survival`);
     default: {
       const exhaustive: never = operation;
@@ -306,7 +306,7 @@ function blockPlanPlaced(
     case 'apply-code-patch':
     case 'revert-splices':
     case 'edit-frontmatter-slot':
-    case 'replace-source':
+    case 'rewrite-text':
     case 'rename-tag':
     case 'rename-attribute':
     case 'wrap-nodes':

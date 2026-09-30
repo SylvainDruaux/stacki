@@ -5,7 +5,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
-  countReplaceSourceCalls,
+  countWholeFileWrites,
   countTreeEdits,
   countWrapperCalls,
 } from '../../dist/scripts/adapter-surface.js';
@@ -54,17 +54,17 @@ test('wrapper call sites exclude their own definitions', () => {
   assert.deepEqual(countWrapperCalls(text), { mutateModelCalls: 1, applyEditCalls: 2 });
 });
 
-// Step 5: whole-file replace-source submissions (plan §3.3) are counted at
-// their call sites; the host's method definitions and comments are not.
-test('replace-source submission sites exclude definitions and comments', () => {
+// Step 10: whole-file writes are the `replace-source` operation named in code
+// or a `replaceSource(` call; a program's diff write (writeText, writeCurrent,
+// writeProjectText) is splices and is not one. Comments do not count.
+test('whole-file write sites count the retired operation, never a diff write', () => {
   const text = [
-    'export function writeProjectText(file: string, text: string): Digest {',
-    '  replaceSource(file: string, text: string, baseChecksum: Digest): WriteReport {',
-    '  writeCurrent(file: string, text: string): WriteReport {',
-    '// writeProjectText(abs, next) in a comment',
-    'writeProjectText(abs, next);',
+    "operation: { tag: 'replace-source', text },",
     'const report = documents.replaceSource(pagePath, text, base);',
-    'documents.writeCurrent(chunkFile, next); writeProjectText(a, b);',
+    '// replaceSource(file, text) in a comment',
+    'writeProjectText(abs, next);',
+    'documents.writeText(file, next, base); documents.writeCurrent(file, next);',
+    "case \"replace-source\":",
   ].join('\n');
-  assert.equal(countReplaceSourceCalls(text), 4);
+  assert.equal(countWholeFileWrites(text), 3);
 });

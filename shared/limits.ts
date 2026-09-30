@@ -39,8 +39,9 @@ export const LIMITS = {
   /** Intents accepted by one document actor and not yet terminal. Past this,
    * submission returns `backpressured`; the persistence layer holds the draft. */
   intentsPendingMax: 64,
-  /** UTF-8 bytes of every string an intent carries, summed. A `replace-source`
-   * intent carries a whole file, so the bound is the file bound itself. */
+  /** UTF-8 bytes of every string an intent carries, summed. A code patch or a
+   * `rewrite-text` may rewrite a whole file's content, so the bound is the file
+   * bound itself. */
   intentPayloadBytesMax: 10 * 1024 * 1024,
   /** Splices one intent may plan, and sites one multi-span operation may name.
    * A loop rename in a generated page touches hundreds of sites, not millions. */

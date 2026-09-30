@@ -3068,7 +3068,7 @@ function pageWriteFailure(
 const STYLE_NUDGE_MS = 150;
 const styleNudges = new Map<string, ReturnType<typeof setTimeout>>(); // path -> pending timer
 
-function nudgeStyle(pagePath: string, text: string, checksum: Digest): void {
+function nudgeStyle(pagePath: string, checksum: Digest): void {
   if (!styleNudges.has(pagePath)) {
     if (styleNudges.size >= MAIN_LIMITS.styleNudgesMax) {
       return; // Past the bound only the dev server's style cache stays one edit behind.
@@ -3085,7 +3085,7 @@ function nudgeStyle(pagePath: string, text: string, checksum: Digest): void {
       // correct bytes on disk; only the dev server's style cache stays one
       // edit behind, so there is nothing to report beyond telemetry.
       noteAppWrite();
-      documents.replaceSource(pagePath, text, checksum);
+      documents.rewriteUnchanged(pagePath, checksum);
     }, STYLE_NUDGE_MS),
   );
 }
@@ -3111,7 +3111,7 @@ ipcMain.handle('page:edit', async (_e, { pagePath, authoredChecksum, edit }) => 
   const text = decoded.value;
   noteAppWrite();
   if (/<style[\s>]/i.test(text)) {
-    nudgeStyle(pagePath, text, report.checksum);
+    nudgeStyle(pagePath, report.checksum);
   }
   const reply = { ...parsePageSource(pagePath, text), checksum: report.checksum };
   return { ok: true as const, ...reply, inverse: report.inverse };

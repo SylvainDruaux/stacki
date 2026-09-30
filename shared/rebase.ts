@@ -64,9 +64,10 @@ export function commitChain(
 }
 
 /** The same edit as the fewest bytes: each splice without the prefix and
- * suffix its witness and replacement share. A whole-file `replace-source`
- * becomes the region the save really changed, so an edit authored before a
- * legacy save still rebases through it. The result writes the same bytes. */
+ * suffix its witness and replacement share, so a commit that rewrote a region
+ * with much of it unchanged is the region it really changed, and an edit
+ * authored before it still rebases through it. The result writes the same
+ * bytes. */
 export function minimalSplices(splices: readonly Splice[]): readonly Splice[] {
   return orderedSplices(splices).map((splice) => {
     const expected = splice.expectedBytes;
@@ -258,10 +259,12 @@ function rebaseOperation(
     case 'set-inline-style':
     case 'rename-tag':
     case 'rename-attribute':
-    case 'replace-source':
     case 'append-body':
     case 'insert-frontmatter':
       return ok(operation);
+    case 'rewrite-text':
+      // A program's rewrite names the exact bytes it read: never rebased.
+      return err('region-externally-modified');
     case 'move-node': {
       const destination = rebaseAnchor(operation.destination, through, current);
       return destination.ok ? ok({ ...operation, destination: destination.value }) : destination;

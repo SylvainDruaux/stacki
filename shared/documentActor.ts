@@ -399,7 +399,7 @@ function authoredBase(submission: Submission, current: Snapshot): Snapshot | und
 function staleWithoutBytes(intent: Intent): RejectionReason {
   const operation = intent.operation;
   switch (operation.tag) {
-    case 'replace-source':
+    case 'rewrite-text':
     case 'revert-splices':
       return 'region-externally-modified';
     case 'apply-code-patch':

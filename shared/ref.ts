@@ -33,7 +33,8 @@ const nodeKindsMatchPageTree: Same<NodeKind, PageNode['kind']> = true;
 assert(nodeKindsMatchPageTree, 'NODE_KINDS names every page-tree kind');
 
 /** Regions an anchor may name besides a node: the frontmatter body, and the
- * whole file (the migration-only `replace-source` and code-editor patches). */
+ * whole file (code patches, program rewrites, reverts, a new frontmatter
+ * block). */
 export const ANCHOR_KINDS = [...NODE_KINDS, 'frontmatter', 'document'] as const;
 
 export type AnchorKind = (typeof ANCHOR_KINDS)[number];

@@ -71,13 +71,13 @@ export function checkCommitted(effect: Committed): void {
     'Invariant 3: the tail is unchanged',
   );
   checkTarget(effect);
-  // Invariant 6, the part checkable here: the whole-file replacement is never
+  // Invariant 6, the part checkable here: a program's text rewrite is never
   // mapped, so one applied to bytes it was not authored against is a silent
   // remap. Every other operation maps from step 6, and world.ts judges each
   // mapped one against where the authored bytes really went — not against the
   // planner's own claim.
   if (effect.intent.authoredChecksum !== effect.base.checksum) {
-    assert(effect.intent.operation.tag !== 'replace-source', 'Invariant 6: no silent remap');
+    assert(effect.intent.operation.tag !== 'rewrite-text', 'Invariant 6: no silent remap');
   }
   checkGeneration(effect.previousGeneration, effect.generation);
 }
@@ -153,7 +153,7 @@ function staysInPlace(tag: Intent['operation']['tag']): boolean {
     case 'edit-frontmatter-slot':
     case 'apply-code-patch':
     case 'revert-splices':
-    case 'replace-source':
+    case 'rewrite-text':
     // A tag rename may change its node's kind (`div` → `Card`); a rewrite
     // states the node's new text, which may parse as another node.
     case 'rename-tag':

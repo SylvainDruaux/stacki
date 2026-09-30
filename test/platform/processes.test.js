@@ -83,7 +83,7 @@ for (const at of ['after-rename', 'before-rename']) {
       // The next writer breaks the dead writer's lock and saves normally.
       const documents = realHost();
       const current = documents.current(file);
-      const report = documents.replaceSource(file, 'next\n', current.value.checksum);
+      const report = documents.writeText(file, 'next\n', current.value.checksum);
       assert.equal(report.tag, 'applied');
       assert.equal(fs.readFileSync(file, 'utf8'), 'next\n');
       assert.ok(

@@ -32,11 +32,12 @@
 //      alias) and `delete <receiver>.props[<key>]`.
 //   3. `mutateModel(` call sites, the definition excluded.
 //   4. `applyEdit(` call sites, the definition excluded.
-//   5. From step 5: whole-file `replace-source` submissions, the migration-only
-//      operation (plan §3.3) — call sites of `replaceSource(`, `writeCurrent(`
-//      and `writeProjectText(` in electron/**/*.ts, definitions excluded, and
-//      the host's own plumbing (documentActors.ts, documentWrites.ts) not
-//      counted. Step 9 deletes them for `.astro`; step 10 for the rest.
+//   5. Whole-file writes: the migration-only `replace-source` operation (plan
+//      §3.3) named in code, or a `replaceSource(` call, in electron/, shared/
+//      and src/ (*.ts, *.tsx). From step 5 this counted every legacy writer's
+//      call; step 9 took them away from `.astro` pages and step 10 retired
+//      the operation, so every write is splices — a program's write of a file
+//      is its diff (`rewrite-text`). Zero, and held there.
 //
 // Comment lines (starting with //, * or /*) are skipped. Hand count on
 // 2026-09-28 was 67 / 10 / 28 / 4; this method is the authority from step 1 on,
@@ -50,10 +51,8 @@ interface Counts {
   readonly propIndexWrites: number;
   readonly mutateModelCalls: number;
   readonly applyEditCalls: number;
-  readonly replaceSourceCalls: number;
+  readonly wholeFileWrites: number;
 }
-
-const REPLACE_SOURCE_BASELINE = 21;
 
 /** Measured 2026-09-28 by this script at step 1, lowered at each step-6
  * expansion and at step 9 (the tracker's adapter table). Lower these; never
@@ -66,32 +65,47 @@ const BASELINE: Counts = {
   propIndexWrites: 0,
   mutateModelCalls: 0,
   applyEditCalls: 4,
-  /** Measured at step 5, when the legacy writers moved onto the actors;
-   * lowered at step 10, when the Markdown whole-model save went. */
-  replaceSourceCalls: REPLACE_SOURCE_BASELINE,
+  /** Measured at step 5 as 22 legacy writer calls, lowered to 21 with the
+   * Markdown whole-model save and to 0 when step 10 retired the operation. */
+  wholeFileWrites: 0,
 };
 
 const FILES_MAX = 20_000;
-const FIELDS = 'props|children|attrOrder|attrSource|kind|name|value|id|dynamicTag|slots|body|test|nodes|mdRaw|mdSource';
+const FIELDS = [
+  'props|children|attrOrder|attrSource|kind|name|value|id',
+  'dynamicTag|slots|body|test|nodes|mdRaw|mdSource',
+].join('|');
 const MUTATORS = 'push|pop|splice|shift|unshift|sort|reverse|fill|copyWithin';
-const EXCLUDED_RECEIVERS = new Set(['event', 'target', 'currentTarget', 'gain', 'input', 'field', 'style', 'dataset']);
+const EXCLUDED_RECEIVERS = new Set([
+  'event',
+  'target',
+  'currentTarget',
+  'gain',
+  'input',
+  'field',
+  'style',
+  'dataset',
+]);
 const RECEIVER = '([A-Za-z_$][\\w$]*(?:\\??\\.[A-Za-z_$][\\w$]*|\\[[^\\]]*\\])*)';
 
 const ASSIGN_RE = new RegExp(`${RECEIVER}\\.(?:${FIELDS})\\s*(?:=(?![=>])|\\+=|-=)`, 'g');
 const MUTATE_RE = new RegExp(`${RECEIVER}\\.(?:${FIELDS})\\.(?:${MUTATORS})\\(`, 'g');
 const DELETE_RE = new RegExp(`delete\\s+${RECEIVER}\\.(?:${FIELDS})\\b(?!\\[)`, 'g');
-const ALIAS_RE = /(?:const|let)\s+([A-Za-z_$][\w$]*)\s*=\s*[^;\n]*\.(?:children|nodes)\b\s*(?:[;\n|?]|$)/g;
+const ALIAS_RE = new RegExp(
+  String.raw`(?:const|let)\s+([A-Za-z_$][\w$]*)\s*=\s*` +
+    String.raw`[^;\n]*\.(?:children|nodes)\b\s*(?:[;\n|?]|$)`,
+  'g',
+);
 const LIST_MUTATE_RE = new RegExp(`${RECEIVER}\\.list\\.(?:${MUTATORS})\\(`, 'g');
 const LIST_ALIAS_RE = /(?:const|let)\s+\{[^}]*\blist\b(?:\s*:\s*([A-Za-z_$][\w$]*))?[^}]*\}\s*=/g;
 const PROP_INDEX_RE = /(?:\bprops\[[^\]]+\]\s*=(?![=>]))|(?:delete\s+[\w$.?]+\.props\[)/g;
 const MUTATE_MODEL_RE = /\bmutateModel\(/g;
 const APPLY_EDIT_RE = /\bapplyEdit\(/g;
-const DEFINITION_RE = /(?:function\s+(?:mutateModel|applyEdit)\b|(?:const|let)\s+(?:mutateModel|applyEdit)\s*=)/;
-const REPLACE_SOURCE_RE = /\b(?:replaceSource|writeCurrent|writeProjectText)\(/g;
-const REPLACE_SOURCE_DEFINITION_RE =
-  /(?:function\s+(?:replaceSource|writeCurrent|writeProjectText)\b|^\s*(?:replaceSource|writeCurrent)\()/;
-/** The host's plumbing: it defines the submissions, it does not make them. */
-const REPLACE_SOURCE_PLUMBING = new Set(['documentActors.ts', 'documentWrites.ts']);
+const DEFINITION_RE = new RegExp(
+  String.raw`(?:function\s+(?:mutateModel|applyEdit)\b|` +
+    String.raw`(?:const|let)\s+(?:mutateModel|applyEdit)\s*=)`,
+);
+const WHOLE_FILE_RE = /\breplaceSource\(|['"]replace-source['"]/g;
 
 export function sourceFiles(directory: string): readonly string[] {
   const found: string[] = [];
@@ -133,18 +147,23 @@ function receiverCounts(line: string, pattern: RegExp): number {
 }
 
 /** Node mutations and prop-index writes in one file's text. */
-export function countTreeEdits(text: string): { readonly mutations: number; readonly propIndexWrites: number } {
+export function countTreeEdits(text: string): {
+  readonly mutations: number;
+  readonly propIndexWrites: number;
+} {
   const lines = codeLines(text);
   const aliases = new Set([
     ...[...text.matchAll(ALIAS_RE)].map((match) => match[1] ?? ''),
     ...[...text.matchAll(LIST_ALIAS_RE)].map((match) => match[1] ?? 'list'),
   ]);
   aliases.delete('');
-  const aliasRe = aliases.size === 0 ? undefined : new RegExp(`\\b(?:${[...aliases].join('|')})\\.(?:${MUTATORS})\\(`, 'g');
+  const aliasSource = `\\b(?:${[...aliases].join('|')})\\.(?:${MUTATORS})\\(`;
+  const aliasRe = aliases.size === 0 ? undefined : new RegExp(aliasSource, 'g');
   let mutations = 0;
   let propIndexWrites = 0;
   for (const line of lines) {
-    mutations += receiverCounts(line, ASSIGN_RE) + receiverCounts(line, MUTATE_RE) + receiverCounts(line, DELETE_RE);
+    mutations += receiverCounts(line, ASSIGN_RE) + receiverCounts(line, MUTATE_RE);
+    mutations += receiverCounts(line, DELETE_RE);
     mutations += receiverCounts(line, LIST_MUTATE_RE);
     mutations += aliasRe === undefined ? 0 : [...line.matchAll(aliasRe)].length;
     propIndexWrites += [...line.matchAll(PROP_INDEX_RE)].length;
@@ -153,7 +172,10 @@ export function countTreeEdits(text: string): { readonly mutations: number; read
 }
 
 /** Wrapper call sites in one file's text, definitions excluded. */
-export function countWrapperCalls(text: string): { readonly mutateModelCalls: number; readonly applyEditCalls: number } {
+export function countWrapperCalls(text: string): {
+  readonly mutateModelCalls: number;
+  readonly applyEditCalls: number;
+} {
   let mutateModelCalls = 0;
   let applyEditCalls = 0;
   for (const line of codeLines(text)) {
@@ -166,29 +188,30 @@ export function countWrapperCalls(text: string): { readonly mutateModelCalls: nu
   return { mutateModelCalls, applyEditCalls };
 }
 
-/** Whole-file `replace-source` submission sites in one file's text. */
-export function countReplaceSourceCalls(text: string): number {
-  let calls = 0;
+/** Whole-file write sites in one file's text: the `replace-source` operation
+ * named, or a `replaceSource(` call. */
+export function countWholeFileWrites(text: string): number {
+  let sites = 0;
   for (const line of codeLines(text)) {
-    if (REPLACE_SOURCE_DEFINITION_RE.test(line)) {
-      continue;
-    }
-    calls += [...line.matchAll(REPLACE_SOURCE_RE)].length;
+    sites += [...line.matchAll(WHOLE_FILE_RE)].length;
   }
-  return calls;
+  return sites;
 }
 
-function measureReplaceSource(root: string): number {
-  let calls = 0;
-  for (const file of sourceFiles(path.join(root, 'electron'))) {
-    if (!REPLACE_SOURCE_PLUMBING.has(path.basename(file))) {
-      calls += countReplaceSourceCalls(fs.readFileSync(file, 'utf8'));
+function measureWholeFileWrites(root: string): number {
+  let sites = 0;
+  for (const directory of ['electron', 'shared', 'src']) {
+    for (const file of sourceFiles(path.join(root, directory))) {
+      sites += countWholeFileWrites(fs.readFileSync(file, 'utf8'));
     }
   }
-  return calls;
+  return sites;
 }
 
-function measure(root: string): { readonly counts: Counts; readonly byFile: ReadonlyMap<string, number> } {
+function measure(root: string): {
+  readonly counts: Counts;
+  readonly byFile: ReadonlyMap<string, number>;
+} {
   const source = path.join(root, 'src');
   const stylePanel = path.join(source, 'style-panel') + path.sep;
   let mutations = 0;
@@ -211,8 +234,8 @@ function measure(root: string): { readonly counts: Counts; readonly byFile: Read
       byFile.set(path.relative(root, file), edits.mutations + edits.propIndexWrites);
     }
   }
-  const replaceSourceCalls = measureReplaceSource(root);
-  const counts = { mutations, propIndexWrites, mutateModelCalls, applyEditCalls, replaceSourceCalls };
+  const wholeFileWrites = measureWholeFileWrites(root);
+  const counts = { mutations, propIndexWrites, mutateModelCalls, applyEditCalls, wholeFileWrites };
   return { counts, byFile };
 }
 
@@ -224,7 +247,7 @@ function main(): void {
     propIndexWrites: 'prop-index writes',
     mutateModelCalls: 'mutateModel( call sites',
     applyEditCalls: 'applyEdit( call sites',
-    replaceSourceCalls: 'replace-source submission sites (electron/)',
+    wholeFileWrites: 'whole-file write sites (replace-source)',
   };
   let slipped = false;
   const keys = [
@@ -232,7 +255,7 @@ function main(): void {
     'propIndexWrites',
     'mutateModelCalls',
     'applyEditCalls',
-    'replaceSourceCalls',
+    'wholeFileWrites',
   ] as const;
   for (const key of keys) {
     const now = counts[key];
@@ -240,9 +263,13 @@ function main(): void {
     console.log(`${String(now).padStart(4)} ${labels[key]} (baseline ${baseline})`);
     if (now > baseline) {
       slipped = true;
-      console.error(`     grew by ${now - baseline}: new code must enter through intents (plan §11 step 6).`);
+      const grown = now - baseline;
+      const rule = 'new code must enter through intents (plan §11 step 6)';
+      console.error(`     grew by ${grown}: ${rule}.`);
     } else if (now < baseline) {
-      console.log(`     ${baseline - now} below baseline — lower BASELINE.${key} in scripts/adapter-surface.ts.`);
+      const below = baseline - now;
+      const where = `BASELINE.${key} in scripts/adapter-surface.ts`;
+      console.log(`     ${below} below baseline — lower ${where}.`);
     }
   }
   if (process.argv.includes('--files')) {

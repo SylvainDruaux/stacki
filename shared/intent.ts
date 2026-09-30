@@ -30,8 +30,7 @@ export type StyleDeclaration =
   { readonly tag: 'set'; readonly value: string } | { readonly tag: 'remove' };
 
 /** The closed operation set (plan §3.3). New operations extend this union; they
- * never extend a writer. `replace-source` is migration-only: the legacy save
- * path submits it from step 5, and step 9 deletes it for `.astro`.
+ * never extend a writer.
  *
  * Added at step 6: `remove-node` (the plan's "insert/remove" gesture needs a
  * removal, which the initial list lacked) and `revert-splices`, the inverse of
@@ -53,7 +52,12 @@ export type StyleDeclaration =
  *
  * Added at step 10: `insert-frontmatter`, the frontmatter block of a page that
  * has none, written at its top (a layout picked for a Markdown post without
- * one). An edit of an existing block stays a slot. */
+ * one). An edit of an existing block stays a slot. And `rewrite-text`, which
+ * replaced the migration-only `replace-source`, the whole-file replacement the
+ * legacy saves submitted from step 5: a program's change to a file's text — a
+ * stylesheet rule, a CMS entry, a property batch — stated as the hunks where
+ * the new text differs from the bytes it read, and written only while the file
+ * holds exactly those bytes. No operation replaces a whole file. */
 export type Operation =
   | { readonly tag: 'set-attribute'; readonly name: string; readonly value: AttributeValue }
   | { readonly tag: 'remove-attribute'; readonly name: string }
@@ -85,7 +89,7 @@ export type Operation =
       readonly open: string;
       readonly close: string;
     }
-  | { readonly tag: 'replace-source'; readonly text: string };
+  | { readonly tag: 'rewrite-text'; readonly hunks: readonly SourceEdit[] };
 
 export type OperationTag = Operation['tag'];
 
@@ -209,9 +213,9 @@ function operationTexts(operation: Operation): readonly string[] {
     case 'apply-code-patch':
     case 'revert-splices':
     case 'rewrite-node':
+    case 'rewrite-text':
       return operation.hunks.map((hunk) => hunk.text);
     case 'edit-frontmatter-slot':
-    case 'replace-source':
       return [operation.text];
     case 'wrap-nodes':
       return [operation.open, operation.close];
@@ -275,6 +279,7 @@ function checkOperationAnchor(operation: Operation, anchor: AnchorRef): void {
       return;
     case 'apply-code-patch':
     case 'revert-splices':
+    case 'rewrite-text':
       requireKind(operation.tag, kind === 'document');
       requireSites(
         operation.tag,
@@ -286,7 +291,6 @@ function checkOperationAnchor(operation: Operation, anchor: AnchorRef): void {
       requireKind(operation.tag, kind === 'frontmatter');
       requireSites(operation.tag, anchor.span, [operation.slot]);
       return;
-    case 'replace-source':
     case 'append-body':
     case 'insert-frontmatter':
       requireKind(operation.tag, kind === 'document');
@@ -404,6 +408,7 @@ function parseOperation(input: unknown): Operation {
     case 'apply-code-patch':
     case 'revert-splices':
     case 'rewrite-node':
+    case 'rewrite-text':
       return { tag, hunks: parseHunks(record['hunks']) };
     case 'rename-tag':
       return {
@@ -435,8 +440,6 @@ function parseOperation(input: unknown): Operation {
         slot: parseByteSpan(record['slot'], 'Operation.slot'),
         text: payloadText(record['text'], 'Operation.text'),
       };
-    case 'replace-source':
-      return { tag, text: payloadText(record['text'], 'Operation.text') };
     default:
       throw new Error(`Operation.tag: unknown operation ${JSON.stringify(tag)}`);
   }

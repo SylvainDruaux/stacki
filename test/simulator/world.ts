@@ -3,11 +3,11 @@
 // PRNG picks one event — a visual intent, a stale preview intent, a Markdown
 // block intent (step 10: text typed, a block or item removed, inserted or
 // moved) fresh or from a stale preview, an oracle gesture, a code-editor save
-// (a patch, since step 8, often leaving the file invalid), a whole-model save,
-// an external manual edit, a pasted copy of a line, an attribute added in
-// another editor, an AI-style rewrite, a git-style atomic replacement, a
-// watcher tick, an actor step, a crash, a disk failure, a submission burst —
-// applies it, and checks the invariants.
+// (a patch, since step 8, often leaving the file invalid), a program's text
+// rewrite (step 10's `rewrite-text`), an external manual edit, a pasted copy of
+// a line, an attribute added in another editor, an AI-style rewrite, a
+// git-style atomic replacement, a watcher tick, an actor step, a crash, a disk
+// failure, a submission burst — applies it, and checks the invariants.
 //
 // Determinism is structural, not careful: the scheduler is the only source of
 // order, the PRNG the only source of choice, the disk is in memory, and there
@@ -160,7 +160,7 @@ const EVENTS = [
   ['copy-paste', 3],
   ['attribute-append', 3],
   ['code-save', 4],
-  ['model-save', 2],
+  ['program-write', 2],
   ['git-replace', 3],
   ['ai-rewrite', 2],
   ['crash', 1],
@@ -311,8 +311,8 @@ class World {
         return this.startGesture(this.prng.pick(ORACLE_SCENARIOS));
       case 'code-save':
         return this.submitCodePatch(this.pickPath());
-      case 'model-save':
-        return this.submitModelSave(this.pickPath());
+      case 'program-write':
+        return this.submitProgramWrite(this.pickPath());
       case 'external-edit':
         return this.editExternally(this.pickPath());
       case 'copy-paste':
@@ -450,7 +450,7 @@ class World {
     const survival = judgedBySurvival(intent.operation.tag);
     if (!survival) {
       if (gesture === undefined) {
-        return; // A whole-model save: never mapped, so never judged.
+        return; // No survival rule, and no oracle step names its expected bytes.
       }
     }
     // The simulated client always sends the snapshot it authored against.
@@ -576,14 +576,14 @@ class World {
 
   // --- Undo (step 6) ----------------------------------------------------------
 
-  // Every applied edit but a whole-file save or a revert can be undone: its
+  // Every applied edit but a program's rewrite or a revert can be undone: its
   // inverse, authored against the bytes it left (plan §11 step 6).
   private rememberUndoable(
     effect: Extract<ActorEffect, { tag: 'committed' }>,
     path: FilePath,
   ): void {
     const tag = effect.intent.operation.tag;
-    if (tag === 'replace-source' || tag === 'revert-splices') {
+    if (NOT_UNDOABLE.includes(tag)) {
       return;
     }
     const origins = this.origins.get(effect.generation);
@@ -972,13 +972,20 @@ class World {
     this.countVerdict(intent.file, verdict);
   }
 
-  /** The legacy whole-model save (`replace-source`, plan §3.3): the file's
-   * text, reprinted, witnessed by the checksum it was read at. */
-  private submitModelSave(path: FilePath): void {
+  /** A program's text rewrite (`rewrite-text`, step 10): a stylesheet rule, a
+   * CMS entry, a property batch — the hunks from the text it read to the text
+   * it wants, witnessed by the checksum it was read at. An unchanged text is
+   * the one empty hunk the host writes to touch a file (rewriteUnchanged). */
+  private submitProgramWrite(path: FilePath): void {
     const view = this.clientView(path);
     const decoded = decodeUtf8(view.snapshot.bytes);
     assert(decoded.ok, 'Simulated writers only write UTF-8');
     const suffix = this.prng.pick(['\n<!-- saved -->\n', '\n<div', '']);
+    const patch = diffCodePatch(decoded.value, decoded.value + suffix);
+    assert(patch.ok, 'A suffix stays inside the bounds');
+    const touch: readonly SourceEdit[] = [{ span: toByteSpan(0, 0), text: '' }];
+    const typed = patch.value.map((hunk) => ({ span: hunk.span, text: hunk.text }));
+    const hunks = typed.length === 0 ? touch : typed;
     const anchor = toAnchorRef({
       span: toByteSpan(0, view.snapshot.bytes.length),
       path: [],
@@ -990,7 +997,7 @@ class World {
         file: path,
         authoredChecksum: view.snapshot.checksum,
         anchor,
-        operation: { tag: 'replace-source', text: decoded.value + suffix },
+        operation: { tag: 'rewrite-text', hunks },
       }),
       view,
     );
@@ -1051,7 +1058,7 @@ class World {
   /** More intents than the queue holds, at once: the tail must be backpressured. */
   private burst(path: FilePath): void {
     for (let index = 0; index < LIMITS.intentsPendingMax + 4; index++) {
-      this.submitModelSave(path);
+      this.submitProgramWrite(path);
     }
   }
 
@@ -1267,6 +1274,10 @@ class World {
 /** What the planner decided for the head intent in one idle step: the plan now
  * in flight, or the rejection among the step's outcomes; undefined when the
  * step rejected before planning (a failed read). */
+// Operations Undo never reverts: a program's rewrite is not the user's edit,
+// and a revert is itself an undo.
+const NOT_UNDOABLE: readonly Operation['tag'][] = ['rewrite-text', 'revert-splices'];
+
 // Operations whose hunks a diff placed: a code patch, and the undo of one.
 const BYTE_HUNK_OPERATIONS: readonly Operation['tag'][] = ['apply-code-patch', 'revert-splices'];
 
@@ -1429,7 +1440,7 @@ function markdownBlockIntent(intent: Intent, authored: Snapshot): boolean {
     case 'apply-code-patch':
     case 'revert-splices':
     case 'edit-frontmatter-slot':
-    case 'replace-source':
+    case 'rewrite-text':
     case 'rename-tag':
     case 'rename-attribute':
     case 'wrap-nodes':

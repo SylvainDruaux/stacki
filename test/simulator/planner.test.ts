@@ -33,6 +33,7 @@ import { snapshotOf } from './project.ts';
 import { referenceMapSpan, referenceTables } from './reference-diff.ts';
 import { planByIdentity } from './reference-planner.ts';
 import { applySplices } from '../../dist/shared/splice.js';
+import { diffCodePatch } from '../../dist/shared/code-patch.js';
 
 const FIXTURES = path.resolve('test/fixtures/editor-core');
 const DIRECTORIES = ['test/corpus', 'test/fixtures/round-trip', 'test/fixtures/editor-core'];
@@ -582,30 +583,35 @@ test('corpus sweep: fast = reference = diff path; an insertion above shifts ever
   assert.ok(shiftedCount > 60, `most of them sit below the insertion (${shiftedCount})`);
 });
 
-// Step 5: the migration-only replace-source is planned by the shipping planner.
-// It never maps, so the fast path, the diff path and the step-1 reference must
-// agree on every fixture: fresh (one whole-file splice, the authored bytes as its
-// witness), stale (`region-externally-modified`), and an anchor whose length is
-// not the file's (`anchor-moved`).
-test('replace-source: whole-file splice fresh, rejected stale, agreeing with the reference', () => {
+// Step 10: `rewrite-text`, a program's change to a file's text as hunks of the
+// bytes it read, replaced step 5's whole-file `replace-source`. It never maps,
+// so the fast path, the diff path and the step-1 reference must agree on every
+// fixture: fresh (a splice per hunk, each witnessed by the authored bytes it
+// replaces — here a few: nothing outside the hunks is rewritten), stale
+// (`region-externally-modified`), and an anchor whose length is not the file's
+// (`anchor-moved`).
+test('rewrite-text: hunk splices fresh, rejected stale, agreeing with the reference', () => {
   let checked = 0;
   for (const directory of DIRECTORIES) {
     for (const name of fs.readdirSync(directory).sort()) {
       const text = fs.readFileSync(path.join(directory, name), 'utf8');
       const authored = snapshotText(text, toFilePath(`/project/${name}`));
-      const replacement = `${text}\n<!-- replaced -->\n`;
-      const whole = replaceSourceIntent(authored, authored.bytes.length, replacement);
+      const replacement = `<!-- first -->\n${text}\n<!-- replaced -->\n`;
+      const rewrite = rewriteTextIntent(authored, authored.bytes.length, text, replacement);
       const fresh = { authored, current: authored };
-      assert.deepEqual(planByIdentity(authored, whole), planIntent(fresh, whole), name);
-      assert.equal(planned(fresh, whole), replacement, `${name}: fresh replaces the file`);
-      const [splice] = planIntent(fresh, whole).ok ? spliceList(fresh, whole) : [];
-      assert.deepEqual(splice?.expectedBytes, authored.bytes, `${name}: witness is the file`);
+      assert.deepEqual(planByIdentity(authored, rewrite), planIntent(fresh, rewrite), name);
+      assert.equal(planned(fresh, rewrite), replacement, `${name}: fresh rewrites the text`);
+      // Text added at both ends: the splices rewrite only the few bytes the
+      // diff aligns there, never the file the program read and kept.
+      for (const splice of spliceList(fresh, rewrite)) {
+        assert.ok(splice.expectedBytes.length < REWRITE_WITNESS_BYTES_MAX, name);
+      }
       const current = snapshotText(`${text} `, authored.path);
       const stale = { authored, current };
-      assert.deepEqual(planByIdentity(current, whole), planIntent(stale, whole), name);
-      assert.equal(planned(stale, whole), 'rejected: region-externally-modified', name);
+      assert.deepEqual(planByIdentity(current, rewrite), planIntent(stale, rewrite), name);
+      assert.equal(planned(stale, rewrite), 'rejected: region-externally-modified', name);
       if (authored.bytes.length > 0) {
-        const short = replaceSourceIntent(authored, authored.bytes.length - 1, replacement);
+        const short = rewriteTextIntent(authored, authored.bytes.length - 1, text, replacement);
         assert.deepEqual(planByIdentity(authored, short), planIntent(fresh, short), name);
         assert.equal(planned(fresh, short), 'rejected: anchor-moved', name);
       }
@@ -615,9 +621,16 @@ test('replace-source: whole-file splice fresh, rejected stale, agreeing with the
   assert.ok(checked > 50, `every fixture directory is swept (${checked} files)`);
 });
 
-function replaceSourceIntent(authored: Snapshot, length: number, text: string): Intent {
+// The diff trims common text at each end; what it leaves of the file's own
+// bytes around an added line is at most a line's worth, far below any fixture.
+const REWRITE_WITNESS_BYTES_MAX = 32;
+
+function rewriteTextIntent(authored: Snapshot, length: number, from: string, to: string): Intent {
   const anchor = { span: toByteSpan(0, length), path: [], expectedKind: 'document' as const };
-  return intentOn(authored, anchor, { tag: 'replace-source', text });
+  const patch = diffCodePatch(from, to);
+  assert.ok(patch.ok, 'the rewrite fits the bounds');
+  const hunks = patch.value.map((hunk) => ({ span: hunk.span, text: hunk.text }));
+  return intentOn(authored, anchor, { tag: 'rewrite-text', hunks });
 }
 
 function spliceList(base: PlanningBase, intent: Intent) {

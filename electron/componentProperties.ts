@@ -5,7 +5,8 @@ import { readPropertyConsumers, readBoundedSource, filesystemError } from './pro
 // From step 5 the batch runs through the document actors (plan §3.3): their
 // actors are leased in sorted canonical-path order, each file is witnessed by
 // the checksum of its `before` text, and every write — rollback included — is
-// a `replace-source` intent, so an outside edit is refused, never overwritten.
+// the file's diff from those bytes (a `rewrite-text`, step 10), so an outside
+// edit is refused, never overwritten.
 import { randomUUID } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -331,11 +332,7 @@ function commitLeased(changes: readonly FileChange[], writer: PropertyWriter): R
   const written: FileChange[] = [];
   for (const change of changes) {
     writer.noteWrite(change.file);
-    const report = writer.documents.replaceSource(
-      change.file,
-      change.after,
-      digestOf(change.before),
-    );
+    const report = writer.documents.writeText(change.file, change.after, digestOf(change.before));
     if (report.tag !== 'applied') {
       // An uncertain write may hold the batch's bytes; the rollback's witness
       // restores it only if it does. A refused one was never written.
@@ -421,7 +418,7 @@ function restorePropertyFile(
   writer: PropertyWriter,
 ): 'restored' | 'changed' | 'failed' {
   writer.noteWrite(change.file);
-  const report = writer.documents.replaceSource(change.file, change.before, digestOf(change.after));
+  const report = writer.documents.writeText(change.file, change.before, digestOf(change.after));
   switch (report.tag) {
     case 'applied':
       return 'restored';

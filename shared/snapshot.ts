@@ -41,10 +41,10 @@ export function createSnapshot(
 
 /** A snapshot whose projection is derived when first read (plan §3.1: the
  * projection is disposable and derived). The write protocol never reads the
- * projection of a whole-file `replace-source` candidate — it has no target
- * kind to check and may be invalid (§3.6) — so the legacy save path, which
- * submits only those, never pays for a parse it does not use; a visual
- * intent's planner reads it, and pays exactly what an eager snapshot costs.
+ * projection of a `rewrite-text` candidate — it has no target kind to check
+ * and may be invalid (§3.6) — so a program's write of a stylesheet or a CMS
+ * entry never pays for a parse it does not use; a visual intent's planner
+ * reads it, and pays exactly what an eager snapshot costs.
  * The derivation is pure over bytes the snapshot owns, so deriving later can
  * never see newer bytes than the snapshot names. */
 export function createLazySnapshot(

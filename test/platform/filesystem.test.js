@@ -33,7 +33,7 @@ test('permission bits and ownership survive a save, whatever the umask', posixOn
         fs.writeFileSync(file, 'old\n');
         fs.chmodSync(file, mode);
         const before = fs.statSync(file);
-        const report = documents.replaceSource(file, 'new\n', sha256('old\n'));
+        const report = documents.writeText(file, 'new\n', sha256('old\n'));
         assert.equal(report.tag, 'applied', mode.toString(8));
         const after = fs.statSync(file);
         assert.equal(after.mode & 0o7777, mode, `mode ${mode.toString(8)} kept`);
@@ -66,7 +66,7 @@ test('flush: the staged file is fsynced before the rename, the folder after it',
       return rename(from, to);
     };
     try {
-      assert.equal(documents.replaceSource(file, 'new\n', sha256('old\n')).tag, 'applied');
+      assert.equal(documents.writeText(file, 'new\n', sha256('old\n')).tag, 'applied');
     } finally {
       fs.fsyncSync = fsync;
       fs.renameSync = rename;
@@ -90,7 +90,7 @@ test('a symlink is written through; a symlinked folder reaches the same actor', 
     fs.symlinkSync(target, link);
     fs.symlinkSync(path.join(root, 'real'), path.join(root, 'alias'));
     const documents = realHost();
-    assert.equal(documents.replaceSource(link, 'new\n', sha256('old\n')).tag, 'applied');
+    assert.equal(documents.writeText(link, 'new\n', sha256('old\n')).tag, 'applied');
     assert.equal(fs.lstatSync(link).isSymbolicLink(), true, 'the link is still a link');
     assert.equal(fs.readFileSync(target, 'utf8'), 'new\n', 'the file it names was written');
     assert.deepEqual(protocolLeftovers(path.join(root, 'other')), [], 'staged beside the target');
@@ -122,7 +122,7 @@ test('continuous readers see whole versions only, never a torn or empty file', a
     const documents = realHost();
     let base = sha256(versions[0]);
     for (const version of versions.slice(1)) {
-      const report = documents.replaceSource(file, version, base);
+      const report = documents.writeText(file, version, base);
       assert.equal(report.tag, 'applied');
       base = report.checksum;
     }

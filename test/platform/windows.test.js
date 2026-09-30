@@ -26,7 +26,7 @@ test('a rename over a file held without delete sharing is write-failed, untouche
     const release = await holdFromWindows(windows, file, 'Read');
     let report;
     try {
-      report = documents.replaceSource(file, 'new\n', sha256('old\n'));
+      report = documents.writeText(file, 'new\n', sha256('old\n'));
     } finally {
       await release();
     }
@@ -36,7 +36,7 @@ test('a rename over a file held without delete sharing is write-failed, untouche
     assert.equal(fs.readFileSync(file, 'utf8'), 'old\n', 'the target is untouched');
     assert.deepEqual(protocolLeftovers(root), [], 'no temporary or lock file is left');
     // Released: the same save, resubmitted deliberately, goes through.
-    assert.equal(documents.replaceSource(file, 'new\n', sha256('old\n')).tag, 'applied');
+    assert.equal(documents.writeText(file, 'new\n', sha256('old\n')).tag, 'applied');
   });
 });
 
@@ -47,7 +47,7 @@ test('a file held with delete sharing is replaced normally', onWindows, async ()
     const documents = realHost();
     const release = await holdFromWindows(windows, file, 'ReadWrite, Delete');
     try {
-      assert.equal(documents.replaceSource(file, 'new\n', sha256('old\n')).tag, 'applied');
+      assert.equal(documents.writeText(file, 'new\n', sha256('old\n')).tag, 'applied');
     } finally {
       await release();
     }
@@ -65,7 +65,7 @@ test('on a case-insensitive disk every spelling is one actor and one lock', onWi
     assert.equal(documents.current(path.join(root, 'PAGE.ASTRO')).ok, true);
     assert.equal(documents.actorCount(), 1, 'one file, one actor');
     // A write under one spelling is seen as the base under another.
-    const report = documents.replaceSource(path.join(root, 'page.astro'), 'new\n', sha256('old\n'));
+    const report = documents.writeText(path.join(root, 'page.astro'), 'new\n', sha256('old\n'));
     assert.equal(report.tag, 'applied');
     assert.equal(documents.current(file).value.checksum, sha256('new\n'));
     assert.deepEqual(protocolLeftovers(root), []);

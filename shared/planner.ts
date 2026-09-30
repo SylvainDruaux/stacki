@@ -62,7 +62,7 @@ import {
   planFrontmatterSlot,
   planInsertFrontmatter,
   planRenameBinding,
-  planReplaceSource,
+  planRewriteText,
   planRevertSplices,
   planRewriteNode,
 } from './planText';
@@ -245,8 +245,8 @@ function planWith(
       return planRenameAttribute(context, anchor, operation);
     case 'rewrite-node':
       return planRewriteNode(context, anchor, operation);
-    case 'replace-source':
-      return planReplaceSource(context, anchor, operation.text);
+    case 'rewrite-text':
+      return planRewriteText(context, anchor, operation);
     default: {
       const exhaustive: never = operation;
       throw new Error(`Unknown operation ${JSON.stringify(exhaustive)}`);

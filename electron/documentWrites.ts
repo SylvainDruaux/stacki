@@ -39,8 +39,9 @@ export function documentHost(): DocumentHost {
 }
 
 /** Write project text that no edit named a base for, through its actor: the
- * witness is the file as it is now, a missing file is created, and anything
- * but `applied` throws like the `fs.writeFileSync` it replaces did. */
+ * diff from the file as it is now, witnessed by those bytes (never the whole
+ * file); a missing file is created, and anything but `applied` throws like the
+ * `fs.writeFileSync` it replaces did. */
 export function writeProjectText(file: string, text: string): Digest {
   const host = documentHost();
   host.noteWrite(file);

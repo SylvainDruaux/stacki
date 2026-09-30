@@ -23,6 +23,7 @@ import {
   type DocumentDisk,
 } from '../../dist/shared/documentActor.js';
 import { toIntent, type Intent, type Outcome } from '../../dist/shared/intent.js';
+import { diffCodePatch } from '../../dist/shared/code-patch.js';
 import { createLazySnapshot } from '../../dist/shared/snapshot.js';
 import { LIMITS } from '../../dist/shared/limits.js';
 import { err } from '../../dist/shared/result.js';
@@ -46,15 +47,20 @@ function fakeWith(text: string): FakeDisk {
 }
 
 let intents = 0;
-function replaceIntent(authoredText: string, text: string): Intent {
+function rewriteIntent(authoredText: string, text: string): Intent {
   intents += 1;
   const length = encodeUtf8(authoredText).length;
+  const patch = diffCodePatch(authoredText, text);
+  assert.ok(patch.ok, 'the rewrite fits the bounds');
   return toIntent({
     id: toIntentId(`actor-test-${intents}`),
     file: PAGE,
     authoredChecksum: sha256(encodeUtf8(authoredText)),
     anchor: { span: toByteSpan(0, length), path: [], expectedKind: 'document' },
-    operation: { tag: 'replace-source', text },
+    operation: {
+      tag: 'rewrite-text',
+      hunks: patch.value.map((hunk) => ({ span: hunk.span, text: hunk.text })),
+    },
   });
 }
 
@@ -85,17 +91,17 @@ function submitted(intent: Intent): ActorState {
   return result.state;
 }
 
-test('a fresh replace-source applies through idle → planned → written → idle', () => {
+test('a fresh rewrite-text applies through idle → planned → written → idle', () => {
   const disk = fakeWith(TEXT);
   const next = '<Hero title="New" />\n';
-  const intent = replaceIntent(TEXT, next);
+  const intent = rewriteIntent(TEXT, next);
   const { state, outcomes, steps } = run(submitted(intent), setup(disk));
   assert.deepEqual(
     steps.map((step) => step.state.phase.tag),
     ['planned', 'written', 'idle'],
   );
   const checksum = sha256(encodeUtf8(next));
-  const range = toByteSpan(0, encodeUtf8(next).length);
+  const range = toByteSpan(13, 16); // `Old` → `New`: only the bytes that differ.
   assert.deepEqual(outcomes, [
     { tag: 'applied', intentId: intent.id, changedRanges: [range], checksum },
   ]);
@@ -107,13 +113,13 @@ test('a full queue backpressures the next submission and keeps the queue intact'
   let state = createActor(PAGE);
   for (let index = 0; index < LIMITS.intentsPendingMax; index++) {
     const result = submitIntent(state, {
-      intent: replaceIntent(TEXT, `${index}`),
+      intent: rewriteIntent(TEXT, `${index}`),
       authored: undefined,
     });
     assert.equal(result.result.tag, 'accepted');
     state = result.state;
   }
-  const extra = submitIntent(state, { intent: replaceIntent(TEXT, 'x'), authored: undefined });
+  const extra = submitIntent(state, { intent: rewriteIntent(TEXT, 'x'), authored: undefined });
   assert.deepEqual(extra.result, { tag: 'backpressured' });
   assert.equal(extra.state, state, 'backpressure changes nothing');
   assert.equal(extra.state.queue.length, LIMITS.intentsPendingMax);
@@ -121,7 +127,7 @@ test('a full queue backpressures the next submission and keeps the queue intact'
 
 test('an intent authored against other bytes is refused without its authored bytes', () => {
   const disk = fakeWith(`${TEXT}<!-- outside -->\n`);
-  const intent = replaceIntent(TEXT, 'mine');
+  const intent = rewriteIntent(TEXT, 'mine');
   const { outcomes } = run(submitted(intent), setup(disk));
   assert.deepEqual(outcomes, [
     { tag: 'rejected', intentId: intent.id, reason: 'region-externally-modified' },
@@ -131,7 +137,7 @@ test('an intent authored against other bytes is refused without its authored byt
 test('a cooperating writer holding the lock is a write-race, and nothing is written', () => {
   const disk = fakeWith(TEXT);
   disk.contendNextLock(PAGE);
-  const intent = replaceIntent(TEXT, 'mine');
+  const intent = rewriteIntent(TEXT, 'mine');
   const { outcomes } = run(submitted(intent), setup(disk));
   assert.deepEqual(outcomes, [{ tag: 'rejected', intentId: intent.id, reason: 'write-race' }]);
   assert.equal(readText(disk), TEXT);
@@ -139,7 +145,7 @@ test('a cooperating writer holding the lock is a write-race, and nothing is writ
 
 test('an outside write between planning and the lock is caught by the re-read', () => {
   const disk = fakeWith(TEXT);
-  const intent = replaceIntent(TEXT, 'mine');
+  const intent = rewriteIntent(TEXT, 'mine');
   const planned = stepActor(submitted(intent), setup(disk));
   assert.equal(planned.state.phase.tag, 'planned');
   disk.writeExternally(PAGE, encodeUtf8('outside\n'));
@@ -153,14 +159,14 @@ test('an outside write between planning and the lock is caught by the re-read', 
 test('a failed replace is write-failed; a replace without a durable directory is uncertain', () => {
   const failed = fakeWith(TEXT);
   failed.failNextReplace(PAGE, 'failed');
-  const first = replaceIntent(TEXT, 'mine');
+  const first = rewriteIntent(TEXT, 'mine');
   assert.deepEqual(run(submitted(first), setup(failed)).outcomes, [
     { tag: 'rejected', intentId: first.id, reason: 'write-failed' },
   ]);
   assert.equal(readText(failed), TEXT);
   const fragile = fakeWith(TEXT);
   fragile.failNextReplace(PAGE, 'not-durable');
-  const second = replaceIntent(TEXT, 'mine');
+  const second = rewriteIntent(TEXT, 'mine');
   const candidateChecksum = sha256(encodeUtf8('mine'));
   assert.deepEqual(run(submitted(second), setup(fragile)).outcomes, [
     { tag: 'uncertain', intentId: second.id, candidateChecksum },
@@ -170,14 +176,14 @@ test('a failed replace is write-failed; a replace without a durable directory is
 
 test('the verifying read: another writer is a write-race, an unreadable file is uncertain', () => {
   const raced = fakeWith(TEXT);
-  const first = replaceIntent(TEXT, 'mine');
+  const first = rewriteIntent(TEXT, 'mine');
   const written = run2(submitted(first), setup(raced));
   raced.writeExternally(PAGE, encodeUtf8('theirs'));
   assert.deepEqual(run(written, setup(raced)).outcomes, [
     { tag: 'rejected', intentId: first.id, reason: 'write-race' },
   ]);
   const broken = fakeWith(TEXT);
-  const second = replaceIntent(TEXT, 'mine');
+  const second = rewriteIntent(TEXT, 'mine');
   const unreadable: DocumentDisk = {
     read: () => err({ code: 'failed', message: 'EIO' }),
     lock: (path) => broken.lock(path),
@@ -213,7 +219,7 @@ test('reconcileUncertain compares checksums: applied, not applied, changed again
 
 test('preconditions assert: an intent goes to its own actor with its own snapshot', () => {
   const other = createActor(toFilePath('/project/other.astro'));
-  const intent = replaceIntent(TEXT, 'x');
+  const intent = rewriteIntent(TEXT, 'x');
   assert.throws(
     () => submitIntent(other, { intent, authored: undefined }),
     /Assertion failed: An intent is submitted to its own file actor/,
