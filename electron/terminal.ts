@@ -7,6 +7,7 @@ import fs from 'node:fs';
 import { Buffer } from 'node:buffer';
 import type { PseudoTerminal, SpawnOptions } from 'node-pty';
 
+import { parseTerminalAck, parseTerminalInput } from '../shared/ipc-payloads.js';
 import { toRecord } from '../shared/record.js';
 import {
   isPathWithin,
@@ -323,14 +324,19 @@ function stopPolling(): void {
 // ---------------------------------------------------------------------------
 
 
-interface TerminalInputPayload {
-  readonly id: string;
-  readonly data: string;
-}
-
-interface TerminalAckPayload {
-  readonly id: string;
-  readonly count: number;
+// A `send` payload that fails its parser is dropped: the channel has no reply
+// to carry the refusal, so the log is where a renderer bug surfaces.
+function parseSendPayload<T>(
+  channel: string,
+  parse: (input: unknown) => T,
+  input: unknown,
+): T | undefined {
+  try {
+    return parse(input);
+  } catch (error: unknown) {
+    console.error(`[terminal] ${channel}: refused payload — ${String(error)}`);
+    return undefined;
+  }
 }
 
 /**
@@ -480,13 +486,17 @@ function registerTerminalHandlers({
 
   // `on`, not `handle`: keystrokes and acks are high-frequency one-way signals
   // that need no reply, so they shouldn't pay for a round trip.
-  nativeIpcMain.on('terminal:input', (event: unknown, payload: TerminalInputPayload) => {
-    const entry = terminals.get(payload?.id ?? '');
-    if (!entry || payload?.data === undefined) {
+  nativeIpcMain.on('terminal:input', (_event: unknown, input: unknown) => {
+    const payload = parseSendPayload('terminal:input', parseTerminalInput, input);
+    if (payload === undefined) {
+      return;
+    }
+    const entry = terminals.get(payload.id);
+    if (!entry) {
       return;
     }
     try {
-      entry.proc.write(String(payload.data));
+      entry.proc.write(payload.data);
     } catch {
       /* exited mid-keystroke */
     }
@@ -494,17 +504,20 @@ function registerTerminalHandlers({
 
   // The renderer reports chars it has actually rendered. Resume a pty the high
   // watermark paused once it has drained.
-  nativeIpcMain.on('terminal:ack', (event: unknown, payload: TerminalAckPayload) => {
-    const flow = flowState.get(payload?.id ?? '');
+  nativeIpcMain.on('terminal:ack', (_event: unknown, input: unknown) => {
+    const payload = parseSendPayload('terminal:ack', parseTerminalAck, input);
+    if (payload === undefined) {
+      return;
+    }
+    const flow = flowState.get(payload.id);
     if (!flow) {
       return;
     }
-    const count = typeof payload?.count === 'number' ? payload.count : 0;
-    flow.unacked = Math.max(0, flow.unacked - count);
+    flow.unacked = Math.max(0, flow.unacked - payload.count);
     if (!flow.paused || flow.unacked > FLOW_LOW_WATERMARK) {
       return;
     }
-    const entry = terminals.get(payload?.id ?? '');
+    const entry = terminals.get(payload.id);
     if (!entry) {
       return;
     }

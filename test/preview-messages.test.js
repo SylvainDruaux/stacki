@@ -3,8 +3,12 @@
 // numeric, nested, discriminant, and collection fields at the boundary.
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { parsePreviewMessage, describePreviewReload, PREVIEW_RELOAD_REASONS } =
-  require('./renderer-module')('previewMessages.ts');
+const {
+  parsePreviewMessage,
+  parseShortcutMessage,
+  describePreviewReload,
+  PREVIEW_RELOAD_REASONS,
+} = require('./renderer-module')('previewMessages.ts');
 
 const box = { x: -1.5, y: 2, w: 30, h: 40 };
 const TOKEN = 'a'.repeat(64);
@@ -114,5 +118,33 @@ test('preview message parser ignores unknown and malformed project messages', ()
     },
   ]) {
     assert.equal(parsePreviewMessage(value), undefined);
+  }
+});
+
+test('forwarded shortcuts parse each variant and ignore every other or malformed message', () => {
+  const shortcut = (fields) => parseShortcutMessage({ type: 'avb:shortcut', ...fields });
+  assert.deepEqual(shortcut({ name: 'insert' }), { name: 'insert' });
+  assert.deepEqual(shortcut({ name: 'arrow', key: 'ArrowUp' }), { name: 'arrow', key: 'ArrowUp' });
+  assert.deepEqual(
+    parseShortcutMessage({ type: 'avb:shortcut', name: 'key', key: 'd', meta: true }),
+    { name: 'key', key: 'd', meta: true },
+  );
+  // Anything but a literal true is no modifier: a page cannot smuggle one in.
+  assert.deepEqual(
+    parseShortcutMessage({ type: 'avb:shortcut', name: 'key', key: 'Delete', meta: 'yes' }),
+    { name: 'key', key: 'Delete', meta: false },
+  );
+  for (const input of [
+    undefined,
+    null,
+    'avb:shortcut',
+    { type: 'avb:rects' },
+    { type: 'avb:shortcut' },
+    { type: 'avb:shortcut', name: 'reload' },
+    { type: 'avb:shortcut', name: 'arrow' },
+    { type: 'avb:shortcut', name: 'arrow', key: 40 },
+    { type: 'avb:shortcut', name: 'key', key: 'k'.repeat(33), meta: false },
+  ]) {
+    assert.equal(parseShortcutMessage(input), undefined);
   }
 });

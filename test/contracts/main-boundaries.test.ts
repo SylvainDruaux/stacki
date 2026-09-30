@@ -21,6 +21,7 @@ import {
   parseRecents,
   parseAliases,
   parseAstroLock,
+  parseValidationResult,
 } from '../../dist/electron/main.validation.js';
 import { directoryBudget, MAIN_LIMITS } from '../../dist/electron/main.bounds.js';
 import { LIMITS } from '../../dist/shared/limits.js';
@@ -59,6 +60,15 @@ test('the complete channel inventory matches real main and terminal registration
     [...Object.keys(IPC_PAYLOADS)].sort(),
     [...harness.handlers.keys(), ...terminalChannels].sort(),
   );
+  // One-way `send` listeners bypass the invoke registrar, so each must name
+  // its own parser before touching the payload.
+  const sendChannels = [...terminal.matchAll(/ipcMain\.on\(['"]([^'"]+)['"]/g)].map(
+    (match) => match[1],
+  );
+  assert.deepEqual(sendChannels, ['terminal:input', 'terminal:ack']);
+  for (const channel of sendChannels) {
+    assert.match(terminal, new RegExp(`parseSendPayload\\('${channel}'`), `${channel} is parsed`);
+  }
 });
 
 test('malformed writes fail before altering disk; valid writes still work', async (context) => {
@@ -138,6 +148,30 @@ test('disk parsers validate known shapes and fail on corrupt data', () => {
     url: 'http://localhost:4321',
   });
   assert.throws(() => parseAstroLock({ url: [] }), /string/);
+});
+
+test('content validation replies keep their issues and refuse corrupt or oversized ones', () => {
+  const issue = { path: ['posts', 0, 'title'], message: 'Required', code: 'invalid_type' };
+  assert.deepEqual(parseValidationResult({ issues: [issue] }), { issues: [issue] });
+  assert.deepEqual(parseValidationResult({ issues: [], unchecked: true, error: 'no schema' }), {
+    issues: [],
+    unchecked: true,
+    error: 'no schema',
+  });
+  const bad: readonly unknown[] = [
+    undefined,
+    { issues: 'none' },
+    { issues: [{ ...issue, path: [-1] }] },
+    { issues: [{ ...issue, path: [1.5] }] },
+    { issues: [{ ...issue, message: 3 }] },
+    { issues: [{ path: [], message: 'm' }] },
+    { issues: [], unchecked: 'yes' },
+    { issues: [], error: 'x'.repeat(LIMITS.ipcFieldCharsMax + 1) },
+    { issues: Array.from({ length: LIMITS.ipcItemsMax + 1 }, () => issue) },
+  ];
+  for (const input of bad) {
+    assert.throws(() => parseValidationResult(input));
+  }
 });
 
 test('dev-server parsers support current and legacy responses', () => {

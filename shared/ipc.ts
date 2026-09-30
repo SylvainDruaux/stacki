@@ -1,6 +1,7 @@
 // One contract for all invoke channels. Payload parsers run in main before
 // side effects; result types are checked at registration. Rejected operating
 // errors keep Electron's existing Promise-rejection channel during migration.
+import { count, pathText, record, text } from './boundary';
 import type { IpcChannel, IpcPayloads } from './ipc-payloads';
 import type { IpcResults } from './ipc-results';
 export { parseIpcPayload, IPC_PAYLOADS } from './ipc-payloads';
@@ -30,65 +31,49 @@ export type AvbBridge = {
 };
 
 // --- Parsers for the small result unions -----------------------------------
+// Built on the bounded boundary parsers, so a result's text, path and line obey
+// the same wire limits as every payload.
 
 export function parseSymbolReadResult(input: unknown): SymbolReadResult {
-  if (typeof input !== 'object' || input === null) {
-    throw new Error('SymbolReadResult: expected object');
-  }
-  const record = input as Record<string, unknown>;
-  if (record['ok'] === false) {
-    const reason = record['reason'];
-    if (reason !== undefined && reason !== 'not-found' && reason !== 'too-large') {
-      throw new Error(`SymbolReadResult: unknown reason ${JSON.stringify(reason)}`);
+  const value = record(input);
+  if (value['ok'] === false) {
+    const reason = value['reason'];
+    if (reason === undefined) {
+      return { ok: false };
     }
-    return reason === undefined ? { ok: false } : { ok: false, reason };
+    if (reason === 'not-found' || reason === 'too-large') {
+      return { ok: false, reason };
+    }
+    throw new Error(`SymbolReadResult: unknown reason ${JSON.stringify(reason)}`);
   }
-  if (record['ok'] !== true) {
+  if (value['ok'] !== true) {
     throw new Error('SymbolReadResult.ok: expected boolean');
   }
-  if (typeof record['rel'] !== 'string' || typeof record['text'] !== 'string') {
-    throw new Error('SymbolReadResult: expected rel and text strings');
-  }
-  if (typeof record['line'] !== 'number') {
-    throw new Error('SymbolReadResult.line: expected number');
-  }
-  return { ok: true, rel: record['rel'], text: record['text'], line: record['line'] };
+  return {
+    ok: true,
+    rel: pathText(value['rel']),
+    text: text(value['text']),
+    line: count(value['line']),
+  };
 }
 
 export function parseResolvePathResult(input: unknown): ResolvePathResult {
-  if (typeof input !== 'object' || input === null) {
-    throw new Error('ResolvePathResult: expected object');
-  }
-  const record = input as Record<string, unknown>;
-  if (record['ok'] === false) {
+  const value = record(input);
+  if (value['ok'] === false) {
     return { ok: false };
   }
-  if (record['ok'] !== true) {
+  if (value['ok'] !== true) {
     throw new Error('ResolvePathResult.ok: expected boolean');
   }
-  if (typeof record['rel'] !== 'string') {
-    throw new Error('ResolvePathResult.rel: expected string');
-  }
-  return { ok: true, rel: record['rel'] };
+  return { ok: true, rel: pathText(value['rel']) };
 }
 
 export function parseTextResult(input: unknown): { readonly text: string } {
-  if (typeof input !== 'object' || input === null) {
-    throw new Error('TextResult: expected object');
-  }
-  const record = input as Record<string, unknown>;
-  if (typeof record['text'] !== 'string') {
-    throw new Error('TextResult.text: expected string');
-  }
-  return { text: record['text'] };
+  return { text: text(record(input)['text']) };
 }
 
 export function parseOkResult(input: unknown): { readonly ok: true } {
-  if (typeof input !== 'object' || input === null) {
-    throw new Error('OkResult: expected object');
-  }
-  const record = input as Record<string, unknown>;
-  if (record['ok'] !== true) {
+  if (record(input)['ok'] !== true) {
     throw new Error('OkResult.ok: expected true');
   }
   return { ok: true };

@@ -4,6 +4,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const load = require('./renderer-module');
+const { BOUNDARY_LIMITS } = require('../dist/shared/boundary.js');
 const { variableEdit, friendlyError } = load('panels/variableEdits.ts');
 const { createVariableHistory } = load('panels/variableHistory.ts');
 const { createVariableRefresh } = load('panels/variableRefresh.ts');
@@ -92,7 +93,7 @@ test('edit payloads are parsed before IPC and bounded replies stay bounded', asy
     ok: false,
     error: 'stale range',
   });
-  window.avb.readStyleFile = async () => ({ css: 'x'.repeat(5 * 1024 * 1024 + 1) });
+  window.avb.readStyleFile = async () => ({ css: 'x'.repeat(BOUNDARY_LIMITS.textLengthMax + 1) });
   await assert.rejects(variableEdit('readStyleFile', calls.readStyleFile), /String exceeds limit/);
   assert.equal(
     friendlyError(new Error("Error invoking remote method 'css:edit': Error: disk full")),

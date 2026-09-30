@@ -7,6 +7,7 @@ const path = require('node:path');
 const fs = require('node:fs');
 const { buildSync } = require('esbuild');
 const { JSDOM } = require('jsdom');
+const { BOUNDARY_LIMITS } = require('../dist/shared/boundary.js');
 const output = path.join(__dirname, '../node_modules/.stacki-test/cms-field.cjs');
 fs.mkdirSync(path.dirname(output), { recursive: true });
 buildSync({
@@ -166,7 +167,7 @@ test('CMS editor bounds reject invalid depth, text, and list size', () => {
   assert.throws(() => render({ depth: 0.5 }), /CMS field: depth must be an integer/);
   assert.throws(() => render({ depth: 129 }), /CMS field: nesting limit exceeded/);
   assert.throws(
-    () => render({ value: 'a'.repeat(5 * 1024 * 1024 + 1) }),
+    () => render({ value: 'a'.repeat(BOUNDARY_LIMITS.textLengthMax + 1) }),
     /CMS field: text limit exceeded/,
   );
   assert.throws(

@@ -257,3 +257,12 @@ export function parseIpcPayload<K extends IpcChannel>(channel: K, input: unknown
   // validates its own fields; this assertion preserves that key correlation.
   return IPC_PAYLOADS[channel](input) as IpcPayloads[K];
 }
+
+// One-way `send` channels. They need no reply, so they stay out of the invoke
+// inventory above, but their payloads cross the same boundary: a keystroke is
+// bounded text, and an acknowledgement is a count — never NaN or negative,
+// which would switch the terminal's backpressure off for good.
+export const parseTerminalInput = object({ id: text, data: text });
+export const parseTerminalAck = object({ id: text, count });
+export type TerminalInput = Parsed<typeof parseTerminalInput>;
+export type TerminalAck = Parsed<typeof parseTerminalAck>;

@@ -3,6 +3,7 @@
 // wrapper keys and expression metadata while editing nested item collections.
 const assert = require('node:assert/strict');
 const loadRenderer = require('./renderer-module.js');
+const { BOUNDARY_LIMITS } = require('../dist/shared/boundary.js');
 const schema = loadRenderer('contentSchema.ts');
 const cms = loadRenderer('cmsSchema.ts');
 const { parseContentSchema } = loadRenderer('contentSchemaBoundary.ts');
@@ -48,7 +49,8 @@ for (const value of [
 ]) {
   assert.throws(() => parseContentSchema(value));
 }
-assert.throws(() => parseContentSchema({ type: 'x'.repeat(5 * 1024 * 1024 + 1) }), /limit/);
+const typeOverLimit = 'x'.repeat(BOUNDARY_LIMITS.textLengthMax + 1);
+assert.throws(() => parseContentSchema({ type: typeOverLimit }), /limit/);
 assert.throws(() => parseContentSchema({ required: Array(100001).fill('a') }), /limit/);
 let deep = { type: 'string' };
 for (let index = 0; index < 130; index++) { deep = { items: deep }; }

@@ -20,6 +20,7 @@ import {
 } from './structureModel';
 import CodeEditor from '../ui/CodeEditor.jsx';
 import { ContextMenu, NodeList } from './StructureTree';
+import { parseNavigatorDrop } from './navigatorDrop';
 
 interface StructurePanelProps {
   readonly pageState: StructurePageState | null;
@@ -417,12 +418,21 @@ function performDrop(
   event.preventDefault();
   event.stopPropagation();
   state.setDropTarget(null);
-  const componentName = event.dataTransfer.getData('avb/component');
-  const nodeId = event.dataTransfer.getData('avb/node');
-  if (componentName) {
-    props.onDropComponent(componentName, target);
-  } else if (nodeId) {
-    props.onMoveNode(nodeId, target);
+  const drop = parseNavigatorDrop((type) => event.dataTransfer.getData(type));
+  if (drop === undefined) {
+    return;
+  }
+  switch (drop.kind) {
+    case 'component':
+      props.onDropComponent(drop.name, target);
+      return;
+    case 'node':
+      props.onMoveNode(drop.id, target);
+      return;
+    default: {
+      const exhaustive: never = drop;
+      return exhaustive;
+    }
   }
 }
 

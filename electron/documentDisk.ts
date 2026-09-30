@@ -311,7 +311,7 @@ export const NODE_PROJECTOR: Projector = {
 
 // --- Helpers -----------------------------------------------------------------------
 
-interface LockOwner {
+export interface LockOwner {
   readonly pid: number;
   readonly host: string;
   readonly token: string;
@@ -326,10 +326,15 @@ function lockFileOf(target: string): string {
   return path.join(path.dirname(target), `${LOCK_PREFIX}${name}${LOCK_SUFFIX}`);
 }
 
-// A lock file is written by another process: parse it, never trust it.
-function readLockOwner(lockFile: string): LockOwner | undefined {
+// A lock file is written by another process: parse it, never trust it. Its
+// size is checked before the read, so a huge foreign file is never loaded, and
+// its text after, since the file can grow in between.
+export function readLockOwner(lockFile: string): LockOwner | undefined {
   let raw: string;
   try {
+    if (fs.statSync(lockFile).size > LOCK_OWNER_CHARS_MAX) {
+      return undefined;
+    }
     raw = fs.readFileSync(lockFile, 'utf8');
   } catch {
     return undefined;
@@ -359,7 +364,7 @@ function readLockOwner(lockFile: string): LockOwner | undefined {
   return undefined;
 }
 
-const LOCK_OWNER_CHARS_MAX = 1_024;
+export const LOCK_OWNER_CHARS_MAX = 1_024;
 
 function processAlive(pid: number): boolean {
   try {

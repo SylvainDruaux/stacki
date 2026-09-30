@@ -8,6 +8,7 @@ const path = require('node:path');
 const { buildSync } = require('esbuild');
 const { JSDOM } = require('jsdom');
 const load = require('./renderer-module');
+const { BOUNDARY_LIMITS } = require('../dist/shared/boundary.js');
 const { parseMergeResult, parseConflictPart } = load('gitBridge.ts');
 const { initialConflictPicks, choicesForSend, conflictHunks } = load('panels/gitConflictModel.ts');
 const { parseConflict } = require('../dist/electron/conflicts.js');
@@ -63,7 +64,7 @@ test('merge contracts reject unknown parts and bound total files plus parts', ()
     /item limit exceeded/,
   );
   assert.throws(
-    () => parseConflictPart({ kind: 'same', text: 'x'.repeat(5 * 1024 * 1024 + 1) }),
+    () => parseConflictPart({ kind: 'same', text: 'x'.repeat(BOUNDARY_LIMITS.textLengthMax + 1) }),
     /String exceeds limit/,
   );
   assert.throws(() => initialConflictPicks(conflict([])), /at least one file/);

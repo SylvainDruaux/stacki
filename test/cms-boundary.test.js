@@ -4,6 +4,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const load = require('./renderer-module');
+const { BOUNDARY_LIMITS } = require('../dist/shared/boundary.js');
 const bridge = load('cmsBridge.ts');
 const types = load('panels/cmsTypes.ts');
 const entries = [
@@ -51,7 +52,8 @@ test('CMS parsers reject malformed shapes, field types, and boundary overflow', 
   for (const value of [null, {}, { ok: 1 }, { ok: false }]) {
     assert.throws(() => bridge.parseCmsSuccess(value));
   }
-  assert.throws(() => bridge.parseCmsRead({ data: 'x'.repeat(5 * 1024 * 1024 + 1) }), /limit/);
+  const data = 'x'.repeat(BOUNDARY_LIMITS.textLengthMax + 1);
+  assert.throws(() => bridge.parseCmsRead({ data }), /limit/);
   assert.throws(() => bridge.parseCmsRead({ data: Array(100001).fill(0) }), /limit/);
   assert.throws(() => types.parseDeclaredTypes({ ['x'.repeat(32769)]: 'text' }), /limit/);
   assert.throws(() => types.withDeclaredTypes([], {}, Array(129).fill('x')), /path limit/);

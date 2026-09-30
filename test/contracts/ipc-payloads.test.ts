@@ -7,6 +7,8 @@ import {
   IPC_PAYLOADS,
   parseIpcPayload,
   CLIPBOARD_BYTES_MAX,
+  parseTerminalAck,
+  parseTerminalInput,
 } from '../../dist/shared/ipc-payloads.js';
 import { BOUNDARY_LIMITS, data, object, text, optional } from '../../dist/shared/boundary.js';
 import type { IpcContract } from '../../dist/shared/ipc.js';
@@ -257,6 +259,25 @@ test('clipboard payloads accept bytes without truncation and reject invalid byte
       }),
     /byte limit/,
   );
+});
+
+test('terminal send channels accept keystrokes and acks and refuse every malformed shape', () => {
+  assert.deepEqual(parseTerminalInput({ id: 't1', data: 'ls\r' }), { id: 't1', data: 'ls\r' });
+  assert.deepEqual(parseTerminalAck({ id: 't1', count: 0 }), { id: 't1', count: 0 });
+  assert.deepEqual(parseTerminalAck({ id: 't1', count: 4096 }), { id: 't1', count: 4096 });
+  const malformedInputs = [undefined, null, 'ls', { id: 't' }, { data: 'x' }, { id: 1, data: 'x' }];
+  for (const input of malformedInputs) {
+    assert.throws(() => parseTerminalInput(input));
+  }
+  assert.throws(
+    () => parseTerminalInput({ id: 't1', data: 'x'.repeat(BOUNDARY_LIMITS.textLengthMax + 1) }),
+    /String exceeds limit/,
+  );
+  // A NaN, negative, fractional or unsafe count would poison the flow-control
+  // total and leave a paused pty paused (or never pause it again).
+  for (const count of [Number.NaN, -1, 1.5, Number.POSITIVE_INFINITY, 2 ** 53, '10', undefined]) {
+    assert.throws(() => parseTerminalAck({ id: 't1', count }));
+  }
 });
 
 type Assignable<Source, Target> = [Source] extends [Target] ? true : false;

@@ -2,6 +2,7 @@
 // Fake postMessage avoids a browser; real promises expose cancellation and limits.
 const assert = require('node:assert/strict');
 const loadRenderer = require('./renderer-module.js');
+const { BOUNDARY_LIMITS } = require('../dist/shared/boundary.js');
 const { parseCanvasReply } = loadRenderer('canvasReply.ts');
 const canvas = loadRenderer('canvasQuery.ts');
 
@@ -21,7 +22,7 @@ for (const input of [
   { ...valid, matched: { '.card': 'yes' } }, { ...valid, computed: { color: 123 } },
   { ...valid, computedProps: { color: false } },
   { ...valid, identity: { ...valid.identity, classes: Array(100001).fill('a') } },
-  { ...valid, identity: { ...valid.identity, tag: 'a'.repeat(5 * 1024 * 1024 + 1) } },
+  { ...valid, identity: { ...valid.identity, tag: 'a'.repeat(BOUNDARY_LIMITS.textLengthMax + 1) } },
 ]) {
   assert.equal(parseCanvasReply(input).ok, false);
 }

@@ -70,6 +70,49 @@ export function describePreviewReload(reason: PreviewReloadReason): string | und
   }
 }
 
+/** A shortcut the canvas frame forwards while it holds keyboard focus
+ * (electron/preload.ts): the app replays it as its own key event. */
+export type ShortcutMessage =
+  | { readonly name: 'insert' }
+  | { readonly name: 'arrow'; readonly key: string }
+  | { readonly name: 'key'; readonly key: string; readonly meta: boolean };
+
+// A KeyboardEvent key is one character or a short name ("ArrowDown").
+const SHORTCUT_KEY_CHARS_MAX = 32;
+
+function shortcutKey(input: unknown): string {
+  if (typeof input === 'string') {
+    if (input.length <= SHORTCUT_KEY_CHARS_MAX) {
+      return input;
+    }
+    throw new Error('Shortcut key exceeds limit');
+  }
+  throw new Error('Expected shortcut key');
+}
+
+/** A forwarded shortcut, or undefined for any other message — project code
+ * posts to the same window, so a message that is not one is ignored. */
+export function parseShortcutMessage(input: unknown): ShortcutMessage | undefined {
+  try {
+    const value = record(input);
+    if (value['type'] !== 'avb:shortcut') {
+      return undefined;
+    }
+    switch (value['name']) {
+      case 'insert':
+        return { name: 'insert' };
+      case 'arrow':
+        return { name: 'arrow', key: shortcutKey(value['key']) };
+      case 'key':
+        return { name: 'key', key: shortcutKey(value['key']), meta: value['meta'] === true };
+      default:
+        return undefined;
+    }
+  } catch {
+    return undefined;
+  }
+}
+
 /** Where on the canvas an event landed, and which rendering it landed on: the
  * token is absent until the frame has digested its rendering's manifest. */
 export interface LocatedEvent {

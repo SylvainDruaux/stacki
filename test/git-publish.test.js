@@ -7,6 +7,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { buildSync } = require('esbuild');
 const { JSDOM } = require('jsdom');
+const { BOUNDARY_LIMITS } = require('../dist/shared/boundary.js');
 const { parseGitHubStatus, readGitHubStatus, repoSlug, webUrl } =
   require('./renderer-module')('panels/gitPublish.ts');
 
@@ -25,7 +26,7 @@ test('GitHub preflight parses each state and rejects impossible or oversized dat
     { installed: false, authed: true },
     { installed: true, authed: true },
     { installed: 1, authed: false },
-    { installed: true, authed: true, user: 'x'.repeat(5 * 1024 * 1024 + 1) },
+    { installed: true, authed: true, user: 'x'.repeat(BOUNDARY_LIMITS.textLengthMax + 1) },
   ]) {
     assert.throws(() => parseGitHubStatus(status));
   }

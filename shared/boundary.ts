@@ -1,13 +1,17 @@
 // Small bounded parsers shared by IPC and disk readers. Parsers construct typed
 // values; no library or assertion is needed to trust a field after this boundary.
 import { toDigest, type Digest } from './brand';
+import { LIMITS } from './limits';
 import { toArray, toRecord } from './record';
 
+// The wire bounds, named for these parsers. The numbers live in limits.ts so a
+// disk reader and the IPC field that carries what it read answer to one bound
+// (a 5 MiB copy here once refused files the 10 MB readers accepted).
 export const BOUNDARY_LIMITS = {
-  textLengthMax: 5 * 1024 * 1024,
-  pathLengthMax: 32768,
-  itemsMax: 100000,
-  depthMax: 128,
+  textLengthMax: LIMITS.ipcFieldCharsMax,
+  pathLengthMax: LIMITS.ipcPathCharsMax,
+  itemsMax: LIMITS.ipcItemsMax,
+  depthMax: LIMITS.ipcDepthMax,
 } as const;
 
 export type Parser<T> = (input: unknown) => T;

@@ -28,6 +28,12 @@ export const LIMITS = {
   importsMax: 256,
   /** Length of one IPC payload string field. */
   ipcFieldCharsMax: 10_000_000,
+  /** Length of one path crossing a boundary: Windows' extended-length limit. */
+  ipcPathCharsMax: 32_768,
+  /** Items in one array or keys in one object crossing a boundary. */
+  ipcItemsMax: 100_000,
+  /** Nesting depth of one structured value crossing a boundary. */
+  ipcDepthMax: 128,
   /** TextMate highlighting is synchronous CPU work after grammar startup. */
   syntaxHighlightCharsMax: 1_000_000,
 
