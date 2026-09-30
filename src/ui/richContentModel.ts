@@ -3,6 +3,7 @@
 import { BIND_PATH_RE } from '../bindings';
 import type { Attr } from '../../shared/page-node';
 import { assert } from '../../shared/assert';
+import { textValueCanonical } from '../../shared/htmlText';
 import { LIMITS } from '../../shared/limits';
 
 export interface InlineCandidate {
@@ -206,6 +207,12 @@ function richReadDOM(element: Element, budget: Budget, depth: number): InlineNod
   }
   return out;
 }
+// The text the field emits is the value the parser will hold once the save
+// is written and read back (textValueCanonical): runs of whitespace squeeze
+// to one space, one kept at either boundary, and a U+00A0 stays itself. The
+// browser renders the same thing either way, but every save echoes back
+// through the parser, and a value that comes back different from the last
+// emission makes the field's sync rewrite the DOM and reset the caret.
 function richReadText(raw: string): InlineNode[] {
   assert(raw.length <= LIMITS.nodeValueCharsMax, 'RichContent: text limit exceeded');
   const out: InlineNode[] = [];
@@ -213,14 +220,14 @@ function richReadText(raw: string): InlineNode[] {
   let last = 0;
   for (const match of raw.matchAll(expression)) {
     if (match.index > last) {
-      out.push({ kind: 'text', value: raw.slice(last, match.index) });
+      out.push({ kind: 'text', value: textValueCanonical(raw.slice(last, match.index)) });
     }
     out.push({ kind: 'expr', value: match[0] });
     last = match.index + match[0].length;
     assert(out.length <= LIMITS.treeNodesMax, 'RichContent: text expression limit exceeded');
   }
   if (last < raw.length) {
-    out.push({ kind: 'text', value: raw.slice(last) });
+    out.push({ kind: 'text', value: textValueCanonical(raw.slice(last)) });
   }
   return out;
 }

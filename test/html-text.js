@@ -26,7 +26,7 @@ const check = (what, condition, detail) => {
   if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
 };
 
-const { decodeEntities, encodeText } = require('../dist/electron/htmlText.js');
+const { decodeEntities, encodeText } = require('../dist/shared/htmlText.js');
 const { parsePage, serializePage } = require('../dist/electron/astroParser.js');
 
 // ── Reading ─────────────────────────────────────────────────────────────────

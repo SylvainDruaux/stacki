@@ -87,7 +87,7 @@ Four cooperating processes, each with one job:
 - **Main** (`electron/`, Node.js, CommonJS): owns everything that touches the
   OS. `main.ts` (emits `main.js`, 113 invoke channels) is a registry of
   capabilities; leaf modules do the work (`astroParser`, `frontmatter`,
-  `htmlText`, `assetRefs`, `cssVars`, `gitBranches`, `gitHistory`,
+  `assetRefs`, `cssVars`, `gitBranches`, `gitHistory`,
   `projectWatcher`, `terminal` via node-pty, `previewWorktree`,
   `serialQueue`, `windowBounds`, content-collection tooling in
   `electron/content/`, data-format parsers in `electron/formats/`).
@@ -190,6 +190,10 @@ now the authoritative description:
 - `shared/limits.ts` — every runtime bound (parser depth/size, component
   nesting, pending intents, retained snapshots) in one importable module,
   enforced at boundaries.
+- `shared/htmlText.ts` — a text node's value: entity decoding and encoding
+  and the whitespace rule (`textValue`). The parser reads text with it, and
+  the Content field emits `textValueCanonical` values so the save echo comes
+  back identical to what it emitted (a differing echo resets its caret).
 - `shared/assert.ts`, `shared/result.ts`, `shared/brand.ts`,
   `shared/record.ts` — the invariant/Result/branding/unknown-narrowing
   primitives.

@@ -48,5 +48,39 @@ for (let depth = 0; depth < 66; depth++) {
   parent = child;
 }
 assert.throws(() => domToNodes(host), /DOM depth limit exceeded/);
+
+// Text the field emits is the value the parser will hold once the save is
+// written and read back: whitespace runs squeeze to one space, with one space
+// kept at either boundary. The save echo comes back through the parser's own
+// rule (textValue in shared/htmlText.ts), so anything looser made the echoed
+// value differ from the last emission and the field's sync reset the caret
+// mid-word.
+host.textContent = 'hello  ';
+assert.deepEqual(domToNodes(host), [{ kind: 'text', value: 'hello ' }]);
+host.textContent = ' hello';
+assert.deepEqual(domToNodes(host), [{ kind: 'text', value: ' hello' }]);
+host.textContent = 'a\n b';
+assert.deepEqual(domToNodes(host), [{ kind: 'text', value: 'a b' }]);
+host.innerHTML = 'hi {x}  there';
+assert.deepEqual(domToNodes(host), [
+  { kind: 'text', value: 'hi ' },
+  { kind: 'expr', value: '{x}' },
+  { kind: 'text', value: ' there' },
+]);
+// The negative space: a U+00A0 read from `&nbsp;` is written back as `&#160;`
+// and the parser keeps it, so the field keeps it too. Squeezing it as
+// whitespace would rewrite the author's non-breaking space on any keystroke.
+host.textContent = 'a  b ';
+assert.deepEqual(domToNodes(host), [{ kind: 'text', value: 'a  b ' }]);
+host.textContent = ' ';
+assert.deepEqual(domToNodes(host), [{ kind: 'text', value: ' ' }]);
+// Whitespace alone is no text node to the parser; one space is what a browser
+// renders for it, never the two the boundary rule would give.
+host.innerHTML = '<b>a</b>   <i>b</i>';
+assert.deepEqual(domToNodes(host)[1], { kind: 'text', value: ' ' });
+// Markup typed as words stays words: `&amp;` typed is `&amp;amp;` in the file.
+host.textContent = 'a &amp; b';
+assert.deepEqual(domToNodes(host), [{ kind: 'text', value: 'a &amp; b' }]);
+
 dom.window.close();
 console.log('renderer-rich: inline round trips, invalid shapes, and traversal limits passed');

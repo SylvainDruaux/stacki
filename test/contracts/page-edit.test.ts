@@ -313,6 +313,45 @@ test('renames and node rewrites write only their bytes; inverses restore them', 
   assert.equal(fs.readFileSync(file, 'utf8'), '<img src="a" alt="b">\n');
 });
 
+// The Content field emits a node's inline children and remembers what it
+// emitted; the save's re-read must hand back the same value, or the field
+// rewrites its DOM mid-keystroke and the caret jumps to the start of the line.
+// The keystroke that ends a word is a space, so the edit is a run that gained
+// a boundary space — restated the way setNodeInline restates it: fresh ids,
+// no source. The serializer used to trim a one-line run, writing `hello` for
+// `hello `.
+test('a Content edit keeps its boundary spaces through the save echo', async (context) => {
+  const harness = fixture();
+  context.after(harness.dispose);
+  const file = path.join(harness.root, 'src/pages/index.astro');
+  const cases: readonly (readonly [string, string, string])[] = [
+    ['hello', 'hello ', '<h1>hello </h1>\n'],
+    ['hello', ' hello', '<h1> hello</h1>\n'],
+    ['hi', ' hello ', '<h1> hello </h1>\n'],
+    // A U+00A0 is written as an entity, so the parse keeps it: it is not
+    // whitespace the file collapses.
+    ['a&#160;b', 'a b ', '<h1>a&#160;b </h1>\n'],
+  ];
+  for (const [words, typed, expected] of cases) {
+    fs.writeFileSync(file, `<h1>${words}</h1>\n`);
+    const page = await read(harness, file);
+    const heading = nodeAt(page, [0]);
+    assert.ok(heading.kind === 'element', 'the heading is an element');
+    const children = [parsePageNode({ id: GESTURE_ID, kind: 'text', value: typed })];
+    const node = { ...heading, children };
+    const applied = await edit(harness, file, page.checksum, {
+      tag: 'replace-node',
+      target: refAt(page, [0]),
+      node,
+    });
+    assert.ok(applied.ok, `the edit to ${JSON.stringify(typed)} applies`);
+    assert.equal(fs.readFileSync(file, 'utf8'), expected);
+    const echo = nodeAt(await read(harness, file), [0, 0]);
+    assert.ok(echo.kind === 'text', 'the run still holds its text');
+    assert.equal(echo.value, typed, 'the save echo is the value the field emitted');
+  }
+});
+
 test('a layout picked wraps the page; removed, its tags go and the page stays', async (context) => {
   const harness = fixture();
   context.after(harness.dispose);

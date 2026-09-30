@@ -259,7 +259,6 @@
       "dist/electron/astroParser.validation.js",
       "dist/electron/componentPreview.js",
       "dist/electron/previewMarkers.js",
-      "dist/electron/htmlText.js",
       "dist/electron/frontmatter.js",
       "dist/shared/**",
       "**/node_modules/node-pty/**"

@@ -9,6 +9,13 @@
 // untouched node is written back exactly as it was found (the writer has the
 // original to hand), and one that has been edited is written as its characters,
 // with the three that would otherwise be markup put back into entities.
+//
+// It lives in shared/ because both processes need the same rule: the parser
+// reads a text node's value with it, and the Content field has to emit values
+// the parser will hand back unchanged. Every save echoes through the parser,
+// and an echo that differs from what the field emitted rewrites the field
+// mid-keystroke, sending the caret to the start of the line.
+import { assert } from './assert';
 
 // The named entities that turn up in hand-written markup. Not the full HTML
 // table — that is 2231 names, nearly all of them for characters nobody types —
@@ -92,4 +99,65 @@ function encodeText(text: unknown): string {
   });
 }
 
-export { decodeEntities, encodeText };
+// Same result as replacing every `\s+` run with one space, but a run that is
+// already one plain space is left unmatched: prose has one at every word gap,
+// and rewriting each of them rebuilt long paragraphs thousands of times over.
+function collapseWhitespace(text: string): string {
+  return text.replace(/\s{2,}|[^\S ]/g, ' ').trim();
+}
+
+// The words, with every run of whitespace inside them squeezed to one space,
+// and a single space kept at either end where the source had any — a
+// newline-and-indent boundary renders as one space, and "people
+// <strong>Acme</strong>" would otherwise lose the gap. The source's own
+// spelling is kept: entities are still entities here.
+function collapseText(raw: string): string {
+  return (/^\s/.test(raw) ? ' ' : '') + collapseWhitespace(raw) + (/\s$/.test(raw) ? ' ' : '');
+}
+
+// What a text node HOLDS: the characters, not the file's spelling of them.
+// `&copy;&#160;` is one character and a space, and a panel over a rendered page
+// has to say what the page says. Decoded after the whitespace above, not
+// before: `&#160;` is a space to `\s`, and collapsing it away would delete the
+// very character it was written to insist on.
+//
+// The parser reads every text node with it; the serializer recomputes it to
+// tell an edited node from an untouched one.
+function textValue(raw: string): string {
+  const collapsed = collapseText(raw);
+  // Every entity starts with `&`; without one there is nothing to decode, and
+  // the check is far cheaper than a regex pass over a long paragraph.
+  return collapsed.includes('&') ? decodeEntities(collapsed) : collapsed;
+}
+
+/**
+ * The value a text node holds once an edited value has been written to the
+ * file and read back: `encodeText` is how the serializer writes an edited
+ * node, `textValue` how the parser reads it. Emitting this instead of the raw
+ * characters makes the save echo identical to what was emitted, so a space
+ * typed after a word survives, and three typed spaces converge on one at once
+ * instead of mismatching once. The characters `encodeText` writes as entities
+ * (U+00A0 among them) are kept: the parser collapses before it decodes.
+ *
+ * A value that is only whitespace is not a text node to the parser at all —
+ * it drops the run between tags — so no value round-trips; one space is what
+ * a browser renders for it, and is kept rather than doubled by the boundary
+ * rule.
+ */
+function textValueCanonical(value: string): string {
+  // Blank as the file will hold it: a lone U+00A0 is written `&#160;`, which
+  // is words to the parser, not whitespace.
+  const written = encodeText(value);
+  if (written.trim().length === 0) {
+    return value.length === 0 ? '' : ' ';
+  }
+  const canonical = textValue(written);
+  assert(canonical.length <= value.length, 'Canonical text never grows');
+  assert(
+    textValue(encodeText(canonical)) === canonical,
+    'Canonical text is a fixed point of write-then-read',
+  );
+  return canonical;
+}
+
+export { collapseText, decodeEntities, encodeText, textValue, textValueCanonical };

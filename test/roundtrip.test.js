@@ -180,6 +180,58 @@ describe('serialization is idempotent', () => {
 });
 
 // ---------------------------------------------------------------------------
+// 4b. An edited inline run keeps its boundary spaces
+// ---------------------------------------------------------------------------
+//
+// The Content field is where words get typed, and the keystroke that ends a
+// word is a space: the field emits "hello ", the model serializes it, and the
+// parse must hand back the same value — parse∘serialize is the field's save
+// echo, and an echo that comes back different resets the caret mid-word. A
+// text node on a line of its own may trim its boundary spaces (the file's
+// indent carries them back in); a run on one line has nothing else to hold
+// them, so the serializer must not strip them.
+
+describe('an edited inline run keeps its boundary spaces', () => {
+  const cases = [
+    ['trailing', '<h1>hello </h1>', 'hello '],
+    ['leading', '<h1> hello</h1>', ' hello'],
+    ['both ends of a run after an edit', '<h1>hi</h1>', ' hello '],
+  ];
+
+  for (const [name, source, editedValue] of cases) {
+    test(name, () => {
+      const first = parsePage(source);
+      assert.ok(first.editable, 'fixture stopped parsing as editable');
+      const heading = first.model.nodes[0];
+      assert.ok(heading, 'fixture has a top-level node');
+      const text = heading.children?.[0];
+      assert.ok(text && text.kind === 'text', 'fixture starts with a text child');
+
+      // The edit the Content field makes: a new model whose heading holds the
+      // typed value and no source, the way setNodeInline's text child lands.
+      const { source: _written, ...unwritten } = text;
+      const edited = { ...heading, children: [{ ...unwritten, value: editedValue }] };
+      const nodes = [edited, ...first.model.nodes.slice(1)];
+      const once = serializePage({ ...first.model, nodes });
+
+      const second = parsePage(once);
+      assert.ok(second.editable, 'edited output no longer parses as editable');
+      const echoed = second.model.nodes[0]?.children?.[0];
+      assert.ok(echoed && echoed.kind === 'text', 'edited run lost its text child');
+      assert.equal(
+        echoed.value,
+        editedValue,
+        `the save echo lost the boundary space of ${JSON.stringify(editedValue)}`
+      );
+
+      // And the round trip is stable: the next save changes nothing.
+      const twice = serializePage(second.model);
+      assert.equal(twice, once, 'saving twice re-trimmed the boundary space');
+    });
+  }
+});
+
+// ---------------------------------------------------------------------------
 // 5. Locality — one edit, one line
 // ---------------------------------------------------------------------------
 //

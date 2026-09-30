@@ -16,7 +16,7 @@
 import fs from 'node:fs';
 import { parseSerializeNodes, parseSerializePage } from './astroParser.validation.js';
 import path from 'node:path';
-import { decodeEntities, encodeText } from './htmlText.js';
+import { collapseText, encodeText, textValue } from '../shared/htmlText.js';
 import { readFrontmatter, writeFrontmatter } from './frontmatter.js';
 import type { FrontmatterModel, ImportMember } from './frontmatter.js';
 import { assertTreeInvariants } from '../shared/page-node.js';
@@ -1316,37 +1316,6 @@ function findMatchingFragmentClose(str: string, from: number): number {
 
 function escapeRe(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
-// Same result as replacing every `\s+` run with one space, but a run that is
-// already one plain space is left unmatched: prose has one at every word gap,
-// and rewriting each of them rebuilt long paragraphs thousands of times over.
-function collapseWhitespace(text: string): string {
-  return text.replace(/\s{2,}|[^\S ]/g, ' ').trim();
-}
-
-// The words, with every run of whitespace inside them squeezed to one space,
-// and a single space kept at either end where the source had any — a
-// newline-and-indent boundary renders as one space, and "people
-// <strong>Acme</strong>" would otherwise lose the gap. The source's own
-// spelling is kept: entities are still entities here.
-function collapseText(raw: string): string {
-  return (/^\s/.test(raw) ? ' ' : '') + collapseWhitespace(raw) + (/\s$/.test(raw) ? ' ' : '');
-}
-
-// What a text node HOLDS: the characters, not the file's spelling of them.
-// `&copy;&#160;` is one character and a space, and a panel over a rendered page
-// has to say what the page says. Decoded after the whitespace above, not
-// before: `&#160;` is a space to `\s`, and collapsing it away would delete the
-// very character it was written to insist on.
-//
-// Shared with the serializer, which recomputes it to tell an edited node from
-// an untouched one.
-function textValue(raw: string): string {
-  const collapsed = collapseText(raw);
-  // Every entity starts with `&`; without one there is nothing to decode, and
-  // the check is far cheaper than a regex pass over a long paragraph.
-  return collapsed.includes('&') ? decodeEntities(collapsed) : collapsed;
 }
 
 // ---------------------------------------------------------------------------
@@ -3673,7 +3642,16 @@ function serializeNodeElement(
       );
       return;
     }
-    openTag(`>${inlineString(node.children).trim()}${closeTag}`);
+    // The run's boundary spaces are content, not layout. A text node on a
+    // line of its own can trim them — the file's indent hands the boundary
+    // whitespace back on reparse (see serializeNodeText) — but a run written
+    // on one line has nothing but the value itself to hold them, and the
+    // parse keeps exactly one space where the source had any (collapseText).
+    // Trimming here made parse∘serialize lossy: a word typed followed by a
+    // space came back from the save without it, and the Content field, seeing
+    // its own edit echo back different, reset the caret to the start of the
+    // line.
+    openTag(`>${inlineString(node.children)}${closeTag}`);
     return;
   }
   // No children: the stored inner keeps `<div>\n</div>` as written — but only

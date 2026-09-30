@@ -23,7 +23,6 @@
     "forceConsistentCasingInFileNames": true
   },
   "files": [
-    "htmlText.ts",
     "serialQueue.ts",
     "windowBounds.ts",
     "platform.ts",
