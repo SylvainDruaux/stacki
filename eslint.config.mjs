@@ -1,9 +1,8 @@
 // ESLint flat config — AGENTS.md rule set.
 //
-// Hand-rolled rather than via the typescript-eslint meta-package because the
-// repo's pnpm tree carries @typescript-eslint/parser and eslint-plugin directly
-// and adding the meta package means a fresh full-graph resolution the tree
-// isn't ready for. Same rules, same shape.
+// Hand-rolled rather than via the typescript-eslint meta-package: the parser
+// and plugin are declared directly (docs/dependencies.md), and the meta package
+// would add a third name for the same code. Same rules, same shape.
 //
 // max-lines-per-function remains a warning until the oversized legacy
 // functions are split (docs/codebase.md, finding 4: the hotspots split as

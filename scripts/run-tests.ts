@@ -100,6 +100,13 @@ const staticGates: readonly GateCommand[] = [
 const staticChecks: readonly TestCommand[] = [
   { name: 'tsc --noEmit', command: node, argumentsList: [typeScript, '--noEmit'] },
   {
+    // The scripts emit CommonJS, so their build config cannot hold
+    // verbatimModuleSyntax; this check-only program holds the full flag set.
+    name: 'tsc scripts',
+    command: node,
+    argumentsList: [typeScript, '-p', path.join('scripts', 'tsconfig.check.json')],
+  },
+  {
     name: 'eslint',
     command: node,
     argumentsList: [path.join(root, 'node_modules', 'eslint', 'bin', 'eslint.js'), '.'],

@@ -6,7 +6,14 @@
   "main": "dist/electron/main.js",
   "author": "Timothy Ricks <hello@timothyricks.com>",
   "license": "MIT",
+  "engines": {
+    "node": ">=22.18"
+  },
   "scripts": {
+    "lint": "eslint --max-warnings 0 .",
+    "typecheck": "tsc --noEmit && tsc -p scripts/tsconfig.check.json",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "roundtrip:report": "npm run build:runtime && node dist/scripts/roundtrip-report.js",
     "fixtures:large": "npm run build:runtime && node dist/scripts/large-fixtures.js --write",
     "spike:editor-core": "npm run build:runtime && node test/simulator/spike.bench.ts",
@@ -220,7 +227,6 @@
     "node-pty": "^1.1.0",
     "postcss": "^8.5.25",
     "postcss-selector-parser": "^7.1.4",
-    "postcss-value-parser": "^4.2.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "smol-toml": "^1.8.0",
@@ -242,6 +248,7 @@
     "eslint": "^9.39.5",
     "eslint-plugin-react-hooks": "^7.1.1",
     "jsdom": "^29.1.1",
+    "prettier": "3.9.9",
     "vite": "^6.0.3",
     "wait-on": "^8.0.1"
   },

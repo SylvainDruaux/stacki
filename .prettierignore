@@ -1,0 +1,18 @@
+# Build output and installs: generated, never hand-edited.
+node_modules/
+dist/
+release/
+coverage/
+test/.stacki-test/
+**/generated/
+
+# Fixtures and corpora are byte-exact inputs to round-trip tests; formatting
+# them would change what the tests measure.
+test/fixtures/
+test/corpus/
+
+# Lockfiles are owned by npm.
+package-lock.json
+
+# Markdown is prose and tables; its line breaks are authored, not formatted.
+*.md
