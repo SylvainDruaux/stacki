@@ -25,12 +25,14 @@ const PARSE_OPTIONS = { keepSourceTokens: true };
 // what most files already look like.
 const STRINGIFY_OPTIONS = { lineWidth: 0, flowCollectionPadding: false };
 
-const parseData = (text: string): unknown => YAML.parse(text) ?? null;
+// An empty document parses to YAML's own `null`, a data value the file holds.
+const parseData = (text: string): unknown => YAML.parse(text);
 
 const parseDocument = (text: string): YAML.Document => YAML.parseDocument(text, PARSE_OPTIONS);
 
-const isPrimitive = (v: unknown): v is string | number | boolean | null =>
-  v === null || ['string', 'number', 'boolean'].includes(typeof v);
+// A YAML scalar: `null` here is the file's own null, not our absence.
+const isPrimitive = (value: unknown): boolean =>
+  value === null || ['string', 'number', 'boolean'].includes(typeof value);
 
 const DELETE = Symbol('delete');
 
@@ -47,17 +49,18 @@ function applyEdits(text: string, edits: readonly Edit[]): string {
   if (!edits.length) {
     return text;
   }
-  const doc = parseDocument(text);
+  const yamlDocument = parseDocument(text);
   // What the serializer makes of this file before anything is changed. When it
   // differs from the file on disk — a folded scalar it writes flat, a quote it
   // normalises — that difference is subtracted back out below rather than
   // landing in the user's diff.
-  const before = doc.toString(STRINGIFY_OPTIONS);
+  const before = yamlDocument.toString(STRINGIFY_OPTIONS);
   for (const { path, value, rename } of edits) {
     // A key renamed where it stands: the pair keeps its comments, its style and
     // its place among the others.
     if (rename !== undefined) {
-      const parent = path.length > 1 ? doc.getIn(path.slice(0, -1), true) : doc.contents;
+      const parent =
+        path.length > 1 ? yamlDocument.getIn(path.slice(0, -1), true) : yamlDocument.contents;
       const items = toArray(toRecord(parent)?.['items']);
       const pair = items
         ?.map((item) => toRecord(item))
@@ -73,14 +76,14 @@ function applyEdits(text: string, edits: readonly Edit[]): string {
         continue;
       }
       const next = parseDocument(YAML.stringify(value, STRINGIFY_OPTIONS));
-      doc.contents = next.contents;
+      yamlDocument.contents = next.contents;
       continue;
     }
     if (value === DELETE) {
-      doc.deleteIn(path);
+      yamlDocument.deleteIn(path);
       continue;
     }
-    const node = doc.getIn(path, true);
+    const node = yamlDocument.getIn(path, true);
     const nodeRecord = toRecord(node);
     const nodeValue = nodeRecord?.['value'];
     // Writing into the node that is already there keeps its style — the block
@@ -94,9 +97,9 @@ function applyEdits(text: string, edits: readonly Edit[]): string {
       nodeRecord['value'] = value;
       continue;
     }
-    doc.setIn(path, value);
+    yamlDocument.setIn(path, value);
   }
-  const after = doc.toString(STRINGIFY_OPTIONS);
+  const after = yamlDocument.toString(STRINGIFY_OPTIONS);
   return before === text ? after : transplant(text, before, after);
 }
 

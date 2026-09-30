@@ -57,11 +57,14 @@ export function pathEnvironmentValue(
   return environment[pathEnvironmentKey(environment, platform)] ?? '';
 }
 
+// Writes in place: `process.env` is the record child processes inherit, so a
+// copy would change nothing they see.
 export function setPathEnvironment(
   environment: Record<string, string | undefined>,
   value: string,
   platform: Platform = process.platform,
 ): void {
+  // eslint-disable-next-line no-param-reassign -- process.env is written in place, by design.
   environment[pathEnvironmentKey(environment, platform)] = value;
 }
 

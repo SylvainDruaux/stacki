@@ -55,10 +55,10 @@ function skipCodeToken(text: string, i: number): number {
       before--;
     }
   }
-  const prev = before >= 0 ? text.charAt(before) : undefined;
+  const previous = before >= 0 ? text.charAt(before) : undefined;
   if (
     text.charAt(i) === '/' &&
-    (before < 0 || (prev !== undefined && '=(:,[!&|?{};'.includes(prev)))
+    (before < 0 || (previous !== undefined && '=(:,[!&|?{};'.includes(previous)))
   ) {
     let inClass = false;
     for (let j = i + 1; j < text.length && text.charAt(j) !== '\n'; j++) {
@@ -93,6 +93,15 @@ function skipBraced(text: string, start: number): number {
   return text.length;
 }
 
+// One import statement the editor models as records, parsed at `at`.
+interface ParsedImport {
+  readonly members: readonly ImportMember[];
+  // Offset just past the statement, its import attributes and its semicolon.
+  readonly end: number;
+  // Offset just past the quoted specifier, inside the statement's own text.
+  readonly pathEnd: number;
+}
+
 function readFrontmatter(source = ''): FrontmatterModel {
   const imports: ImportMember[] = [];
   const slots: ImportSlot[] = [];
@@ -107,68 +116,24 @@ function readFrontmatter(source = ''): FrontmatterModel {
     if (!source.startsWith('import', i) || /[\w$.]/.test(source.charAt(i - 1))) {
       continue;
     }
-    DEFAULT_IMPORT.lastIndex = NAMED_IMPORT.lastIndex = i;
-    const plain = DEFAULT_IMPORT.exec(source);
-    const named = plain ? null : NAMED_IMPORT.exec(source);
-    const match = plain || named;
-    if (!match) {
-      continue; // namespace, side-effect and type-only imports stay code
-    }
-    const quote = match[2];
-    const specifier = match[3];
-    const body = match[1];
-    if (quote === undefined || specifier === undefined || body === undefined) {
+    const parsed = parseImportAt(source, i);
+    if (parsed === undefined) {
       continue;
-    }
-    const members: (ImportMember | null)[] = plain
-      ? [{ name: body, path: specifier, quote, at: i }]
-      : body
-          .split(',')
-          .map((text) => text.trim())
-          .filter(Boolean)
-          .map((text): ImportMember | null => {
-            const member = MEMBER.exec(text);
-            if (!member || member[2] === undefined) {
-              return null;
-            }
-            const [typePrefix, imported, alias] = [member[1], member[2], member[3]];
-            return {
-              name: alias || imported,
-              imported,
-              named: true,
-              path: specifier,
-              quote,
-              at: i,
-              ...(typePrefix ? { typeOnly: true } : {}),
-            };
-          });
-    // Keep an unfamiliar specifier verbatim, instead of extracting half of it.
-    if (!members.length || members.some((member) => !member)) {
-      continue;
-    }
-    let end = i + match[0].length;
-    const attribute = /^[ \t]*(?:with|assert)\s*\{/.exec(source.slice(end));
-    if (attribute) {
-      end = skipBraced(source, end + attribute[0].length - 1);
-      if (source.charAt(end) === ';') {
-        end++;
-      }
     }
     extra += source.slice(cursor, i);
-    const suffix = /^[ \t]*\r?\n/.exec(source.slice(end))?.[0] || '';
-    const raw = source.slice(i, end);
-    const pathEnd = match[0].lastIndexOf(quote + specifier + quote) + specifier.length + 2;
-    const settled = members.filter((member): member is ImportMember => member !== null);
+    const suffix = /^[ \t]*\r?\n/.exec(source.slice(parsed.end))?.[0] || '';
+    const raw = source.slice(i, parsed.end);
     slots.push({
       at: i,
       offset: extra.length,
       source: raw,
       suffix,
-      tail: raw.slice(pathEnd),
-      members: settled.map((member) => ({ ...member })),
+      tail: raw.slice(parsed.pathEnd),
+      members: parsed.members.map((member) => ({ ...member })),
     });
-    imports.push(...settled);
-    cursor = end + suffix.length;
+    imports.push(...parsed.members);
+    cursor = parsed.end + suffix.length;
+    assert(cursor > i, 'readFrontmatter: every modelled import consumes source');
     i = cursor - 1;
   }
   extra += source.slice(cursor);
@@ -183,17 +148,84 @@ function readFrontmatter(source = ''): FrontmatterModel {
   };
 }
 
+// Namespace, side-effect and type-only imports stay code, and so does an
+// unfamiliar specifier: it is kept verbatim instead of extracting half of it.
+function parseImportAt(source: string, at: number): ParsedImport | undefined {
+  DEFAULT_IMPORT.lastIndex = NAMED_IMPORT.lastIndex = at;
+  const plain = DEFAULT_IMPORT.exec(source);
+  const match = plain ?? NAMED_IMPORT.exec(source);
+  if (match === null) {
+    return undefined;
+  }
+  const quote = match[2];
+  const specifier = match[3];
+  const body = match[1];
+  if (quote === undefined || specifier === undefined || body === undefined) {
+    return undefined;
+  }
+  const members =
+    plain === null
+      ? namedMembers(body, specifier, quote, at)
+      : [{ name: body, path: specifier, quote, at }];
+  if (members === undefined) {
+    return undefined;
+  }
+  let end = at + match[0].length;
+  const attribute = /^[ \t]*(?:with|assert)\s*\{/.exec(source.slice(end));
+  if (attribute) {
+    end = skipBraced(source, end + attribute[0].length - 1);
+    if (source.charAt(end) === ';') {
+      end++;
+    }
+  }
+  const pathEnd = match[0].lastIndexOf(quote + specifier + quote) + specifier.length + 2;
+  assert(end > at, 'parseImportAt: an import statement is not empty');
+  return { members, end, pathEnd };
+}
+
+// The members of `import { … }`, or undefined when there are none or one of
+// them is not a plain `[type] name [as alias]`.
+function namedMembers(
+  body: string,
+  specifier: string,
+  quote: string,
+  at: number,
+): ImportMember[] | undefined {
+  const members: ImportMember[] = [];
+  const texts = body
+    .split(',')
+    .map((text) => text.trim())
+    .filter(Boolean);
+  for (const text of texts) {
+    const member = MEMBER.exec(text);
+    if (member === null || member[2] === undefined) {
+      return undefined;
+    }
+    const [typePrefix, imported, alias] = [member[1], member[2], member[3]];
+    members.push({
+      name: alias || imported,
+      imported,
+      named: true,
+      path: specifier,
+      quote,
+      at,
+      ...(typePrefix ? { typeOnly: true } : {}),
+    });
+  }
+  return members.length > 0 ? members : undefined;
+}
+
 const sameImport = <Import extends SerializableImport>(
-  a: Import,
-  b: SerializableImport,
+  candidate: Import,
+  existing: SerializableImport,
   specFor?: (imp: Import) => string,
 ): boolean =>
-  a.name === b.name &&
-  (specFor ? specFor(a) : a.path) === b.path &&
-  a.quote === b.quote &&
-  !!a.named === !!b.named &&
-  a.imported === b.imported &&
-  !!a.typeOnly === !!b.typeOnly;
+  candidate.name === existing.name &&
+  (specFor ? specFor(candidate) : candidate.path) === existing.path &&
+  candidate.quote === existing.quote &&
+  !!candidate.named === !!existing.named &&
+  candidate.imported === existing.imported &&
+  !!candidate.typeOnly === !!existing.typeOnly;
 
 interface ImportGroup<Import extends SerializableImport> {
   members: Import[];
@@ -202,8 +234,8 @@ interface ImportGroup<Import extends SerializableImport> {
 
 function importLines<Import extends SerializableImport>(
   imports: readonly Import[],
+  tail: string,
   specFor?: (imp: Import) => string,
-  tail = ';',
 ): string[] {
   const groups: ImportGroup<Import>[] = [];
   const named = new Map<string, ImportGroup<Import>>();
@@ -264,78 +296,95 @@ function moveOffsets(before: string, after: string, offsets: readonly number[]):
     return [...offsets];
   }
   const split = (text: string): string[] => text.match(/[^\n]*\n|[^\n]+$/g) || [];
-  const a = split(before);
-  const b = split(after);
+  const beforeLines = split(before);
+  const afterLines = split(after);
   let first = 0;
-  while (first < a.length && first < b.length && a[first] === b[first]) {
+  while (
+    first < beforeLines.length &&
+    first < afterLines.length &&
+    beforeLines[first] === afterLines[first]
+  ) {
     first++;
   }
-  let aEnd = a.length;
-  let bEnd = b.length;
-  while (aEnd > first && bEnd > first && a[aEnd - 1] === b[bEnd - 1]) {
-    aEnd--;
-    bEnd--;
+  let beforeEnd = beforeLines.length;
+  let afterEnd = afterLines.length;
+  while (
+    beforeEnd > first &&
+    afterEnd > first &&
+    beforeLines[beforeEnd - 1] === afterLines[afterEnd - 1]
+  ) {
+    beforeEnd--;
+    afterEnd--;
   }
-  const n = aEnd - first;
-  const m = bEnd - first;
-  const dp: Uint32Array[] = [];
-  // A wholesale replacement has no useful interior anchors. Bound the table
-  // and keep its imports in order at the replacement's start in that case.
-  if (n * m <= 262144) {
-    for (let i = 0; i <= n; i++) {
-      dp.push(new Uint32Array(m + 1));
-    }
-    for (let i = n - 1; i >= 0; i--) {
-      for (let j = m - 1; j >= 0; j--) {
-        const row = dp[i];
-        if (row) {
-          row[j] =
-            a[first + i] === b[first + j]
-              ? (dp[i + 1]?.[j + 1] ?? 0) + 1
-              : Math.max(dp[i + 1]?.[j] ?? 0, dp[i]?.[j + 1] ?? 0);
-        }
-      }
-    }
-  }
+  const dp = commonLinesTable(
+    beforeLines.slice(first, beforeEnd),
+    afterLines.slice(first, afterEnd),
+  );
   const moved: number[] = [];
   let oldAt = 0;
   let newAt = 0;
   let slot = 0;
-  const take = (oldText: string, newText: string, same: boolean): void => {
+  // A kept line carries its slots along; a changed one moves them to its start.
+  const take = (oldText: string, newText: string, line: 'kept' | 'changed'): void => {
     const end = oldAt + oldText.length;
     while (slot < offsets.length && (offsets[slot] ?? 0) < end) {
-      moved.push(newAt + (same ? (offsets[slot] ?? 0) - oldAt : 0));
+      moved.push(newAt + (line === 'kept' ? (offsets[slot] ?? 0) - oldAt : 0));
       slot++;
     }
     oldAt = end;
     newAt += newText.length;
   };
   for (let i = 0; i < first; i++) {
-    take(a[i] ?? '', b[i] ?? '', true);
+    take(beforeLines[i] ?? '', afterLines[i] ?? '', 'kept');
   }
   let i = first;
   let j = first;
-  while (i < aEnd || j < bEnd) {
-    if (i < aEnd && j < bEnd && a[i] === b[j]) {
-      take(a[i++] ?? '', b[j++] ?? '', true);
+  while (i < beforeEnd || j < afterEnd) {
+    if (i < beforeEnd && j < afterEnd && beforeLines[i] === afterLines[j]) {
+      take(beforeLines[i++] ?? '', afterLines[j++] ?? '', 'kept');
     } else if (
-      i < aEnd &&
-      (j === bEnd ||
+      i < beforeEnd &&
+      (j === afterEnd ||
         !dp.length ||
         (dp[i - first + 1]?.[j - first] ?? 0) >= (dp[i - first]?.[j - first + 1] ?? 0))
     ) {
-      take(a[i++] ?? '', '', false);
+      take(beforeLines[i++] ?? '', '', 'changed');
     } else {
-      take('', b[j++] ?? '', false);
+      take('', afterLines[j++] ?? '', 'changed');
     }
   }
-  while (i < a.length) {
-    take(a[i++] ?? '', b[j++] ?? '', true);
+  while (i < beforeLines.length) {
+    take(beforeLines[i++] ?? '', afterLines[j++] ?? '', 'kept');
   }
   while (slot++ < offsets.length) {
     moved.push(newAt);
   }
   return safeImportOffsets(after, moved);
+}
+
+// Longest-common-subsequence lengths of two line runs: cell [i][j] counts the
+// lines the runs share from `before[i]` and `after[j]` on. A wholesale
+// replacement has no useful interior anchors, so past the bound the table is
+// empty and the caller keeps its imports in order at the replacement's start.
+function commonLinesTable(before: readonly string[], after: readonly string[]): Uint32Array[] {
+  const table: Uint32Array[] = [];
+  if (before.length * after.length > 262144) {
+    return table;
+  }
+  for (let i = 0; i <= before.length; i++) {
+    table.push(new Uint32Array(after.length + 1));
+  }
+  for (let i = before.length - 1; i >= 0; i--) {
+    for (let j = after.length - 1; j >= 0; j--) {
+      const row = table[i];
+      assert(row !== undefined, 'commonLinesTable: every row was allocated');
+      row[j] =
+        before[i] === after[j]
+          ? (table[i + 1]?.[j + 1] ?? 0) + 1
+          : Math.max(table[i + 1]?.[j] ?? 0, table[i]?.[j + 1] ?? 0);
+    }
+  }
+  return table;
 }
 
 // Matching a line inside a newly added template or function does not make it
@@ -393,49 +442,9 @@ function writeFrontmatter<Import extends SerializableImport>(
 ): string {
   const layout = model.frontmatterLayout;
   if (!layout) {
-    const lines: string[] = [];
-    if (model.frontmatterLead) {
-      lines.push(model.frontmatterLead);
-    }
-    lines.push(...importLines(model.imports || [], specFor));
-    if (model.extraFrontmatter) {
-      if (lines.length && model.extraFrontmatterSpaced !== false) {
-        lines.push('');
-      }
-      lines.push(model.extraFrontmatter);
-    }
-    return lines.join('\n');
+    return writeFrontmatterFresh(model, specFor);
   }
-  const groups = new Map<number, Import[]>(layout.slots.map((slot) => [slot.at, []]));
-  const added: Import[] = [];
-  for (const imp of model.imports || []) {
-    const group = imp.at === undefined ? undefined : groups.get(imp.at);
-    if (group) {
-      group.push(imp);
-    } else {
-      added.push(imp);
-    }
-  }
-  // A newly used named export can join its existing declaration. Separate
-  // declarations already in the source keep their individual positions.
-  const additions: Import[] = [];
-  for (const imp of added) {
-    const slot =
-      imp.named &&
-      layout.slots.find((s) =>
-        (groups.get(s.at) ?? []).some((g) => g.named && g.path === imp.path),
-      );
-    if (slot) {
-      const target = groups.get(slot.at);
-      assert(
-        target !== undefined,
-        'writeFrontmatter: slot group exists — groups were built from layout.slots',
-      );
-      target.push(imp);
-    } else {
-      additions.push(imp);
-    }
-  }
+  const { groups, additions } = groupImports(layout, model.imports || []);
   const extra = withWhitespace(layout.extra, model.extraFrontmatter);
   const offsets = moveOffsets(
     layout.extra,
@@ -461,14 +470,14 @@ function writeFrontmatter<Import extends SerializableImport>(
           return original !== undefined && sameImport(imp, original, specFor);
         });
       output +=
-        (untouched ? slot.source : importLines(members, specFor, slot.tail).join('\n')) +
+        (untouched ? slot.source : importLines(members, slot.tail, specFor).join('\n')) +
         slot.suffix;
     }
     if (i === layout.slots.length - 1 && additions.length) {
       if (output && !/\n$/.test(output)) {
         output += '\n';
       }
-      output += importLines(additions, specFor).join('\n');
+      output += importLines(additions, ';', specFor).join('\n');
       if (extra.slice(from)) {
         output += '\n';
       }
@@ -477,12 +486,72 @@ function writeFrontmatter<Import extends SerializableImport>(
   if (!layout.slots.length && additions.length) {
     from = extra.length - extra.trimStart().length;
     output += extra.slice(0, from);
-    output += importLines(additions, specFor).join('\n');
+    output += importLines(additions, ';', specFor).join('\n');
     if (extra.slice(from)) {
       output += '\n';
     }
   }
   return output + extra.slice(from);
+}
+
+// No layout to preserve: the imports, then the remaining code below a blank line.
+function writeFrontmatterFresh<Import extends SerializableImport>(
+  model: FrontmatterModel<Import>,
+  specFor?: (imp: Import) => string,
+): string {
+  const lines: string[] = [];
+  if (model.frontmatterLead) {
+    lines.push(model.frontmatterLead);
+  }
+  lines.push(...importLines(model.imports || [], ';', specFor));
+  if (model.extraFrontmatter) {
+    if (lines.length && model.extraFrontmatterSpaced !== false) {
+      lines.push('');
+    }
+    lines.push(model.extraFrontmatter);
+  }
+  return lines.join('\n');
+}
+
+// Sorts imports into the slots they were read from. A newly used named export
+// can join its existing declaration; any other new import is an addition.
+// Separate declarations already in the source keep their individual positions.
+function groupImports<Import extends SerializableImport>(
+  layout: FrontmatterLayout,
+  imports: readonly Import[],
+): { readonly groups: ReadonlyMap<number, Import[]>; readonly additions: readonly Import[] } {
+  const groups = new Map<number, Import[]>(layout.slots.map((slot) => [slot.at, []]));
+  const added: Import[] = [];
+  for (const imp of imports) {
+    const group = imp.at === undefined ? undefined : groups.get(imp.at);
+    if (group) {
+      group.push(imp);
+    } else {
+      added.push(imp);
+    }
+  }
+  const additions: Import[] = [];
+  for (const imp of added) {
+    const slot =
+      imp.named &&
+      layout.slots.find((layoutSlot) =>
+        (groups.get(layoutSlot.at) ?? []).some(
+          (grouped) => grouped.named && grouped.path === imp.path,
+        ),
+      );
+    if (slot) {
+      const target = groups.get(slot.at);
+      assert(
+        target !== undefined,
+        'groupImports: slot group exists — groups were built from layout.slots',
+      );
+      target.push(imp);
+    } else {
+      additions.push(imp);
+    }
+  }
+  assert(additions.length <= imports.length, 'groupImports: additions come from the imports');
+  return { groups, additions };
 }
 
 export { readFrontmatter, writeFrontmatter };

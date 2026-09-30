@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 
+import { LIMITS } from '../shared/limits.js';
 import { toRecord, toArray } from '../shared/record.js';
 import { listEntries, writeEntry } from './contentEntries.js';
 import type { Entry as ListedEntry } from './contentEntries.js';
@@ -18,30 +19,41 @@ import type { Entry as ListedEntry } from './contentEntries.js';
 // that could point at this entry is found first, by walking the schema rather
 // than by searching for the string, and the plan says exactly what will change.
 
-const isPlainObject = (v: unknown): boolean => !!v && typeof v === 'object' && !Array.isArray(v);
+// The schemas come from the project's content config, so their nesting is not ours to trust.
+// A `$ref` chain longer than a few links, or a field nested past a dozen levels, is not a real
+// reference field; the walk stops there and finds nothing. `mentions` is only the cheap
+// pre-check for the walk, so it may look as deep as any value crossing a boundary can be.
+const REFERENCE_LIMITS = {
+  derefDepthMax: 8,
+  schemaDepthMax: 12,
+  mentionsDepthMax: LIMITS.ipcDepthMax,
+} as const;
 
-const defsOf = (root: unknown): Record<string, unknown> =>
+const isPlainObject = (value: unknown): boolean =>
+  !!value && typeof value === 'object' && !Array.isArray(value);
+
+const definitionsOf = (root: unknown): Record<string, unknown> =>
   toRecord(toRecord(root)?.['$defs']) ?? {};
 
-function deref(node: unknown, root: unknown, depth: number): Record<string, unknown> | null {
+function deref(node: unknown, root: unknown, depth: number): Record<string, unknown> | undefined {
   const ref = toRecord(node)?.['$ref'];
-  if (!ref || depth > 8) {
-    return ref ? null : (toRecord(node) ?? null);
+  if (!ref || depth > REFERENCE_LIMITS.derefDepthMax) {
+    return ref ? undefined : toRecord(node);
   }
   const name = String(ref).split('/').pop();
-  const target = name === undefined ? undefined : defsOf(root)[name];
-  // `|| null` in the untyped code: a falsy def is no def. A truthy non-object
-  // (a boolean JSON Schema) cannot be walked, so it reads as no def too.
+  const target = name === undefined ? undefined : definitionsOf(root)[name];
+  // A falsy definition is no definition. A truthy non-object (a boolean JSON
+  // Schema) cannot be walked, so it reads as no definition too.
   if (!target) {
-    return null;
+    return undefined;
   }
-  return toRecord(target) ?? null;
+  return toRecord(target);
 }
 
 export type SchemaPath = readonly (string | number)[];
 
 type SchemaNode = Record<string, unknown>;
-type MatchFn = (node: SchemaNode, value: unknown) => boolean;
+type MatchPredicate = (node: SchemaNode, value: unknown) => boolean;
 
 /**
  * Every place inside one entry's data where a reference to `target` sits, as a
@@ -76,7 +88,7 @@ function referencePaths(
 function matchingPaths(
   schema: unknown,
   data: unknown,
-  match: MatchFn,
+  match: MatchPredicate,
   {
     root = schema,
     depth = 0,
@@ -84,7 +96,7 @@ function matchingPaths(
   }: { readonly root?: unknown; readonly depth?: number; readonly path?: (string | number)[] } = {},
 ): SchemaPath[] {
   const node = deref(schema, root, depth);
-  if (!node || depth > 12) {
+  if (!node || depth > REFERENCE_LIMITS.schemaDepthMax) {
     return [];
   }
   const found: SchemaPath[] = [];
@@ -120,7 +132,7 @@ function matchingPaths(
     const properties = toRecord(node['properties']);
     const additional = toRecord(node['additionalProperties']);
     for (const [key, value] of Object.entries(record)) {
-      const child = properties?.[key] ?? additional ?? null;
+      const child = properties?.[key] ?? additional;
       if (!child) {
         continue;
       }
@@ -134,8 +146,8 @@ function matchingPaths(
 
 const dedupe = (paths: SchemaPath[]): SchemaPath[] => {
   const seen = new Set<string>();
-  return paths.filter((p) => {
-    const key = p.join(' ');
+  return paths.filter((schemaPath) => {
+    const key = schemaPath.join(' ');
     if (seen.has(key)) {
       return false;
     }
@@ -146,9 +158,13 @@ const dedupe = (paths: SchemaPath[]): SchemaPath[] => {
 
 // Does this schema mention the collection at all? Cheap enough to run over
 // every collection before doing the expensive per-entry walk.
-function mentions(schema: unknown, target: string, seen = new Set<unknown>()): boolean {
+function mentions(schema: unknown, target: string, seen = new Set<unknown>(), depth = 0): boolean {
   if (!schema || typeof schema !== 'object') {
     return false;
+  }
+  // Past the bound, say it might: the exact walk that follows is bounded on its own.
+  if (depth > REFERENCE_LIMITS.mentionsDepthMax) {
+    return true;
   }
   // oneOf/anyOf/tuple items arrive as arrays; the untyped walk visited them
   // through Object.entries, so they are walked here too.
@@ -159,7 +175,7 @@ function mentions(schema: unknown, target: string, seen = new Set<unknown>()): b
         continue;
       }
       seen.add(item);
-      if (mentions(item, target, seen)) {
+      if (mentions(item, target, seen, depth + 1)) {
         return true;
       }
     }
@@ -183,11 +199,13 @@ function mentions(schema: unknown, target: string, seen = new Set<unknown>()): b
       continue;
     }
     seen.add(value);
-    if (mentions(value, target, seen)) {
+    if (mentions(value, target, seen, depth + 1)) {
       return true;
     }
   }
-  return Object.values(defsOf(node)).some((d) => mentions(d, target, seen));
+  return Object.values(definitionsOf(node)).some((definition) =>
+    mentions(definition, target, seen, depth + 1),
+  );
 }
 
 const isRelativeAsset = (value: unknown): boolean =>
@@ -200,9 +218,9 @@ const posix = path.posix;
  * the entry that holds it — which is the whole point of it, and the reason a
  * post moved one folder up stops finding its own hero image.
  */
-function rewriteRelative(value: string, fromDir: string, toDir: string): string {
-  const target = posix.normalize(posix.join(fromDir, value));
-  const next = posix.relative(toDir, target);
+function rewriteRelative(value: string, sourceDirectory: string, targetDirectory: string): string {
+  const target = posix.normalize(posix.join(sourceDirectory, value));
+  const next = posix.relative(targetDirectory, target);
   return next.startsWith('.') ? next : './' + next;
 }
 
@@ -266,19 +284,39 @@ function planRename(
     to,
   }: { readonly collection: string; readonly from: string; readonly to: string },
 ): RenamePlan {
-  const collection = collections.find((c) => c.name === name);
+  const collection = collections.find((candidate) => candidate.name === name);
   if (!collection) {
     throw new Error(`${name} is not a collection in this project.`);
   }
   const listed = listEntries(projectPath, collection);
-  const entry = listed.entries.find((e) => e.id === from);
+  const entry = listed.entries.find((listedEntry) => listedEntry.id === from);
   if (!entry) {
     throw new Error(`${name} has no entry with the id "${from}".`);
   }
-  if (listed.entries.some((e) => e.id === to)) {
+  if (listed.entries.some((listedEntry) => listedEntry.id === to)) {
     throw new Error(`${name} already has an entry with the id "${to}".`);
   }
+  const pointers = pointersTo(projectPath, collections, name, from);
+  const move = entryMove(collection, entry, { name, from, to });
+  const imageEdits = move.kind === 'file' ? movedImageEdits(collection, entry, move.to) : [];
+  return { collection: name, from, to, entry, move, pointers, imageEdits };
+}
 
+// The value at a path walked by matchingPaths, or the absence the walk ran into.
+const valueAt = (data: unknown, at: SchemaPath): unknown =>
+  at.reduce<unknown>(
+    (node, key) => (node === undefined || node === null ? node : stepInto(node, key)),
+    data,
+  );
+
+// Every field in the project's editable collections that holds `from` as a reference into
+// the collection `name`.
+function pointersTo(
+  projectPath: string,
+  collections: readonly CollectionLike[],
+  name: string,
+  from: string,
+): Pointer[] {
   const pointers: Pointer[] = [];
   for (const other of collections) {
     if (!other.editable || !other.schema || !mentions(other.schema, name)) {
@@ -287,11 +325,7 @@ function planRename(
     const otherEntries = listEntries(projectPath, other).entries;
     for (const candidate of otherEntries) {
       for (const at of referencePaths(other.schema, candidate.data, name)) {
-        const value = at.reduce<unknown>(
-          (node, key) => (node == null ? node : stepInto(node, key)),
-          candidate.data,
-        );
-        if (value !== from) {
+        if (valueAt(candidate.data, at) !== from) {
           continue;
         }
         pointers.push({
@@ -305,58 +339,64 @@ function planRename(
       }
     }
   }
+  return pointers;
+}
 
-  // How the entry's own id is written down, which is the part that differs most
-  // between collections (see contentEntries.js).
-  let move: Move;
+// How the entry's own id is written down, which is the part that differs most
+// between collections (see contentEntries.js).
+function entryMove(
+  collection: CollectionLike,
+  entry: ListedEntry,
+  { name, from, to }: { readonly name: string; readonly from: string; readonly to: string },
+): Move {
   if (collection.loader.kind === 'glob') {
     if (collection.loader.generateId) {
-      move = {
+      return {
         kind: 'generated',
         note:
           `${name} builds its ids in its loader, ` +
           'so its id cannot be changed by renaming a file.',
       };
-    } else {
-      const extension = path.extname(entry.file);
-      const pathPrefix = entry.file.slice(0, entry.file.length - extension.length - from.length);
-      move = {
-        kind: 'file',
-        from: entry.file,
-        to: `${pathPrefix}${to}${extension}`,
-      };
     }
-  } else if (entry.keyed) {
-    move = { kind: 'key', file: entry.file, locator: entry.locator };
-  } else if (isPlainObject(entry.data) && typeof toRecord(entry.data)?.['id'] === 'string') {
-    move = { kind: 'field', file: entry.file, locator: entry.locator };
-  } else {
-    move = { kind: 'unknown', note: `Nothing in ${entry.file} says what this entry's id is.` };
+    const extension = path.extname(entry.file);
+    const pathPrefix = entry.file.slice(0, entry.file.length - extension.length - from.length);
+    return { kind: 'file', from: entry.file, to: `${pathPrefix}${to}${extension}` };
   }
+  if (entry.keyed) {
+    return { kind: 'key', file: entry.file, locator: entry.locator };
+  }
+  if (isPlainObject(entry.data) && typeof toRecord(entry.data)?.['id'] === 'string') {
+    return { kind: 'field', file: entry.file, locator: entry.locator };
+  }
+  return { kind: 'unknown', note: `Nothing in ${entry.file} says what this entry's id is.` };
+}
 
-  // Moving the file moves what its image paths are relative to.
+// Moving the file moves what its image paths are relative to.
+function movedImageEdits(
+  collection: CollectionLike,
+  entry: ListedEntry,
+  movedTo: string,
+): ImageEdit[] {
   const imageEdits: ImageEdit[] = [];
-  if (move.kind === 'file' && collection.schema) {
-    const fromDir = posix.dirname(entry.file);
-    const toDir = posix.dirname(move.to);
-    if (fromDir !== toDir) {
-      const isImage = (node: SchemaNode, value: unknown): boolean =>
-        !!node['astroImage'] && isRelativeAsset(value);
-      for (const at of matchingPaths(collection.schema, entry.data, isImage)) {
-        const value = at.reduce<unknown>(
-          (node, key) => (node == null ? node : stepInto(node, key)),
-          entry.data,
-        );
-        imageEdits.push({
-          path: at,
-          from: value,
-          value: rewriteRelative(String(value), fromDir, toDir),
-        });
-      }
-    }
+  if (!collection.schema) {
+    return imageEdits;
   }
-
-  return { collection: name, from, to, entry, move, pointers, imageEdits };
+  const sourceDirectory = posix.dirname(entry.file);
+  const targetDirectory = posix.dirname(movedTo);
+  if (sourceDirectory === targetDirectory) {
+    return imageEdits;
+  }
+  const isImage = (node: SchemaNode, value: unknown): boolean =>
+    !!node['astroImage'] && isRelativeAsset(value);
+  for (const at of matchingPaths(collection.schema, entry.data, isImage)) {
+    const value = valueAt(entry.data, at);
+    imageEdits.push({
+      path: at,
+      from: value,
+      value: rewriteRelative(String(value), sourceDirectory, targetDirectory),
+    });
+  }
+  return imageEdits;
 }
 
 /**

@@ -59,8 +59,18 @@ export type DevServer = {
       readonly daemon?: false;
       readonly external?: false;
     }
-  | { readonly proc: null; readonly bin: string; readonly daemon: true; readonly external?: false }
-  | { readonly proc: null; readonly external: true; readonly daemon?: false; readonly bin?: never }
+  | {
+      readonly proc: undefined;
+      readonly bin: string;
+      readonly daemon: true;
+      readonly external?: false;
+    }
+  | {
+      readonly proc: undefined;
+      readonly external: true;
+      readonly daemon?: false;
+      readonly bin?: never;
+    }
 );
 export interface PreviewServer {
   readonly proc: ChildProcess;

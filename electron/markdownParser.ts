@@ -153,30 +153,30 @@ const CONTAINER_DEPTH_MAX = LIMITS.treeDepthMax - 3;
 // same frontmatter editor .astro pages use. `layout:` is read back out by name
 // because the layout picker needs it — see layoutFromFrontmatter.
 function splitFrontmatter(source: string): {
-  frontmatter: string | null;
+  frontmatter: string | undefined;
   body: string;
   offset: number;
 } {
-  const m = source.match(/^---\r?\n([\s\S]*?)\r?\n---[ \t]*(\r?\n|$)/);
-  if (!m) {
-    return { frontmatter: null, body: source, offset: 0 };
+  const match = source.match(/^---\r?\n([\s\S]*?)\r?\n---[ \t]*(\r?\n|$)/);
+  if (!match) {
+    return { frontmatter: undefined, body: source, offset: 0 };
   }
-  const offset = m[0]?.length ?? 0;
-  return { frontmatter: m[1] ?? null, body: source.slice(offset), offset };
+  const offset = match[0]?.length ?? 0;
+  return { frontmatter: match[1], body: source.slice(offset), offset };
 }
 
 // The `layout:` value from YAML frontmatter, unquoted. Markdown pages pick
 // their layout here rather than by importing it, so the app's layout picker
 // reads and writes this field.
-function layoutFromFrontmatter(frontmatter: string | null | undefined): string | undefined {
+function layoutFromFrontmatter(frontmatter: string | undefined): string | undefined {
   if (!frontmatter) {
     return undefined;
   }
-  const m = frontmatter.match(/^[ \t]*layout[ \t]*:[ \t]*(.+?)[ \t]*$/m);
-  if (!m) {
+  const match = frontmatter.match(/^[ \t]*layout[ \t]*:[ \t]*(.+?)[ \t]*$/m);
+  if (!match) {
     return undefined;
   }
-  return (m[1] ?? '').replace(/^['"]|['"]$/g, '') || undefined;
+  return (match[1] ?? '').replace(/^['"]|['"]$/g, '') || undefined;
 }
 
 // ---------------------------------------------------------------------------
@@ -581,8 +581,8 @@ function readQuote(
   let next = index;
   while (next < lines.length) {
     const line = lineAt(lines, next);
-    const q = line.text.match(QUOTE_RE);
-    if (!q) {
+    const quoteMatch = line.text.match(QUOTE_RE);
+    if (!quoteMatch) {
       // A lazy continuation line belongs to the quote's last paragraph.
       if (isBlank(line) || LAZY_BREAK_RE.test(line.text)) {
         break;
@@ -591,11 +591,11 @@ function readQuote(
       next++;
       continue;
     }
-    if (q[2]) {
-      gap = q[2];
+    if (quoteMatch[2]) {
+      gap = quoteMatch[2];
     }
-    const taken = (q[1] ?? '').length + 1 + (q[2] ?? '').length;
-    inner.push({ text: q[3] ?? '', start: line.start + taken });
+    const taken = (quoteMatch[1] ?? '').length + 1 + (quoteMatch[2] ?? '').length;
+    inner.push({ text: quoteMatch[3] ?? '', start: line.start + taken });
     next++;
   }
   if (depth >= CONTAINER_DEPTH_MAX) {
@@ -681,19 +681,19 @@ interface ItemRead {
 
 function readItem(lines: readonly Line[], index: number, shape: ListShape): ItemRead | undefined {
   const line = lineAt(lines, index);
-  const m = line.text.match(shape.ordered ? ORDERED_RE : BULLET_RE);
-  if (!m) {
+  const match = line.text.match(shape.ordered ? ORDERED_RE : BULLET_RE);
+  if (!match) {
     return undefined;
   }
-  if ((m[1] ?? '') !== shape.indent) {
+  if ((match[1] ?? '') !== shape.indent) {
     return undefined;
   }
-  if ((shape.ordered ? m[3] : m[2]) !== shape.marker) {
+  if ((shape.ordered ? match[3] : match[2]) !== shape.marker) {
     return undefined;
   }
-  const gap = (shape.ordered ? m[4] : m[3]) ?? '';
-  const content = (shape.ordered ? m[5] : m[4]) ?? '';
-  const markerWidth = shape.ordered ? (m[2]?.length ?? 0) + 1 : 1;
+  const gap = (shape.ordered ? match[4] : match[3]) ?? '';
+  const content = (shape.ordered ? match[5] : match[4]) ?? '';
+  const markerWidth = shape.ordered ? (match[2]?.length ?? 0) + 1 : 1;
   const contentIndent = shape.indent.length + markerWidth + gap.length;
   const inner: Line[] = [{ text: content, start: line.start + contentIndent }];
   const pad = ' '.repeat(contentIndent);
@@ -724,7 +724,7 @@ function readItem(lines: readonly Line[], index: number, shape: ListShape): Item
     last = next;
     next++;
   }
-  const number = shape.ordered ? Number(m[2] ?? '') : undefined;
+  const number = shape.ordered ? Number(match[2] ?? '') : undefined;
   return { inner, gap, number, loose, last, next };
 }
 
@@ -891,19 +891,19 @@ function imageNode(
     return undefined;
   }
   const alt = img[1] ?? '';
-  const src = img[2] ?? '';
+  const source = img[2] ?? '';
   const title = img[3];
   const at = (offset: number): number => text.at(offset);
-  const props: Record<string, Attr> = { src: { type: 'string', value: src } };
+  const props: Record<string, Attr> = { src: { type: 'string', value: source } };
   const spans: AttrSpan[] = [];
   const altEnd = 2 + alt.length;
   if (alt) {
     props['alt'] = { type: 'string', value: alt };
     spans.push(markdownAttr('alt', [at(1), at(altEnd + 1)], [at(2), at(altEnd)]));
   }
-  const srcStart = altEnd + 2;
-  const srcRange = [at(srcStart), at(srcStart + src.length)] as const;
-  spans.push(markdownAttr('src', srcRange, srcRange));
+  const sourceStart = altEnd + 2;
+  const sourceRange = [at(sourceStart), at(sourceStart + source.length)] as const;
+  spans.push(markdownAttr('src', sourceRange, sourceRange));
   if (title) {
     props['title'] = { type: 'string', value: title };
     const titleEnd = text.text.length - 2; // The closing quote, before `)`.
@@ -965,7 +965,7 @@ function serializeBlocks(nodes: readonly PrintNode[] | undefined, out: string[])
 
 function pushBlanks(out: string[], count: number): void {
   assert(count <= LIMITS.treeNodesMax, 'Blank runs are inside the parser bound');
-  for (let b = 0; b < count; b++) {
+  for (let i = 0; i < count; i++) {
     out.push('');
   }
 }
@@ -1009,9 +1009,9 @@ function serializeElement(node: PrintNode, out: string[]): void {
   } else if (name === 'hr') {
     out.push(node.mdRaw ?? '---');
   } else if (name === 'img') {
-    const val = (p: string): string => attrValue(node.props?.[p]) ?? '';
-    const title = val('title') ? ` "${val('title')}"` : '';
-    out.push(`![${val('alt')}](${val('src')}${title})`);
+    const propText = (name: string): string => attrValue(node.props?.[name]) ?? '';
+    const title = propText('title') ? ` "${propText('title')}"` : '';
+    out.push(`![${propText('alt')}](${propText('src')}${title})`);
   } else if (name === 'pre') {
     serializeFence(node, out);
   } else if (name === 'blockquote') {
@@ -1052,8 +1052,8 @@ function serializeQuote(node: PrintNode, out: string[]): void {
   const inner: string[] = [];
   serializeBlocks(node.children ?? [], inner);
   const gap = node.mdGap ?? ' ';
-  for (const l of inner) {
-    out.push(l ? `>${gap}${l}` : '>');
+  for (const line of inner) {
+    out.push(line ? `>${gap}${line}` : '>');
   }
 }
 
@@ -1085,11 +1085,11 @@ function serializeItem(item: PrintNode, at: ItemMarker, out: string[]): void {
   const inner: string[] = [];
   serializeBlocks(item.children ?? [], inner);
   const pad = ' '.repeat(at.indent.length + bullet.length + gap.length);
-  inner.forEach((l, k) => {
-    if (k === 0) {
-      out.push(`${at.indent}${bullet}${gap}${l}`);
+  inner.forEach((line, index) => {
+    if (index === 0) {
+      out.push(`${at.indent}${bullet}${gap}${line}`);
     } else {
-      out.push(l ? pad + l : '');
+      out.push(line ? pad + line : '');
     }
   });
   if (!inner.length) {
@@ -1196,7 +1196,7 @@ function parseMarkdownPage(
       nodes,
       mdEol: eol,
       mdEndsWithNewline: endsWithNewline,
-      mdHasFrontmatter: frontmatter != null,
+      mdHasFrontmatter: frontmatter !== undefined,
       bodyStart: bom + offset,
     },
   };

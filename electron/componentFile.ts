@@ -23,7 +23,7 @@ import path from 'path';
 import { assert } from '../shared/assert.js';
 import { serializePage, serializeNodes } from './astroParser.js';
 
-const toPosix = (p: string): string => p.split(path.sep).join('/');
+const toPosix = (filePath: string): string => filePath.split(path.sep).join('/');
 
 // A component's name is a filename, an import and a tag all at once — and the
 // capital is load-bearing: Astro reads a lowercase tag as an HTML element, so
@@ -64,13 +64,15 @@ function componentFile({
     throw new Error('Nothing to make a component from.');
   }
 
-  const componentsDir = path.join(projectPath, 'src', 'components');
-  const target = path.join(componentsDir, `${name}.astro`);
+  const componentsDirectory = path.join(projectPath, 'src', 'components');
+  const target = path.join(componentsDirectory, `${name}.astro`);
   // Case-insensitively: on a Mac, Card.astro and card.astro are the same file,
   // and writing the second silently replaces the first.
-  const clash = fs.existsSync(componentsDir)
-    ? fs.readdirSync(componentsDir).find((f) => f.toLowerCase() === `${name.toLowerCase()}.astro`)
-    : null;
+  const clash = fs.existsSync(componentsDirectory)
+    ? fs
+        .readdirSync(componentsDirectory)
+        .find((fileName) => fileName.toLowerCase() === `${name.toLowerCase()}.astro`)
+    : undefined;
   if (clash) {
     throw new Error(`There's already a component called ${path.basename(clash, '.astro')}.`);
   }
@@ -87,20 +89,20 @@ function componentFile({
   // `@/components/Button.astro` and bare package names mean the same thing from
   // any file and travel untouched. A relative path was written from the page's
   // folder and has to be re-aimed from src/components.
-  const pageDir = path.dirname(pagePath);
+  const pageDirectory = path.dirname(pagePath);
   const moved = used.map((imp) => {
     const spec = String(imp.path || '');
     if (!spec.startsWith('.')) {
       return { ...imp };
     }
-    const rel = toPosix(path.relative(componentsDir, path.resolve(pageDir, spec)));
+    const rel = toPosix(path.relative(componentsDirectory, path.resolve(pageDirectory, spec)));
     return { ...imp, path: rel.startsWith('.') ? rel : './' + rel };
   });
 
   // The values the piece was reading from the page, now read from its props
   // instead. Astro's own convention, and the one the props panel reads back:
   // a destructure off Astro.props IS the component's interface.
-  const names = props.filter((p) => /^[A-Za-z_$][\w$]*$/.test(String(p || '')));
+  const names = props.filter((prop) => /^[A-Za-z_$][\w$]*$/.test(String(prop || '')));
   const extraFrontmatter = names.length ? `const { ${names.join(', ')} } = Astro.props;` : '';
 
   const text = serializePage({

@@ -28,19 +28,22 @@ const THUMB_WIDTH = 720;
 const SETTLE_MS = 1800;
 const LOAD_TIMEOUT = 15000;
 
-const thumbsDir = (userDataPath: string): string => path.join(userDataPath, 'thumbs');
+const thumbsDirectory = (userDataPath: string): string => path.join(userDataPath, 'thumbs');
 const keyFor = (projectPath: string): string =>
   crypto.createHash('sha1').update(projectPath).digest('hex').slice(0, 16);
 const thumbPathFor = (userDataPath: string, projectPath: string): string =>
-  path.join(thumbsDir(userDataPath), `${keyFor(projectPath)}.png`);
+  path.join(thumbsDirectory(userDataPath), `${keyFor(projectPath)}.png`);
 const metaPathFor = (userDataPath: string, projectPath: string): string =>
-  path.join(thumbsDir(userDataPath), `${keyFor(projectPath)}.json`);
+  path.join(thumbsDirectory(userDataPath), `${keyFor(projectPath)}.json`);
 
 // What the site is made of, as one number that changes when any of it does.
 // Only the directories a page can be built from — a thumbnail does not go stale
 // because node_modules changed, and walking it would cost more than the
 // screenshot.
-const SOURCE_DIRS = ['src', 'public'] as const;
+const SOURCE_DIRECTORIES = ['src', 'public'] as const;
+// A site's own folders rarely nest past four or five; deeper trees are left
+// out of the fingerprint rather than walked.
+const THUMB_LIMITS = { walkDepthMax: 8 } as const;
 const SKIP = new Set(['node_modules', 'dist', '.git', '.astro', '.stacki', '.vercel', '.netlify']);
 
 function fingerprint(projectPath: string): string {
@@ -58,22 +61,22 @@ function fingerprint(projectPath: string): string {
       /* raced with a write */
     }
   };
-  const walk = (dir: string, depth: number): void => {
-    if (depth > 8) {
+  const walk = (directory: string, depth: number): void => {
+    if (depth > THUMB_LIMITS.walkDepthMax) {
       return;
     }
     let entries: fs.Dirent[];
     try {
-      entries = fs.readdirSync(dir, { withFileTypes: true });
+      entries = fs.readdirSync(directory, { withFileTypes: true });
     } catch {
       return;
     }
-    entries.sort((a, b) => a.name.localeCompare(b.name));
+    entries.sort((left, right) => left.name.localeCompare(right.name));
     for (const entry of entries) {
       if (entry.name.startsWith('.') || SKIP.has(entry.name)) {
         continue;
       }
-      const full = path.join(dir, entry.name);
+      const full = path.join(directory, entry.name);
       if (entry.isDirectory()) {
         walk(full, depth + 1);
       } else {
@@ -81,8 +84,8 @@ function fingerprint(projectPath: string): string {
       }
     }
   };
-  for (const dir of SOURCE_DIRS) {
-    walk(path.join(projectPath, dir), 0);
+  for (const directory of SOURCE_DIRECTORIES) {
+    walk(path.join(projectPath, directory), 0);
   }
   for (const name of [
     'astro.config.mjs',
@@ -97,14 +100,14 @@ function fingerprint(projectPath: string): string {
   return hash.digest('hex');
 }
 
-function readMeta(userDataPath: string, projectPath: string): Record<string, unknown> | null {
+function readMeta(userDataPath: string, projectPath: string): Record<string, unknown> | undefined {
   try {
     const raw: unknown = JSON.parse(
       fs.readFileSync(metaPathFor(userDataPath, projectPath), 'utf8'),
     );
-    return toRecord(raw) ?? null;
+    return toRecord(raw);
   } catch {
-    return null;
+    return undefined;
   }
 }
 
@@ -120,12 +123,12 @@ function isStale(userDataPath: string, projectPath: string): boolean {
   return meta['fingerprint'] !== fingerprint(projectPath);
 }
 
-function readThumb(userDataPath: string, projectPath: string): string | null {
+function readThumb(userDataPath: string, projectPath: string): string | undefined {
   try {
     const data = fs.readFileSync(thumbPathFor(userDataPath, projectPath));
     return 'data:image/png;base64,' + data.toString('base64');
   } catch {
-    return null;
+    return undefined;
   }
 }
 
@@ -194,7 +197,7 @@ async function capture(
   projectPath: string,
   url: string,
 ): Promise<CaptureResult> {
-  let win: BrowserWindow | null = null;
+  let win: BrowserWindow | undefined = undefined;
   try {
     win = makeWindow();
     const capturedFingerprint = fingerprint(projectPath);
@@ -252,7 +255,7 @@ async function capture(
       return { ok: false, error: 'the capture came back empty' };
     }
 
-    fs.mkdirSync(thumbsDir(userDataPath), { recursive: true });
+    fs.mkdirSync(thumbsDirectory(userDataPath), { recursive: true });
     fs.writeFileSync(
       thumbPathFor(userDataPath, projectPath),
       image.resize({ width: THUMB_WIDTH }).toPNG(),
@@ -262,9 +265,9 @@ async function capture(
       JSON.stringify({ fingerprint: capturedFingerprint, capturedAt: Date.now(), url }, null, 2),
     );
     return { ok: true };
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    return { ok: false, error: message || String(err) };
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    return { ok: false, error: message || String(error) };
   } finally {
     try {
       if (win && !win.isDestroyed()) {

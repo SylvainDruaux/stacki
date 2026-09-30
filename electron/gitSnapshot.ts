@@ -35,7 +35,7 @@ async function commit(
   },
 ): Promise<{ ok: true; files: number | undefined }> {
   const subject = message || 'Update from Stacki';
-  const chosen = Array.isArray(paths) ? paths.filter(Boolean).map(String) : null;
+  const chosen = Array.isArray(paths) ? paths.filter(Boolean).map(String) : undefined;
   if (chosen && !chosen.length) {
     throw new Error('Nothing was picked to save — choose at least one file.');
   }

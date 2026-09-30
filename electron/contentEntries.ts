@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 
+import { LIMITS } from '../shared/limits.js';
 import { toRecord, toArray } from '../shared/record.js';
 import { MAIN_LIMITS } from './main.bounds.js';
 import { writeProjectText } from './documentWrites.js';
@@ -54,14 +55,15 @@ const FORMATS: Record<string, FormatModule> = {
 };
 
 const extensionOf = (file: string): string => (file.split('.').pop() || '').toLowerCase();
-const formatFor = (file: string): FormatModule | null => FORMATS[extensionOf(file)] ?? null;
+const formatFor = (file: string): FormatModule | undefined => FORMATS[extensionOf(file)];
 const formatName = (file: string): string => {
   const ext = extensionOf(file);
   return FORMATS[ext] === frontmatter ? 'frontmatter' : ext;
 };
 
-const toPosix = (p: string): string => p.split(path.sep).join('/');
-const isPlainObject = (v: unknown): boolean => !!v && typeof v === 'object' && !Array.isArray(v);
+const toPosix = (filePath: string): string => filePath.split(path.sep).join('/');
+const isPlainObject = (value: unknown): boolean =>
+  !!value && typeof value === 'object' && !Array.isArray(value);
 
 // A glob pattern as a regular expression: `**` crosses folders, `*` does not,
 // and `{a,b}` is a choice. Enough for the patterns a content config writes.
@@ -81,7 +83,7 @@ function globToRegExp(pattern: string): RegExp {
       out += `(?:${pattern
         .slice(i + 1, close)
         .split(',')
-        .map((s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+        .map((choice) => choice.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
         .join('|')})`;
       i = close;
     } else if (ch === '?') {
@@ -93,10 +95,15 @@ function globToRegExp(pattern: string): RegExp {
   return new RegExp(`^${out}$`);
 }
 
-function walkFiles(dir: string, base = dir, out: string[] = []): string[] {
+function walkFiles(directory: string, base = directory, out: string[] = [], depth = 0): string[] {
+  // A project's folders are not ours to trust: a tree deeper than any real one stops the walk
+  // there, before it can exhaust the stack.
+  if (depth > MAIN_LIMITS.directoryDepthMax) {
+    return out;
+  }
   let entries: fs.Dirent[] = [];
   try {
-    entries = fs.readdirSync(dir, { withFileTypes: true });
+    entries = fs.readdirSync(directory, { withFileTypes: true });
   } catch {
     return out;
   }
@@ -104,9 +111,9 @@ function walkFiles(dir: string, base = dir, out: string[] = []): string[] {
     if (entry.name.startsWith('.') || entry.name === 'node_modules') {
       continue;
     }
-    const full = path.join(dir, entry.name);
+    const full = path.join(directory, entry.name);
     if (entry.isDirectory()) {
-      walkFiles(full, base, out);
+      walkFiles(full, base, out, depth + 1);
     } else {
       out.push(toPosix(path.relative(base, full)));
     }
@@ -248,8 +255,8 @@ function globEntries(projectPath: string, collection: ContentCollection): ListRe
       } else {
         entry = { ...base, data: format.parseData(text) };
       }
-    } catch (err) {
-      entry = { ...base, error: String(err instanceof Error ? err.message : err), data: {} };
+    } catch (error: unknown) {
+      entry = { ...base, error: String(error instanceof Error ? error.message : error), data: {} };
     }
     entries.push({ ...entry, title: titleOf(entry.data, entry.id) });
   }
@@ -271,17 +278,17 @@ function globEntries(projectPath: string, collection: ContentCollection): ListRe
 
 interface RawRecord {
   readonly id: string;
-  readonly idKey: string | null;
+  readonly idKey: string | undefined;
   readonly keyed?: boolean;
   readonly locator: readonly (string | number)[];
   readonly record: Record<string, unknown>;
 }
 
-// Where the records are inside a data file, and what identifies each one.
+// Where the records are inside a data file, and what identifies each one:
 //   [ { id: … } ]        → the id field, addressed by position
 //   { key: { … } }       → the key itself
 //   anything else        → any object with an id, wherever it sits, which is
-//                          what a parser-shaped file looks like
+//                          what a parser-shaped file looks like.
 function locateRecords(data: unknown): { shape: string; records: RawRecord[] } {
   const list = toArray(data);
   if (list) {
@@ -295,7 +302,7 @@ function locateRecords(data: unknown): { shape: string; records: RawRecord[] } {
         const id = rec['id'];
         return {
           id: typeof id === 'string' ? id : String(index),
-          idKey: typeof id === 'string' ? 'id' : null,
+          idKey: typeof id === 'string' ? 'id' : undefined,
           locator: [index],
           record: rec,
         };
@@ -307,13 +314,13 @@ function locateRecords(data: unknown): { shape: string; records: RawRecord[] } {
     return { shape: 'unknown', records: [] };
   }
 
-  const keys = Object.keys(top).filter((k) => k !== '$schema');
-  if (keys.length && keys.every((k) => isPlainObject(top[k]))) {
+  const keys = Object.keys(top).filter((key) => key !== '$schema');
+  if (keys.length && keys.every((key) => isPlainObject(top[key]))) {
     return {
       shape: 'keyed',
       records: keys.map((key) => ({
         id: key,
-        idKey: null,
+        idKey: undefined,
         keyed: true,
         locator: [key],
         record: toRecord(top[key]) ?? {},
@@ -326,6 +333,12 @@ function locateRecords(data: unknown): { shape: string; records: RawRecord[] } {
   // holding questions) comes apart without knowing what the grouping means.
   const records: RawRecord[] = [];
   const visit = (node: unknown, locator: readonly (string | number)[]): void => {
+    // The file is the project's data: past the depth any IPC value may have, nothing deeper
+    // could reach the editor anyway, so the search stops there.
+    const depth = locator.length;
+    if (depth > LIMITS.ipcDepthMax) {
+      return;
+    }
     const items = toArray(node);
     if (items) {
       items.forEach((item, index) => visit(item, [...locator, index]));
@@ -348,7 +361,8 @@ function locateRecords(data: unknown): { shape: string; records: RawRecord[] } {
   return { shape: records.length ? 'nested' : 'single', records };
 }
 
-const errorMessage = (err: unknown): string => (err instanceof Error ? err.message : String(err));
+const errorMessage = (error: unknown): string =>
+  error instanceof Error ? error.message : String(error);
 
 function fileEntries(projectPath: string, collection: ContentCollection): ListResult {
   const loader = collection.loader ?? {};
@@ -368,18 +382,22 @@ function fileEntries(projectPath: string, collection: ContentCollection): ListRe
       return { entries: [], readOnly: true, reason: 'This file is too large to edit here.' };
     }
     text = fs.readFileSync(abs, 'utf8');
-  } catch (err) {
-    return { entries: [], readOnly: true, reason: `Could not read ${rel} — ${errorMessage(err)}` };
+  } catch (error: unknown) {
+    return {
+      entries: [],
+      readOnly: true,
+      reason: `Could not read ${rel} — ${errorMessage(error)}`,
+    };
   }
 
   let data: unknown;
   try {
     data = format.parseData(text);
-  } catch (err) {
+  } catch (error: unknown) {
     return {
       entries: [],
       readOnly: true,
-      reason: `${rel} could not be parsed — ${errorMessage(err)}`,
+      reason: `${rel} could not be parsed — ${errorMessage(error)}`,
     };
   }
 
@@ -487,17 +505,17 @@ function coveredPaths(collections: readonly ContentCollection[]): {
   dirs: string[];
 } {
   const files: string[] = [];
-  const dirs: string[] = [];
+  const directories: string[] = [];
   for (const collection of collections) {
     const loader = collection.loader ?? {};
     if (loader.kind === 'file' && loader.file) {
       files.push(toPosix(loader.file).replace(/^\.\//, ''));
     }
     if (loader.kind === 'glob' && loader.base) {
-      dirs.push(toPosix(loader.base).replace(/^\.\//, '').replace(/\/$/, ''));
+      directories.push(toPosix(loader.base).replace(/^\.\//, '').replace(/\/$/, ''));
     }
   }
-  return { files, dirs };
+  return { files, dirs: directories };
 }
 
 export {

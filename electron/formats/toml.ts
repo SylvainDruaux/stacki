@@ -14,6 +14,7 @@
 
 import * as TOML from 'smol-toml';
 
+import { LIMITS } from '../../shared/limits.js';
 import { toRecord } from '../../shared/record.js';
 
 const parseData = (text: string): unknown => TOML.parse(text);
@@ -22,10 +23,15 @@ const DELETE = Symbol('delete');
 
 // TOML dates are a type of their own; the parser hands them back as objects
 // that print as the literal the file held.
-const isDateLike = (v: unknown): v is Date | { toISOString(): string } =>
-  v instanceof Date || typeof toRecord(v)?.['toISOString'] === 'function';
+const isDateLike = (value: unknown): value is Date | { toISOString(): string } =>
+  value instanceof Date || typeof toRecord(value)?.['toISOString'] === 'function';
 
-function print(value: unknown): string {
+function print(value: unknown, depth = 0): string {
+  // The value arrives with an edit from the renderer. Nested deeper than any value that crosses
+  // a boundary, it is refused rather than followed.
+  if (depth > LIMITS.ipcDepthMax) {
+    throw new Error('The value is nested too deeply to write.');
+  }
   if (value === null || value === undefined) {
     return '""';
   }
@@ -40,16 +46,16 @@ function print(value: unknown): string {
   }
   if (Array.isArray(value)) {
     const list: unknown[] = value;
-    return `[${list.map(print).join(', ')}]`;
+    return `[${list.map((item) => print(item, depth + 1)).join(', ')}]`;
   }
   const record = toRecord(value);
   if (record) {
     return `{ ${Object.entries(record)
-      .map(([k, v]) => `${printKey(k)} = ${print(v)}`)
+      .map(([key, entry]) => `${printKey(key)} = ${print(entry, depth + 1)}`)
       .join(', ')} }`;
   }
-  const s = String(value);
-  return `"${s.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n')}"`;
+  const text = String(value);
+  return `"${text.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n')}"`;
 }
 
 const BARE_KEY = /^[A-Za-z0-9_-]+$/;
@@ -60,9 +66,9 @@ const printKey = (key: string | number): string =>
 function headerPath(header: string): string[] {
   const out: string[] = [];
   const re = /"([^"]*)"|'([^']*)'|([^.\s]+)/g;
-  let m;
-  while ((m = re.exec(header))) {
-    const segment = m[1] ?? m[2] ?? m[3];
+  let match;
+  while ((match = re.exec(header))) {
+    const segment = match[1] ?? match[2] ?? match[3];
     if (segment !== undefined) {
       out.push(segment);
     }
@@ -92,12 +98,12 @@ function index(text: string): TomlEntry[] {
     lineStarts.push(offset);
     offset += line.length + 1;
   }
-  const lineAt = (pos: number): number => {
-    // The last line is the answer once no later line starts at or before pos.
+  const lineAt = (position: number): number => {
+    // The last line is the answer once no later line starts at or before the position.
     for (let at = 0; at + 1 < lineStarts.length; at++) {
       const nextStart = lineStarts[at + 1];
       if (nextStart !== undefined) {
-        if (nextStart > pos) {
+        if (nextStart > position) {
           return at;
         }
       }
@@ -163,14 +169,14 @@ function index(text: string): TomlEntry[] {
 // across lines and ignoring anything inside a string.
 function spanEnd(text: string, from: number): number {
   let depth = 0;
-  let quote: string | null = null;
+  let quote: string | undefined = undefined;
   for (let i = from; i < text.length; i++) {
     const ch = text.charAt(i);
     if (quote) {
       if (ch === '\\') {
         i++;
       } else if (ch === quote) {
-        quote = null;
+        quote = undefined;
       }
       continue;
     }
@@ -208,14 +214,14 @@ const trimEnd = (text: string, from: number, to: number): number => {
 };
 
 // An inline table is one value, so a key inside it is patched inside that text.
-function patchInline(source: string, key: string | number, value: unknown): string | null {
+function patchInline(source: string, key: string | number, value: unknown): string | undefined {
   const re = new RegExp(`(${escape(printKey(key))}\\s*=\\s*)`, '');
-  const m = source.match(re);
-  if (!m || m[1] === undefined) {
+  const match = source.match(re);
+  if (!match || match[1] === undefined) {
     // Add it before the closing brace.
     const close = source.lastIndexOf('}');
     if (close === -1) {
-      return null;
+      return undefined;
     }
     const body = source.slice(1, close).trim();
     const inner = body
@@ -223,8 +229,8 @@ function patchInline(source: string, key: string | number, value: unknown): stri
       : `${printKey(key)} = ${print(value)}`;
     return `{ ${inner} }`;
   }
-  const at = m.index ?? 0; // defined by construction: the match was found in source
-  const from = at + m[1].length;
+  const at = match.index ?? 0; // defined by construction: the match was found in source
+  const from = at + match[1].length;
   const to = spanEnd(source, from);
   const tail = source.slice(to);
   const end = /^\s*,/.test(tail) && value === DELETE ? to + tail.indexOf(',') + 1 : to;
@@ -235,10 +241,13 @@ function patchInline(source: string, key: string | number, value: unknown): stri
   return source.slice(0, from) + print(value) + source.slice(to);
 }
 
-const escape = (s: string): string => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const escape = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-const samePath = (a: readonly (string | number)[], b: readonly (string | number)[]): boolean =>
-  a.length === b.length && a.every((seg, i) => String(seg) === String(b[i]));
+const samePath = (
+  left: readonly (string | number)[],
+  right: readonly (string | number)[],
+): boolean =>
+  left.length === right.length && left.every((seg, i) => String(seg) === String(right[i]));
 
 export interface Edit {
   readonly path: readonly (string | number)[];
@@ -272,7 +281,7 @@ function applyEdits(text: string, edits: readonly Edit[]): string {
       continue;
     }
     const entries = index(out);
-    const exact = entries.find((e) => samePath(e.path, path));
+    const exact = entries.find((entry) => samePath(entry.path, path));
     if (exact) {
       if (value === DELETE) {
         const from = out.lastIndexOf('\n', exact.lineStart - 1) + 1;
@@ -285,9 +294,9 @@ function applyEdits(text: string, edits: readonly Edit[]): string {
 
     // A key inside an inline table: the nearest ancestor that exists is the
     // value holding it.
-    let inline: { entry: TomlEntry; rest: readonly (string | number)[] } | null = null;
+    let inline: { entry: TomlEntry; rest: readonly (string | number)[] } | undefined = undefined;
     for (let cut = path.length - 1; cut > 0 && !inline; cut--) {
-      const found = entries.find((e) => samePath(e.path, path.slice(0, cut)));
+      const found = entries.find((entry) => samePath(entry.path, path.slice(0, cut)));
       if (found && out.charAt(found.valueStart) === '{') {
         inline = { entry: found, rest: path.slice(cut) };
       }
@@ -295,8 +304,8 @@ function applyEdits(text: string, edits: readonly Edit[]): string {
     if (inline && inline.rest.length === 1) {
       const rest = inline.rest[0];
       const source = out.slice(inline.entry.valueStart, inline.entry.valueEnd);
-      const patched = rest === undefined ? null : patchInline(source, rest, value);
-      if (patched != null) {
+      const patched = rest === undefined ? undefined : patchInline(source, rest, value);
+      if (patched !== undefined) {
         out = out.slice(0, inline.entry.valueStart) + patched + out.slice(inline.entry.valueEnd);
         continue;
       }
@@ -312,7 +321,7 @@ function applyEdits(text: string, edits: readonly Edit[]): string {
     if (key === undefined) {
       continue; // an empty path names no key
     }
-    const siblings = entries.filter((e) => samePath(e.path.slice(0, -1), tablePath));
+    const siblings = entries.filter((entry) => samePath(entry.path.slice(0, -1), tablePath));
     const last = siblings[siblings.length - 1];
     if (last) {
       const indent =

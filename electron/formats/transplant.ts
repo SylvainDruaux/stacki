@@ -12,25 +12,25 @@
 // edit. That is then placed back into the original text, which is otherwise
 // untouched, byte for byte.
 
-// Longest common subsequence over lines, as a map from index in `a` to index in
-// `b` for the lines they share.
-function align(a: readonly string[], b: readonly string[]): Map<number, number> {
-  const n = a.length;
-  const m = b.length;
+// Longest common subsequence over lines, as a map from index in `left` to index in
+// `right` for the lines they share.
+function align(left: readonly string[], right: readonly string[]): Map<number, number> {
+  const leftCount = left.length;
+  const rightCount = right.length;
   // Small files; the quadratic table is a few hundred kilobytes at worst.
-  const table = new Int32Array((n + 1) * (m + 1));
-  const cell = (i: number, j: number): number => table[i * (m + 1) + j] ?? 0;
-  for (let i = n - 1; i >= 0; i--) {
-    for (let j = m - 1; j >= 0; j--) {
-      table[i * (m + 1) + j] =
-        a[i] === b[j] ? cell(i + 1, j + 1) + 1 : Math.max(cell(i + 1, j), cell(i, j + 1));
+  const table = new Int32Array((leftCount + 1) * (rightCount + 1));
+  const cell = (i: number, j: number): number => table[i * (rightCount + 1) + j] ?? 0;
+  for (let i = leftCount - 1; i >= 0; i--) {
+    for (let j = rightCount - 1; j >= 0; j--) {
+      table[i * (rightCount + 1) + j] =
+        left[i] === right[j] ? cell(i + 1, j + 1) + 1 : Math.max(cell(i + 1, j), cell(i, j + 1));
     }
   }
   const map = new Map<number, number>();
   let i = 0;
   let j = 0;
-  while (i < n && j < m) {
-    if (a[i] === b[j]) {
+  while (i < leftCount && j < rightCount) {
+    if (left[i] === right[j]) {
       map.set(i, j);
       i++;
       j++;
@@ -49,27 +49,27 @@ interface Hunk {
   readonly lines: readonly string[];
 }
 
-// The runs of lines that differ, as { start, end, lines } against `a`.
-function hunks(a: readonly string[], b: readonly string[]): Hunk[] {
-  const map = align(a, b);
+// The runs of lines that differ, as { start, end, lines } against `left`.
+function hunks(left: readonly string[], right: readonly string[]): Hunk[] {
+  const map = align(left, right);
   const out: Hunk[] = [];
-  let open: { start: number; from: number } | null = null;
-  let prevB = -1;
-  for (let i = 0; i <= a.length; i++) {
-    const j = i < a.length ? map.get(i) : b.length;
+  let open: { start: number; from: number } | undefined = undefined;
+  let previousRight = -1;
+  for (let i = 0; i <= left.length; i++) {
+    const j = i < left.length ? map.get(i) : right.length;
     if (j === undefined) {
       if (!open) {
-        open = { start: i, from: prevB + 1 };
+        open = { start: i, from: previousRight + 1 };
       }
       continue;
     }
-    if (open || j > prevB + 1) {
+    if (open || j > previousRight + 1) {
       const start = open ? open.start : i;
-      const from = open ? open.from : prevB + 1;
-      out.push({ start, end: i, lines: b.slice(from, j) });
-      open = null;
+      const from = open ? open.from : previousRight + 1;
+      out.push({ start, end: i, lines: right.slice(from, j) });
+      open = undefined;
     }
-    prevB = j;
+    previousRight = j;
   }
   return out;
 }
@@ -85,16 +85,16 @@ function transplant(original: string, before: string, after: string): string {
   if (before === after) {
     return original;
   }
-  const O = original.split('\n');
-  const A = before.split('\n');
-  const B = after.split('\n');
-  const toOriginal = align(A, O);
-  const changes = hunks(A, B);
+  const originalLines = original.split('\n');
+  const beforeLines = before.split('\n');
+  const afterLines = after.split('\n');
+  const toOriginal = align(beforeLines, originalLines);
+  const changes = hunks(beforeLines, afterLines);
   if (!changes.length) {
     return original;
   }
 
-  const out = O.slice();
+  const out = originalLines.slice();
   for (const hunk of changes.reverse()) {
     // The usual case: the lines being replaced are lines the serializer wrote
     // the same way the original has them, so they can be found in the original
@@ -119,19 +119,26 @@ function transplant(original: string, before: string, after: string): string {
       start--;
     }
     let end = hunk.end;
-    while (end < A.length && !toOriginal.has(end)) {
+    while (end < beforeLines.length && !toOriginal.has(end)) {
       end++;
     }
 
     // Both sides of the region are mapped by construction (the loops above stop
     // at a mapped line or at an edge); the fallbacks are unreachable.
     const from = start === 0 ? 0 : (toOriginal.get(start - 1) ?? 0) + 1;
-    const to = end === A.length ? O.length : (toOriginal.get(end) ?? O.length);
+    const to =
+      end === beforeLines.length
+        ? originalLines.length
+        : (toOriginal.get(end) ?? originalLines.length);
     if (to < from) {
       return after;
     }
 
-    const lines = [...A.slice(start, hunk.start), ...hunk.lines, ...A.slice(hunk.end, end)];
+    const lines = [
+      ...beforeLines.slice(start, hunk.start),
+      ...hunk.lines,
+      ...beforeLines.slice(hunk.end, end),
+    ];
     out.splice(from, to - from, ...lines);
   }
   return out.join('\n');

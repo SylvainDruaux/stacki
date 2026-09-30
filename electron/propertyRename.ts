@@ -438,7 +438,10 @@ function editAstroNodes(
     assert(pending.length <= PROPERTY_LIMITS.nodesMax, 'Astro rename node budget');
     const entry = pending[index];
     assert(entry !== undefined, 'Queued Astro node exists');
-    const result = renameNode(source, entry.node, names, rename, owner, entry.expression);
+    const result = renameNode(source, entry.node, names, rename, {
+      owner,
+      expression: entry.expression,
+    });
     if (!result.ok) {
       return result;
     }
@@ -463,8 +466,10 @@ function renameNode(
   node: Node,
   names: ReadonlySet<string>,
   rename: PropertyReferenceEdit,
-  owner: 'definition' | 'consumer',
-  expression: boolean,
+  {
+    owner,
+    expression,
+  }: { readonly owner: 'definition' | 'consumer'; readonly expression: boolean },
 ): Result<readonly SourceEdit[]> {
   const edits: SourceEdit[] = [];
   if ('attributes' in node) {

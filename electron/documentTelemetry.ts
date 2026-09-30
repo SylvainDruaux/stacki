@@ -44,7 +44,19 @@ export function createDocumentTelemetry(log: (line: string) => void): DocumentTe
   const totals: Totals = { applied: 0, uncertain: 0, backpressured: 0, lockLeaked: 0 };
   return {
     record(file, event) {
-      const line = countEvent(event, totals, rejected);
+      // Push the ifs up: every counter moves here, and the line reports its total.
+      const { counter, ...fields } = tallyOf(event);
+      let count: number;
+      if (counter === 'rejected') {
+        assert(fields.reason !== undefined, 'A rejection names its reason');
+        count = (rejected[fields.reason] ?? 0) + 1;
+        rejected[fields.reason] = count;
+      } else {
+        count = totals[counter] + 1;
+        totals[counter] = count;
+      }
+      assert(Number.isSafeInteger(count), 'A counter is a count');
+      const line: Line = { ...fields, count };
       log(JSON.stringify({ event: TELEMETRY_EVENT, file: hashPath(file), ...line }));
     },
     counts() {
@@ -73,17 +85,22 @@ interface Line {
   readonly count: number;
 }
 
-// Push the ifs up: every counter moves here, and the line reports its total.
-function countEvent(event: TelemetryEvent, totals: Totals, rejected: Record<string, number>): Line {
+// What one event counts toward, and what its line says besides the count.
+interface Tally {
+  readonly counter: keyof Totals | 'rejected';
+  readonly intent?: IntentId;
+  readonly outcome: string;
+  readonly reason?: RejectionReason;
+}
+
+function tallyOf(event: TelemetryEvent): Tally {
   switch (event.tag) {
     case 'backpressured':
-      totals.backpressured += 1;
-      return { outcome: 'backpressured', count: totals.backpressured };
+      return { counter: 'backpressured', outcome: 'backpressured' };
     case 'lock-leaked':
-      totals.lockLeaked += 1;
-      return { outcome: 'lock-leaked', count: totals.lockLeaked };
+      return { counter: 'lockLeaked', outcome: 'lock-leaked' };
     case 'outcome':
-      return countOutcome(event.outcome, totals, rejected);
+      return outcomeTally(event.outcome);
     default: {
       const exhaustive: never = event;
       return exhaustive;
@@ -91,20 +108,15 @@ function countEvent(event: TelemetryEvent, totals: Totals, rejected: Record<stri
   }
 }
 
-function countOutcome(outcome: Outcome, totals: Totals, rejected: Record<string, number>): Line {
+function outcomeTally(outcome: Outcome): Tally {
   const intent = outcome.intentId;
   switch (outcome.tag) {
     case 'applied':
-      totals.applied += 1;
-      return { intent, outcome: 'applied', count: totals.applied };
+      return { counter: 'applied', intent, outcome: 'applied' };
     case 'uncertain':
-      totals.uncertain += 1;
-      return { intent, outcome: 'uncertain', count: totals.uncertain };
-    case 'rejected': {
-      const count = (rejected[outcome.reason] ?? 0) + 1;
-      rejected[outcome.reason] = count;
-      return { intent, outcome: 'rejected', reason: outcome.reason, count };
-    }
+      return { counter: 'uncertain', intent, outcome: 'uncertain' };
+    case 'rejected':
+      return { counter: 'rejected', intent, outcome: 'rejected', reason: outcome.reason };
     default: {
       const exhaustive: never = outcome;
       return exhaustive;

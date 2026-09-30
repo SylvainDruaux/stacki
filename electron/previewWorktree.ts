@@ -40,10 +40,10 @@ import path from 'path';
 import type { Git } from './git.js';
 
 /** Where the preview checkout lives, and the directory git must not see. */
-const PREVIEW_DIR = path.join('.stacki', 'preview');
+const PREVIEW_DIRECTORY = path.join('.stacki', 'preview');
 const EXCLUDE_LINE = '.stacki/';
 
-const previewPath = (projectPath: string): string => path.join(projectPath, PREVIEW_DIR);
+const previewPath = (projectPath: string): string => path.join(projectPath, PREVIEW_DIRECTORY);
 
 /**
  * Make git ignore `.stacki/` locally.
@@ -55,18 +55,18 @@ const previewPath = (projectPath: string): string => path.join(projectPath, PREV
 function ensureExcluded(projectPath: string): boolean {
   // In a worktree, `.git` is a file pointing elsewhere; the exclude file we
   // want is always the main repository's.
-  const gitDir = path.join(projectPath, '.git');
-  let infoDir: string;
+  const gitDirectory = path.join(projectPath, '.git');
+  let infoDirectory: string;
   try {
-    const stat = fs.statSync(gitDir);
-    infoDir = stat.isDirectory()
-      ? path.join(gitDir, 'info')
+    const stat = fs.statSync(gitDirectory);
+    infoDirectory = stat.isDirectory()
+      ? path.join(gitDirectory, 'info')
       : // "gitdir: /path/to/.git/worktrees/x" — the common dir is two up.
         path.join(
           path.resolve(
-            path.dirname(gitDir),
+            path.dirname(gitDirectory),
             fs
-              .readFileSync(gitDir, 'utf8')
+              .readFileSync(gitDirectory, 'utf8')
               .replace(/^gitdir:\s*/, '')
               .trim(),
             '..',
@@ -78,10 +78,10 @@ function ensureExcluded(projectPath: string): boolean {
     return false;
   }
   try {
-    fs.mkdirSync(infoDir, { recursive: true });
-    const file = path.join(infoDir, 'exclude');
+    fs.mkdirSync(infoDirectory, { recursive: true });
+    const file = path.join(infoDirectory, 'exclude');
     const current = fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : '';
-    if (current.split('\n').some((l) => l.trim() === EXCLUDE_LINE)) {
+    if (current.split('\n').some((line) => line.trim() === EXCLUDE_LINE)) {
       return true;
     }
     const sep = current && !current.endsWith('\n') ? '\n' : '';
@@ -106,13 +106,13 @@ async function ensureWorktree(
   { projectPath, ref }: { readonly projectPath: string; readonly ref: string },
 ): Promise<string> {
   ensureExcluded(projectPath);
-  const dir = previewPath(projectPath);
+  const directory = previewPath(projectPath);
 
   // Is there already one, and does git still know about it? A folder left
   // behind by a crash is not a worktree, and `worktree add` onto it fails.
-  const known = await isRegistered(git, projectPath, dir);
-  if (!known && fs.existsSync(dir)) {
-    fs.rmSync(dir, { recursive: true, force: true });
+  const known = await isRegistered(git, projectPath, directory);
+  if (!known && fs.existsSync(directory)) {
+    fs.rmSync(directory, { recursive: true, force: true });
     // Registered-but-missing is the other half of the same mess.
     try {
       await git(projectPath, ['worktree', 'prune']);
@@ -125,29 +125,29 @@ async function ensureWorktree(
     // Moving an existing checkout: `--detach` keeps it off any branch, so it
     // can sit on the same commit a branch is on without git objecting that the
     // branch is checked out twice.
-    await git(dir, ['checkout', '--detach', '--force', ref]);
+    await git(directory, ['checkout', '--detach', '--force', ref]);
     // A previous preview may have left build output behind; the checkout does
     // not remove untracked files and stale ones would be served.
-    await git(dir, ['clean', '-qfd']);
-    return dir;
+    await git(directory, ['clean', '-qfd']);
+    return directory;
   }
 
-  fs.mkdirSync(path.dirname(dir), { recursive: true });
-  await git(projectPath, ['worktree', 'add', '--detach', '--force', dir, ref]);
-  return dir;
+  fs.mkdirSync(path.dirname(directory), { recursive: true });
+  await git(projectPath, ['worktree', 'add', '--detach', '--force', directory, ref]);
+  return directory;
 }
 
-async function isRegistered(git: Git, projectPath: string, dir: string): Promise<boolean> {
+async function isRegistered(git: Git, projectPath: string, directory: string): Promise<boolean> {
   try {
     const { stdout } = await git(projectPath, ['worktree', 'list', '--porcelain']);
-    const target = fs.existsSync(dir) ? fs.realpathSync(dir) : path.resolve(dir);
+    const target = fs.existsSync(directory) ? fs.realpathSync(directory) : path.resolve(directory);
     return stdout
       .split('\n')
-      .filter((l) => l.startsWith('worktree '))
-      .map((l) => l.slice('worktree '.length).trim())
-      .some((p) => {
+      .filter((line) => line.startsWith('worktree '))
+      .map((line) => line.slice('worktree '.length).trim())
+      .some((worktreePath) => {
         try {
-          return fs.existsSync(p) && fs.realpathSync(p) === target;
+          return fs.existsSync(worktreePath) && fs.realpathSync(worktreePath) === target;
         } catch {
           return false;
         }
@@ -168,15 +168,15 @@ async function removeWorktree(
   git: Git,
   { projectPath }: { readonly projectPath: string },
 ): Promise<{ ok: boolean }> {
-  const dir = previewPath(projectPath);
+  const directory = previewPath(projectPath);
   try {
-    await git(projectPath, ['worktree', 'remove', '--force', dir]);
+    await git(projectPath, ['worktree', 'remove', '--force', directory]);
   } catch {
     // Already gone, or never registered. Either way the folder should not be
     // left behind.
   }
   try {
-    fs.rmSync(dir, { recursive: true, force: true });
+    fs.rmSync(directory, { recursive: true, force: true });
     // Leave `.stacki` itself only if something else put something in it.
     const parent = path.join(projectPath, '.stacki');
     if (fs.existsSync(parent) && fs.readdirSync(parent).length === 0) {
@@ -193,4 +193,4 @@ async function removeWorktree(
   return { ok: true };
 }
 
-export { ensureWorktree, removeWorktree, ensureExcluded, previewPath, PREVIEW_DIR };
+export { ensureWorktree, removeWorktree, ensureExcluded, previewPath, PREVIEW_DIRECTORY };

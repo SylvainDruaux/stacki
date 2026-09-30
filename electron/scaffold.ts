@@ -166,19 +166,19 @@ description="Drag components, tweak props, and watch the preview update live." /
 `,
 };
 
-function scaffoldProject(dir: string, name?: string): string {
+function scaffoldProject(directory: string, name?: string): string {
   const safeName =
-    (name || path.basename(dir))
+    (name || path.basename(directory))
       .toLowerCase()
       .replace(/[^a-z0-9-]+/g, '-')
       .replace(/^-+|-+$/g, '') || 'astro-site';
 
   for (const [rel, gen] of Object.entries(FILES)) {
-    const filePath = path.join(dir, rel);
+    const filePath = path.join(directory, rel);
     fs.mkdirSync(path.dirname(filePath), { recursive: true });
     fs.writeFileSync(filePath, gen(safeName), 'utf8');
   }
-  return dir;
+  return directory;
 }
 
 export { scaffoldProject };

@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 
 import { toRecord, toArray } from '../shared/record.js';
+import { MAIN_LIMITS } from './main.bounds.js';
 
 // Finds the files that import a JSON collection, and rewrites them to stop:
 // `import clients from '../data/clients.json'` becomes `const clients = []`,
@@ -19,13 +20,13 @@ function readJsonc(file: string): unknown {
   try {
     const raw = fs
       .readFileSync(file, 'utf8')
-      .replace(/\\"|"(?:\\"|[^"])*"|(\/\/.*$|\/\*[\s\S]*?\*\/)/gm, (m, comment) =>
-        comment ? '' : m,
+      .replace(/\\"|"(?:\\"|[^"])*"|(\/\/.*$|\/\*[\s\S]*?\*\/)/gm, (match, comment) =>
+        comment ? '' : match,
       )
       .replace(/,(\s*[}\]])/g, '$1');
     return JSON.parse(raw);
   } catch {
-    return null;
+    return undefined;
   }
 }
 
@@ -50,7 +51,9 @@ function aliasMap(projectPath: string): Alias[] {
   return Object.entries(paths).map(([pattern, targets]) => ({
     prefix: pattern.replace(/\*$/, ''),
     wildcard: pattern.endsWith('*'),
-    targets: (toArray(targets) ?? []).map((t) => path.resolve(base, String(t).replace(/\*$/, ''))),
+    targets: (toArray(targets) ?? []).map((target) =>
+      path.resolve(base, String(target).replace(/\*$/, '')),
+    ),
   }));
 }
 
@@ -61,7 +64,7 @@ function resolveSpec(spec: string, fromFile: string, aliases: readonly Alias[]):
   for (const alias of aliases) {
     if (alias.wildcard ? spec.startsWith(alias.prefix) : spec === alias.prefix) {
       const rest = spec.slice(alias.prefix.length);
-      return alias.targets.map((t) => path.resolve(t, rest));
+      return alias.targets.map((target) => path.resolve(target, rest));
     }
   }
   return []; // a bare package specifier — not a project file
@@ -98,10 +101,15 @@ function boundNames(clause: string): string[] {
   return names;
 }
 
-function walkCodeFiles(dir: string, out: string[] = []): string[] {
+function walkCodeFiles(directory: string, out: string[] = [], depth = 0): string[] {
+  // A project's folders are not ours to trust: a tree deeper than any real one stops the walk
+  // there, before it can exhaust the stack.
+  if (depth > MAIN_LIMITS.directoryDepthMax) {
+    return out;
+  }
   let entries: fs.Dirent[] = [];
   try {
-    entries = fs.readdirSync(dir, { withFileTypes: true });
+    entries = fs.readdirSync(directory, { withFileTypes: true });
   } catch {
     return out;
   }
@@ -109,9 +117,9 @@ function walkCodeFiles(dir: string, out: string[] = []): string[] {
     if (entry.name.startsWith('.') || entry.name === 'node_modules') {
       continue;
     }
-    const full = path.join(dir, entry.name);
+    const full = path.join(directory, entry.name);
     if (entry.isDirectory()) {
-      walkCodeFiles(full, out);
+      walkCodeFiles(full, out, depth + 1);
     } else if (CODE_EXT.test(entry.name)) {
       out.push(full);
     }
@@ -145,7 +153,7 @@ function importersOf(projectPath: string, targetAbs: string): Importer[] {
     const names: string[] = [];
     const next = text.replace(IMPORT_RE, (match, indent: string, clause: string, spec: string) => {
       const resolved = resolveSpec(spec, file, aliases);
-      if (!resolved.some((r) => r === target)) {
+      if (!resolved.some((candidate) => candidate === target)) {
         return match;
       }
       const bound = boundNames(clause);
@@ -153,7 +161,7 @@ function importersOf(projectPath: string, targetAbs: string): Importer[] {
       if (!bound.length) {
         return ''; // side-effect import — just drop it
       }
-      return bound.map((n) => `${indent}const ${n} = [];\n`).join('');
+      return bound.map((name) => `${indent}const ${name} = [];\n`).join('');
     });
     if (names.length || next !== text) {
       hits.push({ file, rel: path.relative(path.join(projectPath, 'src'), file), names, next });
@@ -162,11 +170,11 @@ function importersOf(projectPath: string, targetAbs: string): Importer[] {
   return hits;
 }
 
-// The file an import specifier points at, or null. Extensionless specifiers
+// The file an import specifier points at, or undefined. Extensionless specifiers
 // get the usual candidates tried, the way a bundler would.
 const IMPORT_EXTS = ['', '.astro', '.jsx', '.tsx', '.js', '.ts', '.vue', '.svelte', '.md', '.mdx'];
 
-function resolveImport(projectPath: string, fromFile: string, spec: string): string | null {
+function resolveImport(projectPath: string, fromFile: string, spec: string): string | undefined {
   for (const base of resolveSpec(spec, fromFile, aliasMap(projectPath))) {
     for (const ext of IMPORT_EXTS) {
       const candidate = base + ext;
@@ -189,7 +197,7 @@ function resolveImport(projectPath: string, fromFile: string, spec: string): str
       }
     }
   }
-  return null;
+  return undefined;
 }
 
 export { importersOf, boundNames, resolveSpec, resolveImport, aliasMap };

@@ -11,24 +11,24 @@ import * as yaml from './yaml.js';
 const FRONTMATTER = /^(---)([ \t]*\r?\n)([\s\S]*?)(\r?\n)(---)([ \t]*)(\r?\n?)/;
 
 export interface ParsedFrontmatter {
-  readonly data: unknown; // null when the file has no frontmatter
-  readonly frontmatter: string | null;
+  readonly data: unknown; // undefined when the file has no frontmatter
+  readonly frontmatter: string | undefined;
   readonly body: string;
   readonly offset: number;
 }
 
-/** { data, body, frontmatter } — data is null when the file has no frontmatter. */
+/** { data, body, frontmatter } — data is undefined when the file has no frontmatter. */
 function parse(text: string): ParsedFrontmatter {
-  const m = text.match(FRONTMATTER);
-  const block = m?.[3];
-  if (!m || block === undefined) {
-    return { data: null, frontmatter: null, body: text, offset: 0 };
+  const match = text.match(FRONTMATTER);
+  const block = match?.[3];
+  if (!match || block === undefined) {
+    return { data: undefined, frontmatter: undefined, body: text, offset: 0 };
   }
   return {
     data: yaml.parseData(block + '\n') ?? {},
     frontmatter: block,
-    body: text.slice(m[0].length),
-    offset: m[0].length,
+    body: text.slice(match[0].length),
+    offset: match[0].length,
   };
 }
 
@@ -44,9 +44,9 @@ function applyEdits(
   edits: readonly yaml.Edit[],
   { body }: { readonly body?: string | undefined } = {},
 ): string {
-  const m = text.match(FRONTMATTER);
-  const block = m?.[3];
-  if (!m || block === undefined) {
+  const match = text.match(FRONTMATTER);
+  const block = match?.[3];
+  if (!match || block === undefined) {
     if (!edits.length) {
       return body === undefined ? text : body;
     }
@@ -54,8 +54,8 @@ function applyEdits(
     return `---\n${written}---\n${body === undefined ? text : body}`;
   }
   const written = edits.length ? yaml.applyEdits(block + '\n', edits).replace(/\n$/, '') : block;
-  const head = `${m[1]}${m[2]}${written}${m[4]}${m[5]}${m[6]}${m[7]}`;
-  return head + (body === undefined ? text.slice(m[0].length) : body);
+  const head = `${match[1]}${match[2]}${written}${match[4]}${match[5]}${match[6]}${match[7]}`;
+  return head + (body === undefined ? text.slice(match[0].length) : body);
 }
 
 export { parse, parseData, applyEdits };

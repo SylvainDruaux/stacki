@@ -28,8 +28,8 @@ function packageOf(entrypoint: unknown): string | undefined {
   if (at === -1) {
     return undefined;
   }
-  const m = normalized.slice(at + '/node_modules/'.length).match(/^((?:@[^/]+\/)?[^/]+)/);
-  return m?.[1];
+  const match = normalized.slice(at + '/node_modules/'.length).match(/^((?:@[^/]+\/)?[^/]+)/);
+  return match?.[1];
 }
 
 export interface InjectedRoute {
@@ -62,8 +62,8 @@ function readInjectedRoutes(projectPath: string): InjectedRoute[] {
     return [];
   }
   const injected: InjectedRoute[] = [];
-  for (const r of routes) {
-    const record = toRecord(r);
+  for (const route of routes) {
+    const record = toRecord(route);
     const pattern = record?.['pattern'];
     if (typeof pattern !== 'string' || pattern.startsWith('/__avb')) {
       continue;

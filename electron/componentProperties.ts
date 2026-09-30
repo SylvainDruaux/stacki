@@ -215,7 +215,15 @@ function planPropertyChanges(
     const { file, names } = consumer;
     const own = sameFilesystemPath(file, request.file);
     const original = own ? source : consumer.source;
-    const changed = planConsumerChange(original, names, change, propertyRename, optionRenames, own);
+    const owner = own ? 'definition' : 'consumer';
+    const changed = planConsumerChange(
+      original,
+      names,
+      change,
+      propertyRename,
+      optionRenames,
+      owner,
+    );
     if (!changed.ok) {
       return err({
         code: changed.error.code,
@@ -254,10 +262,10 @@ function planConsumerChange(
   change: Extract<PropertyChange, { readonly kind: 'save' }>,
   propertyRename: { readonly from: string; readonly to: string } | undefined,
   optionRenames: readonly PropertyOptionRename[],
-  own: boolean,
+  owner: 'definition' | 'consumer',
 ): Result<string> {
   const renamed = propertyRename
-    ? renameComponentReferences(source, names, propertyRename, own ? 'definition' : 'consumer')
+    ? renameComponentReferences(source, names, propertyRename, owner)
     : ok(source);
   if (!renamed.ok || optionRenames.length === 0) {
     return renamed;

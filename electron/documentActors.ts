@@ -174,20 +174,73 @@ export interface CurrentError {
   readonly message: string;
 }
 
-interface Entry {
+// One actor and what the host keeps beside it. Its fields change only through the methods
+// below, so every write to an actor's record is in one place and checks its bound there.
+class Entry {
   readonly document: CanonicalDocument;
-  state: ActorState;
-  used: number;
+  #state: ActorState;
+  #used: number;
+  #retained: readonly Snapshot[] = [];
+  #log: readonly CommitRecord[] = [];
+  #written: Digest | undefined = undefined;
+
+  constructor(document: CanonicalDocument, state: ActorState, used: number) {
+    this.document = document;
+    this.#state = state;
+    this.#used = used;
+  }
+
+  get state(): ActorState {
+    return this.#state;
+  }
+
+  /** The host clock when the actor was last used, for least-recently-used eviction. */
+  get used(): number {
+    return this.#used;
+  }
+
   /** Snapshots the actor held before its current one, newest last, bounded by
    * LIMITS.authoredSnapshotsMax: the bytes an edit may have been authored
    * against when an outside write replaced them since (step 6). */
-  retained: Snapshot[];
+  get retained(): readonly Snapshot[] {
+    return this.#retained;
+  }
+
   /** The actor's recent commits, oldest first, bounded by
    * LIMITS.commitLogEntriesMax: an edit authored before them rebases exactly. */
-  log: CommitRecord[];
+  get log(): readonly CommitRecord[] {
+    return this.#log;
+  }
+
   /** The checksum of the bytes this actor last wrote, created or committed;
    * undefined until it writes. A watcher tick asks it (plan §11.9). */
-  written: Digest | undefined;
+  get written(): Digest | undefined {
+    return this.#written;
+  }
+
+  setState(next: ActorState): void {
+    this.#state = next;
+  }
+
+  touch(clock: number): void {
+    assert(clock >= this.#used, 'The host clock only moves forward');
+    this.#used = clock;
+  }
+
+  setRetained(retained: readonly Snapshot[]): void {
+    assert(retained.length <= LIMITS.authoredSnapshotsMax, 'Retained snapshots are bounded');
+    this.#retained = retained;
+  }
+
+  recordCreate(checksum: Digest): void {
+    this.#written = checksum;
+  }
+
+  recordCommit(record: CommitRecord): void {
+    this.#log = [...this.#log, record].slice(-LIMITS.commitLogEntriesMax);
+    this.#written = record.to;
+    assert(this.#log.length <= LIMITS.commitLogEntriesMax, 'The commit log is bounded');
+  }
 }
 
 /** An outcome with what the host learned beside it. */
@@ -500,7 +553,7 @@ export class DocumentActors {
     if (entry === undefined) {
       return; // No actor, no snapshot to refresh.
     }
-    entry.state = markDirty(entry.state);
+    entry.setState(markDirty(entry.state));
     if (this.#dirty.size < LIMITS.watcherFilesPerTickMax) {
       this.#dirty.add(document.value.key);
     }
@@ -584,7 +637,7 @@ export class DocumentActors {
     }
     const chain =
       authored === current ? [] : commitChain(entry.log, authoredChecksum, current.checksum);
-    const history = editHistory(authored === current, chain);
+    const history = editHistory(authored, current, chain);
     const built = build({ authored, current, history });
     if (!built.ok) {
       return built;
@@ -621,7 +674,7 @@ export class DocumentActors {
     authored: Snapshot | undefined = undefined,
   ): 'accepted' | 'backpressured' {
     const submitted = submitIntent(entry.state, { intent, authored });
-    entry.state = submitted.state;
+    entry.setState(submitted.state);
     if (submitted.result.tag === 'backpressured') {
       this.#options.telemetry.record(entry.document.path, { tag: 'backpressured' });
       return 'backpressured';
@@ -801,7 +854,7 @@ export class DocumentActors {
         diskChecksum: current.value,
       };
     }
-    entry.written = checksum;
+    entry.recordCreate(checksum);
     return { tag: 'applied', checksum, inverse: [] };
   }
 
@@ -814,7 +867,7 @@ export class DocumentActors {
     const existing = this.#entries.get(document.value.key);
     if (existing !== undefined) {
       if (existing.document.path === document.value.path) {
-        existing.used = this.#clock;
+        existing.touch(this.#clock);
         return ok(existing);
       }
       // One key, another path: a case variant of the name on a case-insensitive
@@ -825,14 +878,7 @@ export class DocumentActors {
       this.#entries.delete(document.value.key);
     }
     this.#evict();
-    const entry: Entry = {
-      document: document.value,
-      state: createActor(document.value.path),
-      used: this.#clock,
-      retained: [],
-      log: [],
-      written: undefined,
-    };
+    const entry = new Entry(document.value, createActor(document.value.path), this.#clock);
     this.#entries.set(document.value.key, entry);
     assert(
       this.#entries.size <= LIMITS.documentActorsMax,
@@ -873,7 +919,7 @@ export class DocumentActors {
   // edit authored against it can still be mapped (LIMITS.authoredSnapshotsMax).
   #adopt(entry: Entry, next: ActorState): void {
     const previous = entry.state.snapshot;
-    entry.state = next;
+    entry.setState(next);
     if (previous === undefined) {
       return;
     }
@@ -892,8 +938,8 @@ export class DocumentActors {
       assert(oldest !== undefined, 'Bytes over the bound come from some snapshot');
       bytes -= oldest.bytes.length;
     }
-    entry.retained = retained;
-    assert(entry.retained.length <= LIMITS.authoredSnapshotsMax, 'Retained snapshots are bounded');
+    entry.setRetained(retained);
+    assert(entry.retained === retained, 'The entry keeps the snapshots it was given');
   }
 
   #logCommit(entry: Entry, commit: Extract<ActorEffect, { tag: 'committed' }>): void {
@@ -902,9 +948,8 @@ export class DocumentActors {
       to: commit.candidate.checksum,
       splices: minimalSplices(commit.plan.splices),
     };
-    entry.log = [...entry.log, record].slice(-LIMITS.commitLogEntriesMax);
-    entry.written = record.to;
-    assert(entry.log.length <= LIMITS.commitLogEntriesMax, 'The commit log is bounded');
+    entry.recordCommit(record);
+    assert(entry.written === record.to, 'The commit is what the actor last wrote');
     assert(entry.state.snapshot?.checksum === record.to, 'The commit is the actor snapshot');
   }
 
@@ -929,10 +974,11 @@ export class DocumentActors {
 
 // What lies between an edit's authored bytes and the bytes on disk now.
 function editHistory(
-  same: boolean,
+  authored: Snapshot,
+  current: Snapshot,
   chain: readonly CommitRecord[] | undefined,
 ): EditBase['history'] {
-  if (same) {
+  if (authored === current) {
     return 'unchanged';
   }
   return chain === undefined ? 'outside' : 'own-commits';

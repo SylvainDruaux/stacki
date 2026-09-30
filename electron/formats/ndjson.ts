@@ -6,6 +6,7 @@
 // Never pretty-printed: a record spread over several lines is several broken
 // records.
 
+import { LIMITS } from '../../shared/limits.js';
 import { toRecord, toArray } from '../../shared/record.js';
 
 interface LineInfo {
@@ -19,13 +20,13 @@ interface LineInfo {
 const parseLine = (line: string, index: number): LineInfo => {
   const trimmed = line.trim();
   if (!trimmed || trimmed.startsWith('//')) {
-    return { index, line, record: null };
+    return { index, line, record: undefined };
   }
   let record: unknown;
   try {
     record = JSON.parse(trimmed);
   } catch {
-    return { index, line, record: null, error: true };
+    return { index, line, record: undefined, error: true };
   }
   return { index, line, record };
 };
@@ -34,8 +35,8 @@ const parseLines = (text: string): LineInfo[] => text.split('\n').map(parseLine)
 
 const parseData = (text: string): unknown[] =>
   parseLines(text)
-    .filter((l) => l.record)
-    .map((l) => l.record);
+    .filter((info) => info.record)
+    .map((info) => info.record);
 
 const DELETE = Symbol('delete');
 
@@ -44,7 +45,17 @@ export interface Edit {
   readonly value?: unknown;
 }
 
-const setIn = (target: unknown, path: readonly (string | number)[], value: unknown): unknown => {
+const setIn = (
+  target: unknown,
+  path: readonly (string | number)[],
+  value: unknown,
+  depth = 0,
+): unknown => {
+  // The path arrives with an edit from the renderer. One deeper than any value that crosses a
+  // boundary names nothing a record can hold, so the edit fails rather than the stack.
+  if (depth > LIMITS.ipcDepthMax) {
+    throw new Error('The edit path is nested too deeply.');
+  }
   if (!path.length) {
     return value;
   }
@@ -53,7 +64,10 @@ const setIn = (target: unknown, path: readonly (string | number)[], value: unkno
     return value; // unreachable: path is non-empty here
   }
   const isIndex = typeof key === 'number';
-  const next = target == null ? (isIndex ? [] : {}) : target;
+  // JSON's null is a value in the file, but there is nothing inside it to write into: like an
+  // absent member, it becomes the container the path asks for.
+  const absent = target === undefined || target === null;
+  const next = absent ? (isIndex ? [] : {}) : target;
   const list = toArray(next);
   const record = toRecord(next);
   if (!list && !record) {
@@ -78,7 +92,7 @@ const setIn = (target: unknown, path: readonly (string | number)[], value: unkno
     return next;
   }
   const child = list ? list[Number(key)] : record?.[String(key)];
-  const updated = setIn(child, rest, value);
+  const updated = setIn(child, rest, value, depth + 1);
   if (list) {
     list[Number(key)] = updated;
   } else if (record) {
@@ -96,7 +110,7 @@ function applyEdits(text: string, edits: readonly Edit[]): string {
     return text;
   }
   const lines = parseLines(text);
-  const records = lines.filter((l) => l.record);
+  const records = lines.filter((info) => info.record);
   const touched = new Set<number>();
 
   for (const { path, value } of edits) {
@@ -118,8 +132,8 @@ function applyEdits(text: string, edits: readonly Edit[]): string {
   }
 
   return lines
-    .filter((l) => !l.removed)
-    .map((l) => (touched.has(l.index) ? JSON.stringify(l.record) : l.line))
+    .filter((info) => !info.removed)
+    .map((info) => (touched.has(info.index) ? JSON.stringify(info.record) : info.line))
     .join('\n');
 }
 

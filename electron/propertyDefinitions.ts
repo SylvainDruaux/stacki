@@ -326,9 +326,9 @@ function readDescription(member: ts.PropertySignature, source: string): string {
     .trim();
 }
 function renderDefinition(property: ComponentProperty): string {
-  const doc = property.description.trim();
-  const description = doc
-    ? `  /** ${doc.replace(/\*\//g, '* /').replace(/\n/g, '\n   * ')} */\n`
+  const documentation = property.description.trim();
+  const description = documentation
+    ? `  /** ${documentation.replace(/\*\//g, '* /').replace(/\n/g, '\n   * ')} */\n`
     : '';
   return (
     `\n${description}  ${property.readonly ? 'readonly ' : ''}${property.name}` +

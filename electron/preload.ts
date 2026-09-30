@@ -14,11 +14,22 @@ type Spacing = {
   margin: Record<string, number>;
   gaps: GapBand[];
 };
+type GapRow = { top: number; bottom: number; items: DOMRect[] };
 
-const isElement = (n: Node): n is Element => n.nodeType === 1;
-const isComment = (n: Node): n is Comment => n.nodeType === 8;
-const isText = (n: Node): n is Text => n.nodeType === 3;
-const isChildNode = (n: Node): n is ChildNode => 'remove' in n && typeof n['remove'] === 'function';
+// The canvas protocol spells absence `undefined`, like every other value in
+// the app (AGENTS.md §6): postMessage is a structured clone, which keeps it,
+// and the app's parsers (src/previewMessages.ts, src/canvasReply.ts) read it.
+
+// How deep the frame walks the page. An HTML parser stops nesting elements at
+// 512 (Chromium's limit), and style rules nest far less; a deeper tree did not
+// come from the project's markup, and what lies below the bound is skipped.
+const PRELOAD_LIMITS = { domDepthMax: 512, cssRuleDepthMax: 64 } as const;
+
+const isElement = (node: Node): node is Element => node.nodeType === 1;
+const isComment = (node: Node): node is Comment => node.nodeType === 8;
+const isText = (node: Node): node is Text => node.nodeType === 3;
+const isChildNode = (node: Node): node is ChildNode =>
+  'remove' in node && typeof node['remove'] === 'function';
 
 // Preview iframes (nodeIntegrationInSubFrames runs this preload in them too):
 // don't expose the app API to the previewed site — just report the page's
@@ -34,9 +45,10 @@ if (!process.isMainFrame) {
   // renderings disagree about, and neither of them has ever heard of these.
   const stackiMode = location.hash.includes('avb-design') ? 'stacki-designer' : 'stacki-preview';
   const markMode = () => document.documentElement?.classList.add(stackiMode);
-  markMode(); // <html> exists by the time a preload runs, but not always in a
-  // frame that is still being created — so try again at the first two moments
-  // it certainly does.
+  // <html> exists by the time a preload runs, but not always in a frame that
+  // is still being created — so try again at the first two moments it
+  // certainly does.
+  markMode();
   document.addEventListener('readystatechange', markMode);
   window.addEventListener('DOMContentLoaded', markMode);
 
@@ -61,15 +73,16 @@ if (!process.isMainFrame) {
     // Block navigation and submits at capture so page handlers never fire.
     window.addEventListener(
       'click',
-      (e) => {
-        const a = e.target instanceof Element ? e.target.closest('a[href]') : null;
-        if (a) {
-          e.preventDefault();
+      (event) => {
+        const anchor =
+          event.target instanceof Element ? event.target.closest('a[href]') : undefined;
+        if (anchor) {
+          event.preventDefault();
         }
       },
       true,
     );
-    window.addEventListener('submit', (e) => e.preventDefault(), true);
+    window.addEventListener('submit', (event) => event.preventDefault(), true);
     // A press on the canvas is a selection, not an interaction — and left to
     // the browser, a press focuses whatever is under the pointer. Focusing
     // something REVEALS it: the page scrolls to bring it into view, sideways
@@ -86,11 +99,11 @@ if (!process.isMainFrame) {
     // ELEMENT focus, and the scroll that comes with it, that goes.
     window.addEventListener(
       'mousedown',
-      (e) => {
-        if (e.button !== 0) {
+      (event) => {
+        if (event.button !== 0) {
           return;
         }
-        e.preventDefault();
+        event.preventDefault();
         window.focus();
       },
       true,
@@ -102,8 +115,8 @@ if (!process.isMainFrame) {
     // spacing box a hover or a drag applies to — and from the app's side,
     // nobody was pressing anything.
     let held = { shiftKey: false, altKey: false };
-    const tellModifiers = (e: { shiftKey: boolean; altKey: boolean }) => {
-      const next = { shiftKey: !!e.shiftKey, altKey: !!e.altKey };
+    const tellModifiers = (event: { shiftKey: boolean; altKey: boolean }) => {
+      const next = { shiftKey: !!event.shiftKey, altKey: !!event.altKey };
       if (next.shiftKey === held.shiftKey && next.altKey === held.altKey) {
         return;
       }
@@ -125,10 +138,10 @@ if (!process.isMainFrame) {
     // ⌘F/⌘E die inside the iframe and the insert palette never opens.
     window.addEventListener(
       'keydown',
-      (e) => {
-        const mod = e.metaKey || e.ctrlKey;
-        if (mod && (e.key.toLowerCase() === 'f' || e.key.toLowerCase() === 'e')) {
-          e.preventDefault();
+      (event) => {
+        const mod = event.metaKey || event.ctrlKey;
+        if (mod && (event.key.toLowerCase() === 'f' || event.key.toLowerCase() === 'e')) {
+          event.preventDefault();
           try {
             window.parent.postMessage({ type: 'avb:shortcut', name: 'insert' }, '*');
           } catch {
@@ -136,13 +149,13 @@ if (!process.isMainFrame) {
           }
           return;
         }
-        const t = e.target;
+        const target = event.target;
         const typing =
-          t instanceof window.HTMLElement &&
-          (t.tagName === 'INPUT' ||
-            t.tagName === 'TEXTAREA' ||
-            t.tagName === 'SELECT' ||
-            t.isContentEditable);
+          target instanceof window.HTMLElement &&
+          (target.tagName === 'INPUT' ||
+            target.tagName === 'TEXTAREA' ||
+            target.tagName === 'SELECT' ||
+            target.isContentEditable);
         if (typing) {
           return;
         }
@@ -152,13 +165,13 @@ if (!process.isMainFrame) {
         // them (and swallow them here, so the page doesn't scroll instead).
         if (
           !mod &&
-          !e.altKey &&
-          !e.shiftKey &&
-          ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)
+          !event.altKey &&
+          !event.shiftKey &&
+          ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)
         ) {
-          e.preventDefault();
+          event.preventDefault();
           try {
-            window.parent.postMessage({ type: 'avb:shortcut', name: 'arrow', key: e.key }, '*');
+            window.parent.postMessage({ type: 'avb:shortcut', name: 'arrow', key: event.key }, '*');
           } catch {
             /* ignore */
           }
@@ -170,17 +183,20 @@ if (!process.isMainFrame) {
         // menu accelerators, which fire whatever holds focus; delete and
         // duplicate have no menu item, so without this they only work when
         // the selection was made in the navigator.
-        const isDelete = !mod && !e.altKey && (e.key === 'Delete' || e.key === 'Backspace');
-        const isDuplicate = mod && !e.altKey && !e.shiftKey && e.key.toLowerCase() === 'd';
+        const isDelete =
+          !mod && !event.altKey && (event.key === 'Delete' || event.key === 'Backspace');
+        const isDuplicate =
+          mod && !event.altKey && !event.shiftKey && event.key.toLowerCase() === 'd';
         // ⌘Enter jumps to the class field. The canvas is where the selection is
         // usually made, so it has to reach the app from in here too.
-        const isClassJump = mod && !e.altKey && !e.shiftKey && e.key === 'Enter';
-        const isProperties = !mod && !e.altKey && !e.shiftKey && e.key.toLowerCase() === 'k';
+        const isClassJump = mod && !event.altKey && !event.shiftKey && event.key === 'Enter';
+        const isProperties =
+          !mod && !event.altKey && !event.shiftKey && event.key.toLowerCase() === 'k';
         if (isDelete || isDuplicate || isClassJump || isProperties) {
-          e.preventDefault();
+          event.preventDefault();
           try {
             window.parent.postMessage(
-              { type: 'avb:shortcut', name: 'key', key: e.key, meta: mod },
+              { type: 'avb:shortcut', name: 'key', key: event.key, meta: mod },
               '*',
             );
           } catch {
@@ -220,100 +236,26 @@ if (!process.isMainFrame) {
   // copying every rule that uses vh units into an override stylesheet with
   // `Xvh` → `calc(X * var(--avb-vh))`, where --avb-vh is 1% of that height.
   const VH_RE = /(-?\d*\.?\d+)(vh|svh|lvh|dvh)\b/g;
-  let overrideEl: HTMLStyleElement | null = null;
+  let overrideElement: HTMLStyleElement | undefined = undefined;
   let rewriteTimer: ReturnType<typeof setTimeout> | undefined;
 
   // Copies ONLY the declarations that need freezing (vh units, position:
   // fixed) into the override — never whole rule bodies. Re-asserting entire
   // rules at the end of the cascade would let base rules beat utility
   // classes that legitimately override them later in source order.
-  const filterRule = (rule: CSSRule): string => {
-    // An @import brings a whole stylesheet in, and its rules hang off
-    // `rule.styleSheet`, not `rule.cssRules` — so a sheet reached this way was
-    // invisible here. That's where a design system's `body { min-height:
-    // 100svh }` usually lives, and leaving it live is what makes a stretched
-    // canvas frame grow without end: svh tracks the frame, body grows, the
-    // page reports a taller height, the frame stretches again.
+  const filterRule = (rule: CSSRule, depth: number): string => {
+    if (depth > PRELOAD_LIMITS.cssRuleDepthMax) {
+      return '';
+    }
     if (asImport(rule)) {
-      // Still loading: nothing to copy yet, and no <head> mutation will
-      // announce it later, so ask for another pass.
-      if (!rule.styleSheet) {
-        importsPending = true;
-        return '';
-      }
-      let inner = '';
-      try {
-        for (let ri = 0; ri < rule.styleSheet.cssRules.length; ri++) {
-          const r = rule.styleSheet.cssRules[ri];
-          if (r) {
-            inner += filterRule(r);
-          }
-        }
-      } catch {
-        return ''; // cross-origin import — can't read it
-      }
-      if (!inner) {
-        return '';
-      }
-      // Keep whatever layer it was imported into, or the copy would outrank
-      // (or be outranked by) the original.
-      const layer = /\blayer\(([^)]*)\)/i.exec(rule.cssText || '');
-      if (!layer) {
-        return inner;
-      }
-      const layerBody = layer[1] ?? '';
-      return `@layer ${layerBody.trim()} {\n${inner}}\n`;
+      return filterImportRule(rule, depth);
     }
     if (asStyleLike(rule)) {
-      // With CSS nesting a style rule is BOTH: it has its own declarations and
-      // it contains rules. Taking the grouping branch on the strength of
-      // `cssRules` alone skipped everything the rule itself declared — which is
-      // exactly where `body { min-height: 100svh; > main { … } }` hides, and why
-      // a frame with that in its stylesheet grew without end.
-      let nested = '';
-      if (rule instanceof CSSGroupingRule && rule.cssRules.length) {
-        for (let ri = 0; ri < rule.cssRules.length; ri++) {
-          const r = rule.cssRules[ri];
-          if (r) {
-            nested += filterRule(r);
-          }
-        }
-      }
-      let decls = '';
-      for (let di = 0; di < rule.style.length; di++) {
-        const prop = rule.style.item(di);
-        const val = rule.style.getPropertyValue(prop);
-        const prio = rule.style.getPropertyPriority(prop);
-        VH_RE.lastIndex = 0;
-        const hasVh = VH_RE.test(val);
-        const isFixed = prop === 'position' && /fixed/.test(val);
-        if (!hasVh && !isFixed) {
-          continue;
-        }
-        VH_RE.lastIndex = 0;
-        // position:fixed anchors to the stretched frame, so it becomes
-        // absolute — headers/overlays sit at their page position instead of
-        // floating mid-frame.
-        const newVal = isFixed ? 'absolute' : val.replace(VH_RE, 'calc($1 * var(--avb-vh, 1$2))');
-        decls += `${prop}: ${newVal}${prio ? ' !important' : ''}; `;
-      }
-      // Nested matches are re-emitted inside their parent, keeping the nesting
-      // (and so the `&` context) they were written with.
-      if (!decls && !nested) {
-        return '';
-      }
-      const selector = selectorOf(rule);
-      return `${selector} { ${decls}${nested ? '\n' + nested : ''}}\n`;
+      return filterStyleRule(rule, depth);
     }
     // Grouping rule (@media, @supports, @layer, @keyframes …) — recurse.
     if (rule instanceof CSSGroupingRule && rule.cssRules.length) {
-      let inner = '';
-      for (let ri = 0; ri < rule.cssRules.length; ri++) {
-        const r = rule.cssRules[ri];
-        if (r) {
-          inner += filterRule(r);
-        }
-      }
+      const inner = filterRules(rule.cssRules, depth + 1);
       if (!inner) {
         return '';
       }
@@ -321,6 +263,88 @@ if (!process.isMainFrame) {
       return head + '{\n' + inner + '}\n';
     }
     return '';
+  };
+
+  // Every rule of a list, filtered and joined in order. CSSRuleList isn't
+  // iterable in the type library, so an index loop walks it.
+  const filterRules = (rules: CSSRuleList, depth: number): string => {
+    let out = '';
+    for (let ri = 0; ri < rules.length; ri++) {
+      const child = rules[ri];
+      if (child) {
+        out += filterRule(child, depth);
+      }
+    }
+    return out;
+  };
+
+  // An @import brings a whole stylesheet in, and its rules hang off
+  // `rule.styleSheet`, not `rule.cssRules` — so a sheet reached this way was
+  // invisible here. That's where a design system's `body { min-height:
+  // 100svh }` usually lives, and leaving it live is what makes a stretched
+  // canvas frame grow without end: svh tracks the frame, body grows, the
+  // page reports a taller height, the frame stretches again.
+  const filterImportRule = (rule: CSSImportRule, depth: number): string => {
+    // Still loading: nothing to copy yet, and no <head> mutation will
+    // announce it later, so ask for another pass.
+    if (!rule.styleSheet) {
+      importsPending = true;
+      return '';
+    }
+    let inner = '';
+    try {
+      inner = filterRules(rule.styleSheet.cssRules, depth + 1);
+    } catch {
+      return ''; // cross-origin import — can't read it
+    }
+    if (!inner) {
+      return '';
+    }
+    // Keep whatever layer it was imported into, or the copy would outrank
+    // (or be outranked by) the original.
+    const layer = /\blayer\(([^)]*)\)/i.exec(rule.cssText || '');
+    if (!layer) {
+      return inner;
+    }
+    const layerBody = layer[1] ?? '';
+    return `@layer ${layerBody.trim()} {\n${inner}}\n`;
+  };
+
+  // With CSS nesting a style rule is BOTH: it has its own declarations and
+  // it contains rules. Taking the grouping branch on the strength of
+  // `cssRules` alone skipped everything the rule itself declared — which is
+  // exactly where `body { min-height: 100svh; > main { … } }` hides, and why
+  // a frame with that in its stylesheet grew without end.
+  const filterStyleRule = (rule: CSSStyleRule | CSSKeyframeRule, depth: number): string => {
+    let nested = '';
+    if (rule instanceof CSSGroupingRule && rule.cssRules.length) {
+      nested = filterRules(rule.cssRules, depth + 1);
+    }
+    let decls = '';
+    for (let di = 0; di < rule.style.length; di++) {
+      const prop = rule.style.item(di);
+      const value = rule.style.getPropertyValue(prop);
+      const prio = rule.style.getPropertyPriority(prop);
+      VH_RE.lastIndex = 0;
+      const hasVh = VH_RE.test(value);
+      const isFixed = prop === 'position' && /fixed/.test(value);
+      if (!hasVh && !isFixed) {
+        continue;
+      }
+      VH_RE.lastIndex = 0;
+      // position:fixed anchors to the stretched frame, so it becomes
+      // absolute — headers/overlays sit at their page position instead of
+      // floating mid-frame.
+      const newValue = isFixed ? 'absolute' : value.replace(VH_RE, 'calc($1 * var(--avb-vh, 1$2))');
+      decls += `${prop}: ${newValue}${prio ? ' !important' : ''}; `;
+    }
+    // Nested matches are re-emitted inside their parent, keeping the nesting
+    // (and so the `&` context) they were written with.
+    if (!decls && !nested) {
+      return '';
+    }
+    const selector = selectorOf(rule);
+    return `${selector} { ${decls}${nested ? '\n' + nested : ''}}\n`;
   };
 
   // The original checks these the same way (type constants and property
@@ -331,13 +355,13 @@ if (!process.isMainFrame) {
     if (!('style' in rule) || !rule['style']) {
       return false;
     }
-    const selectorText = 'selectorText' in rule ? rule['selectorText'] : null;
-    const keyText = 'keyText' in rule ? rule['keyText'] : null;
+    const selectorText = 'selectorText' in rule ? rule['selectorText'] : undefined;
+    const keyText = 'keyText' in rule ? rule['keyText'] : undefined;
     return !!(selectorText || keyText);
   };
   const selectorOf = (rule: CSSStyleRule | CSSKeyframeRule): string => {
-    const selectorText = 'selectorText' in rule ? rule.selectorText : null;
-    const keyText = 'keyText' in rule ? rule.keyText : null;
+    const selectorText = 'selectorText' in rule ? rule.selectorText : undefined;
+    const keyText = 'keyText' in rule ? rule.keyText : undefined;
     return selectorText || keyText || '';
   };
 
@@ -357,7 +381,7 @@ if (!process.isMainFrame) {
       if (!sheet) {
         continue;
       }
-      if (sheet.ownerNode === overrideEl) {
+      if (sheet.ownerNode === overrideElement) {
         continue;
       }
       let rules: CSSRuleList;
@@ -366,24 +390,17 @@ if (!process.isMainFrame) {
       } catch {
         continue; // cross-origin stylesheet — can't read, leave it be
       }
-      // CSSRuleList isn't iterable in the type library, and the original
-      // walked it in order — an index loop is the same walk.
-      for (let ri = 0; ri < rules.length; ri++) {
-        const rule = rules[ri];
-        if (rule) {
-          css += filterRule(rule);
-        }
-      }
+      css += filterRules(rules, 0);
     }
-    if (!overrideEl) {
-      overrideEl = document.createElement('style');
-      overrideEl.id = 'avb-vh-override';
+    if (!overrideElement) {
+      overrideElement = document.createElement('style');
+      overrideElement.id = 'avb-vh-override';
     }
-    if (overrideEl.textContent !== css) {
-      overrideEl.textContent = css;
+    if (overrideElement.textContent !== css) {
+      overrideElement.textContent = css;
     }
-    if (document.head.lastElementChild !== overrideEl) {
-      document.head.appendChild(overrideEl);
+    if (document.head.lastElementChild !== overrideElement) {
+      document.head.appendChild(overrideElement);
     }
     // An @import that hadn't finished loading has rules we still need, and it
     // won't touch <head> when it arrives — so nothing else would bring us
@@ -429,7 +446,8 @@ if (!process.isMainFrame) {
   // namespace while one is open. Every .astro under src carries markers now,
   // so hover and click must resolve within the file being edited.
   let activeScope = '';
-  const inScope = (p: string) => (activeScope ? p.startsWith(activeScope) : !p.includes('|'));
+  const inScope = (nodePath: string) =>
+    activeScope ? nodePath.startsWith(activeScope) : !nodePath.includes('|');
 
   // Which rendered copy of the open component is being edited. A component
   // used inside a loop renders once per item, and drilling into one card
@@ -440,16 +458,16 @@ if (!process.isMainFrame) {
   let focusOcc = 0;
   // A run whose every node has left the document isn't an instance any more:
   // a patched page collects fresh runs and leaves the old ones in the map.
-  const isLive = (run: Node[]) => run.some((n) => n.isConnected);
-  // Undefined until asked, then null (nothing to narrow) or the run of nodes
-  // the focused instance rendered. Recomputed whenever the DOM moves — a
-  // patched page rebuilds the regions these come from.
-  let focusCache: Node[] | null | undefined;
-  const focusRoots = () => {
+  const isLive = (run: Node[]) => run.some((node) => node.isConnected);
+  // Undefined until asked, then the answer: no roots (nothing to narrow) or
+  // the run of nodes the focused instance rendered. Recomputed whenever the
+  // DOM moves — a patched page rebuilds the regions these come from.
+  let focusCache: { readonly roots: Node[] | undefined } | undefined;
+  const focusRoots = (): Node[] | undefined => {
     if (focusCache !== undefined) {
-      return focusCache;
+      return focusCache.roots;
     }
-    focusCache = null;
+    focusCache = { roots: undefined };
     if (focusPath) {
       const runs = (regions.get(focusPath) || []).filter(isLive);
       // Any run at all is the instance that was opened, and everything below —
@@ -464,7 +482,7 @@ if (!process.isMainFrame) {
       // <head> and <body> and never pairs up, and narrowing to nothing would
       // hide the page.
       if (runs.length) {
-        focusCache = runs[focusOcc] || runs[0];
+        focusCache = { roots: runs[focusOcc] || runs[0] };
       } else {
         // No marker pair at all: the instance is addressed by attribute — a
         // component rendered into another one's slot, or one whose root is a
@@ -480,37 +498,37 @@ if (!process.isMainFrame) {
         // only by luck.
         //
         // The nested reads inside taggedPlaces ask focusRoots again; the cache
-        // is already null by then, so they narrow to nothing and this decides
-        // the answer, rather than recurring.
+        // already holds no roots by then, so they narrow to nothing and this
+        // decides the answer, rather than recurring.
         const places = taggedPlaces(focusPath);
         const one = places[focusOcc] || places[0];
         if (one) {
-          focusCache = [one.el];
+          focusCache = { roots: [one.el] };
         }
       }
     }
-    return focusCache;
+    return focusCache.roots;
   };
-  const inFocus = (n: Node): boolean => {
+  const inFocus = (node: Node): boolean => {
     const roots = focusRoots();
     if (!roots) {
       return true;
     }
-    return roots.some((f) => f === n || (f.nodeType === 1 && f.contains(n)));
+    return roots.some((root) => root === node || (root.nodeType === 1 && root.contains(node)));
   };
   // The occurrences of a path that are on the page, narrowed to the focused
   // instance when there is one. Rects, classes and occurrence numbering all
   // read this, so "the second copy" means the same thing to all of them.
-  const runsOf = (p: string): Node[][] | undefined => {
-    const runs = regions.get(p);
+  const runsOf = (nodePath: string): Node[][] | undefined => {
+    const runs = regions.get(nodePath);
     if (!runs) {
       return runs;
     }
     const live = runs.filter(isLive);
     return focusRoots() ? live.filter((run) => run.some(inFocus)) : live;
   };
-  let lastHoverPath: string | null | undefined = undefined;
-  let lastHoverOcc = 0;
+  // The hover the app was last told about; undefined until it has been told.
+  let lastHover: { readonly path: string | undefined; readonly occurrence: number } | undefined;
   // Whether the markers have been walked yet. The app can ask about a node
   // before then — a selection made while the page is still parsing, or in the
   // instant after a patch — and the honest answer is "not yet", not "no such
@@ -540,11 +558,11 @@ if (!process.isMainFrame) {
   const STAMP_PREFIX = 'avb-d:';
   const STAMPS_MAX = 20000; // LIMITS.previewMarkersMax
   const MANIFEST_FILES_MAX = 512; // LIMITS.previewManifestFilesMax
-  let renderToken: string | null = null;
+  let renderToken: string | undefined = undefined;
   let renderSeq = 0;
-  // Null when the page's stamps cannot form one manifest: too many, or one
-  // file stamped with two checksums (a rendering mixing versions of it).
-  const readManifest = (): { file: string; checksum: string }[] | null => {
+  // Undefined when the page's stamps cannot form one manifest: too many, or
+  // one file stamped with two checksums (a rendering mixing versions of it).
+  const readManifest = (): { file: string; checksum: string }[] | undefined => {
     const byFile = new Map<string, string>();
     let stamps = 0;
     const stack: Node[] = [document];
@@ -553,19 +571,19 @@ if (!process.isMainFrame) {
       if (!parent) {
         break;
       }
-      for (let n = parent.firstChild; n; n = n.nextSibling) {
-        if (isElement(n)) {
-          stack.push(n);
+      for (let node = parent.firstChild; node; node = node.nextSibling) {
+        if (isElement(node)) {
+          stack.push(node);
           continue;
         }
-        if (!isComment(n) || !n.data.startsWith(STAMP_PREFIX)) {
+        if (!isComment(node) || !node.data.startsWith(STAMP_PREFIX)) {
           continue;
         }
         stamps += 1;
         if (stamps > STAMPS_MAX) {
-          return null;
+          return undefined;
         }
-        const rest = n.data.slice(STAMP_PREFIX.length);
+        const rest = node.data.slice(STAMP_PREFIX.length);
         const checksum = rest.slice(0, 64);
         const file = rest.slice(65);
         if (!/^[0-9a-f]{64}$/.test(checksum) || rest[64] !== ':' || !file) {
@@ -573,22 +591,22 @@ if (!process.isMainFrame) {
         }
         const seen = byFile.get(file);
         if (seen !== undefined && seen !== checksum) {
-          return null;
+          return undefined;
         }
         byFile.set(file, checksum);
       }
     }
     if (byFile.size > MANIFEST_FILES_MAX) {
-      return null;
+      return undefined;
     }
     return [...byFile.keys()]
-      .sort((a, b) => (a < b ? -1 : a === b ? 0 : 1))
+      .sort((left, right) => (left < right ? -1 : left === right ? 0 : 1))
       .map((file) => ({ file, checksum: byFile.get(file) ?? '' }));
   };
   const announceRender = () => {
     renderSeq += 1;
     const seq = renderSeq;
-    renderToken = null; // Until this rendering's digest is known, events carry none.
+    renderToken = undefined; // Until this rendering's digest is known, events carry none.
     const stamps = readManifest();
     const subtle = globalThis.crypto?.subtle;
     if (!stamps || !subtle) {
@@ -601,7 +619,7 @@ if (!process.isMainFrame) {
           return;
         } // A newer rendering has announced itself.
         const bytes = Array.from(new Uint8Array(digest));
-        renderToken = bytes.map((b) => b.toString(16).padStart(2, '0')).join('');
+        renderToken = bytes.map((byte) => byte.toString(16).padStart(2, '0')).join('');
         try {
           window.parent.postMessage({ type: 'avb:render', token: renderToken, stamps }, '*');
         } catch {
@@ -629,8 +647,8 @@ if (!process.isMainFrame) {
   // the serializer, since a slotted node can't be wrapped in markers); the
   // component that renders the slot addresses that same element by its own
   // path. Whichever file is open picks its namespace out of the list.
-  const pathsOf = (el: Element): string[] =>
-    (el.getAttribute(PATH_ATTR) || '').split(' ').filter(Boolean);
+  const pathsOf = (element: Element): string[] =>
+    (element.getAttribute(PATH_ATTR) || '').split(' ').filter(Boolean);
   // Which tags this file put on an element itself, as opposed to the ones the
   // page arrived with. The serializer writes a tag into the markup wherever a
   // marker pair can't go — a slotted node, a word in an inline run, a component
@@ -640,15 +658,15 @@ if (!process.isMainFrame) {
   // The shortest path this element carries in each component file — a marker
   // run tags every element it holds, so one element can carry several paths in
   // the same file, and the shortest of them is the highest node it stands for.
-  const nsOf = (el: Element): Map<string, string> => {
+  const nsOf = (element: Element): Map<string, string> => {
     const out = new Map<string, string>();
-    for (const p of pathsOf(el)) {
-      const bar = p.indexOf('|');
+    for (const nodePath of pathsOf(element)) {
+      const bar = nodePath.indexOf('|');
       if (bar === -1) {
         continue;
       }
-      const file = p.slice(0, bar + 1);
-      const inner = p.slice(bar + 1);
+      const file = nodePath.slice(0, bar + 1);
+      const inner = nodePath.slice(bar + 1);
       const had = out.get(file);
       if (had === undefined || inner.length < had.length) {
         out.set(file, inner);
@@ -658,19 +676,22 @@ if (!process.isMainFrame) {
   };
 
   // The nearest ancestor that stands for a node this one is nested UNDER, in
-  // the same file. Null means this element is where that file's rendering
+  // the same file. Undefined means this element is where that file's rendering
   // begins — the root of a component instance.
-  const nsParent = (el: Element, file: string, inner: string): Element | null => {
-    let up = el.parentElement ? el.parentElement.closest(`[${PATH_ATTR}]`) : null;
+  const nsParent = (element: Element, file: string, inner: string): Element | undefined => {
+    let up = taggedAncestor(element);
     while (up) {
       const theirs = nsOf(up).get(file);
       if (theirs !== undefined && inner.startsWith(`${theirs}.`)) {
         return up;
       }
-      up = up.parentElement ? up.parentElement.closest(`[${PATH_ATTR}]`) : null;
+      up = taggedAncestor(up);
     }
-    return null;
+    return undefined;
   };
+  // The nearest strict ancestor that carries a path, if any.
+  const taggedAncestor = (element: Element): Element | undefined =>
+    element.parentElement?.closest(`[${PATH_ATTR}]`) ?? undefined;
 
   // What the page calls a component instance belongs on the element the
   // instance rendered as its root. It does not always land there: the
@@ -708,31 +729,33 @@ if (!process.isMainFrame) {
   // so the climb ran all the way to <html>. A Webflow export is exactly that
   // shape: nine sections, all nine names ending up on <html>, and selecting
   // any one of them outlined the entire page.
-  const rodeIn = (el: Element, path: string): boolean => {
-    const mine = ourTags.get(el);
-    const written = pathsOf(el).filter((p) => !mine?.has(p));
+  const rodeIn = (element: Element, path: string): boolean => {
+    const mine = ourTags.get(element);
+    const written = pathsOf(element).filter((nodePath) => !mine?.has(nodePath));
     const at = written.indexOf(path);
-    return at > 0 && written.slice(0, at).some((p) => p.includes('|'));
+    return at > 0 && written.slice(0, at).some((nodePath) => nodePath.includes('|'));
   };
 
   const promoteInstanceTags = () => {
-    for (const el of Array.from(document.querySelectorAll(`[${PATH_ATTR}]`))) {
-      const page = pathsOf(el).filter((p) => !p.includes('|') && rodeIn(el, p));
+    for (const element of Array.from(document.querySelectorAll(`[${PATH_ATTR}]`))) {
+      const page = pathsOf(element).filter(
+        (nodePath) => !nodePath.includes('|') && rodeIn(element, nodePath),
+      );
       if (!page.length) {
         continue;
       }
-      const ns = nsOf(el);
+      const ns = nsOf(element);
       if (!ns.size) {
         continue;
       }
-      let file: string | null = null;
-      for (const [f, inner] of ns) {
-        if (!nsParent(el, f, inner)) {
-          file = null;
+      let file: string | undefined = undefined;
+      for (const [candidateFile, inner] of ns) {
+        if (!nsParent(element, candidateFile, inner)) {
+          file = undefined;
           break;
         } // a root: leave it alone
         if (!file) {
-          file = f;
+          file = candidateFile;
         }
       }
       if (!file) {
@@ -740,35 +763,35 @@ if (!process.isMainFrame) {
       }
       // nsParent returns a strict ancestor, so the climb ends within the
       // element's depth in the document.
-      let at = el;
+      let at = element;
       let innerOf = nsOf(at).get(file);
-      let up = innerOf === undefined ? null : nsParent(at, file, innerOf);
+      let up = innerOf === undefined ? undefined : nsParent(at, file, innerOf);
       while (up) {
         at = up;
         innerOf = nsOf(at).get(file);
-        up = innerOf === undefined ? null : nsParent(at, file, innerOf);
+        up = innerOf === undefined ? undefined : nsParent(at, file, innerOf);
       }
-      if (at === el) {
+      if (at === element) {
         continue;
       }
-      for (const p of page) {
-        addPath(at, p);
+      for (const nodePath of page) {
+        addPath(at, nodePath);
       }
     }
   };
 
-  const addPath = (el: Element, p: string): void => {
-    const list = pathsOf(el);
-    if (list.includes(p)) {
+  const addPath = (element: Element, nodePath: string): void => {
+    const list = pathsOf(element);
+    if (list.includes(nodePath)) {
       return;
     }
-    list.push(p);
-    el.setAttribute(PATH_ATTR, list.join(' '));
-    let mine = ourTags.get(el);
+    list.push(nodePath);
+    element.setAttribute(PATH_ATTR, list.join(' '));
+    let mine = ourTags.get(element);
     if (!mine) {
-      ourTags.set(el, (mine = new Set()));
+      ourTags.set(element, (mine = new Set()));
     }
-    mine.add(p);
+    mine.add(nodePath);
   };
   // The elements a path is on, one per copy — outermost only. A path can land
   // on an element AND on something inside it: inside slot content the marker
@@ -778,212 +801,246 @@ if (!process.isMainFrame) {
   // twice, and counting them as two made a node with a single instance report
   // "copy 2" for a click in the wrong half of itself — and the classes and
   // spacing lists, which are one entry per occurrence, disagree with the boxes.
-  const elementsWithPath = (p: string): Element[] => {
+  const elementsWithPath = (nodePath: string): Element[] => {
     const all: Element[] = Array.from(document.querySelectorAll(`[${PATH_ATTR}]`)).filter(
-      (el) => pathsOf(el).includes(p) && inFocus(el),
+      (element) => pathsOf(element).includes(nodePath) && inFocus(element),
     );
-    return all.filter((el) => !all.some((other) => other !== el && other.contains(el)));
+    return all.filter(
+      (element) => !all.some((other) => other !== element && other.contains(element)),
+    );
   };
 
-  // The path a node marks, or null when it isn't a marker. `kind` is 's'/'e'.
-  const markerPath = (n: Node | null, kind: 's' | 'e'): string | null => {
-    if (!n) {
-      return null;
-    }
-    if (isComment(n)) {
+  // The path a node marks, or undefined when it isn't a marker. `kind` is 's'/'e'.
+  const markerPath = (node: Node, kind: 's' | 'e'): string | undefined => {
+    if (isComment(node)) {
       const tag = `avb-${kind}:`;
-      return n.data.startsWith(tag) ? n.data.slice(tag.length) : null;
+      return node.data.startsWith(tag) ? node.data.slice(tag.length) : undefined;
     }
-    if (isElement(n) && n.tagName === 'TEMPLATE') {
-      return n.getAttribute(`data-avb-${kind}`);
+    if (isElement(node) && node.tagName === 'TEMPLATE') {
+      return node.getAttribute(`data-avb-${kind}`) ?? undefined;
     }
-    return null;
+    return undefined;
   };
 
   const collectRegions = () => {
-    // Runs that have left the document go first. A patched page collects
-    // again, and what it collected last time is either the same nodes (the
-    // patch morphed them in place) or nodes that are gone — never a second
-    // copy of the node, however many times the page is edited.
-    for (const [p, runs] of regions) {
-      const live = runs.filter(isLive);
-      if (live.length) {
-        regions.set(p, live);
-      } else {
-        regions.delete(p);
-      }
-    }
-    // One pass in document order over both marker forms — the deeper path has
-    // to be seen last so that it wins the tag on an element they share.
-    // Walked by hand rather than with a TreeWalker: this runs in the preload's
-    // isolated world, and depending on nothing but firstChild/nextSibling
-    // keeps it working whatever that world does or doesn't expose. It is also
-    // the only thing standing between the page and no outlines at all —
-    // startOutlines gives up entirely when nothing is recorded.
-    const starts: Node[] = [];
-    const markers: Node[] = [];
-    const visit = (parent: Node) => {
-      for (let n = parent.firstChild; n; n = n.nextSibling) {
-        const isStart = markerPath(n, 's') !== null;
-        if (isStart) {
-          starts.push(n);
-        }
-        if (isStart || markerPath(n, 'e') !== null) {
-          markers.push(n);
-        }
-        if (isElement(n)) {
-          visit(n);
-        }
-      }
-    };
-    visit(document);
+    pruneRegions();
+    const { starts, markers } = findMarkers();
     // What each path was found to hold this pass, so a tag left on an element
-    // the region no longer contains can be taken off again (below).
+    // the region no longer contains can be taken off again (untagStale).
     const collected = new Map<string, Set<Node>>();
-    for (const s of starts) {
-      const p = markerPath(s, 's');
-      if (p === null) {
+    for (const start of starts) {
+      const nodePath = markerPath(start, 's');
+      if (nodePath === undefined) {
         continue;
       } // a start marker always carries a path
-      // The run ends at the matching close marker, and a run with no close
-      // marker among its siblings is EMPTY — never "everything after it".
-      // Both markers are written as siblings around the node, so a start
-      // whose end isn't there has lost it, and the honest reading of that is
-      // that the region holds nothing. Swallowing instead put the following
-      // element inside the region, which then answered for clicks on it: the
-      // docs footer reported a comment when its fine print was clicked.
-      let end: Node | null = null;
-      for (let n = s.nextSibling; n; n = n.nextSibling) {
-        if (markerPath(n, 'e') === p) {
-          end = n;
-          break;
-        }
-      }
-      const run: Node[] = [];
-      for (let n = s.nextSibling; n && n !== end; n = n.nextSibling) {
-        if (!end) {
-          break;
-        }
-        run.push(n);
-        // A chunk group's run contains its members, which are marked too —
-        // document order puts the deeper path last, so it wins the tag.
-        if (isElement(n) && n.tagName !== 'TEMPLATE') {
-          addPath(n, p);
-        }
-      }
-      let set = collected.get(p);
+      const run = runAfter(start, nodePath);
+      let set = collected.get(nodePath);
       if (!set) {
         set = new Set();
-        collected.set(p, set);
+        collected.set(nodePath, set);
       }
-      for (const n of run) {
-        set.add(n);
+      for (const node of run) {
+        set.add(node);
       }
-      if (!regions.has(p)) {
-        regions.set(p, []);
-      }
-      const runs = regions.get(p) ?? [];
-      // The same place, collected again: it replaces itself. Appending would
-      // make one node look like many — the same box drawn over and over (and
-      // the overlays are translucent, so a node hovered after fourteen edits
-      // was painted fourteen times, an opaque wash over the page), and every
-      // count of "which copy" off by however many edits had been made.
-      const again = runs.findIndex((r) => r.some((n) => run.includes(n)));
-      if (again >= 0) {
-        runs[again] = run;
-      } else {
-        runs.push(run);
-      }
+      recordRun(nodePath, run);
     }
-    // A tag WE added is only good while the region still holds the element. They
-    // used to accumulate and never come off, so one bad pass — a marker briefly
-    // out of place — left an element permanently answering to a path it wasn't
-    // in.
-    //
-    // The tags the markup came with are not ours to withdraw, and taking them
-    // meant a click landing nowhere. Five buttons on a page all carry
-    // `Button.astro|0.0.0` — the component's own root, the same path in every
-    // instance — and only the ones a marker pair happened to wrap counted as
-    // collected, so the rest lost the tag. Open Button.astro, click one of
-    // those, and the canvas could not place the click at all: no path in the
-    // open file, but something under the pointer, which reads as "looked away"
-    // and closed the component you were editing.
-    for (const el of Array.from(document.querySelectorAll(`[${PATH_ATTR}]`))) {
-      const mine = ourTags.get(el);
-      const kept = pathsOf(el).filter(
-        (p) => !mine?.has(p) || !collected.has(p) || (collected.get(p)?.has(el) ?? false),
-      );
-      if (kept.length === pathsOf(el).length) {
-        continue;
-      }
-      for (const p of pathsOf(el)) {
-        if (!kept.includes(p)) {
-          mine?.delete(p);
-        }
-      }
-      if (kept.length) {
-        el.setAttribute(PATH_ATTR, kept.join(' '));
-      } else {
-        el.removeAttribute(PATH_ATTR);
-      }
-    }
-    for (const n of markers) {
-      if (isChildNode(n)) {
-        n.remove();
+    untagStale(collected);
+    for (const node of markers) {
+      if (isChildNode(node)) {
+        node.remove();
       }
     }
     promoteInstanceTags();
     focusCache = undefined; // new runs — the focused instance may be among them
   };
 
-  // Grows `acc` (a left/top/right/bottom box, or null) by one node's box.
-  const addNode = (acc: Box | null, n: Node): Box | null => {
-    if (!n.isConnected) {
+  // Runs that have left the document go first. A patched page collects
+  // again, and what it collected last time is either the same nodes (the
+  // patch morphed them in place) or nodes that are gone — never a second
+  // copy of the node, however many times the page is edited.
+  const pruneRegions = () => {
+    for (const [nodePath, runs] of regions) {
+      const live = runs.filter(isLive);
+      if (live.length) {
+        regions.set(nodePath, live);
+      } else {
+        regions.delete(nodePath);
+      }
+    }
+  };
+
+  // One pass in document order over both marker forms — the deeper path has
+  // to be seen last so that it wins the tag on an element they share.
+  // Walked by hand rather than with a TreeWalker: this runs in the preload's
+  // isolated world, and depending on nothing but firstChild/nextSibling
+  // keeps it working whatever that world does or doesn't expose. It is also
+  // the only thing standing between the page and no outlines at all —
+  // startOutlines gives up entirely when nothing is recorded.
+  const findMarkers = (): { starts: Node[]; markers: Node[] } => {
+    const starts: Node[] = [];
+    const markers: Node[] = [];
+    const visit = (parent: Node, depth: number) => {
+      if (depth > PRELOAD_LIMITS.domDepthMax) {
+        return;
+      }
+      for (let node = parent.firstChild; node; node = node.nextSibling) {
+        const isStart = markerPath(node, 's') !== undefined;
+        if (isStart) {
+          starts.push(node);
+        }
+        if (isStart || markerPath(node, 'e') !== undefined) {
+          markers.push(node);
+        }
+        if (isElement(node)) {
+          visit(node, depth + 1);
+        }
+      }
+    };
+    visit(document, 0);
+    return { starts, markers };
+  };
+
+  // The run a start marker opens, tagging each element in it with the path.
+  //
+  // The run ends at the matching close marker, and a run with no close
+  // marker among its siblings is EMPTY — never "everything after it".
+  // Both markers are written as siblings around the node, so a start
+  // whose end isn't there has lost it, and the honest reading of that is
+  // that the region holds nothing. Swallowing instead put the following
+  // element inside the region, which then answered for clicks on it: the
+  // docs footer reported a comment when its fine print was clicked.
+  const runAfter = (start: Node, nodePath: string): Node[] => {
+    let end: Node | undefined = undefined;
+    for (let node = start.nextSibling; node; node = node.nextSibling) {
+      if (markerPath(node, 'e') === nodePath) {
+        end = node;
+        break;
+      }
+    }
+    const run: Node[] = [];
+    for (let node = start.nextSibling; node && node !== end; node = node.nextSibling) {
+      if (!end) {
+        break;
+      }
+      run.push(node);
+      // A chunk group's run contains its members, which are marked too —
+      // document order puts the deeper path last, so it wins the tag.
+      if (isElement(node) && node.tagName !== 'TEMPLATE') {
+        addPath(node, nodePath);
+      }
+    }
+    return run;
+  };
+
+  // The same place, collected again: it replaces itself. Appending would
+  // make one node look like many — the same box drawn over and over (and
+  // the overlays are translucent, so a node hovered after fourteen edits
+  // was painted fourteen times, an opaque wash over the page), and every
+  // count of "which copy" off by however many edits had been made.
+  const recordRun = (nodePath: string, run: Node[]) => {
+    if (!regions.has(nodePath)) {
+      regions.set(nodePath, []);
+    }
+    const runs = regions.get(nodePath) ?? [];
+    const again = runs.findIndex((other) => other.some((node) => run.includes(node)));
+    if (again >= 0) {
+      runs[again] = run;
+    } else {
+      runs.push(run);
+    }
+  };
+
+  // A tag WE added is only good while the region still holds the element. They
+  // used to accumulate and never come off, so one bad pass — a marker briefly
+  // out of place — left an element permanently answering to a path it wasn't
+  // in.
+  //
+  // The tags the markup came with are not ours to withdraw, and taking them
+  // meant a click landing nowhere. Five buttons on a page all carry
+  // `Button.astro|0.0.0` — the component's own root, the same path in every
+  // instance — and only the ones a marker pair happened to wrap counted as
+  // collected, so the rest lost the tag. Open Button.astro, click one of
+  // those, and the canvas could not place the click at all: no path in the
+  // open file, but something under the pointer, which reads as "looked away"
+  // and closed the component you were editing.
+  const untagStale = (collected: Map<string, Set<Node>>) => {
+    for (const element of Array.from(document.querySelectorAll(`[${PATH_ATTR}]`))) {
+      const mine = ourTags.get(element);
+      const kept = pathsOf(element).filter(
+        (nodePath) =>
+          !mine?.has(nodePath) ||
+          !collected.has(nodePath) ||
+          (collected.get(nodePath)?.has(element) ?? false),
+      );
+      if (kept.length === pathsOf(element).length) {
+        continue;
+      }
+      for (const nodePath of pathsOf(element)) {
+        if (!kept.includes(nodePath)) {
+          mine?.delete(nodePath);
+        }
+      }
+      if (kept.length) {
+        element.setAttribute(PATH_ATTR, kept.join(' '));
+      } else {
+        element.removeAttribute(PATH_ATTR);
+      }
+    }
+  };
+
+  // Grows `acc` (a left/top/right/bottom box, or undefined) by one node's box.
+  // `depth` counts the `display: contents` elements descended through.
+  const addNode = (acc: Box | undefined, node: Node, depth = 0): Box | undefined => {
+    if (!node.isConnected) {
       return acc;
     }
-    let b: DOMRect | null = null;
-    if (isElement(n)) {
-      if (n.tagName === 'TEMPLATE') {
+    if (depth > PRELOAD_LIMITS.domDepthMax) {
+      return acc;
+    }
+    let rect: DOMRect | undefined = undefined;
+    if (isElement(node)) {
+      if (node.tagName === 'TEMPLATE') {
         return acc;
       }
-      b = n.getBoundingClientRect();
+      rect = node.getBoundingClientRect();
       // `display: contents` generates no box of its own, so the element
       // measures zero however big its content is. Astro sets it on
       // <astro-island>/<astro-slot>, which is every client: component — they
       // selected fine (hover walks the DOM) but drew no outline. Fall back to
       // the children, which do generate boxes.
-      if (b.width === 0 && b.height === 0) {
-        for (const c of Array.from(n.childNodes)) {
-          acc = addNode(acc, c);
+      if (rect.width === 0 && rect.height === 0) {
+        let grown = acc;
+        for (const child of Array.from(node.childNodes)) {
+          grown = addNode(grown, child, depth + 1);
         }
-        return acc;
+        return grown;
       }
-    } else if (isComment(n)) {
+    } else if (isComment(node)) {
       return acc; // a marker still sitting in a recorded run — no box to add
-    } else if (isText(n) && n.textContent.trim()) {
+    } else if (isText(node) && node.textContent.trim()) {
       const range = document.createRange();
-      range.selectNode(n);
-      b = range.getBoundingClientRect();
+      range.selectNode(node);
+      rect = range.getBoundingClientRect();
     }
-    if (!b || (b.width === 0 && b.height === 0)) {
+    if (!rect || (rect.width === 0 && rect.height === 0)) {
       return acc;
     }
     if (!acc) {
-      return { left: b.left, top: b.top, right: b.right, bottom: b.bottom };
+      return { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom };
     }
     return {
-      left: Math.min(acc.left, b.left),
-      top: Math.min(acc.top, b.top),
-      right: Math.max(acc.right, b.right),
-      bottom: Math.max(acc.bottom, b.bottom),
+      left: Math.min(acc.left, rect.left),
+      top: Math.min(acc.top, rect.top),
+      right: Math.max(acc.right, rect.right),
+      bottom: Math.max(acc.bottom, rect.bottom),
     };
   };
 
-  const toRect = (a: Box): Rect => ({
-    x: a.left,
-    y: a.top,
-    w: a.right - a.left,
-    h: a.bottom - a.top,
+  const toRect = (box: Box): Rect => ({
+    x: box.left,
+    y: box.top,
+    w: box.right - box.left,
+    h: box.bottom - box.top,
   });
 
   // One rect per marker-pair occurrence (a loop child renders once per
@@ -994,8 +1051,8 @@ if (!process.isMainFrame) {
   // <html>, so its start marker is hoisted into <head> and its end into <body>
   // — never siblings, so the pair is never found. Its children are inside the
   // body and marked normally, and their union is exactly the layout's box.
-  const rectsFromDescendants = (p: string): Rect[] | null => {
-    const prefix = p + '.';
+  const rectsFromDescendants = (nodePath: string): Rect[] | undefined => {
+    const prefix = nodePath + '.';
     let best = Infinity;
     const paths: string[] = [];
     for (const key of regions.keys()) {
@@ -1011,15 +1068,15 @@ if (!process.isMainFrame) {
         paths.push(key);
       }
     }
-    let acc: Box | null = null;
+    let acc: Box | undefined = undefined;
     for (const key of paths) {
       for (const run of runsOf(key) || []) {
-        for (const n of run) {
-          acc = addNode(acc, n);
+        for (const node of run) {
+          acc = addNode(acc, node);
         }
       }
     }
-    return acc ? [toRect(acc)] : null;
+    return acc ? [toRect(acc)] : undefined;
   };
 
   // A box with no width or no height, sitting beside boxes that have both.
@@ -1034,7 +1091,7 @@ if (!process.isMainFrame) {
   // Kept when it is all there is: an element that genuinely renders nothing wide
   // should still show where it sits.
   const withoutHollow = (list: Rect[]): Rect[] => {
-    const real = list.filter((r) => r.w > 0 && r.h > 0);
+    const real = list.filter((rect) => rect.w > 0 && rect.h > 0);
     return real.length ? real : list;
   };
 
@@ -1050,31 +1107,31 @@ if (!process.isMainFrame) {
   // counted tagged elements and the click counted marker runs, of which a
   // tagged node has none — so clicking the second link in a list reported
   // occurrence 0 and the first one lit up.
-  const taggedPlaces = (p: string): TaggedPlace[] => {
+  const taggedPlaces = (nodePath: string): TaggedPlace[] => {
     const out: TaggedPlace[] = [];
-    for (const el of elementsWithPath(p)) {
-      const acc = addNode(null, el);
+    for (const element of elementsWithPath(nodePath)) {
+      const acc = addNode(undefined, element);
       if (acc) {
-        out.push({ el, rect: toRect(acc) });
+        out.push({ el: element, rect: toRect(acc) });
       }
     }
     // A line splitter leaves hollow copies of an element behind; they are not
     // places, and counting them would shift every occurrence after them.
-    const real = out.filter((e) => e.rect.w > 0 && e.rect.h > 0);
+    const real = out.filter((place) => place.rect.w > 0 && place.rect.h > 0);
     return real.length ? real : out;
   };
 
-  const rectsForPath = (p: string): Rect[] | null => {
-    const runs = runsOf(p);
+  const rectsForPath = (nodePath: string): Rect[] | undefined => {
+    const runs = runsOf(nodePath);
     if (!runs) {
-      const places = taggedPlaces(p);
-      return places.length ? places.map((e) => e.rect) : rectsFromDescendants(p);
+      const places = taggedPlaces(nodePath);
+      return places.length ? places.map((place) => place.rect) : rectsFromDescendants(nodePath);
     }
     const out: Rect[] = [];
     for (const run of runs) {
-      let acc: Box | null = null;
-      for (const n of run) {
-        acc = addNode(acc, n);
+      let acc: Box | undefined = undefined;
+      for (const node of run) {
+        acc = addNode(acc, node);
       }
       if (acc) {
         out.push(toRect(acc));
@@ -1086,9 +1143,12 @@ if (!process.isMainFrame) {
     // box. Repeated occurrences (a loop child, once per item) are meant to
     // stay separate boxes, so they keep the per-run rects above.
     if (runs.length === 1) {
-      let acc = (runs[0] || []).reduce(addNode, null);
-      for (const el of elementsWithPath(p)) {
-        acc = addNode(acc, el);
+      let acc = (runs[0] || []).reduce<Box | undefined>(
+        (grown, node) => addNode(grown, node),
+        undefined,
+      );
+      for (const element of elementsWithPath(nodePath)) {
+        acc = addNode(acc, element);
       }
       // Nothing measurable: fall through to the children (see below).
       if (acc) {
@@ -1105,10 +1165,10 @@ if (!process.isMainFrame) {
     // order, which is the order occurrences are counted in. Without this a
     // looped node under such a script draws no outline at all, even though
     // clicking it still selects (nodeAt reads the same tag).
-    const tagged = elementsWithPath(p);
+    const tagged = elementsWithPath(nodePath);
     if (tagged.length) {
-      for (const el of tagged) {
-        const acc = addNode(null, el);
+      for (const element of tagged) {
+        const acc = addNode(undefined, element);
         if (acc) {
           out.push(toRect(acc));
         }
@@ -1121,7 +1181,7 @@ if (!process.isMainFrame) {
     // A region that exists but contains nothing with a box — the layout case:
     // its start marker is orphaned in <head>, so the walk collected the head's
     // scripts and links rather than the page. Its children still measure.
-    return rectsFromDescendants(p);
+    return rectsFromDescendants(nodePath);
   };
 
   // The classes actually on the page for a node, one entry per occurrence (a
@@ -1134,20 +1194,22 @@ if (!process.isMainFrame) {
   // selector well, and in the navigator's labels as if the project had written
   // them.
   const STACKI_CLASSES = new Set(['stacki-opened', 'stacki-designer', 'stacki-preview']);
-  const ownClasses = (el: Element): string[] =>
-    Array.from(el.classList).filter((c) => !STACKI_CLASSES.has(c));
+  const ownClasses = (element: Element): string[] =>
+    Array.from(element.classList).filter((className) => !STACKI_CLASSES.has(className));
 
-  const classesForPath = (p: string): string[][] => {
+  const classesForPath = (nodePath: string): string[][] => {
     const out: string[][] = [];
-    for (const run of runsOf(p) || []) {
-      const el = run.find((n): n is Element => isElement(n) && n.tagName !== 'TEMPLATE');
-      if (el) {
-        out.push(ownClasses(el));
+    for (const run of runsOf(nodePath) || []) {
+      const element = run.find(
+        (node): node is Element => isElement(node) && node.tagName !== 'TEMPLATE',
+      );
+      if (element) {
+        out.push(ownClasses(element));
       }
     }
     if (!out.length) {
-      for (const el of elementsWithPath(p)) {
-        out.push(ownClasses(el));
+      for (const element of elementsWithPath(nodePath)) {
+        out.push(ownClasses(element));
       }
     }
     return out;
@@ -1175,7 +1237,98 @@ if (!process.isMainFrame) {
   // bigger than it is. The band is capped at the computed gap and sits against
   // the child before it, which is the part of that space the property is
   // actually responsible for.
-  const gapBandsFor = (el: Element, cs: CSSStyleDeclaration): GapBand[] => {
+  // The children of a flex or grid box a gap can be seen between: each laid
+  // out, with a box of its own.
+  const gapChildRects = (element: Element): DOMRect[] => {
+    const kids: DOMRect[] = [];
+    for (const child of Array.from(element.children)) {
+      if (child.tagName === 'TEMPLATE') {
+        continue;
+      }
+      const rect = child.getBoundingClientRect();
+      // A child with no box is not somewhere a gap can be seen.
+      if (rect.width <= 0 && rect.height <= 0) {
+        continue;
+      }
+      const cd = window.getComputedStyle(child).display;
+      if (cd === 'none' || cd === 'contents') {
+        continue;
+      }
+      kids.push(rect);
+    }
+    return kids;
+  };
+
+  // Children grouped into visual rows: two that overlap vertically are on
+  // the same line, whether that line came from flex-wrap or from grid.
+  const visualRows = (kids: DOMRect[]): GapRow[] => {
+    const byTop = [...kids].sort((left, right) => left.top - right.top || left.left - right.left);
+    const rows: GapRow[] = [];
+    for (const rect of byTop) {
+      const row = rows[rows.length - 1];
+      const overlaps = row && rect.top < row.bottom - 1 && rect.bottom > row.top + 1;
+      if (overlaps) {
+        row.items.push(rect);
+        row.top = Math.min(row.top, rect.top);
+        row.bottom = Math.max(row.bottom, rect.bottom);
+      } else {
+        rows.push({ top: rect.top, bottom: rect.bottom, items: [rect] });
+      }
+    }
+    return rows;
+  };
+
+  // Between columns, within each row.
+  const columnGapBands = (rows: GapRow[], colGap: number): GapBand[] => {
+    const bands: GapBand[] = [];
+    for (const row of rows) {
+      const across = [...row.items].sort((left, right) => left.left - right.left);
+      for (let i = 1; i < across.length; i++) {
+        const previous = across[i - 1];
+        const next = across[i];
+        if (!previous || !next) {
+          continue;
+        }
+        const space = next.left - previous.right;
+        const width = Math.min(space, colGap);
+        if (width <= 0.5) {
+          continue;
+        }
+        bands.push({
+          axis: 'column',
+          x: previous.right,
+          y: row.top,
+          w: width,
+          h: row.bottom - row.top,
+        });
+      }
+    }
+    return bands;
+  };
+
+  // Between rows, across the width the children occupy.
+  const rowGapBands = (rows: GapRow[], rowGap: number): GapBand[] => {
+    const bands: GapBand[] = [];
+    for (let i = 1; i < rows.length; i++) {
+      const previous = rows[i - 1];
+      const next = rows[i];
+      if (!previous || !next) {
+        continue;
+      }
+      const space = next.top - previous.bottom;
+      const height = Math.min(space, rowGap);
+      if (height <= 0.5) {
+        continue;
+      }
+      const span = [...previous.items, ...next.items];
+      const left = Math.min(...span.map((rect) => rect.left));
+      const right = Math.max(...span.map((rect) => rect.right));
+      bands.push({ axis: 'row', x: left, y: previous.bottom, w: right - left, h: height });
+    }
+    return bands;
+  };
+
+  const gapBandsFor = (element: Element, cs: CSSStyleDeclaration): GapBand[] => {
     const display = cs.display;
     if (!/(^|\s)(flex|grid|inline-flex|inline-grid)$/.test(display)) {
       return [];
@@ -1185,133 +1338,75 @@ if (!process.isMainFrame) {
     if (colGap <= 0 && rowGap <= 0) {
       return [];
     }
-
-    const kids: DOMRect[] = [];
-    for (const child of Array.from(el.children)) {
-      if (child.tagName === 'TEMPLATE') {
-        continue;
-      }
-      const r = child.getBoundingClientRect();
-      // A child with no box is not somewhere a gap can be seen.
-      if (r.width <= 0 && r.height <= 0) {
-        continue;
-      }
-      const cd = window.getComputedStyle(child).display;
-      if (cd === 'none' || cd === 'contents') {
-        continue;
-      }
-      kids.push(r);
-    }
+    const kids = gapChildRects(element);
     if (kids.length < 2) {
       return [];
     }
-
-    // Children grouped into visual rows: two that overlap vertically are on
-    // the same line, whether that line came from flex-wrap or from grid.
-    const byTop = [...kids].sort((a, b) => a.top - b.top || a.left - b.left);
-    const rows: { top: number; bottom: number; items: DOMRect[] }[] = [];
-    for (const r of byTop) {
-      const row = rows[rows.length - 1];
-      const overlaps = row && r.top < row.bottom - 1 && r.bottom > row.top + 1;
-      if (overlaps) {
-        row.items.push(r);
-        row.top = Math.min(row.top, r.top);
-        row.bottom = Math.max(row.bottom, r.bottom);
-      } else {
-        rows.push({ top: r.top, bottom: r.bottom, items: [r] });
-      }
-    }
-
-    const bands: GapBand[] = [];
-    // Between columns, within each row.
-    if (colGap > 0) {
-      for (const row of rows) {
-        const across = [...row.items].sort((a, b) => a.left - b.left);
-        for (let i = 1; i < across.length; i++) {
-          const prev = across[i - 1];
-          const next = across[i];
-          if (!prev || !next) {
-            continue;
-          }
-          const space = next.left - prev.right;
-          const w = Math.min(space, colGap);
-          if (w <= 0.5) {
-            continue;
-          }
-          bands.push({ axis: 'column', x: prev.right, y: row.top, w, h: row.bottom - row.top });
-        }
-      }
-    }
-    // Between rows, across the width the children occupy.
-    if (rowGap > 0) {
-      for (let i = 1; i < rows.length; i++) {
-        const prev = rows[i - 1];
-        const next = rows[i];
-        if (!prev || !next) {
-          continue;
-        }
-        const space = next.top - prev.bottom;
-        const h = Math.min(space, rowGap);
-        if (h <= 0.5) {
-          continue;
-        }
-        const span = [...prev.items, ...next.items];
-        const left = Math.min(...span.map((r) => r.left));
-        const right = Math.max(...span.map((r) => r.right));
-        bands.push({ axis: 'row', x: left, y: prev.bottom, w: right - left, h });
-      }
-    }
-    return bands;
+    const rows = visualRows(kids);
+    return [
+      ...(colGap > 0 ? columnGapBands(rows, colGap) : []),
+      ...(rowGap > 0 ? rowGapBands(rows, rowGap) : []),
+    ];
   };
 
-  const spacingForPath = (p: string): (Spacing | null)[] => {
+  const spacingForPath = (nodePath: string): (Spacing | undefined)[] => {
     const out: Element[] = [];
-    for (const run of runsOf(p) || []) {
-      const el = run.find((n): n is Element => isElement(n) && n.tagName !== 'TEMPLATE');
-      if (el) {
-        out.push(el);
+    for (const run of runsOf(nodePath) || []) {
+      const element = run.find(
+        (node): node is Element => isElement(node) && node.tagName !== 'TEMPLATE',
+      );
+      if (element) {
+        out.push(element);
       }
     }
     if (!out.length) {
-      out.push(...elementsWithPath(p));
+      out.push(...elementsWithPath(nodePath));
     }
-    return out.map((el) => {
+    return out.map((element) => {
       try {
-        const cs = window.getComputedStyle(el);
+        const cs = window.getComputedStyle(element);
         const box = (kind: string) =>
           Object.fromEntries(
-            SIDES.map((s): [string, number] => [
-              s,
-              parseFloat(cs.getPropertyValue(`${kind}-${s}`)) || 0,
+            SIDES.map((side): [string, number] => [
+              side,
+              parseFloat(cs.getPropertyValue(`${kind}-${side}`)) || 0,
             ]),
           );
-        return { padding: box('padding'), margin: box('margin'), gaps: gapBandsFor(el, cs) };
+        return { padding: box('padding'), margin: box('margin'), gaps: gapBandsFor(element, cs) };
       } catch {
         // Whatever went wrong measuring one element, the boxes everything else
         // depends on still have to be reported.
-        return null;
+        return undefined;
       }
     });
   };
 
   // The boxes as last reported, so the watcher below can tell whether the page
   // has moved since — see `followMotion`.
-  let lastSentRects: Record<string, Rect[] | null> = {};
+  let lastSentRects: Record<string, Rect[] | undefined> = {};
 
   const sendRects = () => {
     if (!trackedPaths.length) {
       return;
     }
-    const rects: Record<string, Rect[] | null> = {};
+    const rects: Record<string, Rect[] | undefined> = {};
     const classes: Record<string, string[][]> = {};
-    const spacing: Record<string, (Spacing | null)[]> = {};
-    for (const p of trackedPaths) {
-      rects[p] = rectsForPath(p);
-      classes[p] = classesForPath(p);
-      spacing[p] = spacingForPath(p);
+    const spacing: Record<string, (Spacing | undefined)[]> = {};
+    for (const nodePath of trackedPaths) {
+      rects[nodePath] = rectsForPath(nodePath);
+      classes[nodePath] = classesForPath(nodePath);
+      spacing[nodePath] = spacingForPath(nodePath);
     }
     lastSentRects = rects;
-    window.parent.postMessage({ type: 'avb:rects', rects, classes, spacing }, '*');
+    window.parent.postMessage(
+      {
+        type: 'avb:rects',
+        rects,
+        classes,
+        spacing,
+      },
+      '*',
+    );
   };
 
   // --- a page that moves by itself ------------------------------------------
@@ -1335,16 +1430,13 @@ if (!process.isMainFrame) {
   const STILL_FRAMES = 20; // …and a third of a second of stillness is a stop
   const LOOK_EVERY = 200; // ms between looks while the page is holding still
 
-  const boxesMoved = (
-    before: Rect[] | null | undefined,
-    now: Rect[] | null | undefined,
-  ): boolean => {
+  const boxesMoved = (before: Rect[] | undefined, now: Rect[] | undefined): boolean => {
     if (!before || !now || before.length !== now.length) {
       return true;
     }
     for (let i = 0; i < now.length; i++) {
-      for (const k of ['x', 'y', 'w', 'h'] as const) {
-        if (Math.abs((before[i]?.[k] ?? 0) - (now[i]?.[k] ?? 0)) > MOVE_SLACK) {
+      for (const key of ['x', 'y', 'w', 'h'] as const) {
+        if (Math.abs((before[i]?.[key] ?? 0) - (now[i]?.[key] ?? 0)) > MOVE_SLACK) {
           return true;
         }
       }
@@ -1353,13 +1445,13 @@ if (!process.isMainFrame) {
   };
 
   const trackedMoved = () => {
-    for (const p of trackedPaths) {
+    for (const nodePath of trackedPaths) {
       // Never reported yet is not movement: the send that reports it is
       // already on its way.
-      if (!lastSentRects[p]) {
+      if (!lastSentRects[nodePath]) {
         continue;
       }
-      if (boxesMoved(lastSentRects[p], rectsForPath(p))) {
+      if (boxesMoved(lastSentRects[nodePath], rectsForPath(nodePath))) {
         return true;
       }
     }
@@ -1378,7 +1470,7 @@ if (!process.isMainFrame) {
       // The measurements that go stale with the boxes. Not the `stacki-opened`
       // class: painting it writes to the DOM, and a write on every frame of an
       // animation is a mutation storm answered by another measurement.
-      thinCache = null;
+      thinCache = undefined;
       focusCache = undefined;
       sendRects();
     } else if (++stillFor >= STILL_FRAMES) {
@@ -1418,19 +1510,19 @@ if (!process.isMainFrame) {
   let lastRenderedKey = '';
   const sendRendered = () => {
     const rendered = [];
-    for (const p of regions.keys()) {
-      if (!inScope(p)) {
+    for (const nodePath of regions.keys()) {
+      if (!inScope(nodePath)) {
         continue;
       }
       let live = false;
-      for (const run of runsOf(p) || []) {
-        for (const n of run) {
-          if (!n.isConnected) {
+      for (const run of runsOf(nodePath) || []) {
+        for (const node of run) {
+          if (!node.isConnected) {
             continue;
           }
-          if (isElement(n) && n.tagName !== 'TEMPLATE') {
+          if (isElement(node) && node.tagName !== 'TEMPLATE') {
             live = true;
-          } else if (isText(n) && n.textContent !== null && n.textContent.trim()) {
+          } else if (isText(node) && node.textContent !== null && node.textContent.trim()) {
             live = true;
           }
           if (live) {
@@ -1443,23 +1535,23 @@ if (!process.isMainFrame) {
       }
       // The tag survives on clones when a script rebuilds the DOM, so a node
       // whose recorded run went stale is still rendering something.
-      if (!live && elementsWithPath(p).length) {
+      if (!live && elementsWithPath(nodePath).length) {
         live = true;
       }
       if (live) {
-        rendered.push(p);
+        rendered.push(nodePath);
       }
     }
     // A slotted node is never wrapped in markers — it's addressed by the tag
     // alone (see pathsOf) — so it has no region to be found above. Anything
     // carrying a tag is on the page by definition.
-    for (const el of Array.from(document.querySelectorAll(`[${PATH_ATTR}]`))) {
-      if (!inFocus(el)) {
+    for (const element of Array.from(document.querySelectorAll(`[${PATH_ATTR}]`))) {
+      if (!inFocus(element)) {
         continue;
       }
-      for (const p of pathsOf(el)) {
-        if (inScope(p) && !rendered.includes(p)) {
-          rendered.push(p);
+      for (const nodePath of pathsOf(element)) {
+        if (inScope(nodePath) && !rendered.includes(nodePath)) {
+          rendered.push(nodePath);
         }
       }
     }
@@ -1483,30 +1575,32 @@ if (!process.isMainFrame) {
   // hundred, so this rides the walk that already happens rather than adding
   // one of its own.
   let lastStatesKey = '';
-  const firstElementFor = (p: string): Element | null => {
-    for (const run of runsOf(p) || []) {
-      const el = run.find((n): n is Element => isElement(n) && n.tagName !== 'TEMPLATE');
-      if (el && el.isConnected) {
-        return el;
+  const firstElementFor = (nodePath: string): Element | undefined => {
+    for (const run of runsOf(nodePath) || []) {
+      const element = run.find(
+        (node): node is Element => isElement(node) && node.tagName !== 'TEMPLATE',
+      );
+      if (element && element.isConnected) {
+        return element;
       }
     }
-    return elementsWithPath(p)[0] || null;
+    return elementsWithPath(nodePath)[0] || undefined;
   };
   const sendStates = (rendered: string[]): void => {
     const hidden = [];
     const inert = [];
-    for (const p of rendered) {
-      const el = firstElementFor(p);
-      if (!el) {
+    for (const nodePath of rendered) {
+      const element = firstElementFor(nodePath);
+      if (!element) {
         continue;
       }
       try {
-        const cs = window.getComputedStyle(el);
+        const cs = window.getComputedStyle(element);
         if (cs.display === 'none') {
-          hidden.push(p);
+          hidden.push(nodePath);
         }
         if (cs.pointerEvents === 'none') {
-          inert.push(p);
+          inert.push(nodePath);
         }
       } catch {
         /* an element that cannot be measured says nothing about itself */
@@ -1529,24 +1623,24 @@ if (!process.isMainFrame) {
   let lastClassKey = '';
   const sendClasses = () => {
     const out: Record<string, string[]> = {};
-    for (const p of regions.keys()) {
-      if (!inScope(p)) {
+    for (const nodePath of regions.keys()) {
+      if (!inScope(nodePath)) {
         continue;
       }
-      const list = classesForPath(p)[0];
+      const list = classesForPath(nodePath)[0];
       if (list && list.length) {
-        out[p] = list;
+        out[nodePath] = list;
       }
     }
     // Slotted nodes have no marker pair, so they never appear above.
-    for (const el of Array.from(document.querySelectorAll(`[${PATH_ATTR}]`))) {
-      const own = ownClasses(el);
-      if (!own.length || !inFocus(el)) {
+    for (const element of Array.from(document.querySelectorAll(`[${PATH_ATTR}]`))) {
+      const own = ownClasses(element);
+      if (!own.length || !inFocus(element)) {
         continue;
       }
-      for (const p of pathsOf(el)) {
-        if (inScope(p) && !out[p]) {
-          out[p] = own;
+      for (const nodePath of pathsOf(element)) {
+        if (inScope(nodePath) && !out[nodePath]) {
+          out[nodePath] = own;
         }
       }
     }
@@ -1573,27 +1667,27 @@ if (!process.isMainFrame) {
     const offset = length >= viewport - SCROLL_MARGIN * 2 ? SCROLL_MARGIN : (viewport - length) / 2;
     return Math.max(0, at + start - offset);
   };
-  const scrollPathIntoView = (p: string, occ: number): void => {
-    const rects = rectsForPath(p);
+  const scrollPathIntoView = (nodePath: string, occ: number): void => {
+    const rects = rectsForPath(nodePath);
     if (!rects || !rects.length) {
       return;
     }
     // One path can render many times (a node inside a loop, a component used
     // repeatedly). Scroll to the instance being worked in, not whichever one
     // happens to come first in the document.
-    const r = rects[occ] ?? rects[0]; // viewport-relative
-    if (!r) {
+    const rect = rects[occ] ?? rects[0]; // viewport-relative
+    if (!rect) {
       return;
     }
     const vh = window.innerHeight || document.documentElement.clientHeight;
     const vw = window.innerWidth || document.documentElement.clientWidth;
-    const top = revealAlong(r.y, r.h, vh, window.scrollY);
+    const top = revealAlong(rect.y, rect.h, vh, window.scrollY);
     // Sideways too. A site can be wider than the frame — full-bleed sliders,
     // a track of cards, a decorative circle hanging off the edge — and once the
     // canvas is scrolled across, everything on it reads as having slipped off
     // to the left with no scrollbar to say otherwise. Selecting something is
     // how you ask to see it, so it is also how you get back.
-    const left = revealAlong(r.x, r.w, vw, window.scrollX);
+    const left = revealAlong(rect.x, rect.w, vw, window.scrollX);
     if (top === window.scrollY && left === window.scrollX) {
       return;
     }
@@ -1623,7 +1717,9 @@ if (!process.isMainFrame) {
   // and they are not what anyone means by the root of the component.
   const UNRENDERED = new Set(['TEMPLATE', 'SCRIPT', 'STYLE', 'LINK', 'META', 'TITLE']);
   const openedRoots = (): Element[] =>
-    (focusRoots() || []).filter((n): n is Element => isElement(n) && !UNRENDERED.has(n.tagName));
+    (focusRoots() || []).filter(
+      (node): node is Element => isElement(node) && !UNRENDERED.has(node.tagName),
+    );
 
   let openedEls: Element[] = [];
   const paintOpened = () => {
@@ -1632,16 +1728,16 @@ if (!process.isMainFrame) {
     // is still a write, and the canvas re-measures on any mutation — so a
     // repaint that changed nothing scheduled the next repaint, once a frame,
     // for as long as the component stayed open.
-    if (next.length === openedEls.length && next.every((el, i) => el === openedEls[i])) {
+    if (next.length === openedEls.length && next.every((element, i) => element === openedEls[i])) {
       return;
     }
-    for (const el of openedEls) {
-      if (!next.includes(el)) {
-        el.classList.remove('stacki-opened');
+    for (const element of openedEls) {
+      if (!next.includes(element)) {
+        element.classList.remove('stacki-opened');
       }
     }
-    for (const el of next) {
-      el.classList.add('stacki-opened');
+    for (const element of next) {
+      element.classList.add('stacki-opened');
     }
     openedEls = next;
   };
@@ -1664,7 +1760,7 @@ if (!process.isMainFrame) {
   let rectsQueued = false;
   let pageQueued = false;
   const queueRects = (pageToo = false) => {
-    thinCache = null; // scrolled, resized or rebuilt — every box moved
+    thinCache = undefined; // scrolled, resized or rebuilt — every box moved
     focusCache = undefined; // …including the instance being edited
     pageQueued = pageQueued || pageToo;
     if (rectsQueued) {
@@ -1701,7 +1797,7 @@ if (!process.isMainFrame) {
 
   // Which rendered copy of a node the target sits in. A node inside a loop
   // is recorded once per item, so the runs are the instances in order.
-  const occurrenceOf = (path: string, target: Node | null): number => {
+  const occurrenceOf = (path: string, target: Node | undefined): number => {
     const runs = runsOf(path);
     if (runs && runs.length > 1) {
       for (let i = 0; i < runs.length; i++) {
@@ -1709,11 +1805,14 @@ if (!process.isMainFrame) {
         if (!run) {
           continue;
         }
-        for (const n of run) {
-          if (!n.isConnected) {
+        for (const node of run) {
+          if (!node.isConnected) {
             continue;
           }
-          if (n === target || (n.nodeType === 1 && n.contains(target))) {
+          if (node === target) {
+            return i;
+          }
+          if (node.nodeType === 1 && target !== undefined && node.contains(target)) {
             return i;
           }
         }
@@ -1731,8 +1830,11 @@ if (!process.isMainFrame) {
         if (!place) {
           continue;
         }
-        const el = place.el;
-        if (el === target || el.contains(target)) {
+        const element = place.el;
+        if (element === target) {
+          return i;
+        }
+        if (target !== undefined && element.contains(target)) {
           return i;
         }
       }
@@ -1748,30 +1850,30 @@ if (!process.isMainFrame) {
   // wide the outline looks anyway.
   const THIN = 3; // a box this flat can't be entered
   const THIN_SLACK = 5; // …so accept the cursor this near it
-  let thinCache: ThinTarget[] | null = null;
+  let thinCache: ThinTarget[] | undefined = undefined;
   const thinTargets = (): ThinTarget[] => {
     if (thinCache) {
       return thinCache;
     }
     thinCache = [];
-    for (const el of Array.from(document.querySelectorAll(`[${PATH_ATTR}]`))) {
-      if (!inFocus(el)) {
+    for (const element of Array.from(document.querySelectorAll(`[${PATH_ATTR}]`))) {
+      if (!inFocus(element)) {
         continue;
       }
-      const p = pathsOf(el).find(inScope);
-      if (!p) {
+      const nodePath = pathsOf(element).find(inScope);
+      if (!nodePath) {
         continue;
       }
-      const b = el.getBoundingClientRect();
+      const rect = element.getBoundingClientRect();
       // Fully collapsed (0×0) is left alone: the app draws no outline for it,
       // so snapping to it would highlight nothing.
-      if (b.width < 1 && b.height < 1) {
+      if (rect.width < 1 && rect.height < 1) {
         continue;
       }
-      if (b.height > THIN && b.width > THIN) {
+      if (rect.height > THIN && rect.width > THIN) {
         continue;
       }
-      thinCache.push({ path: p, el, box: b });
+      thinCache.push({ path: nodePath, el: element, box: rect });
     }
     return thinCache;
   };
@@ -1779,25 +1881,25 @@ if (!process.isMainFrame) {
   // The deepest line-thin node the cursor is within slack of. Constrained to
   // descendants of what the normal hit test found, so this only ever refines
   // the answer — it can't jump to something else on the page.
-  const thinAt = (x: number, y: number, best: string | null): ThinTarget | null => {
-    let hit: ThinTarget | null = null;
+  const thinAt = (x: number, y: number, best: string | undefined): ThinTarget | undefined => {
+    let hit: ThinTarget | undefined = undefined;
     let hitDepth = best ? best.split('.').length : 0;
-    for (const t of thinTargets()) {
-      if (best && !t.path.startsWith(best + '.')) {
+    for (const target of thinTargets()) {
+      if (best && !target.path.startsWith(best + '.')) {
         continue;
       }
-      const depth = t.path.split('.').length;
+      const depth = target.path.split('.').length;
       if (depth <= hitDepth) {
         continue;
       }
-      const b = t.box;
-      if (x < b.left - THIN_SLACK || x > b.right + THIN_SLACK) {
+      const box = target.box;
+      if (x < box.left - THIN_SLACK || x > box.right + THIN_SLACK) {
         continue;
       }
-      if (y < b.top - THIN_SLACK || y > b.bottom + THIN_SLACK) {
+      if (y < box.top - THIN_SLACK || y > box.bottom + THIN_SLACK) {
         continue;
       }
-      hit = t;
+      hit = target;
       hitDepth = depth;
     }
     return hit;
@@ -1806,94 +1908,22 @@ if (!process.isMainFrame) {
   // Deepest marked node whose rendered DOM contains the target, plus which
   // instance of it was hit — the app outlines only that one.
   const nodeAt = (
-    target: Node | null,
-    x: number | null = null,
-    y: number | null = null,
-  ): { path: string | null; occurrence: number; outside: boolean } => {
-    // Clones the page's own scripts made aren't in any recorded run, so the
-    // tag is the only way to reach them — without this, clicking a split
-    // paragraph would select its parent instead.
-    let tagged = target instanceof Element ? target.closest(`[${PATH_ATTR}]`) : null;
-    // What lights up has to contain the pointer.
-    //
-    // A page's own scripts are free to put a child's box outside its parent's,
-    // and text animation does it as a matter of course: GSAP's SplitText gives
-    // every word a line box taller than the line, so a word hangs thirteen
-    // pixels above the component holding it — measured, on the page this came
-    // from. The pointer in the space above a heading is over one of those
-    // words; the browser says so, truthfully; and what got picked was a node
-    // whose outline starts BELOW the pointer. Which reads, fairly, as the
-    // margin above a thing being treated as part of the thing.
-    //
-    // So an element only answers for a point its own box holds. One that
-    // doesn't hands the question to the element above it, which is what the
-    // person was pointing at.
-    const EDGE = 1; // the outline is drawn on the boundary; that pixel counts
-    const holdsPoint = (el: Element) => {
-      const px = x;
-      const py = y;
-      if (px === null || py === null) {
-        return true;
-      }
-      const b = el.getBoundingClientRect();
-      // No box at all — a <template>, something display:none — cannot answer.
-      if (b.width === 0 && b.height === 0) {
-        return true;
-      }
-      return (
-        px >= b.left - EDGE && px <= b.right + EDGE && py >= b.top - EDGE && py <= b.bottom + EDGE
-      );
-    };
-    while (x !== null && tagged && !holdsPoint(tagged)) {
-      tagged = tagged.parentElement ? tagged.parentElement.closest(`[${PATH_ATTR}]`) : null;
-    }
-    // Walk out of any nested namespace until the tag belongs to the open file
-    // — and, while an instance is focused, until it belongs to that instance:
-    // a click on one of its siblings resolves to nothing, which is how the app
-    // hears "done in here".
-    while (tagged !== null && !(inFocus(tagged) && pathsOf(tagged).some(inScope))) {
-      tagged = tagged.parentElement ? tagged.parentElement.closest(`[${PATH_ATTR}]`) : null;
-    }
-    // Whether anything at all was under the pointer, focus aside. `null` means
-    // the canvas could not place the click; `outside` means it could, somewhere
-    // this file/instance doesn't own — and only the second is somebody looking
-    // away from what they are editing. The app needs them apart: it backs out
-    // of a component on one and must sit still for the other.
-    const anyTag = target instanceof Element ? target.closest(`[${PATH_ATTR}]`) : null;
-    let best = tagged ? (pathsOf(tagged).find(inScope) ?? null) : null;
-    let bestDepth = best ? best.split('.').length : -1;
-    for (const p of regions.keys()) {
-      if (!inScope(p)) {
-        continue;
-      }
-      const runs = runsOf(p) || [];
-      const depth = p.split('.').length;
-      if (depth <= bestDepth) {
-        continue;
-      }
-      for (const run of runs) {
-        let hit = false;
-        for (const n of run) {
-          if (n.isConnected && n.nodeType === 1 && (n === target || n.contains(target))) {
-            hit = true;
-            break;
-          }
-        }
-        if (hit) {
-          // Same rule for a node addressed by markers rather than by a tag:
-          // its run has to be where the pointer is.
-          if (x !== null && !run.some((n) => isElement(n) && holdsPoint(n))) {
-            break;
-          }
-          best = p;
-          bestDepth = depth;
-          break;
-        }
-      }
-    }
+    target: Node | undefined,
+    x?: number,
+    y?: number,
+  ): { path: string | undefined; occurrence: number; outside: boolean } => {
+    const tagged = taggedFor(target, x, y);
+    // Whether anything at all was under the pointer, focus aside. No path
+    // means the canvas could not place the click; `outside` means it could,
+    // somewhere this file/instance doesn't own — and only the second is
+    // somebody looking away from what they are editing. The app needs them
+    // apart: it backs out of a component on one and must sit still for the
+    // other.
+    const anyTag = target instanceof Element ? target.closest(`[${PATH_ATTR}]`) : undefined;
+    const best = deepestRegionAt(target, x, y, tagged && pathsOf(tagged).find(inScope));
     // Nothing containing the cursor can be flat, so this runs last, over the
     // node that did win: a zero-height child of it takes precedence.
-    if (x !== null && y !== null) {
+    if (x !== undefined && y !== undefined) {
       const thin = thinAt(x, y, best);
       if (thin) {
         return { path: thin.path, occurrence: occurrenceOf(thin.path, thin.el), outside: false };
@@ -1908,20 +1938,116 @@ if (!process.isMainFrame) {
     };
   };
 
+  // What lights up has to contain the pointer.
+  //
+  // A page's own scripts are free to put a child's box outside its parent's,
+  // and text animation does it as a matter of course: GSAP's SplitText gives
+  // every word a line box taller than the line, so a word hangs thirteen
+  // pixels above the component holding it — measured, on the page this came
+  // from. The pointer in the space above a heading is over one of those
+  // words; the browser says so, truthfully; and what got picked was a node
+  // whose outline starts BELOW the pointer. Which reads, fairly, as the
+  // margin above a thing being treated as part of the thing.
+  //
+  // So an element only answers for a point its own box holds. One that
+  // doesn't hands the question to the element above it, which is what the
+  // person was pointing at.
+  const EDGE = 1; // the outline is drawn on the boundary; that pixel counts
+  const holdsPoint = (element: Element, x: number | undefined, y: number | undefined) => {
+    if (x === undefined || y === undefined) {
+      return true;
+    }
+    const rect = element.getBoundingClientRect();
+    // No box at all — a <template>, something display:none — cannot answer.
+    if (rect.width === 0 && rect.height === 0) {
+      return true;
+    }
+    return (
+      x >= rect.left - EDGE &&
+      x <= rect.right + EDGE &&
+      y >= rect.top - EDGE &&
+      y <= rect.bottom + EDGE
+    );
+  };
+
+  // The tagged element that answers for the target. Clones the page's own
+  // scripts made aren't in any recorded run, so the tag is the only way to
+  // reach them — without this, clicking a split paragraph would select its
+  // parent instead.
+  const taggedFor = (target: Node | undefined, x?: number, y?: number): Element | undefined => {
+    let tagged =
+      target instanceof Element ? (target.closest(`[${PATH_ATTR}]`) ?? undefined) : undefined;
+    while (x !== undefined && tagged && !holdsPoint(tagged, x, y)) {
+      tagged = taggedAncestor(tagged);
+    }
+    // Walk out of any nested namespace until the tag belongs to the open file
+    // — and, while an instance is focused, until it belongs to that instance:
+    // a click on one of its siblings resolves to nothing, which is how the app
+    // hears "done in here".
+    while (tagged !== undefined && !(inFocus(tagged) && pathsOf(tagged).some(inScope))) {
+      tagged = taggedAncestor(tagged);
+    }
+    return tagged;
+  };
+
+  // The deepest in-scope path whose marker run holds the target, or the path
+  // the tag named when no run goes deeper.
+  const deepestRegionAt = (
+    target: Node | undefined,
+    x: number | undefined,
+    y: number | undefined,
+    tagPath: string | undefined,
+  ): string | undefined => {
+    let best = tagPath;
+    let bestDepth = best ? best.split('.').length : -1;
+    for (const nodePath of regions.keys()) {
+      if (!inScope(nodePath)) {
+        continue;
+      }
+      const runs = runsOf(nodePath) || [];
+      const depth = nodePath.split('.').length;
+      if (depth <= bestDepth) {
+        continue;
+      }
+      for (const run of runs) {
+        const hit = run.some(
+          (node) =>
+            node.isConnected &&
+            node.nodeType === 1 &&
+            (node === target || (target !== undefined && node.contains(target))),
+        );
+        if (hit) {
+          // Same rule for a node addressed by markers rather than by a tag:
+          // its run has to be where the pointer is.
+          if (x !== undefined && !run.some((node) => isElement(node) && holdsPoint(node, x, y))) {
+            break;
+          }
+          best = nodePath;
+          bestDepth = depth;
+          break;
+        }
+      }
+    }
+    return best;
+  };
+
   // What the pointer is actually over. A page script that calls
   // setPointerCapture — drag carousels, sliders, anything with a grab
   // cursor — makes every later pointer event, INCLUDING the click, report
   // the capturing element as its target. Trusting e.target there selects the
   // whole carousel however deep you click. Hit-test the cursor instead; a
   // synthesised event with no coordinates keeps e.target.
-  const targetAt = (e: MouseEvent): Node | null =>
-    (e.clientX || e.clientY ? document.elementFromPoint(e.clientX, e.clientY) : null) ||
-    (e.target instanceof window.Node ? e.target : null);
+  const targetAt = (event: MouseEvent): Node | undefined =>
+    (event.clientX || event.clientY
+      ? document.elementFromPoint(event.clientX, event.clientY)
+      : undefined) || (event.target instanceof window.Node ? event.target : undefined);
 
   // Same resolution for hover, click and dblclick, so what lights up under the
   // cursor is exactly what a click selects.
-  const nodeAtEvent = (e: MouseEvent) =>
-    e.clientX || e.clientY ? nodeAt(targetAt(e), e.clientX, e.clientY) : nodeAt(targetAt(e));
+  const nodeAtEvent = (event: MouseEvent) =>
+    event.clientX || event.clientY
+      ? nodeAt(targetAt(event), event.clientX, event.clientY)
+      : nodeAt(targetAt(event));
 
   const startOutlines = () => {
     // A page edit now patches the document instead of reloading it, so the
@@ -1975,6 +2101,12 @@ if (!process.isMainFrame) {
     // And a page that moves with nothing happening at all — an animation, a
     // transition, anything that only changes where things are. Nothing above
     // fires for that; see followMotion.
+    lookForMotion();
+    listenForPointer();
+  };
+
+  // Polls for motion nothing announces (see followMotion).
+  const lookForMotion = () => {
     const look = setInterval(watchMotion, LOOK_EVERY);
     // A repeating timer is the one thing here that would hold a Node process
     // open — the suites run this file in jsdom, and a page's heartbeat is not
@@ -1988,12 +2120,19 @@ if (!process.isMainFrame) {
     ) {
       look['unref']();
     }
-    document.addEventListener('mousemove', (e) => {
-      const { path: p, occurrence } = nodeAtEvent(e);
-      if (p !== lastHoverPath || occurrence !== lastHoverOcc) {
-        lastHoverPath = p;
-        lastHoverOcc = occurrence;
-        postLocated('avb:hover-node', { path: p, occurrence });
+  };
+
+  // Hover, double-click and click, each resolved to the node under the pointer.
+  const listenForPointer = () => {
+    document.addEventListener('mousemove', (event) => {
+      const { path: nodePath, occurrence } = nodeAtEvent(event);
+      if (
+        lastHover === undefined ||
+        nodePath !== lastHover.path ||
+        occurrence !== lastHover.occurrence
+      ) {
+        lastHover = { path: nodePath, occurrence };
+        postLocated('avb:hover-node', { path: nodePath, occurrence });
       }
     });
     document.documentElement.addEventListener('mouseleave', startOutlinesClearHover);
@@ -2001,19 +2140,19 @@ if (!process.isMainFrame) {
     // drills into one.
     document.addEventListener(
       'dblclick',
-      (e) => {
+      (event) => {
         if (!designMode) {
           return;
         }
-        e.preventDefault();
-        e.stopPropagation();
+        event.preventDefault();
+        event.stopPropagation();
         // Report even when nothing in scope matched: markup the layout renders
         // itself (nav, footer — anything outside the page's <slot>) has no
         // in-scope marker, and the app opens the layout for those.
         // With the occurrence: a component inside a loop renders once per
         // item, and opening it means the one under the cursor.
-        const { path: p, occurrence } = nodeAtEvent(e);
-        postLocated('avb:open-node', { path: p || null, occurrence });
+        const { path: nodePath, occurrence } = nodeAtEvent(event);
+        postLocated('avb:open-node', { path: nodePath || undefined, occurrence });
       },
       true,
     );
@@ -2024,28 +2163,32 @@ if (!process.isMainFrame) {
     // normal page behavior.
     document.addEventListener(
       'click',
-      (e) => {
+      (event) => {
         if (!designMode) {
           return;
         }
-        e.preventDefault();
-        e.stopPropagation();
-        // A click that hits no marked node still reports (path null), with
+        event.preventDefault();
+        event.stopPropagation();
+        // A click that hits no marked node still reports (no path), with
         // `outside` saying whether it landed on something the open file simply
         // doesn't own — which is what the app backs out of a component on.
-        const { path: p, occurrence, outside } = nodeAtEvent(e);
-        postLocated('avb:click-node', { path: p || null, occurrence, outside: !!outside });
+        const { path: nodePath, occurrence, outside } = nodeAtEvent(event);
+        postLocated('avb:click-node', {
+          path: nodePath || undefined,
+          occurrence,
+          outside: !!outside,
+        });
       },
       true,
     );
   };
 
   function startOutlinesClearHover(): void {
-    if (lastHoverPath !== null) {
-      lastHoverPath = null;
-      lastHoverOcc = 0;
+    // Told nothing yet, or told of a node: either way, the pointer has left.
+    if (lastHover === undefined || lastHover.path !== undefined) {
+      lastHover = { path: undefined, occurrence: 0 };
       // Clear messages use the same located-message contract as hover hits.
-      postLocated('avb:hover-node', { path: null, occurrence: 0 });
+      postLocated('avb:hover-node', { path: undefined, occurrence: 0 });
     }
   }
 
@@ -2066,11 +2209,11 @@ if (!process.isMainFrame) {
   // no match, and a class added by a script was invisible. The rendered page
   // is right here, so ask it — Chromium's own selector engine, over the real
   // DOM, knows every element and every class however it got there.
-  const elementsForPath = (p: string): Element[] => {
+  const elementsForPath = (nodePath: string): Element[] => {
     const out: Element[] = [];
-    for (const run of runsOf(p) || []) {
-      for (const n of run) {
-        if (!isElement(n)) {
+    for (const run of runsOf(nodePath) || []) {
+      for (const node of run) {
+        if (!isElement(node)) {
           continue;
         }
         // A run holds everything between the marker pair, which includes the
@@ -2079,23 +2222,23 @@ if (!process.isMainFrame) {
         // updated — never describes the element anyway: reporting one as the
         // node's identity tells the style panel the tag is `template` and there
         // are no classes. Same rule the rect measuring uses.
-        if (!n.isConnected || n.tagName === 'TEMPLATE') {
+        if (!node.isConnected || node.tagName === 'TEMPLATE') {
           continue;
         }
-        out.push(n);
+        out.push(node);
       }
     }
-    for (const el of elementsWithPath(p)) {
-      if (!out.includes(el)) {
-        out.push(el);
+    for (const element of elementsWithPath(nodePath)) {
+      if (!out.includes(element)) {
+        out.push(element);
       }
     }
     // A node that renders nothing of its own (a component wrapping a fragment,
     // `display: contents`) still has descendants that do — the first of those
     // stands in for it, the same fallback the rect measuring uses.
     if (!out.length) {
-      const first = Array.from(document.querySelectorAll(`[${PATH_ATTR}]`)).find((el) =>
-        pathsOf(el).some((x) => x.startsWith(p + '.')),
+      const first = Array.from(document.querySelectorAll(`[${PATH_ATTR}]`)).find((element) =>
+        pathsOf(element).some((x) => x.startsWith(nodePath + '.')),
       );
       if (first) {
         out.push(first);
@@ -2104,14 +2247,14 @@ if (!process.isMainFrame) {
     return out;
   };
 
-  const identityOf = (el: Element) => ({
-    tag: el.tagName.toLowerCase(),
-    id: el.id || null,
-    classes: ownClasses(el),
+  const identityOf = (element: Element) => ({
+    tag: element.tagName.toLowerCase(),
+    id: element.id || undefined,
+    classes: ownClasses(element),
     attributes: Object.fromEntries(
-      Array.from(el.attributes)
-        .filter((a) => a.name !== PATH_ATTR)
-        .map((a) => [a.name, a.value]),
+      Array.from(element.attributes)
+        .filter((attribute) => attribute.name !== PATH_ATTR)
+        .map((attribute) => [attribute.name, attribute.value]),
     ),
   });
 
@@ -2120,161 +2263,182 @@ if (!process.isMainFrame) {
   const recordPayload = (x: unknown): x is Record<string, unknown> =>
     typeof x === 'object' && x !== null;
 
-  window.addEventListener('message', (e: MessageEvent) => {
-    if (e.source !== window.parent) {
+  window.addEventListener('message', (event: MessageEvent) => {
+    if (event.source !== window.parent) {
       return;
     }
-    const d: unknown = e.data;
-    if (!recordPayload(d)) {
+    const data: unknown = event.data;
+    if (!recordPayload(data)) {
       return;
     }
-    if (d['type'] === 'avb:query' && typeof d['id'] === 'number') {
-      const els = typeof d['path'] === 'string' ? elementsForPath(d['path']) : [];
-      const matched: Record<string, boolean | null> = {};
-      // What a value actually resolves to ON THIS ELEMENT. `var(--background)`
-      // means nothing in the app's own document — the panel painted it there
-      // and got transparent — and it can mean different things on two elements
-      // of the same page (a theme class, a container query, a colour scheme).
-      // Only the page can say, so it is asked: a throwaway span in the element
-      // inherits its custom properties, takes the value as a colour, and the
-      // engine hands back the computed one.
-      const computed: Record<string, string | null> = {};
-      const wanted = (Array.isArray(d['compute']) ? d['compute'] : []).filter(
-        (v): v is string => typeof v === 'string',
-      );
-      // No element named, or none found: the question is about the page rather
-      // than about a node. That is what the variables panel asks — a value is
-      // the same colour wherever it is written, and the custom properties it
-      // leans on are declared on :root, which is this element. Only `compute`
-      // takes this: the reads below are ABOUT a node, and answering them from
-      // the root would be answering a different question.
-      const host = els[0] || document.documentElement;
-      if (wanted.length && host) {
-        const probe = document.createElement('span');
-        probe.setAttribute('style', 'position:absolute;width:0;height:0;visibility:hidden');
-        host.appendChild(probe);
-        for (const value of wanted) {
-          try {
-            // A sentinel first: assigning a value the engine rejects leaves the
-            // previous one in place, and reading that back would report a
-            // colour the value never had.
-            probe.style.color = 'rgb(1, 2, 3)';
-            probe.style.color = value;
-            computed[value] =
-              probe.style.color === 'rgb(1, 2, 3)' ? null : getComputedStyle(probe).color;
-          } catch {
-            computed[value] = null;
-          }
-        }
-        probe.remove();
-      }
-      // What the element's style ACTUALLY is for a property nothing in the panel
-      // sets — inherited from a parent, painted by a `*` rule the panel can't see
-      // past a component edge, or a user-agent default. The panel highlights that
-      // value in its dropdowns so an unset control still shows what's on the page.
-      const computedProps: Record<string, string | null> = {};
-      const props = Array.isArray(d['props']) ? d['props'] : [];
-      if (props.length && els[0]) {
-        // Design mode paints `cursor: default !important` over everything (see the
-        // top of this file), so the page's own cursor is hidden behind it. Lift that
-        // sheet for the read and put it straight back — nothing paints in between,
-        // and otherwise every element would report `default`.
-        const designStyle = document.getElementById('avb-design-style');
-        const designSheet = designStyle instanceof HTMLStyleElement ? designStyle : null;
-        try {
-          if (designSheet) {
-            designSheet.disabled = true;
-          }
-          const cs = getComputedStyle(els[0]);
-          for (const prop of props) {
-            if (typeof prop !== 'string') {
-              continue;
-            }
-            computedProps[prop] = cs.getPropertyValue(prop) || null;
-          }
-        } catch {
-          // A detached or cross-document element answers nothing; the panel
-          // falls back to its own defaults.
-        } finally {
-          if (designSheet) {
-            designSheet.disabled = false;
-          }
-        }
-      }
-      const selectors = (Array.isArray(d['selectors']) ? d['selectors'] : []).filter(
-        (v): v is string => typeof v === 'string',
-      );
-      for (const sel of selectors) {
-        try {
-          // Any of the element's occurrences matching counts — a loop child is
-          // one node in the tree and many elements on the page.
-          matched[sel] = els.some((el) => el.matches(sel));
-        } catch {
-          matched[sel] = null; // not a selector this engine accepts
-        }
-      }
-      window.parent.postMessage(
-        {
-          type: 'avb:query-result',
-          id: d['id'],
-          ready: mapped,
-          found: els.length > 0,
-          computed,
-          computedProps,
-          identity: els[0] ? identityOf(els[0]) : null,
-          matched,
-        },
-        '*',
-      );
+    if (data['type'] === 'avb:query' && typeof data['id'] === 'number') {
+      answerQuery(data, data['id']);
       return;
     }
-    if (d['type'] === 'avb:track' && Array.isArray(d['paths'])) {
-      designMode = true;
-      trackedPaths = d['paths'].filter((p): p is string => typeof p === 'string');
-      activeScope = typeof d['scope'] === 'string' ? d['scope'] : '';
-      focusPath = typeof d['focus'] === 'string' ? d['focus'] : '';
-      focusOcc = typeof d['focusOcc'] === 'number' ? d['focusOcc'] : 0;
-      focusCache = undefined;
-      thinCache = null; // scope decides what's hit-testable
-      paintOpened();
-      sendRects();
-      // The page-wide answers, but only when the QUESTION changed. Tracking a
-      // different node does not change which nodes rendered — and the app
-      // tracks a new node on every hover, so answering that here walked the
-      // whole page each time the pointer moved.
-      //
-      // The scope and the focused instance do change it: both decide which
-      // nodes are asked about at all.
-      const question = `${activeScope}|${focusPath}|${focusOcc}`;
-      if (question !== lastQuestion) {
-        lastQuestion = question;
-        lastRenderedKey = '';
-        lastClassKey = '';
-        sendRendered();
-        sendClasses();
-      }
+    if (data['type'] === 'avb:track' && Array.isArray(data['paths'])) {
+      track(data, data['paths']);
     }
-    if (d['type'] === 'avb:scroll-to' && typeof d['path'] === 'string') {
-      scrollPathIntoView(d['path'], typeof d['occ'] === 'number' ? d['occ'] : 0);
+    if (data['type'] === 'avb:scroll-to' && typeof data['path'] === 'string') {
+      scrollPathIntoView(data['path'], typeof data['occ'] === 'number' ? data['occ'] : 0);
     }
-    if (d['type'] === 'avb:set-vh' && typeof d['px'] === 'number') {
-      document.documentElement.style.setProperty('--avb-vh', d['px'] / 100 + 'px');
-      if (!frozen) {
-        frozen = true;
-        rewriteSheets();
-        // Subresources — @import among them — are done by `load`, so take one
-        // more pass then even if the retries above have run out.
-        window.addEventListener('load', scheduleRewrite);
-        // Vite HMR injects/replaces <style> tags — keep the override current
-        // (and last in the cascade).
-        new MutationObserver(scheduleRewrite).observe(document.head || document.documentElement, {
-          childList: true,
-          subtree: true,
-        });
-      }
-      report();
+    if (data['type'] === 'avb:set-vh' && typeof data['px'] === 'number') {
+      freezeViewportHeight(data['px']);
     }
   });
+
+  const answerQuery = (data: Record<string, unknown>, id: number) => {
+    const els = typeof data['path'] === 'string' ? elementsForPath(data['path']) : [];
+    const wanted = (Array.isArray(data['compute']) ? data['compute'] : []).filter(
+      (value): value is string => typeof value === 'string',
+    );
+    // No element named, or none found: the question is about the page rather
+    // than about a node. That is what the variables panel asks — a value is
+    // the same colour wherever it is written, and the custom properties it
+    // leans on are declared on :root, which is this element. Only `compute`
+    // takes this: the reads below are ABOUT a node, and answering them from
+    // the root would be answering a different question.
+    const host = els[0] || document.documentElement;
+    const computed = wanted.length && host ? computeValues(host, wanted) : {};
+    const props = Array.isArray(data['props']) ? data['props'] : [];
+    const computedProps = props.length && els[0] ? computeProperties(els[0], props) : {};
+    const selectors = (Array.isArray(data['selectors']) ? data['selectors'] : []).filter(
+      (value): value is string => typeof value === 'string',
+    );
+    const matched: Record<string, boolean | undefined> = {};
+    for (const selector of selectors) {
+      try {
+        // Any of the element's occurrences matching counts — a loop child is
+        // one node in the tree and many elements on the page.
+        matched[selector] = els.some((element) => element.matches(selector));
+      } catch {
+        matched[selector] = undefined; // not a selector this engine accepts
+      }
+    }
+    window.parent.postMessage(
+      {
+        type: 'avb:query-result',
+        id,
+        ready: mapped,
+        found: els.length > 0,
+        computed,
+        computedProps,
+        identity: els[0] ? identityOf(els[0]) : undefined,
+        matched,
+      },
+      '*',
+    );
+  };
+
+  // What a value actually resolves to ON THIS ELEMENT. `var(--background)`
+  // means nothing in the app's own document — the panel painted it there
+  // and got transparent — and it can mean different things on two elements
+  // of the same page (a theme class, a container query, a colour scheme).
+  // Only the page can say, so it is asked: a throwaway span in the element
+  // inherits its custom properties, takes the value as a colour, and the
+  // engine hands back the computed one.
+  const computeValues = (host: Element, wanted: string[]): Record<string, string | undefined> => {
+    const computed: Record<string, string | undefined> = {};
+    const probe = document.createElement('span');
+    probe.setAttribute('style', 'position:absolute;width:0;height:0;visibility:hidden');
+    host.appendChild(probe);
+    for (const value of wanted) {
+      try {
+        // A sentinel first: assigning a value the engine rejects leaves the
+        // previous one in place, and reading that back would report a
+        // colour the value never had.
+        probe.style.color = 'rgb(1, 2, 3)';
+        probe.style.color = value;
+        computed[value] =
+          probe.style.color === 'rgb(1, 2, 3)' ? undefined : getComputedStyle(probe).color;
+      } catch {
+        computed[value] = undefined;
+      }
+    }
+    probe.remove();
+    return computed;
+  };
+
+  // What the element's style ACTUALLY is for a property nothing in the panel
+  // sets — inherited from a parent, painted by a `*` rule the panel can't see
+  // past a component edge, or a user-agent default. The panel highlights that
+  // value in its dropdowns so an unset control still shows what's on the page.
+  const computeProperties = (
+    element: Element,
+    props: unknown[],
+  ): Record<string, string | undefined> => {
+    const computedProps: Record<string, string | undefined> = {};
+    // Design mode paints `cursor: default !important` over everything (see the
+    // top of this file), so the page's own cursor is hidden behind it. Lift that
+    // sheet for the read and put it straight back — nothing paints in between,
+    // and otherwise every element would report `default`.
+    const designStyle = document.getElementById('avb-design-style');
+    const designSheet = designStyle instanceof HTMLStyleElement ? designStyle : undefined;
+    try {
+      if (designSheet) {
+        designSheet.disabled = true;
+      }
+      const cs = getComputedStyle(element);
+      for (const prop of props) {
+        if (typeof prop !== 'string') {
+          continue;
+        }
+        computedProps[prop] = cs.getPropertyValue(prop) || undefined;
+      }
+    } catch {
+      // A detached or cross-document element answers nothing; the panel
+      // falls back to its own defaults.
+    } finally {
+      if (designSheet) {
+        designSheet.disabled = false;
+      }
+    }
+    return computedProps;
+  };
+
+  const track = (data: Record<string, unknown>, paths: unknown[]) => {
+    designMode = true;
+    trackedPaths = paths.filter((nodePath): nodePath is string => typeof nodePath === 'string');
+    activeScope = typeof data['scope'] === 'string' ? data['scope'] : '';
+    focusPath = typeof data['focus'] === 'string' ? data['focus'] : '';
+    focusOcc = typeof data['focusOcc'] === 'number' ? data['focusOcc'] : 0;
+    focusCache = undefined;
+    thinCache = undefined; // scope decides what's hit-testable
+    paintOpened();
+    sendRects();
+    // The page-wide answers, but only when the QUESTION changed. Tracking a
+    // different node does not change which nodes rendered — and the app
+    // tracks a new node on every hover, so answering that here walked the
+    // whole page each time the pointer moved.
+    //
+    // The scope and the focused instance do change it: both decide which
+    // nodes are asked about at all.
+    const question = `${activeScope}|${focusPath}|${focusOcc}`;
+    if (question !== lastQuestion) {
+      lastQuestion = question;
+      lastRenderedKey = '';
+      lastClassKey = '';
+      sendRendered();
+      sendClasses();
+    }
+  };
+
+  const freezeViewportHeight = (px: number) => {
+    document.documentElement.style.setProperty('--avb-vh', px / 100 + 'px');
+    if (!frozen) {
+      frozen = true;
+      rewriteSheets();
+      // Subresources — @import among them — are done by `load`, so take one
+      // more pass then even if the retries above have run out.
+      window.addEventListener('load', scheduleRewrite);
+      // Vite HMR injects/replaces <style> tags — keep the override current
+      // (and last in the cascade).
+      new MutationObserver(scheduleRewrite).observe(document.head || document.documentElement, {
+        childList: true,
+        subtree: true,
+      });
+    }
+    report();
+  };
 
   const start = () => {
     report();
@@ -2324,7 +2488,7 @@ if (!process.isMainFrame) {
   contextBridge.exposeInMainWorld('avb', {
     platform: process.platform,
 
-    // Project
+    // Project:
     openProjectDialog: invoke('project:openDialog'),
     newProjectDialog: invoke('project:newDialog'),
     scaffoldProject: invoke('project:scaffold'),
@@ -2364,8 +2528,8 @@ if (!process.isMainFrame) {
         return 'path' in file && typeof file['path'] === 'string' ? file['path'] : undefined;
       }
     },
-    onAssetsChanged: (cb: () => void) => {
-      const listener = () => cb();
+    onAssetsChanged: (callback: () => void) => {
+      const listener = () => callback();
       ipcRenderer.on('assets:changed', listener);
       return () => ipcRenderer.removeListener('assets:changed', listener);
     },
@@ -2394,8 +2558,8 @@ if (!process.isMainFrame) {
     removeCssSection: invoke('css:removeSection'),
     addCssSection: invoke('css:addSection'),
     moveCssHeading: invoke('css:moveHeading'),
-    onCssChanged: (cb: () => void) => {
-      const listener = () => cb();
+    onCssChanged: (callback: () => void) => {
+      const listener = () => callback();
       ipcRenderer.on('css:changed', listener);
       return () => ipcRenderer.removeListener('css:changed', listener);
     },
@@ -2408,24 +2572,24 @@ if (!process.isMainFrame) {
     contentRenamePlan: invoke('content:renamePlan'),
     renameContentEntry: invoke('content:rename'),
     setCmsMeta: invoke('cms:setMeta'),
-    onCmsChanged: (cb: () => void) => {
-      const listener = () => cb();
+    onCmsChanged: (callback: () => void) => {
+      const listener = () => callback();
       ipcRenderer.on('cms:changed', listener);
       return () => ipcRenderer.removeListener('cms:changed', listener);
     },
 
-    // Recent projects
+    // Recent projects:
     listRecents: invoke('recents:list'),
     addRecent: invoke('recents:add'),
     removeRecent: invoke('recents:remove'),
     refreshThumb: invoke('recents:refreshThumb'),
-    onThumbUpdated: (cb: (payload: unknown) => void) => {
-      const listener = (_e: unknown, payload: unknown) => cb(payload);
+    onThumbUpdated: (callback: (payload: unknown) => void) => {
+      const listener = (_event: unknown, payload: unknown) => callback(payload);
       ipcRenderer.on('recents:thumb', listener);
       return () => ipcRenderer.removeListener('recents:thumb', listener);
     },
 
-    // Pages
+    // Pages:
     readPage: invoke('page:read'),
     parsePageSource: invoke('page:parse'),
     editPage: invoke('page:edit'),
@@ -2447,19 +2611,19 @@ if (!process.isMainFrame) {
     injectedRoutes: invoke('project:injectedRoutes'),
     sampleEntry: invoke('content:sampleEntry'),
 
-    // Dev server
+    // Dev server:
     startDevServer: invoke('dev:start'),
     stopDevServer: invoke('dev:stop'),
     diagnoseDev: invoke('dev:diagnose'),
     probeDevPage: invoke('dev:probe'),
 
-    // Style panel targets
+    // Style panel targets:
     listStyleFiles: invoke('style:listFiles'),
     listAstroStyleFiles: invoke('style:listAstroStyles'),
     readStyleFile: invoke('style:readFile'),
     writeStyleFile: invoke('style:writeFile'),
 
-    // Git
+    // Git:
     gitInfo: invoke('git:info'),
     ghStatus: invoke('git:ghStatus'),
     gitInit: invoke('git:init'),
@@ -2499,51 +2663,51 @@ if (!process.isMainFrame) {
     terminalAck: (id: string, count: number) => ipcRenderer.send('terminal:ack', { id, count }),
     terminalClipboardImage: (bytes: Uint8Array, mime: string) =>
       ipcRenderer.invoke('terminal:clipboardImage', { bytes, mime }),
-    onTerminalData: (cb: (data: unknown) => void) => {
-      const listener = (_e: unknown, data: unknown) => cb(data);
+    onTerminalData: (callback: (data: unknown) => void) => {
+      const listener = (_event: unknown, data: unknown) => callback(data);
       ipcRenderer.on('terminal:data', listener);
       return () => ipcRenderer.removeListener('terminal:data', listener);
     },
-    onTerminalExit: (cb: (data: unknown) => void) => {
-      const listener = (_e: unknown, data: unknown) => cb(data);
+    onTerminalExit: (callback: (data: unknown) => void) => {
+      const listener = (_event: unknown, data: unknown) => callback(data);
       ipcRenderer.on('terminal:exit', listener);
       return () => ipcRenderer.removeListener('terminal:exit', listener);
     },
-    onTerminalProcess: (cb: (data: unknown) => void) => {
-      const listener = (_e: unknown, data: unknown) => cb(data);
+    onTerminalProcess: (callback: (data: unknown) => void) => {
+      const listener = (_event: unknown, data: unknown) => callback(data);
       ipcRenderer.on('terminal:process', listener);
       return () => ipcRenderer.removeListener('terminal:process', listener);
     },
 
-    // Events
-    onPageMaybeChanged: (cb: (data: unknown) => void) => {
-      const listener = (_event: unknown, data: unknown) => cb(data);
+    // Events:
+    onPageMaybeChanged: (callback: (data: unknown) => void) => {
+      const listener = (_event: unknown, data: unknown) => callback(data);
       ipcRenderer.on('page:maybe-changed', listener);
       return () => ipcRenderer.removeListener('page:maybe-changed', listener);
     },
-    onDevLog: (cb: (data: unknown) => void) => {
-      const listener = (_e: unknown, data: unknown) => cb(data);
+    onDevLog: (callback: (data: unknown) => void) => {
+      const listener = (_event: unknown, data: unknown) => callback(data);
       ipcRenderer.on('dev:log', listener);
       return () => ipcRenderer.removeListener('dev:log', listener);
     },
-    onDevExit: (cb: (data: unknown) => void) => {
-      const listener = (_e: unknown, data: unknown) => cb(data);
+    onDevExit: (callback: (data: unknown) => void) => {
+      const listener = (_event: unknown, data: unknown) => callback(data);
       ipcRenderer.on('dev:exit', listener);
       return () => ipcRenderer.removeListener('dev:exit', listener);
     },
-    onProgress: (cb: (data: unknown) => void) => {
-      const listener = (_e: unknown, data: unknown) => cb(data);
+    onProgress: (callback: (data: unknown) => void) => {
+      const listener = (_event: unknown, data: unknown) => callback(data);
       ipcRenderer.on('progress', listener);
       return () => ipcRenderer.removeListener('progress', listener);
     },
     // Live output from `npm create astro@latest`, shown in the new-project wizard.
-    onCreateLog: (cb: (chunk: unknown) => void) => {
-      const listener = (_e: unknown, chunk: unknown) => cb(chunk);
+    onCreateLog: (callback: (chunk: unknown) => void) => {
+      const listener = (_event: unknown, chunk: unknown) => callback(chunk);
       ipcRenderer.on('create:log', listener);
       return () => ipcRenderer.removeListener('create:log', listener);
     },
-    onFsChanged: (cb: (data: unknown) => void) => {
-      const listener = (_e: unknown, data: unknown) => cb(data);
+    onFsChanged: (callback: (data: unknown) => void) => {
+      const listener = (_event: unknown, data: unknown) => callback(data);
       ipcRenderer.on('fs:changed', listener);
       return () => ipcRenderer.removeListener('fs:changed', listener);
     },
@@ -2552,10 +2716,10 @@ if (!process.isMainFrame) {
     settings: invoke('settings:get'),
 
     // Application menu events (macOS menu accelerators never reach the DOM)
-    onMenu: (channel: string, cb: (data?: unknown) => void) => {
+    onMenu: (channel: string, callback: (data?: unknown) => void) => {
       // The payload is forwarded: a checkbox item sends its new state, and the
       // items that send nothing simply call back with undefined as before.
-      const listener = (_e: unknown, data: unknown) => cb(data);
+      const listener = (_event: unknown, data: unknown) => callback(data);
       ipcRenderer.on(`menu:${channel}`, listener);
       return () => ipcRenderer.removeListener(`menu:${channel}`, listener);
     },

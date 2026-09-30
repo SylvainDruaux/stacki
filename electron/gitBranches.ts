@@ -68,11 +68,11 @@ export type MergeOutcome =
 async function stage(
   git: Git,
   projectPath: string,
-  n: number,
+  stageNumber: number,
   file: string,
 ): Promise<string | undefined> {
   try {
-    return (await git(projectPath, ['show', `:${n}:${file}`])).stdout;
+    return (await git(projectPath, ['show', `:${stageNumber}:${file}`])).stdout;
   } catch {
     return undefined;
   }
@@ -114,7 +114,7 @@ async function resolveMerge(
   }
   const left = (await git(projectPath, ['diff', '--name-only', '--diff-filter=U'])).stdout
     .split('\n')
-    .map((l) => l.trim())
+    .map((line) => line.trim())
     .filter(Boolean);
   try {
     for (const file of left) {
@@ -138,7 +138,7 @@ async function resolveMerge(
     // Everything git reconciled by itself is already staged; this commits the
     // whole merge, the chosen files included.
     await git(projectPath, ['commit', '--no-edit']);
-  } catch (err) {
+  } catch (error: unknown) {
     // Leave nothing half-merged behind — a tree stuck mid-merge is a state the
     // rest of the app has no way to draw.
     try {
@@ -146,7 +146,7 @@ async function resolveMerge(
     } catch {
       /* already unwound */
     }
-    throw new Error(gitErrorDetail(err).trim() || `Could not finish merging "${branch}".`);
+    throw new Error(gitErrorDetail(error).trim() || `Could not finish merging "${branch}".`);
   }
   return { ok: true, into, changed: true, resolved: left.length };
 }
@@ -189,7 +189,7 @@ async function mergeBranch(
     // that did instead of asking about edits nobody disagrees over. Set with
     // -c so the user's own git config is not touched.
     await git(projectPath, ['-c', 'merge.conflictStyle=diff3', 'merge', '--no-edit', branch]);
-  } catch (err) {
+  } catch (error: unknown) {
     // Which files git could not reconcile — asked of git rather than scraped
     // out of its prose, which comes in several shapes (content, modify/delete,
     // add/add) and on STDOUT, not stderr. Read before the abort, which is what
@@ -198,7 +198,7 @@ async function mergeBranch(
     try {
       files = (await git(projectPath, ['diff', '--name-only', '--diff-filter=U'])).stdout
         .split('\n')
-        .map((l) => l.trim())
+        .map((line) => line.trim())
         .filter(Boolean);
     } catch {
       /* no index to ask about — the merge never started */
@@ -254,20 +254,20 @@ async function mergeBranch(
     // moving anything, so this is a question — park it, or commit it — rather
     // than an error, and it comes back shaped like the same question from a
     // branch switch so the UI can ask it the same way.
-    const detail = gitErrorFull(err);
+    const detail = gitErrorFull(error);
     if (/would be overwritten|Please commit your changes|Your local changes/i.test(detail)) {
       const inTheWay = detail
         .split('\n')
-        .map((l) => l.trim())
+        .map((line) => line.trim())
         .filter(
-          (l) =>
-            l &&
-            !/^(error|Please|Aborting|warning|hint|Updating|Merge with)/i.test(l) &&
-            !l.endsWith(':'),
+          (line) =>
+            line &&
+            !/^(error|Please|Aborting|warning|hint|Updating|Merge with)/i.test(line) &&
+            !line.endsWith(':'),
         );
       return { ok: false, dirty: true, from: into, branch, files: inTheWay };
     }
-    throw new Error(gitErrorDetail(err).trim() || `Could not merge "${branch}" into "${into}".`);
+    throw new Error(gitErrorDetail(error).trim() || `Could not merge "${branch}" into "${into}".`);
   }
   const after = (await git(projectPath, ['rev-parse', 'HEAD'])).stdout.trim();
   return { ok: true, into, changed: after !== before };
@@ -319,8 +319,8 @@ async function deleteBranch(
   }
   try {
     await git(projectPath, ['branch', force ? '-D' : '-d', branch]);
-  } catch (err) {
-    const detail = gitErrorDetail(err);
+  } catch (error: unknown) {
+    const detail = gitErrorDetail(error);
     if (/not fully merged/i.test(detail)) {
       return {
         ok: false,
@@ -400,18 +400,21 @@ async function switchBranch(
   // HEAD or restore a file over a mistyped branch name.
   try {
     await git(projectPath, create ? ['switch', '-c', branch] : ['switch', branch]);
-  } catch (err) {
+  } catch (error: unknown) {
     // Put the work straight back rather than leaving it stashed behind a
     // branch change that never happened.
     if (parked && unpark) {
       await unpark(from);
     }
-    const detail = gitErrorDetail(err);
+    const detail = gitErrorDetail(error);
     if (/would be overwritten|Please commit your changes|overwritten by/i.test(detail)) {
       const files = detail
         .split('\n')
-        .map((l) => l.trim())
-        .filter((l) => l && !/^(error|Please|Aborting|warning|hint)/i.test(l) && !l.endsWith(':'));
+        .map((line) => line.trim())
+        .filter(
+          (line) =>
+            line && !/^(error|Please|Aborting|warning|hint)/i.test(line) && !line.endsWith(':'),
+        );
       return { ok: false, blocked: true, from, branch, files };
     }
     throw new Error(detail.trim() || `Could not switch to "${branch}".`);

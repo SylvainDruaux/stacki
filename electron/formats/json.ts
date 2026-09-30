@@ -12,6 +12,7 @@
 // because it is never rewritten.
 
 import { assert } from '../../shared/assert.js';
+import { LIMITS } from '../../shared/limits.js';
 
 const WS = /\s/;
 
@@ -48,124 +49,160 @@ export type JsonNode = ScalarNode | ObjectNode | ArrayNode;
 
 // Where every value in the document starts and ends.
 function parse(text: string): JsonNode {
-  let i = 0;
-
-  const fail = (message: string): never => {
-    const line = text.slice(0, i).split('\n').length;
-    throw new Error(`${message} (line ${line})`);
-  };
-
-  const skip = (): void => {
-    while (i < text.length && WS.test(text.charAt(i))) {
-      i++;
-    }
-  };
-
-  const string = (): { start: number; end: number } => {
-    const start = i;
-    i++; // opening quote
-    while (i < text.length) {
-      if (text.charAt(i) === '\\') {
-        i += 2;
-      } else if (text.charAt(i) === '"') {
-        i++;
-        return { start, end: i };
-      } else {
-        i++;
-      }
-    }
-    return fail('Unterminated string');
-  };
-
-  const value = (): JsonNode => {
-    skip();
-    const start = i;
-    const ch = text.charAt(i);
-    if (ch === '{') {
-      i++;
-      const members: Member[] = [];
-      skip();
-      if (text.charAt(i) === '}') {
-        return { type: 'object', start, end: ++i, members };
-      }
-      // Every pass consumes a key and its value, so the text length bounds it.
-      for (let pass = 0; pass <= text.length; pass++) {
-        skip();
-        if (text.charAt(i) !== '"') {
-          return fail('Expected a key');
-        }
-        const keySpan = string();
-        // The span is a quoted string, so this parses to one; the guard is
-        // unreachable but keeps the boundary honest.
-        const parsedKey: unknown = JSON.parse(text.slice(keySpan.start, keySpan.end));
-        if (typeof parsedKey !== 'string') {
-          return fail('Expected a key');
-        }
-        const key = parsedKey;
-        skip();
-        if (text.charAt(i) !== ':') {
-          return fail('Expected ":"');
-        }
-        i++;
-        const v = value();
-        members.push({
-          key,
-          keyStart: keySpan.start,
-          keyEnd: keySpan.end,
-          start: keySpan.start,
-          end: v.end,
-          value: v,
-        });
-        skip();
-        if (text.charAt(i) === ',') {
-          i++;
-          continue;
-        }
-        if (text.charAt(i) === '}') {
-          return { type: 'object', start, end: ++i, members };
-        }
-        return fail('Expected "," or "}"');
-      }
-      assert(false, 'An object ends within its text');
-    }
-    if (ch === '[') {
-      i++;
-      const items: JsonNode[] = [];
-      skip();
-      if (text.charAt(i) === ']') {
-        return { type: 'array', start, end: ++i, items };
-      }
-      // Every pass consumes a value, so the text length bounds it.
-      for (let pass = 0; pass <= text.length; pass++) {
-        items.push(value());
-        skip();
-        if (text.charAt(i) === ',') {
-          i++;
-          continue;
-        }
-        if (text.charAt(i) === ']') {
-          return { type: 'array', start, end: ++i, items };
-        }
-        return fail('Expected "," or "]"');
-      }
-      assert(false, 'An array ends within its text');
-    }
-    if (ch === '"') {
-      const s = string();
-      return { type: 'scalar', start: s.start, end: s.end };
-    }
-    while (i < text.length && !WS.test(text.charAt(i)) && !',}]'.includes(text.charAt(i))) {
-      i++;
-    }
-    if (i === start) {
-      return fail('Expected a value');
-    }
-    return { type: 'scalar', start, end: i };
-  };
-
-  const root = value();
-  skip();
+  const parser = new SpanParser(text);
+  const root = parser.value(0);
+  parser.skip();
   return root;
+}
+
+// A JSON document read into spans, one value at a time. The cursor is the parser's only state,
+// and only these methods move it.
+class SpanParser {
+  readonly #text: string;
+  #position = 0;
+
+  constructor(text: string) {
+    this.#text = text;
+  }
+
+  fail(message: string): never {
+    const line = this.#text.slice(0, this.#position).split('\n').length;
+    throw new Error(`${message} (line ${line})`);
+  }
+
+  skip(): void {
+    while (this.#position < this.#text.length && WS.test(this.#text.charAt(this.#position))) {
+      this.#position++;
+    }
+  }
+
+  value(depth: number): JsonNode {
+    // A project's file may nest without end. Past the depth any value crossing a boundary may
+    // have, the document is refused like any other malformed one.
+    if (depth > LIMITS.ipcDepthMax) {
+      return this.fail('Nested too deeply');
+    }
+    this.skip();
+    const start = this.#position;
+    const first = this.#text.charAt(start);
+    if (first === '{') {
+      return this.object(start, depth);
+    }
+    if (first === '[') {
+      return this.array(start, depth);
+    }
+    if (first === '"') {
+      const span = this.string();
+      return { type: 'scalar', start: span.start, end: span.end };
+    }
+    const text = this.#text;
+    while (
+      this.#position < text.length &&
+      !WS.test(text.charAt(this.#position)) &&
+      !',}]'.includes(text.charAt(this.#position))
+    ) {
+      this.#position++;
+    }
+    if (this.#position === start) {
+      return this.fail('Expected a value');
+    }
+    return { type: 'scalar', start, end: this.#position };
+  }
+
+  private string(): { start: number; end: number } {
+    const text = this.#text;
+    const start = this.#position;
+    this.#position++; // opening quote
+    while (this.#position < text.length) {
+      if (text.charAt(this.#position) === '\\') {
+        this.#position += 2;
+      } else if (text.charAt(this.#position) === '"') {
+        this.#position++;
+        return { start, end: this.#position };
+      } else {
+        this.#position++;
+      }
+    }
+    return this.fail('Unterminated string');
+  }
+
+  private object(start: number, depth: number): ObjectNode {
+    const text = this.#text;
+    assert(text.charAt(start) === '{', 'An object starts at its brace');
+    this.#position = start + 1;
+    const members: Member[] = [];
+    this.skip();
+    if (text.charAt(this.#position) === '}') {
+      this.#position++;
+      return { type: 'object', start, end: this.#position, members };
+    }
+    // Every pass consumes a key and its value, so the text length bounds it.
+    for (let pass = 0; pass <= text.length; pass++) {
+      this.skip();
+      if (text.charAt(this.#position) !== '"') {
+        return this.fail('Expected a key');
+      }
+      const keySpan = this.string();
+      // The span is a quoted string, so this parses to one; the guard is
+      // unreachable but keeps the boundary honest.
+      const parsedKey: unknown = JSON.parse(text.slice(keySpan.start, keySpan.end));
+      if (typeof parsedKey !== 'string') {
+        return this.fail('Expected a key');
+      }
+      this.skip();
+      if (text.charAt(this.#position) !== ':') {
+        return this.fail('Expected ":"');
+      }
+      this.#position++;
+      const child = this.value(depth + 1);
+      members.push({
+        key: parsedKey,
+        keyStart: keySpan.start,
+        keyEnd: keySpan.end,
+        start: keySpan.start,
+        end: child.end,
+        value: child,
+      });
+      this.skip();
+      if (text.charAt(this.#position) === ',') {
+        this.#position++;
+        continue;
+      }
+      if (text.charAt(this.#position) === '}') {
+        this.#position++;
+        return { type: 'object', start, end: this.#position, members };
+      }
+      return this.fail('Expected "," or "}"');
+    }
+    assert(false, 'An object ends within its text');
+  }
+
+  private array(start: number, depth: number): ArrayNode {
+    const text = this.#text;
+    assert(text.charAt(start) === '[', 'An array starts at its bracket');
+    this.#position = start + 1;
+    const items: JsonNode[] = [];
+    this.skip();
+    if (text.charAt(this.#position) === ']') {
+      this.#position++;
+      return { type: 'array', start, end: this.#position, items };
+    }
+    // Every pass consumes a value, so the text length bounds it.
+    for (let pass = 0; pass <= text.length; pass++) {
+      items.push(this.value(depth + 1));
+      this.skip();
+      if (text.charAt(this.#position) === ',') {
+        this.#position++;
+        continue;
+      }
+      if (text.charAt(this.#position) === ']') {
+        this.#position++;
+        return { type: 'array', start, end: this.#position, items };
+      }
+      return this.fail('Expected "," or "]"');
+    }
+    assert(false, 'An array ends within its text');
+  }
 }
 
 const parseData = (text: string): unknown => {
@@ -175,16 +212,16 @@ const parseData = (text: string): unknown => {
 
 // The indentation of the line a position sits on, so an inserted or replaced
 // value lines up with what is around it.
-function indentAt(text: string, pos: number): string {
-  const lineStart = text.lastIndexOf('\n', pos - 1) + 1;
-  const m = text.slice(lineStart, pos).match(/^[ \t]*/);
-  return m ? m[0] : '';
+function indentAt(text: string, position: number): string {
+  const lineStart = text.lastIndexOf('\n', position - 1) + 1;
+  const match = text.slice(lineStart, position).match(/^[ \t]*/);
+  return match ? match[0] : '';
 }
 
 // One indent level, as the file writes it.
 function indentUnit(text: string): string {
-  const m = text.match(/\n([ \t]+)\S/);
-  const unit = m?.[1];
+  const match = text.match(/\n([ \t]+)\S/);
+  const unit = match?.[1];
   if (unit === undefined) {
     return '  ';
   }
@@ -194,6 +231,7 @@ function indentUnit(text: string): string {
 // A value, printed the way the surrounding file would have printed it.
 function print(value: unknown, baseIndent: string, unit: string): string {
   const body = JSON.stringify(value, null, unit);
+  // A value JSON cannot hold (undefined, a function) is written as JSON's own null.
   if (body === undefined) {
     return 'null';
   }
@@ -207,41 +245,47 @@ type Child =
   | { readonly key: number; readonly start: number; readonly end: number; readonly value: JsonNode }
   | { readonly start: number; readonly end: number; readonly value: JsonNode };
 
-function childAt(node: JsonNode | null, key: string | number | undefined): Child | null {
+function childAt(node: JsonNode | undefined, key: string | number | undefined): Child | undefined {
   if (!node) {
-    return null;
+    return undefined;
   }
   if (node.type === 'object') {
-    return node.members.find((m) => m.key === String(key)) ?? null;
+    return node.members.find((member) => member.key === String(key));
   }
   if (node.type === 'array') {
     const item = node.items[Number(key)];
-    return item ? { key: Number(key), start: item.start, end: item.end, value: item } : null;
+    return item ? { key: Number(key), start: item.start, end: item.end, value: item } : undefined;
   }
-  return null;
+  return undefined;
 }
 
 interface Located {
-  readonly parent: JsonNode | null;
-  readonly key: string | number | null;
-  readonly member: Child | null;
+  readonly parent: JsonNode | undefined;
+  readonly key: string | number | undefined;
+  readonly member: Child | undefined;
 }
 
 // The member a path names, plus the container it lives in — which is what an
 // insert needs when the member is not there yet.
-function locate(root: JsonNode, path: readonly (string | number)[]): Located | null {
+function locate(root: JsonNode, path: readonly (string | number)[]): Located | undefined {
   let node: JsonNode = root;
-  for (let d = 0; d < path.length; d++) {
-    const member = childAt(node, path[d]);
+  for (let level = 0; level < path.length; level++) {
+    const member = childAt(node, path[level]);
     if (!member) {
-      return d === path.length - 1 ? { parent: node, key: path[d] ?? null, member: null } : null;
+      return level === path.length - 1
+        ? { parent: node, key: path[level], member: undefined }
+        : undefined;
     }
-    if (d === path.length - 1) {
-      return { parent: node, key: path[d] ?? null, member };
+    if (level === path.length - 1) {
+      return { parent: node, key: path[level], member };
     }
     node = member.value;
   }
-  return { parent: null, key: null, member: { start: node.start, end: node.end, value: node } };
+  return {
+    parent: undefined,
+    key: undefined,
+    member: { start: node.start, end: node.end, value: node },
+  };
 }
 
 // Where a new member goes, and what has to be written around it: after the last
@@ -340,10 +384,10 @@ function applyEdits(text: string, edits: readonly Edit[]): string {
 
     // Everything below the deepest existing container, wrapped up.
     let value = edit.value;
-    for (let d = path.length - 1; d > depth; d--) {
-      const key = path[d];
+    for (let level = path.length - 1; level > depth; level--) {
+      const key = path[level];
       if (key === undefined) {
-        continue; // unreachable: d < path.length
+        continue; // unreachable: level < path.length
       }
       value = typeof key === 'number' ? [value] : { [key]: value };
     }
@@ -378,7 +422,7 @@ function removeMember(text: string, container: JsonNode, member: Child): string 
       : container.type === 'array'
         ? container.items
         : [];
-  const index = parts.findIndex((p) => p.start === member.start);
+  const index = parts.findIndex((part) => part.start === member.start);
   const only = parts.length === 1;
   let from = member.start;
   let to = member.end;

@@ -11,20 +11,20 @@ export interface GitResult {
 
 export type Git = (projectPath: string, args: readonly string[]) => Promise<GitResult>;
 
-const stderrOf = (err: unknown): string | undefined => {
-  const stderr = toRecord(err)?.['stderr'];
+const stderrOf = (error: unknown): string | undefined => {
+  const stderr = toRecord(error)?.['stderr'];
   return typeof stderr === 'string' ? stderr : undefined;
 };
 
 /** stderr first, then the message — git's own wording leads. */
-export function gitErrorDetail(err: unknown): string {
+export function gitErrorDetail(error: unknown): string {
   // `||`, not `??`: an empty stderr falls through to the message, as the
   // untyped code's `err.stderr || err.message` did.
-  return stderrOf(err) || (err instanceof Error ? err.message : '');
+  return stderrOf(error) || (error instanceof Error ? error.message : '');
 }
 
 /** Both streams, stdout first — used where git reports conflicts on stdout. */
-export function gitErrorFull(err: unknown): string {
-  const stdout = toRecord(err)?.['stdout'];
-  return `${typeof stdout === 'string' ? stdout : ''}\n${gitErrorDetail(err)}`;
+export function gitErrorFull(error: unknown): string {
+  const stdout = toRecord(error)?.['stdout'];
+  return `${typeof stdout === 'string' ? stdout : ''}\n${gitErrorDetail(error)}`;
 }

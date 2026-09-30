@@ -25,6 +25,8 @@
 // three-way merge is git's — with the common ancestor it alone has — and this
 // only has to read the result.
 
+import { assert } from '../shared/assert.js';
+
 // A run of the diff: agreed text, or the two disagreeing versions of it.
 // Runs are built and merged locally here, so their arrays are mutable on
 // purpose; nothing outside this module sees them before they are read out.
@@ -51,23 +53,26 @@ type Run = CommonRun | DiffRun;
 // Comparing the two sides line by line separates them again. The lines they
 // agree on stop being part of the choice, and each run they disagree on
 // becomes a decision of its own.
-function lineDiff(a: readonly string[], b: readonly string[]): Run[] {
+function lineDiff(left: readonly string[], right: readonly string[]): Run[] {
   // A conflict big enough to make this expensive is one nobody is going to
   // resolve line by line anyway; left whole, it still works as one choice.
-  if (a.length * b.length > 250000) {
-    return [{ ours: [...a], theirs: [...b] }];
+  if (left.length * right.length > 250000) {
+    return [{ ours: [...left], theirs: [...right] }];
   }
-  const m = a.length;
-  const n = b.length;
-  const dp: Uint32Array[] = Array.from({ length: m + 1 }, () => new Uint32Array(n + 1));
-  for (let i = m - 1; i >= 0; i--) {
+  const leftCount = left.length;
+  const rightCount = right.length;
+  const dp: Uint32Array[] = Array.from(
+    { length: leftCount + 1 },
+    () => new Uint32Array(rightCount + 1),
+  );
+  for (let i = leftCount - 1; i >= 0; i--) {
     const row = dp[i];
     if (!row) {
       continue;
     }
-    for (let j = n - 1; j >= 0; j--) {
+    for (let j = rightCount - 1; j >= 0; j--) {
       row[j] =
-        a[i] === b[j]
+        left[i] === right[j]
           ? (dp[i + 1]?.[j + 1] ?? 0) + 1
           : Math.max(dp[i + 1]?.[j] ?? 0, row[j + 1] ?? 0);
     }
@@ -90,21 +95,21 @@ function lineDiff(a: readonly string[], b: readonly string[]): Run[] {
     }
     runs.push(run);
   };
-  while (i < m && j < n) {
-    if (a[i] === b[j]) {
-      push({ common: [a[i] ?? ''] });
+  while (i < leftCount && j < rightCount) {
+    if (left[i] === right[j]) {
+      push({ common: [left[i] ?? ''] });
       i++;
       j++;
     } else if ((dp[i + 1]?.[j] ?? 0) >= (dp[i]?.[j + 1] ?? 0)) {
-      push({ ours: [a[i] ?? ''], theirs: [] });
+      push({ ours: [left[i] ?? ''], theirs: [] });
       i++;
     } else {
-      push({ ours: [], theirs: [b[j] ?? ''] });
+      push({ ours: [], theirs: [right[j] ?? ''] });
       j++;
     }
   }
-  if (i < m || j < n) {
-    push({ ours: a.slice(i), theirs: b.slice(j) });
+  if (i < leftCount || j < rightCount) {
+    push({ ours: left.slice(i), theirs: right.slice(j) });
   }
   return runs;
 }
@@ -119,14 +124,14 @@ interface Interval {
 // base line numbers, `lines` being what that side put there instead.
 function changeIntervals(base: readonly string[], side: readonly string[]): Interval[] {
   const out: Interval[] = [];
-  let b = 0;
+  let baseLine = 0;
   for (const run of lineDiff(base, side)) {
     if ('ours' in run) {
-      out.push({ start: b, end: b + run.ours.length, lines: run.theirs });
-      b += run.ours.length;
+      out.push({ start: baseLine, end: baseLine + run.ours.length, lines: run.theirs });
+      baseLine += run.ours.length;
       continue;
     }
-    b += run.common.length;
+    baseLine += run.common.length;
   }
   return out;
 }
@@ -150,95 +155,31 @@ function threeWay(
   ours: readonly string[],
   theirs: readonly string[],
 ): Run[] {
-  const A = changeIntervals(base, ours);
-  const B = changeIntervals(base, theirs);
+  const oursChanges = changeIntervals(base, ours);
+  const theirsChanges = changeIntervals(base, theirs);
   const runs: Run[] = [];
   let i = 0;
-  let ai = 0;
-  let bi = 0;
+  let oursIndex = 0;
+  let theirsIndex = 0;
 
-  while (ai < A.length || bi < B.length) {
+  while (oursIndex < oursChanges.length || theirsIndex < theirsChanges.length) {
     const start = Math.min(
-      ai < A.length ? (A[ai]?.start ?? Infinity) : Infinity,
-      bi < B.length ? (B[bi]?.start ?? Infinity) : Infinity,
+      oursChanges[oursIndex]?.start ?? Infinity,
+      theirsChanges[theirsIndex]?.start ?? Infinity,
     );
     if (i < start) {
       runs.push({ common: base.slice(i, start) });
       i = start;
     }
-    // Edits that OVERLAP are one decision — two rewrites of the same lines
-    // cannot be answered separately. Edits that merely sit next to each other
-    // are two, which is the whole point: a heading changed on one branch and
-    // the paragraph under it changed on the other are adjacent, not the same
-    // question, and joining them would put the user back to choosing a whole
-    // block they only wanted half of.
-    const mine: Interval[] = [];
-    const yours: Interval[] = [];
-    let end = start;
-    // Take whichever starts here, then anything genuinely overlapping it. A
-    // zero-width edit (a pure insertion) sitting exactly at the boundary joins
-    // too: both sides inserting at one point really is one disagreement.
-    const overlaps = (iv: Interval): boolean =>
-      iv.start < end || (iv.start === end && iv.start === iv.end);
-    const takeA = (): void => {
-      const iv = A[ai];
-      if (iv === undefined) {
-        return;
-      }
-      end = Math.max(end, iv.end);
-      mine.push(iv);
-      ai++;
-    };
-    const takeB = (): void => {
-      const iv = B[bi];
-      if (iv === undefined) {
-        return;
-      }
-      end = Math.max(end, iv.end);
-      yours.push(iv);
-      bi++;
-    };
-    if (ai < A.length && A[ai]?.start === start) {
-      takeA();
-    }
-    if (bi < B.length && B[bi]?.start === start) {
-      takeB();
-    }
-    for (let moved = true; moved;) {
-      moved = false;
-      while (ai < A.length) {
-        const iv = A[ai];
-        if (iv === undefined || !overlaps(iv)) {
-          break;
-        }
-        takeA();
-        moved = true;
-      }
-      while (bi < B.length) {
-        const iv = B[bi];
-        if (iv === undefined || !overlaps(iv)) {
-          break;
-        }
-        takeB();
-        moved = true;
-      }
-    }
-    // What each side says across this stretch: the ancestor's lines with that
-    // side's rewrites put back in.
-    const build = (ivs: readonly Interval[]): string[] => {
-      const out: string[] = [];
-      let p = start;
-      for (const iv of ivs) {
-        out.push(...base.slice(p, iv.start));
-        out.push(...iv.lines);
-        p = iv.end;
-      }
-      out.push(...base.slice(p, end));
-      return out;
-    };
+    const group = overlappingChanges(oursChanges, theirsChanges, oursIndex, theirsIndex, start);
+    // The group always takes the edit that starts here, so the loop ends.
+    assert(group.oursNext + group.theirsNext > oursIndex + theirsIndex, 'threeWay: no progress');
+    oursIndex = group.oursNext;
+    theirsIndex = group.theirsNext;
+    const { mine, yours, end } = group;
     runs.push({
-      ours: build(mine),
-      theirs: build(yours),
+      ours: sideAcross(base, start, end, mine),
+      theirs: sideAcross(base, start, end, yours),
       base: base.slice(start, end),
       changedBy: mine.length && yours.length ? 'both' : mine.length ? 'ours' : 'theirs',
     });
@@ -248,6 +189,99 @@ function threeWay(
     runs.push({ common: base.slice(i) });
   }
   return runs;
+}
+
+// One decision's worth of edits, from both sides, and where each side's next edit is.
+interface ChangeGroup {
+  readonly mine: readonly Interval[];
+  readonly yours: readonly Interval[];
+  readonly end: number;
+  readonly oursNext: number;
+  readonly theirsNext: number;
+}
+
+// Edits that OVERLAP are one decision — two rewrites of the same lines
+// cannot be answered separately. Edits that merely sit next to each other
+// are two, which is the whole point: a heading changed on one branch and
+// the paragraph under it changed on the other are adjacent, not the same
+// question, and joining them would put the user back to choosing a whole
+// block they only wanted half of.
+function overlappingChanges(
+  oursChanges: readonly Interval[],
+  theirsChanges: readonly Interval[],
+  oursIndex: number,
+  theirsIndex: number,
+  start: number,
+): ChangeGroup {
+  const mine: Interval[] = [];
+  const yours: Interval[] = [];
+  let end = start;
+  let oursNext = oursIndex;
+  let theirsNext = theirsIndex;
+  // Take whichever starts here, then anything genuinely overlapping it. A
+  // zero-width edit (a pure insertion) sitting exactly at the boundary joins
+  // too: both sides inserting at one point really is one disagreement.
+  const overlaps = (interval: Interval): boolean =>
+    interval.start < end || (interval.start === end && interval.start === interval.end);
+  const takeOurs = (interval: Interval): void => {
+    end = Math.max(end, interval.end);
+    mine.push(interval);
+    oursNext++;
+  };
+  const takeTheirs = (interval: Interval): void => {
+    end = Math.max(end, interval.end);
+    yours.push(interval);
+    theirsNext++;
+  };
+  const firstOurs = oursChanges[oursNext];
+  if (firstOurs !== undefined && firstOurs.start === start) {
+    takeOurs(firstOurs);
+  }
+  const firstTheirs = theirsChanges[theirsNext];
+  if (firstTheirs !== undefined && firstTheirs.start === start) {
+    takeTheirs(firstTheirs);
+  }
+  // Every pass that moves takes at least one interval, so the passes are bounded by the count.
+  for (let moved = true; moved;) {
+    moved = false;
+    while (oursNext < oursChanges.length) {
+      const interval = oursChanges[oursNext];
+      if (interval === undefined || !overlaps(interval)) {
+        break;
+      }
+      takeOurs(interval);
+      moved = true;
+    }
+    while (theirsNext < theirsChanges.length) {
+      const interval = theirsChanges[theirsNext];
+      if (interval === undefined || !overlaps(interval)) {
+        break;
+      }
+      takeTheirs(interval);
+      moved = true;
+    }
+  }
+  assert(end >= start, 'overlappingChanges: a group ends before it starts');
+  return { mine, yours, end, oursNext, theirsNext };
+}
+
+// What one side says across `start..end`: the ancestor's lines with that side's rewrites put
+// back in.
+function sideAcross(
+  base: readonly string[],
+  start: number,
+  end: number,
+  intervals: readonly Interval[],
+): string[] {
+  const out: string[] = [];
+  let baseLine = start;
+  for (const interval of intervals) {
+    out.push(...base.slice(baseLine, interval.start));
+    out.push(...interval.lines);
+    baseLine = interval.end;
+  }
+  out.push(...base.slice(baseLine, end));
+  return out;
 }
 
 // Words, punctuation and the gaps between them, kept separately so joining
@@ -266,24 +300,26 @@ const tokenize = (text: unknown): string[] =>
  * is in the attributes, one is in the text — so the same three-way split, run
  * over words instead of lines, separates them and both can be kept.
  *
- * Returns the combined text, or null when the edits really do overlap and
+ * Returns the combined text, or undefined when the edits really do overlap and
  * there is a genuine choice to make.
  */
-function mergeInline(base: string | null | undefined, ours: string, theirs: string): string | null {
-  if (base == null) {
-    return null;
+function mergeInline(base: string | undefined, ours: string, theirs: string): string | undefined {
+  if (base === undefined) {
+    return undefined;
   }
   const runs = threeWay(tokenize(base), tokenize(ours), tokenize(theirs));
   // Any region both sides rewrote is a real disagreement; combining it would
   // be inventing a version neither branch wrote.
-  if (runs.some((r) => 'ours' in r && r.changedBy === 'both')) {
-    return null;
+  if (runs.some((run) => 'ours' in run && run.changedBy === 'both')) {
+    return undefined;
   }
-  if (!runs.some((r) => 'ours' in r)) {
-    return null; // nothing to combine
+  if (!runs.some((run) => 'ours' in run)) {
+    return undefined; // nothing to combine
   }
   return runs
-    .map((r) => ('ours' in r ? (r.changedBy === 'theirs' ? r.theirs : r.ours) : r.common).join(''))
+    .map((run) =>
+      ('ours' in run ? (run.changedBy === 'theirs' ? run.theirs : run.ours) : run.common).join(''),
+    )
     .join('');
 }
 
@@ -294,18 +330,18 @@ function mergeInline(base: string | null | undefined, ours: string, theirs: stri
 function whoChanged(
   ours: string,
   theirs: string,
-  base: string | null | undefined,
+  base: string | undefined,
 ): 'ours' | 'theirs' | 'both' {
-  if (base == null) {
+  if (base === undefined) {
     return 'both';
   }
   const inBase = (text: string): boolean => text.trim() === '' || base.includes(text.trim());
-  const o = inBase(ours);
-  const t = inBase(theirs);
-  if (o && !t) {
+  const oursUnchanged = inBase(ours);
+  const theirsUnchanged = inBase(theirs);
+  if (oursUnchanged && !theirsUnchanged) {
     return 'theirs';
   }
-  if (t && !o) {
+  if (theirsUnchanged && !oursUnchanged) {
     return 'ours';
   }
   return 'both';
@@ -359,84 +395,110 @@ function parseConflict(text: unknown): ConflictPart[] {
     // A marker that never closes is a file somebody edited by hand and left
     // broken. Treating the rest as ordinary text keeps every line, which
     // matters more here than being clever: nothing is silently dropped.
-    const ours: string[] = [];
-    const theirs: string[] = [];
-    const base: string[] = [];
-    let sawMiddle = false;
-    let sawBase = false;
-    let closed = false;
-    let j = i + 1;
-    for (; j < lines.length; j++) {
-      const line = lines[j] ?? '';
-      if (END.test(line)) {
-        closed = true;
-        break;
-      }
-      if (MIDDLE.test(line)) {
-        sawMiddle = true;
-        continue;
-      }
-      // Under diff3 the common ancestor sits between the two sides. It is not
-      // a third choice — it is what both started FROM — but it is what says
-      // which side actually changed, so it is kept and never offered.
-      if (BASE.test(line)) {
-        sawBase = true;
-        continue;
-      }
-      (sawMiddle ? theirs : sawBase ? base : ours).push(line);
-    }
-    if (!closed) {
+    const block = readConflictBlock(lines, i);
+    if (block.kind === 'unclosed') {
       same.push(startLine);
       i++;
       continue;
     }
     flushSame();
-    // One of git's conflicts is often several decisions wearing one coat.
-    // Comparing the two sides line by line separates them, so the lines they
-    // agree on stop being part of the choice and each run they disagree on
-    // becomes its own.
-    // With the ancestor, the split is exact — each side's edits are known
-    // rather than guessed at. Without it (a repo not set to record it) the two
-    // sides are compared to each other, which still separates edits that share
-    // untouched lines between them.
-    const split = sawBase
-      ? threeWay(base, ours, theirs)
-      : lineDiff(ours, theirs).map((r): Run =>
-          'ours' in r
-            ? { ...r, changedBy: whoChanged(r.ours.join('\n'), r.theirs.join('\n'), null) }
-            : r,
-        );
-    for (const run of split) {
-      if (!('ours' in run)) {
-        parts.push({ kind: 'same', text: run.common.join('\n') });
-        continue;
-      }
-      const clash: ConflictPart = {
-        kind: 'clash',
-        ours: run.ours.join('\n'),
-        theirs: run.theirs.join('\n'),
-        changedBy: run.changedBy ?? 'both',
-      };
-      // Both sides touched these lines — but perhaps not the same part of
-      // them. Splitting again by word finds out, and where the two edits do
-      // not overlap, keeping both is the answer nobody has to think about.
-      if (clash.kind === 'clash' && clash.changedBy === 'both' && run.base) {
-        const merged = mergeInline(run.base.join('\n'), clash.ours, clash.theirs);
-        if (merged !== null) {
-          clash.merged = merged;
-        }
-      }
-      parts.push(clash);
-    }
-    i = j + 1;
+    parts.push(...clashParts(block));
+    assert(block.endLine > i, 'parseConflict: a conflict block ends after it starts');
+    i = block.endLine + 1;
   }
   flushSame();
   return parts;
 }
 
+// One `<<<<<<<` … `>>>>>>>` block, read from the marker at `startLine`.
+type ConflictBlock =
+  | { readonly kind: 'unclosed' }
+  | {
+      readonly kind: 'closed';
+      readonly ours: readonly string[];
+      readonly theirs: readonly string[];
+      readonly base: readonly string[];
+      readonly sawBase: boolean;
+      readonly endLine: number;
+    };
+
+function readConflictBlock(lines: readonly string[], startLine: number): ConflictBlock {
+  assert(START.test(lines[startLine] ?? ''), 'readConflictBlock: starts at a start marker');
+  const ours: string[] = [];
+  const theirs: string[] = [];
+  const base: string[] = [];
+  let sawMiddle = false;
+  let sawBase = false;
+  for (let j = startLine + 1; j < lines.length; j++) {
+    const line = lines[j] ?? '';
+    if (END.test(line)) {
+      return { kind: 'closed', ours, theirs, base, sawBase, endLine: j };
+    }
+    if (MIDDLE.test(line)) {
+      sawMiddle = true;
+      continue;
+    }
+    // Under diff3 the common ancestor sits between the two sides. It is not
+    // a third choice — it is what both started FROM — but it is what says
+    // which side actually changed, so it is kept and never offered.
+    if (BASE.test(line)) {
+      sawBase = true;
+      continue;
+    }
+    (sawMiddle ? theirs : sawBase ? base : ours).push(line);
+  }
+  return { kind: 'unclosed' };
+}
+
+function clashParts(block: Extract<ConflictBlock, { readonly kind: 'closed' }>): ConflictPart[] {
+  const { ours, theirs, base, sawBase } = block;
+  // One of git's conflicts is often several decisions wearing one coat.
+  // Comparing the two sides line by line separates them, so the lines they
+  // agree on stop being part of the choice and each run they disagree on
+  // becomes its own.
+  // With the ancestor, the split is exact — each side's edits are known
+  // rather than guessed at. Without it (a repo not set to record it) the two
+  // sides are compared to each other, which still separates edits that share
+  // untouched lines between them.
+  const split = sawBase
+    ? threeWay(base, ours, theirs)
+    : lineDiff(ours, theirs).map((run): Run =>
+        'ours' in run
+          ? {
+              ...run,
+              changedBy: whoChanged(run.ours.join('\n'), run.theirs.join('\n'), undefined),
+            }
+          : run,
+      );
+  const parts: ConflictPart[] = [];
+  for (const run of split) {
+    if (!('ours' in run)) {
+      parts.push({ kind: 'same', text: run.common.join('\n') });
+      continue;
+    }
+    const clash: ConflictPart = {
+      kind: 'clash',
+      ours: run.ours.join('\n'),
+      theirs: run.theirs.join('\n'),
+      changedBy: run.changedBy ?? 'both',
+    };
+    // Both sides touched these lines — but perhaps not the same part of
+    // them. Splitting again by word finds out, and where the two edits do
+    // not overlap, keeping both is the answer nobody has to think about.
+    if (clash.kind === 'clash' && clash.changedBy === 'both' && run.base) {
+      const merged = mergeInline(run.base.join('\n'), clash.ours, clash.theirs);
+      if (merged !== undefined) {
+        clash.merged = merged;
+      }
+    }
+    parts.push(clash);
+  }
+  return parts;
+}
+
 /** How many disagreements are in a parsed file. */
-const clashCount = (parts: readonly ConflictPart[] | null | undefined): number =>
-  (parts ?? []).filter((p) => p.kind === 'clash').length;
+const clashCount = (parts: readonly ConflictPart[] | undefined): number =>
+  (parts ?? []).filter((part) => part.kind === 'clash').length;
 
 /**
  * Put the file back together, given one answer per disagreement.
@@ -448,20 +510,20 @@ const clashCount = (parts: readonly ConflictPart[] | null | undefined): number =
  * and theirs may exist nowhere else.
  */
 function renderResolved(
-  parts: readonly ConflictPart[] | null | undefined,
+  parts: readonly ConflictPart[] | undefined,
   picks: readonly unknown[] = [],
 ): string {
-  let n = -1;
+  let clashIndex = -1;
   return (parts ?? [])
     .map((part) => {
       if (part.kind === 'same') {
         return part.text;
       }
-      n++;
-      const pick = picks[n];
+      clashIndex++;
+      const pick = picks[clashIndex];
       // Both edits, combined — only offered where they were found not to
       // overlap, so this is the two changes and not a duplication.
-      if (pick === 'merged' && part.merged != null) {
+      if (pick === 'merged' && part.merged !== undefined) {
         return part.merged;
       }
       if (pick === 'theirs') {
@@ -471,7 +533,7 @@ function renderResolved(
       // two branches is usually one or the other; a list that gained an item on
       // each is usually both.
       if (pick === 'both') {
-        return [part.ours, part.theirs].filter((s) => s !== '').join('\n');
+        return [part.ours, part.theirs].filter((side) => side !== '').join('\n');
       }
       return part.ours;
     })

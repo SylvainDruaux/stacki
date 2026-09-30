@@ -14,31 +14,37 @@ import path from 'path';
 
 import { aliasMap, boundNames, resolveSpec } from './cmsRefs.js';
 import type { Alias } from './cmsRefs.js';
+import { MAIN_LIMITS } from './main.bounds.js';
 import { sameFilesystemPath } from './platform.js';
 
-const toPosix = (p: string): string => p.split(path.sep).join('/');
+const toPosix = (filePath: string): string => filePath.split(path.sep).join('/');
 
 /** Every file that can hold an instance: .astro anywhere, and markdown pages,
  *  which render components too. The same set the palette's own count walks. */
-function astroFiles(dir: string): string[] {
-  if (!fs.existsSync(dir)) {
+function astroFiles(directory: string): string[] {
+  if (!fs.existsSync(directory)) {
     return [];
   }
   const out: string[] = [];
-  const walk = (d: string): void => {
-    for (const entry of fs.readdirSync(d, { withFileTypes: true })) {
-      const full = path.join(d, entry.name);
+  const walk = (current: string, depth: number): void => {
+    // A project's folders are not ours to trust: a tree deeper than any real one stops the
+    // walk there, before it can exhaust the stack.
+    if (depth > MAIN_LIMITS.directoryDepthMax) {
+      return;
+    }
+    for (const entry of fs.readdirSync(current, { withFileTypes: true })) {
+      const full = path.join(current, entry.name);
       if (entry.isDirectory()) {
-        walk(full);
+        walk(full, depth + 1);
       } else if (
         entry.name.endsWith('.astro') ||
-        (d.includes(`${path.sep}pages`) && /\.mdx?$/i.test(entry.name))
+        (current.includes(`${path.sep}pages`) && /\.mdx?$/i.test(entry.name))
       ) {
         out.push(full);
       }
     }
   };
-  walk(dir);
+  walk(directory, 0);
   return out;
 }
 
@@ -86,10 +92,10 @@ export interface FileImport {
 function importsOf(source: unknown, file: string, aliases: readonly Alias[]): FileImport[] {
   const out: FileImport[] = [];
   IMPORT_RE.lastIndex = 0;
-  let m;
-  while ((m = IMPORT_RE.exec(String(source))) !== null) {
-    const clause = m[1];
-    const spec = m[2];
+  let match;
+  while ((match = IMPORT_RE.exec(String(source))) !== null) {
+    const clause = match[1];
+    const spec = match[2];
     if (clause === undefined || spec === undefined) {
       continue;
     }
@@ -114,7 +120,7 @@ function importsOf(source: unknown, file: string, aliases: readonly Alias[]): Fi
 
 interface InstanceArgs {
   readonly file: string;
-  readonly targetPath?: string | null;
+  readonly targetPath?: string | undefined;
   readonly name: string;
   readonly aliases?: readonly Alias[];
 }
@@ -129,7 +135,7 @@ function instancesIn(
   source: unknown,
   { file, targetPath, name, aliases = [] }: InstanceArgs,
 ): number {
-  const target = targetPath ? path.resolve(targetPath) : null;
+  const target = targetPath ? path.resolve(targetPath) : undefined;
   if (target) {
     const imports = importsOf(source, file, aliases);
     const local: string[] = [];
@@ -139,7 +145,7 @@ function instancesIn(
       }
     }
     if (local.length) {
-      return local.reduce((n, alias) => n + countIn(source, alias), 0);
+      return local.reduce((total, alias) => total + countIn(source, alias), 0);
     }
     // The name is taken by something else here. `import Section from
     // './ui/Section.astro'` in a file that doesn't use OURS means every
@@ -176,13 +182,13 @@ function componentUsage({
   readonly name: string;
   readonly exclude?: string;
 }): { files: UsageFile[]; total: number } {
-  const src = path.join(projectPath, 'src');
-  const skip = exclude ? path.resolve(exclude) : null;
+  const sourceFolder = path.join(projectPath, 'src');
+  const skip = exclude ? path.resolve(exclude) : undefined;
   // `exclude` is the component's own file, which is also the file every other
   // file's import has to resolve to for its local name to count.
   const aliases = aliasMap(projectPath);
   const kindOf = (file: string): UsageFile['kind'] => {
-    const rel = toPosix(path.relative(src, file));
+    const rel = toPosix(path.relative(sourceFolder, file));
     if (rel.startsWith('pages/')) {
       return 'page';
     }
@@ -196,7 +202,7 @@ function componentUsage({
   };
 
   const files: UsageFile[] = [];
-  for (const file of astroFiles(src)) {
+  for (const file of astroFiles(sourceFolder)) {
     if (skip && sameFilesystemPath(file, skip)) {
       continue;
     }
@@ -206,7 +212,7 @@ function componentUsage({
     } catch {
       continue;
     }
-    const count = instancesIn(text, { file, targetPath: exclude ?? null, name, aliases });
+    const count = instancesIn(text, { file, targetPath: exclude, name, aliases });
     if (!count) {
       continue;
     }
@@ -218,8 +224,8 @@ function componentUsage({
     });
   }
   // Most instances first, then by name — the file it's really "in" leads.
-  files.sort((a, b) => b.count - a.count || a.rel.localeCompare(b.rel));
-  return { files, total: files.reduce((n, f) => n + f.count, 0) };
+  files.sort((left, right) => right.count - left.count || left.rel.localeCompare(right.rel));
+  return { files, total: files.reduce((total, usage) => total + usage.count, 0) };
 }
 
 export { componentUsage, countIn, instancesIn, importsOf, templateOf, astroFiles };

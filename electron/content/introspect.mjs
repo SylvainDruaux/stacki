@@ -20,15 +20,15 @@ const BODY_EXT = new Set(['md', 'mdx', 'mdoc', 'markdown']);
 // The file extensions a glob pattern can match. A pattern ends in its
 // extension, either alone ("*.mdoc") or as a brace group ("**/*.{md,mdx}").
 const extensionsOf = (pattern) =>
-  [].concat(pattern || []).flatMap((p) => {
-    const m = String(p).match(/\.(\{[^}]*\}|[A-Za-z0-9]+)$/);
-    if (!m) {
+  [].concat(pattern || []).flatMap((glob) => {
+    const match = String(glob).match(/\.(\{[^}]*\}|[A-Za-z0-9]+)$/);
+    if (!match) {
       return [];
     }
-    return m[1]
+    return match[1]
       .replace(/[{}]/g, '')
       .split(',')
-      .map((e) => e.trim().toLowerCase())
+      .map((extension) => extension.trim().toLowerCase())
       .filter(Boolean);
   });
 
@@ -47,7 +47,7 @@ function describeLoader(loader) {
   // sync, so nothing the editor writes to them would survive.
   return {
     kind: 'custom',
-    name: typeof loader === 'object' && typeof loader.name === 'string' ? loader.name : null,
+    name: typeof loader === 'object' && typeof loader.name === 'string' ? loader.name : undefined,
   };
 }
 
@@ -62,16 +62,16 @@ function describeCollection(name, collection) {
   record.loader = loader;
   record.editable = loader.kind === 'glob' || loader.kind === 'file';
   record.extensions = loader.kind === 'glob' ? extensionsOf(loader.pattern) : [];
-  record.hasBody = record.extensions.some((e) => BODY_EXT.has(e));
+  record.hasBody = record.extensions.some((extension) => BODY_EXT.has(extension));
   // An id that comes from a field or a filename convention rather than the
   // file path — editing the wrong thing renames the entry.
   record.idFromFile = loader.kind === 'glob' && !loader.generateId;
 
   // A loader may carry the schema instead of the collection.
-  const raw = collection.schema ?? collection.loader?.schema ?? null;
-  if (raw == null) {
+  const raw = collection.schema ?? collection.loader?.schema ?? undefined;
+  if (raw === undefined) {
     // No schema: every key in the file is allowed, and none is required.
-    record.schema = null;
+    record.schema = undefined;
     record.freeform = true;
     return record;
   }
@@ -84,9 +84,9 @@ function describeCollection(name, collection) {
     }
     record.crossFieldChecks = hasCrossFieldChecks(schema);
     record.schema = toJsonSchema(schema);
-  } catch (err) {
-    record.schema = null;
-    record.error = `Couldn't read the schema — ${String(err?.message || err)}`;
+  } catch (error) {
+    record.schema = undefined;
+    record.error = `Couldn't read the schema — ${String(error?.message || error)}`;
   }
   return record;
 }
@@ -97,7 +97,9 @@ export function describe(mod) {
     return { error: 'The content config has no `collections` export.', collections: [] };
   }
   return {
-    collections: Object.entries(collections).map(([name, c]) => describeCollection(name, c)),
+    collections: Object.entries(collections).map(([name, collection]) =>
+      describeCollection(name, collection),
+    ),
   };
 }
 
@@ -116,10 +118,10 @@ function schemaOf(mod, name) {
     return schemaCache.get(name);
   }
   const collection = mod?.collections?.[name];
-  const raw = collection?.schema ?? collection?.loader?.schema ?? null;
+  const raw = collection?.schema ?? collection?.loader?.schema ?? undefined;
   const schema = typeof raw === 'function' ? raw({ image: imageStub }) : raw;
-  schemaCache.set(name, schema || null);
-  return schema || null;
+  schemaCache.set(name, schema || undefined);
+  return schema || undefined;
 }
 
 export function validate(mod, { collection, data }) {
@@ -135,7 +137,7 @@ export function validate(mod, { collection, data }) {
   }
   return {
     issues: result.error.issues.map((issue) => ({
-      path: issue.path.map((p) => (typeof p === 'symbol' ? String(p) : p)),
+      path: issue.path.map((segment) => (typeof segment === 'symbol' ? String(segment) : segment)),
       message: issue.message,
       code: issue.code,
     })),

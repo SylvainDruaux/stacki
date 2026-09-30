@@ -41,21 +41,21 @@ interface DefaultImport {
 function defaultImports(source: string): DefaultImport[] {
   const out: DefaultImport[] = [];
   const re = new RegExp(DEFAULT_IMPORT.source, 'gm');
-  let m;
-  while ((m = re.exec(String(source || ''))) !== null) {
-    const name = m[1];
-    const spec = m[3];
+  let match;
+  while ((match = re.exec(String(source || ''))) !== null) {
+    const name = match[1];
+    const spec = match[3];
     if (name === undefined || spec === undefined) {
       continue;
     }
-    out.push({ name, spec, start: m.index, end: m.index + m[0].length });
+    out.push({ name, spec, start: match.index, end: match.index + match[0].length });
   }
   return out;
 }
 
-/** The name an import binds, or null when nothing imports it. */
-function importedAs(source: string, name: string): DefaultImport | null {
-  return defaultImports(source).find((i) => i.name === name) || null;
+/** The name an import binds, or undefined when nothing imports it. */
+function importedAs(source: string, name: string): DefaultImport | undefined {
+  return defaultImports(source).find((i) => i.name === name);
 }
 
 // Where a new import goes: after the last one, which is where a person adding
@@ -64,10 +64,10 @@ function importedAs(source: string, name: string): DefaultImport | null {
 function importInsertAt(source: string): number {
   const all = defaultImports(source);
   const anyImport = /^[ \t]*import\b[^\n]*$/gm;
-  let end: number | null = null;
-  let m;
-  while ((m = anyImport.exec(String(source || ''))) !== null) {
-    end = m.index + m[0].length;
+  let end: number | undefined = undefined;
+  let match;
+  while ((match = anyImport.exec(String(source || ''))) !== null) {
+    end = match.index + match[0].length;
   }
   if (all.length) {
     const last = all[all.length - 1];
@@ -75,7 +75,7 @@ function importInsertAt(source: string): number {
       end = Math.max(end ?? 0, last.end);
     }
   }
-  return end === null ? 0 : end;
+  return end ?? 0;
 }
 
 /** The source with `import name from 'spec';` written into it. */
@@ -112,11 +112,11 @@ function importName(fileRel: string, taken: readonly string[] = []): string {
   if (!used.has(candidate)) {
     return candidate;
   }
-  let n = 2;
-  while (used.has(`${candidate}${n}`)) {
-    n += 1;
+  let suffix = 2;
+  while (used.has(`${candidate}${suffix}`)) {
+    suffix += 1;
   }
-  return `${candidate}${n}`;
+  return `${candidate}${suffix}`;
 }
 
 interface ImportSpecContext {
@@ -130,16 +130,22 @@ interface ImportSpecContext {
 // beside them would be the odd line out — so the alias is reused when the
 // imports show one. (The renderer decides this the same way for a page's
 // markup; this is the same rule over a file's text.)
-function importSpecFor({ imports = [], srcRelative, relative }: ImportSpecContext): string {
-  if (srcRelative) {
+// The `srcRelative` field names the project's `src/` folder, not an abbreviation; the binding
+// spells it out.
+function importSpecFor({
+  imports = [],
+  srcRelative: pathInSourceFolder,
+  relative,
+}: ImportSpecContext): string {
+  if (pathInSourceFolder) {
     for (const imp of imports) {
       if (imp.spec.startsWith('.')) {
         continue;
       }
       for (const marker of ['/components/', '/layouts/', '/assets/']) {
-        const idx = imp.spec.indexOf(marker);
-        if (idx > 0) {
-          return imp.spec.slice(0, idx + 1) + srcRelative;
+        const markerIndex = imp.spec.indexOf(marker);
+        if (markerIndex > 0) {
+          return imp.spec.slice(0, markerIndex + 1) + pathInSourceFolder;
         }
       }
     }
@@ -147,15 +153,29 @@ function importSpecFor({ imports = [], srcRelative, relative }: ImportSpecContex
   return relative;
 }
 
+import { LIMITS } from '../shared/limits.js';
 import { toRecord } from '../shared/record.js';
 
 // A value the CMS carries as source — `{ __expr: "dailyDevotionals" }` — with
 // the file that name is bound to written beside it, so the field can show the
 // picture instead of the word. `resolve` answers what a name imports, as a
-// project-relative path, or null.
-function withAssets(value: unknown, resolve: (name: string) => string | null): unknown {
+// project-relative path, or undefined.
+function withAssets(value: unknown, resolve: (name: string) => string | undefined): unknown {
+  return withAssetsAtDepth(value, 0, resolve);
+}
+
+// The value comes from a project's data file, so its nesting is not ours to trust: past the
+// depth any IPC value may have, the rest is returned as it is, without asset paths.
+function withAssetsAtDepth(
+  value: unknown,
+  depth: number,
+  resolve: (name: string) => string | undefined,
+): unknown {
+  if (depth > LIMITS.ipcDepthMax) {
+    return value;
+  }
   if (Array.isArray(value)) {
-    return value.map((v) => withAssets(v, resolve));
+    return value.map((item: unknown) => withAssetsAtDepth(item, depth + 1, resolve));
   }
   const record = toRecord(value);
   if (record === undefined) {
@@ -167,8 +187,8 @@ function withAssets(value: unknown, resolve: (name: string) => string | null): u
     return rel ? { ...record, __asset: rel } : value;
   }
   const out: Record<string, unknown> = {};
-  for (const [k, v] of Object.entries(record)) {
-    out[k] = withAssets(v, resolve);
+  for (const [key, entry] of Object.entries(record)) {
+    out[key] = withAssetsAtDepth(entry, depth + 1, resolve);
   }
   return out;
 }

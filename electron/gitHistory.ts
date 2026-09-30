@@ -59,8 +59,10 @@ const LOG_FORMAT = RS + ['%H', '%h', '%an', '%ae', '%aI', '%s', '%P', '%D'].join
 const DIFF_FLAGS = ['--diff-merges=first-parent', '-M'];
 
 /** True when the failure is "this repository has no commits yet". */
-const isEmptyRepo = (err: unknown): boolean =>
-  /does not have any commits yet|bad default revision|unknown revision/i.test(gitErrorDetail(err));
+const isEmptyRepo = (error: unknown): boolean =>
+  /does not have any commits yet|bad default revision|unknown revision/i.test(
+    gitErrorDetail(error),
+  );
 
 export interface FileChange {
   readonly status: string;
@@ -117,13 +119,13 @@ async function log(
   let stdout: string;
   try {
     ({ stdout } = await git(projectPath, args));
-  } catch (err) {
+  } catch (error: unknown) {
     // A project that has just been initialised has a branch and no commits.
     // That is an empty history, not a broken one.
-    if (isEmptyRepo(err)) {
+    if (isEmptyRepo(error)) {
       return { commits: [], atEnd: true };
     }
-    throw err;
+    throw error;
   }
   const commits: CommitInfo[] = stdout
     .split(RS)
@@ -223,16 +225,16 @@ async function status(
     // Not trimmed before slicing — the first column is a space for changes
     // that are only in the working tree, and trimming loses that distinction.
     const code = line.slice(0, 2);
-    let p = line.slice(3);
+    let entryPath = line.slice(3);
     let from: string | undefined;
     // "R  old -> new" — staged renames carry both names.
-    const arrow = p.lastIndexOf(' -> ');
+    const arrow = entryPath.lastIndexOf(' -> ');
     if (arrow !== -1) {
-      from = unquote(p.slice(0, arrow));
-      p = p.slice(arrow + 4);
+      from = unquote(entryPath.slice(0, arrow));
+      entryPath = entryPath.slice(arrow + 4);
     }
     files.push({
-      path: unquote(p),
+      path: unquote(entryPath),
       from,
       // The letter to show. `??` is git's "untracked", which to anyone who did
       // not choose that spelling is simply a new file.
@@ -248,7 +250,8 @@ async function status(
 // quotes are undone here — a path that needed the full C-style unescaping is
 // rare enough that showing it slightly wrong beats getting the common case
 // wrong by hand-rolling an unescaper.
-const unquote = (s: string): string => (s.startsWith('"') && s.endsWith('"') ? s.slice(1, -1) : s);
+const unquote = (text: string): string =>
+  text.startsWith('"') && text.endsWith('"') ? text.slice(1, -1) : text;
 
 export interface ProjectFile {
   readonly path: string;
@@ -279,26 +282,30 @@ async function allFiles(
     '--others',
     '--exclude-standard',
   ]);
-  const changed = new Map((await status(git, { projectPath })).map((f) => [f.path, f]));
+  const changed = new Map((await status(git, { projectPath })).map((entry) => [entry.path, entry]));
   const paths = [
     ...new Set(
       stdout
         .split('\n')
-        .map((l) => unquote(l.trim()))
+        .map((line) => unquote(line.trim()))
         .filter(Boolean),
     ),
   ];
   // A deleted file is gone from the working tree, so ls-files still lists it
   // from the index — but a file deleted and staged is not listed at all, and
   // it is exactly the one somebody may want to find and put back.
-  for (const [p] of changed) {
-    if (!paths.includes(p)) {
-      paths.push(p);
+  for (const [changedPath] of changed) {
+    if (!paths.includes(changedPath)) {
+      paths.push(changedPath);
     }
   }
-  return paths.sort().map((p) => {
-    const c = changed.get(p);
-    return { path: p, status: c ? c.status : undefined, staged: c ? c.staged : false };
+  return paths.sort().map((filePath) => {
+    const change = changed.get(filePath);
+    return {
+      path: filePath,
+      status: change ? change.status : undefined,
+      staged: change ? change.staged : false,
+    };
   });
 }
 
@@ -314,17 +321,17 @@ async function fileAt(
   try {
     const { stdout } = await git(projectPath, ['show', `${ref}:${filePath}`]);
     return stdout;
-  } catch (err) {
+  } catch (error: unknown) {
     // Not an error worth raising: a file that did not exist yet is a normal
     // answer to "what did this look like then", and the caller wants to say
     // "this page didn't exist yet" rather than show a failure.
-    const stderr = toRecord(err)?.['stderr'];
+    const stderr = toRecord(error)?.['stderr'];
     if (
       /does not exist|exists on disk, but not in/i.test(typeof stderr === 'string' ? stderr : '')
     ) {
       return undefined;
     }
-    throw err;
+    throw error;
   }
 }
 
@@ -380,7 +387,7 @@ async function worktrees(
       }
       return out;
     })
-    .filter((w): w is WorktreeInfo => w.path !== undefined);
+    .filter((worktree): worktree is WorktreeInfo => worktree.path !== undefined);
 }
 
 // --- Saying what a file is -------------------------------------------------
@@ -393,7 +400,8 @@ async function worktrees(
 // convention (src/pages, src/components, src/layouts) rather than something
 // this has to go to disk to learn, which is what keeps it testable.
 
-const TITLE = (seg: string): string => seg.replace(/-/g, ' ').replace(/^./, (c) => c.toUpperCase());
+const TITLE = (seg: string): string =>
+  seg.replace(/-/g, ' ').replace(/^./, (letter) => letter.toUpperCase());
 
 export type FileKind =
   | 'page'
@@ -421,69 +429,71 @@ export interface FileDescription {
  * a wrong label is worse than a plain one.
  */
 function describeFile(relPath: unknown): FileDescription {
-  const p = String(relPath || '').replace(/\\/g, '/');
-  const base = p.split('/').pop() || p;
+  const posixPath = String(relPath || '').replace(/\\/g, '/');
+  const base = posixPath.split('/').pop() || posixPath;
 
-  const page = p.match(/^src\/pages\/(.+)\.(astro|mdx?)$/i);
+  const page = posixPath.match(/^src\/pages\/(.+)\.(astro|mdx?)$/i);
   const pageRoute = page?.[1];
   if (pageRoute !== undefined) {
     let route = pageRoute;
     if (route === 'index') {
-      return { path: p, kind: 'page', label: 'Home' };
+      return { path: posixPath, kind: 'page', label: 'Home' };
     }
     // "about/index" is the same page as "about" — the folder is the route.
     if (route.endsWith('/index')) {
       route = route.slice(0, -'/index'.length);
     }
-    return { path: p, kind: 'page', label: route.split('/').map(TITLE).join(' / ') };
+    return { path: posixPath, kind: 'page', label: route.split('/').map(TITLE).join(' / ') };
   }
-  const comp = p.match(/^src\/components\/(.+)\.(astro|jsx?|tsx?|vue|svelte)$/i);
+  const comp = posixPath.match(/^src\/components\/(.+)\.(astro|jsx?|tsx?|vue|svelte)$/i);
   const compName = comp?.[1];
   if (compName !== undefined) {
-    return { path: p, kind: 'component', label: compName.split('/').pop() ?? compName };
+    return { path: posixPath, kind: 'component', label: compName.split('/').pop() ?? compName };
   }
 
-  const layout = p.match(/^src\/layouts\/(.+)\.(astro|jsx?|tsx?)$/i);
+  const layout = posixPath.match(/^src\/layouts\/(.+)\.(astro|jsx?|tsx?)$/i);
   const layoutName = layout?.[1];
   if (layoutName !== undefined) {
-    return { path: p, kind: 'layout', label: layoutName.split('/').pop() ?? layoutName };
+    return { path: posixPath, kind: 'layout', label: layoutName.split('/').pop() ?? layoutName };
   }
 
-  if (/^src\/content\//i.test(p)) {
-    return { path: p, kind: 'content', label: base };
+  if (/^src\/content\//i.test(posixPath)) {
+    return { path: posixPath, kind: 'content', label: base };
   }
-  if (/^public\//i.test(p)) {
-    return { path: p, kind: 'asset', label: base };
+  if (/^public\//i.test(posixPath)) {
+    return { path: posixPath, kind: 'asset', label: base };
   }
-  if (/\.(css|scss|sass|less)$/i.test(p)) {
-    return { path: p, kind: 'style', label: base };
+  if (/\.(css|scss|sass|less)$/i.test(posixPath)) {
+    return { path: posixPath, kind: 'style', label: base };
   }
-  if (/\.(png|jpe?g|gif|svg|webp|avif|ico|woff2?|ttf|otf)$/i.test(p)) {
-    return { path: p, kind: 'asset', label: base };
+  if (/\.(png|jpe?g|gif|svg|webp|avif|ico|woff2?|ttf|otf)$/i.test(posixPath)) {
+    return { path: posixPath, kind: 'asset', label: base };
   }
   // Config and lockfiles are the ones a designer should not be asked to read.
-  if (/^(package(-lock)?\.json|astro\.config\.[a-z]+|tsconfig\.json|\.gitignore)$/i.test(p)) {
-    return { path: p, kind: 'config', label: base };
+  if (
+    /^(package(-lock)?\.json|astro\.config\.[a-z]+|tsconfig\.json|\.gitignore)$/i.test(posixPath)
+  ) {
+    return { path: posixPath, kind: 'config', label: base };
   }
   // Script and prose get named rather than falling into the catch-all. Both
   // are things people change on purpose and go looking for by type — a
   // stylesheet is offered as a stylesheet, and a script should be too.
-  if (/\.(m|c)?[jt]sx?$/i.test(p)) {
-    return { path: p, kind: 'script', label: base };
+  if (/\.(m|c)?[jt]sx?$/i.test(posixPath)) {
+    return { path: posixPath, kind: 'script', label: base };
   }
-  if (/\.mdx?$/i.test(p)) {
-    return { path: p, kind: 'doc', label: base };
+  if (/\.mdx?$/i.test(posixPath)) {
+    return { path: posixPath, kind: 'doc', label: base };
   }
   // Anything genuinely unrecognised keeps its own path. Guessing a category
   // for it would be worse than saying where it is.
-  return { path: p, kind: 'file', label: p };
+  return { path: posixPath, kind: 'file', label: posixPath };
 }
 
 /** Every file in a list, described. Renames keep where they came from. */
 const describeFiles = <T extends { readonly path: string; readonly from?: string | undefined }>(
-  files: readonly T[] | null | undefined,
+  files: readonly T[] | undefined,
 ): (T & FileDescription & { readonly from: string | undefined })[] =>
-  (files ?? []).map((f) => ({ ...f, ...describeFile(f.path), from: f.from }));
+  (files ?? []).map((file) => ({ ...file, ...describeFile(file.path), from: file.from }));
 
 export {
   allFiles,

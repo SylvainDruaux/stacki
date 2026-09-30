@@ -30,32 +30,35 @@ export interface MarkedSource {
   readonly page: boolean;
 }
 
-/** The marked copy of `file`, or null when it is not a project .astro file the
+/** The marked copy of `file`, or undefined when it is not a project .astro file the
  * parser can mark — Vite then loads it unchanged, with no markers and no stamp,
  * and nothing on the canvas can address a node inside it. */
-export function markSourceFile(file: string, projectDirs: readonly string[]): MarkedSource | null {
+export function markSourceFile(
+  file: string,
+  projectDirectories: readonly string[],
+): MarkedSource | undefined {
   if (!file.endsWith('.astro')) {
-    return null;
+    return undefined;
   }
   // Pages mark with bare paths; every other .astro under src — components and
   // layouts — with its own namespace, so selecting inside one outlines too.
-  const projectDir = projectDirs.find((root) => file.startsWith(`${root}/src/`));
-  if (projectDir === undefined) {
-    return null;
+  const projectDirectory = projectDirectories.find((root) => file.startsWith(`${root}/src/`));
+  if (projectDirectory === undefined) {
+    return undefined;
   }
   const bytes = readFileSync(file);
   if (LIMITS.sourceBytesMax < bytes.length) {
-    return null; // Past the file bound: the editor shows it as code, not nodes.
+    return undefined; // Past the file bound: the editor shows it as code, not nodes.
   }
   const source = bytes.toString('utf8');
   const parsed = parsePage(source);
   if (!parsed.editable) {
-    return null;
+    return undefined;
   }
   resolveChunks(parsed.model, file);
-  const rel = file.slice(projectDir.length + 1);
+  const rel = file.slice(projectDirectory.length + 1);
   assert(stampPathProblem(rel) === undefined, 'A file under src has a project-relative path');
-  const page = file.startsWith(`${projectDir}/src/pages/`);
+  const page = file.startsWith(`${projectDirectory}/src/pages/`);
   const marked = page
     ? serializePageMarked(parsed.model)
     : serializePageMarked(parsed.model, `${rel}|`);
@@ -67,11 +70,16 @@ export function markSourceFile(file: string, projectDirs: readonly string[]): Ma
 }
 
 /** The marked copy of a chunk imported as `?raw` (see serializePageMarked's
- * chunk marks), or null when it cannot be marked. */
-export function markChunkFile(file: string, prefix: string, group: boolean): string | null {
+ * chunk marks), or undefined when it cannot be marked. A `group` chunk also
+ * gets a marker pair of its own, since nothing in the page wraps it. */
+export function markChunkFile(
+  file: string,
+  prefix: string,
+  { group }: { readonly group: boolean },
+): string | undefined {
   const bytes = readFileSync(file);
   if (LIMITS.sourceBytesMax < bytes.length) {
-    return null;
+    return undefined;
   }
-  return markChunkHtml(bytes.toString('utf8'), prefix, group);
+  return markChunkHtml(bytes.toString('utf8'), prefix, { group });
 }

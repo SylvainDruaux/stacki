@@ -32,13 +32,13 @@ async function probeUrl(
     return { ok: false, status: 0 };
   }
   try {
-    const res = await fetchImpl(url, { redirect: 'follow' });
+    const response = await fetchImpl(url, { redirect: 'follow' });
     try {
-      await res.arrayBuffer();
+      await response.arrayBuffer();
     } catch {
       /* nothing to drain */
     }
-    return { ok: res.ok, status: res.status };
+    return { ok: response.ok, status: response.status };
   } catch {
     return { ok: false, status: 0 };
   }

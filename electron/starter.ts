@@ -45,7 +45,7 @@ const run = (cmd: string, args: readonly string[], cwd: string, onLog?: OnLog): 
     try {
       proc = spawn(cmd, [...args], {
         cwd,
-        // npm is a .cmd shim on Windows, which needs a shell to be found.
+        // On Windows npm is a .cmd shim, which needs a shell to be found.
         shell: commandNeedsShell(cmd),
         env: {
           ...process.env,
@@ -55,17 +55,19 @@ const run = (cmd: string, args: readonly string[], cwd: string, onLog?: OnLog): 
           CI: '1', // npm asks before downloading a scaffolder; nobody is here to answer
         },
       });
-    } catch (err) {
+    } catch (error: unknown) {
       reject(
-        new Error(`Could not run ${cmd}: ${err instanceof Error ? err.message : String(err)}`),
+        new Error(
+          `Could not run ${cmd}: ${error instanceof Error ? error.message : String(error)}`,
+        ),
       );
       return;
     }
     let tail = '';
-    const onOut = (d: { toString(): string }): void => {
+    const onOut = (chunk: { toString(): string }): void => {
       // Progress spinners are drawn with cursor moves and line clears; strip
       // them so the log pane reads as the plain text it renders.
-      const text = d
+      const text = chunk
         .toString()
         .replace(/\x1b\[[0-9;?]*[A-Za-z]/g, '')
         .replace(/\r/g, '\n');
@@ -74,19 +76,19 @@ const run = (cmd: string, args: readonly string[], cwd: string, onLog?: OnLog): 
     };
     proc.stdout.on('data', onOut);
     proc.stderr.on('data', onOut);
-    proc.on('error', (err: Error) => {
-      const code = toRecord(err)?.['code'];
+    proc.on('error', (error: Error) => {
+      const code = toRecord(error)?.['code'];
       reject(
         new Error(
           code === 'ENOENT'
             ? path.basename(cmd).startsWith('npm')
               ? 'npm could not be found. Install Node.js (which includes npm) and try again.'
               : `${cmd} could not be found. Install it and try again.`
-            : `Could not run ${cmd}: ${err.message}`,
+            : `Could not run ${cmd}: ${error.message}`,
         ),
       );
     });
-    proc.on('exit', (code: number | null) =>
+    proc.on('exit', (code) =>
       code === 0
         ? resolve(tail)
         : reject(new Error(`${cmd} ${args[0] ?? ''} exited with code ${code}.\n\n${tail}`)),
@@ -130,8 +132,8 @@ async function createStarter({
   if (!NAME_RE.test(folder)) {
     throw new Error('Use letters, numbers, dashes, dots or underscores for the folder name.');
   }
-  const dir = path.join(parentPath, folder);
-  if (fs.existsSync(dir)) {
+  const directory = path.join(parentPath, folder);
+  if (fs.existsSync(directory)) {
     throw new Error(`${folder} already exists in that folder.`);
   }
 
@@ -141,7 +143,7 @@ async function createStarter({
   onLog?.(`> npm create ${template.create} ${folder}\n\n`);
   await run(npm || (isWin ? 'npm.cmd' : 'npm'), args, parentPath, onLog);
 
-  if (!fs.existsSync(path.join(dir, 'package.json'))) {
+  if (!fs.existsSync(path.join(directory, 'package.json'))) {
     throw new Error('The starter finished but there is no package.json in it.');
   }
 
@@ -149,7 +151,7 @@ async function createStarter({
   // this too; doing it here is what makes it a promise this app keeps rather
   // than one it hopes for.
   try {
-    const file = path.join(dir, 'package.json');
+    const file = path.join(directory, 'package.json');
     const raw: unknown = JSON.parse(fs.readFileSync(file, 'utf8'));
     const pkg = toRecord(raw);
     if (pkg) {
@@ -162,11 +164,11 @@ async function createStarter({
 
   // A scaffolder that started a history of its own has already done this, and
   // its first commit is the one to keep.
-  if (!fs.existsSync(path.join(dir, '.git'))) {
+  if (!fs.existsSync(path.join(directory, '.git'))) {
     onLog?.('\n> starting a history for this site\n');
     try {
-      await run('git', ['init', '-b', 'main'], dir);
-      await run('git', ['add', '-A'], dir);
+      await run('git', ['init', '-b', 'main'], directory);
+      await run('git', ['add', '-A'], directory);
       // A first-time Git installation has no author configured yet. Give only
       // this generated commit a neutral identity; do not change the user's
       // repository or global configuration behind their back.
@@ -181,17 +183,16 @@ async function createStarter({
           '-m',
           `Start ${folder} from ${template.label}`,
         ],
-        dir,
+        directory,
       );
-    } catch (err) {
+    } catch (error: unknown) {
       // A site with no git still runs; say so rather than throwing it away.
-      onLog?.(
-        `\n(could not start a git history: ${err instanceof Error ? err.message : String(err)})\n`,
-      );
+      const reason = error instanceof Error ? error.message : String(error);
+      onLog?.(`\n(could not start a git history: ${reason})\n`);
     }
   }
 
-  return { ok: true, projectPath: dir };
+  return { ok: true, projectPath: directory };
 }
 
 export { createStarter, STARTERS };

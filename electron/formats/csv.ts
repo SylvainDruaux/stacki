@@ -53,8 +53,8 @@ function splitRow(line: string): Cell[] {
 }
 
 const quote = (value: unknown): string => {
-  const s = String(value ?? '');
-  return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  const text = String(value ?? '');
+  return /[",\n\r]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
 };
 
 // Comment lines and blank lines are content too — they are kept where they are.
@@ -74,14 +74,14 @@ interface ParsedCsv {
 
 function parseLines(text: string): ParsedCsv {
   const lines = text.split('\n');
-  let header: string[] | null = null;
+  let header: string[] | undefined = undefined;
   const rows: Row[] = [];
   lines.forEach((line, index) => {
     if (isSkippable(line)) {
       return;
     }
     if (!header) {
-      header = splitRow(line).map((c) => c.value.trim());
+      header = splitRow(line).map((cell) => cell.value.trim());
       return;
     }
     rows.push({ index, line, cells: splitRow(line) });
@@ -145,7 +145,7 @@ function applyEdits(text: string, edits: readonly Edit[]): string {
     if (!touched.has(row.index)) {
       continue;
     }
-    lines[row.index] = row.cells.map((c) => c.text).join(',');
+    lines[row.index] = row.cells.map((cell) => cell.text).join(',');
   }
   return lines.filter((_, index) => !removed.has(index)).join('\n');
 }

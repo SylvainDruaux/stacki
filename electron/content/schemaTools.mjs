@@ -2,7 +2,10 @@ import { createRequire } from 'node:module';
 import { z } from 'astro/zod';
 
 const META = Symbol.for('stacki.astro.schema-meta');
-export const definitionOf = (schema) => schema?._zod?.def || schema?._def || null;
+// This file is copied alone into the project to run there, so it cannot import shared/limits.
+// A chain of refinements is written by hand, one call per rule; 64 is far past any real one.
+const SCHEMA_LIMITS = { effectsDepthMax: 64 };
+export const definitionOf = (schema) => schema?._zod?.def || schema?._def || undefined;
 
 // Astro 5 exposes Zod 3; newer versions expose Zod 4. Stubs create these
 // schemas themselves, so attaching metadata to the older definition is local
@@ -15,13 +18,20 @@ export function withMetadata(schema, metadata) {
   return schema;
 }
 
-export function hasCrossFieldChecks(schema) {
-  const def = definitionOf(schema);
-  if (Array.isArray(def?.checks) && def.checks.length > 0) {
+export function hasCrossFieldChecks(schema, depth = 0) {
+  // The schema is the project's code. Past the bound, answer as if it had checks: the entry is
+  // then validated by the schema itself, which is the answer that cannot miss a rule.
+  if (depth > SCHEMA_LIMITS.effectsDepthMax) {
     return true;
   }
-  if (def?.typeName === 'ZodEffects') {
-    return def.effect?.type === 'refinement' || hasCrossFieldChecks(def.schema);
+  const definition = definitionOf(schema);
+  if (Array.isArray(definition?.checks) && definition.checks.length > 0) {
+    return true;
+  }
+  if (definition?.typeName === 'ZodEffects') {
+    return (
+      definition.effect?.type === 'refinement' || hasCrossFieldChecks(definition.schema, depth + 1)
+    );
   }
   return false;
 }
@@ -36,14 +46,14 @@ export function toJsonSchema(schema) {
       cycles: 'ref',
       reused: 'inline',
       override({ zodSchema, jsonSchema }) {
-        const def = definitionOf(zodSchema);
-        if (def?.type === 'date') {
+        const definition = definitionOf(zodSchema);
+        if (definition?.type === 'date') {
           jsonSchema.astroDate = true;
-          if (def.coerce) {
+          if (definition.coerce) {
             jsonSchema.astroCoerced = true;
           }
         }
-        if (def?.type === 'pipe' || def?.type === 'transform') {
+        if (definition?.type === 'pipe' || definition?.type === 'transform') {
           jsonSchema.astroTransform = true;
         }
       },
@@ -58,20 +68,20 @@ export function toJsonSchema(schema) {
     effectStrategy: 'input',
     pipeStrategy: 'input',
     definitionPath: '$defs',
-    postProcess(jsonSchema, def) {
+    postProcess(jsonSchema, definition) {
       if (!jsonSchema) {
         return jsonSchema;
       }
-      Object.assign(jsonSchema, def[META]);
-      if (def.typeName === 'ZodDate') {
+      Object.assign(jsonSchema, definition[META]);
+      if (definition.typeName === 'ZodDate') {
         jsonSchema.astroDate = true;
-        if (def.coerce) {
+        if (definition.coerce) {
           jsonSchema.astroCoerced = true;
         }
       }
       if (
-        def.typeName === 'ZodPipeline' ||
-        (def.typeName === 'ZodEffects' && def.effect?.type !== 'refinement')
+        definition.typeName === 'ZodPipeline' ||
+        (definition.typeName === 'ZodEffects' && definition.effect?.type !== 'refinement')
       ) {
         jsonSchema.astroTransform = true;
       }
