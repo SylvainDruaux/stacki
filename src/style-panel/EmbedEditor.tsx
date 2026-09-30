@@ -38,6 +38,7 @@ import { defaultSelectorTokens, selectorToClassTokens, snapshotTokens, tokensToS
 import { resolveStyle, indexContexts, contextKeyOf, listMatchedSelectors, selectorKey, selectorsMatch, stateForSelector, STATES, type ContextInfo, type ContextKey, type MatchedSelector, type ResolvedProp, type ResolvedStyle, type SourceKey, type StateKey, type StyleContext } from './lib/resolved'
 import { breakpointTier, buildStyleContexts, mediaParamsForBreakpoint, nativeContribsFor, nativeHasValues, nativeSelectorChips, optionsFor, selectedNativeIndexFor, type NativeStyleOptions } from './lib/native-styles'
 import type { AtRule, Declaration } from 'postcss'
+import { assert } from '../../shared/assert'
 import {
   addDeclaration,
   appendDecl,
@@ -927,8 +928,10 @@ function VerticalAlignRow({ resolved, dimmed, busy, setProp, clearProp, onProven
 }) {
   const prop = 'vertical-align'
   const isSelected = resolved?.source === 'selected'
-  const src = resolved ? (isSelected && resolved.selectedValue ? resolved.selectedValue : resolved.winner) : null
-  const raw = src ? src.value.trim() : ''
+  const effective = resolved
+    ? (isSelected && resolved.selectedValue ? resolved.selectedValue : resolved.winner)
+    : null
+  const raw = effective ? effective.value.trim() : ''
   const matched = VALIGN_VALUES.has(raw.toLowerCase()) ? raw.toLowerCase() : undefined
   const overridden = resolved?.overridden ?? false
 
@@ -1000,8 +1003,9 @@ function effectiveValue(resolved: ResolvedProp | undefined): string {
 // The effective raw value + !important flag (not lowercased) — for free-value fields.
 function rawEffective(resolved: ResolvedProp | undefined): { value: string; important: boolean } {
   if (!resolved) {return { value: '', important: false }}
-  const src = resolved.source === 'selected' && resolved.selectedValue ? resolved.selectedValue : resolved.winner
-  return { value: src.value, important: src.important }
+  const effective =
+    resolved.source === 'selected' && resolved.selectedValue ? resolved.selectedValue : resolved.winner
+  return { value: effective.value, important: effective.important }
 }
 
 // The current flex flow as a normalized `<direction> [wrap]` string (matching the
@@ -2233,6 +2237,14 @@ function StyleCard({
   const sectionIds = groups.map((group) => group.def.id)
   const [closedSectionIds, toggleSection] = useSectionVisibility()
   const read = (prop: string) => resolved.props.get(prop)
+  // Every grouped name came from `resolved.props.keys()` above, so a miss is a
+  // broken grouping, not an absent property.
+  const readGrouped = (prop: string): ResolvedProp => {
+    const found = resolved.props.get(prop)
+    assert(found !== undefined, `Grouped property ${prop} is resolved`)
+    return found
+  }
+  const provenanceResolved = provenance ? resolved.props.get(provenance.prop) : undefined
 
 
   return (
@@ -2424,7 +2436,7 @@ function StyleCard({
                     <ResolvedRow
                       key={prop}
                       prop={prop}
-                      resolved={resolved.props.get(prop)!}
+                      resolved={readGrouped(prop)}
                       busy={busy}
                       setProp={setProp}
                       clearProp={clearProp}
@@ -2454,7 +2466,7 @@ function StyleCard({
                     <ResolvedRow
                       key={prop}
                       prop={prop}
-                      resolved={resolved.props.get(prop)!}
+                      resolved={readGrouped(prop)}
                       busy={busy}
                       setProp={setProp}
                       clearProp={clearProp}
@@ -2473,7 +2485,7 @@ function StyleCard({
                     <ResolvedRow
                       key={prop}
                       prop={prop}
-                      resolved={resolved.props.get(prop)!}
+                      resolved={readGrouped(prop)}
                       busy={busy}
                       setProp={setProp}
                       clearProp={clearProp}
@@ -2492,7 +2504,7 @@ function StyleCard({
                   <ResolvedRow
                     key={prop}
                     prop={prop}
-                    resolved={resolved.props.get(prop)!}
+                    resolved={readGrouped(prop)}
                     busy={busy}
                     setProp={setProp}
                     clearProp={clearProp}
@@ -2510,8 +2522,8 @@ function StyleCard({
         <AddPropertyRow busy={busy} onAdd={onAdd} />
       </div>
 
-      {provenance && resolved.props.get(provenance.prop) ? (
-        <ProvenancePopover prop={provenance.prop} anchor={provenance.rect} resolved={resolved.props.get(provenance.prop)!} onClose={closeProvenance} onAnchorReclick={suppressProvenanceReopen} onSelectSelector={onSelectSelector} />
+      {provenance && provenanceResolved !== undefined ? (
+        <ProvenancePopover prop={provenance.prop} anchor={provenance.rect} resolved={provenanceResolved} onClose={closeProvenance} onAnchorReclick={suppressProvenanceReopen} onSelectSelector={onSelectSelector} />
       ) : null}
     </div>
   )
@@ -4751,11 +4763,12 @@ export default function EmbedEditor() {
   // select it for the UI and return the route to write THIS edit to (state won't
   // update in time). null → nothing to style.
   const autoSelectForEdit = (): { native: number } | { embedSelector: string } | null => {
-    const model = nativeModelRef.current
-    const base = model?.styles.find((style) => style.applied)
+    const styles = nativeModelRef.current?.styles ?? []
+    const baseIndex = styles.findIndex((style) => style.applied)
+    const base = styles[baseIndex]
     if (base) {
       selectActiveSelector(`.${base.className}`)
-      return { native: model!.styles.indexOf(base) }
+      return { native: baseIndex }
     }
     const tag = snapshot?.tag
     if (tag) {
