@@ -34,7 +34,7 @@ export function readPropertySyntax(source: string): PropertySyntax {
       frontmatter,
       ts.ScriptTarget.Latest,
       true,
-      ts.ScriptKind.TS
+      ts.ScriptKind.TS,
     ),
   };
 }
@@ -76,7 +76,7 @@ export function syntaxError(source: string): string | undefined {
     },
   });
   const diagnostic = result.diagnostics?.find(
-    (item) => item.category === ts.DiagnosticCategory.Error
+    (item) => item.category === ts.DiagnosticCategory.Error,
   );
   return diagnostic ? ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n') : undefined;
 }
@@ -102,7 +102,7 @@ export function validatePropertyCode(type: string, expression: string): Result<v
       expressionSource,
       ts.ScriptTarget.Latest,
       true,
-      ts.ScriptKind.TS
+      ts.ScriptKind.TS,
     );
     if (expressionFile.statements.length !== 1) {
       return err({
@@ -162,7 +162,7 @@ function isAstroPropsUnwrap(node: ts.Node): boolean {
   assert(false, 'Astro.props wrapper depth is bounded');
 }
 export function propertyKey(
-  node: ts.PropertyName | ts.BindingName | undefined
+  node: ts.PropertyName | ts.BindingName | undefined,
 ): string | undefined {
   if (!node) {
     return undefined;
@@ -179,10 +179,10 @@ export function defaultExpression(source: string): string {
     `const value = (${source});`,
     ts.ScriptTarget.Latest,
     true,
-    ts.ScriptKind.TS
+    ts.ScriptKind.TS,
   );
   const comma = syntaxNodes(syntax).some(
-    (node) => ts.isBinaryExpression(node) && node.operatorToken.kind === ts.SyntaxKind.CommaToken
+    (node) => ts.isBinaryExpression(node) && node.operatorToken.kind === ts.SyntaxKind.CommaToken,
   );
   return comma ? `(${source})` : source;
 }

@@ -21,7 +21,9 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
+  if (!condition) {
+    failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  }
 };
 
 (async () => {
@@ -32,8 +34,8 @@ const check = (what, condition, detail) => {
   fs.writeFileSync(
     entry,
     `export { buildTokenHtml, serializeTokens } from ${JSON.stringify(
-      path.join(__dirname, '..', 'src', 'style-panel', 'VariableConnect.tsx')
-    )};\n`
+      path.join(__dirname, '..', 'src', 'style-panel', 'VariableConnect.tsx'),
+    )};\n`,
   );
   const out = path.join(buildDir, 'token-field.bundle.js');
   await esbuild.build({
@@ -53,7 +55,10 @@ const check = (what, condition, detail) => {
   global.window = dom.window;
   global.document = dom.window.document;
   global.MutationObserver = dom.window.MutationObserver;
-  global.ResizeObserver = class { observe() {} disconnect() {} };
+  global.ResizeObserver = class {
+    observe() {}
+    disconnect() {}
+  };
   global.Node = dom.window.Node;
   global.HTMLElement = dom.window.HTMLElement;
 
@@ -73,16 +78,20 @@ const check = (what, condition, detail) => {
   let host = draw(PADDING, chips);
   const spaces = () => [...host.querySelectorAll('.embed-editor_varconnect-space')];
   check('the space between two chips is an element', spaces().length === 1, host.innerHTML);
-  check('holding exactly the space', spaces()[0]?.textContent === ' ', JSON.stringify(spaces()[0]?.textContent));
+  check(
+    'holding exactly the space',
+    spaces()[0]?.textContent === ' ',
+    JSON.stringify(spaces()[0]?.textContent),
+  );
   check(
     'and sitting between them',
     spaces()[0]?.previousElementSibling?.dataset.chip === '1' &&
-      spaces()[0]?.nextElementSibling?.dataset.chip === '1'
+      spaces()[0]?.nextElementSibling?.dataset.chip === '1',
   );
   // What the caret needs: a text node of its own to land in.
   check(
     'with a text node to put a caret in',
-    spaces()[0]?.firstChild?.nodeType === dom.window.Node.TEXT_NODE
+    spaces()[0]?.firstChild?.nodeType === dom.window.Node.TEXT_NODE,
   );
 
   // --- and the value it round-trips to -------------------------------------------
@@ -90,7 +99,11 @@ const check = (what, condition, detail) => {
   check('the value comes back as it went in', back(host) === PADDING, back(host));
 
   host = draw(PADDING, chips, true);
-  check('the same with syntax colouring on', host.querySelectorAll('.embed-editor_varconnect-space').length === 1, host.innerHTML);
+  check(
+    'the same with syntax colouring on',
+    host.querySelectorAll('.embed-editor_varconnect-space').length === 1,
+    host.innerHTML,
+  );
   check('and it still round-trips', back(host) === PADDING, back(host));
 
   // --- runs that are NOT only whitespace are left alone --------------------------
@@ -99,43 +112,60 @@ const check = (what, condition, detail) => {
   // markup for its own sake.
   const border = '1px solid var(--line)';
   host = draw(border, [chip('var(--line)', 'line')]);
-  check('a run with words in it is not wrapped', host.querySelectorAll('.embed-editor_varconnect-space').length === 0, host.innerHTML);
+  check(
+    'a run with words in it is not wrapped',
+    host.querySelectorAll('.embed-editor_varconnect-space').length === 0,
+    host.innerHTML,
+  );
   check(
     'and that value round-trips too',
     serializeTokens(host, border, border) === border,
-    serializeTokens(host, border, border)
+    serializeTokens(host, border, border),
   );
 
   // Three chips, two gaps — `inset` and `border-radius` are written this way.
   const inset = 'var(--a) var(--b) var(--c)';
   host = draw(inset, [chip('var(--a)', 'a'), chip('var(--b)', 'b'), chip('var(--c)', 'c')]);
-  check('every gap gets one', host.querySelectorAll('.embed-editor_varconnect-space').length === 2, host.innerHTML);
-  check('and three chips still round-trip', serializeTokens(host, inset, inset) === inset, serializeTokens(host, inset, inset));
+  check(
+    'every gap gets one',
+    host.querySelectorAll('.embed-editor_varconnect-space').length === 2,
+    host.innerHTML,
+  );
+  check(
+    'and three chips still round-trip',
+    serializeTokens(host, inset, inset) === inset,
+    serializeTokens(host, inset, inset),
+  );
 
   // A value that is one chip and nothing else keeps its zero-width caret slots,
   // which are what let you type in front of a variable that IS the whole value.
   host = draw('var(--only)', [chip('var(--only)', 'only')]);
-  check('a lone chip is not given a space', host.querySelectorAll('.embed-editor_varconnect-space').length === 0);
+  check(
+    'a lone chip is not given a space',
+    host.querySelectorAll('.embed-editor_varconnect-space').length === 0,
+  );
   check(
     'but keeps its caret slots either side',
     (host.textContent.match(/​/g) || []).length === 2,
-    JSON.stringify(host.textContent)
+    JSON.stringify(host.textContent),
   );
 
   // --- the rule that makes it visible --------------------------------------------
   const css = fs.readFileSync(
     path.join(__dirname, '..', 'src', 'style-panel', 'embed-editor.css'),
-    'utf8'
+    'utf8',
   );
   const rule = css.slice(css.indexOf('.embed-editor_varconnect-space'));
   check(
-    'the space keeps its width against the field\'s nowrap',
+    "the space keeps its width against the field's nowrap",
     /white-space:\s*pre/.test(rule.slice(0, rule.indexOf('}'))),
-    rule.slice(0, rule.indexOf('}'))
+    rule.slice(0, rule.indexOf('}')),
   );
 
   if (failures.length) {
-    console.error(`\ntoken-field: ${failures.length} failed, ${checked - failures.length} passed\n`);
+    console.error(
+      `\ntoken-field: ${failures.length} failed, ${checked - failures.length} passed\n`,
+    );
     console.error(failures.join('\n') + '\n');
     process.exit(1);
   }

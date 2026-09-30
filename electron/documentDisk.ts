@@ -305,7 +305,11 @@ export const NODE_PROJECTOR: Projector = {
         }
       }
     }
-    return createLazySnapshot({ path: file, bytes }, (own) => projectDocument(file, own), hashBytes);
+    return createLazySnapshot(
+      { path: file, bytes },
+      (own) => projectDocument(file, own),
+      hashBytes,
+    );
   },
 };
 

@@ -30,7 +30,9 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
+  if (!condition) {
+    failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  }
 };
 
 (async () => {
@@ -81,7 +83,11 @@ const check = (what, condition, detail) => {
   dom.window.WebGL2RenderingContext = global.WebGL2RenderingContext;
   dom.window.HTMLCanvasElement.prototype.getContext = () => null;
   dom.window.ResizeObserver = global.ResizeObserver;
-  dom.window.matchMedia = () => ({ matches: false, addEventListener() {}, removeEventListener() {} });
+  dom.window.matchMedia = () => ({
+    matches: false,
+    addEventListener() {},
+    removeEventListener() {},
+  });
 
   // The preload bridge. Every method answers with something harmless, so the
   // component gets past its first effects without a real main process.
@@ -105,7 +111,7 @@ const check = (what, condition, detail) => {
           : typeof prop === 'string' && prop.startsWith('on')
             ? () => () => {}
             : noop,
-    }
+    },
   );
   dom.window.avb = bridge;
   global.avb = bridge;
@@ -144,14 +150,20 @@ const check = (what, condition, detail) => {
   check(
     'no hook reads something declared later in the component',
     !tdz,
-    tdz && `${tdz.split('\n').slice(0, 3).join('\n    ')}\n    → move that hook below the declaration it names`
+    tdz &&
+      `${tdz.split('\n').slice(0, 3).join('\n    ')}\n    → move that hook below the declaration it names`,
   );
 
-  const other = errors.filter((e) => !/before initialization/.test(e) && /Error|Warning: Failed/.test(e));
+  const other = errors.filter(
+    (e) => !/before initialization/.test(e) && /Error|Warning: Failed/.test(e),
+  );
   check(
     'nothing else was reported during render',
     other.length === 0,
-    other.slice(0, 2).map((e) => e.split('\n')[0]).join('\n    ')
+    other
+      .slice(0, 2)
+      .map((e) => e.split('\n')[0])
+      .join('\n    '),
   );
 
   check('something was actually rendered', document.getElementById('root').innerHTML.length > 0);
@@ -179,7 +191,7 @@ const check = (what, condition, detail) => {
     check(
       'no native confirm() or alert() survives in the app',
       native.length === 0,
-      native.length ? `found ${native.length}: ${[...new Set(native)].join(', ')}` : ''
+      native.length ? `found ${native.length}: ${[...new Set(native)].join(', ')}` : '',
     );
   }
 

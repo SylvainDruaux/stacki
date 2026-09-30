@@ -329,7 +329,7 @@ export function withInserted(
   }
   const index = place?.index ?? 0;
   return withNode(model, parentId, (parent) => {
-    const children = (parent.children ?? []);
+    const children = parent.children ?? [];
     return withChildren(parent, spliced(children, Math.min(index, children.length), node));
   });
 }
@@ -410,8 +410,7 @@ function besidePlace(
 ): { readonly anchorId: string; readonly placement: Placement } | undefined {
   const parentId = place?.parentId ?? null;
   const parent = parentId === null ? undefined : findNode(model.nodes, parentId);
-  const list =
-    parent === undefined ? model.nodes : (parent.children ?? []);
+  const list = parent === undefined ? model.nodes : (parent.children ?? []);
   const index =
     parent === undefined && parentId !== null
       ? list.length

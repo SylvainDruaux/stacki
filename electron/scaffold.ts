@@ -22,7 +22,7 @@ const FILES: Record<string, (name: string) => string> = {
         },
       },
       null,
-      2
+      2,
     ) + '\n',
 
   'astro.config.mjs': () => `import { defineConfig } from 'astro/config';
@@ -160,10 +160,11 @@ import Footer from '../components/Footer.astro';
 };
 
 function scaffoldProject(dir: string, name?: string): string {
-  const safeName = (name || path.basename(dir))
-    .toLowerCase()
-    .replace(/[^a-z0-9-]+/g, '-')
-    .replace(/^-+|-+$/g, '') || 'astro-site';
+  const safeName =
+    (name || path.basename(dir))
+      .toLowerCase()
+      .replace(/[^a-z0-9-]+/g, '-')
+      .replace(/^-+|-+$/g, '') || 'astro-site';
 
   for (const [rel, gen] of Object.entries(FILES)) {
     const filePath = path.join(dir, rel);

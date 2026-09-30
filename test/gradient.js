@@ -21,7 +21,9 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
+  if (!condition) {
+    failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  }
 };
 
 (async () => {
@@ -42,7 +44,9 @@ const check = (what, condition, detail) => {
   // What the panel does when the kind changes.
   const switchKind = (css, next) => {
     const current = parseGradient(css);
-    if (!current?.stops?.length) {return null;}
+    if (!current?.stops?.length) {
+      return null;
+    }
     return serializeGradient({
       ...blankGradientOf(next),
       repeating: current.repeating,
@@ -57,19 +61,27 @@ const check = (what, condition, detail) => {
     check('switching to radial makes a radial gradient', /^radial-gradient\(/.test(radial), radial);
     check('the first colour survives', radial.includes('rgb(255, 0, 0)'), radial);
     check('the second colour survives', radial.includes('rgb(0, 4, 255)'), radial);
-    check('and their positions with them', radial.includes('0%') && radial.includes('100%'), radial);
+    check(
+      'and their positions with them',
+      radial.includes('0%') && radial.includes('100%'),
+      radial,
+    );
     // The failure this file is about: a fresh black-to-white default.
     check('no default colours appear', !/#000000|#ffffff/.test(radial), radial);
 
     const conic = switchKind(css, 'conic');
-    check('the same holds for conic', /^conic-gradient\(/.test(conic) && conic.includes('rgb(0, 4, 255)'), conic);
+    check(
+      'the same holds for conic',
+      /^conic-gradient\(/.test(conic) && conic.includes('rgb(0, 4, 255)'),
+      conic,
+    );
 
     // And back again, unchanged — a round trip must not drift.
     const back = switchKind(radial, 'linear');
     check(
       'switching back gives the colours again',
       back === 'linear-gradient(rgb(255, 0, 0) 0%, rgb(0, 4, 255) 100%)',
-      back
+      back,
     );
   }
 
@@ -112,7 +124,10 @@ const check = (what, condition, detail) => {
   {
     // Unparseable, or empty: the caller falls back to a fresh layer rather than
     // writing a gradient with no colours in it, which is invalid CSS.
-    check('an unparseable gradient carries nothing', switchKind('url(photo.png)', 'radial') === null);
+    check(
+      'an unparseable gradient carries nothing',
+      switchKind('url(photo.png)', 'radial') === null,
+    );
     check('and so does nonsense', switchKind('not a gradient at all', 'radial') === null);
   }
 
@@ -120,7 +135,11 @@ const check = (what, condition, detail) => {
   {
     const b = blankGradientOf('radial');
     check('a blank gradient has the kind asked for', b.type === 'radial');
-    check('and no geometry at all', !b.angle && !b.shape && !b.size && !b.from && !b.posX && !b.posY, JSON.stringify(b));
+    check(
+      'and no geometry at all',
+      !b.angle && !b.shape && !b.size && !b.from && !b.posX && !b.posY,
+      JSON.stringify(b),
+    );
     check('and no colours', b.stops.length === 0);
     check('and is not repeating', b.repeating === false);
   }
@@ -139,14 +158,26 @@ const check = (what, condition, detail) => {
     const reparsed = parseGradient(written);
     check('a gradient the editor writes can be read back', !!reparsed, written);
     check('with both stops', reparsed?.stops.length === 2, JSON.stringify(reparsed?.stops));
-    check('and no stop mistaken for geometry', !reparsed?.shape && !reparsed?.size, JSON.stringify(reparsed));
+    check(
+      'and no stop mistaken for geometry',
+      !reparsed?.shape && !reparsed?.size,
+      JSON.stringify(reparsed),
+    );
 
     // The preludes that ARE preludes must still be recognised.
     const shaped = parseGradient('radial-gradient(circle, red, blue)');
     check('a shape is still a prelude', shaped?.shape === 'circle', JSON.stringify(shaped));
     const sized = parseGradient('radial-gradient(farthest-corner at 20% 30%, red, blue)');
-    check('a size keyword with a centre still is', sized?.size === 'farthest-corner', JSON.stringify(sized));
-    check('and the centre is read', sized?.posX === '20%' && sized?.posY === '30%', JSON.stringify(sized));
+    check(
+      'a size keyword with a centre still is',
+      sized?.size === 'farthest-corner',
+      JSON.stringify(sized),
+    );
+    check(
+      'and the centre is read',
+      sized?.posX === '20%' && sized?.posY === '30%',
+      JSON.stringify(sized),
+    );
     const explicit = parseGradient('radial-gradient(20px 40px, red, blue)');
     check('an explicit size still is', explicit?.size === '20px 40px', JSON.stringify(explicit));
     check('and it keeps both stops', explicit?.stops.length === 2, JSON.stringify(explicit?.stops));

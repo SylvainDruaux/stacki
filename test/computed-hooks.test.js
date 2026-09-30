@@ -17,19 +17,33 @@ test('computed hooks discard stale selections and documents without waking liter
       contents: `export { useResolvedColor, forgetComputedColors } from './src/style-panel/lib/computed-color';
         export { useHighlight, forgetComputedStyles } from './src/style-panel/lib/computed-style';
         export { setHost } from './src/style-panel/lib/host';`,
-      loader: 'ts', resolveDir: rootPath,
+      loader: 'ts',
+      resolveDir: rootPath,
     },
-    outfile, bundle: true, platform: 'node', format: 'cjs', external: ['react'], logLevel: 'silent',
-    plugins: [{ name: 'canvas-probe', setup(build) {
-      build.onResolve({ filter: /canvasQuery\.js$/ }, () => ({ path: 'canvas', namespace: 'probe' }));
-      build.onLoad({ filter: /.*/, namespace: 'probe' }, () => ({
-        contents: `export const hasCanvas = () => true;
+    outfile,
+    bundle: true,
+    platform: 'node',
+    format: 'cjs',
+    external: ['react'],
+    logLevel: 'silent',
+    plugins: [
+      {
+        name: 'canvas-probe',
+        setup(build) {
+          build.onResolve({ filter: /canvasQuery\.js$/ }, () => ({
+            path: 'canvas',
+            namespace: 'probe',
+          }));
+          build.onLoad({ filter: /.*/, namespace: 'probe' }, () => ({
+            contents: `export const hasCanvas = () => true;
           export const queryCanvas = (path, selectors, colors, props = []) => new Promise((resolve) => {
             globalThis.__computedQueries.push({ path, colors, props, resolve });
           });`,
-        loader: 'js',
-      }));
-    } }],
+            loader: 'js',
+          }));
+        },
+      },
+    ],
   });
   const { JSDOM } = require('jsdom');
   const dom = new JSDOM('<!doctype html><div id="root"></div>');
@@ -39,7 +53,13 @@ test('computed hooks discard stale selections and documents without waking liter
   global.__computedQueries = [];
   const React = require('react');
   const { createRoot } = require('react-dom/client');
-  const { useResolvedColor, useHighlight, setHost, forgetComputedColors, forgetComputedStyles } = require(outfile);
+  const {
+    useResolvedColor,
+    useHighlight,
+    setHost,
+    forgetComputedColors,
+    forgetComputedStyles,
+  } = require(outfile);
   const root = createRoot(document.getElementById('root'));
   const renders = { literal: 0, resolved: 0 };
   const Swatch = React.memo(({ name, value }) => {
@@ -47,10 +67,16 @@ test('computed hooks discard stale selections and documents without waking liter
     const result = useResolvedColor(value);
     return React.createElement('output', { id: name }, result);
   });
-  const Style = () => React.createElement('output', { id: 'style' },
-    useHighlight('', 'display', ['block', 'flex', 'grid'], 'block'));
+  const Style = () =>
+    React.createElement(
+      'output',
+      { id: 'style' },
+      useHighlight('', 'display', ['block', 'flex', 'grid'], 'block'),
+    );
   const read = (id) => document.getElementById(id).textContent;
-  const flush = async () => { await React.act(async () => new Promise((resolve) => setTimeout(resolve, 10))); };
+  const flush = async () => {
+    await React.act(async () => new Promise((resolve) => setTimeout(resolve, 10)));
+  };
   const switchTo = async (selectedId, openFilePath = '/project/page.astro') => {
     await React.act(async () => setHost({ selectedId, openFilePath }));
     await flush();
@@ -58,22 +84,38 @@ test('computed hooks discard stale selections and documents without waking liter
   };
   const answer = async (batch, color, display) => {
     await React.act(async () => {
-      for (const query of batch) {query.resolve({
-        computed: Object.fromEntries(query.colors.map((key) => [key, color])),
-        computedProps: Object.fromEntries(query.props.map((key) => [key, display])),
-        identity: { tag: 'div' },
-      });}
+      for (const query of batch) {
+        query.resolve({
+          computed: Object.fromEntries(query.colors.map((key) => [key, color])),
+          computedProps: Object.fromEntries(query.props.map((key) => [key, display])),
+          identity: { tag: 'div' },
+        });
+      }
     });
   };
 
   try {
-    setHost({ projectPath: '/project', openFilePath: '/project/page.astro', selectedId: 'a',
-      nodes: [{ id: 'a', kind: 'element', name: 'div' }, { id: 'b', kind: 'element', name: 'div' }],
-      pathOf: (id) => id === 'a' ? '0' : '1' });
-    await React.act(async () => root.render(React.createElement(React.Fragment, null,
-      React.createElement(Swatch, { name: 'literal', value: '#abc' }),
-      React.createElement(Swatch, { name: 'resolved', value: 'var(--brand)' }),
-      React.createElement(Style))));
+    setHost({
+      projectPath: '/project',
+      openFilePath: '/project/page.astro',
+      selectedId: 'a',
+      nodes: [
+        { id: 'a', kind: 'element', name: 'div' },
+        { id: 'b', kind: 'element', name: 'div' },
+      ],
+      pathOf: (id) => (id === 'a' ? '0' : '1'),
+    });
+    await React.act(async () =>
+      root.render(
+        React.createElement(
+          React.Fragment,
+          null,
+          React.createElement(Swatch, { name: 'literal', value: '#abc' }),
+          React.createElement(Swatch, { name: 'resolved', value: 'var(--brand)' }),
+          React.createElement(Style),
+        ),
+      ),
+    );
     await flush();
     const first = global.__computedQueries.splice(0);
     assert.equal(first.length, 2);
@@ -85,20 +127,31 @@ test('computed hooks discard stale selections and documents without waking liter
     assert.equal(read('resolved'), 'rgb(0 0 255)');
     assert.equal(read('style'), 'grid');
     await answer(first, 'rgb(255 0 0)', 'flex');
-    assert.equal(read('resolved'), 'rgb(0 0 255)', 'a late answer cannot recolor the new selection');
+    assert.equal(
+      read('resolved'),
+      'rgb(0 0 255)',
+      'a late answer cannot recolor the new selection',
+    );
     assert.equal(read('style'), 'grid', 'a late answer cannot restyle the new selection');
-    assert.equal(renders.literal, literalRenders, 'literal swatches do not subscribe to cache or host updates');
+    assert.equal(
+      renders.literal,
+      literalRenders,
+      'literal swatches do not subscribe to cache or host updates',
+    );
 
     const changedFile = await switchTo('b', '/project/other.astro');
     assert.equal(changedFile.length, 2, 'the same path in another document is queried again');
-    assert.equal(read('resolved'), 'var(--brand)', 'the previous document\'s color is not returned');
+    assert.equal(read('resolved'), 'var(--brand)', "the previous document's color is not returned");
     await answer(changedFile, null, null);
     assert.equal(read('style'), 'block', 'a missing answer settles onto the fallback');
     assert.equal(read('resolved'), 'var(--brand)');
     await flush();
     assert.equal(global.__computedQueries.length, 0, 'settled misses do not retry forever');
 
-    await React.act(async () => { forgetComputedColors(); forgetComputedStyles(); });
+    await React.act(async () => {
+      forgetComputedColors();
+      forgetComputedStyles();
+    });
     await flush();
     assert.equal(global.__computedQueries.length, 2, 'explicit invalidation asks the canvas again');
   } finally {

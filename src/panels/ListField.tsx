@@ -219,7 +219,7 @@ function useListField(props: ListFieldProps) {
   const [editor, setEditor] = useState<Editor>({ kind: 'closed' });
   const write = (
     next: readonly Item[],
-    options: { readonly immediate: boolean; readonly change: ListFieldChange }
+    options: { readonly immediate: boolean; readonly change: ListFieldChange },
   ) => {
     if (disabled) {
       return;
@@ -250,7 +250,7 @@ function useListField(props: ListFieldProps) {
       {
         immediate: true,
         change: { kind: 'remove', index },
-      }
+      },
     );
   };
   return {
@@ -293,8 +293,8 @@ function useListDrag(
     options: {
       readonly immediate: boolean;
       readonly change: ListFieldChange;
-    }
-  ) => void
+    },
+  ) => void,
 ) {
   const [drag, setDrag] = useState<Drag>({ kind: 'idle' });
   const drop = (): void => {
@@ -379,7 +379,7 @@ function toggleListRow(
   event: React.MouseEvent<HTMLElement>,
   state: ListState,
   index: number,
-  item: Item
+  item: Item,
 ): void {
   if (state.editor.kind === 'existing' && state.editor.index === index) {
     state.write(state.items, {
@@ -427,7 +427,7 @@ function ListEditor({ state }: { readonly state: ListState }) {
               {
                 immediate: false,
                 change: { kind: 'edit', index: editor.index },
-              }
+              },
             )
           }
           onClose={() => closeListRowEditor(state)}

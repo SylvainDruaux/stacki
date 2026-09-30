@@ -45,7 +45,7 @@ export function PropertyOptions({ type, disabled, onChange }: PropertyOptionsPro
     onChange(
       change.kind === 'move'
         ? { kind: 'reorder', type: nextType }
-        : { kind: 'draft', type: nextType, rename: next.rename }
+        : { kind: 'draft', type: nextType, rename: next.rename },
     );
   };
   return (
@@ -72,7 +72,7 @@ function changePropertyOptionList(
   options: readonly string[],
   value: string,
   change: ListFieldChange,
-  scalarKind: 'text' | 'literal'
+  scalarKind: 'text' | 'literal',
 ): {
   readonly options: readonly string[];
   readonly rename?: PropertyOptionRename;

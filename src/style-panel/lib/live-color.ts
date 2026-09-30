@@ -11,7 +11,7 @@
 // So the control remembers the value it last emitted and shows that, until the
 // model comes back with a value of its own.
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react';
 
 /**
  * `[shown, note]` — the value to display, and where to report a live one.
@@ -21,9 +21,11 @@ import { useEffect, useState } from 'react'
  * colour, arriving from the model.
  */
 export function useLiveColor(external: string): [string, (value: string | null) => void] {
-  const [live, setLive] = useState<string | null>(null)
+  const [live, setLive] = useState<string | null>(null);
   // The model has answered — whatever it says now is more authoritative than a
   // value this control emitted a moment ago.
-  useEffect(() => { setLive(null) }, [external])
-  return [live ?? external, setLive]
+  useEffect(() => {
+    setLive(null);
+  }, [external]);
+  return [live ?? external, setLive];
 }

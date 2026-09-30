@@ -31,7 +31,9 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
+  if (!condition) {
+    failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  }
 };
 
 const { parsePage, serializePage, locateSelection } = require('../dist/electron/astroParser.js');
@@ -53,23 +55,34 @@ function onDisk(body) {
 // The first loop node anywhere in a tree, and every node under it.
 const find = (nodes, kind) => {
   for (const n of nodes || []) {
-    if (n.kind === kind) {return n;}
+    if (n.kind === kind) {
+      return n;
+    }
     const deeper = find(n.children, kind);
-    if (deeper) {return deeper;}
+    if (deeper) {
+      return deeper;
+    }
   }
   return null;
 };
-const count = (nodes) =>
-  (nodes || []).reduce((n, node) => n + 1 + count(node.children), 0);
+const count = (nodes) => (nodes || []).reduce((n, node) => n + 1 + count(node.children), 0);
 
 // Reads as a loop, keeps its bytes.
 function loopIn(body, what) {
   const src = page(body);
   const parsed = parsePage(src);
   const loop = parsed.editable ? find(parsed.model.nodes, 'map') : null;
-  check(`${what} — opens as a loop`, !!loop, parsed.editable ? 'read as code, not a loop' : parsed.reason);
+  check(
+    `${what} — opens as a loop`,
+    !!loop,
+    parsed.editable ? 'read as code, not a loop' : parsed.reason,
+  );
   if (parsed.editable) {
-    check(`${what} — and is written back as it was`, serializePage(parsed.model) === src, 'the file changed');
+    check(
+      `${what} — and is written back as it was`,
+      serializePage(parsed.model) === src,
+      'the file changed',
+    );
   }
   return loop;
 }
@@ -99,18 +112,22 @@ function loopIn(body, what) {
       </li>
     );
   })}`,
-    'a loop that says why it exists'
+    'a loop that says why it exists',
   );
-  check('the markup under it is the tree, not a string', count(loop?.children) === 3, `${count(loop?.children)} nodes`);
+  check(
+    'the markup under it is the tree, not a string',
+    count(loop?.children) === 3,
+    `${count(loop?.children)} nodes`,
+  );
   check(
     'and the sentence is still in the block',
     (loop?.body || []).join('\n').includes('somewhere of its own to lead'),
-    JSON.stringify(loop?.body)
+    JSON.stringify(loop?.body),
   );
   check(
     'the declaration keeps its semicolon',
     (loop?.body || []).some((line) => /const Element = item\.href \? "a" : "div";$/.test(line)),
-    JSON.stringify(loop?.body)
+    JSON.stringify(loop?.body),
   );
 }
 
@@ -120,7 +137,7 @@ loopIn(
     const label = item.title; // what the row says
     return <li>{label}</li>;
   })}`,
-  'a comment after a declaration'
+  'a comment after a declaration',
 );
 
 loopIn(
@@ -129,7 +146,7 @@ loopIn(
     // Whatever it is, it goes in a row.
     return <li>{label}</li>;
   })}`,
-  'a comment above the return'
+  'a comment above the return',
 );
 
 {
@@ -139,12 +156,12 @@ loopIn(
     `  {items.map((item) => {
     const label = item.title; /* and then the row */ return <li>{label}</li>;
   })}`,
-    'a comment on the return\'s own line'
+    "a comment on the return's own line",
   );
   check(
     'it is kept beside the return',
     (loop?.body || []).some((line) => line.includes('and then the row')),
-    JSON.stringify(loop?.body)
+    JSON.stringify(loop?.body),
   );
   // And the markup after it still points at itself. A comment can be as long as
   // it needs to be, so counting past it is counting past its lines too.
@@ -153,7 +170,11 @@ loopIn(
     the whole of what this loop is for */ return <li>{label}</li>;
   })}`;
   const at = locateSelection(onDisk(body), '0.0.0');
-  check('the markup after it points at its own line', at?.startLine === 7, `line ${at?.startLine}, not 7`);
+  check(
+    'the markup after it points at its own line',
+    at?.startLine === 7,
+    `line ${at?.startLine}, not 7`,
+  );
 }
 
 loopIn(
@@ -163,7 +184,7 @@ loopIn(
     /* Then: the row. */
     return <li>{label}</li>;
   })}`,
-  'a comment above each of them'
+  'a comment above each of them',
 );
 
 // --- prose is prose ----------------------------------------------------------
@@ -174,12 +195,12 @@ loopIn(
     const label = item.title;
     return <li>{label}</li>;
   })}`,
-    'a semicolon in the prose'
+    'a semicolon in the prose',
   );
   check(
     'a semicolon inside a comment did not end a statement',
     (loop?.body || []).some((line) => line.includes('this is the first.')),
-    JSON.stringify(loop?.body)
+    JSON.stringify(loop?.body),
   );
 }
 {
@@ -189,12 +210,12 @@ loopIn(
     const label = item.heading || item.title;
     return <li>{label}</li>;
   })}`,
-    "an apostrophe in the prose"
+    'an apostrophe in the prose',
   );
   check(
     'an apostrophe inside a comment is an apostrophe',
     (loop?.body || []).some((line) => line.includes("isn't a heading")),
-    JSON.stringify(loop?.body)
+    JSON.stringify(loop?.body),
   );
 }
 
@@ -202,7 +223,11 @@ loopIn(
 const stillCode = (body, what) => {
   const parsed = parsePage(page(body));
   const loop = parsed.editable ? find(parsed.model.nodes, 'map') : null;
-  check(what, !loop, 'opened as a loop — its body would be rewritten from a shape this file cannot hold');
+  check(
+    what,
+    !loop,
+    'opened as a loop — its body would be rewritten from a shape this file cannot hold',
+  );
 };
 
 stillCode(
@@ -210,7 +235,7 @@ stillCode(
     if (!item.title) return null;
     return <li>{item.title}</li>;
   })}`,
-  'a loop that decides something stays code'
+  'a loop that decides something stays code',
 );
 stillCode(
   `  {items.map((item) => {
@@ -218,7 +243,7 @@ stillCode(
     const label = item.title;
     return <li>{label}</li>;
   })}`,
-  'a comment nobody closed stays code'
+  'a comment nobody closed stays code',
 );
 stillCode(
   `  {items.map((item) => {
@@ -226,7 +251,7 @@ stillCode(
     return <li>{label}</li>;
     /* and then some. */
   })}`,
-  'anything after the return stays code'
+  'anything after the return stays code',
 );
 
 // --- the corpus holds the real one -------------------------------------------
@@ -242,7 +267,7 @@ stillCode(
     check(
       'with all thirty cards worth of markup under it',
       count(loop?.children) > 15,
-      `${count(loop?.children)} nodes`
+      `${count(loop?.children)} nodes`,
     );
     check('and comes back byte for byte', serializePage(parsed.model) === src, 'the file changed');
 
@@ -253,17 +278,21 @@ stillCode(
     const lines = src.split('\n');
     const lineOf = (text) => lines.findIndex((l) => l.includes(text)) + 1;
     const at = locateSelection(file, '0.0.0');
-    check('the card under the loop knows its lines', typeof at?.startLine === 'number', JSON.stringify(at));
+    check(
+      'the card under the loop knows its lines',
+      typeof at?.startLine === 'number',
+      JSON.stringify(at),
+    );
     check(
       'and they are the lines it is written on',
       at?.startLine === lineOf('<li'),
-      `${at?.startLine}, not ${lineOf('<li')}`
+      `${at?.startLine}, not ${lineOf('<li')}`,
     );
     const inner = locateSelection(file, '0.0.0.0.0');
     check(
       'so does the one inside it',
       inner?.startLine === lineOf('<Element'),
-      `${inner?.startLine}, not ${lineOf('<Element')}`
+      `${inner?.startLine}, not ${lineOf('<Element')}`,
     );
   }
 }

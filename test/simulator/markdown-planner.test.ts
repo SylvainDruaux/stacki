@@ -57,15 +57,27 @@ test('a Markdown block is no tag: every tag operation refuses it', () => {
   const page = '# Title\n\nText.\n';
   const string = { type: 'string' as const, value: 'x' };
   const set: Operation = { tag: 'set-attribute', name: 'class', value: string };
-  assert.equal(planned(page, [1], () => set), REFUSED);
-  assert.equal(planned(page, [1], () => ({ tag: 'remove-attribute', name: 'class' })), REFUSED);
+  assert.equal(
+    planned(page, [1], () => set),
+    REFUSED,
+  );
+  assert.equal(
+    planned(page, [1], () => ({ tag: 'remove-attribute', name: 'class' })),
+    REFUSED,
+  );
   const style: Operation = {
     tag: 'set-inline-style',
     property: 'color',
     declaration: { tag: 'remove' },
   };
-  assert.equal(planned(page, [1], () => style), REFUSED);
-  assert.equal(planned(page, [0], () => ({ tag: 'rename-tag', from: 'h1', to: 'h2' })), REFUSED);
+  assert.equal(
+    planned(page, [1], () => style),
+    REFUSED,
+  );
+  assert.equal(
+    planned(page, [0], () => ({ tag: 'rename-tag', from: 'h1', to: 'h2' })),
+    REFUSED,
+  );
   const wrap = (at: (path: readonly number[]) => AnchorRef): Operation => ({
     tag: 'wrap-nodes',
     last: at([1]),
@@ -87,9 +99,15 @@ test('a list and its first item start on one byte and each resolves to itself', 
 
 test("a block's inline text is never removed, moved or stood beside", () => {
   const page = '# T\n\nText.\n';
-  assert.equal(planned(page, [1, 0], () => ({ tag: 'remove-node' })), REFUSED);
+  assert.equal(
+    planned(page, [1, 0], () => ({ tag: 'remove-node' })),
+    REFUSED,
+  );
   const beside: Operation = { tag: 'insert-node', placement: 'before', source: 'x' };
-  assert.equal(planned(page, [1, 0], () => beside), REFUSED);
+  assert.equal(
+    planned(page, [1, 0], () => beside),
+    REFUSED,
+  );
   const move = (at: (path: readonly number[]) => AnchorRef): Operation => ({
     tag: 'move-node',
     destination: at([0, 0]),
@@ -101,11 +119,20 @@ test("a block's inline text is never removed, moved or stood beside", () => {
 test('blocks one line break apart get a blank line on each side of a change', () => {
   const tight = '# H\nText.\n';
   const insert: Operation = { tag: 'insert-node', placement: 'after', source: 'New.' };
-  assert.equal(planned(tight, [0], () => insert), '# H\n\nNew.\n\nText.\n');
+  assert.equal(
+    planned(tight, [0], () => insert),
+    '# H\n\nNew.\n\nText.\n',
+  );
   const fenced = 'Para.\n```\ncode\n```\nMore.\n';
-  assert.equal(planned(fenced, [1], () => ({ tag: 'remove-node' })), 'Para.\n\nMore.\n');
+  assert.equal(
+    planned(fenced, [1], () => ({ tag: 'remove-node' })),
+    'Para.\n\nMore.\n',
+  );
   const quoted = '> # H\n> Text.\n';
-  assert.equal(planned(quoted, [0, 0], () => insert), '> # H\n>\n> New.\n>\n> Text.\n');
+  assert.equal(
+    planned(quoted, [0, 0], () => insert),
+    '> # H\n>\n> New.\n>\n> Text.\n',
+  );
 });
 
 test('items move among items with their marker; blocks never among items', () => {

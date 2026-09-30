@@ -19,7 +19,9 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
+  if (!condition) {
+    failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  }
 };
 const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -38,7 +40,7 @@ const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
         ${marked('2', '<img id="inert" class="inert" alt="">')}
         ${marked('3', '<p id="both" class="gone inert">both</p>')}
       </body>`,
-      { url: 'http://localhost:4321/#avb-design', pretendToBeVisual: true }
+      { url: 'http://localhost:4321/#avb-design', pretendToBeVisual: true },
     );
     const { window } = dom;
     const NO_BOX = { x: 0, y: 0, width: 0, height: 0, left: 0, top: 0, right: 0, bottom: 0 };
@@ -78,10 +80,26 @@ const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
 
     const states = sent.filter((m) => m.type === 'avb:node-states').pop();
     check('the page reports what it computed', !!states, JSON.stringify(sent.map((m) => m.type)));
-    check('a display:none element is hidden', (states?.hidden || []).includes('1'), JSON.stringify(states));
-    check('a pointer-events:none element is inert', (states?.inert || []).includes('2'), JSON.stringify(states));
-    check('an element can be both', (states?.hidden || []).includes('3') && (states?.inert || []).includes('3'), JSON.stringify(states));
-    check('and an ordinary one is neither', !(states?.hidden || []).includes('0') && !(states?.inert || []).includes('0'), JSON.stringify(states));
+    check(
+      'a display:none element is hidden',
+      (states?.hidden || []).includes('1'),
+      JSON.stringify(states),
+    );
+    check(
+      'a pointer-events:none element is inert',
+      (states?.inert || []).includes('2'),
+      JSON.stringify(states),
+    );
+    check(
+      'an element can be both',
+      (states?.hidden || []).includes('3') && (states?.inert || []).includes('3'),
+      JSON.stringify(states),
+    );
+    check(
+      'and an ordinary one is neither',
+      !(states?.hidden || []).includes('0') && !(states?.inert || []).includes('0'),
+      JSON.stringify(states),
+    );
 
     // Computed, not authored: a rule that arrives later is still seen.
     sent.length = 0;
@@ -94,7 +112,7 @@ const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
     check(
       'a rule added later is picked up',
       (after?.inert || []).includes('0'),
-      JSON.stringify(after)
+      JSON.stringify(after),
     );
   }
 
@@ -137,7 +155,10 @@ const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
     await act(async () => {
       root.render(
         React.createElement(StructurePanel, {
-          pageState: { editable: true, model: { nodes: [el('plain'), el('gone'), el('inert'), el('both')], imports: [] } },
+          pageState: {
+            editable: true,
+            model: { nodes: [el('plain'), el('gone'), el('inert'), el('both')], imports: [] },
+          },
           layouts: [],
           currentLayoutName: '',
           selectedId: null,
@@ -152,31 +173,38 @@ const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
           onDuplicateNode: () => {},
           onPasteNode: () => {},
           onChangeLayout: () => {},
-          onCodeChange: () => {}, onOpenCodePanel: () => {},
+          onCodeChange: () => {},
+          onOpenCodePanel: () => {},
           onHoverNode: () => {},
           onOpenComponent: () => {},
           hasClipboard: false,
-        })
+        }),
       );
       await settle(20);
     });
 
     const marks = (id) => {
       const row = container.querySelector(`.structure-node[data-node-id="${id}"]`);
-      return [...(row?.querySelectorAll('.node-empty [title]') || [])].map((s) => s.getAttribute('title'));
+      return [...(row?.querySelectorAll('.node-empty [title]') || [])].map((s) =>
+        s.getAttribute('title'),
+      );
     };
     check('an ordinary row is unmarked', marks('plain').length === 0, marks('plain').join(' | '));
     check(
       'a hidden row says display: none',
       marks('gone').length === 1 && /display: none/.test(marks('gone')[0]),
-      marks('gone').join(' | ')
+      marks('gone').join(' | '),
     );
     check(
       'an inert row says pointer-events: none',
       marks('inert').length === 1 && /pointer-events: none/.test(marks('inert')[0]),
-      marks('inert').join(' | ')
+      marks('inert').join(' | '),
     );
-    check('a row that is both carries both marks', marks('both').length === 2, marks('both').join(' | '));
+    check(
+      'a row that is both carries both marks',
+      marks('both').length === 2,
+      marks('both').join(' | '),
+    );
 
     // "Renders nothing" is a different thing and keeps its own mark — a node
     // that put no element on the page can't also be reported as hidden.
@@ -184,27 +212,40 @@ const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
       root.render(
         React.createElement(StructurePanel, {
           pageState: { editable: true, model: { nodes: [el('plain')], imports: [] } },
-          layouts: [], currentLayoutName: '', selectedId: null,
+          layouts: [],
+          currentLayoutName: '',
+          selectedId: null,
           emptyNodeIds: new Set(['plain']),
           hiddenNodeIds: new Set(['plain']),
           inertNodeIds: new Set(),
-          onSelect: () => {}, onDropComponent: () => {}, onMoveNode: () => {}, onRemoveNode: () => {},
-          onCopyNode: () => {}, onDuplicateNode: () => {}, onPasteNode: () => {}, onChangeLayout: () => {},
-          onCodeChange: () => {}, onOpenCodePanel: () => {},
-          onHoverNode: () => {}, onOpenComponent: () => {}, hasClipboard: false,
-        })
+          onSelect: () => {},
+          onDropComponent: () => {},
+          onMoveNode: () => {},
+          onRemoveNode: () => {},
+          onCopyNode: () => {},
+          onDuplicateNode: () => {},
+          onPasteNode: () => {},
+          onChangeLayout: () => {},
+          onCodeChange: () => {},
+          onOpenCodePanel: () => {},
+          onHoverNode: () => {},
+          onOpenComponent: () => {},
+          hasClipboard: false,
+        }),
       );
       await settle(20);
     });
     check(
       'a node that rendered nothing says that, once',
       marks('plain').length === 1 && /Renders nothing/.test(marks('plain')[0]),
-      marks('plain').join(' | ')
+      marks('plain').join(' | '),
     );
   }
 
   if (failures.length) {
-    console.error(`\nnode-states: ${failures.length} failed, ${checked - failures.length} passed\n`);
+    console.error(
+      `\nnode-states: ${failures.length} failed, ${checked - failures.length} passed\n`,
+    );
     console.error(failures.join('\n') + '\n');
     process.exit(1);
   }

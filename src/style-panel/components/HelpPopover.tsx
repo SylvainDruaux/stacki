@@ -1,7 +1,7 @@
-import { useEffect, useRef, useState } from 'react'
-import type { ReactNode } from 'react'
-import IconButton from './IconButton'
-import './HelpPopover.css'
+import { useEffect, useRef, useState } from 'react';
+import type { ReactNode } from 'react';
+import IconButton from './IconButton';
+import './HelpPopover.css';
 
 function QuestionIcon() {
   return (
@@ -17,18 +17,18 @@ function QuestionIcon() {
       />
       <circle cx="8" cy="11.4" r="0.8" fill="currentColor" />
     </svg>
-  )
+  );
 }
 
 type Props = {
   /** Popover heading — usually the tool name. */
-  title?: string
+  title?: string;
   /** The help content. */
-  children: ReactNode
+  children: ReactNode;
   /** Trigger aria-label / tooltip. Defaults to "Help". */
-  label?: string
-  className?: string
-}
+  label?: string;
+  className?: string;
+};
 
 /**
  * A "?" icon button that opens an info popover (title + content). Reusable across
@@ -36,28 +36,39 @@ type Props = {
  * or Escape.
  */
 export default function HelpPopover({ title, children, label = 'Help', className }: Props) {
-  const [open, setOpen] = useState(false)
-  const rootRef = useRef<HTMLDivElement>(null)
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!open) {return}
+    if (!open) {
+      return;
+    }
     const onDown = (event: MouseEvent) => {
-      if (!(event.target instanceof Node) || !rootRef.current?.contains(event.target)) {setOpen(false)}
-    }
+      if (!(event.target instanceof Node) || !rootRef.current?.contains(event.target)) {
+        setOpen(false);
+      }
+    };
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {setOpen(false)}
-    }
-    document.addEventListener('mousedown', onDown)
-    document.addEventListener('keydown', onKey)
+      if (event.key === 'Escape') {
+        setOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('keydown', onKey);
     return () => {
-      document.removeEventListener('mousedown', onDown)
-      document.removeEventListener('keydown', onKey)
-    }
-  }, [open])
+      document.removeEventListener('mousedown', onDown);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [open]);
 
   return (
     <div ref={rootRef} className={['help-popover', className].filter(Boolean).join(' ')}>
-      <IconButton size="sm" icon={<QuestionIcon />} label={label} onClick={() => setOpen((value) => !value)} />
+      <IconButton
+        size="sm"
+        icon={<QuestionIcon />}
+        label={label}
+        onClick={() => setOpen((value) => !value)}
+      />
       {open ? (
         <div className="help-popover_panel" role="dialog" aria-label={title ?? label}>
           {title ? <div className="help-popover_title">{title}</div> : null}
@@ -65,5 +76,5 @@ export default function HelpPopover({ title, children, label = 'Help', className
         </div>
       ) : null}
     </div>
-  )
+  );
 }

@@ -85,7 +85,7 @@ export const appTheme = EditorView.theme(
       backgroundColor: 'var(--accent)',
     },
   },
-  { dark: true }
+  { dark: true },
 );
 
 export const appHighlight = syntaxHighlighting(
@@ -124,8 +124,8 @@ export const appHighlight = syntaxHighlighting(
       { tag: [t.list], color: '#89ddff' },
       { tag: [t.processingInstruction], color: '#616161' },
     ],
-    { themeType: 'dark' }
-  )
+    { themeType: 'dark' },
+  ),
 );
 
 export interface CodeEditorProps {
@@ -225,7 +225,7 @@ export default function CodeEditor(props: CodeEditorProps) {
  * common prefix and suffix, or undefined when they are equal. */
 export function externalChange(
   current: string,
-  next: string
+  next: string,
 ): { readonly from: number; readonly to: number; readonly insert: string } | undefined {
   if (current === next) {
     return undefined;
@@ -250,7 +250,7 @@ export function externalChange(
   assert(change.from <= change.to, 'The changed region keeps its order');
   assert(
     current.slice(0, change.from) + change.insert + current.slice(change.to) === next,
-    'The change turns the document into the value'
+    'The change turns the document into the value',
   );
   return change;
 }
@@ -258,7 +258,7 @@ export function externalChange(
 function useCodeDecorations(
   viewRef: MutableRefObject<EditorView | null>,
   activeRange: CodeEditorRange | null | undefined,
-  componentRanges: readonly CodeEditorComponentRange[] | undefined
+  componentRanges: readonly CodeEditorComponentRange[] | undefined,
 ): void {
   useEffect(() => {
     const view = viewRef.current;
@@ -282,7 +282,7 @@ function useCodeDecorations(
 function codeEditorCreate(
   parent: HTMLDivElement,
   language: string | undefined,
-  latest: MutableRefObject<CodeEditorProps>
+  latest: MutableRefObject<CodeEditorProps>,
 ): EditorView {
   const view = new EditorView({
     parent,
@@ -302,7 +302,7 @@ function codeEditorCreate(
             if (!update.transactions.some((transaction) => transaction.annotation(externalValue))) {
               latest.current.onChange?.(
                 update.state.doc.toString(),
-                update.state.selection.main.head
+                update.state.selection.main.head,
               );
             }
           }
@@ -332,14 +332,14 @@ function codeEditorInteractions(latest: MutableRefObject<CodeEditorProps>) {
 function codeEditorClick(
   event: MouseEvent,
   view: EditorView,
-  latest: MutableRefObject<CodeEditorProps>
+  latest: MutableRefObject<CodeEditorProps>,
 ): boolean {
   const position = view.posAtCoords({ x: event.clientX, y: event.clientY });
   if (position === null) {
     return false;
   }
   const component = latest.current.componentRanges?.find(
-    (range) => range.from <= position && position <= range.to
+    (range) => range.from <= position && position <= range.to,
   );
   if (event.metaKey && component) {
     event.preventDefault();
@@ -377,7 +377,7 @@ function codeEditorDecorations(length: number, state: CodeDecorations) {
 
 function codeEditorRangeWithin(
   range: CodeEditorRange | null,
-  length: number
+  length: number,
 ): CodeEditorRange | null {
   if (!range || range.from < 0 || range.to < range.from || range.to > length) {
     return null;

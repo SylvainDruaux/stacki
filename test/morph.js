@@ -29,7 +29,9 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
+  if (!condition) {
+    failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  }
 };
 
 const { JSDOM } = require('jsdom');
@@ -53,7 +55,7 @@ const lift = (limits) =>
     'AVB_PREVIEW_LIMITS',
     `${source.slice(start, end)}\n` +
       'return { patchChildren, findLive, syncAnchors, syncStamps, checkMarkerCap, ' +
-      'refillMorphWork, OverCap };'
+      'refillMorphWork, OverCap };',
   )(dom.window.document, limits);
 const { patchChildren, findLive, syncAnchors, syncStamps } = lift({
   previewMarkersMax: LIMITS.previewMarkersMax,
@@ -66,7 +68,7 @@ const sigStart = source.indexOf("// A component's <style> is delivered as a MODU
 const sigEnd = source.indexOf('function fetchDoc');
 const { scriptSignature, isStyleModule, loadStyles, addedScripts, runScripts } = new Function(
   'document',
-  `${source.slice(sigStart, sigEnd)}\nreturn { scriptSignature, isStyleModule, loadStyles, addedScripts, runScripts };`
+  `${source.slice(sigStart, sigEnd)}\nreturn { scriptSignature, isStyleModule, loadStyles, addedScripts, runScripts };`,
 )(dom.window.document);
 
 // Every patch here goes through this: a throw is the failure mode under test
@@ -98,7 +100,7 @@ const LIVE_TABS = (labels, active) =>
   `\n  ${labels
     .map(
       (l, i) =>
-        `<button class="tabs_link${i === active ? ' is-active' : ''}" type="button" id="tab-${i}" role="tab">${l}</button>`
+        `<button class="tabs_link${i === active ? ' is-active' : ''}" type="button" id="tab-${i}" role="tab">${l}</button>`,
     )
     .join('\n  ')}\n`;
 
@@ -115,13 +117,20 @@ const LIVE_TABS = (labels, active) =>
   const threw = patch(live, prev, next);
   check('a tablist the page has marked up does not defeat the patch', threw === null, threw);
   const now = [...live.querySelectorAll('button')];
-  check('the same three buttons are still there', now.length === 3 && now.every((b, i) => b === was[i]));
+  check(
+    'the same three buttons are still there',
+    now.length === 3 && now.every((b, i) => b === was[i]),
+  );
   check(
     'the open tab is still open',
     live.querySelectorAll('.is-active').length === 1 && now[0].classList.contains('is-active'),
-    [...now].map((b) => b.className).join(' / ')
+    [...now].map((b) => b.className).join(' / '),
   );
-  check('and each one kept its id', now.map((b) => b.id).join() === 'tab-0,tab-1,tab-2', now.map((b) => b.id).join());
+  check(
+    'and each one kept its id',
+    now.map((b) => b.id).join() === 'tab-0,tab-1,tab-2',
+    now.map((b) => b.id).join(),
+  );
 }
 
 // The same tablist, with the server changing one tab's text — the node it lands
@@ -134,7 +143,11 @@ const LIVE_TABS = (labels, active) =>
   const threw = patch(live, prev, next);
   check('the edit can be applied at all', threw === null, threw);
   const text = [...live.querySelectorAll('button')].map((b) => b.textContent);
-  check('an edit lands on the tab it was made to', text.join() === 'One,Renamed,Three', text.join());
+  check(
+    'an edit lands on the tab it was made to',
+    text.join() === 'One,Renamed,Three',
+    text.join(),
+  );
 }
 
 // Every tab marked, not just one — an accordion with several panels open, a
@@ -147,14 +160,14 @@ const LIVE_TABS = (labels, active) =>
       ['One', 'Two', 'Three']
         .map((l) => `<button class="tabs_link is-seen" type="button">${l}</button>`)
         .join('\n  ') +
-      '\n'
+      '\n',
   );
   const threw = patch(live, prev, next);
   check('a class on every sibling is fine too', threw === null, threw);
   check(
     'and the edit still lands last',
     [...live.querySelectorAll('button')].map((b) => b.textContent).join() === 'One,Two,Changed',
-    [...live.querySelectorAll('button')].map((b) => b.textContent).join()
+    [...live.querySelectorAll('button')].map((b) => b.textContent).join(),
   );
 }
 
@@ -169,8 +182,16 @@ const LIVE_TABS = (labels, active) =>
   const live = tree('<div class="injected">ad</div><div class="real">a</div>');
   check('an inserted sibling does not stop the patch', patch(live, prev, next) === null);
   const divs = [...live.querySelectorAll('div')];
-  check('an inserted element is stepped over, not patched', divs[0].textContent === 'ad', divs[0].outerHTML);
-  check('and the server’s own element is the one that changes', divs[1].textContent === 'b', divs[1].outerHTML);
+  check(
+    'an inserted element is stepped over, not patched',
+    divs[0].textContent === 'ad',
+    divs[0].outerHTML,
+  );
+  check(
+    'and the server’s own element is the one that changes',
+    divs[1].textContent === 'b',
+    divs[1].outerHTML,
+  );
 }
 
 // A server node with no class at all: anything would satisfy "carries all of
@@ -182,7 +203,11 @@ const LIVE_TABS = (labels, active) =>
   const live = tree('<span class="tooltip">tip</span><span>a</span>');
   check('an inserted span does not stop it either', patch(live, prev, next) === null);
   const spans = [...live.querySelectorAll('span')];
-  check('a classless server node does not match a classed live one', spans[0].textContent === 'tip', spans[0].outerHTML);
+  check(
+    'a classless server node does not match a classed live one',
+    spans[0].textContent === 'tip',
+    spans[0].outerHTML,
+  );
   check('it matches the classless one', spans[1].textContent === 'b', spans[1].outerHTML);
 }
 
@@ -208,20 +233,19 @@ const LIVE_TABS = (labels, active) =>
   const prev = tree(server('Before'));
   const next = tree(server('After'));
   const live = tree(
-    '<div class="runtime"><div class="client-clone">Client state</div></div>' +
-      '<h1>Before</h1>'
+    '<div class="runtime"><div class="client-clone">Client state</div></div>' + '<h1>Before</h1>',
   );
   const threw = patch(live, prev, next);
   check('an unchanged runtime-owned subtree does not force a reload', threw === null, threw);
   check(
     'the text beside that subtree is still patched inline',
     live.querySelector('h1').textContent === 'After',
-    live.innerHTML
+    live.innerHTML,
   );
   check(
     'the runtime-owned subtree remains untouched',
     live.querySelector('.client-clone').textContent === 'Client state',
-    live.innerHTML
+    live.innerHTML,
   );
 }
 
@@ -231,8 +255,16 @@ const LIVE_TABS = (labels, active) =>
   const next = tree('<div id="keep" class="a">y</div>');
   const live = tree('<div class="a">decoy</div><div id="keep" class="a b">x</div>');
   check('a decoy does not stop the patch', patch(live, prev, next) === null);
-  check('an id wins over a same-class sibling', live.querySelector('#keep').textContent === 'y', live.innerHTML);
-  check('and the decoy is untouched', live.firstElementChild.textContent === 'decoy', live.innerHTML);
+  check(
+    'an id wins over a same-class sibling',
+    live.querySelector('#keep').textContent === 'y',
+    live.innerHTML,
+  );
+  check(
+    'and the decoy is untouched',
+    live.firstElementChild.textContent === 'decoy',
+    live.innerHTML,
+  );
 }
 
 // --- the locator, directly ------------------------------------------------------
@@ -245,7 +277,7 @@ const LIVE_TABS = (labels, active) =>
   check(
     'one that never had it is only a last resort',
     findLive(other, server) === other,
-    'nothing else to match, so the same-tag fallback stands'
+    'nothing else to match, so the same-tag fallback stands',
   );
 }
 
@@ -260,13 +292,22 @@ const LIVE_TABS = (labels, active) =>
 // different handful of components, so the list differs, so the page reloaded —
 // for a stylesheet, which is the one thing a patch handles well.
 {
-  const head = (scripts) => new JSDOM(`<!doctype html><html><head>${scripts}</head><body></body></html>`).window.document;
-  const style = (name) => `<script type="module" src="/src/components/${name}.astro?astro&type=style&index=0&lang.css"></script>`;
-  const script = (name) => `<script type="module" src="/src/components/${name}.astro?astro&type=script&index=0&lang.ts"></script>`;
+  const head = (scripts) =>
+    new JSDOM(`<!doctype html><html><head>${scripts}</head><body></body></html>`).window.document;
+  const style = (name) =>
+    `<script type="module" src="/src/components/${name}.astro?astro&type=style&index=0&lang.css"></script>`;
+  const script = (name) =>
+    `<script type="module" src="/src/components/${name}.astro?astro&type=script&index=0&lang.ts"></script>`;
 
-  check('an Astro style module is recognised', isStyleModule('/src/components/Card.astro?astro&type=style&index=0&lang.css'));
+  check(
+    'an Astro style module is recognised',
+    isStyleModule('/src/components/Card.astro?astro&type=style&index=0&lang.css'),
+  );
   check('and so is a plain stylesheet import', isStyleModule('/src/styles/global.css'));
-  check('a component script is not one', !isStyleModule('/src/components/Nav.astro?astro&type=script&index=0&lang.ts'));
+  check(
+    'a component script is not one',
+    !isStyleModule('/src/components/Nav.astro?astro&type=script&index=0&lang.ts'),
+  );
   check('and neither is the module runtime', !isStyleModule('/@vite/client'));
 
   const before = head(style('Card') + script('Nav'));
@@ -274,7 +315,7 @@ const LIVE_TABS = (labels, active) =>
   check(
     'a stylesheet appearing does not force a reload',
     scriptSignature(before) === scriptSignature(withIcon),
-    `${JSON.stringify(scriptSignature(before))} vs ${JSON.stringify(scriptSignature(withIcon))}`
+    `${JSON.stringify(scriptSignature(before))} vs ${JSON.stringify(scriptSignature(withIcon))}`,
   );
   const withoutCard = head(style('Icon') + script('Nav'));
   check('nor one disappearing', scriptSignature(before) === scriptSignature(withoutCard));
@@ -286,9 +327,21 @@ const LIVE_TABS = (labels, active) =>
   // variant switches, one per option while hovering down the list.
   const withFooter = head(style('Card') + script('Nav') + script('Footer'));
   const added = addedScripts(before, withFooter);
-  check('a script appearing is something to run, not to reload for', Array.isArray(added), JSON.stringify(added));
-  check('and it is the one that appeared', added?.length === 1 && /Footer/.test(added[0].src), JSON.stringify(added));
-  check('a rendering asking for nothing new adds nothing', addedScripts(before, withIcon)?.length === 0, JSON.stringify(addedScripts(before, withIcon)));
+  check(
+    'a script appearing is something to run, not to reload for',
+    Array.isArray(added),
+    JSON.stringify(added),
+  );
+  check(
+    'and it is the one that appeared',
+    added?.length === 1 && /Footer/.test(added[0].src),
+    JSON.stringify(added),
+  );
+  check(
+    'a rendering asking for nothing new adds nothing',
+    addedScripts(before, withIcon)?.length === 0,
+    JSON.stringify(addedScripts(before, withIcon)),
+  );
 
   // What the rule is actually for: a script that changed cannot be rewritten
   // into a page, and one that is gone cannot be un-run.
@@ -307,11 +360,19 @@ const LIVE_TABS = (labels, active) =>
   const wanted = '/src/components/Icon.astro?astro&type=style&index=0&lang.css';
   loadStyles(withIcon);
   const loaded = () => [...live.querySelectorAll('script[src]')].map((n) => n.getAttribute('src'));
-  check('a stylesheet the page has just started using is loaded', loaded().includes(wanted), loaded().join('|'));
+  check(
+    'a stylesheet the page has just started using is loaded',
+    loaded().includes(wanted),
+    loaded().join('|'),
+  );
   const count = loaded().length;
   loadStyles(withIcon);
   check('and not loaded twice', loaded().length === count, `${loaded().length} vs ${count}`);
-  check('a real script is never loaded this way', !loaded().some((src) => /type=script/.test(src)), loaded().join('|'));
+  check(
+    'a real script is never loaded this way',
+    !loaded().some((src) => /type=script/.test(src)),
+    loaded().join('|'),
+  );
 
   // Running one means an element made here, not the inert copy a patch inserts.
   {
@@ -319,7 +380,11 @@ const LIVE_TABS = (labels, active) =>
     // A reload verdict has nothing to run, and saying so is the failure — not
     // a stack trace from handing null to a loop.
     runScripts(Array.isArray(added) ? added : []);
-    check('the module the variant needs is put in the page', ran().length === 1, `${ran().length} tags`);
+    check(
+      'the module the variant needs is put in the page',
+      ran().length === 1,
+      `${ran().length} tags`,
+    );
     runScripts(Array.isArray(added) ? added : []);
     check('and not put there twice', ran().length === 1, `${ran().length} tags`);
   }
@@ -346,8 +411,12 @@ const LIVE_TABS = (labels, active) =>
     const out = [];
     const walk = (parent) => {
       for (let n = parent.firstChild; n; n = n.nextSibling) {
-        if (n.nodeType === 8 && n.data.startsWith('avb-d:')) {out.push(n.data);}
-        if (n.nodeType === 1) {walk(n);}
+        if (n.nodeType === 8 && n.data.startsWith('avb-d:')) {
+          out.push(n.data);
+        }
+        if (n.nodeType === 1) {
+          walk(n);
+        }
       }
     };
     walk(doc);
@@ -357,7 +426,9 @@ const LIVE_TABS = (labels, active) =>
   // The diff sees neither stamps nor markers: the clean copies lose them.
   for (const doc of [prev, next]) {
     for (const n of [...doc.body.childNodes]) {
-      if (n.nodeType === 8 && /^avb-[sed]:/.test(n.data)) {n.remove();}
+      if (n.nodeType === 8 && /^avb-[sed]:/.test(n.data)) {
+        n.remove();
+      }
     }
   }
   const threw = patch(live.body, prev.body, next.body);
@@ -365,7 +436,7 @@ const LIVE_TABS = (labels, active) =>
   check(
     'and the text is patched past it',
     live.body.textContent.includes('Two'),
-    live.body.innerHTML
+    live.body.innerHTML,
   );
   const withAnchors = new Dom(html(NEW).replace('One', 'Two')).window.document;
   syncAnchors(live.body, withAnchors.body);
@@ -373,21 +444,21 @@ const LIVE_TABS = (labels, active) =>
   check(
     'the live page holds the new rendering’s stamps, and only them',
     JSON.stringify(stampsOf(live)) === JSON.stringify(wanted),
-    stampsOf(live).join('\n')
+    stampsOf(live).join('\n'),
   );
   check(
     'none of the old ones survived, in <head> or before <html>',
-    !stampsOf(live).some((d) => d.includes(OLD))
+    !stampsOf(live).some((d) => d.includes(OLD)),
   );
   check(
     'the node markers are back where they were',
     /<!--avb-s:0--><p>Two<\/p><!--avb-e:0-->/.test(live.body.innerHTML),
-    live.body.innerHTML
+    live.body.innerHTML,
   );
   check(
     'and no stamp is put back beside them',
     !/avb-d:/.test(live.body.innerHTML),
-    live.body.innerHTML
+    live.body.innerHTML,
   );
 }
 
@@ -405,7 +476,7 @@ const LIVE_TABS = (labels, active) =>
   check(
     'and the page is the new rendering',
     live.innerHTML === tree(html(['b', 'c', 'a'])).innerHTML,
-    live.innerHTML
+    live.innerHTML,
   );
   check('the first sibling that stayed is the same element', live.children[0] === b);
   check('and so is the second', live.children[1] === c);
@@ -429,11 +500,11 @@ const LIVE_TABS = (labels, active) =>
   const markers = (count) => tree(Array.from({ length: count }, (_, i) => marked(i)).join(''));
   check(
     'a rendering at the marker cap patches',
-    reasonOf(() => tiny.checkMarkerCap(markers(3))) === null
+    reasonOf(() => tiny.checkMarkerCap(markers(3))) === null,
   );
   check(
     'one marker past it reloads, and says why',
-    reasonOf(() => tiny.checkMarkerCap(markers(4))) === 'markers-over-cap'
+    reasonOf(() => tiny.checkMarkerCap(markers(4))) === 'markers-over-cap',
   );
   // A middle edit in a list of n children builds an (n+1)² matrix after the
   // shared prefix: five children changed at the head cost 36 cells, under 40.
@@ -443,26 +514,26 @@ const LIVE_TABS = (labels, active) =>
   tiny.refillMorphWork();
   check(
     'a diff inside the work cap patches',
-    reasonOf(() => tiny.patchChildren(...small)) === null
+    reasonOf(() => tiny.patchChildren(...small)) === null,
   );
   check(
     'and the live list shows the edit',
     small[0].firstElementChild.id === 'z',
-    small[0].innerHTML
+    small[0].innerHTML,
   );
   const names = Array.from({ length: 8 }, (_, i) => `n${i}`);
   const large = [tree(list(names)), tree(list(names)), tree(list(['x', ...names.slice(1)]))];
   tiny.refillMorphWork();
   check(
     'a diff past the work cap reloads, and says why',
-    reasonOf(() => tiny.patchChildren(...large)) === 'diff-over-cap'
+    reasonOf(() => tiny.patchChildren(...large)) === 'diff-over-cap',
   );
   // The budget is per patch: refilled, the small edit fits again.
   tiny.refillMorphWork();
   const again = [tree(list(['a', 'b'])), tree(list(['a', 'b'])), tree(list(['q', 'b']))];
   check(
     'the next patch starts with the whole budget',
-    reasonOf(() => tiny.patchChildren(...again)) === null
+    reasonOf(() => tiny.patchChildren(...again)) === null,
   );
   // The shipped bounds are the ones in shared/limits.ts, prepended by main.
   const main = fs.readFileSync(path.join(__dirname, '..', 'dist', 'electron', 'main.js'), 'utf8');
@@ -470,15 +541,15 @@ const LIVE_TABS = (labels, active) =>
     'main prepends the patcher its bounds from LIMITS',
     /const AVB_PREVIEW_LIMITS = Object\.freeze\(\$\{JSON\.stringify\(bounds\)\}\)/.test(main) &&
       /previewMarkersMax: (limits_js_1\.)?LIMITS\.previewMarkersMax/.test(main) &&
-      /previewMorphWorkMax: (limits_js_1\.)?LIMITS\.previewMorphWorkMax/.test(main)
+      /previewMorphWorkMax: (limits_js_1\.)?LIMITS\.previewMorphWorkMax/.test(main),
   );
   check(
     'the patcher declares the bounds, never defines its own',
-    !/AVB_PREVIEW_LIMITS\s*=/.test(source)
+    !/AVB_PREVIEW_LIMITS\s*=/.test(source),
   );
   check(
     'and announces a reload before it happens',
-    /postMessage\(\{ type: 'avb:preview-reload', reason \}/.test(source)
+    /postMessage\(\{ type: 'avb:preview-reload', reason \}/.test(source),
   );
 }
 
@@ -487,4 +558,6 @@ if (failures.length) {
   console.error(failures.join('\n') + '\n');
   process.exit(1);
 }
-console.log(`morph: ${checked} passed  [patching a page whose own JS marks things; stylesheets are not scripts]`);
+console.log(
+  `morph: ${checked} passed  [patching a page whose own JS marks things; stylesheets are not scripts]`,
+);

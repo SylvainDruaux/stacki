@@ -20,28 +20,39 @@
 // the way out.
 
 /** An origin as the pad and its two fields hold it: x, y, and a z we only carry. */
-export type Origin = { x: string; y: string; z: string }
+export type Origin = { x: string; y: string; z: string };
 
-const X_WORD: Record<string, string> = { left: '0%', center: '50%', right: '100%' }
-const Y_WORD: Record<string, string> = { top: '0%', center: '50%', bottom: '100%' }
+const X_WORD: Record<string, string> = { left: '0%', center: '50%', right: '100%' };
+const Y_WORD: Record<string, string> = { top: '0%', center: '50%', bottom: '100%' };
 
 /** The default both origin properties resolve to when nothing is declared. */
-export const CENTER: Origin = { x: '50%', y: '50%', z: '' }
+export const CENTER: Origin = { x: '50%', y: '50%', z: '' };
 
 // Top-level splitting: an origin can hold a calc() or a var() with spaces inside.
 function splitSpaces(value: string): string[] {
-  const out: string[] = []
-  let depth = 0
-  let cur = ''
+  const out: string[] = [];
+  let depth = 0;
+  let cur = '';
   for (let i = 0; i < value.length; i++) {
-    const ch = value[i] ?? ''
-    if (ch === '(') {depth++}
-    else if (ch === ')') {depth--}
-    if (depth === 0 && /\s/.test(ch)) { if (cur.trim()) {out.push(cur.trim());} cur = ''; continue }
-    cur += ch
+    const ch = value[i] ?? '';
+    if (ch === '(') {
+      depth++;
+    } else if (ch === ')') {
+      depth--;
+    }
+    if (depth === 0 && /\s/.test(ch)) {
+      if (cur.trim()) {
+        out.push(cur.trim());
+      }
+      cur = '';
+      continue;
+    }
+    cur += ch;
   }
-  if (cur.trim()) {out.push(cur.trim())}
-  return out
+  if (cur.trim()) {
+    out.push(cur.trim());
+  }
+  return out;
 }
 
 /**
@@ -53,39 +64,48 @@ function splitSpaces(value: string): string[] {
  * properties do by default.
  */
 export function parseOrigin(value: string): Origin {
-  const parts = splitSpaces(String(value ?? '').trim())
-  if (!parts.length) {return { ...CENTER }}
-  const lower = parts.map((p) => p.toLowerCase())
+  const parts = splitSpaces(String(value ?? '').trim());
+  if (!parts.length) {
+    return { ...CENTER };
+  }
+  const lower = parts.map((p) => p.toLowerCase());
 
   if (parts.length === 1) {
-    const w = lower[0] ?? ''
-    if (w in Y_WORD && !(w in X_WORD)) {return { x: '50%', y: Y_WORD[w] ?? '50%', z: '' }}
-    if (w in X_WORD) {return { x: X_WORD[w] ?? '50%', y: '50%', z: '' }}
-    return { x: parts[0] ?? '50%', y: '50%', z: '' }
+    const w = lower[0] ?? '';
+    if (w in Y_WORD && !(w in X_WORD)) {
+      return { x: '50%', y: Y_WORD[w] ?? '50%', z: '' };
+    }
+    if (w in X_WORD) {
+      return { x: X_WORD[w] ?? '50%', y: '50%', z: '' };
+    }
+    return { x: parts[0] ?? '50%', y: '50%', z: '' };
   }
 
   // Two keywords may be written either way round (`top left` is a corner, not a
   // nonsense x of `top`), so the y-only words decide the order.
-  const firstLower = lower[0] ?? ''
-  const secondLower = lower[1] ?? ''
-  const swapped = (firstLower in Y_WORD && !(firstLower in X_WORD)) ||
-    (secondLower in X_WORD && !(secondLower in Y_WORD))
-  const rawX = (swapped ? parts[1] : parts[0]) ?? '50%'
-  const rawY = (swapped ? parts[0] : parts[1]) ?? '50%'
+  const firstLower = lower[0] ?? '';
+  const secondLower = lower[1] ?? '';
+  const swapped =
+    (firstLower in Y_WORD && !(firstLower in X_WORD)) ||
+    (secondLower in X_WORD && !(secondLower in Y_WORD));
+  const rawX = (swapped ? parts[1] : parts[0]) ?? '50%';
+  const rawY = (swapped ? parts[0] : parts[1]) ?? '50%';
   return {
     x: X_WORD[rawX.toLowerCase()] ?? rawX,
     y: Y_WORD[rawY.toLowerCase()] ?? rawY,
     z: parts[2] ?? '',
-  }
+  };
 }
 
 /** An origin back to a value ('' when it is the plain default). */
 export function serializeOrigin(o: Origin): string {
-  const x = (o.x || '').trim() || '50%'
-  const y = (o.y || '').trim() || '50%'
-  const z = (o.z || '').trim()
-  if (!z && x === '50%' && y === '50%') {return ''}
-  return z ? `${x} ${y} ${z}` : `${x} ${y}`
+  const x = (o.x || '').trim() || '50%';
+  const y = (o.y || '').trim() || '50%';
+  const z = (o.z || '').trim();
+  if (!z && x === '50%' && y === '50%') {
+    return '';
+  }
+  return z ? `${x} ${y} ${z}` : `${x} ${y}`;
 }
 
 /** The nine positions of the pad, in reading order (top-left first). */
@@ -99,18 +119,22 @@ export const ORIGIN_PRESETS: ReadonlyArray<{ x: string; y: string; label: string
   { x: '0%', y: '100%', label: 'Bottom left' },
   { x: '50%', y: '100%', label: 'Bottom' },
   { x: '100%', y: '100%', label: 'Bottom right' },
-]
+];
 
 // `0` and `0%` are the same place, and a field showing `0` should still light up
 // the corner. Only the three pad positions need comparing, so this is enough.
 const samePos = (a: string, b: string): boolean => {
-  const n = (v: string) => v.trim().toLowerCase().replace(/^0(?:px|%|em|rem)$/, '0')
-  return n(a) === n(b)
-}
+  const n = (v: string) =>
+    v
+      .trim()
+      .toLowerCase()
+      .replace(/^0(?:px|%|em|rem)$/, '0');
+  return n(a) === n(b);
+};
 
 /** Which pad dot an origin sits on, or -1 when it is somewhere in between. */
 export const originPreset = (o: Origin): number =>
-  ORIGIN_PRESETS.findIndex((p) => samePos(p.x, o.x) && samePos(p.y, o.y))
+  ORIGIN_PRESETS.findIndex((p) => samePos(p.x, o.x) && samePos(p.y, o.y));
 
 /**
  * Lift a `perspective()` out of a transform value.
@@ -119,54 +143,69 @@ export const originPreset = (o: Origin): number =>
  * layer parser — which would otherwise drop the function on the floor.
  */
 export function takeSelfPerspective(value: string): { distance: string; rest: string } {
-  const text = String(value ?? '')
-  let i = 0
-  let depth = 0
+  const text = String(value ?? '');
+  let i = 0;
+  let depth = 0;
   while (i < text.length) {
     // Skip comments whole: a hidden layer's text is not part of the list.
     if (text.startsWith('/*', i)) {
-      const close = text.indexOf('*/', i + 2)
-      i = close === -1 ? text.length : close + 2
-      continue
+      const close = text.indexOf('*/', i + 2);
+      i = close === -1 ? text.length : close + 2;
+      continue;
     }
-    const ch = text[i] ?? ''
-    if (ch === '(') { depth++; i++; continue }
-    if (ch === ')') { depth--; i++; continue }
+    const ch = text[i] ?? '';
+    if (ch === '(') {
+      depth++;
+      i++;
+      continue;
+    }
+    if (ch === ')') {
+      depth--;
+      i++;
+      continue;
+    }
     if (depth === 0 && /[a-z]/i.test(ch)) {
-      const at = /^perspective\s*\(/i.exec(text.slice(i))
+      const at = /^perspective\s*\(/i.exec(text.slice(i));
       // A name boundary, so `my-perspective(…)` is left alone.
       if (at && (i === 0 || !/[\w-]/.test(text[i - 1] ?? ''))) {
-        let j = i + at[0].length
-        let d = 1
+        let j = i + at[0].length;
+        let d = 1;
         while (j < text.length && d > 0) {
-          if ((text[j] ?? '') === '(') {d++}
-          else if ((text[j] ?? '') === ')') {d--}
-          j++
+          if ((text[j] ?? '') === '(') {
+            d++;
+          } else if ((text[j] ?? '') === ')') {
+            d--;
+          }
+          j++;
         }
-        const distance = text.slice(i + at[0].length, j - 1).trim()
-        const rest = `${text.slice(0, i)} ${text.slice(j)}`.replace(/\s+/g, ' ').trim()
-        return { distance, rest }
+        const distance = text.slice(i + at[0].length, j - 1).trim();
+        const rest = `${text.slice(0, i)} ${text.slice(j)}`.replace(/\s+/g, ' ').trim();
+        return { distance, rest };
       }
-      while (i < text.length && /[\w-]/.test(text[i] ?? '')) {i++}
-      continue
+      while (i < text.length && /[\w-]/.test(text[i] ?? '')) {
+        i++;
+      }
+      continue;
     }
-    i++
+    i++;
   }
-  return { distance: '', rest: text.trim() }
+  return { distance: '', rest: text.trim() };
 }
 
 /** Put a `perspective()` back at the front of a transform value. */
 export function withSelfPerspective(rest: string, distance: string): string {
-  const d = (distance || '').trim()
-  const body = (rest || '').trim()
+  const d = (distance || '').trim();
+  const body = (rest || '').trim();
   // No distance, or a zero one: there is nothing to write. `perspective(0)` is
   // not a smaller perspective, it is an invalid one.
-  if (!d || /^0(?:[a-z]*|%)$/i.test(d)) {return body}
+  if (!d || /^0(?:[a-z]*|%)$/i.test(d)) {
+    return body;
+  }
   // `none` is the placeholder written when every layer is hidden (see
   // lib/hideable.ts) to keep the declaration from being empty. A perspective()
   // is itself a value, so the placeholder is no longer needed — and
   // `perspective(500px) none` is not a valid transform, which would drop the
   // declaration and every hidden layer's comment with it.
-  const layers = body.replace(/^none\b\s*/i, '')
-  return layers ? `perspective(${d}) ${layers}` : `perspective(${d})`
+  const layers = body.replace(/^none\b\s*/i, '');
+  return layers ? `perspective(${d}) ${layers}` : `perspective(${d})`;
 }

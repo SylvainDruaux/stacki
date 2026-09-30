@@ -85,10 +85,7 @@ export function mergeToolPaths(
   return parts.join(delimiter);
 }
 
-export function commandNeedsShell(
-  command: string,
-  platform: Platform = process.platform,
-): boolean {
+export function commandNeedsShell(command: string, platform: Platform = process.platform): boolean {
   return platform === 'win32' && /\.(?:cmd|bat)$/i.test(command);
 }
 

@@ -78,7 +78,10 @@ test('typing drops the unsent gestures: the text typed into does not hold them',
   assert.equal(store.entries('/p')[0].tag, 'code');
   // A gesture after typing waits behind the code, stated when it is sent.
   assert.equal(store.addGesture('/p', gesture('b'), record()), 'queued');
-  assert.deepEqual(store.entries('/p').map((entry) => entry.tag), ['code', 'gesture']);
+  assert.deepEqual(
+    store.entries('/p').map((entry) => entry.tag),
+    ['code', 'gesture'],
+  );
 });
 
 test('the queue is bounded: past it, a gesture is refused, never queued', () => {
@@ -154,7 +157,10 @@ async function sent(answers, count = answers.length, refOk = true) {
 test('sending a gesture: every outcome, and what the answers mean', async () => {
   const applied = await sent([PAGE_OK(sum(2)), PAGE_OK(sum(3))]);
   assert.equal(applied.outcome.tag, 'applied');
-  assert.deepEqual(applied.outcome.replies.map((reply) => reply.checksum), [sum(2), sum(3)]);
+  assert.deepEqual(
+    applied.outcome.replies.map((reply) => reply.checksum),
+    [sum(2), sum(3)],
+  );
 
   const unstated = await sent([], 1, false);
   assert.deepEqual(

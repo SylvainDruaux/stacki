@@ -1,5 +1,7 @@
 /* Keep viewport controls with the preview so global input styles cannot expand them. */
-.preview-toolbar .device-btns { flex-shrink: 0; }
+.preview-toolbar .device-btns {
+  flex-shrink: 0;
+}
 .preview-toolbar .preview-size-controls {
   display: flex;
   align-items: center;
@@ -31,14 +33,20 @@
   font: inherit;
   text-align: right;
 }
-.preview-width-field input:focus-visible { outline: 1px solid var(--accent); }
+.preview-width-field input:focus-visible {
+  outline: 1px solid var(--accent);
+}
 .preview-size-controls output {
   min-width: 38px;
   padding-left: 8px;
   border-left: 1px solid var(--border);
   text-align: center;
 }
-.preview-size-controls button { padding: 3px 6px; background: transparent; font-size: inherit; }
+.preview-size-controls button {
+  padding: 3px 6px;
+  background: transparent;
+  font-size: inherit;
+}
 
 /* The iframe and overlays share a top-aligned scale; width must change atomically
    with that scale so the page never animates through the wrong breakpoint. */

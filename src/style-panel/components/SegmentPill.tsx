@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState } from 'react'
+import { useLayoutEffect, useRef, useState } from 'react';
 
 // The selected segment of a segmented bar, as one pill that slides to it rather
 // than a background on each segment taking its turn. The same thing moving is
@@ -16,50 +16,63 @@ import { useLayoutEffect, useRef, useState } from 'react'
 //
 // Drop it inside the track as the first child. It measures its own siblings.
 export default function SegmentPill() {
-  const ref = useRef<HTMLSpanElement>(null)
-  const [box, setBox] = useState<{ x: number; width: number } | null>(null)
-  const [animated, setAnimated] = useState(false)
+  const ref = useRef<HTMLSpanElement>(null);
+  const [box, setBox] = useState<{ x: number; width: number } | null>(null);
+  const [animated, setAnimated] = useState(false);
 
   useLayoutEffect(() => {
-    const track = ref.current?.parentElement
-    if (!track) {return}
-    const watched = new ResizeObserver(() => measure())
+    const track = ref.current?.parentElement;
+    if (!track) {
+      return;
+    }
+    const watched = new ResizeObserver(() => measure());
     function measure() {
-      const track2 = ref.current?.parentElement
-      if (!track2) {return}
-      const segs = [...track2.querySelectorAll<HTMLElement>('.embed-editor_display-seg')]
+      const track2 = ref.current?.parentElement;
+      if (!track2) {
+        return;
+      }
+      const segs = [...track2.querySelectorAll<HTMLElement>('.embed-editor_display-seg')];
       // Re-observed on every measure: which buttons exist changes with the
       // control (a custom value shows none at all), and observe() on one
       // already watched is a no-op.
-      for (const seg of segs) {watched.observe(seg)}
-      const selected = segs.find((seg) => seg.classList.contains('is-selected'))
+      for (const seg of segs) {
+        watched.observe(seg);
+      }
+      const selected = segs.find((seg) => seg.classList.contains('is-selected'));
       // Layout offsets, not getBoundingClientRect: under a CSS `zoom` ancestor a
       // rect comes back in scaled coordinates while the inline px below is
       // re-zoomed, which doubles the scaling. Offsets are zoom-independent.
-      setBox(selected ? { x: selected.offsetLeft, width: selected.offsetWidth } : null)
+      setBox(selected ? { x: selected.offsetLeft, width: selected.offsetWidth } : null);
     }
-    measure()
+    measure();
     // A click changes which button carries `is-selected`; a value arriving from
     // the page can change the buttons themselves.
-    const marks = new MutationObserver(() => measure())
-    marks.observe(track, { attributes: true, attributeFilter: ['class'], subtree: true, childList: true })
-    watched.observe(track)
+    const marks = new MutationObserver(() => measure());
+    marks.observe(track, {
+      attributes: true,
+      attributeFilter: ['class'],
+      subtree: true,
+      childList: true,
+    });
+    watched.observe(track);
     // Only after the first placement, so the pill doesn't fly in from the left
     // on mount.
-    const frame = window.requestAnimationFrame(() => setAnimated(true))
+    const frame = window.requestAnimationFrame(() => setAnimated(true));
     return () => {
-      marks.disconnect()
-      watched.disconnect()
-      window.cancelAnimationFrame(frame)
-    }
-  }, [])
+      marks.disconnect();
+      watched.disconnect();
+      window.cancelAnimationFrame(frame);
+    };
+  }, []);
 
   return (
     <span
       ref={ref}
       className={`embed-editor_display-indicator${animated ? ' is-animated' : ''}`}
       aria-hidden="true"
-      style={box ? { transform: `translateX(${box.x}px)`, width: `${box.width}px` } : { opacity: 0 }}
+      style={
+        box ? { transform: `translateX(${box.x}px)`, width: `${box.width}px` } : { opacity: 0 }
+      }
     />
-  )
+  );
 }

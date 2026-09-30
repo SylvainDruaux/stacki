@@ -58,8 +58,18 @@ test('every kind round-trips through the parser', () => {
       op: '?',
       test: 'loggedIn',
       children: [
-        { kind: 'branch', id: 'n12', name: 'then', children: [{ kind: 'text', id: 'n13', value: 'hi' }] },
-        { kind: 'branch', id: 'n14', name: 'else', children: [{ kind: 'text', id: 'n15', value: 'bye' }] },
+        {
+          kind: 'branch',
+          id: 'n12',
+          name: 'then',
+          children: [{ kind: 'text', id: 'n13', value: 'hi' }],
+        },
+        {
+          kind: 'branch',
+          id: 'n14',
+          name: 'else',
+          children: [{ kind: 'text', id: 'n15', value: 'bye' }],
+        },
       ],
     },
     { kind: 'chunk-group', id: 'n5', name: 'Card', chunkFile: '/chunks/card.astro', children: [] },
@@ -68,7 +78,9 @@ test('every kind round-trips through the parser', () => {
     assert.doesNotThrow(() => parsePageNode(node));
   }
   // The layout id is assigned by parsePage, not the parser, and must pass.
-  assert.doesNotThrow(() => parsePageNode({ kind: 'component', id: 'layout', name: 'Base', children: [] }));
+  assert.doesNotThrow(() =>
+    parsePageNode({ kind: 'component', id: 'layout', name: 'Base', children: [] }),
+  );
 });
 
 test('negative space: every wrong shape fails with a pinned message', () => {
@@ -76,9 +88,15 @@ test('negative space: every wrong shape fails with a pinned message', () => {
   assert.throws(() => parsePageNode([]), /expected object/);
   assert.throws(() => parsePageNode({ kind: 'text', id: 'n1' }), /value: expected string/);
   assert.throws(() => parsePageNode({ kind: 'wat', id: 'n1' }), /unknown kind "wat"/);
-  assert.throws(() => parsePageNode({ kind: 'text', id: 'free-form', value: 'x' }), /NodeId: expected/);
+  assert.throws(
+    () => parsePageNode({ kind: 'text', id: 'free-form', value: 'x' }),
+    /NodeId: expected/,
+  );
   assert.throws(() => parsePageNode({ kind: 'text', id: 7, value: 'x' }), /id: expected id string/);
-  assert.throws(() => parsePageNode({ kind: 'cond', id: 'n1', op: '||', test: 'x', children: [] }), /unknown cond op/);
+  assert.throws(
+    () => parsePageNode({ kind: 'cond', id: 'n1', op: '||', test: 'x', children: [] }),
+    /unknown cond op/,
+  );
   assert.throws(
     () =>
       parsePageNode({
@@ -101,13 +119,24 @@ test('negative space: every wrong shape fails with a pinned message', () => {
       }),
     /cond children must be branch nodes/,
   );
-  assert.throws(() => parsePageNode({ kind: 'element', id: 'n1', name: 'div', children: 'nope' }), /children: expected/);
   assert.throws(
-    () => parsePageNode({ kind: 'element', id: 'n1', name: 'div', children: [], props: { class: { type: 'fancy' } } }),
+    () => parsePageNode({ kind: 'element', id: 'n1', name: 'div', children: 'nope' }),
+    /children: expected/,
+  );
+  assert.throws(
+    () =>
+      parsePageNode({
+        kind: 'element',
+        id: 'n1',
+        name: 'div',
+        children: [],
+        props: { class: { type: 'fancy' } },
+      }),
     /unknown attr type/,
   );
   assert.throws(
-    () => parsePageNode({ kind: 'map', id: 'n1', head: 'x.map((i) => (', children: [], bare: 'yes' }),
+    () =>
+      parsePageNode({ kind: 'map', id: 'n1', head: 'x.map((i) => (', children: [], bare: 'yes' }),
     /bare: expected boolean/,
   );
   assert.throws(
@@ -143,7 +172,9 @@ test('bounds: depth and node count fail at LIMITS, not at stack depth', () => {
 });
 
 test('assertTreeInvariants: duplicate ids are the one invariant a parser cannot see', () => {
-  assert.doesNotThrow(() => assertTreeInvariants(parsePageTree([element('n1', 'div', [text('n2', 'x')])])));
+  assert.doesNotThrow(() =>
+    assertTreeInvariants(parsePageTree([element('n1', 'div', [text('n2', 'x')])])),
+  );
   assert.throws(
     () => assertTreeInvariants(parsePageTree([element('n1', 'div', [text('n1', 'x')])])),
     /duplicate id n1/,
@@ -152,7 +183,9 @@ test('assertTreeInvariants: duplicate ids are the one invariant a parser cannot 
 
 test('parsePageModel and parsePageResult: the envelope is data, including not-editable', () => {
   const model = {
-    imports: [{ name: 'Hero', path: '../components/Hero.astro', quote: "'", named: false, typeOnly: false }],
+    imports: [
+      { name: 'Hero', path: '../components/Hero.astro', quote: "'", named: false, typeOnly: false },
+    ],
     frontmatterLead: '',
     extraFrontmatter: '',
     extraFrontmatterSpaced: false,
@@ -175,7 +208,11 @@ test('parsePageModel and parsePageResult: the envelope is data, including not-ed
   }
   assert.throws(() => parsePageResult({ editable: 'yes' }), /editable: expected boolean/);
   assert.throws(
-    () => parsePageModel({ ...model, imports: Array.from({ length: LIMITS.importsMax + 1 }, () => model.imports[0]) }),
+    () =>
+      parsePageModel({
+        ...model,
+        imports: Array.from({ length: LIMITS.importsMax + 1 }, () => model.imports[0]),
+      }),
     /exceeds \d+/,
   );
 });
@@ -246,7 +283,12 @@ const located = {
       nameSpan: { start: 3, end: 8 },
       valueSpan: { start: 10, end: 13 },
     },
-    { type: 'bare', name: 'hidden', span: { start: 15, end: 21 }, nameSpan: { start: 15, end: 21 } },
+    {
+      type: 'bare',
+      name: 'hidden',
+      span: { start: 15, end: 21 },
+      nameSpan: { start: 15, end: 21 },
+    },
   ],
 };
 
@@ -258,23 +300,42 @@ test('attribute spans: a located tag passes with its spans intact', () => {
 
 test('attribute spans: every wrong shape fails with a pinned message', () => {
   const [title, hidden] = located.attrSpans;
-  const withSpans = (attrSpans: unknown, extra: object = {}) => ({ ...located, attrSpans, ...extra });
+  const withSpans = (attrSpans: unknown, extra: object = {}) => ({
+    ...located,
+    attrSpans,
+    ...extra,
+  });
   const cases: readonly [unknown, RegExp][] = [
-    [withSpans([title, hidden], { start: undefined, end: undefined }), /requires the node source range/],
+    [
+      withSpans([title, hidden], { start: undefined, end: undefined }),
+      /requires the node source range/,
+    ],
     [withSpans({}), /attrSpans: expected array/],
     [withSpans([{ ...title, span: { start: 3, end: 30 } }, hidden]), /lies outside its node/],
     [withSpans([hidden, title]), /ascending, disjoint attribute spans/],
-    [withSpans([{ ...title, valueSpan: { start: 2, end: 4 } }, hidden]), /valueSpan lies outside the attribute/],
-    [withSpans([{ ...title, valueSpan: { start: 5, end: 6 } }, hidden]), /valueSpan must follow nameSpan/],
+    [
+      withSpans([{ ...title, valueSpan: { start: 2, end: 4 } }, hidden]),
+      /valueSpan lies outside the attribute/,
+    ],
+    [
+      withSpans([{ ...title, valueSpan: { start: 5, end: 6 } }, hidden]),
+      /valueSpan must follow nameSpan/,
+    ],
     [withSpans([{ ...title, valueSpan: undefined }, hidden]), /valueSpan: expected span object/],
-    [withSpans([title, { ...hidden, valueSpan: { start: 15, end: 16 } }]), /valueSpan: not allowed on a bare/],
+    [
+      withSpans([title, { ...hidden, valueSpan: { start: 15, end: 16 } }]),
+      /valueSpan: not allowed on a bare/,
+    ],
     [withSpans([title, { ...hidden, type: 'spread' }]), /nameSpan: not allowed on a spread/],
     [withSpans([title, { ...hidden, type: 'flag' }]), /unknown attr type/],
     [withSpans([title]), /names differ from props/],
     [withSpans([title, { ...hidden, name: 'shown' }]), /"hidden" differs from props/],
     [withSpans([{ ...title, type: 'expr' }, hidden]), /"title" differs from props/],
     [withSpans(Array.from({ length: LIMITS.attrsPerNodeMax + 1 }, () => hidden)), /exceeds/],
-    [{ kind: 'text', id: 'n2', value: 'x', start: 0, end: 1, attrSpans: [] }, /a text node has no attributes/],
+    [
+      { kind: 'text', id: 'n2', value: 'x', start: 0, end: 1, attrSpans: [] },
+      /a text node has no attributes/,
+    ],
   ];
   for (const [input, message] of cases) {
     assert.throws(() => parsePageNode(input), message);

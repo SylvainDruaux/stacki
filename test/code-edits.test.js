@@ -86,7 +86,11 @@ test('typing over unsent gestures drops them', () => {
   store.typeCode('/p', shown(dirty(1), 'text of 1'), record());
   assert.deepEqual(step.outcome, { tag: 'dropped' }, 'its undo step has nothing of its own');
   assert.deepEqual(store.codeBaseline('/p'), known(1, 'text of 1'));
-  assert.deepEqual(store.entries('/p').map((entry) => entry.tag), ['code'], 'nothing else is sent');
+  assert.deepEqual(
+    store.entries('/p').map((entry) => entry.tag),
+    ['code'],
+    'nothing else is sent',
+  );
 });
 
 test('a refused page patches the disk only after the user keeps their text', () => {

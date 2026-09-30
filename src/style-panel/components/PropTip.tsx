@@ -1,13 +1,13 @@
-import { useEffect, useRef, useState } from 'react'
-import type { ReactNode } from 'react'
-import { HoverTooltip } from './SegmentedControl'
+import { useEffect, useRef, useState } from 'react';
+import type { ReactNode } from 'react';
+import { HoverTooltip } from './SegmentedControl';
 
 // The style panel's labels are friendly names ("Align", "Gap", "Y") for CSS
 // properties. Hovering one for a beat shows which property (or properties) it
 // writes — in every state, blue / orange / unset — so the mapping is discoverable
 // without clicking. Shares the segmented control's body-portaled popup.
 
-const TIP_DELAY_MS = 500
+const TIP_DELAY_MS = 500;
 
 /**
  * The tooltip body: the CSS property names, and a note only where one says
@@ -25,7 +25,7 @@ export function PropTip({ props, note }: { props: readonly string[]; note?: Reac
       <span className="u-prop-tip">{props.join(', ')}</span>
       {note ? <div className="u-prop-tip-note">{note}</div> : null}
     </>
-  )
+  );
 }
 
 /**
@@ -34,19 +34,33 @@ export function PropTip({ props, note }: { props: readonly string[]; note?: Reac
  * matter where). `hide` dismisses it early — e.g. when a click opens a menu.
  */
 export function useHoverTip<T extends HTMLElement>(content: ReactNode) {
-  const ref = useRef<T | null>(null)
-  const [open, setOpen] = useState(false)
-  const timer = useRef<number | null>(null)
-  const cancel = () => { if (timer.current != null) { window.clearTimeout(timer.current); timer.current = null } }
-  useEffect(() => cancel, [])
+  const ref = useRef<T | null>(null);
+  const [open, setOpen] = useState(false);
+  const timer = useRef<number | null>(null);
+  const cancel = () => {
+    if (timer.current != null) {
+      window.clearTimeout(timer.current);
+      timer.current = null;
+    }
+  };
+  useEffect(() => cancel, []);
 
-  const hide = () => { cancel(); setOpen(false) }
+  const hide = () => {
+    cancel();
+    setOpen(false);
+  };
   const hoverProps = content
     ? {
-      onMouseEnter: () => { cancel(); timer.current = window.setTimeout(() => { timer.current = null; setOpen(true) }, TIP_DELAY_MS) },
-      onMouseLeave: hide,
-    }
-    : {}
+        onMouseEnter: () => {
+          cancel();
+          timer.current = window.setTimeout(() => {
+            timer.current = null;
+            setOpen(true);
+          }, TIP_DELAY_MS);
+        },
+        onMouseLeave: hide,
+      }
+    : {};
 
   // onMouseLeave alone leaves tooltips stranded. A label re-renders as a different
   // element while the pointer is over it (the dim caption and the blue pill are not
@@ -55,34 +69,39 @@ export function useHoverTip<T extends HTMLElement>(content: ReactNode) {
   // this, and the tooltip stays up. So while one is open, watch for the pointer being
   // anywhere but on the anchor (or the anchor being gone) and drop it.
   useEffect(() => {
-    if (!open) {return undefined}
+    if (!open) {
+      return undefined;
+    }
     const away = (event: Event) => {
-      const el = ref.current
+      const el = ref.current;
       if (!el || !el.isConnected || !(event.target instanceof Node) || !el.contains(event.target)) {
-        hide()
+        hide();
       }
-    }
-    const close = () => hide()
-    document.addEventListener('pointermove', away, true)
-    document.addEventListener('pointerdown', close, true)
-    document.addEventListener('keydown', close, true)
-    window.addEventListener('scroll', close, true)
-    window.addEventListener('blur', close)
+    };
+    const close = () => hide();
+    document.addEventListener('pointermove', away, true);
+    document.addEventListener('pointerdown', close, true);
+    document.addEventListener('keydown', close, true);
+    window.addEventListener('scroll', close, true);
+    window.addEventListener('blur', close);
     return () => {
-      document.removeEventListener('pointermove', away, true)
-      document.removeEventListener('pointerdown', close, true)
-      document.removeEventListener('keydown', close, true)
-      window.removeEventListener('scroll', close, true)
-      window.removeEventListener('blur', close)
-    }
-  }, [open])
+      document.removeEventListener('pointermove', away, true);
+      document.removeEventListener('pointerdown', close, true);
+      document.removeEventListener('keydown', close, true);
+      window.removeEventListener('scroll', close, true);
+      window.removeEventListener('blur', close);
+    };
+  }, [open]);
 
   return {
     ref,
     hoverProps,
     hide,
-    tip: open && content && ref.current ? <HoverTooltip anchor={ref.current}>{content}</HoverTooltip> : null,
-  }
+    tip:
+      open && content && ref.current ? (
+        <HoverTooltip anchor={ref.current}>{content}</HoverTooltip>
+      ) : null,
+  };
 }
 
 /**
@@ -91,18 +110,28 @@ export function useHoverTip<T extends HTMLElement>(content: ReactNode) {
  * (Size, Typography, Borders, Background, Effects, Position, …) so they all get the
  * same hover tooltip naming the property.
  */
-export function ProvenanceLabel({ label, props, className = 'embed-editor_size-label', busy, anchorProp, onProvenance, note = 'Set through another selector — click to see all' }: {
-  label: ReactNode
+export function ProvenanceLabel({
+  label,
+  props,
+  className = 'embed-editor_size-label',
+  busy,
+  anchorProp,
+  onProvenance,
+  note = 'Set through another selector — click to see all',
+}: {
+  label: ReactNode;
   /** Properties this label covers — shown in the tooltip. */
-  props: readonly string[]
-  className?: string
-  busy: boolean
+  props: readonly string[];
+  className?: string;
+  busy: boolean;
   /** The property whose provenance the click opens (defaults to the first). */
-  anchorProp?: string
-  onProvenance: (prop: string, anchor: DOMRect) => void
-  note?: ReactNode
+  anchorProp?: string;
+  onProvenance: (prop: string, anchor: DOMRect) => void;
+  note?: ReactNode;
 }) {
-  const { ref, hoverProps, hide, tip } = useHoverTip<HTMLButtonElement>(<PropTip props={props} note={note} />)
+  const { ref, hoverProps, hide, tip } = useHoverTip<HTMLButtonElement>(
+    <PropTip props={props} note={note} />,
+  );
   return (
     <>
       <button
@@ -112,15 +141,17 @@ export function ProvenanceLabel({ label, props, className = 'embed-editor_size-l
         disabled={busy}
         {...hoverProps}
         onClick={(event) => {
-          const property = anchorProp ?? props[0]
-          if (property === undefined) {return}
-          hide()
-          onProvenance(property, event.currentTarget.getBoundingClientRect())
+          const property = anchorProp ?? props[0];
+          if (property === undefined) {
+            return;
+          }
+          hide();
+          onProvenance(property, event.currentTarget.getBoundingClientRect());
         }}
       >
         {label}
       </button>
       {tip}
     </>
-  )
+  );
 }

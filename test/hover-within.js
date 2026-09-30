@@ -27,7 +27,9 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
+  if (!condition) {
+    failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  }
 };
 const settle = (ms = 40) => new Promise((r) => setTimeout(r, ms));
 
@@ -51,7 +53,7 @@ const settle = (ms = 40) => new Promise((r) => setTimeout(r, ms));
       </section>
       <!--avb-e:0-->
     </body>`,
-    { url: 'http://localhost:4321/#avb-design', pretendToBeVisual: true }
+    { url: 'http://localhost:4321/#avb-design', pretendToBeVisual: true },
   );
   const { window } = dom;
   // The section runs from 0 to 800. The eyebrow sits at the top. The component
@@ -78,8 +80,12 @@ const settle = (ms = 40) => new Promise((r) => setTimeout(r, ms));
     let found = null;
     for (const el of window.document.querySelectorAll('[data-box]')) {
       const b = el.getBoundingClientRect();
-      if (x < b.left || x > b.right || y < b.top || y > b.bottom) {continue;}
-      if (!found || found.contains(el)) {found = el;}
+      if (x < b.left || x > b.right || y < b.top || y > b.bottom) {
+        continue;
+      }
+      if (!found || found.contains(el)) {
+        found = el;
+      }
     }
     return found;
   };
@@ -124,7 +130,9 @@ const settle = (ms = 40) => new Promise((r) => setTimeout(r, ms));
   const pointAt = (box, y) => {
     const el = window.document.querySelector(`[data-box="${box}"]`);
     sent.length = 0;
-    el.dispatchEvent(new window.MouseEvent('mousemove', { bubbles: true, clientX: 100, clientY: y }));
+    el.dispatchEvent(
+      new window.MouseEvent('mousemove', { bubbles: true, clientX: 100, clientY: y }),
+    );
     return sent.filter((m) => m.type === 'avb:hover-node').pop();
   };
 
@@ -132,28 +140,39 @@ const settle = (ms = 40) => new Promise((r) => setTimeout(r, ms));
   check(
     'the gap above a component is not the component',
     pointAt('word', 290)?.path === '0',
-    JSON.stringify(pointAt('word', 290))
+    JSON.stringify(pointAt('word', 290)),
   );
   // 400: inside both. This is the component, and always was.
   check(
     'pointing at the component is the component',
     pointAt('word', 400)?.path === '0.1',
-    JSON.stringify(pointAt('word', 400))
+    JSON.stringify(pointAt('word', 400)),
   );
   // The neighbour above keeps its own space.
   check(
     'and its neighbour keeps its own',
     pointAt('eyebrow', 30)?.path === '0.0',
-    JSON.stringify(pointAt('eyebrow', 30))
+    JSON.stringify(pointAt('eyebrow', 30)),
   );
   // A click says the same thing as the hover — the two resolve the same way,
   // so what you select is what lit up.
   {
     const el = window.document.querySelector('[data-box="word"]');
     sent.length = 0;
-    el.dispatchEvent(new window.MouseEvent('click', { bubbles: true, cancelable: true, clientX: 100, clientY: 290 }));
+    el.dispatchEvent(
+      new window.MouseEvent('click', {
+        bubbles: true,
+        cancelable: true,
+        clientX: 100,
+        clientY: 290,
+      }),
+    );
     const msg = sent.filter((m) => m.type === 'avb:click-node').pop();
-    check('and a click in that gap selects what a hover showed', msg?.path === '0', JSON.stringify(msg));
+    check(
+      'and a click in that gap selects what a hover showed',
+      msg?.path === '0',
+      JSON.stringify(msg),
+    );
   }
 
   // The renderer's boundary must accept the actual preload's leave message;
@@ -166,7 +185,7 @@ const settle = (ms = 40) => new Promise((r) => setTimeout(r, ms));
     check(
       'leaving the canvas produces a valid hover-clear message',
       parsed?.kind === 'hover-node' && parsed.path === null && parsed.occurrence === 0,
-      JSON.stringify(message)
+      JSON.stringify(message),
     );
     const entered = parsePreviewMessage(pointAt('word', 400));
     check('re-entering restores canvas hover', entered?.path === '0.1');
@@ -183,7 +202,9 @@ const settle = (ms = 40) => new Promise((r) => setTimeout(r, ms));
   }
 
   if (failures.length) {
-    console.error(`\nhover-within: ${failures.length} failed, ${checked - failures.length} passed\n`);
+    console.error(
+      `\nhover-within: ${failures.length} failed, ${checked - failures.length} passed\n`,
+    );
     console.error(failures.join('\n') + '\n');
     process.exit(1);
   }

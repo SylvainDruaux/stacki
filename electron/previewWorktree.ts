@@ -39,7 +39,6 @@ import fs from 'fs';
 import path from 'path';
 import type { Git } from './git.js';
 
-
 /** Where the preview checkout lives, and the directory git must not see. */
 const PREVIEW_DIR = path.join('.stacki', 'preview');
 const EXCLUDE_LINE = '.stacki/';
@@ -66,7 +65,10 @@ function ensureExcluded(projectPath: string): boolean {
         path.join(
           path.resolve(
             path.dirname(gitDir),
-            fs.readFileSync(gitDir, 'utf8').replace(/^gitdir:\s*/, '').trim(),
+            fs
+              .readFileSync(gitDir, 'utf8')
+              .replace(/^gitdir:\s*/, '')
+              .trim(),
             '..',
             '..',
           ),

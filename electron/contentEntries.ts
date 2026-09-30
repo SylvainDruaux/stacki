@@ -32,7 +32,11 @@ interface FormatEdit {
 
 interface FormatModule {
   readonly parseData: (text: string) => unknown;
-  readonly applyEdits: (text: string, edits: readonly FormatEdit[], opts?: { readonly body?: string }) => string;
+  readonly applyEdits: (
+    text: string,
+    edits: readonly FormatEdit[],
+    opts?: { readonly body?: string },
+  ) => string;
   readonly DELETE: symbol;
 }
 
@@ -302,7 +306,13 @@ function locateRecords(data: unknown): { shape: string; records: RawRecord[] } {
   if (keys.length && keys.every((k) => isPlainObject(top[k]))) {
     return {
       shape: 'keyed',
-      records: keys.map((key) => ({ id: key, idKey: null, keyed: true, locator: [key], record: toRecord(top[key]) ?? {} })),
+      records: keys.map((key) => ({
+        id: key,
+        idKey: null,
+        keyed: true,
+        locator: [key],
+        record: toRecord(top[key]) ?? {},
+      })),
     };
   }
 
@@ -341,7 +351,11 @@ function fileEntries(projectPath: string, collection: ContentCollection): ListRe
   const abs = path.resolve(projectPath, rel);
   const format = formatFor(rel);
   if (!format) {
-    return { entries: [], readOnly: true, reason: `Stacki cannot read ${path.extname(rel)} data files yet.` };
+    return {
+      entries: [],
+      readOnly: true,
+      reason: `Stacki cannot read ${path.extname(rel)} data files yet.`,
+    };
   }
   let text = '';
   try {
@@ -357,7 +371,11 @@ function fileEntries(projectPath: string, collection: ContentCollection): ListRe
   try {
     data = format.parseData(text);
   } catch (err) {
-    return { entries: [], readOnly: true, reason: `${rel} could not be parsed — ${errorMessage(err)}` };
+    return {
+      entries: [],
+      readOnly: true,
+      reason: `${rel} could not be parsed — ${errorMessage(err)}`,
+    };
   }
 
   const { shape, records } = locateRecords(data);
@@ -413,7 +431,10 @@ function writeEntry(
     // at all — and must not be read as one being cleared.
     edit.rename !== undefined
       ? { path: [...locator, ...edit.path], rename: edit.rename }
-      : { path: [...locator, ...edit.path], value: edit.value === undefined ? format.DELETE : edit.value },
+      : {
+          path: [...locator, ...edit.path],
+          value: edit.value === undefined ? format.DELETE : edit.value,
+        },
   );
 
   const next =
@@ -454,7 +475,10 @@ function countEntries(projectPath: string, collection: ContentCollection): numbe
  * schema, not as loose JSON, so the file-based editor leaves them alone rather
  * than offering a second way in with different rules.
  */
-function coveredPaths(collections: readonly ContentCollection[]): { files: string[]; dirs: string[] } {
+function coveredPaths(collections: readonly ContentCollection[]): {
+  files: string[];
+  dirs: string[];
+} {
   const files: string[] = [];
   const dirs: string[] = [];
   for (const collection of collections) {

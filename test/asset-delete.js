@@ -19,7 +19,9 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
+  if (!condition) {
+    failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  }
 };
 
 (async () => {
@@ -30,11 +32,11 @@ const check = (what, condition, detail) => {
   fs.writeFileSync(
     entry,
     `export { default as AssetsPanel } from ${JSON.stringify(
-      path.join(__dirname, '..', 'src', 'panels', 'AssetsPanel.tsx')
+      path.join(__dirname, '..', 'src', 'panels', 'AssetsPanel.tsx'),
     )};\n` +
       `export { ConfirmHost } from ${JSON.stringify(
-        path.join(__dirname, '..', 'src', 'ui', 'ConfirmDialog.jsx')
-      )};\n`
+        path.join(__dirname, '..', 'src', 'ui', 'ConfirmDialog.jsx'),
+      )};\n`,
   );
   const bundle = path.join(buildDir, 'asset-delete.bundle.js');
   await esbuild.build({
@@ -61,14 +63,32 @@ const check = (what, condition, detail) => {
   global.requestAnimationFrame = dom.window.requestAnimationFrame.bind(dom.window);
   global.cancelAnimationFrame = dom.window.cancelAnimationFrame.bind(dom.window);
   global.IS_REACT_ACT_ENVIRONMENT = true;
-  dom.window.ResizeObserver = class { observe() {} unobserve() {} disconnect() {} };
+  dom.window.ResizeObserver = class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  };
   global.ResizeObserver = dom.window.ResizeObserver;
 
   // The listing the main process sends: every entry knows the folder it is in,
   // and the panel shows the ones whose parent is the folder it is looking at.
   const FILES = [
-    { rel: 'public/photo.jpg', name: 'photo.jpg', parent: 'public', abs: '/p/public/photo.jpg', isDir: false, size: 12 },
-    { rel: 'public/notes.txt', name: 'notes.txt', parent: 'public', abs: '/p/public/notes.txt', isDir: false, size: 4 },
+    {
+      rel: 'public/photo.jpg',
+      name: 'photo.jpg',
+      parent: 'public',
+      abs: '/p/public/photo.jpg',
+      isDir: false,
+      size: 12,
+    },
+    {
+      rel: 'public/notes.txt',
+      name: 'notes.txt',
+      parent: 'public',
+      abs: '/p/public/notes.txt',
+      isDir: false,
+      size: 4,
+    },
   ];
   const deleted = [];
   const toasts = [];
@@ -88,7 +108,10 @@ const check = (what, condition, detail) => {
       missing: false,
     }),
     onAssetsChanged: () => () => {},
-    deleteAsset: async ({ rel }) => { deleted.push(rel); return { ok: true } },
+    deleteAsset: async ({ rel }) => {
+      deleted.push(rel);
+      return { ok: true };
+    },
     renameAsset: async () => ({ ok: true }),
     moveAsset: async () => ({ ok: true }),
     assetThumb: async () => ({ dataUrl: null }),
@@ -118,8 +141,8 @@ const check = (what, condition, detail) => {
             onRecordUndo: () => {},
             ...props,
           }),
-          React.createElement(ConfirmHost)
-        )
+          React.createElement(ConfirmHost),
+        ),
       );
       await settle(60);
     });
@@ -128,17 +151,23 @@ const check = (what, condition, detail) => {
   // The panel opens above the roots, where there are only folders. Step into
   // the one holding the files.
   await act(async () => {
-    container.querySelector('.asset-folder')?.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }));
+    container
+      .querySelector('.asset-folder')
+      ?.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }));
     await settle(30);
   });
 
   const tiles = () => [...container.querySelectorAll('.asset-tile')];
   const menuButton = (i) => tiles()[i]?.querySelector('.asset-tile-menu');
-  const rows = () => [...document.querySelectorAll('.more-menu-item')].map((b) => b.textContent.trim());
+  const rows = () =>
+    [...document.querySelectorAll('.more-menu-item')].map((b) => b.textContent.trim());
   // A missing button is a FAILURE to report, not a stack trace: every check
   // after it would otherwise be lost.
   const press = async (el, what = 'something to press') => {
-    if (!el) { check(`there is ${what}`, false); return false }
+    if (!el) {
+      check(`there is ${what}`, false);
+      return false;
+    }
     await act(async () => {
       el.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }));
       await settle(20);
@@ -148,8 +177,15 @@ const check = (what, condition, detail) => {
 
   // --- the tile has one, and only one thing in it ---------------------------------
   check('the assets are on screen', tiles().length === 2, String(tiles().length));
-  check('every tile has a menu button', tiles().every((t) => t.querySelector('.asset-tile-menu')));
-  check('which says what it is for', /photo\.jpg/.test(menuButton(0)?.getAttribute('aria-label') || ''), menuButton(0)?.getAttribute('aria-label'));
+  check(
+    'every tile has a menu button',
+    tiles().every((t) => t.querySelector('.asset-tile-menu')),
+  );
+  check(
+    'which says what it is for',
+    /photo\.jpg/.test(menuButton(0)?.getAttribute('aria-label') || ''),
+    menuButton(0)?.getAttribute('aria-label'),
+  );
   check('and nothing is open yet', rows().length === 0, rows().join());
 
   await press(menuButton(0), 'a menu button on the first tile');
@@ -164,46 +200,85 @@ const check = (what, condition, detail) => {
   const dialog = () => document.querySelector('.confirm-dialog, .confirm, [role="alertdialog"]');
   const answer = async (label) => {
     const button = [...document.querySelectorAll('button')].find(
-      (b) => b.textContent.trim().toLowerCase() === label
+      (b) => b.textContent.trim().toLowerCase() === label,
     );
-    if (!button) {return false;}
+    if (!button) {
+      return false;
+    }
     await press(button, `a "${label}" button`);
-    await act(async () => { await settle(40) });
+    await act(async () => {
+      await settle(40);
+    });
     return true;
   };
 
-  const deleteRow = () => [...document.querySelectorAll('.more-menu-item')].find((b) => b.textContent.trim() === 'Delete');
+  const deleteRow = () =>
+    [...document.querySelectorAll('.more-menu-item')].find(
+      (b) => b.textContent.trim() === 'Delete',
+    );
   await press(deleteRow(), 'a Delete row');
   check('choosing Delete asks first', !!dialog(), document.body.innerHTML.slice(-200));
   check('and has not deleted anything yet', deleted.length === 0, deleted.join());
 
   const said = await answer('cancel');
-  check('the dialog can be answered', said, [...document.querySelectorAll('button')].map((b) => b.textContent).join('|'));
+  check(
+    'the dialog can be answered',
+    said,
+    [...document.querySelectorAll('button')].map((b) => b.textContent).join('|'),
+  );
   check('saying no deletes nothing', deleted.length === 0, deleted.join());
 
   await press(menuButton(0), 'the menu button again');
   await press(deleteRow(), 'the Delete row again');
   await answer('delete');
-  check('saying yes deletes the file it was opened on', deleted.join() === 'public/photo.jpg', deleted.join());
+  check(
+    'saying yes deletes the file it was opened on',
+    deleted.join() === 'public/photo.jpg',
+    deleted.join(),
+  );
 
   // --- and never while an asset is being picked -------------------------------------
   //
   // Choosing an asset for a prop is the whole gesture then, and a menu in the
   // corner of the tile is a way to lose the file instead of using it.
   await render({ pick: { mediaKind: 'image', current: 'public/photo.jpg', onPick: () => {} } });
-  check('picking hides the menus', tiles().every((t) => !t.querySelector('.asset-tile-menu')), container.innerHTML.slice(0, 200));
+  check(
+    'picking hides the menus',
+    tiles().every((t) => !t.querySelector('.asset-tile-menu')),
+    container.innerHTML.slice(0, 200),
+  );
 
   // --- the file goes somewhere it can be got back from --------------------------------
   const main = fs.readFileSync(path.join(__dirname, '..', 'dist', 'electron', 'main.js'), 'utf8');
-  const handler = main.slice(main.indexOf("ipcMain.handle('assets:delete'"), main.indexOf("// Text assets (css/js"));
-  check('deleting sends the file to the bin', /shell\.trashItem\(abs\)/.test(handler), handler.slice(0, 300));
+  const handler = main.slice(
+    main.indexOf("ipcMain.handle('assets:delete'"),
+    main.indexOf('// Text assets (css/js'),
+  );
+  check(
+    'deleting sends the file to the bin',
+    /shell\.trashItem\(abs\)/.test(handler),
+    handler.slice(0, 300),
+  );
   check('never unlinks it outright', !/unlinkSync|rmSync/.test(handler), handler.slice(0, 300));
-  check('and only inside the asset roots', /assetAbs\(projectPath, rel\)/.test(handler), handler.slice(0, 200));
-  const panel = fs.readFileSync(path.join(__dirname, '..', 'src', 'panels', 'AssetsPanel.tsx'), 'utf8');
-  check('the dialog says where it went', /moves to your Bin/.test(panel), 'the confirm does not say what happens');
+  check(
+    'and only inside the asset roots',
+    /assetAbs\(projectPath, rel\)/.test(handler),
+    handler.slice(0, 200),
+  );
+  const panel = fs.readFileSync(
+    path.join(__dirname, '..', 'src', 'panels', 'AssetsPanel.tsx'),
+    'utf8',
+  );
+  check(
+    'the dialog says where it went',
+    /moves to your Bin/.test(panel),
+    'the confirm does not say what happens',
+  );
 
   if (failures.length) {
-    console.error(`\nasset-delete: ${failures.length} failed, ${checked - failures.length} passed\n`);
+    console.error(
+      `\nasset-delete: ${failures.length} failed, ${checked - failures.length} passed\n`,
+    );
     console.error(failures.join('\n') + '\n');
     process.exit(1);
   }

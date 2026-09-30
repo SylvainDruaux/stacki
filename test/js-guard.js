@@ -27,7 +27,9 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
+  if (!condition) {
+    failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  }
 };
 
 (async () => {
@@ -40,7 +42,11 @@ const check = (what, condition, detail) => {
     const out = path.join(buildDir, 'js-check.bundle.js');
     await esbuild.build({
       entryPoints: [path.join(__dirname, '..', 'src', 'jsCheck.js')],
-      outfile: out, bundle: true, format: 'cjs', platform: 'node', logLevel: 'silent',
+      outfile: out,
+      bundle: true,
+      format: 'cjs',
+      platform: 'node',
+      logLevel: 'silent',
     });
     const { checkStatement } = require(out);
 
@@ -48,25 +54,49 @@ const check = (what, condition, detail) => {
     check('a plain declaration passes', ok('const media = "x";'));
     check('a ternary passes', ok('const media = a === "card" ? ["card"] : [a];'));
     check('a template literal passes', ok('const media = `--_o: ${o}`;'));
-    check('top-level await passes', ok('const rows = await load();'), JSON.stringify(checkStatement('const rows = await load();')));
+    check(
+      'top-level await passes',
+      ok('const rows = await load();'),
+      JSON.stringify(checkStatement('const rows = await load();')),
+    );
     // The one that would make this feature worse than useless: Astro frontmatter
     // is TypeScript, and refusing correct TS would mean it could not be saved.
-    check('an annotated declaration passes', ok('const media: string = "x";'), JSON.stringify(checkStatement('const media: string = "x";')));
-    check('a generic passes', ok('const rows: Array<string> = [];'), JSON.stringify(checkStatement('const rows: Array<string> = [];')));
-    check('an interface-typed const passes', ok('const p: Props["media"] = undefined;'), JSON.stringify(checkStatement('const p: Props["media"] = undefined;')));
+    check(
+      'an annotated declaration passes',
+      ok('const media: string = "x";'),
+      JSON.stringify(checkStatement('const media: string = "x";')),
+    );
+    check(
+      'a generic passes',
+      ok('const rows: Array<string> = [];'),
+      JSON.stringify(checkStatement('const rows: Array<string> = [];')),
+    );
+    check(
+      'an interface-typed const passes',
+      ok('const p: Props["media"] = undefined;'),
+      JSON.stringify(checkStatement('const p: Props["media"] = undefined;')),
+    );
     // Emptiness is allowed — clearing a field is a thing to be able to do.
     check('an empty statement passes', ok(''));
 
     check('a stray token fails', !ok('const media = "x" ;; ='));
     check('an unfinished statement fails', !ok('const media = '));
     check('an unclosed brace fails', !ok('const media = {'));
-    check('an unclosed string fails', !ok('const media = "x'), JSON.stringify(checkStatement('const media = "x')));
+    check(
+      'an unclosed string fails',
+      !ok('const media = "x'),
+      JSON.stringify(checkStatement('const media = "x')),
+    );
 
     // The message has to name something you can go and look at.
     const stray = checkStatement('const media = "x" ;; =');
     check('a stray token is named', stray.message.includes('='), stray.message);
     const short = checkStatement('const media = ');
-    check('an unfinished statement says so', /unfinished|stops early/i.test(short.message), short.message);
+    check(
+      'an unfinished statement says so',
+      /unfinished|stops early/i.test(short.message),
+      short.message,
+    );
     const line = checkStatement('const a = 1;\nconst b = ;; =');
     check('and a multi-line mistake says which line', /line 2/.test(line.message), line.message);
   }
@@ -77,13 +107,19 @@ const check = (what, condition, detail) => {
     entry,
     `export { BindField } from ${JSON.stringify(path.join(__dirname, '..', 'src', 'panels', 'PropsPanel.jsx'))};\n` +
       // CodeMirror's own way in from a DOM node — the editor here is a real one.
-      `export { EditorView } from '@codemirror/view';\n`
+      `export { EditorView } from '@codemirror/view';\n`,
   );
   const bundle = path.join(buildDir, 'js-guard.bundle.js');
   await esbuild.build({
-    entryPoints: [entry], outfile: bundle, bundle: true, format: 'cjs', platform: 'node',
-    jsx: 'automatic', external: ['react', 'react-dom', 'react/jsx-runtime', 'react-dom/client'],
-    loader: { '.css': 'empty' }, logLevel: 'silent',
+    entryPoints: [entry],
+    outfile: bundle,
+    bundle: true,
+    format: 'cjs',
+    platform: 'node',
+    jsx: 'automatic',
+    external: ['react', 'react-dom', 'react/jsx-runtime', 'react-dom/client'],
+    loader: { '.css': 'empty' },
+    logLevel: 'silent',
   });
 
   const { JSDOM } = require('jsdom');
@@ -101,10 +137,27 @@ const check = (what, condition, detail) => {
   global.requestAnimationFrame = dom.window.requestAnimationFrame.bind(dom.window);
   global.cancelAnimationFrame = dom.window.cancelAnimationFrame.bind(dom.window);
   global.IS_REACT_ACT_ENVIRONMENT = true;
-  dom.window.ResizeObserver = class { observe() {} unobserve() {} disconnect() {} };
+  dom.window.ResizeObserver = class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  };
   global.ResizeObserver = dom.window.ResizeObserver;
-  dom.window.Range.prototype.getBoundingClientRect = () => ({ x: 0, y: 0, width: 0, height: 0, top: 0, left: 0, right: 0, bottom: 0 });
-  dom.window.Range.prototype.getClientRects = () => ({ length: 0, item: () => null, [Symbol.iterator]: function* () {} });
+  dom.window.Range.prototype.getBoundingClientRect = () => ({
+    x: 0,
+    y: 0,
+    width: 0,
+    height: 0,
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  });
+  dom.window.Range.prototype.getClientRects = () => ({
+    length: 0,
+    item: () => null,
+    [Symbol.iterator]: function* () {},
+  });
 
   const React = require('react');
   const { createRoot } = require('react-dom/client');
@@ -129,26 +182,41 @@ const check = (what, condition, detail) => {
           onSetFrontmatter: (code) => writes.push(code),
         },
         onChange: () => {},
-      })
+      }),
     );
   });
 
   // Open the source editor through the chip's menu, the way a person does.
   const chip = host.querySelector('.expr-chip');
   check('the binding drew a chip', !!chip, host.innerHTML.slice(0, 160));
-  await act(async () => { chip.dispatchEvent(new dom.window.MouseEvent('mousedown', { bubbles: true })) });
-  const editRow = [...document.querySelectorAll('.bind-menu .dp-foot')].find((r) => r.textContent.includes('Edit media'));
-  check('the menu offers to edit it', !!editRow, [...document.querySelectorAll('.bind-menu .dp-foot')].map((r) => r.textContent).join(' | '));
-  await act(async () => { editRow.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true })) });
+  await act(async () => {
+    chip.dispatchEvent(new dom.window.MouseEvent('mousedown', { bubbles: true }));
+  });
+  const editRow = [...document.querySelectorAll('.bind-menu .dp-foot')].find((r) =>
+    r.textContent.includes('Edit media'),
+  );
+  check(
+    'the menu offers to edit it',
+    !!editRow,
+    [...document.querySelectorAll('.bind-menu .dp-foot')].map((r) => r.textContent).join(' | '),
+  );
+  await act(async () => {
+    editRow.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }));
+  });
   const box = document.querySelector('.var-src');
   check('the source editor opens', !!box);
 
   const cm = () => box.querySelector('.expr-input');
   // CodeMirror is real here, so typing goes through its own transaction.
-  const view = () => { const el = cm(); return el ? EditorView.findFromDOM(el) : null };
+  const view = () => {
+    const el = cm();
+    return el ? EditorView.findFromDOM(el) : null;
+  };
   const type = async (text) => {
     const v = view();
-    if (!v) {return false;}
+    if (!v) {
+      return false;
+    }
     await act(async () => {
       v.dispatch({ changes: { from: 0, to: v.state.doc.length, insert: text } });
     });
@@ -163,7 +231,11 @@ const check = (what, condition, detail) => {
   const isRed = () => !!cm()?.classList.contains('invalid');
   const message = () => box?.querySelector('.var-src-error')?.textContent?.trim() ?? '';
 
-  check('typing is possible at all', await type('const media = "half'), 'no CodeMirror view to type into');
+  check(
+    'typing is possible at all',
+    await type('const media = "half'),
+    'no CodeMirror view to type into',
+  );
 
   // Rule one: nothing goes to the file while typing.
   check('typing writes nothing to the file', writes.length === 0, JSON.stringify(writes));
@@ -174,20 +246,38 @@ const check = (what, condition, detail) => {
   check('leaving a broken statement writes nothing', writes.length === 0, JSON.stringify(writes));
   check('the field goes red', isRed(), cm()?.className);
   check('and says what to fix', message().length > 0, JSON.stringify(message()));
-  check('the editor stays open to be fixed', !!document.querySelector('.var-src'), 'it closed, taking the message with it');
+  check(
+    'the editor stays open to be fixed',
+    !!document.querySelector('.var-src'),
+    'it closed, taking the message with it',
+  );
 
   // Fixing it clears the mark as you type — now that there is a mistake to watch.
   await type('const media = "half";');
   check('fixing it clears the mark', !isRed(), cm()?.className);
   check('and the message goes', message() === '', JSON.stringify(message()));
-  check('but still nothing is written until the field is left', writes.length === 0, JSON.stringify(writes));
+  check(
+    'but still nothing is written until the field is left',
+    writes.length === 0,
+    JSON.stringify(writes),
+  );
 
   await leaveField();
   check('leaving a good statement writes it', writes.length === 1, JSON.stringify(writes));
-  check('with the statement in it', writes[0]?.includes('const media = "half";'), JSON.stringify(writes[0]));
-  check('and the editor closes', !document.querySelector('.var-src'), 'still open after a clean commit');
+  check(
+    'with the statement in it',
+    writes[0]?.includes('const media = "half";'),
+    JSON.stringify(writes[0]),
+  );
+  check(
+    'and the editor closes',
+    !document.querySelector('.var-src'),
+    'still open after a clean commit',
+  );
 
-  await act(async () => { root.unmount() });
+  await act(async () => {
+    root.unmount();
+  });
   host.remove();
 
   if (failures.length) {

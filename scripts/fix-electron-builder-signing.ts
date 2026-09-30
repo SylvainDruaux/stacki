@@ -58,11 +58,7 @@ function packageVersion(packagePath: string): string {
 }
 
 function isModuleNotFound(error: unknown): boolean {
-  return (
-    error instanceof Error &&
-    'code' in error &&
-    error.code === 'MODULE_NOT_FOUND'
-  );
+  return error instanceof Error && 'code' in error && error.code === 'MODULE_NOT_FOUND';
 }
 
 export function fixElectronBuilderSigning(
@@ -78,9 +74,7 @@ export function fixElectronBuilderSigning(
     }
     throw error;
   }
-  const libraryPackage = createRequire(builderPackage).resolve(
-    'app-builder-lib/package.json',
-  );
+  const libraryPackage = createRequire(builderPackage).resolve('app-builder-lib/package.json');
   const version = packageVersion(libraryPackage);
   if (version !== BUILDER_VERSION) {
     throw new Error(

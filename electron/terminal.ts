@@ -210,7 +210,7 @@ type SpawnResult =
   | { readonly proc: PseudoTerminal; readonly error: null }
   | { readonly proc: null; readonly error: SpawnFields };
 
-type PtySpawn = typeof import('node-pty')['spawn'];
+type PtySpawn = (typeof import('node-pty'))['spawn'];
 let ptySpawnPromise: Promise<PtySpawn> | undefined;
 
 function loadPtySpawn(): Promise<PtySpawn> {
@@ -322,7 +322,6 @@ function stopPolling(): void {
 // ---------------------------------------------------------------------------
 // IPC
 // ---------------------------------------------------------------------------
-
 
 // A `send` payload that fails its parser is dropped: the channel has no reply
 // to carry the refusal, so the log is where a renderer bug surfaces.

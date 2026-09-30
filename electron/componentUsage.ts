@@ -30,7 +30,10 @@ function astroFiles(dir: string): string[] {
       const full = path.join(d, entry.name);
       if (entry.isDirectory()) {
         walk(full);
-      } else if (entry.name.endsWith('.astro') || (d.includes(`${path.sep}pages`) && /\.mdx?$/i.test(entry.name))) {
+      } else if (
+        entry.name.endsWith('.astro') ||
+        (d.includes(`${path.sep}pages`) && /\.mdx?$/i.test(entry.name))
+      ) {
         out.push(full);
       }
     }
@@ -122,7 +125,10 @@ interface InstanceArgs {
  * component's own name: markdown pages and auto-import integrations render
  * components they never name in an import.
  */
-function instancesIn(source: unknown, { file, targetPath, name, aliases = [] }: InstanceArgs): number {
+function instancesIn(
+  source: unknown,
+  { file, targetPath, name, aliases = [] }: InstanceArgs,
+): number {
   const target = targetPath ? path.resolve(targetPath) : null;
   if (target) {
     const imports = importsOf(source, file, aliases);

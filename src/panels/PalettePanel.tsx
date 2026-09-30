@@ -122,10 +122,7 @@ function useComponentPreview() {
     const rect = anchor.getBoundingClientRect();
     const left = rect.right + 10;
     const top = Math.max(8, Math.min(rect.top, window.innerHeight - 260));
-    timer.current = setTimeout(
-      () => setValue({ component, left, top }),
-      PREVIEW_DELAY_MS,
-    );
+    timer.current = setTimeout(() => setValue({ component, left, top }), PREVIEW_DELAY_MS);
   }, []);
   const cancel = useCallback((): void => {
     clearTimeout(timer.current);

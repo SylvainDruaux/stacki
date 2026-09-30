@@ -14,7 +14,7 @@ export interface ComponentSourceRange extends SourceRange {
 export function sourceRangeForSelection(
   model: EditorModel | null,
   selectedId: string | null,
-  sourceLength: number
+  sourceLength: number,
 ): SourceRange | null {
   if (!model || !selectedId) {
     return null;
@@ -29,7 +29,7 @@ export function sourceRangeForSelection(
 
 export function sourceNodeAtOffset(
   nodes: readonly EditorNode[],
-  offset: number
+  offset: number,
 ): EditorNode | null {
   if (!Number.isSafeInteger(offset) || offset < 0) {
     return null;
@@ -64,7 +64,7 @@ export function sourceNodeAtOffset(
 
 export function componentSourceRanges(
   nodes: readonly EditorNode[],
-  source: string
+  source: string,
 ): readonly ComponentSourceRange[] {
   const ranges: ComponentSourceRange[] = [];
   const pending = [...nodes];

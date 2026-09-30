@@ -21,13 +21,7 @@ export default function afterPack(context: AfterPackContext): void {
   const appName = context.packager.appInfo.productFilename;
   const unpacked =
     context.electronPlatformName === 'darwin'
-      ? path.join(
-          context.appOutDir,
-          `${appName}.app`,
-          'Contents',
-          'Resources',
-          'app.asar.unpacked',
-        )
+      ? path.join(context.appOutDir, `${appName}.app`, 'Contents', 'Resources', 'app.asar.unpacked')
       : path.join(context.appOutDir, 'resources', 'app.asar.unpacked');
   const nodePtyDirectory = path.join(unpacked, 'node_modules', 'node-pty');
 

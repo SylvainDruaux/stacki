@@ -19,7 +19,9 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
+  if (!condition) {
+    failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  }
 };
 
 (async () => {
@@ -55,11 +57,11 @@ const check = (what, condition, detail) => {
 
   check(
     'a press in the variable picker is a press in the popover it opened from',
-    inOwnedPopup($('option'), $('popover'))
+    inOwnedPopup($('option'), $('popover')),
   );
   check(
     'so is a press on HEX, in the layer holding the swatch',
-    inOwnedPopup($('hex'), $('popover'))
+    inOwnedPopup($('hex'), $('popover')),
   );
   check('a press anywhere else is still outside', !inOwnedPopup($('other'), $('popover')));
   check('the popover can tell it has a popup of its own open', hasOwnedPopup($('popover')));
@@ -70,7 +72,7 @@ const check = (what, condition, detail) => {
   const offNested = registerPopupLayer($('elsewhere'), $('hex'));
   check(
     'a popup opened from inside another still belongs to the popover',
-    inOwnedPopup($('other'), $('popover'))
+    inOwnedPopup($('other'), $('popover')),
   );
   offNested();
 
@@ -120,7 +122,10 @@ const check = (what, condition, detail) => {
         {
           name: 'stub-variables',
           setup(build) {
-            build.onResolve({ filter: /lib\/webflow$/ }, () => ({ path: 'stub-webflow', namespace: 'stub' }));
+            build.onResolve({ filter: /lib\/webflow$/ }, () => ({
+              path: 'stub-webflow',
+              namespace: 'stub',
+            }));
             build.onLoad({ filter: /.*/, namespace: 'stub' }, () => ({
               contents: `
                 export function streamProjectVariables(onAdd) {
@@ -150,7 +155,11 @@ const check = (what, condition, detail) => {
     global.MutationObserver = win.MutationObserver;
     global.requestAnimationFrame = (fn) => win.setTimeout(fn, 0);
     global.cancelAnimationFrame = (id) => win.clearTimeout(id);
-    global.ResizeObserver = class { observe() {} unobserve() {} disconnect() {} };
+    global.ResizeObserver = class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    };
     win.ResizeObserver = global.ResizeObserver;
     global.IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -163,7 +172,10 @@ const check = (what, condition, detail) => {
     const writes = [];
     let closes = 0;
     const root = createRoot(win.document.getElementById('root'));
-    const settle = () => act(async () => { await new Promise((r) => win.setTimeout(r, 25)); });
+    const settle = () =>
+      act(async () => {
+        await new Promise((r) => win.setTimeout(r, 25));
+      });
     await act(async () => {
       root.render(
         React.createElement(SpacingEditor, {
@@ -185,9 +197,11 @@ const check = (what, condition, detail) => {
           clearProp: () => {},
           liveSetProp: () => {},
           onSelectSelector: () => {},
-          onClose: () => { closes += 1; },
+          onClose: () => {
+            closes += 1;
+          },
           onSameLabelPress: () => {},
-        })
+        }),
       );
     });
     await settle();
@@ -201,15 +215,24 @@ const check = (what, condition, detail) => {
       el.dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
     };
 
-    await act(async () => { press(popover().querySelector('.embed-editor_varconnect-dot')); });
+    await act(async () => {
+      press(popover().querySelector('.embed-editor_varconnect-dot'));
+    });
     await settle();
-    check('the dot opens the variable picker', !!win.document.querySelector('.embed-editor_varpicker'));
+    check(
+      'the dot opens the variable picker',
+      !!win.document.querySelector('.embed-editor_varpicker'),
+    );
     check('and the editor it opened from stays open', closes === 0, `${closes} closes`);
 
-    const row = [...win.document.querySelectorAll('button')].find((b) => /site-margin/.test(b.textContent || ''));
+    const row = [...win.document.querySelectorAll('button')].find((b) =>
+      /site-margin/.test(b.textContent || ''),
+    );
     check('the picker lists a variable', !!row);
     if (row) {
-      await act(async () => { press(row); });
+      await act(async () => {
+        press(row);
+      });
       await settle();
       check('choosing one writes it', writes.length === 1, JSON.stringify(writes));
     }
@@ -218,14 +241,18 @@ const check = (what, condition, detail) => {
     if (rich) {
       await act(async () => {
         rich.focus();
-        rich.dispatchEvent(new win.KeyboardEvent('keydown', { key: '=', bubbles: true, cancelable: true }));
+        rich.dispatchEvent(
+          new win.KeyboardEvent('keydown', { key: '=', bubbles: true, cancelable: true }),
+        );
       });
       await settle();
       check('= opens the big value editor', !!win.document.querySelector('.var-custom'));
       check('which does not close the editor under it', closes === 0, `${closes} closes`);
     }
 
-    await act(async () => { root.unmount(); });
+    await act(async () => {
+      root.unmount();
+    });
     global.window = prev.window;
     global.document = prev.document;
     global.navigator = prev.navigator;

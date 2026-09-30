@@ -25,7 +25,9 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
+  if (!condition) {
+    failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  }
 };
 
 (async () => {
@@ -65,7 +67,7 @@ const check = (what, condition, detail) => {
          React.createElement(GridSettings, {
            read, busy:false, setProp:()=>{}, clearProp:()=>{},
            onProvenance:()=>{}, onSelectSelector:()=>{}, onClose:()=>{},
-         })))`
+         })))`,
   );
   await esbuild.build({
     entryPoints: [entry],
@@ -87,12 +89,14 @@ const check = (what, condition, detail) => {
       'src/style-panel/utilities.css',
       'src/style-panel/components/IconButton.css',
       'src/style-panel/embed-editor.css',
-    ].map((f) => fs.readFileSync(path.join(root, f), 'utf8')).join('\n')
+    ]
+      .map((f) => fs.readFileSync(path.join(root, f), 'utf8'))
+      .join('\n'),
   );
   fs.writeFileSync(
     path.join(pageDir, 'index.html'),
     '<!doctype html><meta charset=utf-8><link rel="stylesheet" href="app.css">' +
-      '<style>body{margin:0;background:#1a1a1a}</style><div id="root"></div><script src="bundle.js"></script>'
+      '<style>body{margin:0;background:#1a1a1a}</style><div id="root"></div><script src="bundle.js"></script>',
   );
 
   const probe = path.join(pageDir, 'probe.js');
@@ -138,7 +142,7 @@ const check = (what, condition, detail) => {
        const hovered = await read();
        console.log(JSON.stringify({ resting, hovered }));
        app.quit();
-     });`
+     });`,
   );
 
   const { spawnSync } = require('child_process');
@@ -150,22 +154,38 @@ const check = (what, condition, detail) => {
     const { resting, hovered } = JSON.parse(line);
 
     // The premise: this really is a surface outside the host.
-    check('the modal is portaled out of the panel host', resting.portaledOutOfHost, 'it is inside the host — this test is no longer testing anything');
-    check('and carries the panel-surface scope', resting.inSurface, 'without it the global button rules apply');
+    check(
+      'the modal is portaled out of the panel host',
+      resting.portaledOutOfHost,
+      'it is inside the host — this test is no longer testing anything',
+    );
+    check(
+      'and carries the panel-surface scope',
+      resting.inSurface,
+      'without it the global button rules apply',
+    );
 
     // Left-aligned: the label starts at the row's left, not the middle of it.
     check('a track label is not centred', resting.justify !== 'center', resting.justify);
     check(
       'it sits at the left of its row',
       resting.labelInset < resting.mainWidth / 4,
-      `label is ${resting.labelInset}px into a ${resting.mainWidth}px row`
+      `label is ${resting.labelInset}px into a ${resting.mainWidth}px row`,
     );
 
     // Hover highlights the row, not a shape inside it.
     const painted = (c) => c && c !== 'rgba(0, 0, 0, 0)' && c !== 'transparent';
-    check('nothing is highlighted at rest', !painted(resting.rowBg) && !painted(resting.mainBg), JSON.stringify([resting.rowBg, resting.mainBg]));
+    check(
+      'nothing is highlighted at rest',
+      !painted(resting.rowBg) && !painted(resting.mainBg),
+      JSON.stringify([resting.rowBg, resting.mainBg]),
+    );
     check('hovering highlights the row', painted(hovered.rowBg), hovered.rowBg);
-    check('and not the button inside it', !painted(hovered.mainBg), `the button painted ${hovered.mainBg} — that is the pill`);
+    check(
+      'and not the button inside it',
+      !painted(hovered.mainBg),
+      `the button painted ${hovered.mainBg} — that is the pill`,
+    );
 
     // Every heading starts at the same edge. A head holding only its title had
     // that title as its last child too, and the rule that pushes a trailing
@@ -175,7 +195,7 @@ const check = (what, condition, detail) => {
     check(
       'every section heading starts at the same left edge',
       new Set(lefts).size === 1,
-      `${JSON.stringify(lefts)} — one of them is pushed out`
+      `${JSON.stringify(lefts)} — one of them is pushed out`,
     );
   }
 

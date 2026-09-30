@@ -350,7 +350,10 @@ function diffChildren(a: readonly string[], b: readonly string[]): DiffOp[] {
         continue;
       }
       for (let col = m - start - 1; col >= 0; col--) {
-        cur[col] = a[row + start] === b[col + start] ? (next[col + 1] ?? 0) + 1 : Math.max(next[col] ?? 0, cur[col + 1] ?? 0);
+        cur[col] =
+          a[row + start] === b[col + start]
+            ? (next[col + 1] ?? 0) + 1
+            : Math.max(next[col] ?? 0, cur[col + 1] ?? 0);
       }
     }
   }
@@ -401,7 +404,8 @@ function Ambiguous(what: string): Error {
 // contradicted wins, and scanning past one for a "better" match is exactly the
 // mistake. A same-tag node is still remembered as a last resort, for the case
 // where client code took one of the server's own classes away.
-const classesOf = (n: Element): string[] => (n.getAttribute('class') || '').split(/\s+/).filter(Boolean);
+const classesOf = (n: Element): string[] =>
+  (n.getAttribute('class') || '').split(/\s+/).filter(Boolean);
 
 // Every class the server put on the node is still on the live one. A node the
 // server gave no class to has to have none either — otherwise the test is
@@ -531,7 +535,13 @@ function patchNode(live: Node, prev: Node, next: Node): void {
     const liveText = asText(live) ? live : asComment(live) ? live : null;
     const prevData = (asText(prev) ? prev : asComment(prev) ? prev : null)?.data;
     const nextData = (asText(next) ? next : asComment(next) ? next : null)?.data;
-    if (liveText && prevData !== undefined && nextData !== undefined && prevData !== nextData && liveText.data === prevData) {
+    if (
+      liveText &&
+      prevData !== undefined &&
+      nextData !== undefined &&
+      prevData !== nextData &&
+      liveText.data === prevData
+    ) {
       liveText.data = nextData;
     }
     return;
@@ -589,7 +599,13 @@ function patchChildren(liveParent: Element, prevParent: Element, nextParent: Ele
         live = target.nextSibling;
       }
       // remove() lives on the leaf kinds, not on Node itself.
-      const removal = asElement(target) ? target : asText(target) ? target : asComment(target) ? target : null;
+      const removal = asElement(target)
+        ? target
+        : asText(target)
+          ? target
+          : asComment(target)
+            ? target
+            : null;
       removal?.remove();
     } else {
       const nextNode = after[j];
@@ -914,7 +930,12 @@ if (import.meta.hot) {
 }
 window.addEventListener('message', (e: MessageEvent) => {
   const data: unknown = e.data;
-  if (typeof data === 'object' && data !== null && 'type' in data && data['type'] === 'avb:patch-now') {
+  if (
+    typeof data === 'object' &&
+    data !== null &&
+    'type' in data &&
+    data['type'] === 'avb:patch-now'
+  ) {
     update();
   }
 });

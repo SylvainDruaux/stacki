@@ -477,10 +477,9 @@ test('parity, loop rename: each loop parameter renamed, every reference with it'
     if (node.kind !== 'map') {
       return [];
     }
-    const match =
-      /^([\s\S]+?)\.map\(\(\s*([\w$]+)\s*(?:,\s*([\w$]+)\s*)?\)\s*=>\s*\($/.exec(
-        node.head.trim(),
-      );
+    const match = /^([\s\S]+?)\.map\(\(\s*([\w$]+)\s*(?:,\s*([\w$]+)\s*)?\)\s*=>\s*\($/.exec(
+      node.head.trim(),
+    );
     if (match === null) {
       return [];
     }

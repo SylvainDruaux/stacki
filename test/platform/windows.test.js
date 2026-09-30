@@ -12,33 +12,43 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const { holdFromWindows, protocolLeftovers, realHost, scratch, sha256, windowsFilesystem } =
-  require('./support.js');
+const {
+  holdFromWindows,
+  protocolLeftovers,
+  realHost,
+  scratch,
+  sha256,
+  windowsFilesystem,
+} = require('./support.js');
 
 const windows = windowsFilesystem();
 const onWindows = { skip: windows.skip ?? false, timeout: 60_000 };
 
-test('a rename over a file held without delete sharing is write-failed, untouched', onWindows, async () => {
-  await scratch(windows.directory, async (root) => {
-    const file = path.join(root, 'page.astro');
-    fs.writeFileSync(file, 'old\n');
-    const documents = realHost();
-    const release = await holdFromWindows(windows, file, 'Read');
-    let report;
-    try {
-      report = documents.writeText(file, 'new\n', sha256('old\n'));
-    } finally {
-      await release();
-    }
-    assert.equal(report.tag, 'rejected');
-    assert.equal(report.reason, 'write-failed');
-    assert.match(report.message, /EACCES|EPERM|EBUSY/);
-    assert.equal(fs.readFileSync(file, 'utf8'), 'old\n', 'the target is untouched');
-    assert.deepEqual(protocolLeftovers(root), [], 'no temporary or lock file is left');
-    // Released: the same save, resubmitted deliberately, goes through.
-    assert.equal(documents.writeText(file, 'new\n', sha256('old\n')).tag, 'applied');
-  });
-});
+test(
+  'a rename over a file held without delete sharing is write-failed, untouched',
+  onWindows,
+  async () => {
+    await scratch(windows.directory, async (root) => {
+      const file = path.join(root, 'page.astro');
+      fs.writeFileSync(file, 'old\n');
+      const documents = realHost();
+      const release = await holdFromWindows(windows, file, 'Read');
+      let report;
+      try {
+        report = documents.writeText(file, 'new\n', sha256('old\n'));
+      } finally {
+        await release();
+      }
+      assert.equal(report.tag, 'rejected');
+      assert.equal(report.reason, 'write-failed');
+      assert.match(report.message, /EACCES|EPERM|EBUSY/);
+      assert.equal(fs.readFileSync(file, 'utf8'), 'old\n', 'the target is untouched');
+      assert.deepEqual(protocolLeftovers(root), [], 'no temporary or lock file is left');
+      // Released: the same save, resubmitted deliberately, goes through.
+      assert.equal(documents.writeText(file, 'new\n', sha256('old\n')).tag, 'applied');
+    });
+  },
+);
 
 test('a file held with delete sharing is replaced normally', onWindows, async () => {
   await scratch(windows.directory, async (root) => {

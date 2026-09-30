@@ -85,7 +85,12 @@ function applyEdits(text: string, edits: readonly Edit[]): string {
     const nodeValue = nodeRecord?.['value'];
     // Writing into the node that is already there keeps its style — the block
     // scalar, the quoting, the comment sitting beside it.
-    if (nodeRecord && nodeValue !== undefined && isPrimitive(value) && typeof nodeValue === typeof value) {
+    if (
+      nodeRecord &&
+      nodeValue !== undefined &&
+      isPrimitive(value) &&
+      typeof nodeValue === typeof value
+    ) {
       nodeRecord['value'] = value;
       continue;
     }

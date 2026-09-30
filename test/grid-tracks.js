@@ -19,7 +19,9 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
+  if (!condition) {
+    failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  }
 };
 
 (async () => {
@@ -43,7 +45,7 @@ const check = (what, condition, detail) => {
   check('so is one with plain tracks', trackForm('repeat(3, 1fr)') === 'repeat');
   check(
     'tracks written out that match are a list',
-    trackForm('minmax(0, 1fr) minmax(0, 1fr)') === 'list'
+    trackForm('minmax(0, 1fr) minmax(0, 1fr)') === 'list',
   );
   check('tracks that differ are neither', trackForm('200px 1fr auto') === 'mixed');
   check('and cannot be offered a repeat', asRepeat('200px 1fr auto') === '');
@@ -54,33 +56,42 @@ const check = (what, condition, detail) => {
   check(
     'an auto-fit repeat is left out of it',
     trackForm('repeat(auto-fit, minmax(20rem, 1fr))') === 'mixed',
-    trackForm('repeat(auto-fit, minmax(20rem, 1fr))')
+    trackForm('repeat(auto-fit, minmax(20rem, 1fr))'),
   );
 
   // --- saying it the other way ------------------------------------------------
   check(
     'a repeat writes out',
     asTrackList('repeat(2, minmax(0, 1fr))') === 'minmax(0, 1fr) minmax(0, 1fr)',
-    asTrackList('repeat(2, minmax(0, 1fr))')
+    asTrackList('repeat(2, minmax(0, 1fr))'),
   );
   check(
     'and the list collapses back to exactly what it was',
     asRepeat('minmax(0, 1fr) minmax(0, 1fr)') === 'repeat(2, minmax(0, 1fr))',
-    asRepeat('minmax(0, 1fr) minmax(0, 1fr)')
+    asRepeat('minmax(0, 1fr) minmax(0, 1fr)'),
   );
-  check('three of them too', asTrackList('repeat(3, 1fr)') === '1fr 1fr 1fr', asTrackList('repeat(3, 1fr)'));
+  check(
+    'three of them too',
+    asTrackList('repeat(3, 1fr)') === '1fr 1fr 1fr',
+    asTrackList('repeat(3, 1fr)'),
+  );
   check('and back', asRepeat('1fr 1fr 1fr') === 'repeat(3, 1fr)', asRepeat('1fr 1fr 1fr'));
 
   // The round trip is the point: whichever way it is written, it is the same
   // grid, so the tracks it describes must not change.
-  for (const value of ['repeat(2, minmax(0, 1fr))', 'repeat(4, 1fr)', '1fr 1fr', 'minmax(0, 1fr) minmax(0, 1fr)']) {
+  for (const value of [
+    'repeat(2, minmax(0, 1fr))',
+    'repeat(4, 1fr)',
+    '1fr 1fr',
+    'minmax(0, 1fr) minmax(0, 1fr)',
+  ]) {
     const there = asTrackList(value);
     const back = asRepeat(there) || there;
     check(
       `${value} says the same tracks whichever way round`,
       parseTrackList(there).join('|') === parseTrackList(back).join('|') &&
         parseTrackList(value).join('|') === parseTrackList(there).join('|'),
-      `${value} → ${there} → ${back}`
+      `${value} → ${there} → ${back}`,
     );
   }
 
@@ -92,8 +103,8 @@ const check = (what, condition, detail) => {
     fs.writeFileSync(
       entry,
       `export { default as GridSettings } from ${JSON.stringify(
-        path.join(__dirname, '..', 'src', 'style-panel', 'GridSettings.tsx')
-      )};\n`
+        path.join(__dirname, '..', 'src', 'style-panel', 'GridSettings.tsx'),
+      )};\n`,
     );
     const uiPath = path.join(buildDir, 'grid-settings.bundle.js');
     await esbuild.build({
@@ -149,13 +160,16 @@ const check = (what, condition, detail) => {
             busy: false,
             setProp: (prop, value, imp) => {
               written.push([prop, value, !!imp]);
-              if (prop === 'grid-template-columns') { columns = value; important = !!imp }
+              if (prop === 'grid-template-columns') {
+                columns = value;
+                important = !!imp;
+              }
             },
             clearProp: () => {},
             onProvenance: () => {},
             onSelectSelector: () => {},
             onClose: () => {},
-          })
+          }),
         );
         await new Promise((r) => setTimeout(r, 20));
       });
@@ -163,21 +177,27 @@ const check = (what, condition, detail) => {
     // last chose while it is open, which is the point, so a scenario that began
     // inside the last one would be testing that memory rather than the default.
     const show = async (value, imp = false) => {
-      await act(async () => { root.unmount(); await new Promise((r) => setTimeout(r, 5)); });
+      await act(async () => {
+        root.unmount();
+        await new Promise((r) => setTimeout(r, 5));
+      });
       root = createRoot(container);
       columns = value;
       important = imp;
       await paint();
     };
     const press = async (label) => {
-      await act(async () => { button(label)?.click(); await new Promise((r) => setTimeout(r, 10)); });
+      await act(async () => {
+        button(label)?.click();
+        await new Promise((r) => setTimeout(r, 10));
+      });
       await paint();
     };
     // The modal portals to <body>, so its controls are not under the root — and
     // the switch is an <input>, not a button.
     const button = (label) =>
       [...dom.window.document.querySelectorAll('button, input, textarea')].find(
-        (el) => (el.getAttribute('aria-label') || '') === label
+        (el) => (el.getAttribute('aria-label') || '') === label,
       );
 
     await show('repeat(2, minmax(0, 1fr))');
@@ -187,14 +207,15 @@ const check = (what, condition, detail) => {
     check(
       'with the words on it',
       /repeat\(\)/.test(sw()?.closest('label')?.textContent || ''),
-      sw()?.closest('label')?.textContent
+      sw()?.closest('label')?.textContent,
     );
 
     await press('Use repeat() for columns');
     check(
       'switching it off writes the tracks out',
-      JSON.stringify(written[0]) === '["grid-template-columns","minmax(0, 1fr) minmax(0, 1fr)",false]',
-      JSON.stringify(written[0])
+      JSON.stringify(written[0]) ===
+        '["grid-template-columns","minmax(0, 1fr) minmax(0, 1fr)",false]',
+      JSON.stringify(written[0]),
     );
 
     written.length = 0;
@@ -204,7 +225,7 @@ const check = (what, condition, detail) => {
     check(
       'switching it on writes the repeat',
       JSON.stringify(written[0]) === '["grid-template-columns","repeat(2, minmax(0, 1fr))",false]',
-      JSON.stringify(written[0])
+      JSON.stringify(written[0]),
     );
 
     // Adding a column to a repeat() keeps it one: the switch is how this list
@@ -218,7 +239,7 @@ const check = (what, condition, detail) => {
     check(
       'adding a third writes repeat(3, …)',
       JSON.stringify(written[0]) === '["grid-template-columns","repeat(3, minmax(0, 1fr))",false]',
-      JSON.stringify(written[0])
+      JSON.stringify(written[0]),
     );
 
     written.length = 0;
@@ -228,24 +249,33 @@ const check = (what, condition, detail) => {
       'and with the switch off the same edit writes them out',
       JSON.stringify(written[0]) ===
         '["grid-template-columns","minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr)",false]',
-      JSON.stringify(written[0])
+      JSON.stringify(written[0]),
     );
 
     // Nothing there yet: the switch starts on, so the first columns added are a
     // repeat() — the same form the count stepper writes.
     written.length = 0;
     await show('');
-    check('a grid with no tracks starts with it on', sw()?.checked === true, 'a new grid would be written out');
+    check(
+      'a grid with no tracks starts with it on',
+      sw()?.checked === true,
+      'a new grid would be written out',
+    );
     await press('Add a Columns');
     await press('Add a Columns');
     check(
       'so adding two writes a repeat',
-      JSON.stringify(written[1]) === '["grid-template-columns","repeat(2, minmax(0px, 1fr))",false]',
-      JSON.stringify(written)
+      JSON.stringify(written[1]) ===
+        '["grid-template-columns","repeat(2, minmax(0px, 1fr))",false]',
+      JSON.stringify(written),
     );
 
     await show('200px 1fr auto');
-    check('tracks that differ cannot be a repeat', sw()?.disabled === true, 'the switch was offered anyway');
+    check(
+      'tracks that differ cannot be a repeat',
+      sw()?.disabled === true,
+      'the switch was offered anyway',
+    );
     check('and it shows off', sw()?.checked === false);
 
     // --- the whole value as an expression ------------------------------------
@@ -257,7 +287,8 @@ const check = (what, condition, detail) => {
     const braces = () => button('Edit columns as an expression');
     // The expression editor is a textarea — the token editor's own hidden input
     // carries the same label, so ask for the one being typed into.
-    const field = () => dom.window.document.querySelector('textarea[aria-label="Columns expression"]');
+    const field = () =>
+      dom.window.document.querySelector('textarea[aria-label="Columns expression"]');
     check('the braces are offered', !!braces(), 'no expression toggle');
     check('and the list is what shows first', !field(), 'the expression field was already open');
 
@@ -265,20 +296,31 @@ const check = (what, condition, detail) => {
     check('pressing them opens one field for the whole value', !!field(), 'no expression field');
     // The editor the panel opens over a cramped value, in the panel instead of
     // over it: multi-line, and not a trigger for a box on top of a box.
-    check('as the multi-line editor, not a slot', field()?.tagName === 'TEXTAREA', field()?.tagName);
+    check(
+      'as the multi-line editor, not a slot',
+      field()?.tagName === 'TEXTAREA',
+      field()?.tagName,
+    );
     check(
       'with the value editor around it, so variables are chips',
       !!field()?.closest('.embed-editor_varconnect.is-multiline'),
-      field()?.parentElement?.className
+      field()?.parentElement?.className,
     );
     check(
       'and it says it is already the room a long value needs',
       /expanded/.test(
-        fs.readFileSync(path.join(__dirname, '..', 'src', 'style-panel', 'GridSettings.tsx'), 'utf8')
+        fs.readFileSync(
+          path.join(__dirname, '..', 'src', 'style-panel', 'GridSettings.tsx'),
+          'utf8',
+        ),
       ),
-      'a long value would open the popup over this field'
+      'a long value would open the popup over this field',
     );
-    check('holding what the property holds', field()?.value === 'repeat(2, minmax(0, 1fr))', field()?.value);
+    check(
+      'holding what the property holds',
+      field()?.value === 'repeat(2, minmax(0, 1fr))',
+      field()?.value,
+    );
     check('the repeat switch is not offered while it is open', sw()?.disabled === true);
     check('nor is adding a track', !button('Add a Columns'), 'the + is still there');
 
@@ -295,7 +337,10 @@ const check = (what, condition, detail) => {
         const el = field();
         // The field is a textarea now (the same editor the panel opens over a
         // cramped value, inline) — React patches the setter on its prototype.
-        const setValue = Object.getOwnPropertyDescriptor(dom.window.HTMLTextAreaElement.prototype, 'value').set;
+        const setValue = Object.getOwnPropertyDescriptor(
+          dom.window.HTMLTextAreaElement.prototype,
+          'value',
+        ).set;
         setValue.call(el, text);
         el.dispatchEvent(new dom.window.Event('input', { bubbles: true }));
         el.dispatchEvent(new dom.window.Event('focusout', { bubbles: true }));
@@ -310,13 +355,21 @@ const check = (what, condition, detail) => {
     check(
       'typing an expression writes it as it was typed',
       JSON.stringify(written[0]) === '["grid-template-columns","var(--layout-columns)",false]',
-      JSON.stringify(written[0])
+      JSON.stringify(written[0]),
     );
     // And now the tracks cannot hold it, so the way back is shut rather than
     // offering a list that would misread what was typed.
-    check('a value the tracks cannot hold locks the braces', braces()?.disabled === true, 'the way back was still open');
+    check(
+      'a value the tracks cannot hold locks the braces',
+      braces()?.disabled === true,
+      'the way back was still open',
+    );
     check('which stay pressed', braces()?.getAttribute('aria-pressed') === 'true');
-    check('with the field still showing it', field()?.value === 'var(--layout-columns)', field()?.value);
+    check(
+      'with the field still showing it',
+      field()?.value === 'var(--layout-columns)',
+      field()?.value,
+    );
 
     // !important is a value the track editors have no way to write, so it is
     // one of the things the field is for — and it comes back into the field.
@@ -327,10 +380,18 @@ const check = (what, condition, detail) => {
     check(
       'an !important is written as one',
       JSON.stringify(written[0]) === '["grid-template-columns","repeat(2, 1fr)",true]',
-      JSON.stringify(written[0])
+      JSON.stringify(written[0]),
     );
-    check('the field shows it back', field()?.value === 'repeat(2, 1fr) !important', field()?.value);
-    check('and the tracks stay out of it', braces()?.disabled === true, 'tracks offered to hold an !important');
+    check(
+      'the field shows it back',
+      field()?.value === 'repeat(2, 1fr) !important',
+      field()?.value,
+    );
+    check(
+      'and the tracks stay out of it',
+      braces()?.disabled === true,
+      'tracks offered to hold an !important',
+    );
 
     // A value that is tracks after all leaves the way back open.
     written.length = 0;
@@ -340,14 +401,22 @@ const check = (what, condition, detail) => {
     check(
       'a track list typed by hand is still a track list',
       JSON.stringify(written[0]) === '["grid-template-columns","200px 1fr auto",false]',
-      JSON.stringify(written[0])
+      JSON.stringify(written[0]),
     );
-    check('so the braces let go again', braces()?.disabled === false, 'locked into the field for a value tracks can hold');
+    check(
+      'so the braces let go again',
+      braces()?.disabled === false,
+      'locked into the field for a value tracks can hold',
+    );
 
     // A value the list would misread opens as an expression by itself: a
     // variable standing in for every track reads as one track named after it.
     await show('var(--layout-columns)');
-    check('a variable opens as an expression', !!field(), 'shown as a track called var(--layout-columns)');
+    check(
+      'a variable opens as an expression',
+      !!field(),
+      'shown as a track called var(--layout-columns)',
+    );
     check('with the value in it', field()?.value === 'var(--layout-columns)', field()?.value);
   }
 
@@ -370,17 +439,23 @@ const check = (what, condition, detail) => {
   {
     const vc = fs.readFileSync(
       path.join(__dirname, '..', 'src', 'style-panel', 'VariableConnect.tsx'),
-      'utf8'
+      'utf8',
     );
     check(
       'a field can say it is already expanded',
       /expanded\?: boolean/.test(vc),
-      'nothing stops the big editor opening over a big field'
+      'nothing stops the big editor opening over a big field',
     );
     // The guard has grown other reasons to bow out (the picker being open, for one);
     // what matters here is that `expanded` is one of them.
-    check('the press that opens it respects that', /if \(disabled \|\| big \|\| expanded[^)]*\) \{return/.test(vc));
-    check("and so does the '=' shortcut", /e\.key === '=' && !disabled && !big && !expanded/.test(vc));
+    check(
+      'the press that opens it respects that',
+      /if \(disabled \|\| big \|\| expanded[^)]*\) \{return/.test(vc),
+    );
+    check(
+      "and so does the '=' shortcut",
+      /e\.key === '=' && !disabled && !big && !expanded/.test(vc),
+    );
   }
 
   // --- the custom-value editor opens over the modal, not under it -------------
@@ -397,22 +472,23 @@ const check = (what, condition, detail) => {
     check('and below the tooltip layer', z < 10000, `z-index: ${z}`);
   }
 
-
   // --- the settings offer it --------------------------------------------------
   const settings = fs.readFileSync(
     path.join(__dirname, '..', 'src', 'style-panel', 'GridSettings.tsx'),
-    'utf8'
+    'utf8',
   );
   check('the grid settings have the switch', /function RepeatSwitch/.test(settings));
   check('on both track lists, since each is written its own way', /<RepeatSwitch/.test(settings));
   check(
     'and every edit writes the form it is showing',
     /const write = \(next: string\[\]\) => \{ const s = asWritten\(next\)/.test(settings),
-    'an edit would write in its own form regardless of the switch'
+    'an edit would write in its own form regardless of the switch',
   );
 
   if (failures.length) {
-    console.error(`\ngrid-tracks: ${failures.length} failed, ${checked - failures.length} passed\n`);
+    console.error(
+      `\ngrid-tracks: ${failures.length} failed, ${checked - failures.length} passed\n`,
+    );
     console.error(failures.join('\n') + '\n');
     process.exit(1);
   }

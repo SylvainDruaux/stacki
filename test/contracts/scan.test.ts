@@ -49,11 +49,19 @@ test('negative space: wrong entry shapes fail with pinned messages', () => {
     /route: expected string/,
   );
   assert.throws(
-    () => parseScanResult({ ...goodScan, components: [{ path: '/x', name: 'X', folder: '', isLayout: false }] }),
+    () =>
+      parseScanResult({
+        ...goodScan,
+        components: [{ path: '/x', name: 'X', folder: '', isLayout: false }],
+      }),
     /isLayout: only true is ever written/,
   );
   assert.throws(
-    () => parseScanResult({ ...goodScan, components: [{ path: '/x', name: 'X', folder: '', instances: 1.5 }] }),
+    () =>
+      parseScanResult({
+        ...goodScan,
+        components: [{ path: '/x', name: 'X', folder: '', instances: 1.5 }],
+      }),
     /instances: expected nonnegative integer/,
   );
   assert.throws(
@@ -65,19 +73,35 @@ test('negative space: wrong entry shapes fail with pinned messages', () => {
     /instances: expected nonnegative integer/,
   );
   assert.throws(
-    () => parseScanResult({ ...goodScan, components: [{ path: '/x', name: 'X', folder: '', slots: [1] }] }),
+    () =>
+      parseScanResult({
+        ...goodScan,
+        components: [{ path: '/x', name: 'X', folder: '', slots: [1] }],
+      }),
     /slots: expected strings/,
   );
   assert.throws(
-    () => parseScanResult({ ...goodScan, components: [{ path: '/x', name: 'X', folder: '', schema: {} }] }),
+    () =>
+      parseScanResult({
+        ...goodScan,
+        components: [{ path: '/x', name: 'X', folder: '', schema: {} }],
+      }),
     /schema: expected array of fields/,
   );
   assert.throws(
-    () => parseScanResult({ ...goodScan, components: [{ path: '/x', name: 'X', folder: '', schema: [{ type: 'string' }] }] }),
+    () =>
+      parseScanResult({
+        ...goodScan,
+        components: [{ path: '/x', name: 'X', folder: '', schema: [{ type: 'string' }] }],
+      }),
     /name: expected non-empty string/,
   );
   assert.throws(
-    () => parseScanResult({ ...goodScan, components: [{ path: '/x', name: 'X', folder: '', hasRest: 'yes' }] }),
+    () =>
+      parseScanResult({
+        ...goodScan,
+        components: [{ path: '/x', name: 'X', folder: '', hasRest: 'yes' }],
+      }),
     /hasRest: expected boolean/,
   );
 });
@@ -85,12 +109,19 @@ test('negative space: wrong entry shapes fail with pinned messages', () => {
 test('bounds: entry counts fail at LIMITS', () => {
   const page = goodScan.pages[0];
   assert.throws(
-    () => parseScanResult({ ...goodScan, pages: Array.from({ length: LIMITS.scanEntriesMax + 1 }, () => page) }),
+    () =>
+      parseScanResult({
+        ...goodScan,
+        pages: Array.from({ length: LIMITS.scanEntriesMax + 1 }, () => page),
+      }),
     /exceeds \d+ entries/,
   );
   assert.throws(
     () =>
-      parseScanResult({ ...goodScan, pageFolders: Array.from({ length: LIMITS.scanFoldersMax + 1 }, () => 'f') }),
+      parseScanResult({
+        ...goodScan,
+        pageFolders: Array.from({ length: LIMITS.scanFoldersMax + 1 }, () => 'f'),
+      }),
     /exceeds \d+ entries/,
   );
 });

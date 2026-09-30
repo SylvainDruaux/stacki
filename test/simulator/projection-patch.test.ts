@@ -195,7 +195,7 @@ const EXPRESSION_PAGES = [
   // The value in each JavaScript-scanner mode: a string, code (the text's quote
   // closes at the value's opening quote), a block comment, a template literal,
   // after a line comment, and after a URL's `//`.
-  "{show && <p>it's <a title=\"x\">y</a></p>}\n",
+  '{show && <p>it\'s <a title="x">y</a></p>}\n',
   '{show && <p>say "hi <a title="x">y</a></p>}\n',
   '{show && <p>x /* y <a title="x">y</a> z */ w</p>}\n',
   '{show && <p>tick ` a <a title="x">y</a> b ` tock</p>}\n',

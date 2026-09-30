@@ -388,12 +388,7 @@ function parseBlocks(lines: readonly Line[], env: ParseEnv, depth: number): Mark
 // The first reader that recognises the line decides the block. The order is
 // the parser's grammar: a thematic break before lists (`- - -` is a rule, not
 // three bullets), a table before a paragraph.
-function readBlock(
-  lines: readonly Line[],
-  index: number,
-  env: ParseEnv,
-  depth: number,
-): BlockRead {
+function readBlock(lines: readonly Line[], index: number, env: ParseEnv, depth: number): BlockRead {
   return (
     readEsm(lines, index, env) ??
     readMarkup(lines, index, env) ??

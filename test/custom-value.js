@@ -23,7 +23,9 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
+  if (!condition) {
+    failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  }
 };
 
 (async () => {
@@ -79,7 +81,11 @@ const check = (what, condition, detail) => {
     // The value is drawn wider than the box holding it — the only reliable
     // answer, and the reason character counting is a fallback rather than the
     // rule.
-    check('a value drawn wider than its field does not fit', doesNotFit(fieldWith(100, 240), 'short'), 'measured overflow missed');
+    check(
+      'a value drawn wider than its field does not fit',
+      doesNotFit(fieldWith(100, 240), 'short'),
+      'measured overflow missed',
+    );
     check('one that fits, fits', !doesNotFit(fieldWith(240, 240), 'short'));
     // A pixel of slack, so a value that exactly fills its field is not treated
     // as overflowing by a rounding error.
@@ -89,7 +95,10 @@ const check = (what, condition, detail) => {
     // Before layout — and in every headless render — clientWidth is 0. Falling
     // back to the count is what keeps the decision sane there rather than
     // deciding everything fits.
-    check('an unlaid-out field falls back to counting', doesNotFit(fieldWith(0, 0), 'x'.repeat(40)));
+    check(
+      'an unlaid-out field falls back to counting',
+      doesNotFit(fieldWith(0, 0), 'x'.repeat(40)),
+    );
     check('and still says short values fit', !doesNotFit(fieldWith(0, 0), '10px'));
 
     // The rich token editor is what is visible when a value has a chip in it;
@@ -101,13 +110,20 @@ const check = (what, condition, detail) => {
     Object.defineProperty(rich, 'clientWidth', { value: 100 });
     Object.defineProperty(rich, 'scrollWidth', { value: 300 });
     both.insertBefore(rich, both.firstChild);
-    check('the visible editor is the one measured', doesNotFit(both, 'short'), 'measured the hidden input instead');
+    check(
+      'the visible editor is the one measured',
+      doesNotFit(both, 'short'),
+      'measured the hidden input instead',
+    );
 
     // A style-panel field is a plain <input> with neither class, and it has to
     // be found too or the panel would never open the box by measurement.
     check('a bare input is found as well', doesNotFit(fieldWith(100, 300, 'u-input'), 'short'));
     // Nothing to measure at all: fall back rather than throw.
-    check('a container with no field falls back', doesNotFit(dom.window.document.createElement('div'), 'x'.repeat(40)));
+    check(
+      'a container with no field falls back',
+      doesNotFit(dom.window.document.createElement('div'), 'x'.repeat(40)),
+    );
   }
 
   // --- Picking a variable inside an expression ------------------------------
@@ -117,17 +133,17 @@ const check = (what, condition, detail) => {
     check(
       'a variable swap keeps the calc around it',
       withBinding('calc(var(--a) + 10px)', 'var(--b)') === 'calc(var(--b) + 10px)',
-      withBinding('calc(var(--a) + 10px)', 'var(--b)')
+      withBinding('calc(var(--a) + 10px)', 'var(--b)'),
     );
     check(
       'a value with no variable becomes the binding',
       withBinding('10px', 'var(--b)') === 'var(--b)',
-      withBinding('10px', 'var(--b)')
+      withBinding('10px', 'var(--b)'),
     );
     check(
       'only the first reference is replaced',
       withBinding('calc(var(--a) + var(--c))', 'var(--b)') === 'calc(var(--b) + var(--c))',
-      withBinding('calc(var(--a) + var(--c))', 'var(--b)')
+      withBinding('calc(var(--a) + var(--c))', 'var(--b)'),
     );
   }
 
@@ -143,7 +159,8 @@ const check = (what, condition, detail) => {
   // `)` past a variable chip looked like it saved and reopened unchanged.
   {
     const { JSDOM: JSDOM2 } = require('jsdom');
-    const win = new JSDOM2('<!doctype html><div id="root"></div>', { pretendToBeVisual: true }).window;
+    const win = new JSDOM2('<!doctype html><div id="root"></div>', { pretendToBeVisual: true })
+      .window;
     const prev = { window: global.window, document: global.document, navigator: global.navigator };
     global.window = win;
     global.document = win.document;
@@ -153,7 +170,11 @@ const check = (what, condition, detail) => {
     global.HTMLElement = win.HTMLElement;
     global.HTMLInputElement = win.HTMLInputElement;
     global.HTMLTextAreaElement = win.HTMLTextAreaElement;
-    global.ResizeObserver = class { observe() {} unobserve() {} disconnect() {} };
+    global.ResizeObserver = class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    };
     win.ResizeObserver = global.ResizeObserver;
     global.IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -163,7 +184,10 @@ const check = (what, condition, detail) => {
     const { CustomValue } = require(bundlePath);
     const saved = [];
     const root = createRoot(win.document.getElementById('root'));
-    const settle = () => act(async () => { await new Promise((r) => win.setTimeout(r, 20)); });
+    const settle = () =>
+      act(async () => {
+        await new Promise((r) => win.setTimeout(r, 20));
+      });
 
     await act(async () => {
       root.render(
@@ -173,7 +197,7 @@ const check = (what, condition, detail) => {
           anchor: { left: 10, top: 10, bottom: 40, right: 200, width: 190, height: 30 },
           onSave: (v) => saved.push(v),
           onCancel: () => saved.push('CANCELLED'),
-        })
+        }),
       );
     });
     await settle();
@@ -188,8 +212,15 @@ const check = (what, condition, detail) => {
       await act(async () => {
         rich.focus();
         const findParen = (n) => {
-          if (n.nodeType === 3 && n.textContent.includes(')')) {return n;}
-          for (const c of n.childNodes) { const r = findParen(c); if (r) {return r;} }
+          if (n.nodeType === 3 && n.textContent.includes(')')) {
+            return n;
+          }
+          for (const c of n.childNodes) {
+            const r = findParen(c);
+            if (r) {
+              return r;
+            }
+          }
           return null;
         };
         const textNode = findParen(rich);
@@ -203,7 +234,7 @@ const check = (what, condition, detail) => {
       check(
         'every keystroke reaches the value behind the field',
         win.document.querySelector('.var-custom-input')?.value === 'calc(2rem + var(--nav-height))',
-        win.document.querySelector('.var-custom-input')?.value
+        win.document.querySelector('.var-custom-input')?.value,
       );
       // Closed by pressing outside it.
       await act(async () => {
@@ -213,12 +244,14 @@ const check = (what, condition, detail) => {
       check(
         'closing it saves what the rich field holds',
         saved[0] === 'calc(2rem + var(--nav-height))',
-        JSON.stringify(saved)
+        JSON.stringify(saved),
       );
     }
     // The box focuses its field on a timer of its own; unmount inside act so that
     // last update doesn't land outside one (React warns, and the suite prints it).
-    await act(async () => { root.unmount(); });
+    await act(async () => {
+      root.unmount();
+    });
     global.window = prev.window;
     global.document = prev.document;
     global.navigator = prev.navigator;

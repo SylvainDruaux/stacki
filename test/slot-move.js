@@ -20,7 +20,9 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
+  if (!condition) {
+    failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  }
 };
 
 (async () => {
@@ -44,25 +46,37 @@ const check = (what, condition, detail) => {
   // --- where it still means something -------------------------------------------
   check(
     'inside the component whose slot it names, it stays',
-    keepsSlot({ slotName: 'column2', host: wrapper, definition }) === true
+    keepsSlot({ slotName: 'column2', host: wrapper, definition }) === true,
   );
   check(
     'and inside another component that has the same slot',
-    keepsSlot({ slotName: 'column2', host: { kind: 'component', name: 'Split' }, definition: { slots: ['column2'] } }) === true
+    keepsSlot({
+      slotName: 'column2',
+      host: { kind: 'component', name: 'Split' },
+      definition: { slots: ['column2'] },
+    }) === true,
   );
 
   // --- and where it does not -------------------------------------------------------
   check(
     'dragged out into the open, it goes',
-    keepsSlot({ slotName: 'column2', host: null, definition: null }) === false
+    keepsSlot({ slotName: 'column2', host: null, definition: null }) === false,
   );
   check(
     'and into a component with no such slot',
-    keepsSlot({ slotName: 'column2', host: { kind: 'component', name: 'Card' }, definition: { slots: ['default'] } }) === false
+    keepsSlot({
+      slotName: 'column2',
+      host: { kind: 'component', name: 'Card' },
+      definition: { slots: ['default'] },
+    }) === false,
   );
   check(
     'a component with no slots at all is no different',
-    keepsSlot({ slotName: 'column2', host: { kind: 'component', name: 'Img' }, definition: { slots: [] } }) === false
+    keepsSlot({
+      slotName: 'column2',
+      host: { kind: 'component', name: 'Img' },
+      definition: { slots: [] },
+    }) === false,
   );
 
   // --- and where it cannot be said -----------------------------------------------------
@@ -72,35 +86,50 @@ const check = (what, condition, detail) => {
   // wrote for a reason they can no longer see.
   check(
     'a component this project never scanned keeps it',
-    keepsSlot({ slotName: 'column2', host: { kind: 'component', name: 'FromAPackage' }, definition: null }) === true
+    keepsSlot({
+      slotName: 'column2',
+      host: { kind: 'component', name: 'FromAPackage' },
+      definition: null,
+    }) === true,
   );
   check(
     'and a node asking for nothing has nothing to lose',
-    keepsSlot({ slotName: null, host: null, definition: null }) === true
+    keepsSlot({ slotName: null, host: null, definition: null }) === true,
   );
   check(
     'nor does one asking in code, whose value this cannot read',
-    keepsSlot({ slotName: '', host: null, definition: null }) === true
+    keepsSlot({ slotName: '', host: null, definition: null }) === true,
   );
 
   // --- the move asks -----------------------------------------------------------------
   const app = fs.readFileSync(path.join(__dirname, '..', 'src', 'App.tsx'), 'utf8');
-  const move = app.slice(app.indexOf('const moveNode = useCallback'), app.indexOf('const removeNode = useCallback'));
-  check('a move asks about the slot it carries', /keepsSlot\(\{ slotName, host, definition \}\)/.test(move), 'the slot is not reconsidered on a move');
+  const move = app.slice(
+    app.indexOf('const moveNode = useCallback'),
+    app.indexOf('const removeNode = useCallback'),
+  );
+  check(
+    'a move asks about the slot it carries',
+    /keepsSlot\(\{ slotName, host, definition \}\)/.test(move),
+    'the slot is not reconsidered on a move',
+  );
   // Step 6: the move is a gesture (src/editGestures.ts, moveGesture), which
   // asks the app's rule of the model after the move and removes the slot
   // first — as a request, and from the shown model.
-  const gestureSource = fs.readFileSync(path.join(__dirname, '..', 'src', 'editGestures.ts'), 'utf8');
+  const gestureSource = fs.readFileSync(
+    path.join(__dirname, '..', 'src', 'editGestures.ts'),
+    'utf8',
+  );
   check(
     'and drops it when the answer is no',
     /tag: 'remove-attribute', target, name: 'slot'/.test(gestureSource) &&
       /patchedProps\(node\.props, \{ slot: undefined \}\)/.test(gestureSource),
-    'nothing removes it'
+    'nothing removes it',
   );
   check(
     'the host is the component it landed in, not the node above it',
-    /slotHostOf\(model, id\)/.test(move) && /rules\.keepsSlot\(landing\.model, nodeId\)/.test(gestureSource),
-    'a wrapper element would be read as the host'
+    /slotHostOf\(model, id\)/.test(move) &&
+      /rules\.keepsSlot\(landing\.model, nodeId\)/.test(gestureSource),
+    'a wrapper element would be read as the host',
   );
 
   if (failures.length) {

@@ -28,7 +28,9 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
+  if (!condition) {
+    failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  }
 };
 
 const STYLESHEET = `:root {
@@ -119,14 +121,20 @@ const STYLESHEET = `:root {
          writeStyleFile: async () => ({ ok: true }),
        };
      </script>
-     <script src="bundle.js"></script>`
+     <script src="bundle.js"></script>`,
   );
 
   const electronPath = (() => {
-    try { return require('electron'); } catch { return null; }
+    try {
+      return require('electron');
+    } catch {
+      return null;
+    }
   })();
   if (typeof electronPath !== 'string') {
-    console.log('vars-row-height: skipped — no Electron to lay it out in (see test/gap-bands.js for the pattern)');
+    console.log(
+      'vars-row-height: skipped — no Electron to lay it out in (see test/gap-bands.js for the pattern)',
+    );
     return;
   }
 
@@ -225,7 +233,7 @@ const STYLESHEET = `:root {
 
        console.log(JSON.stringify(out));
        app.quit();
-     });`
+     });`,
   );
 
   const { spawnSync } = require('child_process');
@@ -236,44 +244,130 @@ const STYLESHEET = `:root {
   } else {
     const out = JSON.parse(line);
     check('the sheet renders its rows', out.before?.heads > 0, JSON.stringify(out.before));
-    check('a name opens a field when clicked', out.clicked === true && out.after != null, JSON.stringify(out.after));
-    check('the row keeps its height', out.after && out.before.rowH === out.after.rowH, `${out.before?.rowH} → ${out.after?.rowH}`);
-    check('so the row below it does not move', out.after && out.before.nextTop === out.after.nextTop, `${out.before?.nextTop} → ${out.after?.nextTop}`);
-    check('and the field is a real box, not a collapsed one', out.after?.fieldH >= 16, `${out.after?.fieldH}px`);
+    check(
+      'a name opens a field when clicked',
+      out.clicked === true && out.after != null,
+      JSON.stringify(out.after),
+    );
+    check(
+      'the row keeps its height',
+      out.after && out.before.rowH === out.after.rowH,
+      `${out.before?.rowH} → ${out.after?.rowH}`,
+    );
+    check(
+      'so the row below it does not move',
+      out.after && out.before.nextTop === out.after.nextTop,
+      `${out.before?.nextTop} → ${out.after?.nextTop}`,
+    );
+    check(
+      'and the field is a real box, not a collapsed one',
+      out.after?.fieldH >= 16,
+      `${out.after?.fieldH}px`,
+    );
     // Measured with the menu present — a control in the heading is exactly what
     // pushed the two stacks apart, by landing on a second grid row.
     const drift = (out.stacks || []).filter((t) => t.mismatched > 0);
-    check('the names and the values line up, row for row', drift.length === 0, JSON.stringify(drift));
+    check(
+      'the names and the values line up, row for row',
+      drift.length === 0,
+      JSON.stringify(drift),
+    );
     // The names stack carries one line the values stack does not — the "New
     // variable" row, which has nothing to show on the value side (the scrollbar
     // sits on that line instead). Anything beyond that is a stack out of step.
-    check('and neither stack has a line the other lacks', (out.stacks || []).every((t) => t.extraIsAddRow), JSON.stringify((out.stacks || []).map((t) => t.counts)));
+    check(
+      'and neither stack has a line the other lacks',
+      (out.stacks || []).every((t) => t.extraIsAddRow),
+      JSON.stringify((out.stacks || []).map((t) => t.counts)),
+    );
     check('the heading has a menu', out.menuRows != null, String(out.menu));
-    check('offering rename, duplicate and delete', out.menuRows?.labels.join('|') === 'Rename|Duplicate|Delete', JSON.stringify(out.menuRows?.labels));
-    check('its rows start at the left, not the middle', out.menuRows?.justify === 'flex-start', out.menuRows?.justify);
-    check('so every row begins in the same place', out.menuRows?.sameStart === true, JSON.stringify(out.menuRows?.iconLefts));
+    check(
+      'offering rename, duplicate and delete',
+      out.menuRows?.labels.join('|') === 'Rename|Duplicate|Delete',
+      JSON.stringify(out.menuRows?.labels),
+    );
+    check(
+      'its rows start at the left, not the middle',
+      out.menuRows?.justify === 'flex-start',
+      out.menuRows?.justify,
+    );
+    check(
+      'so every row begins in the same place',
+      out.menuRows?.sameStart === true,
+      JSON.stringify(out.menuRows?.iconLefts),
+    );
     // The drag, end to end: it must ask to move the line it was given, and aim
     // it at the group it was dropped on rather than at the end of everything.
-    check('a variable can be dragged out of its group', out.drag?.grabbed && out.drag?.dropped, JSON.stringify(out.drag));
-    check('and the drop asks for one move', out.drag?.moves?.length === 1, JSON.stringify(out.drag?.moves));
-    check('of the variable that was dragged', out.drag?.moves?.[0]?.name === '--light-200', JSON.stringify(out.drag?.moves?.[0]));
+    check(
+      'a variable can be dragged out of its group',
+      out.drag?.grabbed && out.drag?.dropped,
+      JSON.stringify(out.drag),
+    );
+    check(
+      'and the drop asks for one move',
+      out.drag?.moves?.length === 1,
+      JSON.stringify(out.drag?.moves),
+    );
+    check(
+      'of the variable that was dragged',
+      out.drag?.moves?.[0]?.name === '--light-200',
+      JSON.stringify(out.drag?.moves?.[0]),
+    );
     // Into the empty group means "in front of the comment that ends it" — the
     // next variable is on the far side of that comment and would put the line in
     // the group after this one (see test/vars-drop.js).
-    check('landing inside the group it was dropped on', typeof out.drag?.moves?.[0]?.at === 'number', JSON.stringify(out.drag?.moves?.[0]));
-    check('a heading can be dragged by its name too', out.headingDrag?.grabbed && out.headingDrag?.asked != null, JSON.stringify(out.headingDrag));
-    check('and it asks to move the heading, not its variables', out.headingDrag?.asked?.expect === 'Radius', JSON.stringify(out.headingDrag?.asked));
-    check('landing above the variable it was dropped on', out.headingDrag?.asked?.before === '--light-200', JSON.stringify(out.headingDrag?.asked));
-    check('a comment heading can be renamed as well', out.commentBefore?.renamable === true, JSON.stringify(out.commentBefore));
-    check('and opens with the heading in it', out.commentAfter?.value === out.commentBefore?.text, `${out.commentAfter?.value} vs ${out.commentBefore?.text}`);
-    check('without moving the sheet either', out.commentBefore?.h === out.commentAfter?.h, `${out.commentBefore?.h} → ${out.commentAfter?.h}`);
-    check('a shared-prefix heading opens a field', out.headClicked === true && out.headAfter != null, String(out.headAfter));
-    check('and keeps its height as well', out.headBefore === out.headAfter, `${out.headBefore} → ${out.headAfter}`);
+    check(
+      'landing inside the group it was dropped on',
+      typeof out.drag?.moves?.[0]?.at === 'number',
+      JSON.stringify(out.drag?.moves?.[0]),
+    );
+    check(
+      'a heading can be dragged by its name too',
+      out.headingDrag?.grabbed && out.headingDrag?.asked != null,
+      JSON.stringify(out.headingDrag),
+    );
+    check(
+      'and it asks to move the heading, not its variables',
+      out.headingDrag?.asked?.expect === 'Radius',
+      JSON.stringify(out.headingDrag?.asked),
+    );
+    check(
+      'landing above the variable it was dropped on',
+      out.headingDrag?.asked?.before === '--light-200',
+      JSON.stringify(out.headingDrag?.asked),
+    );
+    check(
+      'a comment heading can be renamed as well',
+      out.commentBefore?.renamable === true,
+      JSON.stringify(out.commentBefore),
+    );
+    check(
+      'and opens with the heading in it',
+      out.commentAfter?.value === out.commentBefore?.text,
+      `${out.commentAfter?.value} vs ${out.commentBefore?.text}`,
+    );
+    check(
+      'without moving the sheet either',
+      out.commentBefore?.h === out.commentAfter?.h,
+      `${out.commentBefore?.h} → ${out.commentAfter?.h}`,
+    );
+    check(
+      'a shared-prefix heading opens a field',
+      out.headClicked === true && out.headAfter != null,
+      String(out.headAfter),
+    );
+    check(
+      'and keeps its height as well',
+      out.headBefore === out.headAfter,
+      `${out.headBefore} → ${out.headAfter}`,
+    );
   }
 
   fs.rmSync(dir, { recursive: true, force: true });
   if (failures.length) {
-    console.error(`vars-row-height: ${failures.length} of ${checked} failed\n${failures.join('\n')}`);
+    console.error(
+      `vars-row-height: ${failures.length} of ${checked} failed\n${failures.join('\n')}`,
+    );
     process.exit(1);
   }
   console.log(`vars-row-height: ${checked} passed  [real sheet, real click, measured]`);

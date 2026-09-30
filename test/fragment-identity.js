@@ -24,7 +24,9 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
+  if (!condition) {
+    failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  }
 };
 
 (async () => {
@@ -46,8 +48,14 @@ const check = (what, condition, detail) => {
 
   // --- what renders something of its own ------------------------------------
   check('a div does', rendersOwnElement({ kind: 'element', name: 'div' }) === true);
-  check('and a component does', rendersOwnElement({ kind: 'component', name: 'FeatureImage' }) === true);
-  check('a Fragment does not', rendersOwnElement({ kind: 'component', name: 'Fragment' }) === false);
+  check(
+    'and a component does',
+    rendersOwnElement({ kind: 'component', name: 'FeatureImage' }) === true,
+  );
+  check(
+    'a Fragment does not',
+    rendersOwnElement({ kind: 'component', name: 'Fragment' }) === false,
+  );
   check('nor does a slot', rendersOwnElement({ kind: 'element', name: 'slot' }) === false);
   check('and nothing at all is nothing', rendersOwnElement(null) === false);
 
@@ -56,12 +64,14 @@ const check = (what, condition, detail) => {
   check(
     'the app builds its labels through it',
     /classesByNodeId\(nodeClasses, model\.nodes/.test(app),
-    'the app walks the tree itself and the rule is somewhere else'
+    'the app walks the tree itself and the rule is somewhere else',
   );
   check(
     'and the same question decides what "renders nothing" is a fact about',
-    /const answers = \(node: EditorNode\): boolean =>\s*MARKABLE\.has\(node\.kind\) && rendersOwnElement\(node\)/.test(app),
-    'the two places disagree about what a Fragment renders'
+    /const answers = \(node: EditorNode\): boolean =>\s*MARKABLE\.has\(node\.kind\) && rendersOwnElement\(node\)/.test(
+      app,
+    ),
+    'the two places disagree about what a Fragment renders',
   );
 
   // --- the navigator, with the map the app would build -------------------------
@@ -89,7 +99,11 @@ const check = (what, condition, detail) => {
   global.IS_REACT_ACT_ENVIRONMENT = true;
   global.requestAnimationFrame = (fn) => setTimeout(fn, 0);
   global.cancelAnimationFrame = clearTimeout;
-  global.ResizeObserver = class { observe() {} unobserve() {} disconnect() {} };
+  global.ResizeObserver = class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  };
   dom.window.ResizeObserver = global.ResizeObserver;
 
   const React = require('react');
@@ -111,7 +125,13 @@ const check = (what, condition, detail) => {
   // An element whose class the source cannot show — `class:list={[…]}` — is
   // the reason rows are named after what the page reports at all.
   const listed = { id: 'listed', kind: 'element', name: 'div', props: {} };
-  const wrapper = { id: 'wrap', kind: 'component', name: 'ContentWrapper', props: {}, children: [fragment, listed] };
+  const wrapper = {
+    id: 'wrap',
+    kind: 'component',
+    name: 'ContentWrapper',
+    props: {},
+    children: [fragment, listed],
+  };
 
   const container = document.getElementById('root');
   const root = createRoot(container);
@@ -125,9 +145,9 @@ const check = (what, condition, detail) => {
     {
       '0.0': ['feature-image_wrap', 'is-condensed'],
       '0.0.0': ['feature-image_wrap', 'is-condensed'],
-      '0.1': ['card_wrap'],
+      0.1: ['card_wrap'],
     },
-    [wrapper]
+    [wrapper],
   );
   await act(async () => {
     root.render(
@@ -145,11 +165,12 @@ const check = (what, condition, detail) => {
         onDuplicateNode: () => {},
         onPasteNode: () => {},
         onChangeLayout: () => {},
-        onCodeChange: () => {}, onOpenCodePanel: () => {},
+        onCodeChange: () => {},
+        onOpenCodePanel: () => {},
         onHoverNode: () => {},
         onOpenComponent: () => {},
         hasClipboard: false,
-      })
+      }),
     );
     await new Promise((r) => setTimeout(r, 30));
   });
@@ -159,17 +180,24 @@ const check = (what, condition, detail) => {
   });
 
   const labelOf = (id) =>
-    container.querySelector(`.structure-node[data-node-id="${id}"] .label`)?.textContent?.trim() || '';
+    container.querySelector(`.structure-node[data-node-id="${id}"] .label`)?.textContent?.trim() ||
+    '';
   check('the Fragment says what it is', labelOf('frag') === 'Fragment', labelOf('frag'));
-  check('the component it holds says what IT is', labelOf('img') === 'FeatureImage', labelOf('img'));
+  check(
+    'the component it holds says what IT is',
+    labelOf('img') === 'FeatureImage',
+    labelOf('img'),
+  );
   check(
     'and an element still wears the class the page says it rendered with',
     labelOf('listed') === 'card_wrap',
-    labelOf('listed')
+    labelOf('listed'),
   );
 
   if (failures.length) {
-    console.error(`\nfragment-identity: ${failures.length} failed, ${checked - failures.length} passed\n`);
+    console.error(
+      `\nfragment-identity: ${failures.length} failed, ${checked - failures.length} passed\n`,
+    );
     console.error(failures.join('\n') + '\n');
     process.exit(1);
   }

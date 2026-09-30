@@ -25,7 +25,10 @@ export class Prng {
       this.state[index] = (z ^ (z >>> 16)) >>> 0;
     }
     // xoshiro's one forbidden state is all zeros; splitmix never produces it.
-    assert(this.state.some((word) => word !== 0), 'Seeded state is not all zeros');
+    assert(
+      this.state.some((word) => word !== 0),
+      'Seeded state is not all zeros',
+    );
   }
 
   nextUint32(): number {

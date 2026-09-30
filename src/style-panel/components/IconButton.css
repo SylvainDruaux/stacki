@@ -15,15 +15,25 @@
   background: var(--color-bg-surface);
   color: var(--color-text-secondary);
   cursor: pointer;
-  transition: background var(--transition-fast), color var(--transition-fast);
+  transition:
+    background var(--transition-fast),
+    color var(--transition-fast);
 }
 .icon-button:hover {
   background: var(--color-bg-surface-raised);
   color: var(--color-text-primary);
 }
-.icon-button:active { background: var(--color-bg-active); }
-.icon-button:disabled { opacity: 0.4; cursor: not-allowed; }
-.icon-button:focus-visible { outline: none; box-shadow: var(--shadow-focus); }
+.icon-button:active {
+  background: var(--color-bg-active);
+}
+.icon-button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.icon-button:focus-visible {
+  outline: none;
+  box-shadow: var(--shadow-focus);
+}
 
 /* Compact variant for the app header. */
 .icon-button.is-sm {

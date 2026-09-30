@@ -47,7 +47,7 @@ export function readComponentProperties(source: string): ComponentProperties {
   return {
     source,
     properties: [...fields.values()].map((property) =>
-      sourcedProperty(property, definitions, origins, contracts)
+      sourcedProperty(property, definitions, origins, contracts),
     ),
     frontmatter: definitions.document.frontmatter,
     advanced: definitions.advanced,
@@ -124,10 +124,10 @@ function sourcedProperty(
   property: ComponentProperty,
   definitions: Definitions,
   origins: PropertyOrigins,
-  contracts: PropertyContracts
+  contracts: PropertyContracts,
 ): ComponentProperty {
   const binding = definitions.bindings.find(
-    (item) => propertyKey(item.propertyName ?? item.name) === property.name
+    (item) => propertyKey(item.propertyName ?? item.name) === property.name,
   );
   const types = (origins.members.get(property.name) ?? [])
     .flatMap((member) => (member.type ? [definitions.readType(member.type)] : []))
@@ -157,7 +157,7 @@ function sourcedProperty(
 function contractEditing(
   definitions: Definitions,
   contracts: PropertyContracts,
-  name: string
+  name: string,
 ): PropertyEditing {
   if (
     definitions.patterns.length > 1 ||
@@ -207,7 +207,7 @@ export function editPropertyDefinition(source: string, change: PropertyChange): 
 
 function editCommonDefinition(
   definitions: Definitions,
-  change: Exclude<PropertyChange, { readonly kind: 'source' }>
+  change: Exclude<PropertyChange, { readonly kind: 'source' }>,
 ): Result<string> {
   if (change.kind === 'order' || (change.kind === 'save' && !change.originalName)) {
     return err({
@@ -251,7 +251,7 @@ function readDefinitions(source: string): Definitions {
   const declarations = document.syntax.statements.filter(
     (statement): statement is ts.InterfaceDeclaration | ts.TypeAliasDeclaration =>
       (ts.isInterfaceDeclaration(statement) || ts.isTypeAliasDeclaration(statement)) &&
-      statement.name.text === 'Props'
+      statement.name.text === 'Props',
   );
   const declaration = declarations[0];
   const container = definitionContainer(declaration);
@@ -266,11 +266,11 @@ function readDefinitions(source: string): Definitions {
     .filter((binding) => !binding.dotDotDotToken);
   const typedProps = syntaxNodes(document.syntax).some(
     (node) =>
-      ts.isAsExpression(node) && isAstroProps(node.expression) && node.type.getText() !== 'Props'
+      ts.isAsExpression(node) && isAstroProps(node.expression) && node.type.getText() !== 'Props',
   );
   const imported = document.syntax.statements.some(
     (statement) =>
-      ts.isImportDeclaration(statement) && statement.importClause?.getText().match(/\bProps\b/)
+      ts.isImportDeclaration(statement) && statement.importClause?.getText().match(/\bProps\b/),
   );
   const advanced =
     declarations.length > 1 ||
@@ -301,7 +301,7 @@ function readDefinitions(source: string): Definitions {
 }
 
 function definitionContainer(
-  declaration: ts.InterfaceDeclaration | ts.TypeAliasDeclaration | undefined
+  declaration: ts.InterfaceDeclaration | ts.TypeAliasDeclaration | undefined,
 ): ts.InterfaceDeclaration | ts.TypeLiteralNode | undefined {
   if (!declaration || ts.isInterfaceDeclaration(declaration)) {
     return declaration;
@@ -338,7 +338,7 @@ function renderDefinition(property: ComponentProperty): string {
 function saveDefinition(
   definitions: Definitions,
   originalName: string,
-  property: ComponentProperty
+  property: ComponentProperty,
 ): Result<string> {
   const valid = validatePropertyCode(property.type, property.defaultValue);
   if (!valid.ok) {
@@ -403,10 +403,10 @@ function saveDefinition(
 function saveDefinitionOptions(
   definitions: Definitions,
   name: string,
-  type: string
+  type: string,
 ): Result<string> {
   const property = readComponentProperties(definitions.document.source).properties.find(
-    (field) => field.name === name
+    (field) => field.name === name,
   );
   if (!property) {
     return err({ code: 'missing', message: 'This property no longer exists. Reload the panel.' });
@@ -419,7 +419,7 @@ function saveDefinitionOptions(
 function renderSavedDefinition(
   definitions: Definitions,
   member: ts.PropertySignature,
-  property: ComponentProperty
+  property: ComponentProperty,
 ): string {
   const type = member.type;
   // Required, tooltip, default, and name edits must retain the authored alias.
@@ -433,10 +433,10 @@ function renderSavedDefinition(
 function saveDefinitionBinding(
   definitions: Definitions,
   originalName: string,
-  property: ComponentProperty
+  property: ComponentProperty,
 ): Result<readonly SourceEdit[]> {
   const binding = definitions.bindings.find(
-    (item) => propertyKey(item.propertyName ?? item.name) === originalName
+    (item) => propertyKey(item.propertyName ?? item.name) === originalName,
   );
   const fallback = property.defaultValue.trim()
     ? ` = ${defaultExpression(property.defaultValue.trim())}`
@@ -507,8 +507,8 @@ function reorderDefinitions(definitions: Definitions, names: readonly string[]):
     return ok(
       replaceFrontmatter(
         definitions.document,
-        `interface Props {${text}\n}\n${definitions.document.frontmatter}`
-      )
+        `interface Props {${text}\n}\n${definitions.document.frontmatter}`,
+      ),
     );
   }
   const first = definitions.members[0];
@@ -522,15 +522,15 @@ function reorderDefinitions(definitions: Definitions, names: readonly string[]):
           end: last?.end ?? container.end - 1,
           text,
         },
-      ])
-    )
+      ]),
+    ),
   );
 }
 
 function removeDefinition(definitions: Definitions, name: string): Result<string> {
   const member = definitions.members.find((item) => propertyKey(item.name) === name);
   const binding = definitions.bindings.find(
-    (item) => propertyKey(item.propertyName ?? item.name) === name
+    (item) => propertyKey(item.propertyName ?? item.name) === name,
   );
   if (!member && !binding) {
     return err({ code: 'missing', message: 'Property not found.' });
@@ -545,7 +545,7 @@ function removeDefinition(definitions: Definitions, name: string): Result<string
     const next = pattern.elements[index + 1];
     const previous = pattern.elements[index - 1];
     edits.push({
-      start: next ? binding.getStart() : previous?.end ?? binding.getStart(),
+      start: next ? binding.getStart() : (previous?.end ?? binding.getStart()),
       end: next?.getStart() ?? binding.end,
       text: '',
     });

@@ -46,7 +46,7 @@ export function readPropertyConsumers(location: {
   assert(consumers.length <= PROPERTY_LIMITS.filesMax, 'Consumer collection is bounded');
   assert(
     consumers.some((consumer) => sameFilesystemPath(consumer.file, location.file)),
-    'The component is included among project sources'
+    'The component is included among project sources',
   );
   return ok(consumers);
 }
@@ -71,21 +71,21 @@ function readConsumerNames(
   source: string,
   file: string,
   target: string,
-  aliases: readonly Alias[]
+  aliases: readonly Alias[],
 ): Result<ReadonlySet<string>> {
   const names = new Set(
     importsOf(source, file, aliases)
       .filter((entry) =>
-        [...entry.candidates].some((candidate) => sameFilesystemPath(candidate, target))
+        [...entry.candidates].some((candidate) => sameFilesystemPath(candidate, target)),
       )
-      .flatMap((entry) => entry.names)
+      .flatMap((entry) => entry.names),
   );
   const syntax = file.endsWith('.astro')
     ? readPropertySyntax(source).syntax
     : ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
   const resolves = (specifier: string): boolean =>
     resolveSpec(specifier, file, aliases).some((candidate) =>
-      sameFilesystemPath(candidate, target)
+      sameFilesystemPath(candidate, target),
     );
   for (const statement of syntax.statements) {
     if (

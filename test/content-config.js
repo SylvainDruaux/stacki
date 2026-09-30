@@ -36,7 +36,7 @@ const { readContentConfig, stopAllServices } = require('../dist/electron/content
 
 const DEFAULT_FIXTURE = path.join(os.homedir(), 'Downloads', 'awesome-client-main');
 const projectPath = path.resolve(
-  process.argv[2] || process.env.STACKI_CONTENT_FIXTURE || DEFAULT_FIXTURE
+  process.argv[2] || process.env.STACKI_CONTENT_FIXTURE || DEFAULT_FIXTURE,
 );
 
 const failures = [];
@@ -44,7 +44,9 @@ let checked = 0;
 
 function check(what, condition, detail) {
   checked++;
-  if (condition) {return;}
+  if (condition) {
+    return;
+  }
   failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
 }
 
@@ -53,9 +55,15 @@ function check(what, condition, detail) {
 function propAt(schema, dotted) {
   let node = schema;
   for (const key of dotted.split('.')) {
-    if (!node) {return null;}
-    if (node.$ref) {node = defOf(schema, node.$ref);}
-    if (node.type === 'array') {node = node.items;}
+    if (!node) {
+      return null;
+    }
+    if (node.$ref) {
+      node = defOf(schema, node.$ref);
+    }
+    if (node.type === 'array') {
+      node = node.items;
+    }
     node = node?.properties?.[key];
   }
   return node || null;
@@ -78,7 +86,9 @@ const defOf = (root, ref) => root?.$defs?.[String(ref).split('/').pop()] || null
   const by = Object.fromEntries(result.collections.map((c) => [c.name, c]));
   const has = (name) => {
     const c = by[name];
-    if (!c) {failures.push(`  ${name}: not in the manifest`);}
+    if (!c) {
+      failures.push(`  ${name}: not in the manifest`);
+    }
     return c;
   };
 
@@ -124,12 +134,15 @@ const defOf = (root, ref) => root?.$defs?.[String(ref).split('/').pop()] || null
   check('blog: no cross-field checks', by.blog?.crossFieldChecks === false);
 
   const blog = by.blog?.schema;
-  check('blog.title: length bounds', propAt(blog, 'title')?.minLength === 3 && propAt(blog, 'title')?.maxLength === 120);
+  check(
+    'blog.title: length bounds',
+    propAt(blog, 'title')?.minLength === 3 && propAt(blog, 'title')?.maxLength === 120,
+  );
   check('blog.author: reference to authors', propAt(blog, 'author')?.astroReference === 'authors');
   check(
     'blog.contributors: array of references, default []',
     propAt(blog, 'contributors')?.items?.astroReference === 'authors' &&
-      Array.isArray(propAt(blog, 'contributors')?.default)
+      Array.isArray(propAt(blog, 'contributors')?.default),
   );
   check('blog.heroImage: image', propAt(blog, 'heroImage')?.astroImage === true);
   check('blog.pubDate: date', propAt(blog, 'pubDate')?.astroDate === true);
@@ -137,7 +150,10 @@ const defOf = (root, ref) => root?.$defs?.[String(ref).split('/').pop()] || null
   check('blog.heroImage: optional', !(blog?.required || []).includes('heroImage'));
   check('blog.draft: default false', propAt(blog, 'draft')?.default === false);
   check('blog.category: enum', (propAt(blog, 'category')?.enum || []).includes('engineering'));
-  check('blog.tags: item bounds', propAt(blog, 'tags')?.minItems === 1 && propAt(blog, 'tags')?.maxItems === 8);
+  check(
+    'blog.tags: item bounds',
+    propAt(blog, 'tags')?.minItems === 1 && propAt(blog, 'tags')?.maxItems === 8,
+  );
   check('blog.seo.ogImage: image, nested', propAt(blog, 'seo.ogImage')?.astroImage === true);
 
   // A value that is one thing on disk and another in the entry.
@@ -150,15 +166,18 @@ const defOf = (root, ref) => root?.$defs?.[String(ref).split('/').pop()] || null
   check(
     'products.docsUrl: nullable',
     (docsUrl?.anyOf || []).some((s) => s.type === 'null'),
-    JSON.stringify(docsUrl)
+    JSON.stringify(docsUrl),
   );
 
   // Discriminated unions, at entry level and inside an array.
   const settings = by.siteSettings?.schema;
-  check('siteSettings: union of kinds', Array.isArray(settings?.oneOf) && settings.oneOf.length === 5);
+  check(
+    'siteSettings: union of kinds',
+    Array.isArray(settings?.oneOf) && settings.oneOf.length === 5,
+  );
   check(
     'siteSettings: discriminator is a literal',
-    settings?.oneOf?.[0]?.properties?.kind?.const === 'brand'
+    settings?.oneOf?.[0]?.properties?.kind?.const === 'brand',
   );
   const blocks = propAt(by.landingPages?.schema, 'blocks');
   check('landingPages.blocks: at least one', blocks?.minItems === 1);
@@ -166,16 +185,14 @@ const defOf = (root, ref) => root?.$defs?.[String(ref).split('/').pop()] || null
   check(
     'landingPages.blocks: a block can hold an image',
     (blocks?.items?.oneOf || []).some((b) =>
-      Object.values(b.properties || {}).some((f) => f.astroImage === true)
-    )
+      Object.values(b.properties || {}).some((f) => f.astroImage === true),
+    ),
   );
   check(
     'landingPages.blocks: a block can hold a reference',
     (blocks?.items?.oneOf || []).some((b) =>
-      Object.values(b.properties || {}).some(
-        (f) => f.astroReference || f.items?.astroReference
-      )
-    )
+      Object.values(b.properties || {}).some((f) => f.astroReference || f.items?.astroReference),
+    ),
   );
 
   // z.lazy(): the tree has to point at itself rather than unrolling forever.
@@ -183,28 +200,41 @@ const defOf = (root, ref) => root?.$defs?.[String(ref).split('/').pop()] || null
   const items = nav?.properties?.items;
   check('navigation.items: recursive $ref', typeof items?.items?.$ref === 'string');
   const navItem = defOf(nav, items?.items?.$ref);
-  check('navigation: item children recurse', navItem?.properties?.children?.items?.$ref === items?.items?.$ref);
+  check(
+    'navigation: item children recurse',
+    navItem?.properties?.children?.items?.$ref === items?.items?.$ref,
+  );
   check(
     'navigation: a section header has no href',
-    (navItem?.properties?.href?.anyOf || []).some((s) => s.type === 'null')
+    (navItem?.properties?.href?.anyOf || []).some((s) => s.type === 'null'),
   );
 
   // looseObject: fields nobody declared still exist and must survive a save.
-  check('notes: extra keys allowed', !!by.notes?.schema && by.notes.schema.additionalProperties !== false);
+  check(
+    'notes: extra keys allowed',
+    !!by.notes?.schema && by.notes.schema.additionalProperties !== false,
+  );
 
   // Patterns reach the UI as patterns, so a field can say what it wants.
-  check('apiEndpoints.path: leading slash', propAt(by.apiEndpoints?.schema, 'path')?.pattern?.includes('^'));
+  check(
+    'apiEndpoints.path: leading slash',
+    propAt(by.apiEndpoints?.schema, 'path')?.pattern?.includes('^'),
+  );
   check('docs.version: pattern', typeof propAt(by.docs?.schema, 'version')?.pattern === 'string');
 
   const total = result.collections.length;
   if (failures.length) {
-    console.error(`\ncontent-config: ${failures.length} failed, ${checked - failures.length} passed  [${total} collections]\n`);
+    console.error(
+      `\ncontent-config: ${failures.length} failed, ${checked - failures.length} passed  [${total} collections]\n`,
+    );
     console.error(failures.join('\n') + '\n');
     stopAllServices();
     process.exit(1);
   }
   // Logged before the service is stopped: with nothing left holding the loop
   // open, node can exit before a piped stdout has flushed.
-  console.log(`content-config: ${checked} passed  [${total} collections, ${path.basename(projectPath)}]`);
+  console.log(
+    `content-config: ${checked} passed  [${total} collections, ${path.basename(projectPath)}]`,
+  );
   stopAllServices();
 })();

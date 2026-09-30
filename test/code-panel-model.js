@@ -61,10 +61,7 @@ const output = path.join(__dirname, '../node_modules/.stacki-test/code-panel-mod
       to: source.indexOf('<Card') + 5,
     },
   ]);
-  assert.equal(
-    modelTools.sourceLineLabel(source, { from: card.start, to: card.end }),
-    'L5–7',
-  );
+  assert.equal(modelTools.sourceLineLabel(source, { from: card.start, to: card.end }), 'L5–7');
   assert.equal(
     modelTools.sourceRangeForSelection(model, card.id, card.end - 1),
     null,

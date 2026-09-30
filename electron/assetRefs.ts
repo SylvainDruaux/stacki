@@ -88,9 +88,10 @@ function addImport(source: string, name: string, spec: string): string {
 // `appDailyDevotionals` — and never one the file is already using for
 // something else.
 function importName(fileRel: string, taken: readonly string[] = []): string {
-  const base = String(fileRel || '')
-    .split('/')
-    .pop() ?? '';
+  const base =
+    String(fileRel || '')
+      .split('/')
+      .pop() ?? '';
   const stem = base.replace(/\.[^.]+$/, '');
   const camel = stem
     .split(/[^A-Za-z0-9]+/)

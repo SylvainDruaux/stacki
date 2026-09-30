@@ -222,7 +222,12 @@ function attrSpansOf(scanned: readonly ScannedAttr[], base: number): AttrSpan[] 
       case 'bare':
         return { type: 'bare', name, span, nameSpan: at(required(found.nameAt, 'Bare name')) };
       case 'spread':
-        return { type: 'spread', name, span, valueSpan: at(required(found.valueAt, 'Spread body')) };
+        return {
+          type: 'spread',
+          name,
+          span,
+          valueSpan: at(required(found.valueAt, 'Spread body')),
+        };
     }
   });
 }
@@ -1466,9 +1471,7 @@ function serializePage(input: unknown): string {
     lines.push('');
   }
   const source = lines.join('\n') + '\n';
-  return model.eol === '\r\n'
-    ? source.replace(/\r?\n/g, '\r\n')
-    : source.replace(/\r\n/g, '\n');
+  return model.eol === '\r\n' ? source.replace(/\r?\n/g, '\r\n') : source.replace(/\r\n/g, '\n');
 }
 
 // Inline runs (text + simple tags like <strong>/<em>) serialize on a single

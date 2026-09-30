@@ -24,7 +24,9 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
+  if (!condition) {
+    failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  }
 };
 
 (async () => {
@@ -77,7 +79,7 @@ const check = (what, condition, detail) => {
   check(
     'a div inserted with the Section selected goes inside it',
     at('sec').parentId === 'sec',
-    JSON.stringify(at('sec'))
+    JSON.stringify(at('sec')),
   );
   check('at the end of what it already holds', at('sec').index === 2, JSON.stringify(at('sec')));
   // And the reason it used to land outside — a component with no default slot
@@ -85,30 +87,31 @@ const check = (what, condition, detail) => {
   check(
     'while one that takes no content puts it alongside instead',
     JSON.stringify(at('img')) === JSON.stringify({ parentId: 'sec', index: 1 }),
-    JSON.stringify(at('img'))
+    JSON.stringify(at('img')),
   );
 
   // ── The tags still decide ─────────────────────────────────────────────────
-  check('a void element never holds anything', JSON.stringify(at('hr')) === JSON.stringify({ parentId: null, index: 4 }), JSON.stringify(at('hr')));
+  check(
+    'a void element never holds anything',
+    JSON.stringify(at('hr')) === JSON.stringify({ parentId: null, index: 4 }),
+    JSON.stringify(at('hr')),
+  );
   check(
     'and a <div> inside a <p> lands after the <p>',
     JSON.stringify(at('p')) === JSON.stringify({ parentId: null, index: 2 }),
-    JSON.stringify(at('p'))
+    JSON.stringify(at('p')),
   );
   // A component is judged by what it renders, not by being a component.
   const heading = { id: 'h', kind: 'component', name: 'Heading', props: {}, children: [] };
   check(
     'a <p> is refused by a component that renders a heading',
-    acceptsChildren(heading, 'p', insertables) === false
+    acceptsChildren(heading, 'p', insertables) === false,
   );
-  check(
-    'while a <span> is fine there',
-    acceptsChildren(heading, 'span', insertables) === true
-  );
+  check('while a <span> is fine there', acceptsChildren(heading, 'span', insertables) === true);
   check(
     "and the instance's own tag wins over the component's default",
     tagOfComponent(insertables[3], { props: { tag: { type: 'string', value: 'div' } } }) === 'div',
-    tagOfComponent(insertables[3], { props: { tag: { type: 'string', value: 'div' } } })
+    tagOfComponent(insertables[3], { props: { tag: { type: 'string', value: 'div' } } }),
   );
   // An inserted COMPONENT is judged the same way: <Paragraph> renders a <p>,
   // and a <p> may not sit inside the <h2> a <Heading> renders.
@@ -118,14 +121,21 @@ const check = (what, condition, detail) => {
     check(
       'a <Paragraph> inserted into a <Heading> lands after it',
       JSON.stringify(target) === JSON.stringify({ parentId: null, index: 3 }),
-      JSON.stringify(target)
+      JSON.stringify(target),
     );
     const span = insertTargetFor(model, 'head', { type: 'element', tag: 'span' }, insertables);
     check('while a <span> goes inside it', span.parentId === 'head', JSON.stringify(span));
   }
   // Nothing selected: the end of the page.
-  check('with nothing selected it goes at the end', JSON.stringify(at(null)) === JSON.stringify({ parentId: null, index: 4 }), JSON.stringify(at(null)));
-  check('and the frontmatter row is not a place', JSON.stringify(at('frontmatter')) === JSON.stringify({ parentId: null, index: 4 }));
+  check(
+    'with nothing selected it goes at the end',
+    JSON.stringify(at(null)) === JSON.stringify({ parentId: null, index: 4 }),
+    JSON.stringify(at(null)),
+  );
+  check(
+    'and the frontmatter row is not a place',
+    JSON.stringify(at('frontmatter')) === JSON.stringify({ parentId: null, index: 4 }),
+  );
 
   // ── The components this came from ─────────────────────────────────────────
   // The table above is only right if the scan really reports that, which is
@@ -139,7 +149,9 @@ const check = (what, condition, detail) => {
       const full = path.join(dir, entry.name);
       if (entry.isDirectory()) {
         const hit = findComponent(full, name);
-        if (hit) {return hit;}
+        if (hit) {
+          return hit;
+        }
       } else if (entry.name === `${name}.astro`) {
         return fs.readFileSync(full, 'utf8');
       }
@@ -153,20 +165,28 @@ const check = (what, condition, detail) => {
       ['Img', false, null],
     ]) {
       const src = findComponent(LUMOS, name);
-      if (src == null) {continue;} // not in this project any more
+      if (src == null) {
+        continue;
+      } // not in this project any more
       check(
         `the real <${name}> ${slots ? 'takes' : 'takes no'} default content`,
         parseSlots(src).includes('default') === slots,
-        JSON.stringify(parseSlots(src))
+        JSON.stringify(parseSlots(src)),
       );
       if (tag) {
-        check(`and renders a <${tag}>`, (rootTag(src) || {}).tag === tag, JSON.stringify(rootTag(src)));
+        check(
+          `and renders a <${tag}>`,
+          (rootTag(src) || {}).tag === tag,
+          JSON.stringify(rootTag(src)),
+        );
       }
     }
   }
 
   if (failures.length) {
-    console.error(`\ninsert-target: ${failures.length} failed, ${checked - failures.length} passed\n`);
+    console.error(
+      `\ninsert-target: ${failures.length} failed, ${checked - failures.length} passed\n`,
+    );
     console.error(failures.join('\n') + '\n');
     process.exit(1);
   }

@@ -45,7 +45,12 @@ test('the PRNG is pinned: the same seed yields the same stream on every machine'
   };
   assert.deepEqual(stream(1), stream(1));
   assert.notDeepEqual(stream(1), stream(2));
-  assert.deepEqual(stream(1), [PINNED_SEED_1[0], PINNED_SEED_1[1], PINNED_SEED_1[2], PINNED_SEED_1[3]]);
+  assert.deepEqual(stream(1), [
+    PINNED_SEED_1[0],
+    PINNED_SEED_1[1],
+    PINNED_SEED_1[2],
+    PINNED_SEED_1[3],
+  ]);
   const prng = new Prng(7);
   const buckets = [0, 0, 0, 0];
   for (let draw = 0; draw < 4_000; draw++) {
@@ -76,7 +81,10 @@ test('every seeded run holds the invariants and reproduces per seed (invariant 9
   // Corpus diversity is a gate (tracker step 1): the seeds must reach every
   // outcome class the skeleton can produce, or the run proves little.
   for (const reached of REQUIRED_TALLIES) {
-    assert.ok((tally[reached] ?? 0) > 0, `the gate seeds reach ${reached}: ${JSON.stringify(tally)}`);
+    assert.ok(
+      (tally[reached] ?? 0) > 0,
+      `the gate seeds reach ${reached}: ${JSON.stringify(tally)}`,
+    );
   }
 });
 

@@ -35,7 +35,9 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
+  if (!condition) {
+    failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  }
 };
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -86,7 +88,11 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     // browser would do, so the verdict has to match what the frame will see.
     mode = 'redirect';
     const red = await probeUrl(`${base}/`);
-    check('a redirect is followed to what it lands on', red.ok === true && red.status === 200, JSON.stringify(red));
+    check(
+      'a redirect is followed to what it lands on',
+      red.ok === true && red.status === 200,
+      JSON.stringify(red),
+    );
 
     mode = 'ok';
     check('and recovering reads as ok again', (await probeUrl(`${base}/`)).ok === true);
@@ -110,7 +116,11 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     const out = path.join(buildDir, 'preview-recovery.bundle.js');
     await esbuild.build({
       entryPoints: [path.join(__dirname, '..', 'src', 'previewRecovery.js')],
-      outfile: out, bundle: true, format: 'cjs', platform: 'node', logLevel: 'silent',
+      outfile: out,
+      bundle: true,
+      format: 'cjs',
+      platform: 'node',
+      logLevel: 'silent',
     });
     return require(out);
   })();
@@ -125,7 +135,9 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
         asked.push(next);
         return next;
       },
-      onRecover: () => { reloads++ },
+      onRecover: () => {
+        reloads++;
+      },
       retryMs: 20,
       settleMs: 5,
       quietMs: 120,
@@ -142,7 +154,10 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     check('a healthy preview is asked about', t.asked.length >= 1, JSON.stringify(t.asked));
     check('and is not reloaded', t.reloads() === 0, `${t.reloads()} reloads`);
     // Repeatedly, because this is what every keystroke does.
-    for (let i = 0; i < 5; i++) { t.watch.poke(); await sleep(15) }
+    for (let i = 0; i < 5; i++) {
+      t.watch.poke();
+      await sleep(15);
+    }
     check('and stays un-reloaded across many edits', t.reloads() === 0, `${t.reloads()} reloads`);
     t.watch.stop();
   }
@@ -157,9 +172,16 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   // in a dropdown paid for two renders and showed one.
   {
     const t = makeWatch([{ ok: true }]);
-    for (let i = 0; i < 6; i++) { t.watch.poke(); await sleep(10) }
+    for (let i = 0; i < 6; i++) {
+      t.watch.poke();
+      await sleep(10);
+    }
     await sleep(60);
-    check('a healthy preview is asked about once, not once per edit', t.asked.length === 1, `${t.asked.length} asks`);
+    check(
+      'a healthy preview is asked about once, not once per edit',
+      t.asked.length === 1,
+      `${t.asked.length} asks`,
+    );
     // …but not never: it is how a breakage is noticed at all.
     await sleep(140);
     t.watch.poke();
@@ -181,7 +203,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     check(
       'and asked again on the next edit, quiet spell or not',
       t.asked.length === 2,
-      `${first} → ${t.asked.length}`
+      `${first} → ${t.asked.length}`,
     );
     t.watch.stop();
   }
@@ -207,7 +229,11 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     await sleep(120);
     const settled = t.asked.length;
     await sleep(150);
-    check('a recovered preview stops being polled', t.asked.length === settled, `${settled} → ${t.asked.length} asks`);
+    check(
+      'a recovered preview stops being polled',
+      t.asked.length === settled,
+      `${settled} → ${t.asked.length} asks`,
+    );
     t.watch.stop();
   }
 
@@ -216,8 +242,16 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     let reloads = 0;
     let asks = 0;
     const watch = createPreviewWatch({
-      probe: async () => { asks++; if (asks < 3) {throw new Error('no server');} return { ok: true } },
-      onRecover: () => { reloads++ },
+      probe: async () => {
+        asks++;
+        if (asks < 3) {
+          throw new Error('no server');
+        }
+        return { ok: true };
+      },
+      onRecover: () => {
+        reloads++;
+      },
       retryMs: 20,
       settleMs: 5,
     });
@@ -236,8 +270,16 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     const seen = t.asked.length;
     t.watch.stop();
     await sleep(120);
-    check('stopping ends the polling', t.asked.length === seen, `${seen} → ${t.asked.length} asks after stop`);
-    check('and a poke afterwards does nothing', (t.watch.poke(), await sleep(40), t.asked.length === seen), `${t.asked.length} asks`);
+    check(
+      'stopping ends the polling',
+      t.asked.length === seen,
+      `${seen} → ${t.asked.length} asks after stop`,
+    );
+    check(
+      'and a poke afterwards does nothing',
+      (t.watch.poke(), await sleep(40), t.asked.length === seen),
+      `${t.asked.length} asks`,
+    );
   }
 
   // --- who asks the first question -------------------------------------------
@@ -264,7 +306,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     check(
       'before anything decides the kind is not interesting',
       poke !== -1 && firstBranchReturn !== -1 && poke < firstBranchReturn,
-      `poke at ${poke}, first return at ${firstBranchReturn}`
+      `poke at ${poke}, first return at ${firstBranchReturn}`,
     );
     check(
       'and not for the app’s own writes, which say it themselves',
@@ -272,17 +314,19 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
         String.raw`if \(isSelfWrite\(changed\)\) \{\s*return;\s*\}\s*` +
           String.raw`noteExternalChange\(changed\);\s*notePageMayHaveChanged\(true\);`,
       ).test(handler),
-      handler.slice(0, 400)
+      handler.slice(0, 400),
     );
     check(
       'a write the app makes says it through noteAppWrite',
       /function noteAppWrite\(\)[^{]*\{[\s\S]{0,160}notePageMayHaveChanged\(\);/.test(main),
-      'an in-app write would go unannounced'
+      'an in-app write would go unannounced',
     );
   }
 
   if (failures.length) {
-    console.error(`preview-recovery: ${failures.length} of ${checked} failed\n${failures.join('\n')}`);
+    console.error(
+      `preview-recovery: ${failures.length} of ${checked} failed\n${failures.join('\n')}`,
+    );
     process.exit(1);
   }
   console.log(`preview-recovery: ${checked} passed  [real 500s, and the edge]`);

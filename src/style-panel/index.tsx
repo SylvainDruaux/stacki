@@ -1,1 +1,1 @@
-export { default } from './EmbedEditor'
+export { default } from './EmbedEditor';

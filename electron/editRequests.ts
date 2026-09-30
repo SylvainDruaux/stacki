@@ -270,7 +270,10 @@ function replaceDraft(
   const eol = authored.text.includes('\r\n') ? '\r\n' : '\n';
   const indent = lineIndent(bytes, projected.span.start);
   const print = (node: PageNode): string =>
-    serializeNodes([node]).replace(/\r?\n$/, '').split(/\r?\n/).join(`${eol}${indent}`);
+    serializeNodes([node])
+      .replace(/\r?\n$/, '')
+      .split(/\r?\n/)
+      .join(`${eol}${indent}`);
   const own = textOf(bytes, projected.span);
   const hunks = placedHunks(print(previous), print(next), own);
   if (!hunks.ok) {

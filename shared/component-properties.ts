@@ -152,7 +152,7 @@ export function parsePropertyChange(input: unknown): PropertyChange {
         })(input),
       } as const;
       const optionRenames = optional((item) => propertyList(item, parsePropertyOptionRename))(
-        value['optionRenames']
+        value['optionRenames'],
       );
       return optionRenames === undefined ? saved : { ...saved, optionRenames };
     }

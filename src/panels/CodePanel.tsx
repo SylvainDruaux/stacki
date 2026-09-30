@@ -23,11 +23,11 @@ export default function CodePanel(props: CodePanelProps) {
   const { source, relativePath, model, selectedId, onChange, onSelect, onOpenComponent } = props;
   const activeRange = useMemo(
     () => sourceRangeForSelection(model, selectedId, source.length),
-    [model, selectedId, source.length]
+    [model, selectedId, source.length],
   );
   const components = useMemo(
     () => componentSourceRanges(model?.nodes ?? [], source),
-    [model, source]
+    [model, source],
   );
   const lineLabel = sourceLineLabel(source, activeRange);
   return (

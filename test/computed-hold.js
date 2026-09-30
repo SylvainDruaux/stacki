@@ -28,7 +28,9 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
+  if (!condition) {
+    failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  }
 };
 
 (async () => {
@@ -54,7 +56,7 @@ const check = (what, condition, detail) => {
     entry,
     `export { default as EffectsSection } from ${JSON.stringify(path.join(root, 'src', 'style-panel', 'EffectsSection'))}
      export { setHost } from ${JSON.stringify(path.join(root, 'src', 'style-panel', 'lib', 'host'))}
-     export { forgetComputedStyles } from ${JSON.stringify(path.join(root, 'src', 'style-panel', 'lib', 'computed-style'))}`
+     export { forgetComputedStyles } from ${JSON.stringify(path.join(root, 'src', 'style-panel', 'lib', 'computed-style'))}`,
   );
   const bundlePath = path.join(buildDir, 'computed-hold.bundle.js');
   await esbuild.build({
@@ -66,13 +68,22 @@ const check = (what, condition, detail) => {
     jsx: 'automatic',
     external: ['react', 'react-dom', 'react-dom/client', 'react/jsx-runtime'],
     loader: { '.css': 'empty' },
-    plugins: [{
-      name: 'stub-canvas',
-      setup(build) {
-        build.onResolve({ filter: /canvasQuery\.js$/ }, () => ({ path: 'canvas', namespace: 'stub' }));
-        build.onLoad({ filter: /.*/, namespace: 'stub' }, () => ({ contents: stub, loader: 'js', resolveDir: root }));
+    plugins: [
+      {
+        name: 'stub-canvas',
+        setup(build) {
+          build.onResolve({ filter: /canvasQuery\.js$/ }, () => ({
+            path: 'canvas',
+            namespace: 'stub',
+          }));
+          build.onLoad({ filter: /.*/, namespace: 'stub' }, () => ({
+            contents: stub,
+            loader: 'js',
+            resolveDir: root,
+          }));
+        },
       },
-    }],
+    ],
     logLevel: 'silent',
   });
 
@@ -88,7 +99,11 @@ const check = (what, condition, detail) => {
   global.MutationObserver = dom.window.MutationObserver;
   global.requestAnimationFrame = (fn) => setTimeout(fn, 0);
   global.cancelAnimationFrame = clearTimeout;
-  global.ResizeObserver = class { observe() {} unobserve() {} disconnect() {} };
+  global.ResizeObserver = class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  };
   dom.window.ResizeObserver = global.ResizeObserver;
   global.IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -98,7 +113,9 @@ const check = (what, condition, detail) => {
   // failure in the output.
   const realError = console.error;
   console.error = (...args) => {
-    if (typeof args[0] === 'string' && args[0].includes('not wrapped in act')) {return;}
+    if (typeof args[0] === 'string' && args[0].includes('not wrapped in act')) {
+      return;
+    }
     realError(...args);
   };
 
@@ -108,7 +125,11 @@ const check = (what, condition, detail) => {
   const { EffectsSection, setHost, forgetComputedStyles } = require(bundlePath);
 
   // A selected element, so there is something to ask the page about.
-  setHost({ selectedId: 'n1', pathOf: () => 'page:1', nodes: [{ id: 'n1', kind: 'element', name: 'div' }] });
+  setHost({
+    selectedId: 'n1',
+    pathOf: () => 'page:1',
+    nodes: [{ id: 'n1', kind: 'element', name: 'div' }],
+  });
 
   const mount = async () => {
     const host = document.createElement('div');
@@ -116,34 +137,77 @@ const check = (what, condition, detail) => {
     const rootEl = createRoot(host);
     let decls = {};
     const render = async () => {
-      const read = (p) => decls[p] != null
-        ? { source: 'selected', overridden: false, contributors: [],
-            winner: { selectorText: '.x', value: decls[p], important: false },
-            selectedValue: { value: decls[p], important: false } }
-        : undefined;
+      const read = (p) =>
+        decls[p] != null
+          ? {
+              source: 'selected',
+              overridden: false,
+              contributors: [],
+              winner: { selectorText: '.x', value: decls[p], important: false },
+              selectedValue: { value: decls[p], important: false },
+            }
+          : undefined;
       await act(async () => {
-        rootEl.render(React.createElement(EffectsSection, {
-          read, busy: false, setProp: () => {}, clearProp: () => {}, liveSetProp: () => {},
-          onProvenance: () => {}, onSelectSelector: () => {},
-        }));
+        rootEl.render(
+          React.createElement(EffectsSection, {
+            read,
+            busy: false,
+            setProp: () => {},
+            clearProp: () => {},
+            liveSetProp: () => {},
+            onProvenance: () => {},
+            onSelectSelector: () => {},
+          }),
+        );
       });
     };
     // Every CSS edit drops the cached computed values — that is what opens the gap.
-    const set = async (p, v) => { forgetComputedStyles(); decls = { ...decls, [p]: v }; await render() };
-    const clear = async (p) => { forgetComputedStyles(); const n = { ...decls }; delete n[p]; decls = n; await render() };
-    const settle = async () => { await act(async () => { await new Promise((r) => setTimeout(r, 5)) }) };
+    const set = async (p, v) => {
+      forgetComputedStyles();
+      decls = { ...decls, [p]: v };
+      await render();
+    };
+    const clear = async (p) => {
+      forgetComputedStyles();
+      const n = { ...decls };
+      delete n[p];
+      decls = n;
+      await render();
+    };
+    const settle = async () => {
+      await act(async () => {
+        await new Promise((r) => setTimeout(r, 5));
+      });
+    };
     // Resolving the round trip lands a state update, so it happens inside act().
     const answer = async () => {
-      await act(async () => { globalThis.__answer?.(); globalThis.__answer = null; await new Promise((r) => setTimeout(r, 5)) });
+      await act(async () => {
+        globalThis.__answer?.();
+        globalThis.__answer = null;
+        await new Promise((r) => setTimeout(r, 5));
+      });
       await settle();
     };
     const selected = () => {
       const bar = host.querySelector('[aria-label="Pointer events"]');
-      const on = [...bar.querySelectorAll('.embed-editor_display-seg')].filter((b) => b.classList.contains('is-selected'));
+      const on = [...bar.querySelectorAll('.embed-editor_display-seg')].filter((b) =>
+        b.classList.contains('is-selected'),
+      );
       return on.map((b) => b.getAttribute('aria-label')).join(',') || '(none)';
     };
     await render();
-    return { host, set, clear, settle, answer, selected, done: async () => { await act(async () => rootEl.unmount()); host.remove() } };
+    return {
+      host,
+      set,
+      clear,
+      settle,
+      answer,
+      selected,
+      done: async () => {
+        await act(async () => rootEl.unmount());
+        host.remove();
+      },
+    };
   };
 
   // --- The page still computes `none` (it is inherited) ------------------------
@@ -162,10 +226,14 @@ const check = (what, condition, detail) => {
     check(
       'clearing it does not jump to the fallback',
       m.selected() === 'None',
-      `${m.selected()} — this is the guess, and the page has not been asked yet`
+      `${m.selected()} — this is the guess, and the page has not been asked yet`,
     );
     await m.answer();
-    check('and the answer confirms it, so nothing moved at all', m.selected() === 'None', m.selected());
+    check(
+      'and the answer confirms it, so nothing moved at all',
+      m.selected() === 'None',
+      m.selected(),
+    );
     await m.done();
   }
 
@@ -207,7 +275,9 @@ const check = (what, condition, detail) => {
     console.error(`computed-hold: ${failures.length} of ${checked} failed\n${failures.join('\n')}`);
     process.exit(1);
   }
-  console.log(`computed-hold: ${checked} passed  [holds while asking, falls back with nothing to ask]`);
+  console.log(
+    `computed-hold: ${checked} passed  [holds while asking, falls back with nothing to ask]`,
+  );
 })().catch((err) => {
   console.error(err);
   process.exit(1);

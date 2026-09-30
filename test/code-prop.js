@@ -19,7 +19,9 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
+  if (!condition) {
+    failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  }
 };
 
 (async () => {
@@ -30,8 +32,8 @@ const check = (what, condition, detail) => {
   fs.writeFileSync(
     entry,
     `export { BindField } from ${JSON.stringify(
-      path.join(__dirname, '..', 'src', 'panels', 'PropsPanel.jsx')
-    )};\n`
+      path.join(__dirname, '..', 'src', 'panels', 'PropsPanel.jsx'),
+    )};\n`,
   );
   const bundle = path.join(buildDir, 'code-prop.bundle.js');
   await esbuild.build({
@@ -61,10 +63,27 @@ const check = (what, condition, detail) => {
   global.requestAnimationFrame = dom.window.requestAnimationFrame.bind(dom.window);
   global.cancelAnimationFrame = dom.window.cancelAnimationFrame.bind(dom.window);
   global.IS_REACT_ACT_ENVIRONMENT = true;
-  dom.window.ResizeObserver = class { observe() {} unobserve() {} disconnect() {} };
+  dom.window.ResizeObserver = class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  };
   global.ResizeObserver = dom.window.ResizeObserver;
-  dom.window.Range.prototype.getBoundingClientRect = () => ({ x: 0, y: 0, width: 0, height: 0, top: 0, left: 0, right: 0, bottom: 0 });
-  dom.window.Range.prototype.getClientRects = () => ({ length: 0, item: () => null, [Symbol.iterator]: function* () {} });
+  dom.window.Range.prototype.getBoundingClientRect = () => ({
+    x: 0,
+    y: 0,
+    width: 0,
+    height: 0,
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  });
+  dom.window.Range.prototype.getClientRects = () => ({
+    length: 0,
+    item: () => null,
+    [Symbol.iterator]: function* () {},
+  });
 
   const React = require('react');
   const { createRoot } = require('react-dom/client');
@@ -86,7 +105,7 @@ const check = (what, condition, detail) => {
           placeholder: '',
           bindCtx: { props: [{ name: 'jobs' }] },
           onChange: (v) => wrote.push(v),
-        })
+        }),
       );
     });
     // The chips field is a contenteditable: typing into it is text in the box
@@ -97,7 +116,9 @@ const check = (what, condition, detail) => {
     const box = () => host.querySelector('.bind-input');
     const type = async (text) => {
       const el = box();
-      if (!el) {return false;}
+      if (!el) {
+        return false;
+      }
       await act(async () => {
         el.textContent = text;
         el.dispatchEvent(new dom.window.Event('input', { bubbles: true }));
@@ -110,14 +131,20 @@ const check = (what, condition, detail) => {
       box,
       type,
       code: () => host.querySelector('.cm-editor'),
-      done: async () => { await act(async () => root.unmount()) },
+      done: async () => {
+        await act(async () => root.unmount());
+      },
     };
   };
 
   // --- the report ---------------------------------------------------------------
   {
     const m = await mount({ name: 'options', type: 'code' }, { type: 'expr', value: 'jobs' });
-    check('a prop bound to a name shows a field to type in', !!m.box(), m.host.innerHTML.slice(0, 160));
+    check(
+      'a prop bound to a name shows a field to type in',
+      !!m.box(),
+      m.host.innerHTML.slice(0, 160),
+    );
     const typed = await m.type(ARRAY);
     check('the array can be typed', typed);
     const last = m.wrote[m.wrote.length - 1];
@@ -126,7 +153,7 @@ const check = (what, condition, detail) => {
     check(
       'not as a quoted string',
       !(last?.type === 'string'),
-      'options="[…]" is a string the component calls .map on'
+      'options="[…]" is a string the component calls .map on',
     );
     await m.done();
   }
@@ -188,21 +215,29 @@ const check = (what, condition, detail) => {
     check(
       'an array of objects, written the way TypeScript writes one',
       withType('items?: { title: string; text: string }[];') === 'code',
-      withType('items?: { title: string; text: string }[];')
+      withType('items?: { title: string; text: string }[];'),
     );
     check(
       'and with commas, which always worked',
       withType('items?: { title: string, text: string }[];') === 'code',
-      withType('items?: { title: string, text: string }[];')
+      withType('items?: { title: string, text: string }[];'),
     );
-    check('a named array is still code', withType('items?: Item[];') === 'code', withType('items?: Item[];'));
-    check('and so is a plain one', withType('items?: string[];') === 'code', withType('items?: string[];'));
+    check(
+      'a named array is still code',
+      withType('items?: Item[];') === 'code',
+      withType('items?: Item[];'),
+    );
+    check(
+      'and so is a plain one',
+      withType('items?: string[];') === 'code',
+      withType('items?: string[];'),
+    );
     // The semicolons inside a Record are the same case, and it is still a bag
     // of attributes rather than a list.
     check(
       'a Record with a shape in it is still attributes',
       withType('items?: Record<string, { a: string; b: number }>;') === 'attrs',
-      withType('items?: Record<string, { a: string; b: number }>;')
+      withType('items?: Record<string, { a: string; b: number }>;'),
     );
     // What the semicolon rule must not eat: the ordinary members beside it.
     const many = `---\ninterface Props {\n  /** The rows. */\n  items?: { title: string; text: string }[];\n  variant?: "stack" | "row";\n  count?: number;\n}\nconst { items } = Astro.props;\n---\n<div/>\n`;
@@ -213,7 +248,7 @@ const check = (what, condition, detail) => {
     check(
       'and the note above it is still its own',
       /The rows/.test((schema.find((p) => p.name === 'items') || {}).doc || ''),
-      JSON.stringify((schema.find((p) => p.name === 'items') || {}).doc)
+      JSON.stringify((schema.find((p) => p.name === 'items') || {}).doc),
     );
   }
 
@@ -228,24 +263,32 @@ const check = (what, condition, detail) => {
     const schema = parsePropSchema(src);
     const union = (schema.find((p) => p.unions) || {}).unions || [];
     const names = union[0] ? union[0].names : [];
-    check('a branch knows the array member it declares', names.includes('items'), JSON.stringify(names));
-    check('beside the ones it always knew', names.includes('variant') && names.includes('text'), JSON.stringify(names));
+    check(
+      'a branch knows the array member it declares',
+      names.includes('items'),
+      JSON.stringify(names),
+    );
+    check(
+      'beside the ones it always knew',
+      names.includes('variant') && names.includes('text'),
+      JSON.stringify(names),
+    );
   }
 
   // --- the rule, where it lives ---------------------------------------------------
   const panel = fs.readFileSync(
     path.join(__dirname, '..', 'src', 'panels', 'propBindings.tsx'),
-    'utf8'
+    'utf8',
   );
   check(
     'a code prop is written as an expression',
     /field\?\.type === 'code' \|\|/.test(panel),
-    'nothing marks an array prop as written-as-code'
+    'nothing marks an array prop as written-as-code',
   );
   check(
     'and its parts join as code rather than into a template',
     /mode: field\?\.type === 'code' \? 'code' : mode/.test(panel),
-    'text beside a chip would be quoted into a template string'
+    'text beside a chip would be quoted into a template string',
   );
 
   if (failures.length) {

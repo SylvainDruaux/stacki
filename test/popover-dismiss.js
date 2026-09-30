@@ -18,7 +18,9 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
+  if (!condition) {
+    failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  }
 };
 const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -57,7 +59,11 @@ const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
   // The popover measures the panel it should span, and falls back to CSS
   // variables on the root when the anchor has no panel around it (as here).
   global.getComputedStyle = dom.window.getComputedStyle.bind(dom.window);
-  class RO { observe() {} unobserve() {} disconnect() {} }
+  class RO {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  }
   global.ResizeObserver = RO;
   dom.window.ResizeObserver = RO;
 
@@ -92,11 +98,15 @@ const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
             {
               anchorEl: row,
               ariaLabel: 'Transform',
-              onClose: () => { closes += 1; showing = false; paint() },
+              onClose: () => {
+                closes += 1;
+                showing = false;
+                paint();
+              },
             },
-            React.createElement('input', { id: 'inside', defaultValue: '0deg' })
+            React.createElement('input', { id: 'inside', defaultValue: '0deg' }),
           )
-        : null
+        : null,
     );
   const open = async () =>
     act(async () => {
@@ -125,7 +135,7 @@ const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
   check(
     'and does not also press that control',
     pressed.length === 0,
-    `pressed: ${pressed.join(', ')}`
+    `pressed: ${pressed.join(', ')}`,
   );
 
   // --- the next press is a normal one ------------------------------------------
@@ -133,7 +143,11 @@ const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
   // lands on, or nothing would work after closing a popover.
   pressed.length = 0;
   await pressAndClick(events);
-  check('the press after that presses the control', pressed.join(',') === 'events', pressed.join(','));
+  check(
+    'the press after that presses the control',
+    pressed.join(',') === 'events',
+    pressed.join(','),
+  );
 
   // --- the row the editor belongs to -------------------------------------------
   // Its own click handler is what toggles the editor shut, so that press has to
@@ -142,7 +156,11 @@ const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
   await open();
   pressed.length = 0;
   await pressAndClick(row);
-  check('pressing the row it belongs to reaches the row', pressed.join(',') === 'row', pressed.join(','));
+  check(
+    'pressing the row it belongs to reaches the row',
+    pressed.join(',') === 'row',
+    pressed.join(','),
+  );
 
   // --- a press inside changes nothing ------------------------------------------
   closes = 0;
@@ -171,11 +189,13 @@ const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
   check(
     'a press with no click does not swallow a later one',
     pressed.join(',') === 'events',
-    `pressed: ${pressed.join(', ')}`
+    `pressed: ${pressed.join(', ')}`,
   );
 
   if (failures.length) {
-    console.error(`\npopover-dismiss: ${failures.length} failed, ${checked - failures.length} passed\n`);
+    console.error(
+      `\npopover-dismiss: ${failures.length} failed, ${checked - failures.length} passed\n`,
+    );
     console.error(failures.join('\n') + '\n');
     process.exit(1);
   }

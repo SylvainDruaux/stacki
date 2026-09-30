@@ -32,9 +32,12 @@ const { parsePage, serializePageMarked } = require('../dist/electron/astroParser
 // there are addressed by a `data-avb-p` tag instead, and without it a link in
 // a sentence can't be outlined and reads as a node that never rendered.
 function checkInlineRun() {
-  const source = '---\n---\n<nav>\n  <a href="/docs">Docs</a>\n  <span>/</span>\n  <span>Here</span>\n</nav>\n';
+  const source =
+    '---\n---\n<nav>\n  <a href="/docs">Docs</a>\n  <span>/</span>\n  <span>Here</span>\n</nav>\n';
   const parsed = parsePage(source);
-  if (!parsed.editable) {return fail('inline run tags', '    page did not parse');}
+  if (!parsed.editable) {
+    return fail('inline run tags', '    page did not parse');
+  }
   const marked = serializePageMarked(parsed.model);
   // The <nav> is node 0; its children are the run, spaces included, so the
   // tags land on the odd indices.
@@ -55,16 +58,22 @@ function checkInlineRun() {
 const CASES = {
   'loop, arrow body': '---\nconst xs = [1];\n---\n<ul>{xs.map((x) => (<li>{x}</li>))}</ul>\n',
   'loop, no parens': '---\nconst xs = [1];\n---\n<ul>{xs.map((x) => <li>{x}</li>)}</ul>\n',
-  'loop, block body': '---\nconst xs = [1];\n---\n<ul>{xs.map((x) => { const y = x * 2; return (<li>{y}</li>); })}</ul>\n',
+  'loop, block body':
+    '---\nconst xs = [1];\n---\n<ul>{xs.map((x) => { const y = x * 2; return (<li>{y}</li>); })}</ul>\n',
   'loop, two children': '---\nconst xs = [1];\n---\n<ul>{xs.map((x) => (<li>{x}</li>))}</ul>\n',
-  'loop of components': '---\nimport Card from "../components/Card.astro";\nconst xs = [1];\n---\n<div>{xs.map((x) => (<Card title={x} />))}</div>\n',
-  'nested loops': '---\nconst rows = [[1]];\n---\n<div>{rows.map((row) => (<ul>{row.map((c) => (<li>{c}</li>))}</ul>))}</div>\n',
+  'loop of components':
+    '---\nimport Card from "../components/Card.astro";\nconst xs = [1];\n---\n<div>{xs.map((x) => (<Card title={x} />))}</div>\n',
+  'nested loops':
+    '---\nconst rows = [[1]];\n---\n<div>{rows.map((row) => (<ul>{row.map((c) => (<li>{c}</li>))}</ul>))}</div>\n',
   'conditional, &&': '---\nconst c = true;\n---\n<div>{c && <p>x</p>}</div>\n',
   'conditional, ternary': '---\nconst c = true;\n---\n<div>{c ? <p>a</p> : <p>b</p>}</div>\n',
-  'loop inside conditional': '---\nconst c = true;\nconst xs = [1];\n---\n<div>{c && <ul>{xs.map((x) => (<li>{x}</li>))}</ul>}</div>\n',
-  'slotted child': '---\nimport Card from "../components/Card.astro";\n---\n<Card><h2 slot="header">Hi</h2><p>Body</p></Card>\n',
+  'loop inside conditional':
+    '---\nconst c = true;\nconst xs = [1];\n---\n<div>{c && <ul>{xs.map((x) => (<li>{x}</li>))}</ul>}</div>\n',
+  'slotted child':
+    '---\nimport Card from "../components/Card.astro";\n---\n<Card><h2 slot="header">Hi</h2><p>Body</p></Card>\n',
   'plain elements': '---\n---\n<div><p>hi</p></div>\n',
-  'inline run': '---\n---\n<nav>\n  <a href="/docs">Docs</a>\n  <span>/</span>\n  <span>Here</span>\n</nav>\n',
+  'inline run':
+    '---\n---\n<nav>\n  <a href="/docs">Docs</a>\n  <span>/</span>\n  <span>Here</span>\n</nav>\n',
 };
 
 // Every marker the serializer put in the source, so the compiled output can be
@@ -101,7 +110,9 @@ async function check(compilers, label, source) {
   let marked;
   try {
     const parsed = parsePage(source);
-    if (!parsed.editable) {return { skipped: true };}
+    if (!parsed.editable) {
+      return { skipped: true };
+    }
     marked = serializePageMarked(parsed.model);
   } catch (err) {
     fail(label, `    serializePageMarked threw: ${err.message}`);
@@ -117,7 +128,7 @@ async function check(compilers, label, source) {
       continue;
     }
     const errors = (result.diagnostics || []).filter(
-      (d) => d.severity === 'error' || d.severity === 1
+      (d) => d.severity === 'error' || d.severity === 1,
     );
     if (errors.length) {
       fail(label, `    ${compiler.label}: ${errors[0].text}\n${indented(marked)}`);
@@ -128,7 +139,7 @@ async function check(compilers, label, source) {
       fail(
         label,
         `    ${compiler.label}: ${lost.length} marker${lost.length === 1 ? '' : 's'} dropped by the compiler` +
-          `\n      ${lost.join(' ')}\n${indented(marked)}`
+          `\n      ${lost.join(' ')}\n${indented(marked)}`,
       );
     }
   }
@@ -146,10 +157,15 @@ function indented(text) {
 
 function walk(dir, out = []) {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-    if (entry.name === 'node_modules' || entry.name.startsWith('.')) {continue;}
+    if (entry.name === 'node_modules' || entry.name.startsWith('.')) {
+      continue;
+    }
     const p = path.join(dir, entry.name);
-    if (entry.isDirectory()) {walk(p, out);}
-    else if (entry.name.endsWith('.astro')) {out.push(p);}
+    if (entry.isDirectory()) {
+      walk(p, out);
+    } else if (entry.name.endsWith('.astro')) {
+      out.push(p);
+    }
   }
   return out;
 }
@@ -159,7 +175,7 @@ function walk(dir, out = []) {
   if (!compilers.length) {
     console.error(
       'markers: no Astro compiler installed — this gate cannot run.\n' +
-        '  npm i -D @astrojs/compiler-rs @astrojs/compiler\n'
+        '  npm i -D @astrojs/compiler-rs @astrojs/compiler\n',
     );
     process.exit(2);
   }
@@ -169,7 +185,9 @@ function walk(dir, out = []) {
   let skipped = 0;
   for (const [label, source] of Object.entries(CASES)) {
     const { skipped: s } = await check(compilers, label, source);
-    if (s) {skipped++;}
+    if (s) {
+      skipped++;
+    }
   }
 
   for (const dir of process.argv.slice(2)) {
@@ -181,14 +199,18 @@ function walk(dir, out = []) {
     for (const file of walk(root)) {
       const rel = path.relative(path.dirname(root), file);
       const { skipped: s } = await check(compilers, rel, fs.readFileSync(file, 'utf8'));
-      if (s) {skipped++;}
+      if (s) {
+        skipped++;
+      }
     }
   }
 
   const names = compilers.map((c) => c.label).join(', ');
   const skipNote = skipped ? `, ${skipped} not editable` : '';
   if (failures.length) {
-    console.error(`\nmarkers: ${failures.length} failed, ${checked} passed${skipNote}  [${names}]\n`);
+    console.error(
+      `\nmarkers: ${failures.length} failed, ${checked} passed${skipNote}  [${names}]\n`,
+    );
     console.error(failures.join('\n\n') + '\n');
     process.exit(1);
   }

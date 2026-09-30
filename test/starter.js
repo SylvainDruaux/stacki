@@ -24,11 +24,17 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
+  if (!condition) {
+    failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  }
 };
 
 const git = (cwd, args) =>
-  execFileSync('git', args, { cwd, encoding: 'utf8', env: { ...process.env, GIT_TERMINAL_PROMPT: '0' } });
+  execFileSync('git', args, {
+    cwd,
+    encoding: 'utf8',
+    env: { ...process.env, GIT_TERMINAL_PROMPT: '0' },
+  });
 
 // A stand-in for `npm`: writes down the arguments it was given, then scaffolds
 // what the real one would leave behind — under the starter's own name, since
@@ -44,7 +50,7 @@ fs.appendFileSync(${JSON.stringify(path.join(root, 'calls.txt'))}, process.argv.
 const dir = path.join(process.cwd(), process.argv[4]);
 ${body}
 `,
-    { mode: 0o755 }
+    { mode: 0o755 },
   );
   if (process.platform !== 'win32') {
     return script;
@@ -86,9 +92,9 @@ console.log('Ready.');
   // --- the starter this app ships with ---------------------------------------
   check('Lumos is a starter', !!STARTERS.lumos);
   check(
-    'started with the framework\'s own scaffolder',
+    "started with the framework's own scaffolder",
     STARTERS.lumos.create === 'lumos@latest',
-    STARTERS.lumos.create
+    STARTERS.lumos.create,
   );
 
   // --- a site ----------------------------------------------------------------
@@ -100,7 +106,11 @@ console.log('Ready.');
     onLog: (text) => log.push(text),
   });
   const dir = path.join(parent, 'my-site');
-  check('the site lands in the folder it was named for', result.projectPath === dir, result.projectPath);
+  check(
+    'the site lands in the folder it was named for',
+    result.projectPath === dir,
+    result.projectPath,
+  );
   check('with the starter in it', fs.existsSync(path.join(dir, 'src', 'pages', 'index.astro')));
   check('and its config', fs.existsSync(path.join(dir, 'astro.config.mjs')));
 
@@ -108,9 +118,13 @@ console.log('Ready.');
   check(
     'it runs npm create lumos@latest, in the chosen folder, under the chosen name',
     calls()[0] === 'create lumos@latest my-site --yes -- --no-install',
-    calls()[0]
+    calls()[0],
   );
-  check('the log says what it ran', log.join('').includes('> npm create lumos@latest my-site'), log.join(''));
+  check(
+    'the log says what it ran',
+    log.join('').includes('> npm create lumos@latest my-site'),
+    log.join(''),
+  );
   check('and shows what it said', log.join('').includes('Ready.'), log.join(''));
 
   // The package is the site now.
@@ -125,7 +139,7 @@ console.log('Ready.');
   check(
     'named after what it started from',
     /Start my-site from Lumos/.test(git(dir, ['log', '-1', '--pretty=%s'])),
-    git(dir, ['log', '-1', '--pretty=%s']).trim()
+    git(dir, ['log', '-1', '--pretty=%s']).trim(),
   );
   let remotes = '';
   try {
@@ -148,27 +162,23 @@ console.log('Ready.');
   check(
     'and says so plainly',
     /already exists/.test(await refuses({ name: 'my-site' })),
-    await refuses({ name: 'my-site' })
+    await refuses({ name: 'my-site' }),
   );
   check('an empty name is refused', /Give the site a name/.test(await refuses({ name: '  ' })));
   check(
     'a name that is not a folder name is refused',
     /letters, numbers/.test(await refuses({ name: 'my site/../etc' })),
-    await refuses({ name: 'my site/../etc' })
+    await refuses({ name: 'my site/../etc' }),
   );
   check(
     'a starter nobody has heard of is refused',
-    /not a starter/.test(await refuses({ starter: 'nope', name: 'x' }))
+    /not a starter/.test(await refuses({ starter: 'nope', name: 'x' })),
   );
   check(
     'and so is a folder that is not there',
-    /Choose where/.test(await refuses({ parentPath: path.join(root, 'nowhere'), name: 'x' }))
+    /Choose where/.test(await refuses({ parentPath: path.join(root, 'nowhere'), name: 'x' })),
   );
-  check(
-    'a refused name never reaches the command line',
-    calls().length === 1,
-    calls().join(' | ')
-  );
+  check('a refused name never reaches the command line', calls().length === 1, calls().join(' | '));
 
   // A scaffolder that fails is a site that was not made, said out loud.
   {
@@ -187,14 +197,18 @@ console.log('Ready.');
   {
     let message = '';
     try {
-      await createStarter({ npm: path.join(root, 'nowhere', 'npm'), parentPath: parent, name: 'nonpm' });
+      await createStarter({
+        npm: path.join(root, 'nowhere', 'npm'),
+        parentPath: parent,
+        name: 'nonpm',
+      });
     } catch (err) {
       message = err.message;
     }
     check(
       'a missing npm is said in terms of what to install',
       /npm could not be found\. Install Node\.js/.test(message),
-      message
+      message,
     );
   }
 
@@ -210,17 +224,17 @@ const g = (...a) => execFileSync('git', a, { cwd: dir });
 g('init', '-b', 'main');
 g('add', '-A');
 g('-c', 'user.email=t@t', '-c', 'user.name=T', 'commit', '-m', 'Initial commit from the scaffolder');
-`
+`,
     );
     const own = await createStarter({ npm: withGit, parentPath: parent, name: 'has-history' });
     check(
       "the scaffolder's own first commit is left alone",
       /Initial commit from the scaffolder/.test(git(own.projectPath, ['log', '-1', '--pretty=%s'])),
-      git(own.projectPath, ['log', '-1', '--pretty=%s']).trim()
+      git(own.projectPath, ['log', '-1', '--pretty=%s']).trim(),
     );
     check(
       'and is still the only one',
-      git(own.projectPath, ['rev-list', '--count', 'HEAD']).trim() === '1'
+      git(own.projectPath, ['rev-list', '--count', 'HEAD']).trim() === '1',
     );
   }
 
@@ -229,7 +243,8 @@ g('-c', 'user.email=t@t', '-c', 'user.name=T', 'commit', '-m', 'Initial commit f
   check('a second site is made alongside the first', fs.existsSync(second.projectPath));
   check(
     'with its own name',
-    JSON.parse(fs.readFileSync(path.join(second.projectPath, 'package.json'), 'utf8')).name === 'another-site'
+    JSON.parse(fs.readFileSync(path.join(second.projectPath, 'package.json'), 'utf8')).name ===
+      'another-site',
   );
 
   fs.rmSync(root, { recursive: true, force: true });

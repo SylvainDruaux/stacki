@@ -12,16 +12,27 @@ const directory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
 fs.mkdirSync(directory, { recursive: true });
 const output = path.join(directory, 'renderer-hooks.bundle.cjs');
 buildSync({
-  stdin: { contents: `export { default as useListReorder } from './src/ui/useListReorder.ts';
-    export { usePointerDrag } from './src/ui/usePointerDrag.ts';`, resolveDir: path.join(__dirname, '..') },
-  outfile: output, bundle: true, platform: 'node', format: 'cjs', logLevel: 'silent',
+  stdin: {
+    contents: `export { default as useListReorder } from './src/ui/useListReorder.ts';
+    export { usePointerDrag } from './src/ui/usePointerDrag.ts';`,
+    resolveDir: path.join(__dirname, '..'),
+  },
+  outfile: output,
+  bundle: true,
+  platform: 'node',
+  format: 'cjs',
+  logLevel: 'silent',
   external: ['react', 'react-dom', 'react/jsx-runtime'],
 });
 const { useListReorder, usePointerDrag } = require(output);
 const dom = new JSDOM('<!doctype html><div id="root"></div>', { pretendToBeVisual: true });
 Object.assign(global, {
-  window: dom.window, document: dom.window.document, Element: dom.window.Element,
-  HTMLElement: dom.window.HTMLElement, Node: dom.window.Node, IS_REACT_ACT_ENVIRONMENT: true,
+  window: dom.window,
+  document: dom.window.document,
+  Element: dom.window.Element,
+  HTMLElement: dom.window.HTMLElement,
+  Node: dom.window.Node,
+  IS_REACT_ACT_ENVIRONMENT: true,
   requestAnimationFrame: dom.window.requestAnimationFrame.bind(dom.window),
   cancelAnimationFrame: dom.window.cancelAnimationFrame.bind(dom.window),
 });
@@ -29,14 +40,30 @@ const moves = [];
 const onMove = (source, target) => moves.push([source, target]);
 function Rows() {
   const reorder = useListReorder({ count: 2, onMove });
-  return React.createElement('div', null, [0, 1].map((index) =>
-    React.createElement('div', { ...reorder.rowProps(index), key: index, 'data-row': index }, index)));
+  return React.createElement(
+    'div',
+    null,
+    [0, 1].map((index) =>
+      React.createElement(
+        'div',
+        { ...reorder.rowProps(index), key: index, 'data-row': index },
+        index,
+      ),
+    ),
+  );
 }
 const root = createRoot(document.getElementById('root'));
 const pointer = async (target, type, clientY) => {
-  await act(async () => target.dispatchEvent(new window.MouseEvent(type, {
-    bubbles: true, cancelable: true, button: 0, clientY,
-  })));
+  await act(async () =>
+    target.dispatchEvent(
+      new window.MouseEvent(type, {
+        bubbles: true,
+        cancelable: true,
+        button: 0,
+        clientY,
+      }),
+    ),
+  );
 };
 async function main() {
   await act(async () => root.render(React.createElement(Rows)));
@@ -55,7 +82,9 @@ async function main() {
   assert.equal(moves.length, 1);
   await pointer(rows[0], 'pointerdown', 5);
   await pointer(window, 'pointermove', 25);
-  await act(async () => window.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Escape' })));
+  await act(async () =>
+    window.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Escape' })),
+  );
   await pointer(window, 'pointerup', 45);
   assert.equal(moves.length, 1);
   assert.equal(document.body.style.cursor, '');
@@ -64,9 +93,20 @@ async function main() {
   let ended = 0;
   function Handle() {
     const begin = usePointerDrag();
-    return React.createElement('button', { onPointerDown: (event) => begin(event, {
-      onMove: (next) => positions.push(next.clientY), onEnd: () => { ended++; }, cursor: 'ew-resize',
-    }) }, 'Drag');
+    return React.createElement(
+      'button',
+      {
+        onPointerDown: (event) =>
+          begin(event, {
+            onMove: (next) => positions.push(next.clientY),
+            onEnd: () => {
+              ended++;
+            },
+            cursor: 'ew-resize',
+          }),
+      },
+      'Drag',
+    );
   }
   await act(async () => root.render(React.createElement(Handle)));
   await pointer(document.querySelector('button'), 'pointerdown', 0);
@@ -82,4 +122,8 @@ async function main() {
   dom.window.close();
   console.log('renderer-hooks: stable callbacks, gestures, cancellation and cleanup passed');
 }
-main().catch((error) => { console.error(error); dom.window.close(); process.exitCode = 1; });
+main().catch((error) => {
+  console.error(error);
+  dom.window.close();
+  process.exitCode = 1;
+});

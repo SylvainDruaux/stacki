@@ -16,10 +16,14 @@ const dom = new JSDOM('<!doctype html><html><head></head><body></body></html>');
 const document = dom.window.document;
 // Main prepends the patcher's bounds from shared/limits.ts (step 7).
 const { LIMITS } = require('../dist/shared/limits.js');
-const morph = new Function('document', 'AVB_PREVIEW_LIMITS', `${source.slice(
-  source.indexOf('const isAnchor ='),
-  source.indexOf('function fetchDoc')
-)}\nreturn { diffChildren, findLive, patchChildren, addedScripts, runScripts };`)(document, LIMITS);
+const morph = new Function(
+  'document',
+  'AVB_PREVIEW_LIMITS',
+  `${source.slice(
+    source.indexOf('const isAnchor ='),
+    source.indexOf('function fetchDoc'),
+  )}\nreturn { diffChildren, findLive, patchChildren, addedScripts, runScripts };`,
+)(document, LIMITS);
 
 const tree = (html) => {
   const root = document.createElement('div');
@@ -29,10 +33,13 @@ const tree = (html) => {
 
 test('large unchanged sibling lists and appends stay within a linear allocation budget', () => {
   let allocated = 0;
-  const diff = new Function('Int32Array', `${source.slice(
-    source.indexOf('function diffChildren('),
-    source.indexOf('// Raised when the live document')
-  )}\nreturn diffChildren;`)(function BudgetedArray(size) {
+  const diff = new Function(
+    'Int32Array',
+    `${source.slice(
+      source.indexOf('function diffChildren('),
+      source.indexOf('// Raised when the live document'),
+    )}\nreturn diffChildren;`,
+  )(function BudgetedArray(size) {
     allocated += size;
     assert.ok(allocated < 100_000, 'unchanged siblings allocated a quadratic matrix');
     return new Int32Array(size);
@@ -47,10 +54,15 @@ test('large unchanged sibling lists and appends stay within a linear allocation 
 
 test('child matching retains deletion-first ties and indices after a shared prefix', () => {
   assert.deepEqual(morph.diffChildren(['head', 'a', 'b'], ['head', 'b', 'a']), [
-    [0, 0, 0], [-1, 1, -1], [0, 2, 1], [1, -1, 2],
+    [0, 0, 0],
+    [-1, 1, -1],
+    [0, 2, 1],
+    [1, -1, 2],
   ]);
   assert.deepEqual(morph.diffChildren(['a', 'b'], ['b', 'b']), [
-    [-1, 0, -1], [0, 1, 0], [1, -1, 1],
+    [-1, 0, -1],
+    [0, 1, 0],
+    [1, -1, 1],
   ]);
   assert.deepEqual(morph.diffChildren([], ['a']), [[1, -1, 0]]);
   assert.deepEqual(morph.diffChildren(['a'], []), [[-1, 0, -1]]);
@@ -82,17 +94,29 @@ test('scripts retain ordering, multiplicity, and loading attributes', () => {
   assert.equal(morph.addedScripts(tree(first + second), tree(second + first)), null);
   assert.equal(morph.addedScripts(tree(first + first), tree(first)), null);
   assert.equal(morph.addedScripts(tree(first), tree(first + first)), null);
-  assert.equal(morph.addedScripts(tree(first), tree(first.replace('type="module"', 'type="module" integrity="new"'))), null);
-  assert.deepEqual(morph.addedScripts(tree(first), tree('<script src="/first.js" type="module"></script>')), []);
+  assert.equal(
+    morph.addedScripts(
+      tree(first),
+      tree(first.replace('type="module"', 'type="module" integrity="new"')),
+    ),
+    null,
+  );
+  assert.deepEqual(
+    morph.addedScripts(tree(first), tree('<script src="/first.js" type="module"></script>')),
+    [],
+  );
 
-  const script = '<script type="module" src="/with | separator.js" integrity="sha256-value" crossorigin="anonymous" nonce="nonce-value" referrerpolicy="no-referrer"></script>';
+  const script =
+    '<script type="module" src="/with | separator.js" integrity="sha256-value" crossorigin="anonymous" nonce="nonce-value" referrerpolicy="no-referrer"></script>';
   const added = morph.addedScripts(tree(first), tree(first + script));
   assert.equal(added.length, 1);
   assert.equal(added[0].src, '/with | separator.js');
   morph.runScripts(added);
   const loaded = document.head.querySelector('script');
   const wanted = tree(script).firstChild;
-  for (const attr of wanted.attributes) {assert.equal(loaded.getAttribute(attr.name), attr.value);}
+  for (const attr of wanted.attributes) {
+    assert.equal(loaded.getAttribute(attr.name), attr.value);
+  }
   morph.runScripts(added);
   assert.equal(document.head.querySelectorAll('script').length, 1);
 });

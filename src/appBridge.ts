@@ -82,9 +82,7 @@ export function projectHasNodeModules(projectPath: string): Promise<boolean> {
 }
 
 export function pendingProject(): Promise<string | null> {
-  return window.avb.pendingProject().then((input) =>
-    input === null ? null : pathText(input),
-  );
+  return window.avb.pendingProject().then((input) => (input === null ? null : pathText(input)));
 }
 
 export function openProject(): Promise<IpcResults['project:openDialog']> {
@@ -167,9 +165,7 @@ export function writeProjectFile(
   const channel = area === 'src' ? 'src:writeText' : 'assets:writeText';
   const payload = parseIpcPayload(channel, { projectPath, rel, text: value });
   const request =
-    area === 'src'
-      ? window.avb.writeSourceText(payload)
-      : window.avb.writeAssetText(payload);
+    area === 'src' ? window.avb.writeSourceText(payload) : window.avb.writeAssetText(payload);
   return request.then((input) => void parseOkResult(input));
 }
 
@@ -205,14 +201,16 @@ export function resolveProjectImport(
   spec: string,
 ): Promise<string | null> {
   const payload = parseIpcPayload('project:resolveImport', { projectPath, fromFile, spec });
-  return window.avb.resolveImport(payload).then((input) => nullable(pathText)(record(input)['path']));
+  return window.avb
+    .resolveImport(payload)
+    .then((input) => nullable(pathText)(record(input)['path']));
 }
 
 export function readInjectedRoutes(projectPath: string): Promise<readonly WireInjectedRoute[]> {
   const payload = parseIpcPayload('project:injectedRoutes', { projectPath });
-  return window.avb.injectedRoutes(payload).then((input) =>
-    list(parseInjectedRoute)(record(input)['routes']),
-  );
+  return window.avb
+    .injectedRoutes(payload)
+    .then((input) => list(parseInjectedRoute)(record(input)['routes']));
 }
 
 export function readDynamicPaths(
@@ -226,16 +224,12 @@ export function readDynamicPaths(
 
 export function readContentCollections(projectPath: string): Promise<readonly AppCollection[]> {
   const payload = parseIpcPayload('content:collections', projectPath);
-  return window.avb.contentCollections(payload).then((input) =>
-    list(parseAppCollection)(record(input)['collections']),
-  );
+  return window.avb
+    .contentCollections(payload)
+    .then((input) => list(parseAppCollection)(record(input)['collections']));
 }
 
-export function readSampleEntry(
-  devUrl: string,
-  name: string,
-  id?: string,
-): Promise<Data | null> {
+export function readSampleEntry(devUrl: string, name: string, id?: string): Promise<Data | null> {
   const raw = id === undefined ? { devUrl, name } : { devUrl, name, id };
   const payload = parseIpcPayload('content:sampleEntry', raw);
   return window.avb.sampleEntry(payload).then((input) => {
@@ -253,11 +247,7 @@ export function createProjectPage(
   return window.avb.createPage(payload).then((input) => pathText(record(input)['pagePath']));
 }
 
-export function moveProjectPage(
-  projectPath: string,
-  from: string,
-  to: string,
-): Promise<string> {
+export function moveProjectPage(projectPath: string, from: string, to: string): Promise<string> {
   const payload = parseIpcPayload('page:move', { projectPath, from, to });
   return window.avb.movePage(payload).then((input) => pathText(record(input)['newPath']));
 }
@@ -516,9 +506,7 @@ function parseDynamicPaths(input: unknown): IpcResults['page:dynamicPaths'] {
   return { entries, error: nullable(text)(value['error']) };
 }
 
-function parseDynamicEntry(
-  input: unknown,
-): IpcResults['page:dynamicPaths']['entries'][number] {
+function parseDynamicEntry(input: unknown): IpcResults['page:dynamicPaths']['entries'][number] {
   const value = record(input);
   return {
     params: parseRouteParams(value['params']),

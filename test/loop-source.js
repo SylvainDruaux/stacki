@@ -19,17 +19,26 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
+  if (!condition) {
+    failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  }
 };
 
 // Test the implementation itself so source-selection rules cannot drift into copied fixtures.
-const { sourceChip, withSource, parseMapHead } =
-  require('./renderer-module')('panels/propNodeEditors.tsx');
+const { sourceChip, withSource, parseMapHead } = require('./renderer-module')(
+  'panels/propNodeEditors.tsx',
+);
 const assert = require('node:assert/strict');
-assert.deepEqual(parseMapHead('posts.map((post, index) => ('),
-  { data: 'posts', item: 'post', index: 'index' });
-assert.deepEqual(parseMapHead('posts.filter(p => p.live).map(post => ('),
-  { data: 'posts.filter(p => p.live)', item: 'post', index: '' });
+assert.deepEqual(parseMapHead('posts.map((post, index) => ('), {
+  data: 'posts',
+  item: 'post',
+  index: 'index',
+});
+assert.deepEqual(parseMapHead('posts.filter(p => p.live).map(post => ('), {
+  data: 'posts.filter(p => p.live)',
+  item: 'post',
+  index: '',
+});
 assert.equal(parseMapHead('posts.map(({title}) => ('), null);
 assert.equal(parseMapHead(''), null);
 assert.throws(() => parseMapHead('x'.repeat(1_000_001)), /head limit exceeded/);
@@ -38,17 +47,21 @@ assert.throws(() => withSource('posts', 'x'.repeat(1_000_001)), /path limit exce
 
 (async () => {
   // The panel's own copies, so a change there fails here rather than drifting.
-  const source = require('fs').readFileSync(
-    path.join(__dirname, '..', 'src', 'panels', 'propNodeEditors.tsx'),
-    'utf8'
-  ) + require('fs').readFileSync(
-    path.join(__dirname, '..', 'src', 'panels', 'propBindings.tsx'), 'utf8');
+  const source =
+    require('fs').readFileSync(
+      path.join(__dirname, '..', 'src', 'panels', 'propNodeEditors.tsx'),
+      'utf8',
+    ) +
+    require('fs').readFileSync(
+      path.join(__dirname, '..', 'src', 'panels', 'propBindings.tsx'),
+      'utf8',
+    );
   check('the panel still derives the source the same way', source.includes('function sourceChip('));
   check('and still swaps it in place', source.includes('function withSource('));
   check(
     'the field is the expression, not a button',
     /chip=\{sourceChip\(fields\.data\)\}/.test(source),
-    'the Data field no longer passes its source as a chip'
+    'the Data field no longer passes its source as a chip',
   );
 
   // What counts as the source.
@@ -67,12 +80,12 @@ assert.throws(() => withSource('posts', 'x'.repeat(1_000_001)), /path limit exce
   check(
     'and keeps what was done to it',
     withSource('posts.filter(p => !p.draft)', 'authors') === 'authors.filter(p => !p.draft)',
-    withSource('posts.filter(p => !p.draft)', 'authors')
+    withSource('posts.filter(p => !p.draft)', 'authors'),
   );
   check(
     'including an index',
     withSource('post.data.tags[0]', 'legalEntries') === 'legalEntries[0]',
-    withSource('post.data.tags[0]', 'legalEntries')
+    withSource('post.data.tags[0]', 'legalEntries'),
   );
   check('picking into an empty field just sets it', withSource('', 'authors') === 'authors');
   check('and into a literal replaces it', withSource('[1, 2]', 'authors') === 'authors');
@@ -81,17 +94,19 @@ assert.throws(() => withSource('posts', 'x'.repeat(1_000_001)), /path limit exce
   // was two affordances for one job.
   check(
     'the chip opens the picker',
-    /onChipClick=\{\(\) => \(sourceMenu \? setSourceMenu\(null\) : openSourceMenu\(\)\)\}/.test(source)
+    /onChipClick=\{\(\) => \(sourceMenu \? setSourceMenu\(null\) : openSourceMenu\(\)\)\}/.test(
+      source,
+    ),
   );
   check(
     'and nothing else has to',
     !source.includes('prop-source-open'),
-    'the chevron beside the Data field is back'
+    'the chevron beside the Data field is back',
   );
   check(
     'and the press that opens it does not also close it',
     /\.bind-menu, \.bind-handle, \.dd-source, \.cm-chip/.test(source),
-    'the picker treats the chip as outside itself, so a chip press opens and closes in one go'
+    'the picker treats the chip as outside itself, so a chip press opens and closes in one go',
   );
 
   // Data goes into the expression as well as choosing it: a slice needs its
@@ -100,7 +115,7 @@ assert.throws(() => withSource('posts', 'x'.repeat(1_000_001)), /path limit exce
   check('and so does the Code field', /apiRef=\{codeApiRef\}/.test(source));
   check(
     'both have a handle to open it with',
-    (source.match(/<BindHandle\s+active=\{insertAt\?\.field ===/g) || []).length === 2
+    (source.match(/<BindHandle\s+active=\{insertAt\?\.field ===/g) || []).length === 2,
   );
 
   // Renaming the item is about the source, not the expression: typing a filter
@@ -109,22 +124,33 @@ assert.throws(() => withSource('posts', 'x'.repeat(1_000_001)), /path limit exce
   const renames = (before, after) => sourceChip(before) !== sourceChip(after);
   check('a different list renames the item', renames('posts', 'authors'));
   check('a filter typed after it does not', !renames('posts', 'posts.filter(p => !p.draft)'));
-  check('nor does a value dropped into one', !renames('posts.slice(0, 3)', 'posts.slice(0, count)'));
+  check(
+    'nor does a value dropped into one',
+    !renames('posts.slice(0, 3)', 'posts.slice(0, count)'),
+  );
   check('and a first list still does', renames('[]', 'posts'));
 
   // The chip is a mark over text, so the value never contains anything but the
   // expression itself.
-  const expr = require('fs').readFileSync(path.join(__dirname, '..', 'src', 'ui', 'ExprInput.tsx'), 'utf8');
-  check('the chip is a mark, not a widget', /Decoration\.mark\(\{ class: 'cm-chip' \}\)/.test(expr));
+  const expr = require('fs').readFileSync(
+    path.join(__dirname, '..', 'src', 'ui', 'ExprInput.tsx'),
+    'utf8',
+  );
+  check(
+    'the chip is a mark, not a widget',
+    /Decoration\.mark\(\{ class: 'cm-chip' \}\)/.test(expr),
+  );
   check('and clicking it is handled', /closest\('\.cm-chip, \.expr-chip'\)/.test(expr));
   check(
     'a chip whose text is edited away stops being one',
     /stops being a chip/.test(expr),
-    'the decoration is mapped through edits instead of re-found'
+    'the decoration is mapped through edits instead of re-found',
   );
 
   if (failures.length) {
-    console.error(`\nloop-source: ${failures.length} failed, ${checked - failures.length} passed\n`);
+    console.error(
+      `\nloop-source: ${failures.length} failed, ${checked - failures.length} passed\n`,
+    );
     console.error(failures.join('\n') + '\n');
     process.exit(1);
   }

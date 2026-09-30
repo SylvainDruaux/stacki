@@ -33,7 +33,9 @@ const parseLine = (line: string, index: number): LineInfo => {
 const parseLines = (text: string): LineInfo[] => text.split('\n').map(parseLine);
 
 const parseData = (text: string): unknown[] =>
-  parseLines(text).filter((l) => l.record).map((l) => l.record);
+  parseLines(text)
+    .filter((l) => l.record)
+    .map((l) => l.record);
 
 const DELETE = Symbol('delete');
 

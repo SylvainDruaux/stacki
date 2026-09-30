@@ -19,7 +19,9 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
+  if (!condition) {
+    failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  }
 };
 const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -95,27 +97,30 @@ const WORDS = el('words', 'p', [{ id: 'w-text', kind: 'expr', value: '{heading}'
   check(
     'a condition with an else shows its then inline',
     rowChildren(TERNARY)[0]?.id === 'signed-in',
-    JSON.stringify(rowChildren(TERNARY).map((n) => n.id))
+    JSON.stringify(rowChildren(TERNARY).map((n) => n.id)),
   );
   check(
     'and the else after it, as a row of its own',
     rowChildren(TERNARY)[1]?.id === 't-else',
-    JSON.stringify(rowChildren(TERNARY).map((n) => n.id))
+    JSON.stringify(rowChildren(TERNARY).map((n) => n.id)),
   );
   check('two rows, not three', rowChildren(TERNARY).length === 2, `${rowChildren(TERNARY).length}`);
-  check('the else keeps its own children', rowChildren(elseBranch(TERNARY))[0]?.id === 'signed-out');
+  check(
+    'the else keeps its own children',
+    rowChildren(elseBranch(TERNARY))[0]?.id === 'signed-out',
+  );
   check('and there is none to draw without one', elseBranch(AND) === null);
 
   check('a plain element is only ever itself', rowHost(el('x', 'div')).id === 'x');
   check(
     'a condition with nothing in it hides nothing',
     thenBranch({ kind: 'cond', children: [] }) === null &&
-      rowChildren({ kind: 'cond', children: [] }).length === 0
+      rowChildren({ kind: 'cond', children: [] }).length === 0,
   );
   check(
     'and one with only an else keeps that else',
     rowChildren({ kind: 'cond', children: [branch('e', 'else', [el('x', 'i')])] })[0]?.id === 'e',
-    JSON.stringify(rowChildren({ kind: 'cond', children: [branch('e', 'else', [el('x', 'i')])] }))
+    JSON.stringify(rowChildren({ kind: 'cond', children: [branch('e', 'else', [el('x', 'i')])] })),
   );
 
   // --- the rows ---------------------------------------------------------------
@@ -178,11 +183,12 @@ const WORDS = el('words', 'p', [{ id: 'w-text', kind: 'expr', value: '{heading}'
           onDuplicateNode: () => {},
           onPasteNode: () => {},
           onChangeLayout: () => {},
-          onCodeChange: () => {}, onOpenCodePanel: () => {},
+          onCodeChange: () => {},
+          onOpenCodePanel: () => {},
           onHoverNode: () => {},
           onOpenComponent: () => {},
           hasClipboard: false,
-        })
+        }),
       );
       await settle(20);
     });
@@ -204,7 +210,7 @@ const WORDS = el('words', 'p', [{ id: 'w-text', kind: 'expr', value: '{heading}'
   check(
     'so what is inside sits one level in, not two',
     at('hero-command').indent - at('if-and').indent === 16,
-    `${at('hero-command').indent - at('if-and').indent}px`
+    `${at('hero-command').indent - at('if-and').indent}px`,
   );
 
   // The one with an else draws that else, and nothing for the then: what the
@@ -214,18 +220,18 @@ const WORDS = el('words', 'p', [{ id: 'w-text', kind: 'expr', value: '{heading}'
   check(
     'the markup it renders sits one level into the condition',
     at('signed-in').indent - at('if-ternary').indent === 16,
-    `${at('signed-in').indent - at('if-ternary').indent}px`
+    `${at('signed-in').indent - at('if-ternary').indent}px`,
   );
   check(
     'the else sits beside it, at the same level',
     at('t-else').indent === at('signed-in').indent,
-    `${at('t-else').indent} vs ${at('signed-in').indent}`
+    `${at('t-else').indent} vs ${at('signed-in').indent}`,
   );
   check('with its own markup under it', at('signed-out').indent - at('t-else').indent === 16);
   check(
     'and no row anywhere says "then"',
     labels.filter((l) => l === 'then').length === 0,
-    labels.join(' | ')
+    labels.join(' | '),
   );
 
   // An else that renders a value has to draw it. There is no Content field on a
@@ -236,11 +242,15 @@ const WORDS = el('words', 'p', [{ id: 'w-text', kind: 'expr', value: '{heading}'
   check(
     'the value sits under the else',
     at('v-heading') && at('v-heading').indent - at('v-else').indent === 16,
-    at('v-heading') ? `${at('v-heading').indent - at('v-else').indent}px` : 'no row for it'
+    at('v-heading') ? `${at('v-heading').indent - at('v-else').indent}px` : 'no row for it',
   );
   // Where there IS a Content field, the words stay in it: showing them twice is
   // the noise this rule exists to avoid.
-  check('an element with words in it still leaves them to the panel', !at('w-text'), labels.join(' | '));
+  check(
+    'an element with words in it still leaves them to the panel',
+    !at('w-text'),
+    labels.join(' | '),
+  );
 
   // --- a drop on the condition ------------------------------------------------
   {
@@ -265,7 +275,7 @@ const WORDS = el('words', 'p', [{ id: 'w-text', kind: 'expr', value: '{heading}'
     check(
       'and lands in the branch, which is where the markup lives',
       dropped[0]?.parentId === 'and-then',
-      JSON.stringify(dropped[0])
+      JSON.stringify(dropped[0]),
     );
   }
 
@@ -278,7 +288,10 @@ const WORDS = el('words', 'p', [{ id: 'w-text', kind: 'expr', value: '{heading}'
       await act(async () => {
         reactRoot.render(
           React.createElement(StructurePanel, {
-            pageState: { editable: true, model: { nodes: [el('section', 'section', [AND, TERNARY])], imports: [] } },
+            pageState: {
+              editable: true,
+              model: { nodes: [el('section', 'section', [AND, TERNARY])], imports: [] },
+            },
             layouts: [],
             currentLayoutName: '',
             selectedId: from,
@@ -290,11 +303,12 @@ const WORDS = el('words', 'p', [{ id: 'w-text', kind: 'expr', value: '{heading}'
             onDuplicateNode: () => {},
             onPasteNode: () => {},
             onChangeLayout: () => {},
-            onCodeChange: () => {}, onOpenCodePanel: () => {},
+            onCodeChange: () => {},
+            onOpenCodePanel: () => {},
             onHoverNode: () => {},
             onOpenComponent: () => {},
             hasClipboard: false,
-          })
+          }),
         );
         await settle(10);
       });
@@ -306,27 +320,48 @@ const WORDS = el('words', 'p', [{ id: 'w-text', kind: 'expr', value: '{heading}'
       });
       return selected[0];
     };
-    check('down from the condition reaches what is inside it', (await press('ArrowDown', 'if-and')) === 'hero-command');
-    check('and up from there reaches the condition', (await press('ArrowUp', 'hero-command')) === 'if-and');
+    check(
+      'down from the condition reaches what is inside it',
+      (await press('ArrowDown', 'if-and')) === 'hero-command',
+    );
+    check(
+      'and up from there reaches the condition',
+      (await press('ArrowUp', 'hero-command')) === 'if-and',
+    );
     check(
       'down from a condition with an else reaches its markup, not a branch row',
-      (await press('ArrowDown', 'if-ternary')) === 'signed-in'
+      (await press('ArrowDown', 'if-ternary')) === 'signed-in',
     );
     // ← and → step between siblings, ↑ goes out. The else and the markup the
     // `if` renders are siblings now, so one press moves between them.
     const leftOfElse = await press('ArrowLeft', 't-else');
-    check('left from the else reaches the markup beside it', leftOfElse === 'signed-in', String(leftOfElse));
+    check(
+      'left from the else reaches the markup beside it',
+      leftOfElse === 'signed-in',
+      String(leftOfElse),
+    );
     const outOfElse = await press('ArrowUp', 't-else');
-    check('and up from it goes out to the condition', outOfElse === 'if-ternary', String(outOfElse));
+    check(
+      'and up from it goes out to the condition',
+      outOfElse === 'if-ternary',
+      String(outOfElse),
+    );
   }
 
   // A condition dropped from the palette starts as the one thing it is: a
   // test and what it shows. The else is a switch in the props panel.
   {
     const app = fs.readFileSync(path.join(__dirname, '..', 'src', 'App.tsx'), 'utf8');
-    const insert = app.slice(app.indexOf("item.type === 'cond'"), app.indexOf("item.type === 'comment'"));
-    check("a new condition is `test && (…)`", /op: '&&'/.test(insert), insert.slice(0, 400));
-    check('with one branch in it', (insert.match(/kind: 'branch'/g) || []).length === 1, insert.slice(0, 400));
+    const insert = app.slice(
+      app.indexOf("item.type === 'cond'"),
+      app.indexOf("item.type === 'comment'"),
+    );
+    check('a new condition is `test && (…)`', /op: '&&'/.test(insert), insert.slice(0, 400));
+    check(
+      'with one branch in it',
+      (insert.match(/kind: 'branch'/g) || []).length === 1,
+      insert.slice(0, 400),
+    );
     check('and no else until one is asked for', !/name: 'else'/.test(insert));
   }
 
@@ -372,7 +407,7 @@ const WORDS = el('words', 'p', [{ id: 'w-text', kind: 'expr', value: '{heading}'
     check(
       'better on green than the flat grey it replaced',
       on(greenRow) > grey(greenRow),
-      `${on(greenRow).toFixed(2)} vs ${grey(greenRow).toFixed(2)}`
+      `${on(greenRow).toFixed(2)} vs ${grey(greenRow).toFixed(2)}`,
     );
   }
 
@@ -387,7 +422,12 @@ const WORDS = el('words', 'p', [{ id: 'w-text', kind: 'expr', value: '{heading}'
     global.cancelAnimationFrame = dom.window.cancelAnimationFrame.bind(dom.window);
     dom.window.Range.prototype.getClientRects = () => [];
     dom.window.Range.prototype.getBoundingClientRect = () => ({
-      top: 0, left: 0, bottom: 0, right: 0, width: 0, height: 0,
+      top: 0,
+      left: 0,
+      bottom: 0,
+      right: 0,
+      width: 0,
+      height: 0,
     });
     const opened = [];
     await act(async () => {
@@ -414,7 +454,7 @@ const WORDS = el('words', 'p', [{ id: 'w-text', kind: 'expr', value: '{heading}'
           onOpenCodePanel: () => opened.push('code'),
           devLog: '[astro] Unable to render index.astro',
           hasClipboard: false,
-        })
+        }),
       );
       await settle(20);
     });

@@ -21,7 +21,9 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
+  if (!condition) {
+    failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  }
 };
 
 (async () => {
@@ -59,7 +61,7 @@ const check = (what, condition, detail) => {
     return React.createElement(
       'div',
       { ref: host, className: `style-panel-host ${open ? 'is-locked' : ''}` },
-      React.createElement('div', { className: 'embed-editor_root' }, 'panel')
+      React.createElement('div', { className: 'embed-editor_root' }, 'panel'),
     );
   };
 
@@ -70,7 +72,10 @@ const check = (what, condition, detail) => {
   const host = () => dom.window.document.querySelector('.style-panel-host');
   const locked = () => host().className.includes('is-locked');
   // The observers are async; jsdom delivers records on a microtask.
-  const settle = () => act(async () => { await new Promise((r) => setTimeout(r, 0)) });
+  const settle = () =>
+    act(async () => {
+      await new Promise((r) => setTimeout(r, 0));
+    });
 
   const put = async (where, html) => {
     const node = dom.window.document.createElement('div');
@@ -84,7 +89,10 @@ const check = (what, condition, detail) => {
   check('nothing open, nothing locked', !locked());
 
   // --- portaled to <body>, which is where a picker or a modal lands ------------
-  const picker = await put(dom.window.document.body, '<div role="dialog" aria-label="Color picker"></div>');
+  const picker = await put(
+    dom.window.document.body,
+    '<div role="dialog" aria-label="Color picker"></div>',
+  );
   check('a colour picker locks the panel', locked());
   picker.remove();
   await settle();
@@ -94,7 +102,7 @@ const check = (what, condition, detail) => {
   // counts is not always the node that was added.
   const backdrop = await put(
     dom.window.document.body,
-    '<div class="embed-editor_bg-modal-backdrop"><div role="dialog"></div></div>'
+    '<div class="embed-editor_bg-modal-backdrop"><div role="dialog"></div></div>',
   );
   check('a dialog nested in a backdrop counts too', locked());
   backdrop.remove();
@@ -104,7 +112,7 @@ const check = (what, condition, detail) => {
   // --- rendered inline, which is where the display/direction menus land --------
   const inline = await put(
     dom.window.document.querySelector('.embed-editor_root'),
-    '<div role="menu"></div>'
+    '<div role="menu"></div>',
   );
   check('a menu inside the panel locks it', locked());
   inline.remove();
@@ -124,7 +132,7 @@ const check = (what, condition, detail) => {
 
   const group = await put(
     dom.window.document.querySelector('.embed-editor_root'),
-    '<div role="group"><button role="radio">Block</button></div>'
+    '<div role="group"><button role="radio">Block</button></div>',
   );
   check('nor does an ordinary control', !locked());
   group.remove();
@@ -141,24 +149,31 @@ const check = (what, condition, detail) => {
   await settle();
   check('only the last one to close unlocks', !locked());
 
-  await act(async () => { root.unmount() });
+  await act(async () => {
+    root.unmount();
+  });
 
   // --- the rule that does the work ---------------------------------------------
   const css = fs.readFileSync(path.join(__dirname, '..', 'src', 'styles.css'), 'utf8');
   check(
     'the locked panel stops scrolling',
-    /\.style-panel-host\.is-locked > \* \{ overflow-y: hidden; \}/.test(css)
+    /\.style-panel-host\.is-locked > \* \{ overflow-y: hidden; \}/.test(css),
   );
   check(
     'and its gutter is reserved, so losing the bar costs no layout',
-    /scrollbar-gutter:\s*stable/.test(css)
+    /scrollbar-gutter:\s*stable/.test(css),
   );
-  const panel = fs.readFileSync(path.join(__dirname, '..', 'src', 'panels', 'StylePanel.tsx'), 'utf8');
+  const panel = fs.readFileSync(
+    path.join(__dirname, '..', 'src', 'panels', 'StylePanel.tsx'),
+    'utf8',
+  );
   check('the panel asks', /usePopupOpen\(hostRef\)/.test(panel));
   check('and wears the answer', /popupOpen \? 'is-locked' : ''/.test(panel));
 
   if (failures.length) {
-    console.error(`\npopup-scroll: ${failures.length} failed, ${checked - failures.length} passed\n`);
+    console.error(
+      `\npopup-scroll: ${failures.length} failed, ${checked - failures.length} passed\n`,
+    );
     console.error(failures.join('\n') + '\n');
     process.exit(1);
   }

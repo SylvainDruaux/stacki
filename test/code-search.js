@@ -22,7 +22,9 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
+  if (!condition) {
+    failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  }
 };
 
 const root = path.join(__dirname, '..');
@@ -33,19 +35,21 @@ const read = (rel) => fs.readFileSync(path.join(root, rel), 'utf8').replace(/\r\
 const searchSrc = read('node_modules/@codemirror/search/dist/index.js');
 const panelSrc = searchSrc.slice(
   searchSrc.indexOf('class SearchPanel'),
-  searchSrc.indexOf('commit()', searchSrc.indexOf('class SearchPanel'))
+  searchSrc.indexOf('commit()', searchSrc.indexOf('class SearchPanel')),
 );
 // Fields name themselves in their element spec; buttons are made by a helper
 // that takes the name as its first argument.
-const controlNames = [...new Set([
-  ...[...panelSrc.matchAll(/name: "([a-zA-Z]+)"/g)].map((m) => m[1]),
-  ...[...panelSrc.matchAll(/button\("([a-zA-Z]+)"/g)].map((m) => m[1]),
-])];
+const controlNames = [
+  ...new Set([
+    ...[...panelSrc.matchAll(/name: "([a-zA-Z]+)"/g)].map((m) => m[1]),
+    ...[...panelSrc.matchAll(/button\("([a-zA-Z]+)"/g)].map((m) => m[1]),
+  ]),
+];
 
 check(
   'the panel is still built out of named controls',
   controlNames.length >= 8,
-  controlNames.join(', ')
+  controlNames.join(', '),
 );
 
 // The shape we style. Every name above must appear here — if CodeMirror grows a
@@ -67,7 +71,7 @@ const missing = controlNames.filter((name) => !(name in MIRROR));
 check(
   'and every one of them is a control this styling knows about',
   missing.length === 0,
-  `unstyled: ${missing.join(', ')}`
+  `unstyled: ${missing.join(', ')}`,
 );
 
 const { JSDOM } = require('jsdom');
@@ -97,13 +101,19 @@ const sheet = postcss.parse(read('src/styles.css'));
 const panelRules = [];
 const narrowRules = [];
 sheet.walkRules((rule) => {
-  if (!/\.cm-panel|\.cm-panels|\.cm-search/.test(rule.selector)) {return;}
+  if (!/\.cm-panel|\.cm-panels|\.cm-search/.test(rule.selector)) {
+    return;
+  }
   const inContainer = rule.parent?.type === 'atrule' && rule.parent.name === 'container';
-  ;(inContainer ? narrowRules : panelRules).push(rule);
+  (inContainer ? narrowRules : panelRules).push(rule);
 });
 
 check('the panel has styling of its own', panelRules.length > 10, `${panelRules.length} rules`);
-check('including a compact form for narrow editors', narrowRules.length > 0, `${narrowRules.length} rules`);
+check(
+  'including a compact form for narrow editors',
+  narrowRules.length > 0,
+  `${narrowRules.length} rules`,
+);
 
 // Every rule must hit something. A selector that matches nothing is styling
 // written against a panel that no longer exists.
@@ -118,18 +128,32 @@ const dead = [];
 for (const rule of [...panelRules, ...narrowRules]) {
   for (const selector of rule.selectors) {
     let hit = false;
-    try { hit = doc.querySelectorAll(queryableForm(selector)).length > 0 } catch { hit = false }
-    if (!hit) {dead.push(selector);}
+    try {
+      hit = doc.querySelectorAll(queryableForm(selector)).length > 0;
+    } catch {
+      hit = false;
+    }
+    if (!hit) {
+      dead.push(selector);
+    }
   }
 }
-check('and no rule is written against a panel that no longer exists', dead.length === 0, dead.join('\n    '));
+check(
+  'and no rule is written against a panel that no longer exists',
+  dead.length === 0,
+  dead.join('\n    '),
+);
 
 // Every control is covered by at least one rule.
 const covered = (el) =>
   [...panelRules, ...narrowRules].some((rule) =>
     rule.selectors.some((selector) => {
-      try { return [...doc.querySelectorAll(queryableForm(selector))].includes(el) } catch { return false }
-    })
+      try {
+        return [...doc.querySelectorAll(queryableForm(selector))].includes(el);
+      } catch {
+        return false;
+      }
+    }),
   );
 const q = (sel) => doc.querySelector(sel);
 for (const [what, sel] of [
@@ -155,23 +179,27 @@ const brRule = panelRules.find((rule) => /\bbr\b/.test(rule.selector));
 check(
   'the row break is given a row to break',
   !!brRule && /flex-basis:\s*100%/.test(brRule.toString()),
-  brRule?.toString()
+  brRule?.toString(),
 );
 
 // The magnifier in the query field is a background IMAGE, so anything setting
 // the `background` shorthand on that field — including on :focus, where this
 // went wrong once — wipes it.
-const fieldRules = panelRules.filter((rule) => /input(\.cm-textfield|\[name=search\])/.test(rule.selector));
+const fieldRules = panelRules.filter((rule) =>
+  /input(\.cm-textfield|\[name=search\])/.test(rule.selector),
+);
 const shorthand = fieldRules.filter((rule) => rule.some((decl) => decl.prop === 'background'));
 check(
   'nothing paints over the query field with the background shorthand',
   shorthand.length === 0,
-  shorthand.map((r) => r.selector).join(', ')
+  shorthand.map((r) => r.selector).join(', '),
 );
 check(
   'and the field carries a magnifier',
-  fieldRules.some((rule) => rule.some((decl) => decl.prop === 'background-image' && /svg/.test(decl.value))),
-  fieldRules.map((r) => r.selector).join(', ')
+  fieldRules.some((rule) =>
+    rule.some((decl) => decl.prop === 'background-image' && /svg/.test(decl.value)),
+  ),
+  fieldRules.map((r) => r.selector).join(', '),
 );
 
 // ── Where it opens ─────────────────────────────────────────────────────────
@@ -185,8 +213,10 @@ for (const [what, file] of [
 }
 check(
   'and the top panel is the one the divider goes under',
-  panelRules.some((rule) => /cm-panels-top/.test(rule.selector) && /border-bottom/.test(rule.toString())),
-  'a panel at the top needs its line below it, not above'
+  panelRules.some(
+    (rule) => /cm-panels-top/.test(rule.selector) && /border-bottom/.test(rule.toString()),
+  ),
+  'a panel at the top needs its line below it, not above',
 );
 
 // ── The matches themselves ──────────────────────────────────────────────────
@@ -206,12 +236,12 @@ const appTheme = read('src/ui/CodeEditor.tsx');
 check(
   'and the current match is a ring, not another wash over the selection',
   /cm-searchMatch-selected[\s\S]{0,220}outline:/.test(appTheme),
-  'two translucent fills over each other came out a muddy third colour'
+  'two translucent fills over each other came out a muddy third colour',
 );
 check(
   'the search-match colours are not left to a stylesheet, where they would tie',
   !/\.cm-searchMatch/.test(read('src/styles.css')),
-  'styles.css sets .cm-searchMatch — a base theme ties with it'
+  'styles.css sets .cm-searchMatch — a base theme ties with it',
 );
 
 if (failures.length) {

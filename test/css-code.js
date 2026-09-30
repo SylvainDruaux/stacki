@@ -18,10 +18,16 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
+  if (!condition) {
+    failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  }
 };
 const same = (what, got, want) =>
-  check(what, JSON.stringify(got) === JSON.stringify(want), `got ${JSON.stringify(got)}, want ${JSON.stringify(want)}`);
+  check(
+    what,
+    JSON.stringify(got) === JSON.stringify(want),
+    `got ${JSON.stringify(got)}, want ${JSON.stringify(want)}`,
+  );
 
 (async () => {
   const esbuild = require('esbuild');
@@ -71,7 +77,13 @@ const same = (what, got, want) =>
     '',
   ];
   for (const value of VALUES) {
-    same(`tokens rebuild "${value}"`, cssTokens(value).map((t) => t.text).join(''), value);
+    same(
+      `tokens rebuild "${value}"`,
+      cssTokens(value)
+        .map((t) => t.text)
+        .join(''),
+      value,
+    );
     // The HTML is escaped markup around the same text, so stripping the tags
     // has to give the value back — a painted field must never edit itself.
     const text = highlightCss(value)
@@ -81,9 +93,21 @@ const same = (what, got, want) =>
       .replace(/&gt;/g, '>');
     same(`paint keeps "${value}"`, text, value);
   }
-  same('number and unit split', cssTokens('16px').map((t) => `${t.kind}:${t.text}`), ['num:16', 'unit:px']);
-  same('function before its paren', cssTokens('clamp(').map((t) => t.kind), ['fn', 'plain']);
-  same('custom property', cssTokens('--space-1').map((t) => t.kind), ['prop']);
+  same(
+    'number and unit split',
+    cssTokens('16px').map((t) => `${t.kind}:${t.text}`),
+    ['num:16', 'unit:px'],
+  );
+  same(
+    'function before its paren',
+    cssTokens('clamp(').map((t) => t.kind),
+    ['fn', 'plain'],
+  );
+  same(
+    'custom property',
+    cssTokens('--space-1').map((t) => t.kind),
+    ['prop'],
+  );
   check('markup escapes', !highlightCss('a < b & c').includes('<b'), highlightCss('a < b & c'));
 
   // --- matched-rule view ----------------------------------------------------
@@ -113,8 +137,20 @@ const same = (what, got, want) =>
     },
   });
   const ruleView = buildCssRuleView([
-    matchedRule({ selector: '.general', specificity: [0, 1, 0], order: 0, value: 'red', winning: false }),
-    matchedRule({ selector: '.specific', specificity: [0, 2, 0], order: 1, value: 'blue', winning: true }),
+    matchedRule({
+      selector: '.general',
+      specificity: [0, 1, 0],
+      order: 0,
+      value: 'red',
+      winning: false,
+    }),
+    matchedRule({
+      selector: '.specific',
+      specificity: [0, 2, 0],
+      order: 1,
+      value: 'blue',
+      winning: true,
+    }),
   ]);
   check('the most specific selector is shown first', ruleView.code.startsWith('.specific {'));
   check('every matching selector remains in the code view', ruleView.code.includes('.general {'));
@@ -135,12 +171,12 @@ const same = (what, got, want) =>
   same(
     'only the matching member of a multiline selector is highlighted',
     headingView.selectors.map((range) => headingView.code.slice(range.from, range.to)),
-    ['h1']
+    ['h1'],
   );
   same(
     'the complete multiline selector stays identifiable for neutral syntax',
     headingView.selectorLists.map((range) => headingView.code.slice(range.from, range.to)),
-    [headingGroup]
+    [headingGroup],
   );
 
   const queryView = buildCssRuleView([
@@ -153,8 +189,9 @@ const same = (what, got, want) =>
       atContext: ['@media (width > 40rem)'],
     }),
   ]);
-  check('query context is preserved around its rule',
-    queryView.code === '@media (width > 40rem) {\n  .card {\n    color: green;\n  }\n}'
+  check(
+    'query context is preserved around its rule',
+    queryView.code === '@media (width > 40rem) {\n  .card {\n    color: green;\n  }\n}',
   );
 
   // --- stepping -------------------------------------------------------------
@@ -169,11 +206,17 @@ const same = (what, got, want) =>
   // 0.1 + 0.2 is 0.30000000000000004 in binary floating point, and a field
   // someone is watching must not say so.
   same('float noise is rounded off', stepNumberAt('0.2', 3, 0.1), { text: '.3', caret: 2 });
-  same('the number the caret is in', stepNumberAt('clamp(1rem, 2vw, 3rem)', 12, 1), { text: 'clamp(1rem, 3vw, 3rem)', caret: 13 });
+  same('the number the caret is in', stepNumberAt('clamp(1rem, 2vw, 3rem)', 12, 1), {
+    text: 'clamp(1rem, 3vw, 3rem)',
+    caret: 13,
+  });
   same('a signed number keeps its sign', stepNumberAt('-4px', 2, 1), { text: '-3px', caret: 2 });
   same('down through zero', stepNumberAt('1px', 1, -2), { text: '-1px', caret: 2 });
   // The minus in `100% - 4px` is an operator, not this number's sign.
-  same('an operator is not a sign', stepNumberAt('calc(100% - 4px)', 13, -1), { text: 'calc(100% - 3px)', caret: 13 });
+  same('an operator is not a sign', stepNumberAt('calc(100% - 4px)', 13, -1), {
+    text: 'calc(100% - 3px)',
+    caret: 13,
+  });
   same('nothing to step', stepNumberAt('none', 2, 1), null);
   same('nothing to step in an empty field', stepNumberAt('', 0, 1), null);
 

@@ -32,7 +32,10 @@ function applyEditRequest(file, text, edit) {
 const settle = () => new Promise((resolve) => setTimeout(resolve, 15));
 const deferred = () => {
   let resolve, reject;
-  const promise = new Promise((yes, no) => { resolve = yes; reject = no; });
+  const promise = new Promise((yes, no) => {
+    resolve = yes;
+    reject = no;
+  });
   return { promise, resolve, reject };
 };
 
@@ -40,40 +43,79 @@ test('component navigation keeps the real iframe and inspector mounted while loa
   const buildDir = path.join(__dirname, '..', 'node_modules', '.stacki-test', 'component-preview');
   fs.mkdirSync(buildDir, { recursive: true });
   await esbuild.build({
-    entryPoints: [path.join(__dirname, '..', 'src', 'App.tsx')], outfile: path.join(buildDir, 'app.js'),
-    bundle: true, format: 'cjs', platform: 'node', jsx: 'automatic',
+    entryPoints: [path.join(__dirname, '..', 'src', 'App.tsx')],
+    outfile: path.join(buildDir, 'app.js'),
+    bundle: true,
+    format: 'cjs',
+    platform: 'node',
+    jsx: 'automatic',
     external: ['react', 'react-dom', 'react-dom/client', 'react/jsx-runtime'],
-    loader: { '.css': 'empty', '.svg': 'empty', '.png': 'empty' }, logLevel: 'silent',
-    plugins: [{ name: 'capture-inspectors', setup(build) {
-      build.onLoad({ filter: /\/src\/panels\/[^/]+\.[jt]sx$/ }, (args) => {
-        const name = path.basename(args.path, path.extname(args.path));
-        // Keep both preview components real: a mocked pane cannot reveal frame
-        // replacement, navigation, or an inspector vanishing beside the frame.
-        if (
-          ['PreviewPane', 'CanvasView', 'DevOffline', 'PreviewOverlays', 'PreviewToolbar',
-            'PreviewSizeControls'].includes(name)
-        ) {
-          return;
-        }
-        return { contents: `export const relativeTime = () => ''; export default function Panel(props) { globalThis.__componentPanels[${JSON.stringify(name)}] = props; return null; }`, loader: 'jsx' };
-      });
-    } }],
+    loader: { '.css': 'empty', '.svg': 'empty', '.png': 'empty' },
+    logLevel: 'silent',
+    plugins: [
+      {
+        name: 'capture-inspectors',
+        setup(build) {
+          build.onLoad({ filter: /\/src\/panels\/[^/]+\.[jt]sx$/ }, (args) => {
+            const name = path.basename(args.path, path.extname(args.path));
+            // Keep both preview components real: a mocked pane cannot reveal frame
+            // replacement, navigation, or an inspector vanishing beside the frame.
+            if (
+              [
+                'PreviewPane',
+                'CanvasView',
+                'DevOffline',
+                'PreviewOverlays',
+                'PreviewToolbar',
+                'PreviewSizeControls',
+              ].includes(name)
+            ) {
+              return;
+            }
+            return {
+              contents: `export const relativeTime = () => ''; export default function Panel(props) { globalThis.__componentPanels[${JSON.stringify(name)}] = props; return null; }`,
+              loader: 'jsx',
+            };
+          });
+        },
+      },
+    ],
   });
   const { JSDOM } = require('jsdom');
-  const dom = new JSDOM('<!doctype html><div id="root"></div>', { url: 'http://localhost/', pretendToBeVisual: true });
+  const dom = new JSDOM('<!doctype html><div id="root"></div>', {
+    url: 'http://localhost/',
+    pretendToBeVisual: true,
+  });
   global.window = dom.window;
-  for (const name of ['document', 'navigator', 'HTMLElement', 'Element', 'Node', 'MutationObserver']) {global[name] = dom.window[name];}
+  for (const name of [
+    'document',
+    'navigator',
+    'HTMLElement',
+    'Element',
+    'Node',
+    'MutationObserver',
+  ]) {
+    global[name] = dom.window[name];
+  }
   global.getComputedStyle = dom.window.getComputedStyle;
   global.requestAnimationFrame = (fn) => setTimeout(fn, 0);
   global.cancelAnimationFrame = clearTimeout;
-  global.ResizeObserver = class { observe() {} disconnect() {} };
+  global.ResizeObserver = class {
+    observe() {}
+    disconnect() {}
+  };
   dom.window.ResizeObserver = global.ResizeObserver;
-  dom.window.matchMedia = () => ({ matches: false, addEventListener() {}, removeEventListener() {} });
+  dom.window.matchMedia = () => ({
+    matches: false,
+    addEventListener() {},
+    removeEventListener() {},
+  });
   global.__componentPanels = {};
   global.IS_REACT_ACT_ENVIRONMENT = true;
   const page = { name: 'index.astro', path: '/project/src/pages/index.astro', route: '/' };
   const card = { name: 'Card', path: '/project/src/components/Card.astro', folder: '' };
-  const pageSource = "---\nimport Card from '../components/Card.astro';\n---\n<main><Card /></main>";
+  const pageSource =
+    "---\nimport Card from '../components/Card.astro';\n---\n<main><Card /></main>";
   const cardSource = '<section class="card"><p>Card content</p></section>';
   const pageRead = (source) => ({
     ...parsePage(source, { locs: true }),
@@ -88,33 +130,50 @@ test('component navigation keeps the real iframe and inspector mounted while loa
   const previewChecks = [];
   const writes = [];
   let writeError = null;
-  const bridge = new Proxy({
-    pendingProject: async () => null,
-    scanProject: async () => ({ pages: [page], components: [card], layouts: [], pageFolders: [] }),
-    hasNodeModules: async () => true,
-    startDevServer: async () => ({ url: 'http://localhost:4321' }),
-    listProjectClasses: async () => [],
-    resolveImport: async () => ({ path: card.path }),
-    readPage: async (file) => heldReads.get(file)?.promise ?? structuredClone(states.get(file)),
-    editPage: async ({ pagePath, authoredChecksum, edit }) => {
-      if (writeError) {throw writeError;}
-      const held = states.get(pagePath);
-      assert.equal(authoredChecksum, held.checksum, 'an edit names the bytes it is stated on');
-      const applied = applyEditRequest(pagePath, held.source, edit);
-      const written = pageRead(applied.text);
-      writes.push({ pagePath, model: written.model });
-      states.set(pagePath, written);
-      return { ok: true, ...structuredClone(written), inverse: applied.inverse };
+  const bridge = new Proxy(
+    {
+      pendingProject: async () => null,
+      scanProject: async () => ({
+        pages: [page],
+        components: [card],
+        layouts: [],
+        pageFolders: [],
+      }),
+      hasNodeModules: async () => true,
+      startDevServer: async () => ({ url: 'http://localhost:4321' }),
+      listProjectClasses: async () => [],
+      resolveImport: async () => ({ path: card.path }),
+      readPage: async (file) => heldReads.get(file)?.promise ?? structuredClone(states.get(file)),
+      editPage: async ({ pagePath, authoredChecksum, edit }) => {
+        if (writeError) {
+          throw writeError;
+        }
+        const held = states.get(pagePath);
+        assert.equal(authoredChecksum, held.checksum, 'an edit names the bytes it is stated on');
+        const applied = applyEditRequest(pagePath, held.source, edit);
+        const written = pageRead(applied.text);
+        writes.push({ pagePath, model: written.model });
+        states.set(pagePath, written);
+        return { ok: true, ...structuredClone(written), inverse: applied.inverse };
+      },
+      gitInfo: async () => ({ isRepo: false }),
+      // Main's disk check of a canvas rendering (step 7): the files are the ones
+      // this fake holds, so every stamped file is current.
+      checkPreview: async ({ render }) => {
+        previewChecks.push(render);
+        return { tag: 'current' };
+      },
+      onCssChanged: () => () => {},
     },
-    gitInfo: async () => ({ isRepo: false }),
-    // Main's disk check of a canvas rendering (step 7): the files are the ones
-    // this fake holds, so every stamped file is current.
-    checkPreview: async ({ render }) => {
-      previewChecks.push(render);
-      return { tag: 'current' };
+    {
+      get: (target, name) =>
+        name in target
+          ? target[name]
+          : String(name).startsWith('on')
+            ? () => () => {}
+            : async () => null,
     },
-    onCssChanged: () => () => {},
-  }, { get: (target, name) => name in target ? target[name] : String(name).startsWith('on') ? () => () => {} : async () => null });
+  );
   window.avb = bridge;
   global.avb = bridge;
   const React = require('react');
@@ -122,15 +181,26 @@ test('component navigation keeps the real iframe and inspector mounted while loa
   const { createRoot } = require('react-dom/client');
   const App = require(path.join(buildDir, 'app.js')).default;
   const root = createRoot(document.getElementById('root'));
-  const hold = (file) => { const request = deferred(); heldReads.set(file, request); return request; };
-  const resolve = async (file, request) => act(async () => {
-    heldReads.delete(file);
-    request.resolve(structuredClone(states.get(file)));
-    await settle();
-  });
+  const hold = (file) => {
+    const request = deferred();
+    heldReads.set(file, request);
+    return request;
+  };
+  const resolve = async (file, request) =>
+    act(async () => {
+      heldReads.delete(file);
+      request.resolve(structuredClone(states.get(file)));
+      await settle();
+    });
   try {
-    await act(async () => { root.render(React.createElement(App)); await settle(); });
-    await act(async () => { await __componentPanels.WelcomeScreen.onOpen('/project'); await settle(); });
+    await act(async () => {
+      root.render(React.createElement(App));
+      await settle();
+    });
+    await act(async () => {
+      await __componentPanels.WelcomeScreen.onOpen('/project');
+      await settle();
+    });
     const frame = document.querySelector('.frame-clip iframe');
     const frameWindow = frame.contentWindow;
     const src = frame.src;
@@ -139,10 +209,18 @@ test('component navigation keeps the real iframe and inspector mounted while loa
     const outgoing = [];
     frameWindow.postMessage = (message) => outgoing.push(message);
     const unchanged = () => {
-      assert.equal(document.querySelector('.frame-clip iframe'), frame, 'the loaded iframe is retained');
+      assert.equal(
+        document.querySelector('.frame-clip iframe'),
+        frame,
+        'the loaded iframe is retained',
+      );
       assert.equal(frame.contentWindow, frameWindow, 'the document window stays alive');
       assert.equal(frame.src, src, 'component edits keep the same preview page URL');
-      assert.equal(document.querySelector('.panel.right'), inspector, 'the inspector stays mounted so the page cannot expand and reflow');
+      assert.equal(
+        document.querySelector('.panel.right'),
+        inspector,
+        'the inspector stays mounted so the page cannot expand and reflow',
+      );
     };
     // The frame announces the rendering it shows — stamped with the page's
     // bytes as they are now — and the double-click carries its token (step 7).
@@ -158,20 +236,23 @@ test('component navigation keeps the real iframe and inspector mounted while loa
       });
       return token;
     };
-    const dblclick = async (token) => act(async () => {
-      const data = { type: 'avb:open-node', path: '0.0', occurrence: 0, token };
-      window.dispatchEvent(new dom.window.MessageEvent('message', { source: frameWindow, data }));
-      await settle();
-    });
+    const dblclick = async (token) =>
+      act(async () => {
+        const data = { type: 'avb:open-node', path: '0.0', occurrence: 0, token };
+        window.dispatchEvent(new dom.window.MessageEvent('message', { source: frameWindow, data }));
+        await settle();
+      });
     const openCard = async () => dblclick(await announce());
-    const back = async () => act(async () => {
-      document.querySelector('button.comp-back').click();
-      await settle();
-    });
-    const editTitle = async (value) => act(async () => {
-      __componentPanels.PropsPanel.onSetProp('title', { type: 'string', value });
-      await settle();
-    });
+    const back = async () =>
+      act(async () => {
+        document.querySelector('button.comp-back').click();
+        await settle();
+      });
+    const editTitle = async (value) =>
+      act(async () => {
+        __componentPanels.PropsPanel.onSetProp('title', { type: 'string', value });
+        await settle();
+      });
 
     const entering = hold(card.path);
     // No rendering announced yet: the double-click opens nothing, and main is
@@ -183,23 +264,38 @@ test('component navigation keeps the real iframe and inspector mounted while loa
     await openCard();
     assert.equal(previewChecks.length, 1, 'main checked the rendering before the card opened');
     unchanged();
-    assert.equal(__componentPanels.PropsPanel.filePath, page.path, 'the old file remains paired with its own model while reading');
+    assert.equal(
+      __componentPanels.PropsPanel.filePath,
+      page.path,
+      'the old file remains paired with its own model while reading',
+    );
     await editTitle('page edit during read');
     await resolve(card.path, entering);
     unchanged();
     assert.equal(__componentPanels.PropsPanel.filePath, card.path);
     assert.equal(writes.at(-1).pagePath, page.path);
     assert.equal(writes.at(-1).model.nodes[0].props.title.value, 'page edit during read');
-    assert.ok(outgoing.some((message) => message.type === 'avb:track' && message.scope === 'src/components/Card.astro|'));
+    assert.ok(
+      outgoing.some(
+        (message) => message.type === 'avb:track' && message.scope === 'src/components/Card.astro|',
+      ),
+    );
 
     const reopening = hold(card.path);
-    await act(async () => { void __componentPanels.StructurePanel.onOpenComponent('Card'); await settle(); });
+    await act(async () => {
+      void __componentPanels.StructurePanel.onOpenComponent('Card');
+      await settle();
+    });
     unchanged();
     await editTitle('same file edit during read');
     await resolve(card.path, reopening);
     unchanged();
     assert.equal(__componentPanels.PropsPanel.filePath, card.path);
-    assert.equal(__componentPanels.PropsPanel.node.props.title.value, 'same file edit during read', 'reopening a file preserves edits newer than its read snapshot');
+    assert.equal(
+      __componentPanels.PropsPanel.node.props.title.value,
+      'same file edit during read',
+      'reopening a file preserves edits newer than its read snapshot',
+    );
     assert.equal(writes.at(-1).pagePath, card.path);
     assert.equal(writes.at(-1).model.nodes[0].props.title.value, 'same file edit during read');
 
@@ -223,9 +319,17 @@ test('component navigation keeps the real iframe and inspector mounted while loa
     const failedRead = hold(card.path);
     await openCard();
     unchanged();
-    await act(async () => { heldReads.delete(card.path); failedRead.reject(new Error('unreadable component')); await settle(); });
+    await act(async () => {
+      heldReads.delete(card.path);
+      failedRead.reject(new Error('unreadable component'));
+      await settle();
+    });
     unchanged();
-    assert.equal(__componentPanels.PropsPanel.filePath, page.path, 'a read failure preserves the current editor');
+    assert.equal(
+      __componentPanels.PropsPanel.filePath,
+      page.path,
+      'a read failure preserves the current editor',
+    );
     assert.match(document.querySelector('.toast.error').textContent, /unreadable component/);
 
     const failedSave = hold(card.path);
@@ -234,7 +338,11 @@ test('component navigation keeps the real iframe and inspector mounted while loa
     writeError = new Error('disk full during navigation');
     await resolve(card.path, failedSave);
     unchanged();
-    assert.equal(__componentPanels.PropsPanel.filePath, page.path, 'a failed final save cancels navigation');
+    assert.equal(
+      __componentPanels.PropsPanel.filePath,
+      page.path,
+      'a failed final save cancels navigation',
+    );
     assert.equal(__componentPanels.PropsPanel.node.props.title.value, 'must remain unsaved');
     assert.match(document.querySelector('.toast.error').textContent, /disk full during navigation/);
     writeError = null;
@@ -266,7 +374,8 @@ test('component navigation keeps the real iframe and inspector mounted while loa
       },
       {
         label: 'layout body retains priority over html and head',
-        source: '<html><head><title>Document</title></head><body><main>Content</main></body></html>',
+        source:
+          '<html><head><title>Document</title></head><body><main>Content</main></body></html>',
         selectionPath: '0.1',
         name: 'body',
       },
@@ -279,11 +388,27 @@ test('component navigation keeps the real iframe and inspector mounted while loa
       unchanged();
       const selected = __componentPanels.PropsPanel.node;
       assert.equal(selected.name, fixture.name, `${fixture.label}: selects the rendered target`);
-      assert.equal(__componentPanels.StructurePanel.selectedId, selected.id, `${fixture.label}: navigator and inspector agree`);
+      assert.equal(
+        __componentPanels.StructurePanel.selectedId,
+        selected.id,
+        `${fixture.label}: navigator and inspector agree`,
+      );
       const track = outgoing.filter((message) => message.type === 'avb:track').at(-1);
-      assert.equal(track.scope, 'src/components/Card.astro|', `${fixture.label}: selection stays scoped to the component`);
-      assert.equal(track.paths[0], `src/components/Card.astro|${fixture.selectionPath}`, `${fixture.label}: the actual child path is highlighted`);
-      assert.equal(track.focus, '0.0', `${fixture.label}: the original page instance retains focus`);
+      assert.equal(
+        track.scope,
+        'src/components/Card.astro|',
+        `${fixture.label}: selection stays scoped to the component`,
+      );
+      assert.equal(
+        track.paths[0],
+        `src/components/Card.astro|${fixture.selectionPath}`,
+        `${fixture.label}: the actual child path is highlighted`,
+      );
+      assert.equal(
+        track.focus,
+        '0.0',
+        `${fixture.label}: the original page instance retains focus`,
+      );
       await back();
       unchanged();
       assert.equal(
@@ -300,11 +425,18 @@ test('component navigation keeps the real iframe and inspector mounted while loa
       await openCard();
       unchanged();
       const selected = __componentPanels.PropsPanel.node;
-      assert.equal(selected?.kind ?? null, fixture.kind, 'a component without a rendered target retains the first-node or empty fallback');
+      assert.equal(
+        selected?.kind ?? null,
+        fixture.kind,
+        'a component without a rendered target retains the first-node or empty fallback',
+      );
       assert.equal(__componentPanels.StructurePanel.selectedId, selected?.id ?? null);
       const track = outgoing.filter((message) => message.type === 'avb:track').at(-1);
       assert.equal(track.scope, 'src/components/Card.astro|');
-      assert.deepEqual(track.paths, fixture.kind ? ['src/components/Card.astro|0', '0.0'] : ['0.0']);
+      assert.deepEqual(
+        track.paths,
+        fixture.kind ? ['src/components/Card.astro|0', '0.0'] : ['0.0'],
+      );
       await back();
       unchanged();
       assert.equal(__componentPanels.PropsPanel.node.name, 'Card');

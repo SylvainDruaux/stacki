@@ -217,7 +217,7 @@ function usePreviewSizing(device: PreviewDevice, onDevice: (device: PreviewDevic
   }, [device]);
   const width = customWidth ?? deviceWidth(device);
   const viewport = previewViewport(width, available, customHeight);
-  const activeDevice = device === 'canvas' ? 'canvas' : deviceForWidth(viewport.width) ?? device;
+  const activeDevice = device === 'canvas' ? 'canvas' : (deviceForWidth(viewport.width) ?? device);
   const setWidth = (next: number): void => {
     setCustomWidth(next);
     onDevice('custom');

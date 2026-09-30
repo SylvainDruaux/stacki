@@ -29,13 +29,17 @@ const {
 const frontmatter = require('../dist/electron/formats/frontmatter.js');
 
 const DEFAULT_FIXTURE = path.join(os.homedir(), 'Downloads', 'awesome-client-main');
-const source = path.resolve(process.argv[2] || process.env.STACKI_CONTENT_FIXTURE || DEFAULT_FIXTURE);
+const source = path.resolve(
+  process.argv[2] || process.env.STACKI_CONTENT_FIXTURE || DEFAULT_FIXTURE,
+);
 
 const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
+  if (!condition) {
+    failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  }
 };
 
 const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -69,7 +73,14 @@ const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
     platform: 'node',
     jsx: 'automatic',
     loader: { '.jsx': 'jsx' },
-    external: ['react', 'react-dom', 'react/jsx-runtime', '@uiw/react-codemirror', '@codemirror/*', 'codemirror'],
+    external: [
+      'react',
+      'react-dom',
+      'react/jsx-runtime',
+      '@uiw/react-codemirror',
+      '@codemirror/*',
+      'codemirror',
+    ],
     logLevel: 'silent',
   });
 
@@ -96,16 +107,27 @@ const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
 
   const collectionNamed = (name) => config.collections.find((c) => c.name === name);
   dom.window.avb = {
-    contentEntries: async ({ name }) => ({ collection: collectionNamed(name), ...listEntries(root, collectionNamed(name)) }),
+    contentEntries: async ({ name }) => ({
+      collection: collectionNamed(name),
+      ...listEntries(root, collectionNamed(name)),
+    }),
     contentTargets: async ({ name }) => ({
-      targets: listEntries(root, collectionNamed(name)).entries.map((e) => ({ id: e.id, title: e.title })),
+      targets: listEntries(root, collectionNamed(name)).entries.map((e) => ({
+        id: e.id,
+        title: e.title,
+      })),
     }),
     contentCollections: async () => ({
-      collections: config.collections.map((c) => ({ name: c.name, editable: c.editable, count: countEntries(root, c) })),
+      collections: config.collections.map((c) => ({
+        name: c.name,
+        editable: c.editable,
+        count: countEntries(root, c),
+      })),
       covered: coveredPaths(config.collections),
     }),
     writeContentEntry: async ({ entry, edits, body }) => writeEntry(root, entry, edits, { body }),
-    validateContentEntry: async ({ collection, data }) => validateEntry(source, { collection, data }),
+    validateContentEntry: async ({ collection, data }) =>
+      validateEntry(source, { collection, data }),
     contentRenamePlan: async () => ({ move: { kind: 'file' }, pointers: [] }),
     renameContentEntry: async () => ({ ok: true }),
     listAssets: async () => ({ entries: [] }),
@@ -124,7 +146,9 @@ const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
 
   const mount = async (name) => {
     await act(async () => {
-      reactRoot.render(React.createElement(ContentView, { project, name, hidden: false, onClose: () => {} }));
+      reactRoot.render(
+        React.createElement(ContentView, { project, name, hidden: false, onClose: () => {} }),
+      );
       await settle(60);
     });
   };
@@ -132,26 +156,40 @@ const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
   const find = (selector) => container.querySelector(selector);
   const all = (selector) => [...container.querySelectorAll(selector)];
   const labelled = (label) =>
-    all('.cms-field').find((node) => node.querySelector('label')?.textContent.replace('*', '').trim() === label);
+    all('.cms-field').find(
+      (node) => node.querySelector('label')?.textContent.replace('*', '').trim() === label,
+    );
 
   // --- a markdown collection --------------------------------------------------
   await mount('blog');
-  check('blog: entries are listed', all('.cms-item').length === 7, `${all('.cms-item').length} shown`);
+  check(
+    'blog: entries are listed',
+    all('.cms-item').length === 7,
+    `${all('.cms-item').length} shown`,
+  );
   check('blog: the first entry opens', !!find('.cms-detail-title')?.textContent);
   check('blog: required fields are drawn', !!labelled('Title'));
   check('blog: a reference field is a picker', !!labelled('Author')?.querySelector('select'));
   check(
     'blog: the picker offers real entries',
-    [...(labelled('Author')?.querySelectorAll('option') || [])].some((o) => /Avery Chen/.test(o.textContent)),
-    labelled('Author')?.textContent
+    [...(labelled('Author')?.querySelectorAll('option') || [])].some((o) =>
+      /Avery Chen/.test(o.textContent),
+    ),
+    labelled('Author')?.textContent,
   );
-  check('blog: tags are chips', (labelled('Tags')?.querySelectorAll('.content-chip') || []).length > 0);
+  check(
+    'blog: tags are chips',
+    (labelled('Tags')?.querySelectorAll('.content-chip') || []).length > 0,
+  );
   check('blog: the body is editable', !!find('textarea') && /Body/.test(text()));
-  check('blog: a bounded field says so', /3–120 characters/.test(labelled('Title')?.textContent || ''));
+  check(
+    'blog: a bounded field says so',
+    /3–120 characters/.test(labelled('Title')?.textContent || ''),
+  );
   check(
     'blog: an absent optional field is offered, not drawn',
     all('.content-add-field').length > 0,
-    'every optional field was drawn as an empty box'
+    'every optional field was drawn as an empty box',
   );
 
   // Typing in the title writes it to the file, and only it.
@@ -160,30 +198,46 @@ const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
     const before = fs.readFileSync(path.join(root, entry.file), 'utf8');
     const input = labelled('Title').querySelector('input');
     await act(async () => {
-      const setter = Object.getOwnPropertyDescriptor(dom.window.HTMLInputElement.prototype, 'value').set;
+      const setter = Object.getOwnPropertyDescriptor(
+        dom.window.HTMLInputElement.prototype,
+        'value',
+      ).set;
       setter.call(input, 'A title typed into the editor');
       input.dispatchEvent(new dom.window.Event('input', { bubbles: true }));
       await settle(700);
     });
     const after = fs.readFileSync(path.join(root, entry.file), 'utf8');
-    check('blog: typing saves', frontmatter.parseData(after).title === 'A title typed into the editor');
+    check(
+      'blog: typing saves',
+      frontmatter.parseData(after).title === 'A title typed into the editor',
+    );
     check(
       'blog: and touches one line',
-      before.split('\n').filter((line, i) => line !== after.split('\n')[i]).length === 1
+      before.split('\n').filter((line, i) => line !== after.split('\n')[i]).length === 1,
     );
-    check('blog: the body is untouched', frontmatter.parse(before).body === frontmatter.parse(after).body);
+    check(
+      'blog: the body is untouched',
+      frontmatter.parse(before).body === frontmatter.parse(after).body,
+    );
   }
 
   // A value the schema forbids is reported rather than saved silently.
   {
     const input = labelled('Title').querySelector('input');
     await act(async () => {
-      const setter = Object.getOwnPropertyDescriptor(dom.window.HTMLInputElement.prototype, 'value').set;
+      const setter = Object.getOwnPropertyDescriptor(
+        dom.window.HTMLInputElement.prototype,
+        'value',
+      ).set;
       setter.call(input, 'ab');
       input.dispatchEvent(new dom.window.Event('input', { bubbles: true }));
       await settle(700);
     });
-    check('blog: too short is flagged', /At least 3 characters|Too small/.test(labelled('Title').textContent), labelled('Title').textContent);
+    check(
+      'blog: too short is flagged',
+      /At least 3 characters|Too small/.test(labelled('Title').textContent),
+      labelled('Title').textContent,
+    );
   }
 
   // --- a union of blocks -------------------------------------------------------
@@ -193,7 +247,7 @@ const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
   check(
     'landingPages: each block says which kind it is',
     /Hero|Features|Cta/i.test(all('.cms-repeat-row')[0]?.textContent || ''),
-    all('.cms-repeat-row')[0]?.textContent
+    all('.cms-repeat-row')[0]?.textContent,
   );
 
   // --- an entry-level union ----------------------------------------------------
@@ -201,13 +255,16 @@ const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
   check('siteSettings: the kind is a switcher', !!find('.content-union-head select'));
   check(
     'siteSettings: with every kind offered',
-    (find('.content-union-head select')?.querySelectorAll('option') || []).length === 5
+    (find('.content-union-head select')?.querySelectorAll('option') || []).length === 5,
   );
 
   // --- read-only collections ---------------------------------------------------
   await mount('releases');
   check('releases: nothing to edit', all('.cms-item').length === 0);
-  check('releases: and it says why', /rebuilt from scratch|read-only|built by a loader/i.test(text()));
+  check(
+    'releases: and it says why',
+    /rebuilt from scratch|read-only|built by a loader/i.test(text()),
+  );
 
   // --- a parser-shaped collection ---------------------------------------------
   await mount('faqs');
@@ -216,7 +273,7 @@ const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
   check(
     'faqs: a field the parser invented is marked',
     /from the parser/i.test(text()),
-    'category fields were shown as if they were editable'
+    'category fields were shown as if they were editable',
   );
 
   // --- no schema at all --------------------------------------------------------
@@ -228,7 +285,9 @@ const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
   fs.rmSync(root, { recursive: true, force: true });
 
   if (failures.length) {
-    console.error(`\ncontent-view: ${failures.length} failed, ${checked - failures.length} passed\n`);
+    console.error(
+      `\ncontent-view: ${failures.length} failed, ${checked - failures.length} passed\n`,
+    );
     console.error(failures.join('\n') + '\n');
     stopAllServices();
     process.exit(1);

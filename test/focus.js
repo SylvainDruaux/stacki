@@ -21,7 +21,9 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
+  if (!condition) {
+    failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  }
 };
 
 (async () => {
@@ -32,8 +34,8 @@ const check = (what, condition, detail) => {
   fs.writeFileSync(
     entry,
     `export { RatioOtherInput } from ${JSON.stringify(
-      path.join(__dirname, '..', 'src', 'style-panel', 'SizeSection.tsx')
-    )};\n`
+      path.join(__dirname, '..', 'src', 'style-panel', 'SizeSection.tsx'),
+    )};\n`,
   );
   const out = path.join(buildDir, 'focus.bundle.js');
   await esbuild.build({
@@ -56,7 +58,10 @@ const check = (what, condition, detail) => {
   global.document = dom.window.document;
   global.IS_REACT_ACT_ENVIRONMENT = true;
   global.MutationObserver = dom.window.MutationObserver;
-  global.ResizeObserver = class { observe() {} disconnect() {} };
+  global.ResizeObserver = class {
+    observe() {}
+    disconnect() {}
+  };
   global.requestAnimationFrame = dom.window.requestAnimationFrame.bind(dom.window);
   global.cancelAnimationFrame = dom.window.cancelAnimationFrame.bind(dom.window);
 
@@ -79,7 +84,7 @@ const check = (what, condition, detail) => {
           onLiveCommit() {},
           onClear() {},
           ...props,
-        })
+        }),
       );
     });
     await act(async () => {});
@@ -94,7 +99,9 @@ const check = (what, condition, detail) => {
   check('a field that appeared on its own does not take the caret', !hasCaret());
   check('and leaves it where it was', dom.window.document.activeElement === away);
   check('while still showing the value', field()?.value === 'var(--_visual-ratio)', field()?.value);
-  await act(async () => { root.unmount() });
+  await act(async () => {
+    root.unmount();
+  });
 
   // --- the field somebody ASKED for --------------------------------------------
   away.focus();
@@ -103,16 +110,20 @@ const check = (what, condition, detail) => {
   check(
     'with its text selected, ready to be typed over',
     field()?.selectionStart === 0 && field()?.selectionEnd === field()?.value.length,
-    `${field()?.selectionStart}–${field()?.selectionEnd}`
+    `${field()?.selectionStart}–${field()?.selectionEnd}`,
   );
-  await act(async () => { root.unmount() });
+  await act(async () => {
+    root.unmount();
+  });
 
   // Nothing is focused mid-write: the seeding write disables the field, and
   // focusing a disabled input does nothing at all.
   away.focus();
   root = await show({ autoFocus: true, busy: true });
   check('and not while the seeding write is still going', !hasCaret());
-  await act(async () => { root.unmount() });
+  await act(async () => {
+    root.unmount();
+  });
 
   // --- a variable reads as one ---------------------------------------------------
   //
@@ -124,32 +135,31 @@ const check = (what, condition, detail) => {
   check(
     'the field is wrapped in the variable editor, like its neighbours',
     !!host.querySelector('.embed-editor_varconnect, .u-varconnect, [class*="varconnect"]'),
-    host.innerHTML.slice(0, 160)
+    host.innerHTML.slice(0, 160),
   );
-  await act(async () => { root.unmount() });
+  await act(async () => {
+    root.unmount();
+  });
 
   // --- both fields it serves ----------------------------------------------------
   const size = fs.readFileSync(
     path.join(__dirname, '..', 'src', 'style-panel', 'SizeSection.tsx'),
-    'utf8'
+    'utf8',
   );
   check(
     'Ratio asks for the caret only when Other was picked',
-    /autoFocus=\{askedForOther\.current\}/.test(size)
+    /autoFocus=\{askedForOther\.current\}/.test(size),
   );
-  check(
-    'and Image fit only when Custom was',
-    /autoFocus=\{askedForCustom\.current\}/.test(size)
-  );
+  check('and Image fit only when Custom was', /autoFocus=\{askedForCustom\.current\}/.test(size));
   check(
     'both tell the picker which property they are',
-    /prop="aspect-ratio"/.test(size) && /prop="object-fit"/.test(size)
+    /prop="aspect-ratio"/.test(size) && /prop="object-fit"/.test(size),
   );
   // Picking anything else takes the request back, so returning to the field
   // later — by selecting an element — is silent again.
   check(
     'choosing another option withdraws the request',
-    /askedForOther\.current = false/.test(size) && /askedForCustom\.current = false/.test(size)
+    /askedForOther\.current = false/.test(size) && /askedForCustom\.current = false/.test(size),
   );
 
   // --- the rest of the panel already worked this way ---------------------------
@@ -164,13 +174,19 @@ const check = (what, condition, detail) => {
   // about fields that render as part of a control that was already there.
   const OPENED_ON_PURPOSE = new Set(['SpacingBox.tsx']);
   const ungated = [];
-  for (const file of fs.readdirSync(panel).filter((f) => f.endsWith('.tsx') && !OPENED_ON_PURPOSE.has(f))) {
+  for (const file of fs
+    .readdirSync(panel)
+    .filter((f) => f.endsWith('.tsx') && !OPENED_ON_PURPOSE.has(f))) {
     const source = fs.readFileSync(path.join(panel, file), 'utf8');
     for (const effect of source.split('useEffect(').slice(1)) {
       const body = effect.slice(0, effect.indexOf('}, ['));
-      if (!/inputRef\.current\?\.focus\(\)/.test(body)) {continue;}
+      if (!/inputRef\.current\?\.focus\(\)/.test(body)) {
+        continue;
+      }
       // Gated on something: the mode was entered, or the caller asked.
-      if (/wantFocus|autoFocus|didFocus/.test(body)) {continue;}
+      if (/wantFocus|autoFocus|didFocus/.test(body)) {
+        continue;
+      }
       ungated.push(file);
     }
   }

@@ -1,5 +1,5 @@
-import { useEffect, useRef } from 'react'
-import { getHost } from './host'
+import { useEffect, useRef } from 'react';
+import { getHost } from './host';
 
 // Lighting up the gaps a field controls, while you point at it.
 //
@@ -16,65 +16,69 @@ import { getHost } from './host'
 // field can be pointed at and typed into at once, and leaving on either one
 // would take down an outline the other still wants.
 
-export type GapAxis = 'row' | 'column'
+export type GapAxis = 'row' | 'column';
 
 export function useGapHover(axes: GapAxis[], value: string) {
-  const hovering = useRef(false)
-  const holding = useRef(false)
+  const hovering = useRef(false);
+  const holding = useRef(false);
   // Read at the moment of reporting rather than captured, so a value typed
   // while the bands are up relabels them instead of showing what was there
   // when the pointer arrived.
-  const latest = useRef(value)
-  latest.current = value
+  const latest = useRef(value);
+  latest.current = value;
 
   const show = (text?: string) => {
-    const shown = (text ?? latest.current).trim() || '0'
+    const shown = (text ?? latest.current).trim() || '0';
     getHost().onSpacingHover?.({
       kind: 'gap',
       sides: axes,
       labels: Object.fromEntries(axes.map((a) => [a, shown])),
-    })
-  }
+    });
+  };
 
   const hide = () => {
-    if (hovering.current || holding.current) {return}
-    getHost().onSpacingHover?.(null)
-  }
+    if (hovering.current || holding.current) {
+      return;
+    }
+    getHost().onSpacingHover?.(null);
+  };
 
   // A field that unmounts while lit — the panel changing selection, the link
   // toggling one field into two — would otherwise leave its bands on the
   // canvas with nothing left to take them down.
   useEffect(
     () => () => {
-      getHost().onSpacingHover?.(null)
+      getHost().onSpacingHover?.(null);
     },
-    []
-  )
+    [],
+  );
 
   return {
     /** Spread onto the input. */
     handlers: {
       onMouseEnter: () => {
-        hovering.current = true
-        show()
+        hovering.current = true;
+        show();
       },
       onMouseLeave: () => {
-        hovering.current = false
-        hide()
+        hovering.current = false;
+        hide();
       },
     },
     /** Called alongside the field's own focus/blur/change work. */
     onFocus: () => {
-      holding.current = true
-      show()
+      holding.current = true;
+      show();
     },
     onBlur: () => {
-      holding.current = false
-      hide()
+      holding.current = false;
+      hide();
     },
     /** Relabel while typing, but only if the bands are actually up. */
     onValue: (text: string) => {
-      if (hovering.current || holding.current) {show(text)}
+      if (hovering.current || holding.current) {
+        show(text);
+      }
     },
-  }
+  };
 }

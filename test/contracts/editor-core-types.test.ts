@@ -83,7 +83,11 @@ export function mappingTypeChecks(
   void currentOnly;
 }
 
-export function typeChecks(snapshot: Snapshot, projection: Projection, reason: RejectionReason): void {
+export function typeChecks(
+  snapshot: Snapshot,
+  projection: Projection,
+  reason: RejectionReason,
+): void {
   const utf16 = toUtf16Offset(3);
   // @ts-expect-error A UTF-16 offset is not a byte offset (plan §3.2).
   byteOnly(utf16);
@@ -110,13 +114,20 @@ export function typeChecks(snapshot: Snapshot, projection: Projection, reason: R
   // @ts-expect-error Capabilities are a closed set.
   const writable: Capability = 'writable';
   // @ts-expect-error An anchor's kind is a closed set too.
-  const anchor: AnchorRef = { span: { start: toByteOffset(0), end: toByteOffset(0) }, path: [], expectedKind: 'widget' };
+  const anchor: AnchorRef = {
+    span: { start: toByteOffset(0), end: toByteOffset(0) },
+    path: [],
+    expectedKind: 'widget',
+  };
   void [byteSpan, id, digest, outcome, full, writable, anchor, reason];
 }
 
 test('type-level contracts compile only as intended', () => {
   assert.equal(typeof typeChecks, 'function');
-  assert.equal(describe({ tag: 'rejected', intentId: toIntentId('i1'), reason: 'write-race' }), 'write-race');
+  assert.equal(
+    describe({ tag: 'rejected', intentId: toIntentId('i1'), reason: 'write-race' }),
+    'write-race',
+  );
   assert.equal(typeof mappingTypeChecks, 'function');
   assert.equal(mappingReason({ tag: 'ambiguous' }), 'anchor-ambiguous');
 });

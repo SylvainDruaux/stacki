@@ -28,7 +28,9 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
+  if (!condition) {
+    failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  }
 };
 const settle = (ms = 20) => new Promise((r) => setTimeout(r, ms));
 
@@ -82,7 +84,11 @@ const settle = (ms = 20) => new Promise((r) => setTimeout(r, ms));
 
   require(bundle);
   await settle(30); // the client fetches its baseline as it loads
-  check('the canvas takes a baseline of the server’s rendering', fetches === 1, `${fetches} fetches`);
+  check(
+    'the canvas takes a baseline of the server’s rendering',
+    fetches === 1,
+    `${fetches} fetches`,
+  );
 
   const say = async (message) => {
     window.dispatchEvent(new window.MessageEvent('message', { data: message }));
@@ -94,7 +100,7 @@ const settle = (ms = 20) => new Promise((r) => setTimeout(r, ms));
   check(
     'a page told to patch shows what the file says now',
     window.document.getElementById('probe')?.textContent === 'probe two',
-    window.document.getElementById('probe')?.textContent
+    window.document.getElementById('probe')?.textContent,
   );
   check('without reloading anything', fetches === 2, `${fetches} fetches`);
 
@@ -104,7 +110,7 @@ const settle = (ms = 20) => new Promise((r) => setTimeout(r, ms));
   check(
     'asking again when nothing changed leaves the page alone',
     window.document.getElementById('probe')?.textContent === 'probe two',
-    window.document.getElementById('probe')?.textContent
+    window.document.getElementById('probe')?.textContent,
   );
 
   served = PAGE('three');
@@ -112,7 +118,7 @@ const settle = (ms = 20) => new Promise((r) => setTimeout(r, ms));
   check(
     'and a message that is not this one is not this one',
     window.document.getElementById('probe')?.textContent === 'probe two',
-    window.document.getElementById('probe')?.textContent
+    window.document.getElementById('probe')?.textContent,
   );
 
   // --- a word to the canvas that needs no answer --------------------------------
@@ -131,9 +137,16 @@ const settle = (ms = 20) => new Promise((r) => setTimeout(r, ms));
   const posted = [];
   setCanvasFrame({ postMessage: (m) => posted.push(m) });
   check('what the app says reaches the frame', tellCanvas({ type: 'avb:patch-now' }) === true);
-  check('as the message the client is listening for', posted[0]?.type === 'avb:patch-now', JSON.stringify(posted));
+  check(
+    'as the message the client is listening for',
+    posted[0]?.type === 'avb:patch-now',
+    JSON.stringify(posted),
+  );
   setCanvasFrame(null);
-  check('and with no frame it says so rather than throwing', tellCanvas({ type: 'avb:patch-now' }) === false);
+  check(
+    'and with no frame it says so rather than throwing',
+    tellCanvas({ type: 'avb:patch-now' }) === false,
+  );
 
   // --- who says it, and when -----------------------------------------------------
   const main = fs.readFileSync(path.join(__dirname, '..', 'dist', 'electron', 'main.js'), 'utf8');
@@ -148,24 +161,24 @@ const settle = (ms = 20) => new Promise((r) => setTimeout(r, ms));
       String.raw`if \(isSelfWrite\(changed\)\) \{\s*return;\s*\}\s*` +
         String.raw`noteExternalChange\(changed\);\s*notePageMayHaveChanged\(true\);`,
     ).test(watcher),
-    'the app cannot tell an outside edit from its own'
+    'the app cannot tell an outside edit from its own',
   );
   check(
     'and the app’s own writes are not',
     /function noteAppWrite\(\)[^{]*\{[\s\S]*?notePageMayHaveChanged\(\);/.test(main),
-    'every keystroke would ask the canvas for a fetch of its own'
+    'every keystroke would ask the canvas for a fetch of its own',
   );
   check(
     'the flag survives the debounce that batches them',
     /pageChangeExternal = pageChangeExternal \|\| external;/.test(main),
-    'an outside edit batched with an app write loses the flag'
+    'an outside edit batched with an app write loses the flag',
   );
 
   const app = fs.readFileSync(path.join(__dirname, '..', 'src', 'App.tsx'), 'utf8');
   check(
     'the app tells the canvas about an outside edit',
     /if \(event\.external\) \{tellCanvas\(\{ type: 'avb:patch-now' \}\);\}/.test(app),
-    'nothing reaches the canvas when the socket is quiet'
+    'nothing reaches the canvas when the socket is quiet',
   );
   const morph = fs.readFileSync(
     path.join(__dirname, '..', 'dist', 'electron', 'morphClient.js'),
@@ -174,7 +187,7 @@ const settle = (ms = 20) => new Promise((r) => setTimeout(r, ms));
   check(
     'and the client still listens to the socket as well',
     /import\.meta\.hot\.on\('avb:page-changed', update\)/.test(morph),
-    'the fast path is gone'
+    'the fast path is gone',
   );
 
   // --- an outside edit while the page has unsaved edits ---------------------------
@@ -253,7 +266,9 @@ const settle = (ms = 20) => new Promise((r) => setTimeout(r, ms));
   }
 
   if (failures.length) {
-    console.error(`\noutside-edit: ${failures.length} failed, ${checked - failures.length} passed\n`);
+    console.error(
+      `\noutside-edit: ${failures.length} failed, ${checked - failures.length} passed\n`,
+    );
     console.error(failures.join('\n') + '\n');
     process.exit(1);
   }

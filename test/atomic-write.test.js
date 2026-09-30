@@ -101,13 +101,25 @@ test('a failed cleanup names the temporary file it could not remove', () => {
   directory((root) => {
     const file = path.join(root, 'page.astro');
     fs.writeFileSync(file, 'authored\n');
-    withFailure('renameSync', () => { throw new Error('no rename'); }, () => {
-      withFailure('rmSync', () => { throw new Error('no remove'); }, () => {
-        const result = replaceFileAtomic(file, Buffer.from('replacement\n'));
-        assert.equal(result.error.code, 'filesystem');
-        assert.match(result.error.message, /or remove temporary file .*\.stacki-write-.*\.tmp/);
-      });
-    });
+    withFailure(
+      'renameSync',
+      () => {
+        throw new Error('no rename');
+      },
+      () => {
+        withFailure(
+          'rmSync',
+          () => {
+            throw new Error('no remove');
+          },
+          () => {
+            const result = replaceFileAtomic(file, Buffer.from('replacement\n'));
+            assert.equal(result.error.code, 'filesystem');
+            assert.match(result.error.message, /or remove temporary file .*\.stacki-write-.*\.tmp/);
+          },
+        );
+      },
+    );
     assert.equal(fs.readFileSync(file, 'utf8'), 'authored\n');
   });
 });
@@ -168,19 +180,27 @@ test('a replace that cannot keep the owner is refused', posixOnly, () => {
   directory((root) => {
     const file = path.join(root, 'page.astro');
     fs.writeFileSync(file, 'authored\n');
-    withFailure('statSync', (stat, ...args) => {
-      const stats = stat(...args);
-      const other = Object.create(Object.getPrototypeOf(stats));
-      return Object.assign(other, stats, { uid: stats.uid + 1 });
-    }, () => {
-      withFailure('fchownSync', () => {
-        throw Object.assign(new Error('EPERM: operation not permitted'), { code: 'EPERM' });
-      }, () => {
-        const result = replaceFileAtomic(file, Buffer.from('mine\n'));
-        assert.equal(result.ok, false);
-        assert.match(result.error.message, /would change the file's owner/);
-      });
-    });
+    withFailure(
+      'statSync',
+      (stat, ...args) => {
+        const stats = stat(...args);
+        const other = Object.create(Object.getPrototypeOf(stats));
+        return Object.assign(other, stats, { uid: stats.uid + 1 });
+      },
+      () => {
+        withFailure(
+          'fchownSync',
+          () => {
+            throw Object.assign(new Error('EPERM: operation not permitted'), { code: 'EPERM' });
+          },
+          () => {
+            const result = replaceFileAtomic(file, Buffer.from('mine\n'));
+            assert.equal(result.ok, false);
+            assert.match(result.error.message, /would change the file's owner/);
+          },
+        );
+      },
+    );
     assert.equal(fs.readFileSync(file, 'utf8'), 'authored\n');
     assert.deepEqual(leftovers(root), []);
   });

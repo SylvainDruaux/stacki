@@ -6,7 +6,7 @@ export function PropertyDeclarationInfo({ property }: { readonly property: Compo
   const origin = property.origin;
   const sources = origin?.declarations ?? [];
   const details = sources.map(
-    (source) => `${source.label} (line ${source.line}): ${source.expression}`
+    (source) => `${source.label} (line ${source.line}): ${source.expression}`,
   );
   if (origin?.defaultValue) {
     details.push(`Default (line ${origin.defaultValue.line}): ${origin.defaultValue.expression}`);

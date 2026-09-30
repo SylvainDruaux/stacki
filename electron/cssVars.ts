@@ -140,7 +140,8 @@ function readDeclarations(text: string): Rule[] {
       const end = node.source?.end?.offset ?? start;
       const declText = text.slice(start, end);
       const rawValue = node.raws.value?.raw ?? node.value;
-      const valueStart = start + node.prop.length + (node.raws.between ?? ':').length + leading(rawValue);
+      const valueStart =
+        start + node.prop.length + (node.raws.between ?? ':').length + leading(rawValue);
       // Trailing `;` and whitespace are not part of the value.
       // PostCSS keeps whitespace in an empty custom property's node.value.
       // That whitespace was already skipped above, so using its length again
@@ -216,7 +217,8 @@ function commonStem(labels: readonly string[]): string {
 
 // --- grouping --------------------------------------------------------------
 
-const namesOf = (rule: Rule): string[] => rule.entries.filter((e) => e.kind === 'var').map((e) => e.name);
+const namesOf = (rule: Rule): string[] =>
+  rule.entries.filter((e) => e.kind === 'var').map((e) => e.name);
 
 const overlap = (a: readonly string[], b: readonly string[]): number => {
   const setB = new Set(b);
@@ -255,7 +257,9 @@ function groupRules(rules: readonly Rule[]): Rule[][] {
       // a page of utilities each setting `--_gap-size` is a scale, not a
       // coincidence.
       const enough =
-        names.length > 1 ? same >= MERGE_THRESHOLD : same === 1 && otherNames.length === names.length;
+        names.length > 1
+          ? same >= MERGE_THRESHOLD
+          : same === 1 && otherNames.length === names.length;
       if (enough) {
         members.push(candidate);
         taken.add(other);
@@ -289,7 +293,11 @@ interface Family {
 // The suffixes most of these prefixes declare. "Most" rather than "all",
 // because one variant carrying an extra property is normal and should not cost
 // everyone else the table.
-function rowsFor(prefixes: readonly string[], bySuffix: Map<string, Set<string>>, used: Set<string>): string[] {
+function rowsFor(
+  prefixes: readonly string[],
+  bySuffix: Map<string, Set<string>>,
+  used: Set<string>,
+): string[] {
   const rows: string[] = [];
   for (const [suffix, owners] of bySuffix) {
     const shared = prefixes.filter((p) => owners.has(p) && !used.has(`--${p}-${suffix}`));
@@ -385,7 +393,9 @@ function findFamilies(names: readonly string[]): { families: Family[]; used: Set
         }
       }
     });
-    const columns = [...prefixes].sort((a, b) => (columnOrder.get(a) ?? 0) - (columnOrder.get(b) ?? 0));
+    const columns = [...prefixes].sort(
+      (a, b) => (columnOrder.get(a) ?? 0) - (columnOrder.get(b) ?? 0),
+    );
 
     const family: Family = { prefixes: columns, rows: [], self: false };
     // `--h1` itself, if it exists: the value the family is named for.
@@ -416,7 +426,10 @@ function findFamilies(names: readonly string[]): { families: Family[]; used: Set
 //
 // The longest shared start wins, so `--button-2-*` is its own thing rather than
 // six more rows of `--button-*`.
-function prefixSections(names: readonly string[]): { loose: string[]; sections: Map<string, string[]> } {
+function prefixSections(names: readonly string[]): {
+  loose: string[];
+  sections: Map<string, string[]>;
+} {
   const nameSet = new Set(names);
   const counts = new Map<string, number>();
   for (const name of names) {
@@ -550,12 +563,14 @@ function colorOf(resolved: unknown): string | null {
 
 // True for values that name a colour but cannot be drawn as one — the swatch
 // shows a checkerboard rather than pretending.
-const isUncomputableColor = (resolved: unknown): boolean => /(^|\s|\()color-mix\(/i.test(String(resolved));
+const isUncomputableColor = (resolved: unknown): boolean =>
+  /(^|\s|\()color-mix\(/i.test(String(resolved));
 
 // What kind of thing a variable holds, which is what picks its glyph — the same
 // four the style panel's variable picker uses, so a colour is a droplet in both
 // places and a bare number is a number in both.
-const FONT_WORDS = /(serif|sans-serif|monospace|cursive|system-ui|uppercase|lowercase|capitalize|balance|pretty|italic|normal|inherit)/i;
+const FONT_WORDS =
+  /(serif|sans-serif|monospace|cursive|system-ui|uppercase|lowercase|capitalize|balance|pretty|italic|normal|inherit)/i;
 
 function kindOf(value: unknown, resolved: unknown): string {
   const text = String(resolved ?? value).trim();
@@ -572,7 +587,10 @@ function kindOf(value: unknown, resolved: unknown): string {
   if (/^-?\d*\.?\d+([a-z%]+)$/i.test(text) || /^(calc|clamp|min|max)\(/i.test(text)) {
     return 'size';
   }
-  if (/[a-z]/i.test(text) && (FONT_WORDS.test(text) || text.includes(',') || /^[a-z-]+$/i.test(text))) {
+  if (
+    /[a-z]/i.test(text) &&
+    (FONT_WORDS.test(text) || text.includes(',') || /^[a-z-]+$/i.test(text))
+  ) {
     return 'font';
   }
   return 'size';
@@ -704,7 +722,12 @@ function buildGroup(members: readonly Rule[], file: string): Group {
       });
     }
     const firstLabel = columns[0]?.label ?? '';
-    return { kind: 'modes', label: commonStem(columns.map((c) => c.label)) || firstLabel, columns, blocks };
+    return {
+      kind: 'modes',
+      label: commonStem(columns.map((c) => c.label)) || firstLabel,
+      columns,
+      blocks,
+    };
   }
 
   // One rule: comments are headings, and the names inside each heading may form
@@ -713,7 +736,12 @@ function buildGroup(members: readonly Rule[], file: string): Group {
   if (!rule) {
     return { kind: 'single', label: '', columns, blocks };
   }
-  const sections: ({ title: string | null; titleStart?: number; titleEnd?: number; names: string[] })[] = [];
+  const sections: {
+    title: string | null;
+    titleStart?: number;
+    titleEnd?: number;
+    names: string[];
+  }[] = [];
   let current: { title: string | null; titleStart?: number; titleEnd?: number; names: string[] } = {
     title: null,
     names: [],
@@ -727,7 +755,12 @@ function buildGroup(members: readonly Rule[], file: string): Group {
       if (current.names.length || current.title != null) {
         sections.push(current);
       }
-      current = { title: entry.text, titleStart: entry.textStart, titleEnd: entry.textEnd, names: [] };
+      current = {
+        title: entry.text,
+        titleStart: entry.textStart,
+        titleEnd: entry.textEnd,
+        names: [],
+      };
       continue;
     }
     current.names.push(entry.name);
@@ -766,11 +799,19 @@ function buildGroup(members: readonly Rule[], file: string): Group {
       blocks.push({
         kind: 'matrix',
         title: section.title,
-        columns: family.prefixes.map((p): Column => ({ id: p, label: p, selector: rule.selector, context: rule.context, line: rule.line })),
+        columns: family.prefixes.map((p): Column => ({
+          id: p,
+          label: p,
+          selector: rule.selector,
+          context: rule.context,
+          line: rule.line,
+        })),
         rows: rows.filter((r) => r.cells.some(Boolean)),
         // The inner sections of a one-rule file carry their comment's span so
         // the heading can be renamed in place; a comment-less section has none.
-        ...(section.titleStart !== undefined ? { titleStart: section.titleStart, titleEnd: section.titleEnd } : {}),
+        ...(section.titleStart !== undefined
+          ? { titleStart: section.titleStart, titleEnd: section.titleEnd }
+          : {}),
       });
     }
     const leftovers = section.names.filter((n) => !claimed.has(n) && !used.has(n));
@@ -778,7 +819,11 @@ function buildGroup(members: readonly Rule[], file: string): Group {
       blocks.push({
         kind: 'rows',
         title: families.length ? null : section.title,
-        rows: leftovers.map((n) => ({ label: shortLabel(n), name: n, cells: [cellFor(byName[0], n, file, '0')] })),
+        rows: leftovers.map((n) => ({
+          label: shortLabel(n),
+          name: n,
+          cells: [cellFor(byName[0], n, file, '0')],
+        })),
         ...(families.length ? {} : { titleStart: section.titleStart, titleEnd: section.titleEnd }),
       });
     }
@@ -787,7 +832,12 @@ function buildGroup(members: readonly Rule[], file: string): Group {
   return { kind: 'single', label: labelForRule(rule), columns, blocks };
 }
 
-function cellFor(map: Map<string, TaggedVar> | undefined, name: string, file: string, column: string): Cell | null {
+function cellFor(
+  map: Map<string, TaggedVar> | undefined,
+  name: string,
+  file: string,
+  column: string,
+): Cell | null {
   const entry = map?.get(name);
   if (!entry) {
     return null;
@@ -818,13 +868,15 @@ function describeCell(cell: Cell | null, map: Map<string, string>): DescribedCel
   if (!cell) {
     return null;
   }
-  const single = String(cell.value).trim().match(/^var\(\s*(--[\w-]+)\s*(?:,[^)]*)?\)$/);
+  const single = String(cell.value)
+    .trim()
+    .match(/^var\(\s*(--[\w-]+)\s*(?:,[^)]*)?\)$/);
   const resolved = resolveValue(cell.value, map);
   return {
     ...cell,
     // A value that is nothing but another variable is shown as that variable's
     // name — which is what the author wrote, and what they would search for.
-    ref: single ? single[1] ?? null : null,
+    ref: single ? (single[1] ?? null) : null,
     resolved: resolved === cell.value ? null : resolved,
     color: colorOf(resolved),
     unknownColor: isUncomputableColor(resolved),
@@ -842,7 +894,10 @@ const shortLabel = (name: string, prefix?: string | null): string => {
  * tables. Files with none are left out — a variables panel is a place to find
  * variables, not a file browser.
  */
-function readVariables(projectPath: string): { files: FileModel[]; values: Record<string, string> } {
+function readVariables(projectPath: string): {
+  files: FileModel[];
+  values: Record<string, string>;
+} {
   const files: FileModel[] = [];
   for (const abs of findStylesheets(projectPath)) {
     let text: string;
@@ -859,7 +914,12 @@ function readVariables(projectPath: string): { files: FileModel[]; values: Recor
     try {
       rules = readDeclarations(text);
     } catch (err) {
-      files.push({ rel, name: path.basename(abs), error: `Could not parse — ${err instanceof Error ? err.message : String(err)}`, groups: [] });
+      files.push({
+        rel,
+        name: path.basename(abs),
+        error: `Could not parse — ${err instanceof Error ? err.message : String(err)}`,
+        groups: [],
+      });
       continue;
     }
     if (!rules.length) {
@@ -913,7 +973,10 @@ interface SetValuePayload {
  * the value that was read, or the file has changed underneath the panel and the
  * offsets no longer mean anything.
  */
-function setVariable(projectPath: string, { file, valueStart, valueEnd, expect, value }: SetValuePayload): { ok: boolean; stale?: boolean; error?: string } {
+function setVariable(
+  projectPath: string,
+  { file, valueStart, valueEnd, expect, value }: SetValuePayload,
+): { ok: boolean; stale?: boolean; error?: string } {
   const abs = path.resolve(projectPath, file);
   const text = fs.readFileSync(abs, 'utf8');
   const current = text.slice(valueStart, valueEnd);
@@ -941,7 +1004,10 @@ interface SectionRangePayload {
  * writing them. Like a value, it is written back only if the file still says
  * what the panel read.
  */
-function setSectionTitle(projectPath: string, { file, start, end, expect, title }: SectionRangePayload): { ok: boolean; stale?: boolean; error?: string } {
+function setSectionTitle(
+  projectPath: string,
+  { file, start, end, expect, title }: SectionRangePayload,
+): { ok: boolean; stale?: boolean; error?: string } {
   const next = String(title ?? '').trim();
   if (!next) {
     return { ok: false, error: 'A heading needs a name.' };
@@ -975,7 +1041,10 @@ function setSectionTitle(projectPath: string, { file, start, end, expect, title 
  * one to itself — a heading removed by cutting the words alone would leave an
  * empty comment behind.
  */
-function removeSection(projectPath: string, { file, start, end, expect }: SectionRangePayload): { ok: boolean; stale?: boolean; error?: string } {
+function removeSection(
+  projectPath: string,
+  { file, start, end, expect }: SectionRangePayload,
+): { ok: boolean; stale?: boolean; error?: string } {
   const abs = path.resolve(projectPath, file);
   const text = fs.readFileSync(abs, 'utf8');
   if (expect !== undefined && text.slice(start, end) !== expect) {
@@ -1023,7 +1092,10 @@ interface MoveHeadingPayload {
  * `before` is the declaration it should sit above; null puts it after the last
  * one, where it heads whatever is added next.
  */
-function moveHeading(projectPath: string, { file, selector, start, end, expect, before }: MoveHeadingPayload): { ok: boolean; stale?: boolean; error?: string } {
+function moveHeading(
+  projectPath: string,
+  { file, selector, start, end, expect, before }: MoveHeadingPayload,
+): { ok: boolean; stale?: boolean; error?: string } {
   const abs = path.resolve(projectPath, file);
   const text = fs.readFileSync(abs, 'utf8');
   if (expect !== undefined && text.slice(start, end) !== expect) {
@@ -1040,7 +1112,10 @@ function moveHeading(projectPath: string, { file, selector, start, end, expect, 
   let to = close + 2;
   const lineStart = text.lastIndexOf('\n', from - 1) + 1;
   const lineEnd = text.indexOf('\n', to);
-  if (!text.slice(lineStart, from).trim() && !text.slice(to, lineEnd === -1 ? text.length : lineEnd).trim()) {
+  if (
+    !text.slice(lineStart, from).trim() &&
+    !text.slice(to, lineEnd === -1 ? text.length : lineEnd).trim()
+  ) {
     from = lineStart;
     to = lineEnd === -1 ? text.length : lineEnd + 1;
   }
@@ -1101,7 +1176,10 @@ interface AddSectionPayload {
  * `before` puts it above a named declaration. Either way it takes the
  * indentation of the line it lands on.
  */
-function addSection(projectPath: string, { file, selector, title, before, at }: AddSectionPayload): { ok: boolean; error?: string; stale?: boolean; title?: string } {
+function addSection(
+  projectPath: string,
+  { file, selector, title, before, at }: AddSectionPayload,
+): { ok: boolean; error?: string; stale?: boolean; title?: string } {
   const next = String(title ?? '').trim();
   if (!next) {
     return { ok: false, error: 'A heading needs a name.' };
@@ -1127,7 +1205,8 @@ function addSection(projectPath: string, { file, selector, title, before, at }: 
       return { ok: false, error: `${selector} is no longer in ${file}.` };
     }
     const decls = (rule.nodes || []).filter((n) => n.type === 'decl');
-    const anchorDecl = (before && decls.find((d) => d.prop === before)) || decls[decls.length - 1] || undefined;
+    const anchorDecl =
+      (before && decls.find((d) => d.prop === before)) || decls[decls.length - 1] || undefined;
     if (!anchorDecl) {
       return { ok: false, error: `${selector} has nothing to head.` };
     }
@@ -1182,7 +1261,10 @@ function lineSpan(text: string, node: SourcedNode): { from: number; to: number }
  *
  * `target` is the name to land in front of; null means the end of the rule.
  */
-function moveVariable(projectPath: string, { file, selector, name, target, at: landAt }: MoveVariablePayload): { ok: boolean; error?: string; changed?: boolean } {
+function moveVariable(
+  projectPath: string,
+  { file, selector, name, target, at: landAt }: MoveVariablePayload,
+): { ok: boolean; error?: string; changed?: boolean } {
   const abs = path.resolve(projectPath, file);
   const text = fs.readFileSync(abs, 'utf8');
   const root = postcss.parse(text);
@@ -1250,7 +1332,10 @@ interface MoveSectionPayload {
  * that are not always next to each other (a family's names interleave), so they
  * are cut out and re-inserted together, in the order they were in.
  */
-function moveSection(projectPath: string, { file, selector, names, target }: MoveSectionPayload): { ok: boolean; error?: string; changed?: boolean } {
+function moveSection(
+  projectPath: string,
+  { file, selector, names, target }: MoveSectionPayload,
+): { ok: boolean; error?: string; changed?: boolean } {
   const abs = path.resolve(projectPath, file);
   const text = fs.readFileSync(abs, 'utf8');
   const root = postcss.parse(text);
@@ -1347,7 +1432,10 @@ interface AddVariablePayload {
  * at the bottom of its own group rather than at the bottom of the rule, which
  * for a file like this would be two hundred lines away from what it belongs to.
  */
-function addVariable(projectPath: string, { file, selector, name, value = 'unset', after }: AddVariablePayload): { ok: boolean; error?: string; name?: string } {
+function addVariable(
+  projectPath: string,
+  { file, selector, name, value = 'unset', after }: AddVariablePayload,
+): { ok: boolean; error?: string; name?: string } {
   const abs = path.resolve(projectPath, file);
   const text = fs.readFileSync(abs, 'utf8');
   const root = postcss.parse(text);
@@ -1368,7 +1456,8 @@ function addVariable(projectPath: string, { file, selector, name, value = 'unset
     return { ok: false, error: `${name} is already declared in ${selector}.` };
   }
 
-  const previous = (after && decls.find((d) => d.prop === after)) || decls[decls.length - 1] || undefined;
+  const previous =
+    (after && decls.find((d) => d.prop === after)) || decls[decls.length - 1] || undefined;
   const indentOf = (node: Declaration): string => {
     const start = node.source?.start?.offset ?? 0;
     return text.slice(text.lastIndexOf('\n', start - 1) + 1, start);
@@ -1407,7 +1496,8 @@ function addVariable(projectPath: string, { file, selector, name, value = 'unset
 // Where a name can be written. CSS files hold most of them; an Astro component
 // keeps its rules in a `<style>` block, and a `style="--x: 1"` can sit in markup
 // or a template — a token spelled `--x` in any of these is that variable.
-const RENAME_EXTS = /\.(css|s[ac]ss|less|pcss|postcss|astro|html|htm|md|mdx|mdoc|svelte|vue|jsx|tsx|[cm]?[jt]s)$/i;
+const RENAME_EXTS =
+  /\.(css|s[ac]ss|less|pcss|postcss|astro|html|htm|md|mdx|mdoc|svelte|vue|jsx|tsx|[cm]?[jt]s)$/i;
 
 /**
  * Every file in the project that could spell a variable's name.
@@ -1489,7 +1579,10 @@ function renameVariables(
       return { ok: false, error: `${from} is not a variable name.` };
     }
     if (!NAME_RE.test(String(to || ''))) {
-      return { ok: false, error: `"${String(to || '').replace(/^--/, '')}" cannot be a variable name.` };
+      return {
+        ok: false,
+        error: `"${String(to || '').replace(/^--/, '')}" cannot be a variable name.`,
+      };
     }
     if (froms.has(from)) {
       return { ok: false, error: `${from} is renamed twice in one go.` };

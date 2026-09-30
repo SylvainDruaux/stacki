@@ -51,7 +51,9 @@ function fingerprint(projectPath: string): string {
       // Count + newest timestamp misses changes to every older file whenever
       // another file has a future timestamp. Include each path and its own
       // metadata so renames and edits both invalidate the thumbnail.
-      hash.update(JSON.stringify([path.relative(projectPath, full), stat.size, stat.mtimeMs, stat.ctimeMs]));
+      hash.update(
+        JSON.stringify([path.relative(projectPath, full), stat.size, stat.mtimeMs, stat.ctimeMs]),
+      );
     } catch {
       /* raced with a write */
     }
@@ -82,7 +84,14 @@ function fingerprint(projectPath: string): string {
   for (const dir of SOURCE_DIRS) {
     walk(path.join(projectPath, dir), 0);
   }
-  for (const name of ['astro.config.mjs', 'astro.config.ts', 'astro.config.js', 'astro.config.mts', 'astro.config.cjs', 'package.json']) {
+  for (const name of [
+    'astro.config.mjs',
+    'astro.config.ts',
+    'astro.config.js',
+    'astro.config.mts',
+    'astro.config.cjs',
+    'package.json',
+  ]) {
     include(path.join(projectPath, name));
   }
   return hash.digest('hex');
@@ -90,7 +99,9 @@ function fingerprint(projectPath: string): string {
 
 function readMeta(userDataPath: string, projectPath: string): Record<string, unknown> | null {
   try {
-    const raw: unknown = JSON.parse(fs.readFileSync(metaPathFor(userDataPath, projectPath), 'utf8'));
+    const raw: unknown = JSON.parse(
+      fs.readFileSync(metaPathFor(userDataPath, projectPath), 'utf8'),
+    );
     return toRecord(raw) ?? null;
   } catch {
     return null;
@@ -178,7 +189,11 @@ type CaptureResult = { readonly ok: true } | { readonly ok: false; readonly erro
  * A thumbnail is never worth throwing over, so every failure comes back as a
  * value and the old picture stays.
  */
-async function capture(userDataPath: string, projectPath: string, url: string): Promise<CaptureResult> {
+async function capture(
+  userDataPath: string,
+  projectPath: string,
+  url: string,
+): Promise<CaptureResult> {
   let win: BrowserWindow | null = null;
   try {
     win = makeWindow();
@@ -238,7 +253,10 @@ async function capture(userDataPath: string, projectPath: string, url: string): 
     }
 
     fs.mkdirSync(thumbsDir(userDataPath), { recursive: true });
-    fs.writeFileSync(thumbPathFor(userDataPath, projectPath), image.resize({ width: THUMB_WIDTH }).toPNG());
+    fs.writeFileSync(
+      thumbPathFor(userDataPath, projectPath),
+      image.resize({ width: THUMB_WIDTH }).toPNG(),
+    );
     fs.writeFileSync(
       metaPathFor(userDataPath, projectPath),
       JSON.stringify({ fingerprint: capturedFingerprint, capturedAt: Date.now(), url }, null, 2),
@@ -258,13 +276,4 @@ async function capture(userDataPath: string, projectPath: string, url: string): 
   }
 }
 
-export {
-  capture,
-  fingerprint,
-  isStale,
-  readMeta,
-  readThumb,
-  forget,
-  thumbPathFor,
-  VIEWPORT,
-};
+export { capture, fingerprint, isStale, readMeta, readThumb, forget, thumbPathFor, VIEWPORT };

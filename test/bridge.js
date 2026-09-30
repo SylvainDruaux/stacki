@@ -28,15 +28,22 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
+  if (!condition) {
+    failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  }
 };
 
 const walk = (dir, test, out = []) => {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-    if (entry.name.startsWith('.') || entry.name === 'node_modules') {continue;}
+    if (entry.name.startsWith('.') || entry.name === 'node_modules') {
+      continue;
+    }
     const full = path.join(dir, entry.name);
-    if (entry.isDirectory()) {walk(full, test, out);}
-    else if (test(entry.name)) {out.push(full);}
+    if (entry.isDirectory()) {
+      walk(full, test, out);
+    } else if (test(entry.name)) {
+      out.push(full);
+    }
   }
   return out;
 };
@@ -47,9 +54,13 @@ const used = new Map(); // method -> [files]
 for (const file of sources) {
   const text = fs.readFileSync(file, 'utf8');
   for (const m of text.matchAll(/window\.avb\??\.([A-Za-z_$][\w$]*)/g)) {
-    if (!used.has(m[1])) {used.set(m[1], []);}
+    if (!used.has(m[1])) {
+      used.set(m[1], []);
+    }
     const where = path.relative(root, file);
-    if (!used.get(m[1]).includes(where)) {used.get(m[1]).push(where);}
+    if (!used.get(m[1]).includes(where)) {
+      used.get(m[1]).push(where);
+    }
   }
   // `window.avb?.[name]` with a variable name cannot be checked statically —
   // the sheet's own guarded caller is the one place that does it, and it
@@ -61,7 +72,9 @@ const preload = fs.readFileSync(path.join(root, 'dist', 'electron', 'preload.js'
 const exposed = new Set();
 const bridgeStart = preload.indexOf('contextBridge.exposeInMainWorld');
 const bridgeText = preload.slice(bridgeStart);
-for (const m of bridgeText.matchAll(/^\s+([A-Za-z_$][\w$]*)\s*:/gm)) {exposed.add(m[1]);}
+for (const m of bridgeText.matchAll(/^\s+([A-Za-z_$][\w$]*)\s*:/gm)) {
+  exposed.add(m[1]);
+}
 
 // --- what the main process handles ------------------------------------------
 const main = fs.readFileSync(path.join(root, 'dist', 'electron', 'main.js'), 'utf8');
@@ -78,7 +91,9 @@ for (const m of main.matchAll(/require\(\s*['"]\.\/([\w.-]+?)(?:\.js)?['"]\s*\)/
   }
 }
 for (const text of mainSide) {
-  for (const m of text.matchAll(/ipcMain\.handle\(\s*['"]([^'"]+)['"]/g)) {handled.add(m[1]);}
+  for (const m of text.matchAll(/ipcMain\.handle\(\s*['"]([^'"]+)['"]/g)) {
+    handled.add(m[1]);
+  }
 }
 
 // The channel each exposed method invokes, so a method that is exposed but has
@@ -95,7 +110,7 @@ for (const [method, files] of [...used].sort()) {
   check(
     `window.avb.${method} exists on the bridge`,
     exposed.has(method),
-    `called from ${files.join(', ')} — add it to electron/preload.js`
+    `called from ${files.join(', ')} — add it to electron/preload.js`,
   );
 }
 
@@ -103,7 +118,7 @@ for (const [method, channel] of [...channels].sort()) {
   check(
     `${method} has a handler for ${channel}`,
     handled.has(channel),
-    `electron/preload.js invokes '${channel}', which no ipcMain.handle registers`
+    `electron/preload.js invokes '${channel}', which no ipcMain.handle registers`,
   );
 }
 
@@ -128,14 +143,25 @@ const propsPassed = (text, from) => {
   for (let i = from; i < text.length; i++) {
     const c = text[i];
     if (quote) {
-      if (c === quote && text[i - 1] !== '\\') {quote = null;}
+      if (c === quote && text[i - 1] !== '\\') {
+        quote = null;
+      }
       continue;
     }
-    if (c === '"' || c === "'" || c === '`') { quote = c; continue; }
-    if (c === '{') {depth++;}
-    else if (c === '}') {depth--;}
-    else if (depth === 0 && (c === '>' || (c === '/' && text[i + 1] === '>'))) {break;}
-    if (depth === 0) {head += c;}
+    if (c === '"' || c === "'" || c === '`') {
+      quote = c;
+      continue;
+    }
+    if (c === '{') {
+      depth++;
+    } else if (c === '}') {
+      depth--;
+    } else if (depth === 0 && (c === '>' || (c === '/' && text[i + 1] === '>'))) {
+      break;
+    }
+    if (depth === 0) {
+      head += c;
+    }
   }
   return [...head.matchAll(/(?:^|\s)([a-zA-Z_$][\w$]*)=/g)].map((m) => m[1]);
 };
@@ -145,63 +171,97 @@ const propsPassed = (text, from) => {
 const propsDeclared = (base) => {
   for (const ext of ['.jsx', '.tsx', '.js', '.ts', '']) {
     const file = base + ext;
-    if (!fs.existsSync(file) || fs.statSync(file).isDirectory()) {continue;}
+    if (!fs.existsSync(file) || fs.statSync(file).isDirectory()) {
+      continue;
+    }
     // Parse the exported component itself. A regex can drift into a private
     // hook's destructuring when the component accepts a typed props object.
     const ts = require('typescript');
-    const source = ts.createSourceFile(file, fs.readFileSync(file, 'utf8'),
-      ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+    const source = ts.createSourceFile(
+      file,
+      fs.readFileSync(file, 'utf8'),
+      ts.ScriptTarget.Latest,
+      true,
+      ts.ScriptKind.TSX,
+    );
     const declaration = bridgeComponent(ts, source);
     const binding = declaration?.parameters[0]?.name;
-    if (!binding) { return null; }
+    if (!binding) {
+      return null;
+    }
     if (!ts.isObjectBindingPattern(binding)) {
       // A local props interface is just as explicit as destructuring. Preserve
       // this boundary check when conversion moves a component to a typed object.
       const parameterType = declaration.parameters[0].type;
-      if (!parameterType || !ts.isTypeReferenceNode(parameterType)) { return null; }
+      if (!parameterType || !ts.isTypeReferenceNode(parameterType)) {
+        return null;
+      }
       const name = parameterType.typeName.getText(source);
-      const contract = source.statements.find(node => ts.isInterfaceDeclaration(node) &&
-        node.name.text === name);
-      if (!contract || contract.heritageClauses?.length) { return null; }
-      if (contract.members.some(member => !ts.isPropertySignature(member))) { return null; }
-      return new Set(contract.members.map(member => member.name.getText(source)));
+      const contract = source.statements.find(
+        (node) => ts.isInterfaceDeclaration(node) && node.name.text === name,
+      );
+      if (!contract || contract.heritageClauses?.length) {
+        return null;
+      }
+      if (contract.members.some((member) => !ts.isPropertySignature(member))) {
+        return null;
+      }
+      return new Set(contract.members.map((member) => member.name.getText(source)));
     }
-    if (binding.elements.some((element) => element.dotDotDotToken)) { return null; }
-    return new Set(binding.elements.map((element) =>
-      (element.propertyName || element.name).getText(source)));
+    if (binding.elements.some((element) => element.dotDotDotToken)) {
+      return null;
+    }
+    return new Set(
+      binding.elements.map((element) => (element.propertyName || element.name).getText(source)),
+    );
   }
   return null;
 };
 
 function bridgeComponent(ts, source) {
-  const direct = source.statements.find((node) => ts.isFunctionDeclaration(node) &&
-    node.modifiers?.some((modifier) => modifier.kind === ts.SyntaxKind.DefaultKeyword));
-  if (direct) { return direct; }
+  const direct = source.statements.find(
+    (node) =>
+      ts.isFunctionDeclaration(node) &&
+      node.modifiers?.some((modifier) => modifier.kind === ts.SyntaxKind.DefaultKeyword),
+  );
+  if (direct) {
+    return direct;
+  }
   const assignment = source.statements.find((node) => ts.isExportAssignment(node));
-  if (!assignment) { return undefined; }
+  if (!assignment) {
+    return undefined;
+  }
   let expression = assignment.expression;
   if (ts.isIdentifier(expression)) {
     const name = expression.text;
-    const named = source.statements.find((node) =>
-      ts.isFunctionDeclaration(node) && node.name?.text === name);
-    if (named) { return named; }
-    const variables = source.statements.filter(ts.isVariableStatement)
+    const named = source.statements.find(
+      (node) => ts.isFunctionDeclaration(node) && node.name?.text === name,
+    );
+    if (named) {
+      return named;
+    }
+    const variables = source.statements
+      .filter(ts.isVariableStatement)
       .flatMap((node) => [...node.declarationList.declarations]);
     expression = variables.find((node) => node.name.getText(source) === name)?.initializer;
   }
   // React wrappers take the component as a direct argument; do not inspect
   // unrelated function bodies for a parameter that happens to look like props.
   if (expression && ts.isCallExpression(expression)) {
-    expression = expression.arguments.find((node) =>
-      ts.isFunctionExpression(node) || ts.isArrowFunction(node));
+    expression = expression.arguments.find(
+      (node) => ts.isFunctionExpression(node) || ts.isArrowFunction(node),
+    );
   }
   return expression && (ts.isFunctionExpression(expression) || ts.isArrowFunction(expression))
-    ? expression : undefined;
+    ? expression
+    : undefined;
 }
 
 let wired = 0;
 for (const file of sources) {
-  if (!/\.(jsx|tsx)$/.test(file)) {continue;}
+  if (!/\.(jsx|tsx)$/.test(file)) {
+    continue;
+  }
   const text = stripComments(fs.readFileSync(file, 'utf8'));
   const imported = new Map();
   for (const m of text.matchAll(/^import\s+([A-Za-z_$][\w$]*)\s+from\s+'(\.[^']+)';/gm)) {
@@ -209,22 +269,30 @@ for (const file of sources) {
   }
   // Lazy-loading changes when a panel loads, not its prop contract. Follow
   // those module references too so startup optimization cannot erase coverage.
-  for (const m of text.matchAll(/const\s+([A-Za-z_$][\w$]*)\s*=\s*(?:React\.)?lazy(?:Panel)?\(\s*\(\s*\)\s*=>\s*import\(\s*['"](\.[^'"]+)['"]\s*\)/g)) {
+  for (const m of text.matchAll(
+    /const\s+([A-Za-z_$][\w$]*)\s*=\s*(?:React\.)?lazy(?:Panel)?\(\s*\(\s*\)\s*=>\s*import\(\s*['"](\.[^'"]+)['"]\s*\)/g,
+  )) {
     imported.set(m[1], path.resolve(path.dirname(file), m[2]));
   }
   for (const m of text.matchAll(/<([A-Z][\w$]*)[\s>]/g)) {
     const target = imported.get(m[1]);
-    if (!target) {continue;}
+    if (!target) {
+      continue;
+    }
     const declared = propsDeclared(target);
-    if (!declared) {continue;}
+    if (!declared) {
+      continue;
+    }
     const where = `${path.relative(root, file)}:${text.slice(0, m.index).split('\n').length}`;
     for (const prop of propsPassed(text, m.index + m[0].length - 1)) {
-      if (prop === 'key' || prop === 'ref') {continue;}
+      if (prop === 'key' || prop === 'ref') {
+        continue;
+      }
       wired++;
       check(
         `<${m[1]} ${prop}> is a prop it takes`,
         declared.has(prop),
-        `${where} passes ${prop}, which ${path.relative(root, target)} never reads — it goes nowhere`
+        `${where} passes ${prop}, which ${path.relative(root, target)} never reads — it goes nowhere`,
       );
     }
   }
@@ -237,5 +305,5 @@ if (failures.length) {
   process.exit(1);
 }
 console.log(
-  `bridge: ${checked} passed  [${used.size} methods called, ${exposed.size} exposed, ${wired} props wired]`
+  `bridge: ${checked} passed  [${used.size} methods called, ${exposed.size} exposed, ${wired} props wired]`,
 );

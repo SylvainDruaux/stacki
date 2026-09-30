@@ -33,7 +33,9 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
+  if (!condition) {
+    failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  }
 };
 
 const rowLabels = (block) => block.rows.map((r) => r.label);
@@ -53,10 +55,15 @@ const cssFiles = (root) => {
       return;
     }
     for (const e of entries) {
-      if (e.name === 'node_modules' || e.name.startsWith('.')) {continue;}
+      if (e.name === 'node_modules' || e.name.startsWith('.')) {
+        continue;
+      }
       const full = path.join(dir, e.name);
-      if (e.isDirectory()) {walk(full);}
-      else if (e.name.endsWith('.css')) {out.push(full);}
+      if (e.isDirectory()) {
+        walk(full);
+      } else if (e.name.endsWith('.css')) {
+        out.push(full);
+      }
     }
   };
   walk(path.join(root, 'src'));
@@ -93,31 +100,41 @@ const cssFiles = (root) => {
     --gap-3: 14px;
   }
 }
-`
+`,
   );
 
   const { files } = readVariables(dir);
-  check('a stylesheet with variables is found', files.length === 1, JSON.stringify(files.map((f) => f.rel)));
+  check(
+    'a stylesheet with variables is found',
+    files.length === 1,
+    JSON.stringify(files.map((f) => f.rel)),
+  );
   const groups = files[0].groups;
   check('every declaration is counted', files[0].count === 12, `${files[0].count}`);
   check(
     'a rule inside @media is its own group',
     groups.length === 2,
-    groups.map((g) => `${g.label}[${g.columns.map((c) => c.context.join('|')).join()}]`).join(' ')
+    groups.map((g) => `${g.label}[${g.columns.map((c) => c.context.join('|')).join()}]`).join(' '),
   );
   const root = groups[0];
   check('comments are section headings', findBlock(root, 'Brand') && findBlock(root, 'Scale'));
-  check('a comment section keeps its variables', rowLabels(findBlock(root, 'Brand')).join() === 'blue,ink');
+  check(
+    'a comment section keeps its variables',
+    rowLabels(findBlock(root, 'Brand')).join() === 'blue,ink',
+  );
   const scale = root.blocks.find((b) => b.kind === 'matrix');
   check(
     'a numbered scale becomes columns',
     !!scale && columnLabels(scale, root).join() === 'gap-1,gap-2,gap-3',
-    JSON.stringify(scale && columnLabels(scale, root))
+    JSON.stringify(scale && columnLabels(scale, root)),
   );
-  check('with a row for the value and one for each part', !!scale && rowLabels(scale).join() === 'value,min');
+  check(
+    'with a row for the value and one for each part',
+    !!scale && rowLabels(scale).join() === 'value,min',
+  );
   check(
     'a name with nothing in common stays a row',
-    root.blocks.some((b) => b.kind === 'rows' && rowLabels(b).includes('lonely'))
+    root.blocks.some((b) => b.kind === 'rows' && rowLabels(b).includes('lonely')),
   );
   const cell = findBlock(root, 'Brand').rows[1].cells[0];
   check('a value that is only a reference says which', cell.ref === '--blue', JSON.stringify(cell));
@@ -138,7 +155,7 @@ const cssFiles = (root) => {
   check('only that value changed', after === before.replace('#0af;', '#f0a;'), after.slice(0, 200));
   check(
     'and only one line differs',
-    before.split('\n').filter((line, i) => line !== after.split('\n')[i]).length === 1
+    before.split('\n').filter((line, i) => line !== after.split('\n')[i]).length === 1,
   );
   const stale = setVariable(dir, {
     file: target.file,
@@ -152,10 +169,13 @@ const cssFiles = (root) => {
   // Two rules that declare the same names are one thing in two modes.
   fs.writeFileSync(
     path.join(dir, 'src', 'styles', 'theme.css'),
-    `.light { --bg: white; --fg: black; }\n.dark { --bg: black; --fg: white; }\n`
+    `.light { --bg: white; --fg: black; }\n.dark { --bg: black; --fg: white; }\n`,
   );
   const themed = readVariables(dir).files.find((f) => f.rel.endsWith('theme.css'));
-  check('rules with the same names become modes', themed.groups.length === 1 && themed.groups[0].kind === 'modes');
+  check(
+    'rules with the same names become modes',
+    themed.groups.length === 1 && themed.groups[0].kind === 'modes',
+  );
   check('with a column each', themed.groups[0].columns.map((c) => c.label).join() === 'Light,Dark');
   check('and a row per name', rowLabels(themed.groups[0].blocks[0]).join() === 'bg,fg');
 
@@ -163,20 +183,24 @@ const cssFiles = (root) => {
   fs.writeFileSync(path.join(dir, 'src', 'styles', 'plain.css'), 'body { color: red; }\n');
   check(
     'a stylesheet with no variables is left out',
-    !readVariables(dir).files.some((f) => f.rel.endsWith('plain.css'))
+    !readVariables(dir).files.some((f) => f.rel.endsWith('plain.css')),
   );
 
   // Nested rules (CSS nesting) still report their own selector.
   fs.writeFileSync(
     path.join(dir, 'src', 'styles', 'nested.css'),
-    `.card {\n  color: red;\n  &:hover { --lift: 2px; --shadow: 0 2px 4px; }\n}\n`
+    `.card {\n  color: red;\n  &:hover { --lift: 2px; --shadow: 0 2px 4px; }\n}\n`,
   );
   const nested = readVariables(dir).files.find((f) => f.rel.endsWith('nested.css'));
-  check('a nested rule is found', !!nested && nested.count === 2, JSON.stringify(nested && nested.count));
+  check(
+    'a nested rule is found',
+    !!nested && nested.count === 2,
+    JSON.stringify(nested && nested.count),
+  );
   check(
     'and remembers what it is nested in',
     nested?.groups[0]?.columns[0]?.context?.includes('.card'),
-    JSON.stringify(nested?.groups[0]?.columns[0]?.context)
+    JSON.stringify(nested?.groups[0]?.columns[0]?.context),
   );
 
   // Empty custom properties are valid CSS. PostCSS retains their whitespace;
@@ -192,29 +216,59 @@ const cssFiles = (root) => {
     fs.writeFileSync(file, emptyCss);
     const entries = readDeclarations(emptyCss)[0].entries;
     const declaration = entries.find((entry) => entry.name === '--blank');
-    check('an existing empty CSS value stays empty', declaration.value === '', JSON.stringify(declaration));
-    check('an empty value has a zero-width editable span', declaration.valueStart === declaration.valueEnd);
+    check(
+      'an existing empty CSS value stays empty',
+      declaration.value === '',
+      JSON.stringify(declaration),
+    );
+    check(
+      'an empty value has a zero-width editable span',
+      declaration.valueStart === declaration.valueEnd,
+    );
     if (emptyCss.includes('--next')) {
-      check('a neighboring value excludes its terminator', entries.find((entry) => entry.name === '--next')?.value === 'red');
+      check(
+        'a neighboring value excludes its terminator',
+        entries.find((entry) => entry.name === '--next')?.value === 'red',
+      );
     }
     const result = setVariable(dir, {
-      file: 'src/styles/tokens.css', valueStart: declaration.valueStart, valueEnd: declaration.valueEnd,
-      expect: '', value: 'unset',
+      file: 'src/styles/tokens.css',
+      valueStart: declaration.valueStart,
+      valueEnd: declaration.valueEnd,
+      expect: '',
+      value: 'unset',
     });
     check('an empty value can be updated', result.ok === true, JSON.stringify(result));
-    check('editing an empty value preserves delimiters and adjacent declarations',
+    check(
+      'editing an empty value preserves delimiters and adjacent declarations',
       fs.readFileSync(file, 'utf8') === emptyCss.replace(/(--blank:\s*)/, '$1unset'),
-      fs.readFileSync(file, 'utf8'));
+      fs.readFileSync(file, 'utf8'),
+    );
   }
 
   fs.writeFileSync(file, ':root {\n  --existing: 1px;\n}\n');
-  const added = addVariable(dir, { file: 'src/styles/tokens.css', selector: ':root', name: '--new' });
-  check('a newly added variable defaults to unset', added.ok && fs.readFileSync(file, 'utf8').includes('--new: unset;'));
-  const explicitEmpty = addVariable(dir, {
-    file: 'src/styles/tokens.css', selector: ':root', name: '--explicit-empty', value: '',
+  const added = addVariable(dir, {
+    file: 'src/styles/tokens.css',
+    selector: ':root',
+    name: '--new',
   });
-  check('an explicit empty value is preserved when adding a declaration', explicitEmpty.ok &&
-    readDeclarations(fs.readFileSync(file, 'utf8'))[0].entries.find((entry) => entry.name === '--explicit-empty')?.value === '');
+  check(
+    'a newly added variable defaults to unset',
+    added.ok && fs.readFileSync(file, 'utf8').includes('--new: unset;'),
+  );
+  const explicitEmpty = addVariable(dir, {
+    file: 'src/styles/tokens.css',
+    selector: ':root',
+    name: '--explicit-empty',
+    value: '',
+  });
+  check(
+    'an explicit empty value is preserved when adding a declaration',
+    explicitEmpty.ok &&
+      readDeclarations(fs.readFileSync(file, 'utf8'))[0].entries.find(
+        (entry) => entry.name === '--explicit-empty',
+      )?.value === '',
+  );
 
   fs.rmSync(dir, { recursive: true, force: true });
 }
@@ -235,44 +289,49 @@ if (!fs.existsSync(path.join(source, 'src', 'styles'))) {
   // text and they are free to rename it, or to put the headings and the text
   // styles under one.
   const headings = root.blocks.find(
-    (b) => b.kind === 'matrix' && b.columns.some((c) => c.label === 'h1')
+    (b) => b.kind === 'matrix' && b.columns.some((c) => c.label === 'h1'),
   );
   check('headings become a table', !!headings);
   check(
     'with a column per heading',
     ['display', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6'].every((h) =>
-      columnLabels(headings, root).includes(h)
+      columnLabels(headings, root).includes(h),
     ),
-    JSON.stringify(headings && columnLabels(headings, root))
+    JSON.stringify(headings && columnLabels(headings, root)),
   );
   check(
     'and every property as a row',
     ['value', 'min', 'max', 'line-height', 'margin-top', 'trim-bottom', 'text-wrap'].every((r) =>
-      rowLabels(headings).includes(r)
+      rowLabels(headings).includes(r),
     ),
-    rowLabels(headings).join()
+    rowLabels(headings).join(),
   );
   check(
     'including the ones a shallower reading would steal',
     rowLabels(headings).includes('margin-top') && rowLabels(headings).includes('trim-top'),
-    'margin-top/trim-top were taken by a `top` family instead'
+    'margin-top/trim-top were taken by a `top` family instead',
   );
 
   // The text styles share every one of those properties, so they belong to the
   // same table when they sit under the same comment and their own when they do
   // not — either way they are columns, not thirteen more rows.
   const textStyles = root.blocks.find(
-    (b) => b.kind === 'matrix' && b.columns.some((c) => c.label === 'text-main')
+    (b) => b.kind === 'matrix' && b.columns.some((c) => c.label === 'text-main'),
   );
-  check('text styles are columns too', !!textStyles, JSON.stringify(root.blocks.map((b) => b.title)));
+  check(
+    'text styles are columns too',
+    !!textStyles,
+    JSON.stringify(root.blocks.map((b) => b.title)),
+  );
   check(
     'with the same properties down the side',
-    textStyles && ['value', 'line-height', 'font-weight'].every((r) => rowLabels(textStyles).includes(r)),
-    textStyles && rowLabels(textStyles).join()
+    textStyles &&
+      ['value', 'line-height', 'font-weight'].every((r) => rowLabels(textStyles).includes(r)),
+    textStyles && rowLabels(textStyles).join(),
   );
 
   const spacing = root.blocks.find(
-    (b) => b.kind === 'matrix' && b.columns.some((c) => c.label === 'space-1')
+    (b) => b.kind === 'matrix' && b.columns.some((c) => c.label === 'space-1'),
   );
   check('the spacing scale is a table', !!spacing && columnLabels(spacing, root).length >= 8);
   check('with the fluid pair as rows', !!spacing && rowLabels(spacing).join() === 'value,min,max');
@@ -283,32 +342,35 @@ if (!fs.existsSync(path.join(source, 'src', 'styles'))) {
   check(
     'with a column per theme',
     theme && theme.columns.map((c) => c.label).join() === 'Theme light,Theme dark,Theme brand',
-    JSON.stringify(theme && theme.columns.map((c) => c.label))
+    JSON.stringify(theme && theme.columns.map((c) => c.label)),
   );
   check(
     'the light column is named after its class, not :root',
     theme?.columns[0]?.selector?.startsWith(':root'),
-    theme?.columns[0]?.selector
+    theme?.columns[0]?.selector,
   );
   check(
     'shared names are one row across the modes',
     theme && theme.blocks[0].rows.every((r) => r.cells.length === 3 && r.cells.every(Boolean)),
-    JSON.stringify(theme && theme.blocks[0].rows.map((r) => r.cells.map((c) => !!c)))
+    JSON.stringify(theme && theme.blocks[0].rows.map((r) => r.cells.map((c) => !!c))),
   );
   check(
     'a family of names inside becomes a section',
-    theme && ['selection', 'button', 'button-2', 'link'].every((t) => theme.blocks.some((b) => b.title === t)),
-    JSON.stringify(theme && theme.blocks.map((b) => b.title))
+    theme &&
+      ['selection', 'button', 'button-2', 'link'].every((t) =>
+        theme.blocks.some((b) => b.title === t),
+      ),
+    JSON.stringify(theme && theme.blocks.map((b) => b.title)),
   );
   check(
     'and button-2 is not six more rows of button',
     theme && findBlock(theme, 'button').rows.length === 6,
-    JSON.stringify(theme && rowLabels(findBlock(theme, 'button')))
+    JSON.stringify(theme && rowLabels(findBlock(theme, 'button'))),
   );
   check(
     'a background is not a section of one',
     theme && rowLabels(theme.blocks[0]).includes('background-2'),
-    JSON.stringify(theme && rowLabels(theme.blocks[0]))
+    JSON.stringify(theme && rowLabels(theme.blocks[0])),
   );
 
   // Colours resolve through the chain; the ones that cannot say so.
@@ -324,49 +386,77 @@ if (!fs.existsSync(path.join(source, 'src', 'styles'))) {
       const text = fs.readFileSync(f, 'utf8');
       const hits = [...text.matchAll(new RegExp(`${name}\\s*:\\s*([^;{}]+);`, 'g'))];
       const last = hits[hits.length - 1];
-      if (last && /^#[0-9a-f]{3,8}$/i.test(last[1].trim())) {return last[1].trim().toLowerCase();}
+      if (last && /^#[0-9a-f]{3,8}$/i.test(last[1].trim())) {
+        return last[1].trim().toLowerCase();
+      }
     }
     return null;
   };
   const through = (cell) => {
-    if (!cell?.ref) {return null;}
+    if (!cell?.ref) {
+      return null;
+    }
     const want = declaredColor(cell.ref);
     return want ? cell.color?.toLowerCase() === want : null;
   };
   check(
     'a swatch resolves through its reference',
     through(background.cells[0]) === true,
-    JSON.stringify(background.cells[0])
+    JSON.stringify(background.cells[0]),
   );
   check(
     'per mode',
     through(background.cells[1]) === true && through(background.cells[2]) === true,
-    JSON.stringify([background.cells[1], background.cells[2]])
+    JSON.stringify([background.cells[1], background.cells[2]]),
   );
   const border = themeRows.find((r) => r.label === 'border');
-  check('a colour nothing can compute says so', border.cells[0].unknownColor === true && !border.cells[0].color);
+  check(
+    'a colour nothing can compute says so',
+    border.cells[0].unknownColor === true && !border.cells[0].color,
+  );
 
   // The panel resolves values against this map as they are typed (see
   // src/fluid.js), so it has to carry everything a value can reference.
   const { values } = readVariables(source);
-  check('every variable is in the resolution map', Object.keys(values).length > 200, `${Object.keys(values).length}`);
+  check(
+    'every variable is in the resolution map',
+    Object.keys(values).length > 200,
+    `${Object.keys(values).length}`,
+  );
   check('with its raw value', values['--viewport-max'] === '1440', values['--viewport-max']);
 
   // Nothing is lost: every declaration in the file is in some block.
-  const declared = readDeclarations(fs.readFileSync(path.join(source, 'src', 'styles', 'base.css'), 'utf8'))
-    .flatMap((r) => r.entries.filter((e) => e.kind === 'var').map((e) => e.name));
+  const declared = readDeclarations(
+    fs.readFileSync(path.join(source, 'src', 'styles', 'base.css'), 'utf8'),
+  ).flatMap((r) => r.entries.filter((e) => e.kind === 'var').map((e) => e.name));
   const shown = new Set();
   for (const group of base.groups) {
-    for (const block of group.blocks) {for (const row of block.rows) {for (const cell of row.cells) {if (cell) {shown.add(cell.name);}}}}
+    for (const block of group.blocks) {
+      for (const row of block.rows) {
+        for (const cell of row.cells) {
+          if (cell) {
+            shown.add(cell.name);
+          }
+        }
+      }
+    }
   }
   const missing = [...new Set(declared)].filter((n) => !shown.has(n));
-  check('every variable in the file is shown somewhere', missing.length === 0, missing.slice(0, 8).join(', '));
+  check(
+    'every variable in the file is shown somewhere',
+    missing.length === 0,
+    missing.slice(0, 8).join(', '),
+  );
 
   // The utility stylesheet: many rules, one variable each, all the same name.
   const utilities = files.find((f) => f.rel.endsWith('utilities.css'));
   if (utilities) {
     const gaps = utilities.groups.find((g) => g.columns.length > 3);
-    check('a scale spread over many rules becomes columns', !!gaps, JSON.stringify(utilities.groups.map((g) => g.columns.length)));
+    check(
+      'a scale spread over many rules becomes columns',
+      !!gaps,
+      JSON.stringify(utilities.groups.map((g) => g.columns.length)),
+    );
     check('with one row', gaps && gaps.blocks[0].rows.length === 1);
   }
 

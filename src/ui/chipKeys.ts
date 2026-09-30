@@ -11,8 +11,9 @@ import { assert } from '../../shared/assert';
 const isChip = (node: Node | null | undefined): node is Element => {
   // Use the node's realm so iframe nodes and DOM test documents narrow correctly.
   const ElementType = node?.ownerDocument?.defaultView?.Element;
-  return ElementType !== undefined && node instanceof ElementType &&
-    node.classList.contains('expr-chip');
+  return (
+    ElementType !== undefined && node instanceof ElementType && node.classList.contains('expr-chip')
+  );
 };
 
 // The chip the caret is sitting against, on the side it is about to delete

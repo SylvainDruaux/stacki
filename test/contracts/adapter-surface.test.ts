@@ -64,7 +64,7 @@ test('whole-file write sites count the retired operation, never a diff write', (
     '// replaceSource(file, text) in a comment',
     'writeProjectText(abs, next);',
     'documents.writeText(file, next, base); documents.writeCurrent(file, next);',
-    "case \"replace-source\":",
+    'case "replace-source":',
   ].join('\n');
   assert.equal(countWholeFileWrites(text), 3);
 });

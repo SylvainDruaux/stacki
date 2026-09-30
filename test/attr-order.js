@@ -27,7 +27,9 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
+  if (!condition) {
+    failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  }
 };
 
 const {
@@ -56,7 +58,9 @@ const { renamedAttr } = require(bundled);
 // The rename as the app applies it: a new node, the old one untouched.
 const renameAttr = (node, from, to) => {
   const renamed = renamedAttr(node, from, to);
-  if (renamed === undefined) {return false;}
+  if (renamed === undefined) {
+    return false;
+  }
   Object.assign(node, renamed);
   return true;
 };
@@ -67,7 +71,9 @@ const S = (value) => ({ type: 'string', value });
 // The tag as it comes back out, after `edit` has had the node.
 function after(body, edit, pick = (nodes) => nodes[0]) {
   const parsed = parsePage(page(body));
-  if (!parsed.editable) {return `(code view: ${parsed.reason})`;}
+  if (!parsed.editable) {
+    return `(code view: ${parsed.reason})`;
+  }
   edit(pick(parsed.model.nodes), parsed.model);
   return serializePage(parsed.model).split('\n').slice(2, -1).join('\n');
 }
@@ -84,20 +90,28 @@ const INPUT = '<Input variant="first-name" required />';
   check(
     'a prop cleared and retyped stays where it was',
     out === '<Input variant="given-name" required />',
-    out
+    out,
   );
 }
 {
   const out = after(INPUT, (node) => {
     node.props.variant = S('given-name');
   });
-  check('editing one in place is still in place', out === '<Input variant="given-name" required />', out);
+  check(
+    'editing one in place is still in place',
+    out === '<Input variant="given-name" required />',
+    out,
+  );
 }
 {
   const out = after(INPUT, (node) => {
     delete node.props.required;
   });
-  check('removing one leaves the rest where they were', out === '<Input variant="first-name" />', out);
+  check(
+    'removing one leaves the rest where they were',
+    out === '<Input variant="first-name" />',
+    out,
+  );
 }
 {
   const out = after(INPUT, (node) => {
@@ -106,7 +120,7 @@ const INPUT = '<Input variant="first-name" required />';
   check(
     'a prop the file never had goes at the end',
     out === '<Input variant="first-name" required placeholder="First name" />',
-    out
+    out,
   );
 }
 {
@@ -121,7 +135,7 @@ const INPUT = '<Input variant="first-name" required />';
   check(
     'one set aside and put back returns to its own slot',
     out === '<Input variant="first-name" required disabled />',
-    out
+    out,
   );
 }
 
@@ -135,7 +149,7 @@ const INPUT = '<Input variant="first-name" required />';
   check(
     'strings, expressions and bare names keep one order between them',
     out === '<img src="/a.png" alt="A hallway" width={w} height={h} loading="lazy" />',
-    out
+    out,
   );
 }
 {
@@ -144,7 +158,11 @@ const INPUT = '<Input variant="first-name" required />';
     delete node.props.title;
     node.props.title = S('Hello');
   });
-  check('a spread holds its place too', out === '<Card {...rest} title="Hello" class:list={[base]} data-x="1" />', out);
+  check(
+    'a spread holds its place too',
+    out === '<Card {...rest} title="Hello" class:list={[base]} data-x="1" />',
+    out,
+  );
 }
 
 // --- a tag written across lines ------------------------------------------------
@@ -155,20 +173,26 @@ const INPUT = '<Input variant="first-name" required />';
 />`;
   const parsed = parsePage(page(src));
   const node = parsed.model.nodes[0];
-  check('a multi-line tag is kept as written', serializePage(parsed.model).includes('\n  variant="first-name"\n'), 'reflowed');
+  check(
+    'a multi-line tag is kept as written',
+    serializePage(parsed.model).includes('\n  variant="first-name"\n'),
+    'reflowed',
+  );
   delete node.props.variant;
   node.props.variant = S('given-name');
   const out = serializePage(parsed.model);
   check(
     'and once edited it reflows in the file’s order',
     out.includes('<Input variant="given-name" required />'),
-    out.split('\n').slice(2, -1).join('\n')
+    out.split('\n').slice(2, -1).join('\n'),
   );
 }
 
 // --- an element inside a line of prose -----------------------------------------
 {
-  const nodes = parseTemplate('<p>Call <a href="/x" class="link" target="_blank">us</a> today.</p>').nodes;
+  const nodes = parseTemplate(
+    '<p>Call <a href="/x" class="link" target="_blank">us</a> today.</p>',
+  ).nodes;
   const link = nodes[0].children.find((n) => n.name === 'a');
   delete link.props.href;
   link.props.href = S('/y');
@@ -176,7 +200,7 @@ const INPUT = '<Input variant="first-name" required />';
   check(
     'an inline tag keeps its order as well',
     out.includes('<a href="/y" class="link" target="_blank">'),
-    out
+    out,
   );
 }
 
@@ -190,20 +214,36 @@ const INPUT = '<Input variant="first-name" required />';
   const moved = renameAttr(node, 'data-role', 'data-kind');
   check('a rename reports that it happened', moved === true, String(moved));
   const out = serializePage(parsed.model).split('\n')[2];
-  check('and the renamed prop stays in its slot', out === '<div data-kind="hero" class="wrap" id="one"></div>', out);
+  check(
+    'and the renamed prop stays in its slot',
+    out === '<div data-kind="hero" class="wrap" id="one"></div>',
+    out,
+  );
 }
 {
   const parsed = parsePage(page('<div id="one" class="wrap" title="Hi"></div>'));
   const node = parsed.model.nodes[0];
   renameAttr(node, 'title', 'class'); // onto a name the tag already had
   const out = serializePage(parsed.model).split('\n')[2];
-  check('renaming onto an existing name takes that slot over', out === '<div id="one" class="Hi"></div>', out);
+  check(
+    'renaming onto an existing name takes that slot over',
+    out === '<div id="one" class="Hi"></div>',
+    out,
+  );
 }
 {
   const parsed = parsePage(page('<div id="one"></div>'));
   const node = parsed.model.nodes[0];
-  check('renaming what is not there does nothing', renameAttr(node, 'title', 'alt') === false, 'it did something');
-  check('and renaming to the same name does nothing', renameAttr(node, 'id', 'id') === false, 'it did something');
+  check(
+    'renaming what is not there does nothing',
+    renameAttr(node, 'title', 'alt') === false,
+    'it did something',
+  );
+  check(
+    'and renaming to the same name does nothing',
+    renameAttr(node, 'id', 'id') === false,
+    'it did something',
+  );
 }
 
 // The app's rename goes through it — a second copy of the rule elsewhere would
@@ -224,7 +264,11 @@ const INPUT = '<Input variant="first-name" required />';
   const nodes = parseTemplate('<div></div>').nodes;
   nodes[0].props = { class: S('card'), id: S('one') };
   const out = serializeNodes(nodes, '');
-  check('a tag with no file behind it writes what it was given', out.includes('<div class="card" id="one">'), out);
+  check(
+    'a tag with no file behind it writes what it was given',
+    out.includes('<div class="card" id="one">'),
+    out,
+  );
 }
 
 // --- the canvas still marks what it marks ---------------------------------------
@@ -242,7 +286,7 @@ const INPUT = '<Input variant="first-name" required />';
   check(
     'the path attribute is written after the tag’s own props',
     /<p id="x" role="note" data-avb-p=/.test(marked),
-    marked.split('\n').find((l) => l.includes('<p ')) || marked
+    marked.split('\n').find((l) => l.includes('<p ')) || marked,
   );
   // And an edited prop does not push it around either: what the canvas gets
   // for an edited page is what it gets for the same page written that way.
@@ -262,12 +306,12 @@ const INPUT = '<Input variant="first-name" required />';
   check(
     'on a tag that spreads, the marker goes in front of everything',
     /<div data-avb-p=.*class="wrap".*\{\.\.\.rest\}/.test(spread),
-    spread.split('\n').find((l) => l.includes('<div ')) || spread
+    spread.split('\n').find((l) => l.includes('<div ')) || spread,
   );
   check(
     'and an edited prop leaves the marked page as it would have been written',
     edited === marks('<div class="wrap"><p id="y" role="note">Hi</p></div>'),
-    edited.split('\n').find((l) => l.includes('<p ')) || edited
+    edited.split('\n').find((l) => l.includes('<p ')) || edited,
   );
 }
 

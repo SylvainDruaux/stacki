@@ -175,12 +175,7 @@ test('an invalid intermediate is written; visual edits wait until it parses', as
   assert.equal(fixed.value.editable, true, 'the page parses again');
   const again = await read(harness, file);
   assert.ok(again.editable);
-  const edited = await send(
-    harness,
-    file,
-    again.checksum,
-    title([0, 0], rangeAt(again, [0, 0])),
-  );
+  const edited = await send(harness, file, again.checksum, title([0, 0], rangeAt(again, [0, 0])));
   assert.ok(edited.ok, 'the visual edit applies');
   assert.equal(fs.readFileSync(file, 'utf8'), repaired.replace('"Old"', '"Visual"'));
 });
@@ -217,12 +212,7 @@ test("a code save authored before the app's own edit rebases, or conflicts", asy
   const file = page(harness, 'index.astro', text);
   const before = await read(harness, file);
   assert.ok(before.editable);
-  const visual = await send(
-    harness,
-    file,
-    before.checksum,
-    title([0, 0], rangeAt(before, [0, 0])),
-  );
+  const visual = await send(harness, file, before.checksum, title([0, 0], rangeAt(before, [0, 0])));
   assert.ok(visual.ok);
   // The code editor still holds the text before the visual edit.
   const rebased = await saveCode(harness, file, before, text.replace('Two', 'Deux'));

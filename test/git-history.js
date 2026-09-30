@@ -29,7 +29,9 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
+  if (!condition) {
+    failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  }
 };
 
 const git = (cwd, args) =>
@@ -39,7 +41,9 @@ const git = (cwd, args) =>
         err.stdout = stdout;
         err.stderr = stderr;
         reject(err);
-      } else {resolve({ stdout: String(stdout), stderr: String(stderr) });}
+      } else {
+        resolve({ stdout: String(stdout), stderr: String(stderr) });
+      }
     });
   });
 
@@ -74,7 +78,11 @@ const commit = async (dir, subject) => {
     const r = await history.log(git, { projectPath: dir });
     // git exits 128 here. An editor that surfaced that would greet every new
     // project with an error where its history should be.
-    check('a repo with no commits has an empty history', Array.isArray(r.commits), JSON.stringify(r));
+    check(
+      'a repo with no commits has an empty history',
+      Array.isArray(r.commits),
+      JSON.stringify(r),
+    );
     check('and it is empty rather than failing', r.commits.length === 0, JSON.stringify(r));
     check('and it reports the end of the list', r.atEnd === true);
 
@@ -97,14 +105,29 @@ const commit = async (dir, subject) => {
     await commit(dir, 'about page');
 
     const { commits } = await history.log(git, { projectPath: dir });
-    check('the log comes back newest first', commits[0].subject === 'about page', commits[0]?.subject);
+    check(
+      'the log comes back newest first',
+      commits[0].subject === 'about page',
+      commits[0]?.subject,
+    );
     check('with both commits', commits.length === 2, String(commits.length));
     check('the author is carried', commits[0].author === 'Tim Ricks', commits[0].author);
     check('the date parses', !Number.isNaN(Date.parse(commits[0].when)), commits[0].when);
-    check('the short hash is a prefix of the full one', commits[0].hash.startsWith(commits[0].shortHash));
+    check(
+      'the short hash is a prefix of the full one',
+      commits[0].hash.startsWith(commits[0].shortHash),
+    );
     check('an ordinary commit is not a merge', commits[0].isMerge === false);
-    check('the branch it is on is carried as a ref', commits[0].refs.join(',').includes('main'), commits[0].refs.join(','));
-    check('the root commit has no parents', commits[1].parents.length === 0, JSON.stringify(commits[1].parents));
+    check(
+      'the branch it is on is carried as a ref',
+      commits[0].refs.join(',').includes('main'),
+      commits[0].refs.join(','),
+    );
+    check(
+      'the root commit has no parents',
+      commits[1].parents.length === 0,
+      JSON.stringify(commits[1].parents),
+    );
 
     const files = await history.commitFiles(git, { projectPath: dir, ref: commits[0].hash });
     check('a commit lists what it changed', files.length === 1, JSON.stringify(files));
@@ -114,7 +137,11 @@ const commit = async (dir, subject) => {
     // The root commit: no parent to diff against, and git handles it, but only
     // if the flags do not assume there is one.
     const rootFiles = await history.commitFiles(git, { projectPath: dir, ref: commits[1].hash });
-    check('the very first commit lists its files too', rootFiles.length === 1, JSON.stringify(rootFiles));
+    check(
+      'the very first commit lists its files too',
+      rootFiles.length === 1,
+      JSON.stringify(rootFiles),
+    );
   }
 
   // --- A subject line that fights the parser -------------------------------
@@ -130,9 +157,13 @@ const commit = async (dir, subject) => {
     check(
       'a subject with tabs and quotes survives intact',
       commits[0].subject === 'fix\tthe "quoted" thing | and > that',
-      JSON.stringify(commits[0].subject)
+      JSON.stringify(commits[0].subject),
     );
-    check('and the fields after it are not shifted', commits[0].author === 'Tim Ricks', commits[0].author);
+    check(
+      'and the fields after it are not shifted',
+      commits[0].author === 'Tim Ricks',
+      commits[0].author,
+    );
   }
 
   // --- Merge commits: the case that fails silently -------------------------
@@ -152,7 +183,11 @@ const commit = async (dir, subject) => {
     const { commits } = await history.log(git, { projectPath: dir });
     const merge = commits.find((c) => c.isMerge);
     check('a merge commit is in the log', !!merge, commits.map((c) => c.subject).join(' | '));
-    check('and is marked as a merge', merge && merge.parents.length === 2, JSON.stringify(merge?.parents));
+    check(
+      'and is marked as a merge',
+      merge && merge.parents.length === 2,
+      JSON.stringify(merge?.parents),
+    );
 
     // The whole point of this file. Bare `git show --name-status` returns an
     // empty string here, and every merge in the panel would read as a commit
@@ -167,12 +202,12 @@ const commit = async (dir, subject) => {
     check(
       'commits made on the merged branch are still listed',
       commits.some((c) => c.subject === 'feature page'),
-      commits.map((c) => c.subject).join(' | ')
+      commits.map((c) => c.subject).join(' | '),
     );
     check(
       'along with the ones made on this branch',
       commits.some((c) => c.subject === 'main page'),
-      commits.map((c) => c.subject).join(' | ')
+      commits.map((c) => c.subject).join(' | '),
     );
     check('so the whole history is there', commits.length === 4, String(commits.length));
 
@@ -181,7 +216,7 @@ const commit = async (dir, subject) => {
     check(
       'namely the branch’s work',
       files.some((f) => f.path === 'src/pages/feature.astro'),
-      JSON.stringify(files)
+      JSON.stringify(files),
     );
   }
 
@@ -195,10 +230,22 @@ const commit = async (dir, subject) => {
     const ref = await commit(dir, 'renamed');
 
     const files = await history.commitFiles(git, { projectPath: dir, ref });
-    check('a rename is one entry, not a delete and an add', files.length === 1, JSON.stringify(files));
+    check(
+      'a rename is one entry, not a delete and an add',
+      files.length === 1,
+      JSON.stringify(files),
+    );
     check('marked as a rename', files[0].status === 'R', JSON.stringify(files[0]));
-    check('with the new path', files[0].path === 'src/pages/contact.astro', JSON.stringify(files[0]));
-    check('and where it came from', files[0].from === 'src/pages/about.astro', JSON.stringify(files[0]));
+    check(
+      'with the new path',
+      files[0].path === 'src/pages/contact.astro',
+      JSON.stringify(files[0]),
+    );
+    check(
+      'and where it came from',
+      files[0].from === 'src/pages/about.astro',
+      JSON.stringify(files[0]),
+    );
   }
 
   // --- The working tree right now ------------------------------------------
@@ -217,14 +264,26 @@ const commit = async (dir, subject) => {
     const st = await history.status(git, { projectPath: dir });
     const by = Object.fromEntries(st.map((f) => [f.path, f]));
     check('an edited file is listed', !!by['edit.txt'], JSON.stringify(st));
-    check('a deleted file is listed', by['gone.txt']?.status === 'D', JSON.stringify(by['gone.txt']));
+    check(
+      'a deleted file is listed',
+      by['gone.txt']?.status === 'D',
+      JSON.stringify(by['gone.txt']),
+    );
     check('a new file is listed', by['new.txt']?.status === 'A', JSON.stringify(by['new.txt']));
     check('an untouched file is not listed', !by['keep.txt'], JSON.stringify(st));
     // Worktree-only changes have a leading space in the porcelain code. If the
     // line were trimmed before slicing, the path would lose its first
     // character and every unstaged file would come back misnamed.
-    check('the path of an unstaged edit is intact', by['edit.txt']?.path === 'edit.txt', JSON.stringify(by['edit.txt']));
-    check('and it is not marked staged', by['edit.txt']?.staged === false, JSON.stringify(by['edit.txt']));
+    check(
+      'the path of an unstaged edit is intact',
+      by['edit.txt']?.path === 'edit.txt',
+      JSON.stringify(by['edit.txt']),
+    );
+    check(
+      'and it is not marked staged',
+      by['edit.txt']?.staged === false,
+      JSON.stringify(by['edit.txt']),
+    );
   }
 
   // --- A file as it was ----------------------------------------------------
@@ -236,11 +295,19 @@ const commit = async (dir, subject) => {
     write(dir, 'src/pages/index.astro', 'the new words\n');
     await commit(dir, 'second');
 
-    const then = await history.fileAt(git, { projectPath: dir, ref: first, path: 'src/pages/index.astro' });
+    const then = await history.fileAt(git, {
+      projectPath: dir,
+      ref: first,
+      path: 'src/pages/index.astro',
+    });
     check('a file can be read as it was', then.trim() === 'the old words', JSON.stringify(then));
     // "It did not exist yet" is a real answer to the question, and the panel
     // wants to say so rather than show a failure.
-    const missing = await history.fileAt(git, { projectPath: dir, ref: first, path: 'src/pages/later.astro' });
+    const missing = await history.fileAt(git, {
+      projectPath: dir,
+      ref: first,
+      path: 'src/pages/later.astro',
+    });
     check('a file that did not exist yet reads as null', missing === null, JSON.stringify(missing));
   }
 
@@ -258,15 +325,23 @@ const commit = async (dir, subject) => {
     check('newest first', first.commits[0].subject === 'commit 6', first.commits[0].subject);
 
     const second = await history.log(git, { projectPath: dir, limit: 3, skip: 3 });
-    check('the next page continues', second.commits[0].subject === 'commit 3', second.commits[0].subject);
+    check(
+      'the next page continues',
+      second.commits[0].subject === 'commit 3',
+      second.commits[0].subject,
+    );
     check(
       'and does not repeat the first page',
       !second.commits.some((c) => first.commits.some((f) => f.hash === c.hash)),
-      second.commits.map((c) => c.subject).join(',')
+      second.commits.map((c) => c.subject).join(','),
     );
 
     const last = await history.log(git, { projectPath: dir, limit: 3, skip: 6 });
-    check('the final short page is the end', last.atEnd === true, JSON.stringify(last.commits.length));
+    check(
+      'the final short page is the end',
+      last.atEnd === true,
+      JSON.stringify(last.commits.length),
+    );
   }
 
   // --- Worktrees -----------------------------------------------------------
@@ -294,7 +369,7 @@ const commit = async (dir, subject) => {
     await sh(dir, 'worktree', 'remove', '--force', extra);
     check(
       'and it is gone once removed',
-      (await history.worktrees(git, { projectPath: dir })).length === 1
+      (await history.worktrees(git, { projectPath: dir })).length === 1,
     );
   }
 
@@ -320,20 +395,30 @@ const commit = async (dir, subject) => {
     check('a commit carries its files', top.files?.length === 2, JSON.stringify(top.files));
     check(
       'both of them',
-      top.files.map((f) => f.path).sort().join(',') === 'src/pages/index.astro,src/pages/two.astro',
-      JSON.stringify(top.files)
+      top.files
+        .map((f) => f.path)
+        .sort()
+        .join(',') === 'src/pages/index.astro,src/pages/two.astro',
+      JSON.stringify(top.files),
     );
-    check('an edit reads as modified', top.files.find((f) => f.path === 'src/pages/index.astro').status === 'M');
+    check(
+      'an edit reads as modified',
+      top.files.find((f) => f.path === 'src/pages/index.astro').status === 'M',
+    );
 
     // The same merge trap, on the path the panel actually uses. A page drawn
     // from this call would show every merge as touching nothing.
     const merge = commits.find((c) => c.isMerge);
-    check('a merge in a page carries its files too', merge?.files?.length > 0, JSON.stringify(merge?.files));
+    check(
+      'a merge in a page carries its files too',
+      merge?.files?.length > 0,
+      JSON.stringify(merge?.files),
+    );
     // The same trap on the paged call the panel actually uses.
     check(
       'and the merged branch’s own commit is in the page',
       commits.some((c) => c.subject === 'feature page'),
-      commits.map((c) => c.subject).join(' | ')
+      commits.map((c) => c.subject).join(' | '),
     );
 
     // The record separator leads each record so a file list lands with the
@@ -343,24 +428,48 @@ const commit = async (dir, subject) => {
     check(
       'files land on the right commit',
       first.files.length === 1 && first.files[0].path === 'src/pages/index.astro',
-      JSON.stringify(first.files)
+      JSON.stringify(first.files),
     );
 
     // Without the flag there is no files key at all, rather than an empty
     // array that would read as "this commit changed nothing".
     const plain = await history.log(git, { projectPath: dir });
-    check('files are absent unless asked for', plain.commits[0].files === undefined, JSON.stringify(plain.commits[0].files));
+    check(
+      'files are absent unless asked for',
+      plain.commits[0].files === undefined,
+      JSON.stringify(plain.commits[0].files),
+    );
   }
 
   // --- Saying what a file is ------------------------------------------------
   {
     const d = (p) => history.describeFile(p);
-    check('the index page is Home', d('src/pages/index.astro').label === 'Home', d('src/pages/index.astro').label);
-    check('a page is its route, in words', d('src/pages/about.astro').label === 'About', d('src/pages/about.astro').label);
-    check('dashes become spaces', d('src/pages/about-us.astro').label === 'About us', d('src/pages/about-us.astro').label);
+    check(
+      'the index page is Home',
+      d('src/pages/index.astro').label === 'Home',
+      d('src/pages/index.astro').label,
+    );
+    check(
+      'a page is its route, in words',
+      d('src/pages/about.astro').label === 'About',
+      d('src/pages/about.astro').label,
+    );
+    check(
+      'dashes become spaces',
+      d('src/pages/about-us.astro').label === 'About us',
+      d('src/pages/about-us.astro').label,
+    );
     // A folder's index is that folder's page, not a page called "index".
-    check('a folder index is the folder', d('src/pages/blog/index.astro').label === 'Blog', d('src/pages/blog/index.astro').label);
-    check('a component is its name', d('src/components/Card.astro').label === 'Card', d('src/components/Card.astro').label);
+    check(
+      'a folder index is the folder',
+      d('src/pages/blog/index.astro').label === 'Blog',
+      d('src/pages/blog/index.astro').label,
+    );
+    check(
+      'a component is its name',
+      d('src/components/Card.astro').label === 'Card',
+      d('src/components/Card.astro').label,
+    );
     check('and is marked a component', d('src/components/Card.astro').kind === 'component');
     check('a layout is marked a layout', d('src/layouts/Base.astro').kind === 'layout');
     check('something in public is an asset', d('public/logo.svg').kind === 'asset');
@@ -368,18 +477,38 @@ const commit = async (dir, subject) => {
     check('package.json is config', d('package.json').kind === 'config');
     // A path this knows nothing about keeps its own name. Guessing a label for
     // it would be worse than saying the path.
-    check('an unknown path keeps its path', d('scripts/deploy.sh').label === 'scripts/deploy.sh', d('scripts/deploy.sh').label);
+    check(
+      'an unknown path keeps its path',
+      d('scripts/deploy.sh').label === 'scripts/deploy.sh',
+      d('scripts/deploy.sh').label,
+    );
     check('and no invented kind', d('scripts/deploy.sh').kind === 'file');
     // Windows separators reach this from a checkout made there.
-    check('backslashes are understood', d('src\\pages\\index.astro').label === 'Home', d('src\\pages\\index.astro').label);
+    check(
+      'backslashes are understood',
+      d('src\\pages\\index.astro').label === 'Home',
+      d('src\\pages\\index.astro').label,
+    );
 
-    const described = history.describeFiles([{ status: 'R', path: 'src/pages/contact.astro', from: 'src/pages/about.astro' }]);
-    check('describing a list keeps the status', described[0].status === 'R', JSON.stringify(described[0]));
-    check('and keeps where a rename came from', described[0].from === 'src/pages/about.astro', JSON.stringify(described[0]));
+    const described = history.describeFiles([
+      { status: 'R', path: 'src/pages/contact.astro', from: 'src/pages/about.astro' },
+    ]);
+    check(
+      'describing a list keeps the status',
+      described[0].status === 'R',
+      JSON.stringify(described[0]),
+    );
+    check(
+      'and keeps where a rename came from',
+      described[0].from === 'src/pages/about.astro',
+      JSON.stringify(described[0]),
+    );
     check('and labels it', described[0].label === 'Contact', JSON.stringify(described[0]));
   }
 
-  for (const dir of cleanup) {fs.rmSync(dir, { recursive: true, force: true });}
+  for (const dir of cleanup) {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
 
   if (failures.length) {
     console.error(`git-history: ${failures.length} of ${checked} failed\n${failures.join('\n')}`);

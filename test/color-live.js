@@ -20,7 +20,9 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
+  if (!condition) {
+    failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  }
 };
 
 // jsdom lays nothing out, and a zero-width track divides to NaN, so the picker
@@ -65,7 +67,11 @@ const START = 'rgb(1, 2, 3)';
   global.requestAnimationFrame = dom.window.requestAnimationFrame.bind(dom.window);
   global.cancelAnimationFrame = dom.window.cancelAnimationFrame.bind(dom.window);
   global.MutationObserver = dom.window.MutationObserver;
-  global.ResizeObserver = class { observe() {} unobserve() {} disconnect() {} };
+  global.ResizeObserver = class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  };
   dom.window.Element.prototype.getBoundingClientRect = function rect() {
     return { x: 0, y: 0, top: 0, left: 0, right: SIZE, bottom: SIZE, width: SIZE, height: SIZE };
   };
@@ -102,17 +108,21 @@ const START = 'rgb(1, 2, 3)';
   };
 
   const root = createRoot(document.getElementById('root'));
-  await act(async () => { root.render(React.createElement(BackgroundSection, props)); });
+  await act(async () => {
+    root.render(React.createElement(BackgroundSection, props));
+  });
 
   const field = () => document.querySelector('input[data-prop="background-color"]');
   check('the colour field shows what the model resolved', field()?.value === START, field()?.value);
 
   // Open the picker on that field's swatch.
   const swatch = [...document.querySelectorAll('.u-color-swatch')].find(
-    (b) => b.getAttribute('aria-label') === 'Background color'
+    (b) => b.getAttribute('aria-label') === 'Background color',
   );
   check('the field has a swatch', swatch != null);
-  await act(async () => { swatch.click(); });
+  await act(async () => {
+    swatch.click();
+  });
   check('clicking it opens the picker', document.querySelector('.u-color-sb') != null);
 
   // A drag: pointerdown on the saturation square reports live, then moves do.
@@ -122,32 +132,60 @@ const START = 'rgb(1, 2, 3)';
     Object.defineProperty(event, 'clientY', { value: fy * SIZE });
     (target ?? dom.window).dispatchEvent(event);
   };
-  await act(async () => { at('pointerdown', 0.8, 0.2, document.querySelector('.u-color-sb')); });
+  await act(async () => {
+    at('pointerdown', 0.8, 0.2, document.querySelector('.u-color-sb'));
+  });
 
   const afterDown = field()?.value;
   check('the field moves with the drag', afterDown !== START && !!afterDown, `${afterDown}`);
-  check('and shows the colour the drag emitted', afterDown === live[live.length - 1]?.split('=')[1], `${afterDown} vs ${live[live.length - 1]}`);
-  check('which went to the canvas, not the model', live.length > 0 && committed.length === 0, `${live.length} live / ${committed.length} committed`);
+  check(
+    'and shows the colour the drag emitted',
+    afterDown === live[live.length - 1]?.split('=')[1],
+    `${afterDown} vs ${live[live.length - 1]}`,
+  );
+  check(
+    'which went to the canvas, not the model',
+    live.length > 0 && committed.length === 0,
+    `${live.length} live / ${committed.length} committed`,
+  );
 
   // Further along the same drag.
-  await act(async () => { at('pointermove', 0.2, 0.6); });
+  await act(async () => {
+    at('pointermove', 0.2, 0.6);
+  });
   const afterMove = field()?.value;
-  check('it keeps up as the drag continues', afterMove !== afterDown && afterMove === live[live.length - 1]?.split('=')[1], `${afterMove} vs ${live[live.length - 1]}`);
+  check(
+    'it keeps up as the drag continues',
+    afterMove !== afterDown && afterMove === live[live.length - 1]?.split('=')[1],
+    `${afterMove} vs ${live[live.length - 1]}`,
+  );
 
   const fillOf = () => swatch.querySelector('.u-color-swatch-fill')?.getAttribute('style') || '';
   check('the swatch shows the drag too', /rgb|#/.test(fillOf()), fillOf());
 
   // Letting go commits — the model is told, and the field holds what was picked.
-  await act(async () => { at('pointerup', 0.2, 0.6); });
+  await act(async () => {
+    at('pointerup', 0.2, 0.6);
+  });
   check('releasing commits to the model', committed.length === 1, committed.join(','));
-  check('and the field holds the colour that was picked', field()?.value === committed[0].split('=')[1], `${field()?.value} vs ${committed[0]}`);
+  check(
+    'and the field holds the colour that was picked',
+    field()?.value === committed[0].split('=')[1],
+    `${field()?.value} vs ${committed[0]}`,
+  );
 
   // The model answers with a colour of its own (an undo, another selector
   // winning, a rescan): that is more authoritative than what a drag emitted.
   props.read = (prop) => (prop === 'background-color' ? resolvedColor('rgb(9, 9, 9)') : undefined);
-  await act(async () => { root.render(React.createElement(BackgroundSection, { ...props })); });
+  await act(async () => {
+    root.render(React.createElement(BackgroundSection, { ...props }));
+  });
   await act(async () => {});
-  check('a value from the model wins over the last drag', field()?.value === 'rgb(9, 9, 9)', field()?.value);
+  check(
+    'a value from the model wins over the last drag',
+    field()?.value === 'rgb(9, 9, 9)',
+    field()?.value,
+  );
 
   // --- the swatch on its own ---------------------------------------------------
   // The rows above hand the swatch a value they track themselves. A row that
@@ -167,14 +205,16 @@ const START = 'rgb(1, 2, 3)';
           value: 'rgb(1, 2, 3)',
           ariaLabel: 'Shadow color',
           onChange: (color, live) => seen.push(`${live ? 'live' : 'commit'}=${color}`),
-        })
+        }),
       );
     });
     const only = host.querySelector('.u-color-swatch');
     const fill = () => host.querySelector('.u-color-swatch-fill')?.getAttribute('style') || '';
     check('a swatch with no help from its row still opens', !!only);
     const before = fill();
-    await act(async () => { only.click(); });
+    await act(async () => {
+      only.click();
+    });
     const sb = document.querySelectorAll('.u-color-sb');
     const box = sb[sb.length - 1];
     const drag = (type, fx, fy, target) => {
@@ -183,17 +223,34 @@ const START = 'rgb(1, 2, 3)';
       Object.defineProperty(event, 'clientY', { value: fy * SIZE });
       (target ?? dom.window).dispatchEvent(event);
     };
-    await act(async () => { drag('pointerdown', 0.8, 0.2, box); });
-    await act(async () => { drag('pointermove', 0.3, 0.7); });
-    check('it emits the drag', seen.some((s) => s.startsWith('live=')), seen.join(', '));
-    check('and paints what it emitted, with the value it was given unchanged', fill() !== before, `${before} → ${fill()}`);
-    const last = seen.filter((s) => s.startsWith('live=')).pop().split('=')[1];
+    await act(async () => {
+      drag('pointerdown', 0.8, 0.2, box);
+    });
+    await act(async () => {
+      drag('pointermove', 0.3, 0.7);
+    });
+    check(
+      'it emits the drag',
+      seen.some((s) => s.startsWith('live=')),
+      seen.join(', '),
+    );
+    check(
+      'and paints what it emitted, with the value it was given unchanged',
+      fill() !== before,
+      `${before} → ${fill()}`,
+    );
+    const last = seen
+      .filter((s) => s.startsWith('live='))
+      .pop()
+      .split('=')[1];
     check(
       'the same colour, not an older one',
       fill().replace(/\s/g, '').includes(last.replace(/\s/g, '')),
-      `${fill()} vs ${last}`
+      `${fill()} vs ${last}`,
     );
-    await act(async () => { drag('pointerup', 0.3, 0.7); });
+    await act(async () => {
+      drag('pointerup', 0.3, 0.7);
+    });
   }
 
   if (failures.length) {

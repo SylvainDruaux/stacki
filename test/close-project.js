@@ -23,7 +23,9 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
+  if (!condition) {
+    failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  }
 };
 const settle = (ms = 30) => new Promise((r) => setTimeout(r, ms));
 
@@ -58,7 +60,11 @@ const settle = (ms = 30) => new Promise((r) => setTimeout(r, ms));
   global.getComputedStyle = dom.window.getComputedStyle;
   global.requestAnimationFrame = (fn) => setTimeout(fn, 0);
   global.cancelAnimationFrame = clearTimeout;
-  global.ResizeObserver = class { observe() {} unobserve() {} disconnect() {} };
+  global.ResizeObserver = class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  };
   global.MutationObserver = dom.window.MutationObserver;
   global.WebGLRenderingContext = dom.window.WebGLRenderingContext || class {};
   dom.window.WebGLRenderingContext = global.WebGLRenderingContext;
@@ -66,7 +72,11 @@ const settle = (ms = 30) => new Promise((r) => setTimeout(r, ms));
   dom.window.WebGL2RenderingContext = global.WebGL2RenderingContext;
   dom.window.HTMLCanvasElement.prototype.getContext = () => null;
   dom.window.ResizeObserver = global.ResizeObserver;
-  dom.window.matchMedia = () => ({ matches: false, addEventListener() {}, removeEventListener() {} });
+  dom.window.matchMedia = () => ({
+    matches: false,
+    addEventListener() {},
+    removeEventListener() {},
+  });
   global.IS_REACT_ACT_ENVIRONMENT = true;
 
   // What the app asked main to do. `reloads` is the window starting over, which
@@ -109,7 +119,7 @@ const settle = (ms = 30) => new Promise((r) => setTimeout(r, ms));
           : typeof prop === 'string' && prop.startsWith('on')
             ? () => () => {}
             : noop,
-    }
+    },
   );
   dom.window.avb = bridge;
   global.avb = bridge;
@@ -130,7 +140,9 @@ const settle = (ms = 30) => new Promise((r) => setTimeout(r, ms));
 
   const fire = async (channel, ...args) => {
     const cb = menu.get(channel);
-    if (!cb) {return false;}
+    if (!cb) {
+      return false;
+    }
     await act(async () => {
       await cb(...args);
       await settle(40);
@@ -148,7 +160,6 @@ const settle = (ms = 30) => new Promise((r) => setTimeout(r, ms));
   await fire('closeProject');
   check('closing with no project open does nothing', closed.length === 0, JSON.stringify(closed));
 
-
   // --- opening one from the menu when none is open ----------------------------------
   // This is the welcome screen's own button by another route: there is nothing
   // to let go of, so nothing reloads.
@@ -161,59 +172,87 @@ const settle = (ms = 30) => new Promise((r) => setTimeout(r, ms));
   check('closing tells main to let the project go', closed.length === 1, JSON.stringify(closed));
   check('with nothing to open next', closed[0] === null, JSON.stringify(closed));
 
-
   // --- switching to another one ---------------------------------------------------------
   // The reload is what lets go, so the project being opened has to be handed
   // over BEFORE it — main holds it for the window that comes back.
   dialogAnswer = { projectPath: '/projects/third' };
   await fire('openProject');
   check('switching lets the old project go', closed.length === 2, JSON.stringify(closed));
-  check('and hands over the one to open next', closed[1] === '/projects/third', JSON.stringify(closed));
+  check(
+    'and hands over the one to open next',
+    closed[1] === '/projects/third',
+    JSON.stringify(closed),
+  );
   check(
     'without opening it in the window that is going away',
     !opened.includes('/projects/third'),
-    opened.join()
+    opened.join(),
   );
 
   // --- a dialog nobody answered ----------------------------------------------------------
   dialogAnswer = null;
   await fire('openProject');
-  check('cancelling the picker leaves the project alone', closed.length === 2, JSON.stringify(closed));
-
+  check(
+    'cancelling the picker leaves the project alone',
+    closed.length === 2,
+    JSON.stringify(closed),
+  );
 
   // --- what main does with it -------------------------------------------------------------
   const main = fs.readFileSync(path.join(__dirname, '..', 'dist', 'electron', 'main.js'), 'utf8');
-  check('the File menu offers a way in', /label: 'Open Project…'/.test(main), 'no Open Project item');
+  check(
+    'the File menu offers a way in',
+    /label: 'Open Project…'/.test(main),
+    'no Open Project item',
+  );
   check('and a way out', /label: 'Close Project'/.test(main), 'no Close Project item');
-  const close = main.slice(main.indexOf("ipcMain.handle('project:close'"), main.indexOf("app.on('window-all-closed'"));
+  const close = main.slice(
+    main.indexOf("ipcMain.handle('project:close'"),
+    main.indexOf("app.on('window-all-closed'"),
+  );
   check('letting go stops the dev server', /stopDevServer\(\)/.test(close), close.slice(0, 200));
-  check('and the shells, which outlive a window', /cleanupTerminals\(\)/.test(close), close.slice(0, 200));
+  check(
+    'and the shells, which outlive a window',
+    /cleanupTerminals\(\)/.test(close),
+    close.slice(0, 200),
+  );
   check('and the watcher', /stopWatchingProject\(\)/.test(close), close.slice(0, 200));
-  check('and puts the project out of reach', /openProjectRoot = null/.test(close), close.slice(0, 200));
+  check(
+    'and puts the project out of reach',
+    /openProjectRoot = null/.test(close),
+    close.slice(0, 200),
+  );
   check(
     'and starts the window over, which is what lets the renderer go',
     /mainWindow\?\.webContents\.reload\(\)/.test(close),
-    'the next project opens into the last one’s state'
+    'the next project opens into the last one’s state',
   );
   check(
     'the project to open next is consumed as it is handed over',
     /const asked = pendingProject;\s*\n\s*pendingProject = null;/.test(main),
-    'a pending project would be opened again on the next reload'
+    'a pending project would be opened again on the next reload',
   );
   check(
     'and a window somebody CLOSED forgets what it had',
     /mainWindow\.on\('closed', \(\) => \{\s*\n\s*openProjectRoot = null;/.test(main),
-    'the next window comes back holding the last project'
+    'the next window comes back holding the last project',
   );
 
   const preload = fs.readFileSync(
     path.join(__dirname, '..', 'dist', 'electron', 'preload.js'),
     'utf8',
   );
-  check('the app can ask for both', /closeProject: invoke\('project:close'\)/.test(preload) && /pendingProject: invoke\('project:pending'\)/.test(preload), 'the bridge is missing one');
+  check(
+    'the app can ask for both',
+    /closeProject: invoke\('project:close'\)/.test(preload) &&
+      /pendingProject: invoke\('project:pending'\)/.test(preload),
+    'the bridge is missing one',
+  );
 
   if (failures.length) {
-    console.error(`\nclose-project: ${failures.length} failed, ${checked - failures.length} passed\n`);
+    console.error(
+      `\nclose-project: ${failures.length} failed, ${checked - failures.length} passed\n`,
+    );
     console.error(failures.join('\n') + '\n');
     process.exit(1);
   }

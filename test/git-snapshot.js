@@ -27,7 +27,9 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
+  if (!condition) {
+    failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  }
 };
 
 const git = (cwd, args) =>
@@ -37,7 +39,9 @@ const git = (cwd, args) =>
         err.stdout = stdout;
         err.stderr = stderr;
         reject(err);
-      } else {resolve({ stdout: String(stdout), stderr: String(stderr) });}
+      } else {
+        resolve({ stdout: String(stdout), stderr: String(stderr) });
+      }
     });
   });
 
@@ -153,7 +157,7 @@ const caught = async (fn) => {
     await snap.commit(git, { projectPath: dir, message: 'base' });
     write(dir, 'a.txt', 'y\n');
     const { error } = await caught(() =>
-      snap.commit(git, { projectPath: dir, message: 'nothing', paths: [] })
+      snap.commit(git, { projectPath: dir, message: 'nothing', paths: [] }),
     );
     // An empty list is a mistake, not "commit everything" — the difference
     // between the two is the whole feature.
@@ -193,7 +197,11 @@ const caught = async (fn) => {
       ref: first,
       path: 'src/pages/later.astro',
     });
-    check('a file that did not exist yet is refused', missing.ok === false, JSON.stringify(missing));
+    check(
+      'a file that did not exist yet is refused',
+      missing.ok === false,
+      JSON.stringify(missing),
+    );
     check('and explained', /added later/i.test(missing.message || ''), missing.message);
     check('without creating it', !exists(dir, 'src/pages/later.astro'));
   }
@@ -211,19 +219,26 @@ const caught = async (fn) => {
 
     const r = await snap.restoreProject(git, { projectPath: dir, ref: first });
     check('the project goes back', r.ok === true, JSON.stringify(r));
-    check('files go back to what they said', read(dir, 'keep.txt') === 'v1\n', read(dir, 'keep.txt'));
+    check(
+      'files go back to what they said',
+      read(dir, 'keep.txt') === 'v1\n',
+      read(dir, 'keep.txt'),
+    );
     // THE case. A checkout by pathspec leaves this file behind, and `clean`
     // will not remove it because it is tracked — so "how it was" would be the
     // old project plus a file that did not exist then.
     check(
       'a file added afterwards is gone',
       !exists(dir, 'added-later.txt'),
-      'added-later.txt is still on disk — this is the old tree plus a newer file'
+      'added-later.txt is still on disk — this is the old tree plus a newer file',
     );
     // The branch does not move: going back is itself something to come back
     // from, and moving the branch would silently drop every commit since.
     check('history is not rewritten', (await sh(dir, 'log', '-1', '--format=%s')) === 'two');
-    check('and the difference is visible as changes', (await sh(dir, 'status', '--porcelain')) !== '');
+    check(
+      'and the difference is visible as changes',
+      (await sh(dir, 'status', '--porcelain')) !== '',
+    );
   }
 
   // --- Going back over unsaved work ----------------------------------------
@@ -239,7 +254,9 @@ const caught = async (fn) => {
 
     // With no way to park it, this must refuse rather than write over work
     // that exists nowhere else.
-    const { error } = await caught(() => snap.restoreProject(git, { projectPath: dir, ref: first }));
+    const { error } = await caught(() =>
+      snap.restoreProject(git, { projectPath: dir, ref: first }),
+    );
     check('unsaved work with nowhere to go stops it', !!error, error);
     check('and the work is untouched', read(dir, 'a.txt') === 'work in progress\n');
 
@@ -262,7 +279,9 @@ const caught = async (fn) => {
     check('the work is recoverable', (await sh(dir, 'stash', 'list')).includes('test-park'));
   }
 
-  for (const dir of cleanup) {fs.rmSync(dir, { recursive: true, force: true });}
+  for (const dir of cleanup) {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
 
   if (failures.length) {
     console.error(`git-snapshot: ${failures.length} of ${checked} failed\n${failures.join('\n')}`);

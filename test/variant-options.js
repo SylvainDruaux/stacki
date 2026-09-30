@@ -30,7 +30,9 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
+  if (!condition) {
+    failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  }
 };
 
 // The shape from the report, trimmed to the props it turns on.
@@ -104,10 +106,27 @@ const BUTTON = [
   global.requestAnimationFrame = dom.window.requestAnimationFrame.bind(dom.window);
   global.cancelAnimationFrame = dom.window.cancelAnimationFrame.bind(dom.window);
   global.IS_REACT_ACT_ENVIRONMENT = true;
-  dom.window.ResizeObserver = class { observe() {} unobserve() {} disconnect() {} };
+  dom.window.ResizeObserver = class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  };
   global.ResizeObserver = dom.window.ResizeObserver;
-  dom.window.Range.prototype.getBoundingClientRect = () => ({ x: 0, y: 0, width: 0, height: 0, top: 0, left: 0, right: 0, bottom: 0 });
-  dom.window.Range.prototype.getClientRects = () => ({ length: 0, item: () => null, [Symbol.iterator]: function* () {} });
+  dom.window.Range.prototype.getBoundingClientRect = () => ({
+    x: 0,
+    y: 0,
+    width: 0,
+    height: 0,
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  });
+  dom.window.Range.prototype.getClientRects = () => ({
+    length: 0,
+    item: () => null,
+    [Symbol.iterator]: function* () {},
+  });
 
   const React = require('react');
   const { createRoot } = require('react-dom/client');
@@ -118,11 +137,15 @@ const BUTTON = [
   const parsed = parsePropSchema(BUTTON);
   const schema = Array.isArray(parsed) ? parsed : [...parsed.values()];
 
-  check('the component parses as a union', !!schema.find((f) => f.unions), JSON.stringify(schema.map((f) => f.name)));
+  check(
+    'the component parses as a union',
+    !!schema.find((f) => f.unions),
+    JSON.stringify(schema.map((f) => f.name)),
+  );
   check(
     'and variant knows all four values',
     (schema.find((f) => f.name === 'variant')?.options || []).join() === 'main,play,close,arrow',
-    JSON.stringify(schema.find((f) => f.name === 'variant')?.options)
+    JSON.stringify(schema.find((f) => f.name === 'variant')?.options),
   );
 
   const str = (value) => ({ type: 'string', value });
@@ -142,7 +165,7 @@ const BUTTON = [
           onRenameProp: () => {},
           onOpenCode: () => {},
           onSetText: () => {},
-        })
+        }),
       );
     });
     // The field for one prop, whichever control it drew: the row is labelled
@@ -150,30 +173,46 @@ const BUTTON = [
     const fieldFor = (name) =>
       [...host.querySelectorAll('.props-field')].find((f) =>
         [...f.querySelectorAll('.props-label, label, .props-label-text')].some(
-          (l) => l.textContent.trim().replace(/\s+\{\}$/, '') === name
-        )
+          (l) => l.textContent.trim().replace(/\s+\{\}$/, '') === name,
+        ),
       );
     // What that field is offering, from either control it can be: a two-value
     // switch draws its options as buttons, a longer list opens a dropdown.
     const offered = async (name) => {
       const field = fieldFor(name);
-      if (!field) {return null;}
+      if (!field) {
+        return null;
+      }
       const seg = [...field.querySelectorAll('.props-seg-btn, .seg-btn, button[data-value]')];
-      if (seg.length) {return seg.map((b) => b.textContent.trim());}
+      if (seg.length) {
+        return seg.map((b) => b.textContent.trim());
+      }
       const trigger = field.querySelector('.dd-trigger');
-      if (!trigger) {return null;}
+      if (!trigger) {
+        return null;
+      }
       await act(async () => {
         trigger.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }));
       });
       const list = [...dom.window.document.querySelectorAll('.dd-option-label')].map((o) =>
-        o.textContent.trim()
+        o.textContent.trim(),
       );
       await act(async () => {
-        dom.window.document.dispatchEvent(new dom.window.MouseEvent('mousedown', { bubbles: true }));
+        dom.window.document.dispatchEvent(
+          new dom.window.MouseEvent('mousedown', { bubbles: true }),
+        );
       });
       return list;
     };
-    return { host, written, fieldFor, offered, done: async () => { await act(async () => root.unmount()) } };
+    return {
+      host,
+      written,
+      fieldFor,
+      offered,
+      done: async () => {
+        await act(async () => root.unmount());
+      },
+    };
   };
 
   // --- the report ---------------------------------------------------------------
@@ -185,7 +224,11 @@ const BUTTON = [
     const list = await m.offered('variant');
     check('the variant field is there', list !== null, m.host.textContent.slice(0, 200));
     for (const v of ['main', 'play', 'close', 'arrow']) {
-      check(`a paused play button is still offered ${v}`, (list || []).includes(v), JSON.stringify(list));
+      check(
+        `a paused play button is still offered ${v}`,
+        (list || []).includes(v),
+        JSON.stringify(list),
+      );
     }
     await m.done();
   }
@@ -204,7 +247,11 @@ const BUTTON = [
   {
     const m = await mount({ variant: str('arrow'), direction: str('back') });
     const list = await m.offered('variant');
-    check('an arrow button offers every variant too', (list || []).length === 4, JSON.stringify(list));
+    check(
+      'an arrow button offers every variant too',
+      (list || []).length === 4,
+      JSON.stringify(list),
+    );
     await m.done();
   }
 
@@ -216,7 +263,11 @@ const BUTTON = [
   {
     const m = await mount({ variant: str('play') });
     const list = await m.offered('emphasis');
-    check('a play button is not offered link', !(list || []).includes('link'), JSON.stringify(list));
+    check(
+      'a play button is not offered link',
+      !(list || []).includes('link'),
+      JSON.stringify(list),
+    );
     check('but is offered the two it has', (list || []).length === 2, JSON.stringify(list));
     await m.done();
   }
@@ -243,7 +294,7 @@ const BUTTON = [
         trigger.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }));
       });
       const close = [...dom.window.document.querySelectorAll('.dd-option-label')].find(
-        (o) => o.textContent.trim() === 'close'
+        (o) => o.textContent.trim() === 'close',
       );
       if (!close) {
         check('picking close clears pressed', false, 'close was not in the list');
@@ -252,11 +303,15 @@ const BUTTON = [
           close.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }));
         });
         const patch = m.written[m.written.length - 1] || {};
-        check('picking close writes close', patch.variant?.value === 'close', JSON.stringify(patch));
+        check(
+          'picking close writes close',
+          patch.variant?.value === 'close',
+          JSON.stringify(patch),
+        );
         check(
           'and takes pressed with it, in the same edit',
           'pressed' in patch && patch.pressed === undefined,
-          JSON.stringify(patch)
+          JSON.stringify(patch),
         );
       }
     }
@@ -264,20 +319,25 @@ const BUTTON = [
   }
 
   // --- the rule, stated where it lives -------------------------------------------
-  const rules = fs.readFileSync(path.join(__dirname, '..', 'src', 'panels', 'propRules.ts'), 'utf8');
+  const rules = fs.readFileSync(
+    path.join(__dirname, '..', 'src', 'panels', 'propRules.ts'),
+    'utf8',
+  );
   check(
     'narrowing asks whether the prop chooses the branch',
     /choosesBranch\(union, field\.name\)/.test(rules),
-    'narrowOptions no longer excuses the discriminant'
+    'narrowOptions no longer excuses the discriminant',
   );
   check(
     'and a prop pinned by one branch alone does not count as choosing',
     /pinning > 1/.test(rules),
-    'a single pinned branch would make direction a chooser'
+    'a single pinned branch would make direction a chooser',
   );
 
   if (failures.length) {
-    console.error(`\nvariant-options: ${failures.length} failed, ${checked - failures.length} passed\n`);
+    console.error(
+      `\nvariant-options: ${failures.length} failed, ${checked - failures.length} passed\n`,
+    );
     console.error(failures.join('\n') + '\n');
     process.exit(1);
   }

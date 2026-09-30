@@ -56,13 +56,7 @@ import { assert } from './assert';
 import { LIMITS } from './limits';
 import type { Splice } from './planner';
 import type { ProjectedAttribute, ProjectedNode, Projection } from './source-projection';
-import {
-  byteStringsEqual,
-  toByteSpan,
-  toByteString,
-  type ByteSpan,
-  type ByteString,
-} from './span';
+import { byteStringsEqual, toByteSpan, toByteString, type ByteSpan, type ByteString } from './span';
 
 type ValidProjection = Extract<Projection, { tag: 'valid' }>;
 

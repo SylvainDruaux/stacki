@@ -23,9 +23,7 @@ function align(a: readonly string[], b: readonly string[]): Map<number, number> 
   for (let i = n - 1; i >= 0; i--) {
     for (let j = m - 1; j >= 0; j--) {
       table[i * (m + 1) + j] =
-        a[i] === b[j]
-          ? cell(i + 1, j + 1) + 1
-          : Math.max(cell(i + 1, j), cell(i, j + 1));
+        a[i] === b[j] ? cell(i + 1, j + 1) + 1 : Math.max(cell(i + 1, j), cell(i, j + 1));
     }
   }
   const map = new Map<number, number>();
@@ -128,7 +126,7 @@ function transplant(original: string, before: string, after: string): string {
     // Both sides of the region are mapped by construction (the loops above stop
     // at a mapped line or at an edge); the fallbacks are unreachable.
     const from = start === 0 ? 0 : (toOriginal.get(start - 1) ?? 0) + 1;
-    const to = end === A.length ? O.length : toOriginal.get(end) ?? O.length;
+    const to = end === A.length ? O.length : (toOriginal.get(end) ?? O.length);
     if (to < from) {
       return after;
     }

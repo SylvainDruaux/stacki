@@ -32,10 +32,15 @@ test('the pool never exceeds its job count and keeps input order', async () => {
     const heard = [];
     const outcomes = await runTestPool(commands, options(3), (outcome) => heard.push(outcome.name));
     const names = commands.map((command) => command.name);
-    assert.deepEqual(outcomes.map((outcome) => outcome.name), names);
+    assert.deepEqual(
+      outcomes.map((outcome) => outcome.name),
+      names,
+    );
     assert.equal(heard.length, 8);
     assert.ok(outcomes.every((outcome) => outcome.passed));
-    const seen = fs.readdirSync(marks).filter((name) => name.endsWith('.seen'))
+    const seen = fs
+      .readdirSync(marks)
+      .filter((name) => name.endsWith('.seen'))
       .map((name) => Number(fs.readFileSync(path.join(marks, name), 'utf8')));
     assert.equal(seen.length, 8);
     assert.ok(Math.max(...seen) <= 3, `saw ${Math.max(...seen)} running at once`);
@@ -63,11 +68,13 @@ test('a failing command reports failure with its output; arguments skip the shel
 test('kept output is bounded to the tail', async () => {
   const size = POOL_LIMITS.outputBytesMax + 1024 * 1024;
   const [outcome] = await runTestPool(
-    [{
-      name: 'loud',
-      command: process.execPath,
-      argumentsList: ['-e', `process.stdout.write('x'.repeat(${size})); console.log('END')`],
-    }],
+    [
+      {
+        name: 'loud',
+        command: process.execPath,
+        argumentsList: ['-e', `process.stdout.write('x'.repeat(${size})); console.log('END')`],
+      },
+    ],
     options(1),
     () => {},
   );

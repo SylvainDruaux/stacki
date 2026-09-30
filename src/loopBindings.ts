@@ -16,7 +16,8 @@ import { assert } from '../shared/assert';
 import type { EditorNode } from './pageView';
 import type { Attr } from '../shared/page-node';
 
-const MAP_HEAD_RE = /^([\s\S]+?)\.map\(\s*\(\s*([A-Za-z_$][\w$]*)\s*(?:,\s*([A-Za-z_$][\w$]*)\s*)?\)\s*=>\s*\($/;
+const MAP_HEAD_RE =
+  /^([\s\S]+?)\.map\(\s*\(\s*([A-Za-z_$][\w$]*)\s*(?:,\s*([A-Za-z_$][\w$]*)\s*)?\)\s*=>\s*\($/;
 
 export interface LoopHead {
   readonly data: string;
@@ -36,7 +37,8 @@ export function splitMapHead(head: unknown): LoopHead | null {
 
 // Whole identifier only: `service` but never the `service` in `x.service`
 // (a property of something else) or in `services`.
-const escapeIdentifier = (name: string): string => String(name).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const escapeIdentifier = (name: string): string =>
+  String(name).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const identifierPattern = (name: string, flags?: string): RegExp =>
   new RegExp(`(?<![.\\w$])${escapeIdentifier(name)}(?![\\w$])`, flags);
 const renameIdent = (code: unknown, from: string, to: string): string =>

@@ -6,7 +6,8 @@
  */
 
 .clip-path_component {
-  display: flex; flex-direction: column;
+  display: flex;
+  flex-direction: column;
   gap: var(--space-4);
   width: 100%;
   flex-grow: 1;
@@ -29,27 +30,45 @@
   aspect-ratio: 1 / 1;
   background-color: var(--color-bg-surface-raised);
   background-image:
-    linear-gradient(45deg, rgba(255, 255, 255, 0.06) 25%, transparent 25%, transparent 75%, rgba(255, 255, 255, 0.06) 75%),
-    linear-gradient(45deg, rgba(255, 255, 255, 0.06) 25%, transparent 25%, transparent 75%, rgba(255, 255, 255, 0.06) 75%);
-  background-position: 0 0, 8px 8px;
+    linear-gradient(
+      45deg,
+      rgba(255, 255, 255, 0.06) 25%,
+      transparent 25%,
+      transparent 75%,
+      rgba(255, 255, 255, 0.06) 75%
+    ),
+    linear-gradient(
+      45deg,
+      rgba(255, 255, 255, 0.06) 25%,
+      transparent 25%,
+      transparent 75%,
+      rgba(255, 255, 255, 0.06) 75%
+    );
+  background-position:
+    0 0,
+    8px 8px;
   background-size: 16px 16px;
   user-select: none;
 }
 
 .clip-path_preview {
-  position: absolute; inset: 0;
+  position: absolute;
+  inset: 0;
   background: var(--color-text-primary);
   box-shadow: 0 0 0 100vw color-mix(in srgb, var(--color-text-primary) 90%, black 10%);
 }
 .clip-path_preview.is-code-transitioning {
-  transition: clip-path 400ms cubic-bezier(0.4, 0, 0.2, 1), -webkit-clip-path 400ms cubic-bezier(0.4, 0, 0.2, 1);
+  transition:
+    clip-path 400ms cubic-bezier(0.4, 0, 0.2, 1),
+    -webkit-clip-path 400ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .clip-path_handle {
   --clip-path_handle-color: var(--color-text-primary);
   position: absolute;
   z-index: 2;
-  width: 12px; height: 12px;
+  width: 12px;
+  height: 12px;
   margin: -6px 0 0 -6px;
   border-radius: 50%;
   background: var(--color-text-primary);
@@ -90,7 +109,8 @@
 .clip-path_shape-bounds {
   position: absolute;
   z-index: 1;
-  border: var(--border-width-default) dashed color-mix(in srgb, var(--color-text-primary) 55%, transparent);
+  border: var(--border-width-default) dashed
+    color-mix(in srgb, var(--color-text-primary) 55%, transparent);
   pointer-events: none;
 }
 .clip-path_shape-bounds.is-selected {
@@ -134,30 +154,57 @@
   border-radius: 2px;
 }
 .clip-path_canvas.is-code-transitioning .clip-path_handle {
-  transition: left 400ms cubic-bezier(0.4, 0, 0.2, 1), top 400ms cubic-bezier(0.4, 0, 0.2, 1), transform var(--transition-fast);
+  transition:
+    left 400ms cubic-bezier(0.4, 0, 0.2, 1),
+    top 400ms cubic-bezier(0.4, 0, 0.2, 1),
+    transform var(--transition-fast);
 }
-.clip-path_handle:hover  { transform: scale(1.2); }
-.clip-path_handle:active { cursor: grabbing; transform: scale(1.15); }
+.clip-path_handle:hover {
+  transform: scale(1.2);
+}
+.clip-path_handle:active {
+  cursor: grabbing;
+  transform: scale(1.15);
+}
 .clip-path_handle:focus-visible,
 .clip-path_handle.is-selected,
 .clip-path_handle.is-affected {
   outline: none;
-  width: 16px; height: 16px;
+  width: 16px;
+  height: 16px;
   margin: -8px 0 0 -8px;
   background: var(--clip-path_handle-color);
   border-color: var(--color-text-primary);
   box-shadow: none;
 }
 
-.clip-path_color-center { --clip-path_handle-color: #0c8ce9; }
-.clip-path_color-a { --clip-path_handle-color: #42e87a; }
-.clip-path_color-b { --clip-path_handle-color: #ffb84a; }
-.clip-path_color-c { --clip-path_handle-color: #ff5c7a; }
-.clip-path_color-d { --clip-path_handle-color: #2dd4bf; }
-.clip-path_color-e { --clip-path_handle-color: #2aa8e8; }
-.clip-path_color-f { --clip-path_handle-color: #9fbd00; }
-.clip-path_color-g { --clip-path_handle-color: #ff8a3d; }
-.clip-path_color-h { --clip-path_handle-color: #c084fc; }
+.clip-path_color-center {
+  --clip-path_handle-color: #0c8ce9;
+}
+.clip-path_color-a {
+  --clip-path_handle-color: #42e87a;
+}
+.clip-path_color-b {
+  --clip-path_handle-color: #ffb84a;
+}
+.clip-path_color-c {
+  --clip-path_handle-color: #ff5c7a;
+}
+.clip-path_color-d {
+  --clip-path_handle-color: #2dd4bf;
+}
+.clip-path_color-e {
+  --clip-path_handle-color: #2aa8e8;
+}
+.clip-path_color-f {
+  --clip-path_handle-color: #9fbd00;
+}
+.clip-path_color-g {
+  --clip-path_handle-color: #ff8a3d;
+}
+.clip-path_color-h {
+  --clip-path_handle-color: #c084fc;
+}
 
 .clip-path_code-token,
 .clip-path_code-token * {
@@ -539,7 +586,9 @@
 }
 
 .clip-path_preset-button {
-  display: flex; align-items: center; justify-content: space-between;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   gap: var(--space-4);
   width: 100%;
   height: var(--size-control-lg);
@@ -551,7 +600,9 @@
   font-family: var(--font-family-sans);
   font-size: var(--font-size-md);
   cursor: pointer;
-  transition: background var(--transition-fast), box-shadow var(--transition-fast);
+  transition:
+    background var(--transition-fast),
+    box-shadow var(--transition-fast);
 }
 .clip-path_preset-button:hover {
   background: var(--color-bg-surface-raised);
@@ -562,7 +613,8 @@
 }
 
 .clip-path_preset-value {
-  display: flex; align-items: center;
+  display: flex;
+  align-items: center;
   gap: var(--space-3);
   min-width: 0;
 }
@@ -614,7 +666,8 @@
   left: 0;
   right: 0;
   width: 100%;
-  display: flex; flex-direction: column;
+  display: flex;
+  flex-direction: column;
   gap: var(--space-1);
   max-height: 268px;
   overflow-y: auto;
@@ -629,7 +682,8 @@
 }
 
 .clip-path_preset-option {
-  display: flex; align-items: center;
+  display: flex;
+  align-items: center;
   gap: var(--space-2);
   min-height: var(--size-control-md);
   padding: 0 var(--space-2);
@@ -675,11 +729,14 @@
   background: var(--color-bg-surface);
   color: var(--color-text-tertiary);
   cursor: pointer;
-  transition: background var(--transition-fast), color var(--transition-fast), box-shadow var(--transition-fast);
+  transition:
+    background var(--transition-fast),
+    color var(--transition-fast),
+    box-shadow var(--transition-fast);
 }
 
 .clip-path_shortcuts-button:hover,
-.clip-path_shortcuts-button[aria-expanded="true"] {
+.clip-path_shortcuts-button[aria-expanded='true'] {
   background: var(--color-bg-surface-raised);
   color: var(--color-text-primary);
 }

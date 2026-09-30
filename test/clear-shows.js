@@ -21,7 +21,9 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
+  if (!condition) {
+    failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  }
 };
 
 (async () => {
@@ -54,7 +56,11 @@ const check = (what, condition, detail) => {
   global.requestAnimationFrame = dom.window.requestAnimationFrame.bind(dom.window);
   global.cancelAnimationFrame = dom.window.cancelAnimationFrame.bind(dom.window);
   global.MutationObserver = dom.window.MutationObserver;
-  global.ResizeObserver = class { observe() {} unobserve() {} disconnect() {} };
+  global.ResizeObserver = class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  };
   dom.window.Element.prototype.getBoundingClientRect = function rect() {
     return { x: 0, y: 0, top: 0, left: 0, right: 100, bottom: 20, width: 100, height: 20 };
   };
@@ -89,7 +95,7 @@ const check = (what, condition, detail) => {
           liveSetProp: () => {},
           onProvenance: () => {},
           onSelectSelector: () => {},
-        })
+        }),
       );
     });
   };
@@ -98,7 +104,7 @@ const check = (what, condition, detail) => {
   const field = () => document.querySelector('input[data-prop="width"]');
   const label = () =>
     [...document.querySelectorAll('.u-field-label, .u-field-label-wrap button')].find(
-      (el) => el.textContent.trim() === 'Width'
+      (el) => el.textContent.trim() === 'Width',
     );
   const click = async (el) => {
     await act(async () => {
@@ -111,7 +117,7 @@ const check = (what, condition, detail) => {
   // Option-click is the shortcut for the same Clear the menu offers.
   await act(async () => {
     label().dispatchEvent(
-      new dom.window.MouseEvent('click', { bubbles: true, cancelable: true, altKey: true })
+      new dom.window.MouseEvent('click', { bubbles: true, cancelable: true, altKey: true }),
     );
   });
   check('clearing asks for the property to go', cleared.join() === 'width', cleared.join());
@@ -134,7 +140,7 @@ const check = (what, condition, detail) => {
   const clear = async () => {
     await act(async () => {
       label().dispatchEvent(
-        new dom.window.MouseEvent('click', { bubbles: true, cancelable: true, altKey: true })
+        new dom.window.MouseEvent('click', { bubbles: true, cancelable: true, altKey: true }),
       );
     });
   };
@@ -151,11 +157,7 @@ const check = (what, condition, detail) => {
   width = declared('50rem'); // what the rule below it says
   busy = false;
   await render();
-  check(
-    'and the value that was underneath comes up',
-    field()?.value === '50rem',
-    field()?.value
-  );
+  check('and the value that was underneath comes up', field()?.value === '50rem', field()?.value);
 
   // The value the model reports never changed across the save — a clear that
   // turned out to change nothing here (the declaration lives in a rule this
@@ -163,26 +165,45 @@ const check = (what, condition, detail) => {
   // change for the field to notice, and it would sit empty saying the property
   // is gone when it is not.
   await clear();
-  check('a clear that changed nothing empties the field first', field()?.value === '', field()?.value);
+  check(
+    'a clear that changed nothing empties the field first',
+    field()?.value === '',
+    field()?.value,
+  );
   busy = true;
   await render();
   busy = false;
   await render();
-  check('and the unchanged value comes back when the save ends', field()?.value === '50rem', field()?.value);
+  check(
+    'and the unchanged value comes back when the save ends',
+    field()?.value === '50rem',
+    field()?.value,
+  );
 
   // Typing is still nobody else's business.
-  await act(async () => { field().focus(); });
   await act(async () => {
-    const setter = Object.getOwnPropertyDescriptor(dom.window.HTMLInputElement.prototype, 'value').set;
+    field().focus();
+  });
+  await act(async () => {
+    const setter = Object.getOwnPropertyDescriptor(
+      dom.window.HTMLInputElement.prototype,
+      'value',
+    ).set;
     setter.call(field(), '12px');
     field().dispatchEvent(new dom.window.Event('input', { bubbles: true }));
   });
   width = declared('80rem');
   await render();
-  check('a model that changes under a field being typed in does not take it over', field()?.value === '12px', field()?.value);
+  check(
+    'a model that changes under a field being typed in does not take it over',
+    field()?.value === '12px',
+    field()?.value,
+  );
 
   if (failures.length) {
-    console.error(`\nclear-shows: ${failures.length} failed, ${checked - failures.length} passed\n`);
+    console.error(
+      `\nclear-shows: ${failures.length} failed, ${checked - failures.length} passed\n`,
+    );
     console.error(failures.join('\n') + '\n');
     process.exit(1);
   }

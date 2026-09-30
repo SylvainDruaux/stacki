@@ -12,57 +12,63 @@
 // Works with any unit (px, ch, cqw, cqh, em, vw, vh, svh, lvh, %, …) and no unit
 // (line-height, font-weight, …) — the unit only matters for rem's fine step.
 
-import type { KeyboardEvent } from 'react'
+import type { KeyboardEvent } from 'react';
 
-export type StepMode = 'whole' | 'ten' | 'fine'
+export type StepMode = 'whole' | 'ten' | 'fine';
 
 /** A number and the unit glued to it, located in the value string that holds it. */
 export type NumberRun = {
   /** First character of the number (its sign, if any). */
-  start: number
+  start: number;
   /** One past the number — where the unit begins. */
-  numEnd: number
+  numEnd: number;
   /** One past the unit; `numEnd` when the number is bare. */
-  end: number
+  end: number;
   /** The number as authored (`-1.5`, `.75`), not yet parsed. */
-  raw: string
+  raw: string;
   /** The trailing unit, `''` when bare. */
-  unit: string
-}
+  unit: string;
+};
 
-const ROOT_PX = 16
+const ROOT_PX = 16;
 // A number plus its optional unit (`1.8rem`, `50%`, `10ch`, `1.5`) — captured as
 // two groups so the caret can sit anywhere in the number OR the unit to step it.
-const NUMBER_UNIT_RE = /([-+]?(?:\d+\.?\d*|\.\d+))([a-zA-Z%]*)/g
+const NUMBER_UNIT_RE = /([-+]?(?:\d+\.?\d*|\.\d+))([a-zA-Z%]*)/g;
 
 function stepSizeFor(mode: StepMode, unit: string): number {
-  if (mode === 'ten') {return 10}
-  if (mode === 'whole') {return 1}
+  if (mode === 'ten') {
+    return 10;
+  }
+  if (mode === 'whole') {
+    return 1;
+  }
   // Fine step (Alt): rem keeps a 1px-equivalent nudge; every other unit steps 0.1.
-  if (unit === 'rem') {return 1 / ROOT_PX}
-  return 0.1
+  if (unit === 'rem') {
+    return 1 / ROOT_PX;
+  }
+  return 0.1;
 }
 
 // Next multiple of `step` strictly past `value` in the given direction.
 function snapStep(value: number, step: number, dir: 1 | -1): number {
-  const q = value / step
-  const raw = dir > 0 ? (Math.floor(q + 1e-9) + 1) * step : (Math.ceil(q - 1e-9) - 1) * step
-  return Math.round(raw * 1e5) / 1e5 // shed float dust (0.1 + 0.2 …)
+  const q = value / step;
+  const raw = dir > 0 ? (Math.floor(q + 1e-9) + 1) * step : (Math.ceil(q - 1e-9) - 1) * step;
+  return Math.round(raw * 1e5) / 1e5; // shed float dust (0.1 + 0.2 …)
 }
 
 /** Every number-plus-unit run in the value, left to right. */
 function numberRuns(text: string): NumberRun[] {
-  NUMBER_UNIT_RE.lastIndex = 0
-  const runs: NumberRun[] = []
-  let match: RegExpExecArray | null
+  NUMBER_UNIT_RE.lastIndex = 0;
+  const runs: NumberRun[] = [];
+  let match: RegExpExecArray | null;
   while ((match = NUMBER_UNIT_RE.exec(text))) {
-    const start = match.index
-    const raw = match[1] ?? ''
-    const unit = match[2] ?? ''
-    const numEnd = start + raw.length
-    runs.push({ start, numEnd, end: numEnd + unit.length, raw, unit })
+    const start = match.index;
+    const raw = match[1] ?? '';
+    const unit = match[2] ?? '';
+    const numEnd = start + raw.length;
+    runs.push({ start, numEnd, end: numEnd + unit.length, raw, unit });
   }
-  return runs
+  return runs;
 }
 
 /**
@@ -72,17 +78,28 @@ function numberRuns(text: string): NumberRun[] {
  * below it. Stepping past a floor and letting the write clamp it would leave the
  * field showing a number the page never took.
  */
-export function stepNumberAtCaret(text: string, caret: number, dir: 1 | -1, mode: StepMode, min?: number): { text: string; caret: number } | null {
-  const hit = numberRuns(text).find((run) => caret >= run.start && caret <= run.end)
-  if (!hit) {return null}
-  const num = Number.parseFloat(hit.raw)
-  if (!Number.isFinite(num)) {return null}
-  const stepped = snapStep(num, stepSizeFor(mode, hit.unit.toLowerCase()), dir)
-  const nextStr = String(min != null && stepped < min ? min : stepped)
+export function stepNumberAtCaret(
+  text: string,
+  caret: number,
+  dir: 1 | -1,
+  mode: StepMode,
+  min?: number,
+): { text: string; caret: number } | null {
+  const hit = numberRuns(text).find((run) => caret >= run.start && caret <= run.end);
+  if (!hit) {
+    return null;
+  }
+  const num = Number.parseFloat(hit.raw);
+  if (!Number.isFinite(num)) {
+    return null;
+  }
+  const stepped = snapStep(num, stepSizeFor(mode, hit.unit.toLowerCase()), dir);
+  const nextStr = String(min != null && stepped < min ? min : stepped);
   // Keep the caret where it was: end of the new number if it was in the number,
   // else shift it along with the unit by the number's length change.
-  const nextCaret = caret <= hit.numEnd ? hit.start + nextStr.length : caret + (nextStr.length - hit.raw.length)
-  return { text: text.slice(0, hit.start) + nextStr + text.slice(hit.numEnd), caret: nextCaret }
+  const nextCaret =
+    caret <= hit.numEnd ? hit.start + nextStr.length : caret + (nextStr.length - hit.raw.length);
+  return { text: text.slice(0, hit.start) + nextStr + text.slice(hit.numEnd), caret: nextCaret };
 }
 
 // ───────────────────────────── Pointer scrubbing ─────────────────────────────
@@ -91,25 +108,66 @@ export function stepNumberAtCaret(text: string, caret: number, dir: 1 | -1, mode
 // they're on this list — which is what keeps the scrub off `#3366ff` (unit "ff") and
 // `translate3d` (unit "d"), where dragging would corrupt the value rather than edit it.
 const SCRUB_UNITS = new Set([
-  '', '%',
-  'px', 'em', 'rem', 'ex', 'ch', 'cap', 'ic', 'lh', 'rlh',
-  'vw', 'vh', 'vi', 'vb', 'vmin', 'vmax',
-  'svw', 'svh', 'lvw', 'lvh', 'dvw', 'dvh',
-  'cqw', 'cqh', 'cqi', 'cqb', 'cqmin', 'cqmax',
-  'cm', 'mm', 'q', 'in', 'pt', 'pc',
-  'deg', 'grad', 'rad', 'turn',
-  's', 'ms', 'hz', 'khz',
-  'dpi', 'dpcm', 'dppx', 'x', 'fr',
-])
+  '',
+  '%',
+  'px',
+  'em',
+  'rem',
+  'ex',
+  'ch',
+  'cap',
+  'ic',
+  'lh',
+  'rlh',
+  'vw',
+  'vh',
+  'vi',
+  'vb',
+  'vmin',
+  'vmax',
+  'svw',
+  'svh',
+  'lvw',
+  'lvh',
+  'dvw',
+  'dvh',
+  'cqw',
+  'cqh',
+  'cqi',
+  'cqb',
+  'cqmin',
+  'cqmax',
+  'cm',
+  'mm',
+  'q',
+  'in',
+  'pt',
+  'pc',
+  'deg',
+  'grad',
+  'rad',
+  'turn',
+  's',
+  'ms',
+  'hz',
+  'khz',
+  'dpi',
+  'dpcm',
+  'dppx',
+  'x',
+  'fr',
+]);
 
 // A run is only a value if nothing glues it to the token on its left. `#` starts a hex
 // colour; a word character or hyphen means we're inside an identifier (`--space-4`,
 // `col-2`) where the digits are part of a name, not a length. A real minus sign is
 // captured into the number itself, so a hyphen here is never a sign.
 function isScrubbable(text: string, run: NumberRun): boolean {
-  const before = text[run.start - 1]
-  if (before !== undefined && /[\w#-]/.test(before)) {return false}
-  return SCRUB_UNITS.has(run.unit.toLowerCase())
+  const before = text[run.start - 1];
+  if (before !== undefined && /[\w#-]/.test(before)) {
+    return false;
+  }
+  return SCRUB_UNITS.has(run.unit.toLowerCase());
 }
 
 /**
@@ -119,21 +177,26 @@ function isScrubbable(text: string, run: NumberRun): boolean {
  * Returns null when the value holds no number worth dragging.
  */
 export function findScrubTarget(text: string, caret: number): NumberRun | null {
-  const runs = numberRuns(text).filter((run) => isScrubbable(text, run))
-  const under = runs.find((run) => caret >= run.start && caret <= run.end)
-  if (under) {return under}
-  let best: NumberRun | null = null
-  let bestDistance = Infinity
-  for (const run of runs) {
-    const distance = caret < run.start ? run.start - caret : caret - run.end
-    if (distance < bestDistance) { bestDistance = distance; best = run }
+  const runs = numberRuns(text).filter((run) => isScrubbable(text, run));
+  const under = runs.find((run) => caret >= run.start && caret <= run.end);
+  if (under) {
+    return under;
   }
-  return best
+  let best: NumberRun | null = null;
+  let bestDistance = Infinity;
+  for (const run of runs) {
+    const distance = caret < run.start ? run.start - caret : caret - run.end;
+    if (distance < bestDistance) {
+      bestDistance = distance;
+      best = run;
+    }
+  }
+  return best;
 }
 
 /** True when a value has anything a scrub could drag — drives the ew-resize cursor. */
 export function hasScrubTarget(text: string): boolean {
-  return findScrubTarget(text, 0) !== null
+  return findScrubTarget(text, 0) !== null;
 }
 
 /**
@@ -144,15 +207,17 @@ export function hasScrubTarget(text: string): boolean {
  * the previous mode happened to leave it.
  */
 export function scrubNumber(text: string, run: NumberRun, steps: number, mode: StepMode): string {
-  const base = Number.parseFloat(run.raw)
-  if (!Number.isFinite(base)) {return text}
-  const next = Math.round((base + steps * stepSizeFor(mode, run.unit.toLowerCase())) * 1e5) / 1e5
-  return text.slice(0, run.start) + String(next) + text.slice(run.numEnd)
+  const base = Number.parseFloat(run.raw);
+  if (!Number.isFinite(base)) {
+    return text;
+  }
+  const next = Math.round((base + steps * stepSizeFor(mode, run.unit.toLowerCase())) * 1e5) / 1e5;
+  return text.slice(0, run.start) + String(next) + text.slice(run.numEnd);
 }
 
 /** The step mode a pointer/key event's modifiers ask for — shared by both gestures. */
 export function stepModeOf(event: { shiftKey: boolean; altKey: boolean }): StepMode {
-  return event.shiftKey ? 'ten' : event.altKey ? 'fine' : 'whole'
+  return event.shiftKey ? 'ten' : event.altKey ? 'fine' : 'whole';
 }
 
 /**
@@ -164,7 +229,15 @@ export function handleArrowStep(
   event: KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>,
   min?: number,
 ): { text: string; caret: number } | null {
-  if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') {return null}
-  const el = event.currentTarget
-  return stepNumberAtCaret(el.value, el.selectionStart ?? el.value.length, event.key === 'ArrowUp' ? 1 : -1, stepModeOf(event), min)
+  if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') {
+    return null;
+  }
+  const el = event.currentTarget;
+  return stepNumberAtCaret(
+    el.value,
+    el.selectionStart ?? el.value.length,
+    event.key === 'ArrowUp' ? 1 : -1,
+    stepModeOf(event),
+    min,
+  );
 }

@@ -86,7 +86,7 @@ export function PropertyType({
   const supported =
     TYPE_CHOICES.some((option) => option.value === type) || literalOptions(type) !== undefined;
   const [mode, setMode] = useState<'dropdown' | 'expression'>(
-    supported ? 'dropdown' : 'expression'
+    supported ? 'dropdown' : 'expression',
   );
   const expression = mode === 'expression';
   const action = expression ? 'Use the type dropdown' : 'Write a type expression';
@@ -132,7 +132,7 @@ export function PropertyType({
 function propertyTypeChoices(type: string): readonly DropdownOption<string>[] {
   // Toggling modes must preserve custom expressions and existing union options.
   const choices = TYPE_CHOICES.map((option) =>
-    option.value === UNION_TYPE && literalOptions(type) ? { ...option, value: type } : option
+    option.value === UNION_TYPE && literalOptions(type) ? { ...option, value: type } : option,
   );
   return choices.some((option) => option.value === type)
     ? choices

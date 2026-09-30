@@ -43,12 +43,34 @@ export interface MergeClash {
 }
 
 export type MergeOutcome =
-  | { readonly ok: true; readonly into: string | null; readonly changed: boolean; readonly resolved?: number }
-  | { readonly ok: false; readonly conflicted: true; readonly from: string | null; readonly branch: string; readonly files: readonly MergeClash[] }
-  | { readonly ok: false; readonly dirty: true; readonly from: string | null; readonly branch: string; readonly files: readonly string[] };
+  | {
+      readonly ok: true;
+      readonly into: string | null;
+      readonly changed: boolean;
+      readonly resolved?: number;
+    }
+  | {
+      readonly ok: false;
+      readonly conflicted: true;
+      readonly from: string | null;
+      readonly branch: string;
+      readonly files: readonly MergeClash[];
+    }
+  | {
+      readonly ok: false;
+      readonly dirty: true;
+      readonly from: string | null;
+      readonly branch: string;
+      readonly files: readonly string[];
+    };
 
 /** One side of a conflicted file, or null when that side deleted it. */
-async function stage(git: Git, projectPath: string, n: number, file: string): Promise<string | null> {
+async function stage(
+  git: Git,
+  projectPath: string,
+  n: number,
+  file: string,
+): Promise<string | null> {
   try {
     return (await git(projectPath, ['show', `:${n}:${file}`])).stdout;
   } catch {
@@ -69,7 +91,15 @@ async function stage(git: Git, projectPath: string, n: number, file: string): Pr
  */
 async function resolveMerge(
   git: Git,
-  { projectPath, branch, choices }: { readonly projectPath: string; readonly branch: string; readonly choices?: Record<string, unknown> },
+  {
+    projectPath,
+    branch,
+    choices,
+  }: {
+    readonly projectPath: string;
+    readonly branch: string;
+    readonly choices?: Record<string, unknown>;
+  },
 ): Promise<MergeOutcome> {
   const into = await currentBranch(git, projectPath);
   try {
@@ -229,7 +259,12 @@ async function mergeBranch(
       const inTheWay = detail
         .split('\n')
         .map((l) => l.trim())
-        .filter((l) => l && !/^(error|Please|Aborting|warning|hint|Updating|Merge with)/i.test(l) && !l.endsWith(':'));
+        .filter(
+          (l) =>
+            l &&
+            !/^(error|Please|Aborting|warning|hint|Updating|Merge with)/i.test(l) &&
+            !l.endsWith(':'),
+        );
       return { ok: false, dirty: true, from: into, branch, files: inTheWay };
     }
     throw new Error(gitErrorDetail(err).trim() || `Could not merge "${branch}" into "${into}".`);
@@ -239,8 +274,7 @@ async function mergeBranch(
 }
 
 export type DeleteOutcome =
-  | { readonly ok: true }
-  | { readonly ok: false; readonly unmerged: true; readonly message: string };
+  { readonly ok: true } | { readonly ok: false; readonly unmerged: true; readonly message: string };
 
 /**
  * Delete `branch`.
@@ -254,7 +288,17 @@ export type DeleteOutcome =
  */
 async function deleteBranch(
   git: Git,
-  { projectPath, branch, force, allowTrunk }: { readonly projectPath: string; readonly branch: string; readonly force?: boolean; readonly allowTrunk?: boolean },
+  {
+    projectPath,
+    branch,
+    force,
+    allowTrunk,
+  }: {
+    readonly projectPath: string;
+    readonly branch: string;
+    readonly force?: boolean;
+    readonly allowTrunk?: boolean;
+  },
 ): Promise<DeleteOutcome> {
   const here = await currentBranch(git, projectPath);
   if (branch === here) {
@@ -300,7 +344,13 @@ async function deleteBranch(
 
 export type SwitchOutcome =
   | { readonly ok: true; readonly from: string; readonly parked: boolean }
-  | { readonly ok: false; readonly blocked: true; readonly from: string; readonly branch: string; readonly files: readonly string[] };
+  | {
+      readonly ok: false;
+      readonly blocked: true;
+      readonly from: string;
+      readonly branch: string;
+      readonly files: readonly string[];
+    };
 
 /**
  * Move to another branch.

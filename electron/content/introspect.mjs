@@ -15,7 +15,7 @@ import { LOADER } from './stub-astro-loaders.mjs';
 import { withMetadata, hasCrossFieldChecks, toJsonSchema } from './schemaTools.mjs';
 
 // Only these carry a body; the same loader over .json or .yaml does not.
-const BODY_EXT = new Set(["md", "mdx", "mdoc", "markdown"]);
+const BODY_EXT = new Set(['md', 'mdx', 'mdoc', 'markdown']);
 
 // The file extensions a glob pattern can match. A pattern ends in its
 // extension, either alone ("*.mdoc") or as a brace group ("**/*.{md,mdx}").
@@ -24,8 +24,8 @@ const extensionsOf = (pattern) =>
     const m = String(p).match(/\.(\{[^}]*\}|[A-Za-z0-9]+)$/);
     if (!m) return [];
     return m[1]
-      .replace(/[{}]/g, "")
-      .split(",")
+      .replace(/[{}]/g, '')
+      .split(',')
       .map((e) => e.trim().toLowerCase())
       .filter(Boolean);
   });

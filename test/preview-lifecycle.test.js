@@ -12,12 +12,18 @@ const dir = path.join(__dirname, '..', 'node_modules', '.stacki-test', 'preview-
 fs.mkdirSync(dir, { recursive: true });
 esbuild.buildSync({
   stdin: {
-    contents: "export { default as PreviewPane, deviceForWidth } from './src/panels/PreviewPane.tsx'; export { hasCanvas, queryCanvas } from './src/canvasQuery.js';",
-    resolveDir: path.join(__dirname, '..'), loader: 'jsx',
+    contents:
+      "export { default as PreviewPane, deviceForWidth } from './src/panels/PreviewPane.tsx'; export { hasCanvas, queryCanvas } from './src/canvasQuery.js';",
+    resolveDir: path.join(__dirname, '..'),
+    loader: 'jsx',
   },
-  outfile: path.join(dir, 'preview.js'), bundle: true, format: 'cjs', platform: 'node',
+  outfile: path.join(dir, 'preview.js'),
+  bundle: true,
+  format: 'cjs',
+  platform: 'node',
   external: ['react', 'react-dom', 'react-dom/client', 'react/jsx-runtime'],
-  loader: { '.css': 'empty' }, logLevel: 'silent',
+  loader: { '.css': 'empty' },
+  logLevel: 'silent',
 });
 
 const settle = () => new Promise((resolve) => setTimeout(resolve, 20));
@@ -29,23 +35,34 @@ test('canvas hover measures and outlines the active copy, then clears on leave',
   const { PreviewPane } = require(path.join(dir, 'preview.js'));
   const root = createRoot(document.getElementById('root'));
   const props = hoverPreviewProps();
-  const act = (action) => React.act(async () => { await action(); await settle(); });
+  const act = (action) =>
+    React.act(async () => {
+      await action();
+      await settle();
+    });
   const render = () => act(() => root.render(React.createElement(PreviewPane, props)));
   try {
     await render();
     const frame = document.querySelector('iframe').contentWindow;
     const tracked = [];
     frame.postMessage = (message) => {
-      if (message.type === 'avb:track') {tracked.push(message.paths);}
+      if (message.type === 'avb:track') {
+        tracked.push(message.paths);
+      }
     };
-    const send = (data, source = frame) => act(() =>
-      window.dispatchEvent(new window.MessageEvent('message', { source, data })),
-    );
-    const boxes = [{ x: 10, y: 30, w: 80, h: 40 }, { x: 10, y: 90, w: 80, h: 40 }];
-    const measure = () => send({
-      type: 'avb:rects', classes: {}, spacing: {},
-      rects: Object.fromEntries(tracked.at(-1).map((nodePath) => [nodePath, boxes])),
-    });
+    const send = (data, source = frame) =>
+      act(() => window.dispatchEvent(new window.MessageEvent('message', { source, data })));
+    const boxes = [
+      { x: 10, y: 30, w: 80, h: 40 },
+      { x: 10, y: 90, w: 80, h: 40 },
+    ];
+    const measure = () =>
+      send({
+        type: 'avb:rects',
+        classes: {},
+        spacing: {},
+        rects: Object.fromEntries(tracked.at(-1).map((nodePath) => [nodePath, boxes])),
+      });
     // The frame announces its rendering first (step 7): hover from any other
     // rendering is not drawn.
     const token = 'a'.repeat(64);
@@ -88,58 +105,115 @@ test('canvas hover measures and outlines the active copy, then clears on leave',
 
 function installHoverDOM() {
   const dom = new JSDOM('<!doctype html><div id="root"></div>', {
-    url: 'http://localhost/', pretendToBeVisual: true,
+    url: 'http://localhost/',
+    pretendToBeVisual: true,
   });
   for (const key of ['window', 'document', 'navigator', 'HTMLElement', 'Element', 'Node']) {
     global[key] = key === 'window' ? dom.window : dom.window[key];
   }
   global.requestAnimationFrame = (callback) => setTimeout(callback, 0);
   global.cancelAnimationFrame = clearTimeout;
-  global.ResizeObserver = class { observe() {} disconnect() {} };
+  global.ResizeObserver = class {
+    observe() {}
+    disconnect() {}
+  };
   global.IS_REACT_ACT_ENVIRONMENT = true;
   return dom;
 }
 
 function hoverPreviewProps() {
   return {
-    devUrl: 'http://localhost:4321', route: '/', devStatus: 'on', device: 'desktop',
-    selPath: '0', navHoverPath: null, focusPath: '2', crumbs: [], onDevice() {},
-    judgeEvent: async () => ({ tag: 'current' }), onStaleEvent() {},
+    devUrl: 'http://localhost:4321',
+    route: '/',
+    devStatus: 'on',
+    device: 'desktop',
+    selPath: '0',
+    navHoverPath: null,
+    focusPath: '2',
+    crumbs: [],
+    onDevice() {},
+    judgeEvent: async () => ({ tag: 'current' }),
+    onStaleEvent() {},
     overlayInfo: () => ({
-      label: 'Card', kind: 'element', tag: 'div', nodeKind: 'element',
-      astroAsset: false, dynamicTag: false, isLayout: false, bound: false,
+      label: 'Card',
+      kind: 'element',
+      tag: 'div',
+      nodeKind: 'element',
+      astroAsset: false,
+      dynamicTag: false,
+      isLayout: false,
+      bound: false,
     }),
   };
 }
 
 test('preview owns only mounted frames and cleans canceled/unmounted drags', async () => {
-  const dom = new JSDOM('<!doctype html><div id="root"></div>', { url: 'http://localhost/', pretendToBeVisual: true });
+  const dom = new JSDOM('<!doctype html><div id="root"></div>', {
+    url: 'http://localhost/',
+    pretendToBeVisual: true,
+  });
   const { window } = dom;
-  for (const key of ['window', 'document', 'navigator', 'HTMLElement', 'Element', 'Node', 'MutationObserver']) {
+  for (const key of [
+    'window',
+    'document',
+    'navigator',
+    'HTMLElement',
+    'Element',
+    'Node',
+    'MutationObserver',
+  ]) {
     global[key] = key === 'window' ? window : window[key];
   }
   global.getComputedStyle = window.getComputedStyle;
   global.requestAnimationFrame = (fn) => setTimeout(fn, 0);
   global.cancelAnimationFrame = clearTimeout;
-  global.ResizeObserver = class { observe() {} disconnect() {} };
+  global.ResizeObserver = class {
+    observe() {}
+    disconnect() {}
+  };
   window.ResizeObserver = global.ResizeObserver;
   global.IS_REACT_ACT_ENVIRONMENT = true;
   const React = require('react');
   const { createRoot } = require('react-dom/client');
   const { act } = React;
-  const { PreviewPane, deviceForWidth, hasCanvas, queryCanvas } = require(path.join(dir, 'preview.js'));
+  const { PreviewPane, deviceForWidth, hasCanvas, queryCanvas } = require(
+    path.join(dir, 'preview.js'),
+  );
   const root = createRoot(document.getElementById('root'));
   let selected = [];
-  const props = { devUrl: 'http://localhost:4321', route: '/', devStatus: 'on', device: 'desktop', onDevice: (key) => selected.push(key), crumbs: [], selPath: '0', pathScope: '', focusPath: null };
+  const props = {
+    devUrl: 'http://localhost:4321',
+    route: '/',
+    devStatus: 'on',
+    device: 'desktop',
+    onDevice: (key) => selected.push(key),
+    crumbs: [],
+    selPath: '0',
+    pathScope: '',
+    focusPath: null,
+  };
   const render = async (patch = {}) => {
     Object.assign(props, patch);
-    await act(async () => { root.render(React.createElement(PreviewPane, props)); await settle(); });
+    await act(async () => {
+      root.render(React.createElement(PreviewPane, props));
+      await settle();
+    });
   };
-  const send = async (source, data) => act(async () => {
-    window.dispatchEvent(new window.MessageEvent('message', { source, data }));
-    await settle();
-  });
-  const pointer = (target, type, extra = {}) => target.dispatchEvent(new window.MouseEvent(type, { bubbles: true, button: 0, clientX: 100, clientY: 100, ...extra }));
+  const send = async (source, data) =>
+    act(async () => {
+      window.dispatchEvent(new window.MessageEvent('message', { source, data }));
+      await settle();
+    });
+  const pointer = (target, type, extra = {}) =>
+    target.dispatchEvent(
+      new window.MouseEvent(type, {
+        bubbles: true,
+        button: 0,
+        clientX: 100,
+        clientY: 100,
+        ...extra,
+      }),
+    );
   await render();
   assert.equal(hasCanvas(), true);
   const oldFrame = document.querySelector('iframe').contentWindow;
@@ -147,20 +221,48 @@ test('preview owns only mounted frames and cleans canceled/unmounted drags', asy
   oldFrame.postMessage = (message) => navigationMessages.push(message);
   const scrolls = () => navigationMessages.filter((message) => message.type === 'avb:scroll-to');
   await render({ selPath: '0.1', pathScope: '', focusPath: null });
-  assert.equal(scrolls().at(-1)?.path, '0.1', 'ordinary selections still reveal the selected element');
+  assert.equal(
+    scrolls().at(-1)?.path,
+    '0.1',
+    'ordinary selections still reveal the selected element',
+  );
   navigationMessages.length = 0;
-  await render({ selPath: 'src/components/Card.astro|0', pathScope: 'src/components/Card.astro|', focusPath: '0.1' });
+  await render({
+    selPath: 'src/components/Card.astro|0',
+    pathScope: 'src/components/Card.astro|',
+    focusPath: '0.1',
+  });
   assert.equal(scrolls().length, 0, 'entering a component retains the canvas scroll position');
-  await render({ selPath: 'src/components/Button.astro|0', pathScope: 'src/components/Button.astro|', focusPath: '0.1' });
-  assert.equal(scrolls().length, 0, 'entering a nested component retains scroll even when the outer focus is unchanged');
-  await render({ selPath: 'src/components/Card.astro|0', pathScope: 'src/components/Card.astro|', focusPath: '0.1' });
+  await render({
+    selPath: 'src/components/Button.astro|0',
+    pathScope: 'src/components/Button.astro|',
+    focusPath: '0.1',
+  });
+  assert.equal(
+    scrolls().length,
+    0,
+    'entering a nested component retains scroll even when the outer focus is unchanged',
+  );
+  await render({
+    selPath: 'src/components/Card.astro|0',
+    pathScope: 'src/components/Card.astro|',
+    focusPath: '0.1',
+  });
   assert.equal(scrolls().length, 0, 'closing a nested component retains scroll');
   await render({ selPath: 'src/components/Card.astro|0.1' });
-  assert.equal(scrolls().at(-1)?.path, 'src/components/Card.astro|0.1', 'selections within the open component still reveal elements');
+  assert.equal(
+    scrolls().at(-1)?.path,
+    'src/components/Card.astro|0.1',
+    'selections within the open component still reveal elements',
+  );
   navigationMessages.length = 0;
   await render({ selPath: '0', pathScope: '', focusPath: null });
   assert.equal(scrolls().length, 0, 'closing the component retains scroll');
-  assert.equal(document.querySelector('iframe').contentWindow, oldFrame, 'component navigation retains the same loaded frame');
+  assert.equal(
+    document.querySelector('iframe').contentWindow,
+    oldFrame,
+    'component navigation retains the same loaded frame',
+  );
   const pendingQuery = queryCanvas('0');
   await render({ device: 'canvas' });
   assert.equal(hasCanvas(), false);
@@ -180,28 +282,53 @@ test('preview owns only mounted frames and cleans canceled/unmounted drags', asy
   assert.equal(document.querySelectorAll('.canvas-frame')[2].style.height, '1015px');
   await render({ refreshKey: 1 });
   assert.equal(document.querySelector('.canvas-frame').style.height, '900px');
-  await act(async () => { pointer(document.querySelector('.canvas-view'), 'pointerdown'); await settle(); });
+  await act(async () => {
+    pointer(document.querySelector('.canvas-view'), 'pointerdown');
+    await settle();
+  });
   assert.ok(document.querySelector('.canvas-view').classList.contains('panning'));
-  await act(async () => { pointer(window, 'pointercancel'); await settle(); });
+  await act(async () => {
+    pointer(window, 'pointercancel');
+    await settle();
+  });
   assert.equal(document.querySelector('.canvas-view').classList.contains('panning'), false);
   await render({ device: 'tablet' });
   assert.equal(hasCanvas(), true);
   const replacementCalls = [];
   await render({ onDevice: (key) => replacementCalls.push(key) });
-  await act(async () => { window.dispatchEvent(new window.KeyboardEvent('keydown', { key: '3' })); await settle(); });
+  await act(async () => {
+    window.dispatchEvent(new window.KeyboardEvent('keydown', { key: '3' }));
+    await settle();
+  });
   assert.deepEqual(replacementCalls, ['phone']);
   assert.deepEqual(selected, []);
   document.body.style.cursor = 'crosshair';
-  await act(async () => { pointer(document.querySelector('.rz-e'), 'pointerdown'); await settle(); });
+  await act(async () => {
+    pointer(document.querySelector('.rz-e'), 'pointerdown');
+    await settle();
+  });
   assert.equal(document.body.style.cursor, 'col-resize');
-  await act(async () => { window.dispatchEvent(new window.Event('blur')); await settle(); });
+  await act(async () => {
+    window.dispatchEvent(new window.Event('blur'));
+    await settle();
+  });
   assert.equal(document.body.style.cursor, 'crosshair');
-  await act(async () => { pointer(document.querySelector('.rz-s'), 'pointerdown'); await settle(); });
+  await act(async () => {
+    pointer(document.querySelector('.rz-s'), 'pointerdown');
+    await settle();
+  });
   assert.equal(document.body.style.cursor, 'row-resize');
   await act(async () => root.unmount());
   assert.equal(document.body.style.cursor, 'crosshair');
   assert.equal(hasCanvas(), false);
-  assert.deepEqual([767, 768, 1023, 1024, NaN, 0].map(deviceForWidth), ['phone', 'tablet', 'tablet', 'desktop', null, null]);
+  assert.deepEqual([767, 768, 1023, 1024, NaN, 0].map(deviceForWidth), [
+    'phone',
+    'tablet',
+    'tablet',
+    'desktop',
+    null,
+    null,
+  ]);
   dom.window.close();
 });
 
@@ -214,7 +341,9 @@ test('custom widths preserve layout size, scale to fit, and reset with device co
   const observers = [];
   let containerWidth = 1_024;
   global.ResizeObserver = class {
-    constructor(callback) { observers.push(callback); }
+    constructor(callback) {
+      observers.push(callback);
+    }
     observe() {}
     disconnect() {}
   };
@@ -223,7 +352,11 @@ test('custom widths preserve layout size, scale to fit, and reset with device co
     clientHeight: { configurable: true, get: () => 700 },
   });
   const root = createRoot(document.getElementById('root'));
-  const act = (action) => React.act(async () => { await action(); await settle(); });
+  const act = (action) =>
+    React.act(async () => {
+      await action();
+      await settle();
+    });
   function Preview() {
     const [device, onDevice] = React.useState('desktop');
     return React.createElement(PreviewPane, { ...hoverPreviewProps(), device, onDevice });
@@ -260,13 +393,23 @@ test('custom widths preserve layout size, scale to fit, and reset with device co
       offsetWidth: { get: () => Number.parseFloat(sized.style.width) },
       offsetHeight: { get: () => Number.parseFloat(sized.style.height) },
     });
-    await act(() => document.querySelector('.rz-e').dispatchEvent(
-      new window.MouseEvent('pointerdown', { bubbles: true, button: 0, clientX: 800 }),
-    ));
-    await act(() => window.dispatchEvent(
-      new window.MouseEvent('pointerup', { bubbles: true, button: 0, clientX: 880 }),
-    ));
-    assert.equal(sized.style.width, '2400px', 'Dragging accounts for scale without capping at the panel');
+    await act(() =>
+      document
+        .querySelector('.rz-e')
+        .dispatchEvent(
+          new window.MouseEvent('pointerdown', { bubbles: true, button: 0, clientX: 800 }),
+        ),
+    );
+    await act(() =>
+      window.dispatchEvent(
+        new window.MouseEvent('pointerup', { bubbles: true, button: 0, clientX: 880 }),
+      ),
+    );
+    assert.equal(
+      sized.style.width,
+      '2400px',
+      'Dragging accounts for scale without capping at the panel',
+    );
     await act(() => document.querySelector('[title="Phone (375px) — 3"]').click());
     assert.equal(sized.style.width, '375px');
     assert.match(sized.style.transform, /scale\(1\)/);

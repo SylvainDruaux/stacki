@@ -42,12 +42,29 @@ const GOOD: readonly (readonly [object, object])[] = [
   [element, { tag: 'insert-node', placement: 'after', source: '<p>Hi</p>' }],
   [element, { tag: 'remove-node' }],
   [element, { tag: 'move-node', destination: { ...element, path: [0] }, placement: 'first-child' }],
-  [loop, { tag: 'rename-binding', from: 'item', to: 'entry', sites: [{ start: 12, end: 16 }, { start: 40, end: 44 }] }],
-  [element, { tag: 'set-inline-style', property: '--gap', declaration: { tag: 'set', value: '1rem' } }],
+  [
+    loop,
+    {
+      tag: 'rename-binding',
+      from: 'item',
+      to: 'entry',
+      sites: [
+        { start: 12, end: 16 },
+        { start: 40, end: 44 },
+      ],
+    },
+  ],
+  [
+    element,
+    { tag: 'set-inline-style', property: '--gap', declaration: { tag: 'set', value: '1rem' } },
+  ],
   [element, { tag: 'set-inline-style', property: 'color', declaration: { tag: 'remove' } }],
   [documentAnchor, { tag: 'apply-code-patch', hunks: [{ span: { start: 3, end: 5 }, text: 'x' }] }],
   [documentAnchor, { tag: 'revert-splices', hunks: [{ span: { start: 3, end: 5 }, text: 'x' }] }],
-  [frontmatter, { tag: 'edit-frontmatter-slot', slot: { start: 4, end: 20 }, text: 'const a = 1;' }],
+  [
+    frontmatter,
+    { tag: 'edit-frontmatter-slot', slot: { start: 4, end: 20 }, text: 'const a = 1;' },
+  ],
   [documentAnchor, { tag: 'rewrite-text', hunks: [{ span: { start: 3, end: 5 }, text: 'x' }] }],
   // Step 9.
   [element, { tag: 'rename-tag', from: 'div', to: 'Card' }],
@@ -102,12 +119,39 @@ test('malformed intents fail at the field that is wrong', () => {
     [wire(element, { tag: 'teleport' }), /unknown operation/],
     [wire(element, { ...set, name: 'bad name' }), /expected an attribute name/],
     [wire(element, { ...set, value: { type: 'spread', value: 'x' } }), /value.type: unknown/],
-    [wire(element, { ...set, value: { type: 'string', value: 'x'.repeat(LIMITS.attrCharsMax + 1) } }), /exceeds/],
+    [
+      wire(element, {
+        ...set,
+        value: { type: 'string', value: 'x'.repeat(LIMITS.attrCharsMax + 1) },
+      }),
+      /exceeds/,
+    ],
     [wire(element, { tag: 'insert-node', placement: 'inside', source: '' }), /placement: unknown/],
-    [wire(element, { tag: 'set-inline-style', property: 'Color!', declaration: { tag: 'remove' } }), /CSS property/],
-    [wire(element, { tag: 'set-inline-style', property: 'color', declaration: { tag: 'toggle' } }), /declaration.tag/],
-    [wire(loop, { tag: 'rename-binding', from: 'item', to: 'item', sites: [{ start: 12, end: 16 }] }), /must change/],
-    [wire(loop, { tag: 'rename-binding', from: 'it em', to: 'x', sites: [] }), /expected an identifier/],
+    [
+      wire(element, {
+        tag: 'set-inline-style',
+        property: 'Color!',
+        declaration: { tag: 'remove' },
+      }),
+      /CSS property/,
+    ],
+    [
+      wire(element, { tag: 'set-inline-style', property: 'color', declaration: { tag: 'toggle' } }),
+      /declaration.tag/,
+    ],
+    [
+      wire(loop, {
+        tag: 'rename-binding',
+        from: 'item',
+        to: 'item',
+        sites: [{ start: 12, end: 16 }],
+      }),
+      /must change/,
+    ],
+    [
+      wire(loop, { tag: 'rename-binding', from: 'it em', to: 'x', sites: [] }),
+      /expected an identifier/,
+    ],
     [wire(documentAnchor, { tag: 'apply-code-patch', hunks: {} }), /hunks: expected array/],
     [wire(element, { tag: 'rename-tag', from: 'div', to: 'my div' }), /expected a tag name/],
     [wire(element, { tag: 'rename-tag', from: 'div', to: 'div' }), /must change the name/],
@@ -137,11 +181,27 @@ test('the operation must fit its anchor', () => {
     [element, { tag: 'insert-frontmatter', source: '---\n---\n' }, /insert-frontmatter cannot/],
     // Step 10 retired the whole-file replacement: no such operation parses.
     [documentAnchor, { tag: 'replace-source', text: '' }, /unknown operation/],
-    [element, { tag: 'apply-code-patch', hunks: [{ span: { start: 0, end: 1 }, text: '' }] }, /apply-code-patch cannot/],
-    [element, { tag: 'rename-binding', from: 'a', to: 'b', sites: [{ start: 12, end: 13 }] }, /rename-binding cannot/],
+    [
+      element,
+      { tag: 'apply-code-patch', hunks: [{ span: { start: 0, end: 1 }, text: '' }] },
+      /apply-code-patch cannot/,
+    ],
+    [
+      element,
+      { tag: 'rename-binding', from: 'a', to: 'b', sites: [{ start: 12, end: 13 }] },
+      /rename-binding cannot/,
+    ],
     [documentAnchor, { tag: 'insert-node', placement: 'after', source: '' }, /insert-node cannot/],
-    [element, { tag: 'move-node', destination: frontmatter, placement: 'after' }, /move-node cannot/],
-    [element, { tag: 'edit-frontmatter-slot', slot: { start: 0, end: 1 }, text: '' }, /edit-frontmatter-slot cannot/],
+    [
+      element,
+      { tag: 'move-node', destination: frontmatter, placement: 'after' },
+      /move-node cannot/,
+    ],
+    [
+      element,
+      { tag: 'edit-frontmatter-slot', slot: { start: 0, end: 1 }, text: '' },
+      /edit-frontmatter-slot cannot/,
+    ],
   ];
   for (const [anchor, operation, message] of cases) {
     assert.throws(() => parseIntent(wire(anchor, operation)), message);
@@ -149,12 +209,34 @@ test('the operation must fit its anchor', () => {
 });
 
 test('multi-span sites lie inside the anchor, ascend, do not overlap, and are bounded', () => {
-  const rename = (sites: readonly object[]) => wire(loop, { tag: 'rename-binding', from: 'a', to: 'b', sites });
+  const rename = (sites: readonly object[]) =>
+    wire(loop, { tag: 'rename-binding', from: 'a', to: 'b', sites });
   assert.throws(() => parseIntent(rename([])), /needs at least one site/);
   assert.throws(() => parseIntent(rename([{ start: 5, end: 8 }])), /outside its anchor/);
-  assert.throws(() => parseIntent(rename([{ start: 20, end: 25 }, { start: 12, end: 14 }])), /ascend/);
-  assert.throws(() => parseIntent(rename([{ start: 12, end: 20 }, { start: 15, end: 22 }])), /ascend/);
-  const tooMany = Array.from({ length: LIMITS.splicesPerIntentMax + 1 }, (_, index) => ({ start: index, end: index }));
+  assert.throws(
+    () =>
+      parseIntent(
+        rename([
+          { start: 20, end: 25 },
+          { start: 12, end: 14 },
+        ]),
+      ),
+    /ascend/,
+  );
+  assert.throws(
+    () =>
+      parseIntent(
+        rename([
+          { start: 12, end: 20 },
+          { start: 15, end: 22 },
+        ]),
+      ),
+    /ascend/,
+  );
+  const tooMany = Array.from({ length: LIMITS.splicesPerIntentMax + 1 }, (_, index) => ({
+    start: index,
+    end: index,
+  }));
   assert.throws(() => parseIntent(rename(tooMany)), /exceeds/);
   const slot = { tag: 'edit-frontmatter-slot', slot: { start: 25, end: 31 }, text: '' };
   assert.throws(() => parseIntent(wire(frontmatter, slot)), /outside its anchor/);
@@ -165,7 +247,9 @@ test('the summed payload is bounded in UTF-8 bytes, not characters', () => {
   assert.ok(text.length <= LIMITS.intentPayloadBytesMax, 'the character count alone fits');
   const rewrite = { tag: 'rewrite-text', hunks: [{ span: { start: 0, end: 0 }, text }] };
   assert.throws(() => parseIntent(wire(documentAnchor, rewrite)), /payload exceeds/);
-  const intent = parseIntent(wire(element, { tag: 'set-attribute', name: 'title', value: { type: 'string', value: 'é' } }));
+  const intent = parseIntent(
+    wire(element, { tag: 'set-attribute', name: 'title', value: { type: 'string', value: 'é' } }),
+  );
   assert.equal(intentPayloadBytes(intent.operation), 'title'.length + 2);
 });
 
@@ -178,7 +262,10 @@ test('anchors: path length and kind agree, documents start at zero, depth is bou
     [{ ...element, path: [-1] }, /ChildIndex/],
     [{ ...element, path: [LIMITS.treeNodesMax] }, /ChildIndex/],
     [{ ...element, path: ['0'] }, /expected number/],
-    [{ ...element, path: Array.from({ length: STRUCTURAL_PATH_STEPS_MAX + 1 }, () => 0) }, /exceeds/],
+    [
+      { ...element, path: Array.from({ length: STRUCTURAL_PATH_STEPS_MAX + 1 }, () => 0) },
+      /exceeds/,
+    ],
     [{ ...element, span: { start: 4, end: 2 } }, /end must not precede start/],
   ];
   for (const [input, message] of cases) {
@@ -187,14 +274,22 @@ test('anchors: path length and kind agree, documents start at zero, depth is bou
 });
 
 test('submission results are accepted or backpressured, never an outcome', () => {
-  assert.deepEqual(parseSubmissionResult({ tag: 'accepted', intentId: 'i1' }), { tag: 'accepted', intentId: 'i1' });
+  assert.deepEqual(parseSubmissionResult({ tag: 'accepted', intentId: 'i1' }), {
+    tag: 'accepted',
+    intentId: 'i1',
+  });
   assert.deepEqual(parseSubmissionResult({ tag: 'backpressured' }), { tag: 'backpressured' });
   assert.throws(() => parseSubmissionResult({ tag: 'rejected', intentId: 'i1' }), /unknown value/);
   assert.throws(() => parseSubmissionResult({ tag: 'accepted' }), /intentId: expected string/);
 });
 
 test('outcomes: applied, rejected and uncertain parse; everything else fails', () => {
-  const applied = { tag: 'applied', intentId: 'i1', changedRanges: [{ start: 0, end: 2 }], checksum: DIGEST };
+  const applied = {
+    tag: 'applied',
+    intentId: 'i1',
+    changedRanges: [{ start: 0, end: 2 }],
+    checksum: DIGEST,
+  };
   assert.deepEqual(parseOutcome(applied), applied);
   assert.deepEqual(parseOutcome({ tag: 'rejected', intentId: 'i1', reason: 'write-race' }), {
     tag: 'rejected',
@@ -209,8 +304,26 @@ test('outcomes: applied, rejected and uncertain parse; everything else fails', (
   const cases: readonly [unknown, RegExp][] = [
     [{ ...applied, tag: 'done' }, /Outcome.tag: unknown/],
     [{ ...applied, checksum: 'x' }, /Digest/],
-    [{ ...applied, changedRanges: [{ start: 4, end: 6 }, { start: 0, end: 1 }] }, /ascending/],
-    [{ ...applied, changedRanges: Array.from({ length: LIMITS.splicesPerIntentMax + 1 }, () => ({ start: 0, end: 0 })) }, /exceeds/],
+    [
+      {
+        ...applied,
+        changedRanges: [
+          { start: 4, end: 6 },
+          { start: 0, end: 1 },
+        ],
+      },
+      /ascending/,
+    ],
+    [
+      {
+        ...applied,
+        changedRanges: Array.from({ length: LIMITS.splicesPerIntentMax + 1 }, () => ({
+          start: 0,
+          end: 0,
+        })),
+      },
+      /exceeds/,
+    ],
     [{ tag: 'rejected', intentId: 'i1', reason: 'queue-full' }, /unknown rejection reason/],
     [{ tag: 'uncertain', intentId: 'i1', candidateChecksum: 'nope' }, /Digest/],
     [{ tag: 'applied', changedRanges: [], checksum: DIGEST }, /intentId: expected string/],

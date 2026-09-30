@@ -26,7 +26,9 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
+  if (!condition) {
+    failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  }
 };
 
 const { parseSlots, defaultSlotInline } = require('../dist/electron/astroParser.js');
@@ -39,12 +41,12 @@ check('a plain <slot /> is the default slot', slots('', '<div><slot /></div>') =
 check(
   'a named slot is named',
   slots('', '<div><slot name="footer" /></div>') === '["footer"]',
-  slots('', '<div><slot name="footer" /></div>')
+  slots('', '<div><slot name="footer" /></div>'),
 );
 check(
   'and both together put the default first',
   slots('', '<div><slot name="footer" /><slot /></div>') === '["default","footer"]',
-  slots('', '<div><slot name="footer" /><slot /></div>')
+  slots('', '<div><slot name="footer" /><slot /></div>'),
 );
 check('a component with no slot at all takes none', slots('', '<hr />') === '[]');
 
@@ -52,23 +54,23 @@ check('a component with no slot at all takes none', slots('', '<hr />') === '[]'
 check(
   'render() with nothing named is the default slot',
   slots('const c = await Astro.slots.render();', '<p set:html={c} />') === '["default"]',
-  slots('const c = await Astro.slots.render();', '<p set:html={c} />')
+  slots('const c = await Astro.slots.render();', '<p set:html={c} />'),
 );
 check(
   'render("x") names its slot',
   slots("const c = await Astro.slots.render('footer');", '<p set:html={c} />') === '["footer"]',
-  slots("const c = await Astro.slots.render('footer');", '<p set:html={c} />')
+  slots("const c = await Astro.slots.render('footer');", '<p set:html={c} />'),
 );
 check(
   'has("x") counts too — asking is taking',
   slots('const has = Astro.slots.has("background");', '<div />') === '["background"]',
-  slots('const has = Astro.slots.has("background");', '<div />')
+  slots('const has = Astro.slots.has("background");', '<div />'),
 );
 // Handed to a helper, the string beside it is the name.
 check(
   'a helper given Astro.slots and nothing else means the default',
   slots('const c = await slotContent(Astro.slots);', '<div set:html={c} />') === '["default"]',
-  slots('const c = await slotContent(Astro.slots);', '<div set:html={c} />')
+  slots('const c = await slotContent(Astro.slots);', '<div set:html={c} />'),
 );
 {
   const fm =
@@ -76,41 +78,56 @@ check(
   check(
     'and both columns of a two-slot layout are found',
     slots(fm, '<div />') === '["default","column2"]',
-    slots(fm, '<div />')
+    slots(fm, '<div />'),
   );
 }
 // The name comes from the call it is in, not from the next one down the file.
 {
-  const fm = 'const a = await slotContent(Astro.slots);\nconst b = await slotContent(Astro.slots, "aside");';
-  check('a call cannot borrow the name of a later one', slots(fm, '<div />') === '["default","aside"]', slots(fm, '<div />'));
+  const fm =
+    'const a = await slotContent(Astro.slots);\nconst b = await slotContent(Astro.slots, "aside");';
+  check(
+    'a call cannot borrow the name of a later one',
+    slots(fm, '<div />') === '["default","aside"]',
+    slots(fm, '<div />'),
+  );
 }
 check(
   'a variable slot name reads as the default rather than as itself',
   slots('const c = await Astro.slots.render(name);', '<div set:html={c} />') === '["default"]',
-  slots('const c = await Astro.slots.render(name);', '<div set:html={c} />')
+  slots('const c = await Astro.slots.render(name);', '<div set:html={c} />'),
 );
 
 // ── What a file says about itself is not what it does ───────────────────────
 {
   const fm =
     '/**\n * A <script> never reaches the page when the parent consumes it through\n * `Astro.slots.render()`, which is how `Section` handles its slots.\n */\nconst id = "x";';
-  check('a comment about Astro.slots declares no slot', slots(fm, '<div />') === '[]', slots(fm, '<div />'));
+  check(
+    'a comment about Astro.slots declares no slot',
+    slots(fm, '<div />') === '[]',
+    slots(fm, '<div />'),
+  );
 }
 check(
   'nor does a line comment',
   slots('// uses Astro.slots.render("aside") one day\nconst x = 1;', '<div />') === '[]',
-  slots('// uses Astro.slots.render("aside") one day\nconst x = 1;', '<div />')
+  slots('// uses Astro.slots.render("aside") one day\nconst x = 1;', '<div />'),
 );
 check(
   'and an html comment in the body says nothing either',
   slots('', '<div><!-- Astro.slots.render("aside") --></div>') === '[]',
-  slots('', '<div><!-- Astro.slots.render("aside") --></div>')
+  slots('', '<div><!-- Astro.slots.render("aside") --></div>'),
 );
 // A URL in the template is not a comment, whatever `//` looks like.
 check(
   'a url keeps the rest of its line',
-  slots('const c = await Astro.slots.render();', '<a href="https://x.dev">link</a>\n<p set:html={c} />') === '["default"]',
-  slots('const c = await Astro.slots.render();', '<a href="https://x.dev">link</a>\n<p set:html={c} />')
+  slots(
+    'const c = await Astro.slots.render();',
+    '<a href="https://x.dev">link</a>\n<p set:html={c} />',
+  ) === '["default"]',
+  slots(
+    'const c = await Astro.slots.render();',
+    '<a href="https://x.dev">link</a>\n<p set:html={c} />',
+  ),
 );
 
 // ── Where the content lands decides what arrives in it ──────────────────────
@@ -122,31 +139,41 @@ check('a slot inside a <div> wants blocks', inline('', '<div><slot /></div>') ==
 check(
   'set:html inside a <p> wants words',
   inline('const c = await slotContent(Astro.slots);', '<p><Fragment set:html={c} /></p>') === true,
-  String(inline('const c = await slotContent(Astro.slots);', '<p><Fragment set:html={c} /></p>'))
+  String(inline('const c = await slotContent(Astro.slots);', '<p><Fragment set:html={c} /></p>')),
 );
 check(
   'set:html inside a <div> wants blocks',
-  inline('const c = await slotContent(Astro.slots);', '<div><Fragment set:html={c} /></div>') === false
+  inline('const c = await slotContent(Astro.slots);', '<div><Fragment set:html={c} /></div>') ===
+    false,
 );
 // `<Tag>` is a variable — resolve it to what it defaults to.
 {
-  const fm = 'const { tag = "p" } = Astro.props;\nconst Tag = tag;\nconst c = await slotContent(Astro.slots);';
+  const fm =
+    'const { tag = "p" } = Astro.props;\nconst Tag = tag;\nconst c = await slotContent(Astro.slots);';
   check(
     'and a dynamic tag is resolved before it is judged',
     inline(fm, '<Tag><Fragment set:html={c} /></Tag>') === true,
-    String(inline(fm, '<Tag><Fragment set:html={c} /></Tag>'))
+    String(inline(fm, '<Tag><Fragment set:html={c} /></Tag>')),
   );
 }
 // Set on the element itself, that element is the wrapper.
 check(
   'an element that takes the content directly is the wrapper',
   inline('const c = await slotContent(Astro.slots);', '<p set:html={c} />') === true,
-  String(inline('const c = await slotContent(Astro.slots);', '<p set:html={c} />'))
+  String(inline('const c = await slotContent(Astro.slots);', '<p set:html={c} />')),
 );
 check(
   'a named slot never decides this',
-  inline('const c = await slotContent(Astro.slots, "aside");', '<p><Fragment set:html={c} /></p>') === false,
-  String(inline('const c = await slotContent(Astro.slots, "aside");', '<p><Fragment set:html={c} /></p>'))
+  inline(
+    'const c = await slotContent(Astro.slots, "aside");',
+    '<p><Fragment set:html={c} /></p>',
+  ) === false,
+  String(
+    inline(
+      'const c = await slotContent(Astro.slots, "aside");',
+      '<p><Fragment set:html={c} /></p>',
+    ),
+  ),
 );
 
 // ── The files this came from ────────────────────────────────────────────────
@@ -160,7 +187,9 @@ const findComponent = (dir, name) => {
     const full = path.join(dir, entry.name);
     if (entry.isDirectory()) {
       const hit = findComponent(full, name);
-      if (hit) {return hit;}
+      if (hit) {
+        return hit;
+      }
     } else if (entry.name === `${name}.astro`) {
       return fs.readFileSync(full, 'utf8');
     }
@@ -171,23 +200,33 @@ if (fs.existsSync(LUMOS)) {
   const read = (n) => findComponent(LUMOS, n);
   const onceReal = (what, name, run) => {
     const source = read(name);
-    if (source == null) {return;} // that component is not in this project any more
+    if (source == null) {
+      return;
+    } // that component is not in this project any more
     run(source, what);
   };
   onceReal('the real <Paragraph> takes content', 'Paragraph', (src) => {
-    check('the real <Paragraph> takes content', JSON.stringify(parseSlots(src)) === '["default"]', JSON.stringify(parseSlots(src)));
+    check(
+      'the real <Paragraph> takes content',
+      JSON.stringify(parseSlots(src)) === '["default"]',
+      JSON.stringify(parseSlots(src)),
+    );
     check('and it takes words', defaultSlotInline(src) === true);
   });
   onceReal('the real <ContentWrapper>', 'ContentWrapper', (src) => {
     check(
       'the real <ContentWrapper> offers its second column',
       JSON.stringify(parseSlots(src)) === '["default","column2"]',
-      JSON.stringify(parseSlots(src))
+      JSON.stringify(parseSlots(src)),
     );
     check('while it takes blocks, not words', defaultSlotInline(src) === false);
   });
   onceReal('a component with no slots', 'Img', (src) => {
-    check('a component with no slots still reports none', JSON.stringify(parseSlots(src)) === '[]', JSON.stringify(parseSlots(src)));
+    check(
+      'a component with no slots still reports none',
+      JSON.stringify(parseSlots(src)) === '[]',
+      JSON.stringify(parseSlots(src)),
+    );
   });
 }
 
@@ -224,11 +263,19 @@ if (fs.existsSync(LUMOS)) {
   global.requestAnimationFrame = dom.window.requestAnimationFrame.bind(dom.window);
   global.cancelAnimationFrame = dom.window.cancelAnimationFrame.bind(dom.window);
   global.IS_REACT_ACT_ENVIRONMENT = true;
-  dom.window.ResizeObserver = class { observe() {} unobserve() {} disconnect() {} };
+  dom.window.ResizeObserver = class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  };
   global.ResizeObserver = dom.window.ResizeObserver;
   const NO_BOX = { x: 0, y: 0, width: 0, height: 0, top: 0, left: 0, right: 0, bottom: 0 };
   dom.window.Range.prototype.getBoundingClientRect = () => NO_BOX;
-  dom.window.Range.prototype.getClientRects = () => ({ length: 0, item: () => null, [Symbol.iterator]: function* () {} });
+  dom.window.Range.prototype.getClientRects = () => ({
+    length: 0,
+    item: () => null,
+    [Symbol.iterator]: function* () {},
+  });
 
   const React = require('react');
   const { createRoot } = require('react-dom/client');
@@ -251,7 +298,7 @@ if (fs.existsSync(LUMOS)) {
           onRenameProp: () => {},
           onOpenCode: () => {},
           onSetText: () => {},
-        })
+        }),
       );
     });
     const labels = [...host.querySelectorAll('.prop-label')].map((n) => n.textContent.trim());
@@ -260,7 +307,11 @@ if (fs.existsSync(LUMOS)) {
   };
 
   const withSlot = await mount(true);
-  check('a component that takes content is offered a Content field', withSlot.includes('Content'), JSON.stringify(withSlot));
+  check(
+    'a component that takes content is offered a Content field',
+    withSlot.includes('Content'),
+    JSON.stringify(withSlot),
+  );
   const without = await mount(false);
   check('one that takes none is not', !without.includes('Content'), JSON.stringify(without));
 

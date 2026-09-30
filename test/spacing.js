@@ -19,7 +19,9 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
+  if (!condition) {
+    failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  }
 };
 const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -31,23 +33,23 @@ const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
   fs.writeFileSync(
     entry,
     `export { SpacingFill, SpacingLabel } from ${JSON.stringify(
-      path.join(__dirname, '..', 'src', 'style-panel', 'SpacingBox.tsx')
+      path.join(__dirname, '..', 'src', 'style-panel', 'SpacingBox.tsx'),
     )};\n` +
       `export { clampNonNegative, isNonNegative } from ${JSON.stringify(
-        path.join(__dirname, '..', 'src', 'style-panel', 'lib', 'css-properties.ts')
+        path.join(__dirname, '..', 'src', 'style-panel', 'lib', 'css-properties.ts'),
       )};\n` +
       `export { stepNumberAtCaret } from ${JSON.stringify(
-        path.join(__dirname, '..', 'src', 'style-panel', 'lib', 'number-step.ts')
+        path.join(__dirname, '..', 'src', 'style-panel', 'lib', 'number-step.ts'),
       )};\n` +
       `export { sectionOf } from ${JSON.stringify(
-        path.join(__dirname, '..', 'src', 'style-panel', 'lib', 'sections.ts')
+        path.join(__dirname, '..', 'src', 'style-panel', 'lib', 'sections.ts'),
       )};\n` +
       `export { spacingBands } from ${JSON.stringify(
-        path.join(__dirname, '..', 'src', 'spacingBands.js')
+        path.join(__dirname, '..', 'src', 'spacingBands.js'),
       )};\n` +
       `export { getHost, setHost, setModifiers } from ${JSON.stringify(
-        path.join(__dirname, '..', 'src', 'style-panel', 'lib', 'host.ts')
-      )};\n`
+        path.join(__dirname, '..', 'src', 'style-panel', 'lib', 'host.ts'),
+      )};\n`,
   );
   const bundlePath = path.join(buildDir, 'spacing.bundle.js');
   await esbuild.build({
@@ -153,9 +155,9 @@ const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
               liveSetProp,
               onLive: () => {},
               onLiveEnd: () => {},
-            })
-          )
-        )
+            }),
+          ),
+        ),
       );
       await settle(10);
     });
@@ -168,7 +170,7 @@ const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
     const send = (type, x, y) =>
       act(async () => {
         el.dispatchEvent(
-          new dom.window.MouseEvent(type, { bubbles: true, clientX: x, clientY: y, ...mods })
+          new dom.window.MouseEvent(type, { bubbles: true, clientX: x, clientY: y, ...mods }),
         );
         await settle(0);
       });
@@ -176,18 +178,27 @@ const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
     await send('pointermove', 100 + dx, 100 + dy);
     // A frame, so the throttled write to the canvas actually happens — releasing
     // in the same tick would cancel it, which no real drag does.
-    await act(async () => { await settle(20); });
+    await act(async () => {
+      await settle(20);
+    });
     await send('pointerup', 100 + dx, 100 + dy);
     return committed;
   };
   const band = (side) => container.querySelector(`.embed-editor_spacing-tri.is-${side}`);
   const number = (side) => container.querySelector(`.embed-editor_spacing-${side}`);
-  const props = (list) => list.map(([prop]) => prop).sort().join(' ');
+  const props = (list) =>
+    list
+      .map(([prop]) => prop)
+      .sort()
+      .join(' ');
   const value = (list) => list[0]?.[1];
 
   // --- the bands --------------------------------------------------------------
   await showBox('padding');
-  check('the box has a band per side', [...container.querySelectorAll('.embed-editor_spacing-tri')].length === 4);
+  check(
+    'the box has a band per side',
+    [...container.querySelectorAll('.embed-editor_spacing-tri')].length === 4,
+  );
 
   let out = await dragOn(band('top'), { dy: -40 });
   check('dragging a band writes that side', props(out) === 'padding-top', props(out));
@@ -197,23 +208,23 @@ const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
   check(
     'holding shift writes all four',
     props(out) === 'padding-bottom padding-left padding-right padding-top',
-    props(out)
+    props(out),
   );
-  check(
-    'to the same value',
-    new Set(out.map(([, v]) => v)).size === 1,
-    JSON.stringify(out)
-  );
+  check('to the same value', new Set(out.map(([, v]) => v)).size === 1, JSON.stringify(out));
 
   out = await dragOn(band('top'), { dy: -40, altKey: true });
   check(
     'holding alt writes the side and its opposite',
     props(out) === 'padding-bottom padding-top',
-    props(out)
+    props(out),
   );
 
   out = await dragOn(band('left'), { dx: -40, altKey: true });
-  check('the pair for a side is across from it', props(out) === 'padding-left padding-right', props(out));
+  check(
+    'the pair for a side is across from it',
+    props(out) === 'padding-left padding-right',
+    props(out),
+  );
 
   // --- the numbers ------------------------------------------------------------
   out = await dragOn(number('top'), { dy: -40 });
@@ -222,7 +233,7 @@ const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
   check(
     'with shift, all four — from the number too',
     props(out) === 'padding-bottom padding-left padding-right padding-top',
-    props(out)
+    props(out),
   );
   out = await dragOn(number('right'), { dx: 40, altKey: true });
   check('and with alt, the pair', props(out) === 'padding-left padding-right', props(out));
@@ -231,30 +242,51 @@ const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
   // written.
   out = await dragOn(number('top'), { dy: 0 });
   await act(async () => {
-    number('top').dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true, clientX: 100, clientY: 100 }));
+    number('top').dispatchEvent(
+      new dom.window.MouseEvent('click', { bubbles: true, clientX: 100, clientY: 100 }),
+    );
     await settle(0);
   });
-  check('pressing a number without moving opens the editor', props(out) === 'edit', JSON.stringify(out));
+  check(
+    'pressing a number without moving opens the editor',
+    props(out) === 'edit',
+    JSON.stringify(out),
+  );
   check('and writes nothing', !out.some(([p]) => p.startsWith('padding')), JSON.stringify(out));
 
   // A drag is not a click: the editor must not open on top of it.
   out = await dragOn(number('top'), { dy: -40 });
   await act(async () => {
-    number('top').dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true, clientX: 100, clientY: 60 }));
+    number('top').dispatchEvent(
+      new dom.window.MouseEvent('click', { bubbles: true, clientX: 100, clientY: 60 }),
+    );
     await settle(0);
   });
-  check('dragging a number does not also open the editor', !out.some(([p]) => p === 'edit'), JSON.stringify(out));
+  check(
+    'dragging a number does not also open the editor',
+    !out.some(([p]) => p === 'edit'),
+    JSON.stringify(out),
+  );
 
   // Alt-click still clears — the modifier means "clear" on a click and "the
   // opposite side too" on a drag, and only one of them happened.
   out = await dragOn(number('bottom'), { dy: 0, altKey: true });
   await act(async () => {
     number('bottom').dispatchEvent(
-      new dom.window.MouseEvent('click', { bubbles: true, clientX: 100, clientY: 100, altKey: true })
+      new dom.window.MouseEvent('click', {
+        bubbles: true,
+        clientX: 100,
+        clientY: 100,
+        altKey: true,
+      }),
     );
     await settle(0);
   });
-  check('alt-clicking a number still clears it', out.some(([p, v]) => p === 'padding-bottom' && v === null), JSON.stringify(out));
+  check(
+    'alt-clicking a number still clears it',
+    out.some(([p, v]) => p === 'padding-bottom' && v === null),
+    JSON.stringify(out),
+  );
 
   // --- which way is up --------------------------------------------------------
   // Padding grows inward: dragging the top band DOWN (into the box) makes it
@@ -263,17 +295,25 @@ const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
   check('dragging padding inward grows it', parseFloat(value(out)) > 3, value(out));
   out = await dragOn(band('top'), { dy: -40 });
   check('and dragging it outward shrinks it', parseFloat(value(out)) < 3, value(out));
-  check('never past zero', parseFloat(await dragOn(band('top'), { dy: -4000 }).then(value)) === 0, 'padding went negative');
+  check(
+    'never past zero',
+    parseFloat(await dragOn(band('top'), { dy: -4000 }).then(value)) === 0,
+    'padding went negative',
+  );
 
   await showBox('margin');
   out = await dragOn(band('top'), { dy: -40 });
   check('dragging a margin outward grows it', parseFloat(value(out)) > 3, value(out));
-  check('margins may go negative', parseFloat(await dragOn(band('top'), { dy: 4000 }).then(value)) < 0, 'margin clamped at zero');
+  check(
+    'margins may go negative',
+    parseFloat(await dragOn(band('top'), { dy: 4000 }).then(value)) < 0,
+    'margin clamped at zero',
+  );
   out = await dragOn(number('top'), { dy: -40, shiftKey: true });
   check(
     'and shift on a margin number reaches all four margins',
     props(out) === 'margin-bottom margin-left margin-right margin-top',
-    props(out)
+    props(out),
   );
 
   // --- the unit stays the unit ------------------------------------------------
@@ -289,7 +329,9 @@ const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
     const el = number('top');
     const send = (type, opts) =>
       act(async () => {
-        el.dispatchEvent(new dom.window.MouseEvent(type, { bubbles: true, clientX: 100, clientY: 100, ...opts }));
+        el.dispatchEvent(
+          new dom.window.MouseEvent(type, { bubbles: true, clientX: 100, clientY: 100, ...opts }),
+        );
         await settle(0);
       });
     const key = (type, opts) =>
@@ -302,11 +344,13 @@ const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
     liveWrites = [];
     await send('pointerdown', { clientX: 100, clientY: 100 });
     await send('pointermove', { clientX: 100, clientY: 60 });
-    await act(async () => { await settle(20); }); // let the throttled write land
+    await act(async () => {
+      await settle(20);
+    }); // let the throttled write land
     check(
       'a drag starts on the side it was pressed on',
       new Set(liveWrites.map(([prop]) => prop)).size === 1,
-      JSON.stringify(liveWrites)
+      JSON.stringify(liveWrites),
     );
 
     // Shift goes down; the pointer does not move.
@@ -315,17 +359,20 @@ const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
     check(
       'holding shift mid-drag takes the other three with it',
       new Set(liveWrites.map(([prop]) => prop)).size === 4,
-      JSON.stringify(liveWrites)
+      JSON.stringify(liveWrites),
     );
 
     // And letting go of it puts them back — they were a preview, never a write.
     liveWrites = [];
     await key('keyup', { key: 'Shift', shiftKey: false });
-    const putBack = liveWrites.filter(([, value]) => value === null).map(([prop]) => prop).sort();
+    const putBack = liveWrites
+      .filter(([, value]) => value === null)
+      .map(([prop]) => prop)
+      .sort();
     check(
       'letting go of it puts the other three back',
       putBack.join(' ') === 'padding-bottom padding-left padding-right',
-      JSON.stringify(liveWrites)
+      JSON.stringify(liveWrites),
     );
 
     // Option, the same way, and the release writes what the modifier names then.
@@ -334,15 +381,19 @@ const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
     check(
       'option mid-drag reaches across to the opposite side',
       new Set(liveWrites.map(([prop]) => prop)).size === 2,
-      JSON.stringify(liveWrites)
+      JSON.stringify(liveWrites),
     );
     await send('pointerup', { clientX: 100, clientY: 60, altKey: true });
     check(
       'and releasing writes the pair, not the side it started on',
       props(committed) === 'padding-bottom padding-top',
-      props(committed)
+      props(committed),
     );
-    check('to one value', new Set(committed.map(([, v]) => v)).size === 1, JSON.stringify(committed));
+    check(
+      'to one value',
+      new Set(committed.map(([, v]) => v)).size === 1,
+      JSON.stringify(committed),
+    );
   }
 
   // A modifier let go of before the release is not part of the edit.
@@ -351,25 +402,43 @@ const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
     committed = [];
     liveWrites = [];
     await act(async () => {
-      el.dispatchEvent(new dom.window.MouseEvent('pointerdown', { bubbles: true, clientX: 100, clientY: 100, shiftKey: true }));
+      el.dispatchEvent(
+        new dom.window.MouseEvent('pointerdown', {
+          bubbles: true,
+          clientX: 100,
+          clientY: 100,
+          shiftKey: true,
+        }),
+      );
       await settle(0);
     });
     await act(async () => {
-      el.dispatchEvent(new dom.window.MouseEvent('pointermove', { bubbles: true, clientX: 100, clientY: 60, shiftKey: true }));
+      el.dispatchEvent(
+        new dom.window.MouseEvent('pointermove', {
+          bubbles: true,
+          clientX: 100,
+          clientY: 60,
+          shiftKey: true,
+        }),
+      );
       await settle(20);
     });
     await act(async () => {
-      dom.window.dispatchEvent(new dom.window.KeyboardEvent('keyup', { bubbles: true, key: 'Shift', shiftKey: false }));
+      dom.window.dispatchEvent(
+        new dom.window.KeyboardEvent('keyup', { bubbles: true, key: 'Shift', shiftKey: false }),
+      );
       await settle(20);
     });
     await act(async () => {
-      el.dispatchEvent(new dom.window.MouseEvent('pointerup', { bubbles: true, clientX: 100, clientY: 60 }));
+      el.dispatchEvent(
+        new dom.window.MouseEvent('pointerup', { bubbles: true, clientX: 100, clientY: 60 }),
+      );
       await settle(0);
     });
     check(
       'a shift let go of before release writes only the dragged side',
       props(committed) === 'padding-top',
-      props(committed)
+      props(committed),
     );
   }
 
@@ -391,7 +460,10 @@ const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
     const leave = (el) =>
       act(async () => {
         el.dispatchEvent(
-          new dom.window.MouseEvent('pointerout', { bubbles: true, relatedTarget: dom.window.document.body })
+          new dom.window.MouseEvent('pointerout', {
+            bubbles: true,
+            relatedTarget: dom.window.document.body,
+          }),
         );
         await settle(0);
       });
@@ -406,7 +478,11 @@ const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
     await enter(band('top'));
     check('hovering a band reports it', last()?.sides.join(' ') === 'top', JSON.stringify(last()));
     check('as padding', last()?.kind === 'padding', last()?.kind);
-    check('with the value it is showing', last()?.labels?.top === '3rem', JSON.stringify(last()?.labels));
+    check(
+      'with the value it is showing',
+      last()?.labels?.top === '3rem',
+      JSON.stringify(last()?.labels),
+    );
 
     // Swallowed by a field in the panel — the canvas still has to hear it.
     const greedy = dom.window.document.createElement('input');
@@ -415,16 +491,20 @@ const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
     greedy.addEventListener('keyup', (event) => event.stopPropagation());
 
     await act(async () => {
-      greedy.dispatchEvent(new dom.window.KeyboardEvent('keydown', { bubbles: true, key: 'Shift', shiftKey: true }));
+      greedy.dispatchEvent(
+        new dom.window.KeyboardEvent('keydown', { bubbles: true, key: 'Shift', shiftKey: true }),
+      );
       await settle(0);
     });
     check(
       'a key a field swallows still reaches the canvas',
       last()?.sides.length === 4,
-      JSON.stringify(last())
+      JSON.stringify(last()),
     );
     await act(async () => {
-      greedy.dispatchEvent(new dom.window.KeyboardEvent('keyup', { bubbles: true, key: 'Shift', shiftKey: false }));
+      greedy.dispatchEvent(
+        new dom.window.KeyboardEvent('keyup', { bubbles: true, key: 'Shift', shiftKey: false }),
+      );
       await settle(0);
     });
     greedy.remove();
@@ -433,53 +513,78 @@ const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
     check(
       'holding shift over it reports all four',
       last()?.sides.slice().sort().join(' ') === 'bottom left right top',
-      JSON.stringify(last())
+      JSON.stringify(last()),
     );
-    check('each with its own value', last()?.labels?.left === '2rem', JSON.stringify(last()?.labels));
+    check(
+      'each with its own value',
+      last()?.labels?.left === '2rem',
+      JSON.stringify(last()?.labels),
+    );
     await key('keyup', { key: 'Shift', shiftKey: false });
-    check('letting go reports the one side again', last()?.sides.join(' ') === 'top', JSON.stringify(last()));
+    check(
+      'letting go reports the one side again',
+      last()?.sides.join(' ') === 'top',
+      JSON.stringify(last()),
+    );
 
     await key('keydown', { key: 'Alt', altKey: true });
     check(
       'holding option reports the pair',
       last()?.sides.slice().sort().join(' ') === 'bottom top',
-      JSON.stringify(last())
+      JSON.stringify(last()),
     );
 
     // Swapping one modifier for the other without leaving: option → shift →
     // option → nothing, each of them answered on the way through.
     await key('keydown', { key: 'Shift', shiftKey: true, altKey: true });
-    check('adding shift over option widens to all four', last()?.sides.length === 4, JSON.stringify(last()));
+    check(
+      'adding shift over option widens to all four',
+      last()?.sides.length === 4,
+      JSON.stringify(last()),
+    );
     await key('keyup', { key: 'Shift', shiftKey: false, altKey: true });
     check(
       'and dropping shift falls back to the pair option names',
       last()?.sides.slice().sort().join(' ') === 'bottom top',
-      JSON.stringify(last())
+      JSON.stringify(last()),
     );
     await key('keyup', { key: 'Alt', altKey: false });
-    check('letting go of both is the one side again', last()?.sides.join(' ') === 'top', JSON.stringify(last()));
+    check(
+      'letting go of both is the one side again',
+      last()?.sides.join(' ') === 'top',
+      JSON.stringify(last()),
+    );
 
     // The modifier pressed with the canvas focused. Clicking an element on the
     // page puts keyboard focus inside the preview frame, and every key after
     // that is delivered there — the panel's own listeners never fire. The frame
     // forwards what it heard; this is that arriving.
-    await act(async () => { setModifiers(true, false); await settle(0); });
+    await act(async () => {
+      setModifiers(true, false);
+      await settle(0);
+    });
     check(
       'a shift pressed with the canvas focused reaches the panel',
       last()?.sides.length === 4,
-      JSON.stringify(last())
+      JSON.stringify(last()),
     );
-    await act(async () => { setModifiers(false, true); await settle(0); });
+    await act(async () => {
+      setModifiers(false, true);
+      await settle(0);
+    });
     check(
       'and swapping it for option, from there too',
       last()?.sides.slice().sort().join(' ') === 'bottom top',
-      JSON.stringify(last())
+      JSON.stringify(last()),
     );
-    await act(async () => { setModifiers(false, false); await settle(0); });
+    await act(async () => {
+      setModifiers(false, false);
+      await settle(0);
+    });
     check(
       'and releasing both goes back to the one side',
       last()?.sides.join(' ') === 'top',
-      JSON.stringify(last())
+      JSON.stringify(last()),
     );
 
     // A modifier released while another window had focus is never seen going
@@ -493,7 +598,7 @@ const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
     check(
       'and the window losing focus drops what it can no longer see',
       last()?.sides.join(' ') === 'top',
-      JSON.stringify(last())
+      JSON.stringify(last()),
     );
 
     await leave(band('top'));
@@ -502,7 +607,11 @@ const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
     // The number on top of the band is the other half of the same control.
     hovers.length = 0;
     await enter(number('left'));
-    check('hovering the number reports its side too', last()?.sides.join(' ') === 'left', JSON.stringify(last()));
+    check(
+      'hovering the number reports its side too',
+      last()?.sides.join(' ') === 'left',
+      JSON.stringify(last()),
+    );
     await leave(number('left'));
     check('and leaving it clears', last() === null, JSON.stringify(last()));
 
@@ -530,24 +639,40 @@ const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
     check('and as tall as the padding', top.h === 20, `${top.h}`);
 
     const bottom = of('padding', ['bottom'])[0];
-    check('the padding-bottom band sits on the bottom edge', bottom.y === 50 + 200 - 30, `${bottom.y}`);
+    check(
+      'the padding-bottom band sits on the bottom edge',
+      bottom.y === 50 + 200 - 30,
+      `${bottom.y}`,
+    );
 
     const left = of('padding', ['left'])[0];
-    check('a side band runs the height of the box', left.y === 50 && left.h === 200, JSON.stringify(left));
+    check(
+      'a side band runs the height of the box',
+      left.y === 50 && left.h === 200,
+      JSON.stringify(left),
+    );
     // Hovered on its own, the top runs corner to corner; hovered alongside a
     // side, it stops where that side starts — the corner belongs to one of them.
     check('the top alone spans the whole width', of('padding', ['top'])[0].w === 400);
     const [tWithLeft, lWithTop] = of('padding', ['top', 'left']);
-    check('with a side beside it, it starts after it', tWithLeft.x === 110 && tWithLeft.w === 390, JSON.stringify(tWithLeft));
+    check(
+      'with a side beside it, it starts after it',
+      tWithLeft.x === 110 && tWithLeft.w === 390,
+      JSON.stringify(tWithLeft),
+    );
     check('and the side keeps its full height', lWithTop.h === 200, JSON.stringify(lWithTop));
     check(
       'so no two bands overlap',
       tWithLeft.x >= lWithTop.x + lWithTop.w,
-      `${JSON.stringify(tWithLeft)} over ${JSON.stringify(lWithTop)}`
+      `${JSON.stringify(tWithLeft)} over ${JSON.stringify(lWithTop)}`,
     );
 
     const mTop = of('margin', ['top'])[0];
-    check('a margin band lies outside the box', mTop.y === 50 - 8 && mTop.h === 8, JSON.stringify(mTop));
+    check(
+      'a margin band lies outside the box',
+      mTop.y === 50 - 8 && mTop.h === 8,
+      JSON.stringify(mTop),
+    );
     check('and spans the corners', mTop.x === 96 && mTop.w === 408, JSON.stringify(mTop));
     const mRight = of('margin', ['right'])[0];
     check('the right margin starts where the box ends', mRight.x === 500, `${mRight.x}`);
@@ -555,18 +680,30 @@ const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
     check(
       'and a side margin runs the full height, margins included',
       mLeft.y === 42 && mLeft.h === 216,
-      JSON.stringify(mLeft)
+      JSON.stringify(mLeft),
     );
 
     check('all four is four bands', of('padding', ['top', 'right', 'bottom', 'left']).length === 4);
-    check('and they come in reading order', of('padding', ['left', 'top']).map((b) => b.side).join(' ') === 'top left');
+    check(
+      'and they come in reading order',
+      of('padding', ['left', 'top'])
+        .map((b) => b.side)
+        .join(' ') === 'top left',
+    );
     // A side with nothing on it is not a strip of anything.
     check(
       'a side with no spacing draws nothing',
-      spacingBands(box, { padding: { top: 0, right: 0, bottom: 0, left: 0 } }, 'padding', ['top']).length === 0
+      spacingBands(box, { padding: { top: 0, right: 0, bottom: 0, left: 0 } }, 'padding', ['top'])
+        .length === 0,
     );
-    check('and neither does a box nobody measured', spacingBands(null, size, 'padding', ['top']).length === 0);
-    check('nor a kind that was never reported', spacingBands(box, {}, 'margin', ['top']).length === 0);
+    check(
+      'and neither does a box nobody measured',
+      spacingBands(null, size, 'padding', ['top']).length === 0,
+    );
+    check(
+      'nor a kind that was never reported',
+      spacingBands(box, {}, 'margin', ['top']).length === 0,
+    );
   }
 
   // --- the canvas draws what it is told ---------------------------------------
@@ -578,18 +715,18 @@ const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
     check(
       'the page forwards the modifiers it hears',
       /type: 'avb:modifiers'/.test(frame),
-      'keys pressed with the canvas focused stay in the canvas'
+      'keys pressed with the canvas focused stay in the canvas',
     );
     check(
       'and the app passes them to the panel',
       /case 'modifiers':[\s\S]{0,100}setModifiers\(/.test(
-        fs.readFileSync(path.join(__dirname, '..', 'src', 'panels', 'previewRuntime.ts'), 'utf8')
+        fs.readFileSync(path.join(__dirname, '..', 'src', 'panels', 'previewRuntime.ts'), 'utf8'),
       ),
-      'the message arrives and goes nowhere'
+      'the message arrives and goes nowhere',
     );
     const pane = fs.readFileSync(
       path.join(__dirname, '..', 'src', 'panels', 'PreviewOverlays.tsx'),
-      'utf8'
+      'utf8',
     );
     check('the preview draws the bands', /spacingBands\(/.test(pane));
     check('over the selected element', /rects\[selPath\]/.test(pane));
@@ -601,7 +738,7 @@ const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
     check(
       'the panel is wired to the canvas',
       /onSpacingHover=\{setSpacingHover\}/.test(app) && /spacingHover=\{spacingHover\}/.test(app),
-      'the style panel reports a hover nothing is listening to'
+      'the style panel reports a hover nothing is listening to',
     );
     const preload = fs.readFileSync(
       path.join(__dirname, '..', 'dist', 'electron', 'preload.js'),
@@ -616,7 +753,7 @@ const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
   check(
     'every affected side updates live, not just on release',
     new Set(liveWrites.map(([p]) => p)).size === 4,
-    JSON.stringify(liveWrites)
+    JSON.stringify(liveWrites),
   );
 
   // --- a value the property cannot take ---------------------------------------
@@ -635,35 +772,41 @@ const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
   check(
     'an expression is left to the browser',
     clampNonNegative('padding-top', 'clamp(1rem, -2vw, 3rem)') === 'clamp(1rem, -2vw, 3rem)',
-    clampNonNegative('padding-top', 'clamp(1rem, -2vw, 3rem)')
+    clampNonNegative('padding-top', 'clamp(1rem, -2vw, 3rem)'),
   );
   check(
     'including a subtraction that only looks like a sign',
-    clampNonNegative('padding-top', 'calc(100% - 2rem)') === 'calc(100% - 2rem)'
+    clampNonNegative('padding-top', 'calc(100% - 2rem)') === 'calc(100% - 2rem)',
   );
   check(
     'and so is a variable',
-    clampNonNegative('row-gap', 'var(--gap-negative)') === 'var(--gap-negative)'
+    clampNonNegative('row-gap', 'var(--gap-negative)') === 'var(--gap-negative)',
   );
-  check('a prefix is not a negative number', clampNonNegative('padding-top', '-webkit-fill') === '-webkit-fill');
-  check('padding is on the list, margin is not', isNonNegative('padding-inline-start') && !isNonNegative('margin-left'));
+  check(
+    'a prefix is not a negative number',
+    clampNonNegative('padding-top', '-webkit-fill') === '-webkit-fill',
+  );
+  check(
+    'padding is on the list, margin is not',
+    isNonNegative('padding-inline-start') && !isNonNegative('margin-left'),
+  );
 
   // Stepping down stops at the floor rather than walking past it and being
   // clamped on the way out — the field must never show what the page won't take.
   check(
     'stepping down stops at zero',
     stepNumberAtCaret('1rem', 1, -1, 'whole', 0)?.text === '0rem',
-    JSON.stringify(stepNumberAtCaret('1rem', 1, -1, 'whole', 0))
+    JSON.stringify(stepNumberAtCaret('1rem', 1, -1, 'whole', 0)),
   );
   check(
     'and again at zero, it stays',
     stepNumberAtCaret('0rem', 1, -1, 'whole', 0)?.text === '0rem',
-    JSON.stringify(stepNumberAtCaret('0rem', 1, -1, 'whole', 0))
+    JSON.stringify(stepNumberAtCaret('0rem', 1, -1, 'whole', 0)),
   );
   check(
     'with no floor it goes negative, as a margin should',
     stepNumberAtCaret('0rem', 1, -1, 'whole')?.text === '-1rem',
-    JSON.stringify(stepNumberAtCaret('0rem', 1, -1, 'whole'))
+    JSON.stringify(stepNumberAtCaret('0rem', 1, -1, 'whole')),
   );
 
   // --- Gap bands ------------------------------------------------------------
@@ -690,32 +833,57 @@ const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
     check('gap draws every measured space', both.length === 3, JSON.stringify(both));
     // One band per space, not one per axis: a row of four children has three
     // column gaps and they are three separate rectangles.
-    check('including two gaps on the same axis', both.filter((b) => b.side === 'column').length === 2);
+    check(
+      'including two gaps on the same axis',
+      both.filter((b) => b.side === 'column').length === 2,
+    );
 
     const cols = spacingBands(box, spacing, 'gap', ['column']);
     check('one axis draws only its own', cols.length === 2, JSON.stringify(cols));
-    check('and they are the column ones', cols.every((b) => b.side === 'column'), JSON.stringify(cols));
+    check(
+      'and they are the column ones',
+      cols.every((b) => b.side === 'column'),
+      JSON.stringify(cols),
+    );
     const rows = spacingBands(box, spacing, 'gap', ['row']);
-    check('the other axis likewise', rows.length === 1 && rows[0].side === 'row', JSON.stringify(rows));
+    check(
+      'the other axis likewise',
+      rows.length === 1 && rows[0].side === 'row',
+      JSON.stringify(rows),
+    );
     // The rectangles come through untouched — they were measured on the page
     // and second-guessing them here would move the outline off the gap.
-    check('the geometry is passed through', rows[0].x === 0 && rows[0].y === 50 && rows[0].w === 300 && rows[0].h === 24, JSON.stringify(rows[0]));
+    check(
+      'the geometry is passed through',
+      rows[0].x === 0 && rows[0].y === 50 && rows[0].w === 300 && rows[0].h === 24,
+      JSON.stringify(rows[0]),
+    );
 
     // An element with no gaps measured draws nothing, rather than falling back
     // to padding's four-sided shape.
-    check('no measured gaps draws nothing', spacingBands(box, { ...spacing, gaps: [] }, 'gap', ['row', 'column']).length === 0);
-    check('and a missing gaps list does not throw', spacingBands(box, { padding: {}, margin: {} }, 'gap', ['row']).length === 0);
+    check(
+      'no measured gaps draws nothing',
+      spacingBands(box, { ...spacing, gaps: [] }, 'gap', ['row', 'column']).length === 0,
+    );
+    check(
+      'and a missing gaps list does not throw',
+      spacingBands(box, { padding: {}, margin: {} }, 'gap', ['row']).length === 0,
+    );
     // Gap does not need the element's box at all, so a selection whose rect has
     // not arrived yet still lights up.
     check('gap needs no box', spacingBands(null, spacing, 'gap', ['column']).length === 2);
     // Zero-sized bands are not somewhere to look.
     check(
       'an empty band is skipped',
-      spacingBands(box, { gaps: [{ axis: 'row', x: 0, y: 0, w: 300, h: 0 }] }, 'gap', ['row']).length === 0
+      spacingBands(box, { gaps: [{ axis: 'row', x: 0, y: 0, w: 300, h: 0 }] }, 'gap', ['row'])
+        .length === 0,
     );
     // Padding and margin must be unaffected by any of this.
     check('padding still works', spacingBands(box, spacing, 'padding', ['top']).length === 1);
-    check('and margin still returns nothing when there is none', spacingBands(box, spacing, 'margin', ['top']).length === 0);
+    check(
+      'and margin still returns nothing when there is none',
+      spacingBands(box, spacing, 'margin', ['top']).length === 0,
+    );
   }
 
   // --- a shorthand the box has no field for -------------------------------------
@@ -731,16 +899,32 @@ const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
   // So the section claims the sides and not the shorthand, and the shorthand
   // shows at the bottom with everything else the panel has no control for.
   for (const side of ['top', 'right', 'bottom', 'left']) {
-    check(`padding-${side} belongs to the box`, sectionOf(`padding-${side}`) === 'spacing', sectionOf(`padding-${side}`));
-    check(`margin-${side} too`, sectionOf(`margin-${side}`) === 'spacing', sectionOf(`margin-${side}`));
+    check(
+      `padding-${side} belongs to the box`,
+      sectionOf(`padding-${side}`) === 'spacing',
+      sectionOf(`padding-${side}`),
+    );
+    check(
+      `margin-${side} too`,
+      sectionOf(`margin-${side}`) === 'spacing',
+      sectionOf(`margin-${side}`),
+    );
   }
   check('the padding shorthand does not', sectionOf('padding') === 'other', sectionOf('padding'));
   check('nor the margin one', sectionOf('margin') === 'other', sectionOf('margin'));
   // The logical longhands have no field either — same rule, same place.
-  check('and neither does a longhand with no field', sectionOf('padding-inline') === 'other', sectionOf('padding-inline'));
+  check(
+    'and neither does a longhand with no field',
+    sectionOf('padding-inline') === 'other',
+    sectionOf('padding-inline'),
+  );
   // A shorthand whose control DOES read it stays where it is: the Gap control
   // reads `gap` itself, so it is not homeless.
-  check('a shorthand with a control keeps its section', sectionOf('gap') === 'layout', sectionOf('gap'));
+  check(
+    'a shorthand with a control keeps its section',
+    sectionOf('gap') === 'layout',
+    sectionOf('gap'),
+  );
 
   if (failures.length) {
     console.error(`\nspacing: ${failures.length} failed, ${checked - failures.length} passed\n`);

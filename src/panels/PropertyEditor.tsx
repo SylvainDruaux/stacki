@@ -101,7 +101,7 @@ function usePropertyEditorDraft(props: PropertyEditorProps) {
     const next = changePropertyOptions(
       previous,
       change.type,
-      change.kind === 'draft' ? change.rename : undefined
+      change.kind === 'draft' ? change.rename : undefined,
     );
     const nextRenames = changePropertyOptionRenames(optionRenames, change);
     setProperty(next);
@@ -117,7 +117,7 @@ function usePropertyEditorDraft(props: PropertyEditorProps) {
         .then((saved) => {
           if (!saved) {
             setProperty((current) =>
-              current.type === change.type ? { ...current, type: previous.type } : current
+              current.type === change.type ? { ...current, type: previous.type } : current,
             );
           }
         });
@@ -227,7 +227,7 @@ interface PropertyControls {
   readonly property: ComponentProperty;
   readonly update: <Key extends keyof ComponentProperty>(
     key: Key,
-    value: ComponentProperty[Key]
+    value: ComponentProperty[Key],
   ) => void;
 }
 function PropertyIdentity({
@@ -285,7 +285,7 @@ function PropertyFlags({ property, update }: PropertyControls) {
 function changePropertyOptions(
   property: ComponentProperty,
   type: string,
-  rename?: PropertyOptionRename
+  rename?: PropertyOptionRename,
 ): ComponentProperty {
   if (rename && property.defaultValue.trim()) {
     const current = propertyDefaultText(property.defaultValue);
@@ -301,7 +301,7 @@ function changePropertyOptions(
 
 function changePropertyOptionRenames(
   current: readonly PropertyOptionRename[],
-  change: PropertyOptionChange
+  change: PropertyOptionChange,
 ): readonly PropertyOptionRename[] {
   const options = literalOptions(change.type);
   assert(options !== undefined, 'Edited property options remain a literal union');

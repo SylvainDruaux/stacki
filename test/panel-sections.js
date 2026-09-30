@@ -25,7 +25,9 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
+  if (!condition) {
+    failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  }
 };
 
 (async () => {
@@ -50,18 +52,23 @@ const check = (what, condition, detail) => {
     { prop: 'content', value: '""' },
   ];
   const groups = Object.fromEntries(
-    groupDeclarations(decls).map((g) => [g.def.label, g.decls.map((d) => d.prop)])
+    groupDeclarations(decls).map((g) => [g.def.label, g.decls.map((d) => d.prop)]),
   );
   check('inset is drawn', Object.values(groups).flat().includes('inset'), JSON.stringify(groups));
   check(
     'under Custom properties, with the rest the panel has no control for',
     (groups['Custom properties'] || []).join(',') === 'inset,content',
-    JSON.stringify(groups)
+    JSON.stringify(groups),
   );
-  check('and Position still has what it does draw', (groups.Position || []).join(',') === 'position', JSON.stringify(groups));
-  check('the same holds for the resolved model',
+  check(
+    'and Position still has what it does draw',
+    (groups.Position || []).join(',') === 'position',
+    JSON.stringify(groups),
+  );
+  check(
+    'the same holds for the resolved model',
     groupProps(['inset', 'top']).some((g) => g.def.id === 'other' && g.props.includes('inset')),
-    JSON.stringify(groupProps(['inset', 'top']).map((g) => [g.def.id, g.props]))
+    JSON.stringify(groupProps(['inset', 'top']).map((g) => [g.def.id, g.props])),
   );
 
   // ── Shorthands with no control ────────────────────────────────────────────
@@ -77,40 +84,74 @@ const check = (what, condition, detail) => {
     ['column-rule', 'column-rule-width'],
   ]) {
     check(`${prop} goes to Custom properties`, sectionOf(prop) === 'other', sectionOf(prop));
-    check(`while ${longhand} keeps its section`, sectionOf(longhand) !== 'other', sectionOf(longhand));
+    check(
+      `while ${longhand} keeps its section`,
+      sectionOf(longhand) !== 'other',
+      sectionOf(longhand),
+    );
   }
   check('an unknown property still goes there too', sectionOf('--brand') === 'other');
-  check('and a property with a control does not', sectionOf('box-shadow') === 'effects', sectionOf('box-shadow'));
+  check(
+    'and a property with a control does not',
+    sectionOf('box-shadow') === 'effects',
+    sectionOf('box-shadow'),
+  );
 
   // Generated property names cannot be found as string literals. Mount their
   // actual controls, show each value and commit an edit before treating them as
   // covered. Dead adapters or a matching comment cannot satisfy these checks.
   await esbuild.build({
     entryPoints: ['BordersSection', 'FlexChildSection'].map((name) =>
-      path.join(__dirname, '..', 'src', 'style-panel', `${name}.tsx`)),
-    outdir: path.join(buildDir, 'section-controls'), bundle: true, format: 'cjs',
-    platform: 'node', jsx: 'automatic',
+      path.join(__dirname, '..', 'src', 'style-panel', `${name}.tsx`),
+    ),
+    outdir: path.join(buildDir, 'section-controls'),
+    bundle: true,
+    format: 'cjs',
+    platform: 'node',
+    jsx: 'automatic',
     external: ['react', 'react-dom', 'react-dom/client', 'react/jsx-runtime'],
-    loader: { '.css': 'empty' }, logLevel: 'silent',
+    loader: { '.css': 'empty' },
+    logLevel: 'silent',
   });
   const { JSDOM } = require('jsdom');
-  const dom = new JSDOM('<!doctype html><div id="root"></div>', { pretendToBeVisual: true, url: 'http://localhost/' });
+  const dom = new JSDOM('<!doctype html><div id="root"></div>', {
+    pretendToBeVisual: true,
+    url: 'http://localhost/',
+  });
   global.window = dom.window;
-  for (const key of ['document', 'navigator', 'HTMLElement', 'Element', 'Node', 'MutationObserver']) {global[key] = dom.window[key];}
+  for (const key of [
+    'document',
+    'navigator',
+    'HTMLElement',
+    'Element',
+    'Node',
+    'MutationObserver',
+  ]) {
+    global[key] = dom.window[key];
+  }
   global.getComputedStyle = dom.window.getComputedStyle;
   global.requestAnimationFrame = (fn) => setTimeout(fn, 0);
   global.cancelAnimationFrame = clearTimeout;
-  global.ResizeObserver = class { observe() {} disconnect() {} };
+  global.ResizeObserver = class {
+    observe() {}
+    disconnect() {}
+  };
   dom.window.ResizeObserver = global.ResizeObserver;
   global.IS_REACT_ACT_ENVIRONMENT = true;
   const React = require('react');
   const { act } = React;
   const { createRoot } = require('react-dom/client');
   const root = createRoot(document.getElementById('root'));
-  const BordersSection = require(path.join(buildDir, 'section-controls', 'BordersSection.js')).default;
-  const FlexChildSection = require(path.join(buildDir, 'section-controls', 'FlexChildSection.js')).default;
+  const BordersSection = require(
+    path.join(buildDir, 'section-controls', 'BordersSection.js'),
+  ).default;
+  const FlexChildSection = require(
+    path.join(buildDir, 'section-controls', 'FlexChildSection.js'),
+  ).default;
   const declared = (value) => ({
-    source: 'selected', overridden: false, contributors: [],
+    source: 'selected',
+    overridden: false,
+    contributors: [],
     winner: { selectorText: '.box', value, important: false },
     selectedValue: { value, important: false },
   });
@@ -118,29 +159,39 @@ const check = (what, condition, detail) => {
   const writes = [];
   let mountedComponent;
   const controlProps = {
-    read: (prop) => values[prop] === undefined ? undefined : declared(values[prop]),
+    read: (prop) => (values[prop] === undefined ? undefined : declared(values[prop])),
     busy: false,
     setProp: (prop, value) => {
       writes.push([prop, value]);
       values[prop] = value;
       root.render(React.createElement(mountedComponent, controlProps));
     },
-    liveSetProp: () => {}, clearProp: () => {}, onProvenance: () => {}, onSelectSelector: () => {},
+    liveSetProp: () => {},
+    clearProp: () => {},
+    onProvenance: () => {},
+    onSelectSelector: () => {},
   };
   const dynamicControls = new Set();
-  const render = async (Component) => act(async () => {
-    mountedComponent = Component;
-    root.render(React.createElement(Component, controlProps));
-  });
-  const click = async (element) => act(async () => {
-    element.focus();
-    element.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }));
-  });
+  const render = async (Component) =>
+    act(async () => {
+      mountedComponent = Component;
+      root.render(React.createElement(Component, controlProps));
+    });
+  const click = async (element) =>
+    act(async () => {
+      element.focus();
+      element.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }));
+    });
   const inputFor = (label) => document.querySelector(`input[aria-label="${label}"]`);
   const commit = async (input, value) => {
-    await act(async () => { input.focus(); });
     await act(async () => {
-      Object.getOwnPropertyDescriptor(dom.window.HTMLInputElement.prototype, 'value').set.call(input, value);
+      input.focus();
+    });
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(dom.window.HTMLInputElement.prototype, 'value').set.call(
+        input,
+        value,
+      );
       input.dispatchEvent(new dom.window.Event('input', { bubbles: true }));
     });
     await act(async () => {
@@ -153,8 +204,15 @@ const check = (what, condition, detail) => {
   }
   await render(BordersSection);
   for (const [i, side] of ['top', 'right', 'bottom', 'left'].entries()) {
-    await click(document.querySelector(`button[aria-label="${side[0].toUpperCase() + side.slice(1)} border"]`));
-    for (const [facet, value, next] of [['width', `${i + 1}px`, '9px'], ['color', '#123456', '#abcdef']]) {
+    await click(
+      document.querySelector(
+        `button[aria-label="${side[0].toUpperCase() + side.slice(1)} border"]`,
+      ),
+    );
+    for (const [facet, value, next] of [
+      ['width', `${i + 1}px`, '9px'],
+      ['color', '#123456', '#abcdef'],
+    ]) {
       const prop = `border-${side}-${facet}`;
       const input = inputFor(`${side} border ${facet}`);
       check(`${prop} has a field showing its value`, input?.value === value, input?.value);
@@ -162,22 +220,41 @@ const check = (what, condition, detail) => {
         await commit(input, next);
         const written = writes.some(([p, v]) => p === prop && v === next);
         check(`${prop} can be edited through its side control`, written, JSON.stringify(writes));
-        if (input && written) {dynamicControls.add(prop);}
+        if (input && written) {
+          dynamicControls.add(prop);
+        }
       }
     }
   }
-  Object.assign(values, { 'grid-column-start': '2', 'grid-column-end': '5', 'grid-row-start': '3', 'grid-row-end': '7' });
+  Object.assign(values, {
+    'grid-column-start': '2',
+    'grid-column-end': '5',
+    'grid-row-start': '3',
+    'grid-row-end': '7',
+  });
   await render(FlexChildSection);
-  for (const [axis, start, end] of [['column', '2', '5'], ['row', '3', '7']]) {
-    for (const [position, value] of [['start', start], ['end', end]]) {
+  for (const [axis, start, end] of [
+    ['column', '2', '5'],
+    ['row', '3', '7'],
+  ]) {
+    for (const [position, value] of [
+      ['start', start],
+      ['end', end],
+    ]) {
       const prop = `grid-${axis}-${position}`;
       const label = `${axis[0].toUpperCase() + axis.slice(1)} ${position[0].toUpperCase() + position.slice(1)}`;
       const input = inputFor(label);
       check(`${prop} has a field showing its value`, input?.value === value, input?.value);
-      if (input?.value === value) {dynamicControls.add(prop);}
+      if (input?.value === value) {
+        dynamicControls.add(prop);
+      }
     }
     await commit(inputFor(`${axis[0].toUpperCase() + axis.slice(1)} Start`), '4');
-    check(`grid-${axis} placement can be edited`, writes.some(([p, v]) => p === `grid-${axis}` && v === `4 / ${end}`), JSON.stringify(writes));
+    check(
+      `grid-${axis} placement can be edited`,
+      writes.some(([p, v]) => p === `grid-${axis}` && v === `4 / ${end}`),
+      JSON.stringify(writes),
+    );
   }
   await act(async () => root.unmount());
   dom.window.close();
@@ -195,8 +272,12 @@ const check = (what, condition, detail) => {
   const walk = (dir) => {
     for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
       const file = path.join(dir, entry.name);
-      if (entry.isDirectory()) {walk(file);}
-      else if (/\.(tsx|ts)$/.test(entry.name) && !file.endsWith(path.join('lib', 'sections.ts'))) {
+      if (entry.isDirectory()) {
+        walk(file);
+      } else if (
+        /\.(tsx|ts)$/.test(entry.name) &&
+        !file.endsWith(path.join('lib', 'sections.ts'))
+      ) {
         sources.push(fs.readFileSync(file, 'utf8'));
       }
     }
@@ -204,29 +285,33 @@ const check = (what, condition, detail) => {
   walk(panelDir);
   const text = sources.join('\n');
 
-  const sectionsSrc = fs.readFileSync(
-    path.join(panelDir, 'lib', 'sections.ts'),
-    'utf8'
-  );
+  const sectionsSrc = fs.readFileSync(path.join(panelDir, 'lib', 'sections.ts'), 'utf8');
   const ordered = [
     ...new Set(
-      [...sectionsSrc.matchAll(/order: \[([\s\S]*?)\]/g)]
-        .flatMap((m) => [...m[1].matchAll(/'([^']+)'/g)].map((x) => x[1]))
+      [...sectionsSrc.matchAll(/order: \[([\s\S]*?)\]/g)].flatMap((m) =>
+        [...m[1].matchAll(/'([^']+)'/g)].map((x) => x[1]),
+      ),
     ),
   ];
   check('the sections name properties to sort', ordered.length > 40, `${ordered.length}`);
 
   const swallowed = ordered.filter(
-    (prop) => sectionOf(prop) !== 'other' && !dynamicControls.has(prop) && !text.includes(`'${prop}'`) && !text.includes(`"${prop}"`)
+    (prop) =>
+      sectionOf(prop) !== 'other' &&
+      !dynamicControls.has(prop) &&
+      !text.includes(`'${prop}'`) &&
+      !text.includes(`"${prop}"`),
   );
   check(
     'and every one of them is drawn by the section that claims it',
     swallowed.length === 0,
-    `nothing renders: ${swallowed.join(', ')} — give it a control, or list it in NO_CONTROL`
+    `nothing renders: ${swallowed.join(', ')} — give it a control, or list it in NO_CONTROL`,
   );
 
   if (failures.length) {
-    console.error(`\npanel-sections: ${failures.length} failed, ${checked - failures.length} passed\n`);
+    console.error(
+      `\npanel-sections: ${failures.length} failed, ${checked - failures.length} passed\n`,
+    );
     console.error(failures.join('\n') + '\n');
     process.exit(1);
   }

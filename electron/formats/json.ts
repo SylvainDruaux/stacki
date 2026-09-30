@@ -108,7 +108,14 @@ function parse(text: string): JsonNode {
         }
         i++;
         const v = value();
-        members.push({ key, keyStart: keySpan.start, keyEnd: keySpan.end, start: keySpan.start, end: v.end, value: v });
+        members.push({
+          key,
+          keyStart: keySpan.start,
+          keyEnd: keySpan.end,
+          start: keySpan.start,
+          end: v.end,
+          value: v,
+        });
         skip();
         if (text.charAt(i) === ',') {
           i++;
@@ -245,7 +252,11 @@ function insertion(
   unit: string,
 ): { at: number; before: string; after: string; inner: string } {
   const parts: readonly { start: number; end: number }[] =
-    container.type === 'object' ? container.members : container.type === 'array' ? container.items : [];
+    container.type === 'object'
+      ? container.members
+      : container.type === 'array'
+        ? container.items
+        : [];
   const openIndent = indentAt(text, container.start);
   const inner = openIndent + unit;
   if (!parts.length) {
@@ -255,7 +266,12 @@ function insertion(
   }
   const last = parts[parts.length - 1];
   const lastIndent = indentAt(text, last?.start ?? container.start);
-  return { at: last?.end ?? container.end - 1, before: `,\n${lastIndent}`, after: '', inner: lastIndent };
+  return {
+    at: last?.end ?? container.end - 1,
+    before: `,\n${lastIndent}`,
+    after: '',
+    inner: lastIndent,
+  };
 }
 
 const DELETE = Symbol('delete');
@@ -286,7 +302,10 @@ function applyEdits(text: string, edits: readonly Edit[]): string {
       const found = locate(root, path);
       const member = found?.member;
       if (member && 'keyEnd' in member) {
-        out = out.slice(0, member.keyStart) + JSON.stringify(String(edit.rename)) + out.slice(member.keyEnd);
+        out =
+          out.slice(0, member.keyStart) +
+          JSON.stringify(String(edit.rename)) +
+          out.slice(member.keyEnd);
       }
       continue;
     }
@@ -331,7 +350,10 @@ function applyEdits(text: string, edits: readonly Edit[]): string {
 
     if (remaining.length === 1 && target) {
       const baseIndent = indentAt(out, target.value.start);
-      out = out.slice(0, target.value.start) + print(value, baseIndent, unit) + out.slice(target.value.end);
+      out =
+        out.slice(0, target.value.start) +
+        print(value, baseIndent, unit) +
+        out.slice(target.value.end);
       continue;
     }
 
@@ -351,7 +373,11 @@ function applyEdits(text: string, edits: readonly Edit[]): string {
 // diff stays limited to those lines.
 function removeMember(text: string, container: JsonNode, member: Child): string {
   const parts: readonly Child[] | readonly { start: number; end: number }[] =
-    container.type === 'object' ? container.members : container.type === 'array' ? container.items : [];
+    container.type === 'object'
+      ? container.members
+      : container.type === 'array'
+        ? container.items
+        : [];
   const index = parts.findIndex((p) => p.start === member.start);
   const only = parts.length === 1;
   let from = member.start;

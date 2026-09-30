@@ -17,7 +17,9 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
+  if (!condition) {
+    failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  }
 };
 
 (async () => {
@@ -55,7 +57,11 @@ const check = (what, condition, detail) => {
   global.document = dom.window.document;
   global.navigator = dom.window.navigator;
   global.IS_REACT_ACT_ENVIRONMENT = true;
-  dom.window.ResizeObserver = class { observe() {} unobserve() {} disconnect() {} };
+  dom.window.ResizeObserver = class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  };
   global.ResizeObserver = dom.window.ResizeObserver;
 
   const React = require('react');
@@ -73,22 +79,40 @@ const check = (what, condition, detail) => {
     attributes: { class: 'card is-active' },
   };
   const pruned = withoutClasses(snap, new Set(['is-active']));
-  check('the class is gone from the list', pruned.classList.join(' ') === 'card', pruned.classList.join(' '));
-  check('and from the class attribute selectors read', pruned.attributes.class === 'card', pruned.attributes.class);
+  check(
+    'the class is gone from the list',
+    pruned.classList.join(' ') === 'card',
+    pruned.classList.join(' '),
+  );
+  check(
+    'and from the class attribute selectors read',
+    pruned.attributes.class === 'card',
+    pruned.attributes.class,
+  );
   check('the original is left alone', snap.classList.length === 2, `${snap.classList.length}`);
   check('hiding nothing returns the same object', withoutClasses(snap, new Set()) === snap);
   check('no snapshot stays no snapshot', withoutClasses(undefined, new Set(['x'])) === undefined);
 
   // --- which classes count as just-removed ----------------------------------
-  const node = { id: 'n1', kind: 'element', name: 'div', props: { class: { type: 'string', value: 'card is-active' } } };
+  const node = {
+    id: 'n1',
+    kind: 'element',
+    name: 'div',
+    props: { class: { type: 'string', value: 'card is-active' } },
+  };
   setHost({ selectedId: 'n1', nodes: [node], renderedClasses: ['card', 'is-active'] });
 
   const reactRoot = createRoot(document.getElementById('root'));
   // The host tells its subscribers on a microtask (see lib/host), so let it land.
-  const settle = () => act(async () => { await new Promise((r) => dom.window.setTimeout(r, 5)); });
+  const settle = () =>
+    act(async () => {
+      await new Promise((r) => dom.window.setTimeout(r, 5));
+    });
   const hidden = () => document.querySelector('[data-removed]').dataset.removed;
 
-  await act(async () => { reactRoot.render(React.createElement(Probe)); });
+  await act(async () => {
+    reactRoot.render(React.createElement(Probe));
+  });
   await settle();
   check('nothing is hidden to begin with', hidden() === '', hidden());
 
@@ -114,12 +138,17 @@ const check = (what, condition, detail) => {
   setHost({ nodes: [{ ...node }] });
   await settle();
   check('still hidden on the element it was removed from', hidden() === 'is-active', hidden());
-  setHost({ selectedId: 'n2', nodes: [{ ...node }, { id: 'n2', kind: 'element', name: 'p', props: {} }] });
+  setHost({
+    selectedId: 'n2',
+    nodes: [{ ...node }, { id: 'n2', kind: 'element', name: 'p', props: {} }],
+  });
   await settle();
   check('selecting another element carries nothing over', hidden() === '', hidden());
 
   if (failures.length) {
-    console.error(`selectors-live: ${failures.length} of ${checked} failed\n${failures.join('\n')}`);
+    console.error(
+      `selectors-live: ${failures.length} of ${checked} failed\n${failures.join('\n')}`,
+    );
     process.exit(1);
   }
   console.log(`selectors-live: ${checked} passed  [snapshot pruning, removal tracking]`);

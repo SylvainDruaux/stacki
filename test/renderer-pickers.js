@@ -54,10 +54,7 @@ const repeatedRoute = renderLink({
   route: '/care/plan-a-visit',
 });
 assert.match(repeatedRoute, />care\/plan-a-visit</);
-assert.doesNotMatch(
-  repeatedRoute,
-  /care\/plan-a-visit.*care\/plan-a-visit/,
-);
+assert.doesNotMatch(repeatedRoute, /care\/plan-a-visit.*care\/plan-a-visit/);
 assert.match(renderLink({ name: 'index.astro', route: '/' }), />index  ·  \//);
 assert.throws(
   () =>

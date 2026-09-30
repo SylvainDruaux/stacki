@@ -28,7 +28,7 @@ export function createPropertyTypeReader(document: ts.SourceFile): (type: ts.Typ
 function readPropertyType(
   type: ts.TypeNode,
   aliases: ReadonlyMap<string, ts.TypeAliasDeclaration>,
-  duplicates: ReadonlySet<string>
+  duplicates: ReadonlySet<string>,
 ): string {
   const work: TypeWork[] = [{ node: type, aliases: [] }];
   const values: string[] = [];
@@ -58,7 +58,7 @@ function readPropertyType(
 function expandPropertyType(
   item: TypeWork,
   aliases: ReadonlyMap<string, ts.TypeAliasDeclaration>,
-  duplicates: ReadonlySet<string>
+  duplicates: ReadonlySet<string>,
 ): readonly TypeWork[] | undefined {
   const node = item.node;
   if (ts.isParenthesizedTypeNode(node)) {

@@ -16,7 +16,9 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
+  if (!condition) {
+    failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  }
 };
 const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -27,16 +29,16 @@ const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
     path.join(dir, 'src', 'styles', 'tokens.css'),
     ':root {\n  --blue: #0af;\n  --ink: #111;\n  --_private: #f0f;\n}\n\n' +
       '.light { --bg: white; }\n.dark { --bg: black; }\n' +
-      '.private { --_only: hidden; }\n'
+      '.private { --_only: hidden; }\n',
   );
   fs.writeFileSync(
     path.join(dir, 'src', 'styles', 'other.css'),
-    '.card { --lift: 2px; --shade: 4px; --_private: 8px; }\n'
+    '.card { --lift: 2px; --shade: 4px; --_private: 8px; }\n',
   );
   // One rule, so one group: there is no inside to show.
   fs.writeFileSync(
     path.join(dir, 'src', 'styles', 'motion.css'),
-    ':root { --ease: linear; --duration: 200ms; --_private: 1; }\n'
+    ':root { --ease: linear; --duration: 200ms; --_private: 1; }\n',
   );
   const esbuild = require('esbuild');
   const buildDir = path.join(__dirname, '..', 'node_modules', '.stacki-test');
@@ -94,11 +96,19 @@ const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
     });
 
   await render();
-  check('stylesheets are listed', names().join('|') === 'motion.css|other.css|tokens.css', names().join('|'));
+  check(
+    'stylesheets are listed',
+    names().join('|') === 'motion.css|other.css|tokens.css',
+    names().join('|'),
+  );
   check(
     'with counts that omit private variables',
-    all('.cms-collection-count').map((n) => n.textContent).join('|') === '2 variables|2 variables|4 variables',
-    all('.cms-collection-count').map((n) => n.textContent).join('|')
+    all('.cms-collection-count')
+      .map((n) => n.textContent)
+      .join('|') === '2 variables|2 variables|4 variables',
+    all('.cms-collection-count')
+      .map((n) => n.textContent)
+      .join('|'),
   );
   check('and nothing is open yet', selected === null);
 
@@ -108,18 +118,28 @@ const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
     all('.cms-collection')[0].click();
     await settle(30);
   });
-  check('a one-group stylesheet opens straight away', selected?.file.endsWith('motion.css'), JSON.stringify(selected));
-  check('and the list stays where it was', names().join('|') === 'motion.css|other.css|tokens.css', names().join('|'));
+  check(
+    'a one-group stylesheet opens straight away',
+    selected?.file.endsWith('motion.css'),
+    JSON.stringify(selected),
+  );
+  check(
+    'and the list stays where it was',
+    names().join('|') === 'motion.css|other.css|tokens.css',
+    names().join('|'),
+  );
   check(
     'with that stylesheet marked as the open one',
     all('.cms-collection.on').length === 1 &&
       all('.cms-collection.on')[0].textContent.includes('motion.css'),
-    all('.cms-collection').map((n) => n.className).join('|')
+    all('.cms-collection')
+      .map((n) => n.className)
+      .join('|'),
   );
   check(
     'and no chevron promising more inside it',
     !all('.cms-collection')[0].querySelector('.cms-collection-chevron'),
-    'it still points further in'
+    'it still points further in',
   );
 
   // A stylesheet with more than one opens its first group and goes inside.
@@ -128,22 +148,33 @@ const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
     await settle(30);
   });
   check('opening a stylesheet selects its first group', !!selected, JSON.stringify(selected));
-  check('which is the first one', selected?.index === 0 && selected.file.endsWith('tokens.css'), JSON.stringify(selected));
+  check(
+    'which is the first one',
+    selected?.index === 0 && selected.file.endsWith('tokens.css'),
+    JSON.stringify(selected),
+  );
 
   check(
     'and groups without visible variables are omitted',
     names().join('|') === ':root|Light',
-    names().join('|')
+    names().join('|'),
   );
   check(
     'the open one is marked',
-    all('.cms-collection.on').length === 1 && all('.cms-collection.on')[0].textContent.includes(':root'),
-    all('.cms-collection').map((n) => n.className).join('|')
+    all('.cms-collection.on').length === 1 &&
+      all('.cms-collection.on')[0].textContent.includes(':root'),
+    all('.cms-collection')
+      .map((n) => n.className)
+      .join('|'),
   );
   check(
     'groups also omit private variables from their counts',
-    all('.cms-collection-count').map((n) => n.textContent).join('|') === '2 variables|2 modes',
-    all('.cms-collection-count').map((n) => n.textContent).join('|')
+    all('.cms-collection-count')
+      .map((n) => n.textContent)
+      .join('|') === '2 variables|2 modes',
+    all('.cms-collection-count')
+      .map((n) => n.textContent)
+      .join('|'),
   );
 
   // Backing out closes the sheet rather than leaving it on a file nobody is
@@ -156,7 +187,7 @@ const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
   check(
     'and shows the stylesheets again',
     names().join('|') === 'motion.css|other.css|tokens.css',
-    names().join('|')
+    names().join('|'),
   );
 
   await act(async () => reactRoot.unmount());

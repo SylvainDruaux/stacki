@@ -79,7 +79,7 @@ function lineDiff(a: readonly string[], b: readonly string[]): Run[] {
     const last = runs[runs.length - 1];
     // Adjacent runs of the same sort are one run: two changed lines next to
     // each other are one edit, not two decisions.
-    if (last && ('ours' in last) === ('ours' in run)) {
+    if (last && 'ours' in last === 'ours' in run) {
       if ('ours' in last && 'ours' in run) {
         last.ours.push(...run.ours);
         last.theirs.push(...run.theirs);
@@ -145,7 +145,11 @@ function changeIntervals(base: readonly string[], side: readonly string[]): Inte
  * `{ ours, theirs, base, changedBy }` where `changedBy` is which side actually
  * moved — 'ours', 'theirs', or 'both' when they really do disagree.
  */
-function threeWay(base: readonly string[], ours: readonly string[], theirs: readonly string[]): Run[] {
+function threeWay(
+  base: readonly string[],
+  ours: readonly string[],
+  theirs: readonly string[],
+): Run[] {
   const A = changeIntervals(base, ours);
   const B = changeIntervals(base, theirs);
   const runs: Run[] = [];
@@ -154,7 +158,10 @@ function threeWay(base: readonly string[], ours: readonly string[], theirs: read
   let bi = 0;
 
   while (ai < A.length || bi < B.length) {
-    const start = Math.min(ai < A.length ? A[ai]?.start ?? Infinity : Infinity, bi < B.length ? B[bi]?.start ?? Infinity : Infinity);
+    const start = Math.min(
+      ai < A.length ? (A[ai]?.start ?? Infinity) : Infinity,
+      bi < B.length ? (B[bi]?.start ?? Infinity) : Infinity,
+    );
     if (i < start) {
       runs.push({ common: base.slice(i, start) });
       i = start;
@@ -171,7 +178,8 @@ function threeWay(base: readonly string[], ours: readonly string[], theirs: read
     // Take whichever starts here, then anything genuinely overlapping it. A
     // zero-width edit (a pure insertion) sitting exactly at the boundary joins
     // too: both sides inserting at one point really is one disagreement.
-    const overlaps = (iv: Interval): boolean => iv.start < end || (iv.start === end && iv.start === iv.end);
+    const overlaps = (iv: Interval): boolean =>
+      iv.start < end || (iv.start === end && iv.start === iv.end);
     const takeA = (): void => {
       const iv = A[ai];
       if (iv === undefined) {
@@ -196,7 +204,7 @@ function threeWay(base: readonly string[], ours: readonly string[], theirs: read
     if (bi < B.length && B[bi]?.start === start) {
       takeB();
     }
-    for (let moved = true; moved; ) {
+    for (let moved = true; moved;) {
       moved = false;
       while (ai < A.length) {
         const iv = A[ai];
@@ -246,7 +254,8 @@ function threeWay(base: readonly string[], ours: readonly string[], theirs: read
 // them back together reproduces the text exactly. Splitting on whitespace
 // alone would lose the whitespace, and a merge that quietly reformats a line
 // is a merge nobody can trust.
-const tokenize = (text: unknown): string[] => String(text ?? '').match(/\s+|[A-Za-z0-9_]+|[^\s A-Za-z0-9_]/g) ?? [];
+const tokenize = (text: unknown): string[] =>
+  String(text ?? '').match(/\s+|[A-Za-z0-9_]+|[^\s A-Za-z0-9_]/g) ?? [];
 
 /**
  * Two edits to the same lines that do not actually touch each other.
@@ -282,7 +291,11 @@ function mergeInline(base: string | null | undefined, ours: string, theirs: stri
 // When one side still says what the ancestor said, it did not change — so the
 // other side's edit is the only edit, and defaulting to it loses nothing.
 // Only when both moved is there a real disagreement to put to the user.
-function whoChanged(ours: string, theirs: string, base: string | null | undefined): 'ours' | 'theirs' | 'both' {
+function whoChanged(
+  ours: string,
+  theirs: string,
+  base: string | null | undefined,
+): 'ours' | 'theirs' | 'both' {
   if (base == null) {
     return 'both';
   }
@@ -389,7 +402,9 @@ function parseConflict(text: unknown): ConflictPart[] {
     const split = sawBase
       ? threeWay(base, ours, theirs)
       : lineDiff(ours, theirs).map((r): Run =>
-          'ours' in r ? { ...r, changedBy: whoChanged(r.ours.join('\n'), r.theirs.join('\n'), null) } : r,
+          'ours' in r
+            ? { ...r, changedBy: whoChanged(r.ours.join('\n'), r.theirs.join('\n'), null) }
+            : r,
         );
     for (const run of split) {
       if (!('ours' in run)) {
@@ -432,7 +447,10 @@ const clashCount = (parts: readonly ConflictPart[] | null | undefined): number =
  * in, the first is worse, because the incoming version is still on its branch
  * and theirs may exist nowhere else.
  */
-function renderResolved(parts: readonly ConflictPart[] | null | undefined, picks: readonly unknown[] = []): string {
+function renderResolved(
+  parts: readonly ConflictPart[] | null | undefined,
+  picks: readonly unknown[] = [],
+): string {
   let n = -1;
   return (parts ?? [])
     .map((part) => {

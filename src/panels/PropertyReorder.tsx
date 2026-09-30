@@ -6,7 +6,7 @@ import { DragIcon } from '../ui/Icons';
 export function movePropertyItem<Value>(
   items: readonly Value[],
   source: number,
-  gap: number
+  gap: number,
 ): readonly Value[] {
   assert(items.length <= PROPERTY_LIMITS.fieldsMax, 'Property list exceeds bounds');
   assert(Number.isSafeInteger(source), 'Property source index must be an integer');

@@ -19,7 +19,9 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
+  if (!condition) {
+    failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  }
 };
 
 (async () => {
@@ -42,16 +44,28 @@ const check = (what, condition, detail) => {
   );
 
   check('the folder’s own page leads', leadsFolders('index.astro') === true);
-  check('however it is spelled', leadsFolders('index') === true && leadsFolders('Index.astro') === true);
+  check(
+    'however it is spelled',
+    leadsFolders('index') === true && leadsFolders('Index.astro') === true,
+  );
   check('an .mdx one too', leadsFolders('index.mdx') === true);
   check('a page merely starting with the word does not', leadsFolders('index-old.astro') === false);
-  check('nor does anything else', leadsFolders('about.astro') === false && leadsFolders('404.astro') === false);
+  check(
+    'nor does anything else',
+    leadsFolders('about.astro') === false && leadsFolders('404.astro') === false,
+  );
   check(
     'and among pages it still sorts first',
-    ['story.astro', 'index.astro', '404.astro'].sort(comparePageNames)[0] === 'index.astro'
+    ['story.astro', 'index.astro', '404.astro'].sort(comparePageNames)[0] === 'index.astro',
   );
-  check('with the numbered ones last', ['story.astro', '404.astro'].sort(comparePageNames)[1] === '404.astro');
-  check('naturally, not asciibetically', ['page-10.astro', 'page-2.astro'].sort(comparePageNames)[0] === 'page-2.astro');
+  check(
+    'with the numbered ones last',
+    ['story.astro', '404.astro'].sort(comparePageNames)[1] === '404.astro',
+  );
+  check(
+    'naturally, not asciibetically',
+    ['page-10.astro', 'page-2.astro'].sort(comparePageNames)[0] === 'page-2.astro',
+  );
   check('the rank is what says so', pageRank('index.astro') === 0 && pageRank('about.astro') === 1);
 
   // --- the panel that draws it --------------------------------------------------
@@ -59,8 +73,8 @@ const check = (what, condition, detail) => {
   fs.writeFileSync(
     entry,
     `export { default as PagesPanel } from ${JSON.stringify(
-      path.join(__dirname, '..', 'src', 'panels', 'PagesPanel.tsx')
-    )};\n`
+      path.join(__dirname, '..', 'src', 'panels', 'PagesPanel.tsx'),
+    )};\n`,
   );
   const bundle = path.join(buildDir, 'page-order.bundle.js');
   await esbuild.build({
@@ -87,7 +101,11 @@ const check = (what, condition, detail) => {
   global.requestAnimationFrame = dom.window.requestAnimationFrame.bind(dom.window);
   global.cancelAnimationFrame = dom.window.cancelAnimationFrame.bind(dom.window);
   global.IS_REACT_ACT_ENVIRONMENT = true;
-  dom.window.ResizeObserver = class { observe() {} unobserve() {} disconnect() {} };
+  dom.window.ResizeObserver = class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  };
   global.ResizeObserver = dom.window.ResizeObserver;
 
   const React = require('react');
@@ -97,7 +115,11 @@ const check = (what, condition, detail) => {
 
   // A project shaped like the one that showed this: folders at the root, and
   // the home page among them.
-  const page = (name) => ({ path: `/p/src/pages/${name}`, name, route: '/' + name.replace(/(index)?\.astro$/, '') });
+  const page = (name) => ({
+    path: `/p/src/pages/${name}`,
+    name,
+    route: '/' + name.replace(/(index)?\.astro$/, ''),
+  });
   const scan = {
     pages: [
       page('about/beliefs.astro'),
@@ -128,7 +150,7 @@ const check = (what, condition, detail) => {
         onCreateFolder: () => {},
         onRenameFolder: () => {},
         onDeleteFolder: () => {},
-      })
+      }),
     );
     await new Promise((r) => setTimeout(r, 30));
   });
@@ -145,10 +167,22 @@ const check = (what, condition, detail) => {
       .filter(Boolean);
 
   const order = listed();
-  check('the site’s own page is the first thing in the list', order[0] === 'index', order.join(' · '));
+  check(
+    'the site’s own page is the first thing in the list',
+    order[0] === 'index',
+    order.join(' · '),
+  );
   check('above every folder', order.indexOf('index') < order.indexOf('about/'), order.join(' · '));
-  check('the folders are still together, in order', order.indexOf('about/') < order.indexOf('care/'), order.join(' · '));
-  check('and the other root pages are still below them', order.indexOf('branding') > order.indexOf('care/'), order.join(' · '));
+  check(
+    'the folders are still together, in order',
+    order.indexOf('about/') < order.indexOf('care/'),
+    order.join(' · '),
+  );
+  check(
+    'and the other root pages are still below them',
+    order.indexOf('branding') > order.indexOf('care/'),
+    order.join(' · '),
+  );
   check('a numbered page is still last', order[order.length - 1] === '404', order.join(' · '));
   check('nothing was lost on the way', order.length === 9, order.join(' · '));
 
@@ -156,7 +190,11 @@ const check = (what, condition, detail) => {
   // it leads what is inside the folder rather than sorting among it.
   const inFolder = order.slice(order.indexOf('about/') + 1, order.indexOf('care/'));
   check('a folder’s own page leads what is inside it', inFolder[0] === 'index', order.join(' · '));
-  check('with the rest of the folder after it', inFolder.join() === 'index,beliefs,story', inFolder.join());
+  check(
+    'with the rest of the folder after it',
+    inFolder.join() === 'index,beliefs,story',
+    inFolder.join(),
+  );
 
   // The row that leads is the folder's, not something that happens to be
   // called index: collapsing the folder takes it with it.
@@ -167,8 +205,16 @@ const check = (what, condition, detail) => {
     await new Promise((r) => setTimeout(r, 20));
   });
   const closed = listed();
-  check('closing the folder puts its own page away too', closed.filter((r) => r === 'index').length === 1, closed.join(' · '));
-  check('and the site’s page is still at the top', closed[0] === 'index' && closed[1] === 'about/', closed.join(' · '));
+  check(
+    'closing the folder puts its own page away too',
+    closed.filter((r) => r === 'index').length === 1,
+    closed.join(' · '),
+  );
+  check(
+    'and the site’s page is still at the top',
+    closed[0] === 'index' && closed[1] === 'about/',
+    closed.join(' · '),
+  );
 
   if (failures.length) {
     console.error(`\npage-order: ${failures.length} failed, ${checked - failures.length} passed\n`);

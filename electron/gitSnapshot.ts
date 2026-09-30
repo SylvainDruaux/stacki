@@ -15,7 +15,6 @@
 
 import type { Git } from './git.js';
 
-
 /**
  * Save a version.
  *
@@ -25,7 +24,15 @@ import type { Git } from './git.js';
  */
 async function commit(
   git: Git,
-  { projectPath, message, paths }: { readonly projectPath: string; readonly message?: string; readonly paths?: readonly unknown[] },
+  {
+    projectPath,
+    message,
+    paths,
+  }: {
+    readonly projectPath: string;
+    readonly message?: string;
+    readonly paths?: readonly unknown[];
+  },
 ): Promise<{ ok: true; files: number | null }> {
   const subject = message || 'Update from Stacki';
   const chosen = Array.isArray(paths) ? paths.filter(Boolean).map(String) : null;
@@ -64,7 +71,11 @@ async function commit(
  */
 async function restoreFile(
   git: Git,
-  { projectPath, ref, path: filePath }: { readonly projectPath: string; readonly ref: string; readonly path: string },
+  {
+    projectPath,
+    ref,
+    path: filePath,
+  }: { readonly projectPath: string; readonly ref: string; readonly path: string },
 ): Promise<{ ok: boolean; missing?: boolean; message?: string }> {
   try {
     await git(projectPath, ['cat-file', '-e', `${ref}:${filePath}`]);
@@ -94,7 +105,11 @@ async function restoreFile(
  */
 async function restoreProject(
   git: Git,
-  { projectPath, ref, park }: { readonly projectPath: string; readonly ref: string; readonly park?: () => Promise<boolean> },
+  {
+    projectPath,
+    ref,
+    park,
+  }: { readonly projectPath: string; readonly ref: string; readonly park?: () => Promise<boolean> },
 ): Promise<{ ok: boolean; parked: boolean }> {
   const dirty = (await git(projectPath, ['status', '--porcelain'])).stdout.trim().length > 0;
   let parked = false;

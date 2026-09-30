@@ -64,7 +64,12 @@ function pick(rand: () => number, options: readonly string[]): string {
 // Adjacent sibling text nodes merge on re-parse (the serializer writes them
 // with no separator) — a generator constraint, not a contract bug. A comment
 // keeps them apart on both sides of the roundtrip.
-function pushChild(rand: () => number, nextId: () => string, depth: number, children: GeneratedNode[]): void {
+function pushChild(
+  rand: () => number,
+  nextId: () => string,
+  depth: number,
+  children: GeneratedNode[],
+): void {
   let child = generateNode(rand, nextId, depth);
   const previous = children[children.length - 1];
   if (child.kind === 'text' && previous?.kind === 'text') {
@@ -76,13 +81,22 @@ function pushChild(rand: () => number, nextId: () => string, depth: number, chil
 function generateNode(rand: () => number, nextId: () => string, depth: number): GeneratedNode {
   const shape = rand();
   if (depth >= 3 || shape < 0.3) {
-    return { kind: 'text', id: nextId(), value: `${pick(rand, WORDS)} ${Math.floor(rand() * 100)}` };
+    return {
+      kind: 'text',
+      id: nextId(),
+      value: `${pick(rand, WORDS)} ${Math.floor(rand() * 100)}`,
+    };
   }
   if (shape < 0.4) {
     return { kind: 'comment', id: nextId(), value: ` note ${Math.floor(rand() * 100)} ` };
   }
   if (shape < 0.45) {
-    return { kind: 'raw', id: nextId(), name: 'style', inner: `.x${Math.floor(rand() * 10)} { color: red; }` };
+    return {
+      kind: 'raw',
+      id: nextId(),
+      name: 'style',
+      inner: `.x${Math.floor(rand() * 10)} { color: red; }`,
+    };
   }
   const name = pick(rand, NAMES);
   const props: Record<string, unknown> = {};
@@ -134,7 +148,13 @@ function loose(node: GeneratedNode): unknown {
       const children = (node.children ?? [])
         .filter((child) => !(child.kind === 'text' && (child.value ?? '').trim() === ''))
         .map(loose);
-      return { kind: node.kind, name: node.name, props, children, selfClosing: node.children === null };
+      return {
+        kind: node.kind,
+        name: node.name,
+        props,
+        children,
+        selfClosing: node.children === null,
+      };
     }
     default:
       return { kind: node.kind };

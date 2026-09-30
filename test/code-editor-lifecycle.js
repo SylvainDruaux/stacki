@@ -11,7 +11,7 @@ const path = require('node:path');
 (async () => {
   const outfile = path.join(
     __dirname,
-    '../node_modules/.stacki-test/code-editor-lifecycle.bundle.js'
+    '../node_modules/.stacki-test/code-editor-lifecycle.bundle.js',
   );
   await require('esbuild').build({
     stdin: {
@@ -80,8 +80,8 @@ const path = require('node:path');
           componentRanges: ranges ? [{ from: 0, to: 3, id: 'one', name: 'One' }] : [],
           onPositionChange: (position) => positions.push(position),
           onOpenComponent: (name, id) => components.push({ name, id }),
-        })
-      )
+        }),
+      ),
     );
   };
   try {
@@ -90,7 +90,7 @@ const path = require('node:path');
     assert.equal(view.state.selection.main.head, 4, 'initial reveal goes to the requested line');
     assert.ok(
       document.querySelector('.cm-code-muted'),
-      'code outside the selected range is dimmed'
+      'code outside the selected range is dimmed',
     );
     assert.ok(document.querySelector('.cm-component-link'), 'component names receive link marks');
     view.posAtCoords = () => 1;
@@ -106,7 +106,7 @@ const path = require('node:path');
       view.dispatch({
         selection: { anchor: view.state.doc.length },
         changes: { from: view.state.doc.length, insert: '!' },
-      })
+      }),
     );
     assert.deepEqual(changes, ['one\ntwo\nthree!'], 'user edits emit exactly once');
     const caret = view.state.selection.main.head;
@@ -114,7 +114,7 @@ const path = require('node:path');
     assert.equal(
       view.state.selection.main.head,
       caret,
-      'controlled typing does not jump back to the revealed line'
+      'controlled typing does not jump back to the revealed line',
     );
     await render('external\nupdated\nsource');
     assert.equal(view.state.doc.toString(), 'external\nupdated\nsource');
@@ -133,7 +133,7 @@ const path = require('node:path');
     assert.equal(
       view.state.selection.main.head,
       view.state.doc.line(3).from,
-      'a new reveal request still moves the caret'
+      'a new reveal request still moves the caret',
     );
     const astroSource = '<Heading tag="h1" maxWidth={17}>Find hope.</Heading>';
     await render(astroSource, null, false, 'astro');
@@ -150,22 +150,18 @@ const path = require('node:path');
     assert.match(
       component.getAttribute('style'),
       /rgb\(127, 166, 184\)/,
-      'components use muted blue'
+      'components use muted blue',
     );
     assert.match(
       attribute.getAttribute('style'),
       /rgb\(170, 148, 192\)/,
-      'attributes use muted purple'
+      'attributes use muted purple',
     );
-    assert.match(
-      number.getAttribute('style'),
-      /rgb\(201, 148, 112\)/,
-      'numbers use muted orange'
-    );
+    assert.match(number.getAttribute('style'), /rgb\(201, 148, 112\)/, 'numbers use muted orange');
     assert.match(
       punctuation.getAttribute('style'),
       /rgb\(174, 120, 159\)/,
-      'tag punctuation uses muted pink'
+      'tag punctuation uses muted pink',
     );
     assert.deepEqual(errors, [], 'the editor reports no asynchronous errors');
   } finally {

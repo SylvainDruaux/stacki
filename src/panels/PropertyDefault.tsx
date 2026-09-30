@@ -16,7 +16,7 @@ export function PropertyDefault({ property, frontmatter, onChange }: DefaultProp
     ['string', 'number', 'boolean'].includes(property.type) ||
     literalOptions(property.type) !== undefined;
   const [mode, setMode] = useState<'value' | 'expression'>(
-    simple && isLiteralDefault(property) ? 'value' : 'expression'
+    simple && isLiteralDefault(property) ? 'value' : 'expression',
   );
   const expression = mode === 'expression';
   const action = expression ? 'Use the default value control' : 'Write a default expression';
@@ -116,7 +116,7 @@ function defaultChoice(choices: readonly string[], expression: string): string {
       (choice) =>
         choice === expression ||
         (propertyDefaultText(choice) !== undefined &&
-          propertyDefaultText(choice) === propertyDefaultText(expression))
+          propertyDefaultText(choice) === propertyDefaultText(expression)),
     ) ?? ''
   );
 }

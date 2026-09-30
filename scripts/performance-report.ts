@@ -85,7 +85,11 @@ const cases: ReadonlyArray<
   ['Unchanged siblings', keys, keys],
   ['Append one sibling', keys, [...keys, 'new']],
   ['Remove last sibling', keys, keys.slice(0, -1)],
-  ['Swap first two siblings', keys.slice(0, 200), [keys[1] ?? '', keys[0] ?? '', ...keys.slice(2, 200)]],
+  [
+    'Swap first two siblings',
+    keys.slice(0, 200),
+    [keys[1] ?? '', keys[0] ?? '', ...keys.slice(2, 200)],
+  ],
 ];
 
 console.log('Preview sibling diff; mean of 5 warm runs. Matrix bytes exclude inputs.');

@@ -110,7 +110,11 @@ export function projectPage(text: string, result: ParsePageResult): Projection {
   assert(byteLength <= LIMITS.sourceBytesMax, 'Projected source is inside the file bound');
   if (!result.editable) {
     const near = result.bail === null ? undefined : clip(result.bail.near);
-    return { tag: 'parse-error', byteLength, diagnostics: [{ message: clip(result.reason), near }] };
+    return {
+      tag: 'parse-error',
+      byteLength,
+      diagnostics: [{ message: clip(result.reason), near }],
+    };
   }
   const model = result.model;
   assert(model.bodyStart !== undefined, 'The projected parse recorded source offsets');

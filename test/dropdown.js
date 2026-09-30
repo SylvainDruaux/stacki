@@ -17,7 +17,9 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
+  if (!condition) {
+    failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  }
 };
 const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -78,7 +80,7 @@ const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
           onPick: (i) => {
             picked = i;
           },
-        })
+        }),
       );
       await settle(20);
     });
@@ -86,7 +88,10 @@ const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
   await render(ids);
   check('the trigger reads as a generated route', !!find('.dd-trigger.collection'));
   check('and carries a page glyph', !!find('.dd-trigger .dd-icon svg'));
-  check('showing the current entry', /editorial-calendar-notes/.test(find('.dd-label')?.textContent || ''));
+  check(
+    'showing the current entry',
+    /editorial-calendar-notes/.test(find('.dd-label')?.textContent || ''),
+  );
 
   await act(async () => {
     find('.dd-trigger').click();
@@ -94,29 +99,40 @@ const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
   });
   check('the popup opens', !!find('.dd-popup'));
   check('purple carries into the list', !!find('.dd-popup.collection'));
-  check('every option has a glyph', all('.dd-option .dd-icon svg').length === ids.length, `${all('.dd-option .dd-icon svg').length}`);
+  check(
+    'every option has a glyph',
+    all('.dd-option .dd-icon svg').length === ids.length,
+    `${all('.dd-option .dd-icon svg').length}`,
+  );
   check('the current one is ticked', !!find('.dd-option.selected .dd-check svg'));
   check('the list has a filter box', !!find('.dd-search'));
 
   // Typing narrows it.
   await act(async () => {
     const input = find('.dd-search');
-    const setter = Object.getOwnPropertyDescriptor(dom.window.HTMLInputElement.prototype, 'value').set;
+    const setter = Object.getOwnPropertyDescriptor(
+      dom.window.HTMLInputElement.prototype,
+      'value',
+    ).set;
     setter.call(input, 'spring');
     input.dispatchEvent(new dom.window.Event('input', { bubbles: true }));
     await settle(20);
   });
-  check('the filter narrows the list', all('.dd-option').length === 3, `${all('.dd-option').length} shown`);
+  check(
+    'the filter narrows the list',
+    all('.dd-option').length === 3,
+    `${all('.dd-option').length} shown`,
+  );
   check(
     'to the options that match',
-    all('.dd-option').every((node) => /spring/.test(node.textContent))
+    all('.dd-option').every((node) => /spring/.test(node.textContent)),
   );
 
   // And Enter picks what the filtered list is highlighting, not what the
   // unfiltered one would have.
   await act(async () => {
     find('.dd-search').dispatchEvent(
-      new dom.window.KeyboardEvent('keydown', { key: 'Enter', bubbles: true })
+      new dom.window.KeyboardEvent('keydown', { key: 'Enter', bubbles: true }),
     );
     await settle(20);
   });
@@ -140,7 +156,7 @@ const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
   // forever when a real collection has hundreds of entries.
   const scrollHeight = Object.getOwnPropertyDescriptor(
     dom.window.HTMLElement.prototype,
-    'scrollHeight'
+    'scrollHeight',
   );
   Object.defineProperty(dom.window.HTMLElement.prototype, 'scrollHeight', {
     configurable: true,
@@ -176,7 +192,7 @@ const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
   });
   check(
     'a large controlled picker switches entries',
-    find('.dd-label')?.textContent === 'sermon-295'
+    find('.dd-label')?.textContent === 'sermon-295',
   );
   check('and closes after switching', !find('.dd-popup'));
   if (scrollHeight) {
@@ -195,7 +211,7 @@ const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
   // a second — so the one thing this must not do is ask for the same value
   // twice, which is exactly what picking the option you had just hovered did.
   {
-    const Dropdown = require((
+    const Dropdown = require(
       await (async () => {
         const out = path.join(buildDir, 'dropdown.bundle.js');
         await esbuild.build({
@@ -209,8 +225,8 @@ const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
           logLevel: 'silent',
         });
         return out;
-      })()
-    )).default;
+      })(),
+    ).default;
 
     const applied = [];
     const root2 = createRoot(container);
@@ -226,7 +242,7 @@ const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
             value,
             options: OPTIONS,
             onChange: (v) => applied.push(v),
-          })
+          }),
         );
         await settle(20);
       });
@@ -241,13 +257,20 @@ const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
     const hover = (label) =>
       act(async () => {
         option(label)?.dispatchEvent(
-          new dom.window.MouseEvent('mouseover', { bubbles: true, relatedTarget: dom.window.document.body })
+          new dom.window.MouseEvent('mouseover', {
+            bubbles: true,
+            relatedTarget: dom.window.document.body,
+          }),
         );
         await settle(20);
       });
 
     await hover('play');
-    check('hovering an option applies it, so the canvas can show it', applied.join() === 'play', applied.join());
+    check(
+      'hovering an option applies it, so the canvas can show it',
+      applied.join() === 'play',
+      applied.join(),
+    );
 
     await act(async () => {
       option('play')?.click();
@@ -256,7 +279,7 @@ const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
     check(
       'and picking the option you hovered does not ask for it again',
       applied.join() === 'play',
-      applied.join()
+      applied.join(),
     );
     check('the popup closes on the pick', !find('.dd-popup'), 'still open');
 

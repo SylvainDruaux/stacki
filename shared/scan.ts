@@ -54,7 +54,9 @@ function parseSchemaArray(input: unknown, where: string): readonly PropField[] {
   if (input.length > LIMITS.propSchemaFieldsMax) {
     fail(where, `exceeds ${LIMITS.propSchemaFieldsMax} fields`);
   }
-  return input.map((field, index) => parseField(field, `${where}[${index}]`)) as readonly PropField[];
+  return input.map((field, index) =>
+    parseField(field, `${where}[${index}]`),
+  ) as readonly PropField[];
 }
 
 function asString(value: unknown, where: string): string {
@@ -169,14 +171,14 @@ export function parseScanResult(input: unknown): ScanResult {
     pages: asArray(record['pages'], 'pages', LIMITS.scanEntriesMax).map((entry, index) =>
       parsePage(entry, `pages[${index}]`),
     ),
-    pageFolders: asArray(record['pageFolders'], 'pageFolders', LIMITS.scanFoldersMax).map((folder, index) =>
-      asString(folder, `pageFolders[${index}]`),
+    pageFolders: asArray(record['pageFolders'], 'pageFolders', LIMITS.scanFoldersMax).map(
+      (folder, index) => asString(folder, `pageFolders[${index}]`),
     ),
     layouts: asArray(record['layouts'], 'layouts', LIMITS.scanEntriesMax).map((entry, index) =>
       parseComponent(entry, `layouts[${index}]`),
     ),
-    components: asArray(record['components'], 'components', LIMITS.scanEntriesMax).map((entry, index) =>
-      parseComponent(entry, `components[${index}]`),
+    components: asArray(record['components'], 'components', LIMITS.scanEntriesMax).map(
+      (entry, index) => parseComponent(entry, `components[${index}]`),
     ),
   };
   if (record['trailingSlash'] !== undefined) {

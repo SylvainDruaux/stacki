@@ -376,7 +376,10 @@ function useDockResize(
     startDrag(event, {
       cursor: 'ns-resize',
       onMove: (move) => {
-        nextHeight = Math.min(heightMax, Math.max(HEIGHT_PX_MIN, startHeight + startY - move.clientY));
+        nextHeight = Math.min(
+          heightMax,
+          Math.max(HEIGHT_PX_MIN, startHeight + startY - move.clientY),
+        );
         setHeight(nextHeight);
       },
       onEnd: () => {
@@ -409,7 +412,9 @@ function useVisiblePaneFit(
 function cleanLabel(raw: string): string {
   const flat = raw.replace(CONTROL_CHARS, ' ').replace(/\s+/g, ' ').trim();
   const short = shortenPathLike(flat);
-  return short.length <= LABEL_CHARS_MAX ? short : `${short.slice(0, LABEL_CHARS_MAX - 1).trimEnd()}…`;
+  return short.length <= LABEL_CHARS_MAX
+    ? short
+    : `${short.slice(0, LABEL_CHARS_MAX - 1).trimEnd()}…`;
 }
 
 function shortenPathLike(label: string): string {

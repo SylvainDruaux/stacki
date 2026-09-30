@@ -151,10 +151,7 @@ export async function tidyUp({
     showToast(`${merged}, and deleted ${branch}`, 'success');
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    showToast(
-      `${merged}. ${branch} could not be deleted: ${message}`,
-      'info',
-    );
+    showToast(`${merged}. ${branch} could not be deleted: ${message}`, 'info');
   }
 }
 
@@ -214,7 +211,8 @@ async function mergeDirtyWork(
   const named = files?.length ? files.slice(0, 3).join(', ') : 'a file the merge needs';
   const park = await confirmDialog({
     title: 'You have unsaved work in the way',
-    body: `${named} ${files?.length === 1 ? 'has' : 'have'} changes that aren’t saved, ` +
+    body:
+      `${named} ${files?.length === 1 ? 'has' : 'have'} changes that aren’t saved, ` +
       'and the merge needs to write there. Your work can be set aside and put back ' +
       'afterwards — nothing is lost either way.',
     confirmLabel: 'Set it aside and merge',

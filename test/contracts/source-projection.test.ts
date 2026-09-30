@@ -28,7 +28,8 @@ import {
 } from '../../dist/shared/source-projection.js';
 import { encodeUtf8, type ByteString } from '../../dist/shared/span.js';
 
-const project = (text: string) => projectPage(text, parsePageResult(parsePage(text, { locs: true })));
+const project = (text: string) =>
+  projectPage(text, parsePageResult(parsePage(text, { locs: true })));
 const sha256 = (bytes: ByteString) => toDigest(createHash('sha256').update(bytes).digest('hex'));
 
 function valid(text: string): readonly ProjectedNode[] {
@@ -78,7 +79,11 @@ test('each node is classified by plan §6: loops repeat, code is opaque, the res
       ['...rest', 'read-only-opaque'],
     ],
   );
-  assert.equal(byPath.get('0/0')?.capability, 'read-only-opaque', 'set:html writes children at runtime');
+  assert.equal(
+    byPath.get('0/0')?.capability,
+    'read-only-opaque',
+    'set:html writes children at runtime',
+  );
   assert.equal(byPath.get('0/1')?.kind, 'map');
   assert.equal(byPath.get('0/1')?.capability, 'editable', 'the loop itself is the source node');
   assert.equal(byPath.get('0/1/0')?.capability, 'repeated-source-node');
@@ -198,9 +203,14 @@ test('a snapshot computes its checksum from its bytes and matches its projection
   const snapshot = createSnapshot({ path, bytes, projection: project(text) }, sha256);
   assert.equal(snapshot.checksum, createHash('sha256').update(text, 'utf8').digest('hex'));
   assert.equal(snapshot.bytes, bytes);
-  assert.deepEqual(Object.keys(snapshot).sort(), ['bytes', 'checksum', 'path', 'projection'], 'no version field');
+  assert.deepEqual(
+    Object.keys(snapshot).sort(),
+    ['bytes', 'checksum', 'path', 'projection'],
+    'no version field',
+  );
   assert.throws(
-    () => createSnapshot({ path, bytes: encodeUtf8(`${text} `), projection: project(text) }, sha256),
+    () =>
+      createSnapshot({ path, bytes: encodeUtf8(`${text} `), projection: project(text) }, sha256),
     /derived from bytes of this length/,
   );
 });

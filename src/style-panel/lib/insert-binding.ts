@@ -12,13 +12,11 @@
 
 /** `!important` and whatever whitespace led up to it, kept aside and put back. */
 function splitImportant(value: string): { body: string; suffix: string } {
-  const m = value.match(/(\s*!\s*important\s*)$/i)
-  return m
-    ? { body: value.slice(0, m.index), suffix: m[1] ?? '' }
-    : { body: value, suffix: '' }
+  const m = value.match(/(\s*!\s*important\s*)$/i);
+  return m ? { body: value.slice(0, m.index), suffix: m[1] ?? '' } : { body: value, suffix: '' };
 }
 
-const LONE_VAR = /^var\(\s*--[A-Za-z0-9_-]+\s*(?:,[^)]*)?\)$/i
+const LONE_VAR = /^var\(\s*--[A-Za-z0-9_-]+\s*(?:,[^)]*)?\)$/i;
 
 /**
  * Is this a value picking a variable should replace outright?
@@ -29,27 +27,37 @@ const LONE_VAR = /^var\(\s*--[A-Za-z0-9_-]+\s*(?:,[^)]*)?\)$/i
  * than one part in it, where replacing would throw away the rest.
  */
 export function replacesWholeValue(value: string): boolean {
-  const { body } = splitImportant(String(value ?? ''))
-  const t = body.trim()
-  if (!t) {return true}
-  if (LONE_VAR.test(t)) {return true}
+  const { body } = splitImportant(String(value ?? ''));
+  const t = body.trim();
+  if (!t) {
+    return true;
+  }
+  if (LONE_VAR.test(t)) {
+    return true;
+  }
   // A function call — calc(), clamp(), color-mix(), min(), any of them.
-  if (t.includes('(')) {return false}
+  if (t.includes('(')) {
+    return false;
+  }
   // `1px solid red`: three parts, and a variable is being picked for one of
   // them. Replacing would drop the other two.
-  if (/\s/.test(t)) {return false}
-  return true
+  if (/\s/.test(t)) {
+    return false;
+  }
+  return true;
 }
 
 /** The `var(…)` around `caret`, if the caret is inside one. */
 function varAround(value: string, caret: number): { start: number; end: number } | null {
-  const re = /var\(\s*--[A-Za-z0-9_-]+\s*(?:,[^)]*)?\)/gi
+  const re = /var\(\s*--[A-Za-z0-9_-]+\s*(?:,[^)]*)?\)/gi;
   for (let m = re.exec(value); m; m = re.exec(value)) {
-    const start = m.index
-    const end = start + m[0].length
-    if (caret >= start && caret <= end) {return { start, end }}
+    const start = m.index;
+    const end = start + m[0].length;
+    if (caret >= start && caret <= end) {
+      return { start, end };
+    }
   }
-  return null
+  return null;
 }
 
 /**
@@ -60,10 +68,12 @@ function varAround(value: string, caret: number): { start: number; end: number }
  * declaration does, and nobody picking a variable asked for that.
  */
 export function insertBinding(value: string, binding: string, caret: number | null): string {
-  const text = String(value ?? '')
-  const { body, suffix } = splitImportant(text)
+  const text = String(value ?? '');
+  const { body, suffix } = splitImportant(text);
 
-  if (replacesWholeValue(text)) {return binding + suffix}
+  if (replacesWholeValue(text)) {
+    return binding + suffix;
+  }
 
   // No caret to work from — the field was never focused, or the selection went
   // before the picker opened. Swapping the variable already there is the best
@@ -76,14 +86,16 @@ export function insertBinding(value: string, binding: string, caret: number | nu
   // variable stuck on the end is visibly wrong and takes a second to fix; a
   // calc() that has vanished has to be written again from memory.
   if (caret == null) {
-    const existing = body.match(/var\(\s*--[A-Za-z0-9_-]+\s*(?:,[^)]*)?\)/i)
-    return existing ? text.replace(existing[0], binding) : body + binding + suffix
+    const existing = body.match(/var\(\s*--[A-Za-z0-9_-]+\s*(?:,[^)]*)?\)/i);
+    return existing ? text.replace(existing[0], binding) : body + binding + suffix;
   }
 
-  const at = Math.max(0, Math.min(caret, body.length))
+  const at = Math.max(0, Math.min(caret, body.length));
   // Sitting inside a variable already: this is a swap, not an insertion — two
   // variables nested where one was meant is never what was wanted.
-  const around = varAround(body, at)
-  if (around) {return body.slice(0, around.start) + binding + body.slice(around.end) + suffix}
-  return body.slice(0, at) + binding + body.slice(at) + suffix
+  const around = varAround(body, at);
+  if (around) {
+    return body.slice(0, around.start) + binding + body.slice(around.end) + suffix;
+  }
+  return body.slice(0, at) + binding + body.slice(at) + suffix;
 }

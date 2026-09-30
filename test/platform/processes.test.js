@@ -70,7 +70,11 @@ for (const at of ['after-rename', 'before-rename']) {
       assert.equal(run.signal, 'SIGKILL', 'the writer died inside the write');
       const [staged, ...rest] = run.lines.map((line) => JSON.parse(line));
       assert.deepEqual(rest, [], 'it reported nothing after staging: no outcome was delivered');
-      assert.equal(staged.candidate, sha256('candidate\n'), 'the candidate checksum is deterministic');
+      assert.equal(
+        staged.candidate,
+        sha256('candidate\n'),
+        'the candidate checksum is deterministic',
+      );
       const verdict = reconcileUncertain({
         baseChecksum: staged.base,
         candidateChecksum: staged.candidate,
@@ -78,7 +82,10 @@ for (const at of ['after-rename', 'before-rename']) {
       });
       assert.equal(verdict, at === 'after-rename' ? 'applied' : 'not-applied');
       const leftovers = protocolLeftovers(root);
-      assert.ok(leftovers.some((name) => name.startsWith('.stacki-lock-')), 'its lock is left');
+      assert.ok(
+        leftovers.some((name) => name.startsWith('.stacki-lock-')),
+        'its lock is left',
+      );
       assert.ok(leftovers.every(isAtomicTemporary), 'everything left is ignored by the watcher');
       // The next writer breaks the dead writer's lock and saves normally.
       const documents = realHost();

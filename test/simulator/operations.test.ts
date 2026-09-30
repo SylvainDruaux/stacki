@@ -385,10 +385,7 @@ test('rename-attribute renames in place; a missing name or a clash is refused', 
   assert.equal(run(page, rename('alt', 'title'), anchor), 'rejected: anchor-moved');
   assert.equal(run(page, rename('href', 'title'), anchor), 'rejected: unsupported-operation');
   const twice = snapshotText('<a x="1" x="2">x</a>\n');
-  assert.equal(
-    run(twice, rename('x', 'y'), anchorAt(twice, [0])),
-    'rejected: anchor-ambiguous',
-  );
+  assert.equal(run(twice, rename('x', 'y'), anchorAt(twice, [0])), 'rejected: anchor-ambiguous');
 });
 
 test('rewrite-node writes its hunks inside the node, and only while the node is unchanged', () => {

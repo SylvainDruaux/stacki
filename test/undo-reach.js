@@ -29,7 +29,9 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
+  if (!condition) {
+    failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  }
 };
 
 const read = (...p) => fs.readFileSync(path.join(__dirname, '..', ...p), 'utf8');
@@ -40,19 +42,19 @@ const main = read('dist', 'electron', 'main.js');
 // The handler, from the line that registers it to the one that registers redo.
 const undoHandler = app.slice(
   app.indexOf("window.avb.onMenu('undo'"),
-  app.indexOf("window.avb.onMenu('copy'")
+  app.indexOf("window.avb.onMenu('copy'"),
 );
 
 check('undo is wired to the menu at all', undoHandler.length > 0, 'no onMenu(undo) handler');
 check(
   'a page being open is no longer the price of undoing',
   !/pageStateRef\.current\.pageState\s*&&/.test(undoHandler),
-  undoHandler.slice(0, 400)
+  undoHandler.slice(0, 400),
 );
 check(
   'and neither is the CMS being closed',
   !/cmsOpenRef\.current/.test(undoHandler),
-  undoHandler.slice(0, 400)
+  undoHandler.slice(0, 400),
 );
 check('undo still runs', /\bundo\(\);/.test(undoHandler), undoHandler.slice(0, 400));
 check('and redo', /\bredo\(\);/.test(undoHandler), undoHandler.slice(0, 400));
@@ -60,19 +62,19 @@ check('and redo', /\bredo\(\);/.test(undoHandler), undoHandler.slice(0, 400));
 check(
   'typing gets its own undo back',
   /if \(inEditable\(\)\) \{\s*runNativeEdit\('undo'\)/.test(undoHandler),
-  'a field would lose its undo to the app’s stack'
+  'a field would lose its undo to the app’s stack',
 );
 check(
   'and its own redo',
   /if \(inEditable\(\)\) \{\s*runNativeEdit\('redo'\)/.test(undoHandler),
-  undoHandler.slice(0, 600)
+  undoHandler.slice(0, 600),
 );
 // inEditable is what "typing" means here, and it is already used by copy and
 // paste for the same reason.
 check(
   'which means a field, a box or anything a caret is in',
   /el\.tagName === 'INPUT' \|\| el\.tagName === 'TEXTAREA' \|\| el\.isContentEditable/.test(app),
-  'inEditable no longer covers the three'
+  'inEditable no longer covers the three',
 );
 
 // The bridge that hands it back. test/bridge.js checks every exposed method has
@@ -82,11 +84,11 @@ check('and a native redo', /nativeRedo: invoke\('native:redo'\)/.test(preload));
 check(
   'answered by the window that has the caret in it',
   /ipcMain\.handle\('native:undo'[\s\S]{0,120}webContents\.undo\(\)/.test(main),
-  'native:undo does not reach webContents'
+  'native:undo does not reach webContents',
 );
 check(
   'and the same for redo',
-  /ipcMain\.handle\('native:redo'[\s\S]{0,120}webContents\.redo\(\)/.test(main)
+  /ipcMain\.handle\('native:redo'[\s\S]{0,120}webContents\.redo\(\)/.test(main),
 );
 
 // --- what the panels record ------------------------------------------------------
@@ -95,23 +97,23 @@ check(
 // inverse; nothing else can work it out afterwards. These are the ones that do,
 // and the check is that they still do — the variables panel had three edits
 // that wrote and said nothing, which is what "undo doesn't work here" was.
-const vars = read('src', 'panels', 'VariablesView.tsx') +
-  read('src', 'panels', 'variableHistory.ts');
+const vars =
+  read('src', 'panels', 'VariablesView.tsx') + read('src', 'panels', 'variableHistory.ts');
 for (const [what, near] of [
-  ['a value', "const save = useCallback"],
-  ['a new variable', "const add = useCallback"],
-  ['a row moved', "const move = useCallback"],
+  ['a value', 'const save = useCallback'],
+  ['a new variable', 'const add = useCallback'],
+  ['a row moved', 'const move = useCallback'],
   ['a group moved', "await writeWithUndo(selectedFile.rel, 'the group'"],
-  ['a group added', "const duplicateSection = useCallback"],
-  ['a group deleted', "const deleteSection = useCallback"],
-  ['a heading renamed', "const retitle = useCallback"],
+  ['a group added', 'const duplicateSection = useCallback'],
+  ['a group deleted', 'const deleteSection = useCallback'],
+  ['a heading renamed', 'const retitle = useCallback'],
 ]) {
   const at = vars.indexOf(near);
   const body = at === -1 ? '' : vars.slice(at, at + 1400);
   check(
     `the variables panel records ${what}`,
     at !== -1 && /writeWithUndo\(/.test(body),
-    at === -1 ? `${near} is gone` : body.slice(0, 200)
+    at === -1 ? `${near} is gone` : body.slice(0, 200),
   );
 }
 // A rename is the exception, and says so: its inverse is the rename backwards
@@ -119,14 +121,16 @@ for (const [what, near] of [
 check(
   'and a rename records its own inverse',
   /onRecordUndo\?\.\(\{[\s\S]{0,200}undo: \(\) => apply\(back\)/.test(vars),
-  'renaming would have nothing to undo with'
+  'renaming would have nothing to undo with',
 );
 // Reading the files back is the inverse for the rest, so it has to cover every
 // file an edit touched rather than the first one it happened to name.
 check(
   'a multi-file edit is recorded as all of its files',
-  /const paths = \[\.\.\.new Set\(typeof files === 'string' \? \[files\] : \(files \?\? \[\]\)\)/.test(vars),
-  'writeWithUndo still takes one file'
+  /const paths = \[\.\.\.new Set\(typeof files === 'string' \? \[files\] : \(files \?\? \[\]\)\)/.test(
+    vars,
+  ),
+  'writeWithUndo still takes one file',
 );
 
 const assets = read('src', 'panels', 'AssetsPanel.tsx');

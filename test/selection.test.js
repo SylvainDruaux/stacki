@@ -36,7 +36,9 @@ function everyNode(nodes, prefix = '') {
   nodes.forEach((node, i) => {
     const key = prefix ? `${prefix}.${i}` : String(i);
     out.push({ key, node });
-    if (Array.isArray(node.children)) {out.push(...everyNode(node.children, key));}
+    if (Array.isArray(node.children)) {
+      out.push(...everyNode(node.children, key));
+    }
   });
   return out;
 }
@@ -63,7 +65,7 @@ describe('locateSelection', () => {
         if (parent) {
           assert.ok(
             at.startLine >= parent.startLine && at.endLine <= parent.endLine,
-            `${key}: ${at.startLine}-${at.endLine} escapes its parent's ${parent.startLine}-${parent.endLine}`
+            `${key}: ${at.startLine}-${at.endLine} escapes its parent's ${parent.startLine}-${parent.endLine}`,
           );
         }
         ranges.set(key, at);
@@ -72,7 +74,7 @@ describe('locateSelection', () => {
           const opening = node.shorthand ? '<>' : `<${node.name}`;
           assert.ok(
             lines[at.startLine - 1].includes(opening),
-            `${key}: ${opening} is not on line ${at.startLine}: ${lines[at.startLine - 1]}`
+            `${key}: ${opening} is not on line ${at.startLine}: ${lines[at.startLine - 1]}`,
           );
         }
       }
@@ -80,7 +82,9 @@ describe('locateSelection', () => {
   }
 
   test('the frontmatter block is the file up to its closing ---', () => {
-    const file = fixtures.map((f) => f.file).find((f) => fs.readFileSync(f, 'utf8').startsWith('---'));
+    const file = fixtures
+      .map((f) => f.file)
+      .find((f) => fs.readFileSync(f, 'utf8').startsWith('---'));
     const lines = fs.readFileSync(file, 'utf8').split('\n');
     const at = locateSelection(file, 'frontmatter');
     assert.equal(at.startLine, 1);

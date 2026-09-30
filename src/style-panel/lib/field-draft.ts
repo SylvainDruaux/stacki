@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react';
 
 // What a value field is showing, which is not always what the file says.
 //
@@ -16,17 +16,25 @@ import { useEffect, useRef, useState } from 'react'
 // shows whatever the file now says — including a value from a rule further
 // down the cascade, which was there all along and is now the one that applies.
 export function useFieldDraft(external: string, busy: boolean) {
-  const [draft, setDraft] = useState(external)
-  const focused = useRef(false)
+  const [draft, setDraft] = useState(external);
+  const focused = useRef(false);
 
   // The ordinary sync: a value that changed elsewhere, while nobody is typing
   // in this field.
-  useEffect(() => { if (!focused.current) {setDraft(external)} }, [external])
+  useEffect(() => {
+    if (!focused.current) {
+      setDraft(external);
+    }
+  }, [external]);
 
   // And the end of a save, which is the moment the model is worth believing
   // again — the value may be the same string it was before the edit, so there
   // is nothing above for the change to fire on.
-  useEffect(() => { if (!busy && !focused.current) {setDraft(external)} }, [busy])
+  useEffect(() => {
+    if (!busy && !focused.current) {
+      setDraft(external);
+    }
+  }, [busy]);
 
-  return { draft, setDraft, focused, cleared: () => setDraft('') }
+  return { draft, setDraft, focused, cleared: () => setDraft('') };
 }

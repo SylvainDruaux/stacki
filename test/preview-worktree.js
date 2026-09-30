@@ -31,7 +31,9 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
+  if (!condition) {
+    failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  }
 };
 
 const git = (cwd, args) =>
@@ -41,7 +43,9 @@ const git = (cwd, args) =>
         err.stdout = stdout;
         err.stderr = stderr;
         reject(err);
-      } else {resolve({ stdout: String(stdout), stderr: String(stderr) });}
+      } else {
+        resolve({ stdout: String(stdout), stderr: String(stderr) });
+      }
     });
   });
 
@@ -88,9 +92,19 @@ async function project() {
     check('inside the project', made.startsWith(dir), made);
     // The whole point: it holds the OLD version while the real tree holds the
     // new one.
-    check('holding the old version', read(made, 'src/pages/index.astro') === 'version one\n', read(made, 'src/pages/index.astro'));
-    check('without the page added since', !fs.existsSync(path.join(made, 'src/pages/added-later.astro')));
-    check('and the real project is untouched', read(dir, 'src/pages/index.astro') === 'version two\n');
+    check(
+      'holding the old version',
+      read(made, 'src/pages/index.astro') === 'version one\n',
+      read(made, 'src/pages/index.astro'),
+    );
+    check(
+      'without the page added since',
+      !fs.existsSync(path.join(made, 'src/pages/added-later.astro')),
+    );
+    check(
+      'and the real project is untouched',
+      read(dir, 'src/pages/index.astro') === 'version two\n',
+    );
 
     // Detached on purpose: a branch cannot be checked out in two places, and
     // previewing the commit a branch happens to sit on is entirely normal.
@@ -110,16 +124,28 @@ async function project() {
     const a = await wt.ensureWorktree(git, { projectPath: dir, ref: first });
     const b = await wt.ensureWorktree(git, { projectPath: dir, ref: second });
     check('the same checkout is reused', a === b, `${a} vs ${b}`);
-    check('moved to the new commit', read(b, 'src/pages/index.astro') === 'version two\n', read(b, 'src/pages/index.astro'));
-    check('with the newer page now present', fs.existsSync(path.join(b, 'src/pages/added-later.astro')));
+    check(
+      'moved to the new commit',
+      read(b, 'src/pages/index.astro') === 'version two\n',
+      read(b, 'src/pages/index.astro'),
+    );
+    check(
+      'with the newer page now present',
+      fs.existsSync(path.join(b, 'src/pages/added-later.astro')),
+    );
     // One worktree, not one per commit — otherwise browsing history costs a
     // full copy of the project per click.
-    const listed = (await sh(dir, 'worktree', 'list', '--porcelain')).split('\n').filter((l) => l.startsWith('worktree ')).length;
+    const listed = (await sh(dir, 'worktree', 'list', '--porcelain'))
+      .split('\n')
+      .filter((l) => l.startsWith('worktree ')).length;
     check('there is still only one extra checkout', listed === 2, String(listed));
 
     // Going back again has to leave nothing of the newer version behind.
     const c = await wt.ensureWorktree(git, { projectPath: dir, ref: first });
-    check('moving back removes what was newer', !fs.existsSync(path.join(c, 'src/pages/added-later.astro')));
+    check(
+      'moving back removes what was newer',
+      !fs.existsSync(path.join(c, 'src/pages/added-later.astro')),
+    );
   }
 
   // --- Stale leftovers -----------------------------------------------------
@@ -135,7 +161,10 @@ async function project() {
     const made = await wt.ensureWorktree(git, { projectPath: dir, ref: first });
     check('a leftover folder does not block it', fs.existsSync(made), made);
     check('and the junk is gone', !fs.existsSync(path.join(made, 'junk.txt')));
-    check('with the version actually checked out', read(made, 'src/pages/index.astro') === 'version one\n');
+    check(
+      'with the version actually checked out',
+      read(made, 'src/pages/index.astro') === 'version one\n',
+    );
   }
 
   // --- Taking it away ------------------------------------------------------
@@ -146,7 +175,9 @@ async function project() {
     await wt.removeWorktree(git, { projectPath: dir });
     check('the checkout is gone', !fs.existsSync(made), made);
     check('and its folder with it', !fs.existsSync(path.join(dir, '.stacki')));
-    const listed = (await sh(dir, 'worktree', 'list', '--porcelain')).split('\n').filter((l) => l.startsWith('worktree ')).length;
+    const listed = (await sh(dir, 'worktree', 'list', '--porcelain'))
+      .split('\n')
+      .filter((l) => l.startsWith('worktree ')).length;
     check('git no longer lists it', listed === 1, String(listed));
     // Removing one that was never there is what happens on every ordinary
     // project close, so it must be silent rather than an error.
@@ -176,7 +207,9 @@ async function project() {
     // Called on every preview, so it must not pile up.
     wt.ensureExcluded(dir);
     wt.ensureExcluded(dir);
-    const lines = (read(dir, '.git/info/exclude') || '').split('\n').filter((l) => l.trim() === '.stacki/');
+    const lines = (read(dir, '.git/info/exclude') || '')
+      .split('\n')
+      .filter((l) => l.trim() === '.stacki/');
     check('and is not written twice', lines.length === 1, String(lines.length));
   }
 
@@ -190,7 +223,9 @@ async function project() {
   }
 
   if (failures.length) {
-    console.error(`preview-worktree: ${failures.length} of ${checked} failed\n${failures.join('\n')}`);
+    console.error(
+      `preview-worktree: ${failures.length} of ${checked} failed\n${failures.join('\n')}`,
+    );
     process.exit(1);
   }
   console.log(`preview-worktree: ${checked} passed`);

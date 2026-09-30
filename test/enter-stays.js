@@ -21,7 +21,9 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
+  if (!condition) {
+    failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  }
 };
 
 (async () => {
@@ -57,7 +59,11 @@ const check = (what, condition, detail) => {
   global.requestAnimationFrame = dom.window.requestAnimationFrame.bind(dom.window);
   global.cancelAnimationFrame = dom.window.cancelAnimationFrame.bind(dom.window);
   global.MutationObserver = dom.window.MutationObserver;
-  global.ResizeObserver = class { observe() {} unobserve() {} disconnect() {} };
+  global.ResizeObserver = class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  };
   dom.window.Element.prototype.getBoundingClientRect = function rect() {
     return { x: 0, y: 0, top: 0, left: 0, right: 100, bottom: 20, width: 100, height: 20 };
   };
@@ -80,32 +86,49 @@ const check = (what, condition, detail) => {
   };
 
   const root = createRoot(document.getElementById('root'));
-  await act(async () => { root.render(React.createElement(SizeSection, props)); });
+  await act(async () => {
+    root.render(React.createElement(SizeSection, props));
+  });
 
   const field = document.querySelector('input[data-prop="max-width"]');
   check('the Max W field is there', field != null);
 
   const type = async (text) => {
     await act(async () => {
-      const setter = Object.getOwnPropertyDescriptor(dom.window.HTMLInputElement.prototype, 'value').set;
+      const setter = Object.getOwnPropertyDescriptor(
+        dom.window.HTMLInputElement.prototype,
+        'value',
+      ).set;
       setter.call(field, text);
       field.dispatchEvent(new dom.window.Event('input', { bubbles: true }));
     });
   };
   const press = async (key, init = {}) => {
     await act(async () => {
-      field.dispatchEvent(new dom.window.KeyboardEvent('keydown', { key, bubbles: true, cancelable: true, ...init }));
+      field.dispatchEvent(
+        new dom.window.KeyboardEvent('keydown', { key, bubbles: true, cancelable: true, ...init }),
+      );
     });
   };
 
-  await act(async () => { field.focus(); });
+  await act(async () => {
+    field.focus();
+  });
   await type('20rem');
   await press('Enter');
 
   check('Enter commits the value', committed.includes('max-width=20rem'), committed.join(','));
-  check('and leaves the field focused', document.activeElement === field, String(document.activeElement?.tagName));
+  check(
+    'and leaves the field focused',
+    document.activeElement === field,
+    String(document.activeElement?.tagName),
+  );
   check('with the value still in it', field.value === '20rem', field.value);
-  check('and the caret where it was', field.selectionStart === '20rem'.length, `${field.selectionStart}`);
+  check(
+    'and the caret where it was',
+    field.selectionStart === '20rem'.length,
+    `${field.selectionStart}`,
+  );
 
   // The point of staying: the arrow keys work straight away.
   await press('ArrowUp');
@@ -120,13 +143,27 @@ const check = (what, condition, detail) => {
   // Enter again, on the stepped value: committed, and still focused.
   const before = committed.length;
   await press('Enter');
-  check('Enter commits what the arrows made of it', committed.length === before + 1 && committed[committed.length - 1] === 'max-width=20.0625rem', committed[committed.length - 1]);
+  check(
+    'Enter commits what the arrows made of it',
+    committed.length === before + 1 && committed[committed.length - 1] === 'max-width=20.0625rem',
+    committed[committed.length - 1],
+  );
   check('and still does not throw the field away', document.activeElement === field);
 
   // Tabbing away still commits, and now the field really is left.
-  await act(async () => { field.blur(); });
-  check('blurring commits as it always did', committed[committed.length - 1] === 'max-width=20.0625rem', committed[committed.length - 1]);
-  check('and leaves the field', document.activeElement !== field, String(document.activeElement?.tagName));
+  await act(async () => {
+    field.blur();
+  });
+  check(
+    'blurring commits as it always did',
+    committed[committed.length - 1] === 'max-width=20.0625rem',
+    committed[committed.length - 1],
+  );
+  check(
+    'and leaves the field',
+    document.activeElement !== field,
+    String(document.activeElement?.tagName),
+  );
 
   // The helper itself, on a field with no selection to restore (a colour input
   // throws on setSelectionRange) — it must not take the caller down with it.
@@ -134,7 +171,11 @@ const check = (what, condition, detail) => {
   odd.type = 'color';
   document.body.appendChild(odd);
   let threw = false;
-  try { commitInPlace(odd); } catch { threw = true; }
+  try {
+    commitInPlace(odd);
+  } catch {
+    threw = true;
+  }
   check('a field with no caret is handled', !threw);
 
   if (failures.length) {

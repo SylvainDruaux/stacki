@@ -18,7 +18,9 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
+  if (!condition) {
+    failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  }
 };
 
 (async () => {
@@ -49,14 +51,22 @@ const check = (what, condition, detail) => {
     // The case from the screenshot.
     check('and a plain value with !important is', replacesWholeValue('2rem !important') === true);
 
-    check('replacing gives just the variable', insertBinding('2rem', V, 3) === V, insertBinding('2rem', V, 3));
-    check('a swap gives just the new one', insertBinding('var(--old)', V, 5) === V, insertBinding('var(--old)', V, 5));
+    check(
+      'replacing gives just the variable',
+      insertBinding('2rem', V, 3) === V,
+      insertBinding('2rem', V, 3),
+    );
+    check(
+      'a swap gives just the new one',
+      insertBinding('var(--old)', V, 5) === V,
+      insertBinding('var(--old)', V, 5),
+    );
     // Losing !important would change what the declaration does, and nobody
     // picking a variable asked for that.
     check(
       '!important survives a replacement',
       insertBinding('2rem !important', V, 2) === 'var(--brand) !important',
-      insertBinding('2rem !important', V, 2)
+      insertBinding('2rem !important', V, 2),
     );
   }
 
@@ -67,7 +77,10 @@ const check = (what, condition, detail) => {
     check('nor a color-mix', replacesWholeValue('color-mix(in srgb, red, blue)') === false);
     // Three parts, and a variable is being picked for one of them.
     check('nor a multi-part value', replacesWholeValue('1px solid red') === false);
-    check('nor a calc with !important', replacesWholeValue('calc(100% - 2rem) !important') === false);
+    check(
+      'nor a calc with !important',
+      replacesWholeValue('calc(100% - 2rem) !important') === false,
+    );
 
     // The point of the whole thing: the expression survives.
     const at = 'calc(100% - '.length;
@@ -90,7 +103,7 @@ const check = (what, condition, detail) => {
     check(
       'the edge of a variable counts as inside it',
       insertBinding('calc(var(--old) + 1px)', V, 'calc('.length) === 'calc(var(--brand) + 1px)',
-      insertBinding('calc(var(--old) + 1px)', V, 'calc('.length)
+      insertBinding('calc(var(--old) + 1px)', V, 'calc('.length),
     );
   }
 
@@ -101,7 +114,7 @@ const check = (what, condition, detail) => {
     check(
       'with no caret an existing variable is swapped',
       insertBinding('calc(var(--old) + 1px)', V, null) === 'calc(var(--brand) + 1px)',
-      insertBinding('calc(var(--old) + 1px)', V, null)
+      insertBinding('calc(var(--old) + 1px)', V, null),
     );
     // And with nothing to swap, the variable goes on the end. Replacing the
     // whole value would be valid CSS and would quietly delete the expression —
@@ -110,12 +123,12 @@ const check = (what, condition, detail) => {
     check(
       'and with nothing to swap the expression survives',
       insertBinding('calc(100% - 2rem)', V, null) === `calc(100% - 2rem)${V}`,
-      insertBinding('calc(100% - 2rem)', V, null)
+      insertBinding('calc(100% - 2rem)', V, null),
     );
     check(
       'the reported case is not wiped',
       insertBinding('calc(2rem + )', V, null).startsWith('calc(2rem + )'),
-      insertBinding('calc(2rem + )', V, null)
+      insertBinding('calc(2rem + )', V, null),
     );
   }
 
@@ -123,13 +136,23 @@ const check = (what, condition, detail) => {
   {
     // Clamped rather than trusted: an offset past the end would otherwise
     // splice with a negative index and silently reorder the value.
-    check('a caret past the end lands at the end', insertBinding('calc(1px + 2px)', V, 999) === `calc(1px + 2px)${V}`, insertBinding('calc(1px + 2px)', V, 999));
-    check('a negative caret lands at the start', insertBinding('calc(1px + 2px)', V, -5) === `${V}calc(1px + 2px)`, insertBinding('calc(1px + 2px)', V, -5));
+    check(
+      'a caret past the end lands at the end',
+      insertBinding('calc(1px + 2px)', V, 999) === `calc(1px + 2px)${V}`,
+      insertBinding('calc(1px + 2px)', V, 999),
+    );
+    check(
+      'a negative caret lands at the start',
+      insertBinding('calc(1px + 2px)', V, -5) === `${V}calc(1px + 2px)`,
+      insertBinding('calc(1px + 2px)', V, -5),
+    );
     check('and a missing value does not throw', insertBinding(undefined, V, 0) === V);
   }
 
   if (failures.length) {
-    console.error(`insert-binding: ${failures.length} of ${checked} failed\n${failures.join('\n')}`);
+    console.error(
+      `insert-binding: ${failures.length} of ${checked} failed\n${failures.join('\n')}`,
+    );
     process.exit(1);
   }
   console.log(`insert-binding: ${checked} passed`);

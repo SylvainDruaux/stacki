@@ -165,15 +165,10 @@ export interface SourceNodeMetadata {
 }
 
 export type PageNode = (
-  | PairedNode
-  | RawNode
-  | ValueNode
-  | CommentNode
-  | MapNode
-  | CondNode
-  | BranchNode
-  | ChunkGroupNode
-) & MarkdownNodeMetadata & SourceNodeMetadata;
+  PairedNode | RawNode | ValueNode | CommentNode | MapNode | CondNode | BranchNode | ChunkGroupNode
+) &
+  MarkdownNodeMetadata &
+  SourceNodeMetadata;
 
 export type PageNodeList = readonly PageNode[] & { readonly mdTrailingBlanks?: number };
 
@@ -311,11 +306,15 @@ function parseChildren(
 }
 
 function parseMarkdownBlanks(input: unknown, where: string): number | undefined {
-  if (input === undefined) {return undefined;}
+  if (input === undefined) {
+    return undefined;
+  }
   if (!Number.isSafeInteger(input) || Number(input) < 0) {
     fail(where, 'expected nonnegative integer');
   }
-  if (Number(input) > LIMITS.treeNodesMax) {fail(where, 'exceeds blank-line limit');}
+  if (Number(input) > LIMITS.treeNodesMax) {
+    fail(where, 'exceeds blank-line limit');
+  }
   return Number(input);
 }
 
@@ -338,17 +337,27 @@ function markdownExtras(record: Record<string, unknown>, where: string): Markdow
   }
   for (const field of ['mdUnclosed', 'mdImage', 'mdLoose', 'mdEsm'] as const) {
     if (record[field] !== undefined) {
-      if (typeof record[field] !== 'boolean') {fail(where, `${field}: expected boolean`);}
+      if (typeof record[field] !== 'boolean') {
+        fail(where, `${field}: expected boolean`);
+      }
       out[field] = record[field];
     }
   }
   const blanks = parseMarkdownBlanks(record['mdBlanksBefore'], `${where}.mdBlanksBefore`);
-  if (blanks !== undefined) {out['mdBlanksBefore'] = blanks;}
+  if (blanks !== undefined) {
+    out['mdBlanksBefore'] = blanks;
+  }
   if (record['mdNumbers'] !== undefined) {
-    if (!Array.isArray(record['mdNumbers'])) {fail(where, 'mdNumbers: expected array');}
-    if (record['mdNumbers'].length > LIMITS.treeNodesMax) {fail(where, 'mdNumbers: exceeds limit');}
+    if (!Array.isArray(record['mdNumbers'])) {
+      fail(where, 'mdNumbers: expected array');
+    }
+    if (record['mdNumbers'].length > LIMITS.treeNodesMax) {
+      fail(where, 'mdNumbers: exceeds limit');
+    }
     out['mdNumbers'] = record['mdNumbers'].map((value, index) => {
-      if (!Number.isSafeInteger(value)) {fail(where, `mdNumbers[${index}]: expected integer`);}
+      if (!Number.isSafeInteger(value)) {
+        fail(where, `mdNumbers[${index}]: expected integer`);
+      }
       return Number(value);
     });
   }
@@ -364,7 +373,10 @@ function tagExtras(
 ): Pick<PairedNode, 'attrOrder' | 'attrSource' | 'blankBefore' | 'blankAfter'> {
   const out: Record<string, unknown> = {};
   if (record['attrOrder'] !== undefined) {
-    if (!Array.isArray(record['attrOrder']) || !record['attrOrder'].every((n) => typeof n === 'string')) {
+    if (
+      !Array.isArray(record['attrOrder']) ||
+      !record['attrOrder'].every((n) => typeof n === 'string')
+    ) {
       fail(where, 'attrOrder: expected string array');
     }
     out['attrOrder'] = record['attrOrder'] as readonly string[];
@@ -393,13 +405,20 @@ function tagExtras(
   return out as Pick<PairedNode, 'attrOrder' | 'attrSource' | 'blankBefore' | 'blankAfter'>;
 }
 
-function parsePaired(record: Record<string, unknown>, where: string, depth: number, context: ParseContext): PairedNode {
+function parsePaired(
+  record: Record<string, unknown>,
+  where: string,
+  depth: number,
+  context: ParseContext,
+): PairedNode {
   const kind = record['kind'];
   if (kind !== 'component' && kind !== 'element') {
     fail(where, `parsePaired called for kind ${JSON.stringify(kind)}`);
   }
   const children =
-    record['children'] === null ? null : parseChildren(record['children'], `${where}.children`, depth, context);
+    record['children'] === null
+      ? null
+      : parseChildren(record['children'], `${where}.children`, depth, context);
   const out: Record<string, unknown> = {
     kind,
     id: asNodeId(record['id'], `${where}.id`),
@@ -471,10 +490,15 @@ function parseByKind(
       }
       if (record['body'] !== undefined) {
         const body: unknown = record['body'];
-        if (!Array.isArray(body)) { fail(where, 'body: expected statement array'); }
-        if (body.length > LIMITS.treeNodesMax) { fail(where, 'body: exceeds statement limit'); }
+        if (!Array.isArray(body)) {
+          fail(where, 'body: expected statement array');
+        }
+        if (body.length > LIMITS.treeNodesMax) {
+          fail(where, 'body: exceeds statement limit');
+        }
         out['body'] = body.map((line: unknown, index) =>
-          asString(line, `${where}.body[${index}]`, LIMITS.nodeValueCharsMax));
+          asString(line, `${where}.body[${index}]`, LIMITS.nodeValueCharsMax),
+        );
       }
       if (record['bare'] !== undefined) {
         if (typeof record['bare'] !== 'boolean') {
@@ -553,10 +577,7 @@ export function parsePageNode(
   return node;
 }
 
-function sourceNodeMetadata(
-  record: Record<string, unknown>,
-  where: string,
-): SourceNodeMetadata {
+function sourceNodeMetadata(record: Record<string, unknown>, where: string): SourceNodeMetadata {
   const start = record['start'];
   const end = record['end'];
   if (start === undefined && end === undefined) {
@@ -568,7 +589,9 @@ function sourceNodeMetadata(
   if (!Number.isSafeInteger(start) || !Number.isSafeInteger(end)) {
     fail(where, 'source range: expected safe integer offsets');
   }
-  if (Number(start) < 0) {fail(where, 'source range: start must be nonnegative');}
+  if (Number(start) < 0) {
+    fail(where, 'source range: start must be nonnegative');
+  }
   if (Number(end) < Number(start)) {
     fail(where, 'source range: end must not precede start');
   }
@@ -729,8 +752,16 @@ export function parsePageModel(input: unknown): PageModel {
   }
   const out: Record<string, unknown> = {
     imports: record['imports'].map((entry, index) => parseImport(entry, `model.imports[${index}]`)),
-    frontmatterLead: asString(record['frontmatterLead'], 'model.frontmatterLead', LIMITS.nodeValueCharsMax),
-    extraFrontmatter: asString(record['extraFrontmatter'], 'model.extraFrontmatter', LIMITS.nodeValueCharsMax),
+    frontmatterLead: asString(
+      record['frontmatterLead'],
+      'model.frontmatterLead',
+      LIMITS.nodeValueCharsMax,
+    ),
+    extraFrontmatter: asString(
+      record['extraFrontmatter'],
+      'model.extraFrontmatter',
+      LIMITS.nodeValueCharsMax,
+    ),
     extraFrontmatterSpaced: record['extraFrontmatterSpaced'] === true,
     frontmatterLayout: {
       extra: asString(layout['extra'], 'model.frontmatterLayout.extra', LIMITS.nodeValueCharsMax),
@@ -765,9 +796,15 @@ function parsePageEol(input: unknown): '\n' | '\r\n' {
 
 function parseMarkdownPageModel(record: Record<string, unknown>): PageModel {
   const format = record['format'];
-  if (format !== 'md' && format !== 'mdx') {fail('model.format', 'expected Markdown format');}
-  if (!Array.isArray(record['imports'])) {fail('model.imports', 'expected array');}
-  if (record['imports'].length > LIMITS.importsMax) {fail('model.imports', 'exceeds limit');}
+  if (format !== 'md' && format !== 'mdx') {
+    fail('model.format', 'expected Markdown format');
+  }
+  if (!Array.isArray(record['imports'])) {
+    fail('model.imports', 'expected array');
+  }
+  if (record['imports'].length > LIMITS.importsMax) {
+    fail('model.imports', 'exceeds limit');
+  }
   const imports = record['imports'].map((input, index) => {
     const value = asRecord(input, `model.imports[${index}]`);
     return {
@@ -781,7 +818,9 @@ function parseMarkdownPageModel(record: Record<string, unknown>): PageModel {
     fail('model.layoutPath', 'expected string or null');
   }
   for (const field of ['mdEndsWithNewline', 'mdHasFrontmatter'] as const) {
-    if (typeof record[field] !== 'boolean') {fail(`model.${field}`, 'expected boolean');}
+    if (typeof record[field] !== 'boolean') {
+      fail(`model.${field}`, 'expected boolean');
+    }
   }
   const bodyStart = record['bodyStart'];
   if (bodyStart !== undefined) {
@@ -863,7 +902,9 @@ export function assertTreeInvariants(nodes: readonly TreeInvariantNode[]): void 
   const ids = new Set<string>();
   for (let index = 0; index < pending.length; index++) {
     const entry = pending[index];
-    if (!entry) { throw new Error('Tree invariant violated: missing traversal entry'); }
+    if (!entry) {
+      throw new Error('Tree invariant violated: missing traversal entry');
+    }
     if (entry.depth > LIMITS.treeDepthMax) {
       throw new Error(`Tree invariant violated: exceeds depth ${LIMITS.treeDepthMax}`);
     }
@@ -879,7 +920,9 @@ export function assertTreeInvariants(nodes: readonly TreeInvariantNode[]): void 
       if (pending.length + node.children.length > LIMITS.treeNodesMax) {
         throw new Error(`Tree invariant violated: exceeds ${LIMITS.treeNodesMax} nodes`);
       }
-      for (const child of node.children) { pending.push({ node: child, depth: depth + 1 }); }
+      for (const child of node.children) {
+        pending.push({ node: child, depth: depth + 1 });
+      }
     }
   }
 }

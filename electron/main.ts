@@ -43,11 +43,7 @@ import type { ChildProcess, ExecFileOptions } from 'child_process';
 import { toRecord, toArray } from '../shared/record.js';
 import { assert } from '../shared/assert.js';
 import type { IpcPayloads } from '../shared/ipc-payloads.js';
-import type {
-  IpcResults,
-  WirePageEditError,
-  WirePageWriteFailure,
-} from '../shared/ipc-results.js';
+import type { IpcResults, WirePageEditError, WirePageWriteFailure } from '../shared/ipc-results.js';
 import { describeRejection, type RejectionReason } from '../shared/intent.js';
 import { decodeUtf8, encodeUtf8 } from '../shared/span.js';
 import type { Digest } from '../shared/brand.js';
@@ -1314,9 +1310,7 @@ ipcMain.handle('recents:add', async (_e, projectPath) => {
 });
 
 ipcMain.handle('recents:remove', async (_e, projectPath) => {
-  writeRecents(
-    readRecents().filter((recent) => !sameFilesystemPath(recent.path, projectPath)),
-  );
+  writeRecents(readRecents().filter((recent) => !sameFilesystemPath(recent.path, projectPath)));
   // The picture and the note about when it was taken both go.
   thumbs.forget(app.getPath('userData'), projectPath);
   return { ok: true as const };
@@ -3010,7 +3004,9 @@ function parsePageSource(pagePath: string, source: string): IpcResults['page:par
     return { ...parseMarkdownPage(source, { mdx: isMdx(pagePath) }), source };
   }
   const parsed = parsePage(source, { locs: true });
-  if (parsed.editable) {resolveChunks(parsed.model, pagePath, { locs: true });}
+  if (parsed.editable) {
+    resolveChunks(parsed.model, pagePath, { locs: true });
+  }
   return { ...parsed, source };
 }
 

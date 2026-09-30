@@ -52,7 +52,11 @@ export async function readText(projectPath: string, rel: string): Promise<string
 }
 
 export async function writeText(projectPath: string, rel: string, text: string): Promise<void> {
-  const result = await window.avb.writeSourceText({ projectPath: toProjectPath(projectPath), rel, text });
+  const result = await window.avb.writeSourceText({
+    projectPath: toProjectPath(projectPath),
+    rel,
+    text,
+  });
   parseOkResult(result);
 }
 
@@ -71,7 +75,11 @@ export async function readSymbol(
   return parseSymbolReadResult(result);
 }
 
-export async function resolvePath(projectPath: string, fromFile: string, spec: string): Promise<ResolvePathResult> {
+export async function resolvePath(
+  projectPath: string,
+  fromFile: string,
+  spec: string,
+): Promise<ResolvePathResult> {
   const result = await window.avb.resolveSourcePath({
     projectPath: toProjectPath(projectPath),
     fromFile: toFilePath(fromFile),

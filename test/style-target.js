@@ -21,7 +21,9 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
+  if (!condition) {
+    failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  }
 };
 
 (async () => {
@@ -82,7 +84,7 @@ const check = (what, condition, detail) => {
     const componentSource = (await scanPage()).pageEmbeds[0];
     check(
       'a style tag in an open component is component-authored',
-      componentSource?.fromComponent === true
+      componentSource?.fromComponent === true,
     );
     check('and carries the component name', componentSource?.componentName === 'Card');
 
@@ -90,7 +92,7 @@ const check = (what, condition, detail) => {
     const pageSource = (await scanPage()).pageEmbeds[0];
     check(
       'the same style shape in a page stays page-authored',
-      pageSource?.fromComponent === false
+      pageSource?.fromComponent === false,
     );
     setHost({ nodes: [], openFilePath: null, openFileKind: null });
   }
@@ -114,13 +116,14 @@ const check = (what, condition, detail) => {
   };
   /** The shape queryCanvas answers with — passed straight in, so no canvas is needed. */
   const answer = (identity) => ({ answer: { identity, matched: {} }, askedFor: new Map() });
-  const matches = async (target, selector) => (await matchSelectorList(selector, target))[0].matched;
+  const matches = async (target, selector) =>
+    (await matchSelectorList(selector, target))[0].matched;
 
   {
     const { target, rootSnapshot } = await resolveTarget(
       node,
       scan,
-      answer({ tag: 'html', id: null, classes: ['theme-dark'], attributes: { lang: 'en' } })
+      answer({ tag: 'html', id: null, classes: ['theme-dark'], attributes: { lang: 'en' } }),
     );
     check('the header reads the rendered tag', rootSnapshot.tag === 'html', rootSnapshot.tag);
     const seen = await target.view.snapshot(target.rootKey);
@@ -133,7 +136,11 @@ const check = (what, condition, detail) => {
     // The rule that made this visible: one group, two selectors, both matching.
     // Only the class half used to.
     const both = await matchSelectorList(':root, [class*="theme-"]', target);
-    check('every selector in a group is judged', both.every((r) => r.matched), JSON.stringify(both));
+    check(
+      'every selector in a group is judged',
+      both.every((r) => r.matched),
+      JSON.stringify(both),
+    );
     check('and a tag it does not have does not', !(await matches(target, 'body')));
     check(':root does not match a nested element', !(await matches(target, 'body :root')));
   }
@@ -145,9 +152,12 @@ const check = (what, condition, detail) => {
     const { target } = await resolveTarget(
       section,
       sectionScan,
-      answer({ tag: 'section', id: null, classes: ['section'], attributes: {} })
+      answer({ tag: 'section', id: null, classes: ['section'], attributes: {} }),
     );
-    check('a component instance matches by what it renders', await matches(target, 'section.section'));
+    check(
+      'a component instance matches by what it renders',
+      await matches(target, 'section.section'),
+    );
     check('and by the tag alone', await matches(target, 'section'));
     check('but not by another tag', !(await matches(target, 'div')));
   }
@@ -158,7 +168,11 @@ const check = (what, condition, detail) => {
     // rather than being waved through.
     const { target } = await resolveTarget(node, scan, null);
     const seen = await target.view.snapshot(target.rootKey);
-    check('with no answer the snapshot is the source one', seen?.tag == null, JSON.stringify(seen?.tag));
+    check(
+      'with no answer the snapshot is the source one',
+      seen?.tag == null,
+      JSON.stringify(seen?.tag),
+    );
     check('an unverifiable tag selector does not match', !(await matches(target, 'html')));
     check('the classes it does know still match', await matches(target, '.theme-dark'));
   }
@@ -173,18 +187,28 @@ const check = (what, condition, detail) => {
     // while another is rendering); the state itself is written straight away.
     const settle = () => Promise.resolve().then(() => {});
     let notified = 0;
-    const off = onHostChange(() => { notified += 1; });
+    const off = onHostChange(() => {
+      notified += 1;
+    });
     const before = getHost().historyTick;
     check('the host carries a history tick', typeof before === 'number', typeof before);
     setHost({ historyTick: before + 1 });
-    check('it reads back at once', getHost().historyTick === before + 1, `${getHost().historyTick}`);
+    check(
+      'it reads back at once',
+      getHost().historyTick === before + 1,
+      `${getHost().historyTick}`,
+    );
     check('without calling anyone mid-render', notified === 0, `${notified} notifications`);
     await settle();
     check('moving it notifies', notified === 1, `${notified} notifications`);
     const after = notified;
     setHost({ historyTick: before + 1 });
     await settle();
-    check('setting the same value again says nothing', notified === after, `${notified} vs ${after}, tick=${getHost().historyTick}`);
+    check(
+      'setting the same value again says nothing',
+      notified === after,
+      `${notified} vs ${after}, tick=${getHost().historyTick}`,
+    );
     const beforeOff = notified;
     off();
     setHost({ historyTick: before + 2 });
@@ -207,43 +231,65 @@ const check = (what, condition, detail) => {
     const attr = (name) => ({ name: `attr:${name}`, label: name, kind: 'attribute' });
     const target = (tokens) => tokensToSelector(defaultSelectorTokens(tokens), tokens);
 
-    const lumos = [tag('div'), cls('layout'), cls('card'), cls('theme-dark'), cls('flex-grow'), cls('theme-brand')];
+    const lumos = [
+      tag('div'),
+      cls('layout'),
+      cls('card'),
+      cls('theme-dark'),
+      cls('flex-grow'),
+      cls('theme-brand'),
+    ];
     check(
       'an element with five classes is styled through the first',
       target(lumos) === '.layout',
-      target(lumos)
+      target(lumos),
     );
-    check('one class is that class', target([tag('div'), cls('hero')]) === '.hero', target([tag('div'), cls('hero')]));
+    check(
+      'one class is that class',
+      target([tag('div'), cls('hero')]) === '.hero',
+      target([tag('div'), cls('hero')]),
+    );
     check(
       'a combo is never the default — it takes picking one',
       !target(lumos).includes('.card'),
-      target(lumos)
+      target(lumos),
     );
 
     // The rest of the ladder, unchanged: no classes falls to the last data
     // attribute, then to the tag, and an element with nothing has nothing.
     const dataOnly = [tag('section'), attr('data-theme'), attr('data-variant')];
-    check('no classes falls to the last data attribute', target(dataOnly) === '[data-variant]', target(dataOnly));
+    check(
+      'no classes falls to the last data attribute',
+      target(dataOnly) === '[data-variant]',
+      target(dataOnly),
+    );
     check('and then to the tag', target([tag('section')]) === 'section', target([tag('section')]));
     check('nothing at all targets nothing', target([]) === '', JSON.stringify(target([])));
 
     // A component instance renders markup this side can't see, so it has no tag
     // — its classes are all there is.
     const noTag = [cls('card_component'), cls('is-featured')];
-    check('a tagless element still targets its first class', target(noTag) === '.card_component', target(noTag));
+    check(
+      'a tagless element still targets its first class',
+      target(noTag) === '.card_component',
+      target(noTag),
+    );
 
     // …and the panel actually asks.
     const editor = fs.readFileSync(
       path.join(__dirname, '..', 'src', 'style-panel', 'EmbedEditor.tsx'),
-      'utf8'
+      'utf8',
     );
-    check('the panel defaults through it', /const next = defaultSelectorTokens\(tokens\)/.test(editor));
+    check(
+      'the panel defaults through it',
+      /const next = defaultSelectorTokens\(tokens\)/.test(editor),
+    );
     // The upgrade that follows looks for a class that is already styled — across
     // every class, not just the defaulted one, or an element whose first class
     // has no rules would fall through to a selector picked by specificity.
     check(
       'and the upgrade still searches every class',
-      /const primaryStyled = tokens[\s\S]{0,120}kind === 'class'/.test(editor)
+      /const primaryStyled = tokens[\s\S]{0,120}kind === 'class'/.test(editor),
     );
   }
 

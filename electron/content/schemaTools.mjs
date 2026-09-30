@@ -27,7 +27,10 @@ export function hasCrossFieldChecks(schema) {
 export function toJsonSchema(schema) {
   if (typeof z.toJSONSchema === 'function') {
     return z.toJSONSchema(schema, {
-      io: 'input', unrepresentable: 'any', cycles: 'ref', reused: 'inline',
+      io: 'input',
+      unrepresentable: 'any',
+      cycles: 'ref',
+      reused: 'inline',
       override({ zodSchema, jsonSchema }) {
         const def = definitionOf(zodSchema);
         if (def?.type === 'date') {
@@ -44,7 +47,9 @@ export function toJsonSchema(schema) {
   const astroRequire = createRequire(projectRequire.resolve('astro/package.json'));
   const { zodToJsonSchema } = astroRequire('zod-to-json-schema');
   return zodToJsonSchema(schema, {
-    effectStrategy: 'input', pipeStrategy: 'input', definitionPath: '$defs',
+    effectStrategy: 'input',
+    pipeStrategy: 'input',
+    definitionPath: '$defs',
     postProcess(jsonSchema, def) {
       if (!jsonSchema) return jsonSchema;
       Object.assign(jsonSchema, def[META]);
@@ -52,8 +57,10 @@ export function toJsonSchema(schema) {
         jsonSchema.astroDate = true;
         if (def.coerce) jsonSchema.astroCoerced = true;
       }
-      if (def.typeName === 'ZodPipeline' ||
-          (def.typeName === 'ZodEffects' && def.effect?.type !== 'refinement')) {
+      if (
+        def.typeName === 'ZodPipeline' ||
+        (def.typeName === 'ZodEffects' && def.effect?.type !== 'refinement')
+      ) {
         jsonSchema.astroTransform = true;
       }
       return jsonSchema;

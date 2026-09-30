@@ -44,7 +44,7 @@ export function useComponentProperties(props: ComponentPropertiesPanelProps) {
         props.projectPath,
         props.file,
         snapshot.state.data.source,
-        change
+        change,
       );
       if (!result.ok) {
         if (snapshot.active.current) {
@@ -81,7 +81,7 @@ export function useComponentProperties(props: ComponentPropertiesPanelProps) {
 function usePropertySnapshot(
   props: ComponentPropertiesPanelProps,
   pending: MutableRefObject<boolean>,
-  setError: (message: string) => void
+  setError: (message: string) => void,
 ) {
   const [snapshot, setSnapshot] = useState<Snapshot>({ state: { kind: 'loading' }, revision: 0 });
   const active = useRef(false);
@@ -111,7 +111,7 @@ function usePropertySnapshot(
       setSnapshot((previous) => refreshSnapshot(previous, next));
       setError('');
     },
-    [pending, setError]
+    [pending, setError],
   );
   usePropertyWatcher(props, { active, invalidateReads, reload });
   return {
@@ -148,7 +148,7 @@ function usePropertyWatcher(
     readonly active: MutableRefObject<boolean>;
     readonly invalidateReads: () => void;
     readonly reload: (reason: LoadReason) => Promise<void>;
-  }
+  },
 ): void {
   useEffect(() => {
     active.current = true;
@@ -179,7 +179,7 @@ function refreshSnapshot(previous: Snapshot, state: PanelState): Snapshot {
 
 async function loadPropertiesPanel(
   props: ComponentPropertiesPanelProps,
-  reason: LoadReason
+  reason: LoadReason,
 ): Promise<PanelState> {
   try {
     // An external read must never flush a stale model over the new disk source.

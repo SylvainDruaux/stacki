@@ -25,13 +25,17 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
+  if (!condition) {
+    failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  }
 };
 
 const HERO = { r: 220, g: 40, b: 60 }; // the hero band
 const BELOW = { r: 20, g: 120, b: 220 }; // everything under it
 const near = (a, b, tolerance = 24) =>
-  Math.abs(a.r - b.r) <= tolerance && Math.abs(a.g - b.g) <= tolerance && Math.abs(a.b - b.b) <= tolerance;
+  Math.abs(a.r - b.r) <= tolerance &&
+  Math.abs(a.g - b.g) <= tolerance &&
+  Math.abs(a.b - b.b) <= tolerance;
 
 const PAGE = `<!doctype html>
 <html><head><meta charset="utf-8"><title>Fixture</title><style>
@@ -57,7 +61,13 @@ function pixelAt(file, x, y) {
   const size = image.getSize();
   const bitmap = image.toBitmap(); // BGRA
   const at = (y * size.width + x) * 4;
-  return { b: bitmap[at], g: bitmap[at + 1], r: bitmap[at + 2], width: size.width, height: size.height };
+  return {
+    b: bitmap[at],
+    g: bitmap[at + 1],
+    r: bitmap[at + 2],
+    width: size.width,
+    height: size.height,
+  };
 }
 
 // The capture opens a window and destroys it. Without this, that destruction
@@ -92,7 +102,7 @@ app.whenReady().then(async () => {
     check(
       'the top of the picture is the top of the page',
       near(top, HERO),
-      `expected the hero's colour, got rgb(${top.r},${top.g},${top.b}) — the page was photographed where it scrolled to`
+      `expected the hero's colour, got rgb(${top.r},${top.g},${top.b}) — the page was photographed where it scrolled to`,
     );
     // The viewport is 1440×900 and the hero is exactly 900 tall, so the bottom
     // of the frame is the last of the hero — proof the whole viewport was
@@ -107,7 +117,10 @@ app.whenReady().then(async () => {
   // A change made with the app closed is still a change.
   await new Promise((r) => setTimeout(r, 1100)); // mtime granularity
   fs.writeFileSync(path.join(projectDir, 'src', 'pages', 'about.astro'), '<h1>About</h1>\n');
-  check('a page added outside the app makes it stale', thumbs.isStale(userData, projectDir) === true);
+  check(
+    'a page added outside the app makes it stale',
+    thumbs.isStale(userData, projectDir) === true,
+  );
 
   await thumbs.capture(userData, projectDir, url);
   check('and taking it again clears that', thumbs.isStale(userData, projectDir) === false);

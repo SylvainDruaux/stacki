@@ -14,21 +14,31 @@ esbuild.buildSync({
   entryPoints: ['editorTree', 'loopBindings', 'pagePersistence', 'pageEdits'].map((name) =>
     path.join(__dirname, '..', 'src', `${name}.ts`),
   ),
-  outdir: buildDir, bundle: true, format: 'cjs', platform: 'node', logLevel: 'silent',
+  outdir: buildDir,
+  bundle: true,
+  format: 'cjs',
+  platform: 'node',
+  logLevel: 'silent',
 });
 const tree = require(path.join(buildDir, 'editorTree.js'));
 const loops = require(path.join(buildDir, 'loopBindings.js'));
 const { createPageSaver, scanContainsFile } = require(path.join(buildDir, 'pagePersistence.js'));
 const deferred = () => {
   let resolve, reject;
-  const promise = new Promise((yes, no) => { resolve = yes; reject = no; });
+  const promise = new Promise((yes, no) => {
+    resolve = yes;
+    reject = no;
+  });
   return { promise, resolve, reject };
 };
 const tick = () => new Promise(setImmediate);
 
 test('tree index preserves locations, ancestry and anchors after moves', () => {
   const leaf = { id: 'leaf', props: { id: { type: 'string', value: 'anchor' } }, children: null };
-  const nodes = [{ id: 'first', children: [leaf] }, { id: 'second', children: [] }];
+  const nodes = [
+    { id: 'first', children: [leaf] },
+    { id: 'second', children: [] },
+  ];
   const index = tree.createTreeIndex(nodes);
   assert.equal(index.node('leaf'), leaf);
   assert.equal(index.parent('leaf'), nodes[0]);
@@ -50,7 +60,9 @@ test('tree index preserves locations, ancestry and anchors after moves', () => {
 
 test('deep tree lookup does not exhaust the JavaScript call stack', () => {
   let node = { id: 'leaf' };
-  for (let i = 0; i < 15000; i++) {node = { id: `parent${i}`, children: [node] };}
+  for (let i = 0; i < 15000; i++) {
+    node = { id: `parent${i}`, children: [node] };
+  }
   assert.equal(tree.findNodeById([node], 'leaf').id, 'leaf');
   assert.equal(tree.pathOfNode([node], 'leaf').length, 15001);
 });
@@ -59,8 +71,18 @@ test('loop renames preserve dollar identifiers, property names and nested shadow
   const nodes = [
     { kind: 'expr', value: '{$item.label + $items.label + other.$item}' },
     { kind: 'text', value: '$item prose {$item.label}' },
-    { kind: 'map', head: '$item.children.map(($item) => (', body: ['const title = $item.title;'], children: [{ kind: 'expr', value: '{$item.title}' }] },
-    { kind: 'map', head: '$item.children.map((child) => (', body: ['const title = $item.title;'], children: [{ kind: 'expr', value: '{$item.title}' }] },
+    {
+      kind: 'map',
+      head: '$item.children.map(($item) => (',
+      body: ['const title = $item.title;'],
+      children: [{ kind: 'expr', value: '{$item.title}' }],
+    },
+    {
+      kind: 'map',
+      head: '$item.children.map((child) => (',
+      body: ['const title = $item.title;'],
+      children: [{ kind: 'expr', value: '{$item.title}' }],
+    },
   ];
   const before = structuredClone(nodes);
   const renamed = loops.renamedLoopVar(nodes, '$item', 'next$');
@@ -75,18 +97,24 @@ test('loop renames preserve dollar identifiers, property names and nested shadow
   assert.throws(() => loops.renamedLoopVar(nodes, 'x', 'x'), /A rename changes the name/);
 });
 
-test('switching a loop\'s data points the loops reading its item at an empty array', () => {
+test("switching a loop's data points the loops reading its item at an empty array", () => {
   const nodes = [
-    { kind: 'map', head: 'item.tags.map((tag) => (', children: [
-      {
-        kind: 'cond',
-        test: 'item.show',
-        children: [{ kind: 'branch', name: 'then', children: [] }],
-      },
-    ] },
-    { kind: 'map', head: 'other.map((item) => (', children: [
-      { kind: 'map', head: 'item.more.map((x) => (', children: [] },
-    ] },
+    {
+      kind: 'map',
+      head: 'item.tags.map((tag) => (',
+      children: [
+        {
+          kind: 'cond',
+          test: 'item.show',
+          children: [{ kind: 'branch', name: 'then', children: [] }],
+        },
+      ],
+    },
+    {
+      kind: 'map',
+      head: 'other.map((item) => (',
+      children: [{ kind: 'map', head: 'item.more.map((x) => (', children: [] }],
+    },
   ];
   const before = structuredClone(nodes);
   const disconnected = loops.disconnectedLoops(nodes, ['item']);
@@ -97,13 +125,22 @@ test('switching a loop\'s data points the loops reading its item at an empty arr
 });
 
 test('moving from a loop drops lost bindings without rewriting nested local variables', () => {
-  const node = { kind: 'element', props: {
-    href: { type: 'expr', value: 'item$.url' },
-    title: { type: 'expr', value: 'other.item$' },
-  }, children: [
-    { kind: 'expr', value: '{item$.label}' },
-    { kind: 'map', head: 'item$.children.map((item$) => (', body: ['const title = item$.title;'], children: [{ kind: 'expr', value: '{item$.label}' }] },
-  ] };
+  const node = {
+    kind: 'element',
+    props: {
+      href: { type: 'expr', value: 'item$.url' },
+      title: { type: 'expr', value: 'other.item$' },
+    },
+    children: [
+      { kind: 'expr', value: '{item$.label}' },
+      {
+        kind: 'map',
+        head: 'item$.children.map((item$) => (',
+        body: ['const title = item$.title;'],
+        children: [{ kind: 'expr', value: '{item$.label}' }],
+      },
+    ],
+  };
   const before = structuredClone(node);
   const stripped = loops.strippedBindings(node, ['item$']);
   assert.deepEqual(node, before, 'the node passed in is left as it was');
@@ -119,10 +156,12 @@ test('moving from a loop drops lost bindings without rewriting nested local vari
 });
 
 test('a loop still running keeps its declarations, reading a placeholder instead', () => {
-  const node = { kind: 'map', head: 'list.map((row) => (', body: [
-    'const a = item.title;',
-    'const b = row.title;',
-  ], children: [{ kind: 'text', value: 'x {item.y} {row.z}' }] };
+  const node = {
+    kind: 'map',
+    head: 'list.map((row) => (',
+    body: ['const a = item.title;', 'const b = row.title;'],
+    children: [{ kind: 'text', value: 'x {item.y} {row.z}' }],
+  };
   const stripped = loops.strippedBindings(node, ['item']);
   assert.equal(stripped.removed, 2);
   assert.deepEqual(stripped.node.body, ["const a = 'content';", 'const b = row.title;']);
@@ -165,17 +204,28 @@ test('the saver sends the queued entries in order, one at a time; later ones wai
   page.add('b');
   const one = page.save.flush();
   await tick();
-  assert.deepEqual(page.sent.map((entry) => entry.name), ['a']);
+  assert.deepEqual(
+    page.sent.map((entry) => entry.name),
+    ['a'],
+  );
   assert.equal(page.save.writing(), true);
   page.add('c'); // Made while the flush runs: the next flush sends it.
   const two = page.save.flush();
   page.answer(0, { tag: 'sent' });
   await tick();
-  assert.deepEqual(page.sent.map((entry) => entry.name), ['a', 'b'], 'one at a time, in order');
+  assert.deepEqual(
+    page.sent.map((entry) => entry.name),
+    ['a', 'b'],
+    'one at a time, in order',
+  );
   page.answer(1, { tag: 'sent' });
   assert.equal(await one, 'settled', 'a flush sends what it found, and no more');
   await tick();
-  assert.deepEqual(page.sent.map((entry) => entry.name), ['a', 'b', 'c'], 'the flush asked later');
+  assert.deepEqual(
+    page.sent.map((entry) => entry.name),
+    ['a', 'b', 'c'],
+    'the flush asked later',
+  );
   page.answer(2, { tag: 'sent' });
   assert.equal(await two, 'settled');
   assert.equal(page.save.writing(), false);
@@ -230,8 +280,14 @@ test('no open file: nothing to send', async () => {
 });
 
 test('external edits recognize pages, components and layouts as editable files', () => {
-  const scan = { pages: [{ path: 'a.astro' }], components: [{ path: 'b.astro' }], layouts: [{ path: 'c.astro' }] };
-  for (const file of ['a.astro', 'b.astro', 'c.astro']) {assert.equal(scanContainsFile(scan, file), true);}
+  const scan = {
+    pages: [{ path: 'a.astro' }],
+    components: [{ path: 'b.astro' }],
+    layouts: [{ path: 'c.astro' }],
+  };
+  for (const file of ['a.astro', 'b.astro', 'c.astro']) {
+    assert.equal(scanContainsFile(scan, file), true);
+  }
   assert.equal(scanContainsFile(scan, 'deleted.astro'), false);
 });
 
@@ -245,7 +301,10 @@ test('code window saves keep each file and flush the latest version in order', a
   await saver.flush();
   assert.deepEqual(writes.sort(), ['a:current', 'b:current']);
   const gate = deferred();
-  saver.schedule('a.css', async () => { writes.push('a:pending'); await gate.promise; });
+  saver.schedule('a.css', async () => {
+    writes.push('a:pending');
+    await gate.promise;
+  });
   const first = saver.flush();
   await tick();
   saver.schedule('a.css', async () => writes.push('a:newest'));
@@ -263,7 +322,12 @@ test('failed code window writes are retained for an explicit retry', async () =>
   let attempts = 0;
   const errors = [];
   const saver = createFileSaver({ delay: 10000, onError: (error) => errors.push(error.message) });
-  saver.schedule('a.css', async () => { attempts++; if (fail) {throw new Error('disk full');} });
+  saver.schedule('a.css', async () => {
+    attempts++;
+    if (fail) {
+      throw new Error('disk full');
+    }
+  });
   await assert.rejects(saver.flush(), /disk full/);
   assert.deepEqual(errors, ['disk full']);
   fail = false;

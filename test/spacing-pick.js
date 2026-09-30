@@ -20,7 +20,9 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
+  if (!condition) {
+    failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  }
 };
 
 (async () => {
@@ -43,7 +45,10 @@ const check = (what, condition, detail) => {
         // The picker asks the project for its variables; there is no project here.
         name: 'stub-variables',
         setup(build) {
-          build.onResolve({ filter: /lib\/webflow$/ }, () => ({ path: 'stub-webflow', namespace: 'stub' }));
+          build.onResolve({ filter: /lib\/webflow$/ }, () => ({
+            path: 'stub-webflow',
+            namespace: 'stub',
+          }));
           build.onLoad({ filter: /.*/, namespace: 'stub' }, () => ({
             contents: `
               export async function streamProjectVariables(onAdd) {
@@ -59,7 +64,10 @@ const check = (what, condition, detail) => {
   });
 
   const { JSDOM } = require('jsdom');
-  const dom = new JSDOM('<!doctype html><body><div id="root"></div></body>', { url: 'http://localhost/', pretendToBeVisual: true });
+  const dom = new JSDOM('<!doctype html><body><div id="root"></div></body>', {
+    url: 'http://localhost/',
+    pretendToBeVisual: true,
+  });
   global.window = dom.window;
   global.document = dom.window.document;
   global.navigator = dom.window.navigator;
@@ -70,7 +78,11 @@ const check = (what, condition, detail) => {
   global.MutationObserver = dom.window.MutationObserver;
   global.requestAnimationFrame = dom.window.requestAnimationFrame.bind(dom.window);
   global.cancelAnimationFrame = dom.window.cancelAnimationFrame.bind(dom.window);
-  global.ResizeObserver = class { observe() {} unobserve() {} disconnect() {} };
+  global.ResizeObserver = class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  };
   dom.window.ResizeObserver = global.ResizeObserver;
   global.IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -78,7 +90,12 @@ const check = (what, condition, detail) => {
   // at length. It is noise, and loud enough to bury the failures below it.
   const realError = console.error;
   console.error = (...args) => {
-    if (typeof args[0] === 'string' && args[0].includes('flushSync was called from inside a lifecycle')) {return;}
+    if (
+      typeof args[0] === 'string' &&
+      args[0].includes('flushSync was called from inside a lifecycle')
+    ) {
+      return;
+    }
     realError(...args);
   };
 
@@ -101,23 +118,39 @@ const check = (what, condition, detail) => {
         placeholder: '0',
         read: (prop) =>
           values[prop] != null
-            ? { source: 'selected', selectedValue: { value: values[prop], important: false }, winner: { value: values[prop], important: false, selectorText: '.x' }, contributors: [], overridden: false }
+            ? {
+                source: 'selected',
+                selectedValue: { value: values[prop], important: false },
+                winner: { value: values[prop], important: false, selectorText: '.x' },
+                contributors: [],
+                overridden: false,
+              }
             : undefined,
-        setProp: (prop, value) => { committed.push([prop, value]); values[prop] = value },
+        setProp: (prop, value) => {
+          committed.push([prop, value]);
+          values[prop] = value;
+        },
         clearProp: (prop) => cleared.push(prop),
         liveSetProp: () => {},
         onSelectSelector: () => {},
         onClose: () => {},
         onSameLabelPress: () => {},
-      })
+      }),
     );
   });
-  const settle = () => act(async () => { await new Promise((r) => dom.window.setTimeout(r, 30)) });
+  const settle = () =>
+    act(async () => {
+      await new Promise((r) => dom.window.setTimeout(r, 30));
+    });
   await settle();
 
   const field = () => host.querySelector('input.embed-editor_spacing-editor');
   check('the popover has its field', !!field(), host.innerHTML.slice(0, 200));
-  check('and it starts empty, with nothing set', field()?.value === '', JSON.stringify(field()?.value));
+  check(
+    'and it starts empty, with nothing set',
+    field()?.value === '',
+    JSON.stringify(field()?.value),
+  );
 
   // Open the variable picker the way the purple dot does.
   const dot = host.querySelector('.embed-editor_varconnect-dot');
@@ -130,21 +163,31 @@ const check = (what, condition, detail) => {
 
   const row = [...document.querySelectorAll('.embed-editor_varpicker-item')][0];
   check('the picker lists the variable', !!row, document.body.innerHTML.slice(-300));
-  await act(async () => { row.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true })) });
+  await act(async () => {
+    row.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }));
+  });
   await settle();
 
   // It reaches the element…
-  check('picking it writes the property', committed.some(([p, v]) => p === 'padding-top' && v === 'var(--site-margin)'), JSON.stringify(committed));
+  check(
+    'picking it writes the property',
+    committed.some(([p, v]) => p === 'padding-top' && v === 'var(--site-margin)'),
+    JSON.stringify(committed),
+  );
   // …and it is IN THE FIELD, which is the whole bug.
   check(
     'and the field shows it',
     field()?.value === 'var(--site-margin)',
-    `the field holds ${JSON.stringify(field()?.value)} — the pick landed on the element but not in the field`
+    `the field holds ${JSON.stringify(field()?.value)} — the pick landed on the element but not in the field`,
   );
   // The rich editor is what is actually visible once a value has a variable in
   // it, so it has to be carrying the name too.
   const shown = host.querySelector('.embed-editor_varconnect-editor')?.textContent ?? '';
-  check('and it is legible in the visible editor', shown.includes('site-margin'), JSON.stringify(shown));
+  check(
+    'and it is legible in the visible editor',
+    shown.includes('site-margin'),
+    JSON.stringify(shown),
+  );
 
   // Closing afterwards must not write it a second time: `close()` commits when
   // the draft differs from what the popover opened with, and the pick is
@@ -154,10 +197,16 @@ const check = (what, condition, detail) => {
     dom.window.document.dispatchEvent(new dom.window.MouseEvent('pointerdown', { bubbles: true }));
   });
   await settle();
-  check('closing after a pick writes nothing further', committed.length === before, JSON.stringify(committed));
+  check(
+    'closing after a pick writes nothing further',
+    committed.length === before,
+    JSON.stringify(committed),
+  );
   check('and clears nothing', cleared.length === 0, JSON.stringify(cleared));
 
-  await act(async () => { root.unmount() });
+  await act(async () => {
+    root.unmount();
+  });
 
   if (failures.length) {
     console.error(`spacing-pick: ${failures.length} of ${checked} failed\n${failures.join('\n')}`);

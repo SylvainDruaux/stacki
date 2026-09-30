@@ -99,14 +99,14 @@ export const astroHighlight: Extension = [
           });
         }, highlightDelayMs);
       }
-    }
+    },
   ),
 ];
 
 async function highlightAstro(
   view: EditorView,
   revision: number,
-  currentRevision: () => number
+  currentRevision: () => number,
 ): Promise<void> {
   const source = view.state.doc.toString();
   if (source.length > LIMITS.syntaxHighlightCharsMax) {
@@ -135,7 +135,7 @@ async function highlightAstro(
           attributes: { style },
         }).range(token.offset, to),
       ];
-    })
+    }),
   );
   replaceHighlight(view, Decoration.set(ranges, true), revision, currentRevision, source);
 }
@@ -145,7 +145,7 @@ function replaceHighlight(
   decorations: DecorationSet,
   revision: number,
   currentRevision: () => number,
-  source: string
+  source: string,
 ): void {
   if (revision !== currentRevision()) {
     return;

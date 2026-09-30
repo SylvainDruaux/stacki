@@ -20,7 +20,7 @@
 // and both can hold functions with commas or spaces INSIDE their parentheses
 // (`rgba(0, 0, 0, .5)`, `translate(1px 2px)`) which must not be split on.
 
-export type Hideable<T> = { item: T; hidden: boolean }
+export type Hideable<T> = { item: T; hidden: boolean };
 
 /**
  * A value split into comment runs and the text between them.
@@ -36,37 +36,43 @@ export type Hideable<T> = { item: T; hidden: boolean }
  * been without any of this, and the parser does its own grouping.
  */
 function splitRuns(value: string): Array<{ text: string; hidden: boolean }> {
-  const text = String(value ?? '')
-  const runs: Array<{ text: string; hidden: boolean }> = []
-  let i = 0
-  let start = 0
+  const text = String(value ?? '');
+  const runs: Array<{ text: string; hidden: boolean }> = [];
+  let i = 0;
+  let start = 0;
   const pushVisible = (end: number) => {
-    const piece = text.slice(start, end).trim()
-    if (piece) {runs.push({ text: piece, hidden: false })}
-  }
+    const piece = text.slice(start, end).trim();
+    if (piece) {
+      runs.push({ text: piece, hidden: false });
+    }
+  };
   while (i < text.length) {
     if (!text.startsWith('/*', i)) {
-      i++
-      continue
+      i++;
+      continue;
     }
-    const close = text.indexOf('*/', i + 2)
+    const close = text.indexOf('*/', i + 2);
     // An unterminated comment: everything after it was meant to be hidden and
     // there is no way to tell where it should have stopped. Treat the rest as
     // one hidden run rather than dropping it.
     if (close === -1) {
-      pushVisible(i)
-      const rest = text.slice(i + 2).trim()
-      if (rest) {runs.push({ text: rest, hidden: true })}
-      return runs
+      pushVisible(i);
+      const rest = text.slice(i + 2).trim();
+      if (rest) {
+        runs.push({ text: rest, hidden: true });
+      }
+      return runs;
     }
-    pushVisible(i)
-    const inner = text.slice(i + 2, close).trim()
-    if (inner) {runs.push({ text: inner, hidden: true })}
-    i = close + 2
-    start = i
+    pushVisible(i);
+    const inner = text.slice(i + 2, close).trim();
+    if (inner) {
+      runs.push({ text: inner, hidden: true });
+    }
+    i = close + 2;
+    start = i;
   }
-  pushVisible(text.length)
-  return runs
+  pushVisible(text.length);
+  return runs;
 }
 
 /**
@@ -79,24 +85,30 @@ function splitRuns(value: string): Array<{ text: string; hidden: boolean }> {
 export function parseHideable<T>(
   value: string,
   _sep: ',' | ' ',
-  parseAll: (text: string) => T[]
+  parseAll: (text: string) => T[],
 ): Array<Hideable<T>> {
-  const out: Array<Hideable<T>> = []
+  const out: Array<Hideable<T>> = [];
   for (const run of splitRuns(value)) {
     // The placeholder written when every layer is hidden — not a layer, and a
     // row for it would be a row nobody added.
-    if (!run.hidden && run.text.toLowerCase() === 'none') {continue}
+    if (!run.hidden && run.text.toLowerCase() === 'none') {
+      continue;
+    }
     // A hidden run carries the comma that was hidden along with it (see
     // serializeHideable) — punctuation from the list, not part of the layer,
     // and enough to make the property's own parser see an empty entry.
-    const text = run.hidden ? run.text.replace(/^\s*,\s*/, '').replace(/\s*,\s*$/, '') : run.text
-    if (!text) {continue}
+    const text = run.hidden ? run.text.replace(/^\s*,\s*/, '').replace(/\s*,\s*$/, '') : run.text;
+    if (!text) {
+      continue;
+    }
     for (const item of parseAll(text) ?? []) {
-      if (item === undefined || item === null) {continue}
-      out.push({ item, hidden: run.hidden })
+      if (item === undefined || item === null) {
+        continue;
+      }
+      out.push({ item, hidden: run.hidden });
     }
   }
-  return out
+  return out;
 }
 
 /**
@@ -120,25 +132,27 @@ export function parseHideable<T>(
 export function serializeHideable<T>(
   rows: ReadonlyArray<Hideable<T>>,
   sep: ',' | ' ',
-  serializeAll: (items: T[]) => string
+  serializeAll: (items: T[]) => string,
 ): string {
   const parts = rows
     .map((row) => ({ text: serializeAll([row.item]).trim(), hidden: row.hidden }))
-    .filter((p) => p.text)
-  if (!parts.length) {return ''}
+    .filter((p) => p.text);
+  if (!parts.length) {
+    return '';
+  }
 
-  let out = ''
-  let shown = false
+  let out = '';
+  let shown = false;
   for (const part of parts) {
     if (part.hidden) {
       // The comma that would have preceded this entry, kept inside the comment
       // so it disappears along with the entry. Nothing precedes the first
       // showing entry, so it takes no comma at all.
-      const comma = sep === ',' && shown ? ', ' : ''
-      out += `${out ? ' ' : ''}/* ${comma}${part.text} */`
+      const comma = sep === ',' && shown ? ', ' : '';
+      out += `${out ? ' ' : ''}/* ${comma}${part.text} */`;
     } else {
-      out += shown ? `${sep === ',' ? ',' : ''} ${part.text}` : `${out ? ' ' : ''}${part.text}`
-      shown = true
+      out += shown ? `${sep === ',' ? ',' : ''} ${part.text}` : `${out ? ' ' : ''}${part.text}`;
+      shown = true;
     }
   }
 
@@ -149,9 +163,9 @@ export function serializeHideable<T>(
   // `none` is the get-out: valid for all of these properties, means the same as
   // not declaring them, and gives the comment something to sit beside. Hiding
   // your only filter therefore still leaves it recoverable.
-  return shown ? out : `none ${out}`
+  return shown ? out : `none ${out}`;
 }
 
 /** Whether every layer is hidden — the caller may prefer to clear the property. */
 export const allHidden = <T>(rows: ReadonlyArray<Hideable<T>>): boolean =>
-  rows.length > 0 && rows.every((r) => r.hidden)
+  rows.length > 0 && rows.every((r) => r.hidden);

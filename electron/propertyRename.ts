@@ -51,7 +51,7 @@ export function renameComponentReferences(
   source: string,
   names: ReadonlySet<string>,
   rename: PropertyRename,
-  owner: 'definition' | 'consumer'
+  owner: 'definition' | 'consumer',
 ): Result<string> {
   const typeNames =
     owner === 'definition'
@@ -61,7 +61,7 @@ export function renameComponentReferences(
     source,
     names,
     { kind: 'rename', ...rename, typeNames: new Set(['Props', ...typeNames]) },
-    owner
+    owner,
   );
 }
 
@@ -69,7 +69,7 @@ export function renameComponentOptionValues(
   source: string,
   names: ReadonlySet<string>,
   propertyName: string,
-  renames: readonly PropertyOptionRename[]
+  renames: readonly PropertyOptionRename[],
 ): Result<string> {
   const parsed = parseOptionRenames(renames);
   if (!parsed.ok) {
@@ -111,7 +111,7 @@ function parseAstroRenameSource(source: string): Result<Node> {
 }
 
 function parseOptionRenames(
-  renames: readonly PropertyOptionRename[]
+  renames: readonly PropertyOptionRename[],
 ): Result<readonly ParsedOptionRename[]> {
   assert(renames.length <= PROPERTY_LIMITS.fieldsMax, 'Option rename count is bounded');
   const parsed: ParsedOptionRename[] = [];
@@ -143,7 +143,7 @@ function renameNodeOptions(
   node: Node,
   names: ReadonlySet<string>,
   propertyName: string,
-  renames: readonly ParsedOptionRename[]
+  renames: readonly ParsedOptionRename[],
 ): Result<readonly SourceEdit[]> {
   if (!('attributes' in node) || node.type !== 'component' || !names.has(node.name)) {
     return ok([]);
@@ -163,7 +163,7 @@ function renameOptionAttribute(
   source: string,
   attribute: AttributeNode,
   propertyName: string,
-  renames: readonly ParsedOptionRename[]
+  renames: readonly ParsedOptionRename[],
 ): Result<readonly SourceEdit[]> {
   const start = offset(source, attribute);
   if (attribute.kind === 'spread') {
@@ -189,10 +189,10 @@ function renameQuotedOption(
   source: string,
   attribute: AttributeNode,
   renames: readonly ParsedOptionRename[],
-  start: number
+  start: number,
 ): Result<readonly SourceEdit[]> {
   const rename = renames.find(
-    (entry) => entry.from.kind === 'string' && entry.from.value === attribute.value
+    (entry) => entry.from.kind === 'string' && entry.from.value === attribute.value,
   );
   if (!rename) {
     return ok([]);
@@ -215,7 +215,7 @@ function renameOptionSpread(
   attribute: AttributeNode,
   propertyName: string,
   renames: readonly ParsedOptionRename[],
-  position: number
+  position: number,
 ): Result<readonly SourceEdit[]> {
   const prefix = 'const spread = (';
   const syntax = ts.createSourceFile(
@@ -223,7 +223,7 @@ function renameOptionSpread(
     prefix + attribute.name + ');',
     ts.ScriptTarget.Latest,
     true,
-    ts.ScriptKind.TS
+    ts.ScriptKind.TS,
   );
   const object = syntaxNodes(syntax).find(ts.isObjectLiteralExpression);
   if (!object || optionSpreadIsDynamic(object)) {
@@ -252,14 +252,14 @@ function optionSpreadIsDynamic(object: ts.ObjectLiteralExpression): boolean {
   return object.properties.some(
     (property) =>
       ts.isSpreadAssignment(property) ||
-      (property.name !== undefined && ts.isComputedPropertyName(property.name))
+      (property.name !== undefined && ts.isComputedPropertyName(property.name)),
   );
 }
 
 function renameOptionExpression(
   expression: string,
   start: number,
-  renames: readonly ParsedOptionRename[]
+  renames: readonly ParsedOptionRename[],
 ): readonly SourceEdit[] {
   const prefix = 'const value = (';
   const syntax = ts.createSourceFile(
@@ -267,7 +267,7 @@ function renameOptionExpression(
     prefix + expression + ');',
     ts.ScriptTarget.Latest,
     true,
-    ts.ScriptKind.TSX
+    ts.ScriptKind.TSX,
   );
   const declaration = syntaxNodes(syntax).find(ts.isVariableDeclaration);
   const initializer = declaration?.initializer;
@@ -279,7 +279,7 @@ function renameOptionExpression(
 function renameOptionExpressionNode(
   expression: ts.Expression,
   start: number,
-  renames: readonly ParsedOptionRename[]
+  renames: readonly ParsedOptionRename[],
 ): readonly SourceEdit[] {
   const edits: SourceEdit[] = [];
   for (const node of syntaxNodes(expression)) {
@@ -308,7 +308,7 @@ function optionScalar(expression: string): OptionScalar | undefined {
     prefix + expression + ');',
     ts.ScriptTarget.Latest,
     true,
-    ts.ScriptKind.TS
+    ts.ScriptKind.TS,
   );
   const declaration = syntaxNodes(syntax).find(ts.isVariableDeclaration);
   const initializer = declaration?.initializer;
@@ -343,7 +343,7 @@ function optionScalarKey(value: OptionScalar): string {
 export function bindComponentDefault(
   source: string,
   name: string,
-  binding: string
+  binding: string,
 ): Result<string> {
   const document = readPropertySyntax(source);
   const declaration = syntaxNodes(document.syntax).find(
@@ -353,9 +353,9 @@ export function bindComponentDefault(
         (item) =>
           ts.isObjectBindingPattern(item.name) &&
           item.name.elements.some(
-            (element) => ts.isIdentifier(element.name) && element.name.text === binding
-          )
-      )
+            (element) => ts.isIdentifier(element.name) && element.name.text === binding,
+          ),
+      ),
   );
   assert(declaration !== undefined, 'A default has an Astro.props binding');
   const alias = defaultBindingName(source);
@@ -369,7 +369,7 @@ export function bindComponentDefault(
       local: binding,
       declarationEnd: document.start + declaration.end,
     },
-    'definition'
+    'definition',
   );
 }
 
@@ -377,7 +377,7 @@ function editComponentReferences(
   source: string,
   names: ReadonlySet<string>,
   rename: PropertyReferenceEdit,
-  owner: 'definition' | 'consumer'
+  owner: 'definition' | 'consumer',
 ): Result<string> {
   let root: Node;
   try {
@@ -428,7 +428,7 @@ function editAstroNodes(
   root: Node,
   names: ReadonlySet<string>,
   rename: PropertyReferenceEdit,
-  owner: 'definition' | 'consumer'
+  owner: 'definition' | 'consumer',
 ): Result<readonly SourceEdit[]> {
   const edits: SourceEdit[] = [];
   const pending: { readonly node: Node; readonly expression: boolean }[] = [
@@ -464,7 +464,7 @@ function renameNode(
   names: ReadonlySet<string>,
   rename: PropertyReferenceEdit,
   owner: 'definition' | 'consumer',
-  expression: boolean
+  expression: boolean,
 ): Result<readonly SourceEdit[]> {
   const edits: SourceEdit[] = [];
   if ('attributes' in node) {
@@ -529,7 +529,7 @@ function positionError(): Result<never> {
 function renameAttribute(
   source: string,
   attribute: AttributeNode,
-  rename: PropertyRename
+  rename: PropertyRename,
 ): Result<readonly SourceEdit[]> {
   const start = offset(source, attribute);
   if (attribute.kind === 'spread') {
@@ -560,7 +560,7 @@ function renameSpread(
   source: string,
   attribute: AttributeNode,
   rename: PropertyRename,
-  position: number
+  position: number,
 ): Result<readonly SourceEdit[]> {
   const prefix = 'const spread = (';
   const object = literalSpreadObject(attribute.name, prefix);
@@ -590,8 +590,8 @@ function renameSpread(
     const text = ts.isShorthandPropertyAssignment(property)
       ? `${rename.to}: ${rename.from}`
       : ts.isStringLiteral(property.name)
-      ? JSON.stringify(rename.to)
-      : rename.to;
+        ? JSON.stringify(rename.to)
+        : rename.to;
     edits.push({
       start: start + property.name.getStart() - prefix.length,
       end: start + property.name.end - prefix.length,
@@ -603,14 +603,14 @@ function renameSpread(
 
 function literalSpreadObject(
   expression: string,
-  prefix: string
+  prefix: string,
 ): ts.ObjectLiteralExpression | undefined {
   const syntax = ts.createSourceFile(
     'spread.ts',
     prefix + expression + ');',
     ts.ScriptTarget.Latest,
     true,
-    ts.ScriptKind.TS
+    ts.ScriptKind.TS,
   );
   const nodes = syntaxNodes(syntax);
   const object = nodes.find(ts.isObjectLiteralExpression);
@@ -627,14 +627,14 @@ function literalSpreadObject(
 function renameAstroAccess(
   source: string,
   start: number,
-  rename: PropertyReferenceEdit
+  rename: PropertyReferenceEdit,
 ): Result<readonly SourceEdit[]> {
   const syntax = ts.createSourceFile(
     'expression.ts',
     source,
     ts.ScriptTarget.Latest,
     true,
-    ts.ScriptKind.TSX
+    ts.ScriptKind.TSX,
   );
   const edits: SourceEdit[] = [];
   for (const node of syntaxNodes(syntax)) {
@@ -687,7 +687,7 @@ function astroReferenceEdit(
   access: ts.Node,
   key: ts.Node,
   start: number,
-  change: PropertyReferenceEdit
+  change: PropertyReferenceEdit,
 ): SourceEdit {
   if (change.kind === 'default') {
     return {
@@ -717,7 +717,7 @@ function renameIndexedPropType(
   node: ts.Node,
   start: number,
   rename: PropertyRename,
-  typeNames: ReadonlySet<string>
+  typeNames: ReadonlySet<string>,
 ): SourceEdit | undefined {
   if (
     !ts.isLiteralTypeNode(node) ||

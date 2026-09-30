@@ -198,5 +198,4 @@ async function undo(app) {
   });
 }
 
-
 module.exports = { gesture, mountApp, nodeAt, select, sha256, tick, undo };

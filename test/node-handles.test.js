@@ -80,7 +80,9 @@ const ids = (model) => {
   const visit = (list) => {
     for (const node of list) {
       out.push(node.id);
-      if (Array.isArray(node.children)) {visit(node.children);}
+      if (Array.isArray(node.children)) {
+        visit(node.children);
+      }
     }
   };
   visit(model.nodes);
@@ -125,11 +127,20 @@ test('a removal drops only the removed handles; an insertion takes the gestureâ€
     },
   });
   // The gesture predicted the new node with its own handle, where it lands.
-  const predicted = { ...before.model, nodes: [{ ...before.model.nodes[0], children: [
-    before.model.nodes[0].children[0], before.model.nodes[0].children[1],
-    { id: NEW, kind: 'element', name: 'hr', props: {}, children: null },
-    before.model.nodes[0].children[2],
-  ] }] };
+  const predicted = {
+    ...before.model,
+    nodes: [
+      {
+        ...before.model.nodes[0],
+        children: [
+          before.model.nodes[0].children[0],
+          before.model.nodes[0].children[1],
+          { id: NEW, kind: 'element', name: 'hr', props: {}, children: null },
+          before.model.nodes[0].children[2],
+        ],
+      },
+    ],
+  };
   const afterInsert = carried(before, inserted.source, inserted.own, predicted);
   assert.deepEqual(ids(afterInsert), [h(0), h(1), h(2), h(3), h(4), NEW, h(5), h(6)]);
 });
@@ -148,7 +159,10 @@ test('a moved node keeps its handle at its new place', () => {
   const after = carried(before, moved.source, moved.own, predicted);
   assert.equal(after.nodes[0].children[0].id, h(5), 'the moved paragraph');
   assert.equal(after.nodes[0].children[0].children[0].id, h(6), 'and its text');
-  assert.deepEqual(after.nodes[0].children.slice(1).map((n) => n.id), [h(1), h(3)]);
+  assert.deepEqual(
+    after.nodes[0].children.slice(1).map((n) => n.id),
+    [h(1), h(3)],
+  );
 });
 
 test('an outside edit maps through the diff: untouched nodes keep, changed ones are fresh', () => {

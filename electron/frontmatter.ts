@@ -56,7 +56,10 @@ function skipCodeToken(text: string, i: number): number {
     }
   }
   const prev = before >= 0 ? text.charAt(before) : undefined;
-  if (text.charAt(i) === '/' && (before < 0 || (prev !== undefined && '=(:,[!&|?{};'.includes(prev)))) {
+  if (
+    text.charAt(i) === '/' &&
+    (before < 0 || (prev !== undefined && '=(:,[!&|?{};'.includes(prev)))
+  ) {
     let inClass = false;
     for (let j = i + 1; j < text.length && text.charAt(j) !== '\n'; j++) {
       if (text.charAt(j) === '\\') {
@@ -185,9 +188,12 @@ const sameImport = <Import extends SerializableImport>(
   b: SerializableImport,
   specFor?: (imp: Import) => string,
 ): boolean =>
-  a.name === b.name && (specFor ? specFor(a) : a.path) === b.path &&
-  a.quote === b.quote && !!a.named === !!b.named &&
-  a.imported === b.imported && !!a.typeOnly === !!b.typeOnly;
+  a.name === b.name &&
+  (specFor ? specFor(a) : a.path) === b.path &&
+  a.quote === b.quote &&
+  !!a.named === !!b.named &&
+  a.imported === b.imported &&
+  !!a.typeOnly === !!b.typeOnly;
 
 interface ImportGroup<Import extends SerializableImport> {
   members: Import[];
@@ -221,10 +227,19 @@ function importLines<Import extends SerializableImport>(
       return '';
     }
     const quote = first.quote === '"' ? '"' : "'";
-    const names = first.named ? '{ ' + members.map((imp) => {
-      const name = imp.imported && imp.imported !== imp.name ? `${imp.imported} as ${imp.name}` : imp.name;
-      return imp.typeOnly ? `type ${name}` : name;
-    }).join(', ') + ' }' : first.name;
+    const names = first.named
+      ? '{ ' +
+        members
+          .map((imp) => {
+            const name =
+              imp.imported && imp.imported !== imp.name
+                ? `${imp.imported} as ${imp.name}`
+                : imp.name;
+            return imp.typeOnly ? `type ${name}` : name;
+          })
+          .join(', ') +
+        ' }'
+      : first.name;
     return `import ${names} from ${quote}${specifier}${quote}${tail}`;
   });
 }
@@ -274,9 +289,10 @@ function moveOffsets(before: string, after: string, offsets: readonly number[]):
       for (let j = m - 1; j >= 0; j--) {
         const row = dp[i];
         if (row) {
-          row[j] = a[first + i] === b[first + j]
-            ? (dp[i + 1]?.[j + 1] ?? 0) + 1
-            : Math.max(dp[i + 1]?.[j] ?? 0, dp[i]?.[j + 1] ?? 0);
+          row[j] =
+            a[first + i] === b[first + j]
+              ? (dp[i + 1]?.[j + 1] ?? 0) + 1
+              : Math.max(dp[i + 1]?.[j] ?? 0, dp[i]?.[j + 1] ?? 0);
         }
       }
     }
@@ -302,7 +318,12 @@ function moveOffsets(before: string, after: string, offsets: readonly number[]):
   while (i < aEnd || j < bEnd) {
     if (i < aEnd && j < bEnd && a[i] === b[j]) {
       take(a[i++] ?? '', b[j++] ?? '', true);
-    } else if (i < aEnd && (j === bEnd || !dp.length || (dp[i - first + 1]?.[j - first] ?? 0) >= (dp[i - first]?.[j - first + 1] ?? 0))) {
+    } else if (
+      i < aEnd &&
+      (j === bEnd ||
+        !dp.length ||
+        (dp[i - first + 1]?.[j - first] ?? 0) >= (dp[i - first]?.[j - first + 1] ?? 0))
+    ) {
       take(a[i++] ?? '', '', false);
     } else {
       take('', b[j++] ?? '', false);
@@ -399,17 +420,28 @@ function writeFrontmatter<Import extends SerializableImport>(
   // declarations already in the source keep their individual positions.
   const additions: Import[] = [];
   for (const imp of added) {
-    const slot = imp.named && layout.slots.find((s) => (groups.get(s.at) ?? []).some((g) => g.named && g.path === imp.path));
+    const slot =
+      imp.named &&
+      layout.slots.find((s) =>
+        (groups.get(s.at) ?? []).some((g) => g.named && g.path === imp.path),
+      );
     if (slot) {
       const target = groups.get(slot.at);
-      assert(target !== undefined, 'writeFrontmatter: slot group exists — groups were built from layout.slots');
+      assert(
+        target !== undefined,
+        'writeFrontmatter: slot group exists — groups were built from layout.slots',
+      );
       target.push(imp);
     } else {
       additions.push(imp);
     }
   }
   const extra = withWhitespace(layout.extra, model.extraFrontmatter);
-  const offsets = moveOffsets(layout.extra, extra, layout.slots.map((slot) => slot.offset));
+  const offsets = moveOffsets(
+    layout.extra,
+    extra,
+    layout.slots.map((slot) => slot.offset),
+  );
   let output = model.frontmatterLead ? model.frontmatterLead + '\n' : '';
   let from = 0;
   for (let i = 0; i < layout.slots.length; i++) {
@@ -422,12 +454,15 @@ function writeFrontmatter<Import extends SerializableImport>(
       if (extra !== layout.extra && from === extra.length && output && !/\n$/.test(output)) {
         output += '\n';
       }
-      const untouched = members.length === slot.members.length &&
+      const untouched =
+        members.length === slot.members.length &&
         members.every((imp, index) => {
           const original = slot.members[index];
           return original !== undefined && sameImport(imp, original, specFor);
         });
-      output += (untouched ? slot.source : importLines(members, specFor, slot.tail).join('\n')) + slot.suffix;
+      output +=
+        (untouched ? slot.source : importLines(members, specFor, slot.tail).join('\n')) +
+        slot.suffix;
     }
     if (i === layout.slots.length - 1 && additions.length) {
       if (output && !/\n$/.test(output)) {

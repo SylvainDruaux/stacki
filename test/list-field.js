@@ -24,7 +24,9 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
+  if (!condition) {
+    failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  }
 };
 
 (async () => {
@@ -35,8 +37,8 @@ const check = (what, condition, detail) => {
   fs.writeFileSync(
     entry,
     `export { default as ListField } from ${JSON.stringify(
-      path.join(__dirname, '..', 'src', 'panels', 'ListField.jsx')
-    )};\n`
+      path.join(__dirname, '..', 'src', 'panels', 'ListField.jsx'),
+    )};\n`,
   );
   const bundle = path.join(buildDir, 'list-field.bundle.js');
   await esbuild.build({
@@ -72,7 +74,9 @@ const check = (what, condition, detail) => {
   // question a drop can be asked.
   const ROW = 30;
   dom.window.Element.prototype.getBoundingClientRect = function () {
-    if (!this.classList.contains('list-field-row')) {return { x: 0, y: 0, width: 200, height: 0, top: 0, left: 0, right: 200, bottom: 0 };}
+    if (!this.classList.contains('list-field-row')) {
+      return { x: 0, y: 0, width: 200, height: 0, top: 0, left: 0, right: 200, bottom: 0 };
+    }
     const rows = [...this.parentElement.querySelectorAll('.list-field-row')];
     const top = rows.indexOf(this) * ROW;
     return { x: 0, y: top, width: 200, height: ROW, top, left: 0, right: 200, bottom: top + ROW };
@@ -96,8 +100,12 @@ const check = (what, condition, detail) => {
           React.createElement(ListField, {
             value: current,
             placeholder,
-            onChange: (text, now) => { wrote.push(text); immediate.push(now); current = text },
-          })
+            onChange: (text, now) => {
+              wrote.push(text);
+              immediate.push(now);
+              current = text;
+            },
+          }),
         );
       });
     };
@@ -116,12 +124,18 @@ const check = (what, condition, detail) => {
     };
     // The popup, and its fields by the name the file gives them.
     const popup = () => document.querySelector('.list-item-editor');
-    const fieldNames = () => [...document.querySelectorAll('.list-item-field > span')].map((s) => s.textContent);
+    const fieldNames = () =>
+      [...document.querySelectorAll('.list-item-field > span')].map((s) => s.textContent);
     const typeInto = async (text, at = 0) => {
       const input = document.querySelectorAll('.list-item-editor input')[at];
-      if (!input) {return false;}
+      if (!input) {
+        return false;
+      }
       await act(async () => {
-        const setter = Object.getOwnPropertyDescriptor(dom.window.HTMLInputElement.prototype, 'value').set;
+        const setter = Object.getOwnPropertyDescriptor(
+          dom.window.HTMLInputElement.prototype,
+          'value',
+        ).set;
         setter.call(input, text);
         input.dispatchEvent(new dom.window.Event('input', { bubbles: true }));
       });
@@ -143,17 +157,23 @@ const check = (what, condition, detail) => {
       const clientY = at.top + (half === 'top' ? 4 : ROW - 4);
       await act(async () => {
         rows()[from].dispatchEvent(
-          Object.assign(new dom.window.Event('dragstart', { bubbles: true }), { dataTransfer: dt })
+          Object.assign(new dom.window.Event('dragstart', { bubbles: true }), { dataTransfer: dt }),
         );
       });
       await act(async () => {
         rows()[to].dispatchEvent(
-          Object.assign(new dom.window.Event('dragover', { bubbles: true }), { dataTransfer: dt, clientY })
+          Object.assign(new dom.window.Event('dragover', { bubbles: true }), {
+            dataTransfer: dt,
+            clientY,
+          }),
         );
       });
       await act(async () => {
         rows()[to].dispatchEvent(
-          Object.assign(new dom.window.Event('drop', { bubbles: true }), { dataTransfer: dt, clientY })
+          Object.assign(new dom.window.Event('drop', { bubbles: true }), {
+            dataTransfer: dt,
+            clientY,
+          }),
         );
       });
     };
@@ -172,7 +192,9 @@ const check = (what, condition, detail) => {
       dragTo,
       add: () => press(host.querySelector('.list-field-add')),
       input: () => document.querySelector('.list-item-editor input'),
-      done: async () => { await act(async () => root.unmount()) },
+      done: async () => {
+        await act(async () => root.unmount());
+      },
     };
   };
 
@@ -180,7 +202,11 @@ const check = (what, condition, detail) => {
   {
     const m = await mount('["Designer", "Developer", "Producer"]');
     check('one row per item', m.rows().length === 3, String(m.rows().length));
-    check('showing what is in it', m.labels().join() === 'Designer,Developer,Producer', m.labels().join());
+    check(
+      'showing what is in it',
+      m.labels().join() === 'Designer,Developer,Producer',
+      m.labels().join(),
+    );
     await m.done();
   }
 
@@ -189,9 +215,17 @@ const check = (what, condition, detail) => {
     const m = await mount('["Designer", "Developer"]');
     await m.press(m.host.querySelectorAll('.list-field-text')[1]);
     check('a row opens a popup', !!m.popup(), m.host.innerHTML.slice(0, 200));
-    check('with one field, called what a word is', m.fieldNames().join() === 'value', m.fieldNames().join());
+    check(
+      'with one field, called what a word is',
+      m.fieldNames().join() === 'value',
+      m.fieldNames().join(),
+    );
     await m.typeInto('Engineer');
-    check('typing shows on the canvas as it goes', m.wrote.pop() === '["Designer", "Engineer"]', JSON.stringify(m.wrote));
+    check(
+      'typing shows on the canvas as it goes',
+      m.wrote.pop() === '["Designer", "Engineer"]',
+      JSON.stringify(m.wrote),
+    );
     check('but not as the edit yet', m.immediate.pop() === false, JSON.stringify(m.immediate));
     await m.clickAway();
     check('closing it is the edit', m.immediate.pop() === true, JSON.stringify(m.immediate));
@@ -229,17 +263,28 @@ const check = (what, condition, detail) => {
   // An item with several fields is what the popup is for: a row cannot show
   // two things beside its own name.
   {
-    const m = await mount('[{ value: "us", label: "United States" }, { value: "ca", label: "Canada" }]');
+    const m = await mount(
+      '[{ value: "us", label: "United States" }, { value: "ca", label: "Canada" }]',
+    );
     check('a row per object', m.rows().length === 2, String(m.rows().length));
-    check('named by the field a person reads', m.labels().join() === 'United States,Canada', m.labels().join());
+    check(
+      'named by the field a person reads',
+      m.labels().join() === 'United States,Canada',
+      m.labels().join(),
+    );
     await m.press(m.host.querySelectorAll('.list-field-text')[1]);
-    check('and its fields are the object’s own', m.fieldNames().join() === 'value,label', m.fieldNames().join());
+    check(
+      'and its fields are the object’s own',
+      m.fieldNames().join() === 'value,label',
+      m.fieldNames().join(),
+    );
     await m.typeInto('mx', 0);
     await m.typeInto('Mexico', 1);
     check(
       'each one writes its own key',
-      m.wrote.pop() === '[{ value: "us", label: "United States" }, { value: "mx", label: "Mexico" }]',
-      JSON.stringify(m.wrote.slice(-2))
+      m.wrote.pop() ===
+        '[{ value: "us", label: "United States" }, { value: "mx", label: "Mexico" }]',
+      JSON.stringify(m.wrote.slice(-2)),
     );
     await m.done();
   }
@@ -250,7 +295,11 @@ const check = (what, condition, detail) => {
     const m = await mount('["Designer", "Developer"]');
     await m.press(m.host.querySelector('.list-field-text'));
     await m.typeInto('');
-    check('an emptied word is written as one', m.wrote.pop() === '["", "Developer"]', JSON.stringify(m.wrote));
+    check(
+      'an emptied word is written as one',
+      m.wrote.pop() === '["", "Developer"]',
+      JSON.stringify(m.wrote),
+    );
     await m.clickAway();
     await m.done();
   }
@@ -264,7 +313,11 @@ const check = (what, condition, detail) => {
     await m.typeInto('Producer');
     check('still nothing while it is being typed', m.wrote.length === 0, JSON.stringify(m.wrote));
     await m.clickAway();
-    check('the word is added when the popup closes', m.wrote.pop() === '["Designer", "Producer"]', JSON.stringify(m.wrote));
+    check(
+      'the word is added when the popup closes',
+      m.wrote.pop() === '["Designer", "Producer"]',
+      JSON.stringify(m.wrote),
+    );
     await m.done();
   }
 
@@ -275,7 +328,11 @@ const check = (what, condition, detail) => {
     await m.add();
     await m.typeInto('First');
     await m.clickAway();
-    check('and the first item makes the array', m.wrote.pop() === '["First"]', JSON.stringify(m.wrote));
+    check(
+      'and the first item makes the array',
+      m.wrote.pop() === '["First"]',
+      JSON.stringify(m.wrote),
+    );
     await m.done();
   }
 
@@ -284,14 +341,19 @@ const check = (what, condition, detail) => {
   {
     const m = await mount('[{ value: "us", label: "United States" }]');
     await m.add();
-    check('a new item is shaped like the list', m.fieldNames().join() === 'value,label', m.fieldNames().join());
+    check(
+      'a new item is shaped like the list',
+      m.fieldNames().join() === 'value,label',
+      m.fieldNames().join(),
+    );
     await m.typeInto('ca', 0);
     await m.typeInto('Canada', 1);
     await m.clickAway();
     check(
       'and lands as an object',
-      m.wrote.pop() === '[{ value: "us", label: "United States" }, { value: "ca", label: "Canada" }]',
-      JSON.stringify(m.wrote)
+      m.wrote.pop() ===
+        '[{ value: "us", label: "United States" }, { value: "ca", label: "Canada" }]',
+      JSON.stringify(m.wrote),
     );
     await m.done();
   }
@@ -317,19 +379,31 @@ const check = (what, condition, detail) => {
   {
     const m = await mount('["a", "b", "c"]');
     await m.dragTo(0, 2, 'bottom'); // below the last row: the end of the list
-    check('a row dragged to the end goes there', m.wrote.pop() === '["b", "c", "a"]', JSON.stringify(m.wrote));
+    check(
+      'a row dragged to the end goes there',
+      m.wrote.pop() === '["b", "c", "a"]',
+      JSON.stringify(m.wrote),
+    );
     await m.done();
   }
   {
     const m = await mount('["a", "b", "c"]');
     await m.dragTo(2, 0, 'top'); // above the first row: the front
-    check('and one dragged to the front', m.wrote.pop() === '["c", "a", "b"]', JSON.stringify(m.wrote));
+    check(
+      'and one dragged to the front',
+      m.wrote.pop() === '["c", "a", "b"]',
+      JSON.stringify(m.wrote),
+    );
     await m.done();
   }
   {
     const m = await mount('["a", "b", "c"]');
     await m.dragTo(0, 0, 'bottom'); // the gap it already fills
-    check('a drop where it already sits writes nothing', m.wrote.length === 0, JSON.stringify(m.wrote));
+    check(
+      'a drop where it already sits writes nothing',
+      m.wrote.length === 0,
+      JSON.stringify(m.wrote),
+    );
     await m.done();
   }
 
@@ -344,13 +418,17 @@ const check = (what, condition, detail) => {
     check(
       'and says nothing above the button',
       f.host.querySelectorAll('.list-field-empty').length === 0,
-      f.host.querySelector('.list-field-empty')?.textContent
+      f.host.querySelector('.list-field-empty')?.textContent,
     );
-    check('the way to fill it is still there', !!f.host.querySelector('.list-field-add'), 'no Add item');
+    check(
+      'the way to fill it is still there',
+      !!f.host.querySelector('.list-field-add'),
+      'no Add item',
+    );
     check(
       'and it is the only thing in the box',
       f.host.querySelector('.list-field')?.children.length === 1,
-      `${f.host.querySelector('.list-field')?.children.length} children`
+      `${f.host.querySelector('.list-field')?.children.length} children`,
     );
     await f.done();
   }
@@ -361,7 +439,7 @@ const check = (what, condition, detail) => {
       check(
         `nothing to say, spelled ${JSON.stringify(spelling)}`,
         f.host.querySelectorAll('.list-field-empty').length === 0,
-        f.host.querySelector('.list-field-empty')?.textContent
+        f.host.querySelector('.list-field-empty')?.textContent,
       );
       await f.done();
     }
@@ -371,16 +449,24 @@ const check = (what, condition, detail) => {
     // mean empty on the page.
     const f = await mount('[]', '["Pastors"]');
     const note = f.host.querySelector('.list-field-empty');
-    check('a default that puts something there is still said', note?.textContent === '["Pastors"]', note?.textContent);
+    check(
+      'a default that puts something there is still said',
+      note?.textContent === '["Pastors"]',
+      note?.textContent,
+    );
     await f.done();
   }
   {
     const f = await mount('["Designer"]', '[]');
-    check('a list with something in it is unaffected', f.labels().join() === 'Designer', f.labels().join());
+    check(
+      'a list with something in it is unaffected',
+      f.labels().join() === 'Designer',
+      f.labels().join(),
+    );
     check(
       'and draws no empty note either',
       f.host.querySelectorAll('.list-field-empty').length === 0,
-      f.host.querySelector('.list-field-empty')?.textContent
+      f.host.querySelector('.list-field-empty')?.textContent,
     );
     await f.done();
   }
@@ -394,27 +480,34 @@ const check = (what, condition, detail) => {
     check(
       'a project that writes single quotes keeps them',
       m.wrote.pop() === "['a', 'b', 'c']",
-      JSON.stringify(m.wrote)
+      JSON.stringify(m.wrote),
     );
     await m.done();
   }
 
   // --- and the field it belongs to ----------------------------------------------------------
-  const panel = fs.readFileSync(path.join(__dirname, '..', 'src', 'panels', 'PropField.tsx'), 'utf8');
+  const panel = fs.readFileSync(
+    path.join(__dirname, '..', 'src', 'panels', 'PropField.tsx'),
+    'utf8',
+  );
   check(
     'an array prop shows the list rather than a code field',
-    /if \(type === 'code' && !showExpr && \(value === undefined \|\| arrayItems\(str\)\)\)/.test(panel),
-    'the list is not reached'
+    /if \(type === 'code' && !showExpr && \(value === undefined \|\| arrayItems\(str\)\)\)/.test(
+      panel,
+    ),
+    'the list is not reached',
   );
   check(
     'a list is something the control can write, so `{}` is a toggle and not the only way',
     /if \(field\.type === 'code'\) \{\s*return arrayItems\(source\) === null;\s*\}/.test(panel),
-    'an array would always open as an expression'
+    'an array would always open as an expression',
   );
   check(
     'and the way back keeps the value',
-    /if \(field\.type === 'code' && arrayItems\(source\)\) \{\s*return \{ type: 'expr', value: source \};\s*\}/.test(panel),
-    'coming back from the code editor would drop the prop'
+    /if \(field\.type === 'code' && arrayItems\(source\)\) \{\s*return \{ type: 'expr', value: source \};\s*\}/.test(
+      panel,
+    ),
+    'coming back from the code editor would drop the prop',
   );
   check('the toggle calls it a list', /field\.type === 'code'\) \{\s*return 'list'/.test(panel));
 
@@ -423,7 +516,7 @@ const check = (what, condition, detail) => {
   check(
     'a button alone in the box draws no line above itself',
     /\.list-field-add:first-child\s*\{[^}]*border-top:\s*0/.test(css),
-    'the empty box would have two lines across its top'
+    'the empty box would have two lines across its top',
   );
 
   if (failures.length) {

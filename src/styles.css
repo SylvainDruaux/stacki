@@ -1,7 +1,7 @@
 :root {
-  --bg: #191919;            /* canvas */
-  --bg-panel: #111111;      /* side panels */
-  --bg-panel-2: #1a1a1a;    /* raised surfaces */
+  --bg: #191919; /* canvas */
+  --bg-panel: #111111; /* side panels */
+  --bg-panel-2: #1a1a1a; /* raised surfaces */
   --bg-input: rgba(255, 255, 255, 0.06);
   --bg-hover: rgba(255, 255, 255, 0.05);
   --bg-active: rgba(255, 255, 255, 0.09);
@@ -32,9 +32,17 @@
   --mono: 'SF Mono', 'Cascadia Code', Consolas, monospace;
 }
 
-* { box-sizing: border-box; margin: 0; padding: 0; }
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
 
-html, body, #root { height: 100%; }
+html,
+body,
+#root {
+  height: 100%;
+}
 
 body {
   font-family: var(--font);
@@ -69,15 +77,38 @@ button {
    hover and replaced by a faint white wash over the panel *behind* it, which
    lands darker than the control. Hovering made things dimmer.
    `:where()` keeps the exclusion from changing what this rule beats elsewhere. */
-button:hover:not(:disabled):where(:not(.style-panel-host *, .style-panel-surface *)) { background: var(--bg-active); }
-button:disabled { opacity: 0.4; cursor: default; }
-button.primary { background: var(--accent); color: white; font-weight: 600; }
-button.primary:hover:not(:disabled) { background: #24a8ff; }
-button.ghost { background: transparent; color: var(--text-dim); padding: 4px; border-radius: 6px; }
-button.ghost:hover:not(:disabled) { background: var(--bg-hover); color: var(--text); }
-button.danger { color: var(--red); }
+button:hover:not(:disabled):where(:not(.style-panel-host *, .style-panel-surface *)) {
+  background: var(--bg-active);
+}
+button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+button.primary {
+  background: var(--accent);
+  color: white;
+  font-weight: 600;
+}
+button.primary:hover:not(:disabled) {
+  background: #24a8ff;
+}
+button.ghost {
+  background: transparent;
+  color: var(--text-dim);
+  padding: 4px;
+  border-radius: 6px;
+}
+button.ghost:hover:not(:disabled) {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+button.danger {
+  color: var(--red);
+}
 
-input, select, textarea {
+input,
+select,
+textarea {
   font-family: inherit;
   font-size: 12px;
   color: var(--text);
@@ -87,14 +118,18 @@ input, select, textarea {
   padding: 6px 8px;
   outline: none;
   width: 100%;
-  transition: border-color 0.1s, background 0.1s;
+  transition:
+    border-color 0.1s,
+    background 0.1s;
 }
 /* No hover on a field. A button lights up because pressing it does something;
    a field just sits there holding a value, and lighting it under the pointer
    made the panel twitch on the way past. Focus is where a field changes — see
    below. (This used to paint every input, the style panel's included, which is
    why the panel's fields flickered on the way to a control.) */
-input:focus, select:focus, textarea:focus {
+input:focus,
+select:focus,
+textarea:focus {
   border-color: var(--accent);
   background: var(--bg-input);
 }
@@ -120,13 +155,22 @@ input[type='checkbox'] {
   outline: 2px solid var(--accent);
   outline-offset: 1px;
 }
-textarea { font-family: inherit; font-size: 12px; line-height: 1.5; resize: none; }
+textarea {
+  font-family: inherit;
+  font-size: 12px;
+  line-height: 1.5;
+  resize: none;
+}
 
 /* ------------------------------------------------------------------ */
 /* Layout                                                              */
 /* ------------------------------------------------------------------ */
 
-.app { display: flex; flex-direction: column; height: 100%; }
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
 
 .titlebar {
   height: 40px;
@@ -139,9 +183,15 @@ textarea { font-family: inherit; font-size: 12px; line-height: 1.5; resize: none
   border-bottom: 1px solid var(--border);
   -webkit-app-region: drag;
 }
-html[data-platform='darwin'] .titlebar { padding-left: 84px; }
-html[data-platform='win32'] .titlebar { padding-right: 148px; }
-.titlebar > * { -webkit-app-region: no-drag; }
+html[data-platform='darwin'] .titlebar {
+  padding-left: 84px;
+}
+html[data-platform='win32'] .titlebar {
+  padding-right: 148px;
+}
+.titlebar > * {
+  -webkit-app-region: no-drag;
+}
 .titlebar .app-title {
   font-weight: 600;
   font-size: 12px;
@@ -159,8 +209,13 @@ html[data-platform='win32'] .titlebar { padding-right: 148px; }
   color: var(--text);
   background: var(--bg-hover);
 }
-.project-back svg { flex-shrink: 0; }
-.titlebar .spacer { flex: 1; -webkit-app-region: drag; }
+.project-back svg {
+  flex-shrink: 0;
+}
+.titlebar .spacer {
+  flex: 1;
+  -webkit-app-region: drag;
+}
 
 .titlebar .url-group {
   display: flex;
@@ -195,7 +250,9 @@ html[data-platform='win32'] .titlebar { padding-right: 148px; }
   border-radius: 8px;
   max-width: 220px;
 }
-.page-switch-btn:hover:not(:disabled) { background: var(--bg-hover); }
+.page-switch-btn:hover:not(:disabled) {
+  background: var(--bg-hover);
+}
 /* Editing a component: the switcher becomes a way back out, in the same
    green the navigator and canvas use for components. */
 /* Same green as a selected component row in the Navigator, so "inside a
@@ -205,11 +262,15 @@ html[data-platform='win32'] .titlebar { padding-right: 148px; }
   color: var(--component-green);
   gap: 8px;
 }
-.page-switch-btn.comp-back:hover:not(:disabled) { background: rgba(121, 224, 156, 0.26); }
+.page-switch-btn.comp-back:hover:not(:disabled) {
+  background: rgba(121, 224, 156, 0.26);
+}
 /* Both selectors: the generic `.page-switch-btn svg:first-child` rule below
    ties on specificity and would otherwise grey out the back arrow. */
 .page-switch-btn.comp-back svg,
-.page-switch-btn.comp-back svg:first-child { color: var(--component-green); }
+.page-switch-btn.comp-back svg:first-child {
+  color: var(--component-green);
+}
 .comp-back-sep {
   width: 1px;
   align-self: stretch;
@@ -217,9 +278,17 @@ html[data-platform='win32'] .titlebar { padding-right: 148px; }
   background: rgba(121, 224, 156, 0.35);
   flex-shrink: 0;
 }
-.page-switch-btn svg:first-child { color: var(--text-dim); }
-.page-switch-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.page-switch-chevron { color: var(--text-faint); }
+.page-switch-btn svg:first-child {
+  color: var(--text-dim);
+}
+.page-switch-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.page-switch-chevron {
+  color: var(--text-faint);
+}
 
 .page-menu {
   position: fixed;
@@ -253,17 +322,29 @@ html[data-platform='win32'] .titlebar { padding-right: 148px; }
   font-size: 12px;
   flex-shrink: 0;
 }
-.page-menu-item svg { flex-shrink: 0; color: var(--text-faint); }
-.page-menu-item.highlight { background: var(--bg-active); color: var(--text); }
-.page-menu-item.current { color: var(--text); }
-.page-menu-item.current svg:last-child { color: var(--accent); }
+.page-menu-item svg {
+  flex-shrink: 0;
+  color: var(--text-faint);
+}
+.page-menu-item.highlight {
+  background: var(--bg-active);
+  color: var(--text);
+}
+.page-menu-item.current {
+  color: var(--text);
+}
+.page-menu-item.current svg:last-child {
+  color: var(--accent);
+}
 /* A generated route ([id], [...slug]) — same purple as the Pages panel.
    Both selectors beat `.page-menu-item svg` / `.page-switch-btn svg:first-child`
    on specificity, and neither touches the check on the current row. */
 .page-menu-item.collection > svg:first-child,
 .page-menu-item.collection .page-menu-name,
 .page-switch-btn.collection > svg:first-child,
-.page-switch-btn.collection .page-switch-label { color: var(--collection-purple); }
+.page-switch-btn.collection .page-switch-label {
+  color: var(--collection-purple);
+}
 .page-menu-name {
   font-weight: 500;
   overflow: hidden;
@@ -287,7 +368,11 @@ html[data-platform='win32'] .titlebar { padding-right: 148px; }
 }
 
 /* Preview + open-in-browser sit together as one cluster. */
-.titlebar-actions { display: flex; align-items: center; gap: 2px; }
+.titlebar-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
 
 .titlebar-btn {
   width: 30px;
@@ -297,10 +382,20 @@ html[data-platform='win32'] .titlebar { padding-right: 148px; }
   color: var(--text-dim);
   border-radius: 8px;
 }
-.titlebar-btn:hover:not(:disabled) { background: var(--bg-hover); color: var(--text); }
-.titlebar-btn:disabled { opacity: 0.4; }
-.preview-btn.on { background: var(--accent); color: white; }
-.preview-btn.on:hover:not(:disabled) { background: #24a8ff; }
+.titlebar-btn:hover:not(:disabled) {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+.titlebar-btn:disabled {
+  opacity: 0.4;
+}
+.preview-btn.on {
+  background: var(--accent);
+  color: white;
+}
+.preview-btn.on:hover:not(:disabled) {
+  background: #24a8ff;
+}
 
 /* Interactive preview mode — the site fills everything below the title bar */
 .preview-mode {
@@ -319,9 +414,20 @@ html[data-platform='win32'] .titlebar { padding-right: 148px; }
 /* A question, asked in the app's own window rather than the browser's.
    Narrow, because a confirm that needs a wide window is a confirm asking too
    much at once. */
-.confirm-dialog { width: 380px; max-width: 90vw; }
-.confirm-body { font-size: 12px; line-height: 1.55; color: var(--text-dim); white-space: pre-line; }
-.confirm-body strong { color: var(--text); font-weight: 600; }
+.confirm-dialog {
+  width: 380px;
+  max-width: 90vw;
+}
+.confirm-body {
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--text-dim);
+  white-space: pre-line;
+}
+.confirm-body strong {
+  color: var(--text);
+  font-weight: 600;
+}
 /* A decision that belongs with the question rather than after it. */
 .confirm-check {
   display: flex;
@@ -333,8 +439,17 @@ html[data-platform='win32'] .titlebar { padding-right: 148px; }
   cursor: pointer;
   color: var(--text);
 }
-.confirm-check input { margin: 1px 0 0; flex-shrink: 0; }
-.confirm-check-hint { display: block; margin-top: 2px; color: var(--text-faint); font-style: normal; font-size: 11px; }
+.confirm-check input {
+  margin: 1px 0 0;
+  flex-shrink: 0;
+}
+.confirm-check-hint {
+  display: block;
+  margin-top: 2px;
+  color: var(--text-faint);
+  font-style: normal;
+  font-size: 11px;
+}
 /* Destructive confirms are red and do NOT answer to Return — the button has to
    be chosen on purpose. */
 .modal-footer button.danger {
@@ -342,13 +457,27 @@ html[data-platform='win32'] .titlebar { padding-right: 148px; }
   border-color: var(--red);
   color: #fff;
 }
-.modal-footer button.danger:hover { filter: brightness(1.08); }
+.modal-footer button.danger:hover {
+  filter: brightness(1.08);
+}
 
 /* A merge that touched twenty files is not twenty things to read at once:
    the files down the side, one of them open at a time. */
-.conflict-modal { width: 880px; max-width: 94vw; display: flex; flex-direction: column; }
-.conflict-intro { padding: 0 16px 10px; }
-.conflict-split { display: grid; grid-template-columns: 220px 1fr; min-height: 0; flex: 1; }
+.conflict-modal {
+  width: 880px;
+  max-width: 94vw;
+  display: flex;
+  flex-direction: column;
+}
+.conflict-intro {
+  padding: 0 16px 10px;
+}
+.conflict-split {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  min-height: 0;
+  flex: 1;
+}
 .conflict-files {
   border-right: 1px solid var(--border);
   border-top: 1px solid var(--border);
@@ -369,8 +498,12 @@ html[data-platform='win32'] .titlebar { padding-right: 148px; }
   background: none;
   cursor: pointer;
 }
-.conflict-file-row:hover { background: var(--bg-hover); }
-.conflict-file-row.on { background: var(--accent-soft); }
+.conflict-file-row:hover {
+  background: var(--bg-hover);
+}
+.conflict-file-row.on {
+  background: var(--accent-soft);
+}
 .conflict-file-name {
   grid-area: name;
   font-size: 11.5px;
@@ -401,7 +534,10 @@ html[data-platform='win32'] .titlebar { padding-right: 148px; }
   background: var(--surface-2, rgba(255, 255, 255, 0.06));
   white-space: nowrap;
 }
-.conflict-file-badge.warn { color: #fff; background: var(--accent); }
+.conflict-file-badge.warn {
+  color: #fff;
+  background: var(--accent);
+}
 
 .conflict-detail {
   overflow-y: auto;
@@ -438,12 +574,20 @@ html[data-platform='win32'] .titlebar { padding-right: 148px; }
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.conflict-whole { padding: 10px 4px; font-size: 11.5px; color: var(--text-faint); }
+.conflict-whole {
+  padding: 10px 4px;
+  font-size: 11.5px;
+  color: var(--text-faint);
+}
 
 /* Two or three buttons rather than a toggle: which side is chosen has to be
    readable at a glance down a column of differences, and a switch only shows
    its state by position. */
-.conflict-choice { display: flex; gap: 2px; flex-shrink: 0; }
+.conflict-choice {
+  display: flex;
+  gap: 2px;
+  flex-shrink: 0;
+}
 .conflict-choice button {
   font-size: 11px;
   padding: 3px 9px;
@@ -453,11 +597,24 @@ html[data-platform='win32'] .titlebar { padding-right: 148px; }
   color: var(--text-faint);
   white-space: nowrap;
 }
-.conflict-choice button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+.conflict-choice button.on {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
 
 /* One difference. */
-.conflict-hunk { margin-top: 10px; border-top: 1px solid var(--border); padding-top: 10px; }
-.conflict-hunk-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.conflict-hunk {
+  margin-top: 10px;
+  border-top: 1px solid var(--border);
+  padding-top: 10px;
+}
+.conflict-hunk-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
 .conflict-hunk-n {
   flex: 1;
   font-size: 10px;
@@ -469,15 +626,24 @@ html[data-platform='win32'] .titlebar { padding-right: 148px; }
 
 /* Both versions side by side. The kept one is lit; the other stays legible
    rather than hidden, so the choice can be checked without changing it. */
-.conflict-sides { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.conflict-sides {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
 .conflict-side {
   border: 1px solid var(--border);
   border-radius: 6px;
   overflow: hidden;
   opacity: 0.5;
-  transition: opacity 0.12s ease, border-color 0.12s ease;
+  transition:
+    opacity 0.12s ease,
+    border-color 0.12s ease;
 }
-.conflict-side.kept { opacity: 1; border-color: var(--accent); }
+.conflict-side.kept {
+  opacity: 1;
+  border-color: var(--accent);
+}
 .conflict-side-label {
   padding: 3px 7px;
   font-size: 10px;
@@ -488,23 +654,50 @@ html[data-platform='win32'] .titlebar { padding-right: 148px; }
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.conflict-side.kept .conflict-side-label { color: var(--accent); }
-.conflict-side .code-block { background: var(--bg); }
-.conflict-empty { padding: 8px; font-size: 11px; color: var(--text-faint); font-style: italic; }
+.conflict-side.kept .conflict-side-label {
+  color: var(--accent);
+}
+.conflict-side .code-block {
+  background: var(--bg);
+}
+.conflict-empty {
+  padding: 8px;
+  font-size: 11px;
+  color: var(--text-faint);
+  font-style: italic;
+}
 
 /* Code shown rather than edited — the editor's own type and colours, with
    nothing that invites a cursor. */
-.code-block { font-size: 11px; }
-.code-block .cm-editor { background: transparent; }
-.code-block .cm-content { padding: 6px 8px; }
-.code-block .cm-line { padding: 0; }
-.conflict-hunk.combined .conflict-hunk-n { color: var(--green); }
+.code-block {
+  font-size: 11px;
+}
+.code-block .cm-editor {
+  background: transparent;
+}
+.code-block .cm-content {
+  padding: 6px 8px;
+}
+.code-block .cm-line {
+  padding: 0;
+}
+.conflict-hunk.combined .conflict-hunk-n {
+  color: var(--green);
+}
 
 /* An old version, covering the canvas. Laid out as a column so the banner is
    part of the overlay rather than floating over the page — a bar that overlaps
    the site being looked at is a bar that hides the thing you came to see. */
-.preview-mode.old-version { display: flex; flex-direction: column; background: var(--bg); }
-.preview-mode.old-version iframe { flex: 1; min-height: 0; background: white; }
+.preview-mode.old-version {
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+}
+.preview-mode.old-version iframe {
+  flex: 1;
+  min-height: 0;
+  background: white;
+}
 
 .preview-banner {
   display: flex;
@@ -516,8 +709,13 @@ html[data-platform='win32'] .titlebar { padding-right: 148px; }
   font-size: 12px;
   flex-shrink: 0;
 }
-.preview-banner-text { flex: 1; line-height: 1.4; }
-.preview-banner-text strong { font-weight: 600; }
+.preview-banner-text {
+  flex: 1;
+  line-height: 1.4;
+}
+.preview-banner-text strong {
+  font-weight: 600;
+}
 .preview-banner-exit {
   flex-shrink: 0;
   background: rgba(255, 255, 255, 0.16);
@@ -527,7 +725,9 @@ html[data-platform='win32'] .titlebar { padding-right: 148px; }
   font-weight: 500;
   padding: 4px 10px;
 }
-.preview-banner-exit:hover { background: rgba(255, 255, 255, 0.28); }
+.preview-banner-exit:hover {
+  background: rgba(255, 255, 255, 0.28);
+}
 
 /* Link settings (href fields) */
 .link-types {
@@ -555,7 +755,10 @@ html[data-platform='win32'] .titlebar { padding-right: 148px; }
   color: var(--text);
   background: transparent;
 }
-.link-types button.on { background: transparent; color: var(--text); }
+.link-types button.on {
+  background: transparent;
+  color: var(--text);
+}
 /* Same chip as the True/False switcher: a flat tint this close to the track
    disappears, so it carries a drop shadow and a hairline to lift off it. */
 .link-types-indicator {
@@ -585,8 +788,12 @@ html[data-platform='win32'] .titlebar { padding-right: 148px; }
   padding: 1px 4px;
   border-radius: 4px;
 }
-.props-field .link-types + input { margin-bottom: 0; }
-.props-field input + input { margin-top: 6px; }
+.props-field .link-types + input {
+  margin-bottom: 0;
+}
+.props-field input + input {
+  margin-top: 6px;
+}
 
 /* Free-form attributes section (elements & ...rest components) */
 .attrs-list {
@@ -605,9 +812,17 @@ html[data-platform='win32'] .titlebar { padding-right: 148px; }
   font-size: 12px;
   min-width: 0;
 }
-.attr-row + .attr-row { border-top: 1px solid var(--border); }
-.attr-row:hover, .attr-row.editing { background: var(--bg-hover); }
-.attr-row .attr-name { color: var(--text-dim); flex-shrink: 0; }
+.attr-row + .attr-row {
+  border-top: 1px solid var(--border);
+}
+.attr-row:hover,
+.attr-row.editing {
+  background: var(--bg-hover);
+}
+.attr-row .attr-name {
+  color: var(--text-dim);
+  flex-shrink: 0;
+}
 .attr-row.spread .attr-name {
   flex: 1;
   min-width: 0;
@@ -615,7 +830,10 @@ html[data-platform='win32'] .titlebar { padding-right: 148px; }
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.attr-row .attr-eq { color: var(--text-faint); flex-shrink: 0; }
+.attr-row .attr-eq {
+  color: var(--text-faint);
+  flex-shrink: 0;
+}
 .attr-row .attr-value {
   color: var(--text);
   overflow: hidden;
@@ -632,8 +850,13 @@ html[data-platform='win32'] .titlebar { padding-right: 148px; }
   border-radius: 4px;
   flex-shrink: 0;
 }
-.attr-row:hover .row-action { opacity: 1; }
-.attr-row .row-action:hover { color: var(--red); background: var(--bg-active); }
+.attr-row:hover .row-action {
+  opacity: 1;
+}
+.attr-row .row-action:hover {
+  color: var(--red);
+  background: var(--bg-active);
+}
 
 /* A prop that takes a list of words, edited as a list of words. Built from the
    attribute rows above — same height, same hover, same quiet row action — since
@@ -698,11 +921,21 @@ html[data-platform='win32'] .titlebar { padding-right: 148px; }
      scrolls cannot leave one behind. */
   box-shadow: none;
 }
-.list-field-row + .list-field-row { border-top: 1px solid var(--border); }
-.list-field-row:hover { background: var(--bg-hover); }
-.list-field-row.is-dragging { opacity: 0.4; }
-.list-field-row.is-before { box-shadow: inset 0 1px 0 0 var(--accent); }
-.list-field-row.is-after { box-shadow: inset 0 -1px 0 0 var(--accent); }
+.list-field-row + .list-field-row {
+  border-top: 1px solid var(--border);
+}
+.list-field-row:hover {
+  background: var(--bg-hover);
+}
+.list-field-row.is-dragging {
+  opacity: 0.4;
+}
+.list-field-row.is-before {
+  box-shadow: inset 0 1px 0 0 var(--accent);
+}
+.list-field-row.is-after {
+  box-shadow: inset 0 -1px 0 0 var(--accent);
+}
 .list-field-grip {
   display: flex;
   padding: 0;
@@ -715,9 +948,15 @@ html[data-platform='win32'] .titlebar { padding-right: 148px; }
   touch-action: none;
 }
 .list-field-row:hover .list-field-grip,
-.list-field-row:focus-within .list-field-grip { opacity: 1; }
-.list-field-row .list-field-grip:hover { background: none; }
-.list-field-grip:active { cursor: grabbing; }
+.list-field-row:focus-within .list-field-grip {
+  opacity: 1;
+}
+.list-field-row .list-field-grip:hover {
+  background: none;
+}
+.list-field-grip:active {
+  cursor: grabbing;
+}
 .list-field-icon {
   display: inline-flex;
   align-items: center;
@@ -751,12 +990,20 @@ html[data-platform='win32'] .titlebar { padding-right: 148px; }
    type selector plus two pseudo-classes, and beats a lone class. Without that,
    hovering a row filled the label with the pressed-button colour: a pill inside
    the row, offset from it, reading as a control inside a control. */
-.list-field-row .list-field-text:hover { background: none; }
-.list-field-blank { color: var(--text-faint); }
-.list-field-row.is-open { background: var(--bg-hover); }
+.list-field-row .list-field-text:hover {
+  background: none;
+}
+.list-field-blank {
+  color: var(--text-faint);
+}
+.list-field-row.is-open {
+  background: var(--bg-hover);
+}
 
 /* One item's fields, in the same box the attribute editor uses. */
-.list-item-editor { padding-bottom: 8px; }
+.list-item-editor {
+  padding-bottom: 8px;
+}
 .list-item-field {
   display: flex;
   align-items: center;
@@ -771,7 +1018,10 @@ html[data-platform='win32'] .titlebar { padding-right: 148px; }
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.list-item-field > input { flex: 1; min-width: 0; }
+.list-item-field > input {
+  flex: 1;
+  min-width: 0;
+}
 .list-field-remove {
   opacity: 0;
   padding: 3px;
@@ -780,8 +1030,13 @@ html[data-platform='win32'] .titlebar { padding-right: 148px; }
   flex-shrink: 0;
 }
 .list-field-row:hover .list-field-remove,
-.list-field-row:focus-within .list-field-remove { opacity: 1; }
-.list-field-remove:hover { color: var(--red); background: var(--bg-active); }
+.list-field-row:focus-within .list-field-remove {
+  opacity: 1;
+}
+.list-field-remove:hover {
+  color: var(--red);
+  background: var(--bg-active);
+}
 /* A button, so it arrives centred from the base rule — which reads as a
    caption under the list rather than the next row of it. It is the row after
    the last one, and rows start at the left. */
@@ -801,11 +1056,18 @@ html[data-platform='win32'] .titlebar { padding-right: 148px; }
   text-align: left;
 }
 .list-field-row:first-child + .list-field-add,
-.list-field-empty + .list-field-add { border-top: 1px solid var(--border); }
+.list-field-empty + .list-field-add {
+  border-top: 1px solid var(--border);
+}
 /* Alone in the box — an empty list is just the way to fill it — the rule above
    the button would be a second line under the box's own edge. */
-.list-field-add:first-child { border-top: 0; }
-.list-field-add:hover { background: var(--bg-hover); color: var(--text); }
+.list-field-add:first-child {
+  border-top: 0;
+}
+.list-field-add:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
 
 .attr-editor {
   position: fixed;
@@ -826,7 +1088,10 @@ html[data-platform='win32'] .titlebar { padding-right: 148px; }
 }
 /* Asset picker inside the attribute editor: the mode toggle sits in-flow
    above the card instead of floating beside a field label. */
-.attr-asset { flex: 1; min-width: 0; }
+.attr-asset {
+  flex: 1;
+  min-width: 0;
+}
 .attr-asset .af-mode {
   position: static;
   margin: 0 0 6px auto;
@@ -874,14 +1139,19 @@ html[data-platform='win32'] .titlebar { padding-right: 148px; }
   height: 12px;
   transform: translate(-50%, -50%);
   transform-origin: center;
-  transition: transform 0.1s ease, opacity 0.12s ease;
+  transition:
+    transform 0.1s ease,
+    opacity 0.12s ease;
 }
 .attr-value-field > .bind-handle:hover:not(:disabled),
 .attr-value-field > .bind-handle.on {
   transform: translate(-50%, -50%) scale(1.5);
 }
 .attr-value-field:hover > .bind-handle,
-.attr-value-field > .bind-handle.on { opacity: 1; pointer-events: auto; }
+.attr-value-field > .bind-handle.on {
+  opacity: 1;
+  pointer-events: auto;
+}
 
 /* Tall fields (the CSS editor, the asset card, a multi-line expression) keep the
    label and the asset toggle at the top instead of centred against their whole
@@ -897,7 +1167,9 @@ html[data-platform='win32'] .titlebar { padding-right: 148px; }
   padding-top: 6px;
 }
 .attr-editor-row > .attr-asset-toggle,
-.attr-editor-row > .attr-expand-toggle { align-self: flex-start; }
+.attr-editor-row > .attr-expand-toggle {
+  align-self: flex-start;
+}
 
 /* Compact actions beside the value: expand its code or switch it to a file. */
 .attr-asset-toggle,
@@ -911,8 +1183,13 @@ html[data-platform='win32'] .titlebar { padding-right: 148px; }
   border-radius: 6px;
 }
 .attr-asset-toggle:hover:not(:disabled),
-.attr-expand-toggle:hover:not(:disabled) { background: var(--bg-hover); color: var(--text); }
-.attr-asset-toggle.on { color: var(--accent); }
+.attr-expand-toggle:hover:not(:disabled) {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+.attr-asset-toggle.on {
+  color: var(--accent);
+}
 
 .style-editor {
   flex: 1;
@@ -923,13 +1200,24 @@ html[data-platform='win32'] .titlebar { padding-right: 148px; }
   max-height: 220px;
   overflow: auto;
 }
-.style-editor:focus-within { border-color: var(--accent); }
-.style-editor .cm-content { padding: 6px 8px; }
-.style-editor .cm-line { padding: 0; }
+.style-editor:focus-within {
+  border-color: var(--accent);
+}
+.style-editor .cm-content {
+  padding: 6px 8px;
+}
+.style-editor .cm-line {
+  padding: 0;
+}
 /* The placeholder should read like an input's, not like code. */
-.style-editor .cm-placeholder { color: var(--text-faint); font-family: var(--font); }
+.style-editor .cm-placeholder {
+  color: var(--text-faint);
+  font-family: var(--font);
+}
 /* As a field of its own (inline styles, under class) it's a block, not a row. */
-.props-field > .style-editor { width: 100%; }
+.props-field > .style-editor {
+  width: 100%;
+}
 
 /* Highlighted JS in an input's clothing (loop data, code preview). */
 .expr-input {
@@ -940,16 +1228,34 @@ html[data-platform='win32'] .titlebar { padding-right: 148px; }
   border-radius: 6px;
   max-height: 200px;
   overflow: auto;
-  transition: border-color 0.1s, background 0.1s;
+  transition:
+    border-color 0.1s,
+    background 0.1s;
 }
-.expr-input:hover { background: rgba(255, 255, 255, 0.08); }
-.expr-input:focus-within { border-color: var(--accent); background: var(--bg-input); }
-.expr-input.invalid { border-color: var(--red); }
-.expr-input .cm-content { padding: 6px 8px; }
-.expr-input .cm-line { padding: 0; }
-.expr-input .cm-editor { background: transparent; }
+.expr-input:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+.expr-input:focus-within {
+  border-color: var(--accent);
+  background: var(--bg-input);
+}
+.expr-input.invalid {
+  border-color: var(--red);
+}
+.expr-input .cm-content {
+  padding: 6px 8px;
+}
+.expr-input .cm-line {
+  padding: 0;
+}
+.expr-input .cm-editor {
+  background: transparent;
+}
 /* The placeholder should read like an input's, not like code. */
-.expr-input .cm-placeholder { color: var(--text-faint); font-family: var(--font); }
+.expr-input .cm-placeholder {
+  color: var(--text-faint);
+  font-family: var(--font);
+}
 
 /* An expression prop value: the code field, with the "edit its source"
    pencil tucked beside it. */
@@ -965,7 +1271,9 @@ html[data-platform='win32'] .titlebar { padding-right: 148px; }
 }
 /* Against a single-line control the pencil centres rather than hugging the
    top the way it does beside a code field that can grow. */
-.prop-expr-row:has(> .dd-trigger) { align-items: center; }
+.prop-expr-row:has(> .dd-trigger) {
+  align-items: center;
+}
 
 /* The declaration behind a bound prop, opened in place. */
 .var-src {
@@ -983,7 +1291,9 @@ html[data-platform='win32'] .titlebar { padding-right: 148px; }
   font-family: var(--mono);
   color: var(--text);
 }
-.var-src-head .ghost { padding: 2px; }
+.var-src-head .ghost {
+  padding: 2px;
+}
 .var-src-code {
   max-height: 260px;
   border: 1px solid var(--border);
@@ -995,7 +1305,9 @@ html[data-platform='win32'] .titlebar { padding-right: 148px; }
   overflow: auto;
   overscroll-behavior: contain;
 }
-.var-src .var-src-code .cm-content { max-width: none; }
+.var-src .var-src-code .cm-content {
+  max-width: none;
+}
 
 /* Insert palette (⌘F / ⌘E) */
 .insert-overlay {
@@ -1053,8 +1365,13 @@ html[data-platform='win32'] .titlebar { padding-right: 148px; }
   color: var(--text-faint);
   position: relative;
 }
-.insert-tab:hover:not(:disabled) { background: none; color: var(--text-dim); }
-.insert-tab.on { color: var(--text); }
+.insert-tab:hover:not(:disabled) {
+  background: none;
+  color: var(--text-dim);
+}
+.insert-tab.on {
+  color: var(--text);
+}
 .insert-tab.on::after {
   content: '';
   position: absolute;
@@ -1081,7 +1398,10 @@ html[data-platform='win32'] .titlebar { padding-right: 148px; }
   cursor: pointer;
   color: var(--text-dim);
 }
-.insert-item.highlight { background: var(--bg-active); color: var(--text); }
+.insert-item.highlight {
+  background: var(--bg-active);
+  color: var(--text);
+}
 .insert-item-icon {
   display: flex;
   align-items: center;
@@ -1089,8 +1409,14 @@ html[data-platform='win32'] .titlebar { padding-right: 148px; }
   flex-shrink: 0;
   color: var(--text-dim);
 }
-.insert-item-label { font-size: 13px; font-weight: 500; }
-.insert-item-sub { font-size: 11.5px; color: var(--text-faint); }
+.insert-item-label {
+  font-size: 13px;
+  font-weight: 500;
+}
+.insert-item-sub {
+  font-size: 11.5px;
+  color: var(--text-faint);
+}
 
 /* Assets panel (public/) */
 .asset-crumbs {
@@ -1123,13 +1449,19 @@ html[data-platform='win32'] .titlebar { padding-right: 148px; }
   cursor: pointer;
   color: var(--text-dim);
 }
-.asset-folder:hover { background: var(--bg-hover); color: var(--text); }
+.asset-folder:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
 .asset-folder.drop {
   background: var(--accent-soft);
   outline: 1px dashed var(--accent);
   color: var(--text);
 }
-.asset-folder svg:first-child { color: var(--text-faint); flex-shrink: 0; }
+.asset-folder svg:first-child {
+  color: var(--text-faint);
+  flex-shrink: 0;
+}
 .asset-folder-name {
   flex: 1;
   font-weight: 500;
@@ -1137,8 +1469,13 @@ html[data-platform='win32'] .titlebar { padding-right: 148px; }
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.asset-folder .crumb-sep { margin-left: auto; }
-.asset-folder input { height: 24px; padding: 2px 6px; }
+.asset-folder .crumb-sep {
+  margin-left: auto;
+}
+.asset-folder input {
+  height: 24px;
+  padding: 2px 6px;
+}
 
 .asset-grid {
   display: grid;
@@ -1150,27 +1487,34 @@ html[data-platform='win32'] .titlebar { padding-right: 148px; }
   cursor: grab;
   min-width: 0;
 }
-.asset-tile:active { cursor: grabbing; }
+.asset-tile:active {
+  cursor: grabbing;
+}
 .asset-thumb {
   aspect-ratio: 4 / 3;
   border-radius: 8px;
   border: 1px solid var(--border);
   background:
-    repeating-conic-gradient(rgba(255, 255, 255, 0.05) 0% 25%, transparent 0% 50%)
-    0 0 / 16px 16px,
+    repeating-conic-gradient(rgba(255, 255, 255, 0.05) 0% 25%, transparent 0% 50%) 0 0 / 16px 16px,
     #202020;
   display: flex;
   align-items: center;
   justify-content: center;
   overflow: hidden;
 }
-.asset-tile:hover .asset-thumb { border-color: var(--border-strong); }
-.asset-thumb.editable { cursor: pointer; }
+.asset-tile:hover .asset-thumb {
+  border-color: var(--border-strong);
+}
+.asset-thumb.editable {
+  cursor: pointer;
+}
 .asset-tile:hover .asset-thumb.editable {
   border-color: var(--accent);
   color: var(--accent);
 }
-.asset-thumb { position: relative; }
+.asset-thumb {
+  position: relative;
+}
 .asset-thumb img,
 .asset-thumb video {
   width: 100%;
@@ -1190,7 +1534,9 @@ html[data-platform='win32'] .titlebar { padding-right: 148px; }
   color: rgba(255, 255, 255, 0.85);
   pointer-events: none;
 }
-.asset-tile:hover .asset-badge { opacity: 0; }
+.asset-tile:hover .asset-badge {
+  opacity: 0;
+}
 /* A folded-in HTML comment beside a node's name in the navigator. */
 /* White, thinned — not a grey. A folded comment sits on whatever row it belongs
    to, and a component's row is green: #666 against the panel is 3.1:1 and
@@ -1220,8 +1566,13 @@ html[data-platform='win32'] .titlebar { padding-right: 148px; }
   color: var(--text-faint);
   flex-shrink: 0;
 }
-.node-empty > span { display: flex; align-items: center; }
-.structure-node.selected .node-empty { color: var(--text-dim); }
+.node-empty > span {
+  display: flex;
+  align-items: center;
+}
+.structure-node.selected .node-empty {
+  color: var(--text-dim);
+}
 
 .asset-ext {
   display: flex;
@@ -1249,7 +1600,9 @@ html[data-platform='win32'] .titlebar { padding-right: 148px; }
   white-space: nowrap;
   cursor: text;
 }
-.asset-tile:hover .asset-name { color: var(--text); }
+.asset-tile:hover .asset-name {
+  color: var(--text);
+}
 .asset-tile input {
   margin-top: 4px;
   height: 22px;
@@ -1258,16 +1611,29 @@ html[data-platform='win32'] .titlebar { padding-right: 148px; }
 }
 
 /* Asset field (src/poster props) */
-.asset-field { position: relative; }
+.asset-field {
+  position: relative;
+}
 /* The Asset/URL switch belongs in the field's label row. Anchored to the field
    itself it had to be lifted out with a negative offset, which the panel body
    (a scroll box) clipped whenever the field was the first one in the panel —
    exactly where a component's `src` prop usually is. Anchor it to the whole
    props-field instead, so the label row it sits in is inside the box. */
-.props-field:has(> .asset-field) { position: relative; }
-.props-field:has(> .asset-field) > label { min-height: 20px; display: flex; align-items: center; }
-.props-field > .asset-field { position: static; }
-.props-field > .asset-field > .af-mode { top: 0; right: 0; }
+.props-field:has(> .asset-field) {
+  position: relative;
+}
+.props-field:has(> .asset-field) > label {
+  min-height: 20px;
+  display: flex;
+  align-items: center;
+}
+.props-field > .asset-field {
+  position: static;
+}
+.props-field > .asset-field > .af-mode {
+  top: 0;
+  right: 0;
+}
 .af-mode {
   position: absolute;
   top: -24px;
@@ -1286,8 +1652,14 @@ html[data-platform='win32'] .titlebar { padding-right: 148px; }
   font-weight: 600;
   color: var(--text-faint);
 }
-.af-mode-btn:hover:not(:disabled) { background: transparent; color: var(--text-dim); }
-.af-mode-btn.on { background: rgba(255, 255, 255, 0.12); color: var(--text); }
+.af-mode-btn:hover:not(:disabled) {
+  background: transparent;
+  color: var(--text-dim);
+}
+.af-mode-btn.on {
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--text);
+}
 
 .af-card {
   display: flex;
@@ -1304,16 +1676,22 @@ html[data-platform='win32'] .titlebar { padding-right: 148px; }
   border-radius: 6px;
   overflow: hidden;
   background:
-    repeating-conic-gradient(rgba(255, 255, 255, 0.06) 0% 25%, transparent 0% 50%)
-    0 0 / 14px 14px,
+    repeating-conic-gradient(rgba(255, 255, 255, 0.06) 0% 25%, transparent 0% 50%) 0 0 / 14px 14px,
     #202020;
   display: flex;
   align-items: center;
   justify-content: center;
   color: var(--text-faint);
 }
-.af-thumb img { width: 100%; height: 100%; object-fit: contain; display: block; }
-.af-meta { min-width: 0; }
+.af-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+.af-meta {
+  min-width: 0;
+}
 .af-name {
   font-size: 12px;
   font-weight: 600;
@@ -1322,10 +1700,16 @@ html[data-platform='win32'] .titlebar { padding-right: 148px; }
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.af-sub { font-size: 11px; color: var(--text-dim); margin-top: 2px; }
+.af-sub {
+  font-size: 11px;
+  color: var(--text-dim);
+  margin-top: 2px;
+}
 /* A hosted image previews above the URL box rather than replacing it — the
    URL stays editable while you can see what it points at. */
-.asset-field .af-card + input { margin-top: 8px; }
+.asset-field .af-card + input {
+  margin-top: 8px;
+}
 .af-choose {
   width: 100%;
   margin-top: 8px;
@@ -1362,13 +1746,17 @@ html[data-platform='win32'] .titlebar { padding-right: 148px; }
   padding: 14px;
   align-content: start;
 }
-.asset-picker-body .asset-tile { cursor: pointer; }
+.asset-picker-body .asset-tile {
+  cursor: pointer;
+}
 .asset-picker-body .asset-tile.selected .asset-thumb {
   outline: 2px solid var(--accent);
   outline-offset: -2px;
   border-color: var(--accent);
 }
-.asset-picker-body .asset-tile.folder .asset-thumb { color: var(--text-dim); }
+.asset-picker-body .asset-tile.folder .asset-thumb {
+  color: var(--text-dim);
+}
 
 /* Floating code editor window */
 .code-window {
@@ -1394,25 +1782,86 @@ html[data-platform='win32'] .titlebar { padding-right: 148px; }
   color: var(--text-dim);
   user-select: none;
 }
-.code-window-header:active { cursor: grabbing; }
-.code-window-title { font-size: 12px; font-weight: 600; color: var(--text); }
+.code-window-header:active {
+  cursor: grabbing;
+}
+.code-window-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+}
 .code-window-body {
   flex: 1;
   min-height: 0;
   overflow: hidden;
 }
-.code-window-body .cm-host { height: 100%; }
-.code-window-body .cm-host .cm-editor { height: 100%; }
+.code-window-body .cm-host {
+  height: 100%;
+}
+.code-window-body .cm-host .cm-editor {
+  height: 100%;
+}
 
-.cw-rz { position: absolute; z-index: 2; }
-.cw-rz-n { top: -3px; left: 8px; right: 8px; height: 6px; cursor: ns-resize; }
-.cw-rz-s { bottom: -3px; left: 8px; right: 8px; height: 6px; cursor: ns-resize; }
-.cw-rz-e { right: -3px; top: 8px; bottom: 8px; width: 6px; cursor: ew-resize; }
-.cw-rz-w { left: -3px; top: 8px; bottom: 8px; width: 6px; cursor: ew-resize; }
-.cw-rz-se { right: -3px; bottom: -3px; width: 12px; height: 12px; cursor: nwse-resize; }
-.cw-rz-nw { left: -3px; top: -3px; width: 12px; height: 12px; cursor: nwse-resize; }
-.cw-rz-sw { left: -3px; bottom: -3px; width: 12px; height: 12px; cursor: nesw-resize; }
-.cw-rz-ne { right: -3px; top: -3px; width: 12px; height: 12px; cursor: nesw-resize; }
+.cw-rz {
+  position: absolute;
+  z-index: 2;
+}
+.cw-rz-n {
+  top: -3px;
+  left: 8px;
+  right: 8px;
+  height: 6px;
+  cursor: ns-resize;
+}
+.cw-rz-s {
+  bottom: -3px;
+  left: 8px;
+  right: 8px;
+  height: 6px;
+  cursor: ns-resize;
+}
+.cw-rz-e {
+  right: -3px;
+  top: 8px;
+  bottom: 8px;
+  width: 6px;
+  cursor: ew-resize;
+}
+.cw-rz-w {
+  left: -3px;
+  top: 8px;
+  bottom: 8px;
+  width: 6px;
+  cursor: ew-resize;
+}
+.cw-rz-se {
+  right: -3px;
+  bottom: -3px;
+  width: 12px;
+  height: 12px;
+  cursor: nwse-resize;
+}
+.cw-rz-nw {
+  left: -3px;
+  top: -3px;
+  width: 12px;
+  height: 12px;
+  cursor: nwse-resize;
+}
+.cw-rz-sw {
+  left: -3px;
+  bottom: -3px;
+  width: 12px;
+  height: 12px;
+  cursor: nesw-resize;
+}
+.cw-rz-ne {
+  right: -3px;
+  top: -3px;
+  width: 12px;
+  height: 12px;
+  cursor: nesw-resize;
+}
 
 /* Breadcrumbs (canvas toolbar) */
 .crumbs {
@@ -1438,12 +1887,29 @@ html[data-platform='win32'] .titlebar { padding-right: 148px; }
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.crumb:hover { background: var(--bg-hover); color: var(--text); }
-.crumb.last { color: var(--text); flex-shrink: 0; }
-.crumb-more { letter-spacing: 0.06em; }
-.crumb-sep { color: var(--text-faint); display: flex; flex-shrink: 0; }
+.crumb:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+.crumb.last {
+  color: var(--text);
+  flex-shrink: 0;
+}
+.crumb-more {
+  letter-spacing: 0.06em;
+}
+.crumb-sep {
+  color: var(--text-faint);
+  display: flex;
+  flex-shrink: 0;
+}
 
-.main { display: flex; flex: 1; min-height: 0; position: relative; }
+.main {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  position: relative;
+}
 
 /* Left icon rail (Webflow-style panel tabs) */
 .rail {
@@ -1465,8 +1931,14 @@ html[data-platform='win32'] .titlebar { padding-right: 148px; }
   border-radius: 8px;
   color: var(--text-dim);
 }
-.rail-btn:hover:not(:disabled) { background: var(--bg-hover); color: var(--text); }
-.rail-btn.on { background: var(--bg-active); color: var(--text); }
+.rail-btn:hover:not(:disabled) {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+.rail-btn.on {
+  background: var(--bg-active);
+  color: var(--text);
+}
 
 .rail-tooltip {
   position: fixed;
@@ -1494,7 +1966,9 @@ html[data-platform='win32'] .titlebar { padding-right: 148px; }
   background: inherit;
 }
 /* Variant shown below its anchor (arrow points up, centered). */
-.rail-tooltip.below { transform: translateX(-50%); }
+.rail-tooltip.below {
+  transform: translateX(-50%);
+}
 .rail-tooltip.below::before {
   left: 50%;
   top: -4px;
@@ -1508,12 +1982,20 @@ html[data-platform='win32'] .titlebar { padding-right: 148px; }
   flex-direction: column;
   min-height: 0;
 }
-.panel.left { width: 260px; flex-shrink: 0; }
+.panel.left {
+  width: 260px;
+  flex-shrink: 0;
+}
 .panel.left.code-panel-shell {
   width: clamp(360px, 34vw, 620px);
   background: #111111;
 }
-.panel.right { width: 322px; flex-shrink: 0; border-right: none; border-left: 1px solid var(--border); }
+.panel.right {
+  width: 322px;
+  flex-shrink: 0;
+  border-right: none;
+  border-left: 1px solid var(--border);
+}
 
 .code-panel {
   display: flex;
@@ -1561,11 +2043,23 @@ html[data-platform='win32'] .titlebar { padding-right: 148px; }
 }
 .code-panel-editor,
 .code-panel-editor .cm-host,
-.code-panel-editor .cm-editor { height: 100%; min-height: 0; }
-.code-panel-editor { flex: 1; overflow: hidden; }
-.code-panel-editor .cm-scroller { overflow: auto; }
-.code-panel-editor .cm-code-muted { opacity: 0.24; }
-.code-panel-editor .cm-component-link { transition: color 0.1s ease; }
+.code-panel-editor .cm-editor {
+  height: 100%;
+  min-height: 0;
+}
+.code-panel-editor {
+  flex: 1;
+  overflow: hidden;
+}
+.code-panel-editor .cm-scroller {
+  overflow: auto;
+}
+.code-panel-editor .cm-code-muted {
+  opacity: 0.24;
+}
+.code-panel-editor .cm-component-link {
+  transition: color 0.1s ease;
+}
 .code-panel-editor .cm-meta-held .cm-component-link:hover {
   color: var(--accent);
   cursor: pointer;
@@ -1573,9 +2067,17 @@ html[data-platform='win32'] .titlebar { padding-right: 148px; }
   text-underline-offset: 2px;
 }
 
-.panel-section { display: flex; flex-direction: column; min-height: 0; }
-.panel-section + .panel-section { border-top: 1px solid var(--border); }
-.panel-section.grow { flex: 1; }
+.panel-section {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.panel-section + .panel-section {
+  border-top: 1px solid var(--border);
+}
+.panel-section.grow {
+  flex: 1;
+}
 
 .panel-header {
   display: flex;
@@ -1590,10 +2092,14 @@ html[data-platform='win32'] .titlebar { padding-right: 148px; }
   color: var(--text);
   letter-spacing: 0.01em;
 }
-.panel-header button { padding: 3px; }
+.panel-header button {
+  padding: 3px;
+}
 /* Wraps a header button so a hover still registers when it's disabled (a
    disabled button swallows pointer events, tooltip and all). */
-.tip-anchor { display: inline-flex; }
+.tip-anchor {
+  display: inline-flex;
+}
 
 .panel-body {
   flex: 1;
@@ -1607,7 +2113,14 @@ html[data-platform='win32'] .titlebar { padding-right: 148px; }
   padding: 2px 8px 12px;
 }
 
-.center { flex: 1; display: flex; flex-direction: column; min-width: 0; background: var(--bg); position: relative; }
+.center {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  background: var(--bg);
+  position: relative;
+}
 
 /* ------------------------------------------------------------------ */
 /* Lists                                                               */
@@ -1624,11 +2137,26 @@ html[data-platform='win32'] .titlebar { padding-right: 148px; }
   color: var(--text-dim);
   position: relative;
 }
-.list-item:hover { background: var(--bg-hover); color: var(--text); }
-.list-item.active { background: var(--accent-soft); color: var(--text); }
-.list-item.active .icon { color: var(--accent); }
-.list-item .icon { display: flex; align-items: center; flex-shrink: 0; color: var(--text-faint); }
-.list-item:hover .icon { color: var(--text-dim); }
+.list-item:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+.list-item.active {
+  background: var(--accent-soft);
+  color: var(--text);
+}
+.list-item.active .icon {
+  color: var(--accent);
+}
+.list-item .icon {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  color: var(--text-faint);
+}
+.list-item:hover .icon {
+  color: var(--text-dim);
+}
 .list-item .label {
   flex: 1;
   overflow: hidden;
@@ -1637,7 +2165,11 @@ html[data-platform='win32'] .titlebar { padding-right: 148px; }
   font-weight: 500;
   line-height: 1.2;
 }
-.list-item .sub { font-size: 10px; color: var(--text-faint); font-weight: 400; }
+.list-item .sub {
+  font-size: 10px;
+  color: var(--text-faint);
+  font-weight: 400;
+}
 .list-item .row-action {
   opacity: 0;
   background: none;
@@ -1646,23 +2178,35 @@ html[data-platform='win32'] .titlebar { padding-right: 148px; }
   color: var(--text-faint);
   border-radius: 4px;
 }
-.list-item:hover .row-action { opacity: 1; }
-.list-item .row-action:hover { color: var(--red); background: var(--bg-hover); }
+.list-item:hover .row-action {
+  opacity: 1;
+}
+.list-item .row-action:hover {
+  color: var(--red);
+  background: var(--bg-hover);
+}
 
 /* A generated route, not an authored page — see isCollectionRoute. Stated for
    hover and active too, which otherwise recolour the row. */
 .list-item.collection .icon,
 .list-item.collection:hover .icon,
 .list-item.collection.active .icon,
-.list-item.collection .label { color: var(--collection-purple); }
+.list-item.collection .label {
+  color: var(--collection-purple);
+}
 
 /* Pages tree */
-.list-item.folder .icon { color: var(--text-dim); }
+.list-item.folder .icon {
+  color: var(--text-dim);
+}
 .list-item.folder.drop {
   background: var(--accent-soft);
   box-shadow: inset 0 0 0 1px var(--accent);
 }
-.pages-root-drop { box-shadow: inset 0 0 0 1px var(--accent); border-radius: 8px; }
+.pages-root-drop {
+  box-shadow: inset 0 0 0 1px var(--accent);
+  border-radius: 8px;
+}
 .list-item .folder-count {
   margin-left: auto;
   flex-shrink: 0;
@@ -1781,7 +2325,10 @@ body > .embed-editor_provenance {
   transition: none;
 }
 :where(.style-panel-host, .style-panel-surface) img,
-:where(.style-panel-host, .style-panel-surface) svg { display: block; max-width: 100%; }
+:where(.style-panel-host, .style-panel-surface) svg {
+  display: block;
+  max-width: 100%;
+}
 
 /* The style panel expects the shell around it to supply padding and to be the
    single scroll container — its own root sets neither (see .app_body in moden).
@@ -1793,14 +2340,22 @@ body > .embed-editor_provenance {
    (250). `isolation` makes the host a stacking context, keeping those values
    internal — panel vs app order is then decided here, in app terms. Its
    popovers are unaffected: every one of them portals to <body>. */
-.style-panel-host { flex: 1; min-height: 0; display: flex; flex-direction: column; isolation: isolate; }
+.style-panel-host {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  isolation: isolate;
+}
 /* While a popup is open the panel under it doesn't scroll: a menu or a colour
    picker is positioned against its anchor at the moment it opens, so scrolling
    the field out from under it leaves the two in different places. The gutter
    below is `stable`, so losing the scrollbar costs no layout — the panel simply
    stops moving. A popup with a list of its own still scrolls, since the pointer
    is over it rather than over this. */
-.style-panel-host.is-locked > * { overflow-y: hidden; }
+.style-panel-host.is-locked > * {
+  overflow-y: hidden;
+}
 .style-panel-host > * {
   flex: 1;
   min-width: 0;
@@ -1835,8 +2390,14 @@ body > .embed-editor_provenance {
 }
 /* The sliding indicator is the only background here — hovering just lifts
    the label, so nothing competes with the indicator as it travels. */
-.right-tabs button:hover:not(:disabled) { background: transparent; color: var(--text); }
-.right-tabs button.on { background: transparent; color: var(--text); }
+.right-tabs button:hover:not(:disabled) {
+  background: transparent;
+  color: var(--text);
+}
+.right-tabs button.on {
+  background: transparent;
+  color: var(--text);
+}
 .right-tabs-indicator {
   position: absolute;
   top: 8px;
@@ -1865,21 +2426,38 @@ body > .embed-editor_provenance {
   user-select: none;
   white-space: nowrap;
 }
-.expr-chip:hover { background: rgba(146, 116, 255, 0.42); color: #ddd0ff; }
-.expr-menu { max-height: 260px; overflow-y: auto; }
+.expr-chip:hover {
+  background: rgba(146, 116, 255, 0.42);
+  color: #ddd0ff;
+}
+.expr-menu {
+  max-height: 260px;
+  overflow-y: auto;
+}
 /* This menu drives selection on click, not on hover like Dropdown does, so
    the hover feedback is plain CSS — matching .highlight so the two read the
    same wherever you see them. */
-.expr-menu .dd-option:hover { background: var(--accent); color: white; }
-.expr-menu .dd-option:hover .dd-hint { color: rgba(255, 255, 255, 0.8); }
-.expr-menu .dd-option:hover .dd-check { color: white; }
-.expr-menu .dd-check { color: var(--accent); }
+.expr-menu .dd-option:hover {
+  background: var(--accent);
+  color: white;
+}
+.expr-menu .dd-option:hover .dd-hint {
+  color: rgba(255, 255, 255, 0.8);
+}
+.expr-menu .dd-option:hover .dd-check {
+  color: white;
+}
+.expr-menu .dd-check {
+  color: var(--accent);
+}
 
 /* A prop's value as a field you type in, with the data in it shown as chips.
    Sized and coloured as an input because that is what it is — the chips are
    the same purple the content editor gives an {expression}, so "this comes
    from data" reads the same wherever it appears. */
-.bind-row { align-items: center; }
+.bind-row {
+  align-items: center;
+}
 .bind-input {
   flex: 1;
   min-width: 0;
@@ -1896,22 +2474,40 @@ body > .embed-editor_provenance {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   cursor: text;
-  transition: border-color 0.1s, background 0.1s;
+  transition:
+    border-color 0.1s,
+    background 0.1s;
 }
-.bind-input:hover { background: rgba(255, 255, 255, 0.08); }
-.bind-input:focus { outline: none; border-color: var(--accent); background: var(--bg-input); }
+.bind-input:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+.bind-input:focus {
+  outline: none;
+  border-color: var(--accent);
+  background: var(--bg-input);
+}
 .bind-input:empty::before {
   content: attr(data-placeholder);
   color: var(--text-faint);
   pointer-events: none;
 }
-.bind-input .expr-chip { font-size: 11px; padding: 1px 5px; }
+.bind-input .expr-chip {
+  font-size: 11px;
+  padding: 1px 5px;
+}
 
 /* The data behind the page, as something to look through. Every row is a
    value in scope with what it currently holds beside it — picking what a prop
    is bound to becomes reading real content instead of recalling a path. */
-.bind-menu { padding: 0; overflow: hidden; }
-.data-picker { display: flex; flex-direction: column; max-height: 340px; }
+.bind-menu {
+  padding: 0;
+  overflow: hidden;
+}
+.data-picker {
+  display: flex;
+  flex-direction: column;
+  max-height: 340px;
+}
 
 /* Which entry the values below come from, and the way to the next one. */
 .dp-entry {
@@ -1946,7 +2542,9 @@ body > .embed-editor_provenance {
   margin-left: 6px;
   flex: none;
 }
-.dp-item-nav .dp-step { padding: 0 2px; }
+.dp-item-nav .dp-step {
+  padding: 0 2px;
+}
 .dp-item-count {
   font-size: 10px;
   color: var(--text-faint);
@@ -1964,7 +2562,10 @@ body > .embed-editor_provenance {
   background: transparent;
   color: var(--text-dim);
 }
-.dp-step:hover:not(:disabled) { background: var(--bg-active); color: var(--text); }
+.dp-step:hover:not(:disabled) {
+  background: var(--bg-active);
+  color: var(--text);
+}
 
 .dp-search {
   display: flex;
@@ -1985,9 +2586,16 @@ body > .embed-editor_provenance {
   font-size: 12px;
   color: var(--text);
 }
-.dp-search input:focus { border: none; box-shadow: none; background: transparent; }
+.dp-search input:focus {
+  border: none;
+  box-shadow: none;
+  background: transparent;
+}
 
-.dp-list { overflow-y: auto; padding: 4px; }
+.dp-list {
+  overflow-y: auto;
+  padding: 4px;
+}
 .dp-row {
   display: flex;
   align-items: center;
@@ -1998,7 +2606,10 @@ body > .embed-editor_provenance {
   font-size: 11.5px;
   line-height: 1.4;
 }
-.dp-row:hover { background: var(--accent); color: white; }
+.dp-row:hover {
+  background: var(--accent);
+  color: white;
+}
 /* What the field is bound to now: the row is lit in the same purple as the
    chip that opened the picker, so the connection between the two is visible
    rather than something to work out. */
@@ -2006,11 +2617,18 @@ body > .embed-editor_provenance {
   background: rgba(146, 116, 255, 0.16);
   box-shadow: inset 0 0 0 1px rgba(146, 116, 255, 0.4);
 }
-.dp-row.selected .dp-key { color: var(--collection-purple); }
-.dp-row.selected:hover { background: var(--accent); box-shadow: none; }
+.dp-row.selected .dp-key {
+  color: var(--collection-purple);
+}
+.dp-row.selected:hover {
+  background: var(--accent);
+  box-shadow: none;
+}
 .dp-row:hover .dp-key,
 .dp-row:hover .dp-val,
-.dp-row:hover .dp-twist { color: white; }
+.dp-row:hover .dp-twist {
+  color: white;
+}
 .dp-key {
   font-family: var(--mono);
   font-size: 11px;
@@ -2019,7 +2637,10 @@ body > .embed-editor_provenance {
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.dp-check { flex-shrink: 0; color: var(--collection-purple); }
+.dp-check {
+  flex-shrink: 0;
+  color: var(--collection-purple);
+}
 /* What the value IS, down the right — the column you actually read to find
    the field you mean. Dim, and the first thing to give up space. */
 .dp-val {
@@ -2034,14 +2655,24 @@ body > .embed-editor_provenance {
   font-size: 10.5px;
   text-align: right;
 }
-.dp-val.kind { color: var(--text-faint); font-style: italic; }
+.dp-val.kind {
+  color: var(--text-faint);
+  font-style: italic;
+}
 /* Bound to, but not present in the entry on the canvas — an optional field
    nobody filled in. Stepping to another entry often fills it. */
-.dp-row.missing .dp-key { font-style: italic; opacity: 0.85; }
+.dp-row.missing .dp-key {
+  font-style: italic;
+  opacity: 0.85;
+}
 
 /* Kept so what is under it can be reached, but not itself a choice. */
-.dp-row.path-only .dp-key { color: var(--text-dim); }
-.dp-row.path-only .dp-val { opacity: 0.6; }
+.dp-row.path-only .dp-key {
+  color: var(--text-dim);
+}
+.dp-row.path-only .dp-val {
+  opacity: 0.6;
+}
 /* The target is the box, not the glyph: a 10px chevron is a 10px thing to hit
    with a mouse. Padded out to 20x22 and pulled back with negative margins, so
    it is easy to click without moving the column it sits in — and it stays
@@ -2058,10 +2689,18 @@ body > .embed-editor_provenance {
   border-radius: 4px;
   color: var(--text-faint);
 }
-.dp-twist > svg { transition: transform 0.12s ease; }
-.dp-twist.hidden { visibility: hidden; }
-.dp-twist.open > svg { transform: rotate(90deg); }
-.dp-row:hover .dp-twist:not(.hidden):hover { background: rgba(255, 255, 255, 0.22); }
+.dp-twist > svg {
+  transition: transform 0.12s ease;
+}
+.dp-twist.hidden {
+  visibility: hidden;
+}
+.dp-twist.open > svg {
+  transform: rotate(90deg);
+}
+.dp-row:hover .dp-twist:not(.hidden):hover {
+  background: rgba(255, 255, 255, 0.22);
+}
 /* Collections the page doesn't read yet — a different kind of thing from what
    is already in scope, so it says so rather than running on as one list. */
 .dp-section {
@@ -2099,7 +2738,10 @@ body > .embed-editor_provenance {
   font-size: 11.5px;
   cursor: pointer;
 }
-.dp-foot:hover { background: var(--bg-hover); color: var(--text); }
+.dp-foot:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
 
 /* Loop data source: a purple tag once a source is chosen, matching the
    purple the navigator already uses for loops. Plain while it's None, so an
@@ -2108,9 +2750,16 @@ body > .embed-editor_provenance {
   background: rgba(146, 116, 255, 0.22);
   border-color: rgba(146, 116, 255, 0.45);
 }
-.dd-trigger.dd-source.on .dd-label { color: #c4afff; font-weight: 600; }
-.dd-trigger.dd-source.on .dd-chevron { color: #c4afff; }
-.dd-trigger.dd-source.on:hover { background: rgba(146, 116, 255, 0.3); }
+.dd-trigger.dd-source.on .dd-label {
+  color: #c4afff;
+  font-weight: 600;
+}
+.dd-trigger.dd-source.on .dd-chevron {
+  color: #c4afff;
+}
+.dd-trigger.dd-source.on:hover {
+  background: rgba(146, 116, 255, 0.3);
+}
 
 /* Assets panel while a field is waiting for a pick. */
 .asset-picking {
@@ -2125,11 +2774,23 @@ body > .embed-editor_provenance {
   font-size: 11.5px;
   color: var(--text);
 }
-.asset-picking span { flex: 1; }
-.asset-picking button { padding: 2px 8px; font-size: 11px; }
-.asset-tile.pickable { cursor: pointer; border-radius: 8px; }
-.asset-tile.pickable:hover { background: var(--bg-hover); }
-.asset-tile.selected { background: var(--accent-soft); }
+.asset-picking span {
+  flex: 1;
+}
+.asset-picking button {
+  padding: 2px 8px;
+  font-size: 11px;
+}
+.asset-tile.pickable {
+  cursor: pointer;
+  border-radius: 8px;
+}
+.asset-tile.pickable:hover {
+  background: var(--bg-hover);
+}
+.asset-tile.selected {
+  background: var(--accent-soft);
+}
 
 /* Folder heading in the components list (layouts, component subfolders). */
 .palette-folder {
@@ -2140,7 +2801,9 @@ body > .embed-editor_provenance {
   text-transform: uppercase;
   color: var(--text-faint);
 }
-.palette-folder:first-child { padding-top: 2px; }
+.palette-folder:first-child {
+  padding-top: 2px;
+}
 
 .palette-item {
   display: flex;
@@ -2153,11 +2816,26 @@ body > .embed-editor_provenance {
   cursor: grab;
   color: var(--text-dim);
 }
-.palette-item:hover { background: var(--bg-hover); color: var(--text); }
-.palette-item:hover .icon { color: var(--accent); }
-.palette-item:active { cursor: grabbing; }
-.palette-item .icon { display: flex; align-items: center; color: var(--text-faint); }
-.palette-item .label { font-weight: 500; line-height: 1.25; min-width: 0; }
+.palette-item:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+.palette-item:hover .icon {
+  color: var(--accent);
+}
+.palette-item:active {
+  cursor: grabbing;
+}
+.palette-item .icon {
+  display: flex;
+  align-items: center;
+  color: var(--text-faint);
+}
+.palette-item .label {
+  font-weight: 500;
+  line-height: 1.25;
+  min-width: 0;
+}
 .palette-item .sub {
   font-size: 10.5px;
   font-weight: 400;
@@ -2176,8 +2854,13 @@ body > .embed-editor_provenance {
   cursor: pointer;
   text-decoration: none;
 }
-.palette-instances:hover:not(:disabled) { text-decoration: underline; color: var(--text-dim); }
-.palette-instances:disabled { cursor: default; }
+.palette-instances:hover:not(:disabled) {
+  text-decoration: underline;
+  color: var(--text-dim);
+}
+.palette-instances:disabled {
+  cursor: default;
+}
 
 /* Where a component is used — pages and components, each a way in. */
 .instances-popup {
@@ -2206,8 +2889,12 @@ body > .embed-editor_provenance {
   font-weight: 600;
   color: var(--text);
 }
-.instances-head button { padding: 3px; }
-.instances-group + .instances-group { border-top: 1px solid var(--border); }
+.instances-head button {
+  padding: 3px;
+}
+.instances-group + .instances-group {
+  border-top: 1px solid var(--border);
+}
 .instances-label {
   padding: 8px 12px 4px;
   font-size: 10.5px;
@@ -2230,11 +2917,19 @@ body > .embed-editor_provenance {
   text-align: left;
   cursor: pointer;
 }
-.instances-row:hover { background: var(--bg-hover); }
-.instances-row .icon { display: flex; color: var(--text-faint); flex-shrink: 0; }
+.instances-row:hover {
+  background: var(--bg-hover);
+}
+.instances-row .icon {
+  display: flex;
+  color: var(--text-faint);
+  flex-shrink: 0;
+}
 /* A page is somewhere else in the project — coloured the way pages are
    elsewhere in the app, so the two kinds of row don't have to be read. */
-.instances-row.is-page .icon { color: var(--text-dim); }
+.instances-row.is-page .icon {
+  color: var(--text-dim);
+}
 .instances-name {
   flex: 1;
   min-width: 0;
@@ -2257,7 +2952,9 @@ body > .embed-editor_provenance {
   font-size: 11.5px;
   color: var(--text-faint);
 }
-.instances-empty.is-error { color: var(--red); }
+.instances-empty.is-error {
+  color: var(--red);
+}
 
 /* Component hover preview card */
 .comp-preview {
@@ -2302,7 +2999,10 @@ body > .embed-editor_provenance {
   min-width: 100%;
   white-space: nowrap;
 }
-.structure-node:hover { background: var(--bg-hover); color: var(--text); }
+.structure-node:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
 .structure-node.selected {
   background: var(--accent-soft);
   color: var(--text);
@@ -2310,10 +3010,20 @@ body > .embed-editor_provenance {
 /* Hovering must not repaint the selected row's icon — the :hover rule below
    has the same specificity and would otherwise win on source order. */
 .structure-node.selected .icon,
-.structure-node.selected:hover .icon { color: var(--accent); }
-.structure-node.layout-node { color: var(--text-dim); }
-.structure-node .icon { display: flex; align-items: center; color: var(--text-faint); }
-.structure-node:hover .icon { color: var(--text-dim); }
+.structure-node.selected:hover .icon {
+  color: var(--accent);
+}
+.structure-node.layout-node {
+  color: var(--text-dim);
+}
+.structure-node .icon {
+  display: flex;
+  align-items: center;
+  color: var(--text-faint);
+}
+.structure-node:hover .icon {
+  color: var(--text-dim);
+}
 /* Both the drag grip and — on a node with children — the collapse arrow, and
    as tall as the row rather than as tall as its 10px icon. The row is 28px of
    travel; hitting the toggle should not ask for the middle third of it. */
@@ -2330,7 +3040,10 @@ body > .embed-editor_provenance {
   color: var(--text-faint);
   opacity: 0.6;
 }
-.structure-node .drag-handle:hover { opacity: 1; color: var(--text); }
+.structure-node .drag-handle:hover {
+  opacity: 1;
+  color: var(--text);
+}
 .structure-node .label {
   flex: 1;
   white-space: nowrap;
@@ -2353,35 +3066,60 @@ body > .embed-editor_provenance {
   opacity: 0;
   border-radius: 4px;
 }
-.structure-node:hover .row-action { opacity: 1; }
-.structure-node .row-action:hover { color: var(--red); background: var(--bg-hover); }
+.structure-node:hover .row-action {
+  opacity: 1;
+}
+.structure-node .row-action:hover {
+  color: var(--red);
+  background: var(--bg-hover);
+}
 
 /* Map/loop layers — purple */
 .structure-node.is-map,
 .structure-node.is-map:hover,
-.structure-node.is-map.selected { color: #c4afff; }
+.structure-node.is-map.selected {
+  color: #c4afff;
+}
 .structure-node.is-map .icon,
 .structure-node.is-map:hover .icon,
-.structure-node.is-map.selected .icon { color: #c4afff; }
-.structure-node.is-map:hover { background: var(--bg-active); }
-.structure-node.is-map.selected { background: rgba(146, 116, 255, 0.32); }
+.structure-node.is-map.selected .icon {
+  color: #c4afff;
+}
+.structure-node.is-map:hover {
+  background: var(--bg-active);
+}
+.structure-node.is-map.selected {
+  background: rgba(146, 116, 255, 0.32);
+}
 
 /* Component instances — Webflow-style green */
 .structure-node.is-component,
 .structure-node.is-component:hover,
-.structure-node.is-component.selected { color: var(--component-green); }
+.structure-node.is-component.selected {
+  color: var(--component-green);
+}
 .structure-node.is-component .icon,
 .structure-node.is-component:hover .icon,
-.structure-node.is-component.selected .icon { color: var(--component-green); }
-.structure-node.is-component:hover { background: var(--bg-active); }
-.structure-node.is-component.selected { background: var(--component-green-soft); }
+.structure-node.is-component.selected .icon {
+  color: var(--component-green);
+}
+.structure-node.is-component:hover {
+  background: var(--bg-active);
+}
+.structure-node.is-component.selected {
+  background: var(--component-green-soft);
+}
 
 /* Drop gaps between navigator rows. Where a deep subtree ends, the trailing
    gaps of every ancestor level are adjacent in the DOM — collapse all but
    the first so they don't stack into a large blank strip (each stays a
    distinct drop target for its own nesting level). */
-.nav-gap { height: 7px; }
-.nav-gap + .nav-gap { height: 2px; }
+.nav-gap {
+  height: 7px;
+}
+.nav-gap + .nav-gap {
+  height: 2px;
+}
 
 .drop-indicator {
   height: 2px;
@@ -2399,7 +3137,11 @@ body > .embed-editor_provenance {
   margin: 8px 0;
   font-size: 11.5px;
 }
-.drop-zone-empty.over { border-color: var(--accent); background: var(--accent-soft); color: var(--text); }
+.drop-zone-empty.over {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--text);
+}
 
 /* ------------------------------------------------------------------ */
 /* Custom dropdown                                                     */
@@ -2421,11 +3163,28 @@ body > .embed-editor_provenance {
   padding: 6px 8px;
   cursor: pointer;
 }
-.dd-trigger:hover { background: rgba(255, 255, 255, 0.08); }
-.dd-trigger:focus { outline: none; border-color: var(--accent); }
-.dd-label { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.dd-label.dim { color: var(--text-faint); }
-.dd-chevron { color: var(--text-faint); display: flex; align-items: center; flex-shrink: 0; }
+.dd-trigger:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+.dd-trigger:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+.dd-label {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dd-label.dim {
+  color: var(--text-faint);
+}
+.dd-chevron {
+  color: var(--text-faint);
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
 
 .dd-popup {
   position: fixed;
@@ -2452,9 +3211,16 @@ body > .embed-editor_provenance {
   white-space: nowrap;
   overflow: hidden;
 }
-.dd-option.highlight { background: var(--accent); color: white; }
-.dd-option.selected:not(.highlight) { color: var(--text); }
-.dd-option.dim:not(.highlight) { color: var(--text-faint); }
+.dd-option.highlight {
+  background: var(--accent);
+  color: white;
+}
+.dd-option.selected:not(.highlight) {
+  color: var(--text);
+}
+.dd-option.dim:not(.highlight) {
+  color: var(--text-faint);
+}
 .dd-check {
   width: 16px;
   display: flex;
@@ -2462,16 +3228,32 @@ body > .embed-editor_provenance {
   justify-content: center;
   flex-shrink: 0;
 }
-.dd-option-label { overflow: hidden; text-overflow: ellipsis; }
-.dd-icon { display: flex; align-items: center; flex-shrink: 0; color: var(--text-faint); }
-.dd-option.highlight .dd-icon { color: rgba(255, 255, 255, 0.85); }
+.dd-option-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.dd-icon {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  color: var(--text-faint);
+}
+.dd-option.highlight .dd-icon {
+  color: rgba(255, 255, 255, 0.85);
+}
 
 /* A popup with a filter box scrolls its list, not itself, so the box stays
    put while the options move under it. */
 /* Wide enough to read an entry id in: the trigger is a chip in the title bar,
    and inheriting its width is what cut "2025/the-cost-of-a-thousand-images"
    down to "2025/the-cost-of-a-tho…". */
-.dd-popup.dd-searchable { display: flex; flex-direction: column; overflow: hidden; padding: 0; min-width: 300px; }
+.dd-popup.dd-searchable {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 0;
+  min-width: 300px;
+}
 .dd-search {
   flex-shrink: 0;
   height: 30px;
@@ -2483,18 +3265,32 @@ body > .embed-editor_provenance {
   border-radius: 6px;
   color: var(--text);
 }
-.dd-search:focus { outline: none; border-color: var(--accent); }
-.dd-popup.dd-searchable .dd-list { overflow-y: auto; padding: 2px 4px 4px; }
-.dd-empty { padding: 8px; font-size: 11.5px; color: var(--text-faint); }
+.dd-search:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+.dd-popup.dd-searchable .dd-list {
+  overflow-y: auto;
+  padding: 2px 4px 4px;
+}
+.dd-empty {
+  padding: 8px;
+  font-size: 11.5px;
+  color: var(--text-faint);
+}
 
 /* A generated route is purple wherever it appears — the Pages panel, the title
    bar, and here, where every option is one page a collection makes. */
 .dd-trigger.collection .dd-label,
 .dd-trigger.collection .dd-icon,
 .dd-popup.collection .dd-option-label,
-.dd-popup.collection .dd-icon { color: var(--collection-purple); }
+.dd-popup.collection .dd-icon {
+  color: var(--collection-purple);
+}
 .dd-popup.collection .dd-option.highlight .dd-option-label,
-.dd-popup.collection .dd-option.highlight .dd-icon { color: white; }
+.dd-popup.collection .dd-option.highlight .dd-icon {
+  color: white;
+}
 /* A leading glyph in an option row (the tag switcher's element/component
    icons), in the same 16px column a check mark would occupy. */
 .dd-option-icon {
@@ -2505,7 +3301,9 @@ body > .embed-editor_provenance {
   flex-shrink: 0;
   color: var(--text-dim);
 }
-.dd-option.highlight .dd-option-icon { color: #fff; }
+.dd-option.highlight .dd-option-icon {
+  color: #fff;
+}
 .dd-option .dd-hint {
   margin-left: auto;
   padding-left: 10px;
@@ -2513,13 +3311,17 @@ body > .embed-editor_provenance {
   color: var(--text-faint);
   flex-shrink: 0;
 }
-.dd-option.highlight .dd-hint { color: rgba(255, 255, 255, 0.8); }
+.dd-option.highlight .dd-hint {
+  color: rgba(255, 255, 255, 0.8);
+}
 
 /* ------------------------------------------------------------------ */
 /* Props panel                                                         */
 /* ------------------------------------------------------------------ */
 
-.props-field { margin: 0 12px 12px; }
+.props-field {
+  margin: 0 12px 12px;
+}
 /* The heading over a list (Attributes) — a label in look only: it names the
    section rather than a field, and labelling nothing keeps its clicks from
    reaching the button beside it. */
@@ -2530,7 +3332,9 @@ body > .embed-editor_provenance {
   color: var(--text-dim);
   margin-bottom: 5px;
 }
-.props-field label { display: block; }
+.props-field label {
+  display: block;
+}
 /* Its own rule, not the block above: the row holds the + button beside the
    heading, and as a block the button would hang off the text baseline —
    sitting visibly high against an 11px label. */
@@ -2555,13 +3359,18 @@ body > .embed-editor_provenance {
   margin: -1px 0 -1px -5px;
   border-radius: 4px;
 }
-.prop-label .prop-label-icon { opacity: 0.85; margin-left: -1px; }
+.prop-label .prop-label-icon {
+  opacity: 0.85;
+  margin-left: -1px;
+}
 .prop-label.set {
   color: var(--accent);
   background: var(--accent-soft);
   cursor: pointer;
 }
-.prop-label.set:hover { background: rgba(0, 153, 255, 0.26); }
+.prop-label.set:hover {
+  background: rgba(0, 153, 255, 0.26);
+}
 
 /* The `{}` beside a prop's name: the switch between the control the field
    normally shows and a plain expression. It sits quiet — the weight of the `?`
@@ -2576,7 +3385,9 @@ body > .embed-editor_provenance {
   background: transparent;
   color: var(--text-faint);
 }
-.props-field:hover > label > .prop-expr-toggle { color: var(--text-dim); }
+.props-field:hover > label > .prop-expr-toggle {
+  color: var(--text-dim);
+}
 .prop-expr-toggle:hover:not(:disabled) {
   background: var(--bg-hover);
   color: var(--text);
@@ -2586,15 +3397,21 @@ body > .embed-editor_provenance {
   color: #9274ff;
   background: rgba(146, 116, 255, 0.16);
 }
-.prop-expr-toggle.on:hover:not(:disabled) { background: rgba(146, 116, 255, 0.28); }
+.prop-expr-toggle.on:hover:not(:disabled) {
+  background: rgba(146, 116, 255, 0.28);
+}
 
 /* The way data gets into a field. Nothing until the field is hovered, then a
    dot on its top-left corner — in the purple a binding is shown in, so what it
    does is legible before it is read. Hovering the dot grows it into a +, which
    is the click. Permanent chrome on every field would cost more than it is
    worth for something most fields never need. */
-.props-field { position: relative; }
-.props-field > label { position: relative; }
+.props-field {
+  position: relative;
+}
+.props-field > label {
+  position: relative;
+}
 .bind-handle {
   position: absolute;
   left: -6px;
@@ -2613,7 +3430,11 @@ body > .embed-editor_provenance {
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.45);
   opacity: 0;
   pointer-events: none;
-  transition: width 0.1s ease, height 0.1s ease, left 0.1s ease, bottom 0.1s ease,
+  transition:
+    width 0.1s ease,
+    height 0.1s ease,
+    left 0.1s ease,
+    bottom 0.1s ease,
     opacity 0.12s ease;
 }
 /* Two steps: the field under the pointer shows its own dot, and the dot itself
@@ -2647,9 +3468,13 @@ body > .embed-editor_provenance {
   transition: opacity 0.1s ease;
 }
 .bind-handle:hover .bind-dot,
-.bind-handle.on .bind-dot { opacity: 0; }
+.bind-handle.on .bind-dot {
+  opacity: 0;
+}
 .bind-handle:hover .bind-plus,
-.bind-handle.on .bind-plus { opacity: 1; }
+.bind-handle.on .bind-plus {
+  opacity: 1;
+}
 
 /* A prop the current source makes moot — an SVG or a public/ file is passed
    through, so quality, format and the srcset props do nothing. Unset, the
@@ -2689,7 +3514,10 @@ body > .embed-editor_provenance {
   color: #ddd;
   white-space: nowrap;
 }
-.prop-menu-item:hover { background: var(--accent); color: white; }
+.prop-menu-item:hover {
+  background: var(--accent);
+  color: white;
+}
 
 /* Right-click context menu (navigator) */
 .ctx-menu {
@@ -2714,12 +3542,29 @@ body > .embed-editor_provenance {
   color: #ddd;
   white-space: nowrap;
 }
-.ctx-menu-item:hover:not(.disabled) { background: var(--accent); color: white; }
-.ctx-menu-item:hover:not(.disabled) .ctx-shortcut { color: rgba(255, 255, 255, 0.7); }
-.ctx-menu-item.disabled { color: var(--text-faint); cursor: default; }
-.ctx-shortcut { color: var(--text-faint); font-size: 11px; }
-.ctx-divider { height: 1px; background: var(--border); margin: 5px 4px; }
-.props-field textarea { min-height: 64px; }
+.ctx-menu-item:hover:not(.disabled) {
+  background: var(--accent);
+  color: white;
+}
+.ctx-menu-item:hover:not(.disabled) .ctx-shortcut {
+  color: rgba(255, 255, 255, 0.7);
+}
+.ctx-menu-item.disabled {
+  color: var(--text-faint);
+  cursor: default;
+}
+.ctx-shortcut {
+  color: var(--text-faint);
+  font-size: 11px;
+}
+.ctx-divider {
+  height: 1px;
+  background: var(--border);
+  margin: 5px 4px;
+}
+.props-field textarea {
+  min-height: 64px;
+}
 /* Rich inline Content editor + selection bubble */
 .rich-content {
   width: 100%;
@@ -2738,9 +3583,17 @@ body > .embed-editor_provenance {
   white-space: pre-wrap;
   word-break: break-word;
 }
-.rich-content:hover { background: rgba(255, 255, 255, 0.08); }
-.rich-content:focus { border-color: var(--accent); background: var(--bg-input); }
-.rich-content strong, .rich-content b { font-weight: 700; }
+.rich-content:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+.rich-content:focus {
+  border-color: var(--accent);
+  background: var(--bg-input);
+}
+.rich-content strong,
+.rich-content b {
+  font-weight: 700;
+}
 .rich-content code {
   font-family: var(--mono);
   font-size: 11px;
@@ -2748,7 +3601,10 @@ body > .embed-editor_provenance {
   padding: 1px 4px;
   border-radius: 4px;
 }
-.rich-content a { color: var(--accent); text-decoration: underline; }
+.rich-content a {
+  color: var(--accent);
+  text-decoration: underline;
+}
 
 .rich-bubble {
   position: fixed;
@@ -2762,7 +3618,9 @@ body > .embed-editor_provenance {
   box-shadow: 0 10px 32px rgba(0, 0, 0, 0.55);
   overflow: hidden;
 }
-.rich-bubble.below { transform: translate(-50%, 0); }
+.rich-bubble.below {
+  transform: translate(-50%, 0);
+}
 .rich-bubble::after {
   content: '';
   position: absolute;
@@ -2792,12 +3650,27 @@ body > .embed-editor_provenance {
   padding: 7px 11px;
   min-width: 36px;
 }
-.rich-bubble button + button { border-left: 1px solid var(--border); }
-.rich-bubble button:hover:not(:disabled) { background: var(--bg-active); }
-.rich-bubble button.on { background: var(--accent-soft); color: var(--accent); }
-.rich-bubble button.on:hover:not(:disabled) { background: rgba(0, 153, 255, 0.26); }
-.rich-bubble button .mono { font-family: var(--mono); font-size: 11px; }
-.rich-bubble button sup, .rich-bubble button sub { font-size: 9px; }
+.rich-bubble button + button {
+  border-left: 1px solid var(--border);
+}
+.rich-bubble button:hover:not(:disabled) {
+  background: var(--bg-active);
+}
+.rich-bubble button.on {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.rich-bubble button.on:hover:not(:disabled) {
+  background: rgba(0, 153, 255, 0.26);
+}
+.rich-bubble button .mono {
+  font-family: var(--mono);
+  font-size: 11px;
+}
+.rich-bubble button sup,
+.rich-bubble button sub {
+  font-size: 9px;
+}
 .rich-bubble-url {
   width: 220px;
   background: transparent;
@@ -2837,7 +3710,9 @@ body > .embed-editor_provenance {
   background: rgba(255, 255, 255, 0.03);
   user-select: text;
 }
-.cm-host .cm-editor { height: 100%; }
+.cm-host .cm-editor {
+  height: 100%;
+}
 
 .props-empty {
   padding: 24px 16px;
@@ -2855,7 +3730,9 @@ body > .embed-editor_provenance {
   gap: 8px;
   flex-shrink: 0;
 }
-.props-title .props-title-icon { color: var(--text-dim); }
+.props-title .props-title-icon {
+  color: var(--text-dim);
+}
 .props-title .badge,
 .cms-collection .badge {
   font-size: 10px;
@@ -2865,7 +3742,9 @@ body > .embed-editor_provenance {
   color: var(--accent);
   font-weight: 600;
 }
-.cms-collection .badge { flex-shrink: 0; }
+.cms-collection .badge {
+  flex-shrink: 0;
+}
 
 /* ------------------------------------------------------------------ */
 /* Preview                                                             */
@@ -2894,11 +3773,20 @@ body > .embed-editor_provenance {
   text-align: center;
   font-weight: 450;
 }
-.preview-frame-wrap { flex: 1; position: relative; background: var(--bg); overflow: hidden; }
+.preview-frame-wrap {
+  flex: 1;
+  position: relative;
+  background: var(--bg);
+  overflow: hidden;
+}
 .preview-placeholder {
-  position: absolute; inset: 0;
-  display: flex; flex-direction: column; gap: 12px;
-  align-items: center; justify-content: center;
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: center;
+  justify-content: center;
   color: var(--text-faint);
   font-size: 12.5px;
   padding: 24px;
@@ -2920,7 +3808,11 @@ body > .embed-editor_provenance {
   color: var(--text-dim);
   user-select: text;
 }
-.offline-actions { display: flex; gap: 8px; align-items: center; }
+.offline-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
 .offline-actions button.ghost {
   padding: 6px 12px;
   border: 1px solid var(--border-strong);
@@ -2931,7 +3823,10 @@ body > .embed-editor_provenance {
   color: var(--text-faint);
   user-select: text;
 }
-.offline-log-toggle { padding: 4px 8px; font-size: 11px; }
+.offline-log-toggle {
+  padding: 4px 8px;
+  font-size: 11px;
+}
 .offline-log {
   max-width: min(720px, 90%);
   max-height: 34vh;
@@ -2964,21 +3859,30 @@ body > .embed-editor_provenance {
   border-radius: 6px;
   color: var(--text-faint);
 }
-.device-btns button:hover:not(:disabled) { color: var(--text); background: transparent; }
-.device-btns button.on { background: transparent; color: var(--text); }
+.device-btns button:hover:not(:disabled) {
+  color: var(--text);
+  background: transparent;
+}
+.device-btns button.on {
+  background: transparent;
+  color: var(--text);
+}
 .device-indicator {
   position: absolute;
   top: 2px;
   bottom: 2px;
   border-radius: 6px;
   background: rgba(255, 255, 255, 0.12);
-  transition: left 0.25s cubic-bezier(0.3, 0.7, 0.3, 1), width 0.25s cubic-bezier(0.3, 0.7, 0.3, 1);
+  transition:
+    left 0.25s cubic-bezier(0.3, 0.7, 0.3, 1),
+    width 0.25s cubic-bezier(0.3, 0.7, 0.3, 1);
   pointer-events: none;
 }
 
 .frame-sized {
   position: absolute;
-  top: 16px; bottom: 16px;
+  top: 16px;
+  bottom: 16px;
   left: 50%;
   transform: translateX(-50%);
   border-radius: 10px;
@@ -2990,12 +3894,17 @@ body > .embed-editor_provenance {
     border-radius 0.3s cubic-bezier(0.3, 0.7, 0.3, 1);
 }
 .frame-sized.full {
-  top: 0; bottom: 0;
+  top: 0;
+  bottom: 0;
   border-radius: 0;
   box-shadow: none;
 }
-.frame-sized.resizing { transition: none; }
-.frame-sized.resizing iframe { pointer-events: none; }
+.frame-sized.resizing {
+  transition: none;
+}
+.frame-sized.resizing iframe {
+  pointer-events: none;
+}
 .frame-clip {
   position: absolute;
   inset: 0;
@@ -3003,7 +3912,13 @@ body > .embed-editor_provenance {
   border-radius: inherit;
   background: white;
 }
-.frame-sized iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: none; }
+.frame-sized iframe {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: none;
+}
 
 /* Freeform canvas (all breakpoints, pan + zoom) */
 .canvas-view {
@@ -3013,7 +3928,9 @@ body > .embed-editor_provenance {
   background: var(--bg);
   cursor: grab;
 }
-.canvas-view.panning { cursor: grabbing; }
+.canvas-view.panning {
+  cursor: grabbing;
+}
 .canvas-world {
   position: absolute;
   left: 0;
@@ -3036,7 +3953,10 @@ body > .embed-editor_provenance {
   border: none;
   border-radius: inherit;
 }
-.canvas-frame-cover { position: absolute; inset: 0; }
+.canvas-frame-cover {
+  position: absolute;
+  inset: 0;
+}
 .canvas-frame-label {
   position: absolute;
   bottom: 100%;
@@ -3067,7 +3987,10 @@ body > .embed-editor_provenance {
   color: var(--text-dim);
   font-size: 12px;
 }
-.canvas-controls button:hover:not(:disabled) { background: var(--bg-active); color: var(--text); }
+.canvas-controls button:hover:not(:disabled) {
+  background: var(--bg-active);
+  color: var(--text);
+}
 .canvas-controls .pct {
   min-width: 52px;
   text-align: center;
@@ -3081,17 +4004,52 @@ body > .embed-editor_provenance {
   opacity: 0;
   background: var(--border-strong);
   border-radius: 99px;
-  transition: opacity 0.15s, background 0.15s;
+  transition:
+    opacity 0.15s,
+    background 0.15s;
 }
-.preview-frame-wrap:hover .rz-handle { opacity: 1; }
-.rz-handle:hover, .frame-sized.resizing .rz-handle { background: var(--accent); opacity: 1; }
-.rz-w { left: -12px; top: 50%; transform: translateY(-50%); width: 5px; height: 56px; cursor: col-resize; }
-.rz-e { right: -12px; top: 50%; transform: translateY(-50%); width: 5px; height: 56px; cursor: col-resize; }
-.rz-s { bottom: -12px; left: 50%; transform: translateX(-50%); height: 5px; width: 56px; cursor: row-resize; }
+.preview-frame-wrap:hover .rz-handle {
+  opacity: 1;
+}
+.rz-handle:hover,
+.frame-sized.resizing .rz-handle {
+  background: var(--accent);
+  opacity: 1;
+}
+.rz-w {
+  left: -12px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 5px;
+  height: 56px;
+  cursor: col-resize;
+}
+.rz-e {
+  right: -12px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 5px;
+  height: 56px;
+  cursor: col-resize;
+}
+.rz-s {
+  bottom: -12px;
+  left: 50%;
+  transform: translateX(-50%);
+  height: 5px;
+  width: 56px;
+  cursor: row-resize;
+}
 /* In Fill mode the frame touches the canvas edges, so keep the handles inside. */
-.frame-sized.full .rz-w { left: 5px; }
-.frame-sized.full .rz-e { right: 5px; }
-.frame-sized.full .rz-s { bottom: 5px; }
+.frame-sized.full .rz-w {
+  left: 5px;
+}
+.frame-sized.full .rz-e {
+  right: 5px;
+}
+.frame-sized.full .rz-s {
+  bottom: 5px;
+}
 
 .rz-readout {
   position: absolute;
@@ -3146,9 +4104,19 @@ body > .embed-editor_provenance {
   color: var(--text-dim);
   height: 26px;
 }
-.git-chip:hover { background: var(--bg-active); color: var(--text); }
-.git-chip .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); }
-.git-chip .dot.dirty { background: var(--amber); }
+.git-chip:hover {
+  background: var(--bg-active);
+  color: var(--text);
+}
+.git-chip .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--green);
+}
+.git-chip .dot.dirty {
+  background: var(--amber);
+}
 
 /* Why a typed branch name can't be used. Not an error box — nothing has failed
    yet, and nothing will: the field simply won't act on Enter until it reads. */
@@ -3160,7 +4128,9 @@ body > .embed-editor_provenance {
 }
 /* While an action runs the chip states it, so there's feedback even with the
    dropdown closed (publishing can take a while). */
-.git-chip.busy { color: var(--text); }
+.git-chip.busy {
+  color: var(--text);
+}
 
 .mini-spinner {
   width: 11px;
@@ -3182,7 +4152,9 @@ body > .embed-editor_provenance {
   background: var(--bg-input);
   color: var(--text-dim);
 }
-.repo-link:hover { color: var(--text); }
+.repo-link:hover {
+  color: var(--text);
+}
 .repo-link .repo-slug {
   overflow: hidden;
   text-overflow: ellipsis;
@@ -3217,7 +4189,10 @@ body > .embed-editor_provenance {
   line-height: 1.7;
   color: var(--text-dim);
 }
-.dirty-files .more { color: var(--text-faint); font-family: inherit; }
+.dirty-files .more {
+  color: var(--text-faint);
+  font-family: inherit;
+}
 
 .publish-progress,
 .publish-done {
@@ -3227,22 +4202,44 @@ body > .embed-editor_provenance {
   font-size: 12px;
   color: var(--text-dim);
 }
-.publish-done { color: var(--green); }
+.publish-done {
+  color: var(--green);
+}
 
-.status-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
-.status-dot.on { background: var(--green); box-shadow: 0 0 6px rgba(48, 193, 88, 0.6); }
-.status-dot.off { background: var(--text-faint); }
-.status-dot.starting { background: var(--amber); animation: pulse 1s infinite; }
-@keyframes pulse { 50% { opacity: 0.4; } }
+.status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.status-dot.on {
+  background: var(--green);
+  box-shadow: 0 0 6px rgba(48, 193, 88, 0.6);
+}
+.status-dot.off {
+  background: var(--text-faint);
+}
+.status-dot.starting {
+  background: var(--amber);
+  animation: pulse 1s infinite;
+}
+@keyframes pulse {
+  50% {
+    opacity: 0.4;
+  }
+}
 
 /* ------------------------------------------------------------------ */
 /* Modal & dropdown menu                                               */
 /* ------------------------------------------------------------------ */
 
 .modal-overlay {
-  position: fixed; inset: 0;
+  position: fixed;
+  inset: 0;
   background: rgba(0, 0, 0, 0.55);
-  display: flex; align-items: center; justify-content: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   z-index: 100;
 }
 .modal {
@@ -3254,8 +4251,17 @@ body > .embed-editor_provenance {
   box-shadow: 0 24px 64px rgba(0, 0, 0, 0.6);
   overflow: hidden;
 }
-.modal-header { padding: 16px 16px 0; font-size: 13px; font-weight: 600; }
-.modal-body { padding: 14px 16px; display: flex; flex-direction: column; gap: 12px; }
+.modal-header {
+  padding: 16px 16px 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+.modal-body {
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
 .modal-body label {
   font-size: 11px;
   font-weight: 500;
@@ -3265,10 +4271,17 @@ body > .embed-editor_provenance {
 }
 .modal-footer {
   padding: 12px 16px;
-  display: flex; justify-content: flex-end; gap: 8px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
   border-top: 1px solid var(--border);
 }
-.modal .error-text { color: var(--red); font-size: 11.5px; white-space: pre-wrap; user-select: text; }
+.modal .error-text {
+  color: var(--red);
+  font-size: 11.5px;
+  white-space: pre-wrap;
+  user-select: text;
+}
 
 .dropdown {
   position: absolute;
@@ -3289,16 +4302,29 @@ body > .embed-editor_provenance {
   padding: 4px 8px;
   letter-spacing: 0.02em;
 }
-.dropdown .list-item { height: 28px; padding: 0 8px; }
-.dropdown .divider { height: 1px; background: var(--border); margin: 6px 0; }
-.dropdown-row { display: flex; gap: 6px; padding: 4px 8px 6px; }
+.dropdown .list-item {
+  height: 28px;
+  padding: 0 8px;
+}
+.dropdown .divider {
+  height: 1px;
+  background: var(--border);
+  margin: 6px 0;
+}
+.dropdown-row {
+  display: flex;
+  gap: 6px;
+  padding: 4px 8px 6px;
+}
 
 /* ------------------------------------------------------------------ */
 /* Welcome                                                             */
 /* ------------------------------------------------------------------ */
 
 /* New-project wizard (the create-astro questions, asked in-app) */
-.new-project-modal { width: min(560px, 92vw); }
+.new-project-modal {
+  width: min(560px, 92vw);
+}
 .new-project-dir {
   font-size: 11px;
   font-family: var(--mono);
@@ -3323,12 +4349,27 @@ body > .embed-editor_provenance {
   border-radius: 8px;
   padding: 8px 10px;
   cursor: pointer;
-  transition: border-color 0.12s, background 0.12s;
+  transition:
+    border-color 0.12s,
+    background 0.12s;
 }
-.template-option:hover { background: var(--bg-hover); }
-.template-option.on { border-color: var(--accent); background: var(--accent-soft); }
-.template-name { font-size: 12px; font-weight: 600; }
-.template-hint { font-size: 10.5px; color: var(--text-faint); margin-top: 2px; line-height: 1.4; }
+.template-option:hover {
+  background: var(--bg-hover);
+}
+.template-option.on {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.template-name {
+  font-size: 12px;
+  font-weight: 600;
+}
+.template-hint {
+  font-size: 10.5px;
+  color: var(--text-faint);
+  margin-top: 2px;
+  line-height: 1.4;
+}
 /* Beats `.modal-body label { display: block }`, which would collapse the row
    and leave the box jammed against its text. */
 .modal-body label.check-row {
@@ -3340,7 +4381,10 @@ body > .embed-editor_provenance {
   color: var(--text);
   cursor: pointer;
 }
-.modal-body label.check-row input[type='checkbox'] { margin: 0; flex-shrink: 0; }
+.modal-body label.check-row input[type='checkbox'] {
+  margin: 0;
+  flex-shrink: 0;
+}
 .create-log {
   max-height: 260px;
   overflow: auto;
@@ -3358,7 +4402,9 @@ body > .embed-editor_provenance {
 
 /* Start screen: the title bar floats over the backdrop (still draggable, with
    room for the traffic lights) instead of occupying its own opaque strip. */
-.app.welcome-mode { position: relative; }
+.app.welcome-mode {
+  position: relative;
+}
 .app.welcome-mode .titlebar {
   position: absolute;
   top: 0;
@@ -3386,7 +4432,11 @@ body > .embed-editor_provenance {
   pointer-events: none;
   background: #000;
 }
-.welcome-bg-canvas { display: block; width: 100%; height: 100%; }
+.welcome-bg-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
 /* The wave sweeps through near-white, which would swallow the white logo and
    buttons — a soft scrim keeps the hero readable wherever the wave drifts. */
 .welcome-bg::after {
@@ -3414,7 +4464,10 @@ body > .embed-editor_provenance {
    child rule would also re-position overlays (the new-project modal is
    position: fixed) and drop them into the flow. */
 .welcome > .welcome-hero,
-.welcome > .recents { position: relative; z-index: 1; }
+.welcome > .recents {
+  position: relative;
+  z-index: 1;
+}
 /* Hero takes whatever height the recents strip leaves and centers in it. */
 .welcome-hero {
   flex: 1;
@@ -3431,7 +4484,9 @@ body > .embed-editor_provenance {
   margin-bottom: 8px;
   display: flex;
 }
-.welcome-logo { color: var(--text); }
+.welcome-logo {
+  color: var(--text);
+}
 .welcome-tagline {
   color: var(--text-dim);
   font-size: 13px;
@@ -3439,7 +4494,11 @@ body > .embed-editor_provenance {
   letter-spacing: 0.01em;
   margin-top: 16px;
 }
-.welcome h1 { font-size: 20px; font-weight: 700; letter-spacing: -0.01em; }
+.welcome h1 {
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
 .welcome p {
   color: var(--text-dim);
   max-width: 420px;
@@ -3454,13 +4513,30 @@ body > .embed-editor_provenance {
   gap: 8px;
   margin-top: 16px;
 }
-.welcome .actions-row { display: flex; gap: 10px; }
-.welcome .actions button { padding: 9px 18px; font-size: 12.5px; border-radius: 10px; }
+.welcome .actions-row {
+  display: flex;
+  gap: 10px;
+}
+.welcome .actions button {
+  padding: 9px 18px;
+  font-size: 12.5px;
+  border-radius: 10px;
+}
 /* On the start screen the primary action reads as white-on-dark rather than
    picking up the app's blue accent. */
-.welcome .actions button.primary { background: #fff; color: #111; }
-.welcome .actions button.primary:hover:not(:disabled) { background: #e9e9e9; }
-.welcome .error-text { color: var(--red); margin-top: 12px; font-size: 12px; user-select: text; }
+.welcome .actions button.primary {
+  background: #fff;
+  color: #111;
+}
+.welcome .actions button.primary:hover:not(:disabled) {
+  background: #e9e9e9;
+}
+.welcome .error-text {
+  color: var(--red);
+  margin-top: 12px;
+  font-size: 12px;
+  user-select: text;
+}
 
 /* Recents strip pinned to the bottom, separated by a hairline divider. Cards
    scroll horizontally in one row, so the section is left-aligned and its
@@ -3500,7 +4576,9 @@ body > .embed-editor_provenance {
   scroll-snap-type: x proximity;
   scrollbar-width: thin;
 }
-.recent-rail > * { scroll-snap-align: start; }
+.recent-rail > * {
+  scroll-snap-align: start;
+}
 .recent-card {
   position: relative;
   width: 190px;
@@ -3509,9 +4587,14 @@ body > .embed-editor_provenance {
   border-radius: 12px;
   border: 1px solid transparent;
   cursor: pointer;
-  transition: background 0.12s, border-color 0.12s;
+  transition:
+    background 0.12s,
+    border-color 0.12s;
 }
-.recent-card:hover { background: var(--bg-hover); border-color: var(--border); }
+.recent-card:hover {
+  background: var(--bg-hover);
+  border-color: var(--border);
+}
 .recent-remove {
   position: absolute;
   top: 12px;
@@ -3526,8 +4609,13 @@ body > .embed-editor_provenance {
   opacity: 0;
   transition: opacity 0.12s;
 }
-.recent-card:hover .recent-remove { opacity: 1; }
-.recent-remove:hover:not(:disabled) { background: rgba(0, 0, 0, 0.75); color: var(--red); }
+.recent-card:hover .recent-remove {
+  opacity: 1;
+}
+.recent-remove:hover:not(:disabled) {
+  background: rgba(0, 0, 0, 0.75);
+  color: var(--red);
+}
 .recent-thumb {
   aspect-ratio: 16 / 10;
   border-radius: 8px;
@@ -3548,8 +4636,13 @@ body > .embed-editor_provenance {
 }
 /* A picture being retaken says so with the picture itself, and nothing else —
    the old one dims until the new one lands. */
-.recent-thumb { position: relative; }
-.recent-thumb.busy img { opacity: 0.5; transition: opacity 0.2s ease; }
+.recent-thumb {
+  position: relative;
+}
+.recent-thumb.busy img {
+  opacity: 0.5;
+  transition: opacity 0.2s ease;
+}
 .recent-name {
   font-size: 12px;
   font-weight: 600;
@@ -3570,22 +4663,31 @@ body > .embed-editor_provenance {
 }
 
 .busy-overlay {
-  position: fixed; inset: 0;
+  position: fixed;
+  inset: 0;
   background: rgba(17, 17, 17, 0.85);
-  display: flex; flex-direction: column; gap: 14px;
-  align-items: center; justify-content: center;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  align-items: center;
+  justify-content: center;
   z-index: 200;
   color: var(--text-dim);
   font-size: 12.5px;
 }
 .spinner {
-  width: 26px; height: 26px;
+  width: 26px;
+  height: 26px;
   border: 2.5px solid rgba(255, 255, 255, 0.12);
   border-top-color: var(--accent);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }
-@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
 
 .toast {
   position: fixed;
@@ -3605,8 +4707,12 @@ body > .embed-editor_provenance {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.toast.error { color: var(--red); }
-.toast.success { color: var(--green); }
+.toast.error {
+  color: var(--red);
+}
+.toast.success {
+  color: var(--green);
+}
 
 /* The selection's capability (plan §6): why an edit here means more, or goes
    elsewhere. Informational, so it sits in the panel flow rather than over it. */
@@ -3640,7 +4746,10 @@ body > .embed-editor_provenance {
   font-size: 12px;
   z-index: 300;
 }
-.save-conflict-text { color: var(--text); line-height: 1.4; }
+.save-conflict-text {
+  color: var(--text);
+  line-height: 1.4;
+}
 .save-conflict-action {
   flex-shrink: 0;
   background: var(--bg-active);
@@ -3650,23 +4759,36 @@ body > .embed-editor_provenance {
   font-weight: 500;
   padding: 4px 10px;
 }
-.save-conflict-action:hover { background: rgba(255, 255, 255, 0.16); }
+.save-conflict-action:hover {
+  background: rgba(255, 255, 255, 0.16);
+}
 .save-conflict-action.primary {
   background: var(--accent);
   border-color: var(--accent);
   color: #fff;
 }
 
-::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
 ::-webkit-scrollbar-thumb {
   background: rgba(255, 255, 255, 0.12);
   border-radius: 4px;
   background-clip: padding-box;
   border: 2px solid transparent;
 }
-::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.2); background-clip: padding-box; border: 2px solid transparent; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-corner { background: transparent; }
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
+  background-clip: padding-box;
+  border: 2px solid transparent;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
 
 /* ------------------------------------------------------------------ */
 /* Class tag input                                                     */
@@ -3683,10 +4805,17 @@ body > .embed-editor_provenance {
   padding: 6px;
   min-height: 32px;
   cursor: text;
-  transition: border-color 0.1s, background 0.1s;
+  transition:
+    border-color 0.1s,
+    background 0.1s;
 }
-.class-input:hover { background: rgba(255, 255, 255, 0.08); }
-.class-input.focused { border-color: var(--accent); background: var(--bg-input); }
+.class-input:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+.class-input.focused {
+  border-color: var(--accent);
+  background: var(--bg-input);
+}
 .class-tag {
   background: var(--accent);
   color: white;
@@ -3718,10 +4847,16 @@ body > .embed-editor_provenance {
   width: 2px;
   margin: 0 -4px;
 }
-.class-suggest { z-index: 500; }
+.class-suggest {
+  z-index: 500;
+}
 /* The open tag stays lit while its family menu is up, so it's clear which
    class the list belongs to when several are on the element. */
-.class-tag.open { box-shadow: 0 0 0 2px var(--bg-input), 0 0 0 3px var(--accent); }
+.class-tag.open {
+  box-shadow:
+    0 0 0 2px var(--bg-input),
+    0 0 0 3px var(--accent);
+}
 /* Sized to its longest class rather than to the field: a family menu is a
    short list of near-identical names, and stretching it to the panel width
    reads as a different control than the suggestion list. */
@@ -3766,12 +4901,18 @@ body > .embed-editor_provenance {
   outline: 1px solid color-mix(in srgb, var(--band) 45%, transparent);
   outline-offset: -1px;
 }
-.spacing-band.is-padding { --band: #ec4899; }
-.spacing-band.is-margin { --band: #3b82f6; }
+.spacing-band.is-padding {
+  --band: #ec4899;
+}
+.spacing-band.is-margin {
+  --band: #3b82f6;
+}
 /* Gap is a third thing, so it gets a third colour: padding is inside one box,
    margin is around one box, and gap is between two of them. Sharing a colour
    with either would say they were the same kind of space. */
-.spacing-band.is-gap { --band: #a855f7; }
+.spacing-band.is-gap {
+  --band: #a855f7;
+}
 .spacing-band-label {
   padding: 1px 5px 2px;
   border-radius: 4px;
@@ -3794,17 +4935,25 @@ body > .embed-editor_provenance {
   outline: 1px solid var(--accent);
   outline-offset: -1px;
 }
-.node-outline.component { outline-color: var(--green); }
+.node-outline.component {
+  outline-color: var(--green);
+}
 /* Data-bound elements read as dynamic, same as loops. */
 .node-outline.map,
-.node-outline.bound { outline-color: #8b5cf6; }
+.node-outline.bound {
+  outline-color: #8b5cf6;
+}
 /* Selected: transparent inside, solid name chip above. */
-.node-outline.sel { outline-width: 2px; }
+.node-outline.sel {
+  outline-width: 2px;
+}
 /* Hover: bare colored label above (no chip). Only components get a
    translucent fill — plain elements stay clear so their content reads, and a
    loop covers so much of the page that tinting it washes out everything
    inside. */
-.node-outline.hover.component { background: rgba(48, 193, 88, 0.14); }
+.node-outline.hover.component {
+  background: rgba(48, 193, 88, 0.14);
+}
 .node-outline-tag {
   position: absolute;
   top: 0;
@@ -3822,9 +4971,13 @@ body > .embed-editor_provenance {
   border-radius: 4px 4px 4px 0;
   white-space: nowrap;
 }
-.node-outline.component .node-outline-tag { background: var(--green); }
+.node-outline.component .node-outline-tag {
+  background: var(--green);
+}
 .node-outline.map .node-outline-tag,
-.node-outline.bound .node-outline-tag { background: #8b5cf6; }
+.node-outline.bound .node-outline-tag {
+  background: #8b5cf6;
+}
 .node-outline-tag.inside {
   transform: none;
   border-radius: 0 0 4px 0;
@@ -3834,9 +4987,13 @@ body > .embed-editor_provenance {
   color: var(--accent);
   padding-left: 0;
 }
-.node-outline.hover.component .node-outline-tag { color: var(--green); }
+.node-outline.hover.component .node-outline-tag {
+  color: var(--green);
+}
 .node-outline.hover.map .node-outline-tag,
-.node-outline.hover.bound .node-outline-tag { color: #a78bfa; }
+.node-outline.hover.bound .node-outline-tag {
+  color: #a78bfa;
+}
 
 /* Git panel: a failed action (a refused branch switch, above all) stays put
    until dismissed — you must not keep editing believing you switched. */
@@ -3854,7 +5011,11 @@ body > .embed-editor_provenance {
   line-height: 1.5;
   user-select: text;
 }
-.git-error button { margin-left: auto; flex-shrink: 0; color: inherit; }
+.git-error button {
+  margin-left: auto;
+  flex-shrink: 0;
+  color: inherit;
+}
 
 /* ------------------------------------------------------------------ */
 /* CMS — JSON under src/ edited as collections                         */
@@ -3873,9 +5034,13 @@ body > .embed-editor_provenance {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.cms-crumb button { margin-left: -4px; }
+.cms-crumb button {
+  margin-left: -4px;
+}
 
-.cms-group + .cms-group { margin-top: 10px; }
+.cms-group + .cms-group {
+  margin-top: 10px;
+}
 .cms-group-label {
   padding: 6px 8px 4px;
   font-size: 10px;
@@ -3893,10 +5058,21 @@ body > .embed-editor_provenance {
   cursor: pointer;
   color: var(--text-dim);
 }
-.cms-collection:hover { background: var(--bg-hover); color: var(--text); }
-.cms-collection.on { background: var(--bg-active); color: var(--text); }
-.cms-collection.broken { color: var(--red); }
-.cms-collection input { height: 24px; padding: 2px 6px; }
+.cms-collection:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+.cms-collection.on {
+  background: var(--bg-active);
+  color: var(--text);
+}
+.cms-collection.broken {
+  color: var(--red);
+}
+.cms-collection input {
+  height: 24px;
+  padding: 2px 6px;
+}
 .cms-collection-name {
   flex: 1;
   min-width: 0;
@@ -3905,11 +5081,27 @@ body > .embed-editor_provenance {
   white-space: nowrap;
   font-weight: 500;
 }
-.cms-collection-count { font-size: 10.5px; color: var(--text-faint); flex-shrink: 0; }
-.cms-collection-chevron { color: var(--text-faint); display: flex; }
-.cms-collection .row-action { opacity: 0; padding: 2px; color: var(--text-faint); }
-.cms-collection:hover .row-action { opacity: 1; }
-.cms-collection .row-action:hover { color: var(--red); background: transparent; }
+.cms-collection-count {
+  font-size: 10.5px;
+  color: var(--text-faint);
+  flex-shrink: 0;
+}
+.cms-collection-chevron {
+  color: var(--text-faint);
+  display: flex;
+}
+.cms-collection .row-action {
+  opacity: 0;
+  padding: 2px;
+  color: var(--text-faint);
+}
+.cms-collection:hover .row-action {
+  opacity: 1;
+}
+.cms-collection .row-action:hover {
+  color: var(--red);
+  background: transparent;
+}
 
 /* The editor itself, covering the canvas while the CMS panel is open. */
 .cms-view {
@@ -3936,10 +5128,24 @@ body > .embed-editor_provenance {
   padding: 12px 8px 8px 12px;
   flex-shrink: 0;
 }
-.cms-items-title { font-size: 13px; font-weight: 600; }
-.cms-search { padding: 0 12px 8px; flex-shrink: 0; }
-.cms-search input { height: 28px; padding: 4px 8px; }
-.cms-item-list { flex: 1; min-height: 0; overflow-y: auto; padding: 0 8px 12px; }
+.cms-items-title {
+  font-size: 13px;
+  font-weight: 600;
+}
+.cms-search {
+  padding: 0 12px 8px;
+  flex-shrink: 0;
+}
+.cms-search input {
+  height: 28px;
+  padding: 4px 8px;
+}
+.cms-item-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0 8px 12px;
+}
 
 .cms-item {
   display: flex;
@@ -3953,10 +5159,20 @@ body > .embed-editor_provenance {
   border-top: 1px solid transparent;
   border-bottom: 1px solid transparent;
 }
-.cms-item:hover { background: var(--bg-hover); color: var(--text); }
-.cms-item.on { background: var(--bg-active); color: var(--text); }
-.cms-item.drop-before { border-top-color: var(--accent); }
-.cms-item.drop-after { border-bottom-color: var(--accent); }
+.cms-item:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+.cms-item.on {
+  background: var(--bg-active);
+  color: var(--text);
+}
+.cms-item.drop-before {
+  border-top-color: var(--accent);
+}
+.cms-item.drop-after {
+  border-bottom-color: var(--accent);
+}
 .cms-item-title {
   flex: 1;
   min-width: 0;
@@ -3971,11 +5187,25 @@ body > .embed-editor_provenance {
 .cms-schema-row.is-dragging {
   opacity: 0.4;
 }
-.cms-item-grip { color: var(--text-faint); opacity: 0; display: flex; cursor: grab; }
-.cms-item:hover .cms-item-grip { opacity: 1; }
-.cms-item svg:last-child { color: var(--text-faint); }
+.cms-item-grip {
+  color: var(--text-faint);
+  opacity: 0;
+  display: flex;
+  cursor: grab;
+}
+.cms-item:hover .cms-item-grip {
+  opacity: 1;
+}
+.cms-item svg:last-child {
+  color: var(--text-faint);
+}
 
-.cms-detail { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.cms-detail {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
 .cms-detail-head {
   display: flex;
   align-items: center;
@@ -3984,14 +5214,19 @@ body > .embed-editor_provenance {
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
 }
-.cms-detail-title { font-size: 13px; font-weight: 600; }
+.cms-detail-title {
+  font-size: 13px;
+  font-weight: 600;
+}
 .cms-detail-path {
   margin-left: auto;
   font-size: 10.5px;
   color: var(--text-faint);
   font-family: var(--mono);
 }
-.cms-detail-head .ghost.danger:hover { color: var(--red); }
+.cms-detail-head .ghost.danger:hover {
+  color: var(--red);
+}
 .cms-saved {
   display: inline-flex;
   align-items: center;
@@ -4001,7 +5236,9 @@ body > .embed-editor_provenance {
   opacity: 0;
   transition: opacity 0.2s;
 }
-.cms-saved.on { opacity: 1; }
+.cms-saved.on {
+  opacity: 1;
+}
 
 /* `--cms-body-inset` is this padding's top, named so a sticky heading inside
    can cancel it instead of repeating the number. */
@@ -4020,22 +5257,58 @@ body > .embed-editor_provenance {
   background: var(--bg-panel);
   padding: 16px 18px 14px;
 }
-.cms-card h3 { font-size: 15px; font-weight: 600; margin-bottom: 14px; }
+.cms-card h3 {
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: 14px;
+}
 
-.cms-field { margin-bottom: 14px; }
+.cms-field {
+  margin-bottom: 14px;
+}
 /* Same as the props panel: the Asset/URL switch belongs in the field label
    row, so it anchors to the whole field rather than being lifted out of the
    control with an offset the scroll box would clip. */
-.cms-field:has(> .asset-field) { position: relative; }
-.cms-field:has(> .asset-field) > .cms-field-head { min-height: 20px; }
-.cms-field > .asset-field { position: static; }
-.cms-field > .asset-field > .af-mode { top: 0; right: 0; }
-.cms-field-head { display: flex; align-items: center; gap: 4px; margin-bottom: 5px; }
-.cms-field-head label { font-size: 11.5px; color: var(--text-dim); font-weight: 500; }
-.cms-field-remove { opacity: 0; padding: 1px; color: var(--text-faint); }
-.cms-field:hover .cms-field-remove { opacity: 1; }
-.cms-field-remove:hover { color: var(--red); background: transparent; }
-.cms-field input, .cms-field textarea { padding: 7px 9px; }
+.cms-field:has(> .asset-field) {
+  position: relative;
+}
+.cms-field:has(> .asset-field) > .cms-field-head {
+  min-height: 20px;
+}
+.cms-field > .asset-field {
+  position: static;
+}
+.cms-field > .asset-field > .af-mode {
+  top: 0;
+  right: 0;
+}
+.cms-field-head {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 5px;
+}
+.cms-field-head label {
+  font-size: 11.5px;
+  color: var(--text-dim);
+  font-weight: 500;
+}
+.cms-field-remove {
+  opacity: 0;
+  padding: 1px;
+  color: var(--text-faint);
+}
+.cms-field:hover .cms-field-remove {
+  opacity: 1;
+}
+.cms-field-remove:hover {
+  color: var(--red);
+  background: transparent;
+}
+.cms-field input,
+.cms-field textarea {
+  padding: 7px 9px;
+}
 
 .cms-toggle {
   position: relative;
@@ -4045,7 +5318,9 @@ body > .embed-editor_provenance {
   background: transparent;
   padding: 2px 0;
 }
-.cms-toggle:hover:not(:disabled) { background: transparent; }
+.cms-toggle:hover:not(:disabled) {
+  background: transparent;
+}
 .cms-toggle::before {
   content: '';
   width: 32px;
@@ -4055,7 +5330,10 @@ body > .embed-editor_provenance {
   border: 1px solid var(--border-strong);
   transition: background 0.12s;
 }
-.cms-toggle.on::before { background: var(--accent); border-color: var(--accent); }
+.cms-toggle.on::before {
+  background: var(--accent);
+  border-color: var(--accent);
+}
 .cms-toggle-knob {
   position: absolute;
   left: 4px;
@@ -4065,15 +5343,34 @@ body > .embed-editor_provenance {
   margin-top: -6px;
   border-radius: 50%;
   background: var(--text-dim);
-  transition: left 0.12s, background 0.12s;
+  transition:
+    left 0.12s,
+    background 0.12s;
   pointer-events: none;
 }
-.cms-toggle.on .cms-toggle-knob { left: 17px; background: #fff; }
-.cms-toggle-label { color: var(--text-dim); font-size: 11.5px; }
+.cms-toggle.on .cms-toggle-knob {
+  left: 17px;
+  background: #fff;
+}
+.cms-toggle-label {
+  color: var(--text-dim);
+  font-size: 11.5px;
+}
 
-.cms-list-row { display: flex; align-items: center; gap: 4px; margin-bottom: 4px; }
-.cms-list-row .ghost { padding: 3px; color: var(--text-faint); }
-.cms-list-row .ghost:hover { color: var(--red); background: transparent; }
+.cms-list-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 4px;
+}
+.cms-list-row .ghost {
+  padding: 3px;
+  color: var(--text-faint);
+}
+.cms-list-row .ghost:hover {
+  color: var(--red);
+  background: transparent;
+}
 
 .cms-add {
   background: transparent;
@@ -4083,8 +5380,14 @@ body > .embed-editor_provenance {
   font-size: 11.5px;
   border-radius: 6px;
 }
-.cms-add:hover:not(:disabled) { background: var(--bg-hover); color: var(--text); }
-.cms-add.compact { padding: 3px 8px; font-size: 11px; }
+.cms-add:hover:not(:disabled) {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+.cms-add.compact {
+  padding: 3px 8px;
+  font-size: 11px;
+}
 
 .cms-add-field {
   display: flex;
@@ -4092,9 +5395,18 @@ body > .embed-editor_provenance {
   gap: 6px;
   margin-top: 6px;
 }
-.cms-add-field input { flex: 1; min-width: 0; }
-.cms-add-field .cms-type-dd { width: 130px; flex-shrink: 0; }
-.cms-add-field .ghost { padding: 4px; color: var(--text-faint); }
+.cms-add-field input {
+  flex: 1;
+  min-width: 0;
+}
+.cms-add-field .cms-type-dd {
+  width: 130px;
+  flex-shrink: 0;
+}
+.cms-add-field .ghost {
+  padding: 4px;
+  color: var(--text-faint);
+}
 
 .cms-group-box {
   border: 1px solid var(--border);
@@ -4102,9 +5414,16 @@ body > .embed-editor_provenance {
   padding: 10px 12px;
   background: var(--bg-panel-2);
 }
-.cms-group-box .cms-field:last-of-type { margin-bottom: 8px; }
+.cms-group-box .cms-field:last-of-type {
+  margin-bottom: 8px;
+}
 
-.cms-repeater { display: flex; flex-direction: column; gap: 4px; align-items: flex-start; }
+.cms-repeater {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: flex-start;
+}
 .cms-repeat-row {
   width: 100%;
   display: flex;
@@ -4117,9 +5436,16 @@ body > .embed-editor_provenance {
   cursor: pointer;
   color: var(--text-dim);
 }
-.cms-repeat-row:hover { color: var(--text); background: var(--bg-hover); }
-.cms-repeat-row.drop-before { border-top-color: var(--accent); }
-.cms-repeat-row.drop-after { border-bottom-color: var(--accent); }
+.cms-repeat-row:hover {
+  color: var(--text);
+  background: var(--bg-hover);
+}
+.cms-repeat-row.drop-before {
+  border-top-color: var(--accent);
+}
+.cms-repeat-row.drop-after {
+  border-bottom-color: var(--accent);
+}
 .cms-repeat-title {
   flex: 1;
   min-width: 0;
@@ -4128,23 +5454,69 @@ body > .embed-editor_provenance {
   white-space: nowrap;
   font-weight: 500;
 }
-.cms-repeat-grip { color: var(--text-faint); opacity: 0; display: flex; cursor: grab; }
-.cms-repeat-row:hover .cms-repeat-grip { opacity: 1; }
-.cms-repeat-row .ghost { padding: 3px; color: var(--text-faint); }
-.cms-repeat-row .ghost:hover { color: var(--red); background: transparent; }
+.cms-repeat-grip {
+  color: var(--text-faint);
+  opacity: 0;
+  display: flex;
+  cursor: grab;
+}
+.cms-repeat-row:hover .cms-repeat-grip {
+  opacity: 1;
+}
+.cms-repeat-row .ghost {
+  padding: 3px;
+  color: var(--text-faint);
+}
+.cms-repeat-row .ghost:hover {
+  color: var(--red);
+  background: transparent;
+}
 
 /* One repeater entry, opened in a dialog. */
-.cms-modal { width: 520px; }
-.cms-modal-header { display: flex; align-items: center; gap: 8px; }
-.cms-modal-header span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.cms-modal-header .ghost { padding: 3px; color: var(--text-faint); }
-.cms-modal-body { max-height: 60vh; overflow-y: auto; gap: 0; padding-top: 12px; }
-.cms-modal-body .cms-field:last-of-type { margin-bottom: 8px; }
-.cms-modal-footer { justify-content: space-between; }
-.cms-modal-footer .ghost.danger { color: var(--text-dim); }
-.cms-modal-footer .ghost.danger:hover { color: var(--red); background: rgba(255, 69, 58, 0.12); }
+.cms-modal {
+  width: 520px;
+}
+.cms-modal-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.cms-modal-header span {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cms-modal-header .ghost {
+  padding: 3px;
+  color: var(--text-faint);
+}
+.cms-modal-body {
+  max-height: 60vh;
+  overflow-y: auto;
+  gap: 0;
+  padding-top: 12px;
+}
+.cms-modal-body .cms-field:last-of-type {
+  margin-bottom: 8px;
+}
+.cms-modal-footer {
+  justify-content: space-between;
+}
+.cms-modal-footer .ghost.danger {
+  color: var(--text-dim);
+}
+.cms-modal-footer .ghost.danger:hover {
+  color: var(--red);
+  background: rgba(255, 69, 58, 0.12);
+}
 
-.cms-empty-inline { color: var(--text-faint); font-size: 11.5px; padding: 2px 0 8px; }
+.cms-empty-inline {
+  color: var(--text-faint);
+  font-size: 11.5px;
+  padding: 2px 0 8px;
+}
 .cms-error {
   max-width: 720px;
   margin-bottom: 14px;
@@ -4158,15 +5530,36 @@ body > .embed-editor_provenance {
 }
 /* Kept mounted while another panel is up: picking an image switches to the
    Assets panel, and unmounting would drop the pick and the unsaved edit. */
-.cms-view.hidden { display: none; }
+.cms-view.hidden {
+  display: none;
+}
 
 /* Collection settings — the schema, kept out of the item editor. */
-.cms-settings { flex: 1; min-width: 0; display: flex; flex-direction: column; }
-.cms-settings .cms-detail-head .primary { padding: 5px 14px; }
-.cms-note { color: var(--text-faint); font-size: 11.5px; margin: -8px 0 14px; line-height: 1.5; }
+.cms-settings {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.cms-settings .cms-detail-head .primary {
+  padding: 5px 14px;
+}
+.cms-note {
+  color: var(--text-faint);
+  font-size: 11.5px;
+  margin: -8px 0 14px;
+  line-height: 1.5;
+}
 
-.cms-schema { display: flex; flex-direction: column; gap: 4px; align-items: flex-start; }
-.cms-schema-group { width: 100%; }
+.cms-schema {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: flex-start;
+}
+.cms-schema-group {
+  width: 100%;
+}
 .cms-schema-row {
   display: flex;
   align-items: center;
@@ -4176,10 +5569,21 @@ body > .embed-editor_provenance {
   border-radius: 8px;
   background: var(--bg-panel-2);
 }
-.cms-schema-row.drop-before { border-top-color: var(--accent); }
-.cms-schema-row.drop-after { border-bottom-color: var(--accent); }
-.cms-schema-grip { color: var(--text-faint); opacity: 0; display: flex; cursor: grab; }
-.cms-schema-row:hover .cms-schema-grip { opacity: 1; }
+.cms-schema-row.drop-before {
+  border-top-color: var(--accent);
+}
+.cms-schema-row.drop-after {
+  border-bottom-color: var(--accent);
+}
+.cms-schema-grip {
+  color: var(--text-faint);
+  opacity: 0;
+  display: flex;
+  cursor: grab;
+}
+.cms-schema-row:hover .cms-schema-grip {
+  opacity: 1;
+}
 .cms-schema-expand {
   width: 18px;
   padding: 2px;
@@ -4188,25 +5592,53 @@ body > .embed-editor_provenance {
   justify-content: center;
   flex-shrink: 0;
 }
-.cms-schema-expand svg { transition: transform 0.12s; }
-.cms-schema-expand svg.rotated { transform: rotate(90deg); }
-.cms-schema-name { flex: 1; min-width: 0; background: transparent; }
-.cms-schema-name:hover { background: var(--bg-input); }
-.cms-schema-type { width: 150px; flex-shrink: 0; }
-.cms-schema-row .ghost.danger { padding: 4px; color: var(--text-faint); }
-.cms-schema-row .ghost.danger:hover { color: var(--red); background: transparent; }
+.cms-schema-expand svg {
+  transition: transform 0.12s;
+}
+.cms-schema-expand svg.rotated {
+  transform: rotate(90deg);
+}
+.cms-schema-name {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+}
+.cms-schema-name:hover {
+  background: var(--bg-input);
+}
+.cms-schema-type {
+  width: 150px;
+  flex-shrink: 0;
+}
+.cms-schema-row .ghost.danger {
+  padding: 4px;
+  color: var(--text-faint);
+}
+.cms-schema-row .ghost.danger:hover {
+  color: var(--red);
+  background: transparent;
+}
 .cms-schema-nested {
   margin: 4px 0 4px 26px;
   padding-left: 12px;
   border-left: 1px solid var(--border);
 }
 
-.cms-card.cms-danger { margin-top: 16px; }
-.cms-card.cms-danger .ghost.danger { color: var(--red); border: 1px solid rgba(255, 69, 58, 0.4); }
-.cms-card.cms-danger .ghost.danger:hover { background: rgba(255, 69, 58, 0.14); }
+.cms-card.cms-danger {
+  margin-top: 16px;
+}
+.cms-card.cms-danger .ghost.danger {
+  color: var(--red);
+  border: 1px solid rgba(255, 69, 58, 0.4);
+}
+.cms-card.cms-danger .ghost.danger:hover {
+  background: rgba(255, 69, 58, 0.14);
+}
 
 /* Field-type picker for a new field. */
-.cms-type-modal { width: 560px; }
+.cms-type-modal {
+  width: 560px;
+}
 .cms-type-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -4226,10 +5658,24 @@ body > .embed-editor_provenance {
   text-align: left;
   color: var(--text-dim);
 }
-.cms-type-tile:hover:not(:disabled) { background: var(--bg-active); border-color: var(--border-strong); color: var(--text); }
-.cms-type-tile svg { margin-bottom: 4px; }
-.cms-type-name { font-size: 12px; font-weight: 500; color: var(--text); }
-.cms-type-hint { font-size: 10.5px; color: var(--text-faint); font-weight: 400; }
+.cms-type-tile:hover:not(:disabled) {
+  background: var(--bg-active);
+  border-color: var(--border-strong);
+  color: var(--text);
+}
+.cms-type-tile svg {
+  margin-bottom: 4px;
+}
+.cms-type-name {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text);
+}
+.cms-type-hint {
+  font-size: 10.5px;
+  color: var(--text-faint);
+  font-weight: 400;
+}
 
 /* A field's type, stated rather than editable. */
 .cms-schema-type {
@@ -4242,7 +5688,11 @@ body > .embed-editor_provenance {
   font-size: 11.5px;
 }
 
-.cms-color { display: flex; align-items: center; gap: 6px; }
+.cms-color {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
 .cms-color input[type='color'] {
   width: 34px;
   height: 30px;
@@ -4254,8 +5704,16 @@ body > .embed-editor_provenance {
 
 /* Dynamic-route entry picker in the top bar. A [slug] page has no single URL,
    so the canvas renders one of getStaticPaths' entries and this says which. */
-.route-picker { display: inline-flex; flex-shrink: 0; max-width: 220px; }
-.route-picker .dd-trigger { height: 22px; padding: 0 6px; font-size: 11px; }
+.route-picker {
+  display: inline-flex;
+  flex-shrink: 0;
+  max-width: 220px;
+}
+.route-picker .dd-trigger {
+  height: 22px;
+  padding: 0 6px;
+  font-size: 11px;
+}
 .route-chip {
   flex-shrink: 0;
   padding: 2px 7px;
@@ -4265,7 +5723,10 @@ body > .embed-editor_provenance {
   font-size: 11px;
   white-space: nowrap;
 }
-.route-chip.is-error { color: #e6a03c; background: rgba(230, 160, 60, 0.12); }
+.route-chip.is-error {
+  color: #e6a03c;
+  background: rgba(230, 160, 60, 0.12);
+}
 
 /* A prop's documentation, from the comment above it in `interface Props`. The
    "?" sits beside the name; the bubble is fixed so the panel's scroll box
@@ -4279,8 +5740,13 @@ body > .embed-editor_provenance {
   border-radius: 50%;
   outline: none;
 }
-.prop-tip-icon:hover, .prop-tip-icon:focus-visible { color: var(--text-dim); }
-.prop-tip-icon:focus-visible { box-shadow: 0 0 0 2px var(--accent); }
+.prop-tip-icon:hover,
+.prop-tip-icon:focus-visible {
+  color: var(--text-dim);
+}
+.prop-tip-icon:focus-visible {
+  box-shadow: 0 0 0 2px var(--accent);
+}
 
 .prop-tip {
   position: fixed;
@@ -4299,7 +5765,9 @@ body > .embed-editor_provenance {
   white-space: normal;
   pointer-events: none;
 }
-.prop-tip.below { transform: translate(-50%, 0); }
+.prop-tip.below {
+  transform: translate(-50%, 0);
+}
 /* The pointer, on whichever side the bubble ended up. */
 .prop-tip::after {
   content: '';
@@ -4349,7 +5817,9 @@ body > .embed-editor_provenance {
     inset 0 0 0 1px rgba(255, 255, 255, 0.06);
   transition: transform 0.25s cubic-bezier(0.3, 0.7, 0.3, 1);
 }
-.bool-seg.is-second::before { transform: translateX(calc(100% + 2px)); }
+.bool-seg.is-second::before {
+  transform: translateX(calc(100% + 2px));
+}
 
 .bool-seg button,
 .bool-seg button:hover:not(:disabled) {
@@ -4365,7 +5835,9 @@ body > .embed-editor_provenance {
   cursor: pointer;
   transition: color 0.18s ease;
 }
-.bool-seg button:hover:not(.on) { color: var(--text); }
+.bool-seg button:hover:not(.on) {
+  color: var(--text);
+}
 /* An enum's labels are whatever the type says, so they can be long enough to
    need clipping — True/False never was. */
 .bool-seg button {
@@ -4405,7 +5877,9 @@ body > .embed-editor_provenance {
   transition: opacity 0.12s ease;
 }
 .num-field:hover .num-steppers,
-.num-field:focus-within .num-steppers { opacity: 1; }
+.num-field:focus-within .num-steppers {
+  opacity: 1;
+}
 .num-steppers button,
 .num-steppers button:hover:not(:disabled) {
   flex: 1;
@@ -4425,12 +5899,17 @@ body > .embed-editor_provenance {
   background: var(--bg-active);
   color: var(--text);
 }
-.num-steppers button:active { color: var(--accent); }
+.num-steppers button:active {
+  color: var(--accent);
+}
 
 /* The folded group at the foot of the props panel (class, attributes, the
    comment, slot) — the fields every node has, kept out of the way of the ones
    that describe this one. */
-.props-group { margin: 4px 0 0; border-top: 1px solid var(--border); }
+.props-group {
+  margin: 4px 0 0;
+  border-top: 1px solid var(--border);
+}
 .props-group-head {
   width: 100%;
   display: flex;
@@ -4445,9 +5924,16 @@ body > .embed-editor_provenance {
 }
 /* No hover fill: it's a heading you can click, not a row you pick from — and
    the app-wide `button:hover` would otherwise light the whole strip. */
-.props-group-head:hover:not(:disabled) { background: transparent; }
-.props-group-head:hover .props-group-chevron { color: var(--text-dim); }
-.props-group-name { flex: 1; text-align: left; }
+.props-group-head:hover:not(:disabled) {
+  background: transparent;
+}
+.props-group-head:hover .props-group-chevron {
+  color: var(--text-dim);
+}
+.props-group-name {
+  flex: 1;
+  text-align: left;
+}
 .props-group-count {
   font-size: 10.5px;
   font-weight: 500;
@@ -4456,8 +5942,13 @@ body > .embed-editor_provenance {
   border-radius: 10px;
   padding: 1px 6px;
 }
-.props-group-chevron { color: var(--text-faint); transition: transform 0.12s; }
-.props-group.open .props-group-chevron { transform: rotate(90deg); }
+.props-group-chevron {
+  color: var(--text-faint);
+  transition: transform 0.12s;
+}
+.props-group.open .props-group-chevron {
+  transform: rotate(90deg);
+}
 
 /* The URL bar is an input so it can be selected, copied and typed into — but
    it must still read as the quiet label it was, not a form field, until you
@@ -4468,21 +5959,28 @@ body > .embed-editor_provenance {
   text-align: center;
   cursor: text;
 }
-.titlebar input.url:hover:not(:read-only) { background: var(--bg-active); }
+.titlebar input.url:hover:not(:read-only) {
+  background: var(--bg-active);
+}
 .titlebar input.url:focus {
   outline: none;
   border-color: var(--accent);
   color: var(--text);
   text-align: left;
 }
-.titlebar input.url::placeholder { color: var(--text-faint); }
+.titlebar input.url::placeholder {
+  color: var(--text-faint);
+}
 
 /* Content collections (schema-driven editor) --------------------------------
    The controls reuse the CMS ones; what is new here is everything the schema
    makes possible — a rule under a field, an error on it, a reference to
    another entry, a kind switcher, and the notices that say when a collection
    is not ours to write. */
-.content-count { font-size: 10.5px; color: var(--text-faint); }
+.content-count {
+  font-size: 10.5px;
+  color: var(--text-faint);
+}
 
 .content-banner {
   display: flex;
@@ -4498,15 +5996,32 @@ body > .embed-editor_provenance {
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid var(--border);
 }
-.content-banner svg { flex-shrink: 0; margin-top: 1px; }
-.content-banner.soft { background: transparent; }
+.content-banner svg {
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+.content-banner.soft {
+  background: transparent;
+}
 
-.content-hint { font-size: 10.5px; color: var(--text-faint); margin-top: 4px; }
-.content-issue { font-size: 10.5px; color: var(--red); margin-top: 4px; }
+.content-hint {
+  font-size: 10.5px;
+  color: var(--text-faint);
+  margin-top: 4px;
+}
+.content-issue {
+  font-size: 10.5px;
+  color: var(--red);
+  margin-top: 4px;
+}
 .cms-field.has-issue input,
 .cms-field.has-issue textarea,
-.cms-field.has-issue select { border-color: rgba(255, 69, 58, 0.55); }
-.content-required { color: var(--text-faint); }
+.cms-field.has-issue select {
+  border-color: rgba(255, 69, 58, 0.55);
+}
+.content-required {
+  color: var(--text-faint);
+}
 .content-note {
   display: inline-flex;
   align-items: center;
@@ -4515,8 +6030,16 @@ body > .embed-editor_provenance {
   color: var(--text-faint);
   margin-left: auto;
 }
-.content-warn { font-size: 10.5px; color: var(--yellow, #e0b341); margin-top: 4px; }
-.content-null { font-size: 11.5px; color: var(--text-faint); padding: 6px 0; }
+.content-warn {
+  font-size: 10.5px;
+  color: var(--yellow, #e0b341);
+  margin-top: 4px;
+}
+.content-null {
+  font-size: 11.5px;
+  color: var(--text-faint);
+  padding: 6px 0;
+}
 .content-none {
   padding: 1px 7px;
   border-radius: 5px;
@@ -4524,9 +6047,18 @@ body > .embed-editor_provenance {
   color: var(--text-faint);
   background: var(--bg-input);
 }
-.content-none.on { color: var(--text); background: rgba(255, 255, 255, 0.12); }
-.cms-field-head .content-clear { margin-left: auto; opacity: 0; padding: 1px; }
-.cms-field:hover .cms-field-head .content-clear { opacity: 1; }
+.content-none.on {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.12);
+}
+.cms-field-head .content-clear {
+  margin-left: auto;
+  opacity: 0;
+  padding: 1px;
+}
+.cms-field:hover .cms-field-head .content-clear {
+  opacity: 1;
+}
 
 .content-add-field {
   display: flex;
@@ -4542,7 +6074,10 @@ body > .embed-editor_provenance {
   color: var(--text-dim);
   padding: 2px 6px;
 }
-.content-default { font-size: 10.5px; color: var(--text-faint); }
+.content-default {
+  font-size: 10.5px;
+  color: var(--text-faint);
+}
 
 .content-tags,
 .content-reflist {
@@ -4555,8 +6090,19 @@ body > .embed-editor_provenance {
   border-radius: 8px;
   background: var(--bg-input);
 }
-.content-tags input { flex: 1; min-width: 90px; height: 22px; border: 0; background: transparent; padding: 0 4px; }
-.content-reflist select { flex: 1; min-width: 130px; height: 24px; }
+.content-tags input {
+  flex: 1;
+  min-width: 90px;
+  height: 22px;
+  border: 0;
+  background: transparent;
+  padding: 0 4px;
+}
+.content-reflist select {
+  flex: 1;
+  min-width: 130px;
+  height: 24px;
+}
 .content-chip {
   display: inline-flex;
   align-items: center;
@@ -4567,29 +6113,76 @@ body > .embed-editor_provenance {
   color: var(--text);
   background: rgba(255, 255, 255, 0.1);
 }
-.content-chip .missing { color: var(--red); }
-.content-chip button { padding: 1px; color: var(--text-faint); background: transparent; }
+.content-chip .missing {
+  color: var(--red);
+}
+.content-chip button {
+  padding: 1px;
+  color: var(--text-faint);
+  background: transparent;
+}
 
-.content-union-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
-.content-union-head label { font-size: 11.5px; color: var(--text-dim); }
-.content-union-head select { flex: 1; }
+.content-union-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.content-union-head label {
+  font-size: 11.5px;
+  color: var(--text-dim);
+}
+.content-union-head select {
+  flex: 1;
+}
 
-.content-record-row { padding-bottom: 8px; }
-.content-record-head { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
-.content-record-head .content-key { font-weight: 600; }
-.content-record-add { display: flex; gap: 6px; align-items: center; }
-.content-record-add input { flex: 1; }
+.content-record-row {
+  padding-bottom: 8px;
+}
+.content-record-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+.content-record-head .content-key {
+  font-weight: 600;
+}
+.content-record-add {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.content-record-add input {
+  flex: 1;
+}
 
-.content-simple-list { display: flex; flex-direction: column; gap: 5px; align-items: stretch; }
-.content-simple-row { display: flex; gap: 6px; align-items: center; }
-.content-simple-row > *:first-child { flex: 1; min-width: 0; }
+.content-simple-list {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  align-items: stretch;
+}
+.content-simple-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.content-simple-row > *:first-child {
+  flex: 1;
+  min-width: 0;
+}
 .content-open-item {
   padding: 10px;
   margin: 2px 0 6px;
   border: 1px solid var(--border-strong);
   border-radius: 10px;
 }
-.content-body-note { font-size: 10.5px; color: var(--text-faint); margin-bottom: 6px; }
+.content-body-note {
+  font-size: 10.5px;
+  color: var(--text-faint);
+  margin-bottom: 6px;
+}
 /* The body is an editor, not a growing textarea: a long post would push every
    other field off the screen, so it scrolls within a window big enough to
    write in. Bordered like the fields around it so the card still reads as one
@@ -4603,8 +6196,14 @@ body > .embed-editor_provenance {
   overflow: hidden;
   display: flex;
 }
-.content-body-editor .cm-host { flex: 1; min-width: 0; overflow: auto; }
-.content-body-editor .cm-editor { height: 100%; }
+.content-body-editor .cm-host {
+  flex: 1;
+  min-width: 0;
+  overflow: auto;
+}
+.content-body-editor .cm-editor {
+  height: 100%;
+}
 
 .content-id {
   font-size: 10.5px;
@@ -4613,7 +6212,10 @@ body > .embed-editor_provenance {
   padding: 2px 6px;
   border-radius: 5px;
 }
-.content-id:hover { color: var(--text); background: rgba(255, 255, 255, 0.08); }
+.content-id:hover {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.08);
+}
 .content-rename {
   max-width: 720px;
   margin-bottom: 14px;
@@ -4621,23 +6223,39 @@ body > .embed-editor_provenance {
   border: 1px solid var(--border-strong);
   border-radius: 10px;
 }
-.content-rename-row { display: flex; gap: 6px; align-items: center; }
-.content-rename-row label { font-size: 11.5px; color: var(--text-dim); }
-.content-rename-row input { flex: 1; }
+.content-rename-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.content-rename-row label {
+  font-size: 11.5px;
+  color: var(--text-dim);
+}
+.content-rename-row input {
+  flex: 1;
+}
 .content-rename-plan {
   margin-top: 10px;
   font-size: 11.5px;
   line-height: 1.6;
   color: var(--text-dim);
 }
-.content-rename-plan .primary { margin-top: 8px; }
-.content-pointer { font-size: 10.5px; color: var(--text-faint); }
+.content-rename-plan .primary {
+  margin-top: 8px;
+}
+.content-pointer {
+  font-size: 10.5px;
+  color: var(--text-faint);
+}
 
 /* Variables sheet -----------------------------------------------------------
    The same sheet the CMS uses, with a table in it. Columns are either the
    rules a variable is declared in (a theme and its modes) or the things a
    family of names describes (h1…h6) — see electron/cssVars.js. */
-.vars-view .cms-detail { width: 100%; }
+.vars-view .cms-detail {
+  width: 100%;
+}
 /* One column geometry for the whole sheet: every table lays its columns on the
    same tracks, so names and values line up from the top of the group to the
    bottom whatever each block holds. Wide sets scroll (the body's overflow-y
@@ -4677,14 +6295,19 @@ body > .embed-editor_provenance {
    against that box, so the headings rode the rows out of sight. The scrolling
    moved down to the rows; the heading strip above them is held level with it
    from VariablesView. The room for the scrollbar goes with the scroller. */
-.vars-scroll { min-width: 0; }
+.vars-scroll {
+  min-width: 0;
+}
 .vars-scroll-rows {
   overflow-x: auto;
   overscroll-behavior-x: contain;
   min-width: 0;
   padding-bottom: 19px;
 }
-.vars-scroll-head { overflow: hidden; min-width: 0; }
+.vars-scroll-head {
+  overflow: hidden;
+  min-width: 0;
+}
 
 /* A group's name and its column headings stay with you while its own rows go
    past, and give way to the next group's — which is what says which group you
@@ -4718,7 +6341,9 @@ body > .embed-editor_provenance {
 }
 /* The rows carry the inset themselves; anything else in the sheet (the
    no-results line) still needs it. */
-.vars-body > .props-empty { padding-left: var(--vars-inset); }
+.vars-body > .props-empty {
+  padding-left: var(--vars-inset);
+}
 .vars-search {
   height: 24px;
   width: 180px;
@@ -4743,8 +6368,16 @@ body > .embed-editor_provenance {
    column but no row are placed one under the other, which made the heading two
    rows tall in the name stack and one in the value stack beside it. Every line
    in the sheet is drawn across both, so that put the whole sheet out of step. */
-.vars-section-text { grid-column: 2 / -1; grid-row: 1; white-space: nowrap; }
-.vars-section .vars-section-menu { grid-column: 2 / -1; grid-row: 1; justify-self: end; }
+.vars-section-text {
+  grid-column: 2 / -1;
+  grid-row: 1;
+  white-space: nowrap;
+}
+.vars-section .vars-section-menu {
+  grid-column: 2 / -1;
+  grid-row: 1;
+  justify-self: end;
+}
 /* Shown on hover of the heading, the way the drag grip is: three dots on every
    group at rest is a column of noise down a sheet that is mostly names. */
 .vars-section-menu {
@@ -4764,20 +6397,30 @@ body > .embed-editor_provenance {
 }
 .vars-section:hover .vars-section-menu,
 .vars-section-menu.is-open,
-.vars-section-menu:focus-visible { opacity: 1; }
+.vars-section-menu:focus-visible {
+  opacity: 1;
+}
 .vars-section-menu:hover:not(:disabled),
-.vars-section-menu.is-open { background: rgba(255, 255, 255, 0.09); color: var(--text); }
+.vars-section-menu.is-open {
+  background: rgba(255, 255, 255, 0.09);
+  color: var(--text);
+}
 
 /* The menu itself — portaled, so it is styled from here rather than inherited. */
 /* The `⋯` menu (src/ui/MoreMenu.jsx), wherever it is opened from. The old
    .vars-* names are kept beside the new ones: the variables sheet had this
    first, and its own rows are still styled by them. */
-.more-menu-item:disabled { opacity: 0.4; cursor: default; }
+.more-menu-item:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
 
 /* On a tile, and only while the pointer is on it — an asset grid is a wall of
    pictures, and a button in the corner of every one of them is a wall of
    buttons. Focus shows it too, so it can be reached without a pointer. */
-.asset-tile { position: relative; }
+.asset-tile {
+  position: relative;
+}
 .asset-tile-menu {
   position: absolute;
   top: 6px;
@@ -4795,8 +6438,12 @@ body > .embed-editor_provenance {
 }
 .asset-tile:hover .asset-tile-menu,
 .asset-tile-menu:focus-visible,
-.asset-tile-menu.is-open { opacity: 1; }
-.asset-tile-menu:hover:not(:disabled) { background: rgba(20, 20, 20, 0.9); }
+.asset-tile-menu.is-open {
+  opacity: 1;
+}
+.asset-tile-menu:hover:not(:disabled) {
+  background: rgba(20, 20, 20, 0.9);
+}
 
 .vars-menu,
 .more-menu {
@@ -4828,12 +6475,22 @@ body > .embed-editor_provenance {
   cursor: pointer;
 }
 .vars-menu-item:hover:not(:disabled),
-.more-menu-item:hover:not(:disabled) { background: rgba(255, 255, 255, 0.09); }
+.more-menu-item:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.09);
+}
 .vars-menu-item > svg,
-.more-menu-item > svg { color: var(--text-dim); flex: none; }
+.more-menu-item > svg {
+  color: var(--text-dim);
+  flex: none;
+}
 .vars-menu-item.is-danger:hover:not(:disabled),
-.more-menu-item.is-danger:hover:not(:disabled) { background: rgba(255, 90, 90, 0.16); color: #ff9b9b; }
-.vars-menu-item.is-danger:hover > svg { color: #ff9b9b; }
+.more-menu-item.is-danger:hover:not(:disabled) {
+  background: rgba(255, 90, 90, 0.16);
+  color: #ff9b9b;
+}
+.vars-menu-item.is-danger:hover > svg {
+  color: #ff9b9b;
+}
 /* A row is a grid of its own — a label row in the fixed stack, a value row in
    the scrolling one — with fixed tracks, so the two stacks line up with each
    other and every group's columns start at the same x. */
@@ -4850,7 +6507,9 @@ body > .embed-editor_provenance {
 }
 /* A row is a label and a value stack side by side, so the highlight is driven
    from React (see Table) rather than :hover — one half can't light the other. */
-.vars-row.is-hover:not(.is-head) { background: rgba(255, 255, 255, 0.055); }
+.vars-row.is-hover:not(.is-head) {
+  background: rgba(255, 255, 255, 0.055);
+}
 /* The sheet is a table: the rows and the fields in it are square. The rows'
    radius curled the ends of every rule, and a rounded field box on each value
    read as a chip sitting in a column of chips.
@@ -4859,12 +6518,16 @@ body > .embed-editor_provenance {
    against the round-cornered chip beside it looked like a mistake. */
 .vars-body .vars-row,
 .vars-body .u-input,
-.vars-body .var-input { border-radius: 0; }
+.vars-body .var-input {
+  border-radius: 0;
+}
 /* The sheet's right-hand inset, and room at the left of the value stack for the
    connect dot: it sits on the field's left edge and grows on hover, and the
    scroller clips whatever hangs past its edge — which cropped the first
    column's dot in half. 22px clears it at its hovered size. */
-.vars-scroll .vars-row { padding: 2px var(--vars-inset) 2px 22px; }
+.vars-scroll .vars-row {
+  padding: 2px var(--vars-inset) 2px 22px;
+}
 /* The two rule lines in the sheet: one under the group's name, one under the
    column labels — so the name, the labels and the values each sit in their own
    band. Rows are separated by hover, not borders; these are the only lines.
@@ -4888,13 +6551,26 @@ body > .embed-editor_provenance {
   color: var(--text-faint);
   cursor: grab;
 }
-.vars-grip > svg { opacity: 0; }
-.vars-row:hover .vars-grip > svg { opacity: 1; }
-.vars-grip:active { cursor: grabbing; }
+.vars-grip > svg {
+  opacity: 0;
+}
+.vars-row:hover .vars-grip > svg {
+  opacity: 1;
+}
+.vars-grip:active {
+  cursor: grabbing;
+}
 /* While a row is being dragged, and where it would land. */
-.vars-row.is-dragging { background: rgba(255, 255, 255, 0.09); opacity: 0.75; }
-.vars-row.drop-before { box-shadow: inset 0 2px 0 var(--accent); }
-.vars-row.drop-after { box-shadow: inset 0 -2px 0 var(--accent); }
+.vars-row.is-dragging {
+  background: rgba(255, 255, 255, 0.09);
+  opacity: 0.75;
+}
+.vars-row.drop-before {
+  box-shadow: inset 0 2px 0 var(--accent);
+}
+.vars-row.drop-after {
+  box-shadow: inset 0 -2px 0 var(--accent);
+}
 
 .vars-name {
   display: flex;
@@ -4905,13 +6581,28 @@ body > .embed-editor_provenance {
   padding: 3px 2px;
   min-width: 0;
 }
-.vars-name > svg { color: var(--text-faint); }
-.vars-name-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vars-name > svg {
+  color: var(--text-faint);
+}
+.vars-name-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 
 /* Value, colour box and field: the box is beside the field, not in it, and the
    text starts at the left edge of the field like every other input in the app. */
-.var-cell { display: flex; align-items: center; gap: 6px; min-width: 0; }
-.var-cell.empty { color: var(--text-faint); font-size: 11px; padding-left: 8px; }
+.var-cell {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.var-cell.empty {
+  color: var(--text-faint);
+  font-size: 11px;
+  padding-left: 8px;
+}
 .var-cell .u-color-swatch {
   width: 22px;
   height: 22px;
@@ -4940,13 +6631,23 @@ body > .embed-editor_provenance {
   color: var(--text-dim);
   cursor: pointer;
 }
-.var-ease:hover { color: var(--text); border-color: var(--border-strong); }
+.var-ease:hover {
+  color: var(--text);
+  border-color: var(--border-strong);
+}
 /* The curve glyph is the editor's own preset thumbnail, which sizes itself to
    its box (width/height: 100%) — inside a 22px button that box has to be
    stated, or the drawing takes whatever room the row will give it. */
-.var-ease svg { width: 15px; height: 15px; flex: none; }
+.var-ease svg {
+  width: 15px;
+  height: 15px;
+  flex: none;
+}
 .var-cell .varconnect,
-.var-cell .embed-editor_varconnect { flex: 1; min-width: 0; }
+.var-cell .embed-editor_varconnect {
+  flex: 1;
+  min-width: 0;
+}
 /* A field with a box around it, on every row, is a wall of boxes — and the
    value is the thing to read, not the input holding it. So the field is
    nothing until it is the one under the pointer (or the one being typed in),
@@ -4969,12 +6670,18 @@ body > .embed-editor_provenance {
 .var-input:focus {
   background: var(--bg-input);
 }
-.var-input:focus { border-color: var(--accent); }
+.var-input:focus {
+  border-color: var(--accent);
+}
 
 /* A branch holding work that was set aside on the way out. */
 /* The file picker on the commit box. Closed by default: someone who just
    wants to save everything should never have to read a file list to do it. */
-.git-pick-toggle { width: 100%; font-size: 11px; padding: 4px; }
+.git-pick-toggle {
+  width: 100%;
+  font-size: 11px;
+  padding: 4px;
+}
 .git-pick {
   border: 1px solid var(--border);
   border-radius: 6px;
@@ -4987,12 +6694,25 @@ body > .embed-editor_provenance {
   padding: 4px 6px;
   border-bottom: 1px solid var(--border);
 }
-.git-pick-head button { font-size: 10.5px; padding: 2px 4px; }
-.git-pick-count { font-size: 10px; color: var(--text-faint); font-variant-numeric: tabular-nums; }
-.git-pick-list { max-height: 220px; overflow-y: auto; padding: 2px; }
+.git-pick-head button {
+  font-size: 10.5px;
+  padding: 2px 4px;
+}
+.git-pick-count {
+  font-size: 10px;
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+}
+.git-pick-list {
+  max-height: 220px;
+  overflow-y: auto;
+  padding: 2px;
+}
 /* The heading toggles its whole group — "just the stylesheets" is the shape of
    most real picks, and hunting them out of a flat list is not. */
-.git-pick-group + .git-pick-group { margin-top: 4px; }
+.git-pick-group + .git-pick-group {
+  margin-top: 4px;
+}
 .git-pick-group-head {
   display: flex;
   align-items: center;
@@ -5008,8 +6728,13 @@ body > .embed-editor_provenance {
   text-transform: uppercase;
   cursor: pointer;
 }
-.git-pick-group-head:hover { color: var(--text-dim); }
-.git-pick-group-count { font-weight: 500; letter-spacing: 0; }
+.git-pick-group-head:hover {
+  color: var(--text-dim);
+}
+.git-pick-group-count {
+  font-weight: 500;
+  letter-spacing: 0;
+}
 .git-pick-row {
   display: flex;
   align-items: center;
@@ -5020,9 +6745,19 @@ body > .embed-editor_provenance {
   color: var(--text-dim);
   cursor: pointer;
 }
-.git-pick-row:hover { background: var(--bg-hover); color: var(--text); }
-.git-pick-row input { margin: 0; flex-shrink: 0; }
-.git-pick-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.git-pick-row:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+.git-pick-row input {
+  margin: 0;
+  flex-shrink: 0;
+}
+.git-pick-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 /* The real filename, when the friendly name hides it: "Home" does not say
    index.astro, and which file is being saved is the whole question here. */
 .git-pick-file {
@@ -5038,13 +6773,39 @@ body > .embed-editor_provenance {
 /* File browser                                                        */
 /* ------------------------------------------------------------------ */
 
-.file-browser { display: flex; flex-direction: column; min-height: 0; }
-.fb-search { display: flex; align-items: center; gap: 4px; padding: 0 0 6px; }
-.fb-search input { flex: 1; font-size: 11.5px; }
-.fb-search .ghost { padding: 2px 6px; font-size: 14px; line-height: 1; color: var(--text-faint); }
+.file-browser {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.fb-search {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 0 6px;
+}
+.fb-search input {
+  flex: 1;
+  font-size: 11.5px;
+}
+.fb-search .ghost {
+  padding: 2px 6px;
+  font-size: 14px;
+  line-height: 1;
+  color: var(--text-faint);
+}
 
-.fb-list { flex: 1; min-height: 0; overflow-y: auto; scrollbar-gutter: stable; }
-.fb-empty { padding: 10px 6px; font-size: 11.5px; color: var(--text-faint); }
+.fb-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+}
+.fb-empty {
+  padding: 10px 6px;
+  font-size: 11.5px;
+  color: var(--text-faint);
+}
 
 .fb-row,
 .fb-folder {
@@ -5058,11 +6819,24 @@ body > .embed-editor_provenance {
   color: var(--text-dim);
   cursor: pointer;
 }
-.fb-row:hover, .fb-folder:hover { background: var(--bg-hover); color: var(--text); }
+.fb-row:hover,
+.fb-folder:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
 /* The row the arrow keys are on, so the field can be driven without the mouse. */
-.fb-row.active { background: var(--bg-active); color: var(--text); }
-.fb-row.on { color: var(--text); }
-.fb-row input, .fb-folder input { margin: 0; flex-shrink: 0; }
+.fb-row.active {
+  background: var(--bg-active);
+  color: var(--text);
+}
+.fb-row.on {
+  color: var(--text);
+}
+.fb-row input,
+.fb-folder input {
+  margin: 0;
+  flex-shrink: 0;
+}
 
 .fb-folder-head {
   display: flex;
@@ -5077,10 +6851,28 @@ body > .embed-editor_provenance {
   font-size: inherit;
   cursor: pointer;
 }
-.fb-caret { display: flex; color: var(--text-faint); flex-shrink: 0; }
-.fb-folder-icon { display: flex; color: var(--text-faint); flex-shrink: 0; }
-.fb-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; }
-.fb-count { font-size: 10px; color: var(--text-faint); flex-shrink: 0; }
+.fb-caret {
+  display: flex;
+  color: var(--text-faint);
+  flex-shrink: 0;
+}
+.fb-folder-icon {
+  display: flex;
+  color: var(--text-faint);
+  flex-shrink: 0;
+}
+.fb-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
+}
+.fb-count {
+  font-size: 10px;
+  color: var(--text-faint);
+  flex-shrink: 0;
+}
 /* Only shown while searching — in the tree the indentation already says where
    a file is, and repeating it on every row would be noise. */
 .fb-dir {
@@ -5102,16 +6894,28 @@ body > .embed-editor_provenance {
   border-top: 1px solid var(--border);
   flex-shrink: 0;
 }
-.fb-foot .ghost { font-size: 10.5px; padding: 2px 4px; }
-.fb-selected { font-size: 10px; color: var(--text-faint); font-variant-numeric: tabular-nums; }
+.fb-foot .ghost {
+  font-size: 10.5px;
+  padding: 2px 4px;
+}
+.fb-selected {
+  font-size: 10px;
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+}
 
 /* ------------------------------------------------------------------ */
 /* History panel                                                       */
 /* ------------------------------------------------------------------ */
 
-.history-body { padding-top: 0; }
+.history-body {
+  padding-top: 0;
+}
 
-.history-section + .history-section { margin-top: 4px; border-top: 1px solid var(--border); }
+.history-section + .history-section {
+  margin-top: 4px;
+  border-top: 1px solid var(--border);
+}
 .history-section-head {
   display: flex;
   align-items: center;
@@ -5126,8 +6930,13 @@ body > .embed-editor_provenance {
   letter-spacing: 0.02em;
   cursor: pointer;
 }
-.history-section-head:hover { color: var(--text); }
-.history-section-title { flex: 1; text-align: left; }
+.history-section-head:hover {
+  color: var(--text);
+}
+.history-section-title {
+  flex: 1;
+  text-align: left;
+}
 .history-section-count {
   font-size: 10px;
   font-weight: 500;
@@ -5149,8 +6958,12 @@ body > .embed-editor_provenance {
   padding: 10px 4px 4px;
 }
 
-.history-commit { border-radius: 6px; }
-.history-commit.previewing { background: var(--accent-soft); }
+.history-commit {
+  border-radius: 6px;
+}
+.history-commit.previewing {
+  background: var(--accent-soft);
+}
 .history-commit-head {
   display: flex;
   align-items: flex-start;
@@ -5163,7 +6976,9 @@ body > .embed-editor_provenance {
   cursor: pointer;
   text-align: left;
 }
-.history-commit-head:hover { background: var(--bg-hover); }
+.history-commit-head:hover {
+  background: var(--bg-hover);
+}
 /* The dot is the timeline: one per commit, in a column, so the eye has a line
    to run down rather than a list of paragraphs. */
 .history-dot {
@@ -5174,8 +6989,16 @@ body > .embed-editor_provenance {
   flex-shrink: 0;
   margin-top: 5px;
 }
-.history-commit.previewing .history-dot { background: var(--accent); }
-.history-commit-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+.history-commit.previewing .history-dot {
+  background: var(--accent);
+}
+.history-commit-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
 .history-subject {
   font-size: 12px;
   font-weight: 500;
@@ -5192,8 +7015,16 @@ body > .embed-editor_provenance {
   white-space: nowrap;
 }
 
-.history-commit-body { padding: 2px 8px 10px 23px; display: flex; flex-direction: column; gap: 8px; }
-.history-files { display: flex; flex-direction: column; }
+.history-commit-body {
+  padding: 2px 8px 10px 23px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.history-files {
+  display: flex;
+  flex-direction: column;
+}
 .history-file {
   display: flex;
   align-items: center;
@@ -5203,9 +7034,19 @@ body > .embed-editor_provenance {
   font-size: 11.5px;
   color: var(--text-dim);
 }
-.history-file:hover { background: var(--bg-hover); }
-.history-file.muted { color: var(--text-faint); font-style: italic; }
-.history-file-label { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.history-file:hover {
+  background: var(--bg-hover);
+}
+.history-file.muted {
+  color: var(--text-faint);
+  font-style: italic;
+}
+.history-file-label {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 /* A word, not a letter: "M" needed explaining, which is a sign it was the
    wrong thing to show. Quiet enough not to lead the row — the file's name is
    what anyone is reading for — and colour-coded so the kind of change reads
@@ -5221,14 +7062,32 @@ body > .embed-editor_provenance {
   color: var(--text-faint);
   background: var(--surface-2, rgba(255, 255, 255, 0.06));
 }
-.file-status.s-A { color: var(--green); background: rgba(48, 193, 88, 0.14); }
-.file-status.s-M { color: var(--accent); background: var(--accent-soft); }
-.file-status.s-D { color: var(--red); background: rgba(255, 69, 58, 0.14); }
+.file-status.s-A {
+  color: var(--green);
+  background: rgba(48, 193, 88, 0.14);
+}
+.file-status.s-M {
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+.file-status.s-D {
+  color: var(--red);
+  background: rgba(255, 69, 58, 0.14);
+}
 .file-status.s-R,
-.file-status.s-C { color: var(--text-dim); }
-.file-status.s-U { color: #ffcb6b; background: rgba(255, 203, 107, 0.14); }
+.file-status.s-C {
+  color: var(--text-dim);
+}
+.file-status.s-U {
+  color: #ffcb6b;
+  background: rgba(255, 203, 107, 0.14);
+}
 
-.history-commit-actions { display: flex; flex-direction: column; gap: 5px; }
+.history-commit-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
 .history-commit-actions button {
   display: flex;
   align-items: center;
@@ -5238,7 +7097,11 @@ body > .embed-editor_provenance {
   padding: 5px 8px;
   font-size: 11.5px;
 }
-.history-hash { font-size: 10px; color: var(--text-faint); font-variant-numeric: tabular-nums; }
+.history-hash {
+  font-size: 10px;
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+}
 
 .history-more,
 .history-exit-preview {
@@ -5247,7 +7110,12 @@ body > .embed-editor_provenance {
   padding: 6px;
   font-size: 11.5px;
 }
-.history-exit-preview { margin: 8px 0; background: var(--accent); color: #fff; border-color: var(--accent); }
+.history-exit-preview {
+  margin: 8px 0;
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
 
 .history-empty,
 .history-note {
@@ -5256,15 +7124,24 @@ body > .embed-editor_provenance {
   color: var(--text-faint);
   padding: 4px 4px 8px;
 }
-.history-error { font-size: 11.5px; line-height: 1.5; color: var(--red); padding: 4px; }
+.history-error {
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--red);
+  padding: 4px;
+}
 
 /* Branch rows keep their actions visible. Hover-revealed icons meant that
    until you happened to hover a row there was no sign the app could merge or
    delete anything — dim is quiet enough, and findable. */
 .list-item .row-action.merge,
-.list-item .row-action.branch-action { opacity: 0.45; }
+.list-item .row-action.branch-action {
+  opacity: 0.45;
+}
 .list-item:hover .row-action.merge,
-.list-item:hover .row-action.branch-action { opacity: 1; }
+.list-item:hover .row-action.branch-action {
+  opacity: 1;
+}
 /* Disabled ones stay put rather than vanishing: a greyed button that says why
    is a better answer than a row that is missing something. */
 .list-item .row-action:disabled,
@@ -5273,7 +7150,10 @@ body > .embed-editor_provenance {
   cursor: default;
   background: none;
 }
-.list-item .row-action:disabled:hover { color: var(--text-faint); background: none; }
+.list-item .row-action:disabled:hover {
+  color: var(--text-faint);
+  background: none;
+}
 
 /* Merging is not a destructive act, so it does not get the red the other row
    actions turn on hover — a branch row would otherwise say "danger" twice and
@@ -5282,8 +7162,13 @@ body > .embed-editor_provenance {
   color: var(--text);
   background: var(--bg-hover);
 }
-.list-item .row-action:disabled { opacity: 0.35; cursor: default; }
-.list-item:hover .row-action:disabled { opacity: 0.35; }
+.list-item .row-action:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.list-item:hover .row-action:disabled {
+  opacity: 0.35;
+}
 
 .branch-parked {
   margin-left: auto;
@@ -5343,7 +7228,11 @@ body > .embed-editor_provenance {
   font-family: var(--mono, ui-monospace, monospace);
   resize: vertical;
 }
-.var-custom-foot { font-size: 10.5px; color: var(--text-faint); margin-top: 8px; }
+.var-custom-foot {
+  font-size: 10.5px;
+  color: var(--text-faint);
+  margin-top: 8px;
+}
 /* The token editor is single-line by default (it stands in for an <input>).
    Here it stands in for a textarea, so it wraps and grows instead. */
 .embed-editor_varconnect.is-multiline.is-token > .embed-editor_varconnect-editor {
@@ -5355,7 +7244,10 @@ body > .embed-editor_provenance {
   max-height: 40vh;
   line-height: 1.6;
 }
-.embed-editor_varconnect.is-multiline { display: block; width: 100%; }
+.embed-editor_varconnect.is-multiline {
+  display: block;
+  width: 100%;
+}
 
 /* Selection, app-wide.
    Chromium's default is the system accent, which changes with the user's OS
@@ -5390,8 +7282,15 @@ textarea::selection {
   justify-content: flex-start;
 }
 .vars-row:hover .vars-add-btn,
-.vars-add-btn:hover { color: var(--text-dim); }
-.vars-add-field { display: flex; align-items: center; gap: 2px; min-width: 0; }
+.vars-add-btn:hover {
+  color: var(--text-dim);
+}
+.vars-add-field {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+}
 /* The part of the name the group has already decided — typed names follow it. */
 .vars-add-stem {
   font-size: 11px;
@@ -5432,8 +7331,14 @@ textarea::selection {
 }
 /* The one hint that it can be renamed: the name lifts to full strength under
    the pointer. No box — a box on every name in the sheet is noise. */
-.vars-rename:hover:not(:disabled) { background: none; color: var(--text); }
-.vars-section-text.vars-rename { width: auto; grid-column: 2 / -1; }
+.vars-rename:hover:not(:disabled) {
+  background: none;
+  color: var(--text);
+}
+.vars-section-text.vars-rename {
+  width: auto;
+  grid-column: 2 / -1;
+}
 /* Sized so the row does not change height when it opens: the field is as tall as
    the name box it replaces, and the negative margin gives back the padding that
    box puts around its text. A row that grows under the pointer moves every row
@@ -5449,7 +7354,9 @@ textarea::selection {
 }
 /* The heading's field is as wide as the name track rather than the whole row,
    so renaming a group does not stretch a text box across the sheet. */
-.vars-section .vars-rename-input { grid-column: 2 / 3; }
+.vars-section .vars-rename-input {
+  grid-column: 2 / 3;
+}
 
 /* Fluid type accessibility ---------------------------------------------------
    A badge beside a clamp() that a reader cannot enlarge: red where the value
@@ -5469,10 +7376,23 @@ textarea::selection {
   border: 0;
   cursor: help;
 }
-.fluid-badge.is-error { color: #ff6161; cursor: pointer; }
-.fluid-badge.is-warning { color: #ffba17; }
-.fluid-badge-icon { display: block; width: 100%; height: 100%; }
-.fluid-badge-icon svg { display: block; width: 100%; height: 100%; }
+.fluid-badge.is-error {
+  color: #ff6161;
+  cursor: pointer;
+}
+.fluid-badge.is-warning {
+  color: #ffba17;
+}
+.fluid-badge-icon {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.fluid-badge-icon svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
 
 .fluid-tip {
   position: fixed;
@@ -5488,7 +7408,11 @@ textarea::selection {
   text-align: left;
   pointer-events: none;
 }
-.fluid-tip-more { display: block; margin-top: 4px; color: var(--accent); }
+.fluid-tip-more {
+  display: block;
+  margin-top: 4px;
+  color: var(--accent);
+}
 
 /* A source inside an expression, drawn as a chip. It is painted over ordinary
    text, so everything after it — .filter(…), [1] — is typed the way it reads,
@@ -5500,16 +7424,30 @@ textarea::selection {
   padding: 1px 5px;
   cursor: pointer;
 }
-.expr-input .cm-chip:hover { background: rgba(146, 116, 255, 0.34); }
+.expr-input .cm-chip:hover {
+  background: rgba(146, 116, 255, 0.34);
+}
 
 /* The condition field, and the dot that inserts into it — the same arrangement
    the attribute editor's value uses (see .attr-value-field). */
-.props-cond-field { display: flex; }
-.props-cond-field > .expr-input { flex: 1; min-width: 0; }
+.props-cond-field {
+  display: flex;
+}
+.props-cond-field > .expr-input {
+  flex: 1;
+  min-width: 0;
+}
 
 /* Start from a template: a name, where it goes, and what that means. */
-.starter-field { display: flex; flex-direction: column; gap: 6px; }
-.starter-field > span { font-size: 11.5px; color: var(--text-dim); }
+.starter-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.starter-field > span {
+  font-size: 11.5px;
+  color: var(--text-dim);
+}
 .starter-note {
   font-size: 11.5px;
   line-height: 1.5;
@@ -5527,7 +7465,10 @@ textarea::selection {
   color: var(--text-faint);
   border-color: transparent;
 }
-.welcome .actions .quiet:hover:not(:disabled) { background: rgba(255, 255, 255, 0.06); color: var(--text-dim); }
+.welcome .actions .quiet:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-dim);
+}
 
 /* ─────────────────────── Find in a code block (⌘F) ───────────────────────
    CodeMirror's search panel is real UI — its own field, its own buttons, its
@@ -5545,8 +7486,12 @@ textarea::selection {
   color: var(--text);
   border: none;
 }
-.cm-editor .cm-panels.cm-panels-bottom { border-top: 1px solid var(--border); }
-.cm-editor .cm-panels.cm-panels-top { border-bottom: 1px solid var(--border); }
+.cm-editor .cm-panels.cm-panels-bottom {
+  border-top: 1px solid var(--border);
+}
+.cm-editor .cm-panels.cm-panels-top {
+  border-bottom: 1px solid var(--border);
+}
 
 .cm-editor .cm-panels .cm-panel.cm-search {
   display: flex;
@@ -5581,14 +7526,16 @@ textarea::selection {
   font-family: var(--mono);
   font-size: 12px;
 }
-.cm-editor .cm-panels .cm-panel.cm-search input[name=search] {
+.cm-editor .cm-panels .cm-panel.cm-search input[name='search'] {
   padding-left: 28px;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23999999' stroke-width='1.5'%3E%3Ccircle cx='7' cy='7' r='4.25'/%3E%3Cpath d='M10.2 10.2 13.5 13.5' stroke-linecap='round'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: 8px center;
   background-size: 14px 14px;
 }
-.cm-editor .cm-panels .cm-panel.cm-search input.cm-textfield::placeholder { color: var(--text-faint); }
+.cm-editor .cm-panels .cm-panel.cm-search input.cm-textfield::placeholder {
+  color: var(--text-faint);
+}
 .cm-editor .cm-panels .cm-panel.cm-search input.cm-textfield:focus {
   outline: none;
   border-color: var(--accent);
@@ -5610,8 +7557,12 @@ textarea::selection {
   font-size: 12px;
   font-weight: 500;
 }
-.cm-editor .cm-panels .cm-panel.cm-search .cm-button:hover { background: var(--bg-active); }
-.cm-editor .cm-panels .cm-panel.cm-search .cm-button:active { background-image: none; }
+.cm-editor .cm-panels .cm-panel.cm-search .cm-button:hover {
+  background: var(--bg-active);
+}
+.cm-editor .cm-panels .cm-panel.cm-search .cm-button:active {
+  background-image: none;
+}
 
 /* match case / regexp / by word — options, so they read as toggles that are on
    or off rather than as a form to fill in. The checkbox itself is taken out of
@@ -5632,7 +7583,10 @@ textarea::selection {
   cursor: pointer;
   user-select: none;
 }
-.cm-editor .cm-panels .cm-panel.cm-search label:hover { background: var(--bg-hover); color: var(--text); }
+.cm-editor .cm-panels .cm-panel.cm-search label:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
 .cm-editor .cm-panels .cm-panel.cm-search label:has(:checked) {
   background: var(--accent-soft);
   border-color: rgba(0, 153, 255, 0.45);
@@ -5642,7 +7596,7 @@ textarea::selection {
   outline: 2px solid var(--accent);
   outline-offset: 1px;
 }
-.cm-editor .cm-panels .cm-panel.cm-search label input[type=checkbox] {
+.cm-editor .cm-panels .cm-panel.cm-search label input[type='checkbox'] {
   position: absolute;
   width: 1px;
   height: 1px;
@@ -5652,7 +7606,7 @@ textarea::selection {
 }
 
 /* The close ×, which the panel pins to its top-right corner. */
-.cm-editor .cm-panels .cm-panel.cm-search [name=close] {
+.cm-editor .cm-panels .cm-panel.cm-search [name='close'] {
   top: 8px;
   right: 8px;
   display: inline-flex;
@@ -5668,38 +7622,57 @@ textarea::selection {
   line-height: 1;
   cursor: pointer;
 }
-.cm-editor .cm-panels .cm-panel.cm-search [name=close]:hover { background: var(--bg-hover); color: var(--text); }
+.cm-editor .cm-panels .cm-panel.cm-search [name='close']:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
 
 /* Narrow editors — the CSS box in the style panel is about 300px wide, where a
    row of words wraps to one control per line and the search bar eats half the
    editor. Below the width the full labels need, the query takes a line of its
    own and the controls become the symbols they stand for. The words stay in the
    markup (so the buttons still announce themselves), they just aren't drawn. */
-.cm-editor .cm-panels { container-type: inline-size; }
+.cm-editor .cm-panels {
+  container-type: inline-size;
+}
 
 @container (width < 430px) {
-  .cm-editor .cm-panels .cm-panel.cm-search input[name=search] { flex-basis: 100%; }
-  .cm-editor .cm-panels .cm-panel.cm-search .cm-button[name=next],
-  .cm-editor .cm-panels .cm-panel.cm-search .cm-button[name=prev],
+  .cm-editor .cm-panels .cm-panel.cm-search input[name='search'] {
+    flex-basis: 100%;
+  }
+  .cm-editor .cm-panels .cm-panel.cm-search .cm-button[name='next'],
+  .cm-editor .cm-panels .cm-panel.cm-search .cm-button[name='prev'],
   .cm-editor .cm-panels .cm-panel.cm-search label {
     justify-content: center;
     min-width: 32px;
     padding: 0 8px;
     font-size: 0;
   }
-  .cm-editor .cm-panels .cm-panel.cm-search .cm-button[name=next]::after,
-  .cm-editor .cm-panels .cm-panel.cm-search .cm-button[name=prev]::after,
+  .cm-editor .cm-panels .cm-panel.cm-search .cm-button[name='next']::after,
+  .cm-editor .cm-panels .cm-panel.cm-search .cm-button[name='prev']::after,
   .cm-editor .cm-panels .cm-panel.cm-search label::after {
     font-family: var(--font);
     font-size: 11px;
     font-weight: 500;
     line-height: 1;
   }
-  .cm-editor .cm-panels .cm-panel.cm-search .cm-button[name=next]::after { content: '↓'; font-size: 13px; }
-  .cm-editor .cm-panels .cm-panel.cm-search .cm-button[name=prev]::after { content: '↑'; font-size: 13px; }
-  .cm-editor .cm-panels .cm-panel.cm-search label:has([name=case])::after { content: 'Aa'; }
-  .cm-editor .cm-panels .cm-panel.cm-search label:has([name=re])::after { content: '.*'; }
-  .cm-editor .cm-panels .cm-panel.cm-search label:has([name=word])::after { content: 'ab'; }
+  .cm-editor .cm-panels .cm-panel.cm-search .cm-button[name='next']::after {
+    content: '↓';
+    font-size: 13px;
+  }
+  .cm-editor .cm-panels .cm-panel.cm-search .cm-button[name='prev']::after {
+    content: '↑';
+    font-size: 13px;
+  }
+  .cm-editor .cm-panels .cm-panel.cm-search label:has([name='case'])::after {
+    content: 'Aa';
+  }
+  .cm-editor .cm-panels .cm-panel.cm-search label:has([name='re'])::after {
+    content: '.*';
+  }
+  .cm-editor .cm-panels .cm-panel.cm-search label:has([name='word'])::after {
+    content: 'ab';
+  }
 }
 
 /* What is wrong with a statement, under the field that holds it. Only ever
@@ -5729,7 +7702,10 @@ textarea::selection {
 }
 /* Closed: the border would still hold a 1px strip of dead space, and nothing
    inside should take focus or a click. */
-.term-dock:not(.on) { border-top-width: 0; visibility: hidden; }
+.term-dock:not(.on) {
+  border-top-width: 0;
+  visibility: hidden;
+}
 
 /* Grab strip straddling the top edge — a few px taller than it looks, because
    a 1px target is a 1px target. */
@@ -5742,7 +7718,10 @@ textarea::selection {
   z-index: 3;
   cursor: ns-resize;
 }
-.term-resize:hover, .term-resize.on { background: var(--accent); }
+.term-resize:hover,
+.term-resize.on {
+  background: var(--accent);
+}
 
 .term-bar {
   display: flex;
@@ -5762,7 +7741,9 @@ textarea::selection {
   overflow-x: auto;
   scrollbar-width: none;
 }
-.term-tabs::-webkit-scrollbar { display: none; }
+.term-tabs::-webkit-scrollbar {
+  display: none;
+}
 
 .term-tab {
   display: flex;
@@ -5776,9 +7757,18 @@ textarea::selection {
   color: var(--text-dim);
   font-weight: 500;
 }
-.term-tab:hover:not(:disabled) { background: var(--bg-hover); color: var(--text); }
-.term-tab.on { background: var(--bg-active); color: var(--text); }
-.term-tab-label { font-family: var(--mono); font-size: 11px; }
+.term-tab:hover:not(:disabled) {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+.term-tab.on {
+  background: var(--bg-active);
+  color: var(--text);
+}
+.term-tab-label {
+  font-family: var(--mono);
+  font-size: 11px;
+}
 .term-tab-x {
   display: flex;
   align-items: center;
@@ -5787,8 +7777,14 @@ textarea::selection {
   color: var(--text-faint);
   opacity: 0.7;
 }
-.term-tab-x:hover { opacity: 1; background: var(--bg-active); color: var(--text); }
-.term-add { flex-shrink: 0; }
+.term-tab-x:hover {
+  opacity: 1;
+  background: var(--bg-active);
+  color: var(--text);
+}
+.term-add {
+  flex-shrink: 0;
+}
 
 .term-bar-right {
   display: flex;
@@ -5812,15 +7808,31 @@ textarea::selection {
   font-size: 11px;
 }
 
-.term-panes { flex: 1; min-height: 0; position: relative; }
-.term-pane-wrap { height: 100%; }
-.term-pane { position: relative; height: 100%; }
+.term-panes {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+}
+.term-pane-wrap {
+  height: 100%;
+}
+.term-pane {
+  position: relative;
+  height: 100%;
+}
 /* xterm measures its host, so the padding lives here rather than on .xterm —
    padding on the terminal element itself would be counted as usable columns
    and the last one would be clipped. */
-.term-host { height: 100%; padding: 6px 4px 6px 10px; }
-.term-host .xterm { height: 100%; }
-.term-host .xterm-viewport { background-color: transparent !important; }
+.term-host {
+  height: 100%;
+  padding: 6px 4px 6px 10px;
+}
+.term-host .xterm {
+  height: 100%;
+}
+.term-host .xterm-viewport {
+  background-color: transparent !important;
+}
 
 .term-scroll-btn {
   position: absolute;
@@ -5835,7 +7847,10 @@ textarea::selection {
   color: var(--text-dim);
   box-shadow: 0 3px 10px rgba(0, 0, 0, 0.4);
 }
-.term-scroll-btn:hover:not(:disabled) { background: var(--bg-active); color: var(--text); }
+.term-scroll-btn:hover:not(:disabled) {
+  background: var(--bg-active);
+  color: var(--text);
+}
 
 /* The navigator of a page that does not parse (plan §3.6, step 8). */
 .parse-error-diagnostic {

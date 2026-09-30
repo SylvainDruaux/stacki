@@ -14,7 +14,9 @@ const file = {
 
 test('preview URLs respect the project slash policy and preserve encoded file identity', () => {
   const component = {
-    name: 'Card', folder: 'Cards & Banners', path: '/project/src/components/Cards & Banners/Card.astro',
+    name: 'Card',
+    folder: 'Cards & Banners',
+    path: '/project/src/components/Cards & Banners/Card.astro',
   };
   for (const mode of ['always', 'never', 'ignore']) {
     const url = new URL(model.componentPreviewURL('http://localhost:4321/', component, mode));

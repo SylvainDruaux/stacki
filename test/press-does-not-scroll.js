@@ -28,7 +28,9 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
+  if (!condition) {
+    failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  }
 };
 const settle = (ms = 40) => new Promise((r) => setTimeout(r, ms));
 
@@ -44,13 +46,31 @@ async function frame(hash) {
         <a href="#care" class="clickable_link" data-box="link">A card</a>
       </section><!--avb-e:0-->
     </body>`,
-    { url: `http://localhost:4321/${hash}`, pretendToBeVisual: true }
+    { url: `http://localhost:4321/${hash}`, pretendToBeVisual: true },
   );
   const { window } = dom;
   // jsdom has no focus to give; what is under test is the refusal.
   window.focus = () => {};
-  window.Element.prototype.getBoundingClientRect = () => ({ x: 0, y: 0, width: 100, height: 40, left: 0, top: 0, right: 100, bottom: 40 });
-  window.Range.prototype.getBoundingClientRect = () => ({ x: 0, y: 0, width: 0, height: 0, left: 0, top: 0, right: 0, bottom: 0 });
+  window.Element.prototype.getBoundingClientRect = () => ({
+    x: 0,
+    y: 0,
+    width: 100,
+    height: 40,
+    left: 0,
+    top: 0,
+    right: 100,
+    bottom: 40,
+  });
+  window.Range.prototype.getBoundingClientRect = () => ({
+    x: 0,
+    y: 0,
+    width: 0,
+    height: 0,
+    left: 0,
+    top: 0,
+    right: 0,
+    bottom: 0,
+  });
   global.window = window;
   global.document = window.document;
   global.location = window.location;
@@ -80,7 +100,12 @@ async function frame(hash) {
 }
 
 const press = (window, target, init = {}) => {
-  const e = new window.MouseEvent('mousedown', { bubbles: true, cancelable: true, button: 0, ...init });
+  const e = new window.MouseEvent('mousedown', {
+    bubbles: true,
+    cancelable: true,
+    button: 0,
+    ...init,
+  });
   target.dispatchEvent(e);
   return e;
 };
@@ -90,16 +115,28 @@ const press = (window, target, init = {}) => {
     const { window } = await frame('#avb-design');
     const link = window.document.querySelector('[data-box="link"]');
     const e = press(window, link);
-    check('a press on the canvas is refused', e.defaultPrevented, 'the browser focuses the link and scrolls to it');
+    check(
+      'a press on the canvas is refused',
+      e.defaultPrevented,
+      'the browser focuses the link and scrolls to it',
+    );
     const onNothing = press(window, window.document.querySelector('[data-box="hero"]'));
     check('and so is one on anything else', onNothing.defaultPrevented, 'only links were covered');
     // A right-click is the context menu's, not ours.
     const right = press(window, link, { button: 2 });
-    check('a right-click is left alone', !right.defaultPrevented, 'the context menu would never open');
+    check(
+      'a right-click is left alone',
+      !right.defaultPrevented,
+      'the context menu would never open',
+    );
     // The click after it is still refused — that is what stops navigation.
     const click = new window.MouseEvent('click', { bubbles: true, cancelable: true });
     link.dispatchEvent(click);
-    check('and the click still is, so a link goes nowhere', click.defaultPrevented, 'the canvas would navigate');
+    check(
+      'and the click still is, so a link goes nowhere',
+      click.defaultPrevented,
+      'the canvas would navigate',
+    );
   }
 
   {
@@ -130,40 +167,61 @@ const press = (window, target, init = {}) => {
     // A section off to the left of the frame, as it looks once the canvas has
     // been scrolled across: its box starts well before the viewport does.
     window.Element.prototype.getBoundingClientRect = () => ({
-      x: -900, y: 100, width: 600, height: 300, left: -900, top: 100, right: -300, bottom: 400,
+      x: -900,
+      y: 100,
+      width: 600,
+      height: 300,
+      left: -900,
+      top: 100,
+      right: -300,
+      bottom: 400,
     });
-    const ev = new window.MessageEvent('message', { data: { type: 'avb:track', paths: ['0'], scope: '', focus: '', focusOcc: 0 } });
+    const ev = new window.MessageEvent('message', {
+      data: { type: 'avb:track', paths: ['0'], scope: '', focus: '', focusOcc: 0 },
+    });
     Object.defineProperty(ev, 'source', { value: window.parent });
     window.dispatchEvent(ev);
     await settle(30);
-    const go = new window.MessageEvent('message', { data: { type: 'avb:scroll-to', path: '0', occ: 0 } });
+    const go = new window.MessageEvent('message', {
+      data: { type: 'avb:scroll-to', path: '0', occ: 0 },
+    });
     Object.defineProperty(go, 'source', { value: window.parent });
     window.dispatchEvent(go);
     await settle(30);
     const last = scrolls[scrolls.length - 1];
-    check('asking for a node off to the side scrolls sideways to it', last && typeof last.left === 'number', JSON.stringify(scrolls));
+    check(
+      'asking for a node off to the side scrolls sideways to it',
+      last && typeof last.left === 'number',
+      JSON.stringify(scrolls),
+    );
     check(
       'far enough to put it on screen',
       last && last.left < 1200 && last.left >= 0,
-      JSON.stringify(last)
+      JSON.stringify(last),
     );
-    check('and it says where vertically too, in the same move', last && typeof last.top === 'number', JSON.stringify(last));
+    check(
+      'and it says where vertically too, in the same move',
+      last && typeof last.top === 'number',
+      JSON.stringify(last),
+    );
   }
 
   const source = fs.readFileSync(PRELOAD, 'utf8');
   check(
     'the press is refused where the click already was',
     /addEventListener\(\s*'mousedown'[\s\S]{0,200}preventDefault\(\)/.test(source),
-    'nothing stops the focus that comes with a press'
+    'nothing stops the focus that comes with a press',
   );
   check(
     'and the frame still takes focus itself, so the modifiers keep arriving',
     /preventDefault\(\);\s*\n\s*window\.focus\(\);/.test(source),
-    'the frame stops hearing the keyboard'
+    'the frame stops hearing the keyboard',
   );
 
   if (failures.length) {
-    console.error(`\npress-does-not-scroll: ${failures.length} failed, ${checked - failures.length} passed\n`);
+    console.error(
+      `\npress-does-not-scroll: ${failures.length} failed, ${checked - failures.length} passed\n`,
+    );
     console.error(failures.join('\n') + '\n');
     process.exit(1);
   }

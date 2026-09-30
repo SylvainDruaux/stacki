@@ -29,9 +29,7 @@ const path = require('node:path');
 const { parsePage, serializePage } = require('../dist/electron/astroParser.js');
 
 const CORPUS_DIR = path.join(__dirname, 'corpus');
-const expectations = JSON.parse(
-  fs.readFileSync(path.join(__dirname, 'expectations.json'), 'utf8')
-);
+const expectations = JSON.parse(fs.readFileSync(path.join(__dirname, 'expectations.json'), 'utf8'));
 
 const DEFAULT_EXPECTATION = { editable: true, identity: 'pass' };
 
@@ -61,7 +59,9 @@ function changedRegion(aText, bText) {
   const a = aText.split('\n');
   const b = bText.split('\n');
   let start = 0;
-  while (start < a.length && start < b.length && a[start] === b[start]) {start++;}
+  while (start < a.length && start < b.length && a[start] === b[start]) {
+    start++;
+  }
   let end = 0;
   while (
     end < a.length - start &&
@@ -74,7 +74,8 @@ function changedRegion(aText, bText) {
 }
 
 function formatRegion(region) {
-  const show = (lines) => (lines.length ? lines.map((l) => JSON.stringify(l)).join('\n      ') : '(nothing)');
+  const show = (lines) =>
+    lines.length ? lines.map((l) => JSON.stringify(l)).join('\n      ') : '(nothing)';
   return `at line ${region.start + 1}\n    - ${show(region.before)}\n    + ${show(region.after)}`;
 }
 
@@ -82,9 +83,13 @@ function formatRegion(region) {
 // hang an extra attribute off.
 function firstElement(nodes) {
   for (const n of nodes || []) {
-    if (n.kind === 'element') {return n;}
+    if (n.kind === 'element') {
+      return n;
+    }
     const nested = firstElement(n.children);
-    if (nested) {return nested;}
+    if (nested) {
+      return nested;
+    }
   }
   return null;
 }
@@ -114,7 +119,7 @@ describe('editability matches expectation', () => {
         expect.editable,
         expect.editable
           ? `expected this fixture to be visually editable, but the parser bailed to code view: ${result.reason}`
-          : 'expected this fixture to fall back to code view, but the parser now accepts it — if that is a real improvement, update expectations.json'
+          : 'expected this fixture to fall back to code view, but the parser now accepts it — if that is a real improvement, update expectations.json',
       );
     });
   }
@@ -126,18 +131,22 @@ describe('editability matches expectation', () => {
 
 describe('parse -> serialize returns the original bytes', () => {
   for (const { name, source, expect } of fixtures) {
-    if (!expect.editable) {continue;}
+    if (!expect.editable) {
+      continue;
+    }
 
     test(name, () => {
       const { editable, model } = parsePage(source);
-      if (!editable) {return;} // reported by the editability suite
+      if (!editable) {
+        return;
+      } // reported by the editability suite
       const output = serializePage(model);
 
       if (expect.identity === 'pass') {
         assert.equal(
           output,
           source,
-          `round-trip changed a file nobody edited ${formatRegion(changedRegion(source, output))}`
+          `round-trip changed a file nobody edited ${formatRegion(changedRegion(source, output))}`,
         );
         return;
       }
@@ -147,7 +156,7 @@ describe('parse -> serialize returns the original bytes', () => {
         output,
         source,
         `${name} now round-trips cleanly — delete its entry from test/expectations.json ` +
-          `so this fixture starts guarding the fix.`
+          `so this fixture starts guarding the fix.`,
       );
     });
   }
@@ -159,11 +168,15 @@ describe('parse -> serialize returns the original bytes', () => {
 
 describe('serialization is idempotent', () => {
   for (const { name, source, expect } of fixtures) {
-    if (!expect.editable) {continue;}
+    if (!expect.editable) {
+      continue;
+    }
 
     test(name, () => {
       const first = parsePage(source);
-      if (!first.editable) {return;}
+      if (!first.editable) {
+        return;
+      }
       const once = serializePage(first.model);
 
       const second = parsePage(once);
@@ -173,7 +186,7 @@ describe('serialization is idempotent', () => {
       assert.equal(
         twice,
         once,
-        `saving twice keeps changing the file ${formatRegion(changedRegion(once, twice))}`
+        `saving twice keeps changing the file ${formatRegion(changedRegion(once, twice))}`,
       );
     });
   }
@@ -221,7 +234,7 @@ describe('an edited inline run keeps its boundary spaces', () => {
       assert.equal(
         echoed.value,
         editedValue,
-        `the save echo lost the boundary space of ${JSON.stringify(editedValue)}`
+        `the save echo lost the boundary space of ${JSON.stringify(editedValue)}`,
       );
 
       // And the round trip is stable: the next save changes nothing.
@@ -241,17 +254,23 @@ describe('an edited inline run keeps its boundary spaces', () => {
 
 describe('a single prop edit produces a single-line diff', () => {
   for (const { name, source, expect } of fixtures) {
-    if (!expect.editable) {continue;}
+    if (!expect.editable) {
+      continue;
+    }
 
     test(name, () => {
       const { editable, model } = parsePage(source);
-      if (!editable) {return;}
+      if (!editable) {
+        return;
+      }
 
       const baseline = serializePage(model);
 
       const edited = structuredClone(model);
       const target = firstElement(edited.nodes);
-      if (!target) {return;} // nothing to hang an attribute off
+      if (!target) {
+        return;
+      } // nothing to hang an attribute off
       target.props = { ...(target.props || {}), 'data-probe': { type: 'string', value: '1' } };
 
       const output = serializePage(edited);
@@ -260,16 +279,16 @@ describe('a single prop edit produces a single-line diff', () => {
       assert.equal(
         region.before.length,
         1,
-        `editing one attribute rewrote ${region.before.length} lines ${formatRegion(region)}`
+        `editing one attribute rewrote ${region.before.length} lines ${formatRegion(region)}`,
       );
       assert.equal(
         region.after.length,
         1,
-        `editing one attribute produced ${region.after.length} lines ${formatRegion(region)}`
+        `editing one attribute produced ${region.after.length} lines ${formatRegion(region)}`,
       );
       assert.ok(
         region.after[0].includes('data-probe="1"'),
-        'the changed line should be the one carrying the new attribute'
+        'the changed line should be the one carrying the new attribute',
       );
     });
   }
@@ -288,43 +307,56 @@ describe('a single prop edit produces a single-line diff', () => {
 describe('external corpus sweep', () => {
   const root = process.env.STACKI_CORPUS;
 
-  test('parses every .astro file without throwing', { skip: !root && 'set STACKI_CORPUS to run' }, () => {
-    const files = [];
-    const skipDirs = new Set(['node_modules', '.git', 'dist', '.astro', 'release']);
-    const walk = (dir) => {
-      for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-        if (entry.isDirectory()) {
-          if (!skipDirs.has(entry.name)) {walk(path.join(dir, entry.name));}
-        } else if (entry.name.endsWith('.astro')) {
-          files.push(path.join(dir, entry.name));
+  test(
+    'parses every .astro file without throwing',
+    { skip: !root && 'set STACKI_CORPUS to run' },
+    () => {
+      const files = [];
+      const skipDirs = new Set(['node_modules', '.git', 'dist', '.astro', 'release']);
+      const walk = (dir) => {
+        for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+          if (entry.isDirectory()) {
+            if (!skipDirs.has(entry.name)) {
+              walk(path.join(dir, entry.name));
+            }
+          } else if (entry.name.endsWith('.astro')) {
+            files.push(path.join(dir, entry.name));
+          }
+        }
+      };
+      walk(root);
+
+      const stats = { total: files.length, identical: 0, differs: 0, notEditable: 0 };
+      const crashes = [];
+
+      for (const file of files) {
+        const source = fs.readFileSync(file, 'utf8');
+        try {
+          const { editable, model } = parsePage(source);
+          if (!editable) {
+            stats.notEditable++;
+            continue;
+          }
+          if (serializePage(model) === source) {
+            stats.identical++;
+          } else {
+            stats.differs++;
+          }
+        } catch (err) {
+          crashes.push(`${file}: ${err.message}`);
         }
       }
-    };
-    walk(root);
 
-    const stats = { total: files.length, identical: 0, differs: 0, notEditable: 0 };
-    const crashes = [];
+      console.log(
+        `\n  ${root}\n  ${stats.total} files — ${stats.identical} identical, ` +
+          `${stats.differs} differ, ${stats.notEditable} not editable\n`,
+      );
 
-    for (const file of files) {
-      const source = fs.readFileSync(file, 'utf8');
-      try {
-        const { editable, model } = parsePage(source);
-        if (!editable) {
-          stats.notEditable++;
-          continue;
-        }
-        if (serializePage(model) === source) {stats.identical++;}
-        else {stats.differs++;}
-      } catch (err) {
-        crashes.push(`${file}: ${err.message}`);
-      }
-    }
-
-    console.log(
-      `\n  ${root}\n  ${stats.total} files — ${stats.identical} identical, ` +
-        `${stats.differs} differ, ${stats.notEditable} not editable\n`
-    );
-
-    assert.deepEqual(crashes, [], `parser threw on ${crashes.length} file(s):\n${crashes.join('\n')}`);
-  });
+      assert.deepEqual(
+        crashes,
+        [],
+        `parser threw on ${crashes.length} file(s):\n${crashes.join('\n')}`,
+      );
+    },
+  );
 });

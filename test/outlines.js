@@ -25,7 +25,9 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
+  if (!condition) {
+    failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  }
 };
 
 const box = (x, y, w, h) => ({ x, y, w, h });
@@ -55,18 +57,21 @@ const stacked = (n, a = 0.14) => 1 - (1 - a) ** n;
   check(
     'the same box reported fourteen times is one box',
     onePerPlace(fourteen()).length === 1,
-    `${onePerPlace(fourteen()).length} boxes`
+    `${onePerPlace(fourteen()).length} boxes`,
   );
   check(
     'so the fill stays the fill',
     Math.abs(stacked(onePerPlace(fourteen()).length) - 0.14) < 1e-9,
-    `the page would be ${Math.round(stacked(14) * 100)}% green`
+    `the page would be ${Math.round(stacked(14) * 100)}% green`,
   );
   check(
     'a box a rounding error off is still the same place',
-    onePerPlace([hero, box(0.4, 100.2, 1199.7, 799.6)]).length === 1
+    onePerPlace([hero, box(0.4, 100.2, 1199.7, 799.6)]).length === 1,
   );
-  check('a box inside another is covered by it', onePerPlace([hero, box(40, 200, 300, 100)]).length === 1);
+  check(
+    'a box inside another is covered by it',
+    onePerPlace([hero, box(40, 200, 300, 100)]).length === 1,
+  );
 
   // A loop renders its child once per item: separate places, all of them
   // labelled, none of them inside another.
@@ -74,16 +79,20 @@ const stacked = (n, a = 0.14) => 1 - (1 - a) ** n;
   check('every copy in a loop keeps its box', onePerPlace(items).length === 3);
   check(
     'in the order they are on the page',
-    onePerPlace(items).map((b) => b.y).join(',') === '0,220,440',
-    onePerPlace(items).map((b) => b.y).join(',')
+    onePerPlace(items)
+      .map((b) => b.y)
+      .join(',') === '0,220,440',
+    onePerPlace(items)
+      .map((b) => b.y)
+      .join(','),
   );
   check(
     'and duplicates among them collapse without taking the rest',
-    onePerPlace([items[0], { ...items[0] }, items[1]]).length === 2
+    onePerPlace([items[0], { ...items[0] }, items[1]]).length === 2,
   );
   check(
     'two boxes that merely overlap are still two boxes',
-    onePerPlace([box(0, 0, 100, 100), box(50, 50, 100, 100)]).length === 2
+    onePerPlace([box(0, 0, 100, 100), box(50, 50, 100, 100)]).length === 2,
   );
   check('an empty box is not drawn', onePerPlace([box(10, 10, 0, 0), hero]).length === 1);
   check('nothing at all is nothing', onePerPlace(undefined).length === 0);
@@ -98,27 +107,27 @@ const stacked = (n, a = 0.14) => 1 - (1 - a) ** n;
   const at = (path, occ) => ({ path, occ });
   check(
     'hovering the copy that is selected draws no second outline',
-    hoverIsSelection(at('0.1', 1), at('0.1', 1))
+    hoverIsSelection(at('0.1', 1), at('0.1', 1)),
   );
   check(
     'hovering another copy of it does',
     !hoverIsSelection(at('0.1', 0), at('0.1', 1)),
-    'a sibling in the loop is unhoverable'
+    'a sibling in the loop is unhoverable',
   );
   check('and so does another node entirely', !hoverIsSelection(at('0.2', 0), at('0.1', 0)));
   check(
     'the first copy is the one a selection with no occurrence means',
-    hoverIsSelection(at('0.1', 0), { path: '0.1' })
+    hoverIsSelection(at('0.1', 0), { path: '0.1' }),
   );
   // The navigator points at the NODE — every copy — so it is about the
   // selection whichever copy is selected.
   check(
     'a navigator hover on the selected node draws nothing extra',
-    hoverIsSelection({ path: '0.1', occ: null }, at('0.1', 2))
+    hoverIsSelection({ path: '0.1', occ: null }, at('0.1', 2)),
   );
   check(
     'a navigator hover on another node still draws',
-    !hoverIsSelection({ path: '0.1', occ: null }, at('0.2', 0))
+    !hoverIsSelection({ path: '0.1', occ: null }, at('0.2', 0)),
   );
   check('nothing hovered is not the selection', !hoverIsSelection(null, at('0.1', 0)));
   check('and nothing selected leaves the hover alone', !hoverIsSelection(at('0.1', 0), null));
@@ -137,9 +146,9 @@ const stacked = (n, a = 0.14) => 1 - (1 - a) ** n;
   check(
     'a jump somewhere else starts at the first copy again',
     !sameCopy('0.1.2.0', '0.9.0'),
-    'an unrelated node kept an occurrence that means nothing there'
+    'an unrelated node kept an occurrence that means nothing there',
   );
-  check("a cousin is somewhere else too", !sameCopy('0.1.2.0', '0.1.3.0'));
+  check('a cousin is somewhere else too', !sameCopy('0.1.2.0', '0.1.3.0'));
   check('and so is the same path in another file', !sameCopy('src/A.astro|0.1', 'src/B.astro|0.1'));
   check('within one file it still counts', sameCopy('src/A.astro|0.1.0', 'src/A.astro|0.1'));
   check('nothing selected before is not a step', !sameCopy(null, '0.1'));
@@ -148,33 +157,33 @@ const stacked = (n, a = 0.14) => 1 - (1 - a) ** n;
   // --- the overlay uses it ---------------------------------------------------
   const runtime = fs.readFileSync(
     path.join(__dirname, '..', 'src', 'panels', 'previewRuntime.ts'),
-    'utf8'
+    'utf8',
   );
   const overlays = fs.readFileSync(
     path.join(__dirname, '..', 'src', 'panels', 'PreviewOverlays.tsx'),
-    'utf8'
+    'utf8',
   );
   check(
     'a navigator hover draws one box per place',
     /outline\.occ === null \? onePerPlace\(all\)/.test(overlays),
-    'the hover outlines are back to one box per run'
+    'the hover outlines are back to one box per run',
   );
   check(
     'the overlay asks it rather than comparing paths',
     /!hoverIsSelection\([\s\S]{0,100}path: props\.hoverPath[\s\S]{0,100}occ: props\.hoverOcc/.test(
-      overlays
+      overlays,
     ),
-    'the hover outline is back to comparing paths, which a loop breaks'
+    'the hover outline is back to comparing paths, which a loop breaks',
   );
   check(
     'a step within a copy keeps it',
     /if \(sameCopy\(previous, selPath\)\) \{[\s\S]{0,30}return;/.test(runtime),
-    'every selection outside the canvas is back to meaning the first copy'
+    'every selection outside the canvas is back to meaning the first copy',
   );
   check(
     'and so does the dimming around a component being edited',
     /onePerPlace\(rects\[path\]\)/.test(overlays),
-    'the focus scrim stacks, so the page goes black instead of dim'
+    'the focus scrim stacks, so the page goes black instead of dim',
   );
 
   // --- what the page reports --------------------------------------------------
@@ -210,7 +219,7 @@ const stacked = (n, a = 0.14) => 1 - (1 - a) ** n;
         ${marked('0.4.0', '<li data-box="li-three"><a data-avb-p="0.4.0.0" data-box="link-three">LinkedIn</a></li>')}
       </ul>
     </body>`,
-    { url: 'http://localhost:4321/#avb-design', pretendToBeVisual: true }
+    { url: 'http://localhost:4321/#avb-design', pretendToBeVisual: true },
   );
   const { window } = dom;
   // jsdom lays nothing out, so every box would be zero and nothing would be
@@ -298,7 +307,7 @@ const stacked = (n, a = 0.14) => 1 - (1 - a) ** n;
     check(
       'and the box is the word, not a bar beside it',
       boxes3[0]?.w === 172 && boxes3[0]?.h === 50,
-      JSON.stringify(boxes3[0])
+      JSON.stringify(boxes3[0]),
     );
     check('at the line the word is on', boxes3[0]?.y === 1460, JSON.stringify(boxes3[0]));
   }
@@ -315,7 +324,7 @@ const stacked = (n, a = 0.14) => 1 - (1 - a) ** n;
     check(
       'in the order they are down the page',
       boxes.map((b) => b.x).join(',') === '0,130,260',
-      JSON.stringify(boxes.map((b) => b.x))
+      JSON.stringify(boxes.map((b) => b.x)),
     );
     // What the click reports, from the same list the boxes came from.
     const clickOn = (box) => {
@@ -328,21 +337,25 @@ const stacked = (n, a = 0.14) => 1 - (1 - a) ** n;
     Object.defineProperty(design, 'source', { value: window.parent });
     window.dispatchEvent(design);
 
-    check('clicking the first link says so', clickOn('link-one')?.occurrence === 0, JSON.stringify(clickOn('link-one')));
+    check(
+      'clicking the first link says so',
+      clickOn('link-one')?.occurrence === 0,
+      JSON.stringify(clickOn('link-one')),
+    );
     check(
       'clicking the second says the second',
       clickOn('link-two')?.occurrence === 1,
-      JSON.stringify(clickOn('link-two'))
+      JSON.stringify(clickOn('link-two')),
     );
     check(
       'and the third the third',
       clickOn('link-three')?.occurrence === 2,
-      JSON.stringify(clickOn('link-three'))
+      JSON.stringify(clickOn('link-three')),
     );
     check(
       'all of them naming the same node',
       clickOn('link-three')?.path === '0.4.0.0',
-      JSON.stringify(clickOn('link-three'))
+      JSON.stringify(clickOn('link-three')),
     );
   }
 
@@ -356,13 +369,17 @@ const stacked = (n, a = 0.14) => 1 - (1 - a) ** n;
   };
 
   check('a section is one box', boxesFor('0.1').length === 1, JSON.stringify(boxesFor('0.1')));
-  check('a loop child is one box per item', boxesFor('0.2').length === 2, JSON.stringify(boxesFor('0.2')));
+  check(
+    'a loop child is one box per item',
+    boxesFor('0.2').length === 2,
+    JSON.stringify(boxesFor('0.2')),
+  );
 
   patch('0.1');
   check(
     'and still one box after the page is patched',
     boxesFor('0.1').length === 1,
-    `${boxesFor('0.1').length} boxes — one edit, one extra copy of the same place`
+    `${boxesFor('0.1').length} boxes — one edit, one extra copy of the same place`,
   );
   patch('0.1');
   patch('0.1');
@@ -370,13 +387,13 @@ const stacked = (n, a = 0.14) => 1 - (1 - a) ** n;
     'however many times it is patched',
     boxesFor('0.1').length === 1,
     `${boxesFor('0.1').length} boxes after three edits, painting the fill ${Math.round(
-      stacked(boxesFor('0.1').length) * 100
-    )}% over the section`
+      stacked(boxesFor('0.1').length) * 100,
+    )}% over the section`,
   );
   check(
     'the loop still has its two',
     boxesFor('0.2').length === 2,
-    JSON.stringify(boxesFor('0.2'))
+    JSON.stringify(boxesFor('0.2')),
   );
 
   // A patch that replaces the node rather than morphing it: the old run is
@@ -415,13 +432,23 @@ const stacked = (n, a = 0.14) => 1 - (1 - a) ** n;
     check('and typing on does not repeat it', heard().length === 0, JSON.stringify(sent));
 
     sent.length = 0;
-    window.dispatchEvent(new window.KeyboardEvent('keyup', { key: 'Shift', shiftKey: false, altKey: true }));
-    check('letting go of it is forwarded too', heard()[0]?.shiftKey === false, JSON.stringify(heard()[0]));
+    window.dispatchEvent(
+      new window.KeyboardEvent('keyup', { key: 'Shift', shiftKey: false, altKey: true }),
+    );
+    check(
+      'letting go of it is forwarded too',
+      heard()[0]?.shiftKey === false,
+      JSON.stringify(heard()[0]),
+    );
     check('along with what is still held', heard()[0]?.altKey === true, JSON.stringify(heard()[0]));
 
     sent.length = 0;
     window.dispatchEvent(new window.Event('blur'));
-    check('and losing focus holds nothing', heard()[0]?.altKey === false, JSON.stringify(heard()[0]));
+    check(
+      'and losing focus holds nothing',
+      heard()[0]?.altKey === false,
+      JSON.stringify(heard()[0]),
+    );
   }
 
   // --- styling it moves it, and the outline has to move with it ---------------
@@ -444,8 +471,16 @@ const stacked = (n, a = 0.14) => 1 - (1 - a) ** n;
     style.textContent = '.section { padding-bottom: 2rem }';
     document.head.appendChild(style);
     await new Promise((resolve) => setTimeout(resolve, 60));
-    check('a stylesheet arriving re-measures the page', sent.some((m) => m.type === 'avb:rects'), 'nothing was measured');
-    check('and the box it reports is the new one', lastSent()?.h === 640, JSON.stringify(lastSent()));
+    check(
+      'a stylesheet arriving re-measures the page',
+      sent.some((m) => m.type === 'avb:rects'),
+      'nothing was measured',
+    );
+    check(
+      'and the box it reports is the new one',
+      lastSent()?.h === 640,
+      JSON.stringify(lastSent()),
+    );
 
     // The same again, edited in place rather than added — HMR updates a sheet
     // it has already inserted.
@@ -453,7 +488,11 @@ const stacked = (n, a = 0.14) => 1 - (1 - a) ** n;
     sent.length = 0;
     style.textContent = '.section { padding-bottom: 4rem }';
     await new Promise((resolve) => setTimeout(resolve, 60));
-    check('editing a stylesheet in place re-measures too', lastSent()?.h === 700, JSON.stringify(lastSent()));
+    check(
+      'editing a stylesheet in place re-measures too',
+      lastSent()?.h === 700,
+      JSON.stringify(lastSent()),
+    );
 
     // A change that lands after the one that caused it: the second pass is what
     // catches the layout that had not happened yet when the first one ran.
@@ -462,7 +501,11 @@ const stacked = (n, a = 0.14) => 1 - (1 - a) ** n;
     await new Promise((resolve) => setTimeout(resolve, 10));
     boxes[key] = [0, 100, 1200, 760]; // the browser gets round to it
     await new Promise((resolve) => setTimeout(resolve, 200));
-    check('a layout that settles late is measured again', lastSent()?.h === 760, JSON.stringify(lastSent()));
+    check(
+      'a layout that settles late is measured again',
+      lastSent()?.h === 760,
+      JSON.stringify(lastSent()),
+    );
   }
 
   // --- inside a component that has no marker pair -------------------------------
@@ -500,7 +543,11 @@ const stacked = (n, a = 0.14) => 1 - (1 - a) ** n;
 
     const root = inside('src/components/Card.astro|0.0.0', '0.6.1');
     check('the component root is one box too', root.length === 1, JSON.stringify(root));
-    check('around the open card', root[0]?.y === 2200 && root[0]?.h === 100, JSON.stringify(root[0]));
+    check(
+      'around the open card',
+      root[0]?.y === 2200 && root[0]?.h === 100,
+      JSON.stringify(root[0]),
+    );
   }
 
   if (failures.length) {

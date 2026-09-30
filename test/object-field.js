@@ -21,7 +21,9 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
+  if (!condition) {
+    failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  }
 };
 
 (async () => {
@@ -47,22 +49,42 @@ const check = (what, condition, detail) => {
   {
     const fields = objectFields(TAGS);
     check('an object of plain values reads as fields', !!fields, 'refused');
-    check('one per key, in the order they were written', fields?.map((f) => f.key).join() === 'legend,options', fields?.map((f) => f.key).join());
-    check('a word is a word', fields?.[0].kind === 'text' && fields[0].text === 'Ministry Role', JSON.stringify(fields?.[0]));
-    check('and a list is a list', fields?.[1].kind === 'list' && fields[1].items.length === 3, JSON.stringify(fields?.[1]));
+    check(
+      'one per key, in the order they were written',
+      fields?.map((f) => f.key).join() === 'legend,options',
+      fields?.map((f) => f.key).join(),
+    );
+    check(
+      'a word is a word',
+      fields?.[0].kind === 'text' && fields[0].text === 'Ministry Role',
+      JSON.stringify(fields?.[0]),
+    );
+    check(
+      'and a list is a list',
+      fields?.[1].kind === 'list' && fields[1].items.length === 3,
+      JSON.stringify(fields?.[1]),
+    );
     check('written back as it was', objectText(fields) === TAGS, objectText(fields));
   }
   {
     const fields = objectFields('{ shown: true, count: 3 }');
     check('a yes-or-no is one', fields?.[0].kind === 'boolean', JSON.stringify(fields?.[0]));
     check('and a number is a number', fields?.[1].kind === 'number', JSON.stringify(fields?.[1]));
-    check('both written back unquoted', objectText(fields) === '{ shown: true, count: 3 }', objectText(fields));
+    check(
+      'both written back unquoted',
+      objectText(fields) === '{ shown: true, count: 3 }',
+      objectText(fields),
+    );
   }
   {
     // The file's own quotes are kept: a project that writes single ones should
     // not find double ones the first time a field is touched.
     const single = "{ legend: 'Ministry Role' }";
-    check('the quote the file used is the quote it keeps', objectText(objectFields(single)) === single, objectText(objectFields(single)));
+    check(
+      'the quote the file used is the quote it keeps',
+      objectText(objectFields(single)) === single,
+      objectText(objectFields(single)),
+    );
   }
   for (const refused of [
     '{ nested: { a: 1 } }',
@@ -73,7 +95,11 @@ const check = (what, condition, detail) => {
     'tags',
     '[1, 2]',
   ]) {
-    check(`what a field cannot show is refused — ${refused}`, objectFields(refused) === null, JSON.stringify(objectFields(refused)));
+    check(
+      `what a field cannot show is refused — ${refused}`,
+      objectFields(refused) === null,
+      JSON.stringify(objectFields(refused)),
+    );
   }
 
   // --- and what the control does with them --------------------------------------
@@ -81,8 +107,8 @@ const check = (what, condition, detail) => {
   fs.writeFileSync(
     entry,
     `export { default as ObjectField } from ${JSON.stringify(
-      path.join(__dirname, '..', 'src', 'panels', 'ObjectField.jsx')
-    )};\n`
+      path.join(__dirname, '..', 'src', 'panels', 'ObjectField.jsx'),
+    )};\n`,
   );
   const bundle = path.join(buildDir, 'object-field.bundle.js');
   await esbuild.build({
@@ -127,8 +153,12 @@ const check = (what, condition, detail) => {
       root.render(
         React.createElement(ObjectField, {
           value: current,
-          onChange: (text, now) => { wrote.push(text); immediate.push(now); current = text },
-        })
+          onChange: (text, now) => {
+            wrote.push(text);
+            immediate.push(now);
+            current = text;
+          },
+        }),
       );
     });
   };
@@ -139,57 +169,100 @@ const check = (what, condition, detail) => {
   const rows = () => [...host.querySelectorAll('.list-field-row')];
 
   check('every key is a row', keys().join() === 'legend,options', keys().join());
-  check('the word is in a box', inputs().length === 1 && inputs()[0].value === 'Ministry Role', inputs().map((i) => i.value).join());
+  check(
+    'the word is in a box',
+    inputs().length === 1 && inputs()[0].value === 'Ministry Role',
+    inputs()
+      .map((i) => i.value)
+      .join(),
+  );
   check('and the list is rows, not text', rows().length === 3, `${rows().length} rows`);
   check(
     'each row saying what its item says',
-    [...host.querySelectorAll('.list-field-text')].map((b) => b.textContent).join() === 'Pastors,Staff,Prayer',
-    [...host.querySelectorAll('.list-field-text')].map((b) => b.textContent).join()
+    [...host.querySelectorAll('.list-field-text')].map((b) => b.textContent).join() ===
+      'Pastors,Staff,Prayer',
+    [...host.querySelectorAll('.list-field-text')].map((b) => b.textContent).join(),
   );
 
   // Typing in a field writes the whole object back — that is what the file
   // holds — and says it is not the edit yet.
   await act(async () => {
     const input = inputs()[0];
-    const setter = Object.getOwnPropertyDescriptor(dom.window.HTMLInputElement.prototype, 'value').set;
+    const setter = Object.getOwnPropertyDescriptor(
+      dom.window.HTMLInputElement.prototype,
+      'value',
+    ).set;
     setter.call(input, 'Ministry Area');
     input.dispatchEvent(new dom.window.Event('input', { bubbles: true }));
   });
   await render();
-  check('typing writes the object back', /Ministry Area/.test(wrote[wrote.length - 1] || ''), wrote[wrote.length - 1]);
-  check('with the list beside it untouched', /\["Pastors", "Staff", "Prayer"\]/.test(wrote[wrote.length - 1] || ''), wrote[wrote.length - 1]);
-  check('and says it is still being typed', immediate[immediate.length - 1] === false, String(immediate[immediate.length - 1]));
+  check(
+    'typing writes the object back',
+    /Ministry Area/.test(wrote[wrote.length - 1] || ''),
+    wrote[wrote.length - 1],
+  );
+  check(
+    'with the list beside it untouched',
+    /\["Pastors", "Staff", "Prayer"\]/.test(wrote[wrote.length - 1] || ''),
+    wrote[wrote.length - 1],
+  );
+  check(
+    'and says it is still being typed',
+    immediate[immediate.length - 1] === false,
+    String(immediate[immediate.length - 1]),
+  );
 
   // Dropping an item from the list inside writes the object back too.
   const bin = host.querySelectorAll('.list-field-remove')[1];
   // A missing control is a FAILURE to report, not a stack trace: every check
   // after it would otherwise be lost.
-  check('the list inside has a bin on each row', !!bin, `${host.querySelectorAll('.list-field-remove').length} bins`);
+  check(
+    'the list inside has a bin on each row',
+    !!bin,
+    `${host.querySelectorAll('.list-field-remove').length} bins`,
+  );
   if (bin) {
     await act(async () => {
       bin.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }));
     });
     await render();
   }
-  check('removing an item from the list inside says so', /\["Pastors", "Prayer"\]/.test(wrote[wrote.length - 1] || ''), wrote[wrote.length - 1]);
-  check('and that one IS the edit', immediate[immediate.length - 1] === true, String(immediate[immediate.length - 1]));
-  check('the field beside it survives the change', /Ministry Area/.test(wrote[wrote.length - 1] || ''), wrote[wrote.length - 1]);
+  check(
+    'removing an item from the list inside says so',
+    /\["Pastors", "Prayer"\]/.test(wrote[wrote.length - 1] || ''),
+    wrote[wrote.length - 1],
+  );
+  check(
+    'and that one IS the edit',
+    immediate[immediate.length - 1] === true,
+    String(immediate[immediate.length - 1]),
+  );
+  check(
+    'the field beside it survives the change',
+    /Ministry Area/.test(wrote[wrote.length - 1] || ''),
+    wrote[wrote.length - 1],
+  );
 
   // --- the panel reaches for it --------------------------------------------------
-  const panel = fs.readFileSync(path.join(__dirname, '..', 'src', 'panels', 'PropField.tsx'), 'utf8');
+  const panel = fs.readFileSync(
+    path.join(__dirname, '..', 'src', 'panels', 'PropField.tsx'),
+    'utf8',
+  );
   check(
     'a code prop holding an object gets the fields',
     /type === 'code' && !showExpr && str && objectFields\(str\)/.test(panel),
-    'an object prop still shows as raw code'
+    'an object prop still shows as raw code',
   );
   check(
     'and `{}` still leads back to the code editor',
     /!showExpr/.test(panel),
-    'there would be no way back to the text'
+    'there would be no way back to the text',
   );
 
   if (failures.length) {
-    console.error(`\nobject-field: ${failures.length} failed, ${checked - failures.length} passed\n`);
+    console.error(
+      `\nobject-field: ${failures.length} failed, ${checked - failures.length} passed\n`,
+    );
     console.error(failures.join('\n') + '\n');
     process.exit(1);
   }

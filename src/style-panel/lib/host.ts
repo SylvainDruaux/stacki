@@ -6,53 +6,52 @@
 // answers the panel's questions from it. One panel, one selection, so a
 // module-level record is enough.
 
-type HostAttr = { readonly type: string; readonly value?: string }
+type HostAttr = { readonly type: string; readonly value?: string };
 
 // A page node as the panel reads it: the panel never edits the tree (its
 // class and style changes go through App's gestures), so the view is readonly.
 export type HostNode = {
-  readonly id: string
-  readonly kind: string
-  readonly name?: string
-  readonly props?: Readonly<Record<string, HostAttr | null>>
-  readonly children?: readonly HostNode[] | null
-  readonly inner?: string
-}
+  readonly id: string;
+  readonly kind: string;
+  readonly name?: string;
+  readonly props?: Readonly<Record<string, HostAttr | null>>;
+  readonly children?: readonly HostNode[] | null;
+  readonly inner?: string;
+};
 
 /** Which sides of which box the spacing control is pointing at, and what each
  *  one says — the label is the authored value ("4.8rem"), not the pixels. */
 export type SpacingHover = {
   /** 'gap' lights the space BETWEEN children rather than around one element. */
-  kind: 'padding' | 'margin' | 'gap'
+  kind: 'padding' | 'margin' | 'gap';
   /** Edges for padding and margin; axes for gap. */
-  sides: Array<'top' | 'right' | 'bottom' | 'left' | 'row' | 'column'>
-  labels: Record<string, string>
-}
+  sides: Array<'top' | 'right' | 'bottom' | 'left' | 'row' | 'column'>;
+  labels: Record<string, string>;
+};
 
 /** What became of a class added to the page, for the rule that depends on it. */
 export type ClassOutcome =
-  | { readonly tag: 'applied' }
-  | { readonly tag: 'refused'; readonly message: string }
+  { readonly tag: 'applied' } | { readonly tag: 'refused'; readonly message: string };
 
 export type HostState = {
-  projectPath: string | null
+  projectPath: string | null;
   /** The page (or open component) being edited. */
-  nodes: readonly HostNode[]
-  selectedId: string | null
+  nodes: readonly HostNode[];
+  selectedId: string | null;
   /** Canvas breakpoint: desktop | tablet | phone. */
-  device: string
+  device: string;
   /** Stylesheets in the project, from style:listFiles. */
-  files: Array<{ rel: string; name: string; path: string; size: number }>
+  files: Array<{ rel: string; name: string; path: string; size: number }>;
   /** Component files holding a `<style is:global>` block, from
    *  style:listAstroStyles. Their rules reach the whole page, so they belong to
    *  the cascade even when the selection came from another file. */
-  astroFiles: Array<{ rel: string; name: string; path: string; size: number }>
+  astroFiles: Array<{ rel: string; name: string; path: string; size: number }>;
   /** Absolute path of the file being edited — its own <style> blocks come from
    *  the model, so it must not also be read off disk. */
-  openFilePath: string | null
+  openFilePath: string | null;
   /** Whether the open editable file is a page or a component. Style nodes have
    *  the same model shape in both, so their provenance must be carried separately. */
-  openFileKind: 'page' | 'component' | null
+  openFileKind: 'page' | 'component' | null;
   /**
    * Bumped by the app whenever undo or redo runs. The panel reads its rules
    * from files and from the page model, and an undo rewrites both behind its
@@ -60,55 +59,55 @@ export type HostState = {
    * background refresh came round (throttled to seconds), so the canvas moved
    * and the panel followed late.
    */
-  historyTick: number
+  historyTick: number;
   /**
    * Classes the SELECTED element actually carries on the page, reported by the
    * preview. `class:list={[…]}` and `class={expr}` are expressions — the source
    * holds no class text — so this is the only way to know what a given instance
    * resolved to. Empty when nothing is selected or the node isn't rendered.
    */
-  renderedClasses: string[]
+  renderedClasses: string[];
   /** Every class name used anywhere in the project (the same list the Settings
    *  panel's class field autocompletes from), for the selector input's suggestions. */
-  projectClasses: string[]
+  projectClasses: string[];
   /** Write a <style> node's CSS back into the page model. `immediate` saves the page
    *  right away (a committed edit) instead of coalescing like a typing burst. */
   /** Writes a <style> node's text into the open file's model. Returns false when
    *  that node isn't in the file currently open (a page's block while a component
    *  is being edited) — the panel then keeps the edit and flushes it on exit
    *  rather than reporting a save that never happened. */
-  writeStyleNode: ((nodeId: string, css: string, immediate?: boolean) => boolean | void) | null
+  writeStyleNode: ((nodeId: string, css: string, immediate?: boolean) => boolean | void) | null;
   /** Select a node in the app (used when navigating from a provenance chip). */
-  selectNode: ((nodeId: string) => void) | null
+  selectNode: ((nodeId: string) => void) | null;
   /** Put a class on the selected element. Typing a bare class in the selector
    *  box should land it on the element, the way a class field would — a rule
    *  for a class the element doesn't carry would never apply. Resolves once the
    *  page edit reached disk or was refused: the stylesheet rule for that class
    *  is written only after it applied (step 6, plan §3.3 — outcome-gated). */
-  addClass: ((className: string) => Promise<ClassOutcome>) | null
+  addClass: ((className: string) => Promise<ClassOutcome>) | null;
   /** What the spacing box is pointing at, for the canvas to draw over the
    *  selected element: hovering `padding-top` lights the strip of the page that
    *  padding-top holds open. Null when the pointer leaves it. */
-  onSpacingHover: ((hover: SpacingHover | null) => void) | null
+  onSpacingHover: ((hover: SpacingHover | null) => void) | null;
   /**
    * A node's path in the rendered page (`0.1.2`), which is how the canvas
    * addresses elements. Lets the panel ask the real DOM about the selected
    * element instead of inferring it from the source tree.
    */
-  pathOf: ((nodeId: string) => string | null) | null
+  pathOf: ((nodeId: string) => string | null) | null;
   /** Record an already-applied change on the app's undo stack. Stylesheet edits
    *  don't go through the page model, so without this ⌘Z would skip straight
    *  past them to the last layout change. */
-  recordUndo: ((cmd: UndoCommand) => void) | null
-}
+  recordUndo: ((cmd: UndoCommand) => void) | null;
+};
 
 export type UndoCommand = {
-  label?: string
+  label?: string;
   /** Edits sharing a key inside one burst collapse into a single step. */
-  coalesceKey?: string | null
-  undo: () => void | Promise<void>
-  redo: () => void | Promise<void>
-}
+  coalesceKey?: string | null;
+  undo: () => void | Promise<void>;
+  redo: () => void | Promise<void>;
+};
 
 const state: HostState = {
   projectPath: null,
@@ -128,7 +127,7 @@ const state: HostState = {
   recordUndo: null,
   addClass: null,
   onSpacingHover: null,
-}
+};
 
 // Which modifiers are held, from wherever they were pressed.
 //
@@ -138,26 +137,32 @@ const state: HostState = {
 // told by whoever did hear them. The frame forwards its key events (see the
 // preload) and the app writes them here; the panel reads here rather than
 // straight off the window, and gets the same answer either way.
-type Modifiers = { shiftKey: boolean; altKey: boolean }
-let modifiers: Modifiers = { shiftKey: false, altKey: false }
-const modifierListeners = new Set<(held: Modifiers) => void>()
+type Modifiers = { shiftKey: boolean; altKey: boolean };
+let modifiers: Modifiers = { shiftKey: false, altKey: false };
+const modifierListeners = new Set<(held: Modifiers) => void>();
 
 export function setModifiers(shiftKey: boolean, altKey: boolean) {
-  if (modifiers.shiftKey === shiftKey && modifiers.altKey === altKey) {return}
-  modifiers = { shiftKey, altKey }
-  for (const fn of modifierListeners) {fn(modifiers)}
+  if (modifiers.shiftKey === shiftKey && modifiers.altKey === altKey) {
+    return;
+  }
+  modifiers = { shiftKey, altKey };
+  for (const fn of modifierListeners) {
+    fn(modifiers);
+  }
 }
 
 export function getModifiers(): Modifiers {
-  return modifiers
+  return modifiers;
 }
 
 export function onModifiers(fn: (held: Modifiers) => void) {
-  modifierListeners.add(fn)
-  return () => { modifierListeners.delete(fn) }
+  modifierListeners.add(fn);
+  return () => {
+    modifierListeners.delete(fn);
+  };
 }
 
-const listeners = new Set<() => void>()
+const listeners = new Set<() => void>();
 
 // Listeners are told on a microtask, not inline: the panel sets the host DURING its
 // render (see StylePanel, which has to, so children don't mount against an empty
@@ -165,14 +170,18 @@ const listeners = new Set<() => void>()
 // rendering — exactly what React warns about. The state itself is written
 // synchronously, so anything reading getHost() still sees it at once. Coalesced, so a
 // render that patches several fields wakes subscribers once.
-let notifying = false
+let notifying = false;
 function notifyHost() {
-  if (notifying) {return}
-  notifying = true
+  if (notifying) {
+    return;
+  }
+  notifying = true;
   queueMicrotask(() => {
-    notifying = false
-    for (const fn of listeners) {fn()}
-  })
+    notifying = false;
+    for (const fn of listeners) {
+      fn();
+    }
+  });
 }
 
 // A writer publishes the whole host at once, so no field can be left stale by a
@@ -180,26 +189,30 @@ function notifyHost() {
 // hold what `getHost()` returned for the length of a call.
 export function setHost(next: Readonly<HostState>) {
   if (hostChanged(next)) {
-    Object.assign(state, next)
-    notifyHost()
+    Object.assign(state, next);
+    notifyHost();
   }
 }
 
 function hostChanged(next: Readonly<HostState>): boolean {
-  let key: keyof HostState
+  let key: keyof HostState;
   for (key in next) {
-    if (state[key] !== next[key]) {return true}
+    if (state[key] !== next[key]) {
+      return true;
+    }
   }
-  return false
+  return false;
 }
 
 export function getHost(): HostState {
-  return state
+  return state;
 }
 
 export function onHostChange(fn: () => void): () => void {
-  listeners.add(fn)
-  return () => {listeners.delete(fn)}
+  listeners.add(fn);
+  return () => {
+    listeners.delete(fn);
+  };
 }
 
 // Depth-first walk of the page model.
@@ -209,8 +222,10 @@ export function walkNodes(
   parent: HostNode | null = null,
 ) {
   for (const n of nodes || []) {
-    visit(n, parent)
-    if (Array.isArray(n.children)) {walkNodes(n.children, visit, n)}
+    visit(n, parent);
+    if (Array.isArray(n.children)) {
+      walkNodes(n.children, visit, n);
+    }
   }
 }
 
@@ -219,17 +234,23 @@ export function findNode(
   id: string,
 ): HostNode | null {
   for (const node of nodes || []) {
-    if (node.id === id) {return node}
-    const found = node.children && findNode(node.children, id)
-    if (found) {return found}
+    if (node.id === id) {
+      return node;
+    }
+    const found = node.children && findNode(node.children, id);
+    if (found) {
+      return found;
+    }
   }
-  return null
+  return null;
 }
 
 // A prop's literal string value, or '' for expressions and bare attributes —
 // the panel matches selectors against text, and `class={x}` has no text.
 export function propText(node: HostNode | null | undefined, name: string): string {
-  const p = node?.props?.[name]
-  if (!p || p.type !== 'string') {return ''}
-  return String(p.value ?? '')
+  const p = node?.props?.[name];
+  if (!p || p.type !== 'string') {
+    return '';
+  }
+  return String(p.value ?? '');
 }

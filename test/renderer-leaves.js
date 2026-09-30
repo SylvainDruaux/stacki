@@ -53,7 +53,8 @@ try {
   const { checkStatement } = load('jsCheck');
   assert.equal(checkStatement(' '.repeat(1_000_000)).ok, true);
   assert.deepEqual(checkStatement(' '.repeat(1_000_001)), {
-    ok: false, message: 'This statement exceeds the editor size limit.',
+    ok: false,
+    message: 'This statement exceeds the editor size limit.',
   });
   const { componentNameError } = load('componentName');
   assert.equal(componentNameError('Card', Array(10_000).fill('Other')), null);
@@ -69,9 +70,13 @@ try {
   assert.equal(rankInsertItems(Array(10_000).fill({ name: 'Card' }), '').length, 10_000);
   assert.throws(() => rankInsertItems(Array(10_001).fill({ name: 'Card' }), ''), /item count/);
   const { elementClasses } = load('classNames');
-  assert.throws(() => elementClasses({
-    props: { class: { type: 'expr', value: 'x'.repeat(1_000_001) } },
-  }), /Class expression exceeds size limit/);
+  assert.throws(
+    () =>
+      elementClasses({
+        props: { class: { type: 'expr', value: 'x'.repeat(1_000_001) } },
+      }),
+    /Class expression exceeds size limit/,
+  );
 
   const { decideTerminalPaste } = load('terminalPaste');
   const item = { type: 'text/plain', kind: 'string', getAsFile: () => null };

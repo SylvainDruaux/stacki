@@ -65,52 +65,127 @@
   line-height: var(--line-height-normal);
 }
 
-.u-text-color-primary   { color: var(--color-text-primary); }
-.u-text-color-secondary { color: var(--color-text-secondary); }
-.u-text-color-muted     { color: var(--color-text-tertiary); }
-.u-text-color-accent    { color: var(--color-accent); }
-.u-text-color-success   { color: var(--color-success); }
-.u-text-color-danger    { color: var(--color-danger); }
-.u-text-color-warning   { color: var(--color-warning); }
+.u-text-color-primary {
+  color: var(--color-text-primary);
+}
+.u-text-color-secondary {
+  color: var(--color-text-secondary);
+}
+.u-text-color-muted {
+  color: var(--color-text-tertiary);
+}
+.u-text-color-accent {
+  color: var(--color-accent);
+}
+.u-text-color-success {
+  color: var(--color-success);
+}
+.u-text-color-danger {
+  color: var(--color-danger);
+}
+.u-text-color-warning {
+  color: var(--color-warning);
+}
 
-.u-text-align-left   { text-align: left; }
-.u-text-align-center { text-align: center; }
-.u-text-align-right  { text-align: right; }
+.u-text-align-left {
+  text-align: left;
+}
+.u-text-align-center {
+  text-align: center;
+}
+.u-text-align-right {
+  text-align: right;
+}
 
 /* ──────────────────────────── Spacing utilities ──────────────────────────── */
 
-.u-margin-top-xs  { margin-top: var(--space-3); }
-.u-margin-top-sm  { margin-top: var(--space-4); }
-.u-margin-top-md  { margin-top: var(--space-6); }
-.u-margin-top-lg  { margin-top: var(--space-8); }
-.u-margin-top-xl  { margin-top: var(--space-10); }
+.u-margin-top-xs {
+  margin-top: var(--space-3);
+}
+.u-margin-top-sm {
+  margin-top: var(--space-4);
+}
+.u-margin-top-md {
+  margin-top: var(--space-6);
+}
+.u-margin-top-lg {
+  margin-top: var(--space-8);
+}
+.u-margin-top-xl {
+  margin-top: var(--space-10);
+}
 
-.u-margin-bottom-xs { margin-bottom: var(--space-3); }
-.u-margin-bottom-sm { margin-bottom: var(--space-4); }
-.u-margin-bottom-md { margin-bottom: var(--space-6); }
-.u-margin-bottom-lg { margin-bottom: var(--space-8); }
+.u-margin-bottom-xs {
+  margin-bottom: var(--space-3);
+}
+.u-margin-bottom-sm {
+  margin-bottom: var(--space-4);
+}
+.u-margin-bottom-md {
+  margin-bottom: var(--space-6);
+}
+.u-margin-bottom-lg {
+  margin-bottom: var(--space-8);
+}
 
 /* ──────────────────────────── Layout primitives ──────────────────────────── */
 
-.u-stack    { display: flex; flex-direction: column; gap: var(--space-6); }
-.u-stack-sm { display: flex; flex-direction: column; gap: var(--space-4); }
-.u-stack-lg { display: flex; flex-direction: column; gap: var(--space-8); }
+.u-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+.u-stack-sm {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.u-stack-lg {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+}
 
 .u-cluster {
-  display: flex; flex-wrap: wrap;
+  display: flex;
+  flex-wrap: wrap;
   gap: var(--space-3);
   align-items: center;
 }
 
-.u-row         { display: flex; align-items: center; gap: var(--space-4); }
-.u-row-between { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); }
+.u-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+.u-row-between {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
 
-.u-grid-2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-5); }
-.u-grid-3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-5); }
+.u-grid-2 {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-5);
+}
+.u-grid-3 {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-5);
+}
 
-.u-full     { width: 100%; }
-.u-flex-1   { flex: 1 1 auto; min-width: 0; }
-.u-flex-0   { flex: 0 0 auto; }
+.u-full {
+  width: 100%;
+}
+.u-flex-1 {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.u-flex-0 {
+  flex: 0 0 auto;
+}
 
 /* ──────────────────────────── Surface context ──────────────────────────── */
 /* Put one of these on a container to declare the surface its children sit on.
@@ -119,34 +194,36 @@
    Steps clamp at the top of the ramp (inset → page → surface → raised → high). */
 
 .u-surface-page {
-  --surface:               var(--color-bg-page);
-  --surface-control:       var(--color-bg-surface);
+  --surface: var(--color-bg-page);
+  --surface-control: var(--color-bg-surface);
   --surface-control-hover: var(--color-bg-surface-raised);
-  --surface-inset:         var(--color-bg-inset);
-  --surface-inset-hover:   #181818;
-  --surface-overlay:       var(--color-bg-surface-raised);
+  --surface-inset: var(--color-bg-inset);
+  --surface-inset-hover: #181818;
+  --surface-overlay: var(--color-bg-surface-raised);
 }
 .u-surface-surface {
-  --surface:               var(--color-bg-surface);
-  --surface-control:       var(--color-bg-surface-raised);
+  --surface: var(--color-bg-surface);
+  --surface-control: var(--color-bg-surface-raised);
   --surface-control-hover: var(--color-bg-surface-high);
-  --surface-inset:         var(--color-bg-page);
-  --surface-inset-hover:   var(--color-bg-surface);
-  --surface-overlay:       var(--color-bg-surface-high);
+  --surface-inset: var(--color-bg-page);
+  --surface-inset-hover: var(--color-bg-surface);
+  --surface-overlay: var(--color-bg-surface-high);
 }
 .u-surface-raised {
-  --surface:               var(--color-bg-surface-raised);
-  --surface-control:       var(--color-bg-surface-high);
+  --surface: var(--color-bg-surface-raised);
+  --surface-control: var(--color-bg-surface-high);
   --surface-control-hover: var(--color-bg-surface-high);
-  --surface-inset:         var(--color-bg-surface);
-  --surface-inset-hover:   var(--color-bg-surface-raised);
-  --surface-overlay:       var(--color-bg-surface-high);
+  --surface-inset: var(--color-bg-surface);
+  --surface-inset-hover: var(--color-bg-surface-raised);
+  --surface-overlay: var(--color-bg-surface-high);
 }
 
 /* ──────────────────────────── Button — tone, no default border ──────────────────────────── */
 
 .u-button {
-  display: inline-flex; align-items: center; justify-content: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   flex-shrink: 0;
   gap: var(--space-3);
   height: var(--size-input);
@@ -159,21 +236,37 @@
   font-size: var(--font-size-md);
   font-weight: var(--font-weight-medium);
   cursor: pointer;
-  transition: background var(--transition-fast), color var(--transition-fast);
+  transition:
+    background var(--transition-fast),
+    color var(--transition-fast);
   white-space: nowrap;
   text-decoration: none;
 }
-.u-button:hover  { background: var(--surface-control-hover); }
-.u-button:active { background: var(--color-bg-active); }
-.u-button:disabled { opacity: 0.4; cursor: not-allowed; }
-.u-button:focus-visible { outline: none; box-shadow: var(--shadow-focus); }
+.u-button:hover {
+  background: var(--surface-control-hover);
+}
+.u-button:active {
+  background: var(--color-bg-active);
+}
+.u-button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.u-button:focus-visible {
+  outline: none;
+  box-shadow: var(--shadow-focus);
+}
 
 .u-button.is-primary {
   background: var(--color-accent);
   color: var(--color-accent-inverse);
 }
-.u-button.is-primary:hover  { background: #e5e5e5; }
-.u-button.is-primary:active { background: #d4d4d4; }
+.u-button.is-primary:hover {
+  background: #e5e5e5;
+}
+.u-button.is-primary:active {
+  background: #d4d4d4;
+}
 
 .u-button.is-ghost {
   background: transparent;
@@ -188,7 +281,9 @@
   color: var(--color-danger);
   background: var(--color-danger-bg);
 }
-.u-button.is-danger:hover { background: rgba(248, 113, 113, 0.18); }
+.u-button.is-danger:hover {
+  background: rgba(248, 113, 113, 0.18);
+}
 
 /* is-small / is-large are retained as markers but no longer change the control
    metrics — every button shares the one canonical height/padding/radius/font. */
@@ -200,12 +295,17 @@
   border-radius: var(--radius-input);
 }
 /* Keep the glyph small inside any icon button (e.g. modal close). */
-.u-button.is-icon svg { display: block; width: var(--size-icon-sm); height: var(--size-icon-sm); }
+.u-button.is-icon svg {
+  display: block;
+  width: var(--size-icon-sm);
+  height: var(--size-icon-sm);
+}
 
 /* ──────────────────────────── Input — recessed inset look ──────────────────────────── */
 
 .u-input {
-  display: block; width: 100%;
+  display: block;
+  width: 100%;
   height: var(--size-input);
   padding: 0 var(--space-4);
   border-radius: var(--radius-input);
@@ -219,12 +319,18 @@
   border: 0;
   font-family: var(--font-family-sans);
   font-size: var(--font-size-md);
-  transition: background var(--transition-fast), box-shadow var(--transition-fast);
+  transition:
+    background var(--transition-fast),
+    box-shadow var(--transition-fast);
 }
-.u-input::placeholder { color: var(--color-text-tertiary); }
+.u-input::placeholder {
+  color: var(--color-text-tertiary);
+}
 /* Hide the placeholder once the field is focused. */
-.u-input:focus::placeholder { color: transparent; }
-.u-input:focus  {
+.u-input:focus::placeholder {
+  color: transparent;
+}
+.u-input:focus {
   outline: none;
   /* The ring is the whole of the focus state. The app's blanket `input:focus`
      (src/styles.css) also repaints the background, which on a panel field reads as
@@ -275,20 +381,28 @@ body.is-scrubbing * {
  */
 
 .u-field {
-  display: flex; align-items: stretch;
+  display: flex;
+  align-items: stretch;
   height: var(--size-input);
   padding: 0;
   border-radius: var(--radius-input);
   background: var(--color-bg-inset);
   overflow: hidden;
-  transition: background var(--transition-fast), box-shadow var(--transition-fast);
+  transition:
+    background var(--transition-fast),
+    box-shadow var(--transition-fast);
 }
-.u-field:hover         { background: #181818; }
-.u-field:focus-within  { box-shadow: 0 0 0 var(--border-width-default) var(--color-border-focus); }
+.u-field:hover {
+  background: #181818;
+}
+.u-field:focus-within {
+  box-shadow: 0 0 0 var(--border-width-default) var(--color-border-focus);
+}
 
 .u-field_label {
   flex: 0 0 auto;
-  display: flex; align-items: center;
+  display: flex;
+  align-items: center;
   position: relative;
   padding: 0 var(--space-6);
   margin: var(--space-2);
@@ -311,7 +425,9 @@ body.is-scrubbing * {
 
 .u-field_value {
   flex: 1 1 auto;
-  display: flex; align-items: center; justify-content: flex-end;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
   padding: 0 var(--space-6) 0 var(--space-7);
   color: var(--color-text-primary);
   font-size: var(--font-size-md);
@@ -330,7 +446,8 @@ body.is-scrubbing * {
 /* ──────────────────────────── Tag / Badge ──────────────────────────── */
 
 .u-tag {
-  display: inline-flex; align-items: center;
+  display: inline-flex;
+  align-items: center;
   gap: var(--space-2);
   padding: 3px var(--space-4);
   border-radius: var(--radius-md);
@@ -377,8 +494,15 @@ body.is-scrubbing * {
 /* ──────────────────────────── Misc ──────────────────────────── */
 
 .u-sr-only {
-  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
-  overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0;
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 .u-link {
@@ -387,7 +511,9 @@ body.is-scrubbing * {
   border-bottom: var(--border-width-default) solid var(--color-border-default);
   transition: border-color var(--transition-fast);
 }
-.u-link:hover { border-bottom-color: var(--color-text-primary); }
+.u-link:hover {
+  border-bottom-color: var(--color-text-primary);
+}
 
 /* ──────────────────────────── Segmented tab control ──────────────────────────── */
 /* Sliding-indicator tabs (SegmentedControl.tsx). Fills its container; the grid
@@ -413,7 +539,10 @@ body.is-scrubbing * {
 /* 'hug' variant: the track shrinks to fit its segments (no full-width stretch),
    each segment sizes to its own content, and the indicator (measured in
    SegmentedControl.tsx) animates to the active one's width. */
-.u-segmented.is-hug { width: fit-content; justify-content: flex-start; }
+.u-segmented.is-hug {
+  width: fit-content;
+  justify-content: flex-start;
+}
 
 /* Indicator geometry (transform + width) is set inline from the active button's
    measured rect, so it fits equal-width and content-width segments alike. */
@@ -431,7 +560,9 @@ body.is-scrubbing * {
   pointer-events: none;
 }
 .u-segmented-indicator.is-animated {
-  transition: transform var(--transition-normal), width var(--transition-normal);
+  transition:
+    transform var(--transition-normal),
+    width var(--transition-normal);
 }
 
 .u-segmented-button {
@@ -454,16 +585,26 @@ body.is-scrubbing * {
   font-size: var(--font-size-md);
   line-height: var(--line-height-tight);
   cursor: pointer;
-  transition: background var(--transition-fast), color var(--transition-fast), box-shadow var(--transition-fast);
+  transition:
+    background var(--transition-fast),
+    color var(--transition-fast),
+    box-shadow var(--transition-fast);
 }
-.u-segmented.is-hug .u-segmented-button { flex: 0 0 auto; }
+.u-segmented.is-hug .u-segmented-button {
+  flex: 0 0 auto;
+}
 /* Hover lifts the text only: the chosen segment is drawn by the indicator
    behind these buttons, so a background here would paint over it — and the
    app's blanket `button:hover` (src/styles.css) does exactly that unless this
    states otherwise. */
-.u-segmented-button:hover:not(:disabled) { background: none; color: var(--color-text-primary); }
+.u-segmented-button:hover:not(:disabled) {
+  background: none;
+  color: var(--color-text-primary);
+}
 /* Light text/icon on the grey active pill. */
-.u-segmented-button.is-selected { color: var(--color-text-primary); }
+.u-segmented-button.is-selected {
+  color: var(--color-text-primary);
+}
 .u-segmented-button:focus-visible {
   outline: none;
   box-shadow: 0 0 0 var(--border-width-default) var(--color-border-focus);
@@ -471,12 +612,23 @@ body.is-scrubbing * {
 
 /* Disabled: dim the whole control but keep the current value legible; block
    clicks and the hover color-shift so it reads as informational, not actionable. */
-.u-segmented.is-disabled { opacity: 0.5; }
-.u-segmented.is-disabled .u-segmented-button { cursor: not-allowed; }
-.u-segmented.is-disabled .u-segmented-button:not(.is-selected):hover { color: var(--color-text-tertiary); }
+.u-segmented.is-disabled {
+  opacity: 0.5;
+}
+.u-segmented.is-disabled .u-segmented-button {
+  cursor: not-allowed;
+}
+.u-segmented.is-disabled .u-segmented-button:not(.is-selected):hover {
+  color: var(--color-text-tertiary);
+}
 
 /* Center icon-only segments (e.g. grid/list toggle). */
-.u-segmented-button svg { display: block; margin: 0 auto; width: 14px; height: 14px; }
+.u-segmented-button svg {
+  display: block;
+  margin: 0 auto;
+  width: 14px;
+  height: 14px;
+}
 
 /* Shared tooltip surface — used by the legacy anchored tooltip (`.u-segmented-tooltip`,
    still used by the hand-rolled overflow / display / direction bars) and the newer
@@ -497,7 +649,10 @@ body.is-scrubbing * {
   pointer-events: none;
 }
 .u-segmented-tooltip strong,
-.u-segmented-popup strong { color: var(--color-text-primary); font-weight: var(--font-weight-semibold); }
+.u-segmented-popup strong {
+  color: var(--color-text-primary);
+  font-weight: var(--font-weight-semibold);
+}
 
 /* Property-name tooltip (PropTip.tsx): the CSS property in mono, with an optional
    note — "set through another selector", "overridden by …" — beneath it. */
@@ -511,7 +666,10 @@ body.is-scrubbing * {
   color: var(--color-text-tertiary);
 }
 .u-segmented-tooltip-arrow,
-.u-segmented-popup-arrow { position: absolute; border: 6px solid transparent; }
+.u-segmented-popup-arrow {
+  position: absolute;
+  border: 6px solid transparent;
+}
 
 /* Legacy: absolute, right-anchored to the track and extending left, with a
    down-arrow centered on the hovered segment (`--tip-arrow-right`). */
@@ -531,7 +689,9 @@ body.is-scrubbing * {
    no ancestor `overflow: hidden` can clip it). The arrow (`--tip-arrow-left`, offset
    from the tooltip's left edge) points at the segment center and flips sides when the
    tooltip is placed below. */
-.u-segmented-popup { position: fixed; }
+.u-segmented-popup {
+  position: fixed;
+}
 .u-segmented-popup-arrow {
   left: var(--tip-arrow-left, 50%);
   transform: translateX(-50%);
@@ -566,8 +726,13 @@ body.is-scrubbing * {
   user-select: none;
   overflow: hidden;
 }
-.u-slider.is-disabled { opacity: 0.5; pointer-events: none; }
-.u-slider:focus { outline: none; }
+.u-slider.is-disabled {
+  opacity: 0.5;
+  pointer-events: none;
+}
+.u-slider:focus {
+  outline: none;
+}
 .u-slider:focus-visible {
   box-shadow: 0 0 0 var(--border-width-default) var(--color-border-focus);
 }
@@ -590,7 +755,11 @@ body.is-scrubbing * {
   top: 50%;
   height: 8px;
   transform: translateY(-50%);
-  background: repeating-linear-gradient(to right, var(--color-border-strong) 0 1px, transparent 1px calc(100% / var(--u-slider-ticks, 1)));
+  background: repeating-linear-gradient(
+    to right,
+    var(--color-border-strong) 0 1px,
+    transparent 1px calc(100% / var(--u-slider-ticks, 1))
+  );
   pointer-events: none;
   opacity: 0;
   transition: opacity var(--transition-fast);
@@ -689,7 +858,9 @@ body.is-scrubbing * {
 .u-drag-slider:hover:not(.is-disabled) .u-drag-slider-thumb {
   background: var(--color-text-primary);
 }
-.u-drag-slider:focus-visible { outline: none; }
+.u-drag-slider:focus-visible {
+  outline: none;
+}
 .u-drag-slider:focus-visible .u-drag-slider-thumb {
   box-shadow: 0 0 0 var(--border-width-default) var(--color-border-focus);
 }
@@ -710,12 +881,20 @@ body.is-scrubbing * {
 /* An open select must sit above sibling selects (all at --z-modal), or a later
    sibling's trigger paints over this one's dropdown. Lift its whole stacking
    context one step so the menu clears neighbouring controls. */
-.u-select.is-open { z-index: calc(var(--z-modal) + 1); }
-.u-select.is-disabled { opacity: 0.5; pointer-events: none; }
+.u-select.is-open {
+  z-index: calc(var(--z-modal) + 1);
+}
+.u-select.is-disabled {
+  opacity: 0.5;
+  pointer-events: none;
+}
 
 /* Link variant: an inline text-link trigger (no fill) that opens the same list.
    The menu hugs its content and left-aligns under the link instead of stretching. */
-.u-select.is-link { width: auto; display: inline-flex; }
+.u-select.is-link {
+  width: auto;
+  display: inline-flex;
+}
 .u-select-link {
   display: inline-flex;
   align-items: center;
@@ -730,13 +909,29 @@ body.is-scrubbing * {
   cursor: pointer;
   transition: color var(--transition-fast);
 }
-.u-select-link:hover:not(:disabled) { color: var(--color-text-primary); }
-.u-select-link:focus-visible { outline: none; color: var(--color-text-primary); }
-.u-select-link:disabled { cursor: not-allowed; opacity: 0.6; }
-.u-select-link .u-select-chevron { width: 12px; height: 12px; }
+.u-select-link:hover:not(:disabled) {
+  color: var(--color-text-primary);
+}
+.u-select-link:focus-visible {
+  outline: none;
+  color: var(--color-text-primary);
+}
+.u-select-link:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+.u-select-link .u-select-chevron {
+  width: 12px;
+  height: 12px;
+}
 /* Anchored to the trigger's left with a fixed width, capped to the panel width on a
    narrow sidebar (the JS clamp then nudges it away from the edge). */
-.u-select.is-link .u-select-list { left: 0; right: auto; width: 20rem; max-width: calc(100vw - 16px); }
+.u-select.is-link .u-select-list {
+  left: 0;
+  right: auto;
+  width: 20rem;
+  max-width: calc(100vw - 16px);
+}
 
 .u-select-button {
   display: flex;
@@ -753,7 +948,9 @@ body.is-scrubbing * {
   font-family: var(--font-family-sans);
   font-size: var(--font-size-md);
   cursor: pointer;
-  transition: background var(--transition-fast), box-shadow var(--transition-fast);
+  transition:
+    background var(--transition-fast),
+    box-shadow var(--transition-fast);
 }
 /* Hover lays the house's 5%-white lift OVER whatever the control is painted,
    rather than swapping the colour for the next one on the ramp. Three reasons:
@@ -762,7 +959,9 @@ body.is-scrubbing * {
    panels had no hover at all; and a colour computed from a token is only
    brighter if that token is what actually painted the button — an overlay is
    brighter than whatever is under it, whichever rule put it there. */
-.u-select-button:hover { background-image: linear-gradient(var(--color-bg-hover), var(--color-bg-hover)); }
+.u-select-button:hover {
+  background-image: linear-gradient(var(--color-bg-hover), var(--color-bg-hover));
+}
 .u-select-button:focus-visible {
   outline: none;
   box-shadow: 0 0 0 var(--border-width-default) var(--color-border-focus);
@@ -778,7 +977,9 @@ body.is-scrubbing * {
   cursor: text;
   background: var(--color-bg-inset);
 }
-.u-select-button.is-custom:hover { background: var(--color-bg-inset); }
+.u-select-button.is-custom:hover {
+  background: var(--color-bg-inset);
+}
 .u-select-button.is-custom:focus-within {
   box-shadow: 0 0 0 var(--border-width-default) var(--color-border-focus);
 }
@@ -794,8 +995,12 @@ body.is-scrubbing * {
   font-family: var(--font-family-mono);
   font-size: var(--font-size-sm);
 }
-.u-select-custom-input:focus { outline: none; }
-.u-select-custom-input::placeholder { color: var(--color-text-tertiary); }
+.u-select-custom-input:focus {
+  outline: none;
+}
+.u-select-custom-input::placeholder {
+  color: var(--color-text-tertiary);
+}
 /* The custom-mode arrow mirrors the Display control's dropdown arrow: a small
    rounded button that tints on hover, not the plain inline chevron. */
 .u-select-chevron-btn {
@@ -810,15 +1015,25 @@ body.is-scrubbing * {
   background: transparent;
   color: var(--color-text-secondary);
   cursor: pointer;
-  transition: background var(--transition-fast), color var(--transition-fast);
+  transition:
+    background var(--transition-fast),
+    color var(--transition-fast);
 }
-.u-select-chevron-btn .u-select-chevron { width: 12px; height: 12px; color: inherit; }
+.u-select-chevron-btn .u-select-chevron {
+  width: 12px;
+  height: 12px;
+  color: inherit;
+}
 .u-select-chevron-btn:hover:not(:disabled) {
   background: color-mix(in srgb, var(--color-text-primary) 14%, transparent);
   color: var(--color-text-primary);
 }
-.u-select-chevron-btn:disabled { cursor: not-allowed; }
-.u-select-chevron-btn:focus-visible { outline: none; }
+.u-select-chevron-btn:disabled {
+  cursor: not-allowed;
+}
+.u-select-chevron-btn:focus-visible {
+  outline: none;
+}
 
 .u-select-value {
   display: flex;
@@ -877,7 +1092,9 @@ body.is-scrubbing * {
   top: auto;
   bottom: calc(100% + var(--space-2));
 }
-.u-select-list:focus { outline: none; }
+.u-select-list:focus {
+  outline: none;
+}
 
 /* Search filter pinned to the top of the open list (searchable selects). */
 .u-select-search {
@@ -899,8 +1116,12 @@ body.is-scrubbing * {
   font-size: var(--font-size-sm);
   outline: none;
 }
-.u-select-search-input::placeholder { color: var(--color-text-tertiary); }
-.u-select-search-input:focus { border-color: var(--color-text-tertiary); }
+.u-select-search-input::placeholder {
+  color: var(--color-text-tertiary);
+}
+.u-select-search-input:focus {
+  border-color: var(--color-text-tertiary);
+}
 .u-select-empty {
   padding: var(--space-3);
   color: var(--color-text-tertiary);
@@ -923,16 +1144,30 @@ body.is-scrubbing * {
   font-family: var(--font-family-sans);
   font-size: var(--font-size-md);
 }
-.u-select-option.is-active { background: var(--color-bg-hover); }
+.u-select-option.is-active {
+  background: var(--color-bg-hover);
+}
 /* Selection is shown by the leading checkmark (Webflow-style), not a fill — so a
    selected row only takes a background when it's also the active/hover row. */
-.u-select-option.is-active.is-selected { background: var(--color-bg-hover); }
+.u-select-option.is-active.is-selected {
+  background: var(--color-bg-hover);
+}
 /* Leading checkmark gutter: a fixed column so labels stay aligned whether or not the
    row is selected; the checkmark shows only on the selected row. */
-.u-select-check { flex: 0 0 auto; width: 16px; height: 16px; display: inline-flex; align-items: center; justify-content: center; color: var(--color-text-primary); }
+.u-select-check {
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-primary);
+}
 /* Nested under a group subheader — the checkmark gutter already offsets options from
    the flush-left heading, so only a small extra indent is needed. */
-.u-select-option.is-indented { padding-left: var(--space-1); }
+.u-select-option.is-indented {
+  padding-left: var(--space-1);
+}
 
 /* Non-selectable group subheader (e.g. a component grouping its embeds). */
 .u-select-heading {
@@ -947,12 +1182,23 @@ body.is-scrubbing * {
   cursor: default;
   user-select: none;
 }
-.u-select-heading:not(:first-child) { margin-top: var(--space-1); }
-.u-select-heading .u-select-icon { color: var(--color-text-tertiary); }
+.u-select-heading:not(:first-child) {
+  margin-top: var(--space-1);
+}
+.u-select-heading .u-select-icon {
+  color: var(--color-text-tertiary);
+}
 /* The link variant's headings are component NAMES → Webflow's component-tag green. */
 .u-select.is-link .u-select-heading,
-.u-select.is-link .u-select-heading .u-select-icon { color: var(--color-component-tag); }
-.u-select-heading-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.u-select.is-link .u-select-heading .u-select-icon {
+  color: var(--color-component-tag);
+}
+.u-select-heading-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 
 /* Trailing status dot — pinned right; orange normally, white on the selected row. */
 .u-select-dot {
@@ -963,7 +1209,9 @@ body.is-scrubbing * {
   border-radius: var(--radius-pill);
   background: var(--color-warning);
 }
-.u-select-option.is-selected .u-select-dot { background: var(--color-accent); }
+.u-select-option.is-selected .u-select-dot {
+  background: var(--color-accent);
+}
 
 /* A control that acts ON the row (edit, say) rather than picking it. Kept out of
    sight until the row is under the pointer, so a list of options reads as a list
@@ -987,9 +1235,16 @@ body.is-scrubbing * {
 }
 /* The dot is pinned right by its own auto margin; with an action beside it the
    action takes that job and the dot sits just inside it. */
-.u-select-dot + .u-select-action { margin-left: var(--space-2); }
-.u-select-option.is-active .u-select-action { opacity: 1; }
-.u-select-action:hover { background: var(--color-bg-active); color: var(--color-text-primary); }
+.u-select-dot + .u-select-action {
+  margin-left: var(--space-2);
+}
+.u-select-option.is-active .u-select-action {
+  opacity: 1;
+}
+.u-select-action:hover {
+  background: var(--color-bg-active);
+  color: var(--color-text-primary);
+}
 
 /* ─────────────────────── Field label + reset menu (FieldLabel.tsx) ─────────────────────── */
 /* Dim caption when the field is empty; a blue pill button that opens a reset
@@ -1136,8 +1391,15 @@ body.is-scrubbing * {
   cursor: pointer;
   overflow: hidden;
 }
-.u-color-swatch:disabled { cursor: not-allowed; opacity: 0.6; }
-.u-color-swatch-fill { display: block; width: 100%; height: 100%; }
+.u-color-swatch:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+.u-color-swatch-fill {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
 
 .u-color-picker {
   position: fixed;
@@ -1174,7 +1436,11 @@ body.is-scrubbing * {
   pointer-events: none;
 }
 /* Eyedropper + hue/alpha sliders. */
-.u-color-sliders { display: flex; align-items: center; gap: var(--space-3); }
+.u-color-sliders {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
 .u-color-eyedrop {
   flex: none;
   display: flex;
@@ -1188,9 +1454,19 @@ body.is-scrubbing * {
   color: var(--color-text-secondary);
   cursor: pointer;
 }
-.u-color-eyedrop:hover { color: var(--color-text-primary); }
-.u-color-eyedrop.is-hidden { display: none; }
-.u-color-slider-stack { flex: 1; display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; }
+.u-color-eyedrop:hover {
+  color: var(--color-text-primary);
+}
+.u-color-eyedrop.is-hidden {
+  display: none;
+}
+.u-color-slider-stack {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
 .u-color-slider {
   position: relative;
   height: 12px;
@@ -1199,8 +1475,14 @@ body.is-scrubbing * {
   touch-action: none;
   box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.3);
 }
-.u-color-alpha { background: repeating-conic-gradient(#808080 0% 25%, #a0a0a0 0% 50%) 50% / 10px 10px; }
-.u-color-alpha-fill { position: absolute; inset: 0; border-radius: 6px; }
+.u-color-alpha {
+  background: repeating-conic-gradient(#808080 0% 25%, #a0a0a0 0% 50%) 50% / 10px 10px;
+}
+.u-color-alpha-fill {
+  position: absolute;
+  inset: 0;
+  border-radius: 6px;
+}
 .u-color-slider-thumb {
   position: absolute;
   top: 50%;
@@ -1214,10 +1496,24 @@ body.is-scrubbing * {
 }
 /* Numeric inputs: HEX (wide) + the three channel fields (grouped) + alpha. The
    group + the label row below share the same flex ratios so columns line up. */
-.u-color-inputs { display: flex; gap: var(--space-1); }
-.u-color-field { position: relative; flex: 1; min-width: 0; }
-.u-color-field.is-wide { flex: 1.8; }
-.u-color-channels { flex: 3; display: flex; gap: var(--space-1); min-width: 0; }
+.u-color-inputs {
+  display: flex;
+  gap: var(--space-1);
+}
+.u-color-field {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+.u-color-field.is-wide {
+  flex: 1.8;
+}
+.u-color-channels {
+  flex: 3;
+  display: flex;
+  gap: var(--space-1);
+  min-width: 0;
+}
 .u-color-field-input {
   width: 100%;
   padding: 5px var(--space-2);
@@ -1234,14 +1530,20 @@ body.is-scrubbing * {
 }
 /* Label row (matches the input columns above): HEX and A are static labels; the
    middle spans the three channel fields and IS the notation toggle. */
-.u-color-modes { display: flex; gap: var(--space-1); align-items: center; }
+.u-color-modes {
+  display: flex;
+  gap: var(--space-1);
+  align-items: center;
+}
 .u-color-mode-static {
   flex: 1;
   text-align: center;
   font-size: var(--font-size-2xs);
   color: var(--color-text-tertiary);
 }
-.u-color-mode-static.is-alpha { flex: 1; }
+.u-color-mode-static.is-alpha {
+  flex: 1;
+}
 /* The HEX label is a notation too, so it is a button like the channel pill —
    quiet until it is the one being written. */
 .u-color-mode.is-hex {
@@ -1256,7 +1558,9 @@ body.is-scrubbing * {
   font-size: var(--font-size-2xs);
   cursor: pointer;
 }
-.u-color-mode.is-hex:hover { color: var(--color-text-secondary); }
+.u-color-mode.is-hex:hover {
+  color: var(--color-text-secondary);
+}
 .u-color-mode.is-hex.is-on {
   background: var(--color-bg-surface-high);
   box-shadow: inset 0 0 0 1px var(--color-border-default);
@@ -1288,4 +1592,6 @@ body.is-scrubbing * {
   font-size: var(--font-size-2xs);
   cursor: pointer;
 }
-.u-color-mode.is-channel:hover { background: color-mix(in srgb, #fff 6%, var(--color-bg-surface-high)); }
+.u-color-mode.is-channel:hover {
+  background: color-mix(in srgb, #fff 6%, var(--color-bg-surface-high));
+}

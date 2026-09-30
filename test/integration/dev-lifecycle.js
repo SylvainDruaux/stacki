@@ -15,28 +15,54 @@ async function orchestrate() {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'stacki-dev-integration-'));
   const project = path.join(dir, 'project');
   fs.mkdirSync(path.join(project, 'src', 'pages'), { recursive: true });
-  fs.writeFileSync(path.join(project, 'package.json'), JSON.stringify({
-    name: 'stacki-dev-integration', private: true, type: 'module', dependencies: { astro: ASTRO_VERSION },
-  }));
-  fs.writeFileSync(path.join(project, 'astro.config.mjs'), 'export default { trailingSlash: "always" };\n');
-  fs.writeFileSync(path.join(project, 'src', 'pages', 'index.astro'), '<html><body><h1>Lifecycle fixture</h1></body></html>\n');
+  fs.writeFileSync(
+    path.join(project, 'package.json'),
+    JSON.stringify({
+      name: 'stacki-dev-integration',
+      private: true,
+      type: 'module',
+      dependencies: { astro: ASTRO_VERSION },
+    }),
+  );
+  fs.writeFileSync(
+    path.join(project, 'astro.config.mjs'),
+    'export default { trailingSlash: "always" };\n',
+  );
+  fs.writeFileSync(
+    path.join(project, 'src', 'pages', 'index.astro'),
+    '<html><body><h1>Lifecycle fixture</h1></body></html>\n',
+  );
   writeHoverComponents(project);
   fs.mkdirSync(path.join(project, 'src', 'data'));
-  fs.writeFileSync(path.join(project, 'src', 'data', 'posts.json'), JSON.stringify([{ id: 'hello', title: 'Hello', rank: 1 }]));
-  fs.writeFileSync(path.join(project, 'src', 'content.config.ts'), [
-    "import { defineCollection, reference, z } from 'astro:content';",
-    "import { file } from 'astro/loaders';",
-    "export const collections = { posts: defineCollection({ loader: file('src/data/posts.json'),",
-    "schema: ({ image }) => z.object({ title: z.string().min(3), rank: z.number().int().min(0), live: z.boolean().default(false),",
-    "hero: image().optional(), author: reference('authors').optional(), published: z.coerce.date().optional(),",
-    "flag: z.enum(['true', 'false']).transform((value) => value === 'true').optional(),",
-    "}).refine((data) => data.title !== 'reserved', { message: 'This title is reserved', path: ['title'] }) }),",
-    "authors: defineCollection({ loader: file('src/data/authors.json'), schema: z.object({ name: z.string() }) }) };",
-  ].join('\n'));
-  fs.writeFileSync(path.join(project, 'src', 'data', 'authors.json'), JSON.stringify([{ id: 'author', name: 'Author' }]));
+  fs.writeFileSync(
+    path.join(project, 'src', 'data', 'posts.json'),
+    JSON.stringify([{ id: 'hello', title: 'Hello', rank: 1 }]),
+  );
+  fs.writeFileSync(
+    path.join(project, 'src', 'content.config.ts'),
+    [
+      "import { defineCollection, reference, z } from 'astro:content';",
+      "import { file } from 'astro/loaders';",
+      "export const collections = { posts: defineCollection({ loader: file('src/data/posts.json'),",
+      'schema: ({ image }) => z.object({ title: z.string().min(3), rank: z.number().int().min(0), live: z.boolean().default(false),',
+      "hero: image().optional(), author: reference('authors').optional(), published: z.coerce.date().optional(),",
+      "flag: z.enum(['true', 'false']).transform((value) => value === 'true').optional(),",
+      "}).refine((data) => data.title !== 'reserved', { message: 'This title is reserved', path: ['title'] }) }),",
+      "authors: defineCollection({ loader: file('src/data/authors.json'), schema: z.object({ name: z.string() }) }) };",
+    ].join('\n'),
+  );
+  fs.writeFileSync(
+    path.join(project, 'src', 'data', 'authors.json'),
+    JSON.stringify([{ id: 'author', name: 'Author' }]),
+  );
   const linkedProject = path.join(dir, 'project-link');
   fs.symlinkSync(project, linkedProject, process.platform === 'win32' ? 'junction' : 'dir');
-  const env = { ...process.env, ASTRO_TELEMETRY_DISABLED: '1', STACKI_INTEGRATION_DIR: dir, STACKI_INTEGRATION_PROJECT: linkedProject };
+  const env = {
+    ...process.env,
+    ASTRO_TELEMETRY_DISABLED: '1',
+    STACKI_INTEGRATION_DIR: dir,
+    STACKI_INTEGRATION_PROJECT: linkedProject,
+  };
   delete env.ELECTRON_RUN_AS_NODE;
   delete env.VITE_DEV_SERVER_URL;
   // Avoid invoking the user's interactive shell startup files while discovering
@@ -45,14 +71,22 @@ async function orchestrate() {
   env.PATH = `${path.dirname(process.execPath)}${path.delimiter}${env.PATH || ''}`;
   try {
     console.log(`Installing Astro ${ASTRO_VERSION} in an isolated temporary project…`);
-    const installed = childProcess.spawnSync(process.platform === 'win32' ? 'npm.cmd' : 'npm', [
-      'install', '--no-audit', '--no-fund', '--cache', path.join(dir, 'npm-cache'),
-    ], { cwd: project, env, stdio: 'inherit', timeout: 180000, shell: process.platform === 'win32' });
-    if (installed.error) {throw installed.error;}
+    const installed = childProcess.spawnSync(
+      process.platform === 'win32' ? 'npm.cmd' : 'npm',
+      ['install', '--no-audit', '--no-fund', '--cache', path.join(dir, 'npm-cache')],
+      { cwd: project, env, stdio: 'inherit', timeout: 180000, shell: process.platform === 'win32' },
+    );
+    if (installed.error) {
+      throw installed.error;
+    }
     assert.equal(installed.status, 0, 'fixture dependencies install');
     const electron = require('electron');
     const result = await new Promise((resolve, reject) => {
-      const child = childProcess.spawn(electron, [__filename, '--electron'], { cwd: ROOT, env, stdio: 'inherit' });
+      const child = childProcess.spawn(electron, [__filename, '--electron'], {
+        cwd: ROOT,
+        env,
+        stdio: 'inherit',
+      });
       child.on('error', reject);
       child.on('exit', (code) => resolve(code ?? 1));
     });
@@ -66,7 +100,10 @@ async function inElectron() {
   const electron = require('electron');
   const { app, ipcMain, BrowserWindow } = electron;
   const dir = process.env.STACKI_INTEGRATION_DIR;
-  assert.ok(dir && path.basename(dir).startsWith('stacki-dev-integration-'), 'use the isolated fixture only');
+  assert.ok(
+    dir && path.basename(dir).startsWith('stacki-dev-integration-'),
+    'use the isolated fixture only',
+  );
   const project = process.env.STACKI_INTEGRATION_PROJECT;
   assert.equal(fs.realpathSync(project), fs.realpathSync(path.join(dir, 'project')));
   const userData = path.join(dir, 'user-data');
@@ -79,14 +116,21 @@ async function inElectron() {
   const logs = [];
   const handlers = new Map();
   const register = ipcMain.handle.bind(ipcMain);
-  ipcMain.handle = (channel, handler) => { handlers.set(channel, handler); register(channel, handler); };
+  ipcMain.handle = (channel, handler) => {
+    handlers.set(channel, handler);
+    register(channel, handler);
+  };
   const servers = [];
   const contentWorkers = [];
   const originalSpawn = childProcess.spawn;
   childProcess.spawn = function (cmd, args, options) {
     const child = originalSpawn.apply(this, arguments);
-    if (options?.cwd === project && args?.includes('dev')) {servers.push(child);}
-    if (options?.cwd === project && args?.some((arg) => String(arg).endsWith('read-config.mjs'))) {contentWorkers.push(child);}
+    if (options?.cwd === project && args?.includes('dev')) {
+      servers.push(child);
+    }
+    if (options?.cwd === project && args?.some((arg) => String(arg).endsWith('read-config.mjs'))) {
+      contentWorkers.push(child);
+    }
     return child;
   };
 
@@ -98,12 +142,18 @@ async function inElectron() {
   function HiddenWindow(options) {
     const win = new BrowserWindow({ ...options, show: false, webPreferences: { sandbox: true } });
     win.loadFile = () => win.loadURL('data:text/html,<title>Stacki lifecycle smoke</title>');
-    win.webContents.send = (channel, payload) => { if (channel === 'dev:log') {logs.push(payload);} };
+    win.webContents.send = (channel, payload) => {
+      if (channel === 'dev:log') {
+        logs.push(payload);
+      }
+    };
     return win;
   }
   Object.setPrototypeOf(HiddenWindow, BrowserWindow);
   Module._load = function (name, parent) {
-    if (name === 'electron' && parent?.filename === mainPath) {return { ...electron, BrowserWindow: HiddenWindow };}
+    if (name === 'electron' && parent?.filename === mainPath) {
+      return { ...electron, BrowserWindow: HiddenWindow };
+    }
     return originalLoad.apply(this, arguments);
   };
   require(mainPath);
@@ -116,26 +166,46 @@ async function inElectron() {
     return handlers.get(channel)({}, ...args);
   };
   const groupAlive = (child, group = true) => {
-    if (!child.pid) {return false;}
-    try { process.kill(process.platform === 'win32' || !group ? child.pid : -child.pid, 0); return true; } catch { return false; }
+    if (!child.pid) {
+      return false;
+    }
+    try {
+      process.kill(process.platform === 'win32' || !group ? child.pid : -child.pid, 0);
+      return true;
+    } catch {
+      return false;
+    }
   };
   const waitForExit = async (children, group = true) => {
     const deadline = Date.now() + 10000;
-    while (children.some((child) => groupAlive(child, group)) && Date.now() < deadline) {await sleep(50);}
-    assert.equal(children.filter((child) => groupAlive(child, group)).length, 0, 'all owned server processes and descendants exit');
+    while (children.some((child) => groupAlive(child, group)) && Date.now() < deadline) {
+      await sleep(50);
+    }
+    assert.equal(
+      children.filter((child) => groupAlive(child, group)).length,
+      0,
+      'all owned server processes and descendants exit',
+    );
   };
   const fetchPreview = async (url) => {
     const response = await fetch(url + '/', { signal: AbortSignal.timeout(20000) });
     assert.equal(response.status, 200);
     const html = await response.text();
     assert.match(html, /Lifecycle fixture/);
-    assert.match(html, /<!--avb-s:/, `the generated marker config must serve editable preview HTML\nProject path: ${project}\nCanonical path: ${fs.realpathSync(project)}\nHTML: ${html.slice(0, 2000)}\nDev logs: ${logs.join('').slice(-3000)}`);
+    assert.match(
+      html,
+      /<!--avb-s:/,
+      `the generated marker config must serve editable preview HTML\nProject path: ${project}\nCanonical path: ${fs.realpathSync(project)}\nHTML: ${html.slice(0, 2000)}\nDev logs: ${logs.join('').slice(-3000)}`,
+    );
     return html;
   };
   const say = (message) => fs.writeSync(1, message + '\n');
   const content = require(path.join(ROOT, 'dist', 'electron', 'contentConfig.js'));
   try {
-    const configs = await Promise.all([content.readContentConfig(project), content.readContentConfig(project)]);
+    const configs = await Promise.all([
+      content.readContentConfig(project),
+      content.readContentConfig(project),
+    ]);
     for (const config of configs) {
       assert.equal(config.error, undefined, config.error);
       const posts = config.collections.find((collection) => collection.name === 'posts');
@@ -151,13 +221,22 @@ async function inElectron() {
       assert.equal(posts?.schema.properties.flag.astroTransform, true);
     }
     assert.equal(contentWorkers.length, 1, 'concurrent config reads share one real worker');
-    const valid = await content.validateEntry(project, { collection: 'posts', data: { title: 'Hello', rank: 1 } });
+    const valid = await content.validateEntry(project, {
+      collection: 'posts',
+      data: { title: 'Hello', rank: 1 },
+    });
     assert.equal(valid.error, undefined, valid.error);
     assert.equal(valid.issues.length, 0);
-    const invalid = await content.validateEntry(project, { collection: 'posts', data: { title: 'x', rank: -1 } });
+    const invalid = await content.validateEntry(project, {
+      collection: 'posts',
+      data: { title: 'x', rank: -1 },
+    });
     assert.equal(invalid.error, undefined, invalid.error);
     assert.deepEqual(invalid.issues.map((issue) => issue.path.join('.')).sort(), ['rank', 'title']);
-    const refined = await content.validateEntry(project, { collection: 'posts', data: { title: 'reserved', rank: 1 } });
+    const refined = await content.validateEntry(project, {
+      collection: 'posts',
+      data: { title: 'reserved', rank: 1 },
+    });
     assert.match(refined.issues[0]?.message, /reserved/);
     content.stopAllServices();
     await waitForExit(contentWorkers, false);
@@ -168,15 +247,22 @@ async function inElectron() {
     const projectRequire = require('node:module').createRequire(path.join(project, 'package.json'));
     const schemaBundle = path.join(dir, 'schema-v4.mjs');
     await projectRequire('esbuild').build({
-      stdin: { contents: [
-        "import { z } from 'astro/zod';",
-        `import { withMetadata, toJsonSchema } from ${JSON.stringify(
-          path.join(ROOT, 'dist', 'electron', 'content', 'schemaTools.mjs'),
-        )};`,
-        "export const result = toJsonSchema(z.object({ title: z.string().min(3), hero: withMetadata(z.string(), { astroImage: true }), date: z.coerce.date(), flag: z.string().transform(Boolean) }));",
-      ].join('\n'), resolveDir: project },
-      outfile: schemaBundle, bundle: true, platform: 'node', format: 'esm',
-      alias: { 'astro/zod': projectRequire.resolve('zod/v4') }, logLevel: 'silent',
+      stdin: {
+        contents: [
+          "import { z } from 'astro/zod';",
+          `import { withMetadata, toJsonSchema } from ${JSON.stringify(
+            path.join(ROOT, 'dist', 'electron', 'content', 'schemaTools.mjs'),
+          )};`,
+          'export const result = toJsonSchema(z.object({ title: z.string().min(3), hero: withMetadata(z.string(), { astroImage: true }), date: z.coerce.date(), flag: z.string().transform(Boolean) }));',
+        ].join('\n'),
+        resolveDir: project,
+      },
+      outfile: schemaBundle,
+      bundle: true,
+      platform: 'node',
+      format: 'esm',
+      alias: { 'astro/zod': projectRequire.resolve('zod/v4') },
+      logLevel: 'silent',
     });
     const modern = (await import(require('node:url').pathToFileURL(schemaBundle).href)).result;
     assert.equal(modern.properties.title.minLength, 3);
@@ -208,7 +294,9 @@ async function inElectron() {
     const spawning = invoke('dev:start', project);
     const cancelled = assert.rejects(spawning, /cancelled/);
     const deadline = Date.now() + 10000;
-    while (servers.length < 3 && Date.now() < deadline) {await sleep(5);}
+    while (servers.length < 3 && Date.now() < deadline) {
+      await sleep(5);
+    }
     assert.equal(servers.length, 3, 'cancellation reaches a real spawned process');
     await invoke('project:close');
     await cancelled;
@@ -225,38 +313,57 @@ async function inElectron() {
     // empty userData, after project teardown has returned to the welcome screen.
     const dist = path.join(ROOT, 'dist', 'renderer', 'index.html');
     if (fs.existsSync(dist)) {
-      const renderer = new BrowserWindow({ show: false, webPreferences: {
-        preload: path.join(ROOT, 'dist', 'electron', 'preload.js'),
-        contextIsolation: true,
-        nodeIntegration: false,
-      } });
+      const renderer = new BrowserWindow({
+        show: false,
+        webPreferences: {
+          preload: path.join(ROOT, 'dist', 'electron', 'preload.js'),
+          contextIsolation: true,
+          nodeIntegration: false,
+        },
+      });
       const preloadErrors = [];
-      renderer.webContents.on('preload-error', (_event, _file, error) => preloadErrors.push(error.message));
+      renderer.webContents.on('preload-error', (_event, _file, error) =>
+        preloadErrors.push(error.message),
+      );
       await renderer.loadFile(dist);
       const bootDeadline = Date.now() + 10000;
       let welcome = false;
       while (!welcome && Date.now() < bootDeadline) {
-        welcome = await renderer.webContents.executeJavaScript("!!window.avb && !!document.querySelector('.welcome')");
-        if (!welcome) {await sleep(50);}
+        welcome = await renderer.webContents.executeJavaScript(
+          "!!window.avb && !!document.querySelector('.welcome')",
+        );
+        if (!welcome) {
+          await sleep(50);
+        }
       }
       assert.deepEqual(preloadErrors, []);
       assert.equal(welcome, true, 'production renderer and preload reach the welcome screen');
       renderer.destroy();
       say('PASS production dist/preload boots the welcome screen in a hidden window');
     }
-    say(`dev-lifecycle integration: passed (Electron ${process.versions.electron}, Astro ${ASTRO_VERSION})`);
+    say(
+      `dev-lifecycle integration: passed (Electron ${process.versions.electron}, Astro ${ASTRO_VERSION})`,
+    );
   } finally {
     content.stopAllServices();
     await invoke('project:close').catch(() => {});
     for (const child of contentWorkers) {
-      if (groupAlive(child, false)) { try { child.kill('SIGKILL'); } catch {} }
+      if (groupAlive(child, false)) {
+        try {
+          child.kill('SIGKILL');
+        } catch {}
+      }
     }
     for (const child of servers) {
       if (groupAlive(child)) {
-        try { process.kill(process.platform === 'win32' ? child.pid : -child.pid, 'SIGKILL'); } catch {}
+        try {
+          process.kill(process.platform === 'win32' ? child.pid : -child.pid, 'SIGKILL');
+        } catch {}
       }
     }
-    for (const win of BrowserWindow.getAllWindows()) {win.destroy();}
+    for (const win of BrowserWindow.getAllWindows()) {
+      win.destroy();
+    }
   }
 }
 
@@ -264,18 +371,23 @@ function writeHoverComponents(project) {
   for (const folder of ['Interactive', 'Other']) {
     fs.mkdirSync(path.join(project, 'src', 'components', folder), { recursive: true });
   }
-  fs.writeFileSync(path.join(project, 'src/components/Interactive/AccordionItem.astro'), [
-    '---',
-    'type Props = { heading?: string; render?: boolean };',
-    'const { heading, render = true } = Astro.props;',
-    'const content = await Astro.slots.render("default");',
-    '---',
-    '{render && heading && content && (',
-    '  <details><summary>{heading}</summary><p set:html={content} /></details>',
-    ')}',
-  ].join('\n'));
-  fs.writeFileSync(path.join(project, 'src/components/Other/AccordionItem.astro'),
-    '<p>Distinct other component</p>\n');
+  fs.writeFileSync(
+    path.join(project, 'src/components/Interactive/AccordionItem.astro'),
+    [
+      '---',
+      'type Props = { heading?: string; render?: boolean };',
+      'const { heading, render = true } = Astro.props;',
+      'const content = await Astro.slots.render("default");',
+      '---',
+      '{render && heading && content && (',
+      '  <details><summary>{heading}</summary><p set:html={content} /></details>',
+      ')}',
+    ].join('\n'),
+  );
+  fs.writeFileSync(
+    path.join(project, 'src/components/Other/AccordionItem.astro'),
+    '<p>Distinct other component</p>\n',
+  );
 }
 
 async function verifyHoverPreview(base) {
@@ -298,10 +410,16 @@ async function verifyHoverPreview(base) {
 
 if (process.argv.includes('--electron')) {
   const { app } = require('electron');
-  inElectron().then(() => app.exit(0), (error) => {
-    fs.writeSync(2, String(error.stack || error) + '\n');
-    app.exit(1);
-  });
+  inElectron().then(
+    () => app.exit(0),
+    (error) => {
+      fs.writeSync(2, String(error.stack || error) + '\n');
+      app.exit(1);
+    },
+  );
 } else {
-  orchestrate().catch((error) => { console.error(error); process.exitCode = 1; });
+  orchestrate().catch((error) => {
+    console.error(error);
+    process.exitCode = 1;
+  });
 }

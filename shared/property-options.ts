@@ -8,7 +8,7 @@ export function literalOptions(type: string): readonly string[] | undefined {
   }
   const remaining = type.replace(
     /"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|-?\d+(?:\.\d+)?|true|false/g,
-    ''
+    '',
   );
   if (!/^\s*(?:\|\s*)*$/.test(remaining)) {
     return undefined;

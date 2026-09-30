@@ -16,13 +16,17 @@ const { readContentConfig, stopAllServices } = require('../dist/electron/content
 const { listEntries, countEntries, coveredPaths } = require('../dist/electron/contentEntries.js');
 
 const DEFAULT_FIXTURE = path.join(os.homedir(), 'Downloads', 'awesome-client-main');
-const source = path.resolve(process.argv[2] || process.env.STACKI_CONTENT_FIXTURE || DEFAULT_FIXTURE);
+const source = path.resolve(
+  process.argv[2] || process.env.STACKI_CONTENT_FIXTURE || DEFAULT_FIXTURE,
+);
 
 const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
+  if (!condition) {
+    failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  }
 };
 const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -32,11 +36,14 @@ function listCms(root) {
   const files = [];
   const walk = (dir, rel) => {
     for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-      if (entry.name.startsWith('.') || entry.name === 'node_modules') {continue;}
+      if (entry.name.startsWith('.') || entry.name === 'node_modules') {
+        continue;
+      }
       const full = path.join(dir, entry.name);
       const entryRel = rel ? `${rel}/${entry.name}` : entry.name;
-      if (entry.isDirectory()) {walk(full, entryRel);}
-      else if (/\.json$/i.test(entry.name)) {
+      if (entry.isDirectory()) {
+        walk(full, entryRel);
+      } else if (/\.json$/i.test(entry.name)) {
         try {
           files.push({
             rel: entryRel,
@@ -124,7 +131,7 @@ function listCms(root) {
           onSelectContent: () => {},
           onOpenSettings: () => {},
           showToast: () => {},
-        })
+        }),
       );
       await settle(80);
     });
@@ -132,7 +139,9 @@ function listCms(root) {
   const all = (selector) => [...container.querySelectorAll(selector)];
   const text = () => container.textContent;
   const rowNamed = (name) =>
-    all('.cms-collection').find((node) => node.querySelector('.cms-collection-name')?.textContent === name);
+    all('.cms-collection').find(
+      (node) => node.querySelector('.cms-collection-name')?.textContent === name,
+    );
 
   // --- both sources present --------------------------------------------------
   await mount({ listCms: async (root) => listCms(root), contentCollections });
@@ -140,13 +149,17 @@ function listCms(root) {
   check(
     'with every collection counted',
     /26 collections/.test(rowNamed('Content collections')?.textContent || ''),
-    rowNamed('Content collections')?.textContent
+    rowNamed('Content collections')?.textContent,
   );
   check('and the project does not read as empty', !/No content found/.test(text()));
   check(
     'a data file a collection owns is not listed twice',
-    !all('.cms-collection').some((n) => /^Data$/.test(n.querySelector('.cms-collection-name')?.textContent || '')),
-    all('.cms-collection').map((n) => n.querySelector('.cms-collection-name')?.textContent).join(', ')
+    !all('.cms-collection').some((n) =>
+      /^Data$/.test(n.querySelector('.cms-collection-name')?.textContent || ''),
+    ),
+    all('.cms-collection')
+      .map((n) => n.querySelector('.cms-collection-name')?.textContent)
+      .join(', '),
   );
 
   // --- the content config cannot be read ------------------------------------
@@ -159,7 +172,7 @@ function listCms(root) {
   check(
     'a broken content config leaves the JSON files listed',
     all('.cms-collection').length > 0,
-    'the panel went empty because one of its two questions failed'
+    'the panel went empty because one of its two questions failed',
   );
   check('and does not claim the project is empty', !/No content found/.test(text()));
 
@@ -168,7 +181,10 @@ function listCms(root) {
   check('a missing bridge is survivable', all('.cms-collection').length > 0);
 
   // --- a project with neither ------------------------------------------------
-  await mount({ listCms: async () => ({ files: [] }), contentCollections: async () => ({ collections: [] }) });
+  await mount({
+    listCms: async () => ({ files: [] }),
+    contentCollections: async () => ({ collections: [] }),
+  });
   check('an actually empty project says so', /No content found/.test(text()));
 
   await act(async () => reactRoot.unmount());

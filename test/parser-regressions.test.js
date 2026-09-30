@@ -19,7 +19,7 @@ test('empty frontmatter closes before body text beginning with dashes', () => {
   assert.equal(parsePage('---\r\n---\r\n<p>x</p>').model.extraFrontmatter, '');
 });
 
-test('closing-fence suffixes retain the Astro compiler\'s existing support', () => {
+test("closing-fence suffixes retain the Astro compiler's existing support", () => {
   const source = '---\nconst note = 1;\n---body text\n<p>Text</p>\n';
   const parsed = parsePage(source);
   assert.equal(parsed.editable, true);
@@ -48,7 +48,10 @@ test('unknown entities never resolve through Object.prototype', () => {
 test('package attribution handles Windows, nested dependencies, and pnpm', () => {
   assert.equal(packageOf('C:\\site\\node_modules\\@scope\\cards\\Page.astro'), '@scope/cards');
   assert.equal(packageOf('/site/node_modules/outer/node_modules/inner/Page.astro'), 'inner');
-  assert.equal(packageOf('/site/node_modules/.pnpm/@scope+cards@1.0/node_modules/@scope/cards/Page.astro'), '@scope/cards');
+  assert.equal(
+    packageOf('/site/node_modules/.pnpm/@scope+cards@1.0/node_modules/@scope/cards/Page.astro'),
+    '@scope/cards',
+  );
   assert.equal(packageOf('/site/mynode_modules/not-a-package/Page.astro'), null);
   assert.equal(packageOf('node_modules/package/Page.astro'), 'package');
 });

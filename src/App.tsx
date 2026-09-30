@@ -160,7 +160,7 @@ import type { InsertItem } from './ui/InsertSearch';
 import { toRecord } from '../shared/record';
 import { projectRelativePath } from './projectPath.js';
 import { currentDesktopPlatform, shortcutLabel } from './shortcutLabel.js';
-import { sourceNodeAtOffset } from './codePanelModel.js'
+import { sourceNodeAtOffset } from './codePanelModel.js';
 import {
   codeWindowFor,
   FRONTMATTER_SUBJECT,
@@ -257,7 +257,11 @@ import {
 import { judgeCanvasEvent, type ShownFile } from './previewGate';
 import { describePreviewStale, type PreviewVerdict } from '../shared/preview-token';
 import type { JudgeCanvasEvent } from './panels/previewRuntime';
-import { describePreviewReload, parseShortcutMessage, type PreviewReloadReason } from './previewMessages';
+import {
+  describePreviewReload,
+  parseShortcutMessage,
+  type PreviewReloadReason,
+} from './previewMessages';
 
 // Each optional editor owns its loading boundary so opening it keeps the
 // canvas and neighboring panels visible and interactive.
@@ -269,7 +273,7 @@ const CmsView = lazyPanel(() => import('./panels/CmsView'));
 const ContentView = lazyPanel(() => import('./panels/ContentView'));
 const VariablesPanel = lazyPanel(() => import('./panels/VariablesPanel'));
 const VariablesView = lazyPanel(() => import('./panels/VariablesView'));
-const CodePanel = lazyPanel(() => import('./panels/CodePanel'))
+const CodePanel = lazyPanel(() => import('./panels/CodePanel'));
 
 // A node a gesture creates has no parse yet to name it: its handle is random,
 // unique without a counter, and carried onto the reply that first contains it
@@ -337,11 +341,17 @@ function defaultText(tag: string): string | undefined {
 // to refuse over (the fix is a prop, and only the author knows its name) but
 // very much something to say out loud.
 function usesPageScope(node: PageNode | null | undefined): boolean {
-  if (!node) {return false;}
-  if (['expr', 'cond', 'map', 'branch'].includes(node.kind)) {return true;}
+  if (!node) {
+    return false;
+  }
+  if (['expr', 'cond', 'map', 'branch'].includes(node.kind)) {
+    return true;
+  }
   const props = 'props' in node ? node.props : undefined;
   for (const value of Object.values(props || {})) {
-    if (value && value.type === 'expr') {return true;}
+    if (value && value.type === 'expr') {
+      return true;
+    }
   }
   const children = 'children' in node ? node.children : undefined;
   return (children || []).some(usesPageScope);
@@ -370,9 +380,14 @@ function definitionOf(
   insertables: readonly ScanComponent[],
 ): ScanComponent | null {
   const byName = insertables.find((c) => c.name === node.name);
-  if (byName) {return byName;}
+  if (byName) {
+    return byName;
+  }
   const imp = (model.imports || []).find((i) => i.name === node.name);
-  const base = imp?.path.split('/').pop()?.replace(/\.astro$/i, '');
+  const base = imp?.path
+    .split('/')
+    .pop()
+    ?.replace(/\.astro$/i, '');
   return (base && insertables.find((c) => c.name === base)) || null;
 }
 
@@ -384,10 +399,14 @@ function findElementByTag(
   tag: string,
 ): PairedNode | null {
   for (const n of nodes || []) {
-    if (n.kind === 'element' && String(n.name).toLowerCase() === tag) {return n;}
+    if (n.kind === 'element' && String(n.name).toLowerCase() === tag) {
+      return n;
+    }
     if ('children' in n && Array.isArray(n.children)) {
       const found = findElementByTag(n.children, tag);
-      if (found) {return found;}
+      if (found) {
+        return found;
+      }
     }
   }
   return null;
@@ -403,8 +422,15 @@ function openingSelection(nodes: readonly PageNode[] | null | undefined): PageNo
       const markup = node.kind === 'element' || node.kind === 'component';
       if (SLOT_TRANSPARENT.has(node.kind) || (markup && ['Fragment', 'slot'].includes(node.name))) {
         const child = firstRendered('children' in node ? node.children : undefined);
-        if (child) {return child;}
-      } else if (markup && !['head', 'script', 'style', 'link', 'meta', 'title', 'base', 'template'].includes(node.name)) {
+        if (child) {
+          return child;
+        }
+      } else if (
+        markup &&
+        !['head', 'script', 'style', 'link', 'meta', 'title', 'base', 'template'].includes(
+          node.name,
+        )
+      ) {
         return node;
       }
     }
@@ -435,12 +461,16 @@ function openFileSelection(
   result: EditorPageState,
   selectionPath: string | null,
 ): PageNode | null {
-  if (!result.editable) {return null;}
+  if (!result.editable) {
+    return null;
+  }
   if (selectionPath) {
     const localPath = selectionPath.split('|').at(-1);
     assert(localPath !== undefined, 'A stored component path must have a local path');
     const selected = nodeAtPath(result.model.nodes, localPath.split('.').map(Number));
-    if (selected) {return selected;}
+    if (selected) {
+      return selected;
+    }
   }
   return entry.kind === 'component'
     ? openingSelection(result.model.nodes)
@@ -451,8 +481,12 @@ function collectUsedNames(model: PageModel): Set<string> {
   const used = new Set<string>();
   const walk = (list: readonly PageNode[]): void => {
     for (const node of list) {
-      if ('name' in node && node.name) {used.add(node.name);}
-      if ('children' in node && Array.isArray(node.children)) {walk(node.children);}
+      if ('name' in node && node.name) {
+        used.add(node.name);
+      }
+      if ('children' in node && Array.isArray(node.children)) {
+        walk(node.children);
+      }
     }
   };
   walk(model.nodes);
@@ -483,14 +517,24 @@ function codeText(model: PageModel): string {
   const parts = [stripComments(model.extraFrontmatter || '')];
   const walk = (list: readonly PageNode[]): void => {
     for (const node of list) {
-      if (node.kind === 'expr' || node.kind === 'raw-line') {parts.push(node.value || '');}
-      if (node.kind === 'map') {parts.push(node.head || '');}
-      if (node.kind === 'cond') {parts.push(node.test || '');}
+      if (node.kind === 'expr' || node.kind === 'raw-line') {
+        parts.push(node.value || '');
+      }
+      if (node.kind === 'map') {
+        parts.push(node.head || '');
+      }
+      if (node.kind === 'cond') {
+        parts.push(node.test || '');
+      }
       const props = 'props' in node ? node.props : undefined;
       for (const v of Object.values(props || {})) {
-        if (v && (v.type === 'expr' || v.type === 'spread')) {parts.push(String(v.value ?? ''));}
+        if (v && (v.type === 'expr' || v.type === 'spread')) {
+          parts.push(String(v.value ?? ''));
+        }
       }
-      if ('children' in node && Array.isArray(node.children)) {walk(node.children);}
+      if ('children' in node && Array.isArray(node.children)) {
+        walk(node.children);
+      }
     }
   };
   walk(model.nodes);
@@ -524,7 +568,7 @@ function tagChangeGesture(
   const kept = change.dropped.length > 0 ? removal.apply(model) : model;
   const before = findNodeById(kept.nodes, node.id);
   assert(before !== null, 'The renamed node survives its attribute removals');
-  const children = VOID_TAGS.has(change.name) ? null : before.children ?? null;
+  const children = VOID_TAGS.has(change.name) ? null : (before.children ?? null);
   // A fresh copy, so taking the old tag's flags off it edits nothing shown.
   const next: EditorNode = Object.assign({}, before, {
     kind: change.kind,
@@ -533,11 +577,15 @@ function tagChangeGesture(
   });
   Reflect.deleteProperty(next, 'dynamicTag');
   Reflect.deleteProperty(next, 'astroAsset');
-  if (change.asset) {Object.assign(next, { astroAsset: true });}
+  if (change.asset) {
+    Object.assign(next, { astroAsset: true });
+  }
   const rename = tagRenameGesture(node, next, options);
   const renamed = rename.apply(kept);
   const named = change.dropped.length > 0 ? sequence(removal, rename) : rename;
-  if (frontmatterOf(imports(renamed)) === frontmatterOf(renamed)) {return named;}
+  if (frontmatterOf(imports(renamed)) === frontmatterOf(renamed)) {
+    return named;
+  }
   return sequence(named, frontmatterGesture(renamed, imports, options));
 }
 
@@ -669,11 +717,17 @@ function saveDelay(urgency: boolean | 'live'): number {
 // and answers the other with a 404 help page. So the project's trailingSlash
 // is applied on the way from one to the other, never before.
 function routeToPath(route: string, trailingSlash: TrailingSlash): string {
-  if (!route || route === '/') {return route || '/';}
+  if (!route || route === '/') {
+    return route || '/';
+  }
   // An extension means a file, not a directory-style route: /rss.xml keeps
   // its shape under every setting, which is also how Astro checks it.
-  if (trailingSlash === 'always') {return /\.[^/]+$/.test(route) ? route : route + '/';}
-  if (trailingSlash === 'never') {return route.replace(/\/$/, '');}
+  if (trailingSlash === 'always') {
+    return /\.[^/]+$/.test(route) ? route : route + '/';
+  }
+  if (trailingSlash === 'never') {
+    return route.replace(/\/$/, '');
+  }
   return route; // 'ignore' — the default, and it serves either
 }
 
@@ -713,7 +767,7 @@ function withPrunedImports(model: EditorModel): EditorModel {
   const mentioned = (name: string): boolean =>
     new RegExp(`\\b${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`).test(code);
   const imports = model.imports.filter(
-    (i) => !prunableImport(i) || used.has(i.name) || mentioned(i.name)
+    (i) => !prunableImport(i) || used.has(i.name) || mentioned(i.name),
   );
   return imports.length === model.imports.length ? model : { ...model, imports };
 }
@@ -728,10 +782,14 @@ function chooseImportPath(
   const { relative, srcRelative } = paths;
   if (srcRelative) {
     for (const imp of model.imports) {
-      if (imp.path.startsWith('.')) {continue;}
+      if (imp.path.startsWith('.')) {
+        continue;
+      }
       for (const marker of ['/components/', '/layouts/']) {
         const idx = imp.path.indexOf(marker);
-        if (idx > 0) {return imp.path.slice(0, idx + 1) + srcRelative;}
+        if (idx > 0) {
+          return imp.path.slice(0, idx + 1) + srcRelative;
+        }
       }
     }
   }
@@ -744,8 +802,12 @@ function chooseImportPath(
 // hold text. Kept in step with it by hand; the two disagreeing would mean a
 // double-click that focuses a field which isn't there.
 function holdsInlineText(node: PageNode | null | undefined): boolean {
-  if (!node || node.kind !== 'element') {return false;}
-  if (VOID_TAGS.has(String(node.name).toLowerCase())) {return false;}
+  if (!node || node.kind !== 'element') {
+    return false;
+  }
+  if (VOID_TAGS.has(String(node.name).toLowerCase())) {
+    return false;
+  }
   const kids = node.children;
   return isInlineOnly(kids) || !Array.isArray(kids) || kids.length === 0;
 }
@@ -784,10 +846,9 @@ export default function App() {
   const [nodeStates, setNodeStates] = useState<NodeStates | null>(null);
   // path -> the classes that node rendered with, for labelling rows whose
   // class is an expression the source can't resolve.
-  const [nodeClasses, setNodeClasses] = useState<
-    Readonly<Record<string, readonly string[]>
-  > | null
-  >(null);
+  const [nodeClasses, setNodeClasses] = useState<Readonly<
+    Record<string, readonly string[]>
+  > | null>(null);
   const [devUrl, setDevUrl] = useState<string | null>(null);
   const [trailingSlash, setTrailingSlash] = useState<TrailingSlash>('ignore');
   const [devStatus, setDevStatus] = useState<DevStatus>('off');
@@ -824,7 +885,7 @@ export default function App() {
   const componentPropertiesOpen = currentPage?.kind === 'component';
   useEffect(() => {
     if (!componentPropertiesOpen) {
-      setLeftTab((tab) => ( tab === 'properties' ? 'navigator' : tab));
+      setLeftTab((tab) => (tab === 'properties' ? 'navigator' : tab));
     }
   }, [componentPropertiesOpen]);
   const [cmsRel, setCmsRel] = useState<string | null>(null);
@@ -887,7 +948,7 @@ export default function App() {
   // Components win a name collision: they're the more likely intent.
   const insertables = useMemo(
     () => [...scan.components, ...scan.layouts],
-    [scan.components, scan.layouts]
+    [scan.components, scan.layouts],
   );
 
   const saveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -905,7 +966,9 @@ export default function App() {
     const model = pageState?.editable ? pageState.model : null;
     const before = shownModelRef.current;
     shownModelRef.current = model;
-    if (!model || !before || before === model) {return;}
+    if (!model || !before || before === model) {
+      return;
+    }
     setSelectedId((id) => {
       if (!id || id === 'layout' || id === 'frontmatter' || findNodeById(model.nodes, id)) {
         return id;
@@ -953,7 +1016,9 @@ export default function App() {
   // projectRef is declared further down, but this only reads it when called.
   const diagnose = useCallback(() => {
     const p = projectRef.current?.path;
-    if (!p) {return;}
+    if (!p) {
+      return;
+    }
     diagnoseProject(p)
       .then((d) => setDevDiag(d))
       .catch(() => setDevDiag(null));
@@ -965,7 +1030,9 @@ export default function App() {
     clearAssetRequest();
     setAssetPick(null);
     setLeftTab((t) => {
-      if (t !== 'assets') {return t;}
+      if (t !== 'assets') {
+        return t;
+      }
       // Answering the field ends the errand: show the element it belongs to
       // rather than leaving the user parked in the asset browser — including
       // when the browser is where they started, which used to strand them.
@@ -975,12 +1042,16 @@ export default function App() {
     tabBeforePick.current = null;
     // The navigator opens on the element that was just given an asset, not
     // wherever it happened to be scrolled.
-    if (picked === true) {setRevealTick((n) => n + 1);}
+    if (picked === true) {
+      setRevealTick((n) => n + 1);
+    }
   }, []);
 
   useEffect(() => {
     return onAssetRequest((req) => {
-      if (!req) {return;} // cleared from this side already
+      if (!req) {
+        return;
+      } // cleared from this side already
       setAssetPick({
         ...req,
         // The entry rides along: which root it came from decides whether the
@@ -991,7 +1062,9 @@ export default function App() {
         },
       });
       setLeftTab((t) => {
-        if (t !== 'assets') {tabBeforePick.current = t;}
+        if (t !== 'assets') {
+          tabBeforePick.current = t;
+        }
         return 'assets';
       });
     });
@@ -1041,12 +1114,17 @@ export default function App() {
   // time a probe actually runs, and the watch has no reason to be rebuilt just
   // because the route changed.
   useEffect(() => {
-    if (!devUrl) {return undefined;}
+    if (!devUrl) {
+      return undefined;
+    }
     // Both of these arrive with the main process, which does not reload when the
     // renderer does (see VITE_DEV_SERVER_URL): a renderer newer than the bridge
     // would call undefined and take the app down with it. Absent means there is
     // nothing to ask, which is the same answer as having no dev server.
-    if (typeof window.avb.probeDevPage !== 'function' || typeof window.avb.onPageMaybeChanged !== 'function') {
+    if (
+      typeof window.avb.probeDevPage !== 'function' ||
+      typeof window.avb.onPageMaybeChanged !== 'function'
+    ) {
       return undefined;
     }
     const watch = createPreviewWatch({
@@ -1062,7 +1140,9 @@ export default function App() {
       // that stayed open, a machine that slept) nothing says so: the page just
       // stops updating and the only way to see an edit is the refresh button.
       // The app's own watcher saw this change, so it says it directly too.
-      if (event.external) {tellCanvas({ type: 'avb:patch-now' });}
+      if (event.external) {
+        tellCanvas({ type: 'avb:patch-now' });
+      }
     });
     return () => {
       offWrite();
@@ -1091,10 +1171,16 @@ export default function App() {
           const result = await scanProject(projectPath);
           if (projectScansRef.current === opened && !opened.scans.superseded()) {
             setScan(result);
-            if (result.trailingSlash) {setTrailingSlash(parseTrailingSlash(result.trailingSlash));}
-            readProjectClasses(projectPath).then((classes) => {
-              if (projectScansRef.current === opened) {setProjectClasses(classes || []);}
-            }).catch(() => {});
+            if (result.trailingSlash) {
+              setTrailingSlash(parseTrailingSlash(result.trailingSlash));
+            }
+            readProjectClasses(projectPath)
+              .then((classes) => {
+                if (projectScansRef.current === opened) {
+                  setProjectClasses(classes || []);
+                }
+              })
+              .catch(() => {});
           }
           return result;
         }),
@@ -1113,13 +1199,15 @@ export default function App() {
         const started = await startProjectPreview(projectPath);
         const { url, trailingSlash: resolved } = started;
         setDevUrl(url);
-        if (resolved) {setTrailingSlash(parseTrailingSlash(resolved));}
+        if (resolved) {
+          setTrailingSlash(parseTrailingSlash(resolved));
+        }
         setDevStatus('on');
         setDevDiag(null);
         if ('external' in started && started.external) {
           showToast(
             `Reusing the dev server already running for this project (${url}) — canvas outlines need the app's own server, so stop that one to enable them.`,
-            'info'
+            'info',
           );
         }
       } catch (err) {
@@ -1132,7 +1220,7 @@ export default function App() {
         diagnose();
       }
     },
-    [showToast, diagnose]
+    [showToast, diagnose],
   );
 
   const loadProject = useCallback(
@@ -1158,11 +1246,12 @@ export default function App() {
       startPreview(projectPath);
       void watchProject(projectPath).catch(() => {});
 
-      const first =
-        result.pages.find((p) => p.name === 'index.astro') || result.pages[0] || null;
-      if (first) {selectPage(first);}
+      const first = result.pages.find((p) => p.name === 'index.astro') || result.pages[0] || null;
+      if (first) {
+        selectPage(first);
+      }
     },
-    [rescan, startPreview] // eslint-disable-line react-hooks/exhaustive-deps
+    [rescan, startPreview], // eslint-disable-line react-hooks/exhaustive-deps
   );
 
   // A window can come up owing a project: one was picked from the menu and the
@@ -1171,7 +1260,9 @@ export default function App() {
   // somebody closed, both of which belong on the welcome screen.
   const reopenedRef = useRef(false);
   useEffect(() => {
-    if (reopenedRef.current || !window.avb.pendingProject) {return;}
+    if (reopenedRef.current || !window.avb.pendingProject) {
+      return;
+    }
     reopenedRef.current = true;
     pendingProject()
       .then((path) => {
@@ -1182,7 +1273,6 @@ export default function App() {
       })
       .catch(() => {});
   }, [loadProject]);
-
 
   // ----------------------------------------------------------------
   // Page loading & saving
@@ -1276,17 +1366,21 @@ export default function App() {
       }
       await closeProject(next);
     },
-    [flushSave, showToast]
+    [flushSave, showToast],
   );
 
   useEffect(() => {
     const offClose = window.avb.onMenu('closeProject', () => {
-      if (projectRef.current) {void leaveProject(null);}
+      if (projectRef.current) {
+        void leaveProject(null);
+      }
     });
     const offOpen = window.avb.onMenu('openProject', async () => {
       const picked = await openProject();
       const next = !picked.canceled && 'projectPath' in picked ? picked.projectPath : null;
-      if (!next) {return;}
+      if (!next) {
+        return;
+      }
       // Nothing open yet: this IS the welcome screen's own button.
       if (!projectRef.current) {
         loadProject(next);
@@ -1310,29 +1404,41 @@ export default function App() {
       try {
         await flushSave();
       } catch (err) {
-        if (request === pageLoadRef.current) {showToast(`Save failed: ${cleanError(err)}`, 'error');}
+        if (request === pageLoadRef.current) {
+          showToast(`Save failed: ${cleanError(err)}`, 'error');
+        }
         return;
       }
-      if (request !== pageLoadRef.current) {return;}
+      if (request !== pageLoadRef.current) {
+        return;
+      }
       const beforeRead = pageStateRef.current;
       let result: EditorPageState;
       try {
         const read = await readPage(entry.path);
         result = toEditorPageState(read);
       } catch (err) {
-        if (request === pageLoadRef.current) {showToast(`Couldn’t open ${entry.name}: ${cleanError(err)}`, 'error');}
+        if (request === pageLoadRef.current) {
+          showToast(`Couldn’t open ${entry.name}: ${cleanError(err)}`, 'error');
+        }
         return;
       }
-      if (request !== pageLoadRef.current) {return;}
+      if (request !== pageLoadRef.current) {
+        return;
+      }
       // The existing editor stays mounted while reading. Save anything typed
       // in that interval before handing the editor to the destination file.
       try {
         await flushSave();
       } catch (err) {
-        if (request === pageLoadRef.current) {showToast(`Save failed: ${cleanError(err)}`, 'error');}
+        if (request === pageLoadRef.current) {
+          showToast(`Save failed: ${cleanError(err)}`, 'error');
+        }
         return;
       }
-      if (request !== pageLoadRef.current) {return;}
+      if (request !== pageLoadRef.current) {
+        return;
+      }
       const latest = pageStateRef.current;
       // Reopening the same file must not replace an edit made during the read
       // with the older snapshot that read returned.
@@ -1355,7 +1461,7 @@ export default function App() {
       setSelectedId(start?.id ?? null);
       dropPageHistory(); // page snapshots don't apply to another page; commands stay
     },
-    [flushSave, showToast]
+    [flushSave, showToast],
   );
 
   // What's typed in the URL bar while it's being edited; null means "show the
@@ -1369,7 +1475,7 @@ export default function App() {
       const entry: OpenFile = { ...page, kind: 'page' };
       await openFile(entry, { nextStack: [entry], selectionPath: null });
     },
-    [openFile]
+    [openFile],
   );
 
   // An injected route has no file in this project to open — its source lives
@@ -1387,14 +1493,16 @@ export default function App() {
         }
         return;
       }
-      if (request !== pageLoadRef.current) {return;}
+      if (request !== pageLoadRef.current) {
+        return;
+      }
       setEditStack([]);
       setCurrentPage({ kind: 'route', name: entry.route, route: entry.route, from: entry.from });
       setPageState(null);
       setSelectedId(null);
       setHoverNodeId(null);
     },
-    [flushSave, showToast]
+    [flushSave, showToast],
   );
 
   // Enter in the URL bar. A route names a page file, so this switches the
@@ -1405,15 +1513,20 @@ export default function App() {
     (typed: string) => {
       setUrlDraft(null);
       const raw = String(typed || '').trim();
-      if (!raw) {return;}
+      if (!raw) {
+        return;
+      }
       // Accept a full URL or a bare path.
       let route = raw;
       const m = raw.match(/^https?:\/\/[^/]+(\/.*)?$/i);
-      if (m) {route = m[1] || '/';}
-      if (!route.startsWith('/')) {route = '/' + route;}
+      if (m) {
+        route = m[1] || '/';
+      }
+      if (!route.startsWith('/')) {
+        route = '/' + route;
+      }
       route = route.replace(/\?.*$|#.*$/, '');
-      const norm = (value: string): string => (
-        value !== '/' ? value.replace(/\/$/, '') : value);
+      const norm = (value: string): string => (value !== '/' ? value.replace(/\/$/, '') : value);
       const page = (scan.pages || []).find((p) => norm(p.route) === norm(route));
       if (page) {
         selectPage(page);
@@ -1421,9 +1534,8 @@ export default function App() {
       }
       showToast(`No page matches ${route}`, 'error');
     },
-    [scan.pages, showToast, selectPage]
+    [scan.pages, showToast, selectPage],
   );
-
 
   // Re-reads whatever is open straight from disk. A git checkout rewrites the
   // working tree wholesale, and the file watcher can't be relied on for it:
@@ -1434,16 +1546,24 @@ export default function App() {
     const proj = projectRef.current;
     const { currentPage: open, pageState: state } = pageStateRef.current;
     const request = pageLoadRef.current;
-    const stillCurrent = () => request === pageLoadRef.current &&
-      pageStateRef.current.currentPage === open && pageStateRef.current.pageState === state;
-    if (!proj) {return;}
+    const stillCurrent = () =>
+      request === pageLoadRef.current &&
+      pageStateRef.current.currentPage === open &&
+      pageStateRef.current.pageState === state;
+    if (!proj) {
+      return;
+    }
     const result = await rescan(proj.path);
-    if (!open || open.kind === 'route' || !stillCurrent()) {return;}
+    if (!open || open.kind === 'route' || !stillCurrent()) {
+      return;
+    }
     // The open file may not exist on the branch just switched to.
     const stillThere = scanContainsFile(result, open.path);
     if (stillThere) {
       const read = await readPage(open.path);
-      if (!stillCurrent()) {return;}
+      if (!stillCurrent()) {
+        return;
+      }
       // Deliberate: this discards local edits, including a conflicted page's.
       // Handles still carry where the bytes allow, so the selection stays.
       editDrafts.discard(open.path);
@@ -1490,23 +1610,28 @@ export default function App() {
       // popup names a component by where it lives, and two folders can hold
       // the same basename.
       if (filePath) {
-        comp =
-          scan.components.find((c) => c.path === filePath) ||
-          scan.layouts.find((l) => l.path === filePath) ||
-          { name, path: filePath };
+        comp = scan.components.find((c) => c.path === filePath) ||
+          scan.layouts.find((l) => l.path === filePath) || { name, path: filePath };
       }
       if (!comp && spec && host?.path) {
         const projectPath = projectRef.current?.path;
-        if (!projectPath) {return;}
+        if (!projectPath) {
+          return;
+        }
         const file = await resolveProjectImport(projectPath, host.path, spec);
-        if (request !== pageLoadRef.current || pageStateRef.current.currentPage !== host) {return;}
+        if (request !== pageLoadRef.current || pageStateRef.current.currentPage !== host) {
+          return;
+        }
         if (file && /\.astro$/i.test(file)) {
           const fileName = file.split('/').pop();
           assert(fileName !== undefined, 'Resolved component path has a filename');
           comp = { name: fileName.replace(/\.astro$/i, ''), path: file };
         } else if (file) {
           // A framework island (.jsx/.svelte/…) has no Astro tree to show.
-          showToast(`<${name}> is a ${file.split('.').pop()} component — edit it in code.`, 'error');
+          showToast(
+            `<${name}> is a ${file.split('.').pop()} component — edit it in code.`,
+            'error',
+          );
           return;
         }
       }
@@ -1540,12 +1665,12 @@ export default function App() {
       const hostNode = hostPath
         ? nodeAtPath(
             state?.editable ? state.model.nodes : [],
-            (String(hostPath).split('|').at(-1) ?? '').split('.').map(Number)
+            (String(hostPath).split('|').at(-1) ?? '').split('.').map(Number),
           )
         : null;
       const focusPath = top?.focusPath ?? hostPath ?? null;
       const nested = top?.focusPath != null;
-      const focusOcc = nested ? top.focusOcc ?? 0 : hostOcc;
+      const focusOcc = nested ? (top.focusOcc ?? 0) : hostOcc;
       const focusWhole = nested ? !!top.focusWhole : hostNode?.id === 'layout';
       const entry: OpenFile = {
         kind: 'component',
@@ -1564,13 +1689,15 @@ export default function App() {
         selectionPath: null,
       });
     },
-    [scan.components, scan.layouts, openFile, showToast]
+    [scan.components, scan.layouts, openFile, showToast],
   );
 
   // Back out one level: to the parent component if nested, else to the page.
   const closeComponent = useCallback(async () => {
     const stack = editStackRef.current;
-    if (stack.length < 2) {return;}
+    if (stack.length < 2) {
+      return;
+    }
     const closing = stack.at(-1);
     assert(closing, 'Component stack must contain the component being closed');
     const next = stack.slice(0, -1);
@@ -1603,7 +1730,9 @@ export default function App() {
   // moment the preview ends, with nothing to say it had happened.
   const previewCommit = useCallback(
     async (commit: WireCommitInfo) => {
-      if (!project) {return;}
+      if (!project) {
+        return;
+      }
       assert(commit.hash, 'Previewed commit must have a hash');
       setBusy('Getting that version ready…');
       try {
@@ -1616,7 +1745,7 @@ export default function App() {
         setBusy(null);
       }
     },
-    [project, showToast]
+    [project, showToast],
   );
 
   // Named apart from exitPreview below, which is the app's own interactive
@@ -1624,20 +1753,26 @@ export default function App() {
   const exitCommitPreview = useCallback(async () => {
     setPreviewRef(null);
     setPreviewInfo(null);
-    if (project) {await stopProjectCommitPreview(project.path).catch(() => {});}
+    if (project) {
+      await stopProjectCommitPreview(project.path).catch(() => {});
+    }
   }, [project]);
 
   // Leaving the project (or closing it) must not leave a second server and a
   // checkout behind inside it.
   useEffect(() => {
-    if (!project) {return undefined;}
+    if (!project) {
+      return undefined;
+    }
     return () => {
       void stopProjectCommitPreview(project.path).catch(() => {});
     };
   }, [project?.path]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const refreshGit = useCallback(async () => {
-    if (!project) {return null;}
+    if (!project) {
+      return null;
+    }
     const result = await readGitInfo(project.path);
     if (!result.ok) {
       showToast(result.error, 'error');
@@ -1667,8 +1802,7 @@ export default function App() {
     const h = historyRef.current;
     const now = Date.now();
     const previous = h.past[h.past.length - 1];
-    const coalesce =
-      coalesceKey !== null && coalesceKey === h.lastKey && now - h.lastPush < 800;
+    const coalesce = coalesceKey !== null && coalesceKey === h.lastKey && now - h.lastPush < 800;
     h.future = [];
     h.lastKey = coalesceKey;
     h.lastPush = now;
@@ -1676,7 +1810,9 @@ export default function App() {
       return previous.record;
     }
     h.past.push({ kind: 'edits', record });
-    if (h.past.length > LIMITS.undoEntriesMax) {h.past.shift();}
+    if (h.past.length > LIMITS.undoEntriesMax) {
+      h.past.shift();
+    }
     return record;
   }, []);
 
@@ -1703,7 +1839,9 @@ export default function App() {
       }
     } else {
       h.past.push({ kind: 'cmd', ...cmd });
-      if (h.past.length > LIMITS.undoEntriesMax) {h.past.shift();}
+      if (h.past.length > LIMITS.undoEntriesMax) {
+        h.past.shift();
+      }
     }
     h.future = [];
     h.lastKey = cmd.coalesceKey ?? null;
@@ -1748,55 +1886,60 @@ export default function App() {
   // panel when it does not (plan §3.6). Installed only over the same text: the
   // text orders parses, so no counter does — a parse of text typed over since
   // is dropped, and the parse of the newest text is on its way.
-  const parseTypedCode = useCallback(async (
-    pagePath: string,
-    source: string,
-    position: number,
-  ): Promise<void> => {
-    let parsed: Awaited<ReturnType<typeof parseSourcePage>>;
-    try {
-      parsed = await parseSourcePage(pagePath, source);
-    } catch (error: unknown) {
+  const parseTypedCode = useCallback(
+    async (pagePath: string, source: string, position: number): Promise<void> => {
+      let parsed: Awaited<ReturnType<typeof parseSourcePage>>;
+      try {
+        parsed = await parseSourcePage(pagePath, source);
+      } catch (error: unknown) {
+        if (typedSourceRef.current === source) {
+          typedSourceRef.current = null;
+          showToast(`Couldn’t update code: ${cleanError(error)}`, 'error');
+        }
+        return;
+      }
+      if (pageStateRef.current.currentPage?.path !== pagePath) {
+        return;
+      }
       if (typedSourceRef.current === source) {
         typedSourceRef.current = null;
-        showToast(`Couldn’t update code: ${cleanError(error)}`, 'error');
       }
-      return;
-    }
-    if (pageStateRef.current.currentPage?.path !== pagePath) {return;}
-    if (typedSourceRef.current === source) {typedSourceRef.current = null;}
-    // The ref may not show the typed text yet (a fast parse beats the render);
-    // the page it shows is what handles are carried from, and whether this
-    // parse is still of the page's text is decided when it is installed.
-    const local = pageStateRef.current.pageState;
-    if (!local) {return;}
-    // Handles carried from the page shown by the text diff, so the editors it
-    // feeds keep their keys and focus per keystroke (issue #29). Typed text is
-    // no bytes on disk: the origin stays the last one a save left.
-    const carried = carriedParse(local, parsed);
-    const installed = (current: EditorPageState): EditorPageState => {
-      if (!carried.editable) {
-        const { reason, bail } = carried;
-        return { editable: false, reason, bail, source, save: current.save };
+      // The ref may not show the typed text yet (a fast parse beats the render);
+      // the page it shows is what handles are carried from, and whether this
+      // parse is still of the page's text is decided when it is installed.
+      const local = pageStateRef.current.pageState;
+      if (!local) {
+        return;
       }
-      const origin = current.editable ? current.origin : undefined;
-      const model: EditorModel = carried.model;
-      return { editable: true, model, source, parsedFrom: source, save: current.save, origin };
-    };
-    if (carried.editable) {
-      const inFrontmatter =
-        carried.model.bodyStart !== undefined && position < carried.model.bodyStart;
-      const selected = sourceNodeAtOffset(carried.model.nodes, position);
-      setSelectedId(inFrontmatter ? 'frontmatter' : selected?.id ?? null);
-    } else {
-      setSelectedId(null);
-    }
-    // The save state is whatever is current when this lands: a conflicted
-    // page stays conflicted, and a save that landed meanwhile keeps its base.
-    setPageState((current) =>
-      current && current.source === source ? installed(current) : current,
-    );
-  }, [showToast]);
+      // Handles carried from the page shown by the text diff, so the editors it
+      // feeds keep their keys and focus per keystroke (issue #29). Typed text is
+      // no bytes on disk: the origin stays the last one a save left.
+      const carried = carriedParse(local, parsed);
+      const installed = (current: EditorPageState): EditorPageState => {
+        if (!carried.editable) {
+          const { reason, bail } = carried;
+          return { editable: false, reason, bail, source, save: current.save };
+        }
+        const origin = current.editable ? current.origin : undefined;
+        const model: EditorModel = carried.model;
+        return { editable: true, model, source, parsedFrom: source, save: current.save, origin };
+      };
+      if (carried.editable) {
+        const inFrontmatter =
+          carried.model.bodyStart !== undefined && position < carried.model.bodyStart;
+        const selected = sourceNodeAtOffset(carried.model.nodes, position);
+        setSelectedId(inFrontmatter ? 'frontmatter' : (selected?.id ?? null));
+      } else {
+        setSelectedId(null);
+      }
+      // The save state is whatever is current when this lands: a conflicted
+      // page stays conflicted, and a save that landed meanwhile keeps its base.
+      setPageState((current) =>
+        current && current.source === source ? installed(current) : current,
+      );
+    },
+    [showToast],
+  );
 
   const scheduleSaveRef = useRef<((urgency?: boolean | 'live') => void) | null>(null);
 
@@ -1822,7 +1965,9 @@ export default function App() {
       }
       const path = pageStateRef.current.currentPage?.path;
       const state = pageStateRef.current.pageState;
-      if (!path || !state) {return;} // its page is gone — nothing to restore onto
+      if (!path || !state) {
+        return;
+      } // its page is gone — nothing to restore onto
       const outcome = entry.record.outcome;
       if (outcome.tag !== 'applied' || !editDrafts.empty(path) || state.save.tag !== 'clean') {
         // Edits that have not reached disk (refused, or failing) come first:
@@ -1858,7 +2003,9 @@ export default function App() {
       if (left.length > 0) {
         back({ kind: 'edits', record: { outcome: { tag: 'applied', applied: left } } });
       }
-      if (written === undefined) {return;}
+      if (written === undefined) {
+        return;
+      }
       forth({ kind: 'edits', record: { outcome: { tag: 'applied', applied: done } } });
       const reply = written;
       const shown =
@@ -1889,19 +2036,26 @@ export default function App() {
   };
 
   const undo = useCallback(async () => {
-    if (propertySave.saving.current) { return; }
+    if (propertySave.saving.current) {
+      return;
+    }
     setHistoryTick((n) => n + 1);
     const h = historyRef.current;
     h.lastKey = null;
     h.lastPush = 0;
     const entry = effective(h.past);
-    if (!entry) {return;}
+    if (!entry) {
+      return;
+    }
     if (entry.kind === 'cmd') {
       h.future.push(entry);
       try {
         await entry.undo();
       } catch (err) {
-        showToast(`Couldn’t undo${entry.label ? ` ${entry.label}` : ''}: ${cleanError(err)}`, 'error');
+        showToast(
+          `Couldn’t undo${entry.label ? ` ${entry.label}` : ''}: ${cleanError(err)}`,
+          'error',
+        );
       }
       return;
     }
@@ -1909,19 +2063,26 @@ export default function App() {
   }, [showToast, propertySave.saving, stepEdits]);
 
   const redo = useCallback(async () => {
-    if (propertySave.saving.current) { return; }
+    if (propertySave.saving.current) {
+      return;
+    }
     setHistoryTick((n) => n + 1);
     const h = historyRef.current;
     h.lastKey = null;
     h.lastPush = 0;
     const entry = effective(h.future);
-    if (!entry) {return;}
+    if (!entry) {
+      return;
+    }
     if (entry.kind === 'cmd') {
       h.past.push(entry);
       try {
         await entry.redo();
       } catch (err) {
-        showToast(`Couldn’t redo${entry.label ? ` ${entry.label}` : ''}: ${cleanError(err)}`, 'error');
+        showToast(
+          `Couldn’t redo${entry.label ? ` ${entry.label}` : ''}: ${cleanError(err)}`,
+          'error',
+        );
       }
       return;
     }
@@ -1941,14 +2102,11 @@ export default function App() {
   const scheduleSave = useCallback(
     (immediate: boolean | 'live' = false) => {
       clearTimeout(saveTimer.current);
-      saveTimer.current = setTimeout(
-        () => {
-          autosave().catch((err) => showToast(`Save failed: ${cleanError(err)}`, 'error'));
-        },
-        saveDelay(immediate)
-      );
+      saveTimer.current = setTimeout(() => {
+        autosave().catch((err) => showToast(`Save failed: ${cleanError(err)}`, 'error'));
+      }, saveDelay(immediate));
     },
-    [autosave, showToast]
+    [autosave, showToast],
   );
   scheduleSaveRef.current = scheduleSave;
 
@@ -1999,7 +2157,9 @@ export default function App() {
   const keepLocalVersion = useCallback(() => {
     setConflictReason(undefined);
     const path = pageStateRef.current.currentPage?.path;
-    if (path) {editDrafts.acceptDisk(path);} // typed code now patches the disk's text
+    if (path) {
+      editDrafts.acceptDisk(path);
+    } // typed code now patches the disk's text
     setPageState((current) =>
       current?.save.tag === 'conflicted'
         ? { ...current, save: saveStateAccepted(current.save) }
@@ -2017,10 +2177,14 @@ export default function App() {
   // file holds) is refused before it shows.
   const commitEdit = useCallback(
     (gesture: EditGesture) => {
-      if (propertySave.saving.current) { return; }
+      if (propertySave.saving.current) {
+        return;
+      }
       const { currentPage, pageState: state } = pageStateRef.current;
       const path = currentPage?.path;
-      if (!path || !state?.editable || typedCodeUnparsed()) {return;}
+      if (!path || !state?.editable || typedCodeUnparsed()) {
+        return;
+      }
       // Every page's gestures are edit requests (step 10: Markdown and MDX
       // too). Without an origin — typed code made the page parse and is not
       // saved yet — no node can be named until that save replies.
@@ -2044,7 +2208,7 @@ export default function App() {
       );
       scheduleSave(gesture.urgency);
     },
-    [scheduleSave, pushEditHistory, propertySave.saving, editDrafts, typedCodeUnparsed, showToast]
+    [scheduleSave, pushEditHistory, propertySave.saving, editDrafts, typedCodeUnparsed, showToast],
   );
 
   // Typed code (step 8). The text is the page's edit: it is set at once, so a
@@ -2084,45 +2248,48 @@ export default function App() {
   // behaviour) let the pending save overwrite it; reloading would discard the
   // user's input. Neither is ours to decide, so it becomes a conflict and the
   // notice asks (plan §7). A write in flight is left to main's own guard.
-  const surfaceOutsideEdit = useCallback(async (pagePath: string): Promise<void> => {
-    const saver = pageSaverRef.current;
-    const before = pageStateRef.current.pageState;
-    assert(saver !== null, 'The page saver exists before any file event');
-    if (!before || before.save.tag !== 'dirty' || saver.writing()) {
-      return;
-    }
-    // Unsaved edits that are all requests map through an outside change or
-    // are refused one by one, each with its reason (step 6): no page-wide
-    // conflict for them.
-    // Typed code is a patch too (step 8): it merges with the outside change
-    // or comes back `merge-conflict` — also not a page-wide conflict here.
-    if (!editDrafts.empty(pagePath)) {
-      return;
-    }
-    const baseBefore = saveStateBase(before.save);
-    let diskChecksum: Digest;
-    try {
-      diskChecksum = (await readPage(pagePath)).checksum;
-    } catch {
-      return; // gone or unreadable: the next save reports it
-    }
-    const latest = pageStateRef.current;
-    if (latest.currentPage?.path !== pagePath || latest.pageState?.save.tag !== 'dirty') {
-      return;
-    }
-    // A save that started or finished during the read moved the base, and its
-    // own guard in main compares against the disk authoritatively.
-    const base = saveStateBase(latest.pageState.save);
-    if (saver.writing() || base !== baseBefore || diskChecksum === base) {
-      return;
-    }
-    setConflictReason(undefined);
-    setPageState((current) =>
-      current?.save.tag === 'dirty'
-        ? { ...current, save: saveStateRefused(current.save, base, diskChecksum) }
-        : current,
-    );
-  }, [editDrafts]);
+  const surfaceOutsideEdit = useCallback(
+    async (pagePath: string): Promise<void> => {
+      const saver = pageSaverRef.current;
+      const before = pageStateRef.current.pageState;
+      assert(saver !== null, 'The page saver exists before any file event');
+      if (!before || before.save.tag !== 'dirty' || saver.writing()) {
+        return;
+      }
+      // Unsaved edits that are all requests map through an outside change or
+      // are refused one by one, each with its reason (step 6): no page-wide
+      // conflict for them.
+      // Typed code is a patch too (step 8): it merges with the outside change
+      // or comes back `merge-conflict` — also not a page-wide conflict here.
+      if (!editDrafts.empty(pagePath)) {
+        return;
+      }
+      const baseBefore = saveStateBase(before.save);
+      let diskChecksum: Digest;
+      try {
+        diskChecksum = (await readPage(pagePath)).checksum;
+      } catch {
+        return; // gone or unreadable: the next save reports it
+      }
+      const latest = pageStateRef.current;
+      if (latest.currentPage?.path !== pagePath || latest.pageState?.save.tag !== 'dirty') {
+        return;
+      }
+      // A save that started or finished during the read moved the base, and its
+      // own guard in main compares against the disk authoritatively.
+      const base = saveStateBase(latest.pageState.save);
+      if (saver.writing() || base !== baseBefore || diskChecksum === base) {
+        return;
+      }
+      setConflictReason(undefined);
+      setPageState((current) =>
+        current?.save.tag === 'dirty'
+          ? { ...current, save: saveStateRefused(current.save, base, diskChecksum) }
+          : current,
+      );
+    },
+    [editDrafts],
+  );
 
   useEffect(() => {
     // Every file an event named since the last reconcile read them. A burst
@@ -2133,7 +2300,9 @@ export default function App() {
     let closed = false;
     const reconcile = createCoalescedRun(async (): Promise<void> => {
       const proj = projectRef.current;
-      if (closed || !proj) {return;}
+      if (closed || !proj) {
+        return;
+      }
       let scanResult;
       try {
         scanResult = await rescan(proj.path);
@@ -2143,15 +2312,21 @@ export default function App() {
       // A newer event waits behind this run: its reconcile scans again, and
       // decides on every file named so far — a superseded scan never decides
       // that a page was deleted.
-      if (reconcile.superseded()) {return;}
+      if (reconcile.superseded()) {
+        return;
+      }
       const files = new Set(pendingFiles);
       pendingFiles.clear();
       const { currentPage: page, pageState: state } = pageStateRef.current;
-      if (closed || !page || page.kind === 'route') {return;}
+      if (closed || !page || page.kind === 'route') {
+        return;
+      }
       // Chunk .html files feed the open page's Fragment subtrees — treat a
       // change to any of them like a change to the page itself.
       const chunk = [...files].some((f) => f.toLowerCase().endsWith('.html'));
-      if (!files.has(page.path) && !chunk) {return;}
+      if (!files.has(page.path) && !chunk) {
+        return;
+      }
       // Current page deleted externally.
       if (!scanContainsFile(scanResult, page.path)) {
         pageLoadRef.current = {};
@@ -2160,7 +2335,9 @@ export default function App() {
         setSelectedId(null);
         return;
       }
-      if (!state) {return;}
+      if (!state) {
+        return;
+      }
       // Hot-reload only a clean page. Unsaved edits are never overwritten by
       // the disk, nor the disk by them: a dirty page surfaces a conflict, and
       // a saving or conflicted one already has main's verdict coming or shown.
@@ -2178,7 +2355,9 @@ export default function App() {
       // page already shows: the app's own write heard late (its actor was
       // dropped past LIMITS.documentActorsMax), or an outside save of the same
       // bytes. Nothing changed, so nothing reloads and Undo keeps its entries.
-      if (!chunk && parsed.checksum === state.save.checksum) {return;}
+      if (!chunk && parsed.checksum === state.save.checksum) {
+        return;
+      }
       // The read may finish after another page opened or a fresh edit. Neither
       // may be overwritten by the disk read requested before it: only the same
       // page, still clean, takes it.
@@ -2195,10 +2374,15 @@ export default function App() {
       dropPageHistory();
     });
     const off = onFilesChanged(({ files }) => {
-      for (const file of files) {pendingFiles.add(file);}
+      for (const file of files) {
+        pendingFiles.add(file);
+      }
       return reconcile.request();
     });
-    return () => { closed = true; off(); };
+    return () => {
+      closed = true;
+      off();
+    };
   }, [rescan, surfaceOutsideEdit, dropPageHistory]);
 
   // ----------------------------------------------------------------
@@ -2222,7 +2406,9 @@ export default function App() {
     async (componentName: string, target: InsertTarget | null) => {
       const comp = insertables.find((c) => c.name === componentName);
       const page = pageStateRef.current.currentPage;
-      if (!comp || !page) {return;}
+      if (!comp || !page) {
+        return;
+      }
       const paths = await resolveImportPath(comp.path);
       const id = newId();
       // A component whose default slot sits in a text context arrives with a
@@ -2238,7 +2424,9 @@ export default function App() {
         children: takesText ? [{ id: newId(), kind: 'text', value: 'Text' }] : null,
       };
       const state = pageStateRef.current.pageState;
-      if (!state?.editable) {return;}
+      if (!state?.editable) {
+        return;
+      }
       // Step 6, insert and frontmatter: the import when the page lacks it,
       // then the node — two requests, one undo step.
       const insert = insertGesture(state.model, node, target, { urgency: true });
@@ -2257,18 +2445,24 @@ export default function App() {
       }
       setSelectedId(id);
     },
-    [insertables, commitEdit, resolveImportPath]
+    [insertables, commitEdit, resolveImportPath],
   );
 
   // The page values a subtree reads — the props it would need once it's a file
   // of its own. Asked twice (once to show in the dialog, once to act on) and
   // both times of the live model, so nothing can drift between them.
   const propsNeededFor = useCallback((model: EditorModel, node: EditorNode) => {
-    if (!model || !node) {return [];}
+    if (!model || !node) {
+      return [];
+    }
     const scope = namesInScope(model.extraFrontmatter || '', model.imports || []);
-    for (const v of loopVarsAt(model.nodes, node.id)) {scope.add(v);}
+    for (const v of loopVarsAt(model.nodes, node.id)) {
+      scope.add(v);
+    }
     // An imported component is carried across as an import, not passed as a prop.
-    for (const imp of model.imports || []) {scope.delete(imp.name);}
+    for (const imp of model.imports || []) {
+      scope.delete(imp.name);
+    }
     return propsForExtraction(node, scope);
   }, []);
 
@@ -2276,7 +2470,9 @@ export default function App() {
   // project (not the open file) so it covers pages and components alike; the
   // component's own file is left out — a file is not one of its own users.
   const componentUsage = useCallback(async (comp: ScanComponent) => {
-    if (!projectRef.current?.path) {return { files: [] };}
+    if (!projectRef.current?.path) {
+      return { files: [] };
+    }
     try {
       return await readComponentUsage(projectRef.current.path, comp.name, comp.path);
     } catch (err) {
@@ -2289,23 +2485,26 @@ export default function App() {
 
   // The instances in the file that's already open — those a click can select
   // rather than navigate to.
-  const pageInstancesOf = useCallback(
-    (name: string) => {
-      const state = pageStateRef.current.pageState;
-      const model = state?.editable ? state.model : null;
-      if (!model) {return [];}
-      const out: { readonly id: string }[] = [];
-      const walk = (list: readonly EditorNode[]): void => {
-        for (const n of list || []) {
-          if (n.kind === 'component' && n.name === name) {out.push({ id: n.id });}
-          if (Array.isArray(n.children)) {walk(n.children);}
+  const pageInstancesOf = useCallback((name: string) => {
+    const state = pageStateRef.current.pageState;
+    const model = state?.editable ? state.model : null;
+    if (!model) {
+      return [];
+    }
+    const out: { readonly id: string }[] = [];
+    const walk = (list: readonly EditorNode[]): void => {
+      for (const n of list || []) {
+        if (n.kind === 'component' && n.name === name) {
+          out.push({ id: n.id });
         }
-      };
-      walk(model.nodes);
-      return out;
-    },
-    []
-  );
+        if (Array.isArray(n.children)) {
+          walk(n.children);
+        }
+      }
+    };
+    walk(model.nodes);
+    return out;
+  }, []);
 
   // Turn what's selected into a component of its own: write the file, then
   // replace the element in the page with an instance of it. The markup MOVES —
@@ -2318,9 +2517,12 @@ export default function App() {
       const page = pageStateRef.current.currentPage;
       const state = pageStateRef.current.pageState;
       const model = state?.editable ? state.model : null;
-      const node = model && selectedIdRef.current ? findNodeById(model.nodes, selectedIdRef.current) : null;
+      const node =
+        model && selectedIdRef.current ? findNodeById(model.nodes, selectedIdRef.current) : null;
       const projectPath = projectRef.current?.path;
-      if (!page?.path || !model || !node || !projectPath) {return;}
+      if (!page?.path || !model || !node || !projectPath) {
+        return;
+      }
       const props = withProps ? propsNeededFor(model, node) : [];
       let created;
       try {
@@ -2344,7 +2546,9 @@ export default function App() {
       const now = pageStateRef.current.pageState;
       const shown = now?.editable ? now.model : null;
       const found = shown ? findWithParent(shown.nodes, node.id) : null;
-      if (!shown || !found) {return;}
+      if (!shown || !found) {
+        return;
+      }
       // The instance passes each value straight back in under its own name.
       // That's what reconnects it: `title` meant the page's title where this
       // markup used to sit, and it still does, one level out.
@@ -2385,10 +2589,10 @@ export default function App() {
           ? `Created ${created.rel} — it reads page data, so it will need props.`
           : props.length
             ? `Created ${created.rel} with ${props.length} prop${props.length === 1 ? '' : 's'}.`
-            : `Created ${created.rel}`
+            : `Created ${created.rel}`,
       );
     },
-    [commitEdit, propsNeededFor, rescan, showToast]
+    [commitEdit, propsNeededFor, rescan, showToast],
   );
 
   // Step 6, move: the node's own bytes are relocated, its note with it; a
@@ -2397,7 +2601,9 @@ export default function App() {
   const moveNode = useCallback(
     (nodeId: string, target: InsertTarget | null) => {
       const state = pageStateRef.current.pageState;
-      if (!state?.editable) {return;}
+      if (!state?.editable) {
+        return;
+      }
       // `slot` is a word addressed to the component the node sat inside, and
       // means nothing anywhere else (src/slotAttr.js).
       const rules = {
@@ -2410,7 +2616,9 @@ export default function App() {
         },
       };
       const gesture = moveGesture(state.model, nodeId, target, rules, { urgency: true });
-      if (!gesture) {return;}
+      if (!gesture) {
+        return;
+      }
       // Left a loop? Anything still reading its item would throw; say what
       // the move replaced.
       const before = loopVarsAt(state.model.nodes, nodeId);
@@ -2422,22 +2630,27 @@ export default function App() {
       if (removed) {
         showToast(
           `Removed ${removed} binding${removed === 1 ? '' : 's'} that referenced ${lost.join(
-            ', '
+            ', ',
           )}.`,
-          'info'
+          'info',
         );
       }
     },
-    [insertables, commitEdit, showToast]
+    [insertables, commitEdit, showToast],
   );
 
   const removeNode = useCallback(
     (nodeId: string) => {
       const state = pageStateRef.current.pageState;
-      if (!state?.editable) {return;}
+      if (!state?.editable) {
+        return;
+      }
       const target = findNodeById(state.model.nodes, nodeId);
       if (target?.kind === 'chunk-group') {
-        showToast('This section comes from the page frontmatter — remove it from the code instead.', 'error');
+        showToast(
+          'This section comes from the page frontmatter — remove it from the code instead.',
+          'error',
+        );
         return;
       }
       // Worked out against the tree as it stands, before the node is gone.
@@ -2462,15 +2675,18 @@ export default function App() {
         const names = removed.dropped;
         showToast(
           `Also removed ${names
-            .map((n) => `\`${n}\``).join(', ')} from the frontmatter — nothing was reading ${names.length === 1 ? 'it' : 'them'} any more.`,
-          'info'
+            .map((n) => `\`${n}\``)
+            .join(
+              ', ',
+            )} from the frontmatter — nothing was reading ${names.length === 1 ? 'it' : 'them'} any more.`,
+          'info',
         );
       }
       // Only the selection that just vanished moves — deleting some other row
       // (navigator menu, canvas) leaves what you were working on alone.
       setSelectedId((id) => (id === nodeId ? nextId : id));
     },
-    [commitEdit, showToast]
+    [commitEdit, showToast],
   );
 
   // ----------------------------------------------------------------
@@ -2478,7 +2694,6 @@ export default function App() {
   // ----------------------------------------------------------------
 
   const nodeClipboardRef = useRef<NodeClipboard | null>(null);
-
 
   const copyNode = useCallback(
     (nodeId: string) => {
@@ -2508,7 +2723,7 @@ export default function App() {
       };
       showToast(`Copied ${node.name || 'text'}`, 'success');
     },
-    [showToast]
+    [showToast],
   );
 
   const duplicateNode = useCallback(
@@ -2524,7 +2739,7 @@ export default function App() {
       if (sourceNode.kind === 'chunk-group' || sourceNode.chunkFile) {
         showToast(
           'Chunk sections are defined in the page frontmatter and cannot be duplicated here.',
-          'error'
+          'error',
         );
         return;
       }
@@ -2533,7 +2748,7 @@ export default function App() {
       commitEdit(duplicateGesture(nodeId, clone, { urgency: true }));
       setSelectedId(clone.id);
     },
-    [commitEdit]
+    [commitEdit],
   );
 
   // Pastes into the current selection when it can host children (a non-void
@@ -2590,7 +2805,7 @@ export default function App() {
           ? await rebaseProjectImport(
               clip.pagePath,
               pageStateRef.current.currentPage?.path ?? null,
-              imp.path
+              imp.path,
             )
           : { path: imp.path };
       carriedImports.push({
@@ -2618,7 +2833,9 @@ export default function App() {
     // one undo step. The model is the one shown now: the lookups above
     // awaited, and edits made meanwhile are part of it.
     const now = pageStateRef.current.pageState;
-    if (!now?.editable) {return;}
+    if (!now?.editable) {
+      return;
+    }
     const shown = now.model;
     const imported = (model: EditorModel): EditorModel => {
       let imports = model.imports;
@@ -2629,7 +2846,9 @@ export default function App() {
         }
       }
       for (const imp of carriedImports) {
-        if (!imports.some((i) => i.name === imp.name)) {imports = [...imports, imp];}
+        if (!imports.some((i) => i.name === imp.name)) {
+          imports = [...imports, imp];
+        }
       }
       const extraFrontmatter = carried.statements.length
         ? withStatements(model.extraFrontmatter, carried.statements)
@@ -2653,7 +2872,7 @@ export default function App() {
     if (removed) {
       showToast(
         `Removed ${removed} binding${removed === 1 ? '' : 's'} that referenced ${lost.join(', ')}.`,
-        'info'
+        'info',
       );
     }
     const insert = insertGesture(withImports, pasted, place, { urgency: true });
@@ -2671,7 +2890,7 @@ export default function App() {
     if (brought.length) {
       showToast(
         `Brought ${brought.map((n) => `\`${n}\``).join(', ')} across from the page it was copied from.`,
-        'info'
+        'info',
       );
     }
   }, [commitEdit, insertables, resolveImportPath, showToast]);
@@ -2689,7 +2908,9 @@ export default function App() {
       const isToggle =
         (mod && !e.altKey && !e.shiftKey && e.key.toLowerCase() === 'j') ||
         (e.ctrlKey && !e.metaKey && !e.altKey && e.key === '`');
-      if (!isToggle) {return;}
+      if (!isToggle) {
+        return;
+      }
       e.preventDefault();
       setTermOpen((v) => !v);
     };
@@ -2705,9 +2926,13 @@ export default function App() {
   // to make a noise on its own.
   useEffect(() => {
     let live = true;
-    readAppSettings().then((settings) => {
-      if (live) {setSoundEnabled(settings.sound);}
-    }).catch(() => {});
+    readAppSettings()
+      .then((settings) => {
+        if (live) {
+          setSoundEnabled(settings.sound);
+        }
+      })
+      .catch(() => {});
     const off = onSoundSettingChanged((enabled) => setSoundEnabled(enabled));
     return () => {
       live = false;
@@ -2729,9 +2954,13 @@ export default function App() {
       const fromOwnFrame = Array.from(document.querySelectorAll('iframe')).some(
         (frame) => frame.contentWindow === event.source,
       );
-      if (!fromOwnFrame) {return;}
+      if (!fromOwnFrame) {
+        return;
+      }
       const message = parseShortcutMessage(event.data);
-      if (message === undefined) {return;}
+      if (message === undefined) {
+        return;
+      }
       switch (message.name) {
         case 'insert':
           openIfEditable();
@@ -2741,7 +2970,7 @@ export default function App() {
         // selection was made on the canvas or in the navigator.
         case 'arrow':
           window.dispatchEvent(
-            new KeyboardEvent('keydown', { key: message.key, bubbles: true, cancelable: true })
+            new KeyboardEvent('keydown', { key: message.key, bubbles: true, cancelable: true }),
           );
           return;
         // Delete / ⌘D from the canvas. Replayed on the document rather than
@@ -2756,7 +2985,7 @@ export default function App() {
               ctrlKey: message.meta,
               bubbles: true,
               cancelable: true,
-            })
+            }),
           );
           return;
         default: {
@@ -2778,14 +3007,16 @@ export default function App() {
   const insertTargetFor = useCallback(
     (model: EditorModel, selId: string | null, item: InsertItem) =>
       placeInsert(model, selId, item, insertables),
-    [insertables]
+    [insertables],
   );
 
   const insertItem = useCallback(
     (item: InsertItem) => {
       setInsertOpen(false);
       const state = pageStateRef.current.pageState;
-      if (!state?.editable) {return;}
+      if (!state?.editable) {
+        return;
+      }
       const target = insertTargetFor(state.model, selectedIdRef.current, item);
 
       if (item.type === 'component') {
@@ -2879,12 +3110,14 @@ export default function App() {
       } else if (item.type === 'style' || item.type === 'script') {
         node = { id, kind: 'raw', name: item.type, props: {}, inner: '' };
       }
-      if (!node) {return;}
+      if (!node) {
+        return;
+      }
       // Step 6, insert: a new node needs no import, so it is one request.
       commitEdit(insertGesture(state.model, node, target, { urgency: true }));
       setSelectedId(id);
     },
-    [insertTargetFor, addComponent, commitEdit]
+    [insertTargetFor, addComponent, commitEdit],
   );
 
   // True while the CMS covers the canvas: the page-editing shortcuts below
@@ -2906,21 +3139,32 @@ export default function App() {
       if (mod && (e.key.toLowerCase() === 'z' || e.key.toLowerCase() === 'y')) {
         const h = historyRef.current;
         const wantsRedo = e.key.toLowerCase() === 'y' || e.shiftKey;
-        if (!(wantsRedo ? h.future : h.past).length) {return;} // let the field's own undo have it
+        if (!(wantsRedo ? h.future : h.past).length) {
+          return;
+        } // let the field's own undo have it
         e.preventDefault();
-        if (wantsRedo) {void redo();}
-        else {void undo();}
+        if (wantsRedo) {
+          void redo();
+        } else {
+          void undo();
+        }
         return;
       }
 
-      if (cmsOpenRef.current) {return;}
+      if (cmsOpenRef.current) {
+        return;
+      }
 
       // ⌘F / ⌘E open the insert palette (works from anywhere except the
       // code editor, which keeps its own find).
       if (mod && (e.key.toLowerCase() === 'f' || e.key.toLowerCase() === 'e')) {
-        if (!pageStateRef.current.pageState?.editable) {return;}
+        if (!pageStateRef.current.pageState?.editable) {
+          return;
+        }
         const el = e.target;
-        if (el instanceof HTMLElement && el.closest('.cm-editor')) {return;}
+        if (el instanceof HTMLElement && el.closest('.cm-editor')) {
+          return;
+        }
         e.preventDefault();
         setInsertOpen(true);
         return;
@@ -2931,10 +3175,16 @@ export default function App() {
       // Before the "am I typing" guard, so it works wherever focus happens to
       // be — it acts on the selected element, not on the field.
       if (mod && e.shiftKey && !e.altKey && e.key.toLowerCase() === 'a') {
-        if (!pageStateRef.current.pageState?.editable) {return;}
-        if (!selectedIdRef.current || selectedIdRef.current === 'frontmatter') {return;}
+        if (!pageStateRef.current.pageState?.editable) {
+          return;
+        }
+        if (!selectedIdRef.current || selectedIdRef.current === 'frontmatter') {
+          return;
+        }
         const el = e.target;
-        if (el instanceof HTMLElement && el.closest('.cm-editor')) {return;}
+        if (el instanceof HTMLElement && el.closest('.cm-editor')) {
+          return;
+        }
         e.preventDefault();
         setLeftTab('components');
         setCreateRequest((n) => n + 1);
@@ -2945,9 +3195,13 @@ export default function App() {
       // open, caret in the class input. Before the "am I typing" guard below,
       // so it also works from another field in the panel.
       if (mod && !e.altKey && !e.shiftKey && e.key === 'Enter') {
-        if (!selectedIdRef.current) {return;}
+        if (!selectedIdRef.current) {
+          return;
+        }
         const el = e.target;
-        if (el instanceof HTMLElement && el.closest('.cm-editor')) {return;}
+        if (el instanceof HTMLElement && el.closest('.cm-editor')) {
+          return;
+        }
         e.preventDefault();
         setRightTab('settings');
         setClassFocus((n) => n + 1);
@@ -2962,7 +3216,9 @@ export default function App() {
         return;
       }
       const state = pageStateRef.current.pageState;
-      if (!state?.editable) {return;}
+      if (!state?.editable) {
+        return;
+      }
       const selId = selectedIdRef.current;
       const hasNodeSel = !!selId && selId !== 'frontmatter';
 
@@ -2973,8 +3229,12 @@ export default function App() {
         // On a focused control Enter means "activate this", not "open the
         // selection" — leave those alone (including the Edit code button
         // itself, which would otherwise fire twice).
-        if (t instanceof HTMLElement && t.closest('button, a, [role="button"]')) {return;}
-        if (openCodeWindowRef.current?.()) {e.preventDefault();}
+        if (t instanceof HTMLElement && t.closest('button, a, [role="button"]')) {
+          return;
+        }
+        if (openCodeWindowRef.current?.()) {
+          e.preventDefault();
+        }
         return;
       }
 
@@ -2992,20 +3252,28 @@ export default function App() {
       }
 
       if (!mod && (e.key === 'Delete' || e.key === 'Backspace')) {
-        if (!hasNodeSel) {return;}
+        if (!hasNodeSel) {
+          return;
+        }
         e.preventDefault();
         removeNode(selId);
       } else if (mod && e.key.toLowerCase() === 'c') {
         // Let native copy win when actual text is selected.
-        if (!hasNodeSel || String(window.getSelection() || '')) {return;}
+        if (!hasNodeSel || String(window.getSelection() || '')) {
+          return;
+        }
         e.preventDefault();
         copyNode(selId);
       } else if (mod && e.key.toLowerCase() === 'd') {
-        if (!hasNodeSel) {return;}
+        if (!hasNodeSel) {
+          return;
+        }
         e.preventDefault();
         duplicateNode(selId);
       } else if (mod && e.key.toLowerCase() === 'v') {
-        if (!nodeClipboardRef.current) {return;}
+        if (!nodeClipboardRef.current) {
+          return;
+        }
         e.preventDefault();
         pasteNode();
       }
@@ -3069,7 +3337,11 @@ export default function App() {
           runNativeEdit('paste');
           return;
         }
-        if (nodeClipboardRef.current && pageStateRef.current.pageState?.editable && !cmsOpenRef.current) {
+        if (
+          nodeClipboardRef.current &&
+          pageStateRef.current.pageState?.editable &&
+          !cmsOpenRef.current
+        ) {
           pasteNode();
         }
       }),
@@ -3085,10 +3357,15 @@ export default function App() {
           return;
         }
         const projectPath = projectRef.current?.path;
-        if (!projectPath) {return;}
+        if (!projectPath) {
+          return;
+        }
         const copied = await copyEditorSelection(projectPath, [...selectionKeysRef.current]);
-        if (copied) {showToast('Selection copied — paste it into your AI chat.');}
-        else {showToast('Nothing selected to copy.', 'error');}
+        if (copied) {
+          showToast('Selection copied — paste it into your AI chat.');
+        } else {
+          showToast('Nothing selected to copy.', 'error');
+        }
       }),
     ];
     return () => offs.forEach((off) => off());
@@ -3100,7 +3377,9 @@ export default function App() {
   // ----------------------------------------------------------------
 
   const enterPreview = useCallback(() => {
-    if (!devUrl) {return;}
+    if (!devUrl) {
+      return;
+    }
     // Whatever the canvas is showing — which for a dynamic page is one entry's
     // URL, not its pattern. Opening /blog/[...id] asks the dev server for a
     // route no page produces, and it answers with the site's 404, while the
@@ -3116,9 +3395,13 @@ export default function App() {
   const exitPreview = useCallback(() => {
     setInPreview(false);
     const raw = previewPathRef.current;
-    if (!raw) {return;}
+    if (!raw) {
+      return;
+    }
     let p = raw.split('?')[0]?.split('#')[0] ?? '';
-    if (p.length > 1 && p.endsWith('/')) {p = p.slice(0, -1);}
+    if (p.length > 1 && p.endsWith('/')) {
+      p = p.slice(0, -1);
+    }
     const page = scan.pages.find((pg) => pg.route === (p || '/'));
     if (page && page.path !== pageStateRef.current.currentPage?.path) {
       selectPage(page);
@@ -3130,11 +3413,15 @@ export default function App() {
   useEffect(() => {
     const onMsg = (e: MessageEvent<unknown>): void => {
       const message = toRecord(e.data);
-      if (message?.['type'] !== 'avb:navigated' || !inPreviewRef.current) {return;}
+      if (message?.['type'] !== 'avb:navigated' || !inPreviewRef.current) {
+        return;
+      }
       const ifr = previewIframeRef.current;
       if (ifr && e.source === ifr.contentWindow) {
         const path = message['path'];
-        if (typeof path === 'string') {previewPathRef.current = path;}
+        if (typeof path === 'string') {
+          previewPathRef.current = path;
+        }
       }
     };
     window.addEventListener('message', onMsg);
@@ -3146,12 +3433,17 @@ export default function App() {
     // Escape leaves either kind of looking-not-working. An older version takes
     // precedence: it is the one covering everything, so it is the one Escape
     // is about while it is up.
-    if (!inPreview && !previewRef) {return undefined;}
+    if (!inPreview && !previewRef) {
+      return undefined;
+    }
     const onKey = (e: KeyboardEvent): void => {
       if (e.key === 'Escape') {
         e.preventDefault();
-        if (previewRef) {exitCommitPreview();}
-        else {exitPreview();}
+        if (previewRef) {
+          exitCommitPreview();
+        } else {
+          exitPreview();
+        }
       }
     };
     document.addEventListener('keydown', onKey);
@@ -3160,9 +3452,13 @@ export default function App() {
 
   // Escape backs out of a drilled-into component, one level at a time.
   useEffect(() => {
-    if (inPreview || editStack.length < 2) {return;}
+    if (inPreview || editStack.length < 2) {
+      return;
+    }
     const onKey = (e: KeyboardEvent): void => {
-      if (e.key !== 'Escape') {return;}
+      if (e.key !== 'Escape') {
+        return;
+      }
       const t = e.target;
       // Let fields, menus, and dialogs consume their own Escape first.
       if (
@@ -3207,16 +3503,23 @@ export default function App() {
       return undefined;
     }
     let live = true;
-    if (!entry.path) {return undefined;}
+    if (!entry.path) {
+      return undefined;
+    }
     readDynamicPaths(project.path, entry.path, devUrl)
       .then((r) => {
-        if (!live) {return;}
+        if (!live) {
+          return;
+        }
         setDynamicPaths(r?.entries || []);
         // Keep showing the same entry across reloads where we can — the
         // params are what identify it, not its position in the list.
         setDynamicIndex((i) => (i < (r?.entries || []).length ? i : 0));
-        if (r?.error) {setDynamicError(r.error);}
-        else {setDynamicError(null);}
+        if (r?.error) {
+          setDynamicError(r.error);
+        } else {
+          setDynamicError(null);
+        }
       })
       .catch(() => live && setDynamicPaths([]));
     return () => {
@@ -3243,7 +3546,9 @@ export default function App() {
     sampleAskedRef.current = new Set();
   }, [project?.path]);
   useEffect(() => {
-    if (!project?.path) {return undefined;}
+    if (!project?.path) {
+      return undefined;
+    }
     let live = true;
     readContentCollections(project.path)
       .then((value) => live && setCollections(value))
@@ -3259,7 +3564,9 @@ export default function App() {
     };
   }, [project?.path]);
   useEffect(() => {
-    if (!devUrl || devStatus !== 'on') {return undefined;}
+    if (!devUrl || devStatus !== 'on') {
+      return undefined;
+    }
     const frontmatter = pageState?.editable ? pageState.model.extraFrontmatter : '';
     // The entry on the canvas, which is what a reference in this file resolves
     // AGAINST — this post's author, not the collection's first.
@@ -3273,17 +3580,19 @@ export default function App() {
         id: r.id,
       })),
     ].filter((w) => !(w.key in collectionSamples));
-    if (!wanted.length) {return undefined;}
+    if (!wanted.length) {
+      return undefined;
+    }
     let live = true;
     Promise.all(
       wanted.map((w) =>
-        readSampleEntry(devUrl, w.name, w.id).then(
-          (entry) => [w.key, entry] as const,
-        )
-      )
+        readSampleEntry(devUrl, w.name, w.id).then((entry) => [w.key, entry] as const),
+      ),
     )
       .then((pairs) => {
-        if (live) {setCollectionSamples((prev) => ({ ...prev, ...Object.fromEntries(pairs) }));}
+        if (live) {
+          setCollectionSamples((prev) => ({ ...prev, ...Object.fromEntries(pairs) }));
+        }
       })
       .catch(() => {});
     return () => {
@@ -3310,11 +3619,16 @@ export default function App() {
   // waits for a pause in typing, because a half-typed name reads as unused.
   useEffect(() => {
     const current = pageState?.editable ? pageState.model : undefined;
-    if (!current?.extraFrontmatter?.includes(QUERY_MARK)) {return undefined;}
+    if (!current?.extraFrontmatter?.includes(QUERY_MARK)) {
+      return undefined;
+    }
     const timer = setTimeout(() => {
       const focused = document.activeElement;
-      if (focused?.closest?.('.props-field, .rich-content, .bind-input, .expr-input, .attr-editor'))
-        {return;}
+      if (
+        focused?.closest?.('.props-field, .rich-content, .bind-input, .expr-input, .attr-editor')
+      ) {
+        return;
+      }
       const fm = current.extraFrontmatter || '';
       const markup = JSON.stringify(current.nodes || []);
       const dead = markedQueries(fm).filter((q) => {
@@ -3322,11 +3636,15 @@ export default function App() {
         const elsewhere = fm.slice(0, q.start) + fm.slice(q.end);
         return !word.test(elsewhere) && !word.test(markup);
       });
-      if (!dead.length) {return;}
+      if (!dead.length) {
+        return;
+      }
       // Step 6, frontmatter: the dead queries, and the import only they needed.
       const cleaned = (m: EditorModel): EditorModel => {
         let next = m.extraFrontmatter || '';
-        for (const q of dead) {next = removeMarkedQuery(next, q.name);}
+        for (const q of dead) {
+          next = removeMarkedQuery(next, q.name);
+        }
         // The import goes with the last query that needed it — but only when
         // nothing else in the file mentions it, so an import someone else put
         // there and still uses stays put.
@@ -3334,7 +3652,8 @@ export default function App() {
         let imports = m.imports;
         if (!mentions(next)) {
           if (!mentions(JSON.stringify(m.nodes || []))) {
-            const needed = (i: ImportDecl) => !(i.name === 'getCollection' && i.path === 'astro:content');
+            const needed = (i: ImportDecl) =>
+              !(i.name === 'getCollection' && i.path === 'astro:content');
             imports = m.imports.filter(needed);
           }
         }
@@ -3351,14 +3670,17 @@ export default function App() {
   // own panels — and whatever page and scroll position the user left — into
   // the picture that is supposed to show the site.
 
-
   // The comment sitting directly above a node. The navigator folds it into
   // that node's row rather than giving it one of its own, and the props panel
   // edits it there — so a section's label and its note stay together.
   const commentAbove = (model: EditorModel | null, nodeId: string | null): EditorNode | null => {
-    if (!model || !nodeId) {return null;}
+    if (!model || !nodeId) {
+      return null;
+    }
     const found = findParentList(model, nodeId);
-    if (!found || found.index === 0) {return null;}
+    if (!found || found.index === 0) {
+      return null;
+    }
     const prev = found.list[found.index - 1];
     return prev && prev.kind === 'comment' ? prev : null;
   };
@@ -3368,9 +3690,13 @@ export default function App() {
   const setComment = useCallback(
     (nodeId: string, text: string) => {
       const state = pageStateRef.current.pageState;
-      if (!state?.editable) {return;}
+      if (!state?.editable) {
+        return;
+      }
       const found = findWithParent(state.model.nodes, nodeId);
-      if (!found) {return;}
+      if (!found) {
+        return;
+      }
       const prev = found.index > 0 ? found.siblings[found.index - 1] : null;
       const existing = prev && prev.kind === 'comment' ? prev : null;
       const body = String(text ?? '').trim();
@@ -3396,11 +3722,13 @@ export default function App() {
       }
       // Step 9, rewording: the note restated, its new words placed on its bytes.
       const note = findNodeById(state.model.nodes, existing.id);
-      if (note?.kind !== 'comment') {return;}
+      if (note?.kind !== 'comment') {
+        return;
+      }
       const options = { coalesceKey: `comment:${nodeId}`, urgency: false };
       commitEdit(nodeGesture(note.id, { ...note, value }, options));
     },
-    [commitEdit]
+    [commitEdit],
   );
 
   // Typing a bare class in the style panel's selector box puts it on the
@@ -3428,7 +3756,9 @@ export default function App() {
       }
       const edit = withClass(node.props, clean);
       if (!edit) {
-        showToast(`Add ${clean} to this element yourself — its class comes from code Stacki can't edit safely.`);
+        showToast(
+          `Add ${clean} to this element yourself — its class comes from code Stacki can't edit safely.`,
+        );
         return { tag: 'refused', message: 'its class comes from code' };
       }
       // Step 6, attribute: the class attribute, as its own edit request.
@@ -3441,7 +3771,7 @@ export default function App() {
         return { tag: 'refused', message: cleanError(error) };
       }
     },
-    [commitEdit, flushSave, showToast]
+    [commitEdit, flushSave, showToast],
   );
 
   // Step 6, attribute: set or remove one prop, as an edit request when it has
@@ -3461,7 +3791,7 @@ export default function App() {
       }
       commitEdit(propsGesture(nodeId, { [propName]: value }, options));
     },
-    [commitEdit]
+    [commitEdit],
   );
 
   // Several props in one edit, so picking an image and getting its width and
@@ -3471,7 +3801,7 @@ export default function App() {
       const coalesceKey = `props:${nodeId}:${Object.keys(patch).join(',')}`;
       commitEdit(propsGesture(nodeId, patch, { coalesceKey, urgency: immediate }));
     },
-    [commitEdit]
+    [commitEdit],
   );
 
   // Writes an asset pick into a prop. The root decides the form:
@@ -3486,33 +3816,47 @@ export default function App() {
   const setAssetProp = useCallback(
     async (nodeId: string, propName: string, picked: PickedAsset & { readonly abs?: string }) => {
       const { pageState: state, currentPage: page } = pageStateRef.current;
-      if (!state?.editable || !page?.path || !picked?.rel) {return;}
+      if (!state?.editable || !page?.path || !picked?.rel) {
+        return;
+      }
       const withoutRoot = picked.rel.split('/').slice(1).join('/');
       if (picked.root !== 'src') {
         setProp(nodeId, propName, { type: 'string', value: '/' + withoutRoot }, true);
         return;
       }
       const projectPath = projectRef.current?.path;
-      if (!projectPath) {return;}
+      if (!projectPath) {
+        return;
+      }
       const abs = picked.abs || `${projectPath}/${picked.rel}`;
       const paths = await findImportPath(projectPath, page.path, abs);
       const latest = pageStateRef.current.pageState;
-      if (!latest?.editable) {return;}
+      if (!latest?.editable) {
+        return;
+      }
       const model = latest.model;
       const node = findNodeById(model.nodes, nodeId);
-      if (!node) {return;}
+      if (!node) {
+        return;
+      }
       const spec = chooseImportPath(model, paths);
       // Reuse the binding if this file is already imported — importing the
       // same asset twice under two names is just noise.
       let local = (model.imports || []).find((i) => !i.named && i.path === spec)?.name;
       const added = local === undefined;
       if (!local) {
-        const base = withoutRoot.split('/').pop()?.replace(/\.[^.]+$/, '') ?? 'asset';
+        const base =
+          withoutRoot
+            .split('/')
+            .pop()
+            ?.replace(/\.[^.]+$/, '') ?? 'asset';
         let candidate = base.replace(/[^A-Za-z0-9_$]/g, '_').replace(/^(\d)/, '_$1') || 'asset';
         const taken = new Set((model.imports || []).map((i) => i.name));
         // Ends within taken.size + 1 passes: each tries a name not yet tried.
         let n = 2;
-        while (taken.has(candidate)) {candidate = `${base}${n++}`;}
+        while (taken.has(candidate)) {
+          candidate = `${base}${n++}`;
+        }
         local = candidate;
       }
       const binding = local;
@@ -3533,7 +3877,7 @@ export default function App() {
       const changed = frontmatterOf(imported(afterProp)) !== frontmatterOf(afterProp);
       commitEdit(changed ? sequence(prop, frontmatterGesture(afterProp, imported, options)) : prop);
     },
-    [commitEdit, setProp]
+    [commitEdit, setProp],
   );
 
   // Renames an attribute in place, preserving its value and position (step 9:
@@ -3541,12 +3885,16 @@ export default function App() {
   const renameProp = useCallback(
     (nodeId: string, oldName: string, newName: string) => {
       const state = pageStateRef.current.pageState;
-      if (!state?.editable) {return;}
+      if (!state?.editable) {
+        return;
+      }
       const names = { from: oldName, to: newName };
       const gesture = attributeRenameGesture(state.model, nodeId, names);
-      if (gesture) {commitEdit(gesture);}
+      if (gesture) {
+        commitEdit(gesture);
+      }
     },
-    [commitEdit]
+    [commitEdit],
   );
 
   // Switches a plain element's tag. Attributes that belonged to the old
@@ -3561,19 +3909,29 @@ export default function App() {
   const changeNodeKind = useCallback(
     async (nodeId: string, newTag: string) => {
       const name = String(newTag || '').trim();
-      if (!/^[A-Z][\w$]*$/.test(name)) {return false;}
+      if (!/^[A-Z][\w$]*$/.test(name)) {
+        return false;
+      }
       const state = pageStateRef.current.pageState;
-      if (!state?.editable) {return false;}
+      if (!state?.editable) {
+        return false;
+      }
       const already = (state.model.imports || []).some((i) => i.name === name);
       const comp = insertables.find((c) => c.name === name);
       const asset = ASTRO_ASSETS.some((a) => a.name === name);
-      if (!already && !comp && !asset) {return false;} // nothing provides it
+      if (!already && !comp && !asset) {
+        return false;
+      } // nothing provides it
       const paths = comp && !already ? await resolveImportPath(comp.path) : null;
       const current = pageStateRef.current.pageState;
       const model = current?.editable ? current.model : null;
       const node = model ? findNodeById(model.nodes, nodeId) : null;
-      if (!model || !node) {return false;}
-      if (node.name === name) {return true;}
+      if (!model || !node) {
+        return false;
+      }
+      if (node.name === name) {
+        return true;
+      }
       // Attributes that belonged to the old element's tag mean nothing to a
       // component; class, data- and aria- carry over the way they do for a
       // tag change.
@@ -3583,7 +3941,9 @@ export default function App() {
         (attr) => oldNames?.has(attr) && !GLOBAL_ATTRS.has(attr) && !/^(data-|aria-)/.test(attr),
       );
       const imported = (m: EditorModel): EditorModel => {
-        if (m.imports.some((i) => i.name === name)) {return withPrunedImports(m);}
+        if (m.imports.some((i) => i.name === name)) {
+          return withPrunedImports(m);
+        }
         const entry = paths
           ? { name, path: chooseImportPath(m, paths), quote: "'" }
           : asset
@@ -3595,17 +3955,23 @@ export default function App() {
       commitEdit(tagChangeGesture(model, node, change, imported));
       return true;
     },
-    [insertables, commitEdit, resolveImportPath]
+    [insertables, commitEdit, resolveImportPath],
   );
 
   const changeElementTag = useCallback(
     (nodeId: string, newTag: string) => {
-      const tag = String(newTag || '').trim().toLowerCase();
-      if (!/^[a-z][a-z0-9-]*$/.test(tag)) {return;}
+      const tag = String(newTag || '')
+        .trim()
+        .toLowerCase();
+      if (!/^[a-z][a-z0-9-]*$/.test(tag)) {
+        return;
+      }
       const state = pageStateRef.current.pageState;
       const model = state?.editable ? state.model : null;
       const node = model ? findNodeById(model.nodes, nodeId) : null;
-      if (!model || !node || node.name === tag) {return;}
+      if (!model || !node || node.name === tag) {
+        return;
+      }
       // A component becoming a plain tag keeps only what a tag understands:
       // its props were the component's API, and they'd be junk attributes on
       // a <div>.
@@ -3624,7 +3990,7 @@ export default function App() {
       const change = { kind: 'element' as const, name: tag, asset: false, dropped };
       commitEdit(tagChangeGesture(model, node, change, withPrunedImports));
     },
-    [commitEdit]
+    [commitEdit],
   );
 
   // `renames` (loop editor only) carries the variable names this edit is
@@ -3659,11 +4025,13 @@ export default function App() {
       // Step 9: everything else the field says is the node restated.
       const node = state?.editable ? findNodeById(state.model.nodes, nodeId) : null;
       const next = node ? restatedText(node, value, renames) : undefined;
-      if (!next) {return;}
+      if (!next) {
+        return;
+      }
       const coalesceKey = renaming ? null : `text:${nodeId}`;
       commitEdit(nodeGesture(nodeId, next, { coalesceKey, urgency: renaming || immediate }));
     },
-    [commitEdit]
+    [commitEdit],
   );
 
   // The code editor and file writer share the same frontmatter model, so
@@ -3673,14 +4041,16 @@ export default function App() {
   const setFrontmatter = useCallback(
     (code: string) => {
       const state = pageStateRef.current.pageState;
-      if (!state?.editable) {return;}
+      if (!state?.editable) {
+        return;
+      }
       // Object.assign, as the legacy setFrontmatter did: the block's fields replace the model's.
       const written = (model: EditorModel): EditorModel =>
         Object.assign({}, model, readFrontmatter(code));
       const options = { coalesceKey: 'frontmatter', urgency: false };
       commitEdit(frontmatterGesture(state.model, written, options));
     },
-    [commitEdit]
+    [commitEdit],
   );
 
   // Adds or removes a condition's else branch. Removing keeps the markup that
@@ -3691,10 +4061,16 @@ export default function App() {
     (nodeId: string, want: boolean) => {
       const state = pageStateRef.current.pageState;
       const node = state?.editable ? findNodeById(state.model.nodes, nodeId) : null;
-      if (!node || node.kind !== 'cond') {return;}
+      if (!node || node.kind !== 'cond') {
+        return;
+      }
       const kids = node.children;
-      const thenBranch: BranchNode =
-        kids[0] ?? { id: newId(), kind: 'branch', name: 'then', children: [] };
+      const thenBranch: BranchNode = kids[0] ?? {
+        id: newId(),
+        kind: 'branch',
+        name: 'then',
+        children: [],
+      };
       let next: EditorNode | undefined;
       if (want && kids.length < 2) {
         const elseBranch: BranchNode = { id: newId(), kind: 'branch', name: 'else', children: [] };
@@ -3706,10 +4082,12 @@ export default function App() {
         const merged = { ...thenBranch, children: [...(thenBranch.children || []), ...rescued] };
         next = { ...node, op: '&&', children: [merged] };
       }
-      if (!next) {return;}
+      if (!next) {
+        return;
+      }
       commitEdit(nodeGesture(nodeId, next, { coalesceKey: null, urgency: true }));
     },
-    [commitEdit]
+    [commitEdit],
   );
 
   // Replaces the frontmatter's non-import code (its declarations), leaving the
@@ -3719,12 +4097,14 @@ export default function App() {
   const setExtraFrontmatter = useCallback(
     (code: string) => {
       const state = pageStateRef.current.pageState;
-      if (!state?.editable) {return;}
+      if (!state?.editable) {
+        return;
+      }
       const written = (model: EditorModel): EditorModel => ({ ...model, extraFrontmatter: code });
       const options = { coalesceKey: 'frontmatter', urgency: false };
       commitEdit(frontmatterGesture(state.model, written, options));
     },
-    [commitEdit]
+    [commitEdit],
   );
 
   // Sets the text content of a component (single text child convenience).
@@ -3739,7 +4119,9 @@ export default function App() {
       const state = pageStateRef.current.pageState;
       const model = state?.editable ? state.model : null;
       const node = model ? findNodeById(model.nodes, nodeId) : null;
-      if (!model || !node || node.kind === 'text') {return;}
+      if (!model || !node || node.kind === 'text') {
+        return;
+      }
       const options = { coalesceKey: `content:${nodeId}`, urgency: false };
       const children = node.children ?? null;
       const at = children ? children.findIndex((c) => c.kind === 'text') : -1;
@@ -3757,7 +4139,9 @@ export default function App() {
         }
         return;
       }
-      if (!value) {return;}
+      if (!value) {
+        return;
+      }
       const text: EditorNode = { id: newId(), kind: 'text', value };
       if (!children) {
         commitEdit(nodeGesture(nodeId, withChildren(node, [text]), options));
@@ -3770,7 +4154,7 @@ export default function App() {
           : children.length;
       commitEdit(insertGesture(model, text, { parentId: nodeId, index }, { urgency: false }));
     },
-    [commitEdit]
+    [commitEdit],
   );
 
   // Replaces a node's inline children wholesale (rich Content field edits).
@@ -3798,11 +4182,13 @@ export default function App() {
       // Step 9: the node restated with its new inline children.
       const state = pageStateRef.current.pageState;
       const node = state?.editable ? findNodeById(state.model.nodes, nodeId) : null;
-      if (!node || node.kind === 'text') {return;}
+      if (!node || node.kind === 'text') {
+        return;
+      }
       const next = withChildren(node, withIds(kids));
       commitEdit(nodeGesture(nodeId, next, { coalesceKey: `content:${nodeId}`, urgency: false }));
     },
-    [commitEdit]
+    [commitEdit],
   );
 
   // Set/replace/remove the `layout:` key in a markdown page's YAML
@@ -3816,7 +4202,9 @@ export default function App() {
         ? fm.replace(/^[ \t]*layout[ \t]*:.*$/m, `layout: ${layoutPath}`)
         : fm.replace(/^[ \t]*layout[ \t]*:.*(\n|$)/m, '');
     }
-    if (!layoutPath) {return fm;}
+    if (!layoutPath) {
+      return fm;
+    }
     // First, so it reads as the page's frame rather than one field among many.
     return fm ? `layout: ${layoutPath}\n${fm}` : `layout: ${layoutPath}`;
   };
@@ -3837,19 +4225,25 @@ export default function App() {
       // Same picker, different place to write the answer.
       if (isMarkdownFormatRef.current) {
         const layout = layoutName ? scan.layouts.find((l) => l.name === layoutName) : null;
-        if (layoutName && !layout) {return;}
+        if (layoutName && !layout) {
+          return;
+        }
         // A file-relative path, not an alias: `layout:` is resolved by Astro
         // against the page, and every project has that whether or not it has
         // configured `@/…`.
         const rel = layout ? (await resolveImportPath(layout.path)).relative : null;
-        if (seq !== layoutSeq.current) {return;}
+        if (seq !== layoutSeq.current) {
+          return;
+        }
         const framed = (model: EditorModel): EditorModel => ({
           ...model,
           extraFrontmatter: withLayoutField(model.extraFrontmatter, rel),
           layoutPath: rel,
         });
         const shown = pageStateRef.current.pageState;
-        if (!shown?.editable) {return;}
+        if (!shown?.editable) {
+          return;
+        }
         // The YAML block the model now holds, written as the slot that
         // differs — or, on a post without one, a new block at its top.
         commitEdit(frontmatterGesture(shown.model, framed, { coalesceKey: null, urgency: true }));
@@ -3857,7 +4251,9 @@ export default function App() {
       }
       const state = pageStateRef.current.pageState;
       const model = state?.editable ? state.model : null;
-      if (!model) {return;}
+      if (!model) {
+        return;
+      }
       const options = { coalesceKey: null, urgency: true };
       // The imports the wrapper change needs, and those it leaves unused, as
       // the same undo step (step 9: a frontmatter slot).
@@ -3870,14 +4266,20 @@ export default function App() {
       const wrapper = findNodeById(model.nodes, 'layout');
       if (!layoutName) {
         // Unwrap: the wrapper's tags go, its children stay where they are.
-        if (wrapper) {commitEdit(withImports(unwrapGesture('layout'), withPrunedImports));}
+        if (wrapper) {
+          commitEdit(withImports(unwrapGesture('layout'), withPrunedImports));
+        }
         setSelectedId((id) => (id === 'layout' ? null : id));
         return;
       }
       const layout = scan.layouts.find((l) => l.name === layoutName);
-      if (!layout) {return;}
+      if (!layout) {
+        return;
+      }
       const paths = await resolveImportPath(layout.path);
-      if (seq !== layoutSeq.current) {return;} // superseded by a newer change
+      if (seq !== layoutSeq.current) {
+        return;
+      } // superseded by a newer change
       const imports = (m: EditorModel): EditorModel =>
         withPrunedImports(
           m.imports.some((i) => i.name === layout.name)
@@ -3891,8 +4293,12 @@ export default function App() {
               },
         );
       if (wrapper) {
-        if (wrapper.kind !== 'component' && wrapper.kind !== 'element') {return;}
-        if (wrapper.name === layout.name) {return;}
+        if (wrapper.kind !== 'component' && wrapper.kind !== 'element') {
+          return;
+        }
+        if (wrapper.name === layout.name) {
+          return;
+        }
         const renamed: EditorNode = { ...wrapper, name: layout.name };
         commitEdit(withImports(tagRenameGesture(wrapper, renamed, options), imports));
         return;
@@ -3907,7 +4313,7 @@ export default function App() {
       };
       commitEdit(withImports(wrapGesture(model, created), imports));
     },
-    [scan.layouts, commitEdit, resolveImportPath]
+    [scan.layouts, commitEdit, resolveImportPath],
   );
 
   // ----------------------------------------------------------------
@@ -3917,19 +4323,23 @@ export default function App() {
   const createPage = useCallback(
     async (name: string, layoutName: string | null) => {
       const projectPath = projectRef.current?.path;
-      if (!projectPath) {return;}
+      if (!projectPath) {
+        return;
+      }
       const layout = scan.layouts.find((l) => l.name === layoutName) || null;
       try {
         const pagePath = await createProjectPage(projectPath, name, layout);
         const result = await rescan(projectPath);
         const page = result.pages.find((p) => p.path === pagePath);
-        if (page) {selectPage(page);}
+        if (page) {
+          selectPage(page);
+        }
         showToast(`Created ${name}.astro`, 'success');
       } catch (err) {
         showToast(cleanError(err), 'error');
       }
     },
-    [scan.layouts, rescan, selectPage, showToast]
+    [scan.layouts, rescan, selectPage, showToast],
   );
 
   const deletePage = useCallback(
@@ -3945,20 +4355,23 @@ export default function App() {
         return;
       }
       const projectPath = projectRef.current?.path;
-      if (!projectPath) {return;}
+      if (!projectPath) {
+        return;
+      }
       await deleteProjectPage(page.path);
       const result = await rescan(projectPath);
       if (currentPage?.path === page.path) {
         const next = result.pages[0] || null;
-        if (next) {selectPage(next);}
-        else {
+        if (next) {
+          selectPage(next);
+        } else {
           setCurrentPage(null);
           setPageState(null);
         }
       }
       showToast(`Deleted ${page.name}`, 'success');
     },
-    [currentPage, rescan, selectPage, showToast]
+    [currentPage, rescan, selectPage, showToast],
   );
 
   // Moves/renames a page (drag between folders, inline rename). `to` is the
@@ -3966,19 +4379,23 @@ export default function App() {
   const movePageTo = useCallback(
     async (page: ScanPage, to: string) => {
       const projectPath = projectRef.current?.path;
-      if (!projectPath) {return;}
+      if (!projectPath) {
+        return;
+      }
       try {
         const newPath = await moveProjectPage(projectPath, page.path, to);
         const result = await rescan(projectPath);
         if (pageStateRef.current.currentPage?.path === page.path) {
           const np = result.pages.find((p) => p.path === newPath);
-          if (np) {selectPage(np);}
+          if (np) {
+            selectPage(np);
+          }
         }
       } catch (err) {
         showToast(cleanError(err), 'error');
       }
     },
-    [rescan, selectPage, showToast]
+    [rescan, selectPage, showToast],
   );
 
   // Creates an (empty) folder with a placeholder name; the panel opens an
@@ -3986,9 +4403,13 @@ export default function App() {
   const createPageFolder = useCallback(async () => {
     const existing = new Set(scan.pageFolders || []);
     let name = 'new-folder';
-    for (let i = 2; existing.has(name); i++) {name = `new-folder-${i}`;}
+    for (let i = 2; existing.has(name); i++) {
+      name = `new-folder-${i}`;
+    }
     const projectPath = projectRef.current?.path;
-    if (!projectPath) {return null;}
+    if (!projectPath) {
+      return null;
+    }
     try {
       await createProjectPageFolder(projectPath, name);
       await rescan(projectPath);
@@ -4002,24 +4423,26 @@ export default function App() {
   const renamePageFolder = useCallback(
     async (from: string, to: string) => {
       const projectPath = projectRef.current?.path;
-      if (!projectPath) {return;}
+      if (!projectPath) {
+        return;
+      }
       try {
         await renameProjectPageFolder(projectPath, from, to);
         const result = await rescan(projectPath);
         // Re-select the current page if it lived inside the renamed folder.
         const cur = pageStateRef.current.currentPage;
         if (cur && !result.pages.some((p) => p.path === cur.path)) {
-          const newName = cur.name.startsWith(from + '/')
-            ? to + cur.name.slice(from.length)
-            : null;
+          const newName = cur.name.startsWith(from + '/') ? to + cur.name.slice(from.length) : null;
           const np = newName && result.pages.find((p) => p.name === newName);
-          if (np) {selectPage(np);}
+          if (np) {
+            selectPage(np);
+          }
         }
       } catch (err) {
         showToast(cleanError(err), 'error');
       }
     },
-    [rescan, selectPage, showToast]
+    [rescan, selectPage, showToast],
   );
 
   const deletePageFolder = useCallback(
@@ -4038,15 +4461,18 @@ export default function App() {
         return;
       }
       const projectPath = projectRef.current?.path;
-      if (!projectPath) {return;}
+      if (!projectPath) {
+        return;
+      }
       try {
         await deleteProjectPageFolder(projectPath, dir);
         const result = await rescan(projectPath);
         const cur = pageStateRef.current.currentPage;
         if (cur && !result.pages.some((p) => p.path === cur.path)) {
           const next = result.pages[0] || null;
-          if (next) {selectPage(next);}
-          else {
+          if (next) {
+            selectPage(next);
+          } else {
             setCurrentPage(null);
             setPageState(null);
           }
@@ -4055,7 +4481,7 @@ export default function App() {
         showToast(cleanError(err), 'error');
       }
     },
-    [rescan, selectPage, showToast]
+    [rescan, selectPage, showToast],
   );
 
   // ----------------------------------------------------------------
@@ -4071,13 +4497,17 @@ export default function App() {
 
   // The frontmatter as one editable code block (imports + everything else,
   // matching how the file is serialized).
-  const frontmatterCode = useMemo(() => ( model ? writeFrontmatter(model) : ''), [model]);
+  const frontmatterCode = useMemo(() => (model ? writeFrontmatter(model) : ''), [model]);
 
   // One entry of a collection, asked for when someone opens it in the picker.
   // The ref is what stops a row that has no answer from asking again forever.
   const requestCollectionSample = (name: string): void => {
-    if (!name || !devUrl || devStatus !== 'on') {return;}
-    if (sampleAskedRef.current.has(name)) {return;}
+    if (!name || !devUrl || devStatus !== 'on') {
+      return;
+    }
+    if (sampleAskedRef.current.has(name)) {
+      return;
+    }
     sampleAskedRef.current.add(name);
     readSampleEntry(devUrl, name)
       .then((entry) => setCollectionSamples((prev) => ({ ...prev, [name]: entry })))
@@ -4091,9 +4521,13 @@ export default function App() {
   const ensureCollectionQuery = (collection: string): string => {
     const fm = model?.extraFrontmatter || '';
     const existing = queriesInScope(fm).get(collection);
-    if (existing) {return existing;}
+    if (existing) {
+      return existing;
+    }
     const name = autoQueryName(collection, namesInScope(fm, model?.imports));
-    if (!model) {return name;}
+    if (!model) {
+      return name;
+    }
     // Step 9: the frontmatter gesture — the import and the query line, as the
     // slot of the block that differs.
     const queried = (m: EditorModel): EditorModel => {
@@ -4117,8 +4551,7 @@ export default function App() {
     return name;
   };
 
-  const selectedNode:
-    | EditorNode | (FrontmatterSubject & { readonly value: string }) | null =
+  const selectedNode: EditorNode | (FrontmatterSubject & { readonly value: string }) | null =
     model && selectedId
       ? selectedId === 'frontmatter'
         ? { id: 'frontmatter', kind: 'frontmatter', value: frontmatterCode }
@@ -4176,7 +4609,9 @@ export default function App() {
   // by the time the gap stops being a gap. In practice the report lands first
   // and the timer never fires.
   useEffect(() => {
-    if (classesForRef.current === selectedId) {return undefined;}
+    if (classesForRef.current === selectedId) {
+      return undefined;
+    }
     const t = setTimeout(() => setSelectedClasses((prev) => (prev.length ? [] : prev)), 600);
     return () => clearTimeout(t);
   }, [selectedId, classesTick]);
@@ -4192,7 +4627,8 @@ export default function App() {
       // Read back out of the frontmatter text, not a cached field: editing
       // that text by hand has to move the picker too.
       const m = (model?.extraFrontmatter || '').match(/^[ \t]*layout[ \t]*:[ \t]*(.+?)[ \t]*$/m);
-      const base = m?.[1]?.replace(/^['"]|['"]$/g, '')
+      const base = m?.[1]
+        ?.replace(/^['"]|['"]$/g, '')
         .split('/')
         .pop()
         ?.replace(/\.astro$/i, '');
@@ -4217,7 +4653,7 @@ export default function App() {
   // A component whose Props extends HTMLAttributes<"tag"> also accepts that
   // element's built-in attributes — merge them in after its own props.
   const schemaFor = (
-    entry: ScanComponent | AstroAsset | undefined | null
+    entry: ScanComponent | AstroAsset | undefined | null,
   ): readonly FieldDefinition[] => {
     if (!entry) {
       return [];
@@ -4270,7 +4706,7 @@ export default function App() {
     return schemaFor(
       selectedNode.astroAsset
         ? astroAssetDef(selectedNode.name)
-        : insertables.find((component) => component.name === selectedNode.name)
+        : insertables.find((component) => component.name === selectedNode.name),
     );
   })();
 
@@ -4311,7 +4747,7 @@ export default function App() {
   // says: it is in the file this one was opened from, at the focused path, and
   // the page's own scope is what its expressions come to.
   const [instanceProps, setInstanceProps] = useState<Readonly<Record<string, unknown>> | null>(
-    null
+    null,
   );
   const focusOf = currentPage?.kind === 'component' ? currentPage.focusPath : null;
   const hostFile = editStack.length > 1 ? editStack[0] : null;
@@ -4349,7 +4785,7 @@ export default function App() {
               .map((n) => n.head),
             collectionSamples,
             collections,
-          })
+          }),
         );
       } catch {
         if (!dropped) {
@@ -4370,7 +4806,7 @@ export default function App() {
       sectionIds: tree.sectionIds,
       projectPath: project?.path ?? '',
     }),
-    [scan.pages, tree, project?.path]
+    [scan.pages, tree, project?.path],
   );
 
   // A class the source can't resolve — `class:list={["button_wrap", …]}` —
@@ -4462,14 +4898,14 @@ export default function App() {
   const codeWinValue = !codeWin
     ? null
     : isFileWin
-    ? fileText
-    : codeWin.targetId === 'frontmatter'
-    ? model
-      ? frontmatterCode
-      : null
-    : codeWinNode?.kind === 'raw'
-    ? codeWinNode.inner
-    : null;
+      ? fileText
+      : codeWin.targetId === 'frontmatter'
+        ? model
+          ? frontmatterCode
+          : null
+        : codeWinNode?.kind === 'raw'
+          ? codeWinNode.inner
+          : null;
 
   // Returns whether the subject actually has a code editor, so the Enter
   // shortcut below knows whether it handled the key.
@@ -4511,7 +4947,7 @@ export default function App() {
         showToast(cleanError(err), 'error');
       }
     },
-    [showToast]
+    [showToast],
   );
 
   // Opens the file an imported symbol is defined in, on its declaration —
@@ -4540,7 +4976,7 @@ export default function App() {
             r?.reason === 'too-large'
               ? 'That file is too large to edit in the app.'
               : `Couldn't find where ${name} is defined (${imp.spec}).`,
-            'error'
+            'error',
           );
           return false;
         }
@@ -4559,7 +4995,7 @@ export default function App() {
         return false;
       }
     },
-    [frontmatterCode, currentPage, showToast]
+    [frontmatterCode, currentPage, showToast],
   );
 
   // File edits stream to disk (debounced) — the dev server picks them up.
@@ -4580,10 +5016,10 @@ export default function App() {
         return;
       }
       saver.schedule(`${projectPath}|${area || 'public'}|${rel}`, () =>
-        writeProjectFile(area ?? 'public', projectPath, rel, text)
+        writeProjectFile(area ?? 'public', projectPath, rel, text),
       );
     },
-    [codeWin]
+    [codeWin],
   );
 
   // Close the window if its target disappears (page switch, node deleted).
@@ -4612,7 +5048,7 @@ export default function App() {
     return judgeCanvasEvent(token, render, shown, (checked) =>
       projectPath
         ? checkPreviewRender(projectPath, checked)
-        : Promise.resolve<PreviewVerdict>({ tag: 'stale', reason: 'no-render', file: undefined })
+        : Promise.resolve<PreviewVerdict>({ tag: 'stale', reason: 'no-render', file: undefined }),
     );
   }, []);
   const onStaleEvent = useCallback(
@@ -4622,7 +5058,7 @@ export default function App() {
       const where = verdict.file ? ` (${verdict.file})` : '';
       showToast(`Click not applied: ${describePreviewStale(verdict.reason)}${where}`);
     },
-    [showToast]
+    [showToast],
   );
 
   // Past the patcher's caps the canvas reloads instead of patching (step 7):
@@ -4636,7 +5072,7 @@ export default function App() {
         showToast(why);
       }
     },
-    [showToast]
+    [showToast],
   );
 
   const editedRel =
@@ -4644,7 +5080,7 @@ export default function App() {
       ? projectRelativePath(
           project.path,
           editStack[editStack.length - 1]?.path ?? '',
-          window.avb.platform
+          window.avb.platform,
         )
       : null;
 
@@ -4655,7 +5091,7 @@ export default function App() {
       nodeClasses && model
         ? classesByNodeId(nodeClasses, model.nodes, editedRel ? `${editedRel}|` : '')
         : null,
-    [nodeClasses, model, editedRel]
+    [nodeClasses, model, editedRel],
   );
 
   // The file being edited, relative to src/ — how the CMS addresses a page's
@@ -4704,7 +5140,7 @@ export default function App() {
     crumbs.push(
       ...chain
         .filter((n, i) => n !== thenBranch(chain[i - 1]))
-        .map((n) => ({ id: n.id, label: crumbLabel(n) }))
+        .map((n) => ({ id: n.id, label: crumbLabel(n) })),
     );
   }
 
@@ -4755,7 +5191,7 @@ export default function App() {
     const walk = (
       list: readonly EditorNode[],
       trail: readonly number[],
-      unmarked: boolean
+      unmarked: boolean,
     ): void => {
       list.forEach((n, i) => {
         const t = [...trail, i];
@@ -4835,8 +5271,8 @@ export default function App() {
         selectedId === 'frontmatter'
           ? `${openRel}#frontmatter`
           : leafPath !== null
-          ? `${openRel}#${leafPath}`
-          : `${openRel}#`,
+            ? `${openRel}#${leafPath}`
+            : `${openRel}#`,
       ];
 
   // Position the Style/Settings highlight: on tab change, when the panel first
@@ -4870,10 +5306,10 @@ export default function App() {
     const kind = isFragmentNode(n)
       ? 'element'
       : n.kind === 'component' && !n.dynamicTag
-      ? 'component'
-      : n.kind === 'map' || n.kind === 'cond' || n.kind === 'branch'
-      ? 'map'
-      : 'element';
+        ? 'component'
+        : n.kind === 'map' || n.kind === 'cond' || n.kind === 'branch'
+          ? 'map'
+          : 'element';
     // The tag drives the overlay's icon, so it matches the Navigator row.
     const tag = n.kind === 'element' || n.kind === 'raw' ? n.name : null;
     return {
@@ -4912,8 +5348,8 @@ export default function App() {
   // everything outside the instance being worked on.
   const pageEntry = editStack[0] || currentPage;
   const patternRoute = pageEntry?.route;
-  const focusPath = currentPage?.kind === 'component' ? currentPage.focusPath ?? null : null;
-  const focusOcc = currentPage?.kind === 'component' ? currentPage.focusOcc ?? 0 : 0;
+  const focusPath = currentPage?.kind === 'component' ? (currentPage.focusPath ?? null) : null;
+  const focusOcc = currentPage?.kind === 'component' ? (currentPage.focusOcc ?? 0) : 0;
   // The focus routes clicks either way; this says whether it also draws.
   const focusWhole = currentPage?.kind === 'component' && !!currentPage.focusWhole;
   // A dynamic page's route is a pattern, not a URL — /posts/[slug] is a 404.
@@ -4939,7 +5375,7 @@ export default function App() {
     onStepItem: (name: string, dir: number, count: number) =>
       setItemIndex((cur) => ({
         ...cur,
-        [name]: (((cur[name] ?? 0) + dir) % count + count) % count,
+        [name]: ((((cur[name] ?? 0) + dir) % count) + count) % count,
       })),
     // A component's frontmatter is not the page's, so the page's entry is not
     // its data. What it does have is the instance it was opened from, whose
@@ -4984,7 +5420,7 @@ export default function App() {
   const currentScanPage =
     currentPage?.path === undefined
       ? null
-      : scan.pages.find((page) => page.path === currentPage.path) ?? null;
+      : (scan.pages.find((page) => page.path === currentPage.path) ?? null);
   const repository = gitInfo?.isRepo ? gitInfo : null;
 
   return (
@@ -5083,7 +5519,7 @@ export default function App() {
             title={`${termOpen ? 'Hide' : 'Show'} terminal (${shortcutLabel(
               'J',
               'primary',
-              currentDesktopPlatform()
+              currentDesktopPlatform(),
             )})`}
             onClick={() => setTermOpen((v) => !v)}
           >
@@ -5111,8 +5547,8 @@ export default function App() {
               previewRef
                 ? 'Back to now (Esc)'
                 : inPreview
-                ? 'Exit preview (Esc)'
-                : 'Preview the site'
+                  ? 'Exit preview (Esc)'
+                  : 'Preview the site'
             }
             disabled={!devUrl}
             onClick={() =>
@@ -5353,7 +5789,7 @@ export default function App() {
                       r?.parked
                         ? 'The project is back — your unsaved work is waiting on this branch'
                         : 'The project is back to how it was',
-                      'success'
+                      'success',
                     );
                   } catch (err) {
                     showToast(cleanError(err), 'error');
@@ -5381,7 +5817,7 @@ export default function App() {
                           `${
                             r.files[0] || 'a file'
                           } you have unsaved work in — switch from the branch button to decide what to do with it.`,
-                        'error'
+                        'error',
                       );
                       return;
                     }
@@ -5389,7 +5825,7 @@ export default function App() {
                     await reloadFromDisk();
                     showToast(
                       r.restored ? `Picked your changes back up on ${b}` : `Switched to ${b}`,
-                      'success'
+                      'success',
                     );
                   } catch (err) {
                     showToast(cleanError(err), 'error');
@@ -5417,11 +5853,11 @@ export default function App() {
                         `${r.from} and ${r.branch} both changed ` +
                           `${
                             r.files.length === 1
-                              ? r.files[0]?.path ?? 'a file'
+                              ? (r.files[0]?.path ?? 'a file')
                               : `${r.files.length} files`
                           }. ` +
                           'Open the branch button to choose which versions to keep.',
-                        'info'
+                        'info',
                       ),
                   })
                 }
@@ -5499,7 +5935,9 @@ export default function App() {
                 focusPath,
                 scope: editedRel ? `${editedRel}|` : '',
               });
-              if (kind === 'nothing') {return;}
+              if (kind === 'nothing') {
+                return;
+              }
               if (kind === 'close') {
                 closeComponent();
                 return;
@@ -5695,7 +6133,7 @@ export default function App() {
                 takesSlotText={
                   selectedNode?.kind === 'component' &&
                   (insertables.find((c) => c.name === selectedNode.name)?.slots || []).includes(
-                    'default'
+                    'default',
                   )
                 }
                 loopContext={loopContext}
@@ -5747,8 +6185,8 @@ export default function App() {
                   selectedId === 'frontmatter'
                     ? setFrontmatter(value)
                     : selectedId
-                    ? setNodeText(selectedId, value, renames)
-                    : undefined
+                      ? setNodeText(selectedId, value, renames)
+                      : undefined
                 }
                 onSetContent={(value) => {
                   if (selectedId) {
@@ -5794,10 +6232,10 @@ export default function App() {
             isFileWin
               ? setAssetFileText(value)
               : codeWin.targetId === 'frontmatter'
-              ? setFrontmatter(value)
-              : codeWin.targetId
-              ? setNodeText(codeWin.targetId, value)
-              : undefined
+                ? setFrontmatter(value)
+                : codeWin.targetId
+                  ? setNodeText(codeWin.targetId, value)
+                  : undefined
           }
           onClose={() => setCodeWin(null)}
         />
@@ -5835,9 +6273,10 @@ export default function App() {
 
 // What a delete leaves unused: the imports and declarations only the removed
 // nodes were reading (the legacy removeNode's rule). Pure: a new model.
-function prunedAfterRemoval(
-  model: EditorModel,
-): { readonly model: EditorModel; readonly dropped: readonly string[] } {
+function prunedAfterRemoval(model: EditorModel): {
+  readonly model: EditorModel;
+  readonly dropped: readonly string[];
+} {
   const next = withPrunedImports(model);
   // The code the deleted markup was the only reader of goes with it: a
   // `const jobs = […]` nothing lists any more is left behind otherwise, and a

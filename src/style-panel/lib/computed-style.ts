@@ -12,50 +12,66 @@
 // use it to HIGHLIGHT an option — never to claim the property is set, which stays the
 // resolved model's call (the label is dim either way).
 
-import { useEffect, useRef, useState } from 'react'
-import { hasCanvas, queryCanvas } from '../../canvasQuery.js'
-import { findNode, getHost, onHostChange } from './host'
-import { createQueryCache } from './query-cache'
+import { useEffect, useRef, useState } from 'react';
+import { hasCanvas, queryCanvas } from '../../canvasQuery.js';
+import { findNode, getHost, onHostChange } from './host';
+import { createQueryCache } from './query-cache';
 
 const cache = createQueryCache(async (path, props) => {
-  const expected = selectedTag()
-  const answer = await queryCanvas(path, [], [], props)
-  const tag = answer?.identity?.tag
-  if (tag && expected && tag !== expected) {return null}
+  const expected = selectedTag();
+  const answer = await queryCanvas(path, [], [], props);
+  const tag = answer?.identity?.tag;
+  if (tag && expected && tag !== expected) {
+    return null;
+  }
   return answer?.computedProps
-    ? Object.fromEntries(Object.entries(answer.computedProps).map(([key, value]) => [key, typeof value === 'string' ? value.trim() : null]))
-    : null
-})
+    ? Object.fromEntries(
+        Object.entries(answer.computedProps).map(([key, value]) => [
+          key,
+          typeof value === 'string' ? value.trim() : null,
+        ]),
+      )
+    : null;
+});
 
 function currentCache() {
-  const host = getHost()
-  cache.setScope([host.projectPath, host.openFilePath, host.nodes, host.selectedId, host.device, host.historyTick])
-  return cache
+  const host = getHost();
+  cache.setScope([
+    host.projectPath,
+    host.openFilePath,
+    host.nodes,
+    host.selectedId,
+    host.device,
+    host.historyTick,
+  ]);
+  return cache;
 }
 
 /** Forget everything: the page changed under us, so the answers may have too. */
 export function forgetComputedStyles(): void {
-  cache.clear()
+  cache.clear();
 }
 
 function pathOfSelection(): string | null {
-  const host = getHost()
-  return host.selectedId ? host.pathOf?.(host.selectedId) ?? null : null
+  const host = getHost();
+  return host.selectedId ? (host.pathOf?.(host.selectedId) ?? null) : null;
 }
 
 // The selected node's HTML tag, when it has one. A component instance's name is its
 // component ('Card'), which says nothing about the tag it renders, so only a plain
 // lowercase name counts — those are the ones a rendered tag can be checked against.
 function selectedTag(): string | null {
-  const host = getHost()
-  const node = host.selectedId ? findNode(host.nodes, host.selectedId) : null
-  if (node?.kind !== 'element') {return null}
-  const name = node.name ?? ''
-  return /^[a-z][a-z0-9-]*$/.test(name) ? name : null
+  const host = getHost();
+  const node = host.selectedId ? findNode(host.nodes, host.selectedId) : null;
+  if (node?.kind !== 'element') {
+    return null;
+  }
+  const name = node.name ?? '';
+  return /^[a-z][a-z0-9-]*$/.test(name) ? name : null;
 }
 
 /** An answer from the page: what it said, and whether it is still being asked. */
-type Answer = { value: string; pending: boolean; path: string | null }
+type Answer = { value: string; pending: boolean; path: string | null };
 
 /**
  * What the page has already said about `prop`, read straight from the store.
@@ -68,45 +84,53 @@ type Answer = { value: string; pending: boolean; path: string | null }
  * is the truth and it is synchronous, so it is read synchronously.
  */
 function answeredNow(prop: string): Answer {
-  if (!prop) {return { value: '', pending: false, path: null }}
+  if (!prop) {
+    return { value: '', pending: false, path: null };
+  }
   // `hasCanvas` is checked HERE, not once on mount: the panel can render before
   // the preview frame registers, and that first pass must not opt out for good.
-  const path = hasCanvas() ? pathOfSelection() : null
+  const path = hasCanvas() ? pathOfSelection() : null;
   // Nothing to ask — so nothing is pending either. No answer is ever coming, and
   // a control waiting forever would never show anything.
-  if (!path) {return { value: '', pending: false, path: null }}
-  const known = currentCache().read(path, prop)
-  return { value: known ?? '', pending: known === undefined, path }
+  if (!path) {
+    return { value: '', pending: false, path: null };
+  }
+  const known = currentCache().read(path, prop);
+  return { value: known ?? '', pending: known === undefined, path };
 }
 
 // `pending` is the part worth having. '' means two different things — "the page
 // says nothing" and "the page has not been asked yet" — and a control that can't
 // tell them apart has to guess during the wait. See useHighlight.
 function useComputedAnswer(prop: string): Answer {
-  const [, bump] = useState(0)
+  const [, bump] = useState(0);
 
   useEffect(() => {
-    if (!prop) {return undefined}
-    const sync = () => bump((n) => n + 1)
-    const offCache = cache.subscribe(sync)
+    if (!prop) {
+      return undefined;
+    }
+    const sync = () => bump((n) => n + 1);
+    const offCache = cache.subscribe(sync);
     // The selection moves, or the page re-renders under it: ask for the element
     // that's selected now.
-    const off = onHostChange(sync)
+    const off = onHostChange(sync);
     return () => {
-      offCache()
-      off()
-    }
-  }, [prop])
+      offCache();
+      off();
+    };
+  }, [prop]);
 
-  const answer = answeredNow(prop)
+  const answer = answeredNow(prop);
   // Asking is a side effect, so it waits until after the render that noticed the
   // answer was missing. `request` is idempotent — already answered, or already
   // queued for this flush, and it does nothing.
   useEffect(() => {
-    if (answer.pending && answer.path) {void currentCache().request(answer.path, prop)}
-  })
+    if (answer.pending && answer.path) {
+      void currentCache().request(answer.path, prop);
+    }
+  });
 
-  return answer
+  return answer;
 }
 
 /**
@@ -115,7 +139,7 @@ function useComputedAnswer(prop: string): Answer {
  * control that already has an authored value costs nothing.
  */
 export function useComputedValue(prop: string): string {
-  return useComputedAnswer(prop).value
+  return useComputedAnswer(prop).value;
 }
 
 /**
@@ -125,8 +149,8 @@ export function useComputedValue(prop: string): string {
  * the control's own default in charge.
  */
 export function useComputedChoice(prop: string, values: readonly string[]): string {
-  const computed = useComputedValue(prop).toLowerCase()
-  return computed && values.includes(computed) ? computed : ''
+  const computed = useComputedValue(prop).toLowerCase();
+  return computed && values.includes(computed) ? computed : '';
 }
 
 /**
@@ -151,16 +175,18 @@ export function useHighlight(
   authored: string,
   prop: string,
   values: readonly string[],
-  fallback: string
+  fallback: string,
 ): string {
-  const answer = useComputedAnswer(authored || !prop ? '' : prop)
-  const computed = answer.value.toLowerCase()
-  const known = computed && values.includes(computed) ? computed : ''
-  const settled = authored || known || (answer.pending ? '' : fallback)
+  const answer = useComputedAnswer(authored || !prop ? '' : prop);
+  const computed = answer.value.toLowerCase();
+  const known = computed && values.includes(computed) ? computed : '';
+  const settled = authored || known || (answer.pending ? '' : fallback);
   // Seeded with the fallback: on the very first render there is nothing else to
   // have been showing.
-  const last = useRef(settled || fallback)
-  const shown = settled || last.current
-  useEffect(() => { last.current = shown }, [shown])
-  return shown
+  const last = useRef(settled || fallback);
+  const shown = settled || last.current;
+  useEffect(() => {
+    last.current = shown;
+  }, [shown]);
+  return shown;
 }

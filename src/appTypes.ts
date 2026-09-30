@@ -11,10 +11,7 @@ import { carryHandles, randomSeed, seedOf } from './nodeHandles';
 import type { EditsRecord, PageOrigin } from './pageEdits';
 import { saveStateClean, type SaveState } from './saveState';
 import type { VariableSelection } from './variablesBridge';
-import {
-  type EditorModel,
-  type EditorNode,
-} from './pageView';
+import { type EditorModel, type EditorNode } from './pageView';
 
 export { nodeId } from './pageView';
 export type { EditorModel, EditorNode } from './pageView';

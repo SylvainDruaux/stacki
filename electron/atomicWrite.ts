@@ -57,7 +57,6 @@ const MODE_BITS = 0o7777;
  * directories", not "the flush failed". */
 const FLUSH_UNSUPPORTED = new Set(['EINVAL', 'ENOTSUP', 'EOPNOTSUPP', 'EISDIR', 'EPERM', 'EBADF']);
 
-
 /** SHA-256 of the exact bytes, the only constructor of a Digest outside the
  * wire parser. A string is hashed as its UTF-8 encoding. */
 export function digestOf(bytes: Uint8Array | string): Digest {

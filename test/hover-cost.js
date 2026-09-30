@@ -29,7 +29,9 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
+  if (!condition) {
+    failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  }
 };
 const settle = (ms = 120) => new Promise((r) => setTimeout(r, ms));
 
@@ -41,7 +43,7 @@ const settle = (ms = 120) => new Promise((r) => setTimeout(r, ms));
       ${marked('0', '<section class="hero" data-box="hero"><h1 data-box="head">Hi</h1></section>')}
       ${marked('1', '<section class="rest" data-box="rest"><p data-box="copy">Words</p></section>')}
     </body>`,
-    { url: 'http://localhost:4321/#avb-design', pretendToBeVisual: true }
+    { url: 'http://localhost:4321/#avb-design', pretendToBeVisual: true },
   );
   const { window } = dom;
   const boxes = {
@@ -97,7 +99,11 @@ const settle = (ms = 120) => new Promise((r) => setTimeout(r, ms));
 
   // --- the first question is answered in full ---------------------------------
   await track(['0']);
-  check('the canvas says where the tracked node is', count('avb:rects') >= 1, `${count('avb:rects')} rect answers`);
+  check(
+    'the canvas says where the tracked node is',
+    count('avb:rects') >= 1,
+    `${count('avb:rects')} rect answers`,
+  );
   check('and what the page holds', pageAnswers() > 0, 'the page was never described');
 
   // --- and then the pointer moves ----------------------------------------------
@@ -109,12 +115,12 @@ const settle = (ms = 120) => new Promise((r) => setTimeout(r, ms));
   check(
     'every node hovered gets its boxes measured',
     count('avb:rects') >= rectsAfterFirst + 3,
-    `${count('avb:rects') - rectsAfterFirst} rect answers for 3 hovers`
+    `${count('avb:rects') - rectsAfterFirst} rect answers for 3 hovers`,
   );
   check(
     'and none of them re-walks the page',
     pageAnswers() === afterFirst,
-    `${pageAnswers() - afterFirst} extra page answers for three hovers`
+    `${pageAnswers() - afterFirst} extra page answers for three hovers`,
   );
 
   // --- and when the page itself moves ------------------------------------------
@@ -126,18 +132,21 @@ const settle = (ms = 120) => new Promise((r) => setTimeout(r, ms));
   check(
     'a change to the page asks again',
     pageAnswers() > beforeEdit,
-    'an edit leaves the navigator describing the page as it was'
+    'an edit leaves the navigator describing the page as it was',
   );
 
   // --- unless the question really did change -----------------------------------
   // Opening a component narrows everything to one instance: which nodes count
   // as rendered is a different question inside it.
   const beforeScope = pageAnswers();
-  await track(['0.0'], { scope: 'src/components/Card.astro|', focus: 'src/components/Card.astro|0' });
+  await track(['0.0'], {
+    scope: 'src/components/Card.astro|',
+    focus: 'src/components/Card.astro|0',
+  });
   check(
     'stepping into a component asks again',
     pageAnswers() > beforeScope,
-    'the page-wide answers are stale inside a component'
+    'the page-wide answers are stale inside a component',
   );
 
   // --- a scroll is not a change ---------------------------------------------------
@@ -145,11 +154,15 @@ const settle = (ms = 120) => new Promise((r) => setTimeout(r, ms));
   const rectsBeforeScroll = count('avb:rects');
   window.dispatchEvent(new window.Event('scroll'));
   await settle(60);
-  check('scrolling re-measures the boxes', count('avb:rects') > rectsBeforeScroll, 'the outline would stay behind');
+  check(
+    'scrolling re-measures the boxes',
+    count('avb:rects') > rectsBeforeScroll,
+    'the outline would stay behind',
+  );
   check(
     'and nothing else',
     pageAnswers() === beforeScroll,
-    `${pageAnswers() - beforeScroll} page answers for a scroll`
+    `${pageAnswers() - beforeScroll} page answers for a scroll`,
   );
 
   // Counting the messages is not enough, and believing it cost half a second a
@@ -194,12 +207,12 @@ const settle = (ms = 120) => new Promise((r) => setTimeout(r, ms));
     // on Windows. A page refresh costs several extra walks; one query is
     // bounded scheduling noise rather than the regression this pins out.
     forScroll <= forTrack + 1,
-    `${forScroll} document queries for a scroll against ${forTrack} for a re-measure — the scroll is walking the page`
+    `${forScroll} document queries for a scroll against ${forTrack} for a re-measure — the scroll is walking the page`,
   );
   check(
     'while a change to the page really does walk it',
     forEdit > forTrack,
-    `${forEdit} for an edit against ${forTrack} for a re-measure`
+    `${forEdit} for an edit against ${forTrack} for a re-measure`,
   );
 
   if (failures.length) {

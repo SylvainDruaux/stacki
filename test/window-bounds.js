@@ -15,7 +15,9 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
+  if (!condition) {
+    failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  }
 };
 
 // A 16" laptop: the menu bar is off the top, the Dock off the bottom.
@@ -36,8 +38,15 @@ check('at its own size', m.width === 2560 && m.height === 1415, `${m.width}×${m
 // Small displays: the panels have a width below which they stop working, so
 // the minimum wins and the window hangs over rather than opening unusable.
 const small = openingBounds({ x: 0, y: 0, width: 800, height: 500 });
-check('a display below the minimum still gets the minimum', small.width === WIDTH_PX_MIN && small.height === HEIGHT_PX_MIN, `${small.width}×${small.height}`);
-check('and the window keeps its minimum size', b.minWidth === WIDTH_PX_MIN && b.minHeight === HEIGHT_PX_MIN);
+check(
+  'a display below the minimum still gets the minimum',
+  small.width === WIDTH_PX_MIN && small.height === HEIGHT_PX_MIN,
+  `${small.width}×${small.height}`,
+);
+check(
+  'and the window keeps its minimum size',
+  b.minWidth === WIDTH_PX_MIN && b.minHeight === HEIGHT_PX_MIN,
+);
 
 // Nothing to ask: opening somewhere beats not opening.
 check('no work area at all still opens a window', openingBounds().width === WIDTH_PX_MIN);
@@ -49,26 +58,32 @@ const frac = openingBounds({ x: 0.5, y: 37.5, width: 1727.6, height: 1078.2 });
 check(
   'fractional work areas are rounded to whole pixels',
   Number.isInteger(frac.width) && Number.isInteger(frac.height) && Number.isInteger(frac.y),
-  JSON.stringify(frac)
+  JSON.stringify(frac),
 );
 
 // --- the app opens with them -------------------------------------------------
 const main = fs.readFileSync(path.join(__dirname, '..', 'dist', 'electron', 'main.js'), 'utf8');
-check('the window is opened with these bounds', /\.\.\.bounds,/.test(main), 'the window still opens at its own size');
+check(
+  'the window is opened with these bounds',
+  /\.\.\.bounds,/.test(main),
+  'the window still opens at its own size',
+);
 check(
   'measured from the display the pointer is on',
   /screen\.getDisplayNearestPoint\(screen\.getCursorScreenPoint\(\)\)\.workArea/.test(main),
-  'a second display would open the window on the first'
+  'a second display would open the window on the first',
 );
 check(
   'and a display it cannot ask about still opens one',
   /catch \{[\s\S]{0,200}openingBounds\(\{ width: 1480, height: 940 \}\)/.test(main),
-  'no screen means no window'
+  'no screen means no window',
 );
 check('nothing is hard-coded to 1480×940 any more', !/width: 1480,\s*\n\s*height: 940,/.test(main));
 
 if (failures.length) {
-  console.error(`\nwindow-bounds: ${failures.length} failed, ${checked - failures.length} passed\n`);
+  console.error(
+    `\nwindow-bounds: ${failures.length} failed, ${checked - failures.length} passed\n`,
+  );
   console.error(failures.join('\n') + '\n');
   process.exit(1);
 }

@@ -30,8 +30,7 @@ interface ExprMarker {
   readonly __expr: string;
 }
 
-const isExpr = (v: unknown): v is ExprMarker =>
-  typeof toRecord(v)?.[EXPR] === 'string';
+const isExpr = (v: unknown): v is ExprMarker => typeof toRecord(v)?.[EXPR] === 'string';
 
 /**
  * Past the quoted run starting at `i`. A scanner, not a parser: it only needs
@@ -75,7 +74,8 @@ function skipQuoted(source: string, i: number): number {
 // What can only be the start of the next statement, never a continuation of
 // this one — so an expression written across lines without semicolons still
 // ends where it should.
-const NEXT_STATEMENT = /^(?:(?:export|import|const|let|var|function|class|return|if|for|while|switch|try)\b|\}|---)/;
+const NEXT_STATEMENT =
+  /^(?:(?:export|import|const|let|var|function|class|return|if|for|while|switch|try)\b|\}|---)/;
 
 /**
  * End of the expression starting at `i`: its `;`, or the line break that ends
@@ -147,7 +147,15 @@ interface Parsed {
   readonly next: number;
 }
 
-const SIMPLE_ESCAPES: Record<string, string> = { n: '\n', t: '\t', r: '\r', b: '\b', f: '\f', v: '\v', '0': '\0' };
+const SIMPLE_ESCAPES: Record<string, string> = {
+  n: '\n',
+  t: '\t',
+  r: '\r',
+  b: '\b',
+  f: '\f',
+  v: '\v',
+  '0': '\0',
+};
 
 function parseString(source: string, i: number): { value: string; next: number } {
   const quote = source.charAt(i);
@@ -251,7 +259,12 @@ function parseValue(source: string, i: number): Parsed {
   const word = /^(true|false|null|undefined)\b/.exec(source.slice(i));
   const wordText = word?.[1];
   if (word && wordText !== undefined) {
-    const words: Record<string, boolean | null> = { true: true, false: false, null: null, undefined: null };
+    const words: Record<string, boolean | null> = {
+      true: true,
+      false: false,
+      null: null,
+      undefined: null,
+    };
     const v = words[wordText];
     return { value: v === undefined ? null : v, next: i + word[0].length };
   }
@@ -332,7 +345,13 @@ function findCollections(source: string, opts: ScanOptions = {}): Collection[] {
     try {
       parsed = parseValue(source, start);
     } catch (err) {
-      out.push({ name, data: null, start, end: start, reason: err instanceof Error ? err.message : String(err) });
+      out.push({
+        name,
+        data: null,
+        start,
+        end: start,
+        reason: err instanceof Error ? err.message : String(err),
+      });
       continue;
     }
     const value = parsed.value;
@@ -343,9 +362,9 @@ function findCollections(source: string, opts: ScanOptions = {}): Collection[] {
     // A collection is a list of records; an array of bare strings is a
     // constant in a data file, but it is content in a page.
     const isRecords =
-      list.length > 0 && list.every((v) => v !== null && typeof v === 'object' && !Array.isArray(v));
-    const isPlainList =
-      allowPlainLists && list.every((v) => v === null || typeof v !== 'object');
+      list.length > 0 &&
+      list.every((v) => v !== null && typeof v === 'object' && !Array.isArray(v));
+    const isPlainList = allowPlainLists && list.every((v) => v === null || typeof v !== 'object');
     if (!isRecords && !isPlainList) {
       continue;
     }
@@ -401,7 +420,8 @@ function literal(value: unknown, indent: string, pad: string): string {
   if (!entries.length) {
     return '{}';
   }
-  const pair = ([k, v]: [string, unknown]): string => `${ID_KEY.test(k) ? k : quote(k)}: ${literal(v, indent, pad + indent)}`;
+  const pair = ([k, v]: [string, unknown]): string =>
+    `${ID_KEY.test(k) ? k : quote(k)}: ${literal(v, indent, pad + indent)}`;
   // Keep short records on one line — that's how these files are written by
   // hand, and expanding every one would churn the whole file on first save.
   // WIDTH matches Prettier's default so re-saving a formatted file is a no-op;

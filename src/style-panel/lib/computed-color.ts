@@ -12,10 +12,10 @@
 // element (see the `compute` half of avb:query) and hands back the computed
 // colour, which is what the swatch paints.
 
-import { useEffect, useState } from 'react'
-import { hasCanvas, queryCanvas } from '../../canvasQuery.js'
-import { getHost, onHostChange } from './host'
-import { createQueryCache } from './query-cache'
+import { useEffect, useState } from 'react';
+import { hasCanvas, queryCanvas } from '../../canvasQuery.js';
+import { getHost, onHostChange } from './host';
+import { createQueryCache } from './query-cache';
 
 /**
  * Does this value need the page to resolve it?
@@ -26,25 +26,29 @@ import { createQueryCache } from './query-cache'
  * for `#fff`.
  */
 export function needsPage(value: string): boolean {
-  const v = String(value ?? '').trim().toLowerCase()
-  if (!v) {return false}
+  const v = String(value ?? '')
+    .trim()
+    .toLowerCase();
+  if (!v) {
+    return false;
+  }
   return (
     v.includes('var(') ||
     v.includes('color-mix(') ||
     v.includes('light-dark(') ||
     v.includes('currentcolor') ||
     v.startsWith('--')
-  )
+  );
 }
 
 const cache = createQueryCache(async (path, values) => {
-  const answer = await queryCanvas(path, [], values)
-  return answer?.computed ?? null
-})
+  const answer = await queryCanvas(path, [], values);
+  return answer?.computed ?? null;
+});
 
 /** Forget everything: the page changed under us, so the answers may have too. */
 export function forgetComputedColors(): void {
-  cache.clear()
+  cache.clear();
 }
 
 // The element to resolve against: whatever is selected, and the page itself
@@ -52,8 +56,8 @@ export function forgetComputedColors(): void {
 // The variables panel has no selection to speak of and its swatches are as
 // answerable as any other.
 function pathOfSelection(): string {
-  const host = getHost()
-  return (host.selectedId ? host.pathOf?.(host.selectedId) : null) ?? ''
+  const host = getHost();
+  return (host.selectedId ? host.pathOf?.(host.selectedId) : null) ?? '';
 }
 
 /**
@@ -62,26 +66,40 @@ function pathOfSelection(): string {
  * the answer arrives, so a swatch never flashes empty on a re-render.
  */
 export function useResolvedColor(value: string): string {
-  const raw = String(value ?? '').trim()
-  const [, bump] = useState(0)
-  const host = getHost()
-  cache.setScope([host.projectPath, host.openFilePath, host.nodes, host.selectedId, host.device, host.historyTick])
-  const path = pathOfSelection()
-  const pageDependent = needsPage(raw)
-  const enabled = pageDependent && hasCanvas()
-  const resolved = enabled ? cache.read(path, raw) : null
+  const raw = String(value ?? '').trim();
+  const [, bump] = useState(0);
+  const host = getHost();
+  cache.setScope([
+    host.projectPath,
+    host.openFilePath,
+    host.nodes,
+    host.selectedId,
+    host.device,
+    host.historyTick,
+  ]);
+  const path = pathOfSelection();
+  const pageDependent = needsPage(raw);
+  const enabled = pageDependent && hasCanvas();
+  const resolved = enabled ? cache.read(path, raw) : null;
 
   useEffect(() => {
-    if (!pageDependent) {return undefined}
-    const sync = () => bump((n) => n + 1)
-    const offCache = cache.subscribe(sync)
-    const offHost = onHostChange(sync)
-    return () => { offCache(); offHost() }
-  }, [pageDependent])
+    if (!pageDependent) {
+      return undefined;
+    }
+    const sync = () => bump((n) => n + 1);
+    const offCache = cache.subscribe(sync);
+    const offHost = onHostChange(sync);
+    return () => {
+      offCache();
+      offHost();
+    };
+  }, [pageDependent]);
 
   useEffect(() => {
-    if (enabled && resolved === undefined) {void cache.request(path, raw)}
-  })
+    if (enabled && resolved === undefined) {
+      void cache.request(path, raw);
+    }
+  });
 
-  return resolved || raw
+  return resolved || raw;
 }

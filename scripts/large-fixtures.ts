@@ -71,11 +71,21 @@ export function generateLargeFixtures(
   const fixtures: LargeFixture[] = [];
   for (const percent of PERCENTS) {
     const nodes = Math.floor((limits.treeNodesMax * percent) / 100);
-    fixtures.push({ name: `nodes-${percent}`, axis: 'nodes', percent, text: nodesFixture(pieces, nodes) });
+    fixtures.push({
+      name: `nodes-${percent}`,
+      axis: 'nodes',
+      percent,
+      text: nodesFixture(pieces, nodes),
+    });
   }
   for (const percent of PERCENTS) {
     const bytes = Math.floor((limits.sourceBytesMax * percent) / 100);
-    fixtures.push({ name: `bytes-${percent}`, axis: 'bytes', percent, text: bytesFixture(pieces, bytes) });
+    fixtures.push({
+      name: `bytes-${percent}`,
+      axis: 'bytes',
+      percent,
+      text: bytesFixture(pieces, bytes),
+    });
   }
   return fixtures;
 }
@@ -110,7 +120,10 @@ interface Piece {
 // The template part of each corpus file, wrapped in a section so pieces sit
 // side by side as blocks. Only pieces that parse alone are used; the node count
 // is measured on the wrapped piece, which is exactly what it adds to a fixture.
-function standalonePieces(corpus: ReadonlyMap<string, string>, countNodes: NodeCounter): readonly Piece[] {
+function standalonePieces(
+  corpus: ReadonlyMap<string, string>,
+  countNodes: NodeCounter,
+): readonly Piece[] {
   const names = [...corpus.keys()].sort();
   if (names.length > PIECES_MAX) {
     throw new Error(`Large fixtures: more than ${PIECES_MAX} corpus files`);

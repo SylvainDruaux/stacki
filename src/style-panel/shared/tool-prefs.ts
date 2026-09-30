@@ -5,11 +5,11 @@
  * Best-effort: any read failure falls back to no preference rather than
  * throwing, so a corrupt value never blocks the app from loading.
  */
-import { BOUNDARY_LIMITS } from '../../../shared/boundary'
+import { BOUNDARY_LIMITS } from '../../../shared/boundary';
 
 // The embed the Style Editor last targeted for new custom styles — restored as the
 // default so a chosen embed (e.g. a global-CSS embed) sticks across reloads.
-const EMBED_SOURCE_KEY = 'moden.embedEditor.source'
+const EMBED_SOURCE_KEY = 'moden.embedEditor.source';
 
 /** A stored embed source key, or null when absent or not one: storage is
  * shared with every earlier build, so what it holds is parsed like any input.
@@ -17,24 +17,27 @@ const EMBED_SOURCE_KEY = 'moden.embedEditor.source'
 export function parseStoredEmbedSource(raw: unknown): string | null {
   if (typeof raw === 'string') {
     if (raw.length > 0) {
-      return raw.length <= BOUNDARY_LIMITS.pathLengthMax ? raw : null
+      return raw.length <= BOUNDARY_LIMITS.pathLengthMax ? raw : null;
     }
   }
-  return null
+  return null;
 }
 
 export function loadEmbedSource(): string | null {
   try {
-    return parseStoredEmbedSource(localStorage.getItem(EMBED_SOURCE_KEY))
+    return parseStoredEmbedSource(localStorage.getItem(EMBED_SOURCE_KEY));
   } catch {
-    return null
+    return null;
   }
 }
 
 export function saveEmbedSource(key: string | null) {
   try {
-    if (key) {localStorage.setItem(EMBED_SOURCE_KEY, key)}
-    else {localStorage.removeItem(EMBED_SOURCE_KEY)}
+    if (key) {
+      localStorage.setItem(EMBED_SOURCE_KEY, key);
+    } else {
+      localStorage.removeItem(EMBED_SOURCE_KEY);
+    }
   } catch {
     /* noop */
   }

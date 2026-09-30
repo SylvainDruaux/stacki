@@ -138,7 +138,9 @@ export function createFileSaver({ delay = 300, onError = () => {} }: FileSaverDe
     if (entry.timer !== null) {
       clearTimeout(entry.timer);
     }
-    const result: Promise<unknown> = (running.get(key) || Promise.resolve()).catch(() => {}).then(() => entry.write());
+    const result: Promise<unknown> = (running.get(key) || Promise.resolve())
+      .catch(() => {})
+      .then(() => entry.write());
     running.set(key, result);
     result.then(
       () => {

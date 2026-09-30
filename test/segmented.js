@@ -25,7 +25,9 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
+  if (!condition) {
+    failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  }
 };
 
 // Segment geometry, since jsdom lays nothing out: the track is 320px wide with
@@ -43,8 +45,8 @@ const SEG = (TRACK - PAD * 2) / 4;
   fs.writeFileSync(
     entry,
     `export { default as DisplayControl } from ${JSON.stringify(
-      path.join(__dirname, '..', 'src', 'style-panel', 'DisplayControl.tsx')
-    )};\n`
+      path.join(__dirname, '..', 'src', 'style-panel', 'DisplayControl.tsx'),
+    )};\n`,
   );
   const out = path.join(buildDir, 'segmented.bundle.js');
   await esbuild.build({
@@ -69,10 +71,13 @@ const SEG = (TRACK - PAD * 2) / 4;
   // The pill measures with offsetLeft/offsetWidth — zoom-independent, and the
   // reason it can't be a percentage of the track. jsdom reports 0 for both, so
   // they are defined here from the layout above.
-  const index = (el) => [...(el.parentElement?.children ?? [])].filter((n) => n.tagName === 'BUTTON').indexOf(el);
+  const index = (el) =>
+    [...(el.parentElement?.children ?? [])].filter((n) => n.tagName === 'BUTTON').indexOf(el);
   Object.defineProperty(dom.window.HTMLElement.prototype, 'offsetLeft', {
     get() {
-      if (!this.className?.includes?.('display-seg')) {return 0;}
+      if (!this.className?.includes?.('display-seg')) {
+        return 0;
+      }
       return PAD + index(this) * SEG;
     },
   });
@@ -102,9 +107,7 @@ const SEG = (TRACK - PAD * 2) / 4;
   const root = createRoot(host);
   const show = async (value) => {
     await act(async () => {
-      root.render(
-        React.createElement(DisplayControl, { value, busy: false, onCommit: () => {} })
-      );
+      root.render(React.createElement(DisplayControl, { value, busy: false, onCommit: () => {} }));
     });
     await act(async () => {});
   };
@@ -119,23 +122,42 @@ const SEG = (TRACK - PAD * 2) / 4;
 
   // --- the pill lands on the selection ----------------------------------------
   await show('block');
-  check('there is one pill, not four backgrounds', host.querySelectorAll('.embed-editor_display-indicator').length === 1);
+  check(
+    'there is one pill, not four backgrounds',
+    host.querySelectorAll('.embed-editor_display-indicator').length === 1,
+  );
   check('and it starts on the selected segment', at()?.x === PAD, JSON.stringify(at()));
   check('as wide as that segment', at()?.width === SEG, JSON.stringify(at()));
 
   await show('flex');
-  check('choosing the second moves it one segment along', at()?.x === PAD + SEG, JSON.stringify(at()));
+  check(
+    'choosing the second moves it one segment along',
+    at()?.x === PAD + SEG,
+    JSON.stringify(at()),
+  );
   await show('grid');
   check('and the third, two', at()?.x === PAD + SEG * 2, JSON.stringify(at()));
 
   // The fourth slot is whichever non-primary value is set, and its label
   // changes with it — so the pill is measured, never assumed.
   await show('none');
-  check('an inline/none value puts it on the fourth', at()?.x === PAD + SEG * 3, JSON.stringify(at()));
-  check('and the fourth reads as the value it holds', segments()[3]?.textContent === 'None', segments()[3]?.textContent);
+  check(
+    'an inline/none value puts it on the fourth',
+    at()?.x === PAD + SEG * 3,
+    JSON.stringify(at()),
+  );
+  check(
+    'and the fourth reads as the value it holds',
+    segments()[3]?.textContent === 'None',
+    segments()[3]?.textContent,
+  );
   await show('inline-block');
   check('whatever that value is', at()?.x === PAD + SEG * 3, JSON.stringify(at()));
-  check('with the label to match', segments()[3]?.textContent === 'In-block', segments()[3]?.textContent);
+  check(
+    'with the label to match',
+    segments()[3]?.textContent === 'In-block',
+    segments()[3]?.textContent,
+  );
 
   // --- and nothing else claims to be selected ---------------------------------
   await show('grid');
@@ -144,7 +166,7 @@ const SEG = (TRACK - PAD * 2) / 4;
   check('the one the pill is under', selected[0]?.textContent === 'Grid', selected[0]?.textContent);
   check(
     'and it is announced as checked',
-    segments().filter((el) => el.getAttribute('aria-checked') === 'true').length === 1
+    segments().filter((el) => el.getAttribute('aria-checked') === 'true').length === 1,
   );
 
   // --- what the fourth slot can hold --------------------------------------------
@@ -155,13 +177,18 @@ const SEG = (TRACK - PAD * 2) / 4;
   // fell through to the custom text field, which is where a value goes when the
   // panel doesn't understand it.
   await show('contents');
-  check('contents is a segment, not a custom value', segments().length === 4, String(segments().length));
-  check('sitting in the fourth slot', at()?.x === PAD + SEG * 3, JSON.stringify(at()));
-  check('labelled as itself', segments()[3]?.textContent === 'Contents', segments()[3]?.textContent);
   check(
-    'and marked as the one that is on',
-    segments()[3]?.getAttribute('aria-checked') === 'true'
+    'contents is a segment, not a custom value',
+    segments().length === 4,
+    String(segments().length),
   );
+  check('sitting in the fourth slot', at()?.x === PAD + SEG * 3, JSON.stringify(at()));
+  check(
+    'labelled as itself',
+    segments()[3]?.textContent === 'Contents',
+    segments()[3]?.textContent,
+  );
+  check('and marked as the one that is on', segments()[3]?.getAttribute('aria-checked') === 'true');
 
   // --- a value with no segment at all ------------------------------------------
   await show('var(--layout)');
@@ -179,7 +206,7 @@ const SEG = (TRACK - PAD * 2) / 4;
   check(
     'the pill can be animated once placed',
     pill()?.className.includes('is-animated'),
-    pill()?.className
+    pill()?.className,
   );
 
   await act(async () => {
@@ -190,17 +217,18 @@ const SEG = (TRACK - PAD * 2) / 4;
   // from the bar and the one that opens from a custom value are different lists.
   const display = fs.readFileSync(
     path.join(__dirname, '..', 'src', 'style-panel', 'DisplayControl.tsx'),
-    'utf8'
+    'utf8',
   );
   check(
     'the menu lists it beside None, whichever menu it is',
     (display.match(/\{BOXLESS\.map\(/g) || []).length === 2,
-    'the two menus render the boxless group'
+    'the two menus render the boxless group',
   );
   check('with a tooltip saying what it does', /contents: <>/.test(display));
   check(
     'and it is a supported value, so the bar keeps it',
-    /const BOXLESS = \['none', 'contents'\]/.test(display) && /\.\.\.INLINE, \.\.\.BOXLESS/.test(display)
+    /const BOXLESS = \['none', 'contents'\]/.test(display) &&
+      /\.\.\.INLINE, \.\.\.BOXLESS/.test(display),
   );
 
   // --- every bar that shares the classes ----------------------------------------
@@ -228,7 +256,7 @@ const SEG = (TRACK - PAD * 2) / 4;
     check(
       `${file.replace('.tsx', '')} draws a pill in each of its tracks`,
       tracks > 0 && pills === tracks,
-      `${pills} pills for ${tracks} tracks`
+      `${pills} pills for ${tracks} tracks`,
     );
   }
   // …and every file that renders a segment is on that list, so a new bar can't
@@ -236,17 +264,19 @@ const SEG = (TRACK - PAD * 2) / 4;
   const users = fs
     .readdirSync(panel)
     .filter((f) => f.endsWith('.tsx'))
-    .filter((f) => fs.readFileSync(path.join(panel, f), 'utf8').includes('embed-editor_display-seg'));
+    .filter((f) =>
+      fs.readFileSync(path.join(panel, f), 'utf8').includes('embed-editor_display-seg'),
+    );
   check(
     'and no other file renders segments without one',
     users.every((f) => bars.includes(f)),
-    users.filter((f) => !bars.includes(f)).join(', ')
+    users.filter((f) => !bars.includes(f)).join(', '),
   );
 
   // --- what the CSS says --------------------------------------------------------
   const css = fs.readFileSync(
     path.join(__dirname, '..', 'src', 'style-panel', 'embed-editor.css'),
-    'utf8'
+    'utf8',
   );
   // Every rule with this selector, joined — `.embed-editor_display-seg` is
   // declared twice in the file, and reading only the first says the opposite of
@@ -256,35 +286,45 @@ const SEG = (TRACK - PAD * 2) / 4;
     let from = 0;
     for (;;) {
       const at = css.indexOf(selector + ' {', from);
-      if (at < 0) {break;}
+      if (at < 0) {
+        break;
+      }
       const end = css.indexOf('}', at);
       out.push(css.slice(at, end));
       from = end + 1;
     }
     return out.length ? out.join('\n') : null;
   };
-  check('the pill is the thing that carries the background', /background:\s*var\(--surface-control\)/.test(rule('.embed-editor_display-indicator') || ''));
-  check('and the thing that moves', /transition:\s*transform/.test(rule('.embed-editor_display-indicator.is-animated') || ''));
+  check(
+    'the pill is the thing that carries the background',
+    /background:\s*var\(--surface-control\)/.test(rule('.embed-editor_display-indicator') || ''),
+  );
+  check(
+    'and the thing that moves',
+    /transition:\s*transform/.test(rule('.embed-editor_display-indicator.is-animated') || ''),
+  );
   check(
     'a selected segment has no background of its own',
     !/background/.test(rule('.embed-editor_display-seg.is-selected') || '') &&
       !css.includes('.embed-editor_display-seg.is-selected:hover'),
-    rule('.embed-editor_display-seg.is-selected') || 'no rule'
+    rule('.embed-editor_display-seg.is-selected') || 'no rule',
   );
   check(
     'hover moves the label, not a background',
     /background:\s*none/.test(rule('.embed-editor_display-seg:hover:not(:disabled)') || '') &&
-      /color:\s*var\(--color-text-primary\)/.test(rule('.embed-editor_display-seg:hover:not(:disabled)') || ''),
-    rule('.embed-editor_display-seg:hover:not(:disabled)') || 'no rule'
+      /color:\s*var\(--color-text-primary\)/.test(
+        rule('.embed-editor_display-seg:hover:not(:disabled)') || '',
+      ),
+    rule('.embed-editor_display-seg:hover:not(:disabled)') || 'no rule',
   );
   check(
     'the chevron beside them agrees',
     /background:\s*none/.test(rule('.embed-editor_display-arrow:hover:not(:disabled)') || ''),
-    rule('.embed-editor_display-arrow:hover:not(:disabled)') || 'no rule'
+    rule('.embed-editor_display-arrow:hover:not(:disabled)') || 'no rule',
   );
   check(
     'and the segments sit above the pill rather than under it',
-    /z-index:\s*1/.test(rule('.embed-editor_display-seg') || '')
+    /z-index:\s*1/.test(rule('.embed-editor_display-seg') || ''),
   );
 
   if (failures.length) {

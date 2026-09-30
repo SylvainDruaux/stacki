@@ -40,7 +40,7 @@ export function readPropertyOrigins(document: PropertySyntax): PropertyOrigins {
       if (!members.has(name)) {
         members.set(
           name,
-          entries.map((entry) => entry.member)
+          entries.map((entry) => entry.member),
         );
         sources.set(
           name,
@@ -49,9 +49,9 @@ export function readPropertyOrigins(document: PropertySyntax): PropertyOrigins {
               document,
               entry.member,
               `${entry.owner}.${name}`,
-              entry.member.type?.getText() ?? 'unknown'
-            )
-          )
+              entry.member.type?.getText() ?? 'unknown',
+            ),
+          ),
         );
       }
     }
@@ -67,7 +67,7 @@ export function readPropertyOrigins(document: PropertySyntax): PropertyOrigins {
               document,
               binding,
               `Astro.props.${name}`,
-              binding.initializer.getText()
+              binding.initializer.getText(),
             ),
           }
         : {}),
@@ -81,7 +81,7 @@ interface OriginMember {
 }
 function readOriginMembers(
   root: Declaration | undefined,
-  declarations: ReadonlyMap<string, Declaration>
+  declarations: ReadonlyMap<string, Declaration>,
 ): ReadonlyMap<string, readonly OriginMember[]> {
   const work: Work[] = root ? [{ node: root, owner: root.name.text }] : [];
   const seen = new Set<ts.Node>();
@@ -147,7 +147,7 @@ function originSource(
   document: PropertySyntax,
   node: ts.Node,
   label: string,
-  expression: string
+  expression: string,
 ): PropertySource {
   const offset = node.getStart(document.syntax);
   assert(offset >= 0, 'Property source offset is nonnegative');

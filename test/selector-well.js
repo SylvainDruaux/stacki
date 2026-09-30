@@ -22,18 +22,20 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
+  if (!condition) {
+    failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  }
 };
 
 const channelLuminance = (value) => {
   const channel = value / 255;
-  return channel <= 0.04045
-    ? channel / 12.92
-    : ((channel + 0.055) / 1.055) ** 2.4;
+  return channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
 };
 const colorLuminance = (hex) => {
   const channels = hex.match(/[0-9a-f]{2}/gi)?.map((value) => Number.parseInt(value, 16));
-  if (!channels || channels.length !== 3) {return null;}
+  if (!channels || channels.length !== 3) {
+    return null;
+  }
   return (
     0.2126 * channelLuminance(channels[0]) +
     0.7152 * channelLuminance(channels[1]) +
@@ -43,7 +45,9 @@ const colorLuminance = (hex) => {
 const contrastRatio = (first, second) => {
   const firstLuminance = colorLuminance(first);
   const secondLuminance = colorLuminance(second);
-  if (firstLuminance == null || secondLuminance == null) {return null;}
+  if (firstLuminance == null || secondLuminance == null) {
+    return null;
+  }
   const lighter = Math.max(firstLuminance, secondLuminance);
   const darker = Math.min(firstLuminance, secondLuminance);
   return (lighter + 0.05) / (darker + 0.05);
@@ -85,25 +89,32 @@ const contrastRatio = (first, second) => {
   global.Node = dom.window.Node;
   global.getComputedStyle = dom.window.getComputedStyle;
   global.IS_REACT_ACT_ENVIRONMENT = true;
-  dom.window.ResizeObserver = class { observe() {} unobserve() {} disconnect() {} };
+  dom.window.ResizeObserver = class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  };
   global.ResizeObserver = dom.window.ResizeObserver;
   global.MutationObserver = dom.window.MutationObserver;
   global.requestAnimationFrame = dom.window.requestAnimationFrame.bind(dom.window);
   global.cancelAnimationFrame = dom.window.cancelAnimationFrame.bind(dom.window);
   dom.window.Range.prototype.getClientRects = () => [];
   dom.window.Range.prototype.getBoundingClientRect = () => ({
-    bottom: 0, height: 0, left: 0, right: 0, top: 0, width: 0, x: 0, y: 0,
+    bottom: 0,
+    height: 0,
+    left: 0,
+    right: 0,
+    top: 0,
+    width: 0,
+    x: 0,
+    y: 0,
     toJSON: () => ({}),
   });
 
   const React = require('react');
   const { createRoot } = require('react-dom/client');
   const { act } = require('react');
-  const {
-    SelectorPicker,
-    listMatchedSelectors,
-    selectorDependsOnAncestor,
-  } = require(bundlePath);
+  const { SelectorPicker, listMatchedSelectors, selectorDependsOnAncestor } = require(bundlePath);
 
   const CHIPS = [
     { key: 'a', text: 'html.theme-dark', fromComponent: true },
@@ -124,7 +135,7 @@ const contrastRatio = (first, second) => {
           onDeselect: () => {},
           onAdd: () => {},
           ...props,
-        })
+        }),
       );
     });
   const spinner = () => document.querySelector('.embed-editor_selector-loading');
@@ -132,42 +143,56 @@ const contrastRatio = (first, second) => {
 
   await show({ loading: true });
   check('an empty well says it is still counting', spinner() != null);
-  check('and says so in words, for a screen reader', /finding/i.test(spinner()?.textContent || ''), spinner()?.textContent);
+  check(
+    'and says so in words, for a screen reader',
+    /finding/i.test(spinner()?.textContent || ''),
+    spinner()?.textContent,
+  );
   check('with no chips beside it', chips() === 0, `${chips()} chips`);
 
   await show({ loading: true, selectors: CHIPS });
-  check('chips that have arrived show without a spinner', spinner() == null && chips() === 2, `${chips()} chips`);
+  check(
+    'chips that have arrived show without a spinner',
+    spinner() == null && chips() === 2,
+    `${chips()} chips`,
+  );
 
   await show({ loading: false, selectors: [] });
-  check('a finished scan with no selectors shows an empty well', spinner() == null && chips() === 0);
+  check(
+    'a finished scan with no selectors shows an empty well',
+    spinner() == null && chips() === 0,
+  );
 
   await show({ loading: false, selectors: CHIPS });
-  check('and a finished one with selectors shows them', spinner() == null && chips() === 2, `${chips()} chips`);
+  check(
+    'and a finished one with selectors shows them',
+    spinner() == null && chips() === 2,
+    `${chips()} chips`,
+  );
   const renderedChips = [...document.querySelectorAll('.embed-editor_selector-chip')];
   check(
     'a component selector receives the green component class',
     renderedChips[0]?.classList.contains('is-component') === true,
-    renderedChips[0]?.className
+    renderedChips[0]?.className,
   );
   check(
     'a non-component selector keeps the standard class treatment',
     renderedChips[1]?.classList.contains('is-component') === false,
-    renderedChips[1]?.className
+    renderedChips[1]?.className,
   );
   check(
     'component provenance is included in the accessible name',
-    renderedChips[0]?.getAttribute('aria-label') ===
-      'html.theme-dark, component selector',
-    renderedChips[0]?.getAttribute('aria-label')
+    renderedChips[0]?.getAttribute('aria-label') === 'html.theme-dark, component selector',
+    renderedChips[0]?.getAttribute('aria-label'),
   );
   check(
     'an inactive selector exposes its unpressed state',
-    renderedChips[0]?.getAttribute('aria-pressed') === 'false'
+    renderedChips[0]?.getAttribute('aria-pressed') === 'false',
   );
   await show({ loading: false, selectors: CHIPS, activeSelector: 'html.theme-dark' });
   check(
     'the selected selector exposes its pressed state',
-    document.querySelector('.embed-editor_selector-chip')?.getAttribute('aria-pressed') === 'true'
+    document.querySelector('.embed-editor_selector-chip')?.getAttribute('aria-pressed') === 'true',
   );
   let defaultDeselections = 0;
   let defaultSelections = 0;
@@ -175,27 +200,31 @@ const contrastRatio = (first, second) => {
     loading: false,
     selectors: CHIPS,
     activeSelector: 'html.theme-dark',
-    onDeselect: () => {defaultDeselections += 1;},
-    onSelect: () => {defaultSelections += 1;},
+    onDeselect: () => {
+      defaultDeselections += 1;
+    },
+    onSelect: () => {
+      defaultSelections += 1;
+    },
   });
   await act(async () => document.querySelector('.embed-editor_selector-chip')?.click());
   check(
     'the initially active selector deselects on its first click',
     defaultDeselections === 1 && defaultSelections === 0,
-    `${defaultDeselections} deselections, ${defaultSelections} selections`
+    `${defaultDeselections} deselections, ${defaultSelections} selections`,
   );
 
   check(
     'an ancestor selector is classified as inherited',
-    selectorDependsOnAncestor('.layout > .heading') === true
+    selectorDependsOnAncestor('.layout > .heading') === true,
   );
   check(
     'a sibling condition inside :has does not become inherited',
-    selectorDependsOnAncestor('.heading:has(+ .text)') === false
+    selectorDependsOnAncestor('.heading:has(+ .text)') === false,
   );
   check(
     'a sibling selector is not described as a parent relationship',
-    selectorDependsOnAncestor('.eyebrow + .heading') === false
+    selectorDependsOnAncestor('.eyebrow + .heading') === false,
   );
 
   const CATEGORY_CHIPS = [
@@ -208,26 +237,29 @@ const contrastRatio = (first, second) => {
   await show({
     loading: false,
     selectors: CATEGORY_CHIPS,
-    onVisibleSelectorsChange: (selectors) => {visibleSelectors = [...selectors];},
+    onVisibleSelectorsChange: (selectors) => {
+      visibleSelectors = [...selectors];
+    },
   });
   check('global selectors are hidden initially', chips() === 1, `${chips()} chips`);
   check(
     'the picker reports only selectors visible with both filters closed',
     visibleSelectors.join('|') === '.heading:has(+ .text)',
-    visibleSelectors.join('|')
+    visibleSelectors.join('|'),
   );
   const filterLabel = (name) =>
-    [...document.querySelectorAll('.embed-editor_selector-filter')]
-      .find((label) => label.textContent.includes(name));
+    [...document.querySelectorAll('.embed-editor_selector-filter')].find((label) =>
+      label.textContent.includes(name),
+    );
   check(
     'tag and broad-state selectors are counted as global',
     filterLabel('global')?.textContent.includes('(2)') === true,
-    filterLabel('global')?.textContent
+    filterLabel('global')?.textContent,
   );
   check(
     'parent-qualified selectors are counted as inherited',
     filterLabel('inherited')?.textContent.includes('(1)') === true,
-    filterLabel('inherited')?.textContent
+    filterLabel('inherited')?.textContent,
   );
 
   await act(async () => filterLabel('global')?.querySelector('input')?.click());
@@ -236,32 +268,33 @@ const contrastRatio = (first, second) => {
   check(
     'the visible-selector report follows the global checkbox',
     visibleSelectors.includes('h1') && visibleSelectors.includes(':focus-visible'),
-    visibleSelectors.join('|')
+    visibleSelectors.join('|'),
   );
   check(
     'a tag selector receives the global grey class',
-    globalChips.find((chip) => chip.textContent === 'h1')?.classList.contains('is-global') === true
+    globalChips.find((chip) => chip.textContent === 'h1')?.classList.contains('is-global') === true,
   );
   check(
     'a global selector is named for assistive technology',
     globalChips.find((chip) => chip.textContent === 'h1')?.getAttribute('aria-label') ===
-      'h1, global selector'
+      'h1, global selector',
   );
 
   await act(async () => filterLabel('global')?.querySelector('input')?.click());
   await act(async () => filterLabel('inherited')?.querySelector('input')?.click());
-  const inheritedChip = [...document.querySelectorAll('.embed-editor_selector-chip')]
-    .find((chip) => chip.textContent === '.hero .heading');
+  const inheritedChip = [...document.querySelectorAll('.embed-editor_selector-chip')].find(
+    (chip) => chip.textContent === '.hero .heading',
+  );
   check(
     'an ancestor-qualified selector receives the inherited grey class',
     inheritedChip?.classList.contains('is-inherited') === true,
-    inheritedChip?.className
+    inheritedChip?.className,
   );
   check(
     'grey category naming preserves component provenance',
     inheritedChip?.getAttribute('aria-label') ===
       '.hero .heading, inherited and component selector',
-    inheritedChip?.getAttribute('aria-label')
+    inheritedChip?.getAttribute('aria-label'),
   );
 
   // The same selector may be authored globally and inside a component. The chip is
@@ -285,21 +318,25 @@ const contrastRatio = (first, second) => {
       ],
       conditional: [],
     },
-    ''
+    '',
   );
   check(
     'component provenance survives selector deduplication',
-    listed.find((selector) => selector.text === '.shared')?.fromComponent === true
+    listed.find((selector) => selector.text === '.shared')?.fromComponent === true,
   );
   check(
     'ordinary stylesheet provenance remains ordinary',
-    listed.find((selector) => selector.text === '.global')?.fromComponent === false
+    listed.find((selector) => selector.text === '.global')?.fromComponent === false,
   );
 
   // A global selector (`:target`, `*`) is folded away unless asked for — the well
   // then has nothing in it, and the scan is over, so it must not spin forever.
   await show({ loading: false, selectors: [{ key: 'g', text: ':focus-visible' }] });
-  check('a folded-away global leaves the well quiet', spinner() == null && chips() === 0, `${chips()} chips`);
+  check(
+    'a folded-away global leaves the well quiet',
+    spinner() == null && chips() === 0,
+    `${chips()} chips`,
+  );
 
   // --- the whole panel, from a cold open ------------------------------------
   //
@@ -332,7 +369,12 @@ const contrastRatio = (first, second) => {
   });
 
   const READ_MS = 250;
-  const SHEET = { rel: 'src/styles/main.css', name: 'main.css', path: '/p/src/styles/main.css', size: 10 };
+  const SHEET = {
+    rel: 'src/styles/main.css',
+    name: 'main.css',
+    path: '/p/src/styles/main.css',
+    size: 10,
+  };
   let styleWriteCount = 0;
   let writtenCss = '';
   dom.window.avb = {
@@ -340,10 +382,19 @@ const contrastRatio = (first, second) => {
     listAstroStyleFiles: async () => ({ files: [] }),
     listAssets: async () => ({ entries: [] }),
     readStyleFile: () =>
-      new Promise((r) => dom.window.setTimeout(() => r({
-        css: 'section { margin: 0 } div { display: block } .card { color: red }',
-      }), READ_MS)),
-    writeStyleFile: async ({ css }) => {styleWriteCount += 1; writtenCss = css;},
+      new Promise((r) =>
+        dom.window.setTimeout(
+          () =>
+            r({
+              css: 'section { margin: 0 } div { display: block } .card { color: red }',
+            }),
+          READ_MS,
+        ),
+      ),
+    writeStyleFile: async ({ css }) => {
+      styleWriteCount += 1;
+      writtenCss = css;
+    },
   };
 
   const { EditorView, EmbedEditor, setHost, setCanvasFrame } = require(panelBundle);
@@ -379,9 +430,13 @@ const contrastRatio = (first, second) => {
   const cssCodeToggle = () => panel.querySelector('.embed-editor_css-code-toggle');
   check(
     'the CSS Code section starts closed',
-    cssCodeToggle()?.getAttribute('aria-expanded') === 'false'
+    cssCodeToggle()?.getAttribute('aria-expanded') === 'false',
   );
-  check('a project with no stylesheets to read settles empty', panelChips().length === 0, `${panelChips().length} chips`);
+  check(
+    'a project with no stylesheets to read settles empty',
+    panelChips().length === 0,
+    `${panelChips().length} chips`,
+  );
   check('and does not pretend to be waiting', panelSpinner() == null);
 
   // The list arrives, after the panel already called itself ready.
@@ -393,7 +448,7 @@ const contrastRatio = (first, second) => {
   await wait(READ_MS + 400); // still far inside the 4s refresh throttle it used to wait out
   check(
     'the global rule is counted after the stylesheet lands',
-    panel.querySelector('.embed-editor_selector-filter')?.textContent.includes('(1)') === true
+    panel.querySelector('.embed-editor_selector-filter')?.textContent.includes('(1)') === true,
   );
   check('the global rule stays folded initially', panelChips().length === 0);
   check('and the spinner goes with the completed scan', panelSpinner() == null);
@@ -403,7 +458,7 @@ const contrastRatio = (first, second) => {
   check(
     'revealing globals shows the stylesheet selector',
     panelChips()[0]?.textContent === 'section',
-    panelChips()[0]?.textContent
+    panelChips()[0]?.textContent,
   );
   panelChips()[0]?.click();
   await wait(30);
@@ -412,19 +467,19 @@ const contrastRatio = (first, second) => {
   check(
     'a picked selector names the file its CSS comes from',
     panel.querySelector('.embed-editor_css-code-source')?.textContent === 'src/styles/main.css',
-    panel.querySelector('.embed-editor_css-code-source')?.textContent
+    panel.querySelector('.embed-editor_css-code-source')?.textContent,
   );
   cssCodeToggle()?.click();
   await wait(30);
   check(
     'the CSS Code section opens on request',
-    cssCodeToggle()?.getAttribute('aria-expanded') === 'true'
+    cssCodeToggle()?.getAttribute('aria-expanded') === 'true',
   );
   panel.querySelector('.embed-editor_css-code-source')?.click();
   await wait(30);
   check(
     'clicking the filename closes the whole CSS Code disclosure',
-    cssCodeToggle()?.getAttribute('aria-expanded') === 'false'
+    cssCodeToggle()?.getAttribute('aria-expanded') === 'false',
   );
   cssCodeToggle()?.click();
   await wait(30);
@@ -440,36 +495,49 @@ const contrastRatio = (first, second) => {
   await wait(120);
   check(
     'the CSS Code disclosure stays open when the element changes',
-    cssCodeToggle()?.getAttribute('aria-expanded') === 'true'
+    cssCodeToggle()?.getAttribute('aria-expanded') === 'true',
   );
-  check('picking another element empties the well', panelChips().length === 0, `${panelChips().length} chips`);
+  check(
+    'picking another element empties the well',
+    panelChips().length === 0,
+    `${panelChips().length} chips`,
+  );
   check('and it spins while the canvas is asked', panelSpinner() != null);
 
   await wait(2000);
-  check('the well fills once the answer (or its absence) lands', panelChips().length === 2, panelChips().map((c) => c.textContent).join(','));
+  check(
+    'the well fills once the answer (or its absence) lands',
+    panelChips().length === 2,
+    panelChips()
+      .map((c) => c.textContent)
+      .join(','),
+  );
   check('and stops spinning', panelSpinner() == null);
-  const codeText = () => (
+  const codeText = () =>
     panel.querySelector('.embed-editor_css-code-editor .cm-content')?.textContent ||
     panel.querySelector('.embed-editor_css-code-preview')?.textContent ||
-    ''
-  );
+    '';
   check(
     'the initially selected core class filters the CSS view',
     codeText().includes('.card {') && !codeText().includes('div {'),
-    codeText()
+    codeText(),
   );
   check(
     'the initially selected core class opens an editable CSS box',
-    panel.querySelector('.embed-editor_css-code-editor .cm-editor') != null
+    panel.querySelector('.embed-editor_css-code-editor .cm-editor') != null,
   );
-  panelChips().find((chip) => chip.textContent === '.card')?.click();
+  panelChips()
+    .find((chip) => chip.textContent === '.card')
+    ?.click();
   await wait(30);
   check(
     'one click deselects the initially active core class',
     codeText().includes('.card {') && codeText().includes('div {'),
-    codeText()
+    codeText(),
   );
-  panelChips().find((chip) => chip.textContent === '.card')?.click();
+  panelChips()
+    .find((chip) => chip.textContent === '.card')
+    ?.click();
   await wait(30);
   const editorElement = panel.querySelector('.embed-editor_css-code-editor .cm-editor');
   check('an individually selected selector has an editable CSS box', editorElement != null);
@@ -483,7 +551,7 @@ const contrastRatio = (first, second) => {
     await wait(450);
     check(
       'typing in the CSS box automatically writes the selected rule',
-      writtenCss.includes('.card { color: blue }')
+      writtenCss.includes('.card { color: blue }'),
     );
     const currentEditorElement = panel.querySelector('.embed-editor_css-code-editor .cm-editor');
     check(
@@ -491,16 +559,16 @@ const contrastRatio = (first, second) => {
       currentEditorElement === editorElement &&
         editor.state.selection.main.head === editor.state.doc.length,
       `same element: ${currentEditorElement === editorElement}; ` +
-        `caret: ${editor.state.selection.main.head}; length: ${editor.state.doc.length}`
+        `caret: ${editor.state.selection.main.head}; length: ${editor.state.doc.length}`,
     );
     check(
       'the autosaving editor has no manual Save CSS button',
-      !panel.textContent.includes('Save CSS')
+      !panel.textContent.includes('Save CSS'),
     );
     check(
       'the style panel refreshes from the edited CSS',
       panel.querySelector('[data-prop="color"]')?.value === 'blue',
-      panel.querySelector('[data-prop="color"]')?.value
+      panel.querySelector('[data-prop="color"]')?.value,
     );
     editor.dispatch({
       changes: { from: 0, to: editor.state.doc.length, insert: '.card { color:' },
@@ -509,23 +577,25 @@ const contrastRatio = (first, second) => {
     check(
       'an invalid intermediate draft is not written or retried',
       styleWriteCount === 1,
-      `${styleWriteCount} stylesheet writes`
+      `${styleWriteCount} stylesheet writes`,
     );
   }
 
-  panelChips().find((chip) => chip.textContent === '.card')?.click();
+  panelChips()
+    .find((chip) => chip.textContent === '.card')
+    ?.click();
   await wait(30);
   check(
     'deselecting shows code for every currently visible selector',
     codeText().includes('.card {') && codeText().includes('div {'),
-    codeText()
+    codeText(),
   );
   panel.querySelector('.embed-editor_selector-filter input')?.click();
   await wait(30);
   check(
     'hiding global selectors also removes their code',
     codeText().includes('.card {') && !codeText().includes('div {'),
-    codeText()
+    codeText(),
   );
 
   // --- the well doesn't rearrange itself when the scan lands ------------------
@@ -537,7 +607,7 @@ const contrastRatio = (first, second) => {
   {
     const css = fs.readFileSync(
       path.join(__dirname, '..', 'src', 'style-panel', 'embed-editor.css'),
-      'utf8'
+      'utf8',
     );
     const chipHeight = /--embed-editor_chip-h:/.test(css);
     check('a chip row has one stated height', chipHeight);
@@ -547,7 +617,7 @@ const contrastRatio = (first, second) => {
       'the CSS box uses the full section width',
       /padding:\s*0 0 var\(--space-4\)/.test(codeBodyRule) &&
         /\.code-editor\.embed-editor_css-code-editor\s*\{[^}]*padding:\s*0;/s.test(css),
-      `${codeBodyRule}\n${css.match(/\.code-editor\.embed-editor_css-code-editor\s*\{[^}]*\}/s)?.[0]}`
+      `${codeBodyRule}\n${css.match(/\.code-editor\.embed-editor_css-code-editor\s*\{[^}]*\}/s)?.[0]}`,
     );
     const codePreview = css.slice(css.indexOf('.embed-editor_css-code-preview {'));
     const codePreviewRule = codePreview.slice(0, codePreview.indexOf('}'));
@@ -555,61 +625,61 @@ const contrastRatio = (first, second) => {
       'the CSS preview has a tight independently scrollable height',
       /max-height: min\(36vh, 360px\)/.test(codePreviewRule) &&
         /overflow-y: auto/.test(codePreviewRule),
-      codePreviewRule
+      codePreviewRule,
     );
     const componentChip = css.slice(css.indexOf('.embed-editor_selector-chip.is-component'));
     check(
       'the component chip class uses the component green tokens',
       /--color-component-tag-bg/.test(componentChip.slice(0, 800)) &&
         /--color-component-tag\)/.test(componentChip.slice(0, 800)),
-      componentChip.slice(0, 800)
+      componentChip.slice(0, 800),
     );
     check(
       'component hover and selected states use different brightness tokens',
       /--color-component-tag-bg-hover/.test(componentChip.slice(0, 800)) &&
         /--color-component-tag-bg-active/.test(componentChip.slice(0, 800)),
-      componentChip.slice(0, 800)
+      componentChip.slice(0, 800),
     );
     const tokens = fs.readFileSync(
       path.join(__dirname, '..', 'src', 'style-panel', 'tokens.css'),
-      'utf8'
+      'utf8',
     );
     const activeGreen = tokens.match(/--color-component-tag-bg-active:\s*(#[0-9a-f]{6})/i)?.[1];
     const activeContrast = activeGreen ? contrastRatio('#ffffff', activeGreen) : null;
     check(
       'selected component text meets WCAG AA contrast',
       activeContrast != null && activeContrast >= 4.5,
-      activeContrast == null ? String(activeGreen) : `${activeContrast.toFixed(2)}:1`
+      activeContrast == null ? String(activeGreen) : `${activeContrast.toFixed(2)}:1`,
     );
     const loading = css.slice(css.indexOf('.embed-editor_selector-loading {'));
     check(
       'the spinner row is exactly that tall',
       /min-height: var\(--embed-editor_chip-h\)/.test(loading.slice(0, loading.indexOf('}'))),
-      loading.slice(0, loading.indexOf('}'))
+      loading.slice(0, loading.indexOf('}')),
     );
     const src = fs.readFileSync(
       path.join(__dirname, '..', 'src', 'style-panel', 'EmbedEditor.tsx'),
-      'utf8'
+      'utf8',
     );
     const check_ = src.slice(src.indexOf('embed-editor_selector-filter'));
     check(
       'the globals checkbox is not conditional on having any',
       !/\{globals\.length \? \(/.test(src),
-      'it still renders only when there are globals'
+      'it still renders only when there are globals',
     );
     check(
       'it disables itself instead when there are none',
-      /disabled=\{busy \|\| !globals\.length\}/.test(check_)
+      /disabled=\{busy \|\| !globals\.length\}/.test(check_),
     );
     const contextualChip = css.slice(
-      css.indexOf('.embed-editor_selector-chip:is(.is-global, .is-inherited)')
+      css.indexOf('.embed-editor_selector-chip:is(.is-global, .is-inherited)'),
     );
     check(
       'global and inherited chips use the neutral grey ramp',
       /--color-selector-context-bg/.test(contextualChip.slice(0, 1000)) &&
         /--color-selector-context-bg-hover/.test(contextualChip.slice(0, 1000)) &&
         /--color-selector-context-bg-active/.test(contextualChip.slice(0, 1000)),
-      contextualChip.slice(0, 1000)
+      contextualChip.slice(0, 1000),
     );
   }
 
@@ -617,7 +687,9 @@ const contrastRatio = (first, second) => {
     console.error(`selector-well: ${failures.length} of ${checked} failed\n${failures.join('\n')}`);
     process.exit(1);
   }
-  console.log(`selector-well: ${checked} passed  [well markup, cold open, late stylesheets, next element]`);
+  console.log(
+    `selector-well: ${checked} passed  [well markup, cold open, late stylesheets, next element]`,
+  );
   // jsdom's timers keep the loop alive.
   process.exit(0);
 })();

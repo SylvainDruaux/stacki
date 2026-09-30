@@ -35,9 +35,7 @@ export interface ObjectItem {
 
 export type Item = ScalarItem | ObjectItem;
 
-type ItemDraft =
-  | { text: string; quote: string | null }
-  | { fields: ItemField[] };
+type ItemDraft = { text: string; quote: string | null } | { fields: ItemField[] };
 
 // `{ value: "a", label: "A" }` — an object whose every value is a word or a
 // number. That is a thing with several fields, which a row can name and a popup
@@ -215,7 +213,10 @@ export function arrayItems(source: unknown): Item[] | null {
 }
 
 /** How a string is written back, in the quote it was written with. */
-function quoted(item: { readonly text: string; readonly quote: string | null | undefined }, fallback: string): string {
+function quoted(
+  item: { readonly text: string; readonly quote: string | null | undefined },
+  fallback: string,
+): string {
   const q = item.quote || fallback;
   const body = String(item.text)
     .replace(/\\/g, '\\\\')
@@ -238,9 +239,12 @@ export function arrayText(items: readonly Item[] | null | undefined): string {
   const one = (item: Item): string => {
     if (item.fields) {
       const inner = item.fields
-        .map((f) => `${f.keyQuote ? `${f.keyQuote}${f.key}${f.keyQuote}` : f.key}: ${
-          f.quote === null ? String(f.text) : quoted(f, fallback)
-        }`)
+        .map(
+          (f) =>
+            `${f.keyQuote ? `${f.keyQuote}${f.key}${f.keyQuote}` : f.key}: ${
+              f.quote === null ? String(f.text) : quoted(f, fallback)
+            }`,
+        )
         .join(', ');
       return `{ ${inner} }`;
     }
@@ -382,7 +386,12 @@ export function blankLike(items: readonly Item[] | null | undefined): Item {
     return { text: '', quote };
   }
   return {
-    fields: shape.fields.map((f) => ({ key: f.key, keyQuote: f.keyQuote, text: '', quote: f.quote ?? quote })),
+    fields: shape.fields.map((f) => ({
+      key: f.key,
+      keyQuote: f.keyQuote,
+      text: '',
+      quote: f.quote ?? quote,
+    })),
   };
 }
 

@@ -52,7 +52,7 @@ export function readPropertyContracts(document: PropertySyntax): PropertyContrac
   const imports = importedTypeNames(document.syntax);
   const publicContract = readContract(declarations.get('Props'), declarations, attributes, imports);
   const runtimeContracts = assertions.map((node) =>
-    readContract(node.type, declarations, attributes, imports)
+    readContract(node.type, declarations, attributes, imports),
   );
   const contracts = [publicContract, ...runtimeContracts];
   const editable = new Map<string, ts.PropertySignature>();
@@ -69,24 +69,22 @@ export function readPropertyContracts(document: PropertySyntax): PropertyContrac
   }
   assert(editable.size <= PROPERTY_LIMITS.fieldsMax, 'Editable contract fields are bounded');
   return {
-    names: new Set(
-      contracts.flatMap((contract) => [...contract.names])
-    ),
+    names: new Set(contracts.flatMap((contract) => [...contract.names])),
     editable,
     editing: (name) =>
       editable.has(name)
         ? { kind: 'editable' }
         : inheritedAttributeCanOverride(name, contracts)
-        ? {
-            kind: 'override',
-            reason: 'This HTML attribute will be declared locally when you save it.',
-          }
-        : {
-            kind: 'restricted',
-            reason:
-              reasons.get(name) ??
-              'This prop is inherited or imported. Edit its declaration in source.',
-          },
+          ? {
+              kind: 'override',
+              reason: 'This HTML attribute will be declared locally when you save it.',
+            }
+          : {
+              kind: 'restricted',
+              reason:
+                reasons.get(name) ??
+                'This prop is inherited or imported. Edit its declaration in source.',
+            },
     conditions: (name) => contractConditions(publicContract, name),
   };
 }
@@ -105,15 +103,13 @@ function inheritedAttributeCanOverride(name: string, contracts: readonly Contrac
   if (!publicContract?.inheritedAttributes) {
     return false;
   }
-  return contracts.every(
-    (contract) => contract.inheritedAttributes && !contract.members.has(name)
-  );
+  return contracts.every((contract) => contract.inheritedAttributes && !contract.members.has(name));
 }
 
 function commonMemberRestriction(
   name: string,
   contract: Contract,
-  runtimeContracts: readonly Contract[]
+  runtimeContracts: readonly Contract[],
 ): string | undefined {
   const usages = contract.members.get(name) ?? [];
   if (usages.some((usage) => usage.conditional)) {
@@ -143,7 +139,7 @@ function readContract(
   root: ts.Node | undefined,
   declarations: ReadonlyMap<string, Declaration>,
   attributes: ReadonlySet<string>,
-  imports: ReadonlySet<string>
+  imports: ReadonlySet<string>,
 ): Contract {
   const work: Work[] = root ? [{ node: root, conditional: false, path: [] }] : [];
   const members = new Map<string, readonly Usage[]>();
@@ -186,7 +182,7 @@ function readContract(
 function isInheritedAstroAttributes(
   node: ts.Node,
   declarations: ReadonlyMap<string, Declaration>,
-  attributes: ReadonlySet<string>
+  attributes: ReadonlySet<string>,
 ): boolean {
   if (!ts.isTypeReferenceNode(node) && !ts.isExpressionWithTypeArguments(node)) {
     return false;
@@ -199,7 +195,7 @@ function contractChildren(
   item: Work,
   declarations: ReadonlyMap<string, Declaration>,
   attributes: ReadonlySet<string>,
-  imports: ReadonlySet<string>
+  imports: ReadonlySet<string>,
 ): readonly Work[] | undefined {
   const { node } = item;
   if (ts.isTypeAliasDeclaration(node) || ts.isInterfaceDeclaration(node)) {
@@ -256,7 +252,7 @@ function isOmittedAstroAttributes(
   node: ts.TypeReferenceNode,
   declarations: ReadonlyMap<string, Declaration>,
   attributes: ReadonlySet<string>,
-  imports: ReadonlySet<string>
+  imports: ReadonlySet<string>,
 ): boolean {
   if (node.typeName.getText() !== 'Omit') {
     return false;
@@ -327,7 +323,7 @@ function importedTypeNames(syntax: ts.SourceFile): ReadonlySet<string> {
 function unionBranches(node: ts.UnionTypeNode): readonly Branch[] {
   const fields = node.types.map(branchFields);
   const discriminator = [...(fields[0]?.keys() ?? [])].find((name) =>
-    fields.every((branch) => literalBranchValue(branch.get(name)?.type) !== undefined)
+    fields.every((branch) => literalBranchValue(branch.get(name)?.type) !== undefined),
   );
   return fields.map((branch, index) => ({
     fields: branch,
@@ -381,11 +377,11 @@ function contractConditions(contract: Contract, name: string): readonly string[]
           ? member.type?.kind === ts.SyntaxKind.NeverKeyword
             ? 'not allowed'
             : member.questionToken
-            ? 'optional'
-            : 'required'
+              ? 'optional'
+              : 'required'
           : 'not declared';
         return `${branch.condition}: ${state}`;
-      })
+      }),
     );
   assert(conditions.length <= PROPERTY_LIMITS.fieldsMax, 'Property variant conditions are bounded');
   return conditions;

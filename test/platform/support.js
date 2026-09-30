@@ -53,7 +53,10 @@ function windowsFilesystem() {
   if (!fs.existsSync('/proc/sys/fs/binfmt_misc/WSLInterop')) {
     return { skip: 'not WSL with Windows interop' };
   }
-  const user = spawnSync('cmd.exe', ['/c', 'echo %USERNAME%'], { encoding: 'utf8', timeout: 20_000 });
+  const user = spawnSync('cmd.exe', ['/c', 'echo %USERNAME%'], {
+    encoding: 'utf8',
+    timeout: 20_000,
+  });
   const name = user.stdout?.trim();
   if (user.status !== 0 || !name) {
     return { skip: 'Windows interop did not answer' };
@@ -62,7 +65,8 @@ function windowsFilesystem() {
   if (!fs.existsSync(directory)) {
     return { skip: `no NTFS temp folder at ${directory}` };
   }
-  const toWindows = (file) => spawnSync('wslpath', ['-w', file], { encoding: 'utf8' }).stdout.trim();
+  const toWindows = (file) =>
+    spawnSync('wslpath', ['-w', file], { encoding: 'utf8' }).stdout.trim();
   return { directory, toWindows, powershell: 'powershell.exe' };
 }
 
@@ -99,7 +103,9 @@ function runChild(job) {
   });
   return new Promise((resolve, reject) => {
     child.on('error', reject);
-    child.on('exit', (code, signal) => resolve({ code, signal, lines: output.split('\n').filter(Boolean) }));
+    child.on('exit', (code, signal) =>
+      resolve({ code, signal, lines: output.split('\n').filter(Boolean) }),
+    );
   });
 }
 

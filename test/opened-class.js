@@ -26,7 +26,9 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
+  if (!condition) {
+    failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  }
 };
 
 const PRELOAD = path.join(__dirname, '..', 'dist', 'electron', 'preload.js');
@@ -62,7 +64,7 @@ const frame = (url) => {
         <li data-avb-p="src/components/Row.astro|0.0.0 0.6.0" class="row">c</li>
       </ul>
     </body>`,
-    { url, pretendToBeVisual: true }
+    { url, pretendToBeVisual: true },
   );
   const { window } = dom;
   const NO_BOX = { x: 0, y: 0, width: 0, height: 0, left: 0, top: 0, right: 0, bottom: 0 };
@@ -71,7 +73,9 @@ const frame = (url) => {
   // element that renders a box of its own, stacked down the page.
   let top = 0;
   window.Element.prototype.getBoundingClientRect = function () {
-    if (['SCRIPT', 'STYLE', 'TEMPLATE', 'LINK', 'META', 'TITLE', 'HEAD'].includes(this.tagName)) {return NO_BOX;}
+    if (['SCRIPT', 'STYLE', 'TEMPLATE', 'LINK', 'META', 'TITLE', 'HEAD'].includes(this.tagName)) {
+      return NO_BOX;
+    }
     const y = (top += 50);
     return { x: 0, y, width: 200, height: 40, left: 0, top: y, right: 200, bottom: y + 40 };
   };
@@ -119,7 +123,8 @@ const frame = (url) => {
     Object.defineProperty(ev, 'source', { value: window.parent });
     window.dispatchEvent(ev);
   };
-  const opened = () => [...window.document.querySelectorAll('.stacki-opened')].map((el) => el.textContent);
+  const opened = () =>
+    [...window.document.querySelectorAll('.stacki-opened')].map((el) => el.textContent);
   // Read the moment the script has run, before any event has had a chance to
   // fire: the page paints before DOMContentLoaded, and a canvas that spent that
   // time looking like the preview would flash.
@@ -135,33 +140,49 @@ const frame = (url) => {
   check(
     'the canvas frame says so on <html>',
     canvas.doc.documentElement.classList.contains('stacki-designer'),
-    canvas.doc.documentElement.className
+    canvas.doc.documentElement.className,
   );
   check(
     'and does not also claim to be the preview',
-    !canvas.doc.documentElement.classList.contains('stacki-preview')
+    !canvas.doc.documentElement.classList.contains('stacki-preview'),
   );
   check(
     'from the moment the script runs, not from an event later on',
     canvas.markedOnLoad.includes('stacki-designer'),
-    JSON.stringify(canvas.markedOnLoad)
+    JSON.stringify(canvas.markedOnLoad),
   );
 
   // --- opening one copy of a component in a loop ---------------------------------
   //
   // Three cards, one path, three runs. Opening the second means the second.
   canvas.track('0.1', 1);
-  check('the copy that was opened is marked', canvas.opened().join() === 'two', canvas.opened().join());
+  check(
+    'the copy that was opened is marked',
+    canvas.opened().join() === 'two',
+    canvas.opened().join(),
+  );
 
   canvas.track('0.1', 0);
-  check('opening another copy moves the mark', canvas.opened().join() === 'one', canvas.opened().join());
+  check(
+    'opening another copy moves the mark',
+    canvas.opened().join() === 'one',
+    canvas.opened().join(),
+  );
 
   canvas.track('0.1', 2);
-  check('and the last one is reachable too', canvas.opened().join() === 'three', canvas.opened().join());
+  check(
+    'and the last one is reachable too',
+    canvas.opened().join() === 'three',
+    canvas.opened().join(),
+  );
 
   // A component that renders two siblings has no single root, so both are it.
   canvas.track('0.3', 0);
-  check('a component with two roots marks both', canvas.opened().join() === 'head,body', canvas.opened().join());
+  check(
+    'a component with two roots marks both',
+    canvas.opened().join() === 'head,body',
+    canvas.opened().join(),
+  );
 
   // --- a component whose root is a conditional -------------------------------------
   //
@@ -169,15 +190,27 @@ const frame = (url) => {
   // instance, and it carries the path rather than being wrapped in a pair.
   // Marking what the branch rendered is the only thing there is to mark.
   canvas.track('0.5.0', 0);
-  check('an instance addressed by attribute is marked', canvas.opened().join() === 'first', canvas.opened().join());
+  check(
+    'an instance addressed by attribute is marked',
+    canvas.opened().join() === 'first',
+    canvas.opened().join(),
+  );
   canvas.track('0.5.1', 0);
-  check('and its neighbour is a different one', canvas.opened().join() === 'second', canvas.opened().join());
+  check(
+    'and its neighbour is a different one',
+    canvas.opened().join() === 'second',
+    canvas.opened().join(),
+  );
 
   // The same component inside a loop: one path, one tagged element per item,
   // and the occurrence is the copy that was double-clicked — the same list the
   // click that opened it counted.
   canvas.track('0.6.0', 1);
-  check('a conditional root inside a loop marks the copy that was opened', canvas.opened().join() === 'b', canvas.opened().join());
+  check(
+    'a conditional root inside a loop marks the copy that was opened',
+    canvas.opened().join() === 'b',
+    canvas.opened().join(),
+  );
   canvas.track('0.6.0', 2);
   check('and the next copy along', canvas.opened().join() === 'c', canvas.opened().join());
   check('one copy at a time', canvas.opened().length === 1, canvas.opened().join());
@@ -187,7 +220,11 @@ const frame = (url) => {
   // A component's region holds its <script> and <style> too. They are elements
   // and they are not what anyone means by the root of the component.
   canvas.track('0.4', 0);
-  check('the script in a component is not marked', canvas.opened().join() === 'widget', canvas.opened().join());
+  check(
+    'the script in a component is not marked',
+    canvas.opened().join() === 'widget',
+    canvas.opened().join(),
+  );
 
   // --- painting it twice ------------------------------------------------------------
   //
@@ -198,11 +235,19 @@ const frame = (url) => {
   {
     canvas.track('0.1', 1);
     const watch = new canvas.window.MutationObserver(() => {});
-    watch.observe(canvas.doc.documentElement, { subtree: true, attributes: true, attributeFilter: ['class'] });
+    watch.observe(canvas.doc.documentElement, {
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['class'],
+    });
     canvas.track('0.1', 1);
     const wrote = watch.takeRecords();
     watch.disconnect();
-    check('painting the same instance again writes nothing', wrote.length === 0, `${wrote.length} class writes`);
+    check(
+      'painting the same instance again writes nothing',
+      wrote.length === 0,
+      `${wrote.length} class writes`,
+    );
   }
 
   // --- and leaving ----------------------------------------------------------------
@@ -219,17 +264,21 @@ const frame = (url) => {
     const list = (rects?.classes || {})[p];
     return list ? list.flat() : [];
   };
-  check('the marked element still reports its own class', classesFor('0.1').includes('card'), JSON.stringify(classesFor('0.1')));
+  check(
+    'the marked element still reports its own class',
+    classesFor('0.1').includes('card'),
+    JSON.stringify(classesFor('0.1')),
+  );
   check(
     'and not the one the canvas put there',
     !classesFor('0.1').includes('stacki-opened'),
-    JSON.stringify(classesFor('0.1'))
+    JSON.stringify(classesFor('0.1')),
   );
   const nodeClasses = canvas.sent.filter((m) => m.type === 'avb:node-classes').pop();
   check(
     'nor in the classes the navigator reads',
     !JSON.stringify(nodeClasses?.classes || {}).includes('stacki-'),
-    JSON.stringify(nodeClasses?.classes || {})
+    JSON.stringify(nodeClasses?.classes || {}),
   );
 
   // --- the interactive preview ------------------------------------------------------
@@ -242,21 +291,21 @@ const frame = (url) => {
   check(
     'the preview frame says so on <html>',
     preview.doc.documentElement.classList.contains('stacki-preview'),
-    preview.doc.documentElement.className
+    preview.doc.documentElement.className,
   );
   check(
     'and not that it is the designer',
     !preview.doc.documentElement.classList.contains('stacki-designer'),
-    preview.doc.documentElement.className
+    preview.doc.documentElement.className,
   );
   check(
     'as immediately as the canvas does',
     preview.markedOnLoad.includes('stacki-preview'),
-    JSON.stringify(preview.markedOnLoad)
+    JSON.stringify(preview.markedOnLoad),
   );
   check(
     'nothing is opened in a frame that is only being browsed',
-    preview.doc.querySelectorAll('.stacki-opened').length === 0
+    preview.doc.querySelectorAll('.stacki-opened').length === 0,
   );
 
   // --- the source, for the rule that spans both -------------------------------------
@@ -264,7 +313,7 @@ const frame = (url) => {
   check(
     'the classes the canvas adds are named in one place',
     /const STACKI_CLASSES = new Set\(\[/.test(source),
-    'a second list of them will drift from the first'
+    'a second list of them will drift from the first',
   );
   // The one raw read left is the filter's own; anything else is a way for these
   // classes to reach the app.
@@ -272,7 +321,7 @@ const frame = (url) => {
   check(
     'and every reported class list is filtered through it',
     raw.length === 1 && /ownClasses/.test(raw[0]),
-    raw.join('\n    ')
+    raw.join('\n    '),
   );
   // Both halves come from the lists everything else in the canvas already uses,
   // so "the open instance" and "which copy" mean one thing across the outline,
@@ -281,7 +330,7 @@ const frame = (url) => {
   check(
     'the marked instance is the one the rest of the canvas narrows to',
     /focusRoots\(\)/.test(roots),
-    'openedRoots works the instance out for itself'
+    'openedRoots works the instance out for itself',
   );
   // And that narrowing is one rule for the whole canvas — the outline, the hit
   // testing and the scroll-to read it too, so an instance with no marker pair
@@ -290,11 +339,13 @@ const frame = (url) => {
   check(
     'an instance with no marker pair counts copies the way the click does',
     /taggedPlaces\(focusPath\)/.test(focus) && /places\[focusOcc\]/.test(focus),
-    focus
+    focus,
   );
 
   if (failures.length) {
-    console.error(`\nopened-class: ${failures.length} failed, ${checked - failures.length} passed\n`);
+    console.error(
+      `\nopened-class: ${failures.length} failed, ${checked - failures.length} passed\n`,
+    );
     console.error(failures.join('\n') + '\n');
     process.exit(1);
   }

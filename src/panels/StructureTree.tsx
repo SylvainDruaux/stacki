@@ -608,8 +608,7 @@ export function ContextMenu({
   useContextDismiss(ref, onClose);
   const left = Math.min(position.left, window.innerWidth - 208);
   const top = Math.min(position.top, window.innerHeight - 130);
-  const shortcut = (key: string): string =>
-    shortcutLabel(key, 'primary', currentDesktopPlatform());
+  const shortcut = (key: string): string => shortcutLabel(key, 'primary', currentDesktopPlatform());
   return (
     <div ref={ref} className="ctx-menu" style={{ left, top, width: 200 }}>
       <ContextMenuItem action="copy" label="Copy" shortcut={shortcut('C')} onAction={onAction} />

@@ -46,7 +46,7 @@ const NO_ASTRO_PRINTING = [
     message: WHOLE_FILE_REGENERATION_MESSAGE,
   },
   {
-    selector: "ImportDeclaration[source.value=/astroParser(\\.js)?$/] > ImportNamespaceSpecifier",
+    selector: 'ImportDeclaration[source.value=/astroParser(\\.js)?$/] > ImportNamespaceSpecifier',
     message: WHOLE_FILE_REGENERATION_MESSAGE,
   },
 ];
@@ -61,7 +61,7 @@ const NO_MARKDOWN_PRINTING = [
   },
   {
     selector:
-      "ImportDeclaration[source.value=/markdownParser(\\.js)?$/] > ImportNamespaceSpecifier",
+      'ImportDeclaration[source.value=/markdownParser(\\.js)?$/] > ImportNamespaceSpecifier',
     message: WHOLE_FILE_REGENERATION_MESSAGE,
   },
 ];
@@ -84,8 +84,14 @@ const PRINTER_BOUNDARY = ['electron/markdownParser.ts'];
 // a failed gate, not a flaky test.
 const NO_ASYNC = [
   { selector: 'AwaitExpression', message: 'Deterministic code has no async steps (plan §10).' },
-  { selector: ':function[async=true]', message: 'Deterministic code has no async steps (plan §10).' },
-  { selector: "Identifier[name='Promise']", message: 'Deterministic code has no promises (plan §10).' },
+  {
+    selector: ':function[async=true]',
+    message: 'Deterministic code has no async steps (plan §10).',
+  },
+  {
+    selector: "Identifier[name='Promise']",
+    message: 'Deterministic code has no promises (plan §10).',
+  },
 ];
 const DETERMINISM_RULES = {
   'no-restricted-globals': [
@@ -102,7 +108,10 @@ const DETERMINISM_RULES = {
       'performance',
       'process',
       'fetch',
-    ].map((name) => ({ name, message: `${name} is nondeterministic; the scheduler owns time (plan §10).` })),
+    ].map((name) => ({
+      name,
+      message: `${name} is nondeterministic; the scheduler owns time (plan §10).`,
+    })),
   ],
   'no-restricted-properties': [
     'error',
@@ -127,7 +136,10 @@ const DETERMINISM_RULES = {
         'node:net',
         'node:http',
         'node:https',
-      ].map((name) => ({ name, message: 'Deterministic code does no I/O; fake it behind an interface (plan §10).' })),
+      ].map((name) => ({
+        name,
+        message: 'Deterministic code does no I/O; fake it behind an interface (plan §10).',
+      })),
     },
   ],
 };
@@ -299,7 +311,12 @@ export default [
     ],
     rules: {
       ...DETERMINISM_RULES,
-      'no-restricted-syntax': ['error', ...NO_ASSERTIONS, ...NO_WHOLE_FILE_REGENERATION, ...NO_ASYNC],
+      'no-restricted-syntax': [
+        'error',
+        ...NO_ASSERTIONS,
+        ...NO_WHOLE_FILE_REGENERATION,
+        ...NO_ASYNC,
+      ],
     },
   },
 ];

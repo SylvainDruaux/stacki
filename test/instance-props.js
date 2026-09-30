@@ -23,7 +23,9 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
+  if (!condition) {
+    failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  }
 };
 
 (async () => {
@@ -70,33 +72,44 @@ const check = (what, condition, detail) => {
   check(
     'a path into the data resolves to the data',
     got({ heading: expr('project.data.title') })?.heading === 'BloomCraft',
-    JSON.stringify(got({ heading: expr('project.data.title') }))
+    JSON.stringify(got({ heading: expr('project.data.title') })),
   );
   check(
     'a template literal comes out as the string it builds',
     got({ href: expr('`/portfolio/${project.id}`') })?.href === '/portfolio/bloomcraft',
-    JSON.stringify(got({ href: expr('`/portfolio/${project.id}`') }))
+    JSON.stringify(got({ href: expr('`/portfolio/${project.id}`') })),
   );
   check('a written string is its own answer', got({ variant: text('cover') })?.variant === 'cover');
-  check('an attribute with no value means true', got({ render: { type: 'bare' } })?.render === true);
-  check('a number stays a number', got({ cols: expr('3') })?.cols === 3, JSON.stringify(got({ cols: expr('3') })));
+  check(
+    'an attribute with no value means true',
+    got({ render: { type: 'bare' } })?.render === true,
+  );
+  check(
+    'a number stays a number',
+    got({ cols: expr('3') })?.cols === 3,
+    JSON.stringify(got({ cols: expr('3') })),
+  );
   check('and a boolean a boolean', got({ overlap: expr('true') })?.overlap === true);
   check(
     'a value reached the careful way is the same value',
     got({ heading: expr('project?.data.title') })?.heading === 'BloomCraft',
-    JSON.stringify(got({ heading: expr('project?.data.title') }))
+    JSON.stringify(got({ heading: expr('project?.data.title') })),
   );
   check(
     'a frontmatter constant resolves too',
     got({ site: expr('SITE') })?.site === 'Remarkable',
-    JSON.stringify(got({ site: expr('SITE') }))
+    JSON.stringify(got({ site: expr('SITE') })),
   );
 
   // ── What it refuses to answer ─────────────────────────────────────────────
   // A value in a panel reads as fact. Guessing one is worse than leaving it
   // to the type, which at least says it doesn't know.
   const unsure = (props, why) =>
-    check(why, got(props) === null || !(Object.keys(props)[0] in (got(props) || {})), JSON.stringify(got(props)));
+    check(
+      why,
+      got(props) === null || !(Object.keys(props)[0] in (got(props) || {})),
+      JSON.stringify(got(props)),
+    );
   unsure({ meta: expr('formatDate(project.data.date)') }, 'a call is not worked out');
   unsure({ heading: expr('mystery.title') }, 'nor is a name the page never had');
   unsure({ href: expr('`/x/${mystery.id}`') }, 'one unknown piece leaves the whole string unsaid');
@@ -104,16 +117,23 @@ const check = (what, condition, detail) => {
   check(
     'a spread contributes nothing rather than everything',
     got({ '...rest': expr('card') }) === null || !('...rest' in got({ '...rest': expr('card') })),
-    JSON.stringify(got({ '...rest': expr('card') }))
+    JSON.stringify(got({ '...rest': expr('card') })),
   );
   check(
     'an instance with nothing knowable answers null, not an empty object',
     got({ meta: expr('helper()') }) === null,
-    JSON.stringify(got({ meta: expr('helper()') }))
+    JSON.stringify(got({ meta: expr('helper()') })),
   );
-  check('and so does a node with no props at all', resolveInstanceProps({ kind: 'component' }, PAGE) === null);
+  check(
+    'and so does a node with no props at all',
+    resolveInstanceProps({ kind: 'component' }, PAGE) === null,
+  );
   // Classes belong to the style panel, not the data picker.
-  check('the class attribute is left alone', got({ class: text('card') }) === null, JSON.stringify(got({ class: text('card') })));
+  check(
+    'the class attribute is left alone',
+    got({ class: text('card') }) === null,
+    JSON.stringify(got({ class: text('card') })),
+  );
 
   // ── What the picker does with it ──────────────────────────────────────────
   // The whole point: the same rows, with values in them.
@@ -125,20 +145,33 @@ const check = (what, condition, detail) => {
   ];
   const rows = (sample) =>
     Object.fromEntries(
-      dataTree({ frontmatter: '', imports: [], propsSample: sample, propsSchema: SCHEMA }).map((n) => [
-        n.path,
-        n.preview || n.kind,
-      ])
+      dataTree({ frontmatter: '', imports: [], propsSample: sample, propsSchema: SCHEMA }).map(
+        (n) => [n.path, n.preview || n.kind],
+      ),
     );
   const before = rows(null);
-  const after = rows(got({ heading: expr('project.data.title'), href: expr('`/portfolio/${project.id}`') }));
-  check('without an instance the props say what they are', before.heading === 'string', JSON.stringify(before));
-  check('with one they say what they hold', after.heading === '"BloomCraft"', JSON.stringify(after));
-  check('every one of them it could work out', after.href === '"/portfolio/bloomcraft"', JSON.stringify(after));
+  const after = rows(
+    got({ heading: expr('project.data.title'), href: expr('`/portfolio/${project.id}`') }),
+  );
+  check(
+    'without an instance the props say what they are',
+    before.heading === 'string',
+    JSON.stringify(before),
+  );
+  check(
+    'with one they say what they hold',
+    after.heading === '"BloomCraft"',
+    JSON.stringify(after),
+  );
+  check(
+    'every one of them it could work out',
+    after.href === '"/portfolio/bloomcraft"',
+    JSON.stringify(after),
+  );
   check(
     'and the ones it could not still say what they are',
     after.meta === 'string',
-    JSON.stringify(after)
+    JSON.stringify(after),
   );
 
   // ── Against the real project ──────────────────────────────────────────────
@@ -150,8 +183,12 @@ const check = (what, condition, detail) => {
     const found = [];
     const walk = (list, chain) => {
       for (const n of list) {
-        if (n.kind === 'component' && n.name === 'LinkCard') {found.push({ n, chain });}
-        if (Array.isArray(n.children)) {walk(n.children, [...chain, n]);}
+        if (n.kind === 'component' && n.name === 'LinkCard') {
+          found.push({ n, chain });
+        }
+        if (Array.isArray(n.children)) {
+          walk(n.children, [...chain, n]);
+        }
       }
     };
     walk(page.model.nodes, []);
@@ -161,18 +198,20 @@ const check = (what, condition, detail) => {
         imports: page.model.imports || [],
         ancestorHeads: chain.filter((c) => c.kind === 'map').map((c) => c.head),
         collectionSamples: { portfolio: ENTRY },
-      })
+      }),
     );
     check('the real page has cards to read', found.length > 0, `${found.length}`);
     check(
       'and the one in the loop knows its heading and its link',
       resolved.some((r) => r?.heading === 'BloomCraft' && r?.href === '/portfolio/bloomcraft'),
-      JSON.stringify(resolved)
+      JSON.stringify(resolved),
     );
   }
 
   if (failures.length) {
-    console.error(`\ninstance-props: ${failures.length} failed, ${checked - failures.length} passed\n`);
+    console.error(
+      `\ninstance-props: ${failures.length} failed, ${checked - failures.length} passed\n`,
+    );
     console.error(failures.join('\n') + '\n');
     process.exit(1);
   }

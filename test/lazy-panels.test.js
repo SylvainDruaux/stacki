@@ -78,7 +78,9 @@ test('all optional editors load without hiding the app or replacing its preview'
     });
   try {
     await act(() =>
-      root.render(React.createElement(React.Suspense, { fallback: null }, React.createElement(App)))
+      root.render(
+        React.createElement(React.Suspense, { fallback: null }, React.createElement(App)),
+      ),
     );
     await act(() => __lazyPanels.WelcomeScreen.onOpen('/project'));
     const stable = captureEditor();
@@ -109,7 +111,7 @@ async function checkVariables(context) {
     __lazyPanels.VariablesPanel.onSelect({
       file: 'src/styles/tokens.css',
       index: 0,
-    })
+    }),
   );
   assertPending(context, 'VariablesView');
   await releasePanel(context, 'VariablesView');
@@ -134,16 +136,16 @@ async function checkCodePanel(context) {
           outside: false,
         },
         source: frame.contentWindow,
-      })
+      }),
     );
   });
   assert.ok(
     document.querySelector('[data-test-panel="CodePanel"]'),
-    'canvas selection keeps the code panel open'
+    'canvas selection keeps the code panel open',
   );
   const changed = __lazyPanels.CodePanel.source.replace(
     '<main>Content</main>',
-    '<main><h1>Changed</h1></main>'
+    '<main><h1>Changed</h1></main>',
   );
   await context.act(async () => {
     await __lazyPanels.CodePanel.onChange(changed, changed.indexOf('<h1>') + 2);
@@ -155,7 +157,7 @@ async function checkCodePanel(context) {
   assert.equal(
     document.querySelector('.property-saving-overlay'),
     null,
-    'visual edits are enabled'
+    'visual edits are enabled',
   );
   await context.act(() => new Promise((resolve) => setTimeout(resolve, 200)));
   await context.act(() => __lazyPanels.PropsPanel.onSetContent('Visual edit'));
@@ -163,7 +165,7 @@ async function checkCodePanel(context) {
   assert.match(
     __lazyPanels.CodePanel.source,
     /<h1>Visual edit<\/h1>/,
-    'visual edits serialize back into the code panel'
+    'visual edits serialize back into the code panel',
   );
   const shown = __lazyPanels.CodePanel.source;
   assert.equal(context.bridge.disk(), shown, 'as the request left the disk');

@@ -19,7 +19,9 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
+  if (!condition) {
+    failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  }
 };
 
 (async () => {
@@ -51,7 +53,11 @@ const check = (what, condition, detail) => {
   global.MutationObserver = dom.window.MutationObserver;
   global.requestAnimationFrame = (fn) => setTimeout(fn, 0);
   global.cancelAnimationFrame = clearTimeout;
-  global.ResizeObserver = class { observe() {} unobserve() {} disconnect() {} };
+  global.ResizeObserver = class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  };
   dom.window.ResizeObserver = global.ResizeObserver;
   global.IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -89,7 +95,7 @@ const check = (what, condition, detail) => {
           liveSetProp: () => {},
           onProvenance: () => {},
           onSelectSelector: () => {},
-        })
+        }),
       );
     });
     const done = async () => {
@@ -99,7 +105,9 @@ const check = (what, condition, detail) => {
     const presets = () => [...host.querySelectorAll('.embed-editor_inset-preset')];
     const press = async (label) => {
       const btn = presets().find((b) => b.getAttribute('aria-label') === label);
-      if (!btn) {throw new Error(`no preset button "${label}"`);}
+      if (!btn) {
+        throw new Error(`no preset button "${label}"`);
+      }
       await act(async () => {
         btn.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }));
       });
@@ -115,7 +123,11 @@ const check = (what, condition, detail) => {
   // disappearing row of buttons above a permanent box would be the odd one out.
   {
     const stat = await mount({ position: 'static' });
-    check('a static element still gets them', stat.presets().length === 9, String(stat.presets().length));
+    check(
+      'a static element still gets them',
+      stat.presets().length === 9,
+      String(stat.presets().length),
+    );
     await stat.done();
 
     const rel = await mount({ position: 'relative' });
@@ -123,11 +135,19 @@ const check = (what, condition, detail) => {
     await rel.done();
 
     const bare = await mount({});
-    check('and one with no position declared at all', bare.presets().length === 9, String(bare.presets().length));
+    check(
+      'and one with no position declared at all',
+      bare.presets().length === 9,
+      String(bare.presets().length),
+    );
     await bare.done();
 
     const abs = await mount({ position: 'absolute' });
-    check('an absolute one gets all nine', abs.presets().length === 9, String(abs.presets().length));
+    check(
+      'an absolute one gets all nine',
+      abs.presets().length === 9,
+      String(abs.presets().length),
+    );
     await abs.done();
 
     const fixed = await mount({ position: 'fixed' });
@@ -147,7 +167,11 @@ const check = (what, condition, detail) => {
     for (const pos of ['static', 'relative', 'absolute', undefined]) {
       const m = await mount(pos ? { position: pos } : {});
       const z = m.host.querySelector('[aria-label="z-index"]');
-      check(`z-index is present for position: ${pos ?? '(unset)'}`, !!z, m.host.innerHTML.slice(0, 120));
+      check(
+        `z-index is present for position: ${pos ?? '(unset)'}`,
+        !!z,
+        m.host.innerHTML.slice(0, 120),
+      );
       await m.done();
     }
   }
@@ -157,18 +181,25 @@ const check = (what, condition, detail) => {
     const m = await mount({ position: 'absolute' });
     await m.press('Bottom right');
     check('a corner sets its two sides', m.set.length === 2, JSON.stringify(m.set));
-    check('to zero', m.set.every(([, v]) => v === '0'), JSON.stringify(m.set));
+    check(
+      'to zero',
+      m.set.every(([, v]) => v === '0'),
+      JSON.stringify(m.set),
+    );
     check(
       'namely bottom and right',
-      m.set.map(([p]) => p).sort().join(',') === 'bottom,right',
-      JSON.stringify(m.set)
+      m.set
+        .map(([p]) => p)
+        .sort()
+        .join(',') === 'bottom,right',
+      JSON.stringify(m.set),
     );
     // The half that is easy to miss: left and top must GO, or the element
     // stretches across the parent instead of sitting in the corner.
     check(
       'and the opposite sides are cleared',
       m.cleared.sort().join(',') === 'left,top',
-      JSON.stringify(m.cleared)
+      JSON.stringify(m.cleared),
     );
     await m.done();
   }
@@ -179,8 +210,11 @@ const check = (what, condition, detail) => {
     await m.press('Left edge');
     check(
       'an edge sets three sides',
-      m.set.map(([p]) => p).sort().join(',') === 'bottom,left,top',
-      JSON.stringify(m.set)
+      m.set
+        .map(([p]) => p)
+        .sort()
+        .join(',') === 'bottom,left,top',
+      JSON.stringify(m.set),
     );
     check('and clears the fourth', m.cleared.join(',') === 'right', JSON.stringify(m.cleared));
     await m.done();
@@ -192,8 +226,11 @@ const check = (what, condition, detail) => {
     await m.press('Fill');
     check(
       'fill sets every side',
-      m.set.map(([p]) => p).sort().join(',') === 'bottom,left,right,top',
-      JSON.stringify(m.set)
+      m.set
+        .map(([p]) => p)
+        .sort()
+        .join(',') === 'bottom,left,right,top',
+      JSON.stringify(m.set),
     );
     check('with nothing left to clear', m.cleared.length === 0, JSON.stringify(m.cleared));
     await m.done();
@@ -202,35 +239,61 @@ const check = (what, condition, detail) => {
   // --- Which one lights up ---------------------------------------------------
   {
     const selected = (m) =>
-      m.presets().filter((b) => b.getAttribute('aria-checked') === 'true')
+      m
+        .presets()
+        .filter((b) => b.getAttribute('aria-checked') === 'true')
         .map((b) => b.getAttribute('aria-label'));
 
     const corner = await mount({ position: 'absolute', top: '0', left: '0' });
-    check('the matching corner is shown as chosen', selected(corner).join(',') === 'Top left', JSON.stringify(selected(corner)));
+    check(
+      'the matching corner is shown as chosen',
+      selected(corner).join(',') === 'Top left',
+      JSON.stringify(selected(corner)),
+    );
     check('and only that one', selected(corner).length === 1, JSON.stringify(selected(corner)));
     await corner.done();
 
     // Read from WHICH sides are set, not from whether they are still zero: a
     // nudged corner is still pinned to that corner.
     const nudged = await mount({ position: 'absolute', top: '12px', left: '2rem' });
-    check('a nudged corner still reads as that corner', selected(nudged).join(',') === 'Top left', JSON.stringify(selected(nudged)));
+    check(
+      'a nudged corner still reads as that corner',
+      selected(nudged).join(',') === 'Top left',
+      JSON.stringify(selected(nudged)),
+    );
     await nudged.done();
 
     const edge = await mount({ position: 'absolute', top: '0', bottom: '0', left: '0' });
-    check('three sides read as an edge', selected(edge).join(',') === 'Left edge', JSON.stringify(selected(edge)));
+    check(
+      'three sides read as an edge',
+      selected(edge).join(',') === 'Left edge',
+      JSON.stringify(selected(edge)),
+    );
     await edge.done();
 
     const all = await mount({ position: 'absolute', top: '0', right: '0', bottom: '0', left: '0' });
-    check('four sides read as fill', selected(all).join(',') === 'Fill', JSON.stringify(selected(all)));
+    check(
+      'four sides read as fill',
+      selected(all).join(',') === 'Fill',
+      JSON.stringify(selected(all)),
+    );
     await all.done();
 
     // `auto` is what an unset side reads as, and it is not a pin.
     const autos = await mount({ position: 'absolute', top: '0', left: 'auto' });
-    check('an auto side does not count as pinned', selected(autos).length === 0, JSON.stringify(selected(autos)));
+    check(
+      'an auto side does not count as pinned',
+      selected(autos).length === 0,
+      JSON.stringify(selected(autos)),
+    );
     await autos.done();
 
     const none = await mount({ position: 'absolute' });
-    check('nothing set means nothing chosen', selected(none).length === 0, JSON.stringify(selected(none)));
+    check(
+      'nothing set means nothing chosen',
+      selected(none).length === 0,
+      JSON.stringify(selected(none)),
+    );
     await none.done();
   }
 

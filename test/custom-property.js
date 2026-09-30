@@ -22,7 +22,9 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
+  if (!condition) {
+    failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  }
 };
 
 (async () => {
@@ -51,76 +53,87 @@ const check = (what, condition, detail) => {
   check(
     'typing a dash offers this project first',
     first('-', 3).join() === '--brand-500,--light-300,--space-4',
-    first('-', 6).join()
+    first('-', 6).join(),
   );
   check(
     'and the vendor-prefixed ones after it',
     first('-', 4)[3].startsWith('-webkit-'),
-    first('-', 4)[3]
+    first('-', 4)[3],
   );
-  check('a name narrows to the one', filterCssProperties('--l', VARS).join() === '--light-300', filterCssProperties('--l', VARS).join());
+  check(
+    'a name narrows to the one',
+    filterCssProperties('--l', VARS).join() === '--light-300',
+    filterCssProperties('--l', VARS).join(),
+  );
   check(
     'and the middle of a name finds it too',
     filterCssProperties('brand', VARS).join() === '--brand-500',
-    filterCssProperties('brand', VARS).join()
+    filterCssProperties('brand', VARS).join(),
   );
   check(
     'a standard property is still what a standard query offers',
     first('align', 3).join() === 'align-content,align-items,align-self',
-    first('align', 3).join()
+    first('align', 3).join(),
   );
   check(
     '-webkit- is still reachable by name',
     filterCssProperties('-webkit-align', VARS)[0] === '-webkit-align-content',
-    filterCssProperties('-webkit-align', VARS)[0]
+    filterCssProperties('-webkit-align', VARS)[0],
   );
   check(
     'an empty field opens on everything, this project included',
-    filterCssProperties('', VARS)[0] === '--brand-500' && filterCssProperties('', VARS).length === VARS.length + CSS_PROPERTIES.length,
-    `${filterCssProperties('', VARS).length}`
+    filterCssProperties('', VARS)[0] === '--brand-500' &&
+      filterCssProperties('', VARS).length === VARS.length + CSS_PROPERTIES.length,
+    `${filterCssProperties('', VARS).length}`,
   );
   check(
     'a project with no variables is the list as it was',
     filterCssProperties('align').join() === filterCssProperties('align', []).join(),
-    'the two disagree'
+    'the two disagree',
   );
   check(
     'and nothing is offered twice',
     new Set(filterCssProperties('-', VARS)).size === filterCssProperties('-', VARS).length,
-    'a duplicate'
+    'a duplicate',
   );
 
   // --- Enter goes where the rest of the answer is ------------------------------------
   const source = fs.readFileSync(
     path.join(__dirname, '..', 'src', 'style-panel', 'EmbedEditor.tsx'),
-    'utf8'
+    'utf8',
   );
   check(
     'Enter on a named property with no value moves to the value field',
-    /onEnter=\{\(\) => \{ if \(prop\.trim\(\) && !value\.trim\(\)\) \{ valueRef\.current\?\.focus\(\); return \} submit\(\) \}\}/.test(source),
-    'Enter still calls a submit that has nothing to write'
+    /onEnter=\{\(\) => \{ if \(prop\.trim\(\) && !value\.trim\(\)\) \{ valueRef\.current\?\.focus\(\); return \} submit\(\) \}\}/.test(
+      source,
+    ),
+    'Enter still calls a submit that has nothing to write',
   );
   check(
     'picking one from the list goes there too',
     /onPick=\{\(picked\) => \{ setProp\(picked\); valueRef\.current\?\.focus\(\) \}\}/.test(source),
-    'picking leaves the caret where it was'
+    'picking leaves the caret where it was',
   );
   check(
     'and the row asks for the project’s variables while it is open',
     /useSharedVars\(expanded\)/.test(source),
-    'either nothing is asked for, or it is asked for always'
+    'either nothing is asked for, or it is asked for always',
   );
   check(
     'which reach the list as property names',
     /vars\.map\(\(v\) => `--\$\{v\.name\}`\)/.test(source),
-    'the names would be offered without their dashes'
+    'the names would be offered without their dashes',
   );
 
   if (failures.length) {
-    console.error(`\ncustom-property: ${failures.length} failed, ${checked - failures.length} passed\n`);
+    console.error(
+      `\ncustom-property: ${failures.length} failed, ${checked - failures.length} passed\n`,
+    );
     console.error(failures.join('\n') + '\n');
     process.exit(1);
   }
-  console.log(`custom-property: ${checked} passed  [a project's own properties, and a key that moves on]`);
+  console.log(
+    `custom-property: ${checked} passed  [a project's own properties, and a key that moves on]`,
+  );
   process.exit(0);
 })();

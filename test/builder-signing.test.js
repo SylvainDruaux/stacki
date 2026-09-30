@@ -22,13 +22,20 @@ const builderRequire = createRequire(require.resolve('electron-builder/package.j
 const signingFile = builderRequire.resolve('app-builder-lib/out/codeSign/macCodeSign.js');
 // npm postinstall may already have applied the backport. Recover the pristine
 // installed implementation so these tests exercise both sides of the change.
-const original = fs.readFileSync(signingFile, 'utf8')
-  .replace('return await importCerts(keychainFile, certPaths, cscPasswords, keychainPassword);',
-    'return await importCerts(keychainFile, certPaths, cscPasswords);')
-  .replace('async function importCerts(keychainFile, paths, keyPasswords, keychainPassword) {',
-    'async function importCerts(keychainFile, paths, keyPasswords) {')
-  .replace('["set-key-partition-list", "-S", "apple-tool:,apple:", "-s", "-k", keychainPassword, keychainFile]',
-    '["set-key-partition-list", "-S", "apple-tool:,apple:", "-s", "-k", password, keychainFile]');
+const original = fs
+  .readFileSync(signingFile, 'utf8')
+  .replace(
+    'return await importCerts(keychainFile, certPaths, cscPasswords, keychainPassword);',
+    'return await importCerts(keychainFile, certPaths, cscPasswords);',
+  )
+  .replace(
+    'async function importCerts(keychainFile, paths, keyPasswords, keychainPassword) {',
+    'async function importCerts(keychainFile, paths, keyPasswords) {',
+  )
+  .replace(
+    '["set-key-partition-list", "-S", "apple-tool:,apple:", "-s", "-k", keychainPassword, keychainFile]',
+    '["set-key-partition-list", "-S", "apple-tool:,apple:", "-s", "-k", password, keychainFile]',
+  );
 
 function loadSigning(source) {
   const calls = [];
@@ -39,27 +46,39 @@ function loadSigning(source) {
       exec: async (command, args) => {
         assert.equal(command, '/usr/bin/security');
         calls.push([...args]);
-        if (args[0] === 'create-keychain') {keychainPassword = args[args.indexOf('-p') + 1];}
+        if (args[0] === 'create-keychain') {
+          keychainPassword = args[args.indexOf('-p') + 1];
+        }
         if (args[0] === 'set-key-partition-list') {
-          assert.equal(args[args.indexOf('-k') + 1], keychainPassword, 'ACL must authenticate with the keychain password');
+          assert.equal(
+            args[args.indexOf('-k') + 1],
+            keychainPassword,
+            'ACL must authenticate with the keychain password',
+          );
         }
         return '';
       },
     },
-    'bluebird-lst': { default: {
-      map: (items, callback) => Promise.all(items.map(callback)),
-      mapSeries: async (items, callback) => {
-        for (const item of items) {await callback(item);}
+    'bluebird-lst': {
+      default: {
+        map: (items, callback) => Promise.all(items.map(callback)),
+        mapSeries: async (items, callback) => {
+          for (const item of items) {
+            await callback(item);
+          }
+        },
       },
-    } },
+    },
     'lazy-val': { Lazy: class {} },
-    './codesign': { importCertificate: async (link, tmpDir, currentDir) => {
-      imports.push({ link, tmpDir, currentDir });
-      return path.join(tmpDir.root, `${link}.p12`);
-    } },
-    'crypto': require('node:crypto'),
-    'path': path,
-    'os': os,
+    './codesign': {
+      importCertificate: async (link, tmpDir, currentDir) => {
+        imports.push({ link, tmpDir, currentDir });
+        return path.join(tmpDir.root, `${link}.p12`);
+      },
+    },
+    crypto: require('node:crypto'),
+    path: path,
+    os: os,
     'fs/promises': {},
     'temp-file': {},
     '../util/flags': {},
@@ -67,15 +86,19 @@ function loadSigning(source) {
     '@electron/osx-sign': {},
   };
   const exported = {};
-  vm.runInNewContext(source, {
-    exports: exported,
-    __dirname: path.dirname(signingFile),
-    process: { platform: 'darwin', env: { TRAVIS: 'true' } },
-    require: (name) => {
-      assert.ok(Object.hasOwn(mocks, name), `Unexpected real dependency: ${name}`);
-      return mocks[name];
+  vm.runInNewContext(
+    source,
+    {
+      exports: exported,
+      __dirname: path.dirname(signingFile),
+      process: { platform: 'darwin', env: { TRAVIS: 'true' } },
+      require: (name) => {
+        assert.ok(Object.hasOwn(mocks, name), `Unexpected real dependency: ${name}`);
+        return mocks[name];
+      },
     },
-  }, { filename: signingFile });
+    { filename: signingFile },
+  );
   return { createKeychain: exported.createKeychain, calls, imports };
 }
 
@@ -84,9 +107,14 @@ for (const installer of [false, true]) {
     const { createKeychain, calls, imports } = loadSigning(patchSigningSource(original));
     const currentDir = path.join(os.tmpdir(), 'stacki-signing-test-project');
     const tmpDir = { root: path.join(os.tmpdir(), 'stacki-signing-test-certificates') };
-    const certificatePasswords = installer ? ['app-test-password', 'installer-test-password'] : [''];
+    const certificatePasswords = installer
+      ? ['app-test-password', 'installer-test-password']
+      : [''];
     const result = await createKeychain({
-      currentDir, tmpDir, cscLink: 'app', cscKeyPassword: certificatePasswords[0],
+      currentDir,
+      tmpDir,
+      cscLink: 'app',
+      cscKeyPassword: certificatePasswords[0],
       ...(installer ? { cscILink: 'installer', cscIKeyPassword: certificatePasswords[1] } : {}),
     });
     const created = calls.find(([command]) => command === 'create-keychain');
@@ -99,20 +127,33 @@ for (const installer of [false, true]) {
     assert.equal(imports.length, certificatePasswords.length);
     assert.ok(imports.every((entry) => entry.tmpDir === tmpDir && entry.currentDir === currentDir));
     const importCommands = calls.filter(([command]) => command === 'import');
-    assert.deepEqual(importCommands.map((args) => args[args.indexOf('-P') + 1]), certificatePasswords);
+    assert.deepEqual(
+      importCommands.map((args) => args[args.indexOf('-P') + 1]),
+      certificatePasswords,
+    );
     assert.ok(importCommands.every((args) => args[args.indexOf('-k') + 1] === result.keychainFile));
     const aclCommands = calls.filter(([command]) => command === 'set-key-partition-list');
     assert.equal(aclCommands.length, certificatePasswords.length);
-    assert.ok(aclCommands.every((args) => args[args.indexOf('-k') + 1] === keychainPassword && args.at(-1) === result.keychainFile));
+    assert.ok(
+      aclCommands.every(
+        (args) =>
+          args[args.indexOf('-k') + 1] === keychainPassword && args.at(-1) === result.keychainFile,
+      ),
+    );
   });
 }
 
 test('regression harness rejects the original wrong-password implementation', async () => {
   const { createKeychain } = loadSigning(original);
-  await assert.rejects(createKeychain({
-    currentDir: os.tmpdir(), tmpDir: { root: os.tmpdir() },
-    cscLink: 'app', cscKeyPassword: 'certificate-password',
-  }), /ACL must authenticate with the keychain password/);
+  await assert.rejects(
+    createKeychain({
+      currentDir: os.tmpdir(),
+      tmpDir: { root: os.tmpdir() },
+      cscLink: 'app',
+      cscKeyPassword: 'certificate-password',
+    }),
+    /ACL must authenticate with the keychain password/,
+  );
 });
 
 function fixture(t, source = original, version = '25.1.8') {
@@ -123,8 +164,14 @@ function fixture(t, source = original, version = '25.1.8') {
   const library = path.join(builder, 'node_modules/app-builder-lib');
   const file = path.join(library, 'out/codeSign/macCodeSign.js');
   fs.mkdirSync(path.dirname(file), { recursive: true });
-  fs.writeFileSync(path.join(builder, 'package.json'), JSON.stringify({ name: 'electron-builder', version }));
-  fs.writeFileSync(path.join(library, 'package.json'), JSON.stringify({ name: 'app-builder-lib', version }));
+  fs.writeFileSync(
+    path.join(builder, 'package.json'),
+    JSON.stringify({ name: 'electron-builder', version }),
+  );
+  fs.writeFileSync(
+    path.join(library, 'package.json'),
+    JSON.stringify({ name: 'app-builder-lib', version }),
+  );
   fs.writeFileSync(file, source);
   return { root, file, builder };
 }
@@ -147,7 +194,10 @@ test('unknown or partly patched sources are refused without changing any bytes',
     'async function importCerts() {}',
   ]) {
     const { root, file } = fixture(t, source);
-    assert.throws(() => fixElectronBuilderSigning(root), /Unrecognized electron-builder signing source/);
+    assert.throws(
+      () => fixElectronBuilderSigning(root),
+      /Unrecognized electron-builder signing source/,
+    );
     assert.equal(fs.readFileSync(file, 'utf8'), source);
     assert.deepEqual(fs.readdirSync(path.dirname(file)), ['macCodeSign.js']);
   }

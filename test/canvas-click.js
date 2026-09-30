@@ -24,7 +24,9 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
+  if (!condition) {
+    failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  }
 };
 
 (async () => {
@@ -53,9 +55,9 @@ const check = (what, condition, detail) => {
 
   // --- inside a component -------------------------------------------------------
   check(
-    'a click on the component\'s own markup selects that node',
+    "a click on the component's own markup selects that node",
     act(`${COMPONENT}1.0.2`) === 'inner',
-    act(`${COMPONENT}1.0.2`)
+    act(`${COMPONENT}1.0.2`),
   );
   check('however deep it is', act(`${COMPONENT}1.0.2.0.1.0`) === 'inner');
   check('the component root included', act(`${COMPONENT}0`) === 'inner');
@@ -66,7 +68,11 @@ const check = (what, condition, detail) => {
 
   // A path in the PAGE's namespace, under the instance being edited: the
   // instance's own markup as the page sees it, or content passed into its slot.
-  check('a page-side path inside the instance stays put', act('0.3.1.2') === 'nothing', act('0.3.1.2'));
+  check(
+    'a page-side path inside the instance stays put',
+    act('0.3.1.2') === 'nothing',
+    act('0.3.1.2'),
+  );
   check('as does the instance itself', act('0.3.1') === 'nothing');
 
   // --- leaving ------------------------------------------------------------------
@@ -91,7 +97,11 @@ const check = (what, condition, detail) => {
   check('on a page, a mapped path selects', act('0.1', page) === 'select', act('0.1', page));
   // Chrome the layout renders itself — header, footer, anything outside the
   // page's <slot> — carries no page-model marker, so it arrives with no path.
-  check('and an unmapped click selects the layout that owns it', act(null, page) === 'layout', act(null, page));
+  check(
+    'and an unmapped click selects the layout that owns it',
+    act(null, page) === 'layout',
+    act(null, page),
+  );
 
   // --- the panel asks -----------------------------------------------------------
   const app = fs.readFileSync(path.join(__dirname, '..', 'src', 'App.tsx'), 'utf8');
@@ -109,18 +119,20 @@ const check = (what, condition, detail) => {
   check(
     'one run is enough to narrow to the instance',
     /if \(runs\.length\) \{[\s\S]*?focusCache = runs\[focusOcc\]/.test(preload),
-    'focusRoots still requires more than one run'
+    'focusRoots still requires more than one run',
   );
   check('and none still narrows to nothing', /if \(focusPath\) \{/.test(preload));
   check('the click carries whether it landed outside', /outside: !best && !!anyTag/.test(preload));
   check(
     'and closing is the only thing that closes',
     (app.match(/kind === 'close'/g) || []).length === 1 &&
-      /if \(kind === 'nothing'\) \{return;\}/.test(app)
+      /if \(kind === 'nothing'\) \{return;\}/.test(app),
   );
 
   if (failures.length) {
-    console.error(`\ncanvas-click: ${failures.length} failed, ${checked - failures.length} passed\n`);
+    console.error(
+      `\ncanvas-click: ${failures.length} failed, ${checked - failures.length} passed\n`,
+    );
     console.error(failures.join('\n') + '\n');
     process.exit(1);
   }

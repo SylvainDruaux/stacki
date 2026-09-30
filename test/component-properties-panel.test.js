@@ -76,7 +76,7 @@ test('component properties lifecycle and controls', async () => {
           componentOpen,
           active: 'navigator',
           onSelect: (value) => clicked.push(value),
-        })
+        }),
       );
     });
   const key = async (name, options = {}, target = window) =>
@@ -87,7 +87,7 @@ test('component properties lifecycle and controls', async () => {
           bubbles: true,
           cancelable: true,
           ...options,
-        })
+        }),
       );
     });
   await renderRail(false);
@@ -165,7 +165,7 @@ test('component properties lifecycle and controls', async () => {
           ...data,
           source: `${data.source}\noptions:${request.change.type}`,
           properties: data.properties.map((field) =>
-            field.name === request.change.name ? { ...field, type: request.change.type } : field
+            field.name === request.change.name ? { ...field, type: request.change.type } : field,
           ),
         };
         return { ok: true, value: data };
@@ -178,7 +178,7 @@ test('component properties lifecycle and controls', async () => {
         data = {
           ...data,
           properties: request.change.names.map((name) =>
-            data.properties.find((field) => field.name === name)
+            data.properties.find((field) => field.name === name),
           ),
         };
         return { ok: true, value: data };
@@ -202,8 +202,8 @@ test('component properties lifecycle and controls', async () => {
           order.push('refresh');
           await finishSave();
         },
-      })
-    )
+      }),
+    ),
   );
   assert.match(document.body.textContent, /Properties/);
   assert.match(document.body.textContent, /Card/);
@@ -226,7 +226,7 @@ test('component properties lifecycle and controls', async () => {
             cancelable: true,
             button: 0,
             clientY,
-          })
+          }),
         );
       });
     await pointer(document.querySelector(selector), 'pointerdown', from * 40 + 20);
@@ -235,7 +235,7 @@ test('component properties lifecycle and controls', async () => {
   };
   const optionValues = () =>
     [...document.querySelectorAll('.property-options .list-field-text')].map((row) =>
-      row.textContent.trim()
+      row.textContent.trim(),
     );
   const dragOptions = async (from, gap) => {
     const rows = [...document.querySelectorAll('.property-options .list-field-row')];
@@ -274,7 +274,7 @@ test('component properties lifecycle and controls', async () => {
   await act(async () => document.querySelector('[aria-label="Add property"]').click());
   assert.match(document.body.textContent, /New property/);
   const save = [...document.querySelectorAll('button')].find(
-    (button) => button.textContent === 'Save property'
+    (button) => button.textContent === 'Save property',
   );
   await act(async () => save.click());
   assert.match(document.body.textContent, /Use a name/);
@@ -283,13 +283,13 @@ test('component properties lifecycle and controls', async () => {
   await act(async () =>
     [...document.querySelectorAll('.property-row-main')]
       .find((button) => button.textContent.includes('title'))
-      .click()
+      .click(),
   );
   assert.equal(document.querySelector('[aria-label="Default text"]').value, 'Hello');
   await act(async () =>
     [...document.querySelectorAll('button')]
       .find((button) => button.textContent === 'Save property')
-      .click()
+      .click(),
   );
   assert.match(document.body.textContent, /Write failed/);
   assert.match(document.body.textContent, /Property settings/);
@@ -320,7 +320,7 @@ test('component properties lifecycle and controls', async () => {
   await act(async () =>
     [...document.querySelectorAll('button')]
       .find((button) => button.textContent === 'Save property')
-      .click()
+      .click(),
   );
   assert.equal(edits.at(-1).change.property.type, '"Outline"');
   const previousReads = reads;
@@ -404,7 +404,7 @@ test('component properties lifecycle and controls', async () => {
   await act(async () =>
     [...document.querySelectorAll('button')]
       .find((button) => button.textContent === 'Save property')
-      .click()
+      .click(),
   );
   assert.match(document.querySelector('.property-list').textContent, /reconciled/);
   assert.equal(document.querySelector('.property-editor'), null);
@@ -468,7 +468,7 @@ const { gap = 'small', other = 'large', ...rest } = Astro.props;
   await act(async () =>
     document
       .querySelector('.dd-option')
-      .dispatchEvent(new window.MouseEvent('mouseover', { bubbles: true }))
+      .dispatchEvent(new window.MouseEvent('mouseover', { bubbles: true })),
   );
   assert.equal(defaultLabel(), 'compact');
   await act(async () => document.querySelector('.dd-option').click());
@@ -488,7 +488,7 @@ const { gap = 'small', other = 'large', ...rest } = Astro.props;
   await act(async () =>
     [...document.querySelectorAll('button')]
       .find((button) => button.textContent === 'Save property')
-      .click()
+      .click(),
   );
   const editedGap = data.properties.find((field) => field.name === 'spacing');
   assert.equal(editedGap.required, true);
@@ -516,7 +516,7 @@ const { gap = 'small', other = 'large', ...rest } = Astro.props;
   await act(async () =>
     document
       .querySelector('.dd-option')
-      .dispatchEvent(new window.MouseEvent('mouseover', { bubbles: true }))
+      .dispatchEvent(new window.MouseEvent('mouseover', { bubbles: true })),
   );
   assert.equal(optionValues()[0], 'large');
   await key('Escape', {}, document.querySelector('.dd-search'));
@@ -529,17 +529,17 @@ const { gap = 'small', other = 'large', ...rest } = Astro.props;
   assert.equal(document.querySelector('input[aria-label="Type expression"]').value, 'boolean');
   await setValue(
     document.querySelector('input[aria-label="Type expression"]'),
-    'typeof designTheme'
+    'typeof designTheme',
   );
   await toggleType('Use the type dropdown');
   assert.match(
     document.querySelector('.property-type .dd-trigger').textContent,
-    /typeof designTheme/
+    /typeof designTheme/,
   );
   await toggleType('Write a type expression');
   assert.equal(
     document.querySelector('input[aria-label="Type expression"]').value,
-    'typeof designTheme'
+    'typeof designTheme',
   );
   // Existing unsupported types open directly as ordinary inputs.
   data = {
@@ -551,7 +551,7 @@ const { gap = 'small', other = 'large', ...rest } = Astro.props;
   await act(async () => document.querySelector('.property-row-main').click());
   assert.equal(
     document.querySelector('input[aria-label="Type expression"]').value,
-    'typeof designTheme'
+    'typeof designTheme',
   );
   // A default that names another frontmatter value is shown as a binding. Its
   // chip opens the same scoped picker used by prop values and can be repointed.
@@ -569,7 +569,7 @@ const { tag = 'h2', variant = tag } = Astro.props;
   await act(async () =>
     [...document.querySelectorAll('.property-row-main')]
       .find((button) => button.textContent.includes('variant'))
-      .click()
+      .click(),
   );
   const defaultChip = document.querySelector('.property-default .cm-chip');
   assert.equal(defaultChip.textContent, 'tag');
@@ -579,13 +579,13 @@ const { tag = 'h2', variant = tag } = Astro.props;
   await act(async () =>
     [...document.querySelectorAll('.bind-menu .dp-row')]
       .find((row) => row.title.startsWith('fallback'))
-      .click()
+      .click(),
   );
   assert.equal(document.querySelector('.property-default .cm-content').textContent, 'fallback');
   await act(async () =>
     [...document.querySelectorAll('button')]
       .find((button) => button.textContent === 'Save property')
-      .click()
+      .click(),
   );
   assert.equal(data.properties.find((field) => field.name === 'variant').defaultValue, 'fallback');
   assert.match(data.source, /variant = fallback/);
@@ -609,7 +609,7 @@ const { tag = 'h2', variant = tag } = Astro.props;
   await toggleType('Write a type expression');
   assert.equal(
     document.querySelector('input[aria-label="Type expression"]').value,
-    '"1" | true | false | "true" | 1'
+    '"1" | true | false | "true" | 1',
   );
   await toggleType('Use the type dropdown');
   await act(async () => document.querySelectorAll('.property-options .list-field-text')[4].click());
@@ -619,7 +619,7 @@ const { tag = 'h2', variant = tag } = Astro.props;
   await toggleType('Write a type expression');
   assert.equal(
     document.querySelector('input[aria-label="Type expression"]').value,
-    '"1" | true | false | "true" | -2'
+    '"1" | true | false | "true" | -2',
   );
   await toggleType('Use the type dropdown');
   await act(async () => document.querySelector('.property-options .list-field-add').click());
@@ -631,7 +631,7 @@ const { tag = 'h2', variant = tag } = Astro.props;
   assert.equal(optionValues().at(-1), added);
   assert.equal(document.querySelector('.list-item-editor'), null);
   await act(async () =>
-    [...document.querySelectorAll('.property-options .list-field-remove')].at(-1).click()
+    [...document.querySelectorAll('.property-options .list-field-remove')].at(-1).click(),
   );
   assert.equal(optionValues().length, 5);
   await act(async () => document.querySelectorAll('.property-options .list-field-text')[1].click());
@@ -650,8 +650,8 @@ const { tag = 'h2', variant = tag } = Astro.props;
     window.dispatchEvent(
       new window.MessageEvent('message', {
         data: { type: 'avb:click-node', path: '0' },
-      })
-    )
+      }),
+    ),
   );
   assert.equal(document.querySelector('.property-editor') === null, true);
   assert.equal(edits.length, editsBeforeDismiss);
@@ -749,7 +749,7 @@ const { tag = 'h2', variant = tag } = Astro.props;
   assert.equal(document.querySelector('.property-editor label input').disabled, true);
   assert.equal(
     document.querySelector('textarea[placeholder="Describe how to use this property…"]').readOnly,
-    false
+    false,
   );
   assert.match(document.querySelector('.property-editor').textContent, /declared locally/);
   assert.equal(document.querySelector('.property-actions .danger'), null);

@@ -19,7 +19,9 @@ function readJsonc(file: string): unknown {
   try {
     const raw = fs
       .readFileSync(file, 'utf8')
-      .replace(/\\"|"(?:\\"|[^"])*"|(\/\/.*$|\/\*[\s\S]*?\*\/)/gm, (m, comment) => (comment ? '' : m))
+      .replace(/\\"|"(?:\\"|[^"])*"|(\/\/.*$|\/\*[\s\S]*?\*\/)/gm, (m, comment) =>
+        comment ? '' : m,
+      )
       .replace(/,(\s*[}\]])/g, '$1');
     return JSON.parse(raw);
   } catch {

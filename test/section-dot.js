@@ -27,7 +27,9 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
+  if (!condition) {
+    failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  }
 };
 
 (async () => {
@@ -41,7 +43,11 @@ const check = (what, condition, detail) => {
   global.document = dom.window.document;
   global.navigator = dom.window.navigator;
   global.IS_REACT_ACT_ENVIRONMENT = false;
-  dom.window.ResizeObserver = class { observe() {} unobserve() {} disconnect() {} };
+  dom.window.ResizeObserver = class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  };
   global.ResizeObserver = dom.window.ResizeObserver;
   global.MutationObserver = dom.window.MutationObserver;
   global.requestAnimationFrame = dom.window.requestAnimationFrame.bind(dom.window);
@@ -81,7 +87,12 @@ const check = (what, condition, detail) => {
     .card { order: 3 }
     .plain { color: red }
   `;
-  const SHEET = { rel: 'src/styles/main.css', name: 'main.css', path: '/p/src/styles/main.css', size: 10 };
+  const SHEET = {
+    rel: 'src/styles/main.css',
+    name: 'main.css',
+    path: '/p/src/styles/main.css',
+    size: 10,
+  };
   dom.window.avb = {
     listStyleFiles: async () => ({ files: [SHEET] }),
     listAstroStyleFiles: async () => ({ files: [] }),
@@ -92,7 +103,12 @@ const check = (what, condition, detail) => {
   const { EmbedEditor, setHost } = require(bundle);
   const NODES = [
     { id: 'n1', kind: 'element', name: 'div', props: { class: { type: 'string', value: 'card' } } },
-    { id: 'n2', kind: 'element', name: 'div', props: { class: { type: 'string', value: 'plain' } } },
+    {
+      id: 'n2',
+      kind: 'element',
+      name: 'div',
+      props: { class: { type: 'string', value: 'plain' } },
+    },
   ];
 
   const panel = document.createElement('div');
@@ -101,7 +117,15 @@ const check = (what, condition, detail) => {
   const wait = (ms) => new Promise((r) => dom.window.setTimeout(r, ms));
 
   const select = async (id) => {
-    setHost({ projectPath: '/p', nodes: NODES, selectedId: id, files: [SHEET], astroFiles: [], renderedClasses: [], pathOf: () => '0.1' });
+    setHost({
+      projectPath: '/p',
+      nodes: NODES,
+      selectedId: id,
+      files: [SHEET],
+      astroFiles: [],
+      renderedClasses: [],
+      pathOf: () => '0.1',
+    });
     root.render(React.createElement(EmbedEditor));
     // Poll for the panel to go quiet: a fixed sleep here was load-sensitive —
     // 400ms passed when written and fails on the same machine a session later.
@@ -111,7 +135,9 @@ const check = (what, condition, detail) => {
     for (let tries = 0; tries < 100; tries++) {
       await wait(50);
       const html = panel.innerHTML;
-      if (html === previous && html.includes('section-dot')) {return;}
+      if (html === previous && html.includes('section-dot')) {
+        return;
+      }
       previous = html;
     }
   };
@@ -119,13 +145,14 @@ const check = (what, condition, detail) => {
   // The section by its title, and whether its header carries the dot.
   const sectionNamed = (label) =>
     [...panel.querySelectorAll('.embed-editor_section-block')].find(
-      (b) => b.querySelector('.embed-editor_section-title')?.textContent?.trim() === label
+      (b) => b.querySelector('.embed-editor_section-title')?.textContent?.trim() === label,
     );
   const dotOn = (label) => !!sectionNamed(label)?.querySelector('.embed-editor_section-dot');
   const collapsed = (label) => !!sectionNamed(label)?.classList.contains('is-collapsed');
-  const collapsedLabels = () => [...panel.querySelectorAll('.embed-editor_section-block')]
-    .filter((section) => section.classList.contains('is-collapsed'))
-    .map((section) => section.querySelector('.embed-editor_section-title')?.textContent?.trim());
+  const collapsedLabels = () =>
+    [...panel.querySelectorAll('.embed-editor_section-block')]
+      .filter((section) => section.classList.contains('is-collapsed'))
+      .map((section) => section.querySelector('.embed-editor_section-title')?.textContent?.trim());
   const clickSection = async ({ label, shiftKey = false }) => {
     const button = sectionNamed(label)?.querySelector('.embed-editor_section-toggle');
     button?.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true, shiftKey }));
@@ -134,13 +161,25 @@ const check = (what, condition, detail) => {
 
   const dotOf = (label) => {
     const dot = sectionNamed(label)?.querySelector('.embed-editor_section-dot');
-    if (!dot) {return 'none';}
+    if (!dot) {
+      return 'none';
+    }
     return dot.classList.contains('is-own') ? 'blue' : 'orange';
   };
 
   await select('n1');
-  check('the panel mounts with its sections', !!sectionNamed('Flex/Grid Child'), [...panel.querySelectorAll('.embed-editor_section-title')].map((t) => t.textContent).join(' | '));
-  check('and Flex/Grid Child starts collapsed', collapsed('Flex/Grid Child'), 'it is open, so the collapsed case is not being tested');
+  check(
+    'the panel mounts with its sections',
+    !!sectionNamed('Flex/Grid Child'),
+    [...panel.querySelectorAll('.embed-editor_section-title')]
+      .map((t) => t.textContent)
+      .join(' | '),
+  );
+  check(
+    'and Flex/Grid Child starts collapsed',
+    collapsed('Flex/Grid Child'),
+    'it is open, so the collapsed case is not being tested',
+  );
 
   // Shift applies the clicked section's next state to every peer. An open
   // section therefore closes all; any closed section then opens all. A plain
@@ -149,31 +188,35 @@ const check = (what, condition, detail) => {
   check(
     'Shift-clicking an open header closes every section',
     collapsedLabels().length === panel.querySelectorAll('.embed-editor_section-block').length,
-    collapsedLabels().join(' | ')
+    collapsedLabels().join(' | '),
   );
   await clickSection({ label: 'Size', shiftKey: true });
   check(
     'Shift-clicking a closed header opens every section',
     collapsedLabels().length === 0,
-    collapsedLabels().join(' | ')
+    collapsedLabels().join(' | '),
   );
   await clickSection({ label: 'Size' });
   check(
     'a plain click still changes only one section',
     collapsedLabels().join(' | ') === 'Size',
-    collapsedLabels().join(' | ')
+    collapsedLabels().join(' | '),
   );
   await clickSection({ label: 'Size' });
   await clickSection({ label: 'Flex/Grid Child' });
   check(
     'the initial mixed state can still be restored',
     collapsedLabels().join(' | ') === 'Flex/Grid Child',
-    collapsedLabels().join(' | ')
+    collapsedLabels().join(' | '),
   );
 
   // `.card { order: 3 }` — the picked selector is one of the things styling this
   // section, so the dot is blue.
-  check('a section your own selector styles is blue', dotOf('Flex/Grid Child') === 'blue', dotOf('Flex/Grid Child'));
+  check(
+    'a section your own selector styles is blue',
+    dotOf('Flex/Grid Child') === 'blue',
+    dotOf('Flex/Grid Child'),
+  );
 
   // Open, the property labels inside say the same thing in the same colours, so
   // the dot stands down.
@@ -181,30 +224,52 @@ const check = (what, condition, detail) => {
   toggle.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }));
   await wait(120);
   check('and the section really opens', !collapsed('Flex/Grid Child'));
-  check('opening it puts the dot away', dotOf('Flex/Grid Child') === 'none', dotOf('Flex/Grid Child'));
+  check(
+    'opening it puts the dot away',
+    dotOf('Flex/Grid Child') === 'none',
+    dotOf('Flex/Grid Child'),
+  );
   toggle.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }));
   await wait(120);
-  check('closing it brings the dot back', dotOf('Flex/Grid Child') === 'blue', dotOf('Flex/Grid Child'));
+  check(
+    'closing it brings the dot back',
+    dotOf('Flex/Grid Child') === 'blue',
+    dotOf('Flex/Grid Child'),
+  );
 
   // It sits at the right edge, beside the chevron — not next to the label.
   const header = sectionNamed('Flex/Grid Child').querySelector('.embed-editor_section-header');
   const kids = [...header.children];
   const dotAt = kids.findIndex((el) => el.classList.contains('embed-editor_section-dot'));
-  const chevronAt = kids.findIndex((el) => el.classList.contains('embed-editor_section-chevron-btn'));
+  const chevronAt = kids.findIndex((el) =>
+    el.classList.contains('embed-editor_section-chevron-btn'),
+  );
   const titleAt = kids.findIndex((el) => el.classList.contains('embed-editor_section-toggle'));
   check('the dot sits after the label', dotAt > titleAt, `dot ${dotAt}, label ${titleAt}`);
-  check('and immediately before the chevron', chevronAt === dotAt + 1, `dot ${dotAt}, chevron ${chevronAt}`);
+  check(
+    'and immediately before the chevron',
+    chevronAt === dotAt + 1,
+    `dot ${dotAt}, chevron ${chevronAt}`,
+  );
 
   // `.plain` sets nothing in this section, but the bare `div` rule sets
   // `align-self`, which reaches the element from another selector.
   await select('n2');
-  check('a section styled only from elsewhere is orange', dotOf('Flex/Grid Child') === 'orange', dotOf('Flex/Grid Child'));
+  check(
+    'a section styled only from elsewhere is orange',
+    dotOf('Flex/Grid Child') === 'orange',
+    dotOf('Flex/Grid Child'),
+  );
   // …and it really is reaching the element, or the case above proves nothing.
   const openIt = sectionNamed('Flex/Grid Child').querySelector('.embed-editor_section-toggle');
   openIt.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }));
   await wait(150);
   const body = sectionNamed('Flex/Grid Child')?.textContent ?? '';
-  check('because the section is not empty for it', body.length > 'Flex/Grid Child'.length, body.slice(0, 120));
+  check(
+    'because the section is not empty for it',
+    body.length > 'Flex/Grid Child'.length,
+    body.slice(0, 120),
+  );
   openIt.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }));
   await wait(120);
 
@@ -213,8 +278,13 @@ const check = (what, condition, detail) => {
   // Named explicitly, and checked to EXIST first: `dotOf` reports 'none' for a
   // section that isn't rendered, so without this the case passes by absence.
   const empties = ['Backgrounds', 'Effects', 'Borders'];
-  check('the empty sections are on screen to be checked', empties.every((l) => !!sectionNamed(l)),
-    [...panel.querySelectorAll('.embed-editor_section-title')].map((t) => t.textContent.trim()).join(' | '));
+  check(
+    'the empty sections are on screen to be checked',
+    empties.every((l) => !!sectionNamed(l)),
+    [...panel.querySelectorAll('.embed-editor_section-title')]
+      .map((t) => t.textContent.trim())
+      .join(' | '),
+  );
   const bare = empties.map((l) => [l, dotOf(l)]).filter(([, d]) => d !== 'none');
   check('a section nothing styles has no dot', bare.length === 0, JSON.stringify(bare));
 

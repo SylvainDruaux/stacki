@@ -37,7 +37,9 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
+  if (!condition) {
+    failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  }
 };
 const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -73,7 +75,7 @@ const FOOTER = `
     const syncAnchors = new Function(
       'document',
       'AVB_PREVIEW_LIMITS',
-      `${source.slice(start, end)}\nreturn syncAnchors;`
+      `${source.slice(start, end)}\nreturn syncAnchors;`,
     )(dom.window.document, LIMITS);
 
     const server = dom.window.document.createElement('div');
@@ -84,7 +86,8 @@ const FOOTER = `
     // its blank text nodes in different places from the fresh rendering's. One
     // trailing newline and none in between is enough: matching any text against
     // any text sent the cursor past both elements to reach it.
-    live.innerHTML = '<div class="container">above</div><div class="site-footer_fine">© 2026</div>\n';
+    live.innerHTML =
+      '<div class="container">above</div><div class="site-footer_fine">© 2026</div>\n';
     dom.window.document.body.append(live, server);
 
     syncAnchors(live, server);
@@ -96,22 +99,22 @@ const FOOTER = `
     check(
       "the comment's markers stay together",
       at('avb-e:0.1') === at('avb-s:0.1') + 1,
-      live.innerHTML
+      live.innerHTML,
     );
     check(
       'and the element after it is outside them',
       at('avb-e:0.1') < elAt('site-footer_fine'),
-      live.innerHTML
+      live.innerHTML,
     );
     check(
       'each element is still wrapped by its own pair',
       at('avb-s:0.2') < elAt('site-footer_fine') && at('avb-e:0.2') > elAt('site-footer_fine'),
-      live.innerHTML
+      live.innerHTML,
     );
     check(
       'and so is the one before it',
       at('avb-s:0.0') < elAt('container') && at('avb-e:0.0') > elAt('container'),
-      live.innerHTML
+      live.innerHTML,
     );
     delete global.document;
   }
@@ -123,7 +126,7 @@ const FOOTER = `
     const { JSDOM } = require('jsdom');
     const dom = new JSDOM(
       `<!doctype html><body><!--avb-s:0--><footer class="site-footer">${FOOTER}</footer><!--avb-e:0--></body>`,
-      { url: 'http://localhost:4321/#avb-design', pretendToBeVisual: true }
+      { url: 'http://localhost:4321/#avb-design', pretendToBeVisual: true },
     );
     const { window } = dom;
     const NO_BOX = { x: 0, y: 0, width: 0, height: 0, left: 0, top: 0, right: 0, bottom: 0 };
@@ -172,7 +175,7 @@ const FOOTER = `
     check(
       "the comment's region is not stamped on the element after it",
       !(fine.getAttribute('data-avb-p') || '').split(' ').includes('0.1'),
-      fine.getAttribute('data-avb-p')
+      fine.getAttribute('data-avb-p'),
     );
 
     sent.length = 0;
@@ -195,7 +198,7 @@ const FOOTER = `
     check(
       'a marker with no close claims nothing',
       !(fine2.getAttribute('data-avb-p') || '').split(' ').includes('0.1'),
-      fine2.getAttribute('data-avb-p')
+      fine2.getAttribute('data-avb-p'),
     );
     sent.length = 0;
     fine2.dispatchEvent(new window.MouseEvent('click', { bubbles: true, cancelable: true }));
@@ -204,12 +207,14 @@ const FOOTER = `
     check(
       'so the click still reports the element that was clicked',
       click2?.path === '0.2',
-      JSON.stringify(click2)
+      JSON.stringify(click2),
     );
   }
 
   if (failures.length) {
-    console.error(`\ncomment-region: ${failures.length} failed, ${checked - failures.length} passed\n`);
+    console.error(
+      `\ncomment-region: ${failures.length} failed, ${checked - failures.length} passed\n`,
+    );
     console.error(failures.join('\n') + '\n');
     process.exit(1);
   }

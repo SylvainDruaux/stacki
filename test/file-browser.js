@@ -19,7 +19,9 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
+  if (!condition) {
+    failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  }
 };
 
 (async () => {
@@ -68,16 +70,31 @@ const check = (what, condition, detail) => {
 
     // The point of the whole thing: initials across separators.
     const spi = paths(search(project, 'spi'));
-    check('letters spread across a path still match', spi.includes('src/pages/index.astro'), JSON.stringify(spi));
+    check(
+      'letters spread across a path still match',
+      spi.includes('src/pages/index.astro'),
+      JSON.stringify(spi),
+    );
 
     // A plain name should put the file of that name first, not a longer path
     // that happens to contain the letters.
     const card = paths(search(project, 'card'));
-    check('a filename search finds it', card[0] === 'src/components/Card.astro', JSON.stringify(card));
-    check('matching is case-insensitive', paths(search(project, 'CARD'))[0] === 'src/components/Card.astro');
+    check(
+      'a filename search finds it',
+      card[0] === 'src/components/Card.astro',
+      JSON.stringify(card),
+    );
+    check(
+      'matching is case-insensitive',
+      paths(search(project, 'CARD'))[0] === 'src/components/Card.astro',
+    );
 
     const css = paths(search(project, 'css'));
-    check('an extension finds files of that type', css.includes('src/styles/main.css'), JSON.stringify(css));
+    check(
+      'an extension finds files of that type',
+      css.includes('src/styles/main.css'),
+      JSON.stringify(css),
+    );
 
     // Letters that are not all present must not match at all — a search that
     // falls back to "nearly" is a search that never says "no such file".
@@ -89,44 +106,72 @@ const check = (what, condition, detail) => {
     check(
       'an exact name outranks an incidental match',
       paths(search(project, 'index'))[0].endsWith('index.astro'),
-      JSON.stringify(paths(search(project, 'index')))
+      JSON.stringify(paths(search(project, 'index'))),
     );
     // Two files could match "index"; the shorter path wins, since it is the
     // less buried one.
     check(
       'the shallower of two matches comes first',
       paths(search(project, 'index'))[0] === 'src/pages/index.astro',
-      JSON.stringify(paths(search(project, 'index')))
+      JSON.stringify(paths(search(project, 'index'))),
     );
 
     check('a non-match scores below zero', fuzzyScore('zzz', 'src/pages/index.astro') < 0);
     check('a match scores above it', fuzzyScore('index', 'src/pages/index.astro') > 0);
     // Long lists are cut, or a three-letter query redraws the whole project.
     const many = Array.from({ length: 500 }, (_, i) => f(`src/pages/page${i}.astro`));
-    check('results are capped', search(many, 'page').length <= 60, String(search(many, 'page').length));
+    check(
+      'results are capped',
+      search(many, 'page').length <= 60,
+      String(search(many, 'page').length),
+    );
   }
 
   // --- The tree -------------------------------------------------------------
   {
     const tree = buildTree(project);
-    check('top-level folders are found', [...tree.dirs.keys()].join(',') === 'public,src', [...tree.dirs.keys()].join(','));
-    check('a loose file stays at the top', tree.files.map((x) => x.name).join(',') === 'package.json');
-    check('folders nest', [...tree.dirs.get('src').dirs.keys()].join(',') === 'components,pages,styles');
+    check(
+      'top-level folders are found',
+      [...tree.dirs.keys()].join(',') === 'public,src',
+      [...tree.dirs.keys()].join(','),
+    );
+    check(
+      'a loose file stays at the top',
+      tree.files.map((x) => x.name).join(',') === 'package.json',
+    );
+    check(
+      'folders nest',
+      [...tree.dirs.get('src').dirs.keys()].join(',') === 'components,pages,styles',
+    );
     check('a folder inside a folder', tree.dirs.get('src').dirs.get('pages').dirs.has('blog'));
 
     // Every file has to land somewhere: one lost in the tree is one that
     // cannot be found or ticked, with nothing on screen to say it is missing.
     const countFiles = (node) =>
       node.files.length + [...node.dirs.values()].reduce((n, d) => n + countFiles(d), 0);
-    check('no file is lost', countFiles(tree) === project.length, `${countFiles(tree)} of ${project.length}`);
+    check(
+      'no file is lost',
+      countFiles(tree) === project.length,
+      `${countFiles(tree)} of ${project.length}`,
+    );
 
     // Sorted, so the tree does not reshuffle between reads.
-    const pagesFiles = tree.dirs.get('src').dirs.get('pages').files.map((x) => x.name);
-    check('files are in name order', pagesFiles.join(',') === 'about.astro,index.astro', pagesFiles.join(','));
+    const pagesFiles = tree.dirs
+      .get('src')
+      .dirs.get('pages')
+      .files.map((x) => x.name);
+    check(
+      'files are in name order',
+      pagesFiles.join(',') === 'about.astro,index.astro',
+      pagesFiles.join(','),
+    );
 
     // The status has to survive into the tree, or the browser can show where a
     // file is or that it changed, but never both.
-    const idx = tree.dirs.get('src').dirs.get('pages').files.find((x) => x.name === 'index.astro');
+    const idx = tree.dirs
+      .get('src')
+      .dirs.get('pages')
+      .files.find((x) => x.name === 'index.astro');
     check('status is carried onto the row', idx.status === 'M', JSON.stringify(idx));
     check('and the full path with it', idx.path === 'src/pages/index.astro', idx.path);
 

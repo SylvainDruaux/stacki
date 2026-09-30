@@ -20,7 +20,9 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
+  if (!condition) {
+    failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  }
 };
 
 // The picker's own geometry, since jsdom lays nothing out: a 240px square and
@@ -35,8 +37,8 @@ const SIZE = 240;
   fs.writeFileSync(
     entry,
     `export { default as ColorPicker } from ${JSON.stringify(
-      path.join(__dirname, '..', 'src', 'style-panel', 'components', 'ColorPicker.tsx')
-    )};\n`
+      path.join(__dirname, '..', 'src', 'style-panel', 'components', 'ColorPicker.tsx'),
+    )};\n`,
   );
   const out = path.join(buildDir, 'color-alpha.bundle.js');
   await esbuild.build({
@@ -67,7 +69,10 @@ const SIZE = 240;
   global.requestAnimationFrame = dom.window.requestAnimationFrame.bind(dom.window);
   global.cancelAnimationFrame = dom.window.cancelAnimationFrame.bind(dom.window);
   global.MutationObserver = dom.window.MutationObserver;
-  global.ResizeObserver = class { observe() {} disconnect() {} };
+  global.ResizeObserver = class {
+    observe() {}
+    disconnect() {}
+  };
   // Everything the picker measures, since jsdom reports zeroes — a zero-width
   // track divides to NaN and no drag reports anything at all.
   dom.window.Element.prototype.getBoundingClientRect = function rect() {
@@ -92,7 +97,7 @@ const SIZE = 240;
           trigger: null,
           onChange: (color, live) => emitted.push({ color, live }),
           onClose: () => {},
-        })
+        }),
       );
     });
     await act(async () => {});
@@ -101,7 +106,9 @@ const SIZE = 240;
   // A drag is a pointerdown on the surface, which reports immediately.
   const dragOn = async (selector, fx, fy = 0.5) => {
     const el = dom.window.document.querySelector(selector);
-    if (!el) {throw new Error(`no ${selector}`);}
+    if (!el) {
+      throw new Error(`no ${selector}`);
+    }
     await act(async () => {
       const event = new dom.window.MouseEvent('pointerdown', { bubbles: true, cancelable: true });
       Object.defineProperty(event, 'clientX', { value: fx * SIZE });
@@ -112,7 +119,9 @@ const SIZE = 240;
   const last = () => emitted[emitted.length - 1]?.color ?? '';
   const alphaOf = (color) => {
     const m = color.match(/rgba?\(([^)]*)\)/);
-    if (!m) {return color.startsWith('#') && color.length === 9 ? parseInt(color.slice(7), 16) / 255 : 1;}
+    if (!m) {
+      return color.startsWith('#') && color.length === 9 ? parseInt(color.slice(7), 16) / 255 : 1;
+    }
     const parts = m[1].split(',').map((p) => parseFloat(p));
     return parts.length > 3 ? parts[3] : 1;
   };
@@ -121,25 +130,39 @@ const SIZE = 240;
   let root = await open('');
   await dragOn('.u-color-sb', 0.8, 0.3);
   check('a drag on an unset colour comes out visible', alphaOf(last()) === 1, last());
-  check('and picks the colour that was dragged to', /^rgb/.test(last()) && !/, 0\)$/.test(last()), last());
+  check(
+    'and picks the colour that was dragged to',
+    /^rgb/.test(last()) && !/, 0\)$/.test(last()),
+    last(),
+  );
   // A first colour has no notation to preserve, so it is written the way this
   // panel has always written one.
   check('a colour with nothing to follow is written as rgb()', /^rgba?\(/.test(last()), last());
-  await act(async () => { root.unmount() });
+  await act(async () => {
+    root.unmount();
+  });
 
   root = await open('');
   await dragOn('.u-color-slider', 0.5);
   check('so does a drag on the hue bar', alphaOf(last()) === 1, last());
-  await act(async () => { root.unmount() });
+  await act(async () => {
+    root.unmount();
+  });
 
   // --- the alpha, once it is a choice -------------------------------------------
   root = await open('');
   await dragOn('.u-color-alpha', 0.4);
   const chosen = alphaOf(last());
-  check('dragging the alpha bar sets the alpha it was dragged to', chosen > 0.3 && chosen < 0.5, last());
+  check(
+    'dragging the alpha bar sets the alpha it was dragged to',
+    chosen > 0.3 && chosen < 0.5,
+    last(),
+  );
   await dragOn('.u-color-sb', 0.2, 0.2);
   check('and a later drag keeps it', Math.abs(alphaOf(last()) - chosen) < 0.02, last());
-  await act(async () => { root.unmount() });
+  await act(async () => {
+    root.unmount();
+  });
 
   // 0 is a choice like any other: a colour faded to nothing on purpose must not
   // spring back to full the next time its hue is touched.
@@ -148,18 +171,24 @@ const SIZE = 240;
   check('including when what was chosen is nothing', alphaOf(last()) === 0, last());
   await dragOn('.u-color-sb', 0.6, 0.4);
   check('which a hue drag then leaves alone', alphaOf(last()) === 0, last());
-  await act(async () => { root.unmount() });
+  await act(async () => {
+    root.unmount();
+  });
 
   // --- a colour that was already set --------------------------------------------
   root = await open('rgba(255, 0, 0, 0.5)');
   await dragOn('.u-color-sb', 0.5, 0.5);
   check('an existing alpha is never touched', Math.abs(alphaOf(last()) - 0.5) < 0.02, last());
-  await act(async () => { root.unmount() });
+  await act(async () => {
+    root.unmount();
+  });
 
   root = await open('#3366ff');
   await dragOn('.u-color-sb', 0.5, 0.5);
   check('an opaque colour stays opaque', alphaOf(last()) === 1, last());
-  await act(async () => { root.unmount() });
+  await act(async () => {
+    root.unmount();
+  });
 
   // `transparent` written out and a property never set at all read the same in
   // the field, and a drag on either is somebody asking for a colour they can
@@ -167,7 +196,9 @@ const SIZE = 240;
   root = await open('transparent');
   await dragOn('.u-color-sb', 0.5, 0.5);
   check('an explicit `transparent` lifts the same way', alphaOf(last()) === 1, last());
-  await act(async () => { root.unmount() });
+  await act(async () => {
+    root.unmount();
+  });
 
   // …and it is understood as a colour in the first place, canvas or no canvas:
   // without that the picker opens on opaque black for a value that is nothing.
@@ -175,8 +206,14 @@ const SIZE = 240;
   // The property, not the attribute: React writes the value onto the DOM node,
   // and reading the attribute would answer null and pass whatever happened.
   const hexShown = dom.window.document.querySelector('.u-color-field-input')?.value;
-  check('and opens showing no opacity, not opaque black', hexShown === '#00000000', String(hexShown));
-  await act(async () => { root.unmount() });
+  check(
+    'and opens showing no opacity, not opaque black',
+    hexShown === '#00000000',
+    String(hexShown),
+  );
+  await act(async () => {
+    root.unmount();
+  });
 
   // --- the notation toggle ------------------------------------------------------
   //
@@ -188,7 +225,9 @@ const SIZE = 240;
   root = await open('rgb(224, 4, 4)');
   const press = async (selector) => {
     const button = dom.window.document.querySelector(selector);
-    if (!button) {throw new Error(`no ${selector}`);}
+    if (!button) {
+      throw new Error(`no ${selector}`);
+    }
     await act(async () => {
       button.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }));
     });
@@ -197,7 +236,9 @@ const SIZE = 240;
   const cycle = () => press('.u-color-mode.is-channel');
   const pressHex = () => press('.u-color-mode.is-hex');
   const letters = () =>
-    [...dom.window.document.querySelectorAll('.u-color-mode.is-channel span')].map((s) => s.textContent).join('');
+    [...dom.window.document.querySelectorAll('.u-color-mode.is-channel span')]
+      .map((s) => s.textContent)
+      .join('');
   const hexOn = () => !!dom.window.document.querySelector('.u-color-mode.is-hex.is-on');
 
   // RGB → HEX → HSL, which are the three notations CSS can spell. (HSB was the
@@ -214,7 +255,7 @@ const SIZE = 240;
   check(
     'while the numbers, which are still R/G/B, say what they are',
     letters() === 'RGB',
-    letters()
+    letters(),
   );
   await cycle();
   check('the pill comes back to the notation its letters show', /^rgba?\(/.test(last()), last());
@@ -229,7 +270,11 @@ const SIZE = 240;
   check('and keeps the colour it was', /^hsla?\(\s*0[,\s]/.test(last()), last());
   check('with the columns following', letters() === 'HSL' && !hexOn(), letters());
   await cycle();
-  check('and back to rgb() — two states, not three', /^rgba?\(/.test(last()) && letters() === 'RGB', last());
+  check(
+    'and back to rgb() — two states, not three',
+    /^rgba?\(/.test(last()) && letters() === 'RGB',
+    last(),
+  );
   // Hex from HSL keeps the H/S/L numbers on screen: the pill says what the
   // fields hold, and they still hold those.
   await cycle();
@@ -238,24 +283,32 @@ const SIZE = 240;
   check('and leaves the fields as they were', letters() === 'HSL', letters());
   await cycle();
   check('so the pill returns to hsl(), which is what it shows', /^hsl\(/.test(last()), last());
-  await act(async () => { root.unmount() });
+  await act(async () => {
+    root.unmount();
+  });
 
   // The picker opens in the notation the value is already written in, so opening
   // one never rewrites what it is looking at.
   root = await open('hsl(0, 96%, 45%)');
   check('an hsl value opens on HSL', letters() === 'HSL', letters());
-  await act(async () => { root.unmount() });
+  await act(async () => {
+    root.unmount();
+  });
   root = await open('#3366ff');
   check('and a hex value opens on HEX', hexOn(), 'hex not marked');
   await dragOn('.u-color-sb', 0.5, 0.5);
   check('so a drag on it stays hex', /^#[0-9a-f]{6,8}$/i.test(last()), last());
-  await act(async () => { root.unmount() });
+  await act(async () => {
+    root.unmount();
+  });
 
   // Cycling the notation on a colour nobody has set must not set one.
   root = await open('');
   await cycle();
   check('an unset colour is left unset', emitted.length === 0, JSON.stringify(emitted));
-  await act(async () => { root.unmount() });
+  await act(async () => {
+    root.unmount();
+  });
 
   // An opaque colour is `hsl()`; one with alpha is `hsla()`, which is the same
   // notation with the channel CSS needs for it.
@@ -263,41 +316,43 @@ const SIZE = 240;
   await cycle();
   check('a colour with alpha writes hsla()', /^hsla\(/.test(last()), last());
   check('carrying the alpha it had', /0\.5\s*\)$/.test(last()), last());
-  await act(async () => { root.unmount() });
+  await act(async () => {
+    root.unmount();
+  });
 
   // The panel writes what was authored, and only converts on the way to a native
   // Webflow style — which is not a thing that exists here.
   const editor = fs.readFileSync(
     path.join(__dirname, '..', 'src', 'style-panel', 'EmbedEditor.tsx'),
-    'utf8'
+    'utf8',
   );
   const setPropAt = editor.indexOf('const setProp = (prop: string');
   check(
     'a committed write is not converted on its way out',
     !/hslaToRgba/.test(editor.slice(setPropAt, setPropAt + 700)),
-    'setProp still normalizes hsl away'
+    'setProp still normalizes hsl away',
   );
   const liveAt = editor.indexOf('const liveSetProp = (prop: string');
   check(
     'nor is a live one',
     !/value = hslaToRgba/.test(editor.slice(liveAt, liveAt + 700)),
-    'liveSetProp still normalizes hsl away'
+    'liveSetProp still normalizes hsl away',
   );
   check(
     'but a native write still is, where the API demands it',
-    /const nativeSetOrFallback[\s\S]{0,200}hslaToRgba/.test(editor)
+    /const nativeSetOrFallback[\s\S]{0,200}hslaToRgba/.test(editor),
   );
 
   // --- the hex field ------------------------------------------------------------
   const css = fs.readFileSync(
     path.join(__dirname, '..', 'src', 'style-panel', 'utilities.css'),
-    'utf8'
+    'utf8',
   );
   const wide = css.slice(css.indexOf('.u-color-field.is-wide .u-color-field-input'));
   check(
     'the hex field has room at the edge its text starts from',
     /padding-inline: var\(--space-4\)/.test(wide.slice(0, wide.indexOf('}'))),
-    wide.slice(0, wide.indexOf('}'))
+    wide.slice(0, wide.indexOf('}')),
   );
   // The app used to paint a hover on every input, the panel's included:
   // `:where(.style-panel-host) input` costs zero specificity, so a plain
@@ -312,11 +367,13 @@ const SIZE = 240;
   check(
     'and the app paints no hover over the panel it does not dress',
     unscoped.length === 0,
-    unscoped.join(' | ')
+    unscoped.join(' | '),
   );
 
   if (failures.length) {
-    console.error(`\ncolor-alpha: ${failures.length} failed, ${checked - failures.length} passed\n`);
+    console.error(
+      `\ncolor-alpha: ${failures.length} failed, ${checked - failures.length} passed\n`,
+    );
     console.error(failures.join('\n') + '\n');
     process.exit(1);
   }

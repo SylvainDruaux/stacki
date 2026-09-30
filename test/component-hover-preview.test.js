@@ -60,27 +60,41 @@ type Props = {
 ---
 <slot />`;
   assert.deepEqual(componentPreviewInputs(fields, 'Card').props, {
-    title: 'Card', render: true, tag: 'h2',
+    title: 'Card',
+    render: true,
+    tag: 'h2',
   });
 });
 
 test('preview metadata rejects malformed and oversized inputs', () => {
   assert.throws(() => componentPreviewInputs({}, 'Card'), /expected string/);
   assert.throws(() => componentPreviewInputs('', 'x'.repeat(201)), /exceeds length limit/);
-  assert.throws(() => componentPreviewInputs('x'.repeat(10 * 1024 * 1024 + 1), 'Card'),
-    /exceeds length limit/);
+  assert.throws(
+    () => componentPreviewInputs('x'.repeat(10 * 1024 * 1024 + 1), 'Card'),
+    /exceeds length limit/,
+  );
 });
 
 test('exact project paths distinguish duplicate component names and support layouts', () => {
-  const paths = ['/src/components/One/Card.astro', '/src/components/Two/Card.astro',
-    '/src/layouts/BaseLayout.astro'];
+  const paths = [
+    '/src/components/One/Card.astro',
+    '/src/components/Two/Card.astro',
+    '/src/layouts/BaseLayout.astro',
+  ];
   assert.equal(componentPreviewPath(paths, 'src/components/Two/Card.astro', 'Card'), paths[1]);
   assert.equal(componentPreviewPath(paths, 'src/layouts/BaseLayout.astro', 'BaseLayout'), paths[2]);
   assert.equal(componentPreviewPath(paths, '', 'Card'), paths[0], 'legacy name URLs still work');
-  for (const selected of ['../../Card.astro', '/etc/Card.astro', 'src/pages/Card.astro',
-    'src/components/Missing/Card.astro']) {
-    assert.equal(componentPreviewPath(paths, selected, 'Card'), undefined,
-      'invalid explicit paths cannot fall back to another component with the same name');
+  for (const selected of [
+    '../../Card.astro',
+    '/etc/Card.astro',
+    'src/pages/Card.astro',
+    'src/components/Missing/Card.astro',
+  ]) {
+    assert.equal(
+      componentPreviewPath(paths, selected, 'Card'),
+      undefined,
+      'invalid explicit paths cannot fall back to another component with the same name',
+    );
   }
   assert.equal(componentPreviewPath(paths, '', '<script>'), undefined);
   assert.throws(() => componentPreviewPath(paths, null, 'Card'), /expected string/);
@@ -114,29 +128,47 @@ test('generated Astro route keeps its default slot and loads the selected source
   assert.match(template, /reportStatus\('empty'\)/);
   assert.match(template, /reportStatus\('ready'\)/);
   assert.doesNotMatch(template, /__STACKI_PREVIEW_/);
-  assert.doesNotMatch(template, /require\(|componentPreview\.js|node:/,
-    'edge-rendered pages cannot import the app CommonJS or Node helpers');
+  assert.doesNotMatch(
+    template,
+    /require\(|componentPreview\.js|node:/,
+    'edge-rendered pages cannot import the app CommonJS or Node helpers',
+  );
   const compiled = await compiler.transform(template, { filename: 'preview.astro' });
   assert.equal(compiled.diagnostics.filter((item) => item.severity === 1).length, 0);
-  assert.doesNotMatch(compiled.code, /__stacki_unused_|\[undefined\]/,
-    'the preview must not create artificial named slots');
+  assert.doesNotMatch(
+    compiled.code,
+    /__stacki_unused_|\[undefined\]/,
+    'the preview must not create artificial named slots',
+  );
 
   const loaded = [];
   const selected = '/src/components/Two/Card.astro';
   const paths = ['/src/components/One/Card.astro', selected];
-  const modules = Object.fromEntries(paths.map((file) => [file, async () => {
-    loaded.push(file); return { default: 'Component' };
-  }]));
-  const sources = Object.fromEntries(paths.map((file) => [file, async () => {
-    loaded.push(file + '?raw&stacki-preview-props');
-    return componentPreviewInputs(accordion, path.basename(file, '.astro'));
-  }]));
-  const frontmatter = template.split('---')[1]
+  const modules = Object.fromEntries(
+    paths.map((file) => [
+      file,
+      async () => {
+        loaded.push(file);
+        return { default: 'Component' };
+      },
+    ]),
+  );
+  const sources = Object.fromEntries(
+    paths.map((file) => [
+      file,
+      async () => {
+        loaded.push(file + '?raw&stacki-preview-props');
+        return componentPreviewInputs(accordion, path.basename(file, '.astro'));
+      },
+    ]),
+  );
+  const frontmatter = template
+    .split('---')[1]
     .replace(/export const prerender = false;/, '')
     .replaceAll('import.meta.glob', 'glob');
   const run = vm.runInNewContext(`(async () => { ${frontmatter}; return { name, C, props }; })`, {
     Astro: { url: new URL('http://localhost/__avb/preview?p=' + selected) },
-    glob: (_pattern, options) => options?.eager ? {} : options?.query ? sources : modules,
+    glob: (_pattern, options) => (options?.eager ? {} : options?.query ? sources : modules),
   });
   const result = await run();
   assert.equal(result.name, 'Card');
@@ -158,14 +190,23 @@ test('Vite metadata exports plain ESM data and reflects source edits', async (t)
   const imported = await import('data:text/javascript,' + encodeURIComponent(first));
   assert.deepEqual(imported.default, { props: { heading: 'AccordionItem' } });
   fs.writeFileSync(file, accordion.replace('heading, headingTag', "heading = 'Saved', headingTag"));
-  assert.equal(plugin.load(id), 'export default {"props":{}};',
-    'a later load sees authored defaults after a source edit');
+  assert.equal(
+    plugin.load(id),
+    'export default {"props":{}};',
+    'a later load sees authored defaults after a source edit',
+  );
   for (const query of ['', '?raw', '?stacki-preview-props', '?raw&not-stacki-preview-props']) {
     assert.equal(plugin.load(file + query), undefined);
   }
-  for (const relative of ['src/pages/index.astro', 'src/components/../../private.astro',
-    '../outside.astro', 'src/components/private.json']) {
-    assert.throws(() => plugin.load(path.join(project, relative) + '?raw&stacki-preview-props'),
-      /must belong to a project component or layout/);
+  for (const relative of [
+    'src/pages/index.astro',
+    'src/components/../../private.astro',
+    '../outside.astro',
+    'src/components/private.json',
+  ]) {
+    assert.throws(
+      () => plugin.load(path.join(project, relative) + '?raw&stacki-preview-props'),
+      /must belong to a project component or layout/,
+    );
   }
 });

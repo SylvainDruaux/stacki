@@ -21,7 +21,9 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
+  if (!condition) {
+    failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  }
 };
 
 // Enough of Web Audio to build one note and see where it went.
@@ -36,14 +38,26 @@ function fakeAudio() {
     kind,
     connect() {},
     disconnect() {},
-    frequency: { value: 0, setValueAtTime(v) { this.value = v } },
-    Q: { value: 0, setValueAtTime(v) { this.value = v } },
+    frequency: {
+      value: 0,
+      setValueAtTime(v) {
+        this.value = v;
+      },
+    },
+    Q: {
+      value: 0,
+      setValueAtTime(v) {
+        this.value = v;
+      },
+    },
     gain: {
       value: 0,
       // The peak of the envelope is the note's loudness — the ramp it is
       // ramped to, not the value it starts at.
       setValueAtTime() {},
-      linearRampToValueAtTime(v) { this.value = v },
+      linearRampToValueAtTime(v) {
+        this.value = v;
+      },
       exponentialRampToValueAtTime() {},
     },
     type: '',
@@ -65,7 +79,11 @@ function fakeAudio() {
       // just before it are this note's, so the whole sound is captured.
       osc.start = () => {
         played.push(osc.frequency.value);
-        tones.push({ cutoff: lastFilter?.frequency.value, gain: lastGain?.gain.value, wave: osc.type });
+        tones.push({
+          cutoff: lastFilter?.frequency.value,
+          gain: lastGain?.gain.value,
+          wave: osc.type,
+        });
       };
       return osc;
     }
@@ -100,19 +118,32 @@ function fakeAudio() {
 
   const audio = fakeAudio();
   global.window = { AudioContext: audio.Ctx };
-  const { clickNote, dragNote, endDragNotes, hoverNote, noteHzFor, noteToneFor, rowHzFor, setSoundEnabled, soundEnabled } =
-    await import(
-    `${pathToFileURL(out).href}?v=${Date.now()}`
-  );
+  const {
+    clickNote,
+    dragNote,
+    endDragNotes,
+    hoverNote,
+    noteHzFor,
+    noteToneFor,
+    rowHzFor,
+    setSoundEnabled,
+    soundEnabled,
+  } = await import(`${pathToFileURL(out).href}?v=${Date.now()}`);
 
   // --- off until asked for ----------------------------------------------------
   check('silent by default', soundEnabled() === false);
-  for (const f of [0, 0.2, 0.4, 0.6, 0.8, 1]) {dragNote(f);}
-  check('a drag makes no sound while it is off', audio.played.length === 0, String(audio.played.length));
+  for (const f of [0, 0.2, 0.4, 0.6, 0.8, 1]) {
+    dragNote(f);
+  }
+  check(
+    'a drag makes no sound while it is off',
+    audio.played.length === 0,
+    String(audio.played.length),
+  );
   check(
     'and builds no audio at all — no context, no nodes',
     audio.nodes.oscillators === 0 && audio.nodes.filters === 0,
-    JSON.stringify(audio.nodes)
+    JSON.stringify(audio.nodes),
   );
 
   // --- the pitch ---------------------------------------------------------------
@@ -120,12 +151,15 @@ function fakeAudio() {
   check(
     'dragging right raises the pitch',
     across.every((hz, i) => i === 0 || hz > across[i - 1]),
-    JSON.stringify(across)
+    JSON.stringify(across),
   );
   check('and dragging left lowers it', noteHzFor(0.2) < noteHzFor(0.8));
   check('the left end is the root', Math.round(noteHzFor(0)) === 196, String(noteHzFor(0)));
   check('the right end is two octaves up', Math.round(noteHzFor(1)) === 784, String(noteHzFor(1)));
-  check('outside the track is clamped, not extrapolated', noteHzFor(-3) === noteHzFor(0) && noteHzFor(9) === noteHzFor(1));
+  check(
+    'outside the track is clamped, not extrapolated',
+    noteHzFor(-3) === noteHzFor(0) && noteHzFor(9) === noteHzFor(1),
+  );
   // Every note in a minor pentatonic, so a fast drag reads as a run rather than
   // a siren: no two adjacent steps are a semitone apart.
   const steps = Array.from({ length: 11 }, (_, i) => noteHzFor(i / 10));
@@ -133,7 +167,7 @@ function fakeAudio() {
   check(
     'no two steps are a semitone apart',
     ratios.every((r) => r > 1.09),
-    JSON.stringify(ratios.map((r) => r.toFixed(3)))
+    JSON.stringify(ratios.map((r) => r.toFixed(3))),
   );
 
   // --- on ----------------------------------------------------------------------
@@ -142,7 +176,11 @@ function fakeAudio() {
 
   dragNote(0);
   check('the first move sounds', audio.played.length === 1, JSON.stringify(audio.played));
-  check('at the pitch for where it is', audio.played[0] === noteHzFor(0), JSON.stringify(audio.played));
+  check(
+    'at the pitch for where it is',
+    audio.played[0] === noteHzFor(0),
+    JSON.stringify(audio.played),
+  );
 
   // A pointer emits many moves within one step of the scale; they are one note.
   // Spaced past the floor on purpose: if the moves came faster than FLOOR_MS
@@ -156,7 +194,7 @@ function fakeAudio() {
   check(
     'moving within a step does not sound again',
     audio.played.length === before,
-    `${audio.played.length - before} extra notes`
+    `${audio.played.length - before} extra notes`,
   );
 
   // Crossing steps sounds each one, and coming back down sounds lower.
@@ -164,11 +202,15 @@ function fakeAudio() {
   dragNote(1);
   await new Promise((r) => setTimeout(r, 40));
   dragNote(0.5);
-  check('crossing a step sounds it', audio.played.length === before + 2, JSON.stringify(audio.played));
+  check(
+    'crossing a step sounds it',
+    audio.played.length === before + 2,
+    JSON.stringify(audio.played),
+  );
   check(
     'and coming back down is lower than what it left',
     audio.played[audio.played.length - 1] < audio.played[audio.played.length - 2],
-    JSON.stringify(audio.played.slice(-2))
+    JSON.stringify(audio.played.slice(-2)),
   );
 
   // --- up and down --------------------------------------------------------------
@@ -179,17 +221,21 @@ function fakeAudio() {
   // filter decides how much of it comes through.
   const low = noteToneFor(1);
   const high = noteToneFor(0);
-  check('the bottom is muted and the top is not', low.cutoff < high.cutoff, `${low.cutoff} vs ${high.cutoff}`);
+  check(
+    'the bottom is muted and the top is not',
+    low.cutoff < high.cutoff,
+    `${low.cutoff} vs ${high.cutoff}`,
+  );
   check('and quieter with it', low.gain < high.gain, `${low.gain} vs ${high.gain}`);
   check('with a softer attack', low.attack > high.attack, `${low.attack} vs ${high.attack}`);
   check('and a longer, rounder tail', low.decay > high.decay, `${low.decay} vs ${high.decay}`);
   check(
     'the middle is between the two',
-    noteToneFor(0.5).cutoff > low.cutoff && noteToneFor(0.5).cutoff < high.cutoff
+    noteToneFor(0.5).cutoff > low.cutoff && noteToneFor(0.5).cutoff < high.cutoff,
   );
   check(
     'a control with no meaningful height sounds like the middle',
-    noteToneFor(undefined).cutoff === noteToneFor(0.5).cutoff
+    noteToneFor(undefined).cutoff === noteToneFor(0.5).cutoff,
   );
 
   // Moving straight up, across no steps at all, is still a change worth hearing.
@@ -199,10 +245,22 @@ function fakeAudio() {
   await new Promise((r) => setTimeout(r, 40));
   dragNote(0.5, 0);
   const [muted, struck] = audio.tones.slice(-2);
-  check('moving up without moving across still sounds', audio.played.slice(-2)[0] === audio.played.slice(-1)[0], JSON.stringify(audio.played.slice(-2)));
-  check('and opens the filter as it goes', muted.cutoff < struck.cutoff, `${muted.cutoff} vs ${struck.cutoff}`);
+  check(
+    'moving up without moving across still sounds',
+    audio.played.slice(-2)[0] === audio.played.slice(-1)[0],
+    JSON.stringify(audio.played.slice(-2)),
+  );
+  check(
+    'and opens the filter as it goes',
+    muted.cutoff < struck.cutoff,
+    `${muted.cutoff} vs ${struck.cutoff}`,
+  );
   check('and hits harder', muted.gain < struck.gain, `${muted.gain} vs ${struck.gain}`);
-  check('on the one waveform', muted.wave === 'sawtooth' && struck.wave === 'sawtooth', `${muted.wave} / ${struck.wave}`);
+  check(
+    'on the one waveform',
+    muted.wave === 'sawtooth' && struck.wave === 'sawtooth',
+    `${muted.wave} / ${struck.wave}`,
+  );
   // The top of the scale at the bottom of the square: the muted cutoff sits well
   // below that note's own frequency, so this is the one combination where the
   // floor has to do something. Played on purpose, since a test that never
@@ -214,7 +272,7 @@ function fakeAudio() {
   check(
     'the highest note still speaks at the most muted end',
     topMuted.cutoff > noteHzFor(1),
-    `${topMuted.cutoff} for a ${noteHzFor(1)}Hz note`
+    `${topMuted.cutoff} for a ${noteHzFor(1)}Hz note`,
   );
 
   // A cutoff under the note itself doesn't mute it, it removes it. The size of
@@ -222,19 +280,31 @@ function fakeAudio() {
   check(
     'the mute never shuts below the note',
     audio.tones.every((t, i) => t.cutoff > audio.played[i]),
-    JSON.stringify(audio.tones.map((t, i) => [audio.played[i], t.cutoff]))
+    JSON.stringify(audio.tones.map((t, i) => [audio.played[i], t.cutoff])),
   );
 
   // --- the graph ---------------------------------------------------------------
-  check('a filter per note — it is what the vertical moves', audio.nodes.filters === audio.played.length, `${audio.nodes.filters} for ${audio.played.length}`);
-  check('a note per oscillator', audio.nodes.oscillators === audio.played.length, `${audio.nodes.oscillators} for ${audio.played.length}`);
+  check(
+    'a filter per note — it is what the vertical moves',
+    audio.nodes.filters === audio.played.length,
+    `${audio.nodes.filters} for ${audio.played.length}`,
+  );
+  check(
+    'a note per oscillator',
+    audio.nodes.oscillators === audio.played.length,
+    `${audio.nodes.oscillators} for ${audio.played.length}`,
+  );
 
   // --- off again ---------------------------------------------------------------
   setSoundEnabled(false);
   const quiet = audio.played.length;
   await new Promise((r) => setTimeout(r, 40));
   dragNote(0.9);
-  check('switching it off stops it', audio.played.length === quiet, JSON.stringify(audio.played.slice(quiet)));
+  check(
+    'switching it off stops it',
+    audio.played.length === quiet,
+    JSON.stringify(audio.played.slice(quiet)),
+  );
 
   // A drag that ends resets, so the next one sounds wherever it begins — even
   // if that is the step the last one finished on.
@@ -260,14 +330,22 @@ function fakeAudio() {
   clickNote();
   check('a button press sounds', audio.played.length === beforeTap + 1);
   const tap = audio.tones[audio.tones.length - 1];
-  check('darkly', tap.cutoff < noteToneFor(0.5).cutoff, `${tap.cutoff} vs ${noteToneFor(0.5).cutoff}`);
-  check('and at the same pitch every time', audio.played[audio.played.length - 1] < noteHzFor(0), String(audio.played[audio.played.length - 1]));
+  check(
+    'darkly',
+    tap.cutoff < noteToneFor(0.5).cutoff,
+    `${tap.cutoff} vs ${noteToneFor(0.5).cutoff}`,
+  );
+  check(
+    'and at the same pitch every time',
+    audio.played[audio.played.length - 1] < noteHzFor(0),
+    String(audio.played[audio.played.length - 1]),
+  );
   clickNote();
   clickNote();
   check(
     'every press, with no step to cross first',
     audio.played.length === beforeTap + 3,
-    String(audio.played.length - beforeTap)
+    String(audio.played.length - beforeTap),
   );
 
   setSoundEnabled(false);
@@ -295,18 +373,20 @@ function fakeAudio() {
     const Popover = () =>
       ReactDOM.createPortal(
         React.createElement('button', { id: 'in-portal' }, 'pick'),
-        view.window.document.getElementById('elsewhere')
+        view.window.document.getElementById('elsewhere'),
       );
     const Panel = () =>
       React.createElement(
         'div',
         {
           onClick: (e) => {
-            if (e.target.closest('button')) {heard += 1;}
+            if (e.target.closest('button')) {
+              heard += 1;
+            }
           },
         },
         React.createElement('button', { id: 'in-panel' }, 'grid'),
-        React.createElement(Popover)
+        React.createElement(Popover),
       );
     const root = createRoot(view.window.document.getElementById('root'));
     await act(async () => {
@@ -324,7 +404,7 @@ function fakeAudio() {
     check(
       'and so does one in a popover portaled out of it',
       heard === 2,
-      `${heard} — React would have to bubble the portal to its own tree`
+      `${heard} — React would have to bubble the portal to its own tree`,
     );
     await act(async () => {
       root.unmount();
@@ -343,14 +423,26 @@ function fakeAudio() {
   check(
     'each row down the list is deeper than the one above',
     down.every((hz, i) => i === 0 || hz < down[i - 1]),
-    JSON.stringify(down.map(Math.round))
+    JSON.stringify(down.map(Math.round)),
   );
-  check('the first row is the top of the scale', Math.round(down[0]) === Math.round(noteHzFor(1)), String(down[0]));
-  check('and the last is the bottom of it', Math.round(down[menu - 1]) === Math.round(noteHzFor(0)), String(down[menu - 1]));
-  check('a list of one sounds its top note', Math.round(rowHzFor(0, 1)) === Math.round(noteHzFor(1)), String(rowHzFor(0, 1)));
+  check(
+    'the first row is the top of the scale',
+    Math.round(down[0]) === Math.round(noteHzFor(1)),
+    String(down[0]),
+  );
+  check(
+    'and the last is the bottom of it',
+    Math.round(down[menu - 1]) === Math.round(noteHzFor(0)),
+    String(down[menu - 1]),
+  );
+  check(
+    'a list of one sounds its top note',
+    Math.round(rowHzFor(0, 1)) === Math.round(noteHzFor(1)),
+    String(rowHzFor(0, 1)),
+  );
   check(
     'a row past the end is the last row, not something off the scale',
-    rowHzFor(99, menu) === down[menu - 1] && rowHzFor(-4, menu) === down[0]
+    rowHzFor(99, menu) === down[menu - 1] && rowHzFor(-4, menu) === down[0],
   );
 
   endDragNotes();
@@ -358,24 +450,28 @@ function fakeAudio() {
   const beforeRows = audio.played.length;
   hoverNote(2, menu);
   check('moving onto a row sounds it', audio.played.length === beforeRows + 1);
-  check('at that row\'s pitch', audio.played[audio.played.length - 1] === rowHzFor(2, menu));
+  check("at that row's pitch", audio.played[audio.played.length - 1] === rowHzFor(2, menu));
   await new Promise((r) => setTimeout(r, 40));
   hoverNote(2, menu);
   check(
     'and staying on it says nothing more',
     audio.played.length === beforeRows + 1,
-    `${audio.played.length - beforeRows} notes for one row`
+    `${audio.played.length - beforeRows} notes for one row`,
   );
   await new Promise((r) => setTimeout(r, 40));
   hoverNote(5, menu);
   check(
     'moving further down goes deeper',
     audio.played[audio.played.length - 1] < audio.played[audio.played.length - 2],
-    JSON.stringify(audio.played.slice(-2))
+    JSON.stringify(audio.played.slice(-2)),
   );
   // Lighter than a drag: a sweep down a long menu is a lot of notes.
   const rowTone = audio.tones[audio.tones.length - 1];
-  check('a row is played lighter than a drag', rowTone.gain < noteToneFor(0).gain, `${rowTone.gain}`);
+  check(
+    'a row is played lighter than a drag',
+    rowTone.gain < noteToneFor(0).gain,
+    `${rowTone.gain}`,
+  );
 
   setSoundEnabled(false);
   const quietRows = audio.played.length;
@@ -403,11 +499,11 @@ function fakeAudio() {
     fs.writeFileSync(
       entry,
       `export { default as Select } from ${JSON.stringify(
-        path.join(__dirname, '..', 'src', 'style-panel', 'components', 'Select.tsx')
+        path.join(__dirname, '..', 'src', 'style-panel', 'components', 'Select.tsx'),
       )};\n` +
         `export { setSoundEnabled } from ${JSON.stringify(
-          path.join(__dirname, '..', 'src', 'ui', 'sound.js')
-        )};\n`
+          path.join(__dirname, '..', 'src', 'ui', 'sound.js'),
+        )};\n`,
     );
     const bundle = path.join(buildDir, 'rows.bundle.js');
     await esbuild.build({
@@ -429,24 +525,51 @@ function fakeAudio() {
     global.document = view.window.document;
     global.IS_REACT_ACT_ENVIRONMENT = true;
     global.MutationObserver = view.window.MutationObserver;
-    global.ResizeObserver = class { observe() {} disconnect() {} };
+    global.ResizeObserver = class {
+      observe() {}
+      disconnect() {}
+    };
     global.requestAnimationFrame = view.window.requestAnimationFrame.bind(view.window);
     global.cancelAnimationFrame = view.window.cancelAnimationFrame.bind(view.window);
     // This bundle carries its own copy of the sound module, so it needs its own
     // stand-in to count through.
     const heard = [];
     const stub = () => ({
-      connect() {}, disconnect() {},
-      frequency: { value: 0, setValueAtTime(v) { this.value = v } },
+      connect() {},
+      disconnect() {},
+      frequency: {
+        value: 0,
+        setValueAtTime(v) {
+          this.value = v;
+        },
+      },
       Q: { setValueAtTime() {} },
-      gain: { setValueAtTime() {}, linearRampToValueAtTime() {}, exponentialRampToValueAtTime() {} },
-      type: '', start() {}, stop() {},
+      gain: {
+        setValueAtTime() {},
+        linearRampToValueAtTime() {},
+        exponentialRampToValueAtTime() {},
+      },
+      type: '',
+      start() {},
+      stop() {},
     });
     view.window.AudioContext = class {
-      constructor() { this.state = 'running'; this.currentTime = 0; this.destination = stub() }
-      createOscillator() { const o = stub(); o.start = () => heard.push(Math.round(o.frequency.value)); return o }
-      createGain() { return stub() }
-      createBiquadFilter() { return stub() }
+      constructor() {
+        this.state = 'running';
+        this.currentTime = 0;
+        this.destination = stub();
+      }
+      createOscillator() {
+        const o = stub();
+        o.start = () => heard.push(Math.round(o.frequency.value));
+        return o;
+      }
+      createGain() {
+        return stub();
+      }
+      createBiquadFilter() {
+        return stub();
+      }
       resume() {}
     };
 
@@ -456,8 +579,17 @@ function fakeAudio() {
     const rows = require(bundle);
     rows.setSoundEnabled(true);
 
-    const options = ['Auto', 'Anamorphic', 'Univisium', 'Widescreen', 'Landscape', 'Portrait', 'Square', 'Custom', 'Other']
-      .map((label, i) => ({ value: String(i), label }));
+    const options = [
+      'Auto',
+      'Anamorphic',
+      'Univisium',
+      'Widescreen',
+      'Landscape',
+      'Portrait',
+      'Square',
+      'Custom',
+      'Other',
+    ].map((label, i) => ({ value: String(i), label }));
     const fresh = () => options.map((o) => ({ ...o }));
     const Panel = () => {
       const [tick, setTick] = React.useState(0);
@@ -465,22 +597,36 @@ function fakeAudio() {
         React.Fragment,
         null,
         // Closed, and rendered first — their effects run before the open one's.
-        React.createElement(rows.Select, { value: '0', options: fresh(), onChange() {}, ariaLabel: 'Position' }),
-        React.createElement(rows.Select, { value: '0', options: fresh(), onChange() {}, ariaLabel: 'Overflow' }),
+        React.createElement(rows.Select, {
+          value: '0',
+          options: fresh(),
+          onChange() {},
+          ariaLabel: 'Position',
+        }),
+        React.createElement(rows.Select, {
+          value: '0',
+          options: fresh(),
+          onChange() {},
+          ariaLabel: 'Overflow',
+        }),
         React.createElement(rows.Select, {
           value: '0',
           options: fresh(),
           onChange() {},
           // The live write lands after the note floor and re-renders the panel.
-          onPreview() { setTimeout(() => setTick((t) => t + 1), 45) },
+          onPreview() {
+            setTimeout(() => setTick((t) => t + 1), 45);
+          },
           ariaLabel: 'Ratio',
         }),
-        React.createElement('span', null, tick)
+        React.createElement('span', null, tick),
       );
     };
 
     const root = createRoot(view.window.document.getElementById('root'));
-    await act(async () => { root.render(React.createElement(Panel)) });
+    await act(async () => {
+      root.render(React.createElement(Panel));
+    });
     const triggers = view.window.document.querySelectorAll('button, [role="combobox"]');
     await act(async () => {
       triggers[2].dispatchEvent(new view.window.MouseEvent('click', { bubbles: true }));
@@ -493,11 +639,19 @@ function fakeAudio() {
     await act(async () => {
       rowEls[3].dispatchEvent(new view.window.MouseEvent('mouseover', { bubbles: true }));
     });
-    await act(async () => { await new Promise((r) => setTimeout(r, 90)) });
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 90));
+    });
     check('a row hovered once sounds once', heard.length === 1, JSON.stringify(heard));
-    check('and not again when the panel re-renders under it', !(heard[1] === heard[0]), JSON.stringify(heard));
+    check(
+      'and not again when the panel re-renders under it',
+      !(heard[1] === heard[0]),
+      JSON.stringify(heard),
+    );
 
-    await act(async () => { root.unmount() });
+    await act(async () => {
+      root.unmount();
+    });
     global.window = prior.window;
     global.document = prior.document;
   }
@@ -505,9 +659,12 @@ function fakeAudio() {
   // --- the wiring --------------------------------------------------------------
   const picker = fs.readFileSync(
     path.join(__dirname, '..', 'src', 'style-panel', 'components', 'ColorPicker.tsx'),
-    'utf8'
+    'utf8',
   );
-  check('the colour drag plays the note', /if \(live\) \{dragNote\(fx, tall \? fy : undefined\)/.test(picker));
+  check(
+    'the colour drag plays the note',
+    /if \(live\) \{dragNote\(fx, tall \? fy : undefined\)/.test(picker),
+  );
   check('and releasing ends the run', /endDragNotes\(\)/.test(picker));
   // The square is a surface to drag around in; the bars are a few pixels high,
   // where a fraction of the height is noise rather than intent.
@@ -515,23 +672,29 @@ function fakeAudio() {
     'the square is the one that hears its vertical',
     /const dragSB = useDrag\(.*, true\)/.test(picker) &&
       !/const dragHue = useDrag\(.*, true\)/.test(picker) &&
-      !/const dragAlpha = useDrag\(.*, true\)/.test(picker)
+      !/const dragAlpha = useDrag\(.*, true\)/.test(picker),
   );
 
   const main = fs.readFileSync(path.join(__dirname, '..', 'dist', 'electron', 'main.js'), 'utf8');
   check('the setting is a menu item', /label: 'Interface Sounds'/.test(main));
   check('a checkbox, so it reads as a toggle', /type: 'checkbox'/.test(main));
   check('off unless it has been turned on', /SETTINGS_DEFAULTS = \{ sound: false \}/.test(main));
-  check('and remembered across launches', /writeSettings\(\)/.test(main) && /settings:get/.test(main));
+  check(
+    'and remembered across launches',
+    /writeSettings\(\)/.test(main) && /settings:get/.test(main),
+  );
 
   const select = fs.readFileSync(
     path.join(__dirname, '..', 'src', 'style-panel', 'components', 'Select.tsx'),
-    'utf8'
+    'utf8',
   );
-  check('the menu sounds its highlight', /hoverNote\(activeIndex, displayed\.length\)/.test(select));
+  check(
+    'the menu sounds its highlight',
+    /hoverNote\(activeIndex, displayed\.length\)/.test(select),
+  );
   check(
     'from the highlight itself, so arrowing sounds like hovering',
-    /\[open, activeIndex, displayed\]/.test(select)
+    /\[open, activeIndex, displayed\]/.test(select),
   );
   // A source check, and a shape-of-the-code one at that — the guard is three
   // lines inside an effect in a 560-line component, and rendering the whole
@@ -540,11 +703,17 @@ function fakeAudio() {
   check(
     'but not for the row it opens on',
     /if \(!placedRef\.current\) \{\s*placedRef\.current = true\s*return\s*\}/.test(select),
-    'the highlight the menu opens with should not sound'
+    'the highlight the menu opens with should not sound',
   );
 
-  const panel = fs.readFileSync(path.join(__dirname, '..', 'src', 'panels', 'StylePanel.tsx'), 'utf8');
-  check('the style panel taps on a button press', /closest\('button'\)/.test(panel) && /clickNote\(\)/.test(panel));
+  const panel = fs.readFileSync(
+    path.join(__dirname, '..', 'src', 'panels', 'StylePanel.tsx'),
+    'utf8',
+  );
+  check(
+    'the style panel taps on a button press',
+    /closest\('button'\)/.test(panel) && /clickNote\(\)/.test(panel),
+  );
   check('but not on a disabled one', /!button\.disabled/.test(panel));
 
   const app = fs.readFileSync(path.join(__dirname, '..', 'src', 'App.tsx'), 'utf8');
@@ -552,10 +721,14 @@ function fakeAudio() {
   check('and follows the menu after that', /onSoundSettingChanged\(/.test(app));
 
   // A burst of synthetic click events cannot allocate unbounded audio nodes.
-  for (const voice of audio.voices) { voice.onended?.(); }
+  for (const voice of audio.voices) {
+    voice.onended?.();
+  }
   setSoundEnabled(true);
   const beforeBurst = audio.nodes.oscillators;
-  for (let index = 0; index < 100; index++) { clickNote(); }
+  for (let index = 0; index < 100; index++) {
+    clickNote();
+  }
   check('overlapping voices are capped', audio.nodes.oscillators - beforeBurst === 32);
   audio.voices.at(-1).onended();
   clickNote();

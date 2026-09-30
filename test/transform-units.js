@@ -15,7 +15,9 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
+  if (!condition) {
+    failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  }
 };
 
 (async () => {
@@ -32,12 +34,27 @@ const check = (what, condition, detail) => {
     loader: { '.ts': 'ts' },
     logLevel: 'silent',
   });
-  const { IDENTITY, blankTransform, retypeTransform, parseTransforms, serializeTransforms } = require(bundlePath);
+  const {
+    IDENTITY,
+    blankTransform,
+    retypeTransform,
+    parseTransforms,
+    serializeTransforms,
+  } = require(bundlePath);
 
   // --- where a move starts -----------------------------------------------------
   check('a move starts in rem', IDENTITY.move === '0rem', IDENTITY.move);
-  check('a new layer is three rem axes', JSON.stringify(blankTransform('move')) === JSON.stringify({ type: 'move', x: '0rem', y: '0rem', z: '0rem' }), JSON.stringify(blankTransform('move')));
-  check('and switching a layer to Move resets it to rem', retypeTransform('move').x === '0rem', retypeTransform('move').x);
+  check(
+    'a new layer is three rem axes',
+    JSON.stringify(blankTransform('move')) ===
+      JSON.stringify({ type: 'move', x: '0rem', y: '0rem', z: '0rem' }),
+    JSON.stringify(blankTransform('move')),
+  );
+  check(
+    'and switching a layer to Move resets it to rem',
+    retypeTransform('move').x === '0rem',
+    retypeTransform('move').x,
+  );
   // The others are not lengths and are untouched by this.
   check('scale is still a bare number', IDENTITY.scale === '1');
   check('rotate is still degrees', IDENTITY.rotate === '0deg');
@@ -55,7 +72,7 @@ const check = (what, condition, detail) => {
   check(
     'a mix of units survives the round trip',
     /4rem/.test(serializeTransforms(mixed)) && /12px/.test(serializeTransforms(mixed)),
-    serializeTransforms(mixed)
+    serializeTransforms(mixed),
   );
 
   // --- what the slider re-attaches ---------------------------------------------
@@ -63,16 +80,23 @@ const check = (what, condition, detail) => {
   // when the value has none does it fall back to the axis default.
   const effects = fs.readFileSync(
     path.join(__dirname, '..', 'src', 'style-panel', 'EffectsSection.tsx'),
-    'utf8'
+    'utf8',
   );
   const cfg = effects.slice(effects.indexOf('const AXIS_CFG'), effects.indexOf('/** Split'));
-  check("the move axis's default unit is rem", /move: \{ unit: 'rem'/.test(cfg), cfg.match(/move: \{[^}]*\}/)?.[0]);
-  check('degrees still belong to rotate and skew', /rotate: \{ unit: 'deg'/.test(cfg) && /skew: \{ unit: 'deg'/.test(cfg));
+  check(
+    "the move axis's default unit is rem",
+    /move: \{ unit: 'rem'/.test(cfg),
+    cfg.match(/move: \{[^}]*\}/)?.[0],
+  );
+  check(
+    'degrees still belong to rotate and skew',
+    /rotate: \{ unit: 'deg'/.test(cfg) && /skew: \{ unit: 'deg'/.test(cfg),
+  );
   check('and scale has no unit at all', /scale: \{ unit: ''/.test(cfg));
   check(
     'the unit comes off the value first, the default second',
     /const unit = parsed\?\.unit \?\? cfg\.unit/.test(effects),
-    'the control would overwrite a unit somebody typed'
+    'the control would overwrite a unit somebody typed',
   );
   // A rem range in whole px steps would only ever land on whole rem; the steps
   // are what give the slider anything to say between 1rem and 2rem.
@@ -81,7 +105,9 @@ const check = (what, condition, detail) => {
   check('the move slider steps finer than one rem', steps >= 10, move);
 
   if (failures.length) {
-    console.error(`\ntransform-units: ${failures.length} failed, ${checked - failures.length} passed\n`);
+    console.error(
+      `\ntransform-units: ${failures.length} failed, ${checked - failures.length} passed\n`,
+    );
     console.error(failures.join('\n') + '\n');
     process.exit(1);
   }

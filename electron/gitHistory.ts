@@ -89,7 +89,13 @@ export interface CommitInfo {
  */
 async function log(
   git: Git,
-  { projectPath, ref, limit = 50, skip = 0, withFiles = false }: {
+  {
+    projectPath,
+    ref,
+    limit = 50,
+    skip = 0,
+    withFiles = false,
+  }: {
     readonly projectPath: string;
     readonly ref?: string;
     readonly limit?: number;
@@ -203,7 +209,10 @@ export interface StatusFile {
  * chip; this is the one that has to be complete, because a file missing from
  * it is a file that silently cannot be committed.
  */
-async function status(git: Git, { projectPath }: { readonly projectPath: string }): Promise<StatusFile[]> {
+async function status(
+  git: Git,
+  { projectPath }: { readonly projectPath: string },
+): Promise<StatusFile[]> {
   const { stdout } = await git(projectPath, ['status', '--porcelain']);
   const files: StatusFile[] = [];
   for (const line of stdout.split('\n')) {
@@ -260,7 +269,10 @@ export interface ProjectFile {
  * Status comes from the same porcelain the file picker reads, so a file cannot
  * appear as changed in one place and clean in another.
  */
-async function allFiles(git: Git, { projectPath }: { readonly projectPath: string }): Promise<ProjectFile[]> {
+async function allFiles(
+  git: Git,
+  { projectPath }: { readonly projectPath: string },
+): Promise<ProjectFile[]> {
   const { stdout } = await git(projectPath, [
     'ls-files',
     '--cached',
@@ -293,7 +305,11 @@ async function allFiles(git: Git, { projectPath }: { readonly projectPath: strin
 /** A file's contents as they were at `ref`, or null when it wasn't there. */
 async function fileAt(
   git: Git,
-  { projectPath, ref, path: filePath }: { readonly projectPath: string; readonly ref: string; readonly path: string },
+  {
+    projectPath,
+    ref,
+    path: filePath,
+  }: { readonly projectPath: string; readonly ref: string; readonly path: string },
 ): Promise<string | null> {
   try {
     const { stdout } = await git(projectPath, ['show', `${ref}:${filePath}`]);
@@ -303,7 +319,9 @@ async function fileAt(
     // answer to "what did this look like then", and the caller wants to say
     // "this page didn't exist yet" rather than show a failure.
     const stderr = toRecord(err)?.['stderr'];
-    if (/does not exist|exists on disk, but not in/i.test(typeof stderr === 'string' ? stderr : '')) {
+    if (
+      /does not exist|exists on disk, but not in/i.test(typeof stderr === 'string' ? stderr : '')
+    ) {
       return null;
     }
     throw err;
@@ -319,7 +337,10 @@ export interface WorktreeInfo {
 }
 
 /** Every worktree of this repository, the main one first. */
-async function worktrees(git: Git, { projectPath }: { readonly projectPath: string }): Promise<WorktreeInfo[]> {
+async function worktrees(
+  git: Git,
+  { projectPath }: { readonly projectPath: string },
+): Promise<WorktreeInfo[]> {
   const { stdout } = await git(projectPath, ['worktree', 'list', '--porcelain']);
   // Blank-line-separated records of "key value" lines. `detached` and `bare`
   // are bare keys with no value.
@@ -328,7 +349,13 @@ async function worktrees(git: Git, { projectPath }: { readonly projectPath: stri
     .map((rec) => rec.trim())
     .filter(Boolean)
     .map((rec) => {
-      const out: { path: string | null; head: string | null; branch: string | null; detached: boolean; bare: boolean } = {
+      const out: {
+        path: string | null;
+        head: string | null;
+        branch: string | null;
+        detached: boolean;
+        bare: boolean;
+      } = {
         path: null,
         head: null,
         branch: null,
@@ -366,14 +393,19 @@ async function worktrees(git: Git, { projectPath }: { readonly projectPath: stri
 // convention (src/pages, src/components, src/layouts) rather than something
 // this has to go to disk to learn, which is what keeps it testable.
 
-const TITLE = (seg: string): string =>
-  seg
-    .replace(/-/g, ' ')
-    .replace(/^./, (c) => c.toUpperCase());
+const TITLE = (seg: string): string => seg.replace(/-/g, ' ').replace(/^./, (c) => c.toUpperCase());
 
 export type FileKind =
-  | 'page' | 'component' | 'layout' | 'content' | 'asset'
-  | 'style' | 'config' | 'script' | 'doc' | 'file';
+  | 'page'
+  | 'component'
+  | 'layout'
+  | 'content'
+  | 'asset'
+  | 'style'
+  | 'config'
+  | 'script'
+  | 'doc'
+  | 'file';
 
 export interface FileDescription {
   readonly path: string;

@@ -1,6 +1,6 @@
-import { useMemo } from 'react'
-import type { ElementSnapshot } from './lib/types'
-import { snapshotTokens } from './lib/element-tokens'
+import { useMemo } from 'react';
+import type { ElementSnapshot } from './lib/types';
+import { snapshotTokens } from './lib/element-tokens';
 
 /**
  * A read-only, monospace rendering of the selected element's identity as a CSS
@@ -12,22 +12,32 @@ import { snapshotTokens } from './lib/element-tokens'
 export default function ElementTokenPicker({
   snapshot,
 }: {
-  snapshot: ElementSnapshot | undefined
-  selected?: string[]
-  onChange?: (selectedNames: string[], selector: string) => void
+  snapshot: ElementSnapshot | undefined;
+  selected?: string[];
+  onChange?: (selectedNames: string[], selector: string) => void;
 }) {
-  const tokens = useMemo(() => snapshotTokens(snapshot), [snapshot])
-  if (!tokens.length) {return null}
+  const tokens = useMemo(() => snapshotTokens(snapshot), [snapshot]);
+  if (!tokens.length) {
+    return null;
+  }
 
   const selector = tokens
     .map((token) => {
-      const name = token.label ?? ''
-      if (token.kind === 'tag') {return name}
-      if (token.kind === 'class') {return `.${name}`}
-      const value = snapshot?.attributes[name] ?? ''
-      return value ? `[${name}="${value}"]` : `[${name}]`
+      const name = token.label ?? '';
+      if (token.kind === 'tag') {
+        return name;
+      }
+      if (token.kind === 'class') {
+        return `.${name}`;
+      }
+      const value = snapshot?.attributes[name] ?? '';
+      return value ? `[${name}="${value}"]` : `[${name}]`;
     })
-    .join('')
+    .join('');
 
-  return <div className="embed-editor_element-id" title={selector}>{selector}</div>
+  return (
+    <div className="embed-editor_element-id" title={selector}>
+      {selector}
+    </div>
+  );
 }

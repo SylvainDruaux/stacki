@@ -32,8 +32,7 @@ export function isDataBound(node: BindableNode | null | undefined): boolean {
 // A plain name — `overlap`, `post.data.title`. What a chip can show and a
 // picker can choose; anything with an operator or a call in it can't be named
 // that way and stays code.
-export const BIND_PATH_RE =
-  /^[A-Za-z_$][\w$]*(?:\[\d+\])*(?:\.[A-Za-z_$][\w$]*(?:\[\d+\])*)*$/;
+export const BIND_PATH_RE = /^[A-Za-z_$][\w$]*(?:\[\d+\])*(?:\.[A-Za-z_$][\w$]*(?:\[\d+\])*)*$/;
 
 export interface TemplateHole {
   readonly from: number;
@@ -99,16 +98,27 @@ const unescapeTpl = (text: string): string =>
     .replace(/\\\\/g, '\\');
 
 const escapeTpl = (text: string | undefined): string =>
-  String(text)
-    .replace(/\\/g, '\\\\')
-    .replace(/`/g, '\\`')
-    .replace(/\$\{/g, '\\${');
+  String(text).replace(/\\/g, '\\\\').replace(/`/g, '\\`').replace(/\$\{/g, '\\${');
 
 // Words that are JavaScript rather than data. `true` is not something to bind
 // to, and neither is the `of` in a for loop.
 const CODE_WORDS = new Set([
-  'true', 'false', 'null', 'undefined', 'new', 'typeof', 'void', 'delete', 'in', 'of',
-  'instanceof', 'await', 'return', 'if', 'else', 'this',
+  'true',
+  'false',
+  'null',
+  'undefined',
+  'new',
+  'typeof',
+  'void',
+  'delete',
+  'in',
+  'of',
+  'instanceof',
+  'await',
+  'return',
+  'if',
+  'else',
+  'this',
 ]);
 
 // An expression simple enough to read as data with operators between it —

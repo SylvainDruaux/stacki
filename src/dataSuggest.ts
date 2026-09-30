@@ -545,7 +545,10 @@ export interface ReferenceNeed {
  * getEntry(post.data.author)` — as {key, collection, id} to fetch. Needs the
  * props sample, since the reference's target is in the data, not the source.
  */
-export function referencesInScope(frontmatter: string | null | undefined, propsSample: unknown): ReferenceNeed[] {
+export function referencesInScope(
+  frontmatter: string | null | undefined,
+  propsSample: unknown,
+): ReferenceNeed[] {
   if (!propsSample) {
     return [];
   }
@@ -622,11 +625,12 @@ const ENTRY_INTERNALS = new Set([
   'legacyId',
   'assetImports',
 ]);
-const isEntry = (v: Record<string, unknown>): boolean =>
-  'collection' in v && 'data' in v;
+const isEntry = (v: Record<string, unknown>): boolean => 'collection' in v && 'data' in v;
 const shownKeys = (v: unknown): string[] => {
   const record = toRecord(v) ?? {};
-  return isEntry(record) ? Object.keys(record).filter((k) => !ENTRY_INTERNALS.has(k)) : Object.keys(record);
+  return isEntry(record)
+    ? Object.keys(record).filter((k) => !ENTRY_INTERNALS.has(k))
+    : Object.keys(record);
 };
 
 const clip = (text: unknown, max: number): string =>
@@ -888,7 +892,7 @@ export function scopeCompletions(context: DataContext = {}): { label: string; de
   };
   const walk = (nodes: readonly TreeNode[] | null | undefined, depth: number): void => {
     for (const node of nodes ?? []) {
-      add(node.path, node.preview ? String(node.preview).slice(0, 40) : node.section ?? '');
+      add(node.path, node.preview ? String(node.preview).slice(0, 40) : (node.section ?? ''));
       // One level in is the useful depth: `post.data` earns its place, every
       // field of every collection does not — the picker is for browsing.
       if (depth < 2 && Array.isArray(node.children)) {
@@ -934,7 +938,10 @@ function isTypeSyntaxIdentifier(source: string, from: number, root: string): boo
  *
  * Strings are skipped: `"content"` is a word, not the prop of that name.
  */
-export function scopeChips(text: unknown, names: Iterable<string> | Set<string> | null | undefined): ScopeChip[] {
+export function scopeChips(
+  text: unknown,
+  names: Iterable<string> | Set<string> | null | undefined,
+): ScopeChip[] {
   const source = String(text ?? '');
   const inScope = names instanceof Set ? names : new Set(names ?? []);
   if (!inScope.size) {
@@ -1066,7 +1073,8 @@ function shapeNode(name: string, fields: readonly { key: string; kind: string }[
 // `const toc = headings.filter(h => h.depth < 4)` — fewer of the same thing.
 // Whatever `headings` turned out to be, `toc` is that too, so the fields under
 // one belong under the other.
-const KEEPS_SHAPE = /^([A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*)\s*\.\s*(filter|slice|sort|reverse|concat|toSorted|toReversed|flat)\s*\(/;
+const KEEPS_SHAPE =
+  /^([A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*)\s*\.\s*(filter|slice|sort|reverse|concat|toSorted|toReversed|flat)\s*\(/;
 
 // `const featured = portfolio.find(…) ?? portfolio[0]` — ONE of the same thing.
 // The picker knew `portfolio` was a list of entries and could open it, and knew
@@ -1097,14 +1105,22 @@ function shapeChildren(field: SchemaField | undefined, base: string): TreeNode[]
     shape.map((f) => ({
       path: `${at}.${f.name}`,
       key: f.name,
-      kind: f.type === 'code' ? 'value' : f.type ?? 'value',
+      kind: f.type === 'code' ? 'value' : (f.type ?? 'value'),
       preview: '',
       children: null,
     }));
   // A list is written the way a sample of one is, so everything downstream —
   // the loop item's fields, the picker's own walk — reads it the same way.
   return field.shapeIsList
-    ? [{ path: `${base}[0]`, key: '0', kind: 'object', preview: '', children: fields(`${base}[0]`) }]
+    ? [
+        {
+          path: `${base}[0]`,
+          key: '0',
+          kind: 'object',
+          preview: '',
+          children: fields(`${base}[0]`),
+        },
+      ]
     : fields(base);
 }
 
@@ -1130,17 +1146,22 @@ function buildPropNodes(
     }
     const field = schema.find((f) => f.name === d.name);
     const shape = shapeChildren(field, d.name);
-    addUnique(props, {
-      path: d.name,
-      key: d.name,
-      kind: shape && field?.shapeIsList
-        ? 'list'
-        : d.kind === 'rest'
-          ? 'rest props'
-          : field?.type || (d.kind || 'prop'),
-      preview: field?.default !== undefined ? String(field.default) : '',
-      children: shape,
-    }, seen);
+    addUnique(
+      props,
+      {
+        path: d.name,
+        key: d.name,
+        kind:
+          shape && field?.shapeIsList
+            ? 'list'
+            : d.kind === 'rest'
+              ? 'rest props'
+              : field?.type || d.kind || 'prop',
+        preview: field?.default !== undefined ? String(field.default) : '',
+        children: shape,
+      },
+      seen,
+    );
   }
   // A prop the file declares but destructures elsewhere (or reads off
   // Astro.props directly) is still a prop of this file.
@@ -1196,9 +1217,7 @@ function buildValueNodes(
     const ref = referenceCallIn(value);
     const at = ref ? sampleAt(sample, ref.path) : null;
     const targetList = toArray(at);
-    const target = targetList
-      ? targetList.find((v) => toRecord(v)?.['collection'])
-      : at;
+    const target = targetList ? targetList.find((v) => toRecord(v)?.['collection']) : at;
     const targetRecord = toRecord(target);
     const targetCollection = targetRecord?.['collection'];
     const targetId = targetRecord?.['id'];
@@ -1235,7 +1254,11 @@ function buildValueNodes(
     if (!mayHoldData(imp)) {
       continue;
     }
-    addUnique(values, { path: imp.name, key: imp.name, kind: 'import', preview: '', children: null }, seen);
+    addUnique(
+      values,
+      { path: imp.name, key: imp.name, kind: 'import', preview: '', children: null },
+      seen,
+    );
   }
   return values;
 }
@@ -1365,7 +1388,10 @@ function everyField(entries: readonly TreeNode[] | undefined, at = 0): TreeNode[
     // item name from there, and a path through `[3]` would name one particular
     // service rather than the item.
     const home = entries[at] ?? first;
-    const kids = entry === home ? entry.children ?? [] : rebase(entry.children, entry.path, home.path) ?? [];
+    const kids =
+      entry === home
+        ? (entry.children ?? [])
+        : (rebase(entry.children, entry.path, home.path) ?? []);
     for (const child of kids) {
       if (seenKeys.has(child.key)) {
         continue;
@@ -1414,28 +1440,36 @@ function buildLoopNodes(
     const first = source?.kind === 'list' ? source.children?.[0] : null;
     // Which entry of the list the item is being read as. One list, one place
     // in it — the arrows on the row move it (see `nav` below).
-    const entries = source?.kind === 'list' ? source.children ?? [] : [];
+    const entries = source?.kind === 'list' ? (source.children ?? []) : [];
     const at = Math.min(Math.max(itemIndex?.[item] ?? 0, 0), Math.max(entries.length - 1, 0));
     const shown = entries[at] ?? first;
-    addUnique(loops, {
-      path: item,
-      key: item,
-      kind: first ? first.kind : 'loop item',
-      preview: shown ? shown.preview : '',
-      // What the arrows on this row say, and what they have to step through.
-      // Only when there is more than one entry to look at: a list of one, or a
-      // shape with no values behind it at all, has nowhere to go.
-      ...(entries.length > 1 ? { nav: { index: at, count: entries.length } } : {}),
-      // Re-rooted onto the item's name: `posts[0].title` is `post.title` here.
-      // Every entry contributes: a field the first one happens not to have — a
-      // campus on one service and not another — is still a field of the item,
-      // and leaving it out meant typing `service.campus` from memory to reach
-      // a value the picker was already holding.
-      children: shown ? rebase(everyField(entries, at), shown.path, item) : null,
-    }, seen);
+    addUnique(
+      loops,
+      {
+        path: item,
+        key: item,
+        kind: first ? first.kind : 'loop item',
+        preview: shown ? shown.preview : '',
+        // What the arrows on this row say, and what they have to step through.
+        // Only when there is more than one entry to look at: a list of one, or a
+        // shape with no values behind it at all, has nowhere to go.
+        ...(entries.length > 1 ? { nav: { index: at, count: entries.length } } : {}),
+        // Re-rooted onto the item's name: `posts[0].title` is `post.title` here.
+        // Every entry contributes: a field the first one happens not to have — a
+        // campus on one service and not another — is still a field of the item,
+        // and leaving it out meant typing `service.campus` from memory to reach
+        // a value the picker was already holding.
+        children: shown ? rebase(everyField(entries, at), shown.path, item) : null,
+      },
+      seen,
+    );
     const indexName = m[3];
     if (indexName !== undefined) {
-      addUnique(loops, { path: indexName, key: indexName, kind: 'number', preview: '0', children: null }, seen);
+      addUnique(
+        loops,
+        { path: indexName, key: indexName, kind: 'number', preview: '0', children: null },
+        seen,
+      );
     }
   }
   return loops;
@@ -1476,7 +1510,13 @@ export function dataTree(context: DataContext | null | undefined): TreeNode[] {
     ...derived.values,
     ...buildCollectionNodes(context?.collections ?? [], fm, imports, samples, seen),
   ];
-  const loops = buildLoopNodes(context?.ancestorHeads ?? [], props, values, context?.itemIndex, seen);
+  const loops = buildLoopNodes(
+    context?.ancestorHeads ?? [],
+    props,
+    values,
+    context?.itemIndex,
+    seen,
+  );
 
   // The loop item leads: inside a loop, it is what the markup is FOR — every
   // field in there is a field of that item. Then this file's props, then
@@ -1513,7 +1553,11 @@ export function listsOnly(nodes: readonly TreeNode[] | null | undefined): Pickab
 }
 
 // `posts[0].data.title` seen from inside the loop is `post.data.title`.
-function rebase(nodes: readonly TreeNode[] | null | undefined, from: string, to: string): TreeNode[] | null {
+function rebase(
+  nodes: readonly TreeNode[] | null | undefined,
+  from: string,
+  to: string,
+): TreeNode[] | null {
   if (!nodes) {
     return null;
   }

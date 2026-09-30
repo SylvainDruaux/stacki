@@ -12,15 +12,19 @@ const { JSDOM } = require('jsdom');
 const HOVER_WAIT_MS = 490;
 const COMPONENTS = [
   {
-    name: 'AccordionItem', folder: 'Interactive',
+    name: 'AccordionItem',
+    folder: 'Interactive',
     path: '/project/src/components/Interactive/AccordionItem.astro',
   },
   {
-    name: 'AccordionItem', folder: 'Marketing',
+    name: 'AccordionItem',
+    folder: 'Marketing',
     path: '/project/src/components/Marketing/AccordionItem.astro',
   },
   {
-    name: 'Base', folder: 'layouts', isLayout: true,
+    name: 'Base',
+    folder: 'layouts',
+    isLayout: true,
     path: '/project/src/layouts/Base.astro',
   },
 ];
@@ -28,7 +32,8 @@ const COMPONENTS = [
 test('hover preview targets exact files and cancels obsolete delayed opens', async () => {
   const bundle = await buildPalette();
   const dom = new JSDOM('<!doctype html><div id="root"></div>', {
-    url: 'http://localhost/', pretendToBeVisual: true,
+    url: 'http://localhost/',
+    pretendToBeVisual: true,
   });
   global.window = dom.window;
   for (const name of ['document', 'navigator', 'HTMLElement', 'Element', 'Node']) {
@@ -42,14 +47,18 @@ test('hover preview targets exact files and cancels obsolete delayed opens', asy
   const inserted = [];
   const context = { dom, act: React.act, hoveredItem: undefined };
   try {
-    await React.act(async () => root.render(React.createElement(Palette, {
-      components: COMPONENTS,
-      devUrl: 'http://localhost:4321',
-      trailingSlash: 'always',
-      onInsert: (name) => inserted.push(name),
-      onCreateComponent() {},
-      createFrom: { kind: 'unavailable', reason: 'Select an element.' },
-    })));
+    await React.act(async () =>
+      root.render(
+        React.createElement(Palette, {
+          components: COMPONENTS,
+          devUrl: 'http://localhost:4321',
+          trailingSlash: 'always',
+          onInsert: (name) => inserted.push(name),
+          onCreateComponent() {},
+          createFrom: { kind: 'unavailable', reason: 'Select an element.' },
+        }),
+      ),
+    );
     await checkCancelledHover(context);
     const interactiveFrame = await checkPreviewTarget(
       context,
@@ -108,10 +117,12 @@ async function checkPreviewTarget(context, folder, componentPath) {
   const preview = document.querySelector('.comp-preview');
   assert.equal(preview.style.visibility, 'hidden', 'The box waits for rendered preview content');
   await context.act(async () => {
-    window.dispatchEvent(new context.dom.window.MessageEvent('message', {
-      source: iframe.contentWindow,
-      data: { type: 'avb:component-preview', status: 'unknown' },
-    }));
+    window.dispatchEvent(
+      new context.dom.window.MessageEvent('message', {
+        source: iframe.contentWindow,
+        data: { type: 'avb:component-preview', status: 'unknown' },
+      }),
+    );
   });
   assert.equal(preview.style.visibility, 'hidden', 'Malformed preview status is ignored');
   await sendPreviewStatus(context, iframe, 'ready');
@@ -121,18 +132,23 @@ async function checkPreviewTarget(context, folder, componentPath) {
 
 async function sendPreviewStatus(context, iframe, status) {
   await context.act(async () => {
-    window.dispatchEvent(new context.dom.window.MessageEvent('message', {
-      source: iframe.contentWindow,
-      data: { type: 'avb:component-preview', status },
-    }));
+    window.dispatchEvent(
+      new context.dom.window.MessageEvent('message', {
+        source: iframe.contentWindow,
+        data: { type: 'avb:component-preview', status },
+      }),
+    );
   });
 }
 
 async function pointerEvent({ dom, act }, item, type) {
   await act(async () => {
-    item.dispatchEvent(new dom.window.MouseEvent(type, {
-      bubbles: true, relatedTarget: document.body,
-    }));
+    item.dispatchEvent(
+      new dom.window.MouseEvent(type, {
+        bubbles: true,
+        relatedTarget: document.body,
+      }),
+    );
   });
 }
 

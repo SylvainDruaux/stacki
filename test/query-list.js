@@ -22,7 +22,9 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
+  if (!condition) {
+    failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  }
 };
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -73,30 +75,44 @@ const SHEET = `.card {
     check(
       'a query written twice is counted twice',
       countAtRuleQuery(region, '@media (prefers-reduced-motion: reduce)') === 2,
-      String(countAtRuleQuery(region, '@media (prefers-reduced-motion: reduce)'))
+      String(countAtRuleQuery(region, '@media (prefers-reduced-motion: reduce)')),
     );
-    const n = renameAtRuleQuery(region, '@media (prefers-reduced-motion: reduce)', '@media (prefers-reduced-motion: no-preference)');
+    const n = renameAtRuleQuery(
+      region,
+      '@media (prefers-reduced-motion: reduce)',
+      '@media (prefers-reduced-motion: no-preference)',
+    );
     const out = region.root.toString();
     check('both blocks are renamed in one pass', n === 2, `${n} renamed`);
+    check('including the one nested inside a rule', !/: reduce\)/.test(out), out);
     check(
-      'including the one nested inside a rule',
-      !/: reduce\)/.test(out),
-      out
+      'and the new condition is what got written',
+      (out.match(/no-preference/g) || []).length === 2,
+      out,
     );
-    check('and the new condition is what got written', (out.match(/no-preference/g) || []).length === 2, out);
-    check('the rules inside are untouched', /transition: none/.test(out) && /animation: none/.test(out), out);
+    check(
+      'the rules inside are untouched',
+      /transition: none/.test(out) && /animation: none/.test(out),
+      out,
+    );
     check('an unrelated query is left alone', /@container \(width > 40em\)/.test(out), out);
     check(
       "and so is everybody else's formatting",
       /\.card \{\n  color: red;\n\}/.test(out),
-      JSON.stringify(out.slice(0, 40))
+      JSON.stringify(out.slice(0, 40)),
     );
 
     // Spelled differently in two places, meant the same in both.
-    const spaced = regionOf('@media (width>=64rem){.a{color:red}}\n@MEDIA (width >= 64rem) { .b { color: blue } }\n');
+    const spaced = regionOf(
+      '@media (width>=64rem){.a{color:red}}\n@MEDIA (width >= 64rem) { .b { color: blue } }\n',
+    );
     const m = renameAtRuleQuery(spaced, '@media (width >= 64rem)', '@media (width >= 48rem)');
     check('whitespace and case in the at-name do not hide a match', m === 2, `${m} renamed`);
-    check('both come out with the new condition', (spaced.root.toString().match(/48rem/g) || []).length === 2, spaced.root.toString());
+    check(
+      'both come out with the new condition',
+      (spaced.root.toString().match(/48rem/g) || []).length === 2,
+      spaced.root.toString(),
+    );
 
     // A query can become another KIND of query — the field takes anything.
     const kind = regionOf('@media (width > 30em) { .a { color: red } }');
@@ -104,17 +120,29 @@ const SHEET = `.card {
     check(
       'and can be changed into a container query',
       /@container card \(width > 30em\)/.test(kind.root.toString()),
-      kind.root.toString()
+      kind.root.toString(),
     );
 
     // Renaming something the file doesn't have changes nothing, and says so.
     const miss = regionOf('@media (width > 30em) { .a { color: red } }');
-    check('a query that is not there renames nothing', renameAtRuleQuery(miss, '@media print', '@media screen') === 0);
-    check('and the file is left exactly as it was', miss.root.toString() === '@media (width > 30em) { .a { color: red } }', miss.root.toString());
+    check(
+      'a query that is not there renames nothing',
+      renameAtRuleQuery(miss, '@media print', '@media screen') === 0,
+    );
+    check(
+      'and the file is left exactly as it was',
+      miss.root.toString() === '@media (width > 30em) { .a { color: red } }',
+      miss.root.toString(),
+    );
 
     // Text that isn't an at-rule can't be written into the file.
     check('a query has to start with @', splitQuery('width < 40em') === null);
-    check('and is split into the parts postcss holds', JSON.stringify(splitQuery('@media (width < 40em)')) === '{"name":"media","params":"(width < 40em)"}', JSON.stringify(splitQuery('@media (width < 40em)')));
+    check(
+      'and is split into the parts postcss holds',
+      JSON.stringify(splitQuery('@media (width < 40em)')) ===
+        '{"name":"media","params":"(width < 40em)"}',
+      JSON.stringify(splitQuery('@media (width < 40em)')),
+    );
   }
 
   // ── Where each query sits in the list ─────────────────────────────────────
@@ -134,7 +162,12 @@ const SHEET = `.card {
     const { buildStyleContexts } = require(nsBundle);
     // The far-away query is listed FIRST — if order alone decided, it would stay
     // first.
-    const keys = ['', '@media (prefers-contrast: more)', '@container (width > 40em)', '@media (width > 90em)'];
+    const keys = [
+      '',
+      '@media (prefers-contrast: more)',
+      '@container (width > 40em)',
+      '@media (width > 90em)',
+    ];
     const styled = new Set(keys.slice(1));
     const own = new Set(['@container (width > 40em)', '@media (width > 90em)']);
     const labels = buildStyleContexts(keys, null, null, styled, own).map((c) => c.label);
@@ -142,17 +175,28 @@ const SHEET = `.card {
     check('Base leads the list', labels[0] === 'Base', labels.join(' | '));
     check(
       "the component's own queries come first",
-      idx(/width > 40em/) < idx(/prefers-contrast/) && idx(/width > 90em/) < idx(/prefers-contrast/),
-      labels.join(' | ')
+      idx(/width > 40em/) < idx(/prefers-contrast/) &&
+        idx(/width > 90em/) < idx(/prefers-contrast/),
+      labels.join(' | '),
     );
     check(
       'and among its own, the order the file has them is kept',
       idx(/width > 40em/) < idx(/width > 90em/),
-      labels.join(' | ')
+      labels.join(' | '),
     );
     // With nothing owned, the list is what it always was.
     const plain = buildStyleContexts(keys, null, null, styled, new Set()).map((c) => c.label);
-    check('with no component queries at all, order is left alone', plain.join('|') === ['Base', '@media (prefers-contrast: more)', '@container (width > 40em)', '@media (width > 90em)'].join('|'), plain.join(' | '));
+    check(
+      'with no component queries at all, order is left alone',
+      plain.join('|') ===
+        [
+          'Base',
+          '@media (prefers-contrast: more)',
+          '@container (width > 40em)',
+          '@media (width > 90em)',
+        ].join('|'),
+      plain.join(' | '),
+    );
   }
 
   // ── The dropdown ──────────────────────────────────────────────────────────
@@ -185,15 +229,29 @@ const SHEET = `.card {
   global.getComputedStyle = dom.window.getComputedStyle.bind(dom.window);
   global.requestAnimationFrame = dom.window.requestAnimationFrame.bind(dom.window);
   global.cancelAnimationFrame = dom.window.cancelAnimationFrame.bind(dom.window);
-  class RO { observe() {} unobserve() {} disconnect() {} }
+  class RO {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  }
   global.ResizeObserver = RO;
   dom.window.ResizeObserver = RO;
   dom.window.Element.prototype.scrollIntoView = function () {};
 
-  const FILE = { rel: 'src/styles/main.css', name: 'main.css', path: '/p/src/styles/main.css', size: 10 };
+  const FILE = {
+    rel: 'src/styles/main.css',
+    name: 'main.css',
+    path: '/p/src/styles/main.css',
+    size: 10,
+  };
   // A second stylesheet, further from the element than the one being written
   // into: it styles `.plain` inside a query of its own.
-  const OTHER = { rel: 'src/styles/late.css', name: 'late.css', path: '/p/src/styles/late.css', size: 10 };
+  const OTHER = {
+    rel: 'src/styles/late.css',
+    name: 'late.css',
+    path: '/p/src/styles/late.css',
+    size: 10,
+  };
   const LATE = '@container (width > 90em) {\n  .plain { color: green }\n}\n';
   let onDisk = SHEET;
   const writes = [];
@@ -202,7 +260,11 @@ const SHEET = `.card {
     listAstroStyleFiles: async () => ({ files: [] }),
     listAssets: async () => ({ entries: [] }),
     readStyleFile: async (filePath) => ({ css: filePath === OTHER.path ? LATE : onDisk }),
-    writeStyleFile: async ({ css }) => { writes.push(css); onDisk = css; return { ok: true } },
+    writeStyleFile: async ({ css }) => {
+      writes.push(css);
+      onDisk = css;
+      return { ok: true };
+    },
   };
 
   const React = require('react');
@@ -212,7 +274,14 @@ const SHEET = `.card {
   // `.plain` has a rule in this sheet, but no styles in either query.
   setHost({
     projectPath: '/p',
-    nodes: [{ id: 'n1', kind: 'element', name: 'div', props: { class: { type: 'string', value: 'plain' } } }],
+    nodes: [
+      {
+        id: 'n1',
+        kind: 'element',
+        name: 'div',
+        props: { class: { type: 'string', value: 'plain' } },
+      },
+    ],
     selectedId: 'n1',
     files: [FILE, OTHER],
     astroFiles: [],
@@ -226,7 +295,9 @@ const SHEET = `.card {
 
   const doc = dom.window.document;
   const openList = async () => {
-    const trigger = [...host.querySelectorAll('button')].find((b) => /Base/.test(b.textContent || ''));
+    const trigger = [...host.querySelectorAll('button')].find((b) =>
+      /Base/.test(b.textContent || ''),
+    );
     trigger?.click();
     await wait(120);
   };
@@ -239,20 +310,25 @@ const SHEET = `.card {
   check('the dropdown opens', options.length > 0, `${options.length} options`);
   check('Base is offered', has(/^Base/), options.join(' | '));
   check(
-    "a query the file uses is offered, though this element has nothing in it",
+    'a query the file uses is offered, though this element has nothing in it',
     has(/prefers-reduced-motion/),
-    options.join(' | ')
+    options.join(' | '),
   );
   check('and so is a container query', has(/width > 40em|container/), options.join(' | '));
   check('adding a new one is still offered', has(/Add query/i), options.join(' | '));
   // A query from another stylesheet is reachable too, but it isn't what's being
   // worked on — the open file's own queries lead.
-  check('a query from another stylesheet is offered as well', has(/width > 90em/), options.join(' | '));
+  check(
+    'a query from another stylesheet is offered as well',
+    has(/width > 90em/),
+    options.join(' | '),
+  );
   const rowAt = (re) => options.findIndex((o) => re.test(o));
   check(
     "this file's queries come before another file's",
-    rowAt(/width > 40em/) < rowAt(/width > 90em/) && rowAt(/prefers-reduced-motion/) < rowAt(/width > 90em/),
-    options.join(' | ')
+    rowAt(/width > 40em/) < rowAt(/width > 90em/) &&
+      rowAt(/prefers-reduced-motion/) < rowAt(/width > 90em/),
+    options.join(' | '),
   );
   check('and Base still leads', rowAt(/^Base/) === 0, options.join(' | '));
 
@@ -261,7 +337,11 @@ const SHEET = `.card {
   const pencil = (row) => row?.querySelector('.u-select-action');
   check('Base has nothing to rename', !pencil(rowFor(/^\s*Base/)), 'Base offered an edit control');
   const motionRow = rowFor(/prefers-reduced-motion/);
-  check('a query the file holds offers an edit control', !!pencil(motionRow), rowText().join(' | '));
+  check(
+    'a query the file holds offers an edit control',
+    !!pencil(motionRow),
+    rowText().join(' | '),
+  );
 
   pencil(motionRow)?.click();
   await wait(80);
@@ -269,28 +349,35 @@ const SHEET = `.card {
   check(
     'and does not switch the panel into that query',
     /Base/.test(host.querySelector('.embed-editor_context-select')?.textContent || ''),
-    host.querySelector('.embed-editor_context-select')?.textContent || ''
+    host.querySelector('.embed-editor_context-select')?.textContent || '',
   );
 
   const field = host.querySelector('[aria-label="Query"]');
-  check('a field opens holding the query', field?.value === '@media (prefers-reduced-motion: reduce)', field?.value);
+  check(
+    'a field opens holding the query',
+    field?.value === '@media (prefers-reduced-motion: reduce)',
+    field?.value,
+  );
   // A field holding a whole query has nothing to narrow — the list is there to
   // show what else this block could be, so it shows everything.
-  const suggested = () => [...host.querySelectorAll('.embed-editor_suggest-item')].map((b) => (b.textContent || '').trim());
+  const suggested = () =>
+    [...host.querySelectorAll('.embed-editor_suggest-item')].map((b) =>
+      (b.textContent || '').trim(),
+    );
   check(
     'with the whole query typed, the list still offers the others',
     suggested().length > 3,
-    suggested().join(' | ')
+    suggested().join(' | '),
   );
   check(
-    'including the file\'s other query',
+    "including the file's other query",
     suggested().some((s) => /width > 40em/.test(s)),
-    suggested().join(' | ')
+    suggested().join(' | '),
   );
   check(
     'and common ones it does not use yet',
     suggested().some((s) => /prefers-color-scheme/.test(s)),
-    suggested().join(' | ')
+    suggested().join(' | '),
   );
   // Size first: breakpoints are what this list is reached for, over and over,
   // while hover and the prefers-* queries are set once and left alone.
@@ -298,34 +385,39 @@ const SHEET = `.card {
   check(
     'a container query outranks a preference query',
     at(/width > 40em/) < at(/prefers-reduced-motion/),
-    suggested().join(' | ')
+    suggested().join(' | '),
   );
   check(
     'and a width query outranks hover',
     at(/min-width|width [<>]/) < at(/hover: hover/),
-    suggested().join(' | ')
+    suggested().join(' | '),
   );
   check(
-    'the file\'s own queries still come before the suggested ones',
+    "the file's own queries still come before the suggested ones",
     at(/width > 40em/) < at(/width < 50em/),
-    suggested().join(' | ')
+    suggested().join(' | '),
   );
   check(
     'saying how much a rename touches',
     /2 blocks/.test(host.querySelector('.embed-editor_add-query-count')?.textContent || ''),
-    host.querySelector('.embed-editor_add-query-count')?.textContent || ''
+    host.querySelector('.embed-editor_add-query-count')?.textContent || '',
   );
 
   // Type something the suggestion list never offered — the list is a shortcut,
   // not the set of allowed answers.
   const setValue = (el, value) => {
-    const setter = Object.getOwnPropertyDescriptor(dom.window.HTMLInputElement.prototype, 'value').set;
+    const setter = Object.getOwnPropertyDescriptor(
+      dom.window.HTMLInputElement.prototype,
+      'value',
+    ).set;
     setter.call(el, value);
     el.dispatchEvent(new dom.window.Event('input', { bubbles: true }));
   };
   setValue(field, '@media (prefers-reduced-motion: no-preference) and (width > 20em)');
   await wait(40);
-  const rename = [...host.querySelectorAll('button')].find((b) => /^Rename$/.test((b.textContent || '').trim()));
+  const rename = [...host.querySelectorAll('button')].find((b) =>
+    /^Rename$/.test((b.textContent || '').trim()),
+  );
   check('the rename button is there', !!rename, host.textContent?.slice(0, 200));
   rename?.click();
   await wait(400);
@@ -335,10 +427,14 @@ const SHEET = `.card {
   check(
     'every block that spelled the old query now spells the new one',
     (written.match(/no-preference\) and \(width > 20em\)/g) || []).length === 2,
-    written
+    written,
   );
   check('and none of them still says the old one', !/: reduce\)/.test(written), written);
-  check('the rules inside came through unchanged', /transition: none/.test(written) && /animation: none/.test(written), written);
+  check(
+    'the rules inside came through unchanged',
+    /transition: none/.test(written) && /animation: none/.test(written),
+    written,
+  );
   check('the other query is left alone', /@container \(width > 40em\)/.test(written), written);
 
   if (failures.length) {

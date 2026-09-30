@@ -27,7 +27,9 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
+  if (!condition) {
+    failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  }
 };
 
 const ROOT = path.join(__dirname, '..');
@@ -67,7 +69,7 @@ const ROOT_PATH = `${SCOPE}0.0.0`;
         ${instance('0.3', 'three')}
       </div>
     </body>`,
-    { url: 'http://localhost:4321/#avb-design', pretendToBeVisual: true }
+    { url: 'http://localhost:4321/#avb-design', pretendToBeVisual: true },
   );
   const { window } = dom;
   const NO_BOX = { x: 0, y: 0, width: 0, height: 0, left: 0, top: 0, right: 0, bottom: 0 };
@@ -131,7 +133,9 @@ const ROOT_PATH = `${SCOPE}0.0.0`;
     return sent.filter((m) => m.type === 'avb:click-node').pop();
   };
   const actionFor = (msg, focusPath = '0.2') =>
-    msg ? canvasClickAction({ path: msg.path, outside: !!msg.outside, focusPath, scope: SCOPE }).kind : '(nothing reported)';
+    msg
+      ? canvasClickAction({ path: msg.path, outside: !!msg.outside, focusPath, scope: SCOPE }).kind
+      : '(nothing reported)';
 
   // --- the report ---------------------------------------------------------------
   {
@@ -146,7 +150,11 @@ const ROOT_PATH = `${SCOPE}0.0.0`;
   {
     open('0.1');
     const msg = clickOn(buttons[0]);
-    check('the instance with a marker pair is placed too', msg?.path === ROOT_PATH, JSON.stringify(msg));
+    check(
+      'the instance with a marker pair is placed too',
+      msg?.path === ROOT_PATH,
+      JSON.stringify(msg),
+    );
     check('and selects', actionFor(msg, '0.1') === 'inner', actionFor(msg, '0.1'));
     open('0.2');
   }
@@ -158,14 +166,18 @@ const ROOT_PATH = `${SCOPE}0.0.0`;
   // instance, and it is what the dimming has been saying all along.
   {
     const msg = clickOn(buttons[2]);
-    check('a click on another copy leaves the component', actionFor(msg) === 'close', JSON.stringify(msg));
+    check(
+      'a click on another copy leaves the component',
+      actionFor(msg) === 'close',
+      JSON.stringify(msg),
+    );
   }
 
   // The tag has to still be ON the element — this is what was being taken away.
   check(
     'every instance still carries the component’s own path',
     buttons.every((b) => (b.getAttribute('data-avb-p') || '').split(' ').includes(ROOT_PATH)),
-    buttons.map((b) => b.getAttribute('data-avb-p')).join(' | ')
+    buttons.map((b) => b.getAttribute('data-avb-p')).join(' | '),
   );
 
   // --- and what the withdrawing was for -------------------------------------------
@@ -194,7 +206,7 @@ const ROOT_PATH = `${SCOPE}0.0.0`;
     check(
       'a node inside a region is tagged for it',
       (first.getAttribute('data-avb-p') || '').includes(OTHER),
-      String(first.getAttribute('data-avb-p'))
+      String(first.getAttribute('data-avb-p')),
     );
 
     // The region is somewhere else now — that tag is stale, and it is ours.
@@ -202,22 +214,24 @@ const ROOT_PATH = `${SCOPE}0.0.0`;
     check(
       'and loses the tag once the region holds something else',
       !(first.getAttribute('data-avb-p') || '').includes(OTHER),
-      String(first.getAttribute('data-avb-p'))
+      String(first.getAttribute('data-avb-p')),
     );
     check(
       'which the node it moved to now carries',
       (second.getAttribute('data-avb-p') || '').includes(OTHER),
-      String(second.getAttribute('data-avb-p'))
+      String(second.getAttribute('data-avb-p')),
     );
     check(
       'while the markup’s own tags are left alone',
       buttons.every((b) => (b.getAttribute('data-avb-p') || '').split(' ').includes(ROOT_PATH)),
-      buttons.map((b) => b.getAttribute('data-avb-p')).join(' | ')
+      buttons.map((b) => b.getAttribute('data-avb-p')).join(' | '),
     );
   }
 
   if (failures.length) {
-    console.error(`\nopened-click: ${failures.length} failed, ${checked - failures.length} passed\n`);
+    console.error(
+      `\nopened-click: ${failures.length} failed, ${checked - failures.length} passed\n`,
+    );
     console.error(failures.join('\n') + '\n');
     process.exit(1);
   }

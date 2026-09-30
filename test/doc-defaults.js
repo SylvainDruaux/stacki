@@ -23,12 +23,14 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
+  if (!condition) {
+    failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  }
 };
 
 const schemaFor = (doc) =>
   parsePropSchema(
-    `---\ninterface Props {\n  /** ${doc} */\n  thing?: string;\n}\nconst { thing } = Astro.props;\n---\n<div>{thing}</div>\n`
+    `---\ninterface Props {\n  /** ${doc} */\n  thing?: string;\n}\nconst { thing } = Astro.props;\n---\n<div>{thing}</div>\n`,
   );
 
 const field = (doc) => {
@@ -57,11 +59,19 @@ for (const [label, doc] of [
 
 // Prose naming one value still needs a joining word to read as conditional.
 const prose = field('Output format. Defaults to webp or svg for SVG sources.');
-check('unbackticked prose still reads as conditional', prose.default === undefined, JSON.stringify(prose));
+check(
+  'unbackticked prose still reads as conditional',
+  prose.default === undefined,
+  JSON.stringify(prose),
+);
 
 // A decimal inside backticks is one value, not a sentence that ended early.
 const decimal = field('How far. Defaults to `1.5`.');
-check('a decimal is one value', decimal.default === 1.5 || decimal.default === '1.5', JSON.stringify(decimal));
+check(
+  'a decimal is one value',
+  decimal.default === 1.5 || decimal.default === '1.5',
+  JSON.stringify(decimal),
+);
 
 // A prop written in several branches of a union has one answer per branch,
 // and the branch is decided by props the panel already knows. The field
@@ -83,19 +93,25 @@ const union = parsePropSchema(
     'const { variant, label } = Astro.props;',
     '---',
     '<button>{label}{variant}</button>',
-  ].join('\n')
+  ].join('\n'),
 );
 const unionList = Array.isArray(union) ? union : [...(union?.values?.() ?? [])];
 const labelField = unionList.find((f) => f.name === 'label') || {};
 const table = (labelField.unions || []).find((u) => u.names.includes('label'));
 
-check('the field claims no default of its own', labelField.default === undefined, JSON.stringify(labelField.default));
+check(
+  'the field claims no default of its own',
+  labelField.default === undefined,
+  JSON.stringify(labelField.default),
+);
 check('the union is reported', !!table, JSON.stringify(labelField.unions));
 if (table) {
   const byVariant = {};
   for (const b of table.branches) {
     const pinned = (b.pins.variant || [])[0];
-    if (pinned) {byVariant[pinned] = b.defaults?.label;}
+    if (pinned) {
+      byVariant[pinned] = b.defaults?.label;
+    }
   }
   check('play branch falls back to Play', byVariant.play === 'Play', JSON.stringify(byVariant));
   check('close branch falls back to Close', byVariant.close === 'Close', JSON.stringify(byVariant));
@@ -120,7 +136,9 @@ const ruleFor = (doc) => {
     '<button>{label}{variant}{direction}</button>',
   ].join('\n');
   const list = [...parsePropSchema(src).values()];
-  const table = (list.find((f) => f.name === 'label')?.unions || []).find((u) => u.names.includes('label'));
+  const table = (list.find((f) => f.name === 'label')?.unions || []).find((u) =>
+    u.names.includes('label'),
+  );
   const arrow = (table?.branches || []).find((b) => (b.pins.variant || []).includes('arrow'));
   return arrow?.rules?.label;
 };
@@ -130,11 +148,19 @@ check('a named condition becomes a rule', !!named, JSON.stringify(named));
 if (named) {
   check('the rule reads its prop', named.prop === 'direction', JSON.stringify(named));
   check('the rule reads the value it turns on', named.is === 'back', JSON.stringify(named));
-  check('the rule reads both answers', named.then === 'Previous' && named.otherwise === 'Next', JSON.stringify(named));
+  check(
+    'the rule reads both answers',
+    named.then === 'Previous' && named.otherwise === 'Next',
+    JSON.stringify(named),
+  );
 }
 
 const bare = ruleFor('What it says. Defaults to `Play`, or `Pause` when pressed.');
-check('a bare boolean condition reads as true', bare && bare.prop === 'pressed' && bare.is === 'true', JSON.stringify(bare));
+check(
+  'a bare boolean condition reads as true',
+  bare && bare.prop === 'pressed' && bare.is === 'true',
+  JSON.stringify(bare),
+);
 
 // A clause with two answers but no prop named stays a hint, since there is
 // nothing to weigh it against.
@@ -162,13 +188,13 @@ const shared = parsePropSchema(
     'const { variant, label } = Astro.props;',
     '---',
     '<button>{label}{variant}</button>',
-  ].join('\n')
+  ].join('\n'),
 );
 const sharedLabel = [...shared.values()].find((f) => f.name === 'label') || {};
 check(
   'the tip keeps what every branch says',
   sharedLabel.doc === 'What it says.',
-  JSON.stringify(sharedLabel.doc)
+  JSON.stringify(sharedLabel.doc),
 );
 
 // One branch, one doc: nothing is trimmed.
@@ -182,13 +208,13 @@ const single = parsePropSchema(
     'const { format } = Astro.props;',
     '---',
     '<img alt="" data-f={format} />',
-  ].join('\n')
+  ].join('\n'),
 );
 const only = [...single.values()].find((f) => f.name === 'format') || {};
 check(
   'a prop declared once keeps its whole doc',
   only.doc === 'Output format. Defaults to `webp`.',
-  JSON.stringify(only.doc)
+  JSON.stringify(only.doc),
 );
 
 // A branch can allow fewer values than the prop as a whole. The alias naming
@@ -204,17 +230,29 @@ const narrowed = parsePropSchema(
     'const { variant, emphasis } = Astro.props;',
     '---',
     '<button>{variant}{emphasis}</button>',
-  ].join('\n')
+  ].join('\n'),
 );
 const emphasis = [...narrowed.values()].find((f) => f.name === 'emphasis') || {};
 const emTable = (emphasis.unions || []).find((u) => u.names.includes('emphasis'));
 const pinFor = (v) =>
   (emTable?.branches || []).find((b) => (b.pins.variant || []).includes(v))?.pins?.emphasis;
 
-check('every value is still offered by the prop', (emphasis.options || []).length === 3, JSON.stringify(emphasis.options));
+check(
+  'every value is still offered by the prop',
+  (emphasis.options || []).length === 3,
+  JSON.stringify(emphasis.options),
+);
 check('an alias behind a branch still pins it', !!pinFor('close'), JSON.stringify(pinFor('close')));
-check('the narrow branch drops link', pinFor('close') && !pinFor('close').includes('link'), JSON.stringify(pinFor('close')));
-check('the wide branch keeps link', (pinFor('main') || []).includes('link'), JSON.stringify(pinFor('main')));
+check(
+  'the narrow branch drops link',
+  pinFor('close') && !pinFor('close').includes('link'),
+  JSON.stringify(pinFor('close')),
+);
+check(
+  'the wide branch keeps link',
+  (pinFor('main') || []).includes('link'),
+  JSON.stringify(pinFor('main')),
+);
 
 if (failures.length) {
   console.error(`\ndoc-defaults: ${failures.length} failed, ${checked - failures.length} passed\n`);

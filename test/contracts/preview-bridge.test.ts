@@ -429,10 +429,7 @@ function markerPlugin(config: unknown, name: string): MarkerPlugin {
   assert.ok(Array.isArray(plugins));
   const found: unknown = plugins.find(
     (plugin: unknown) =>
-      typeof plugin === 'object' &&
-      plugin !== null &&
-      'name' in plugin &&
-      plugin.name === name,
+      typeof plugin === 'object' && plugin !== null && 'name' in plugin && plugin.name === name,
   );
   assert.ok(typeof found === 'object' && found !== null && 'load' in found);
   const load: unknown = found.load;

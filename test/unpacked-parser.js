@@ -31,12 +31,14 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
+  if (!condition) {
+    failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  }
 };
 
 const ROOT = path.join(__dirname, '..');
 const ENTRIES = ['astroParser.js', 'componentPreview.js', 'previewMarkers.js'].map((name) =>
-  path.join('dist', 'electron', name)
+  path.join('dist', 'electron', name),
 );
 
 // Every local file the entry pulls in, transitively. Only relative requires:
@@ -44,14 +46,22 @@ const ENTRIES = ['astroParser.js', 'componentPreview.js', 'previewMarkers.js'].m
 // which this parser deliberately has none of.
 function closureOf(rel, seen = new Set()) {
   rel = rel.split(path.sep).join('/');
-  if (seen.has(rel)) {return seen;}
+  if (seen.has(rel)) {
+    return seen;
+  }
   seen.add(rel);
   const source = fs.readFileSync(path.join(ROOT, rel), 'utf8');
   for (const m of source.matchAll(/require\(\s*['"](\.[^'"]+)['"]\s*\)/g)) {
     let next = path.join(path.dirname(rel), m[1]).split(path.sep).join('/');
-    if (!fs.existsSync(path.join(ROOT, next))) {next += '.js';}
     if (!fs.existsSync(path.join(ROOT, next))) {
-      check(`the require ${JSON.stringify(m[1])} in ${rel} resolves`, false, 'nothing on disk answers to it');
+      next += '.js';
+    }
+    if (!fs.existsSync(path.join(ROOT, next))) {
+      check(
+        `the require ${JSON.stringify(m[1])} in ${rel} resolves`,
+        false,
+        'nothing on disk answers to it',
+      );
       continue;
     }
     closureOf(next, seen);
@@ -60,15 +70,22 @@ function closureOf(rel, seen = new Set()) {
 }
 
 const covers = (pattern, rel) => {
-  if (pattern === rel) {return true;}
+  if (pattern === rel) {
+    return true;
+  }
   // The globs electron-builder takes, as far as this needs to read them.
   const re = new RegExp(
     '^' +
       pattern
         .split('**')
-        .map((part) => part.split('*').map((p) => p.replace(/[.+^${}()|[\]\\]/g, '\\$&')).join('[^/]*'))
+        .map((part) =>
+          part
+            .split('*')
+            .map((p) => p.replace(/[.+^${}()|[\]\\]/g, '\\$&'))
+            .join('[^/]*'),
+        )
         .join('.*') +
-      '$'
+      '$',
   );
   return re.test(rel);
 };
@@ -79,15 +96,17 @@ const files = [...ENTRIES.reduce((seen, entry) => closureOf(entry, seen), new Se
 const main = fs.readFileSync(path.join(ROOT, 'dist', 'electron', 'main.js'), 'utf8');
 
 for (const entry of ENTRIES) {
-  check(`${entry} is referenced by the generated preview configuration`,
-    main.includes(path.basename(entry)));
+  check(
+    `${entry} is referenced by the generated preview configuration`,
+    main.includes(path.basename(entry)),
+  );
   check(`${entry} pulls in its supporting modules`, closureOf(entry).size > 1);
 }
 for (const rel of files) {
   check(
     `${rel} is unpacked, so plain Node can read it`,
     patterns.some((p) => covers(p, rel)),
-    `no asarUnpack pattern covers it — ${patterns.join(' , ')}`
+    `no asarUnpack pattern covers it — ${patterns.join(' , ')}`,
   );
 }
 
@@ -111,7 +130,10 @@ for (const rel of files) {
         encoding: 'utf8',
       });
     } catch (err) {
-      error = String(err.stderr || err.message).split('\n').find((l) => /Error/.test(l)) || 'it threw';
+      error =
+        String(err.stderr || err.message)
+          .split('\n')
+          .find((l) => /Error/.test(l)) || 'it threw';
     }
     check(`the unpacked ${entry} copy loads on its own`, !error, error);
   }
@@ -119,7 +141,9 @@ for (const rel of files) {
 }
 
 if (failures.length) {
-  console.error(`\nunpacked-parser: ${failures.length} failed, ${checked - failures.length} passed\n`);
+  console.error(
+    `\nunpacked-parser: ${failures.length} failed, ${checked - failures.length} passed\n`,
+  );
   console.error(failures.join('\n') + '\n');
   process.exit(1);
 }

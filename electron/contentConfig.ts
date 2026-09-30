@@ -50,7 +50,9 @@ function configPathOf(projectPath: string): { abs: string; rel: string } | null 
 // own) keeps us on the version the project already runs. The build surface
 // used here is the one every esbuild version this app supports exposes.
 interface ProjectEsbuild {
-  build(options: Record<string, unknown>): Promise<{ metafile?: { inputs?: Record<string, unknown> } }>;
+  build(
+    options: Record<string, unknown>,
+  ): Promise<{ metafile?: { inputs?: Record<string, unknown> } }>;
 }
 
 function isProjectEsbuild(input: unknown): input is ProjectEsbuild {
@@ -76,7 +78,8 @@ function esbuildOf(projectPath: string): ProjectEsbuild | null {
 // The generated bundle lives in the project so that `astro/zod` — left
 // external, so the config and our stubs share one zod instance — resolves
 // against the project's node_modules.
-const workDirOf = (projectPath: string): string => path.join(projectPath, 'node_modules', '.stacki');
+const workDirOf = (projectPath: string): string =>
+  path.join(projectPath, 'node_modules', '.stacki');
 
 // The stubs are copied into the project rather than bundled from where they
 // sit, because in a packaged build they sit inside app.asar, which esbuild (a
@@ -84,7 +87,12 @@ const workDirOf = (projectPath: string): string => path.join(projectPath, 'node_
 function stageRunner(projectPath: string, configAbs: string): { dir: string; entry: string } {
   const dir = workDirOf(projectPath);
   fs.mkdirSync(dir, { recursive: true });
-  for (const name of ['stub-astro-content.mjs', 'stub-astro-loaders.mjs', 'schemaTools.mjs', 'introspect.mjs']) {
+  for (const name of [
+    'stub-astro-content.mjs',
+    'stub-astro-loaders.mjs',
+    'schemaTools.mjs',
+    'introspect.mjs',
+  ]) {
     fs.writeFileSync(
       path.join(dir, name),
       fs.readFileSync(path.join(__dirname, 'content', name), 'utf8'),
@@ -337,8 +345,13 @@ async function startService(service: Service): Promise<Service> {
     });
     child.on('error', fail);
     child.stdin.on('error', fail);
-    child.on('exit', () => fail(new Error(cleanError(service.stderr) || 'The content config could not be read.')));
-    service.timer = setTimeout(() => fail(new Error('Reading the content config timed out.')), RUN_TIMEOUT);
+    child.on('exit', () =>
+      fail(new Error(cleanError(service.stderr) || 'The content config could not be read.')),
+    );
+    service.timer = setTimeout(
+      () => fail(new Error('Reading the content config timed out.')),
+      RUN_TIMEOUT,
+    );
     service.timer.unref?.();
     service.manifest = await manifest;
     if (service.stopped) {
@@ -356,7 +369,10 @@ async function startService(service: Service): Promise<Service> {
 
 // Publish the pending service before doing any asynchronous work. Readers and
 // validation requests then share its bundle, process, and completed manifest.
-function serviceFor(projectPath: string, { force = false }: { readonly force?: boolean } = {}): Promise<Service | null> {
+function serviceFor(
+  projectPath: string,
+  { force = false }: { readonly force?: boolean } = {},
+): Promise<Service | null> {
   const found = configPathOf(projectPath);
   const existing = services.get(projectPath);
   if (!found) {
@@ -408,7 +424,10 @@ export type ContentConfigResult =
  * { collections: [...] } for a project, { missing: true } when it has no
  * content config, or { error } when the config could not be read.
  */
-async function readContentConfig(projectPath: string, { force = false }: { readonly force?: boolean } = {}): Promise<ContentConfigResult> {
+async function readContentConfig(
+  projectPath: string,
+  { force = false }: { readonly force?: boolean } = {},
+): Promise<ContentConfigResult> {
   const found = configPathOf(projectPath);
   if (!found) {
     stopService(projectPath);
@@ -421,7 +440,11 @@ async function readContentConfig(projectPath: string, { force = false }: { reado
     // noise the caller never read.
     return { collections: toArray(manifest['collections']) ?? [], configPath: found.rel };
   } catch (err) {
-    return { collections: [], configPath: found.rel, error: cleanError(err instanceof Error ? err.message : err) };
+    return {
+      collections: [],
+      configPath: found.rel,
+      error: cleanError(err instanceof Error ? err.message : err),
+    };
   }
 }
 
@@ -458,12 +481,16 @@ async function validateEntry(
         service?.pending.delete(id);
         callback(value);
       };
-      const timer = setTimeout(() => finish(reject, new Error('Checking the entry timed out.')), RUN_TIMEOUT);
+      const timer = setTimeout(
+        () => finish(reject, new Error('Checking the entry timed out.')),
+        RUN_TIMEOUT,
+      );
       timer.unref?.();
       service.pending.set(id, {
         // The child's reply is an object or nothing; the boundary narrows it.
         resolve: (value) => finish(resolve, toRecord(value) ?? {}),
-        reject: (error) => finish(reject, error instanceof Error ? error : new Error(String(error))),
+        reject: (error) =>
+          finish(reject, error instanceof Error ? error : new Error(String(error))),
       });
       try {
         service.child?.stdin?.write(message, (error) => {

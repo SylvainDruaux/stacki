@@ -1,9 +1,9 @@
-import { useEffect, useRef, useState } from 'react'
-import type { ReactNode } from 'react'
-import VariableConnect from '../VariableConnect'
-import { handleArrowStep } from '../lib/number-step'
-import { commitInPlace } from '../lib/commit-in-place'
-import useScrub from './useScrub'
+import { useEffect, useRef, useState } from 'react';
+import type { ReactNode } from 'react';
+import VariableConnect from '../VariableConnect';
+import { handleArrowStep } from '../lib/number-step';
+import { commitInPlace } from '../lib/commit-in-place';
+import useScrub from './useScrub';
 
 // The panel's value field.
 //
@@ -25,65 +25,111 @@ import useScrub from './useScrub'
 // out of the field it belongs to.
 
 export default function LiveInput({
-  value, busy, readOnly = false, ariaLabel, placeholder, prop, suffix, min, wrapClassName = 'embed-editor_field',
-  onLive, onCommit, onVariablePick,
+  value,
+  busy,
+  readOnly = false,
+  ariaLabel,
+  placeholder,
+  prop,
+  suffix,
+  min,
+  wrapClassName = 'embed-editor_field',
+  onLive,
+  onCommit,
+  onVariablePick,
 }: {
-  value: string
-  busy: boolean
-  readOnly?: boolean
-  ariaLabel: string
-  placeholder?: string
+  value: string;
+  busy: boolean;
+  readOnly?: boolean;
+  ariaLabel: string;
+  placeholder?: string;
   /** The CSS property being edited — filters the variable picker (a colour
    *  property offers Color variables; a length offers sizes). */
-  prop: string
+  prop: string;
   /** A unit shown inside the field, after the value (`%`, `deg`). */
-  suffix?: ReactNode
+  suffix?: ReactNode;
   /** A floor the arrow keys stop at, for a property that refuses to go below it. */
-  min?: number
+  min?: number;
   /** The box the field lives in — sections that lay their fields out differently
    *  pass their own. It owns the focus ring. */
-  wrapClassName?: string
-  onLive: (value: string) => void
-  onCommit: (value: string) => void
-  onVariablePick?: (binding: string) => void
+  wrapClassName?: string;
+  onLive: (value: string) => void;
+  onCommit: (value: string) => void;
+  onVariablePick?: (binding: string) => void;
 }) {
-  const [draft, setDraft] = useState(value)
-  const focused = useRef(false)
-  const liveTimer = useRef<number | null>(null)
-  useEffect(() => { if (!focused.current) {setDraft(value)} }, [value])
-  const cancelLive = () => { if (liveTimer.current != null) { window.clearTimeout(liveTimer.current); liveTimer.current = null } }
-  useEffect(() => cancelLive, [])
+  const [draft, setDraft] = useState(value);
+  const focused = useRef(false);
+  const liveTimer = useRef<number | null>(null);
+  useEffect(() => {
+    if (!focused.current) {
+      setDraft(value);
+    }
+  }, [value]);
+  const cancelLive = () => {
+    if (liveTimer.current != null) {
+      window.clearTimeout(liveTimer.current);
+      liveTimer.current = null;
+    }
+  };
+  useEffect(() => cancelLive, []);
   const scheduleLive = (text: string) => {
-    cancelLive()
-    liveTimer.current = window.setTimeout(() => { liveTimer.current = null; onLive(text) }, 100)
-  }
+    cancelLive();
+    liveTimer.current = window.setTimeout(() => {
+      liveTimer.current = null;
+      onLive(text);
+    }, 100);
+  };
   const scrub = useScrub({
     value: draft,
     disabled: busy || readOnly,
     onPreview: setDraft,
     onInput: onLive,
-    onCommit: (text) => { setDraft(text); onCommit(text) },
-  })
+    onCommit: (text) => {
+      setDraft(text);
+      onCommit(text);
+    },
+  });
   return (
     <div className={wrapClassName}>
-      <VariableConnect code className="is-fill" ariaLabel={`Connect ${ariaLabel} to a variable`} disabled={busy} prop={prop} onPick={(binding) => (onVariablePick ?? onCommit)(binding)}>
+      <VariableConnect
+        code
+        className="is-fill"
+        ariaLabel={`Connect ${ariaLabel} to a variable`}
+        disabled={busy}
+        prop={prop}
+        onPick={(binding) => (onVariablePick ?? onCommit)(binding)}
+      >
         <input
           {...scrub.input}
           className="u-input embed-editor_size-input"
           value={draft}
-          onChange={(event) => { setDraft(event.target.value); scheduleLive(event.target.value) }}
-          onFocus={() => { focused.current = true }}
-          onBlur={() => { focused.current = false; cancelLive(); onCommit(draft) }}
+          onChange={(event) => {
+            setDraft(event.target.value);
+            scheduleLive(event.target.value);
+          }}
+          onFocus={() => {
+            focused.current = true;
+          }}
+          onBlur={() => {
+            focused.current = false;
+            cancelLive();
+            onCommit(draft);
+          }}
           onKeyDown={(event) => {
-            if (event.key === 'Enter') { commitInPlace(event.currentTarget); return }
-            const stepped = handleArrowStep(event, min)
-            if (!stepped) {return}
-            event.preventDefault()
-            const el = event.currentTarget
-            el.value = stepped.text
-            el.setSelectionRange(stepped.caret, stepped.caret)
-            setDraft(stepped.text)
-            scheduleLive(stepped.text)
+            if (event.key === 'Enter') {
+              commitInPlace(event.currentTarget);
+              return;
+            }
+            const stepped = handleArrowStep(event, min);
+            if (!stepped) {
+              return;
+            }
+            event.preventDefault();
+            const el = event.currentTarget;
+            el.value = stepped.text;
+            el.setSelectionRange(stepped.caret, stepped.caret);
+            setDraft(stepped.text);
+            scheduleLive(stepped.text);
           }}
           disabled={busy}
           readOnly={readOnly}
@@ -94,5 +140,5 @@ export default function LiveInput({
       </VariableConnect>
       {suffix != null ? <span className="embed-editor_field-suffix">{suffix}</span> : null}
     </div>
-  )
+  );
 }

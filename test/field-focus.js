@@ -28,7 +28,9 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
+  if (!condition) {
+    failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  }
 };
 
 (async () => {
@@ -77,7 +79,7 @@ const check = (what, condition, detail) => {
          React.createElement('div', { id:'grad' },
            React.createElement(GradientEditor, { gradient: grad, busy:false, onChange:()=>{} })),
        )
-     )`
+     )`,
   );
   await esbuild.build({
     entryPoints: [entry],
@@ -95,12 +97,12 @@ const check = (what, condition, detail) => {
     path.join(pageDir, 'app.css'),
     ['src/styles.css', 'src/style-panel/utilities.css', 'src/style-panel/embed-editor.css']
       .map((f) => fs.readFileSync(path.join(root, f), 'utf8'))
-      .join('\n')
+      .join('\n'),
   );
   fs.writeFileSync(
     path.join(pageDir, 'index.html'),
     '<!doctype html><meta charset=utf-8><link rel="stylesheet" href="app.css">' +
-      '<style>body{margin:0;background:#1a1a1a}</style><div id="root"></div><script src="bundle.js"></script>'
+      '<style>body{margin:0;background:#1a1a1a}</style><div id="root"></div><script src="bundle.js"></script>',
   );
 
   const probe = path.join(pageDir, 'probe.js');
@@ -192,7 +194,7 @@ const check = (what, condition, detail) => {
            .filter((w) => w.closest('label')).length\`);
        console.log(JSON.stringify(out));
        app.quit();
-     });`
+     });`,
   );
 
   const { spawnSync } = require('child_process');
@@ -208,16 +210,40 @@ const check = (what, condition, detail) => {
     // back in.
     const skipped = out.fields.filter((f) => f.skipped);
     check('every field was reachable and pressed', skipped.length === 0, JSON.stringify(skipped));
-    check('both origin pads were among them', tested.filter((f) => /origin/i.test(f.label)).length === 4, JSON.stringify(tested.map((f) => f.label)));
-    check('and the gradient centre too', tested.filter((f) => /^Position/.test(f.label)).length === 2, JSON.stringify(tested.map((f) => f.label)));
+    check(
+      'both origin pads were among them',
+      tested.filter((f) => /origin/i.test(f.label)).length === 4,
+      JSON.stringify(tested.map((f) => f.label)),
+    );
+    check(
+      'and the gradient centre too',
+      tested.filter((f) => /^Position/.test(f.label)).length === 2,
+      JSON.stringify(tested.map((f) => f.label)),
+    );
     // The premise: these fields really are a visible editor over a hidden input.
-    check('the input behind them is invisible', tested.every((f) => f.inputHidden), JSON.stringify(tested.map((f) => [f.label, f.inputHidden])));
+    check(
+      'the input behind them is invisible',
+      tested.every((f) => f.inputHidden),
+      JSON.stringify(tested.map((f) => [f.label, f.inputHidden])),
+    );
     for (const f of tested) {
-      check(`pressing "${f.label}" leaves the caret in it`, f.caretInTheFieldPressed, `focus went to ${f.activeTag}${f.focusedAnInvisibleField ? ' — an invisible one' : ''} | at (${f.x},${f.y}) the top element is ${f.hitTag}.${f.hitCls} | popup open: ${f.popupOpen}`);
-      check(`and not into a field that cannot be seen ("${f.label}")`, !f.focusedAnInvisibleField, `${f.activeTag} | hit=${f.hitTag}.${f.hitCls} popup=${f.popupOpen}`);
+      check(
+        `pressing "${f.label}" leaves the caret in it`,
+        f.caretInTheFieldPressed,
+        `focus went to ${f.activeTag}${f.focusedAnInvisibleField ? ' — an invisible one' : ''} | at (${f.x},${f.y}) the top element is ${f.hitTag}.${f.hitCls} | popup open: ${f.popupOpen}`,
+      );
+      check(
+        `and not into a field that cannot be seen ("${f.label}")`,
+        !f.focusedAnInvisibleField,
+        `${f.activeTag} | hit=${f.hitTag}.${f.hitCls} popup=${f.popupOpen}`,
+      );
     }
     // The cause, kept out directly: a <label> forwards the press to the input.
-    check('no field is wrapped in a label', out.labelWrapped === 0, `${out.labelWrapped} still are`);
+    check(
+      'no field is wrapped in a label',
+      out.labelWrapped === 0,
+      `${out.labelWrapped} still are`,
+    );
   }
 
   if (failures.length) {

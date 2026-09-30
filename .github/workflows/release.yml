@@ -35,7 +35,7 @@ jobs:
         env:
           DEBUG: electron-osx-sign*,electron-builder
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
-          CSC_LINK: "data:application/x-pkcs12;base64,${{ secrets.MAC_CSC_LINK }}"
+          CSC_LINK: 'data:application/x-pkcs12;base64,${{ secrets.MAC_CSC_LINK }}'
           CSC_KEY_PASSWORD: ${{ secrets.MAC_CSC_KEY_PASSWORD }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}

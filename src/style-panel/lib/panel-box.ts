@@ -20,13 +20,13 @@ export function panelBox(anchor: Element): HTMLElement | null {
     anchor.closest<HTMLElement>('.app_body') ??
     anchor.closest<HTMLElement>('.embed-editor_root') ??
     null
-  )
+  );
 }
 
 /** That box's rect, or the window when the panel isn't found. */
 export function panelBounds(anchor: Element): DOMRect {
-  const el = panelBox(anchor)
-  return (el ?? document.documentElement).getBoundingClientRect()
+  const el = panelBox(anchor);
+  return (el ?? document.documentElement).getBoundingClientRect();
 }
 
 /**
@@ -39,14 +39,16 @@ export function panelBounds(anchor: Element): DOMRect {
  * variables for that case (see StylePanel.tsx).
  */
 export function panelSpan(anchor: Element): { left: number; width: number } {
-  const el = panelBox(anchor)
+  const el = panelBox(anchor);
   if (el) {
-    const r = el.getBoundingClientRect()
-    return { left: r.left, width: r.width }
+    const r = el.getBoundingClientRect();
+    return { left: r.left, width: r.width };
   }
-  const root = getComputedStyle(document.documentElement)
-  const left = parseFloat(root.getPropertyValue('--style-panel-left'))
-  const width = parseFloat(root.getPropertyValue('--style-panel-width'))
-  if (Number.isFinite(left) && Number.isFinite(width) && width > 0) {return { left, width }}
-  return { left: 0, width: window.innerWidth }
+  const root = getComputedStyle(document.documentElement);
+  const left = parseFloat(root.getPropertyValue('--style-panel-left'));
+  const width = parseFloat(root.getPropertyValue('--style-panel-width'));
+  if (Number.isFinite(left) && Number.isFinite(width) && width > 0) {
+    return { left, width };
+  }
+  return { left: 0, width: window.innerWidth };
 }

@@ -56,7 +56,9 @@ const run = (cmd: string, args: readonly string[], cwd: string, onLog?: OnLog): 
         },
       });
     } catch (err) {
-      reject(new Error(`Could not run ${cmd}: ${err instanceof Error ? err.message : String(err)}`));
+      reject(
+        new Error(`Could not run ${cmd}: ${err instanceof Error ? err.message : String(err)}`),
+      );
       return;
     }
     let tail = '';
@@ -106,7 +108,13 @@ interface CreateStarterOptions {
  * caller's — this is the part that has to be right before anything is
  * installed into it.
  */
-async function createStarter({ starter = 'lumos', parentPath, name, npm, onLog }: CreateStarterOptions = {}): Promise<{ ok: boolean; projectPath: string }> {
+async function createStarter({
+  starter = 'lumos',
+  parentPath,
+  name,
+  npm,
+  onLog,
+}: CreateStarterOptions = {}): Promise<{ ok: boolean; projectPath: string }> {
   const template = STARTERS[starter];
   if (!template) {
     throw new Error(`${starter} is not a starter this app knows.`);
@@ -177,7 +185,9 @@ async function createStarter({ starter = 'lumos', parentPath, name, npm, onLog }
       );
     } catch (err) {
       // A site with no git still runs; say so rather than throwing it away.
-      onLog?.(`\n(could not start a git history: ${err instanceof Error ? err.message : String(err)})\n`);
+      onLog?.(
+        `\n(could not start a git history: ${err instanceof Error ? err.message : String(err)})\n`,
+      );
     }
   }
 

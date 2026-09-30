@@ -21,7 +21,9 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
+  if (!condition) {
+    failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  }
 };
 
 (async () => {
@@ -55,7 +57,11 @@ const check = (what, condition, detail) => {
   global.navigator = dom.window.navigator;
   global.IS_REACT_ACT_ENVIRONMENT = true;
   global.MutationObserver = dom.window.MutationObserver;
-  global.ResizeObserver = class { observe() {} unobserve() {} disconnect() {} };
+  global.ResizeObserver = class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  };
   dom.window.avb = {};
 
   const React = require('react');
@@ -71,7 +77,10 @@ const check = (what, condition, detail) => {
     selectedId: null,
     files: [],
     astroFiles: [],
-    onSpacingHover: (h) => { hover = h; seen.push(h); },
+    onSpacingHover: (h) => {
+      hover = h;
+      seen.push(h);
+    },
   });
 
   // `gap: 2rem`, set by the rule the panel is editing — the screenshot's case.
@@ -93,7 +102,9 @@ const check = (what, condition, detail) => {
   };
 
   const root = createRoot(document.getElementById('root'));
-  await act(async () => { root.render(React.createElement(GapControl, props)); });
+  await act(async () => {
+    root.render(React.createElement(GapControl, props));
+  });
 
   const field = document.querySelector('input.embed-editor_size-input');
   check('the gap field is there', field != null);
@@ -101,21 +112,39 @@ const check = (what, condition, detail) => {
 
   // The syntax-highlighted editor is what the pointer actually meets.
   const wrap = field?.closest('.embed-editor_varconnect');
-  check('the field wears the code editor', wrap != null && wrap.className.includes('is-token'), wrap?.className);
+  check(
+    'the field wears the code editor',
+    wrap != null && wrap.className.includes('is-token'),
+    wrap?.className,
+  );
 
   // React synthesises enter/leave from mouseover/mouseout, so that is what a
   // pointer arriving is.
   const point = async (type, node, related) => {
     await act(async () => {
-      node.dispatchEvent(new dom.window.MouseEvent(type, { bubbles: true, cancelable: true, relatedTarget: related ?? null }));
+      node.dispatchEvent(
+        new dom.window.MouseEvent(type, {
+          bubbles: true,
+          cancelable: true,
+          relatedTarget: related ?? null,
+        }),
+      );
     });
   };
   const editor = wrap?.querySelector('[contenteditable]') ?? wrap;
 
   await point('mouseover', editor, document.body);
   check('pointing at it asks for the bands', hover != null, JSON.stringify(hover));
-  check('on both axes, since one field owns both', hover?.sides?.join(',') === 'row,column', JSON.stringify(hover?.sides));
-  check('labelled with the value it holds', hover?.labels?.row === '2rem', JSON.stringify(hover?.labels));
+  check(
+    'on both axes, since one field owns both',
+    hover?.sides?.join(',') === 'row,column',
+    JSON.stringify(hover?.sides),
+  );
+  check(
+    'labelled with the value it holds',
+    hover?.labels?.row === '2rem',
+    JSON.stringify(hover?.labels),
+  );
   check('and named as a gap, not a padding', hover?.kind === 'gap', hover?.kind);
 
   await point('mouseout', editor, document.body);
@@ -123,22 +152,37 @@ const check = (what, condition, detail) => {
 
   // Hover and focus are two hands on the same thing: whichever is left holds it.
   await point('mouseover', editor, document.body);
-  await act(async () => { field.focus(); });
+  await act(async () => {
+    field.focus();
+  });
   check('clicking in while hovering keeps them up', hover != null);
   await point('mouseout', editor, document.body);
-  check('and the pointer leaving does not take them from the caret', hover != null, JSON.stringify(hover));
-  await act(async () => { field.blur(); });
+  check(
+    'and the pointer leaving does not take them from the caret',
+    hover != null,
+    JSON.stringify(hover),
+  );
+  await act(async () => {
+    field.blur();
+  });
   check('only letting go of both does', hover === null, JSON.stringify(hover));
 
   // Typing relabels the bands that are already up, rather than showing the value
   // that was there when the pointer arrived.
   await point('mouseover', editor, document.body);
   await act(async () => {
-    const setter = Object.getOwnPropertyDescriptor(dom.window.HTMLInputElement.prototype, 'value').set;
+    const setter = Object.getOwnPropertyDescriptor(
+      dom.window.HTMLInputElement.prototype,
+      'value',
+    ).set;
     setter.call(field, '3rem');
     field.dispatchEvent(new dom.window.Event('input', { bubbles: true }));
   });
-  check('typing relabels them as it goes', hover?.labels?.row === '3rem', JSON.stringify(hover?.labels));
+  check(
+    'typing relabels them as it goes',
+    hover?.labels?.row === '3rem',
+    JSON.stringify(hover?.labels),
+  );
 
   if (failures.length) {
     console.error(`gap-hover: ${failures.length} of ${checked} failed\n${failures.join('\n')}`);

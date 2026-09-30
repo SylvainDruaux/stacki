@@ -33,7 +33,9 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
+  if (!condition) {
+    failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  }
 };
 const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -74,7 +76,11 @@ const { parsePage, serializePageMarked } = require('../dist/electron/astroParser
   // The markers are still there. They are what works when nothing interferes,
   // and they carry what an attribute can't — text, a loop, a branch.
   for (const p of ['0.0', '0.0.0', '0.0.1', '0.0.1.0']) {
-    check(`the marker pair for ${p} is still written`, marked.includes(`avb-s:${p}--`) && marked.includes(`avb-e:${p}--`), marked);
+    check(
+      `the marker pair for ${p} is still written`,
+      marked.includes(`avb-s:${p}--`) && marked.includes(`avb-e:${p}--`),
+      marked,
+    );
   }
 
   // Not just slot content. What gets scrubbed is everything the slot rendered,
@@ -82,8 +88,14 @@ const { parsePage, serializePageMarked } = require('../dist/electron/astroParser
   // written with its markup at the top of its own file, a page away from any
   // slot, still loses every marker for being placed inside one. So the tag is
   // on the markup wherever it is.
-  const plain = serializePageMarked(parsePage('---\n---\n<section>\n  <p>hi</p>\n</section>\n').model);
-  check('the top level of a file carries it too', /<section data-avb-p=\{\["0", /.test(plain), plain);
+  const plain = serializePageMarked(
+    parsePage('---\n---\n<section>\n  <p>hi</p>\n</section>\n').model,
+  );
+  check(
+    'the top level of a file carries it too',
+    /<section data-avb-p=\{\["0", /.test(plain),
+    plain,
+  );
   check('and so does what is inside it', /<p data-avb-p="0\.0">/.test(plain), plain);
 
   // ── A file's own roots carry whatever they were called by ──────────────────
@@ -99,43 +111,45 @@ const { parsePage, serializePageMarked } = require('../dist/electron/astroParser
   // So a root says both names: its own, and whatever the caller called it.
   {
     const noSpread = serializePageMarked(
-      parsePage('---\nconst { slides } = Astro.props;\n---\n<div class="slider">{slides.length}</div>\n').model,
-      'src/components/Slider.astro|'
+      parsePage(
+        '---\nconst { slides } = Astro.props;\n---\n<div class="slider">{slides.length}</div>\n',
+      ).model,
+      'src/components/Slider.astro|',
     );
     check(
       'a root that never asked for rest props still carries the caller’s name',
-      /data-avb-p=\{\["src\/components\/Slider\.astro\|0", Astro\.props\["data-avb-p"\]\]/.test(noSpread),
-      noSpread
+      /data-avb-p=\{\["src\/components\/Slider\.astro\|0", Astro\.props\["data-avb-p"\]\]/.test(
+        noSpread,
+      ),
+      noSpread,
     );
 
     // The common shape for a component that can decline to render: the root is
     // a condition, and what the branch renders is what the caller placed.
     const conditional = serializePageMarked(
       parsePage(
-        '---\nconst { render = true, slides } = Astro.props;\n---\n{\n  render && slides.length > 0 && (\n    <div class="slider">x</div>\n  )\n}\n'
+        '---\nconst { render = true, slides } = Astro.props;\n---\n{\n  render && slides.length > 0 && (\n    <div class="slider">x</div>\n  )\n}\n',
       ).model,
-      'src/components/Slider.astro|'
+      'src/components/Slider.astro|',
     );
     check(
       'a root written as a condition carries it too',
-      /<div class="slider" data-avb-p=\{\["src\/components\/Slider\.astro\|0\.0\.0", Astro\.props\["data-avb-p"\]\]/.test(conditional),
-      conditional
+      /<div class="slider" data-avb-p=\{\["src\/components\/Slider\.astro\|0\.0\.0", Astro\.props\["data-avb-p"\]\]/.test(
+        conditional,
+      ),
+      conditional,
     );
 
     // Only the roots. An element deeper in the file is not what the caller
     // placed, and naming it after the caller would put the page's name for the
     // whole component on some div inside it.
-    check(
-      'nothing deeper in the file does',
-      !/<p data-avb-p=\{/.test(plain),
-      plain
-    );
+    check('nothing deeper in the file does', !/<p data-avb-p=\{/.test(plain), plain);
   }
 
   // The two that render no element of their own: there is nothing for an
   // attribute to ride on, and their markers are what address them.
   const passthrough = serializePageMarked(
-    parsePage('---\n---\n<div>\n  <Fragment>\n    <slot />\n  </Fragment>\n</div>\n').model
+    parsePage('---\n---\n<div>\n  <Fragment>\n    <slot />\n  </Fragment>\n</div>\n').model,
   );
   check('a <Fragment> is left alone', !/<Fragment data-avb-p/.test(passthrough), passthrough);
   check('and so is a <slot />', !/<slot data-avb-p/.test(passthrough), passthrough);
@@ -151,31 +165,44 @@ const { parsePage, serializePageMarked } = require('../dist/electron/astroParser
   // the component closed itself the moment you clicked inside it.
   const el = serializePageMarked(
     parsePage('---\nconst { ...rest } = Astro.props;\n---\n<span {...rest}>x</span>\n').model,
-    'src/components/Icon.astro|'
+    'src/components/Icon.astro|',
   );
   const comp = serializePageMarked(
     parsePage('---\nconst { ...rest } = Astro.props;\n---\n<Svg {...rest} />\n').model,
-    'src/components/Icon.astro|'
+    'src/components/Icon.astro|',
   );
-  for (const [what, out] of [['an element', el], ['a component', comp]]) {
+  for (const [what, out] of [
+    ['an element', el],
+    ['a component', comp],
+  ]) {
     check(
       `${what} that forwards rest props keeps the path that arrived`,
-      /data-avb-p=\{\["src\/components\/Icon\.astro\|0", Astro\.props\["data-avb-p"\]\]\.filter\(Boolean\)\.join\(" "\)\}/.test(out),
-      out
+      /data-avb-p=\{\["src\/components\/Icon\.astro\|0", Astro\.props\["data-avb-p"\]\]\.filter\(Boolean\)\.join\(" "\)\}/.test(
+        out,
+      ),
+      out,
     );
   }
   // An element's attributes are text, and an html parser keeps the FIRST of
   // two with the same name.
-  check('an element writes it before the spread', el.indexOf('data-avb-p') < el.indexOf('{...rest}'), el);
+  check(
+    'an element writes it before the spread',
+    el.indexOf('data-avb-p') < el.indexOf('{...rest}'),
+    el,
+  );
   // A component's are an object, where the later key overwrites.
-  check('a component writes it after', comp.indexOf('{...rest}') < comp.indexOf('data-avb-p'), comp);
+  check(
+    'a component writes it after',
+    comp.indexOf('{...rest}') < comp.indexOf('data-avb-p'),
+    comp,
+  );
   // Everything else stays the plain attribute — no expression, nothing to
   // evaluate, nothing to go wrong in a file that never mentions Astro.props.
   const nested = serializePageMarked(parsePage('---\n---\n<div><span>x</span></div>\n').model);
   check(
     'a node that is neither a root nor a spread gets the plain attribute',
     /<span data-avb-p="0\.0">/.test(nested),
-    nested
+    nested,
   );
 }
 
@@ -197,7 +224,7 @@ const { parsePage, serializePageMarked } = require('../dist/electron/astroParser
       </div>
       <!--avb-e:0-->
     </body>`,
-    { url: 'http://localhost:4321/#avb-design', pretendToBeVisual: true }
+    { url: 'http://localhost:4321/#avb-design', pretendToBeVisual: true },
   );
   const { window } = dom;
   const NO_BOX = { x: 0, y: 0, width: 0, height: 0, left: 0, top: 0, right: 0, bottom: 0 };
@@ -231,7 +258,9 @@ const { parsePage, serializePageMarked } = require('../dist/electron/astroParser
   Module.prototype.require = realRequire;
   await settle(60);
 
-  const ev = new window.MessageEvent('message', { data: { type: 'avb:track', paths: ['0', '0.2'] } });
+  const ev = new window.MessageEvent('message', {
+    data: { type: 'avb:track', paths: ['0', '0.2'] },
+  });
   Object.defineProperty(ev, 'source', { value: window.parent });
   window.dispatchEvent(ev);
   await settle(20);
@@ -245,11 +274,19 @@ const { parsePage, serializePageMarked } = require('../dist/electron/astroParser
   }
   // An element can answer to more than one file: the component that rendered
   // it has a name for it, and so does the page that placed that component.
-  check('an element in two namespaces answers to the page', paths.includes('0.3'), JSON.stringify(paths));
+  check(
+    'an element in two namespaces answers to the page',
+    paths.includes('0.3'),
+    JSON.stringify(paths),
+  );
   // The other half of the report: nothing here is display:none, and a node the
   // page can't find says nothing about itself either way.
   const states = sent.filter((m) => m.type === 'avb:node-states').pop();
-  check('and none of them is called hidden', !(states?.hidden || []).length, JSON.stringify(states));
+  check(
+    'and none of them is called hidden',
+    !(states?.hidden || []).length,
+    JSON.stringify(states),
+  );
 
   // A component that spreads its rest props puts the path on whatever element
   // it spreads onto, which can sit inside the one the collector tagged. That
@@ -260,16 +297,18 @@ const { parsePage, serializePageMarked } = require('../dist/electron/astroParser
   check(
     'a path on an element and again inside it is one copy',
     (rects?.rects?.['0.2'] || []).length === 1,
-    JSON.stringify(rects?.rects?.['0.2'])
+    JSON.stringify(rects?.rects?.['0.2']),
   );
   check(
     'and its classes are read once, from the outer one',
     JSON.stringify(rects?.classes?.['0.2']) === JSON.stringify([['c']]),
-    JSON.stringify(rects?.classes?.['0.2'])
+    JSON.stringify(rects?.classes?.['0.2']),
   );
 
   if (failures.length) {
-    console.error(`\nslot-markers: ${failures.length} failed, ${checked - failures.length} passed\n`);
+    console.error(
+      `\nslot-markers: ${failures.length} failed, ${checked - failures.length} passed\n`,
+    );
     console.error(failures.join('\n') + '\n');
     process.exit(1);
   }

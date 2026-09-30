@@ -7,8 +7,9 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { BOUNDARY_LIMITS } = require('../dist/shared/boundary.js');
-const { parseStoredEmbedSource, loadEmbedSource } =
-  require('./renderer-module')('style-panel/shared/tool-prefs.ts');
+const { parseStoredEmbedSource, loadEmbedSource } = require('./renderer-module')(
+  'style-panel/shared/tool-prefs.ts',
+);
 
 test('a stored embed source is restored only when it is a bounded key', () => {
   assert.equal(parseStoredEmbedSource('file:/p/global.css'), 'file:/p/global.css');

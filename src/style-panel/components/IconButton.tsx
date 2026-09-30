@@ -1,19 +1,19 @@
-import type { MouseEventHandler, ReactNode } from 'react'
-import './IconButton.css'
+import type { MouseEventHandler, ReactNode } from 'react';
+import './IconButton.css';
 
 type Props = {
   /** The icon glyph (an <svg>). IconButton controls its size and color, so
       differently-authored SVGs still render at a consistent size + brightness. */
-  icon: ReactNode
+  icon: ReactNode;
   /** Accessible label; also the default tooltip. */
-  label: string
-  onClick?: MouseEventHandler<HTMLButtonElement>
-  title?: string
-  disabled?: boolean
+  label: string;
+  onClick?: MouseEventHandler<HTMLButtonElement>;
+  title?: string;
+  disabled?: boolean;
   /** Footprint: 'md' (34px, default) for toolbars; 'sm' (24px) for the compact header. */
-  size?: 'sm' | 'md'
-  className?: string
-}
+  size?: 'sm' | 'md';
+  className?: string;
+};
 
 /**
  * Icon-only button with one shared footprint, glyph size, and brightness. Use it
@@ -41,5 +41,5 @@ export default function IconButton({
     >
       {icon}
     </button>
-  )
+  );
 }

@@ -20,12 +20,13 @@ import type { Entry as ListedEntry } from './contentEntries.js';
 
 const isPlainObject = (v: unknown): boolean => !!v && typeof v === 'object' && !Array.isArray(v);
 
-const defsOf = (root: unknown): Record<string, unknown> => toRecord(toRecord(root)?.['$defs']) ?? {};
+const defsOf = (root: unknown): Record<string, unknown> =>
+  toRecord(toRecord(root)?.['$defs']) ?? {};
 
 function deref(node: unknown, root: unknown, depth: number): Record<string, unknown> | null {
   const ref = toRecord(node)?.['$ref'];
   if (!ref || depth > 8) {
-    return ref ? null : toRecord(node) ?? null;
+    return ref ? null : (toRecord(node) ?? null);
   }
   const name = String(ref).split('/').pop();
   const target = name === undefined ? undefined : defsOf(root)[name];
@@ -52,7 +53,11 @@ function referencePaths(
   schema: unknown,
   data: unknown,
   target: string,
-  options: { readonly root?: unknown; readonly depth?: number; readonly path?: (string | number)[] } = {},
+  options: {
+    readonly root?: unknown;
+    readonly depth?: number;
+    readonly path?: (string | number)[];
+  } = {},
 ): SchemaPath[] {
   return matchingPaths(
     schema,
@@ -72,7 +77,11 @@ function matchingPaths(
   schema: unknown,
   data: unknown,
   match: MatchFn,
-  { root = schema, depth = 0, path: at = [] }: { readonly root?: unknown; readonly depth?: number; readonly path?: (string | number)[] } = {},
+  {
+    root = schema,
+    depth = 0,
+    path: at = [],
+  }: { readonly root?: unknown; readonly depth?: number; readonly path?: (string | number)[] } = {},
 ): SchemaPath[] {
   const node = deref(schema, root, depth);
   if (!node || depth > 12) {
@@ -96,7 +105,13 @@ function matchingPaths(
   const items = toArray(data);
   if (node['type'] === 'array' && items) {
     items.forEach((item, index) => {
-      found.push(...matchingPaths(node['items'] ?? {}, item, match, { root, depth: depth + 1, path: [...at, index] }));
+      found.push(
+        ...matchingPaths(node['items'] ?? {}, item, match, {
+          root,
+          depth: depth + 1,
+          path: [...at, index],
+        }),
+      );
     });
     return found;
   }
@@ -109,7 +124,9 @@ function matchingPaths(
       if (!child) {
         continue;
       }
-      found.push(...matchingPaths(child, value, match, { root, depth: depth + 1, path: [...at, key] }));
+      found.push(
+        ...matchingPaths(child, value, match, { root, depth: depth + 1, path: [...at, key] }),
+      );
     }
   }
   return found;
@@ -201,7 +218,11 @@ type Move =
   | { readonly kind: 'unknown'; readonly note: string }
   | { readonly kind: 'file'; readonly from: string; readonly to: string }
   | { readonly kind: 'key'; readonly file: string; readonly locator: readonly (string | number)[] }
-  | { readonly kind: 'field'; readonly file: string; readonly locator: readonly (string | number)[] };
+  | {
+      readonly kind: 'field';
+      readonly file: string;
+      readonly locator: readonly (string | number)[];
+    };
 
 export interface Pointer {
   readonly collection: string;
@@ -239,7 +260,11 @@ const stepInto = (node: unknown, key: string | number): unknown =>
 function planRename(
   projectPath: string,
   collections: readonly CollectionLike[],
-  { collection: name, from, to }: { readonly collection: string; readonly from: string; readonly to: string },
+  {
+    collection: name,
+    from,
+    to,
+  }: { readonly collection: string; readonly from: string; readonly to: string },
 ): RenamePlan {
   const collection = collections.find((c) => c.name === name);
   if (!collection) {
@@ -262,7 +287,10 @@ function planRename(
     const otherEntries = listEntries(projectPath, other).entries;
     for (const candidate of otherEntries) {
       for (const at of referencePaths(other.schema, candidate.data, name)) {
-        const value = at.reduce<unknown>((node, key) => (node == null ? node : stepInto(node, key)), candidate.data);
+        const value = at.reduce<unknown>(
+          (node, key) => (node == null ? node : stepInto(node, key)),
+          candidate.data,
+        );
         if (value !== from) {
           continue;
         }
@@ -283,7 +311,10 @@ function planRename(
   let move: Move;
   if (collection.loader.kind === 'glob') {
     if (collection.loader.generateId) {
-      move = { kind: 'generated', note: `${name} builds its ids in its loader, so its id cannot be changed by renaming a file.` };
+      move = {
+        kind: 'generated',
+        note: `${name} builds its ids in its loader, so its id cannot be changed by renaming a file.`,
+      };
     } else {
       const extension = path.extname(entry.file);
       move = {
@@ -306,10 +337,18 @@ function planRename(
     const fromDir = posix.dirname(entry.file);
     const toDir = posix.dirname(move.to);
     if (fromDir !== toDir) {
-      const isImage = (node: SchemaNode, value: unknown): boolean => !!node['astroImage'] && isRelativeAsset(value);
+      const isImage = (node: SchemaNode, value: unknown): boolean =>
+        !!node['astroImage'] && isRelativeAsset(value);
       for (const at of matchingPaths(collection.schema, entry.data, isImage)) {
-        const value = at.reduce<unknown>((node, key) => (node == null ? node : stepInto(node, key)), entry.data);
-        imageEdits.push({ path: at, from: value, value: rewriteRelative(String(value), fromDir, toDir) });
+        const value = at.reduce<unknown>(
+          (node, key) => (node == null ? node : stepInto(node, key)),
+          entry.data,
+        );
+        imageEdits.push({
+          path: at,
+          from: value,
+          value: rewriteRelative(String(value), fromDir, toDir),
+        });
       }
     }
   }
@@ -322,7 +361,10 @@ function planRename(
  * renamed but not yet pointed at is a broken link, and the shorter that window
  * is the better.
  */
-function applyRename(projectPath: string, plan: RenamePlan): { renamed: boolean; pointers: number; files: string[] } {
+function applyRename(
+  projectPath: string,
+  plan: RenamePlan,
+): { renamed: boolean; pointers: number; files: string[] } {
   const touched = new Set<string>();
   for (const pointer of plan.pointers) {
     writeEntry(projectPath, pointer.entry, [{ path: pointer.path, value: plan.to }]);
@@ -346,21 +388,20 @@ function applyRename(projectPath: string, plan: RenamePlan): { renamed: boolean;
     fs.renameSync(from, to);
     touched.add(move.to);
   } else if (move.kind === 'key') {
-    writeEntry(projectPath, { file: move.file, locator: [] }, [{ path: move.locator, rename: plan.to }]);
+    writeEntry(projectPath, { file: move.file, locator: [] }, [
+      { path: move.locator, rename: plan.to },
+    ]);
     touched.add(move.file);
   } else if (move.kind === 'field') {
     writeEntry(projectPath, plan.entry, [{ path: ['id'], value: plan.to }]);
     touched.add(move.file);
   }
 
-  return { renamed: move.kind !== 'unknown' && move.kind !== 'generated', pointers: plan.pointers.length, files: [...touched] };
+  return {
+    renamed: move.kind !== 'unknown' && move.kind !== 'generated',
+    pointers: plan.pointers.length,
+    files: [...touched],
+  };
 }
 
-export {
-  planRename,
-  applyRename,
-  referencePaths,
-  matchingPaths,
-  rewriteRelative,
-  mentions,
-};
+export { planRename, applyRename, referencePaths, matchingPaths, rewriteRelative, mentions };

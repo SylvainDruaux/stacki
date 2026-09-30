@@ -3,12 +3,8 @@
 // numeric, nested, discriminant, and collection fields at the boundary.
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const {
-  parsePreviewMessage,
-  parseShortcutMessage,
-  describePreviewReload,
-  PREVIEW_RELOAD_REASONS,
-} = require('./renderer-module')('previewMessages.ts');
+const { parsePreviewMessage, parseShortcutMessage, describePreviewReload, PREVIEW_RELOAD_REASONS } =
+  require('./renderer-module')('previewMessages.ts');
 
 const box = { x: -1.5, y: 2, w: 30, h: 40 };
 const TOKEN = 'a'.repeat(64);

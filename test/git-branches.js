@@ -31,7 +31,9 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
+  if (!condition) {
+    failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  }
 };
 
 // The runner the module takes, without main.js's PATH repair — nothing here
@@ -43,7 +45,9 @@ const git = (cwd, args) =>
         err.stdout = stdout;
         err.stderr = stderr;
         reject(err);
-      } else {resolve({ stdout: String(stdout), stderr: String(stderr) });}
+      } else {
+        resolve({ stdout: String(stdout), stderr: String(stderr) });
+      }
     });
   });
 
@@ -91,10 +95,7 @@ const caught = async (fn) => {
     const r = await mergeBranch(git, { projectPath: dir, branch: 'feature' });
     check('a merge that moves work reports it', r.changed === true, JSON.stringify(r));
     check('the merge names the branch merged into', r.into === 'main', r.into);
-    check(
-      'the merged file is on the branch afterwards',
-      fs.existsSync(path.join(dir, 'b.txt'))
-    );
+    check('the merged file is on the branch afterwards', fs.existsSync(path.join(dir, 'b.txt')));
 
     // Once merged, git's safe delete is willing.
     const d = await deleteBranch(git, { projectPath: dir, branch: 'feature' });
@@ -144,11 +145,11 @@ const caught = async (fn) => {
     check('the branch is where it was', (await sh(dir, 'rev-parse', 'HEAD')) === head);
     check(
       'no conflict markers were left in the file',
-      !fs.readFileSync(path.join(dir, 'a.txt'), 'utf8').includes('<<<<<<<')
+      !fs.readFileSync(path.join(dir, 'a.txt'), 'utf8').includes('<<<<<<<'),
     );
     check(
       'and the file still says what the branch said',
-      fs.readFileSync(path.join(dir, 'a.txt'), 'utf8').trim() === 'main wins'
+      fs.readFileSync(path.join(dir, 'a.txt'), 'utf8').trim() === 'main wins',
     );
   }
 
@@ -171,7 +172,11 @@ const caught = async (fn) => {
     await sh(dir, 'commit', '-qm', 'main both');
 
     const clash = await mergeBranch(git, { projectPath: dir, branch: 'feature' });
-    check('both clashing files come back', clash.files.length === 2, JSON.stringify(clash.files.map((f) => f.path)));
+    check(
+      'both clashing files come back',
+      clash.files.length === 2,
+      JSON.stringify(clash.files.map((f) => f.path)),
+    );
 
     // One decision per file — a merge taking the page from one branch and the
     // stylesheet from the other is completely ordinary.
@@ -181,16 +186,25 @@ const caught = async (fn) => {
       choices: { 'a.txt': 'ours', 'b.txt': 'theirs' },
     });
     check('the merge finishes', done.ok === true, JSON.stringify(done));
-    check('keeping mine where I said', fs.readFileSync(path.join(dir, 'a.txt'), 'utf8').trim() === 'main a');
-    check('and theirs where I said', fs.readFileSync(path.join(dir, 'b.txt'), 'utf8').trim() === 'feature b');
+    check(
+      'keeping mine where I said',
+      fs.readFileSync(path.join(dir, 'a.txt'), 'utf8').trim() === 'main a',
+    );
+    check(
+      'and theirs where I said',
+      fs.readFileSync(path.join(dir, 'b.txt'), 'utf8').trim() === 'feature b',
+    );
     // A real merge commit, so the branch counts as merged afterwards and the
     // safe delete will allow itself.
-    check('it is a real merge commit', (await sh(dir, 'log', '-1', '--format=%P')).split(' ').length === 2);
+    check(
+      'it is a real merge commit',
+      (await sh(dir, 'log', '-1', '--format=%P')).split(' ').length === 2,
+    );
     check('the tree is clean', (await sh(dir, 'status', '--porcelain')) === '');
     check(
       'and no markers survived',
       !fs.readFileSync(path.join(dir, 'a.txt'), 'utf8').includes('<<<<<<<') &&
-        !fs.readFileSync(path.join(dir, 'b.txt'), 'utf8').includes('<<<<<<<')
+        !fs.readFileSync(path.join(dir, 'b.txt'), 'utf8').includes('<<<<<<<'),
     );
     const d = await deleteBranch(git, { projectPath: dir, branch: 'feature' });
     check('and the branch now deletes as merged', d.ok === true, JSON.stringify(d));
@@ -225,7 +239,11 @@ const caught = async (fn) => {
     // came back as one, there would be nothing to choose between per-part.
     check('the two edits come back separately', clashes.length === 2, JSON.stringify(clashes));
     check('the heading is one of them', clashes[0].ours.trim() === 'HERO MAIN', clashes[0].ours);
-    check('and the footer the other', clashes[1].theirs.trim() === 'FOOTER FEATURE', clashes[1].theirs);
+    check(
+      'and the footer the other',
+      clashes[1].theirs.trim() === 'FOOTER FEATURE',
+      clashes[1].theirs,
+    );
 
     // Heading from the incoming branch, footer from this one.
     const done = await resolveMerge(git, {
@@ -237,17 +255,24 @@ const caught = async (fn) => {
     const out = fs.readFileSync(path.join(dir, 'p.astro'), 'utf8');
     check('the heading came from the other branch', out.includes('HERO FEATURE'), out);
     check('the footer stayed on this one', out.includes('FOOTER MAIN'), out);
-    check('and the versions not chosen are gone', !out.includes('HERO MAIN') && !out.includes('FOOTER FEATURE'), out);
+    check(
+      'and the versions not chosen are gone',
+      !out.includes('HERO MAIN') && !out.includes('FOOTER FEATURE'),
+      out,
+    );
     // The lines both branches agreed on are not part of the choice and must
     // survive untouched — losing one would be silent and permanent.
     check(
       'every agreed line survived',
       Array.from({ length: 6 }, (_, i) => `unchanged ${i}`).every((l) => out.includes(l)),
-      out
+      out,
     );
     check('no markers were left behind', !out.includes('<<<<<<<') && !out.includes('======='), out);
     check('the tree is clean', (await sh(dir, 'status', '--porcelain')) === '');
-    check('and it is a real merge commit', (await sh(dir, 'log', '-1', '--format=%P')).split(' ').length === 2);
+    check(
+      'and it is a real merge commit',
+      (await sh(dir, 'log', '-1', '--format=%P')).split(' ').length === 2,
+    );
   }
 
   // --- The real case: one edit each, right next to each other ---------------
@@ -280,11 +305,27 @@ const caught = async (fn) => {
     const clash = await mergeBranch(git, { projectPath: dir, branch: 'new-branch' });
     const file = clash.files.find((f) => f.path === 'index.astro');
     const clashes = (file.parts || []).filter((p) => p.kind === 'clash');
-    check('the one conflict is split into two decisions', clashes.length === 2, JSON.stringify(clashes));
-    check('the heading credited to the branch that changed it', clashes[0].changedBy === 'theirs', JSON.stringify(clashes[0]));
-    check('the paragraph to the other one', clashes[1].changedBy === 'ours', JSON.stringify(clashes[1]));
+    check(
+      'the one conflict is split into two decisions',
+      clashes.length === 2,
+      JSON.stringify(clashes),
+    );
+    check(
+      'the heading credited to the branch that changed it',
+      clashes[0].changedBy === 'theirs',
+      JSON.stringify(clashes[0]),
+    );
+    check(
+      'the paragraph to the other one',
+      clashes[1].changedBy === 'ours',
+      JSON.stringify(clashes[1]),
+    );
     // Neither is a real disagreement, so neither needs asking about.
-    check('neither is contested', !clashes.some((c) => c.changedBy === 'both'), JSON.stringify(clashes));
+    check(
+      'neither is contested',
+      !clashes.some((c) => c.changedBy === 'both'),
+      JSON.stringify(clashes),
+    );
 
     // What the dialog defaults to: whoever actually made each change.
     const picks = clashes.map((c) => (c.changedBy === 'theirs' ? 'theirs' : 'ours'));
@@ -303,7 +344,11 @@ const caught = async (fn) => {
     // Nothing duplicated — the failure "both" would have produced.
     check('the heading appears once', (out.match(/<h2>/g) || []).length === 1, out);
     check('the paragraph appears once', (out.match(/<p>/g) || []).length === 1, out);
-    check('the markup around them is intact', out.includes('<section>') && out.includes('</section>'), out);
+    check(
+      'the markup around them is intact',
+      out.includes('<section>') && out.includes('</section>'),
+      out,
+    );
     check('no markers were left', !out.includes('<<<<<<<') && !out.includes('|||||||'), out);
     check('the tree is clean', (await sh(dir, 'status', '--porcelain')) === '');
   }
@@ -316,23 +361,40 @@ const caught = async (fn) => {
   {
     const dir = await repo('inline');
     cleanup.push(dir);
-    fs.writeFileSync(path.join(dir, 'index.astro'), '<section>\n  <h2>Heading 2</h2>\n</section>\n');
+    fs.writeFileSync(
+      path.join(dir, 'index.astro'),
+      '<section>\n  <h2>Heading 2</h2>\n</section>\n',
+    );
     await sh(dir, 'add', '-A');
     await sh(dir, 'commit', '-qm', 'page');
     await sh(dir, 'checkout', '-qb', 'new-branch');
-    fs.writeFileSync(path.join(dir, 'index.astro'), '<section>\n  <h2>Heading 3</h2>\n</section>\n');
+    fs.writeFileSync(
+      path.join(dir, 'index.astro'),
+      '<section>\n  <h2>Heading 3</h2>\n</section>\n',
+    );
     await sh(dir, 'add', '-A');
     await sh(dir, 'commit', '-qm', 'new words');
     await sh(dir, 'checkout', '-q', 'main');
-    fs.writeFileSync(path.join(dir, 'index.astro'), '<section>\n  <h2 class="title">Heading 2</h2>\n</section>\n');
+    fs.writeFileSync(
+      path.join(dir, 'index.astro'),
+      '<section>\n  <h2 class="title">Heading 2</h2>\n</section>\n',
+    );
     await sh(dir, 'add', '-A');
     await sh(dir, 'commit', '-qm', 'a class');
 
     const clash = await mergeBranch(git, { projectPath: dir, branch: 'new-branch' });
     const c = (clash.files[0].parts || []).find((p) => p.kind === 'clash');
-    check('the same line edited twice is still one clash', !!c, JSON.stringify(clash.files[0].parts));
+    check(
+      'the same line edited twice is still one clash',
+      !!c,
+      JSON.stringify(clash.files[0].parts),
+    );
     check('but a combined version is offered', c.merged != null, JSON.stringify(c));
-    check('holding both edits', c.merged.includes('class="title"') && c.merged.includes('Heading 3'), c.merged);
+    check(
+      'holding both edits',
+      c.merged.includes('class="title"') && c.merged.includes('Heading 3'),
+      c.merged,
+    );
 
     const done = await resolveMerge(git, {
       projectPath: dir,
@@ -373,7 +435,7 @@ const caught = async (fn) => {
     check(
       'rather than the incoming one',
       fs.readFileSync(path.join(dir, 'a.txt'), 'utf8').trim() === 'mine',
-      fs.readFileSync(path.join(dir, 'a.txt'), 'utf8')
+      fs.readFileSync(path.join(dir, 'a.txt'), 'utf8'),
     );
   }
 
@@ -399,7 +461,7 @@ const caught = async (fn) => {
     check(
       'and the unsaved work is untouched',
       fs.readFileSync(path.join(dir, 'a.txt'), 'utf8') === 'work in progress\n',
-      fs.readFileSync(path.join(dir, 'a.txt'), 'utf8')
+      fs.readFileSync(path.join(dir, 'a.txt'), 'utf8'),
     );
   }
 
@@ -417,12 +479,19 @@ const caught = async (fn) => {
     // same question a blocked branch switch asks.
     check('a merge that needs that file stops', r.ok === false, JSON.stringify(r));
     check('and is flagged as work being in the way', r.dirty === true, JSON.stringify(r));
-    check('naming the file', (r.files || []).some((f) => f.includes('a.txt')), JSON.stringify(r.files));
+    check(
+      'naming the file',
+      (r.files || []).some((f) => f.includes('a.txt')),
+      JSON.stringify(r.files),
+    );
     check(
       'the uncommitted work is untouched',
-      fs.readFileSync(path.join(dir, 'a.txt'), 'utf8') === 'unsaved edit\n'
+      fs.readFileSync(path.join(dir, 'a.txt'), 'utf8') === 'unsaved edit\n',
     );
-    check('and nothing was merged', (await sh(dir, 'log', '-1', '--format=%s')) !== 'a.txt on feature');
+    check(
+      'and nothing was merged',
+      (await sh(dir, 'log', '-1', '--format=%s')) !== 'a.txt on feature',
+    );
   }
 
   // --- Merging the branch you are on ---------------------------------------
@@ -449,18 +518,18 @@ const caught = async (fn) => {
     check(
       'the message says what is at stake',
       /commits/i.test(r.message || '') && /feature/.test(r.message || ''),
-      r.message
+      r.message,
     );
     check(
       'the branch is still there',
-      (await sh(dir, 'branch', '--format=%(refname:short)')).includes('feature')
+      (await sh(dir, 'branch', '--format=%(refname:short)')).includes('feature'),
     );
 
     const forced = await deleteBranch(git, { projectPath: dir, branch: 'feature', force: true });
     check('forcing deletes it', forced.ok === true, JSON.stringify(forced));
     check(
       'and it is gone',
-      !(await sh(dir, 'branch', '--format=%(refname:short)')).includes('feature')
+      !(await sh(dir, 'branch', '--format=%(refname:short)')).includes('feature'),
     );
   }
 
@@ -482,7 +551,10 @@ const caught = async (fn) => {
     // No force: git is satisfied because the work is now on main.
     const gone = await deleteBranch(git, { projectPath: dir, branch: 'feature' });
     check('the branch deletes without forcing', gone.ok === true, JSON.stringify(gone));
-    check('and is gone', !(await sh(dir, 'branch', '--format=%(refname:short)')).includes('feature'));
+    check(
+      'and is gone',
+      !(await sh(dir, 'branch', '--format=%(refname:short)')).includes('feature'),
+    );
     check('while its work stayed', fs.existsSync(path.join(dir, 'b.txt')));
   }
 
@@ -522,7 +594,7 @@ const caught = async (fn) => {
     check('and the refusal says why', /comes back to|main line/i.test(error || ''), error);
     check(
       'main is still there',
-      (await sh(dir, 'branch', '--format=%(refname:short)')).includes('main')
+      (await sh(dir, 'branch', '--format=%(refname:short)')).includes('main'),
     );
 
     // An ordinary branch in the same repository is unaffected — the guard is
@@ -555,7 +627,7 @@ const caught = async (fn) => {
     cleanup.push(wt);
 
     const { error } = await caught(() =>
-      deleteBranch(git, { projectPath: dir, branch: 'elsewhere' })
+      deleteBranch(git, { projectPath: dir, branch: 'elsewhere' }),
     );
     check('a branch held by another worktree is refused', !!error, error);
     // Git leads with a path nobody asked about; this should lead with the name.
@@ -579,11 +651,14 @@ const caught = async (fn) => {
     fs.writeFileSync(path.join(dir, 'shared.txt'), 'work in progress\n');
     const r = await switchBranch(git, { projectPath: dir, branch: 'feature' });
     check('a switch with unsaved work just happens', r.ok === true, JSON.stringify(r));
-    check('landing on the branch', (await sh(dir, 'rev-parse', '--abbrev-ref', 'HEAD')) === 'feature');
+    check(
+      'landing on the branch',
+      (await sh(dir, 'rev-parse', '--abbrev-ref', 'HEAD')) === 'feature',
+    );
     check(
       'with the work carried across',
       fs.readFileSync(path.join(dir, 'shared.txt'), 'utf8') === 'work in progress\n',
-      fs.readFileSync(path.join(dir, 'shared.txt'), 'utf8')
+      fs.readFileSync(path.join(dir, 'shared.txt'), 'utf8'),
     );
     check('nothing was parked', r.parked === false, JSON.stringify(r));
     check('and nothing was committed', (await sh(dir, 'log', '-1', '--format=%s')) === 'shared');
@@ -608,10 +683,13 @@ const caught = async (fn) => {
     check('naming the file in the way', (r.files || []).includes('a.txt'), JSON.stringify(r.files));
     // HEAD must not move: an editor that believes it switched when it did not
     // writes every later edit onto the wrong branch.
-    check('you are still where you were', (await sh(dir, 'rev-parse', '--abbrev-ref', 'HEAD')) === 'main');
+    check(
+      'you are still where you were',
+      (await sh(dir, 'rev-parse', '--abbrev-ref', 'HEAD')) === 'main',
+    );
     check(
       'and the work is untouched',
-      fs.readFileSync(path.join(dir, 'a.txt'), 'utf8') === 'unsaved work\n'
+      fs.readFileSync(path.join(dir, 'a.txt'), 'utf8') === 'unsaved work\n',
     );
   }
 
@@ -627,11 +705,13 @@ const caught = async (fn) => {
     // Starting a branch from what is in front of you means taking it with you.
     check(
       'with the work in progress on it',
-      fs.readFileSync(path.join(dir, 'a.txt'), 'utf8') === 'started something\n'
+      fs.readFileSync(path.join(dir, 'a.txt'), 'utf8') === 'started something\n',
     );
   }
 
-  for (const dir of cleanup) {fs.rmSync(dir, { recursive: true, force: true });}
+  for (const dir of cleanup) {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
 
   if (failures.length) {
     console.error(`git-branches: ${failures.length} of ${checked} failed\n${failures.join('\n')}`);

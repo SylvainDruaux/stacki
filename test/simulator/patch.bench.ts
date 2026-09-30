@@ -311,7 +311,14 @@ function seriesRow(name: string, scenario: Scenario, variant: string, runs: read
   const totals = runs.map((stages) => stages.total);
   const offPath = runs.map((stages) => stages.total - stages.refresh);
   const engine = runs.map((stages) => engineOf(stages));
-  const medians = STAGES.map((stage) => format(percentile(runs.map((s) => s[stage]), 50)));
+  const medians = STAGES.map((stage) =>
+    format(
+      percentile(
+        runs.map((s) => s[stage]),
+        50,
+      ),
+    ),
+  );
   const cells = [format(percentile(totals, 50)), format(percentile(totals, 95))];
   const offCells = [format(percentile(offPath, 95)), format(percentile(engine, 95))];
   const row = [name, scenario, variant, ...cells, ...offCells, ...medians];
