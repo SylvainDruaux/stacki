@@ -30,16 +30,16 @@ const check = (what, condition, detail) => {
   }
 };
 
-const box = (x, y, w, h) => ({ x, y, w, h });
+const box = (x, y, width, height) => ({ x, y, w: width, h: height });
 // What a stack of translucent fills comes to, so the numbers here are the ones
 // that were on the screen rather than a count of divs.
-const stacked = (n, a = 0.14) => 1 - (1 - a) ** n;
+const stacked = (layers, opacity = 0.14) => 1 - (1 - opacity) ** layers;
 
 (async () => {
   const esbuild = require('esbuild');
-  const buildDir = path.join(__dirname, '..', 'node_modules', '.stacki-test');
-  fs.mkdirSync(buildDir, { recursive: true });
-  const bundlePath = path.join(buildDir, 'outline-boxes.bundle.js');
+  const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
+  fs.mkdirSync(buildDirectory, { recursive: true });
+  const bundlePath = path.join(buildDirectory, 'outline-boxes.bundle.js');
   await esbuild.build({
     entryPoints: [path.join(__dirname, '..', 'src', 'outlineBoxes.js')],
     outfile: bundlePath,
@@ -80,10 +80,10 @@ const stacked = (n, a = 0.14) => 1 - (1 - a) ** n;
   check(
     'in the order they are on the page',
     onePerPlace(items)
-      .map((b) => b.y)
+      .map((box) => box.y)
       .join(',') === '0,220,440',
     onePerPlace(items)
-      .map((b) => b.y)
+      .map((box) => box.y)
       .join(','),
   );
   check(
@@ -123,14 +123,14 @@ const stacked = (n, a = 0.14) => 1 - (1 - a) ** n;
   // selection whichever copy is selected.
   check(
     'a navigator hover on the selected node draws nothing extra',
-    hoverIsSelection({ path: '0.1', occ: null }, at('0.1', 2)),
+    hoverIsSelection({ path: '0.1', occ: undefined }, at('0.1', 2)),
   );
   check(
     'a navigator hover on another node still draws',
-    !hoverIsSelection({ path: '0.1', occ: null }, at('0.2', 0)),
+    !hoverIsSelection({ path: '0.1', occ: undefined }, at('0.2', 0)),
   );
-  check('nothing hovered is not the selection', !hoverIsSelection(null, at('0.1', 0)));
-  check('and nothing selected leaves the hover alone', !hoverIsSelection(at('0.1', 0), null));
+  check('nothing hovered is not the selection', !hoverIsSelection(undefined, at('0.1', 0)));
+  check('and nothing selected leaves the hover alone', !hoverIsSelection(at('0.1', 0), undefined));
 
   // --- stepping within the copy you are looking at ---------------------------
   // Which copy of a looped node is selected rides beside the path, because the
@@ -151,7 +151,7 @@ const stacked = (n, a = 0.14) => 1 - (1 - a) ** n;
   check('a cousin is somewhere else too', !sameCopy('0.1.2.0', '0.1.3.0'));
   check('and so is the same path in another file', !sameCopy('src/A.astro|0.1', 'src/B.astro|0.1'));
   check('within one file it still counts', sameCopy('src/A.astro|0.1.0', 'src/A.astro|0.1'));
-  check('nothing selected before is not a step', !sameCopy(null, '0.1'));
+  check('nothing selected before is not a step', !sameCopy(undefined, '0.1'));
   check('and neither is standing still', !sameCopy('0.1', '0.1'));
 
   // --- the overlay uses it ---------------------------------------------------
@@ -165,7 +165,7 @@ const stacked = (n, a = 0.14) => 1 - (1 - a) ** n;
   );
   check(
     'a navigator hover draws one box per place',
-    /outline\.occ === null \? onePerPlace\(all\)/.test(overlays),
+    /outline\.occ === undefined \? onePerPlace\(all\)/.test(overlays),
     'the hover outlines are back to one box per run',
   );
   check(
@@ -177,12 +177,12 @@ const stacked = (n, a = 0.14) => 1 - (1 - a) ** n;
   );
   check(
     'a step within a copy keeps it',
-    /if \(sameCopy\(previous, selPath\)\) \{[\s\S]{0,30}return;/.test(runtime),
+    /if \(sameCopy\(previous, selectedPath\)\) \{[\s\S]{0,30}return;/.test(runtime),
     'every selection outside the canvas is back to meaning the first copy',
   );
   check(
     'and so does the dimming around a component being edited',
-    /onePerPlace\(rects\[path\]\)/.test(overlays),
+    /onePerPlace\(rects\[path\] \?\? undefined\)/.test(overlays),
     'the focus scrim stacks, so the page goes black instead of dim',
   );
 
@@ -234,7 +234,7 @@ const stacked = (n, a = 0.14) => 1 - (1 - a) ** n;
     { url: 'http://localhost:4321/#avb-design', pretendToBeVisual: true },
   );
   const { window } = dom;
-  // jsdom lays nothing out, so every box would be zero and nothing would be
+  // `jsdom` lays nothing out, so every box would be zero and nothing would be
   // measurable. Each element carries the name of a box, and the boxes live here
   // — so a "style change" can move an element without touching the DOM around
   // it, which is exactly what a stylesheet does.
@@ -261,8 +261,17 @@ const stacked = (n, a = 0.14) => 1 - (1 - a) ** n;
     'link-three': [260, 1600, 100, 20],
   };
   window.Element.prototype.getBoundingClientRect = function () {
-    const [x, y, w, h] = boxes[this.getAttribute('data-box')] || [0, 0, 0, 0];
-    return { x, y, width: w, height: h, left: x, top: y, right: x + w, bottom: y + h };
+    const [x, y, width, height] = boxes[this.getAttribute('data-box')] || [0, 0, 0, 0];
+    return {
+      x,
+      y,
+      width,
+      height,
+      left: x,
+      top: y,
+      right: x + width,
+      bottom: y + height,
+    };
   };
   const NO_BOX = { x: 0, y: 0, width: 0, height: 0, left: 0, top: 0, right: 0, bottom: 0 };
   window.Range.prototype.getBoundingClientRect = () => NO_BOX;
@@ -278,7 +287,7 @@ const stacked = (n, a = 0.14) => 1 - (1 - a) ** n;
   global.requestAnimationFrame = window.requestAnimationFrame.bind(window);
 
   const sent = [];
-  window.parent = { postMessage: (m) => sent.push(m) };
+  window.parent = { postMessage: (message) => sent.push(message) };
 
   const electron = {
     contextBridge: { exposeInMainWorld: () => {} },
@@ -298,12 +307,14 @@ const stacked = (n, a = 0.14) => 1 - (1 - a) ** n;
 
   // Asking for a node's boxes is what the app does on every selection and
   // hover; the answer comes back on the same turn.
-  const boxesFor = (p) => {
-    const ev = new window.MessageEvent('message', { data: { type: 'avb:track', paths: [p] } });
-    Object.defineProperty(ev, 'source', { value: window.parent });
-    window.dispatchEvent(ev);
-    const last = sent.filter((m) => m.type === 'avb:rects').pop();
-    return (last?.rects || {})[p] || [];
+  const boxesFor = (nodePath) => {
+    const event = new window.MessageEvent('message', {
+      data: { type: 'avb:track', paths: [nodePath] },
+    });
+    Object.defineProperty(event, 'source', { value: window.parent });
+    window.dispatchEvent(event);
+    const last = sent.filter((message) => message.type === 'avb:rects').pop();
+    return (last?.rects || {})[nodePath] || [];
   };
   // --- a heading a line splitter has rebuilt ---------------------------------
   // GSAP's SplitText (and every library like it) rebuilds a heading into one
@@ -335,15 +346,15 @@ const stacked = (n, a = 0.14) => 1 - (1 - a) ** n;
     check('each copy of the link is a box', boxes.length === 3, JSON.stringify(boxes));
     check(
       'in the order they are down the page',
-      boxes.map((b) => b.x).join(',') === '0,130,260',
-      JSON.stringify(boxes.map((b) => b.x)),
+      boxes.map((box) => box.x).join(',') === '0,130,260',
+      JSON.stringify(boxes.map((box) => box.x)),
     );
     // What the click reports, from the same list the boxes came from.
     const clickOn = (box) => {
-      const el = document.querySelector(`[data-box="${box}"]`);
+      const element = document.querySelector(`[data-box="${box}"]`);
       sent.length = 0;
-      el.dispatchEvent(new window.MouseEvent('click', { bubbles: true, cancelable: true }));
-      return sent.filter((m) => m.type === 'avb:click-node').pop();
+      element.dispatchEvent(new window.MouseEvent('click', { bubbles: true, cancelable: true }));
+      return sent.filter((message) => message.type === 'avb:click-node').pop();
     };
     const design = new window.MessageEvent('message', { data: { type: 'avb:design', on: true } });
     Object.defineProperty(design, 'source', { value: window.parent });
@@ -373,10 +384,13 @@ const stacked = (n, a = 0.14) => 1 - (1 - a) ** n;
 
   // A patch: the page is re-rendered around the nodes that are already there,
   // markers and all, and the app is told the document moved.
-  const patch = (p) => {
-    const el = document.querySelector(p === '0.1' ? 'section' : 'article');
-    el.parentNode.insertBefore(document.createComment(`avb-s:${p}`), el);
-    el.parentNode.insertBefore(document.createComment(`avb-e:${p}`), el.nextSibling);
+  const patch = (nodePath) => {
+    const element = document.querySelector(nodePath === '0.1' ? 'section' : 'article');
+    element.parentNode.insertBefore(document.createComment(`avb-s:${nodePath}`), element);
+    element.parentNode.insertBefore(
+      document.createComment(`avb-e:${nodePath}`),
+      element.nextSibling,
+    );
     document.dispatchEvent(new window.Event('avb:morphed'));
   };
 
@@ -433,7 +447,7 @@ const stacked = (n, a = 0.14) => 1 - (1 - a) ** n;
   // spacing box a hover applies to — from the app's side, nobody was pressing
   // anything. So the frame says what it heard.
   {
-    const heard = () => sent.filter((m) => m.type === 'avb:modifiers');
+    const heard = () => sent.filter((message) => message.type === 'avb:modifiers');
     sent.length = 0;
     window.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Shift', shiftKey: true }));
     check('shift on the page is forwarded', heard().length === 1, JSON.stringify(sent));
@@ -471,8 +485,8 @@ const stacked = (n, a = 0.14) => 1 - (1 - a) ** n;
   {
     // What the app last heard, with nobody asking again.
     const lastSent = () => {
-      const last = sent.filter((m) => m.type === 'avb:rects').pop();
-      return (last?.rects || {})['0.1']?.[0] || null;
+      const last = sent.filter((message) => message.type === 'avb:rects').pop();
+      return (last?.rects || {})['0.1']?.[0];
     };
     boxesFor('0.1'); // the app is watching this node
     // Whichever box the section is reading now (the block above replaced it).
@@ -485,7 +499,7 @@ const stacked = (n, a = 0.14) => 1 - (1 - a) ** n;
     await new Promise((resolve) => setTimeout(resolve, 60));
     check(
       'a stylesheet arriving re-measures the page',
-      sent.some((m) => m.type === 'avb:rects'),
+      sent.some((message) => message.type === 'avb:rects'),
       'nothing was measured',
     );
     check(
@@ -529,7 +543,7 @@ const stacked = (n, a = 0.14) => 1 - (1 - a) ** n;
   // reported one box per copy and lit whichever came first.
   {
     const inside = (path, focus, occ = 0) => {
-      const ev = new window.MessageEvent('message', {
+      const event = new window.MessageEvent('message', {
         data: {
           type: 'avb:track',
           paths: [path],
@@ -538,9 +552,9 @@ const stacked = (n, a = 0.14) => 1 - (1 - a) ** n;
           focusOcc: occ,
         },
       });
-      Object.defineProperty(ev, 'source', { value: window.parent });
-      window.dispatchEvent(ev);
-      const last = sent.filter((m) => m.type === 'avb:rects').pop();
+      Object.defineProperty(event, 'source', { value: window.parent });
+      window.dispatchEvent(event);
+      const last = sent.filter((message) => message.type === 'avb:rects').pop();
       return (last?.rects || {})[path] || [];
     };
     const TEXT = 'src/components/Card.astro|0.0.0.1';

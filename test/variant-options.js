@@ -26,6 +26,10 @@
 const fs = require('fs');
 const path = require('path');
 
+// The DOM answers "none" with null. The fakes below that stand in for DOM APIs
+// return the platform's own value, read from JSON because our code never writes one.
+const PLATFORM_NULL = JSON.parse('null');
+
 const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
@@ -77,9 +81,9 @@ const BUTTON = [
 
 (async () => {
   const esbuild = require('esbuild');
-  const buildDir = path.join(__dirname, '..', 'node_modules', '.stacki-test');
-  fs.mkdirSync(buildDir, { recursive: true });
-  const bundle = path.join(buildDir, 'variant-options.bundle.js');
+  const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
+  fs.mkdirSync(buildDirectory, { recursive: true });
+  const bundle = path.join(buildDirectory, 'variant-options.bundle.js');
   await esbuild.build({
     entryPoints: [path.join(__dirname, '..', 'src', 'panels', 'PropsPanel.jsx')],
     outfile: bundle,
@@ -124,7 +128,7 @@ const BUTTON = [
   });
   dom.window.Range.prototype.getClientRects = () => ({
     length: 0,
-    item: () => null,
+    item: () => PLATFORM_NULL,
     [Symbol.iterator]: function* () {},
   });
 
@@ -139,16 +143,17 @@ const BUTTON = [
 
   check(
     'the component parses as a union',
-    !!schema.find((f) => f.unions),
-    JSON.stringify(schema.map((f) => f.name)),
+    !!schema.find((field) => field.unions),
+    JSON.stringify(schema.map((field) => field.name)),
   );
   check(
     'and variant knows all four values',
-    (schema.find((f) => f.name === 'variant')?.options || []).join() === 'main,play,close,arrow',
-    JSON.stringify(schema.find((f) => f.name === 'variant')?.options),
+    (schema.find((field) => field.name === 'variant')?.options || []).join() ===
+      'main,play,close,arrow',
+    JSON.stringify(schema.find((field) => field.name === 'variant')?.options),
   );
 
-  const str = (value) => ({ type: 'string', value });
+  const stringValue = (value) => ({ type: 'string', value });
   const mount = async (props) => {
     const host = dom.window.document.getElementById('root');
     const root = createRoot(host);
@@ -171,9 +176,9 @@ const BUTTON = [
     // The field for one prop, whichever control it drew: the row is labelled
     // with the prop's name.
     const fieldFor = (name) =>
-      [...host.querySelectorAll('.props-field')].find((f) =>
-        [...f.querySelectorAll('.props-label, label, .props-label-text')].some(
-          (l) => l.textContent.trim().replace(/\s+\{\}$/, '') === name,
+      [...host.querySelectorAll('.props-field')].find((field) =>
+        [...field.querySelectorAll('.props-label, label, .props-label-text')].some(
+          (label) => label.textContent.trim().replace(/\s+\{\}$/, '') === name,
         ),
       );
     // What that field is offering, from either control it can be: a two-value
@@ -181,21 +186,21 @@ const BUTTON = [
     const offered = async (name) => {
       const field = fieldFor(name);
       if (!field) {
-        return null;
+        return undefined;
       }
       const seg = [...field.querySelectorAll('.props-seg-btn, .seg-btn, button[data-value]')];
       if (seg.length) {
-        return seg.map((b) => b.textContent.trim());
+        return seg.map((button) => button.textContent.trim());
       }
       const trigger = field.querySelector('.dd-trigger');
       if (!trigger) {
-        return null;
+        return undefined;
       }
       await act(async () => {
         trigger.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }));
       });
-      const list = [...dom.window.document.querySelectorAll('.dd-option-label')].map((o) =>
-        o.textContent.trim(),
+      const list = [...dom.window.document.querySelectorAll('.dd-option-label')].map((option) =>
+        option.textContent.trim(),
       );
       await act(async () => {
         dom.window.document.dispatchEvent(
@@ -220,39 +225,42 @@ const BUTTON = [
   // A paused play button: variant="play", pressed set. The close and arrow
   // branches both say `pressed?: never`.
   {
-    const m = await mount({ variant: str('play'), pressed: { type: 'expr', value: 'true' } });
-    const list = await m.offered('variant');
-    check('the variant field is there', list !== null, m.host.textContent.slice(0, 200));
-    for (const v of ['main', 'play', 'close', 'arrow']) {
+    const mounted = await mount({
+      variant: stringValue('play'),
+      pressed: { type: 'expr', value: 'true' },
+    });
+    const list = await mounted.offered('variant');
+    check('the variant field is there', list !== null, mounted.host.textContent.slice(0, 200));
+    for (const value of ['main', 'play', 'close', 'arrow']) {
       check(
-        `a paused play button is still offered ${v}`,
-        (list || []).includes(v),
+        `a paused play button is still offered ${value}`,
+        (list || []).includes(value),
         JSON.stringify(list),
       );
     }
-    await m.done();
+    await mounted.done();
   }
 
   // The same button with nothing else set — the list can only have been
   // narrowed by `pressed`, so this is the control.
   {
-    const m = await mount({ variant: str('play') });
-    const list = await m.offered('variant');
+    const mounted = await mount({ variant: stringValue('play') });
+    const list = await mounted.offered('variant');
     check('and so is one that is not pressed', (list || []).length === 4, JSON.stringify(list));
-    await m.done();
+    await mounted.done();
   }
 
   // An arrow button, whose branch forbids `pressed` — the same list from the
   // other side.
   {
-    const m = await mount({ variant: str('arrow'), direction: str('back') });
-    const list = await m.offered('variant');
+    const mounted = await mount({ variant: stringValue('arrow'), direction: stringValue('back') });
+    const list = await mounted.offered('variant');
     check(
       'an arrow button offers every variant too',
       (list || []).length === 4,
       JSON.stringify(list),
     );
-    await m.done();
+    await mounted.done();
   }
 
   // --- what narrowing is still for ----------------------------------------------
@@ -261,21 +269,21 @@ const BUTTON = [
   // is allowed on all four variants — so choosing one settles nothing, and the
   // branch in force is what says which are available.
   {
-    const m = await mount({ variant: str('play') });
-    const list = await m.offered('emphasis');
+    const mounted = await mount({ variant: stringValue('play') });
+    const list = await mounted.offered('emphasis');
     check(
       'a play button is not offered link',
       !(list || []).includes('link'),
       JSON.stringify(list),
     );
     check('but is offered the two it has', (list || []).length === 2, JSON.stringify(list));
-    await m.done();
+    await mounted.done();
   }
   {
-    const m = await mount({ variant: str('main') });
-    const list = await m.offered('emphasis');
+    const mounted = await mount({ variant: stringValue('main') });
+    const list = await mounted.offered('emphasis');
     check('a main button is offered link', (list || []).includes('link'), JSON.stringify(list));
-    await m.done();
+    await mounted.done();
   }
 
   // --- and the switch it makes ---------------------------------------------------
@@ -284,8 +292,11 @@ const BUTTON = [
   // markup the component accepts. It does: the props the new branch forbids go
   // in the same edit.
   {
-    const m = await mount({ variant: str('play'), pressed: { type: 'expr', value: 'true' } });
-    const field = m.fieldFor('variant');
+    const mounted = await mount({
+      variant: stringValue('play'),
+      pressed: { type: 'expr', value: 'true' },
+    });
+    const field = mounted.fieldFor('variant');
     const trigger = field?.querySelector('.dd-trigger');
     if (!trigger) {
       check('picking close clears pressed', false, 'no variant dropdown to open');
@@ -294,7 +305,7 @@ const BUTTON = [
         trigger.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }));
       });
       const close = [...dom.window.document.querySelectorAll('.dd-option-label')].find(
-        (o) => o.textContent.trim() === 'close',
+        (option) => option.textContent.trim() === 'close',
       );
       if (!close) {
         check('picking close clears pressed', false, 'close was not in the list');
@@ -302,7 +313,7 @@ const BUTTON = [
         await act(async () => {
           close.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }));
         });
-        const patch = m.written[m.written.length - 1] || {};
+        const patch = mounted.written[mounted.written.length - 1] || {};
         check(
           'picking close writes close',
           patch.variant?.value === 'close',
@@ -315,7 +326,7 @@ const BUTTON = [
         );
       }
     }
-    await m.done();
+    await mounted.done();
   }
 
   // --- the rule, stated where it lives -------------------------------------------

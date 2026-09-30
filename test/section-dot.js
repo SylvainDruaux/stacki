@@ -34,8 +34,8 @@ const check = (what, condition, detail) => {
 
 (async () => {
   const esbuild = require('esbuild');
-  const buildDir = path.join(__dirname, '..', 'node_modules', '.stacki-test');
-  fs.mkdirSync(buildDir, { recursive: true });
+  const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
+  fs.mkdirSync(buildDirectory, { recursive: true });
 
   const { JSDOM } = require('jsdom');
   const dom = new JSDOM('<!doctype html><div id="root"></div>', { pretendToBeVisual: true });
@@ -60,7 +60,7 @@ const check = (what, condition, detail) => {
   const React = require('react');
   const { createRoot } = require('react-dom/client');
 
-  const bundle = path.join(buildDir, 'section-dot.bundle.js');
+  const bundle = path.join(buildDirectory, 'section-dot.bundle.js');
   await esbuild.build({
     stdin: {
       contents: `
@@ -114,7 +114,7 @@ const check = (what, condition, detail) => {
   const panel = document.createElement('div');
   document.body.appendChild(panel);
   const root = createRoot(panel);
-  const wait = (ms) => new Promise((r) => dom.window.setTimeout(r, ms));
+  const wait = (ms) => new Promise((resolve) => dom.window.setTimeout(resolve, ms));
 
   const select = async (id) => {
     setHost({
@@ -145,7 +145,8 @@ const check = (what, condition, detail) => {
   // The section by its title, and whether its header carries the dot.
   const sectionNamed = (label) =>
     [...panel.querySelectorAll('.embed-editor_section-block')].find(
-      (b) => b.querySelector('.embed-editor_section-title')?.textContent?.trim() === label,
+      (section) =>
+        section.querySelector('.embed-editor_section-title')?.textContent?.trim() === label,
     );
   const dotOn = (label) => !!sectionNamed(label)?.querySelector('.embed-editor_section-dot');
   const collapsed = (label) => !!sectionNamed(label)?.classList.contains('is-collapsed');
@@ -172,7 +173,7 @@ const check = (what, condition, detail) => {
     'the panel mounts with its sections',
     !!sectionNamed('Flex/Grid Child'),
     [...panel.querySelectorAll('.embed-editor_section-title')]
-      .map((t) => t.textContent)
+      .map((table) => table.textContent)
       .join(' | '),
   );
   check(
@@ -240,11 +241,13 @@ const check = (what, condition, detail) => {
   // It sits at the right edge, beside the chevron — not next to the label.
   const header = sectionNamed('Flex/Grid Child').querySelector('.embed-editor_section-header');
   const kids = [...header.children];
-  const dotAt = kids.findIndex((el) => el.classList.contains('embed-editor_section-dot'));
-  const chevronAt = kids.findIndex((el) =>
-    el.classList.contains('embed-editor_section-chevron-btn'),
+  const dotAt = kids.findIndex((element) => element.classList.contains('embed-editor_section-dot'));
+  const chevronAt = kids.findIndex((element) =>
+    element.classList.contains('embed-editor_section-chevron-btn'),
   );
-  const titleAt = kids.findIndex((el) => el.classList.contains('embed-editor_section-toggle'));
+  const titleAt = kids.findIndex((element) =>
+    element.classList.contains('embed-editor_section-toggle'),
+  );
   check('the dot sits after the label', dotAt > titleAt, `dot ${dotAt}, label ${titleAt}`);
   check(
     'and immediately before the chevron',
@@ -280,12 +283,12 @@ const check = (what, condition, detail) => {
   const empties = ['Backgrounds', 'Effects', 'Borders'];
   check(
     'the empty sections are on screen to be checked',
-    empties.every((l) => !!sectionNamed(l)),
+    empties.every((label) => !!sectionNamed(label)),
     [...panel.querySelectorAll('.embed-editor_section-title')]
-      .map((t) => t.textContent.trim())
+      .map((table) => table.textContent.trim())
       .join(' | '),
   );
-  const bare = empties.map((l) => [l, dotOf(l)]).filter(([, d]) => d !== 'none');
+  const bare = empties.map((label) => [label, dotOf(label)]).filter(([, dot]) => dot !== 'none');
   check('a section nothing styles has no dot', bare.length === 0, JSON.stringify(bare));
 
   root.unmount();
@@ -297,7 +300,7 @@ const check = (what, condition, detail) => {
   }
   console.log(`section-dot: ${checked} passed  [orange vs blue, right edge, closed only]`);
   process.exit(0);
-})().catch((err) => {
-  console.error(err);
+})().catch((error) => {
+  console.error(error);
   process.exit(1);
 });

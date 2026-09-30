@@ -28,9 +28,9 @@ const check = (what, condition, detail) => {
 
 (async () => {
   const esbuild = require('esbuild');
-  const buildDir = path.join(__dirname, '..', 'node_modules', '.stacki-test');
-  fs.mkdirSync(buildDir, { recursive: true });
-  const out = path.join(buildDir, 'popup-scroll.bundle.js');
+  const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
+  fs.mkdirSync(buildDirectory, { recursive: true });
+  const out = path.join(buildDirectory, 'popup-scroll.bundle.js');
   await esbuild.build({
     entryPoints: [path.join(__dirname, '..', 'src', 'ui', 'usePopupOpen.js')],
     outfile: out,
@@ -74,16 +74,16 @@ const check = (what, condition, detail) => {
   // The observers are async; jsdom delivers records on a microtask.
   const settle = () =>
     act(async () => {
-      await new Promise((r) => setTimeout(r, 0));
+      await new Promise((resolve) => setTimeout(resolve, 0));
     });
 
   const put = async (where, html) => {
     const node = dom.window.document.createElement('div');
     node.innerHTML = html;
-    const el = node.firstElementChild;
-    where.appendChild(el);
+    const element = node.firstElementChild;
+    where.appendChild(element);
     await settle();
-    return el;
+    return element;
   };
 
   check('nothing open, nothing locked', !locked());

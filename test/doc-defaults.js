@@ -28,16 +28,16 @@ const check = (what, condition, detail) => {
   }
 };
 
-const schemaFor = (doc) =>
+const schemaFor = (document) =>
   parsePropSchema(
-    `---\ninterface Props {\n  /** ${doc} */\n  thing?: string;\n}\n` +
+    `---\ninterface Props {\n  /** ${document} */\n  thing?: string;\n}\n` +
       `const { thing } = Astro.props;\n---\n<div>{thing}</div>\n`,
   );
 
-const field = (doc) => {
-  const schema = schemaFor(doc);
+const field = (document) => {
+  const schema = schemaFor(document);
   const list = Array.isArray(schema) ? schema : [...(schema?.values?.() ?? [])];
-  return list.find((f) => f.name === 'thing') || {};
+  return list.find((field) => field.name === 'thing') || {};
 };
 
 // One value, stated plainly: taken as the placeholder.
@@ -46,16 +46,20 @@ check('a single value becomes the default', plain.default === 'webp', JSON.strin
 check('a single value claims no hint', !plain.hint, JSON.stringify(plain));
 
 // Two values: no default may be claimed, whatever joins them.
-for (const [label, doc] of [
+for (const [label, document] of [
   ['for', 'Output format. Defaults to `webp`, or `svg` for SVG sources.'],
   ['when', 'What it says. Defaults to `Play`, or `Pause` when pressed.'],
   ['while', 'What it says. Defaults to `Play`, or `Pause` while pressed.'],
   ['going', 'Which way. Defaults to `Next`, or `Previous` going back.'],
   ['plain or', 'Which way. Defaults to `Next`, or `Previous`.'],
 ]) {
-  const f = field(doc);
-  check(`two values claim no default — ${label}`, f.default === undefined, JSON.stringify(f));
-  check(`two values leave a hint — ${label}`, !!f.hint, JSON.stringify(f));
+  const thingField = field(document);
+  check(
+    `two values claim no default — ${label}`,
+    thingField.default === undefined,
+    JSON.stringify(thingField),
+  );
+  check(`two values leave a hint — ${label}`, !!thingField.hint, JSON.stringify(thingField));
 }
 
 // Prose naming one value still needs a joining word to read as conditional.
@@ -97,8 +101,8 @@ const union = parsePropSchema(
   ].join('\n'),
 );
 const unionList = Array.isArray(union) ? union : [...(union?.values?.() ?? [])];
-const labelField = unionList.find((f) => f.name === 'label') || {};
-const table = (labelField.unions || []).find((u) => u.names.includes('label'));
+const labelField = unionList.find((field) => field.name === 'label') || {};
+const table = (labelField.unions || []).find((union) => union.names.includes('label'));
 
 check(
   'the field claims no default of its own',
@@ -108,10 +112,10 @@ check(
 check('the union is reported', !!table, JSON.stringify(labelField.unions));
 if (table) {
   const byVariant = {};
-  for (const b of table.branches) {
-    const pinned = (b.pins.variant || [])[0];
+  for (const branch of table.branches) {
+    const pinned = (branch.pins.variant || [])[0];
     if (pinned) {
-      byVariant[pinned] = b.defaults?.label;
+      byVariant[pinned] = branch.defaults?.label;
     }
   }
   check('play branch falls back to Play', byVariant.play === 'Play', JSON.stringify(byVariant));
@@ -121,13 +125,13 @@ if (table) {
 // A clause that names the prop it turns on is a rule, not just a warning that
 // there are two answers. The panel holds that prop's value already, so it can
 // weigh the rule and show the answer that actually applies.
-const ruleFor = (doc) => {
-  const src = [
+const ruleFor = (document) => {
+  const source = [
     '---',
     'type Props =',
     '  | {',
     '      variant: "arrow";',
-    `      /** ${doc} */`,
+    `      /** ${document} */`,
     '      label?: string;',
     '      direction?: "forward" | "back";',
     '    }',
@@ -136,11 +140,13 @@ const ruleFor = (doc) => {
     '---',
     '<button>{label}{variant}{direction}</button>',
   ].join('\n');
-  const list = [...parsePropSchema(src).values()];
-  const table = (list.find((f) => f.name === 'label')?.unions || []).find((u) =>
-    u.names.includes('label'),
+  const list = [...parsePropSchema(source).values()];
+  const table = (list.find((field) => field.name === 'label')?.unions || []).find((union) =>
+    union.names.includes('label'),
   );
-  const arrow = (table?.branches || []).find((b) => (b.pins.variant || []).includes('arrow'));
+  const arrow = (table?.branches || []).find((branch) =>
+    (branch.pins.variant || []).includes('arrow'),
+  );
   return arrow?.rules?.label;
 };
 
@@ -191,7 +197,7 @@ const shared = parsePropSchema(
     '<button>{label}{variant}</button>',
   ].join('\n'),
 );
-const sharedLabel = [...shared.values()].find((f) => f.name === 'label') || {};
+const sharedLabel = [...shared.values()].find((field) => field.name === 'label') || {};
 check(
   'the tip keeps what every branch says',
   sharedLabel.doc === 'What it says.',
@@ -211,7 +217,7 @@ const single = parsePropSchema(
     '<img alt="" data-f={format} />',
   ].join('\n'),
 );
-const only = [...single.values()].find((f) => f.name === 'format') || {};
+const only = [...single.values()].find((field) => field.name === 'format') || {};
 check(
   'a prop declared once keeps its whole doc',
   only.doc === 'Output format. Defaults to `webp`.',
@@ -233,10 +239,11 @@ const narrowed = parsePropSchema(
     '<button>{variant}{emphasis}</button>',
   ].join('\n'),
 );
-const emphasis = [...narrowed.values()].find((f) => f.name === 'emphasis') || {};
-const emTable = (emphasis.unions || []).find((u) => u.names.includes('emphasis'));
-const pinFor = (v) =>
-  (emTable?.branches || []).find((b) => (b.pins.variant || []).includes(v))?.pins?.emphasis;
+const emphasis = [...narrowed.values()].find((field) => field.name === 'emphasis') || {};
+const emTable = (emphasis.unions || []).find((union) => union.names.includes('emphasis'));
+const pinFor = (value) =>
+  (emTable?.branches || []).find((branch) => (branch.pins.variant || []).includes(value))?.pins
+    ?.emphasis;
 
 check(
   'every value is still offered by the prop',

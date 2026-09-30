@@ -267,14 +267,13 @@ function blockPlanPlaced(
   },
 ): 'placed' | 'misplaced' | 'unjudged' {
   const span = survivor.span;
-  const verdict = (right: boolean) => (right ? 'placed' : 'misplaced');
   switch (operation.tag) {
     case 'rewrite-node':
-      return verdict(splices.every((splice) => within(splice.range, span)));
+      return splices.every((splice) => within(splice.range, span)) ? 'placed' : 'misplaced';
     case 'remove-node':
-      return verdict(splices.some((splice) => within(span, splice.range)));
+      return splices.some((splice) => within(span, splice.range)) ? 'placed' : 'misplaced';
     case 'insert-node':
-      return verdict(splices.every((splice) => touches(splice.range, span)));
+      return splices.every((splice) => touches(splice.range, span)) ? 'placed' : 'misplaced';
     case 'move-node': {
       const destination = views.authored.nodes.find(
         (candidate) =>
@@ -297,7 +296,7 @@ function blockPlanPlaced(
       }
       const out = splices.filter((splice) => within(span, splice.range));
       const into = splices.filter((splice) => touches(splice.range, there.span));
-      return verdict(out.length > 0 && into.length > 0);
+      return out.length > 0 && into.length > 0 ? 'placed' : 'misplaced';
     }
     case 'set-attribute':
     case 'remove-attribute':

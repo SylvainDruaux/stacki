@@ -24,9 +24,9 @@ const check = (what, condition, detail) => {
 
 (async () => {
   const esbuild = require('esbuild');
-  const buildDir = path.join(__dirname, '..', 'node_modules', '.stacki-test');
-  fs.mkdirSync(buildDir, { recursive: true });
-  const bundlePath = path.join(buildDir, 'computed-color.bundle.js');
+  const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
+  fs.mkdirSync(buildDirectory, { recursive: true });
+  const bundlePath = path.join(buildDirectory, 'computed-color.bundle.js');
   await esbuild.build({
     stdin: {
       contents: `export { needsPage } from './lib/computed-color'`,
@@ -94,7 +94,7 @@ const check = (what, condition, detail) => {
     try {
       return require('electron');
     } catch {
-      return null;
+      return undefined;
     }
   })();
   if (typeof electronPath !== 'string') {
@@ -106,7 +106,7 @@ const check = (what, condition, detail) => {
   }
 
   const { spawnSync } = require('child_process');
-  const scriptPath = path.join(buildDir, 'computed-color.probe.js');
+  const scriptPath = path.join(buildDirectory, 'computed-color.probe.js');
   fs.writeFileSync(
     scriptPath,
     `const { app, BrowserWindow } = require('electron');
@@ -159,7 +159,7 @@ const check = (what, condition, detail) => {
      });`,
   );
   const run = spawnSync(electronPath, [scriptPath], { encoding: 'utf8', timeout: 60000 });
-  const line = (run.stdout || '').split('\n').find((l) => l.trim().startsWith('{'));
+  const line = (run.stdout || '').split('\n').find((line) => line.trim().startsWith('{'));
   if (!line) {
     check('the probe ran in a browser', false, (run.stderr || run.stdout || '').slice(0, 300));
   } else {

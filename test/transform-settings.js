@@ -28,17 +28,18 @@ const check = (what, condition, detail) => {
 
 (async () => {
   const esbuild = require('esbuild');
-  const buildDir = path.join(__dirname, '..', 'node_modules', '.stacki-test');
-  fs.mkdirSync(buildDir, { recursive: true });
-  const lib = (f) => JSON.stringify(path.join(__dirname, '..', 'src', 'style-panel', 'lib', f));
-  const entry = path.join(buildDir, 'transform-settings.entry.ts');
+  const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
+  fs.mkdirSync(buildDirectory, { recursive: true });
+  const lib = (file) =>
+    JSON.stringify(path.join(__dirname, '..', 'src', 'style-panel', 'lib', file));
+  const entry = path.join(buildDirectory, 'transform-settings.entry.ts');
   fs.writeFileSync(
     entry,
     `export * from ${lib('transform-settings.ts')};\n` +
       `export { parseTransforms, serializeTransforms } from ${lib('transform.ts')};\n` +
       `export { parseHideable, serializeHideable } from ${lib('hideable.ts')};\n`,
   );
-  const bundlePath = path.join(buildDir, 'transform-settings.bundle.js');
+  const bundlePath = path.join(buildDirectory, 'transform-settings.bundle.js');
   await esbuild.build({
     entryPoints: [entry],
     outfile: bundlePath,
@@ -180,26 +181,30 @@ const check = (what, condition, detail) => {
     check(
       'every dot round-trips',
       ORIGIN_PRESETS.every(
-        (p, i) =>
-          originPreset(parseOrigin(serializeOrigin({ x: p.x, y: p.y, z: '' }) || 'center')) === i,
+        (preset, i) =>
+          originPreset(
+            parseOrigin(serializeOrigin({ x: preset.x, y: preset.y, z: '' }) || 'center'),
+          ) === i,
       ),
     );
   }
 
   // --- Lifting the self perspective out --------------------------------------
   {
-    const t = takeSelfPerspective('perspective(500px) rotateX(0deg) rotateY(0deg) rotateZ(45deg)');
-    check('the distance comes out', t.distance === '500px', t.distance);
+    const taken = takeSelfPerspective(
+      'perspective(500px) rotateX(0deg) rotateY(0deg) rotateZ(45deg)',
+    );
+    check('the distance comes out', taken.distance === '500px', taken.distance);
     check(
       'and the layers are left behind',
-      t.rest === 'rotateX(0deg) rotateY(0deg) rotateZ(45deg)',
-      t.rest,
+      taken.rest === 'rotateX(0deg) rotateY(0deg) rotateZ(45deg)',
+      taken.rest,
     );
     // The rest has to be something parseTransforms can still read.
     check(
       'which still parse as layers',
-      parseTransforms(t.rest).length === 1,
-      JSON.stringify(parseTransforms(t.rest)),
+      parseTransforms(taken.rest).length === 1,
+      JSON.stringify(parseTransforms(taken.rest)),
     );
 
     // Written by hand somewhere other than the front — still found, because
@@ -300,20 +305,20 @@ const check = (what, condition, detail) => {
     };
     check(
       'it survives a reorder',
-      round(start, (r) => [r[1], r[0]]).startsWith('perspective(600px) '),
-      round(start, (r) => [r[1], r[0]]),
+      round(start, (layers) => [layers[1], layers[0]]).startsWith('perspective(600px) '),
+      round(start, (layers) => [layers[1], layers[0]]),
     );
     check(
       'it survives hiding a layer',
-      round(start, (r) => r.map((x, i) => (i === 0 ? { ...x, hidden: true } : x))).startsWith(
-        'perspective(600px) ',
-      ),
-      round(start, (r) => r.map((x, i) => (i === 0 ? { ...x, hidden: true } : x))),
+      round(start, (layers) =>
+        layers.map((x, i) => (i === 0 ? { ...x, hidden: true } : x)),
+      ).startsWith('perspective(600px) '),
+      round(start, (layers) => layers.map((x, i) => (i === 0 ? { ...x, hidden: true } : x))),
     );
     check(
       'it survives removing one',
-      round(start, (r) => r.slice(1)).startsWith('perspective(600px) '),
-      round(start, (r) => r.slice(1)),
+      round(start, (layers) => layers.slice(1)).startsWith('perspective(600px) '),
+      round(start, (layers) => layers.slice(1)),
     );
     check(
       'it survives removing them all',
@@ -322,13 +327,13 @@ const check = (what, condition, detail) => {
     );
     check(
       'it survives hiding them all',
-      round(start, (r) => r.map((x) => ({ ...x, hidden: true }))).startsWith(
+      round(start, (layers) => layers.map((x) => ({ ...x, hidden: true }))).startsWith(
         'perspective(600px) /*',
       ),
-      round(start, (r) => r.map((x) => ({ ...x, hidden: true }))),
+      round(start, (layers) => layers.map((x) => ({ ...x, hidden: true }))),
     );
     // And the layers are still all there afterwards.
-    const after = round(start, (r) => r);
+    const after = round(start, (layers) => layers);
     check('and nothing else changed', after === start, after);
   }
 
@@ -339,7 +344,7 @@ const check = (what, condition, detail) => {
   // through the real section rather than the popup alone, so the button, the
   // popover and the writes are all exercised the way a press exercises them.
   {
-    const bundle2 = path.join(buildDir, 'effects.bundle.js');
+    const bundle2 = path.join(buildDirectory, 'effects.bundle.js');
     await esbuild.build({
       entryPoints: [path.join(__dirname, '..', 'src', 'style-panel', 'EffectsSection.tsx')],
       outfile: bundle2,
@@ -362,7 +367,7 @@ const check = (what, condition, detail) => {
     global.Node = dom.window.Node;
     global.getComputedStyle = dom.window.getComputedStyle;
     global.MutationObserver = dom.window.MutationObserver;
-    global.requestAnimationFrame = (fn) => setTimeout(fn, 0);
+    global.requestAnimationFrame = (callback) => setTimeout(callback, 0);
     global.cancelAnimationFrame = clearTimeout;
     global.ResizeObserver = class {
       observe() {}
@@ -384,7 +389,7 @@ const check = (what, condition, detail) => {
       const set = [];
       const cleared = [];
       const read = (prop) =>
-        decls[prop] != null
+        decls[prop] !== undefined
           ? {
               source: 'selected',
               overridden: false,
@@ -406,9 +411,9 @@ const check = (what, condition, detail) => {
           }),
         );
       });
-      const click = async (el) => {
+      const click = async (element) => {
         await act(async () => {
-          el.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }));
+          element.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }));
         });
       };
       // Typing, as React sees it. Setting `.value` straight goes through React's
@@ -447,15 +452,15 @@ const check = (what, condition, detail) => {
       };
     };
 
-    const m = await mount({ transform: 'rotateX(0deg) rotateY(0deg) rotateZ(45deg)' });
+    const mounted = await mount({ transform: 'rotateX(0deg) rotateY(0deg) rotateZ(45deg)' });
     check(
       'the transform list has a settings button',
-      !!m.trigger(),
-      m.host.innerHTML.slice(0, 200),
+      !!mounted.trigger(),
+      mounted.host.innerHTML.slice(0, 200),
     );
     check('and it is closed to begin with', !document.querySelector('.embed-editor_tsettings'));
 
-    await m.click(m.trigger());
+    await mounted.click(mounted.trigger());
     const popup = document.querySelector('.embed-editor_tsettings');
     check('pressing it opens the settings', !!popup, document.body.innerHTML.slice(-300));
     if (popup) {
@@ -471,16 +476,18 @@ const check = (what, condition, detail) => {
       // computes, and falls back to the CSS initial value with no canvas to ask —
       // the same rule every other unset control in the panel follows.
       const segs = [...popup.querySelectorAll('[aria-label="Backface visibility"] button')];
-      const lit = segs.filter((b) => b.getAttribute('aria-checked') === 'true');
+      const lit = segs.filter((button) => button.getAttribute('aria-checked') === 'true');
       check(
         'with one of its segments lit even though nothing is set',
         lit.length === 1,
-        JSON.stringify(segs.map((b) => [b.textContent, b.getAttribute('aria-checked')])),
+        JSON.stringify(
+          segs.map((button) => [button.textContent, button.getAttribute('aria-checked')]),
+        ),
       );
       check(
         'and it is Visible, which is what the element actually does',
         lit.length === 1 && (lit[0].textContent || '').trim() === 'Visible',
-        lit.map((b) => b.textContent).join(','),
+        lit.map((button) => button.textContent).join(','),
       );
       check('a transform-origin pad', !!popup.querySelector('[aria-label="Transform origin"]'));
       check(
@@ -495,53 +502,58 @@ const check = (what, condition, detail) => {
 
       // A pad dot writes the origin it shows.
       const pad = popup.querySelector('[aria-label="Transform origin"]');
-      await m.click(pad.querySelectorAll('button')[0]);
+      await mounted.click(pad.querySelectorAll('button')[0]);
       check(
         'a pad dot writes transform-origin',
-        m.set.some(([p, v]) => p === 'transform-origin' && v === '0% 0%'),
-        JSON.stringify(m.set),
+        mounted.set.some(
+          ([property, value]) => property === 'transform-origin' && value === '0% 0%',
+        ),
+        JSON.stringify(mounted.set),
       );
 
       // The centre is the default, so choosing it clears rather than writes.
-      await m.click(pad.querySelectorAll('button')[4]);
+      await mounted.click(pad.querySelectorAll('button')[4]);
       check(
         'and the centre clears it instead',
-        m.cleared.includes('transform-origin'),
-        JSON.stringify(m.cleared),
+        mounted.cleared.includes('transform-origin'),
+        JSON.stringify(mounted.cleared),
       );
 
       // Backface writes its own property, not the transform.
       const hidden = [...popup.querySelectorAll('[aria-label="Backface visibility"] button')].find(
-        (b) => (b.textContent || '').trim() === 'Hidden',
+        (button) => (button.textContent || '').trim() === 'Hidden',
       );
-      await m.click(hidden);
+      await mounted.click(hidden);
       check(
         'Hidden writes backface-visibility',
-        m.set.some(([p, v]) => p === 'backface-visibility' && v === 'hidden'),
-        JSON.stringify(m.set),
+        mounted.set.some(
+          ([property, value]) => property === 'backface-visibility' && value === 'hidden',
+        ),
+        JSON.stringify(mounted.set),
       );
 
       // The two perspectives are different CSS, and the popup must not confuse
       // them: children writes the `perspective` property, self writes into the
       // element's own transform.
       const child = popup.querySelector('input[aria-label="Children perspective distance"]');
-      await m.type(child, '500');
+      await mounted.type(child, '500');
       check(
         'children perspective writes the property',
-        m.set.some(([p, v]) => p === 'perspective' && v === '500px'),
-        JSON.stringify(m.set),
+        mounted.set.some(([property, value]) => property === 'perspective' && value === '500px'),
+        JSON.stringify(mounted.set),
       );
       check(
         'and never touches the transform',
-        !m.set.some(([p, v]) => p === 'transform' && v.includes('perspective')) ||
-          m.set.filter(([p]) => p === 'transform').length === 0,
-        JSON.stringify(m.set.filter(([p]) => p === 'transform')),
+        !mounted.set.some(
+          ([property, value]) => property === 'transform' && value.includes('perspective'),
+        ) || mounted.set.filter(([property]) => property === 'transform').length === 0,
+        JSON.stringify(mounted.set.filter(([property]) => property === 'transform')),
       );
 
       const self = popup.querySelector('input[aria-label="Self perspective distance"]');
-      await m.type(self, '500');
-      const wrote = m.set.filter(([p]) => p === 'transform').pop();
-      check('self perspective writes into the transform', !!wrote, JSON.stringify(m.set));
+      await mounted.type(self, '500');
+      const wrote = mounted.set.filter(([property]) => property === 'transform').pop();
+      check('self perspective writes into the transform', !!wrote, JSON.stringify(mounted.set));
       // In front, which is the half that decides what it means.
       check(
         'at the front of the list',
@@ -555,21 +567,24 @@ const check = (what, condition, detail) => {
         JSON.stringify(wrote),
       );
     }
-    await m.done();
+    await mounted.done();
 
     // A declared value still decides — the fallback only fills a gap.
     {
-      const h = await mount({ transform: 'rotateZ(45deg)', 'backface-visibility': 'hidden' });
-      await h.click(h.trigger());
+      const declared = await mount({
+        transform: 'rotateZ(45deg)',
+        'backface-visibility': 'hidden',
+      });
+      await declared.click(declared.trigger());
       const lit = [
         ...document.querySelectorAll('[aria-label="Backface visibility"] button'),
-      ].filter((b) => b.getAttribute('aria-checked') === 'true');
+      ].filter((button) => button.getAttribute('aria-checked') === 'true');
       check(
         'a declared backface lights its own segment',
         lit.length === 1 && (lit[0].textContent || '').trim() === 'Hidden',
-        lit.map((b) => b.textContent).join(','),
+        lit.map((button) => button.textContent).join(','),
       );
-      await h.done();
+      await declared.done();
     }
 
     // The regression this whole lifting-out exists for: an element that ALREADY
@@ -578,18 +593,18 @@ const check = (what, condition, detail) => {
     // it does not know — so without lifting it out first, adding a layer would
     // quietly delete the perspective.
     {
-      const e = await mount({
+      const lifted = await mount({
         transform: 'perspective(600px) rotateX(0deg) rotateY(0deg) rotateZ(45deg)',
       });
       // It is a setting, not a layer: it must not show up as a row in the list.
       check(
         'a self perspective is not a layer in the list',
-        e.host.querySelectorAll('.embed-editor_bg-layer').length === 1,
-        String(e.host.querySelectorAll('.embed-editor_bg-layer').length),
+        lifted.host.querySelectorAll('.embed-editor_bg-layer').length === 1,
+        String(lifted.host.querySelectorAll('.embed-editor_bg-layer').length),
       );
 
-      await e.click(e.host.querySelector('button[aria-label="Add a transform"]'));
-      const added = e.set.filter(([p]) => p === 'transform').pop();
+      await lifted.click(lifted.host.querySelector('button[aria-label="Add a transform"]'));
+      const added = lifted.set.filter(([property]) => property === 'transform').pop();
       check(
         'adding a layer keeps the self perspective',
         !!added && added[1].startsWith('perspective(600px) '),
@@ -608,14 +623,14 @@ const check = (what, condition, detail) => {
 
       // And the settings popup reads the existing distance back out rather than
       // showing an empty field over a perspective that is really set.
-      await e.click(e.trigger());
+      await lifted.click(lifted.trigger());
       const field = document.querySelector('input[aria-label="Self perspective distance"]');
       check(
         'the popup shows the perspective already set',
         field && field.value === '600px',
         field && field.value,
       );
-      await e.done();
+      await lifted.done();
     }
   }
 
@@ -628,7 +643,7 @@ const check = (what, condition, detail) => {
     try {
       return require('electron');
     } catch {
-      return null;
+      return undefined;
     }
   })();
   if (typeof electronPath !== 'string') {
@@ -686,7 +701,7 @@ const check = (what, condition, detail) => {
   ];
 
   const { spawnSync } = require('child_process');
-  const probePath = path.join(buildDir, 'transform-settings.probe.js');
+  const probePath = path.join(buildDirectory, 'transform-settings.probe.js');
   fs.writeFileSync(
     probePath,
     `const { app, BrowserWindow } = require('electron');
@@ -715,14 +730,14 @@ const check = (what, condition, detail) => {
      });`,
   );
   const run = spawnSync(electronPath, [probePath], { encoding: 'utf8', timeout: 120000 });
-  const line = (run.stdout || '').split('\n').find((l) => l.trim().startsWith('['));
+  const line = (run.stdout || '').split('\n').find((line) => line.trim().startsWith('['));
   if (!line) {
     check('the browser probe ran', false, (run.stderr || run.stdout || '').slice(0, 400));
   } else {
     const out = JSON.parse(line);
-    const by = Object.fromEntries(out.map((r) => [r.name, r]));
-    for (const r of out) {
-      check(`the browser accepts the ${r.name} value`, r.kept !== '', `dropped: ${r.value}`);
+    const by = Object.fromEntries(out.map((row) => [row.name, row]));
+    for (const row of out) {
+      check(`the browser accepts the ${row.name} value`, row.kept !== '', `dropped: ${row.value}`);
     }
     // The point of the ordering: same two functions, different result.
     check(
@@ -791,7 +806,7 @@ const check = (what, condition, detail) => {
     `transform-settings: ${checked} passed  ` +
       `[origin, self vs children perspective, in a real browser]`,
   );
-})().catch((err) => {
-  console.error(err);
+})().catch((error) => {
+  console.error(error);
   process.exit(1);
 });

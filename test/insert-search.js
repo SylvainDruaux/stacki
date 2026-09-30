@@ -34,9 +34,9 @@ const check = (what, condition, detail) => {
 
 (async () => {
   const esbuild = require('esbuild');
-  const buildDir = path.join(__dirname, '..', 'node_modules', '.stacki-test');
-  fs.mkdirSync(buildDir, { recursive: true });
-  const out = path.join(buildDir, 'insert-rank.bundle.mjs');
+  const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
+  fs.mkdirSync(buildDirectory, { recursive: true });
+  const out = path.join(buildDirectory, 'insert-rank.bundle.mjs');
   await esbuild.build({
     entryPoints: [path.join(__dirname, '..', 'src', 'insertRank.js')],
     outfile: out,
@@ -56,7 +56,13 @@ const check = (what, condition, detail) => {
     sub: folder,
     cat: 'components',
   });
-  const tag = (t) => ({ type: 'element', tag: t, label: `<${t}>`, search: t, cat: 'elements' });
+  const tag = (tagName) => ({
+    type: 'element',
+    tag: tagName,
+    label: `<${tagName}>`,
+    search: tagName,
+    cat: 'elements',
+  });
   const ITEMS = [
     comp('Form', 'Form'),
     comp('FormattedDate', 'Utility'),
@@ -83,14 +89,17 @@ const check = (what, condition, detail) => {
     { type: 'text', label: 'Text', cat: 'other' },
   ];
 
-  const names = (q) => rankInsertItems(ITEMS, q).map((i) => i.label);
+  const names = (query) => rankInsertItems(ITEMS, query).map((i) => i.label);
 
   // --- a project's own things come first --------------------------------------------
   {
     const list = names('form');
     check('typing a word finds the component first', list[0] === 'Form', list.join(' | '));
-    const firstTag = list.findIndex((l) => l.startsWith('<') && l !== '<Image>');
-    const lastComp = list.reduce((at, l, i) => (l.startsWith('<') && l !== '<Image>' ? at : i), -1);
+    const firstTag = list.findIndex((label) => label.startsWith('<') && label !== '<Image>');
+    const lastComp = list.reduce(
+      (at, label, i) => (label.startsWith('<') && label !== '<Image>' ? at : i),
+      -1,
+    );
     check(
       'and no element sits above a component',
       firstTag === -1 || firstTag > lastComp,
@@ -117,7 +126,7 @@ const check = (what, condition, detail) => {
     );
     check(
       'along with everything in the folder called Form',
-      ['Choice', 'Fieldset', 'Input', 'Select', 'Textarea'].every((n) => done.includes(n)),
+      ['Choice', 'Fieldset', 'Input', 'Select', 'Textarea'].every((name) => done.includes(name)),
       done.join(' | '),
     );
     check('but nothing from another folder', !done.includes('Card'), done.join(' | '));

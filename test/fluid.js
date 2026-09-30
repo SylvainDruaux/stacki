@@ -70,14 +70,17 @@ const check = (what, condition, detail) => {
   );
   check(
     'a clamp with no viewport term is not fluid',
-    fluidCheck('clamp(1rem, 1.5rem, 2rem)') === null,
+    fluidCheck('clamp(1rem, 1.5rem, 2rem)') === undefined,
   );
-  check('a plain value is not fluid', fluidCheck('2rem') === null);
+  check('a plain value is not fluid', fluidCheck('2rem') === undefined);
   check(
     'an unreadable expression is left alone',
-    fluidCheck('clamp(1rem, min(2rem, 3vw), 4rem)') === null,
+    fluidCheck('clamp(1rem, min(2rem, 3vw), 4rem)') === undefined,
   );
-  check('a viewport range of zero is left alone', fluidCheck(fluid(16, 24, 320, 320)) === null);
+  check(
+    'a viewport range of zero is left alone',
+    fluidCheck(fluid(16, 24, 320, 320)) === undefined,
+  );
 
   // Resolution: the same value, built out of variables, and then edited.
   {
@@ -108,7 +111,7 @@ const check = (what, condition, detail) => {
     );
     check(
       'a half-typed number is not a value yet',
-      fluidCheck(resolveValue(value, values, { '--site-margin-min': '' })) === null,
+      fluidCheck(resolveValue(value, values, { '--site-margin-min': '' })) === undefined,
       JSON.stringify(fluidCheck(resolveValue(value, values, { '--site-margin-min': '' }))),
     );
   }

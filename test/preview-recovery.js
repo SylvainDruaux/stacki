@@ -40,7 +40,7 @@ const check = (what, condition, detail) => {
   }
 };
 
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 (async () => {
   // --- The probe, against a server that really answers ----------------------
@@ -50,30 +50,30 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     // Flips between serving a page and serving an error, like a dev server
     // either side of a compile error.
     let mode = 'ok';
-    const server = http.createServer((req, res) => {
+    const server = http.createServer((request, response) => {
       // Where a redirect lands always serves — otherwise the redirect below
       // points at itself and the fetch dies of a loop, which would be this
       // test's bug rather than the probe's.
-      if (req.url === '/landed') {
-        res.writeHead(200, { 'Content-Type': 'text/html' });
-        res.end('<html><body>landed</body></html>');
+      if (request.url === '/landed') {
+        response.writeHead(200, { 'Content-Type': 'text/html' });
+        response.end('<html><body>landed</body></html>');
         return;
       }
       if (mode === 'error') {
         // Astro's error screen: a 5xx with a big HTML body.
-        res.writeHead(500, { 'Content-Type': 'text/html' });
-        res.end(`<html><body>${'x'.repeat(50000)}</body></html>`);
+        response.writeHead(500, { 'Content-Type': 'text/html' });
+        response.end(`<html><body>${'x'.repeat(50000)}</body></html>`);
         return;
       }
       if (mode === 'redirect') {
-        res.writeHead(302, { Location: '/landed' });
-        res.end();
+        response.writeHead(302, { Location: '/landed' });
+        response.end();
         return;
       }
-      res.writeHead(200, { 'Content-Type': 'text/html' });
-      res.end('<html><body>the page</body></html>');
+      response.writeHead(200, { 'Content-Type': 'text/html' });
+      response.end('<html><body>the page</body></html>');
     });
-    await new Promise((r) => server.listen(0, '127.0.0.1', r));
+    await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
     const base = `http://127.0.0.1:${server.address().port}`;
 
     check('a served page is ok', (await probeUrl(`${base}/`)).ok === true);
@@ -99,7 +99,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
     // A server that isn't there yet is not a page either — the same verdict, so
     // the watch keeps asking rather than deciding it has recovered.
-    await new Promise((r) => server.close(r));
+    await new Promise((resolve) => server.close(resolve));
     const gone = await probeUrl(`${base}/`);
     check('an unreachable server is not ok', gone.ok === false, JSON.stringify(gone));
     check('and does not throw', gone.status === 0, JSON.stringify(gone));
@@ -111,9 +111,9 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   // --- The watch ------------------------------------------------------------
   const { createPreviewWatch } = await (async () => {
     const esbuild = require('esbuild');
-    const buildDir = path.join(__dirname, '..', 'node_modules', '.stacki-test');
-    fs.mkdirSync(buildDir, { recursive: true });
-    const out = path.join(buildDir, 'preview-recovery.bundle.js');
+    const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
+    fs.mkdirSync(buildDirectory, { recursive: true });
+    const out = path.join(buildDirectory, 'preview-recovery.bundle.js');
     await esbuild.build({
       entryPoints: [path.join(__dirname, '..', 'src', 'previewRecovery.js')],
       outfile: out,
@@ -148,18 +148,26 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
   // --- An ordinary edit: nothing was broken, so nothing reloads -------------
   {
-    const t = makeWatch([{ ok: true }]);
-    t.watch.poke();
+    const harness = makeWatch([{ ok: true }]);
+    harness.watch.poke();
     await sleep(80);
-    check('a healthy preview is asked about', t.asked.length >= 1, JSON.stringify(t.asked));
-    check('and is not reloaded', t.reloads() === 0, `${t.reloads()} reloads`);
+    check(
+      'a healthy preview is asked about',
+      harness.asked.length >= 1,
+      JSON.stringify(harness.asked),
+    );
+    check('and is not reloaded', harness.reloads() === 0, `${harness.reloads()} reloads`);
     // Repeatedly, because this is what every keystroke does.
     for (let i = 0; i < 5; i++) {
-      t.watch.poke();
+      harness.watch.poke();
       await sleep(15);
     }
-    check('and stays un-reloaded across many edits', t.reloads() === 0, `${t.reloads()} reloads`);
-    t.watch.stop();
+    check(
+      'and stays un-reloaded across many edits',
+      harness.reloads() === 0,
+      `${harness.reloads()} reloads`,
+    );
+    harness.watch.stop();
   }
 
   // --- Asking costs a page --------------------------------------------------
@@ -171,70 +179,82 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   // render nobody wanted to see, to be shown the one it did. A variant hovered
   // in a dropdown paid for two renders and showed one.
   {
-    const t = makeWatch([{ ok: true }]);
+    const harness = makeWatch([{ ok: true }]);
     for (let i = 0; i < 6; i++) {
-      t.watch.poke();
+      harness.watch.poke();
       await sleep(10);
     }
     await sleep(60);
     check(
       'a healthy preview is asked about once, not once per edit',
-      t.asked.length === 1,
-      `${t.asked.length} asks`,
+      harness.asked.length === 1,
+      `${harness.asked.length} asks`,
     );
     // …but not never: it is how a breakage is noticed at all.
     await sleep(140);
-    t.watch.poke();
+    harness.watch.poke();
     await sleep(40);
-    check('and again once the quiet spell is over', t.asked.length === 2, `${t.asked.length} asks`);
-    t.watch.stop();
+    check(
+      'and again once the quiet spell is over',
+      harness.asked.length === 2,
+      `${harness.asked.length} asks`,
+    );
+    harness.watch.stop();
   }
   {
     // A broken preview is a different matter: nothing is being rendered but an
     // error screen, and the answer is the whole point. The retry is held off
     // here so that what is measured is the poke and not the loop.
-    const t = makeWatch([{ ok: false }], { retryMs: 5000 });
-    t.watch.poke();
+    const harness = makeWatch([{ ok: false }], { retryMs: 5000 });
+    harness.watch.poke();
     await sleep(40);
-    const first = t.asked.length;
+    const first = harness.asked.length;
     check('a broken preview is asked about', first === 1, `${first} asks`);
-    t.watch.poke();
+    harness.watch.poke();
     await sleep(40);
     check(
       'and asked again on the next edit, quiet spell or not',
-      t.asked.length === 2,
-      `${first} → ${t.asked.length}`,
+      harness.asked.length === 2,
+      `${first} → ${harness.asked.length}`,
     );
-    t.watch.stop();
+    harness.watch.stop();
   }
 
   // --- Broken, then fixed ---------------------------------------------------
   {
     // Still compiling for the first two asks, then serving.
-    const t = makeWatch([{ ok: false }, { ok: false }, { ok: true }]);
-    t.watch.poke();
+    const harness = makeWatch([{ ok: false }, { ok: false }, { ok: true }]);
+    harness.watch.poke();
     await sleep(200);
-    check('a broken preview keeps being asked about', t.asked.length >= 3, JSON.stringify(t.asked));
-    check('and is reloaded once it serves again', t.reloads() === 1, `${t.reloads()} reloads`);
+    check(
+      'a broken preview keeps being asked about',
+      harness.asked.length >= 3,
+      JSON.stringify(harness.asked),
+    );
+    check(
+      'and is reloaded once it serves again',
+      harness.reloads() === 1,
+      `${harness.reloads()} reloads`,
+    );
     // And exactly once — a second reload would be a loop.
     await sleep(120);
-    check('exactly once', t.reloads() === 1, `${t.reloads()} reloads`);
-    t.watch.stop();
+    check('exactly once', harness.reloads() === 1, `${harness.reloads()} reloads`);
+    harness.watch.stop();
   }
 
   // --- It gives up asking when it recovers ----------------------------------
   {
-    const t = makeWatch([{ ok: false }, { ok: true }]);
-    t.watch.poke();
+    const harness = makeWatch([{ ok: false }, { ok: true }]);
+    harness.watch.poke();
     await sleep(120);
-    const settled = t.asked.length;
+    const settled = harness.asked.length;
     await sleep(150);
     check(
       'a recovered preview stops being polled',
-      t.asked.length === settled,
-      `${settled} → ${t.asked.length} asks`,
+      harness.asked.length === settled,
+      `${settled} → ${harness.asked.length} asks`,
     );
-    t.watch.stop();
+    harness.watch.stop();
   }
 
   // --- A probe that throws ---------------------------------------------------
@@ -264,21 +284,21 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
   // --- Stopping means stopping ----------------------------------------------
   {
-    const t = makeWatch([{ ok: false }]);
-    t.watch.poke();
+    const harness = makeWatch([{ ok: false }]);
+    harness.watch.poke();
     await sleep(60);
-    const seen = t.asked.length;
-    t.watch.stop();
+    const seen = harness.asked.length;
+    harness.watch.stop();
     await sleep(120);
     check(
       'stopping ends the polling',
-      t.asked.length === seen,
-      `${seen} → ${t.asked.length} asks after stop`,
+      harness.asked.length === seen,
+      `${seen} → ${harness.asked.length} asks after stop`,
     );
     check(
       'and a poke afterwards does nothing',
-      (t.watch.poke(), await sleep(40), t.asked.length === seen),
-      `${t.asked.length} asks`,
+      (harness.watch.poke(), await sleep(40), harness.asked.length === seen),
+      `${harness.asked.length} asks`,
     );
   }
 
@@ -294,14 +314,14 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
       path.join(__dirname, '..', 'dist', 'electron', 'projectWatcher.js'),
       'utf8',
     );
-    const at = source.indexOf('watchers.push(watch(srcDir');
+    const at = source.indexOf('watchers.push(watch(sourceDirectory');
     const handler = source.slice(at, source.indexOf('const publicDir', at));
     check('the src watcher is still there', at !== -1);
     // `(true)` — the watcher only ever hears about changes the app did not
     // make, and saying which kind it was is what lets the canvas be told
     // directly (see test/outside-edit.js).
     const poke = handler.indexOf('notePageMayHaveChanged(true)');
-    const firstBranchReturn = handler.indexOf('return debounce', handler.indexOf('.json$'));
+    const firstBranchReturn = handler.indexOf('sourceChangeChannel(');
     check('a change under src says the site may have changed', poke !== -1, handler.slice(0, 300));
     check(
       'before anything decides the kind is not interesting',
@@ -330,7 +350,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     process.exit(1);
   }
   console.log(`preview-recovery: ${checked} passed  [real 500s, and the edge]`);
-})().catch((err) => {
-  console.error(err);
+})().catch((error) => {
+  console.error(error);
   process.exit(1);
 });

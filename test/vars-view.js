@@ -82,15 +82,15 @@ const STYLESHEET = `/* =========================================================
 `;
 
 (async () => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'stacki-vars-'));
-  fs.mkdirSync(path.join(dir, 'src', 'styles'), { recursive: true });
-  const file = path.join(dir, 'src', 'styles', 'tokens.css');
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'stacki-vars-'));
+  fs.mkdirSync(path.join(directory, 'src', 'styles'), { recursive: true });
+  const file = path.join(directory, 'src', 'styles', 'tokens.css');
   fs.writeFileSync(file, STYLESHEET);
 
   const esbuild = require('esbuild');
-  const buildDir = path.join(__dirname, '..', 'node_modules', '.stacki-test');
-  fs.mkdirSync(buildDir, { recursive: true });
-  const bundlePath = path.join(buildDir, 'vars-view.bundle.js');
+  const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
+  fs.mkdirSync(buildDirectory, { recursive: true });
+  const bundlePath = path.join(buildDirectory, 'vars-view.bundle.js');
   await esbuild.build({
     entryPoints: [path.join(__dirname, '..', 'src', 'panels', 'VariablesView.jsx')],
     outfile: bundlePath,
@@ -120,29 +120,32 @@ const STYLESHEET = `/* =========================================================
   // What the sheet hands the app to undo with.
   const commands = [];
   dom.window.avb = {
-    cssVariables: async () => cssVars.readVariables(dir),
+    cssVariables: async () => cssVars.readVariables(directory),
     addCssVariables: async ({ adds }) => {
       let last = { ok: true };
-      for (const a of adds) {
-        last = cssVars.addVariable(dir, a);
+      for (const add of adds) {
+        last = cssVars.addVariable(directory, add);
       }
       return last;
     },
-    setCssVariable: async ({ projectPath, ...edit }) => cssVars.setVariable(dir, edit),
+    setCssVariable: async ({ projectPath, ...edit }) => cssVars.setVariable(directory, edit),
     moveCssVariables: async ({ moves }) => {
       let last = { ok: true };
       // The same split the main process makes: a group carries names, a row
       // does not.
       for (const move of moves) {
-        last = move.names ? cssVars.moveSection(dir, move) : cssVars.moveVariable(dir, move);
+        last = move.names
+          ? cssVars.moveSection(directory, move)
+          : cssVars.moveVariable(directory, move);
       }
       return last;
     },
-    renameCssVariables: async ({ renames }) => cssVars.renameVariables(dir, { renames }),
-    setCssSectionTitle: async ({ projectPath, ...edit }) => cssVars.setSectionTitle(dir, edit),
-    removeCssSection: async ({ projectPath, ...edit }) => cssVars.removeSection(dir, edit),
-    addCssSection: async ({ projectPath, ...edit }) => cssVars.addSection(dir, edit),
-    moveCssHeading: async ({ projectPath, ...edit }) => cssVars.moveHeading(dir, edit),
+    renameCssVariables: async ({ renames }) => cssVars.renameVariables(directory, { renames }),
+    setCssSectionTitle: async ({ projectPath, ...edit }) =>
+      cssVars.setSectionTitle(directory, edit),
+    removeCssSection: async ({ projectPath, ...edit }) => cssVars.removeSection(directory, edit),
+    addCssSection: async ({ projectPath, ...edit }) => cssVars.addSection(directory, edit),
+    moveCssHeading: async ({ projectPath, ...edit }) => cssVars.moveHeading(directory, edit),
     writeStyleFile: async ({ filePath, css }) => {
       fs.writeFileSync(String(filePath), css);
       return { ok: true };
@@ -156,8 +159,8 @@ const STYLESHEET = `/* =========================================================
     listAstroStyleFiles: async () => ({ files: [] }),
     // The picker asks for the stylesheet it knows about; the undo path asks for
     // whichever file an edit touched, by path.
-    readStyleFile: async (p) => ({
-      css: fs.readFileSync(typeof p === 'string' ? p : file, 'utf8'),
+    readStyleFile: async (filePath) => ({
+      css: fs.readFileSync(typeof filePath === 'string' ? filePath : file, 'utf8'),
     }),
   };
 
@@ -170,19 +173,19 @@ const STYLESHEET = `/* =========================================================
   const reactRoot = createRoot(container);
   const all = (selector) => [...container.querySelectorAll(selector)];
   const find = (selector) => container.querySelector(selector);
-  const texts = (selector) => all(selector).map((n) => n.textContent);
+  const texts = (selector) => all(selector).map((node) => node.textContent);
   // The name cell carries a glyph whose <title> is part of its text.
-  const rowNames = () => all('.vars-name-text').map((n) => n.textContent);
+  const rowNames = () => all('.vars-name-text').map((node) => node.textContent);
 
   const show = async (index) =>
     act(async () => {
       reactRoot.render(
         React.createElement(VariablesView, {
-          project: { path: dir },
+          project: { path: directory },
           selected: { file: 'src/styles/tokens.css', index },
           hidden: false,
           onClose: () => {},
-          showToast: (m) => toasts.push(m),
+          showToast: (message) => toasts.push(message),
           onRecordUndo: (cmd) => commands.push(cmd),
         }),
       );
@@ -210,11 +213,11 @@ const STYLESHEET = `/* =========================================================
   );
   check(
     'the swatch is the colour it resolves to',
-    all('.u-color-swatch-fill').some((n) =>
-      /255, 255, 255|#ffffff/.test(n.getAttribute('style') || ''),
+    all('.u-color-swatch-fill').some((swatch) =>
+      /255, 255, 255|#ffffff/.test(swatch.getAttribute('style') || ''),
     ),
     all('.u-color-swatch-fill')
-      .map((n) => n.getAttribute('style'))
+      .map((node) => node.getAttribute('style'))
       .join(' | '),
   );
   // A mix of known ingredients is a colour, and the swatch used to be handed
@@ -223,18 +226,18 @@ const STYLESHEET = `/* =========================================================
   {
     // Names and values are two columns of the same table, paired by position.
     const swatchFor = (name) => {
-      const named = all('.vars-fixed .vars-name-text').find((n) => n.textContent === name);
+      const named = all('.vars-fixed .vars-name-text').find((node) => node.textContent === name);
       const table = named?.closest('.vars-table');
       if (!table) {
-        return null;
+        return undefined;
       }
       const at = [...table.querySelectorAll('.vars-fixed .vars-name-text')].findIndex(
-        (n) => n.textContent === name,
+        (node) => node.textContent === name,
       );
       const valueRows = table.querySelectorAll(
         '.vars-scroll .vars-row:not(.is-head):not(.vars-section)',
       );
-      return valueRows[at]?.querySelector('.u-color-swatch-fill') || null;
+      return valueRows[at]?.querySelector('.u-color-swatch-fill') ?? undefined;
     };
     const fill = swatchFor('tint-100');
     const painted = fill?.getAttribute('style') || '';
@@ -265,20 +268,22 @@ const STYLESHEET = `/* =========================================================
   );
   check(
     'a colour row carries the colour glyph',
-    all('.vars-name svg title').some((n) => n.textContent === 'Colour'),
+    all('.vars-name svg title').some((node) => node.textContent === 'Colour'),
     all('.vars-name svg title')
-      .map((n) => n.textContent)
+      .map((node) => node.textContent)
       .join('|'),
   );
   check(
     'a unitless number carries the number glyph',
-    all('.vars-name svg title').some((n) => n.textContent === 'Number'),
+    all('.vars-name svg title').some((node) => node.textContent === 'Number'),
     all('.vars-name svg title')
-      .map((n) => n.textContent)
+      .map((node) => node.textContent)
       .join('|'),
   );
 
-  const headingTable = all('.vars-table').find((t) => t.textContent.includes('Heading styles'));
+  const headingTable = all('.vars-table').find((table) =>
+    table.textContent.includes('Heading styles'),
+  );
   check('a family becomes a table', !!headingTable);
   check(
     'with a column per heading',
@@ -287,25 +292,27 @@ const STYLESHEET = `/* =========================================================
   check(
     'and the shared properties as rows',
     headingTable &&
-      ['value', 'line-height', 'margin-top'].every((r) => headingTable.textContent.includes(r)),
+      ['value', 'line-height', 'margin-top'].every((property) =>
+        headingTable.textContent.includes(property),
+      ),
     headingTable?.textContent,
   );
 
   // --- fluid values a reader cannot enlarge ---------------------------------
   {
     const badgeFor = (name) => {
-      const row = all('.vars-fixed .vars-name-text').findIndex((n) => n.textContent === name);
+      const row = all('.vars-fixed .vars-name-text').findIndex((node) => node.textContent === name);
       if (row < 0) {
-        return null;
+        return undefined;
       }
       const table = all('.vars-fixed .vars-name-text')[row].closest('.vars-table');
       const at = [...table.querySelectorAll('.vars-fixed .vars-name-text')].findIndex(
-        (n) => n.textContent === name,
+        (node) => node.textContent === name,
       );
       const valueRows = table.querySelectorAll(
         '.vars-scroll .vars-row:not(.is-head):not(.vars-section)',
       );
-      return valueRows[at]?.querySelector('.fluid-badge') || null;
+      return valueRows[at]?.querySelector('.fluid-badge') ?? undefined;
     };
 
     const steep = badgeFor('too-steep');
@@ -367,9 +374,11 @@ const STYLESHEET = `/* =========================================================
     // Typing into a variable the clamp references re-checks it on the
     // keystroke, without saving anything.
     const table = all('.vars-fixed .vars-name-text')
-      .find((n) => n.textContent === 'too-steep')
+      .find((node) => node.textContent === 'too-steep')
       .closest('.vars-table');
-    const minInput = [...table.querySelectorAll('input.var-input')].find((n) => n.value === '16');
+    const minInput = [...table.querySelectorAll('input.var-input')].find(
+      (node) => node.value === '16',
+    );
     check(
       'the value it depends on is in the same table',
       !!minInput,
@@ -410,12 +419,12 @@ const STYLESHEET = `/* =========================================================
     await act(async () => settle(400));
     // The one built out of variables — the fixture has other clamps now, and
     // this case is about the chips inside a long value.
-    const long = all('input.var-input').find((n) => n.value.includes('var(--h1-min)'));
+    const long = all('input.var-input').find((node) => node.value.includes('var(--h1-min)'));
     check(
       'the long value is in the sheet',
       !!long,
       all('input.var-input')
-        .map((n) => n.value)
+        .map((node) => node.value)
         .join(' | '),
     );
     const cell = long.closest('.var-cell');
@@ -467,13 +476,14 @@ const STYLESHEET = `/* =========================================================
     check('every reference in it is a chip', chips.length === 3, `${chips.length} chips`);
     check(
       'each named after the variable it stands for',
-      chips.map((c) => c.textContent.trim()).join(',') === 'h1-min,h1-min,h1-max',
-      chips.map((c) => c.textContent.trim()).join(','),
+      chips.map((chip) => chip.textContent.trim()).join(',') === 'h1-min,h1-min,h1-max',
+      chips.map((chip) => chip.textContent.trim()).join(','),
     );
     check(
       'and each remembers its own',
-      chips.map((c) => c.dataset.binding).join(',') === 'var(--h1-min),var(--h1-min),var(--h1-max)',
-      chips.map((c) => c.dataset.binding).join(','),
+      chips.map((chip) => chip.dataset.binding).join(',') ===
+        'var(--h1-min),var(--h1-min),var(--h1-max)',
+      chips.map((chip) => chip.dataset.binding).join(','),
     );
 
     // Editing there writes the file, the same as editing in place.
@@ -495,7 +505,7 @@ const STYLESHEET = `/* =========================================================
     check('and closes the editor', !dom.window.document.querySelector('.var-custom'));
 
     // "=" opens it on any field, however short the value.
-    const short = all('input.var-input').find((n) => n.value === '1');
+    const short = all('input.var-input').find((node) => node.value === '1');
     await act(async () => {
       short.dispatchEvent(new dom.window.KeyboardEvent('keydown', { key: '=', bubbles: true }));
       await settle(40);
@@ -546,7 +556,7 @@ const STYLESHEET = `/* =========================================================
     // belongs to.
     {
       const other = all('.var-cell')
-        .filter((c) => c.querySelector('.embed-editor_varconnect-editor'))
+        .filter((cell) => cell.querySelector('.embed-editor_varconnect-editor'))
         .pop();
       await act(async () => {
         other
@@ -585,13 +595,13 @@ const STYLESHEET = `/* =========================================================
     // A value drawn with a chip in it runs wider than its own text, so counting
     // characters called cells readable when they were showing half an
     // expression. Layout is the authority wherever there is layout to read.
-    const editing = all('.var-cell').find((c) =>
-      c.querySelector('.embed-editor_varconnect-editor'),
+    const editing = all('.var-cell').find((cell) =>
+      cell.querySelector('.embed-editor_varconnect-editor'),
     );
     const field = editing?.querySelector('.embed-editor_varconnect-editor');
     check('the cells are fields that can be measured', !!field);
     if (field) {
-      // jsdom lays nothing out, so the widths are staged by hand — the reading
+      // `jsdom` lays nothing out, so the widths are staged by hand — the reading
       // a browser gives for a value overflowing its column.
       Object.defineProperty(field, 'clientWidth', { value: 120, configurable: true });
       Object.defineProperty(field, 'scrollWidth', { value: 260, configurable: true });
@@ -628,7 +638,9 @@ const STYLESHEET = `/* =========================================================
     // one of those selects the input's text — which focuses the input. That put
     // the caret in the hidden element behind every cell: the value looked
     // clickable and nothing typed into it.
-    const cell = all('.var-cell').find((c) => c.querySelector('.embed-editor_varconnect-editor'));
+    const cell = all('.var-cell').find((cell) =>
+      cell.querySelector('.embed-editor_varconnect-editor'),
+    );
     const editor = cell?.querySelector('.embed-editor_varconnect-editor');
     check('a cell is a rich field', !!editor);
     await act(async () => {
@@ -651,7 +663,7 @@ const STYLESHEET = `/* =========================================================
     // By the value itself: the names are in one stack and the values in the
     // other, and it is the value's own cell that carries the button.
     const cellShowing = (text) =>
-      all('.var-cell').find((c) => c.textContent.trim() === text) || null;
+      all('.var-cell').find((cell) => cell.textContent.trim() === text) ?? undefined;
     const easeCell = cellShowing('cubic-bezier(0.16, 1, 0.3, 1)');
     check(
       'a curve value offers the editor',
@@ -670,7 +682,7 @@ const STYLESHEET = `/* =========================================================
       `${glyph(easeCell)} vs ${glyph(cellShowing('linear'))}`,
     );
 
-    // jsdom measures everything as zero; give the sheet a box so the editor has
+    // `jsdom` measures everything as zero; give the sheet a box so the editor has
     // one to be placed over.
     const sheet = find('.vars-view') || container.querySelector('.cms-view');
     sheet.getBoundingClientRect = () => ({
@@ -758,12 +770,12 @@ const STYLESHEET = `/* =========================================================
     // when the editor closes, not per frame of a drag.
     const before = fs.readFileSync(file, 'utf8');
     const preset = [...modal.querySelectorAll('button')].find(
-      (b) => (b.getAttribute('title') || '') === 'Ease In Back',
+      (button) => (button.getAttribute('title') || '') === 'Ease In Back',
     );
     check(
       'the presets are there',
       !!preset,
-      [...modal.querySelectorAll('button')].map((b) => b.getAttribute('title')).join('|'),
+      [...modal.querySelectorAll('button')].map((button) => button.getAttribute('title')).join('|'),
     );
     await act(async () => {
       preset.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }));
@@ -854,7 +866,7 @@ const STYLESHEET = `/* =========================================================
   // --- editing a cell writes the file ---------------------------------------
   {
     const before = fs.readFileSync(file, 'utf8');
-    const input = all('input.var-input').find((n) => n.value === '#c6fb50');
+    const input = all('input.var-input').find((node) => node.value === '#c6fb50');
     check('the value is in a field, ready to type in', !!input);
     await act(async () => {
       const setter = Object.getOwnPropertyDescriptor(
@@ -895,7 +907,7 @@ const STYLESHEET = `/* =========================================================
     // The Swatches section: light-100, dark-900, brand-500. Drag the last one
     // to the top.
     const swatchRows = [...all('.vars-table')]
-      .find((t) => t.textContent.includes('Swatches'))
+      .find((table) => table.textContent.includes('Swatches'))
       .querySelectorAll('.vars-fixed .vars-row:not(.is-head):not(.vars-section):not(.vars-add)');
     const grip = swatchRows[2];
     const box = (node, top) => {
@@ -937,8 +949,8 @@ const STYLESHEET = `/* =========================================================
     const order = fs
       .readFileSync(file, 'utf8')
       .split('\n')
-      .filter((l) => /^\s*--(light|dark|brand)/.test(l))
-      .map((l) => l.trim().split(':')[0]);
+      .filter((line) => /^\s*--(light|dark|brand)/.test(line))
+      .map((line) => line.trim().split(':')[0]);
     check(
       'dragging a row to the top moves its line in the file',
       order[0] === '--brand-500',
@@ -954,14 +966,16 @@ const STYLESHEET = `/* =========================================================
     const heads = all('.vars-fixed .vars-section');
     check(
       'group headings are rows with a grip',
-      heads.every((h) => h.querySelector('.vars-grip')),
+      heads.every((head) => head.querySelector('.vars-grip')),
     );
     // The value side's counterpart has to measure the same as the rows under
     // it, or its rule stops at the edge of the scroller while theirs run the
     // full width of the columns.
     // Each table has its own column count — a matrix brings its own — so the
     // comparison is within a table, not across the sheet.
-    const tables = all('.vars-table').filter((t) => t.querySelector('.vars-scroll .vars-section'));
+    const tables = all('.vars-table').filter((table) =>
+      table.querySelector('.vars-scroll .vars-section'),
+    );
     check(
       'the heading rule runs as wide as the columns do',
       tables.length > 0 &&
@@ -971,23 +985,25 @@ const STYLESHEET = `/* =========================================================
           return !head || section.style.gridTemplateColumns === head.style.gridTemplateColumns;
         }),
       tables
-        .map((t) => {
-          const s2 = t.querySelector('.vars-scroll .vars-section')?.style.gridTemplateColumns;
-          const h = t.querySelector('.vars-scroll .vars-row.is-head')?.style.gridTemplateColumns;
-          return `${s2} vs ${h}`;
+        .map((table) => {
+          const sectionColumns = table.querySelector('.vars-scroll .vars-section')?.style
+            .gridTemplateColumns;
+          const headColumns = table.querySelector('.vars-scroll .vars-row.is-head')?.style
+            .gridTemplateColumns;
+          return `${sectionColumns} vs ${headColumns}`;
         })
         .join(' | '),
     );
     check(
       'and their text starts where the variable names do',
-      heads.every((h) => h.querySelector('.vars-section-text')),
-      heads.map((h) => h.textContent).join('|'),
+      heads.every((head) => head.querySelector('.vars-section-text')),
+      heads.map((head) => head.textContent).join('|'),
     );
   }
 
   // --- adding a variable to a group ------------------------------------------
   {
-    const swatchTable = all('.vars-table').find((t) => t.textContent.includes('Swatches'));
+    const swatchTable = all('.vars-table').find((table) => table.textContent.includes('Swatches'));
     const addRow = swatchTable.querySelector('.vars-fixed .vars-add');
     check('every group ends with a way to add one', !!addRow, swatchTable.innerHTML.slice(-200));
     check('and it reads as a row', addRow.classList.contains('vars-row'));
@@ -1024,8 +1040,8 @@ const STYLESHEET = `/* =========================================================
     check('the variable is written', written.includes('--mid-500:'), written.slice(0, 300));
     // Landing in the group means landing directly under that group's last
     // variable, wherever the group itself has ended up.
-    const lines = written.split('\n').map((l) => l.trim());
-    const at = lines.findIndex((l) => l.startsWith('--mid-500'));
+    const lines = written.split('\n').map((line) => line.trim());
+    const at = lines.findIndex((line) => line.startsWith('--mid-500'));
     check(
       'under the group it was added to, not at the end of the rule',
       /^--(light|dark|brand)/.test(lines[at - 1] || ''),
@@ -1039,9 +1055,9 @@ const STYLESHEET = `/* =========================================================
     );
     check(
       'the new value field shows unset without the semicolon',
-      all('input.var-input').filter((n) => n.value === 'unset').length === 1,
+      all('input.var-input').filter((node) => node.value === 'unset').length === 1,
       all('input.var-input')
-        .map((n) => n.value)
+        .map((node) => node.value)
         .join(' | '),
     );
   }
@@ -1055,15 +1071,15 @@ const STYLESHEET = `/* =========================================================
   );
   check(
     'and the heading is written once, not per section',
-    texts('.vars-head').filter((t) => t === 'Name').length === 1,
+    texts('.vars-head').filter((text) => text === 'Name').length === 1,
     texts('.vars-head').join('|'),
   );
   check('a name is one row across them', rowNames().includes('background'), rowNames().join('|'));
   check(
     'each mode has its own value',
-    all('input.var-input').filter((n) => /light-100|dark-900/.test(n.value)).length >= 2,
+    all('input.var-input').filter((node) => /light-100|dark-900/.test(node.value)).length >= 2,
     all('input.var-input')
-      .map((n) => n.value)
+      .map((node) => node.value)
       .join(' | '),
   );
   check(
@@ -1080,9 +1096,9 @@ const STYLESHEET = `/* =========================================================
   );
   check(
     'the chip is named after the variable it points at',
-    all('.embed-editor_varconnect-token-name').some((n) => n.textContent === 'light-100'),
+    all('.embed-editor_varconnect-token-name').some((node) => node.textContent === 'light-100'),
     all('.embed-editor_varconnect-token-name')
-      .map((n) => n.textContent)
+      .map((node) => node.textContent)
       .join('|'),
   );
 
@@ -1122,9 +1138,9 @@ const STYLESHEET = `/* =========================================================
   });
   await show(0);
   const clickName = async (label) => {
-    const button = all('.vars-name .vars-rename').find((b) => b.textContent === label);
+    const button = all('.vars-name .vars-rename').find((button) => button.textContent === label);
     if (!button) {
-      return null;
+      return undefined;
     }
     await act(async () => {
       button.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }));
@@ -1185,7 +1201,7 @@ const STYLESHEET = `/* =========================================================
     await typeInto(field, 'leading');
     check(
       'a name already in use is refused',
-      toasts.some((t) => /already exists/i.test(t)),
+      toasts.some((toast) => /already exists/i.test(toast)),
       toasts.join('|'),
     );
     check('and the file is untouched', fs.readFileSync(file, 'utf8') === before);
@@ -1210,10 +1226,10 @@ const STYLESHEET = `/* =========================================================
     // line between runs of variables, so one of them splits a group and the
     // other joins it back.
     const openMenu = async (title) => {
-      const head = all('.vars-section').find((h) => h.textContent.includes(title));
+      const head = all('.vars-section').find((head) => head.textContent.includes(title));
       const dots = head?.querySelector('.vars-section-menu');
       if (!dots) {
-        return null;
+        return undefined;
       }
       await act(async () => {
         dots.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }));
@@ -1264,7 +1280,7 @@ const STYLESHEET = `/* =========================================================
     }
 
     // Duplicate: a second heading, with the run's last variable under it.
-    const headings = () => all('.vars-fixed .vars-section').map((h) => h.textContent.trim());
+    const headings = () => all('.vars-fixed .vars-section').map((head) => head.textContent.trim());
     const before = headings().length;
     const dupItems = await openMenu('Swatches');
     await clickItem(dupItems, 1, 'duplicate');
@@ -1291,7 +1307,9 @@ const STYLESHEET = `/* =========================================================
       headings().indexOf('Swatches copy') === headings().indexOf('Swatches') - 1,
       headings().join('|'),
     );
-    const newTable = all('.vars-table').find((t) => t.textContent.includes('Swatches copy'));
+    const newTable = all('.vars-table').find((table) =>
+      table.textContent.includes('Swatches copy'),
+    );
     check(
       'with no variables in it',
       newTable?.querySelectorAll('.vars-name').length === 0,
@@ -1303,7 +1321,7 @@ const STYLESHEET = `/* =========================================================
       newTable?.textContent?.slice(0, 60),
     );
     const originalTable = all('.vars-table').find(
-      (t) => t !== newTable && t.textContent.includes('Swatches'),
+      (table) => table !== newTable && table.textContent.includes('Swatches'),
     );
     check(
       'and the group it came from keeps its own',
@@ -1341,10 +1359,10 @@ const STYLESHEET = `/* =========================================================
     // layout change and the group is simply gone. What the app is handed is
     // checked by running it.
     const openMenu = async (title) => {
-      const head = all('.vars-section').find((h) => h.textContent.includes(title));
+      const head = all('.vars-section').find((head) => head.textContent.includes(title));
       const dots = head?.querySelector('.vars-section-menu');
       if (!dots) {
-        return null;
+        return undefined;
       }
       await act(async () => {
         dots.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }));
@@ -1418,7 +1436,7 @@ const STYLESHEET = `/* =========================================================
       const valueBefore = commands.length;
       const wasFile = fs.readFileSync(file, 'utf8');
       const cell = all('.var-cell').find(
-        (c) => c.querySelector('input.var-input')?.value === 'linear',
+        (cell) => cell.querySelector('input.var-input')?.value === 'linear',
       );
       const rich = cell?.querySelector('.embed-editor_varconnect-editor');
       if (!rich) {
@@ -1542,7 +1560,9 @@ const STYLESHEET = `/* =========================================================
     // The other kind of heading: a comment above some names. Most of a
     // single-rule file's headings are these, and they were the ones that could
     // not be clicked — the check that sent me looking was the user's, not mine.
-    const heading = all('.vars-section .vars-rename').find((b) => b.textContent === 'Swatches');
+    const heading = all('.vars-section .vars-rename').find(
+      (button) => button.textContent === 'Swatches',
+    );
     check('a comment heading can be clicked too', !!heading, texts('.vars-section').join('|'));
     if (heading) {
       await act(async () => {
@@ -1570,7 +1590,9 @@ const STYLESHEET = `/* =========================================================
   {
     // A group heading that is a shared prefix renames every member under it.
     await show(1); // the light/dark modes group, whose `selection` names form a section
-    const heading = all('.vars-section .vars-rename').find((b) => b.textContent === 'selection');
+    const heading = all('.vars-section .vars-rename').find(
+      (button) => button.textContent === 'selection',
+    );
     check('a prefix heading is renamable', !!heading, texts('.vars-section').join('|'));
     if (heading) {
       await act(async () => {
@@ -1610,12 +1632,12 @@ const STYLESHEET = `/* =========================================================
     check(
       'there are headings to drag',
       !!swatches && !!headings,
-      heads.map((h) => h.textContent.trim()).join('|'),
+      heads.map((head) => head.textContent.trim()).join('|'),
     );
     if (!swatches || !headings) {
       return;
     }
-    // jsdom measures nothing, so the two headings are given boxes and the drop
+    // `jsdom` measures nothing, so the two headings are given boxes and the drop
     // lands past everything — the end of the rule.
     const box = (node, top) => {
       node.getBoundingClientRect = () => ({
@@ -1676,16 +1698,16 @@ const STYLESHEET = `/* =========================================================
     check(
       'so the variables it left behind are not in it any more',
       !all('.vars-table')
-        .find((t) => t.textContent.includes(title))
+        .find((table) => table.textContent.includes(title))
         ?.textContent.includes(firstName().replace('--', '')),
       all('.vars-table')
-        .find((t) => t.textContent.includes(title))
+        .find((table) => table.textContent.includes(title))
         ?.textContent.slice(0, 80),
     );
   }
 
   await act(async () => reactRoot.unmount());
-  fs.rmSync(dir, { recursive: true, force: true });
+  fs.rmSync(directory, { recursive: true, force: true });
 
   if (failures.length) {
     console.error(`\nvars-view: ${failures.length} failed, ${checked - failures.length} passed\n`);

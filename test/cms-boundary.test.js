@@ -5,6 +5,9 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const load = require('./renderer-module');
 const { BOUNDARY_LIMITS } = require('../dist/shared/boundary.js');
+
+// Null as a boundary receives it, parsed from JSON: inputs may hold it; our values never do.
+const jsonNull = JSON.parse('null');
 const bridge = load('cmsBridge.ts');
 const types = load('panels/cmsTypes.ts');
 const entries = [
@@ -31,11 +34,11 @@ test('CMS data and declared field types retain their wire meaning', () => {
 });
 
 test('CMS parsers reject malformed shapes, field types, and boundary overflow', () => {
-  for (const value of [null, {}, [], { data: NaN }, { data: () => {} }]) {
+  for (const value of [jsonNull, {}, [], { data: NaN }, { data: () => {} }]) {
     assert.throws(() => bridge.parseCmsRead(value));
   }
   for (const value of [
-    null,
+    jsonNull,
     {},
     { meta: [] },
     { meta: { file: { field: 'mystery' } } },
@@ -43,13 +46,13 @@ test('CMS parsers reject malformed shapes, field types, and boundary overflow', 
   ]) {
     assert.throws(() => bridge.parseCmsMeta(value));
   }
-  for (const value of [null, {}, { files: ['ok', 1] }, { files: ['x'.repeat(32769)] }]) {
+  for (const value of [jsonNull, {}, { files: ['ok', 1] }, { files: ['x'.repeat(32769)] }]) {
     assert.throws(() => bridge.parseCmsUsage(value));
   }
-  for (const value of [null, {}, { value: 1 }, { name: 'hero' }, { name: 4, asset: 'hero' }]) {
+  for (const value of [jsonNull, {}, { value: 1 }, { name: 'hero' }, { name: 4, asset: 'hero' }]) {
     assert.throws(() => bridge.parseCmsAsset(value));
   }
-  for (const value of [null, {}, { ok: 1 }, { ok: false }]) {
+  for (const value of [jsonNull, {}, { ok: 1 }, { ok: false }]) {
     assert.throws(() => bridge.parseCmsSuccess(value));
   }
   const data = 'x'.repeat(BOUNDARY_LIMITS.textLengthMax + 1);
@@ -87,13 +90,13 @@ test('CMS requests parse replies outside the operating failure catch', async () 
     };
     assert.equal((await bridge[method](...args)).ok, true);
     assert.equal(calls, 1);
-    assert.throws(() => bridge[method](null, ...args.slice(1)), /Expected string/);
+    assert.throws(() => bridge[method](jsonNull, ...args.slice(1)), /Expected string/);
     assert.equal(calls, 1, 'bad request never reaches IPC');
     window.avb[channel] = async () => {
       throw new Error('disk full');
     };
     assert.deepEqual(await bridge[method](...args), { ok: false, error: 'disk full' });
-    window.avb[channel] = async () => null;
+    window.avb[channel] = async () => jsonNull;
     await assert.rejects(bridge[method](...args), /Expected object/);
   }
 });

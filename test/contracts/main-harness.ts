@@ -49,6 +49,7 @@ export function mainHarness(
       Headers,
       fetch,
       helpers,
+      // eslint-disable-next-line stacki/callback-last -- The platform setTimeout's own signature.
       setTimeout: (callback: () => void, delay: number) => {
         const timer = setTimeout(callback, delay);
         timers.add(timer);

@@ -14,6 +14,7 @@
 // a real one (lumos-framework), and a small synthetic one covers the setups it
 // does not have.
 
+const assert = require('node:assert/strict');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
@@ -38,30 +39,34 @@ const check = (what, condition, detail) => {
   }
 };
 
-const rowLabels = (block) => block.rows.map((r) => r.label);
+const rowLabels = (block) => block.rows.map((row) => row.label);
 const columnLabels = (block, group) =>
-  (block.kind === 'matrix' ? block.columns : group.columns).map((c) => c.label);
-const findBlock = (group, title) => group.blocks.find((b) => b.title === title);
+  (block.kind === 'matrix' ? block.columns : group.columns).map((column) => column.label);
+const findBlock = (group, title) => group.blocks.find((block) => block.title === title);
 
 // Every stylesheet under a project, for reading a declaration back out of the
 // source the parse came from.
+// A walk of a project's folders stops at this depth: real source trees are a few folders
+// deep, so anything deeper is a loop or a runaway, not a project.
+const WALK_LIMITS = { directoryDepthMax: 32 };
 const cssFiles = (root) => {
   const out = [];
-  const walk = (dir) => {
+  const walk = (directory, depth = 0) => {
+    assert.ok(depth <= WALK_LIMITS.directoryDepthMax, 'walk: directory depth limit');
     let entries = [];
     try {
-      entries = fs.readdirSync(dir, { withFileTypes: true });
+      entries = fs.readdirSync(directory, { withFileTypes: true });
     } catch {
       return;
     }
-    for (const e of entries) {
-      if (e.name === 'node_modules' || e.name.startsWith('.')) {
+    for (const entry of entries) {
+      if (entry.name === 'node_modules' || entry.name.startsWith('.')) {
         continue;
       }
-      const full = path.join(dir, e.name);
-      if (e.isDirectory()) {
-        walk(full);
-      } else if (e.name.endsWith('.css')) {
+      const full = path.join(directory, entry.name);
+      if (entry.isDirectory()) {
+        walk(full, depth + 1);
+      } else if (entry.name.endsWith('.css')) {
         out.push(full);
       }
     }
@@ -72,9 +77,9 @@ const cssFiles = (root) => {
 
 // --- a stylesheet written by hand, with the shapes the real one lacks -------
 {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'stacki-css-'));
-  fs.mkdirSync(path.join(dir, 'src', 'styles'), { recursive: true });
-  const file = path.join(dir, 'src', 'styles', 'tokens.css');
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'stacki-css-'));
+  fs.mkdirSync(path.join(directory, 'src', 'styles'), { recursive: true });
+  const file = path.join(directory, 'src', 'styles', 'tokens.css');
   fs.writeFileSync(
     file,
     `/* tokens */
@@ -103,18 +108,23 @@ const cssFiles = (root) => {
 `,
   );
 
-  const { files } = readVariables(dir);
+  const { files } = readVariables(directory);
   check(
     'a stylesheet with variables is found',
     files.length === 1,
-    JSON.stringify(files.map((f) => f.rel)),
+    JSON.stringify(files.map((file) => file.rel)),
   );
   const groups = files[0].groups;
   check('every declaration is counted', files[0].count === 12, `${files[0].count}`);
   check(
     'a rule inside @media is its own group',
     groups.length === 2,
-    groups.map((g) => `${g.label}[${g.columns.map((c) => c.context.join('|')).join()}]`).join(' '),
+    groups
+      .map(
+        (group) =>
+          `${group.label}[${group.columns.map((column) => column.context.join('|')).join()}]`,
+      )
+      .join(' '),
   );
   const root = groups[0];
   check('comments are section headings', findBlock(root, 'Brand') && findBlock(root, 'Scale'));
@@ -122,7 +132,7 @@ const cssFiles = (root) => {
     'a comment section keeps its variables',
     rowLabels(findBlock(root, 'Brand')).join() === 'blue,ink',
   );
-  const scale = root.blocks.find((b) => b.kind === 'matrix');
+  const scale = root.blocks.find((block) => block.kind === 'matrix');
   check(
     'a numbered scale becomes columns',
     !!scale && columnLabels(scale, root).join() === 'gap-1,gap-2,gap-3',
@@ -134,7 +144,7 @@ const cssFiles = (root) => {
   );
   check(
     'a name with nothing in common stays a row',
-    root.blocks.some((b) => b.kind === 'rows' && rowLabels(b).includes('lonely')),
+    root.blocks.some((block) => block.kind === 'rows' && rowLabels(block).includes('lonely')),
   );
   const cell = findBlock(root, 'Brand').rows[1].cells[0];
   check('a value that is only a reference says which', cell.ref === '--blue', JSON.stringify(cell));
@@ -143,7 +153,7 @@ const cssFiles = (root) => {
   // Writing one value back.
   const before = fs.readFileSync(file, 'utf8');
   const target = findBlock(root, 'Brand').rows[0].cells[0];
-  const written = setVariable(dir, {
+  const written = setVariable(directory, {
     file: target.file,
     valueStart: target.valueStart,
     valueEnd: target.valueEnd,
@@ -157,7 +167,7 @@ const cssFiles = (root) => {
     'and only one line differs',
     before.split('\n').filter((line, i) => line !== after.split('\n')[i]).length === 1,
   );
-  const stale = setVariable(dir, {
+  const stale = setVariable(directory, {
     file: target.file,
     valueStart: target.valueStart,
     valueEnd: target.valueEnd,
@@ -168,30 +178,33 @@ const cssFiles = (root) => {
 
   // Two rules that declare the same names are one thing in two modes.
   fs.writeFileSync(
-    path.join(dir, 'src', 'styles', 'theme.css'),
+    path.join(directory, 'src', 'styles', 'theme.css'),
     `.light { --bg: white; --fg: black; }\n.dark { --bg: black; --fg: white; }\n`,
   );
-  const themed = readVariables(dir).files.find((f) => f.rel.endsWith('theme.css'));
+  const themed = readVariables(directory).files.find((file) => file.rel.endsWith('theme.css'));
   check(
     'rules with the same names become modes',
     themed.groups.length === 1 && themed.groups[0].kind === 'modes',
   );
-  check('with a column each', themed.groups[0].columns.map((c) => c.label).join() === 'Light,Dark');
+  check(
+    'with a column each',
+    themed.groups[0].columns.map((column) => column.label).join() === 'Light,Dark',
+  );
   check('and a row per name', rowLabels(themed.groups[0].blocks[0]).join() === 'bg,fg');
 
   // A stylesheet with no variables is not a tab.
-  fs.writeFileSync(path.join(dir, 'src', 'styles', 'plain.css'), 'body { color: red; }\n');
+  fs.writeFileSync(path.join(directory, 'src', 'styles', 'plain.css'), 'body { color: red; }\n');
   check(
     'a stylesheet with no variables is left out',
-    !readVariables(dir).files.some((f) => f.rel.endsWith('plain.css')),
+    !readVariables(directory).files.some((file) => file.rel.endsWith('plain.css')),
   );
 
   // Nested rules (CSS nesting) still report their own selector.
   fs.writeFileSync(
-    path.join(dir, 'src', 'styles', 'nested.css'),
+    path.join(directory, 'src', 'styles', 'nested.css'),
     `.card {\n  color: red;\n  &:hover { --lift: 2px; --shadow: 0 2px 4px; }\n}\n`,
   );
-  const nested = readVariables(dir).files.find((f) => f.rel.endsWith('nested.css'));
+  const nested = readVariables(directory).files.find((file) => file.rel.endsWith('nested.css'));
   check(
     'a nested rule is found',
     !!nested && nested.count === 2,
@@ -231,7 +244,7 @@ const cssFiles = (root) => {
         entries.find((entry) => entry.name === '--next')?.value === 'red',
       );
     }
-    const result = setVariable(dir, {
+    const result = setVariable(directory, {
       file: 'src/styles/tokens.css',
       valueStart: declaration.valueStart,
       valueEnd: declaration.valueEnd,
@@ -247,7 +260,7 @@ const cssFiles = (root) => {
   }
 
   fs.writeFileSync(file, ':root {\n  --existing: 1px;\n}\n');
-  const added = addVariable(dir, {
+  const added = addVariable(directory, {
     file: 'src/styles/tokens.css',
     selector: ':root',
     name: '--new',
@@ -256,7 +269,7 @@ const cssFiles = (root) => {
     'a newly added variable defaults to unset',
     added.ok && fs.readFileSync(file, 'utf8').includes('--new: unset;'),
   );
-  const explicitEmpty = addVariable(dir, {
+  const explicitEmpty = addVariable(directory, {
     file: 'src/styles/tokens.css',
     selector: ':root',
     name: '--explicit-empty',
@@ -270,7 +283,7 @@ const cssFiles = (root) => {
       )?.value === '',
   );
 
-  fs.rmSync(dir, { recursive: true, force: true });
+  fs.rmSync(directory, { recursive: true, force: true });
 }
 
 // --- the real stylesheet ----------------------------------------------------
@@ -278,10 +291,10 @@ if (!fs.existsSync(path.join(source, 'src', 'styles'))) {
   console.log(`css-vars: ${checked} passed (synthetic only — no project at ${source})`);
 } else {
   const { files } = readVariables(source);
-  const base = files.find((f) => f.rel.endsWith('base.css'));
+  const base = files.find((file) => file.rel.endsWith('base.css'));
   check('the token stylesheet is found', !!base);
 
-  const root = base.groups.find((g) => g.label === ':root');
+  const root = base.groups.find((group) => group.label === ':root');
   check(':root is its own group', !!root && root.kind === 'single');
 
   // The heading scale: one column per heading, one row per property. Found by
@@ -289,20 +302,20 @@ if (!fs.existsSync(path.join(source, 'src', 'styles'))) {
   // text and they are free to rename it, or to put the headings and the text
   // styles under one.
   const headings = root.blocks.find(
-    (b) => b.kind === 'matrix' && b.columns.some((c) => c.label === 'h1'),
+    (block) => block.kind === 'matrix' && block.columns.some((column) => column.label === 'h1'),
   );
   check('headings become a table', !!headings);
   check(
     'with a column per heading',
-    ['display', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6'].every((h) =>
-      columnLabels(headings, root).includes(h),
+    ['display', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6'].every((heading) =>
+      columnLabels(headings, root).includes(heading),
     ),
     JSON.stringify(headings && columnLabels(headings, root)),
   );
   check(
     'and every property as a row',
-    ['value', 'min', 'max', 'line-height', 'margin-top', 'trim-bottom', 'text-wrap'].every((r) =>
-      rowLabels(headings).includes(r),
+    ['value', 'min', 'max', 'line-height', 'margin-top', 'trim-bottom', 'text-wrap'].every(
+      (label) => rowLabels(headings).includes(label),
     ),
     rowLabels(headings).join(),
   );
@@ -316,33 +329,38 @@ if (!fs.existsSync(path.join(source, 'src', 'styles'))) {
   // same table when they sit under the same comment and their own when they do
   // not — either way they are columns, not thirteen more rows.
   const textStyles = root.blocks.find(
-    (b) => b.kind === 'matrix' && b.columns.some((c) => c.label === 'text-main'),
+    (block) =>
+      block.kind === 'matrix' && block.columns.some((column) => column.label === 'text-main'),
   );
   check(
     'text styles are columns too',
     !!textStyles,
-    JSON.stringify(root.blocks.map((b) => b.title)),
+    JSON.stringify(root.blocks.map((block) => block.title)),
   );
   check(
     'with the same properties down the side',
     textStyles &&
-      ['value', 'line-height', 'font-weight'].every((r) => rowLabels(textStyles).includes(r)),
+      ['value', 'line-height', 'font-weight'].every((label) =>
+        rowLabels(textStyles).includes(label),
+      ),
     textStyles && rowLabels(textStyles).join(),
   );
 
   const spacing = root.blocks.find(
-    (b) => b.kind === 'matrix' && b.columns.some((c) => c.label === 'space-1'),
+    (block) =>
+      block.kind === 'matrix' && block.columns.some((column) => column.label === 'space-1'),
   );
   check('the spacing scale is a table', !!spacing && columnLabels(spacing, root).length >= 8);
   check('with the fluid pair as rows', !!spacing && rowLabels(spacing).join() === 'value,min,max');
 
   // The themes: three rules, one table.
-  const theme = base.groups.find((g) => g.kind === 'modes' && g.label === 'Theme');
+  const theme = base.groups.find((group) => group.kind === 'modes' && group.label === 'Theme');
   check('the themes are one group', !!theme);
   check(
     'with a column per theme',
-    theme && theme.columns.map((c) => c.label).join() === 'Theme light,Theme dark,Theme brand',
-    JSON.stringify(theme && theme.columns.map((c) => c.label)),
+    theme &&
+      theme.columns.map((column) => column.label).join() === 'Theme light,Theme dark,Theme brand',
+    JSON.stringify(theme && theme.columns.map((column) => column.label)),
   );
   check(
     'the light column is named after its class, not :root',
@@ -351,16 +369,17 @@ if (!fs.existsSync(path.join(source, 'src', 'styles'))) {
   );
   check(
     'shared names are one row across the modes',
-    theme && theme.blocks[0].rows.every((r) => r.cells.length === 3 && r.cells.every(Boolean)),
-    JSON.stringify(theme && theme.blocks[0].rows.map((r) => r.cells.map((c) => !!c))),
+    theme &&
+      theme.blocks[0].rows.every((row) => row.cells.length === 3 && row.cells.every(Boolean)),
+    JSON.stringify(theme && theme.blocks[0].rows.map((row) => row.cells.map((cell) => !!cell))),
   );
   check(
     'a family of names inside becomes a section',
     theme &&
-      ['selection', 'button', 'button-2', 'link'].every((t) =>
-        theme.blocks.some((b) => b.title === t),
+      ['selection', 'button', 'button-2', 'link'].every((title) =>
+        theme.blocks.some((block) => block.title === title),
       ),
-    JSON.stringify(theme && theme.blocks.map((b) => b.title)),
+    JSON.stringify(theme && theme.blocks.map((block) => block.title)),
   );
   check(
     'and button-2 is not six more rows of button',
@@ -375,29 +394,29 @@ if (!fs.existsSync(path.join(source, 'src', 'styles'))) {
 
   // Colours resolve through the chain; the ones that cannot say so.
   const themeRows = theme.blocks[0].rows;
-  const background = themeRows.find((r) => r.label === 'background');
+  const background = themeRows.find((row) => row.label === 'background');
   // Against the stylesheet itself rather than against a colour written down
   // here: this fixture is a real project someone is working in, and its palette
   // is theirs to change. What is being checked is that the swatch followed the
   // reference — `--background: var(--light-300)` shows what --light-300 IS —
   // and the hex it lands on is the project's business.
   const declaredColor = (name) => {
-    for (const f of cssFiles(source)) {
-      const text = fs.readFileSync(f, 'utf8');
+    for (const file of cssFiles(source)) {
+      const text = fs.readFileSync(file, 'utf8');
       const hits = [...text.matchAll(new RegExp(`${name}\\s*:\\s*([^;{}]+);`, 'g'))];
       const last = hits[hits.length - 1];
       if (last && /^#[0-9a-f]{3,8}$/i.test(last[1].trim())) {
         return last[1].trim().toLowerCase();
       }
     }
-    return null;
+    return undefined;
   };
   const through = (cell) => {
     if (!cell?.ref) {
-      return null;
+      return undefined;
     }
     const want = declaredColor(cell.ref);
-    return want ? cell.color?.toLowerCase() === want : null;
+    return want ? cell.color?.toLowerCase() === want : undefined;
   };
   check(
     'a swatch resolves through its reference',
@@ -409,7 +428,7 @@ if (!fs.existsSync(path.join(source, 'src', 'styles'))) {
     through(background.cells[1]) === true && through(background.cells[2]) === true,
     JSON.stringify([background.cells[1], background.cells[2]]),
   );
-  const border = themeRows.find((r) => r.label === 'border');
+  const border = themeRows.find((row) => row.label === 'border');
   check(
     'a colour nothing can compute says so',
     border.cells[0].unknownColor === true && !border.cells[0].color,
@@ -428,7 +447,9 @@ if (!fs.existsSync(path.join(source, 'src', 'styles'))) {
   // Nothing is lost: every declaration in the file is in some block.
   const declared = readDeclarations(
     fs.readFileSync(path.join(source, 'src', 'styles', 'base.css'), 'utf8'),
-  ).flatMap((r) => r.entries.filter((e) => e.kind === 'var').map((e) => e.name));
+  ).flatMap((rule) =>
+    rule.entries.filter((entry) => entry.kind === 'var').map((entry) => entry.name),
+  );
   const shown = new Set();
   for (const group of base.groups) {
     for (const block of group.blocks) {
@@ -441,7 +462,7 @@ if (!fs.existsSync(path.join(source, 'src', 'styles'))) {
       }
     }
   }
-  const missing = [...new Set(declared)].filter((n) => !shown.has(n));
+  const missing = [...new Set(declared)].filter((name) => !shown.has(name));
   check(
     'every variable in the file is shown somewhere',
     missing.length === 0,
@@ -449,13 +470,13 @@ if (!fs.existsSync(path.join(source, 'src', 'styles'))) {
   );
 
   // The utility stylesheet: many rules, one variable each, all the same name.
-  const utilities = files.find((f) => f.rel.endsWith('utilities.css'));
+  const utilities = files.find((file) => file.rel.endsWith('utilities.css'));
   if (utilities) {
-    const gaps = utilities.groups.find((g) => g.columns.length > 3);
+    const gaps = utilities.groups.find((group) => group.columns.length > 3);
     check(
       'a scale spread over many rules becomes columns',
       !!gaps,
-      JSON.stringify(utilities.groups.map((g) => g.columns.length)),
+      JSON.stringify(utilities.groups.map((group) => group.columns.length)),
     );
     check('with one row', gaps && gaps.blocks[0].rows.length === 1);
   }

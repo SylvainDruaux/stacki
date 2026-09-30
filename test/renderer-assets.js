@@ -2,6 +2,11 @@
 // rendering. Scripted preload calls distinguish disk failures from contract bugs.
 const assert = require('node:assert/strict');
 const loadRenderer = require('./renderer-module');
+
+// A boundary can receive null — JSON, structured clone and postMessage all carry it —
+// so the negative space below includes it. It is read from JSON, because our own
+// code never writes a null.
+const PLATFORM_NULL = JSON.parse('null');
 const {
   parseAssetEntry,
   parseAssetEntries,
@@ -31,16 +36,16 @@ assert.deepEqual(parseAssetEntry(file), file);
 assert.deepEqual(parseAssetEntry(directory), directory);
 assert.deepEqual(parseAssetEntries({ entries: [directory, file] }).entries, [directory, file]);
 for (const invalid of [
-  null,
+  PLATFORM_NULL,
   [],
   {},
   { ...file, isDir: 'false' },
-  { ...file, abs: null },
+  { ...file, abs: PLATFORM_NULL },
   { ...file, size: -1 },
   { ...file, size: 1.5 },
   { ...file, size: NaN },
   { ...file, size: Number.MAX_SAFE_INTEGER + 1 },
-  { ...file, root: null },
+  { ...file, root: PLATFORM_NULL },
   { ...file, rel: 'bad\0path' },
   { ...file, rel: 'x'.repeat(32769) },
   { ...directory, isRoot: 'true' },
@@ -51,14 +56,14 @@ assert.throws(
   () => parseAssetEntries({ entries: Array(100001).fill(file) }),
   /Array exceeds limit/,
 );
-assert.throws(() => parseAssetEntries({ entries: null }), /Expected array/);
+assert.throws(() => parseAssetEntries({ entries: PLATFORM_NULL }), /Expected array/);
 assert.deepEqual(parseAssetDimensions({ dims: { w: 640, h: 480 } }), { w: 640, h: 480 });
 // Absence is `undefined` (AGENTS.md §6): an image whose size is unknown sends
 // `dims: undefined`, which structured clone keeps, and never `null`.
 assert.equal(parseAssetDimensions({ dims: undefined }), undefined);
 for (const invalid of [
-  null,
-  { dims: null },
+  PLATFORM_NULL,
+  { dims: PLATFORM_NULL },
   { dims: [] },
   { dims: { w: 1 } },
   ...[0, -1, 1.5, NaN, Infinity, '20', 0x1_0000_0000].flatMap((value) => [
@@ -79,7 +84,7 @@ assert.deepEqual(parseAssetDimensions({ dims: { w: 0xffff_ffff, h: 1 } }), {
     throw new Error('disk unavailable');
   };
   assert.deepEqual(await listAssetEntries('/p'), { ok: false, error: 'disk unavailable' });
-  window.avb.listAssets = async () => ({ entries: [null] });
+  window.avb.listAssets = async () => ({ entries: [PLATFORM_NULL] });
   await assert.rejects(() => listAssetEntries('/p'), /Expected object/);
   const request = ['/p', '/p/src/pages/index.astro', '../assets/hero.png'];
   window.avb.resolveSourcePath = async (payload) => {
@@ -94,7 +99,7 @@ assert.deepEqual(parseAssetDimensions({ dims: { w: 0xffff_ffff, h: 1 } }), {
   };
   assert.deepEqual(await resolveAssetImport(...request), { ok: false });
   for (const response of [
-    null,
+    PLATFORM_NULL,
     {},
     { ok: true, rel: 0 },
     { ok: true, rel: 'x'.repeat(32769) },

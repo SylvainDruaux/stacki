@@ -59,6 +59,10 @@ const {
   parsePropertiesResult,
   PROPERTY_LIMITS,
 } = require('../dist/shared/component-properties');
+
+// Null as a boundary receives it, parsed from JSON: inputs may hold it; our values never do.
+const jsonNull = JSON.parse('null');
+
 const source = `---
 import type { ImageMetadata } from 'astro';
 interface Props {
@@ -551,7 +555,7 @@ test('source metadata rejects malformed and oversized inputs at the contract bou
   const data = readComponentProperties(source);
   const origin = data.properties[0].origin;
   for (const invalid of [
-    null,
+    jsonNull,
     {},
     { declarations: {} },
     {
@@ -628,7 +632,7 @@ test('common props remain editable while variant restrictions stay specific to e
 
 test('common declaration edits preserve variants, runtime assertions and unrelated types', () => {
   const eyebrow = readComponentProperties(compositeCard).properties.find(
-    (p) => p.name === 'eyebrow',
+    (property) => property.name === 'eyebrow',
   );
   const changed = value(
     editPropertyDefinition(compositeCard, {
@@ -651,7 +655,9 @@ test('common declaration edits preserve variants, runtime assertions and unrelat
   assert.equal(variants(changed), variants(compositeCard));
   assert.match(changed, /Astro.props as AllProps/);
   assert.match(changed, /type Other = \{ eyebrow: number \}/);
-  const reread = readComponentProperties(changed).properties.find((p) => p.name === 'eyebrow');
+  const reread = readComponentProperties(changed).properties.find(
+    (property) => property.name === 'eyebrow',
+  );
   assert.equal(reread.required, true);
   assert.equal(reread.readonly, true);
   assert.equal(reread.description, 'New tooltip');
@@ -672,7 +678,7 @@ test(
           '<Card eyebrow="Hello"/><Card eyebrow="Again"/>',
       );
       const eyebrow = readComponentProperties(compositeCard).properties.find(
-        (p) => p.name === 'eyebrow',
+        (property) => property.name === 'eyebrow',
       );
       const updated = value(
         updateComponentProperties(
@@ -689,7 +695,10 @@ test(
           writer,
         ),
       );
-      assert.equal(updated.properties.find((p) => p.name === 'kicker').editing.kind, 'editable');
+      assert.equal(
+        updated.properties.find((property) => property.name === 'kicker').editing.kind,
+        'editable',
+      );
       const after = fs.readFileSync(component, 'utf8');
       assert.match(after, /kicker: eyebrow/);
       assert.match(after, /Astro.props.kicker/);
@@ -719,7 +728,9 @@ test('ambiguous common declarations remain restricted without flattening their c
   ]) {
     const assertion = declaration.includes('type AllProps') ? ' as AllProps' : '';
     const source = `---\n${declaration}\nconst { eyebrow } = Astro.props${assertion};\n---\n`;
-    const eyebrow = readComponentProperties(source).properties.find((p) => p.name === 'eyebrow');
+    const eyebrow = readComponentProperties(source).properties.find(
+      (property) => property.name === 'eyebrow',
+    );
     assert.equal(eyebrow.editing.kind, 'restricted', declaration);
     assert.equal(
       editPropertyDefinition(source, {
@@ -842,7 +853,7 @@ test('property permissions and conditions are validated at the boundary', () => 
   const data = readComponentProperties(compositeCard);
   const field = data.properties[0];
   for (const editing of [
-    null,
+    jsonNull,
     {},
     { kind: 'override' },
     { kind: 'override', reason: '' },
@@ -891,7 +902,7 @@ test('contracts reject malformed payloads and enforce resource bounds', () => {
     { kind: 'options', name: 'variant', type: "'outline' | 'solid'" },
   );
   for (const input of [
-    null,
+    jsonNull,
     {},
     { kind: 'save', originalName: 'title', property: {} },
     { kind: 'order', names: [42] },
@@ -960,7 +971,7 @@ test('defaults apply to direct reads without being shadowed by template locals',
   const evaluate = new Function('Astro', script + '\nreturn _stackiDefault0;');
   assert.equal(evaluate({ props: {} }), 'New title');
   assert.equal(evaluate({ props: { title: 'Instance' } }), 'Instance');
-  assert.equal(evaluate({ props: { title: null } }), null);
+  assert.equal(evaluate({ props: { title: jsonNull } }), jsonNull);
   const before =
     '---\ninterface Props { title?: string }\n' +
     'const value = Astro.props.title;\n---\n<p>{value}</p>';

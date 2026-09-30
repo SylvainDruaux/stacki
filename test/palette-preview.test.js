@@ -87,16 +87,16 @@ test('hover preview targets exact files and cancels obsolete delayed opens', asy
 
 async function checkCancelledHover(context) {
   await pointerEvent(context, itemInFolder('Interactive'), 'mouseover');
-  assert.equal(document.querySelector('.comp-preview'), null, 'Hover waits before opening');
+  assert.ok(document.querySelector('.comp-preview') === null, 'Hover waits before opening');
   await pointerEvent(context, itemInFolder('Interactive'), 'mouseout');
   await context.act(() => new Promise((resolve) => setTimeout(resolve, HOVER_WAIT_MS)));
-  assert.equal(document.querySelector('.comp-preview'), null, 'Leaving cancels the delayed open');
+  assert.ok(document.querySelector('.comp-preview') === null, 'Leaving cancels the delayed open');
 }
 
 async function checkPreviewTarget(context, folder, componentPath) {
   if (context.hoveredItem) {
     await pointerEvent(context, context.hoveredItem, 'mouseout');
-    assert.equal(document.querySelector('.comp-preview'), null, 'The previous target closes');
+    assert.ok(document.querySelector('.comp-preview') === null, 'The previous target closes');
   }
   context.hoveredItem = itemInFolder(folder);
   await pointerEvent(context, context.hoveredItem, 'mouseover');

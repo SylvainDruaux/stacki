@@ -45,7 +45,7 @@ test('component usage popup ignores replies after close and from older opens', a
     root.render(
       React.createElement(PalettePanel, {
         components: [{ path: '/p/Button.astro', name: 'Button', folder: '', instances: 1 }],
-        devUrl: null,
+        devUrl: undefined,
         onInsert: () => {},
         onCreateComponent: () => {},
         createFrom: { kind: 'unavailable', reason: 'Select an element.' },
@@ -72,7 +72,7 @@ test('component usage popup ignores replies after close and from older opens', a
     requests[0].resolve({ files: [] });
     await Promise.resolve();
   });
-  assert.equal(document.querySelector('.instances-popup'), null);
+  assert.ok(document.querySelector('.instances-popup') === null);
 
   await clickCount();
   await clickCount();

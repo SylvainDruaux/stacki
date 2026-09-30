@@ -61,8 +61,8 @@ const { parsePage, serializePageMarked } = require('../dist/electron/astroParser
   check('the page parses', parsed.editable, parsed.reason);
   const marked = serializePageMarked(parsed.model);
 
-  const tagged = (tag, p) =>
-    new RegExp(`<${tag}\\b[^>]*\\bdata-avb-p="${p.replace(/\./g, '\\.')}"`).test(marked);
+  const tagged = (tag, nodePath) =>
+    new RegExp(`<${tag}\\b[^>]*\\bdata-avb-p="${nodePath.replace(/\./g, '\\.')}"`).test(marked);
 
   // A component instance carries it as a prop. It only reaches the DOM where
   // that component spreads its rest props — most do, and where one doesn't
@@ -78,10 +78,10 @@ const { parsePage, serializePageMarked } = require('../dist/electron/astroParser
 
   // The markers are still there. They are what works when nothing interferes,
   // and they carry what an attribute can't — text, a loop, a branch.
-  for (const p of ['0.0', '0.0.0', '0.0.1', '0.0.1.0']) {
+  for (const nodePath of ['0.0', '0.0.0', '0.0.1', '0.0.1.0']) {
     check(
-      `the marker pair for ${p} is still written`,
-      marked.includes(`avb-s:${p}--`) && marked.includes(`avb-e:${p}--`),
+      `the marker pair for ${nodePath} is still written`,
+      marked.includes(`avb-s:${nodePath}--`) && marked.includes(`avb-e:${nodePath}--`),
       marked,
     );
   }
@@ -168,7 +168,7 @@ const { parsePage, serializePageMarked } = require('../dist/electron/astroParser
   // path. <Tabs>'s root div kept the page's path, so with Tabs open a click on
   // it resolved to nothing — which is how the canvas hears "done in here", and
   // the component closed itself the moment you clicked inside it.
-  const el = serializePageMarked(
+  const elementMarked = serializePageMarked(
     parsePage('---\nconst { ...rest } = Astro.props;\n---\n<span {...rest}>x</span>\n').model,
     'src/components/Icon.astro|',
   );
@@ -177,7 +177,7 @@ const { parsePage, serializePageMarked } = require('../dist/electron/astroParser
     'src/components/Icon.astro|',
   );
   for (const [what, out] of [
-    ['an element', el],
+    ['an element', elementMarked],
     ['a component', comp],
   ]) {
     check(
@@ -193,8 +193,8 @@ const { parsePage, serializePageMarked } = require('../dist/electron/astroParser
   // two with the same name.
   check(
     'an element writes it before the spread',
-    el.indexOf('data-avb-p') < el.indexOf('{...rest}'),
-    el,
+    elementMarked.indexOf('data-avb-p') < elementMarked.indexOf('{...rest}'),
+    elementMarked,
   );
   // A component's are an object, where the later key overwrites.
   check(
@@ -250,7 +250,7 @@ const { parsePage, serializePageMarked } = require('../dist/electron/astroParser
   global.Node = window.Node;
 
   const sent = [];
-  window.parent = { postMessage: (m) => sent.push(m) };
+  window.parent = { postMessage: (message) => sent.push(message) };
   const electron = {
     contextBridge: { exposeInMainWorld: () => {} },
     ipcRenderer: { on: () => {}, send: () => {}, invoke: async () => {} },
@@ -265,19 +265,27 @@ const { parsePage, serializePageMarked } = require('../dist/electron/astroParser
   Module.prototype.require = realRequire;
   await settle(60);
 
-  const ev = new window.MessageEvent('message', {
+  const event = new window.MessageEvent('message', {
     data: { type: 'avb:track', paths: ['0', '0.2'] },
   });
-  Object.defineProperty(ev, 'source', { value: window.parent });
-  window.dispatchEvent(ev);
+  Object.defineProperty(event, 'source', { value: window.parent });
+  window.dispatchEvent(event);
   await settle(20);
 
-  const rendered = sent.filter((m) => m.type === 'avb:rendered-nodes').pop();
+  const rendered = sent.filter((message) => message.type === 'avb:rendered-nodes').pop();
   const paths = rendered?.paths || [];
-  check('the page reports what rendered', !!rendered, JSON.stringify(sent.map((m) => m.type)));
+  check(
+    'the page reports what rendered',
+    !!rendered,
+    JSON.stringify(sent.map((message) => message.type)),
+  );
   check('the wrapped node is on the page', paths.includes('0'), JSON.stringify(paths));
-  for (const p of ['0.0', '0.1', '0.1.0']) {
-    check(`the tag alone puts ${p} on the page`, paths.includes(p), JSON.stringify(paths));
+  for (const nodePath of ['0.0', '0.1', '0.1.0']) {
+    check(
+      `the tag alone puts ${nodePath} on the page`,
+      paths.includes(nodePath),
+      JSON.stringify(paths),
+    );
   }
   // An element can answer to more than one file: the component that rendered
   // it has a name for it, and so does the page that placed that component.
@@ -288,7 +296,7 @@ const { parsePage, serializePageMarked } = require('../dist/electron/astroParser
   );
   // The other half of the report: nothing here is display:none, and a node the
   // page can't find says nothing about itself either way.
-  const states = sent.filter((m) => m.type === 'avb:node-states').pop();
+  const states = sent.filter((message) => message.type === 'avb:node-states').pop();
   check(
     'and none of them is called hidden',
     !(states?.hidden || []).length,
@@ -300,7 +308,7 @@ const { parsePage, serializePageMarked } = require('../dist/electron/astroParser
   // is one copy addressed twice — not two — and the boxes have to agree with
   // the occurrence a click reports, or a node with a single instance answers
   // "copy 2" for a click in the wrong half of itself.
-  const rects = sent.filter((m) => m.type === 'avb:rects').pop();
+  const rects = sent.filter((message) => message.type === 'avb:rects').pop();
   check(
     'a path on an element and again inside it is one copy',
     (rects?.rects?.['0.2'] || []).length === 1,

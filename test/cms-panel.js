@@ -8,6 +8,7 @@
 // project. A panel that shows nothing is indistinguishable from a project with
 // nothing in it, which is the worst thing it could do.
 
+const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
@@ -32,17 +33,22 @@ const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
 
 // Every .json under src/, the way the main process lists it — enough of
 // cms:list for the panel to have something to show.
+// A walk of a project's folders stops at this depth: real source trees are a few folders
+// deep, so anything deeper is a loop or a runaway, not a project.
+const WALK_LIMITS = { directoryDepthMax: 32 };
+
 function listCms(root) {
   const files = [];
-  const walk = (dir, rel) => {
-    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+  const walk = (directory, rel, depth = 0) => {
+    assert.ok(depth <= WALK_LIMITS.directoryDepthMax, 'walk: directory depth limit');
+    for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
       if (entry.name.startsWith('.') || entry.name === 'node_modules') {
         continue;
       }
-      const full = path.join(dir, entry.name);
+      const full = path.join(directory, entry.name);
       const entryRel = rel ? `${rel}/${entry.name}` : entry.name;
       if (entry.isDirectory()) {
-        walk(full, entryRel);
+        walk(full, entryRel, depth + 1);
       } else if (/\.json$/i.test(entry.name)) {
         try {
           files.push({
@@ -73,9 +79,9 @@ function listCms(root) {
   }
 
   const esbuild = require('esbuild');
-  const buildDir = path.join(__dirname, '..', 'node_modules', '.stacki-test');
-  fs.mkdirSync(buildDir, { recursive: true });
-  const bundlePath = path.join(buildDir, 'cms-panel.bundle.js');
+  const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
+  fs.mkdirSync(buildDirectory, { recursive: true });
+  const bundlePath = path.join(buildDirectory, 'cms-panel.bundle.js');
   await esbuild.build({
     entryPoints: [path.join(__dirname, '..', 'src', 'panels', 'CmsPanel.tsx')],
     outfile: bundlePath,
@@ -93,17 +99,17 @@ function listCms(root) {
   global.document = dom.window.document;
   global.navigator = dom.window.navigator;
   global.IS_REACT_ACT_ENVIRONMENT = true;
-  // jsdom has no layout, so it has no scrollIntoView; the popup calls it to
+  // `jsdom` has no layout, so it has no scrollIntoView; the popup calls it to
   // keep the highlighted option visible.
   dom.window.Element.prototype.scrollIntoView = function scrollIntoView() {};
 
   const contentCollections = async () => ({
-    collections: config.collections.map((c) => ({
-      name: c.name,
-      editable: c.editable,
-      loader: c.loader,
-      error: c.error || null,
-      count: countEntries(source, c),
+    collections: config.collections.map((collection) => ({
+      name: collection.name,
+      editable: collection.editable,
+      loader: collection.loader,
+      error: collection.error || undefined,
+      count: countEntries(source, collection),
     })),
     covered: coveredPaths(config.collections),
     configPath: config.configPath,
@@ -123,9 +129,9 @@ function listCms(root) {
       reactRoot.render(
         React.createElement(CmsPanel, {
           project: { path: source },
-          selectedRel: null,
-          selectedContent: null,
-          currentFile: null,
+          selectedRel: undefined,
+          selectedContent: undefined,
+          currentFile: undefined,
           refreshKey: Math.random(),
           onSelect: () => {},
           onSelectContent: () => {},
@@ -154,11 +160,11 @@ function listCms(root) {
   check('and the project does not read as empty', !/No content found/.test(text()));
   check(
     'a data file a collection owns is not listed twice',
-    !all('.cms-collection').some((n) =>
-      /^Data$/.test(n.querySelector('.cms-collection-name')?.textContent || ''),
+    !all('.cms-collection').some((element) =>
+      /^Data$/.test(element.querySelector('.cms-collection-name')?.textContent || ''),
     ),
     all('.cms-collection')
-      .map((n) => n.querySelector('.cms-collection-name')?.textContent)
+      .map((element) => element.querySelector('.cms-collection-name')?.textContent)
       .join(', '),
   );
 

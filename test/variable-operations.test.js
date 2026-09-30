@@ -5,6 +5,11 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const load = require('./renderer-module');
 const { BOUNDARY_LIMITS } = require('../dist/shared/boundary.js');
+
+// A boundary can receive null — JSON, structured clone and postMessage all carry it —
+// so the negative space below includes it. It is read from JSON, because our own
+// code never writes a null.
+const PLATFORM_NULL = JSON.parse('null');
 const { variableEdit, friendlyError } = load('panels/variableEdits.ts');
 const { createVariableHistory } = load('panels/variableHistory.ts');
 const { createVariableRefresh } = load('panels/variableRefresh.ts');
@@ -43,7 +48,7 @@ test('all variable edit contracts accept valid replies and reject malformed repl
       name === 'readStyleFile' ? { ok: true, css: '' } : response,
     );
     assert.deepEqual(received, payload);
-    for (const invalid of [null, {}, { ok: 1 }, { css: 42 }]) {
+    for (const invalid of [PLATFORM_NULL, {}, { ok: 1 }, { css: 42 }]) {
       window.avb[name] = async () => invalid;
       await assert.rejects(variableEdit(name, payload), /Expected/);
     }
@@ -70,7 +75,7 @@ test('edit payloads are parsed before IPC and bounded replies stay bounded', asy
     ),
   };
   for (const name of Object.keys(calls)) {
-    await assert.rejects(variableEdit(name, null), /Expected/);
+    await assert.rejects(variableEdit(name, PLATFORM_NULL), /Expected/);
   }
   await assert.rejects(
     variableEdit('setCssVariable', {
@@ -137,16 +142,11 @@ function historyFixture() {
 test('history deduplicates every touched file and restores both directions', async () => {
   const state = historyFixture();
   assert.equal(
-    await state.history(
-      ['a.css', 'b.css', 'a.css'],
-      'the move',
-      async () => {
-        state.files.set('/project/a.css', 'new a');
-        state.files.set('/project/b.css', 'new b');
-        return true;
-      },
-      'move',
-    ),
+    await state.history(['a.css', 'b.css', 'a.css'], 'the move', 'move', async () => {
+      state.files.set('/project/a.css', 'new a');
+      state.files.set('/project/b.css', 'new b');
+      return true;
+    }),
     true,
   );
   assert.equal(state.records.length, 1);
@@ -178,7 +178,7 @@ test('snapshot failures prevent unrecorded writes and false success', async () =
     throw new Error('cannot read');
   };
   assert.equal(
-    await state.history('a.css', 'edit', async () => {
+    await state.history('a.css', 'edit', undefined, async () => {
       edits++;
     }),
     false,
@@ -187,7 +187,7 @@ test('snapshot failures prevent unrecorded writes and false success', async () =
   assert.deepEqual(state.errors, ['cannot read']);
   window.avb.readStyleFile = async () => ({ css: 'before' });
   assert.equal(
-    await state.history('a.css', 'edit', async () => {
+    await state.history('a.css', 'edit', undefined, async () => {
       window.avb.readStyleFile = async () => {
         throw new Error('cannot reread');
       };
@@ -200,6 +200,7 @@ test('snapshot failures prevent unrecorded writes and false success', async () =
     state.history(
       Array.from({ length: 10001 }, (_, i) => `${i}.css`),
       'edit',
+      undefined,
       async () => {},
     ),
     /Variable undo: file limit exceeded/,
@@ -208,8 +209,8 @@ test('snapshot failures prevent unrecorded writes and false success', async () =
 
 test('unchanged and rejected edits do not add undo commands', async () => {
   const state = historyFixture();
-  assert.equal(await state.history('a.css', 'edit', async () => true), true);
-  assert.equal(await state.history('a.css', 'edit', async () => false), false);
+  assert.equal(await state.history('a.css', 'edit', undefined, async () => true), true);
+  assert.equal(await state.history('a.css', 'edit', undefined, async () => false), false);
   assert.equal(state.records.length, 0);
   assert.equal(state.reads.length, 3, 'rejected edit does not take an after snapshot');
 });
@@ -275,7 +276,7 @@ test('refresh surfaces operating failures and rejects malformed data', async () 
   const reader = createVariableRefresh('/project', (value) => published.push(value));
   await reader.refresh();
   assert.deepEqual(published, [{ ok: false, error: 'disk unavailable' }]);
-  window.avb.cssVariables = async () => null;
+  window.avb.cssVariables = async () => PLATFORM_NULL;
   await assert.rejects(reader.refresh(), /Expected object/);
   reader.dispose();
 });

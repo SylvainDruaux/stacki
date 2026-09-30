@@ -57,34 +57,37 @@ const ASTRO_ROUTES = [
 const { readInjectedRoutes, packageOf } = require('../dist/electron/injectedRoutes.js');
 
 (async () => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'stacki-routes-'));
-  const avbDir = path.join(dir, 'node_modules', '.avb');
-  fs.mkdirSync(avbDir, { recursive: true });
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'stacki-routes-'));
+  const avbDirectory = path.join(directory, 'node_modules', '.avb');
+  fs.mkdirSync(avbDirectory, { recursive: true });
 
   // Everything Astro reported, Stacki's own preview endpoints included — the
   // reader drops those, so the fixture keeps them to prove it.
-  fs.writeFileSync(path.join(avbDir, 'routes.json'), JSON.stringify(ASTRO_ROUTES));
+  fs.writeFileSync(path.join(avbDirectory, 'routes.json'), JSON.stringify(ASTRO_ROUTES));
 
   const read = readInjectedRoutes;
 
   {
-    const routes = read(dir);
+    const routes = read(directory);
     check('the injected pages are found', routes.length === 3, `${routes.length} routes`);
     check(
       'and are the ones the library ships',
-      routes.map((r) => r.route).join(',') === '/,/contacto,/blog/[...id]',
-      routes.map((r) => r.route).join(','),
+      routes.map((route) => route.route).join(',') === '/,/contacto,/blog/[...id]',
+      routes.map((route) => route.route).join(','),
     );
     check(
       "Astro's own internals are left out",
-      !routes.some((r) => r.route === '/404'),
-      JSON.stringify(routes.map((r) => r.route)),
+      !routes.some((route) => route.route === '/404'),
+      JSON.stringify(routes.map((route) => route.route)),
     );
-    check("and so are Stacki's own endpoints", !routes.some((r) => r.route.startsWith('/__avb')));
+    check(
+      "and so are Stacki's own endpoints",
+      !routes.some((route) => route.route.startsWith('/__avb')),
+    );
     check(
       'each says which package it came from',
-      routes.every((r) => r.from === '@fivedogs/presencia-core'),
-      JSON.stringify(routes.map((r) => r.from)),
+      routes.every((route) => route.from === '@fivedogs/presencia-core'),
+      JSON.stringify(routes.map((route) => route.from)),
     );
     check(
       'a dynamic one keeps its params',
@@ -97,7 +100,7 @@ const { readInjectedRoutes, packageOf } = require('../dist/electron/injectedRout
     // A project's own pages are files the editor already knows about, and must
     // not be listed twice.
     fs.writeFileSync(
-      path.join(avbDir, 'routes.json'),
+      path.join(avbDirectory, 'routes.json'),
       JSON.stringify([
         { pattern: '/', origin: 'project', entrypoint: 'src/pages/index.astro', params: [] },
         {
@@ -108,7 +111,7 @@ const { readInjectedRoutes, packageOf } = require('../dist/electron/injectedRout
         },
       ]),
     );
-    const routes = read(dir);
+    const routes = read(directory);
     check(
       'a page of your own is not listed as injected',
       routes.length === 1 && routes[0].route === '/from-a-package',
@@ -126,8 +129,8 @@ const { readInjectedRoutes, packageOf } = require('../dist/electron/injectedRout
     // app carries on with whatever it can see on disk.
     const empty = fs.mkdtempSync(path.join(os.tmpdir(), 'stacki-routes-none-'));
     check('a project with no list reads as none', read(empty).length === 0);
-    fs.writeFileSync(path.join(avbDir, 'routes.json'), 'not json');
-    check('and so does an unreadable one', read(dir).length === 0);
+    fs.writeFileSync(path.join(avbDirectory, 'routes.json'), 'not json');
+    check('and so does an unreadable one', read(directory).length === 0);
   }
 
   {

@@ -26,19 +26,19 @@ import { shiftUntouched } from '../../dist/shared/rebase.js';
 import { encodeUtf8, toByteSpan } from '../../dist/shared/span.js';
 
 const ROOT = path.join(import.meta.dirname, '..');
-const FIXTURE_DIRS = ['corpus', 'fixtures/editor-core', 'fixtures/round-trip'];
+const FIXTURE_DIRECTORIES = ['corpus', 'fixtures/editor-core', 'fixtures/round-trip'];
 
 function fixtures(): readonly {
   readonly name: string;
   readonly text: string;
 }[] {
-  return FIXTURE_DIRS.flatMap((dir) =>
+  return FIXTURE_DIRECTORIES.flatMap((directory) =>
     fs
-      .readdirSync(path.join(ROOT, dir))
+      .readdirSync(path.join(ROOT, directory))
       .filter((name) => /\.(astro|mdx?|css)$/.test(name))
       .map((name) => ({
         name,
-        text: fs.readFileSync(path.join(ROOT, dir, name), 'utf8'),
+        text: fs.readFileSync(path.join(ROOT, directory, name), 'utf8'),
       })),
   );
 }
@@ -135,7 +135,7 @@ test('seeded edits of every fixture: the patch gives the text back exactly', () 
       }
       assert.equal(
         codePatchBytes(hunks),
-        hunks.reduce((n, h) => n + Buffer.byteLength(h.text), 0),
+        hunks.reduce((total, hunk) => total + Buffer.byteLength(hunk.text), 0),
       );
       current = edited;
       checked++;

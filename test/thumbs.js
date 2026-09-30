@@ -32,10 +32,10 @@ const check = (what, condition, detail) => {
 
 const HERO = { r: 220, g: 40, b: 60 }; // the hero band
 const BELOW = { r: 20, g: 120, b: 220 }; // everything under it
-const near = (a, b, tolerance = 24) =>
-  Math.abs(a.r - b.r) <= tolerance &&
-  Math.abs(a.g - b.g) <= tolerance &&
-  Math.abs(a.b - b.b) <= tolerance;
+const near = (actual, expected, tolerance = 24) =>
+  Math.abs(actual.r - expected.r) <= tolerance &&
+  Math.abs(actual.g - expected.g) <= tolerance &&
+  Math.abs(actual.b - expected.b) <= tolerance;
 
 const PAGE = `<!doctype html>
 <html><head><meta charset="utf-8"><title>Fixture</title><style>
@@ -77,23 +77,23 @@ app.on('window-all-closed', () => {});
 
 app.whenReady().then(async () => {
   const userData = fs.mkdtempSync(path.join(os.tmpdir(), 'stacki-thumbs-'));
-  const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'stacki-proj-'));
-  fs.mkdirSync(path.join(projectDir, 'src', 'pages'), { recursive: true });
-  fs.writeFileSync(path.join(projectDir, 'src', 'pages', 'index.astro'), '<h1>Hi</h1>\n');
-  fs.writeFileSync(path.join(projectDir, 'astro.config.mjs'), 'export default {}\n');
+  const projectDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'stacki-proj-'));
+  fs.mkdirSync(path.join(projectDirectory, 'src', 'pages'), { recursive: true });
+  fs.writeFileSync(path.join(projectDirectory, 'src', 'pages', 'index.astro'), '<h1>Hi</h1>\n');
+  fs.writeFileSync(path.join(projectDirectory, 'astro.config.mjs'), 'export default {}\n');
 
-  const server = http.createServer((_req, res) => {
-    res.writeHead(200, { 'content-type': 'text/html' });
-    res.end(PAGE);
+  const server = http.createServer((_request, response) => {
+    response.writeHead(200, { 'content-type': 'text/html' });
+    response.end(PAGE);
   });
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
   const url = `http://127.0.0.1:${server.address().port}/`;
 
   // --- the capture ---------------------------------------------------------
-  const result = await thumbs.capture(userData, projectDir, url);
+  const result = await thumbs.capture(userData, projectDirectory, url);
   check('the capture succeeds', result.ok === true, result.error);
 
-  const file = thumbs.thumbPathFor(userData, projectDir);
+  const file = thumbs.thumbPathFor(userData, projectDirectory);
   check('a file is written', fs.existsSync(file));
 
   if (fs.existsSync(file)) {
@@ -113,37 +113,37 @@ app.whenReady().then(async () => {
   }
 
   // --- staleness -----------------------------------------------------------
-  check('a fresh capture is not stale', thumbs.isStale(userData, projectDir) === false);
+  check('a fresh capture is not stale', thumbs.isStale(userData, projectDirectory) === false);
 
   // A change made with the app closed is still a change.
-  await new Promise((r) => setTimeout(r, 1100)); // mtime granularity
-  fs.writeFileSync(path.join(projectDir, 'src', 'pages', 'about.astro'), '<h1>About</h1>\n');
+  await new Promise((resolve) => setTimeout(resolve, 1100)); // mtime granularity
+  fs.writeFileSync(path.join(projectDirectory, 'src', 'pages', 'about.astro'), '<h1>About</h1>\n');
   check(
     'a page added outside the app makes it stale',
-    thumbs.isStale(userData, projectDir) === true,
+    thumbs.isStale(userData, projectDirectory) === true,
   );
 
-  await thumbs.capture(userData, projectDir, url);
-  check('and taking it again clears that', thumbs.isStale(userData, projectDir) === false);
+  await thumbs.capture(userData, projectDirectory, url);
+  check('and taking it again clears that', thumbs.isStale(userData, projectDirectory) === false);
 
   // node_modules churn is not a content change.
-  const modules = path.join(projectDir, 'node_modules', 'left-pad');
+  const modules = path.join(projectDirectory, 'node_modules', 'left-pad');
   fs.mkdirSync(modules, { recursive: true });
   fs.writeFileSync(path.join(modules, 'index.js'), 'module.exports = 1;\n');
-  check('installing a package does not', thumbs.isStale(userData, projectDir) === false);
+  check('installing a package does not', thumbs.isStale(userData, projectDirectory) === false);
 
   // --- a project that cannot be rendered -----------------------------------
-  const dead = await thumbs.capture(userData, projectDir, 'http://127.0.0.1:45999/');
+  const dead = await thumbs.capture(userData, projectDirectory, 'http://127.0.0.1:45999/');
   check('an unreachable site fails quietly', dead.ok === false && typeof dead.error === 'string');
   check('and keeps the picture it had', fs.existsSync(file));
 
   // --- forgetting ----------------------------------------------------------
-  thumbs.forget(userData, projectDir);
+  thumbs.forget(userData, projectDirectory);
   check('removing a project takes its picture with it', !fs.existsSync(file));
 
   server.close();
   fs.rmSync(userData, { recursive: true, force: true });
-  fs.rmSync(projectDir, { recursive: true, force: true });
+  fs.rmSync(projectDirectory, { recursive: true, force: true });
 
   // Written synchronously: app.exit() does not wait for a piped stdout to
   // flush, so console.log here reaches nobody.

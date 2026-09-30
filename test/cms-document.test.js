@@ -4,6 +4,9 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const load = require('./renderer-module');
+
+// Null as a boundary receives it, parsed from JSON: inputs may hold it; our values never do.
+const jsonNull = JSON.parse('null');
 const { createCmsWriter } = load('panels/cmsWriter.ts');
 const { createCmsReader, cmsCollection } = load('panels/cmsReader.ts');
 const { createCmsSchemaOperations } = load('panels/cmsOperations.ts');
@@ -114,7 +117,7 @@ test(
       () => state.writer.accept(cmsCollection('another.json', []), []),
       /snapshot belongs to another file/,
     );
-    assert.throws(() => state.writer.queue(Array(100001).fill(null)), /item limit exceeded/);
+    assert.throws(() => state.writer.queue(Array(100001).fill(jsonNull)), /item limit exceeded/);
     const empty = createCmsWriter({
       projectPath: '/project',
       rel: 'data.json',

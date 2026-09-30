@@ -23,11 +23,11 @@ const {
 } = require('../dist/shared/preview-token.js');
 
 const settle = (ms = 80) => new Promise((resolve) => setTimeout(resolve, ms));
-const A = 'a'.repeat(64);
-const B = 'b'.repeat(64);
-const page = { file: 'src/pages/index.astro', checksum: A };
-const card = { file: 'src/components/Card.astro', checksum: B };
-const head = { file: 'src/components/Seo.astro', checksum: A };
+const FIRST_CHECKSUM = 'a'.repeat(64);
+const SECOND_CHECKSUM = 'b'.repeat(64);
+const page = { file: 'src/pages/index.astro', checksum: FIRST_CHECKSUM };
+const card = { file: 'src/components/Card.astro', checksum: SECOND_CHECKSUM };
+const head = { file: 'src/components/Seo.astro', checksum: FIRST_CHECKSUM };
 
 async function frame(html) {
   const dom = new JSDOM(html, {
@@ -35,7 +35,7 @@ async function frame(html) {
     pretendToBeVisual: true,
   });
   const { window } = dom;
-  // jsdom lays nothing out; the frame measures, so every box is a fixed one.
+  // `jsdom` lays nothing out; the frame measures, so every box is a fixed one.
   const BOX = { x: 0, y: 0, width: 100, height: 20, left: 0, top: 0, right: 100, bottom: 20 };
   window.Element.prototype.getBoundingClientRect = () => BOX;
   window.Range.prototype.getBoundingClientRect = () => BOX;
@@ -126,19 +126,23 @@ test('a patched page announces again; a forged second version, never', async () 
   assert.equal(first.length, 1);
   // The patcher gathers the new rendering's stamps at the document's end and
   // says so; the frame reads them again.
-  for (const comment of [...window.document.body.childNodes].filter((n) => n.nodeType === 8)) {
+  for (const comment of [...window.document.body.childNodes].filter(
+    (node) => node.nodeType === 8,
+  )) {
     if (comment.data.startsWith('avb-d:')) {
       comment.remove();
     }
   }
   window.document.appendChild(
-    window.document.createComment(stampComment({ ...page, checksum: B }).slice(4, -3)),
+    window.document.createComment(
+      stampComment({ ...page, checksum: SECOND_CHECKSUM }).slice(4, -3),
+    ),
   );
   window.document.dispatchEvent(new window.CustomEvent('avb:morphed'));
   await settle();
   const second = sent.filter((message) => message.type === 'avb:render');
   assert.equal(second.length, 2, 'the patched rendering is announced');
-  assert.equal(second[1].token, expectedToken([{ ...page, checksum: B }]));
+  assert.equal(second[1].token, expectedToken([{ ...page, checksum: SECOND_CHECKSUM }]));
   assert.notEqual(second[1].token, second[0].token);
   // Page code adds a stamp for the same file with other bytes: no manifest can
   // name that rendering, so the frame announces nothing and its events carry
@@ -151,5 +155,9 @@ test('a patched page announces again; a forged second version, never', async () 
     .querySelector('p')
     .dispatchEvent(new window.MouseEvent('click', { bubbles: true, cancelable: true }));
   const clicks = sent.filter((message) => message.type === 'avb:click-node');
-  assert.equal(clicks.at(-1)?.token, null, 'a rendering with no token vouches for no click');
+  const lastClick = clicks.at(-1);
+  assert.ok(lastClick !== undefined, 'the click is still reported');
+  // The key is sent, and it names no rendering: absent, as the protocol spells it.
+  assert.ok('token' in lastClick, 'the click states its token');
+  assert.ok(lastClick.token === undefined, 'a rendering with no token vouches for no click');
 });

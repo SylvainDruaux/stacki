@@ -24,6 +24,9 @@ test('Vite development modules link the renderer contract dependencies', async (
   const cacheDirectory = await mkdtemp(join(tmpdir(), 'stacki-vite-modules-'));
   const server = await createServer({
     cacheDir: cacheDirectory,
+    // Vite's own API: `watch: null` turns the file watcher off, where undefined would
+    // start the default one.
+    // eslint-disable-next-line stacki/no-null -- Vite's documented value for "no watcher".
     server: { middlewareMode: true, hmr: false, watch: null },
     logLevel: 'silent',
   });

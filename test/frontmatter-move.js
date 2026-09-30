@@ -34,9 +34,9 @@ const check = (what, condition, detail) => {
 
 (async () => {
   const esbuild = require('esbuild');
-  const buildDir = path.join(__dirname, '..', 'node_modules', '.stacki-test');
-  fs.mkdirSync(buildDir, { recursive: true });
-  const out = path.join(buildDir, 'frontmatter-move.bundle.mjs');
+  const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
+  fs.mkdirSync(buildDirectory, { recursive: true });
+  const out = path.join(buildDirectory, 'frontmatter-move.bundle.mjs');
   await esbuild.build({
     entryPoints: [path.join(__dirname, '..', 'src', 'frontmatterMove.js')],
     outfile: out,
@@ -86,7 +86,7 @@ const check = (what, condition, detail) => {
     check('a loop variable is read where it is used', names.includes('post'), names.join());
     check(
       'but a prop that is TEXT is not a name',
-      !JSON.stringify(nodes).includes('__') && names.filter((n) => n === 'jobs').length === 1,
+      !JSON.stringify(nodes).includes('__') && names.filter((name) => name === 'jobs').length === 1,
       names.join(),
     );
     check(
@@ -125,7 +125,7 @@ const check = (what, condition, detail) => {
       ],
     };
     const dead = unusedDeclarations(model)
-      .map((d) => d.name)
+      .map((declaration) => declaration.name)
       .sort();
     check('a const nothing reads any more is offered up', dead.includes('label'), dead.join());
     check('and so is the one that only fed it', dead.includes('year'), dead.join());
@@ -149,7 +149,7 @@ const check = (what, condition, detail) => {
       extraFrontmatter: "const posts = await getCollection('blog');\nconst featured = posts[0];",
       nodes: [{ kind: 'expr', value: '{featured.data.title}' }],
     };
-    const dead = unusedDeclarations(model).map((d) => d.name);
+    const dead = unusedDeclarations(model).map((declaration) => declaration.name);
     check('a const another const reads is kept', !dead.includes('posts'), dead.join());
     check('and nothing is taken at all here', dead.length === 0, dead.join());
   }
@@ -161,7 +161,7 @@ const check = (what, condition, detail) => {
       nodes: [{ kind: 'element', name: 'div' }],
     };
     const dead = unusedDeclarations(model)
-      .map((d) => d.name)
+      .map((declaration) => declaration.name)
       .sort();
     check('a whole dead chain goes', dead.join() === 'featured,posts', dead.join());
   }
@@ -181,7 +181,7 @@ const check = (what, condition, detail) => {
         },
       ],
     };
-    const dead = unusedDeclarations(model).map((d) => d.name);
+    const dead = unusedDeclarations(model).map((declaration) => declaration.name);
     check('a name read deep in the tree is not dead', !dead.includes('other'), dead.join());
     check('and one nothing reads is', dead.join() === 'jobs', dead.join());
   }
@@ -192,7 +192,7 @@ const check = (what, condition, detail) => {
       extraFrontmatter: 'const { href = "/" } = Astro.props;\nconst used = 1;',
       nodes: [],
     };
-    const dead = unusedDeclarations(model).map((d) => d.name);
+    const dead = unusedDeclarations(model).map((declaration) => declaration.name);
     check('a destructure is not something this takes out', !dead.includes('href'), dead.join());
   }
 
@@ -216,7 +216,7 @@ const check = (what, condition, detail) => {
       has: () => false,
     });
     const imported = carried.imports.map((i) => `${i.name}=${i.path}`).sort();
-    const statements = carried.statements.map((s) => s.name);
+    const statements = carried.statements.map((statement) => statement.name);
     check(
       'an import the markup reads comes across',
       imported.includes('hero=../assets/hero.png'),
@@ -249,16 +249,16 @@ const check = (what, condition, detail) => {
       names: new Set(['jobs', 'label']),
       frontmatter: FRONTMATTER,
       imports: [],
-      has: (n) => n === 'jobs',
+      has: (name) => name === 'jobs',
     });
     check(
       'a name the page already knows is left alone',
-      !carried.statements.some((s) => s.name === 'jobs'),
+      !carried.statements.some((statement) => statement.name === 'jobs'),
       JSON.stringify(carried.statements),
     );
     check(
       'and the rest still comes',
-      carried.statements.some((s) => s.name === 'label'),
+      carried.statements.some((statement) => statement.name === 'label'),
       JSON.stringify(carried.statements),
     );
   }

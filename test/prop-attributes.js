@@ -56,11 +56,11 @@ assert.deepEqual(parseObjectLiteral('{ id: "hero", tabindex: 2, disabled: true }
   { key: 'tabindex', raw: '2' },
   { key: 'disabled', raw: 'true' },
 ]);
-assert.equal(parseObjectLiteral('{ nested: { key: 1 } }'), null);
-assert.equal(parseObjectLiteral('{ ...defaults }'), null);
-assert.equal(parseObjectLiteral('named'), null);
-assert.equal(parseObjectLiteral('x'.repeat(8193)), null);
-assert.equal(parseObjectLiteral(`{ ${Array(257).fill('a: 1').join(', ')} }`), null);
+assert.equal(parseObjectLiteral('{ nested: { key: 1 } }'), undefined);
+assert.equal(parseObjectLiteral('{ ...defaults }'), undefined);
+assert.equal(parseObjectLiteral('named'), undefined);
+assert.equal(parseObjectLiteral('x'.repeat(8193)), undefined);
+assert.equal(parseObjectLiteral(`{ ${Array(257).fill('a: 1').join(', ')} }`), undefined);
 assert.deepEqual(parseAttrPaste('x'.repeat(8193)), []);
 assert.deepEqual(parseAttrPaste(Array(257).fill('x="y"').join(' ')), []);
 assert.equal(serializeObjectLiteral([{ key: 'data-id', raw: '"hero"' }]), '{ "data-id": "hero" }');
@@ -84,8 +84,8 @@ const render = () =>
       React.createElement(ObjectAttrsField, {
         entries,
         pill: 'Attributes',
-        menu: null,
-        bindCtx: {},
+        menu: undefined,
+        bindContext: {},
         projectPath: '/project',
         onCommit: (next) => {
           entries = next;
@@ -125,7 +125,7 @@ const paste = async (text) => {
     { key: 'tabindex', raw: '2' },
     { key: 'disabled', raw: 'true' },
   ]);
-  assert.equal(document.querySelector('.attr-editor'), null);
+  assert.ok(document.querySelector('.attr-editor') === null);
   assert.equal(writes, 2);
   await press(document.querySelector('button[title="Add attribute"]'));
   await paste('role="button"');
@@ -144,7 +144,7 @@ const paste = async (text) => {
           },
         },
         names: ['class:list', '...rest'],
-        bindCtx: { frontmatter: 'const variant = "medium";' },
+        bindContext: { frontmatter: 'const variant = "medium";' },
         onSetProp: () => {},
         onRenameProp: () => {},
       }),
@@ -163,7 +163,7 @@ const paste = async (text) => {
       new dom.window.MouseEvent('pointerdown', { bubbles: true, cancelable: true }),
     ),
   );
-  assert.equal(document.querySelector('.attr-editor.var-src'), null);
+  assert.ok(document.querySelector('.attr-editor.var-src') === null);
   assert.ok(valueField.querySelector('.cm-lineWrapping'));
   await act(async () =>
     document
@@ -175,8 +175,8 @@ const paste = async (text) => {
   assert.equal(expanded.style.width, '760px');
   const spreadRow = document.querySelectorAll('.attr-row')[1];
   assert.equal(spreadRow.querySelector('.attr-name').textContent, '{...rest}');
-  assert.equal(spreadRow.querySelector('.attr-eq'), null);
-  assert.equal(spreadRow.querySelector('.attr-value'), null);
+  assert.ok(spreadRow.querySelector('.attr-eq') === null);
+  assert.ok(spreadRow.querySelector('.attr-value') === null);
   await act(async () =>
     spreadRow.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true })),
   );

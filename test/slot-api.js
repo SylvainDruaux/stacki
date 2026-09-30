@@ -19,6 +19,7 @@
 // explaining how `Astro.slots.render()` works, so what a file says about itself
 // is blanked before any of this is read.
 
+const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
 
@@ -32,6 +33,10 @@ const check = (what, condition, detail) => {
 };
 
 const { parseSlots, defaultSlotInline } = require('../dist/electron/astroParser.js');
+
+// The DOM answers "none" with null. The fakes below that stand in for DOM APIs
+// return the platform's own value, read from JSON because our code never writes one.
+const PLATFORM_NULL = JSON.parse('null');
 
 const page = (frontmatter, body) => `---\n${frontmatter}\n---\n${body}\n`;
 const slots = (fm, body) => JSON.stringify(parseSlots(page(fm, body)));
@@ -186,11 +191,15 @@ const LUMOS = '/Users/timothyricks/Documents/Projects/lumos-framework/src/compon
 // components were in one folder when this was written and are in a tree of
 // them now, and a moved file should not read as a broken parser — or, as it
 // did, as a crash that takes the rest of the suite with it.
-const findComponent = (dir, name) => {
-  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-    const full = path.join(dir, entry.name);
+// A component library nests a handful of folders deep; a search past this has
+// met a cycle and should stop loudly rather than recurse on.
+const SEARCH_LIMITS = { directoryDepthMax: 32 };
+const findComponent = (directory, name, depth = 0) => {
+  assert.ok(depth <= SEARCH_LIMITS.directoryDepthMax, 'findComponent: depth limit');
+  for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+    const full = path.join(directory, entry.name);
     if (entry.isDirectory()) {
-      const hit = findComponent(full, name);
+      const hit = findComponent(full, name, depth + 1);
       if (hit) {
         return hit;
       }
@@ -198,38 +207,38 @@ const findComponent = (dir, name) => {
       return fs.readFileSync(full, 'utf8');
     }
   }
-  return null;
+  return undefined;
 };
 if (fs.existsSync(LUMOS)) {
-  const read = (n) => findComponent(LUMOS, n);
+  const read = (name) => findComponent(LUMOS, name);
   const onceReal = (what, name, run) => {
     const source = read(name);
-    if (source == null) {
+    if (source === undefined) {
       return;
     } // that component is not in this project any more
     run(source, what);
   };
-  onceReal('the real <Paragraph> takes content', 'Paragraph', (src) => {
+  onceReal('the real <Paragraph> takes content', 'Paragraph', (source) => {
     check(
       'the real <Paragraph> takes content',
-      JSON.stringify(parseSlots(src)) === '["default"]',
-      JSON.stringify(parseSlots(src)),
+      JSON.stringify(parseSlots(source)) === '["default"]',
+      JSON.stringify(parseSlots(source)),
     );
-    check('and it takes words', defaultSlotInline(src) === true);
+    check('and it takes words', defaultSlotInline(source) === true);
   });
-  onceReal('the real <ContentWrapper>', 'ContentWrapper', (src) => {
+  onceReal('the real <ContentWrapper>', 'ContentWrapper', (source) => {
     check(
       'the real <ContentWrapper> offers its second column',
-      JSON.stringify(parseSlots(src)) === '["default","column2"]',
-      JSON.stringify(parseSlots(src)),
+      JSON.stringify(parseSlots(source)) === '["default","column2"]',
+      JSON.stringify(parseSlots(source)),
     );
-    check('while it takes blocks, not words', defaultSlotInline(src) === false);
+    check('while it takes blocks, not words', defaultSlotInline(source) === false);
   });
-  onceReal('a component with no slots', 'Img', (src) => {
+  onceReal('a component with no slots', 'Img', (source) => {
     check(
       'a component with no slots still reports none',
-      JSON.stringify(parseSlots(src)) === '[]',
-      JSON.stringify(parseSlots(src)),
+      JSON.stringify(parseSlots(source)) === '[]',
+      JSON.stringify(parseSlots(source)),
     );
   });
 }
@@ -237,9 +246,9 @@ if (fs.existsSync(LUMOS)) {
 // ── The field it was all for ────────────────────────────────────────────────
 (async () => {
   const esbuild = require('esbuild');
-  const buildDir = path.join(__dirname, '..', 'node_modules', '.stacki-test');
-  fs.mkdirSync(buildDir, { recursive: true });
-  const bundle = path.join(buildDir, 'slot-api.bundle.js');
+  const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
+  fs.mkdirSync(buildDirectory, { recursive: true });
+  const bundle = path.join(buildDirectory, 'slot-api.bundle.js');
   await esbuild.build({
     entryPoints: [path.join(__dirname, '..', 'src', 'panels', 'PropsPanel.jsx')],
     outfile: bundle,
@@ -277,7 +286,7 @@ if (fs.existsSync(LUMOS)) {
   dom.window.Range.prototype.getBoundingClientRect = () => NO_BOX;
   dom.window.Range.prototype.getClientRects = () => ({
     length: 0,
-    item: () => null,
+    item: () => PLATFORM_NULL,
     [Symbol.iterator]: function* () {},
   });
 
@@ -305,7 +314,7 @@ if (fs.existsSync(LUMOS)) {
         }),
       );
     });
-    const labels = [...host.querySelectorAll('.prop-label')].map((n) => n.textContent.trim());
+    const labels = [...host.querySelectorAll('.prop-label')].map((node) => node.textContent.trim());
     await act(async () => root.unmount());
     return labels;
   };

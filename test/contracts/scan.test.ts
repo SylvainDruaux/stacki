@@ -10,6 +10,9 @@ import assert from 'node:assert/strict';
 import { parseScanResult } from '../../dist/shared/scan.js';
 import { LIMITS } from '../../dist/shared/limits.js';
 
+// Null as a boundary receives it, parsed from JSON: inputs may hold it; our values never do.
+const jsonNull: unknown = JSON.parse('null');
+
 const goodScan = {
   pages: [{ path: '/p/src/pages/index.astro', name: 'index.astro', route: '/' }],
   pageFolders: ['blog'],
@@ -49,17 +52,17 @@ test('a component without an extended or root tag carries undefined, never null'
   assert.equal(parsed.components[0]?.extendsTag, undefined);
   assert.equal(parsed.components[0]?.renderTag, undefined);
   assert.throws(
-    () => parseScanResult({ ...goodScan, components: [{ ...bare, extendsTag: null }] }),
+    () => parseScanResult({ ...goodScan, components: [{ ...bare, extendsTag: jsonNull }] }),
     /extendsTag: expected string/,
   );
   assert.throws(
-    () => parseScanResult({ ...goodScan, components: [{ ...bare, renderTag: null }] }),
+    () => parseScanResult({ ...goodScan, components: [{ ...bare, renderTag: jsonNull }] }),
     /renderTag: expected object/,
   );
 });
 
 test('negative space: wrong entry shapes fail with pinned messages', () => {
-  assert.throws(() => parseScanResult(null), /expected object/);
+  assert.throws(() => parseScanResult(jsonNull), /expected object/);
   assert.throws(() => parseScanResult({ ...goodScan, pages: {} }), /pages: expected array/);
   assert.throws(
     () => parseScanResult({ ...goodScan, pages: [{ path: '/x', name: 'x.astro' }] }),

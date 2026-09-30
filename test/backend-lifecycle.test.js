@@ -29,7 +29,7 @@ const deferred = () => {
   return { promise, resolve };
 };
 
-function contentHarness(t) {
+function contentHarness(context) {
   const projectPath = fs.mkdtempSync(path.join(os.tmpdir(), 'stacki-content-lifecycle-'));
   const config = path.join(projectPath, 'src', 'content.config.ts');
   fs.mkdirSync(path.dirname(config), { recursive: true });
@@ -76,7 +76,7 @@ function contentHarness(t) {
   );
   const runtimeRequire = createRequire(path.join(__dirname, '../dist/electron/main.js'));
   const mod = { exports: {} };
-  const fn = vm.runInNewContext(
+  const moduleFactory = vm.runInNewContext(
     '(function(require, module, __dirname, exports) {' + source + '\n})',
     {
       process,
@@ -88,13 +88,13 @@ function contentHarness(t) {
       clearTimeout: (timer) => timers.delete(timer),
     },
   );
-  fn(
+  moduleFactory(
     (name) => mocks[name] || runtimeRequire(name),
     mod,
     path.join(__dirname, '..', 'dist', 'electron'),
     mod.exports,
   );
-  t.after(() => {
+  context.after(() => {
     mod.exports.stopAllServices();
     assert.equal(timers.size, 0, 'stopping releases every timeout');
     fs.rmSync(projectPath, { recursive: true, force: true });
@@ -116,98 +116,107 @@ function contentHarness(t) {
   };
 }
 
-test('content readers share a pending build and wait for the completed manifest', async (t) => {
-  const h = contentHarness(t);
-  const first = h.readContentConfig(h.projectPath);
-  const second = h.readContentConfig(h.projectPath);
-  assert.equal(h.builds.length, 1);
-  h.builds[0].resolve();
-  await tick();
-  let resolved = false;
-  const third = h.readContentConfig(h.projectPath).then((result) => {
-    resolved = true;
-    return result;
-  });
-  await tick();
-  assert.equal(resolved, false, 'a spawned worker has not necessarily loaded its schema');
-  h.children[0].reply({ type: 'manifest', value: { collections: [{ name: 'posts' }] } });
-  const results = await Promise.all([first, second, third]);
-  assert.equal(h.children.length, 1);
-  for (const result of results) {
-    assert.equal(result.collections[0].name, 'posts');
-  }
-});
+test(
+  'content readers share a pending build and wait for ' + 'the completed manifest',
+  async (context) => {
+    const harness = contentHarness(context);
+    const first = harness.readContentConfig(harness.projectPath);
+    const second = harness.readContentConfig(harness.projectPath);
+    assert.equal(harness.builds.length, 1);
+    harness.builds[0].resolve();
+    await tick();
+    let resolved = false;
+    const third = harness.readContentConfig(harness.projectPath).then((result) => {
+      resolved = true;
+      return result;
+    });
+    await tick();
+    assert.equal(resolved, false, 'a spawned worker has not necessarily loaded its schema');
+    harness.children[0].reply({ type: 'manifest', value: { collections: [{ name: 'posts' }] } });
+    const results = await Promise.all([first, second, third]);
+    assert.equal(harness.children.length, 1);
+    for (const result of results) {
+      assert.equal(result.collections[0].name, 'posts');
+    }
+  },
+);
 
-test('an old content worker exiting cannot terminate its replacement', async (t) => {
-  const h = contentHarness(t);
-  await h.start();
-  const oldChild = h.children[0];
-  const next = h.readContentConfig(h.projectPath, { force: true });
+test('an old content worker exiting cannot terminate its replacement', async (context) => {
+  const harness = contentHarness(context);
+  await harness.start();
+  const oldChild = harness.children[0];
+  const next = harness.readContentConfig(harness.projectPath, { force: true });
   await tick();
-  h.builds[1].resolve();
+  harness.builds[1].resolve();
   await tick();
-  const replacement = h.children[1];
+  const replacement = harness.children[1];
   replacement.reply({ type: 'manifest', value: { collections: [{ name: 'new' }] } });
   await next;
   oldChild.emit('exit', 0);
   assert.equal(replacement.killed, undefined);
-  assert.equal((await h.readContentConfig(h.projectPath)).collections[0].name, 'new');
-  assert.equal(h.builds.length, 2);
+  assert.equal((await harness.readContentConfig(harness.projectPath)).collections[0].name, 'new');
+  assert.equal(harness.builds.length, 2);
 });
 
-test('closing a project during a content build prevents a late worker spawn', async (t) => {
-  const h = contentHarness(t);
-  const reading = h.readContentConfig(h.projectPath);
-  h.stopAllServices();
-  h.builds[0].resolve();
+test('closing a project during a content build prevents a late worker spawn', async (context) => {
+  const harness = contentHarness(context);
+  const reading = harness.readContentConfig(harness.projectPath);
+  harness.stopAllServices();
+  harness.builds[0].resolve();
   const result = await reading;
   assert.match(result.error, /reloaded/);
-  assert.equal(h.children.length, 0);
-});
-
-test('forcing a content reload waits for the old build before rewriting its bundle', async (t) => {
-  const h = contentHarness(t);
-  const first = h.readContentConfig(h.projectPath);
-  const second = h.readContentConfig(h.projectPath, { force: true });
-  assert.equal(h.builds.length, 1);
-  h.builds[0].resolve();
-  await tick();
-  assert.match((await first).error, /reloaded/);
-  assert.equal(h.builds.length, 2);
-  assert.equal(h.children.length, 0);
-  h.builds[1].resolve();
-  await tick();
-  h.children[0].reply({ type: 'manifest', value: { collections: [] } });
-  assert.equal((await second).error, undefined);
+  assert.equal(harness.children.length, 0);
 });
 
 test(
-  'validation clears completed requests and ' + 'rejects pending requests when a worker exits',
-  async (t) => {
-    const h = contentHarness(t);
-    await h.start();
-    const child = h.children[0];
-    const validation = h.validateEntry(h.projectPath, { collection: 'posts', data: {} });
+  'forcing a content reload waits for the old build ' + 'before rewriting its bundle',
+  async (context) => {
+    const harness = contentHarness(context);
+    const first = harness.readContentConfig(harness.projectPath);
+    const second = harness.readContentConfig(harness.projectPath, { force: true });
+    assert.equal(harness.builds.length, 1);
+    harness.builds[0].resolve();
     await tick();
-    assert.equal(h.timers.size, 2, 'idle and current request timeouts only');
+    assert.match((await first).error, /reloaded/);
+    assert.equal(harness.builds.length, 2);
+    assert.equal(harness.children.length, 0);
+    harness.builds[1].resolve();
+    await tick();
+    harness.children[0].reply({ type: 'manifest', value: { collections: [] } });
+    assert.equal((await second).error, undefined);
+  },
+);
+
+test(
+  'validation clears completed requests and ' + 'rejects pending requests when a worker exits',
+  async (context) => {
+    const harness = contentHarness(context);
+    await harness.start();
+    const child = harness.children[0];
+    const validation = harness.validateEntry(harness.projectPath, {
+      collection: 'posts',
+      data: {},
+    });
+    await tick();
+    assert.equal(harness.timers.size, 2, 'idle and current request timeouts only');
     child.reply({ type: 'reply', id: child.requests[0].id, value: { issues: [] } });
     assert.equal((await validation).issues.length, 0);
-    assert.equal(h.timers.size, 1, 'the completed request timeout was cleared');
-    const pending = h.validateEntry(h.projectPath, { collection: 'posts', data: {} });
+    assert.equal(harness.timers.size, 1, 'the completed request timeout was cleared');
+    const pending = harness.validateEntry(harness.projectPath, { collection: 'posts', data: {} });
     await tick();
     child.stderr.emit('data', 'invalid worker state');
     child.emit('exit', 1);
     assert.match((await pending).error, /invalid worker state/);
-    assert.equal(h.timers.size, 0);
+    assert.equal(harness.timers.size, 0);
   },
 );
 
-test('removing a content config closes its cached worker', async (t) => {
-  const h = contentHarness(t);
-  await h.start();
-  fs.unlinkSync(h.config);
-  assert.equal((await h.readContentConfig(h.projectPath)).missing, true);
-  assert.equal(h.children[0].killed, true);
+test('removing a content config closes its cached worker', async (context) => {
+  const harness = contentHarness(context);
+  await harness.start();
+  fs.unlinkSync(harness.config);
+  assert.equal((await harness.readContentConfig(harness.projectPath)).missing, true);
+  assert.equal(harness.children[0].killed, true);
 });
 
 test(
@@ -243,10 +252,10 @@ test(
 
 test(
   'project watchers route batched edits once ' + 'and cancel all pending events on close',
-  async (t) => {
+  async (context) => {
     const projectPath = fs.mkdtempSync(path.join(os.tmpdir(), 'stacki-watch-lifecycle-'));
     fs.mkdirSync(path.join(projectPath, 'public'));
-    t.after(() => fs.rmSync(projectPath, { recursive: true, force: true }));
+    context.after(() => fs.rmSync(projectPath, { recursive: true, force: true }));
     const handlers = new Map();
     const closed = [];
     const events = [];
@@ -255,9 +264,9 @@ test(
     const hints = [];
     const watcher = watchProject({
       projectPath,
-      watch: (dir, _options, handler) => {
-        handlers.set(path.basename(dir), handler);
-        return { close: () => closed.push(dir) };
+      watch: (directory, _options, handler) => {
+        handlers.set(path.basename(directory), handler);
+        return { close: () => closed.push(directory) };
       },
       send: (channel, payload) => events.push({ channel, payload }),
       isSelfWrite: (file) => {
@@ -380,34 +389,37 @@ function loadThumbs(BrowserWindow) {
   return mod.exports;
 }
 
-function thumbFixture(t) {
+function thumbFixture(context) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'stacki-thumb-lifecycle-'));
   const project = path.join(root, 'project');
   const userData = path.join(root, 'user');
   const source = path.join(project, 'src', 'index.astro');
   fs.mkdirSync(path.dirname(source), { recursive: true });
   fs.writeFileSync(source, '<h1>Before</h1>');
-  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  context.after(() => fs.rmSync(root, { recursive: true, force: true }));
   return { root, project, userData, source };
 }
 
-test('thumbnail fingerprints notice edits hidden by a newer file and path-only renames', (t) => {
-  const h = thumbFixture(t);
-  const thumbs = loadThumbs();
-  const newest = path.join(h.project, 'src', 'newest.astro');
-  fs.writeFileSync(newest, '<h1>Future</h1>');
-  const future = new Date('2099-01-01');
-  fs.utimesSync(newest, future, future);
-  const before = thumbs.fingerprint(h.project);
-  fs.writeFileSync(h.source, '<h1>Changed</h1>');
-  const changed = thumbs.fingerprint(h.project);
-  assert.notEqual(changed, before);
-  fs.renameSync(h.source, path.join(h.project, 'src', 'renamed.astro'));
-  assert.notEqual(thumbs.fingerprint(h.project), changed);
-});
+test(
+  'thumbnail fingerprints notice edits hidden by a newer file ' + 'and path-only renames',
+  (context) => {
+    const fixture = thumbFixture(context);
+    const thumbs = loadThumbs();
+    const newest = path.join(fixture.project, 'src', 'newest.astro');
+    fs.writeFileSync(newest, '<h1>Future</h1>');
+    const future = new Date('2099-01-01');
+    fs.utimesSync(newest, future, future);
+    const before = thumbs.fingerprint(fixture.project);
+    fs.writeFileSync(fixture.source, '<h1>Changed</h1>');
+    const changed = thumbs.fingerprint(fixture.project);
+    assert.notEqual(changed, before);
+    fs.renameSync(fixture.source, path.join(fixture.project, 'src', 'renamed.astro'));
+    assert.notEqual(thumbs.fingerprint(fixture.project), changed);
+  },
+);
 
-test('a stalled thumbnail navigation times out and destroys its window', async (t) => {
-  const h = thumbFixture(t);
+test('a stalled thumbnail navigation times out and destroys its window', async (context) => {
+  const fixture = thumbFixture(context);
   let destroyed = false;
   const thumbs = loadThumbs(
     class {
@@ -422,7 +434,7 @@ test('a stalled thumbnail navigation times out and destroys its window', async (
       }
     },
   );
-  const result = await thumbs.capture(h.userData, h.project, 'http://example.invalid');
+  const result = await thumbs.capture(fixture.userData, fixture.project, 'http://example.invalid');
   assert.equal(result.ok, false);
   assert.match(result.error, /did not finish loading/);
   assert.equal(destroyed, true);
@@ -430,15 +442,15 @@ test('a stalled thumbnail navigation times out and destroys its window', async (
 
 test(
   'an edit during thumbnail rendering remains ' + 'stale and a missing image is regenerated',
-  async (t) => {
-    const h = thumbFixture(t);
+  async (context) => {
+    const fixture = thumbFixture(context);
     const thumbs = loadThumbs(
       class {
         constructor() {
           this.webContents = {
             executeJavaScript: async () => {},
             capturePage: async () => {
-              fs.writeFileSync(h.source, '<h1>Edited while rendering</h1>');
+              fs.writeFileSync(fixture.source, '<h1>Edited while rendering</h1>');
               return {
                 isEmpty: () => false,
                 resize: () => ({ toPNG: () => Buffer.from('image') }),
@@ -453,31 +465,34 @@ test(
         destroy() {}
       },
     );
-    assert.equal((await thumbs.capture(h.userData, h.project, 'http://example.invalid')).ok, true);
-    assert.equal(thumbs.isStale(h.userData, h.project), true);
-    const file = thumbs.thumbPathFor(h.userData, h.project);
+    assert.equal(
+      (await thumbs.capture(fixture.userData, fixture.project, 'http://example.invalid')).ok,
+      true,
+    );
+    assert.equal(thumbs.isStale(fixture.userData, fixture.project), true);
+    const file = thumbs.thumbPathFor(fixture.userData, fixture.project);
     fs.writeFileSync(
       file.replace(/\.png$/, '.json'),
-      JSON.stringify({ fingerprint: thumbs.fingerprint(h.project) }),
+      JSON.stringify({ fingerprint: thumbs.fingerprint(fixture.project) }),
     );
-    assert.equal(thumbs.isStale(h.userData, h.project), false);
+    assert.equal(thumbs.isStale(fixture.userData, fixture.project), false);
     fs.unlinkSync(file);
-    assert.equal(thumbs.isStale(h.userData, h.project), true);
+    assert.equal(thumbs.isStale(fixture.userData, fixture.project), true);
   },
 );
 
 test(
   'legacy schema conversion resolves Astro ' + 'private dependencies without root hoisting',
-  async (t) => {
+  async (context) => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'stacki-schema-resolution-'));
-    t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+    context.after(() => fs.rmSync(root, { recursive: true, force: true }));
     const modules = path.join(root, 'project', 'node_modules');
     const storeModules = path.join(root, 'store', 'astro-version', 'node_modules');
     const astro = path.join(storeModules, 'astro');
     const converter = path.join(storeModules, 'zod-to-json-schema');
     const staging = path.join(modules, '.stacki');
-    for (const dir of [astro, converter, staging]) {
-      fs.mkdirSync(dir, { recursive: true });
+    for (const directory of [astro, converter, staging]) {
+      fs.mkdirSync(directory, { recursive: true });
     }
     fs.writeFileSync(
       path.join(astro, 'package.json'),

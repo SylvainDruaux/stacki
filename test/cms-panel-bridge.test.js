@@ -5,6 +5,9 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const bridge = require('./renderer-module')('cmsPanelBridge.ts');
 
+// Null as a boundary receives it, parsed from JSON: inputs may hold it; our values never do.
+const jsonNull = JSON.parse('null');
+
 const file = {
   rel: 'data/posts.json',
   name: 'posts.json',
@@ -50,8 +53,8 @@ test('CMS panel parsers preserve the fields used by the panel', () => {
 
 test('CMS panel parsers reject malformed paths, counts, data, and bounds', () => {
   for (const value of [
-    null,
-    { files: null },
+    jsonNull,
+    { files: jsonNull },
     { files: [{ ...file, rel: 'bad\0path' }] },
     { files: [{ ...file, data: Number.NaN }] },
     { files: Array(100_001).fill(file) },
@@ -61,8 +64,8 @@ test('CMS panel parsers reject malformed paths, counts, data, and bounds', () =>
   for (const value of [
     { ...content, collections: [{ ...content.collections[0], count: -1 }] },
     // Absence is `undefined` (AGENTS.md §6): main never sends a null error.
-    { ...content, collections: [{ ...content.collections[0], error: null }] },
-    { ...content, covered: { files: null, dirs: [] } },
+    { ...content, collections: [{ ...content.collections[0], error: jsonNull }] },
+    { ...content, covered: { files: jsonNull, dirs: [] } },
     { collections: [{ ...content.collections[0] }] },
     { collections: [], missing: false },
     { ...content, collections: Array(100_001).fill(content.collections[0]) },

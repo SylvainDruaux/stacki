@@ -61,16 +61,16 @@ const STYLESHEET = `:root {
 `;
 
 (async () => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'stacki-varsrow-'));
-  fs.mkdirSync(path.join(dir, 'src', 'styles'), { recursive: true });
-  fs.writeFileSync(path.join(dir, 'src', 'styles', 'tokens.css'), STYLESHEET);
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'stacki-varsrow-'));
+  fs.mkdirSync(path.join(directory, 'src', 'styles'), { recursive: true });
+  fs.writeFileSync(path.join(directory, 'src', 'styles', 'tokens.css'), STYLESHEET);
 
   const cssVars = require('../dist/electron/cssVars.js');
-  const data = cssVars.readVariables(dir);
+  const data = cssVars.readVariables(directory);
 
   const esbuild = require('esbuild');
-  const buildDir = path.join(__dirname, '..', 'node_modules', '.stacki-test', 'varsrow');
-  fs.mkdirSync(buildDir, { recursive: true });
+  const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test', 'varsrow');
+  fs.mkdirSync(buildDirectory, { recursive: true });
   await esbuild.build({
     stdin: {
       contents: `
@@ -93,7 +93,7 @@ const STYLESHEET = `:root {
       resolveDir: path.join(__dirname, '..'),
       loader: 'jsx',
     },
-    outfile: path.join(buildDir, 'bundle.js'),
+    outfile: path.join(buildDirectory, 'bundle.js'),
     bundle: true,
     format: 'iife',
     jsx: 'automatic',
@@ -103,7 +103,7 @@ const STYLESHEET = `:root {
   // The sheet reads the project over the bridge; in here the answer is the one
   // the real reader produced from the fixture above, handed over as a literal.
   fs.writeFileSync(
-    path.join(buildDir, 'index.html'),
+    path.join(buildDirectory, 'index.html'),
     `<!doctype html><meta charset="utf-8"><link rel="stylesheet" href="bundle.css">
      <style>body { margin: 0; background: #191919 }</style>
      <div id="root"></div>
@@ -131,7 +131,7 @@ const STYLESHEET = `:root {
     try {
       return require('electron');
     } catch {
-      return null;
+      return undefined;
     }
   })();
   if (typeof electronPath !== 'string') {
@@ -142,14 +142,14 @@ const STYLESHEET = `:root {
     return;
   }
 
-  const scriptPath = path.join(buildDir, 'probe.js');
+  const scriptPath = path.join(buildDirectory, 'probe.js');
   fs.writeFileSync(
     scriptPath,
     `const { app, BrowserWindow } = require('electron');
      app.on('window-all-closed', () => app.quit());
      app.whenReady().then(async () => {
        const win = new BrowserWindow({ show: false, width: 1000, height: 800 });
-       await win.loadFile(${JSON.stringify(path.join(buildDir, 'index.html'))});
+       await win.loadFile(${JSON.stringify(path.join(buildDirectory, 'index.html'))});
        const js = (code) => win.webContents.executeJavaScript(code);
        const pointerAt = (type, x, y) => js(
          "(() => { const target = " +
@@ -309,15 +309,18 @@ const STYLESHEET = `:root {
 
   const { spawnSync } = require('child_process');
   const run = spawnSync(electronPath, [scriptPath], { encoding: 'utf8', timeout: 90000 });
-  const line = (run.stdout || '').split('\n').find((l) => l.trim().startsWith('{'));
+  const line = (run.stdout || '').split('\n').find((line) => line.trim().startsWith('{'));
   if (!line) {
     check('the probe ran in a browser', false, (run.stderr || run.stdout || '').slice(0, 400));
   } else {
     const out = JSON.parse(line);
+    // The run reports through JSON, which spells a value it never found as null;
+    // a key it never wrote reads as undefined. Either is "not there".
+    const present = (value) => value !== null && value !== undefined;
     check('the sheet renders its rows', out.before?.heads > 0, JSON.stringify(out.before));
     check(
       'a name opens a field when clicked',
-      out.clicked === true && out.after != null,
+      out.clicked === true && present(out.after),
       JSON.stringify(out.after),
     );
     check(
@@ -337,7 +340,7 @@ const STYLESHEET = `:root {
     );
     // Measured with the menu present — a control in the heading is exactly what
     // pushed the two stacks apart, by landing on a second grid row.
-    const drift = (out.stacks || []).filter((t) => t.mismatched > 0);
+    const drift = (out.stacks || []).filter((stack) => stack.mismatched > 0);
     check(
       'the names and the values line up, row for row',
       drift.length === 0,
@@ -348,10 +351,10 @@ const STYLESHEET = `:root {
     // sits on that line instead). Anything beyond that is a stack out of step.
     check(
       'and neither stack has a line the other lacks',
-      (out.stacks || []).every((t) => t.extraIsAddRow),
-      JSON.stringify((out.stacks || []).map((t) => t.counts)),
+      (out.stacks || []).every((stack) => stack.extraIsAddRow),
+      JSON.stringify((out.stacks || []).map((stack) => stack.counts)),
     );
-    check('the heading has a menu', out.menuRows != null, String(out.menu));
+    check('the heading has a menu', present(out.menuRows), String(out.menu));
     check(
       'offering rename, duplicate and delete',
       out.menuRows?.labels.join('|') === 'Rename|Duplicate|Delete',
@@ -394,7 +397,7 @@ const STYLESHEET = `:root {
     );
     check(
       'a heading can be dragged by its name too',
-      out.headingDrag?.grabbed && out.headingDrag?.asked != null,
+      out.headingDrag?.grabbed && present(out.headingDrag?.asked),
       JSON.stringify(out.headingDrag),
     );
     check(
@@ -424,7 +427,7 @@ const STYLESHEET = `:root {
     );
     check(
       'a shared-prefix heading opens a field',
-      out.headClicked === true && out.headAfter != null,
+      out.headClicked === true && present(out.headAfter),
       String(out.headAfter),
     );
     check(
@@ -434,7 +437,7 @@ const STYLESHEET = `:root {
     );
   }
 
-  fs.rmSync(dir, { recursive: true, force: true });
+  fs.rmSync(directory, { recursive: true, force: true });
   if (failures.length) {
     console.error(
       `vars-row-height: ${failures.length} of ${checked} failed\n${failures.join('\n')}`,

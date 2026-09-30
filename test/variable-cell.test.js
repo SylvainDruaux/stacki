@@ -64,10 +64,10 @@ test('variable cells keep hook order across sparse matrix updates', async () => 
     valueEnd: 14,
   };
   const sequence = [
-    [cell, null],
-    [null, cell],
+    [cell, undefined],
+    [undefined, cell],
     [cell, { ...cell, value: '2rem' }],
-    [null, null],
+    [undefined, undefined],
     [undefined, cell],
     [cell, undefined],
   ];
@@ -77,7 +77,7 @@ test('variable cells keep hook order across sparse matrix updates', async () => 
         root.render(
           React.createElement(
             'div',
-            null,
+            undefined,
             values.map((value, index) =>
               React.createElement(Cell, { key: index, cell: value, onSave() {}, onDraft }),
             ),
@@ -95,7 +95,7 @@ test('variable cells keep hook order across sparse matrix updates', async () => 
     }
     await act(async () => root.unmount());
     assert.ok(notes.length > sequence.length, 'draft lifecycle ran for populated cells');
-    assert.deepEqual(notes.at(-1), { name: '--gap', value: null }, 'unmount clears the draft');
+    assert.deepEqual(notes.at(-1), { name: '--gap', value: undefined }, 'unmount clears the draft');
     const { renderToStaticMarkup } = require('react-dom/server');
     assert.throws(
       () =>

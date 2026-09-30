@@ -10,6 +10,9 @@ const assert = require('node:assert/strict');
 const loadRenderer = require('./renderer-module');
 
 const bridgeModule = loadRenderer('appBridge.ts');
+// A legacy bridge answered a cancelled dialog with null; the parser still reads it as a
+// cancellation, so the stub sends null as JSON would carry it.
+const legacyCancel = JSON.parse('null');
 
 test('App bridge preserves validated lifecycle and write operations', async () => {
   const calls = [];
@@ -20,7 +23,7 @@ test('App bridge preserves validated lifecycle and write operations', async () =
         calls.push(['start', payload]);
         return { url: 'http://localhost:4321' };
       },
-      openProjectDialog: async () => null,
+      openProjectDialog: async () => legacyCancel,
       copySelection: async (payload) => {
         calls.push(['copy', payload]);
         return { ok: true, count: 2 };

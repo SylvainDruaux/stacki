@@ -25,13 +25,22 @@ import { snapshotOf } from './project.ts';
 const PAGE = toFilePath('/project/page.md');
 const snapshot = (text: string): Snapshot => snapshotOf(PAGE, encodeUtf8(text));
 
-/** Plan `operation` at `path` of `authored` against `current`; the new text,
- * or the rejection. */
+/** Plan `operation` at `path` of `authored` against the same text unchanged. */
 function planned(
   authored: string,
   path: readonly number[],
   operation: (at: (path: readonly number[]) => AnchorRef) => Operation,
-  current = authored,
+): string {
+  return plannedAgainst(authored, authored, path, operation);
+}
+
+/** Plan `operation` at `path` of `authored` against `current`; the new text,
+ * or the rejection. */
+function plannedAgainst(
+  authored: string,
+  current: string,
+  path: readonly number[],
+  operation: (at: (path: readonly number[]) => AnchorRef) => Operation,
 ): string {
   const before = snapshot(authored);
   const now = snapshot(current);
@@ -93,8 +102,8 @@ test('a list and its first item start on one byte and each resolves to itself', 
   assert.equal(planned(page, [0, 0], remove), '- b\n');
   assert.equal(planned(page, [0], remove), '\n');
   const above = `Intro.\n\n${page}`;
-  assert.equal(planned(page, [0, 0], remove, above), 'Intro.\n\n- b\n', 'the item, mapped');
-  assert.equal(planned(page, [0], remove, above), 'Intro.\n', 'the list, mapped');
+  assert.equal(plannedAgainst(page, above, [0, 0], remove), 'Intro.\n\n- b\n', 'the item, mapped');
+  assert.equal(plannedAgainst(page, above, [0], remove), 'Intro.\n', 'the list, mapped');
 });
 
 test("a block's inline text is never removed, moved or stood beside", () => {

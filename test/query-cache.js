@@ -43,18 +43,26 @@ const esbuild = require('esbuild');
   calls[1].resolve({ opacity: '0.5' });
   calls[0].resolve({ display: 'grid', color: '' });
   assert.deepEqual(await Promise.all([first, otherProp, otherPath]), ['grid', '', '0.5']);
-  assert.equal(cache.read('a', 'color'), '', 'empty values are settled answers');
+  assert.deepEqual(
+    cache.read('a', 'color'),
+    { kind: 'settled', answer: '' },
+    'empty values are settled answers',
+  );
   assert.equal(notifications, 2, 'one notification per completed batch');
 
   const obsolete = cache.request('a', 'width');
   await tick();
   cache.clear();
-  assert.equal(await obsolete, null, 'invalidation settles outstanding callers');
+  assert.equal(await obsolete, undefined, 'invalidation settles outstanding callers');
   const fresh = cache.request('a', 'width');
   await tick();
   calls[2].resolve({ width: '10px' });
   await tick();
-  assert.equal(cache.read('a', 'width'), undefined, 'old replies cannot refill the new cache');
+  assert.deepEqual(
+    cache.read('a', 'width'),
+    { kind: 'pending' },
+    'old replies cannot refill the new cache',
+  );
   assert.equal(
     cache.request('a', 'width'),
     fresh,
@@ -64,32 +72,36 @@ const esbuild = require('esbuild');
   assert.equal(await fresh, '20px');
 
   cache.setScope(['project', 'page', 'desktop']);
-  assert.equal(
+  assert.deepEqual(
     cache.read('a', 'width'),
-    undefined,
+    { kind: 'pending' },
     'documents and breakpoints have separate answers',
   );
   const missing = cache.request('a', 'missing');
   await tick();
-  calls[4].resolve(null);
-  assert.equal(await missing, null);
-  assert.equal(
+  calls[4].resolve(undefined);
+  assert.equal(await missing, undefined);
+  assert.deepEqual(
     cache.read('a', 'missing'),
-    null,
+    { kind: 'settled', answer: undefined },
     'a failed query settles, rather than waiting forever',
   );
   cache.setScope(['project', 'page', 'desktop']);
-  assert.equal(cache.read('a', 'missing'), null, 'unchanged scope preserves settled answers');
+  assert.deepEqual(
+    cache.read('a', 'missing'),
+    { kind: 'settled', answer: undefined },
+    'unchanged scope preserves settled answers',
+  );
   const queued = cache.request('a', 'cancelled');
   cache.clear();
-  assert.equal(await queued, null);
+  assert.equal(await queued, undefined);
   await tick();
   assert.equal(calls.length, 5, 'clearing cancels a batch that has not started');
 
   const rejects = createQueryCache(() => Promise.reject(new Error('frame closed')));
   assert.equal(
     await rejects.request('', 'var(--color)'),
-    null,
+    undefined,
     'bridge rejection is a settled miss',
   );
   const throws = createQueryCache(() => {
@@ -97,7 +109,7 @@ const esbuild = require('esbuild');
   });
   assert.equal(
     await throws.request('', 'var(--color)'),
-    null,
+    undefined,
     'synchronous bridge failure is contained',
   );
   off();

@@ -31,14 +31,14 @@ function fakeAudio() {
   const played = [];
   const param = () => ({
     value: 0,
-    setValueAtTime(v) {
-      this.value = v;
+    setValueAtTime(value) {
+      this.value = value;
     },
-    linearRampToValueAtTime(v) {
-      this.value = v;
+    linearRampToValueAtTime(value) {
+      this.value = value;
     },
-    exponentialRampToValueAtTime(v) {
-      this.value = v;
+    exponentialRampToValueAtTime(value) {
+      this.value = value;
     },
   });
   const node = () => ({
@@ -49,7 +49,7 @@ function fakeAudio() {
     Q: param(),
     type: '',
   });
-  class Ctx {
+  class FakeAudioContext {
     constructor() {
       this.currentTime = 0;
       this.destination = {};
@@ -71,15 +71,15 @@ function fakeAudio() {
     }
     resume() {}
   }
-  return { Ctx, played };
+  return { AudioContext: FakeAudioContext, played };
 }
 
 (async () => {
   const esbuild = require('esbuild');
-  const buildDir = path.join(__dirname, '..', 'node_modules', '.stacki-test');
-  fs.mkdirSync(buildDir, { recursive: true });
-  const entry = path.join(buildDir, 'panel-sound.entry.jsx');
-  const ui = (f) => JSON.stringify(path.join(__dirname, '..', 'src', 'ui', f));
+  const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
+  fs.mkdirSync(buildDirectory, { recursive: true });
+  const entry = path.join(buildDirectory, 'panel-sound.entry.jsx');
+  const ui = (file) => JSON.stringify(path.join(__dirname, '..', 'src', 'ui', file));
   // One bundle, so the dropdown and the switch that turns sound on are looking
   // at the same module.
   fs.writeFileSync(
@@ -88,7 +88,7 @@ function fakeAudio() {
       `export { SoundHere } from ${ui('soundScope.jsx')};\n` +
       `export { setSoundEnabled } from ${ui('sound.js')};\n`,
   );
-  const bundle = path.join(buildDir, 'panel-sound.bundle.js');
+  const bundle = path.join(buildDirectory, 'panel-sound.bundle.js');
   await esbuild.build({
     entryPoints: [entry],
     outfile: bundle,
@@ -105,7 +105,7 @@ function fakeAudio() {
   const dom = new JSDOM('<!doctype html><div id="root"></div>', { pretendToBeVisual: true });
   const audio = fakeAudio();
   global.window = dom.window;
-  dom.window.AudioContext = audio.Ctx;
+  dom.window.AudioContext = audio.AudioContext;
   global.document = dom.window.document;
   global.navigator = dom.window.navigator;
   global.MutationObserver = dom.window.MutationObserver;
@@ -124,7 +124,7 @@ function fakeAudio() {
     disconnect() {}
   };
   global.ResizeObserver = dom.window.ResizeObserver;
-  // jsdom has no scrolling, and the menu keeps its highlight in view.
+  // `jsdom` has no scrolling, and the menu keeps its highlight in view.
   dom.window.Element.prototype.scrollIntoView = function () {};
 
   const React = require('react');
@@ -148,7 +148,7 @@ function fakeAudio() {
       onChange: () => {},
     });
     await act(async () => {
-      root.render(inScope ? React.createElement(SoundHere, null, field) : field);
+      root.render(inScope ? React.createElement(SoundHere, undefined, field) : field);
     });
     const trigger = () => host.querySelector('.dd-trigger');
     const rows = () => [...document.querySelectorAll('.dd-option')];
@@ -167,7 +167,7 @@ function fakeAudio() {
       // same instant are one sound — which is right, and would make a count
       // here mean nothing.
       down: async () => {
-        await new Promise((r) => setTimeout(r, 40));
+        await new Promise((resolve) => setTimeout(resolve, 40));
         await act(async () => {
           trigger().dispatchEvent(
             new dom.window.KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }),
@@ -190,15 +190,15 @@ function fakeAudio() {
   {
     setSoundEnabled(false);
     audio.played.length = 0;
-    const m = await mount(true);
-    await m.open();
-    await m.down();
+    const mounted = await mount(true);
+    await mounted.open();
+    await mounted.down();
     check(
       'a menu in a panel is silent while the setting is off',
       audio.played.length === 0,
       String(audio.played.length),
     );
-    await m.done();
+    await mounted.done();
   }
 
   setSoundEnabled(true);
@@ -206,43 +206,43 @@ function fakeAudio() {
   // --- inside a panel --------------------------------------------------------------
   {
     audio.played.length = 0;
-    const m = await mount(true);
-    await m.open();
-    check('the menu opened', m.rows().length === 3, String(m.rows().length));
+    const mounted = await mount(true);
+    await mounted.open();
+    check('the menu opened', mounted.rows().length === 3, String(mounted.rows().length));
     check('opening it says nothing', audio.played.length === 0, JSON.stringify(audio.played));
-    await m.down();
+    await mounted.down();
     check(
       'moving the highlight sounds a note',
       audio.played.length === 1,
       JSON.stringify(audio.played),
     );
-    await m.down();
+    await mounted.down();
     check('and the next row another', audio.played.length === 2, JSON.stringify(audio.played));
     check(
       'deeper down the list, deeper the note',
       audio.played[1] < audio.played[0],
       JSON.stringify(audio.played),
     );
-    await m.done();
+    await mounted.done();
   }
 
   // --- and outside one ---------------------------------------------------------------
   {
     audio.played.length = 0;
-    const m = await mount(false);
-    await m.open();
-    await m.down();
-    await m.down();
+    const mounted = await mount(false);
+    await mounted.open();
+    await mounted.down();
+    await mounted.down();
     check(
       'a dropdown outside the panels stays quiet',
       audio.played.length === 0,
       JSON.stringify(audio.played),
     );
-    await m.done();
+    await mounted.done();
   }
 
   // --- the two panels, and only those -------------------------------------------------
-  const read = (...p) => fs.readFileSync(path.join(__dirname, '..', ...p), 'utf8');
+  const read = (...segments) => fs.readFileSync(path.join(__dirname, '..', ...segments), 'utf8');
   const props = read('src', 'panels', 'PropsPanel.tsx');
   const style = read('src', 'panels', 'StylePanel.tsx');
   check(
@@ -257,7 +257,7 @@ function fakeAudio() {
     'panels/PagesPanel.tsx',
     'panels/TerminalDock.tsx',
     'panels/WelcomeScreen.tsx',
-  ].filter((f) => /<SoundHere>/.test(read('src', ...f.split('/'))));
+  ].filter((file) => /<SoundHere>/.test(read('src', ...file.split('/'))));
   check('and nothing else is', scopes.length === 0, scopes.join(', '));
 
   if (failures.length) {

@@ -27,9 +27,9 @@ const check = (what, condition, detail) => {
 
 (async () => {
   const esbuild = require('esbuild');
-  const buildDir = path.join(__dirname, '..', 'node_modules', '.stacki-test');
-  fs.mkdirSync(buildDir, { recursive: true });
-  const bundlePath = path.join(buildDir, 'spacing-pick.bundle.js');
+  const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
+  fs.mkdirSync(buildDirectory, { recursive: true });
+  const bundlePath = path.join(buildDirectory, 'spacing-pick.bundle.js');
   await esbuild.build({
     entryPoints: [path.join(__dirname, '..', 'src', 'style-panel', 'SpacingBox.tsx')],
     outfile: bundlePath,
@@ -120,7 +120,7 @@ const check = (what, condition, detail) => {
         side: 'top',
         placeholder: '0',
         read: (prop) =>
-          values[prop] != null
+          values[prop] !== undefined
             ? {
                 source: 'selected',
                 selectedValue: { value: values[prop], important: false },
@@ -143,7 +143,7 @@ const check = (what, condition, detail) => {
   });
   const settle = () =>
     act(async () => {
-      await new Promise((r) => dom.window.setTimeout(r, 30));
+      await new Promise((resolve) => dom.window.setTimeout(resolve, 30));
     });
   await settle();
 
@@ -171,10 +171,12 @@ const check = (what, condition, detail) => {
   });
   await settle();
 
-  // It reaches the element…
+  // It reaches the element:
   check(
     'picking it writes the property',
-    committed.some(([p, v]) => p === 'padding-top' && v === 'var(--site-margin)'),
+    committed.some(
+      ([property, value]) => property === 'padding-top' && value === 'var(--site-margin)',
+    ),
     JSON.stringify(committed),
   );
   // …and it is IN THE FIELD, which is the whole bug.
@@ -218,7 +220,7 @@ const check = (what, condition, detail) => {
   }
   console.log(`spacing-pick: ${checked} passed  [the pick lands in the field]`);
   process.exit(0);
-})().catch((err) => {
-  console.error(err);
+})().catch((error) => {
+  console.error(error);
   process.exit(1);
 });

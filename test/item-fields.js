@@ -35,9 +35,9 @@ const check = (what, condition, detail) => {
 
 (async () => {
   const esbuild = require('esbuild');
-  const buildDir = path.join(__dirname, '..', 'node_modules', '.stacki-test');
-  fs.mkdirSync(buildDir, { recursive: true });
-  const out = path.join(buildDir, 'item-fields.cjs');
+  const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
+  fs.mkdirSync(buildDirectory, { recursive: true });
+  const out = path.join(buildDirectory, 'item-fields.cjs');
   await esbuild.build({
     entryPoints: [path.join(__dirname, '..', 'src', 'dataSuggest.js')],
     outfile: out,
@@ -50,8 +50,8 @@ const check = (what, condition, detail) => {
   const { parsePropSchema } = require('../dist/electron/astroParser.js');
 
   const itemOf = (context, name = 'service') =>
-    dataTree(context).find((n) => n.path === name) || null;
-  const fieldsOf = (node) => (node?.children || []).map((c) => c.key).join(',');
+    dataTree(context).find((node) => node.path === name);
+  const fieldsOf = (node) => (node?.children || []).map((child) => child.key).join(',');
 
   // --- a component, where the type is all there is -------------------------------
   const COMPONENT = `interface ServiceTime {
@@ -79,13 +79,13 @@ const { times = [] } = Astro.props;`;
     );
     check(
       'each named as a field of the item, not of the prop',
-      (item?.children || []).every((c) => c.path.startsWith('service.')),
-      (item?.children || []).map((c) => c.path).join(),
+      (item?.children || []).every((child) => child.path.startsWith('service.')),
+      (item?.children || []).map((child) => child.path).join(),
     );
     // The prop itself still reads as the list it is, so the loop editor's own
     // Data field can find it.
     const times = dataTree({ frontmatter: COMPONENT, propsSchema: schema }).find(
-      (n) => n.path === 'times',
+      (node) => node.path === 'times',
     );
     check(
       'and the prop is a list with an entry under it',
@@ -125,7 +125,7 @@ const { rows = [], seo } = Astro.props;`;
     );
     check('an inline item type works the same', fieldsOf(item) === 'label,href', fieldsOf(item));
     const seo = dataTree({ frontmatter: inline, propsSchema: schema }).find(
-      (n) => n.path === 'seo',
+      (node) => node.path === 'seo',
     );
     check(
       'an object prop lists its members directly',
@@ -185,7 +185,7 @@ const { posts = [] } = Astro.props;`;
       fieldsOf(item) === 'day,time,campus',
       fieldsOf(item),
     );
-    const campus = (item?.children || []).find((c) => c.key === 'campus');
+    const campus = (item?.children || []).find((child) => child.key === 'campus');
     check(
       'shown with the value of the entry that has it',
       campus?.preview === '"St. Amant"',
@@ -208,7 +208,7 @@ const { posts = [] } = Astro.props;`;
       },
       'row',
     );
-    const nested = (deep?.children || []).find((c) => c.key === 'b');
+    const nested = (deep?.children || []).find((child) => child.key === 'b');
     check(
       'and neither does anything under it',
       nested?.children?.[0]?.path === 'row.b.deep',
@@ -249,7 +249,8 @@ const { posts = [] } = Astro.props;`;
         ancestorHeads: ['times.map((service) => ('],
         itemIndex: { service: i },
       });
-    const valueOf = (node, key) => (node?.children || []).find((c) => c.key === key)?.preview;
+    const valueOf = (node, key) =>
+      (node?.children || []).find((child) => child.key === key)?.preview;
 
     check(
       'the item says which entry it is showing',
@@ -269,8 +270,8 @@ const { posts = [] } = Astro.props;`;
     );
     check(
       'and the fields are still named after the item',
-      (at(2)?.children || []).every((c) => c.path.startsWith('service.')),
-      (at(2)?.children || []).map((c) => c.path).join(),
+      (at(2)?.children || []).every((child) => child.path.startsWith('service.')),
+      (at(2)?.children || []).map((child) => child.path).join(),
     );
     check(
       'an index past the end lands on the last entry',
@@ -335,12 +336,12 @@ const { posts = [] } = Astro.props;`;
     );
     check(
       'the row draws the arrows when the item has somewhere to go',
-      /n\.nav && onStepItem/.test(picker),
+      /node\.nav && onStepItem/.test(picker),
       'no arrows on the row',
     );
     check(
       'and a press on one does not also pick the row',
-      /className="dp-item-nav" onClick=\{\(e\) => e\.stopPropagation\(\)\}/.test(picker),
+      /className="dp-item-nav" onClick=\{\(event\) => event\.stopPropagation\(\)\}/.test(picker),
       'stepping would choose the item as the binding',
     );
     const app = fs
@@ -355,7 +356,7 @@ const { posts = [] } = Astro.props;`;
     // `… % count` are optional: they are redundant, and Prettier adds them.
     check(
       'and stepping wraps rather than running off either end',
-      /\(\(?\(\(cur\[name\]\?\?0\)\+dir\)%count\)?\+count\)%count/.test(compactSource(app)),
+      /\(\(?\(\(current\[name\]\?\?0\)\+step\)%count\)?\+count\)%count/.test(compactSource(app)),
       'a step past the last entry would leave the list',
     );
   }

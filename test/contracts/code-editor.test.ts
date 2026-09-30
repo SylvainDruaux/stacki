@@ -29,6 +29,9 @@ import {
   type PageDiskRead,
 } from '../../dist/shared/page-save.js';
 
+// Null as a boundary receives it, parsed from JSON: inputs may hold it; our values never do.
+const jsonNull: unknown = JSON.parse('null');
+
 const sha256 = (text: string): string => createHash('sha256').update(text).digest('hex');
 const DIGEST = 'a'.repeat(64);
 const CORPUS = path.resolve('test/corpus');
@@ -119,7 +122,7 @@ test('parseEditRequest takes a code patch and refuses each malformed shape', () 
     [[], /at least one hunk/],
     [{}, /expected array/],
     [[{ ...hunk, expected: 1 }], /expected string/],
-    [[{ ...hunk, text: null }], /expected string/],
+    [[{ ...hunk, text: jsonNull }], /expected string/],
     [[{ span: { start: 2, end: 1 }, expected: '', text: '' }], /end/],
     [[hunk, hunk], /ascending disjoint/],
     [Array.from({ length: LIMITS.splicesPerIntentMax + 1 }, () => hunk), /exceeds/],

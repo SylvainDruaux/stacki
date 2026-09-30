@@ -37,9 +37,9 @@ const check = (what, condition, detail) => {
 
 (async () => {
   const esbuild = require('esbuild');
-  const buildDir = path.join(__dirname, '..', 'node_modules', '.stacki-test');
-  fs.mkdirSync(buildDir, { recursive: true });
-  const bundlePath = path.join(buildDir, 'app.bundle.js');
+  const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
+  fs.mkdirSync(buildDirectory, { recursive: true });
+  const bundlePath = path.join(buildDirectory, 'app.bundle.js');
 
   await esbuild.build({
     entryPoints: [path.join(__dirname, '..', 'src', 'App.tsx')],
@@ -66,7 +66,7 @@ const check = (what, condition, detail) => {
   global.Element = dom.window.Element;
   global.Node = dom.window.Node;
   global.getComputedStyle = dom.window.getComputedStyle;
-  global.requestAnimationFrame = (fn) => setTimeout(fn, 0);
+  global.requestAnimationFrame = (callback) => setTimeout(callback, 0);
   global.cancelAnimationFrame = clearTimeout;
   global.ResizeObserver = class {
     observe() {}
@@ -81,6 +81,7 @@ const check = (what, condition, detail) => {
   dom.window.WebGLRenderingContext = global.WebGLRenderingContext;
   global.WebGL2RenderingContext = dom.window.WebGL2RenderingContext || class {};
   dom.window.WebGL2RenderingContext = global.WebGL2RenderingContext;
+  // eslint-disable-next-line stacki/no-null -- Stubs the platform getContext, which answers null.
   dom.window.HTMLCanvasElement.prototype.getContext = () => null;
   dom.window.ResizeObserver = global.ResizeObserver;
   dom.window.matchMedia = () => ({
@@ -91,7 +92,7 @@ const check = (what, condition, detail) => {
 
   // The preload bridge. Every method answers with something harmless, so the
   // component gets past its first effects without a real main process.
-  const noop = async () => null;
+  const noop = async () => undefined;
   const bridge = new Proxy(
     {
       // The few whose shape is actually read during a bare first render.
@@ -125,18 +126,18 @@ const check = (what, condition, detail) => {
   const errors = [];
   const realError = console.error;
   console.error = (...args) => {
-    errors.push(args.map((a) => (a && a.stack) || String(a)).join(' '));
+    errors.push(args.map((argument) => (argument && argument.stack) || String(argument)).join(' '));
   };
 
-  let threw = null;
+  let threw;
   try {
     const root = createRoot(document.getElementById('root'));
     // Synchronous, so the render happens inside this block.
     require('react-dom').flushSync(() => {
       root.render(React.createElement(App));
     });
-  } catch (err) {
-    threw = err;
+  } catch (error) {
+    threw = error;
   } finally {
     console.error = realError;
   }
@@ -146,7 +147,7 @@ const check = (what, condition, detail) => {
   // The one this file exists for. It is called out separately because the
   // message is so specific, and because seeing it named makes the fix obvious:
   // move the hook below whatever it names.
-  const tdz = errors.find((e) => /before initialization/.test(e));
+  const tdz = errors.find((error) => /before initialization/.test(error));
   check(
     'no hook reads something declared later in the component',
     !tdz,
@@ -156,14 +157,14 @@ const check = (what, condition, detail) => {
   );
 
   const other = errors.filter(
-    (e) => !/before initialization/.test(e) && /Error|Warning: Failed/.test(e),
+    (error) => !/before initialization/.test(error) && /Error|Warning: Failed/.test(error),
   );
   check(
     'nothing else was reported during render',
     other.length === 0,
     other
       .slice(0, 2)
-      .map((e) => e.split('\n')[0])
+      .map((error) => error.split('\n')[0])
       .join('\n    '),
   );
 
@@ -186,7 +187,7 @@ const check = (what, condition, detail) => {
       .filter((chunk) => !/^\/\/ node_modules\//.test(chunk))
       .join('\n');
     const native = [...ours.matchAll(/(?<![.\w])(?:window\.)?(confirm|alert)\s*\(/g)]
-      .map((m) => m[0])
+      .map((match) => match[0])
       // confirmDialog / confirmLabel are ours and read the same to a regex.
       .filter((hit) => !/confirmDialog|confirmLabel/.test(hit));
     check(
@@ -202,7 +203,7 @@ const check = (what, condition, detail) => {
   }
   console.log(`app-renders: ${checked} passed`);
   process.exit(0);
-})().catch((err) => {
-  console.error(err);
+})().catch((error) => {
+  console.error(error);
   process.exit(1);
 });

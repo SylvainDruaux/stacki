@@ -41,7 +41,7 @@ esbuild.buildSync({
   external: ['react'],
   logLevel: 'silent',
 });
-const { srcCandidates } = require(assetURLBundle);
+const { sourceCandidates } = require(assetURLBundle);
 const shortcutBundle = path.join(bundleDirectory, 'shortcut-label.cjs');
 esbuild.buildSync({
   entryPoints: [path.join(__dirname, '..', 'src', 'shortcutLabel.ts')],
@@ -120,11 +120,11 @@ test('renderer derives project-relative paths from Windows paths', () => {
 });
 
 test('asset URLs preserve Windows drive and UNC roots', () => {
-  assert.deepEqual(srcCandidates('C:\\Site Files\\public\\hero.png'), [
+  assert.deepEqual(sourceCandidates('C:\\Site Files\\public\\hero.png'), [
     'stacki-asset://local/C:/Site%20Files/public/hero.png',
     'file:///C:/Site%20Files/public/hero.png',
   ]);
-  assert.deepEqual(srcCandidates('\\\\server\\share\\Site Files\\hero.png'), [
+  assert.deepEqual(sourceCandidates('\\\\server\\share\\Site Files\\hero.png'), [
     'stacki-asset://local///server/share/Site%20Files/hero.png',
     'file://server/share/Site%20Files/hero.png',
   ]);

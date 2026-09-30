@@ -25,9 +25,9 @@ const check = (what, condition, detail) => {
 
 (async () => {
   const esbuild = require('esbuild');
-  const buildDir = path.join(__dirname, '..', 'node_modules', '.stacki-test');
-  fs.mkdirSync(buildDir, { recursive: true });
-  const bundlePath = path.join(buildDir, 'insert-binding.bundle.js');
+  const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
+  fs.mkdirSync(buildDirectory, { recursive: true });
+  const bundlePath = path.join(buildDirectory, 'insert-binding.bundle.js');
   await esbuild.build({
     entryPoints: [path.join(__dirname, '..', 'src', 'style-panel', 'lib', 'insert-binding.ts')],
     outfile: bundlePath,
@@ -37,7 +37,7 @@ const check = (what, condition, detail) => {
     logLevel: 'silent',
   });
   const { insertBinding, replacesWholeValue } = require(bundlePath);
-  const V = 'var(--brand)';
+  const BRAND = 'var(--brand)';
 
   // --- Values a variable simply replaces ------------------------------------
   {
@@ -53,20 +53,20 @@ const check = (what, condition, detail) => {
 
     check(
       'replacing gives just the variable',
-      insertBinding('2rem', V, 3) === V,
-      insertBinding('2rem', V, 3),
+      insertBinding('2rem', BRAND, 3) === BRAND,
+      insertBinding('2rem', BRAND, 3),
     );
     check(
       'a swap gives just the new one',
-      insertBinding('var(--old)', V, 5) === V,
-      insertBinding('var(--old)', V, 5),
+      insertBinding('var(--old)', BRAND, 5) === BRAND,
+      insertBinding('var(--old)', BRAND, 5),
     );
     // Losing !important would change what the declaration does, and nobody
     // picking a variable asked for that.
     check(
       '!important survives a replacement',
-      insertBinding('2rem !important', V, 2) === 'var(--brand) !important',
-      insertBinding('2rem !important', V, 2),
+      insertBinding('2rem !important', BRAND, 2) === 'var(--brand) !important',
+      insertBinding('2rem !important', BRAND, 2),
     );
   }
 
@@ -84,26 +84,26 @@ const check = (what, condition, detail) => {
 
     // The point of the whole thing: the expression survives.
     const at = 'calc(100% - '.length;
-    const out = insertBinding('calc(100% - 2rem)', V, at);
+    const out = insertBinding('calc(100% - 2rem)', BRAND, at);
     check('the variable lands at the caret', out === 'calc(100% - var(--brand)2rem)', out);
     check('and the calc is still there', out.startsWith('calc(') && out.endsWith(')'), out);
 
     // Into a shorthand, where each part is its own thing.
-    const border = insertBinding('1px solid red', V, '1px solid '.length);
+    const border = insertBinding('1px solid red', BRAND, '1px solid '.length);
     check('a shorthand keeps its other parts', border === '1px solid var(--brand)red', border);
   }
 
   // --- The caret inside a variable that is already there --------------------
   {
     // Two variables nested where one was meant is never what was wanted.
-    const out = insertBinding('calc(var(--old) + 10px)', V, 'calc(var(--o'.length);
+    const out = insertBinding('calc(var(--old) + 10px)', BRAND, 'calc(var(--o'.length);
     check('a caret inside a variable swaps it', out === 'calc(var(--brand) + 10px)', out);
     check('rather than nesting one inside it', !out.includes('var(var('), out);
     // Right at either edge counts as inside — the caret sits against the chip.
     check(
       'the edge of a variable counts as inside it',
-      insertBinding('calc(var(--old) + 1px)', V, 'calc('.length) === 'calc(var(--brand) + 1px)',
-      insertBinding('calc(var(--old) + 1px)', V, 'calc('.length),
+      insertBinding('calc(var(--old) + 1px)', BRAND, 'calc('.length) === 'calc(var(--brand) + 1px)',
+      insertBinding('calc(var(--old) + 1px)', BRAND, 'calc('.length),
     );
   }
 
@@ -113,8 +113,8 @@ const check = (what, condition, detail) => {
     // opened. Swapping the variable already there is the best guess.
     check(
       'with no caret an existing variable is swapped',
-      insertBinding('calc(var(--old) + 1px)', V, null) === 'calc(var(--brand) + 1px)',
-      insertBinding('calc(var(--old) + 1px)', V, null),
+      insertBinding('calc(var(--old) + 1px)', BRAND, undefined) === 'calc(var(--brand) + 1px)',
+      insertBinding('calc(var(--old) + 1px)', BRAND, undefined),
     );
     // And with nothing to swap, the variable goes on the end. Replacing the
     // whole value would be valid CSS and would quietly delete the expression —
@@ -122,13 +122,13 @@ const check = (what, condition, detail) => {
     // visibly wrong and takes a second to fix.
     check(
       'and with nothing to swap the expression survives',
-      insertBinding('calc(100% - 2rem)', V, null) === `calc(100% - 2rem)${V}`,
-      insertBinding('calc(100% - 2rem)', V, null),
+      insertBinding('calc(100% - 2rem)', BRAND, undefined) === `calc(100% - 2rem)${BRAND}`,
+      insertBinding('calc(100% - 2rem)', BRAND, undefined),
     );
     check(
       'the reported case is not wiped',
-      insertBinding('calc(2rem + )', V, null).startsWith('calc(2rem + )'),
-      insertBinding('calc(2rem + )', V, null),
+      insertBinding('calc(2rem + )', BRAND, undefined).startsWith('calc(2rem + )'),
+      insertBinding('calc(2rem + )', BRAND, undefined),
     );
   }
 
@@ -138,15 +138,15 @@ const check = (what, condition, detail) => {
     // splice with a negative index and silently reorder the value.
     check(
       'a caret past the end lands at the end',
-      insertBinding('calc(1px + 2px)', V, 999) === `calc(1px + 2px)${V}`,
-      insertBinding('calc(1px + 2px)', V, 999),
+      insertBinding('calc(1px + 2px)', BRAND, 999) === `calc(1px + 2px)${BRAND}`,
+      insertBinding('calc(1px + 2px)', BRAND, 999),
     );
     check(
       'a negative caret lands at the start',
-      insertBinding('calc(1px + 2px)', V, -5) === `${V}calc(1px + 2px)`,
-      insertBinding('calc(1px + 2px)', V, -5),
+      insertBinding('calc(1px + 2px)', BRAND, -5) === `${BRAND}calc(1px + 2px)`,
+      insertBinding('calc(1px + 2px)', BRAND, -5),
     );
-    check('and a missing value does not throw', insertBinding(undefined, V, 0) === V);
+    check('and a missing value does not throw', insertBinding(undefined, BRAND, 0) === BRAND);
   }
 
   if (failures.length) {
@@ -156,7 +156,7 @@ const check = (what, condition, detail) => {
     process.exit(1);
   }
   console.log(`insert-binding: ${checked} passed`);
-})().catch((err) => {
-  console.error(err);
+})().catch((error) => {
+  console.error(error);
   process.exit(1);
 });

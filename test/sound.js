@@ -57,8 +57,8 @@ function fakeAudio() {
   const played = [];
   const voices = [];
   const tones = [];
-  let lastFilter = null;
-  let lastGain = null;
+  let lastFilter;
+  let lastGain;
   const nodes = { oscillators: 0, gains: 0, filters: 0 };
   const node = (kind) => ({
     kind,
@@ -66,14 +66,14 @@ function fakeAudio() {
     disconnect() {},
     frequency: {
       value: 0,
-      setValueAtTime(v) {
-        this.value = v;
+      setValueAtTime(value) {
+        this.value = value;
       },
     },
     Q: {
       value: 0,
-      setValueAtTime(v) {
-        this.value = v;
+      setValueAtTime(value) {
+        this.value = value;
       },
     },
     gain: {
@@ -81,8 +81,8 @@ function fakeAudio() {
       // The peak of the envelope is the note's loudness — the ramp it is
       // ramped to, not the value it starts at.
       setValueAtTime() {},
-      linearRampToValueAtTime(v) {
-        this.value = v;
+      linearRampToValueAtTime(value) {
+        this.value = value;
       },
       exponentialRampToValueAtTime() {},
     },
@@ -90,7 +90,7 @@ function fakeAudio() {
     start() {},
     stop() {},
   });
-  class Ctx {
+  class FakeAudioContext {
     constructor() {
       this.state = 'running';
       this.currentTime = 0;
@@ -125,14 +125,14 @@ function fakeAudio() {
     }
     resume() {}
   }
-  return { Ctx, played, tones, nodes, voices };
+  return { AudioContext: FakeAudioContext, played, tones, nodes, voices };
 }
 
 (async () => {
   const esbuild = require('esbuild');
-  const buildDir = path.join(__dirname, '..', 'node_modules', '.stacki-test');
-  fs.mkdirSync(buildDir, { recursive: true });
-  const out = path.join(buildDir, 'sound.bundle.mjs');
+  const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
+  fs.mkdirSync(buildDirectory, { recursive: true });
+  const out = path.join(buildDirectory, 'sound.bundle.mjs');
   await esbuild.build({
     entryPoints: [path.join(__dirname, '..', 'src', 'ui', 'sound.js')],
     outfile: out,
@@ -143,7 +143,7 @@ function fakeAudio() {
   });
 
   const audio = fakeAudio();
-  global.window = { AudioContext: audio.Ctx };
+  global.window = { AudioContext: audio.AudioContext };
   const {
     clickNote,
     dragNote,
@@ -158,8 +158,8 @@ function fakeAudio() {
 
   // --- off until asked for ----------------------------------------------------
   check('silent by default', soundEnabled() === false);
-  for (const f of [0, 0.2, 0.4, 0.6, 0.8, 1]) {
-    dragNote(f);
+  for (const fraction of [0, 0.2, 0.4, 0.6, 0.8, 1]) {
+    dragNote(fraction);
   }
   check(
     'a drag makes no sound while it is off',
@@ -192,8 +192,8 @@ function fakeAudio() {
   const ratios = steps.slice(1).map((hz, i) => hz / steps[i]);
   check(
     'no two steps are a semitone apart',
-    ratios.every((r) => r > 1.09),
-    JSON.stringify(ratios.map((r) => r.toFixed(3))),
+    ratios.every((ratio) => ratio > 1.09),
+    JSON.stringify(ratios.map((ratio) => ratio.toFixed(3))),
   );
 
   // --- on ----------------------------------------------------------------------
@@ -214,7 +214,7 @@ function fakeAudio() {
   // step is what decides.
   const before = audio.played.length;
   for (let i = 0; i < 5; i += 1) {
-    await new Promise((r) => setTimeout(r, 40));
+    await new Promise((resolve) => setTimeout(resolve, 40));
     dragNote(0.01 * i);
   }
   check(
@@ -224,9 +224,9 @@ function fakeAudio() {
   );
 
   // Crossing steps sounds each one, and coming back down sounds lower.
-  await new Promise((r) => setTimeout(r, 40));
+  await new Promise((resolve) => setTimeout(resolve, 40));
   dragNote(1);
-  await new Promise((r) => setTimeout(r, 40));
+  await new Promise((resolve) => setTimeout(resolve, 40));
   dragNote(0.5);
   check(
     'crossing a step sounds it',
@@ -266,9 +266,9 @@ function fakeAudio() {
 
   // Moving straight up, across no steps at all, is still a change worth hearing.
   endDragNotes();
-  await new Promise((r) => setTimeout(r, 40));
+  await new Promise((resolve) => setTimeout(resolve, 40));
   dragNote(0.5, 1);
-  await new Promise((r) => setTimeout(r, 40));
+  await new Promise((resolve) => setTimeout(resolve, 40));
   dragNote(0.5, 0);
   const [muted, struck] = audio.tones.slice(-2);
   check(
@@ -292,7 +292,7 @@ function fakeAudio() {
   // floor has to do something. Played on purpose, since a test that never
   // reaches it cannot tell whether the floor is there.
   endDragNotes();
-  await new Promise((r) => setTimeout(r, 40));
+  await new Promise((resolve) => setTimeout(resolve, 40));
   dragNote(1, 1);
   const topMuted = audio.tones[audio.tones.length - 1];
   check(
@@ -305,8 +305,8 @@ function fakeAudio() {
   // the margin above it is a tuning choice; that there IS one is not.
   check(
     'the mute never shuts below the note',
-    audio.tones.every((t, i) => t.cutoff > audio.played[i]),
-    JSON.stringify(audio.tones.map((t, i) => [audio.played[i], t.cutoff])),
+    audio.tones.every((tone, i) => tone.cutoff > audio.played[i]),
+    JSON.stringify(audio.tones.map((tone, i) => [audio.played[i], tone.cutoff])),
   );
 
   // --- the graph ---------------------------------------------------------------
@@ -324,7 +324,7 @@ function fakeAudio() {
   // --- off again ---------------------------------------------------------------
   setSoundEnabled(false);
   const quiet = audio.played.length;
-  await new Promise((r) => setTimeout(r, 40));
+  await new Promise((resolve) => setTimeout(resolve, 40));
   dragNote(0.9);
   check(
     'switching it off stops it',
@@ -335,11 +335,11 @@ function fakeAudio() {
   // A drag that ends resets, so the next one sounds wherever it begins — even
   // if that is the step the last one finished on.
   setSoundEnabled(true);
-  await new Promise((r) => setTimeout(r, 40));
+  await new Promise((resolve) => setTimeout(resolve, 40));
   dragNote(0.5);
   const atRest = audio.played.length;
   endDragNotes();
-  await new Promise((r) => setTimeout(r, 40));
+  await new Promise((resolve) => setTimeout(resolve, 40));
   dragNote(0.5);
   check('a new drag sounds its first step', audio.played.length === atRest + 1);
 
@@ -405,8 +405,8 @@ function fakeAudio() {
       React.createElement(
         'div',
         {
-          onClick: (e) => {
-            if (e.target.closest('button')) {
+          onClick: (event) => {
+            if (event.target.closest('button')) {
               heard += 1;
             }
           },
@@ -472,19 +472,19 @@ function fakeAudio() {
   );
 
   endDragNotes();
-  await new Promise((r) => setTimeout(r, 40));
+  await new Promise((resolve) => setTimeout(resolve, 40));
   const beforeRows = audio.played.length;
   hoverNote(2, menu);
   check('moving onto a row sounds it', audio.played.length === beforeRows + 1);
   check("at that row's pitch", audio.played[audio.played.length - 1] === rowHzFor(2, menu));
-  await new Promise((r) => setTimeout(r, 40));
+  await new Promise((resolve) => setTimeout(resolve, 40));
   hoverNote(2, menu);
   check(
     'and staying on it says nothing more',
     audio.played.length === beforeRows + 1,
     `${audio.played.length - beforeRows} notes for one row`,
   );
-  await new Promise((r) => setTimeout(r, 40));
+  await new Promise((resolve) => setTimeout(resolve, 40));
   hoverNote(5, menu);
   check(
     'moving further down goes deeper',
@@ -501,7 +501,7 @@ function fakeAudio() {
 
   setSoundEnabled(false);
   const quietRows = audio.played.length;
-  await new Promise((r) => setTimeout(r, 40));
+  await new Promise((resolve) => setTimeout(resolve, 40));
   hoverNote(0, menu);
   check('and rows are silent when the setting is off', audio.played.length === quietRows);
   setSoundEnabled(true);
@@ -521,7 +521,7 @@ function fakeAudio() {
   // rebuilt on each render — which is how the panel builds them. So all three
   // are here.
   {
-    const entry = path.join(buildDir, 'rows.entry.jsx');
+    const entry = path.join(buildDirectory, 'rows.entry.jsx');
     fs.writeFileSync(
       entry,
       `export { default as Select } from ${JSON.stringify(
@@ -531,7 +531,7 @@ function fakeAudio() {
           path.join(__dirname, '..', 'src', 'ui', 'sound.js'),
         )};\n`,
     );
-    const bundle = path.join(buildDir, 'rows.bundle.js');
+    const bundle = path.join(buildDirectory, 'rows.bundle.js');
     await esbuild.build({
       entryPoints: [entry],
       outfile: bundle,
@@ -565,8 +565,8 @@ function fakeAudio() {
       disconnect() {},
       frequency: {
         value: 0,
-        setValueAtTime(v) {
-          this.value = v;
+        setValueAtTime(value) {
+          this.value = value;
         },
       },
       Q: { setValueAtTime() {} },
@@ -586,9 +586,9 @@ function fakeAudio() {
         this.destination = stub();
       }
       createOscillator() {
-        const o = stub();
-        o.start = () => heard.push(Math.round(o.frequency.value));
-        return o;
+        const oscillator = stub();
+        oscillator.start = () => heard.push(Math.round(oscillator.frequency.value));
+        return oscillator;
       }
       createGain() {
         return stub();
@@ -616,12 +616,12 @@ function fakeAudio() {
       'Custom',
       'Other',
     ].map((label, i) => ({ value: String(i), label }));
-    const fresh = () => options.map((o) => ({ ...o }));
+    const fresh = () => options.map((option) => ({ ...option }));
     const Panel = () => {
       const [tick, setTick] = React.useState(0);
       return React.createElement(
         React.Fragment,
-        null,
+        undefined,
         // Closed, and rendered first — their effects run before the open one's.
         React.createElement(rows.Select, {
           value: '0',
@@ -641,11 +641,11 @@ function fakeAudio() {
           onChange() {},
           // The live write lands after the note floor and re-renders the panel.
           onPreview() {
-            setTimeout(() => setTick((t) => t + 1), 45);
+            setTimeout(() => setTick((tick) => tick + 1), 45);
           },
           ariaLabel: 'Ratio',
         }),
-        React.createElement('span', null, tick),
+        React.createElement('span', undefined, tick),
       );
     };
 
@@ -666,7 +666,7 @@ function fakeAudio() {
       rowEls[3].dispatchEvent(new view.window.MouseEvent('mouseover', { bubbles: true }));
     });
     await act(async () => {
-      await new Promise((r) => setTimeout(r, 90));
+      await new Promise((resolve) => setTimeout(resolve, 90));
     });
     check('a row hovered once sounds once', heard.length === 1, JSON.stringify(heard));
     check(
@@ -689,15 +689,15 @@ function fakeAudio() {
   );
   check(
     'the colour drag plays the note',
-    /if \(live\) \{\s*dragNote\(fx, tall \? fy : undefined\)/.test(picker),
+    /if \(phase === 'live'\) \{\s*dragNote\(fx, tall \? fy : undefined\)/.test(picker),
   );
   check('and releasing ends the run', /endDragNotes\(\)/.test(picker));
   // The square is a surface to drag around in; the bars are a few pixels high,
   // where a fraction of the height is noise rather than intent.
   // Each call is read to its own closing parenthesis, because a formatter may
-  // spread its arguments over several lines; `tall` is the last one.
+  // spread its arguments over several lines; `tall` is a named option.
   const hearsVertical = (name) =>
-    /,\s*true,?\s*$/.test(callArguments(picker, `const ${name} = useDrag(`) ?? '');
+    /\btall:\s*true\b/.test(callArguments(picker, `const ${name} = useDrag(`) ?? '');
   check(
     'the square is the one that hears its vertical',
     hearsVertical('dragSB') && !hearsVertical('dragHue') && !hearsVertical('dragAlpha'),

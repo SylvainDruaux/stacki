@@ -28,16 +28,16 @@ const check = (what, condition, detail) => {
 
 (async () => {
   const esbuild = require('esbuild');
-  const buildDir = path.join(__dirname, '..', 'node_modules', '.stacki-test');
-  fs.mkdirSync(buildDir, { recursive: true });
-  const entry = path.join(buildDir, 'token-field.entry.jsx');
+  const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
+  fs.mkdirSync(buildDirectory, { recursive: true });
+  const entry = path.join(buildDirectory, 'token-field.entry.jsx');
   fs.writeFileSync(
     entry,
     `export { buildTokenHtml, serializeTokens } from ${JSON.stringify(
       path.join(__dirname, '..', 'src', 'style-panel', 'VariableConnect.tsx'),
     )};\n`,
   );
-  const out = path.join(buildDir, 'token-field.bundle.js');
+  const out = path.join(buildDirectory, 'token-field.bundle.js');
   await esbuild.build({
     entryPoints: [entry],
     outfile: out,

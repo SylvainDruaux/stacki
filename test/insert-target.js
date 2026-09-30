@@ -17,6 +17,7 @@
 // it renders, and a <p> is no more allowed inside a heading for being wrapped
 // in one.
 
+const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
 
@@ -31,9 +32,9 @@ const check = (what, condition, detail) => {
 
 (async () => {
   const esbuild = require('esbuild');
-  const buildDir = path.join(__dirname, '..', 'node_modules', '.stacki-test');
-  fs.mkdirSync(buildDir, { recursive: true });
-  const bundle = path.join(buildDir, 'insert-target.bundle.js');
+  const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
+  fs.mkdirSync(buildDirectory, { recursive: true });
+  const bundle = path.join(buildDirectory, 'insert-target.bundle.js');
   await esbuild.build({
     entryPoints: [path.join(__dirname, '..', 'src', 'insertTarget.js')],
     outfile: bundle,
@@ -73,7 +74,7 @@ const check = (what, condition, detail) => {
     { name: 'Heading', slots: ['default'], renderTag: { prop: 'tag', tag: 'h2' } },
     { name: 'Paragraph', slots: ['default'], renderTag: { prop: 'tag', tag: 'p' } },
   ];
-  const at = (selId, item = DIV) => insertTargetFor(model, selId, item, insertables);
+  const at = (selectionId, item = DIV) => insertTargetFor(model, selectionId, item, insertables);
 
   // ── The report ────────────────────────────────────────────────────────────
   check(
@@ -93,12 +94,12 @@ const check = (what, condition, detail) => {
   // ── The tags still decide ─────────────────────────────────────────────────
   check(
     'a void element never holds anything',
-    JSON.stringify(at('hr')) === JSON.stringify({ parentId: null, index: 4 }),
+    JSON.stringify(at('hr')) === JSON.stringify({ parentId: undefined, index: 4 }),
     JSON.stringify(at('hr')),
   );
   check(
     'and a <div> inside a <p> lands after the <p>',
-    JSON.stringify(at('p')) === JSON.stringify({ parentId: null, index: 2 }),
+    JSON.stringify(at('p')) === JSON.stringify({ parentId: undefined, index: 2 }),
     JSON.stringify(at('p')),
   );
   // A component is judged by what it renders, not by being a component.
@@ -120,7 +121,7 @@ const check = (what, condition, detail) => {
     const target = insertTargetFor(model, 'head', para, insertables);
     check(
       'a <Paragraph> inserted into a <Heading> lands after it',
-      JSON.stringify(target) === JSON.stringify({ parentId: null, index: 3 }),
+      JSON.stringify(target) === JSON.stringify({ parentId: undefined, index: 3 }),
       JSON.stringify(target),
     );
     const span = insertTargetFor(model, 'head', { type: 'element', tag: 'span' }, insertables);
@@ -129,12 +130,12 @@ const check = (what, condition, detail) => {
   // Nothing selected: the end of the page.
   check(
     'with nothing selected it goes at the end',
-    JSON.stringify(at(null)) === JSON.stringify({ parentId: null, index: 4 }),
-    JSON.stringify(at(null)),
+    JSON.stringify(at(undefined)) === JSON.stringify({ parentId: undefined, index: 4 }),
+    JSON.stringify(at(undefined)),
   );
   check(
     'and the frontmatter row is not a place',
-    JSON.stringify(at('frontmatter')) === JSON.stringify({ parentId: null, index: 4 }),
+    JSON.stringify(at('frontmatter')) === JSON.stringify({ parentId: undefined, index: 4 }),
   );
 
   // ── The components this came from ─────────────────────────────────────────
@@ -144,11 +145,14 @@ const check = (what, condition, detail) => {
   // By name, from wherever it sits: this is somebody's working project, and a
   // component moved into a folder should not read as a broken scan — or, as it
   // did, as a crash that takes the rest of the suite with it.
-  const findComponent = (dir, name) => {
-    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-      const full = path.join(dir, entry.name);
+  // A project's component folders are a few levels deep; the bound stops a runaway walk.
+  const WALK_LIMITS = { directoryDepthMax: 32 };
+  const findComponent = (directory, name, depth = 0) => {
+    assert.ok(depth <= WALK_LIMITS.directoryDepthMax, 'findComponent: directory depth limit');
+    for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+      const full = path.join(directory, entry.name);
       if (entry.isDirectory()) {
-        const hit = findComponent(full, name);
+        const hit = findComponent(full, name, depth + 1);
         if (hit) {
           return hit;
         }
@@ -156,28 +160,28 @@ const check = (what, condition, detail) => {
         return fs.readFileSync(full, 'utf8');
       }
     }
-    return null;
+    return undefined;
   };
   if (fs.existsSync(LUMOS)) {
     for (const [name, slots, tag] of [
       ['Section', true, 'section'],
       ['ContentWrapper', true, 'div'],
-      ['Img', false, null],
+      ['Img', false, undefined],
     ]) {
-      const src = findComponent(LUMOS, name);
-      if (src == null) {
+      const source = findComponent(LUMOS, name);
+      if (source === undefined) {
         continue;
       } // not in this project any more
       check(
         `the real <${name}> ${slots ? 'takes' : 'takes no'} default content`,
-        parseSlots(src).includes('default') === slots,
-        JSON.stringify(parseSlots(src)),
+        parseSlots(source).includes('default') === slots,
+        JSON.stringify(parseSlots(source)),
       );
       if (tag) {
         check(
           `and renders a <${tag}>`,
-          (rootTag(src) || {}).tag === tag,
-          JSON.stringify(rootTag(src)),
+          (rootTag(source) || {}).tag === tag,
+          JSON.stringify(rootTag(source)),
         );
       }
     }

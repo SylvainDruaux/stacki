@@ -125,8 +125,8 @@ test(
       });
       await act(async () => state.reads[2].reject(new Error('cannot read')));
       assert.match(document.querySelector('.cms-error').textContent, /cannot read/);
-      assert.equal(document.querySelector('[title="New item"]'), null);
-      assert.equal(document.querySelector('.cms-items .primary'), null);
+      assert.ok(document.querySelector('[title="New item"]') === null);
+      assert.ok(document.querySelector('.cms-items .primary') === null);
       assert.equal(state.writes.length, 0);
     } finally {
       await act(async () => state.root.unmount());

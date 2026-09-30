@@ -34,7 +34,7 @@ const channelLuminance = (value) => {
 const colorLuminance = (hex) => {
   const channels = hex.match(/[0-9a-f]{2}/gi)?.map((value) => Number.parseInt(value, 16));
   if (!channels || channels.length !== 3) {
-    return null;
+    return undefined;
   }
   return (
     0.2126 * channelLuminance(channels[0]) +
@@ -45,8 +45,8 @@ const colorLuminance = (hex) => {
 const contrastRatio = (first, second) => {
   const firstLuminance = colorLuminance(first);
   const secondLuminance = colorLuminance(second);
-  if (firstLuminance == null || secondLuminance == null) {
-    return null;
+  if (firstLuminance === undefined || secondLuminance === undefined) {
+    return undefined;
   }
   const lighter = Math.max(firstLuminance, secondLuminance);
   const darker = Math.min(firstLuminance, secondLuminance);
@@ -55,9 +55,9 @@ const contrastRatio = (first, second) => {
 
 (async () => {
   const esbuild = require('esbuild');
-  const buildDir = path.join(__dirname, '..', 'node_modules', '.stacki-test');
-  fs.mkdirSync(buildDir, { recursive: true });
-  const bundlePath = path.join(buildDir, 'selector-well.bundle.js');
+  const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
+  fs.mkdirSync(buildDirectory, { recursive: true });
+  const bundlePath = path.join(buildDirectory, 'selector-well.bundle.js');
   await esbuild.build({
     stdin: {
       contents: `
@@ -142,7 +142,7 @@ const contrastRatio = (first, second) => {
   const chips = () => document.querySelectorAll('.embed-editor_selector-chip').length;
 
   await show({ loading: true });
-  check('an empty well says it is still counting', spinner() != null);
+  check('an empty well says it is still counting', spinner() !== null);
   check(
     'and says so in words, for a screen reader',
     /finding/i.test(spinner()?.textContent || ''),
@@ -153,20 +153,20 @@ const contrastRatio = (first, second) => {
   await show({ loading: true, selectors: CHIPS });
   check(
     'chips that have arrived show without a spinner',
-    spinner() == null && chips() === 2,
+    spinner() === null && chips() === 2,
     `${chips()} chips`,
   );
 
   await show({ loading: false, selectors: [] });
   check(
     'a finished scan with no selectors shows an empty well',
-    spinner() == null && chips() === 0,
+    spinner() === null && chips() === 0,
   );
 
   await show({ loading: false, selectors: CHIPS });
   check(
     'and a finished one with selectors shows them',
-    spinner() == null && chips() === 2,
+    spinner() === null && chips() === 2,
     `${chips()} chips`,
   );
   const renderedChips = [...document.querySelectorAll('.embed-editor_selector-chip')];
@@ -306,7 +306,7 @@ const contrastRatio = (first, second) => {
       atContext: [],
       fromComponent,
     },
-    matchedSelectors: [{ text, specificity: [0, 1, 0], pseudoElement: null }],
+    matchedSelectors: [{ text, specificity: [0, 1, 0], pseudoElement: undefined }],
     order,
   });
   const listed = listMatchedSelectors(
@@ -334,7 +334,7 @@ const contrastRatio = (first, second) => {
   await show({ loading: false, selectors: [{ key: 'g', text: ':focus-visible' }] });
   check(
     'a folded-away global leaves the well quiet',
-    spinner() == null && chips() === 0,
+    spinner() === null && chips() === 0,
     `${chips()} chips`,
   );
 
@@ -346,7 +346,7 @@ const contrastRatio = (first, second) => {
   // stayed empty and silent through all of it — the panel only noticed the files
   // on its next background refresh, throttled to 4s, which is exactly how long a
   // layout's well sat blank while the CSS that styles it was there on disk.
-  const panelBundle = path.join(buildDir, 'panel-mount.bundle.js');
+  const panelBundle = path.join(buildDirectory, 'panel-mount.bundle.js');
   await esbuild.build({
     stdin: {
       contents: `
@@ -382,10 +382,10 @@ const contrastRatio = (first, second) => {
     listAstroStyleFiles: async () => ({ files: [] }),
     listAssets: async () => ({ entries: [] }),
     readStyleFile: () =>
-      new Promise((r) =>
+      new Promise((resolve) =>
         dom.window.setTimeout(
           () =>
-            r({
+            resolve({
               css: 'section { margin: 0 } div { display: block } .card { color: red }',
             }),
           READ_MS,
@@ -421,12 +421,12 @@ const contrastRatio = (first, second) => {
   global.IS_REACT_ACT_ENVIRONMENT = false;
   const panelRoot = createRoot(panel);
   panelRoot.render(React.createElement(EmbedEditor));
-  const wait = (ms) => new Promise((r) => dom.window.setTimeout(r, ms));
+  const wait = (ms) => new Promise((resolve) => dom.window.setTimeout(resolve, ms));
   const panelChips = () => [...panel.querySelectorAll('.embed-editor_selector-chip')];
   const panelSpinner = () => panel.querySelector('.embed-editor_selector-loading');
 
   await wait(200);
-  check('the panel mounts', panel.querySelector('.embed-editor_selector-well') != null);
+  check('the panel mounts', panel.querySelector('.embed-editor_selector-well') !== null);
   const cssCodeToggle = () => panel.querySelector('.embed-editor_css-code-toggle');
   check(
     'the CSS Code section starts closed',
@@ -437,12 +437,12 @@ const contrastRatio = (first, second) => {
     panelChips().length === 0,
     `${panelChips().length} chips`,
   );
-  check('and does not pretend to be waiting', panelSpinner() == null);
+  check('and does not pretend to be waiting', panelSpinner() === null);
 
   // The list arrives, after the panel already called itself ready.
   setHost({ files: [SHEET] });
   await wait(60);
-  check('the well waits on stylesheets it has just been offered', panelSpinner() != null);
+  check('the well waits on stylesheets it has just been offered', panelSpinner() !== null);
   check('with nothing in it yet', panelChips().length === 0, `${panelChips().length} chips`);
 
   await wait(READ_MS + 400); // still far inside the 4s refresh throttle it used to wait out
@@ -451,7 +451,7 @@ const contrastRatio = (first, second) => {
     panel.querySelector('.embed-editor_selector-filter')?.textContent.includes('(1)') === true,
   );
   check('the global rule stays folded initially', panelChips().length === 0);
-  check('and the spinner goes with the completed scan', panelSpinner() == null);
+  check('and the spinner goes with the completed scan', panelSpinner() === null);
 
   panel.querySelector('.embed-editor_selector-filter input')?.click();
   await wait(30);
@@ -502,17 +502,17 @@ const contrastRatio = (first, second) => {
     panelChips().length === 0,
     `${panelChips().length} chips`,
   );
-  check('and it spins while the canvas is asked', panelSpinner() != null);
+  check('and it spins while the canvas is asked', panelSpinner() !== null);
 
   await wait(2000);
   check(
     'the well fills once the answer (or its absence) lands',
     panelChips().length === 2,
     panelChips()
-      .map((c) => c.textContent)
+      .map((chip) => chip.textContent)
       .join(','),
   );
-  check('and stops spinning', panelSpinner() == null);
+  check('and stops spinning', panelSpinner() === null);
   const codeText = () =>
     panel.querySelector('.embed-editor_css-code-editor .cm-content')?.textContent ||
     panel.querySelector('.embed-editor_css-code-preview')?.textContent ||
@@ -524,7 +524,7 @@ const contrastRatio = (first, second) => {
   );
   check(
     'the initially selected core class opens an editable CSS box',
-    panel.querySelector('.embed-editor_css-code-editor .cm-editor') != null,
+    panel.querySelector('.embed-editor_css-code-editor .cm-editor') !== null,
   );
   panelChips()
     .find((chip) => chip.textContent === '.card')
@@ -540,7 +540,7 @@ const contrastRatio = (first, second) => {
     ?.click();
   await wait(30);
   const editorElement = panel.querySelector('.embed-editor_css-code-editor .cm-editor');
-  check('an individually selected selector has an editable CSS box', editorElement != null);
+  check('an individually selected selector has an editable CSS box', editorElement !== null);
   if (editorElement) {
     const editor = EditorView.findFromDOM(editorElement);
     const nextCss = '.card { color: blue }';
@@ -646,11 +646,11 @@ const contrastRatio = (first, second) => {
       'utf8',
     );
     const activeGreen = tokens.match(/--color-component-tag-bg-active:\s*(#[0-9a-f]{6})/i)?.[1];
-    const activeContrast = activeGreen ? contrastRatio('#ffffff', activeGreen) : null;
+    const activeContrast = activeGreen ? contrastRatio('#ffffff', activeGreen) : undefined;
     check(
       'selected component text meets WCAG AA contrast',
-      activeContrast != null && activeContrast >= 4.5,
-      activeContrast == null ? String(activeGreen) : `${activeContrast.toFixed(2)}:1`,
+      activeContrast !== undefined && activeContrast >= 4.5,
+      activeContrast === undefined ? String(activeGreen) : `${activeContrast.toFixed(2)}:1`,
     );
     const loading = css.slice(css.indexOf('.embed-editor_selector-loading {'));
     check(
@@ -658,14 +658,14 @@ const contrastRatio = (first, second) => {
       /min-height: var\(--embed-editor_chip-h\)/.test(loading.slice(0, loading.indexOf('}'))),
       loading.slice(0, loading.indexOf('}')),
     );
-    const src = fs.readFileSync(
+    const source = fs.readFileSync(
       path.join(__dirname, '..', 'src', 'style-panel', 'EmbedEditor.tsx'),
       'utf8',
     );
-    const check_ = src.slice(src.indexOf('embed-editor_selector-filter'));
+    const check_ = source.slice(source.indexOf('embed-editor_selector-filter'));
     check(
       'the globals checkbox is not conditional on having any',
-      !/\{globals\.length \? \(/.test(src),
+      !/\{globals\.length \? \(/.test(source),
       'it still renders only when there are globals',
     );
     check(

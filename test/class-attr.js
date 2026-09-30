@@ -28,13 +28,13 @@ const check = (what, condition, detail) => {
 };
 
 const expr = (value) => ({ type: 'expr', value });
-const str = (value) => ({ type: 'string', value });
+const stringValue = (value) => ({ type: 'string', value });
 
 (async () => {
   const esbuild = require('esbuild');
-  const buildDir = path.join(__dirname, '..', 'node_modules', '.stacki-test');
-  fs.mkdirSync(buildDir, { recursive: true });
-  const bundlePath = path.join(buildDir, 'class-attr.bundle.js');
+  const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
+  fs.mkdirSync(buildDirectory, { recursive: true });
+  const bundlePath = path.join(buildDirectory, 'class-attr.bundle.js');
   await esbuild.build({
     entryPoints: [path.join(__dirname, '..', 'src', 'classAttr.js')],
     outfile: bundlePath,
@@ -50,13 +50,13 @@ const str = (value) => ({ type: 'string', value });
   check('under the plain attribute', withClass({}, 'hero').key === 'class');
   check(
     'an element with classes keeps them',
-    withClass({ class: str('card is-wide') }, 'hero').value.value === 'card is-wide hero',
+    withClass({ class: stringValue('card is-wide') }, 'hero').value.value === 'card is-wide hero',
   );
   check(
     'a class it already has is not added twice',
-    withClass({ class: str('card') }, 'card') === null,
+    withClass({ class: stringValue('card') }, 'card') === undefined,
   );
-  check('and is reported as already there', hasClass({ class: str('card') }, 'card'));
+  check('and is reported as already there', hasClass({ class: stringValue('card') }, 'card'));
 
   // --- class:list -------------------------------------------------------------
   const oneLine = { 'class:list': expr('["card", isWide && "is-wide"]') };
@@ -66,7 +66,7 @@ const str = (value) => ({ type: 'string', value });
     withClass(oneLine, 'hero').value.value,
   );
   check('and stays a list', withClass(oneLine, 'hero').key === 'class:list');
-  check('a class already in the list is not added again', withClass(oneLine, 'card') === null);
+  check('a class already in the list is not added again', withClass(oneLine, 'card') === undefined);
   check(
     'an empty list still takes one',
     withClass({ 'class:list': expr('[]') }, 'hero').value.value === '["hero"]',
@@ -89,8 +89,8 @@ const str = (value) => ({ type: 'string', value });
   check('a list broken over lines gets its own line', /\n\s+"hero",\n/.test(grown), grown);
   check(
     'indented like the entries above it',
-    grown.split('\n').find((l) => l.includes('"hero"')) === '        "hero",',
-    JSON.stringify(grown.split('\n').find((l) => l.includes('"hero"'))),
+    grown.split('\n').find((line) => line.includes('"hero"')) === '        "hero",',
+    JSON.stringify(grown.split('\n').find((line) => line.includes('"hero"'))),
   );
   check('with the list still closed', grown.trim().endsWith(']'), grown);
   check(
@@ -107,14 +107,14 @@ const str = (value) => ({ type: 'string', value });
   );
   check(
     'a word already in it is not repeated',
-    withClass({ class: expr('`card ${size}`') }, 'card') === null,
+    withClass({ class: expr('`card ${size}`') }, 'card') === undefined,
   );
   check('a hole is not read as a name', !hasClass({ class: expr('`card ${size}`') }, 'size'));
   check(
     'an expression nobody can read is refused',
-    withClass({ class: expr('cx(base, extra)') }, 'hero') === null,
+    withClass({ class: expr('cx(base, extra)') }, 'hero') === undefined,
   );
-  check('a name with a space in it is refused', withClass({}, 'a b') === null);
+  check('a name with a space in it is refused', withClass({}, 'a b') === undefined);
 
   // --- the real thing ---------------------------------------------------------
   // Parse a component the way the app does, add the class, write it back: the
@@ -135,7 +135,7 @@ const { class: className } = Astro.props;
 `;
   const { editable, model } = parsePage(source);
   check('the component parses', editable && !!model);
-  const section = model.nodes.find((n) => n.kind === 'element' && n.name === 'section');
+  const section = model.nodes.find((node) => node.kind === 'element' && node.name === 'section');
   check(
     'its classes are a list, not a string',
     !!section?.props?.['class:list'],
@@ -163,7 +163,9 @@ const { class: className } = Astro.props;
   // Re-parsing what was written gives the class back — the round trip is what
   // the canvas re-renders from.
   const again = parsePage(written);
-  const again0 = again.model.nodes.find((n) => n.kind === 'element' && n.name === 'section');
+  const again0 = again.model.nodes.find(
+    (node) => node.kind === 'element' && node.name === 'section',
+  );
   check(
     'and it reads back as a class the element has',
     hasClass(again0.props, 'hero'),
@@ -202,10 +204,13 @@ const { class: className } = Astro.props;
   );
   check(
     'and a refused class cancels the rule before it is written',
-    new RegExp(
-      "if \\(outcome\\.tag === 'refused'\\) \\{[\\s\\S]{0,400}?return" +
-        '[\\s\\S]{0,1600}?writeEmbedDoc\\(doc\\)',
-    ).test(embed),
+    /if \(outcome\.tag !== 'refused'\) \{\s*return true;\s*\}[\s\S]{0,300}?return false;/.test(
+      embed,
+    ) &&
+      new RegExp(
+        'if \\(!\\(await passesClassGate\\(rule\\)\\)\\) \\{\\s*return;\\s*\\}' +
+          '[\\s\\S]{0,1600}?writeEmbedDocument\\(embedDocument\\)',
+      ).test(embed),
     'the rule is still written after the page refused the class',
   );
 

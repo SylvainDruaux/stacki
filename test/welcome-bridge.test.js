@@ -5,6 +5,11 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const welcome = require('./renderer-module')('welcomeBridge.ts');
 
+// A boundary can receive null — JSON, structured clone and postMessage all carry it —
+// so the negative space below includes it. It is read from JSON, because our own
+// code never writes a null.
+const PLATFORM_NULL = JSON.parse('null');
+
 const recent = {
   thumb: undefined,
   stale: true,
@@ -50,19 +55,19 @@ test('welcome parsers preserve valid recent, thumbnail, and dialog variants', ()
 
 test('welcome parsers reject missing, duplicate, invalid, and oversized records', () => {
   for (const value of [
-    null,
+    PLATFORM_NULL,
     [{ ...recent, openedAt: -1 }],
     [{ ...recent, path: 'bad\0path' }],
     [recent, recent],
     // Absence is `undefined` (AGENTS.md §6); main never sends a null thumbnail.
-    [{ ...recent, thumb: null }],
+    [{ ...recent, thumb: PLATFORM_NULL }],
     Array(100_001).fill(recent),
   ]) {
     assert.throws(() => welcome.parseRecentProjects(value));
   }
   assert.throws(() => welcome.parseRefreshThumb({ ok: false, thumb: undefined, stale: true }));
   assert.throws(() => welcome.parseProjectDialog({ canceled: false }));
-  assert.throws(() => welcome.parseParentDialog({ canceled: false, parentPath: null }));
+  assert.throws(() => welcome.parseParentDialog({ canceled: false, parentPath: PLATFORM_NULL }));
 });
 
 test('welcome operations validate replies and preserve expected transport failures', async () => {

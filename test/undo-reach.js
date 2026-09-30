@@ -34,7 +34,7 @@ const check = (what, condition, detail) => {
   }
 };
 
-const read = (...p) => fs.readFileSync(path.join(__dirname, '..', ...p), 'utf8');
+const read = (...segments) => fs.readFileSync(path.join(__dirname, '..', ...segments), 'utf8');
 const app = read('src', 'App.tsx');
 const preload = read('dist', 'electron', 'preload.js');
 const main = read('dist', 'electron', 'main.js');
@@ -73,7 +73,8 @@ check(
 // paste for the same reason.
 check(
   'which means a field, a box or anything a caret is in',
-  /el\.tagName === 'INPUT' \|\| el\.tagName === 'TEXTAREA' \|\| el\.isContentEditable/.test(app),
+  /active\.tagName === 'INPUT' \|\|\s*active\.tagName === 'TEXTAREA' \|\|/.test(app) &&
+    /active\.tagName === 'TEXTAREA' \|\|\s*active\.isContentEditable/.test(app),
   'inEditable no longer covers the three',
 );
 

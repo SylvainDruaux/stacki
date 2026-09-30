@@ -12,6 +12,9 @@ const { BOUNDARY_LIMITS } = require('../dist/shared/boundary.js');
 const { parseMergeResult, parseConflictPart } = load('gitBridge.ts');
 const { initialConflictPicks, choicesForSend, conflictHunks } = load('panels/gitConflictModel.ts');
 const { parseConflict } = require('../dist/electron/conflicts.js');
+
+// Null as a boundary receives it, parsed from JSON: inputs may hold it; our values never do.
+const jsonNull = JSON.parse('null');
 const clash = { kind: 'clash', ours: 'ours', theirs: 'theirs', changedBy: 'both' };
 const file = (parts) => ({ path: 'a.astro', ours: 'ours', theirs: 'theirs', parts });
 const conflict = (files) => ({ ok: false, conflicted: true, from: 'main', branch: 'topic', files });
@@ -41,11 +44,11 @@ test('real conflict output survives the renderer parser and preserves each choic
 
 test('merge contracts reject unknown parts and bound total files plus parts', () => {
   for (const part of [
-    null,
+    jsonNull,
     {},
     { kind: 'same', text: 1 },
     { ...clash, changedBy: 'someone' },
-    { ...clash, ours: null },
+    { ...clash, ours: jsonNull },
     { ...clash, merged: false },
   ]) {
     assert.throws(() => parseConflictPart(part));
@@ -109,7 +112,7 @@ test('merge dialog sends exact selected choices and locks binary choices while b
   ]);
   const resolutions = [];
   let cancellations = 0;
-  const show = (busy = null) =>
+  const show = (busy) =>
     act(async () =>
       root.render(
         React.createElement(Modal, {

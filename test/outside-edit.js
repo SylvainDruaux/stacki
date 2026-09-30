@@ -33,16 +33,16 @@ const check = (what, condition, detail) => {
     failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
   }
 };
-const settle = (ms = 20) => new Promise((r) => setTimeout(r, ms));
+const settle = (ms = 20) => new Promise((resolve) => setTimeout(resolve, ms));
 
 (async () => {
   const esbuild = require('esbuild');
-  const buildDir = path.join(__dirname, '..', 'node_modules', '.stacki-test');
-  fs.mkdirSync(buildDir, { recursive: true });
+  const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
+  fs.mkdirSync(buildDirectory, { recursive: true });
 
   // --- the canvas patches when it is asked to ---------------------------------
   // The real client, in a real document, told by a message rather than by HMR.
-  const bundle = path.join(buildDir, 'morph-client.bundle.js');
+  const bundle = path.join(buildDirectory, 'morph-client.bundle.js');
   await esbuild.build({
     entryPoints: [path.join(__dirname, '..', 'dist', 'electron', 'morphClient.js')],
     outfile: bundle,
@@ -123,7 +123,7 @@ const settle = (ms = 20) => new Promise((r) => setTimeout(r, ms));
   );
 
   // --- a word to the canvas that needs no answer --------------------------------
-  const queryBundle = path.join(buildDir, 'canvas-query.bundle.mjs');
+  const queryBundle = path.join(buildDirectory, 'canvas-query.bundle.mjs');
   await esbuild.build({
     entryPoints: [path.join(__dirname, '..', 'src', 'canvasQuery.js')],
     outfile: queryBundle,
@@ -136,14 +136,14 @@ const settle = (ms = 20) => new Promise((r) => setTimeout(r, ms));
     `${pathToFileURL(queryBundle).href}?v=${Date.now()}`
   );
   const posted = [];
-  setCanvasFrame({ postMessage: (m) => posted.push(m) });
+  setCanvasFrame({ postMessage: (message) => posted.push(message) });
   check('what the app says reaches the frame', tellCanvas({ type: 'avb:patch-now' }) === true);
   check(
     'as the message the client is listening for',
     posted[0]?.type === 'avb:patch-now',
     JSON.stringify(posted),
   );
-  setCanvasFrame(null);
+  setCanvasFrame(undefined);
   check(
     'and with no frame it says so rather than throwing',
     tellCanvas({ type: 'avb:patch-now' }) === false,
@@ -187,7 +187,9 @@ const settle = (ms = 20) => new Promise((r) => setTimeout(r, ms));
   );
   check(
     'and the client still listens to the socket as well',
-    /import\.meta\.hot\.on\('avb:page-changed', update\)/.test(morph),
+    /import\.meta\.hot\.on\('avb:page-changed', \(\) => \{[\s\S]{0,200}?void update\(\);/.test(
+      morph,
+    ),
     'the fast path is gone',
   );
 

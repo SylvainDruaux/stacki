@@ -20,24 +20,26 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const { parsePage, locateSelection } = require('../dist/electron/astroParser.js');
+const { LIMITS } = require('../dist/shared/limits.js');
 
-const CORPUS_DIR = path.join(__dirname, 'corpus');
+const CORPUS_DIRECTORY = path.join(__dirname, 'corpus');
 
 const fixtures = fs
-  .readdirSync(CORPUS_DIR)
-  .filter((f) => f.endsWith('.astro'))
+  .readdirSync(CORPUS_DIRECTORY)
+  .filter((file) => file.endsWith('.astro'))
   .sort()
-  .map((name) => ({ name, file: path.join(CORPUS_DIR, name) }))
+  .map((name) => ({ name, file: path.join(CORPUS_DIRECTORY, name) }))
   .filter(({ file }) => parsePage(fs.readFileSync(file, 'utf8')).editable);
 
 // Every node in the tree, as {path, node} pairs keyed the way the canvas is.
-function everyNode(nodes, prefix = '') {
+function everyNode(nodes, prefix = '', depth = 0) {
+  assert.ok(depth <= LIMITS.treeDepthMax, 'everyNode: depth limit');
   const out = [];
   nodes.forEach((node, i) => {
     const key = prefix ? `${prefix}.${i}` : String(i);
     out.push({ key, node });
     if (Array.isArray(node.children)) {
-      out.push(...everyNode(node.children, key));
+      out.push(...everyNode(node.children, key, depth + 1));
     }
   });
   return out;
@@ -84,8 +86,8 @@ describe('locateSelection', () => {
 
   test('the frontmatter block is the file up to its closing ---', () => {
     const file = fixtures
-      .map((f) => f.file)
-      .find((f) => fs.readFileSync(f, 'utf8').startsWith('---'));
+      .map((entry) => entry.file)
+      .find((file) => fs.readFileSync(file, 'utf8').startsWith('---'));
     const lines = fs.readFileSync(file, 'utf8').split('\n');
     const at = locateSelection(file, 'frontmatter');
     assert.equal(at.startLine, 1);
@@ -105,6 +107,6 @@ describe('locateSelection', () => {
   });
 
   test('a file that does not exist has no location', () => {
-    assert.equal(locateSelection(path.join(CORPUS_DIR, 'nope.astro'), '0'), null);
+    assert.equal(locateSelection(path.join(CORPUS_DIRECTORY, 'nope.astro'), '0'), undefined);
   });
 });

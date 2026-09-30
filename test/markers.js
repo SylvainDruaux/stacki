@@ -23,6 +23,7 @@
 // Astro ≤6, @astrojs/compiler-rs is Astro 7+. A project can be passed on the
 // command line to run its own pages through the same two checks.
 
+const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
 const { parsePage, serializePageMarked } = require('../dist/electron/astroParser.js');
@@ -85,7 +86,7 @@ const CASES = {
 // checked for the same set. `set:html` markers appear as a quoted string, plain
 // ones as a comment — the path is what identifies them either way.
 function markersIn(text) {
-  return new Set([...text.matchAll(/avb-[se]:([\w|./-]+?)-->/g)].map((m) => m[0]));
+  return new Set([...text.matchAll(/avb-[se]:([\w|./-]+?)-->/g)].map((match) => match[0]));
 }
 
 const failures = [];
@@ -119,8 +120,8 @@ async function check(compilers, label, source) {
       return { skipped: true };
     }
     marked = serializePageMarked(parsed.model);
-  } catch (err) {
-    fail(label, `    serializePageMarked threw: ${err.message}`);
+  } catch (error) {
+    fail(label, `    serializePageMarked threw: ${error.message}`);
     return {};
   }
   const expected = markersIn(marked);
@@ -128,18 +129,18 @@ async function check(compilers, label, source) {
     let result;
     try {
       result = await compiler.transform(marked, { filename: '/page.astro' });
-    } catch (err) {
-      fail(label, `    ${compiler.label}: threw ${String(err.message || err).split('\n')[0]}`);
+    } catch (error) {
+      fail(label, `    ${compiler.label}: threw ${String(error.message || error).split('\n')[0]}`);
       continue;
     }
     const errors = (result.diagnostics || []).filter(
-      (d) => d.severity === 'error' || d.severity === 1,
+      (diagnostic) => diagnostic.severity === 'error' || diagnostic.severity === 1,
     );
     if (errors.length) {
       fail(label, `    ${compiler.label}: ${errors[0].text}\n${indented(marked)}`);
       continue;
     }
-    const lost = [...expected].filter((m) => !result.code.includes(m));
+    const lost = [...expected].filter((marker) => !result.code.includes(marker));
     if (lost.length) {
       fail(
         label,
@@ -157,20 +158,25 @@ function indented(text) {
   return text
     .trimEnd()
     .split('\n')
-    .map((l) => '      ' + l)
+    .map((line) => '      ' + line)
     .join('\n');
 }
 
-function walk(dir, out = []) {
-  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+// Project folders nest a handful deep; a walk past this has met a cycle or a
+// generated tree, and should stop loudly rather than recurse on.
+const WALK_LIMITS = { directoryDepthMax: 32 };
+
+function walk(directory, out = [], depth = 0) {
+  assert.ok(depth <= WALK_LIMITS.directoryDepthMax, 'walk: depth limit');
+  for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
     if (entry.name === 'node_modules' || entry.name.startsWith('.')) {
       continue;
     }
-    const p = path.join(dir, entry.name);
+    const entryPath = path.join(directory, entry.name);
     if (entry.isDirectory()) {
-      walk(p, out);
+      walk(entryPath, out, depth + 1);
     } else if (entry.name.endsWith('.astro')) {
-      out.push(p);
+      out.push(entryPath);
     }
   }
   return out;
@@ -190,28 +196,28 @@ function walk(dir, out = []) {
 
   let skipped = 0;
   for (const [label, source] of Object.entries(CASES)) {
-    const { skipped: s } = await check(compilers, label, source);
-    if (s) {
+    const { skipped: caseSkipped } = await check(compilers, label, source);
+    if (caseSkipped) {
       skipped++;
     }
   }
 
-  for (const dir of process.argv.slice(2)) {
-    const root = path.resolve(dir);
+  for (const directory of process.argv.slice(2)) {
+    const root = path.resolve(directory);
     if (!fs.existsSync(root)) {
-      console.error(`no such directory: ${dir}`);
+      console.error(`no such directory: ${directory}`);
       process.exit(2);
     }
     for (const file of walk(root)) {
       const rel = path.relative(path.dirname(root), file);
-      const { skipped: s } = await check(compilers, rel, fs.readFileSync(file, 'utf8'));
-      if (s) {
+      const { skipped: fileSkipped } = await check(compilers, rel, fs.readFileSync(file, 'utf8'));
+      if (fileSkipped) {
         skipped++;
       }
     }
   }
 
-  const names = compilers.map((c) => c.label).join(', ');
+  const names = compilers.map((compiler) => compiler.label).join(', ');
   const skipNote = skipped ? `, ${skipped} not editable` : '';
   if (failures.length) {
     console.error(

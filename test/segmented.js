@@ -39,16 +39,16 @@ const SEG = (TRACK - PAD * 2) / 4;
 
 (async () => {
   const esbuild = require('esbuild');
-  const buildDir = path.join(__dirname, '..', 'node_modules', '.stacki-test');
-  fs.mkdirSync(buildDir, { recursive: true });
-  const entry = path.join(buildDir, 'segmented.entry.jsx');
+  const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
+  fs.mkdirSync(buildDirectory, { recursive: true });
+  const entry = path.join(buildDirectory, 'segmented.entry.jsx');
   fs.writeFileSync(
     entry,
     `export { default as DisplayControl } from ${JSON.stringify(
       path.join(__dirname, '..', 'src', 'style-panel', 'DisplayControl.tsx'),
     )};\n`,
   );
-  const out = path.join(buildDir, 'segmented.bundle.js');
+  const out = path.join(buildDirectory, 'segmented.bundle.js');
   await esbuild.build({
     entryPoints: [entry],
     outfile: out,
@@ -71,8 +71,10 @@ const SEG = (TRACK - PAD * 2) / 4;
   // The pill measures with offsetLeft/offsetWidth — zoom-independent, and the
   // reason it can't be a percentage of the track. jsdom reports 0 for both, so
   // they are defined here from the layout above.
-  const index = (el) =>
-    [...(el.parentElement?.children ?? [])].filter((n) => n.tagName === 'BUTTON').indexOf(el);
+  const index = (element) =>
+    [...(element.parentElement?.children ?? [])]
+      .filter((sibling) => sibling.tagName === 'BUTTON')
+      .indexOf(element);
   Object.defineProperty(dom.window.HTMLElement.prototype, 'offsetLeft', {
     get() {
       if (!this.className?.includes?.('display-seg')) {
@@ -115,8 +117,8 @@ const SEG = (TRACK - PAD * 2) / 4;
   const at = () => {
     const style = pill()?.getAttribute('style') || '';
     const x = style.match(/translateX\(([-\d.]+)px\)/);
-    const w = style.match(/width:\s*([\d.]+)px/);
-    return x && w ? { x: Number(x[1]), width: Number(w[1]) } : null;
+    const widthMatch = style.match(/width:\s*([\d.]+)px/);
+    return x && widthMatch ? { x: Number(x[1]), width: Number(widthMatch[1]) } : undefined;
   };
   const segments = () => [...host.querySelectorAll('.embed-editor_display-seg')];
 
@@ -161,12 +163,12 @@ const SEG = (TRACK - PAD * 2) / 4;
 
   // --- and nothing else claims to be selected ---------------------------------
   await show('grid');
-  const selected = segments().filter((el) => el.className.includes('is-selected'));
+  const selected = segments().filter((element) => element.className.includes('is-selected'));
   check('exactly one segment is marked selected', selected.length === 1, String(selected.length));
   check('the one the pill is under', selected[0]?.textContent === 'Grid', selected[0]?.textContent);
   check(
     'and it is announced as checked',
-    segments().filter((el) => el.getAttribute('aria-checked') === 'true').length === 1,
+    segments().filter((element) => element.getAttribute('aria-checked') === 'true').length === 1,
   );
 
   // --- what the fourth slot can hold --------------------------------------------
@@ -263,14 +265,14 @@ const SEG = (TRACK - PAD * 2) / 4;
   // quietly appear without one.
   const users = fs
     .readdirSync(panel)
-    .filter((f) => f.endsWith('.tsx'))
-    .filter((f) =>
-      fs.readFileSync(path.join(panel, f), 'utf8').includes('embed-editor_display-seg'),
+    .filter((file) => file.endsWith('.tsx'))
+    .filter((file) =>
+      fs.readFileSync(path.join(panel, file), 'utf8').includes('embed-editor_display-seg'),
     );
   check(
     'and no other file renders segments without one',
-    users.every((f) => bars.includes(f)),
-    users.filter((f) => !bars.includes(f)).join(', '),
+    users.every((file) => bars.includes(file)),
+    users.filter((file) => !bars.includes(file)).join(', '),
   );
 
   // --- what the CSS says --------------------------------------------------------
@@ -298,7 +300,7 @@ const SEG = (TRACK - PAD * 2) / 4;
       out.push(css.slice(at, end));
       from = end + 1;
     }
-    return out.length ? out.join('\n') : null;
+    return out.length ? out.join('\n') : undefined;
   };
   check(
     'the pill is the thing that carries the background',

@@ -39,11 +39,11 @@ assert.deepEqual(rows.rowRenames(block, first, 'accent'), [
 assert.deepEqual(rows.movesForDrop(slots, 1, 3), [
   { file: 'tokens.css', selector: ':root', name: '--color-primary', at: 90 },
 ]);
-assert.equal(rows.dropPlan(slots, 0, 1), null);
-assert.equal(rows.dropPlan(slots, 99, 0), null);
+assert.equal(rows.dropPlan(slots, 0, 1), undefined);
+assert.equal(rows.dropPlan(slots, 99, 0), undefined);
 assert.equal(rows.dropPlan(slots, 0, 2).before, '--color-secondary');
 const matrix = { kind: 'matrix', title: 'Heading', rows: [] };
-assert.equal(rows.sectionPrefix(matrix), null);
+assert.equal(rows.sectionPrefix(matrix), undefined);
 assert.deepEqual(
   rows.rowRenames(
     matrix,
@@ -80,7 +80,7 @@ global.cancelAnimationFrame = (id) => frames.delete(id);
 const flush = () => {
   const pending = [...frames.values()];
   frames.clear();
-  pending.forEach((fn) => fn());
+  pending.forEach((callback) => callback());
 };
 const sync = createScrollSync();
 const firstPeer = { scrollLeft: 0 },

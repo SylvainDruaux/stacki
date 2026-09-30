@@ -58,11 +58,11 @@ function applyEdit(file, text, edit) {
 }
 
 test('out-of-order page reads and external reads cannot replace the current edit', async () => {
-  const dir = path.join(__dirname, '..', 'node_modules', '.stacki-test', 'page-navigation');
-  fs.mkdirSync(dir, { recursive: true });
+  const directory = path.join(__dirname, '..', 'node_modules', '.stacki-test', 'page-navigation');
+  fs.mkdirSync(directory, { recursive: true });
   await esbuild.build({
     entryPoints: [path.join(__dirname, '..', 'src', 'App.tsx')],
-    outfile: path.join(dir, 'app.js'),
+    outfile: path.join(directory, 'app.js'),
     bundle: true,
     format: 'cjs',
     platform: 'node',
@@ -102,7 +102,7 @@ test('out-of-order page reads and external reads cannot replace the current edit
     global[key] = key === 'window' ? window : window[key];
   }
   global.getComputedStyle = window.getComputedStyle;
-  global.requestAnimationFrame = (fn) => setTimeout(fn, 0);
+  global.requestAnimationFrame = (callback) => setTimeout(callback, 0);
   global.cancelAnimationFrame = clearTimeout;
   global.ResizeObserver = class {
     observe() {}
@@ -127,7 +127,7 @@ test('out-of-order page reads and external reads cannot replace the current edit
   const disk = new Map();
   const edits = [];
   const previews = [];
-  let editError = null;
+  let editError;
   let onFsChanged;
   const refused = (reason, diskChecksum) => ({
     ok: false,
@@ -135,7 +135,7 @@ test('out-of-order page reads and external reads cannot replace the current edit
   });
   const bridge = new Proxy(
     {
-      pendingProject: async () => null,
+      pendingProject: async () => undefined,
       scanProject: async () => {
         if (!deferScans) {
           return scan;
@@ -183,8 +183,8 @@ test('out-of-order page reads and external reads cannot replace the current edit
         };
         return { ok: true, ...page, inverse: applied.inverse };
       },
-      onFsChanged: (cb) => {
-        onFsChanged = cb;
+      onFsChanged: (callback) => {
+        onFsChanged = callback;
         return () => {};
       },
       gitInfo: async () => ({ isRepo: false }),
@@ -195,7 +195,7 @@ test('out-of-order page reads and external reads cannot replace the current edit
         if (key in target) {
           return target[key];
         }
-        return String(key).startsWith('on') ? () => () => {} : async () => null;
+        return String(key).startsWith('on') ? () => () => {} : async () => undefined;
       },
     },
   );
@@ -205,7 +205,7 @@ test('out-of-order page reads and external reads cannot replace the current edit
   const { createRoot } = require('react-dom/client');
   const { act } = React;
   const root = createRoot(document.getElementById('root'));
-  const App = require(path.join(dir, 'app.js')).default;
+  const App = require(path.join(directory, 'app.js')).default;
   // Answer read `index` with `label`'s text, which is then what disk holds.
   const answer = (index, label) => {
     disk.set(reads[index].path, textOf(label));
@@ -263,7 +263,7 @@ test('out-of-order page reads and external reads cannot replace the current edit
   assert.equal(shown(), 'third');
   assert.equal(
     __panels.PreviewPane.navHoverPath,
-    null,
+    undefined,
     'Installing a page clears navigator hover so canvas hover can take over',
   );
   await act(async () => {
@@ -358,7 +358,7 @@ test('out-of-order page reads and external reads cannot replace the current edit
   assert.equal(__panels.PropsPanel.filePath, card.path);
   assert.equal(__panels.PreviewPane.route, '/third');
   assert.match(document.querySelector('.toast.error').textContent, /disk full/);
-  editError = null;
+  editError = undefined;
   await navigate('/second');
   assert.equal(reads[8].path, pages[1].path);
   assert.equal(disk.get(card.path), '<div data-label="card-updated" title="unsaved card"></div>\n');

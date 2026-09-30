@@ -26,6 +26,9 @@ import {
 import { directoryBudget, MAIN_LIMITS } from '../../dist/electron/main.bounds.js';
 import { LIMITS } from '../../dist/shared/limits.js';
 
+// Null as a boundary receives it, parsed from JSON: inputs may hold it; our values never do.
+const jsonNull: unknown = JSON.parse('null');
+
 const sha256 = (text: string): string => createHash('sha256').update(text).digest('hex');
 
 function fixture() {
@@ -176,7 +179,7 @@ test('content validation replies keep their issues and refuse corrupt or oversiz
 
 test('dev-server parsers support current and legacy responses', () => {
   assert.deepEqual(parseDynamicPaths({ entries: [{ slug: 'a' }] }).entries, [
-    { params: { slug: 'a' }, props: null },
+    { params: { slug: 'a' }, props: undefined },
   ]);
   assert.deepEqual(
     parseDynamicPaths({ entries: [{ params: { slug: 'a' }, props: { n: 1 } }] }).entries,
@@ -184,8 +187,8 @@ test('dev-server parsers support current and legacy responses', () => {
   );
   assert.throws(() => parseDynamicPaths({ entries: [42] }), /object/);
   assert.throws(() => parseDynamicPaths({ entries: [], error: 42 }), /string/);
-  assert.deepEqual(parseSampleEntry({ entry: null, error: 'offline' }), {
-    entry: null,
+  assert.deepEqual(parseSampleEntry({ entry: jsonNull, error: 'offline' }), {
+    entry: jsonNull,
     error: 'offline',
   });
   assert.throws(() => parseSampleEntry([]), /object/);

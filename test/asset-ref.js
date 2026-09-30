@@ -44,18 +44,19 @@ const jc = require('../dist/electron/jsCollections.js');
 const ar = require('../dist/electron/assetRefs.js');
 
 const SCAN = { requireExport: false, allowPlainLists: true };
-const read = (src) => jc.findCollections(src, SCAN).find((c) => c.name === 'SCREENS');
+const read = (source) =>
+  jc.findCollections(source, SCAN).find((collection) => collection.name === 'SCREENS');
 // The write, as something to compare against — a collection that cannot be read
 // and a writer that throws are both answers this file has to be able to report
 // rather than die on.
-const writeBack = (src, data) => {
+const writeBack = (source, data) => {
   if (!data) {
     return '(read-only)';
   }
   try {
-    return jc.replaceCollection(src, 'SCREENS', data, SCAN);
-  } catch (e) {
-    return `(threw: ${e.message})`;
+    return jc.replaceCollection(source, 'SCREENS', data, SCAN);
+  } catch (error) {
+    return `(threw: ${error.message})`;
   }
 };
 
@@ -103,11 +104,11 @@ const SCREENS = [
     ['count + 1', 'a sum'],
     ['...defaults', 'a spread'],
   ]) {
-    const src = `const SCREENS = [\n  { image: ${expr} },\n];\n`;
+    const source = `const SCREENS = [\n  { image: ${expr} },\n];\n`;
     check(
       `${what} keeps the collection read-only`,
-      read(src)?.data === null,
-      JSON.stringify(read(src)?.data),
+      read(source) !== undefined && read(source).data === undefined,
+      JSON.stringify(read(source)?.data),
     );
   }
   const dotted = read('const SCREENS = [\n  { image: icons.mail },\n];\n');
@@ -189,7 +190,7 @@ const SCREENS = [
   );
   check(
     'a name nothing imports is not one',
-    ar.importedAs(FM, 'nowhere') === null,
+    ar.importedAs(FM, 'nowhere') === undefined,
     'it found something',
   );
   // A name that stands for something INSIDE a module is not a file to swap.
@@ -206,7 +207,7 @@ const SCREENS = [
   );
 }
 {
-  const resolve = (name) => (name === 'muchMore' ? 'src/assets/images/app-more.webp' : null);
+  const resolve = (name) => (name === 'muchMore' ? 'src/assets/images/app-more.webp' : undefined);
   // A collection that could not be read has no names to bind; say so rather
   // than reading into nothing.
   const withAssets = ar.withAssets(read(FM)?.data || [], resolve);
@@ -313,9 +314,9 @@ const SCREENS = [
   const { inferType } = require('esbuild').buildSync
     ? (() => {
         const esbuild = require('esbuild');
-        const dir = path.join(__dirname, '..', 'node_modules', '.stacki-test');
-        fs.mkdirSync(dir, { recursive: true });
-        const out = path.join(dir, 'cms-schema.cjs');
+        const directory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
+        fs.mkdirSync(directory, { recursive: true });
+        const out = path.join(directory, 'cms-schema.cjs');
         esbuild.buildSync({
           entryPoints: [path.join(__dirname, '..', 'src', 'cmsSchema.js')],
           outfile: out,

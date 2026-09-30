@@ -29,7 +29,7 @@ const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
   // --- what the page reports ---------------------------------------------------
   {
     const { JSDOM } = require('jsdom');
-    const marked = (p, html) => `<!--avb-s:${p}-->${html}<!--avb-e:${p}-->`;
+    const marked = (nodePath, html) => `<!--avb-s:${nodePath}-->${html}<!--avb-e:${nodePath}-->`;
     const dom = new JSDOM(
       `<!doctype html><head><style>
          .gone { display: none }
@@ -57,7 +57,7 @@ const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
     global.requestAnimationFrame = window.requestAnimationFrame.bind(window);
 
     const sent = [];
-    window.parent = { postMessage: (m) => sent.push(m) };
+    window.parent = { postMessage: (message) => sent.push(message) };
     const electron = {
       contextBridge: { exposeInMainWorld: () => {} },
       ipcRenderer: { on: () => {}, send: () => {}, invoke: async () => {} },
@@ -73,13 +73,17 @@ const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
     await settle(60);
 
     // Asking for anything makes the frame report what it sees.
-    const ev = new window.MessageEvent('message', { data: { type: 'avb:track', paths: ['0'] } });
-    Object.defineProperty(ev, 'source', { value: window.parent });
-    window.dispatchEvent(ev);
+    const event = new window.MessageEvent('message', { data: { type: 'avb:track', paths: ['0'] } });
+    Object.defineProperty(event, 'source', { value: window.parent });
+    window.dispatchEvent(event);
     await settle(20);
 
-    const states = sent.filter((m) => m.type === 'avb:node-states').pop();
-    check('the page reports what it computed', !!states, JSON.stringify(sent.map((m) => m.type)));
+    const states = sent.filter((message) => message.type === 'avb:node-states').pop();
+    check(
+      'the page reports what it computed',
+      !!states,
+      JSON.stringify(sent.map((message) => message.type)),
+    );
     check(
       'a display:none element is hidden',
       (states?.hidden || []).includes('1'),
@@ -106,9 +110,9 @@ const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
     const style = document.createElement('style');
     style.textContent = '#plain { pointer-events: none }';
     document.head.appendChild(style);
-    window.dispatchEvent(ev);
+    window.dispatchEvent(event);
     await settle(20);
-    const after = sent.filter((m) => m.type === 'avb:node-states').pop();
+    const after = sent.filter((message) => message.type === 'avb:node-states').pop();
     check(
       'a rule added later is picked up',
       (after?.inert || []).includes('0'),
@@ -119,9 +123,9 @@ const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
   // --- what the navigator draws ------------------------------------------------
   {
     const esbuild = require('esbuild');
-    const buildDir = path.join(__dirname, '..', 'node_modules', '.stacki-test');
-    fs.mkdirSync(buildDir, { recursive: true });
-    const bundlePath = path.join(buildDir, 'node-states.bundle.js');
+    const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
+    fs.mkdirSync(buildDirectory, { recursive: true });
+    const bundlePath = path.join(buildDirectory, 'node-states.bundle.js');
     await esbuild.build({
       entryPoints: [path.join(__dirname, '..', 'src', 'panels', 'StructurePanel.tsx')],
       outfile: bundlePath,
@@ -149,7 +153,7 @@ const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
     const { act } = require('react');
     const StructurePanel = require(bundlePath).default;
 
-    const el = (id) => ({ id, kind: 'element', name: 'div', props: {}, children: [] });
+    const elementNode = (id) => ({ id, kind: 'element', name: 'div', props: {}, children: [] });
     const container = dom.window.document.getElementById('root');
     const root = createRoot(container);
     await act(async () => {
@@ -157,11 +161,19 @@ const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
         React.createElement(StructurePanel, {
           pageState: {
             editable: true,
-            model: { nodes: [el('plain'), el('gone'), el('inert'), el('both')], imports: [] },
+            model: {
+              nodes: [
+                elementNode('plain'),
+                elementNode('gone'),
+                elementNode('inert'),
+                elementNode('both'),
+              ],
+              imports: [],
+            },
           },
           layouts: [],
           currentLayoutName: '',
-          selectedId: null,
+          selectedId: undefined,
           emptyNodeIds: new Set(),
           hiddenNodeIds: new Set(['gone', 'both']),
           inertNodeIds: new Set(['inert', 'both']),
@@ -185,8 +197,8 @@ const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
 
     const marks = (id) => {
       const row = container.querySelector(`.structure-node[data-node-id="${id}"]`);
-      return [...(row?.querySelectorAll('.node-empty [title]') || [])].map((s) =>
-        s.getAttribute('title'),
+      return [...(row?.querySelectorAll('.node-empty [title]') || [])].map((empty) =>
+        empty.getAttribute('title'),
       );
     };
     check('an ordinary row is unmarked', marks('plain').length === 0, marks('plain').join(' | '));
@@ -211,10 +223,10 @@ const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
     await act(async () => {
       root.render(
         React.createElement(StructurePanel, {
-          pageState: { editable: true, model: { nodes: [el('plain')], imports: [] } },
+          pageState: { editable: true, model: { nodes: [elementNode('plain')], imports: [] } },
           layouts: [],
           currentLayoutName: '',
-          selectedId: null,
+          selectedId: undefined,
           emptyNodeIds: new Set(['plain']),
           hiddenNodeIds: new Set(['plain']),
           inertNodeIds: new Set(),

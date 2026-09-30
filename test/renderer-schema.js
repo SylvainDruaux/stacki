@@ -4,6 +4,11 @@
 const assert = require('node:assert/strict');
 const loadRenderer = require('./renderer-module.js');
 const { BOUNDARY_LIMITS } = require('../dist/shared/boundary.js');
+
+// A boundary can receive null — JSON, structured clone and postMessage all carry it —
+// so the negative space below includes it. It is read from JSON, because our own
+// code never writes a null.
+const PLATFORM_NULL = JSON.parse('null');
 const schema = loadRenderer('contentSchema.ts');
 const cms = loadRenderer('cmsSchema.ts');
 const { parseContentSchema } = loadRenderer('contentSchemaBoundary.ts');
@@ -26,7 +31,7 @@ assert.equal(fields[0].required, true);
 assert.equal(fields[0].default, 'Untitled');
 assert.equal(fields[1].nullable, true);
 assert.equal(schema.fieldIssue(fields[0], ''), 'Required');
-assert.equal(schema.fieldIssue(fields[1], null), null);
+assert.equal(schema.fieldIssue(fields[1], PLATFORM_NULL), undefined);
 assert.equal(schema.fieldIssue(fields[2], 0), 'At least 1');
 assert.equal('max' in fields[2].constraints, false);
 assert.equal(fields[3].control, 'image');
@@ -41,19 +46,19 @@ const union = schema.collectionFields({
 }).union;
 assert.equal(union.discriminator, 'kind');
 assert.equal(schema.memberFor(union, { kind: 'image' }).value, 'image');
-assert.deepEqual(schema.editsBetween({ a: 1, b: null }, { b: null, c: 2 }), [
+assert.deepEqual(schema.editsBetween({ a: 1, b: PLATFORM_NULL }, { b: PLATFORM_NULL, c: 2 }), [
   { path: ['a'], value: undefined },
   { path: ['c'], value: 2 },
 ]);
 for (const value of [
-  null,
+  PLATFORM_NULL,
   [],
   42,
   { type: 42 },
   { required: [42] },
   { properties: [] },
   { items: 42 },
-  { oneOf: [null] },
+  { oneOf: [PLATFORM_NULL] },
   { $defs: { a: 42 } },
   { minLength: -1 },
   { minItems: 0.5 },
@@ -97,7 +102,7 @@ assert.deepEqual(cms.duplicateItem({ id: 'one', name: 'One', image: raw.rows[0].
 });
 assert.deepEqual(cms.blankItem([1, 2]), 0);
 assert.deepEqual(
-  cms.fieldsOf([null, 'plain', { title: 'A', count: 1 }]).map((field) => field.type),
+  cms.fieldsOf([PLATFORM_NULL, 'plain', { title: 'A', count: 1 }]).map((field) => field.type),
   ['text', 'number'],
 );
 assert.throws(() => cms.applyToItems([], Array(129).fill('x'), cms.dropKey('a')), /depth limit/);

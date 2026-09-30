@@ -5,11 +5,11 @@
 // A loop that declares something before it renders is written with a statement
 // body:
 //
-//   {items.map((item) => {
-//     /* Not everything listed has somewhere of its own to lead. */
-//     const Element = item.href ? "a" : "div";
-//     return ( <li>…</li> );
-//   })}
+//   | {items.map((item) => {
+//   |   /* Not everything listed has somewhere of its own to lead. */
+//   |   const Element = item.href ? "a" : "div";
+//   |   return ( <li>…</li> );
+//   | })}
 //
 // That form is read as a loop — the declarations kept aside, the returned
 // markup becoming the loop's children. But the block was split into statements
@@ -37,6 +37,8 @@ const check = (what, condition, detail) => {
 };
 
 const { parsePage, serializePage, locateSelection } = require('../dist/electron/astroParser.js');
+const { LIMITS } = require('../dist/shared/limits.js');
+const assert = require('node:assert/strict');
 
 const os = require('os');
 
@@ -53,25 +55,29 @@ function onDisk(body) {
 }
 
 // The first loop node anywhere in a tree, and every node under it.
-const find = (nodes, kind) => {
-  for (const n of nodes || []) {
-    if (n.kind === kind) {
-      return n;
+const find = (nodes, kind, depth = 0) => {
+  assert.ok(depth <= LIMITS.treeDepthMax, 'find: depth limit');
+  for (const node of nodes || []) {
+    if (node.kind === kind) {
+      return node;
     }
-    const deeper = find(n.children, kind);
+    const deeper = find(node.children, kind, depth + 1);
     if (deeper) {
       return deeper;
     }
   }
-  return null;
+  return undefined;
 };
-const count = (nodes) => (nodes || []).reduce((n, node) => n + 1 + count(node.children), 0);
+const count = (nodes, depth = 0) => {
+  assert.ok(depth <= LIMITS.treeDepthMax, 'count: depth limit');
+  return (nodes || []).reduce((total, node) => total + 1 + count(node.children, depth + 1), 0);
+};
 
 // Reads as a loop, keeps its bytes.
 function loopIn(body, what) {
-  const src = page(body);
-  const parsed = parsePage(src);
-  const loop = parsed.editable ? find(parsed.model.nodes, 'map') : null;
+  const source = page(body);
+  const parsed = parsePage(source);
+  const loop = parsed.editable ? find(parsed.model.nodes, 'map') : undefined;
   check(
     `${what} — opens as a loop`,
     !!loop,
@@ -80,7 +86,7 @@ function loopIn(body, what) {
   if (parsed.editable) {
     check(
       `${what} — and is written back as it was`,
-      serializePage(parsed.model) === src,
+      serializePage(parsed.model) === source,
       'the file changed',
     );
   }
@@ -88,13 +94,13 @@ function loopIn(body, what) {
 }
 
 {
-  const src = page('  {items.map((item) => <li>{item}</li>)}').replace(/\n/g, '\r\n');
-  const parsed = parsePage(src);
+  const source = page('  {items.map((item) => <li>{item}</li>)}').replace(/\n/g, '\r\n');
+  const parsed = parsePage(source);
   check('a CRLF page remains editable', parsed.editable, parsed.reason);
   if (parsed.editable) {
     check(
       'and keeps its Windows line endings byte for byte',
-      serializePage(parsed.model) === src,
+      serializePage(parsed.model) === source,
       'the line endings changed',
     );
   }
@@ -222,7 +228,7 @@ loopIn(
 // --- what is still not a statement -------------------------------------------
 const stillCode = (body, what) => {
   const parsed = parsePage(page(body));
-  const loop = parsed.editable ? find(parsed.model.nodes, 'map') : null;
+  const loop = parsed.editable ? find(parsed.model.nodes, 'map') : undefined;
   check(
     what,
     !loop,
@@ -260,23 +266,27 @@ stillCode(
   const file = path.join(__dirname, 'corpus', name);
   check('the page this came from is in the corpus', fs.existsSync(file), file);
   if (fs.existsSync(file)) {
-    const src = fs.readFileSync(file, 'utf8');
-    const parsed = parsePage(src);
-    const loop = parsed.editable ? find(parsed.model.nodes, 'map') : null;
+    const source = fs.readFileSync(file, 'utf8');
+    const parsed = parsePage(source);
+    const loop = parsed.editable ? find(parsed.model.nodes, 'map') : undefined;
     check('and it opens as a loop', !!loop, parsed.reason || 'read as code');
     check(
       'with all thirty cards worth of markup under it',
       count(loop?.children) > 15,
       `${count(loop?.children)} nodes`,
     );
-    check('and comes back byte for byte', serializePage(parsed.model) === src, 'the file changed');
+    check(
+      'and comes back byte for byte',
+      serializePage(parsed.model) === source,
+      'the file changed',
+    );
 
     // A tree of the file: clicking a card on the canvas has to land on the
     // lines that card is written on. The block form used to parse its markup
     // with no idea where in the file it sat, so every node under the loop —
     // every card on the page — knew nothing about its own lines.
-    const lines = src.split('\n');
-    const lineOf = (text) => lines.findIndex((l) => l.includes(text)) + 1;
+    const lines = source.split('\n');
+    const lineOf = (text) => lines.findIndex((line) => line.includes(text)) + 1;
     const at = locateSelection(file, '0.0.0');
     check(
       'the card under the loop knows its lines',

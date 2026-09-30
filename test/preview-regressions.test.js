@@ -73,33 +73,36 @@ test('a missing explicit id cannot redirect an edit onto an unrelated live eleme
   const after = tree('<p id="wanted">after</p>');
   const live = tree('<p id="other">before</p>');
   const original = live.innerHTML;
-  assert.equal(morph.findLive(live.firstChild, before.firstChild), null);
+  assert.equal(morph.findLive(live.firstChild, before.firstChild), undefined);
   assert.throws(() => morph.patchChildren(live, before, after), /cannot line up/);
   assert.equal(live.innerHTML, original);
 });
 
 test('a comment cannot stand in for missing text', () => {
-  assert.equal(morph.findLive(tree('<!--before-->').firstChild, tree('before').firstChild), null);
+  assert.equal(
+    morph.findLive(tree('<!--before-->').firstChild, tree('before').firstChild),
+    undefined,
+  );
 });
 
 test('script identity cannot collide with separators inside source text', () => {
   const before = tree('<script>one\n@@\n |  | two</script>');
   const after = tree('<script>one</script><script>two</script>');
-  assert.equal(morph.addedScripts(before, after), null);
+  assert.equal(morph.addedScripts(before, after), undefined);
 });
 
 test('scripts retain ordering, multiplicity, and loading attributes', () => {
   const first = '<script type="module" src="/first.js"></script>';
   const second = '<script type="module" src="/second.js"></script>';
-  assert.equal(morph.addedScripts(tree(first + second), tree(second + first)), null);
-  assert.equal(morph.addedScripts(tree(first + first), tree(first)), null);
-  assert.equal(morph.addedScripts(tree(first), tree(first + first)), null);
+  assert.equal(morph.addedScripts(tree(first + second), tree(second + first)), undefined);
+  assert.equal(morph.addedScripts(tree(first + first), tree(first)), undefined);
+  assert.equal(morph.addedScripts(tree(first), tree(first + first)), undefined);
   assert.equal(
     morph.addedScripts(
       tree(first),
       tree(first.replace('type="module"', 'type="module" integrity="new"')),
     ),
-    null,
+    undefined,
   );
   assert.deepEqual(
     morph.addedScripts(tree(first), tree('<script src="/first.js" type="module"></script>')),

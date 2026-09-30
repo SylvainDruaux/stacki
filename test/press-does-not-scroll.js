@@ -32,7 +32,7 @@ const check = (what, condition, detail) => {
     failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
   }
 };
-const settle = (ms = 40) => new Promise((r) => setTimeout(r, ms));
+const settle = (ms = 40) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const PRELOAD = path.join(__dirname, '..', 'dist', 'electron', 'preload.js');
 
@@ -49,7 +49,7 @@ async function frame(hash) {
     { url: `http://localhost:4321/${hash}`, pretendToBeVisual: true },
   );
   const { window } = dom;
-  // jsdom has no focus to give; what is under test is the refusal.
+  // `jsdom` has no focus to give; what is under test is the refusal.
   window.focus = () => {};
   window.Element.prototype.getBoundingClientRect = () => ({
     x: 0,
@@ -81,7 +81,7 @@ async function frame(hash) {
   global.MouseEvent = window.MouseEvent;
   global.requestAnimationFrame = window.requestAnimationFrame.bind(window);
   const sent = [];
-  window.parent = { postMessage: (m) => sent.push(m) };
+  window.parent = { postMessage: (message) => sent.push(message) };
   const electron = {
     contextBridge: { exposeInMainWorld: () => {} },
     ipcRenderer: { on: () => {}, send: () => {}, invoke: async () => {} },
@@ -100,24 +100,24 @@ async function frame(hash) {
 }
 
 const press = (window, target, init = {}) => {
-  const e = new window.MouseEvent('mousedown', {
+  const event = new window.MouseEvent('mousedown', {
     bubbles: true,
     cancelable: true,
     button: 0,
     ...init,
   });
-  target.dispatchEvent(e);
-  return e;
+  target.dispatchEvent(event);
+  return event;
 };
 
 (async () => {
   {
     const { window } = await frame('#avb-design');
     const link = window.document.querySelector('[data-box="link"]');
-    const e = press(window, link);
+    const event = press(window, link);
     check(
       'a press on the canvas is refused',
-      e.defaultPrevented,
+      event.defaultPrevented,
       'the browser focuses the link and scrolls to it',
     );
     const onNothing = press(window, window.document.querySelector('[data-box="hero"]'));
@@ -143,8 +143,8 @@ const press = (window, target, init = {}) => {
     // The interactive preview: a real page, where pressing things is the point.
     const { window } = await frame('');
     const link = window.document.querySelector('[data-box="link"]');
-    const e = press(window, link);
-    check('the preview lets a press through', !e.defaultPrevented, 'the site cannot be used');
+    const event = press(window, link);
+    check('the preview lets a press through', !event.defaultPrevented, 'the site cannot be used');
     const click = new window.MouseEvent('click', { bubbles: true, cancelable: true });
     link.dispatchEvent(click);
     check('and the click with it', !click.defaultPrevented, 'links would not work in the preview');
@@ -159,7 +159,7 @@ const press = (window, target, init = {}) => {
   {
     const { window } = await frame('#avb-design');
     const scrolls = [];
-    window.scrollTo = (opts) => scrolls.push(opts);
+    window.scrollTo = (options) => scrolls.push(options);
     Object.defineProperty(window, 'innerWidth', { value: 1000, configurable: true });
     Object.defineProperty(window, 'innerHeight', { value: 800, configurable: true });
     Object.defineProperty(window, 'scrollX', { value: 1200, writable: true, configurable: true });
@@ -176,11 +176,11 @@ const press = (window, target, init = {}) => {
       right: -300,
       bottom: 400,
     });
-    const ev = new window.MessageEvent('message', {
+    const event = new window.MessageEvent('message', {
       data: { type: 'avb:track', paths: ['0'], scope: '', focus: '', focusOcc: 0 },
     });
-    Object.defineProperty(ev, 'source', { value: window.parent });
-    window.dispatchEvent(ev);
+    Object.defineProperty(event, 'source', { value: window.parent });
+    window.dispatchEvent(event);
     await settle(30);
     const go = new window.MessageEvent('message', {
       data: { type: 'avb:scroll-to', path: '0', occ: 0 },

@@ -25,7 +25,7 @@ buildSync({
   external: ['react', 'react-dom', 'react/jsx-runtime'],
 });
 const { DataPicker, InsertSearch, LinkField } = require(output);
-const leaf = { path: 'post', key: 'post', kind: 'object', preview: '', children: null };
+const leaf = { path: 'post', key: 'post', kind: 'object', preview: '', children: undefined };
 const renderData = (props) =>
   renderToStaticMarkup(
     React.createElement(DataPicker, {

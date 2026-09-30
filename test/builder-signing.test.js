@@ -20,7 +20,7 @@ const {
 
 const builderRequire = createRequire(require.resolve('electron-builder/package.json'));
 const signingFile = builderRequire.resolve('app-builder-lib/out/codeSign/macCodeSign.js');
-// npm postinstall may already have applied the backport. Recover the pristine
+// `npm` postinstall may already have applied the backport. Recover the pristine
 // installed implementation so these tests exercise both sides of the change.
 const original = fs
   .readFileSync(signingFile, 'utf8')
@@ -72,9 +72,9 @@ function loadSigning(source) {
     },
     'lazy-val': { Lazy: class {} },
     './codesign': {
-      importCertificate: async (link, tmpDir, currentDir) => {
-        imports.push({ link, tmpDir, currentDir });
-        return path.join(tmpDir.root, `${link}.p12`);
+      importCertificate: async (link, temporaryDirectory, currentDirectory) => {
+        imports.push({ link, tmpDir: temporaryDirectory, currentDir: currentDirectory });
+        return path.join(temporaryDirectory.root, `${link}.p12`);
       },
     },
     crypto: require('node:crypto'),
@@ -109,14 +109,16 @@ for (const installer of [false, true]) {
       `and ${installer ? 'both certificate passwords' : 'certificate password'}`,
     async () => {
       const { createKeychain, calls, imports } = loadSigning(patchSigningSource(original));
-      const currentDir = path.join(os.tmpdir(), 'stacki-signing-test-project');
-      const tmpDir = { root: path.join(os.tmpdir(), 'stacki-signing-test-certificates') };
+      const currentDirectory = path.join(os.tmpdir(), 'stacki-signing-test-project');
+      const temporaryDirectory = {
+        root: path.join(os.tmpdir(), 'stacki-signing-test-certificates'),
+      };
       const certificatePasswords = installer
         ? ['app-test-password', 'installer-test-password']
         : [''];
       const result = await createKeychain({
-        currentDir,
-        tmpDir,
+        currentDir: currentDirectory,
+        tmpDir: temporaryDirectory,
         cscLink: 'app',
         cscKeyPassword: certificatePasswords[0],
         ...(installer ? { cscILink: 'installer', cscIKeyPassword: certificatePasswords[1] } : {}),
@@ -130,7 +132,9 @@ for (const installer of [false, true]) {
       assert.equal(result.keychainFile, created.at(-1));
       assert.equal(imports.length, certificatePasswords.length);
       assert.ok(
-        imports.every((entry) => entry.tmpDir === tmpDir && entry.currentDir === currentDir),
+        imports.every(
+          (entry) => entry.tmpDir === temporaryDirectory && entry.currentDir === currentDirectory,
+        ),
       );
       const importCommands = calls.filter(([command]) => command === 'import');
       assert.deepEqual(
@@ -166,9 +170,9 @@ test('regression harness rejects the original wrong-password implementation', as
   );
 });
 
-function fixture(t, source = original, version = '25.1.8') {
+function fixture(context, source = original, version = '25.1.8') {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'stacki-builder-signing-'));
-  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  context.after(() => fs.rmSync(root, { recursive: true, force: true }));
   fs.writeFileSync(path.join(root, 'package.json'), '{}');
   const builder = path.join(root, 'node_modules/electron-builder');
   const library = path.join(builder, 'node_modules/app-builder-lib');
@@ -186,8 +190,8 @@ function fixture(t, source = original, version = '25.1.8') {
   return { root, file, builder };
 }
 
-test('patch resolves non-hoisted builder dependencies and is idempotent', (t) => {
-  const { root, file } = fixture(t);
+test('patch resolves non-hoisted builder dependencies and is idempotent', (context) => {
+  const { root, file } = fixture(context);
   assert.equal(fixElectronBuilderSigning(root), 'patched');
   const patched = fs.readFileSync(file, 'utf8');
   assert.equal(patched, patchSigningSource(original));
@@ -197,13 +201,13 @@ test('patch resolves non-hoisted builder dependencies and is idempotent', (t) =>
   assert.deepEqual(fs.readdirSync(path.dirname(file)), ['macCodeSign.js']);
 });
 
-test('unknown or partly patched sources are refused without changing any bytes', (t) => {
+test('unknown or partly patched sources are refused without changing any bytes', (context) => {
   for (const source of [
     original + '\n// unexpected upstream edit\n',
     original.replace('cscPasswords);', 'cscPasswords, keychainPassword);'),
     'async function importCerts() {}',
   ]) {
-    const { root, file } = fixture(t, source);
+    const { root, file } = fixture(context, source);
     assert.throws(
       () => fixElectronBuilderSigning(root),
       /Unrecognized electron-builder signing source/,
@@ -213,15 +217,18 @@ test('unknown or partly patched sources are refused without changing any bytes',
   }
 });
 
-test('dependency upgrades fail explicitly before modifying their source', (t) => {
-  const { root, file } = fixture(t, original, '26.0.0');
+test('dependency upgrades fail explicitly before modifying their source', (context) => {
+  const { root, file } = fixture(context, original, '26.0.0');
   assert.throws(() => fixElectronBuilderSigning(root), /Unsupported app-builder-lib 26.0.0/);
   assert.equal(fs.readFileSync(file, 'utf8'), original);
 });
 
-test('production install without electron-builder succeeds without creating dependencies', (t) => {
-  const { root, builder } = fixture(t);
-  fs.rmSync(builder, { recursive: true });
-  assert.equal(fixElectronBuilderSigning(root), 'not-installed');
-  assert.deepEqual(fs.readdirSync(path.join(root, 'node_modules')), []);
-});
+test(
+  'production install without electron-builder succeeds ' + 'without creating dependencies',
+  (context) => {
+    const { root, builder } = fixture(context);
+    fs.rmSync(builder, { recursive: true });
+    assert.equal(fixElectronBuilderSigning(root), 'not-installed');
+    assert.deepEqual(fs.readdirSync(path.join(root, 'node_modules')), []);
+  },
+);

@@ -408,7 +408,7 @@ test(
       return anchorAt(page, node.path);
     };
     const classCount = (node: ProjectedNode) =>
-      node.attributes.filter((a) => a.name === 'class').length;
+      node.attributes.filter((attribute) => attribute.name === 'class').length;
     const duplicated = nodeWith((node) => {
       if (node.capability === 'editable') {
         return classCount(node) > 1;
@@ -420,7 +420,9 @@ test(
       error: 'anchor-ambiguous',
     });
     // An expression attribute is set as a whole: `data-x={ 1 + 2 }` → `data-x="3"`.
-    const expression = nodeWith((node) => node.attributes.some((a) => a.name === 'data-x'));
+    const expression = nodeWith((node) =>
+      node.attributes.some((attribute) => attribute.name === 'data-x'),
+    );
     const set = planIntent(base, intentOn(page, expression, setAttribute('data-x', '3')));
     assert.ok(set.ok, 'a type change plans');
     const written = decodeUtf8(applySplices(page.bytes, set.value.splices));
@@ -515,7 +517,9 @@ function regionRepeats(authored: Snapshot, current: Snapshot, node: ProjectedNod
   return text.value.indexOf(region, first + 1) >= 0;
 }
 
-test('corpus sweep: fast = reference = diff path; an insertion above shifts every plan', (t) => {
+const SWEEP_TITLE =
+  'corpus sweep: fast = reference = diff path; an insertion above shifts every plan';
+test(SWEEP_TITLE, (testContext) => {
   let plannedCount = 0;
   let shiftedCount = 0;
   let repeatedCount = 0;
@@ -529,7 +533,7 @@ test('corpus sweep: fast = reference = diff path; an insertion above shifts ever
     const insertion = withInsertion(authored, file.text);
     const current = snapshotText(insertion.text, authored.path);
     for (const node of authored.projection.nodes) {
-      for (const attribute of node.attributes.filter((a) => a.type === 'string')) {
+      for (const attribute of node.attributes.filter((attribute) => attribute.type === 'string')) {
         if (!['element', 'component', 'raw'].includes(node.kind)) {
           continue;
         }
@@ -578,7 +582,7 @@ test('corpus sweep: fast = reference = diff path; an insertion above shifts ever
       }
     }
   }
-  t.diagnostic(
+  testContext.diagnostic(
     `${fileCount} files, ${plannedCount} attributes planned, ${shiftedCount} shifted, ` +
       `${repeatedCount} refused as repeated`,
   );

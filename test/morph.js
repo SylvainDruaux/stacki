@@ -49,6 +49,7 @@ const end = source.indexOf('// A script that CHANGED, or one that is GONE');
 // Main prepends the patcher's bounds from shared/limits.ts (step 7); the lifted
 // half takes them as a parameter, so the cap tests below can shrink them.
 const { LIMITS } = require('../dist/shared/limits.js');
+const assert = require('node:assert/strict');
 const lift = (limits) =>
   new Function(
     'document',
@@ -76,25 +77,25 @@ const { scriptSignature, isStyleModule, loadStyles, addedScripts, runScripts } =
 // (the client turns it into location.reload()), so it is reported as one rather
 // than ending the run with a stack trace that says nothing about which case it
 // was.
-const patch = (live, prev, next) => {
+const patch = (live, previous, next) => {
   try {
-    patchChildren(live, prev, next);
-    return null;
-  } catch (err) {
-    return err.message;
+    patchChildren(live, previous, next);
+    return undefined;
+  } catch (error) {
+    return error.message;
   }
 };
 
 const tree = (html) => {
-  const el = dom.window.document.createElement('div');
-  el.innerHTML = html;
-  return el;
+  const element = dom.window.document.createElement('div');
+  element.innerHTML = html;
+  return element;
 };
 
 // A tablist as the server renders it: three buttons, one class each.
 const TABS = (labels) =>
   `\n  ${labels
-    .map((l) => `<button class="tabs_link" type="button">${l}</button>`)
+    .map((label) => `<button class="tabs_link" type="button">${label}</button>`)
     .join('\n  ')}\n`;
 
 // The same tablist after the page's own script has run: ids, roles, and
@@ -102,9 +103,9 @@ const TABS = (labels) =>
 const LIVE_TABS = (labels, active) =>
   `\n  ${labels
     .map(
-      (l, i) =>
+      (label, i) =>
         `<button class="tabs_link${i === active ? ' is-active' : ''}" type="button" ` +
-        `id="tab-${i}" role="tab">${l}</button>`,
+        `id="tab-${i}" role="tab">${label}</button>`,
     )
     .join('\n  ')}\n`;
 
@@ -113,27 +114,27 @@ const LIVE_TABS = (labels, active) =>
 // Nothing about the tabs changed: the edit was somewhere else on the page. The
 // patch has no business touching them, and must not fall over them either.
 {
-  const prev = tree(TABS(['One', 'Two', 'Three']));
+  const previous = tree(TABS(['One', 'Two', 'Three']));
   const next = tree(TABS(['One', 'Two', 'Three']));
   const live = tree(LIVE_TABS(['One', 'Two', 'Three'], 0));
   const was = [...live.querySelectorAll('button')];
 
-  const threw = patch(live, prev, next);
-  check('a tablist the page has marked up does not defeat the patch', threw === null, threw);
+  const threw = patch(live, previous, next);
+  check('a tablist the page has marked up does not defeat the patch', threw === undefined, threw);
   const now = [...live.querySelectorAll('button')];
   check(
     'the same three buttons are still there',
-    now.length === 3 && now.every((b, i) => b === was[i]),
+    now.length === 3 && now.every((button, i) => button === was[i]),
   );
   check(
     'the open tab is still open',
     live.querySelectorAll('.is-active').length === 1 && now[0].classList.contains('is-active'),
-    [...now].map((b) => b.className).join(' / '),
+    [...now].map((button) => button.className).join(' / '),
   );
   check(
     'and each one kept its id',
-    now.map((b) => b.id).join() === 'tab-0,tab-1,tab-2',
-    now.map((b) => b.id).join(),
+    now.map((button) => button.id).join() === 'tab-0,tab-1,tab-2',
+    now.map((button) => button.id).join(),
   );
 }
 
@@ -141,12 +142,12 @@ const LIVE_TABS = (labels, active) =>
 // on is the point. Matched by position, it is tab two; matched by "which one
 // still has the pristine class", it was tab three.
 {
-  const prev = tree(TABS(['One', 'Two', 'Three']));
+  const previous = tree(TABS(['One', 'Two', 'Three']));
   const next = tree(TABS(['One', 'Renamed', 'Three']));
   const live = tree(LIVE_TABS(['One', 'Two', 'Three'], 0));
-  const threw = patch(live, prev, next);
-  check('the edit can be applied at all', threw === null, threw);
-  const text = [...live.querySelectorAll('button')].map((b) => b.textContent);
+  const threw = patch(live, previous, next);
+  check('the edit can be applied at all', threw === undefined, threw);
+  const text = [...live.querySelectorAll('button')].map((button) => button.textContent);
   check(
     'an edit lands on the tab it was made to',
     text.join() === 'One,Renamed,Three',
@@ -157,21 +158,22 @@ const LIVE_TABS = (labels, active) =>
 // Every tab marked, not just one — an accordion with several panels open, a
 // carousel where every slide carries state.
 {
-  const prev = tree(TABS(['One', 'Two', 'Three']));
+  const previous = tree(TABS(['One', 'Two', 'Three']));
   const next = tree(TABS(['One', 'Two', 'Changed']));
   const live = tree(
     '\n  ' +
       ['One', 'Two', 'Three']
-        .map((l) => `<button class="tabs_link is-seen" type="button">${l}</button>`)
+        .map((label) => `<button class="tabs_link is-seen" type="button">${label}</button>`)
         .join('\n  ') +
       '\n',
   );
-  const threw = patch(live, prev, next);
-  check('a class on every sibling is fine too', threw === null, threw);
+  const threw = patch(live, previous, next);
+  check('a class on every sibling is fine too', threw === undefined, threw);
   check(
     'and the edit still lands last',
-    [...live.querySelectorAll('button')].map((b) => b.textContent).join() === 'One,Two,Changed',
-    [...live.querySelectorAll('button')].map((b) => b.textContent).join(),
+    [...live.querySelectorAll('button')].map((button) => button.textContent).join() ===
+      'One,Two,Changed',
+    [...live.querySelectorAll('button')].map((button) => button.textContent).join(),
   );
 }
 
@@ -181,10 +183,10 @@ const LIVE_TABS = (labels, active) =>
 // is the evidence that this is the node: an element the client inserted, with a
 // class of its own, is not it.
 {
-  const prev = tree('<div class="real">a</div>');
+  const previous = tree('<div class="real">a</div>');
   const next = tree('<div class="real">b</div>');
   const live = tree('<div class="injected">ad</div><div class="real">a</div>');
-  check('an inserted sibling does not stop the patch', patch(live, prev, next) === null);
+  check('an inserted sibling does not stop the patch', patch(live, previous, next) === undefined);
   const divs = [...live.querySelectorAll('div')];
   check(
     'an inserted element is stepped over, not patched',
@@ -202,10 +204,10 @@ const LIVE_TABS = (labels, active) =>
 // none", so that test would match the first same-tag node — including one the
 // client put there. It has to have no class either.
 {
-  const prev = tree('<span>a</span>');
+  const previous = tree('<span>a</span>');
   const next = tree('<span>b</span>');
   const live = tree('<span class="tooltip">tip</span><span>a</span>');
-  check('an inserted span does not stop it either', patch(live, prev, next) === null);
+  check('an inserted span does not stop it either', patch(live, previous, next) === undefined);
   const spans = [...live.querySelectorAll('span')];
   check(
     'a classless server node does not match a classed live one',
@@ -218,11 +220,11 @@ const LIVE_TABS = (labels, active) =>
 // The last resort is still there: when the client takes one of the server's own
 // classes away, the first same-tag node is a better answer than reloading.
 {
-  const prev = tree('<p class="note">a</p>');
+  const previous = tree('<p class="note">a</p>');
   const next = tree('<p class="note">b</p>');
   const live = tree('<p class="">a</p>');
-  const threw = patch(live, prev, next);
-  check('a class the client removed does not force a reload', threw === null, threw);
+  const threw = patch(live, previous, next);
+  check('a class the client removed does not force a reload', threw === undefined, threw);
   check('the node is still patched', live.querySelector('p').textContent === 'b', live.innerHTML);
 }
 
@@ -234,13 +236,13 @@ const LIVE_TABS = (labels, active) =>
   const server = (text) =>
     '<div class="runtime"><div class="item">One</div><div class="item">Two</div></div>' +
     `<h1>${text}</h1>`;
-  const prev = tree(server('Before'));
+  const previous = tree(server('Before'));
   const next = tree(server('After'));
   const live = tree(
     '<div class="runtime"><div class="client-clone">Client state</div></div>' + '<h1>Before</h1>',
   );
-  const threw = patch(live, prev, next);
-  check('an unchanged runtime-owned subtree does not force a reload', threw === null, threw);
+  const threw = patch(live, previous, next);
+  check('an unchanged runtime-owned subtree does not force a reload', threw === undefined, threw);
   check(
     'the text beside that subtree is still patched inline',
     live.querySelector('h1').textContent === 'After',
@@ -255,10 +257,10 @@ const LIVE_TABS = (labels, active) =>
 
 // An id is still taken at its word, ahead of any class.
 {
-  const prev = tree('<div id="keep" class="a">x</div>');
+  const previous = tree('<div id="keep" class="a">x</div>');
   const next = tree('<div id="keep" class="a">y</div>');
   const live = tree('<div class="a">decoy</div><div id="keep" class="a b">x</div>');
-  check('a decoy does not stop the patch', patch(live, prev, next) === null);
+  check('a decoy does not stop the patch', patch(live, previous, next) === undefined);
   check(
     'an id wins over a same-class sibling',
     live.querySelector('#keep').textContent === 'y',
@@ -352,12 +354,12 @@ const LIVE_TABS = (labels, active) =>
   // What the rule is actually for: a script that changed cannot be rewritten
   // into a page, and one that is gone cannot be un-run.
   const changed = head(style('Card') + '<script type="module">console.log(1)</script>');
-  check('a script whose code changed still reloads', addedScripts(before, changed) === null);
+  check('a script whose code changed still reloads', addedScripts(before, changed) === undefined);
   const withoutNav = head(style('Card'));
-  check('and so does one that went away', addedScripts(before, withoutNav) === null);
+  check('and so does one that went away', addedScripts(before, withoutNav) === undefined);
   // An inline script has to run where it sits, which this cannot arrange.
   const withInline = head(style('Card') + script('Nav') + '<script>console.log(2)</script>');
-  check('an inline arrival reloads too', addedScripts(before, withInline) === null);
+  check('an inline arrival reloads too', addedScripts(before, withInline) === undefined);
 
   // Not reloading is only half of it: the new component's CSS has to arrive.
   // The patch cannot bring it — a <script> cloned from a fetched document is
@@ -365,7 +367,8 @@ const LIVE_TABS = (labels, active) =>
   const live = dom.window.document;
   const wanted = '/src/components/Icon.astro?astro&type=style&index=0&lang.css';
   loadStyles(withIcon);
-  const loaded = () => [...live.querySelectorAll('script[src]')].map((n) => n.getAttribute('src'));
+  const loaded = () =>
+    [...live.querySelectorAll('script[src]')].map((node) => node.getAttribute('src'));
   check(
     'a stylesheet the page has just started using is loaded',
     loaded().includes(wanted),
@@ -376,7 +379,7 @@ const LIVE_TABS = (labels, active) =>
   check('and not loaded twice', loaded().length === count, `${loaded().length} vs ${count}`);
   check(
     'a real script is never loaded this way',
-    !loaded().some((src) => /type=script/.test(src)),
+    !loaded().some((source) => /type=script/.test(source)),
     loaded().join('|'),
   );
 
@@ -411,34 +414,35 @@ const LIVE_TABS = (labels, active) =>
     `<head>${stamp(sum, 'src/components/Seo.astro')}</head><body><!--avb-s:0--><p>One</p>` +
     `${stamp(sum, 'src/components/Card.astro')}<!--avb-e:0--></body></html>`;
   const live = new Dom(html(OLD)).window.document;
-  const prev = new Dom(html(OLD)).window.document;
+  const previous = new Dom(html(OLD)).window.document;
   const next = new Dom(html(NEW).replace('One', 'Two')).window.document;
-  const stampsOf = (doc) => {
+  const stampsOf = (tree) => {
     const out = [];
-    const walk = (parent) => {
-      for (let n = parent.firstChild; n; n = n.nextSibling) {
-        if (n.nodeType === 8 && n.data.startsWith('avb-d:')) {
-          out.push(n.data);
+    const walk = (parent, depth) => {
+      assert.ok(depth <= LIMITS.treeDepthMax, 'walk: depth limit');
+      for (let child = parent.firstChild; child; child = child.nextSibling) {
+        if (child.nodeType === 8 && child.data.startsWith('avb-d:')) {
+          out.push(child.data);
         }
-        if (n.nodeType === 1) {
-          walk(n);
+        if (child.nodeType === 1) {
+          walk(child, depth + 1);
         }
       }
     };
-    walk(doc);
+    walk(tree, 0);
     return out.sort();
   };
   const wanted = stampsOf(next);
   // The diff sees neither stamps nor markers: the clean copies lose them.
-  for (const doc of [prev, next]) {
-    for (const n of [...doc.body.childNodes]) {
-      if (n.nodeType === 8 && /^avb-[sed]:/.test(n.data)) {
-        n.remove();
+  for (const tree of [previous, next]) {
+    for (const child of [...tree.body.childNodes]) {
+      if (child.nodeType === 8 && /^avb-[sed]:/.test(child.data)) {
+        child.remove();
       }
     }
   }
-  const threw = patch(live.body, prev.body, next.body);
-  check('a stamp in the live body does not stop the patch', threw === null, threw);
+  const threw = patch(live.body, previous.body, next.body);
+  check('a stamp in the live body does not stop the patch', threw === undefined, threw);
   check(
     'and the text is patched past it',
     live.body.textContent.includes('Two'),
@@ -454,7 +458,7 @@ const LIVE_TABS = (labels, active) =>
   );
   check(
     'none of the old ones survived, in <head> or before <html>',
-    !stampsOf(live).some((d) => d.includes(OLD)),
+    !stampsOf(live).some((stamp) => stamp.includes(OLD)),
   );
   check(
     'the node markers are back where they were',
@@ -476,17 +480,17 @@ const LIVE_TABS = (labels, active) =>
 {
   const html = (order) => order.map((id) => `<section id="${id}"><p>${id}</p></section>`).join('');
   const live = tree(html(['a', 'b', 'c']));
-  const [a, b, c] = [...live.children];
+  const [first, second, third] = [...live.children];
   const threw = patch(live, tree(html(['a', 'b', 'c'])), tree(html(['b', 'c', 'a'])));
-  check('a moved node patches without a reload', threw === null, threw);
+  check('a moved node patches without a reload', threw === undefined, threw);
   check(
     'and the page is the new rendering',
     live.innerHTML === tree(html(['b', 'c', 'a'])).innerHTML,
     live.innerHTML,
   );
-  check('the first sibling that stayed is the same element', live.children[0] === b);
-  check('and so is the second', live.children[1] === c);
-  check('the moved one is rebuilt, not carried', live.children[2] !== a && !a.isConnected);
+  check('the first sibling that stayed is the same element', live.children[0] === second);
+  check('and so is the second', live.children[1] === third);
+  check('the moved one is rebuilt, not carried', live.children[2] !== first && !first.isConnected);
 }
 
 // The caps (step 7). Past the marker cap or the diff-work cap the patch throws
@@ -497,16 +501,16 @@ const LIVE_TABS = (labels, active) =>
   const reasonOf = (run) => {
     try {
       run();
-      return null;
-    } catch (err) {
-      return err instanceof tiny.OverCap ? err.reason : `not a cap: ${err.message}`;
+      return undefined;
+    } catch (error) {
+      return error instanceof tiny.OverCap ? error.reason : `not a cap: ${error.message}`;
     }
   };
   const marked = (i) => `<!--avb-s:${i}--><p>${i}</p><!--avb-e:${i}-->`;
   const markers = (count) => tree(Array.from({ length: count }, (_, i) => marked(i)).join(''));
   check(
     'a rendering at the marker cap patches',
-    reasonOf(() => tiny.checkMarkerCap(markers(3))) === null,
+    reasonOf(() => tiny.checkMarkerCap(markers(3))) === undefined,
   );
   check(
     'one marker past it reloads, and says why',
@@ -520,7 +524,7 @@ const LIVE_TABS = (labels, active) =>
   tiny.refillMorphWork();
   check(
     'a diff inside the work cap patches',
-    reasonOf(() => tiny.patchChildren(...small)) === null,
+    reasonOf(() => tiny.patchChildren(...small)) === undefined,
   );
   check(
     'and the live list shows the edit',
@@ -539,7 +543,7 @@ const LIVE_TABS = (labels, active) =>
   const again = [tree(list(['a', 'b'])), tree(list(['a', 'b'])), tree(list(['q', 'b']))];
   check(
     'the next patch starts with the whole budget',
-    reasonOf(() => tiny.patchChildren(...again)) === null,
+    reasonOf(() => tiny.patchChildren(...again)) === undefined,
   );
   // The shipped bounds are the ones in shared/limits.ts, prepended by main.
   const main = fs.readFileSync(path.join(__dirname, '..', 'dist', 'electron', 'main.js'), 'utf8');

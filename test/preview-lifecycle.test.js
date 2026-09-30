@@ -8,8 +8,8 @@ const path = require('node:path');
 const esbuild = require('esbuild');
 const { JSDOM } = require('jsdom');
 
-const dir = path.join(__dirname, '..', 'node_modules', '.stacki-test', 'preview-lifecycle');
-fs.mkdirSync(dir, { recursive: true });
+const directory = path.join(__dirname, '..', 'node_modules', '.stacki-test', 'preview-lifecycle');
+fs.mkdirSync(directory, { recursive: true });
 esbuild.buildSync({
   stdin: {
     contents:
@@ -18,7 +18,7 @@ esbuild.buildSync({
     resolveDir: path.join(__dirname, '..'),
     loader: 'jsx',
   },
-  outfile: path.join(dir, 'preview.js'),
+  outfile: path.join(directory, 'preview.js'),
   bundle: true,
   format: 'cjs',
   platform: 'node',
@@ -33,7 +33,7 @@ test('canvas hover measures and outlines the active copy, then clears on leave',
   const dom = installHoverDOM();
   const React = require('react');
   const { createRoot } = require('react-dom/client');
-  const { PreviewPane } = require(path.join(dir, 'preview.js'));
+  const { PreviewPane } = require(path.join(directory, 'preview.js'));
   const root = createRoot(document.getElementById('root'));
   const props = hoverPreviewProps();
   const act = (action) =>
@@ -88,15 +88,15 @@ test('canvas hover measures and outlines the active copy, then clears on leave',
     assert.deepEqual(tracked.at(-1), ['0', '3', '2']);
     await measure();
     assert.equal(document.querySelectorAll('.node-outline.hover').length, 2);
-    props.navHoverPath = null;
+    props.navHoverPath = undefined;
     await render();
     assert.deepEqual(tracked.at(-1), ['0', '1', '2'], 'Canvas hover resumes after navigator hover');
     await measure();
-    await send({ type: 'avb:hover-node', path: null, occurrence: 0, token }, window);
+    await send({ type: 'avb:hover-node', path: undefined, occurrence: 0, token }, window);
     assert.equal(document.querySelectorAll('.node-outline.hover').length, 1);
-    await send({ type: 'avb:hover-node', path: null, occurrence: 0, token });
+    await send({ type: 'avb:hover-node', path: undefined, occurrence: 0, token });
     assert.deepEqual(tracked.at(-1), ['0', '2']);
-    assert.equal(document.querySelector('.node-outline.hover'), null);
+    assert.ok(document.querySelector('.node-outline.hover') === null);
     assert.equal(document.querySelectorAll('.node-outline.sel').length, 2);
   } finally {
     await act(() => root.unmount());
@@ -129,7 +129,7 @@ function hoverPreviewProps() {
     devStatus: 'on',
     device: 'desktop',
     selPath: '0',
-    navHoverPath: null,
+    navHoverPath: undefined,
     focusPath: '2',
     crumbs: [],
     onDevice() {},
@@ -166,7 +166,7 @@ test('preview owns only mounted frames and cleans canceled/unmounted drags', asy
     global[key] = key === 'window' ? window : window[key];
   }
   global.getComputedStyle = window.getComputedStyle;
-  global.requestAnimationFrame = (fn) => setTimeout(fn, 0);
+  global.requestAnimationFrame = (callback) => setTimeout(callback, 0);
   global.cancelAnimationFrame = clearTimeout;
   global.ResizeObserver = class {
     observe() {}
@@ -178,7 +178,7 @@ test('preview owns only mounted frames and cleans canceled/unmounted drags', asy
   const { createRoot } = require('react-dom/client');
   const { act } = React;
   const { PreviewPane, deviceForWidth, hasCanvas, queryCanvas } = require(
-    path.join(dir, 'preview.js'),
+    path.join(directory, 'preview.js'),
   );
   const root = createRoot(document.getElementById('root'));
   let selected = [];
@@ -191,7 +191,7 @@ test('preview owns only mounted frames and cleans canceled/unmounted drags', asy
     crumbs: [],
     selPath: '0',
     pathScope: '',
-    focusPath: null,
+    focusPath: undefined,
   };
   const render = async (patch = {}) => {
     Object.assign(props, patch);
@@ -221,7 +221,7 @@ test('preview owns only mounted frames and cleans canceled/unmounted drags', asy
   const navigationMessages = [];
   oldFrame.postMessage = (message) => navigationMessages.push(message);
   const scrolls = () => navigationMessages.filter((message) => message.type === 'avb:scroll-to');
-  await render({ selPath: '0.1', pathScope: '', focusPath: null });
+  await render({ selPath: '0.1', pathScope: '', focusPath: undefined });
   assert.equal(
     scrolls().at(-1)?.path,
     '0.1',
@@ -257,7 +257,7 @@ test('preview owns only mounted frames and cleans canceled/unmounted drags', asy
     'selections within the open component still reveal elements',
   );
   navigationMessages.length = 0;
-  await render({ selPath: '0', pathScope: '', focusPath: null });
+  await render({ selPath: '0', pathScope: '', focusPath: undefined });
   assert.equal(scrolls().length, 0, 'closing the component retains scroll');
   assert.equal(
     document.querySelector('iframe').contentWindow,
@@ -267,7 +267,7 @@ test('preview owns only mounted frames and cleans canceled/unmounted drags', asy
   const pendingQuery = queryCanvas('0');
   await render({ device: 'canvas' });
   assert.equal(hasCanvas(), false);
-  assert.equal(await pendingQuery, null);
+  assert.equal(await pendingQuery, undefined);
   assert.equal(document.querySelectorAll('iframe').length, 3);
   const canvasFrame = document.querySelector('iframe').contentWindow;
   await send(canvasFrame, { type: 'avb:page-height', height: NaN });
@@ -327,8 +327,8 @@ test('preview owns only mounted frames and cleans canceled/unmounted drags', asy
     'tablet',
     'tablet',
     'desktop',
-    null,
-    null,
+    undefined,
+    undefined,
   ]);
   dom.window.close();
 });
@@ -340,7 +340,7 @@ test(
     const React = require('react');
     const { createRoot } = require('react-dom/client');
     const { Simulate } = require('react-dom/test-utils');
-    const { PreviewPane } = require(path.join(dir, 'preview.js'));
+    const { PreviewPane } = require(path.join(directory, 'preview.js'));
     const observers = [];
     let containerWidth = 1_024;
     global.ResizeObserver = class {

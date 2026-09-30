@@ -36,36 +36,36 @@ const check = (what, condition, detail) => {
 
 const git = (cwd, args) =>
   new Promise((resolve, reject) => {
-    execFile('git', args, { cwd, maxBuffer: 1 << 24 }, (err, stdout, stderr) => {
-      if (err) {
-        err.stdout = stdout;
-        err.stderr = stderr;
-        reject(err);
+    execFile('git', args, { cwd, maxBuffer: 1 << 24 }, (error, stdout, stderr) => {
+      if (error) {
+        error.stdout = stdout;
+        error.stderr = stderr;
+        reject(error);
       } else {
         resolve({ stdout: String(stdout), stderr: String(stderr) });
       }
     });
   });
 
-const sh = async (dir, ...args) => (await git(dir, args)).stdout.trim();
+const sh = async (directory, ...args) => (await git(directory, args)).stdout.trim();
 
 async function repo(name) {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), `stacki-hist-${name}-`));
-  await sh(dir, 'init', '-q', '-b', 'main', '.');
-  await sh(dir, 'config', 'user.email', 'tim@example.com');
-  await sh(dir, 'config', 'user.name', 'Tim Ricks');
-  return dir;
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), `stacki-hist-${name}-`));
+  await sh(directory, 'init', '-q', '-b', 'main', '.');
+  await sh(directory, 'config', 'user.email', 'tim@example.com');
+  await sh(directory, 'config', 'user.name', 'Tim Ricks');
+  return directory;
 }
 
-const write = (dir, rel, body) => {
-  fs.mkdirSync(path.dirname(path.join(dir, rel)), { recursive: true });
-  fs.writeFileSync(path.join(dir, rel), body);
+const write = (directory, rel, body) => {
+  fs.mkdirSync(path.dirname(path.join(directory, rel)), { recursive: true });
+  fs.writeFileSync(path.join(directory, rel), body);
 };
 
-const commit = async (dir, subject) => {
-  await sh(dir, 'add', '-A');
-  await sh(dir, 'commit', '-qm', subject);
-  return sh(dir, 'rev-parse', 'HEAD');
+const commit = async (directory, subject) => {
+  await sh(directory, 'add', '-A');
+  await sh(directory, 'commit', '-qm', subject);
+  return sh(directory, 'rev-parse', 'HEAD');
 };
 
 (async () => {
@@ -73,23 +73,27 @@ const commit = async (dir, subject) => {
 
   // --- A repository with nothing in it yet ---------------------------------
   {
-    const dir = await repo('empty');
-    cleanup.push(dir);
-    const r = await history.log(git, { projectPath: dir });
-    // git exits 128 here. An editor that surfaced that would greet every new
+    const directory = await repo('empty');
+    cleanup.push(directory);
+    const result = await history.log(git, { projectPath: directory });
+    // `git` exits 128 here. An editor that surfaced that would greet every new
     // project with an error where its history should be.
     check(
       'a repo with no commits has an empty history',
-      Array.isArray(r.commits),
-      JSON.stringify(r),
+      Array.isArray(result.commits),
+      JSON.stringify(result),
     );
-    check('and it is empty rather than failing', r.commits.length === 0, JSON.stringify(r));
-    check('and it reports the end of the list', r.atEnd === true);
+    check(
+      'and it is empty rather than failing',
+      result.commits.length === 0,
+      JSON.stringify(result),
+    );
+    check('and it reports the end of the list', result.atEnd === true);
 
     // Nothing committed, but files on disk — the file picker must still see
     // them, because at this point they are the entire project.
-    write(dir, 'src/pages/index.astro', 'hello\n');
-    const st = await history.status(git, { projectPath: dir });
+    write(directory, 'src/pages/index.astro', 'hello\n');
+    const st = await history.status(git, { projectPath: directory });
     check('untracked files show before the first commit', st.length === 1, JSON.stringify(st));
     check('and read as added, not as git’s "??"', st[0].status === 'A', JSON.stringify(st[0]));
     check('and are flagged untracked', st[0].untracked === true, JSON.stringify(st[0]));
@@ -97,14 +101,14 @@ const commit = async (dir, subject) => {
 
   // --- An ordinary history -------------------------------------------------
   {
-    const dir = await repo('log');
-    cleanup.push(dir);
-    write(dir, 'src/pages/index.astro', 'one\n');
-    await commit(dir, 'first page');
-    write(dir, 'src/pages/about.astro', 'two\n');
-    await commit(dir, 'about page');
+    const directory = await repo('log');
+    cleanup.push(directory);
+    write(directory, 'src/pages/index.astro', 'one\n');
+    await commit(directory, 'first page');
+    write(directory, 'src/pages/about.astro', 'two\n');
+    await commit(directory, 'about page');
 
-    const { commits } = await history.log(git, { projectPath: dir });
+    const { commits } = await history.log(git, { projectPath: directory });
     check(
       'the log comes back newest first',
       commits[0].subject === 'about page',
@@ -129,14 +133,17 @@ const commit = async (dir, subject) => {
       JSON.stringify(commits[1].parents),
     );
 
-    const files = await history.commitFiles(git, { projectPath: dir, ref: commits[0].hash });
+    const files = await history.commitFiles(git, { projectPath: directory, ref: commits[0].hash });
     check('a commit lists what it changed', files.length === 1, JSON.stringify(files));
     check('with the path', files[0].path === 'src/pages/about.astro', JSON.stringify(files[0]));
     check('and the letter for a new file', files[0].status === 'A', JSON.stringify(files[0]));
 
     // The root commit: no parent to diff against, and git handles it, but only
     // if the flags do not assume there is one.
-    const rootFiles = await history.commitFiles(git, { projectPath: dir, ref: commits[1].hash });
+    const rootFiles = await history.commitFiles(git, {
+      projectPath: directory,
+      ref: commits[1].hash,
+    });
     check(
       'the very first commit lists its files too',
       rootFiles.length === 1,
@@ -146,14 +153,14 @@ const commit = async (dir, subject) => {
 
   // --- A subject line that fights the parser -------------------------------
   {
-    const dir = await repo('nasty');
-    cleanup.push(dir);
-    write(dir, 'a.txt', 'x\n');
+    const directory = await repo('nasty');
+    cleanup.push(directory);
+    write(directory, 'a.txt', 'x\n');
     // Tabs and quotes in a subject. A format delimited by tabs or spaces
     // splits this into the wrong number of fields and shifts every value
     // after it — the author becomes part of the message, silently.
-    await commit(dir, 'fix\tthe "quoted" thing | and > that');
-    const { commits } = await history.log(git, { projectPath: dir });
+    await commit(directory, 'fix\tthe "quoted" thing | and > that');
+    const { commits } = await history.log(git, { projectPath: directory });
     check(
       'a subject with tabs and quotes survives intact',
       commits[0].subject === 'fix\tthe "quoted" thing | and > that',
@@ -168,21 +175,25 @@ const commit = async (dir, subject) => {
 
   // --- Merge commits: the case that fails silently -------------------------
   {
-    const dir = await repo('merge');
-    cleanup.push(dir);
-    write(dir, 'src/pages/index.astro', 'base\n');
-    await commit(dir, 'first');
-    await sh(dir, 'checkout', '-qb', 'feature');
-    write(dir, 'src/pages/feature.astro', 'from the feature\n');
-    await commit(dir, 'feature page');
-    await sh(dir, 'checkout', '-q', 'main');
-    write(dir, 'src/pages/main.astro', 'from main\n');
-    await commit(dir, 'main page');
-    await sh(dir, 'merge', '--no-edit', '-q', 'feature');
+    const directory = await repo('merge');
+    cleanup.push(directory);
+    write(directory, 'src/pages/index.astro', 'base\n');
+    await commit(directory, 'first');
+    await sh(directory, 'checkout', '-qb', 'feature');
+    write(directory, 'src/pages/feature.astro', 'from the feature\n');
+    await commit(directory, 'feature page');
+    await sh(directory, 'checkout', '-q', 'main');
+    write(directory, 'src/pages/main.astro', 'from main\n');
+    await commit(directory, 'main page');
+    await sh(directory, 'merge', '--no-edit', '-q', 'feature');
 
-    const { commits } = await history.log(git, { projectPath: dir });
-    const merge = commits.find((c) => c.isMerge);
-    check('a merge commit is in the log', !!merge, commits.map((c) => c.subject).join(' | '));
+    const { commits } = await history.log(git, { projectPath: directory });
+    const merge = commits.find((commit) => commit.isMerge);
+    check(
+      'a merge commit is in the log',
+      !!merge,
+      commits.map((commit) => commit.subject).join(' | '),
+    );
     check(
       'and is marked as a merge',
       merge && merge.parents.length === 2,
@@ -201,35 +212,39 @@ const commit = async (dir, subject) => {
     // sitting there as though nothing came with it.
     check(
       'commits made on the merged branch are still listed',
-      commits.some((c) => c.subject === 'feature page'),
-      commits.map((c) => c.subject).join(' | '),
+      commits.some((commit) => commit.subject === 'feature page'),
+      commits.map((commit) => commit.subject).join(' | '),
     );
     check(
       'along with the ones made on this branch',
-      commits.some((c) => c.subject === 'main page'),
-      commits.map((c) => c.subject).join(' | '),
+      commits.some((commit) => commit.subject === 'main page'),
+      commits.map((commit) => commit.subject).join(' | '),
     );
     check('so the whole history is there', commits.length === 4, String(commits.length));
 
-    const files = await history.commitFiles(git, { projectPath: dir, ref: merge.hash });
+    const files = await history.commitFiles(git, { projectPath: directory, ref: merge.hash });
     check('a merge reports the files it brought in', files.length > 0, JSON.stringify(files));
     check(
       'namely the branch’s work',
-      files.some((f) => f.path === 'src/pages/feature.astro'),
+      files.some((file) => file.path === 'src/pages/feature.astro'),
       JSON.stringify(files),
     );
   }
 
   // --- Renames -------------------------------------------------------------
   {
-    const dir = await repo('rename');
-    cleanup.push(dir);
-    write(dir, 'src/pages/about.astro', 'a page with enough text in it to match on\n'.repeat(4));
-    await commit(dir, 'about');
-    await sh(dir, 'mv', 'src/pages/about.astro', 'src/pages/contact.astro');
-    const ref = await commit(dir, 'renamed');
+    const directory = await repo('rename');
+    cleanup.push(directory);
+    write(
+      directory,
+      'src/pages/about.astro',
+      'a page with enough text in it to match on\n'.repeat(4),
+    );
+    await commit(directory, 'about');
+    await sh(directory, 'mv', 'src/pages/about.astro', 'src/pages/contact.astro');
+    const ref = await commit(directory, 'renamed');
 
-    const files = await history.commitFiles(git, { projectPath: dir, ref });
+    const files = await history.commitFiles(git, { projectPath: directory, ref });
     check(
       'a rename is one entry, not a delete and an add',
       files.length === 1,
@@ -250,19 +265,19 @@ const commit = async (dir, subject) => {
 
   // --- The working tree right now ------------------------------------------
   {
-    const dir = await repo('status');
-    cleanup.push(dir);
-    write(dir, 'keep.txt', 'kept\n');
-    write(dir, 'gone.txt', 'going\n');
-    write(dir, 'edit.txt', 'before\n');
-    await commit(dir, 'base');
+    const directory = await repo('status');
+    cleanup.push(directory);
+    write(directory, 'keep.txt', 'kept\n');
+    write(directory, 'gone.txt', 'going\n');
+    write(directory, 'edit.txt', 'before\n');
+    await commit(directory, 'base');
 
-    write(dir, 'edit.txt', 'after\n');
-    fs.rmSync(path.join(dir, 'gone.txt'));
-    write(dir, 'new.txt', 'brand new\n');
+    write(directory, 'edit.txt', 'after\n');
+    fs.rmSync(path.join(directory, 'gone.txt'));
+    write(directory, 'new.txt', 'brand new\n');
 
-    const st = await history.status(git, { projectPath: dir });
-    const by = Object.fromEntries(st.map((f) => [f.path, f]));
+    const st = await history.status(git, { projectPath: directory });
+    const by = Object.fromEntries(st.map((file) => [file.path, file]));
     check('an edited file is listed', !!by['edit.txt'], JSON.stringify(st));
     check(
       'a deleted file is listed',
@@ -288,15 +303,15 @@ const commit = async (dir, subject) => {
 
   // --- A file as it was ----------------------------------------------------
   {
-    const dir = await repo('fileat');
-    cleanup.push(dir);
-    write(dir, 'src/pages/index.astro', 'the old words\n');
-    const first = await commit(dir, 'first');
-    write(dir, 'src/pages/index.astro', 'the new words\n');
-    await commit(dir, 'second');
+    const directory = await repo('fileat');
+    cleanup.push(directory);
+    write(directory, 'src/pages/index.astro', 'the old words\n');
+    const first = await commit(directory, 'first');
+    write(directory, 'src/pages/index.astro', 'the new words\n');
+    await commit(directory, 'second');
 
     const then = await history.fileAt(git, {
-      projectPath: dir,
+      projectPath: directory,
       ref: first,
       path: 'src/pages/index.astro',
     });
@@ -304,7 +319,7 @@ const commit = async (dir, subject) => {
     // "It did not exist yet" is a real answer to the question, and the panel
     // wants to say so rather than show a failure.
     const missing = await history.fileAt(git, {
-      projectPath: dir,
+      projectPath: directory,
       ref: first,
       path: 'src/pages/later.astro',
     });
@@ -317,18 +332,18 @@ const commit = async (dir, subject) => {
 
   // --- Paging --------------------------------------------------------------
   {
-    const dir = await repo('paging');
-    cleanup.push(dir);
+    const directory = await repo('paging');
+    cleanup.push(directory);
     for (let i = 0; i < 7; i++) {
-      write(dir, `f${i}.txt`, `${i}\n`);
-      await commit(dir, `commit ${i}`);
+      write(directory, `f${i}.txt`, `${i}\n`);
+      await commit(directory, `commit ${i}`);
     }
-    const first = await history.log(git, { projectPath: dir, limit: 3 });
+    const first = await history.log(git, { projectPath: directory, limit: 3 });
     check('a page holds the limit', first.commits.length === 3, String(first.commits.length));
     check('and knows it is not the end', first.atEnd === false);
     check('newest first', first.commits[0].subject === 'commit 6', first.commits[0].subject);
 
-    const second = await history.log(git, { projectPath: dir, limit: 3, skip: 3 });
+    const second = await history.log(git, { projectPath: directory, limit: 3, skip: 3 });
     check(
       'the next page continues',
       second.commits[0].subject === 'commit 3',
@@ -336,11 +351,13 @@ const commit = async (dir, subject) => {
     );
     check(
       'and does not repeat the first page',
-      !second.commits.some((c) => first.commits.some((f) => f.hash === c.hash)),
-      second.commits.map((c) => c.subject).join(','),
+      !second.commits.some((commit) =>
+        first.commits.some((earlier) => earlier.hash === commit.hash),
+      ),
+      second.commits.map((commit) => commit.subject).join(','),
     );
 
-    const last = await history.log(git, { projectPath: dir, limit: 3, skip: 6 });
+    const last = await history.log(git, { projectPath: directory, limit: 3, skip: 6 });
     check(
       'the final short page is the end',
       last.atEnd === true,
@@ -350,69 +367,69 @@ const commit = async (dir, subject) => {
 
   // --- Worktrees -----------------------------------------------------------
   {
-    const dir = await repo('worktrees');
-    cleanup.push(dir);
-    write(dir, 'a.txt', 'x\n');
-    await commit(dir, 'first');
+    const directory = await repo('worktrees');
+    cleanup.push(directory);
+    write(directory, 'a.txt', 'x\n');
+    await commit(directory, 'first');
 
-    const one = await history.worktrees(git, { projectPath: dir });
+    const one = await history.worktrees(git, { projectPath: directory });
     check('the main checkout is a worktree', one.length === 1, JSON.stringify(one));
     check('on its branch', one[0].branch === 'main', JSON.stringify(one[0]));
     check('and not detached', one[0].detached === false, JSON.stringify(one[0]));
 
-    const extra = path.join(dir, '..', `${path.basename(dir)}-wt`);
-    await sh(dir, 'worktree', 'add', '-q', '--detach', extra, 'HEAD');
+    const extra = path.join(directory, '..', `${path.basename(directory)}-wt`);
+    await sh(directory, 'worktree', 'add', '-q', '--detach', extra, 'HEAD');
     cleanup.push(extra);
-    const two = await history.worktrees(git, { projectPath: dir });
+    const two = await history.worktrees(git, { projectPath: directory });
     check('an added worktree shows up', two.length === 2, JSON.stringify(two));
-    const det = two.find((w) => w.path !== one[0].path);
+    const det = two.find((worktree) => worktree.path !== one[0].path);
     // A detached worktree is exactly what commit preview creates, so this is
     // the shape the panel will actually be rendering.
     check('a detached one is marked detached', det?.detached === true, JSON.stringify(det));
     check('and has no branch', det?.branch === undefined, JSON.stringify(det));
-    await sh(dir, 'worktree', 'remove', '--force', extra);
+    await sh(directory, 'worktree', 'remove', '--force', extra);
     check(
       'and it is gone once removed',
-      (await history.worktrees(git, { projectPath: dir })).length === 1,
+      (await history.worktrees(git, { projectPath: directory })).length === 1,
     );
   }
 
   // --- A page of commits with their files, in one call ----------------------
   {
-    const dir = await repo('withfiles');
-    cleanup.push(dir);
-    write(dir, 'src/pages/index.astro', 'base\n');
-    await commit(dir, 'first');
-    await sh(dir, 'checkout', '-qb', 'feature');
-    write(dir, 'src/pages/feature.astro', 'f\n');
-    await commit(dir, 'feature page');
-    await sh(dir, 'checkout', '-q', 'main');
-    write(dir, 'src/pages/main.astro', 'm\n');
-    await commit(dir, 'main page');
-    await sh(dir, 'merge', '--no-edit', '-q', 'feature');
-    write(dir, 'src/pages/index.astro', 'changed\n');
-    write(dir, 'src/pages/two.astro', 'two\n');
-    await commit(dir, 'two files at once');
+    const directory = await repo('withfiles');
+    cleanup.push(directory);
+    write(directory, 'src/pages/index.astro', 'base\n');
+    await commit(directory, 'first');
+    await sh(directory, 'checkout', '-qb', 'feature');
+    write(directory, 'src/pages/feature.astro', 'f\n');
+    await commit(directory, 'feature page');
+    await sh(directory, 'checkout', '-q', 'main');
+    write(directory, 'src/pages/main.astro', 'm\n');
+    await commit(directory, 'main page');
+    await sh(directory, 'merge', '--no-edit', '-q', 'feature');
+    write(directory, 'src/pages/index.astro', 'changed\n');
+    write(directory, 'src/pages/two.astro', 'two\n');
+    await commit(directory, 'two files at once');
 
-    const { commits } = await history.log(git, { projectPath: dir, withFiles: true });
+    const { commits } = await history.log(git, { projectPath: directory, withFiles: true });
     const top = commits[0];
     check('a commit carries its files', top.files?.length === 2, JSON.stringify(top.files));
     check(
       'both of them',
       top.files
-        .map((f) => f.path)
+        .map((file) => file.path)
         .sort()
         .join(',') === 'src/pages/index.astro,src/pages/two.astro',
       JSON.stringify(top.files),
     );
     check(
       'an edit reads as modified',
-      top.files.find((f) => f.path === 'src/pages/index.astro').status === 'M',
+      top.files.find((file) => file.path === 'src/pages/index.astro').status === 'M',
     );
 
     // The same merge trap, on the path the panel actually uses. A page drawn
     // from this call would show every merge as touching nothing.
-    const merge = commits.find((c) => c.isMerge);
+    const merge = commits.find((commit) => commit.isMerge);
     check(
       'a merge in a page carries its files too',
       merge?.files?.length > 0,
@@ -421,14 +438,14 @@ const commit = async (dir, subject) => {
     // The same trap on the paged call the panel actually uses.
     check(
       'and the merged branch’s own commit is in the page',
-      commits.some((c) => c.subject === 'feature page'),
-      commits.map((c) => c.subject).join(' | '),
+      commits.some((commit) => commit.subject === 'feature page'),
+      commits.map((commit) => commit.subject).join(' | '),
     );
 
     // The record separator leads each record so a file list lands with the
     // commit it belongs to. If it trailed, every file list would attach to the
     // NEXT commit — every row wrong, none of them empty, nothing to notice.
-    const first = commits.find((c) => c.subject === 'first');
+    const first = commits.find((commit) => commit.subject === 'first');
     check(
       'files land on the right commit',
       first.files.length === 1 && first.files[0].path === 'src/pages/index.astro',
@@ -437,7 +454,7 @@ const commit = async (dir, subject) => {
 
     // Without the flag there is no files key at all, rather than an empty
     // array that would read as "this commit changed nothing".
-    const plain = await history.log(git, { projectPath: dir });
+    const plain = await history.log(git, { projectPath: directory });
     check(
       'files are absent unless asked for',
       plain.commits[0].files === undefined,
@@ -447,51 +464,51 @@ const commit = async (dir, subject) => {
 
   // --- Saying what a file is ------------------------------------------------
   {
-    const d = (p) => history.describeFile(p);
+    const describe = (filePath) => history.describeFile(filePath);
     check(
       'the index page is Home',
-      d('src/pages/index.astro').label === 'Home',
-      d('src/pages/index.astro').label,
+      describe('src/pages/index.astro').label === 'Home',
+      describe('src/pages/index.astro').label,
     );
     check(
       'a page is its route, in words',
-      d('src/pages/about.astro').label === 'About',
-      d('src/pages/about.astro').label,
+      describe('src/pages/about.astro').label === 'About',
+      describe('src/pages/about.astro').label,
     );
     check(
       'dashes become spaces',
-      d('src/pages/about-us.astro').label === 'About us',
-      d('src/pages/about-us.astro').label,
+      describe('src/pages/about-us.astro').label === 'About us',
+      describe('src/pages/about-us.astro').label,
     );
     // A folder's index is that folder's page, not a page called "index".
     check(
       'a folder index is the folder',
-      d('src/pages/blog/index.astro').label === 'Blog',
-      d('src/pages/blog/index.astro').label,
+      describe('src/pages/blog/index.astro').label === 'Blog',
+      describe('src/pages/blog/index.astro').label,
     );
     check(
       'a component is its name',
-      d('src/components/Card.astro').label === 'Card',
-      d('src/components/Card.astro').label,
+      describe('src/components/Card.astro').label === 'Card',
+      describe('src/components/Card.astro').label,
     );
-    check('and is marked a component', d('src/components/Card.astro').kind === 'component');
-    check('a layout is marked a layout', d('src/layouts/Base.astro').kind === 'layout');
-    check('something in public is an asset', d('public/logo.svg').kind === 'asset');
-    check('a stylesheet is a style', d('src/styles.css').kind === 'style');
-    check('package.json is config', d('package.json').kind === 'config');
+    check('and is marked a component', describe('src/components/Card.astro').kind === 'component');
+    check('a layout is marked a layout', describe('src/layouts/Base.astro').kind === 'layout');
+    check('something in public is an asset', describe('public/logo.svg').kind === 'asset');
+    check('a stylesheet is a style', describe('src/styles.css').kind === 'style');
+    check('package.json is config', describe('package.json').kind === 'config');
     // A path this knows nothing about keeps its own name. Guessing a label for
     // it would be worse than saying the path.
     check(
       'an unknown path keeps its path',
-      d('scripts/deploy.sh').label === 'scripts/deploy.sh',
-      d('scripts/deploy.sh').label,
+      describe('scripts/deploy.sh').label === 'scripts/deploy.sh',
+      describe('scripts/deploy.sh').label,
     );
-    check('and no invented kind', d('scripts/deploy.sh').kind === 'file');
+    check('and no invented kind', describe('scripts/deploy.sh').kind === 'file');
     // Windows separators reach this from a checkout made there.
     check(
       'backslashes are understood',
-      d('src\\pages\\index.astro').label === 'Home',
-      d('src\\pages\\index.astro').label,
+      describe('src\\pages\\index.astro').label === 'Home',
+      describe('src\\pages\\index.astro').label,
     );
 
     const described = history.describeFiles([
@@ -510,8 +527,8 @@ const commit = async (dir, subject) => {
     check('and labels it', described[0].label === 'Contact', JSON.stringify(described[0]));
   }
 
-  for (const dir of cleanup) {
-    fs.rmSync(dir, { recursive: true, force: true });
+  for (const directory of cleanup) {
+    fs.rmSync(directory, { recursive: true, force: true });
   }
 
   if (failures.length) {
@@ -519,7 +536,7 @@ const commit = async (dir, subject) => {
     process.exit(1);
   }
   console.log(`git-history: ${checked} passed`);
-})().catch((err) => {
-  console.error(err);
+})().catch((error) => {
+  console.error(error);
   process.exit(1);
 });

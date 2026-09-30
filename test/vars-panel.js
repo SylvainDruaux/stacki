@@ -23,27 +23,27 @@ const check = (what, condition, detail) => {
 const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
 
 (async () => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'stacki-vp-'));
-  fs.mkdirSync(path.join(dir, 'src', 'styles'), { recursive: true });
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'stacki-vp-'));
+  fs.mkdirSync(path.join(directory, 'src', 'styles'), { recursive: true });
   fs.writeFileSync(
-    path.join(dir, 'src', 'styles', 'tokens.css'),
+    path.join(directory, 'src', 'styles', 'tokens.css'),
     ':root {\n  --blue: #0af;\n  --ink: #111;\n  --_private: #f0f;\n}\n\n' +
       '.light { --bg: white; }\n.dark { --bg: black; }\n' +
       '.private { --_only: hidden; }\n',
   );
   fs.writeFileSync(
-    path.join(dir, 'src', 'styles', 'other.css'),
+    path.join(directory, 'src', 'styles', 'other.css'),
     '.card { --lift: 2px; --shade: 4px; --_private: 8px; }\n',
   );
   // One rule, so one group: there is no inside to show.
   fs.writeFileSync(
-    path.join(dir, 'src', 'styles', 'motion.css'),
+    path.join(directory, 'src', 'styles', 'motion.css'),
     ':root { --ease: linear; --duration: 200ms; --_private: 1; }\n',
   );
   const esbuild = require('esbuild');
-  const buildDir = path.join(__dirname, '..', 'node_modules', '.stacki-test');
-  fs.mkdirSync(buildDir, { recursive: true });
-  const bundlePath = path.join(buildDir, 'vars-panel.bundle.js');
+  const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
+  fs.mkdirSync(buildDirectory, { recursive: true });
+  const bundlePath = path.join(buildDirectory, 'vars-panel.bundle.js');
   await esbuild.build({
     entryPoints: [path.join(__dirname, '..', 'src', 'panels', 'VariablesPanel.jsx')],
     outfile: bundlePath,
@@ -62,7 +62,7 @@ const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
   global.navigator = dom.window.navigator;
   global.IS_REACT_ACT_ENVIRONMENT = true;
   dom.window.avb = {
-    cssVariables: async () => cssVars.readVariables(dir),
+    cssVariables: async () => cssVars.readVariables(directory),
     onCssChanged: () => () => {},
   };
 
@@ -74,17 +74,17 @@ const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
   const container = dom.window.document.getElementById('root');
   const reactRoot = createRoot(container);
   const all = (selector) => [...container.querySelectorAll(selector)];
-  const names = () => all('.cms-collection-name').map((n) => n.textContent);
+  const names = () => all('.cms-collection-name').map((node) => node.textContent);
 
   // The panel's `selected` is state in the app, not a value the panel owns —
   // and the difference matters here, because backing out sets both at once. A
   // host that holds it the way App does is what makes that observable.
-  let selected = null;
+  let selected;
   function Host() {
-    const [value, setValue] = React.useState(null);
+    const [value, setValue] = React.useState(undefined);
     selected = value;
     return React.createElement(VariablesPanel, {
-      project: { path: dir },
+      project: { path: directory },
       selected: value,
       onSelect: setValue,
     });
@@ -104,13 +104,13 @@ const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
   check(
     'with counts that omit private variables',
     all('.cms-collection-count')
-      .map((n) => n.textContent)
+      .map((node) => node.textContent)
       .join('|') === '2 variables|2 variables|4 variables',
     all('.cms-collection-count')
-      .map((n) => n.textContent)
+      .map((node) => node.textContent)
       .join('|'),
   );
-  check('and nothing is open yet', selected === null);
+  check('and nothing is open yet', selected === undefined);
 
   // A stylesheet with one group opens that group, and stays in the list: there
   // is no inside to go into.
@@ -133,7 +133,7 @@ const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
     all('.cms-collection.on').length === 1 &&
       all('.cms-collection.on')[0].textContent.includes('motion.css'),
     all('.cms-collection')
-      .map((n) => n.className)
+      .map((node) => node.className)
       .join('|'),
   );
   check(
@@ -164,16 +164,16 @@ const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
     all('.cms-collection.on').length === 1 &&
       all('.cms-collection.on')[0].textContent.includes(':root'),
     all('.cms-collection')
-      .map((n) => n.className)
+      .map((node) => node.className)
       .join('|'),
   );
   check(
     'groups also omit private variables from their counts',
     all('.cms-collection-count')
-      .map((n) => n.textContent)
+      .map((node) => node.textContent)
       .join('|') === '2 variables|2 modes',
     all('.cms-collection-count')
-      .map((n) => n.textContent)
+      .map((node) => node.textContent)
       .join('|'),
   );
 
@@ -183,7 +183,7 @@ const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
     container.querySelector('.cms-crumb button').click();
     await settle(30);
   });
-  check('backing out closes the sheet', selected === null);
+  check('backing out closes the sheet', selected === undefined);
   check(
     'and shows the stylesheets again',
     names().join('|') === 'motion.css|other.css|tokens.css',
@@ -191,7 +191,7 @@ const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
   );
 
   await act(async () => reactRoot.unmount());
-  fs.rmSync(dir, { recursive: true, force: true });
+  fs.rmSync(directory, { recursive: true, force: true });
 
   if (failures.length) {
     console.error(`\nvars-panel: ${failures.length} failed, ${checked - failures.length} passed\n`);

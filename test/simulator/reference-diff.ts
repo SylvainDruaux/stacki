@@ -32,15 +32,13 @@ export function referenceTables(source: ByteString, target: ByteString): Referen
   for (let x = 0; x <= source.length; x++) {
     for (let y = 0; y <= target.length; y++) {
       const equal = () => source[x - 1] === target[y - 1];
-      before[x * width + y] = cellCost(before, width, x, y, x === 0, y === 0, equal);
+      before[x * width + y] = cellCost(before, width, x, y, equal);
     }
   }
   for (let x = source.length; x >= 0; x--) {
     for (let y = target.length; y >= 0; y--) {
-      const xLast = x === source.length;
-      const yLast = y === target.length;
       const equal = () => source[x] === target[y];
-      after[x * width + y] = cellCostAfter(after, width, x, y, xLast, yLast, equal);
+      after[x * width + y] = cellCostAfter(after, width, x, y, equal);
     }
   }
   const read = (table: Int32Array, x: number, y: number): number => {
@@ -60,20 +58,19 @@ export function referenceTables(source: ByteString, target: ByteString): Referen
 }
 
 // Distance to (x, y): the cheapest of deleting source[x − 1], inserting
-// target[y − 1], or matching them when they are equal.
+// target[y − 1], or matching them when they are equal. The first row and
+// column are the edges: only insertions, or only deletions, reach them.
 function cellCost(
   table: Int32Array,
   width: number,
   x: number,
   y: number,
-  xFirst: boolean,
-  yFirst: boolean,
   equal: () => boolean,
 ): number {
-  if (xFirst) {
+  if (x === 0) {
     return y;
   }
-  if (yFirst) {
+  if (y === 0) {
     return x;
   }
   const deleted = (table[(x - 1) * width + y] ?? Infinity) + 1;
@@ -82,21 +79,21 @@ function cellCost(
   return Math.min(deleted, inserted, matched);
 }
 
+// The mirror of cellCost, from (x, y) to the end: the last row and column are
+// the edges, where nothing of the source, or of the target, is left.
 function cellCostAfter(
   table: Int32Array,
   width: number,
   x: number,
   y: number,
-  xLast: boolean,
-  yLast: boolean,
   equal: () => boolean,
 ): number {
   const sourceLeft = table.length / width - 1 - x;
   const targetLeft = width - 1 - y;
-  if (xLast) {
+  if (sourceLeft === 0) {
     return targetLeft;
   }
-  if (yLast) {
+  if (targetLeft === 0) {
     return sourceLeft;
   }
   const deleted = (table[(x + 1) * width + y] ?? Infinity) + 1;

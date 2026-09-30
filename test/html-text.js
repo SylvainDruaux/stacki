@@ -16,8 +16,10 @@
 // characters are what there is, and the three that would otherwise be markup
 // become entities again.
 
+const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
+const { LIMITS } = require('../dist/shared/limits.js');
 
 const failures = [];
 let checked = 0;
@@ -82,12 +84,12 @@ const kids = parsed.model.nodes[0].children;
 check(
   'the copyright sign is a copyright sign',
   kids[0]?.value === '©',
-  JSON.stringify(kids.map((k) => k.value)),
+  JSON.stringify(kids.map((child) => child.value)),
 );
 check(
   'and the hard space is a space',
   kids[2]?.value === ' ',
-  JSON.stringify(kids.map((k) => k.value)),
+  JSON.stringify(kids.map((child) => child.value)),
 );
 
 // Nothing was edited, so nothing about the file changes.
@@ -137,31 +139,32 @@ for (const body of [
 // ── The real file this came from ────────────────────────────────────────────
 const REAL = '/Users/timothyricks/Documents/Projects/remarkable-agency/src/components/Footer.astro';
 if (fs.existsSync(REAL)) {
-  const src = fs.readFileSync(REAL, 'utf8');
-  const model = parsePage(src).model;
+  const source = fs.readFileSync(REAL, 'utf8');
+  const model = parsePage(source).model;
   const values = [];
-  const walk = (list) => {
-    for (const n of list) {
-      if (n.kind === 'text') {
-        values.push(n.value);
+  const walk = (list, depth = 0) => {
+    assert.ok(depth <= LIMITS.treeDepthMax, 'walk: tree depth limit');
+    for (const node of list) {
+      if (node.kind === 'text') {
+        values.push(node.value);
       }
-      if (Array.isArray(n.children)) {
-        walk(n.children);
+      if (Array.isArray(node.children)) {
+        walk(node.children, depth + 1);
       }
     }
   };
   walk(model.nodes);
   check(
     'the real footer shows characters, not entities',
-    !values.some((v) => /&[#a-z]/i.test(v)),
-    JSON.stringify(values.filter((v) => /&[#a-z]/i.test(v))),
+    !values.some((value) => /&[#a-z]/i.test(value)),
+    JSON.stringify(values.filter((value) => /&[#a-z]/i.test(value))),
   );
   check(
     'and the copyright row is the sign itself',
-    values.some((v) => v.trim() === '©'),
+    values.some((value) => value.trim() === '©'),
     JSON.stringify(values),
   );
-  check('while the file is left as it was', serializePage(parsePage(src).model) === src);
+  check('while the file is left as it was', serializePage(parsePage(source).model) === source);
 }
 
 if (failures.length) {

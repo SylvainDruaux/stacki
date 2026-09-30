@@ -5,6 +5,10 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const esbuild = require('esbuild');
+
+// The DOM answers "none" with null. The fakes below that stand in for DOM APIs
+// return the platform's own value, read from JSON because our code never writes one.
+const PLATFORM_NULL = JSON.parse('null');
 const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'stacki-renderer-leaves-'));
 const load = (name) => {
   const output = path.join(directory, `${name}.cjs`);
@@ -31,14 +35,14 @@ try {
   assert.equal(getPendingAsset(), request);
   clearAssetRequest();
   assert.deepEqual(first, []);
-  assert.deepEqual(second, [request, null]);
-  assert.equal(getPendingAsset(), null);
+  assert.deepEqual(second, [request, undefined]);
+  assert.equal(getPendingAsset(), undefined);
 
   const { setDrag, getDrag, clearDrag } = load('dragState');
   setDrag({ kind: 'component', name: 'Card' });
   assert.deepEqual(getDrag(), { kind: 'component', name: 'Card' });
   clearDrag();
-  assert.equal(getDrag(), null);
+  assert.equal(getDrag(), undefined);
 
   const { renamedAttr } = load('attrOrder');
   const value = { type: 'expr', value: 'someCall()', metadata: 'preserve' };
@@ -57,7 +61,7 @@ try {
     message: 'This statement exceeds the editor size limit.',
   });
   const { componentNameError } = load('componentName');
-  assert.equal(componentNameError('Card', Array(10_000).fill('Other')), null);
+  assert.equal(componentNameError('Card', Array(10_000).fill('Other')), undefined);
   assert.throws(() => componentNameError('Card', Array(10_001).fill('Other')), /scan limit/);
 
   const { onePerPlace } = load('outlineBoxes');
@@ -79,9 +83,12 @@ try {
   );
 
   const { decideTerminalPaste } = load('terminalPaste');
-  const item = { type: 'text/plain', kind: 'string', getAsFile: () => null };
-  assert.deepEqual(decideTerminalPaste([item], 'hello', null, false), { kind: 'text' });
-  assert.throws(() => decideTerminalPaste(Array(10_001).fill(item), '', null, false), /item count/);
+  const item = { type: 'text/plain', kind: 'string', getAsFile: () => PLATFORM_NULL };
+  assert.deepEqual(decideTerminalPaste([item], 'hello', undefined, 'posix'), { kind: 'text' });
+  assert.throws(
+    () => decideTerminalPaste(Array(10_001).fill(item), '', undefined, 'posix'),
+    /item count/,
+  );
   const { findWithParent, isInlineRun } = load('treeSelection');
   const cycle = { id: 'cycle', kind: 'element', name: 'span', children: [] };
   cycle.children.push(cycle);
@@ -96,8 +103,8 @@ try {
   assert.throws(() => propsForExtraction(cycle, ['title']), /Tree traversal exceeds depth limit/);
   const { evaluate } = load('fluid');
   assert.equal(evaluate('(2rem + 16px) * 2', 0), 6);
-  assert.equal(evaluate('('.repeat(66) + '1' + ')'.repeat(66), 0), null);
-  assert.equal(evaluate('1'.repeat(1_000_001), 0), null);
+  assert.equal(evaluate('('.repeat(66) + '1' + ')'.repeat(66), 0), undefined);
+  assert.equal(evaluate('1'.repeat(1_000_001), 0), undefined);
 
   console.log('renderer-leaves: state replacement, cancellation, metadata and limits passed');
 } finally {

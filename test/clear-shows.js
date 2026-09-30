@@ -28,9 +28,9 @@ const check = (what, condition, detail) => {
 
 (async () => {
   const esbuild = require('esbuild');
-  const buildDir = path.join(__dirname, '..', 'node_modules', '.stacki-test');
-  fs.mkdirSync(buildDir, { recursive: true });
-  const bundlePath = path.join(buildDir, 'clear-shows.bundle.js');
+  const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
+  fs.mkdirSync(buildDirectory, { recursive: true });
+  const bundlePath = path.join(buildDirectory, 'clear-shows.bundle.js');
   await esbuild.build({
     stdin: {
       contents: `export { default as SizeSection } from './SizeSection'`,
@@ -104,11 +104,13 @@ const check = (what, condition, detail) => {
   const field = () => document.querySelector('input[data-prop="width"]');
   const label = () =>
     [...document.querySelectorAll('.u-field-label, .u-field-label-wrap button')].find(
-      (el) => el.textContent.trim() === 'Width',
+      (element) => element.textContent.trim() === 'Width',
     );
-  const click = async (el) => {
+  const click = async (element) => {
     await act(async () => {
-      el.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true, cancelable: true }));
+      element.dispatchEvent(
+        new dom.window.MouseEvent('click', { bubbles: true, cancelable: true }),
+      );
     });
   };
 

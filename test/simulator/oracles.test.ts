@@ -116,7 +116,7 @@ test(
     const duplicated = page.projection.nodes.find(
       (node) =>
         node.capability === 'editable' &&
-        node.attributes.filter((a) => a.name === 'class').length > 1,
+        node.attributes.filter((attribute) => attribute.name === 'class').length > 1,
     );
     assert.ok(duplicated !== undefined, 'the fixture has an editable node with a duplicated class');
     const step = {

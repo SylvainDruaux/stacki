@@ -31,7 +31,7 @@ const check = (what, condition, detail) => {
     failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
   }
 };
-const settle = (ms = 40) => new Promise((r) => setTimeout(r, ms));
+const settle = (ms = 40) => new Promise((resolve) => setTimeout(resolve, ms));
 
 (async () => {
   const { JSDOM } = require('jsdom');
@@ -67,24 +67,34 @@ const settle = (ms = 40) => new Promise((r) => setTimeout(r, ms));
     word: [0, 287, 300, 200],
   };
   window.Element.prototype.getBoundingClientRect = function () {
-    const [x, y, w, h] = boxes[this.getAttribute('data-box')] || [0, 0, 0, 0];
-    return { x, y, width: w, height: h, left: x, top: y, right: x + w, bottom: y + h };
+    const [x, y, width, height] = boxes[this.getAttribute('data-box')] || [0, 0, 0, 0];
+    return {
+      x,
+      y,
+      width: width,
+      height: height,
+      left: x,
+      top: y,
+      right: x + width,
+      bottom: y + height,
+    };
   };
   const NO_BOX = { x: 0, y: 0, width: 0, height: 0, left: 0, top: 0, right: 0, bottom: 0 };
   window.Range.prototype.getBoundingClientRect = () => NO_BOX;
   window.focus = () => {};
-  // jsdom has no hit testing, and the canvas asks for it by coordinate. What is
+  // `jsdom` has no hit testing, and the canvas asks for it by coordinate. What is
   // under a point here is what the boxes above say is under it — the deepest
   // element whose box holds it, which is what a browser would answer.
   window.document.elementFromPoint = (x, y) => {
+    // eslint-disable-next-line stacki/no-null -- Stubs elementFromPoint, which answers null.
     let found = null;
-    for (const el of window.document.querySelectorAll('[data-box]')) {
-      const b = el.getBoundingClientRect();
-      if (x < b.left || x > b.right || y < b.top || y > b.bottom) {
+    for (const element of window.document.querySelectorAll('[data-box]')) {
+      const box = element.getBoundingClientRect();
+      if (x < box.left || x > box.right || y < box.top || y > box.bottom) {
         continue;
       }
-      if (!found || found.contains(el)) {
-        found = el;
+      if (!found || found.contains(element)) {
+        found = element;
       }
     }
     return found;
@@ -101,7 +111,7 @@ const settle = (ms = 40) => new Promise((r) => setTimeout(r, ms));
   global.requestAnimationFrame = window.requestAnimationFrame.bind(window);
 
   const sent = [];
-  window.parent = { postMessage: (m) => sent.push(m) };
+  window.parent = { postMessage: (message) => sent.push(message) };
   const electron = {
     contextBridge: { exposeInMainWorld: () => {} },
     ipcRenderer: { on: () => {}, send: () => {}, invoke: async () => {} },
@@ -117,9 +127,9 @@ const settle = (ms = 40) => new Promise((r) => setTimeout(r, ms));
   await settle(60);
 
   const post = (data) => {
-    const ev = new window.MessageEvent('message', { data });
-    Object.defineProperty(ev, 'source', { value: window.parent });
-    window.dispatchEvent(ev);
+    const event = new window.MessageEvent('message', { data });
+    Object.defineProperty(event, 'source', { value: window.parent });
+    window.dispatchEvent(event);
   };
   post({ type: 'avb:design', on: true });
   post({ type: 'avb:track', paths: ['0'], scope: '', focus: '', focusOcc: 0 });
@@ -128,12 +138,12 @@ const settle = (ms = 40) => new Promise((r) => setTimeout(r, ms));
   // The pointer lands where it lands; what it is OVER is the browser's answer,
   // which in the gap above the component is the word.
   const pointAt = (box, y) => {
-    const el = window.document.querySelector(`[data-box="${box}"]`);
+    const element = window.document.querySelector(`[data-box="${box}"]`);
     sent.length = 0;
-    el.dispatchEvent(
+    element.dispatchEvent(
       new window.MouseEvent('mousemove', { bubbles: true, clientX: 100, clientY: y }),
     );
-    return sent.filter((m) => m.type === 'avb:hover-node').pop();
+    return sent.filter((message) => message.type === 'avb:hover-node').pop();
   };
 
   // 290: inside the word's box, above the component's. Nothing is drawn there.
@@ -157,9 +167,9 @@ const settle = (ms = 40) => new Promise((r) => setTimeout(r, ms));
   // A click says the same thing as the hover — the two resolve the same way,
   // so what you select is what lit up.
   {
-    const el = window.document.querySelector('[data-box="word"]');
+    const element = window.document.querySelector('[data-box="word"]');
     sent.length = 0;
-    el.dispatchEvent(
+    element.dispatchEvent(
       new window.MouseEvent('click', {
         bubbles: true,
         cancelable: true,
@@ -167,11 +177,11 @@ const settle = (ms = 40) => new Promise((r) => setTimeout(r, ms));
         clientY: 290,
       }),
     );
-    const msg = sent.filter((m) => m.type === 'avb:click-node').pop();
+    const message = sent.filter((message) => message.type === 'avb:click-node').pop();
     check(
       'and a click in that gap selects what a hover showed',
-      msg?.path === '0',
-      JSON.stringify(msg),
+      message?.path === '0',
+      JSON.stringify(message),
     );
   }
 
@@ -184,7 +194,7 @@ const settle = (ms = 40) => new Promise((r) => setTimeout(r, ms));
     const parsed = parsePreviewMessage(message);
     check(
       'leaving the canvas produces a valid hover-clear message',
-      parsed?.kind === 'hover-node' && parsed.path === null && parsed.occurrence === 0,
+      parsed?.kind === 'hover-node' && parsed.path === undefined && parsed.occurrence === 0,
       JSON.stringify(message),
     );
     const entered = parsePreviewMessage(pointAt('word', 400));
@@ -194,11 +204,15 @@ const settle = (ms = 40) => new Promise((r) => setTimeout(r, ms));
   // An event with no coordinates — something synthesised — has no point to
   // judge, and is answered as before rather than refused.
   {
-    const el = window.document.querySelector('[data-box="word"]');
+    const element = window.document.querySelector('[data-box="word"]');
     sent.length = 0;
-    el.dispatchEvent(new window.MouseEvent('click', { bubbles: true, cancelable: true }));
-    const msg = sent.filter((m) => m.type === 'avb:click-node').pop();
-    check('a click with nowhere to be still resolves', msg?.path === '0.1', JSON.stringify(msg));
+    element.dispatchEvent(new window.MouseEvent('click', { bubbles: true, cancelable: true }));
+    const message = sent.filter((message) => message.type === 'avb:click-node').pop();
+    check(
+      'a click with nowhere to be still resolves',
+      message?.path === '0.1',
+      JSON.stringify(message),
+    );
   }
 
   if (failures.length) {

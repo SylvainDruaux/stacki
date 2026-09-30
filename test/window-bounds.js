@@ -25,15 +25,27 @@ const laptop = { x: 0, y: 38, width: 1728, height: 1079 };
 // An external display, second in the layout, so it starts past the first.
 const monitor = { x: 1728, y: 0, width: 2560, height: 1415 };
 
-const b = openingBounds(laptop);
-check('the window fills the width it is given', b.width === 1728, `${b.width}`);
-check('and the height', b.height === 1079, `${b.height}`);
-check('starting where the work area starts', b.x === 0 && b.y === 38, `${b.x},${b.y}`);
-check('which is under the menu bar, not over it', b.y === laptop.y);
+const laptopBounds = openingBounds(laptop);
+check(
+  'the window fills the width it is given',
+  laptopBounds.width === 1728,
+  `${laptopBounds.width}`,
+);
+check('and the height', laptopBounds.height === 1079, `${laptopBounds.height}`);
+check(
+  'starting where the work area starts',
+  laptopBounds.x === 0 && laptopBounds.y === 38,
+  `${laptopBounds.x},${laptopBounds.y}`,
+);
+check('which is under the menu bar, not over it', laptopBounds.y === laptop.y);
 
-const m = openingBounds(monitor);
-check('a second display is filled where it sits', m.x === 1728, `${m.x}`);
-check('at its own size', m.width === 2560 && m.height === 1415, `${m.width}×${m.height}`);
+const monitorBounds = openingBounds(monitor);
+check('a second display is filled where it sits', monitorBounds.x === 1728, `${monitorBounds.x}`);
+check(
+  'at its own size',
+  monitorBounds.width === 2560 && monitorBounds.height === 1415,
+  `${monitorBounds.width}×${monitorBounds.height}`,
+);
 
 // Small displays: the panels have a width below which they stop working, so
 // the minimum wins and the window hangs over rather than opening unusable.
@@ -45,7 +57,7 @@ check(
 );
 check(
   'and the window keeps its minimum size',
-  b.minWidth === WIDTH_PX_MIN && b.minHeight === HEIGHT_PX_MIN,
+  laptopBounds.minWidth === WIDTH_PX_MIN && laptopBounds.minHeight === HEIGHT_PX_MIN,
 );
 
 // Nothing to ask: opening somewhere beats not opening.

@@ -14,6 +14,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { LIMITS } = require('../dist/shared/limits.js');
 
 const failures = [];
 let checked = 0;
@@ -26,9 +27,9 @@ const check = (what, condition, detail) => {
 
 (async () => {
   const esbuild = require('esbuild');
-  const buildDir = path.join(__dirname, '..', 'node_modules', '.stacki-test');
-  fs.mkdirSync(buildDir, { recursive: true });
-  const bundlePath = path.join(buildDir, 'file-browser.bundle.js');
+  const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
+  fs.mkdirSync(buildDirectory, { recursive: true });
+  const bundlePath = path.join(buildDirectory, 'file-browser.bundle.js');
   await esbuild.build({
     entryPoints: [path.join(__dirname, '..', 'src', 'ui', 'FileBrowser.jsx')],
     outfile: bundlePath,
@@ -50,16 +51,16 @@ const check = (what, condition, detail) => {
   assert.throws(() => search([], 'a', -1), /valid result limit/);
   assert.throws(() => search([], 'a', 1.5), /valid result limit/);
 
-  const f = (p, status = null) => ({ path: p, status });
+  const fileEntry = (filePath, status) => ({ path: filePath, status });
   const project = [
-    f('src/pages/index.astro', 'M'),
-    f('src/pages/about.astro'),
-    f('src/pages/blog/index.astro'),
-    f('src/components/Card.astro', 'A'),
-    f('src/components/Nav.astro'),
-    f('src/styles/main.css'),
-    f('public/logo.svg'),
-    f('package.json'),
+    fileEntry('src/pages/index.astro', 'M'),
+    fileEntry('src/pages/about.astro'),
+    fileEntry('src/pages/blog/index.astro'),
+    fileEntry('src/components/Card.astro', 'A'),
+    fileEntry('src/components/Nav.astro'),
+    fileEntry('src/styles/main.css'),
+    fileEntry('public/logo.svg'),
+    fileEntry('package.json'),
   ];
   const paths = (list) => list.map((x) => x.path);
 
@@ -119,7 +120,7 @@ const check = (what, condition, detail) => {
     check('a non-match scores below zero', fuzzyScore('zzz', 'src/pages/index.astro') < 0);
     check('a match scores above it', fuzzyScore('index', 'src/pages/index.astro') > 0);
     // Long lists are cut, or a three-letter query redraws the whole project.
-    const many = Array.from({ length: 500 }, (_, i) => f(`src/pages/page${i}.astro`));
+    const many = Array.from({ length: 500 }, (_, i) => fileEntry(`src/pages/page${i}.astro`));
     check(
       'results are capped',
       search(many, 'page').length <= 60,
@@ -147,8 +148,12 @@ const check = (what, condition, detail) => {
 
     // Every file has to land somewhere: one lost in the tree is one that
     // cannot be found or ticked, with nothing on screen to say it is missing.
-    const countFiles = (node) =>
-      node.files.length + [...node.dirs.values()].reduce((n, d) => n + countFiles(d), 0);
+    // The tree is as deep as its deepest path, which buildTree bounds (see above).
+    const countFiles = (node, depth = 0) => {
+      assert.ok(depth <= LIMITS.treeDepthMax, 'countFiles: tree depth limit');
+      const nested = [...node.dirs.values()].map((directory) => countFiles(directory, depth + 1));
+      return node.files.length + nested.reduce((total, count) => total + count, 0);
+    };
     check(
       'no file is lost',
       countFiles(tree) === project.length,
@@ -168,12 +173,12 @@ const check = (what, condition, detail) => {
 
     // The status has to survive into the tree, or the browser can show where a
     // file is or that it changed, but never both.
-    const idx = tree.dirs
+    const index = tree.dirs
       .get('src')
       .dirs.get('pages')
       .files.find((x) => x.name === 'index.astro');
-    check('status is carried onto the row', idx.status === 'M', JSON.stringify(idx));
-    check('and the full path with it', idx.path === 'src/pages/index.astro', idx.path);
+    check('status is carried onto the row', index.status === 'M', JSON.stringify(index));
+    check('and the full path with it', index.path === 'src/pages/index.astro', index.path);
 
     check('an empty project builds an empty tree', countFiles(buildTree([])) === 0);
   }
@@ -183,7 +188,7 @@ const check = (what, condition, detail) => {
     process.exit(1);
   }
   console.log(`file-browser: ${checked} passed`);
-})().catch((err) => {
-  console.error(err);
+})().catch((error) => {
+  console.error(error);
   process.exit(1);
 });

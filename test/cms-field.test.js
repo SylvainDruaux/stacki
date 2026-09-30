@@ -57,7 +57,7 @@ test('a focused CMS field retains its input until blur', async () => {
     await act(async () => input.focus());
     await show('longtext');
     assert.equal(document.querySelector('input'), input);
-    assert.equal(document.querySelector('textarea'), null);
+    assert.ok(document.querySelector('textarea') === null);
     await act(async () => input.blur());
     assert.ok(document.querySelector('textarea'));
   } finally {
@@ -75,6 +75,7 @@ test(
       imports.push(picked);
       return { ok: true, value: { __expr: 'newImage', __asset: picked.rel } };
     };
+    // eslint-disable-next-line stacki/bounded-recursion -- Event re-entry: onChange re-renders.
     const render = () =>
       root.render(
         React.createElement(Field, {
@@ -120,6 +121,7 @@ test(
 test('reordering a repeater preserves the entry shown by its open dialog', async () => {
   const root = createRoot(document.getElementById('root'));
   let value = [{ title: 'First' }, { title: 'Second' }, { title: 'Third' }];
+  // eslint-disable-next-line stacki/bounded-recursion -- Event re-entry: onChange re-renders.
   const render = () =>
     root.render(
       React.createElement(Field, {

@@ -26,9 +26,9 @@ const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
 
 (async () => {
   const esbuild = require('esbuild');
-  const buildDir = path.join(__dirname, '..', 'node_modules', '.stacki-test');
-  fs.mkdirSync(buildDir, { recursive: true });
-  const bundlePath = path.join(buildDir, 'popover.bundle.js');
+  const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
+  fs.mkdirSync(buildDirectory, { recursive: true });
+  const bundlePath = path.join(buildDirectory, 'popover.bundle.js');
   await esbuild.build({
     stdin: {
       contents: `export { default as LayerPopover } from './LayerPopover'`,
@@ -90,6 +90,8 @@ const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
   const host = dom.window.document.createElement('div');
   dom.window.document.body.appendChild(host);
   const root = createRoot(host);
+  // `paint` runs again from the popover's onClose event, never from its own stack.
+  // eslint-disable-next-line stacki/bounded-recursion -- onClose re-enters it as an event.
   const paint = () =>
     root.render(
       showing
@@ -106,7 +108,7 @@ const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
             },
             React.createElement('input', { id: 'inside', defaultValue: '0deg' }),
           )
-        : null,
+        : undefined,
     );
   const open = async () =>
     act(async () => {
@@ -116,11 +118,13 @@ const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
     });
 
   // A press somewhere, and the click it becomes.
-  const pressAndClick = async (el) => {
+  const pressAndClick = async (element) => {
     await act(async () => {
-      el.dispatchEvent(new dom.window.MouseEvent('mousedown', { bubbles: true }));
+      element.dispatchEvent(new dom.window.MouseEvent('mousedown', { bubbles: true }));
       await settle(0);
-      el.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true, cancelable: true }));
+      element.dispatchEvent(
+        new dom.window.MouseEvent('click', { bubbles: true, cancelable: true }),
+      );
       await settle(0);
     });
   };

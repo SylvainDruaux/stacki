@@ -75,11 +75,11 @@ export function mappingTypeChecks(
   // @ts-expect-error The frontiers stay private to the diff; callers read distances.
   void diff.forward;
   // @ts-expect-error A diff is immutable once computed.
-  diff.distance = 0;
+  diff.distance = 0; // eslint-disable-line no-param-reassign -- The error expected here.
   // @ts-expect-error Planning needs the authored snapshot, not only the current one (plan §4).
   const currentOnly: PlanningBase = { current: base.current };
   // @ts-expect-error A plan's splices are read-only.
-  plan.splices.length = 0;
+  plan.splices.length = 0; // eslint-disable-line no-param-reassign -- The error expected here.
   void currentOnly;
 }
 

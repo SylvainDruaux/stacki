@@ -5,9 +5,7 @@
 // Clicking the fine print at the bottom of the docs footer selected `comment`
 // — the JSX note written above that row in the source:
 //
-//   {
-//     /* Two elements, because the rule and the content want different widths … */
-//   }
+//   { /* Two elements, because the rule and the content want different widths … */ }
 //   <div class="site-footer_fine"> … </div>
 //
 // A comment renders nothing, so its region is a marker pair with only
@@ -93,8 +91,9 @@ const FOOTER = `
     syncAnchors(live, server);
 
     const kids = [...live.childNodes];
-    const at = (data) => kids.findIndex((n) => n.nodeType === 8 && n.data === data);
-    const elAt = (cls) => kids.findIndex((n) => n.nodeType === 1 && n.className === cls);
+    const at = (data) => kids.findIndex((child) => child.nodeType === 8 && child.data === data);
+    const elementAt = (cls) =>
+      kids.findIndex((child) => child.nodeType === 1 && child.className === cls);
     check('every marker is put back', at('avb-s:0.1') >= 0 && at('avb-e:0.1') >= 0, live.innerHTML);
     check(
       "the comment's markers stay together",
@@ -103,17 +102,18 @@ const FOOTER = `
     );
     check(
       'and the element after it is outside them',
-      at('avb-e:0.1') < elAt('site-footer_fine'),
+      at('avb-e:0.1') < elementAt('site-footer_fine'),
       live.innerHTML,
     );
     check(
       'each element is still wrapped by its own pair',
-      at('avb-s:0.2') < elAt('site-footer_fine') && at('avb-e:0.2') > elAt('site-footer_fine'),
+      at('avb-s:0.2') < elementAt('site-footer_fine') &&
+        at('avb-e:0.2') > elementAt('site-footer_fine'),
       live.innerHTML,
     );
     check(
       'and so is the one before it',
-      at('avb-s:0.0') < elAt('container') && at('avb-e:0.0') > elAt('container'),
+      at('avb-s:0.0') < elementAt('container') && at('avb-e:0.0') > elementAt('container'),
       live.innerHTML,
     );
     delete global.document;
@@ -147,7 +147,7 @@ const FOOTER = `
     global.requestAnimationFrame = window.requestAnimationFrame.bind(window);
 
     const sent = [];
-    window.parent = { postMessage: (m) => sent.push(m) };
+    window.parent = { postMessage: (message) => sent.push(message) };
     const electron = {
       contextBridge: { exposeInMainWorld: () => {} },
       ipcRenderer: { on: () => {}, send: () => {}, invoke: async () => {} },
@@ -164,9 +164,9 @@ const FOOTER = `
 
     // Design mode, and tracking every path in the file.
     const send = (data) => {
-      const ev = new window.MessageEvent('message', { data });
-      Object.defineProperty(ev, 'source', { value: window.parent });
-      window.dispatchEvent(ev);
+      const event = new window.MessageEvent('message', { data });
+      Object.defineProperty(event, 'source', { value: window.parent });
+      window.dispatchEvent(event);
     };
     send({ type: 'avb:design', on: true });
     send({ type: 'avb:track', paths: ['0', '0.0', '0.1', '0.2'] });
@@ -182,7 +182,7 @@ const FOOTER = `
     sent.length = 0;
     fine.dispatchEvent(new window.MouseEvent('click', { bubbles: true, cancelable: true }));
     await settle(20);
-    const click = sent.filter((m) => m.type === 'avb:click-node').pop();
+    const click = sent.filter((message) => message.type === 'avb:click-node').pop();
     check('a click on the fine print reports it', click?.path === '0.2', JSON.stringify(click));
 
     // …and the same with the closing marker missing altogether, which is the
@@ -204,7 +204,7 @@ const FOOTER = `
     sent.length = 0;
     fine2.dispatchEvent(new window.MouseEvent('click', { bubbles: true, cancelable: true }));
     await settle(20);
-    const click2 = sent.filter((m) => m.type === 'avb:click-node').pop();
+    const click2 = sent.filter((message) => message.type === 'avb:click-node').pop();
     check(
       'so the click still reports the element that was clicked',
       click2?.path === '0.2',

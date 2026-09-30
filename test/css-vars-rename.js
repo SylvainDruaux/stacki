@@ -76,25 +76,25 @@ const FILES = {
   'dist/build.css': `.built { max-width: var(--max-width-main); }\n`,
 };
 
-const write = (dir, files) => {
+const write = (directory, files) => {
   for (const [rel, text] of Object.entries(files)) {
-    const abs = path.join(dir, rel);
+    const abs = path.join(directory, rel);
     fs.mkdirSync(path.dirname(abs), { recursive: true });
     fs.writeFileSync(abs, text);
   }
 };
 const project = (files = FILES) => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'stacki-rename-'));
-  write(dir, files);
-  return dir;
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'stacki-rename-'));
+  write(directory, files);
+  return directory;
 };
-const read = (dir, rel) => fs.readFileSync(path.join(dir, rel), 'utf8');
+const read = (directory, rel) => fs.readFileSync(path.join(directory, rel), 'utf8');
 
 (async () => {
   // --- one variable ---------------------------------------------------------
   {
-    const dir = project();
-    const out = renameVariables(dir, {
+    const directory = project();
+    const out = renameVariables(directory, {
       renames: [{ from: '--max-width-main', to: '--max-width-wide' }],
     });
     check('the rename reports success', out.ok === true, JSON.stringify(out));
@@ -107,7 +107,7 @@ const read = (dir, rel) => fs.readFileSync(path.join(dir, rel), 'utf8');
       JSON.stringify(out),
     );
 
-    const base = read(dir, 'src/styles/base.css');
+    const base = read(directory, 'src/styles/base.css');
     check('the declaration is renamed', base.includes('--max-width-wide: calc('), base);
     check(
       'and so is the one in the other mode',
@@ -120,7 +120,7 @@ const read = (dir, rel) => fs.readFileSync(path.join(dir, rel), 'utf8');
       base,
     );
 
-    const layout = read(dir, 'src/styles/layout.css');
+    const layout = read(directory, 'src/styles/layout.css');
     check('every reference follows it', !layout.includes('--max-width-main'), layout);
     check(
       'including one inside a function',
@@ -138,7 +138,7 @@ const read = (dir, rel) => fs.readFileSync(path.join(dir, rel), 'utf8');
       layout,
     );
 
-    const card = read(dir, 'src/components/Card.astro');
+    const card = read(directory, 'src/components/Card.astro');
     check("a component's own <style> follows too", card.includes('var(--max-width-wide)'), card);
     check(
       'and so does a style attribute in its markup',
@@ -154,30 +154,33 @@ const read = (dir, rel) => fs.readFileSync(path.join(dir, rel), 'utf8');
   // panel reads would leave those pointing at a name that no longer exists —
   // and CSS says nothing when that happens, it just falls back.
   {
-    const dir = project();
-    renameVariables(dir, { renames: [{ from: '--max-width-main', to: '--max-width-wide' }] });
+    const directory = project();
+    renameVariables(directory, { renames: [{ from: '--max-width-main', to: '--max-width-wide' }] });
     check(
       'a config at the project root follows',
-      read(dir, 'tailwind.config.js').includes('var(--max-width-wide)'),
-      read(dir, 'tailwind.config.js'),
+      read(directory, 'tailwind.config.js').includes('var(--max-width-wide)'),
+      read(directory, 'tailwind.config.js'),
     );
     check(
       'so does a TypeScript module',
-      read(dir, 'src/lib/theme.ts').includes('var(--max-width-wide)'),
-      read(dir, 'src/lib/theme.ts'),
+      read(directory, 'src/lib/theme.ts').includes('var(--max-width-wide)'),
+      read(directory, 'src/lib/theme.ts'),
     );
     check(
       'and a stylesheet in a folder of its own',
-      read(dir, 'app/legacy/old.css').includes('var(--max-width-wide)'),
-      read(dir, 'app/legacy/old.css'),
+      read(directory, 'app/legacy/old.css').includes('var(--max-width-wide)'),
+      read(directory, 'app/legacy/old.css'),
     );
     // Not the project's text: renaming into a dependency or a build would be
     // undone by the next install or build, and is not ours to edit.
     check(
       'a dependency is left alone',
-      read(dir, 'node_modules/some-dep/dep.css').includes('var(--max-width-main)'),
+      read(directory, 'node_modules/some-dep/dep.css').includes('var(--max-width-main)'),
     );
-    check('and so is build output', read(dir, 'dist/build.css').includes('var(--max-width-main)'));
+    check(
+      'and so is build output',
+      read(directory, 'dist/build.css').includes('var(--max-width-main)'),
+    );
   }
 
   // --- the name, and things that merely contain it --------------------------
@@ -185,9 +188,9 @@ const read = (dir, rel) => fs.readFileSync(path.join(dir, rel), 'utf8');
     // `--max-width` is a name AND the start of four other names. Renaming it must
     // move exactly one declaration and leave its longer namesakes alone — this is
     // the mistake a plain string replacement makes.
-    const dir = project();
-    const out = renameVariables(dir, { renames: [{ from: '--max-width', to: '--measure' }] });
-    const base = read(dir, 'src/styles/base.css');
+    const directory = project();
+    const out = renameVariables(directory, { renames: [{ from: '--max-width', to: '--measure' }] });
+    const base = read(directory, 'src/styles/base.css');
     check(
       'a shorter name does not eat the longer ones',
       out.ok && base.includes('--measure: 60rem'),
@@ -200,23 +203,23 @@ const read = (dir, rel) => fs.readFileSync(path.join(dir, rel), 'utf8');
     );
     check(
       'and their references',
-      read(dir, 'src/styles/layout.css').includes('var(--max-width-main)'),
+      read(directory, 'src/styles/layout.css').includes('var(--max-width-main)'),
     );
   }
 
   // --- a whole group --------------------------------------------------------
   {
     // What renaming the group heading does: every member at once, in one pass.
-    const dir = project();
-    const out = renameVariables(dir, {
+    const directory = project();
+    const out = renameVariables(directory, {
       renames: [
         { from: '--max-width-small', to: '--container-small' },
         { from: '--max-width-main', to: '--container-main' },
         { from: '--max-width-full', to: '--container-full' },
       ],
     });
-    const base = read(dir, 'src/styles/base.css');
-    const layout = read(dir, 'src/styles/layout.css');
+    const base = read(directory, 'src/styles/base.css');
+    const layout = read(directory, 'src/styles/layout.css');
     check('the group renames as one', out.ok === true, JSON.stringify(out));
     check(
       'each member takes the new prefix',
@@ -241,14 +244,14 @@ const read = (dir, rel) => fs.readFileSync(path.join(dir, rel), 'utf8');
   {
     // Two names trading places in one batch. Applied one after another this
     // collapses into a single name; applied in one pass it is a swap.
-    const dir = project();
-    const out = renameVariables(dir, {
+    const directory = project();
+    const out = renameVariables(directory, {
       renames: [
         { from: '--max-width-small', to: '--max-width-full' },
         { from: '--max-width-full', to: '--max-width-small' },
       ],
     });
-    const base = read(dir, 'src/styles/base.css');
+    const base = read(directory, 'src/styles/base.css');
     check('a swap is allowed', out.ok === true, JSON.stringify(out));
     check(
       'and both names survive it',
@@ -259,8 +262,8 @@ const read = (dir, rel) => fs.readFileSync(path.join(dir, rel), 'utf8');
 
   // --- what is refused ------------------------------------------------------
   {
-    const dir = project();
-    const taken = renameVariables(dir, {
+    const directory = project();
+    const taken = renameVariables(directory, {
       renames: [{ from: '--max-width-small', to: '--radius-main' }],
     });
     check(
@@ -270,12 +273,14 @@ const read = (dir, rel) => fs.readFileSync(path.join(dir, rel), 'utf8');
     );
     check(
       'and nothing is written',
-      read(dir, 'src/styles/base.css').includes('--max-width-small: 50rem'),
+      read(directory, 'src/styles/base.css').includes('--max-width-small: 50rem'),
     );
 
-    const empty = renameVariables(dir, { renames: [{ from: '--max-width-small', to: '--' }] });
+    const empty = renameVariables(directory, {
+      renames: [{ from: '--max-width-small', to: '--' }],
+    });
     check('a name that is not a name is refused', empty.ok === false, JSON.stringify(empty));
-    const spaced = renameVariables(dir, {
+    const spaced = renameVariables(directory, {
       renames: [{ from: '--max-width-small', to: '--two words' }],
     });
     check('and so is one with a space in it', spaced.ok === false, JSON.stringify(spaced));
@@ -285,7 +290,7 @@ const read = (dir, rel) => fs.readFileSync(path.join(dir, rel), 'utf8');
       spaced.error,
     );
 
-    const clash = renameVariables(dir, {
+    const clash = renameVariables(directory, {
       renames: [
         { from: '--max-width-small', to: '--size' },
         { from: '--max-width-main', to: '--size' },
@@ -298,7 +303,7 @@ const read = (dir, rel) => fs.readFileSync(path.join(dir, rel), 'utf8');
     );
     check(
       'and that batch writes nothing either',
-      read(dir, 'src/styles/base.css').includes('--max-width-main: calc('),
+      read(directory, 'src/styles/base.css').includes('--max-width-main: calc('),
     );
   }
 
@@ -309,7 +314,7 @@ const read = (dir, rel) => fs.readFileSync(path.join(dir, rel), 'utf8');
   // renaming it is writing them. Nothing else refers to them, which is why this
   // is a one-file edit and a variable's name is not.
   {
-    const dir = project({
+    const directory = project({
       'src/styles/tokens.css': `:root {
   /* Swatches */
   --light-100: #ffffff;
@@ -322,7 +327,7 @@ const read = (dir, rel) => fs.readFileSync(path.join(dir, rel), 'utf8');
 `,
     });
     const blockFor = (title) =>
-      readVariables(dir).files[0].groups[0].blocks.find((b) => b.title === title);
+      readVariables(directory).files[0].groups[0].blocks.find((block) => block.title === title);
 
     const swatches = blockFor('Swatches');
     check(
@@ -331,14 +336,14 @@ const read = (dir, rel) => fs.readFileSync(path.join(dir, rel), 'utf8');
       JSON.stringify(swatches.titleStart),
     );
 
-    const out = setSectionTitle(dir, {
+    const out = setSectionTitle(directory, {
       file: 'src/styles/tokens.css',
       start: swatches.titleStart,
       end: swatches.titleEnd,
       expect: 'Swatches',
       title: 'Palette',
     });
-    const css = read(dir, 'src/styles/tokens.css');
+    const css = read(directory, 'src/styles/tokens.css');
     check('renaming it rewrites the comment', out.ok && css.includes('/* Palette */'), css);
     check('and leaves the comment a comment', css.includes('/* Palette */\n  --light-100'), css);
     check('the variables under it are untouched', css.includes('--light-100: #ffffff'), css);
@@ -346,14 +351,14 @@ const read = (dir, rel) => fs.readFileSync(path.join(dir, rel), 'utf8');
     check(
       'the panel reads the new heading back',
       !!blockFor('Palette'),
-      readVariables(dir)
-        .files[0].groups[0].blocks.map((b) => b.title)
+      readVariables(directory)
+        .files[0].groups[0].blocks.map((block) => block.title)
         .join('|'),
     );
 
     // `*/` would close the comment early and swallow the rest of the rule.
     const radius = blockFor('Radius');
-    const broken = setSectionTitle(dir, {
+    const broken = setSectionTitle(directory, {
       file: 'src/styles/tokens.css',
       start: radius.titleStart,
       end: radius.titleEnd,
@@ -367,7 +372,7 @@ const read = (dir, rel) => fs.readFileSync(path.join(dir, rel), 'utf8');
     );
     check(
       'an empty heading is refused too',
-      setSectionTitle(dir, {
+      setSectionTitle(directory, {
         file: 'src/styles/tokens.css',
         start: radius.titleStart,
         end: radius.titleEnd,
@@ -377,11 +382,11 @@ const read = (dir, rel) => fs.readFileSync(path.join(dir, rel), 'utf8');
     );
     check(
       'and the file still says Radius',
-      read(dir, 'src/styles/tokens.css').includes('/* Radius */'),
+      read(directory, 'src/styles/tokens.css').includes('/* Radius */'),
     );
 
     // The offsets are only meaningful against the text they were read from.
-    const stale = setSectionTitle(dir, {
+    const stale = setSectionTitle(directory, {
       file: 'src/styles/tokens.css',
       start: radius.titleStart,
       end: radius.titleEnd,
@@ -412,20 +417,21 @@ const read = (dir, rel) => fs.readFileSync(path.join(dir, rel), 'utf8');
   --radius-round: 100vw;
 }
 `;
-    const titles = (dir) => readVariables(dir).files[0].groups[0].blocks.map((b) => b.title);
-    const blockFor = (dir, title) =>
-      readVariables(dir).files[0].groups[0].blocks.find((b) => b.title === title);
+    const titles = (directory) =>
+      readVariables(directory).files[0].groups[0].blocks.map((block) => block.title);
+    const blockFor = (directory, title) =>
+      readVariables(directory).files[0].groups[0].blocks.find((block) => block.title === title);
 
     {
-      const dir = project({ 'src/styles/tokens.css': SHEET });
-      const radius = blockFor(dir, 'Radius');
-      const out = removeSection(dir, {
+      const directory = project({ 'src/styles/tokens.css': SHEET });
+      const radius = blockFor(directory, 'Radius');
+      const out = removeSection(directory, {
         file: 'src/styles/tokens.css',
         start: radius.titleStart,
         end: radius.titleEnd,
         expect: 'Radius',
       });
-      const css = read(dir, 'src/styles/tokens.css');
+      const css = read(directory, 'src/styles/tokens.css');
       check('deleting a heading takes the comment', out.ok && !css.includes('/* Radius */'), css);
       // The whole line goes, not just the words: an indent left on a line of its
       // own is whitespace nobody typed.
@@ -437,8 +443,8 @@ const read = (dir, rel) => fs.readFileSync(path.join(dir, rel), 'utf8');
       );
       check(
         'and join the group above',
-        titles(dir).join('|') === 'Swatches',
-        titles(dir).join('|'),
+        titles(directory).join('|') === 'Swatches',
+        titles(directory).join('|'),
       );
       check('the other heading is untouched', css.includes('/* Swatches */'), css);
     }
@@ -446,9 +452,9 @@ const read = (dir, rel) => fs.readFileSync(path.join(dir, rel), 'utf8');
     {
       // Removing the FIRST heading leaves its names with no heading at all,
       // which the sheet shows as the group's own untitled list.
-      const dir = project({ 'src/styles/tokens.css': SHEET });
-      const swatches = blockFor(dir, 'Swatches');
-      removeSection(dir, {
+      const directory = project({ 'src/styles/tokens.css': SHEET });
+      const swatches = blockFor(directory, 'Swatches');
+      removeSection(directory, {
         file: 'src/styles/tokens.css',
         start: swatches.titleStart,
         end: swatches.titleEnd,
@@ -456,30 +462,30 @@ const read = (dir, rel) => fs.readFileSync(path.join(dir, rel), 'utf8');
       });
       // Its names now head the group with no title of their own, which is how
       // the sheet shows variables declared before any comment.
-      const after = titles(dir);
+      const after = titles(directory);
       check(
         'the first heading can go too',
-        after[0] == null && after[1] === 'Radius',
+        after[0] === undefined && after[1] === 'Radius',
         JSON.stringify(after),
       );
       check(
         'and nothing else moves',
-        read(dir, 'src/styles/tokens.css').includes('--light-100: #ffffff'),
-        read(dir, 'src/styles/tokens.css'),
+        read(directory, 'src/styles/tokens.css').includes('--light-100: #ffffff'),
+        read(directory, 'src/styles/tokens.css'),
       );
     }
 
     {
       // What Duplicate does: another heading, above the last variable of the run
       // — so the new group has something under it and can be seen.
-      const dir = project({ 'src/styles/tokens.css': SHEET });
-      const out = addSection(dir, {
+      const directory = project({ 'src/styles/tokens.css': SHEET });
+      const out = addSection(directory, {
         file: 'src/styles/tokens.css',
         selector: ':root',
         title: 'Radius copy',
         before: '--radius-round',
       });
-      const css = read(dir, 'src/styles/tokens.css');
+      const css = read(directory, 'src/styles/tokens.css');
       check(
         'duplicating writes a second heading',
         out.ok && css.includes('/* Radius copy */'),
@@ -497,22 +503,22 @@ const read = (dir, rel) => fs.readFileSync(path.join(dir, rel), 'utf8');
       );
       check(
         'and the sheet reads it as a group of its own',
-        titles(dir).join('|') === 'Swatches|Radius|Radius copy',
-        titles(dir).join('|'),
+        titles(directory).join('|') === 'Swatches|Radius|Radius copy',
+        titles(directory).join('|'),
       );
       check(
         'with the variable under it',
-        blockFor(dir, 'Radius copy')
-          .rows.map((r) => r.name)
+        blockFor(directory, 'Radius copy')
+          .rows.map((row) => row.name)
           .join() === '--radius-round',
-        JSON.stringify(blockFor(dir, 'Radius copy').rows.map((r) => r.name)),
+        JSON.stringify(blockFor(directory, 'Radius copy').rows.map((row) => row.name)),
       );
       check(
         'and the rest left in the first',
-        blockFor(dir, 'Radius')
-          .rows.map((r) => r.name)
+        blockFor(directory, 'Radius')
+          .rows.map((row) => row.name)
           .join() === '--radius-small,--radius-main',
-        JSON.stringify(blockFor(dir, 'Radius').rows.map((r) => r.name)),
+        JSON.stringify(blockFor(directory, 'Radius').rows.map((row) => row.name)),
       );
     }
 
@@ -521,15 +527,15 @@ const read = (dir, rel) => fs.readFileSync(path.join(dir, rel), 'utf8');
       // the new group starts with nothing in it and the old one keeps all of its
       // variables. A group with no variables is still a group — it is the one
       // you are about to fill.
-      const dir = project({ 'src/styles/tokens.css': SHEET });
-      const radius = blockFor(dir, 'Radius');
-      const out = addSection(dir, {
+      const directory = project({ 'src/styles/tokens.css': SHEET });
+      const radius = blockFor(directory, 'Radius');
+      const out = addSection(directory, {
         file: 'src/styles/tokens.css',
         selector: ':root',
         title: 'Radius copy',
         at: radius.titleStart,
       });
-      const css = read(dir, 'src/styles/tokens.css');
+      const css = read(directory, 'src/styles/tokens.css');
       check('an empty heading can be written above another', out.ok === true, JSON.stringify(out));
       check(
         'and lands on the line above it',
@@ -538,15 +544,15 @@ const read = (dir, rel) => fs.readFileSync(path.join(dir, rel), 'utf8');
       );
       check('indented to match', /\n  \/\* Radius copy \*\//.test(css), JSON.stringify(css));
 
-      const after = readVariables(dir).files[0].groups[0].blocks;
+      const after = readVariables(directory).files[0].groups[0].blocks;
       check(
         'the sheet shows it in order',
-        after.map((b) => b.title).join('|') === 'Swatches|Radius copy|Radius',
-        after.map((b) => b.title).join('|'),
+        after.map((block) => block.title).join('|') === 'Swatches|Radius copy|Radius',
+        after.map((block) => block.title).join('|'),
       );
       // A group with nothing in it is still a group — dropped, it would be a
       // heading you wrote and then could not find.
-      const made = after.find((b) => b.title === 'Radius copy');
+      const made = after.find((block) => block.title === 'Radius copy');
       check(
         'with nothing in it',
         made?.rows.length === 0,
@@ -554,8 +560,10 @@ const read = (dir, rel) => fs.readFileSync(path.join(dir, rel), 'utf8');
       );
       check(
         'and the group it came from keeps all of its own',
-        after.find((b) => b.title === 'Radius')?.rows.length === 3,
-        JSON.stringify(after.find((b) => b.title === 'Radius')?.rows.map((r) => r.name)),
+        after.find((block) => block.title === 'Radius')?.rows.length === 3,
+        JSON.stringify(
+          after.find((block) => block.title === 'Radius')?.rows.map((row) => row.name),
+        ),
       );
     }
 
@@ -563,9 +571,9 @@ const read = (dir, rel) => fs.readFileSync(path.join(dir, rel), 'utf8');
       // Dragging a heading moves the heading. The variables stay exactly where
       // they are — and that is the whole point: the ones that end up below it
       // are now the ones it heads.
-      const dir = project({ 'src/styles/tokens.css': SHEET });
-      const radius = blockFor(dir, 'Radius');
-      const out = moveHeading(dir, {
+      const directory = project({ 'src/styles/tokens.css': SHEET });
+      const radius = blockFor(directory, 'Radius');
+      const out = moveHeading(directory, {
         file: 'src/styles/tokens.css',
         selector: ':root',
         start: radius.titleStart,
@@ -573,7 +581,7 @@ const read = (dir, rel) => fs.readFileSync(path.join(dir, rel), 'utf8');
         expect: 'Radius',
         before: '--dark-900',
       });
-      const css = read(dir, 'src/styles/tokens.css');
+      const css = read(directory, 'src/styles/tokens.css');
       check('a heading can be moved on its own', out.ok === true, JSON.stringify(out));
       check(
         'to sit above the variable it was dropped on',
@@ -587,17 +595,17 @@ const read = (dir, rel) => fs.readFileSync(path.join(dir, rel), 'utf8');
       );
       check(
         'so the ones below it are now its own',
-        blockFor(dir, 'Radius')
-          .rows.map((r) => r.name)
+        blockFor(directory, 'Radius')
+          .rows.map((row) => row.name)
           .join() === '--dark-900,--radius-small,--radius-main,--radius-round',
-        JSON.stringify(blockFor(dir, 'Radius').rows.map((r) => r.name)),
+        JSON.stringify(blockFor(directory, 'Radius').rows.map((row) => row.name)),
       );
       check(
         'and the group above it keeps the rest',
-        blockFor(dir, 'Swatches')
-          .rows.map((r) => r.name)
+        blockFor(directory, 'Swatches')
+          .rows.map((row) => row.name)
           .join() === '--light-100',
-        JSON.stringify(blockFor(dir, 'Swatches').rows.map((r) => r.name)),
+        JSON.stringify(blockFor(directory, 'Swatches').rows.map((row) => row.name)),
       );
       check(
         'the comment itself is unchanged',
@@ -609,17 +617,17 @@ const read = (dir, rel) => fs.readFileSync(path.join(dir, rel), 'utf8');
     {
       // Dropped past everything: it heads nothing yet, and heads whatever is
       // added next.
-      const dir = project({ 'src/styles/tokens.css': SHEET });
-      const swatches = blockFor(dir, 'Swatches');
-      const out = moveHeading(dir, {
+      const directory = project({ 'src/styles/tokens.css': SHEET });
+      const swatches = blockFor(directory, 'Swatches');
+      const out = moveHeading(directory, {
         file: 'src/styles/tokens.css',
         selector: ':root',
         start: swatches.titleStart,
         end: swatches.titleEnd,
         expect: 'Swatches',
-        before: null,
+        before: undefined,
       });
-      const css = read(dir, 'src/styles/tokens.css');
+      const css = read(directory, 'src/styles/tokens.css');
       check('a heading can be moved to the end', out.ok === true, JSON.stringify(out));
       check(
         'landing after the last variable',
@@ -628,16 +636,18 @@ const read = (dir, rel) => fs.readFileSync(path.join(dir, rel), 'utf8');
       );
       check(
         'where it heads nothing',
-        blockFor(dir, 'Swatches').rows.length === 0,
-        JSON.stringify(blockFor(dir, 'Swatches').rows.length),
+        blockFor(directory, 'Swatches').rows.length === 0,
+        JSON.stringify(blockFor(directory, 'Swatches').rows.length),
       );
       check(
         'and what it used to head is now the untitled run',
-        readVariables(dir).files[0].groups[0].blocks[0].title == null,
-        JSON.stringify(readVariables(dir).files[0].groups[0].blocks.map((b) => b.title)),
+        readVariables(directory).files[0].groups[0].blocks[0].title === undefined,
+        JSON.stringify(
+          readVariables(directory).files[0].groups[0].blocks.map((block) => block.title),
+        ),
       );
 
-      const stale = moveHeading(dir, {
+      const stale = moveHeading(directory, {
         file: 'src/styles/tokens.css',
         selector: ':root',
         start: swatches.titleStart,
@@ -653,10 +663,10 @@ const read = (dir, rel) => fs.readFileSync(path.join(dir, rel), 'utf8');
     }
 
     {
-      const dir = project({ 'src/styles/tokens.css': SHEET });
+      const directory = project({ 'src/styles/tokens.css': SHEET });
       check(
         'a heading that would close its own comment is refused',
-        addSection(dir, {
+        addSection(directory, {
           file: 'src/styles/tokens.css',
           selector: ':root',
           title: 'a */ b',
@@ -665,7 +675,7 @@ const read = (dir, rel) => fs.readFileSync(path.join(dir, rel), 'utf8');
       );
       check(
         'an empty one is refused',
-        addSection(dir, {
+        addSection(directory, {
           file: 'src/styles/tokens.css',
           selector: ':root',
           title: '  ',
@@ -674,15 +684,15 @@ const read = (dir, rel) => fs.readFileSync(path.join(dir, rel), 'utf8');
       );
       check(
         'and a rule that is not there is refused',
-        addSection(dir, {
+        addSection(directory, {
           file: 'src/styles/tokens.css',
           selector: '.gone',
           title: 'x',
-          before: null,
+          before: undefined,
         }).ok === false,
       );
-      const radius = blockFor(dir, 'Radius');
-      const stale = removeSection(dir, {
+      const radius = blockFor(directory, 'Radius');
+      const stale = removeSection(directory, {
         file: 'src/styles/tokens.css',
         start: radius.titleStart,
         end: radius.titleEnd,
@@ -695,16 +705,16 @@ const read = (dir, rel) => fs.readFileSync(path.join(dir, rel), 'utf8');
       );
       check(
         'and the file is whole',
-        read(dir, 'src/styles/tokens.css') === SHEET,
-        read(dir, 'src/styles/tokens.css'),
+        read(directory, 'src/styles/tokens.css') === SHEET,
+        read(directory, 'src/styles/tokens.css'),
       );
     }
   }
 
   // --- nothing to do --------------------------------------------------------
   {
-    const dir = project();
-    const same = renameVariables(dir, {
+    const directory = project();
+    const same = renameVariables(directory, {
       renames: [{ from: '--max-width-main', to: '--max-width-main' }],
     });
     check(
@@ -712,9 +722,11 @@ const read = (dir, rel) => fs.readFileSync(path.join(dir, rel), 'utf8');
       same.ok === true && same.files === 0,
       JSON.stringify(same),
     );
-    const none = renameVariables(dir, { renames: [] });
+    const none = renameVariables(directory, { renames: [] });
     check('and an empty batch is not an error', none.ok === true, JSON.stringify(none));
-    const missing = renameVariables(dir, { renames: [{ from: '--not-here', to: '--nor-here' }] });
+    const missing = renameVariables(directory, {
+      renames: [{ from: '--not-here', to: '--nor-here' }],
+    });
     check(
       'a name nothing declares touches nothing',
       missing.ok === true && missing.occurrences === 0,

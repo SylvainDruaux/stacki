@@ -31,9 +31,9 @@ const check = (what, condition, detail) => {
 
 (async () => {
   const esbuild = require('esbuild');
-  const buildDir = path.join(__dirname, '..', 'node_modules', '.stacki-test');
-  fs.mkdirSync(buildDir, { recursive: true });
-  const out = path.join(buildDir, 'renders-element.bundle.mjs');
+  const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
+  fs.mkdirSync(buildDirectory, { recursive: true });
+  const out = path.join(buildDirectory, 'renders-element.bundle.mjs');
   await esbuild.build({
     entryPoints: [path.join(__dirname, '..', 'src', 'liveClasses.js')],
     outfile: out,
@@ -57,7 +57,7 @@ const check = (what, condition, detail) => {
     rendersOwnElement({ kind: 'component', name: 'Fragment' }) === false,
   );
   check('nor does a slot', rendersOwnElement({ kind: 'element', name: 'slot' }) === false);
-  check('and nothing at all is nothing', rendersOwnElement(null) === false);
+  check('and nothing at all is nothing', rendersOwnElement(undefined) === false);
 
   // --- and who asks -----------------------------------------------------------
   const app = fs.readFileSync(path.join(__dirname, '..', 'src', 'App.tsx'), 'utf8');
@@ -76,7 +76,7 @@ const check = (what, condition, detail) => {
   );
 
   // --- the navigator, with the map the app would build -------------------------
-  const bundlePath = path.join(buildDir, 'fragment-identity.bundle.js');
+  const bundlePath = path.join(buildDirectory, 'fragment-identity.bundle.js');
   await esbuild.build({
     entryPoints: [path.join(__dirname, '..', 'src', 'panels', 'StructurePanel.tsx')],
     outfile: bundlePath,
@@ -98,7 +98,7 @@ const check = (what, condition, detail) => {
   global.HTMLElement = dom.window.HTMLElement;
   global.Node = dom.window.Node;
   global.IS_REACT_ACT_ENVIRONMENT = true;
-  global.requestAnimationFrame = (fn) => setTimeout(fn, 0);
+  global.requestAnimationFrame = (callback) => setTimeout(callback, 0);
   global.cancelAnimationFrame = clearTimeout;
   global.ResizeObserver = class {
     observe() {}
@@ -156,7 +156,7 @@ const check = (what, condition, detail) => {
         pageState: { editable: true, model: { nodes: [wrapper], imports: [] } },
         layouts: [],
         currentLayoutName: '',
-        selectedId: null,
+        selectedId: undefined,
         liveClassesById: live,
         onSelect: () => {},
         onDropComponent: () => {},
@@ -173,11 +173,11 @@ const check = (what, condition, detail) => {
         hasClipboard: false,
       }),
     );
-    await new Promise((r) => setTimeout(r, 30));
+    await new Promise((resolve) => setTimeout(resolve, 30));
   });
   await act(async () => {
     container.querySelector('.panel-header button')?.click();
-    await new Promise((r) => setTimeout(r, 30));
+    await new Promise((resolve) => setTimeout(resolve, 30));
   });
 
   const labelOf = (id) =>

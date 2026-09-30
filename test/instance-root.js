@@ -103,12 +103,21 @@ const BUTTON = 'src/components/Button.astro|';
   const NO_BOX = { x: 0, y: 0, width: 0, height: 0, left: 0, top: 0, right: 0, bottom: 0 };
   window.Element.prototype.getBoundingClientRect = function () {
     const key = (this.getAttribute('class') || '').split(' ')[0];
-    const b = BOXES[key];
-    if (!b) {
+    const box = BOXES[key];
+    if (!box) {
       return NO_BOX;
     }
-    const [x, y, w, h] = b;
-    return { x, y, width: w, height: h, left: x, top: y, right: x + w, bottom: y + h };
+    const [x, y, width, height] = box;
+    return {
+      x,
+      y,
+      width,
+      height,
+      left: x,
+      top: y,
+      right: x + width,
+      bottom: y + height,
+    };
   };
   window.Range.prototype.getBoundingClientRect = () => NO_BOX;
 
@@ -123,7 +132,7 @@ const BUTTON = 'src/components/Button.astro|';
   global.requestAnimationFrame = window.requestAnimationFrame.bind(window);
 
   const sent = [];
-  window.parent = { postMessage: (m) => sent.push(m) };
+  window.parent = { postMessage: (message) => sent.push(message) };
   const electron = {
     contextBridge: { exposeInMainWorld: () => {} },
     ipcRenderer: { on: () => {}, send: () => {}, invoke: async () => {} },
@@ -136,31 +145,32 @@ const BUTTON = 'src/components/Button.astro|';
   process.isMainFrame = false;
   require(PRELOAD);
   Module.prototype.require = realRequire;
-  await new Promise((r) => setTimeout(r, 60));
+  await new Promise((resolve) => setTimeout(resolve, 60));
 
-  const q = (sel) => window.document.querySelector(sel);
-  const carries = (el, p) => (el.getAttribute('data-avb-p') || '').split(' ').includes(p);
+  const query = (selector) => window.document.querySelector(selector);
+  const carries = (element, nodePath) =>
+    (element.getAttribute('data-avb-p') || '').split(' ').includes(nodePath);
 
   // --- the report ---------------------------------------------------------------
   check(
     'the field answers to the instance',
-    carries(q('label.field'), '0.1.0.0'),
-    q('label.field').getAttribute('data-avb-p'),
+    carries(query('label.field'), '0.1.0.0'),
+    query('label.field').getAttribute('data-avb-p'),
   );
   check(
     'and so does the control it came in on',
-    carries(q('select.field_control'), '0.1.0.0'),
-    q('select.field_control').getAttribute('data-avb-p'),
+    carries(query('select.field_control'), '0.1.0.0'),
+    query('select.field_control').getAttribute('data-avb-p'),
   );
 
-  const boxFor = (p) => {
-    const ev = new window.MessageEvent('message', {
-      data: { type: 'avb:track', paths: [p], scope: '', focus: '', focusOcc: 0 },
+  const boxFor = (nodePath) => {
+    const event = new window.MessageEvent('message', {
+      data: { type: 'avb:track', paths: [nodePath], scope: '', focus: '', focusOcc: 0 },
     });
-    Object.defineProperty(ev, 'source', { value: window.parent });
-    window.dispatchEvent(ev);
-    const rects = sent.filter((m) => m.type === 'avb:rects').pop();
-    return ((rects?.rects || {})[p] || [])[0];
+    Object.defineProperty(event, 'source', { value: window.parent });
+    window.dispatchEvent(event);
+    const rects = sent.filter((message) => message.type === 'avb:rects').pop();
+    return ((rects?.rects || {})[nodePath] || [])[0];
   };
   {
     const box = boxFor('0.1.0.0');
@@ -176,14 +186,14 @@ const BUTTON = 'src/components/Button.astro|';
   // whatever the component happens to sit in.
   {
     sent.length = 0;
-    q('span.field_label').dispatchEvent(
+    query('span.field_label').dispatchEvent(
       new window.MouseEvent('click', { bubbles: true, cancelable: true }),
     );
-    const msg = sent.filter((m) => m.type === 'avb:click-node').pop();
+    const message = sent.filter((message) => message.type === 'avb:click-node').pop();
     check(
       'a click on the label reaches the component',
-      msg?.path === '0.1.0.0',
-      JSON.stringify(msg),
+      message?.path === '0.1.0.0',
+      JSON.stringify(message),
     );
   }
 
@@ -194,14 +204,14 @@ const BUTTON = 'src/components/Button.astro|';
   // handed in on a spread, and climbing it would walk to <body>.
   check(
     'the layout body is not given the page path',
-    !carries(q('body'), '0.1'),
-    q('body').getAttribute('data-avb-p'),
+    !carries(query('body'), '0.1'),
+    query('body').getAttribute('data-avb-p'),
   );
-  check('nor is <main>', !carries(q('main'), '0.1'), q('main').getAttribute('data-avb-p'));
+  check('nor is <main>', !carries(query('main'), '0.1'), query('main').getAttribute('data-avb-p'));
   check(
     'the section still has it',
-    carries(q('section'), '0.1'),
-    q('section').getAttribute('data-avb-p'),
+    carries(query('section'), '0.1'),
+    query('section').getAttribute('data-avb-p'),
   );
   {
     const box = boxFor('0.1');
@@ -214,7 +224,7 @@ const BUTTON = 'src/components/Button.astro|';
 
   // A component whose own root takes the spread was already named there, and
   // nothing moves.
-  check('a component named on its root is left alone', carries(q('button.button'), '0.1.0.1'));
+  check('a component named on its root is left alone', carries(query('button.button'), '0.1.0.1'));
   {
     const box = boxFor('0.1.0.1');
     check('and measures as itself', box && box.h === 40, JSON.stringify(box));
@@ -230,23 +240,23 @@ const BUTTON = 'src/components/Button.astro|';
   // one of them outlined the whole page.
   check(
     'the layout is not given the page’s name for a section',
-    !carries(q('body'), '0.2'),
-    q('body').getAttribute('data-avb-p'),
+    !carries(query('body'), '0.2'),
+    query('body').getAttribute('data-avb-p'),
   );
   check(
     'and neither is anything else on the way up',
-    !carries(q('main'), '0.2'),
-    q('main').getAttribute('data-avb-p'),
+    !carries(query('main'), '0.2'),
+    query('main').getAttribute('data-avb-p'),
   );
   check(
     'the section did pick up the layout’s namespace, which is what tempted it',
-    (q('section.plain').getAttribute('data-avb-p') || '').includes(LAYOUT),
-    q('section.plain').getAttribute('data-avb-p'),
+    (query('section.plain').getAttribute('data-avb-p') || '').includes(LAYOUT),
+    query('section.plain').getAttribute('data-avb-p'),
   );
   check(
     'the section it belongs to still has it',
-    carries(q('section.plain'), '0.2'),
-    q('section.plain').getAttribute('data-avb-p'),
+    carries(query('section.plain'), '0.2'),
+    query('section.plain').getAttribute('data-avb-p'),
   );
   {
     const box = boxFor('0.2');
@@ -259,14 +269,14 @@ const BUTTON = 'src/components/Button.astro|';
   }
   {
     sent.length = 0;
-    q('p.plain_text').dispatchEvent(
+    query('p.plain_text').dispatchEvent(
       new window.MouseEvent('click', { bubbles: true, cancelable: true }),
     );
-    const msg = sent.filter((m) => m.type === 'avb:click-node').pop();
+    const message = sent.filter((message) => message.type === 'avb:click-node').pop();
     check(
       'and a click inside it reaches what is inside it',
-      msg?.path === '0.2.0',
-      JSON.stringify(msg),
+      message?.path === '0.2.0',
+      JSON.stringify(message),
     );
   }
 
@@ -284,7 +294,7 @@ const BUTTON = 'src/components/Button.astro|';
   );
   check(
     'and only moves a name that arrived on a spread',
-    /rodeIn\(el, p\)/.test(source),
+    /rodeIn\(element, nodePath\)/.test(source),
     'an element the page named itself can still be climbed away from',
   );
 

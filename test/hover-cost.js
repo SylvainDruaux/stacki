@@ -33,11 +33,11 @@ const check = (what, condition, detail) => {
     failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
   }
 };
-const settle = (ms = 120) => new Promise((r) => setTimeout(r, ms));
+const settle = (ms = 120) => new Promise((resolve) => setTimeout(resolve, ms));
 
 (async () => {
   const { JSDOM } = require('jsdom');
-  const marked = (p, html) => `<!--avb-s:${p}-->${html}<!--avb-e:${p}-->`;
+  const marked = (nodePath, html) => `<!--avb-s:${nodePath}-->${html}<!--avb-e:${nodePath}-->`;
   const dom = new JSDOM(
     `<!doctype html><body>
       ${marked('0', '<section class="hero" data-box="hero"><h1 data-box="head">Hi</h1></section>')}
@@ -53,8 +53,17 @@ const settle = (ms = 120) => new Promise((r) => setTimeout(r, ms));
     copy: [10, 420, 300, 40],
   };
   window.Element.prototype.getBoundingClientRect = function () {
-    const [x, y, w, h] = boxes[this.getAttribute('data-box')] || [0, 0, 0, 0];
-    return { x, y, width: w, height: h, left: x, top: y, right: x + w, bottom: y + h };
+    const [x, y, width, height] = boxes[this.getAttribute('data-box')] || [0, 0, 0, 0];
+    return {
+      x,
+      y,
+      width: width,
+      height: height,
+      left: x,
+      top: y,
+      right: x + width,
+      bottom: y + height,
+    };
   };
   const NO_BOX = { x: 0, y: 0, width: 0, height: 0, left: 0, top: 0, right: 0, bottom: 0 };
   window.Range.prototype.getBoundingClientRect = () => NO_BOX;
@@ -70,7 +79,7 @@ const settle = (ms = 120) => new Promise((r) => setTimeout(r, ms));
   global.requestAnimationFrame = window.requestAnimationFrame.bind(window);
 
   const sent = [];
-  window.parent = { postMessage: (m) => sent.push(m) };
+  window.parent = { postMessage: (message) => sent.push(message) };
   const electron = {
     contextBridge: { exposeInMainWorld: () => {} },
     ipcRenderer: { on: () => {}, send: () => {}, invoke: async () => {} },
@@ -86,11 +95,11 @@ const settle = (ms = 120) => new Promise((r) => setTimeout(r, ms));
   await settle(60);
 
   const post = (data) => {
-    const ev = new window.MessageEvent('message', { data });
-    Object.defineProperty(ev, 'source', { value: window.parent });
-    window.dispatchEvent(ev);
+    const event = new window.MessageEvent('message', { data });
+    Object.defineProperty(event, 'source', { value: window.parent });
+    window.dispatchEvent(event);
   };
-  const count = (type) => sent.filter((m) => m.type === type).length;
+  const count = (type) => sent.filter((message) => message.type === type).length;
   const pageAnswers = () => count('avb:rendered-nodes') + count('avb:node-classes');
   const track = async (paths, extra = {}) => {
     post({ type: 'avb:track', paths, scope: '', focus: '', focusOcc: 0, ...extra });

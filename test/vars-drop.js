@@ -37,9 +37,9 @@ const check = (what, condition, detail) => {
 
 (async () => {
   const esbuild = require('esbuild');
-  const buildDir = path.join(__dirname, '..', 'node_modules', '.stacki-test');
-  fs.mkdirSync(buildDir, { recursive: true });
-  const bundlePath = path.join(buildDir, 'vars-drop.bundle.js');
+  const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
+  fs.mkdirSync(buildDirectory, { recursive: true });
+  const bundlePath = path.join(buildDirectory, 'vars-drop.bundle.js');
   await esbuild.build({
     stdin: {
       contents:
@@ -81,18 +81,19 @@ const check = (what, condition, detail) => {
   const slotsOf = (blocks) => {
     const list = [];
     blocks.forEach((block, bi) => {
-      if (block.title != null) {
+      if (block.title !== undefined) {
         list.push({ kind: 'heading', block, bi });
       }
-      block.rows.forEach((r) => list.push({ kind: 'row', block, row: r, bi }));
+      block.rows.forEach((row) => list.push({ kind: 'row', block, row, bi }));
       list.push({ kind: 'end', block, bi });
     });
     return list;
   };
   const slots = slotsOf([swatches, empty, radius]);
+  // The slots, by index:
   // 0 head(Swatches) | 1 --light-100 | 2 --light-200 | 3 --dark-900 | 4 end
   // 5 head(Palette)   | 6 end
-  // 7 head(Radius)    | 8 --radius-main | 9 end
+  // 7 head(Radius)    | 8 --radius-main | 9 end.
 
   // --- within a group -------------------------------------------------------
   {
@@ -147,7 +148,7 @@ const check = (what, condition, detail) => {
     const toEnd = movesForDrop(slots, 1, 9);
     check(
       'dropping past everything goes to the end of the rule',
-      toEnd.length === 1 && toEnd[0].target === null,
+      toEnd.length === 1 && toEnd[0].target === undefined,
       JSON.stringify(toEnd),
     );
 
@@ -170,9 +171,9 @@ const check = (what, condition, detail) => {
       label: name.slice(2),
       cells: [cell(name, '0', ':root'), cell(name, '1', '.theme-dark')],
     });
-    const a = { title: 'a', rows: [modeRow('--background'), modeRow('--text')] };
-    const b = { title: 'b', rows: [modeRow('--link')] };
-    const modeSlots = slotsOf([a, b]);
+    const firstBlock = { title: 'a', rows: [modeRow('--background'), modeRow('--text')] };
+    const secondBlock = { title: 'b', rows: [modeRow('--link')] };
+    const modeSlots = slotsOf([firstBlock, secondBlock]);
     // These headings are shared name prefixes rather than comments (no
     // titleStart), so a name is the right thing to land in front of.
     const moves = movesForDrop(modeSlots, 1, 4); // --background into group b
@@ -183,12 +184,12 @@ const check = (what, condition, detail) => {
     );
     check(
       'each in its own rule',
-      moves.map((m) => m.selector).join('|') === ':root|.theme-dark',
-      JSON.stringify(moves.map((m) => m.selector)),
+      moves.map((move) => move.selector).join('|') === ':root|.theme-dark',
+      JSON.stringify(moves.map((move) => move.selector)),
     );
     check(
       'and each in front of that rule’s copy of the target',
-      moves.every((m) => m.target === '--link'),
+      moves.every((move) => move.target === '--link'),
       JSON.stringify(moves),
     );
   }
@@ -270,7 +271,7 @@ const check = (what, condition, detail) => {
     const toEnd = dropPlan(slots, 0, 9);
     check(
       'dropped past everything it heads nothing yet',
-      toEnd?.kind === 'heading' && toEnd.before === null,
+      toEnd?.kind === 'heading' && toEnd.before === undefined,
       JSON.stringify(toEnd),
     );
 
@@ -283,12 +284,12 @@ const check = (what, condition, detail) => {
 
     check(
       'a heading dropped where it already is does nothing',
-      dropPlan(slots, 0, 0) === null,
+      dropPlan(slots, 0, 0) === undefined,
       JSON.stringify(dropPlan(slots, 0, 0)),
     );
     check(
       'and dropped just below itself does nothing either',
-      dropPlan(slots, 0, 1) === null,
+      dropPlan(slots, 0, 1) === undefined,
       JSON.stringify(dropPlan(slots, 0, 1)),
     );
 
@@ -309,9 +310,9 @@ const check = (what, condition, detail) => {
   // moving a line in a real file and reading the groups back.
   {
     const cssVars = require('../dist/electron/cssVars.js');
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'stacki-drop-'));
-    fs.mkdirSync(path.join(dir, 'src', 'styles'), { recursive: true });
-    const sheet = path.join(dir, 'src', 'styles', 't.css');
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'stacki-drop-'));
+    fs.mkdirSync(path.join(directory, 'src', 'styles'), { recursive: true });
+    const sheet = path.join(directory, 'src', 'styles', 't.css');
     // The shape that broke: variables, an EMPTY group, then another group. It is
     // what you get by duplicating a group, which is how you make an empty one.
     fs.writeFileSync(
@@ -328,10 +329,10 @@ const check = (what, condition, detail) => {
 }
 `,
     );
-    const blocksNow = () => cssVars.readVariables(dir).files[0].groups[0].blocks;
+    const blocksNow = () => cssVars.readVariables(directory).files[0].groups[0].blocks;
     const groupsNow = () =>
       blocksNow()
-        .map((b) => `${b.title}:${b.rows.map((r) => r.name).join(',')}`)
+        .map((block) => `${block.title}:${block.rows.map((row) => row.name).join(',')}`)
         .join(' | ');
     const liveSlots = () => slotsOf(blocksNow());
 
@@ -341,8 +342,8 @@ const check = (what, condition, detail) => {
       (slot) => slot.kind === 'end' && slot.block.title === 'Swatches',
     );
     const intoEmpty = movesForDrop(live, 0, emptyEnd);
-    for (const m of intoEmpty) {
-      cssVars.moveVariable(dir, m);
+    for (const move of intoEmpty) {
+      cssVars.moveVariable(directory, move);
     }
     check(
       'a variable dropped into an empty group ends up in it',
@@ -363,8 +364,8 @@ const check = (what, condition, detail) => {
     const light200 = live.findIndex(
       (slot) => slot.kind === 'row' && slot.row.name === '--light-200',
     );
-    for (const m of movesForDrop(live, light200, onBold)) {
-      cssVars.moveVariable(dir, m);
+    for (const move of movesForDrop(live, light200, onBold)) {
+      cssVars.moveVariable(directory, move);
     }
     check(
       'a variable dropped onto another lands in front of it',
@@ -380,8 +381,8 @@ const check = (what, condition, detail) => {
     // Dropped past everything: the end of the rule, inside the last group.
     live = liveSlots();
     const first = live.findIndex((slot) => slot.kind === 'row');
-    for (const m of movesForDrop(live, first, live.length)) {
-      cssVars.moveVariable(dir, m);
+    for (const move of movesForDrop(live, first, live.length)) {
+      cssVars.moveVariable(directory, move);
     }
     check(
       'a variable dropped past everything goes to the last group',
@@ -390,7 +391,7 @@ const check = (what, condition, detail) => {
       groupsNow(),
     );
 
-    fs.rmSync(dir, { recursive: true, force: true });
+    fs.rmSync(directory, { recursive: true, force: true });
   }
 
   if (failures.length) {

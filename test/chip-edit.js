@@ -27,15 +27,15 @@ const check = (what, condition, detail) => {
 
 (async () => {
   const esbuild = require('esbuild');
-  const buildDir = path.join(__dirname, '..', 'node_modules', '.stacki-test');
-  fs.mkdirSync(buildDir, { recursive: true });
-  const entry = path.join(buildDir, 'chip-edit.entry.jsx');
+  const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
+  fs.mkdirSync(buildDirectory, { recursive: true });
+  const entry = path.join(buildDirectory, 'chip-edit.entry.jsx');
   fs.writeFileSync(
     entry,
     `export { BindField } ` +
       `from ${JSON.stringify(path.join(__dirname, '..', 'src', 'panels', 'PropsPanel.jsx'))};\n`,
   );
-  const bundle = path.join(buildDir, 'chip-edit.bundle.js');
+  const bundle = path.join(buildDirectory, 'chip-edit.bundle.js');
   await esbuild.build({
     entryPoints: [entry],
     outfile: bundle,
@@ -81,6 +81,7 @@ const check = (what, condition, detail) => {
   });
   dom.window.Range.prototype.getClientRects = () => ({
     length: 0,
+    // eslint-disable-next-line stacki/no-null -- Stubs DOMRectList.item, which answers null.
     item: () => null,
     [Symbol.iterator]: function* () {},
   });
@@ -107,8 +108,8 @@ const check = (what, condition, detail) => {
         React.createElement(BindField, {
           value,
           placeholder: '',
-          bindCtx: {},
-          dataCtx: {
+          bindContext: {},
+          dataContext: {
             frontmatter: FRONTMATTER,
             imports: IMPORTS,
             onSetFrontmatter: (code) => wrote.push(code),
@@ -126,12 +127,12 @@ const check = (what, condition, detail) => {
     };
     // Every action row in the open menu, by its text.
     const menuRows = () =>
-      [...document.querySelectorAll('.bind-menu .dp-foot')].map((r) => r.textContent.trim());
+      [...document.querySelectorAll('.bind-menu .dp-foot')].map((row) => row.textContent.trim());
     // A missing row is a FAILURE, not a crash: this is exactly what regresses,
     // and a stack trace buries which case it was.
     const clickRow = async (match) => {
-      const row = [...document.querySelectorAll('.bind-menu .dp-foot')].find((r) =>
-        r.textContent.includes(match),
+      const row = [...document.querySelectorAll('.bind-menu .dp-foot')].find((row) =>
+        row.textContent.includes(match),
       );
       check(`the menu offers "${match}"`, !!row, `rows were ${JSON.stringify(menuRows())}`);
       if (!row) {
@@ -160,82 +161,88 @@ const check = (what, condition, detail) => {
 
   // --- Two chips in one field -----------------------------------------------
   {
-    const m = await mount({ type: 'expr', value: '`${media} ${theme}`' });
+    const mounted = await mount({ type: 'expr', value: '`${media} ${theme}`' });
     check(
       'both bindings draw as chips',
-      m.chips().length === 2,
-      `${m.chips().length} chips: ${m.host.textContent}`,
+      mounted.chips().length === 2,
+      `${mounted.chips().length} chips: ${mounted.host.textContent}`,
     );
     // The pencil that could only speak for one of them is gone.
     check(
       'the field has no pencil beside it',
-      !m.host.querySelector('.attr-asset-toggle'),
-      m.host.innerHTML.slice(0, 200),
+      !mounted.host.querySelector('.attr-asset-toggle'),
+      mounted.host.innerHTML.slice(0, 200),
     );
 
     // First chip: a const in this file, so the row offers to edit it here.
-    await m.press(m.chips()[0]);
-    check('pressing a chip opens the menu', m.menuOpen(), 'no menu');
+    await mounted.press(mounted.chips()[0]);
+    check('pressing a chip opens the menu', mounted.menuOpen(), 'no menu');
     check(
       'and the menu offers to edit THAT chip',
-      m.menuRows().some((t) => t === 'Edit media'),
-      JSON.stringify(m.menuRows()),
+      mounted.menuRows().some((label) => label === 'Edit media'),
+      JSON.stringify(mounted.menuRows()),
     );
 
     // Second chip: imported, so the row offers to open its file instead.
-    await m.press(m.chips()[1]);
+    await mounted.press(mounted.chips()[1]);
     check(
       'the second chip gets its own answer',
-      m.menuRows().some((t) => t === 'Open where theme is defined'),
-      JSON.stringify(m.menuRows()),
+      mounted.menuRows().some((label) => label === 'Open where theme is defined'),
+      JSON.stringify(mounted.menuRows()),
     );
     check(
       'and not the first chip’s',
-      !m.menuRows().some((t) => t.includes('media')),
-      JSON.stringify(m.menuRows()),
+      !mounted.menuRows().some((label) => label.includes('media')),
+      JSON.stringify(mounted.menuRows()),
     );
 
     // …and taking it does the thing for the chip that was pressed.
-    await m.clickRow('Open where theme');
+    await mounted.clickRow('Open where theme');
     check(
       'choosing it opens that symbol',
-      m.opened.join(',') === 'theme',
-      JSON.stringify(m.opened),
+      mounted.opened.join(',') === 'theme',
+      JSON.stringify(mounted.opened),
     );
-    check('and closes the menu', !m.menuOpen(), 'menu still open');
+    check('and closes the menu', !mounted.menuOpen(), 'menu still open');
 
     // The local one edits in place, under the field, rather than opening a file.
-    await m.press(m.chips()[0]);
-    await m.clickRow('Edit media');
+    await mounted.press(mounted.chips()[0]);
+    await mounted.clickRow('Edit media');
     check(
       'editing a local const opens it in place',
       !!document.querySelector('.var-src'),
       'no inline editor',
     );
-    check('and does not open a file', m.opened.join(',') === 'theme', JSON.stringify(m.opened));
-    await m.done();
+    check(
+      'and does not open a file',
+      mounted.opened.join(',') === 'theme',
+      JSON.stringify(mounted.opened),
+    );
+    await mounted.done();
   }
 
   // --- Nothing to edit -------------------------------------------------------
   {
     // A binding to something no frontmatter declares and no import names: the
     // row would have nowhere to go, so it isn't offered.
-    const m = await mount({ type: 'expr', value: '`${nowhere}`' });
+    const mounted = await mount({ type: 'expr', value: '`${nowhere}`' });
     check(
       'an unfindable binding still opens the menu',
-      (await m.press(m.chips()[0]), m.menuOpen()),
+      (await mounted.press(mounted.chips()[0]), mounted.menuOpen()),
     );
     check(
       'but offers no edit row',
-      !m.menuRows().some((t) => t.startsWith('Edit') || t.startsWith('Open where')),
-      JSON.stringify(m.menuRows()),
+      !mounted
+        .menuRows()
+        .some((label) => label.startsWith('Edit') || label.startsWith('Open where')),
+      JSON.stringify(mounted.menuRows()),
     );
     check(
       'while still offering the rest of it',
-      m.menuRows().some((t) => t.includes('Write an expression')),
-      JSON.stringify(m.menuRows()),
+      mounted.menuRows().some((label) => label.includes('Write an expression')),
+      JSON.stringify(mounted.menuRows()),
     );
-    await m.done();
+    await mounted.done();
   }
 
   if (failures.length) {
@@ -244,7 +251,7 @@ const check = (what, condition, detail) => {
   }
   console.log(`chip-edit: ${checked} passed  [per chip, in the menu]`);
   process.exit(0);
-})().catch((err) => {
-  console.error(err);
+})().catch((error) => {
+  console.error(error);
   process.exit(1);
 });

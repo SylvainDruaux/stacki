@@ -11,6 +11,9 @@ import {
 } from '../../dist/shared/frontmatter.js';
 import { LIMITS } from '../../dist/shared/limits.js';
 
+// Null as a boundary receives it, parsed from JSON: inputs may hold it; our values never do.
+const jsonNull: unknown = JSON.parse('null');
+
 const member = { name: 'Card', path: './Card.astro', quote: '"', at: 0 };
 const slot = {
   at: 0,
@@ -31,10 +34,10 @@ test('real import slots preserve aliases, comments, quote choice, and placement'
 
 test('slot and member fields reject malformed values', () => {
   for (const bad of [
-    null,
+    jsonNull,
     [],
     {},
-    { ...slot, members: null },
+    { ...slot, members: jsonNull },
     { ...slot, source: 1 },
     { ...slot, offset: -1 },
     { ...slot, at: 0.5 },
@@ -45,8 +48,8 @@ test('slot and member fields reject malformed values', () => {
     assert.throws(() => parseImportSlot(bad), /ImportSlot/);
   }
   for (const bad of [
-    null,
-    { ...member, name: null },
+    jsonNull,
+    { ...member, name: jsonNull },
     { ...member, path: false },
     { ...member, quote: 2 },
     { ...member, at: -1 },

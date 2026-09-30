@@ -17,6 +17,7 @@
 // compared: they still take the legacy path in the app. Byte-identical
 // results are counted and reported; a model difference fails.
 const assert = require('node:assert/strict');
+const { LIMITS } = require('../dist/shared/limits.js');
 const { test } = require('node:test');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -34,20 +35,20 @@ const { projectPage } = require('../dist/shared/source-projection.js');
 const { decodeUtf8, encodeUtf8 } = require('../dist/shared/span.js');
 const { applySplices } = require('../dist/shared/splice.js');
 
-const buildDir = path.join(__dirname, '..', 'node_modules', '.stacki-test', 'gesture-parity');
-fs.mkdirSync(buildDir, { recursive: true });
+const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test', 'gesture-parity');
+fs.mkdirSync(buildDirectory, { recursive: true });
 esbuild.buildSync({
   entryPoints: ['pageEdits', 'editGestures'].map((name) =>
     path.join(__dirname, '..', 'src', `${name}.ts`),
   ),
-  outdir: buildDir,
+  outdir: buildDirectory,
   bundle: true,
   format: 'cjs',
   platform: 'node',
   logLevel: 'silent',
 });
-const edits = require(path.join(buildDir, 'pageEdits.js'));
-const gestures = require(path.join(buildDir, 'editGestures.js'));
+const edits = require(path.join(buildDirectory, 'pageEdits.js'));
+const gestures = require(path.join(buildDirectory, 'editGestures.js'));
 
 const DIRECTORIES = ['test/corpus', 'test/fixtures/round-trip', 'test/fixtures/editor-core'];
 const BOM = '﻿';
@@ -109,7 +110,8 @@ const LAYOUT = new Set([
 // (duplicate the `.` closing a sentence and it writes `.` twice, a line each,
 // which even renders as `. .`), where the engine keeps the bytes (`..`).
 // Which words, in which nodes and order, is what the comparison holds equal.
-function meaning(value) {
+function meaning(value, depth = 0) {
+  assert.ok(depth <= LIMITS.ipcDepthMax, 'meaning: value depth limit');
   if (Array.isArray(value)) {
     const merged = [];
     for (const item of value) {
@@ -122,14 +124,17 @@ function meaning(value) {
     }
     return merged
       .filter((item) => !(item && item.kind === 'text' && /^\s*$/.test(item.value)))
-      .map(meaning);
+      .map((item) => meaning(item, depth + 1));
   }
   if (value && typeof value === 'object') {
     const out = {};
     for (const key of Object.keys(value).sort()) {
       if (!LAYOUT.has(key)) {
         // Defined, not assigned: an attribute may be named `__proto__`.
-        Object.defineProperty(out, key, { value: meaning(value[key]), enumerable: true });
+        Object.defineProperty(out, key, {
+          value: meaning(value[key], depth + 1),
+          enumerable: true,
+        });
       }
     }
     return out;
@@ -231,9 +236,9 @@ function sweep(label, casesFor) {
   return tally;
 }
 
-function report(t, tally) {
+function report(context, tally) {
   const refused = [...tally.refused].map(([reason, count]) => `${count} ${reason}`).join(', ');
-  t.diagnostic(
+  context.diagnostic(
     `${tally.compared} compared, ${tally.identical} byte-identical, ` +
       `${tally.legacyOnly} legacy-only, refused: ${refused || 'none'}`,
   );
@@ -242,9 +247,9 @@ function report(t, tally) {
 const TAGS = new Set(['element', 'component', 'raw']);
 const stringProps = (node) =>
   Object.entries(node.props ?? {}).filter(([, value]) => value && value.type === 'string');
-const options = { coalesceKey: null, urgency: true };
+const options = { coalesceKey: undefined, urgency: true };
 
-test('parity, attribute: set a new attribute, set and remove each string one', (t) => {
+test('parity, attribute: set a new attribute, set and remove each string one', (context) => {
   const tally = sweep('attribute', (node) => {
     if (!TAGS.has(node.kind)) {
       return [];
@@ -262,11 +267,11 @@ test('parity, attribute: set a new attribute, set and remove each string one', (
       ),
     ];
   });
-  report(t, tally);
+  report(context, tally);
   assert.ok(tally.compared > 300, `the sweep compares many real gestures (${tally.compared})`);
 });
 
-test('parity, prop: expressions and bare props, new and replacing any value', (t) => {
+test('parity, prop: expressions and bare props, new and replacing any value', (context) => {
   const tally = sweep('prop', (node) => {
     if (!TAGS.has(node.kind)) {
       return [];
@@ -286,14 +291,14 @@ test('parity, prop: expressions and bare props, new and replacing any value', (t
       ]),
     ];
   });
-  report(t, tally);
+  report(context, tally);
   assert.ok(tally.compared > 500, `the sweep compares many real gestures (${tally.compared})`);
 });
 
-// Every node with its parent's id (null at the root) and its index there.
+// Every node with its parent's id (undefined at the root) and its index there.
 function placesOf(model) {
   const found = [];
-  const pending = model.nodes.map((node, index) => ({ node, parentId: null, index }));
+  const pending = model.nodes.map((node, index) => ({ node, parentId: undefined, index }));
   for (let at = 0; at < pending.length; at++) {
     const entry = pending[at];
     found.push(entry);
@@ -331,7 +336,7 @@ function withNewIds(node) {
   return copy;
 }
 
-test('parity, insert and remove: beside, inside, a copy of each node, each removed', (t) => {
+test('parity, insert and remove: beside, inside, a copy of each node, each removed', (context) => {
   const byNode = new Map();
   const tally = sweep('insert/remove', (node, model) => {
     if (!byNode.has(model)) {
@@ -365,32 +370,35 @@ test('parity, insert and remove: beside, inside, a copy of each node, each remov
     }
     return cases;
   });
-  report(t, tally);
+  report(context, tally);
   assert.ok(tally.compared > 1000, `the sweep compares many real gestures (${tally.compared})`);
 });
 
-test('parity, move: every node before the first root, after the last, into each element', (t) => {
-  const rules = { keepsSlot: () => true };
-  const tally = sweep('move', (node, model) => {
-    const roots = model.nodes;
-    const elements = placesOf(model)
-      .map((entry) => entry.node)
-      .filter((candidate) => candidate.kind === 'element' && Array.isArray(candidate.children))
-      .slice(0, 4);
-    const places = [
-      { parentId: null, index: 0 },
-      { parentId: null, index: roots.length },
-      ...elements.map((parent) => ({ parentId: parent.id, index: parent.children.length })),
-    ];
-    return places
-      .map((place) => gestures.moveGesture(model, node.id, place, rules, { urgency: true }))
-      .filter((gesture) => gesture !== undefined);
-  });
-  report(t, tally);
-  assert.ok(tally.compared > 500, `the sweep compares many real moves (${tally.compared})`);
-});
+test(
+  'parity, move: every node before the first root, ' + 'after the last, into each element',
+  (context) => {
+    const rules = { keepsSlot: () => true };
+    const tally = sweep('move', (node, model) => {
+      const roots = model.nodes;
+      const elements = placesOf(model)
+        .map((entry) => entry.node)
+        .filter((candidate) => candidate.kind === 'element' && Array.isArray(candidate.children))
+        .slice(0, 4);
+      const places = [
+        { parentId: undefined, index: 0 },
+        { parentId: undefined, index: roots.length },
+        ...elements.map((parent) => ({ parentId: parent.id, index: parent.children.length })),
+      ];
+      return places
+        .map((place) => gestures.moveGesture(model, node.id, place, rules, { urgency: true }))
+        .filter((gesture) => gesture !== undefined);
+    });
+    report(context, tally);
+    assert.ok(tally.compared > 500, `the sweep compares many real moves (${tally.compared})`);
+  },
+);
 
-test('parity, inline CSS: one declaration set, changed, added or removed in place', (t) => {
+test('parity, inline CSS: one declaration set, changed, added or removed in place', (context) => {
   let inPlace = 0;
   const tally = sweep('inline CSS', (node) => {
     const style = node.props?.style;
@@ -415,20 +423,20 @@ test('parity, inline CSS: one declaration set, changed, added or removed in plac
       return gesture;
     });
   });
-  report(t, tally);
-  t.diagnostic(`${inPlace} of them edit one declaration in place`);
+  report(context, tally);
+  context.diagnostic(`${inPlace} of them edit one declaration in place`);
   assert.ok(tally.compared >= 15, `the sweep compares every style gesture (${tally.compared})`);
   assert.ok(inPlace >= 10, `most of them in place (${inPlace})`);
 });
 
-test('parity, frontmatter: imports added and removed, declarations, with an insert', (t) => {
+test('parity, frontmatter: imports added and removed, declarations, with an insert', (context) => {
   const seen = new Set();
   const tally = sweep('frontmatter', (node, model) => {
     if (seen.has(model) || !model.hadFrontmatter) {
       return [];
     }
     seen.add(model); // Once per page: these gestures do not depend on the node.
-    const options = { coalesceKey: null, urgency: true };
+    const options = { coalesceKey: undefined, urgency: true };
     const card = { name: 'ZCard', path: '../components/ZCard.astro', quote: "'" };
     const addImport = (current) => ({ ...current, imports: [...current.imports, card] });
     const declare = (current) => ({
@@ -436,20 +444,16 @@ test('parity, frontmatter: imports added and removed, declarations, with an inse
       extraFrontmatter: [current.extraFrontmatter, 'const added = 1;'].filter(Boolean).join('\n'),
     });
     const cases = [
-      gestures.frontmatterGesture(model, addImport, options),
-      gestures.frontmatterGesture(model, declare, options),
-      gestures.frontmatterGesture(model, (current) => declare(addImport(current)), options),
+      gestures.frontmatterGesture(model, options, addImport),
+      gestures.frontmatterGesture(model, options, declare),
+      gestures.frontmatterGesture(model, options, (current) => declare(addImport(current))),
       ...model.imports.map((imported) =>
-        gestures.frontmatterGesture(
-          model,
-          (current) => ({
-            ...current,
-            imports: current.imports.filter(
-              (entry) => entry !== imported && entry.name !== imported.name,
-            ),
-          }),
-          options,
-        ),
+        gestures.frontmatterGesture(model, options, (current) => ({
+          ...current,
+          imports: current.imports.filter(
+            (entry) => entry !== imported && entry.name !== imported.name,
+          ),
+        })),
       ),
     ];
     const first = model.nodes.find((candidate) => candidate.kind !== 'text');
@@ -464,21 +468,21 @@ test('parity, frontmatter: imports added and removed, declarations, with an inse
       const insert = gestures.insertGesture(
         model,
         node,
-        { parentId: null, index: model.nodes.indexOf(first) },
+        { parentId: undefined, index: model.nodes.indexOf(first) },
         options,
       );
-      cases.push(gestures.sequence(gestures.frontmatterGesture(model, addImport, options), insert));
+      cases.push(gestures.sequence(gestures.frontmatterGesture(model, options, addImport), insert));
     }
     return cases;
   });
-  report(t, tally);
+  report(context, tally);
   assert.ok(
     tally.compared > 60,
     `the sweep compares many frontmatter gestures (${tally.compared})`,
   );
 });
 
-test('parity, loop rename: each loop parameter renamed, every reference with it', (t) => {
+test('parity, loop rename: each loop parameter renamed, every reference with it', (context) => {
   const tally = sweep('loop rename', (node, page) => {
     if (node.kind !== 'map') {
       return [];
@@ -512,6 +516,6 @@ test('parity, loop rename: each loop parameter renamed, every reference with it'
     }
     return cases.filter((gesture) => gesture !== undefined);
   });
-  report(t, tally);
+  report(context, tally);
   assert.ok(tally.compared >= 4, `the sweep renames every loop it can read (${tally.compared})`);
 });

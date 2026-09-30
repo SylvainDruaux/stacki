@@ -16,6 +16,10 @@
 const fs = require('fs');
 const path = require('path');
 
+// The DOM answers "none" with null. The fakes below that stand in for DOM APIs
+// return the platform's own value, read from JSON because our code never writes one.
+const PLATFORM_NULL = JSON.parse('null');
+
 const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
@@ -27,9 +31,9 @@ const check = (what, condition, detail) => {
 
 (async () => {
   const esbuild = require('esbuild');
-  const buildDir = path.join(__dirname, '..', 'node_modules', '.stacki-test');
-  fs.mkdirSync(buildDir, { recursive: true });
-  const bundle = path.join(buildDir, 'rich-span.bundle.js');
+  const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
+  fs.mkdirSync(buildDirectory, { recursive: true });
+  const bundle = path.join(buildDirectory, 'rich-span.bundle.js');
   await esbuild.build({
     entryPoints: [path.join(__dirname, '..', 'src', 'ui', 'RichContent.jsx')],
     outfile: bundle,
@@ -55,7 +59,7 @@ const check = (what, condition, detail) => {
   global.requestAnimationFrame = dom.window.requestAnimationFrame.bind(dom.window);
   global.cancelAnimationFrame = dom.window.cancelAnimationFrame.bind(dom.window);
   global.IS_REACT_ACT_ENVIRONMENT = true;
-  // jsdom lays nothing out; the bubble positions itself off these.
+  // `jsdom` lays nothing out; the bubble positions itself off these.
   dom.window.Range.prototype.getBoundingClientRect = () => ({
     x: 0,
     y: 0,
@@ -68,7 +72,7 @@ const check = (what, condition, detail) => {
   });
   dom.window.Range.prototype.getClientRects = () => ({
     length: 1,
-    item: () => null,
+    item: () => PLATFORM_NULL,
     [Symbol.iterator]: function* () {},
   });
   dom.window.Element.prototype.getBoundingClientRect = () => ({
@@ -89,14 +93,14 @@ const check = (what, condition, detail) => {
 
   const host = dom.window.document.getElementById('root');
   const root = createRoot(host);
-  let emitted = null;
+  let emitted;
   const START = [{ kind: 'text', value: 'Human-centric strategies to cut through the noise' }];
   await act(async () => {
     root.render(
       React.createElement(RichContent, {
         nodes: START,
-        onChange: (n) => {
-          emitted = n;
+        onChange: (nodes) => {
+          emitted = nodes;
         },
       }),
     );
@@ -116,7 +120,7 @@ const check = (what, condition, detail) => {
     // three, and reaching for `firstChild` after that selects the wrong piece.
     field.normalize();
     const textNode = [...field.childNodes].find(
-      (n) => n.nodeType === 3 && n.textContent.includes('through the noise'),
+      (node) => node.nodeType === 3 && node.textContent.includes('through the noise'),
     );
     // Guarded: when a regression leaves the words buried inside a tag, there is
     // no top-level text node to select — a FAILURE to report, not a stack trace
@@ -129,9 +133,9 @@ const check = (what, condition, detail) => {
     const range = dom.window.document.createRange();
     range.setStart(textNode, at);
     range.setEnd(textNode, at + 'through the noise'.length);
-    const sel = dom.window.getSelection();
-    sel.removeAllRanges();
-    sel.addRange(range);
+    const selection = dom.window.getSelection();
+    selection.removeAllRanges();
+    selection.addRange(range);
     await act(async () => {
       field.dispatchEvent(new dom.window.Event('mouseup', { bubbles: true }));
       dom.window.document.dispatchEvent(new dom.window.Event('selectionchange'));
@@ -140,14 +144,14 @@ const check = (what, condition, detail) => {
   };
   await selectTail();
 
-  const bubbleBtn = (title) =>
+  const bubbleButton = (title) =>
     [...host.querySelectorAll('.rich-bubble button')].find(
-      (b) => b.getAttribute('title') === title,
+      (button) => button.getAttribute('title') === title,
     );
-  const press = async (btn) => {
+  const press = async (button) => {
     await act(async () => {
-      btn.dispatchEvent(new dom.window.MouseEvent('mousedown', { bubbles: true }));
-      btn.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }));
+      button.dispatchEvent(new dom.window.MouseEvent('mousedown', { bubbles: true }));
+      button.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }));
     });
   };
 
@@ -156,57 +160,59 @@ const check = (what, condition, detail) => {
   // one in here is the only thing in the bubble nobody designed.
   {
     const buttons = [...host.querySelectorAll('.rich-bubble button')];
-    const emoji = buttons.filter((b) => /\p{Extended_Pictographic}/u.test(b.textContent || ''));
+    const emoji = buttons.filter((button) =>
+      /\p{Extended_Pictographic}/u.test(button.textContent || ''),
+    );
     check(
       'no button in the bubble is an emoji',
       emoji.length === 0,
-      emoji.map((b) => `${b.getAttribute('title')}: ${b.textContent}`).join(', '),
+      emoji.map((button) => `${button.getAttribute('title')}: ${button.textContent}`).join(', '),
     );
-    const link = bubbleBtn('Link');
+    const link = bubbleButton('Link');
     check(
       'the link button is there',
       !!link,
-      buttons.map((b) => b.getAttribute('title')).join(', '),
+      buttons.map((button) => button.getAttribute('title')).join(', '),
     );
     check('and it is drawn, not typed', !!link?.querySelector('svg'), link?.innerHTML);
   }
 
-  const spanBtn = bubbleBtn('Wrap in a span');
+  const spanButton = bubbleButton('Wrap in a span');
   check(
     'the bubble offers a span',
-    !!spanBtn,
+    !!spanButton,
     [...host.querySelectorAll('.rich-bubble button')]
-      .map((b) => b.getAttribute('title'))
+      .map((button) => button.getAttribute('title'))
       .join(' | ') || 'no bubble',
   );
   // It sits alongside the ones that were already there, not instead of them.
-  const titles = [...host.querySelectorAll('.rich-bubble button')].map((b) =>
-    b.getAttribute('title'),
+  const titles = [...host.querySelectorAll('.rich-bubble button')].map((button) =>
+    button.getAttribute('title'),
   );
   check(
     'beside the existing tools',
-    ['Bold', 'Italic', 'Code'].every((t) => titles.includes(t)),
+    ['Bold', 'Italic', 'Code'].every((title) => titles.includes(title)),
     JSON.stringify(titles),
   );
 
-  if (spanBtn) {
-    await press(spanBtn);
-    // The DOM now holds the span…
-    const el = field.querySelector('span:not(.expr-chip)');
-    check('pressing it wraps the selection', !!el, field.innerHTML);
+  if (spanButton) {
+    await press(spanButton);
+    // The DOM now holds the span:
+    const element = field.querySelector('span:not(.expr-chip)');
+    check('pressing it wraps the selection', !!element, field.innerHTML);
     check(
       'around exactly the words chosen',
-      el?.textContent === 'through the noise',
-      JSON.stringify(el?.textContent),
+      element?.textContent === 'through the noise',
+      JSON.stringify(element?.textContent),
     );
     check(
       'and with nothing on it — an empty span is the useful result',
-      el && el.attributes.length === 0,
-      el?.outerHTML,
+      element && element.attributes.length === 0,
+      element?.outerHTML,
     );
 
     // …and so does the model that gets written back.
-    const spans = (emitted || []).filter((n) => n.kind === 'element' && n.name === 'span');
+    const spans = (emitted || []).filter((node) => node.kind === 'element' && node.name === 'span');
     check('the change reaches the model', spans.length === 1, JSON.stringify(emitted));
     check(
       'carrying the words',
@@ -220,7 +226,7 @@ const check = (what, condition, detail) => {
     );
 
     // Pressing again takes it back off — the only way back for an invisible tag.
-    const again = bubbleBtn('Wrap in a span');
+    const again = bubbleButton('Wrap in a span');
     check('the button is still there to press again', !!again);
     if (again) {
       await press(again);
@@ -234,7 +240,9 @@ const check = (what, condition, detail) => {
         field.textContent === START[0].value,
         JSON.stringify(field.textContent),
       );
-      const after = (emitted || []).filter((n) => n.kind === 'element' && n.name === 'span');
+      const after = (emitted || []).filter(
+        (node) => node.kind === 'element' && node.name === 'span',
+      );
       check('with no span left in the model', after.length === 0, JSON.stringify(emitted));
     }
   }
@@ -243,16 +251,16 @@ const check = (what, condition, detail) => {
   // and it gains the same toggle, which it never had (pressing it twice used to
   // nest one <code> inside another).
   await selectTail();
-  const codeBtn = bubbleBtn('Code');
-  check('Code is still wired', !!codeBtn);
-  if (codeBtn) {
-    await press(codeBtn);
+  const codeButton = bubbleButton('Code');
+  check('Code is still wired', !!codeButton);
+  if (codeButton) {
+    await press(codeButton);
     check(
       'Code still wraps',
       field.querySelector('code')?.textContent === 'through the noise',
       field.innerHTML,
     );
-    await press(bubbleBtn('Code'));
+    await press(bubbleButton('Code'));
     check('and now unwraps instead of nesting', !field.querySelector('code'), field.innerHTML);
     check(
       'leaving the text whole',
@@ -270,11 +278,11 @@ const check = (what, condition, detail) => {
   // again. Pressing in separate ticks let the event land first, which is why
   // this only ever showed up as the odd failed run.
   await selectTail();
-  if (bubbleBtn('Code')) {
+  if (bubbleButton('Code')) {
     const fire = () => {
-      const b = bubbleBtn('Code');
-      b.dispatchEvent(new dom.window.MouseEvent('mousedown', { bubbles: true }));
-      b.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }));
+      const button = bubbleButton('Code');
+      button.dispatchEvent(new dom.window.MouseEvent('mousedown', { bubbles: true }));
+      button.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }));
     };
     await act(async () => {
       fire();
@@ -302,7 +310,7 @@ const check = (what, condition, detail) => {
   }
   console.log(`rich-span: ${checked} passed  [wraps, and unwraps]`);
   process.exit(0);
-})().catch((err) => {
-  console.error(err);
+})().catch((error) => {
+  console.error(error);
   process.exit(1);
 });

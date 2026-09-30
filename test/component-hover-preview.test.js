@@ -14,6 +14,9 @@ const {
   renderComponentPreviewPage,
 } = require('../dist/electron/componentPreview.js');
 
+// Null as a boundary receives it, parsed from JSON: inputs may hold it; our values never do.
+const jsonNull = JSON.parse('null');
+
 const accordion = `---
 type Props = {
   render?: boolean;
@@ -97,7 +100,7 @@ test('exact project paths distinguish duplicate component names and support layo
     );
   }
   assert.equal(componentPreviewPath(paths, '', '<script>'), undefined);
-  assert.throws(() => componentPreviewPath(paths, null, 'Card'), /expected string/);
+  assert.throws(() => componentPreviewPath(paths, jsonNull, 'Card'), /expected string/);
   assert.throws(() => componentPreviewPath(paths, 'a'.repeat(4097), 'Card'), /length limit/);
 });
 
@@ -176,9 +179,9 @@ test('generated Astro route keeps its default slot and loads the selected source
   assert.deepEqual(loaded, [selected + '?raw&stacki-preview-props', selected]);
 });
 
-test('Vite metadata exports plain ESM data and reflects source edits', async (t) => {
+test('Vite metadata exports plain ESM data and reflects source edits', async (context) => {
   const project = fs.mkdtempSync(path.join(os.tmpdir(), 'stacki-hover-metadata-'));
-  t.after(() => fs.rmSync(project, { recursive: true, force: true }));
+  context.after(() => fs.rmSync(project, { recursive: true, force: true }));
   const file = path.join(project, 'src', 'components', 'AccordionItem.astro');
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(file, accordion);

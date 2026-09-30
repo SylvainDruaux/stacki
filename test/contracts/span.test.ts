@@ -24,6 +24,9 @@ import {
   utf8ByteLength,
 } from '../../dist/shared/span.js';
 
+// Null as a boundary receives it, parsed from JSON: inputs may hold it; our values never do.
+const jsonNull: unknown = JSON.parse('null');
+
 const HOSTILE = ['', 'ascii', 'café', '🎉', 'a🎉b', '﻿---\r\n', 'Zoë 👋🏽 naïve', 'ࠀ￿', '\uD800x'];
 
 test('offset brands accept nonnegative safe integers only', () => {
@@ -60,7 +63,7 @@ test('span wire parsers reject every malformed shape and the bounds', () => {
   assert.deepEqual(parseByteSpan({ start: 1, end: 3 }, 'span'), { start: 1, end: 3 });
   assert.deepEqual(parseUtf16Span({ start: 0, end: 0 }, 'span'), { start: 0, end: 0 });
   const bad: readonly [unknown, RegExp][] = [
-    [null, /expected span object/],
+    [jsonNull, /expected span object/],
     [[1, 2], /expected span object/],
     [{ start: '1', end: 2 }, /start: expected number/],
     [{ start: 1 }, /end: expected number/],

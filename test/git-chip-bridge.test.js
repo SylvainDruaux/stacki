@@ -7,6 +7,9 @@ const fs = require('node:fs');
 const path = require('node:path');
 const bridge = require('./renderer-module')('gitChipBridge.ts');
 
+// Null as a boundary receives it, parsed from JSON: inputs may hold it; our values never do.
+const jsonNull = JSON.parse('null');
+
 const status = {
   path: 'src/pages/index.astro',
   from: undefined,
@@ -40,7 +43,7 @@ test('GitChip parsers cover status and checkout variants', () => {
   });
   assert.deepEqual(bridge.parseGitCheckout(blocked), blocked);
   for (const value of [
-    null,
+    jsonNull,
     {},
     [{ ...status, kind: 'mystery' }],
     [{ ...status, staged: 'no' }],
@@ -49,12 +52,12 @@ test('GitChip parsers cover status and checkout variants', () => {
     assert.throws(() => bridge.parseGitStatus(value));
   }
   for (const value of [
-    null,
+    jsonNull,
     {},
     { ...blocked, blocked: false },
     { ...switched, parkedFrom: 1 },
     // Absence is `undefined` (AGENTS.md §6): main never sends a null origin.
-    { ...switched, parkedFrom: null },
+    { ...switched, parkedFrom: jsonNull },
     { ...blocked, files: Array(100001).fill('file') },
   ]) {
     assert.throws(() => bridge.parseGitCheckout(value));

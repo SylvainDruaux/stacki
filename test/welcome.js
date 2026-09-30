@@ -13,6 +13,10 @@
 const fs = require('fs');
 const path = require('path');
 
+// The DOM answers "none" with null. The fakes below that stand in for DOM APIs
+// return the platform's own value, read from JSON because our code never writes one.
+const PLATFORM_NULL = JSON.parse('null');
+
 const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
@@ -30,9 +34,9 @@ const PIXEL =
 
 (async () => {
   const esbuild = require('esbuild');
-  const buildDir = path.join(__dirname, '..', 'node_modules', '.stacki-test');
-  fs.mkdirSync(buildDir, { recursive: true });
-  const bundlePath = path.join(buildDir, 'welcome.bundle.js');
+  const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
+  fs.mkdirSync(buildDirectory, { recursive: true });
+  const bundlePath = path.join(buildDirectory, 'welcome.bundle.js');
   await esbuild.build({
     entryPoints: [path.join(__dirname, '..', 'src', 'panels', 'WelcomeScreen.tsx')],
     outfile: bundlePath,
@@ -55,7 +59,7 @@ const PIXEL =
   // hands back no context is the same situation as a machine without a GPU, so
   // the background is expected to cope with it — the cards are what is under
   // test here.
-  dom.window.HTMLCanvasElement.prototype.getContext = () => null;
+  dom.window.HTMLCanvasElement.prototype.getContext = () => PLATFORM_NULL;
   global.WebGLRenderingContext = dom.window.WebGLRenderingContext =
     function WebGLRenderingContext() {};
 
@@ -95,11 +99,11 @@ const PIXEL =
   const asked = [];
   let inFlight = 0;
   let maxInFlight = 0;
-  let release = null;
+  let release;
   const toasts = [];
 
   dom.window.avb = {
-    listRecents: async () => recents.map((r) => ({ ...r })),
+    listRecents: async () => recents.map((recent) => ({ ...recent })),
     removeRecent: async () => ({ ok: true }),
     refreshThumb: async (projectPath) => {
       asked.push(projectPath);
@@ -107,7 +111,7 @@ const PIXEL =
       maxInFlight = Math.max(maxInFlight, inFlight);
       await new Promise((resolve) => {
         release = () => {
-          release = null;
+          release = undefined;
           resolve();
         };
       });
@@ -138,7 +142,7 @@ const PIXEL =
 
   // Three ways to start, in the order they are reached for — and the one the
   // situation calls for is the one that looks like the answer.
-  const actions = all('.actions button').map((b) => b.textContent.trim());
+  const actions = all('.actions button').map((button) => button.textContent.trim());
   check(
     'the actions read in that order',
     actions.join(' | ') === 'Open Project… | Start from Lumos… | Empty Astro project…',
@@ -148,7 +152,7 @@ const PIXEL =
     'with projects to return to, opening one leads',
     all('.actions button')[0].classList.contains('primary'),
     all('.actions button')
-      .map((b) => b.className)
+      .map((button) => button.className)
       .join(' | '),
   );
   check(
@@ -259,7 +263,7 @@ const PIXEL =
     check(
       'with no projects, starting from Lumos leads',
       buttons[1]?.classList.contains('primary'),
-      buttons.map((b) => b.className).join(' | '),
+      buttons.map((button) => button.className).join(' | '),
     );
     check('and opening one does not', !buttons[0]?.classList.contains('primary'));
   }

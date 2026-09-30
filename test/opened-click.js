@@ -39,9 +39,9 @@ const ROOT_PATH = `${SCOPE}0.0.0`;
 
 (async () => {
   const esbuild = require('esbuild');
-  const buildDir = path.join(ROOT, 'node_modules', '.stacki-test');
-  fs.mkdirSync(buildDir, { recursive: true });
-  const bundle = path.join(buildDir, 'opened-click.cjs');
+  const buildDirectory = path.join(ROOT, 'node_modules', '.stacki-test');
+  fs.mkdirSync(buildDirectory, { recursive: true });
+  const bundle = path.join(buildDirectory, 'opened-click.cjs');
   await esbuild.build({
     entryPoints: [path.join(ROOT, 'src', 'canvasClick.js')],
     outfile: bundle,
@@ -53,7 +53,7 @@ const ROOT_PATH = `${SCOPE}0.0.0`;
   const { canvasClickAction } = require(bundle);
 
   const { JSDOM } = require('jsdom');
-  const marked = (p, html) => `<!--avb-s:${p}-->${html}<!--avb-e:${p}-->`;
+  const marked = (nodePath, html) => `<!--avb-s:${nodePath}-->${html}<!--avb-e:${nodePath}-->`;
   // A row of the same component, rendered five times. The serializer wraps what
   // it can in marker pairs and tags the rest — a component rendered into
   // another one's slot, or whose root is a conditional, can only be tagged.
@@ -76,13 +76,13 @@ const ROOT_PATH = `${SCOPE}0.0.0`;
   const boxes = new WeakMap();
   let top = 0;
   window.Element.prototype.getBoundingClientRect = function () {
-    let b = boxes.get(this);
-    if (!b) {
+    let box = boxes.get(this);
+    if (!box) {
       const y = (top += 50);
-      b = { x: 0, y, width: 120, height: 40, left: 0, top: y, right: 120, bottom: y + 40 };
-      boxes.set(this, b);
+      box = { x: 0, y, width: 120, height: 40, left: 0, top: y, right: 120, bottom: y + 40 };
+      boxes.set(this, box);
     }
-    return b;
+    return box;
   };
   window.Range.prototype.getBoundingClientRect = () => NO_BOX;
 
@@ -97,7 +97,7 @@ const ROOT_PATH = `${SCOPE}0.0.0`;
   global.requestAnimationFrame = window.requestAnimationFrame.bind(window);
 
   const sent = [];
-  window.parent = { postMessage: (m) => sent.push(m) };
+  window.parent = { postMessage: (message) => sent.push(message) };
   const electron = {
     contextBridge: { exposeInMainWorld: () => {} },
     ipcRenderer: { on: () => {}, send: () => {}, invoke: async () => {} },
@@ -112,50 +112,67 @@ const ROOT_PATH = `${SCOPE}0.0.0`;
   Module.prototype.require = realRequire;
   // The markers are walked when parsing finishes, and the listeners that answer
   // clicks go on then too.
-  await new Promise((r) => setTimeout(r, 60));
+  await new Promise((resolve) => setTimeout(resolve, 60));
 
   const buttons = [...window.document.querySelectorAll('button')];
   check('the row rendered', buttons.length === 3, String(buttons.length));
 
   // Open the component from the second instance — the one no marker pair wraps.
   const open = (focus, occ = 0) => {
-    const ev = new window.MessageEvent('message', {
+    const event = new window.MessageEvent('message', {
       data: { type: 'avb:track', paths: [focus], scope: SCOPE, focus, focusOcc: occ },
     });
-    Object.defineProperty(ev, 'source', { value: window.parent });
-    window.dispatchEvent(ev);
+    Object.defineProperty(event, 'source', { value: window.parent });
+    window.dispatchEvent(event);
   };
   open('0.2');
 
-  const clickOn = (el) => {
+  const clickOn = (element) => {
     sent.length = 0;
-    el.dispatchEvent(new window.MouseEvent('click', { bubbles: true, cancelable: true }));
-    return sent.filter((m) => m.type === 'avb:click-node').pop();
+    element.dispatchEvent(new window.MouseEvent('click', { bubbles: true, cancelable: true }));
+    return sent.filter((message) => message.type === 'avb:click-node').pop();
   };
-  const actionFor = (msg, focusPath = '0.2') =>
-    msg
-      ? canvasClickAction({ path: msg.path, outside: !!msg.outside, focusPath, scope: SCOPE }).kind
+  const actionFor = (message, focusPath = '0.2') =>
+    message
+      ? canvasClickAction({
+          path: message.path,
+          outside: !!message.outside,
+          focusPath,
+          scope: SCOPE,
+        }).kind
       : '(nothing reported)';
 
   // --- the report ---------------------------------------------------------------
   {
-    const msg = clickOn(buttons[1]);
-    check('a click on the open instance is placed', msg?.path === ROOT_PATH, JSON.stringify(msg));
-    check('and is not read as landing outside it', msg?.outside === false, JSON.stringify(msg));
-    check('so the click selects rather than closes', actionFor(msg) === 'inner', actionFor(msg));
+    const message = clickOn(buttons[1]);
+    check(
+      'a click on the open instance is placed',
+      message?.path === ROOT_PATH,
+      JSON.stringify(message),
+    );
+    check(
+      'and is not read as landing outside it',
+      message?.outside === false,
+      JSON.stringify(message),
+    );
+    check(
+      'so the click selects rather than closes',
+      actionFor(message) === 'inner',
+      actionFor(message),
+    );
   }
 
   // The instance a marker pair DID wrap works the same way when it is the one
   // that was opened.
   {
     open('0.1');
-    const msg = clickOn(buttons[0]);
+    const message = clickOn(buttons[0]);
     check(
       'the instance with a marker pair is placed too',
-      msg?.path === ROOT_PATH,
-      JSON.stringify(msg),
+      message?.path === ROOT_PATH,
+      JSON.stringify(message),
     );
-    check('and selects', actionFor(msg, '0.1') === 'inner', actionFor(msg, '0.1'));
+    check('and selects', actionFor(message, '0.1') === 'inner', actionFor(message, '0.1'));
     open('0.2');
   }
 
@@ -165,19 +182,21 @@ const ROOT_PATH = `${SCOPE}0.0.0`;
   // leaves. That is the same answer it gives for anything else outside the
   // instance, and it is what the dimming has been saying all along.
   {
-    const msg = clickOn(buttons[2]);
+    const message = clickOn(buttons[2]);
     check(
       'a click on another copy leaves the component',
-      actionFor(msg) === 'close',
-      JSON.stringify(msg),
+      actionFor(message) === 'close',
+      JSON.stringify(message),
     );
   }
 
   // The tag has to still be ON the element — this is what was being taken away.
   check(
     'every instance still carries the component’s own path',
-    buttons.every((b) => (b.getAttribute('data-avb-p') || '').split(' ').includes(ROOT_PATH)),
-    buttons.map((b) => b.getAttribute('data-avb-p')).join(' | '),
+    buttons.every((button) =>
+      (button.getAttribute('data-avb-p') || '').split(' ').includes(ROOT_PATH),
+    ),
+    buttons.map((button) => button.getAttribute('data-avb-p')).join(' | '),
   );
 
   // --- and what the withdrawing was for -------------------------------------------
@@ -191,9 +210,12 @@ const ROOT_PATH = `${SCOPE}0.0.0`;
     const OTHER = `${SCOPE}9`;
     // A fresh region, wrapping one element. The markers are consumed by the
     // walk, which is why they are written again for the second pass.
-    const wrap = (el) => {
-      el.parentNode.insertBefore(window.document.createComment(`avb-s:${OTHER}`), el);
-      el.parentNode.insertBefore(window.document.createComment(`avb-e:${OTHER}`), el.nextSibling);
+    const wrap = (element) => {
+      element.parentNode.insertBefore(window.document.createComment(`avb-s:${OTHER}`), element);
+      element.parentNode.insertBefore(
+        window.document.createComment(`avb-e:${OTHER}`),
+        element.nextSibling,
+      );
       window.document.dispatchEvent(new window.CustomEvent('avb:morphed'));
     };
     const first = window.document.createElement('span');
@@ -223,8 +245,10 @@ const ROOT_PATH = `${SCOPE}0.0.0`;
     );
     check(
       'while the markup’s own tags are left alone',
-      buttons.every((b) => (b.getAttribute('data-avb-p') || '').split(' ').includes(ROOT_PATH)),
-      buttons.map((b) => b.getAttribute('data-avb-p')).join(' | '),
+      buttons.every((button) =>
+        (button.getAttribute('data-avb-p') || '').split(' ').includes(ROOT_PATH),
+      ),
+      buttons.map((button) => button.getAttribute('data-avb-p')).join(' | '),
     );
   }
 

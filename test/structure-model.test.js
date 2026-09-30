@@ -35,7 +35,7 @@ test('Navigator traversal follows visible conditional rows and raw ownership', (
     index: 0,
   });
   assert.deepEqual(
-    [...model.collapseMap([root], true)],
+    [...model.collapseMap([root], { collapsed: true })],
     [
       ['root', true],
       ['condition', true],
@@ -55,5 +55,5 @@ test('Navigator traversals reject excessive width, depth, and cycles', () => {
 
   const cyclic = element('cycle');
   cyclic.children.push(cyclic);
-  assert.throws(() => model.collapseMap([cyclic], false), /depth limit/);
+  assert.throws(() => model.collapseMap([cyclic], { collapsed: false }), /depth limit/);
 });

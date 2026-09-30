@@ -28,9 +28,9 @@ const check = (what, condition, detail) => {
 
 (async () => {
   const esbuild = require('esbuild');
-  const buildDir = path.join(__dirname, '..', 'node_modules', '.stacki-test');
-  fs.mkdirSync(buildDir, { recursive: true });
-  const bundlePath = path.join(buildDir, 'gap-hover.bundle.js');
+  const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
+  fs.mkdirSync(buildDirectory, { recursive: true });
+  const bundlePath = path.join(buildDirectory, 'gap-hover.bundle.js');
   await esbuild.build({
     stdin: {
       contents: `
@@ -69,17 +69,17 @@ const check = (what, condition, detail) => {
   const { act } = React;
   const { GapControl, setHost } = require(bundlePath);
 
-  // What the canvas is told to draw. null = take the bands down.
-  let hover = null;
+  // What the canvas is told to draw. undefined = take the bands down.
+  let hover;
   const seen = [];
   setHost({
     nodes: [],
-    selectedId: null,
+    selectedId: undefined,
     files: [],
     astroFiles: [],
-    onSpacingHover: (h) => {
-      hover = h;
-      seen.push(h);
+    onSpacingHover: (spacingHover) => {
+      hover = spacingHover;
+      seen.push(spacingHover);
     },
   });
 
@@ -107,14 +107,14 @@ const check = (what, condition, detail) => {
   });
 
   const field = document.querySelector('input.embed-editor_size-input');
-  check('the gap field is there', field != null);
+  check('the gap field is there', field !== null);
   check('and it reads the value that is set', field?.value === '2rem', field?.value);
 
   // The syntax-highlighted editor is what the pointer actually meets.
   const wrap = field?.closest('.embed-editor_varconnect');
   check(
     'the field wears the code editor',
-    wrap != null && wrap.className.includes('is-token'),
+    wrap?.className.includes('is-token') === true,
     wrap?.className,
   );
 
@@ -126,7 +126,7 @@ const check = (what, condition, detail) => {
         new dom.window.MouseEvent(type, {
           bubbles: true,
           cancelable: true,
-          relatedTarget: related ?? null,
+          relatedTarget: related,
         }),
       );
     });
@@ -134,7 +134,7 @@ const check = (what, condition, detail) => {
   const editor = wrap?.querySelector('[contenteditable]') ?? wrap;
 
   await point('mouseover', editor, document.body);
-  check('pointing at it asks for the bands', hover != null, JSON.stringify(hover));
+  check('pointing at it asks for the bands', hover !== undefined, JSON.stringify(hover));
   check(
     'on both axes, since one field owns both',
     hover?.sides?.join(',') === 'row,column',
@@ -148,24 +148,24 @@ const check = (what, condition, detail) => {
   check('and named as a gap, not a padding', hover?.kind === 'gap', hover?.kind);
 
   await point('mouseout', editor, document.body);
-  check('taking the pointer away takes them down', hover === null, JSON.stringify(hover));
+  check('taking the pointer away takes them down', hover === undefined, JSON.stringify(hover));
 
   // Hover and focus are two hands on the same thing: whichever is left holds it.
   await point('mouseover', editor, document.body);
   await act(async () => {
     field.focus();
   });
-  check('clicking in while hovering keeps them up', hover != null);
+  check('clicking in while hovering keeps them up', hover !== undefined);
   await point('mouseout', editor, document.body);
   check(
     'and the pointer leaving does not take them from the caret',
-    hover != null,
+    hover !== undefined,
     JSON.stringify(hover),
   );
   await act(async () => {
     field.blur();
   });
-  check('only letting go of both does', hover === null, JSON.stringify(hover));
+  check('only letting go of both does', hover === undefined, JSON.stringify(hover));
 
   // Typing relabels the bands that are already up, rather than showing the value
   // that was there when the pointer arrived.

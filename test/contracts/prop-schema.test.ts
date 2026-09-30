@@ -12,6 +12,9 @@ import { parsePropSchema as parseAstroSchema } from '../../dist/electron/astroPa
 import { parseScanResult } from '../../dist/shared/scan.js';
 import { LIMITS } from '../../dist/shared/limits.js';
 
+// Null as a boundary receives it, parsed from JSON: inputs may hold it; our values never do.
+const jsonNull: unknown = JSON.parse('null');
+
 const goodSchema = new Map<string, unknown>([
   [
     'title',
@@ -166,13 +169,13 @@ test('nested schema metadata rejects invalid shapes and values', () => {
   const branch = { forbids: [], pins: {}, defaults: {}, docs: {}, rules: {} };
   const invalid: readonly Readonly<Record<string, unknown>>[] = [
     { shape: {} },
-    { shape: [null] },
+    { shape: [jsonNull] },
     { shape: [{ name: 'x', type: 3 }] },
     { unions: [{}] },
     { unions: [{ names: [false], branches: [] }] },
-    { unions: [{ names: ['x'], branches: [null] }] },
+    { unions: [{ names: ['x'], branches: [jsonNull] }] },
     { default: {} },
-    { default: null },
+    { default: jsonNull },
     { default: Infinity },
     { hint: false },
     { doc: 0 },
@@ -182,7 +185,7 @@ test('nested schema metadata rejects invalid shapes and values', () => {
     { step: -Infinity },
     { minExclusive: 'true' },
     { maxExclusive: 1 },
-    { numeric: null },
+    { numeric: jsonNull },
   ];
   for (const metadata of invalid) {
     assert.throws(() => parseField({ ...base, ...metadata }, 'item'), /PropSchema/);
@@ -190,12 +193,12 @@ test('nested schema metadata rejects invalid shapes and values', () => {
   for (const metadata of [
     { forbids: [false] },
     { pins: { x: [3] } },
-    { pins: null },
+    { pins: jsonNull },
     { defaults: { x: true } },
-    { defaults: null },
+    { defaults: jsonNull },
     { docs: { x: false } },
     { rules: { x: { prop: 'pressed', is: 'true', then: 'Pause' } } },
-    { rules: null },
+    { rules: jsonNull },
   ]) {
     const unions = [{ names: ['x'], branches: [{ ...branch, ...metadata }] }];
     assert.throws(() => parseField({ ...base, unions }, 'item'), /PropSchema/);

@@ -26,6 +26,7 @@ import {
   printMarkdownNode,
   serializeMarkdownPage,
 } from '../../dist/electron/markdownParser.js';
+import { LIMITS } from '../../dist/shared/limits.js';
 import { markdownPrefix } from '../../dist/shared/markdownLayout.js';
 import { parsePageResult, type PageModel, type PageNode } from '../../dist/shared/page-node.js';
 import { projectPage, type ProjectedNode } from '../../dist/shared/source-projection.js';
@@ -56,9 +57,9 @@ interface Located {
 }
 
 interface Counts {
-  nodes: number;
-  printed: number;
-  attributes: number;
+  readonly nodes: number;
+  readonly printed: number;
+  readonly attributes: number;
 }
 
 function parsed(document: MarkdownDocument): { model: PageModel; located: readonly Located[] } {
@@ -74,6 +75,8 @@ function parsed(document: MarkdownDocument): { model: PageModel; located: readon
   const located: Located[] = [];
   type Parent = Located['parent'];
   const walk = (nodes: readonly PageNode[], parent: Parent, prefix: readonly number[]) => {
+    const depth = prefix.length;
+    assert.ok(depth <= LIMITS.treeDepthMax, `${document.name}: tree depth limit`);
     nodes.forEach((node, index) => {
       const at = [...prefix, index];
       const projected = byPath.get(at.join('/'));
@@ -172,7 +175,23 @@ function unprefixed(line: string, prefix: string): string {
   return line.startsWith(blank) ? line.slice(blank.length) : line;
 }
 
-function checkDocument(document: MarkdownDocument, counts: Counts, exact: boolean): void {
+// How much of a document is checked: every node's slice and its printed place, or only the
+// slices when the printer does not reproduce the page byte for byte.
+type CheckScope = 'printed' | 'slices';
+
+function addCounts(total: Counts, more: Counts): Counts {
+  return {
+    nodes: total.nodes + more.nodes,
+    printed: total.printed + more.printed,
+    attributes: total.attributes + more.attributes,
+  };
+}
+
+function checkDocument(document: MarkdownDocument, scope: CheckScope): Counts {
+  const exact = scope === 'printed';
+  let nodes = 0;
+  let printed = 0;
+  let attributes = 0;
   const { model, located } = parsed(document);
   const bytes = encodeUtf8(document.text);
   for (const entry of located) {
@@ -181,11 +200,11 @@ function checkDocument(document: MarkdownDocument, counts: Counts, exact: boolea
     const slice = Buffer.from(bytes.subarray(projected.span.start, projected.span.end)).toString();
     const located16 = document.text.slice(node.start, node.end);
     assert.equal(slice, located16, `${where}: byte and UTF-16 spans`);
-    counts.nodes += 1;
+    nodes += 1;
     if (projected.syntax === 'markdown') {
       if (exact) {
         assert.equal(printedAt(bytes, model, entry), slice, `${where}: printed at its place`);
-        counts.printed += 1;
+        printed += 1;
       }
     } else if (exact) {
       checkMarkup(slice, node, where, markupPrefix(bytes, located, entry));
@@ -196,10 +215,11 @@ function checkDocument(document: MarkdownDocument, counts: Counts, exact: boolea
       ).toString();
       if (attribute.type === 'markdown') {
         assert.equal(value, attributeValue(node, attribute.name), `${where}: ${attribute.name}`);
-        counts.attributes += 1;
+        attributes += 1;
       }
     }
   }
+  return { nodes, printed, attributes };
 }
 
 // The prefix of the Markdown container a markup node's block stands in: read
@@ -235,9 +255,9 @@ test('every Markdown fixture prints back byte for byte', () => {
 });
 
 test('every node of every Markdown fixture slices to itself as printed at its place', () => {
-  const counts: Counts = { nodes: 0, printed: 0, attributes: 0 };
+  let counts: Counts = { nodes: 0, printed: 0, attributes: 0 };
   for (const document of fixtures()) {
-    checkDocument(document, counts, true);
+    counts = addCounts(counts, checkDocument(document, 'printed'));
   }
   // Floors, so a parser change that silently stopped locating nodes fails here.
   assert.ok(counts.nodes >= 230, `nodes checked: ${counts.nodes}`);
@@ -246,13 +266,13 @@ test('every node of every Markdown fixture slices to itself as printed at its pl
 });
 
 test('a seeded corpus keeps span integrity wherever the printer reproduces the page', () => {
-  const counts: Counts = { nodes: 0, printed: 0, attributes: 0 };
+  let counts: Counts = { nodes: 0, printed: 0, attributes: 0 };
   let exact = 0;
   const documents = generatedMarkdown(10, 600);
   for (const document of documents) {
     const whole = printedWhole(document);
     exact += whole ? 1 : 0;
-    checkDocument(document, counts, whole);
+    counts = addCounts(counts, checkDocument(document, whole ? 'printed' : 'slices'));
   }
   assert.ok(exact >= 300, `pages printed exactly: ${exact} of ${documents.length}`);
   assert.ok(counts.printed >= 1_700, `printed checks: ${counts.printed}`);

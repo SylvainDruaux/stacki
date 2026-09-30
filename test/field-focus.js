@@ -38,7 +38,7 @@ const check = (what, condition, detail) => {
     try {
       return require('electron');
     } catch {
-      return null;
+      return undefined;
     }
   })();
   if (typeof electronPath !== 'string') {
@@ -48,13 +48,13 @@ const check = (what, condition, detail) => {
 
   const esbuild = require('esbuild');
   const root = path.join(__dirname, '..');
-  const buildDir = path.join(root, 'node_modules', '.stacki-test');
-  const pageDir = path.join(buildDir, 'field-focus');
-  fs.mkdirSync(pageDir, { recursive: true });
+  const buildDirectory = path.join(root, 'node_modules', '.stacki-test');
+  const pageDirectory = path.join(buildDirectory, 'field-focus');
+  fs.mkdirSync(pageDirectory, { recursive: true });
 
   // Both places this control is used: the transform settings popup and the
   // gradient centre it was copied from.
-  const entry = path.join(buildDir, 'field-focus.entry.jsx');
+  const entry = path.join(buildDirectory, 'field-focus.entry.jsx');
   // The module specifier of a style-panel source file, written into the entry below.
   const stylePanelImport = (...parts) =>
     JSON.stringify(path.join(root, 'src', 'style-panel', ...parts));
@@ -87,7 +87,7 @@ const check = (what, condition, detail) => {
   );
   await esbuild.build({
     entryPoints: [entry],
-    outfile: path.join(pageDir, 'bundle.js'),
+    outfile: path.join(pageDirectory, 'bundle.js'),
     bundle: true,
     format: 'iife',
     jsx: 'automatic',
@@ -98,19 +98,19 @@ const check = (what, condition, detail) => {
   // The real stylesheets — the whole point is the `opacity: 0` on the input,
   // which only exists in the CSS.
   fs.writeFileSync(
-    path.join(pageDir, 'app.css'),
+    path.join(pageDirectory, 'app.css'),
     ['src/styles.css', 'src/style-panel/utilities.css', 'src/style-panel/embed-editor.css']
-      .map((f) => fs.readFileSync(path.join(root, f), 'utf8'))
+      .map((file) => fs.readFileSync(path.join(root, file), 'utf8'))
       .join('\n'),
   );
   fs.writeFileSync(
-    path.join(pageDir, 'index.html'),
+    path.join(pageDirectory, 'index.html'),
     '<!doctype html><meta charset=utf-8><link rel="stylesheet" href="app.css">' +
       '<style>body{margin:0;background:#1a1a1a}</style><div id="root"></div>' +
       '<script src="bundle.js"></script>',
   );
 
-  const probe = path.join(pageDir, 'probe.js');
+  const probe = path.join(pageDirectory, 'probe.js');
   fs.writeFileSync(
     probe,
     `const { app, BrowserWindow } = require('electron');
@@ -222,45 +222,46 @@ const check = (what, condition, detail) => {
 
   const { spawnSync } = require('child_process');
   const run = spawnSync(electronPath, [probe], { encoding: 'utf8', timeout: 180000 });
-  const line = (run.stdout || '').split('\n').find((l) => l.trim().startsWith('{'));
+  const line = (run.stdout || '').split('\n').find((line) => line.trim().startsWith('{'));
   if (!line) {
     check('the browser probe ran', false, (run.stderr || run.stdout || '').slice(0, 500));
   } else {
     const out = JSON.parse(line);
-    const tested = out.fields.filter((f) => !f.skipped);
+    const tested = out.fields.filter((field) => !field.skipped);
     // A field that could not be found or was off-screen is not a pass — it is a
     // field this test did not check, and silence there is how a regression walks
     // back in.
-    const skipped = out.fields.filter((f) => f.skipped);
+    const skipped = out.fields.filter((field) => field.skipped);
     check('every field was reachable and pressed', skipped.length === 0, JSON.stringify(skipped));
     check(
       'both origin pads were among them',
-      tested.filter((f) => /origin/i.test(f.label)).length === 4,
-      JSON.stringify(tested.map((f) => f.label)),
+      tested.filter((field) => /origin/i.test(field.label)).length === 4,
+      JSON.stringify(tested.map((field) => field.label)),
     );
     check(
       'and the gradient centre too',
-      tested.filter((f) => /^Position/.test(f.label)).length === 2,
-      JSON.stringify(tested.map((f) => f.label)),
+      tested.filter((field) => /^Position/.test(field.label)).length === 2,
+      JSON.stringify(tested.map((field) => field.label)),
     );
     // The premise: these fields really are a visible editor over a hidden input.
     check(
       'the input behind them is invisible',
-      tested.every((f) => f.inputHidden),
-      JSON.stringify(tested.map((f) => [f.label, f.inputHidden])),
+      tested.every((field) => field.inputHidden),
+      JSON.stringify(tested.map((field) => [field.label, field.inputHidden])),
     );
-    for (const f of tested) {
+    for (const field of tested) {
       check(
-        `pressing "${f.label}" leaves the caret in it`,
-        f.caretInTheFieldPressed,
-        `focus went to ${f.activeTag}` +
-          `${f.focusedAnInvisibleField ? ' — an invisible one' : ''} | at (${f.x},${f.y})` +
-          ` the top element is ${f.hitTag}.${f.hitCls} | popup open: ${f.popupOpen}`,
+        `pressing "${field.label}" leaves the caret in it`,
+        field.caretInTheFieldPressed,
+        `focus went to ${field.activeTag}` +
+          `${field.focusedAnInvisibleField ? ' — an invisible one' : ''}` +
+          ` | at (${field.x},${field.y})` +
+          ` the top element is ${field.hitTag}.${field.hitCls} | popup open: ${field.popupOpen}`,
       );
       check(
-        `and not into a field that cannot be seen ("${f.label}")`,
-        !f.focusedAnInvisibleField,
-        `${f.activeTag} | hit=${f.hitTag}.${f.hitCls} popup=${f.popupOpen}`,
+        `and not into a field that cannot be seen ("${field.label}")`,
+        !field.focusedAnInvisibleField,
+        `${field.activeTag} | hit=${field.hitTag}.${field.hitCls} popup=${field.popupOpen}`,
       );
     }
     // The cause, kept out directly: a <label> forwards the press to the input.
@@ -276,7 +277,7 @@ const check = (what, condition, detail) => {
     process.exit(1);
   }
   console.log(`field-focus: ${checked} passed  [real presses, real layout]`);
-})().catch((err) => {
-  console.error(err);
+})().catch((error) => {
+  console.error(error);
   process.exit(1);
 });

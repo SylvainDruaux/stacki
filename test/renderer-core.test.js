@@ -8,21 +8,23 @@ const path = require('node:path');
 const fs = require('node:fs');
 const esbuild = require('esbuild');
 
-const buildDir = path.join(__dirname, '..', 'node_modules', '.stacki-test', 'renderer-core');
-fs.mkdirSync(buildDir, { recursive: true });
+const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test', 'renderer-core');
+fs.mkdirSync(buildDirectory, { recursive: true });
 esbuild.buildSync({
   entryPoints: ['editorTree', 'loopBindings', 'pagePersistence', 'pageEdits'].map((name) =>
     path.join(__dirname, '..', 'src', `${name}.ts`),
   ),
-  outdir: buildDir,
+  outdir: buildDirectory,
   bundle: true,
   format: 'cjs',
   platform: 'node',
   logLevel: 'silent',
 });
-const tree = require(path.join(buildDir, 'editorTree.js'));
-const loops = require(path.join(buildDir, 'loopBindings.js'));
-const { createPageSaver, scanContainsFile } = require(path.join(buildDir, 'pagePersistence.js'));
+const tree = require(path.join(buildDirectory, 'editorTree.js'));
+const loops = require(path.join(buildDirectory, 'loopBindings.js'));
+const { createPageSaver, scanContainsFile } = require(
+  path.join(buildDirectory, 'pagePersistence.js'),
+);
 const deferred = () => {
   let resolve, reject;
   const promise = new Promise((yes, no) => {
@@ -50,8 +52,8 @@ test('tree index preserves locations, ancestry and anchors after moves', () => {
   assert.deepEqual(index.ancestors('leaf'), [nodes[0], leaf]);
   assert.deepEqual(index.sectionIds, ['anchor']);
   assert.equal(index.byPath.get('0.0'), leaf);
-  assert.equal(index.path('missing'), null);
-  assert.equal(index.parent('first'), null);
+  assert.equal(index.path('missing'), undefined);
+  assert.equal(index.parent('first'), undefined);
   assert.equal(tree.isDescendantOf(leaf, 'leaf'), true);
   nodes[1].children.push(nodes[0].children.pop());
   assert.equal(tree.findParentNode(nodes, 'leaf'), nodes[1]);
@@ -174,12 +176,12 @@ test('a loop still running keeps its declarations, reading a placeholder instead
 
 // Page saver harness: a real queue (src/pageEdits.ts) and a send held on a
 // gate per entry, so each test decides exactly when disk answers.
-const edits = require(path.join(buildDir, 'pageEdits.js'));
+const edits = require(path.join(buildDirectory, 'pageEdits.js'));
 const step = () => ({ outcome: { tag: 'applied', applied: [] } });
 const gesture = (name) => ({
-  coalesceKey: null,
+  coalesceKey: undefined,
   urgency: true,
-  stream: null,
+  stream: undefined,
   request: () => [],
   apply: (model) => model,
   name,
@@ -296,7 +298,7 @@ test('external edits recognize pages, components and layouts as editable files',
 });
 
 test('code window saves keep each file and flush the latest version in order', async () => {
-  const { createFileSaver } = require(path.join(buildDir, 'pagePersistence.js'));
+  const { createFileSaver } = require(path.join(buildDirectory, 'pagePersistence.js'));
   const writes = [];
   const saver = createFileSaver({ delay: 10000 });
   saver.schedule('a.css', async () => writes.push('a:old'));
@@ -321,7 +323,7 @@ test('code window saves keep each file and flush the latest version in order', a
 });
 
 test('failed code window writes are retained for an explicit retry', async () => {
-  const { createFileSaver } = require(path.join(buildDir, 'pagePersistence.js'));
+  const { createFileSaver } = require(path.join(buildDirectory, 'pagePersistence.js'));
   let fail = true;
   let attempts = 0;
   const errors = [];

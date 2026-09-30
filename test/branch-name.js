@@ -28,9 +28,9 @@ const check = (what, condition, detail) => {
 
 (async () => {
   const esbuild = require('esbuild');
-  const buildDir = path.join(__dirname, '..', 'node_modules', '.stacki-test');
-  fs.mkdirSync(buildDir, { recursive: true });
-  const bundlePath = path.join(buildDir, 'branch-name.bundle.js');
+  const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
+  fs.mkdirSync(buildDirectory, { recursive: true });
+  const bundlePath = path.join(buildDirectory, 'branch-name.bundle.js');
   await esbuild.build({
     entryPoints: [path.join(__dirname, '..', 'src', 'branchName.js')],
     outfile: bundlePath,
@@ -77,8 +77,8 @@ const check = (what, condition, detail) => {
   check('so are digits and underscores', clean('fix_123') === 'fix_123');
 
   // --- the shape of the whole name -------------------------------------------
-  check('nothing typed is not an error', why('') === null && why('   ') === null);
-  check('a plain name is not an error', why('feature/login') === null, why('feature/login'));
+  check('nothing typed is not an error', why('') === undefined && why('   ') === undefined);
+  check('a plain name is not an error', why('feature/login') === undefined, why('feature/login'));
   check("`@` is git's own name for HEAD", !!why('@'));
   check('a trailing slash has no name after it', !!why('a/'));
   check('a trailing dot is refused by git', !!why('a.'));
@@ -97,7 +97,7 @@ const check = (what, condition, detail) => {
     /same branch here/.test(why('Main', existing) || ''),
     why('Main', existing),
   );
-  check('a free name is free', why('feature/logout', existing) === null);
+  check('a free name is free', why('feature/logout', existing) === undefined);
 
   // --- the answer the field acts on -------------------------------------------
   check(

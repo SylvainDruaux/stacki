@@ -5,13 +5,18 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const bridge = require('./renderer-module')('stylePanelBridge.ts');
 
+// A boundary can receive null — JSON, structured clone and postMessage all carry it —
+// so the negative space below includes it. It is read from JSON, because our own
+// code never writes a null.
+const PLATFORM_NULL = JSON.parse('null');
+
 const file = { rel: 'src/styles/site.css', name: 'site.css', path: '/project/site.css', size: 12 };
 
 test('style file parser accepts complete records and rejects invalid bounds', () => {
   assert.deepEqual(bridge.parseStyleFiles({ files: [file] }), [file]);
   for (const value of [
-    null,
-    { files: null },
+    PLATFORM_NULL,
+    { files: PLATFORM_NULL },
     { files: [{ ...file, size: -1 }] },
     { files: [{ ...file, path: 'bad\0path' }] },
     { files: Array(100_001).fill(file) },

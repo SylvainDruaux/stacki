@@ -26,9 +26,9 @@ const check = (what, condition, detail) => {
 
 (async () => {
   const esbuild = require('esbuild');
-  const buildDir = path.join(__dirname, '..', 'node_modules', '.stacki-test');
-  fs.mkdirSync(buildDir, { recursive: true });
-  const bundlePath = path.join(buildDir, 'popup-layers.bundle.js');
+  const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
+  fs.mkdirSync(buildDirectory, { recursive: true });
+  const bundlePath = path.join(buildDirectory, 'popup-layers.bundle.js');
   await esbuild.build({
     stdin: {
       contents:
@@ -88,16 +88,16 @@ const check = (what, condition, detail) => {
     'SpacingBox.tsx': 'the spacing editor',
   };
   for (const [file, what] of Object.entries(files)) {
-    const src = fs.readFileSync(path.join(__dirname, '..', 'src', 'style-panel', file), 'utf8');
-    check(`${what} asks before closing on a press`, /inOwnedPopup\(/.test(src), file);
+    const source = fs.readFileSync(path.join(__dirname, '..', 'src', 'style-panel', file), 'utf8');
+    check(`${what} asks before closing on a press`, /inOwnedPopup\(/.test(source), file);
   }
   const pickers = {
     'components/ColorPicker.tsx': 'the colour picker',
     'VariableConnect.tsx': 'the variable picker',
   };
   for (const [file, what] of Object.entries(pickers)) {
-    const src = fs.readFileSync(path.join(__dirname, '..', 'src', 'style-panel', file), 'utf8');
-    check(`${what} says where it was opened from`, /registerPopupLayer\(/.test(src), file);
+    const source = fs.readFileSync(path.join(__dirname, '..', 'src', 'style-panel', file), 'utf8');
+    check(`${what} says where it was opened from`, /registerPopupLayer\(/.test(source), file);
   }
 
   // --- and the popover it all happens in stays open --------------------------
@@ -108,7 +108,7 @@ const check = (what, condition, detail) => {
   // is the part that was wrong (the search box takes focus as it mounts, before a
   // passive effect could announce the popup).
   {
-    const popupBundle = path.join(buildDir, 'popup-layers-spacing.bundle.js');
+    const popupBundle = path.join(buildDirectory, 'popup-layers-spacing.bundle.js');
     await esbuild.build({
       entryPoints: [path.join(__dirname, '..', 'src', 'style-panel', 'SpacingBox.tsx')],
       outfile: popupBundle,
@@ -148,7 +148,11 @@ const check = (what, condition, detail) => {
       url: 'http://localhost/',
       pretendToBeVisual: true,
     }).window;
-    const prev = { window: global.window, document: global.document, navigator: global.navigator };
+    const previous = {
+      window: global.window,
+      document: global.document,
+      navigator: global.navigator,
+    };
     global.window = win;
     global.document = win.document;
     global.navigator = win.navigator;
@@ -157,7 +161,7 @@ const check = (what, condition, detail) => {
     global.HTMLElement = win.HTMLElement;
     global.getComputedStyle = win.getComputedStyle;
     global.MutationObserver = win.MutationObserver;
-    global.requestAnimationFrame = (fn) => win.setTimeout(fn, 0);
+    global.requestAnimationFrame = (callback) => win.setTimeout(callback, 0);
     global.cancelAnimationFrame = (id) => win.clearTimeout(id);
     global.ResizeObserver = class {
       observe() {}
@@ -178,7 +182,7 @@ const check = (what, condition, detail) => {
     const root = createRoot(win.document.getElementById('root'));
     const settle = () =>
       act(async () => {
-        await new Promise((r) => win.setTimeout(r, 25));
+        await new Promise((resolve) => win.setTimeout(resolve, 25));
       });
     await act(async () => {
       root.render(
@@ -186,10 +190,10 @@ const check = (what, condition, detail) => {
           prop: 'padding-bottom',
           side: 'bottom',
           placeholder: '0',
-          read: (p) =>
-            p === 'padding-bottom'
+          read: (property) =>
+            property === 'padding-bottom'
               ? {
-                  prop: p,
+                  prop: property,
                   source: 'selected',
                   selectedValue: { value, important: false },
                   winner: { value, selectorText: '.hero', important: false },
@@ -197,7 +201,7 @@ const check = (what, condition, detail) => {
                   contributors: [],
                 }
               : undefined,
-          setProp: (p, v) => writes.push(`${p}: ${v}`),
+          setProp: (property, value) => writes.push(`${property}: ${value}`),
           clearProp: () => {},
           liveSetProp: () => {},
           onSelectSelector: () => {},
@@ -212,11 +216,11 @@ const check = (what, condition, detail) => {
     const popover = () => win.document.querySelector('.embed-editor_spacing-popover');
     check('the spacing editor opens', !!popover());
 
-    const press = (el) => {
-      el.dispatchEvent(new win.MouseEvent('pointerdown', { bubbles: true, cancelable: true }));
-      el.dispatchEvent(new win.MouseEvent('mousedown', { bubbles: true, cancelable: true }));
-      el.dispatchEvent(new win.MouseEvent('mouseup', { bubbles: true }));
-      el.dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+    const press = (element) => {
+      element.dispatchEvent(new win.MouseEvent('pointerdown', { bubbles: true, cancelable: true }));
+      element.dispatchEvent(new win.MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+      element.dispatchEvent(new win.MouseEvent('mouseup', { bubbles: true }));
+      element.dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
     };
 
     await act(async () => {
@@ -229,8 +233,8 @@ const check = (what, condition, detail) => {
     );
     check('and the editor it opened from stays open', closes === 0, `${closes} closes`);
 
-    const row = [...win.document.querySelectorAll('button')].find((b) =>
-      /site-margin/.test(b.textContent || ''),
+    const row = [...win.document.querySelectorAll('button')].find((button) =>
+      /site-margin/.test(button.textContent || ''),
     );
     check('the picker lists a variable', !!row);
     if (row) {
@@ -257,9 +261,9 @@ const check = (what, condition, detail) => {
     await act(async () => {
       root.unmount();
     });
-    global.window = prev.window;
-    global.document = prev.document;
-    global.navigator = prev.navigator;
+    global.window = previous.window;
+    global.document = previous.document;
+    global.navigator = previous.navigator;
   }
 
   if (failures.length) {

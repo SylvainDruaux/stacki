@@ -12,8 +12,8 @@ const ASTRO_VERSION = '5.13.10';
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 async function orchestrate() {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'stacki-dev-integration-'));
-  const project = path.join(dir, 'project');
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'stacki-dev-integration-'));
+  const project = path.join(directory, 'project');
   fs.mkdirSync(path.join(project, 'src', 'pages'), { recursive: true });
   fs.writeFileSync(
     path.join(project, 'package.json'),
@@ -59,12 +59,12 @@ async function orchestrate() {
     path.join(project, 'src', 'data', 'authors.json'),
     JSON.stringify([{ id: 'author', name: 'Author' }]),
   );
-  const linkedProject = path.join(dir, 'project-link');
+  const linkedProject = path.join(directory, 'project-link');
   fs.symlinkSync(project, linkedProject, process.platform === 'win32' ? 'junction' : 'dir');
   const env = {
     ...process.env,
     ASTRO_TELEMETRY_DISABLED: '1',
-    STACKI_INTEGRATION_DIR: dir,
+    STACKI_INTEGRATION_DIR: directory,
     STACKI_INTEGRATION_PROJECT: linkedProject,
   };
   delete env.ELECTRON_RUN_AS_NODE;
@@ -77,7 +77,7 @@ async function orchestrate() {
     console.log(`Installing Astro ${ASTRO_VERSION} in an isolated temporary project…`);
     const installed = childProcess.spawnSync(
       process.platform === 'win32' ? 'npm.cmd' : 'npm',
-      ['install', '--no-audit', '--no-fund', '--cache', path.join(dir, 'npm-cache')],
+      ['install', '--no-audit', '--no-fund', '--cache', path.join(directory, 'npm-cache')],
       { cwd: project, env, stdio: 'inherit', timeout: 180000, shell: process.platform === 'win32' },
     );
     if (installed.error) {
@@ -96,26 +96,26 @@ async function orchestrate() {
     });
     process.exitCode = result;
   } finally {
-    fs.rmSync(dir, { recursive: true, force: true });
+    fs.rmSync(directory, { recursive: true, force: true });
   }
 }
 
 async function inElectron() {
   const electron = require('electron');
   const { app, ipcMain, BrowserWindow } = electron;
-  const dir = process.env.STACKI_INTEGRATION_DIR;
+  const directory = process.env.STACKI_INTEGRATION_DIR;
   assert.ok(
-    dir && path.basename(dir).startsWith('stacki-dev-integration-'),
+    directory && path.basename(directory).startsWith('stacki-dev-integration-'),
     'use the isolated fixture only',
   );
   const project = process.env.STACKI_INTEGRATION_PROJECT;
-  assert.equal(fs.realpathSync(project), fs.realpathSync(path.join(dir, 'project')));
-  const userData = path.join(dir, 'user-data');
+  assert.equal(fs.realpathSync(project), fs.realpathSync(path.join(directory, 'project')));
+  const userData = path.join(directory, 'user-data');
   fs.mkdirSync(userData, { recursive: true });
   app.setPath('userData', userData);
   app.setPath('sessionData', userData);
-  app.setAppLogsPath(path.join(dir, 'logs'));
-  app.setPath('crashDumps', dir);
+  app.setAppLogsPath(path.join(directory, 'logs'));
+  app.setPath('crashDumps', directory);
 
   const logs = [];
   const handlers = new Map();
@@ -251,7 +251,7 @@ async function inElectron() {
     // Zod 3.25 also ships its Zod 4 entrypoint. Exercise the existing modern
     // conversion with real schemas so the compatibility branch cannot regress it.
     const projectRequire = require('node:module').createRequire(path.join(project, 'package.json'));
-    const schemaBundle = path.join(dir, 'schema-v4.mjs');
+    const schemaBundle = path.join(directory, 'schema-v4.mjs');
     await projectRequire('esbuild').build({
       stdin: {
         contents: [

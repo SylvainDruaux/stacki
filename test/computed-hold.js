@@ -36,8 +36,8 @@ const check = (what, condition, detail) => {
 (async () => {
   const esbuild = require('esbuild');
   const root = path.join(__dirname, '..');
-  const buildDir = path.join(root, 'node_modules', '.stacki-test');
-  fs.mkdirSync(buildDir, { recursive: true });
+  const buildDirectory = path.join(root, 'node_modules', '.stacki-test');
+  fs.mkdirSync(buildDirectory, { recursive: true });
 
   // Stand in for the preview frame, so the round trip can be held open and the
   // answer chosen per case. Everything else is the real panel.
@@ -51,7 +51,7 @@ const check = (what, condition, detail) => {
       };
     });
   `;
-  const entry = path.join(buildDir, 'computed-hold.entry.jsx');
+  const entry = path.join(buildDirectory, 'computed-hold.entry.jsx');
   // The module specifier of a style-panel source file, written into the entry below.
   const stylePanelImport = (...parts) =>
     JSON.stringify(path.join(root, 'src', 'style-panel', ...parts));
@@ -61,7 +61,7 @@ const check = (what, condition, detail) => {
      export { setHost } from ${stylePanelImport('lib', 'host')}
      export { forgetComputedStyles } from ${stylePanelImport('lib', 'computed-style')}`,
   );
-  const bundlePath = path.join(buildDir, 'computed-hold.bundle.js');
+  const bundlePath = path.join(buildDirectory, 'computed-hold.bundle.js');
   await esbuild.build({
     entryPoints: [entry],
     outfile: bundlePath,
@@ -100,7 +100,7 @@ const check = (what, condition, detail) => {
   global.Node = dom.window.Node;
   global.getComputedStyle = dom.window.getComputedStyle;
   global.MutationObserver = dom.window.MutationObserver;
-  global.requestAnimationFrame = (fn) => setTimeout(fn, 0);
+  global.requestAnimationFrame = (callback) => setTimeout(callback, 0);
   global.cancelAnimationFrame = clearTimeout;
   global.ResizeObserver = class {
     observe() {}
@@ -137,21 +137,21 @@ const check = (what, condition, detail) => {
   const mount = async () => {
     const host = document.createElement('div');
     document.body.appendChild(host);
-    const rootEl = createRoot(host);
+    const rootElement = createRoot(host);
     let decls = {};
     const render = async () => {
-      const read = (p) =>
-        decls[p] != null
+      const read = (property) =>
+        decls[property] !== undefined
           ? {
               source: 'selected',
               overridden: false,
               contributors: [],
-              winner: { selectorText: '.x', value: decls[p], important: false },
-              selectedValue: { value: decls[p], important: false },
+              winner: { selectorText: '.x', value: decls[property], important: false },
+              selectedValue: { value: decls[property], important: false },
             }
           : undefined;
       await act(async () => {
-        rootEl.render(
+        rootElement.render(
           React.createElement(EffectsSection, {
             read,
             busy: false,
@@ -165,38 +165,38 @@ const check = (what, condition, detail) => {
       });
     };
     // Every CSS edit drops the cached computed values — that is what opens the gap.
-    const set = async (p, v) => {
+    const set = async (property, value) => {
       forgetComputedStyles();
-      decls = { ...decls, [p]: v };
+      decls = { ...decls, [property]: value };
       await render();
     };
-    const clear = async (p) => {
+    const clear = async (property) => {
       forgetComputedStyles();
-      const n = { ...decls };
-      delete n[p];
-      decls = n;
+      const next = { ...decls };
+      delete next[property];
+      decls = next;
       await render();
     };
     const settle = async () => {
       await act(async () => {
-        await new Promise((r) => setTimeout(r, 5));
+        await new Promise((resolve) => setTimeout(resolve, 5));
       });
     };
     // Resolving the round trip lands a state update, so it happens inside act().
     const answer = async () => {
       await act(async () => {
         globalThis.__answer?.();
-        globalThis.__answer = null;
-        await new Promise((r) => setTimeout(r, 5));
+        globalThis.__answer = undefined;
+        await new Promise((resolve) => setTimeout(resolve, 5));
       });
       await settle();
     };
     const selected = () => {
       const bar = host.querySelector('[aria-label="Pointer events"]');
-      const on = [...bar.querySelectorAll('.embed-editor_display-seg')].filter((b) =>
-        b.classList.contains('is-selected'),
+      const on = [...bar.querySelectorAll('.embed-editor_display-seg')].filter((segment) =>
+        segment.classList.contains('is-selected'),
       );
-      return on.map((b) => b.getAttribute('aria-label')).join(',') || '(none)';
+      return on.map((segment) => segment.getAttribute('aria-label')).join(',') || '(none)';
     };
     await render();
     return {
@@ -207,7 +207,7 @@ const check = (what, condition, detail) => {
       answer,
       selected,
       done: async () => {
-        await act(async () => rootEl.unmount());
+        await act(async () => rootElement.unmount());
         host.remove();
       },
     };
@@ -217,45 +217,49 @@ const check = (what, condition, detail) => {
   {
     globalThis.__noCanvas = false;
     globalThis.__computed = { 'pointer-events': 'none' };
-    const m = await mount();
-    await m.set('pointer-events', 'none');
-    await m.settle();
-    await m.answer();
-    check('an authored value is shown', m.selected() === 'None', m.selected());
+    const mounted = await mount();
+    await mounted.set('pointer-events', 'none');
+    await mounted.settle();
+    await mounted.answer();
+    check('an authored value is shown', mounted.selected() === 'None', mounted.selected());
 
-    await m.clear('pointer-events');
-    await m.settle();
+    await mounted.clear('pointer-events');
+    await mounted.settle();
     // The gap. Nothing is authored and the page has not answered yet.
     check(
       'clearing it does not jump to the fallback',
-      m.selected() === 'None',
-      `${m.selected()} — this is the guess, and the page has not been asked yet`,
+      mounted.selected() === 'None',
+      `${mounted.selected()} — this is the guess, and the page has not been asked yet`,
     );
-    await m.answer();
+    await mounted.answer();
     check(
       'and the answer confirms it, so nothing moved at all',
-      m.selected() === 'None',
-      m.selected(),
+      mounted.selected() === 'None',
+      mounted.selected(),
     );
-    await m.done();
+    await mounted.done();
   }
 
   // --- The page computes something else --------------------------------------
   {
     globalThis.__computed = { 'pointer-events': 'auto' };
-    const m = await mount();
-    await m.set('pointer-events', 'none');
-    await m.settle();
-    await m.answer();
-    check('starts on the authored value', m.selected() === 'None', m.selected());
+    const mounted = await mount();
+    await mounted.set('pointer-events', 'none');
+    await mounted.settle();
+    await mounted.answer();
+    check('starts on the authored value', mounted.selected() === 'None', mounted.selected());
 
-    await m.clear('pointer-events');
-    await m.settle();
-    check('still holds while the page is asked', m.selected() === 'None', m.selected());
-    await m.answer();
+    await mounted.clear('pointer-events');
+    await mounted.settle();
+    check('still holds while the page is asked', mounted.selected() === 'None', mounted.selected());
+    await mounted.answer();
     // One move, and to the place the page actually named.
-    check('then moves once, to what the page says', m.selected() === 'Auto', m.selected());
-    await m.done();
+    check(
+      'then moves once, to what the page says',
+      mounted.selected() === 'Auto',
+      mounted.selected(),
+    );
+    await mounted.done();
   }
 
   // --- No canvas to ask -------------------------------------------------------
@@ -263,14 +267,18 @@ const check = (what, condition, detail) => {
     // Nothing is ever coming, so holding would hold for ever. The fallback is the
     // best answer available and it is used straight away.
     globalThis.__noCanvas = true;
-    const m = await mount();
-    await m.set('pointer-events', 'none');
-    await m.settle();
-    check('the authored value still wins', m.selected() === 'None', m.selected());
-    await m.clear('pointer-events');
-    await m.settle();
-    check('clearing falls back at once with no page to ask', m.selected() === 'Auto', m.selected());
-    await m.done();
+    const mounted = await mount();
+    await mounted.set('pointer-events', 'none');
+    await mounted.settle();
+    check('the authored value still wins', mounted.selected() === 'None', mounted.selected());
+    await mounted.clear('pointer-events');
+    await mounted.settle();
+    check(
+      'clearing falls back at once with no page to ask',
+      mounted.selected() === 'Auto',
+      mounted.selected(),
+    );
+    await mounted.done();
     globalThis.__noCanvas = false;
   }
 
@@ -281,7 +289,7 @@ const check = (what, condition, detail) => {
   console.log(
     `computed-hold: ${checked} passed  [holds while asking, falls back with nothing to ask]`,
   );
-})().catch((err) => {
-  console.error(err);
+})().catch((error) => {
+  console.error(error);
   process.exit(1);
 });

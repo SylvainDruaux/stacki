@@ -61,7 +61,7 @@ const props = {
   onSetComment: noop,
 };
 const nodes = [
-  null,
+  undefined,
   { id: 'one', kind: 'element', name: 'h1', props: {}, children: [] },
   { id: 'text', kind: 'text', value: 'Heading' },
   { id: 'component', kind: 'component', name: 'Button', props: {}, children: [] },

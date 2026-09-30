@@ -24,9 +24,9 @@ const check = (what, condition, detail) => {
 
 (async () => {
   const esbuild = require('esbuild');
-  const buildDir = path.join(__dirname, '..', 'node_modules', '.stacki-test');
-  fs.mkdirSync(buildDir, { recursive: true });
-  const bundlePath = path.join(buildDir, 'history-panel.bundle.js');
+  const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
+  fs.mkdirSync(buildDirectory, { recursive: true });
+  const bundlePath = path.join(buildDirectory, 'history-panel.bundle.js');
   await esbuild.build({
     entryPoints: [path.join(__dirname, '..', 'src', 'panels', 'HistoryPanel.tsx')],
     outfile: bundlePath,
@@ -121,47 +121,48 @@ const check = (what, condition, detail) => {
   check('an unparseable date groups as nothing', dayGroup('nonsense', now) === '');
 
   // --- Saying what changed -------------------------------------------------
-  const f = (label, kind = 'page') => ({ label, kind });
+  const entry = (label, kind = 'page') => ({ label, kind });
   check('nothing changed says so', summarize([]) === 'No files changed', summarize([]));
   check('a missing list does not crash', summarize(undefined) === 'No files changed');
-  check('one file is named', summarize([f('Home')]) === 'Home', summarize([f('Home')]));
+  check('one file is named', summarize([entry('Home')]) === 'Home', summarize([entry('Home')]));
   check(
     'two are both named',
-    summarize([f('Home'), f('About')]) === 'Home and About',
-    summarize([f('Home'), f('About')]),
+    summarize([entry('Home'), entry('About')]) === 'Home and About',
+    summarize([entry('Home'), entry('About')]),
   );
   // Three or more: name the first and count the rest. The line is for
   // recognising a commit at a glance, not for listing it.
   check(
     'three are one name and a count',
-    summarize([f('Home'), f('About'), f('Contact')]) === 'Home and 2 other pages',
-    summarize([f('Home'), f('About'), f('Contact')]),
+    summarize([entry('Home'), entry('About'), entry('Contact')]) === 'Home and 2 other pages',
+    summarize([entry('Home'), entry('About'), entry('Contact')]),
   );
   // Two distinct names are both spelled out, so the remainder in the counted
   // form is never one — there is no singular case to get wrong.
   check(
     'a repeated name collapses to the two-name form',
-    summarize([f('Home'), f('About'), f('About')]) === 'Home and About',
-    summarize([f('Home'), f('About'), f('About')]),
+    summarize([entry('Home'), entry('About'), entry('About')]) === 'Home and About',
+    summarize([entry('Home'), entry('About'), entry('About')]),
   );
   check(
     'four distinct names count three',
-    summarize([f('Home'), f('About'), f('Contact'), f('Blog')]) === 'Home and 3 other pages',
-    summarize([f('Home'), f('About'), f('Contact'), f('Blog')]),
+    summarize([entry('Home'), entry('About'), entry('Contact'), entry('Blog')]) ===
+      'Home and 3 other pages',
+    summarize([entry('Home'), entry('About'), entry('Contact'), entry('Blog')]),
   );
   // All pages reads as pages; anything else and "files" is the honest word.
   check(
     'a mixed commit says files, not pages',
-    summarize([f('Home'), f('Card', 'component'), f('styles.css', 'style')]) ===
+    summarize([entry('Home'), entry('Card', 'component'), entry('styles.css', 'style')]) ===
       'Home and 2 other files',
-    summarize([f('Home'), f('Card', 'component'), f('styles.css', 'style')]),
+    summarize([entry('Home'), entry('Card', 'component'), entry('styles.css', 'style')]),
   );
   // Astro writes a page and its layout in one go often enough that a commit
   // naming the same thing twice would look like a bug in the panel.
   check(
     'the same label twice is counted once',
-    summarize([f('Home'), f('Home')]) === 'Home',
-    summarize([f('Home'), f('Home')]),
+    summarize([entry('Home'), entry('Home')]) === 'Home',
+    summarize([entry('Home'), entry('Home')]),
   );
 
   if (failures.length) {
@@ -169,7 +170,7 @@ const check = (what, condition, detail) => {
     process.exit(1);
   }
   console.log(`history-panel: ${checked} passed`);
-})().catch((err) => {
-  console.error(err);
+})().catch((error) => {
+  console.error(error);
   process.exit(1);
 });

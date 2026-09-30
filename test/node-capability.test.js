@@ -13,17 +13,25 @@ const path = require('node:path');
 const fs = require('node:fs');
 const esbuild = require('esbuild');
 
-const buildDir = path.join(__dirname, '..', 'node_modules', '.stacki-test', 'node-capability');
-fs.mkdirSync(buildDir, { recursive: true });
+const buildDirectory = path.join(
+  __dirname,
+  '..',
+  'node_modules',
+  '.stacki-test',
+  'node-capability',
+);
+fs.mkdirSync(buildDirectory, { recursive: true });
 esbuild.buildSync({
   entryPoints: [path.join(__dirname, '..', 'src', 'nodeCapability.ts')],
-  outdir: buildDir,
+  outdir: buildDirectory,
   bundle: true,
   format: 'cjs',
   platform: 'node',
   logLevel: 'silent',
 });
-const { nodeCapability, capabilityNeedsNotice } = require(path.join(buildDir, 'nodeCapability.js'));
+const { nodeCapability, capabilityNeedsNotice } = require(
+  path.join(buildDirectory, 'nodeCapability.js'),
+);
 const { parsePage } = require('../dist/electron/astroParser.js');
 const { parseMarkdownPage } = require('../dist/electron/markdownParser.js');
 const { projectPage } = require('../dist/shared/source-projection.js');

@@ -26,11 +26,11 @@ const check = (what, condition, detail) => {
 
 (async () => {
   const esbuild = require('esbuild');
-  const buildDir = path.join(__dirname, '..', 'node_modules', '.stacki-test');
-  fs.mkdirSync(buildDir, { recursive: true });
+  const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
+  fs.mkdirSync(buildDirectory, { recursive: true });
 
   // --- the rule ---------------------------------------------------------------
-  const orderOut = path.join(buildDir, 'page-order.bundle.mjs');
+  const orderOut = path.join(buildDirectory, 'page-order.bundle.mjs');
   await esbuild.build({
     entryPoints: [path.join(__dirname, '..', 'src', 'pageOrder.js')],
     outfile: orderOut,
@@ -69,14 +69,14 @@ const check = (what, condition, detail) => {
   check('the rank is what says so', pageRank('index.astro') === 0 && pageRank('about.astro') === 1);
 
   // --- the panel that draws it --------------------------------------------------
-  const entry = path.join(buildDir, 'page-order.entry.jsx');
+  const entry = path.join(buildDirectory, 'page-order.entry.jsx');
   fs.writeFileSync(
     entry,
     `export { default as PagesPanel } from ${JSON.stringify(
       path.join(__dirname, '..', 'src', 'panels', 'PagesPanel.tsx'),
     )};\n`,
   );
-  const bundle = path.join(buildDir, 'page-order.bundle.js');
+  const bundle = path.join(buildDirectory, 'page-order.bundle.js');
   await esbuild.build({
     entryPoints: [entry],
     outfile: bundle,
@@ -139,7 +139,7 @@ const check = (what, condition, detail) => {
     root.render(
       React.createElement(PagesPanel, {
         scan,
-        currentPage: null,
+        currentPage: undefined,
         injectedRoutes: [],
         onSelectRoute: () => {},
         onSelect: () => {},
@@ -152,17 +152,17 @@ const check = (what, condition, detail) => {
         onDeleteFolder: () => {},
       }),
     );
-    await new Promise((r) => setTimeout(r, 30));
+    await new Promise((resolve) => setTimeout(resolve, 30));
   });
 
   // What the list reads as, top to bottom: a folder row says its name, a page
   // row says its own.
   const listed = () =>
     [...container.querySelectorAll('.list-item')]
-      .filter((el) => !el.classList.contains('pages-injected-head'))
-      .map((el) => {
-        const label = el.querySelector('.label')?.textContent?.trim() || '';
-        return el.classList.contains('folder') ? `${label}/` : label;
+      .filter((element) => !element.classList.contains('pages-injected-head'))
+      .map((element) => {
+        const label = element.querySelector('.label')?.textContent?.trim() || '';
+        return element.classList.contains('folder') ? `${label}/` : label;
       })
       .filter(Boolean);
 
@@ -200,14 +200,14 @@ const check = (what, condition, detail) => {
   // called index: collapsing the folder takes it with it.
   await act(async () => {
     [...container.querySelectorAll('.list-item.folder')]
-      .find((el) => el.textContent.includes('about'))
+      .find((element) => element.textContent.includes('about'))
       ?.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }));
-    await new Promise((r) => setTimeout(r, 20));
+    await new Promise((resolve) => setTimeout(resolve, 20));
   });
   const closed = listed();
   check(
     'closing the folder puts its own page away too',
-    closed.filter((r) => r === 'index').length === 1,
+    closed.filter((page) => page === 'index').length === 1,
     closed.join(' · '),
   );
   check(

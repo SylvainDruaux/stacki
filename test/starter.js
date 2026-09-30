@@ -112,14 +112,17 @@ console.log('Ready.');
     name: 'my-site',
     onLog: (text) => log.push(text),
   });
-  const dir = path.join(parent, 'my-site');
+  const directory = path.join(parent, 'my-site');
   check(
     'the site lands in the folder it was named for',
-    result.projectPath === dir,
+    result.projectPath === directory,
     result.projectPath,
   );
-  check('with the starter in it', fs.existsSync(path.join(dir, 'src', 'pages', 'index.astro')));
-  check('and its config', fs.existsSync(path.join(dir, 'astro.config.mjs')));
+  check(
+    'with the starter in it',
+    fs.existsSync(path.join(directory, 'src', 'pages', 'index.astro')),
+  );
+  check('and its config', fs.existsSync(path.join(directory, 'astro.config.mjs')));
 
   // The command, as the framework documents it.
   check(
@@ -135,22 +138,22 @@ console.log('Ready.');
   check('and shows what it said', log.join('').includes('Ready.'), log.join(''));
 
   // The package is the site now.
-  const pkg = JSON.parse(fs.readFileSync(path.join(dir, 'package.json'), 'utf8'));
+  const pkg = JSON.parse(fs.readFileSync(path.join(directory, 'package.json'), 'utf8'));
   check('the package takes the site name', pkg.name === 'my-site', pkg.name);
   check('and keeps everything else', pkg.dependencies?.astro === '^7.1.4');
 
   // The history is theirs.
-  check('it is a git repository', fs.existsSync(path.join(dir, '.git')));
-  const commits = git(dir, ['rev-list', '--count', 'HEAD']).trim();
+  check('it is a git repository', fs.existsSync(path.join(directory, '.git')));
+  const commits = git(directory, ['rev-list', '--count', 'HEAD']).trim();
   check('starting at one commit', commits === '1', `${commits} commits`);
   check(
     'named after what it started from',
-    /Start my-site from Lumos/.test(git(dir, ['log', '-1', '--pretty=%s'])),
-    git(dir, ['log', '-1', '--pretty=%s']).trim(),
+    /Start my-site from Lumos/.test(git(directory, ['log', '-1', '--pretty=%s'])),
+    git(directory, ['log', '-1', '--pretty=%s']).trim(),
   );
   let remotes = '';
   try {
-    remotes = git(dir, ['remote']).trim();
+    remotes = git(directory, ['remote']).trim();
   } catch {
     remotes = '';
   }
@@ -161,8 +164,8 @@ console.log('Ready.');
     try {
       await createStarter({ npm, parentPath: parent, ...options });
       return '';
-    } catch (err) {
-      return err.message;
+    } catch (error) {
+      return error.message;
     }
   };
   check('a folder that exists is refused', !!(await refuses({ name: 'my-site' })));
@@ -193,8 +196,8 @@ console.log('Ready.');
     let message = '';
     try {
       await createStarter({ npm: broken, parentPath: parent, name: 'doomed' });
-    } catch (err) {
-      message = err.message;
+    } catch (error) {
+      message = error.message;
     }
     check('a scaffolder that fails fails the site', !!message, 'it returned as though it worked');
     check('with what it printed', /E404 not found/.test(message), message);
@@ -209,8 +212,8 @@ console.log('Ready.');
         parentPath: parent,
         name: 'nonpm',
       });
-    } catch (err) {
-      message = err.message;
+    } catch (error) {
+      message = error.message;
     }
     check(
       'a missing npm is said in terms of what to install',

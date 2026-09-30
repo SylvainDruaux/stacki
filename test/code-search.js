@@ -32,17 +32,17 @@ const read = (rel) => fs.readFileSync(path.join(root, rel), 'utf8').replace(/\r\
 
 // ── What CodeMirror actually renders ────────────────────────────────────────
 // The SearchPanel constructor, straight from the installed package.
-const searchSrc = read('node_modules/@codemirror/search/dist/index.js');
-const panelSrc = searchSrc.slice(
-  searchSrc.indexOf('class SearchPanel'),
-  searchSrc.indexOf('commit()', searchSrc.indexOf('class SearchPanel')),
+const searchSource = read('node_modules/@codemirror/search/dist/index.js');
+const panelSource = searchSource.slice(
+  searchSource.indexOf('class SearchPanel'),
+  searchSource.indexOf('commit()', searchSource.indexOf('class SearchPanel')),
 );
 // Fields name themselves in their element spec; buttons are made by a helper
 // that takes the name as its first argument.
 const controlNames = [
   ...new Set([
-    ...[...panelSrc.matchAll(/name: "([a-zA-Z]+)"/g)].map((m) => m[1]),
-    ...[...panelSrc.matchAll(/button\("([a-zA-Z]+)"/g)].map((m) => m[1]),
+    ...[...panelSource.matchAll(/name: "([a-zA-Z]+)"/g)].map((match) => match[1]),
+    ...[...panelSource.matchAll(/button\("([a-zA-Z]+)"/g)].map((match) => match[1]),
   ]),
 ];
 
@@ -93,7 +93,7 @@ const dom = new JSDOM(`<!doctype html><div class="cm-editor cm-dark">
     ${MIRROR.close}
   </div></div>
 </div>`);
-const doc = dom.window.document;
+const document = dom.window.document;
 
 // ── What our stylesheet says about it ───────────────────────────────────────
 const postcss = require('postcss');
@@ -129,7 +129,7 @@ for (const rule of [...panelRules, ...narrowRules]) {
   for (const selector of rule.selectors) {
     let hit = false;
     try {
-      hit = doc.querySelectorAll(queryableForm(selector)).length > 0;
+      hit = document.querySelectorAll(queryableForm(selector)).length > 0;
     } catch {
       hit = false;
     }
@@ -145,18 +145,18 @@ check(
 );
 
 // Every control is covered by at least one rule.
-const covered = (el) =>
+const covered = (element) =>
   [...panelRules, ...narrowRules].some((rule) =>
     rule.selectors.some((selector) => {
       try {
-        return [...doc.querySelectorAll(queryableForm(selector))].includes(el);
+        return [...document.querySelectorAll(queryableForm(selector))].includes(element);
       } catch {
         return false;
       }
     }),
   );
-const q = (sel) => doc.querySelector(sel);
-for (const [what, sel] of [
+const query = (selector) => document.querySelector(selector);
+for (const [what, selector] of [
   ['the query field', '.cm-search input[name=search]'],
   ['the replace field', '.cm-search input[name=replace]'],
   ['find next', '.cm-search [name=next]'],
@@ -169,8 +169,8 @@ for (const [what, sel] of [
   ['the regexp toggle', '.cm-search label:has([name=re])'],
   ['the whole-word toggle', '.cm-search label:has([name=word])'],
 ]) {
-  const el = q(sel);
-  check(`${what} is styled`, !!el && covered(el), sel);
+  const element = query(selector);
+  check(`${what} is styled`, !!element && covered(element), selector);
 }
 
 // The panel's own line break is what puts replace on its own row; flexbox only
@@ -193,14 +193,14 @@ const shorthand = fieldRules.filter((rule) => rule.some((decl) => decl.prop === 
 check(
   'nothing paints over the query field with the background shorthand',
   shorthand.length === 0,
-  shorthand.map((r) => r.selector).join(', '),
+  shorthand.map((rule) => rule.selector).join(', '),
 );
 check(
   'and the field carries a magnifier',
   fieldRules.some((rule) =>
     rule.some((decl) => decl.prop === 'background-image' && /svg/.test(decl.value)),
   ),
-  fieldRules.map((r) => r.selector).join(', '),
+  fieldRules.map((rule) => rule.selector).join(', '),
 );
 
 // ── Where it opens ─────────────────────────────────────────────────────────
@@ -229,9 +229,9 @@ for (const [what, file] of [
   ['the app editor', 'src/ui/CodeEditor.tsx'],
   ['the style panel editor', 'src/style-panel/components/CodeEditor.tsx'],
 ]) {
-  const src = read(file);
-  check(`${what} themes its search matches`, /'\.cm-searchMatch'/.test(src), file);
-  check(`${what} marks the current match apart`, /cm-searchMatch-selected/.test(src), file);
+  const source = read(file);
+  check(`${what} themes its search matches`, /'\.cm-searchMatch'/.test(source), file);
+  check(`${what} marks the current match apart`, /cm-searchMatch-selected/.test(source), file);
 }
 const appTheme = read('src/ui/CodeEditor.tsx');
 check(

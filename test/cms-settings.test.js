@@ -83,7 +83,7 @@ function fixture(overrides = {}) {
         root.render(
           React.createElement(
             React.Fragment,
-            null,
+            {},
             React.createElement(Settings, props),
             React.createElement(ConfirmHost),
           ),
@@ -119,7 +119,7 @@ test('nested schema editing preserves paths and the new field name', async () =>
     assert.equal(document.querySelector('.cms-type-modal input').value, 'Hero title');
     await click(document.querySelector('.cms-type-modal .primary'));
     assert.deepEqual(state.operations[1], ['add', ['group'], 'heroTitle', 'longtext']);
-    assert.equal(document.querySelector('.cms-type-modal'), null);
+    assert.ok(document.querySelector('.cms-type-modal') === null);
   } finally {
     await act(async () => state.root.unmount());
   }

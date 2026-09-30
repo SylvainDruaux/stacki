@@ -32,8 +32,8 @@ const check = (what, condition, detail) => {
 
 (async () => {
   const esbuild = require('esbuild');
-  const buildDir = path.join(__dirname, '..', 'node_modules', '.stacki-test', 'popover');
-  fs.mkdirSync(buildDir, { recursive: true });
+  const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test', 'popover');
+  fs.mkdirSync(buildDirectory, { recursive: true });
 
   // The popover anchored near the bottom of the window, which is where a layer
   // row sits in the panel — and the reason the menu has to open upward.
@@ -82,14 +82,14 @@ const check = (what, condition, detail) => {
   `;
   await esbuild.build({
     stdin: { contents: entry, resolveDir: path.join(__dirname, '..'), loader: 'jsx' },
-    outfile: path.join(buildDir, 'bundle.js'),
+    outfile: path.join(buildDirectory, 'bundle.js'),
     bundle: true,
     format: 'iife',
     jsx: 'automatic',
     logLevel: 'silent',
   });
   fs.writeFileSync(
-    path.join(buildDir, 'index.html'),
+    path.join(buildDirectory, 'index.html'),
     '<!doctype html><meta charset="utf-8"><link rel="stylesheet" href="bundle.css">' +
       '<style>body{margin:0;background:#111}</style><div id="root"></div>' +
       '<script src="bundle.js"></script>',
@@ -99,7 +99,7 @@ const check = (what, condition, detail) => {
     try {
       return require('electron');
     } catch {
-      return null;
+      return undefined;
     }
   })();
   if (typeof electronPath !== 'string') {
@@ -110,7 +110,7 @@ const check = (what, condition, detail) => {
     return;
   }
 
-  const scriptPath = path.join(buildDir, 'probe.js');
+  const scriptPath = path.join(buildDirectory, 'probe.js');
   fs.writeFileSync(
     scriptPath,
     `const { app, BrowserWindow } = require('electron');
@@ -118,7 +118,7 @@ const check = (what, condition, detail) => {
      app.on('window-all-closed', () => app.quit());
      app.whenReady().then(async () => {
        const win = new BrowserWindow({ show: false, width: 900, height: 700 });
-       await win.loadFile(${JSON.stringify(path.join(buildDir, 'index.html'))});
+       await win.loadFile(${JSON.stringify(path.join(buildDirectory, 'index.html'))});
        const js = (code) => win.webContents.executeJavaScript(code);
        // A real press, from the browser's own input pipeline — a dispatched event
        // would be delivered to the element it is dispatched ON, which is exactly
@@ -184,7 +184,7 @@ const check = (what, condition, detail) => {
 
   const { spawnSync } = require('child_process');
   const run = spawnSync(electronPath, [scriptPath], { encoding: 'utf8', timeout: 90000 });
-  const line = (run.stdout || '').split('\n').find((l) => l.trim().startsWith('{'));
+  const line = (run.stdout || '').split('\n').find((line) => line.trim().startsWith('{'));
   if (!line) {
     check('the probe ran in a browser', false, (run.stderr || run.stdout || '').slice(0, 400));
   } else {

@@ -39,8 +39,8 @@ assert.deepEqual(parseMapHead('posts.filter(p => p.live).map(post => ('), {
   item: 'post',
   index: '',
 });
-assert.equal(parseMapHead('posts.map(({title}) => ('), null);
-assert.equal(parseMapHead(''), null);
+assert.equal(parseMapHead('posts.map(({title}) => ('), undefined);
+assert.equal(parseMapHead(''), undefined);
 assert.throws(() => parseMapHead('x'.repeat(1_000_001)), /head limit exceeded/);
 assert.throws(() => sourceChip('x'.repeat(1_000_001)), /source limit exceeded/);
 assert.throws(() => withSource('posts', 'x'.repeat(1_000_001)), /path limit exceeded/);
@@ -92,12 +92,9 @@ assert.throws(() => withSource('posts', 'x'.repeat(1_000_001)), /path limit exce
 
   // The chip is the control. A second button beside it opening the same picker
   // was two affordances for one job.
-  check(
-    'the chip opens the picker',
-    /onChipClick=\{\(\) => \(sourceMenu \? setSourceMenu\(null\) : openSourceMenu\(\)\)\}/.test(
-      source,
-    ),
-  );
+  const chipToggle =
+    'onChipClick={() => (sourceMenu ? setSourceMenu(undefined) : openSourceMenu())}';
+  check('the chip opens the picker', source.includes(chipToggle));
   check(
     'and nothing else has to',
     !source.includes('prop-source-open'),

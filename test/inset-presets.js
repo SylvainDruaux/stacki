@@ -26,9 +26,9 @@ const check = (what, condition, detail) => {
 
 (async () => {
   const esbuild = require('esbuild');
-  const buildDir = path.join(__dirname, '..', 'node_modules', '.stacki-test');
-  fs.mkdirSync(buildDir, { recursive: true });
-  const bundlePath = path.join(buildDir, 'inset-presets.bundle.js');
+  const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
+  fs.mkdirSync(buildDirectory, { recursive: true });
+  const bundlePath = path.join(buildDirectory, 'inset-presets.bundle.js');
   await esbuild.build({
     entryPoints: [path.join(__dirname, '..', 'src', 'style-panel', 'PositionSection.tsx')],
     outfile: bundlePath,
@@ -51,7 +51,7 @@ const check = (what, condition, detail) => {
   global.Node = dom.window.Node;
   global.getComputedStyle = dom.window.getComputedStyle;
   global.MutationObserver = dom.window.MutationObserver;
-  global.requestAnimationFrame = (fn) => setTimeout(fn, 0);
+  global.requestAnimationFrame = (callback) => setTimeout(callback, 0);
   global.cancelAnimationFrame = clearTimeout;
   global.ResizeObserver = class {
     observe() {}
@@ -76,7 +76,7 @@ const check = (what, condition, detail) => {
     // The shape the panel's resolver hands back (see displayOf): a declaration
     // has a `winner`, and an absent one is simply undefined.
     const read = (prop) =>
-      decls[prop] != null
+      decls[prop] !== undefined
         ? {
             source: 'selected',
             overridden: false,
@@ -104,12 +104,12 @@ const check = (what, condition, detail) => {
     };
     const presets = () => [...host.querySelectorAll('.embed-editor_inset-preset')];
     const press = async (label) => {
-      const btn = presets().find((b) => b.getAttribute('aria-label') === label);
-      if (!btn) {
+      const button = presets().find((preset) => preset.getAttribute('aria-label') === label);
+      if (!button) {
         throw new Error(`no preset button "${label}"`);
       }
       await act(async () => {
-        btn.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }));
+        button.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }));
       });
     };
     return { host, set, cleared, presets, press, done };
@@ -164,85 +164,93 @@ const check = (what, condition, detail) => {
     // It used to appear only once the element was positioned, so the field
     // moved in and out of the panel as the dropdown changed. A field showing
     // "Auto" says more than a field that isn't there.
-    for (const pos of ['static', 'relative', 'absolute', undefined]) {
-      const m = await mount(pos ? { position: pos } : {});
-      const z = m.host.querySelector('[aria-label="z-index"]');
+    for (const position of ['static', 'relative', 'absolute', undefined]) {
+      const mounted = await mount(position ? { position: position } : {});
+      const z = mounted.host.querySelector('[aria-label="z-index"]');
       check(
-        `z-index is present for position: ${pos ?? '(unset)'}`,
+        `z-index is present for position: ${position ?? '(unset)'}`,
         !!z,
-        m.host.innerHTML.slice(0, 120),
+        mounted.host.innerHTML.slice(0, 120),
       );
-      await m.done();
+      await mounted.done();
     }
   }
 
   // --- What a corner writes, and what it clears -----------------------------
   {
-    const m = await mount({ position: 'absolute' });
-    await m.press('Bottom right');
-    check('a corner sets its two sides', m.set.length === 2, JSON.stringify(m.set));
+    const mounted = await mount({ position: 'absolute' });
+    await mounted.press('Bottom right');
+    check('a corner sets its two sides', mounted.set.length === 2, JSON.stringify(mounted.set));
     check(
       'to zero',
-      m.set.every(([, v]) => v === '0'),
-      JSON.stringify(m.set),
+      mounted.set.every(([, value]) => value === '0'),
+      JSON.stringify(mounted.set),
     );
     check(
       'namely bottom and right',
-      m.set
-        .map(([p]) => p)
+      mounted.set
+        .map(([property]) => property)
         .sort()
         .join(',') === 'bottom,right',
-      JSON.stringify(m.set),
+      JSON.stringify(mounted.set),
     );
     // The half that is easy to miss: left and top must GO, or the element
     // stretches across the parent instead of sitting in the corner.
     check(
       'and the opposite sides are cleared',
-      m.cleared.sort().join(',') === 'left,top',
-      JSON.stringify(m.cleared),
+      mounted.cleared.sort().join(',') === 'left,top',
+      JSON.stringify(mounted.cleared),
     );
-    await m.done();
+    await mounted.done();
   }
 
   // --- An edge pins three sides ---------------------------------------------
   {
-    const m = await mount({ position: 'absolute' });
-    await m.press('Left edge');
+    const mounted = await mount({ position: 'absolute' });
+    await mounted.press('Left edge');
     check(
       'an edge sets three sides',
-      m.set
-        .map(([p]) => p)
+      mounted.set
+        .map(([property]) => property)
         .sort()
         .join(',') === 'bottom,left,top',
-      JSON.stringify(m.set),
+      JSON.stringify(mounted.set),
     );
-    check('and clears the fourth', m.cleared.join(',') === 'right', JSON.stringify(m.cleared));
-    await m.done();
+    check(
+      'and clears the fourth',
+      mounted.cleared.join(',') === 'right',
+      JSON.stringify(mounted.cleared),
+    );
+    await mounted.done();
   }
 
   // --- Fill pins all four ----------------------------------------------------
   {
-    const m = await mount({ position: 'absolute' });
-    await m.press('Fill');
+    const mounted = await mount({ position: 'absolute' });
+    await mounted.press('Fill');
     check(
       'fill sets every side',
-      m.set
-        .map(([p]) => p)
+      mounted.set
+        .map(([property]) => property)
         .sort()
         .join(',') === 'bottom,left,right,top',
-      JSON.stringify(m.set),
+      JSON.stringify(mounted.set),
     );
-    check('with nothing left to clear', m.cleared.length === 0, JSON.stringify(m.cleared));
-    await m.done();
+    check(
+      'with nothing left to clear',
+      mounted.cleared.length === 0,
+      JSON.stringify(mounted.cleared),
+    );
+    await mounted.done();
   }
 
   // --- Which one lights up ---------------------------------------------------
   {
-    const selected = (m) =>
-      m
+    const selected = (mounted) =>
+      mounted
         .presets()
-        .filter((b) => b.getAttribute('aria-checked') === 'true')
-        .map((b) => b.getAttribute('aria-label'));
+        .filter((button) => button.getAttribute('aria-checked') === 'true')
+        .map((button) => button.getAttribute('aria-label'));
 
     const corner = await mount({ position: 'absolute', top: '0', left: '0' });
     check(
@@ -303,7 +311,7 @@ const check = (what, condition, detail) => {
   }
   console.log(`inset-presets: ${checked} passed`);
   process.exit(0);
-})().catch((err) => {
-  console.error(err);
+})().catch((error) => {
+  console.error(error);
   process.exit(1);
 });

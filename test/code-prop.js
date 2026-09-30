@@ -26,16 +26,16 @@ const check = (what, condition, detail) => {
 
 (async () => {
   const esbuild = require('esbuild');
-  const buildDir = path.join(__dirname, '..', 'node_modules', '.stacki-test');
-  fs.mkdirSync(buildDir, { recursive: true });
-  const entry = path.join(buildDir, 'code-prop.entry.jsx');
+  const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
+  fs.mkdirSync(buildDirectory, { recursive: true });
+  const entry = path.join(buildDirectory, 'code-prop.entry.jsx');
   fs.writeFileSync(
     entry,
     `export { BindField } from ${JSON.stringify(
       path.join(__dirname, '..', 'src', 'panels', 'PropsPanel.jsx'),
     )};\n`,
   );
-  const bundle = path.join(buildDir, 'code-prop.bundle.js');
+  const bundle = path.join(buildDirectory, 'code-prop.bundle.js');
   await esbuild.build({
     entryPoints: [entry],
     outfile: bundle,
@@ -81,6 +81,7 @@ const check = (what, condition, detail) => {
   });
   dom.window.Range.prototype.getClientRects = () => ({
     length: 0,
+    // eslint-disable-next-line stacki/no-null -- Stubs DOMRectList.item, which answers null.
     item: () => null,
     [Symbol.iterator]: function* () {},
   });
@@ -103,8 +104,8 @@ const check = (what, condition, detail) => {
           value,
           field,
           placeholder: '',
-          bindCtx: { props: [{ name: 'jobs' }] },
-          onChange: (v) => wrote.push(v),
+          bindContext: { props: [{ name: 'jobs' }] },
+          onChange: (value) => wrote.push(value),
         }),
       );
     });
@@ -115,13 +116,13 @@ const check = (what, condition, detail) => {
     // apart.
     const box = () => host.querySelector('.bind-input');
     const type = async (text) => {
-      const el = box();
-      if (!el) {
+      const element = box();
+      if (!element) {
         return false;
       }
       await act(async () => {
-        el.textContent = text;
-        el.dispatchEvent(new dom.window.Event('input', { bubbles: true }));
+        element.textContent = text;
+        element.dispatchEvent(new dom.window.Event('input', { bubbles: true }));
       });
       return true;
     };
@@ -139,15 +140,15 @@ const check = (what, condition, detail) => {
 
   // --- the report ---------------------------------------------------------------
   {
-    const m = await mount({ name: 'options', type: 'code' }, { type: 'expr', value: 'jobs' });
+    const mounted = await mount({ name: 'options', type: 'code' }, { type: 'expr', value: 'jobs' });
     check(
       'a prop bound to a name shows a field to type in',
-      !!m.box(),
-      m.host.innerHTML.slice(0, 160),
+      !!mounted.box(),
+      mounted.host.innerHTML.slice(0, 160),
     );
-    const typed = await m.type(ARRAY);
+    const typed = await mounted.type(ARRAY);
     check('the array can be typed', typed);
-    const last = m.wrote[m.wrote.length - 1];
+    const last = mounted.wrote[mounted.wrote.length - 1];
     check('and is written as an expression', last?.type === 'expr', JSON.stringify(last));
     check('with the array itself as the value', last?.value === ARRAY, JSON.stringify(last));
     check(
@@ -155,7 +156,7 @@ const check = (what, condition, detail) => {
       !(last?.type === 'string'),
       'options="[…]" is a string the component calls .map on',
     );
-    await m.done();
+    await mounted.done();
   }
 
   // --- and then it reads as code -----------------------------------------------
@@ -164,10 +165,18 @@ const check = (what, condition, detail) => {
   // keeps the code editor — which is where the highlighting and the completions
   // are.
   {
-    const m = await mount({ name: 'options', type: 'code' }, { type: 'expr', value: ARRAY });
-    check('an array value gets the code editor', !!m.code(), m.host.innerHTML.slice(0, 200));
-    check('rather than a field of chips and text', !m.box(), m.host.innerHTML.slice(0, 200));
-    await m.done();
+    const mounted = await mount({ name: 'options', type: 'code' }, { type: 'expr', value: ARRAY });
+    check(
+      'an array value gets the code editor',
+      !!mounted.code(),
+      mounted.host.innerHTML.slice(0, 200),
+    );
+    check(
+      'rather than a field of chips and text',
+      !mounted.box(),
+      mounted.host.innerHTML.slice(0, 200),
+    );
+    await mounted.done();
   }
 
   // --- what has not changed ------------------------------------------------------
@@ -175,22 +184,25 @@ const check = (what, condition, detail) => {
   // A text prop is still text. The same characters typed into a heading are the
   // heading, brackets and all.
   {
-    const m = await mount({ name: 'heading', type: 'string' }, { type: 'string', value: 'Hi' });
-    await m.type(ARRAY);
-    const last = m.wrote[m.wrote.length - 1];
+    const mounted = await mount(
+      { name: 'heading', type: 'string' },
+      { type: 'string', value: 'Hi' },
+    );
+    await mounted.type(ARRAY);
+    const last = mounted.wrote[mounted.wrote.length - 1];
     check('a text prop still writes text', last?.type === 'string', JSON.stringify(last));
     check('with what was typed in it', last?.value === ARRAY, JSON.stringify(last));
-    await m.done();
+    await mounted.done();
   }
 
   // A number prop was always written as an expression; that is the rule this
   // extends, not one it replaces.
   {
-    const m = await mount({ name: 'cols', type: 'number' }, { type: 'expr', value: '3' });
-    await m.type('4');
-    const last = m.wrote[m.wrote.length - 1];
+    const mounted = await mount({ name: 'cols', type: 'number' }, { type: 'expr', value: '3' });
+    await mounted.type('4');
+    const last = mounted.wrote[mounted.wrote.length - 1];
     check('a number prop still writes an expression', last?.type === 'expr', JSON.stringify(last));
-    await m.done();
+    await mounted.done();
   }
 
   // --- the type has to be read before any of this can happen ------------------------
@@ -209,9 +221,9 @@ const check = (what, condition, detail) => {
       path.join(__dirname, '..', 'dist', 'electron', 'astroParser.js'),
     );
     const withType = (decl) => {
-      const src =
+      const source =
         `---\ninterface Props {\n  ${decl}\n}\n` + `const { items } = Astro.props;\n---\n<div/>\n`;
-      return (parsePropSchema(src).find((p) => p.name === 'items') || {}).type;
+      return (parsePropSchema(source).find((prop) => prop.name === 'items') || {}).type;
     };
     check(
       'an array of objects, written the way TypeScript writes one',
@@ -246,13 +258,13 @@ const check = (what, condition, detail) => {
       `  items?: { title: string; text: string }[];\n  variant?: "stack" | "row";\n` +
       `  count?: number;\n}\nconst { items } = Astro.props;\n---\n<div/>\n`;
     const schema = parsePropSchema(many);
-    const type = (n) => (schema.find((p) => p.name === n) || {}).type;
+    const type = (name) => (schema.find((prop) => prop.name === name) || {}).type;
     check('the prop after it is still read', type('variant') === 'enum', type('variant'));
     check('and the one after that', type('count') === 'number', type('count'));
     check(
       'and the note above it is still its own',
-      /The rows/.test((schema.find((p) => p.name === 'items') || {}).doc || ''),
-      JSON.stringify((schema.find((p) => p.name === 'items') || {}).doc),
+      /The rows/.test((schema.find((prop) => prop.name === 'items') || {}).doc || ''),
+      JSON.stringify((schema.find((prop) => prop.name === 'items') || {}).doc),
     );
   }
 
@@ -263,12 +275,12 @@ const check = (what, condition, detail) => {
     const { parsePropSchema } = require(
       path.join(__dirname, '..', 'dist', 'electron', 'astroParser.js'),
     );
-    const src =
+    const source =
       `---\ntype Props =\n  | { variant: "list"; items: { title: string; text: string }[] }\n` +
       `  | { variant: "plain"; text: string };\nconst { variant } = Astro.props as Props;\n` +
       `---\n<div/>\n`;
-    const schema = parsePropSchema(src);
-    const union = (schema.find((p) => p.unions) || {}).unions || [];
+    const schema = parsePropSchema(source);
+    const union = (schema.find((prop) => prop.unions) || {}).unions || [];
     const names = union[0] ? union[0].names : [];
     check(
       'a branch knows the array member it declares',

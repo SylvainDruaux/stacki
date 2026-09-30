@@ -36,11 +36,11 @@ const panelStub = (name) =>
   `globalThis.__panels[${JSON.stringify(name)}] = props; return null; }`;
 
 async function mountApp(root, files, build) {
-  const dir = path.join(__dirname, '..', 'node_modules', '.stacki-test', build);
-  fs.mkdirSync(dir, { recursive: true });
+  const directory = path.join(__dirname, '..', 'node_modules', '.stacki-test', build);
+  fs.mkdirSync(directory, { recursive: true });
   await esbuild.build({
     entryPoints: [path.join(__dirname, '..', 'src', 'App.tsx')],
-    outfile: path.join(dir, 'app.js'),
+    outfile: path.join(directory, 'app.js'),
     bundle: true,
     format: 'cjs',
     platform: 'node',
@@ -81,7 +81,7 @@ async function mountApp(root, files, build) {
     global[key] = key === 'window' ? window : window[key];
   }
   global.getComputedStyle = window.getComputedStyle;
-  global.requestAnimationFrame = (fn) => setTimeout(fn, 0);
+  global.requestAnimationFrame = (callback) => setTimeout(callback, 0);
   global.cancelAnimationFrame = clearTimeout;
   global.ResizeObserver = class {
     observe() {}
@@ -102,7 +102,7 @@ async function mountApp(root, files, build) {
   };
   const bridge = new Proxy(
     {
-      pendingProject: async () => null,
+      pendingProject: async () => undefined,
       scanProject: async () => files.scan,
       hasNodeModules: async () => true,
       startDevServer: async () => ({ url: 'http://localhost:4321' }),
@@ -119,7 +119,7 @@ async function mountApp(root, files, build) {
                   code: 'rejected',
                   reason: report.reason,
                   message: report.message,
-                  diskChecksum: report.diskChecksum ?? null,
+                  diskChecksum: report.diskChecksum,
                 }
               : { code: 'filesystem', message: report.tag };
           return { ok: false, error };
@@ -142,7 +142,7 @@ async function mountApp(root, files, build) {
           ? target[key]
           : String(key).startsWith('on')
             ? () => () => {}
-            : async () => null,
+            : async () => undefined,
     },
   );
   window.avb = bridge;
@@ -151,7 +151,7 @@ async function mountApp(root, files, build) {
   const { createRoot } = require('react-dom/client');
   const { act } = React;
   const reactRoot = createRoot(document.getElementById('root'));
-  const App = require(path.join(dir, 'app.js')).default;
+  const App = require(path.join(directory, 'app.js')).default;
   await act(async () => {
     reactRoot.render(React.createElement(App));
     await tick();

@@ -5,6 +5,11 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { readVariables } = require('../dist/electron/cssVars.js');
+
+// A boundary can receive null — JSON, structured clone and postMessage all carry it —
+// so the negative space below includes it. It is read from JSON, because our own
+// code never writes a null.
+const PLATFORM_NULL = JSON.parse('null');
 const { parseCSSVariables, readCSSVariables, VARIABLES_LIMITS } =
   require('./renderer-module')('variablesBridge.ts');
 const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'stacki-variable-boundary-'));
@@ -39,83 +44,83 @@ const block = (snapshot) => group(snapshot).blocks[0];
 const row = (snapshot) => block(snapshot).rows[0];
 const cell = (snapshot) => row(snapshot).cells.find(Boolean);
 for (const mutate of [
-  (s) => {
-    s.files = null;
+  (snapshot) => {
+    snapshot.files = PLATFORM_NULL;
   },
-  (s) => {
-    s.values = [];
+  (snapshot) => {
+    snapshot.values = [];
   },
-  (s) => {
-    s.values['--brand'] = 2;
+  (snapshot) => {
+    snapshot.values['--brand'] = 2;
   },
-  (s) => {
-    s.error = 'cannot contain successful files';
+  (snapshot) => {
+    snapshot.error = 'cannot contain successful files';
   },
-  (s) => {
-    validFile(s).rel = 'bad\0path';
+  (snapshot) => {
+    validFile(snapshot).rel = 'bad\0path';
   },
-  (s) => {
-    validFile(s).count = -1;
+  (snapshot) => {
+    validFile(snapshot).count = -1;
   },
-  (s) => {
-    validFile(s).groups = null;
+  (snapshot) => {
+    validFile(snapshot).groups = PLATFORM_NULL;
   },
-  (s) => {
-    group(s).kind = 'matrix';
+  (snapshot) => {
+    group(snapshot).kind = 'matrix';
   },
-  (s) => {
-    group(s).columns[0].line = 1.5;
+  (snapshot) => {
+    group(snapshot).columns[0].line = 1.5;
   },
-  (s) => {
-    group(s).columns[0].context = [false];
+  (snapshot) => {
+    group(snapshot).columns[0].context = [false];
   },
-  (s) => {
-    block(s).kind = 'single';
+  (snapshot) => {
+    block(snapshot).kind = 'single';
   },
-  (s) => {
-    block(s).title = 2;
+  (snapshot) => {
+    block(snapshot).title = 2;
   },
-  (s) => {
-    block(s).titleStart = -1;
+  (snapshot) => {
+    block(snapshot).titleStart = -1;
   },
-  (s) => {
-    block(s).rows = null;
+  (snapshot) => {
+    block(snapshot).rows = PLATFORM_NULL;
   },
-  (s) => {
-    row(s).cells = {};
+  (snapshot) => {
+    row(snapshot).cells = {};
   },
-  (s) => {
-    row(s).label = null;
+  (snapshot) => {
+    row(snapshot).label = PLATFORM_NULL;
   },
-  (s) => {
-    cell(s).value = 1;
+  (snapshot) => {
+    cell(snapshot).value = 1;
   },
-  (s) => {
-    cell(s).valueStart = -1;
+  (snapshot) => {
+    cell(snapshot).valueStart = -1;
   },
-  (s) => {
-    cell(s).valueEnd = 0;
+  (snapshot) => {
+    cell(snapshot).valueEnd = 0;
   },
-  (s) => {
-    cell(s).valueEnd = VARIABLES_LIMITS.fileCharsMax + 1;
+  (snapshot) => {
+    cell(snapshot).valueEnd = VARIABLES_LIMITS.fileCharsMax + 1;
   },
-  (s) => {
-    cell(s).resolved = false;
+  (snapshot) => {
+    cell(snapshot).resolved = false;
   },
-  (s) => {
-    cell(s).color = [];
+  (snapshot) => {
+    cell(snapshot).color = [];
   },
-  (s) => {
-    cell(s).unknownColor = 'true';
+  (snapshot) => {
+    cell(snapshot).unknownColor = 'true';
   },
-  (s) => {
-    cell(s).value = 'x'.repeat(VARIABLES_LIMITS.fileCharsMax + 1);
+  (snapshot) => {
+    cell(snapshot).value = 'x'.repeat(VARIABLES_LIMITS.fileCharsMax + 1);
   },
-  (s) => {
-    group(s).columns = Array(VARIABLES_LIMITS.entriesMax + 1).fill(null);
+  (snapshot) => {
+    group(snapshot).columns = Array(VARIABLES_LIMITS.entriesMax + 1).fill(PLATFORM_NULL);
   },
-  (s) => {
-    s.files = Array(VARIABLES_LIMITS.entriesMax + 1).fill(null);
+  (snapshot) => {
+    snapshot.files = Array(VARIABLES_LIMITS.entriesMax + 1).fill(PLATFORM_NULL);
   },
 ]) {
   const invalid = good();
@@ -133,7 +138,7 @@ assert.throws(() => parseCSSVariables(matrix), /reversed title range/);
 const holes = good();
 row(holes).cells[0] = undefined;
 assert.equal(parseCSSVariables(holes).ok, true, 'matrix holes are valid');
-for (const invalid of [null, [], {}, { files: [] }, { files: [], error: false }]) {
+for (const invalid of [PLATFORM_NULL, [], {}, { files: [] }, { files: [], error: false }]) {
   assert.throws(() => parseCSSVariables(invalid));
 }
 (async () => {
@@ -150,7 +155,7 @@ for (const invalid of [null, [], {}, { files: [] }, { files: [], error: false }]
     throw new Error('disk unavailable');
   };
   assert.deepEqual(await readCSSVariables('/project'), { ok: false, error: 'disk unavailable' });
-  window.avb.cssVariables = async () => null;
+  window.avb.cssVariables = async () => PLATFORM_NULL;
   await assert.rejects(() => readCSSVariables('/project'));
   console.log(
     'variables-boundary: real parser round trip, nested bounds and failure channels passed',

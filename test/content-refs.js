@@ -46,7 +46,7 @@ const check = (what, condition, detail) => {
     process.exit(1);
   }
   const collections = config.collections;
-  const by = Object.fromEntries(collections.map((c) => [c.name, c]));
+  const by = Object.fromEntries(collections.map((collection) => [collection.name, collection]));
 
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'stacki-refs-'));
   fs.cpSync(path.join(source, 'src'), path.join(root, 'src'), { recursive: true });
@@ -64,30 +64,32 @@ const check = (what, condition, detail) => {
     check('authors: pointers found', plan.pointers.length >= 5, `${plan.pointers.length} found`);
     check(
       'authors: across more than one collection',
-      new Set(plan.pointers.map((p) => p.collection)).size >= 3,
-      [...new Set(plan.pointers.map((p) => p.collection))].join(', '),
+      new Set(plan.pointers.map((pointer) => pointer.collection)).size >= 3,
+      [...new Set(plan.pointers.map((pointer) => pointer.collection))].join(', '),
     );
     check(
       'authors: an array reference is found by position',
-      plan.pointers.some((p) => p.path.length === 2 && p.path[0] === 'contributors'),
+      plan.pointers.some(
+        (pointer) => pointer.path.length === 2 && pointer.path[0] === 'contributors',
+      ),
     );
 
-    const before = plan.pointers.map((p) => ({ ...p }));
+    const before = plan.pointers.map((pointer) => ({ ...pointer }));
     applyRename(root, plan);
 
     check(
       'authors: the entry itself is renamed',
-      entriesOf('authors').some((e) => e.id === 'avery-chen-jones'),
+      entriesOf('authors').some((entry) => entry.id === 'avery-chen-jones'),
     );
     check(
       'authors: and the old id is gone',
-      !entriesOf('authors').some((e) => e.id === 'avery-chen'),
+      !entriesOf('authors').some((entry) => entry.id === 'avery-chen'),
     );
     let rewritten = 0;
     for (const pointer of before) {
       const data =
         frontmatter.parseData(read(pointer.file)) || jsonFormat.parseData(read(pointer.file));
-      const value = pointer.path.reduce((node, key) => (node == null ? node : node[key]), data);
+      const value = pointer.path.reduce((node, key) => node?.[key], data);
       if (value === 'avery-chen-jones') {
         rewritten++;
       }
@@ -103,7 +105,7 @@ const check = (what, condition, detail) => {
         collection: 'authors',
         from: 'avery-chen-jones',
         to: 'x',
-      }).pointers.some((p) => p.value === 'avery-chen'),
+      }).pointers.some((pointer) => pointer.value === 'avery-chen'),
     );
   }
 
@@ -151,8 +153,8 @@ const check = (what, condition, detail) => {
     check('blog: nothing left behind', !fs.existsSync(path.join(root, plan.move.from)));
     check(
       'blog: relatedPosts elsewhere follow it',
-      !entriesOf('blog').some((e) =>
-        (e.data.relatedPosts || []).includes('schema-design-for-editors'),
+      !entriesOf('blog').some((entry) =>
+        (entry.data.relatedPosts || []).includes('schema-design-for-editors'),
       ),
     );
   }
@@ -176,7 +178,7 @@ const check = (what, condition, detail) => {
       JSON.stringify(plan.imageEdits),
     );
     applyRename(root, plan);
-    const moved = entriesOf('blog').find((e) => e.id === 'the-cost-of-a-thousand-images');
+    const moved = entriesOf('blog').find((entry) => entry.id === 'the-cost-of-a-thousand-images');
     check('blog: the moved entry is where it says', !!moved);
     const target = path.resolve(root, path.dirname(moved.file), moved.data.heroImage || '');
     check('blog: and its image resolves to a real file', fs.existsSync(target), target);
@@ -195,15 +197,15 @@ const check = (what, condition, detail) => {
 
   // --- a rename that would collide -------------------------------------------
   {
-    let threw = null;
+    let threw;
     try {
       planRename(root, collections, {
         collection: 'authors',
         from: 'toshi-nakamura',
         to: 'marisol-vega',
       });
-    } catch (err) {
-      threw = err.message;
+    } catch (error) {
+      threw = error.message;
     }
     check('a duplicate id is refused', !!threw && /already has/.test(threw), threw || 'no error');
   }

@@ -22,9 +22,9 @@ const check = (what, condition, detail) => {
 
 (async () => {
   const esbuild = require('esbuild');
-  const buildDir = path.join(__dirname, '..', 'node_modules', '.stacki-test');
-  fs.mkdirSync(buildDir, { recursive: true });
-  const bundlePath = path.join(buildDir, 'transform.bundle.js');
+  const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
+  fs.mkdirSync(buildDirectory, { recursive: true });
+  const bundlePath = path.join(buildDirectory, 'transform.bundle.js');
   await esbuild.build({
     entryPoints: [path.join(__dirname, '..', 'src', 'style-panel', 'lib', 'transform.ts')],
     outfile: bundlePath,
@@ -82,25 +82,29 @@ const check = (what, condition, detail) => {
     path.join(__dirname, '..', 'src', 'style-panel', 'EffectsSection.tsx'),
     'utf8',
   );
-  const cfg = effects.slice(effects.indexOf('const AXIS_CFG'), effects.indexOf('/** Split'));
+  const axisConfigSource = effects.slice(
+    effects.indexOf('const AXIS_CONFIG'),
+    effects.indexOf('/** Split'),
+  );
   check(
     "the move axis's default unit is rem",
-    /move: \{ unit: 'rem'/.test(cfg),
-    cfg.match(/move: \{[^}]*\}/)?.[0],
+    /move: \{ unit: 'rem'/.test(axisConfigSource),
+    axisConfigSource.match(/move: \{[^}]*\}/)?.[0],
   );
   check(
     'degrees still belong to rotate and skew',
-    /rotate: \{ unit: 'deg'/.test(cfg) && /skew: \{ unit: 'deg'/.test(cfg),
+    /rotate: \{ unit: 'deg'/.test(axisConfigSource) &&
+      /skew: \{ unit: 'deg'/.test(axisConfigSource),
   );
-  check('and scale has no unit at all', /scale: \{ unit: ''/.test(cfg));
+  check('and scale has no unit at all', /scale: \{ unit: ''/.test(axisConfigSource));
   check(
     'the unit comes off the value first, the default second',
-    /const unit = parsed\?\.unit \?\? cfg\.unit/.test(effects),
+    /const unit = parsed\?\.unit \?\? config\.unit/.test(effects),
     'the control would overwrite a unit somebody typed',
   );
   // A rem range in whole px steps would only ever land on whole rem; the steps
   // are what give the slider anything to say between 1rem and 2rem.
-  const move = cfg.match(/move: \{[^}]*\}/)?.[0] ?? '';
+  const move = axisConfigSource.match(/move: \{[^}]*\}/)?.[0] ?? '';
   const steps = Number(move.match(/steps: (\d+)/)?.[1]);
   check('the move slider steps finer than one rem', steps >= 10, move);
 

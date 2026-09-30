@@ -43,9 +43,12 @@ import {
 import { toDigest } from '../../dist/shared/brand.js';
 import { LIMITS } from '../../dist/shared/limits.js';
 
+// Null as a boundary receives it, parsed from JSON: inputs may hold it; our values never do.
+const jsonNull: unknown = JSON.parse('null');
+
 const sha256 = (bytes: string | Buffer): string => createHash('sha256').update(bytes).digest('hex');
-const A = toDigest('a'.repeat(64));
-const B = toDigest('b'.repeat(64));
+const firstDigest = toDigest('a'.repeat(64));
+const secondDigest = toDigest('b'.repeat(64));
 
 function renderOf(stamps: readonly PreviewStamp[]): PreviewRender {
   const manifest = manifestOf(stamps);
@@ -54,44 +57,50 @@ function renderOf(stamps: readonly PreviewStamp[]): PreviewRender {
 }
 
 test('a stamp is written and read back; anything else in a comment is not one', () => {
-  const stamp = { file: 'src/components/Card.astro', checksum: A };
+  const stamp = { file: 'src/components/Card.astro', checksum: firstDigest };
   const comment = stampComment(stamp);
-  assert.equal(comment, `<!--avb-d:${A}:src/components/Card.astro-->`);
+  assert.equal(comment, `<!--avb-d:${firstDigest}:src/components/Card.astro-->`);
   assert.deepEqual(parseStampData(comment.slice(4, -3)), stamp);
   // Page code can write any comment it likes; none of these is a stamp.
   for (const data of [
     'avb-s:0.1',
-    `avb-d:${A}`,
-    `avb-d:${A.toUpperCase()}:src/a.astro`,
+    `avb-d:${firstDigest}`,
+    `avb-d:${firstDigest.toUpperCase()}:src/a.astro`,
     `avb-d:${'a'.repeat(63)}:src/a.astro`,
-    `avb-d:${A}:`,
-    `avb-d:${A}:/etc/passwd`,
-    `avb-d:${A}:C:/x.astro`,
-    `avb-d:${A}:src/../../x.astro`,
-    `avb-d:${A}:src//x.astro`,
-    `avb-d:${A}:src\\x.astro`,
-    `avb-d:${A}:src/x.astro\n`,
-    `avb-d:${A}:${'x'.repeat(LIMITS.previewStampPathCharsMax + 1)}`,
+    `avb-d:${firstDigest}:`,
+    `avb-d:${firstDigest}:/etc/passwd`,
+    `avb-d:${firstDigest}:C:/x.astro`,
+    `avb-d:${firstDigest}:src/../../x.astro`,
+    `avb-d:${firstDigest}:src//x.astro`,
+    `avb-d:${firstDigest}:src\\x.astro`,
+    `avb-d:${firstDigest}:src/x.astro\n`,
+    `avb-d:${firstDigest}:${'x'.repeat(LIMITS.previewStampPathCharsMax + 1)}`,
   ]) {
     assert.equal(parseStampData(data), undefined, JSON.stringify(data));
   }
-  assert.throws(() => stampComment({ file: '../x.astro', checksum: A }), /project-relative/);
-  assert.throws(() => stampComment({ file: 'a-->b.astro', checksum: A }), /project-relative/);
+  assert.throws(
+    () => stampComment({ file: '../x.astro', checksum: firstDigest }),
+    /project-relative/,
+  );
+  assert.throws(
+    () => stampComment({ file: 'a-->b.astro', checksum: firstDigest }),
+    /project-relative/,
+  );
 });
 
 test('a manifest is sorted, one entry per file, and refuses a rendering of two versions', () => {
-  const card = { file: 'src/components/Card.astro', checksum: A };
-  const page = { file: 'src/pages/index.astro', checksum: B };
+  const card = { file: 'src/components/Card.astro', checksum: firstDigest };
+  const page = { file: 'src/pages/index.astro', checksum: secondDigest };
   // Every rendered copy of a component stamps the same entry.
   const manifest = manifestOf([page, card, card, card]);
   assert.deepEqual(manifest, { ok: true, value: [card, page] });
-  assert.deepEqual(manifestOf([card, { ...card, checksum: B }]), {
+  assert.deepEqual(manifestOf([card, { ...card, checksum: secondDigest }]), {
     ok: false,
     error: 'conflicting-stamps',
   });
   const many = Array.from({ length: LIMITS.previewManifestFilesMax + 1 }, (_, index) => ({
     file: `src/components/C${index}.astro`,
-    checksum: A,
+    checksum: firstDigest,
   }));
   assert.deepEqual(manifestOf(many), { ok: false, error: 'too-many-files' });
   assert.equal(manifestOf(many.slice(1)).ok, true, 'the bound itself is allowed');
@@ -99,34 +108,34 @@ test('a manifest is sorted, one entry per file, and refuses a rendering of two v
   assert.deepEqual(manifestOf(copies), { ok: false, error: 'too-many-files' });
   assert.equal(
     canonicalManifest([card, page]),
-    `${A} src/components/Card.astro\n${B} src/pages/index.astro\n`,
+    `${firstDigest} src/components/Card.astro\n${secondDigest} src/pages/index.astro\n`,
   );
   assert.throws(() => canonicalManifest([page, card]), /sorted/);
 });
 
 test('a rendering parses when well formed and fails at the field that is wrong', () => {
   const good = renderOf([
-    { file: 'src/pages/index.astro', checksum: B },
-    { file: 'src/components/Card.astro', checksum: A },
+    { file: 'src/pages/index.astro', checksum: secondDigest },
+    { file: 'src/components/Card.astro', checksum: firstDigest },
   ]);
   assert.deepEqual(parsePreviewRender(JSON.parse(JSON.stringify(good))), good);
   const bad: readonly [unknown, RegExp][] = [
-    [null, /expected object/],
+    [jsonNull, /expected object/],
     [[], /expected object/],
     [{ ...good, token: 'nope' }, /Digest/],
     [{ ...good, token: undefined }, /token/],
     [{ ...good, stamps: {} }, /expected list/],
     [{ ...good, stamps: [...good.stamps].reverse() }, /sorted/],
     [{ ...good, stamps: [good.stamps[0], good.stamps[0]] }, /sorted/],
-    [{ ...good, stamps: [{ file: '/abs.astro', checksum: A }] }, /absolute/],
+    [{ ...good, stamps: [{ file: '/abs.astro', checksum: firstDigest }] }, /absolute/],
     [{ ...good, stamps: [{ file: 'src/a.astro', checksum: 'x' }] }, /Digest/],
-    [{ ...good, stamps: [{ file: 7, checksum: A }] }, /file/],
+    [{ ...good, stamps: [{ file: 7, checksum: firstDigest }] }, /file/],
     [
       {
         ...good,
         stamps: Array.from({ length: LIMITS.previewManifestFilesMax + 1 }, (_, i) => ({
           file: `src/c${String(i).padStart(4, '0')}.astro`,
-          checksum: A,
+          checksum: firstDigest,
         })),
       },
       /exceeds limit/,
@@ -139,50 +148,68 @@ test('a rendering parses when well formed and fails at the field that is wrong',
 
 test('the judge: token first, then every stamped file, each state named', () => {
   const render = renderOf([
-    { file: 'src/components/Card.astro', checksum: A },
-    { file: 'src/pages/index.astro', checksum: B },
+    { file: 'src/components/Card.astro', checksum: firstDigest },
+    { file: 'src/pages/index.astro', checksum: secondDigest },
   ]);
   const tokenOf = (text: string) => toDigest(sha256(text));
-  const present = (checksum: typeof A): StampedFileState => ({ tag: 'present', checksum });
+  const present = (checksum: typeof firstDigest): StampedFileState => ({
+    tag: 'present',
+    checksum,
+  });
   const now = (card: StampedFileState, page: StampedFileState) =>
     new Map<string, StampedFileState>([
       ['src/components/Card.astro', card],
       ['src/pages/index.astro', page],
     ]);
-  assert.deepEqual(judgePreviewRender(render, now(present(A), present(B)), tokenOf), {
-    tag: 'current',
-  });
-  assert.deepEqual(judgePreviewRender(render, now(present(B), present(B)), tokenOf), {
-    tag: 'stale',
-    reason: 'file-changed',
-    file: 'src/components/Card.astro',
-  });
-  assert.deepEqual(judgePreviewRender(render, now({ tag: 'missing' }, present(B)), tokenOf), {
-    tag: 'stale',
-    reason: 'file-missing',
-    file: 'src/components/Card.astro',
-  });
-  assert.deepEqual(judgePreviewRender(render, now(present(A), { tag: 'over-limit' }), tokenOf), {
-    tag: 'stale',
-    reason: 'file-changed',
-    file: 'src/pages/index.astro',
-  });
+  assert.deepEqual(
+    judgePreviewRender(render, now(present(firstDigest), present(secondDigest)), tokenOf),
+    {
+      tag: 'current',
+    },
+  );
+  assert.deepEqual(
+    judgePreviewRender(render, now(present(secondDigest), present(secondDigest)), tokenOf),
+    {
+      tag: 'stale',
+      reason: 'file-changed',
+      file: 'src/components/Card.astro',
+    },
+  );
+  assert.deepEqual(
+    judgePreviewRender(render, now({ tag: 'missing' }, present(secondDigest)), tokenOf),
+    {
+      tag: 'stale',
+      reason: 'file-missing',
+      file: 'src/components/Card.astro',
+    },
+  );
+  assert.deepEqual(
+    judgePreviewRender(render, now(present(firstDigest), { tag: 'over-limit' }), tokenOf),
+    {
+      tag: 'stale',
+      reason: 'file-changed',
+      file: 'src/pages/index.astro',
+    },
+  );
   // A token that is not the manifest's digest vouches for nothing.
-  const forged = { ...render, token: A };
-  assert.deepEqual(judgePreviewRender(forged, now(present(A), present(B)), tokenOf), {
-    tag: 'stale',
-    reason: 'token-mismatch',
-    file: undefined,
-  });
+  const forged = { ...render, token: firstDigest };
+  assert.deepEqual(
+    judgePreviewRender(forged, now(present(firstDigest), present(secondDigest)), tokenOf),
+    {
+      tag: 'stale',
+      reason: 'token-mismatch',
+      file: undefined,
+    },
+  );
   // Main must have read every stamped file: a missing entry is a bug.
   assert.throws(() => judgePreviewRender(render, new Map(), tokenOf), /read every stamped file/);
 });
 
 test('the event token and the shown file', () => {
-  const render = renderOf([{ file: 'src/pages/index.astro', checksum: B }]);
+  const render = renderOf([{ file: 'src/pages/index.astro', checksum: secondDigest }]);
   assert.deepEqual(judgeEventToken(render.token, render), { tag: 'current' });
-  assert.equal(judgeEventToken(A, render).tag, 'stale');
-  assert.deepEqual(judgeEventToken(A, render), {
+  assert.equal(judgeEventToken(firstDigest, render).tag, 'stale');
+  assert.deepEqual(judgeEventToken(firstDigest, render), {
     tag: 'stale',
     reason: 'superseded',
     file: undefined,
@@ -193,14 +220,16 @@ test('the event token and the shown file', () => {
     reason: 'no-render',
     file: undefined,
   });
-  assert.deepEqual(judgeShownFile(render, 'src/pages/index.astro', B), { tag: 'current' });
-  assert.deepEqual(judgeShownFile(render, 'src/pages/index.astro', A), {
+  assert.deepEqual(judgeShownFile(render, 'src/pages/index.astro', secondDigest), {
+    tag: 'current',
+  });
+  assert.deepEqual(judgeShownFile(render, 'src/pages/index.astro', firstDigest), {
     tag: 'stale',
     reason: 'shown-page-differs',
     file: 'src/pages/index.astro',
   });
   assert.equal(judgeShownFile(render, 'src/pages/index.astro', undefined).tag, 'stale');
-  assert.deepEqual(judgeShownFile(render, 'src/pages/about.astro', B), {
+  assert.deepEqual(judgeShownFile(render, 'src/pages/about.astro', secondDigest), {
     tag: 'stale',
     reason: 'unstamped-file',
     file: 'src/pages/about.astro',
@@ -268,10 +297,10 @@ function snapshot(root: string): ReadonlyMap<string, string> {
   const out = new Map<string, string>();
   const stack = [root];
   while (stack.length > 0) {
-    const dir = stack.pop();
-    assert.ok(dir !== undefined);
-    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-      const full = path.join(dir, entry.name);
+    const directory = stack.pop();
+    assert.ok(directory !== undefined);
+    for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+      const full = path.join(directory, entry.name);
       const rel = path.relative(root, full).split(path.sep).join('/');
       if (rel === 'node_modules/.avb' || rel === 'user') {
         continue;
@@ -400,7 +429,10 @@ async function judgeAsFilesChange(
   // Page code can forge a stamp; one pointing out of the project reads as
   // missing, never as a file somewhere else on disk.
   const outside = path.join(path.dirname(root), 'outside.astro');
-  const escaped = { token: A, stamps: [{ file: 'src/../../outside.astro', checksum: A }] };
+  const escaped = {
+    token: firstDigest,
+    stamps: [{ file: 'src/../../outside.astro', checksum: firstDigest }],
+  };
   await assert.rejects(
     () => harness.invoke('preview:check', { projectPath: root, render: escaped }),
     /not normalized/,
@@ -408,7 +440,7 @@ async function judgeAsFilesChange(
   );
   assert.equal(fs.existsSync(outside), false);
   // A token that does not match its manifest vouches for nothing.
-  const forged = { ...render, token: A };
+  const forged = { ...render, token: firstDigest };
   assert.deepEqual(
     parsePreviewVerdict(
       await harness.invoke('preview:check', { projectPath: root, render: forged }),
@@ -444,11 +476,11 @@ function markerPlugin(config: unknown, name: string): MarkerPlugin {
 
 // --- Static inventory ---------------------------------------------------------
 
-function sources(dir: string): readonly string[] {
+function sources(directory: string): readonly string[] {
   return fs
-    .readdirSync(dir, { recursive: true, encoding: 'utf8' })
+    .readdirSync(directory, { recursive: true, encoding: 'utf8' })
     .filter((file) => /\.(ts|tsx)$/.test(file) && !file.endsWith('.d.ts'))
-    .map((file) => path.join(dir, file));
+    .map((file) => path.join(directory, file));
 }
 
 test('only the marking module makes markers, and nothing imports it', () => {

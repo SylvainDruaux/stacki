@@ -13,6 +13,9 @@ import {
 import { BOUNDARY_LIMITS, data, object, text, optional } from '../../dist/shared/boundary.js';
 import type { IpcContract } from '../../dist/shared/ipc.js';
 
+// Null as a boundary receives it, parsed from JSON: inputs may hold it; our values never do.
+const jsonNull: unknown = JSON.parse('null');
+
 const noPayload = new Set([
   'project:pending',
   'native:copy',
@@ -89,7 +92,7 @@ const fields = {
   value: 'red',
   title: 'Colors',
   adds: [{ file: 'site.css', selector: ':root', name: '--red' }],
-  moves: [{ file: 'site.css', selector: ':root', name: '--red', target: null }],
+  moves: [{ file: 'site.css', selector: ':root', name: '--red', target: jsonNull }],
   renames: [{ from: '--old', to: '--new' }],
   fields: { title: { type: 'string' } },
   data: { title: 'Hello' },
@@ -265,7 +268,14 @@ test('terminal send channels accept keystrokes and acks and refuse every malform
   assert.deepEqual(parseTerminalInput({ id: 't1', data: 'ls\r' }), { id: 't1', data: 'ls\r' });
   assert.deepEqual(parseTerminalAck({ id: 't1', count: 0 }), { id: 't1', count: 0 });
   assert.deepEqual(parseTerminalAck({ id: 't1', count: 4096 }), { id: 't1', count: 4096 });
-  const malformedInputs = [undefined, null, 'ls', { id: 't' }, { data: 'x' }, { id: 1, data: 'x' }];
+  const malformedInputs = [
+    undefined,
+    jsonNull,
+    'ls',
+    { id: 't' },
+    { data: 'x' },
+    { id: 1, data: 'x' },
+  ];
   for (const input of malformedInputs) {
     assert.throws(() => parseTerminalInput(input));
   }

@@ -222,18 +222,24 @@ function latencyRow(file: string, fixture: FixtureEntry, scenario: 'fresh' | 'st
     }
   }
   const totals = recorded.map((stages) => stages.total);
-  const p95 = percentile(totals, 95);
+  const percentile95 = percentile(totals, 95);
   const medians = STAGE_NAMES.map((name) =>
     format(
       percentile(
-        recorded.map((s) => s[name]),
+        recorded.map((sample) => sample[name]),
         50,
       ),
     ),
   );
-  const verdict = p95 <= THRESHOLD_INTENT_MS ? 'pass' : 'FAIL';
+  const verdict = percentile95 <= THRESHOLD_INTENT_MS ? 'pass' : 'FAIL';
   const outcome = `${recorded.length} / ${rejected.length}${rejectionNote(rejected)}`;
-  const cells = [fixture.name, scenario, outcome, format(percentile(totals, 50)), format(p95)];
+  const cells = [
+    fixture.name,
+    scenario,
+    outcome,
+    format(percentile(totals, 50)),
+    format(percentile95),
+  ];
   return `| ${[...cells, format(Math.max(...totals)), verdict, ...medians].join(' | ')} |`;
 }
 
@@ -421,9 +427,13 @@ async function keystrokeRow(file: string, fixture: FixtureEntry): Promise<string
       lateness.push(fired - keystroke - TYPING_BATCH_MS);
     }
   }
-  const p95 = percentile(latencies, 95);
-  const verdict = p95 <= THRESHOLD_KEYSTROKE_MS ? 'pass' : 'FAIL';
-  const cells = [format(percentile(latencies, 50)), format(p95), format(Math.max(...latencies))];
+  const percentile95 = percentile(latencies, 95);
+  const verdict = percentile95 <= THRESHOLD_KEYSTROKE_MS ? 'pass' : 'FAIL';
+  const cells = [
+    format(percentile(latencies, 50)),
+    format(percentile95),
+    format(Math.max(...latencies)),
+  ];
   const row = [fixture.name, ...cells, format(percentile(lateness, 95)), verdict];
   return `| ${row.join(' | ')} |`;
 }
@@ -442,12 +452,12 @@ function lapClock(): () => number {
 }
 
 /** Nearest-rank percentile: the smallest sample with at least p % at or below it. */
-function percentile(values: readonly number[], p: number): number {
+function percentile(values: readonly number[], percent: number): number {
   if (values.length === 0) {
     return Number.NaN;
   }
   const sorted = [...values].sort((left, right) => left - right);
-  const rank = Math.ceil((p / 100) * sorted.length);
+  const rank = Math.ceil((percent / 100) * sorted.length);
   const value = sorted[Math.max(rank, 1) - 1];
   if (value === undefined) {
     throw new Error('Assertion failed: a nearest rank lies inside the samples');

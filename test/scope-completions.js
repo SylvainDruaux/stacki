@@ -23,9 +23,9 @@ const check = (what, condition, detail) => {
 
 (async () => {
   const esbuild = require('esbuild');
-  const buildDir = path.join(__dirname, '..', 'node_modules', '.stacki-test');
-  fs.mkdirSync(buildDir, { recursive: true });
-  const bundlePath = path.join(buildDir, 'scope-completions.bundle.js');
+  const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
+  fs.mkdirSync(buildDirectory, { recursive: true });
+  const bundlePath = path.join(buildDirectory, 'scope-completions.bundle.js');
   await esbuild.build({
     entryPoints: [path.join(__dirname, '..', 'src', 'dataSuggest.js')],
     outfile: bundlePath,
@@ -40,7 +40,7 @@ const check = (what, condition, detail) => {
 const { render, content, background, title = 'Untitled' } = Astro.props;
 const posts = await getCollection('blog');
 const year = new Date().getFullYear();`;
-  const labels = (ctx) => scopeCompletions(ctx).map((c) => c.label);
+  const labels = (context) => scopeCompletions(context).map((completion) => completion.label);
 
   const list = labels({ frontmatter, imports: [{ name: 'Layout' }] });
   // --- the props of this file ------------------------------------------------
@@ -76,7 +76,7 @@ const year = new Date().getFullYear();`;
 
   // --- the note beside a name ------------------------------------------------
   const withDetail = scopeCompletions({ frontmatter, imports: [] }).find(
-    (c) => c.label === 'title',
+    (completion) => completion.label === 'title',
   );
   check('a value carries what it holds', !!withDetail, JSON.stringify(withDetail));
 
@@ -87,7 +87,8 @@ const year = new Date().getFullYear();`;
   // drawn as a chip would claim to be a value you could swap.
   const { scopeChips } = require(bundlePath);
   const names = new Set(['render', 'content', 'background', 'post', 'items']);
-  const chipped = (src) => scopeChips(src, names).map((c) => src.slice(c.from, c.to));
+  const chipped = (source) =>
+    scopeChips(source, names).map((chip) => source.slice(chip.from, chip.to));
 
   check(
     'every value in a boolean is a chip',

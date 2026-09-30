@@ -13,6 +13,11 @@
 const fs = require('fs');
 const path = require('path');
 
+// A boundary can receive null — JSON, structured clone and postMessage all carry it —
+// so the negative space below includes it. It is read from JSON, because our own
+// code never writes a null.
+const PLATFORM_NULL = JSON.parse('null');
+
 const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
@@ -24,9 +29,9 @@ const check = (what, condition, detail) => {
 
 (async () => {
   const esbuild = require('esbuild');
-  const buildDir = path.join(__dirname, '..', 'node_modules', '.stacki-test');
-  fs.mkdirSync(buildDir, { recursive: true });
-  const bundlePath = path.join(buildDir, 'selectors-live.bundle.js');
+  const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
+  fs.mkdirSync(buildDirectory, { recursive: true });
+  const bundlePath = path.join(buildDirectory, 'selectors-live.bundle.js');
   await esbuild.build({
     stdin: {
       contents: `
@@ -73,7 +78,7 @@ const check = (what, condition, detail) => {
   const snap = {
     tag: 'div',
     webflowType: '',
-    id: null,
+    id: PLATFORM_NULL,
     classes: ['card', 'is-active'],
     classList: ['card', 'is-active'],
     attributes: { class: 'card is-active' },
@@ -106,7 +111,7 @@ const check = (what, condition, detail) => {
   // The host tells its subscribers on a microtask (see lib/host), so let it land.
   const settle = () =>
     act(async () => {
-      await new Promise((r) => dom.window.setTimeout(r, 5));
+      await new Promise((resolve) => dom.window.setTimeout(resolve, 5));
     });
   const hidden = () => document.querySelector('[data-removed]').dataset.removed;
 

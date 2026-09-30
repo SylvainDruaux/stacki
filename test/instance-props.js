@@ -16,8 +16,10 @@
 // a panel reads as fact, so anything this can't work out is left out rather
 // than guessed at.
 
+const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
+const { LIMITS } = require('../dist/shared/limits.js');
 
 const failures = [];
 let checked = 0;
@@ -30,9 +32,9 @@ const check = (what, condition, detail) => {
 
 (async () => {
   const esbuild = require('esbuild');
-  const buildDir = path.join(__dirname, '..', 'node_modules', '.stacki-test');
-  fs.mkdirSync(buildDir, { recursive: true });
-  const out = path.join(buildDir, 'instance-props.bundle.js');
+  const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
+  fs.mkdirSync(buildDirectory, { recursive: true });
+  const out = path.join(buildDirectory, 'instance-props.bundle.js');
   await esbuild.build({
     stdin: {
       contents: [
@@ -66,7 +68,7 @@ const check = (what, condition, detail) => {
   const instance = (props) => ({ kind: 'component', name: 'LinkCard', props });
   const expr = (value) => ({ type: 'expr', value });
   const text = (value) => ({ type: 'string', value });
-  const got = (props, ctx = PAGE) => resolveInstanceProps(instance(props), ctx);
+  const got = (props, context = PAGE) => resolveInstanceProps(instance(props), context);
 
   // ── What it can answer ────────────────────────────────────────────────────
   check(
@@ -107,7 +109,7 @@ const check = (what, condition, detail) => {
   const unsure = (props, why) =>
     check(
       why,
-      got(props) === null || !(Object.keys(props)[0] in (got(props) || {})),
+      got(props) === undefined || !(Object.keys(props)[0] in (got(props) || {})),
       JSON.stringify(got(props)),
     );
   unsure({ meta: expr('formatDate(project.data.date)') }, 'a call is not worked out');
@@ -116,22 +118,23 @@ const check = (what, condition, detail) => {
   unsure({ tag: expr('null') }, 'and null says nothing at all');
   check(
     'a spread contributes nothing rather than everything',
-    got({ '...rest': expr('card') }) === null || !('...rest' in got({ '...rest': expr('card') })),
+    got({ '...rest': expr('card') }) === undefined ||
+      !('...rest' in got({ '...rest': expr('card') })),
     JSON.stringify(got({ '...rest': expr('card') })),
   );
   check(
-    'an instance with nothing knowable answers null, not an empty object',
-    got({ meta: expr('helper()') }) === null,
+    'an instance with nothing knowable answers undefined, not an empty object',
+    got({ meta: expr('helper()') }) === undefined,
     JSON.stringify(got({ meta: expr('helper()') })),
   );
   check(
     'and so does a node with no props at all',
-    resolveInstanceProps({ kind: 'component' }, PAGE) === null,
+    resolveInstanceProps({ kind: 'component' }, PAGE) === undefined,
   );
   // Classes belong to the style panel, not the data picker.
   check(
     'the class attribute is left alone',
-    got({ class: text('card') }) === null,
+    got({ class: text('card') }) === undefined,
     JSON.stringify(got({ class: text('card') })),
   );
 
@@ -146,10 +149,10 @@ const check = (what, condition, detail) => {
   const rows = (sample) =>
     Object.fromEntries(
       dataTree({ frontmatter: '', imports: [], propsSample: sample, propsSchema: SCHEMA }).map(
-        (n) => [n.path, n.preview || n.kind],
+        (node) => [node.path, node.preview || node.kind],
       ),
     );
-  const before = rows(null);
+  const before = rows(undefined);
   const after = rows(
     got({ heading: expr('project.data.title'), href: expr('`/portfolio/${project.id}`') }),
   );
@@ -182,28 +185,32 @@ const check = (what, condition, detail) => {
     const page = parsePage(fs.readFileSync(REAL, 'utf8'));
     const found = [];
     const walk = (list, chain) => {
-      for (const n of list) {
-        if (n.kind === 'component' && n.name === 'LinkCard') {
-          found.push({ n, chain });
+      const depth = chain.length;
+      assert.ok(depth <= LIMITS.treeDepthMax, 'walk: tree depth limit');
+      for (const node of list) {
+        if (node.kind === 'component' && node.name === 'LinkCard') {
+          found.push({ n: node, chain });
         }
-        if (Array.isArray(n.children)) {
-          walk(n.children, [...chain, n]);
+        if (Array.isArray(node.children)) {
+          walk(node.children, [...chain, node]);
         }
       }
     };
     walk(page.model.nodes, []);
-    const resolved = found.map(({ n, chain }) =>
-      resolveInstanceProps(n, {
+    const resolved = found.map(({ n: node, chain }) =>
+      resolveInstanceProps(node, {
         frontmatter: page.model.extraFrontmatter || '',
         imports: page.model.imports || [],
-        ancestorHeads: chain.filter((c) => c.kind === 'map').map((c) => c.head),
+        ancestorHeads: chain.filter((link) => link.kind === 'map').map((link) => link.head),
         collectionSamples: { portfolio: ENTRY },
       }),
     );
     check('the real page has cards to read', found.length > 0, `${found.length}`);
     check(
       'and the one in the loop knows its heading and its link',
-      resolved.some((r) => r?.heading === 'BloomCraft' && r?.href === '/portfolio/bloomcraft'),
+      resolved.some(
+        (result) => result?.heading === 'BloomCraft' && result?.href === '/portfolio/bloomcraft',
+      ),
       JSON.stringify(resolved),
     );
   }

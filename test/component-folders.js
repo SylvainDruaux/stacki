@@ -12,6 +12,7 @@
 // search, which has to be able to find a component by where it lives as well as
 // by what it is called. `form input` is how a person says which Input.
 
+const assert = require('node:assert/strict');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
@@ -31,30 +32,34 @@ const check = (what, condition, detail) => {
 // ipc handler in a file that cannot be required outside Electron — so what is
 // checked is that a walk of a real tree with folders inside folders produces
 // the records the panel and the search are written against.
-const listAstroFiles = (dir) => {
-  if (!fs.existsSync(dir)) {
+// A walk of a project's folders stops at this depth: real source trees are a few folders
+// deep, so anything deeper is a loop or a runaway, not a project.
+const WALK_LIMITS = { directoryDepthMax: 32 };
+const listAstroFiles = (directory) => {
+  if (!fs.existsSync(directory)) {
     return [];
   }
   const out = [];
-  const walk = (d) => {
-    for (const entry of fs.readdirSync(d, { withFileTypes: true })) {
-      const full = path.join(d, entry.name);
+  const walk = (folder, depth = 0) => {
+    assert.ok(depth <= WALK_LIMITS.directoryDepthMax, 'walk: directory depth limit');
+    for (const entry of fs.readdirSync(folder, { withFileTypes: true })) {
+      const full = path.join(folder, entry.name);
       if (entry.isDirectory()) {
-        walk(full);
+        walk(full, depth + 1);
       } else if (entry.name.endsWith('.astro')) {
         out.push(full);
       }
     }
   };
-  walk(dir);
+  walk(directory);
   return out;
 };
-const toPosix = (p) => p.split(path.sep).join('/');
+const toPosix = (filePath) => filePath.split(path.sep).join('/');
 
 (async () => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'stacki-folders-'));
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'stacki-folders-'));
   const write = (rel) => {
-    const full = path.join(dir, rel);
+    const full = path.join(directory, rel);
     fs.mkdirSync(path.dirname(full), { recursive: true });
     fs.writeFileSync(full, '---\n---\n<div><slot /></div>\n');
   };
@@ -65,21 +70,22 @@ const toPosix = (p) => p.split(path.sep).join('/');
   write('src/components/Form/Layout/Row.astro');
   write('src/layouts/marketing/Landing.astro');
 
-  const src = path.join(dir, 'src');
-  const componentsDir = path.join(src, 'components');
-  const components = listAstroFiles(componentsDir).map((p) => ({
-    path: p,
-    name: path.basename(p, '.astro'),
-    folder: toPosix(path.relative(componentsDir, path.dirname(p))),
+  const source = path.join(directory, 'src');
+  const componentsDirectory = path.join(source, 'components');
+  const components = listAstroFiles(componentsDirectory).map((filePath) => ({
+    path: filePath,
+    name: path.basename(filePath, '.astro'),
+    folder: toPosix(path.relative(componentsDirectory, path.dirname(filePath))),
   }));
-  const layouts = listAstroFiles(path.join(src, 'layouts')).map((p) => ({
-    path: p,
-    name: path.basename(p, '.astro'),
-    folder: toPosix(path.relative(src, path.dirname(p))),
+  const layouts = listAstroFiles(path.join(source, 'layouts')).map((filePath) => ({
+    path: filePath,
+    name: path.basename(filePath, '.astro'),
+    folder: toPosix(path.relative(source, path.dirname(filePath))),
     isLayout: true,
   }));
 
-  const folderOf = (name) => components.concat(layouts).find((c) => c.name === name)?.folder;
+  const folderOf = (name) =>
+    components.concat(layouts).find((component) => component.name === name)?.folder;
 
   // --- the scan ------------------------------------------------------------------
   check(
@@ -108,18 +114,18 @@ const toPosix = (p) => p.split(path.sep).join('/');
   // scattered through the list.
   const groupsOf = (list) => {
     const byFolder = new Map();
-    for (const c of list) {
-      const key = c.folder || '';
+    for (const component of list) {
+      const key = component.folder || '';
       if (!byFolder.has(key)) {
         byFolder.set(key, []);
       }
-      byFolder.get(key).push(c);
+      byFolder.get(key).push(component);
     }
-    return [...byFolder.entries()].sort(([a], [b]) =>
-      a === '' ? -1 : b === '' ? 1 : a.localeCompare(b),
+    return [...byFolder.entries()].sort(([left], [right]) =>
+      left === '' ? -1 : right === '' ? 1 : left.localeCompare(right),
     );
   };
-  const headings = groupsOf(components).map(([f]) => f);
+  const headings = groupsOf(components).map(([folder]) => folder);
   check('the root comes first', headings[0] === '', JSON.stringify(headings));
   check(
     'and each folder is its own group, named by its path',
@@ -129,9 +135,9 @@ const toPosix = (p) => p.split(path.sep).join('/');
 
   // --- searching by where it lives --------------------------------------------------
   const esbuild = require('esbuild');
-  const buildDir = path.join(__dirname, '..', 'node_modules', '.stacki-test');
-  fs.mkdirSync(buildDir, { recursive: true });
-  const out = path.join(buildDir, 'component-folders.bundle.mjs');
+  const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
+  fs.mkdirSync(buildDirectory, { recursive: true });
+  const out = path.join(buildDirectory, 'component-folders.bundle.mjs');
   await esbuild.build({
     entryPoints: [path.join(__dirname, '..', 'src', 'insertRank.js')],
     outfile: out,
@@ -141,7 +147,7 @@ const toPosix = (p) => p.split(path.sep).join('/');
     logLevel: 'silent',
   });
   const { rankInsertItems } = await import(`${pathToFileURL(out).href}?v=${Date.now()}`);
-  const found = (q) => rankInsertItems(components, q).map((c) => c.name);
+  const found = (query) => rankInsertItems(components, query).map((item) => item.name);
 
   check(
     'a component is found by its name',
@@ -208,7 +214,7 @@ const toPosix = (p) => p.split(path.sep).join('/');
     'the grouping went with it',
   );
 
-  fs.rmSync(dir, { recursive: true, force: true });
+  fs.rmSync(directory, { recursive: true, force: true });
 
   if (failures.length) {
     console.error(

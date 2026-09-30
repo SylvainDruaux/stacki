@@ -5,6 +5,11 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const model = require('./renderer-module')('paletteModel.ts');
 
+// A boundary can receive null — JSON, structured clone and postMessage all carry it —
+// so the negative space below includes it. It is read from JSON, because our own
+// code never writes a null.
+const PLATFORM_NULL = JSON.parse('null');
+
 const file = {
   rel: 'src/pages/about.astro',
   path: '/project/src/pages/about.astro',
@@ -34,7 +39,7 @@ test('component preview messages accept only known status updates', () => {
     );
   }
   for (const value of [
-    null,
+    PLATFORM_NULL,
     {},
     { type: 'other', status: 'ready' },
     { type: 'avb:component-preview' },
@@ -57,7 +62,7 @@ test('component usage parser preserves success and operating-error variants', ()
 
 test('component usage parser rejects invalid nested values, totals, and bounds', () => {
   for (const value of [
-    null,
+    PLATFORM_NULL,
     {},
     { error: 'failed', files: [] },
     { files: [{ ...file, rel: 'bad\0path' }] },

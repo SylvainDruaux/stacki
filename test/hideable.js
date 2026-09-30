@@ -27,10 +27,11 @@ const check = (what, condition, detail) => {
 
 (async () => {
   const esbuild = require('esbuild');
-  const buildDir = path.join(__dirname, '..', 'node_modules', '.stacki-test');
-  fs.mkdirSync(buildDir, { recursive: true });
-  const entry = path.join(buildDir, 'hideable.entry.ts');
-  const lib = (f) => JSON.stringify(path.join(__dirname, '..', 'src', 'style-panel', 'lib', f));
+  const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
+  fs.mkdirSync(buildDirectory, { recursive: true });
+  const entry = path.join(buildDirectory, 'hideable.entry.ts');
+  const lib = (file) =>
+    JSON.stringify(path.join(__dirname, '..', 'src', 'style-panel', 'lib', file));
   fs.writeFileSync(
     entry,
     `export * from ${lib('hideable.ts')};\n` +
@@ -40,7 +41,7 @@ const check = (what, condition, detail) => {
       `export { parseBoxShadows, serializeBoxShadows } from ${lib('box-shadow.ts')};\n` +
       `export { parseShadows, serializeShadows } from ${lib('text-shadow.ts')};\n`,
   );
-  const bundlePath = path.join(buildDir, 'hideable.bundle.js');
+  const bundlePath = path.join(buildDirectory, 'hideable.bundle.js');
   await esbuild.build({
     entryPoints: [entry],
     outfile: bundlePath,
@@ -75,7 +76,7 @@ const check = (what, condition, detail) => {
   };
   const rowsOf = (kind, value) => parseHideable(value, KINDS[kind].sep, KINDS[kind].parse);
   const textOf = (kind, rows) => serializeHideable(rows, KINDS[kind].sep, KINDS[kind].serialize);
-  const setHidden = (rows, i, hidden) => rows.map((r, j) => (j === i ? { ...r, hidden } : r));
+  const setHidden = (rows, i, hidden) => rows.map((row, j) => (j === i ? { ...row, hidden } : row));
 
   // --- Hiding, and getting it back ------------------------------------------
   {
@@ -87,7 +88,7 @@ const check = (what, condition, detail) => {
     check('both layers are read', rows.length === 2, JSON.stringify(rows));
     check(
       'and neither starts hidden',
-      rows.every((r) => !r.hidden),
+      rows.every((row) => !row.hidden),
       JSON.stringify(rows),
     );
 
@@ -130,7 +131,7 @@ const check = (what, condition, detail) => {
       textOf('filter', setHidden(back, 0, false)) === 'blur(5px)',
       textOf('filter', setHidden(back, 0, false)),
     );
-    check('allHidden agrees', allHidden(rows.map((r) => ({ ...r, hidden: true }))) === true);
+    check('allHidden agrees', allHidden(rows.map((row) => ({ ...row, hidden: true }))) === true);
     check('and says no when one is showing', allHidden(rows) === false);
   }
 
@@ -144,7 +145,7 @@ const check = (what, condition, detail) => {
     check(
       'a filter with spaces and commas inside stays one layer',
       rows.length === 2,
-      JSON.stringify(rows.map((r) => r.item)),
+      JSON.stringify(rows.map((row) => row.item)),
     );
     const off = textOf('filter', setHidden(rows, 0, true));
     check('and survives being hidden', off.includes('rgba(0, 0, 0, 0.5)'), off);
@@ -173,12 +174,12 @@ const check = (what, condition, detail) => {
     check(
       'a rotate stays one layer',
       rows.length === 2,
-      JSON.stringify(rows.map((r) => r.item.type)),
+      JSON.stringify(rows.map((row) => row.item.type)),
     );
     check(
       'a move and a rotate',
-      rows.map((r) => r.item.type).join(',') === 'move,rotate',
-      JSON.stringify(rows.map((r) => r.item.type)),
+      rows.map((row) => row.item.type).join(',') === 'move,rotate',
+      JSON.stringify(rows.map((row) => row.item.type)),
     );
 
     // Hidden, the rotate's three functions live inside one comment — and have
@@ -193,7 +194,7 @@ const check = (what, condition, detail) => {
     check(
       'and it reads back as one hidden layer',
       back.length === 2,
-      JSON.stringify(back.map((r) => r.item.type)),
+      JSON.stringify(back.map((row) => row.item.type)),
     );
     check(
       'still a rotate',
@@ -213,7 +214,11 @@ const check = (what, condition, detail) => {
   // --- Transform: space-separated -------------------------------------------
   {
     const rows = rowsOf('transform', 'translate(10px, 20px) rotate(45deg)');
-    check('two transforms are read', rows.length === 2, JSON.stringify(rows.map((r) => r.item)));
+    check(
+      'two transforms are read',
+      rows.length === 2,
+      JSON.stringify(rows.map((row) => row.item)),
+    );
     const off = textOf('transform', setHidden(rows, 0, true));
     check(
       'hiding the first comments only that one',
@@ -231,7 +236,11 @@ const check = (what, condition, detail) => {
   // --- Transition: comma-separated ------------------------------------------
   {
     const rows = rowsOf('transition', 'opacity 200ms ease, transform 300ms linear');
-    check('two transitions are read', rows.length === 2, JSON.stringify(rows.map((r) => r.item)));
+    check(
+      'two transitions are read',
+      rows.length === 2,
+      JSON.stringify(rows.map((row) => row.item)),
+    );
     const off = textOf('transition', setHidden(rows, 1, true));
     // Comma-joined, so the comment sits after a comma rather than a space.
     check('the hidden one is commented', off.includes('/*') && off.includes('transform'), off);
@@ -284,7 +293,7 @@ const check = (what, condition, detail) => {
     try {
       return require('electron');
     } catch {
-      return null;
+      return undefined;
     }
   })();
   const HIDE_SETS = [[], [0], [1], [2], [0, 1], [1, 2], [0, 2], [0, 1, 2]];
@@ -302,7 +311,7 @@ const check = (what, condition, detail) => {
     check(
       `${prop}: three layers to work with`,
       rows.length === 3,
-      JSON.stringify(rows.map((r) => r.item)),
+      JSON.stringify(rows.map((row) => row.item)),
     );
     for (const hide of HIDE_SETS) {
       cases.push({
@@ -311,7 +320,7 @@ const check = (what, condition, detail) => {
         shown: rows.length - hide.length,
         value: textOf(
           prop,
-          rows.map((r, i) => ({ ...r, hidden: hide.includes(i) })),
+          rows.map((row, i) => ({ ...row, hidden: hide.includes(i) })),
         ),
       });
     }
@@ -330,7 +339,7 @@ const check = (what, condition, detail) => {
   }
 
   const { spawnSync } = require('child_process');
-  const probePath = path.join(buildDir, 'hideable.probe.js');
+  const probePath = path.join(buildDirectory, 'hideable.probe.js');
   fs.writeFileSync(
     probePath,
     `const { app, BrowserWindow } = require('electron');
@@ -361,33 +370,38 @@ const check = (what, condition, detail) => {
      });`,
   );
   const run = spawnSync(electronPath, [probePath], { encoding: 'utf8', timeout: 120000 });
-  const line = (run.stdout || '').split('\n').find((l) => l.trim().startsWith('['));
+  const line = (run.stdout || '').split('\n').find((line) => line.trim().startsWith('['));
   if (!line) {
     check('the browser probe ran', false, (run.stderr || run.stdout || '').slice(0, 400));
   } else {
-    for (const r of JSON.parse(line)) {
-      const where = `${r.prop} with ${r.hide === 'none' ? 'nothing' : r.hide} hidden`;
+    for (const result of JSON.parse(line)) {
+      const hiddenLayers = result.hide === 'none' ? 'nothing' : result.hide;
+      const where = `${result.prop} with ${hiddenLayers} hidden`;
       // The declaration surviving at all is the half that was broken.
       check(
         `${where}: the browser keeps the declaration`,
-        r.shown === 0 || r.kept !== '',
-        `dropped — "${r.computed}"`,
+        result.shown === 0 || result.kept !== '',
+        `dropped — "${result.computed}"`,
       );
       // And it applies exactly the layers still showing, no more and no fewer.
       const applied =
-        r.kept === '' ||
-        r.computed === 'none' ||
-        r.computed === 'all' ||
-        r.computed === 'matrix(1, 0, 0, 1, 0, 0)'
+        result.kept === '' ||
+        result.computed === 'none' ||
+        result.computed === 'all' ||
+        result.computed === 'matrix(1, 0, 0, 1, 0, 0)'
           ? 0
-          : r.prop === 'filter' || r.prop === 'transform'
-            ? r.computed.split(/\s+(?![^(]*\))/).filter(Boolean).length
-            : r.computed.split(/,(?![^(]*\))/).length;
-      const want = r.prop === 'transform' ? Math.min(r.shown, 1) : r.shown;
+          : result.prop === 'filter' || result.prop === 'transform'
+            ? result.computed.split(/\s+(?![^(]*\))/).filter(Boolean).length
+            : result.computed.split(/,(?![^(]*\))/).length;
+      const want = result.prop === 'transform' ? Math.min(result.shown, 1) : result.shown;
       check(
-        `${where}: it applies the ${r.shown} still showing`,
-        r.prop === 'transform' ? (r.shown === 0 ? applied === 0 : applied >= 1) : applied === want,
-        `applied ${applied}, computed "${r.computed}"`,
+        `${where}: it applies the ${result.shown} still showing`,
+        result.prop === 'transform'
+          ? result.shown === 0
+            ? applied === 0
+            : applied >= 1
+          : applied === want,
+        `applied ${applied}, computed "${result.computed}"`,
       );
     }
   }
@@ -397,7 +411,7 @@ const check = (what, condition, detail) => {
     process.exit(1);
   }
   console.log(`hideable: ${checked} passed`);
-})().catch((err) => {
-  console.error(err);
+})().catch((error) => {
+  console.error(error);
   process.exit(1);
 });

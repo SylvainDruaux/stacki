@@ -34,7 +34,7 @@ const check = (what, condition, detail) => {
 const PRELOAD = path.join(__dirname, '..', 'dist', 'electron', 'preload.js');
 const { JSDOM } = require('jsdom');
 
-const marked = (p, html) => `<!--avb-s:${p}-->${html}<!--avb-e:${p}-->`;
+const marked = (nodePath, html) => `<!--avb-s:${nodePath}-->${html}<!--avb-e:${nodePath}-->`;
 
 // The preview frame, as the canvas sees it: a document with markers in it, an
 // electron that does nothing, and a parent to post the answers to.
@@ -70,7 +70,7 @@ const frame = (url) => {
   );
   const { window } = dom;
   const NO_BOX = { x: 0, y: 0, width: 0, height: 0, left: 0, top: 0, right: 0, bottom: 0 };
-  // jsdom lays nothing out, and a node with no box is not a place — which is
+  // `jsdom` lays nothing out, and a node with no box is not a place — which is
   // how the canvas tells a real occurrence from a hollow leftover. Give every
   // element that renders a box of its own, stacked down the page.
   let top = 0;
@@ -94,7 +94,7 @@ const frame = (url) => {
   global.requestAnimationFrame = window.requestAnimationFrame.bind(window);
 
   const sent = [];
-  window.parent = { postMessage: (m) => sent.push(m) };
+  window.parent = { postMessage: (message) => sent.push(message) };
 
   const electron = {
     contextBridge: { exposeInMainWorld: () => {} },
@@ -113,7 +113,7 @@ const frame = (url) => {
   // What the app says when it opens a component: the file in scope, the
   // instance, and which copy of it.
   const track = (focus, focusOcc = 0) => {
-    const ev = new window.MessageEvent('message', {
+    const event = new window.MessageEvent('message', {
       data: {
         type: 'avb:track',
         paths: ['0.1', '0.2', '0.3', '0.4', '0.5.0', '0.5.1', '0.6.0'],
@@ -122,11 +122,11 @@ const frame = (url) => {
         focusOcc,
       },
     });
-    Object.defineProperty(ev, 'source', { value: window.parent });
-    window.dispatchEvent(ev);
+    Object.defineProperty(event, 'source', { value: window.parent });
+    window.dispatchEvent(event);
   };
   const opened = () =>
-    [...window.document.querySelectorAll('.stacki-opened')].map((el) => el.textContent);
+    [...window.document.querySelectorAll('.stacki-opened')].map((element) => element.textContent);
   // Read the moment the script has run, before any event has had a chance to
   // fire: the page paints before DOMContentLoaded, and a canvas that spent that
   // time looking like the preview would flash.
@@ -137,7 +137,8 @@ const frame = (url) => {
 (async () => {
   // --- the canvas ---------------------------------------------------------------
   const canvas = frame('http://localhost:4321/#avb-design');
-  await new Promise((r) => setTimeout(r, 50)); // the markers are walked once parsing is done
+  // The markers are walked once parsing is done.
+  await new Promise((resolve) => setTimeout(resolve, 50));
 
   check(
     'the canvas frame says so on <html>',
@@ -261,9 +262,9 @@ const frame = (url) => {
   // The page's own classes, and only those. `stacki-opened` is on the element
   // and must not be in the answer.
   canvas.track('0.1', 1);
-  const classesFor = (p) => {
-    const rects = canvas.sent.filter((m) => m.type === 'avb:rects').pop();
-    const list = (rects?.classes || {})[p];
+  const classesFor = (nodePath) => {
+    const rects = canvas.sent.filter((message) => message.type === 'avb:rects').pop();
+    const list = (rects?.classes || {})[nodePath];
     return list ? list.flat() : [];
   };
   check(
@@ -276,7 +277,7 @@ const frame = (url) => {
     !classesFor('0.1').includes('stacki-opened'),
     JSON.stringify(classesFor('0.1')),
   );
-  const nodeClasses = canvas.sent.filter((m) => m.type === 'avb:node-classes').pop();
+  const nodeClasses = canvas.sent.filter((message) => message.type === 'avb:node-classes').pop();
   check(
     'nor in the classes the navigator reads',
     !JSON.stringify(nodeClasses?.classes || {}).includes('stacki-'),
@@ -289,7 +290,7 @@ const frame = (url) => {
   // avb:track — so the class has to come from the frame itself, and it has to
   // be there from the first paint rather than after a message that never comes.
   const preview = frame('http://localhost:4321/');
-  await new Promise((r) => setTimeout(r, 50));
+  await new Promise((resolve) => setTimeout(resolve, 50));
   check(
     'the preview frame says so on <html>',
     preview.doc.documentElement.classList.contains('stacki-preview'),
@@ -319,7 +320,7 @@ const frame = (url) => {
   );
   // The one raw read left is the filter's own; anything else is a way for these
   // classes to reach the app.
-  const raw = source.split('\n').filter((l) => /Array\.from\(\w+\.classList\)/.test(l));
+  const raw = source.split('\n').filter((line) => /Array\.from\(\w+\.classList\)/.test(line));
   check(
     'and every reported class list is filtered through it',
     raw.length === 1 && /ownClasses/.test(raw[0]),

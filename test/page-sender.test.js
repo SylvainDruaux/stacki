@@ -105,7 +105,10 @@ test('an applied gesture: the page is the reply, clean, with every handle carrie
   const heading = box.state.model.nodes[0].children[0];
   const record = step();
   const big = { class: { type: 'string', value: 'big' } };
-  const retitle = editGestures.propsGesture(heading.id, big, { coalesceKey: null, urgency: true });
+  const retitle = editGestures.propsGesture(heading.id, big, {
+    coalesceKey: undefined,
+    urgency: true,
+  });
   queue.addGesture(PATH, retitle, record);
   box.state = { ...box.state, model: retitle.apply(box.state.model) };
   const outcome = await send(PATH, queue.shift(PATH));
@@ -120,7 +123,7 @@ test('an applied gesture: the page is the reply, clean, with every handle carrie
 test('with more queued, only the origin moves on; the model shows the newer edit', async () => {
   const { disk, box, queue, send } = harness(PAGE);
   const [heading, paragraph] = box.state.model.nodes[0].children;
-  const options = { coalesceKey: null, urgency: true };
+  const options = { coalesceKey: undefined, urgency: true };
   const first = editGestures.propsGesture(heading.id, titled('a'), options);
   const second = editGestures.propsGesture(paragraph.id, titled('b'), options);
   queue.addGesture(PATH, first, step());
@@ -139,9 +142,9 @@ test('a gesture the engine cannot plan is taken back and said, never saved other
   const { disk, box, queue, send } = harness(PAGE);
   const record = step();
   const unplannable = {
-    coalesceKey: null,
+    coalesceKey: undefined,
     urgency: true,
-    stream: null,
+    stream: undefined,
     request: () => undefined, // Its node is another file's: nothing to state.
     apply: (model) => ({ ...model, nodes: [] }),
   };
@@ -158,7 +161,7 @@ test('a gesture the engine cannot plan is taken back and said, never saved other
 test('refused over changed bytes: the conflict notice with the reason', async () => {
   const { disk, box, queue, send } = harness(PAGE);
   const heading = box.state.model.nodes[0].children[0];
-  const options = { coalesceKey: null, urgency: true };
+  const options = { coalesceKey: undefined, urgency: true };
   const untitle = editGestures.propsGesture(heading.id, { title: undefined }, options);
   queue.addGesture(PATH, untitle, step());
   disk.text = PAGE.replace('Title', 'Outside');
@@ -172,7 +175,7 @@ test('a write that may have landed is never sent again blind: the disk decides',
   const uncertain = async () => ({ ok: false, error: { code: 'uncertain', message: 'rename?' } });
   const untouched = harness(PAGE, { edit: uncertain });
   const heading = untouched.box.state.model.nodes[0].children[0];
-  const options = { coalesceKey: null, urgency: true };
+  const options = { coalesceKey: undefined, urgency: true };
   const drop = editGestures.propsGesture(heading.id, { class: undefined }, options);
   untouched.queue.addGesture(PATH, drop, step());
   const again = await untouched.send(PATH, untouched.queue.shift(PATH));
@@ -188,10 +191,10 @@ test('a preview plans every queued gesture as splices, chained, and writes nothi
   const disk = { text: PAGE.replace('One', 'Outside') }; // The disk moved on.
   const origin = pageState(PAGE).origin;
   const [heading, paragraph] = origin.model.nodes[0].children;
-  const options = { coalesceKey: null, urgency: true };
+  const options = { coalesceKey: undefined, urgency: true };
   const unplannable = {
     ...options,
-    stream: null,
+    stream: undefined,
     request: () => undefined,
     apply: (model) => model,
   };

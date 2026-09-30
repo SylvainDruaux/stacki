@@ -28,9 +28,9 @@ const check = (what, condition, detail) => {
 
 (async () => {
   const esbuild = require('esbuild');
-  const buildDir = path.join(__dirname, '..', 'node_modules', '.stacki-test');
-  fs.mkdirSync(buildDir, { recursive: true });
-  const bundlePath = path.join(buildDir, 'gradient.bundle.js');
+  const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
+  fs.mkdirSync(buildDirectory, { recursive: true });
+  const bundlePath = path.join(buildDirectory, 'gradient.bundle.js');
   await esbuild.build({
     entryPoints: [path.join(__dirname, '..', 'src', 'style-panel', 'lib', 'gradient.ts')],
     outfile: bundlePath,
@@ -45,7 +45,7 @@ const check = (what, condition, detail) => {
   const switchKind = (css, next) => {
     const current = parseGradient(css);
     if (!current?.stops?.length) {
-      return null;
+      return undefined;
     }
     return serializeGradient({
       ...blankGradientOf(next),
@@ -89,8 +89,8 @@ const check = (what, condition, detail) => {
   {
     const css = 'linear-gradient(90deg, red 0%, yellow 40%, green 60%, blue 100%)';
     const radial = switchKind(css, 'radial');
-    for (const c of ['red', 'yellow', 'green', 'blue']) {
-      check(`${c} survives the switch`, radial.includes(c), radial);
+    for (const color of ['red', 'yellow', 'green', 'blue']) {
+      check(`${color} survives the switch`, radial.includes(color), radial);
     }
     check('and stays in order', radial.indexOf('yellow') < radial.indexOf('green'), radial);
     check('with every stop kept', parseGradient(radial).stops.length === 4, radial);
@@ -114,8 +114,12 @@ const check = (what, condition, detail) => {
 
   // --- Repeating is about the stops, so it does carry -----------------------
   {
-    const r = switchKind('repeating-linear-gradient(90deg, red 0%, blue 20%)', 'radial');
-    check('a repeating gradient stays repeating', /^repeating-radial-gradient\(/.test(r), r);
+    const result = switchKind('repeating-linear-gradient(90deg, red 0%, blue 20%)', 'radial');
+    check(
+      'a repeating gradient stays repeating',
+      /^repeating-radial-gradient\(/.test(result),
+      result,
+    );
     const plain = switchKind('linear-gradient(90deg, red, blue)', 'radial');
     check('and a plain one stays plain', !/^repeating-/.test(plain), plain);
   }
@@ -126,22 +130,22 @@ const check = (what, condition, detail) => {
     // writing a gradient with no colours in it, which is invalid CSS.
     check(
       'an unparseable gradient carries nothing',
-      switchKind('url(photo.png)', 'radial') === null,
+      switchKind('url(photo.png)', 'radial') === undefined,
     );
-    check('and so does nonsense', switchKind('not a gradient at all', 'radial') === null);
+    check('and so does nonsense', switchKind('not a gradient at all', 'radial') === undefined);
   }
 
   // --- A blank gradient is blank --------------------------------------------
   {
-    const b = blankGradientOf('radial');
-    check('a blank gradient has the kind asked for', b.type === 'radial');
+    const blank = blankGradientOf('radial');
+    check('a blank gradient has the kind asked for', blank.type === 'radial');
     check(
       'and no geometry at all',
-      !b.angle && !b.shape && !b.size && !b.from && !b.posX && !b.posY,
-      JSON.stringify(b),
+      !blank.angle && !blank.shape && !blank.size && !blank.from && !blank.posX && !blank.posY,
+      JSON.stringify(blank),
     );
-    check('and no colours', b.stops.length === 0);
-    check('and is not repeating', b.repeating === false);
+    check('and no colours', blank.stops.length === 0);
+    check('and is not repeating', blank.repeating === false);
   }
 
   // --- The editor must be able to read what it writes -----------------------
@@ -188,7 +192,7 @@ const check = (what, condition, detail) => {
     process.exit(1);
   }
   console.log(`gradient: ${checked} passed`);
-})().catch((err) => {
-  console.error(err);
+})().catch((error) => {
+  console.error(error);
   process.exit(1);
 });

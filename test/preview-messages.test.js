@@ -3,6 +3,11 @@
 // numeric, nested, discriminant, and collection fields at the boundary.
 const test = require('node:test');
 const assert = require('node:assert/strict');
+
+// A boundary can receive null — JSON, structured clone and postMessage all carry it —
+// so the negative space below includes it. It is read from JSON, because our own
+// code never writes a null.
+const PLATFORM_NULL = JSON.parse('null');
 const { parsePreviewMessage, parseShortcutMessage, describePreviewReload, PREVIEW_RELOAD_REASONS } =
   require('./renderer-module')('previewMessages.ts');
 
@@ -26,7 +31,7 @@ test('preview message parser preserves every supported message variant', () => {
     { type: 'avb:rendered-nodes', paths: ['0'] },
     { type: 'avb:node-states', hidden: ['0'], inert: [] },
     { type: 'avb:modifiers', shiftKey: true, altKey: false },
-    { type: 'avb:hover-node', path: null, occurrence: 0 },
+    { type: 'avb:hover-node', path: undefined, occurrence: 0 },
     { type: 'avb:click-node', path: '0', occurrence: 1, outside: false },
     { type: 'avb:open-node', path: '0', occurrence: 2 },
     { type: 'avb:canvas-ready' },
@@ -61,11 +66,32 @@ test('located events carry the rendering token they landed on (step 7)', () => {
   assert.equal(parsePreviewMessage({ ...click, token: TOKEN }).token, TOKEN);
   // Before the frame has digested its rendering, events carry none — absent to
   // the gate, which refuses them.
-  assert.equal(parsePreviewMessage({ ...click, token: null }).token, undefined);
+  assert.equal(parsePreviewMessage({ ...click, token: undefined }).token, undefined);
   assert.equal(parsePreviewMessage(click).token, undefined);
   assert.equal(
-    parsePreviewMessage({ type: 'avb:hover-node', path: null, occurrence: 0, token: TOKEN }).token,
+    parsePreviewMessage({
+      type: 'avb:hover-node',
+      path: undefined,
+      occurrence: 0,
+      token: TOKEN,
+    }).token,
     TOKEN,
+  );
+  // The protocol spells absence `undefined`, like the rest of the app; the
+  // retired `null` spelling is a malformed message, not an absent value.
+  assert.equal(parsePreviewMessage({ ...click, token: PLATFORM_NULL }), undefined);
+  assert.equal(
+    parsePreviewMessage({ type: 'avb:hover-node', path: PLATFORM_NULL, occurrence: 0 }),
+    undefined,
+  );
+  assert.equal(
+    parsePreviewMessage({
+      type: 'avb:rects',
+      rects: { 0: PLATFORM_NULL },
+      classes: {},
+      spacing: {},
+    }),
+    undefined,
   );
   assert.equal(
     parsePreviewMessage({ type: 'avb:open-node', path: '1', occurrence: 2, token: TOKEN }).token,
@@ -88,7 +114,7 @@ test('a reload names its reason; only the caps are announced to the user (step 7
 
 test('preview message parser ignores unknown and malformed project messages', () => {
   for (const value of [
-    null,
+    PLATFORM_NULL,
     { type: 'other' },
     { type: 'avb:rects', rects: { 0: [{ ...box, w: -1 }] }, classes: {}, spacing: {} },
     { type: 'avb:rects', rects: { 0: [{ ...box, x: Number.NaN }] }, classes: {}, spacing: {} },
@@ -132,7 +158,7 @@ test('forwarded shortcuts parse each variant and ignore every other or malformed
   );
   for (const input of [
     undefined,
-    null,
+    PLATFORM_NULL,
     'avb:shortcut',
     { type: 'avb:rects' },
     { type: 'avb:shortcut' },

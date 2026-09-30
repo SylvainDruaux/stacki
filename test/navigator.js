@@ -25,7 +25,7 @@ const check = (what, condition, detail) => {
 };
 const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
 
-const el = (id, name, children = []) => ({
+const elementNode = (id, name, children = []) => ({
   id,
   kind: 'element',
   name,
@@ -40,7 +40,7 @@ const AND = {
   kind: 'cond',
   op: '&&',
   test: 'command',
-  children: [branch('and-then', 'then', [el('hero-command', 'div')])],
+  children: [branch('and-then', 'then', [elementNode('hero-command', 'div')])],
 };
 // `{user ? (<a/>) : (<b/>)}`
 const TERNARY = {
@@ -49,8 +49,8 @@ const TERNARY = {
   op: '?',
   test: 'user',
   children: [
-    branch('t-then', 'then', [el('signed-in', 'a')]),
-    branch('t-else', 'else', [el('signed-out', 'b')]),
+    branch('t-then', 'then', [elementNode('signed-in', 'a')]),
+    branch('t-else', 'else', [elementNode('signed-out', 'b')]),
   ],
 };
 
@@ -62,21 +62,21 @@ const VALUE_ELSE = {
   op: '?',
   test: 'href',
   children: [
-    branch('v-then', 'then', [el('card-link', 'a')]),
+    branch('v-then', 'then', [elementNode('card-link', 'a')]),
     branch('v-else', 'else', [{ id: 'v-heading', kind: 'expr', value: '{heading}' }]),
   ],
 };
 // An element whose only child is the same kind of value: this one HAS a
 // Content field, so the tree leaves it to the panel.
-const WORDS = el('words', 'p', [{ id: 'w-text', kind: 'expr', value: '{heading}' }]);
+const WORDS = elementNode('words', 'p', [{ id: 'w-text', kind: 'expr', value: '{heading}' }]);
 
 (async () => {
   const esbuild = require('esbuild');
-  const buildDir = path.join(__dirname, '..', 'node_modules', '.stacki-test');
-  fs.mkdirSync(buildDir, { recursive: true });
+  const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
+  fs.mkdirSync(buildDirectory, { recursive: true });
 
   // --- the rule itself --------------------------------------------------------
-  const rulePath = path.join(buildDir, 'branches.bundle.js');
+  const rulePath = path.join(buildDirectory, 'branches.bundle.js');
   await esbuild.build({
     entryPoints: [path.join(__dirname, '..', 'src', 'branches.js')],
     outfile: rulePath,
@@ -97,34 +97,37 @@ const WORDS = el('words', 'p', [{ id: 'w-text', kind: 'expr', value: '{heading}'
   check(
     'a condition with an else shows its then inline',
     rowChildren(TERNARY)[0]?.id === 'signed-in',
-    JSON.stringify(rowChildren(TERNARY).map((n) => n.id)),
+    JSON.stringify(rowChildren(TERNARY).map((node) => node.id)),
   );
   check(
     'and the else after it, as a row of its own',
     rowChildren(TERNARY)[1]?.id === 't-else',
-    JSON.stringify(rowChildren(TERNARY).map((n) => n.id)),
+    JSON.stringify(rowChildren(TERNARY).map((node) => node.id)),
   );
   check('two rows, not three', rowChildren(TERNARY).length === 2, `${rowChildren(TERNARY).length}`);
   check(
     'the else keeps its own children',
     rowChildren(elseBranch(TERNARY))[0]?.id === 'signed-out',
   );
-  check('and there is none to draw without one', elseBranch(AND) === null);
+  check('and there is none to draw without one', elseBranch(AND) === undefined);
 
-  check('a plain element is only ever itself', rowHost(el('x', 'div')).id === 'x');
+  check('a plain element is only ever itself', rowHost(elementNode('x', 'div')).id === 'x');
   check(
     'a condition with nothing in it hides nothing',
-    thenBranch({ kind: 'cond', children: [] }) === null &&
+    thenBranch({ kind: 'cond', children: [] }) === undefined &&
       rowChildren({ kind: 'cond', children: [] }).length === 0,
   );
   check(
     'and one with only an else keeps that else',
-    rowChildren({ kind: 'cond', children: [branch('e', 'else', [el('x', 'i')])] })[0]?.id === 'e',
-    JSON.stringify(rowChildren({ kind: 'cond', children: [branch('e', 'else', [el('x', 'i')])] })),
+    rowChildren({ kind: 'cond', children: [branch('e', 'else', [elementNode('x', 'i')])] })[0]
+      ?.id === 'e',
+    JSON.stringify(
+      rowChildren({ kind: 'cond', children: [branch('e', 'else', [elementNode('x', 'i')])] }),
+    ),
   );
 
   // --- the rows ---------------------------------------------------------------
-  const bundlePath = path.join(buildDir, 'structure.bundle.js');
+  const bundlePath = path.join(buildDirectory, 'structure.bundle.js');
   await esbuild.build({
     entryPoints: [path.join(__dirname, '..', 'src', 'panels', 'StructurePanel.tsx')],
     outfile: bundlePath,
@@ -156,14 +159,14 @@ const WORDS = el('words', 'p', [{ id: 'w-text', kind: 'expr', value: '{heading}'
   const reactRoot = createRoot(container);
   const rows = () =>
     [...container.querySelectorAll('.structure-node')]
-      .filter((r) => !r.classList.contains('frontmatter-node'))
-      .map((r) => ({
-        label: r.querySelector('.label')?.textContent || '',
-        indent: parseInt(r.style.paddingLeft, 10) || 0,
-        node: r.getAttribute('data-node-id'),
+      .filter((row) => !row.classList.contains('frontmatter-node'))
+      .map((row) => ({
+        label: row.querySelector('.label')?.textContent || '',
+        indent: parseInt(row.style.paddingLeft, 10) || 0,
+        node: row.getAttribute('data-node-id'),
       }));
   const rowFor = (id) => container.querySelector(`.structure-node[data-node-id="${id}"]`);
-  const at = (id) => rows().find((r) => r.node === id);
+  const at = (id) => rows().find((row) => row.node === id);
 
   const selected = [];
   const dropped = [];
@@ -174,7 +177,7 @@ const WORDS = el('words', 'p', [{ id: 'w-text', kind: 'expr', value: '{heading}'
           pageState: { editable: true, model: { nodes, imports: [] } },
           layouts: [],
           currentLayoutName: '',
-          selectedId: null,
+          selectedId: undefined,
           onSelect: (id) => selected.push(id),
           onDropComponent: (name, target) => dropped.push({ name, ...target }),
           onMoveNode: () => {},
@@ -199,10 +202,10 @@ const WORDS = el('words', 'p', [{ id: 'w-text', kind: 'expr', value: '{heading}'
       await settle(20);
     });
 
-  await render([el('section', 'section', [AND, TERNARY, VALUE_ELSE, WORDS])]);
+  await render([elementNode('section', 'section', [AND, TERNARY, VALUE_ELSE, WORDS])]);
   await expandAll();
 
-  const labels = rows().map((r) => r.label);
+  const labels = rows().map((row) => row.label);
   check('the condition is a row', !!at('if-and'), labels.join(' | '));
   check('it says what it tests', at('if-and').label === 'if command', at('if-and').label);
   check('what is inside it is a row', !!at('hero-command'), labels.join(' | '));
@@ -230,7 +233,7 @@ const WORDS = el('words', 'p', [{ id: 'w-text', kind: 'expr', value: '{heading}'
   check('with its own markup under it', at('signed-out').indent - at('t-else').indent === 16);
   check(
     'and no row anywhere says "then"',
-    labels.filter((l) => l === 'then').length === 0,
+    labels.filter((label) => label === 'then').length === 0,
     labels.join(' | '),
   );
 
@@ -262,9 +265,9 @@ const WORDS = el('words', 'p', [{ id: 'w-text', kind: 'expr', value: '{heading}'
       effectAllowed: 'move',
     };
     const fire = (type) => {
-      const ev = new dom.window.Event(type, { bubbles: true, cancelable: true });
-      Object.defineProperty(ev, 'dataTransfer', { value: dataTransfer });
-      row.dispatchEvent(ev);
+      const event = new dom.window.Event(type, { bubbles: true, cancelable: true });
+      Object.defineProperty(event, 'dataTransfer', { value: dataTransfer });
+      row.dispatchEvent(event);
     };
     await act(async () => {
       fire('dragover');
@@ -290,7 +293,7 @@ const WORDS = el('words', 'p', [{ id: 'w-text', kind: 'expr', value: '{heading}'
           React.createElement(StructurePanel, {
             pageState: {
               editable: true,
-              model: { nodes: [el('section', 'section', [AND, TERNARY])], imports: [] },
+              model: { nodes: [elementNode('section', 'section', [AND, TERNARY])], imports: [] },
             },
             layouts: [],
             currentLayoutName: '',
@@ -378,25 +381,27 @@ const WORDS = el('words', 'p', [{ id: 'w-text', kind: 'expr', value: '{heading}'
     const rule = css.slice(css.indexOf('.node-note {'));
     const note = /color:\s*rgba\(([^)]+)\)/.exec(rule.slice(0, rule.indexOf('}')));
     check('the note is written as a colour with alpha', !!note, rule.slice(0, rule.indexOf('}')));
-    const [r, g, b, a] = (note?.[1] ?? '0,0,0,1').split(',').map((n) => parseFloat(n));
+    const [red, green, blue, alpha] = (note?.[1] ?? '0,0,0,1')
+      .split(',')
+      .map((part) => parseFloat(part));
 
-    const over = (fg, alpha, bg) => fg.map((f, i) => f * alpha + bg[i] * (1 - alpha));
-    const lum = (c) => {
-      const [rl, gl, bl] = c.map((v) => {
-        const n = v / 255;
-        return n <= 0.03928 ? n / 12.92 : ((n + 0.055) / 1.055) ** 2.4;
+    const over = (fg, alpha, bg) => fg.map((channel, i) => channel * alpha + bg[i] * (1 - alpha));
+    const lum = (color) => {
+      const [rl, gl, bl] = color.map((channel) => {
+        const normalized = channel / 255;
+        return normalized <= 0.03928 ? normalized / 12.92 : ((normalized + 0.055) / 1.055) ** 2.4;
       });
       return 0.2126 * rl + 0.7152 * gl + 0.0722 * bl;
     };
     const ratio = (x, y) => {
-      const [hi, lo] = [lum(x), lum(y)].sort((p, q) => q - p);
+      const [hi, lo] = [lum(x), lum(y)].sort((left, right) => right - left);
       return (hi + 0.05) / (lo + 0.05);
     };
     // The two rows a note can sit on: the panel, and a selected component row
     // (--component-green-soft over --bg).
     const panel = [25, 25, 25];
     const greenRow = over([121, 224, 156], 0.16, panel);
-    const on = (bg) => ratio(over([r, g, b], a, bg), bg);
+    const on = (bg) => ratio(over([red, green, blue], alpha, bg), bg);
 
     check('it reads on the panel', on(panel) > 4, on(panel).toFixed(2));
     check('and on a green component row', on(greenRow) > 3.5, on(greenRow).toFixed(2));
@@ -441,7 +446,7 @@ const WORDS = el('words', 'p', [{ id: 'w-text', kind: 'expr', value: '{heading}'
           },
           layouts: [],
           currentLayoutName: '',
-          selectedId: null,
+          selectedId: undefined,
           onSelect: () => {},
           onDropComponent: () => {},
           onMoveNode: () => {},

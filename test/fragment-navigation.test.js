@@ -7,6 +7,7 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const { LIMITS } = require('../dist/shared/limits.js');
 const fs = require('node:fs');
 const path = require('node:path');
 const esbuild = require('esbuild');
@@ -32,7 +33,10 @@ const { render = true, class: className } = Astro.props;
 )}
 `;
 
-const flatten = (nodes) => nodes.flatMap((node) => [node, ...flatten(node.children || [])]);
+const flatten = (nodes, depth = 0) => {
+  assert.ok(depth <= LIMITS.treeDepthMax, 'flatten: tree depth limit');
+  return nodes.flatMap((node) => [node, ...flatten(node.children || [], depth + 1)]);
+};
 async function checkFragment(syntax) {
   const input =
     syntax === 'shorthand'
@@ -64,14 +68,14 @@ async function checkFragment(syntax) {
     false,
   );
 
-  const buildDir = path.join(
+  const buildDirectory = path.join(
     __dirname,
     '..',
     'node_modules',
     '.stacki-test',
     'fragment-navigation',
   );
-  fs.mkdirSync(buildDir, { recursive: true });
+  fs.mkdirSync(buildDirectory, { recursive: true });
   await esbuild.build({
     stdin: {
       contents:
@@ -81,7 +85,7 @@ async function checkFragment(syntax) {
       loader: 'jsx',
       resolveDir: path.join(__dirname, '..'),
     },
-    outfile: path.join(buildDir, 'navigator.js'),
+    outfile: path.join(buildDirectory, 'navigator.js'),
     bundle: true,
     format: 'cjs',
     platform: 'node',
@@ -99,7 +103,7 @@ async function checkFragment(syntax) {
   for (const name of ['document', 'navigator', 'Element', 'HTMLElement', 'Node']) {
     global[name] = dom.window[name];
   }
-  global.requestAnimationFrame = (fn) => setTimeout(fn, 0);
+  global.requestAnimationFrame = (callback) => setTimeout(callback, 0);
   global.cancelAnimationFrame = clearTimeout;
   global.ResizeObserver = class {
     observe() {}
@@ -112,7 +116,7 @@ async function checkFragment(syntax) {
   const { act } = React;
   const { createRoot } = require('react-dom/client');
   const { StructurePanel, liveClassesById, createTreeIndex } = require(
-    path.join(buildDir, 'navigator.js'),
+    path.join(buildDirectory, 'navigator.js'),
   );
   const tree = createTreeIndex(parsed.model.nodes);
   const live = liveClassesById(
@@ -130,7 +134,7 @@ async function checkFragment(syntax) {
   const selections = [];
   const opened = [];
   function Harness() {
-    const [selectedId, setSelectedId] = React.useState(null);
+    const [selectedId, setSelectedId] = React.useState(undefined);
     return React.createElement(StructurePanel, {
       pageState: parsed,
       currentPage: { kind: 'component', name: 'SermonSearch.astro' },
@@ -217,7 +221,7 @@ async function checkFragment(syntax) {
     await arrow('ArrowUp');
     assert.equal(selections.at(-1), fragment.id);
     await click(row(fragment).querySelector('.drag-handle'));
-    assert.equal(row(textarea), null, 'Fragment can collapse its subtree');
+    assert.ok(row(textarea) === null, 'Fragment can collapse its subtree');
     await arrow('ArrowDown');
     assert.equal(
       selections.at(-1),

@@ -27,8 +27,9 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const { parsePage, serializePage } = require('../dist/electron/astroParser.js');
+const { LIMITS } = require('../dist/shared/limits.js');
 
-const CORPUS_DIR = path.join(__dirname, 'corpus');
+const CORPUS_DIRECTORY = path.join(__dirname, 'corpus');
 const expectations = JSON.parse(fs.readFileSync(path.join(__dirname, 'expectations.json'), 'utf8'));
 
 const DEFAULT_EXPECTATION = { editable: true, identity: 'pass' };
@@ -38,12 +39,12 @@ function expectationFor(name) {
 }
 
 const fixtures = fs
-  .readdirSync(CORPUS_DIR)
-  .filter((f) => f.endsWith('.astro'))
+  .readdirSync(CORPUS_DIRECTORY)
+  .filter((file) => file.endsWith('.astro'))
   .sort()
   .map((name) => ({
     name,
-    source: fs.readFileSync(path.join(CORPUS_DIR, name), 'utf8'),
+    source: fs.readFileSync(path.join(CORPUS_DIRECTORY, name), 'utf8'),
     expect: expectationFor(name),
   }));
 
@@ -55,43 +56,52 @@ const fixtures = fs
 // they share at the top and the bottom. This is the whole diff, expressed
 // without needing a diff algorithm: if `before` and `after` are one line each,
 // the change was local.
-function changedRegion(aText, bText) {
-  const a = aText.split('\n');
-  const b = bText.split('\n');
+function changedRegion(beforeText, afterText) {
+  const beforeLines = beforeText.split('\n');
+  const afterLines = afterText.split('\n');
   let start = 0;
-  while (start < a.length && start < b.length && a[start] === b[start]) {
+  while (
+    start < beforeLines.length &&
+    start < afterLines.length &&
+    beforeLines[start] === afterLines[start]
+  ) {
     start++;
   }
   let end = 0;
   while (
-    end < a.length - start &&
-    end < b.length - start &&
-    a[a.length - 1 - end] === b[b.length - 1 - end]
+    end < beforeLines.length - start &&
+    end < afterLines.length - start &&
+    beforeLines[beforeLines.length - 1 - end] === afterLines[afterLines.length - 1 - end]
   ) {
     end++;
   }
-  return { start, before: a.slice(start, a.length - end), after: b.slice(start, b.length - end) };
+  return {
+    start,
+    before: beforeLines.slice(start, beforeLines.length - end),
+    after: afterLines.slice(start, afterLines.length - end),
+  };
 }
 
 function formatRegion(region) {
   const show = (lines) =>
-    lines.length ? lines.map((l) => JSON.stringify(l)).join('\n      ') : '(nothing)';
+    lines.length ? lines.map((line) => JSON.stringify(line)).join('\n      ') : '(nothing)';
   return `at line ${region.start + 1}\n    - ${show(region.before)}\n    + ${show(region.after)}`;
 }
 
 // First element node in document order — the node a locality test can safely
 // hang an extra attribute off.
-function firstElement(nodes) {
-  for (const n of nodes || []) {
-    if (n.kind === 'element') {
-      return n;
+function firstElement(nodes, depth = 0) {
+  assert.ok(depth <= LIMITS.treeDepthMax, 'firstElement: depth limit');
+  for (const node of nodes || []) {
+    if (node.kind === 'element') {
+      return node;
     }
-    const nested = firstElement(n.children);
+    const nested = firstElement(node.children, depth + 1);
     if (nested) {
       return nested;
     }
   }
-  return null;
+  return undefined;
 }
 
 // ---------------------------------------------------------------------------
@@ -314,19 +324,23 @@ describe('external corpus sweep', () => {
     { skip: !root && 'set STACKI_CORPUS to run' },
     () => {
       const files = [];
-      const skipDirs = new Set(['node_modules', '.git', 'dist', '.astro', 'release']);
-      const walk = (dir) => {
-        for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const skipDirectories = new Set(['node_modules', '.git', 'dist', '.astro', 'release']);
+      // A corpus is a project tree: folders nest a handful deep, and a walk past
+      // this has met a cycle or a generated tree.
+      const WALK_LIMITS = { directoryDepthMax: 32 };
+      const walk = (directory, depth) => {
+        assert.ok(depth <= WALK_LIMITS.directoryDepthMax, 'walk: depth limit');
+        for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
           if (entry.isDirectory()) {
-            if (!skipDirs.has(entry.name)) {
-              walk(path.join(dir, entry.name));
+            if (!skipDirectories.has(entry.name)) {
+              walk(path.join(directory, entry.name), depth + 1);
             }
           } else if (entry.name.endsWith('.astro')) {
-            files.push(path.join(dir, entry.name));
+            files.push(path.join(directory, entry.name));
           }
         }
       };
-      walk(root);
+      walk(root, 0);
 
       const stats = { total: files.length, identical: 0, differs: 0, notEditable: 0 };
       const crashes = [];
@@ -344,8 +358,8 @@ describe('external corpus sweep', () => {
           } else {
             stats.differs++;
           }
-        } catch (err) {
-          crashes.push(`${file}: ${err.message}`);
+        } catch (error) {
+          crashes.push(`${file}: ${error.message}`);
         }
       }
 

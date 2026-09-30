@@ -6,8 +6,8 @@
 // works while every item is a value a row can SHOW — a word or a number.
 // `[...defaults, other]`, `[{ value, label }]`, a name standing for a list
 // somewhere else: those are programs, and a row that pretended otherwise would
-// lose what it could not draw. So the reader answers with items or with null,
-// and null is the field's cue to stay in the code editor.
+// lose what it could not draw. So the reader answers with items or with undefined,
+// and undefined is the field's cue to stay in the code editor.
 //
 // The writer's job is smaller and just as easy to get wrong: put back what the
 // file had. A project that writes single quotes should not find double ones the
@@ -28,9 +28,9 @@ const check = (what, condition, detail) => {
 
 (async () => {
   const esbuild = require('esbuild');
-  const buildDir = path.join(__dirname, '..', 'node_modules', '.stacki-test');
-  fs.mkdirSync(buildDir, { recursive: true });
-  const out = path.join(buildDir, 'array-value.bundle.mjs');
+  const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
+  fs.mkdirSync(buildDirectory, { recursive: true });
+  const out = path.join(buildDirectory, 'array-value.bundle.mjs');
   await esbuild.build({
     entryPoints: [path.join(__dirname, '..', 'src', 'arrayValue.js')],
     outfile: out,
@@ -43,7 +43,7 @@ const check = (what, condition, detail) => {
     `${pathToFileURL(out).href}?v=${Date.now()}`
   );
 
-  const texts = (src) => (arrayItems(src) || []).map((i) => i.text);
+  const texts = (source) => (arrayItems(source) || []).map((i) => i.text);
 
   // --- what a list can show ------------------------------------------------------
   check('a list of words', texts('["Designer", "Developer"]').join() === 'Designer,Developer');
@@ -65,8 +65,8 @@ const check = (what, condition, detail) => {
   check('a backtick with nothing in it is a word', texts('[`a`, `b`]').join() === 'a,b');
 
   // --- and what it cannot ----------------------------------------------------------
-  const refuses = (src, why) =>
-    check(`refuses ${why}`, arrayItems(src) === null, JSON.stringify(arrayItems(src)));
+  const refuses = (source, why) =>
+    check(`refuses ${why}`, arrayItems(source) === undefined, JSON.stringify(arrayItems(source)));
   refuses('jobs', 'a name standing for a list');
   refuses('[...defaults, "other"]', 'a spread');
   refuses('[{ value, label }]', 'an object that names things instead of saying them');
@@ -92,7 +92,8 @@ const check = (what, condition, detail) => {
     check('an object per item is a list of rows', items?.length === 2, JSON.stringify(items));
     check(
       'with its fields, in the order they were written',
-      items?.[0].fields.map((f) => `${f.key}=${f.text}`).join() === 'value=us,label=United States',
+      items?.[0].fields.map((field) => `${field.key}=${field.text}`).join() ===
+        'value=us,label=United States',
       JSON.stringify(items?.[0]),
     );
     check(
@@ -116,7 +117,7 @@ const check = (what, condition, detail) => {
     );
     check(
       'and a number value stays a number',
-      items[0].fields[0].quote === null,
+      items[0].fields[0].quote === undefined,
       JSON.stringify(items[0]),
     );
   }
@@ -133,12 +134,12 @@ const check = (what, condition, detail) => {
     const shaped = blankLike(arrayItems('[{ value: "us", label: "United States" }]'));
     check(
       'a new item takes the shape of the list',
-      shaped.fields?.map((f) => f.key).join() === 'value,label',
+      shaped.fields?.map((field) => field.key).join() === 'value,label',
       JSON.stringify(shaped),
     );
     check(
       'with nothing in it yet',
-      shaped.fields.every((f) => f.text === ''),
+      shaped.fields.every((field) => field.text === ''),
       JSON.stringify(shaped),
     );
     check(

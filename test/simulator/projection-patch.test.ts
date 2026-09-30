@@ -296,7 +296,7 @@ test('the UTF-16 bound is kept from the projection count, on both sides of it', 
 // rule. Bounded: PROPERTY_PAGES pages, PROPERTY_EDITS edits per value site.
 const PROPERTY_PAGES = 1500;
 const PROPERTY_EDITS = 3;
-const PROPERTY_DEPTH_MAX = 2;
+const PROPERTY_LIMITS = { depthMax: 2 } as const;
 const TEXTS = [
   'plain words',
   "it's",
@@ -336,7 +336,7 @@ function propertyBody(prng: Prng, depth: number): string {
   const host = `<a title="${value()}" data-x="${value()}">${text()}</a>`;
   const [before, after] = prng.pick(AROUND);
   const element = `<p>${text()} ${before} ${host} ${after} ${text()}</p>`;
-  if (depth >= PROPERTY_DEPTH_MAX) {
+  if (depth >= PROPERTY_LIMITS.depthMax) {
     return element;
   }
   const inner = (): string => propertyBody(prng, depth + 1);

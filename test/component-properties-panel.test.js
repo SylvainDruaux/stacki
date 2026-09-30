@@ -91,7 +91,7 @@ test('component properties lifecycle and controls', async () => {
       );
     });
   await renderRail(false);
-  assert.equal(document.querySelector('[aria-label="Properties (K)"]'), null);
+  assert.ok(document.querySelector('[aria-label="Properties (K)"]') === null);
   await key('k');
   assert.deepEqual(clicked, []);
   await renderRail(true);
@@ -340,7 +340,7 @@ test('component properties lifecycle and controls', async () => {
   };
   await notify();
   assert.match(document.querySelector('.property-list').textContent, /heading/);
-  assert.equal(document.querySelector('.property-editor'), null);
+  assert.ok(document.querySelector('.property-editor') === null);
   assert.equal(order.filter((item) => item === 'flush').length, flushCount);
   // The newer response wins even when an older request finishes last.
   const responses = [];
@@ -407,7 +407,7 @@ test('component properties lifecycle and controls', async () => {
       .click(),
   );
   assert.match(document.querySelector('.property-list').textContent, /reconciled/);
-  assert.equal(document.querySelector('.property-editor'), null);
+  assert.ok(document.querySelector('.property-editor') === null);
 
   // Exercise the actual inherited-contract reader and writer through the controls.
   const {
@@ -434,7 +434,7 @@ const { gap = 'small', other = 'large', ...rest } = Astro.props;
   };
   await notify();
   await act(async () => document.querySelector('.property-row-main').click());
-  assert.equal(document.querySelector('[aria-label="Component TypeScript source"]'), null);
+  assert.ok(document.querySelector('[aria-label="Component TypeScript source"]') === null);
   assert.equal(optionValues()[0], 'small');
   const setValue = async (element, value) =>
     act(async () => {
@@ -447,7 +447,7 @@ const { gap = 'small', other = 'large', ...rest } = Astro.props;
     });
   const pressDown = async (element) =>
     act(async () => element.dispatchEvent(new window.MouseEvent('mousedown', { bubbles: true })));
-  assert.equal(document.querySelector('.property-options input'), null);
+  assert.ok(document.querySelector('.property-options input') === null);
   await act(async () => document.querySelector('.property-options .list-field-text').click());
   const firstOption = document.querySelector('.list-item-field input');
   assert.equal(document.activeElement, firstOption);
@@ -458,7 +458,7 @@ const { gap = 'small', other = 'large', ...rest } = Astro.props;
   await setValue(firstOption, 'compact');
   await act(async () => document.querySelector('.list-item-editor [title="Close"]').click());
   const defaultLabel = () => document.querySelector('.property-default .dd-label').textContent;
-  assert.equal(document.querySelector('.property-default select'), null);
+  assert.ok(document.querySelector('.property-default select') === null);
   assert.equal(defaultLabel(), 'compact');
   await act(async () => document.querySelector('.property-default .dd-trigger').click());
   await setValue(document.querySelector('.dd-search'), 'medium');
@@ -524,7 +524,7 @@ const { gap = 'small', other = 'large', ...rest } = Astro.props;
   await act(async () => document.querySelector('.property-type .dd-trigger').click());
   await setValue(document.querySelector('.dd-search'), 'boolean');
   await act(async () => document.querySelector('.dd-option').click());
-  assert.equal(document.querySelector('.property-options .list-field'), null);
+  assert.ok(document.querySelector('.property-options .list-field') === null);
   await toggleType('Write a type expression');
   assert.equal(document.querySelector('input[aria-label="Type expression"]').value, 'boolean');
   await setValue(
@@ -573,7 +573,7 @@ const { tag = 'h2', variant = tag } = Astro.props;
   );
   const defaultChip = document.querySelector('.property-default .cm-chip');
   assert.equal(defaultChip.textContent, 'tag');
-  assert.equal(document.querySelector('.property-default textarea'), null);
+  assert.ok(document.querySelector('.property-default textarea') === null);
   await pressDown(defaultChip);
   assert.equal(document.querySelector('.bind-menu .dp-row.selected .dp-key').textContent, 'tag');
   await act(async () =>
@@ -629,7 +629,7 @@ const { tag = 'h2', variant = tag } = Astro.props;
   await setValue(document.querySelector('.list-item-field input'), added);
   await key('Enter', {}, document.querySelector('.list-item-field input'));
   assert.equal(optionValues().at(-1), added);
-  assert.equal(document.querySelector('.list-item-editor'), null);
+  assert.ok(document.querySelector('.list-item-editor') === null);
   await act(async () =>
     [...document.querySelectorAll('.property-options .list-field-remove')].at(-1).click(),
   );
@@ -638,7 +638,7 @@ const { tag = 'h2', variant = tag } = Astro.props;
   await setValue(document.querySelector('.list-item-field input'), 'false');
   await key('Escape', {}, document.querySelector('.list-item-field input'));
   assert.equal(defaultLabel(), 'false');
-  assert.equal(document.querySelector('.list-item-editor'), null);
+  assert.ok(document.querySelector('.list-item-editor') === null);
   // Settings use the shared dismissal behavior for app chrome and canvas clicks.
   // Nested option popovers and dropdowns above remain inside the settings editor.
   const editsBeforeDismiss = edits.length;
@@ -675,19 +675,19 @@ const { tag = 'h2', variant = tag } = Astro.props;
   await notify();
   await act(async () => document.querySelector('.property-row-main').click());
   assert.match(document.body.textContent, /Property settings/);
-  assert.equal(document.querySelector('[aria-label="Component TypeScript source"]'), null);
+  assert.ok(document.querySelector('[aria-label="Component TypeScript source"]') === null);
   assert.equal(document.querySelector('.property-readonly-fields textarea').readOnly, true);
-  assert.equal(document.querySelector('.property-source-tag'), null);
+  assert.ok(document.querySelector('.property-source-tag') === null);
   assert.match(document.querySelector('.property-declaration-info').title, /Tag\./);
   assert.match(document.querySelector('.property-declaration-info').title, /line 3/);
   assert.equal(document.querySelector('[aria-label="Close property settings"]').disabled, false);
   await pressDown(document.querySelector('.property-declaration-info'));
   assert.ok(document.querySelector('.property-editor'));
   await act(async () => document.querySelector('[aria-label="Close property settings"]').click());
-  assert.equal(document.querySelector('.property-editor'), null);
+  assert.ok(document.querySelector('.property-editor') === null);
   await act(async () => document.querySelector('.property-row-main').click());
   await pressDown(document.querySelector('.property-component'));
-  assert.equal(document.querySelector('.property-editor'), null);
+  assert.ok(document.querySelector('.property-editor') === null);
   assert.equal(edits.length, editsBeforeDismiss);
   // Common fields in a combined contract use normal editing; only affected props are restricted.
   data = {
@@ -716,14 +716,14 @@ const { tag = 'h2', variant = tag } = Astro.props;
   assert.equal(document.querySelector('[aria-label="Delete image"]').disabled, true);
   await act(async () => document.querySelector('.property-row-main').click());
   assert.equal(document.querySelector('.property-editor fieldset').disabled, false);
-  assert.equal(document.querySelector('.property-readonly-fields'), null);
+  assert.ok(document.querySelector('.property-readonly-fields') === null);
   assert.equal(document.querySelector('.property-editor label input').value, 'eyebrow');
   assert.doesNotMatch(document.body.textContent, /This view is read-only/);
   await act(async () => document.querySelector('[aria-label="Close property settings"]').click());
   await act(async () => document.querySelectorAll('.property-row-main')[1].click());
   assert.match(document.querySelector('.property-conditions').textContent, /default.*not allowed/);
   assert.match(document.querySelector('.property-readonly-fields').textContent, /variant rules/);
-  assert.equal(document.querySelector('.property-editor fieldset'), null);
+  assert.ok(document.querySelector('.property-editor fieldset') === null);
   // Inherited Astro attributes can be overridden locally without exposing a
   // rename or delete that would leave the inherited contract in place.
   data = {
@@ -745,14 +745,14 @@ const { tag = 'h2', variant = tag } = Astro.props;
   assert.equal(document.querySelector('[aria-label="Delete class"]').disabled, true);
   await act(async () => document.querySelector('.property-row-main').click());
   assert.equal(document.querySelector('.property-editor fieldset').disabled, false);
-  assert.equal(document.querySelector('.property-readonly-fields'), null);
+  assert.ok(document.querySelector('.property-readonly-fields') === null);
   assert.equal(document.querySelector('.property-editor label input').disabled, true);
   assert.equal(
     document.querySelector('textarea[placeholder="Describe how to use this property…"]').readOnly,
     false,
   );
   assert.match(document.querySelector('.property-editor').textContent, /declared locally/);
-  assert.equal(document.querySelector('.property-actions .danger'), null);
+  assert.ok(document.querySelector('.property-actions .danger') === null);
   await act(async () => document.querySelector('[aria-label="Close property settings"]').click());
   let completeRead;
   readProperties = () =>

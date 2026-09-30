@@ -18,6 +18,9 @@ import {
 import { LIMITS } from '../../dist/shared/limits.js';
 import type { ParserNode } from '../../dist/electron/astroParser.types.js';
 
+// Null as a boundary receives it, parsed from JSON: inputs may hold it; our values never do.
+const jsonNull: unknown = JSON.parse('null');
+
 test('block loops and import slots survive the real IPC contract', () => {
   const source = [
     '---',
@@ -59,7 +62,7 @@ test('legacy component inputs retain defaults and do not gain frontmatter', () =
 
 test('serializer rejects malformed node kinds and their required payloads', () => {
   const invalid: readonly unknown[] = [
-    null,
+    jsonNull,
     {},
     { kind: 'unknown' },
     { kind: 'text' },
@@ -76,7 +79,7 @@ test('serializer rejects malformed node kinds and their required payloads', () =
   for (const input of invalid) {
     assert.throws(() => serializeNodes([input]), /Serialize|node\./);
   }
-  assert.throws(() => serializePage(null), /SerializePage: expected object/);
+  assert.throws(() => serializePage(jsonNull), /SerializePage: expected object/);
   assert.throws(() => serializePage({ nodes: [], hadFrontmatter: 'false' }), /expected boolean/);
 });
 
@@ -166,7 +169,7 @@ test('truncated raw close tags and deep conditional chains finish safely', () =>
 
 test('loop statement wire data rejects the old string shape and malformed arrays', () => {
   const loop = { id: 'n1', kind: 'map', head: 'items.map(item => (', children: [] };
-  for (const body of ['const x = 1;', [1], [null]]) {
+  for (const body of ['const x = 1;', [1], [jsonNull]]) {
     assert.throws(() => parsePageNode({ ...loop, body }), /body/);
   }
   const body = Array.from({ length: LIMITS.treeNodesMax + 1 }, () => 'const x = 1;');

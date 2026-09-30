@@ -79,7 +79,7 @@ test('all optional editors load without hiding the app or replacing its preview'
   try {
     await act(() =>
       root.render(
-        React.createElement(React.Suspense, { fallback: null }, React.createElement(App)),
+        React.createElement(React.Suspense, { fallback: undefined }, React.createElement(App)),
       ),
     );
     await act(() => __lazyPanels.WelcomeScreen.onOpen('/project'));
@@ -154,9 +154,8 @@ async function checkCodePanel(context) {
   await context.act(() => new Promise((resolve) => setTimeout(resolve, 200)));
   assert.equal(context.bridge.codeSaves, 1, 'typed code is saved as a patch (step 8)');
   assert.equal(context.bridge.disk(), changed, 'the patch leaves exactly the typed text');
-  assert.equal(
-    document.querySelector('.property-saving-overlay'),
-    null,
+  assert.ok(
+    document.querySelector('.property-saving-overlay') === null,
     'visual edits are enabled',
   );
   await context.act(() => new Promise((resolve) => setTimeout(resolve, 200)));
@@ -200,7 +199,7 @@ async function checkCodeWindow(context) {
 
 function assertPending(context, name) {
   assert.ok(context.gates.requested.has(name), `${name} requested its first chunk`);
-  assert.equal(document.querySelector(`[data-test-panel="${name}"]`), null);
+  assert.ok(document.querySelector(`[data-test-panel="${name}"]`) === null);
   context.stable();
 }
 
@@ -361,7 +360,7 @@ function createBridge() {
   const bridge = {
     disk: () => disk,
     codeSaves: 0,
-    pendingProject: async () => null,
+    pendingProject: async () => undefined,
     scanProject: async () => ({
       pages: [page],
       pageFolders: [],
@@ -398,7 +397,7 @@ function createBridge() {
       if (name in target) {
         return target[name];
       }
-      return String(name).startsWith('on') ? () => () => {} : async () => null;
+      return String(name).startsWith('on') ? () => () => {} : async () => undefined;
     },
   });
 }

@@ -30,11 +30,11 @@ const check = (what, condition, detail) => {
 
 (async () => {
   const esbuild = require('esbuild');
-  const buildDir = path.join(__dirname, '..', 'node_modules', '.stacki-test');
-  fs.mkdirSync(buildDir, { recursive: true });
+  const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
+  fs.mkdirSync(buildDirectory, { recursive: true });
 
   const bundle = async (rel, name) => {
-    const out = path.join(buildDir, name);
+    const out = path.join(buildDirectory, name);
     await esbuild.build({
       entryPoints: [path.join(__dirname, '..', rel)],
       bundle: true,
@@ -50,7 +50,7 @@ const check = (what, condition, detail) => {
 
   // ── values ↔ parts ────────────────────────────────────────────────────────
   const J = JSON.stringify;
-  const round = (parts, opts) => partsFromValue(valueFromParts(parts, opts));
+  const round = (parts, options) => partsFromValue(valueFromParts(parts, options));
 
   check(
     'a bare path reads as one chip',
@@ -93,13 +93,16 @@ const check = (what, condition, detail) => {
   // section below.)
   check(
     'a call has no parts',
-    partsFromValue({ type: 'expr', value: 'items.filter(Boolean)' }) === null,
+    partsFromValue({ type: 'expr', value: 'items.filter(Boolean)' }) === undefined,
   );
   check(
     'a computed hole makes the whole thing code',
-    partsFromValue({ type: 'expr', value: '`a ${x + 1}`' }) === null,
+    partsFromValue({ type: 'expr', value: '`a ${x + 1}`' }) === undefined,
   );
-  check('an unclosed hole is code', partsFromValue({ type: 'expr', value: '`a ${x`' }) === null);
+  check(
+    'an unclosed hole is code',
+    partsFromValue({ type: 'expr', value: '`a ${x`' }) === undefined,
+  );
 
   check(
     'one binding stays one expression',
@@ -138,7 +141,7 @@ const check = (what, condition, detail) => {
     'src/bindings.js',
     'bindings2.bundle.mjs',
   );
-  const expr = (v) => ({ type: 'expr', value: v });
+  const expr = (value) => ({ type: 'expr', value: value });
 
   check(
     'a fallback splits into its two paths',
@@ -158,10 +161,10 @@ const check = (what, condition, detail) => {
     'a name inside a string stays a string',
     J(partsFromValue(expr('x.y ?? "none"'))) === J([{ expr: 'x.y' }, { text: ' ?? "none"' }]),
   );
-  check('a call is still code', partsFromValue(expr('items.filter(Boolean)')) === null);
-  check('an arrow is still code', partsFromValue(expr('items.map(i => i.on)')) === null);
-  check('an object literal is still code', codeParts('{ a: b }') === null);
-  check('an expression with no data in it is not worth chipping', codeParts('1 + 2') === null);
+  check('a call is still code', partsFromValue(expr('items.filter(Boolean)')) === undefined);
+  check('an arrow is still code', partsFromValue(expr('items.map(i => i.on)')) === undefined);
+  check('an object literal is still code', codeParts('{ a: b }') === undefined);
+  check('an expression with no data in it is not worth chipping', codeParts('1 + 2') === undefined);
   check(
     'keywords are not data',
     J(partsFromValue(expr('a.b ?? null'))) === J([{ expr: 'a.b' }, { text: ' ?? null' }]),
@@ -170,7 +173,10 @@ const check = (what, condition, detail) => {
   // Code that stays code still has data in it, and the data is still drawn as
   // chips — inside the editor, over the text, so the program reads as written.
   const style = 'maxWidth ? `--_mw: ${maxWidth}ch;` : undefined';
-  check('an expression like this one keeps the code editor', partsFromValue(expr(style)) === null);
+  check(
+    'an expression like this one keeps the code editor',
+    partsFromValue(expr(style)) === undefined,
+  );
   check(
     'and its hole is found where it sits',
     J(templateHoles(style)) === J([{ from: 19, to: 30, path: 'maxWidth' }]),
@@ -222,20 +228,29 @@ const check = (what, condition, detail) => {
   global.document = dom.window.document;
   const host = document.getElementById('host');
 
-  const chip = (p) =>
-    `<span class="expr-chip" contenteditable="false" data-expr="${p}">${p}</span>`;
+  const chip = (expression) =>
+    `<span class="expr-chip" contenteditable="false" data-expr="${expression}">` +
+    `${expression}</span>`;
   const caret = (node, offset) => {
-    const r = document.createRange();
-    r.setStart(node, offset);
-    r.collapse(true);
-    const s = window.getSelection();
-    s.removeAllRanges();
-    s.addRange(r);
+    const range = document.createRange();
+    range.setStart(node, offset);
+    range.collapse(true);
+    const selection = window.getSelection();
+    selection.removeAllRanges();
+    selection.addRange(range);
   };
-  const key = (k, mods) => ({ key: k, metaKey: false, ctrlKey: false, altKey: false, ...mods });
+  const key = (keyName, mods) => ({
+    key: keyName,
+    metaKey: false,
+    ctrlKey: false,
+    altKey: false,
+    ...mods,
+  });
   const shown = () =>
     [...host.childNodes]
-      .map((n) => (n.nodeType === 3 ? J(n.nodeValue) : `[${n.getAttribute('data-expr')}]`))
+      .map((node) =>
+        node.nodeType === 3 ? J(node.nodeValue) : `[${node.getAttribute('data-expr')}]`,
+      )
       .join(' ');
 
   // The case that made this necessary: chips with no text around them, caret
@@ -325,8 +340,8 @@ const check = (what, condition, detail) => {
   );
   check(
     'names already bound are known',
-    ['posts', 'x', 'Layout'].every((n) =>
-      namesInScope('const posts = 1;\nconst { x } = y;', [{ name: 'Layout' }]).has(n),
+    ['posts', 'x', 'Layout'].every((name) =>
+      namesInScope('const posts = 1;\nconst { x } = y;', [{ name: 'Layout' }]).has(name),
     ),
   );
 
@@ -348,7 +363,7 @@ const check = (what, condition, detail) => {
     dataTree({
       frontmatter: 'const posts = await getCollection("blog");',
       collections: [{ name: 'blog', count: 7 }],
-    }).every((n) => n.section !== 'collections'),
+    }).every((node) => node.section !== 'collections'),
   );
 
   // One entry OF a list is one of whatever the list holds. The picker knew
@@ -366,7 +381,7 @@ const check = (what, condition, detail) => {
       dataTree({
         frontmatter: `const portfolio = await getCollection("portfolio");\n${decl}`,
         collectionSamples: { portfolio: entry },
-      }).find((n) => n.path === 'featured');
+      }).find((node) => node.path === 'featured');
 
     const found = picked(
       'const featured = portfolio.find((p) => p.data.featured) ?? portfolio[0];',
@@ -374,19 +389,22 @@ const check = (what, condition, detail) => {
     check('an entry picked out of a list opens', !!found?.children, J(found));
     check(
       'onto the fields of one entry',
-      (found?.children || []).map((c) => c.key).join(',') === 'id,collection,data',
-      J((found?.children || []).map((c) => c.key)),
+      (found?.children || []).map((child) => child.key).join(',') === 'id,collection,data',
+      J((found?.children || []).map((child) => child.key)),
     );
     check(
       'with paths that name it, not the list it came from',
-      (found?.children || []).every((c) => c.path.startsWith('featured.')),
-      J((found?.children || []).map((c) => c.path)),
+      (found?.children || []).every((child) => child.path.startsWith('featured.')),
+      J((found?.children || []).map((child) => child.path)),
     );
     check(
       'and its fields go as deep as the entry does',
-      J((found?.children?.find((c) => c.key === 'data')?.children || []).map((c) => c.path)) ===
-        J(['featured.data.title', 'featured.data.order']),
-      J(found?.children?.find((c) => c.key === 'data')?.children),
+      J(
+        (found?.children?.find((child) => child.key === 'data')?.children || []).map(
+          (child) => child.path,
+        ),
+      ) === J(['featured.data.title', 'featured.data.order']),
+      J(found?.children?.find((child) => child.key === 'data')?.children),
     );
     check(
       'it reads as one of them, not all of them',
@@ -402,7 +420,7 @@ const check = (what, condition, detail) => {
           'const portfolio = await getCollection("portfolio");\n' +
           'const some = portfolio.filter(Boolean);',
         collectionSamples: { portfolio: entry },
-      }).find((n) => n.path === 'some')?.kind === 'list',
+      }).find((node) => node.path === 'some')?.kind === 'list',
     );
     check(
       'a value that picks from nothing known stays a plain value',
@@ -417,8 +435,8 @@ const check = (what, condition, detail) => {
   });
   check(
     "the loop item comes before this file's props",
-    inLoop.map((n) => n.key)[0] === 'row',
-    inLoop.map((n) => n.key).join(', '),
+    inLoop.map((node) => node.key)[0] === 'row',
+    inLoop.map((node) => node.key).join(', '),
   );
 
   const nested = dataTree({
@@ -428,10 +446,10 @@ const check = (what, condition, detail) => {
   check(
     'and the innermost loop leads the outer one',
     nested
-      .map((n) => n.key)
+      .map((node) => node.key)
       .slice(0, 3)
       .join() === 'cell,i,row',
-    nested.map((n) => n.key).join(', '),
+    nested.map((node) => node.key).join(', '),
   );
 
   // Cleanup only ever considers what Stacki wrote.
@@ -441,7 +459,7 @@ const check = (what, condition, detail) => {
   check(
     'a written query is recognised',
     markedQueries(written)
-      .map((q) => q.name)
+      .map((query) => query.name)
       .join() === 'blogEntries',
   );
   check(
@@ -549,7 +567,7 @@ const check = (what, condition, detail) => {
     global.Node = page.window.Node;
     global.IS_REACT_ACT_ENVIRONMENT = true;
 
-    const out = path.join(buildDir, 'bindinput.bundle.js');
+    const out = path.join(buildDirectory, 'bindinput.bundle.js');
     await esbuild.build({
       stdin: {
         contents: "export { default as BindInput } from './src/ui/BindInput.jsx'",
@@ -570,14 +588,14 @@ const check = (what, condition, detail) => {
     const { act } = React;
     const { BindInput } = require(out);
 
-    const api = { current: null };
+    const api = { current: undefined };
     const root = createRoot(page.window.document.getElementById('root'));
     const draw = async (value) => {
       await act(async () => {
         root.render(
           React.createElement(BindInput, {
-            ref: (r) => {
-              api.current = r;
+            ref: (element) => {
+              api.current = element;
             },
             parts: partsFromValue(expr(value)),
             onChange: () => {},
@@ -587,17 +605,17 @@ const check = (what, condition, detail) => {
       await act(async () => {});
     };
     const chipsNow = () =>
-      [...page.window.document.querySelectorAll('.expr-chip')].map((c) => ({
-        text: c.textContent,
-        expr: c.getAttribute('data-expr'),
-        full: c.getAttribute('data-full'),
+      [...page.window.document.querySelectorAll('.expr-chip')].map((chip) => ({
+        text: chip.textContent,
+        expr: chip.getAttribute('data-expr'),
+        full: chip.getAttribute('data-full') ?? undefined,
       }));
     const written = () => page.window.document.querySelector('[contenteditable]').textContent;
 
     await draw('featured?.data.title');
     check(
       'the tail chip writes the tail',
-      J(chipsNow().map((c) => c.expr)) === J(['featured', '.data.title']),
+      J(chipsNow().map((chip) => chip.expr)) === J(['featured', '.data.title']),
       J(chipsNow()),
     );
     check(
@@ -607,7 +625,7 @@ const check = (what, condition, detail) => {
     );
     check(
       'a chip that is a whole path in itself needs no second reading',
-      chipsNow()[0].full === null,
+      chipsNow()[0].full === undefined,
     );
 
     // Repointed somewhere under the same value: the `?` is how the author chose
@@ -642,7 +660,7 @@ const check = (what, condition, detail) => {
     );
     check(
       'leaving one chip, standing for itself',
-      J(chipsNow()) === J([{ text: 'posts[0].title', expr: 'posts[0].title', full: null }]),
+      J(chipsNow()) === J([{ text: 'posts[0].title', expr: 'posts[0].title', full: undefined }]),
       J(chipsNow()),
     );
 
@@ -663,7 +681,7 @@ const check = (what, condition, detail) => {
   check(
     'a chip in another field closes this one',
     new RegExp(
-      /const chip = eventElement\(e\.target\)\?\.closest\('\.expr-chip/.source +
+      /const chip = eventElement\(event\.target\)\?\.closest\('\.expr-chip/.source +
         /, \.cm-chip'\)[\s\S]{0,120}wrapRef\.current\?\.contains\(chip\)/.source,
     ).test(panel),
     'any chip anywhere keeps this picker open',
@@ -677,14 +695,14 @@ const check = (what, condition, detail) => {
   // document underneath: what the field writes back has to come out byte for
   // byte the way it went in.
   const chipDom = await (async () => {
-    const entry = path.join(buildDir, 'chip.entry.jsx');
+    const entry = path.join(buildDirectory, 'chip.entry.jsx');
     fs.writeFileSync(
       entry,
       `export { default as ExprInput } from ${JSON.stringify(
         path.join(__dirname, '..', 'src', 'ui', 'ExprInput.jsx'),
       )};\n`,
     );
-    const out = path.join(buildDir, 'chip.bundle.js');
+    const out = path.join(buildDirectory, 'chip.bundle.js');
     await esbuild.build({
       entryPoints: [entry],
       outfile: out,
@@ -727,6 +745,7 @@ const check = (what, condition, detail) => {
     });
     view.window.Range.prototype.getClientRects = () => ({
       length: 0,
+      // eslint-disable-next-line stacki/no-null -- Stubs DOMRectList.item, which answers null.
       item: () => null,
       [Symbol.iterator]: function* () {},
     });
@@ -737,7 +756,7 @@ const check = (what, condition, detail) => {
     const { ExprInput } = require(out);
 
     const source = 'maxWidth ? `--_mw: ${maxWidth}ch;` : undefined';
-    let committed = null;
+    let committed;
     const root = createRoot(view.window.document.getElementById('root'));
     await act(async () => {
       root.render(
@@ -745,8 +764,8 @@ const check = (what, condition, detail) => {
           value: source,
           syncValue: source,
           chipsOf: templateHoles,
-          onCommit: (v) => {
-            committed = v;
+          onCommit: (value) => {
+            committed = value;
           },
         }),
       );
@@ -767,7 +786,7 @@ const check = (what, condition, detail) => {
     });
     global.window = prior.window;
     global.document = prior.document;
-    return { chips: chips.map((c) => c.textContent), committed, source };
+    return { chips: chips.map((chip) => chip.textContent), committed, source };
   })();
 
   check('the hole is drawn as one chip', chipDom.chips.length === 1, J(chipDom.chips));
@@ -796,23 +815,23 @@ const check = (what, condition, detail) => {
         '<span class="prop-label">style</span><button id="btn"></button>' +
         '</label><input></div>',
     );
-    const doc = page.window.document;
+    const document = page.window.document;
     const clickLabel = () =>
-      doc
+      document
         .getElementById('lab')
         .dispatchEvent(new page.window.MouseEvent('click', { bubbles: true, cancelable: true }));
     let pressed = 0;
-    doc.getElementById('btn').addEventListener('click', () => {
+    document.getElementById('btn').addEventListener('click', () => {
       pressed += 1;
     });
     clickLabel();
     check('a bare label really does press the button inside it', pressed === 1, String(pressed));
-    doc.getElementById('lab').addEventListener('click', (e) => e.preventDefault());
+    document.getElementById('lab').addEventListener('click', (event) => event.preventDefault());
     pressed = 0;
     clickLabel();
     check("cancelling the label's default stops that", pressed === 0, String(pressed));
     pressed = 0;
-    doc
+    document
       .getElementById('btn')
       .dispatchEvent(new page.window.MouseEvent('click', { bubbles: true, cancelable: true }));
     check('while a press on the button itself still counts', pressed === 1, String(pressed));
@@ -857,15 +876,15 @@ const check = (what, condition, detail) => {
   // The parts are what gets written back, so they have to add up to the value
   // they came from — a chip that swallowed or dropped a character would edit
   // the file just by being looked at.
-  for (const src of [
+  for (const source of [
     'featured?.data.title',
     'post?.data.seo?.title ?? post.data.title',
     'a?.b + 1',
   ]) {
     check(
-      `${src} survives being split into chips`,
-      valueFromParts(partsFromValue(expr(src)), { mode: 'code' })?.value === src,
-      J(valueFromParts(partsFromValue(expr(src)), { mode: 'code' })),
+      `${source} survives being split into chips`,
+      valueFromParts(partsFromValue(expr(source)), { mode: 'code' })?.value === source,
+      J(valueFromParts(partsFromValue(expr(source)), { mode: 'code' })),
     );
   }
 

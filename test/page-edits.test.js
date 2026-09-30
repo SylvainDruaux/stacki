@@ -19,27 +19,27 @@ const path = require('node:path');
 const esbuild = require('esbuild');
 const { parsePageDiskRead, parsePageEditResult } = require('../dist/shared/page-save.js');
 
-const buildDir = path.join(__dirname, '..', 'node_modules', '.stacki-test', 'page-edits');
-fs.mkdirSync(buildDir, { recursive: true });
+const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test', 'page-edits');
+fs.mkdirSync(buildDirectory, { recursive: true });
 esbuild.buildSync({
   entryPoints: ['pageEdits', 'editGestures'].map((name) =>
     path.join(__dirname, '..', 'src', `${name}.ts`),
   ),
-  outdir: buildDir,
+  outdir: buildDirectory,
   bundle: true,
   format: 'cjs',
   platform: 'node',
   logLevel: 'silent',
 });
-const edits = require(path.join(buildDir, 'pageEdits.js'));
-const gestures = require(path.join(buildDir, 'editGestures.js'));
+const edits = require(path.join(buildDirectory, 'pageEdits.js'));
+const gestures = require(path.join(buildDirectory, 'editGestures.js'));
 
 const sum = (digit) => String(digit).repeat(64);
 const REF = { path: [0], kind: 'element', span: { start: 0, end: 4 } };
 const record = () => ({ outcome: { tag: 'applied', applied: [] } });
 // A gesture of one stream: its request removes the node REF names.
 const gesture = (stream, refOk = true) => ({
-  coalesceKey: null,
+  coalesceKey: undefined,
   urgency: false,
   stream,
   request: () => (refOk ? [{ tag: 'remove-node', target: REF }] : undefined),
@@ -54,8 +54,8 @@ test('the queue coalesces one stream of one undo step, and nothing else', () => 
   assert.equal(store.entries('/p').length, 1, 'the newer value replaced the older');
   assert.deepEqual(step.outcome, { tag: 'pending', waiting: 1, applied: [] });
   store.addGesture('/p', gesture('title'), record());
-  store.addGesture('/p', gesture(null), step);
-  store.addGesture('/p', gesture(null), step);
+  store.addGesture('/p', gesture(undefined), step);
+  store.addGesture('/p', gesture(undefined), step);
   assert.equal(store.entries('/p').length, 4, 'another step, and structural gestures, stay apart');
   assert.deepEqual(step.outcome, { tag: 'pending', waiting: 3, applied: [] });
   assert.equal(store.entries('/elsewhere').length, 0, 'another page owes nothing here');
@@ -87,10 +87,10 @@ test('typing drops the unsent gestures: the text typed into does not hold them',
 test('the queue is bounded: past it, a gesture is refused, never queued', () => {
   const store = new edits.EditDrafts();
   for (let index = 0; index < 64; index++) {
-    assert.equal(store.addGesture('/p', gesture(null), record()), 'queued');
+    assert.equal(store.addGesture('/p', gesture(undefined), record()), 'queued');
   }
   const over = record();
-  assert.equal(store.addGesture('/p', gesture(null), over), 'full');
+  assert.equal(store.addGesture('/p', gesture(undefined), over), 'full');
   assert.equal(store.entries('/p').length, 64);
   assert.deepEqual(over.outcome, { tag: 'applied', applied: [] }, 'nothing is owed for it');
 });
@@ -98,8 +98,8 @@ test('the queue is bounded: past it, a gesture is refused, never queued', () => 
 test('answers fill the undo step in order; a step is applied when nothing is owed', () => {
   const step = record();
   const store = new edits.EditDrafts();
-  store.addGesture('/p', gesture(null), step);
-  store.addGesture('/p', gesture(null), step);
+  store.addGesture('/p', gesture(undefined), step);
+  store.addGesture('/p', gesture(undefined), step);
   edits.recordApplied(step, { checksum: sum(2), inverse: [] });
   assert.equal(step.outcome.tag, 'pending');
   edits.recordApplied(step, { checksum: sum(3), inverse: [] });
@@ -124,7 +124,7 @@ test('answers fill the undo step in order; a step is applied when nothing is owe
 
 const PAGE_OK = (checksum) => ({
   ok: true,
-  value: { source: '', editable: false, reason: '', bail: null, checksum, inverse: [] },
+  value: { source: '', editable: false, reason: '', bail: undefined, checksum, inverse: [] },
 });
 const refusal = (reason, diskChecksum) => ({
   ok: false,
@@ -137,7 +137,7 @@ async function sent(answers, count = answers.length, refOk = true) {
   step.outcome = { tag: 'pending', waiting: 1, applied: [] };
   let index = 0;
   const many = {
-    ...gesture(null, refOk),
+    ...gesture(undefined, refOk),
     request: () =>
       refOk
         ? Array.from({ length: count }, () => ({ tag: 'remove-node', target: REF }))
@@ -233,8 +233,8 @@ test('propsGesture: values of every type but a spread are requests; the effect c
     { tag: 'set-attribute', target: REF, name: 'title', value: { type: 'string', value: 'T' } },
     { tag: 'remove-attribute', target: REF, name: 'alt' },
   ]);
-  assert.equal(set.stream, null, 'two fields are no one stream');
-  const one = { coalesceKey: null, urgency: true };
+  assert.equal(set.stream, undefined, 'two fields are no one stream');
+  const one = { coalesceKey: undefined, urgency: true };
   assert.equal(
     gestures.propsGesture('a', { title: undefined }, one).stream,
     'attribute:a:title',
@@ -242,11 +242,11 @@ test('propsGesture: values of every type but a spread are requests; the effect c
   );
   assert.equal(
     gestures
-      .propsGesture('b', { title: undefined }, { coalesceKey: null, urgency: true })
+      .propsGesture('b', { title: undefined }, { coalesceKey: undefined, urgency: true })
       .request(refOf),
     undefined,
   );
-  const options = { coalesceKey: null, urgency: true };
+  const options = { coalesceKey: undefined, urgency: true };
   const expr = gestures
     .propsGesture('a', { n: { type: 'expr', value: 'x' } }, options)
     .request(refOf);
@@ -364,17 +364,17 @@ test(
       return first && [first.placement, first.target.path[0]];
     };
     assert.deepEqual(
-      placed({ parentId: null, index: 0 }),
+      placed({ parentId: undefined, index: 0 }),
       ['before', 1],
       'before the node at the place',
     );
     assert.deepEqual(
-      placed({ parentId: null, index: 1 }),
+      placed({ parentId: undefined, index: 1 }),
       ['before', 2],
       'blank text is not a neighbour',
     );
     assert.deepEqual(
-      placed({ parentId: null, index: 9 }),
+      placed({ parentId: undefined, index: 9 }),
       ['after', 2],
       'past the end: after the last',
     );
@@ -385,7 +385,7 @@ test(
     );
     assert.deepEqual(placed({ parentId: 'bb', index: 1 }), ['after', 3]);
     assert.deepEqual(
-      gestures.insertGesture({ imports: [], nodes: [] }, node, null, options).request(refOf),
+      gestures.insertGesture({ imports: [], nodes: [] }, node, undefined, options).request(refOf),
       [{ tag: 'append-body', nodes: [node] }],
       'an empty body takes its first node',
     );
@@ -403,7 +403,7 @@ test(
     );
     const without = gestures.withoutNodes(model, ['ccc', 'gap']);
     assert.deepEqual(
-      without.nodes.map((n) => n.id),
+      without.nodes.map((node) => node.id),
       ['a', 'bb'],
     );
     assert.deepEqual(without.nodes[1].children, []);
@@ -441,19 +441,19 @@ test(
         .moveGesture(model, 'x', place, rules, { urgency: true })
         .request(refOf)
         .map((edit) => [edit.tag, edit.target.path[0], edit.placement]);
-    const [n, x, z] = ['n', 'x', 'z'].map((id) => id.charCodeAt(0));
+    const [note, x, z] = ['n', 'x', 'z'].map((id) => id.charCodeAt(0));
     assert.deepEqual(
-      tags({ parentId: null, index: 3 }),
+      tags({ parentId: undefined, index: 3 }),
       [
         ['remove-attribute', x, undefined],
         ['move-node', x, 'after'],
-        ['move-node', n, 'after'],
+        ['move-node', note, 'after'],
       ],
       'after a node: the node, then its note in front of it',
     );
     assert.deepEqual(tags({ parentId: 'z', index: 0 }).slice(1), [
       ['move-node', x, 'first-child'],
-      ['move-node', n, 'first-child'],
+      ['move-node', note, 'first-child'],
     ]);
     const moved = gestures
       .moveGesture(model, 'x', { parentId: 'z', index: 0 }, rules, { urgency: true })

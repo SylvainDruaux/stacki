@@ -83,7 +83,7 @@ test(
     Object.defineProperty(dom.window.HTMLElement.prototype, 'offsetHeight', { get: () => 240 });
     global.IS_REACT_ACT_ENVIRONMENT = true;
     global.getComputedStyle = dom.window.getComputedStyle;
-    global.requestAnimationFrame = (fn) => setTimeout(fn, 0);
+    global.requestAnimationFrame = (callback) => setTimeout(callback, 0);
     global.cancelAnimationFrame = clearTimeout;
     global.ResizeObserver = class {
       observe() {}
@@ -111,9 +111,9 @@ test(
         closed.push(args.id);
         return Promise.resolve({ ok: true });
       },
-      onTerminalData: (fn) => {
-        dataListeners.add(fn);
-        return () => dataListeners.delete(fn);
+      onTerminalData: (listener) => {
+        dataListeners.add(listener);
+        return () => dataListeners.delete(listener);
       },
       onTerminalExit: () => () => {},
       onTerminalProcess: () => () => {},

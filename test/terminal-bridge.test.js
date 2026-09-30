@@ -5,6 +5,11 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const terminal = require('./renderer-module')('terminalBridge.ts');
 
+// A boundary can receive null — JSON, structured clone and postMessage all carry it —
+// so the negative space below includes it. It is read from JSON, because our own
+// code never writes a null.
+const PLATFORM_NULL = JSON.parse('null');
+
 test('terminal event parsers preserve valid bounded messages', () => {
   assert.deepEqual(terminal.parseTerminalData({ id: 'one', data: 'hello' }), {
     id: 'one',
@@ -21,7 +26,7 @@ test('terminal event parsers preserve valid bounded messages', () => {
 });
 
 test('terminal event parsers reject incomplete and invalid messages', () => {
-  for (const value of [null, {}, { id: 1, data: 'x' }, { id: 'one', data: 2 }]) {
+  for (const value of [PLATFORM_NULL, {}, { id: 1, data: 'x' }, { id: 'one', data: 2 }]) {
     assert.throws(() => terminal.parseTerminalData(value));
   }
   assert.throws(() => terminal.parseTerminalExit({ id: 'one', exitCode: -1 }));

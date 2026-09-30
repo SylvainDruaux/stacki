@@ -33,15 +33,20 @@ const check = (what, condition, detail) => {
 // and evaluated — which keeps this honest: an edit to preload changes what
 // runs here.
 function loadGapBandsFor(window) {
-  const src = fs.readFileSync(path.join(__dirname, '..', 'dist', 'electron', 'preload.js'), 'utf8');
-  const start = src.indexOf('  const gapBandsFor = (el, cs) => {');
-  if (start === -1) {
+  const source = fs.readFileSync(
+    path.join(__dirname, '..', 'dist', 'electron', 'preload.js'),
+    'utf8',
+  );
+  // gapBandsFor and the helpers it calls, which sit just above it.
+  const start = source.indexOf('  const gapChildRects = (element) => {');
+  const at = source.indexOf('  const gapBandsFor = (element, cs) => {');
+  if (start === -1 || at === -1) {
     throw new Error('gapBandsFor not found in preload.js — has it been renamed?');
   }
   // The file is now the tsc emit of preload.ts, which indents every level
   // with four spaces — the function's own closing brace sits at that depth.
-  const end = src.indexOf('\n    };', start);
-  const body = src.slice(start, end + '\n    };'.length);
+  const end = source.indexOf('\n    };', at);
+  const body = source.slice(start, end + '\n    };'.length);
 
   return new Function('window', `${body}\nreturn gapBandsFor;`)(window);
 }
@@ -54,8 +59,8 @@ function loadGapBandsFor(window) {
   // JSDOM does not lay anything out, so the boxes are supplied. This is the
   // seam the real browser fills in; everything above it — grouping into rows,
   // capping at the gap, skipping empties — is what is being tested.
-  const place = (el, box) => {
-    el.getBoundingClientRect = () => ({
+  const place = (element, box) => {
+    element.getBoundingClientRect = () => ({
       left: box.x,
       top: box.y,
       right: box.x + box.w,
@@ -65,33 +70,33 @@ function loadGapBandsFor(window) {
     });
   };
   const parentWith = (styles, kids) => {
-    const el = document.createElement('div');
-    for (const k of kids) {
+    const element = document.createElement('div');
+    for (const kid of kids) {
       const child = document.createElement('div');
-      place(child, k);
-      child.__display = k.display || 'block';
-      el.appendChild(child);
+      place(child, kid);
+      child.__display = kid.display || 'block';
+      element.appendChild(child);
     }
     // getComputedStyle is asked for each child's display; JSDOM's own answer is
     // not driven by anything here, so it is stubbed per element.
     window.getComputedStyle = (node) => ({ display: node.__display || 'block' });
-    return { el, cs: styles };
+    return { el: element, cs: styles };
   };
 
   const gapBandsFor = loadGapBandsFor(window);
 
   // --- A row of three, 20px apart -------------------------------------------
   {
-    const { el, cs } = parentWith({ display: 'flex', columnGap: '20px', rowGap: '0px' }, [
+    const { el: element, cs } = parentWith({ display: 'flex', columnGap: '20px', rowGap: '0px' }, [
       { x: 0, y: 0, w: 100, h: 50 },
       { x: 120, y: 0, w: 100, h: 50 },
       { x: 240, y: 0, w: 100, h: 50 },
     ]);
-    const bands = gapBandsFor(el, cs);
+    const bands = gapBandsFor(element, cs);
     check('a row of three has two gaps', bands.length === 2, JSON.stringify(bands));
     check(
       'both on the column axis',
-      bands.every((b) => b.axis === 'column'),
+      bands.every((band) => band.axis === 'column'),
       JSON.stringify(bands),
     );
     check(
@@ -108,28 +113,28 @@ function loadGapBandsFor(window) {
     // two items apart rather than a floating rectangle.
     check(
       'and each spans the row',
-      bands.every((b) => b.y === 0 && b.h === 50),
+      bands.every((band) => band.y === 0 && band.h === 50),
       JSON.stringify(bands),
     );
   }
 
   // --- Wrapped: two rows, both axes -----------------------------------------
   {
-    const { el, cs } = parentWith({ display: 'flex', columnGap: '20px', rowGap: '30px' }, [
+    const { el: element, cs } = parentWith({ display: 'flex', columnGap: '20px', rowGap: '30px' }, [
       { x: 0, y: 0, w: 100, h: 50 },
       { x: 120, y: 0, w: 100, h: 50 },
       { x: 0, y: 80, w: 100, h: 50 },
       { x: 120, y: 80, w: 100, h: 50 },
     ]);
-    const bands = gapBandsFor(el, cs);
-    const cols = bands.filter((b) => b.axis === 'column');
-    const rows = bands.filter((b) => b.axis === 'row');
+    const bands = gapBandsFor(element, cs);
+    const cols = bands.filter((band) => band.axis === 'column');
+    const rows = bands.filter((band) => band.axis === 'row');
     // Children are grouped into visual rows by vertical overlap, so a wrapped
     // flex line and a grid row are the same thing to this.
     check('each row gets its own column gap', cols.length === 2, JSON.stringify(cols));
     check(
       'the second row’s gap is on the second row',
-      cols.some((b) => b.y === 80),
+      cols.some((band) => band.y === 80),
       JSON.stringify(cols),
     );
     check('and there is one gap between the rows', rows.length === 1, JSON.stringify(rows));
@@ -143,12 +148,12 @@ function loadGapBandsFor(window) {
 
   // --- space-between: the band is the gap, not the free space ---------------
   {
-    const { el, cs } = parentWith({ display: 'flex', columnGap: '20px', rowGap: '0px' }, [
+    const { el: element, cs } = parentWith({ display: 'flex', columnGap: '20px', rowGap: '0px' }, [
       { x: 0, y: 0, w: 100, h: 50 },
       // 200px of space where the gap is only 20 of it.
       { x: 300, y: 0, w: 100, h: 50 },
     ]);
-    const bands = gapBandsFor(el, cs);
+    const bands = gapBandsFor(element, cs);
     check('the space is still marked', bands.length === 1, JSON.stringify(bands));
     // Lighting all 200 would say `gap: 20px` was holding 200px open.
     check('but only gap-wide', bands[0].w === 20, JSON.stringify(bands[0]));
@@ -182,14 +187,14 @@ function loadGapBandsFor(window) {
 
   // --- Children that are not really there -----------------------------------
   {
-    const { el, cs } = parentWith({ display: 'grid', columnGap: '20px', rowGap: '0px' }, [
+    const { el: element, cs } = parentWith({ display: 'grid', columnGap: '20px', rowGap: '0px' }, [
       { x: 0, y: 0, w: 100, h: 50 },
       // display:none takes part in nothing; counting it would invent a gap
       // where the page shows none.
       { x: 0, y: 0, w: 0, h: 0, display: 'none' },
       { x: 120, y: 0, w: 100, h: 50 },
     ]);
-    const bands = gapBandsFor(el, cs);
+    const bands = gapBandsFor(element, cs);
     check('a hidden child is not a gap boundary', bands.length === 1, JSON.stringify(bands));
     check(
       'and the gap spans the two real children',
@@ -201,14 +206,14 @@ function loadGapBandsFor(window) {
   // --- Overlapping children -------------------------------------------------
   {
     // Negative margins, absolute positioning: a "gap" that is not open space.
-    const { el, cs } = parentWith({ display: 'flex', columnGap: '20px', rowGap: '0px' }, [
+    const { el: element, cs } = parentWith({ display: 'flex', columnGap: '20px', rowGap: '0px' }, [
       { x: 0, y: 0, w: 100, h: 50 },
       { x: 90, y: 0, w: 100, h: 50 },
     ]);
     check(
       'overlapping children have no gap to show',
-      gapBandsFor(el, cs).length === 0,
-      JSON.stringify(gapBandsFor(el, cs)),
+      gapBandsFor(element, cs).length === 0,
+      JSON.stringify(gapBandsFor(element, cs)),
     );
   }
 
@@ -217,7 +222,7 @@ function loadGapBandsFor(window) {
     process.exit(1);
   }
   console.log(`gap-bands: ${checked} passed`);
-})().catch((err) => {
-  console.error(err);
+})().catch((error) => {
+  console.error(error);
   process.exit(1);
 });

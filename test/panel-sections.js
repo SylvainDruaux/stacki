@@ -18,8 +18,13 @@
 // to have no control land there, and no property is quietly claimed by a
 // section that never draws it.
 
+const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
+
+// Source folders nest a handful deep; a walk past this has met a cycle or a
+// generated tree, and should stop loudly rather than recurse on.
+const WALK_LIMITS = { directoryDepthMax: 32 };
 
 const failures = [];
 let checked = 0;
@@ -32,9 +37,9 @@ const check = (what, condition, detail) => {
 
 (async () => {
   const esbuild = require('esbuild');
-  const buildDir = path.join(__dirname, '..', 'node_modules', '.stacki-test');
-  fs.mkdirSync(buildDir, { recursive: true });
-  const out = path.join(buildDir, 'sections.bundle.js');
+  const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
+  fs.mkdirSync(buildDirectory, { recursive: true });
+  const out = path.join(buildDirectory, 'sections.bundle.js');
   await esbuild.build({
     entryPoints: [path.join(__dirname, '..', 'src', 'style-panel', 'lib', 'sections.ts')],
     outfile: out,
@@ -52,7 +57,10 @@ const check = (what, condition, detail) => {
     { prop: 'content', value: '""' },
   ];
   const groups = Object.fromEntries(
-    groupDeclarations(decls).map((g) => [g.def.label, g.decls.map((d) => d.prop)]),
+    groupDeclarations(decls).map((group) => [
+      group.def.label,
+      group.decls.map((declaration) => declaration.prop),
+    ]),
   );
   check('inset is drawn', Object.values(groups).flat().includes('inset'), JSON.stringify(groups));
   check(
@@ -67,8 +75,10 @@ const check = (what, condition, detail) => {
   );
   check(
     'the same holds for the resolved model',
-    groupProps(['inset', 'top']).some((g) => g.def.id === 'other' && g.props.includes('inset')),
-    JSON.stringify(groupProps(['inset', 'top']).map((g) => [g.def.id, g.props])),
+    groupProps(['inset', 'top']).some(
+      (group) => group.def.id === 'other' && group.props.includes('inset'),
+    ),
+    JSON.stringify(groupProps(['inset', 'top']).map((group) => [group.def.id, group.props])),
   );
 
   // ── Shorthands with no control ────────────────────────────────────────────
@@ -104,7 +114,7 @@ const check = (what, condition, detail) => {
     entryPoints: ['BordersSection', 'FlexChildSection'].map((name) =>
       path.join(__dirname, '..', 'src', 'style-panel', `${name}.tsx`),
     ),
-    outdir: path.join(buildDir, 'section-controls'),
+    outdir: path.join(buildDirectory, 'section-controls'),
     bundle: true,
     format: 'cjs',
     platform: 'node',
@@ -130,7 +140,7 @@ const check = (what, condition, detail) => {
     global[key] = dom.window[key];
   }
   global.getComputedStyle = dom.window.getComputedStyle;
-  global.requestAnimationFrame = (fn) => setTimeout(fn, 0);
+  global.requestAnimationFrame = (callback) => setTimeout(callback, 0);
   global.cancelAnimationFrame = clearTimeout;
   global.ResizeObserver = class {
     observe() {}
@@ -143,10 +153,10 @@ const check = (what, condition, detail) => {
   const { createRoot } = require('react-dom/client');
   const root = createRoot(document.getElementById('root'));
   const BordersSection = require(
-    path.join(buildDir, 'section-controls', 'BordersSection.js'),
+    path.join(buildDirectory, 'section-controls', 'BordersSection.js'),
   ).default;
   const FlexChildSection = require(
-    path.join(buildDir, 'section-controls', 'FlexChildSection.js'),
+    path.join(buildDirectory, 'section-controls', 'FlexChildSection.js'),
   ).default;
   const declared = (value) => ({
     source: 'selected',
@@ -218,7 +228,7 @@ const check = (what, condition, detail) => {
       check(`${prop} has a field showing its value`, input?.value === value, input?.value);
       if (input) {
         await commit(input, next);
-        const written = writes.some(([p, v]) => p === prop && v === next);
+        const written = writes.some(([property, value]) => property === prop && value === next);
         check(`${prop} can be edited through its side control`, written, JSON.stringify(writes));
         if (input && written) {
           dynamicControls.add(prop);
@@ -254,7 +264,7 @@ const check = (what, condition, detail) => {
     await commit(inputFor(`${axis[0].toUpperCase() + axis.slice(1)} Start`), '4');
     check(
       `grid-${axis} placement can be edited`,
-      writes.some(([p, v]) => p === `grid-${axis}` && v === `4 / ${end}`),
+      writes.some(([property, value]) => property === `grid-${axis}` && value === `4 / ${end}`),
       JSON.stringify(writes),
     );
   }
@@ -269,13 +279,14 @@ const check = (what, condition, detail) => {
   // Heuristic in one direction only — a name that appears for another reason
   // (`inset` is also a box-shadow keyword) can hide a missing control, which is
   // why the list above is spelled out by hand as well.
-  const panelDir = path.join(__dirname, '..', 'src', 'style-panel');
+  const panelDirectory = path.join(__dirname, '..', 'src', 'style-panel');
   const sources = [];
-  const walk = (dir) => {
-    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-      const file = path.join(dir, entry.name);
+  const walk = (directory, depth) => {
+    assert.ok(depth <= WALK_LIMITS.directoryDepthMax, 'walk: depth limit');
+    for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+      const file = path.join(directory, entry.name);
       if (entry.isDirectory()) {
-        walk(file);
+        walk(file, depth + 1);
       } else if (
         /\.(tsx|ts)$/.test(entry.name) &&
         !file.endsWith(path.join('lib', 'sections.ts'))
@@ -284,14 +295,14 @@ const check = (what, condition, detail) => {
       }
     }
   };
-  walk(panelDir);
+  walk(panelDirectory, 0);
   const text = sources.join('\n');
 
-  const sectionsSrc = fs.readFileSync(path.join(panelDir, 'lib', 'sections.ts'), 'utf8');
+  const sectionsSource = fs.readFileSync(path.join(panelDirectory, 'lib', 'sections.ts'), 'utf8');
   const ordered = [
     ...new Set(
-      [...sectionsSrc.matchAll(/order: \[([\s\S]*?)\]/g)].flatMap((m) =>
-        [...m[1].matchAll(/'([^']+)'/g)].map((x) => x[1]),
+      [...sectionsSource.matchAll(/order: \[([\s\S]*?)\]/g)].flatMap((match) =>
+        [...match[1].matchAll(/'([^']+)'/g)].map((x) => x[1]),
       ),
     ),
   ];

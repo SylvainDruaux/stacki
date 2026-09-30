@@ -9,8 +9,8 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { parsePage, serializePage, serializePageMarked } = require('../dist/electron/astroParser');
 
-function parsed(source, opts) {
-  const result = parsePage(source, opts);
+function parsed(source, options) {
+  const result = parsePage(source, options);
   assert.equal(result.editable, true, result.reason);
   return result.model;
 }
@@ -168,7 +168,7 @@ test('both Astro compilers retain preview markers around shorthand fragments', a
       for (const output of [serializePage(model), serializePageMarked(model)]) {
         const result = await transform(output, { filename: '/fragment.astro' });
         const errors = (result.diagnostics || []).filter(
-          (d) => d.severity === 'error' || d.severity === 1,
+          (diagnostic) => diagnostic.severity === 'error' || diagnostic.severity === 1,
         );
         assert.deepEqual(errors, [], `${compilerName}: ${output}`);
         for (const marker of new Set(output.match(/avb-[se]:[\w|./-]+?-->/g) || [])) {

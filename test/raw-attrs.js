@@ -16,8 +16,13 @@
 // attribute that is added and then dropped on the next save is worse than one
 // that was never offered, because the CSS around it looks like it should work.
 
+const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
+
+// The DOM answers "none" with null. The fakes below that stand in for DOM APIs
+// return the platform's own value, read from JSON because our code never writes one.
+const PLATFORM_NULL = JSON.parse('null');
 
 const failures = [];
 let checked = 0;
@@ -32,17 +37,19 @@ const check = (what, condition, detail) => {
   // --- The file keeps them ---------------------------------------------------
   {
     const { parsePage, serializePage } = require('../dist/electron/astroParser.js');
-    const findRaw = (nodes) => {
-      for (const n of nodes || []) {
-        if (n.kind === 'raw') {
-          return n;
+    const { LIMITS } = require('../dist/shared/limits.js');
+    const findRaw = (nodes, depth = 0) => {
+      assert.ok(depth <= LIMITS.treeDepthMax, 'findRaw: depth limit');
+      for (const node of nodes || []) {
+        if (node.kind === 'raw') {
+          return node;
         }
-        const hit = findRaw(n.children);
+        const hit = findRaw(node.children, depth + 1);
         if (hit) {
           return hit;
         }
       }
-      return null;
+      return undefined;
     };
 
     // The three shapes an attribute comes in, all of which these tags use.
@@ -61,7 +68,7 @@ const check = (what, condition, detail) => {
       'define:vars': { type: 'expr', value: '{ c }' },
     };
     const out = serializePage(model);
-    const tag = out.split('\n').find((l) => l.includes('<style')) ?? '';
+    const tag = out.split('\n').find((line) => line.includes('<style')) ?? '';
     // Bare stays bare: `is:global=""` is not the same attribute to Astro.
     check('a bare attribute is written bare', /<style is:global[ >]/.test(tag), tag);
     check('a string attribute is quoted', tag.includes('class="footer-css"'), tag);
@@ -91,33 +98,33 @@ const check = (what, condition, detail) => {
     );
 
     // A script's own set, including one that changes how Astro treats it.
-    const sModel = parsePage('---\n---\n<script>console.log(1)</script>\n').model;
-    const script = findRaw(sModel.nodes);
+    const scriptModel = parsePage('---\n---\n<script>console.log(1)</script>\n').model;
+    const script = findRaw(scriptModel.nodes);
     script.props = { 'is:inline': { type: 'bare' }, type: { type: 'string', value: 'module' } };
-    const sOut = serializePage(sModel);
+    const scriptOut = serializePage(scriptModel);
     check(
       'a script keeps its attributes too',
-      /<script is:inline type="module">/.test(sOut),
-      sOut.trim(),
+      /<script is:inline type="module">/.test(scriptOut),
+      scriptOut.trim(),
     );
-    const sBack = findRaw(parsePage(sOut).model.nodes);
+    const scriptBack = findRaw(parsePage(scriptOut).model.nodes);
     check(
       'and they read back',
-      Object.keys(sBack.props).join(',') === 'is:inline,type',
-      JSON.stringify(sBack.props),
+      Object.keys(scriptBack.props).join(',') === 'is:inline,type',
+      JSON.stringify(scriptBack.props),
     );
     check(
       'with the script body intact',
-      sBack.inner.includes('console.log(1)'),
-      JSON.stringify(sBack.inner),
+      scriptBack.inner.includes('console.log(1)'),
+      JSON.stringify(scriptBack.inner),
     );
   }
 
   // --- The panel offers them -------------------------------------------------
   const esbuild = require('esbuild');
-  const buildDir = path.join(__dirname, '..', 'node_modules', '.stacki-test');
-  fs.mkdirSync(buildDir, { recursive: true });
-  const bundle = path.join(buildDir, 'raw-attrs.bundle.js');
+  const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
+  fs.mkdirSync(buildDirectory, { recursive: true });
+  const bundle = path.join(buildDirectory, 'raw-attrs.bundle.js');
   await esbuild.build({
     entryPoints: [path.join(__dirname, '..', 'src', 'panels', 'PropsPanel.jsx')],
     outfile: bundle,
@@ -163,7 +170,7 @@ const check = (what, condition, detail) => {
   });
   dom.window.Range.prototype.getClientRects = () => ({
     length: 0,
-    item: () => null,
+    item: () => PLATFORM_NULL,
     [Symbol.iterator]: function* () {},
   });
 
@@ -194,10 +201,11 @@ const check = (what, condition, detail) => {
       set,
       root,
       section: () =>
-        [...host.querySelectorAll('.props-label-row')].find((r) =>
-          r.textContent.includes('Attributes'),
+        [...host.querySelectorAll('.props-label-row')].find((row) =>
+          row.textContent.includes('Attributes'),
         ),
-      rows: () => [...host.querySelectorAll('.attr-row .attr-name')].map((n) => n.textContent),
+      rows: () =>
+        [...host.querySelectorAll('.attr-row .attr-name')].map((node) => node.textContent),
       done: async () => {
         await act(async () => root.unmount());
       },
@@ -206,7 +214,7 @@ const check = (what, condition, detail) => {
 
   // A <style> with nothing on it — the case from the report.
   {
-    const m = await mount({
+    const mounted = await mount({
       id: 'n1',
       kind: 'raw',
       name: 'style',
@@ -215,14 +223,14 @@ const check = (what, condition, detail) => {
     });
     check(
       'a bare <style> still offers Attributes',
-      !!m.section(),
-      m.host.textContent.slice(0, 160),
+      !!mounted.section(),
+      mounted.host.textContent.slice(0, 160),
     );
-    const add = m.section()?.querySelector('button');
+    const add = mounted.section()?.querySelector('button');
     check(
       'with something to press to add one',
       !!add,
-      m.section()?.innerHTML ?? 'no Attributes section at all',
+      mounted.section()?.innerHTML ?? 'no Attributes section at all',
     );
     // Guarded: a missing button is a FAILURE to report, not a stack trace that
     // buries which case broke.
@@ -241,15 +249,15 @@ const check = (what, condition, detail) => {
     // And the code editor is still there — this is an addition, not a swap.
     check(
       'and Edit code is still offered',
-      m.host.textContent.includes('Edit code'),
-      m.host.textContent.slice(0, 200),
+      mounted.host.textContent.includes('Edit code'),
+      mounted.host.textContent.slice(0, 200),
     );
-    await m.done();
+    await mounted.done();
   }
 
   // One that already has attributes lists them.
   {
-    const m = await mount({
+    const mounted = await mount({
       id: 'n2',
       kind: 'raw',
       name: 'style',
@@ -258,27 +266,35 @@ const check = (what, condition, detail) => {
     });
     check(
       'existing attributes are listed',
-      m.rows().join(',') === 'is:global,class',
-      JSON.stringify(m.rows()),
+      mounted.rows().join(',') === 'is:global,class',
+      JSON.stringify(mounted.rows()),
     );
     // `class` is NOT filtered out here the way it is for an element: an element
     // has a dedicated class field, and this has none — so it must appear.
-    check('including class', m.rows().includes('class'), JSON.stringify(m.rows()));
-    await m.done();
+    check('including class', mounted.rows().includes('class'), JSON.stringify(mounted.rows()));
+    await mounted.done();
   }
 
   // And a <script>, which is the same node kind.
   {
-    const m = await mount({
+    const mounted = await mount({
       id: 'n3',
       kind: 'raw',
       name: 'script',
       props: { 'is:inline': { type: 'bare' } },
       inner: 'console.log(1)',
     });
-    check('a <script> gets the same section', !!m.section(), m.host.textContent.slice(0, 160));
-    check('and lists its own', m.rows().join(',') === 'is:inline', JSON.stringify(m.rows()));
-    await m.done();
+    check(
+      'a <script> gets the same section',
+      !!mounted.section(),
+      mounted.host.textContent.slice(0, 160),
+    );
+    check(
+      'and lists its own',
+      mounted.rows().join(',') === 'is:inline',
+      JSON.stringify(mounted.rows()),
+    );
+    await mounted.done();
   }
 
   if (failures.length) {
@@ -287,7 +303,7 @@ const check = (what, condition, detail) => {
   }
   console.log(`raw-attrs: ${checked} passed  [offered, and kept by the file]`);
   process.exit(0);
-})().catch((err) => {
-  console.error(err);
+})().catch((error) => {
+  console.error(error);
   process.exit(1);
 });

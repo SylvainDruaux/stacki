@@ -6,7 +6,7 @@
 // the component instead of selecting what was clicked.
 //
 // The canvas answers a click with the deepest path it can map under the pointer
-// in the open file's scope — or null. Null has two causes that want opposite
+// in the open file's scope — or no path. No path has two causes that want opposite
 // things: the click landed somewhere this file doesn't own (the page around an
 // open component), or it landed on something inside it that carries no marker —
 // content passed into a slot belongs to the caller, an expression the marker
@@ -32,9 +32,9 @@ const check = (what, condition, detail) => {
 
 (async () => {
   const esbuild = require('esbuild');
-  const buildDir = path.join(__dirname, '..', 'node_modules', '.stacki-test');
-  fs.mkdirSync(buildDir, { recursive: true });
-  const out = path.join(buildDir, 'canvas-click.bundle.mjs');
+  const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
+  fs.mkdirSync(buildDirectory, { recursive: true });
+  const out = path.join(buildDirectory, 'canvas-click.bundle.mjs');
   await esbuild.build({
     entryPoints: [path.join(__dirname, '..', 'src', 'canvasClick.js')],
     outfile: out,
@@ -52,7 +52,7 @@ const check = (what, condition, detail) => {
   // The canvas narrows to the instance being edited, so a click on the page
   // around it arrives with no path AND this flag — that is what tells "looked
   // away" apart from "couldn't place it".
-  const away = (path = null) => canvasClickAction({ path, outside: true, ...inside }).kind;
+  const away = (path) => canvasClickAction({ path, outside: true, ...inside }).kind;
 
   // --- inside a component -------------------------------------------------------
   check(
@@ -64,8 +64,8 @@ const check = (what, condition, detail) => {
   check('the component root included', act(`${COMPONENT}0`) === 'inner');
 
   // The bug: a click the canvas couldn't name is not a click somewhere else.
-  check('a click it could not map changes nothing', act(null) === 'nothing', act(null));
-  check('and certainly does not close', act(null) !== 'close');
+  check('a click it could not map changes nothing', act(undefined) === 'nothing', act(undefined));
+  check('and certainly does not close', act(undefined) !== 'close');
 
   // A path in the PAGE's namespace, under the instance being edited: the
   // instance's own markup as the page sees it, or content passed into its slot.
@@ -79,12 +79,12 @@ const check = (what, condition, detail) => {
   // --- leaving ------------------------------------------------------------------
   //
   // With the instance narrowed, a click on the page around it maps to nothing in
-  // scope — so the path is null and `outside` is what says it was a click on
+  // scope — so the path is undefined and `outside` is what says it was a click on
   // SOMETHING. Both halves matter: without the flag this reads as "couldn't
-  // place it" and there is no way to click away; without the null-is-nothing
+  // place it" and there is no way to click away; without the no-path-is-nothing
   // rule every unmarked node inside the component throws you out.
   check('a click on the page around it leaves', away() === 'close', away());
-  check('and one it simply could not place still does not', act(null) === 'nothing');
+  check('and one it simply could not place still does not', act(undefined) === 'nothing');
 
   //
   // A node the canvas DID place, somewhere else on the page — that is somebody
@@ -94,14 +94,14 @@ const check = (what, condition, detail) => {
   check('and a node above it', act('0') === 'close');
 
   // --- not in a component -------------------------------------------------------
-  const page = { focusPath: null, scope: '' };
+  const page = { focusPath: undefined, scope: '' };
   check('on a page, a mapped path selects', act('0.1', page) === 'select', act('0.1', page));
   // Chrome the layout renders itself — header, footer, anything outside the
   // page's <slot> — carries no page-model marker, so it arrives with no path.
   check(
     'and an unmapped click selects the layout that owns it',
-    act(null, page) === 'layout',
-    act(null, page),
+    act(undefined, page) === 'layout',
+    act(undefined, page),
   );
 
   // --- the panel asks -----------------------------------------------------------
@@ -119,7 +119,7 @@ const check = (what, condition, detail) => {
   );
   check(
     'one run is enough to narrow to the instance',
-    /if \(runs\.length\) \{[\s\S]*?focusCache = runs\[focusOcc\]/.test(preload),
+    /if \(runs\.length\) \{[\s\S]*?focusCache = \{ roots: runs\[focusOcc\]/.test(preload),
     'focusRoots still requires more than one run',
   );
   check('and none still narrows to nothing', /if \(focusPath\) \{/.test(preload));

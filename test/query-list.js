@@ -49,13 +49,13 @@ const SHEET = `.card {
 
 (async () => {
   const esbuild = require('esbuild');
-  const buildDir = path.join(__dirname, '..', 'node_modules', '.stacki-test');
-  fs.mkdirSync(buildDir, { recursive: true });
+  const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
+  fs.mkdirSync(buildDirectory, { recursive: true });
 
   // ── The rewrite itself ────────────────────────────────────────────────────
   // No panel, no DOM: given a stylesheet, what does renaming a query do to it.
   {
-    const cssBundle = path.join(buildDir, 'query-css.bundle.js');
+    const cssBundle = path.join(buildDirectory, 'query-css.bundle.js');
     await esbuild.build({
       entryPoints: [path.join(__dirname, '..', 'src', 'style-panel', 'lib', 'css.ts')],
       outfile: cssBundle,
@@ -66,9 +66,7 @@ const SHEET = `.card {
     });
     const { parseRegion, renameAtRuleQuery, countAtRuleQuery, splitQuery } = require(cssBundle);
     const regionOf = (css) => {
-      const region = { start: 0, end: css.length, css, root: null, openTag: '<style>' };
-      parseRegion(region);
-      return region;
+      return parseRegion({ start: 0, end: css.length, css, root: undefined, openTag: '<style>' });
     };
 
     const region = regionOf(SHEET);
@@ -77,13 +75,13 @@ const SHEET = `.card {
       countAtRuleQuery(region, '@media (prefers-reduced-motion: reduce)') === 2,
       String(countAtRuleQuery(region, '@media (prefers-reduced-motion: reduce)')),
     );
-    const n = renameAtRuleQuery(
+    const renamedCount = renameAtRuleQuery(
       region,
       '@media (prefers-reduced-motion: reduce)',
       '@media (prefers-reduced-motion: no-preference)',
     );
     const out = region.root.toString();
-    check('both blocks are renamed in one pass', n === 2, `${n} renamed`);
+    check('both blocks are renamed in one pass', renamedCount === 2, `${renamedCount} renamed`);
     check('including the one nested inside a rule', !/: reduce\)/.test(out), out);
     check(
       'and the new condition is what got written',
@@ -106,8 +104,16 @@ const SHEET = `.card {
     const spaced = regionOf(
       '@media (width>=64rem){.a{color:red}}\n@MEDIA (width >= 64rem) { .b { color: blue } }\n',
     );
-    const m = renameAtRuleQuery(spaced, '@media (width >= 64rem)', '@media (width >= 48rem)');
-    check('whitespace and case in the at-name do not hide a match', m === 2, `${m} renamed`);
+    const spacedCount = renameAtRuleQuery(
+      spaced,
+      '@media (width >= 64rem)',
+      '@media (width >= 48rem)',
+    );
+    check(
+      'whitespace and case in the at-name do not hide a match',
+      spacedCount === 2,
+      `${spacedCount} renamed`,
+    );
     check(
       'both come out with the new condition',
       (spaced.root.toString().match(/48rem/g) || []).length === 2,
@@ -136,7 +142,7 @@ const SHEET = `.card {
     );
 
     // Text that isn't an at-rule can't be written into the file.
-    check('a query has to start with @', splitQuery('width < 40em') === null);
+    check('a query has to start with @', splitQuery('width < 40em') === undefined);
     check(
       'and is split into the parts postcss holds',
       JSON.stringify(splitQuery('@media (width < 40em)')) ===
@@ -150,7 +156,7 @@ const SHEET = `.card {
   // they reached the panel in: they're the ones being worked on, and a query
   // arriving from a project-wide stylesheet is further away in every sense.
   {
-    const nsBundle = path.join(buildDir, 'query-contexts.bundle.js');
+    const nsBundle = path.join(buildDirectory, 'query-contexts.bundle.js');
     await esbuild.build({
       entryPoints: [path.join(__dirname, '..', 'src', 'style-panel', 'lib', 'native-styles.ts')],
       outfile: nsBundle,
@@ -170,22 +176,26 @@ const SHEET = `.card {
     ];
     const styled = new Set(keys.slice(1));
     const own = new Set(['@container (width > 40em)', '@media (width > 90em)']);
-    const labels = buildStyleContexts(keys, null, null, styled, own).map((c) => c.label);
-    const idx = (re) => labels.findIndex((l) => re.test(l));
+    const labels = buildStyleContexts(keys, undefined, undefined, styled, own).map(
+      (context) => context.label,
+    );
+    const labelIndex = (re) => labels.findIndex((label) => re.test(label));
     check('Base leads the list', labels[0] === 'Base', labels.join(' | '));
     check(
       "the component's own queries come first",
-      idx(/width > 40em/) < idx(/prefers-contrast/) &&
-        idx(/width > 90em/) < idx(/prefers-contrast/),
+      labelIndex(/width > 40em/) < labelIndex(/prefers-contrast/) &&
+        labelIndex(/width > 90em/) < labelIndex(/prefers-contrast/),
       labels.join(' | '),
     );
     check(
       'and among its own, the order the file has them is kept',
-      idx(/width > 40em/) < idx(/width > 90em/),
+      labelIndex(/width > 40em/) < labelIndex(/width > 90em/),
       labels.join(' | '),
     );
     // With nothing owned, the list is what it always was.
-    const plain = buildStyleContexts(keys, null, null, styled, new Set()).map((c) => c.label);
+    const plain = buildStyleContexts(keys, undefined, undefined, styled, new Set()).map(
+      (context) => context.label,
+    );
     check(
       'with no component queries at all, order is left alone',
       plain.join('|') ===
@@ -200,7 +210,7 @@ const SHEET = `.card {
   }
 
   // ── The dropdown ──────────────────────────────────────────────────────────
-  const bundlePath = path.join(buildDir, 'query-list.bundle.js');
+  const bundlePath = path.join(buildDirectory, 'query-list.bundle.js');
   await esbuild.build({
     stdin: {
       contents:
@@ -295,20 +305,20 @@ const SHEET = `.card {
   createRoot(host).render(React.createElement(EmbedEditor));
   await wait(700);
 
-  const doc = dom.window.document;
+  const domDocument = dom.window.document;
   const openList = async () => {
-    const trigger = [...host.querySelectorAll('button')].find((b) =>
-      /Base/.test(b.textContent || ''),
+    const trigger = [...host.querySelectorAll('button')].find((button) =>
+      /Base/.test(button.textContent || ''),
     );
     trigger?.click();
     await wait(120);
   };
-  const rows = () => [...doc.querySelectorAll('.u-select-option')];
-  const rowText = () => rows().map((o) => (o.textContent || '').trim());
+  const rows = () => [...domDocument.querySelectorAll('.u-select-option')];
+  const rowText = () => rows().map((option) => (option.textContent || '').trim());
 
   await openList();
   const options = rowText();
-  const has = (re) => options.some((o) => re.test(o));
+  const has = (re) => options.some((option) => re.test(option));
   check('the dropdown opens', options.length > 0, `${options.length} options`);
   check('Base is offered', has(/^Base/), options.join(' | '));
   check(
@@ -325,7 +335,7 @@ const SHEET = `.card {
     has(/width > 90em/),
     options.join(' | '),
   );
-  const rowAt = (re) => options.findIndex((o) => re.test(o));
+  const rowAt = (re) => options.findIndex((option) => re.test(option));
   check(
     "this file's queries come before another file's",
     rowAt(/width > 40em/) < rowAt(/width > 90em/) &&
@@ -335,7 +345,7 @@ const SHEET = `.card {
   check('and Base still leads', rowAt(/^Base/) === 0, options.join(' | '));
 
   // ── Editing one ───────────────────────────────────────────────────────────
-  const rowFor = (re) => rows().find((o) => re.test(o.textContent || ''));
+  const rowFor = (re) => rows().find((option) => re.test(option.textContent || ''));
   const pencil = (row) => row?.querySelector('.u-select-action');
   check('Base has nothing to rename', !pencil(rowFor(/^\s*Base/)), 'Base offered an edit control');
   const motionRow = rowFor(/prefers-reduced-motion/);
@@ -363,8 +373,8 @@ const SHEET = `.card {
   // A field holding a whole query has nothing to narrow — the list is there to
   // show what else this block could be, so it shows everything.
   const suggested = () =>
-    [...host.querySelectorAll('.embed-editor_suggest-item')].map((b) =>
-      (b.textContent || '').trim(),
+    [...host.querySelectorAll('.embed-editor_suggest-item')].map((button) =>
+      (button.textContent || '').trim(),
     );
   check(
     'with the whole query typed, the list still offers the others',
@@ -373,17 +383,17 @@ const SHEET = `.card {
   );
   check(
     "including the file's other query",
-    suggested().some((s) => /width > 40em/.test(s)),
+    suggested().some((suggestion) => /width > 40em/.test(suggestion)),
     suggested().join(' | '),
   );
   check(
     'and common ones it does not use yet',
-    suggested().some((s) => /prefers-color-scheme/.test(s)),
+    suggested().some((suggestion) => /prefers-color-scheme/.test(suggestion)),
     suggested().join(' | '),
   );
   // Size first: breakpoints are what this list is reached for, over and over,
   // while hover and the prefers-* queries are set once and left alone.
-  const at = (re) => suggested().findIndex((s) => re.test(s));
+  const at = (re) => suggested().findIndex((suggestion) => re.test(suggestion));
   check(
     'a container query outranks a preference query',
     at(/width > 40em/) < at(/prefers-reduced-motion/),
@@ -407,18 +417,18 @@ const SHEET = `.card {
 
   // Type something the suggestion list never offered — the list is a shortcut,
   // not the set of allowed answers.
-  const setValue = (el, value) => {
+  const setValue = (element, value) => {
     const setter = Object.getOwnPropertyDescriptor(
       dom.window.HTMLInputElement.prototype,
       'value',
     ).set;
-    setter.call(el, value);
-    el.dispatchEvent(new dom.window.Event('input', { bubbles: true }));
+    setter.call(element, value);
+    element.dispatchEvent(new dom.window.Event('input', { bubbles: true }));
   };
   setValue(field, '@media (prefers-reduced-motion: no-preference) and (width > 20em)');
   await wait(40);
-  const rename = [...host.querySelectorAll('button')].find((b) =>
-    /^Rename$/.test((b.textContent || '').trim()),
+  const rename = [...host.querySelectorAll('button')].find((button) =>
+    /^Rename$/.test((button.textContent || '').trim()),
   );
   check('the rename button is there', !!rename, host.textContent?.slice(0, 200));
   rename?.click();

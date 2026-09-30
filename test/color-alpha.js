@@ -31,16 +31,16 @@ const SIZE = 240;
 
 (async () => {
   const esbuild = require('esbuild');
-  const buildDir = path.join(__dirname, '..', 'node_modules', '.stacki-test');
-  fs.mkdirSync(buildDir, { recursive: true });
-  const entry = path.join(buildDir, 'color-alpha.entry.jsx');
+  const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
+  fs.mkdirSync(buildDirectory, { recursive: true });
+  const entry = path.join(buildDirectory, 'color-alpha.entry.jsx');
   fs.writeFileSync(
     entry,
     `export { default as ColorPicker } from ${JSON.stringify(
       path.join(__dirname, '..', 'src', 'style-panel', 'components', 'ColorPicker.tsx'),
     )};\n`,
   );
-  const out = path.join(buildDir, 'color-alpha.bundle.js');
+  const out = path.join(buildDirectory, 'color-alpha.bundle.js');
   await esbuild.build({
     entryPoints: [entry],
     outfile: out,
@@ -59,6 +59,7 @@ const SIZE = 240;
   global.document = dom.window.document;
   global.Node = dom.window.Node;
   // Geometry is supplied below; this test does not need a canvas renderer.
+  // eslint-disable-next-line stacki/no-null -- Stubs the platform getContext, which answers null.
   dom.window.HTMLCanvasElement.prototype.getContext = () => null;
   // JSDOM reports event-handler exceptions without rejecting dispatchEvent.
   // Count them as failures so a broken drag cannot leave this test green.
@@ -94,7 +95,7 @@ const SIZE = 240;
         React.createElement(ColorPicker, {
           value,
           anchor: { top: 0, bottom: 0, left: 0, right: 0, width: 0, height: 0 },
-          trigger: null,
+          trigger: undefined,
           onChange: (color, live) => emitted.push({ color, live }),
           onClose: () => {},
         }),
@@ -105,24 +106,24 @@ const SIZE = 240;
   };
   // A drag is a pointerdown on the surface, which reports immediately.
   const dragOn = async (selector, fx, fy = 0.5) => {
-    const el = dom.window.document.querySelector(selector);
-    if (!el) {
+    const element = dom.window.document.querySelector(selector);
+    if (!element) {
       throw new Error(`no ${selector}`);
     }
     await act(async () => {
       const event = new dom.window.MouseEvent('pointerdown', { bubbles: true, cancelable: true });
       Object.defineProperty(event, 'clientX', { value: fx * SIZE });
       Object.defineProperty(event, 'clientY', { value: fy * SIZE });
-      el.dispatchEvent(event);
+      element.dispatchEvent(event);
     });
   };
   const last = () => emitted[emitted.length - 1]?.color ?? '';
   const alphaOf = (color) => {
-    const m = color.match(/rgba?\(([^)]*)\)/);
-    if (!m) {
+    const match = color.match(/rgba?\(([^)]*)\)/);
+    if (!match) {
       return color.startsWith('#') && color.length === 9 ? parseInt(color.slice(7), 16) / 255 : 1;
     }
-    const parts = m[1].split(',').map((p) => parseFloat(p));
+    const parts = match[1].split(',').map((part) => parseFloat(part));
     return parts.length > 3 ? parts[3] : 1;
   };
 
@@ -237,7 +238,7 @@ const SIZE = 240;
   const pressHex = () => press('.u-color-mode.is-hex');
   const letters = () =>
     [...dom.window.document.querySelectorAll('.u-color-mode.is-channel span')]
-      .map((s) => s.textContent)
+      .map((span) => span.textContent)
       .join('');
   const hexOn = () => !!dom.window.document.querySelector('.u-color-mode.is-hex.is-on');
 

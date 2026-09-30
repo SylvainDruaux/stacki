@@ -8,6 +8,9 @@ const path = require('node:path');
 const { buildSync } = require('esbuild');
 const { JSDOM } = require('jsdom');
 const { BOUNDARY_LIMITS } = require('../dist/shared/boundary.js');
+
+// Null as a boundary receives it, parsed from JSON: inputs may hold it; our values never do.
+const jsonNull = JSON.parse('null');
 const { parseGitHubStatus, readGitHubStatus, repoSlug, webUrl } =
   require('./renderer-module')('panels/gitPublish.ts');
 
@@ -21,11 +24,11 @@ test('GitHub preflight parses each state and rejects impossible or oversized dat
     assert.deepEqual(parseGitHubStatus(status), status);
   }
   for (const status of [
-    null,
+    jsonNull,
     {},
     { installed: false, authed: true },
     // Absence is `undefined` (AGENTS.md §6): an unknown user is never sent as null.
-    { installed: true, authed: true, user: null },
+    { installed: true, authed: true, user: jsonNull },
     { installed: 1, authed: false },
     { installed: true, authed: true, user: 'x'.repeat(BOUNDARY_LIMITS.textLengthMax + 1) },
   ]) {
@@ -129,7 +132,7 @@ test('publish dialog passes its project to preflight and ignores old replies', a
             from: 'main',
             to: 'topic',
             files: Array(100001).fill('a'),
-            busy: null,
+            busy: undefined,
             onCancel() {},
             onLeaveHere() {},
             onCommitFirst() {},

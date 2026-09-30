@@ -11,8 +11,10 @@
 //
 // So this drives the real component rather than reasoning about the handlers.
 
+const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
+const { LIMITS } = require('../dist/shared/limits.js');
 
 const failures = [];
 let checked = 0;
@@ -25,9 +27,9 @@ const check = (what, condition, detail) => {
 
 (async () => {
   const esbuild = require('esbuild');
-  const buildDir = path.join(__dirname, '..', 'node_modules', '.stacki-test');
-  fs.mkdirSync(buildDir, { recursive: true });
-  const bundlePath = path.join(buildDir, 'varconnect-open.bundle.js');
+  const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
+  fs.mkdirSync(buildDirectory, { recursive: true });
+  const bundlePath = path.join(buildDirectory, 'varconnect-open.bundle.js');
   await esbuild.build({
     entryPoints: [path.join(__dirname, '..', 'src', 'style-panel', 'VariableConnect.tsx')],
     outfile: bundlePath,
@@ -80,7 +82,7 @@ const check = (what, condition, detail) => {
   global.Node = dom.window.Node;
   global.getComputedStyle = dom.window.getComputedStyle;
   global.MutationObserver = dom.window.MutationObserver;
-  global.requestAnimationFrame = (fn) => setTimeout(fn, 0);
+  global.requestAnimationFrame = (callback) => setTimeout(callback, 0);
   global.cancelAnimationFrame = clearTimeout;
   global.ResizeObserver = class {
     observe() {}
@@ -99,22 +101,27 @@ const check = (what, condition, detail) => {
   // The field is as wide as its content unless a test says otherwise, so
   // "fits" is the default and overflow is opted into.
   const setOverflow = (root, over) => {
-    for (const el of root.querySelectorAll('input, .embed-editor_varconnect-editor')) {
-      Object.defineProperty(el, 'clientWidth', { value: 100, configurable: true });
-      Object.defineProperty(el, 'scrollWidth', { value: over ? 400 : 100, configurable: true });
+    for (const element of root.querySelectorAll('input, .embed-editor_varconnect-editor')) {
+      Object.defineProperty(element, 'clientWidth', { value: 100, configurable: true });
+      Object.defineProperty(element, 'scrollWidth', {
+        value: over ? 400 : 100,
+        configurable: true,
+      });
     }
   };
 
-  const press = (el) => {
-    el.dispatchEvent(new dom.window.MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+  const press = (element) => {
+    element.dispatchEvent(
+      new dom.window.MouseEvent('mousedown', { bubbles: true, cancelable: true }),
+    );
   };
-  const clickIt = (el) => {
-    press(el);
-    el.dispatchEvent(new dom.window.MouseEvent('mouseup', { bubbles: true }));
-    el.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }));
+  const clickIt = (element) => {
+    press(element);
+    element.dispatchEvent(new dom.window.MouseEvent('mouseup', { bubbles: true }));
+    element.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }));
   };
 
-  const mount = async (value, opts = {}) => {
+  const mount = async (value, options = {}) => {
     const host = document.createElement('div');
     document.body.appendChild(host);
     const root = createRoot(host);
@@ -123,7 +130,12 @@ const check = (what, condition, detail) => {
       root.render(
         React.createElement(
           VariableConnect,
-          { onPick: (v) => picked.push(v), ariaLabel: 'Height', prop: 'height', ...opts },
+          {
+            onPick: (value) => picked.push(value),
+            ariaLabel: 'Height',
+            prop: 'height',
+            ...options,
+          },
           React.createElement('input', { className: 'u-input', value, onChange() {} }),
         ),
       );
@@ -474,8 +486,8 @@ const check = (what, condition, detail) => {
       clickIt(host.querySelector('.embed-editor_varconnect-dot'));
     });
     check('the picker opens from the dot', !!document.querySelector('.embed-editor_varpicker'));
-    const row = [...document.querySelectorAll('button')].find((b) =>
-      /brand/.test(b.textContent || ''),
+    const row = [...document.querySelectorAll('button')].find((button) =>
+      /brand/.test(button.textContent || ''),
     );
     check('it lists a variable', !!row);
     if (row) {
@@ -505,17 +517,18 @@ const check = (what, condition, detail) => {
     const field = host.querySelector('.embed-editor_varconnect-editor');
     check('the value edits in the rich field', !!field);
     // Put the caret just before the ")".
-    const findParen = (n) => {
-      if (n.nodeType === 3 && n.textContent.includes(')')) {
-        return n;
+    const findParen = (node, depth = 0) => {
+      assert.ok(depth <= LIMITS.treeDepthMax, 'findParen: depth limit');
+      if (node.nodeType === 3 && node.textContent.includes(')')) {
+        return node;
       }
-      for (const c of n.childNodes) {
-        const r = findParen(c);
-        if (r) {
-          return r;
+      for (const child of node.childNodes) {
+        const found = findParen(child, depth + 1);
+        if (found) {
+          return found;
         }
       }
-      return null;
+      return undefined;
     };
     await act(async () => {
       field.focus();
@@ -523,9 +536,9 @@ const check = (what, condition, detail) => {
       const range = document.createRange();
       range.setStart(node, node.textContent.indexOf(')'));
       range.collapse(true);
-      const sel = dom.window.getSelection();
-      sel.removeAllRanges();
-      sel.addRange(range);
+      const selection = dom.window.getSelection();
+      selection.removeAllRanges();
+      selection.addRange(range);
       field.dispatchEvent(new dom.window.MouseEvent('mouseup', { bubbles: true }));
     });
     // Everything that happens between placing the caret and picking: the panel
@@ -539,8 +552,8 @@ const check = (what, condition, detail) => {
     await act(async () => {
       clickIt(host.querySelector('.embed-editor_varconnect-dot'));
     });
-    const row = [...document.querySelectorAll('button')].find((b) =>
-      /brand/.test(b.textContent || ''),
+    const row = [...document.querySelectorAll('button')].find((button) =>
+      /brand/.test(button.textContent || ''),
     );
     check('the picker lists a variable to choose', !!row);
     if (row) {
@@ -564,7 +577,7 @@ const check = (what, condition, detail) => {
   }
   console.log(`varconnect-open: ${checked} passed`);
   process.exit(0);
-})().catch((err) => {
-  console.error(err);
+})().catch((error) => {
+  console.error(error);
   process.exit(1);
 });

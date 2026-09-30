@@ -70,7 +70,14 @@ const path = require('node:path');
   const changes = [];
   const positions = [];
   const components = [];
-  const render = async (value, revealLine = 2, ranges = true, language = 'javascript') => {
+  // Options spread over the defaults, so a render can ask for no reveal line at all.
+  const render = async (value, options = {}) => {
+    const { revealLine, ranges, language } = {
+      revealLine: 2,
+      ranges: true,
+      language: 'javascript',
+      ...options,
+    };
     await React.act(async () =>
       root.render(
         React.createElement(CodeEditor, {
@@ -78,7 +85,7 @@ const path = require('node:path');
           revealLine,
           language,
           onChange: (text) => changes.push(text),
-          activeRange: ranges ? { from: 4, to: 7 } : null,
+          activeRange: ranges ? { from: 4, to: 7 } : undefined,
           componentRanges: ranges ? [{ from: 0, to: 3, id: 'one', name: 'One' }] : [],
           onPositionChange: (position) => positions.push(position),
           onOpenComponent: (name, id) => components.push({ name, id }),
@@ -131,14 +138,14 @@ const path = require('node:path');
     assert.equal(view.state.selection.main.head, 5, 'a change before the caret carries it');
     assert.equal(changes.length, 1, 'neither echoes as an edit');
     await render('external\nupdated\nsource');
-    await render('external\nupdated\nsource', 3);
+    await render('external\nupdated\nsource', { revealLine: 3 });
     assert.equal(
       view.state.selection.main.head,
       view.state.doc.line(3).from,
       'a new reveal request still moves the caret',
     );
     const astroSource = '<Heading tag="h1" maxWidth={17}>Find hope.</Heading>';
-    await render(astroSource, null, false, 'astro');
+    await render(astroSource, { revealLine: undefined, ranges: false, language: 'astro' });
     await React.act(() => new Promise((resolve) => setTimeout(resolve, 500)));
     const astroTokens = [...document.querySelectorAll('.cm-astro-token')];
     const punctuation = astroTokens.find((token) => token.textContent === '<');

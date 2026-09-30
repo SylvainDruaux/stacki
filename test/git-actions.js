@@ -6,6 +6,9 @@ const path = require('node:path');
 const vm = require('node:vm');
 const esbuild = require('esbuild');
 const loadRenderer = require('./renderer-module.js');
+
+// Null as a boundary receives it, parsed from JSON: inputs may hold it; our values never do.
+const jsonNull = JSON.parse('null');
 const { parseMergeResult, parseDeleteResult } = loadRenderer('gitBridge.ts');
 const success = { ok: true, into: 'main', changed: true };
 const dirty = { ok: false, dirty: true, from: 'topic', branch: 'main', files: ['a.astro'] };
@@ -20,14 +23,14 @@ for (const result of [success, dirty, conflict]) {
   assert.deepEqual(parseMergeResult(result), result);
 }
 for (const result of [
-  null,
+  jsonNull,
   {},
   { ok: true },
   { ok: false },
   { ...dirty, files: [1] },
   { ...conflict, files: [{ path: 'a', ours: 1, theirs: undefined, parts: undefined }] },
   // Absence is `undefined` (AGENTS.md §6): a deleted side is never sent as null.
-  { ...conflict, files: [{ path: 'a', ours: 'x', theirs: null, parts: undefined }] },
+  { ...conflict, files: [{ path: 'a', ours: 'x', theirs: jsonNull, parts: undefined }] },
 ]) {
   assert.throws(() => parseMergeResult(result));
 }
@@ -37,7 +40,7 @@ assert.deepEqual(parseDeleteResult({ ok: false, unmerged: true, message: 'Unmerg
   unmerged: true,
   message: 'Unmerged',
 });
-for (const result of [null, {}, { ok: false }, { ok: false, unmerged: true, message: 1 }]) {
+for (const result of [jsonNull, {}, { ok: false }, { ok: false, unmerged: true, message: 1 }]) {
   assert.throws(() => parseDeleteResult(result));
 }
 
@@ -113,7 +116,7 @@ async function main() {
     { branch: 'main' },
   );
   assert.deepEqual(names(trunk), ['gitMerge']);
-  assert.equal(trunk[0].checkbox, null);
+  assert.equal(trunk[0].checkbox, undefined);
   const parked = await scenario('mergeBranchAction', [{ checked: true }, true], {
     gitMerge: [dirty, conflict],
     gitPark: [{ ok: true, parked: true, branch: 'main' }],

@@ -21,6 +21,9 @@ const {
   mergeInline,
 } = require('../dist/electron/conflicts.js');
 
+// Null as a boundary receives it, parsed from JSON: inputs may hold it; our values never do.
+const jsonNull = JSON.parse('null');
+
 const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
@@ -50,7 +53,7 @@ const conflicted = [
 {
   const parts = parseConflict(conflicted);
   check('both disagreements are found', clashCount(parts) === 2, String(clashCount(parts)));
-  const clashes = parts.filter((p) => p.kind === 'clash');
+  const clashes = parts.filter((part) => part.kind === 'clash');
   check('this branch’s side is read', clashes[0].ours === 'HERO MAIN', clashes[0].ours);
   check('and the incoming side', clashes[0].theirs === 'HERO FEATURE', clashes[0].theirs);
   check('the second one too', clashes[1].ours === 'FOOTER MAIN', clashes[1].ours);
@@ -58,7 +61,8 @@ const conflicted = [
   check(
     'no marker text is kept as content',
     !parts.some(
-      (p) => JSON.stringify(p).includes('<<<<<<<') || JSON.stringify(p).includes('======='),
+      (part) =>
+        JSON.stringify(part).includes('<<<<<<<') || JSON.stringify(part).includes('======='),
     ),
     JSON.stringify(parts),
   );
@@ -143,7 +147,7 @@ const conflicted = [
   );
 
   check('empty text is handled', renderResolved(parseConflict(''), []) === '');
-  check('null text is handled', renderResolved(parseConflict(null), []) === '');
+  check('null text is handled', renderResolved(parseConflict(jsonNull), []) === '');
 
   // A marker somebody left in by hand, never closed. Every line has to
   // survive: dropping the tail would silently delete the rest of the file.
@@ -204,7 +208,7 @@ const conflicted = [
     clashCount(parts) === 1,
     JSON.stringify(parts),
   );
-  const clash = parts.find((p) => p.kind === 'clash');
+  const clash = parts.find((part) => part.kind === 'clash');
   check('with this branch’s side', clash.ours === 'mine', JSON.stringify(clash.ours));
   check('and the incoming side', clash.theirs === 'theirs', JSON.stringify(clash.theirs));
   check(
@@ -246,7 +250,7 @@ const conflicted = [
   const parts = parseConflict(conflicted);
 
   check('two adjacent edits are two decisions', clashCount(parts) === 2, JSON.stringify(parts));
-  const clashes = parts.filter((p) => p.kind === 'clash');
+  const clashes = parts.filter((part) => part.kind === 'clash');
   // And each is attributed to the branch that actually made it, which is what
   // lets the dialog answer them without asking.
   check(
@@ -258,7 +262,7 @@ const conflicted = [
 
   // Defaulting to whoever changed each part gives exactly what was wanted,
   // with nothing to pick by hand.
-  const picks = clashes.map((c) => (c.changedBy === 'theirs' ? 'theirs' : 'ours'));
+  const picks = clashes.map((clash) => (clash.changedBy === 'theirs' ? 'theirs' : 'ours'));
   const out = renderResolved(parts, picks);
   check('the heading comes from the branch that changed it', out.includes('Heading 3'), out);
   check('the paragraph from the branch that changed it', out.includes('EDITED ON MAIN'), out);
@@ -269,7 +273,7 @@ const conflicted = [
   );
   check(
     'the file has just the two lines',
-    out.split('\n').filter((l) => l.trim()).length === 2,
+    out.split('\n').filter((line) => line.trim()).length === 2,
     JSON.stringify(out),
   );
 }
@@ -291,7 +295,7 @@ const conflicted = [
   check('one line both changed is one decision', clashCount(parts) === 1, JSON.stringify(parts));
   check(
     'and is marked as a real disagreement',
-    parts.find((p) => p.kind === 'clash').changedBy === 'both',
+    parts.find((part) => part.kind === 'clash').changedBy === 'both',
   );
 }
 
@@ -316,7 +320,7 @@ const conflicted = [
   // One side changes the first line, the other the last: two decisions, with
   // the untouched middle no longer part of either.
   const runs = threeWay(base, ['A', 'b', 'c', 'd'], ['a', 'b', 'c', 'D']);
-  const clashes = runs.filter((r) => !r.common);
+  const clashes = runs.filter((run) => !run.common);
   check('separate edits split apart', clashes.length === 2, JSON.stringify(runs));
   check(
     'each credited to its own side',
@@ -325,16 +329,16 @@ const conflicted = [
   );
   check(
     'untouched lines are common',
-    runs.some((r) => r.common && r.common.includes('b')),
+    runs.some((run) => run.common && run.common.includes('b')),
     JSON.stringify(runs),
   );
 
   // Nothing changed on either side: no decisions at all.
-  const none = threeWay(base, base, base).filter((r) => !r.common);
+  const none = threeWay(base, base, base).filter((run) => !run.common);
   check('an unchanged region asks nothing', none.length === 0, JSON.stringify(none));
 
   // One side deleted lines the other left alone.
-  const del = threeWay(base, ['a', 'd'], base).filter((r) => !r.common);
+  const del = threeWay(base, ['a', 'd'], base).filter((run) => !run.common);
   check('a deletion is one decision', del.length === 1, JSON.stringify(del));
   check('credited to the side that deleted', del[0].changedBy === 'ours', JSON.stringify(del[0]));
   check(
@@ -374,15 +378,15 @@ const conflicted = [
   // produce a line neither branch wrote.
   check(
     'the same words rewritten twice is still a question',
-    mergeInline('<h2>Title</h2>', '<h2>From main</h2>', '<h2>From branch</h2>') === null,
+    mergeInline('<h2>Title</h2>', '<h2>From main</h2>', '<h2>From branch</h2>') === undefined,
   );
   // Both added something at the same place — the order would be invented.
   check(
     'two attributes added at the same spot is still a question',
-    mergeInline('<h2>Hi</h2>', '<h2 class="a">Hi</h2>', '<h2 id="b">Hi</h2>') === null,
+    mergeInline('<h2>Hi</h2>', '<h2 class="a">Hi</h2>', '<h2 id="b">Hi</h2>') === undefined,
   );
-  check('with no ancestor it will not guess', mergeInline(null, 'a', 'b') === null);
-  check('and an unchanged line offers nothing', mergeInline('same', 'same', 'same') === null);
+  check('with no ancestor it will not guess', mergeInline(undefined, 'a', 'b') === undefined);
+  check('and an unchanged line offers nothing', mergeInline('same', 'same', 'same') === undefined);
 }
 
 // --- The combined version, end to end ---------------------------------------
@@ -397,10 +401,10 @@ const conflicted = [
     '>>>>>>> new-branch',
   ].join('\n');
   const parts = parseConflict(conflicted);
-  const clash = parts.find((p) => p.kind === 'clash');
+  const clash = parts.find((part) => part.kind === 'clash');
   check(
     'a combinable clash carries the combined text',
-    clash.merged != null,
+    clash.merged !== undefined,
     JSON.stringify(clash),
   );
   check(
@@ -423,7 +427,7 @@ const conflicted = [
   // would offer a button that silently means "ours".
   const plain = parseConflict(
     ['<<<<<<< HEAD', 'aaa', '||||||| base', 'bbb', '=======', 'ccc', '>>>>>>> f'].join('\n'),
-  ).find((p) => p.kind === 'clash');
+  ).find((part) => part.kind === 'clash');
   check(
     'an uncombinable clash has no combined version',
     plain.merged === undefined,

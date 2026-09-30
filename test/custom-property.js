@@ -30,9 +30,9 @@ const check = (what, condition, detail) => {
 
 (async () => {
   const esbuild = require('esbuild');
-  const buildDir = path.join(__dirname, '..', 'node_modules', '.stacki-test');
-  fs.mkdirSync(buildDir, { recursive: true });
-  const out = path.join(buildDir, 'custom-property.cjs');
+  const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
+  fs.mkdirSync(buildDirectory, { recursive: true });
+  const out = path.join(buildDirectory, 'custom-property.cjs');
   await esbuild.build({
     stdin: {
       contents: `export { filterCssProperties, CSS_PROPERTIES } from './lib/css-properties'`,
@@ -48,7 +48,7 @@ const check = (what, condition, detail) => {
   const { filterCssProperties, CSS_PROPERTIES } = require(out);
 
   const VARS = ['--brand-500', '--light-300', '--space-4'];
-  const first = (q, n = 4) => filterCssProperties(q, VARS).slice(0, n);
+  const first = (query, count = 4) => filterCssProperties(query, VARS).slice(0, count);
 
   // --- the project's own properties are properties ---------------------------------
   check(
@@ -107,9 +107,9 @@ const check = (what, condition, detail) => {
     'Enter on a named property with no value moves to the value field',
     containsCode(
       source,
-      'onEnter={() => { if (prop.trim() && !value.trim()) ' +
-        '{ valueRef.current?.focus(); return } submit() }}',
-    ),
+      'const enterName = () => { if (prop.trim() && !value.trim()) ' +
+        '{ valueRef.current?.focus(); return } submit() }',
+    ) && containsCode(source, 'onEnter={row.enterName}'),
     'Enter still calls a submit that has nothing to write',
   );
   check(
@@ -119,12 +119,12 @@ const check = (what, condition, detail) => {
   );
   check(
     'and the row asks for the project’s variables while it is open',
-    /useSharedVars\(expanded\)/.test(source),
+    /useSharedVars\((?:expanded|\{ active: expanded \})\)/.test(source),
     'either nothing is asked for, or it is asked for always',
   );
   check(
     'which reach the list as property names',
-    /vars\.map\(\(v\) => `--\$\{v\.name\}`\)/.test(source),
+    /vars\.map\(\(variable\) => `--\$\{variable\.name\}`\)/.test(source),
     'the names would be offered without their dashes',
   );
 

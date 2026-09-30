@@ -22,20 +22,20 @@ const { parsePageDiskRead, parsePageEditResult } = require('../dist/shared/page-
 const { applyCodePatch } = require('../dist/shared/code-patch.js');
 const { LIMITS } = require('../dist/shared/limits.js');
 
-const buildDir = path.join(__dirname, '..', 'node_modules', '.stacki-test', 'code-edits');
-fs.mkdirSync(buildDir, { recursive: true });
+const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test', 'code-edits');
+fs.mkdirSync(buildDirectory, { recursive: true });
 esbuild.buildSync({
   entryPoints: ['pageEdits', 'codeEdits'].map((name) =>
     path.join(__dirname, '..', 'src', `${name}.ts`),
   ),
-  outdir: buildDir,
+  outdir: buildDirectory,
   bundle: true,
   format: 'cjs',
   platform: 'node',
   logLevel: 'silent',
 });
-const edits = require(path.join(buildDir, 'pageEdits.js'));
-const code = require(path.join(buildDir, 'codeEdits.js'));
+const edits = require(path.join(buildDirectory, 'pageEdits.js'));
+const code = require(path.join(buildDirectory, 'codeEdits.js'));
 
 const sum = (digit) => String(digit).repeat(64);
 const clean = (digit) => ({ tag: 'clean', checksum: sum(digit) });
@@ -75,11 +75,11 @@ test('typing over unsent gestures drops them', () => {
   const store = new edits.EditDrafts();
   const step = record();
   const gesture = {
-    coalesceKey: null,
+    coalesceKey: undefined,
     urgency: false,
-    stream: null,
+    stream: undefined,
     request: () => [],
-    apply: (m) => m,
+    apply: (model) => model,
   };
   store.addGesture('/p', gesture, step);
   assert.equal(step.outcome.tag, 'pending');
@@ -130,7 +130,7 @@ function harness(baseline, answers = []) {
 }
 
 function page(source) {
-  return { editable: false, reason: 'x', bail: null, source, checksum: sum(9) };
+  return { editable: false, reason: 'x', bail: undefined, source, checksum: sum(9) };
 }
 
 const applied = (digit, source) => ({

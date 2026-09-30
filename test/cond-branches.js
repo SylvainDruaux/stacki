@@ -49,7 +49,8 @@ const {
 } = require('../dist/electron/astroParser.js');
 
 const page = (body) => `---\n---\n<div>\n${body}\n</div>\n`;
-const first = (src) => parsePage(src).model.nodes[0].children.find((n) => n.kind !== 'text');
+const first = (source) =>
+  parsePage(source).model.nodes[0].children.find((child) => child.kind !== 'text');
 // What the tree looks like, flattened: `cond(then:a, else:expr)`.
 const shape = (node) => {
   if (!node) {
@@ -57,7 +58,7 @@ const shape = (node) => {
   }
   if (node.kind === 'cond') {
     const branches = (node.children || []).map(
-      (b) => `${b.name}:${(b.children || []).map(shape).join('+') || 'empty'}`,
+      (branch) => `${branch.name}:${(branch.children || []).map(shape).join('+') || 'empty'}`,
     );
     return `cond(${branches.join(', ')})`;
   }
@@ -134,7 +135,7 @@ const shape = (node) => {
   // Edited, the writer has to produce it from the tree — and a branch's parens
   // are JS, so the braces come off.
   const edited = parsePage(LINK);
-  const node = edited.model.nodes[0].children.find((n) => n.kind === 'cond');
+  const node = edited.model.nodes[0].children.find((child) => child.kind === 'cond');
   check('there is a conditional to edit', !!node, 'it never became one');
   if (node) {
     delete node.source;
@@ -172,14 +173,14 @@ const shape = (node) => {
     ['@astrojs/compiler-rs (Astro 7+)', '@astrojs/compiler-rs'],
     ['@astrojs/compiler (Astro ≤6)', '@astrojs/compiler'],
   ]) {
-    let error = null;
+    let error;
     try {
       const { transform } = require(mod);
       await transform(marked, { filename: 'LinkCard.astro' });
-    } catch (err) {
-      error = String(err?.message || err);
+    } catch (caught) {
+      error = String(caught?.message || caught);
     }
-    check(`the canvas form compiles — ${label}`, error === null, error);
+    check(`the canvas form compiles — ${label}`, error === undefined, error);
   }
 
   if (failures.length) {

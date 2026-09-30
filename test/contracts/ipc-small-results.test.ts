@@ -14,6 +14,9 @@ import {
 } from '../../dist/shared/ipc.js';
 import { BOUNDARY_LIMITS } from '../../dist/shared/boundary.js';
 
+// Null as a boundary receives it, parsed from JSON: inputs may hold it; our values never do.
+const jsonNull: unknown = JSON.parse('null');
+
 const textOverLimit = 'x'.repeat(BOUNDARY_LIMITS.textLengthMax + 1);
 const pathOverLimit = 'p'.repeat(BOUNDARY_LIMITS.pathLengthMax + 1);
 
@@ -35,7 +38,7 @@ test('a symbol read refuses malformed and oversized shapes', () => {
   const good = { ok: true, rel: 'src/data.ts', text: 'x', line: 3 };
   const bad: readonly unknown[] = [
     undefined,
-    null,
+    jsonNull,
     'ok',
     [],
     { ok: 'yes' },
@@ -61,7 +64,7 @@ test('a resolved path is ok with a bounded path, or a bare refusal', () => {
     rel: 'src/a.ts',
   });
   assert.deepEqual(parseResolvePathResult({ ok: false, rel: 'ignored' }), { ok: false });
-  for (const input of [null, {}, { ok: 1 }, { ok: true }, { ok: true, rel: pathOverLimit }]) {
+  for (const input of [jsonNull, {}, { ok: 1 }, { ok: true }, { ok: true, rel: pathOverLimit }]) {
     assert.throws(() => parseResolvePathResult(input));
   }
 });
@@ -69,11 +72,11 @@ test('a resolved path is ok with a bounded path, or a bare refusal', () => {
 test('a text reply carries bounded text and a bare ok carries nothing else', () => {
   assert.deepEqual(parseTextResult({ text: '' }), { text: '' });
   assert.deepEqual(parseTextResult({ text: 'body', extra: 1 }), { text: 'body' });
-  for (const input of [null, {}, { text: 3 }, { text: textOverLimit }]) {
+  for (const input of [jsonNull, {}, { text: 3 }, { text: textOverLimit }]) {
     assert.throws(() => parseTextResult(input));
   }
   assert.deepEqual(parseOkResult({ ok: true, note: 'x' }), { ok: true });
-  for (const input of [null, undefined, {}, { ok: false }, { ok: 'true' }]) {
+  for (const input of [jsonNull, undefined, {}, { ok: false }, { ok: 'true' }]) {
     assert.throws(() => parseOkResult(input), /OkResult|Expected object/);
   }
 });

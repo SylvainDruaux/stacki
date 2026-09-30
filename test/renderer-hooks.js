@@ -42,7 +42,7 @@ function Rows() {
   const reorder = useListReorder({ count: 2, onMove });
   return React.createElement(
     'div',
-    null,
+    undefined,
     [0, 1].map((index) =>
       React.createElement(
         'div',

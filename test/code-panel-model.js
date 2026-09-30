@@ -64,7 +64,7 @@ const output = path.join(__dirname, '../node_modules/.stacki-test/code-panel-mod
   assert.equal(modelTools.sourceLineLabel(source, { from: card.start, to: card.end }), 'L5–7');
   assert.equal(
     modelTools.sourceRangeForSelection(model, card.id, card.end - 1),
-    null,
+    undefined,
     'stale ranges never escape the current document',
   );
   console.log('code-panel-model: passed [selection, links, nesting, bounds]');

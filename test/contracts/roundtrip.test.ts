@@ -22,7 +22,7 @@ import { parsePageResult, assertTreeInvariants } from '../../dist/shared/page-no
 
 const require = createRequire(import.meta.url);
 // CJS module boundary; every value it returns is validated by the contract parsers.
-// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- Untyped CJS exports.
 const astroParser: {
   parsePage: (source: string) => unknown;
   serializeNodes: (nodes: readonly unknown[]) => string;
@@ -34,9 +34,9 @@ function rng(seed: number): () => number {
   let state = seed;
   return () => {
     state = (state + 0x6d2b79f5) | 0;
-    let t = Math.imul(state ^ (state >>> 15), 1 | state);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    let mixed = Math.imul(state ^ (state >>> 15), 1 | state);
+    mixed = (mixed + Math.imul(mixed ^ (mixed >>> 7), 61 | mixed)) ^ mixed;
+    return ((mixed ^ (mixed >>> 14)) >>> 0) / 4294967296;
   };
 }
 
@@ -57,20 +57,22 @@ interface GeneratedNode {
   readonly children?: readonly GeneratedNode[] | undefined;
 }
 
-function pick(rand: () => number, options: readonly string[]): string {
+// The seeded sources a generated tree draws from: its randomness and its node ids.
+interface Sources {
+  readonly rand: () => number;
+  readonly nextId: () => string;
+}
+
+function pick(options: readonly string[], rand: () => number): string {
   return options[Math.floor(rand() * options.length)] ?? options[0] ?? 'div';
 }
 
 // Adjacent sibling text nodes merge on re-parse (the serializer writes them
 // with no separator) — a generator constraint, not a contract bug. A comment
 // keeps them apart on both sides of the roundtrip.
-function pushChild(
-  rand: () => number,
-  nextId: () => string,
-  depth: number,
-  children: GeneratedNode[],
-): void {
-  let child = generateNode(rand, nextId, depth);
+function pushChild(sources: Sources, depth: number, children: GeneratedNode[]): void {
+  const { rand, nextId } = sources;
+  let child = generateNode(sources, depth);
   const previous = children[children.length - 1];
   if (child.kind === 'text' && previous?.kind === 'text') {
     child = { kind: 'comment', id: nextId(), value: ` sep ${Math.floor(rand() * 100)} ` };
@@ -78,13 +80,14 @@ function pushChild(
   children.push(child);
 }
 
-function generateNode(rand: () => number, nextId: () => string, depth: number): GeneratedNode {
+function generateNode(sources: Sources, depth: number): GeneratedNode {
+  const { rand, nextId } = sources;
   const shape = rand();
   if (depth >= 3 || shape < 0.3) {
     return {
       kind: 'text',
       id: nextId(),
-      value: `${pick(rand, WORDS)} ${Math.floor(rand() * 100)}`,
+      value: `${pick(WORDS, rand)} ${Math.floor(rand() * 100)}`,
     };
   }
   if (shape < 0.4) {
@@ -98,7 +101,7 @@ function generateNode(rand: () => number, nextId: () => string, depth: number): 
       inner: `.x${Math.floor(rand() * 10)} { color: red; }`,
     };
   }
-  const name = pick(rand, NAMES);
+  const name = pick(NAMES, rand);
   const props: Record<string, unknown> = {};
   const attrCount = Math.floor(rand() * 3);
   const attrOrder: string[] = [];
@@ -119,7 +122,7 @@ function generateNode(rand: () => number, nextId: () => string, depth: number): 
   if (wantsChildren) {
     const childCount = 1 + Math.floor(rand() * 3);
     for (let i = 0; i < childCount; i++) {
-      pushChild(rand, nextId, depth + 1, children);
+      pushChild(sources, depth + 1, children);
     }
   }
   const node: GeneratedNode = {
@@ -139,7 +142,7 @@ function loose(node: GeneratedNode): unknown {
     case 'comment':
       return { kind: node.kind, value: (node.value ?? '').trim() };
     case 'raw':
-      // inner is verbatim source, so it keeps the serializer's indentation —
+      // `inner` is verbatim source, so it keeps the serializer's indentation —
       // the payload itself is what round-trips.
       return { kind: node.kind, name: node.name, inner: (node.inner ?? '').trim() };
     case 'component':
@@ -169,7 +172,7 @@ test('serialize ∘ parse roundtrip: generated trees survive the real parser', (
     const tree: GeneratedNode[] = [];
     const topCount = 1 + Math.floor(rand() * 4);
     for (let i = 0; i < topCount; i++) {
-      pushChild(rand, nextId, 0, tree);
+      pushChild({ rand, nextId }, 0, tree);
     }
     const source = serializeNodes(tree);
     const result = parsePageResult(parsePage(source));

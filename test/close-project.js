@@ -27,13 +27,13 @@ const check = (what, condition, detail) => {
     failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
   }
 };
-const settle = (ms = 30) => new Promise((r) => setTimeout(r, ms));
+const settle = (ms = 30) => new Promise((resolve) => setTimeout(resolve, ms));
 
 (async () => {
   const esbuild = require('esbuild');
-  const buildDir = path.join(__dirname, '..', 'node_modules', '.stacki-test');
-  fs.mkdirSync(buildDir, { recursive: true });
-  const bundlePath = path.join(buildDir, 'close-project.bundle.js');
+  const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
+  fs.mkdirSync(buildDirectory, { recursive: true });
+  const bundlePath = path.join(buildDirectory, 'close-project.bundle.js');
   await esbuild.build({
     entryPoints: [path.join(__dirname, '..', 'src', 'App.tsx')],
     outfile: bundlePath,
@@ -58,7 +58,7 @@ const settle = (ms = 30) => new Promise((r) => setTimeout(r, ms));
   global.Element = dom.window.Element;
   global.Node = dom.window.Node;
   global.getComputedStyle = dom.window.getComputedStyle;
-  global.requestAnimationFrame = (fn) => setTimeout(fn, 0);
+  global.requestAnimationFrame = (callback) => setTimeout(callback, 0);
   global.cancelAnimationFrame = clearTimeout;
   global.ResizeObserver = class {
     observe() {}
@@ -70,6 +70,7 @@ const settle = (ms = 30) => new Promise((r) => setTimeout(r, ms));
   dom.window.WebGLRenderingContext = global.WebGLRenderingContext;
   global.WebGL2RenderingContext = dom.window.WebGL2RenderingContext || class {};
   dom.window.WebGL2RenderingContext = global.WebGL2RenderingContext;
+  // eslint-disable-next-line stacki/no-null -- Stubs the platform getContext, which answers null.
   dom.window.HTMLCanvasElement.prototype.getContext = () => null;
   dom.window.ResizeObserver = global.ResizeObserver;
   dom.window.matchMedia = () => ({
@@ -85,21 +86,21 @@ const settle = (ms = 30) => new Promise((r) => setTimeout(r, ms));
   const opened = [];
   let dialogAnswer = { projectPath: '/projects/next' };
   const menu = new Map();
-  const noop = async () => null;
+  const noop = async () => undefined;
   const bridge = new Proxy(
     {
-      onMenu: (channel, cb) => {
-        menu.set(channel, cb);
+      onMenu: (channel, callback) => {
+        menu.set(channel, callback);
         return () => menu.delete(channel);
       },
       openProjectDialog: async () => dialogAnswer,
       closeProject: async (next) => {
-        closed.push(next ?? null);
+        closed.push(next);
         return { ok: true };
       },
-      pendingProject: async () => null,
-      scanProject: async (p) => {
-        opened.push(p);
+      pendingProject: async () => undefined,
+      scanProject: async (projectPath) => {
+        opened.push(projectPath);
         return { pages: [], layouts: [], components: [], pageFolders: [] };
       },
       listProjectClasses: async () => [],
@@ -139,12 +140,12 @@ const settle = (ms = 30) => new Promise((r) => setTimeout(r, ms));
   });
 
   const fire = async (channel, ...args) => {
-    const cb = menu.get(channel);
-    if (!cb) {
+    const callback = menu.get(channel);
+    if (!callback) {
       return false;
     }
     await act(async () => {
-      await cb(...args);
+      await callback(...args);
       await settle(40);
     });
     return true;
@@ -170,7 +171,7 @@ const settle = (ms = 30) => new Promise((r) => setTimeout(r, ms));
   // --- leaving the one that is open --------------------------------------------------
   await fire('closeProject');
   check('closing tells main to let the project go', closed.length === 1, JSON.stringify(closed));
-  check('with nothing to open next', closed[0] === null, JSON.stringify(closed));
+  check('with nothing to open next', closed[0] === undefined, JSON.stringify(closed));
 
   // --- switching to another one ---------------------------------------------------------
   // The reload is what lets go, so the project being opened has to be handed
@@ -190,7 +191,7 @@ const settle = (ms = 30) => new Promise((r) => setTimeout(r, ms));
   );
 
   // --- a dialog nobody answered ----------------------------------------------------------
-  dialogAnswer = null;
+  dialogAnswer = { canceled: true };
   await fire('openProject');
   check(
     'cancelling the picker leaves the project alone',
@@ -219,7 +220,7 @@ const settle = (ms = 30) => new Promise((r) => setTimeout(r, ms));
   check('and the watcher', /stopWatchingProject\(\)/.test(close), close.slice(0, 200));
   check(
     'and puts the project out of reach',
-    /openProjectRoot = null/.test(close),
+    /openProjectRoot = undefined/.test(close),
     close.slice(0, 200),
   );
   check(
@@ -229,12 +230,12 @@ const settle = (ms = 30) => new Promise((r) => setTimeout(r, ms));
   );
   check(
     'the project to open next is consumed as it is handed over',
-    /const asked = pendingProject;\s*\n\s*pendingProject = null;/.test(main),
+    /const asked = pendingProject;\s*\n\s*pendingProject = undefined;/.test(main),
     'a pending project would be opened again on the next reload',
   );
   check(
     'and a window somebody CLOSED forgets what it had',
-    /mainWindow\.on\('closed', \(\) => \{\s*\n\s*openProjectRoot = null;/.test(main),
+    /mainWindow\.on\('closed', \(\) => \{\s*\n\s*openProjectRoot = undefined;/.test(main),
     'the next window comes back holding the last project',
   );
 

@@ -11,12 +11,24 @@ const { parseStoredEmbedSource, loadEmbedSource } = require('./renderer-module')
   'style-panel/shared/tool-prefs.ts',
 );
 
+// A boundary can receive null — JSON, structured clone and postMessage all carry it —
+// so the negative space below includes it. It is read from JSON, because our own
+// code never writes a null.
+const PLATFORM_NULL = JSON.parse('null');
+
 test('a stored embed source is restored only when it is a bounded key', () => {
   assert.equal(parseStoredEmbedSource('file:/p/global.css'), 'file:/p/global.css');
   const atLimit = 'k'.repeat(BOUNDARY_LIMITS.pathLengthMax);
   assert.equal(parseStoredEmbedSource(atLimit), atLimit);
-  for (const raw of [null, undefined, '', 42, {}, 'k'.repeat(BOUNDARY_LIMITS.pathLengthMax + 1)]) {
-    assert.equal(parseStoredEmbedSource(raw), null);
+  for (const raw of [
+    PLATFORM_NULL,
+    undefined,
+    '',
+    42,
+    {},
+    'k'.repeat(BOUNDARY_LIMITS.pathLengthMax + 1),
+  ]) {
+    assert.equal(parseStoredEmbedSource(raw), undefined);
   }
 });
 
@@ -26,13 +38,13 @@ test('loading falls back to no preference when storage is corrupt or unreadable'
     globalThis.localStorage = previous;
   });
   globalThis.localStorage = { getItem: () => 'x'.repeat(BOUNDARY_LIMITS.pathLengthMax + 1) };
-  assert.equal(loadEmbedSource(), null);
+  assert.equal(loadEmbedSource(), undefined);
   globalThis.localStorage = {
     getItem: () => {
       throw new Error('denied');
     },
   };
-  assert.equal(loadEmbedSource(), null);
+  assert.equal(loadEmbedSource(), undefined);
   globalThis.localStorage = { getItem: () => 'embed:node-7' };
   assert.equal(loadEmbedSource(), 'embed:node-7');
 });

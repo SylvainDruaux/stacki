@@ -28,9 +28,9 @@ const check = (what, condition, detail) => {
 
 (async () => {
   const esbuild = require('esbuild');
-  const buildDir = path.join(__dirname, '..', 'node_modules', '.stacki-test');
-  fs.mkdirSync(buildDir, { recursive: true });
-  const bundlePath = path.join(buildDir, 'style-target.bundle.js');
+  const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
+  fs.mkdirSync(buildDirectory, { recursive: true });
+  const bundlePath = path.join(buildDirectory, 'style-target.bundle.js');
   await esbuild.build({
     // A tiny entry over the three modules involved, bundled from the panel's
     // own directory so its imports resolve the way they do in the app.
@@ -94,7 +94,7 @@ const check = (what, condition, detail) => {
       'the same style shape in a page stays page-authored',
       pageSource?.fromComponent === false,
     );
-    setHost({ nodes: [], openFilePath: null, openFileKind: null });
+    setHost({ nodes: [], openFilePath: undefined, openFileKind: undefined });
   }
 
   // A layout: a component call in the source, `<html class="theme-dark">` on
@@ -115,7 +115,11 @@ const check = (what, condition, detail) => {
     inComponentContext: false,
   };
   /** The shape queryCanvas answers with — passed straight in, so no canvas is needed. */
-  const answer = (identity) => ({ answer: { identity, matched: {} }, askedFor: new Map() });
+  const answer = (identity) => ({
+    kind: 'asked',
+    answer: { identity, matched: {} },
+    askedFor: new Map(),
+  });
   const matches = async (target, selector) =>
     (await matchSelectorList(selector, target))[0].matched;
 
@@ -123,7 +127,7 @@ const check = (what, condition, detail) => {
     const { target, rootSnapshot } = await resolveTarget(
       node,
       scan,
-      answer({ tag: 'html', id: null, classes: ['theme-dark'], attributes: { lang: 'en' } }),
+      answer({ tag: 'html', classes: ['theme-dark'], attributes: { lang: 'en' } }),
     );
     check('the header reads the rendered tag', rootSnapshot.tag === 'html', rootSnapshot.tag);
     const seen = await target.view.snapshot(target.rootKey);
@@ -138,7 +142,7 @@ const check = (what, condition, detail) => {
     const both = await matchSelectorList(':root, [class*="theme-"]', target);
     check(
       'every selector in a group is judged',
-      both.every((r) => r.matched),
+      both.every((result) => result.matched),
       JSON.stringify(both),
     );
     check('and a tag it does not have does not', !(await matches(target, 'body')));
@@ -152,7 +156,7 @@ const check = (what, condition, detail) => {
     const { target } = await resolveTarget(
       section,
       sectionScan,
-      answer({ tag: 'section', id: null, classes: ['section'], attributes: {} }),
+      answer({ tag: 'section', classes: ['section'], attributes: {} }),
     );
     check(
       'a component instance matches by what it renders',
@@ -166,11 +170,11 @@ const check = (what, condition, detail) => {
     // No canvas (preview offline, or a node that renders nothing): the source
     // is all there is, and an unverifiable type selector stays unmatched
     // rather than being waved through.
-    const { target } = await resolveTarget(node, scan, null);
+    const { target } = await resolveTarget(node, scan, { kind: 'unasked' });
     const seen = await target.view.snapshot(target.rootKey);
     check(
       'with no answer the snapshot is the source one',
-      seen?.tag == null,
+      seen?.tag === undefined,
       JSON.stringify(seen?.tag),
     );
     check('an unverifiable tag selector does not match', !(await matches(target, 'html')));

@@ -27,9 +27,9 @@ const check = (what, condition, detail) => {
 
 (async () => {
   const esbuild = require('esbuild');
-  const buildDir = path.join(__dirname, '..', 'node_modules', '.stacki-test');
-  fs.mkdirSync(buildDir, { recursive: true });
-  const out = path.join(buildDir, 'slot-attr.bundle.mjs');
+  const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
+  fs.mkdirSync(buildDirectory, { recursive: true });
+  const out = path.join(buildDirectory, 'slot-attr.bundle.mjs');
   await esbuild.build({
     entryPoints: [path.join(__dirname, '..', 'src', 'slotAttr.js')],
     outfile: out,
@@ -60,7 +60,7 @@ const check = (what, condition, detail) => {
   // --- and where it does not -------------------------------------------------------
   check(
     'dragged out into the open, it goes',
-    keepsSlot({ slotName: 'column2', host: null, definition: null }) === false,
+    keepsSlot({ slotName: 'column2', host: undefined, definition: undefined }) === false,
   );
   check(
     'and into a component with no such slot',
@@ -89,16 +89,16 @@ const check = (what, condition, detail) => {
     keepsSlot({
       slotName: 'column2',
       host: { kind: 'component', name: 'FromAPackage' },
-      definition: null,
+      definition: undefined,
     }) === true,
   );
   check(
     'and a node asking for nothing has nothing to lose',
-    keepsSlot({ slotName: null, host: null, definition: null }) === true,
+    keepsSlot({ slotName: undefined, host: undefined, definition: undefined }) === true,
   );
   check(
     'nor does one asking in code, whose value this cannot read',
-    keepsSlot({ slotName: '', host: null, definition: null }) === true,
+    keepsSlot({ slotName: '', host: undefined, definition: undefined }) === true,
   );
 
   // --- the move asks -----------------------------------------------------------------
@@ -109,7 +109,7 @@ const check = (what, condition, detail) => {
   );
   check(
     'a move asks about the slot it carries',
-    /keepsSlot\(\{ slotName, host, definition \}\)/.test(move),
+    /keepsSlotAttribute\(\{ slotName, host, definition \}\)/.test(move),
     'the slot is not reconsidered on a move',
   );
   // Step 6: the move is a gesture (src/editGestures.ts, moveGesture), which

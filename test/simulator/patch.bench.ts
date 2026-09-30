@@ -314,7 +314,7 @@ function seriesRow(name: string, scenario: Scenario, variant: string, runs: read
   const medians = STAGES.map((stage) =>
     format(
       percentile(
-        runs.map((s) => s[stage]),
+        runs.map((run) => run[stage]),
         50,
       ),
     ),
@@ -420,9 +420,9 @@ function lapClock(): () => number {
   };
 }
 
-function percentile(values: readonly number[], p: number): number {
+function percentile(values: readonly number[], percent: number): number {
   const sorted = [...values].sort((left, right) => left - right);
-  const value = sorted[Math.max(Math.ceil((p / 100) * sorted.length), 1) - 1];
+  const value = sorted[Math.max(Math.ceil((percent / 100) * sorted.length), 1) - 1];
   assert.ok(value !== undefined, 'A nearest rank lies inside the samples');
   return value;
 }

@@ -135,7 +135,7 @@ const LARGE = '<ul class="list">\n  <li>one</li>\n  <li>two</li>\n  <li>three</l
 test('moved blocks: the block every minimum script keeps follows; the moved one is gone', () => {
   const moved = `${LARGE}${SMALL}`;
   // Every minimum script keeps the large block and moves the small one around
-  // it, so the list follows to the file start…
+  // it, so the list follows to the file start:
   assert.deepEqual(mapBoth(`${SMALL}${LARGE}`, moved, 17, 32), resolved(1, 16));
   // …and the paragraph, deleted and re-inserted by every minimum script, is
   // gone: moves are step 6's gesture, and a mapping never pretends to see one.

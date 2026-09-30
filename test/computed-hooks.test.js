@@ -9,6 +9,9 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const path = require('node:path');
 
+// The canvas protocol answers an unresolved value as absent (`undefined`); the
+// probe hands it over as the wire carries it.
+
 test(
   'computed hooks discard stale selections and ' + 'documents without waking literal swatches',
   async () => {
@@ -113,7 +116,7 @@ test(
         root.render(
           React.createElement(
             React.Fragment,
-            null,
+            {},
             React.createElement(Swatch, { name: 'literal', value: '#abc' }),
             React.createElement(Swatch, { name: 'resolved', value: 'var(--brand)' }),
             React.createElement(Style),
@@ -150,7 +153,7 @@ test(
         'var(--brand)',
         "the previous document's color is not returned",
       );
-      await answer(changedFile, null, null);
+      await answer(changedFile, undefined, undefined);
       assert.equal(read('style'), 'block', 'a missing answer settles onto the fallback');
       assert.equal(read('resolved'), 'var(--brand)');
       await flush();

@@ -25,16 +25,16 @@ const check = (what, condition, detail) => {
   }
 };
 
-// jsdom lays nothing out, and a zero-width track divides to NaN, so the picker
+// `jsdom` lays nothing out, and a zero-width track divides to NaN, so the picker
 // is given a geometry to measure.
 const SIZE = 240;
 const START = 'rgb(1, 2, 3)';
 
 (async () => {
   const esbuild = require('esbuild');
-  const buildDir = path.join(__dirname, '..', 'node_modules', '.stacki-test');
-  fs.mkdirSync(buildDir, { recursive: true });
-  const bundlePath = path.join(buildDir, 'color-live.bundle.js');
+  const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
+  fs.mkdirSync(buildDirectory, { recursive: true });
+  const bundlePath = path.join(buildDirectory, 'color-live.bundle.js');
   await esbuild.build({
     stdin: {
       contents:
@@ -59,6 +59,7 @@ const START = 'rgb(1, 2, 3)';
   global.document = dom.window.document;
   global.Node = dom.window.Node;
   // These interaction checks supply geometry without drawing to a canvas.
+  // eslint-disable-next-line stacki/no-null -- Stubs the platform getContext, which answers null.
   dom.window.HTMLCanvasElement.prototype.getContext = () => null;
   // JSDOM otherwise logs handler exceptions while the test still reports success.
   dom.window.addEventListener('error', (event) => {
@@ -119,13 +120,13 @@ const START = 'rgb(1, 2, 3)';
 
   // Open the picker on that field's swatch.
   const swatch = [...document.querySelectorAll('.u-color-swatch')].find(
-    (b) => b.getAttribute('aria-label') === 'Background color',
+    (button) => button.getAttribute('aria-label') === 'Background color',
   );
-  check('the field has a swatch', swatch != null);
+  check('the field has a swatch', swatch !== null);
   await act(async () => {
     swatch.click();
   });
-  check('clicking it opens the picker', document.querySelector('.u-color-sb') != null);
+  check('clicking it opens the picker', document.querySelector('.u-color-sb') !== null);
 
   // A drag: pointerdown on the saturation square reports live, then moves do.
   const at = (type, fx, fy, target) => {
@@ -233,7 +234,7 @@ const START = 'rgb(1, 2, 3)';
     });
     check(
       'it emits the drag',
-      seen.some((s) => s.startsWith('live=')),
+      seen.some((entry) => entry.startsWith('live=')),
       seen.join(', '),
     );
     check(
@@ -242,7 +243,7 @@ const START = 'rgb(1, 2, 3)';
       `${before} → ${fill()}`,
     );
     const last = seen
-      .filter((s) => s.startsWith('live='))
+      .filter((entry) => entry.startsWith('live='))
       .pop()
       .split('=')[1];
     check(

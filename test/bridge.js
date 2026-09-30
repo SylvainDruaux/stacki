@@ -20,6 +20,7 @@
 // So the three lists are compared here: what the renderer calls, what the
 // preload exposes, and what main.js handles.
 
+const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
 
@@ -33,14 +34,18 @@ const check = (what, condition, detail) => {
   }
 };
 
-const walk = (dir, test, out = []) => {
-  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+// A walk of a project's folders stops at this depth: real source trees are a few folders
+// deep, so anything deeper is a loop or a runaway, not a project.
+const WALK_LIMITS = { directoryDepthMax: 32 };
+const walk = (directory, test, out = [], depth = 0) => {
+  assert.ok(depth <= WALK_LIMITS.directoryDepthMax, 'walk: directory depth limit');
+  for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
     if (entry.name.startsWith('.') || entry.name === 'node_modules') {
       continue;
     }
-    const full = path.join(dir, entry.name);
+    const full = path.join(directory, entry.name);
     if (entry.isDirectory()) {
-      walk(full, test, out);
+      walk(full, test, out, depth + 1);
     } else if (test(entry.name)) {
       out.push(full);
     }
@@ -53,13 +58,13 @@ const sources = walk(path.join(root, 'src'), (name) => /\.(jsx?|tsx?)$/.test(nam
 const used = new Map(); // method -> [files]
 for (const file of sources) {
   const text = fs.readFileSync(file, 'utf8');
-  for (const m of text.matchAll(/window\.avb\??\.([A-Za-z_$][\w$]*)/g)) {
-    if (!used.has(m[1])) {
-      used.set(m[1], []);
+  for (const match of text.matchAll(/window\.avb\??\.([A-Za-z_$][\w$]*)/g)) {
+    if (!used.has(match[1])) {
+      used.set(match[1], []);
     }
     const where = path.relative(root, file);
-    if (!used.get(m[1]).includes(where)) {
-      used.get(m[1]).push(where);
+    if (!used.get(match[1]).includes(where)) {
+      used.get(match[1]).push(where);
     }
   }
   // `window.avb?.[name]` with a variable name cannot be checked statically —
@@ -72,8 +77,8 @@ const preload = fs.readFileSync(path.join(root, 'dist', 'electron', 'preload.js'
 const exposed = new Set();
 const bridgeStart = preload.indexOf('contextBridge.exposeInMainWorld');
 const bridgeText = preload.slice(bridgeStart);
-for (const m of bridgeText.matchAll(/^\s+([A-Za-z_$][\w$]*)\s*:/gm)) {
-  exposed.add(m[1]);
+for (const match of bridgeText.matchAll(/^\s+([A-Za-z_$][\w$]*)\s*:/gm)) {
+  exposed.add(match[1]);
 }
 
 // --- what the main process handles ------------------------------------------
@@ -83,24 +88,26 @@ const handled = new Set();
 // loads the module that registers it — the terminal keeps its own (and its
 // pty bookkeeping) in electron/terminal.js rather than in main.js.
 const mainSide = [main];
-for (const m of main.matchAll(/require\(\s*['"]\.\/([\w.-]+?)(?:\.js)?['"]\s*\)/g)) {
+for (const match of main.matchAll(/require\(\s*['"]\.\/([\w.-]+?)(?:\.js)?['"]\s*\)/g)) {
   try {
-    mainSide.push(fs.readFileSync(path.join(root, 'dist', 'electron', `${m[1]}.js`), 'utf8'));
+    mainSide.push(fs.readFileSync(path.join(root, 'dist', 'electron', `${match[1]}.js`), 'utf8'));
   } catch {
     /* not a file of ours */
   }
 }
 for (const text of mainSide) {
-  for (const m of text.matchAll(/ipcMain\.handle\(\s*['"]([^'"]+)['"]/g)) {
-    handled.add(m[1]);
+  for (const match of text.matchAll(/ipcMain\.handle\(\s*['"]([^'"]+)['"]/g)) {
+    handled.add(match[1]);
   }
 }
 
 // The channel each exposed method invokes, so a method that is exposed but has
 // no handler is caught too — that fails at runtime with "no handler registered".
 const channels = new Map();
-for (const m of bridgeText.matchAll(/^\s+([A-Za-z_$][\w$]*)\s*:\s*invoke\(\s*['"]([^'"]+)['"]/gm)) {
-  channels.set(m[1], m[2]);
+for (const match of bridgeText.matchAll(
+  /^\s+([A-Za-z_$][\w$]*)\s*:\s*invoke\(\s*['"]([^'"]+)['"]/gm,
+)) {
+  channels.set(match[1], match[2]);
 }
 
 check('the preload exposes something', exposed.size > 20, `${exposed.size}`);
@@ -140,35 +147,35 @@ const stripComments = (text) =>
 // value containing `>` (an arrow function, a comparison) doesn't end it early.
 const propsPassed = (text, from) => {
   let depth = 0;
-  let quote = null;
+  let quote;
   let head = '';
   for (let i = from; i < text.length; i++) {
-    const c = text[i];
+    const character = text[i];
     if (quote) {
-      if (c === quote && text[i - 1] !== '\\') {
-        quote = null;
+      if (character === quote && text[i - 1] !== '\\') {
+        quote = undefined;
       }
       continue;
     }
-    if (c === '"' || c === "'" || c === '`') {
-      quote = c;
+    if (character === '"' || character === "'" || character === '`') {
+      quote = character;
       continue;
     }
-    if (c === '{') {
+    if (character === '{') {
       depth++;
-    } else if (c === '}') {
+    } else if (character === '}') {
       depth--;
-    } else if (depth === 0 && (c === '>' || (c === '/' && text[i + 1] === '>'))) {
+    } else if (depth === 0 && (character === '>' || (character === '/' && text[i + 1] === '>'))) {
       break;
     }
     if (depth === 0) {
-      head += c;
+      head += character;
     }
   }
-  return [...head.matchAll(/(?:^|\s)([a-zA-Z_$][\w$]*)=/g)].map((m) => m[1]);
+  return [...head.matchAll(/(?:^|\s)([a-zA-Z_$][\w$]*)=/g)].map((match) => match[1]);
 };
 
-// The props a component destructures in its signature, or null when it takes
+// The props a component destructures in its signature, or undefined when it takes
 // them whole (or forwards a rest).
 const propsDeclared = (base) => {
   for (const ext of ['.jsx', '.tsx', '.js', '.ts', '']) {
@@ -189,35 +196,35 @@ const propsDeclared = (base) => {
     const declaration = bridgeComponent(ts, source);
     const binding = declaration?.parameters[0]?.name;
     if (!binding) {
-      return null;
+      return undefined;
     }
     if (!ts.isObjectBindingPattern(binding)) {
       // A local props interface is just as explicit as destructuring. Preserve
       // this boundary check when conversion moves a component to a typed object.
       const parameterType = declaration.parameters[0].type;
       if (!parameterType || !ts.isTypeReferenceNode(parameterType)) {
-        return null;
+        return undefined;
       }
       const name = parameterType.typeName.getText(source);
       const contract = source.statements.find(
         (node) => ts.isInterfaceDeclaration(node) && node.name.text === name,
       );
       if (!contract || contract.heritageClauses?.length) {
-        return null;
+        return undefined;
       }
       if (contract.members.some((member) => !ts.isPropertySignature(member))) {
-        return null;
+        return undefined;
       }
       return new Set(contract.members.map((member) => member.name.getText(source)));
     }
     if (binding.elements.some((element) => element.dotDotDotToken)) {
-      return null;
+      return undefined;
     }
     return new Set(
       binding.elements.map((element) => (element.propertyName || element.name).getText(source)),
     );
   }
-  return null;
+  return undefined;
 };
 
 function bridgeComponent(ts, source) {
@@ -268,22 +275,22 @@ for (const file of sources) {
   const imported = new Map();
   // The semicolon is optional: a file written without them imports the same
   // component, and requiring one silently skipped every such file.
-  for (const m of text.matchAll(/^import\s+([A-Za-z_$][\w$]*)\s+from\s+'(\.[^']+)';?/gm)) {
-    imported.set(m[1], path.resolve(path.dirname(file), m[2]));
+  for (const match of text.matchAll(/^import\s+([A-Za-z_$][\w$]*)\s+from\s+'(\.[^']+)';?/gm)) {
+    imported.set(match[1], path.resolve(path.dirname(file), match[2]));
   }
   // Lazy-loading changes when a panel loads, not its prop contract. Follow
   // those module references too so startup optimization cannot erase coverage.
-  for (const m of text.matchAll(
+  for (const match of text.matchAll(
     new RegExp(
       /const\s+([A-Za-z_$][\w$]*)\s*=\s*(?:React\.)?lazy(?:Panel)?/.source +
         /\(\s*\(\s*\)\s*=>\s*import\(\s*['"](\.[^'"]+)['"]\s*\)/.source,
       'g',
     ),
   )) {
-    imported.set(m[1], path.resolve(path.dirname(file), m[2]));
+    imported.set(match[1], path.resolve(path.dirname(file), match[2]));
   }
-  for (const m of text.matchAll(/<([A-Z][\w$]*)[\s>]/g)) {
-    const target = imported.get(m[1]);
+  for (const match of text.matchAll(/<([A-Z][\w$]*)[\s>]/g)) {
+    const target = imported.get(match[1]);
     if (!target) {
       continue;
     }
@@ -291,14 +298,14 @@ for (const file of sources) {
     if (!declared) {
       continue;
     }
-    const where = `${path.relative(root, file)}:${text.slice(0, m.index).split('\n').length}`;
-    for (const prop of propsPassed(text, m.index + m[0].length - 1)) {
+    const where = `${path.relative(root, file)}:${text.slice(0, match.index).split('\n').length}`;
+    for (const prop of propsPassed(text, match.index + match[0].length - 1)) {
       if (prop === 'key' || prop === 'ref') {
         continue;
       }
       wired++;
       check(
-        `<${m[1]} ${prop}> is a prop it takes`,
+        `<${match[1]} ${prop}> is a prop it takes`,
         declared.has(prop),
         `${where} passes ${prop}, which ${path.relative(root, target)} never reads — it goes ` +
           `nowhere`,

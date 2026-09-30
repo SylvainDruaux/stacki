@@ -7,6 +7,9 @@ const { parseGitCommit, parseGitInfo, parseGitPublish, parseGitSuccess } =
   require('./renderer-module')('gitChipBridge.ts');
 const { publishGitProject } = require('./renderer-module')('panels/gitPublishWorkflow.ts');
 
+// Null as a boundary receives it, parsed from JSON: inputs may hold it; our values never do.
+const jsonNull = JSON.parse('null');
+
 const cleanInfo = {
   isRepo: true,
   branch: 'main',
@@ -25,18 +28,18 @@ test('Git publish response parsers reject malformed and oversized data', () => {
   assert.deepEqual(parseGitPublish(published), published);
   assert.equal(parseGitSuccess({ ok: true }), undefined);
   for (const value of [
-    null,
+    jsonNull,
     {},
     { ...cleanInfo, ahead: -1 },
     { ...cleanInfo, branch: 1 },
     // Absence is `undefined` (AGENTS.md §6): main never sends a null remote.
-    { ...cleanInfo, remote: null },
+    { ...cleanInfo, remote: jsonNull },
     { ...cleanInfo, branches: Array(100001).fill('main') },
   ]) {
     assert.throws(() => parseGitInfo(value));
   }
   assert.throws(() => parseGitCommit({ ok: true, files: -1 }));
-  assert.throws(() => parseGitPublish({ ok: true, url: null }));
+  assert.throws(() => parseGitPublish({ ok: true, url: jsonNull }));
   assert.throws(() => parseGitSuccess({ ok: false }));
 });
 

@@ -62,9 +62,9 @@ const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
   // --- the panel, compiled ---------------------------------------------------
   const esbuild = require('esbuild');
   // Inside the repo, so `react` resolves the way it does for the app.
-  const buildDir = path.join(__dirname, '..', 'node_modules', '.stacki-test');
-  fs.mkdirSync(buildDir, { recursive: true });
-  const bundlePath = path.join(buildDir, 'content-view.bundle.js');
+  const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
+  fs.mkdirSync(buildDirectory, { recursive: true });
+  const bundlePath = path.join(buildDirectory, 'content-view.bundle.js');
   await esbuild.build({
     entryPoints: [path.join(__dirname, '..', 'src', 'panels', 'ContentView.tsx')],
     outfile: bundlePath,
@@ -98,30 +98,31 @@ const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
   // mounted in, and measures itself against the window class by name.
   global.MutationObserver = dom.window.MutationObserver;
   global.Window = dom.window.Window;
-  global.requestAnimationFrame = (cb) => setTimeout(cb, 0);
+  global.requestAnimationFrame = (callback) => setTimeout(callback, 0);
   global.cancelAnimationFrame = clearTimeout;
   global.IS_REACT_ACT_ENVIRONMENT = true;
-  // jsdom has no layout, so it has no scrollIntoView; the popup calls it to
+  // `jsdom` has no layout, so it has no scrollIntoView; the popup calls it to
   // keep the highlighted option visible.
   dom.window.Element.prototype.scrollIntoView = function scrollIntoView() {};
 
-  const collectionNamed = (name) => config.collections.find((c) => c.name === name);
+  const collectionNamed = (name) =>
+    config.collections.find((collection) => collection.name === name);
   dom.window.avb = {
     contentEntries: async ({ name }) => ({
       collection: collectionNamed(name),
       ...listEntries(root, collectionNamed(name)),
     }),
     contentTargets: async ({ name }) => ({
-      targets: listEntries(root, collectionNamed(name)).entries.map((e) => ({
-        id: e.id,
-        title: e.title,
+      targets: listEntries(root, collectionNamed(name)).entries.map((entry) => ({
+        id: entry.id,
+        title: entry.title,
       })),
     }),
     contentCollections: async () => ({
-      collections: config.collections.map((c) => ({
-        name: c.name,
-        editable: c.editable,
-        count: countEntries(root, c),
+      collections: config.collections.map((collection) => ({
+        name: collection.name,
+        editable: collection.editable,
+        count: countEntries(root, collection),
       })),
       covered: coveredPaths(config.collections),
     }),
@@ -172,8 +173,8 @@ const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
   check('blog: a reference field is a picker', !!labelled('Author')?.querySelector('select'));
   check(
     'blog: the picker offers real entries',
-    [...(labelled('Author')?.querySelectorAll('option') || [])].some((o) =>
-      /Avery Chen/.test(o.textContent),
+    [...(labelled('Author')?.querySelectorAll('option') || [])].some((option) =>
+      /Avery Chen/.test(option.textContent),
     ),
     labelled('Author')?.textContent,
   );

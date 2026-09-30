@@ -43,9 +43,9 @@ const {
 // gets it rather than as a copy of its rules.
 const fs = require('fs');
 const path = require('path');
-const buildDir = path.join(__dirname, '..', 'node_modules', '.stacki-test');
-fs.mkdirSync(buildDir, { recursive: true });
-const bundled = path.join(buildDir, 'attr-order.cjs');
+const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
+fs.mkdirSync(buildDirectory, { recursive: true });
+const bundled = path.join(buildDirectory, 'attr-order.cjs');
 require('esbuild').buildSync({
   entryPoints: [path.join(__dirname, '..', 'src', 'attrOrder.js')],
   outfile: bundled,
@@ -66,7 +66,7 @@ const renameAttr = (node, from, to) => {
 };
 
 const page = (body) => `---\n---\n${body}\n`;
-const S = (value) => ({ type: 'string', value });
+const stringValue = (value) => ({ type: 'string', value });
 
 // The tag as it comes back out, after `edit` has had the node.
 function after(body, edit, pick = (nodes) => nodes[0]) {
@@ -85,7 +85,7 @@ const INPUT = '<Input variant="first-name" required />';
   // Between those two the model has forgotten where it was.
   const out = after(INPUT, (node) => {
     delete node.props.variant;
-    node.props.variant = S('given-name');
+    node.props.variant = stringValue('given-name');
   });
   check(
     'a prop cleared and retyped stays where it was',
@@ -95,7 +95,7 @@ const INPUT = '<Input variant="first-name" required />';
 }
 {
   const out = after(INPUT, (node) => {
-    node.props.variant = S('given-name');
+    node.props.variant = stringValue('given-name');
   });
   check(
     'editing one in place is still in place',
@@ -115,7 +115,7 @@ const INPUT = '<Input variant="first-name" required />';
 }
 {
   const out = after(INPUT, (node) => {
-    node.props.placeholder = S('First name');
+    node.props.placeholder = stringValue('First name');
   });
   check(
     'a prop the file never had goes at the end',
@@ -141,10 +141,10 @@ const INPUT = '<Input variant="first-name" required />';
 
 // --- the shapes an attribute comes in -----------------------------------------
 {
-  const src = '<img src="/a.png" alt="" width={w} height={h} loading="lazy" />';
-  const out = after(src, (node) => {
+  const source = '<img src="/a.png" alt="" width={w} height={h} loading="lazy" />';
+  const out = after(source, (node) => {
     delete node.props.alt;
-    node.props.alt = S('A hallway');
+    node.props.alt = stringValue('A hallway');
   });
   check(
     'strings, expressions and bare names keep one order between them',
@@ -153,10 +153,10 @@ const INPUT = '<Input variant="first-name" required />';
   );
 }
 {
-  const src = '<Card {...rest} title="Hi" class:list={[base]} data-x="1" />';
-  const out = after(src, (node) => {
+  const source = '<Card {...rest} title="Hi" class:list={[base]} data-x="1" />';
+  const out = after(source, (node) => {
     delete node.props.title;
-    node.props.title = S('Hello');
+    node.props.title = stringValue('Hello');
   });
   check(
     'a spread holds its place too',
@@ -167,11 +167,11 @@ const INPUT = '<Input variant="first-name" required />';
 
 // --- a tag written across lines ------------------------------------------------
 {
-  const src = `<Input
+  const source = `<Input
   variant="first-name"
   required
 />`;
-  const parsed = parsePage(page(src));
+  const parsed = parsePage(page(source));
   const node = parsed.model.nodes[0];
   check(
     'a multi-line tag is kept as written',
@@ -179,7 +179,7 @@ const INPUT = '<Input variant="first-name" required />';
     'reflowed',
   );
   delete node.props.variant;
-  node.props.variant = S('given-name');
+  node.props.variant = stringValue('given-name');
   const out = serializePage(parsed.model);
   check(
     'and once edited it reflows in the file’s order',
@@ -193,9 +193,9 @@ const INPUT = '<Input variant="first-name" required />';
   const nodes = parseTemplate(
     '<p>Call <a href="/x" class="link" target="_blank">us</a> today.</p>',
   ).nodes;
-  const link = nodes[0].children.find((n) => n.name === 'a');
+  const link = nodes[0].children.find((child) => child.name === 'a');
   delete link.props.href;
-  link.props.href = S('/y');
+  link.props.href = stringValue('/y');
   const out = serializeNodes(nodes, '');
   check(
     'an inline tag keeps its order as well',
@@ -262,7 +262,7 @@ const INPUT = '<Input variant="first-name" required />';
   // A tag the app builds itself was never in a file; its props go out in the
   // order they were set.
   const nodes = parseTemplate('<div></div>').nodes;
-  nodes[0].props = { class: S('card'), id: S('one') };
+  nodes[0].props = { class: stringValue('card'), id: stringValue('one') };
   const out = serializeNodes(nodes, '');
   check(
     'a tag with no file behind it writes what it was given',
@@ -286,7 +286,7 @@ const INPUT = '<Input variant="first-name" required />';
   check(
     'the path attribute is written after the tag’s own props',
     /<p id="x" role="note" data-avb-p=/.test(marked),
-    marked.split('\n').find((l) => l.includes('<p ')) || marked,
+    marked.split('\n').find((line) => line.includes('<p ')) || marked,
   );
   // And an edited prop does not push it around either: what the canvas gets
   // for an edited page is what it gets for the same page written that way.
@@ -294,7 +294,7 @@ const INPUT = '<Input variant="first-name" required />';
     const parsed = parsePage(page('<div class="wrap"><p id="x" role="note">Hi</p></div>'));
     const para = parsed.model.nodes[0].children[0];
     delete para.props.id;
-    para.props.id = S('y');
+    para.props.id = stringValue('y');
     return serializePageMarked(parsed.model, 'src/pages/index.astro');
   })();
   // The one place the marker must NOT go last. An element that spreads its rest
@@ -306,12 +306,12 @@ const INPUT = '<Input variant="first-name" required />';
   check(
     'on a tag that spreads, the marker goes in front of everything',
     /<div data-avb-p=.*class="wrap".*\{\.\.\.rest\}/.test(spread),
-    spread.split('\n').find((l) => l.includes('<div ')) || spread,
+    spread.split('\n').find((line) => line.includes('<div ')) || spread,
   );
   check(
     'and an edited prop leaves the marked page as it would have been written',
     edited === marks('<div class="wrap"><p id="y" role="note">Hi</p></div>'),
-    edited.split('\n').find((l) => l.includes('<p ')) || edited,
+    edited.split('\n').find((line) => line.includes('<p ')) || edited,
   );
 }
 

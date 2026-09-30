@@ -28,16 +28,16 @@ const check = (what, condition, detail) => {
 
 (async () => {
   const esbuild = require('esbuild');
-  const buildDir = path.join(__dirname, '..', 'node_modules', '.stacki-test');
-  fs.mkdirSync(buildDir, { recursive: true });
-  const entry = path.join(buildDir, 'focus.entry.jsx');
+  const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
+  fs.mkdirSync(buildDirectory, { recursive: true });
+  const entry = path.join(buildDirectory, 'focus.entry.jsx');
   fs.writeFileSync(
     entry,
     `export { RatioOtherInput } from ${JSON.stringify(
       path.join(__dirname, '..', 'src', 'style-panel', 'SizeSection.tsx'),
     )};\n`,
   );
-  const out = path.join(buildDir, 'focus.bundle.js');
+  const out = path.join(buildDirectory, 'focus.bundle.js');
   await esbuild.build({
     entryPoints: [entry],
     outfile: out,
@@ -176,7 +176,7 @@ const check = (what, condition, detail) => {
   const ungated = [];
   for (const file of fs
     .readdirSync(panel)
-    .filter((f) => f.endsWith('.tsx') && !OPENED_ON_PURPOSE.has(f))) {
+    .filter((file) => file.endsWith('.tsx') && !OPENED_ON_PURPOSE.has(file))) {
     const source = fs.readFileSync(path.join(panel, file), 'utf8');
     for (const effect of source.split('useEffect(').slice(1)) {
       const body = effect.slice(0, effect.indexOf('}, ['));

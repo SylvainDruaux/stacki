@@ -26,9 +26,9 @@ const check = (what, condition, detail) => {
 
 (async () => {
   const esbuild = require('esbuild');
-  const buildDir = path.join(__dirname, '..', 'node_modules', '.stacki-test');
-  fs.mkdirSync(buildDir, { recursive: true });
-  const entry = path.join(buildDir, 'asset-delete.entry.jsx');
+  const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
+  fs.mkdirSync(buildDirectory, { recursive: true });
+  const entry = path.join(buildDirectory, 'asset-delete.entry.jsx');
   fs.writeFileSync(
     entry,
     `export { default as AssetsPanel } from ${JSON.stringify(
@@ -38,7 +38,7 @@ const check = (what, condition, detail) => {
         path.join(__dirname, '..', 'src', 'ui', 'ConfirmDialog.jsx'),
       )};\n`,
   );
-  const bundle = path.join(buildDir, 'asset-delete.bundle.js');
+  const bundle = path.join(buildDirectory, 'asset-delete.bundle.js');
   await esbuild.build({
     entryPoints: [entry],
     outfile: bundle,
@@ -114,7 +114,7 @@ const check = (what, condition, detail) => {
     },
     renameAsset: async () => ({ ok: true }),
     moveAsset: async () => ({ ok: true }),
-    assetThumb: async () => ({ dataUrl: null }),
+    assetThumb: async () => ({ dataUrl: undefined }),
     getFilePath: () => '',
   };
 
@@ -124,7 +124,7 @@ const check = (what, condition, detail) => {
   // The app mounts one of these for the whole window; the confirm resolves
   // through it, so a test that asks a question needs it too.
   const { AssetsPanel, ConfirmHost } = require(bundle);
-  const settle = (ms = 30) => new Promise((r) => setTimeout(r, ms));
+  const settle = (ms = 30) => new Promise((resolve) => setTimeout(resolve, ms));
 
   const container = document.getElementById('root');
   const root = createRoot(container);
@@ -133,10 +133,10 @@ const check = (what, condition, detail) => {
       root.render(
         React.createElement(
           React.Fragment,
-          null,
+          {},
           React.createElement(AssetsPanel, {
             project: { path: '/p' },
-            showToast: (m) => toasts.push(m),
+            showToast: (message) => toasts.push(message),
             onOpenFile: () => {},
             onRecordUndo: () => {},
             ...props,
@@ -160,16 +160,16 @@ const check = (what, condition, detail) => {
   const tiles = () => [...container.querySelectorAll('.asset-tile')];
   const menuButton = (i) => tiles()[i]?.querySelector('.asset-tile-menu');
   const rows = () =>
-    [...document.querySelectorAll('.more-menu-item')].map((b) => b.textContent.trim());
+    [...document.querySelectorAll('.more-menu-item')].map((item) => item.textContent.trim());
   // A missing button is a FAILURE to report, not a stack trace: every check
   // after it would otherwise be lost.
-  const press = async (el, what = 'something to press') => {
-    if (!el) {
+  const press = async (element, what = 'something to press') => {
+    if (!element) {
       check(`there is ${what}`, false);
       return false;
     }
     await act(async () => {
-      el.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }));
+      element.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }));
       await settle(20);
     });
     return true;
@@ -179,7 +179,7 @@ const check = (what, condition, detail) => {
   check('the assets are on screen', tiles().length === 2, String(tiles().length));
   check(
     'every tile has a menu button',
-    tiles().every((t) => t.querySelector('.asset-tile-menu')),
+    tiles().every((tile) => tile.querySelector('.asset-tile-menu')),
   );
   check(
     'which says what it is for',
@@ -200,7 +200,7 @@ const check = (what, condition, detail) => {
   const dialog = () => document.querySelector('.confirm-dialog, .confirm, [role="alertdialog"]');
   const answer = async (label) => {
     const button = [...document.querySelectorAll('button')].find(
-      (b) => b.textContent.trim().toLowerCase() === label,
+      (button) => button.textContent.trim().toLowerCase() === label,
     );
     if (!button) {
       return false;
@@ -214,7 +214,7 @@ const check = (what, condition, detail) => {
 
   const deleteRow = () =>
     [...document.querySelectorAll('.more-menu-item')].find(
-      (b) => b.textContent.trim() === 'Delete',
+      (button) => button.textContent.trim() === 'Delete',
     );
   await press(deleteRow(), 'a Delete row');
   check('choosing Delete asks first', !!dialog(), document.body.innerHTML.slice(-200));
@@ -224,7 +224,7 @@ const check = (what, condition, detail) => {
   check(
     'the dialog can be answered',
     said,
-    [...document.querySelectorAll('button')].map((b) => b.textContent).join('|'),
+    [...document.querySelectorAll('button')].map((button) => button.textContent).join('|'),
   );
   check('saying no deletes nothing', deleted.length === 0, deleted.join());
 
@@ -244,7 +244,7 @@ const check = (what, condition, detail) => {
   await render({ pick: { mediaKind: 'image', current: 'public/photo.jpg', onPick: () => {} } });
   check(
     'picking hides the menus',
-    tiles().every((t) => !t.querySelector('.asset-tile-menu')),
+    tiles().every((tile) => !tile.querySelector('.asset-tile-menu')),
     container.innerHTML.slice(0, 200),
   );
 

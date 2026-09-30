@@ -23,6 +23,10 @@
 const fs = require('fs');
 const path = require('path');
 
+// The DOM answers "none" with null. The fakes below that stand in for DOM APIs
+// return the platform's own value, read from JSON because our code never writes one.
+const PLATFORM_NULL = JSON.parse('null');
+
 const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
@@ -34,12 +38,12 @@ const check = (what, condition, detail) => {
 
 (async () => {
   const esbuild = require('esbuild');
-  const buildDir = path.join(__dirname, '..', 'node_modules', '.stacki-test');
-  fs.mkdirSync(buildDir, { recursive: true });
+  const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
+  fs.mkdirSync(buildDirectory, { recursive: true });
 
   // --- The checker -----------------------------------------------------------
   {
-    const out = path.join(buildDir, 'js-check.bundle.js');
+    const out = path.join(buildDirectory, 'js-check.bundle.js');
     await esbuild.build({
       entryPoints: [path.join(__dirname, '..', 'src', 'jsCheck.js')],
       outfile: out,
@@ -102,7 +106,7 @@ const check = (what, condition, detail) => {
   }
 
   // --- The editor ------------------------------------------------------------
-  const entry = path.join(buildDir, 'js-guard.entry.jsx');
+  const entry = path.join(buildDirectory, 'js-guard.entry.jsx');
   fs.writeFileSync(
     entry,
     `export { BindField } ` +
@@ -110,7 +114,7 @@ const check = (what, condition, detail) => {
       // CodeMirror's own way in from a DOM node — the editor here is a real one.
       `export { EditorView } from '@codemirror/view';\n`,
   );
-  const bundle = path.join(buildDir, 'js-guard.bundle.js');
+  const bundle = path.join(buildDirectory, 'js-guard.bundle.js');
   await esbuild.build({
     entryPoints: [entry],
     outfile: bundle,
@@ -156,7 +160,7 @@ const check = (what, condition, detail) => {
   });
   dom.window.Range.prototype.getClientRects = () => ({
     length: 0,
-    item: () => null,
+    item: () => PLATFORM_NULL,
     [Symbol.iterator]: function* () {},
   });
 
@@ -176,8 +180,8 @@ const check = (what, condition, detail) => {
       React.createElement(BindField, {
         value: { type: 'expr', value: '`${media}`' },
         placeholder: '',
-        bindCtx: {},
-        dataCtx: {
+        bindContext: {},
+        dataContext: {
           frontmatter: `${START}\n`,
           imports: '',
           onSetFrontmatter: (code) => writes.push(code),
@@ -193,13 +197,13 @@ const check = (what, condition, detail) => {
   await act(async () => {
     chip.dispatchEvent(new dom.window.MouseEvent('mousedown', { bubbles: true }));
   });
-  const editRow = [...document.querySelectorAll('.bind-menu .dp-foot')].find((r) =>
-    r.textContent.includes('Edit media'),
+  const editRow = [...document.querySelectorAll('.bind-menu .dp-foot')].find((row) =>
+    row.textContent.includes('Edit media'),
   );
   check(
     'the menu offers to edit it',
     !!editRow,
-    [...document.querySelectorAll('.bind-menu .dp-foot')].map((r) => r.textContent).join(' | '),
+    [...document.querySelectorAll('.bind-menu .dp-foot')].map((row) => row.textContent).join(' | '),
   );
   await act(async () => {
     editRow.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }));
@@ -210,16 +214,16 @@ const check = (what, condition, detail) => {
   const cm = () => box.querySelector('.expr-input');
   // CodeMirror is real here, so typing goes through its own transaction.
   const view = () => {
-    const el = cm();
-    return el ? EditorView.findFromDOM(el) : null;
+    const element = cm();
+    return element ? EditorView.findFromDOM(element) : undefined;
   };
   const type = async (text) => {
-    const v = view();
-    if (!v) {
+    const editorView = view();
+    if (!editorView) {
       return false;
     }
     await act(async () => {
-      v.dispatch({ changes: { from: 0, to: v.state.doc.length, insert: text } });
+      editorView.dispatch({ changes: { from: 0, to: editorView.state.doc.length, insert: text } });
     });
     return true;
   };
@@ -287,7 +291,7 @@ const check = (what, condition, detail) => {
   }
   console.log(`js-guard: ${checked} passed  [commit on leave, refuse broken, TS-safe]`);
   process.exit(0);
-})().catch((err) => {
-  console.error(err);
+})().catch((error) => {
+  console.error(error);
   process.exit(1);
 });

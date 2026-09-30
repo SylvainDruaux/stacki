@@ -18,6 +18,9 @@ import {
 } from '../../dist/shared/page-node.js';
 import { LIMITS } from '../../dist/shared/limits.js';
 
+// Null as a boundary receives it, parsed from JSON: inputs may hold it; our values never do.
+const jsonNull: unknown = JSON.parse('null');
+
 // Helpers return producer-shaped plain data; branding happens in the parser.
 const text = (id: string, value: string): unknown => ({ kind: 'text', id, value });
 const element = (id: string, name: string, children: readonly unknown[] | undefined): unknown => ({
@@ -84,7 +87,7 @@ test('every kind round-trips through the parser', () => {
 });
 
 test('negative space: every wrong shape fails with a pinned message', () => {
-  assert.throws(() => parsePageNode(null), /PageNode\.node: expected object/);
+  assert.throws(() => parsePageNode(jsonNull), /PageNode\.node: expected object/);
   assert.throws(() => parsePageNode([]), /expected object/);
   assert.throws(() => parsePageNode({ kind: 'text', id: 'n1' }), /value: expected string/);
   assert.throws(() => parsePageNode({ kind: 'wat', id: 'n1' }), /unknown kind "wat"/);
@@ -269,14 +272,14 @@ test('parsePageModel preserves Markdown source metadata and rejects malformed me
 // written before that convention holds `null`, and JSON drops the key
 // altogether: the parser reads both as absent and emits `undefined`.
 test('a self-closing tag, a missing bail and no layout read the same in every spelling', () => {
-  for (const spelling of [{ children: undefined }, { children: null }, {}]) {
+  for (const spelling of [{ children: undefined }, { children: jsonNull }, {}]) {
     const node = parsePageNode({ kind: 'element', id: 'n1', name: 'br', ...spelling });
     assert.ok(node.kind === 'element');
     assert.equal(node.children, undefined);
     assert.ok(Object.hasOwn(node, 'children'), 'the parsed tag states it has no children');
   }
   const refused = { editable: false, reason: 'r' };
-  for (const spelling of [{ bail: undefined }, { bail: null }, {}]) {
+  for (const spelling of [{ bail: undefined }, { bail: jsonNull }, {}]) {
     const result = parsePageResult({ ...refused, ...spelling });
     assert.ok(!result.editable);
     assert.equal(result.bail, undefined);
@@ -291,7 +294,7 @@ test('a self-closing tag, a missing bail and no layout read the same in every sp
     mdEndsWithNewline: true,
     mdHasFrontmatter: false,
   };
-  for (const spelling of [{ layoutPath: undefined }, { layoutPath: null }, {}]) {
+  for (const spelling of [{ layoutPath: undefined }, { layoutPath: jsonNull }, {}]) {
     assert.equal(parsePageModel({ ...markdown, ...spelling }).layoutPath, undefined);
   }
   assert.equal(parsePageModel({ ...markdown, layoutPath: 'L.astro' }).layoutPath, 'L.astro');

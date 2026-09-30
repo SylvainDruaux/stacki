@@ -28,11 +28,11 @@ const check = (what, condition, detail) => {
 
 (async () => {
   const esbuild = require('esbuild');
-  const buildDir = path.join(__dirname, '..', 'node_modules', '.stacki-test');
-  fs.mkdirSync(buildDir, { recursive: true });
+  const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
+  fs.mkdirSync(buildDirectory, { recursive: true });
 
   // --- what the reader accepts ------------------------------------------------
-  const modOut = path.join(buildDir, 'object-value.bundle.mjs');
+  const modOut = path.join(buildDirectory, 'object-value.bundle.mjs');
   await esbuild.build({
     entryPoints: [path.join(__dirname, '..', 'src', 'arrayValue.js')],
     outfile: modOut,
@@ -51,8 +51,8 @@ const check = (what, condition, detail) => {
     check('an object of plain values reads as fields', !!fields, 'refused');
     check(
       'one per key, in the order they were written',
-      fields?.map((f) => f.key).join() === 'legend,options',
-      fields?.map((f) => f.key).join(),
+      fields?.map((field) => field.key).join() === 'legend,options',
+      fields?.map((field) => field.key).join(),
     );
     check(
       'a word is a word',
@@ -97,20 +97,20 @@ const check = (what, condition, detail) => {
   ]) {
     check(
       `what a field cannot show is refused — ${refused}`,
-      objectFields(refused) === null,
+      objectFields(refused) === undefined,
       JSON.stringify(objectFields(refused)),
     );
   }
 
   // --- and what the control does with them --------------------------------------
-  const entry = path.join(buildDir, 'object-field.entry.jsx');
+  const entry = path.join(buildDirectory, 'object-field.entry.jsx');
   fs.writeFileSync(
     entry,
     `export { default as ObjectField } from ${JSON.stringify(
       path.join(__dirname, '..', 'src', 'panels', 'ObjectField.jsx'),
     )};\n`,
   );
-  const bundle = path.join(buildDir, 'object-field.bundle.js');
+  const bundle = path.join(buildDirectory, 'object-field.bundle.js');
   await esbuild.build({
     entryPoints: [entry],
     outfile: bundle,
@@ -164,7 +164,8 @@ const check = (what, condition, detail) => {
   };
   await render();
 
-  const keys = () => [...host.querySelectorAll('.object-field-key')].map((k) => k.textContent);
+  const keys = () =>
+    [...host.querySelectorAll('.object-field-key')].map((keyElement) => keyElement.textContent);
   const inputs = () => [...host.querySelectorAll('.object-field-input')];
   const rows = () => [...host.querySelectorAll('.list-field-row')];
 
@@ -179,9 +180,9 @@ const check = (what, condition, detail) => {
   check('and the list is rows, not text', rows().length === 3, `${rows().length} rows`);
   check(
     'each row saying what its item says',
-    [...host.querySelectorAll('.list-field-text')].map((b) => b.textContent).join() ===
+    [...host.querySelectorAll('.list-field-text')].map((button) => button.textContent).join() ===
       'Pastors,Staff,Prayer',
-    [...host.querySelectorAll('.list-field-text')].map((b) => b.textContent).join(),
+    [...host.querySelectorAll('.list-field-text')].map((button) => button.textContent).join(),
   );
 
   // Typing in a field writes the whole object back — that is what the file
@@ -250,7 +251,7 @@ const check = (what, condition, detail) => {
   );
   check(
     'a code prop holding an object gets the fields',
-    /type === 'code' && !showExpr && str && objectFields\(str\)/.test(panel),
+    /type === 'code' && !showExpr && valueText && objectFields\(valueText\)/.test(panel),
     'an object prop still shows as raw code',
   );
   check(

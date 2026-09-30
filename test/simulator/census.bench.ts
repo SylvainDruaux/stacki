@@ -85,18 +85,48 @@ function main(): void {
     }
     seen.add(digest);
     tally.files++;
-    censusFile(bytes, tally);
+    // The tally is main's alone: each file reports its own counts, added here.
+    const found = censusFile(bytes);
+    tally.reparseMs.push(found.reparseMs);
+    tally.invalid += found.invalid;
+    tally.sites += found.sites;
+    tally.markup += found.markup;
+    tally.expression += found.expression;
+    tally.refusedHost += found.refusedHost;
+    tally.compared += found.compared;
+    for (const value of REPLACEMENTS) {
+      const counts = tally.accepted[value];
+      const more = found.accepted[value];
+      assert.ok(counts !== undefined, 'Every replacement has a tally');
+      assert.ok(more !== undefined, 'Every replacement has a count for the file');
+      counts.a += more.a;
+      counts.b += more.b;
+    }
   }
   report(tally);
 }
 
-function censusFile(bytes: ByteString, tally: Tally): void {
+// One file's share of the tally: the counts it adds, and its own reparse time.
+interface FileTally extends Omit<Tally, 'files' | 'duplicates' | 'reparseMs'> {
+  readonly reparseMs: number;
+}
+
+function censusFile(bytes: ByteString): FileTally {
   const started = performance.now();
   const projection = projectBytes(PAGE, bytes);
-  tally.reparseMs.push(performance.now() - started);
+  const tally: FileTally = {
+    reparseMs: performance.now() - started,
+    invalid: 0,
+    sites: 0,
+    markup: 0,
+    expression: 0,
+    refusedHost: 0,
+    compared: 0,
+    accepted: Object.fromEntries(REPLACEMENTS.map((value) => [value, { a: 0, b: 0 }])),
+  };
   if (projection.tag !== 'valid') {
     tally.invalid++;
-    return;
+    return tally;
   }
   for (const range of editableValues(projection)) {
     tally.sites++;
@@ -122,6 +152,7 @@ function censusFile(bytes: ByteString, tally: Tally): void {
       }
     }
   }
+  return tally;
 }
 
 // The sites the planner could target (planner.ts soleAttribute): an editable
@@ -224,8 +255,8 @@ function report(tally: Tally): void {
   }
   console.log(`\nB patches compared with a full reparse: ${tally.compared}, all equal.`);
   const sorted = [...tally.reparseMs].sort((left, right) => left - right);
-  const rank = (p: number): string =>
-    (sorted[Math.max(Math.ceil((p / 100) * sorted.length), 1) - 1] ?? 0).toFixed(1);
+  const rank = (percent: number): string =>
+    (sorted[Math.max(Math.ceil((percent / 100) * sorted.length), 1) - 1] ?? 0).toFixed(1);
   const max = (sorted.at(-1) ?? 0).toFixed(1);
   console.log(`Full reparse per file, ms: p50 ${rank(50)}, p95 ${rank(95)}, max ${max}`);
 }

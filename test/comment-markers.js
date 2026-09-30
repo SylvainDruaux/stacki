@@ -176,15 +176,15 @@ const marked = (
       ['@astrojs/compiler-rs (Astro 7+)', '@astrojs/compiler-rs'],
       ['@astrojs/compiler (Astro ≤6)', '@astrojs/compiler'],
     ]) {
-      let error = null;
+      let error;
       let code = '';
       try {
         const { transform } = require(mod);
         code = (await transform(out, { filename: 'Page.astro' })).code || '';
-      } catch (err) {
-        error = String(err?.message || err);
+      } catch (caught) {
+        error = String(caught?.message || caught);
       }
-      check(`a slotted marker compiles — ${label}`, error === null, error);
+      check(`a slotted marker compiles — ${label}`, error === undefined, error);
       check(
         `and keeps the slot on it — ${label}`,
         /column2/.test(code) && /avb-s:0\.0/.test(code),
@@ -283,14 +283,15 @@ const marked = (
     );
     check(
       'a comment is a marker',
-      /if \(isComment\(n\)\) \{[\s\S]*?avb-\$\{kind\}:/.test(preload),
+      /if \(isComment\(node\)\) \{[\s\S]*?avb-\$\{kind\}:/.test(preload),
       'the collector cannot read a comment marker',
     );
     check(
       'and a template still is too, for a page served before this update',
-      /n\.tagName === 'TEMPLATE'\) \{[\s\S]*?return n\.getAttribute\(`data-avb-\$\{kind\}`\)/.test(
-        preload,
-      ),
+      new RegExp(
+        String.raw`node\.tagName === 'TEMPLATE'\) \{[\s\S]*?` +
+          String.raw`return node\.getAttribute\(\`data-avb-\$\{kind\}\`\)`,
+      ).test(preload),
       'a running dev server would go blank on update',
     );
   }

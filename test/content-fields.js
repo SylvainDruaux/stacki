@@ -13,9 +13,11 @@
 // back clean. Anything that does not is this file's reading of the schema being
 // wrong, not the content.
 
+const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
+const { LIMITS } = require('../dist/shared/limits.js');
 const loadRenderer = require('./renderer-module.js');
 const {
   readContentConfig,
@@ -38,7 +40,7 @@ const check = (what, condition, detail) => {
   }
 };
 
-const isPlainObject = (v) => !!v && typeof v === 'object' && !Array.isArray(v);
+const isPlainObject = (value) => !!value && typeof value === 'object' && !Array.isArray(value);
 
 (async () => {
   if (!fs.existsSync(path.join(source, 'src', 'content.config.ts'))) {
@@ -56,7 +58,8 @@ const isPlainObject = (v) => !!v && typeof v === 'object' && !Array.isArray(v);
   }
 
   // Walks a value with the field that describes it, the way the form does.
-  const walk = (field, value, at, report) => {
+  const walk = (field, value, at, depth, report) => {
+    assert.ok(depth <= LIMITS.ipcDepthMax, 'walk: value depth limit');
     if (value === undefined || value === null) {
       return;
     }
@@ -66,18 +69,18 @@ const isPlainObject = (v) => !!v && typeof v === 'object' && !Array.isArray(v);
     }
     if (field.control === 'object' && isPlainObject(value)) {
       for (const child of field.fields || []) {
-        walk(child, value[child.key], `${at}.${child.key}`, report);
+        walk(child, value[child.key], `${at}.${child.key}`, depth + 1, report);
       }
     } else if (field.control === 'list' && Array.isArray(value)) {
-      value.forEach((item, i) => walk(field.item || {}, item, `${at}[${i}]`, report));
+      value.forEach((item, i) => walk(field.item || {}, item, `${at}[${i}]`, depth + 1, report));
     } else if (field.control === 'record' && isPlainObject(value)) {
       for (const [key, item] of Object.entries(value)) {
-        walk(field.value || {}, item, `${at}.${key}`, report);
+        walk(field.value || {}, item, `${at}.${key}`, depth + 1, report);
       }
     } else if (field.control === 'union' && isPlainObject(value)) {
       const member = memberFor(field, value);
       for (const child of member?.fields || []) {
-        walk(child, value[child.key], `${at}.${child.key}`, report);
+        walk(child, value[child.key], `${at}.${child.key}`, depth + 1, report);
       }
     }
   };
@@ -97,7 +100,9 @@ const isPlainObject = (v) => !!v && typeof v === 'object' && !Array.isArray(v);
       continue;
     }
 
-    const fields = shape.union ? shape.union.members.flatMap((m) => m.fields) : shape.fields;
+    const fields = shape.union
+      ? shape.union.members.flatMap((member) => member.fields)
+      : shape.fields;
     check(`${collection.name}: has fields`, fields.length > 0);
     for (const field of fields) {
       fieldsSeen++;
@@ -117,11 +122,11 @@ const isPlainObject = (v) => !!v && typeof v === 'object' && !Array.isArray(v);
       if (shape.union) {
         const member = memberFor(shape.union, entry.data);
         for (const field of member?.fields || []) {
-          walk(field, entry.data[field.key], `${field.key}`, report);
+          walk(field, entry.data[field.key], `${field.key}`, 0, report);
         }
       } else {
         for (const field of shape.fields) {
-          walk(field, entry.data[field.key], field.key, report);
+          walk(field, entry.data[field.key], field.key, 0, report);
         }
       }
       check(
@@ -180,7 +185,7 @@ const isPlainObject = (v) => !!v && typeof v === 'object' && !Array.isArray(v);
 
   // The zod round trip agrees with the form: what the fixture holds parses.
   {
-    const blog = config.collections.find((c) => c.name === 'blog');
+    const blog = config.collections.find((collection) => collection.name === 'blog');
     const entry = listEntries(source, blog).entries[0];
     const result = await validateEntry(source, { collection: 'blog', data: entry.data });
     check(
@@ -202,7 +207,7 @@ const isPlainObject = (v) => !!v && typeof v === 'object' && !Array.isArray(v);
   {
     const jobs = listEntries(
       source,
-      config.collections.find((c) => c.name === 'jobs'),
+      config.collections.find((collection) => collection.name === 'jobs'),
     ).entries[0];
     const closes = await validateEntry(source, {
       collection: 'jobs',
@@ -231,9 +236,9 @@ const isPlainObject = (v) => !!v && typeof v === 'object' && !Array.isArray(v);
 
   // A hint is what the user reads instead of the schema.
   {
-    const settings = config.collections.find((c) => c.name === 'siteSettings');
+    const settings = config.collections.find((collection) => collection.name === 'siteSettings');
     const brand = collectionFields(settings.schema).union.members[0];
-    const theme = brand.fields.find((f) => f.key === 'themeColor');
+    const theme = brand.fields.find((field) => field.key === 'themeColor');
     check('a regex becomes a sentence', /hex colour/.test(hintFor(theme) || ''), hintFor(theme));
     const field = describeField({ type: 'string', pattern: '^[a-z0-9-]+$' }, 'slug', {});
     check(
@@ -241,10 +246,10 @@ const isPlainObject = (v) => !!v && typeof v === 'object' && !Array.isArray(v);
       /lowercase/.test(hintFor(field) || ''),
       hintFor(field),
     );
-    const products = config.collections.find((c) => c.name === 'products');
+    const products = config.collections.find((collection) => collection.name === 'products');
     const sku = collectionFields(products.schema)
-      .fields.find((f) => f.key === 'variants')
-      .item.fields.find((f) => f.key === 'sku');
+      .fields.find((field) => field.key === 'variants')
+      .item.fields.find((field) => field.key === 'sku');
     check('a sku pattern reads as an example', /BCN-STD/.test(hintFor(sku) || ''), hintFor(sku));
   }
 

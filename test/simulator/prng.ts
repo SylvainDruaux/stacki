@@ -32,16 +32,16 @@ export class Prng {
   }
 
   nextUint32(): number {
-    const s = this.state;
-    const [s0 = 0, s1 = 0, s2 = 0, s3 = 0] = s;
-    const result = Math.imul(rotl(Math.imul(s1, 5) >>> 0, 7), 9) >>> 0;
-    const t = (s1 << 9) >>> 0;
-    s[2] = s2 ^ s0;
-    s[3] = s3 ^ s1;
-    s[1] = s1 ^ (s[2] ?? 0);
-    s[0] = s0 ^ (s[3] ?? 0);
-    s[2] = (s[2] ?? 0) ^ t;
-    s[3] = rotl(s[3] ?? 0, 11);
+    const state = this.state;
+    const [word0 = 0, word1 = 0, word2 = 0, word3 = 0] = state;
+    const result = Math.imul(rotl(Math.imul(word1, 5) >>> 0, 7), 9) >>> 0;
+    const shifted = (word1 << 9) >>> 0;
+    state[2] = word2 ^ word0;
+    state[3] = word3 ^ word1;
+    state[1] = word1 ^ (state[2] ?? 0);
+    state[0] = word0 ^ (state[3] ?? 0);
+    state[2] = (state[2] ?? 0) ^ shifted;
+    state[3] = rotl(state[3] ?? 0, 11);
     return result;
   }
 

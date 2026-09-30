@@ -31,13 +31,13 @@ const check = (what, condition, detail) => {
     failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
   }
 };
-const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 (async () => {
   const esbuild = require('esbuild');
-  const buildDir = path.join(__dirname, '..', 'node_modules', '.stacki-test');
-  fs.mkdirSync(buildDir, { recursive: true });
-  const bundlePath = path.join(buildDir, 'moving-page.bundle.js');
+  const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
+  fs.mkdirSync(buildDirectory, { recursive: true });
+  const bundlePath = path.join(buildDirectory, 'moving-page.bundle.js');
   await esbuild.build({
     entryPoints: [path.join(__dirname, '..', 'src', 'outlineBoxes.js')],
     outfile: bundlePath,
@@ -69,7 +69,7 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms));
   const { window } = dom;
   const document = window.document;
 
-  // jsdom lays nothing out, so the boxes live here — which is also what makes
+  // `jsdom` lays nothing out, so the boxes live here — which is also what makes
   // the animation sayable: `travel` moves the track's contents without touching
   // the DOM at all, exactly as a transform does.
   const boxes = {
@@ -97,9 +97,18 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms));
   ]);
   window.Element.prototype.getBoundingClientRect = function () {
     const name = this.getAttribute('data-box');
-    const [x, y, w, h] = boxes[name] || [0, 0, 0, 0];
+    const [x, y, width, height] = boxes[name] || [0, 0, 0, 0];
     const at = MOVES.has(name) ? x + travelled : x;
-    return { x: at, y, width: w, height: h, left: at, top: y, right: at + w, bottom: y + h };
+    return {
+      x: at,
+      y,
+      width,
+      height,
+      left: at,
+      top: y,
+      right: at + width,
+      bottom: y + height,
+    };
   };
   const NO_BOX = { x: 0, y: 0, width: 0, height: 0, left: 0, top: 0, right: 0, bottom: 0 };
   window.Range.prototype.getBoundingClientRect = () => NO_BOX;
@@ -115,7 +124,7 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms));
   global.requestAnimationFrame = window.requestAnimationFrame.bind(window);
 
   const sent = [];
-  window.parent = { postMessage: (m) => sent.push(m) };
+  window.parent = { postMessage: (message) => sent.push(message) };
   const electron = {
     contextBridge: { exposeInMainWorld: () => {} },
     ipcRenderer: { on: () => {}, send: () => {}, invoke: async () => {} },
@@ -131,14 +140,14 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms));
   await wait(50);
 
   const post = (data) => {
-    const ev = new window.MessageEvent('message', { data });
-    Object.defineProperty(ev, 'source', { value: window.parent });
-    window.dispatchEvent(ev);
+    const event = new window.MessageEvent('message', { data });
+    Object.defineProperty(event, 'source', { value: window.parent });
+    window.dispatchEvent(event);
   };
   post({ type: 'avb:design', on: true });
   const ICON = '0.1.1';
   const lastRects = () =>
-    (sent.filter((m) => m.type === 'avb:rects').pop()?.rects || {})[ICON] || [];
+    (sent.filter((message) => message.type === 'avb:rects').pop()?.rects || {})[ICON] || [];
   post({ type: 'avb:track', paths: [ICON] });
   await wait(30);
 
@@ -148,14 +157,14 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms));
     check('the strip and its copy are two boxes', drawn.length === 2, JSON.stringify(drawn));
     check(
       'in the order they are across the page',
-      drawn.map((r) => r.x).join(',') === '300,1500',
-      JSON.stringify(drawn.map((r) => r.x)),
+      drawn.map((rect) => rect.x).join(',') === '300,1500',
+      JSON.stringify(drawn.map((rect) => rect.x)),
     );
     const clickOn = (name) => {
-      const el = document.querySelector(`[data-box="${name}"]`);
+      const element = document.querySelector(`[data-box="${name}"]`);
       sent.length = 0;
-      el.dispatchEvent(new window.MouseEvent('click', { bubbles: true, cancelable: true }));
-      return sent.filter((m) => m.type === 'avb:click-node').pop();
+      element.dispatchEvent(new window.MouseEvent('click', { bubbles: true, cancelable: true }));
+      return sent.filter((message) => message.type === 'avb:click-node').pop();
     };
     check(
       'clicking the first copy says the first',
@@ -247,17 +256,18 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms));
   );
   check(
     'a selection from anywhere but the canvas means the node',
-    /setSelOcc\(null\)/.test(runtime) && /useState<number \| null>\(null\)/.test(runtime),
+    /setSelectedOccurrence\(undefined\)/.test(runtime) &&
+      /useState<number \| undefined>\(undefined\)/.test(runtime),
     'a navigator selection still means the first copy',
   );
   check(
     'and a click still means the copy that was clicked',
-    /setSelOcc\(message\.occurrence\)/.test(runtime),
+    /setSelectedOccurrence\(message\.occurrence\)/.test(runtime),
     'a canvas click no longer picks an instance',
   );
   check(
     'which the outline draws as every place',
-    /outline\.occ === null \? onePerPlace\(all\)/.test(overlays),
+    /outline\.occ === undefined \? onePerPlace\(all\)/.test(overlays),
     'a selection with no occurrence draws one box',
   );
   check(
@@ -267,7 +277,7 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms));
   );
   check(
     'a hover on any copy of an all-copies selection is already outlined',
-    hoverIsSelection({ path: '0.1.1', occ: 1 }, { path: '0.1.1', occ: null }),
+    hoverIsSelection({ path: '0.1.1', occ: 1 }, { path: '0.1.1', occ: undefined }),
   );
   check(
     'while a hover on another copy of ONE selected copy still draws',

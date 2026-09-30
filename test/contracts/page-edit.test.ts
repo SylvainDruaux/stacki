@@ -27,6 +27,9 @@ import {
 import { parsePageNode, type PageNode } from '../../dist/shared/page-node.js';
 import { toUtf16Span } from '../../dist/shared/span.js';
 
+// Null as a boundary receives it, parsed from JSON: inputs may hold it; our values never do.
+const jsonNull: unknown = JSON.parse('null');
+
 const sha256 = (bytes: string | Buffer): string => createHash('sha256').update(bytes).digest('hex');
 const DIGEST = 'a'.repeat(64);
 // A node a gesture created: the renderer's own handle (shared/brand.ts).
@@ -173,7 +176,7 @@ test('parseEditRequest takes every edit and refuses each malformed shape', () =>
 });
 
 test('parsePageEditResult: an applied edit carries its inverse; a refusal is a rejection', () => {
-  const page = { source: 'x', editable: false, reason: 'r', bail: null, checksum: DIGEST };
+  const page = { source: 'x', editable: false, reason: 'r', bail: jsonNull, checksum: DIGEST };
   const applied = parsePageEditResult({
     ok: true,
     ...page,
@@ -214,7 +217,7 @@ test('parsePageEditResult: an applied edit carries its inverse; a refusal is a r
     () =>
       parsePageEditResult({
         ok: false,
-        error: { code: 'rejected', reason: 'anchor-moved', message: 'm', diskChecksum: null },
+        error: { code: 'rejected', reason: 'anchor-moved', message: 'm', diskChecksum: jsonNull },
       }),
     /diskChecksum: expected string/,
   );
@@ -638,11 +641,11 @@ test('two frontmatter requests against one read add each import once', async (co
   fs.writeFileSync(file, "---\nimport A from './A.astro';\n---\n<A />\n");
   const page = await read(harness, file);
   assert.ok(page.editable);
-  const B = { name: 'B', path: './B.astro', quote: "'" };
-  const C = { name: 'C', path: './C.astro', quote: "'" };
+  const secondImport = { name: 'B', path: './B.astro', quote: "'" };
+  const thirdImport = { name: 'C', path: './C.astro', quote: "'" };
   for (const imports of [
-    [...page.model.imports, B],
-    [...page.model.imports, B, C],
+    [...page.model.imports, secondImport],
+    [...page.model.imports, secondImport, thirdImport],
   ]) {
     const applied = await edit(harness, file, page.checksum, {
       tag: 'set-frontmatter',

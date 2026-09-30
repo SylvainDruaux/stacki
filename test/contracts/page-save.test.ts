@@ -21,6 +21,9 @@ import { toDigest } from '../../dist/shared/brand.js';
 import type { PageDiskRead } from '../../dist/shared/page-save.js';
 import { toRecord } from '../../dist/shared/record.js';
 
+// Null as a boundary receives it, parsed from JSON: inputs may hold it; our values never do.
+const jsonNull: unknown = JSON.parse('null');
+
 const sha256 = (bytes: string | Buffer): string => createHash('sha256').update(bytes).digest('hex');
 const FIXTURES = path.resolve('test/fixtures/round-trip');
 const page = {
@@ -120,7 +123,7 @@ test('page read and edit replies parse only with a valid checksum', () => {
     () => parsePageEditResult({ ok: true, ...page, checksum }),
     /PageEdited\.inverse: expected array/,
   );
-  assert.throws(() => parsePageEditResult(null), /PageEditResult: expected object/);
+  assert.throws(() => parsePageEditResult(jsonNull), /PageEditResult: expected object/);
   assert.throws(() => parsePageEditResult({ ok: 'yes' }), /PageEditResult\.ok/);
 });
 

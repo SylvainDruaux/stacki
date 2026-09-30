@@ -26,9 +26,9 @@ const check = (what, condition, detail) => {
 
 (async () => {
   const esbuild = require('esbuild');
-  const buildDir = path.join(__dirname, '..', 'node_modules', '.stacki-test');
-  fs.mkdirSync(buildDir, { recursive: true });
-  const bundlePath = path.join(buildDir, 'grid-tracks.bundle.js');
+  const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
+  fs.mkdirSync(buildDirectory, { recursive: true });
+  const bundlePath = path.join(buildDirectory, 'grid-tracks.bundle.js');
   await esbuild.build({
     entryPoints: [path.join(__dirname, '..', 'src', 'style-panel', 'lib', 'grid-template.ts')],
     outfile: bundlePath,
@@ -99,14 +99,14 @@ const check = (what, condition, detail) => {
   // Mounted rather than read: what matters is that the switch is there for a
   // grid written each way, and says which way the press goes.
   {
-    const entry = path.join(buildDir, 'grid-settings.entry.jsx');
+    const entry = path.join(buildDirectory, 'grid-settings.entry.jsx');
     fs.writeFileSync(
       entry,
       `export { default as GridSettings } from ${JSON.stringify(
         path.join(__dirname, '..', 'src', 'style-panel', 'GridSettings.tsx'),
       )};\n`,
     );
-    const uiPath = path.join(buildDir, 'grid-settings.bundle.js');
+    const uiPath = path.join(buildDirectory, 'grid-settings.bundle.js');
     await esbuild.build({
       entryPoints: [entry],
       outfile: uiPath,
@@ -171,7 +171,7 @@ const check = (what, condition, detail) => {
             onClose: () => {},
           }),
         );
-        await new Promise((r) => setTimeout(r, 20));
+        await new Promise((resolve) => setTimeout(resolve, 20));
       });
     // Each scenario opens the settings again: the switch remembers the form you
     // last chose while it is open, which is the point, so a scenario that began
@@ -179,7 +179,7 @@ const check = (what, condition, detail) => {
     const show = async (value, imp = false) => {
       await act(async () => {
         root.unmount();
-        await new Promise((r) => setTimeout(r, 5));
+        await new Promise((resolve) => setTimeout(resolve, 5));
       });
       root = createRoot(container);
       columns = value;
@@ -189,7 +189,7 @@ const check = (what, condition, detail) => {
     const press = async (label) => {
       await act(async () => {
         button(label)?.click();
-        await new Promise((r) => setTimeout(r, 10));
+        await new Promise((resolve) => setTimeout(resolve, 10));
       });
       await paint();
     };
@@ -197,7 +197,7 @@ const check = (what, condition, detail) => {
     // the switch is an <input>, not a button.
     const button = (label) =>
       [...dom.window.document.querySelectorAll('button, input, textarea')].find(
-        (el) => (el.getAttribute('aria-label') || '') === label,
+        (element) => (element.getAttribute('aria-label') || '') === label,
       );
 
     await show('repeat(2, minmax(0, 1fr))');
@@ -334,17 +334,17 @@ const check = (what, condition, detail) => {
     // leaving the field is a focusout (blur does not bubble).
     const type = async (text) => {
       await act(async () => {
-        const el = field();
+        const element = field();
         // The field is a textarea now (the same editor the panel opens over a
         // cramped value, inline) — React patches the setter on its prototype.
         const setValue = Object.getOwnPropertyDescriptor(
           dom.window.HTMLTextAreaElement.prototype,
           'value',
         ).set;
-        setValue.call(el, text);
-        el.dispatchEvent(new dom.window.Event('input', { bubbles: true }));
-        el.dispatchEvent(new dom.window.Event('focusout', { bubbles: true }));
-        await new Promise((r) => setTimeout(r, 10));
+        setValue.call(element, text);
+        element.dispatchEvent(new dom.window.Event('input', { bubbles: true }));
+        element.dispatchEvent(new dom.window.Event('focusout', { bubbles: true }));
+        await new Promise((resolve) => setTimeout(resolve, 10));
       });
       await paint();
     };
@@ -454,7 +454,7 @@ const check = (what, condition, detail) => {
     );
     check(
       "and so does the '=' shortcut",
-      /e\.key === '=' && !disabled && !big && !expanded/.test(vc),
+      /event\.key === '=' && !disabled && !big && !expanded/.test(vc),
     );
   }
 
@@ -481,7 +481,7 @@ const check = (what, condition, detail) => {
   check('on both track lists, since each is written its own way', /<RepeatSwitch/.test(settings));
   check(
     'and every edit writes the form it is showing',
-    /const write = \(next: string\[\]\) => \{\s*const s = asWritten\(next\)/.test(settings),
+    /const write = \(next: string\[\]\) => \{\s*const written = asWritten\(next\)/.test(settings),
     'an edit would write in its own form regardless of the switch',
   );
 

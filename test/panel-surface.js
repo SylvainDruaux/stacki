@@ -35,7 +35,7 @@ const check = (what, condition, detail) => {
     try {
       return require('electron');
     } catch {
-      return null;
+      return undefined;
     }
   })();
   if (typeof electronPath !== 'string') {
@@ -45,10 +45,10 @@ const check = (what, condition, detail) => {
 
   const esbuild = require('esbuild');
   const root = path.join(__dirname, '..');
-  const pageDir = path.join(root, 'node_modules', '.stacki-test', 'panel-surface');
-  fs.mkdirSync(pageDir, { recursive: true });
+  const pageDirectory = path.join(root, 'node_modules', '.stacki-test', 'panel-surface');
+  fs.mkdirSync(pageDirectory, { recursive: true });
 
-  const entry = path.join(pageDir, 'entry.jsx');
+  const entry = path.join(pageDirectory, 'entry.jsx');
   // The module specifier of a style-panel source file, written into the entry below.
   const stylePanelImport = (...parts) =>
     JSON.stringify(path.join(root, 'src', 'style-panel', ...parts));
@@ -74,7 +74,7 @@ const check = (what, condition, detail) => {
   );
   await esbuild.build({
     entryPoints: [entry],
-    outfile: path.join(pageDir, 'bundle.js'),
+    outfile: path.join(pageDirectory, 'bundle.js'),
     bundle: true,
     format: 'iife',
     jsx: 'automatic',
@@ -85,7 +85,7 @@ const check = (what, condition, detail) => {
   // Every stylesheet the app loads, tokens first — without those the `var()`s
   // resolve to nothing and the measurements are of a page that never existed.
   fs.writeFileSync(
-    path.join(pageDir, 'app.css'),
+    path.join(pageDirectory, 'app.css'),
     [
       'src/style-panel/tokens.css',
       'src/styles.css',
@@ -93,17 +93,17 @@ const check = (what, condition, detail) => {
       'src/style-panel/components/IconButton.css',
       'src/style-panel/embed-editor.css',
     ]
-      .map((f) => fs.readFileSync(path.join(root, f), 'utf8'))
+      .map((file) => fs.readFileSync(path.join(root, file), 'utf8'))
       .join('\n'),
   );
   fs.writeFileSync(
-    path.join(pageDir, 'index.html'),
+    path.join(pageDirectory, 'index.html'),
     '<!doctype html><meta charset=utf-8><link rel="stylesheet" href="app.css">' +
       '<style>body{margin:0;background:#1a1a1a}</style><div id="root"></div>' +
       '<script src="bundle.js"></script>',
   );
 
-  const probe = path.join(pageDir, 'probe.js');
+  const probe = path.join(pageDirectory, 'probe.js');
   fs.writeFileSync(
     probe,
     `const { app, BrowserWindow } = require('electron');
@@ -154,7 +154,7 @@ const check = (what, condition, detail) => {
 
   const { spawnSync } = require('child_process');
   const run = spawnSync(electronPath, [probe], { encoding: 'utf8', timeout: 180000 });
-  const line = (run.stdout || '').split('\n').find((l) => l.trim().startsWith('{'));
+  const line = (run.stdout || '').split('\n').find((line) => line.trim().startsWith('{'));
   if (!line) {
     check('the browser probe ran', false, (run.stderr || run.stdout || '').slice(0, 500));
   } else {
@@ -181,7 +181,7 @@ const check = (what, condition, detail) => {
     );
 
     // Hover highlights the row, not a shape inside it.
-    const painted = (c) => c && c !== 'rgba(0, 0, 0, 0)' && c !== 'transparent';
+    const painted = (color) => color && color !== 'rgba(0, 0, 0, 0)' && color !== 'transparent';
     check(
       'nothing is highlighted at rest',
       !painted(resting.rowBg) && !painted(resting.mainBg),
@@ -211,7 +211,7 @@ const check = (what, condition, detail) => {
     process.exit(1);
   }
   console.log(`panel-surface: ${checked} passed  [portaled modal, real layout]`);
-})().catch((err) => {
-  console.error(err);
+})().catch((error) => {
+  console.error(error);
   process.exit(1);
 });

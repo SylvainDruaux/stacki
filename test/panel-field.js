@@ -30,13 +30,13 @@ const check = (what, condition, detail) => {
 
 (async () => {
   const esbuild = require('esbuild');
-  const buildDir = path.join(__dirname, '..', 'node_modules', '.stacki-test', 'field');
-  fs.mkdirSync(buildDir, { recursive: true });
+  const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test', 'field');
+  fs.mkdirSync(buildDirectory, { recursive: true });
 
   const entry = `
     import React from 'react'
     import { createRoot } from 'react-dom/client'
-    import { NumField } from './src/style-panel/components/PositionGrid'
+    import { NumberField } from './src/style-panel/components/PositionGrid'
     import SizeSection from './src/style-panel/SizeSection'
     import EffectsSection from './src/style-panel/EffectsSection'
     import { setHost } from './src/style-panel/lib/host'
@@ -72,7 +72,7 @@ const check = (what, condition, detail) => {
       <div className="embed-editor_root" style={{ width: 320, padding: 12 }}>
         <div className="embed-editor_rule">
           <div id="popupfield" style={{ display: 'flex', width: 160 }}>
-            <NumField
+            <NumberField
               value="50%" unit="%" label="Position left" busy={false}
               onLive={() => {}} onCommit={() => {}}
             />
@@ -85,14 +85,14 @@ const check = (what, condition, detail) => {
   `;
   await esbuild.build({
     stdin: { contents: entry, resolveDir: path.join(__dirname, '..'), loader: 'jsx' },
-    outfile: path.join(buildDir, 'bundle.js'),
+    outfile: path.join(buildDirectory, 'bundle.js'),
     bundle: true,
     format: 'iife',
     jsx: 'automatic',
     logLevel: 'silent',
   });
   fs.writeFileSync(
-    path.join(buildDir, 'index.html'),
+    path.join(buildDirectory, 'index.html'),
     '<!doctype html><meta charset="utf-8"><link rel="stylesheet" href="bundle.css">' +
       '<style>body{margin:0;background:#111}</style><div id="root"></div>' +
       '<script src="bundle.js"></script>',
@@ -102,7 +102,7 @@ const check = (what, condition, detail) => {
     try {
       return require('electron');
     } catch {
-      return null;
+      return undefined;
     }
   })();
   if (typeof electronPath !== 'string') {
@@ -112,14 +112,14 @@ const check = (what, condition, detail) => {
     return;
   }
 
-  const scriptPath = path.join(buildDir, 'probe.js');
+  const scriptPath = path.join(buildDirectory, 'probe.js');
   fs.writeFileSync(
     scriptPath,
     `const { app, BrowserWindow } = require('electron');
      app.on('window-all-closed', () => app.quit());
      app.whenReady().then(async () => {
        const win = new BrowserWindow({ show: false, width: 900, height: 700 });
-       await win.loadFile(${JSON.stringify(path.join(buildDir, 'index.html'))});
+       await win.loadFile(${JSON.stringify(path.join(buildDirectory, 'index.html'))});
        const js = (code) => win.webContents.executeJavaScript(code);
        await new Promise((r) => setTimeout(r, 400));
        // A window that is not on screen does not run transitions, so a transitioned
@@ -217,7 +217,7 @@ const check = (what, condition, detail) => {
 
   const { spawnSync } = require('child_process');
   const run = spawnSync(electronPath, [scriptPath], { encoding: 'utf8', timeout: 90000 });
-  const line = (run.stdout || '').split('\n').find((l) => l.trim().startsWith('{'));
+  const line = (run.stdout || '').split('\n').find((line) => line.trim().startsWith('{'));
   if (!line) {
     check('the probe ran in a browser', false, (run.stderr || run.stdout || '').slice(0, 400));
   } else {

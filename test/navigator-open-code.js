@@ -9,18 +9,18 @@
 //    which the row's own click has only just asked for — while element and
 //    component rows keep the behaviour they had.
 //
-//   node test/navigator-open-code.js
+// Run it with `node test/navigator-open-code.js`.
 
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const esbuild = require('esbuild');
 
-const buildDir = path.join(__dirname, '..', 'node_modules', '.stacki-test');
+const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
 const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const bundle = async (entry, name) => {
-  const outfile = path.join(buildDir, name);
+  const outfile = path.join(buildDirectory, name);
   await esbuild.build({
     entryPoints: [path.join(__dirname, '..', 'src', ...entry)],
     outfile,
@@ -110,7 +110,7 @@ async function checkNavigator(StructurePanel) {
         pageState: { editable: true, model: { nodes, imports: [] } },
         layouts: [],
         currentLayoutName: '',
-        selectedId: null,
+        selectedId: undefined,
         onSelect: () => {},
         onOpenCode: (id) => opened.code.push(id),
         onOpenComponent: (name, id) => opened.component.push(`${name}:${id}`),
@@ -156,7 +156,7 @@ async function checkNavigator(StructurePanel) {
 }
 
 (async () => {
-  fs.mkdirSync(buildDir, { recursive: true });
+  fs.mkdirSync(buildDirectory, { recursive: true });
   checkCodeWindowRule(await bundle(['codeWindowTarget.ts'], 'code-window-target.cjs'));
   const { default: StructurePanel } = await bundle(
     ['panels', 'StructurePanel.tsx'],

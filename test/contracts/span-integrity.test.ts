@@ -173,6 +173,8 @@ function checkBytes(text: string, parsed: ReturnType<typeof parsePageResult>): v
   assert.equal(projection.byteLength, bytes.length);
   const located = new Map<string, string>();
   const walk = (nodes: readonly PageNode[], prefix: readonly number[]) => {
+    const depth = prefix.length;
+    assert.ok(depth <= LIMITS.treeDepthMax, 'walk: tree depth limit');
     nodes.forEach((node, index) => {
       const path = [...prefix, index];
       located.set(path.join('/'), text.slice(node.start, node.end));

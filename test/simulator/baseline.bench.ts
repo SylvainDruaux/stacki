@@ -102,9 +102,9 @@ function samples(measure: () => number): readonly number[] {
   return kept;
 }
 
-function percentile(values: readonly number[], p: number): number {
+function percentile(values: readonly number[], percent: number): number {
   const sorted = [...values].sort((left, right) => left - right);
-  const rank = Math.max(1, Math.ceil((p / 100) * sorted.length));
+  const rank = Math.max(1, Math.ceil((percent / 100) * sorted.length));
   const value = sorted[rank - 1];
   if (value === undefined) {
     throw new Error('Assertion failed: a percentile of a non-empty series');

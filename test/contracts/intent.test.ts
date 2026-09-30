@@ -20,6 +20,9 @@ import {
 import { LIMITS } from '../../dist/shared/limits.js';
 import { parseAnchorRef, STRUCTURAL_PATH_STEPS_MAX } from '../../dist/shared/ref.js';
 
+// Null as a boundary receives it, parsed from JSON: inputs may hold it; our values never do.
+const jsonNull: unknown = JSON.parse('null');
+
 const DIGEST = 'a'.repeat(64);
 const element = { span: { start: 10, end: 40 }, path: [0, 2], expectedKind: 'element' };
 const loop = { span: { start: 10, end: 90 }, path: [1], expectedKind: 'map' };
@@ -111,7 +114,7 @@ test('one known-good intent per operation parses to itself', () => {
 test('malformed intents fail at the field that is wrong', () => {
   const set = { tag: 'set-attribute', name: 'title', value: { type: 'string', value: 'x' } };
   const cases: readonly [unknown, RegExp][] = [
-    [null, /Intent: expected object/],
+    [jsonNull, /Intent: expected object/],
     [{ ...wire(element, set), id: 7 }, /Intent.id: expected string/],
     [{ ...wire(element, set), id: 'bad id' }, /IntentId/],
     [{ ...wire(element, set), file: '' }, /FilePath/],

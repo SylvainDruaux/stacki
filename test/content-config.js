@@ -56,20 +56,20 @@ function propAt(schema, dotted) {
   let node = schema;
   for (const key of dotted.split('.')) {
     if (!node) {
-      return null;
+      return undefined;
     }
     if (node.$ref) {
-      node = defOf(schema, node.$ref);
+      node = definitionOf(schema, node.$ref);
     }
     if (node.type === 'array') {
       node = node.items;
     }
     node = node?.properties?.[key];
   }
-  return node || null;
+  return node || undefined;
 }
 
-const defOf = (root, ref) => root?.$defs?.[String(ref).split('/').pop()] || null;
+const definitionOf = (root, ref) => root?.$defs?.[String(ref).split('/').pop()] || undefined;
 
 (async () => {
   if (!fs.existsSync(path.join(projectPath, 'src', 'content.config.ts'))) {
@@ -83,30 +83,44 @@ const defOf = (root, ref) => root?.$defs?.[String(ref).split('/').pop()] || null
     process.exit(1);
   }
 
-  const by = Object.fromEntries(result.collections.map((c) => [c.name, c]));
+  const by = Object.fromEntries(
+    result.collections.map((collection) => [collection.name, collection]),
+  );
   const has = (name) => {
-    const c = by[name];
-    if (!c) {
+    const collection = by[name];
+    if (!collection) {
       failures.push(`  ${name}: not in the manifest`);
     }
-    return c;
+    return collection;
   };
 
   // Loader kinds decide what is editable at all.
   for (const name of ['blog', 'docs', 'landingPages', 'apiEndpoints']) {
-    const c = has(name);
-    check(`${name}: glob loader`, c?.loader?.kind === 'glob', `got ${c?.loader?.kind}`);
-    check(`${name}: editable`, c?.editable === true);
+    const collection = has(name);
+    check(
+      `${name}: glob loader`,
+      collection?.loader?.kind === 'glob',
+      `got ${collection?.loader?.kind}`,
+    );
+    check(`${name}: editable`, collection?.editable === true);
   }
   for (const name of ['authors', 'pricingPlans', 'testimonials', 'jobs']) {
-    const c = has(name);
-    check(`${name}: file loader`, c?.loader?.kind === 'file', `got ${c?.loader?.kind}`);
-    check(`${name}: names its file`, !!c?.loader?.file);
+    const collection = has(name);
+    check(
+      `${name}: file loader`,
+      collection?.loader?.kind === 'file',
+      `got ${collection?.loader?.kind}`,
+    );
+    check(`${name}: names its file`, !!collection?.loader?.file);
   }
   for (const name of ['events', 'releases', 'iconLibrary', 'announcements', 'buildInfo']) {
-    const c = has(name);
-    check(`${name}: custom loader`, c?.loader?.kind === 'custom', `got ${c?.loader?.kind}`);
-    check(`${name}: read-only`, c?.editable === false);
+    const collection = has(name);
+    check(
+      `${name}: custom loader`,
+      collection?.loader?.kind === 'custom',
+      `got ${collection?.loader?.kind}`,
+    );
+    check(`${name}: read-only`, collection?.editable === false);
   }
 
   // A parser reshapes the file, so the entry is not the record on disk.
@@ -126,7 +140,7 @@ const defOf = (root, ref) => root?.$defs?.[String(ref).split('/').pop()] || null
   check('localized: id is generated', by.localized?.idFromFile === false);
 
   // No schema at all: every key is the user's.
-  check('legal: freeform', by.legal?.freeform === true && by.legal?.schema === null);
+  check('legal: freeform', by.legal?.freeform === true && by.legal?.schema === undefined);
 
   // Cross-field rules, which no single field can enforce.
   check('recipes: cross-field checks', by.recipes?.crossFieldChecks === true);
@@ -165,7 +179,7 @@ const defOf = (root, ref) => root?.$defs?.[String(ref).split('/').pop()] || null
   const docsUrl = propAt(by.products?.schema, 'docsUrl');
   check(
     'products.docsUrl: nullable',
-    (docsUrl?.anyOf || []).some((s) => s.type === 'null'),
+    (docsUrl?.anyOf || []).some((schema) => schema.type === 'null'),
     JSON.stringify(docsUrl),
   );
 
@@ -184,14 +198,16 @@ const defOf = (root, ref) => root?.$defs?.[String(ref).split('/').pop()] || null
   check('landingPages.blocks: block union', (blocks?.items?.oneOf || []).length === 12);
   check(
     'landingPages.blocks: a block can hold an image',
-    (blocks?.items?.oneOf || []).some((b) =>
-      Object.values(b.properties || {}).some((f) => f.astroImage === true),
+    (blocks?.items?.oneOf || []).some((block) =>
+      Object.values(block.properties || {}).some((property) => property.astroImage === true),
     ),
   );
   check(
     'landingPages.blocks: a block can hold a reference',
-    (blocks?.items?.oneOf || []).some((b) =>
-      Object.values(b.properties || {}).some((f) => f.astroReference || f.items?.astroReference),
+    (blocks?.items?.oneOf || []).some((block) =>
+      Object.values(block.properties || {}).some(
+        (property) => property.astroReference || property.items?.astroReference,
+      ),
     ),
   );
 
@@ -199,14 +215,14 @@ const defOf = (root, ref) => root?.$defs?.[String(ref).split('/').pop()] || null
   const nav = by.navigation?.schema;
   const items = nav?.properties?.items;
   check('navigation.items: recursive $ref', typeof items?.items?.$ref === 'string');
-  const navItem = defOf(nav, items?.items?.$ref);
+  const navItem = definitionOf(nav, items?.items?.$ref);
   check(
     'navigation: item children recurse',
     navItem?.properties?.children?.items?.$ref === items?.items?.$ref,
   );
   check(
     'navigation: a section header has no href',
-    (navItem?.properties?.href?.anyOf || []).some((s) => s.type === 'null'),
+    (navItem?.properties?.href?.anyOf || []).some((schema) => schema.type === 'null'),
   );
 
   // looseObject: fields nobody declared still exist and must survive a save.

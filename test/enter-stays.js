@@ -28,9 +28,9 @@ const check = (what, condition, detail) => {
 
 (async () => {
   const esbuild = require('esbuild');
-  const buildDir = path.join(__dirname, '..', 'node_modules', '.stacki-test');
-  fs.mkdirSync(buildDir, { recursive: true });
-  const bundlePath = path.join(buildDir, 'enter-stays.bundle.js');
+  const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
+  fs.mkdirSync(buildDirectory, { recursive: true });
+  const bundlePath = path.join(buildDirectory, 'enter-stays.bundle.js');
   await esbuild.build({
     stdin: {
       contents: `
@@ -91,7 +91,7 @@ const check = (what, condition, detail) => {
   });
 
   const field = document.querySelector('input[data-prop="max-width"]');
-  check('the Max W field is there', field != null);
+  check('the Max W field is there', field !== null);
 
   const type = async (text) => {
     await act(async () => {

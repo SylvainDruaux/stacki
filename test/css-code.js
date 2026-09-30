@@ -31,9 +31,9 @@ const same = (what, got, want) =>
 
 (async () => {
   const esbuild = require('esbuild');
-  const buildDir = path.join(__dirname, '..', 'node_modules', '.stacki-test');
-  fs.mkdirSync(buildDir, { recursive: true });
-  const bundlePath = path.join(buildDir, 'css-code.bundle.js');
+  const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
+  fs.mkdirSync(buildDirectory, { recursive: true });
+  const bundlePath = path.join(buildDirectory, 'css-code.bundle.js');
   await esbuild.build({
     stdin: {
       contents: `
@@ -80,7 +80,7 @@ const same = (what, got, want) =>
     same(
       `tokens rebuild "${value}"`,
       cssTokens(value)
-        .map((t) => t.text)
+        .map((token) => token.text)
         .join(''),
       value,
     );
@@ -95,17 +95,17 @@ const same = (what, got, want) =>
   }
   same(
     'number and unit split',
-    cssTokens('16px').map((t) => `${t.kind}:${t.text}`),
+    cssTokens('16px').map((token) => `${token.kind}:${token.text}`),
     ['num:16', 'unit:px'],
   );
   same(
     'function before its paren',
-    cssTokens('clamp(').map((t) => t.kind),
+    cssTokens('clamp(').map((token) => token.kind),
     ['fn', 'plain'],
   );
   same(
     'custom property',
-    cssTokens('--space-1').map((t) => t.kind),
+    cssTokens('--space-1').map((token) => token.kind),
     ['prop'],
   );
   check('markup escapes', !highlightCss('a < b & c').includes('<b'), highlightCss('a < b & c'));
@@ -132,7 +132,7 @@ const same = (what, got, want) =>
     declStatus: {
       [`${selector}:color`]: {
         winning,
-        overriddenBy: winning ? null : '.specific',
+        overriddenBy: winning ? undefined : '.specific',
       },
     },
   });
@@ -217,8 +217,8 @@ const same = (what, got, want) =>
     text: 'calc(100% - 3px)',
     caret: 13,
   });
-  same('nothing to step', stepNumberAt('none', 2, 1), null);
-  same('nothing to step in an empty field', stepNumberAt('', 0, 1), null);
+  same('nothing to step', stepNumberAt('none', 2, 1), undefined);
+  same('nothing to step in an empty field', stepNumberAt('', 0, 1), undefined);
 
   // --- the caret, against a real DOM ---------------------------------------
   const { JSDOM } = require('jsdom');

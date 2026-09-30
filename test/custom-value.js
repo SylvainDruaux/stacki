@@ -16,8 +16,10 @@
 // editing becomes a popup for every field; miss one that overflows and the
 // value stays unreadable with no sign there was ever a better way to edit it.
 
+const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
+const { LIMITS } = require('../dist/shared/limits.js');
 
 const failures = [];
 let checked = 0;
@@ -30,9 +32,9 @@ const check = (what, condition, detail) => {
 
 (async () => {
   const esbuild = require('esbuild');
-  const buildDir = path.join(__dirname, '..', 'node_modules', '.stacki-test');
-  fs.mkdirSync(buildDir, { recursive: true });
-  const bundlePath = path.join(buildDir, 'custom-value.bundle.js');
+  const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
+  fs.mkdirSync(buildDirectory, { recursive: true });
+  const bundlePath = path.join(buildDirectory, 'custom-value.bundle.js');
   await esbuild.build({
     entryPoints: [path.join(__dirname, '..', 'src', 'ui', 'CustomValueEditor.jsx')],
     outfile: bundlePath,
@@ -161,7 +163,11 @@ const check = (what, condition, detail) => {
     const { JSDOM: JSDOM2 } = require('jsdom');
     const win = new JSDOM2('<!doctype html><div id="root"></div>', { pretendToBeVisual: true })
       .window;
-    const prev = { window: global.window, document: global.document, navigator: global.navigator };
+    const previous = {
+      window: global.window,
+      document: global.document,
+      navigator: global.navigator,
+    };
     global.window = win;
     global.document = win.document;
     global.navigator = win.navigator;
@@ -186,7 +192,7 @@ const check = (what, condition, detail) => {
     const root = createRoot(win.document.getElementById('root'));
     const settle = () =>
       act(async () => {
-        await new Promise((r) => win.setTimeout(r, 20));
+        await new Promise((resolve) => win.setTimeout(resolve, 20));
       });
 
     await act(async () => {
@@ -195,7 +201,7 @@ const check = (what, condition, detail) => {
           value: 'calc(2rem + )var(--nav-height)',
           label: 'width',
           anchor: { left: 10, top: 10, bottom: 40, right: 200, width: 190, height: 30 },
-          onSave: (v) => saved.push(v),
+          onSave: (value) => saved.push(value),
           onCancel: () => saved.push('CANCELLED'),
         }),
       );
@@ -211,17 +217,18 @@ const check = (what, condition, detail) => {
       check('the variable draws as a chip', !!chip, rich.innerHTML.slice(0, 120));
       await act(async () => {
         rich.focus();
-        const findParen = (n) => {
-          if (n.nodeType === 3 && n.textContent.includes(')')) {
-            return n;
+        const findParen = (node, depth = 0) => {
+          assert.ok(depth <= LIMITS.treeDepthMax, 'findParen: DOM depth limit');
+          if (node.nodeType === 3 && node.textContent.includes(')')) {
+            return node;
           }
-          for (const c of n.childNodes) {
-            const r = findParen(c);
-            if (r) {
-              return r;
+          for (const child of node.childNodes) {
+            const found = findParen(child, depth + 1);
+            if (found) {
+              return found;
             }
           }
-          return null;
+          return undefined;
         };
         const textNode = findParen(rich);
         textNode.textContent = textNode.textContent.replace(')', '');
@@ -252,9 +259,9 @@ const check = (what, condition, detail) => {
     await act(async () => {
       root.unmount();
     });
-    global.window = prev.window;
-    global.document = prev.document;
-    global.navigator = prev.navigator;
+    global.window = previous.window;
+    global.document = previous.document;
+    global.navigator = previous.navigator;
   }
 
   if (failures.length) {
@@ -262,7 +269,7 @@ const check = (what, condition, detail) => {
     process.exit(1);
   }
   console.log(`custom-value: ${checked} passed`);
-})().catch((err) => {
-  console.error(err);
+})().catch((error) => {
+  console.error(error);
   process.exit(1);
 });

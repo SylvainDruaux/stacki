@@ -42,17 +42,17 @@ const deferred = () => {
 test(
   'component navigation keeps the real iframe ' + 'and inspector mounted while loading and saving',
   async () => {
-    const buildDir = path.join(
+    const buildDirectory = path.join(
       __dirname,
       '..',
       'node_modules',
       '.stacki-test',
       'component-preview',
     );
-    fs.mkdirSync(buildDir, { recursive: true });
+    fs.mkdirSync(buildDirectory, { recursive: true });
     await esbuild.build({
       entryPoints: [path.join(__dirname, '..', 'src', 'App.tsx')],
-      outfile: path.join(buildDir, 'app.js'),
+      outfile: path.join(buildDirectory, 'app.js'),
       bundle: true,
       format: 'cjs',
       platform: 'node',
@@ -108,7 +108,7 @@ test(
       global[name] = dom.window[name];
     }
     global.getComputedStyle = dom.window.getComputedStyle;
-    global.requestAnimationFrame = (fn) => setTimeout(fn, 0);
+    global.requestAnimationFrame = (callback) => setTimeout(callback, 0);
     global.cancelAnimationFrame = clearTimeout;
     global.ResizeObserver = class {
       observe() {}
@@ -139,10 +139,10 @@ test(
     const heldReads = new Map();
     const previewChecks = [];
     const writes = [];
-    let writeError = null;
+    let writeError;
     const bridge = new Proxy(
       {
-        pendingProject: async () => null,
+        pendingProject: async () => undefined,
         scanProject: async () => ({
           pages: [page],
           components: [card],
@@ -181,7 +181,7 @@ test(
             ? target[name]
             : String(name).startsWith('on')
               ? () => () => {}
-              : async () => null,
+              : async () => undefined,
       },
     );
     window.avb = bridge;
@@ -189,7 +189,7 @@ test(
     const React = require('react');
     const { act } = React;
     const { createRoot } = require('react-dom/client');
-    const App = require(path.join(buildDir, 'app.js')).default;
+    const App = require(path.join(buildDirectory, 'app.js')).default;
     const root = createRoot(document.getElementById('root'));
     const hold = (file) => {
       const request = deferred();
@@ -213,7 +213,7 @@ test(
       });
       const frame = document.querySelector('.frame-clip iframe');
       const frameWindow = frame.contentWindow;
-      const src = frame.src;
+      const source = frame.src;
       const inspector = document.querySelector('.panel.right');
       assert.ok(frame && inspector);
       const outgoing = [];
@@ -225,7 +225,7 @@ test(
           'the loaded iframe is retained',
         );
         assert.equal(frame.contentWindow, frameWindow, 'the document window stays alive');
-        assert.equal(frame.src, src, 'component edits keep the same preview page URL');
+        assert.equal(frame.src, source, 'component edits keep the same preview page URL');
         assert.equal(
           document.querySelector('.panel.right'),
           inspector,
@@ -273,7 +273,7 @@ test(
       // never asked.
       await dblclick(undefined);
       const backButton = document.querySelector('button.comp-back');
-      assert.equal(backButton, null, 'a tokenless event opens nothing');
+      assert.ok(backButton === null, 'a tokenless event opens nothing');
       assert.equal(previewChecks.length, 0);
       await openCard();
       assert.equal(previewChecks.length, 1, 'main checked the rendering before the card opened');
@@ -363,7 +363,7 @@ test(
         document.querySelector('.toast.error').textContent,
         /disk full during navigation/,
       );
-      writeError = null;
+      writeError = undefined;
 
       const wrappedMarkup = [
         {
@@ -448,18 +448,18 @@ test(
       }
       for (const fixture of [
         { source: '---\nconst render = true;\n---\n{render && (<>Text only</>)}', kind: 'cond' },
-        { source: '', kind: null },
+        { source: '', kind: undefined },
       ]) {
         states.set(card.path, pageRead(fixture.source));
         await openCard();
         unchanged();
         const selected = __componentPanels.PropsPanel.node;
         assert.equal(
-          selected?.kind ?? null,
+          selected?.kind,
           fixture.kind,
           'a component without a rendered target retains the first-node or empty fallback',
         );
-        assert.equal(__componentPanels.StructurePanel.selectedId, selected?.id ?? null);
+        assert.equal(__componentPanels.StructurePanel.selectedId, selected?.id);
         const track = outgoing.filter((message) => message.type === 'avb:track').at(-1);
         assert.equal(track.scope, 'src/components/Card.astro|');
         assert.deepEqual(

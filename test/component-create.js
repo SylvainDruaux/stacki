@@ -34,9 +34,9 @@ const check = (what, condition, detail) => {
 (async () => {
   // ── The name ──────────────────────────────────────────────────────────────
   const esbuild = require('esbuild');
-  const buildDir = path.join(__dirname, '..', 'node_modules', '.stacki-test');
-  fs.mkdirSync(buildDir, { recursive: true });
-  const namesBundle = path.join(buildDir, 'component-name.bundle.js');
+  const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
+  fs.mkdirSync(buildDirectory, { recursive: true });
+  const namesBundle = path.join(buildDirectory, 'component-name.bundle.js');
   await esbuild.build({
     entryPoints: [path.join(__dirname, '..', 'src', 'componentName.js')],
     outfile: namesBundle,
@@ -66,21 +66,21 @@ const check = (what, condition, detail) => {
   named('', '');
 
   const taken = ['Button', 'ProjectCard', 'BaseLayout'];
-  const err = (input, expect, why) => {
+  const checkNameError = (input, expect, why) => {
     const got = componentNameError(input, taken);
-    check(why, expect ? !!got && expect.test(got) : got === null, JSON.stringify(got));
+    check(why, expect ? !!got && expect.test(got) : got === undefined, JSON.stringify(got));
   };
-  err('Card', null, 'a fresh name is fine');
-  err('card', null, 'and so is one that only needs capitalising');
-  err('', /name/i, 'an empty name is refused');
-  err('   ', /name/i, 'and so is a blank one');
-  err('!!!', /letters/i, 'so is one with nothing usable in it');
-  err('2col', /number/i, "a name can't start with a number");
-  err('Button', /already/i, 'a name already in use is refused');
+  checkNameError('Card', undefined, 'a fresh name is fine');
+  checkNameError('card', undefined, 'and so is one that only needs capitalising');
+  checkNameError('', /name/i, 'an empty name is refused');
+  checkNameError('   ', /name/i, 'and so is a blank one');
+  checkNameError('!!!', /letters/i, 'so is one with nothing usable in it');
+  checkNameError('2col', /number/i, "a name can't start with a number");
+  checkNameError('Button', /already/i, 'a name already in use is refused');
   // The conversion happens first, so the collision is with what would be SAVED.
-  err('project card', /already/i, 'including one that only collides once converted');
-  err('BUTTON', /already/i, 'and one that differs only in case — same file on a Mac');
-  err('Fragment', /Astro/i, "Astro's own tag is refused");
+  checkNameError('project card', /already/i, 'including one that only collides once converted');
+  checkNameError('BUTTON', /already/i, 'and one that differs only in case — same file on a Mac');
+  checkNameError('Fragment', /Astro/i, "Astro's own tag is refused");
   check(
     'and the refusal names the component already there',
     /ProjectCard/.test(componentNameError('project card', taken) || ''),
@@ -91,7 +91,7 @@ const check = (what, condition, detail) => {
   // Markup pulled out of a page leaves its scope behind: `{title}` in a page
   // reads the page's title, and in Card.astro it reads nothing at all. The
   // values it was reading are exactly the props the component wants.
-  const propsBundle = path.join(buildDir, 'extract-props.bundle.js');
+  const propsBundle = path.join(buildDirectory, 'extract-props.bundle.js');
   await esbuild.build({
     entryPoints: [path.join(__dirname, '..', 'src', 'extractProps.js')],
     outfile: propsBundle,
@@ -102,7 +102,7 @@ const check = (what, condition, detail) => {
   });
   const { propsForExtraction, propsDestructure } = require(propsBundle);
 
-  const el = (name, props, children) => ({
+  const elementNode = (name, props, children) => ({
     id: name,
     kind: 'element',
     name,
@@ -116,32 +116,32 @@ const check = (what, condition, detail) => {
   };
 
   reads(
-    el('h2', {}, [{ id: 'e', kind: 'expr', value: 'title' }]),
+    elementNode('h2', {}, [{ id: 'e', kind: 'expr', value: 'title' }]),
     ['title'],
     'an expression names a prop',
   );
   reads(
-    el('a', { href: { type: 'expr', value: 'link' } }),
+    elementNode('a', { href: { type: 'expr', value: 'link' } }),
     ['link'],
     'and so does an expression prop',
   );
   reads(
-    el('p', {}, [{ id: 't', kind: 'text', value: 'You have {count} of them' }]),
+    elementNode('p', {}, [{ id: 't', kind: 'text', value: 'You have {count} of them' }]),
     ['count'],
     'and a hole in a text run',
   );
   reads(
-    el('div', {}, [{ id: 'c', kind: 'cond', test: 'show', children: [] }]),
+    elementNode('div', {}, [{ id: 'c', kind: 'cond', test: 'show', children: [] }]),
     ['show'],
     'and a condition',
   );
   reads(
-    el('ul', {}, [
+    elementNode('ul', {}, [
       {
         id: 'm',
         kind: 'map',
         head: 'items.map((item) => (',
-        children: [el('li', {}, [{ id: 'x', kind: 'expr', value: 'item.name' }])],
+        children: [elementNode('li', {}, [{ id: 'x', kind: 'expr', value: 'item.name' }])],
       },
     ]),
     ['items'],
@@ -150,24 +150,24 @@ const check = (what, condition, detail) => {
   check(
     'but the item it binds is not — it travels with the markup',
     !propsForExtraction(
-      el('ul', {}, [
+      elementNode('ul', {}, [
         {
           id: 'm',
           kind: 'map',
           head: 'items.map((item) => (',
-          children: [el('li', {}, [{ id: 'x', kind: 'expr', value: 'item' }])],
+          children: [elementNode('li', {}, [{ id: 'x', kind: 'expr', value: 'item' }])],
         },
       ]),
       [...scope, 'item'],
     ).includes('item'),
     JSON.stringify(
       propsForExtraction(
-        el('ul', {}, [
+        elementNode('ul', {}, [
           {
             id: 'm',
             kind: 'map',
             head: 'items.map((item) => (',
-            children: [el('li', {}, [{ id: 'x', kind: 'expr', value: 'item' }])],
+            children: [elementNode('li', {}, [{ id: 'x', kind: 'expr', value: 'item' }])],
           },
         ]),
         [...scope, 'item'],
@@ -177,20 +177,20 @@ const check = (what, condition, detail) => {
   // The other way round: extracting from INSIDE a loop, the item is a value the
   // page has at that spot, and the instance can pass it straight back in.
   reads(
-    el('li', {}, [{ id: 'x', kind: 'expr', value: 'item.name' }]),
+    elementNode('li', {}, [{ id: 'x', kind: 'expr', value: 'item.name' }]),
     [],
     'a name not in scope is not a prop',
   );
   check(
     'an ancestor loop item is, since the instance sits inside that loop',
     JSON.stringify(
-      propsForExtraction(el('li', {}, [{ id: 'x', kind: 'expr', value: 'item.name' }]), [
+      propsForExtraction(elementNode('li', {}, [{ id: 'x', kind: 'expr', value: 'item.name' }]), [
         ...scope,
         'item',
       ]),
     ) === '["item"]',
     JSON.stringify(
-      propsForExtraction(el('li', {}, [{ id: 'x', kind: 'expr', value: 'item.name' }]), [
+      propsForExtraction(elementNode('li', {}, [{ id: 'x', kind: 'expr', value: 'item.name' }]), [
         ...scope,
         'item',
       ]),
@@ -198,23 +198,27 @@ const check = (what, condition, detail) => {
   );
 
   reads(
-    el('h2', {}, [{ id: 'e', kind: 'expr', value: 'post.data.title' }]),
+    elementNode('h2', {}, [{ id: 'e', kind: 'expr', value: 'post.data.title' }]),
     ['post'],
     'a chain is one prop, its root',
   );
   reads(
-    el('h2', {}, [{ id: 'e', kind: 'expr', value: 'Math.max(1, 2)' }]),
+    elementNode('h2', {}, [{ id: 'e', kind: 'expr', value: 'Math.max(1, 2)' }]),
     [],
     'a global is not a prop',
   );
   reads(
-    el('h2', { class: { type: 'string', value: 'title' } }),
+    elementNode('h2', { class: { type: 'string', value: 'title' } }),
     [],
     'nor is a word that only looks like one',
   );
-  reads(el('h2', {}, [{ id: 'e', kind: 'expr', value: '"title"' }]), [], 'nor one inside a string');
   reads(
-    el('div', {}, [
+    elementNode('h2', {}, [{ id: 'e', kind: 'expr', value: '"title"' }]),
+    [],
+    'nor one inside a string',
+  );
+  reads(
+    elementNode('div', {}, [
       { id: 'a', kind: 'expr', value: 'count' },
       { id: 'b', kind: 'expr', value: 'title' },
       { id: 'c', kind: 'expr', value: 'count' },
@@ -222,7 +226,7 @@ const check = (what, condition, detail) => {
     ['count', 'title'],
     'each is named once, in the order the markup reads them',
   );
-  reads(el('div', {}, []), [], 'markup that reads nothing needs no props');
+  reads(elementNode('div', {}, []), [], 'markup that reads nothing needs no props');
 
   check(
     'the destructure is what Astro (and this app) reads back as the interface',
@@ -367,7 +371,10 @@ const check = (what, condition, detail) => {
         path.join(__dirname, '..', 'dist', 'electron', 'astroParser.js'),
       );
       const schema = parsePropSchema(withProps.text);
-      return schema.some((f) => f.name === 'title') && schema.some((f) => f.name === 'items');
+      return (
+        schema.some((field) => field.name === 'title') &&
+        schema.some((field) => field.name === 'items')
+      );
     })(),
     '',
   );
@@ -398,13 +405,13 @@ const check = (what, condition, detail) => {
 
   // ── What it refuses ───────────────────────────────────────────────────────
   const refuses = (what, run, expect) => {
-    let message = null;
+    let message;
     try {
       run();
-    } catch (e) {
-      message = String(e.message || e);
+    } catch (error) {
+      message = String(error.message || error);
     }
-    check(what, !!message && expect.test(message), message === null ? 'no error' : message);
+    check(what, !!message && expect.test(message), message === undefined ? 'no error' : message);
   };
   refuses(
     'a lowercase name never reaches the disk — Astro would read it as an HTML tag',
@@ -439,8 +446,8 @@ const check = (what, condition, detail) => {
       (() => {
         try {
           componentFile({ projectPath: project, pagePath, name: 'Projectcard', nodes: [card] });
-        } catch (e) {
-          return e.message;
+        } catch (error) {
+          return error.message;
         }
       })(),
     ),
@@ -452,7 +459,7 @@ const check = (what, condition, detail) => {
   // same element it was cut from.
   const { parsePage } = require(path.join(__dirname, '..', 'dist', 'electron', 'astroParser.js'));
   const reparsed = parsePage(fs.readFileSync(made.path, 'utf8'));
-  const root = reparsed.model.nodes.find((n) => n.kind === 'element');
+  const root = reparsed.model.nodes.find((node) => node.kind === 'element');
   check('the written file parses back', !!root, JSON.stringify(reparsed.model.nodes));
   check('as the same element', root?.name === 'article', root?.name);
   check(
@@ -463,7 +470,7 @@ const check = (what, condition, detail) => {
   check(
     'and its children',
     (root?.children || []).length === 2,
-    JSON.stringify((root?.children || []).map((c) => c.name)),
+    JSON.stringify((root?.children || []).map((child) => child.name)),
   );
   check(
     'and the import is one the file itself declares',
@@ -526,11 +533,11 @@ const check = (what, condition, detail) => {
     put('src/pages/decoys.astro', '<SectionList />\n<MySection />\n</Section>\n');
 
     const found = componentUsage({ projectPath: proj, name: 'Section', exclude: selfPath });
-    const byRel = Object.fromEntries(found.files.map((f) => [f.rel, f]));
+    const byRel = Object.fromEntries(found.files.map((file) => [file.rel, file]));
     check(
       'every file holding one is listed',
       found.files.length === 5,
-      JSON.stringify(found.files.map((f) => f.rel)),
+      JSON.stringify(found.files.map((file) => file.rel)),
     );
     check(
       'a name written in the frontmatter is code talking, not an instance',
@@ -605,7 +612,7 @@ const check = (what, condition, detail) => {
       name: 'BaseLayout',
       exclude: path.join(proj, 'src/layouts/BaseLayout.astro'),
     });
-    const layoutBy = Object.fromEntries(layout.files.map((f) => [f.rel, f.count]));
+    const layoutBy = Object.fromEntries(layout.files.map((file) => [file.rel, file.count]));
     check(
       'a component imported under another name still counts',
       layoutBy['src/pages/aliased.astro'] === 1,
@@ -630,7 +637,7 @@ const check = (what, condition, detail) => {
   // The button is only live when there's something to act on, and the field
   // shows what the name will actually be before it's committed to.
   {
-    const panelBundle = path.join(buildDir, 'palette-panel.bundle.js');
+    const panelBundle = path.join(buildDirectory, 'palette-panel.bundle.js');
     await esbuild.build({
       entryPoints: [path.join(__dirname, '..', 'src', 'panels', 'PalettePanel.tsx')],
       outfile: panelBundle,
@@ -686,7 +693,7 @@ const check = (what, condition, detail) => {
                 instances: 0,
               },
             ],
-            devUrl: null,
+            devUrl: undefined,
             onInsert: () => {},
             onDragBegin: () => {},
             createFrom,
@@ -697,7 +704,7 @@ const check = (what, condition, detail) => {
             onSelectInstance: (id) => opened.push(`node:${id}`),
           }),
         );
-        await new Promise((r) => setTimeout(r, 10));
+        await new Promise((resolve) => setTimeout(resolve, 10));
       });
 
     const makeButton = () => [...container.querySelectorAll('.panel-header button')].pop();
@@ -714,10 +721,8 @@ const check = (what, condition, detail) => {
     const hover = async () => {
       const anchor = container.querySelector('.tip-anchor');
       await act(async () => {
-        anchor.dispatchEvent(
-          new dom.window.MouseEvent('mouseover', { bubbles: true, relatedTarget: null }),
-        );
-        await new Promise((r) => setTimeout(r, 560));
+        anchor.dispatchEvent(new dom.window.MouseEvent('mouseover', { bubbles: true }));
+        await new Promise((resolve) => setTimeout(resolve, 560));
       });
     };
     const tip = () => dom.window.document.querySelector('.rail-tooltip.below');
@@ -743,13 +748,13 @@ const check = (what, condition, detail) => {
     );
     await act(async () => {
       makeButton().click();
-      await new Promise((r) => setTimeout(r, 10));
+      await new Promise((resolve) => setTimeout(resolve, 10));
     });
 
     const field = () => dom.window.document.querySelector('.modal input');
-    const createBtn = () =>
-      [...dom.window.document.querySelectorAll('.modal-footer button')].find((b) =>
-        /Create/.test(b.textContent),
+    const createButton = () =>
+      [...dom.window.document.querySelectorAll('.modal-footer button')].find((button) =>
+        /Create/.test(button.textContent),
       );
     check('the name is asked for', !!field(), 'no dialog');
     check(
@@ -760,8 +765,8 @@ const check = (what, condition, detail) => {
     // …which is a name already taken, so it cannot be committed as it stands.
     check(
       'a name already in use blocks Create',
-      createBtn()?.disabled === true,
-      String(createBtn()?.disabled),
+      createButton()?.disabled === true,
+      String(createButton()?.disabled),
     );
     check(
       'and says so',
@@ -770,15 +775,15 @@ const check = (what, condition, detail) => {
     );
 
     const type = async (value) => {
-      const el = field();
+      const element = field();
       const setter = Object.getOwnPropertyDescriptor(
         dom.window.HTMLInputElement.prototype,
         'value',
       ).set;
       await act(async () => {
-        setter.call(el, value);
-        el.dispatchEvent(new dom.window.Event('input', { bubbles: true }));
-        await new Promise((r) => setTimeout(r, 5));
+        setter.call(element, value);
+        element.dispatchEvent(new dom.window.Event('input', { bubbles: true }));
+        await new Promise((resolve) => setTimeout(resolve, 5));
       });
     };
 
@@ -795,11 +800,15 @@ const check = (what, condition, detail) => {
       ),
       dom.window.document.querySelector('.modal .hint-text')?.textContent,
     );
-    check('and it can be created', createBtn()?.disabled === false, String(createBtn()?.disabled));
+    check(
+      'and it can be created',
+      createButton()?.disabled === false,
+      String(createButton()?.disabled),
+    );
 
     await act(async () => {
-      createBtn().click();
-      await new Promise((r) => setTimeout(r, 10));
+      createButton().click();
+      await new Promise((resolve) => setTimeout(resolve, 10));
     });
     check(
       'creating passes the converted name',
@@ -815,7 +824,7 @@ const check = (what, condition, detail) => {
     await render({ name: 'Card', label: '<article>', props: ['title', 'items'] });
     await act(async () => {
       makeButton().click();
-      await new Promise((r) => setTimeout(r, 10));
+      await new Promise((resolve) => setTimeout(resolve, 10));
     });
     const offer = () => dom.window.document.querySelector('.modal .check-row');
     check('the values it reads are offered as props', !!offer(), 'no offer');
@@ -826,8 +835,8 @@ const check = (what, condition, detail) => {
     );
     check('taken by default', offer()?.querySelector('input')?.checked === true, 'unchecked');
     await act(async () => {
-      createBtn().click();
-      await new Promise((r) => setTimeout(r, 10));
+      createButton().click();
+      await new Promise((resolve) => setTimeout(resolve, 10));
     });
     check('so creating takes them', created[0]?.withProps === true, JSON.stringify(created));
 
@@ -835,11 +844,11 @@ const check = (what, condition, detail) => {
     created.length = 0;
     await act(async () => {
       makeButton().click();
-      await new Promise((r) => setTimeout(r, 10));
+      await new Promise((resolve) => setTimeout(resolve, 10));
     });
     await act(async () => {
       offer().querySelector('input').click();
-      await new Promise((r) => setTimeout(r, 5));
+      await new Promise((resolve) => setTimeout(resolve, 5));
     });
     check(
       'and it can be turned off',
@@ -847,8 +856,8 @@ const check = (what, condition, detail) => {
       'still checked',
     );
     await act(async () => {
-      createBtn().click();
-      await new Promise((r) => setTimeout(r, 10));
+      createButton().click();
+      await new Promise((resolve) => setTimeout(resolve, 10));
     });
     check('which is passed through', created[0]?.withProps === false, JSON.stringify(created));
 
@@ -871,9 +880,9 @@ const check = (what, condition, detail) => {
     );
     await act(async () => {
       [...dom.window.document.querySelectorAll('.modal-footer button')]
-        .find((b) => /Cancel/.test(b.textContent))
+        .find((button) => /Cancel/.test(button.textContent))
         .click();
-      await new Promise((r) => setTimeout(r, 5));
+      await new Promise((resolve) => setTimeout(resolve, 5));
     });
     check('cancelling closes it', !dom.window.document.querySelector('.modal'), 'still open');
     request += 1;
@@ -885,9 +894,9 @@ const check = (what, condition, detail) => {
     );
     await act(async () => {
       [...dom.window.document.querySelectorAll('.modal-footer button')]
-        .find((b) => /Cancel/.test(b.textContent))
+        .find((button) => /Cancel/.test(button.textContent))
         .click();
-      await new Promise((r) => setTimeout(r, 5));
+      await new Promise((resolve) => setTimeout(resolve, 5));
     });
     request += 1;
     await render({ reason: 'Select an element on the canvas first.' });
@@ -902,9 +911,9 @@ const check = (what, condition, detail) => {
     // The whole `if` that tests for the key, body included, however it is wrapped.
     const binding = sourceBlock(
       appSource,
-      appSource.lastIndexOf('if (', appSource.indexOf("e.key.toLowerCase() === 'a'")),
+      appSource.lastIndexOf('if (', appSource.indexOf("event.key.toLowerCase() === 'a'")),
     );
-    check('⌘⇧A is bound', /mod && e\.shiftKey[\s\S]*'a'/.test(binding), binding.slice(0, 120));
+    check('⌘⇧A is bound', /mod && event\.shiftKey[\s\S]*'a'/.test(binding), binding.slice(0, 120));
     check('to the Components panel', /setLeftTab\('components'\)/.test(binding), binding);
     check('and to the request this panel answers', /setCreateRequest/.test(binding), binding);
 
@@ -924,51 +933,51 @@ const check = (what, condition, detail) => {
     };
     await render({ reason: 'Select an element on the canvas first.' });
     const countButton = () =>
-      [...container.querySelectorAll('.palette-instances')].find((b) =>
-        /2 instances/.test(b.textContent),
+      [...container.querySelectorAll('.palette-instances')].find((button) =>
+        /2 instances/.test(button.textContent),
       );
     check('the count is a control, not just text', !!countButton(), 'no button');
     check(
       'and a component nothing uses has nothing to open',
-      [...container.querySelectorAll('.palette-instances')].find((b) =>
-        /0 instances/.test(b.textContent),
+      [...container.querySelectorAll('.palette-instances')].find((button) =>
+        /0 instances/.test(button.textContent),
       )?.disabled === true,
       'enabled with no instances',
     );
 
     await act(async () => {
       countButton().click();
-      await new Promise((r) => setTimeout(r, 20));
+      await new Promise((resolve) => setTimeout(resolve, 20));
     });
     const popup = () => dom.window.document.querySelector('.instances-popup');
     check('clicking it opens the list', !!popup(), 'no popup');
     const rowText = () =>
-      [...popup().querySelectorAll('.instances-row')].map((r) => r.textContent.trim());
+      [...popup().querySelectorAll('.instances-row')].map((row) => row.textContent.trim());
     check(
       'the instances on the open file come first, one row each',
       rowText()
         .slice(0, 2)
-        .every((t) => /Button/.test(t)),
+        .every((text) => /Button/.test(text)),
       rowText().join(' | '),
     );
     check(
       'then the other files, named and counted',
-      rowText().some((t) => /about/.test(t) && /4/.test(t)) &&
-        rowText().some((t) => /Hero/.test(t)),
+      rowText().some((text) => /about/.test(text) && /4/.test(text)) &&
+        rowText().some((text) => /Hero/.test(text)),
       rowText().join(' | '),
     );
     check(
       'a page reads as its route, not its path',
-      rowText().some((t) => t.startsWith('about')),
+      rowText().some((text) => text.startsWith('about')),
       rowText().join(' | '),
     );
 
     // Each row is a way in.
     await act(async () => {
       [...popup().querySelectorAll('.instances-row')]
-        .find((r) => /about/.test(r.textContent))
+        .find((row) => /about/.test(row.textContent))
         .click();
-      await new Promise((r) => setTimeout(r, 10));
+      await new Promise((resolve) => setTimeout(resolve, 10));
     });
     check(
       'clicking a file opens it',
@@ -980,11 +989,11 @@ const check = (what, condition, detail) => {
     opened.length = 0;
     await act(async () => {
       countButton().click();
-      await new Promise((r) => setTimeout(r, 20));
+      await new Promise((resolve) => setTimeout(resolve, 20));
     });
     await act(async () => {
       popup().querySelectorAll('.instances-row')[0].click();
-      await new Promise((r) => setTimeout(r, 10));
+      await new Promise((resolve) => setTimeout(resolve, 10));
     });
     check(
       'clicking an instance on this page selects it',
@@ -997,7 +1006,7 @@ const check = (what, condition, detail) => {
     // amount to keep it on screen, which for a row near the bottom of a long
     // palette left it floating half a screen away from the thing it was about.
     {
-      // jsdom lays nothing out, so the two measurements the placement needs are
+      // `jsdom` lays nothing out, so the two measurements the placement needs are
       // supplied: how tall the popup is, and where the row is.
       Object.defineProperty(dom.window.HTMLElement.prototype, 'offsetHeight', {
         configurable: true,
@@ -1014,23 +1023,23 @@ const check = (what, condition, detail) => {
       dom.window.innerHeight = 768;
       dom.window.innerWidth = 1200;
       const openAt = async (rect) => {
-        const btn = countButton();
-        btn.getBoundingClientRect = () => ({
+        const button = countButton();
+        button.getBoundingClientRect = () => ({
           ...rect,
           right: rect.left + 80,
           width: 80,
           height: rect.bottom - rect.top,
         });
         await act(async () => {
-          btn.click();
-          await new Promise((r) => setTimeout(r, 20));
+          button.click();
+          await new Promise((resolve) => setTimeout(resolve, 20));
         });
         return popup();
       };
       const close = () =>
         act(async () => {
           popup()?.querySelector('.instances-head button').click();
-          await new Promise((r) => setTimeout(r, 5));
+          await new Promise((resolve) => setTimeout(resolve, 5));
         });
 
       usageAnswer = { files: [{ rel: 'src/pages/a.astro', path: '/p/a', kind: 'page', count: 1 }] };
@@ -1072,7 +1081,7 @@ const check = (what, condition, detail) => {
     await render({ reason: 'Select an element on the canvas first.' });
     await act(async () => {
       countButton().click();
-      await new Promise((r) => setTimeout(r, 20));
+      await new Promise((resolve) => setTimeout(resolve, 20));
     });
     check(
       'a failed look says it failed',
@@ -1086,7 +1095,7 @@ const check = (what, condition, detail) => {
     );
     await act(async () => {
       popup().querySelector('.instances-head button').click();
-      await new Promise((r) => setTimeout(r, 10));
+      await new Promise((resolve) => setTimeout(resolve, 10));
     });
 
     // Nothing anywhere is a sentence, not an empty box.
@@ -1095,7 +1104,7 @@ const check = (what, condition, detail) => {
     await render({ reason: 'Select an element on the canvas first.' });
     await act(async () => {
       countButton().click();
-      await new Promise((r) => setTimeout(r, 20));
+      await new Promise((resolve) => setTimeout(resolve, 20));
     });
     check(
       'a component used nowhere says so',
@@ -1104,7 +1113,7 @@ const check = (what, condition, detail) => {
     );
     await act(async () => {
       popup().querySelector('.instances-head button').click();
-      await new Promise((r) => setTimeout(r, 10));
+      await new Promise((resolve) => setTimeout(resolve, 10));
     });
     check('and it closes', !popup(), 'still open');
 
@@ -1112,7 +1121,7 @@ const check = (what, condition, detail) => {
     await render({ name: 'Plain', label: '<div>', props: [] });
     await act(async () => {
       makeButton().click();
-      await new Promise((r) => setTimeout(r, 10));
+      await new Promise((resolve) => setTimeout(resolve, 10));
     });
     check(
       'markup that reads nothing is asked nothing',
@@ -1121,9 +1130,9 @@ const check = (what, condition, detail) => {
     );
     await act(async () => {
       [...dom.window.document.querySelectorAll('.modal-footer button')]
-        .find((b) => /Cancel/.test(b.textContent))
+        .find((button) => /Cancel/.test(button.textContent))
         .click();
-      await new Promise((r) => setTimeout(r, 5));
+      await new Promise((resolve) => setTimeout(resolve, 5));
     });
 
     await act(async () => {

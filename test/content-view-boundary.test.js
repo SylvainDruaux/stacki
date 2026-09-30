@@ -5,6 +5,9 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const bridge = require('./renderer-module')('contentViewBridge.ts');
 
+// Null as a boundary receives it, parsed from JSON: inputs may hold it; our values never do.
+const jsonNull = JSON.parse('null');
+
 const collection = {
   name: 'posts',
   editable: true,
@@ -58,10 +61,10 @@ test('content entry, validation, and rename parsers preserve valid replies', () 
 
 test('content parsers reject malformed nested data and collection bounds', () => {
   for (const value of [
-    null,
-    { ...entries, entries: null },
+    jsonNull,
+    { ...entries, entries: jsonNull },
     // Absence is `undefined` (AGENTS.md §6): main never sends a null note.
-    { ...entries, parserNote: null },
+    { ...entries, parserNote: jsonNull },
     { ...entries, entries: [{ ...entry, locator: [-1] }] },
     { ...entries, entries: [{ ...entry, data: Number.NaN }] },
     { ...entries, collection: { ...collection, name: 1 } },

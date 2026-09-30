@@ -581,7 +581,8 @@ const ALLOWED: ReadonlySet<string> = new Set([
 ]);
 
 for (const [label, sweep] of Object.entries(SWEEPS)) {
-  test(`corpus sweep: ${label} plans a parsing candidate whose inverse restores the input`, (t) => {
+  const title = `corpus sweep: ${label} plans a parsing candidate whose inverse restores the input`;
+  test(title, (testContext) => {
     let planned = 0;
     let shifted = 0;
     const refused = new Map<string, number>();
@@ -638,7 +639,9 @@ for (const [label, sweep] of Object.entries(SWEEPS)) {
       }
     }
     const reasons = [...refused].map(([reason, count]) => `${count} ${reason}`).join(', ');
-    t.diagnostic(`${planned} planned, ${shifted} mapped stale; refused: ${reasons || 'none'}`);
+    testContext.diagnostic(
+      `${planned} planned, ${shifted} mapped stale; refused: ${reasons || 'none'}`,
+    );
     assert.ok(planned > 60, `the sweep plans many real edits (${planned})`);
     assert.ok(shifted > 30, `and maps many of them stale (${shifted})`);
   });

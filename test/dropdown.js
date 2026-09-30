@@ -25,9 +25,9 @@ const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
 
 (async () => {
   const esbuild = require('esbuild');
-  const buildDir = path.join(__dirname, '..', 'node_modules', '.stacki-test');
-  fs.mkdirSync(buildDir, { recursive: true });
-  const bundlePath = path.join(buildDir, 'dynamic-picker.bundle.js');
+  const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
+  fs.mkdirSync(buildDirectory, { recursive: true });
+  const bundlePath = path.join(buildDirectory, 'dynamic-picker.bundle.js');
   await esbuild.build({
     entryPoints: [path.join(__dirname, '..', 'src', 'ui', 'DynamicPicker.jsx')],
     outfile: bundlePath,
@@ -45,7 +45,7 @@ const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
   global.document = dom.window.document;
   global.navigator = dom.window.navigator;
   global.IS_REACT_ACT_ENVIRONMENT = true;
-  // jsdom has no layout, so it has no scrollIntoView; the popup calls it to
+  // `jsdom` has no layout, so it has no scrollIntoView; the popup calls it to
   // keep the highlighted option visible.
   dom.window.Element.prototype.scrollIntoView = function scrollIntoView() {};
 
@@ -69,7 +69,7 @@ const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
     'schema-design-for-editors',
     'what-changed-in-the-content-layer',
   ];
-  let picked = null;
+  let picked;
 
   const render = (entries) =>
     act(async () => {
@@ -213,7 +213,7 @@ const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
   {
     const Dropdown = require(
       await (async () => {
-        const out = path.join(buildDir, 'dropdown.bundle.js');
+        const out = path.join(buildDirectory, 'dropdown.bundle.js');
         await esbuild.build({
           entryPoints: [path.join(__dirname, '..', 'src', 'ui', 'Dropdown.jsx')],
           outfile: out,
@@ -241,7 +241,7 @@ const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
           React.createElement(Dropdown, {
             value,
             options: OPTIONS,
-            onChange: (v) => applied.push(v),
+            onChange: (value) => applied.push(value),
           }),
         );
         await settle(20);
@@ -251,7 +251,8 @@ const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
       find('.dd-trigger').click();
       await settle(20);
     });
-    const option = (label) => all('.dd-option').find((o) => o.textContent.trim() === label);
+    const option = (label) =>
+      all('.dd-option').find((option) => option.textContent.trim() === label);
     // React synthesises mouseenter from a bubbling mouseover, so that is what
     // a pointer arriving on an option looks like from here.
     const hover = (label) =>
