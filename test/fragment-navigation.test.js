@@ -1,3 +1,10 @@
+// Goal: a conditional that renders several roots through a Fragment (shorthand
+// `<>` or named) is navigable — its children are editable Navigator groups with
+// stable identity — rather than one opaque expression.
+// Method: a regression source from a real project is parsed with the built
+// parser in both Fragment spellings; the tree is flattened and each expected
+// node is checked for kind, editability and source identity.
+
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');

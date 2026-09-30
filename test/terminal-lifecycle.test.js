@@ -1,3 +1,9 @@
+// Goal: the terminal dock loads xterm only when opened, keeps scrollback while
+// hidden, and ignores a startup reply for a terminal already disposed.
+// Method: TerminalDock is bundled with xterm and the bridge replaced by
+// recording fakes, mounted in jsdom, and driven through open, hide and dispose
+// while the fakes report what was created and written.
+
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const path = require('node:path');

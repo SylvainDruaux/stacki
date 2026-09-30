@@ -1,3 +1,8 @@
+// Goal: the style panel's query cache batches a render's requests per element,
+// deduplicates outstanding work, and discards replies from before a clear.
+// Method: the module is bundled with esbuild and driven against a query whose
+// replies the test resolves by hand, so batching and ordering are observable.
+
 const assert = require('node:assert/strict');
 const path = require('node:path');
 const esbuild = require('esbuild');

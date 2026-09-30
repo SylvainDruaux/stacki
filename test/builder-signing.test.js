@@ -1,3 +1,11 @@
+// Goal: the electron-builder signing backport (scripts/fix-electron-builder-
+// signing.ts) authenticates the keychain ACL with the keychain password, and the
+// patcher refuses anything it does not recognize without changing a byte.
+// Method: the installed macCodeSign.js is restored to its pristine text, loaded
+// in a VM with `security` mocked, and run both unpatched (the regression must
+// fail) and patched; the patcher itself runs against temporary copies of known,
+// partly patched and upgraded sources.
+
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');

@@ -126,7 +126,8 @@ export function moveOrigins(
   const ordered = orderedSplices(splices);
   const [first, second] = ordered;
   assert(ordered.length === 2, 'A move is an insertion and a removal');
-  assert(first !== undefined && second !== undefined, 'Both splices exist');
+  assert(first !== undefined, 'The first splice exists');
+  assert(second !== undefined, 'The second splice exists');
   const removal = first.expectedBytes.length >= second.expectedBytes.length ? first : second;
   const insertion = removal === first ? second : first;
   const removed = origins.slice(removal.range.start, removal.range.end);

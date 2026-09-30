@@ -1,3 +1,10 @@
+// Goal: frontmatter survives the round trip byte for byte — declarations
+// before, between and after imports, every import form, and text that only
+// looks like an import — while its declarations stay editable to bindings.
+// Method: one interleaved frontmatter source is read and written through the
+// built frontmatter and parser modules; tests edit imports and declarations and
+// compare the written text with the expected source.
+
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const path = require('node:path');

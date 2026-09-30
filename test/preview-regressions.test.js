@@ -1,3 +1,10 @@
+// Goal: the canvas morph (electron/morphClient.ts) patches large pages within a
+// linear budget and never lets identity collide — a missing id, a comment
+// standing in for text, or a script whose source contains separators.
+// Method: the morph's own functions are cut out of the built client and run
+// against jsdom documents built for each case, with the same bounds main
+// prepends in the app.
+
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');

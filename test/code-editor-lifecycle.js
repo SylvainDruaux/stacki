@@ -1,3 +1,10 @@
+// Goal: the shared CodeEditor reveals the requested line, marks component
+// links, reports clicks, and emits each user edit exactly once — never echoing
+// an external reload or an app undo back as a new edit.
+// Method: the component is bundled with esbuild, mounted into jsdom through
+// React, and driven through its CodeMirror view; assertions read the editor
+// state and the callbacks it fired.
+
 const assert = require('node:assert/strict');
 const path = require('node:path');
 

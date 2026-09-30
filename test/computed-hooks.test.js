@@ -1,3 +1,10 @@
+// Goal: the style panel's computed-value hooks drop answers that arrive for a
+// stale selection or document, and a swatch with a literal color never
+// re-renders because of a canvas query.
+// Method: the hooks are bundled with the canvas query replaced by a probe that
+// hands each request's resolver to the test, mounted in jsdom, and resolved out
+// of order while render counts are recorded.
+
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const path = require('node:path');

@@ -1,3 +1,9 @@
+// Goal: pin parser fixes that each once broke a real page — empty frontmatter
+// fences, closing-fence suffixes, prototype-looking attribute names, unknown
+// entities, and package attribution on Windows and pnpm paths.
+// Method: one minimal source per regression runs through the built parser and
+// helpers; each assertion states the behavior that used to be wrong.
+
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { parsePage, serializePage, parseAttrs } = require('../dist/electron/astroParser');

@@ -1,3 +1,13 @@
+// Goal: the main process's long-lived workers — the content-config runner, the
+// serial queue, project watchers, dev-server starts and thumbnail windows —
+// never let an old generation of work touch a newer one, and always let go of
+// what they hold when a project closes.
+// Method: each module runs from its built output with its I/O replaced by
+// in-memory mocks (deferred esbuild builds, fake child processes, manual
+// timers), so every test drives the exact interleaving it names — a worker
+// exiting after its replacement started, a close during a build — and asserts
+// on what was spawned, resolved, rejected or cancelled.
+
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');

@@ -1,3 +1,10 @@
+// Goal: shorthand fragments parse into structure with exact source spans, keep
+// their spelling on write, and carry preview markers through every wrapper.
+// Method: small sources exercise each placement (conditionals, maps, roots,
+// attribute and comment text that looks like a delimiter); each is parsed with
+// the built parser and checked against its spans, its serialization, and the
+// output of both Astro compilers.
+
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { parsePage, serializePage, serializePageMarked } = require('../dist/electron/astroParser');

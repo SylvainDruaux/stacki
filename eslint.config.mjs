@@ -5,8 +5,10 @@
 // and adding the meta package means a fresh full-graph resolution the tree
 // isn't ready for. Same rules, same shape.
 //
-// max-lines-per-function and prefer-readonly remain warnings until the
-//    oversized legacy functions are split.
+// max-lines-per-function remains a warning until the oversized legacy
+// functions are split (docs/codebase.md, finding 4: the hotspots split as
+// architecture work, never inside a conversion). prefer-readonly reached zero
+// and is an error, as AGENTS.md requires.
 import tsParser from '@typescript-eslint/parser';
 import tsPlugin from '@typescript-eslint/eslint-plugin';
 import reactHooks from 'eslint-plugin-react-hooks';
@@ -212,6 +214,8 @@ export default [
       // The migration ratchet is zero, so unchecked files cannot re-enter the tree.
       '@typescript-eslint/ban-ts-comment': ['error', { 'ts-nocheck': true }],
       '@typescript-eslint/no-explicit-any': 'error',
+      // Reached zero in the alignment pass; AGENTS.md forbids `x!` outright.
+      '@typescript-eslint/no-non-null-assertion': 'error',
       '@typescript-eslint/consistent-type-assertions': 'off',
       'no-restricted-syntax': ['error', ...NO_ASSERTIONS, ...NO_WHOLE_FILE_REGENERATION],
       '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
@@ -225,8 +229,8 @@ export default [
       '@typescript-eslint/no-unsafe-call': 'error',
       '@typescript-eslint/no-unsafe-return': 'error',
       '@typescript-eslint/switch-exhaustiveness-check': 'error',
-      // Scale rules: legacy functions violate these at volume. Warn now, tighten on conversion.
-      '@typescript-eslint/prefer-readonly': 'warn',
+      '@typescript-eslint/prefer-readonly': 'error',
+      // Scale rule: legacy functions violate it at volume. Warn now, tighten as they split.
       'max-lines-per-function': ['warn', { max: 70, skipBlankLines: true, skipComments: true }],
     },
   },
@@ -249,7 +253,6 @@ export default [
       'src/style-panel/lib/host.ts',
       'src/style-panel/lib/webflow.ts',
       'src/style-panel/shared/dom-safety.ts',
-      'src/style-panel/shared/tool-prefs.ts',
     ],
     rules: {
       'no-restricted-syntax': ['error', ...NO_WHOLE_FILE_REGENERATION],
