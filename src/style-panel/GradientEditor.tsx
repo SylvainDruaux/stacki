@@ -72,6 +72,9 @@ const RADIAL_SIZES = [
   },
 ] as const;
 
+const RADIAL_SIZE_FARTHEST_SIDE_SECOND_PATH =
+  'M13.85 5a7.465 7.465 0 00-1.35-3H2v10.5A7.503 7.503 0 0013.85 8H8.5a2.5 2.5 0 110-3h5.35z';
+
 // Webflow's radial-extent icons (closest/farthest × side/corner).
 const RADIAL_SIZE_ICONS: Record<string, ReactNode> = {
   'closest-side': (
@@ -137,7 +140,7 @@ const RADIAL_SIZE_ICONS: Record<string, ReactNode> = {
         opacity=".4"
         fillRule="evenodd"
         clipRule="evenodd"
-        d="M13.85 5a7.465 7.465 0 00-1.35-3H2v10.5A7.503 7.503 0 0013.85 8H8.5a2.5 2.5 0 110-3h5.35z"
+        d={RADIAL_SIZE_FARTHEST_SIDE_SECOND_PATH}
         fill="currentColor"
       />
       <path

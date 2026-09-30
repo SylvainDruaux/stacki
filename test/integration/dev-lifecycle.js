@@ -44,11 +44,15 @@ async function orchestrate() {
       "import { defineCollection, reference, z } from 'astro:content';",
       "import { file } from 'astro/loaders';",
       "export const collections = { posts: defineCollection({ loader: file('src/data/posts.json'),",
-      'schema: ({ image }) => z.object({ title: z.string().min(3), rank: z.number().int().min(0), live: z.boolean().default(false),',
-      "hero: image().optional(), author: reference('authors').optional(), published: z.coerce.date().optional(),",
+      'schema: ({ image }) => z.object({ title: z.string().min(3), rank: ' +
+        'z.number().int().min(0), live: z.boolean().default(false),',
+      "hero: image().optional(), author: reference('authors').optional(), published: " +
+        'z.coerce.date().optional(),',
       "flag: z.enum(['true', 'false']).transform((value) => value === 'true').optional(),",
-      "}).refine((data) => data.title !== 'reserved', { message: 'This title is reserved', path: ['title'] }) }),",
-      "authors: defineCollection({ loader: file('src/data/authors.json'), schema: z.object({ name: z.string() }) }) };",
+      "}).refine((data) => data.title !== 'reserved', { message: 'This title is reserved', " +
+        "path: ['title'] }) }),",
+      "authors: defineCollection({ loader: file('src/data/authors.json'), schema: z.object({ " +
+        'name: z.string() }) }) };',
     ].join('\n'),
   );
   fs.writeFileSync(
@@ -195,7 +199,9 @@ async function inElectron() {
     assert.match(
       html,
       /<!--avb-s:/,
-      `the generated marker config must serve editable preview HTML\nProject path: ${project}\nCanonical path: ${fs.realpathSync(project)}\nHTML: ${html.slice(0, 2000)}\nDev logs: ${logs.join('').slice(-3000)}`,
+      `the generated marker config must serve editable preview HTML\n` +
+        `Project path: ${project}\nCanonical path: ${fs.realpathSync(project)}\n` +
+        `HTML: ${html.slice(0, 2000)}\nDev logs: ${logs.join('').slice(-3000)}`,
     );
     return html;
   };
@@ -253,7 +259,9 @@ async function inElectron() {
           `import { withMetadata, toJsonSchema } from ${JSON.stringify(
             path.join(ROOT, 'dist', 'electron', 'content', 'schemaTools.mjs'),
           )};`,
-          'export const result = toJsonSchema(z.object({ title: z.string().min(3), hero: withMetadata(z.string(), { astroImage: true }), date: z.coerce.date(), flag: z.string().transform(Boolean) }));',
+          'export const result = toJsonSchema(z.object({ title: z.string().min(3), hero: ' +
+            'withMetadata(z.string(), { astroImage: true }), date: z.coerce.date(), flag: ' +
+            'z.string().transform(Boolean) }));',
         ].join('\n'),
         resolveDir: project,
       },
@@ -342,7 +350,8 @@ async function inElectron() {
       say('PASS production dist/preload boots the welcome screen in a hidden window');
     }
     say(
-      `dev-lifecycle integration: passed (Electron ${process.versions.electron}, Astro ${ASTRO_VERSION})`,
+      `dev-lifecycle integration: passed ` +
+        `(Electron ${process.versions.electron}, Astro ${ASTRO_VERSION})`,
     );
   } finally {
     content.stopAllServices();

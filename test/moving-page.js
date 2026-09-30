@@ -55,12 +55,14 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms));
   const { JSDOM } = require('jsdom');
   const panel = (which) => `
     <div data-box="panel-${which}"${which === 'two' ? ' aria-hidden="true" inert' : ''}>
-      <p data-avb-p="src/components/Typography/Paragraph.astro|0.0.0 0.1.0" data-box="text-${which}">Design</p>
+      <p data-avb-p="src/components/Typography/Paragraph.astro|0.0.0 0.1.0"
+        data-box="text-${which}">Design</p>
       <svg data-avb-p="src/components/Media/Icon.astro|0.0.0 0.1.1" data-box="icon-${which}"></svg>
     </div>`;
+  const track = `<div data-box="track">${panel('one')}${panel('two')}</div>`;
   const dom = new JSDOM(
     `<!doctype html><body>
-      <!--avb-s:0.1--><div data-box="wrap"><div data-box="track">${panel('one')}${panel('two')}</div></div><!--avb-e:0.1-->
+      <!--avb-s:0.1--><div data-box="wrap">${track}</div><!--avb-e:0.1-->
     </body>`,
     { url: 'http://localhost:4321/#avb-design', pretendToBeVisual: true },
   );

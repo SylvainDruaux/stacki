@@ -23,6 +23,7 @@
 const fs = require('fs');
 const path = require('path');
 const { pathToFileURL } = require('url');
+const { containsCode } = require('./source-text.js');
 
 const failures = [];
 let checked = 0;
@@ -177,7 +178,7 @@ const settle = (ms = 20) => new Promise((r) => setTimeout(r, ms));
   const app = fs.readFileSync(path.join(__dirname, '..', 'src', 'App.tsx'), 'utf8');
   check(
     'the app tells the canvas about an outside edit',
-    /if \(event\.external\) \{tellCanvas\(\{ type: 'avb:patch-now' \}\);\}/.test(app),
+    containsCode(app, "if (event.external) { tellCanvas({ type: 'avb:patch-now' }); }"),
     'nothing reaches the canvas when the socket is quiet',
   );
   const morph = fs.readFileSync(
@@ -195,7 +196,8 @@ const settle = (ms = 20) => new Promise((r) => setTimeout(r, ms));
   // was dirty, and the whole-model save overwrote the file without looking.
   // Now every edit names the bytes it was stated against (plan §11 step 0; a
   // page's edits are requests since step 9, a Markdown page's since step 10),
-  // and main refuses the ones whose bytes are gone. The real handlers run in the windowless harness.
+  // and main refuses the ones whose bytes are gone. The real handlers run in the
+  // windowless harness.
   {
     const os = require('os');
     const { createHash } = require('crypto');

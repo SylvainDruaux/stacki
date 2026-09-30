@@ -212,7 +212,10 @@ type FillProps = {
   frame: FrameKey;
   /** Maps a side to its CSS property (`margin-top`, `padding-top`, or plain `top`). */
   propFor: (side: Side) => string;
-  /** Grows inward (padding): flip the drag direction and clamp at 0. Insets & margins grow outward. */
+  /**
+   * Grows inward (padding): flip the drag direction and clamp at 0. Insets & margins grow
+   * outward.
+   */
   inward?: boolean;
   read: Read;
   busy: boolean;

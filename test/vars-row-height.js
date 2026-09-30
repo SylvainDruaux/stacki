@@ -115,7 +115,10 @@ const STYLESHEET = `:root {
          listAstroStyleFiles: async () => ({ files: [] }),
          readStyleFile: async () => ({ css: '' }),
          renameCssVariables: async () => ({ ok: true }),
-         moveCssVariables: async (payload) => { window.__moves = payload.moves; return { ok: true } },
+         moveCssVariables: async (payload) => {
+           window.__moves = payload.moves;
+           return { ok: true };
+         },
          moveCssHeading: async (payload) => { window.__heading = payload; return { ok: true } },
          readStyleFile: async () => ({ css: '' }),
          writeStyleFile: async () => ({ ok: true }),
@@ -133,7 +136,8 @@ const STYLESHEET = `:root {
   })();
   if (typeof electronPath !== 'string') {
     console.log(
-      'vars-row-height: skipped — no Electron to lay it out in (see test/gap-bands.js for the pattern)',
+      'vars-row-height: skipped — no Electron to lay it out in ' +
+        '(see test/gap-bands.js for the pattern)',
     );
     return;
   }
@@ -162,34 +166,82 @@ const STYLESHEET = `:root {
        // of the values start at the same height and are the same size. Measured
        // first, with nothing clicked — the heading's menu is in the DOM from the
        // start (hidden until hover), which is how it pushed the stacks apart.
-       out.stacks = await js("(() => { const box = (el) => { const r = el.getBoundingClientRect(); return [Math.round(r.top), Math.round(r.height)] }; return [...document.querySelectorAll('.vars-table')].map((table, i) => { const fixed = [...table.querySelectorAll('.vars-fixed .vars-row')].map(box); const scroll = [...table.querySelectorAll('.vars-scroll .vars-row')].map(box); const off = fixed.map((f, n) => (scroll[n] ? [f[0] - scroll[n][0], f[1] - scroll[n][1]] : null)); const last = [...table.querySelectorAll('.vars-fixed .vars-row')].pop(); return { table: i, counts: [fixed.length, scroll.length], extraIsAddRow: fixed.length === scroll.length || (fixed.length === scroll.length + 1 && !!last && last.className.includes('vars-add')), mismatched: off.filter((o) => o && (o[0] !== 0 || o[1] !== 0)).length, worst: off.filter(Boolean).sort((a, b) => Math.abs(b[0]) - Math.abs(a[0]))[0] } }) })()");
+       out.stacks = await js("(() => { const box = (el) => { const r = " +
+         "el.getBoundingClientRect(); return [Math.round(r.top), Math.round(r.height)] }; " +
+         "return [...document.querySelectorAll('.vars-table')].map((table, " +
+         "i) => { const fixed = [...table.querySelectorAll('.vars-fixed .vars-row')].map(box); " +
+         "const scroll = [...table.querySelectorAll('.vars-scroll .vars-row')].map(box); " +
+         "const off = fixed.map((f, n) => (scroll[n] ? [f[0] - scroll[n][0], " +
+         "f[1] - scroll[n][1]] : null)); const last = [...table.querySelectorAll('.vars-fixed " +
+         ".vars-row')].pop(); return { table: i, counts: [fixed.length, scroll.length], " +
+         "extraIsAddRow: fixed.length === scroll.length || (fixed.length === scroll.length + 1 " +
+         "&& !!last && last.className.includes('vars-add')), " +
+         "mismatched: off.filter((o) => o && (o[0] !== 0 || o[1] !== 0)).length, " +
+         "worst: off.filter(Boolean).sort((a, b) => Math.abs(b[0]) - Math.abs(a[0]))[0] } }) })()");
        // Every row's height before anything is clicked, and where the row after
        // the one being renamed starts.
        // The heading's menu. It is portaled to <body>, outside the panel's own
        // reset, where the app's global button rule centres everything — so where
        // its rows start is a real question and not a styling detail.
-       out.menu = await js("(() => { const b = document.querySelector('.vars-section-menu'); if (!b) return null; b.click(); return true })()");
+       out.menu = await js("(() => { const b = document.querySelector('.vars-section-menu'); " +
+         "if (!b) return null; b.click(); return true })()");
        await new Promise((r) => setTimeout(r, 120));
-       out.menuRows = await js("(() => { const menu = document.querySelector('.more-menu'); if (!menu) return null; const items = [...menu.querySelectorAll('.more-menu-item')]; const m = menu.getBoundingClientRect(); return { labels: items.map((i) => i.textContent.trim()), justify: getComputedStyle(items[0]).justifyContent, iconLefts: items.map((i) => Math.round(i.querySelector('svg').getBoundingClientRect().left - m.left)), sameStart: new Set(items.map((i) => Math.round(i.querySelector('svg').getBoundingClientRect().left))).size === 1 } })()");
-       out.before = await js("(() => { const rows = [...document.querySelectorAll('.vars-fixed .vars-row')]; const name = rows.find((r) => (r.textContent || '').includes('light-100')); const next = rows[rows.indexOf(name) + 1]; return { rowH: Math.round(name.getBoundingClientRect().height), nextTop: Math.round(next.getBoundingClientRect().top), heads: rows.length } })()");
-       out.clicked = await js("(() => { const b = [...document.querySelectorAll('.vars-name .vars-rename')].find((n) => n.textContent === 'light-100'); if (!b) return null; b.click(); return true })()");
+       out.menuRows = await js("(() => { const menu = document.querySelector('.more-menu'); " +
+         "if (!menu) return null; const items = [...menu.querySelectorAll('.more-menu-item')]; " +
+         "const m = menu.getBoundingClientRect(); return { labels: items.map((i) => " +
+         "i.textContent.trim()), justify: getComputedStyle(items[0]).justifyContent, " +
+         "iconLefts: items.map((i) => " +
+         "Math.round(i.querySelector('svg').getBoundingClientRect().left - m.left)), " +
+         "sameStart: new Set(items.map((i) => " +
+         "Math.round(i.querySelector('svg').getBoundingClientRect().left))).size === 1 } })()");
+       out.before = await js("(() => { const rows = [...document.querySelectorAll('.vars-fixed " +
+         ".vars-row')]; const name = rows.find((r) => (r.textContent || " +
+         "'').includes('light-100')); const next = rows[rows.indexOf(name) + 1]; " +
+         "return { rowH: Math.round(name.getBoundingClientRect().height), " +
+         "nextTop: Math.round(next.getBoundingClientRect().top), heads: rows.length } })()");
+       out.clicked = await js("(() => { const b = [...document.querySelectorAll('.vars-name " +
+         ".vars-rename')].find((n) => n.textContent === 'light-100'); if (!b) return null; " +
+         "b.click(); return true })()");
        await new Promise((r) => setTimeout(r, 150));
-       out.after = await js("(() => { const rows = [...document.querySelectorAll('.vars-fixed .vars-row')]; const editing = rows.find((r) => r.querySelector('.vars-rename-input')); if (!editing) return null; const next = rows[rows.indexOf(editing) + 1]; return { rowH: Math.round(editing.getBoundingClientRect().height), nextTop: Math.round(next.getBoundingClientRect().top), fieldH: Math.round(editing.querySelector('.vars-rename-input').getBoundingClientRect().height) } })()");
+       out.after = await js("(() => { const rows = [...document.querySelectorAll('.vars-fixed " +
+         ".vars-row')]; const editing = rows.find((r) => r.querySelector('.vars-rename-input')); " +
+         "if (!editing) return null; const next = rows[rows.indexOf(editing) + 1]; " +
+         "return { rowH: Math.round(editing.getBoundingClientRect().height), " +
+         "nextTop: Math.round(next.getBoundingClientRect().top), " +
+         "fieldH: " +
+         "Math.round(editing.querySelector('.vars-rename-input').getBoundingClientRect().height) " +
+         "} })()");
        // A heading that is a comment above some names opens the same way — it
        // writes the comment rather than any name, and it must not move the sheet
        // either.
-       out.commentBefore = await js("(() => { const h = [...document.querySelectorAll('.vars-fixed .vars-section')].find((n) => /radius/i.test(n.textContent || '')); return h ? { text: h.textContent.trim(), renamable: !!h.querySelector('.vars-rename'), h: Math.round(h.getBoundingClientRect().height) } : null })()");
-       out.commentClicked = await js("(() => { const b = [...document.querySelectorAll('.vars-section .vars-rename')].find((n) => /radius/i.test(n.textContent)); if (!b) return null; b.click(); return true })()");
+       out.commentBefore = await js("(() => { const h = " +
+         "[...document.querySelectorAll('.vars-fixed .vars-section')].find((n) => " +
+         "/radius/i.test(n.textContent || '')); return h ? { text: h.textContent.trim(), " +
+         "renamable: !!h.querySelector('.vars-rename'), h: " +
+         "Math.round(h.getBoundingClientRect().height) } : null })()");
+       out.commentClicked = await js("(() => { const b = " +
+         "[...document.querySelectorAll('.vars-section .vars-rename')].find((n) => " +
+         "/radius/i.test(n.textContent)); if (!b) return null; b.click(); return true })()");
        await new Promise((r) => setTimeout(r, 150));
-       out.commentAfter = await js("(() => { const h = [...document.querySelectorAll('.vars-fixed .vars-section')].find((n) => n.querySelector('.vars-rename-input')); return h ? { h: Math.round(h.getBoundingClientRect().height), value: h.querySelector('.vars-rename-input').value } : null })()");
+       out.commentAfter = await js("(() => { const h = " +
+         "[...document.querySelectorAll('.vars-fixed .vars-section')].find((n) => " +
+         "n.querySelector('.vars-rename-input')); return h ? { h: " +
+         "Math.round(h.getBoundingClientRect().height), value: " +
+         "h.querySelector('.vars-rename-input').value } : null })()");
 
        // A group of modes, whose headings ARE names its rows share.
        await js('window.__show(1)');
        await new Promise((r) => setTimeout(r, 300));
-       out.headBefore = await js("(() => { const h = [...document.querySelectorAll('.vars-fixed .vars-section')].find((n) => (n.textContent || '').includes('selection')); return h ? Math.round(h.getBoundingClientRect().height) : null })()");
-       out.headClicked = await js("(() => { const b = [...document.querySelectorAll('.vars-section .vars-rename')].find((n) => n.textContent === 'selection'); if (!b) return null; b.click(); return true })()");
+       out.headBefore = await js("(() => { const h = [...document.querySelectorAll('.vars-fixed " +
+         ".vars-section')].find((n) => (n.textContent || '').includes('selection')); " +
+         "return h ? Math.round(h.getBoundingClientRect().height) : null })()");
+       out.headClicked = await js("(() => { const b = " +
+         "[...document.querySelectorAll('.vars-section .vars-rename')].find((n) => n.textContent " +
+         "=== 'selection'); if (!b) return null; b.click(); return true })()");
        await new Promise((r) => setTimeout(r, 150));
-       out.headAfter = await js("(() => { const h = [...document.querySelectorAll('.vars-fixed .vars-section')].find((n) => n.querySelector('.vars-rename-input')); return h ? Math.round(h.getBoundingClientRect().height) : null })()");
+       out.headAfter = await js("(() => { const h = [...document.querySelectorAll('.vars-fixed " +
+         ".vars-section')].find((n) => n.querySelector('.vars-rename-input')); " +
+         "return h ? Math.round(h.getBoundingClientRect().height) : null })()");
        // Dragging a variable from one group into another — the whole chain, from
        // a real press to the file edit that is asked for. A group is a run of
        // lines between two comments, so "into the empty group" comes out as
@@ -199,8 +251,16 @@ const STYLESHEET = `:root {
        // Pressed on the NAME, which is what anyone reaching for a variable grabs.
        // (It is a button now — it opens the rename field — so this is exactly the
        // press that has to still start a drag.)
-       const grab = await js("(() => { const n = [...document.querySelectorAll('.vars-name .vars-rename')].find((el) => el.textContent === 'light-200'); if (!n) return null; const b = n.getBoundingClientRect(); return { x: Math.round(b.left + 10), y: Math.round(b.top + b.height / 2) } })()");
-       const drop = await js("(() => { const tables = [...document.querySelectorAll('.vars-table')]; const t = tables.find((n) => /Palette/.test(n.textContent)); if (!t) return null; const add = t.querySelector('.vars-fixed .vars-add'); const b = add.getBoundingClientRect(); return { x: Math.round(b.left + 40), y: Math.round(b.top + b.height / 2) } })()");
+       const grab = await js("(() => { const n = [...document.querySelectorAll('.vars-name " +
+         ".vars-rename')].find((el) => el.textContent === 'light-200'); if (!n) return null; " +
+         "const b = n.getBoundingClientRect(); return { x: Math.round(b.left + 10), " +
+         "y: Math.round(b.top + b.height / 2) } })()");
+       const drop = await js("(() => { const tables = " +
+         "[...document.querySelectorAll('.vars-table')]; const t = tables.find((n) => " +
+         "/Palette/.test(n.textContent)); if (!t) return null; " +
+         "const add = t.querySelector('.vars-fixed .vars-add'); " +
+         "const b = add.getBoundingClientRect(); return { x: Math.round(b.left + 40), " +
+         "y: Math.round(b.top + b.height / 2) } })()");
        if (grab && drop) {
          await pointerAt('pointerdown', grab.x, grab.y);
          await new Promise((r) => setTimeout(r, 50));
@@ -215,15 +275,26 @@ const STYLESHEET = `:root {
 
        // And the heading, dragged by its name for the same reason: the heading's
        // text is a button too.
-       const grabHead = await js("(() => { const n = [...document.querySelectorAll('.vars-section .vars-rename')].find((el) => /Radius/.test(el.textContent)); if (!n) return null; const b = n.getBoundingClientRect(); return { x: Math.round(b.left + 10), y: Math.round(b.top + b.height / 2) } })()");
+       const grabHead = await js("(() => { const n = " +
+         "[...document.querySelectorAll('.vars-section .vars-rename')].find((el) => " +
+         "/Radius/.test(el.textContent)); if (!n) return null; " +
+         "const b = n.getBoundingClientRect(); return { x: Math.round(b.left + 10), " +
+         "y: Math.round(b.top + b.height / 2) } })()");
        // Above the row's middle, which is the line between "in front of this one"
        // and "after it".
-       const dropHead = await js("(() => { const r = [...document.querySelectorAll('.vars-fixed .vars-row')].find((n) => (n.textContent || '').includes('light-200')); if (!r) return null; const b = r.getBoundingClientRect(); return { x: Math.round(b.left + 40), y: Math.round(b.top + 3) } })()");
+       const dropHead = await js("(() => { const r = [...document.querySelectorAll('.vars-fixed " +
+         ".vars-row')].find((n) => (n.textContent || '').includes('light-200')); " +
+         "if (!r) return null; const b = r.getBoundingClientRect(); " +
+         "return { x: Math.round(b.left + 40), y: Math.round(b.top + 3) } })()");
        if (grabHead && dropHead) {
          await pointerAt('pointerdown', grabHead.x, grabHead.y);
          await new Promise((r) => setTimeout(r, 50));
          for (let i = 1; i <= 6; i++) {
-           await pointerAt('pointermove', grabHead.x, Math.round(grabHead.y + ((dropHead.y - grabHead.y) * i) / 6));
+           await pointerAt(
+             'pointermove',
+             grabHead.x,
+             Math.round(grabHead.y + ((dropHead.y - grabHead.y) * i) / 6),
+           );
            await new Promise((r) => setTimeout(r, 25));
          }
          await pointerAt('pointerup', dropHead.x, dropHead.y);

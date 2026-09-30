@@ -37,7 +37,9 @@ const START = 'rgb(1, 2, 3)';
   const bundlePath = path.join(buildDir, 'color-live.bundle.js');
   await esbuild.build({
     stdin: {
-      contents: `export { default as BackgroundSection } from './BackgroundSection'\nexport { default as ColorSwatch } from './components/ColorSwatch'`,
+      contents:
+        `export { default as BackgroundSection } from './BackgroundSection'\n` +
+        `export { default as ColorSwatch } from './components/ColorSwatch'`,
       resolveDir: path.join(__dirname, '..', 'src', 'style-panel'),
       loader: 'tsx',
     },

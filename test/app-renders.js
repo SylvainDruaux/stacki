@@ -151,7 +151,8 @@ const check = (what, condition, detail) => {
     'no hook reads something declared later in the component',
     !tdz,
     tdz &&
-      `${tdz.split('\n').slice(0, 3).join('\n    ')}\n    → move that hook below the declaration it names`,
+      `${tdz.split('\n').slice(0, 3).join('\n    ')}\n` +
+        `    → move that hook below the declaration it names`,
   );
 
   const other = errors.filter(

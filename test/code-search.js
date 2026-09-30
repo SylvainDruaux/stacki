@@ -185,8 +185,9 @@ check(
 // The magnifier in the query field is a background IMAGE, so anything setting
 // the `background` shorthand on that field — including on :focus, where this
 // went wrong once — wipes it.
+// Prettier quotes attribute values, so `[name=search]` may be `[name='search']`.
 const fieldRules = panelRules.filter((rule) =>
-  /input(\.cm-textfield|\[name=search\])/.test(rule.selector),
+  /input(\.cm-textfield|\[name=(search|'search'|"search")\])/.test(rule.selector),
 );
 const shorthand = fieldRules.filter((rule) => rule.some((decl) => decl.prop === 'background'));
 check(

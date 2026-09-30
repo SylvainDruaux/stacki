@@ -28,7 +28,10 @@ const check = (what, condition, detail) => {
   // The shape the framework writes: sizes in px, divided by 16 into rem, scaled
   // between two viewport widths.
   const fluid = (min, max, vpMin = 320, vpMax = 1440) =>
-    `clamp(${min} / 16 * 1rem, ((${min} - ((${max} - ${min}) / (${vpMax} - ${vpMin}) * ${vpMin})) / 16 * 1rem + ((${max} - ${min}) / (${vpMax} - ${vpMin})) * 100vw), ${max} / 16 * 1rem)`;
+    `clamp(${min} / 16 * 1rem, ` +
+    `((${min} - ((${max} - ${min}) / (${vpMax} - ${vpMin}) * ${vpMin})) / 16 * 1rem + ` +
+    `((${max} - ${min}) / (${vpMax} - ${vpMin})) * 100vw), ` +
+    `${max} / 16 * 1rem)`;
 
   check('a gentle scale is fine', fluidCheck(fluid(64, 112)).status === 'ok');
   check('exactly 2.5x is still fine', fluidCheck(fluid(16, 40)).status === 'ok');

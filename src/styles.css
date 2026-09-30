@@ -7528,7 +7528,10 @@ textarea::selection {
 }
 .cm-editor .cm-panels .cm-panel.cm-search input[name='search'] {
   padding-left: 28px;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23999999' stroke-width='1.5'%3E%3Ccircle cx='7' cy='7' r='4.25'/%3E%3Cpath d='M10.2 10.2 13.5 13.5' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' \
+viewBox='0 0 16 16' fill='none' stroke='%23999999' stroke-width='1.5'%3E\
+%3Ccircle cx='7' cy='7' r='4.25'/%3E\
+%3Cpath d='M10.2 10.2 13.5 13.5' stroke-linecap='round'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: 8px center;
   background-size: 14px 14px;

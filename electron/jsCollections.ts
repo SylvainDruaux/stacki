@@ -311,7 +311,8 @@ interface ScanOptions {
 
 const declRe = (requireExport: boolean, tail: string): RegExp =>
   new RegExp(
-    `${requireExport ? 'export\\s+' : '(?:^|[\\n;{])[ \\t]*(?:export\\s+)?'}const\\s+([A-Za-z_$][\\w$]*)\\s*(?::[^=]+)?=\\s*${tail}`,
+    `${requireExport ? 'export\\s+' : '(?:^|[\\n;{])[ \\t]*(?:export\\s+)?'}` +
+      `const\\s+([A-Za-z_$][\\w$]*)\\s*(?::[^=]+)?=\\s*${tail}`,
     'g',
   );
 

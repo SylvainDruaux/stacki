@@ -244,6 +244,14 @@ function DistanceRow({
   );
 }
 
+// The explanatory notes under the two perspective headings.
+const SELF_PERSPECTIVE_NOTE =
+  "Depth for this element's own transform — written as perspective() at the front of " +
+  'the transform list.';
+const CHILDREN_PERSPECTIVE_NOTE =
+  "Depth for this element's CHILDREN, so they share one viewpoint. It does nothing to " +
+  'the element itself.';
+
 export default function TransformSettings({
   read,
   busy,
@@ -320,7 +328,7 @@ export default function TransformSettings({
         <Heading
           title="Self perspective"
           props={['transform']}
-          note="Depth for this element's own transform — written as perspective() at the front of the transform list."
+          note={SELF_PERSPECTIVE_NOTE}
           busy={busy}
           cleared={!!selfPerspective}
           onClear={() => onSelfPerspective('', false)}
@@ -338,7 +346,7 @@ export default function TransformSettings({
         <Heading
           title="Children perspective"
           props={['perspective', 'perspective-origin']}
-          note="Depth for this element's CHILDREN, so they share one viewpoint. It does nothing to the element itself."
+          note={CHILDREN_PERSPECTIVE_NOTE}
           busy={busy}
           cleared={!!childDistance || !!val(read, 'perspective-origin')}
           onClear={() => clearProp(['perspective', 'perspective-origin'])}

@@ -22,6 +22,13 @@ const check = (what, condition, detail) => {
 };
 const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
 
+// The value of --too-steep: a fluid clamp too long for one source line, written into the
+// sheet below as the single line it has always been.
+const TOO_STEEP =
+  'clamp(var(--too-steep-min) / 16 * 1rem, ((var(--too-steep-min) - ((var(--too-steep-max) - ' +
+  'var(--too-steep-min)) / (1440 - 320) * 320)) / 16 * 1rem + ((var(--too-steep-max) - ' +
+  'var(--too-steep-min)) / (1440 - 320)) * 100vw), var(--too-steep-max) / 16 * 1rem)';
+
 const STYLESHEET = `/* ==========================================================================
    Tokens
    ========================================================================== */
@@ -43,7 +50,7 @@ const STYLESHEET = `/* =========================================================
   --tint-100: color-mix(in srgb, var(--brand-500), white 80%);
 
   /* Fluid */
-  --too-steep: clamp(var(--too-steep-min) / 16 * 1rem, ((var(--too-steep-min) - ((var(--too-steep-max) - var(--too-steep-min)) / (1440 - 320) * 320)) / 16 * 1rem + ((var(--too-steep-max) - var(--too-steep-min)) / (1440 - 320)) * 100vw), var(--too-steep-max) / 16 * 1rem);
+  --too-steep: ${TOO_STEEP};
   --too-steep-min: 16;
   --too-steep-max: 64;
   --no-rem: clamp(1rem, 0rem + 2vw, 2rem);
@@ -1301,7 +1308,8 @@ const STYLESHEET = `/* =========================================================
     check(
       'and the group it came from keeps its own',
       (originalTable?.querySelectorAll('.vars-name').length ?? 0) > 0,
-      `${originalTable?.querySelectorAll('.vars-name').length} rows in ${originalTable?.textContent?.slice(0, 40)}`,
+      `${originalTable?.querySelectorAll('.vars-name').length} ` +
+        `rows in ${originalTable?.textContent?.slice(0, 40)}`,
     );
 
     // Delete: the comment goes, its variables stay.
@@ -1662,7 +1670,8 @@ const STYLESHEET = `/* =========================================================
     check(
       'and every variable stays exactly where it was',
       (written.match(/--[\w-]+:/g) || []).join('|') === namesBefore,
-      `${(written.match(/--[\w-]+:/g) || []).slice(0, 6).join('|')} vs ${namesBefore.split('|').slice(0, 6).join('|')}`,
+      `${(written.match(/--[\w-]+:/g) || []).slice(0, 6).join('|')} ` +
+        `vs ${namesBefore.split('|').slice(0, 6).join('|')}`,
     );
     check(
       'so the variables it left behind are not in it any more',

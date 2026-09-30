@@ -107,27 +107,31 @@ test('switching CMS files flushes the old edit to the old file', async () => {
   }
 });
 
-test('obsolete reads cannot replace the selected collection and unreadable files cannot be edited', async () => {
-  const state = fixture();
-  try {
-    await state.show('a.json');
-    await state.show('b.json');
-    await act(async () => state.reads[1].resolve({ data: [{ title: 'Second' }] }));
-    await act(async () => state.reads[0].resolve({ data: [{ title: 'Obsolete' }] }));
-    assert.equal(document.querySelector('.cms-field input').value, 'Second');
-    await act(async () => {
-      for (const listener of state.listeners) {
-        listener();
-      }
-    });
-    await act(async () => state.reads[2].reject(new Error('cannot read')));
-    assert.match(document.querySelector('.cms-error').textContent, /cannot read/);
-    assert.equal(document.querySelector('[title="New item"]'), null);
-    assert.equal(document.querySelector('.cms-items .primary'), null);
-    assert.equal(state.writes.length, 0);
-  } finally {
-    await act(async () => state.root.unmount());
-  }
-});
+test(
+  'obsolete reads cannot replace the selected ' +
+    'collection and unreadable files cannot be edited',
+  async () => {
+    const state = fixture();
+    try {
+      await state.show('a.json');
+      await state.show('b.json');
+      await act(async () => state.reads[1].resolve({ data: [{ title: 'Second' }] }));
+      await act(async () => state.reads[0].resolve({ data: [{ title: 'Obsolete' }] }));
+      assert.equal(document.querySelector('.cms-field input').value, 'Second');
+      await act(async () => {
+        for (const listener of state.listeners) {
+          listener();
+        }
+      });
+      await act(async () => state.reads[2].reject(new Error('cannot read')));
+      assert.match(document.querySelector('.cms-error').textContent, /cannot read/);
+      assert.equal(document.querySelector('[title="New item"]'), null);
+      assert.equal(document.querySelector('.cms-items .primary'), null);
+      assert.equal(state.writes.length, 0);
+    } finally {
+      await act(async () => state.root.unmount());
+    }
+  },
+);
 
 test.after(() => dom.window.close());

@@ -313,14 +313,17 @@ function planRename(
     if (collection.loader.generateId) {
       move = {
         kind: 'generated',
-        note: `${name} builds its ids in its loader, so its id cannot be changed by renaming a file.`,
+        note:
+          `${name} builds its ids in its loader, ` +
+          'so its id cannot be changed by renaming a file.',
       };
     } else {
       const extension = path.extname(entry.file);
+      const pathPrefix = entry.file.slice(0, entry.file.length - extension.length - from.length);
       move = {
         kind: 'file',
         from: entry.file,
-        to: `${entry.file.slice(0, entry.file.length - extension.length - from.length)}${to}${extension}`,
+        to: `${pathPrefix}${to}${extension}`,
       };
     }
   } else if (entry.keyed) {

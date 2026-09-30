@@ -21,7 +21,8 @@ function fontOf(computed: CSSStyleDeclaration): string {
   if (computed.font) {
     return computed.font;
   }
-  return `${computed.fontStyle} ${computed.fontWeight} ${computed.fontSize} / ${computed.lineHeight} ${computed.fontFamily}`;
+  const size = `${computed.fontSize} / ${computed.lineHeight}`;
+  return `${computed.fontStyle} ${computed.fontWeight} ${size} ${computed.fontFamily}`;
 }
 
 /**

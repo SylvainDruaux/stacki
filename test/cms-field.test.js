@@ -65,54 +65,57 @@ test('a focused CMS field retains its input until blur', async () => {
   }
 });
 
-test('nested repeaters keep image imports and Escape closes only the innermost dialog', async () => {
-  const root = createRoot(document.getElementById('root'));
-  let value = [{ title: 'Outer', nested: [{ title: 'Inner', image: 'old.png' }] }];
-  const imports = [];
-  const pickAsset = async (picked) => {
-    imports.push(picked);
-    return { ok: true, value: { __expr: 'newImage', __asset: picked.rel } };
-  };
-  const render = () =>
-    root.render(
-      React.createElement(Field, {
-        ...context,
-        type: 'objects',
-        value,
-        pickAsset,
-        onChange(next) {
-          value = next;
-          render();
-        },
-      }),
-    );
-  try {
-    await act(async () => render());
-    await click(document.querySelector('.cms-repeat-row'));
-    await click(document.querySelector('.cms-modal .cms-repeat-row'));
-    assert.equal(document.querySelectorAll('.cms-modal-overlay').length, 2);
-    await click(document.querySelectorAll('.cms-modal .af-choose')[0]);
-    const request = getPendingAsset();
-    assert.ok(request);
-    await act(async () => request.onPick('src/assets/new.png'));
-    assert.deepEqual(imports, [{ rel: 'src/assets/new.png', root: 'src' }]);
-    assert.deepEqual(value[0].nested[0].image, {
-      __expr: 'newImage',
-      __asset: 'src/assets/new.png',
-    });
-    await act(async () =>
-      window.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Escape' })),
-    );
-    assert.equal(document.querySelectorAll('.cms-modal-overlay').length, 1);
-    assert.match(document.querySelector('.cms-modal-header').textContent, /Outer/);
-    await act(async () =>
-      window.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Escape' })),
-    );
-    assert.equal(document.querySelectorAll('.cms-modal-overlay').length, 0);
-  } finally {
-    await act(async () => root.unmount());
-  }
-});
+test(
+  'nested repeaters keep image imports and ' + 'Escape closes only the innermost dialog',
+  async () => {
+    const root = createRoot(document.getElementById('root'));
+    let value = [{ title: 'Outer', nested: [{ title: 'Inner', image: 'old.png' }] }];
+    const imports = [];
+    const pickAsset = async (picked) => {
+      imports.push(picked);
+      return { ok: true, value: { __expr: 'newImage', __asset: picked.rel } };
+    };
+    const render = () =>
+      root.render(
+        React.createElement(Field, {
+          ...context,
+          type: 'objects',
+          value,
+          pickAsset,
+          onChange(next) {
+            value = next;
+            render();
+          },
+        }),
+      );
+    try {
+      await act(async () => render());
+      await click(document.querySelector('.cms-repeat-row'));
+      await click(document.querySelector('.cms-modal .cms-repeat-row'));
+      assert.equal(document.querySelectorAll('.cms-modal-overlay').length, 2);
+      await click(document.querySelectorAll('.cms-modal .af-choose')[0]);
+      const request = getPendingAsset();
+      assert.ok(request);
+      await act(async () => request.onPick('src/assets/new.png'));
+      assert.deepEqual(imports, [{ rel: 'src/assets/new.png', root: 'src' }]);
+      assert.deepEqual(value[0].nested[0].image, {
+        __expr: 'newImage',
+        __asset: 'src/assets/new.png',
+      });
+      await act(async () =>
+        window.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Escape' })),
+      );
+      assert.equal(document.querySelectorAll('.cms-modal-overlay').length, 1);
+      assert.match(document.querySelector('.cms-modal-header').textContent, /Outer/);
+      await act(async () =>
+        window.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Escape' })),
+      );
+      assert.equal(document.querySelectorAll('.cms-modal-overlay').length, 0);
+    } finally {
+      await act(async () => root.unmount());
+    }
+  },
+);
 
 test('reordering a repeater preserves the entry shown by its open dialog', async () => {
   const root = createRoot(document.getElementById('root'));

@@ -118,8 +118,10 @@ describe('editability matches expectation', () => {
         !!result.editable,
         expect.editable,
         expect.editable
-          ? `expected this fixture to be visually editable, but the parser bailed to code view: ${result.reason}`
-          : 'expected this fixture to fall back to code view, but the parser now accepts it — if that is a real improvement, update expectations.json',
+          ? `expected this fixture to be visually editable, but ` +
+              `the parser bailed to code view: ${result.reason}`
+          : 'expected this fixture to fall back to code view, but the parser now accepts it — ' +
+              'if that is a real improvement, update expectations.json',
       );
     });
   }

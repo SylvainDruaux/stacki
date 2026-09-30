@@ -17,6 +17,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { containsCode } = require('./source-text.js');
 
 const failures = [];
 let checked = 0;
@@ -104,14 +105,16 @@ const check = (what, condition, detail) => {
   );
   check(
     'Enter on a named property with no value moves to the value field',
-    /onEnter=\{\(\) => \{ if \(prop\.trim\(\) && !value\.trim\(\)\) \{ valueRef\.current\?\.focus\(\); return \} submit\(\) \}\}/.test(
+    containsCode(
       source,
+      'onEnter={() => { if (prop.trim() && !value.trim()) ' +
+        '{ valueRef.current?.focus(); return } submit() }}',
     ),
     'Enter still calls a submit that has nothing to write',
   );
   check(
     'picking one from the list goes there too',
-    /onPick=\{\(picked\) => \{ setProp\(picked\); valueRef\.current\?\.focus\(\) \}\}/.test(source),
+    containsCode(source, 'onPick={(picked) => { setProp(picked); valueRef.current?.focus() }}'),
     'picking leaves the caret where it was',
   );
   check(

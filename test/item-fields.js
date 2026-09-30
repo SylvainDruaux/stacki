@@ -22,6 +22,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { compactSource } = require('./source-text.js');
 
 const failures = [];
 let checked = 0;
@@ -95,9 +96,10 @@ const { times = [] } = Astro.props;`;
   {
     // The same interface written on one line — the shape is in the type either
     // way, and a `;` between members is not part of one.
-    const oneLine = `interface ServiceTime { day: string; campus: string | null; time: string | null }
-interface Props { times?: ServiceTime[] }
-const { times = [] } = Astro.props;`;
+    const oneLine =
+      'interface ServiceTime { day: string; campus: string | null; time: string | null }\n' +
+      'interface Props { times?: ServiceTime[] }\n' +
+      'const { times = [] } = Astro.props;';
     const item = itemOf({
       frontmatter: oneLine,
       propsSchema: parsePropSchema(`---\n${oneLine}\n---\n<div></div>`),
@@ -309,7 +311,8 @@ const { posts = [] } = Astro.props;`;
       frontmatter:
         'interface Props { times?: { day: string }[] }\nconst { times = [] } = Astro.props;',
       propsSchema: parsePropSchema(
-        '---\ninterface Props { times?: { day: string }[] }\nconst { times = [] } = Astro.props;\n---\n<div></div>',
+        '---\ninterface Props { times?: { day: string }[] }\n' +
+          'const { times = [] } = Astro.props;\n---\n<div></div>',
       ),
       ancestorHeads: ['times.map((service) => ('],
     });
@@ -348,9 +351,11 @@ const { posts = [] } = Astro.props;`;
       /itemIndex,\n\s*onStepItem:/.test(app),
       'the picker has nothing to step',
     );
+    // Compact form, so wrapping and spacing don't matter. The parentheses around
+    // `… % count` are optional: they are redundant, and Prettier adds them.
     check(
       'and stepping wraps rather than running off either end',
-      /\(\(\(cur\[name\] \?\? 0\) \+ dir\) % count \+ count\) % count/.test(app),
+      /\(\(?\(\(cur\[name\]\?\?0\)\+dir\)%count\)?\+count\)%count/.test(compactSource(app)),
       'a step past the last entry would leave the list',
     );
   }

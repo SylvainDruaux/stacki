@@ -31,7 +31,8 @@ const check = (what, condition, detail) => {
   const bundlePath = path.join(buildDir, 'popup-layers.bundle.js');
   await esbuild.build({
     stdin: {
-      contents: `export { registerPopupLayer, inOwnedPopup, hasOwnedPopup } from './lib/popup-layer'`,
+      contents:
+        `export { registerPopupLayer, inOwnedPopup, hasOwnedPopup } ` + `from './lib/popup-layer'`,
       resolveDir: path.join(__dirname, '..', 'src', 'style-panel'),
       loader: 'ts',
     },
@@ -129,7 +130,10 @@ const check = (what, condition, detail) => {
             build.onLoad({ filter: /.*/, namespace: 'stub' }, () => ({
               contents: `
                 export function streamProjectVariables(onAdd) {
-                  onAdd({ name: 'site-margin', collection: 'Sizes', group: '', value: '2rem', binding: 'var(--site-margin)', kind: 'Size' });
+                  onAdd({
+                    name: 'site-margin', collection: 'Sizes', group: '', value: '2rem',
+                    binding: 'var(--site-margin)', kind: 'Size',
+                  });
                   return Promise.resolve([]);
                 }
               `,

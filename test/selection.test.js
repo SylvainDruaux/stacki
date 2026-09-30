@@ -65,7 +65,8 @@ describe('locateSelection', () => {
         if (parent) {
           assert.ok(
             at.startLine >= parent.startLine && at.endLine <= parent.endLine,
-            `${key}: ${at.startLine}-${at.endLine} escapes its parent's ${parent.startLine}-${parent.endLine}`,
+            `${key}: ${at.startLine}-${at.endLine} escapes ` +
+              `its parent's ${parent.startLine}-${parent.endLine}`,
           );
         }
         ranges.set(key, at);

@@ -52,11 +52,14 @@ const check = (what, condition, detail) => {
     });
   `;
   const entry = path.join(buildDir, 'computed-hold.entry.jsx');
+  // The module specifier of a style-panel source file, written into the entry below.
+  const stylePanelImport = (...parts) =>
+    JSON.stringify(path.join(root, 'src', 'style-panel', ...parts));
   fs.writeFileSync(
     entry,
-    `export { default as EffectsSection } from ${JSON.stringify(path.join(root, 'src', 'style-panel', 'EffectsSection'))}
-     export { setHost } from ${JSON.stringify(path.join(root, 'src', 'style-panel', 'lib', 'host'))}
-     export { forgetComputedStyles } from ${JSON.stringify(path.join(root, 'src', 'style-panel', 'lib', 'computed-style'))}`,
+    `export { default as EffectsSection } from ${stylePanelImport('EffectsSection')}
+     export { setHost } from ${stylePanelImport('lib', 'host')}
+     export { forgetComputedStyles } from ${stylePanelImport('lib', 'computed-style')}`,
   );
   const bundlePath = path.join(buildDir, 'computed-hold.bundle.js');
   await esbuild.build({

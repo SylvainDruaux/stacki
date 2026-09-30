@@ -74,7 +74,8 @@ check(
 );
 {
   const fm =
-    'const column1 = await slotContent(Astro.slots);\nconst column2 = await slotContent(Astro.slots, "column2");';
+    'const column1 = await slotContent(Astro.slots);\n' +
+    'const column2 = await slotContent(Astro.slots, "column2");';
   check(
     'and both columns of a two-slot layout are found',
     slots(fm, '<div />') === '["default","column2"]',
@@ -100,7 +101,9 @@ check(
 // ── What a file says about itself is not what it does ───────────────────────
 {
   const fm =
-    '/**\n * A <script> never reaches the page when the parent consumes it through\n * `Astro.slots.render()`, which is how `Section` handles its slots.\n */\nconst id = "x";';
+    '/**\n * A <script> never reaches the page when the parent consumes it through\n' +
+    ' * `Astro.slots.render()`, which is how `Section` handles its slots.\n */\n' +
+    'const id = "x";';
   check(
     'a comment about Astro.slots declares no slot',
     slots(fm, '<div />') === '[]',
@@ -149,7 +152,8 @@ check(
 // `<Tag>` is a variable — resolve it to what it defaults to.
 {
   const fm =
-    'const { tag = "p" } = Astro.props;\nconst Tag = tag;\nconst c = await slotContent(Astro.slots);';
+    'const { tag = "p" } = Astro.props;\nconst Tag = tag;\n' +
+    'const c = await slotContent(Astro.slots);';
   check(
     'and a dynamic tag is resolved before it is judged',
     inline(fm, '<Tag><Fragment set:html={c} /></Tag>') === true,

@@ -641,10 +641,45 @@ export async function navigateToEmbed(
 // Longest name first, and `(?![\w-])` rather than `\b` to close the trap that
 // `-` is a non-word character: `:focus\b` happily matches inside
 // `:focus-visible`, leaving the nonsense selector `a-visible`.
-const STATE_PSEUDO_RE =
-  /:(?:focus-visible|focus-within|focus|hover|active|visited|target|checked|indeterminate|default|disabled|enabled|placeholder-shown|autofill|user-invalid|user-valid|read-only|read-write|open)(?![\w-])/g;
-const PSEUDO_ELEMENT_RE =
-  /::?(?:before|after|first-line|first-letter|selection|placeholder|marker|backdrop|file-selector-button)(?![\w-])|::(?:part|slotted)\([^)]*\)/g;
+// The names are plain letters and hyphens, so they join into an alternation unescaped; the list
+// order is the alternation order.
+const STATE_PSEUDO_NAMES = [
+  'focus-visible',
+  'focus-within',
+  'focus',
+  'hover',
+  'active',
+  'visited',
+  'target',
+  'checked',
+  'indeterminate',
+  'default',
+  'disabled',
+  'enabled',
+  'placeholder-shown',
+  'autofill',
+  'user-invalid',
+  'user-valid',
+  'read-only',
+  'read-write',
+  'open',
+] as const;
+const STATE_PSEUDO_RE = new RegExp(`:(?:${STATE_PSEUDO_NAMES.join('|')})(?![\\w-])`, 'g');
+const PSEUDO_ELEMENT_NAMES = [
+  'before',
+  'after',
+  'first-line',
+  'first-letter',
+  'selection',
+  'placeholder',
+  'marker',
+  'backdrop',
+  'file-selector-button',
+] as const;
+const PSEUDO_ELEMENT_RE = new RegExp(
+  `::?(?:${PSEUDO_ELEMENT_NAMES.join('|')})(?![\\w-])|::(?:part|slotted)\\([^)]*\\)`,
+  'g',
+);
 
 function askableForm(text: string): string | null {
   const bare = text.replace(PSEUDO_ELEMENT_RE, '').replace(STATE_PSEUDO_RE, '').trim();

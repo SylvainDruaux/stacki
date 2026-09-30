@@ -97,7 +97,10 @@ export default function LayerList({
         return (
           <li
             key={index}
-            className={`embed-editor_bg-layer ${dragOver === index ? 'is-drop-target' : ''} ${dragFrom === index ? 'is-dragging' : ''} ${hidden ? 'is-hidden' : ''}`}
+            className={
+              `embed-editor_bg-layer ${dragOver === index ? 'is-drop-target' : ''} ` +
+              `${dragFrom === index ? 'is-dragging' : ''} ${hidden ? 'is-hidden' : ''}`
+            }
             onDragOver={(event) => {
               event.preventDefault();
               setDragOver(index);

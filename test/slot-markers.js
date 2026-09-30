@@ -44,7 +44,10 @@ const { parsePage, serializePageMarked } = require('../dist/electron/astroParser
 // ── What the serializer writes ──────────────────────────────────────────────
 {
   const source =
-    '---\nimport Layout from "../layouts/Base.astro";\nimport Wrap from "../components/Wrap.astro";\nimport Eyebrow from "../components/Eyebrow.astro";\nimport Img from "../components/Img.astro";\n---\n' +
+    '---\nimport Layout from "../layouts/Base.astro";\n' +
+    'import Wrap from "../components/Wrap.astro";\n' +
+    'import Eyebrow from "../components/Eyebrow.astro";\n' +
+    'import Img from "../components/Img.astro";\n---\n' +
     '<Layout title="t">\n' +
     '  <Wrap>\n' +
     '    <Eyebrow>stack</Eyebrow>\n' +
@@ -128,15 +131,17 @@ const { parsePage, serializePageMarked } = require('../dist/electron/astroParser
     // a condition, and what the branch renders is what the caller placed.
     const conditional = serializePageMarked(
       parsePage(
-        '---\nconst { render = true, slides } = Astro.props;\n---\n{\n  render && slides.length > 0 && (\n    <div class="slider">x</div>\n  )\n}\n',
+        '---\nconst { render = true, slides } = Astro.props;\n---\n' +
+          '{\n  render && slides.length > 0 && (\n    <div class="slider">x</div>\n  )\n}\n',
       ).model,
       'src/components/Slider.astro|',
     );
     check(
       'a root written as a condition carries it too',
-      /<div class="slider" data-avb-p=\{\["src\/components\/Slider\.astro\|0\.0\.0", Astro\.props\["data-avb-p"\]\]/.test(
-        conditional,
-      ),
+      new RegExp(
+        /<div class="slider" data-avb-p=\{\["src\/components\//.source +
+          /Slider\.astro\|0\.0\.0", Astro\.props\["data-avb-p"\]\]/.source,
+      ).test(conditional),
       conditional,
     );
 
@@ -177,9 +182,10 @@ const { parsePage, serializePageMarked } = require('../dist/electron/astroParser
   ]) {
     check(
       `${what} that forwards rest props keeps the path that arrived`,
-      /data-avb-p=\{\["src\/components\/Icon\.astro\|0", Astro\.props\["data-avb-p"\]\]\.filter\(Boolean\)\.join\(" "\)\}/.test(
-        out,
-      ),
+      new RegExp(
+        /data-avb-p=\{\["src\/components\/Icon\.astro\|0", Astro\./.source +
+          /props\["data-avb-p"\]\]\.filter\(Boolean\)\.join\(" "\)\}/.source,
+      ).test(out),
       out,
     );
   }
@@ -219,7 +225,8 @@ const { parsePage, serializePageMarked } = require('../dist/electron/astroParser
       <div class="layout">
         <div class="eyebrow" data-avb-p="0.0">stack</div>
         <div class="a" data-avb-p="0.1"><p class="b" data-avb-p="0.1.0">deep</p></div>
-        <div class="c" data-avb-p="0.2"><span data-avb-p="0.2">spread onto an inner element</span></div>
+        <div class="c"
+          data-avb-p="0.2"><span data-avb-p="0.2">spread onto an inner element</span></div>
         <em data-avb-p="src/components/Icon.astro|0.0 0.3">two files, one element</em>
       </div>
       <!--avb-e:0-->

@@ -60,55 +60,59 @@ test('source slots preserve frontmatter after real markup and import edits', () 
   assert.equal(serializePage(parsePage(removed).model), removed, 'subsequent saves are stable');
 });
 
-test('declarations before and between imports remain available and editable to bindings', async () => {
-  const outfile = path.join(
-    __dirname,
-    '../node_modules/.stacki-test/frontmatter-bindings.bundle.js',
-  );
-  await require('esbuild').build({
-    entryPoints: [path.join(__dirname, '../src/dataSuggest.js')],
-    outfile,
-    bundle: true,
-    platform: 'node',
-    format: 'cjs',
-    logLevel: 'silent',
-  });
-  const { parseDeclarations, findDeclaration } = require(outfile);
-  const model = parsePage(SOURCE).model;
-  assert.deepEqual(
-    [...parseDeclarations(model.extraFrontmatter).keys()],
-    ['heading', 'title', 'year'],
-  );
-  for (const name of ['heading', 'title']) {
-    const declaration = findDeclaration(model.extraFrontmatter, name);
-    assert.ok(declaration, `${name} is offered by the source editor`);
-    model.extraFrontmatter =
-      model.extraFrontmatter.slice(0, declaration.start) +
-      declaration.statement.replace(/'[^']*'/, `'Edited ${name}'`) +
-      model.extraFrontmatter.slice(declaration.end);
-  }
-  assert.equal(
-    serializePage(model),
-    SOURCE.replace("'Before imports'", "'Edited heading'").replace(
-      "'Between imports'",
-      "'Edited title'",
-    ),
-  );
+test(
+  'declarations before and between imports ' + 'remain available and editable to bindings',
+  async () => {
+    const outfile = path.join(
+      __dirname,
+      '../node_modules/.stacki-test/frontmatter-bindings.bundle.js',
+    );
+    await require('esbuild').build({
+      entryPoints: [path.join(__dirname, '../src/dataSuggest.js')],
+      outfile,
+      bundle: true,
+      platform: 'node',
+      format: 'cjs',
+      logLevel: 'silent',
+    });
+    const { parseDeclarations, findDeclaration } = require(outfile);
+    const model = parsePage(SOURCE).model;
+    assert.deepEqual(
+      [...parseDeclarations(model.extraFrontmatter).keys()],
+      ['heading', 'title', 'year'],
+    );
+    for (const name of ['heading', 'title']) {
+      const declaration = findDeclaration(model.extraFrontmatter, name);
+      assert.ok(declaration, `${name} is offered by the source editor`);
+      model.extraFrontmatter =
+        model.extraFrontmatter.slice(0, declaration.start) +
+        declaration.statement.replace(/'[^']*'/, `'Edited ${name}'`) +
+        model.extraFrontmatter.slice(declaration.end);
+    }
+    assert.equal(
+      serializePage(model),
+      SOURCE.replace("'Before imports'", "'Edited heading'").replace(
+        "'Between imports'",
+        "'Edited title'",
+      ),
+    );
 
-  const location = findDeclaration(model.extraFrontmatter, 'heading');
-  model.extraFrontmatter =
-    model.extraFrontmatter.slice(0, location.end) +
-    '\nconst inserted = [1, 2, 3];' +
-    model.extraFrontmatter.slice(location.end);
-  const output = serializePage(model);
-  assert.ok(output.indexOf('const inserted') < output.indexOf('import Layout'));
-  assert.ok(output.indexOf('const title') < output.indexOf('import Footer'));
-  assert.equal(serializePage(parsePage(output).model), output);
-});
+    const location = findDeclaration(model.extraFrontmatter, 'heading');
+    model.extraFrontmatter =
+      model.extraFrontmatter.slice(0, location.end) +
+      '\nconst inserted = [1, 2, 3];' +
+      model.extraFrontmatter.slice(location.end);
+    const output = serializePage(model);
+    assert.ok(output.indexOf('const inserted') < output.indexOf('import Layout'));
+    assert.ok(output.indexOf('const title') < output.indexOf('import Footer'));
+    assert.equal(serializePage(parsePage(output).model), output);
+  },
+);
 
 test('named declarations keep separate source positions and support member edits', () => {
   const raw =
-    "import { Image as Picture, type ImageMetadata } from 'astro:assets';\nconst x = 1;\nimport { getImage } from 'astro:assets';\n";
+    "import { Image as Picture, type ImageMetadata } from 'astro:assets';\nconst x = 1;\n" +
+    "import { getImage } from 'astro:assets';\n";
   const model = readFrontmatter(raw);
   assert.equal(writeFrontmatter(model), raw);
   model.imports.push({
@@ -193,7 +197,8 @@ test('leading and trailing blank lines survive declaration and import changes', 
 
 test('preview import rewrites preserve interleaved frontmatter', () => {
   const model = parsePage(
-    "---\nconst heading = 'Heading';\nimport chunk from './chunk.html?raw';\nconst year = 2026;\n---\n<Fragment set:html={chunk} />\n",
+    "---\nconst heading = 'Heading';\nimport chunk from './chunk.html?raw';\n" +
+      'const year = 2026;\n---\n<Fragment set:html={chunk} />\n',
   ).model;
   model.nodes[0].chunkFile = '/project/chunk.html';
   const marked = serializePageMarked(model);

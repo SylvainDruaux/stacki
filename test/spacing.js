@@ -732,8 +732,8 @@ const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
     check('over the selected element', /rects\[selPath\]/.test(pane));
     check('from what the page measured', /spacing\[selPath\]/.test(pane));
     const css = fs.readFileSync(path.join(__dirname, '..', 'src', 'styles.css'), 'utf8');
-    check('padding is pink', /\.spacing-band\.is-padding \{ --band: #ec4899; \}/.test(css));
-    check('and margin is blue', /\.spacing-band\.is-margin \{ --band: #3b82f6; \}/.test(css));
+    check('padding is pink', /\.spacing-band\.is-padding \{\s*--band: #ec4899;\s*\}/.test(css));
+    check('and margin is blue', /\.spacing-band\.is-margin \{\s*--band: #3b82f6;\s*\}/.test(css));
     const app = fs.readFileSync(path.join(__dirname, '..', 'src', 'App.tsx'), 'utf8');
     check(
       'the panel is wired to the canvas',

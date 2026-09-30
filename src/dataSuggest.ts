@@ -83,7 +83,8 @@ export function findDeclaration(code: unknown, name: unknown): DeclarationSpan |
     return null;
   }
   const re = new RegExp(
-    `(?:^|\\n)([ \\t]*)((?:export\\s+)?(?:const|let|var)\\s+${ident.replace(/\$/g, '\\$')}\\s*=\\s*)`,
+    `(?:^|\\n)([ \\t]*)((?:export\\s+)?(?:const|let|var)\\s+` +
+      `${ident.replace(/\$/g, '\\$')}\\s*=\\s*)`,
     'g',
   );
   const m = re.exec(source);
@@ -305,8 +306,11 @@ const MAP_HEAD_RE = /^([\s\S]+?)\.map\(\s*\(\s*([\w$]+)\s*(?:,\s*([\w$]+)\s*)?\)
 // Modules that can't be looped over, by what they are rather than by naming
 // luck: markup, styles, and media. A PascalCase default import is Astro's
 // component convention, which catches the rest.
-const NON_DATA_EXT =
-  /\.(astro|md|mdx|css|s[ac]ss|less|svg|png|jpe?g|gif|webp|avif|ico|bmp|mp4|webm|mov|woff2?|ttf|otf)(\?.*)?$/i;
+const NON_DATA_EXT = new RegExp(
+  '\\.(astro|md|mdx|css|s[ac]ss|less|svg|png|jpe?g|gif|webp|avif|ico|bmp|' +
+    'mp4|webm|mov|woff2?|ttf|otf)(\\?.*)?$',
+  'i',
+);
 
 // The framework's own modules hold functions and types — `getCollection`,
 // `render`, `GetStaticPaths`. They are how data is FETCHED, never data itself,
@@ -1073,8 +1077,13 @@ function shapeNode(name: string, fields: readonly { key: string; kind: string }[
 // `const toc = headings.filter(h => h.depth < 4)` — fewer of the same thing.
 // Whatever `headings` turned out to be, `toc` is that too, so the fields under
 // one belong under the other.
-const KEEPS_SHAPE =
-  /^([A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*)\s*\.\s*(filter|slice|sort|reverse|concat|toSorted|toReversed|flat)\s*\(/;
+// The pattern is assembled from two literal pieces only to fit the line width; each piece is a
+// complete regular expression on its own, and the joined source is the original pattern.
+const KEEPS_SHAPE = new RegExp(
+  /^([A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*)\s*\.\s*/.source +
+    /(filter|slice|sort|reverse|concat|toSorted|toReversed|flat)\s*\(/.source,
+  '',
+);
 
 // `const featured = portfolio.find(…) ?? portfolio[0]` — ONE of the same thing.
 // The picker knew `portfolio` was a list of entries and could open it, and knew

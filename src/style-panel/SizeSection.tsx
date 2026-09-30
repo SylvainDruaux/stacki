@@ -301,50 +301,63 @@ function ChevronIcon() {
     </svg>
   );
 }
+const SHOW_ICON_FIRST_PATH =
+  'M8 9.5C8.82843 9.5 9.5 8.82843 9.5 8C9.5 7.17157 8.82843 6.5 8 6.5' +
+  'C7.17157 6.5 6.5 7.17157 6.5 8C6.5 8.82843 7.17157 9.5 8 9.5Z';
+const SHOW_ICON_SECOND_PATH =
+  'M8.00004 4C5.37598 4 3.11613 5.55492 2.08964 7.79148' +
+  'C2.02887 7.92388 2.02888 8.07621 2.08965 8.20861C3.11615 10.4451 5.37597 12 8.00001 12' +
+  'C10.6241 12 12.8839 10.4451 13.9104 8.20852' +
+  'C13.9712 8.07612 13.9712 7.92379 13.9104 7.79139C12.8839 5.55488 10.6241 4 8.00004 4Z' +
+  'M8.00001 11C5.86346 11 4.01048 9.78173 3.09961 8.00004C4.01047 6.21831 5.86347 5 8.00004 5' +
+  'C10.1366 5 11.9896 6.21827 12.9004 7.99996C11.9896 9.78169 10.1366 11 8.00001 11Z';
+
 function ShowIcon() {
   return (
     <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
-      <path
-        d="M8 9.5C8.82843 9.5 9.5 8.82843 9.5 8C9.5 7.17157 8.82843 6.5 8 6.5C7.17157 6.5 6.5 7.17157 6.5 8C6.5 8.82843 7.17157 9.5 8 9.5Z"
-        fill="currentColor"
-      />
-      <path
-        fillRule="evenodd"
-        clipRule="evenodd"
-        d="M8.00004 4C5.37598 4 3.11613 5.55492 2.08964 7.79148C2.02887 7.92388 2.02888 8.07621 2.08965 8.20861C3.11615 10.4451 5.37597 12 8.00001 12C10.6241 12 12.8839 10.4451 13.9104 8.20852C13.9712 8.07612 13.9712 7.92379 13.9104 7.79139C12.8839 5.55488 10.6241 4 8.00004 4ZM8.00001 11C5.86346 11 4.01048 9.78173 3.09961 8.00004C4.01047 6.21831 5.86347 5 8.00004 5C10.1366 5 11.9896 6.21827 12.9004 7.99996C11.9896 9.78169 10.1366 11 8.00001 11Z"
-        fill="currentColor"
-      />
+      <path d={SHOW_ICON_FIRST_PATH} fill="currentColor" />
+      <path fillRule="evenodd" clipRule="evenodd" d={SHOW_ICON_SECOND_PATH} fill="currentColor" />
     </svg>
   );
 }
+const HIDE_ICON_FIRST_PATH =
+  'M10.705 11.4122L13.6465 14.3536L14.3536 13.6465L2.35356 1.64648L1.64645 2.35359' +
+  'L4.3881 5.09524C3.39355 5.76124 2.5932 6.69436 2.08965 7.79152' +
+  'C2.02888 7.92392 2.02888 8.07624 2.08965 8.20865C3.11616 10.4452 5.37598 12 8.00001 12' +
+  'C8.9654 12 9.8815 11.7896 10.705 11.4122ZM9.94073 10.6479L5.11152 5.81865' +
+  'C4.25765 6.3466 3.55888 7.10172 3.09962 8.00007C4.01049 9.78177 5.86347 11 8.00001 11' +
+  'C8.68308 11 9.33716 10.8755 9.94073 10.6479Z';
+const HIDE_ICON_SECOND_PATH =
+  'M13.9104 8.20856C13.5777 8.93353 13.1154 9.58688 12.5531 10.1389L11.846 9.43184' +
+  'C12.2702 9.01685 12.6276 8.5337 12.9004 8C11.9896 6.21831 10.1366 5.00004 8.00005 5.00004' +
+  'C7.81174 5.00004 7.62562 5.0095 7.44217 5.02798L6.57167 4.15749' +
+  'C7.03127 4.05443 7.50929 4.00004 8.00005 4.00004' +
+  'C10.6241 4.00004 12.8839 5.55491 13.9104 7.79143' +
+  'C13.9712 7.92383 13.9712 8.07616 13.9104 8.20856Z';
+
 function HideIcon() {
   return (
     <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
-      <path
-        fillRule="evenodd"
-        clipRule="evenodd"
-        d="M10.705 11.4122L13.6465 14.3536L14.3536 13.6465L2.35356 1.64648L1.64645 2.35359L4.3881 5.09524C3.39355 5.76124 2.5932 6.69436 2.08965 7.79152C2.02888 7.92392 2.02888 8.07624 2.08965 8.20865C3.11616 10.4452 5.37598 12 8.00001 12C8.9654 12 9.8815 11.7896 10.705 11.4122ZM9.94073 10.6479L5.11152 5.81865C4.25765 6.3466 3.55888 7.10172 3.09962 8.00007C4.01049 9.78177 5.86347 11 8.00001 11C8.68308 11 9.33716 10.8755 9.94073 10.6479Z"
-        fill="currentColor"
-      />
-      <path
-        d="M13.9104 8.20856C13.5777 8.93353 13.1154 9.58688 12.5531 10.1389L11.846 9.43184C12.2702 9.01685 12.6276 8.5337 12.9004 8C11.9896 6.21831 10.1366 5.00004 8.00005 5.00004C7.81174 5.00004 7.62562 5.0095 7.44217 5.02798L6.57167 4.15749C7.03127 4.05443 7.50929 4.00004 8.00005 4.00004C10.6241 4.00004 12.8839 5.55491 13.9104 7.79143C13.9712 7.92383 13.9712 8.07616 13.9104 8.20856Z"
-        fill="currentColor"
-      />
+      <path fillRule="evenodd" clipRule="evenodd" d={HIDE_ICON_FIRST_PATH} fill="currentColor" />
+      <path d={HIDE_ICON_SECOND_PATH} fill="currentColor" />
     </svg>
   );
 }
+const CROP_ICON_PATH =
+  'M12 12C12.5523 12 13 11.5523 13 11V5H15.5V4H13V1.5H12V4H5C4.44772 4 4 4.44772 4 5V11H1.5' +
+  'V12H4V14.5H5V12H12ZM5 11H12V5H5V11Z';
+
 function CropIcon() {
   return (
     <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
-      <path
-        fillRule="evenodd"
-        clipRule="evenodd"
-        d="M12 12C12.5523 12 13 11.5523 13 11V5H15.5V4H13V1.5H12V4H5C4.44772 4 4 4.44772 4 5V11H1.5V12H4V14.5H5V12H12ZM5 11H12V5H5V11Z"
-        fill="currentColor"
-      />
+      <path fillRule="evenodd" clipRule="evenodd" d={CROP_ICON_PATH} fill="currentColor" />
     </svg>
   );
 }
+const SCROLL_ICON_FOURTH_PATH =
+  'M12 11.2929L10.3536 9.64645L9.64645 10.3536L12.5 13.2071L15.3536 10.3536L14.6464 9.64645' +
+  'L13 11.2929V5H12V11.2929Z';
+
 function ScrollIcon() {
   return (
     <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
@@ -352,10 +365,7 @@ function ScrollIcon() {
       <g opacity="0.67">
         <path d="M1 2H15V3L1 3V2Z" fill="currentColor" />
         <path d="M1 11H8V12H1V11Z" fill="currentColor" />
-        <path
-          d="M12 11.2929L10.3536 9.64645L9.64645 10.3536L12.5 13.2071L15.3536 10.3536L14.6464 9.64645L13 11.2929V5H12V11.2929Z"
-          fill="currentColor"
-        />
+        <path d={SCROLL_ICON_FOURTH_PATH} fill="currentColor" />
       </g>
     </svg>
   );
@@ -832,39 +842,53 @@ function OverflowField({
 
 // ─────────────────────────── Box sizing ───────────────────────────
 
+const BORDER_BOX_ICON_FIRST_PATH =
+  'M4 5C3.44772 5 3 5.44772 3 6V10C3 10.5523 3.44772 11 4 11H12C12.5523 11 13 10.5523 13 10V6' +
+  'C13 5.44772 12.5523 5 12 5H4ZM12 6H4V10H12V6Z';
+const BORDER_BOX_ICON_SECOND_PATH =
+  'M4 2C3.44772 2 3 2.44772 3 3V13C3 13.5523 3.44772 14 4 14H12C12.5523 14 13 13.5523 13 13V3' +
+  'C13 2.44772 12.5523 2 12 2H4ZM12 3H4V13H12V3Z';
+
 function BorderBoxIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
       <path
         fillRule="evenodd"
         clipRule="evenodd"
-        d="M4 5C3.44772 5 3 5.44772 3 6V10C3 10.5523 3.44772 11 4 11H12C12.5523 11 13 10.5523 13 10V6C13 5.44772 12.5523 5 12 5H4ZM12 6H4V10H12V6Z"
+        d={BORDER_BOX_ICON_FIRST_PATH}
         fill="currentColor"
       />
       <path
         opacity="0.4"
         fillRule="evenodd"
         clipRule="evenodd"
-        d="M4 2C3.44772 2 3 2.44772 3 3V13C3 13.5523 3.44772 14 4 14H12C12.5523 14 13 13.5523 13 13V3C13 2.44772 12.5523 2 12 2H4ZM12 3H4V13H12V3Z"
+        d={BORDER_BOX_ICON_SECOND_PATH}
         fill="currentColor"
       />
     </svg>
   );
 }
+const CONTENT_BOX_ICON_FIRST_PATH =
+  'M3 5C2.44772 5 2 5.44772 2 6V10C2 10.5523 2.44772 11 3 11H13C13.5523 11 14 10.5523 14 10V6' +
+  'C14 5.44772 13.5523 5 13 5H3ZM13 6H3L3 10H13V6Z';
+const CONTENT_BOX_ICON_SECOND_PATH =
+  'M3 2C2.44772 2 2 2.44772 2 3V13C2 13.5523 2.44772 14 3 14H10C10.5523 14 11 13.5523 11 13V3' +
+  'C11 2.44772 10.5523 2 10 2H3ZM10 3H3L3 13H10V3Z';
+
 function ContentBoxIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
       <path
         fillRule="evenodd"
         clipRule="evenodd"
-        d="M3 5C2.44772 5 2 5.44772 2 6V10C2 10.5523 2.44772 11 3 11H13C13.5523 11 14 10.5523 14 10V6C14 5.44772 13.5523 5 13 5H3ZM13 6H3L3 10H13V6Z"
+        d={CONTENT_BOX_ICON_FIRST_PATH}
         fill="currentColor"
       />
       <path
         opacity="0.4"
         fillRule="evenodd"
         clipRule="evenodd"
-        d="M3 2C2.44772 2 2 2.44772 2 3V13C2 13.5523 2.44772 14 3 14H10C10.5523 14 11 13.5523 11 13V3C11 2.44772 10.5523 2 10 2H3ZM10 3H3L3 13H10V3Z"
+        d={CONTENT_BOX_ICON_SECOND_PATH}
         fill="currentColor"
       />
     </svg>
@@ -1781,7 +1805,9 @@ function ImageFitField({
           <button
             ref={moreRef}
             type="button"
-            className={`embed-editor_icon-btn embed-editor_imgfit-more ${posSet ? 'is-active' : ''}`}
+            className={
+              'embed-editor_icon-btn embed-editor_imgfit-more ' + (posSet ? 'is-active' : '')
+            }
             disabled={busy}
             aria-haspopup="dialog"
             aria-expanded={posOpen}
@@ -1824,9 +1850,15 @@ function ImageFitField({
                     <button
                       key={`${row}-${col}`}
                       type="button"
-                      className={`embed-editor_bg-poscell ${activeCol === col && activeRow === row ? 'is-active' : ''}`}
+                      className={
+                        'embed-editor_bg-poscell ' +
+                        (activeCol === col && activeRow === row ? 'is-active' : '')
+                      }
                       disabled={busy}
-                      aria-label={`${['Left', 'Center', 'Right'][col]} ${['top', 'center', 'bottom'][row]}`}
+                      aria-label={
+                        `${['Left', 'Center', 'Right'][col]} ` +
+                        `${['top', 'center', 'bottom'][row]}`
+                      }
                       onClick={() => writePos(`${OBJ_POS_PCT[col]} ${OBJ_POS_PCT[row]}`, false)}
                     />
                   )),

@@ -431,7 +431,10 @@ function SideSelector({
   const btn = (s: Side, label: string) => (
     <button
       type="button"
-      className={`embed-editor_border-side is-${s} ${side === s ? 'is-active' : ''} ${applied.has(s) ? 'is-applied' : ''}`}
+      className={
+        `embed-editor_border-side is-${s} ${side === s ? 'is-active' : ''} ` +
+        (applied.has(s) ? 'is-applied' : '')
+      }
       aria-pressed={side === s}
       aria-label={s === 'all' ? 'All borders' : `${label} border`}
       onClick={() => onPick(s)}

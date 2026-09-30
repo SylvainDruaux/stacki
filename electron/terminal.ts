@@ -395,8 +395,10 @@ function registerTerminalHandlers({
       return {
         ok: false as const,
         error: FD_LIMIT_CODES.has(code ?? '')
-          ? `Couldn't open a terminal — too many open files (${code}). Close a few tabs and try again.`
-          : `Couldn't start ${shell}${code ? ` (${code})` : ''}: ${error.message || 'unknown error'}`,
+          ? `Couldn't open a terminal — too many open files (${code}). ` +
+            'Close a few tabs and try again.'
+          : `Couldn't start ${shell}${code ? ` (${code})` : ''}: ` +
+            `${error.message || 'unknown error'}`,
       };
     }
 

@@ -617,7 +617,8 @@ const contrastRatio = (first, second) => {
       'the CSS box uses the full section width',
       /padding:\s*0 0 var\(--space-4\)/.test(codeBodyRule) &&
         /\.code-editor\.embed-editor_css-code-editor\s*\{[^}]*padding:\s*0;/s.test(css),
-      `${codeBodyRule}\n${css.match(/\.code-editor\.embed-editor_css-code-editor\s*\{[^}]*\}/s)?.[0]}`,
+      `${codeBodyRule}\n` +
+        `${css.match(/\.code-editor\.embed-editor_css-code-editor\s*\{[^}]*\}/s)?.[0]}`,
     );
     const codePreview = css.slice(css.indexOf('.embed-editor_css-code-preview {'));
     const codePreviewRule = codePreview.slice(0, codePreview.indexOf('}'));

@@ -24,7 +24,8 @@ export function patchSigningSource(source: string): string {
   }
   if (digest !== ORIGINAL_HASH) {
     throw new Error(
-      'Unrecognized electron-builder signing source; review the signing backport before installing.',
+      'Unrecognized electron-builder signing source; ' +
+        'review the signing backport before installing.',
     );
   }
   const patched = source
@@ -38,7 +39,8 @@ export function patchSigningSource(source: string): string {
     )
     .replace(
       '["set-key-partition-list", "-S", "apple-tool:,apple:", "-s", "-k", password, keychainFile]',
-      '["set-key-partition-list", "-S", "apple-tool:,apple:", "-s", "-k", keychainPassword, keychainFile]',
+      '["set-key-partition-list", "-S", "apple-tool:,apple:", "-s", "-k", ' +
+        'keychainPassword, keychainFile]',
     );
   if (sourceHash(patched) !== PATCHED_HASH) {
     throw new Error('Electron-builder signing backport failed validation.');

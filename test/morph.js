@@ -68,7 +68,8 @@ const sigStart = source.indexOf("// A component's <style> is delivered as a MODU
 const sigEnd = source.indexOf('function fetchDoc');
 const { scriptSignature, isStyleModule, loadStyles, addedScripts, runScripts } = new Function(
   'document',
-  `${source.slice(sigStart, sigEnd)}\nreturn { scriptSignature, isStyleModule, loadStyles, addedScripts, runScripts };`,
+  `${source.slice(sigStart, sigEnd)}\nreturn { scriptSignature, isStyleModule, loadStyles, ` +
+    `addedScripts, runScripts };`,
 )(dom.window.document);
 
 // Every patch here goes through this: a throw is the failure mode under test
@@ -92,7 +93,9 @@ const tree = (html) => {
 
 // A tablist as the server renders it: three buttons, one class each.
 const TABS = (labels) =>
-  `\n  ${labels.map((l) => `<button class="tabs_link" type="button">${l}</button>`).join('\n  ')}\n`;
+  `\n  ${labels
+    .map((l) => `<button class="tabs_link" type="button">${l}</button>`)
+    .join('\n  ')}\n`;
 
 // The same tablist after the page's own script has run: ids, roles, and
 // `is-active` on whichever tab is open.
@@ -100,7 +103,8 @@ const LIVE_TABS = (labels, active) =>
   `\n  ${labels
     .map(
       (l, i) =>
-        `<button class="tabs_link${i === active ? ' is-active' : ''}" type="button" id="tab-${i}" role="tab">${l}</button>`,
+        `<button class="tabs_link${i === active ? ' is-active' : ''}" type="button" ` +
+        `id="tab-${i}" role="tab">${l}</button>`,
     )
     .join('\n  ')}\n`;
 
@@ -295,9 +299,11 @@ const LIVE_TABS = (labels, active) =>
   const head = (scripts) =>
     new JSDOM(`<!doctype html><html><head>${scripts}</head><body></body></html>`).window.document;
   const style = (name) =>
-    `<script type="module" src="/src/components/${name}.astro?astro&type=style&index=0&lang.css"></script>`;
+    `<script type="module" ` +
+    `src="/src/components/${name}.astro?astro&type=style&index=0&lang.css"></script>`;
   const script = (name) =>
-    `<script type="module" src="/src/components/${name}.astro?astro&type=script&index=0&lang.ts"></script>`;
+    `<script type="module" ` +
+    `src="/src/components/${name}.astro?astro&type=script&index=0&lang.ts"></script>`;
 
   check(
     'an Astro style module is recognised',
@@ -559,5 +565,6 @@ if (failures.length) {
   process.exit(1);
 }
 console.log(
-  `morph: ${checked} passed  [patching a page whose own JS marks things; stylesheets are not scripts]`,
+  `morph: ${checked} passed  [patching a page whose own JS marks things; stylesheets are not ` +
+    `scripts]`,
 );

@@ -1754,6 +1754,10 @@ function BoxShadowEditor({
   );
 }
 
+// The transparency checkerboard drawn beneath each box-shadow layer's color preview.
+const BOX_SHADOW_PREVIEW_CHECKERBOARD =
+  'conic-gradient(#8883 25%, transparent 0 50%, #8883 0 75%, transparent 0) 0 0 / 10px 10px';
+
 // The box-shadow stack: header + add, a reorderable/removable layer list, and the
 // per-shadow editor in a popup — the same layer + component functionality as text-shadow.
 function BoxShadowsRow({ props }: { props: Props }) {
@@ -1849,7 +1853,9 @@ function BoxShadowsRow({ props }: { props: Props }) {
               <span
                 className="embed-editor_bg-layer-preview"
                 style={{
-                  background: `linear-gradient(${shadow.color}, ${shadow.color}), conic-gradient(#8883 25%, transparent 0 50%, #8883 0 75%, transparent 0) 0 0 / 10px 10px`,
+                  background:
+                    `linear-gradient(${shadow.color}, ${shadow.color}), ` +
+                    BOX_SHADOW_PREVIEW_CHECKERBOARD,
                 }}
                 aria-hidden="true"
               />
@@ -1900,6 +1906,10 @@ const ClipEditIcon = () => (
   </svg>
 );
 
+const CLIP_GLYPH_SHAPE_PATH =
+  'M8 .5c.4 4.3 2.8 6.8 7.5 7.5-4.7.7-7.1 3.2-7.5 7.5-.4-4.3-2.8-6.8-7.5-7.5' +
+  'C5.2 7.3 7.6 4.8 8 .5Z';
+
 // Canonical shape glyphs mirroring the editor's preset picker, so the trigger reads at
 // a glance. Local (not imported from the editor) to keep that module out of the bundle.
 function ClipGlyph({ type }: { type: string }) {
@@ -1938,10 +1948,7 @@ function ClipGlyph({ type }: { type: string }) {
     case 'Shape':
       return (
         <svg className={cls} viewBox="0 0 16 16" aria-hidden="true">
-          <path
-            d="M8 .5c.4 4.3 2.8 6.8 7.5 7.5-4.7.7-7.1 3.2-7.5 7.5-.4-4.3-2.8-6.8-7.5-7.5C5.2 7.3 7.6 4.8 8 .5Z"
-            fill="currentColor"
-          />
+          <path d={CLIP_GLYPH_SHAPE_PATH} fill="currentColor" />
         </svg>
       );
     default:

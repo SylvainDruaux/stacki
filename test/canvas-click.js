@@ -19,6 +19,7 @@
 const fs = require('fs');
 const path = require('path');
 const { pathToFileURL } = require('url');
+const { containsCode } = require('./source-text.js');
 
 const failures = [];
 let checked = 0;
@@ -126,7 +127,7 @@ const check = (what, condition, detail) => {
   check(
     'and closing is the only thing that closes',
     (app.match(/kind === 'close'/g) || []).length === 1 &&
-      /if \(kind === 'nothing'\) \{return;\}/.test(app),
+      containsCode(app, "if (kind === 'nothing') { return; }"),
   );
 
   if (failures.length) {

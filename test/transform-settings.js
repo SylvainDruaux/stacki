@@ -788,7 +788,8 @@ const check = (what, condition, detail) => {
     process.exit(1);
   }
   console.log(
-    `transform-settings: ${checked} passed  [origin, self vs children perspective, in a real browser]`,
+    `transform-settings: ${checked} passed  ` +
+      `[origin, self vs children perspective, in a real browser]`,
   );
 })().catch((err) => {
   console.error(err);

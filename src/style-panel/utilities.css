@@ -371,7 +371,7 @@ body.is-scrubbing * {
   color: var(--color-text-tertiary);
 }
 
-/* ──────────────────────────── Field — pill row with label chip + value ──────────────────────────── */
+/* ────────────────────────── Field — pill row with label chip + value ────────────────────────── */
 /* Markup:
  *   <div class="u-field">
  *     <span class="u-field_label">Count</span>

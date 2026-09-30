@@ -203,7 +203,9 @@ const SHEET = `.card {
   const bundlePath = path.join(buildDir, 'query-list.bundle.js');
   await esbuild.build({
     stdin: {
-      contents: `export { default as EmbedEditor } from './EmbedEditor'\nexport { setHost } from './lib/host'`,
+      contents:
+        `export { default as EmbedEditor } from './EmbedEditor'\n` +
+        `export { setHost } from './lib/host'`,
       resolveDir: path.join(__dirname, '..', 'src', 'style-panel'),
       loader: 'tsx',
     },

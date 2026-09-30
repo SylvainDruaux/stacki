@@ -124,7 +124,8 @@ export function HistoryWorktrees({
       <p className="history-note">
         {worktrees.length > 1
           ? 'The same project, open in more than one folder — each on its own branch.'
-          : 'This project is open in one folder only. Worktrees let the same project sit in several folders at once, each on a different branch.'}
+          : 'This project is open in one folder only. Worktrees let the same project sit in ' +
+            'several folders at once, each on a different branch.'}
       </p>
       {worktrees.length > 1 &&
         worktrees.map((worktree) => (

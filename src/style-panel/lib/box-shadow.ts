@@ -63,16 +63,19 @@ export function parseBoxShadows(value: string): BoxShadow[] {
     });
 }
 
+/** The four lengths of a shadow (x, y, blur, spread), each defaulting to `0px`. */
+function boxShadowLengths(shadow: BoxShadow): string {
+  const { x, y, blur, spread } = shadow;
+  return `${x || '0px'} ${y || '0px'} ${blur || '0px'} ${spread || '0px'}`;
+}
+
 /** Serialize a shadow list back to a `box-shadow` value ('' when empty). */
 export function serializeBoxShadows(shadows: BoxShadow[]): string {
   if (!shadows.length) {
     return '';
   }
   return shadows
-    .map(
-      (s) =>
-        `${s.inset ? 'inset ' : ''}${s.x || '0px'} ${s.y || '0px'} ${s.blur || '0px'} ${s.spread || '0px'}${s.color ? ` ${s.color}` : ''}`,
-    )
+    .map((s) => `${s.inset ? 'inset ' : ''}${boxShadowLengths(s)}${s.color ? ` ${s.color}` : ''}`)
     .join(', ');
 }
 
@@ -90,5 +93,5 @@ export function blankBoxShadow(): BoxShadow {
 
 /** A short label for a collapsed row ("Outer shadow: 0px 2px 5px 0px"). */
 export function boxShadowLabel(s: BoxShadow): string {
-  return `${s.inset ? 'Inner' : 'Outer'} shadow: ${s.x || '0px'} ${s.y || '0px'} ${s.blur || '0px'} ${s.spread || '0px'}`;
+  return `${s.inset ? 'Inner' : 'Outer'} shadow: ${boxShadowLengths(s)}`;
 }

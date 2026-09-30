@@ -125,7 +125,8 @@ const FOOTER = `
   {
     const { JSDOM } = require('jsdom');
     const dom = new JSDOM(
-      `<!doctype html><body><!--avb-s:0--><footer class="site-footer">${FOOTER}</footer><!--avb-e:0--></body>`,
+      `<!doctype html><body><!--avb-s:0--><footer class="site-footer">${FOOTER}</footer>` +
+        `<!--avb-e:0--></body>`,
       { url: 'http://localhost:4321/#avb-design', pretendToBeVisual: true },
     );
     const { window } = dom;

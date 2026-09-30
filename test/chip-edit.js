@@ -32,7 +32,8 @@ const check = (what, condition, detail) => {
   const entry = path.join(buildDir, 'chip-edit.entry.jsx');
   fs.writeFileSync(
     entry,
-    `export { BindField } from ${JSON.stringify(path.join(__dirname, '..', 'src', 'panels', 'PropsPanel.jsx'))};\n`,
+    `export { BindField } ` +
+      `from ${JSON.stringify(path.join(__dirname, '..', 'src', 'panels', 'PropsPanel.jsx'))};\n`,
   );
   const bundle = path.join(buildDir, 'chip-edit.bundle.js');
   await esbuild.build({

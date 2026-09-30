@@ -504,9 +504,10 @@ const check = (what, condition, detail) => {
   );
   check(
     'and the way back keeps the value',
-    /if \(field\.type === 'code' && arrayItems\(source\)\) \{\s*return \{ type: 'expr', value: source \};\s*\}/.test(
-      panel,
-    ),
+    new RegExp(
+      /if \(field\.type === 'code' && arrayItems\(source\)\)/.source +
+        / \{\s*return \{ type: 'expr', value: source \};\s*\}/.source,
+    ).test(panel),
     'coming back from the code editor would drop the prop',
   );
   check('the toggle calls it a list', /field\.type === 'code'\) \{\s*return 'list'/.test(panel));

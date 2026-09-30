@@ -107,7 +107,8 @@ test('scripts retain ordering, multiplicity, and loading attributes', () => {
   );
 
   const script =
-    '<script type="module" src="/with | separator.js" integrity="sha256-value" crossorigin="anonymous" nonce="nonce-value" referrerpolicy="no-referrer"></script>';
+    '<script type="module" src="/with | separator.js" integrity="sha256-value" ' +
+    'crossorigin="anonymous" nonce="nonce-value" referrerpolicy="no-referrer"></script>';
   const added = morph.addedScripts(tree(first), tree(first + script));
   assert.equal(added.length, 1);
   assert.equal(added[0].src, '/with | separator.js');

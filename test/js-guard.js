@@ -105,7 +105,8 @@ const check = (what, condition, detail) => {
   const entry = path.join(buildDir, 'js-guard.entry.jsx');
   fs.writeFileSync(
     entry,
-    `export { BindField } from ${JSON.stringify(path.join(__dirname, '..', 'src', 'panels', 'PropsPanel.jsx'))};\n` +
+    `export { BindField } ` +
+      `from ${JSON.stringify(path.join(__dirname, '..', 'src', 'panels', 'PropsPanel.jsx'))};\n` +
       // CodeMirror's own way in from a DOM node — the editor here is a real one.
       `export { EditorView } from '@codemirror/view';\n`,
   );

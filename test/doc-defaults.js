@@ -30,7 +30,8 @@ const check = (what, condition, detail) => {
 
 const schemaFor = (doc) =>
   parsePropSchema(
-    `---\ninterface Props {\n  /** ${doc} */\n  thing?: string;\n}\nconst { thing } = Astro.props;\n---\n<div>{thing}</div>\n`,
+    `---\ninterface Props {\n  /** ${doc} */\n  thing?: string;\n}\n` +
+      `const { thing } = Astro.props;\n---\n<div>{thing}</div>\n`,
   );
 
 const field = (doc) => {

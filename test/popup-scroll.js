@@ -157,7 +157,7 @@ const check = (what, condition, detail) => {
   const css = fs.readFileSync(path.join(__dirname, '..', 'src', 'styles.css'), 'utf8');
   check(
     'the locked panel stops scrolling',
-    /\.style-panel-host\.is-locked > \* \{ overflow-y: hidden; \}/.test(css),
+    /\.style-panel-host\.is-locked > \* \{\s*overflow-y: hidden;\s*\}/.test(css),
   );
   check(
     'and its gutter is reserved, so losing the bar costs no layout',

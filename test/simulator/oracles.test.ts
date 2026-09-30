@@ -105,38 +105,41 @@ test('a stale oracle intent is refused, never re-targeted (identity mapping only
   assert.deepEqual(planByIdentity(shifted, intent), { ok: false, error: 'anchor-moved' });
 });
 
-test('duplicate attribute names are ambiguous, and a file that does not parse is source-invalid', () => {
-  const page = snapshotFile('conditional-template.astro');
-  assert.equal(page.projection.tag, 'valid');
-  if (page.projection.tag !== 'valid') {
-    return;
-  }
-  const duplicated = page.projection.nodes.find(
-    (node) =>
-      node.capability === 'editable' &&
-      node.attributes.filter((a) => a.name === 'class').length > 1,
-  );
-  assert.ok(duplicated !== undefined, 'the fixture has an editable node with a duplicated class');
-  const step = {
-    file: 'conditional-template.astro',
-    expectedFile: 'conditional-template.astro',
-    anchor: { path: duplicated.path, kind: duplicated.kind },
-    operation: () => ({
-      tag: 'set-attribute' as const,
-      name: 'class',
-      value: { type: 'string' as const, value: 'c' },
-    }),
-    splices: [],
-    postKinds: [],
-    reference: 'anchor-ambiguous' as const,
-  };
-  const intent = oracleIntent(step, page, toIntentId('dup'));
-  assert.deepEqual(planByIdentity(page, intent), { ok: false, error: 'anchor-ambiguous' });
-  const broken = snapshotFile('malformed.astro');
-  assert.equal(broken.projection.tag, 'parse-error');
-  assert.deepEqual(planByIdentity(broken, { ...intent, file: broken.path }), {
-    ok: false,
-    error: 'source-invalid',
-  });
-  assert.ok(LIMITS.splicesPerIntentMax >= 3, 'the loop rename fits the splice bound');
-});
+test(
+  'duplicate attribute names are ambiguous, and ' + 'a file that does not parse is source-invalid',
+  () => {
+    const page = snapshotFile('conditional-template.astro');
+    assert.equal(page.projection.tag, 'valid');
+    if (page.projection.tag !== 'valid') {
+      return;
+    }
+    const duplicated = page.projection.nodes.find(
+      (node) =>
+        node.capability === 'editable' &&
+        node.attributes.filter((a) => a.name === 'class').length > 1,
+    );
+    assert.ok(duplicated !== undefined, 'the fixture has an editable node with a duplicated class');
+    const step = {
+      file: 'conditional-template.astro',
+      expectedFile: 'conditional-template.astro',
+      anchor: { path: duplicated.path, kind: duplicated.kind },
+      operation: () => ({
+        tag: 'set-attribute' as const,
+        name: 'class',
+        value: { type: 'string' as const, value: 'c' },
+      }),
+      splices: [],
+      postKinds: [],
+      reference: 'anchor-ambiguous' as const,
+    };
+    const intent = oracleIntent(step, page, toIntentId('dup'));
+    assert.deepEqual(planByIdentity(page, intent), { ok: false, error: 'anchor-ambiguous' });
+    const broken = snapshotFile('malformed.astro');
+    assert.equal(broken.projection.tag, 'parse-error');
+    assert.deepEqual(planByIdentity(broken, { ...intent, file: broken.path }), {
+      ok: false,
+      error: 'source-invalid',
+    });
+    assert.ok(LIMITS.splicesPerIntentMax >= 3, 'the loop rename fits the splice bound');
+  },
+);

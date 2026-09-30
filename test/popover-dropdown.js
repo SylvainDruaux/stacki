@@ -46,7 +46,10 @@ const check = (what, condition, detail) => {
     import './src/style-panel/utilities.css'
     import './src/style-panel/embed-editor.css'
 
-    const OPTIONS = Array.from({ length: 24 }, (_, i) => ({ value: 'p' + i, label: 'Property ' + i }))
+    const OPTIONS = Array.from(
+      { length: 24 },
+      (_, i) => ({ value: 'p' + i, label: 'Property ' + i }),
+    )
 
     function Harness() {
       const [anchor, setAnchor] = useState(null)
@@ -54,9 +57,19 @@ const check = (what, condition, detail) => {
       window.__setTall = setTall
       return (
         <div className="embed-editor_root">
-          <div ref={(el) => el && !anchor && setAnchor(el)} id="anchor" style={{ position: 'fixed', bottom: 24, left: 12, width: 280, height: 28, background: '#333' }}>row</div>
+          <div
+            ref={(el) => el && !anchor && setAnchor(el)}
+            id="anchor"
+            style={{
+              position: 'fixed', bottom: 24, left: 12, width: 280, height: 28, background: '#333',
+            }}
+          >row</div>
           {anchor ? (
-            <LayerPopover anchorEl={anchor} ariaLabel="Layer" onClose={() => { window.__closed = (window.__closed || 0) + 1 }}>
+            <LayerPopover
+              anchorEl={anchor}
+              ariaLabel="Layer"
+              onClose={() => { window.__closed = (window.__closed || 0) + 1 }}
+            >
               <div style={{ height: tall ? 4000 : undefined }}>
                 <Select value="p0" options={OPTIONS} onChange={() => {}} ariaLabel="Type" />
               </div>
@@ -77,7 +90,9 @@ const check = (what, condition, detail) => {
   });
   fs.writeFileSync(
     path.join(buildDir, 'index.html'),
-    '<!doctype html><meta charset="utf-8"><link rel="stylesheet" href="bundle.css"><style>body{margin:0;background:#111}</style><div id="root"></div><script src="bundle.js"></script>',
+    '<!doctype html><meta charset="utf-8"><link rel="stylesheet" href="bundle.css">' +
+      '<style>body{margin:0;background:#111}</style><div id="root"></div>' +
+      '<script src="bundle.js"></script>',
   );
 
   const electronPath = (() => {
@@ -89,7 +104,8 @@ const check = (what, condition, detail) => {
   })();
   if (typeof electronPath !== 'string') {
     console.log(
-      'popover-dropdown: skipped — no Electron to lay it out in (see test/gap-bands.js for the pattern)',
+      'popover-dropdown: skipped — no Electron to lay it out in ' +
+        '(see test/gap-bands.js for the pattern)',
     );
     return;
   }
@@ -115,26 +131,51 @@ const check = (what, condition, detail) => {
        await new Promise((r) => setTimeout(r, 400));
 
        const out = {};
-       out.box = await js("(() => { const b = document.querySelector('.embed-editor_layer-popover-box'); return { overflow: getComputedStyle(b).overflowY, scrollingClass: b.className.includes('is-scrolling') } })()");
-       const trigger = await js("(() => { const r = document.querySelector('.u-select-button').getBoundingClientRect(); return { x: Math.round(r.left + r.width/2), y: Math.round(r.top + r.height/2) } })()");
-       await js("window.__why = []; document.addEventListener('mousedown', (e) => window.__why.push('mousedown on ' + String(e.target.className || e.target.nodeName).slice(0, 30) + (document.querySelector('.embed-editor_layer-popover').contains(e.target) ? ' (inside)' : ' (OUTSIDE)')), true); window.addEventListener('scroll', (e) => window.__why.push('scroll from ' + String(e.target.className || e.target.nodeName).slice(0, 30)), true); true");
+       out.box = await js("(() => { const b = " +
+         "document.querySelector('.embed-editor_layer-popover-box'); " +
+         "return { overflow: getComputedStyle(b).overflowY, scrollingClass: " +
+         "b.className.includes('is-scrolling') } })()");
+       const trigger = await js("(() => { const r = " +
+         "document.querySelector('.u-select-button').getBoundingClientRect(); " +
+         "return { x: Math.round(r.left + r.width/2), y: Math.round(r.top + r.height/2) } })()");
+       await js("window.__why = []; document.addEventListener('mousedown', " +
+         "(e) => window.__why.push('mousedown on ' + String(e.target.className || " +
+         "e.target.nodeName).slice(0, 30) + " +
+         "(document.querySelector('.embed-editor_layer-popover').contains(e.target) ? ' " +
+         "(inside)' : ' (OUTSIDE)')), true); window.addEventListener('scroll', " +
+         "(e) => window.__why.push('scroll from ' + String(e.target.className || " +
+         "e.target.nodeName).slice(0, 30)), true); true");
        await clickAt(trigger.x, trigger.y);
        out.opened = await js("!!document.querySelector('.u-select-list')");
        out.dropUp = await js("!!document.querySelector('.u-select-list.is-up')");
-       out.menu = await js("(() => { const l = document.querySelector('.u-select-list'); const b = document.querySelector('.embed-editor_layer-popover-box'); if (!l) return null; const lr = l.getBoundingClientRect(), br = b.getBoundingClientRect(); return { above: lr.top < br.top, o: [...l.querySelectorAll('[role=\\"option\\"]')].length } })()");
+       out.menu = await js("(() => { const l = document.querySelector('.u-select-list'); " +
+         "const b = document.querySelector('.embed-editor_layer-popover-box'); " +
+         "if (!l) return null; const lr = l.getBoundingClientRect(), " +
+         "br = b.getBoundingClientRect(); return { above: lr.top < br.top, " +
+         "o: [...l.querySelectorAll('[role=\\"option\\"]')].length } })()");
        // The question: at an option's own coordinates, what would you hit?
-       out.hit = await js("(() => { const o = document.querySelectorAll('.u-select-list [role=\\"option\\"]')[3]; const r = o.getBoundingClientRect(); const at = document.elementFromPoint(Math.round(r.left + r.width/2), Math.round(r.top + r.height/2)); return { isTheOption: at === o || o.contains(at), hit: String(at && at.className || '').slice(0, 40), x: Math.round(r.left + r.width/2), y: Math.round(r.top + r.height/2) } })()");
+       out.hit = await js("(() => { const o = document.querySelectorAll('.u-select-list " +
+         "[role=\\"option\\"]')[3]; const r = o.getBoundingClientRect(); " +
+         "const at = document.elementFromPoint(Math.round(r.left + r.width/2), " +
+         "Math.round(r.top + r.height/2)); return { isTheOption: at === o || o.contains(at), " +
+         "hit: String(at && at.className || '').slice(0, 40), x: Math.round(r.left + r.width/2), " +
+         "y: Math.round(r.top + r.height/2) } })()");
        // And pressing there must not shut the popover. Record what any close is
        // actually reacting to, so a failure here names its own cause.
        await clickAt(out.hit.x, out.hit.y);
        out.why = await js('window.__why');
-       out.afterPick = await js("({ popover: !!document.querySelector('.embed-editor_layer-popover'), closes: window.__closed || 0 })");
+       out.afterPick = await js("({ popover: " +
+         "!!document.querySelector('.embed-editor_layer-popover'), " +
+         "closes: window.__closed || 0 })");
 
        // A box that really does outgrow the screen still scrolls — the reason the
        // overflow was there in the first place.
        await js('window.__setTall(true)');
        await new Promise((r) => setTimeout(r, 200));
-       out.tall = await js("(() => { const b = document.querySelector('.embed-editor_layer-popover-box'); return { overflow: getComputedStyle(b).overflowY, scrollingClass: b.className.includes('is-scrolling') } })()");
+       out.tall = await js("(() => { const b = " +
+         "document.querySelector('.embed-editor_layer-popover-box'); " +
+         "return { overflow: getComputedStyle(b).overflowY, scrollingClass: " +
+         "b.className.includes('is-scrolling') } })()");
 
        console.log(JSON.stringify(out));
        app.quit();

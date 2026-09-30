@@ -126,7 +126,9 @@ export default function LayerPopover({
     >
       <div
         ref={boxRef}
-        className={`embed-editor_layer-popover-box u-surface-surface${scrolls ? ' is-scrolling' : ''}`}
+        className={
+          'embed-editor_layer-popover-box u-surface-surface' + (scrolls ? ' is-scrolling' : '')
+        }
       >
         {children}
       </div>

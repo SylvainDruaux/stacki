@@ -292,7 +292,8 @@ const STYLE_PROPERTY_LOOKUP_TIMEOUT_MS = 750;
 const SHAPE_STRETCH_PROPERTY = '--moden-clip-path-shape-stretch';
 const SHAPE_CONTAIN_PROPERTY = '--moden-clip-path-shape-contain';
 // All variable names default to empty: an empty name emits the raw value (e.g. 100cqw or 0.5)
-// instead of var(--size, 100cqw) / var(--offset-left, 0.5). The placeholders below are only UI hints.
+// instead of var(--size, 100cqw) / var(--offset-left, 0.5). The placeholders below are only UI
+// hints.
 const DEFAULT_SHAPE_SCALE_VARIABLE_NAME = '';
 const DEFAULT_SHAPE_OFFSET_LEFT_VARIABLE_NAME = '';
 const DEFAULT_SHAPE_OFFSET_TOP_VARIABLE_NAME = '';
@@ -345,7 +346,8 @@ const CSS_GEOMETRY_BOX_CLIP_PATH_VALUES = new Set([
   'view-box',
 ]);
 const DEFAULT_SHAPE_PATH_DATA =
-  'M56.8 43.2H100V56.8C76.2 56.8 56.8 76.2 56.8 100H43.2V56.8H0V43.2C23.8 43.2 43.2 23.8 43.2 0H56.8V43.2Z';
+  'M56.8 43.2H100V56.8C76.2 56.8 56.8 76.2 56.8 100H43.2' +
+  'V56.8H0V43.2C23.8 43.2 43.2 23.8 43.2 0H56.8V43.2Z';
 const DEFAULT_SHAPE_VALUE = [
   'from 56.8% 43.2%',
   'line to 100% 43.2%',
@@ -921,11 +923,15 @@ function formatRawEditableClipPath(editable: RawEditableClipPath) {
   }
 
   if (editable.kind === 'circle') {
-    return `circle(${formatCssUnitValue(editable.radius)} at ${formatCssUnitValue(editable.cx)} ${formatCssUnitValue(editable.cy)})`;
+    const radius = formatCssUnitValue(editable.radius);
+    const center = `${formatCssUnitValue(editable.cx)} ${formatCssUnitValue(editable.cy)}`;
+    return `circle(${radius} at ${center})`;
   }
 
   if (editable.kind === 'ellipse') {
-    return `ellipse(${formatCssUnitValue(editable.rx)} ${formatCssUnitValue(editable.ry)} at ${formatCssUnitValue(editable.cx)} ${formatCssUnitValue(editable.cy)})`;
+    const radii = `${formatCssUnitValue(editable.rx)} ${formatCssUnitValue(editable.ry)}`;
+    const center = `${formatCssUnitValue(editable.cx)} ${formatCssUnitValue(editable.cy)}`;
+    return `ellipse(${radii} at ${center})`;
   }
 
   const sides = formatCssUnitList([editable.top, editable.right, editable.bottom, editable.left]);
@@ -1430,7 +1436,9 @@ function formatPathDataFromSubpaths(subpaths: SvgShapeSubpath[]) {
       }
       if (command.kind === 'curve') {
         return command.control2
-          ? `C${command.control1.x} ${command.control1.y} ${command.control2.x} ${command.control2.y} ${command.to.x} ${command.to.y}`
+          ? `C${command.control1.x} ${command.control1.y} ` +
+              `${command.control2.x} ${command.control2.y} ` +
+              `${command.to.x} ${command.to.y}`
           : `Q${command.control1.x} ${command.control1.y} ${command.to.x} ${command.to.y}`;
       }
       return 'Z';
@@ -1561,7 +1569,8 @@ function formatShapeContainCoordinate(
   if (options.useVariable) {
     const variableName = sanitizeShapeScaleVariableName(options.variableName);
     if (variableName) {
-      return `calc(50% ${sign} ${formatCssScaleNumber(amount / 100)} * var(${variableName}, 100cqw))`;
+      const amountScale = formatCssScaleNumber(amount / 100);
+      return `calc(50% ${sign} ${amountScale} * var(${variableName}, 100cqw))`;
     }
   }
   return `calc(50% ${sign} ${formatCqw(amount)})`;
@@ -1594,7 +1603,9 @@ function formatShapeOffsetCoordinate(
   const offsetToken = offsetVar
     ? `var(${offsetVar}, ${formatCssScaleNumber(offset)})`
     : formatCssScaleNumber(offset);
-  return `calc(${formatCssScaleNumber(u)} * ${sizeToken} + ${offsetToken} * (100${travelUnit} - ${formatCssScaleNumber(span)} * ${sizeToken}))`;
+  const positionTerm = `${formatCssScaleNumber(u)} * ${sizeToken}`;
+  const spanTerm = `${formatCssScaleNumber(span)} * ${sizeToken}`;
+  return `calc(${positionTerm} + ${offsetToken} * (100${travelUnit} - ${spanTerm}))`;
 }
 
 type ShapeOffsetBounds = {
@@ -1623,7 +1634,8 @@ function shapeOffsetBoundsFromCanvasPoints(points: Point[]): ShapeOffsetBounds |
   const size = 100;
   const travelX = 100 - wu * size;
   const travelY = 100 - hu * size;
-  // |travel| ~ 0 means the shape fills the axis; OL/OT are then indeterminate, so default to centered.
+  // |travel| ~ 0 means the shape fills the axis; OL/OT are then indeterminate, so default to
+  // centered.
   const ol =
     Math.abs(travelX) > SHAPE_OFFSET_TRAVEL_EPSILON
       ? (50 + minAx * 100) / travelX
@@ -1714,10 +1726,13 @@ function formatClipPath(shape: ClipShape) {
     return `shape(${prefix}${shape.value})`;
   }
   if (shape.kind === 'circle') {
-    return `circle(${formatPercent(shape.radius)} at ${formatPercent(shape.cx)} ${formatPercent(shape.cy)})`;
+    const center = `${formatPercent(shape.cx)} ${formatPercent(shape.cy)}`;
+    return `circle(${formatPercent(shape.radius)} at ${center})`;
   }
   if (shape.kind === 'ellipse') {
-    return `ellipse(${formatPercent(shape.rx)} ${formatPercent(shape.ry)} at ${formatPercent(shape.cx)} ${formatPercent(shape.cy)})`;
+    const radii = `${formatPercent(shape.rx)} ${formatPercent(shape.ry)}`;
+    const center = `${formatPercent(shape.cx)} ${formatPercent(shape.cy)}`;
+    return `ellipse(${radii} at ${center})`;
   }
   const sides = formatInsetSides(shape);
   return hasRoundedCorners(shape.radii)
@@ -1867,24 +1882,26 @@ function formatRawEditableClipPathForPreview(editable: RawEditableClipPath, size
     const points = editable.points
       .map(
         (point) =>
-          `${formatCssCoordinateValueForPreview(point.x, 'x', size)} ${formatCssCoordinateValueForPreview(point.y, 'y', size)}`,
+          `${formatCssCoordinateValueForPreview(point.x, 'x', size)} ` +
+          formatCssCoordinateValueForPreview(point.y, 'y', size),
       )
       .join(', ');
     return `polygon(${prefix}${points})`;
   }
 
   if (editable.kind === 'circle') {
-    return [
-      `circle(${formatCssUnitValueForPreview(editable.radius, 'x', size)}`,
-      `at ${formatCssUnitValueForPreview(editable.cx, 'x', size)} ${formatCssUnitValueForPreview(editable.cy, 'y', size)})`,
-    ].join(' ');
+    const radius = formatCssUnitValueForPreview(editable.radius, 'x', size);
+    const centerX = formatCssUnitValueForPreview(editable.cx, 'x', size);
+    const centerY = formatCssUnitValueForPreview(editable.cy, 'y', size);
+    return [`circle(${radius}`, `at ${centerX} ${centerY})`].join(' ');
   }
 
   if (editable.kind === 'ellipse') {
-    return [
-      `ellipse(${formatCssUnitValueForPreview(editable.rx, 'x', size)} ${formatCssUnitValueForPreview(editable.ry, 'y', size)}`,
-      `at ${formatCssUnitValueForPreview(editable.cx, 'x', size)} ${formatCssUnitValueForPreview(editable.cy, 'y', size)})`,
-    ].join(' ');
+    const radiusX = formatCssUnitValueForPreview(editable.rx, 'x', size);
+    const radiusY = formatCssUnitValueForPreview(editable.ry, 'y', size);
+    const centerX = formatCssUnitValueForPreview(editable.cx, 'x', size);
+    const centerY = formatCssUnitValueForPreview(editable.cy, 'y', size);
+    return [`ellipse(${radiusX} ${radiusY}`, `at ${centerX} ${centerY})`].join(' ');
   }
 
   const sides = [
@@ -1905,7 +1922,8 @@ function formatRawEditableClipPathForPreview(editable: RawEditableClipPath, size
   const vertical = verticalValues
     .map((value) => formatCssUnitValueForPreview(value, 'y', size))
     .join(' ');
-  return `inset(${sides} round ${horizontal}${horizontal === vertical ? '' : ` / ${vertical}`})`;
+  const verticalSuffix = horizontal === vertical ? '' : ` / ${vertical}`;
+  return `inset(${sides} round ${horizontal}${verticalSuffix})`;
 }
 
 function formatShapeFunctionForPreview(shape: ShapeFunctionShape, size: CanvasSize) {
@@ -1922,6 +1940,14 @@ function formatShapeFunctionForPreview(shape: ShapeFunctionShape, size: CanvasSi
   return `shape(${prefix}${formatShapeValueFromCssSubpaths(transformed)})`;
 }
 
+// A raw `x y` coordinate pair, each token given its preview fallbacks for its own axis.
+function previewCssCoordinatePair(xToken: string, yToken: string, size: CanvasSize) {
+  return (
+    `${previewCssCoordinateToken(xToken, 'x', size)} ` +
+    previewCssCoordinateToken(yToken, 'y', size)
+  );
+}
+
 function formatRawClipPathStringForPreview(value: string, size: CanvasSize) {
   const polygonMatch = value.match(/^polygon\s*\((.*)\)$/is);
   if (polygonMatch?.[1]) {
@@ -1931,7 +1957,7 @@ function formatRawClipPathStringForPreview(value: string, size: CanvasSize) {
     const points = pointParts.map((part) => {
       const tokens = splitTopLevelWhitespace(part);
       return tokens.length === 2
-        ? `${previewCssCoordinateToken(tokens[0] ?? '', 'x', size)} ${previewCssCoordinateToken(tokens[1] ?? '', 'y', size)}`
+        ? previewCssCoordinatePair(tokens[0] ?? '', tokens[1] ?? '', size)
         : part;
     });
     return `polygon(${[fillRule, ...points].filter(Boolean).join(', ')})`;
@@ -1947,7 +1973,7 @@ function formatRawClipPathStringForPreview(value: string, size: CanvasSize) {
       : radiusPart;
     const center =
       centerTokens.length === 2
-        ? ` at ${previewCssCoordinateToken(centerTokens[0] ?? '', 'x', size)} ${previewCssCoordinateToken(centerTokens[1] ?? '', 'y', size)}`
+        ? ` at ${previewCssCoordinatePair(centerTokens[0] ?? '', centerTokens[1] ?? '', size)}`
         : centerPart
           ? ` at ${centerPart}`
           : '';
@@ -1961,11 +1987,11 @@ function formatRawClipPathStringForPreview(value: string, size: CanvasSize) {
     const centerTokens = centerPart ? splitTopLevelWhitespace(centerPart) : [];
     const previewRadii =
       radii.length === 2
-        ? `${previewCssCoordinateToken(radii[0] ?? '', 'x', size)} ${previewCssCoordinateToken(radii[1] ?? '', 'y', size)}`
+        ? previewCssCoordinatePair(radii[0] ?? '', radii[1] ?? '', size)
         : radiiPart;
     const center =
       centerTokens.length === 2
-        ? ` at ${previewCssCoordinateToken(centerTokens[0] ?? '', 'x', size)} ${previewCssCoordinateToken(centerTokens[1] ?? '', 'y', size)}`
+        ? ` at ${previewCssCoordinatePair(centerTokens[0] ?? '', centerTokens[1] ?? '', size)}`
         : centerPart
           ? ` at ${centerPart}`
           : '';
@@ -1997,7 +2023,8 @@ function formatRawClipPathStringForPreview(value: string, size: CanvasSize) {
     const vertical = expandCssShorthandTokens(verticalTokens)
       .map((token) => previewCssCoordinateToken(token, 'y', size))
       .join(' ');
-    return `inset(${previewSides} round ${horizontal}${horizontal === vertical ? '' : ` / ${vertical}`})`;
+    const verticalSuffix = horizontal === vertical ? '' : ` / ${vertical}`;
+    return `inset(${previewSides} round ${horizontal}${verticalSuffix})`;
   }
 
   return addPreviewVariableFallbacks(value);
@@ -2857,16 +2884,22 @@ const SHAPE_SCALE_COORDINATE_PATTERN = [
 //                 6=offset(var form), 7=offset(raw form), 8=span.
 const SHAPE_VAR_NAME = '([a-zA-Z0-9_-]+)';
 // Size token: var(name, S cqw) or a bare S cqw (capturing name + both number forms).
-const SHAPE_SIZE_TOKEN = `(?:var\\(\\s*${SHAPE_VAR_NAME}\\s*,\\s*(${SHAPE_ABSOLUTE_NUMBER})cqw\\s*\\)|(${SHAPE_ABSOLUTE_NUMBER})cqw)`;
+const SHAPE_SIZE_TOKEN =
+  `(?:var\\(\\s*${SHAPE_VAR_NAME}\\s*,\\s*(${SHAPE_ABSOLUTE_NUMBER})cqw\\s*\\)` +
+  `|(${SHAPE_ABSOLUTE_NUMBER})cqw)`;
 // Second size occurrence inside the travel term — match either form, capture nothing.
-const SHAPE_SIZE_TOKEN_LOOSE = `(?:var\\(\\s*[a-zA-Z0-9_-]+\\s*,\\s*${SHAPE_ABSOLUTE_NUMBER}cqw\\s*\\)|${SHAPE_ABSOLUTE_NUMBER}cqw)`;
+const SHAPE_SIZE_TOKEN_LOOSE =
+  `(?:var\\(\\s*[a-zA-Z0-9_-]+\\s*,\\s*${SHAPE_ABSOLUTE_NUMBER}cqw\\s*\\)` +
+  `|${SHAPE_ABSOLUTE_NUMBER}cqw)`;
 const buildShapeOffsetCoordinatePattern = (travelUnit: string) =>
   [
     'calc\\(\\s*',
     `(${SHAPE_SIGNED_NUMBER})\\s*\\*\\s*${SHAPE_SIZE_TOKEN}`,
     '\\s*\\+\\s*',
-    `(?:var\\(\\s*${SHAPE_VAR_NAME}\\s*,\\s*(${SHAPE_SIGNED_NUMBER})\\s*\\)|(${SHAPE_SIGNED_NUMBER}))`,
-    `\\s*\\*\\s*\\(\\s*100${travelUnit}\\s*-\\s*(${SHAPE_ABSOLUTE_NUMBER})\\s*\\*\\s*${SHAPE_SIZE_TOKEN_LOOSE}\\s*\\)`,
+    `(?:var\\(\\s*${SHAPE_VAR_NAME}\\s*,\\s*(${SHAPE_SIGNED_NUMBER})\\s*\\)`,
+    `|(${SHAPE_SIGNED_NUMBER}))`,
+    `\\s*\\*\\s*\\(\\s*100${travelUnit}\\s*-\\s*`,
+    `(${SHAPE_ABSOLUTE_NUMBER})\\s*\\*\\s*${SHAPE_SIZE_TOKEN_LOOSE}\\s*\\)`,
     '\\s*\\)',
   ].join('');
 const SHAPE_OFFSET_COORDINATE_PATTERN_X = buildShapeOffsetCoordinatePattern('cqw');
@@ -2885,7 +2918,13 @@ const SHAPE_OFFSET_LEFT_VARIABLE_NAME_RE = new RegExp(SHAPE_OFFSET_COORDINATE_PA
 const SHAPE_OFFSET_TOP_VARIABLE_NAME_RE = new RegExp(SHAPE_OFFSET_COORDINATE_PATTERN_Y, 'i');
 // Offset patterns must come first so the longer, more specific match wins coordinate splitting.
 const SHAPE_CALC_COORDINATE_RE = new RegExp(
-  `^(?:${SHAPE_OFFSET_COORDINATE_PATTERN_X}|${SHAPE_OFFSET_COORDINATE_PATTERN_Y}|${SHAPE_MIN_COORDINATE_PATTERN}|${SHAPE_SCALE_COORDINATE_PATTERN}|${SHAPE_CQW_COORDINATE_PATTERN})`,
+  `^(?:${[
+    SHAPE_OFFSET_COORDINATE_PATTERN_X,
+    SHAPE_OFFSET_COORDINATE_PATTERN_Y,
+    SHAPE_MIN_COORDINATE_PATTERN,
+    SHAPE_SCALE_COORDINATE_PATTERN,
+    SHAPE_CQW_COORDINATE_PATTERN,
+  ].join('|')})`,
   'i',
 );
 const SHAPE_CQW_COORDINATE_EXACT_RE = new RegExp(`^${SHAPE_CQW_COORDINATE_PATTERN}$`, 'i');
@@ -3258,7 +3297,8 @@ function containModelFromShape(shape: ShapeFunctionShape): ShapeContainModel | n
   return { points, ...header };
 }
 
-// Re-emit a contain shape keeping every point's own Ux/Uy but applying the model's size/offset/names.
+// Re-emit a contain shape keeping every point's own Ux/Uy but applying the model's
+// size/offset/names.
 function shapeFromContainModel(
   shape: ShapeFunctionShape,
   model: ShapeContainModel,
@@ -3297,7 +3337,8 @@ function shapeFromContainModel(
   return { ...shape, value: formatShapeValueFromCssSubpaths(remapped) };
 }
 
-// Translate a contain shape by a canvas-space delta by folding it into OL/OT (the geometry is fixed).
+// Translate a contain shape by a canvas-space delta by folding it into OL/OT (the geometry is
+// fixed).
 // Offsets are left unclamped so the shape can be moved partially off the container, as before.
 function moveContainModel(model: ShapeContainModel, dx: number, dy: number): ShapeContainModel {
   const travelX = 100 - model.wu * model.size;
@@ -3421,7 +3462,8 @@ function normalizeContainShapeCoordinates(
   shape: ShapeFunctionShape,
   options: ShapeScaleOptions = DEFAULT_SHAPE_SCALE_OPTIONS,
 ): ShapeFunctionShape {
-  // Already in the offset encoding: preserve geometry/size/offset, only apply (possibly renamed) vars.
+  // Already in the offset encoding: preserve geometry/size/offset, only apply (possibly renamed)
+  // vars.
   const model = containModelFromShape(shape);
   if (model) {
     const names = resolveShapeScaleVarNames(options);
@@ -5541,16 +5583,28 @@ function rawEditableHandleCssPoint(
   return null;
 }
 
+const MEDIUM_BREAKPOINT_ICON_PATH =
+  'M3 3C3 2.44772 3.44772 2 4 2H12C12.5523 2 13 2.44772 13 3V13' +
+  'C13 13.5523 12.5523 14 12 14H4C3.44772 14 3 13.5523 3 13V3ZM4 3H12V13H4V3Z';
+const SMALL_BREAKPOINT_ICON_PATH =
+  'M4 12C2.89543 12 2 11.1046 2 10L2 6C2 4.89543 2.89543 4 4 4L12 4C13.1046 4 14 4.89543 14 6' +
+  'V10C14 11.1046 13.1046 12 12 12H4ZM3 10L3 6C3 5.44772 3.44772 5 4 5L12 5C12.5523 ' +
+  '5 13 5.44772 13 6V10C13 10.5523 12.5523 11 12 11L4 11C3.44772 11 3 10.5523 3 10Z';
+const TINY_BREAKPOINT_ICON_PATH =
+  'M4 4C4 2.89543 4.89543 2 6 2H10C11.1046 2 12 2.89543 12 4V12C12 13.1046 11.1046 ' +
+  '14 10 14H6C4.89543 14 4 13.1046 4 12V4ZM6 3H10C10.5523 3 11 3.44772 11 4V12' +
+  'C11 12.5523 10.5523 13 10 13H6C5.44772 13 5 12.5523 5 12V4C5 3.44772 5.44772 3 6 3Z';
+const DESKTOP_BREAKPOINT_ICON_PATH =
+  'M12 5.36602L10.1519 6.43301L9.65192 5.56699L11.5 4.5L9.65193 3.43301' +
+  'L10.1519 2.56699L12 3.63397V1.5H13V3.63397L14.8481 2.56699L15.3481 3.43301' +
+  'L13.5 4.5L15.3481 5.56699L14.8481 6.43301L13 5.36602V7.5H12V5.36602Z';
+
 function BreakpointIcon({ breakpoint }: { breakpoint: BreakpointId }) {
   if (breakpoint === 'medium') {
     return (
       <svg className="clip-path_source-icon" viewBox="0 0 16 16" aria-hidden="true">
         <path d="M9.5 11H6.5V12H9.5V11Z" />
-        <path
-          fillRule="evenodd"
-          clipRule="evenodd"
-          d="M3 3C3 2.44772 3.44772 2 4 2H12C12.5523 2 13 2.44772 13 3V13C13 13.5523 12.5523 14 12 14H4C3.44772 14 3 13.5523 3 13V3ZM4 3H12V13H4V3Z"
-        />
+        <path fillRule="evenodd" clipRule="evenodd" d={MEDIUM_BREAKPOINT_ICON_PATH} />
       </svg>
     );
   }
@@ -5558,11 +5612,7 @@ function BreakpointIcon({ breakpoint }: { breakpoint: BreakpointId }) {
     return (
       <svg className="clip-path_source-icon" viewBox="0 0 16 16" aria-hidden="true">
         <path d="M12 9V7H11V9H12Z" />
-        <path
-          fillRule="evenodd"
-          clipRule="evenodd"
-          d="M4 12C2.89543 12 2 11.1046 2 10L2 6C2 4.89543 2.89543 4 4 4L12 4C13.1046 4 14 4.89543 14 6V10C14 11.1046 13.1046 12 12 12H4ZM3 10L3 6C3 5.44772 3.44772 5 4 5L12 5C12.5523 5 13 5.44772 13 6V10C13 10.5523 12.5523 11 12 11L4 11C3.44772 11 3 10.5523 3 10Z"
-        />
+        <path fillRule="evenodd" clipRule="evenodd" d={SMALL_BREAKPOINT_ICON_PATH} />
       </svg>
     );
   }
@@ -5570,18 +5620,14 @@ function BreakpointIcon({ breakpoint }: { breakpoint: BreakpointId }) {
     return (
       <svg className="clip-path_source-icon" viewBox="0 0 16 16" aria-hidden="true">
         <path d="M7 12H9V11H7V12Z" />
-        <path
-          fillRule="evenodd"
-          clipRule="evenodd"
-          d="M4 4C4 2.89543 4.89543 2 6 2H10C11.1046 2 12 2.89543 12 4V12C12 13.1046 11.1046 14 10 14H6C4.89543 14 4 13.1046 4 12V4ZM6 3H10C10.5523 3 11 3.44772 11 4V12C11 12.5523 10.5523 13 10 13H6C5.44772 13 5 12.5523 5 12V4C5 3.44772 5.44772 3 6 3Z"
-        />
+        <path fillRule="evenodd" clipRule="evenodd" d={TINY_BREAKPOINT_ICON_PATH} />
       </svg>
     );
   }
   // Desktop (main) and all larger breakpoints (large / xl / xxl).
   return (
     <svg className="clip-path_source-icon" viewBox="0 0 16 16" aria-hidden="true">
-      <path d="M12 5.36602L10.1519 6.43301L9.65192 5.56699L11.5 4.5L9.65193 3.43301L10.1519 2.56699L12 3.63397V1.5H13V3.63397L14.8481 2.56699L15.3481 3.43301L13.5 4.5L15.3481 5.56699L14.8481 6.43301L13 5.36602V7.5H12V5.36602Z" />
+      <path d={DESKTOP_BREAKPOINT_ICON_PATH} />
       <path d="M3 4H8V5H3V12H13V9H14V12H16V13H0V12H2V5C2 4.44772 2.44772 4 3 4Z" />
     </svg>
   );
@@ -7153,6 +7199,18 @@ async function resolveCascadeWinnerClipPathStyle(
     namePath: winner.namePath,
   };
 }
+
+// The keyboard and pointer hints read out after each canvas handle's name.
+const HANDLE_ADJUST_HINT = 'Drag or use arrow keys to adjust.';
+const POINT_HANDLE_HINT =
+  'Drag to move, double-click to remove. Use arrow keys to move when selected.';
+const INSET_EDGE_HANDLE_HINT =
+  'Drag or use arrow keys to resize. ' +
+  'Hold Shift for all sides or Option for this side and the opposite side.';
+const INSET_RADIUS_HANDLE_HINT =
+  'Drag or use arrow keys to adjust. ' +
+  'Hold U to unlock separate horizontal and vertical radii. ' +
+  'Hold Shift for all corners or Option for this corner and the opposite corner.';
 
 export default function ClipPath({
   onApply,
@@ -9624,7 +9682,9 @@ export default function ClipPath({
             if (!cancelled && readSeq === selectionReadSeqRef.current) {
               setClipPathStyleOrigin('inherited');
             }
-            const winnerKey = `${classNames.join('\u0000')}|${selectedStyle?.style?.id ?? ''}|${selectedStyle?.raw ?? ''}`;
+            const winnerKey =
+              `${classNames.join('\u0000')}|` +
+              `${selectedStyle?.style?.id ?? ''}|${selectedStyle?.raw ?? ''}`;
             const cached = cascadeWinnerCacheRef.current;
             if (cached && cached.key === winnerKey) {
               // Exact winner already known — use it directly (no flash).
@@ -10636,7 +10696,8 @@ export default function ClipPath({
           {renderShapeVariableLabel(
             'clip-path_shape-variable-label',
             'Size',
-            'This optional variable allows us to animate shape size or change size based on screen size',
+            'This optional variable allows us to animate shape size or change size based on ' +
+              'screen size',
           )}
           {renderShapeVariableInput(
             'clip-path_shape-variable-input',
@@ -10913,6 +10974,12 @@ export default function ClipPath({
                   if (!point) {
                     return null;
                   }
+                  const handleLabel =
+                    handle.kind === 'ellipse-center'
+                      ? 'Ellipse center'
+                      : handle.kind === 'ellipse-rx'
+                        ? 'Ellipse horizontal radius'
+                        : 'Ellipse vertical radius';
                   return (
                     <button
                       key={handle.kind}
@@ -10925,7 +10992,7 @@ export default function ClipPath({
                       onKeyDown={onHandleKeyDown(handle)}
                       onKeyUp={onHandleKeyUp}
                       aria-pressed={isHandleSelected(handle)}
-                      aria-label={`${handle.kind === 'ellipse-center' ? 'Ellipse center' : handle.kind === 'ellipse-rx' ? 'Ellipse horizontal radius' : 'Ellipse vertical radius'}. Drag or use arrow keys to adjust.`}
+                      aria-label={`${handleLabel}. ${HANDLE_ADJUST_HINT}`}
                     />
                   );
                 });
@@ -10974,6 +11041,7 @@ export default function ClipPath({
                     if (!point) {
                       return null;
                     }
+                    const cornerName = cornerLabel(corner);
                     return (
                       <button
                         key={corner}
@@ -10983,7 +11051,7 @@ export default function ClipPath({
                         onKeyDown={onHandleKeyDown(handle)}
                         onKeyUp={onHandleKeyUp}
                         aria-pressed={isHandleSelected(handle)}
-                        aria-label={`Inset ${cornerLabel(corner)} corner radius. Drag or use arrow keys to adjust.`}
+                        aria-label={`Inset ${cornerName} corner radius. ${HANDLE_ADJUST_HINT}`}
                       />
                     );
                   })
@@ -11017,7 +11085,7 @@ export default function ClipPath({
                       onRemovePoint(i);
                     }}
                     aria-pressed={isHandleSelected(handle)}
-                    aria-label={`Point ${i + 1}. Drag to move, double-click to remove. Use arrow keys to move when selected.`}
+                    aria-label={`Point ${i + 1}. ${POINT_HANDLE_HINT}`}
                   />
                 );
               })
@@ -11084,7 +11152,7 @@ export default function ClipPath({
                 onKeyDown={onHandleKeyDown({ kind: 'inset-top' })}
                 onKeyUp={onHandleKeyUp}
                 aria-pressed={isHandleSelected({ kind: 'inset-top' })}
-                aria-label="Inset top edge. Drag or use arrow keys to resize. Hold Shift for all sides or Option for this side and the opposite side."
+                aria-label={`Inset top edge. ${INSET_EDGE_HANDLE_HINT}`}
               />
               <button
                 className={handleClassName({ kind: 'inset-right' }, 'is-inset-side')}
@@ -11093,7 +11161,7 @@ export default function ClipPath({
                 onKeyDown={onHandleKeyDown({ kind: 'inset-right' })}
                 onKeyUp={onHandleKeyUp}
                 aria-pressed={isHandleSelected({ kind: 'inset-right' })}
-                aria-label="Inset right edge. Drag or use arrow keys to resize. Hold Shift for all sides or Option for this side and the opposite side."
+                aria-label={`Inset right edge. ${INSET_EDGE_HANDLE_HINT}`}
               />
               <button
                 className={handleClassName({ kind: 'inset-bottom' }, 'is-inset-side')}
@@ -11102,7 +11170,7 @@ export default function ClipPath({
                 onKeyDown={onHandleKeyDown({ kind: 'inset-bottom' })}
                 onKeyUp={onHandleKeyUp}
                 aria-pressed={isHandleSelected({ kind: 'inset-bottom' })}
-                aria-label="Inset bottom edge. Drag or use arrow keys to resize. Hold Shift for all sides or Option for this side and the opposite side."
+                aria-label={`Inset bottom edge. ${INSET_EDGE_HANDLE_HINT}`}
               />
               <button
                 className={handleClassName({ kind: 'inset-left' }, 'is-inset-side')}
@@ -11111,11 +11179,12 @@ export default function ClipPath({
                 onKeyDown={onHandleKeyDown({ kind: 'inset-left' })}
                 onKeyUp={onHandleKeyUp}
                 aria-pressed={isHandleSelected({ kind: 'inset-left' })}
-                aria-label="Inset left edge. Drag or use arrow keys to resize. Hold Shift for all sides or Option for this side and the opposite side."
+                aria-label={`Inset left edge. ${INSET_EDGE_HANDLE_HINT}`}
               />
               {CORNERS.map((corner) => {
                 const position = insetRadiusHandlePosition(corner);
                 const handle: HandleTarget = { kind: 'inset-radius', corner };
+                const cornerName = cornerLabel(corner);
                 return (
                   <button
                     key={corner}
@@ -11125,7 +11194,7 @@ export default function ClipPath({
                     onKeyDown={onHandleKeyDown(handle)}
                     onKeyUp={onHandleKeyUp}
                     aria-pressed={isHandleSelected(handle)}
-                    aria-label={`Inset ${cornerLabel(corner)} corner radius. Drag or use arrow keys to adjust. Hold U to unlock separate horizontal and vertical radii. Hold Shift for all corners or Option for this corner and the opposite corner.`}
+                    aria-label={`Inset ${cornerName} corner radius. ${INSET_RADIUS_HANDLE_HINT}`}
                   />
                 );
               })}

@@ -319,7 +319,8 @@ const check = (what, condition, detail) => {
 
   if (typeof electronPath !== 'string') {
     console.log(
-      `hideable: ${checked} passed  [the browser check needs a Chromium — see test/computed-color.js]`,
+      `hideable: ${checked} passed  ` +
+        `[the browser check needs a Chromium — see test/computed-color.js]`,
     );
     if (failures.length) {
       console.error(`hideable: ${failures.length} of ${checked} failed\n${failures.join('\n')}`);

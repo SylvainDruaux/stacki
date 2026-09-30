@@ -497,9 +497,10 @@ function NavigatorBody({
 
 function FrontmatterRow({ props }: { readonly props: EditableProps }) {
   const importCount = props.pageState.model.imports.length;
+  const selectedClass = props.selectedId === 'frontmatter' ? 'selected' : '';
   return (
     <div
-      className={`structure-node frontmatter-node ${props.selectedId === 'frontmatter' ? 'selected' : ''}`}
+      className={`structure-node frontmatter-node ${selectedClass}`}
       style={{ paddingLeft: 6 }}
       onClick={() => props.onSelect('frontmatter')}
       onDoubleClick={() => props.onOpenCode?.('frontmatter')}

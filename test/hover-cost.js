@@ -207,7 +207,8 @@ const settle = (ms = 120) => new Promise((r) => setTimeout(r, ms));
     // on Windows. A page refresh costs several extra walks; one query is
     // bounded scheduling noise rather than the regression this pins out.
     forScroll <= forTrack + 1,
-    `${forScroll} document queries for a scroll against ${forTrack} for a re-measure — the scroll is walking the page`,
+    `${forScroll} document queries for a scroll against ${forTrack} for a re-measure ` +
+      `— the scroll is walking the page`,
   );
   check(
     'while a change to the page really does walk it',

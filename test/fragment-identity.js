@@ -68,9 +68,10 @@ const check = (what, condition, detail) => {
   );
   check(
     'and the same question decides what "renders nothing" is a fact about',
-    /const answers = \(node: EditorNode\): boolean =>\s*MARKABLE\.has\(node\.kind\) && rendersOwnElement\(node\)/.test(
-      app,
-    ),
+    new RegExp(
+      /const answers = \(node: EditorNode\): boolean =>\s*/.source +
+        /MARKABLE\.has\(node\.kind\) && rendersOwnElement\(node\)/.source,
+    ).test(app),
     'the two places disagree about what a Fragment renders',
   );
 

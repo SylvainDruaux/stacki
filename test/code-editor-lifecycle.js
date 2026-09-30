@@ -15,7 +15,9 @@ const path = require('node:path');
   );
   await require('esbuild').build({
     stdin: {
-      contents: `export { default as CodeEditor } from './src/ui/CodeEditor.jsx'; export { EditorView } from '@codemirror/view';`,
+      contents:
+        `export { default as CodeEditor } from './src/ui/CodeEditor.jsx'; export { EditorView ` +
+        `} from '@codemirror/view';`,
       resolveDir: path.join(__dirname, '..'),
       loader: 'jsx',
     },

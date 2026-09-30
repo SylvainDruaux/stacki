@@ -224,7 +224,7 @@ const SEG = (TRACK - PAD * 2) / 4;
     (display.match(/\{BOXLESS\.map\(/g) || []).length === 2,
     'the two menus render the boxless group',
   );
-  check('with a tooltip saying what it does', /contents: <>/.test(display));
+  check('with a tooltip saying what it does', /contents: (?:\(\s*)?<>/.test(display));
   check(
     'and it is a supported value, so the bar keeps it',
     /const BOXLESS = \['none', 'contents'\]/.test(display) &&
@@ -284,12 +284,17 @@ const SEG = (TRACK - PAD * 2) / 4;
   const rule = (selector) => {
     const out = [];
     let from = 0;
-    for (;;) {
+    // Each pass moves `from` past a closing brace, so the loop ends within the
+    // stylesheet's length; an unclosed rule ends it rather than rescanning.
+    while (from < css.length) {
       const at = css.indexOf(selector + ' {', from);
       if (at < 0) {
         break;
       }
       const end = css.indexOf('}', at);
+      if (end < 0) {
+        break;
+      }
       out.push(css.slice(at, end));
       from = end + 1;
     }

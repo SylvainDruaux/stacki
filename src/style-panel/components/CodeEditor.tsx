@@ -40,6 +40,12 @@ const codeEditorHighlightStyle = HighlightStyle.define([
   { tag: tags.comment, color: 'var(--color-text-tertiary)', fontStyle: 'italic' },
 ]);
 
+// CodeMirror paints its selection as its own layer; this selector covers both the unfocused
+// and the focused selection backgrounds.
+const SELECTION_BACKGROUND_SELECTOR =
+  '.cm-selectionBackground, ' +
+  '&.cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground';
+
 const codeEditorTheme = EditorView.theme(
   {
     '&': {
@@ -58,10 +64,9 @@ const codeEditorTheme = EditorView.theme(
     },
     // Matches the selection used everywhere else; CodeMirror paints its own
     // layer instead of using ::selection.
-    '.cm-selectionBackground, &.cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground':
-      {
-        backgroundColor: 'var(--selection)',
-      },
+    [SELECTION_BACKGROUND_SELECTOR]: {
+      backgroundColor: 'var(--selection)',
+    },
     // Find results: a quiet wash on every hit, amber on the current one. Set here
     // rather than in CSS because CodeMirror's defaults for these live in a base
     // theme, which only a theme reliably outranks.

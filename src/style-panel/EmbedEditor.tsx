@@ -278,38 +278,41 @@ function PencilIcon() {
     </svg>
   );
 }
+const EMBED_ICON_SECOND_PATH =
+  'M6.35352 6.85352L5.20703 8L6.35352 9.14648L5.64648 9.85352L3.79297 8L5.64648 6.14648' +
+  'L6.35352 6.85352Z';
+const EMBED_ICON_THIRD_PATH =
+  'M12.207 8L10.3535 9.85352L9.64648 9.14648L10.793 8L9.64648 6.85352L10.3535 6.14648' +
+  'L12.207 8Z';
+const EMBED_ICON_FOURTH_PATH =
+  'M13 2C13.5523 2 14 2.44772 14 3V13C14 13.5523 13.5523 14 13 14H3C2.44772 14 2 13.5523 2 13' +
+  'V3C2 2.44772 2.44772 2 3 2H13ZM3 13H13V3H3V13Z';
+
 function EmbedIcon() {
   return (
     <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
       <path d="M7.73438 11.5H6.70996L8.26562 4.5H9.29004L7.73438 11.5Z" fill="currentColor" />
-      <path
-        d="M6.35352 6.85352L5.20703 8L6.35352 9.14648L5.64648 9.85352L3.79297 8L5.64648 6.14648L6.35352 6.85352Z"
-        fill="currentColor"
-      />
-      <path
-        d="M12.207 8L10.3535 9.85352L9.64648 9.14648L10.793 8L9.64648 6.85352L10.3535 6.14648L12.207 8Z"
-        fill="currentColor"
-      />
-      <path
-        fillRule="evenodd"
-        clipRule="evenodd"
-        d="M13 2C13.5523 2 14 2.44772 14 3V13C14 13.5523 13.5523 14 13 14H3C2.44772 14 2 13.5523 2 13V3C2 2.44772 2.44772 2 3 2H13ZM3 13H13V3H3V13Z"
-        fill="currentColor"
-      />
+      <path d={EMBED_ICON_SECOND_PATH} fill="currentColor" />
+      <path d={EMBED_ICON_THIRD_PATH} fill="currentColor" />
+      <path fillRule="evenodd" clipRule="evenodd" d={EMBED_ICON_FOURTH_PATH} fill="currentColor" />
     </svg>
   );
 }
+
+const COMPONENT_ICON_PATH =
+  'M8.47885 1.69144C8.18037 1.52863 7.81963 1.52863 7.52115 1.69144L2.52115 4.41871' +
+  'C2.19989 4.59395 2 4.93066 2 5.29661V10.703C2 11.0689 2.19989 11.4056 2.52115 11.5809' +
+  'L7.52115 14.3081C7.81963 14.471 8.18037 14.471 8.47885 14.3081L13.4789 11.5809' +
+  'C13.8001 11.4056 14 11.0689 14 10.703V5.29661C14 4.93066 13.8001 4.59395 13.4789 4.41871' +
+  'L8.47885 1.69144ZM3.54416 4.99979L8 2.56934L12.4558 4.99979L8 7.43025L3.54416 4.99979Z' +
+  'M3 5.84206L3 10.703L7.5 13.1575V8.29661L3 5.84206ZM8.5 13.1575L13 10.703V5.84206' +
+  'L8.5 8.29661V13.1575Z';
 
 // Webflow's component glyph — labels a component subheader in the source dropdown.
 function ComponentIcon() {
   return (
     <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-      <path
-        fillRule="evenodd"
-        clipRule="evenodd"
-        d="M8.47885 1.69144C8.18037 1.52863 7.81963 1.52863 7.52115 1.69144L2.52115 4.41871C2.19989 4.59395 2 4.93066 2 5.29661V10.703C2 11.0689 2.19989 11.4056 2.52115 11.5809L7.52115 14.3081C7.81963 14.471 8.18037 14.471 8.47885 14.3081L13.4789 11.5809C13.8001 11.4056 14 11.0689 14 10.703V5.29661C14 4.93066 13.8001 4.59395 13.4789 4.41871L8.47885 1.69144ZM3.54416 4.99979L8 2.56934L12.4558 4.99979L8 7.43025L3.54416 4.99979ZM3 5.84206L3 10.703L7.5 13.1575V8.29661L3 5.84206ZM8.5 13.1575L13 10.703V5.84206L8.5 8.29661V13.1575Z"
-        fill="currentColor"
-      />
+      <path fillRule="evenodd" clipRule="evenodd" d={COMPONENT_ICON_PATH} fill="currentColor" />
     </svg>
   );
 }
@@ -386,6 +389,10 @@ function SaveIndicator({
   return createPortal(node, target);
 }
 
+const TABLET_BREAKPOINT_ICON_SECOND_PATH =
+  'M3 3C3 2.44772 3.44772 2 4 2H12C12.5523 2 13 2.44772 13 3V13C13 13.5523 12.5523 14 12 14H4' +
+  'C3.44772 14 3 13.5523 3 13V3ZM4 3H12V13H4V3Z';
+
 // Webflow's native breakpoint glyphs (tablet / mobile-landscape / mobile),
 // shown beside the responsive contexts in the style-context dropdown.
 function TabletBreakpointIcon() {
@@ -395,12 +402,17 @@ function TabletBreakpointIcon() {
       <path
         fillRule="evenodd"
         clipRule="evenodd"
-        d="M3 3C3 2.44772 3.44772 2 4 2H12C12.5523 2 13 2.44772 13 3V13C13 13.5523 12.5523 14 12 14H4C3.44772 14 3 13.5523 3 13V3ZM4 3H12V13H4V3Z"
+        d={TABLET_BREAKPOINT_ICON_SECOND_PATH}
         fill="currentColor"
       />
     </svg>
   );
 }
+const MOBILE_LANDSCAPE_BREAKPOINT_ICON_SECOND_PATH =
+  'M4 12C2.89543 12 2 11.1046 2 10L2 6C2 4.89543 2.89543 4 4 4L12 4C13.1046 4 14 4.89543 14 6' +
+  'V10C14 11.1046 13.1046 12 12 12H4ZM3 10L3 6C3 5.44772 3.44772 5 4 5L12 5' +
+  'C12.5523 5 13 5.44772 13 6V10C13 10.5523 12.5523 11 12 11L4 11C3.44772 11 3 10.5523 3 10Z';
+
 function MobileLandscapeBreakpointIcon() {
   return (
     <svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true">
@@ -408,12 +420,17 @@ function MobileLandscapeBreakpointIcon() {
       <path
         fillRule="evenodd"
         clipRule="evenodd"
-        d="M4 12C2.89543 12 2 11.1046 2 10L2 6C2 4.89543 2.89543 4 4 4L12 4C13.1046 4 14 4.89543 14 6V10C14 11.1046 13.1046 12 12 12H4ZM3 10L3 6C3 5.44772 3.44772 5 4 5L12 5C12.5523 5 13 5.44772 13 6V10C13 10.5523 12.5523 11 12 11L4 11C3.44772 11 3 10.5523 3 10Z"
+        d={MOBILE_LANDSCAPE_BREAKPOINT_ICON_SECOND_PATH}
         fill="currentColor"
       />
     </svg>
   );
 }
+const MOBILE_BREAKPOINT_ICON_SECOND_PATH =
+  'M4 4C4 2.89543 4.89543 2 6 2H10C11.1046 2 12 2.89543 12 4V12C12 13.1046 11.1046 14 10 14H6' +
+  'C4.89543 14 4 13.1046 4 12V4ZM6 3H10C10.5523 3 11 3.44772 11 4V12' +
+  'C11 12.5523 10.5523 13 10 13H6C5.44772 13 5 12.5523 5 12V4C5 3.44772 5.44772 3 6 3Z';
+
 function MobileBreakpointIcon() {
   return (
     <svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true">
@@ -421,19 +438,21 @@ function MobileBreakpointIcon() {
       <path
         fillRule="evenodd"
         clipRule="evenodd"
-        d="M4 4C4 2.89543 4.89543 2 6 2H10C11.1046 2 12 2.89543 12 4V12C12 13.1046 11.1046 14 10 14H6C4.89543 14 4 13.1046 4 12V4ZM6 3H10C10.5523 3 11 3.44772 11 4V12C11 12.5523 10.5523 13 10 13H6C5.44772 13 5 12.5523 5 12V4C5 3.44772 5.44772 3 6 3Z"
+        d={MOBILE_BREAKPOINT_ICON_SECOND_PATH}
         fill="currentColor"
       />
     </svg>
   );
 }
+const DESKTOP_BREAKPOINT_ICON_FIRST_PATH =
+  'M12 5.36602L10.1519 6.43301L9.65192 5.56699L11.5 4.5L9.65193 3.43301L10.1519 2.56699' +
+  'L12 3.63397V1.5H13V3.63397L14.8481 2.56699L15.3481 3.43301L13.5 4.5L15.3481 5.56699' +
+  'L14.8481 6.43301L13 5.36602V7.5H12V5.36602Z';
+
 function DesktopBreakpointIcon() {
   return (
     <svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-      <path
-        d="M12 5.36602L10.1519 6.43301L9.65192 5.56699L11.5 4.5L9.65193 3.43301L10.1519 2.56699L12 3.63397V1.5H13V3.63397L14.8481 2.56699L15.3481 3.43301L13.5 4.5L15.3481 5.56699L14.8481 6.43301L13 5.36602V7.5H12V5.36602Z"
-        fill="currentColor"
-      />
+      <path d={DESKTOP_BREAKPOINT_ICON_FIRST_PATH} fill="currentColor" />
       <path
         d="M3 4H8V5H3V12H13V9H14V12H16V13H0V12H2V5C2 4.44772 2.44772 4 3 4Z"
         fill="currentColor"
@@ -1175,7 +1194,9 @@ function ResolvedRow({
     <div className={`embed-editor_decl ${isDisplay ? 'is-control' : ''}`}>
       {isSelected ? (
         <FieldLabel
-          className={`embed-editor_prop-label is-blue ${resolved.overridden ? 'is-overridden' : ''}`}
+          className={
+            'embed-editor_prop-label is-blue ' + (resolved.overridden ? 'is-overridden' : '')
+          }
           active
           disabled={busy}
           onReset={() => clearProp(prop)}
@@ -2318,7 +2339,9 @@ export function SelectorPicker({
         under it down a row, so the panel rearranged itself under the pointer just as
         it became usable. With nothing to reveal it sits inert instead. */}
       <label
-        className={`embed-editor_check embed-editor_selector-filter ${globals.length ? '' : 'is-empty'}`}
+        className={
+          'embed-editor_check embed-editor_selector-filter ' + (globals.length ? '' : 'is-empty')
+        }
         title="Tags, universal selectors, and broad states can match many elements"
       >
         <input
@@ -2330,7 +2353,9 @@ export function SelectorPicker({
         <span>Show global selectors ({globals.length})</span>
       </label>
       <label
-        className={`embed-editor_check embed-editor_selector-filter ${inherited.length ? '' : 'is-empty'}`}
+        className={
+          'embed-editor_check embed-editor_selector-filter ' + (inherited.length ? '' : 'is-empty')
+        }
         title="Selectors that apply because this element is inside a matching parent or ancestor"
       >
         <input
@@ -2944,12 +2969,10 @@ function CssCodeSection({
 
 function StyleCard({
   snapshot,
-  selectedNames,
   activePicked,
   cssCodeOpen,
   onToggleCssCode,
   model,
-  onSelectNames,
   resolved,
   contexts,
   contextInfos,
@@ -2982,13 +3005,11 @@ function StyleCard({
   onSaveCssRule,
 }: {
   snapshot: ElementSnapshot | undefined;
-  selectedNames: string[];
   selectedSelector: string;
   activePicked: boolean;
   cssCodeOpen: boolean;
   onToggleCssCode: () => void;
   model: RuleModel;
-  onSelectNames: (names: string[]) => void;
   resolved: ResolvedStyle;
   contexts: StyleContext[];
   contextInfos: ContextInfo[];
@@ -3171,11 +3192,7 @@ function StyleCard({
         <div className="embed-editor_selector">
           <div className="embed-editor_selector-box">
             {snapshot ? (
-              <ElementTokenPicker
-                snapshot={snapshot}
-                selected={selectedNames}
-                onChange={(names) => onSelectNames(names)}
-              />
+              <ElementTokenPicker snapshot={snapshot} />
             ) : (
               <div className="embed-editor_element-id is-empty">No element selected</div>
             )}
@@ -3567,7 +3584,9 @@ function nativeSignature(model: NativeModel | null): string {
         `${style.className}:${[...style.propsByContext]
           .map(
             ([ctx, props]) =>
-              `${ctx}{${[...props].map(([prop, v]) => `${prop}=${v.value}${v.isVariable ? '~' : ''}`).join(';')}}`,
+              `${ctx}{${[...props]
+                .map(([prop, v]) => `${prop}=${v.value}${v.isVariable ? '~' : ''}`)
+                .join(';')}}`,
           )
           .join('|')}`,
     )
@@ -4260,7 +4279,8 @@ export default function EmbedEditor() {
         if (content.partial) {
           setStatus(
             model.matchedRuleCount > 0
-              ? `${model.matchedRuleCount} matching rule${model.matchedRuleCount === 1 ? '' : 's'} so far — scanning components…`
+              ? `${model.matchedRuleCount} matching ` +
+                  `rule${model.matchedRuleCount === 1 ? '' : 's'} so far — scanning components…`
               : 'Scanning component embeds…',
           );
         } else {
@@ -4794,7 +4814,8 @@ export default function EmbedEditor() {
           if (inComponentRef.current && !doc.source.fromComponent) {
             markPending(doc.source.key);
             setStatus(
-              'Held — this rule lives in the page, so the canvas shows it once you leave the component.',
+              'Held — this rule lives in the page, so the canvas shows it once you ' +
+                'leave the component.',
             );
             return;
           }
@@ -4804,7 +4825,8 @@ export default function EmbedEditor() {
         clearPending(doc.source.key);
         setStatus(
           rule.fromComponent
-            ? `Saved. This embed is shared by every instance of ${rule.componentName ?? 'the component'}.`
+            ? 'Saved. This embed is shared by every instance of ' +
+                `${rule.componentName ?? 'the component'}.`
             : 'Saved to embed.',
         );
       } finally {
@@ -5186,13 +5208,6 @@ export default function EmbedEditor() {
     };
   }, [phase, standaloneClass]);
 
-  // Pick a simple selector via the element's token chips (always base state).
-  const selectTokens = useCallback((names: string[]) => {
-    pendingDefaultRef.current = false;
-    setSelectedTokens(names);
-    setSelectedSelectorText(null);
-    setStateKey('');
-  }, []);
   // Pick any matched selector (a chip, an override-note jump, or a typed one) as the
   // edit target. Sync the token pick + interaction state so native editing (class +
   // pseudo) still resolves; a complex selector clears the tokens (embed-only) and
@@ -5410,7 +5425,8 @@ export default function EmbedEditor() {
           if (inComponentRef.current && !doc.source.fromComponent) {
             markPending(doc.source.key);
             setStatus(
-              'Held — this query lives in the page, so the canvas shows it once you leave the component.',
+              'Held — this query lives in the page, so the canvas shows it once you ' +
+                'leave the component.',
             );
             return;
           }
@@ -6147,7 +6163,8 @@ export default function EmbedEditor() {
           if (inComponentRef.current && !doc.source.fromComponent) {
             markPending(doc.source.key);
             setStatus(
-              'Held — this rule lives in the page, so the canvas shows it once you leave the component.',
+              'Held — this rule lives in the page, so the canvas shows it once you ' +
+                'leave the component.',
             );
             return;
           }
@@ -6204,7 +6221,8 @@ export default function EmbedEditor() {
           if (inComponentRef.current && !doc.source.fromComponent) {
             markPending(doc.source.key);
             setStatus(
-              'Held — this rule lives in the page, so the canvas shows it once you leave the component.',
+              'Held — this rule lives in the page, so the canvas shows it once you ' +
+                'leave the component.',
             );
             return;
           }
@@ -6310,12 +6328,14 @@ export default function EmbedEditor() {
         setBusyBoth(false);
       }
       setStatus(
-        `Couldn’t set ${prop} as a Webflow style${reason ? ` (${reason})` : ''} — moving it to an embed.`,
+        `Couldn’t set ${prop} as a Webflow style${reason ? ` (${reason})` : ''}` +
+          ' — moving it to an embed.',
       );
       // The status line isn't rendered, so surface the reason inline — otherwise the
       // fall-through to an embed is invisible and looks like "it always writes code".
       setNativeFallback(
-        `Webflow wouldn’t apply ${prop} to this class natively${reason ? ` (${reason})` : ''} — saved it to the embed instead.`,
+        `Webflow wouldn’t apply ${prop} to this class natively${reason ? ` (${reason})` : ''}` +
+          ' — saved it to the embed instead.',
       );
       writeEmbedProp(prop, value, important);
     });
@@ -6384,10 +6404,12 @@ export default function EmbedEditor() {
         return;
       }
       setStatus(
-        `Couldn’t create .${className} as a Webflow class${reason ? ` (${reason})` : ''} — moving it to an embed.`,
+        `Couldn’t create .${className} as a Webflow class${reason ? ` (${reason})` : ''}` +
+          ' — moving it to an embed.',
       );
       setNativeFallback(
-        `Webflow wouldn’t create .${className} as a class${reason ? ` (${reason})` : ''} — saved it to the embed instead.`,
+        `Webflow wouldn’t create .${className} as a class${reason ? ` (${reason})` : ''}` +
+          ' — saved it to the embed instead.',
       );
       writeEmbedProp(prop, value, important);
     });
@@ -6602,7 +6624,8 @@ export default function EmbedEditor() {
           error={saveError}
           pending={
             pendingKeys.size
-              ? `${pendingKeys.size} change${pendingKeys.size === 1 ? '' : 's'} to the page's styles — not on the canvas until you leave this component`
+              ? `${pendingKeys.size} change${pendingKeys.size === 1 ? '' : 's'} ` +
+                "to the page's styles — not on the canvas until you leave this component"
               : null
           }
         />
@@ -6638,13 +6661,11 @@ export default function EmbedEditor() {
             <div className="embed-editor_list">
               <StyleCard
                 snapshot={snapshot}
-                selectedNames={selectedTokens}
                 selectedSelector={activeSelector}
                 activePicked={selectedSelectorText != null}
                 cssCodeOpen={cssCodeOpen}
                 onToggleCssCode={() => setCssCodeOpen((open) => !open)}
                 model={model ?? EMPTY_RULE_MODEL}
-                onSelectNames={selectTokens}
                 resolved={resolved ?? EMPTY_RESOLVED}
                 contexts={styleContexts}
                 contextInfos={contextInfos}
@@ -6698,7 +6719,9 @@ export default function EmbedEditor() {
         !nativeHasAny ? (
           <div className="embed-editor_empty">
             {scan?.embedCount
-              ? `Scanned ${scan.embedCount} embed${scan.embedCount === 1 ? '' : 's'}${scan.componentEmbedCount ? ` (${scan.componentEmbedCount} in components)` : ''}, but none target this element.`
+              ? `Scanned ${scan.embedCount} embed${scan.embedCount === 1 ? '' : 's'}` +
+                (scan.componentEmbedCount ? ` (${scan.componentEmbedCount} in components)` : '') +
+                ', but none target this element.'
               : 'No HTML embeds with <style> blocks were found on this page.'}
           </div>
         ) : null}

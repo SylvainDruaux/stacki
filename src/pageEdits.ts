@@ -4,12 +4,13 @@
 //
 // Two kinds of entry, never mixed up:
 //   - a gesture (any page — .astro, Markdown or MDX since step 10): the edit
-//     requests it becomes, stated when it is sent — against the page as the app's last reply left it (the origin),
-//     so a node an earlier gesture created a moment ago is already there to
-//     name. A request names nodes by the facts of that parse (path, kind,
-//     source range), and main checks them against its own projection of the
-//     same bytes. Nothing is saved as a whole model: a gesture that cannot be
-//     stated — its node is gone, or lives in another file — is refused.
+//     requests it becomes, stated when it is sent — against the page as the
+//     app's last reply left it (the origin), so a node an earlier gesture
+//     created a moment ago is already there to name. A request names nodes by
+//     the facts of that parse (path, kind, source range), and main checks them
+//     against its own projection of the same bytes. Nothing is saved as a
+//     whole model: a gesture that cannot be stated — its node is gone, or
+//     lives in another file — is refused.
 //   - typed code (step 8): the page's text, saved as one patch from the
 //     baseline the typing descends from (src/codeEdits.ts). At most one, and
 //     first: typing replaces the unsent gestures, which the text it was typed

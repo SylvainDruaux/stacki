@@ -102,7 +102,8 @@ app.whenReady().then(async () => {
     check(
       'the top of the picture is the top of the page',
       near(top, HERO),
-      `expected the hero's colour, got rgb(${top.r},${top.g},${top.b}) — the page was photographed where it scrolled to`,
+      `expected the hero's colour, got rgb(${top.r},${top.g},${top.b}) ` +
+        `— the page was photographed where it scrolled to`,
     );
     // The viewport is 1440×900 and the hero is exactly 900 tall, so the bottom
     // of the frame is the last of the hero — proof the whole viewport was

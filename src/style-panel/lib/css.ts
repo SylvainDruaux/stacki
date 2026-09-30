@@ -661,7 +661,10 @@ export function createRuleInQuery(
   return createRuleInAtRule(container as AtRule, selector, prop, value, important);
 }
 
-/** Create `selector { prop: value }` at the region root (base, non-@ level). Returns false on empty input. */
+/**
+ * Create `selector { prop: value }` at the region root (base, non-@ level). Returns false on
+ * empty input.
+ */
 export function createRuleAtRoot(
   region: StyleRegion,
   selector: string,

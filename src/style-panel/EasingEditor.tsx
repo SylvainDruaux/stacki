@@ -254,13 +254,19 @@ function BezierEditor({
       />
       {/* The easing curve. */}
       <path
-        d={`M ${sx(0)} ${sy(0)} C ${sx(value[0])} ${sy(value[1])} ${sx(value[2])} ${sy(value[3])} ${sx(1)} ${sy(1)}`}
+        d={
+          `M ${sx(0)} ${sy(0)} C ${sx(value[0])} ${sy(value[1])} ` +
+          `${sx(value[2])} ${sy(value[3])} ${sx(1)} ${sy(1)}`
+        }
         className="embed-editor_ease-path"
       />
       {/* Playhead on the right edge — slides up with the current progress. */}
       {pd ? (
         <polygon
-          points={`${S},${pd.y} ${S + 9},${pd.y - 9} ${S + 27},${pd.y - 9} ${S + 27},${pd.y + 9} ${S + 9},${pd.y + 9}`}
+          points={
+            `${S},${pd.y} ${S + 9},${pd.y - 9} ${S + 27},${pd.y - 9} ` +
+            `${S + 27},${pd.y + 9} ${S + 9},${pd.y + 9}`
+          }
           className="embed-editor_ease-playhead"
         />
       ) : null}
@@ -377,7 +383,9 @@ export default function EasingEditor({
 
   return createPortal(
     <div
-      className={`embed-editor_bg-modal-backdrop embed-editor_ease-backdrop${frame ? ' is-framed' : ''}`}
+      className={
+        'embed-editor_bg-modal-backdrop embed-editor_ease-backdrop' + (frame ? ' is-framed' : '')
+      }
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) {
           onClose();
@@ -468,7 +476,9 @@ export default function EasingEditor({
                     <button
                       key={preset.label}
                       type="button"
-                      className={`embed-editor_ease-preset ${bezEq(preset.b, bezier) ? 'is-active' : ''}`}
+                      className={
+                        'embed-editor_ease-preset ' + (bezEq(preset.b, bezier) ? 'is-active' : '')
+                      }
                       title={`${group.heading} ${preset.label}`}
                       onClick={() => apply(preset.b)}
                     >

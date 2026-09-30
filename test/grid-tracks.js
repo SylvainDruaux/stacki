@@ -450,7 +450,7 @@ const check = (what, condition, detail) => {
     // what matters here is that `expanded` is one of them.
     check(
       'the press that opens it respects that',
-      /if \(disabled \|\| big \|\| expanded[^)]*\) \{return/.test(vc),
+      /if \(disabled \|\| big \|\| expanded[^)]*\) \{\s*return/.test(vc),
     );
     check(
       "and so does the '=' shortcut",
@@ -481,7 +481,7 @@ const check = (what, condition, detail) => {
   check('on both track lists, since each is written its own way', /<RepeatSwitch/.test(settings));
   check(
     'and every edit writes the form it is showing',
-    /const write = \(next: string\[\]\) => \{ const s = asWritten\(next\)/.test(settings),
+    /const write = \(next: string\[\]\) => \{\s*const s = asWritten\(next\)/.test(settings),
     'an edit would write in its own form regardless of the switch',
   );
 

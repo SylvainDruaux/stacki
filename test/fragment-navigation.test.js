@@ -75,7 +75,9 @@ async function checkFragment(syntax) {
   await esbuild.build({
     stdin: {
       contents:
-        "export {default as StructurePanel} from './src/panels/StructurePanel.tsx'; export {liveClassesById} from './src/liveClasses.js'; export {createTreeIndex} from './src/editorTree.js';",
+        "export {default as StructurePanel} from './src/panels/StructurePanel.tsx'; export " +
+        "{liveClassesById} from './src/liveClasses.js'; export {createTreeIndex} from " +
+        "'./src/editorTree.js';",
       loader: 'jsx',
       resolveDir: path.join(__dirname, '..'),
     },
@@ -238,6 +240,8 @@ async function checkFragment(syntax) {
 }
 
 for (const syntax of ['shorthand', 'named']) {
-  test(`conditional ${syntax} fragments expose editable Navigator groups and preserve identity`, () =>
-    checkFragment(syntax));
+  test(
+    `conditional ${syntax} fragments expose ` + `editable Navigator groups and preserve identity`,
+    () => checkFragment(syntax),
+  );
 }

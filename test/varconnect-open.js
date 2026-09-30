@@ -52,7 +52,10 @@ const check = (what, condition, detail) => {
           build.onLoad({ filter: /.*/, namespace: 'stub' }, () => ({
             contents: `
               export async function streamProjectVariables(onAdd) {
-                onAdd({ name: 'brand', collection: 'Colors', group: '', value: '#f00', binding: 'var(--brand)', kind: 'Color' });
+                onAdd({
+                  name: 'brand', collection: 'Colors', group: '', value: '#f00',
+                  binding: 'var(--brand)', kind: 'Color',
+                });
                 return [];
               }
               export const __stub = true;

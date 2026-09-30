@@ -399,7 +399,8 @@ const check = (what, condition, detail) => {
       'while a narrowed list is still a list',
       dataTree({
         frontmatter:
-          'const portfolio = await getCollection("portfolio");\nconst some = portfolio.filter(Boolean);',
+          'const portfolio = await getCollection("portfolio");\n' +
+          'const some = portfolio.filter(Boolean);',
         collectionSamples: { portfolio: entry },
       }).find((n) => n.path === 'some')?.kind === 'list',
     );
@@ -434,7 +435,9 @@ const check = (what, condition, detail) => {
   );
 
   // Cleanup only ever considers what Stacki wrote.
-  const written = `const a = 1;\nconst blogEntries = await getCollection('blog'); // ${QUERY_MARK}\nconst b = 2;`;
+  const written =
+    `const a = 1;\nconst blogEntries = await getCollection('blog'); // ${QUERY_MARK}\n` +
+    `const b = 2;`;
   check(
     'a written query is recognised',
     markedQueries(written)
@@ -659,9 +662,10 @@ const check = (what, condition, detail) => {
   );
   check(
     'a chip in another field closes this one',
-    /const chip = eventElement\(e\.target\)\?\.closest\('\.expr-chip, \.cm-chip'\)[\s\S]{0,120}wrapRef\.current\?\.contains\(chip\)/.test(
-      panel,
-    ),
+    new RegExp(
+      /const chip = eventElement\(e\.target\)\?\.closest\('\.expr-chip/.source +
+        /, \.cm-chip'\)[\s\S]{0,120}wrapRef\.current\?\.contains\(chip\)/.source,
+    ).test(panel),
     'any chip anywhere keeps this picker open',
   );
 

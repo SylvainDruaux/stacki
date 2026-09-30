@@ -661,44 +661,47 @@ test('common declaration edits preserve variants, runtime assertions and unrelat
   assert.equal(variants(removed), variants(compositeCard));
 });
 
-test('renaming a common prop updates its instances, runtime binding and related type references', () => {
-  project(({ root, component, page }) => {
-    fs.writeFileSync(component, compositeCard);
-    fs.writeFileSync(
-      page,
-      '---\nimport Card from "../components/Card.astro";\n---\n' +
-        '<Card eyebrow="Hello"/><Card eyebrow="Again"/>',
-    );
-    const eyebrow = readComponentProperties(compositeCard).properties.find(
-      (p) => p.name === 'eyebrow',
-    );
-    const updated = value(
-      updateComponentProperties(
-        {
-          projectPath: root,
-          file: component,
-          source: compositeCard,
-          change: {
-            kind: 'save',
-            originalName: 'eyebrow',
-            property: { ...eyebrow, name: 'kicker' },
+test(
+  'renaming a common prop updates its instances, ' + 'runtime binding and related type references',
+  () => {
+    project(({ root, component, page }) => {
+      fs.writeFileSync(component, compositeCard);
+      fs.writeFileSync(
+        page,
+        '---\nimport Card from "../components/Card.astro";\n---\n' +
+          '<Card eyebrow="Hello"/><Card eyebrow="Again"/>',
+      );
+      const eyebrow = readComponentProperties(compositeCard).properties.find(
+        (p) => p.name === 'eyebrow',
+      );
+      const updated = value(
+        updateComponentProperties(
+          {
+            projectPath: root,
+            file: component,
+            source: compositeCard,
+            change: {
+              kind: 'save',
+              originalName: 'eyebrow',
+              property: { ...eyebrow, name: 'kicker' },
+            },
           },
-        },
-        writer,
-      ),
-    );
-    assert.equal(updated.properties.find((p) => p.name === 'kicker').editing.kind, 'editable');
-    const after = fs.readFileSync(component, 'utf8');
-    assert.match(after, /kicker: eyebrow/);
-    assert.match(after, /Astro.props.kicker/);
-    assert.match(after, /Base\["kicker"\]/);
-    assert.match(after, /AllProps\["kicker"\]/);
-    assert.match(after, /Pick<Base, "kicker">/);
-    assert.match(after, /Other\["eyebrow"\]/);
-    assert.match(after, /\{eyebrow\}/);
-    assert.equal(fs.readFileSync(page, 'utf8').match(/kicker=/g).length, 2);
-  });
-});
+          writer,
+        ),
+      );
+      assert.equal(updated.properties.find((p) => p.name === 'kicker').editing.kind, 'editable');
+      const after = fs.readFileSync(component, 'utf8');
+      assert.match(after, /kicker: eyebrow/);
+      assert.match(after, /Astro.props.kicker/);
+      assert.match(after, /Base\["kicker"\]/);
+      assert.match(after, /AllProps\["kicker"\]/);
+      assert.match(after, /Pick<Base, "kicker">/);
+      assert.match(after, /Other\["eyebrow"\]/);
+      assert.match(after, /\{eyebrow\}/);
+      assert.equal(fs.readFileSync(page, 'utf8').match(/kicker=/g).length, 2);
+    });
+  },
+);
 
 test('ambiguous common declarations remain restricted without flattening their contracts', () => {
   for (const declaration of [

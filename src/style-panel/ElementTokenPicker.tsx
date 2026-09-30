@@ -6,15 +6,12 @@ import { snapshotTokens } from './lib/element-tokens';
  * A read-only, monospace rendering of the selected element's identity as a CSS
  * selector — tag + `.class`es + `[attr]`/`[attr="value"]` (e.g.
  * `h2.hero_title.u-text-style-h2[data-x="1"]`). Just a reference; the actual
- * editable selectors live in the SelectorPicker below. (selected/onChange are
- * kept in the type for call-site compatibility but no longer used.)
+ * editable selectors live in the SelectorPicker below.
  */
 export default function ElementTokenPicker({
   snapshot,
 }: {
   snapshot: ElementSnapshot | undefined;
-  selected?: string[];
-  onChange?: (selectedNames: string[], selector: string) => void;
 }) {
   const tokens = useMemo(() => snapshotTokens(snapshot), [snapshot]);
   if (!tokens.length) {

@@ -538,18 +538,20 @@ const ChevDown = () => (
     />
   </svg>
 );
+const DENSE_ICON_FIRST_PATH =
+  'M14.8535 11.1465 14.1465 11.8535 12.5 10.207V14H11.5v-3.793' +
+  'L9.85352 11.8535 9.14648 11.1465 12 8.29297 14.8535 11.1465Z';
+const DENSE_ICON_SECOND_PATH =
+  'M14.1025 1.005C14.6067 1.056 15 1.482 15 2v4l-.005.103c-.048.47-.422.844-.892.892L14 7h-4' +
+  'c-.518 0-.944-.393-.995-.897L9 6V2c0-.552.448-1 1-1h4l.103.005ZM10 6h4V2h-4v4Z';
+const DENSE_ICON_FOURTH_PATH =
+  'M7.103 1.005C7.607 1.056 8 1.482 8 2v4l-.005.103c-.048.47-.422.844-.892.892L7 7H3' +
+  'c-.518 0-.944-.393-.995-.897L2 6V2c0-.552.448-1 1-1h4l.103.005ZM3 6h4V2H3v4Z';
+
 const DenseIcon = () => (
   <svg viewBox="0 0 16 16" fill="none" aria-hidden="true" width="16" height="16">
-    <path
-      d="M14.8535 11.1465 14.1465 11.8535 12.5 10.207V14H11.5v-3.793L9.85352 11.8535 9.14648 11.1465 12 8.29297 14.8535 11.1465Z"
-      fill="currentColor"
-    />
-    <path
-      fillRule="evenodd"
-      clipRule="evenodd"
-      d="M14.1025 1.005C14.6067 1.056 15 1.482 15 2v4l-.005.103c-.048.47-.422.844-.892.892L14 7h-4c-.518 0-.944-.393-.995-.897L9 6V2c0-.552.448-1 1-1h4l.103.005ZM10 6h4V2h-4v4Z"
-      fill="currentColor"
-    />
+    <path d={DENSE_ICON_FIRST_PATH} fill="currentColor" />
+    <path fillRule="evenodd" clipRule="evenodd" d={DENSE_ICON_SECOND_PATH} fill="currentColor" />
     <path
       opacity="0.4"
       d="M9 9H3v4h6v1H3l-.103-.005c-.47-.048-.844-.422-.892-.892L2 13V9c0-.552.448-1 1-1h6v1Z"
@@ -559,7 +561,7 @@ const DenseIcon = () => (
       opacity="0.4"
       fillRule="evenodd"
       clipRule="evenodd"
-      d="M7.103 1.005C7.607 1.056 8 1.482 8 2v4l-.005.103c-.048.47-.422.844-.892.892L7 7H3c-.518 0-.944-.393-.995-.897L2 6V2c0-.552.448-1 1-1h4l.103.005ZM3 6h4V2H3v4Z"
+      d={DENSE_ICON_FOURTH_PATH}
       fill="currentColor"
     />
   </svg>

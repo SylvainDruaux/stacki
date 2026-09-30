@@ -49,11 +49,14 @@ const check = (what, condition, detail) => {
   fs.mkdirSync(pageDir, { recursive: true });
 
   const entry = path.join(pageDir, 'entry.jsx');
+  // The module specifier of a style-panel source file, written into the entry below.
+  const stylePanelImport = (...parts) =>
+    JSON.stringify(path.join(root, 'src', 'style-panel', ...parts));
   fs.writeFileSync(
     entry,
     `import React from 'react'
      import { createRoot } from 'react-dom/client'
-     import GridSettings from ${JSON.stringify(path.join(root, 'src', 'style-panel', 'GridSettings'))}
+     import GridSettings from ${stylePanelImport('GridSettings')}
      const decls = { 'grid-template-columns': '200px 1fr minmax(0, 2fr)' }
      const read = (p) => decls[p] != null
        ? { source:'selected', overridden:false, contributors:[],
@@ -96,7 +99,8 @@ const check = (what, condition, detail) => {
   fs.writeFileSync(
     path.join(pageDir, 'index.html'),
     '<!doctype html><meta charset=utf-8><link rel="stylesheet" href="app.css">' +
-      '<style>body{margin:0;background:#1a1a1a}</style><div id="root"></div><script src="bundle.js"></script>',
+      '<style>body{margin:0;background:#1a1a1a}</style><div id="root"></div>' +
+      '<script src="bundle.js"></script>',
   );
 
   const probe = path.join(pageDir, 'probe.js');
@@ -122,13 +126,16 @@ const check = (what, condition, detail) => {
            portaledOutOfHost: !main.closest('.style-panel-host'),
            inSurface: !!main.closest('.style-panel-surface'),
            justify: getComputedStyle(main).justifyContent,
-           labelInset: Math.round(label.getBoundingClientRect().left - main.getBoundingClientRect().left),
+           labelInset: Math.round(
+             label.getBoundingClientRect().left - main.getBoundingClientRect().left,
+           ),
            mainWidth: Math.round(main.getBoundingClientRect().width),
            rowBg: getComputedStyle(row).backgroundColor,
            mainBg: getComputedStyle(main).backgroundColor,
            rowWidth: Math.round(row.getBoundingClientRect().width),
            // Every section heading should start at the same left edge.
-           headingLefts: heads.map((h) => Math.round(h.firstElementChild.getBoundingClientRect().left - bodyLeft)),
+           headingLefts: heads.map((h) =>
+             Math.round(h.firstElementChild.getBoundingClientRect().left - bodyLeft)),
          };
        })()\`);
        const resting = await read();

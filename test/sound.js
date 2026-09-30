@@ -26,6 +26,32 @@ const check = (what, condition, detail) => {
   }
 };
 
+// The text between the parenthesis that ends `opening` and the one that closes
+// it, or undefined when `opening` is absent or never closed. Counting depth
+// keeps the read inside one call however its arguments are spread over lines,
+// which a line-bound regex like `useDrag\(.*\)` cannot do. The sources read
+// here keep their parentheses balanced outside strings, so strings are not
+// skipped.
+function callArguments(text, opening) {
+  const start = text.indexOf(opening);
+  if (start === -1) {
+    return undefined;
+  }
+  const argumentsStart = start + opening.length;
+  let depth = 1;
+  for (let index = argumentsStart; index < text.length; index++) {
+    if (text[index] === '(') {
+      depth++;
+    } else if (text[index] === ')') {
+      depth--;
+      if (depth === 0) {
+        return text.slice(argumentsStart, index);
+      }
+    }
+  }
+  return undefined;
+}
+
 // Enough of Web Audio to build one note and see where it went.
 function fakeAudio() {
   const played = [];
@@ -663,16 +689,24 @@ function fakeAudio() {
   );
   check(
     'the colour drag plays the note',
-    /if \(live\) \{dragNote\(fx, tall \? fy : undefined\)/.test(picker),
+    /if \(live\) \{\s*dragNote\(fx, tall \? fy : undefined\)/.test(picker),
   );
   check('and releasing ends the run', /endDragNotes\(\)/.test(picker));
   // The square is a surface to drag around in; the bars are a few pixels high,
   // where a fraction of the height is noise rather than intent.
+  // Each call is read to its own closing parenthesis, because a formatter may
+  // spread its arguments over several lines; `tall` is the last one.
+  const hearsVertical = (name) =>
+    /,\s*true,?\s*$/.test(callArguments(picker, `const ${name} = useDrag(`) ?? '');
   check(
     'the square is the one that hears its vertical',
-    /const dragSB = useDrag\(.*, true\)/.test(picker) &&
-      !/const dragHue = useDrag\(.*, true\)/.test(picker) &&
-      !/const dragAlpha = useDrag\(.*, true\)/.test(picker),
+    hearsVertical('dragSB') && !hearsVertical('dragHue') && !hearsVertical('dragAlpha'),
+  );
+  check(
+    'and all three drags are there to be read',
+    ['dragSB', 'dragHue', 'dragAlpha'].every(
+      (name) => callArguments(picker, `const ${name} = useDrag(`) !== undefined,
+    ),
   );
 
   const main = fs.readFileSync(path.join(__dirname, '..', 'dist', 'electron', 'main.js'), 'utf8');
@@ -702,7 +736,7 @@ function fakeAudio() {
   // so that deleting the early return fails here.
   check(
     'but not for the row it opens on',
-    /if \(!placedRef\.current\) \{\s*placedRef\.current = true\s*return\s*\}/.test(select),
+    /if \(!placedRef\.current\) \{\s*placedRef\.current = true;?\s*return;?\s*\}/.test(select),
     'the highlight the menu opens with should not sound',
   );
 
@@ -717,7 +751,7 @@ function fakeAudio() {
   check('but not on a disabled one', /!button\.disabled/.test(panel));
 
   const app = fs.readFileSync(path.join(__dirname, '..', 'src', 'App.tsx'), 'utf8');
-  check('the app reads it on load', /readAppSettings\(\)\.then/.test(app));
+  check('the app reads it on load', /readAppSettings\(\)\s*\.then/.test(app));
   check('and follows the menu after that', /onSoundSettingChanged\(/.test(app));
 
   // A burst of synthetic click events cannot allocate unbounded audio nodes.

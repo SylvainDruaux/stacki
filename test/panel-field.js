@@ -45,7 +45,12 @@ const check = (what, condition, detail) => {
     import './src/style-panel/embed-editor.css'
 
     setHost({ projectPath: '/p', nodes: [], selectedId: null, files: [], astroFiles: [] })
-    const resolved = (value) => ({ source: 'selected', selectedValue: { value, important: false }, winner: { value, important: false }, contributors: [] })
+    const resolved = (value) => ({
+      source: 'selected',
+      selectedValue: { value, important: false },
+      winner: { value, important: false },
+      contributors: [],
+    })
     const props = {
       read: (p) => (p === 'max-width' ? resolved('20rem') : undefined),
       busy: false, setProp: () => {}, clearProp: () => {}, liveSetProp: () => {},
@@ -57,12 +62,20 @@ const check = (what, condition, detail) => {
     // Two of them: one plain, one whose duration and easing are variables. The
     // second is the case that squeezed the slider to nothing — a variable's name
     // is long — and the one that has to show chips.
-    const fx = { ...props, read: (p) => (p === 'transition' ? resolved('opacity 200ms ease, transform var(--open-duration) var(--open-ease)') : undefined) }
+    const fx = {
+      ...props,
+      read: (p) => (p === 'transition'
+        ? resolved('opacity 200ms ease, transform var(--open-duration) var(--open-ease)')
+        : undefined),
+    }
     createRoot(document.getElementById('root')).render(
       <div className="embed-editor_root" style={{ width: 320, padding: 12 }}>
         <div className="embed-editor_rule">
           <div id="popupfield" style={{ display: 'flex', width: 160 }}>
-            <NumField value="50%" unit="%" label="Position left" busy={false} onLive={() => {}} onCommit={() => {}} />
+            <NumField
+              value="50%" unit="%" label="Position left" busy={false}
+              onLive={() => {}} onCommit={() => {}}
+            />
           </div>
           <SizeSection {...props} />
           <EffectsSection {...fx} />
@@ -80,7 +93,9 @@ const check = (what, condition, detail) => {
   });
   fs.writeFileSync(
     path.join(buildDir, 'index.html'),
-    '<!doctype html><meta charset="utf-8"><link rel="stylesheet" href="bundle.css"><style>body{margin:0;background:#111}</style><div id="root"></div><script src="bundle.js"></script>',
+    '<!doctype html><meta charset="utf-8"><link rel="stylesheet" href="bundle.css">' +
+      '<style>body{margin:0;background:#111}</style><div id="root"></div>' +
+      '<script src="bundle.js"></script>',
   );
 
   const electronPath = (() => {
@@ -110,7 +125,9 @@ const check = (what, condition, detail) => {
        // A window that is not on screen does not run transitions, so a transitioned
        // box-shadow would read as its starting value forever. Nothing here is about
        // the animation.
-       await js("(() => { const s = document.createElement('style'); s.textContent = '* { transition: none !important }'; document.head.appendChild(s); return true })()");
+       await js("(() => { const s = document.createElement('style'); " +
+         "s.textContent = '* { transition: none !important }'; document.head.appendChild(s); " +
+         "return true })()");
 
        // Open the transition's editor — a real press, because the row opens on one.
        const clickAt = async (x, y) => {
@@ -120,18 +137,45 @@ const check = (what, condition, detail) => {
        };
        // The effects section is long; the row has to be on screen before a press
        // at its coordinates means anything.
-       const rowAt = (n) => js("(() => { const rows = [...document.querySelectorAll('.embed-editor_transitions .embed-editor_bg-layer-main')]; const r = rows[" + n + "]; if (!r) return null; r.scrollIntoView({ block: 'center' }); const b = r.getBoundingClientRect(); return { x: Math.round(b.left + b.width / 2), y: Math.round(b.top + b.height / 2) } })()");
+       const rowAt = (n) => js("(() => { const rows = " +
+         "[...document.querySelectorAll('.embed-editor_transitions " +
+         ".embed-editor_bg-layer-main')]; const r = rows[" + n + "]; if (!r) return null; " +
+         "r.scrollIntoView({ block: 'center' }); const b = r.getBoundingClientRect(); " +
+         "return { x: Math.round(b.left + b.width / 2), y: Math.round(b.top + b.height / 2) } " +
+         "})()");
        const layerRow = await rowAt(1);
        await new Promise((r) => setTimeout(r, 120));
        if (layerRow) await clickAt(layerRow.x, layerRow.y);
-       const opening = { open: await js("!!document.querySelector('.embed-editor_layer-popover')"), foundRow: !!layerRow, sections: await js("[...document.querySelectorAll('.embed-editor_transitions')].length"), rows: await js("[...document.querySelectorAll('.embed-editor_bg-layer-main')].map((n) => n.textContent).join('|')") };
+       const opening = {
+         open: await js("!!document.querySelector('.embed-editor_layer-popover')"),
+         foundRow: !!layerRow,
+         sections: await js("[...document.querySelectorAll('.embed-editor_transitions')].length"),
+         rows: await js("[...document.querySelectorAll('.embed-editor_bg-layer-main')]" +
+           ".map((n) => n.textContent).join('|')"),
+       };
 
-       const shape = (sel) => js("(() => { const el = document.querySelector('" + sel + "'); const r = el.getBoundingClientRect(); const c = getComputedStyle(el); return { h: Math.round(r.height), font: c.fontSize, family: c.fontFamily.split(',')[0].replace(/[\\"']/g, ''), padding: c.padding, radius: c.borderRadius } })()");
+       const shape = (sel) => js("(() => { const el = document.querySelector('" + sel + "'); " +
+         "const r = el.getBoundingClientRect(); const c = getComputedStyle(el); " +
+         "return { h: Math.round(r.height), font: c.fontSize, " +
+         "family: c.fontFamily.split(',')[0].replace(/[\\"']/g, ''), padding: c.padding, " +
+         "radius: c.borderRadius } })()");
        const out = { opening };
-       // One line and double-quoted: this whole probe is itself a template
-       // literal, so a backtick or an interpolation in here would belong to the
-       // wrong one.
-       out.varFields = await js("(() => { const pop = document.querySelector('.embed-editor_layer-popover'); if (!pop) return null; const shape = (el) => { const c = getComputedStyle(el); const r = el.getBoundingClientRect(); return { h: Math.round(r.height), font: c.fontSize, w: Math.round(r.width) } }; const dur = pop.querySelector('.embed-editor_trans-duration .embed-editor_field'); const ease = pop.querySelector('.embed-editor_trans-easing .embed-editor_field'); const slider = pop.querySelector('.u-drag-slider'); return { sharedField: !!dur && !!ease, input: dur && shape(dur.querySelector('input')), dots: [dur, ease].map((f) => !!(f && f.querySelector('.embed-editor_varconnect-dot'))), chips: [dur, ease].map((f) => !!(f && f.querySelector('.embed-editor_varconnect-token-name'))), code: [dur, ease].map((f) => !!(f && f.querySelector('[contenteditable]'))), slider: slider && Math.round(slider.getBoundingClientRect().width) } })()");
+       // Double-quoted: this whole probe is itself a template literal, so a
+       // backtick or an interpolation in here would belong to the wrong one.
+       out.varFields = await js("(() => { const pop = " +
+         "document.querySelector('.embed-editor_layer-popover'); if (!pop) return null; " +
+         "const shape = (el) => { const c = getComputedStyle(el); " +
+         "const r = el.getBoundingClientRect(); return { h: Math.round(r.height), " +
+         "font: c.fontSize, w: Math.round(r.width) } }; const dur = " +
+         "pop.querySelector('.embed-editor_trans-duration .embed-editor_field'); " +
+         "const ease = pop.querySelector('.embed-editor_trans-easing .embed-editor_field'); " +
+         "const slider = pop.querySelector('.u-drag-slider'); " +
+         "return { sharedField: !!dur && !!ease, input: dur && " +
+         "shape(dur.querySelector('input')), dots: [dur, ease].map((f) => !!(f && " +
+         "f.querySelector('.embed-editor_varconnect-dot'))), chips: [dur, " +
+         "ease].map((f) => !!(f && f.querySelector('.embed-editor_varconnect-token-name'))), " +
+         "code: [dur, ease].map((f) => !!(f && f.querySelector('[contenteditable]'))), " +
+         "slider: slider && Math.round(slider.getBoundingClientRect().width) } })()");
        // Close the open one first — it is drawn over the rows, so a press aimed at
        // another row would land on the popover instead.
        win.webContents.sendInputEvent({ type: 'keyDown', keyCode: 'Escape' });
@@ -139,11 +183,33 @@ const check = (what, condition, detail) => {
        await new Promise((r) => setTimeout(r, 150));
        const plainRow = await rowAt(0);
        if (plainRow) await clickAt(plainRow.x, plainRow.y);
-       out.plainFields = await js("(() => { const pop = document.querySelector('.embed-editor_layer-popover'); if (!pop) return null; const shape = (el) => { const c = getComputedStyle(el); const r = el.getBoundingClientRect(); return { h: Math.round(r.height), font: c.fontSize, w: Math.round(r.width) } }; const dur = pop.querySelector('.embed-editor_trans-duration .embed-editor_field'); const ease = pop.querySelector('.embed-editor_trans-easing .embed-editor_field'); const slider = pop.querySelector('.u-drag-slider'); return { sharedField: !!dur && !!ease, input: dur && shape(dur.querySelector('input')), dots: [dur, ease].map((f) => !!(f && f.querySelector('.embed-editor_varconnect-dot'))), chips: [dur, ease].map((f) => !!(f && f.querySelector('.embed-editor_varconnect-token-name'))), code: [dur, ease].map((f) => !!(f && f.querySelector('[contenteditable]'))), slider: slider && Math.round(slider.getBoundingClientRect().width) } })()");
+       out.plainFields = await js("(() => { const pop = " +
+         "document.querySelector('.embed-editor_layer-popover'); if (!pop) return null; " +
+         "const shape = (el) => { const c = getComputedStyle(el); " +
+         "const r = el.getBoundingClientRect(); return { h: Math.round(r.height), " +
+         "font: c.fontSize, w: Math.round(r.width) } }; const dur = " +
+         "pop.querySelector('.embed-editor_trans-duration .embed-editor_field'); " +
+         "const ease = pop.querySelector('.embed-editor_trans-easing .embed-editor_field'); " +
+         "const slider = pop.querySelector('.u-drag-slider'); " +
+         "return { sharedField: !!dur && !!ease, input: dur && " +
+         "shape(dur.querySelector('input')), dots: [dur, ease].map((f) => !!(f && " +
+         "f.querySelector('.embed-editor_varconnect-dot'))), chips: [dur, " +
+         "ease].map((f) => !!(f && f.querySelector('.embed-editor_varconnect-token-name'))), " +
+         "code: [dur, ease].map((f) => !!(f && f.querySelector('[contenteditable]'))), " +
+         "slider: slider && Math.round(slider.getBoundingClientRect().width) } })()");
        out.popup = await shape('#popupfield input');
        out.panel = await shape('input[data-prop=\\"max-width\\"]');
-       out.focus = await js("(() => { const f = document.querySelector('#popupfield .embed-editor_field'); const i = f.querySelector('[contenteditable]') || f.querySelector('input'); i.focus(); const fs = getComputedStyle(f), is = getComputedStyle(f.querySelector('input')), es = getComputedStyle(i); const fr = f.getBoundingClientRect(), sr = f.querySelector('.embed-editor_field-suffix').getBoundingClientRect(); return { onBox: fs.boxShadow, onInput: is.boxShadow, onVisible: es.boxShadow, suffixInside: sr.left >= fr.left && sr.right <= fr.right, focusWithin: f.matches(':focus-within') } })()");
-       out.suffix = await js("(() => { const s = document.querySelector('#popupfield .embed-editor_field-suffix'); return s && s.textContent })()");
+       out.focus = await js("(() => { const f = document.querySelector('#popupfield " +
+         ".embed-editor_field'); const i = f.querySelector('[contenteditable]') || " +
+         "f.querySelector('input'); i.focus(); const fs = getComputedStyle(f), " +
+         "is = getComputedStyle(f.querySelector('input')), es = getComputedStyle(i); " +
+         "const fr = f.getBoundingClientRect(), sr = " +
+         "f.querySelector('.embed-editor_field-suffix').getBoundingClientRect(); " +
+         "return { onBox: fs.boxShadow, onInput: is.boxShadow, onVisible: es.boxShadow, " +
+         "suffixInside: sr.left >= fr.left && sr.right <= fr.right, " +
+         "focusWithin: f.matches(':focus-within') } })()");
+       out.suffix = await js("(() => { const s = document.querySelector('#popupfield " +
+         ".embed-editor_field-suffix'); return s && s.textContent })()");
        console.log(JSON.stringify(out));
        app.quit();
      });`,

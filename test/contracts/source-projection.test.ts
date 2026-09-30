@@ -55,43 +55,46 @@ test('capabilities are a closed set with a visual-edit answer and notice for eac
   assert.throws(() => parseCapability('writable'), /unknown value/);
 });
 
-test('each node is classified by plan §6: loops repeat, code is opaque, the rest is editable', () => {
-  const nodes = valid(
-    [
-      '---',
-      'const items = [1];',
-      '---',
-      '<main class="page" {...rest}>',
-      '  <p set:html={html}></p>',
-      '  {items.map((item) => (<li>{item}</li>))}',
-      '  {value}',
-      '  <!-- note -->',
-      '</main>',
-      '<script>let a = 1;</script>',
-    ].join('\n'),
-  );
-  const byPath = new Map(nodes.map((node) => [node.path.join('/'), node]));
-  assert.equal(byPath.get('0')?.capability, 'editable');
-  assert.deepEqual(
-    byPath.get('0')?.attributes.map((attribute) => [attribute.name, attribute.capability]),
-    [
-      ['class', 'editable'],
-      ['...rest', 'read-only-opaque'],
-    ],
-  );
-  assert.equal(
-    byPath.get('0/0')?.capability,
-    'read-only-opaque',
-    'set:html writes children at runtime',
-  );
-  assert.equal(byPath.get('0/1')?.kind, 'map');
-  assert.equal(byPath.get('0/1')?.capability, 'editable', 'the loop itself is the source node');
-  assert.equal(byPath.get('0/1/0')?.capability, 'repeated-source-node');
-  assert.equal(byPath.get('0/1/0/0')?.capability, 'repeated-source-node');
-  assert.equal(byPath.get('0/2')?.capability, 'read-only-opaque');
-  assert.equal(byPath.get('0/3')?.capability, 'editable');
-  assert.equal(byPath.get('1')?.capability, 'read-only-opaque');
-});
+test(
+  'each node is classified by plan §6: loops ' + 'repeat, code is opaque, the rest is editable',
+  () => {
+    const nodes = valid(
+      [
+        '---',
+        'const items = [1];',
+        '---',
+        '<main class="page" {...rest}>',
+        '  <p set:html={html}></p>',
+        '  {items.map((item) => (<li>{item}</li>))}',
+        '  {value}',
+        '  <!-- note -->',
+        '</main>',
+        '<script>let a = 1;</script>',
+      ].join('\n'),
+    );
+    const byPath = new Map(nodes.map((node) => [node.path.join('/'), node]));
+    assert.equal(byPath.get('0')?.capability, 'editable');
+    assert.deepEqual(
+      byPath.get('0')?.attributes.map((attribute) => [attribute.name, attribute.capability]),
+      [
+        ['class', 'editable'],
+        ['...rest', 'read-only-opaque'],
+      ],
+    );
+    assert.equal(
+      byPath.get('0/0')?.capability,
+      'read-only-opaque',
+      'set:html writes children at runtime',
+    );
+    assert.equal(byPath.get('0/1')?.kind, 'map');
+    assert.equal(byPath.get('0/1')?.capability, 'editable', 'the loop itself is the source node');
+    assert.equal(byPath.get('0/1/0')?.capability, 'repeated-source-node');
+    assert.equal(byPath.get('0/1/0/0')?.capability, 'repeated-source-node');
+    assert.equal(byPath.get('0/2')?.capability, 'read-only-opaque');
+    assert.equal(byPath.get('0/3')?.capability, 'editable');
+    assert.equal(byPath.get('1')?.capability, 'read-only-opaque');
+  },
+);
 
 test('spans are bytes: paths are preorder, and attribute parts are exact', () => {
   const text = '---\nconst a = "é";\n---\n<p title="Zoë 🎉" hidden>x</p>\n';

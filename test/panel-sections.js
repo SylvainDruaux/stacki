@@ -242,7 +242,9 @@ const check = (what, condition, detail) => {
       ['end', end],
     ]) {
       const prop = `grid-${axis}-${position}`;
-      const label = `${axis[0].toUpperCase() + axis.slice(1)} ${position[0].toUpperCase() + position.slice(1)}`;
+      const label =
+        `${axis[0].toUpperCase() + axis.slice(1)} ` +
+        `${position[0].toUpperCase() + position.slice(1)}`;
       const input = inputFor(label);
       check(`${prop} has a field showing its value`, input?.value === value, input?.value);
       if (input?.value === value) {

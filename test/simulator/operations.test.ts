@@ -128,56 +128,59 @@ function revert(
 
 // --- (1) Oracles through the shipping planner ---------------------------------------
 
-test('every oracle scenario plans its expected file with the shipping planner, fresh, stale', () => {
-  let exact = 0;
-  for (const step of ORACLE_SCENARIOS.flatMap((scenario) => scenario.steps)) {
-    const input = snapshotOf(
-      toFilePath(`/project/${step.file}`),
-      encodeUtf8(fs.readFileSync(path.join(FIXTURES, step.file), 'utf8')),
-    );
-    const expected = fs.readFileSync(path.join(FIXTURES, step.expectedFile));
-    const intent = oracleIntent(step, input, toIntentId('oracle'));
-    const planned = planIntent({ authored: input, current: input }, intent);
-    assert.ok(planned.ok, `${step.file}: plans (${planned.ok ? '' : planned.error})`);
-    assert.deepEqual(
-      Buffer.from(applySplices(input.bytes, planned.value.splices)),
-      expected,
-      step.file,
-    );
-    if (step.reference === 'agrees') {
-      assert.deepEqual(planned.value.splices, oracleSplices(step), `${step.file}: exact splices`);
-      exact += 1;
+test(
+  'every oracle scenario plans its expected ' + 'file with the shipping planner, fresh, stale',
+  () => {
+    let exact = 0;
+    for (const step of ORACLE_SCENARIOS.flatMap((scenario) => scenario.steps)) {
+      const input = snapshotOf(
+        toFilePath(`/project/${step.file}`),
+        encodeUtf8(fs.readFileSync(path.join(FIXTURES, step.file), 'utf8')),
+      );
+      const expected = fs.readFileSync(path.join(FIXTURES, step.expectedFile));
+      const intent = oracleIntent(step, input, toIntentId('oracle'));
+      const planned = planIntent({ authored: input, current: input }, intent);
+      assert.ok(planned.ok, `${step.file}: plans (${planned.ok ? '' : planned.error})`);
+      assert.deepEqual(
+        Buffer.from(applySplices(input.bytes, planned.value.splices)),
+        expected,
+        step.file,
+      );
+      if (step.reference === 'agrees') {
+        assert.deepEqual(planned.value.splices, oracleSplices(step), `${step.file}: exact splices`);
+        exact += 1;
+      }
+      const inverse = revert(
+        snapshotOf(input.path, applySplices(input.bytes, planned.value.splices)),
+        planned.value,
+      );
+      assert.ok(inverse.ok, `${step.file}: the inverse plans`);
+      if (step.file.endsWith('.css')) {
+        continue; // A stylesheet has no body to insert above.
+      }
+      // Stale: an unrelated insertion above the body. The same edit, moved.
+      const stale = withInsertion(input);
+      const current = snapshotOf(input.path, encodeUtf8(Buffer.from(stale.bytes).toString('utf8')));
+      const mapped = planIntent({ authored: input, current }, intent);
+      if (!mapped.ok) {
+        // A moved region whose bytes repeat is refused, never guessed (plan §4).
+        assert.equal(mapped.error, 'anchor-ambiguous', `${step.file}: stale`);
+        continue;
+      }
+      const want = Buffer.concat([
+        expected.subarray(0, stale.at),
+        Buffer.from(stale.text),
+        expected.subarray(stale.at),
+      ]);
+      assert.deepEqual(
+        Buffer.from(applySplices(current.bytes, mapped.value.splices)),
+        want,
+        `${step.file} stale`,
+      );
     }
-    const inverse = revert(
-      snapshotOf(input.path, applySplices(input.bytes, planned.value.splices)),
-      planned.value,
-    );
-    assert.ok(inverse.ok, `${step.file}: the inverse plans`);
-    if (step.file.endsWith('.css')) {
-      continue; // A stylesheet has no body to insert above.
-    }
-    // Stale: an unrelated insertion above the body. The same edit, moved.
-    const stale = withInsertion(input);
-    const current = snapshotOf(input.path, encodeUtf8(Buffer.from(stale.bytes).toString('utf8')));
-    const mapped = planIntent({ authored: input, current }, intent);
-    if (!mapped.ok) {
-      // A moved region whose bytes repeat is refused, never guessed (plan §4).
-      assert.equal(mapped.error, 'anchor-ambiguous', `${step.file}: stale`);
-      continue;
-    }
-    const want = Buffer.concat([
-      expected.subarray(0, stale.at),
-      Buffer.from(stale.text),
-      expected.subarray(stale.at),
-    ]);
-    assert.deepEqual(
-      Buffer.from(applySplices(current.bytes, mapped.value.splices)),
-      want,
-      `${step.file} stale`,
-    );
-  }
-  assert.ok(exact >= 4, 'the minimal oracle splices are matched exactly');
-});
+    assert.ok(exact >= 4, 'the minimal oracle splices are matched exactly');
+  },
+);
 
 test('a loop rename finds exactly the oracle sites: the declaration and its two uses', () => {
   const page = snapshotText(fs.readFileSync(path.join(FIXTURES, 'loop-rename.astro'), 'utf8'));
@@ -708,23 +711,26 @@ test('editInlineStyle edits one declaration and keeps the rest of the text', () 
   assert.equal(set('just words', 'a', '3'), 'unreadable');
 });
 
-test('code around markup: an emptied branch, and a node beside one in a branch, are refused', () => {
-  // `cond && ( )` and `: <p/>other ? …` parse, but no JavaScript engine runs
-  // them; the legacy printer rewrites both, so the app saves those whole.
-  const page = snapshotText('{show && (\n  <p>Only</p>\n)}\n{show ? <em>a</em> : <b>b</b>}\n');
-  assert.equal(
-    run(page, { tag: 'remove-node' }, anchorAt(page, [0, 0, 0])),
-    'rejected: unsupported-operation',
-  );
-  const beside = { tag: 'insert-node' as const, placement: 'after' as const, source: '<i />' };
-  assert.equal(run(page, beside, anchorAt(page, [1, 1, 0])), 'rejected: unsupported-operation');
-  const twice = snapshotText('{show && (\n  <p>One</p>\n  <p>Two</p>\n)}\n');
-  assert.equal(
-    run(twice, { tag: 'remove-node' }, anchorAt(twice, [0, 0, 1])),
-    '{show && (\n  <p>One</p>\n)}\n',
-    'one of several may go',
-  );
-});
+test(
+  'code around markup: an emptied branch, and ' + 'a node beside one in a branch, are refused',
+  () => {
+    // `cond && ( )` and `: <p/>other ? …` parse, but no JavaScript engine runs
+    // them; the legacy printer rewrites both, so the app saves those whole.
+    const page = snapshotText('{show && (\n  <p>Only</p>\n)}\n{show ? <em>a</em> : <b>b</b>}\n');
+    assert.equal(
+      run(page, { tag: 'remove-node' }, anchorAt(page, [0, 0, 0])),
+      'rejected: unsupported-operation',
+    );
+    const beside = { tag: 'insert-node' as const, placement: 'after' as const, source: '<i />' };
+    assert.equal(run(page, beside, anchorAt(page, [1, 1, 0])), 'rejected: unsupported-operation');
+    const twice = snapshotText('{show && (\n  <p>One</p>\n  <p>Two</p>\n)}\n');
+    assert.equal(
+      run(twice, { tag: 'remove-node' }, anchorAt(twice, [0, 0, 1])),
+      '{show && (\n  <p>One</p>\n)}\n',
+      'one of several may go',
+    );
+  },
+);
 
 test('singleDeclarationChange finds the one declaration a Style field edit changed', () => {
   assert.deepEqual(singleDeclarationChange('a: 1; b: 2', 'a: 1; b: 3'), {

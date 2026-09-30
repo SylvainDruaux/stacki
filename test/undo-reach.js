@@ -127,9 +127,10 @@ check(
 // file an edit touched rather than the first one it happened to name.
 check(
   'a multi-file edit is recorded as all of its files',
-  /const paths = \[\.\.\.new Set\(typeof files === 'string' \? \[files\] : \(files \?\? \[\]\)\)/.test(
-    vars,
-  ),
+  new RegExp(
+    /const paths = \[\.\.\.new Set\(typeof files ===/.source +
+      / 'string' \? \[files\] : \(files \?\? \[\]\)\)/.source,
+  ).test(vars),
   'writeWithUndo still takes one file',
 );
 

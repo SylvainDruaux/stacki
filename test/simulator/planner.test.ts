@@ -391,67 +391,71 @@ test('rejections that need no diff: the anchor, the attribute, the value, the op
   assert.deepEqual(plan({ tag: 'move-node', destination: hero, placement: 'after' }).ok, true);
 });
 
-test('duplicate attributes are refused, loop bodies edit their one source node, and an expression attribute is replaced whole', () => {
-  const page = snapshotText(readFixture('conditional-template.astro'));
-  const projection = page.projection;
-  assert.equal(projection.tag, 'valid');
-  if (projection.tag !== 'valid') {
-    return;
-  }
-  const base = { authored: page, current: page };
-  const nodeWith = (predicate: (node: ProjectedNode) => boolean) => {
-    const node = projection.nodes.find(predicate);
-    assert.ok(node !== undefined);
-    return anchorAt(page, node.path);
-  };
-  const classCount = (node: ProjectedNode) =>
-    node.attributes.filter((a) => a.name === 'class').length;
-  const duplicated = nodeWith((node) => {
-    if (node.capability === 'editable') {
-      return classCount(node) > 1;
+test(
+  'duplicate attributes are refused, loop bodies edit their one source node, and an expression ' +
+    'attribute is replaced whole',
+  () => {
+    const page = snapshotText(readFixture('conditional-template.astro'));
+    const projection = page.projection;
+    assert.equal(projection.tag, 'valid');
+    if (projection.tag !== 'valid') {
+      return;
     }
-    return false;
-  });
-  assert.deepEqual(planIntent(base, intentOn(page, duplicated, setAttribute('class', 'c'))), {
-    ok: false,
-    error: 'anchor-ambiguous',
-  });
-  // An expression attribute is set as a whole: `data-x={ 1 + 2 }` → `data-x="3"`.
-  const expression = nodeWith((node) => node.attributes.some((a) => a.name === 'data-x'));
-  const set = planIntent(base, intentOn(page, expression, setAttribute('data-x', '3')));
-  assert.ok(set.ok, 'a type change plans');
-  const written = decodeUtf8(applySplices(page.bytes, set.value.splices));
-  assert.ok(written.ok);
-  assert.match(written.value, /\n  data-x="3"\n/);
-  const repeated = nodeWith((node) => {
-    if (node.capability === 'repeated-source-node') {
-      return node.kind === 'element';
-    }
-    return false;
-  });
-  // Step 7: a node a loop repeats is one source node, and an edit of it edits
-  // that source — every copy the loop renders — never one runtime instance.
-  const edited = planIntent(base, intentOn(page, repeated, setAttribute('data-step', '7')));
-  assert.ok(edited.ok, 'an attribute of a repeated node plans against its source node');
-  const [splice, ...others] = edited.value.splices;
-  assert.equal(others.length, 0, 'one splice: the source node is written once');
-  assert.ok(splice !== undefined);
-  assert.ok(repeated.span.start <= splice.range.start, 'the splice lands in the source node');
-  assert.ok(splice.range.end <= repeated.span.end, 'and stays inside it');
-  // Nothing is placed beside it or taken from it: the list it sits in is the
-  // loop body's code.
-  assert.deepEqual(
-    planIntent(
-      base,
-      intentOn(page, repeated, { tag: 'insert-node', placement: 'after', source: '<p />' }),
-    ),
-    { ok: false, error: 'unsupported-operation' },
-  );
-  assert.deepEqual(planIntent(base, intentOn(page, repeated, { tag: 'remove-node' })), {
-    ok: false,
-    error: 'unsupported-operation',
-  });
-});
+    const base = { authored: page, current: page };
+    const nodeWith = (predicate: (node: ProjectedNode) => boolean) => {
+      const node = projection.nodes.find(predicate);
+      assert.ok(node !== undefined);
+      return anchorAt(page, node.path);
+    };
+    const classCount = (node: ProjectedNode) =>
+      node.attributes.filter((a) => a.name === 'class').length;
+    const duplicated = nodeWith((node) => {
+      if (node.capability === 'editable') {
+        return classCount(node) > 1;
+      }
+      return false;
+    });
+    assert.deepEqual(planIntent(base, intentOn(page, duplicated, setAttribute('class', 'c'))), {
+      ok: false,
+      error: 'anchor-ambiguous',
+    });
+    // An expression attribute is set as a whole: `data-x={ 1 + 2 }` → `data-x="3"`.
+    const expression = nodeWith((node) => node.attributes.some((a) => a.name === 'data-x'));
+    const set = planIntent(base, intentOn(page, expression, setAttribute('data-x', '3')));
+    assert.ok(set.ok, 'a type change plans');
+    const written = decodeUtf8(applySplices(page.bytes, set.value.splices));
+    assert.ok(written.ok);
+    assert.match(written.value, /\n  data-x="3"\n/);
+    const repeated = nodeWith((node) => {
+      if (node.capability === 'repeated-source-node') {
+        return node.kind === 'element';
+      }
+      return false;
+    });
+    // Step 7: a node a loop repeats is one source node, and an edit of it edits
+    // that source — every copy the loop renders — never one runtime instance.
+    const edited = planIntent(base, intentOn(page, repeated, setAttribute('data-step', '7')));
+    assert.ok(edited.ok, 'an attribute of a repeated node plans against its source node');
+    const [splice, ...others] = edited.value.splices;
+    assert.equal(others.length, 0, 'one splice: the source node is written once');
+    assert.ok(splice !== undefined);
+    assert.ok(repeated.span.start <= splice.range.start, 'the splice lands in the source node');
+    assert.ok(splice.range.end <= repeated.span.end, 'and stays inside it');
+    // Nothing is placed beside it or taken from it: the list it sits in is the
+    // loop body's code.
+    assert.deepEqual(
+      planIntent(
+        base,
+        intentOn(page, repeated, { tag: 'insert-node', placement: 'after', source: '<p />' }),
+      ),
+      { ok: false, error: 'unsupported-operation' },
+    );
+    assert.deepEqual(planIntent(base, intentOn(page, repeated, { tag: 'remove-node' })), {
+      ok: false,
+      error: 'unsupported-operation',
+    });
+  },
+);
 
 test("preconditions assert: the authored snapshot and the file are the intent's own", () => {
   const { authored, intent } = secondCardIntent();

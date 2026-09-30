@@ -18,53 +18,58 @@ function tooltipArrowStyle(
 
 // ─────────────────────────── Icons (from Webflow) ───────────────────────────
 
+const ARROW_RIGHT_ICON_PATH =
+  'M12.2929 7.00001L9.14645 3.85356L9.85355 3.14645L14.2071 7.50001L9.85355 11.8536' +
+  'L9.14645 11.1465L12.2929 8.00001H3V7.00001H12.2929Z';
+
 function ArrowRightIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-      <path
-        d="M12.2929 7.00001L9.14645 3.85356L9.85355 3.14645L14.2071 7.50001L9.85355 11.8536L9.14645 11.1465L12.2929 8.00001H3V7.00001H12.2929Z"
-        fill="currentColor"
-      />
+      <path d={ARROW_RIGHT_ICON_PATH} fill="currentColor" />
     </svg>
   );
 }
+const ARROW_DOWN_ICON_PATH =
+  'M8.00004 12.2929L4.85359 9.14645L4.14648 9.85355L8.50004 14.2071L12.8536 9.85355' +
+  'L12.1465 9.14645L9.00004 12.2929L9.00004 3H8.00004L8.00004 12.2929Z';
+
 function ArrowDownIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-      <path
-        d="M8.00004 12.2929L4.85359 9.14645L4.14648 9.85355L8.50004 14.2071L12.8536 9.85355L12.1465 9.14645L9.00004 12.2929L9.00004 3H8.00004L8.00004 12.2929Z"
-        fill="currentColor"
-      />
+      <path d={ARROW_DOWN_ICON_PATH} fill="currentColor" />
     </svg>
   );
 }
+const ARROW_LEFT_ICON_PATH =
+  'M3.70718 7.00001L6.85363 3.85356L6.14652 3.14645L1.79297 7.50001L6.14652 11.8536' +
+  'L6.85363 11.1465L3.70718 8.00001H13.0001V7.00001H3.70718Z';
+
 function ArrowLeftIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-      <path
-        d="M3.70718 7.00001L6.85363 3.85356L6.14652 3.14645L1.79297 7.50001L6.14652 11.8536L6.85363 11.1465L3.70718 8.00001H13.0001V7.00001H3.70718Z"
-        fill="currentColor"
-      />
+      <path d={ARROW_LEFT_ICON_PATH} fill="currentColor" />
     </svg>
   );
 }
+const ARROW_UP_ICON_PATH =
+  'M9.00007 3.70714L12.1465 6.85355L12.8536 6.14645L8.50004 1.79289L4.14648 6.14645' +
+  'L4.85359 6.85355L8.00007 3.70707L8.00007 13H9.00007L9.00007 3.70714Z';
+
 function ArrowUpIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-      <path
-        d="M9.00007 3.70714L12.1465 6.85355L12.8536 6.14645L8.50004 1.79289L4.14648 6.14645L4.85359 6.85355L8.00007 3.70707L8.00007 13H9.00007L9.00007 3.70714Z"
-        fill="currentColor"
-      />
+      <path d={ARROW_UP_ICON_PATH} fill="currentColor" />
     </svg>
   );
 }
+const ROW_WRAP_ICON_FIRST_PATH =
+  'M14.207 11.5L10.8535 14.8535L10.1465 14.1465L12.293 12H3V11H12.293L10.1465 8.85352' +
+  'L10.8535 8.14648L14.207 11.5ZM11 4H3V3H11V4Z';
+
 function RowWrapIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-      <path
-        d="M14.207 11.5L10.8535 14.8535L10.1465 14.1465L12.293 12H3V11H12.293L10.1465 8.85352L10.8535 8.14648L14.207 11.5ZM11 4H3V3H11V4Z"
-        fill="currentColor"
-      />
+      <path d={ROW_WRAP_ICON_FIRST_PATH} fill="currentColor" />
       <path
         opacity="0.4"
         d="M11 4.20703L4.20703 11H3V10.793L9.79297 4H11V4.20703Z"
@@ -73,13 +78,14 @@ function RowWrapIcon() {
     </svg>
   );
 }
+const ROW_WRAP_REVERSE_ICON_FIRST_PATH =
+  'M14.207 4.5L10.8535 1.14648L10.1465 1.85352L12.293 4L3 4L3 5L12.293 5L10.1465 7.14648' +
+  'L10.8535 7.85351L14.207 4.5ZM11 12L3 12L3 13L11 13L11 12Z';
+
 function RowWrapReverseIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-      <path
-        d="M14.207 4.5L10.8535 1.14648L10.1465 1.85352L12.293 4L3 4L3 5L12.293 5L10.1465 7.14648L10.8535 7.85351L14.207 4.5ZM11 12L3 12L3 13L11 13L11 12Z"
-        fill="currentColor"
-      />
+      <path d={ROW_WRAP_REVERSE_ICON_FIRST_PATH} fill="currentColor" />
       <path
         opacity="0.4"
         d="M11 11.793L4.20703 5L3 5L3 5.20703L9.79297 12L11 12L11 11.793Z"
@@ -88,13 +94,14 @@ function RowWrapReverseIcon() {
     </svg>
   );
 }
+const ROW_REVERSE_WRAP_ICON_FIRST_PATH =
+  'M1.79297 11.5L5.14648 14.8535L5.85352 14.1465L3.70703 12H13V11H3.70703L5.85352 8.85352' +
+  'L5.14648 8.14648L1.79297 11.5ZM5 4H13V3H5V4Z';
+
 function RowReverseWrapIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-      <path
-        d="M1.79297 11.5L5.14648 14.8535L5.85352 14.1465L3.70703 12H13V11H3.70703L5.85352 8.85352L5.14648 8.14648L1.79297 11.5ZM5 4H13V3H5V4Z"
-        fill="currentColor"
-      />
+      <path d={ROW_REVERSE_WRAP_ICON_FIRST_PATH} fill="currentColor" />
       <path
         opacity="0.4"
         d="M5 4.20703L11.793 11H13V10.793L6.20703 4H5V4.20703Z"
@@ -103,13 +110,14 @@ function RowReverseWrapIcon() {
     </svg>
   );
 }
+const ROW_REVERSE_WRAP_REVERSE_ICON_FIRST_PATH =
+  'M1.79297 4.5L5.14648 1.14649L5.85351 1.85352L3.70703 4L13 4L13 5L3.70703 5L5.85352 7.14648' +
+  'L5.14648 7.85352L1.79297 4.5ZM5 12L13 12L13 13L5 13L5 12Z';
+
 function RowReverseWrapReverseIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-      <path
-        d="M1.79297 4.5L5.14648 1.14649L5.85351 1.85352L3.70703 4L13 4L13 5L3.70703 5L5.85352 7.14648L5.14648 7.85352L1.79297 4.5ZM5 12L13 12L13 13L5 13L5 12Z"
-        fill="currentColor"
-      />
+      <path d={ROW_REVERSE_WRAP_REVERSE_ICON_FIRST_PATH} fill="currentColor" />
       <path
         opacity="0.4"
         d="M5 11.793L11.793 5L13 5L13 5.20703L6.20703 12L5 12L5 11.793Z"
@@ -118,13 +126,14 @@ function RowReverseWrapReverseIcon() {
     </svg>
   );
 }
+const COLUMN_WRAP_ICON_FIRST_PATH =
+  'M11.5 14.207L14.8535 10.8535L14.1465 10.1465L12 12.293L12 3L11 3L11 12.293L8.85352 10.1465' +
+  'L8.14648 10.8535L11.5 14.207ZM4 11L4 3L3 3L3 11L4 11Z';
+
 function ColumnWrapIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-      <path
-        d="M11.5 14.207L14.8535 10.8535L14.1465 10.1465L12 12.293L12 3L11 3L11 12.293L8.85352 10.1465L8.14648 10.8535L11.5 14.207ZM4 11L4 3L3 3L3 11L4 11Z"
-        fill="currentColor"
-      />
+      <path d={COLUMN_WRAP_ICON_FIRST_PATH} fill="currentColor" />
       <path
         opacity="0.4"
         d="M4.20703 11L11 4.20703L11 3L10.793 3L4 9.79297L4 11L4.20703 11Z"
@@ -133,13 +142,14 @@ function ColumnWrapIcon() {
     </svg>
   );
 }
+const COLUMN_WRAP_REVERSE_ICON_FIRST_PATH =
+  'M4.5 14.207L1.14648 10.8535L1.85352 10.1465L4 12.293L4 3L5 3L5 12.293L7.14648 10.1465' +
+  'L7.85352 10.8535L4.5 14.207ZM12 11L12 3L13 3L13 11L12 11Z';
+
 function ColumnWrapReverseIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-      <path
-        d="M4.5 14.207L1.14648 10.8535L1.85352 10.1465L4 12.293L4 3L5 3L5 12.293L7.14648 10.1465L7.85352 10.8535L4.5 14.207ZM12 11L12 3L13 3L13 11L12 11Z"
-        fill="currentColor"
-      />
+      <path d={COLUMN_WRAP_REVERSE_ICON_FIRST_PATH} fill="currentColor" />
       <path
         opacity="0.4"
         d="M11.793 11L5 4.20703L5 3L5.20703 3L12 9.79297L12 11L11.793 11Z"
@@ -148,13 +158,14 @@ function ColumnWrapReverseIcon() {
     </svg>
   );
 }
+const COLUMN_REVERSE_WRAP_ICON_FIRST_PATH =
+  'M11.5 1.79297L14.8535 5.14648L14.1465 5.85352L12 3.70703L12 13L11 13L11 3.70703' +
+  'L8.85352 5.85352L8.14648 5.14648L11.5 1.79297ZM4 5L4 13L3 13L3 5L4 5Z';
+
 function ColumnReverseWrapIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-      <path
-        d="M11.5 1.79297L14.8535 5.14648L14.1465 5.85352L12 3.70703L12 13L11 13L11 3.70703L8.85352 5.85352L8.14648 5.14648L11.5 1.79297ZM4 5L4 13L3 13L3 5L4 5Z"
-        fill="currentColor"
-      />
+      <path d={COLUMN_REVERSE_WRAP_ICON_FIRST_PATH} fill="currentColor" />
       <path
         opacity="0.4"
         d="M4.20703 5L11 11.793L11 13L10.793 13L4 6.20703L4 5L4.20703 5Z"
@@ -163,13 +174,14 @@ function ColumnReverseWrapIcon() {
     </svg>
   );
 }
+const COLUMN_REVERSE_WRAP_REVERSE_ICON_FIRST_PATH =
+  'M4.5 1.79297L1.14648 5.14648L1.85352 5.85352L4 3.70703L4 13L5 13L5 3.70703L7.14648 5.85352' +
+  'L7.85352 5.14648L4.5 1.79297ZM12 5L12 13L13 13L13 5L12 5Z';
+
 function ColumnReverseWrapReverseIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-      <path
-        d="M4.5 1.79297L1.14648 5.14648L1.85352 5.85352L4 3.70703L4 13L5 13L5 3.70703L7.14648 5.85352L7.85352 5.14648L4.5 1.79297ZM12 5L12 13L13 13L13 5L12 5Z"
-        fill="currentColor"
-      />
+      <path d={COLUMN_REVERSE_WRAP_REVERSE_ICON_FIRST_PATH} fill="currentColor" />
       <path
         opacity="0.4"
         d="M11.793 5L5 11.793L5 13L5.20703 13L12 6.20703L12 5L11.793 5Z"
@@ -527,7 +539,10 @@ export default function DirectionControl({
                     type="button"
                     role="menuitemradio"
                     aria-checked={!customMode && current === option.value}
-                    className={`embed-editor_direction-item ${!customMode && current === option.value ? 'is-selected' : ''}`}
+                    className={
+                      'embed-editor_direction-item ' +
+                      (!customMode && current === option.value ? 'is-selected' : '')
+                    }
                     onClick={() => pick(option)}
                     onMouseEnter={() => setHovered(option)}
                     onMouseLeave={() => setHovered(null)}

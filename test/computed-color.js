@@ -99,7 +99,8 @@ const check = (what, condition, detail) => {
   })();
   if (typeof electronPath !== 'string') {
     console.log(
-      `computed-color: ${checked} passed  [needsPage; the probe needs a browser — see test/thumbs.js for the pattern]`,
+      `computed-color: ${checked} passed  ` +
+        `[needsPage; the probe needs a browser — see test/thumbs.js for the pattern]`,
     );
     return;
   }
@@ -137,15 +138,21 @@ const check = (what, condition, detail) => {
        const out = {
          light: await win.webContents.executeJavaScript(compute('#light', 'var(--background)')),
          dark: await win.webContents.executeJavaScript(compute('#dark', 'var(--background)')),
-         mixed: await win.webContents.executeJavaScript(compute('#dark', 'color-mix(in srgb, var(--brand) 50%, black)')),
+         mixed: await win.webContents.executeJavaScript(
+           compute('#dark', 'color-mix(in srgb, var(--brand) 50%, black)'),
+         ),
          inherited: await win.webContents.executeJavaScript(compute('#a', 'currentcolor')),
          // Nothing selected: the page answers about itself, which is where
          // :root's custom properties are declared. This is the variables
          // panel's question — a value is the same colour wherever it is
          // written — and without it every swatch there stayed a chequerboard.
-         atRoot: await win.webContents.executeJavaScript(compute(':root', 'color-mix(in srgb, var(--brand), white 80%)')),
+         atRoot: await win.webContents.executeJavaScript(
+           compute(':root', 'color-mix(in srgb, var(--brand), white 80%)'),
+         ),
          nonsense: await win.webContents.executeJavaScript(compute('#light', 'not-a-color')),
-         leftClean: await win.webContents.executeJavaScript("document.querySelectorAll('span').length"),
+         leftClean: await win.webContents.executeJavaScript(
+           "document.querySelectorAll('span').length",
+         ),
        };
        console.log(JSON.stringify(out));
        app.quit();

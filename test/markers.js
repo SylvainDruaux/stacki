@@ -59,18 +59,23 @@ const CASES = {
   'loop, arrow body': '---\nconst xs = [1];\n---\n<ul>{xs.map((x) => (<li>{x}</li>))}</ul>\n',
   'loop, no parens': '---\nconst xs = [1];\n---\n<ul>{xs.map((x) => <li>{x}</li>)}</ul>\n',
   'loop, block body':
-    '---\nconst xs = [1];\n---\n<ul>{xs.map((x) => { const y = x * 2; return (<li>{y}</li>); })}</ul>\n',
+    '---\nconst xs = [1];\n---\n' +
+    '<ul>{xs.map((x) => { const y = x * 2; return (<li>{y}</li>); })}</ul>\n',
   'loop, two children': '---\nconst xs = [1];\n---\n<ul>{xs.map((x) => (<li>{x}</li>))}</ul>\n',
   'loop of components':
-    '---\nimport Card from "../components/Card.astro";\nconst xs = [1];\n---\n<div>{xs.map((x) => (<Card title={x} />))}</div>\n',
+    '---\nimport Card from "../components/Card.astro";\nconst xs = [1];\n---\n' +
+    '<div>{xs.map((x) => (<Card title={x} />))}</div>\n',
   'nested loops':
-    '---\nconst rows = [[1]];\n---\n<div>{rows.map((row) => (<ul>{row.map((c) => (<li>{c}</li>))}</ul>))}</div>\n',
+    '---\nconst rows = [[1]];\n---\n' +
+    '<div>{rows.map((row) => (<ul>{row.map((c) => (<li>{c}</li>))}</ul>))}</div>\n',
   'conditional, &&': '---\nconst c = true;\n---\n<div>{c && <p>x</p>}</div>\n',
   'conditional, ternary': '---\nconst c = true;\n---\n<div>{c ? <p>a</p> : <p>b</p>}</div>\n',
   'loop inside conditional':
-    '---\nconst c = true;\nconst xs = [1];\n---\n<div>{c && <ul>{xs.map((x) => (<li>{x}</li>))}</ul>}</div>\n',
+    '---\nconst c = true;\nconst xs = [1];\n---\n' +
+    '<div>{c && <ul>{xs.map((x) => (<li>{x}</li>))}</ul>}</div>\n',
   'slotted child':
-    '---\nimport Card from "../components/Card.astro";\n---\n<Card><h2 slot="header">Hi</h2><p>Body</p></Card>\n',
+    '---\nimport Card from "../components/Card.astro";\n---\n' +
+    '<Card><h2 slot="header">Hi</h2><p>Body</p></Card>\n',
   'plain elements': '---\n---\n<div><p>hi</p></div>\n',
   'inline run':
     '---\n---\n<nav>\n  <a href="/docs">Docs</a>\n  <span>/</span>\n  <span>Here</span>\n</nav>\n',
@@ -138,7 +143,8 @@ async function check(compilers, label, source) {
     if (lost.length) {
       fail(
         label,
-        `    ${compiler.label}: ${lost.length} marker${lost.length === 1 ? '' : 's'} dropped by the compiler` +
+        `    ${compiler.label}: ${lost.length} marker${lost.length === 1 ? '' : 's'} ` +
+          `dropped by the compiler` +
           `\n      ${lost.join(' ')}\n${indented(marked)}`,
       );
     }

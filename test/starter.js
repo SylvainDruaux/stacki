@@ -46,7 +46,10 @@ const fakeNpm = (root, name, body) => {
     `#!/usr/bin/env node
 const fs = require('fs');
 const path = require('path');
-fs.appendFileSync(${JSON.stringify(path.join(root, 'calls.txt'))}, process.argv.slice(2).join(' ') + '\\n');
+fs.appendFileSync(
+  ${JSON.stringify(path.join(root, 'calls.txt'))},
+  process.argv.slice(2).join(' ') + '\\n',
+);
 const dir = path.join(process.cwd(), process.argv[4]);
 ${body}
 `,
@@ -64,7 +67,11 @@ const SCAFFOLD = `
 fs.mkdirSync(path.join(dir, 'src', 'pages'), { recursive: true });
 fs.writeFileSync(
   path.join(dir, 'package.json'),
-  JSON.stringify({ name: 'lumos-for-astro', version: '0.0.1', dependencies: { astro: '^7.1.4' } }, null, 2)
+  JSON.stringify(
+    { name: 'lumos-for-astro', version: '0.0.1', dependencies: { astro: '^7.1.4' } },
+    null,
+    2
+  )
 );
 fs.writeFileSync(path.join(dir, 'src', 'pages', 'index.astro'), '<h1>Hi</h1>\\n');
 fs.writeFileSync(path.join(dir, 'astro.config.mjs'), 'export default {}\\n');
@@ -223,7 +230,8 @@ const { execFileSync } = require('child_process');
 const g = (...a) => execFileSync('git', a, { cwd: dir });
 g('init', '-b', 'main');
 g('add', '-A');
-g('-c', 'user.email=t@t', '-c', 'user.name=T', 'commit', '-m', 'Initial commit from the scaffolder');
+g('-c', 'user.email=t@t', '-c', 'user.name=T',
+  'commit', '-m', 'Initial commit from the scaffolder');
 `,
     );
     const own = await createStarter({ npm: withGit, parentPath: parent, name: 'has-history' });

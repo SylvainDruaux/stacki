@@ -225,7 +225,8 @@ const defOf = (root, ref) => root?.$defs?.[String(ref).split('/').pop()] || null
   const total = result.collections.length;
   if (failures.length) {
     console.error(
-      `\ncontent-config: ${failures.length} failed, ${checked - failures.length} passed  [${total} collections]\n`,
+      `\ncontent-config: ${failures.length} failed, ${checked - failures.length} passed  ` +
+        `[${total} collections]\n`,
     );
     console.error(failures.join('\n') + '\n');
     stopAllServices();

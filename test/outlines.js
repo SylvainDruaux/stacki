@@ -198,8 +198,10 @@ const stacked = (n, a = 0.14) => 1 - (1 - a) ** n;
       ${marked('0.2', '<article data-box="one">one</article>')}
       ${marked('0.2', '<article data-box="two">two</article>')}
       <h2 data-box="head">
-        <div class="split-line"><strong data-avb-p="0.3" data-box="hollow"></strong> Human-centric</div>
-        <div class="split-line"><strong data-avb-p="0.3" data-box="word">strategies</strong> to cut</div>
+        <div class="split-line"><strong data-avb-p="0.3"
+          data-box="hollow"></strong> Human-centric</div>
+        <div class="split-line"><strong data-avb-p="0.3"
+          data-box="word">strategies</strong> to cut</div>
       </h2>
       <!-- Two copies of a component with no marker pair of its own: rendered
            into another one's slot, so the serializer can only tag it. Both carry
@@ -214,9 +216,19 @@ const stacked = (n, a = 0.14) => 1 - (1 - a) ** n;
         </article>
       </div>
       <ul data-box="links">
-        ${marked('0.4.0', '<li data-box="li-one"><a data-avb-p="0.4.0.0" data-box="link-one">Instagram</a></li>')}
-        ${marked('0.4.0', '<li data-box="li-two"><a data-avb-p="0.4.0.0" data-box="link-two">YouTube</a></li>')}
-        ${marked('0.4.0', '<li data-box="li-three"><a data-avb-p="0.4.0.0" data-box="link-three">LinkedIn</a></li>')}
+        ${marked(
+          '0.4.0',
+          '<li data-box="li-one"><a data-avb-p="0.4.0.0" data-box="link-one">Instagram</a></li>',
+        )}
+        ${marked(
+          '0.4.0',
+          '<li data-box="li-two"><a data-avb-p="0.4.0.0" data-box="link-two">YouTube</a></li>',
+        )}
+        ${marked(
+          '0.4.0',
+          '<li data-box="li-three">' +
+            '<a data-avb-p="0.4.0.0" data-box="link-three">LinkedIn</a></li>',
+        )}
       </ul>
     </body>`,
     { url: 'http://localhost:4321/#avb-design', pretendToBeVisual: true },

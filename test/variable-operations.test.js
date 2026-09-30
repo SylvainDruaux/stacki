@@ -214,35 +214,38 @@ test('unchanged and rejected edits do not add undo commands', async () => {
   assert.equal(state.reads.length, 3, 'rejected edit does not take an after snapshot');
 });
 
-test('refresh bursts share one request and one follow-up; disposal suppresses late results', async () => {
-  const reads = [];
-  const published = [];
-  global.window = { avb: { cssVariables: () => new Promise((resolve) => reads.push(resolve)) } };
-  const reader = createVariableRefresh('/project', (value) => published.push(value));
-  const first = reader.refresh();
-  await tick();
-  // A burst during a read shares the one read after it: two reads in all.
-  const pending = reader.refresh();
-  for (let index = 0; index < 50; index++) {
-    assert.equal(reader.refresh(), pending);
-  }
-  assert.equal(reads.length, 1);
-  reads[0](snapshot);
-  await first;
-  await tick();
-  assert.equal(reads.length, 2);
-  reads[1](snapshot);
-  await pending;
-  assert.equal(published.length, 2);
-  const last = reader.refresh();
-  await tick();
-  reader.dispose();
-  reads[2](snapshot);
-  await last;
-  await reader.refresh();
-  assert.equal(reads.length, 3);
-  assert.equal(published.length, 2);
-});
+test(
+  'refresh bursts share one request and one ' + 'follow-up; disposal suppresses late results',
+  async () => {
+    const reads = [];
+    const published = [];
+    global.window = { avb: { cssVariables: () => new Promise((resolve) => reads.push(resolve)) } };
+    const reader = createVariableRefresh('/project', (value) => published.push(value));
+    const first = reader.refresh();
+    await tick();
+    // A burst during a read shares the one read after it: two reads in all.
+    const pending = reader.refresh();
+    for (let index = 0; index < 50; index++) {
+      assert.equal(reader.refresh(), pending);
+    }
+    assert.equal(reads.length, 1);
+    reads[0](snapshot);
+    await first;
+    await tick();
+    assert.equal(reads.length, 2);
+    reads[1](snapshot);
+    await pending;
+    assert.equal(published.length, 2);
+    const last = reader.refresh();
+    await tick();
+    reader.dispose();
+    reads[2](snapshot);
+    await last;
+    await reader.refresh();
+    assert.equal(reads.length, 3);
+    assert.equal(published.length, 2);
+  },
+);
 
 test('publication cannot resurrect a disposed refresh coordinator', async () => {
   let reads = 0;

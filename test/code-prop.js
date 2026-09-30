@@ -209,7 +209,8 @@ const check = (what, condition, detail) => {
       path.join(__dirname, '..', 'dist', 'electron', 'astroParser.js'),
     );
     const withType = (decl) => {
-      const src = `---\ninterface Props {\n  ${decl}\n}\nconst { items } = Astro.props;\n---\n<div/>\n`;
+      const src =
+        `---\ninterface Props {\n  ${decl}\n}\n` + `const { items } = Astro.props;\n---\n<div/>\n`;
       return (parsePropSchema(src).find((p) => p.name === 'items') || {}).type;
     };
     check(
@@ -240,7 +241,10 @@ const check = (what, condition, detail) => {
       withType('items?: Record<string, { a: string; b: number }>;'),
     );
     // What the semicolon rule must not eat: the ordinary members beside it.
-    const many = `---\ninterface Props {\n  /** The rows. */\n  items?: { title: string; text: string }[];\n  variant?: "stack" | "row";\n  count?: number;\n}\nconst { items } = Astro.props;\n---\n<div/>\n`;
+    const many =
+      `---\ninterface Props {\n  /** The rows. */\n` +
+      `  items?: { title: string; text: string }[];\n  variant?: "stack" | "row";\n` +
+      `  count?: number;\n}\nconst { items } = Astro.props;\n---\n<div/>\n`;
     const schema = parsePropSchema(many);
     const type = (n) => (schema.find((p) => p.name === n) || {}).type;
     check('the prop after it is still read', type('variant') === 'enum', type('variant'));
@@ -259,7 +263,10 @@ const check = (what, condition, detail) => {
     const { parsePropSchema } = require(
       path.join(__dirname, '..', 'dist', 'electron', 'astroParser.js'),
     );
-    const src = `---\ntype Props =\n  | { variant: "list"; items: { title: string; text: string }[] }\n  | { variant: "plain"; text: string };\nconst { variant } = Astro.props as Props;\n---\n<div/>\n`;
+    const src =
+      `---\ntype Props =\n  | { variant: "list"; items: { title: string; text: string }[] }\n` +
+      `  | { variant: "plain"; text: string };\nconst { variant } = Astro.props as Props;\n` +
+      `---\n<div/>\n`;
     const schema = parsePropSchema(src);
     const union = (schema.find((p) => p.unions) || {}).unions || [];
     const names = union[0] ? union[0].names : [];

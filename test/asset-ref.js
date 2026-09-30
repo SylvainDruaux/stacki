@@ -122,7 +122,10 @@ const SCREENS = [
 {
   // A record too long for one line. WIDTH is the question "does this fit", and
   // it had no answer — the save threw ReferenceError and nothing was written.
-  const long = `const SCREENS = [\n  {\n    label:\n      "A label long enough that the record it sits in cannot be written on one line",\n    image: muchMore,\n  },\n];\n`;
+  const long =
+    `const SCREENS = [\n  {\n    label:\n` +
+    `      "A label long enough that the record it sits in cannot be written on one line",\n` +
+    `    image: muchMore,\n  },\n];\n`;
   const out = writeBack(long, read(long)?.data);
   check('a record too long for one line can be written at all', !/^\(threw/.test(out), out);
   check('and is written as it was', out === long, out);

@@ -64,15 +64,31 @@ function readExpectations(filePath: string): Readonly<Record<string, Expectation
     if (typeof expectation['severity'] !== 'string') {
       throw new Error(`expectations.${name}.severity: expected string`);
     }
-    if (typeof expectation['note'] !== 'string') {
-      throw new Error(`expectations.${name}.note: expected string`);
-    }
     output[name] = {
       severity: expectation['severity'],
-      note: expectation['note'],
+      note: readNote(expectation['note'], name),
     };
   }
   return output;
+}
+
+// A note is stored as an array of lines so the file stays within 100 columns
+// (JSON strings cannot wrap); the lines were split at spaces, and rejoin so.
+const NOTE_LINES_MAX = 64;
+
+function readNote(input: unknown, name: string): string {
+  if (!Array.isArray(input) || input.length === 0 || input.length > NOTE_LINES_MAX) {
+    throw new Error(`expectations.${name}.note: expected 1–${NOTE_LINES_MAX} lines`);
+  }
+  const lines: readonly unknown[] = input;
+  return lines
+    .map((line, index) => {
+      if (typeof line !== 'string') {
+        throw new Error(`expectations.${name}.note[${index}]: expected string`);
+      }
+      return line;
+    })
+    .join(' ');
 }
 
 function collect(directory: string): readonly string[] {

@@ -184,7 +184,8 @@ class ArithmeticReader {
 }
 
 export const FLUID_LINK =
-  'https://www.smashingmagazine.com/2023/11/addressing-accessibility-concerns-fluid-type/#conclusion';
+  'https://www.smashingmagazine.com/2023/11/' +
+  'addressing-accessibility-concerns-fluid-type/#conclusion';
 
 /**
  * What a fluid clamp() is worth, accessibility-wise: { status, min, max, rem,

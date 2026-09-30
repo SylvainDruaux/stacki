@@ -55,13 +55,16 @@ const check = (what, condition, detail) => {
   // Both places this control is used: the transform settings popup and the
   // gradient centre it was copied from.
   const entry = path.join(buildDir, 'field-focus.entry.jsx');
+  // The module specifier of a style-panel source file, written into the entry below.
+  const stylePanelImport = (...parts) =>
+    JSON.stringify(path.join(root, 'src', 'style-panel', ...parts));
   fs.writeFileSync(
     entry,
     `import React from 'react'
      import { createRoot } from 'react-dom/client'
-     import EffectsSection from ${JSON.stringify(path.join(root, 'src', 'style-panel', 'EffectsSection'))}
-     import GradientEditor from ${JSON.stringify(path.join(root, 'src', 'style-panel', 'GradientEditor'))}
-     import { parseGradient } from ${JSON.stringify(path.join(root, 'src', 'style-panel', 'lib', 'gradient'))}
+     import EffectsSection from ${stylePanelImport('EffectsSection')}
+     import GradientEditor from ${stylePanelImport('GradientEditor')}
+     import { parseGradient } from ${stylePanelImport('lib', 'gradient')}
      const decls = { transform: 'rotateZ(45deg)' }
      const read = (p) => decls[p] != null
        ? { source:'selected', overridden:false, contributors:[],
@@ -71,7 +74,8 @@ const check = (what, condition, detail) => {
      // Radial, so the centre row (the pad and its Left/Top fields) is drawn.
      const grad = parseGradient('radial-gradient(circle at 50% 50%, #000000, #ffffff)')
      createRoot(document.getElementById('root')).render(
-       React.createElement('div', { className:'embed-editor_panel', style:{ width:'320px', padding:'12px' } },
+       React.createElement('div',
+         { className:'embed-editor_panel', style:{ width:'320px', padding:'12px' } },
          React.createElement(EffectsSection, {
            read, busy:false, setProp:()=>{}, clearProp:()=>{}, liveSetProp:()=>{},
            onProvenance:()=>{}, onSelectSelector:()=>{},
@@ -102,7 +106,8 @@ const check = (what, condition, detail) => {
   fs.writeFileSync(
     path.join(pageDir, 'index.html'),
     '<!doctype html><meta charset=utf-8><link rel="stylesheet" href="app.css">' +
-      '<style>body{margin:0;background:#1a1a1a}</style><div id="root"></div><script src="bundle.js"></script>',
+      '<style>body{margin:0;background:#1a1a1a}</style><div id="root"></div>' +
+      '<script src="bundle.js"></script>',
   );
 
   const probe = path.join(pageDir, 'probe.js');
@@ -118,7 +123,9 @@ const check = (what, condition, detail) => {
        await win.loadFile(path.join(__dirname, 'index.html'));
        await sleep(800);
        // Open the transform settings popup.
-       await win.webContents.executeJavaScript("document.querySelector('button[aria-label=\\"Transform settings\\"]').click(); null");
+       await win.webContents.executeJavaScript(
+         "document.querySelector('button[aria-label=\\"Transform settings\\"]').click(); null",
+       );
        await sleep(400);
 
        const out = { fields: [] };
@@ -128,7 +135,10 @@ const check = (what, condition, detail) => {
        // outside-press that dismisses the popup. Each field is therefore found and
        // measured immediately before it is pressed, with the popup reopened if a
        // previous press closed it.
-       const POPUP = ['Transform origin left', 'Transform origin top', 'Perspective origin left', 'Perspective origin top'];
+       const POPUP = [
+         'Transform origin left', 'Transform origin top',
+         'Perspective origin left', 'Perspective origin top',
+       ];
        const LABELS = [...POPUP, 'Position left', 'Position top'];
        for (const label of LABELS) {
          if (POPUP.includes(label)) {
@@ -146,7 +156,8 @@ const check = (what, condition, detail) => {
            })()\`);
            await sleep(350);
            await win.webContents.executeJavaScript(\`(() => {
-             const input = document.querySelector('input[aria-label=' + JSON.stringify(\${JSON.stringify(label)}) + ']');
+             const input = document.querySelector(
+               'input[aria-label=' + JSON.stringify(\${JSON.stringify(label)}) + ']');
              const editor = input?.closest('.embed-editor_varconnect')
                ?.querySelector('.embed-editor_varconnect-editor');
              editor?.scrollIntoView({ block: 'center', behavior: 'instant' });
@@ -157,7 +168,8 @@ const check = (what, condition, detail) => {
            await sleep(150);
          }
          const t = await win.webContents.executeJavaScript(\`(() => {
-           const input = document.querySelector('input[aria-label=' + JSON.stringify(\${JSON.stringify(label)}) + ']');
+           const input = document.querySelector(
+             'input[aria-label=' + JSON.stringify(\${JSON.stringify(label)}) + ']');
            if (!input) return null;
            const wrap = input.closest('.embed-editor_varconnect');
            const ed = wrap && wrap.querySelector('.embed-editor_varconnect-editor');
@@ -169,23 +181,34 @@ const check = (what, condition, detail) => {
                     x: Math.round(r.left + r.width/2), y: Math.round(r.top + r.height/2),
                     inputHidden: getComputedStyle(input).opacity === '0' };
          })()\`);
-         if (!t || t.noEditor || !t.inView) { out.fields.push({ label, skipped: true, why: t }); continue; }
-         await win.webContents.executeJavaScript("document.activeElement && document.activeElement.blur(); null");
-         win.webContents.sendInputEvent({ type:'mouseDown', x:t.x, y:t.y, button:'left', clickCount:1 });
-         win.webContents.sendInputEvent({ type:'mouseUp',   x:t.x, y:t.y, button:'left', clickCount:1 });
+         if (!t || t.noEditor || !t.inView) {
+           out.fields.push({ label, skipped: true, why: t });
+           continue;
+         }
+         await win.webContents.executeJavaScript(
+           "document.activeElement && document.activeElement.blur(); null",
+         );
+         win.webContents.sendInputEvent(
+           { type:'mouseDown', x:t.x, y:t.y, button:'left', clickCount:1 });
+         win.webContents.sendInputEvent(
+           { type:'mouseUp',   x:t.x, y:t.y, button:'left', clickCount:1 });
          await sleep(250);
          const after = await win.webContents.executeJavaScript(\`(() => {
            const a = document.activeElement;
            const hit = document.elementFromPoint(\${t.x}, \${t.y});
            return {
              caretInTheFieldPressed: !!(a && a.dataset && a.dataset.probe === 'target'),
-             focusedAnInvisibleField: !!(a && a.tagName === 'INPUT' && getComputedStyle(a).opacity === '0'),
+             focusedAnInvisibleField:
+               !!(a && a.tagName === 'INPUT' && getComputedStyle(a).opacity === '0'),
              activeTag: a ? a.tagName : null,
-             hitTag: hit ? hit.tagName : null, hitCls: hit ? String(hit.className).slice(0,60) : null,
+             hitTag: hit ? hit.tagName : null,
+             hitCls: hit ? String(hit.className).slice(0,60) : null,
              popupOpen: !!document.querySelector('.embed-editor_tsettings'),
            };
          })()\`);
-         await win.webContents.executeJavaScript("document.querySelectorAll('[data-probe]').forEach(e => delete e.dataset.probe); null");
+         await win.webContents.executeJavaScript(
+           "document.querySelectorAll('[data-probe]').forEach(e => delete e.dataset.probe); null",
+         );
          out.fields.push({ ...t, ...after });
        }
        // And nothing wraps one of these fields in a <label> any more.
@@ -230,7 +253,9 @@ const check = (what, condition, detail) => {
       check(
         `pressing "${f.label}" leaves the caret in it`,
         f.caretInTheFieldPressed,
-        `focus went to ${f.activeTag}${f.focusedAnInvisibleField ? ' — an invisible one' : ''} | at (${f.x},${f.y}) the top element is ${f.hitTag}.${f.hitCls} | popup open: ${f.popupOpen}`,
+        `focus went to ${f.activeTag}` +
+          `${f.focusedAnInvisibleField ? ' — an invisible one' : ''} | at (${f.x},${f.y})` +
+          ` the top element is ${f.hitTag}.${f.hitCls} | popup open: ${f.popupOpen}`,
       );
       check(
         `and not into a field that cannot be seen ("${f.label}")`,

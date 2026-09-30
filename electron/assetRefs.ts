@@ -21,8 +21,14 @@
 // `import name from '…'` — the only form a picker can repoint, since the name
 // stands for the file itself. `import { a } from` and `import * as ns from`
 // name something inside a module, which is not a file to swap.
-const DEFAULT_IMPORT =
-  /^[ \t]*import\s+([A-Za-z_$][\w$]*)\s*(?:,\s*(?:\{[^}]*\}|\*\s+as\s+[A-Za-z_$][\w$]*))?\s*from\s*(['"])([^'"]+)\2\s*;?[ \t]*$/gm;
+// The pattern is assembled from three literal pieces only to fit the line width; each piece is a
+// complete regular expression on its own, and the joined source is the original pattern.
+const DEFAULT_IMPORT = new RegExp(
+  /^[ \t]*import\s+([A-Za-z_$][\w$]*)\s*/.source +
+    /(?:,\s*(?:\{[^}]*\}|\*\s+as\s+[A-Za-z_$][\w$]*))?/.source +
+    /\s*from\s*(['"])([^'"]+)\2\s*;?[ \t]*$/.source,
+  'gm',
+);
 
 interface DefaultImport {
   readonly name: string;

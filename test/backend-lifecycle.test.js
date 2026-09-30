@@ -181,23 +181,26 @@ test('forcing a content reload waits for the old build before rewriting its bund
   assert.equal((await second).error, undefined);
 });
 
-test('validation clears completed requests and rejects pending requests when a worker exits', async (t) => {
-  const h = contentHarness(t);
-  await h.start();
-  const child = h.children[0];
-  const validation = h.validateEntry(h.projectPath, { collection: 'posts', data: {} });
-  await tick();
-  assert.equal(h.timers.size, 2, 'idle and current request timeouts only');
-  child.reply({ type: 'reply', id: child.requests[0].id, value: { issues: [] } });
-  assert.equal((await validation).issues.length, 0);
-  assert.equal(h.timers.size, 1, 'the completed request timeout was cleared');
-  const pending = h.validateEntry(h.projectPath, { collection: 'posts', data: {} });
-  await tick();
-  child.stderr.emit('data', 'invalid worker state');
-  child.emit('exit', 1);
-  assert.match((await pending).error, /invalid worker state/);
-  assert.equal(h.timers.size, 0);
-});
+test(
+  'validation clears completed requests and ' + 'rejects pending requests when a worker exits',
+  async (t) => {
+    const h = contentHarness(t);
+    await h.start();
+    const child = h.children[0];
+    const validation = h.validateEntry(h.projectPath, { collection: 'posts', data: {} });
+    await tick();
+    assert.equal(h.timers.size, 2, 'idle and current request timeouts only');
+    child.reply({ type: 'reply', id: child.requests[0].id, value: { issues: [] } });
+    assert.equal((await validation).issues.length, 0);
+    assert.equal(h.timers.size, 1, 'the completed request timeout was cleared');
+    const pending = h.validateEntry(h.projectPath, { collection: 'posts', data: {} });
+    await tick();
+    child.stderr.emit('data', 'invalid worker state');
+    child.emit('exit', 1);
+    assert.match((await pending).error, /invalid worker state/);
+    assert.equal(h.timers.size, 0);
+  },
+);
 
 test('removing a content config closes its cached worker', async (t) => {
   const h = contentHarness(t);
@@ -207,145 +210,161 @@ test('removing a content config closes its cached worker', async (t) => {
   assert.equal(h.children[0].killed, true);
 });
 
-test('the serial queue never starts waiting captures together and continues after rejection', async () => {
-  const queue = createSerialQueue();
-  const release = deferred();
-  const started = [];
-  const first = queue(async () => {
-    started.push(1);
-    await release.promise;
-    throw new Error('failed capture');
-  });
-  const rejected = assert.rejects(first, /failed capture/);
-  const second = queue(async () => {
-    started.push(2);
+test(
+  'the serial queue never starts waiting ' + 'captures together and continues after rejection',
+  async () => {
+    const queue = createSerialQueue();
+    const release = deferred();
+    const started = [];
+    const first = queue(async () => {
+      started.push(1);
+      await release.promise;
+      throw new Error('failed capture');
+    });
+    const rejected = assert.rejects(first, /failed capture/);
+    const second = queue(async () => {
+      started.push(2);
+      await tick();
+      started.push('done 2');
+      return 2;
+    });
+    const third = queue(() => {
+      started.push(3);
+      return 3;
+    });
     await tick();
-    started.push('done 2');
-    return 2;
-  });
-  const third = queue(() => {
-    started.push(3);
-    return 3;
-  });
-  await tick();
-  assert.deepEqual(started, [1]);
-  release.resolve();
-  await rejected;
-  assert.deepEqual(await Promise.all([second, third]), [2, 3]);
-  assert.deepEqual(started, [1, 2, 'done 2', 3]);
-});
+    assert.deepEqual(started, [1]);
+    release.resolve();
+    await rejected;
+    assert.deepEqual(await Promise.all([second, third]), [2, 3]);
+    assert.deepEqual(started, [1, 2, 'done 2', 3]);
+  },
+);
 
-test('project watchers route batched edits once and cancel all pending events on close', async (t) => {
-  const projectPath = fs.mkdtempSync(path.join(os.tmpdir(), 'stacki-watch-lifecycle-'));
-  fs.mkdirSync(path.join(projectPath, 'public'));
-  t.after(() => fs.rmSync(projectPath, { recursive: true, force: true }));
-  const handlers = new Map();
-  const closed = [];
-  const events = [];
-  const checks = [];
-  const pokes = [];
-  const hints = [];
-  const watcher = watchProject({
-    projectPath,
-    watch: (dir, _options, handler) => {
-      handlers.set(path.basename(dir), handler);
-      return { close: () => closed.push(dir) };
-    },
-    send: (channel, payload) => events.push({ channel, payload }),
-    isSelfWrite: (file) => {
-      checks.push(file);
-      return file.endsWith('ours.astro');
-    },
-    noteExternalChange: (file) => hints.push(path.basename(file)),
-    notePageMayHaveChanged: (external) => pokes.push(external),
-    scheduleThumb: () => {},
-    mediaPattern: /\.png$/,
-  });
-  const emit = (name, root = 'src') => handlers.get(root)('change', name);
-  for (const name of [
-    'page.astro',
-    'page.astro',
-    'ours.astro',
-    'info.json',
-    'hero.png',
-    'style.css',
-    'code.ts',
-  ]) {
-    emit(name);
-  }
-  await sleep(250);
-  assert.equal(checks.length, 7, 'each event reads its self-write contents at most once');
-  assert.equal(pokes.length, 6, 'every external source type nudges preview recovery');
-  // The document actors hear every outside change as a hint to re-read (plan §7);
-  // the app's own write is not one.
-  assert.deepEqual(hints, [
-    'page.astro',
-    'page.astro',
-    'info.json',
-    'hero.png',
-    'style.css',
-    'code.ts',
-  ]);
-  assert.equal(events.length, 4);
-  assert.deepEqual(events.find((event) => event.channel === 'fs:changed').payload.files, [
-    path.join(projectPath, 'src', 'page.astro'),
-  ]);
-  for (const name of ['next.astro', 'next.json', 'next.png', 'next.css']) {
-    emit(name);
-  }
-  emit('public.png', 'public');
-  watcher.close();
-  emit('late.astro');
-  emit('late.png', 'public');
-  await sleep(250);
-  assert.equal(events.length, 4, 'the next project receives no old notifications');
-  assert.equal(closed.length, 2, 'both watched directories close together');
-});
+test(
+  'project watchers route batched edits once ' + 'and cancel all pending events on close',
+  async (t) => {
+    const projectPath = fs.mkdtempSync(path.join(os.tmpdir(), 'stacki-watch-lifecycle-'));
+    fs.mkdirSync(path.join(projectPath, 'public'));
+    t.after(() => fs.rmSync(projectPath, { recursive: true, force: true }));
+    const handlers = new Map();
+    const closed = [];
+    const events = [];
+    const checks = [];
+    const pokes = [];
+    const hints = [];
+    const watcher = watchProject({
+      projectPath,
+      watch: (dir, _options, handler) => {
+        handlers.set(path.basename(dir), handler);
+        return { close: () => closed.push(dir) };
+      },
+      send: (channel, payload) => events.push({ channel, payload }),
+      isSelfWrite: (file) => {
+        checks.push(file);
+        return file.endsWith('ours.astro');
+      },
+      noteExternalChange: (file) => hints.push(path.basename(file)),
+      notePageMayHaveChanged: (external) => pokes.push(external),
+      scheduleThumb: () => {},
+      mediaPattern: /\.png$/,
+    });
+    const emit = (name, root = 'src') => handlers.get(root)('change', name);
+    for (const name of [
+      'page.astro',
+      'page.astro',
+      'ours.astro',
+      'info.json',
+      'hero.png',
+      'style.css',
+      'code.ts',
+    ]) {
+      emit(name);
+    }
+    await sleep(250);
+    assert.equal(checks.length, 7, 'each event reads its self-write contents at most once');
+    assert.equal(pokes.length, 6, 'every external source type nudges preview recovery');
+    // The document actors hear every outside change as a hint to re-read (plan §7);
+    // the app's own write is not one.
+    assert.deepEqual(hints, [
+      'page.astro',
+      'page.astro',
+      'info.json',
+      'hero.png',
+      'style.css',
+      'code.ts',
+    ]);
+    assert.equal(events.length, 4);
+    assert.deepEqual(events.find((event) => event.channel === 'fs:changed').payload.files, [
+      path.join(projectPath, 'src', 'page.astro'),
+    ]);
+    for (const name of ['next.astro', 'next.json', 'next.png', 'next.css']) {
+      emit(name);
+    }
+    emit('public.png', 'public');
+    watcher.close();
+    emit('late.astro');
+    emit('late.png', 'public');
+    await sleep(250);
+    assert.equal(events.length, 4, 'the next project receives no old notifications');
+    assert.equal(closed.length, 2, 'both watched directories close together');
+  },
+);
 
-test('dev starts share a result only for the same project and serialize different projects', async () => {
-  const { createKeyedQueue } = require('../dist/electron/serialQueue');
-  const queue = createKeyedQueue();
-  const release = deferred();
-  const started = [];
-  const first = queue.run('one', async () => {
-    started.push('one');
-    await release.promise;
-    return 'one-url';
-  });
-  const duplicate = queue.run('one', () => {
-    throw new Error('duplicate start');
-  });
-  const next = queue.run('two', () => {
-    started.push('two');
-    return 'two-url';
-  });
-  assert.equal(first, duplicate);
-  await tick();
-  assert.deepEqual(started, ['one']);
-  release.resolve();
-  assert.deepEqual(await Promise.all([first, duplicate, next]), ['one-url', 'one-url', 'two-url']);
-  assert.deepEqual(started, ['one', 'two']);
-});
+test(
+  'dev starts share a result only for the same ' + 'project and serialize different projects',
+  async () => {
+    const { createKeyedQueue } = require('../dist/electron/serialQueue');
+    const queue = createKeyedQueue();
+    const release = deferred();
+    const started = [];
+    const first = queue.run('one', async () => {
+      started.push('one');
+      await release.promise;
+      return 'one-url';
+    });
+    const duplicate = queue.run('one', () => {
+      throw new Error('duplicate start');
+    });
+    const next = queue.run('two', () => {
+      started.push('two');
+      return 'two-url';
+    });
+    assert.equal(first, duplicate);
+    await tick();
+    assert.deepEqual(started, ['one']);
+    release.resolve();
+    assert.deepEqual(await Promise.all([first, duplicate, next]), [
+      'one-url',
+      'one-url',
+      'two-url',
+    ]);
+    assert.deepEqual(started, ['one', 'two']);
+  },
+);
 
-test('closing a project cancels active and queued starts without poisoning the next start', async () => {
-  const { createKeyedQueue } = require('../dist/electron/serialQueue');
-  const queue = createKeyedQueue();
-  const release = deferred();
-  const active = queue.run('one', async (assertActive) => {
-    await release.promise;
-    assertActive();
-  });
-  const waiting = queue.run('two', () => {
-    throw new Error('must not start');
-  });
-  const rejected = [assert.rejects(active, /cancelled/), assert.rejects(waiting, /cancelled/)];
-  await tick();
-  queue.cancel();
-  const reopened = queue.run('one', () => 'new-url');
-  release.resolve();
-  await Promise.all(rejected);
-  assert.equal(await reopened, 'new-url');
-});
+test(
+  'closing a project cancels active and queued ' + 'starts without poisoning the next start',
+  async () => {
+    const { createKeyedQueue } = require('../dist/electron/serialQueue');
+    const queue = createKeyedQueue();
+    const release = deferred();
+    const active = queue.run('one', async (assertActive) => {
+      await release.promise;
+      assertActive();
+    });
+    const waiting = queue.run('two', () => {
+      throw new Error('must not start');
+    });
+    const rejected = [assert.rejects(active, /cancelled/), assert.rejects(waiting, /cancelled/)];
+    await tick();
+    queue.cancel();
+    const reopened = queue.run('one', () => 'new-url');
+    release.resolve();
+    await Promise.all(rejected);
+    assert.equal(await reopened, 'new-url');
+  },
+);
 
 function loadThumbs(BrowserWindow) {
   const source = fs.readFileSync(
@@ -409,80 +428,90 @@ test('a stalled thumbnail navigation times out and destroys its window', async (
   assert.equal(destroyed, true);
 });
 
-test('an edit during thumbnail rendering remains stale and a missing image is regenerated', async (t) => {
-  const h = thumbFixture(t);
-  const thumbs = loadThumbs(
-    class {
-      constructor() {
-        this.webContents = {
-          executeJavaScript: async () => {},
-          capturePage: async () => {
-            fs.writeFileSync(h.source, '<h1>Edited while rendering</h1>');
-            return { isEmpty: () => false, resize: () => ({ toPNG: () => Buffer.from('image') }) };
-          },
-        };
-      }
-      async loadURL() {}
-      isDestroyed() {
-        return false;
-      }
-      destroy() {}
-    },
-  );
-  assert.equal((await thumbs.capture(h.userData, h.project, 'http://example.invalid')).ok, true);
-  assert.equal(thumbs.isStale(h.userData, h.project), true);
-  const file = thumbs.thumbPathFor(h.userData, h.project);
-  fs.writeFileSync(
-    file.replace(/\.png$/, '.json'),
-    JSON.stringify({ fingerprint: thumbs.fingerprint(h.project) }),
-  );
-  assert.equal(thumbs.isStale(h.userData, h.project), false);
-  fs.unlinkSync(file);
-  assert.equal(thumbs.isStale(h.userData, h.project), true);
-});
+test(
+  'an edit during thumbnail rendering remains ' + 'stale and a missing image is regenerated',
+  async (t) => {
+    const h = thumbFixture(t);
+    const thumbs = loadThumbs(
+      class {
+        constructor() {
+          this.webContents = {
+            executeJavaScript: async () => {},
+            capturePage: async () => {
+              fs.writeFileSync(h.source, '<h1>Edited while rendering</h1>');
+              return {
+                isEmpty: () => false,
+                resize: () => ({ toPNG: () => Buffer.from('image') }),
+              };
+            },
+          };
+        }
+        async loadURL() {}
+        isDestroyed() {
+          return false;
+        }
+        destroy() {}
+      },
+    );
+    assert.equal((await thumbs.capture(h.userData, h.project, 'http://example.invalid')).ok, true);
+    assert.equal(thumbs.isStale(h.userData, h.project), true);
+    const file = thumbs.thumbPathFor(h.userData, h.project);
+    fs.writeFileSync(
+      file.replace(/\.png$/, '.json'),
+      JSON.stringify({ fingerprint: thumbs.fingerprint(h.project) }),
+    );
+    assert.equal(thumbs.isStale(h.userData, h.project), false);
+    fs.unlinkSync(file);
+    assert.equal(thumbs.isStale(h.userData, h.project), true);
+  },
+);
 
-test('legacy schema conversion resolves Astro private dependencies without root hoisting', async (t) => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'stacki-schema-resolution-'));
-  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
-  const modules = path.join(root, 'project', 'node_modules');
-  const storeModules = path.join(root, 'store', 'astro-version', 'node_modules');
-  const astro = path.join(storeModules, 'astro');
-  const converter = path.join(storeModules, 'zod-to-json-schema');
-  const staging = path.join(modules, '.stacki');
-  for (const dir of [astro, converter, staging]) {
-    fs.mkdirSync(dir, { recursive: true });
-  }
-  fs.writeFileSync(
-    path.join(astro, 'package.json'),
-    JSON.stringify({
-      name: 'astro',
-      type: 'module',
-      exports: { './package.json': './package.json', './zod': './zod.mjs' },
-    }),
-  );
-  fs.writeFileSync(path.join(astro, 'zod.mjs'), 'export const z = {};');
-  fs.writeFileSync(
-    path.join(converter, 'package.json'),
-    JSON.stringify({ name: 'zod-to-json-schema', main: 'index.cjs' }),
-  );
-  fs.writeFileSync(
-    path.join(converter, 'index.cjs'),
-    'exports.zodToJsonSchema = (schema, options) => ({ source: schema.source, strategy: options.effectStrategy });',
-  );
-  fs.symlinkSync(
-    astro,
-    path.join(modules, 'astro'),
-    process.platform === 'win32' ? 'junction' : 'dir',
-  );
-  const staged = path.join(staging, 'schemaTools.mjs');
-  fs.copyFileSync(
-    path.join(__dirname, '..', 'dist', 'electron', 'content', 'schemaTools.mjs'),
-    staged,
-  );
-  assert.equal(fs.existsSync(path.join(modules, 'zod-to-json-schema')), false);
-  const { toJsonSchema } = await import(require('node:url').pathToFileURL(staged).href);
-  assert.deepEqual(toJsonSchema({ source: 'private Astro dependency' }), {
-    source: 'private Astro dependency',
-    strategy: 'input',
-  });
-});
+test(
+  'legacy schema conversion resolves Astro ' + 'private dependencies without root hoisting',
+  async (t) => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'stacki-schema-resolution-'));
+    t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+    const modules = path.join(root, 'project', 'node_modules');
+    const storeModules = path.join(root, 'store', 'astro-version', 'node_modules');
+    const astro = path.join(storeModules, 'astro');
+    const converter = path.join(storeModules, 'zod-to-json-schema');
+    const staging = path.join(modules, '.stacki');
+    for (const dir of [astro, converter, staging]) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+    fs.writeFileSync(
+      path.join(astro, 'package.json'),
+      JSON.stringify({
+        name: 'astro',
+        type: 'module',
+        exports: { './package.json': './package.json', './zod': './zod.mjs' },
+      }),
+    );
+    fs.writeFileSync(path.join(astro, 'zod.mjs'), 'export const z = {};');
+    fs.writeFileSync(
+      path.join(converter, 'package.json'),
+      JSON.stringify({ name: 'zod-to-json-schema', main: 'index.cjs' }),
+    );
+    fs.writeFileSync(
+      path.join(converter, 'index.cjs'),
+      'exports.zodToJsonSchema = (schema, options) => ({ source: schema.source, strategy: ' +
+        'options.effectStrategy });',
+    );
+    fs.symlinkSync(
+      astro,
+      path.join(modules, 'astro'),
+      process.platform === 'win32' ? 'junction' : 'dir',
+    );
+    const staged = path.join(staging, 'schemaTools.mjs');
+    fs.copyFileSync(
+      path.join(__dirname, '..', 'dist', 'electron', 'content', 'schemaTools.mjs'),
+      staged,
+    );
+    assert.equal(fs.existsSync(path.join(modules, 'zod-to-json-schema')), false);
+    const { toJsonSchema } = await import(require('node:url').pathToFileURL(staged).href);
+    assert.deepEqual(toJsonSchema({ source: 'private Astro dependency' }), {
+      source: 'private Astro dependency',
+      strategy: 'input',
+    });
+  },
+);

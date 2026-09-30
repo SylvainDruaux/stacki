@@ -149,14 +149,13 @@ function Field({
   );
 }
 
+const EYEDROPPER_ICON_PATH =
+  'M10.5 2.5a1.7 1.7 0 0 1 2.4 2.4l-1 1 1 1-1.2 1.2-1-1' +
+  'L6 12.8 3 13.5l.7-3 4.1-4.1-1-1L8 4.2l1 1 1-1a1.7 1.7 0 0 1 .5-.4Z';
+
 const EyedropperIcon = () => (
   <svg viewBox="0 0 16 16" width="15" height="15" fill="none" aria-hidden="true">
-    <path
-      d="M10.5 2.5a1.7 1.7 0 0 1 2.4 2.4l-1 1 1 1-1.2 1.2-1-1L6 12.8 3 13.5l.7-3 4.1-4.1-1-1L8 4.2l1 1 1-1a1.7 1.7 0 0 1 .5-.4Z"
-      stroke="currentColor"
-      strokeWidth="1.1"
-      strokeLinejoin="round"
-    />
+    <path d={EYEDROPPER_ICON_PATH} stroke="currentColor" strokeWidth="1.1" strokeLinejoin="round" />
   </svg>
 );
 
@@ -363,7 +362,8 @@ export default function ColorPicker({ value, anchor, trigger, onChange, onClose 
       );
     } else {
       setFromColor(
-        `rgba(${i === 0 ? v : rgba.r}, ${i === 1 ? v : rgba.g}, ${i === 2 ? v : rgba.b}, ${rgba.a})`,
+        `rgba(${i === 0 ? v : rgba.r}, ${i === 1 ? v : rgba.g}, ` +
+          `${i === 2 ? v : rgba.b}, ${rgba.a})`,
         false,
       );
     }
@@ -380,7 +380,9 @@ export default function ColorPicker({ value, anchor, trigger, onChange, onClose 
       <div
         className="u-color-sb"
         style={{
-          background: `linear-gradient(to top, #000, transparent), linear-gradient(to right, #fff, ${hueColor})`,
+          background:
+            'linear-gradient(to top, #000, transparent), ' +
+            `linear-gradient(to right, #fff, ${hueColor})`,
         }}
         onPointerDown={(e) => {
           e.preventDefault();

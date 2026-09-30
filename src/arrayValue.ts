@@ -347,7 +347,9 @@ export function objectText(fields: readonly ObjectRow[] | null | undefined): str
     if (f.items) {
       return `${name}: ${arrayText(f.items)}`;
     }
-    return `${name}: ${f.quote === null ? String(f.text) : quoted({ text: f.text ?? '', quote: f.quote }, fallback)}`;
+    const valueText =
+      f.quote === null ? String(f.text) : quoted({ text: f.text ?? '', quote: f.quote }, fallback);
+    return `${name}: ${valueText}`;
   };
   return `{ ${list.map(one).join(', ')} }`;
 }

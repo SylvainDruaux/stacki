@@ -484,32 +484,38 @@ function LayerLonghandField({
   );
 }
 
+const BACKGROUND_IMAGE_ICON_FIRST_PATH =
+  'M6 7C6.55228 7 7 6.55228 7 6C7 5.44772 6.55228 5 6 5C5.44772 5 5 5.44772 5 6' +
+  'C5 6.55228 5.44772 7 6 7Z';
+const BACKGROUND_IMAGE_ICON_SECOND_PATH =
+  'M2 3C2 2.44772 2.44772 2 3 2H13C13.5523 2 14 2.44772 14 3V13C14 13.5523 13.5523 14 13 14H3' +
+  'C2.44772 14 2 13.5523 2 13V3ZM13 3L3 3V12.2929L8 7.29289L13 12.2929V3ZM8 8.70711' +
+  'L12.2929 13H3.70711L8 8.70711Z';
+
 // Layer-type icons (Webflow's), currentColor-driven. Gradient icons use a useId
 // gradient id so multiple instances never collide.
 function BgImageIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-      <path
-        d="M6 7C6.55228 7 7 6.55228 7 6C7 5.44772 6.55228 5 6 5C5.44772 5 5 5.44772 5 6C5 6.55228 5.44772 7 6 7Z"
-        fill="currentColor"
-      />
+      <path d={BACKGROUND_IMAGE_ICON_FIRST_PATH} fill="currentColor" />
       <path
         fillRule="evenodd"
         clipRule="evenodd"
-        d="M2 3C2 2.44772 2.44772 2 3 2H13C13.5523 2 14 2.44772 14 3V13C14 13.5523 13.5523 14 13 14H3C2.44772 14 2 13.5523 2 13V3ZM13 3L3 3V12.2929L8 7.29289L13 12.2929V3ZM8 8.70711L12.2929 13H3.70711L8 8.70711Z"
+        d={BACKGROUND_IMAGE_ICON_SECOND_PATH}
         fill="currentColor"
       />
     </svg>
   );
 }
+const BACKGROUND_LINEAR_ICON_PATH =
+  'M2 3C2 2.44772 2.44772 2 3 2H13C13.5523 2 14 2.44772 14 3V13C14 13.5523 13.5523 14 13 14H3' +
+  'C2.44772 14 2 13.5523 2 13V3Z';
+
 function BgLinearIcon() {
   const id = useId();
   return (
     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-      <path
-        d="M2 3C2 2.44772 2.44772 2 3 2H13C13.5523 2 14 2.44772 14 3V13C14 13.5523 13.5523 14 13 14H3C2.44772 14 2 13.5523 2 13V3Z"
-        fill={`url(#${id})`}
-      />
+      <path d={BACKGROUND_LINEAR_ICON_PATH} fill={`url(#${id})`} />
       <defs>
         <linearGradient id={id} x1="14" y1="2" x2="14" y2="14" gradientUnits="userSpaceOnUse">
           <stop stopColor="currentColor" />
@@ -519,14 +525,15 @@ function BgLinearIcon() {
     </svg>
   );
 }
+const BACKGROUND_RADIAL_ICON_PATH =
+  'M2 3C2 2.44772 2.44772 2 3 2H13C13.5523 2 14 2.44772 14 3V13C14 13.5523 13.5523 14 13 14H3' +
+  'C2.44772 14 2 13.5523 2 13V3Z';
+
 function BgRadialIcon() {
   const id = useId();
   return (
     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-      <path
-        d="M2 3C2 2.44772 2.44772 2 3 2H13C13.5523 2 14 2.44772 14 3V13C14 13.5523 13.5523 14 13 14H3C2.44772 14 2 13.5523 2 13V3Z"
-        fill={`url(#${id})`}
-      />
+      <path d={BACKGROUND_RADIAL_ICON_PATH} fill={`url(#${id})`} />
       <defs>
         <radialGradient
           id={id}
@@ -544,13 +551,14 @@ function BgRadialIcon() {
     </svg>
   );
 }
+const BACKGROUND_COLOR_ICON_PATH =
+  'M2 3C2 2.44772 2.44772 2 3 2H13C13.5523 2 14 2.44772 14 3V13C14 13.5523 13.5523 14 13 14H3' +
+  'C2.44772 14 2 13.5523 2 13V3Z';
+
 function BgColorIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-      <path
-        d="M2 3C2 2.44772 2.44772 2 3 2H13C13.5523 2 14 2.44772 14 3V13C14 13.5523 13.5523 14 13 14H3C2.44772 14 2 13.5523 2 13V3Z"
-        fill="currentColor"
-      />
+      <path d={BACKGROUND_COLOR_ICON_PATH} fill="currentColor" />
     </svg>
   );
 }
@@ -802,7 +810,10 @@ function LayerPositionField({
             <button
               key={`${row}-${col}`}
               type="button"
-              className={`embed-editor_bg-poscell ${activeCol === col && activeRow === row ? 'is-active' : ''}`}
+              className={
+                'embed-editor_bg-poscell ' +
+                (activeCol === col && activeRow === row ? 'is-active' : '')
+              }
               disabled={busy}
               aria-label={`${['Left', 'Center', 'Right'][col]} ${['top', 'center', 'bottom'][row]}`}
               onClick={() => writePos(`${AXIS_PCT[col]} ${AXIS_PCT[row]}`, false)}

@@ -68,7 +68,8 @@ const FILES = {
   // Places a reference lives that are not the project's stylesheet folders: a
   // config at the root, a helper module, a page's frontmatter, and a file under
   // a directory nobody would have thought to list.
-  'tailwind.config.js': `export default { theme: { maxWidth: { main: 'var(--max-width-main)' } } }\n`,
+  'tailwind.config.js':
+    `export default { theme: { maxWidth: { ` + `main: 'var(--max-width-main)' } } }\n`,
   'src/lib/theme.ts': `export const wide = { maxWidth: 'var(--max-width-main)' }\n`,
   'app/legacy/old.css': `.legacy { max-width: var(--max-width-main); }\n`,
   'node_modules/some-dep/dep.css': `.dep { max-width: var(--max-width-main); }\n`,

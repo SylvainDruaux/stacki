@@ -921,7 +921,8 @@ function precedingSiblings(key: string, view: TreeView, adjacentOnly: boolean): 
     return [];
   }
   const adjacent = sibs[idx - 1];
-  return adjacentOnly && adjacent !== undefined ? [adjacent] : sibs.slice(0, idx).reverse(); // nearest-first
+  // The preceding siblings come back nearest-first.
+  return adjacentOnly && adjacent !== undefined ? [adjacent] : sibs.slice(0, idx).reverse();
 }
 
 function followingSiblings(key: string, view: TreeView, adjacentOnly: boolean): string[] {

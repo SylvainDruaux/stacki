@@ -23,21 +23,27 @@ const norm = (value: string) => value.trim().toLowerCase().replace(/\s+/g, ' ');
 
 // ─────────────────────────── Icons (from Webflow) ───────────────────────────
 
+const FLEX_SHRINK_ICON_SECOND_PATH =
+  'M8.00004 10.7071L5.85359 12.8536L5.14648 12.1464L8.50004 8.79289L11.8536 12.1464' +
+  'L11.1465 12.8536L9.00004 10.7071V15H8.00004V10.7071Z';
+const FLEX_SHRINK_ICON_THIRD_PATH =
+  'M8.00004 4.29289L5.85359 2.14645L5.14648 2.85355L8.50004 6.20711L11.8536 2.85355' +
+  'L11.1465 2.14645L9.00004 4.29289V0L8.00004 4.37103e-08V4.29289Z';
+
 function FlexShrinkIcon() {
   return (
     <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
       <path fillRule="evenodd" clipRule="evenodd" d="M15 8L2 8L2 7L15 7V8Z" fill="currentColor" />
-      <path
-        d="M8.00004 10.7071L5.85359 12.8536L5.14648 12.1464L8.50004 8.79289L11.8536 12.1464L11.1465 12.8536L9.00004 10.7071V15H8.00004V10.7071Z"
-        fill="currentColor"
-      />
-      <path
-        d="M8.00004 4.29289L5.85359 2.14645L5.14648 2.85355L8.50004 6.20711L11.8536 2.85355L11.1465 2.14645L9.00004 4.29289V0L8.00004 4.37103e-08V4.29289Z"
-        fill="currentColor"
-      />
+      <path d={FLEX_SHRINK_ICON_SECOND_PATH} fill="currentColor" />
+      <path d={FLEX_SHRINK_ICON_THIRD_PATH} fill="currentColor" />
     </svg>
   );
 }
+const FLEX_GROW_ICON_SECOND_PATH =
+  'M8.52731 3.70718L10.6738 5.85363L11.3809 5.14652L8.02731 1.79297L4.67375 5.14652' +
+  'L5.38086 5.85363L7.52731 3.70718L7.52731 12.293L5.38086 10.1465L4.67375 10.8536' +
+  'L8.02731 14.2072L11.3809 10.8536L10.6738 10.1465L8.52731 12.293L8.52731 3.70718Z';
+
 function FlexGrowIcon() {
   return (
     <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
@@ -48,13 +54,15 @@ function FlexGrowIcon() {
         d="M2 0.999999L14 1L14 2L2 2L2 0.999999ZM2 14L14 14L14 15L2 15L2 14Z"
         fill="currentColor"
       />
-      <path
-        d="M8.52731 3.70718L10.6738 5.85363L11.3809 5.14652L8.02731 1.79297L4.67375 5.14652L5.38086 5.85363L7.52731 3.70718L7.52731 12.293L5.38086 10.1465L4.67375 10.8536L8.02731 14.2072L11.3809 10.8536L10.6738 10.1465L8.52731 12.293L8.52731 3.70718Z"
-        fill="currentColor"
-      />
+      <path d={FLEX_GROW_ICON_SECOND_PATH} fill="currentColor" />
     </svg>
   );
 }
+const FLEX_NONE_ICON_SECOND_PATH =
+  'M7.29293 7.99996L5.14648 5.85352L5.85359 5.14641L8.00004 7.29286L10.1465 5.14641' +
+  'L10.8536 5.85352L8.70714 7.99996L10.8536 10.1464L10.1465 10.8535L8.00004 8.70707' +
+  'L5.85359 10.8535L5.14648 10.1464L7.29293 7.99996Z';
+
 function FlexNoneIcon() {
   return (
     <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
@@ -67,39 +75,40 @@ function FlexNoneIcon() {
       <path
         fillRule="evenodd"
         clipRule="evenodd"
-        d="M7.29293 7.99996L5.14648 5.85352L5.85359 5.14641L8.00004 7.29286L10.1465 5.14641L10.8536 5.85352L8.70714 7.99996L10.8536 10.1464L10.1465 10.8535L8.00004 8.70707L5.85359 10.8535L5.14648 10.1464L7.29293 7.99996Z"
+        d={FLEX_NONE_ICON_SECOND_PATH}
         fill="currentColor"
       />
     </svg>
   );
 }
+const CLOSE_ICON_PATH =
+  'M8.70708 8.00004L12.3535 4.35359L11.6464 3.64648L7.99998 7.29293L4.35353 3.64648' +
+  'L3.64642 4.35359L7.29287 8.00004L3.64642 11.6465L4.35353 12.3536L7.99998 8.70714' +
+  'L11.6464 12.3536L12.3535 11.6465L8.70708 8.00004Z';
+
 function CloseIcon() {
   return (
     <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
-      <path
-        fillRule="evenodd"
-        clipRule="evenodd"
-        d="M8.70708 8.00004L12.3535 4.35359L11.6464 3.64648L7.99998 7.29293L4.35353 3.64648L3.64642 4.35359L7.29287 8.00004L3.64642 11.6465L4.35353 12.3536L7.99998 8.70714L11.6464 12.3536L12.3535 11.6465L8.70708 8.00004Z"
-        fill="currentColor"
-      />
+      <path fillRule="evenodd" clipRule="evenodd" d={CLOSE_ICON_PATH} fill="currentColor" />
     </svg>
   );
 }
+const MORE_DOTS_ICON_FIRST_PATH =
+  'M3 8C3 7.44772 3.44772 7 4 7C4.55228 7 5 7.44772 5 8C5 8.55228 4.55228 9 4 9' +
+  'C3.44772 9 3 8.55228 3 8Z';
+const MORE_DOTS_ICON_SECOND_PATH =
+  'M7 8C7 7.44772 7.44772 7 8 7C8.55228 7 9 7.44772 9 8C9 8.55228 8.55228 9 8 9' +
+  'C7.44772 9 7 8.55228 7 8Z';
+const MORE_DOTS_ICON_THIRD_PATH =
+  'M11 8C11 7.44772 11.4477 7 12 7C12.5523 7 13 7.44772 13 8C13 8.55228 12.5523 9 12 9' +
+  'C11.4477 9 11 8.55228 11 8Z';
+
 function MoreDotsIcon() {
   return (
     <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
-      <path
-        d="M3 8C3 7.44772 3.44772 7 4 7C4.55228 7 5 7.44772 5 8C5 8.55228 4.55228 9 4 9C3.44772 9 3 8.55228 3 8Z"
-        fill="currentColor"
-      />
-      <path
-        d="M7 8C7 7.44772 7.44772 7 8 7C8.55228 7 9 7.44772 9 8C9 8.55228 8.55228 9 8 9C7.44772 9 7 8.55228 7 8Z"
-        fill="currentColor"
-      />
-      <path
-        d="M11 8C11 7.44772 11.4477 7 12 7C12.5523 7 13 7.44772 13 8C13 8.55228 12.5523 9 12 9C11.4477 9 11 8.55228 11 8Z"
-        fill="currentColor"
-      />
+      <path d={MORE_DOTS_ICON_FIRST_PATH} fill="currentColor" />
+      <path d={MORE_DOTS_ICON_SECOND_PATH} fill="currentColor" />
+      <path d={MORE_DOTS_ICON_THIRD_PATH} fill="currentColor" />
     </svg>
   );
 }
@@ -169,18 +178,22 @@ function AlignSelfStretchIcon() {
     </svg>
   );
 }
+const ALIGN_SELF_BASELINE_ICON_FIRST_PATH =
+  'M13 2V8.29289L14.6464 6.64645L15.3536 7.35355L12.5 10.2071L9.64645 7.35355L10.3536 6.64645' +
+  'L12 8.29289V2H13Z';
+const ALIGN_SELF_BASELINE_ICON_THIRD_PATH =
+  'M4.62582 2H6.37412L8.72712 10H7.68476L7.09649 7.99994H3.90349L3.31524 10H2.27288L4.62582 2' +
+  'ZM6.80237 6.99994L5.62585 2.9999H5.37409L4.19761 6.99994H6.80237Z';
+
 function AlignSelfBaselineIcon() {
   return (
     <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
-      <path
-        d="M13 2V8.29289L14.6464 6.64645L15.3536 7.35355L12.5 10.2071L9.64645 7.35355L10.3536 6.64645L12 8.29289V2H13Z"
-        fill="currentColor"
-      />
+      <path d={ALIGN_SELF_BASELINE_ICON_FIRST_PATH} fill="currentColor" />
       <path d="M16 12L1 12V13L16 13V12Z" fill="currentColor" />
       <path
         fillRule="evenodd"
         clipRule="evenodd"
-        d="M4.62582 2H6.37412L8.72712 10H7.68476L7.09649 7.99994H3.90349L3.31524 10H2.27288L4.62582 2ZM6.80237 6.99994L5.62585 2.9999H5.37409L4.19761 6.99994H6.80237Z"
+        d={ALIGN_SELF_BASELINE_ICON_THIRD_PATH}
         fill="currentColor"
       />
     </svg>
@@ -414,7 +427,9 @@ function SizingControl(props: Props) {
                   type="button"
                   role="radio"
                   aria-checked={current === seg.value}
-                  className={`embed-editor_display-seg ${current === seg.value ? 'is-selected' : ''}`}
+                  className={
+                    'embed-editor_display-seg ' + (current === seg.value ? 'is-selected' : '')
+                  }
                   disabled={busy}
                   aria-label={seg.label}
                   title={seg.label}
@@ -425,7 +440,9 @@ function SizingControl(props: Props) {
               ))}
               <button
                 type="button"
-                className={`embed-editor_display-seg ${showPanel || customTriple ? 'is-selected' : ''}`}
+                className={
+                  'embed-editor_display-seg ' + (showPanel || customTriple ? 'is-selected' : '')
+                }
                 disabled={busy}
                 aria-pressed={showPanel || customTriple}
                 aria-label="Customize grow and shrink behavior"

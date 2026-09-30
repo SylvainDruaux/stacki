@@ -123,10 +123,12 @@ function stageRunner(projectPath: string, configAbs: string): { dir: string; ent
       '    let request;',
       '    try { request = JSON.parse(line); } catch { continue; }',
       '    try {',
-      '      const value = request.op === "validate" ? validate(config, request) : { error: "unknown request" };',
+      '      const value = request.op === "validate" ? validate(config, request) : ' +
+        '{ error: "unknown request" };',
       '      send({ type: "reply", id: request.id, value });',
       '    } catch (err) {',
-      '      send({ type: "reply", id: request.id, value: { error: String(err && err.message || err) } });',
+      '      send({ type: "reply", id: request.id, value: ' +
+        '{ error: String(err && err.message || err) } });',
       '    }',
       '  }',
       '});',

@@ -56,7 +56,10 @@ const shape = (node) => {
     return 'nothing';
   }
   if (node.kind === 'cond') {
-    return `cond(${(node.children || []).map((b) => `${b.name}:${(b.children || []).map(shape).join('+') || 'empty'}`).join(', ')})`;
+    const branches = (node.children || []).map(
+      (b) => `${b.name}:${(b.children || []).map(shape).join('+') || 'empty'}`,
+    );
+    return `cond(${branches.join(', ')})`;
   }
   if (node.kind === 'element' || node.kind === 'component') {
     return node.name;
@@ -67,7 +70,8 @@ const shape = (node) => {
 (async () => {
   // ── What the tree makes of it ─────────────────────────────────────────────
   const LINK = page(
-    '  {href ? (\n    <a class="link-card_link" href={href}>{heading}</a>\n  ) : (\n    heading\n  )}',
+    '  {href ? (\n    <a class="link-card_link" href={href}>{heading}</a>\n' +
+      '  ) : (\n    heading\n  )}',
   );
   const cond = first(LINK);
   check('the conditional is a conditional', shape(cond) === 'cond(then:a, else:expr)', shape(cond));

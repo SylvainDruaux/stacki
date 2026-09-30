@@ -236,9 +236,10 @@ const marked = (
     const main = fs.readFileSync(path.join(__dirname, '..', 'dist', 'electron', 'main.js'), 'utf8');
     check(
       'the dev config writes the hoistable form',
-      /const MORPH_TAG_HTML = MORPH_CLIENT \? "<script>import 'virtual:avb-morph';<\/script>" : '';/.test(
-        main,
-      ),
+      new RegExp(
+        /const MORPH_TAG_HTML = MORPH_CLIENT \? "<script/.source +
+          />import 'virtual:avb-morph';<\/script>" : '';/.source,
+      ).test(main),
       'the patcher is written some other way',
     );
   }

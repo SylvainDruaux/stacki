@@ -78,10 +78,12 @@ const {
   ctaLink = '#',
 } = Astro.props;
 ---
-<section style="padding: 6rem 2rem; text-align: center; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+<section style="padding: 6rem 2rem; text-align: center; \
+background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
   <h1 style="font-size: 3rem; margin-bottom: 1rem;">{heading}</h1>
   <p style="font-size: 1.25rem; opacity: 0.9; margin-bottom: 2rem;">{subheading}</p>
-  <a href={ctaLink} style="display: inline-block; padding: 0.75rem 2rem; background: white; color: #667eea; border-radius: 8px; text-decoration: none; font-weight: 600;">{ctaText}</a>
+  <a href={ctaLink} style="display: inline-block; padding: 0.75rem 2rem; background: white; \
+color: #667eea; border-radius: 8px; text-decoration: none; font-weight: 600;">{ctaText}</a>
 </section>
 `,
 
@@ -97,7 +99,8 @@ const {
   description = 'Describe this feature here.',
 } = Astro.props;
 ---
-<div style="max-width: 640px; margin: 0 auto; padding: 2rem; display: flex; gap: 1rem; align-items: flex-start;">
+<div style="max-width: 640px; margin: 0 auto; padding: 2rem; display: flex; gap: 1rem; \
+align-items: flex-start;">
   <div style="font-size: 2rem;">{icon}</div>
   <div>
     <h3 style="font-size: 1.25rem; margin-bottom: 0.25rem;">{title}</h3>
@@ -139,7 +142,8 @@ interface Props {
 }
 const { text = '© 2026 My Site. All rights reserved.' } = Astro.props;
 ---
-<footer style="padding: 3rem 2rem; text-align: center; color: #888; border-top: 1px solid #eee; margin-top: 4rem;">
+<footer style="padding: 3rem 2rem; text-align: center; color: #888; \
+border-top: 1px solid #eee; margin-top: 4rem;">
   <p>{text}</p>
 </footer>
 `,
@@ -151,9 +155,12 @@ import Feature from '../components/Feature.astro';
 import Footer from '../components/Footer.astro';
 ---
 <BaseLayout title="Home">
-  <Hero heading="Welcome to your new site" subheading="Everything on this page is editable in the visual builder." />
-  <Feature icon="🚀" title="Fast by default" description="Astro ships zero JavaScript unless you ask for it." />
-  <Feature icon="🎨" title="Visually editable" description="Drag components, tweak props, and watch the preview update live." />
+  <Hero heading="Welcome to your new site" \
+subheading="Everything on this page is editable in the visual builder." />
+  <Feature icon="🚀" title="Fast by default" \
+description="Astro ships zero JavaScript unless you ask for it." />
+  <Feature icon="🎨" title="Visually editable" \
+description="Drag components, tweak props, and watch the preview update live." />
   <Footer />
 </BaseLayout>
 `,

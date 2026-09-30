@@ -127,9 +127,11 @@ for (const [method, channel] of [...channels].sort()) {
 // rest of their props (`{...ctx}`) forward what they aren't named, so they are
 // not checked; nor is anything whose props aren't destructured in its
 // signature, which is what "declared" means here.
+// A block comment keeps its line breaks, so a reported line number is the
+// line in the file rather than the line in the stripped text.
 const stripComments = (text) =>
   text
-    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/\/\*[\s\S]*?\*\//g, (comment) => comment.replace(/[^\n]/g, ''))
     .split('\n')
     .map((line) => (/^\s*\/\//.test(line) ? '' : line))
     .join('\n');
@@ -264,13 +266,19 @@ for (const file of sources) {
   }
   const text = stripComments(fs.readFileSync(file, 'utf8'));
   const imported = new Map();
-  for (const m of text.matchAll(/^import\s+([A-Za-z_$][\w$]*)\s+from\s+'(\.[^']+)';/gm)) {
+  // The semicolon is optional: a file written without them imports the same
+  // component, and requiring one silently skipped every such file.
+  for (const m of text.matchAll(/^import\s+([A-Za-z_$][\w$]*)\s+from\s+'(\.[^']+)';?/gm)) {
     imported.set(m[1], path.resolve(path.dirname(file), m[2]));
   }
   // Lazy-loading changes when a panel loads, not its prop contract. Follow
   // those module references too so startup optimization cannot erase coverage.
   for (const m of text.matchAll(
-    /const\s+([A-Za-z_$][\w$]*)\s*=\s*(?:React\.)?lazy(?:Panel)?\(\s*\(\s*\)\s*=>\s*import\(\s*['"](\.[^'"]+)['"]\s*\)/g,
+    new RegExp(
+      /const\s+([A-Za-z_$][\w$]*)\s*=\s*(?:React\.)?lazy(?:Panel)?/.source +
+        /\(\s*\(\s*\)\s*=>\s*import\(\s*['"](\.[^'"]+)['"]\s*\)/.source,
+      'g',
+    ),
   )) {
     imported.set(m[1], path.resolve(path.dirname(file), m[2]));
   }
@@ -292,7 +300,8 @@ for (const file of sources) {
       check(
         `<${m[1]} ${prop}> is a prop it takes`,
         declared.has(prop),
-        `${where} passes ${prop}, which ${path.relative(root, target)} never reads — it goes nowhere`,
+        `${where} passes ${prop}, which ${path.relative(root, target)} never reads — it goes ` +
+          `nowhere`,
       );
     }
   }
@@ -305,5 +314,6 @@ if (failures.length) {
   process.exit(1);
 }
 console.log(
-  `bridge: ${checked} passed  [${used.size} methods called, ${exposed.size} exposed, ${wired} props wired]`,
+  `bridge: ${checked} passed  [${used.size} methods called, ${exposed.size} exposed,` +
+    ` ${wired} props wired]`,
 );

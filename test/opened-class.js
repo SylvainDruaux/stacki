@@ -54,8 +54,10 @@ const frame = (url) => {
            whether the branch rendered or not. The path rides on the element the
            branch rendered instead. -->
       <section>
-        <details data-avb-p="src/components/AccordionItem.astro|0.0.0 0.5.0" class="accordion_item">first</details>
-        <details data-avb-p="src/components/AccordionItem.astro|0.0.0 0.5.1" class="accordion_item">second</details>
+        <details data-avb-p="src/components/AccordionItem.astro|0.0.0 0.5.0"
+          class="accordion_item">first</details>
+        <details data-avb-p="src/components/AccordionItem.astro|0.0.0 0.5.1"
+          class="accordion_item">second</details>
       </section>
       <!-- The same, in a loop: one page path, one tagged element per item. -->
       <ul>

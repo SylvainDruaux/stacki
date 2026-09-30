@@ -52,7 +52,10 @@ const check = (what, condition, detail) => {
           build.onLoad({ filter: /.*/, namespace: 'stub' }, () => ({
             contents: `
               export async function streamProjectVariables(onAdd) {
-                onAdd({ name: 'site-margin', collection: 'Sizes', group: '', value: '2rem', binding: 'var(--site-margin)', kind: 'Size' });
+                onAdd({
+                  name: 'site-margin', collection: 'Sizes', group: '', value: '2rem',
+                  binding: 'var(--site-margin)', kind: 'Size',
+                });
                 return [];
               }
             `,
@@ -178,7 +181,8 @@ const check = (what, condition, detail) => {
   check(
     'and the field shows it',
     field()?.value === 'var(--site-margin)',
-    `the field holds ${JSON.stringify(field()?.value)} — the pick landed on the element but not in the field`,
+    `the field holds ${JSON.stringify(field()?.value)} ` +
+      `— the pick landed on the element but not in the field`,
   );
   // The rich editor is what is actually visible once a value has a variable in
   // it, so it has to be carrying the name too.
