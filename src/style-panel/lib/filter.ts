@@ -15,6 +15,14 @@ export type Filter = {
   amount: string // value filters, e.g. '200%', '4px', '180deg'
   x: string; y: string; blur: string; color: string // drop-shadow only
 }
+// One control's edit. Each member names the fields that control owns — an
+// explicit update surface rather than `Partial<T>` (AGENTS.md §4).
+export type FilterPatch =
+  | Pick<Filter, 'amount'>
+  | Pick<Filter, 'x'>
+  | Pick<Filter, 'y'>
+  | Pick<Filter, 'blur'>
+  | Pick<Filter, 'color'>
 
 export type FilterControl = 'amount' | 'angle' | 'shadow'
 export const FILTER_META: Record<FilterType, { label: string; unit: string; min: number; max: number; control: FilterControl; def: string }> = {

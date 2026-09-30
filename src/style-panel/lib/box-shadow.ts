@@ -7,6 +7,15 @@
 import { splitTopLevelCommas, splitTopLevelSpaces } from './background'
 
 export type BoxShadow = { inset: boolean; x: string; y: string; blur: string; spread: string; color: string }
+// One control's edit. Each member names the fields that control owns — an
+// explicit update surface rather than `Partial<T>` (AGENTS.md §4).
+export type BoxShadowPatch =
+  | Pick<BoxShadow, 'inset'>
+  | Pick<BoxShadow, 'x'>
+  | Pick<BoxShadow, 'y'>
+  | Pick<BoxShadow, 'blur'>
+  | Pick<BoxShadow, 'spread'>
+  | Pick<BoxShadow, 'color'>
 
 /** A token that reads as a length (a number with an optional CSS unit). */
 function isLength(token: string): boolean {

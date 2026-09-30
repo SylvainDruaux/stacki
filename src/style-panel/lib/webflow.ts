@@ -146,8 +146,19 @@ const classTokens = (node: HostNode | null): string[] => {
   return out
 }
 
+// Elements reach the panel through the Designer-shaped API as `unknown`; one is
+// read as a node only when it carries a node's identity.
+function isHostNode(value: unknown): value is HostNode {
+  if (typeof value === 'object' && value !== null) {
+    if ('id' in value && 'kind' in value) {
+      return typeof value.id === 'string' && typeof value.kind === 'string'
+    }
+  }
+  return false
+}
+
 export async function buildSnapshot(el: AnyEl): Promise<ElementSnapshot> {
-  const node = typeof el === 'string' ? nodeById(el) : (el as HostNode)
+  const node = typeof el === 'string' ? nodeById(el) : isHostNode(el) ? el : null
   const classes = classTokens(node)
   const attributes: Record<string, string> = {}
   for (const [k, v] of Object.entries(node?.props || {})) {
@@ -202,7 +213,7 @@ export type EmbedDoc = {
 export type EmbedScan = {
   parentByKey: Map<string, string>
   childrenByKey: Map<string, string[]>
-  elementByKey: Map<string, AnyEl>
+  elementByKey: Map<string, HostNode>
   embeds: EmbedSource[]
   inComponentContext: boolean
 }
@@ -210,7 +221,7 @@ export type EmbedScan = {
 export type PageScan = {
   parentByKey: Map<string, string>
   childrenByKey: Map<string, string[]>
-  elementByKey: Map<string, AnyEl>
+  elementByKey: Map<string, HostNode>
   pageEmbeds: EmbedSource[]
   instances: AnyEl[]
   inComponentContext: boolean
@@ -323,13 +334,24 @@ export function scanHasElement(scan: EmbedScan, selected: AnyEl): boolean {
 // Model kinds that render exactly one element (so CSS counts them as a child),
 // and kinds whose element count can't be known without running the page.
 // Everything else (text, comment, raw-line) renders no element at all.
+// A custom property's group is the selector of the rule declaring it; one set
+// at the root of a sheet (or inside an at-rule) has none.
+function ruleSelectorOf(parent: unknown): string {
+  if (typeof parent === 'object' && parent !== null) {
+    if ('selector' in parent) {
+      return typeof parent.selector === 'string' ? parent.selector : ''
+    }
+  }
+  return ''
+}
+
 const ELEMENT_KINDS = new Set(['element', 'component', 'raw'])
 const OPAQUE_COUNT_KINDS = new Set(['map', 'expr', 'chunk-group', 'cond', 'branch'])
 
 function buildTreeMaps() {
   const parentByKey = new Map<string, string>()
   const childrenByKey = new Map<string, string[]>()
-  const elementByKey = new Map<string, AnyEl>()
+  const elementByKey = new Map<string, HostNode>()
   walkNodes(getHost().nodes, (n, parent) => {
     elementByKey.set(n.id, n)
     if (parent) {
@@ -477,7 +499,9 @@ export async function writeEmbedDoc(
     doc.code = code
     return { ok: true, code }
   } catch (err) {
-    return { ok: false, error: String((err as Error)?.message || err) }
+    // An empty message says nothing, so it falls back to the thrown value itself.
+    const message = err instanceof Error ? err.message : ''
+    return { ok: false, error: message || String(err) }
   }
 }
 
@@ -677,12 +701,9 @@ export async function resolveTarget(
       // A loop or a bare expression renders any number of elements (including
       // none), so positions around one can't be pinned down — say "unknown"
       // rather than count it as a single sibling.
-      if (nodes.some((n) => n && OPAQUE_COUNT_KINDS.has(String((n as { kind?: string }).kind))))
+      if (nodes.some((n) => n && OPAQUE_COUNT_KINDS.has(n.kind)))
         {return null}
-      return kids.filter((_, i) => {
-        const kind = String((nodes[i] as { kind?: string } | undefined)?.kind ?? '')
-        return ELEMENT_KINDS.has(kind)
-      })
+      return kids.filter((_, i) => ELEMENT_KINDS.has(nodes[i]?.kind ?? ''))
     },
     snapshot: async (key) => {
       if (snapshots.has(key)) {return snapshots.get(key) ?? null}
@@ -1007,7 +1028,7 @@ export async function streamProjectVariables(
       seen.add(name)
       const v: ProjectVariable = {
         collection: label,
-        group: (decl.parent as { selector?: string })?.selector || ':root',
+        group: ruleSelectorOf(decl.parent) || ':root',
         name,
         value: decl.value.trim(),
         binding: `var(${decl.prop})`,

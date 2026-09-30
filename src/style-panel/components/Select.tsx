@@ -3,6 +3,7 @@ import type { KeyboardEvent, ReactNode } from 'react'
 import { panelBounds } from '../lib/panel-box'
 import { isHTMLElementInDocument, isNodeInDocument } from '../lib/dom'
 import { endDragNotes, hoverNote } from '../../ui/sound.js'
+import { assert } from '../../../shared/assert'
 
 export type SelectOption<T extends string> = {
   value: T
@@ -606,7 +607,9 @@ export default function Select<T extends string>({
                       // would also select it.
                       onClick={(event) => {
                         event.stopPropagation()
-                        const run = option.action!.onSelect
+                        const action = option.action
+                        assert(action !== undefined, 'An action button implies an action')
+                        const run = action.onSelect
                         cancelMenu()
                         run()
                       }}

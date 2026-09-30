@@ -18,15 +18,15 @@ import LayerPopover from './LayerPopover'
 import { CURSOR_ICONS } from './cursor-icons'
 import { useComputedValue, useHighlight } from './lib/computed-style'
 import { ShadowNum, ShadowColorRow } from './ShadowFields'
-import { parseBoxShadows, serializeBoxShadows, blankBoxShadow, boxShadowLabel, type BoxShadow } from './lib/box-shadow'
+import { parseBoxShadows, serializeBoxShadows, blankBoxShadow, boxShadowLabel, type BoxShadow, type BoxShadowPatch } from './lib/box-shadow'
 import { handleArrowStep } from './lib/number-step'
-import { parseTransforms, serializeTransforms, blankTransform, retypeTransform, transformLabel, hasZ, IDENTITY, type Transform, type TransformType } from './lib/transform'
+import { parseTransforms, serializeTransforms, blankTransform, retypeTransform, transformLabel, hasZ, IDENTITY, type Transform, type TransformPatch, type TransformType } from './lib/transform'
 import { transformAxisIcon, transformTypeIcon, LockIcon, UnlockIcon } from './transform-icons'
 import ProvenanceList from './ProvenanceList'
 import VariableConnect from './VariableConnect'
 import type { Contributor, ResolvedProp } from './lib/resolved'
 import EasingEditor from './EasingEditor'
-import { parseTransitions, serializeTransitions, blankTransition, transitionLabel, easingToBezier, TRANSITION_GROUPS, type Transition } from './lib/transition'
+import { parseTransitions, serializeTransitions, blankTransition, transitionLabel, easingToBezier, TRANSITION_GROUPS, type Transition, type TransitionPatch } from './lib/transition'
 import { parseFilters, serializeFilters, blankFilter, filterLabel, type Filter } from './lib/filter'
 import FilterEditor from './FilterFields'
 import { commitInPlace } from './lib/commit-in-place'
@@ -600,7 +600,7 @@ function AxisInput({ type, label, value, placeholder, busy, onPreview, onLive, o
 
 // The per-layer editor: a Type toggle (Move/Scale/Rotate/Skew) + X/Y/Z fields (Z is
 // hidden for Skew, which is 2D). Switching Type resets the axes to that type's identity.
-function TransformEditor({ layer, busy, onChange }: { layer: Transform; busy: boolean; onChange: (patch: Partial<Transform>, live: boolean) => void }) {
+function TransformEditor({ layer, busy, onChange }: { layer: Transform; busy: boolean; onChange: (patch: TransformPatch, live: boolean) => void }) {
   const id = IDENTITY[layer.type]
   // Scale defaults to linked X & Y (uniform scale, like Webflow); the lock toggles it.
   const [locked, setLocked] = useState(true)
@@ -611,14 +611,17 @@ function TransformEditor({ layer, busy, onChange }: { layer: Transform; busy: bo
   // still until release. Mirror every edit here and feed these to the fields.
   const [live, setLive] = useState<{ x: string; y: string; z: string }>({ x: layer.x, y: layer.y, z: layer.z })
   useEffect(() => { setLive({ x: layer.x, y: layer.y, z: layer.z }) }, [layer.x, layer.y, layer.z])
-  const bump = (patch: Partial<Transform>) => setLive((cur) => ({ x: patch.x ?? cur.x, y: patch.y ?? cur.y, z: patch.z ?? cur.z }))
+  const bump = (patch: TransformPatch) => setLive((cur) => {
+    const next = { ...cur, ...patch }
+    return { x: next.x, y: next.y, z: next.z }
+  })
   // One axis edit → the axes it actually drives (X and Y move together when linked).
-  const px = (v: string): Partial<Transform> => (linkXY ? { x: v, y: v } : { x: v })
-  const py = (v: string): Partial<Transform> => (linkXY ? { x: v, y: v } : { y: v })
-  const pz = (v: string): Partial<Transform> => ({ z: v })
-  const preview = (p: Partial<Transform>) => bump(p)
-  const emitLive = (p: Partial<Transform>) => { bump(p); onChange(p, true) }
-  const emitCommit = (p: Partial<Transform>) => { bump(p); onChange(p, false) }
+  const px = (v: string): TransformPatch => (linkXY ? { x: v, y: v } : { x: v })
+  const py = (v: string): TransformPatch => (linkXY ? { x: v, y: v } : { y: v })
+  const pz = (v: string): TransformPatch => ({ z: v })
+  const preview = (p: TransformPatch) => bump(p)
+  const emitLive = (p: TransformPatch) => { bump(p); onChange(p, true) }
+  const emitCommit = (p: TransformPatch) => { bump(p); onChange(p, false) }
   const retype = (type: TransformType) => { const p = retypeTransform(type); bump(p); onChange(p, false) }
   return (
     <div className="embed-editor_type-shadow-editor">
@@ -700,7 +703,7 @@ function TransformsRow({ props }: { props: Props }) {
     next.splice(to, 0, moved); write(next, false)
     setOpenIdx((cur) => (cur === from ? to : cur))
   }
-  const patch = (i: number, p: Partial<Transform>, live: boolean) => write(rows.map((r, j) => (j === i ? { ...r, item: { ...r.item, ...p } } : r)), live)
+  const patch = (i: number, p: TransformPatch, live: boolean) => write(rows.map((r, j) => (j === i ? { ...r, item: { ...r.item, ...p } } : r)), live)
   const toggle = (i: number) => write(rows.map((r, j) => (j === i ? { ...r, hidden: !r.hidden } : r)), false)
   return (
     <div className="embed-editor_type-shadows">
@@ -841,7 +844,7 @@ function EasingField({ value, busy, onCommit, onEditEasing }: { value: string; b
   )
 }
 
-function TransitionEditor({ transition, busy, onChange, onEditEasing }: { transition: Transition; busy: boolean; onChange: (p: Partial<Transition>, live: boolean) => void; onEditEasing: () => void }) {
+function TransitionEditor({ transition, busy, onChange, onEditEasing }: { transition: Transition; busy: boolean; onChange: (p: TransitionPatch, live: boolean) => void; onEditEasing: () => void }) {
   const options = TRANSITION_GROUPS.flatMap<SelectOption<string>>((group) => [
     { value: `__h_${group.heading}`, label: group.heading, heading: true },
     ...group.items.map((item) => ({ value: item.value, label: item.label, indent: true })),
@@ -887,7 +890,7 @@ function TransitionsRow({ props }: { props: Props }) {
     next.splice(to, 0, moved); write(next, false)
     setOpenIdx((cur) => (cur === from ? to : cur))
   }
-  const patch = (i: number, p: Partial<Transition>, live: boolean) => write(rows.map((r, j) => (j === i ? { ...r, item: { ...r.item, ...p } } : r)), live)
+  const patch = (i: number, p: TransitionPatch, live: boolean) => write(rows.map((r, j) => (j === i ? { ...r, item: { ...r.item, ...p } } : r)), live)
   const toggle = (i: number) => write(rows.map((r, j) => (j === i ? { ...r, hidden: !r.hidden } : r)), false)
   const cur = openIdx != null ? list[openIdx] : null
 
@@ -919,7 +922,9 @@ function TransitionsRow({ props }: { props: Props }) {
         </LayerPopover>
       ) : null}
       {easingOpen && cur ? (
-        <EasingEditor value={cur.timing || 'ease'} onClose={() => setEasingOpen(false)} onChange={(timing) => patch(openIdx!, { timing }, false)} />
+        <EasingEditor value={cur.timing || 'ease'} onClose={() => setEasingOpen(false)} onChange={(timing) => {
+          if (openIdx !== null) {patch(openIdx, { timing }, false)}
+        }} />
       ) : null}
     </div>
   )
@@ -934,7 +939,7 @@ const BOX_SHADOW_TYPES: ReadonlyArray<SegmentedOption<string>> = [
 
 // The per-shadow editor: Type (Outside/Inside) + X/Y/Blur/Size length rows + Color —
 // the same components the text-shadow editor uses.
-function BoxShadowEditor({ shadow, busy, onChange }: { shadow: BoxShadow; busy: boolean; onChange: (patch: Partial<BoxShadow>, live: boolean) => void }) {
+function BoxShadowEditor({ shadow, busy, onChange }: { shadow: BoxShadow; busy: boolean; onChange: (patch: BoxShadowPatch, live: boolean) => void }) {
   return (
     <div className="embed-editor_type-shadow-editor">
       <div className="embed-editor_size-row">
@@ -973,7 +978,7 @@ function BoxShadowsRow({ props }: { props: Props }) {
     next.splice(to, 0, moved); write(next, false)
     setOpenIdx((cur) => (cur === from ? to : cur))
   }
-  const patch = (i: number, p: Partial<BoxShadow>, live: boolean) => write(rows.map((r, j) => (j === i ? { ...r, item: { ...r.item, ...p } } : r)), live)
+  const patch = (i: number, p: BoxShadowPatch, live: boolean) => write(rows.map((r, j) => (j === i ? { ...r, item: { ...r.item, ...p } } : r)), live)
   const toggle = (i: number) => write(rows.map((r, j) => (j === i ? { ...r, hidden: !r.hidden } : r)), false)
   return (
     <div className="embed-editor_type-shadows">

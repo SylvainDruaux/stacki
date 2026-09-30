@@ -1,7 +1,7 @@
 import Select, { type SelectOption } from './components/Select'
 import { ShadowColorRow, ShadowNum } from './ShadowFields'
 import { AngleControl } from './GradientEditor'
-import { FILTER_GROUPS, FILTER_META, retypeFilter, type Filter, type FilterType } from './lib/filter'
+import { FILTER_GROUPS, FILTER_META, retypeFilter, type Filter, type FilterPatch, type FilterType } from './lib/filter'
 
 // The per-filter editor (Webflow's Filters): a grouped Filter-type dropdown, then the
 // controls for that type — Amount (%/px/…, any unit), Hue rotate's Angle dial, or Drop
@@ -23,7 +23,7 @@ export default function FilterEditor({ filter, busy, onChange }: {
   onChange: (next: Filter, live: boolean) => void
 }) {
   const meta = FILTER_META[filter.type]
-  const set = (p: Partial<Filter>, live: boolean) => onChange({ ...filter, ...p }, live)
+  const set = (p: FilterPatch, live: boolean) => onChange({ ...filter, ...p }, live)
   return (
     <div className="embed-editor_filter-editor">
       <div className="embed-editor_size-row">

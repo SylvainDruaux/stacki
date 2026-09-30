@@ -15,7 +15,7 @@ import { createVariableHistory } from './variableHistory';
 import { createVariableRefresh } from './variableRefresh';
 import { dropPlan, stemOf } from './variableRows';
 import { fluidCheck, resolveValue } from '../fluid';
-import { setHost } from '../style-panel/lib/host';
+import { getHost, setHost } from '../style-panel/lib/host';
 import { CloseIcon, CheckIcon } from '../ui/Icons';
 import Sheet from './VariableTable';
 import '../style-panel/utilities.css';
@@ -212,7 +212,7 @@ function useVariableModel(props: VariablesViewProps) {
   // unless an element is selected. Set it here too, so a chip can be swapped
   // from this sheet on its own.
   useEffect(() => {
-    setHost({ projectPath: project.path });
+    setHost({ ...getHost(), projectPath: project.path });
   }, [project.path]);
 
   const file = files.find((f) => f.rel === selected?.file);

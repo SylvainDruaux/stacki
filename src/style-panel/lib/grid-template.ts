@@ -170,6 +170,14 @@ export function trackLabel(track: string): string {
 // A named area addressed by its 1-based, inclusive cell span (start/end column and
 // start/end row) — the shape Webflow's Areas editor exposes.
 export type GridArea = { name: string; colStart: number; colEnd: number; rowStart: number; rowEnd: number }
+// One control's edit. Each member names the fields that control owns — an
+// explicit update surface rather than `Partial<T>` (AGENTS.md §4).
+export type GridAreaPatch =
+  | Pick<GridArea, 'name'>
+  | Pick<GridArea, 'colStart'>
+  | Pick<GridArea, 'colEnd'>
+  | Pick<GridArea, 'rowStart'>
+  | Pick<GridArea, 'rowEnd'>
 
 /** Parse a `grid-template-areas` value into its named areas (in first-appearance
  *  order), each as the bounding box of the cells its name occupies. `.` = empty. */

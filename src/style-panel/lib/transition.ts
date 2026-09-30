@@ -6,6 +6,12 @@
 import { splitTopLevelCommas, splitTopLevelSpaces } from './background'
 
 export type Transition = { property: string; duration: string; timing: string; delay: string }
+// One control's edit. Each member names the fields that control owns — an
+// explicit update surface rather than `Partial<T>` (AGENTS.md §4).
+export type TransitionPatch =
+  | Pick<Transition, 'property'>
+  | Pick<Transition, 'duration'>
+  | Pick<Transition, 'timing'>
 
 export type TransitionProp = { value: string; label: string }
 

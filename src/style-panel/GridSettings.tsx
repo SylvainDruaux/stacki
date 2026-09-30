@@ -7,7 +7,7 @@ import VariableConnect from './VariableConnect'
 import { GroupLabel } from './TypographySection'
 import { handleArrowStep } from './lib/number-step'
 import { panelSpan } from './lib/panel-box'
-import { parseTrackList, serializeTrackList, parseTrackSize, serializeTrackSize, trackKind, trackLabel, isFixedSizeTrack, parseAreas, serializeAreas, areaLabel, nextAreaName, trackForm, asTrackList, asRepeat, canEditAsTracks, type TrackSize, type GridArea } from './lib/grid-template'
+import { parseTrackList, serializeTrackList, parseTrackSize, serializeTrackSize, trackKind, trackLabel, isFixedSizeTrack, parseAreas, serializeAreas, areaLabel, nextAreaName, trackForm, asTrackList, asRepeat, canEditAsTracks, type TrackSize, type GridArea, type GridAreaPatch } from './lib/grid-template'
 import type { ResolvedProp } from './lib/resolved'
 
 // The "Grid settings" modal (Webflow's Configure-grid popup): the Columns and Rows
@@ -634,7 +634,7 @@ function AreaNumInput({ value, ariaLabel, busy, onCommit }: { value: number; ari
 }
 
 // The area editor popover body: Name + Position (Column start/end, Row start/end).
-function AreaEditor({ area, busy, onChange }: { area: GridArea; busy: boolean; onChange: (patch: Partial<GridArea>) => void }) {
+function AreaEditor({ area, busy, onChange }: { area: GridArea; busy: boolean; onChange: (patch: GridAreaPatch) => void }) {
   return (
     <div className="embed-editor_grid-track-editor">
       <div className="embed-editor_size-row">
@@ -679,9 +679,10 @@ function AreasSection({ setProp, labels }: { setProp: SetProp; labels: LabelProp
     const maxRow = areas.reduce((m, a) => Math.max(m, a.rowEnd), 0)
     write([...areas, { name: nextAreaName(areas), colStart: 1, colEnd: 1, rowStart: maxRow + 1, rowEnd: maxRow + 1 }])
   }
-  const update = (name: string, patch: Partial<GridArea>) => {
+  const update = (name: string, patch: GridAreaPatch) => {
     write(areas.map((a) => (a.name === name ? { ...a, ...patch } : a)))
-    if (patch.name) {setOpenName(patch.name)} // follow a rename so the editor stays open
+    const renamed = 'name' in patch ? patch.name : ''
+    if (renamed) {setOpenName(renamed)} // follow a rename so the editor stays open
   }
   const remove = (name: string) => { write(areas.filter((a) => a.name !== name)); setOpenName((o) => (o === name ? null : o)) }
   const openAt = (name: string, el: HTMLElement) => {

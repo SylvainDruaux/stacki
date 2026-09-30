@@ -175,15 +175,22 @@ function notifyHost() {
   })
 }
 
-export function setHost(patch: Partial<HostState>) {
-  let changed = false
-  for (const [k, v] of Object.entries(patch)) {
-    if ((state as Record<string, unknown>)[k] !== v) {
-      ;(state as Record<string, unknown>)[k] = v
-      changed = true
-    }
+// A writer publishes the whole host at once, so no field can be left stale by a
+// partial write (AGENTS.md §4). The object is updated in place because readers
+// hold what `getHost()` returned for the length of a call.
+export function setHost(next: Readonly<HostState>) {
+  if (hostChanged(next)) {
+    Object.assign(state, next)
+    notifyHost()
   }
-  if (changed) {notifyHost()}
+}
+
+function hostChanged(next: Readonly<HostState>): boolean {
+  let key: keyof HostState
+  for (key in next) {
+    if (state[key] !== next[key]) {return true}
+  }
+  return false
 }
 
 export function getHost(): HostState {

@@ -30,6 +30,18 @@ export type Gradient = {
   posY: string
   stops: GradientStop[]
 }
+// One control's edit. Each member names the fields that control owns — an
+// explicit update surface rather than `Partial<T>` (AGENTS.md §4); the
+// type and the stop list change only through their own paths.
+export type GradientPatch =
+  | Pick<Gradient, 'angle'>
+  | Pick<Gradient, 'from'>
+  | Pick<Gradient, 'posX'>
+  | Pick<Gradient, 'posY'>
+  | Pick<Gradient, 'posX' | 'posY'>
+  | Pick<Gradient, 'repeating'>
+  | Pick<Gradient, 'size'>
+export type GradientStopPatch = Pick<GradientStop, 'color'> | Pick<GradientStop, 'pos'>
 
 const GRADIENT_RE = /^(repeating-)?(linear|radial|conic)-gradient\s*\(([\s\S]*)\)\s*$/i
 const RADIAL_SIZE_KW = new Set(['closest-side', 'closest-corner', 'farthest-side', 'farthest-corner'])

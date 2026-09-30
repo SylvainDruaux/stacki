@@ -10,6 +10,7 @@ import VariableConnect, { useSharedVars } from './VariableConnect'
 import type { ProjectVariable } from './lib/webflow'
 import { selectorsMatch, type ResolvedProp } from './lib/resolved'
 import { getHost, getModifiers, onModifiers, setModifiers } from './lib/host'
+import { assert } from '../../shared/assert'
 
 // Shared "spacing box" primitives: Webflow's masked-SVG frame with draggable side
 // handles, click-to-edit value labels, and a popover editor. Used by SpacingSection
@@ -255,7 +256,8 @@ function useSideDrag({
   useEffect(() => cancelFrame, [])
 
   const valueAt = () => {
-    const d = drag.current!
+    const d = drag.current
+    assert(d !== null, 'A drag value is read only while a drag is in progress')
     const px = (d.axis === 'x' ? d.x - d.startX : d.y - d.startY) * d.sign
     let next = d.startNum + (px * DRAG_SENSITIVITY) / pxPerUnit(d.unit)
     if (inward && next < 0) {next = 0} // padding can't go negative; insets/margins can
@@ -265,7 +267,10 @@ function useSideDrag({
   const flush = () => {
     raf.current = null
     const d = drag.current
-    if (d && pending.current != null) {d.props.forEach((prop) => liveSetProp(prop, pending.current!, d.important))}
+    const value = pending.current
+    if (d) {
+      if (value !== null) {d.props.forEach((prop) => liveSetProp(prop, value, d.important))}
+    }
   }
 
   // Everything the drag does on any change — the pointer moving, or a modifier

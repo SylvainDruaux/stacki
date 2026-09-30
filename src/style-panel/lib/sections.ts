@@ -223,10 +223,9 @@ export function groupDeclarations(
 
   const groups: SectionGroup[] = []
   for (const def of SECTIONS) {
-    const bucket = buckets.get(def.id)
-    const has = bucket != null && bucket.length > 0
+    const list = buckets.get(def.id) ?? []
+    const has = list.length > 0
     if (!has && !alwaysShow.includes(def.id)) {continue}
-    const list = has ? bucket! : []
     if (has && def.id !== 'other') {
       // Stable sort by canonical index; equal ranks keep their source order.
       list
@@ -253,10 +252,9 @@ export function groupProps(propNames: string[], alwaysShow: readonly SectionId[]
 
   const groups: SectionPropGroup[] = []
   for (const def of SECTIONS) {
-    const bucket = buckets.get(def.id)
-    const has = bucket != null && bucket.length > 0
+    const list = buckets.get(def.id) ?? []
+    const has = list.length > 0
     if (!has && !alwaysShow.includes(def.id)) {continue}
-    const list = has ? bucket! : []
     if (has && def.id !== 'other') {
       list
         .map((prop, index) => ({ prop, index, rank: PROPERTY_ORDER.get(prop) ?? UNRANKED }))

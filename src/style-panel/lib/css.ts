@@ -10,6 +10,7 @@ import postcss, { type Root, type Rule, type AtRule, type ChildNode, type Declar
 import type { ParsedDeclaration, ParsedRule, StyleRegion } from './types'
 import { parseSelectorList, selectorListMembers } from './selectors'
 import { selectorKey } from './resolved'
+import { LIMITS } from '../../../shared/limits'
 
 // A direct child rule of `container` whose selector is the SAME target as `selector`
 // (by selectorKey, so `.a.b` === `.b.a`) — used to merge into an existing rule rather
@@ -302,7 +303,9 @@ export function parseNestedInput(
   const path: NestStep[] = []
   const QUERY_ATS = new Set(['media', 'container', 'supports'])
   let container: Root | Rule | AtRule = root
-  for (;;) {
+  // Each pass descends one level. A snippet nested as deep as a whole page tree
+  // may be is refused, never truncated.
+  while (path.length < LIMITS.treeDepthMax) {
     const children: ChildNode[] = []
     container.each((child: ChildNode) => { children.push(child) })
     const next = children.find(
@@ -318,6 +321,7 @@ export function parseNestedInput(
       container = at
     }
   }
+  if (path.length === LIMITS.treeDepthMax) {return null}
   if (!path.length) {return null}
   // Derive the resolved selector + query context from the path.
   let selector = ''

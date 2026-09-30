@@ -94,7 +94,7 @@ function hostState(
   props: StylePanelProps,
   files: StyleFiles,
   astroFiles: StyleFiles,
-): Partial<HostState> {
+): HostState {
   return {
     projectPath: props.project?.path ?? null,
     nodes: props.model?.nodes ?? [],

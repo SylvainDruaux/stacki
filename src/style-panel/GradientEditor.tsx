@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties, ReactNode } from 'react'
 import ColorSwatch from './components/ColorSwatch'
-import { angleToDegrees, degreesToAngle, gradientCenter, serializeGradient, stopPercent, stopsBarCss, type Gradient, type GradientStop } from './lib/gradient'
+import { angleToDegrees, degreesToAngle, gradientCenter, serializeGradient, stopPercent, stopsBarCss, type Gradient, type GradientPatch, type GradientStop, type GradientStopPatch } from './lib/gradient'
 import { commitInPlace } from './lib/commit-in-place'
 import { PositionGrid, NumField } from './components/PositionGrid'
+import { assert } from '../../shared/assert'
 
 function tooltipArrowStyle(arrowRight: number): CSSProperties & { readonly '--tip-arrow-right': string } {
   return { '--tip-arrow-right': `${arrowRight}px` }
@@ -144,7 +145,10 @@ function AngleDial({ deg, busy, onChange }: { deg: number; busy: boolean; onChan
   const ref = useRef<HTMLButtonElement>(null)
   const dragging = useRef(false)
   const angleFrom = (event: React.PointerEvent) => {
-    const rect = ref.current!.getBoundingClientRect()
+    // Pointer events only reach the dial through its mounted button.
+    const button = ref.current
+    assert(button !== null, 'The angle dial is mounted while it receives pointer events')
+    const rect = button.getBoundingClientRect()
     const dx = event.clientX - (rect.left + rect.width / 2)
     const dy = event.clientY - (rect.top + rect.height / 2)
     return Math.round(((Math.atan2(dx, -dy) * 180) / Math.PI + 360) % 360)
@@ -198,9 +202,9 @@ export default function GradientEditor({ gradient, busy, onChange }: Props) {
   const center = gradientCenter(g)
 
   const push = (next: Gradient, live: boolean) => { setDraft(next); onChange(next, live) }
-  const patch = (p: Partial<Gradient>, live = false) => push({ ...g, ...p }, live)
+  const patch = (p: GradientPatch, live = false) => push({ ...g, ...p }, live)
   const patchStops = (next: GradientStop[], live = false) => push({ ...g, stops: next }, live)
-  const setStop = (i: number, p: Partial<GradientStop>, live = false) =>
+  const setStop = (i: number, p: GradientStopPatch, live = false) =>
     patchStops(stops.map((s, k) => (k === i ? { ...s, ...p } : s)), live)
 
   // Sort stops by position, keeping the given stop selected.

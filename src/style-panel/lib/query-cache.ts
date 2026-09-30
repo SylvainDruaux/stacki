@@ -1,6 +1,17 @@
+import { assert } from '../../../shared/assert'
+
 type Answer = string | null
 type Query = (path: string, keys: string[]) => Promise<Record<string, Answer> | null>
 type Entry = { value?: Answer; promise: Promise<Answer>; resolve: (value: Answer) => void }
+
+// A pending answer and the function that settles it. The executor runs
+// synchronously inside the constructor, so the settle function exists on return.
+function deferAnswer(): Pick<Entry, 'promise' | 'resolve'> {
+  const settle: { resolve?: Entry['resolve'] } = {}
+  const promise = new Promise<Answer>((done) => { settle.resolve = done })
+  assert(settle.resolve !== undefined, 'A promise executor runs synchronously')
+  return { promise, resolve: settle.resolve }
+}
 
 /** Batch a render's requests by element, deduplicate outstanding work, and discard
  * replies from before an invalidation. Undefined means pending; null means the
@@ -33,8 +44,12 @@ export function createQueryCache(query: Query) {
       // Promise.resolve also contains a bridge that throws before returning.
       void Promise.resolve().then(() => query(path, [...keys])).catch(() => null).then((answer) => {
         if (generation !== entries) {return}
+        // Same generation, so every queued key still has the entry `get` made for it.
+        const values = entries.get(path)
+        assert(values !== undefined, `Queued path ${path} has entries`)
         for (const key of keys) {
-          const entry = entries.get(path)!.get(key)!
+          const entry = values.get(key)
+          assert(entry !== undefined, `Queued key ${key} has an entry`)
           entry.value = answer?.[key] ?? null
           entry.resolve(entry.value)
         }
@@ -60,8 +75,7 @@ export function createQueryCache(query: Query) {
       if (!values) {entries.set(path, values = new Map())}
       const existing = values.get(key)
       if (existing) {return existing.promise}
-      let resolve!: Entry['resolve']
-      const promise = new Promise<Answer>((done) => { resolve = done })
+      const { promise, resolve } = deferAnswer()
       values.set(key, { promise, resolve })
       let keys = queued.get(path)
       if (!keys) {queued.set(path, keys = new Set())}

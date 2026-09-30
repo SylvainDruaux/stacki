@@ -8,6 +8,15 @@ import { splitTopLevelCommas, splitTopLevelSpaces } from './background'
 export type TransformType = 'move' | 'scale' | 'rotate' | 'skew'
 /** One transform layer: a type + its per-axis values (skew ignores z). */
 export type Transform = { type: TransformType; x: string; y: string; z: string }
+// One control's edit. Each member names the fields that control owns — an
+// explicit update surface rather than `Partial<T>` (AGENTS.md §4); a retype
+// replaces the whole layer.
+export type TransformPatch =
+  | Transform
+  | Pick<Transform, 'x'>
+  | Pick<Transform, 'y'>
+  | Pick<Transform, 'z'>
+  | Pick<Transform, 'x' | 'y'>
 
 /** The identity (no-op) value for a type's axis — also the blank default. */
 // A move is a length, and this project's lengths are rem: type sizes, spacing

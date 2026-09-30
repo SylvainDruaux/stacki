@@ -422,6 +422,8 @@ export function resolveStyle(
       }
     }
     if (!best) {continue}
+    // `best` is reassigned by the loop above; the callbacks below read this settled one.
+    const winner = best
 
     // A rule is "selected" (blue, editable) when it carries a matched selector — in
     // the active state — equal to the active selector (by selector identity: `.a.b`
@@ -450,10 +452,10 @@ export function resolveStyle(
     lastByProp.forEach((decl, prop) => {
       const list = byProp.get(prop) ?? []
       list.push({
-        selectorText: best!.text,
+        selectorText: winner.text,
         value: decl.value,
         important: decl.important,
-        specificity: best!.specificity,
+        specificity: winner.specificity,
         order: matched.rule.order,
         ruleId: matched.rule.ruleId,
         origin: 'embed',
@@ -462,7 +464,7 @@ export function resolveStyle(
         fromComponent: matched.rule.fromComponent,
         isSelected,
         winning: false,
-        complexOnly: !best!.simple,
+        complexOnly: !winner.simple,
       })
       byProp.set(prop, list)
     })

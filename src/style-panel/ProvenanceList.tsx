@@ -42,10 +42,11 @@ export default function ProvenanceList({ contributors, prop, onSelect }: {
     <ul className="embed-editor_provenance-list">
       {contributors.map((c, index) => {
         const cls = `embed-editor_provenance-item ${index === activeIdx ? 'is-active' : ''}`
-        const embedName = c.embedKey && nav ? nav.labelFor(c.embedKey) : null
+        const embedKey = c.embedKey
+        const embedName = embedKey && nav ? nav.labelFor(embedKey) : null
         const origin = c.origin === 'native'
           ? <span className="embed-editor_provenance-origin">Webflow</span>
-          : c.embedKey && nav && embedName
+          : embedKey && nav && embedName
             ? (
               // A span (not a button) so it's valid inside the clickable row button;
               // stopPropagation keeps the row's selector-jump from also firing.
@@ -53,7 +54,7 @@ export default function ProvenanceList({ contributors, prop, onSelect }: {
                 className={`embed-editor_provenance-embed ${c.fromComponent ? 'is-component' : ''}`}
                 role="button"
                 title={`Select ${embedName} on the canvas`}
-                onClick={(event) => { event.stopPropagation(); nav.open(c.embedKey!) }}
+                onClick={(event) => { event.stopPropagation(); nav.open(embedKey) }}
               >
                 <EmbedGlyph />
                 <span className="embed-editor_provenance-embed-label">{embedName}</span>
@@ -72,15 +73,15 @@ export default function ProvenanceList({ contributors, prop, onSelect }: {
         )
         // The row for the selector you're already editing isn't a navigation
         // target — it stays a plain (non-clickable) row.
-        const clickable = Boolean(onSelect) && !c.editing
+        const select = c.editing ? undefined : onSelect
         return (
           <li key={index}>
-            {clickable ? (
+            {select ? (
               <button
                 type="button"
                 className={`${cls} is-clickable`}
                 title={`Edit ${c.selectorText}`}
-                onClick={() => onSelect!(c.selectorText, prop)}
+                onClick={() => select(c.selectorText, prop)}
               >
                 {body}
               </button>
