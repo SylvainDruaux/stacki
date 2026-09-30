@@ -9,6 +9,9 @@ import { requestAsset } from '../assetPick.js';
 import { assetRelCandidates, assetValueFor, isExternalAsset } from '../assetPath.js';
 
 const kindLabel = { image: 'Image', video: 'Video', audio: 'Audio', asset: 'Asset' };
+// Refreshes one read may chain while watcher events keep arriving. Each is a
+// real read, so a burst that outlasts this many is a watcher loop, not a user.
+const ASSET_REFRESH_CHAIN_MAX = 256;
 
 const fmtSize = (bytes: number | undefined) => {
   if (bytes == null) {
@@ -311,7 +314,7 @@ function useAssetEntries(projectPath: string): readonly WireAssetEntry[] {
       try {
         // Coalesce watcher bursts into one read and one pending refresh.
         for (let attempt = 0; requested && active; attempt++) {
-          if (attempt >= 256) {
+          if (attempt >= ASSET_REFRESH_CHAIN_MAX) {
             throw new Error('AssetField: refresh chain limit exceeded');
           }
           requested = false;

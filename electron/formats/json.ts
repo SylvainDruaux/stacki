@@ -11,6 +11,8 @@
 // the `$schema` key Astro ignores but the editor must keep — is untouched
 // because it is never rewritten.
 
+import { assert } from '../../shared/assert.js';
+
 const WS = /\s/;
 
 export interface ScalarNode {
@@ -86,7 +88,8 @@ function parse(text: string): JsonNode {
       if (text.charAt(i) === '}') {
         return { type: 'object', start, end: ++i, members };
       }
-      for (;;) {
+      // Every pass consumes a key and its value, so the text length bounds it.
+      for (let pass = 0; pass <= text.length; pass++) {
         skip();
         if (text.charAt(i) !== '"') {
           return fail('Expected a key');
@@ -116,6 +119,7 @@ function parse(text: string): JsonNode {
         }
         return fail('Expected "," or "}"');
       }
+      assert(false, 'An object ends within its text');
     }
     if (ch === '[') {
       i++;
@@ -124,7 +128,8 @@ function parse(text: string): JsonNode {
       if (text.charAt(i) === ']') {
         return { type: 'array', start, end: ++i, items };
       }
-      for (;;) {
+      // Every pass consumes a value, so the text length bounds it.
+      for (let pass = 0; pass <= text.length; pass++) {
         items.push(value());
         skip();
         if (text.charAt(i) === ',') {
@@ -136,6 +141,7 @@ function parse(text: string): JsonNode {
         }
         return fail('Expected "," or "]"');
       }
+      assert(false, 'An array ends within its text');
     }
     if (ch === '"') {
       const s = string();

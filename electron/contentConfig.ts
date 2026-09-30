@@ -4,6 +4,7 @@ import { createRequire } from 'module';
 import { spawn, type ChildProcess } from 'child_process';
 
 import { toRecord, toArray } from '../shared/record.js';
+import { MAIN_LIMITS } from './main.bounds.js';
 
 // Reads a project's Astro content config — src/content.config.ts — and reports
 // what collections it declares.
@@ -325,8 +326,15 @@ async function startService(service: Service): Promise<Service> {
           service.pending.get(typeof id === 'number' ? id : -1)?.resolve(record['value']);
         }
       }
+      if (buffer.length > MAIN_LIMITS.runnerLineCharsMax) {
+        // What is left is one unfinished line. One that never ends is a runner
+        // gone wrong, not a large reply.
+        fail(new Error('The content config runner wrote a line past its limit.'));
+      }
     });
-    child.stderr.on('data', (chunk) => (service.stderr = (service.stderr + chunk).slice(-4000)));
+    child.stderr.on('data', (chunk) => {
+      service.stderr = (service.stderr + chunk).slice(-MAIN_LIMITS.runnerStderrCharsMax);
+    });
     child.on('error', fail);
     child.stdin.on('error', fail);
     child.on('exit', () => fail(new Error(cleanError(service.stderr) || 'The content config could not be read.')));

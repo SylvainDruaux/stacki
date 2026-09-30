@@ -98,6 +98,9 @@ const { pathToFileURL } = urlModule;
 import * as net from 'net';
 import * as childprocessModule from 'child_process';
 const { spawn, spawnSync, execFile, execFileSync } = childprocessModule;
+// A stop or log command: ten seconds, and the output bound stated rather than
+// left to Node's default.
+const SHORT_COMMAND = { timeout: 10000, maxBuffer: MAIN_LIMITS.commandOutputBytesMax } as const;
 
 import {
   parsePage,
@@ -1021,7 +1024,13 @@ function run(cmd: string, args: readonly string[], cwd: string, opts: ExecFileOp
     execFile(
       cmd,
       [...args],
-      { cwd, timeout: opts.timeout || 60000, shell: commandNeedsShell(cmd), ...opts },
+      {
+        cwd,
+        timeout: opts.timeout || 60000,
+        shell: commandNeedsShell(cmd),
+        maxBuffer: MAIN_LIMITS.commandOutputBytesMax,
+        ...opts,
+      },
       (err, stdout, stderr) => {
         if (err) {
           Object.assign(err, { stdout, stderr });
@@ -1434,7 +1443,7 @@ async function withTemporaryServer(
         execFile(
           stopCmd,
           stopArgv,
-          { cwd: projectPath, timeout: 10000, shell: commandNeedsShell(stopCmd) },
+          { ...SHORT_COMMAND, cwd: projectPath, shell: commandNeedsShell(stopCmd) },
           () => {},
         );
       }
@@ -2255,7 +2264,7 @@ function assetAbs(projectPath: string, rel: string) {
 }
 
 // A destination name that doesn't collide: name.ext, name-1.ext, name-2.ext …
-function uniqueDest(dir: string, name: string) {
+function uniqueTarget(dir: string, name: string) {
   const ext = path.extname(name);
   const base = path.basename(name, ext);
   let candidate = name;
@@ -2312,14 +2321,14 @@ ipcMain.handle('assets:upload', async (_e, { projectPath, destRel, filePaths }) 
 });
 
 function copyAssetsIn(projectPath: string, destRel: string, filePaths: readonly string[]) {
-  const destDir = assetAbs(projectPath, destRel);
-  fs.mkdirSync(destDir, { recursive: true });
+  const targetDirectory = assetAbs(projectPath, destRel);
+  fs.mkdirSync(targetDirectory, { recursive: true });
   let added = 0;
-  for (const src of filePaths) {
+  for (const source of filePaths) {
     try {
-      const dest = uniqueDest(destDir, path.basename(src));
+      const target = uniqueTarget(targetDirectory, path.basename(source));
       noteAppWrite();
-      fs.cpSync(src, dest, { recursive: true });
+      fs.cpSync(source, target, { recursive: true });
       added++;
     } catch {
       /* skip unreadable file */
@@ -2350,7 +2359,7 @@ ipcMain.handle('assets:move', async (_e, { projectPath, fromRel, toDirRel }) => 
   if (fs.statSync(from).isDirectory() && isPathWithin(from, toDir)) {
     throw new Error('Cannot move a folder into itself.');
   }
-  const dest = uniqueDest(toDir, path.basename(from));
+  const dest = uniqueTarget(toDir, path.basename(from));
   noteAppWrite();
   noteAppWrite();
   fs.mkdirSync(toDir, { recursive: true });
@@ -2395,12 +2404,10 @@ ipcMain.handle('assets:delete', async (_e, { projectPath, rel }) => {
 });
 
 // Text assets (css/js/json/svg/…) are editable in the floating code window.
-const MAX_EDITABLE_BYTES = 5 * 1024 * 1024;
-
 ipcMain.handle('assets:readText', async (_e, { projectPath, rel }) => {
   const abs = assetAbs(projectPath, rel);
   const stat = fs.statSync(abs);
-  if (stat.size > MAX_EDITABLE_BYTES) {
+  if (stat.size > MAIN_LIMITS.editableFileBytesMax) {
     throw new Error('That file is too large to edit in the app (over 5 MB).');
   }
   return { text: readSource(abs) };
@@ -2428,7 +2435,6 @@ ipcMain.handle('assets:mkdir', async (_e, { projectPath, parentRel, name }) => {
 // CMS — JSON data files under src/ edited as collections
 // ---------------------------------------------------------------------------
 
-const MAX_CMS_BYTES = 2 * 1024 * 1024;
 // Config files that happen to live in src/ aren't content.
 const CMS_SKIP = /^(tsconfig|jsconfig|package|package-lock|env\.d)\.json$/i;
 
@@ -3481,7 +3487,7 @@ function stopDevServer(cancelPending = true) {
       execFile(
         cmd,
         argv,
-        { cwd: projectPath, timeout: 10000, shell: commandNeedsShell(cmd) },
+        { ...SHORT_COMMAND, cwd: projectPath, shell: commandNeedsShell(cmd) },
         () => {},
       );
     } catch {
@@ -4234,7 +4240,7 @@ ipcMain.handle('src:readSymbol', async (_e, { projectPath, fromFile, spec, name 
   }
   assertInProject(abs);
   const stat = fs.statSync(abs);
-  if (stat.size > MAX_EDITABLE_BYTES) {
+  if (stat.size > MAIN_LIMITS.editableFileBytesMax) {
     return { ok: false as const, reason: 'too-large' };
   }
   const text = readSource(abs);
@@ -4982,7 +4988,7 @@ function readCmsSource(
 ): CmsFile[] {
   let source: string;
   try {
-    if (fs.statSync(full).size > MAX_CMS_BYTES) {
+    if (fs.statSync(full).size > MAIN_LIMITS.cmsFileBytesMax) {
       return [];
     }
     source = readSource(full);
@@ -5027,7 +5033,7 @@ function readCmsJson(full: string, entryRel: string, rel: string, name: string):
   try {
     const stat = fs.statSync(full);
     file = { ...file, size: stat.size };
-    if (stat.size > MAX_CMS_BYTES) {
+    if (stat.size > MAIN_LIMITS.cmsFileBytesMax) {
       return { ...file, error: 'This file is too large to edit here (over 2 MB).' };
     }
     return { ...file, data: parseData(readJson(full)) };
@@ -5117,7 +5123,7 @@ async function spawnDevServerFailureDetail(projectPath: string, localBin: string
       execFile(
         logCmd,
         logArgs,
-        { cwd: projectPath, timeout: 10000, shell: commandNeedsShell(logCmd) },
+        { ...SHORT_COMMAND, cwd: projectPath, shell: commandNeedsShell(logCmd) },
         (err, so) => (err ? reject(err) : resolve({ stdout: so.toString() })),
       ),
     );

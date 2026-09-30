@@ -57,6 +57,8 @@ function framedStyle(frame: { left: number; width: number }): { left: number; wi
 const bezEq = (a: Bezier, b: Bezier) => a.every((n, i) => Math.abs(n - (b[i] ?? 0)) < 0.005)
 const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, n))
 // One coordinate of the unit cubic-bezier (0,0)->(1,1) at parameter s.
+// Each bisection halves the interval: 2⁻²⁴ is far finer than a rendered curve.
+const BISECTION_PASSES_MAX = 24
 const bezAt = (s: number, a: number, b: number) => 3 * (1 - s) ** 2 * s * a + 3 * (1 - s) * s ** 2 * b + s ** 3
 // The eased PROGRESS (output) at input time t: solve x(s)=t for the parameter s, then
 // read y(s). This is what makes the playback follow the ease — the parameter s is NOT
@@ -65,7 +67,7 @@ function easeProgress(t: number, x1: number, y1: number, x2: number, y2: number)
   if (t <= 0) {return 0}
   if (t >= 1) {return 1}
   let lo = 0, hi = 1, s = t
-  for (let i = 0; i < 24; i += 1) {
+  for (let i = 0; i < BISECTION_PASSES_MAX; i += 1) {
     const x = bezAt(s, x1, x2)
     if (Math.abs(x - t) < 1e-4) {break}
     if (x < t) {lo = s;} else {hi = s}

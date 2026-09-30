@@ -9,7 +9,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { openingBounds, MIN_WIDTH, MIN_HEIGHT } = require('../dist/electron/windowBounds.js');
+const { openingBounds, WIDTH_PX_MIN, HEIGHT_PX_MIN } = require('../dist/electron/windowBounds.js');
 
 const failures = [];
 let checked = 0;
@@ -36,12 +36,12 @@ check('at its own size', m.width === 2560 && m.height === 1415, `${m.width}×${m
 // Small displays: the panels have a width below which they stop working, so
 // the minimum wins and the window hangs over rather than opening unusable.
 const small = openingBounds({ x: 0, y: 0, width: 800, height: 500 });
-check('a display below the minimum still gets the minimum', small.width === MIN_WIDTH && small.height === MIN_HEIGHT, `${small.width}×${small.height}`);
-check('and the window keeps its minimum size', b.minWidth === MIN_WIDTH && b.minHeight === MIN_HEIGHT);
+check('a display below the minimum still gets the minimum', small.width === WIDTH_PX_MIN && small.height === HEIGHT_PX_MIN, `${small.width}×${small.height}`);
+check('and the window keeps its minimum size', b.minWidth === WIDTH_PX_MIN && b.minHeight === HEIGHT_PX_MIN);
 
 // Nothing to ask: opening somewhere beats not opening.
-check('no work area at all still opens a window', openingBounds().width === MIN_WIDTH);
-check('and so does an empty one', openingBounds({}).height === MIN_HEIGHT);
+check('no work area at all still opens a window', openingBounds().width === WIDTH_PX_MIN);
+check('and so does an empty one', openingBounds({}).height === HEIGHT_PX_MIN);
 
 // Fractional bounds are a real thing on scaled displays; a window takes whole
 // pixels.

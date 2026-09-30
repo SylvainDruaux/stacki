@@ -148,9 +148,11 @@ export function isAstroProps(node: ts.Node | undefined): boolean {
     node.name.text === 'props'
   );
 }
+// `(Astro.props as Props)` nests a wrapper or two; a hundred is a generated file.
+const PROPS_WRAPPER_DEPTH_MAX = 128;
 function isAstroPropsUnwrap(node: ts.Node): boolean {
   let current = node;
-  for (let depth = 0; depth < 128; depth += 1) {
+  for (let depth = 0; depth < PROPS_WRAPPER_DEPTH_MAX; depth += 1) {
     if (ts.isAsExpression(current) || ts.isParenthesizedExpression(current)) {
       current = current.expression;
     } else {

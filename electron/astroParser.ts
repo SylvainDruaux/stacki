@@ -427,18 +427,18 @@ function dedentHead(text: string): string {
 // an apostrophe in it is an apostrophe.
 // Each piece says where in `src` it began, so what is found inside it can be
 // pointed back at the file it came from.
-function topLevelStatements(src: string): { text: string; at: number }[] {
+function topLevelStatements(source: string): { text: string; at: number }[] {
   const out: { text: string; at: number }[] = [];
-  const push = (end: number) => out.push({ text: src.slice(start, end), at: start });
+  const push = (end: number) => out.push({ text: source.slice(start, end), at: start });
   let depth = 0;
   let start = 0;
-  for (let i = 0; i < src.length; i++) {
-    const skipped = skipStringOrComment(src, i);
+  for (let i = 0; i < source.length; i++) {
+    const skipped = skipStringOrComment(source, i);
     if (skipped !== i) {
       i = skipped - 1;
       continue;
     }
-    const c = src.charAt(i);
+    const c = source.charAt(i);
     if ('([{'.includes(c)) {
       depth++;
     } else if (')]}'.includes(c)) {
@@ -450,14 +450,14 @@ function topLevelStatements(src: string): { text: string; at: number }[] {
       // Semicolons are optional. A newline ends the statement when what
       // follows starts a new one — the same call JavaScript's own insertion
       // makes, without pretending to be a parser.
-      if (/^\s*(const|let|return)\b/.test(src.slice(i))) {
+      if (/^\s*(const|let|return)\b/.test(source.slice(i))) {
         push(i);
         start = i + 1;
       }
     }
   }
-  if (src.slice(start).trim()) {
-    push(src.length);
+  if (source.slice(start).trim()) {
+    push(source.length);
   }
   return out;
 }
@@ -468,7 +468,8 @@ function topLevelStatements(src: string): { text: string; at: number }[] {
 // exists into a loop this file refused to open.
 function afterComments(text: string): number | null {
   let i = 0;
-  for (;;) {
+  // Every pass returns or skips a comment of at least two characters.
+  for (let pass = 0; pass <= text.length; pass++) {
     while (i < text.length && /\s/.test(text.charAt(i))) {
       i++;
     }
@@ -487,6 +488,7 @@ function afterComments(text: string): number | null {
     }
     i = skipped;
   }
+  assert(false, 'Comments in front of a statement end within its text');
 }
 
 // Whether a statement's last word is a comment — a `;` written after one would
@@ -712,16 +714,16 @@ function tryParseBlockMap(inner: string, base: number | null = null): MapNode | 
 // split it, not the ones nested in a call, an object, a string, or a JSX tag.
 // `?.` and `??` are single tokens, and `client:load` is an attribute name, so
 // none of those count.
-function topLevelOps(src: string): { op: '?' | ':' | '&&'; at: number }[] {
+function topLevelOps(source: string): { op: '?' | ':' | '&&'; at: number }[] {
   const out: { op: '?' | ':' | '&&'; at: number }[] = [];
   let depth = 0;
-  for (let i = 0; i < src.length; i++) {
-    const skipped = skipStringOrComment(src, i);
+  for (let i = 0; i < source.length; i++) {
+    const skipped = skipStringOrComment(source, i);
     if (skipped !== i) {
       i = skipped - 1;
       continue;
     }
-    const ch = src.charAt(i);
+    const ch = source.charAt(i);
     if (ch === '(' || ch === '[' || ch === '{') {
       depth++;
       continue;
@@ -731,15 +733,15 @@ function topLevelOps(src: string): { op: '?' | ':' | '&&'; at: number }[] {
       continue;
     }
     // A JSX tag's own attributes are not part of the expression around it.
-    if (ch === '<' && /[A-Za-z/]/.test(src.charAt(i + 1) || '')) {
+    if (ch === '<' && /[A-Za-z/]/.test(source.charAt(i + 1) || '')) {
       let j = i + 1;
-      while (j < src.length) {
-        const s = skipStringOrComment(src, j);
+      while (j < source.length) {
+        const s = skipStringOrComment(source, j);
         if (s !== j) {
           j = s;
           continue;
         }
-        if (src.charAt(j) === '>') {
+        if (source.charAt(j) === '>') {
           break;
         }
         j++;
@@ -751,7 +753,7 @@ function topLevelOps(src: string): { op: '?' | ':' | '&&'; at: number }[] {
       continue;
     }
     if (ch === '?') {
-      if (src.charAt(i + 1) === '?' || src.charAt(i + 1) === '.') {
+      if (source.charAt(i + 1) === '?' || source.charAt(i + 1) === '.') {
         i++;
       } // ?? and ?. aren't ternaries
       else {
@@ -759,7 +761,7 @@ function topLevelOps(src: string): { op: '?' | ':' | '&&'; at: number }[] {
       }
     } else if (ch === ':') {
       out.push({ op: ':', at: i });
-    } else if (ch === '&' && src.charAt(i + 1) === '&') {
+    } else if (ch === '&' && source.charAt(i + 1) === '&') {
       out.push({ op: '&&', at: i });
       i++;
     }
@@ -874,21 +876,21 @@ function exprBranch(raw: string, base: number | null = null): ParserNode[] | nul
 // `test ? ( … ) : ( … )` and `test && ( … )` as a structural node. Returns null
 // for anything whose branches aren't markup (a ternary picking between two
 // strings, say) — those stay code.
-function parseCondSource(src: string, base: number | null = null): CondNode | null {
+function parseCondSource(source: string, base: number | null = null): CondNode | null {
   if (parseState.conditions >= LIMITS.treeDepthMax) {
     return null;
   }
   parseState.conditions++;
   try {
-    return parseCondSourceBody(src, base);
+    return parseCondSourceBody(source, base);
   } finally {
     parseState.conditions--;
     assert(parseState.conditions >= 0, 'Conditional recursion unwinds to its caller');
   }
 }
 
-function parseCondSourceBody(src: string, base: number | null): CondNode | null {
-  const raw = String(src);
+function parseCondSourceBody(source: string, base: number | null): CondNode | null {
+  const raw = String(source);
   const text = raw.trim();
   if (!text) {
     return null;
@@ -1696,11 +1698,10 @@ function blockAsWritten(node: ParserNode, indent: string): string[] | null {
   if (flat(rebuilt.join('\n')) !== flat(node.source)) {
     return null;
   }
-  const src = node.source.split('\n');
-  const base = (required(src[src.length - 1], 'Source has a final line').match(/^[ \t]*/) || [
-    '',
-  ])[0];
-  return src.map((line, i) =>
+  const sourceLines = node.source.split('\n');
+  const finalLine = required(sourceLines[sourceLines.length - 1], 'Source has a final line');
+  const base = (finalLine.match(/^[ \t]*/) || [''])[0];
+  return sourceLines.map((line, i) =>
     i === 0 ? indent + line : line.startsWith(base) ? indent + line.slice(base.length) : line,
   );
 }

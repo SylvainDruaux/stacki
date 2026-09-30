@@ -77,7 +77,7 @@ export interface DeclarationSpan {
 // = […]` behind it. `start`/`end` bound the whole statement (its indentation
 // stays outside the range, and a trailing ';' inside it).
 export function findDeclaration(code: unknown, name: unknown): DeclarationSpan | null {
-  const src = String(code || '');
+  const source = String(code || '');
   const ident = String(name || '');
   if (!/^[A-Za-z_$][\w$]*$/.test(ident)) {
     return null;
@@ -86,7 +86,7 @@ export function findDeclaration(code: unknown, name: unknown): DeclarationSpan |
     `(?:^|\\n)([ \\t]*)((?:export\\s+)?(?:const|let|var)\\s+${ident.replace(/\$/g, '\\$')}\\s*=\\s*)`,
     'g',
   );
-  const m = re.exec(src);
+  const m = re.exec(source);
   const lead = m?.[1];
   const head = m?.[2];
   if (!m || lead === undefined || head === undefined) {
@@ -94,14 +94,14 @@ export function findDeclaration(code: unknown, name: unknown): DeclarationSpan |
   }
   const valueStart = m.index + m[0].length;
   const start = valueStart - head.length;
-  const valueEnd = scanValue(src, valueStart);
-  const end = src.charAt(valueEnd) === ';' ? valueEnd + 1 : valueEnd;
+  const valueEnd = scanValue(source, valueStart);
+  const end = source.charAt(valueEnd) === ';' ? valueEnd + 1 : valueEnd;
   return {
     name: ident,
     start,
     end,
-    statement: src.slice(start, end),
-    value: src.slice(valueStart, valueEnd).trim(),
+    statement: source.slice(start, end),
+    value: source.slice(valueStart, valueEnd).trim(),
   };
 }
 
@@ -296,6 +296,10 @@ function kindOf(value: string | null | undefined): string {
   return '';
 }
 
+// Numbered names tried for a collection's entries before settling on `…X`: a
+// page reads a handful of collections, never dozens under one name.
+const COLLECTION_NAME_ATTEMPTS_MAX = 50;
+
 const MAP_HEAD_RE = /^([\s\S]+?)\.map\(\s*\(\s*([\w$]+)\s*(?:,\s*([\w$]+)\s*)?\)\s*=>\s*\($/;
 
 // Modules that can't be looped over, by what they are rather than by naming
@@ -386,19 +390,19 @@ export interface Destructure {
  * and `name` is the LOCAL name (`{ title: heading }` binds `heading`).
  */
 export function parseDestructures(code: unknown): Destructure[] {
-  const src = String(code || '');
+  const source = String(code || '');
   const out: Destructure[] = [];
   const re = /(?:^|[\n;])\s*(?:export\s+)?(?:const|let|var)\s*\{/g;
-  while (re.exec(src) !== null) {
+  while (re.exec(source) !== null) {
     const open = re.lastIndex - 1;
     // The pattern's own closing brace, then the `=` that must follow it —
     // without which this is a block, not a declaration.
     let depth = 0;
     let close = -1;
-    for (let i = open; i < src.length; i++) {
-      const c = src.charAt(i);
+    for (let i = open; i < source.length; i++) {
+      const c = source.charAt(i);
       if (c === '"' || c === "'" || c === '`') {
-        i = skipString(src, i);
+        i = skipString(source, i);
         continue;
       }
       if ('([{'.includes(c)) {
@@ -415,13 +419,13 @@ export function parseDestructures(code: unknown): Destructure[] {
       break;
     }
     re.lastIndex = close + 1;
-    const eq = src.slice(close + 1).match(/^\s*=\s*/);
+    const eq = source.slice(close + 1).match(/^\s*=\s*/);
     if (!eq) {
       continue;
     }
     const valueStart = close + 1 + eq[0].length;
-    const from = src.slice(valueStart, scanValue(src, valueStart)).trim();
-    for (const part of splitTopLevel(src.slice(open + 1, close))) {
+    const from = source.slice(valueStart, scanValue(source, valueStart)).trim();
+    for (const part of splitTopLevel(source.slice(open + 1, close))) {
       const t = part.trim();
       if (!t) {
         continue;
@@ -664,7 +668,7 @@ export function samplePreview(v: unknown): string {
   return keys.length ? `${keys.length} ${keys.length === 1 ? 'field' : 'fields'}` : '{}';
 }
 
-const MAX_TREE_DEPTH = 6;
+const TREE_DEPTH_MAX = 6;
 
 export interface TreeNode {
   path: string;
@@ -681,7 +685,7 @@ export interface TreeNode {
 // A value the app has actually seen — every key is real, so the tree is the
 // data rather than a guess at it.
 function fromSample(value: unknown, base: string, depth: number): TreeNode[] | null {
-  if (depth >= MAX_TREE_DEPTH) {
+  if (depth >= TREE_DEPTH_MAX) {
     return null;
   }
   const kind = sampleKind(value);
@@ -710,13 +714,13 @@ function sampleNode(path: string, key: string, value: unknown, depth: number): T
   };
 }
 
-const MAX_LITERAL_DEPTH = 4;
+const LITERAL_DEPTH_MAX = 4;
 
 // No live data, but the source says the shape outright: `const site = { … }`.
 // A list contributes its FIRST item, which is the only one whose shape is
 // knowable — and the one a loop over it will be handed.
 function fromLiteral(text: unknown, base: string, depth: number): TreeNode[] | null {
-  if (depth >= MAX_LITERAL_DEPTH) {
+  if (depth >= LITERAL_DEPTH_MAX) {
     return null;
   }
   const t = String(text || '').trim();
@@ -791,14 +795,14 @@ export function removeMarkedQuery(frontmatter: string, name: string): string {
   if (!found) {
     return frontmatter;
   }
-  const src = String(frontmatter);
+  const source = String(frontmatter);
   let { start, end } = found;
-  if (start > 0 && src.charAt(start - 1) === '\n') {
+  if (start > 0 && source.charAt(start - 1) === '\n') {
     start -= 1;
-  } else if (src.charAt(end) === '\n') {
+  } else if (source.charAt(end) === '\n') {
     end += 1;
   }
-  return src.slice(0, start) + src.slice(end);
+  return source.slice(0, start) + source.slice(end);
 }
 
 /**
@@ -931,20 +935,20 @@ function isTypeSyntaxIdentifier(source: string, from: number, root: string): boo
  * Strings are skipped: `"content"` is a word, not the prop of that name.
  */
 export function scopeChips(text: unknown, names: Iterable<string> | Set<string> | null | undefined): ScopeChip[] {
-  const src = String(text ?? '');
+  const source = String(text ?? '');
   const inScope = names instanceof Set ? names : new Set(names ?? []);
   if (!inScope.size) {
     return [];
   }
   const out: ScopeChip[] = [];
   let i = 0;
-  while (i < src.length) {
-    const ch = src.charAt(i);
+  while (i < source.length) {
+    const ch = source.charAt(i);
     // Skip over a string whole — quotes, escapes and all.
     if (ch === '"' || ch === "'" || ch === '`') {
       i += 1;
-      while (i < src.length && src.charAt(i) !== ch) {
-        i += src.charAt(i) === '\\' ? 2 : 1;
+      while (i < source.length && source.charAt(i) !== ch) {
+        i += source.charAt(i) === '\\' ? 2 : 1;
       }
       i += 1;
       continue;
@@ -956,20 +960,20 @@ export function scopeChips(text: unknown, names: Iterable<string> | Set<string> 
     // A name, plus any `.field` chain hanging off it: `post.data.title` is one
     // value, not three.
     let j = i;
-    while (j < src.length && /[\w$]/.test(src.charAt(j))) {
+    while (j < source.length && /[\w$]/.test(source.charAt(j))) {
       j += 1;
     }
-    while (src.charAt(j) === '.' && /[A-Za-z_$]/.test(src.charAt(j + 1))) {
+    while (source.charAt(j) === '.' && /[A-Za-z_$]/.test(source.charAt(j + 1))) {
       j += 1;
-      while (j < src.length && /[\w$]/.test(src.charAt(j))) {
+      while (j < source.length && /[\w$]/.test(source.charAt(j))) {
         j += 1;
       }
     }
-    let path = src.slice(i, j);
+    let path = source.slice(i, j);
     let end = j;
     // A call is the method, not the value: in `items.map(…)` the value is
     // `items`, so the chip stops before `.map`. `fn(…)` on its own chips nothing.
-    if (src.slice(j).trimStart().startsWith('(')) {
+    if (source.slice(j).trimStart().startsWith('(')) {
       const cut = path.lastIndexOf('.');
       if (cut <= 0) {
         i = j;
@@ -980,9 +984,9 @@ export function scopeChips(text: unknown, names: Iterable<string> | Set<string> 
     }
     // Not a property of something else — the `data` in `post.data` is part of
     // that chip, not one of its own.
-    const before = src.slice(0, i).trimEnd();
+    const before = source.slice(0, i).trimEnd();
     const root = path.split('.')[0] ?? '';
-    if (!before.endsWith('.') && inScope.has(root) && !isTypeSyntaxIdentifier(src, i, root)) {
+    if (!before.endsWith('.') && inScope.has(root) && !isTypeSyntaxIdentifier(source, i, root)) {
       out.push({ from: i, to: end, path });
     }
     i = j;
@@ -1004,7 +1008,7 @@ export function autoQueryName(collection: string, taken: ReadonlySet<string> = n
   if (!taken.has(base)) {
     return base;
   }
-  for (let i = 2; i < 50; i++) {
+  for (let i = 2; i < COLLECTION_NAME_ATTEMPTS_MAX; i++) {
     if (!taken.has(`${base}${i}`)) {
       return `${base}${i}`;
     }

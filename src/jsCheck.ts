@@ -59,24 +59,24 @@ export type StatementCheck =
   { readonly ok: true } | { readonly ok: false; readonly message: string };
 
 export function checkStatement(code: unknown): StatementCheck {
-  const src = String(code ?? '');
-  if (src.length > LIMITS.nodeValueCharsMax) {
+  const source = String(code ?? '');
+  if (source.length > LIMITS.nodeValueCharsMax) {
     return { ok: false, message: 'This statement exceeds the editor size limit.' };
   }
-  if (!src.trim()) {
+  if (!source.trim()) {
     return { ok: true };
   }
-  const at = firstError(src);
+  const at = firstError(source);
   if (at < 0) {
     return { ok: true };
   }
-  const token = tokenAt(src, at);
-  const line = lineOf(src, at);
-  const where = src.split('\n').length > 1 ? ` on line ${line}` : '';
+  const token = tokenAt(source, at);
+  const line = lineOf(source, at);
+  const where = source.split('\n').length > 1 ? ` on line ${line}` : '';
   // Past the end: the statement stops in the middle of itself, which reads
   // very differently from a stray character and is the commoner of the two
   // while typing.
-  if (at >= src.trimEnd().length) {
+  if (at >= source.trimEnd().length) {
     return { ok: false, message: 'This looks unfinished — the statement stops early.' };
   }
   return {

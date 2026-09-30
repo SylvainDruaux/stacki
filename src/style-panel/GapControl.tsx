@@ -68,10 +68,10 @@ function axisState(
   // the old write path appended last, so it's what the canvas is using), else an
   // inherited longhand, else the `gap` shorthand's part for this axis.
   const own = lSet ? l : mSet ? m : undefined
-  const src = own ?? l ?? m
-  if (src) {
-    const raw = rawEffective(src)
-    return { value: raw.value, important: raw.important, targets, resolved: src }
+  const effective = own ?? l ?? m
+  if (effective) {
+    const raw = rawEffective(effective)
+    return { value: raw.value, important: raw.important, targets, resolved: effective }
   }
   const short = read(SHORTHAND)
   if (short) {
@@ -84,8 +84,9 @@ function axisState(
 // The effective raw value + !important (not lowercased) — mirrors EmbedEditor's helper.
 function rawEffective(resolved: ResolvedProp | undefined): { value: string; important: boolean } {
   if (!resolved) {return { value: '', important: false }}
-  const src = resolved.source === 'selected' && resolved.selectedValue ? resolved.selectedValue : resolved.winner
-  return { value: src.value, important: src.important }
+  const effective =
+    resolved.source === 'selected' && resolved.selectedValue ? resolved.selectedValue : resolved.winner
+  return { value: effective.value, important: effective.important }
 }
 
 function LockedIcon() {

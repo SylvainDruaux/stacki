@@ -2,6 +2,7 @@ import type { CSSProperties } from 'react';
 import type { Data } from '../shared/boundary';
 import type { IpcResults, WireGitInfo, WireInjectedRoute } from '../shared/ipc-results';
 import type { Digest } from '../shared/brand';
+import { LIMITS } from '../shared/limits';
 import type { ParsePageResult } from '../shared/page-node';
 import type { ScanResult } from '../shared/scan';
 import type { AssetRequest } from './assetPick';
@@ -178,7 +179,8 @@ export function findEditorNodeById(
   let visited = 0;
   while (pending.length > 0) {
     visited += 1;
-    if (visited > 100_000) {
+    // Each node is visited once, so a model past the page-tree bound has a cycle.
+    if (visited > LIMITS.treeNodesMax) {
       throw new Error('Editor node lookup exceeds limit');
     }
     const node = pending.shift();
@@ -203,7 +205,8 @@ export function findEditorParentList(
   let visited = 0;
   while (pending.length > 0) {
     visited += 1;
-    if (visited > 100_000) {
+    // Each node is visited once, so a model past the page-tree bound has a cycle.
+    if (visited > LIMITS.treeNodesMax) {
       throw new Error('Editor parent lookup exceeds limit');
     }
     const list = pending.shift();

@@ -10,8 +10,8 @@
 // bar out of reach. Full screen proper is a different thing — a space of its
 // own, which is the user's choice to make, not the app's to make for them.
 
-const MIN_WIDTH = 1024;
-const MIN_HEIGHT = 640;
+const WIDTH_PX_MIN = 1024;
+const HEIGHT_PX_MIN = 640;
 
 /** The display's work area — the screen minus whatever the OS keeps for
  * itself. Every field is optional because the caller reads it from Electron's
@@ -44,17 +44,17 @@ const rounded = (value: number | undefined): number => (value === undefined ? Na
  */
 function openingBounds(workArea?: WorkArea): WindowBounds {
   const area: WorkArea = workArea ?? {};
-  const width = Math.max(MIN_WIDTH, rounded(area.width) || MIN_WIDTH);
-  const height = Math.max(MIN_HEIGHT, rounded(area.height) || MIN_HEIGHT);
+  const width = Math.max(WIDTH_PX_MIN, rounded(area.width) || WIDTH_PX_MIN);
+  const height = Math.max(HEIGHT_PX_MIN, rounded(area.height) || HEIGHT_PX_MIN);
   return {
     x: rounded(area.x) || 0,
     y: rounded(area.y) || 0,
     width,
     height,
-    minWidth: MIN_WIDTH,
-    minHeight: MIN_HEIGHT,
+    minWidth: WIDTH_PX_MIN,
+    minHeight: HEIGHT_PX_MIN,
   };
 }
 
-export { openingBounds, MIN_WIDTH, MIN_HEIGHT };
+export { openingBounds, WIDTH_PX_MIN, HEIGHT_PX_MIN };
 export type { WorkArea, WindowBounds };

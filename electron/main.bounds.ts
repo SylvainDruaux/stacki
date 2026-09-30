@@ -15,6 +15,23 @@ export const MAIN_LIMITS = {
   previewServersMax: 16,
   styleNudgesMax: 1024,
   logChunkCharsMax: 64000,
+  /** One JSON line from the content-config runner. Sized as one IPC field: a
+   * reply longer than that could never reach the renderer, so the runner is
+   * stopped instead of buffering toward it. */
+  runnerLineCharsMax: LIMITS.ipcFieldCharsMax,
+  /** The runner's stderr tail kept for an error message. */
+  runnerStderrCharsMax: 4000,
+  /** One content-collection entry file. An entry is a page's worth of data. */
+  contentEntryBytesMax: 2 * 1024 * 1024,
+  /** One JSON data file edited as a CMS collection. */
+  cmsFileBytesMax: 2 * 1024 * 1024,
+  /** One stylesheet scanned for CSS variables. */
+  cssVariableFileBytesMax: 1024 * 1024,
+  /** One text asset opened in the floating code window. */
+  editableFileBytesMax: 5 * 1024 * 1024,
+  /** Output one command (git, the package manager, astro) may print before it
+   * is killed. Node's own default, stated so no call relies on it. */
+  commandOutputBytesMax: 1024 * 1024,
 } as const;
 
 export function readSource(file: string): string {

@@ -658,13 +658,15 @@ if (!process.isMainFrame) {
         if (!file) {file = f;}
       }
       if (!file) {continue;}
+      // nsParent returns a strict ancestor, so the climb ends within the
+      // element's depth in the document.
       let at = el;
-      for (;;) {
-        const innerOf = nsOf(at).get(file);
-        if (innerOf === undefined) {break;}
-        const up = nsParent(at, file, innerOf);
-        if (!up) {break;}
+      let innerOf = nsOf(at).get(file);
+      let up = innerOf === undefined ? null : nsParent(at, file, innerOf);
+      while (up) {
         at = up;
+        innerOf = nsOf(at).get(file);
+        up = innerOf === undefined ? null : nsParent(at, file, innerOf);
       }
       if (at === el) {continue;}
       for (const p of page) {addPath(at, p);}

@@ -463,7 +463,7 @@ export type MatchTarget = {
   domMatched?: Map<string, boolean>
 }
 
-const MAX_HAS_DESCENDANTS = 2000
+const HAS_DESCENDANTS_MAX = 2000
 
 /** Match every selector in a list against the target element; results in order. */
 export async function matchSelectorList(selectorText: string, target: MatchTarget): Promise<MatchResult[]> {
@@ -734,7 +734,7 @@ function followingSiblings(key: string, view: TreeView, adjacentOnly: boolean): 
 function descendants(key: string, view: TreeView): string[] {
   const out: string[] = []
   const stack = [...view.childKeys(key)]
-  while (stack.length && out.length < MAX_HAS_DESCENDANTS) {
+  while (stack.length && out.length < HAS_DESCENDANTS_MAX) {
     const current = stack.shift()
     if (current === undefined) {break}
     out.push(current)

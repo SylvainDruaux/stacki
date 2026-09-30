@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import postcss from 'postcss';
 import { writeProjectText } from './documentWrites.js';
+import { MAIN_LIMITS } from './main.bounds.js';
 import type { Declaration, Rule as PostcssRule } from 'postcss';
 
 // Reading a project's CSS custom properties as something an editor can show.
@@ -28,7 +29,6 @@ import type { Declaration, Rule as PostcssRule } from 'postcss';
 // property, one column per thing — which is both shorter and the way the
 // author was thinking when they wrote it.
 
-const MAX_BYTES = 1024 * 1024;
 const SKIP_DIRS = new Set(['node_modules', 'dist', '.git', '.astro', '.stacki']);
 
 const toPosix = (p: string): string => p.split(path.sep).join('/');
@@ -309,6 +309,9 @@ function rowsFor(prefixes: readonly string[], bySuffix: Map<string, Set<string>>
  * becomes a row. A name that is only the prefix (`--h1`) is the family's own
  * value, and is the first row.
  */
+// Families one stylesheet is read into: a stylesheet, not a database.
+const FAMILIES_MAX = 25;
+
 function findFamilies(names: readonly string[]): { families: Family[]; used: Set<string> } {
   const bySuffix = new Map<string, Set<string>>(); // suffix -> Set(prefix)
   for (const name of names) {
@@ -326,7 +329,7 @@ function findFamilies(names: readonly string[]): { families: Family[]; used: Set
   const families: Family[] = [];
   const used = new Set<string>();
 
-  for (;;) {
+  while (families.length < FAMILIES_MAX) {
     // Every suffix is a candidate seed: the prefixes that share it might be a
     // family. Which one is picked matters — `--h1-margin-top` and
     // `--h1-trim-top` both end in `top`, so "top" seeds a wide, shallow family
@@ -399,9 +402,6 @@ function findFamilies(names: readonly string[]): { families: Family[]; used: Set
       }
     }
     families.push(family);
-    if (families.length > 24) {
-      break; // a stylesheet, not a database
-    }
   }
 
   return { families, used };
@@ -847,7 +847,7 @@ function readVariables(projectPath: string): { files: FileModel[]; values: Recor
   for (const abs of findStylesheets(projectPath)) {
     let text: string;
     try {
-      if (fs.statSync(abs).size > MAX_BYTES) {
+      if (fs.statSync(abs).size > MAIN_LIMITS.cssVariableFileBytesMax) {
         continue;
       }
       text = fs.readFileSync(abs, 'utf8');
@@ -1538,7 +1538,7 @@ function renameVariables(
   for (const abs of findRenameTargets(projectPath)) {
     let text: string;
     try {
-      if (fs.statSync(abs).size > MAX_BYTES) {
+      if (fs.statSync(abs).size > MAIN_LIMITS.cssVariableFileBytesMax) {
         continue;
       }
       text = fs.readFileSync(abs, 'utf8');

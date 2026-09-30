@@ -13,6 +13,11 @@ const PAGE_HEIGHT_VIEWPORTS_MAX = 1.25;
 const ZOOM_MIN = 0.05;
 const ZOOM_MAX = 4;
 type BreakpointKey = (typeof BREAKPOINTS)[number]['key'];
+// Per-breakpoint lookups that fill in as frames mount and report: a frame that
+// has not reported yet has no entry. Sparse maps, not update types, so absence
+// is part of the type.
+type FrameHeights = Partial<Record<BreakpointKey, number>>;
+type FrameElements = Partial<Record<BreakpointKey, HTMLIFrameElement>>;
 interface ViewState {
   readonly x: number;
   readonly y: number;
@@ -30,10 +35,10 @@ function clamp(value: number, minimum: number, maximum: number): number {
 export default function CanvasView({ url, refreshKey }: CanvasViewProps) {
   const startDrag = usePointerDrag();
   const wrapRef = React.useRef<HTMLDivElement>(null);
-  const iframeRefs = React.useRef<Partial<Record<BreakpointKey, HTMLIFrameElement>>>({});
+  const iframeRefs = React.useRef<FrameElements>({});
   const [view, setView] = React.useState<ViewState | null>(null);
   const [panning, setPanning] = React.useState(false);
-  const [heights, setHeights] = React.useState<Partial<Record<BreakpointKey, number>>>({});
+  const [heights, setHeights] = React.useState<FrameHeights>({});
   const viewRef = React.useRef<ViewState | null>(null);
   viewRef.current = view;
   const frames = React.useMemo(() => layoutFrames(heights), [heights]);
@@ -116,7 +121,7 @@ function useCanvasPointer(
   };
 }
 
-function layoutFrames(heights: Partial<Record<BreakpointKey, number>>) {
+function layoutFrames(heights: FrameHeights) {
   let x = 0;
   return BREAKPOINTS.map((breakpoint) => {
     // The overview cannot know the eventual browser viewport, and stretching
@@ -138,8 +143,8 @@ function layoutFrames(heights: Partial<Record<BreakpointKey, number>>) {
 }
 
 function useFrameHeights(
-  iframeRefs: React.MutableRefObject<Partial<Record<BreakpointKey, HTMLIFrameElement>>>,
-  setHeights: React.Dispatch<React.SetStateAction<Partial<Record<BreakpointKey, number>>>>,
+  iframeRefs: React.MutableRefObject<FrameElements>,
+  setHeights: React.Dispatch<React.SetStateAction<FrameHeights>>,
 ): void {
   React.useEffect(() => {
     const onMessage = (event: MessageEvent<unknown>): void => {
@@ -304,7 +309,7 @@ function CanvasFrames({
   readonly view: ViewState;
   readonly url: string;
   readonly refreshKey: string | number;
-  readonly iframeRefs: React.MutableRefObject<Partial<Record<BreakpointKey, HTMLIFrameElement>>>;
+  readonly iframeRefs: React.MutableRefObject<FrameElements>;
 }) {
   return (
     <div

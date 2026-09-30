@@ -93,14 +93,16 @@ function index(text: string): TomlEntry[] {
     offset += line.length + 1;
   }
   const lineAt = (pos: number): number => {
-    let at = 0;
-    for (;;) {
+    // The last line is the answer once no later line starts at or before pos.
+    for (let at = 0; at + 1 < lineStarts.length; at++) {
       const nextStart = lineStarts[at + 1];
-      if (nextStart === undefined || nextStart > pos) {
-        return at;
+      if (nextStart !== undefined) {
+        if (nextStart > pos) {
+          return at;
+        }
       }
-      at++;
     }
+    return Math.max(0, lineStarts.length - 1);
   };
 
   let table: (string | number)[] = [];

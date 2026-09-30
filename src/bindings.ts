@@ -53,25 +53,25 @@ export interface TemplateHole {
  * picker could choose, so it stays code, coloured like the rest of it.
  */
 export function templateHoles(text: unknown): TemplateHole[] {
-  const src = String(text ?? '');
+  const source = String(text ?? '');
   const out: TemplateHole[] = [];
   let i = 0;
-  while (i < src.length) {
+  while (i < source.length) {
     // `\${x}` is the characters, not a hole — the same escape partsFromValue
     // honours when it splits a template.
-    if (src.charAt(i) === '\\') {
+    if (source.charAt(i) === '\\') {
       i += 2;
       continue;
     }
-    if (src.charAt(i) !== '$' || src.charAt(i + 1) !== '{') {
+    if (source.charAt(i) !== '$' || source.charAt(i + 1) !== '{') {
       i += 1;
       continue;
     }
-    const close = src.indexOf('}', i + 2);
+    const close = source.indexOf('}', i + 2);
     if (close === -1) {
       break;
     }
-    const path = src.slice(i + 2, close).trim();
+    const path = source.slice(i + 2, close).trim();
     if (BIND_PATH_RE.test(path)) {
       out.push({ from: i, to: close + 1, path });
     }
@@ -123,8 +123,8 @@ const NOT_SIMPLE = /[(){}`]|=>|\[\s*[^\d\s]/;
  * the expression is more than that, which keeps the code editor for the cases
  * that need one.
  */
-export function codeParts(src: unknown): Part[] | null {
-  const text = String(src || '');
+export function codeParts(source: unknown): Part[] | null {
+  const text = String(source || '');
   if (NOT_SIMPLE.test(text)) {
     return null;
   }
@@ -212,14 +212,14 @@ export function valueModeOf(value: ValueLike | null | undefined): 'text' | 'code
   if (!value || value.type !== 'expr') {
     return 'text';
   }
-  const src = String(value.value ?? '').trim();
-  if (!src || BIND_PATH_RE.test(src)) {
+  const source = String(value.value ?? '').trim();
+  if (!source || BIND_PATH_RE.test(source)) {
     return 'text';
   }
-  if (/^(['"`])/.test(src)) {
+  if (/^(['"`])/.test(source)) {
     return 'text';
   }
-  return codeParts(src) ? 'code' : 'text';
+  return codeParts(source) ? 'code' : 'text';
 }
 
 /**
@@ -234,29 +234,29 @@ export function partsFromValue(value: ValueLike | null | undefined): Part[] | nu
   if (value.type !== 'expr') {
     return value.value === '' ? [] : [{ text: String(value.value) }];
   }
-  const src = String(value.value ?? '').trim();
-  if (!src) {
+  const source = String(value.value ?? '').trim();
+  if (!source) {
     return [];
   }
   // `cols={3}`, `overlap={true}` — written as expressions because that is how
   // those props are written, but there is nothing bound about them. Ahead of
   // the path test, which would otherwise read `true` as a name to bind to.
-  if (/^[-+]?(\d+\.?\d*|\.\d+)$/.test(src) || /^(true|false|null|undefined)$/.test(src)) {
-    return [{ text: src }];
+  if (/^[-+]?(\d+\.?\d*|\.\d+)$/.test(source) || /^(true|false|null|undefined)$/.test(source)) {
+    return [{ text: source }];
   }
-  if (BIND_PATH_RE.test(src)) {
-    return [{ expr: src }];
+  if (BIND_PATH_RE.test(source)) {
+    return [{ expr: source }];
   }
   // A quoted string written as an expression is still just text.
-  const quoted = src.match(/^(['"])((?:[^\\]|\\.)*)\1$/);
+  const quoted = source.match(/^(['"])((?:[^\\]|\\.)*)\1$/);
   if (quoted) {
     return [{ text: (quoted[2] ?? '').replace(/\\n/g, '\n').replace(/\\(['"\\])/g, '$1') }];
   }
-  const tpl = src.match(/^`([\s\S]*)`$/);
+  const tpl = source.match(/^`([\s\S]*)`$/);
   // Not a template: an expression, which is data with code between it or
   // nothing this field can show.
   if (!tpl) {
-    return codeParts(src);
+    return codeParts(source);
   }
   const body = tpl[1] ?? '';
   const out: Part[] = [];

@@ -23,20 +23,20 @@ import {
 // it rather than making you find it: `post.data.title` opens post and post.data.
 function ancestorsOf(path: string | null | undefined): string[] {
   const out: string[] = [];
-  const src = path || '';
-  assert(src.length <= LIMITS.attrCharsMax, 'DataPicker: binding path limit exceeded');
+  const pathText = path || '';
+  assert(pathText.length <= LIMITS.attrCharsMax, 'DataPicker: binding path limit exceeded');
   let acc = '';
-  for (const part of src.split('.')) {
+  for (const part of pathText.split('.')) {
     // Array steps ride along with the name they belong to: `posts[0]` is one
     // step down from `posts`, not two.
     const m = part.match(/^([^[]*)((\[\d+\])*)$/);
     acc = acc ? `${acc}.${m ? (m[1] ?? '') : part}` : m ? (m[1] ?? '') : part;
-    if (acc !== src) {
+    if (acc !== pathText) {
       out.push(acc);
     }
     for (const idx of (m?.[2] || '').match(/\[\d+\]/g) || []) {
       acc += idx;
-      if (acc !== src) {
+      if (acc !== pathText) {
         out.push(acc);
       }
     }

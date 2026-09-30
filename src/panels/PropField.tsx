@@ -207,28 +207,28 @@ function isBoundValue(field: FieldDefinition, value: Attr | undefined) {
   if (!value || value.type !== 'expr') {
     return false;
   }
-  const src = String(value.value).trim();
+  const source = String(value.value).trim();
   if (field.type === 'boolean') {
-    return !/^(true|false)$/.test(src);
+    return !/^(true|false)$/.test(source);
   }
   if (field.type === 'number') {
-    return !/^[-+]?(\d+\.?\d*|\.\d+)$/.test(src);
+    return !/^[-+]?(\d+\.?\d*|\.\d+)$/.test(source);
   }
   if (field.type === 'enum') {
-    return !(field.options || []).includes(src);
+    return !(field.options || []).includes(source);
   }
   // A list of plain items is a list, and the list control writes exactly that.
   // Anything else an array prop can hold — a name, a spread, an object per item
   // — is a program, and the code editor is the only field that can show one.
   if (field.type === 'code') {
-    return arrayItems(src) === null;
+    return arrayItems(source) === null;
   }
   return true;
 }
 
 function valueFromExpr(field: FieldDefinition, raw: string): Attr | undefined {
-  const src = String(raw ?? '').trim();
-  const quoted = src.match(/^(['"])((?:[^\\]|\\.)*)\1$/);
+  const source = String(raw ?? '').trim();
+  const quoted = source.match(/^(['"])((?:[^\\]|\\.)*)\1$/);
   if (quoted) {
     if (field.type === 'boolean' || field.type === 'number') {
       return undefined;
@@ -239,20 +239,20 @@ function valueFromExpr(field: FieldDefinition, raw: string): Attr | undefined {
       : { type: 'string', value: text };
   }
   if (field.type === 'boolean') {
-    return /^(true|false)$/.test(src) ? { type: 'expr', value: src } : undefined;
+    return /^(true|false)$/.test(source) ? { type: 'expr', value: source } : undefined;
   }
   if (field.type === 'number') {
-    return /^[-+]?(\d+\.?\d*|\.\d+)$/.test(src) ? { type: 'expr', value: src } : undefined;
+    return /^[-+]?(\d+\.?\d*|\.\d+)$/.test(source) ? { type: 'expr', value: source } : undefined;
   }
   if (field.type === 'enum') {
-    return (field.options || []).includes(src)
-      ? { type: field.numeric ? 'expr' : 'string', value: src }
+    return (field.options || []).includes(source)
+      ? { type: field.numeric ? 'expr' : 'string', value: source }
       : undefined;
   }
   // An array of plain items survives the trip: the list can show it, so going
   // back to the control keeps the value rather than dropping the prop.
-  if (field.type === 'code' && arrayItems(src)) {
-    return { type: 'expr', value: src };
+  if (field.type === 'code' && arrayItems(source)) {
+    return { type: 'expr', value: source };
   }
   return undefined;
 }
@@ -561,10 +561,10 @@ function StyleControl({ state }: { readonly state: PropControlState }) {
 function AttributeControl({ state }: { readonly state: PropControlState }) {
   const { field, value, bindCtx, assetCtx, onChange, pill, menu } = state;
 
-  const src = value?.type === 'expr' ? value.value : null;
+  const source = value?.type === 'expr' ? value.value : null;
   const entries =
-    src != null
-      ? parseObjectLiteral(src)
+    source != null
+      ? parseObjectLiteral(source)
       : (parseObjectLiteral(typeof field.default === 'string' ? field.default : '{}') ?? []);
   if (entries) {
     return (

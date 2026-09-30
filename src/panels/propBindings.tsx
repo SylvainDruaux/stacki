@@ -890,19 +890,19 @@ function useVarSourceEditor(props: VarSourceEditorProps) {
   const rangeRef = useRef<{ readonly start: number; readonly end: number } | null>(null);
 
   const apply = (text: string) => {
-    const src = codeRef.current;
+    const source = codeRef.current;
     // Re-locate on every write: the surrounding code can shift under us (an
     // undo, an edit elsewhere). Renaming the variable inside this editor is
     // the one case the lookup can't follow — fall back to where we last wrote.
-    const found = findDeclaration(src, name);
+    const found = findDeclaration(source, name);
     const range = found ? { start: found.start, end: found.end } : rangeRef.current;
     if (!range) {
       return;
     }
     assert(range.start >= 0, 'Source editor: declaration starts inside source');
-    assert(range.end <= src.length, 'Source editor: declaration ends inside source');
+    assert(range.end <= source.length, 'Source editor: declaration ends inside source');
     rangeRef.current = { start: range.start, end: range.start + text.length };
-    onChangeCode?.(src.slice(0, range.start) + text + src.slice(range.end));
+    onChangeCode?.(source.slice(0, range.start) + text + source.slice(range.end));
   };
 
   // Nothing is written while typing. This is code being spliced into a file the

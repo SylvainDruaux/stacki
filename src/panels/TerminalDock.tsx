@@ -16,13 +16,13 @@ import { currentDesktopPlatform, shortcutLabel } from '../shortcutLabel';
 
 const TerminalPane = lazy(() => import('./TerminalPane'));
 
-const MIN_HEIGHT = 120;
+const HEIGHT_PX_MIN = 120;
 const DEFAULT_HEIGHT = 280;
-const MIN_TOP_GAP = 180;
+const TOP_GAP_PX_MIN = 180;
 const STORED_HEIGHT_MAX = 10_000;
 const TERMINAL_TABS_MAX = 32;
 const CUSTOM_COMMAND_CHARS_MAX = 4_096;
-const MAX_LABEL = 22;
+const LABEL_CHARS_MAX = 22;
 
 const HEIGHT_KEY = 'stacki.terminal.height';
 const MODE_KEY = 'stacki.terminal.autoLaunch';
@@ -370,13 +370,13 @@ function useDockResize(
     event.preventDefault();
     const startY = event.clientY;
     const startHeight = height;
-    const heightMax = Math.max(MIN_HEIGHT, window.innerHeight - MIN_TOP_GAP);
+    const heightMax = Math.max(HEIGHT_PX_MIN, window.innerHeight - TOP_GAP_PX_MIN);
     let nextHeight = startHeight;
     setDragging(true);
     startDrag(event, {
       cursor: 'ns-resize',
       onMove: (move) => {
-        nextHeight = Math.min(heightMax, Math.max(MIN_HEIGHT, startHeight + startY - move.clientY));
+        nextHeight = Math.min(heightMax, Math.max(HEIGHT_PX_MIN, startHeight + startY - move.clientY));
         setHeight(nextHeight);
       },
       onEnd: () => {
@@ -409,7 +409,7 @@ function useVisiblePaneFit(
 function cleanLabel(raw: string): string {
   const flat = raw.replace(CONTROL_CHARS, ' ').replace(/\s+/g, ' ').trim();
   const short = shortenPathLike(flat);
-  return short.length <= MAX_LABEL ? short : `${short.slice(0, MAX_LABEL - 1).trimEnd()}…`;
+  return short.length <= LABEL_CHARS_MAX ? short : `${short.slice(0, LABEL_CHARS_MAX - 1).trimEnd()}…`;
 }
 
 function shortenPathLike(label: string): string {
@@ -446,7 +446,7 @@ function parseLaunchMode(value: string): LaunchMode {
 
 function parseStoredHeight(value: string): number {
   const height = Number.parseInt(value, 10);
-  if (Number.isSafeInteger(height) && height >= MIN_HEIGHT && height <= STORED_HEIGHT_MAX) {
+  if (Number.isSafeInteger(height) && height >= HEIGHT_PX_MIN && height <= STORED_HEIGHT_MAX) {
     return height;
   }
   return DEFAULT_HEIGHT;

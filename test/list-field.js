@@ -408,12 +408,12 @@ const check = (what, condition, detail) => {
   );
   check(
     'a list is something the control can write, so `{}` is a toggle and not the only way',
-    /if \(field\.type === 'code'\) \{\s*return arrayItems\(src\) === null;\s*\}/.test(panel),
+    /if \(field\.type === 'code'\) \{\s*return arrayItems\(source\) === null;\s*\}/.test(panel),
     'an array would always open as an expression'
   );
   check(
     'and the way back keeps the value',
-    /if \(field\.type === 'code' && arrayItems\(src\)\) \{\s*return \{ type: 'expr', value: src \};\s*\}/.test(panel),
+    /if \(field\.type === 'code' && arrayItems\(source\)\) \{\s*return \{ type: 'expr', value: source \};\s*\}/.test(panel),
     'coming back from the code editor would drop the prop'
   );
   check('the toggle calls it a list', /field\.type === 'code'\) \{\s*return 'list'/.test(panel));

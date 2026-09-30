@@ -7,8 +7,8 @@ import { usePointerDrag } from './usePointerDrag';
 
 const clamp = (value: number, minimum: number, maximum: number): number =>
   Math.min(Math.max(value, minimum), maximum);
-const MIN_W = 340;
-const MIN_H = 220;
+const WIDTH_PX_MIN = 340;
+const HEIGHT_PX_MIN = 220;
 const EDGES = ['n', 's', 'e', 'w', 'se', 'sw', 'ne', 'nw'] as const;
 type Edge = (typeof EDGES)[number];
 interface Rectangle {
@@ -96,8 +96,8 @@ function useWindowRectangle() {
 
 function windowRectangleInitial(): Rectangle {
   // Proportional dimensions make real code usable while keeping the canvas visible.
-  const w = clamp(Math.round(window.innerWidth * 0.52), MIN_W, 1040);
-  const h = clamp(Math.round(window.innerHeight * 0.78), MIN_H, window.innerHeight - 140);
+  const w = clamp(Math.round(window.innerWidth * 0.52), WIDTH_PX_MIN, 1040);
+  const h = clamp(Math.round(window.innerHeight * 0.78), HEIGHT_PX_MIN, window.innerHeight - 140);
   return { x: Math.max(60, window.innerWidth - w - 80), y: 96, w, h };
 }
 
@@ -105,17 +105,17 @@ function windowRectangleResize(start: Rectangle, edge: Edge, dx: number, dy: num
   // Mutation stays local to this calculation; the state is replaced atomically.
   let { x, y, w, h } = start;
   if (edge.includes('e')) {
-    w = Math.max(MIN_W, start.w + dx);
+    w = Math.max(WIDTH_PX_MIN, start.w + dx);
   }
   if (edge.includes('s')) {
-    h = Math.max(MIN_H, start.h + dy);
+    h = Math.max(HEIGHT_PX_MIN, start.h + dy);
   }
   if (edge.includes('w')) {
-    w = Math.max(MIN_W, start.w - dx);
+    w = Math.max(WIDTH_PX_MIN, start.w - dx);
     x = start.x + (start.w - w);
   }
   if (edge.includes('n')) {
-    h = Math.max(MIN_H, start.h - dy);
+    h = Math.max(HEIGHT_PX_MIN, start.h - dy);
     y = start.y + (start.h - h);
   }
   return { x, y, w, h };

@@ -12,6 +12,7 @@
 // Only the array's own span is replaced on write, so everything around it —
 // imports, comments above the export, other constants — is untouched.
 
+import { assert } from '../shared/assert.js';
 import { toRecord } from '../shared/record.js';
 
 const ID_KEY = /^[A-Za-z_$][\w$]*$/;
@@ -36,22 +37,22 @@ const isExpr = (v: unknown): v is ExprMarker =>
  * Past the quoted run starting at `i`. A scanner, not a parser: it only needs
  * the end, so a template's `${…}` is stepped over rather than understood.
  */
-function skipQuoted(src: string, i: number): number {
-  const q = src.charAt(i);
+function skipQuoted(source: string, i: number): number {
+  const q = source.charAt(i);
   i += 1;
-  while (i < src.length) {
-    const ch = src.charAt(i);
+  while (i < source.length) {
+    const ch = source.charAt(i);
     if (ch === '\\') {
       i += 2;
       continue;
     }
-    if (q === '`' && ch === '$' && src.charAt(i + 1) === '{') {
+    if (q === '`' && ch === '$' && source.charAt(i + 1) === '{') {
       let depth = 1;
       i += 2;
-      while (i < src.length && depth > 0) {
-        const c = src.charAt(i);
+      while (i < source.length && depth > 0) {
+        const c = source.charAt(i);
         if (c === '"' || c === "'" || c === '`') {
-          i = skipQuoted(src, i);
+          i = skipQuoted(source, i);
           continue;
         }
         if (c === '{') {
@@ -80,22 +81,22 @@ const NEXT_STATEMENT = /^(?:(?:export|import|const|let|var|function|class|return
  * End of the expression starting at `i`: its `;`, or the line break that ends
  * it when the file doesn't use semicolons.
  */
-function scanStatement(src: string, i: number): number {
+function scanStatement(source: string, i: number): number {
   let depth = 0;
-  while (i < src.length) {
-    const ch = src.charAt(i);
+  while (i < source.length) {
+    const ch = source.charAt(i);
     if (ch === '"' || ch === "'" || ch === '`') {
-      i = skipQuoted(src, i);
+      i = skipQuoted(source, i);
       continue;
     }
-    if (src.startsWith('//', i)) {
-      const nl = src.indexOf('\n', i);
-      i = nl === -1 ? src.length : nl;
+    if (source.startsWith('//', i)) {
+      const nl = source.indexOf('\n', i);
+      i = nl === -1 ? source.length : nl;
       continue;
     }
-    if (src.startsWith('/*', i)) {
-      const end = src.indexOf('*/', i + 2);
-      i = end === -1 ? src.length : end + 2;
+    if (source.startsWith('/*', i)) {
+      const end = source.indexOf('*/', i + 2);
+      i = end === -1 ? source.length : end + 2;
       continue;
     }
     if ('([{'.includes(ch)) {
@@ -108,8 +109,8 @@ function scanStatement(src: string, i: number): number {
     } else if (ch === ';' && depth === 0) {
       return i;
     } else if (ch === '\n' && depth === 0) {
-      const next = skipTrivia(src, i);
-      if (next >= src.length || NEXT_STATEMENT.test(src.slice(next, next + 10))) {
+      const next = skipTrivia(source, i);
+      if (next >= source.length || NEXT_STATEMENT.test(source.slice(next, next + 10))) {
         return i;
       }
     }
@@ -118,23 +119,25 @@ function scanStatement(src: string, i: number): number {
   return i;
 }
 
-function skipTrivia(src: string, i: number): number {
-  for (;;) {
-    while (i < src.length && /\s/.test(src.charAt(i))) {
+function skipTrivia(source: string, i: number): number {
+  // Every pass returns or moves past a comment, so the text length bounds it.
+  for (let pass = 0; pass <= source.length; pass++) {
+    while (i < source.length && /\s/.test(source.charAt(i))) {
       i += 1;
     }
-    if (src.startsWith('//', i)) {
-      const nl = src.indexOf('\n', i);
-      i = nl === -1 ? src.length : nl + 1;
+    if (source.startsWith('//', i)) {
+      const nl = source.indexOf('\n', i);
+      i = nl === -1 ? source.length : nl + 1;
       continue;
     }
-    if (src.startsWith('/*', i)) {
-      const end = src.indexOf('*/', i + 2);
-      i = end === -1 ? src.length : end + 2;
+    if (source.startsWith('/*', i)) {
+      const end = source.indexOf('*/', i + 2);
+      i = end === -1 ? source.length : end + 2;
       continue;
     }
     return i;
   }
+  assert(false, 'Trivia ends within its text');
 }
 
 class Unsupported extends Error {}
@@ -146,22 +149,22 @@ interface Parsed {
 
 const SIMPLE_ESCAPES: Record<string, string> = { n: '\n', t: '\t', r: '\r', b: '\b', f: '\f', v: '\v', '0': '\0' };
 
-function parseString(src: string, i: number): { value: string; next: number } {
-  const quote = src.charAt(i);
+function parseString(source: string, i: number): { value: string; next: number } {
+  const quote = source.charAt(i);
   let out = '';
   i += 1;
-  while (i < src.length) {
-    const ch = src.charAt(i);
+  while (i < source.length) {
+    const ch = source.charAt(i);
     if (ch === '\\') {
-      const next = src.charAt(i + 1);
+      const next = source.charAt(i + 1);
       if (next === 'u') {
         // \uXXXX and \u{XXXXX}
-        if (src.charAt(i + 2) === '{') {
-          const close = src.indexOf('}', i + 3);
-          out += String.fromCodePoint(parseInt(src.slice(i + 3, close), 16));
+        if (source.charAt(i + 2) === '{') {
+          const close = source.indexOf('}', i + 3);
+          out += String.fromCodePoint(parseInt(source.slice(i + 3, close), 16));
           i = close + 1;
         } else {
-          out += String.fromCharCode(parseInt(src.slice(i + 2, i + 6), 16));
+          out += String.fromCharCode(parseInt(source.slice(i + 2, i + 6), 16));
           i += 6;
         }
         continue;
@@ -178,7 +181,7 @@ function parseString(src: string, i: number): { value: string; next: number } {
     }
     // A template literal with a substitution isn't a constant — bail rather
     // than freezing whatever it happens to evaluate to right now.
-    if (quote === '`' && ch === '$' && src.charAt(i + 1) === '{') {
+    if (quote === '`' && ch === '$' && source.charAt(i + 1) === '{') {
       throw new Unsupported('template expression');
     }
     out += ch;
@@ -187,72 +190,74 @@ function parseString(src: string, i: number): { value: string; next: number } {
   throw new Unsupported('unterminated string');
 }
 
-function parseValue(src: string, i: number): Parsed {
-  i = skipTrivia(src, i);
-  const ch = src.charAt(i);
+function parseValue(source: string, i: number): Parsed {
+  i = skipTrivia(source, i);
+  const ch = source.charAt(i);
   if (ch === '"' || ch === "'" || ch === '`') {
-    return parseString(src, i);
+    return parseString(source, i);
   }
   if (ch === '[') {
     const arr: unknown[] = [];
-    i = skipTrivia(src, i + 1);
-    while (src.charAt(i) !== ']') {
-      if (i >= src.length) {
+    i = skipTrivia(source, i + 1);
+    while (source.charAt(i) !== ']') {
+      if (i >= source.length) {
         throw new Unsupported('unterminated array');
       }
-      const v = parseValue(src, i);
+      const v = parseValue(source, i);
       arr.push(v.value);
-      i = skipTrivia(src, v.next);
-      if (src.charAt(i) === ',') {
-        i = skipTrivia(src, i + 1);
+      i = skipTrivia(source, v.next);
+      if (source.charAt(i) === ',') {
+        i = skipTrivia(source, i + 1);
       }
     }
     return { value: arr, next: i + 1 };
   }
   if (ch === '{') {
     const obj: Record<string, unknown> = {};
-    i = skipTrivia(src, i + 1);
-    while (src.charAt(i) !== '}') {
-      if (i >= src.length) {
+    i = skipTrivia(source, i + 1);
+    while (source.charAt(i) !== '}') {
+      if (i >= source.length) {
         throw new Unsupported('unterminated object');
       }
-      if (src.startsWith('...', i)) {
+      if (source.startsWith('...', i)) {
         throw new Unsupported('spread');
       }
       let key: string;
-      const keyQuote = src.charAt(i);
+      const keyQuote = source.charAt(i);
       if (keyQuote === '"' || keyQuote === "'") {
-        const k = parseString(src, i);
+        const k = parseString(source, i);
         key = k.value;
-        i = skipTrivia(src, k.next);
+        i = skipTrivia(source, k.next);
       } else {
-        const m = /^[A-Za-z_$][\w$]*/.exec(src.slice(i));
+        const m = /^[A-Za-z_$][\w$]*/.exec(source.slice(i));
         if (!m) {
           throw new Unsupported('computed or unusual key');
         }
         key = m[0];
-        i = skipTrivia(src, i + m[0].length);
+        i = skipTrivia(source, i + m[0].length);
       }
-      if (src.charAt(i) !== ':') {
+      if (source.charAt(i) !== ':') {
         throw new Unsupported('shorthand or method');
       }
-      const v = parseValue(src, i + 1);
+      const v = parseValue(source, i + 1);
       obj[key] = v.value;
-      i = skipTrivia(src, v.next);
-      if (src.charAt(i) === ',') {
-        i = skipTrivia(src, i + 1);
+      i = skipTrivia(source, v.next);
+      if (source.charAt(i) === ',') {
+        i = skipTrivia(source, i + 1);
       }
     }
     return { value: obj, next: i + 1 };
   }
-  const word = /^(true|false|null|undefined)\b/.exec(src.slice(i));
+  const word = /^(true|false|null|undefined)\b/.exec(source.slice(i));
   const wordText = word?.[1];
   if (word && wordText !== undefined) {
     const words: Record<string, boolean | null> = { true: true, false: false, null: null, undefined: null };
     const v = words[wordText];
     return { value: v === undefined ? null : v, next: i + word[0].length };
   }
-  const num = /^-?(?:0[xX][\da-fA-F]+|\d[\d_]*(?:\.\d[\d_]*)?(?:[eE][+-]?\d+)?|\.\d+)/.exec(src.slice(i));
+  const num = /^-?(?:0[xX][\da-fA-F]+|\d[\d_]*(?:\.\d[\d_]*)?(?:[eE][+-]?\d+)?|\.\d+)/.exec(
+    source.slice(i),
+  );
   if (num) {
     return { value: Number(num[0].replace(/_/g, '')), next: i + num[0].length };
   }
@@ -267,11 +272,11 @@ function parseValue(src: string, i: number): Parsed {
   // the value. `getTags()`, `a ? b : c` and `x + 1` all fail that test and
   // leave the collection read-only, which is where a value this cannot write
   // back belongs.
-  const name = /^[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*/.exec(src.slice(i));
+  const name = /^[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*/.exec(source.slice(i));
   if (name) {
-    const after = skipTrivia(src, i + name[0].length);
-    const at = src.charAt(after);
-    if (after >= src.length || at === ',' || at === ']' || at === '}') {
+    const after = skipTrivia(source, i + name[0].length);
+    const at = source.charAt(after);
+    if (after >= source.length || at === ',' || at === ']' || at === '}') {
       return { value: { [EXPR]: name[0] }, next: i + name[0].length };
     }
   }

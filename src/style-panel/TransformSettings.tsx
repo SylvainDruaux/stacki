@@ -30,7 +30,7 @@ const BACKFACE: ReadonlyArray<SegmentedOption<string>> = [
 
 // Far enough for the flat-looking end of the range to be reachable; a perspective
 // past this is indistinguishable from none.
-const MAX_DISTANCE = 2000
+const DISTANCE_PX_MAX = 2000
 
 const val = (read: Read, prop: string): string => {
   const r = read(prop)
@@ -131,7 +131,7 @@ function DistanceRow({ value, busy, ariaLabel, onLive, onCommit }: {
         <DragSlider
           value={num ?? 0}
           min={0}
-          max={MAX_DISTANCE}
+          max={DISTANCE_PX_MAX}
           disabled={busy || (value.trim() !== '' && num === null)}
           ariaLabel={ariaLabel}
           onPreview={(n) => { if (!focused.current) {setDraft(`${n}px`)} }}

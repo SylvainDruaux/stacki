@@ -88,25 +88,25 @@ export function resolveInstanceProps(
     if (prop.type !== 'expr') {
       continue;
     }
-    const src = String(prop.value ?? '').trim();
-    if (!src) {
+    const source = String(prop.value ?? '').trim();
+    if (!source) {
       continue;
     }
     // `cols={3}`, `overlap={true}` — a literal that happens to be written as
     // an expression, because that is how those are written.
-    if (/^-?\d+(\.\d+)?$/.test(src)) {
-      out[name] = Number(src);
+    if (/^-?\d+(\.\d+)?$/.test(source)) {
+      out[name] = Number(source);
       continue;
     }
-    if (src === 'true' || src === 'false') {
-      out[name] = src === 'true';
+    if (source === 'true' || source === 'false') {
+      out[name] = source === 'true';
       continue;
     }
-    if (src === 'null' || src === 'undefined') {
+    if (source === 'null' || source === 'undefined') {
       continue;
     }
 
-    const resolved = resolveInstanceExpression(src, known);
+    const resolved = resolveInstanceExpression(source, known);
     if (resolved.ok) {
       out[name] = resolved.value;
     }

@@ -1,5 +1,6 @@
 import { findWithParent } from './treeSelection';
 import type { TreeView } from './treeView';
+import { LIMITS } from '../shared/limits';
 interface Insertable {
   readonly name: string;
   readonly slots?: readonly string[];
@@ -119,7 +120,7 @@ export function insertTargetFor(
     // can't legally hold it either (a <div> next to a <span> inside a <p>
     // still isn't valid, so it lands after the <p>).
     let childId = selId;
-    for (let depth = 0; depth < 50; depth++) {
+    for (let depth = 0; depth < LIMITS.treeDepthMax; depth++) {
       const fp = findParentOf(model.nodes, childId);
       if (!fp) {
         break;

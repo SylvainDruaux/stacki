@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 
 import { toRecord, toArray } from '../shared/record.js';
+import { MAIN_LIMITS } from './main.bounds.js';
 import { writeProjectText } from './documentWrites.js';
 import * as frontmatter from './formats/frontmatter.js';
 import * as jsonFormat from './formats/json.js';
@@ -22,8 +23,6 @@ import * as ndjsonFormat from './formats/ndjson.js';
 // collection — from the file path, from a field, from the key an object sits
 // under — and an id is what every reference() in the project points at. So it
 // is computed here, once, and the rules are named rather than assumed.
-
-const MAX_BYTES = 2 * 1024 * 1024;
 
 interface FormatEdit {
   readonly path: readonly (string | number)[];
@@ -218,7 +217,7 @@ function globEntries(projectPath: string, collection: ContentCollection): ListRe
     }
     let text = '';
     try {
-      if (fs.statSync(abs).size > MAX_BYTES) {
+      if (fs.statSync(abs).size > MAIN_LIMITS.contentEntryBytesMax) {
         continue;
       }
       text = fs.readFileSync(abs, 'utf8');
@@ -346,7 +345,7 @@ function fileEntries(projectPath: string, collection: ContentCollection): ListRe
   }
   let text = '';
   try {
-    if (fs.statSync(abs).size > MAX_BYTES) {
+    if (fs.statSync(abs).size > MAIN_LIMITS.contentEntryBytesMax) {
       return { entries: [], readOnly: true, reason: 'This file is too large to edit here.' };
     }
     text = fs.readFileSync(abs, 'utf8');
@@ -401,6 +400,10 @@ function writeEntry(
   const format = formatFor(entry.file);
   if (!format) {
     throw new Error(`Stacki cannot write ${path.extname(entry.file)} files.`);
+  }
+  // The same bound the reader applies: a file can grow between listing and edit.
+  if (fs.statSync(abs).size > MAIN_LIMITS.contentEntryBytesMax) {
+    throw new Error('This file is too large to edit here.');
   }
   const text = fs.readFileSync(abs, 'utf8');
 

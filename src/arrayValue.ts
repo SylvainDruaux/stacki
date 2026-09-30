@@ -42,8 +42,8 @@ type ItemDraft =
 // `{ value: "a", label: "A" }` — an object whose every value is a word or a
 // number. That is a thing with several fields, which a row can name and a popup
 // can edit; an object with a call or another object inside it is not.
-function objectFrom(src: string): { fields: ItemField[] } | null {
-  const body = src.trim().slice(1, -1);
+function objectFrom(source: string): { fields: ItemField[] } | null {
+  const body = source.trim().slice(1, -1);
   const parts = splitTop(body);
   if (!parts) {
     return null;
@@ -104,8 +104,8 @@ function topColon(part: string): number {
 }
 
 /** A quoted string, a number, an object of those, or nothing this can show. */
-function itemFrom(src: string): ItemDraft | null {
-  const text = src.trim();
+function itemFrom(source: string): ItemDraft | null {
+  const text = source.trim();
   if (!text) {
     return null;
   }
@@ -185,8 +185,8 @@ function splitTop(body: string): string[] | null {
  * empty array is an empty list, which is not the same as null: one is a list
  * with nothing in it, the other is not a list.
  */
-export function arrayItems(src: unknown): Item[] | null {
-  const text = String(src ?? '').trim();
+export function arrayItems(source: unknown): Item[] | null {
+  const text = String(source ?? '').trim();
   if (!text.startsWith('[') || !text.endsWith(']')) {
     return null;
   }
@@ -271,8 +271,8 @@ export interface ObjectRow {
  * Null for everything else — a name, a call, an object inside an object, a
  * spread — which is the field's cue to stay in the code editor.
  */
-export function objectFields(src: unknown): ObjectRow[] | null {
-  const text = String(src ?? '').trim();
+export function objectFields(source: unknown): ObjectRow[] | null {
+  const text = String(source ?? '').trim();
   if (!text.startsWith('{') || !text.endsWith('}')) {
     return null;
   }

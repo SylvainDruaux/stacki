@@ -625,8 +625,8 @@ function AttributePopups({ state }: { readonly state: AttributeState }) {
   );
 }
 
-export function parseObjectLiteral(src: unknown): readonly ObjectEntry[] | null {
-  const t = String(src ?? '').trim();
+export function parseObjectLiteral(input: unknown): readonly ObjectEntry[] | null {
+  const t = String(input ?? '').trim();
   if (t.length > LIMITS.attrCharsMax) {
     return null;
   }

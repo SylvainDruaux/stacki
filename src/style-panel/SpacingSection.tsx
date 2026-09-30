@@ -31,8 +31,8 @@ function CenterHorizontallyIcon() {
 function sideValue(read: Read, prop: string): string {
   const r = read(prop)
   if (!r) {return ''}
-  const src = r.source === 'selected' && r.selectedValue ? r.selectedValue : r.winner
-  return src.value.trim().toLowerCase()
+  const effective = r.source === 'selected' && r.selectedValue ? r.selectedValue : r.winner
+  return effective.value.trim().toLowerCase()
 }
 
 // "Center horizontally" = margin-left/right auto. Rendered in the Spacing section
