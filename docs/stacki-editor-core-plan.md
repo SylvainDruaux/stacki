@@ -332,7 +332,9 @@ non-addressable. The fallback is visible, never silent.
 branches to `serializeMarkdownPage` (`main.ts:3069`). Step 0 guards every page type — the
 checksum guard is format-agnostic. Steps 1–8 target `.astro`; Markdown and MDX pages save through
 `ReplaceSource` until step 10 gives them spans and operations (§11). Step 9 therefore
-deletes `serializePage` as an `.astro` write path only.
+deletes `serializePage` as an `.astro` write path only. **Step 10 closed the scope
+(2026-09-29):** `.md` and `.mdx` pages are projected, planned and written like `.astro` pages,
+and no page type is saved whole.
 
 ## 7. External writers and the persistence layer
 
@@ -608,6 +610,21 @@ Ratchet counts only decrease.
    node and attribute spans with the span-integrity property; its gestures move to intents;
    `ReplaceSource` and `serializeMarkdownPage` retire as write paths. Same gate and simulator
    rules as steps 1–6, run against the step-0 markdown fixtures.
+   **Landed 2026-09-29** (tracker, Step 10). The parser locates every node and every attribute
+   Markdown writes in its own syntax, with structural path ids; the projection takes Markdown
+   pages and says how each node is written and which list it sits in. Every Markdown gesture is
+   an edit request: main drafts a node's change as the node printed at its place before and
+   after, placed on its own bytes (`rewrite-node`), inserts new blocks beside a neighbour, and
+   writes the YAML frontmatter as a slot or, on a page without one, as `insert-frontmatter`. The
+   planner's Markdown rules separate blocks as their neighbours are and move items only among
+   their own marker. The simulator runs Markdown events over the round-trip and editor-core
+   Markdown fixtures, with oracle scenarios for lists, fences, MDX JSX blocks and a tight gap,
+   and judges every stale block decision against byte origins. `ReplaceSource` is gone:
+   `rewrite-text` carries a program's change as the hunks of the bytes it read, and
+   `page:write` and `page:serialize` are retired; `serializeMarkdownPage` is the round-trip
+   oracle only. Decided there: a region unique in the current file but repeated in the
+   authored one is ambiguous (a removed target's twin can survive it). Adapter surface
+   0 / 0 / 0 / 4 / 0.
 
 ## 12. Contingent upgrades and rejected options
 
@@ -687,8 +704,9 @@ Corrected from the previous draft:
   mixed; the `rollback` error names them. Product requirements carry it (§3.3).
 - **Typing batching is policy.** Shrinking the 300 ms window multiplies preview re-renders; the
   preview throttle (§12) is the lever, not the engine.
-- **Markdown and MDX keep whole-file regeneration until step 10**, guarded against overwrites
-  from step 0.
+- **Markdown and MDX kept whole-file regeneration until step 10**, guarded against overwrites
+  from step 0. Closed at step 10: no page type is written whole. Their canvas renderings still
+  carry no stamp (the Markdown processor never sees the bytes); every edit is checked by main.
 
 Decided 2026-09-28: keystroke→disk split into engine and batch numbers (§11 step 4); the
 property batch hardened, not split (§3.3); undo as inverse splices, with snapshots dropped on

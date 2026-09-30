@@ -1,7 +1,9 @@
 # Editor-Core Handoff — for the developer taking over this workstream
 
 **Status: handoff written 2026-09-18 at `7053ccf` on `refactor/architecture-consolidation`.**
-Working tree clean. Read `docs/editor-core-prompts.md` and
+**Historical since 2026-09-29: steps 0–10 have landed — the tracker's handoff
+state is current, this note is not.** Working tree clean at the time.
+Read `docs/editor-core-prompts.md` and
 `docs/editor-core-tracker.md` before touching anything.
 
 ## What this workstream is

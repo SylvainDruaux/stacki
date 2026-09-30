@@ -3,9 +3,10 @@
 //   floor   — the plan §5.2 disk work alone: read + SHA-256, then
 //             writeVerified (temp file, fsync, rename, directory flush, read-back). No engine
 //             change can go below it on this machine.
-//   legacy  — the shipped page:write path, lower bound: serializePage(model),
-//             the base-checksum read, writeVerified, then parsePage(locs) of
-//             the written text (main.ts writePageText → parsePageSource).
+//   legacy  — the page:write path shipped at step 4 (retired at step 10),
+//             lower bound: serializePage(model), the base-checksum read,
+//             writeVerified, then parsePage(locs) of the written text (main.ts
+//             writePageText → parsePageSource, both gone since).
 //             Chunk writes and the IPC transfer are left out.
 // Method: 2 warm-ups then SAMPLES samples per fixture, nearest-rank p95, on a
 // scratch copy. A legacy serialization that is not byte-identical, or that

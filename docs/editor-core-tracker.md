@@ -48,15 +48,19 @@ lands it.
   page tree is readonly, undo is inverse splices, node handles are carried by
   span mapping; `selfWrites`, the rescan chain and drains, `mutateModel`,
   `PageSnapshot`, `WeakMap` acks, `modelAdoption`, the mutable tree and
-  parse-order ids are deleted (see Step 9). Step 10 has not started.
+  parse-order ids are deleted (see Step 9). **Step 10 landed (2026-09-29)**:
+  `.md` and `.mdx` pages are on the engine — spans, Markdown gestures as edit
+  requests planned as splices, the simulator judging them on the Markdown
+  corpus — and no write replaces a file whole: `replace-source`, `page:write`
+  and `page:serialize` are gone (see Step 10). **Every step row, 0–10, is
+  ✅**; PROMPT-ALIGN is next.
 - **Step 0 landed (2026-09-28).** The legacy
-  write path still serializes whole files (`mutateModel` → `page:write` →
-  `serializePage`), but every page write now names the checksum it was
-  authored against and main refuses a stale one with `conflict`. Since step 5
-  that write is a `replace-source` intent to the page's document actor, and
-  so is every other write of project text. Still legacy: watcher echo via
-  `selfWrites`, the renderer rescan chain, saver acks by `WeakMap` object
-  identity.
+  write path then serialized whole files (`mutateModel` → `page:write` →
+  `serializePage`), but every page write named the checksum it was
+  authored against and main refused a stale one with `conflict`. From step 5
+  that write was a `replace-source` intent to the page's document actor, and
+  so was every other write of project text; steps 9 and 10 retired it
+  (history: the rows below).
 - **A partial precedent landed in the window (v0.1.29).**
   `electron/componentProperties.ts` validates a whole-file expected-source
   (`source.value !== request.source` → typed `conflict` rejection), then
@@ -1652,9 +1656,10 @@ Left open, carried:
   a load average of 11): the pre-step-9 commit `e089902` fails the same
   cases standalone (2 of 5 runs, against 3 of 5 at HEAD), so the flake
   predates this step.
-- Markdown and MDX: whole-model save, `page:serialize`, `m<N>` ids — step 10.
+- Markdown and MDX: whole-model save, `page:serialize`, `m<N>` ids — step 10
+  (closed there).
 
-### Step 10 — Markdown and MDX on the engine ⬜
+### Step 10 — Markdown and MDX on the engine ✅
 
 **Deliverables.** Spans with the span-integrity property in
 `electron/markdownParser.ts`; markdown gestures as intents; `ReplaceSource`
@@ -1662,6 +1667,131 @@ and `serializeMarkdownPage` retired as write paths.
 
 **Gate proof.** Same simulator and gate rules as steps 1–6, run against the
 step-0 markdown fixtures.
+
+**Landed 2026-09-29** on `refactor/architecture-consolidation`, one commit per
+group, each gated alone (Verification record): `7ecfad5` (spans), `11569c8`
+(Markdown gestures planned as splices), `01b0434` (every Markdown gesture an
+edit request; `page:write` and `page:serialize` go), `32f8e31` (the simulator
+on the Markdown corpus), `d2b0ac1` (`rewrite-text` replaces `replace-source`),
+then this record.
+
+What landed:
+
+- **Spans** (`7ecfad5`). The parser reads each container's lines with their
+  file offsets, one reader per block kind (it was one 298-line function), so
+  every node of a `.md` or `.mdx` page carries its exact range however deep it
+  sits, and what Markdown writes in its own syntax — an image's alt, source
+  and title, a fence's language, a list's first number — carries a `markdown`
+  attribute span. JSX blocks keep the `.astro` parser's spans, moved to the
+  file through the same line table. Ids are structural paths (`m<N>` is gone).
+  A differential run against the previous parser over 4 007 pages gave
+  identical models and printed output. Span integrity
+  (`test/contracts/markdown-spans.test.ts`): every node of every Markdown
+  fixture slices to itself as printed at its place; a seeded corpus of 600
+  pages holds the structural properties everywhere. The projection takes
+  Markdown pages (`syntax`, `list`); the value-splice projection patch
+  refuses them (typing can change Markdown structure).
+- **Planning** (`11569c8`). `electron/markdownEdits.ts` drafts a Markdown
+  node's intents: its new content is the node printed before and after the
+  edit at its place, the difference placed on its own bytes (`rewrite-node`);
+  new blocks and items are printed where they go and inserted beside a
+  neighbour; the YAML frontmatter is the slot that differs or, on a page
+  without one, the new `insert-frontmatter` operation (which an `.astro` page
+  without a block also gets). `shared/planMarkdown.ts` holds the planner's
+  Markdown rules (contracts.md, Markdown and MDX).
+  `test/contracts/markdown-edit.test.ts` and
+  `test/simulator/markdown-planner.test.ts` hold every gesture and rule to
+  hand-written files.
+- **The renderer** (`01b0434`). A Markdown page's gestures are queued, sent,
+  previewed and undone exactly as an `.astro` page's; the layout picker is a
+  frontmatter gesture. Gone: the `model` queue entry, the Markdown sender,
+  `carryRoundTrip`, the `page:write` and `page:serialize` channels and their
+  contracts, main's save guard behind them, the `conflict` write error (a
+  stale edit is `rejected` with the actor's reason) and its telemetry event.
+  `test/markdown-gestures.test.js` drives the real App on a `.md` page: each
+  gesture writes only its bytes, and four undos restore the file.
+- **The simulator** (`32f8e31`). Four editor-core fixtures with hand-written
+  expected files and oracle scenarios: `lists.md` (an item moved: two
+  splices), `fences.md` (a fence retyped under a BOM and CRLF, beside an
+  astral character), `jsx-blocks.mdx` (the second of two `<Card
+  title="Old">` blocks retitled) and `tight-gap.md` (a paragraph inserted
+  under a heading one line break above its neighbour: the gap rewritten).
+  Two events — `markdown-intent` (weight 8) and `markdown-preview` (4, from a
+  stale view) — type, remove, insert beside and move Markdown nodes on every
+  Markdown file (`post.md`, `post-bom-crlf.md` and `components.mdx` join the
+  round-trip slice). Every stale block decision is judged
+  (`judgeBlockRemap`): the node survives as the node of its kind holding
+  most of its content bytes by origin, and the plan's splices must sit where
+  the operation says relative to it. Provenance learned moves (a moved
+  block's bytes keep their origins, aligned by core) and fresh undos (the
+  bytes an edit replaced come back with their origins). The corpus sweep in
+  `operations.test.ts` covers `.md` and `.mdx`.
+- **`rewrite-text`** (`d2b0ac1`). The migration-only `replace-source` is gone
+  from the union: a program's change to a file's text — a stylesheet rule, a
+  CMS entry, a property batch — is `writeText(file, text, base)`, the hunks
+  from the bytes at `base` to `text`, never mapped, each witnessed by the
+  bytes it replaces. `rewriteUnchanged` writes a file's bytes back (one empty
+  hunk: Astro's dev server serves a `<style>` block one write behind). The
+  adapter script's fifth column counts whole-file write sites (the operation
+  or a `replaceSource(` call) in `electron/`, `shared/` and `src/`: 21 → 0,
+  baseline 0.
+
+Found while landing it, and fixed:
+
+- **A planner wrong-site** (seed 3005, `jsx-blocks.mdx`, 4 000-seed sweep).
+  The authored file held two `<Card title="Old"` regions; a stale removal
+  took the second card, and the second card's stale retitle resolved onto the
+  first — the only occurrence left. The uniqueness guard's reasoning (a
+  surviving target is an occurrence, so a unique one is the target) assumed
+  the target survived. The guard now also requires the region to occur once
+  in the authored bytes. Cost: an edit on one of two identical siblings is
+  refused when the other was changed outside the app (`planner.test.ts`, the
+  "first card retitled" case, which planned before); the refusal is typed and
+  the next edit applies.
+- **A judge artifact** (seed 2181). An undo of a slidable code patch is
+  slidable too: the patch's `<`, not the file's, had become the list's own,
+  and the undo removed it. Undos of code patches now join `slidPatches`.
+- **An empty rewrite threw** (`test/document-actors.test.js`): a text equal
+  to the file's, or a base the disk no longer held, gave no hunk, and
+  `toIntent` asserts every rewrite names a site. Both are now the one empty
+  hunk; the planner refuses the stale one.
+- Earlier in the set, provenance limits, each now unjudged or learned rather
+  than a false wrong-site: a node gone while a node of its kind holds exactly
+  its bytes under other origins (rewritten identically, or restored by an
+  undo mapped through other writes — BYTES CANNOT TELL); a moved block's
+  bytes; an undo's restored bytes, only when planned on exactly the bytes its
+  edit left.
+
+Deviations, with reasons:
+
+- **Markdown renderings carry no canvas stamp.** Their markers come from the
+  Markdown processor's tree (`main.ts`, `avbSatteriMarkers`), which never
+  sees the file's bytes, so no marker can name them; the processor's API
+  could not be checked from here. A click selects by the editor's own parse,
+  every edit is checked by main, and the layout's stamps are still checked.
+- **The parser's lazy lists.** A list directly under an item's first line,
+  with no blank line between, is read as paragraph text (pre-existing,
+  unchanged; `lists.md` has the blank line). Markdown engines differ here.
+- **Two benches retired** (`01b0434`): `test/legacy-parity.bench.js` and
+  `test/save-latency.bench.js` drove `page:write` against the pre-step-5
+  build; their results stay in Step 5.
+- **The projection-patch sample** runs 12 seeds, not 8: Markdown events took
+  a share of the attribute edits it samples (78 patched candidates at 8, 120
+  at 12, against the 100 it requires).
+- Channel count 118 → 116.
+
+Forbidden-pattern scan (after the last commit): `rg` for
+`replaceSource|replace-source|serializeMarkdownPage|page:write\b|page:serialize`
+over `electron/`, `shared/`, `src/`, `scripts/` and `test/` finds the
+printer's definition and its lint fence, the round-trip oracle in
+`markdown-spans.test.ts`, the contract test that a `replace-source` intent is
+an unknown operation, the tests that the retired channels have no handler
+(`page-save`, `main-boundaries`, `outside-edit`), the adapter script's pattern
+and its test, and comments giving history. Two stale comments it found are
+fixed in this record's commit (`astroParser.ts` said the page writer restores
+a BOM; `baseline.bench.ts` called `page:write` the shipped path). No
+whole-file write path remains: every write of project text is splices
+witnessed by the bytes they replace.
 
 ## Thresholds (pre-registered, §11.4)
 
@@ -1996,10 +2126,14 @@ flushed.
 | Step 9 `126847b` (queue, handles; `page:write` `.astro` gone) | 18 | 2 | 0 | 4 | 22 |
 | Step 9 `b5d2802` (readonly tree) | 0 | 0 | 0 | 4 | 22 |
 | Step 9 `616b71d` (printing fenced) | 0 | 0 | 0 | 4 | 22 |
+| Step 10 `01b0434` (`page:write` gone) | 0 | 0 | 0 | 4 | 21 |
+| Step 10 `d2b0ac1` (`rewrite-text`; whole-file writes) | 0 | 0 | 0 | 4 | 0 |
 
 Mutations: direct node-mutation sites in `src/`; prop-index: prop-index writes;
 `applyEdit(`: the style panel's; replace-source: submission sites in
-`electron/`. Step 6 says why prop and inline CSS left the surface unchanged.
+`electron/` — since step 10 whole-file write sites (the operation or a
+`replaceSource(` call) in `electron/`, `shared/` and `src/`, zero. Step 6
+says why prop and inline CSS left the surface unchanged.
 `scripts/adapter-surface.ts` holds the last row as its baseline. At step 9
 the tree became readonly, so no node is edited in place anywhere in `src/`;
 the four `applyEdit(` sites left are the style panel's CSS-rule edits.
@@ -2067,7 +2201,8 @@ consolidated plan:
   at step 5; inverse batch at step 6). Best-effort rollback goes in product
   requirements.
 - **Markdown and MDX** — resolved 2026-09-28: guarded and round-trip tested
-  at step 0; on the engine at step 10.
+  at step 0; on the engine at step 10. **Landed at step 10** (2026-09-29): see
+  Step 10; the canvas stamp for Markdown renderings stays open there.
 
 ## Telemetry (§9a)
 
@@ -2368,6 +2503,42 @@ update on every step):
     test/simulator/simulator.test.ts` — green in 17 min 19 s, 2/2, exit 0.
   - Formatting: every line step 9 added is ≤ 100 columns (checked by
     character count over the diff from `e089902`).
+
+- 2026-09-29, step 10 (PROMPT-10), `7ecfad5`..HEAD on top of `573b4ce`:
+  - Commits: `7ecfad5` (spans), `11569c8` (Markdown gestures planned as
+    splices), `01b0434` (every Markdown gesture an edit request; `page:write`
+    and `page:serialize` go), `32f8e31` (the simulator on the Markdown
+    corpus), `d2b0ac1` (`rewrite-text` replaces `replace-source`), then this
+    record with the scan's two comment fixes.
+  - Each gated alone in a clean worktree holding only that commit's changes.
+    `7ecfad5` and `11569c8`: 153/154 each — `test:apprenders`, whose
+    library filter the worktree's symlinked `node_modules` defeated; green in
+    the repository, and neither change touches renderer code (the worktree
+    has used a hard-linked copy since, and `apprenders` passes there).
+    `01b0434`: 153/154 — one contract
+    assertion pinning the retired `conflict` message, fixed in that commit
+    and `test:contracts` re-run green (263/263). `32f8e31`: **154/154 in
+    230.2 s, exit 0**. `d2b0ac1`: **154/154 in 234.8 s, exit 0** — tsc,
+    eslint 0 errors (113 warnings, all pre-existing), `ratchet-check` 0,
+    `adapter-surface` 0 / 0 / 0 / 4 / 0. This record's commit (docs and two
+    comments): **154/154 in 233.0 s, exit 0**.
+  - Suites at `d2b0ac1`: `test:contracts` 263/263 (with `markdown-spans`,
+    `markdown-edit`); `test:simulator` 102/102 (with `markdown-planner`, the
+    four Markdown oracle scenarios, and the twin case in `planner.test.ts`);
+    `test:roundtrip` 499 passed, 1 skipped, of 500 (with
+    `markdown-gestures`). Byte-exact round trips: every Markdown and MDX
+    fixture parses and prints back to its bytes (`markdown-spans`, and the
+    round-trip suites).
+  - Long run: `STACKI_SIMULATOR_SEEDS=2000 node --test
+    test/simulator/simulator.test.ts` at `d2b0ac1` — green in 13 min 8 s,
+    2/2, exit 0, `wrongSite: 'fail'`.
+  - Wide sweep at `32f8e31`: seeds 1–4 000, 400 steps each, `wrongSite:
+    'fail'` — no failure; 58 843 stale Markdown block decisions judged
+    applied-correct. The sweep before the fixes failed on seeds 2181 (judge)
+    and 3005 (planner): Step 10, "Found while landing it".
+  - Formatting: every line step 10 added is ≤ 100 columns (checked by
+    character count over each commit's diff); lines over 100 in files it
+    touched (`oracles.ts`, `scripts/adapter-surface.ts`) were wrapped.
 
 ## How to work this tracker
 

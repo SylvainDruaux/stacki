@@ -1371,7 +1371,7 @@ function parsePage(source: string, opts: { readonly locs?: boolean } = {}): Pars
   // mistakes the start of the prose for a second closing fence.
   // A leading byte-order mark is an encoding signal, not content (plan §3.2):
   // the fences are matched past it, and offsets still count it so they index
-  // the file as read. The page writer puts it back (see page:write in main).
+  // the file as read. No write touches it: an edit is splices of other bytes.
   const bom = source.startsWith('\uFEFF') ? 1 : 0;
   const fm = source.slice(bom).match(/^---\r?\n(?:---|([\s\S]*?\r?\n)---)\r?\n?/);
   const frontmatter = fm ? fm[1] || '' : '';

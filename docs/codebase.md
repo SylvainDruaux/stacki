@@ -145,9 +145,10 @@ gesture → edit requests (page:edit) → main: intent → document actor
   against main's own snapshot of those bytes; the planner
   (`shared/planner.ts`) and the page's actor (`electron/documentActors.ts`)
   do the rest.
-- `src/pageEdits.ts` holds the open page's queue — gestures, typed code (a
-  byte diff, `shared/code-patch.ts`), or a Markdown page's whole model until
-  step 10 — and `src/pagePersistence.ts` sends it one entry at a time; a flush
+- `src/pageEdits.ts` holds the open page's queue — gestures on any page
+  (`.astro`, `.md`, `.mdx`), or typed code (a byte diff,
+  `shared/code-patch.ts`) — and `src/pagePersistence.ts` sends it one entry
+  at a time; a flush
   sends only the entries present when it starts, so there is no drain loop.
   `src/pageSender.ts` installs each reply: node handles are carried from the
   origin through the write's own splices (`src/nodeHandles.ts`), so selection
@@ -163,7 +164,9 @@ gesture → edit requests (page:edit) → main: intent → document actor
   panel write is one run of `src/coalescedRun.ts` (one in flight, one
   waiting), so a burst costs at most two.
 - Printing a whole file is fenced by lint to new files (`componentFile.ts`)
-  and Markdown's whole save (`eslint.config.mjs`).
+  and the parsers' own round-trip oracles (`eslint.config.mjs`); no write
+  replaces a file whole — a program's write is the diff it makes
+  (`rewrite-text`, step 10).
 
 ## Data model
 
