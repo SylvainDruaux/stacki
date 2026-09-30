@@ -2540,6 +2540,76 @@ update on every step):
     character count over each commit's diff); lines over 100 in files it
     touched (`oracles.ts`, `scripts/adapter-surface.ts`) were wrapped.
 
+- 2026-09-30, alignment sweep (PROMPT-ALIGN), `9ff7867`..`fb86495` on top
+  of `f9ceb1c`:
+  - Commits: `9ff7867` (`ClipPath.tsx`), `253fe7f` (`EmbedEditor.tsx`),
+    `3e31db7` (style panel: `x!`, `Partial<T>` inputs, casts), `8dca252`
+    (boundaries and their parse tests), `53f6502` (`App.tsx`), `efbffc3`
+    (loop bounds, limits, names), `fb86495` (lint ratchets, test headers),
+    then this record. Hotspots each in their own commit; none split.
+  - Gate on the full tree at `fb86495` (the same bytes as the last code
+    commit): **154/154 in 230.8 s, exit 0**. tsc clean; eslint 0 errors,
+    113 warnings (88 `max-lines-per-function`, 25 hook dependencies —
+    the same set as before the sweep; none new); `ratchet-check` 0 (baseline
+    0, unchanged); `adapter-surface` 0 / 0 / 0 / 4 / 0 (unchanged). The
+    intermediate commits were not gated one by one. An earlier run on the
+    working tree failed one command, `test:listfield`: it pins
+    `PropField.tsx`'s text, which the `src` → `source` rename changed; its
+    patterns follow the rename.
+  - Suites: `test:contracts` 271/271 (+8: `ipc-small-results`,
+    `lock-owner`, terminal send channels, validation replies);
+    `test:simulator` 102/102; `test:roundtrip` 504 passed, 1 skipped, of
+    505 (+5: `navigator-drop`, `tool-prefs`, forwarded shortcuts).
+  - Measured by AST scan over `src`, `electron`, `shared`, `scripts`,
+    `test` (TypeScript), before → after:
+    - `any` 0 → 0; `enum` 0 → 0; `@ts-ignore` 0 → 0 (`@ts-expect-error`
+      only in the type-level contract test); `Record<string, any>` 0 → 0.
+    - Non-null `x!` (with definite assignment `let x!:`) 27 → 0; the lint
+      rule is now an error.
+    - Type assertions outside `as const` 90 → 78, every remaining one in
+      a lint-listed validated constructor (`shared/`, the postcss and DOM
+      adapters).
+    - `Partial<T>` in parameters 24 → 4; the 4 are CanvasView's sparse
+      per-breakpoint maps, now named, with the reason, not update types.
+    - `assert(a && b)` 1 → 0; `catch` reading `.message` unnarrowed 1 → 0.
+    - `for (;;)` 8 → 0; literal loop caps 7 → 0 (named, or `LIMITS`);
+      binary searches keep their derived pass counts, with the derivation.
+    - Unbounded boundary buffers 1 → 0 (content-config runner stdout).
+    - Test files without a goal/method header 11 → 0.
+    - Abbreviated `src`/`dest` meaning source/target: 41 renamed; the HTML
+      `src` attribute, the `src/` folder and wire fields (`destRel`) keep
+      their names. Qualifier-first constants renamed 11; local file-size
+      gates moved into `MAIN_LIMITS` 4.
+    - Boundaries fixed: `terminal:input` / `terminal:ack` (unparsed; a NaN
+      ack disabled backpressure), `avb:shortcut` (no sender check, no
+      parser), Navigator drag data (no parser), `shared/ipc.ts` results (no
+      bounds, no tests), lock owner (read before its bound),
+      `BOUNDARY_LIMITS` (a 5 MiB copy disagreeing with the 10 MB limit),
+      tool preferences (unbounded; dead readers removed).
+  - Not changed, measured and left for the owner (each a redesign, not a
+    compliance fix, or a new runtime gate needing a lifecycle decision):
+    - Compound `if` conditions 1 998 → 1 991, `null` literals 5 084 →
+      5 094 (the added ones are `typeof x === 'object' && x !== null`
+      narrowing in new guards). Concentrated in `src/style-panel` (678 /
+      2 006) and `src/panels`.
+    - 88 functions over 70 lines in 45 files (docs/codebase.md finding 4);
+      boolean parameters (`live: boolean`) across the style panel.
+    - Engine-contract assertion density 1.25 per function (230 over 184
+      functions of 3+ statements); lowest `intent.ts` (a parser),
+      `planTree.ts` 0.46, `inlineStyle.ts` 0.38.
+    - Boundary residue: `process.env` reads (`SHELL`, `HOME`,
+      `VITE_DEV_SERVER_URL`, `PATH`) are used unparsed; the preload's
+      canvas query messages check types inline without count bounds; main
+      keeps no cap on open terminals (ptys are only reaped at quit, so a cap
+      needs a lifecycle decision first); `count` has no upper bound; raw
+      reads without a size check first in `cssVars`, `astroParser`,
+      `componentUsage`, `cmsRefs`, `gitBranches`, `previewWorktree`,
+      `thumbs`, `starter`, `injectedRoutes`; renderer-local parsers
+      `parsePageHeight`, `parseStoredHeight`, `parseAssetRel` have bounds
+      but no parse test.
+  - Formatting: every line the sweep added or rewrote is ≤ 100 columns
+    (checked over the diff); long lines it did not touch are unchanged.
+
 ## How to work this tracker
 
 The executor's workflow lives in `docs/editor-core-prompts.md` — one prompt
