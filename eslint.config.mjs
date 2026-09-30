@@ -4,13 +4,134 @@
 // and plugin are declared directly (docs/dependencies.md), and the meta package
 // would add a third name for the same code. Same rules, same shape.
 //
-// max-lines-per-function remains a warning until the oversized legacy
-// functions are split (docs/codebase.md, finding 4: the hotspots split as
-// architecture work, never inside a conversion). prefer-readonly reached zero
-// and is an error, as AGENTS.md requires.
+// docs/enforcement.md maps every AGENTS.md rule to the check that holds it;
+// the rules AGENTS.md states that stock ESLint cannot express live in the
+// local plugin, scripts/eslint-plugin/, loaded here without a build step.
+//
+// DEBT marks the rules the tree does not yet satisfy. They report as warnings
+// while the legacy code is brought into line, then DEBT becomes 'error' and
+// `npm run lint` runs with --max-warnings 0. Every other rule is an error now.
 import tsParser from '@typescript-eslint/parser';
 import tsPlugin from '@typescript-eslint/eslint-plugin';
 import reactHooks from 'eslint-plugin-react-hooks';
+import stacki from './scripts/eslint-plugin/index.mts';
+
+const DEBT = 'warn';
+
+// AGENTS.md §12: no abbreviations. Word → what to write instead. Checked word
+// by word on every declared name (scripts/eslint-plugin/naming.mts). Loop
+// counters i, j, k are the stated exception; x, y, z are coordinates, not
+// abbreviations. `attr` and `env` are left alone: they are the platform's own
+// vocabulary (the DOM's Attr, process.env).
+const ABBREVIATIONS = {
+  a: 'a descriptive name (left, first, …)',
+  arr: 'array, or what it lists',
+  b: 'a descriptive name (right, second, …)',
+  btn: 'button',
+  c: 'a descriptive name',
+  calc: 'calculate',
+  cb: 'callback',
+  cfg: 'config',
+  ctx: 'context',
+  cur: 'current',
+  curr: 'current',
+  d: 'a descriptive name',
+  def: 'definition',
+  defs: 'definitions',
+  desc: 'description',
+  dest: 'target',
+  dir: 'directory',
+  dirs: 'directories',
+  doc: 'document',
+  e: 'event or error',
+  el: 'element',
+  elem: 'element',
+  err: 'error',
+  ev: 'event',
+  evt: 'event',
+  f: 'a descriptive name',
+  fn: 'callback, handler, or what it computes',
+  g: 'a descriptive name',
+  h: 'height',
+  idx: 'index',
+  k: 'key',
+  l: 'a descriptive name',
+  len: 'length',
+  m: 'a descriptive name (match, …)',
+  msg: 'message',
+  n: 'count, or what it counts',
+  num: 'number, or what it counts',
+  o: 'a descriptive name',
+  obj: 'object, or what it holds',
+  opt: 'option',
+  opts: 'options',
+  p: 'a descriptive name',
+  pct: 'percent',
+  pos: 'position',
+  prev: 'previous',
+  q: 'query',
+  r: 'a descriptive name',
+  req: 'request',
+  res: 'result or response',
+  s: 'a descriptive name (text, …)',
+  sel: 'selection or selector',
+  src: 'source',
+  str: 'text, or what it spells',
+  t: 'a descriptive name',
+  temp: 'temporary, or what it holds',
+  tmp: 'temporary, or what it holds',
+  u: 'a descriptive name',
+  util: 'utility',
+  utils: 'utilities',
+  v: 'value',
+  val: 'value',
+  w: 'width',
+};
+// Quantities whose `max`/`min` prefix is a misplaced qualifier (§12:
+// latencyMsMax, not maxLatencyMs).
+const QUANTITY_WORDS = [
+  'bytes',
+  'chars',
+  'columns',
+  'count',
+  'depth',
+  'entries',
+  'height',
+  'items',
+  'length',
+  'lines',
+  'ms',
+  'nodes',
+  'px',
+  'retries',
+  'rows',
+  'seconds',
+  'size',
+  'width',
+];
+const NAMING = { words: ABBREVIATIONS, quantityWords: QUANTITY_WORDS };
+
+// Rules that read syntax only, so they hold for JavaScript and TypeScript
+// alike. Type-aware and TypeScript-syntax rules join in the TS block.
+const STACKI_SYNTAX_RULES = {
+  'stacki/bounded-recursion': DEBT,
+  'stacki/comment-sentence': DEBT,
+  'stacki/division-intent': 'error',
+  'stacki/naming': [DEBT, NAMING],
+  'stacki/no-compound-assert': 'error',
+  'stacki/no-null': DEBT,
+  'stacki/no-unbounded-loop': 'error',
+  'stacki/require-disable-reason': DEBT,
+};
+const STACKI_TYPESCRIPT_RULES = {
+  ...STACKI_SYNTAX_RULES,
+  'stacki/callback-last': DEBT,
+  'stacki/catch-unknown': DEBT,
+  'stacki/no-boolean-parameter': DEBT,
+  'stacki/no-enum': 'error',
+  'stacki/no-overloads': 'error',
+  'stacki/no-partial-parameter': 'error',
+};
 
 // no-restricted-syntax lists replace each other between config blocks rather
 // than merging, so each group is defined once and composed per block below.
@@ -179,37 +300,23 @@ export default [
     ],
   },
   {
-    // Renderer JS/JSX is ESM with JSX. Electron main, scripts, and tests are
-    // CommonJS (top-level return is legal in the CJS module wrapper).
-    files: ['src/**/*.{js,jsx,mjs}'],
-    languageOptions: {
-      ecmaVersion: 'latest',
-      sourceType: 'module',
-      parserOptions: { ecmaFeatures: { jsx: true } },
-    },
-    plugins: { 'react-hooks': reactHooks },
-    rules: {
-      curly: ['error', 'all'],
-      'react-hooks/exhaustive-deps': 'warn',
-      // Legacy JSX calls hooks conditionally (PropsPanel.jsx, VariablesView.jsx)
-      // — real crash-on-flip bugs, fixed as part of those files' Phase 3
-      // conversions. Error level stands for all TS.
-      'react-hooks/rules-of-hooks': 'warn',
-    },
+    // The JavaScript left in the tree: ESM configs and content-tool modules,
+    // and the CommonJS test harnesses (top-level return is legal in the CJS
+    // module wrapper). No types, so only the syntax rules apply.
+    files: ['*.mjs', 'electron/**/*.mjs'],
+    languageOptions: { ecmaVersion: 'latest', sourceType: 'module' },
+    plugins: { stacki },
+    rules: { curly: ['error', 'all'], ...STACKI_SYNTAX_RULES },
   },
   {
     files: ['electron/**/*.js', 'scripts/**/*.js', 'test/**/*.js'],
-    languageOptions: {
-      ecmaVersion: 'latest',
-      sourceType: 'commonjs',
-    },
-    rules: {
-      curly: ['error', 'all'],
-    },
+    languageOptions: { ecmaVersion: 'latest', sourceType: 'commonjs' },
+    plugins: { stacki },
+    rules: { curly: ['error', 'all'], ...STACKI_SYNTAX_RULES },
   },
   {
-    files: ['**/*.{ts,tsx}'],
-    linterOptions: { reportUnusedDisableDirectives: 'warn' },
+    files: ['**/*.{ts,tsx,mts}'],
+    linterOptions: { reportUnusedDisableDirectives: 'error' },
     languageOptions: {
       parser: tsParser,
       parserOptions: {
@@ -217,13 +324,18 @@ export default [
         tsconfigRootDir: import.meta.dirname,
       },
     },
-    plugins: { '@typescript-eslint': tsPlugin, 'react-hooks': reactHooks },
+    plugins: { '@typescript-eslint': tsPlugin, 'react-hooks': reactHooks, stacki },
     rules: {
       ...tsPlugin.configs['eslint-recommended'].rules,
       ...tsPlugin.configs.recommended.rules,
+      ...STACKI_TYPESCRIPT_RULES,
       // AGENTS.md non-negotiables.
-      // The migration ratchet is zero, so unchecked files cannot re-enter the tree.
-      '@typescript-eslint/ban-ts-comment': ['error', { 'ts-nocheck': true }],
+      // The migration ratchet is zero, so unchecked files cannot re-enter the
+      // tree; a type test's expected error must say what it proves.
+      '@typescript-eslint/ban-ts-comment': [
+        'error',
+        { 'ts-nocheck': true, 'ts-expect-error': 'allow-with-description' },
+      ],
       '@typescript-eslint/no-explicit-any': 'error',
       // Reached zero in the alignment pass; AGENTS.md forbids `x!` outright.
       '@typescript-eslint/no-non-null-assertion': 'error',
@@ -231,19 +343,52 @@ export default [
       'no-restricted-syntax': ['error', ...NO_ASSERTIONS, ...NO_WHOLE_FILE_REGENERATION],
       '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
       curly: ['error', 'all'],
-      // Hooks deps were the author's own suppressed warnings; keep them visible.
-      'react-hooks/exhaustive-deps': 'warn',
+      // Effect dependencies are correctness: a stale closure is a real bug.
+      'react-hooks/exhaustive-deps': DEBT,
       'react-hooks/rules-of-hooks': 'error',
       // Type-aware safety. Error — the compiler-adjacent bug class.
+      '@typescript-eslint/no-unsafe-argument': DEBT,
       '@typescript-eslint/no-unsafe-assignment': 'error',
       '@typescript-eslint/no-unsafe-member-access': 'error',
       '@typescript-eslint/no-unsafe-call': 'error',
       '@typescript-eslint/no-unsafe-return': 'error',
       '@typescript-eslint/switch-exhaustiveness-check': 'error',
       '@typescript-eslint/prefer-readonly': 'error',
-      // Scale rule: legacy functions violate it at volume. Warn now, tighten as they split.
-      'max-lines-per-function': ['warn', { max: 70, skipBlankLines: true, skipComments: true }],
+      // §3: all errors are handled. A promise nobody awaits drops its
+      // rejection; `void` is the explicit, reviewable way to say "detached".
+      // node:test's registration calls are the exception: the runner owns
+      // and awaits the promise each returns.
+      '@typescript-eslint/no-floating-promises': [
+        DEBT,
+        {
+          allowForKnownSafeCalls: [
+            { from: 'package', package: 'node:test', name: ['describe', 'it', 'suite', 'test'] },
+          ],
+        },
+      ],
+      '@typescript-eslint/no-misused-promises': DEBT,
+      '@typescript-eslint/only-throw-error': 'error',
+      '@typescript-eslint/use-unknown-in-catch-callback-variable': DEBT,
+      eqeqeq: [DEBT, 'always'],
+      // §7: construct and return, never mutate a parameter. DOM elements,
+      // refs, canvas contexts, and style objects are mutable by platform
+      // design; a function that takes one exists to change it.
+      'no-param-reassign': [
+        DEBT,
+        {
+          props: true,
+          ignorePropertyModificationsForRegex: ['[eE]lement$', '[rR]ef$', '[cC]ontext$', '^style$'],
+        },
+      ],
+      // §11: a function fits on a screen.
+      'max-lines-per-function': [DEBT, { max: 70, skipBlankLines: true, skipComments: true }],
     },
+  },
+  {
+    // The Result constructor pair is the canonical `ok`/`err` of AGENTS.md §3;
+    // `err` means exactly that and nothing else anywhere in the tree.
+    files: ['shared/result.ts'],
+    rules: { 'stacki/naming': [DEBT, { ...NAMING, allowedNames: ['err'] }] },
   },
   {
     // shared/ is the validated-constructor layer (AGENTS.md §2): assertions

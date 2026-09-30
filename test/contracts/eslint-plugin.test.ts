@@ -1,0 +1,317 @@
+// Goal: pin the behavior of every rule in the local ESLint plugin
+// (scripts/eslint-plugin/), which turns AGENTS.md rules into lint errors.
+// Method: typescript-eslint's RuleTester, run under node:test, feeds each rule source
+// snippets parsed as TypeScript. Every rule gets the positive space it must
+// accept — including each documented exemption — and the negative space it
+// must reject, with the message id pinned so a changed diagnosis is a failure.
+// A rule's fixer, where it has one, is pinned by its output.
+import { after, describe, it } from 'node:test';
+import { RuleTester } from '@typescript-eslint/rule-tester';
+import { rules } from '../../scripts/eslint-plugin/index.mts';
+
+RuleTester.afterAll = after;
+RuleTester.describe = describe;
+RuleTester.describeSkip = describe.skip;
+RuleTester.it = it;
+RuleTester.itOnly = it.only;
+RuleTester.itSkip = it.skip;
+
+// Directives in the test snippets suppress nothing, and the linter's own
+// unused-directive report would count as a second error for the case.
+const tester = new RuleTester({
+  linterOptions: { reportUnusedDisableDirectives: 'off' },
+  languageOptions: { parserOptions: { ecmaFeatures: { jsx: true } } },
+});
+
+const NAMING_OPTIONS: [
+  {
+    readonly words: Readonly<Record<string, string>>;
+    readonly quantityWords: readonly string[];
+  },
+] = [
+  {
+    words: { el: 'element', src: 'source', e: 'event or error', err: 'error' },
+    quantityWords: ['depth', 'ms'],
+  },
+];
+
+tester.run('naming', rules.naming, {
+  valid: [
+    { code: 'const element = document.body;', options: NAMING_OPTIONS },
+    { code: 'for (let i = 0; i < 3; i += 1) {}', options: NAMING_OPTIONS },
+    // Property keys mirror external shapes and are not ours to name.
+    { code: 'const image = { src: "a.png" }; image.src;', options: NAMING_OPTIONS },
+    { code: 'const depthMax = 3;', options: NAMING_OPTIONS },
+    // A lone qualifier names nothing to reorder.
+    { code: 'const max = 3;', options: NAMING_OPTIONS },
+    { code: 'const maxWidth = 3;', options: NAMING_OPTIONS },
+    { code: 'export const err = 1;', options: [{ ...NAMING_OPTIONS[0], allowedNames: ['err'] }] },
+    { code: 'import { err } from "./result";', options: NAMING_OPTIONS },
+  ],
+  invalid: [
+    { code: 'const el = 1;', options: NAMING_OPTIONS, errors: [{ messageId: 'abbreviation' }] },
+    {
+      code: 'const srcPath = 1;',
+      options: NAMING_OPTIONS,
+      errors: [{ messageId: 'abbreviation' }],
+    },
+    {
+      code: 'const SRC_PATH = 1;',
+      options: NAMING_OPTIONS,
+      errors: [{ messageId: 'abbreviation' }],
+    },
+    {
+      code: 'try {} catch (err) {}',
+      options: NAMING_OPTIONS,
+      errors: [{ messageId: 'abbreviation' }],
+    },
+    {
+      code: 'list.forEach((e) => e);',
+      options: NAMING_OPTIONS,
+      errors: [{ messageId: 'abbreviation' }],
+    },
+    {
+      code: 'function load({ src }: { src: string }) {}',
+      options: NAMING_OPTIONS,
+      errors: [{ messageId: 'abbreviation' }],
+    },
+    {
+      code: 'const [first, el] = pair;',
+      options: NAMING_OPTIONS,
+      errors: [{ messageId: 'abbreviation' }],
+    },
+    {
+      code: 'interface ElProps {}',
+      options: NAMING_OPTIONS,
+      errors: [{ messageId: 'abbreviation' }],
+    },
+    {
+      code: 'const maxDepth = 3;',
+      options: NAMING_OPTIONS,
+      errors: [{ messageId: 'qualifierFirst' }],
+    },
+    {
+      code: 'const MAX_LATENCY_MS = 3;',
+      options: NAMING_OPTIONS,
+      errors: [{ messageId: 'qualifierFirst' }],
+    },
+  ],
+});
+
+tester.run('no-boolean-parameter', rules['no-boolean-parameter'], {
+  valid: [
+    'function load(options: { readonly force?: boolean }) {}',
+    'function setOpen(open: boolean) {}',
+    'list.filter((keep: boolean) => keep);',
+    'const view = <input onChange={(checked: boolean) => checked} />;',
+    'function load(count: number) {}',
+  ],
+  invalid: [
+    {
+      code: 'function load(force: boolean) {}',
+      errors: [{ messageId: 'booleanParameter', data: { name: 'force' } }],
+    },
+    {
+      code: 'const load = (path: string, force?: boolean | undefined) => path;',
+      errors: [{ messageId: 'booleanParameter' }],
+    },
+    { code: 'function load(force: true | false) {}', errors: [{ messageId: 'booleanParameter' }] },
+    // A setter with a second parameter is no longer self-describing.
+    {
+      code: 'function setOpen(open: boolean, animate: boolean) {}',
+      errors: [{ messageId: 'booleanParameter' }, { messageId: 'booleanParameter' }],
+    },
+    {
+      code: 'function load(force = false, enabled: boolean) {}',
+      errors: [{ messageId: 'booleanParameter', data: { name: 'enabled' } }],
+    },
+  ],
+});
+
+tester.run('bounded-recursion', rules['bounded-recursion'], {
+  valid: [
+    'function walk(node, depth) {\n' +
+      '  assert(depth <= LIMITS.treeDepthMax, "deep");\n' +
+      '  walk(node, depth + 1);\n' +
+      '}',
+    'function walk(node, depth) {\n' +
+      '  if (depth + 1 > LIMITS.treeDepthMax) { return; }\n' +
+      '  walk(node, depth + 1);\n' +
+      '}',
+    'function visit(node, state) {\n' +
+      '  if (state.depth > LIMITS.treeDepthMax) { return; }\n' +
+      '  visit(node, state);\n' +
+      '}',
+    'function once() { return other(); }',
+    'function walk(node, depth) {\n' +
+      '  assert(depth < PARSE_LIMITS.depthMax, "deep");\n' +
+      '  walk(node, depth + 1);\n' +
+      '}',
+  ],
+  invalid: [
+    { code: 'function walk(node) { walk(node.child); }', errors: [{ messageId: 'unbounded' }] },
+    {
+      code: 'const visit = (node) => { node.children.forEach((child) => visit(child)); };',
+      errors: [{ messageId: 'unbounded' }],
+    },
+    {
+      code: 'class Tree { walk(node) { this.walk(node.child); } }',
+      errors: [{ messageId: 'unbounded' }],
+    },
+    // A bound on something other than depth bounds nothing.
+    {
+      code:
+        'function walk(node, count) {\n' +
+        '  assert(count <= LIMITS.treeNodesMax, "n");\n' +
+        '  walk(node, count);\n' +
+        '}',
+      errors: [{ messageId: 'unbounded' }],
+    },
+  ],
+});
+
+tester.run('no-null', rules['no-null'], {
+  valid: [
+    'const value = undefined;',
+    'if (element === null) {}',
+    'if (match !== null) {}',
+    'const ref = useRef<HTMLDivElement>(null);',
+    'JSON.stringify(value, null, 2);',
+    'const map = Object.create(null);',
+    'history.replaceState(null, "", url);',
+  ],
+  invalid: [
+    { code: 'const value = null;', errors: [{ messageId: 'nullLiteral' }] },
+    { code: 'function find() { return null; }', errors: [{ messageId: 'nullLiteral' }] },
+    { code: 'if (value == null) {}', errors: [{ messageId: 'nullLiteral' }] },
+    {
+      code: 'let value: string | null;',
+      errors: [{ messageId: 'nullType' }],
+    },
+    { code: 'JSON.stringify(null);', errors: [{ messageId: 'nullLiteral' }] },
+    { code: 'useRef<HTMLDivElement | null>(null);', errors: [{ messageId: 'nullType' }] },
+  ],
+});
+
+tester.run('catch-unknown', rules['catch-unknown'], {
+  valid: ['try {} catch (error: unknown) {}', 'try {} catch {}'],
+  invalid: [
+    {
+      code: 'try {} catch (error) {}',
+      output: 'try {} catch (error: unknown) {}',
+      errors: [{ messageId: 'untyped' }],
+    },
+  ],
+});
+
+tester.run('no-compound-assert', rules['no-compound-assert'], {
+  valid: ['assert(a); assert(b);', 'assert(a || b, "either");', 'check(a && b);'],
+  invalid: [{ code: 'assert(a && b, "both");', errors: [{ messageId: 'compound' }] }],
+});
+
+tester.run('no-unbounded-loop', rules['no-unbounded-loop'], {
+  valid: ['while (index < count) {}', 'for (let i = 0; i < 3; i += 1) {}', 'do {} while (more);'],
+  invalid: [
+    { code: 'while (true) {}', errors: [{ messageId: 'unbounded' }] },
+    { code: 'for (;;) {}', errors: [{ messageId: 'unbounded' }] },
+    { code: 'do {} while (1);', errors: [{ messageId: 'unbounded' }] },
+  ],
+});
+
+tester.run('division-intent', rules['division-intent'], {
+  valid: [
+    'const middle = list[Math.floor(list.length / 2)];',
+    'const ratio = width / height;',
+    'text.slice(0, Math.ceil(text.length / 2));',
+  ],
+  invalid: [
+    { code: 'const middle = list[list.length / 2];', errors: [{ messageId: 'bareDivision' }] },
+    { code: 'text.slice(0, text.length / 2);', errors: [{ messageId: 'bareDivision' }] },
+    { code: 'new Array(size / 2);', errors: [{ messageId: 'bareDivision' }] },
+  ],
+});
+
+tester.run('comment-sentence', rules['comment-sentence'], {
+  valid: [
+    '// A sentence.\nconst a = 1;',
+    '// A sentence that\n// continues here.\nconst a = 1;',
+    '// `loadURL` opens the page.\nconst a = 1;',
+    '// loadURL opens the page.\nconst a = 1;',
+    '// Lists follow:\n// - one\n// - two\nconst a = 1;',
+    'const a = 1; // an end-of-line phrase',
+    '// --- Section ---\nconst a = 1;',
+    '// eslint-disable-next-line no-console -- demo\nconst a = 1;',
+    '// Ends with code: `a.b()`\nconst a = 1;',
+  ],
+  invalid: [
+    { code: '//No space.\nconst a = 1;', errors: [{ messageId: 'space' }] },
+    { code: '// lower case.\nconst a = 1;', errors: [{ messageId: 'capital' }] },
+    { code: '// No stop\nconst a = 1;', errors: [{ messageId: 'terminal' }] },
+    { code: '// Two lines\n// and no stop\nconst a = 1;', errors: [{ messageId: 'terminal' }] },
+  ],
+});
+
+// A blanket `eslint-disable` suppresses this rule too, so the policy scan
+// holds that case (test/contracts/policy-scan.test.ts).
+tester.run('require-disable-reason', rules['require-disable-reason'], {
+  valid: [
+    '// eslint-disable-next-line no-console -- the CLI prints\nconsole.log(1);',
+    '/* eslint-disable no-console -- the CLI prints */',
+  ],
+  invalid: [
+    {
+      code: '// eslint-disable-next-line no-console\nconsole.log(1);',
+      errors: [{ messageId: 'missingReason' }],
+    },
+    { code: '/* eslint-disable no-console */', errors: [{ messageId: 'missingReason' }] },
+  ],
+});
+
+tester.run('no-enum', rules['no-enum'], {
+  valid: ['const STATUSES = ["draft", "done"] as const;'],
+  invalid: [{ code: 'enum Status { Draft }', errors: [{ messageId: 'enum' }] }],
+});
+
+tester.run('no-partial-parameter', rules['no-partial-parameter'], {
+  valid: ['function update(fields: Pick<Project, "title">) {}', 'type Draft = Partial<Project>;'],
+  invalid: [
+    { code: 'function update(fields: Partial<Project>) {}', errors: [{ messageId: 'partial' }] },
+    {
+      code: 'const update = (fields: Partial<Project>) => fields;',
+      errors: [{ messageId: 'partial' }],
+    },
+  ],
+});
+
+tester.run('no-overloads', rules['no-overloads'], {
+  valid: ['function parse(input: string | number) {}', 'declare function external(): void;'],
+  invalid: [
+    {
+      code:
+        'function parse(input: string): string;\n' +
+        'function parse(input: unknown) { return input; }',
+      errors: [{ messageId: 'overload' }],
+    },
+    {
+      code:
+        'class Parser {\n' +
+        '  parse(input: string): string;\n' +
+        '  parse(input: unknown) { return input; }\n' +
+        '}',
+      errors: [{ messageId: 'overload' }],
+    },
+  ],
+});
+
+tester.run('callback-last', rules['callback-last'], {
+  valid: [
+    'function watch(path: string, onChange: () => void) {}',
+    'function both(onStart: () => void, onEnd: () => void) {}',
+  ],
+  invalid: [
+    {
+      code: 'function watch(onChange: () => void, path: string) {}',
+      errors: [{ messageId: 'callbackNotLast' }],
+    },
+  ],
+});

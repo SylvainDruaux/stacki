@@ -59,26 +59,33 @@ it.
 
 ## ESLint (required rules)
 
-```jsonc
-{
-  "rules": {
-    "@typescript-eslint/no-explicit-any": "error",
-    "@typescript-eslint/no-unsafe-assignment": "error",
-    "@typescript-eslint/no-unsafe-member-access": "error",
-    "@typescript-eslint/no-unsafe-call": "error",
-    "@typescript-eslint/no-unsafe-return": "error",
-    "@typescript-eslint/consistent-type-assertions": ["error", { "assertionStyle": "never" }],
-    "@typescript-eslint/prefer-readonly": "error",
-    "@typescript-eslint/switch-exhaustiveness-check": "error",
-    "curly": ["error", "all"],
-    "max-lines-per-function": ["error", { "max": 70, "skipBlankLines": true, "skipComments": true }]
-  }
-}
-```
+`eslint.config.mjs` is the source of truth; a copy here would drift from it.
+It holds, at minimum: `no-explicit-any`, the `no-unsafe-*` family, a ban on
+type-assertion syntax outside validated constructors, `prefer-readonly`,
+`switch-exhaustiveness-check`, `curly: all`, and `max-lines-per-function: 70`.
+The rules below that stock ESLint cannot express live in the local plugin,
+`scripts/eslint-plugin/`.
 
 Formatting: Prettier with `printWidth: 100`. **100 columns is a hard limit,
 without exception** — nothing may hide behind a horizontal scrollbar. Use the
 full width; never go beyond.
+
+## Enforcement
+
+These rules are checked by machines wherever a machine can check them, and
+the same checks run for people and for every coding agent (Claude Code, Codex,
+Pi). `docs/enforcement.md` maps each rule to the check that holds it and lists
+the rules that remain for review.
+
+- Agent hooks format and check each file you edit, and check every changed
+  file before you finish. Fix what they report; do not work around them.
+- `npm run check:changed` runs the finish check by hand. Run it before you
+  say you are done.
+- Git hooks check staged files, commit messages, and pushes. Never skip them
+  (`--no-verify`); the agent hooks refuse it, and CI runs the same checks.
+- The files that define the gates (this file, lint and compiler configs,
+  `scripts/{eslint-plugin,policy,agent}/`, hook configs, `shared/limits.ts`)
+  change only with a human's approval.
 
 ---
 
@@ -564,4 +571,4 @@ ESLint, production builds, contract tests, and the complete regression suite.
 - [ ] Comments are sentences that say why; test files open with goal and
       methodology
 - [ ] New dependencies carry a written justification
-- [ ] `tsc --noEmit` and lint clean
+- [ ] `npm run check:changed` passes (`tsc`, ESLint, Prettier, policy scan)

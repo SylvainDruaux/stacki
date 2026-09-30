@@ -113,10 +113,10 @@ export function typeChecks(
   const full: RejectionReason = 'queue-full';
   // @ts-expect-error Capabilities are a closed set.
   const writable: Capability = 'writable';
-  // @ts-expect-error An anchor's kind is a closed set too.
   const anchor: AnchorRef = {
     span: { start: toByteOffset(0), end: toByteOffset(0) },
     path: [],
+    // @ts-expect-error An anchor's kind is a closed set too.
     expectedKind: 'widget',
   };
   void [byteSpan, id, digest, outcome, full, writable, anchor, reason];

@@ -1,0 +1,5 @@
+# Commits that only reformat code; `git blame` skips them.
+# Enable locally with: git config blame.ignoreRevsFile .git-blame-ignore-revs
+
+# style: format the tree with Prettier
+59cd752b01fb227626f7461ffb0e2a3280a97a1d

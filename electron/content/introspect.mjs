@@ -22,7 +22,9 @@ const BODY_EXT = new Set(['md', 'mdx', 'mdoc', 'markdown']);
 const extensionsOf = (pattern) =>
   [].concat(pattern || []).flatMap((p) => {
     const m = String(p).match(/\.(\{[^}]*\}|[A-Za-z0-9]+)$/);
-    if (!m) return [];
+    if (!m) {
+      return [];
+    }
     return m[1]
       .replace(/[{}]/g, '')
       .split(',')
@@ -33,9 +35,13 @@ const extensionsOf = (pattern) =>
 const imageStub = () => withMetadata(z.string(), { astroImage: true });
 
 function describeLoader(loader) {
-  if (!loader) return { kind: 'none' };
+  if (!loader) {
+    return { kind: 'none' };
+  }
   const tagged = loader[LOADER];
-  if (tagged) return tagged;
+  if (tagged) {
+    return tagged;
+  }
   // Somebody's own loader: an object with load(), or the result of calling a
   // factory. Its entries come from wherever it says, and are rebuilt on every
   // sync, so nothing the editor writes to them would survive.
@@ -73,7 +79,9 @@ function describeCollection(name, collection) {
   let schema = raw;
   try {
     // `schema: ({ image }) => …` is the only form that can use image().
-    if (typeof raw === 'function') schema = raw({ image: imageStub });
+    if (typeof raw === 'function') {
+      schema = raw({ image: imageStub });
+    }
     record.crossFieldChecks = hasCrossFieldChecks(schema);
     record.schema = toJsonSchema(schema);
   } catch (err) {
@@ -104,7 +112,9 @@ export function describe(mod) {
 const schemaCache = new Map();
 
 function schemaOf(mod, name) {
-  if (schemaCache.has(name)) return schemaCache.get(name);
+  if (schemaCache.has(name)) {
+    return schemaCache.get(name);
+  }
   const collection = mod?.collections?.[name];
   const raw = collection?.schema ?? collection?.loader?.schema ?? null;
   const schema = typeof raw === 'function' ? raw({ image: imageStub }) : raw;
@@ -116,9 +126,13 @@ export function validate(mod, { collection, data }) {
   const schema = schemaOf(mod, collection);
   // No schema means every shape is allowed — which is a real answer, not a
   // missing one.
-  if (!schema) return { issues: [], unchecked: true };
+  if (!schema) {
+    return { issues: [], unchecked: true };
+  }
   const result = schema.safeParse(data);
-  if (result.success) return { issues: [] };
+  if (result.success) {
+    return { issues: [] };
+  }
   return {
     issues: result.error.issues.map((issue) => ({
       path: issue.path.map((p) => (typeof p === 'symbol' ? String(p) : p)),

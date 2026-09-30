@@ -7,17 +7,38 @@ on:
       - main
 
 jobs:
+  # The fast lane: formatting, the repository policy scan, and both type-check
+  # programs finish in a few minutes and fail a pull request before the full
+  # suite does. docs/enforcement.md maps each check to the rule it holds.
+  policy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run format:check
+      - run: npm run check:policy
+      - run: npm run typecheck
+
+  # The full gate on every platform the app ships on, plus Linux. Linux has no
+  # display, so the Electron probes run under a virtual one.
   test:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-latest, windows-latest]
+        os: [ubuntu-latest, macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version-file: .nvmrc
           cache: npm
       - run: npm ci
-      - run: npm test
+      - if: runner.os == 'Linux'
+        run: xvfb-run --auto-servernum npm test
+      - if: runner.os != 'Linux'
+        run: npm test

@@ -1,5 +1,7 @@
 {
-  "//": "AGENTS.md mandates this strict flag set. Runtime scripts use their own CommonJS tsconfig; JavaScript test harnesses remain outside the checked program by design.",
+  // AGENTS.md mandates this strict flag set. Scripts are checked by
+  // scripts/tsconfig.json; JavaScript test harnesses remain outside the checked
+  // program by design.
   "compilerOptions": {
     "target": "ES2022",
     "module": "ESNext",

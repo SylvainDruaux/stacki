@@ -8,14 +8,18 @@ export const definitionOf = (schema) => schema?._zod?.def || schema?._def || nul
 // schemas themselves, so attaching metadata to the older definition is local
 // to introspection and never changes a schema inside the user's dev server.
 export function withMetadata(schema, metadata) {
-  if (typeof schema.meta === 'function') return schema.meta(metadata);
+  if (typeof schema.meta === 'function') {
+    return schema.meta(metadata);
+  }
   schema._def[META] = { ...schema._def[META], ...metadata };
   return schema;
 }
 
 export function hasCrossFieldChecks(schema) {
   const def = definitionOf(schema);
-  if (Array.isArray(def?.checks) && def.checks.length > 0) return true;
+  if (Array.isArray(def?.checks) && def.checks.length > 0) {
+    return true;
+  }
   if (def?.typeName === 'ZodEffects') {
     return def.effect?.type === 'refinement' || hasCrossFieldChecks(def.schema);
   }
@@ -35,9 +39,13 @@ export function toJsonSchema(schema) {
         const def = definitionOf(zodSchema);
         if (def?.type === 'date') {
           jsonSchema.astroDate = true;
-          if (def.coerce) jsonSchema.astroCoerced = true;
+          if (def.coerce) {
+            jsonSchema.astroCoerced = true;
+          }
         }
-        if (def?.type === 'pipe' || def?.type === 'transform') jsonSchema.astroTransform = true;
+        if (def?.type === 'pipe' || def?.type === 'transform') {
+          jsonSchema.astroTransform = true;
+        }
       },
     });
   }
@@ -51,11 +59,15 @@ export function toJsonSchema(schema) {
     pipeStrategy: 'input',
     definitionPath: '$defs',
     postProcess(jsonSchema, def) {
-      if (!jsonSchema) return jsonSchema;
+      if (!jsonSchema) {
+        return jsonSchema;
+      }
       Object.assign(jsonSchema, def[META]);
       if (def.typeName === 'ZodDate') {
         jsonSchema.astroDate = true;
-        if (def.coerce) jsonSchema.astroCoerced = true;
+        if (def.coerce) {
+          jsonSchema.astroCoerced = true;
+        }
       }
       if (
         def.typeName === 'ZodPipeline' ||

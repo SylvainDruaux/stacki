@@ -75,18 +75,11 @@ const environment = {
 const node = process.execPath;
 const typeScript = path.join(root, 'node_modules', 'typescript', 'bin', 'tsc');
 const staticGates: readonly GateCommand[] = [
-  [
-    'build:clean',
-    node,
-    [
-      '--disable-warning=ExperimentalWarning',
-      '--experimental-transform-types',
-      path.join(root, 'scripts', 'clean-build.mts'),
-    ],
-  ],
+  // Node >= 22.18 strips types itself (package.json engines).
+  ['build:clean', node, [path.join(root, 'scripts', 'clean-build.mts')]],
   ['build:contracts', node, [typeScript, '-p', path.join('shared', 'tsconfig.json')]],
   ['build:electron', node, [typeScript, '-p', path.join('electron', 'tsconfig.json')]],
-  ['build:scripts', node, [typeScript, '-p', path.join('scripts', 'tsconfig.json')]],
+  ['build:scripts', node, [typeScript, '-p', path.join('scripts', 'tsconfig.build.json')]],
   ['build:morph', node, [typeScript, '-p', path.join('electron', 'tsconfig.morph.json')]],
   ['build:preload', node, [typeScript, '-p', path.join('electron', 'tsconfig.preload.json')]],
   ['stage:runtime', node, [path.join(root, 'dist', 'scripts', 'stage-runtime.js')]],
@@ -100,7 +93,7 @@ const staticChecks: readonly TestCommand[] = [
     // verbatimModuleSyntax; this check-only program holds the full flag set.
     name: 'tsc scripts',
     command: node,
-    argumentsList: [typeScript, '-p', path.join('scripts', 'tsconfig.check.json')],
+    argumentsList: [typeScript, '-p', path.join('scripts', 'tsconfig.json')],
   },
   {
     name: 'eslint',
@@ -108,9 +101,22 @@ const staticChecks: readonly TestCommand[] = [
     argumentsList: [path.join(root, 'node_modules', 'eslint', 'bin', 'eslint.js'), '.'],
   },
   {
-    name: 'ratchet-check',
+    // Line width, shell scripts, test headers, the dependency record, one
+    // lockfile, agent instructions, assertion density (docs/enforcement.md).
+    name: 'policy scan',
     command: node,
-    argumentsList: [path.join(root, 'dist', 'scripts', 'ratchet-check.js')],
+    argumentsList: [path.join(root, 'scripts', 'policy', 'scan.mts')],
+  },
+  {
+    name: 'prettier',
+    command: node,
+    argumentsList: [
+      path.join(root, 'node_modules', 'prettier', 'bin', 'prettier.cjs'),
+      '--check',
+      '--log-level',
+      'warn',
+      '.',
+    ],
   },
   {
     name: 'adapter-surface',

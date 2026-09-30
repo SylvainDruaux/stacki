@@ -100,17 +100,18 @@ export function runTestCommand(command: TestCommand, options: PoolOptions): Prom
     running.add(child);
     child.stdout.on('data', (chunk: Buffer) => output.push(chunk));
     child.stderr.on('data', (chunk: Buffer) => output.push(chunk));
-    const finish = (passed: boolean, note: string): void => {
+    const finish = (ending: { readonly passed: boolean; readonly note: string }): void => {
       running.delete(child);
-      if (note !== '') {
-        output.push(Buffer.from(`\n${note}\n`));
+      if (ending.note !== '') {
+        output.push(Buffer.from(`\n${ending.note}\n`));
       }
       const durationMs = Date.now() - startedMs;
+      const passed = ending.passed;
       resolve({ name: command.name, passed, durationMs, output: output.text() });
     };
-    child.on('error', (error) => finish(false, error.message));
+    child.on('error', (error) => finish({ passed: false, note: error.message }));
     child.on('close', (code, signal) => {
-      finish(code === 0, signal === null ? '' : `terminated by ${signal}`);
+      finish({ passed: code === 0, note: signal === null ? '' : `terminated by ${signal}` });
     });
   });
 }

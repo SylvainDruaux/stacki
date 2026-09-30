@@ -10,8 +10,12 @@
 export const LOADER = Symbol.for('stacki.astro.loader');
 
 const asPath = (value) => {
-  if (!value) return null;
-  if (typeof value === 'string') return value;
+  if (!value) {
+    return null;
+  }
+  if (typeof value === 'string') {
+    return value;
+  }
   // base can be a file: URL
   try {
     return value instanceof URL ? value.pathname : String(value);

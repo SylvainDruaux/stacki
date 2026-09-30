@@ -104,22 +104,31 @@ not the platform:** as for `@astrojs/compiler`. **Cost:** native binary; tests o
 **Does:** type declarations for Node and React. **Why not the platform:** neither ships its own
 types. **Cost:** none at runtime.
 
-### `@typescript-eslint/eslint-plugin`, `@typescript-eslint/parser`
+### `@typescript-eslint/eslint-plugin`, `@typescript-eslint/parser`, `@typescript-eslint/utils`
 
 **Does:** type-aware lint rules and the TypeScript parser for ESLint; `scripts/eslint-plugin/`
-builds on their AST types. **Why not the platform:** `tsc` has no policy rules (no-unsafe-*,
+builds on the AST and rule types from `utils` (type-only imports, same release line as the
+parser, so the node shapes the rules see are the ones they were written against). **Why not the platform:** `tsc` has no policy rules (no-unsafe-*,
 exhaustiveness). **Cost:** lint time; about 80 s for a full run.
+
+### `@typescript-eslint/rule-tester`
+
+**Does:** runs the local plugin's rule tests (`test/contracts/eslint-plugin.test.ts`) under
+`node:test`. **Why not the platform:** ESLint's own `RuleTester` is typed for ESLint's rule shape,
+not typescript-eslint's, so the tests would need type assertions (AGENTS.md non-negotiable 2).
+**Cost:** tests only; same release line as the parser.
 
 ### `@vitejs/plugin-react`
 
 **Does:** JSX transform and fast refresh for Vite. **Why not the platform:** browsers do not run
 JSX. **Cost:** build-time only.
 
-### `concurrently`, `cross-env`, `wait-on`
+### `concurrently`, `wait-on`
 
-**Does:** the `dev` script: runs Vite and Electron together, sets environment variables portably,
-and waits for the dev server port. **Why not the platform:** npm scripts have no cross-platform
-process orchestration. **Cost:** dev-only; candidates to replace with one TypeScript script.
+**Does:** the `dev` script: runs Vite and Electron together, and waits for the dev server port.
+**Why not the platform:** npm scripts have no cross-platform process orchestration. **Cost:**
+dev-only; candidates to fold into one TypeScript script, as the dev server URL already was
+(`scripts/dev-electron.ts`).
 
 ### `electron`
 
