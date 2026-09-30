@@ -42,7 +42,7 @@ export function PropertyDefault({ property, frontmatter, onChange }: DefaultProp
       ) : (
         <ExpressionBindingField
           value={property.defaultValue}
-          bindCtx={{ frontmatter }}
+          bindContext={{ frontmatter }}
           placeholder={'"Hello", 42, true, [], {…}'}
           onChange={(value) => {
             if (value.length <= PROPERTY_LIMITS.textCharsMax) {

@@ -28,22 +28,22 @@ const chipHtml = (path: string, full?: string) =>
     full && full !== path ? ` data-full="${esc(full)}"` : ''
   }>${esc(path)}</span>`;
 
-const partsToHtml = (parts: readonly Part[] | null | undefined): string => {
+const partsToHtml = (parts: readonly Part[] | undefined): string => {
   assert((parts?.length ?? 0) <= LIMITS.treeNodesMax, 'BindInput: part limit exceeded');
   // The path the chip before this one stood for, so a `.field` tail can be
   // read as the whole thing it names.
-  let last: string | null = null;
+  let last: string | undefined;
   let afterQuestion = false;
   return (parts || [])
-    .map((p) => {
-      if (p.expr === undefined) {
-        afterQuestion = last !== null && p.text === '?';
-        return esc(p.text);
+    .map((part) => {
+      if (part.expr === undefined) {
+        afterQuestion = last !== undefined && part.text === '?';
+        return esc(part.text);
       }
-      const full = afterQuestion && p.expr.startsWith('.') ? last + p.expr : p.expr;
+      const full = afterQuestion && part.expr.startsWith('.') ? last + part.expr : part.expr;
       last = full;
       afterQuestion = false;
-      return chipHtml(p.expr, full);
+      return chipHtml(part.expr, full);
     })
     .join('');
 };
@@ -72,11 +72,11 @@ function readParts(host: HTMLElement): Part[] {
 
 export interface BindInputHandle {
   readonly insert: (path: string) => void;
-  readonly replace: (chip: Element | null, path: string) => void;
+  readonly replace: (chip: Element | undefined, path: string) => void;
   readonly focus: () => void;
 }
 interface BindInputProps {
-  readonly parts?: readonly Part[] | null;
+  readonly parts?: readonly Part[] | undefined;
   readonly placeholder?: string;
   readonly onChange?: (parts: Part[]) => void;
   readonly onChipClick?: (chip: Element) => void;
@@ -101,40 +101,42 @@ const BindInput = forwardRef<BindInputHandle, BindInputProps>(function BindInput
       onKeyUp={saveRange}
       onMouseUp={saveRange}
       onFocus={onFocus}
-      onBlur={(e) => {
+      onBlur={(event) => {
         saveRange();
-        onBlur?.(e);
+        onBlur?.(event);
       }}
-      onKeyDown={(e) => {
+      onKeyDown={(event) => {
         // One line: Enter commits rather than splitting the value in two.
-        if (e.key === 'Enter') {
-          e.preventDefault();
+        if (event.key === 'Enter') {
+          event.preventDefault();
           hostRef.current?.blur();
           return;
         }
         // Backspace against a chip takes that chip, and only that chip.
-        if (deleteChipAtCaret(hostRef.current, e)) {
-          e.preventDefault();
+        if (deleteChipAtCaret(hostRef.current ?? undefined, event)) {
+          event.preventDefault();
           emit();
         }
       }}
       // Plain text only — a paste from a page would otherwise bring its markup
       // (and its own chips' styling) into a prop value.
-      onPaste={(e) => {
-        e.preventDefault();
-        const text = e.clipboardData.getData('text/plain').replace(/\s*\n\s*/g, ' ');
+      onPaste={(event) => {
+        event.preventDefault();
+        const text = event.clipboardData.getData('text/plain').replace(/\s*\n\s*/g, ' ');
         document.execCommand('insertText', false, text);
       }}
-      onMouseDown={(e) => {
-        const ElementType = e.currentTarget.ownerDocument.defaultView?.Element;
+      onMouseDown={(event) => {
+        const ElementType = event.currentTarget.ownerDocument.defaultView?.Element;
         const chip =
-          ElementType && e.target instanceof ElementType ? e.target.closest('.expr-chip') : null;
+          ElementType && event.target instanceof ElementType
+            ? event.target.closest('.expr-chip')
+            : undefined;
         if (!chip) {
           return;
         }
         // The caret must not land inside a chip: it is one thing, and half of
         // a path is not a value.
-        e.preventDefault();
+        event.preventDefault();
         onChipClick?.(chip);
       }}
     />
@@ -148,7 +150,7 @@ function useBindInput({ parts, onChange }: BindInputProps) {
   const lastHtmlRef = useRef('');
   // Where the caret was when focus left — the picker's search box takes it, so
   // inserting has to put the chip back where the caret actually was.
-  const rangeRef = useRef<Range | null>(null);
+  const rangeRef = useRef<Range | undefined>(undefined);
 
   const emit = () => {
     const host = hostRef.current;
@@ -161,13 +163,13 @@ function useBindInput({ parts, onChange }: BindInputProps) {
 
   const saveRange = () => {
     const host = hostRef.current;
-    const sel = window.getSelection();
-    if (!host || !sel?.rangeCount) {
+    const selection = window.getSelection();
+    if (!host || !selection?.rangeCount) {
       return;
     }
-    const r = sel.getRangeAt(0);
-    if (host.contains(r.commonAncestorContainer)) {
-      rangeRef.current = r.cloneRange();
+    const range = selection.getRangeAt(0);
+    if (host.contains(range.commonAncestorContainer)) {
+      rangeRef.current = range.cloneRange();
     }
   };
 
@@ -212,7 +214,7 @@ function bindHandle(state: BindState): BindInputHandle {
         return;
       }
       host.focus();
-      const sel = window.getSelection();
+      const selection = window.getSelection();
       const saved = rangeRef.current;
       const range = document.createRange();
       if (saved && host.contains(saved.commonAncestorContainer)) {
@@ -222,11 +224,11 @@ function bindHandle(state: BindState): BindInputHandle {
         range.selectNodeContents(host);
         range.collapse(false);
       }
-      if (!sel) {
+      if (!selection) {
         return;
       }
-      sel.removeAllRanges();
-      sel.addRange(range);
+      selection.removeAllRanges();
+      selection.addRange(range);
       document.execCommand('insertHTML', false, chipHtml(path));
       saveRange();
       emit();
@@ -240,40 +242,40 @@ function bindHandle(state: BindState): BindInputHandle {
   };
 }
 
-function bindReplace(chip: Element | null, path: string, emit: () => void): void {
-  if (!chip) {
+function bindReplace(chipElement: Element | undefined, path: string, emit: () => void): void {
+  if (!chipElement) {
     return;
   }
-  const full = chip.getAttribute('data-full');
+  const full = chipElement.getAttribute('data-full');
   if (full) {
     // A chip reached through a `?` writes only its tail. Repointing it
     // somewhere under the same value keeps the chain — the `?` is how the
     // author chose to reach it and isn't ours to remove.
-    const base = full.slice(0, full.length - (chip.getAttribute('data-expr') || '').length);
+    const base = full.slice(0, full.length - (chipElement.getAttribute('data-expr') || '').length);
     if (path.startsWith(`${base}.`)) {
       const tail = path.slice(base.length);
-      chip.setAttribute('data-expr', tail);
-      chip.setAttribute('data-full', path);
-      chip.textContent = tail;
+      chipElement.setAttribute('data-expr', tail);
+      chipElement.setAttribute('data-full', path);
+      chipElement.textContent = tail;
       emit();
       return;
     }
     // Somewhere else entirely: the chain it was reached through goes with
     // it, or the field would read `featured?other.thing`.
-    const punct = chip.previousSibling;
-    const baseChip = punct?.previousSibling;
+    const punct = chipElement.previousSibling;
+    const baseChip = punct?.previousSibling ?? undefined;
     if (punct?.nodeType === 3 && (punct.nodeValue || '').trim() === '?' && isChip(baseChip)) {
       punct.remove();
       baseChip.remove();
     }
   }
-  chip.removeAttribute('data-full');
-  chip.setAttribute('data-expr', path);
-  chip.textContent = path;
+  chipElement.removeAttribute('data-full');
+  chipElement.setAttribute('data-expr', path);
+  chipElement.textContent = path;
   emit();
 }
 
-function isChip(node: Node | null | undefined): node is Element {
+function isChip(node: Node | undefined): node is Element {
   const ElementType = node?.ownerDocument?.defaultView?.Element;
   return !!ElementType && node instanceof ElementType && node.classList.contains('expr-chip');
 }

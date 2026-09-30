@@ -40,17 +40,17 @@ interface TreeBuilder<T extends BrowserFile> {
 export function fuzzyScore(query: string, path: string): number {
   assert(query.length <= FILE_LIMITS.pathCharsMax, 'FileBrowser: query limit exceeded');
   assert(path.length <= FILE_LIMITS.pathCharsMax, 'FileBrowser: path limit exceeded');
-  const q = query.toLowerCase();
-  const p = path.toLowerCase();
-  if (!q) {
+  const queryLower = query.toLowerCase();
+  const pathLower = path.toLowerCase();
+  if (!queryLower) {
     return 0;
   }
   let qi = 0;
   let score = 0;
   let streak = 0;
   let firstHit = -1;
-  for (let i = 0; i < p.length && qi < q.length; i++) {
-    if (p[i] !== q[qi]) {
+  for (let i = 0; i < pathLower.length && qi < queryLower.length; i++) {
+    if (pathLower[i] !== queryLower[qi]) {
       streak = 0;
       continue;
     }
@@ -63,16 +63,16 @@ export function fuzzyScore(query: string, path: string): number {
     score += 1 + streak;
     // A match right after a separator is the start of a name, which is nearly
     // always what was meant.
-    if (i === 0 || '/-_.'.includes(p.charAt(i - 1))) {
+    if (i === 0 || '/-_.'.includes(pathLower.charAt(i - 1))) {
       score += 4;
     }
     qi++;
   }
-  if (qi < q.length) {
+  if (qi < queryLower.length) {
     return -1;
   } // not all of the query is in there
   // Shorter paths, and matches nearer the front, first.
-  return score - firstHit * 0.05 - p.length * 0.02;
+  return score - firstHit * 0.05 - pathLower.length * 0.02;
 }
 
 /** The best matches for a query, most likely first. */
@@ -84,11 +84,11 @@ export function search<T extends BrowserFile>(files: readonly T[], query: string
     return [];
   }
   return files
-    .map((f) => ({ file: f, score: fuzzyScore(query.trim(), f.path) }))
-    .filter((r) => r.score >= 0)
-    .sort((a, b) => b.score - a.score)
+    .map((file) => ({ file: file, score: fuzzyScore(query.trim(), file.path) }))
+    .filter((scored) => scored.score >= 0)
+    .sort((left, right) => right.score - left.score)
     .slice(0, limit)
-    .map((r) => r.file);
+    .map((scored) => scored.file);
 }
 
 // --- The tree ---------------------------------------------------------------
@@ -166,7 +166,7 @@ export default function FileBrowser<T extends BrowserFile>(props: FileBrowserPro
           ref={inputRef}
           value={query}
           placeholder="Search files…"
-          onChange={(e) => setQuery(e.target.value)}
+          onChange={(event) => setQuery(event.target.value)}
           onKeyDown={onKeyDown}
         />
         {query && (
@@ -182,8 +182,8 @@ export default function FileBrowser<T extends BrowserFile>(props: FileBrowserPro
         {searching ? (
           <>
             {!matches.length && <div className="fb-empty">Nothing matches “{query}”.</div>}
-            {matches.map((f, i) => (
-              <FileRow state={state} key={f.path} file={f} depth={0} index={i} />
+            {matches.map((file, i) => (
+              <FileRow state={state} key={file.path} file={file} depth={0} index={i} />
             ))}
           </>
         ) : (
@@ -196,7 +196,7 @@ export default function FileBrowser<T extends BrowserFile>(props: FileBrowserPro
           <button
             className="ghost"
             onClick={() =>
-              onSelect?.(selected?.length === files.length ? [] : files.map((f) => f.path))
+              onSelect?.(selected?.length === files.length ? [] : files.map((file) => file.path))
             }
           >
             {selected?.length === files.length ? 'Clear all' : 'Select all'}
@@ -235,7 +235,7 @@ function useFileBrowser<T extends BrowserFile>({
 
   useEffect(() => setActive(0), [query]);
 
-  const isOn = (p: string) => !!selected?.includes(p);
+  const isOn = (path: string) => !!selected?.includes(path);
   const toggle = (paths: readonly string[], options: { readonly remove: boolean }): void => {
     if (onSelect) {
       onSelect(fileBrowserSelection(selected ?? [], paths, options));
@@ -244,26 +244,26 @@ function useFileBrowser<T extends BrowserFile>({
 
   // Typing is the fastest way in, so the field takes the arrow keys and Enter
   // without anyone having to leave it.
-  const onKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+  const onKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
     if (!searching || !matches.length) {
       return;
     }
-    if (e.key === 'ArrowDown') {
-      e.preventDefault();
-      setActive((n) => Math.min(n + 1, matches.length - 1));
-    } else if (e.key === 'ArrowUp') {
-      e.preventDefault();
-      setActive((n) => Math.max(n - 1, 0));
-    } else if (e.key === 'Enter') {
-      e.preventDefault();
-      const f = matches[active];
-      if (!f) {
+    if (event.key === 'ArrowDown') {
+      event.preventDefault();
+      setActive((current) => Math.min(current + 1, matches.length - 1));
+    } else if (event.key === 'ArrowUp') {
+      event.preventDefault();
+      setActive((current) => Math.max(current - 1, 0));
+    } else if (event.key === 'Enter') {
+      event.preventDefault();
+      const file = matches[active];
+      if (!file) {
         return;
       }
       if (selectable) {
-        toggle([f.path], { remove: isOn(f.path) });
+        toggle([file.path], { remove: isOn(file.path) });
       } else {
-        onOpen?.(f);
+        onOpen?.(file);
       }
     }
   };
@@ -315,14 +315,14 @@ function FileRow<T extends BrowserFile>({
           type="checkbox"
           checked={isOn(file.path)}
           onChange={() => toggle([file.path], { remove: isOn(file.path) })}
-          onClick={(e) => e.stopPropagation()}
+          onClick={(event) => event.stopPropagation()}
         />
       )}
       <span className="fb-name">{file.name || file.path.split('/').pop()}</span>
       {/* Where it is, but only while searching — in the tree the indentation
           already says it, and repeating it would be noise on every row. */}
       {searching && <span className="fb-dir">{file.path.split('/').slice(0, -1).join('/')}</span>}
-      <FileStatus status={file.status ?? null} />
+      <FileStatus status={file.status ?? undefined} />
     </div>
   );
 }
@@ -360,14 +360,14 @@ function FileFolder<T extends BrowserFile>({
               }
             }}
             onChange={() => toggle(paths, { remove: allOn })}
-            onClick={(e) => e.stopPropagation()}
+            onClick={(event) => event.stopPropagation()}
           />
         )}
         <button
           className="fb-folder-head"
           onClick={() =>
-            setClosed((c) => {
-              const next = new Set(c);
+            setClosed((previous) => {
+              const next = new Set(previous);
               if (next.has(key)) {
                 next.delete(key);
               } else {
@@ -416,8 +416,8 @@ function FileNode<T extends BrowserFile>({
           depth={depth}
         />
       ))}
-      {node.files.map((f) => (
-        <FileRow state={state} key={f.path} file={f} depth={depth} index={-1} />
+      {node.files.map((file) => (
+        <FileRow state={state} key={file.path} file={file} depth={depth} index={-1} />
       ))}
     </>
   );

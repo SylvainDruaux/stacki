@@ -27,10 +27,10 @@ export interface OpenFile {
   readonly path: string;
   readonly name: string;
   readonly route?: string;
-  readonly focusPath?: string | null;
+  readonly focusPath?: string | undefined;
   readonly focusOcc?: number;
   readonly focusWhole?: boolean;
-  readonly hostKey?: string | null;
+  readonly hostKey?: string | undefined;
 }
 
 export interface OpenRoute {
@@ -72,8 +72,8 @@ export interface RawPageState extends PageStateBase {
 export type EditorPageState = EditablePageState | RawPageState;
 
 export interface PageStateSnapshot {
-  readonly currentPage: CurrentPage | null;
-  readonly pageState: EditorPageState | null;
+  readonly currentPage: CurrentPage | undefined;
+  readonly pageState: EditorPageState | undefined;
 }
 
 export interface UndoCommand {
@@ -81,7 +81,7 @@ export interface UndoCommand {
   readonly undo: () => unknown | Promise<unknown>;
   redo: () => unknown | Promise<unknown>;
   label?: string;
-  readonly coalesceKey?: string | null;
+  readonly coalesceKey?: string | undefined;
 }
 
 /** An undo step of the open page: its writes' inverses, which Undo submits
@@ -98,7 +98,7 @@ export interface AppHistory {
   past: HistoryEntry[];
   future: HistoryEntry[];
   lastPush: number;
-  lastKey: string | null;
+  lastKey: string | undefined;
 }
 
 export type ToastKind = 'info' | 'success' | 'error';
@@ -117,7 +117,7 @@ export type LeftTab =
   | 'variables'
   | 'code'
   | 'history'
-  | null;
+  | undefined;
 export type RightTab = 'style' | 'settings';
 export type DevStatus = 'off' | 'starting' | 'on';
 export type TrailingSlash = 'always' | 'never' | 'ignore';
@@ -144,7 +144,7 @@ export interface PreviewCommitInfo {
 }
 
 export type DynamicEntry = IpcResults['page:dynamicPaths']['entries'][number];
-export type CollectionSample = Data | null;
+export type CollectionSample = Data;
 export type CollectionSamples = Readonly<Record<string, CollectionSample>>;
 export type ItemIndexes = Readonly<Record<string, number>>;
 export type GitInfo = IpcResults['git:info'];
@@ -165,13 +165,13 @@ export interface NodeClipboard {
   readonly vars: readonly string[];
   readonly frontmatter: string;
   readonly imports: readonly { readonly name: string; readonly path: string }[];
-  readonly pagePath: string | null;
+  readonly pagePath: string | undefined;
 }
 
 export function findEditorNodeById(
-  nodes: readonly EditorNode[] | null | undefined,
+  nodes: readonly EditorNode[] | undefined,
   id: string,
-): EditorNode | null {
+): EditorNode | undefined {
   const pending = [...(nodes ?? [])];
   let visited = 0;
   while (pending.length > 0) {
@@ -187,17 +187,17 @@ export function findEditorNodeById(
     if (node.id === id) {
       return node;
     }
-    if ('children' in node && Array.isArray(node.children)) {
+    if ('children' in node && node.children !== undefined) {
       pending.unshift(...node.children);
     }
   }
-  return null;
+  return undefined;
 }
 
 export function findEditorParentList(
   model: EditorModel,
   id: string,
-): { readonly list: readonly EditorNode[]; readonly index: number } | null {
+): { readonly list: readonly EditorNode[]; readonly index: number } | undefined {
   const pending: (readonly EditorNode[])[] = [model.nodes];
   let visited = 0;
   while (pending.length > 0) {
@@ -220,7 +220,7 @@ export function findEditorParentList(
       }
     }
   }
-  return null;
+  return undefined;
 }
 
 /** A page as a read or a reply left it: clean, and its own origin. */
@@ -244,7 +244,7 @@ export function toEditorPageState(
  * from the view, which also holds newer gestures' nodes. Unchanged when
  * either side is not editable. */
 export function carriedParse<Parsed extends ParsePageResult & { readonly source: string }>(
-  local: EditorPageState | null,
+  local: EditorPageState | undefined,
   parsed: Parsed & { readonly checksum?: Digest },
 ): Parsed {
   if (!isEditableState(local) || !parsed.editable) {
@@ -258,10 +258,10 @@ export function carriedParse<Parsed extends ParsePageResult & { readonly source:
   return { ...parsed, model };
 }
 
-export function isOpenFile(page: CurrentPage | null): page is OpenFile {
+export function isOpenFile(page: CurrentPage | undefined): page is OpenFile {
   return page?.kind === 'page' || page?.kind === 'component';
 }
 
-export function isEditableState(state: EditorPageState | null): state is EditablePageState {
+export function isEditableState(state: EditorPageState | undefined): state is EditablePageState {
   return state?.editable === true;
 }

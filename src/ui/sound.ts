@@ -53,16 +53,16 @@ const BITE_LEVELS = 5;
 // one over a fast attack is the same note struck.
 const MUTED = { cutoff: 420, gain: 0.55, attack: 0.014, decay: 0.2 };
 const SHARP = { cutoff: 2200, gain: 1, attack: 0.002, decay: 0.09 };
-const mix = (a: number, b: number, t: number): number => a + (b - a) * t;
+const mix = (from: number, to: number, fraction: number): number => from + (to - from) * fraction;
 
 // Bound overlapping envelopes even if callers fire click events in a burst.
 const VOICES_MAX = 32;
 let activeVoices = 0;
 let enabled = false;
-let ctx: AudioContext | null = null;
+let context: AudioContext | undefined;
 // Where a note is played into: the master gain. Each note brings its own
 // filter, since the filter is what the vertical axis moves.
-let input: GainNode | null = null;
+let input: GainNode | undefined;
 // Both axes: moving up and down without moving across is still a change worth
 // hearing, so the note that was last played is remembered as the pair.
 let lastKey = '';
@@ -86,20 +86,20 @@ export function setSoundEnabled(on: unknown): void {
 
 // Built on the first note, which is inside a pointer event — the gesture a
 // browser requires before it will let anything make sound.
-function bench(): AudioContext | null {
-  if (ctx) {
-    return ctx;
+function bench(): AudioContext | undefined {
+  if (context) {
+    return context;
   }
   const Ctor = typeof window !== 'undefined' && (window.AudioContext || window.webkitAudioContext);
   if (!Ctor) {
-    return null;
+    return undefined;
   }
-  ctx = new Ctor();
-  const master = ctx.createGain();
+  context = new Ctor();
+  const master = context.createGain();
   master.gain.value = 0.06; // quiet enough to sit under a conversation
-  master.connect(ctx.destination);
+  master.connect(context.destination);
   input = master;
-  return ctx;
+  return context;
 }
 
 function note(hz: number, tone: Tone): void {
@@ -134,7 +134,7 @@ function note(hz: number, tone: Tone): void {
   env.gain.exponentialRampToValueAtTime(0.0001, at + tone.attack + tone.decay);
   osc.connect(mute);
   mute.connect(env);
-  assert(input !== null, 'Audio context must have a master gain');
+  assert(input !== undefined, 'Audio context must have a master gain');
   env.connect(input);
   osc.start(at);
   osc.stop(at + tone.attack + tone.decay + 0.02);
@@ -164,11 +164,11 @@ export function dragNote(fraction: unknown, verticalFraction?: unknown): void {
   if (!enabled) {
     return;
   }
-  const f = Number(fraction);
-  if (!Number.isFinite(f)) {
+  const position = Number(fraction);
+  if (!Number.isFinite(position)) {
     return;
   }
-  const step = Math.max(0, Math.min(LAST, Math.round(f * LAST)));
+  const step = Math.max(0, Math.min(LAST, Math.round(position * LAST)));
   const level = biteLevel(verticalFraction);
   const key = `${step}:${level}`;
   const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
@@ -182,8 +182,8 @@ export function dragNote(fraction: unknown, verticalFraction?: unknown): void {
 
 /** The pitch a fraction sounds at — exported for the tests, and for tuning. */
 export function noteHzFor(fraction: unknown): number {
-  const f = Math.max(0, Math.min(1, Number(fraction) || 0));
-  return ROOT_HZ * Math.pow(2, (SEMITONES[Math.round(f * LAST)] ?? NaN) / 12);
+  const position = Math.max(0, Math.min(1, Number(fraction) || 0));
+  return ROOT_HZ * Math.pow(2, (SEMITONES[Math.round(position * LAST)] ?? NaN) / 12);
 }
 
 // Which of the levels a vertical fraction falls in. Nothing given — a control
@@ -199,12 +199,12 @@ function biteLevel(verticalFraction: unknown): number {
 }
 
 function toneFor(level: number): Tone {
-  const t = level / (BITE_LEVELS - 1);
+  const sharpness = level / (BITE_LEVELS - 1);
   return {
-    cutoff: mix(MUTED.cutoff, SHARP.cutoff, t),
-    gain: mix(MUTED.gain, SHARP.gain, t),
-    attack: mix(MUTED.attack, SHARP.attack, t),
-    decay: mix(MUTED.decay, SHARP.decay, t),
+    cutoff: mix(MUTED.cutoff, SHARP.cutoff, sharpness),
+    gain: mix(MUTED.gain, SHARP.gain, sharpness),
+    attack: mix(MUTED.attack, SHARP.attack, sharpness),
+    decay: mix(MUTED.decay, SHARP.decay, sharpness),
   };
 }
 

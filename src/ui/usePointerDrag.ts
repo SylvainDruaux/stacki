@@ -12,12 +12,12 @@ interface DragStart {
 // One session owns the listeners and one animation frame. Starting another drag
 // releases the previous one before applying its cursor or scheduling more work.
 export function usePointerDrag() {
-  const stopRef = useRef<(() => void) | null>(null);
+  const stopRef = useRef<(() => void) | undefined>(undefined);
   useEffect(() => () => stopRef.current?.(), []);
   return useCallback((event: DragStart, options: DragOptions): void => {
     stopRef.current?.();
     stopRef.current = startPointerDrag(event, options, () => {
-      stopRef.current = null;
+      stopRef.current = undefined;
     });
   }, []);
 }
@@ -27,20 +27,22 @@ function startPointerDrag(event: DragStart, options: DragOptions, release: () =>
   if (options.cursor) {
     document.body.style.cursor = options.cursor;
   }
-  let frame: number | null = null;
-  let latest: PointerEvent | null = null;
+  let frame: number | undefined;
+  let latest: PointerEvent | undefined;
+  // A platform event may carry a null pointerId; either side missing one matches anything.
   const matches = (next: Event): boolean =>
     !('pointerId' in next) ||
-    next.pointerId == null ||
-    event.pointerId == null ||
+    next.pointerId === undefined ||
+    next.pointerId === null ||
+    event.pointerId === undefined ||
     next.pointerId === event.pointerId;
   const apply = (): void => {
-    frame = null;
+    frame = undefined;
     if (!latest) {
       return;
     }
     const next = latest;
-    latest = null;
+    latest = undefined;
     options.onMove(next);
   };
   const move = (next: PointerEvent): void => {
@@ -48,7 +50,7 @@ function startPointerDrag(event: DragStart, options: DragOptions, release: () =>
       return;
     }
     latest = next;
-    if (frame === null) {
+    if (frame === undefined) {
       frame = requestAnimationFrame(apply);
     }
   };
@@ -56,7 +58,7 @@ function startPointerDrag(event: DragStart, options: DragOptions, release: () =>
     if (next && !matches(next)) {
       return;
     }
-    if (frame !== null) {
+    if (frame !== undefined) {
       cancelAnimationFrame(frame);
     }
     apply();

@@ -22,65 +22,27 @@ import { appTheme, appHighlight } from './CodeEditor.jsx';
 // nodes. So this is a small mode for declarations only. Token names map
 // through tokenTable to the same tags the app's highlight style already
 // colors, so it looks like the rest of the editors.
-const styleMode = StreamLanguage.define({
+interface StyleState {
+  readonly inValue: boolean;
+  readonly depth: number;
+}
+interface StyleStep extends StyleState {
+  readonly style: string | undefined;
+}
+
+const styleMode = StreamLanguage.define<{ inValue: boolean; depth: number }>({
   name: 'css-declarations',
   startState: () => ({ inValue: false, depth: 0 }),
+  // CodeMirror's stream parser advances the state object it hands in, and reads
+  // "no style" as null; the step itself is computed without touching either.
   token(stream, state) {
-    // One declaration per line, so a new line starts a new property — even
-    // when the previous one was left without its semicolon. Values that wrap
-    // inside parens (a long gradient) are the exception, hence the depth.
-    if (stream.sol() && state.depth === 0) {
-      state.inValue = false;
-    }
-    if (stream.eatSpace()) {
-      return null;
-    }
-
-    const literal = styleLiteral(stream);
-    if (literal !== undefined) {
-      return literal;
-    }
-    const ch = stream.peek();
-    if (ch === ':') {
-      stream.next();
-      state.inValue = true;
-      return 'punct';
-    }
-    if (ch === ';') {
-      stream.next();
-      state.inValue = false;
-      return 'punct';
-    }
-    if (/[(),/]/.test(ch ?? '')) {
-      stream.next();
-      if (ch === '(') {
-        state.depth++;
-      } else if (ch === ')') {
-        state.depth = Math.max(0, state.depth - 1);
-      }
-      return 'punct';
-    }
-    if (ch === '#') {
-      stream.next();
-      stream.eatWhile(/[\da-fA-F]/);
-      return 'num'; // hex color
-    }
-    // Number with an optional unit (12px, 1.5rem, 50%, -.3em)
-    if (
-      stream.match(/^[-+]?(\d*\.\d+|\d+)(px|r?em|%|vh|vw|vmin|vmax|s|ms|deg|fr|ch|ex|pt|cm|mm|in)?/)
-    ) {
-      return 'num';
-    }
-    // Bare word: a property before the colon, a function if a ( follows,
-    // otherwise a keyword value (auto, none, …) or a var()/custom property.
-    if (stream.match(/^[-\w\\]+/)) {
-      if (stream.peek() === '(') {
-        return 'fn';
-      }
-      return state.inValue ? 'val' : 'prop';
-    }
-    stream.next();
-    return null;
+    const step = styleStep(stream, state);
+    // eslint-disable-next-line no-param-reassign -- StreamParser advances its state in place.
+    state.inValue = step.inValue;
+    // eslint-disable-next-line no-param-reassign -- StreamParser advances its state in place.
+    state.depth = step.depth;
+    // eslint-disable-next-line stacki/no-null -- StreamParser spells "no style" as null.
+    return step.style ?? null;
   },
   tokenTable: {
     prop: t.propertyName,
@@ -94,6 +56,63 @@ const styleMode = StreamLanguage.define({
   },
 });
 
+// One token of a declaration list, and the state after it.
+function styleStep(stream: StringStream, state: StyleState): StyleStep {
+  // One declaration per line, so a new line starts a new property — even
+  // when the previous one was left without its semicolon. Values that wrap
+  // inside parens (a long gradient) are the exception, hence the depth.
+  const inValue = stream.sol() && state.depth === 0 ? false : state.inValue;
+  const depth = state.depth;
+  if (stream.eatSpace()) {
+    return { style: undefined, inValue, depth };
+  }
+
+  const literal = styleLiteral(stream);
+  if (literal !== undefined) {
+    return { style: literal, inValue, depth };
+  }
+  const ch = stream.peek();
+  if (ch === ':') {
+    stream.next();
+    return { style: 'punct', inValue: true, depth };
+  }
+  if (ch === ';') {
+    stream.next();
+    return { style: 'punct', inValue: false, depth };
+  }
+  if (/[(),/]/.test(ch ?? '')) {
+    stream.next();
+    if (ch === '(') {
+      return { style: 'punct', inValue, depth: depth + 1 };
+    }
+    if (ch === ')') {
+      return { style: 'punct', inValue, depth: Math.max(0, depth - 1) };
+    }
+    return { style: 'punct', inValue, depth };
+  }
+  if (ch === '#') {
+    stream.next();
+    stream.eatWhile(/[\da-fA-F]/);
+    return { style: 'num', inValue, depth }; // hex color
+  }
+  // Number with an optional unit (12px, 1.5rem, 50%, -.3em)
+  if (
+    stream.match(/^[-+]?(\d*\.\d+|\d+)(px|r?em|%|vh|vw|vmin|vmax|s|ms|deg|fr|ch|ex|pt|cm|mm|in)?/)
+  ) {
+    return { style: 'num', inValue, depth };
+  }
+  // Bare word: a property before the colon, a function if a ( follows,
+  // otherwise a keyword value (auto, none, …) or a var()/custom property.
+  if (stream.match(/^[-\w\\]+/)) {
+    if (stream.peek() === '(') {
+      return { style: 'fn', inValue, depth };
+    }
+    return { style: inValue ? 'val' : 'prop', inValue, depth };
+  }
+  stream.next();
+  return { style: undefined, inValue, depth };
+}
+
 // Splitting on ";" has to skip the ones inside strings and parens — a
 // `background: url("a;b.png")` or a data: URI would otherwise be cut in half.
 export function splitDeclarations(text: string): string[] {
@@ -101,40 +120,40 @@ export function splitDeclarations(text: string): string[] {
   const out: string[] = [];
   let buf = '';
   let depth = 0;
-  let quote: string | null = null;
+  let quote: string | undefined;
   for (let i = 0; i < text.length; i++) {
-    const c = text.charAt(i);
+    const character = text.charAt(i);
     if (quote) {
-      buf += c;
-      if (c === quote && text[i - 1] !== '\\') {
-        quote = null;
+      buf += character;
+      if (character === quote && text[i - 1] !== '\\') {
+        quote = undefined;
       }
       continue;
     }
-    if (c === '"' || c === "'") {
-      quote = c;
-      buf += c;
-    } else if (c === '(') {
+    if (character === '"' || character === "'") {
+      quote = character;
+      buf += character;
+    } else if (character === '(') {
       depth++;
-      buf += c;
-    } else if (c === ')') {
+      buf += character;
+    } else if (character === ')') {
       depth = Math.max(0, depth - 1);
-      buf += c;
-    } else if (c === ';' && depth === 0) {
+      buf += character;
+    } else if (character === ';' && depth === 0) {
       out.push(buf);
       buf = '';
     } else {
-      buf += c;
+      buf += character;
     }
   }
   out.push(buf);
-  return out.map((d) => d.trim()).filter(Boolean);
+  return out.map((declaration) => declaration.trim()).filter(Boolean);
 }
 
-// One declaration per line for editing…
-export const expandDeclarations = (value: string | null | undefined) =>
+// One declaration per line for editing.
+export const expandDeclarations = (value: string | undefined) =>
   splitDeclarations(value || '')
-    .map((d) => d + ';')
+    .map((declaration) => declaration + ';')
     .join('\n');
 
 // …and back onto one line for the attribute itself. Newlines are legal in an
@@ -146,7 +165,7 @@ export const collapseDeclarations = (text: string): string => {
 };
 
 interface StyleEditorProps {
-  readonly value?: string | null;
+  readonly value?: string | undefined;
   readonly onChange?: (value: string) => void;
   readonly autoFocus?: boolean;
   readonly placeholder?: string;
@@ -161,7 +180,7 @@ export default function StyleEditor({
   placeholder = '',
 }: StyleEditorProps) {
   const hostRef = useRef<HTMLDivElement>(null);
-  const viewRef = useRef<EditorView | null>(null);
+  const viewRef = useRef<EditorView | undefined>(undefined);
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
   // Mounted once with the expanded text; from then on the effect below decides
@@ -171,7 +190,7 @@ export default function StyleEditor({
   useEffect(() => {
     const parent = hostRef.current;
     assert(parent !== null, 'StyleEditor: mounted host exists');
-    assert(viewRef.current === null, 'StyleEditor: only one editor owns the host');
+    assert(viewRef.current === undefined, 'StyleEditor: only one editor owns the host');
     const view = new EditorView({
       parent,
       state: EditorState.create({
@@ -186,9 +205,9 @@ export default function StyleEditor({
           appTheme,
           appHighlight,
           EditorView.lineWrapping,
-          EditorView.updateListener.of((u) => {
-            if (u.docChanged) {
-              onChangeRef.current?.(u.state.doc.toString());
+          EditorView.updateListener.of((update) => {
+            if (update.docChanged) {
+              onChangeRef.current?.(update.state.doc.toString());
             }
           }),
         ],
@@ -199,7 +218,7 @@ export default function StyleEditor({
       view.focus();
     }
     return () => {
-      viewRef.current = null;
+      viewRef.current = undefined;
       view.destroy();
     };
   }, [initial]);
@@ -246,11 +265,11 @@ function styleLiteral(stream: StringStream): string | undefined {
     stream.next();
     let escaped = false;
     while (!stream.eol()) {
-      const c = stream.next();
-      if (!escaped && c === ch) {
+      const character = stream.next();
+      if (!escaped && character === ch) {
         break;
       }
-      escaped = !escaped && c === '\\';
+      escaped = !escaped && character === '\\';
     }
     return 'str';
   }

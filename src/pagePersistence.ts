@@ -102,7 +102,7 @@ export function createPageSaver(deps: PageSaverDeps): PageSaver {
   };
 }
 
-export function scanContainsFile(scan: ScanResult | null | undefined, path: string): boolean {
+export function scanContainsFile(scan: ScanResult | undefined, path: string): boolean {
   return (['pages', 'components', 'layouts'] as const).some((kind) =>
     scan?.[kind]?.some((entry) => entry.path === path),
   );
@@ -111,11 +111,11 @@ export function scanContainsFile(scan: ScanResult | null | undefined, path: stri
 // Each code window destination owns its debounce. Typing in a second file must
 // never cancel the first file's pending write. Writes to one file stay ordered.
 
-type WriteFn = () => unknown;
+type FileWrite = () => unknown;
 
 interface WaitingEntry {
-  readonly write: WriteFn;
-  readonly timer: ReturnType<typeof setTimeout> | null;
+  readonly write: FileWrite;
+  readonly timer: ReturnType<typeof setTimeout> | undefined;
 }
 
 interface FileSaverDeps {
@@ -124,7 +124,7 @@ interface FileSaverDeps {
 }
 
 export function createFileSaver({ delay = 300, onError = () => {} }: FileSaverDeps = {}): {
-  schedule(key: string, write: WriteFn): void;
+  schedule(key: string, write: FileWrite): void;
   flush(): Promise<void>;
 } {
   const waiting = new Map<string, WaitingEntry>();
@@ -135,7 +135,7 @@ export function createFileSaver({ delay = 300, onError = () => {} }: FileSaverDe
       return running.get(key) || Promise.resolve();
     }
     waiting.delete(key);
-    if (entry.timer !== null) {
+    if (entry.timer !== undefined) {
       clearTimeout(entry.timer);
     }
     const result: Promise<unknown> = (running.get(key) || Promise.resolve())
@@ -152,7 +152,7 @@ export function createFileSaver({ delay = 300, onError = () => {} }: FileSaverDe
         if (running.get(key) === result) {
           running.delete(key);
           if (!waiting.has(key)) {
-            waiting.set(key, { write: entry.write, timer: null });
+            waiting.set(key, { write: entry.write, timer: undefined });
           }
         }
         onError(error);
@@ -161,9 +161,9 @@ export function createFileSaver({ delay = 300, onError = () => {} }: FileSaverDe
     return result;
   };
   return {
-    schedule(key: string, write: WriteFn): void {
+    schedule(key: string, write: FileWrite): void {
       const pending = waiting.get(key);
-      if (pending?.timer != null) {
+      if (pending?.timer !== undefined) {
         clearTimeout(pending.timer);
       }
       waiting.set(key, {

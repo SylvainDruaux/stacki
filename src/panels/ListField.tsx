@@ -4,6 +4,7 @@ import { assert } from '../../shared/assert';
 import { LIMITS } from '../../shared/limits';
 import { PlusIcon, CloseIcon } from '../ui/Icons.jsx';
 import ListFieldRow from '../ui/ListFieldRow';
+import { allowDragEffect } from '../dragState';
 import { arrayItems, arrayText, blankLike, itemLabel, moveItem } from '../arrayValue.js';
 
 // A prop that takes a list, edited as a list.
@@ -31,12 +32,12 @@ interface Position {
 }
 interface ItemEditorProps {
   readonly item: Item;
-  readonly pos: Position;
+  readonly position: Position;
   readonly trigger: HTMLElement;
   readonly onChange: (item: Item) => void;
   readonly onClose: () => void;
 }
-function ItemEditor({ item, pos, trigger, onChange, onClose }: ItemEditorProps) {
+function ItemEditor({ item, position, trigger, onChange, onClose }: ItemEditorProps) {
   const ref = useListEditorDismiss(trigger, onClose);
   const firstRef = useRef<HTMLInputElement>(null);
 
@@ -53,7 +54,7 @@ function ItemEditor({ item, pos, trigger, onChange, onClose }: ItemEditorProps) 
     if (item.fields) {
       onChange({
         ...item,
-        fields: item.fields.map((f, at) => (at === i ? { ...f, text } : f)),
+        fields: item.fields.map((field, at) => (at === i ? { ...field, text } : field)),
       });
       return;
     }
@@ -64,7 +65,7 @@ function ItemEditor({ item, pos, trigger, onChange, onClose }: ItemEditorProps) 
     <div
       ref={ref}
       className="attr-editor list-item-editor"
-      style={{ top: pos.top, left: pos.left, width: pos.width }}
+      style={{ top: position.top, left: position.left, width: position.width }}
     >
       <div className="var-src-head">
         <span className="var-src-name">{item.fields ? 'Item' : 'Value'}</span>
@@ -77,14 +78,14 @@ function ItemEditor({ item, pos, trigger, onChange, onClose }: ItemEditorProps) 
         <label className="list-item-field" key={field.key}>
           <span>{field.key}</span>
           <input
-            ref={i === 0 ? firstRef : null}
+            ref={i === 0 ? firstRef : undefined}
             value={field.text}
             spellCheck={false}
             maxLength={LIMITS.attrCharsMax}
-            onChange={(e) => set(i, e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                e.preventDefault();
+            onChange={(event) => set(i, event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') {
+                event.preventDefault();
                 onClose();
               }
             }}
@@ -98,19 +99,19 @@ function ItemEditor({ item, pos, trigger, onChange, onClose }: ItemEditorProps) 
 function useListEditorDismiss(trigger: HTMLElement, onClose: () => void) {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    const onDown = (e: PointerEvent) => {
+    const onDown = (event: PointerEvent) => {
       // The active row handles its own toggle; dismissing here would reopen it on click.
-      if (e.composedPath().includes(trigger)) {
+      if (event.composedPath().includes(trigger)) {
         return;
       }
       const NodeType = ref.current?.ownerDocument.defaultView?.Node;
-      if (NodeType && e.target instanceof NodeType && !ref.current?.contains(e.target)) {
+      if (NodeType && event.target instanceof NodeType && !ref.current?.contains(event.target)) {
         onClose();
       }
     };
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        e.stopPropagation();
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.stopPropagation();
         onClose();
       }
     };
@@ -141,8 +142,8 @@ export type ListFieldChange =
   | { readonly kind: 'move'; readonly index: number; readonly gap: number };
 
 interface ListFieldProps {
-  readonly value?: string | null;
-  readonly placeholder?: string | null;
+  readonly value?: string | undefined;
+  readonly placeholder?: string | undefined;
   readonly onChange: (value: string, immediate: boolean, change: ListFieldChange) => void;
   readonly disabled?: boolean;
   readonly itemsMin?: number;
@@ -154,13 +155,13 @@ type Editor =
   | {
       readonly kind: 'existing';
       readonly index: number;
-      readonly pos: Position;
+      readonly position: Position;
       readonly trigger: HTMLElement;
     }
   | {
       readonly kind: 'pending';
       readonly item: Item;
-      readonly pos: Position;
+      readonly position: Position;
       readonly trigger: HTMLElement;
     };
 type Drag =
@@ -168,7 +169,8 @@ type Drag =
   | {
       readonly kind: 'dragging';
       readonly index: number;
-      readonly gap: number | null;
+      /** The gap the row would land in; undefined until the pointer is over a row. */
+      readonly gap: number | undefined;
     };
 
 export default function ListField(props: ListFieldProps) {
@@ -176,7 +178,9 @@ export default function ListField(props: ListFieldProps) {
   const note = emptyNote(props.placeholder);
   return (
     <div className="list-field" onDragOver={(event) => event.preventDefault()} onDrop={state.drop}>
-      {state.items.length === 0 && note ? <div className="list-field-empty">{note}</div> : null}
+      {state.items.length === 0 && note ? (
+        <div className="list-field-empty">{note}</div>
+      ) : undefined}
       {state.items.length > 0 && (
         <div className="list-field-items" onScroll={() => closeListRowEditor(state)}>
           {state.items.map((item, index) => (
@@ -192,7 +196,7 @@ export default function ListField(props: ListFieldProps) {
           if (state.editor.kind === 'pending') {
             state.closePending();
           } else {
-            state.openAt(event, null, blankLike(state.items));
+            state.openAt(event, undefined, blankLike(state.items));
           }
         }}
       >
@@ -230,7 +234,12 @@ function useListField(props: ListFieldProps) {
     onChange(text, options.immediate, options.change);
   };
   const { drag, setDrag, drop } = useListDrag(items, write);
-  const openAt = (event: React.MouseEvent<HTMLElement>, index: number | null, item: Item): void => {
+  // No index opens a new item, not yet in the list.
+  const openAt = (
+    event: React.MouseEvent<HTMLElement>,
+    index: number | undefined,
+    item: Item,
+  ): void => {
     setEditor(listEditorAt(event.currentTarget, index, item));
   };
   const closePending = (): void => {
@@ -269,11 +278,11 @@ function useListField(props: ListFieldProps) {
     itemsMax,
   };
 }
-function listEditorAt(trigger: HTMLElement, index: number | null, item: Item): Editor {
-  const pos = listPopupPosition(trigger);
-  return index === null
-    ? { kind: 'pending', item, pos, trigger }
-    : { kind: 'existing', index, pos, trigger };
+function listEditorAt(trigger: HTMLElement, index: number | undefined, item: Item): Editor {
+  const position = listPopupPosition(trigger);
+  return index === undefined
+    ? { kind: 'pending', item, position, trigger }
+    : { kind: 'existing', index, position, trigger };
 }
 
 function pendingListItem(editor: Editor): Item | undefined {
@@ -298,7 +307,7 @@ function useListDrag(
 ) {
   const [drag, setDrag] = useState<Drag>({ kind: 'idle' });
   const drop = (): void => {
-    if (drag.kind === 'dragging' && drag.gap !== null) {
+    if (drag.kind === 'dragging' && drag.gap !== undefined) {
       const next = moveItem(items, drag.index, drag.gap);
       // A drop into the original gap must not create an undo/save operation.
       if (next.some((item, index) => item !== items[index])) {
@@ -336,8 +345,8 @@ function ListRow({
   readonly state: ListState;
 }) {
   const { drag, editor, setDrag, remove, drop } = state;
-  const dragging = drag.kind === 'dragging' ? drag.index : null;
-  const gap = drag.kind === 'dragging' ? drag.gap : null;
+  const dragging = drag.kind === 'dragging' ? drag.index : undefined;
+  const gap = drag.kind === 'dragging' ? drag.gap : undefined;
   const open = editor.kind === 'existing' && editor.index === index;
   return (
     <ListFieldRow
@@ -396,9 +405,9 @@ function startListDrag(event: React.DragEvent<HTMLElement>, state: ListState, in
   if (state.disabled) {
     return;
   }
-  state.setDrag({ kind: 'dragging', index, gap: null });
+  state.setDrag({ kind: 'dragging', index, gap: undefined });
   state.setEditor({ kind: 'closed' });
-  event.dataTransfer.effectAllowed = 'move';
+  allowDragEffect(event.dataTransfer, 'move');
   try {
     event.dataTransfer.setData('text/plain', String(index));
   } catch {
@@ -410,16 +419,16 @@ function ListEditor({ state }: { readonly state: ListState }) {
   const { editor, items, write, setEditor, closePending } = state;
   switch (editor.kind) {
     case 'closed':
-      return null;
+      return undefined;
     case 'existing': {
       const item = items[editor.index];
       if (!item) {
-        return null;
+        return undefined;
       }
       return (
         <ItemEditor
           item={item}
-          pos={editor.pos}
+          position={editor.position}
           trigger={editor.trigger}
           onChange={(next) =>
             write(
@@ -438,7 +447,7 @@ function ListEditor({ state }: { readonly state: ListState }) {
       return (
         <ItemEditor
           item={editor.item}
-          pos={editor.pos}
+          position={editor.position}
           trigger={editor.trigger}
           onChange={(item) =>
             setEditor((current) => (current.kind === 'pending' ? { ...current, item } : current))

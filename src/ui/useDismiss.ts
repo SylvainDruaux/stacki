@@ -27,8 +27,8 @@ import { useEffect } from 'react';
  * menu costs nothing.
  */
 export default function useDismiss(
-  ref: RefObject<HTMLElement> | null | undefined,
-  active: boolean,
+  ref: RefObject<HTMLElement> | undefined,
+  { active }: { readonly active: boolean },
   onDismiss: () => void,
 ): void {
   useEffect(() => {
@@ -37,9 +37,9 @@ export default function useDismiss(
     }
 
     let blurTimer: ReturnType<typeof setTimeout> | undefined;
-    const onDown = (e: MouseEvent): void => {
-      const el = ref?.current;
-      if (el && e.target instanceof Node && !el.contains(e.target)) {
+    const onDown = (event: MouseEvent): void => {
+      const element = ref?.current;
+      if (element && event.target instanceof Node && !element.contains(event.target)) {
         onDismiss();
       }
     };
@@ -60,9 +60,9 @@ export default function useDismiss(
     // window (see electron/preload.js), which is a signal that does not depend
     // on how focus behaves — belt and braces, since the two cost the same and
     // a menu left hanging over the page is the thing being fixed.
-    const onMessage = (e: MessageEvent<unknown>): void => {
-      const t = toRecord(e.data)?.['type'];
-      if (typeof t === 'string' && (t === 'avb:click-node' || t === 'avb:open-node')) {
+    const onMessage = (event: MessageEvent<unknown>): void => {
+      const type = toRecord(event.data)?.['type'];
+      if (typeof type === 'string' && (type === 'avb:click-node' || type === 'avb:open-node')) {
         onDismiss();
       }
     };

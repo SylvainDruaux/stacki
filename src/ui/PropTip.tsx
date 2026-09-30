@@ -8,7 +8,7 @@ interface TipPosition {
 }
 interface TipSurfaceProps {
   readonly text: string;
-  readonly pos: TipPosition | null;
+  readonly pos: TipPosition | undefined;
   readonly iconRef: RefObject<HTMLSpanElement>;
   readonly tipRef: RefObject<HTMLDivElement>;
   readonly show: () => void;
@@ -24,8 +24,9 @@ const MARGIN = 8; // keep the bubble this far from the window's edges
 // comment written above it in the component's `interface Props`. The bubble is
 // position:fixed so it escapes the panel's scroll box, and flips below the icon
 // when there isn't room above.
-export default function PropTip({ text }: { readonly text?: string | null }) {
-  const [pos, setPos] = useState<TipPosition | null>(null); // {left, top, below, arrow}
+export default function PropTip({ text }: { readonly text?: string | undefined }) {
+  // Where the tip sits: {left, top, below, arrow}.
+  const [position, setPosition] = useState<TipPosition | undefined>(undefined);
   const iconRef = useRef<HTMLSpanElement>(null);
   const tipRef = useRef<HTMLDivElement>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout>>();
@@ -35,15 +36,15 @@ export default function PropTip({ text }: { readonly text?: string | null }) {
   const show = () => {
     clearTimeout(timerRef.current);
     timerRef.current = setTimeout(() => {
-      const el = iconRef.current;
-      if (!el) {
+      const element = iconRef.current;
+      if (!element) {
         return;
       }
-      const r = el.getBoundingClientRect();
-      const below = r.top < 120; // not enough room for the bubble above
-      setPos({
-        left: Math.round(r.left + r.width / 2),
-        top: below ? Math.round(r.bottom + 8) : Math.round(r.top - 8),
+      const rect = element.getBoundingClientRect();
+      const below = rect.top < 120; // not enough room for the bubble above
+      setPosition({
+        left: Math.round(rect.left + rect.width / 2),
+        top: below ? Math.round(rect.bottom + 8) : Math.round(rect.top - 8),
         below,
       });
     }, DELAY);
@@ -51,7 +52,7 @@ export default function PropTip({ text }: { readonly text?: string | null }) {
 
   const hide = () => {
     clearTimeout(timerRef.current);
-    setPos(null);
+    setPosition(undefined);
   };
 
   // Centering on the icon puts the bubble off-screen when the prop sits near
@@ -61,34 +62,41 @@ export default function PropTip({ text }: { readonly text?: string | null }) {
   useLayoutEffect(() => {
     const tip = tipRef.current;
     const icon = iconRef.current;
-    if (!tip || !icon || !pos || pos.clamped) {
+    if (!tip || !icon || !position || position.clamped) {
       return;
     }
     const half = tip.getBoundingClientRect().width / 2;
-    const center = pos.left;
+    const center = position.left;
     const left = Math.min(Math.max(center, MARGIN + half), window.innerWidth - MARGIN - half);
     if (left === center) {
-      setPos({ ...pos, clamped: true });
+      setPosition({ ...position, clamped: true });
       return;
     }
     // Keep the arrow over the icon, but not past the bubble's own corners.
     const arrow = Math.max(Math.min(center - left, half - 12), -(half - 12));
-    setPos({ ...pos, left, arrow, clamped: true });
-  }, [pos]);
+    setPosition({ ...position, left, arrow, clamped: true });
+  }, [position]);
 
   if (!text) {
-    return null;
+    return undefined;
   }
 
   return (
-    <TipSurface text={text} pos={pos} iconRef={iconRef} tipRef={tipRef} show={show} hide={hide} />
+    <TipSurface
+      text={text}
+      pos={position}
+      iconRef={iconRef}
+      tipRef={tipRef}
+      show={show}
+      hide={hide}
+    />
   );
 }
-function TipSurface({ text, pos, iconRef, tipRef, show, hide }: TipSurfaceProps) {
+function TipSurface({ text, pos: position, iconRef, tipRef, show, hide }: TipSurfaceProps) {
   const style: CSSProperties & { readonly '--tip-arrow': string } = {
-    left: pos?.left,
-    top: pos?.top,
-    '--tip-arrow': `${pos?.arrow || 0}px`,
+    left: position?.left,
+    top: position?.top,
+    '--tip-arrow': `${position?.arrow || 0}px`,
   };
   return (
     <>
@@ -107,8 +115,8 @@ function TipSurface({ text, pos, iconRef, tipRef, show, hide }: TipSurfaceProps)
       >
         <HelpCircleIcon size={13} />
       </span>
-      {pos && (
-        <div ref={tipRef} className={`prop-tip ${pos.below ? 'below' : ''}`} style={style}>
+      {position && (
+        <div ref={tipRef} className={`prop-tip ${position.below ? 'below' : ''}`} style={style}>
           {text}
         </div>
       )}

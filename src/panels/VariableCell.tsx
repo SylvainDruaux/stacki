@@ -14,10 +14,10 @@ type CellValue = VariableCell & {
 };
 type FluidReport = React.ComponentProps<typeof FluidBadge>['fluid'];
 export interface VariableCellProps {
-  readonly cell: CellValue | null | undefined;
+  readonly cell: CellValue | undefined;
   readonly onSave: (cell: VariableCell, value: string) => void | Promise<void>;
   readonly fluidOf?: ((cell: VariableCell) => FluidReport) | undefined;
-  readonly onDraft?: ((name: string, value: string | null) => void) | undefined;
+  readonly onDraft?: ((name: string, value: string | undefined) => void) | undefined;
 }
 interface PopulatedCellProps extends Omit<VariableCellProps, 'cell'> {
   readonly cell: CellValue;
@@ -28,7 +28,13 @@ interface CurveFrame {
 }
 const SAVE_ON = ['Enter', 'Tab'];
 // The sheet permits one curve editor; opening the next commits and closes the previous one.
-let closeOpenCurve: (() => void) | null = null;
+let closeOpenCurve: (() => void) | undefined;
+
+// The sheet reports a refused write itself (a toast, then a reload from the
+// file); what reaches here is a write that could not be attempted at all.
+function reportSaveFailure(error: unknown): void {
+  console.error('[stacki] variable save failed:', error);
+}
 
 export default function VariableCellEditor(props: VariableCellProps) {
   if (!props.cell) {
@@ -38,14 +44,15 @@ export default function VariableCellEditor(props: VariableCellProps) {
   return <PopulatedCell {...props} cell={props.cell} />;
 }
 function useVariableCell({ cell, onSave, fluidOf, onDraft }: PopulatedCellProps) {
-  const [draft, setDraft] = useState<string | null>(null);
-  const [custom, setCustom] = useState<DOMRect | null>(null); // the anchor rect while open
-  const [curve, setCurve] = useState<CurveFrame | null>(null);
+  const [draft, setDraft] = useState<string | undefined>(undefined);
+  // The anchor rect while the custom value editor is open.
+  const [custom, setCustom] = useState<DOMRect | undefined>(undefined);
+  const [curve, setCurve] = useState<CurveFrame | undefined>(undefined);
   const value = draft ?? cell.value;
   assert(value.length <= VARIABLES_LIMITS.fileCharsMax, 'Variable cell: value limit exceeded');
   assert(cell.name.length <= VARIABLES_LIMITS.fileCharsMax, 'Variable cell: name limit exceeded');
 
-  useEffect(() => setDraft(null), [cell?.value, cell?.valueStart]);
+  useEffect(() => setDraft(undefined), [cell?.value, cell?.valueStart]);
 
   // Every keystroke goes up as well as into the field: another row's badge may
   // be about this value.
@@ -54,15 +61,18 @@ function useVariableCell({ cell, onSave, fluidOf, onDraft }: PopulatedCellProps)
       return undefined;
     }
     onDraft?.(cell.name, draft);
-    return () => onDraft?.(cell.name, null);
+    return () => onDraft?.(cell.name, undefined);
   }, [cell?.name, draft, onDraft]);
 
-  const commit = async (next = value) => {
-    setDraft(null);
+  const write = async (next: string) => {
+    setDraft(undefined);
     if (next === cell.value) {
       return;
     }
     await onSave(cell, next);
+  };
+  const commit = (next = value): void => {
+    void write(next).catch(reportSaveFailure);
   };
 
   // Whatever `commit` is this render — the closer below outlives the render it
@@ -75,13 +85,13 @@ function useVariableCell({ cell, onSave, fluidOf, onDraft }: PopulatedCellProps)
     }
     closeOpenCurve?.(); // never two at once
     const close = () => {
-      setCurve(null);
+      setCurve(undefined);
       commitRef.current();
     };
     closeOpenCurve = close;
     return () => {
       if (closeOpenCurve === close) {
-        closeOpenCurve = null;
+        closeOpenCurve = undefined;
       }
     };
   }, [curve]);
@@ -132,32 +142,32 @@ function CellView({ state }: { readonly state: CellState }) {
   return (
     <div
       className="var-cell"
-      onMouseDownCapture={(e) => {
-        if (custom || alwaysOwn(e.target)) {
+      onMouseDownCapture={(event) => {
+        if (custom || alwaysOwn(event.target)) {
           return;
         }
         // Fits: everything in the field keeps its own press, chip included.
-        if (!doesNotFit(e.currentTarget, value)) {
+        if (!doesNotFit(event.currentTarget, value)) {
           return;
         }
-        e.preventDefault();
+        event.preventDefault();
         // And nothing else gets this press. preventDefault only cancels the
         // browser's own reaction (focus, caret); the chip's handler is another
         // listener further down and ran anyway — so a press on the chip of a
         // value too long to read opened the variable picker ON TOP of the
         // editor it had just opened. Stopping here in the capture phase means
         // the press reaches nothing inside the cell.
-        e.stopPropagation();
-        openCustom(e.currentTarget);
+        event.stopPropagation();
+        openCustom(event.currentTarget);
       }}
-      onKeyDownCapture={(e) => {
+      onKeyDownCapture={(event) => {
         // The same shortcut, wherever the caret is — the token editor holds it
         // as often as the input does.
-        if (e.key !== '=' || custom) {
+        if (event.key !== '=' || custom) {
           return;
         }
-        e.preventDefault();
-        openCustom(e.currentTarget);
+        event.preventDefault();
+        openCustom(event.currentTarget);
       }}
     >
       {/* A timing function is a curve, and a curve is easier to judge by eye
@@ -170,10 +180,14 @@ function CellView({ state }: { readonly state: CellState }) {
       <CellInput state={state} />
       {/* Only drawn when the value is a fluid clamp with something wrong with
           it — see fluidCheck in electron/cssVars.js. */}
-      <FluidBadge fluid={(fluidOf ? fluidOf(cell) : cell.fluid) ?? null} />
+      <CellFluidBadge report={fluidOf ? fluidOf(cell) : cell.fluid} />
       <CellCustomValue state={state} />
     </div>
   );
+}
+// The badge takes no report at all when there is nothing to say.
+function CellFluidBadge({ report }: { readonly report: FluidReport }) {
+  return <FluidBadge {...(report ? { fluid: report } : {})} />;
 }
 function CellCurveButton({ state }: { readonly state: CellState }) {
   const { cell, setCurve, value } = state;
@@ -188,9 +202,9 @@ function CellCurveButton({ state }: { readonly state: CellState }) {
           // The editor belongs over the sheet it was opened from, not over the
           // panel beside it — so it is handed the sheet's own box. Read at the
           // press rather than held in state: the sheet is resizable.
-          onClick={(e) => {
+          onClick={(event) => {
             const sheet =
-              e.currentTarget.closest('.vars-view') || e.currentTarget.closest('.cms-view');
+              event.currentTarget.closest('.vars-view') || event.currentTarget.closest('.cms-view');
             const box = sheet?.getBoundingClientRect();
             // Always framed, even when the sheet measures nothing (a mid-layout
             // read): the window is the fallback, never the style panel's box —
@@ -225,7 +239,7 @@ function CellCurveEditor({ state }: { readonly state: CellState }) {
           // when the editor closes — a drag is one edit, not sixty.
           onChange={(timing) => setDraft(timing)}
           onClose={() => {
-            setCurve(null);
+            setCurve(undefined);
             commit();
           }}
         />
@@ -279,11 +293,11 @@ function CellCustomValue({ state }: { readonly state: CellState }) {
           label={cell.name}
           anchor={custom}
           onCancel={() => {
-            setCustom(null);
-            setDraft(null);
+            setCustom(undefined);
+            setDraft(undefined);
           }}
           onSave={(next) => {
-            setCustom(null);
+            setCustom(undefined);
             commit(next);
           }}
         />
@@ -309,8 +323,12 @@ function CellInput({ state }: { readonly state: CellState }) {
         value={value}
         spellCheck={false}
         title={`${cell.name}: ${cell.value}${cell.resolved ? `\n→ ${cell.resolved}` : ''}`}
-        onChange={(e) => setDraft(e.target.value)}
-        onBlur={() => !custom && commit()}
+        onChange={(event) => setDraft(event.target.value)}
+        onBlur={() => {
+          if (!custom) {
+            commit();
+          }
+        }}
         // Arriving by keyboard: the value is what you came to replace.
         //
         // Only when the focus is really this input's. The rich field calls
@@ -318,19 +336,19 @@ function CellInput({ state }: { readonly state: CellState }) {
         // stand-in event pointing here), and select() on an input focuses it
         // — so clicking a value moved the caret into the hidden input behind
         // the field, where nothing typed and nothing showed.
-        onFocus={(e) => {
-          if (document.activeElement !== e.currentTarget) {
+        onFocus={(event) => {
+          if (document.activeElement !== event.currentTarget) {
             return;
           }
-          e.currentTarget.select();
+          event.currentTarget.select();
         }}
-        onMouseDown={(e) => {
+        onMouseDown={(event) => {
           // A value too long for its column edits in the bigger box instead —
           // clicking it there would put the caret in a slot showing a third
           // of what is being changed.
           if (isLong(value)) {
-            e.preventDefault();
-            setCustom(e.currentTarget.getBoundingClientRect());
+            event.preventDefault();
+            setCustom(event.currentTarget.getBoundingClientRect());
             return;
           }
           // Clicking in takes the whole value, because replacing it is what
@@ -340,26 +358,26 @@ function CellInput({ state }: { readonly state: CellState }) {
           // is what gets skipped. A second click, once the field already has
           // focus, behaves normally and can place the caret or drag over
           // part of the value.
-          if (document.activeElement === e.currentTarget) {
+          if (document.activeElement === event.currentTarget) {
             return;
           }
-          e.preventDefault();
-          e.currentTarget.focus();
-          e.currentTarget.select();
+          event.preventDefault();
+          event.currentTarget.focus();
+          event.currentTarget.select();
         }}
-        onKeyDown={(e) => {
-          if (e.key === '=') {
-            e.preventDefault();
-            setCustom(e.currentTarget.getBoundingClientRect());
+        onKeyDown={(event) => {
+          if (event.key === '=') {
+            event.preventDefault();
+            setCustom(event.currentTarget.getBoundingClientRect());
             return;
           }
-          if (SAVE_ON.includes(e.key)) {
-            e.preventDefault();
-            e.currentTarget.blur();
+          if (SAVE_ON.includes(event.key)) {
+            event.preventDefault();
+            event.currentTarget.blur();
           }
-          if (e.key === 'Escape') {
-            e.preventDefault();
-            setDraft(null);
+          if (event.key === 'Escape') {
+            event.preventDefault();
+            setDraft(undefined);
           }
         }}
       />

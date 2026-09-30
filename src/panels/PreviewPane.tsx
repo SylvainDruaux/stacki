@@ -16,23 +16,23 @@ import './previewViewport.css';
 export { deviceForWidth } from './PreviewToolbar';
 
 interface PreviewPaneProps {
-  readonly spacingHover?: SpacingHover | null;
-  readonly devUrl?: string | null;
+  readonly spacingHover?: SpacingHover | undefined;
+  readonly devUrl?: string | undefined;
   readonly devStatus?: string;
-  readonly devLog?: string | null;
-  readonly devDiag?: DevDiagnosis | null;
+  readonly devLog?: string | undefined;
+  readonly devDiag?: DevDiagnosis | undefined;
   readonly pathScope?: string;
-  readonly route?: string | null;
+  readonly route?: string | undefined;
   readonly refreshKey?: string | number;
   readonly crumbs?: readonly PreviewCrumb[];
-  readonly onCrumb?: (id: string | null) => void;
+  readonly onCrumb?: (id: string | undefined) => void;
   readonly onRefresh?: () => void;
   readonly onRestart?: () => void;
-  readonly selPath?: string | null;
-  readonly navHoverPath?: string | null;
-  readonly overlayInfo?: (path: string) => OverlayInfo | null;
-  readonly onSelectPath?: (path: string | null, info: { readonly outside: boolean }) => void;
-  readonly onOpenPath?: (path: string | null, occurrence: number) => void;
+  readonly selPath?: string | undefined;
+  readonly navHoverPath?: string | undefined;
+  readonly overlayInfo?: (path: string) => OverlayInfo | undefined;
+  readonly onSelectPath?: (path: string | undefined, info: { readonly outside: boolean }) => void;
+  readonly onOpenPath?: (path: string | undefined, occurrence: number) => void;
   readonly judgeEvent: JudgeCanvasEvent;
   readonly onStaleEvent: (verdict: Extract<PreviewVerdict, { readonly tag: 'stale' }>) => void;
   readonly onPreviewReload?: (reason: PreviewReloadReason) => void;
@@ -43,22 +43,16 @@ interface PreviewPaneProps {
     readonly inert: readonly string[];
   }) => void;
   readonly onNodeClasses?: (classes: Readonly<Record<string, readonly string[]>>) => void;
-  readonly focusPath?: string | null;
-  readonly focusOcc?: number | null;
+  readonly focusPath?: string | undefined;
+  readonly focusOcc?: number | undefined;
   readonly focusWhole?: boolean;
   readonly device: PreviewDevice;
   readonly onDevice: (device: PreviewDevice) => void;
 }
 
 export default function PreviewPane(props: PreviewPaneProps) {
-  const url = props.devUrl && props.route ? props.devUrl + props.route : null;
-  const runtime = usePreviewRuntime(
-    {
-      ...props,
-      selPath: props.selPath ?? null,
-    },
-    url,
-  );
+  const url = props.devUrl && props.route ? props.devUrl + props.route : undefined;
+  const runtime = usePreviewRuntime({ ...props, selPath: props.selPath }, url);
   const sizing = usePreviewSizing(props.device, props.onDevice);
   return (
     <>
@@ -95,7 +89,7 @@ function PreviewContent({
   sizing,
 }: {
   readonly props: PreviewPaneProps;
-  readonly url: string | null;
+  readonly url: string | undefined;
   readonly runtime: Runtime;
   readonly sizing: Sizing;
 }) {
@@ -146,11 +140,11 @@ function DesignPreview({
           rects={runtime.rects}
           spacing={runtime.spacing}
           {...(props.spacingHover === undefined ? {} : { spacingHover: props.spacingHover })}
-          selPath={props.selPath ?? null}
+          selPath={props.selPath}
           selOcc={runtime.selOcc}
           hoverPath={runtime.hoverPath}
           hoverOcc={runtime.hoverOcc}
-          focusPath={props.focusPath ?? null}
+          focusPath={props.focusPath}
           focusWhole={props.focusWhole ?? false}
           {...(props.overlayInfo === undefined ? {} : { overlayInfo: props.overlayInfo })}
         />
@@ -202,17 +196,17 @@ function usePreviewSizing(device: PreviewDevice, onDevice: (device: PreviewDevic
   const wrapRef = useRef<HTMLDivElement>(null);
   const frameRef = useRef<HTMLDivElement>(null);
   const [available, setAvailable] = useState({ width: 0, height: 0 });
-  const [customWidth, setCustomWidth] = useState<number | null>(null);
-  const [customHeight, setCustomHeight] = useState<number | null>(null);
+  const [customWidth, setCustomWidth] = useState<number | undefined>(undefined);
+  const [customHeight, setCustomHeight] = useState<number | undefined>(undefined);
   const [resizing, setResizing] = useState(false);
   useMeasuredSize(wrapRef, setAvailable);
   useDeviceShortcuts(onDevice);
   useEffect(() => {
     if (device !== 'custom') {
-      setCustomWidth(null);
+      setCustomWidth(undefined);
     }
     if (device === 'desktop' || device === 'canvas') {
-      setCustomHeight(null);
+      setCustomHeight(undefined);
     }
   }, [device]);
   const width = customWidth ?? deviceWidth(device);
@@ -269,7 +263,12 @@ function useDeviceShortcuts(onDevice: (device: PreviewDevice) => void): void {
   onDeviceRef.current = onDevice;
   useEffect(() => {
     const onKey = (event: KeyboardEvent): void => {
-      if (event.metaKey || event.ctrlKey || event.altKey || isTypingTarget(event.target)) {
+      if (
+        event.metaKey ||
+        event.ctrlKey ||
+        event.altKey ||
+        isTypingTarget(event.target ?? undefined)
+      ) {
         return;
       }
       const device = deviceFromKey(event.key);
@@ -282,7 +281,7 @@ function useDeviceShortcuts(onDevice: (device: PreviewDevice) => void): void {
   }, []);
 }
 
-function isTypingTarget(target: EventTarget | null): boolean {
+function isTypingTarget(target: EventTarget | undefined): boolean {
   return (
     target instanceof HTMLElement &&
     (target.matches('input, textarea, select') || target.isContentEditable)
@@ -310,8 +309,8 @@ interface ResizeContext {
   readonly frameRef: React.RefObject<HTMLDivElement>;
   readonly startDrag: ReturnType<typeof usePointerDrag>;
   readonly onDevice: (device: PreviewDevice) => void;
-  readonly setCustomWidth: React.Dispatch<React.SetStateAction<number | null>>;
-  readonly setCustomHeight: React.Dispatch<React.SetStateAction<number | null>>;
+  readonly setCustomWidth: React.Dispatch<React.SetStateAction<number | undefined>>;
+  readonly setCustomHeight: React.Dispatch<React.SetStateAction<number | undefined>>;
   readonly setResizing: React.Dispatch<React.SetStateAction<boolean>>;
 }
 

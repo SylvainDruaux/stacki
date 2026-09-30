@@ -40,7 +40,7 @@ import {
 type SelectedNode = PageNode | { readonly kind: 'frontmatter'; readonly id: string };
 type ElementNode = (PairedNode | ChunkGroupNode) & { readonly props?: PropValues };
 export interface PropsPanelProps {
-  readonly node?: SelectedNode | null;
+  readonly node?: SelectedNode | undefined;
   readonly focusClass?: number;
   readonly focusContent?: number;
   readonly isLayout?: boolean;
@@ -48,16 +48,16 @@ export interface PropsPanelProps {
   readonly currentLayoutName?: string;
   readonly onChangeLayout?: (name: string) => void;
   readonly schema?: readonly FieldDefinition[];
-  readonly slotOptions?: readonly string[] | null;
+  readonly slotOptions?: readonly string[] | undefined;
   readonly takesSlotText?: boolean;
   readonly tagOptions?: readonly TagOption[];
   readonly projectClasses?: readonly string[];
   readonly allowAttrs?: boolean;
   readonly comment?: string;
   readonly onSetComment?: (value: string) => void;
-  readonly loopContext?: RichContext | null;
-  readonly bindContext?: RichContext | null;
-  readonly linkContext?: React.ComponentProps<typeof LinkField>['context'] | null;
+  readonly loopContext?: RichContext | undefined;
+  readonly bindContext?: RichContext | undefined;
+  readonly linkContext?: React.ComponentProps<typeof LinkField>['context'] | undefined;
   readonly onSetProp: SetProp;
   readonly onSetProps?: SetProps;
   readonly onSetAssetProp?: (nodeId: string, name: string, picked: PickedAsset) => void;
@@ -71,8 +71,8 @@ export interface PropsPanelProps {
   readonly frontmatterSource?: string;
   readonly onOpenSymbol?: (name: string) => void;
   readonly onToggleElse?: (value: boolean) => void;
-  readonly projectPath?: string | null;
-  readonly filePath?: string | null;
+  readonly projectPath?: string | undefined;
+  readonly filePath?: string | undefined;
 }
 type NodePanelProps<Kind extends SelectedNode['kind']> = Omit<PropsPanelProps, 'node'> & {
   readonly node:
@@ -81,15 +81,15 @@ type NodePanelProps<Kind extends SelectedNode['kind']> = Omit<PropsPanelProps, '
 };
 interface ElementPropsPanelProps extends Omit<PropsPanelProps, 'node'> {
   readonly node: ElementNode;
-  readonly dataCtx: SourceContext;
+  readonly dataContext: SourceContext;
   readonly stashRef: React.MutableRefObject<Map<string, PropValues>>;
 }
 interface SourceDimensionsOptions {
-  readonly srcProp: Attr | undefined;
-  readonly projectPath: string | null | undefined;
-  readonly filePath: string | null | undefined;
+  readonly source: Attr | undefined;
+  readonly projectPath: string | undefined;
+  readonly filePath: string | undefined;
   readonly imports: unknown;
-  readonly setSrcDims: (value: AssetDimensions) => void;
+  readonly setSourceDimensions: (value: AssetDimensions) => void;
 }
 
 export { BindField } from './propBindings';
@@ -151,7 +151,7 @@ function renderPropsPanel(
         <ElementPropsPanel
           {...props}
           node={node}
-          dataCtx={panelDataContext(props)}
+          dataContext={panelDataContext(props)}
           stashRef={stashRef}
         />
       );
@@ -187,15 +187,15 @@ function useElementProps(props: ElementPropsPanelProps) {
   const focus = useElementFocus(props);
   const settings = elementSettings(props, layout, rules.appliesNow);
   const dimensions = elementDimensionAction(props);
-  const assetCtx = {
+  const assetContext = {
     projectPath: props.projectPath,
     filePath: props.filePath,
     nodeName: props.node.name,
     onPickDimensions: dimensions.onPickDimensions,
-    srcDims: assets.srcDims,
-    onSrcDimensions: assets.setSrcDims,
+    srcDims: assets.sourceDimensions,
+    onSrcDimensions: assets.setSourceDimensions,
     siblingProps: props.node.props,
-    srcKind: assets.srcKind,
+    srcKind: assets.sourceKind,
     onPickAsset: props.onSetAssetProp
       ? (name: string, picked: PickedAsset) => props.onSetAssetProp?.(props.node.id, name, picked)
       : undefined,
@@ -210,7 +210,7 @@ function useElementProps(props: ElementPropsPanelProps) {
     ...focus,
     ...settings,
     ...dimensions,
-    assetCtx,
+    assetContext,
   };
 }
 type ElementState = ReturnType<typeof useElementProps>;
@@ -244,7 +244,8 @@ function ElementPanelView({ state }: { readonly state: ElementState }) {
         ref={rootRef}
         style={{ flex: '1 1 50%', overflow: 'hidden' }}
         onClick={(event) => {
-          const button = event.target instanceof Element ? event.target.closest('button') : null;
+          const button =
+            event.target instanceof Element ? event.target.closest('button') : undefined;
           if (button && !button.disabled) {
             clickNote();
           }
@@ -334,9 +335,9 @@ function CommentField({
         minRows={1}
         placeholder="Note above this element…"
         value={draft}
-        onChange={(e) => {
-          setDraft(e.target.value);
-          commit(e.target.value);
+        onChange={(event) => {
+          setDraft(event.target.value);
+          commit(event.target.value);
         }}
         onFocus={() => {
           focused.current = true;
@@ -401,7 +402,7 @@ function ExprPanel(props: NodePanelProps<'expr'>) {
           value={node.value}
           syncValue={node.value}
           completions={scope}
-          onCommit={(v) => v !== node.value && onSetText(v)}
+          onCommit={(next) => next !== node.value && onSetText(next)}
         />
       </div>
     </div>
@@ -429,7 +430,7 @@ function RawLinePanel(props: NodePanelProps<'raw-line'>) {
           value={node.value}
           spellCheck={false}
           style={{ fontFamily: 'var(--mono)' }}
-          onChange={(e) => onSetText(e.target.value)}
+          onChange={(event) => onSetText(event.target.value)}
         />
         <div style={{ fontSize: 11, color: 'var(--text-faint)', marginTop: 6, lineHeight: 1.5 }}>
           {isDoctype
@@ -444,7 +445,7 @@ function RawLinePanel(props: NodePanelProps<'raw-line'>) {
 function MapPanel(props: NodePanelProps<'map'>) {
   const { node, loopContext, bindContext, onSetText } = props;
 
-  const buildDataCtx = () => panelDataContext(props);
+  const buildDataContext = () => panelDataContext(props);
 
   return (
     <div className="panel-section grow" style={{ flex: '1 1 50%', overflow: 'hidden' }}>
@@ -455,8 +456,8 @@ function MapPanel(props: NodePanelProps<'map'>) {
         key={node.id}
         node={node}
         loopContext={loopContext}
-        bindCtx={bindContext || loopContext}
-        dataCtx={buildDataCtx()}
+        bindContext={bindContext || loopContext}
+        dataContext={buildDataContext()}
         onSetText={onSetText}
       />
     </div>
@@ -465,7 +466,7 @@ function MapPanel(props: NodePanelProps<'map'>) {
 function CondPanel(props: NodePanelProps<'cond'>) {
   const { node, loopContext, bindContext, onSetText, onToggleElse } = props;
   const scope = scopeCompletions(bindContext || loopContext || {});
-  const scopeNames = new Set(scope.map((c) => c.label.split('.')[0] ?? ''));
+  const scopeNames = new Set(scope.map((completion) => completion.label.split('.')[0] ?? ''));
   const chipsInScope = (text: string) => scopeChips(text, scopeNames);
 
   const hasElse = (node.children || []).length > 1;
@@ -486,7 +487,7 @@ function CondPanel(props: NodePanelProps<'cond'>) {
           test={node.test}
           scope={scope}
           chipsOf={chipsInScope}
-          bindCtx={bindContext || loopContext}
+          bindContext={bindContext || loopContext}
           onSetText={onSetText}
         />
         <div style={{ fontSize: 11, color: 'var(--text-faint)', marginTop: 8, lineHeight: 1.5 }}>
@@ -542,7 +543,11 @@ function CommentPanel(props: NodePanelProps<'comment'>) {
             Comment
           </span>
         </label>
-        <AutoTextarea minRows={3} value={node.value} onChange={(e) => onSetText(e.target.value)} />
+        <AutoTextarea
+          minRows={3}
+          value={node.value}
+          onChange={(event) => onSetText(event.target.value)}
+        />
       </div>
     </div>
   );
@@ -576,7 +581,7 @@ function RawPanel(props: NodePanelProps<'raw'>) {
           node={node}
           names={attrs}
           projectPath={projectPath}
-          bindCtx={bindContext || loopContext}
+          bindContext={bindContext || loopContext}
           onSetProp={onSetProp}
           onSetProps={onSetProps}
           onRenameProp={onRenameProp}
@@ -609,7 +614,11 @@ function TextPanel(props: NodePanelProps<'text'>) {
             Content
           </span>
         </label>
-        <AutoTextarea minRows={3} value={node.value} onChange={(e) => onSetText(e.target.value)} />
+        <AutoTextarea
+          minRows={3}
+          value={node.value}
+          onChange={(event) => onSetText(event.target.value)}
+        />
       </div>
     </div>
   );
@@ -617,15 +626,15 @@ function TextPanel(props: NodePanelProps<'text'>) {
 function sourceKind(
   source: Attr | undefined,
   imports: unknown,
-): 'svg' | 'public' | 'remote' | 'asset' | null {
+): 'svg' | 'public' | 'remote' | 'asset' | undefined {
   if (!source || source.type === 'bare') {
-    return null;
+    return undefined;
   }
   const isSVG = (value: string) => /\.svg(\?|#|$)/i.test(value);
   if (source.type === 'string') {
     const value = source.value;
     if (!value) {
-      return null;
+      return undefined;
     }
     if (isSVG(value)) {
       return 'svg';
@@ -634,20 +643,20 @@ function sourceKind(
   }
   const binding = assetImportOf(source.value, imports);
   if (!binding) {
-    return null;
+    return undefined;
   }
   return isSVG(binding.spec) ? 'svg' : 'asset';
 }
 function useSourceDimensions({
-  srcProp,
+  source,
   projectPath,
   filePath,
   imports,
-  setSrcDims,
+  setSourceDimensions,
 }: SourceDimensionsOptions) {
   // Primitive dependencies also refresh dimensions when an import changes in place.
-  const sourceType = srcProp?.type;
-  const sourceValue = srcProp?.type === 'bare' ? undefined : srcProp?.value;
+  const sourceType = source?.type;
+  const sourceValue = source?.type === 'bare' ? undefined : source?.value;
   useEffect(() => {
     if (!sourceValue || !projectPath) {
       return undefined;
@@ -656,7 +665,7 @@ function useSourceDimensions({
     const fromRel = async (rel: string) => {
       const result = await readAssetDimensions(projectPath, rel);
       if (live && result.ok && result.value) {
-        setSrcDims(result.value);
+        setSourceDimensions(result.value);
       }
     };
     if (sourceType === 'string') {
@@ -679,34 +688,34 @@ function useSourceDimensions({
     return () => {
       live = false;
     };
-  }, [sourceType, sourceValue, projectPath, filePath, imports, setSrcDims]);
+  }, [sourceType, sourceValue, projectPath, filePath, imports, setSourceDimensions]);
 }
 
 function elementFieldLayout(props: ElementPropsPanelProps) {
   const { node, schema = [], slotOptions, takesSlotText, allowAttrs } = props;
   assert((node.children?.length ?? 0) <= LIMITS.treeNodesMax, 'PropsPanel: child limit exceeded');
-  const schemaNames = new Set(schema.map((s) => s.name));
+  const schemaNames = new Set(schema.map((entry) => entry.name));
 
   // The slot field renders in one stable spot whether or not the attribute
   // is currently set — hover-previewing a value must not remount the field
   // (that would close the dropdown mid-hover).
   const showSlotField =
     Array.isArray(slotOptions) &&
-    slotOptions.some((s) => s !== 'default') &&
+    slotOptions.some((slot) => slot !== 'default') &&
     !schemaNames.has('slot');
   let extraProps = Object.keys(node.props || {}).filter(
-    (k) => !schemaNames.has(k) && !(showSlotField && k === 'slot'),
+    (key) => !schemaNames.has(key) && !(showSlotField && key === 'slot'),
   );
   // With a free-form Attributes section, unknown attrs live there instead of
   // as individual fields — except class and style, which keep dedicated ones.
   let attrNames: string[] = [];
   if (allowAttrs) {
-    attrNames = extraProps.filter((k) => k !== 'class' && k !== 'style' && k !== 'slot');
+    attrNames = extraProps.filter((key) => key !== 'class' && key !== 'style' && key !== 'slot');
     // `slot` is sorted last so a hand-written one lands where the picker's
     // does — directly above the comment — instead of in among the props.
     extraProps = extraProps
-      .filter((k) => k === 'class' || k === 'slot')
-      .sort((a, b) => (a === 'slot' ? 1 : b === 'slot' ? -1 : 0));
+      .filter((key) => key === 'class' || key === 'slot')
+      .sort((left, right) => (left === 'slot' ? 1 : right === 'slot' ? -1 : 0));
   }
 
   // Content field: shown when the children are inline-only (text plus simple
@@ -750,26 +759,32 @@ function elementFieldLayout(props: ElementPropsPanelProps) {
 }
 
 function useElementAssets(props: ElementPropsPanelProps) {
-  const { node, projectPath, filePath, dataCtx } = props;
+  const { node, projectPath, filePath, dataContext } = props;
   // Astro's <Image> (and any component that forwards to it) rejects a public/
   // path with no width and height — "MissingImageDimension" takes the page
   // down. The picker already knows the size it just showed, so an image pick
   // fills those in when the component has them. One edit, one undo.
   // The size of the image currently in `src`. width/height fall back to it
   // when unset, so it is what those fields should show as their placeholder.
-  const [srcDims, setSrcDims] = useState<AssetDimensions | null>(null);
-  useEffect(() => setSrcDims(null), [node?.id]);
+  const [sourceDimensions, setSourceDimensions] = useState<AssetDimensions | undefined>(undefined);
+  useEffect(() => setSourceDimensions(undefined), [node?.id]);
 
   // …and read them from the file as well. The card above reports what its
   // thumbnail decoded, which only happens if a thumbnail rendered — so a
   // source the picker couldn't preview (or a field the eye never reached)
   // left width/height claiming the size was "inferred". Astro infers nothing
   // for a local asset: it reads the real size out of the file, and so do we.
-  const srcProp = node.props?.['src'];
-  const srcKind = sourceKind(srcProp, dataCtx.imports);
-  useSourceDimensions({ srcProp, projectPath, filePath, imports: dataCtx.imports, setSrcDims });
+  const source = node.props?.['src'];
+  const kind = sourceKind(source, dataContext.imports);
+  useSourceDimensions({
+    source,
+    projectPath,
+    filePath,
+    imports: dataContext.imports,
+    setSourceDimensions,
+  });
 
-  return { srcDims, setSrcDims, srcKind };
+  return { sourceDimensions, setSourceDimensions, sourceKind: kind };
 }
 
 function elementRules(props: ElementPropsPanelProps) {
@@ -805,8 +820,9 @@ function useElementFocus(props: ElementPropsPanelProps) {
   const { focusClass, focusContent } = props;
   // The data picker over the Content field, and the way into the editor's
   // caret once something is chosen.
-  const [contentPicker, setContentPicker] = useState<FieldPosition | null>(null);
-  const contentInsertRef = useRef<RichInsertAPI | null>(null);
+  const [contentPicker, setContentPicker] = useState<FieldPosition | undefined>(undefined);
+  // A ref prop: RichContent fills it with its caret API while it is mounted.
+  const contentInsertRef = useRef<RichInsertAPI | undefined>(undefined);
 
   // Settings survives ordinary selections through hook state and special-node
   // selections through this module's value, because those unmount the element panel.
@@ -861,9 +877,9 @@ function useElementFocus(props: ElementPropsPanelProps) {
     const range = document.createRange();
     range.selectNodeContents(field);
     range.collapse(false);
-    const sel = window.getSelection();
-    sel?.removeAllRanges();
-    sel?.addRange(range);
+    const selection = window.getSelection();
+    selection?.removeAllRanges();
+    selection?.addRange(range);
     field.closest('.props-field')?.scrollIntoView({ block: 'nearest' });
   }, [focusContent]);
 
@@ -894,18 +910,18 @@ function elementSettings(
     onChangeTag,
   } = props;
   const { isSlot, showSlotField, attrNames } = layout;
-  const classField: FieldDefinition | null =
-    schema.find((f) => f.name === 'class' && appliesNow(f)) ||
-    (node.props?.['class'] !== undefined ? { name: 'class', type: 'string' } : null);
+  const classField: FieldDefinition | undefined =
+    schema.find((field) => field.name === 'class' && appliesNow(field)) ||
+    (node.props?.['class'] !== undefined ? { name: 'class', type: 'string' } : undefined);
   // Inline styles, directly under the class field. Anything that renders a
   // real element has one, whatever it declares; a component only when it
   // takes the attribute (…rest) or already carries it, so the panel never
   // offers a prop the component would ignore. Always the CSS editor, even
   // when a component types it `style?: string`.
-  const styleField: FieldDefinition | null =
+  const styleField: FieldDefinition | undefined =
     allowAttrs || node.props?.['style'] !== undefined
-      ? { ...(schema.find((f) => f.name === 'style') || {}), name: 'style', type: 'style' }
-      : null;
+      ? { ...(schema.find((field) => field.name === 'style') || {}), name: 'style', type: 'style' }
+      : undefined;
   // The page's wrapper switches through the same Tag field as everything else
   // — it just answers with a layout rather than a tag, so its list is the
   // project's layouts and the change goes through the import rewrite.
@@ -913,7 +929,7 @@ function elementSettings(
   const changeToLayout = (name: string) => {
     // The wrapper is an import, not markup: a name no layout file provides
     // can't be written, so the field puts the old one back.
-    if (!layouts.some((l) => l.name === name)) {
+    if (!layouts.some((layout) => layout.name === name)) {
       return false;
     }
     onChangeLayout?.(name);
@@ -958,7 +974,7 @@ function elementDimensionAction(props: ElementPropsPanelProps) {
     if (!/^(src|poster)$/i.test(fieldName)) {
       return;
     }
-    const takes = (n: string) => (schema || []).some((f) => f.name === n);
+    const takes = (propName: string) => (schema || []).some((field) => field.name === propName);
     const patch: Record<string, Attr> = {};
     if (takes('width')) {
       patch['width'] = { type: 'expr', value: String(dims.w) };
@@ -1001,26 +1017,25 @@ function ElementContent({ state }: { readonly state: ElementState }) {
                   `{post.data.title}`. */}
             <BindHandle
               active={!!contentPicker}
-              onOpen={(host) => elementOpenContentPicker(state, host)}
+              onOpen={(host) => elementOpenContentPicker(state, host ?? undefined)}
             />
           </label>
           <RichContent
             key={node.id}
             nodes={isInlineOnly(node.children) ? node.children : []}
-            bindCtx={bindContext || loopContext || null}
+            {...richContextProp(bindContext || loopContext)}
             insertRef={contentInsertRef}
             onChange={onSetInline}
           />
           {contentPicker && (
             <FieldDataPicker
               pos={contentPicker}
-              bindCtx={bindContext || loopContext}
-              current={null}
+              bindContext={bindContext || loopContext}
               onPick={(path) => {
-                setContentPicker(null);
+                setContentPicker(undefined);
                 contentInsertRef.current?.insert(path);
               }}
-              onClose={() => setContentPicker(null)}
+              onClose={() => setContentPicker(undefined)}
             />
           )}
           {isSlot && (
@@ -1041,6 +1056,11 @@ function ElementContent({ state }: { readonly state: ElementState }) {
   );
 }
 
+// RichContent spells a missing context by leaving the prop out.
+function richContextProp(context: RichContext | undefined): { readonly bindContext?: RichContext } {
+  return context === undefined ? {} : { bindContext: context };
+}
+
 function ElementLooseText({ state }: { readonly state: ElementState }) {
   const { node, onSetContent, showLooseTextField, looseText } = state;
   return (
@@ -1058,7 +1078,7 @@ function ElementLooseText({ state }: { readonly state: ElementState }) {
             minRows={2}
             value={looseText ? looseText.value : ''}
             placeholder="Text alongside the children below"
-            onChange={(e) => onSetContent(e.target.value)}
+            onChange={(event) => onSetContent(event.target.value)}
           />
         </div>
       )}
@@ -1075,33 +1095,33 @@ function ElementSchemaFields({ state }: { readonly state: ElementState }) {
     loopContext,
     bindContext,
     linkContext,
-    dataCtx,
+    dataContext,
     appliesNow,
     branchDefault,
     narrowOptions,
     setPropCascading,
     styleField,
-    assetCtx,
+    assetContext,
   } = state;
   return (
     <>
       {schema
         .filter(appliesNow)
-        .filter((f) => f.name !== 'class' && !(styleField && f.name === 'style'))
+        .filter((field) => field.name !== 'class' && !(styleField && field.name === 'style'))
         .map((field) => (
           <PropField
             key={field.name}
             nodeKey={node.id}
-            bindCtx={bindContext || loopContext}
+            bindContext={bindContext || loopContext}
             field={narrowOptions(field)}
             branchDefault={branchDefault(field.name)}
             value={node.props?.[field.name]}
             slotOptions={slotOptions}
             projectClasses={projectClasses}
-            assetCtx={assetCtx}
+            assetContext={assetContext}
             linkContext={linkContext}
-            dataCtx={dataCtx}
-            onChange={(v, immediate) => setPropCascading(field.name, v, immediate)}
+            dataContext={dataContext}
+            onChange={(next, immediate) => setPropCascading(field.name, next, immediate)}
           />
         ))}
     </>
@@ -1117,10 +1137,10 @@ function ElementExtraFields({ state }: { readonly state: ElementState }) {
     bindContext,
     linkContext,
     onSetProp,
-    dataCtx,
+    dataContext,
     extraProps,
     styleField,
-    assetCtx,
+    assetContext,
   } = state;
   return (
     <>
@@ -1130,15 +1150,15 @@ function ElementExtraFields({ state }: { readonly state: ElementState }) {
           <PropField
             key={name}
             nodeKey={node.id}
-            bindCtx={bindContext || loopContext}
+            bindContext={bindContext || loopContext}
             field={{ name, type: 'other' }}
             value={node.props?.[name]}
             slotOptions={slotOptions}
             projectClasses={projectClasses}
-            assetCtx={assetCtx}
+            assetContext={assetContext}
             linkContext={linkContext}
-            dataCtx={dataCtx}
-            onChange={(v, immediate) => onSetProp(name, v, immediate)}
+            dataContext={dataContext}
+            onChange={(next, immediate) => onSetProp(name, next, immediate)}
           />
         ))}
     </>
@@ -1155,7 +1175,7 @@ function ElementSettingsHeader({ state }: { readonly state: ElementState }) {
             type="button"
             className="props-group-head"
             aria-expanded={settingsOpen}
-            onClick={() => setSettingsOpen((v) => !v)}
+            onClick={() => setSettingsOpen((open) => !open)}
           >
             <span className="props-group-name">Settings</span>
             {/* Something set in there is worth knowing about without opening
@@ -1191,7 +1211,11 @@ function ElementTag({ state }: { readonly state: ElementState }) {
           // local name the page imported it under — that name is a detail of
           // this page, while the file is what you're choosing between.
           tag={layoutTag ? currentLayoutName || node.name : node.name}
-          options={layoutTag ? layouts.map((l) => ({ name: l.name, kind: 'layout' })) : tagOptions}
+          options={
+            layoutTag
+              ? layouts.map((option) => ({ name: option.name, kind: 'layout' }))
+              : tagOptions
+          }
           onChangeTag={layoutTag ? changeToLayout : (name) => onChangeTag?.(name)}
         />
       )}
@@ -1207,10 +1231,10 @@ function ElementClass({ state }: { readonly state: ElementState }) {
     loopContext,
     bindContext,
     linkContext,
-    dataCtx,
+    dataContext,
     setPropCascading,
     classField,
-    assetCtx,
+    assetContext,
   } = state;
   return (
     <>
@@ -1218,15 +1242,15 @@ function ElementClass({ state }: { readonly state: ElementState }) {
         <PropField
           key="class"
           nodeKey={node.id}
-          bindCtx={bindContext || loopContext}
+          bindContext={bindContext || loopContext}
           field={classField}
           value={node.props?.['class']}
           slotOptions={slotOptions}
           projectClasses={projectClasses}
-          assetCtx={assetCtx}
+          assetContext={assetContext}
           linkContext={linkContext}
-          dataCtx={dataCtx}
-          onChange={(v, immediate) => setPropCascading('class', v, immediate)}
+          dataContext={dataContext}
+          onChange={(next, immediate) => setPropCascading('class', next, immediate)}
         />
       )}
     </>
@@ -1241,7 +1265,7 @@ function ElementStyle({ state }: { readonly state: ElementState }) {
     loopContext,
     bindContext,
     linkContext,
-    dataCtx,
+    dataContext,
     setPropCascading,
     styleField,
   } = state;
@@ -1254,14 +1278,14 @@ function ElementStyle({ state }: { readonly state: ElementState }) {
           // would leave the previous element's CSS sitting in the field.
           key={`style:${node.id}`}
           nodeKey={node.id}
-          bindCtx={bindContext || loopContext}
+          bindContext={bindContext || loopContext}
           field={styleField}
           value={node.props?.['style']}
           slotOptions={slotOptions}
           projectClasses={projectClasses}
           linkContext={linkContext}
-          dataCtx={dataCtx}
-          onChange={(v, immediate) => setPropCascading('style', v, immediate)}
+          dataContext={dataContext}
+          onChange={(next, immediate) => setPropCascading('style', next, immediate)}
         />
       )}
     </>
@@ -1288,7 +1312,7 @@ function ElementAttributes({ state }: { readonly state: ElementState }) {
           node={node}
           names={attrNames}
           projectPath={projectPath}
-          bindCtx={bindContext || loopContext}
+          bindContext={bindContext || loopContext}
           onSetProp={onSetProp}
           onSetProps={onSetProps}
           onRenameProp={onRenameProp}
@@ -1308,7 +1332,7 @@ function ElementSlot({ state }: { readonly state: ElementState }) {
           field={{ name: 'slot', type: 'slot' }}
           value={node.props?.['slot']}
           slotOptions={slotOptions}
-          onChange={(v, immediate) => onSetProp('slot', v, immediate)}
+          onChange={(next, immediate) => onSetProp('slot', next, immediate)}
         />
       )}
     </>
@@ -1341,9 +1365,9 @@ function ElementSettings({ state }: { readonly state: ElementState }) {
   );
 }
 
-function elementOpenContentPicker(state: ElementState, host: Element | null): void {
+function elementOpenContentPicker(state: ElementState, host: Element | undefined): void {
   if (state.contentPicker) {
-    state.setContentPicker(null);
+    state.setContentPicker(undefined);
     return;
   }
   const rectangle = host?.getBoundingClientRect();

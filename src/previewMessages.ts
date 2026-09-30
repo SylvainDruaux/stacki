@@ -6,7 +6,6 @@ import {
   dictionary,
   digest,
   list,
-  nullable,
   optional,
   pathText,
   record,
@@ -17,9 +16,9 @@ import { parsePreviewRender, type PreviewRender } from '../shared/preview-token'
 export type PreviewMessage =
   | {
       readonly kind: 'rects';
-      readonly rects: Readonly<Record<string, readonly Box[] | null>>;
+      readonly rects: Readonly<Record<string, readonly Box[] | undefined>>;
       readonly classes: Readonly<Record<string, readonly (readonly string[])[]>>;
-      readonly spacing: Readonly<Record<string, readonly (Spacing | null)[]>>;
+      readonly spacing: Readonly<Record<string, readonly (Spacing | undefined)[]>>;
     }
   | {
       readonly kind: 'node-classes';
@@ -116,7 +115,7 @@ export function parseShortcutMessage(input: unknown): ShortcutMessage | undefine
 /** Where on the canvas an event landed, and which rendering it landed on: the
  * token is absent until the frame has digested its rendering's manifest. */
 export interface LocatedEvent {
-  readonly path: string | null;
+  readonly path: string | undefined;
   readonly occurrence: number;
   readonly token: Digest | undefined;
 }
@@ -179,9 +178,9 @@ function parseKnownMessage(value: Readonly<Record<string, unknown>>): PreviewMes
 function parseRects(value: Readonly<Record<string, unknown>>): PreviewMessage {
   return {
     kind: 'rects',
-    rects: dictionary(nullable(list(parseBox)))(value['rects']),
+    rects: dictionary(optional(list(parseBox)))(value['rects']),
     classes: dictionary(list(list(pathText)))(value['classes']),
-    spacing: dictionary(list(nullable(parseSpacing)))(value['spacing']),
+    spacing: dictionary(list(optional(parseSpacing)))(value['spacing']),
   };
 }
 
@@ -194,11 +193,10 @@ function parseReloadReason(input: unknown): PreviewReloadReason {
 }
 
 function parseLocatedMessage(value: Readonly<Record<string, unknown>>): LocatedEvent {
-  const token = nullable(optional(digest))(value['token']);
   return {
-    path: nullable(pathText)(value['path']),
+    path: optional(pathText)(value['path']),
     occurrence: count(value['occurrence']),
-    token: token ?? undefined,
+    token: optional(digest)(value['token']),
   };
 }
 

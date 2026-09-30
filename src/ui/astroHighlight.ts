@@ -110,7 +110,7 @@ async function highlightAstro(
 ): Promise<void> {
   const source = view.state.doc.toString();
   if (source.length > LIMITS.syntaxHighlightCharsMax) {
-    replaceHighlight(view, Decoration.none, revision, currentRevision, source);
+    replaceHighlight(view, Decoration.none, revision, source, currentRevision);
     return;
   }
   const instance = await astroHighlighter();
@@ -137,15 +137,15 @@ async function highlightAstro(
       ];
     }),
   );
-  replaceHighlight(view, Decoration.set(ranges, true), revision, currentRevision, source);
+  replaceHighlight(view, Decoration.set(ranges, true), revision, source, currentRevision);
 }
 
 function replaceHighlight(
   view: EditorView,
   decorations: DecorationSet,
   revision: number,
-  currentRevision: () => number,
   source: string,
+  currentRevision: () => number,
 ): void {
   if (revision !== currentRevision()) {
     return;

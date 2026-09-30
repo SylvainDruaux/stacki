@@ -26,6 +26,7 @@ import { sendCode } from './codeEdits';
 import { carryHandles, seedOf } from './nodeHandles';
 import {
   recordWrite,
+  writeOutcome,
   sendGesture,
   type EditDrafts,
   type EditGesture,
@@ -45,7 +46,7 @@ import {
 export interface SenderDeps {
   readonly queue: EditDrafts;
   /** The open page's state now (a ref: installs are seen at once). */
-  readonly state: () => EditorPageState | null;
+  readonly state: () => EditorPageState | undefined;
   /** Change the open page's state; the change sees the latest one. */
   readonly update: (path: string, change: (current: EditorPageState) => EditorPageState) => void;
   /** The file refused a write: show the conflict notice with its reason. */
@@ -61,7 +62,7 @@ export function createEntrySender(
 ): (path: string, entry: QueueEntry) => Promise<EntrySent> {
   return async (path, entry) => {
     const state = deps.state();
-    assert(state !== null, 'An entry is sent for an open page');
+    assert(state !== undefined, 'An entry is sent for an open page');
     deps.update(path, (current) => withSave(current, started(current.save)));
     switch (entry.tag) {
       case 'gesture':
@@ -239,7 +240,7 @@ async function sendCodeEntry(
   entry: Extract<QueueEntry, { tag: 'code' }>,
 ): Promise<EntrySent> {
   const state = deps.state();
-  assert(state !== null, 'Typed code belongs to an open page');
+  assert(state !== undefined, 'Typed code belongs to an open page');
   const sent = await sendCode({
     path,
     text: state.source,
@@ -343,7 +344,7 @@ function withdraw(
   record: EditsRecord,
   reason: RejectionReason,
 ): void {
-  record.outcome = { tag: 'dropped' };
+  writeOutcome(record, { tag: 'dropped' });
   deps.notice(`That edit can’t be made visually: ${describeRejection(reason)}`);
   const queued = deps.queue.entries(path);
   const code = queued.some((entry) => entry.tag !== 'gesture');

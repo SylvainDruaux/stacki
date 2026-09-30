@@ -59,7 +59,8 @@ interface Selection<T> {
   readonly listRef: RefObject<HTMLDivElement>;
   readonly searchRef: RefObject<HTMLInputElement>;
   readonly committed: MutableRefObject<T>;
-  readonly previewed: MutableRefObject<T | null>;
+  // Boxed, so previewing an option whose value is itself undefined still counts.
+  readonly previewed: MutableRefObject<{ readonly value: T } | undefined>;
 }
 interface Actions<T> {
   readonly openPopup: () => void;
@@ -118,7 +119,7 @@ function useDropdownSelection<T>(props: DropdownProps<T>): Selection<T> {
   const listRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const committed = useRef(props.value);
-  const previewed = useRef<T | null>(null);
+  const previewed = useRef<{ readonly value: T } | undefined>(undefined);
   const queryText = query.trim().toLowerCase();
   const visible =
     props.searchable && queryText
@@ -149,16 +150,16 @@ function useDropdownActions<T>(props: DropdownProps<T>, state: Selection<T>): Ac
   const { value, options, onChange, livePreview = true } = props;
   const close = useCallback(() => {
     setOpen(false);
-    if (previewed.current !== null && previewed.current !== committed.current) {
+    if (previewed.current !== undefined && previewed.current.value !== committed.current) {
       onChange(committed.current);
     }
-    previewed.current = null;
+    previewed.current = undefined;
   }, [setOpen, previewed, committed, onChange]);
   return {
     close,
     openPopup: () => {
       committed.current = value;
-      previewed.current = null;
+      previewed.current = undefined;
       setQuery('');
       setHighlight(options.findIndex((option) => option.value === value));
       setOpen(true);
@@ -169,16 +170,16 @@ function useDropdownActions<T>(props: DropdownProps<T>, state: Selection<T>): Ac
       if (!option || !livePreview) {
         return;
       }
-      const applied = previewed.current ?? committed.current;
+      const applied = previewed.current?.value ?? committed.current;
       if (option.value !== applied) {
-        previewed.current = option.value;
+        previewed.current = { value: option.value };
         onChange(option.value);
       }
     },
     pick: (option) => {
-      const applied = previewed.current ?? committed.current;
+      const applied = previewed.current?.value ?? committed.current;
       committed.current = option.value;
-      previewed.current = null;
+      previewed.current = undefined;
       setOpen(false);
       if (option.value !== applied) {
         onChange(option.value);
@@ -189,7 +190,7 @@ function useDropdownActions<T>(props: DropdownProps<T>, state: Selection<T>): Ac
 }
 
 function useDropdownPosition<T>(state: Selection<T>, options: { readonly searchable: boolean }) {
-  const [position, setPosition] = useState<PopupPosition | null>(null);
+  const [position, setPosition] = useState<PopupPosition | undefined>(undefined);
   const { open, triggerRef, visible } = state;
   const { searchable } = options;
   useLayoutEffect(() => {
@@ -412,7 +413,7 @@ function DropdownRow<T>({
       onClick={() => control.pick(option)}
     >
       <span className="dd-check">
-        {option.value === control.committed.current ? <CheckIcon size={11} /> : null}
+        {option.value === control.committed.current ? <CheckIcon size={11} /> : undefined}
       </span>
       {option.icon && <span className="dd-icon">{option.icon}</span>}
       <span className="dd-option-label">{option.label}</span>

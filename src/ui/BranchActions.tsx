@@ -1,7 +1,7 @@
 interface BranchActionsProps {
   readonly branch: string;
   readonly current: string;
-  readonly trunk?: string | null;
+  readonly trunk?: string | undefined;
   readonly onMerge?: (branch: string) => void;
   readonly onDelete?: (branch: string) => void;
   readonly disabled?: boolean;
@@ -63,8 +63,8 @@ export default function BranchActions({
         className="row-action merge"
         title={mergeWhy}
         disabled={disabled || isCurrent}
-        onClick={(e) => {
-          e.stopPropagation();
+        onClick={(event) => {
+          event.stopPropagation();
           onMerge?.(branch);
         }}
       >
@@ -74,8 +74,8 @@ export default function BranchActions({
         className="row-action branch-action"
         title={deleteWhy}
         disabled={disabled || isCurrent || isTrunk}
-        onClick={(e) => {
-          e.stopPropagation();
+        onClick={(event) => {
+          event.stopPropagation();
           onDelete?.(branch);
         }}
       >

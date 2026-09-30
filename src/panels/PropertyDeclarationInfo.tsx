@@ -12,7 +12,7 @@ export function PropertyDeclarationInfo({ property }: { readonly property: Compo
     details.push(`Default (line ${origin.defaultValue.line}): ${origin.defaultValue.expression}`);
   }
   if (details.length === 0) {
-    return null;
+    return undefined;
   }
   return (
     <button
@@ -28,7 +28,7 @@ export function PropertyDeclarationInfo({ property }: { readonly property: Compo
 
 export function PropertyConditions({ property }: { readonly property: ComponentProperty }) {
   if (!property.conditions?.length) {
-    return null;
+    return undefined;
   }
   return (
     <div className="property-conditions">

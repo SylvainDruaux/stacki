@@ -141,7 +141,7 @@ function usePropertySnapshot(
 function usePropertyWatcher(
   props: Pick<ComponentPropertiesPanelProps, 'file' | 'projectPath'>,
   {
-    active,
+    active: activeRef,
     invalidateReads,
     reload,
   }: {
@@ -151,7 +151,7 @@ function usePropertyWatcher(
   },
 ): void {
   useEffect(() => {
-    active.current = true;
+    activeRef.current = true;
     // This event excludes self writes in projectWatcher, before IPC dispatch.
     const off = onFilesChanged(({ files }) => {
       if (files.includes(props.file)) {
@@ -160,11 +160,11 @@ function usePropertyWatcher(
     });
     void reload('initial');
     return () => {
-      active.current = false;
+      activeRef.current = false;
       invalidateReads();
       off();
     };
-  }, [props.file, props.projectPath, reload, invalidateReads, active]);
+  }, [props.file, props.projectPath, reload, invalidateReads, activeRef]);
 }
 
 function refreshSnapshot(previous: Snapshot, state: PanelState): Snapshot {

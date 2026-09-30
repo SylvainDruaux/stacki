@@ -25,9 +25,9 @@ export interface Rename {
 export type SetText = (value: string, renames?: readonly Rename[]) => void;
 interface MapEditorProps {
   readonly node: MapNode;
-  readonly loopContext?: RichContext | null | undefined;
-  readonly bindCtx?: RichContext | null | undefined;
-  readonly dataCtx?: SourceContext | undefined;
+  readonly loopContext?: RichContext | undefined;
+  readonly bindContext?: RichContext | undefined;
+  readonly dataContext?: SourceContext | undefined;
   readonly onSetText: SetText;
 }
 interface MapFields {
@@ -59,17 +59,17 @@ const noLabelActivation = (event: React.MouseEvent<HTMLLabelElement>) => event.p
 // callbacks fall back to code.
 export function parseMapHead(head: string) {
   assert(head.length <= LIMITS.nodeValueCharsMax, 'MapEditor: head limit exceeded');
-  const m = String(head)
+  const match = String(head)
     .trim()
     .match(/^([\s\S]+?)\.map\(\s*(?:\(\s*([\w$]+)\s*(?:,\s*([\w$]+)\s*)?\)|([\w$]+))\s*=>\s*\($/);
-  if (!m?.[1]) {
-    return null;
+  if (!match?.[1]) {
+    return undefined;
   }
-  const item = m[2] || m[4];
+  const item = match[2] || match[4];
   if (!item) {
-    return null;
+    return undefined;
   }
-  return { data: m[1].trim(), item, index: m[3] || '' };
+  return { data: match[1].trim(), item, index: match[3] || '' };
 }
 
 // The leading name in an expression — what the value is a list OF, before
@@ -132,9 +132,9 @@ function useMapModel({ node, onSetText }: MapEditorProps) {
   // External changes (undo, file reload, code edits below) re-sync fields.
   useEffect(() => {
     if (node.head !== lastBuiltRef.current) {
-      const p = parseMapHead(node.head);
-      if (p) {
-        setFields(p);
+      const parsed = parseMapHead(node.head);
+      if (parsed) {
+        setFields(parsed);
       }
       lastBuiltRef.current = node.head;
     }
@@ -142,7 +142,7 @@ function useMapModel({ node, onSetText }: MapEditorProps) {
 
   // Typing only updates local state; the head is written on blur/Enter/pick
   // so half-typed values never run in the preview.
-  const update = (patch: MapPatch) => setFields((f) => ({ ...f, ...patch }));
+  const update = (patch: MapPatch) => setFields((previous) => ({ ...previous, ...patch }));
   const commit = (next: MapFields) => {
     setFields(next);
     const itemOk = IDENT_RE.test(next.item);
@@ -165,8 +165,8 @@ function useMapModel({ node, onSetText }: MapEditorProps) {
     lastBuiltRef.current = head;
     onSetText(head, renames);
   };
-  const commitOnEnter = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
+  const commitOnEnter = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === 'Enter') {
       commit(fields);
     }
   };
@@ -185,46 +185,46 @@ function useMapModel({ node, onSetText }: MapEditorProps) {
   return { fields, update, commit, commitOnEnter, commitSource };
 }
 function useMapEditor(props: MapEditorProps) {
-  const { node, loopContext, bindCtx, dataCtx, onSetText } = props;
+  const { node, loopContext, bindContext, dataContext, onSetText } = props;
   const { fields, update, commit, commitOnEnter, commitSource } = useMapModel(props);
   // Anchors the source popup under the Data row.
   const dataRef = useRef<HTMLDivElement>(null);
   const codeRef = useRef<HTMLDivElement>(null);
-  const [sourceMenu, setSourceMenu] = useState<FieldPosition | null>(null);
+  const [sourceMenu, setSourceMenu] = useState<FieldPosition | undefined>(undefined);
   // The bind handle's picker, and the way into whichever field it belongs to.
   // The source picker chooses what is being looped over; this drops a value
   // into the expression around it — `posts.slice(0, count)` needs `count` from
   // somewhere, and there was no way to reach it from here.
-  const [insertAt, setInsertAt] = useState<MapInsert | null>(null); // {pos, field}
-  const dataApiRef = useRef<ExprInputAPI | null>(null);
-  const codeApiRef = useRef<ExprInputAPI | null>(null);
+  const [insertAt, setInsertAt] = useState<MapInsert | undefined>(undefined); // {pos, field}
+  const dataApiRef = useRef<ExprInputAPI | undefined>(undefined);
+  const codeApiRef = useRef<ExprInputAPI | undefined>(undefined);
   const openInsert = (field: 'data' | 'code', ref: React.RefObject<HTMLElement>) => {
     if (insertAt) {
-      setInsertAt(null);
+      setInsertAt(undefined);
       return;
     }
-    const r = ref.current?.getBoundingClientRect();
-    if (!r) {
+    const rect = ref.current?.getBoundingClientRect();
+    if (!rect) {
       return;
     }
     setInsertAt({
       field,
       pos: {
-        left: r.left,
-        top: Math.min(r.bottom + 4, Math.max(60, window.innerHeight - 340)),
-        width: Math.max(r.width, 240),
+        left: rect.left,
+        top: Math.min(rect.bottom + 4, Math.max(60, window.innerHeight - 340)),
+        width: Math.max(rect.width, 240),
       },
     });
   };
   const openSourceMenu = () => {
-    const r = dataRef.current?.getBoundingClientRect();
-    if (!r) {
+    const rect = dataRef.current?.getBoundingClientRect();
+    if (!rect) {
       return;
     }
     setSourceMenu({
-      left: r.left,
-      top: Math.min(r.bottom + 4, Math.max(60, window.innerHeight - 340)),
-      width: Math.max(r.width, 240),
+      left: rect.left,
+      top: Math.min(rect.bottom + 4, Math.max(60, window.innerHeight - 340)),
+      width: Math.max(rect.width, 240),
     });
   };
 
@@ -236,8 +236,8 @@ function useMapEditor(props: MapEditorProps) {
   return {
     node,
     loopContext,
-    bindCtx,
-    dataCtx,
+    bindContext,
+    dataContext,
     onSetText,
     fields,
     update,
@@ -294,24 +294,24 @@ function MapEditorView({ state }: { readonly state: ReturnType<typeof useMapEdit
 // follows the tag, and attributes invalid for the new tag are dropped.
 // The glyph an option wears in the tag list — the same ones the insert
 // palette uses, so a component reads as a component in both places.
-function tagOptionIcon(opt: TagOption) {
-  if (opt.kind === 'astroAsset') {
-    return astroAssetIcon(opt.name, 13);
+function tagOptionIcon(option: TagOption) {
+  if (option.kind === 'astroAsset') {
+    return astroAssetIcon(option.name, 13);
   }
-  if (opt.kind === 'layout') {
+  if (option.kind === 'layout') {
     return <LayoutIcon size={13} style={{ color: '#79e09c' }} />;
   }
-  if (opt.kind === 'component') {
+  if (option.kind === 'component') {
     return <ElementComponentIcon size={13} style={{ color: '#79e09c' }} />;
   }
-  return elementIcon(opt.name, 13);
+  return elementIcon(option.name, 13);
 }
 
 function useTagModel({ tag, options }: TagFieldProps) {
   const [draft, setDraft] = useState(tag);
   const [focused, setFocused] = useState(false);
   const [highlight, setHighlight] = useState(0);
-  const [popupPos, setPopupPos] = useState<FieldPosition | null>(null);
+  const [popupPosition, setPopupPosition] = useState<FieldPosition | undefined>(undefined);
   const wrapRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   // Two refs, because picking from the list commits and then blurs in the same
@@ -324,9 +324,9 @@ function useTagModel({ tag, options }: TagFieldProps) {
   //     the picked name sitting in the box.
   const committedRef = useRef(tag);
   const draftRef = useRef(tag);
-  const updateDraft = (v: string) => {
-    draftRef.current = v;
-    setDraft(v);
+  const updateDraft = (value: string) => {
+    draftRef.current = value;
+    setDraft(value);
   };
   useEffect(() => {
     committedRef.current = tag;
@@ -342,27 +342,27 @@ function useTagModel({ tag, options }: TagFieldProps) {
   assert((options?.length ?? 0) <= LIMITS.scanEntriesMax, 'TagField: option limit exceeded');
   const pool =
     options && options.length ? options : HTML_TAGS.map((name) => ({ name, kind: 'element' }));
-  const q = draft.trim();
-  const ql = q.toLowerCase();
+  const query = draft.trim();
+  const ql = query.toLowerCase();
   const matches =
-    focused && q && q !== tag
+    focused && query && query !== tag
       ? pool
-          .filter((o) => o.name.toLowerCase().includes(ql))
-          .sort((a, b) => {
-            const ap = a.name.toLowerCase().startsWith(ql) ? 0 : 1;
-            const bp = b.name.toLowerCase().startsWith(ql) ? 0 : 1;
-            return ap - bp || a.name.length - b.name.length;
+          .filter((option) => option.name.toLowerCase().includes(ql))
+          .sort((left, right) => {
+            const ap = left.name.toLowerCase().startsWith(ql) ? 0 : 1;
+            const bp = right.name.toLowerCase().startsWith(ql) ? 0 : 1;
+            return ap - bp || left.name.length - right.name.length;
           })
           .slice(0, 12)
       : [];
 
   useLayoutEffect(() => {
     if (!matches.length || !wrapRef.current) {
-      setPopupPos(null);
+      setPopupPosition(undefined);
       return;
     }
-    const r = wrapRef.current.getBoundingClientRect();
-    setPopupPos({ left: r.left, top: r.bottom + 4, width: r.width });
+    const rect = wrapRef.current.getBoundingClientRect();
+    setPopupPosition({ left: rect.left, top: rect.bottom + 4, width: rect.width });
   }, [matches.length, draft]);
 
   return {
@@ -370,7 +370,7 @@ function useTagModel({ tag, options }: TagFieldProps) {
     setFocused,
     highlight,
     setHighlight,
-    popupPos,
+    popupPos: popupPosition,
     wrapRef,
     inputRef,
     committedRef,
@@ -398,16 +398,26 @@ function useTagField(props: TagFieldProps) {
   const apply = (name: string) => {
     committedRef.current = name;
     updateDraft(name);
-    Promise.resolve(onChangeTag(name)).then((ok) => {
-      if (ok === false) {
-        committedRef.current = tag;
-        updateDraft(tag);
-      }
-    });
+    const revert = () => {
+      committedRef.current = tag;
+      updateDraft(tag);
+    };
+    Promise.resolve(onChangeTag(name)).then(
+      (ok) => {
+        if (ok === false) {
+          revert();
+        }
+      },
+      (error: unknown) => {
+        // A rename that failed leaves the element as it was, so the field says so too.
+        console.error('Tag field: rename failed', error);
+        revert();
+      },
+    );
   };
 
-  const commit = (t: string) => {
-    const raw = String(t).trim();
+  const commit = (text: string) => {
+    const raw = String(text).trim();
     if (raw.length > LIMITS.tagNameCharsMax) {
       return updateDraft(committedRef.current);
     }
@@ -429,19 +439,19 @@ function useTagField(props: TagFieldProps) {
     }
   };
 
-  const onKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'ArrowDown' && matches.length) {
-      e.preventDefault();
-      setHighlight((h) => Math.min(h + 1, matches.length - 1));
-    } else if (e.key === 'ArrowUp' && matches.length) {
-      e.preventDefault();
-      setHighlight((h) => Math.max(h - 1, 0));
-    } else if (e.key === 'Enter' || (e.key === 'Tab' && matches.length)) {
-      e.preventDefault();
+  const onKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === 'ArrowDown' && matches.length) {
+      event.preventDefault();
+      setHighlight((current) => Math.min(current + 1, matches.length - 1));
+    } else if (event.key === 'ArrowUp' && matches.length) {
+      event.preventDefault();
+      setHighlight((current) => Math.max(current - 1, 0));
+    } else if (event.key === 'Enter' || (event.key === 'Tab' && matches.length)) {
+      event.preventDefault();
       const picked = matches[Math.min(highlight, matches.length - 1)];
       commit(picked ? picked.name : draftRef.current);
       inputRef.current?.blur();
-    } else if (e.key === 'Escape') {
+    } else if (event.key === 'Escape') {
       // Put the text back before blurring, or the blur below would commit
       // whatever was being typed — the opposite of what Escape means.
       updateDraft(committedRef.current);
@@ -463,7 +473,7 @@ function TagFieldView({ state }: { readonly state: ReturnType<typeof useTagField
     setFocused,
     highlight,
     setHighlight,
-    popupPos,
+    popupPos: popupPosition,
     wrapRef,
     inputRef,
     draftRef,
@@ -485,8 +495,8 @@ function TagFieldView({ state }: { readonly state: ReturnType<typeof useTagField
         ref={inputRef}
         value={draft}
         spellCheck={false}
-        onChange={(e) => {
-          updateDraft(e.target.value);
+        onChange={(event) => {
+          updateDraft(event.target.value);
           setHighlight(0);
         }}
         onFocus={() => setFocused(true)}
@@ -498,24 +508,24 @@ function TagFieldView({ state }: { readonly state: ReturnType<typeof useTagField
         }}
         onKeyDown={onKeyDown}
       />
-      {popupPos && (
+      {popupPosition && (
         <div
           className="dd-popup class-suggest"
-          style={{ left: popupPos.left, top: popupPos.top, width: popupPos.width }}
+          style={{ left: popupPosition.left, top: popupPosition.top, width: popupPosition.width }}
         >
-          {matches.map((o, i) => (
+          {matches.map((option, i) => (
             <div
-              key={o.name}
+              key={option.name}
               className={`dd-option ${i === highlight ? 'highlight' : ''}`}
-              onMouseDown={(e) => e.preventDefault()}
+              onMouseDown={(event) => event.preventDefault()}
               onMouseEnter={() => setHighlight(i)}
               onClick={() => {
-                commit(o.name);
+                commit(option.name);
                 inputRef.current?.blur();
               }}
             >
-              <span className="dd-option-icon">{tagOptionIcon(o)}</span>
-              <span className="dd-option-label">{o.name}</span>
+              <span className="dd-option-icon">{tagOptionIcon(option)}</span>
+              <span className="dd-option-label">{option.name}</span>
             </div>
           ))}
         </div>
@@ -527,7 +537,7 @@ function TagFieldView({ state }: { readonly state: ReturnType<typeof useTagField
 function MapSourcePicker({ state }: { readonly state: ReturnType<typeof useMapEditor> }) {
   const {
     loopContext,
-    bindCtx,
+    bindContext,
 
     fields,
     update,
@@ -544,22 +554,22 @@ function MapSourcePicker({ state }: { readonly state: ReturnType<typeof useMapEd
       {sourceMenu && (
         <FieldDataPicker
           pos={sourceMenu}
-          bindCtx={bindCtx || loopContext}
-          tree={listsOnly(dataTree(bindCtx || loopContext || {}))}
-          current={isNoSource ? null : sourceChip(fields.data) || fields.data.trim()}
+          bindContext={bindContext || loopContext}
+          tree={listsOnly(dataTree(bindContext || loopContext || {}))}
+          current={isNoSource ? undefined : sourceChip(fields.data) || fields.data.trim()}
           onPick={(path) => {
-            setSourceMenu(null);
+            setSourceMenu(undefined);
             // Picking swaps the source and keeps the code after it: a
             // list chosen again is still `.filter(…)`-ed the same way.
             commitSource(withSource(fields.data, path));
           }}
           onWrite={() => {
-            setSourceMenu(null);
+            setSourceMenu(undefined);
             if (isNoSource) {
               update({ data: '' });
             }
           }}
-          onClose={() => setSourceMenu(null)}
+          onClose={() => setSourceMenu(undefined)}
         />
       )}
     </>
@@ -568,7 +578,7 @@ function MapSourcePicker({ state }: { readonly state: ReturnType<typeof useMapEd
 
 function MapDataField({ state }: { readonly state: ReturnType<typeof useMapEditor> }) {
   const {
-    dataCtx,
+    dataContext,
 
     fields,
     update,
@@ -612,13 +622,13 @@ function MapDataField({ state }: { readonly state: ReturnType<typeof useMapEdito
           placeholder="Choose or write a list…"
           chip={sourceChip(fields.data)}
           apiRef={dataApiRef}
-          onChipClick={() => (sourceMenu ? setSourceMenu(null) : openSourceMenu())}
-          onChange={(v) => update({ data: v })}
-          onCommit={(v) => commitSource(v.trim() || NO_SOURCE)}
+          onChipClick={() => (sourceMenu ? setSourceMenu(undefined) : openSourceMenu())}
+          onChange={(value) => update({ data: value })}
+          onCommit={(value) => commitSource(value.trim() || NO_SOURCE)}
         />
         <SourceEditButton
           name={referencedName(fields.data)}
-          dataCtx={dataCtx}
+          dataContext={dataContext}
           anchorRef={dataRef}
         />
       </div>
@@ -648,7 +658,7 @@ function MapNames({ state }: { readonly state: ReturnType<typeof useMapEditor> }
           placeholder="e.g. service"
           spellCheck={false}
           style={itemBad ? { borderColor: 'var(--red)' } : undefined}
-          onChange={(e) => update({ item: e.target.value })}
+          onChange={(event) => update({ item: event.target.value })}
           onBlur={() => commit(fields)}
           onKeyDown={commitOnEnter}
         />
@@ -663,7 +673,7 @@ function MapNames({ state }: { readonly state: ReturnType<typeof useMapEditor> }
           placeholder="e.g. index"
           spellCheck={false}
           style={indexBad ? { borderColor: 'var(--red)' } : undefined}
-          onChange={(e) => update({ index: e.target.value })}
+          onChange={(event) => update({ index: event.target.value })}
           onBlur={() => commit(fields)}
           onKeyDown={commitOnEnter}
         />
@@ -703,7 +713,7 @@ function MapCodeField({ state }: { readonly state: ReturnType<typeof useMapEdito
         value={node.head}
         syncValue={node.head}
         apiRef={codeApiRef}
-        onCommit={(v) => v !== node.head && onSetText(v)}
+        onCommit={(value) => value !== node.head && onSetText(value)}
       />
     </div>
   );
@@ -713,7 +723,7 @@ function MapInsertPicker({ state }: { readonly state: ReturnType<typeof useMapEd
   const {
     node,
     loopContext,
-    bindCtx,
+    bindContext,
 
     onSetText,
 
@@ -729,16 +739,16 @@ function MapInsertPicker({ state }: { readonly state: ReturnType<typeof useMapEd
       {insertAt && (
         <FieldDataPicker
           pos={insertAt.pos}
-          bindCtx={bindCtx || loopContext}
-          current={null}
+          bindContext={bindContext || loopContext}
+          current={undefined}
           onPick={(path) => {
             const field = insertAt.field;
-            setInsertAt(null);
+            setInsertAt(undefined);
             const next =
               field === 'data'
                 ? dataApiRef.current?.insert(path)
                 : codeApiRef.current?.insert(path);
-            if (next == null) {
+            if (next === undefined) {
               return;
             }
             if (field === 'data') {
@@ -747,7 +757,7 @@ function MapInsertPicker({ state }: { readonly state: ReturnType<typeof useMapEd
               onSetText(next);
             }
           }}
-          onClose={() => setInsertAt(null)}
+          onClose={() => setInsertAt(undefined)}
         />
       )}
     </>

@@ -6,6 +6,7 @@ import { assert } from '../../shared/assert';
 import { fieldsAt, keyFor } from '../cmsSchema';
 import { withDeclaredTypes } from './cmsTypes';
 import { readCmsUsage, deleteCms } from '../cmsBridge';
+import { cleanError } from '../cleanError';
 import { confirmDialog } from '../ui/ConfirmDialog';
 import useListReorder from '../ui/useListReorder';
 import { useCmsDialog } from './CmsField';
@@ -75,7 +76,7 @@ const FIELD_TYPES = [
 ] as const;
 
 // The types you can choose for a new field.
-const CREATABLE_TYPES = FIELD_TYPES.filter((t) => t.value !== 'code');
+const CREATABLE_TYPES = FIELD_TYPES.filter((entry) => entry.value !== 'code');
 
 const typeInfo = (type: FieldType) =>
   FIELD_TYPES.find((entry) => entry.value === type) ?? FIELD_TYPES[0];
@@ -155,7 +156,11 @@ function DeleteCollectionCard({
       </p>
       <button
         className="ghost danger"
-        onClick={() => deleteCollection(collection, project, showToast, onDeleted)}
+        onClick={() => {
+          void deleteCollection(collection, project, showToast, onDeleted).catch((error: unknown) =>
+            showToast(cleanError(error), 'error'),
+          );
+        }}
       >
         <TrashIcon size={12} /> Delete {collection.label}
       </button>
@@ -299,19 +304,24 @@ function SchemaName({
           event.currentTarget.blur();
         }
         if (event.key === 'Escape') {
-          event.currentTarget.value = field.label;
+          setInputText(event.currentTarget, field.label);
           event.currentTarget.blur();
         }
       }}
       onBlur={(event) => {
         const next = keyFor(event.target.value);
         if (!next || !onRenameField(path, field.key, next)) {
-          event.target.value = field.label;
+          setInputText(event.target, field.label);
         }
       }}
     />
   );
 }
+// An uncontrolled input's text is the element's own state, set in place.
+function setInputText(inputElement: HTMLInputElement, text: string): void {
+  inputElement.value = text;
+}
+
 function SchemaDelete({
   field,
   path,
@@ -321,17 +331,18 @@ function SchemaDelete({
     <button
       className="ghost danger"
       title="Delete field"
-      onClick={async () => {
-        if (
-          await confirmDialog({
-            title: `Delete the “${field.label}” field?`,
-            body: 'Its content is removed from every item in this collection.',
-            confirmLabel: 'Delete field',
-            danger: true,
-          })
-        ) {
-          onRemoveField(path, field.key);
-        }
+      onClick={() => {
+        // The confirm dialog answers yes or no; it never rejects.
+        void confirmDialog({
+          title: `Delete the “${field.label}” field?`,
+          body: 'Its content is removed from every item in this collection.',
+          confirmLabel: 'Delete field',
+          danger: true,
+        }).then((confirmed) => {
+          if (confirmed) {
+            onRemoveField(path, field.key);
+          }
+        });
       }}
     >
       <TrashIcon size={12} />

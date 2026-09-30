@@ -14,18 +14,18 @@ export interface AssetRequest {
   readonly onPick: (rel: string, entry?: WireAssetEntry) => void;
 }
 
-type AssetListener = (request: AssetRequest | null) => void;
-// A single request and listener bound state for the whole window. Null is the
-// existing cancellation message, so it remains part of this migration's API.
-let listener: AssetListener | null = null;
-let pending: AssetRequest | null = null;
+type AssetListener = (request: AssetRequest | undefined) => void;
+// A single request and listener bound state for the whole window. Undefined is the
+// cancellation message.
+let listener: AssetListener | undefined = undefined;
+let pending: AssetRequest | undefined = undefined;
 
 // Called by App to receive requests. Returns an unsubscribe.
-export function onAssetRequest(fn: AssetListener): () => void {
-  listener = fn;
+export function onAssetRequest(handler: AssetListener): () => void {
+  listener = handler;
   return () => {
-    if (listener === fn) {
-      listener = null;
+    if (listener === handler) {
+      listener = undefined;
     }
   };
 }
@@ -33,16 +33,16 @@ export function onAssetRequest(fn: AssetListener): () => void {
 // { mediaKind: 'image'|'video'|'audio'|'asset', current: string,
 //   onPick(rel, entry) } — entry carries the root ('public'|'src') and abs path,
 //   which decide whether the value is a URL string or an ESM import.
-export function requestAsset(req: AssetRequest): void {
-  pending = req;
-  listener?.(req);
+export function requestAsset(request: AssetRequest): void {
+  pending = request;
+  listener?.(request);
 }
 
-export function getPendingAsset(): AssetRequest | null {
+export function getPendingAsset(): AssetRequest | undefined {
   return pending;
 }
 
 export function clearAssetRequest(): void {
-  pending = null;
-  listener?.(null);
+  pending = undefined;
+  listener?.(undefined);
 }

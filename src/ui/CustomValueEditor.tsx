@@ -41,7 +41,7 @@ function doesNotFit(container: Element, value: string) {
 // opens the new one is stopped at its own cell (so the chip under it does
 // nothing), and that stop is also what keeps it from reaching the open box's
 // outside-press handler — hence this rather than relying on the press.
-let closeOpenCustom: (() => void) | null = null;
+let closeOpenCustom: (() => void) | undefined;
 
 // The whole value, in a box big enough to read it. A long value is usually a
 // long expression — a clamp() of four variables, a calc() of three — and the
@@ -59,8 +59,8 @@ let closeOpenCustom: (() => void) | null = null;
 interface CustomValueProps {
   readonly value: string;
   readonly label?: string;
-  readonly anchor?: DOMRect | null;
-  readonly anchorEl?: HTMLElement | null;
+  readonly anchor?: DOMRect | undefined;
+  readonly anchorEl?: HTMLElement | undefined;
   readonly onCancel: () => void;
   readonly onSave: (value: string) => void;
 }
@@ -100,7 +100,7 @@ function CustomValue(props: CustomValueProps) {
           value={state.draft}
           spellCheck={false}
           rows={4}
-          onChange={(e) => state.setDraft(e.target.value)}
+          onChange={(event) => state.setDraft(event.target.value)}
           /* Enter is handled for the whole box (see the key listener above) — a
              CSS value has no need for a line break, and the field that actually
              has focus is usually the rich one in front of this. */
@@ -114,14 +114,23 @@ function CustomValue(props: CustomValueProps) {
   );
 }
 
-function useCustomValue({ value, anchor, anchorEl, onCancel, onSave }: CustomValueProps) {
+function useCustomValue({
+  value,
+  anchor,
+  anchorEl: anchorElement,
+  onCancel,
+  onSave,
+}: CustomValueProps) {
   const [draft, setDraft] = useState(value);
   const boxRef = useRef<HTMLDivElement>(null);
   const fieldRef = useRef<HTMLTextAreaElement>(null);
   const draftRef = useRef(draft);
   draftRef.current = draft;
   const position = useCustomPosition(boxRef, anchor);
-  useLayoutEffect(() => registerPopupLayer(boxRef.current, anchorEl ?? null), [anchorEl]);
+  useLayoutEffect(
+    () => registerPopupLayer(boxRef.current ?? undefined, anchorElement ?? undefined),
+    [anchorElement],
+  );
   const commit = useCallback((): string => {
     const rich = boxRef.current?.querySelector<HTMLElement>('.embed-editor_varconnect-editor');
     // Blur commits synchronously; reading the draft first would discard the last keystroke.
@@ -135,8 +144,8 @@ function useCustomValue({ value, anchor, anchorEl, onCancel, onSave }: CustomVal
   return { draft, setDraft, boxRef, fieldRef, position };
 }
 
-function useCustomPosition(boxRef: RefObject<HTMLDivElement>, anchor: DOMRect | null | undefined) {
-  const [position, setPosition] = useState<CSSProperties | null>(null);
+function useCustomPosition(boxRef: RefObject<HTMLDivElement>, anchor: DOMRect | undefined) {
+  const [position, setPosition] = useState<CSSProperties | undefined>(undefined);
   useLayoutEffect(() => {
     if (!anchor) {
       return;
@@ -168,7 +177,7 @@ function useCustomClose(
     closeOpenCustom = close;
     return () => {
       if (closeOpenCustom === close) {
-        closeOpenCustom = null;
+        closeOpenCustom = undefined;
       }
     };
   }, [commit]);
@@ -197,7 +206,7 @@ function useCustomClose(
       if (
         event.key === 'Enter' &&
         !event.shiftKey &&
-        customContains(boxRef.current, event.target)
+        customContains(boxRef.current ?? undefined, event.target)
       ) {
         event.preventDefault();
         onSave(commit());
@@ -212,7 +221,7 @@ function useCustomClose(
   }, [boxRef, commit, onCancel, onSave]);
 }
 
-function customContains(box: HTMLElement | null, target: EventTarget | null): boolean {
+function customContains(box: HTMLElement | undefined, target: unknown): boolean {
   const NodeType = box?.ownerDocument.defaultView?.Node;
   return !!box && !!NodeType && target instanceof NodeType && box.contains(target);
 }
@@ -221,7 +230,7 @@ function useCustomScrollLock(boxRef: RefObject<HTMLDivElement>): void {
   useEffect(() => {
     // Refuse scrolling outside the box so the anchored field cannot move underneath it.
     const onWheel = (event: Event): void => {
-      if (!customContains(boxRef.current, event.target)) {
+      if (!customContains(boxRef.current ?? undefined, event.target)) {
         event.preventDefault();
       }
     };

@@ -56,7 +56,10 @@ export default function InsertSearch(props: InsertSearchProps) {
   const state = useInsertSearch(props);
   const { query, setQuery, tab, setTab, highlight, setHighlight, listRef, results } = state;
   return (
-    <div className="insert-overlay" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
+    <div
+      className="insert-overlay"
+      onMouseDown={(event) => event.target === event.currentTarget && onClose()}
+    >
       <div
         className="insert-palette"
         onKeyDown={(event) => insertKey(event, state, onInsert, onClose)}
@@ -68,17 +71,17 @@ export default function InsertSearch(props: InsertSearchProps) {
             value={query}
             placeholder="Search components, elements…"
             spellCheck={false}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(event) => setQuery(event.target.value)}
           />
         </div>
         <div className="insert-tabs">
-          {TABS.map((t) => (
+          {TABS.map((tabEntry) => (
             <button
-              key={t.key}
-              className={`insert-tab ${tab === t.key ? 'on' : ''}`}
-              onClick={() => setTab(t.key)}
+              key={tabEntry.key}
+              className={`insert-tab ${tab === tabEntry.key ? 'on' : ''}`}
+              onClick={() => setTab(tabEntry.key)}
             >
-              {t.label}
+              {tabEntry.label}
             </button>
           ))}
         </div>
@@ -123,9 +126,9 @@ function useInsertSearch({ components, allowSlot }: InsertSearchProps) {
 
   // Keep the highlighted row scrolled into view.
   useEffect(() => {
-    const el = listRef.current?.children[highlight];
-    if (el) {
-      el.scrollIntoView({ block: 'nearest' });
+    const element = listRef.current?.children[highlight];
+    if (element) {
+      element.scrollIntoView({ block: 'nearest' });
     }
   }, [highlight]);
 
@@ -140,26 +143,25 @@ function insertKey(
   onClose: () => void,
 ): void {
   const { results, highlight, setHighlight, tab, setTab } = state;
-  const e = event;
-  if (e.key === 'Escape') {
-    e.preventDefault();
+  if (event.key === 'Escape') {
+    event.preventDefault();
     onClose();
-  } else if (e.key === 'ArrowDown') {
-    e.preventDefault();
-    setHighlight((h) => Math.min(h + 1, results.length - 1));
-  } else if (e.key === 'ArrowUp') {
-    e.preventDefault();
-    setHighlight((h) => Math.max(h - 1, 0));
-  } else if (e.key === 'Enter') {
-    e.preventDefault();
+  } else if (event.key === 'ArrowDown') {
+    event.preventDefault();
+    setHighlight((current) => Math.min(current + 1, results.length - 1));
+  } else if (event.key === 'ArrowUp') {
+    event.preventDefault();
+    setHighlight((current) => Math.max(current - 1, 0));
+  } else if (event.key === 'Enter') {
+    event.preventDefault();
     const item = results[highlight];
     if (item) {
       onInsert(item);
     }
-  } else if (e.key === 'Tab') {
-    e.preventDefault();
-    const idx = TABS.findIndex((t) => t.key === tab);
-    const next = TABS[(idx + (e.shiftKey ? TABS.length - 1 : 1)) % TABS.length];
+  } else if (event.key === 'Tab') {
+    event.preventDefault();
+    const index = TABS.findIndex((tabEntry) => tabEntry.key === tab);
+    const next = TABS[(index + (event.shiftKey ? TABS.length - 1 : 1)) % TABS.length];
     assert(next !== undefined, 'InsertSearch: next tab exists');
     setTab(next.key);
   }
@@ -185,13 +187,13 @@ function insertItems(
   return items;
 }
 function insertComponents(components: readonly InsertComponent[]): InsertItem[] {
-  return components.map((c): InsertItem => ({
+  return components.map((component): InsertItem => ({
     type: 'component',
-    name: c.name,
-    label: c.name,
-    sub: c.folder || 'component',
+    name: component.name,
+    label: component.name,
+    sub: component.folder || 'component',
     cat: 'components',
-    icon: c.isLayout ? (
+    icon: component.isLayout ? (
       <LayoutIcon size={15} style={{ color: '#79e09c' }} />
     ) : (
       <ElementComponentIcon size={15} style={{ color: '#79e09c' }} />
@@ -199,14 +201,14 @@ function insertComponents(components: readonly InsertComponent[]): InsertItem[] 
   }));
 }
 function insertAssets(): InsertItem[] {
-  return ASTRO_ASSETS.map((a): InsertItem => ({
+  return ASTRO_ASSETS.map((asset): InsertItem => ({
     type: 'astroAsset',
-    name: a.name,
-    label: `<${a.name}>`,
+    name: asset.name,
+    label: `<${asset.name}>`,
     sub: 'astro:assets',
-    search: `${a.name} astro assets image picture optimised responsive`,
+    search: `${asset.name} astro assets image picture optimised responsive`,
     cat: 'components',
-    icon: astroAssetIcon(a.name, 15),
+    icon: astroAssetIcon(asset.name, 15),
   }));
 }
 function insertTags({ allowSlot }: { readonly allowSlot: boolean | undefined }): InsertItem[] {

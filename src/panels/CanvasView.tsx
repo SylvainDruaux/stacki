@@ -35,11 +35,11 @@ function clamp(value: number, minimum: number, maximum: number): number {
 export default function CanvasView({ url, refreshKey }: CanvasViewProps) {
   const startDrag = usePointerDrag();
   const wrapRef = React.useRef<HTMLDivElement>(null);
-  const iframeRefs = React.useRef<FrameElements>({});
-  const [view, setView] = React.useState<ViewState | null>(null);
+  const iframesRef = React.useRef<FrameElements>({});
+  const [view, setView] = React.useState<ViewState | undefined>(undefined);
   const [panning, setPanning] = React.useState(false);
   const [heights, setHeights] = React.useState<FrameHeights>({});
-  const viewRef = React.useRef<ViewState | null>(null);
+  const viewRef = React.useRef<ViewState | undefined>(undefined);
   viewRef.current = view;
   const frames = React.useMemo(() => layoutFrames(heights), [heights]);
   const lastFrame = frames.at(-1);
@@ -53,14 +53,14 @@ export default function CanvasView({ url, refreshKey }: CanvasViewProps) {
   const worldRef = React.useRef(world);
   worldRef.current = world;
   const userMovedRef = React.useRef(false);
-  useFrameHeights(iframeRefs, setHeights);
+  useFrameHeights(iframesRef, setHeights);
   const fit = useFitCanvas(wrapRef, worldRef, setView);
-  useCanvasFit(wrapRef, fit, userMovedRef, world.width, world.height);
+  useCanvasFit(wrapRef, userMovedRef, world.width, world.height, fit);
   React.useEffect(() => setHeights({}), [refreshKey, url]);
   useCanvasWheel(wrapRef, viewRef, userMovedRef, setView);
   const onPointerDown = useCanvasPointer(startDrag, viewRef, userMovedRef, setView, setPanning);
   const zoomTo = (scale: number): void =>
-    zoomCanvas(wrapRef.current, viewRef.current, scale, userMovedRef, setView);
+    zoomCanvas(wrapRef.current ?? undefined, viewRef.current, scale, userMovedRef, setView);
   return (
     <div
       ref={wrapRef}
@@ -73,7 +73,7 @@ export default function CanvasView({ url, refreshKey }: CanvasViewProps) {
           view={view}
           url={url}
           refreshKey={refreshKey}
-          iframeRefs={iframeRefs}
+          iframesRef={iframesRef}
         />
       )}
       {view && (
@@ -92,9 +92,9 @@ export default function CanvasView({ url, refreshKey }: CanvasViewProps) {
 
 function useCanvasPointer(
   startDrag: ReturnType<typeof usePointerDrag>,
-  viewRef: React.MutableRefObject<ViewState | null>,
+  viewRef: React.MutableRefObject<ViewState | undefined>,
   userMovedRef: React.MutableRefObject<boolean>,
-  setView: React.Dispatch<React.SetStateAction<ViewState | null>>,
+  setView: React.Dispatch<React.SetStateAction<ViewState | undefined>>,
   setPanning: React.Dispatch<React.SetStateAction<boolean>>,
 ) {
   return (event: React.PointerEvent<HTMLDivElement>): void => {
@@ -143,16 +143,16 @@ function layoutFrames(heights: FrameHeights) {
 }
 
 function useFrameHeights(
-  iframeRefs: React.MutableRefObject<FrameElements>,
+  iframesRef: React.MutableRefObject<FrameElements>,
   setHeights: React.Dispatch<React.SetStateAction<FrameHeights>>,
 ): void {
   React.useEffect(() => {
     const onMessage = (event: MessageEvent<unknown>): void => {
       const height = parsePageHeight(event.data);
-      if (height === null) {
+      if (height === undefined) {
         return;
       }
-      const match = Object.entries(iframeRefs.current).find(
+      const match = Object.entries(iframesRef.current).find(
         ([, iframe]) => iframe?.contentWindow === event.source,
       );
       const key = match?.[0];
@@ -163,18 +163,18 @@ function useFrameHeights(
     };
     window.addEventListener('message', onMessage);
     return () => window.removeEventListener('message', onMessage);
-  }, [iframeRefs, setHeights]);
+  }, [iframesRef, setHeights]);
 }
 
-export function parsePageHeight(input: unknown): number | null {
+export function parsePageHeight(input: unknown): number | undefined {
   if (typeof input !== 'object' || input === null) {
-    return null;
+    return undefined;
   }
   if (!('type' in input) || input.type !== 'avb:page-height') {
-    return null;
+    return undefined;
   }
   if (!('height' in input) || typeof input.height !== 'number' || !Number.isFinite(input.height)) {
-    return null;
+    return undefined;
   }
   return clamp(Math.round(input.height), PAGE_HEIGHT_PX_MIN, PAGE_HEIGHT_PX_MAX);
 }
@@ -186,7 +186,7 @@ function isBreakpointKey(value: string | undefined): value is BreakpointKey {
 function useFitCanvas(
   wrapRef: React.RefObject<HTMLDivElement>,
   worldRef: React.MutableRefObject<{ readonly width: number; readonly height: number }>,
-  setView: React.Dispatch<React.SetStateAction<ViewState | null>>,
+  setView: React.Dispatch<React.SetStateAction<ViewState | undefined>>,
 ) {
   return React.useCallback((): void => {
     const element = wrapRef.current;
@@ -213,10 +213,10 @@ function useFitCanvas(
 
 function useCanvasFit(
   wrapRef: React.RefObject<HTMLDivElement>,
-  fit: () => void,
   userMovedRef: React.MutableRefObject<boolean>,
   worldWidth: number,
   worldHeight: number,
+  fit: () => void,
 ): void {
   React.useLayoutEffect(() => {
     const element = wrapRef.current;
@@ -241,9 +241,9 @@ function useCanvasFit(
 
 function useCanvasWheel(
   wrapRef: React.RefObject<HTMLDivElement>,
-  viewRef: React.MutableRefObject<ViewState | null>,
+  viewRef: React.MutableRefObject<ViewState | undefined>,
   userMovedRef: React.MutableRefObject<boolean>,
-  setView: React.Dispatch<React.SetStateAction<ViewState | null>>,
+  setView: React.Dispatch<React.SetStateAction<ViewState | undefined>>,
 ): void {
   React.useEffect(() => {
     const element = wrapRef.current;
@@ -263,7 +263,7 @@ function useCanvasWheel(
   }, [setView, userMovedRef, viewRef, wrapRef]);
 }
 
-function wheelView(view: ViewState | null, event: WheelEvent, x: number, y: number) {
+function wheelView(view: ViewState | undefined, event: WheelEvent, x: number, y: number) {
   if (!view) {
     return view;
   }
@@ -276,11 +276,11 @@ function wheelView(view: ViewState | null, event: WheelEvent, x: number, y: numb
 }
 
 function zoomCanvas(
-  element: HTMLDivElement | null,
-  view: ViewState | null,
+  element: HTMLDivElement | undefined,
+  view: ViewState | undefined,
   nextScale: number,
   userMovedRef: React.MutableRefObject<boolean>,
-  setView: React.Dispatch<React.SetStateAction<ViewState | null>>,
+  setView: React.Dispatch<React.SetStateAction<ViewState | undefined>>,
 ): void {
   if (!element || !view) {
     return;
@@ -303,13 +303,13 @@ function CanvasFrames({
   view,
   url,
   refreshKey,
-  iframeRefs,
+  iframesRef,
 }: {
   readonly frames: Frames;
   readonly view: ViewState;
   readonly url: string;
   readonly refreshKey: string | number;
-  readonly iframeRefs: React.MutableRefObject<FrameElements>;
+  readonly iframesRef: React.MutableRefObject<FrameElements>;
 }) {
   return (
     <div
@@ -332,9 +332,9 @@ function CanvasFrames({
             key={`${url}-${refreshKey}`}
             ref={(element) => {
               if (element) {
-                iframeRefs.current[frame.key] = element;
+                iframesRef.current[frame.key] = element;
               } else {
-                delete iframeRefs.current[frame.key];
+                delete iframesRef.current[frame.key];
               }
             }}
             src={`${url}#avb-design`}

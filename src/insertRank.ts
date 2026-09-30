@@ -64,32 +64,35 @@ const FIELDS = [
   { of: (item: SearchItem) => item.sub || item.folder, base: 4 },
 ];
 
+/** A word the person has finished typing (there is a space after it), or one
+ * they are still typing. */
+type TokenState = 'finished' | 'typing';
+
 /**
- * How well one token lands on one item, or null for not at all.
- * `whole` is a word the person has finished typing (there is a space after it),
- * and it has to match a word rather than begin one.
+ * How well one token lands on one item, or undefined for not at all.
+ * A finished token has to match a word rather than begin one.
  */
-function scoreToken(item: SearchItem, token: string, whole: boolean): number | null {
-  let best: number | null = null;
+function scoreToken(item: SearchItem, token: string, state: TokenState): number | undefined {
+  let best: number | undefined;
   for (const field of FIELDS) {
     const text = String(field.of(item) || '').toLowerCase();
     if (!text) {
       continue;
     }
     const words = wordsOf(field.of(item));
-    let score: number | null = null;
+    let score: number | undefined;
     if (text === token || words.includes(token)) {
       score = field.base;
-    } else if (whole) {
-      score = null;
+    } else if (state === 'finished') {
+      score = undefined;
     } else if (text.startsWith(token)) {
       score = field.base + 1;
-    } else if (words.some((w) => w.startsWith(token))) {
+    } else if (words.some((word) => word.startsWith(token))) {
       score = field.base + 2;
     } else if (text.includes(token)) {
       score = field.base + 3;
     }
-    if (score !== null && (best === null || score < best)) {
+    if (score !== undefined && (best === undefined || score < best)) {
       best = score;
     }
   }
@@ -110,7 +113,7 @@ const CATEGORY: Readonly<Record<string, number>> = { components: 0, elements: 1,
  * list that answered with forty rows would be answering a different question.
  */
 export function rankInsertItems<T extends SearchItem>(
-  items: readonly T[] | null | undefined,
+  items: readonly T[] | undefined,
   query: unknown,
 ): readonly T[] {
   assert((items?.length ?? 0) <= LIMITS.scanEntriesMax, 'Palette item count exceeds limit');
@@ -126,9 +129,9 @@ export function rankInsertItems<T extends SearchItem>(
     let total = 0;
     let matched = true;
     for (const [at, token] of tokens.entries()) {
-      const whole = finished || at < tokens.length - 1;
-      const score = scoreToken(item, token, whole);
-      if (score === null) {
+      const state = finished || at < tokens.length - 1 ? 'finished' : 'typing';
+      const score = scoreToken(item, token, state);
+      if (score === undefined) {
         matched = false;
         break;
       }
@@ -139,10 +142,10 @@ export function rankInsertItems<T extends SearchItem>(
     }
   }
   scored.sort(
-    (a, b) =>
-      (CATEGORY[a.item.cat ?? ''] ?? 3) - (CATEGORY[b.item.cat ?? ''] ?? 3) ||
-      a.total - b.total ||
-      a.index - b.index,
+    (left, right) =>
+      (CATEGORY[left.item.cat ?? ''] ?? 3) - (CATEGORY[right.item.cat ?? ''] ?? 3) ||
+      left.total - right.total ||
+      left.index - right.index,
   );
-  return scored.map((s) => s.item);
+  return scored.map((entry) => entry.item);
 }

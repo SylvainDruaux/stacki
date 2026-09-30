@@ -14,20 +14,20 @@ interface TreeEntry<Node extends TreeNodeLike<Node> = PageNode> {
   node: Node;
   list: readonly Node[];
   index: number;
-  parent: TreeEntry<Node> | null;
+  parent: TreeEntry<Node> | undefined;
   path?: string;
 }
 
 interface Frame<Node extends TreeNodeLike<Node> = PageNode> {
   list: readonly Node[];
   index: number;
-  parent: TreeEntry<Node> | null;
+  parent: TreeEntry<Node> | undefined;
 }
 
 function* entries<Node extends TreeNodeLike<Node>>(
-  nodes: readonly Node[] | null | undefined,
+  nodes: readonly Node[] | undefined,
 ): Generator<TreeEntry<Node>> {
-  const stack: Frame<Node>[] = [{ list: nodes ?? [], index: 0, parent: null }];
+  const stack: Frame<Node>[] = [{ list: nodes ?? [], index: 0, parent: undefined }];
   while (stack.length) {
     const frame = stack[stack.length - 1];
     if (frame === undefined) {
@@ -51,73 +51,73 @@ function* entries<Node extends TreeNodeLike<Node>>(
 }
 
 function findEntry<Node extends TreeNodeLike<Node>>(
-  nodes: readonly Node[] | null | undefined,
+  nodes: readonly Node[] | undefined,
   id: string,
-): TreeEntry<Node> | null {
+): TreeEntry<Node> | undefined {
   for (const entry of entries(nodes)) {
     if (entry.node.id === id) {
       return entry;
     }
   }
-  return null;
+  return undefined;
 }
 
 function trailOf<Node extends TreeNodeLike<Node>, Value>(
-  entry: TreeEntry<Node> | null,
+  entry: TreeEntry<Node> | undefined,
   pick: (entry: TreeEntry<Node>) => Value,
-): Value[] | null {
+): Value[] | undefined {
   if (!entry) {
-    return null;
+    return undefined;
   }
   const trail: Value[] = [];
-  for (let current: TreeEntry<Node> | null = entry; current; current = current.parent) {
+  for (let current: TreeEntry<Node> | undefined = entry; current; current = current.parent) {
     trail.push(pick(current));
   }
   return trail.reverse();
 }
 
 export const findNodeById = <Node extends TreeNodeLike<Node>>(
-  nodes: readonly Node[] | null | undefined,
+  nodes: readonly Node[] | undefined,
   id: string,
-): Node | null => findEntry(nodes, id)?.node || null;
+): Node | undefined => findEntry(nodes, id)?.node || undefined;
 export const findParentNode = <Node extends TreeNodeLike<Node>>(
-  nodes: readonly Node[] | null | undefined,
+  nodes: readonly Node[] | undefined,
   id: string,
-): Node | null => findEntry(nodes, id)?.parent?.node || null;
+): Node | undefined => findEntry(nodes, id)?.parent?.node || undefined;
 export const pathOfNode = <Node extends TreeNodeLike<Node>>(
-  nodes: readonly Node[] | null | undefined,
+  nodes: readonly Node[] | undefined,
   id: string,
-): number[] | null => trailOf(findEntry(nodes, id), (entry) => entry.index);
+): number[] | undefined => trailOf(findEntry(nodes, id), (entry) => entry.index);
 export const ancestorChain = <Node extends TreeNodeLike<Node>>(
-  nodes: readonly Node[] | null | undefined,
+  nodes: readonly Node[] | undefined,
   id: string,
-): Node[] | null => trailOf(findEntry(nodes, id), (entry) => entry.node);
+): Node[] | undefined => trailOf(findEntry(nodes, id), (entry) => entry.node);
 
 export function findParentList(
   model: { readonly nodes: readonly PageNode[] },
   id: string,
-): { list: readonly PageNode[]; index: number } | null {
+): { list: readonly PageNode[]; index: number } | undefined {
   const found = findEntry(model.nodes, id);
-  return found ? { list: found.list, index: found.index } : null;
+  return found ? { list: found.list, index: found.index } : undefined;
 }
 
 export function isDescendantOf(candidateParent: PageNode, id: string): boolean {
-  const children = 'children' in candidateParent ? candidateParent.children : null;
+  const children = 'children' in candidateParent ? candidateParent.children : undefined;
   return candidateParent.id === id || !!findNodeById(children, id);
 }
 
 export function nodeAtPath<Node extends TreeNodeLike<Node>>(
-  nodes: readonly Node[] | null | undefined,
+  nodes: readonly Node[] | undefined,
   trail: readonly number[],
-): Node | null {
+): Node | undefined {
   let list = nodes;
-  let node: Node | null = null;
+  let node: Node | undefined;
   for (const i of trail) {
-    node = list?.[i] ?? null;
+    node = list?.[i];
     if (!node) {
-      return null;
+      return undefined;
     }
-    list = 'children' in node ? node.children : null;
+    list = 'children' in node ? node.children : undefined;
   }
   return node;
 }
@@ -126,14 +126,14 @@ interface TreeIndex<Node extends TreeNodeLike<Node> = PageNode> {
   readonly byId: Map<string, TreeEntry<Node>>;
   readonly byPath: Map<string, Node>;
   readonly sectionIds: string[];
-  node(id: string): Node | null;
-  parent(id: string): Node | null;
-  path(id: string): string | null;
-  ancestors(id: string): Node[] | null;
+  node(id: string): Node | undefined;
+  parent(id: string): Node | undefined;
+  path(id: string): string | undefined;
+  ancestors(id: string): Node[] | undefined;
 }
 
 export function createTreeIndex<Node extends TreeNodeLike<Node>>(
-  nodes: readonly Node[] | null | undefined,
+  nodes: readonly Node[] | undefined,
 ): TreeIndex<Node> {
   const byId = new Map<string, TreeEntry<Node>>();
   const byPath = new Map<string, Node>();
@@ -155,10 +155,10 @@ export function createTreeIndex<Node extends TreeNodeLike<Node>>(
     byId,
     byPath,
     sectionIds,
-    node: (id) => byId.get(id)?.node || null,
-    parent: (id) => byId.get(id)?.parent?.node || null,
-    path: (id) => byId.get(id)?.path ?? null,
-    ancestors: (id) => trailOf(byId.get(id) ?? null, (entry) => entry.node),
+    node: (id) => byId.get(id)?.node || undefined,
+    parent: (id) => byId.get(id)?.parent?.node || undefined,
+    path: (id) => byId.get(id)?.path,
+    ancestors: (id) => trailOf(byId.get(id), (entry) => entry.node),
   };
 }
 

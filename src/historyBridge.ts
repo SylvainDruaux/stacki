@@ -64,17 +64,17 @@ export function readHistoryLog(projectPath: string, skip: number) {
     skip,
     withFiles: true,
   });
-  return historyRequest(() => window.avb.gitLog(payload), parseHistoryLog);
+  return historyRequest(parseHistoryLog, () => window.avb.gitLog(payload));
 }
 
 export function readHistoryFiles(projectPath: string) {
   const payload = parseIpcPayload('git:allFiles', { projectPath });
-  return historyRequest(() => window.avb.gitAllFiles(payload), parseHistoryFiles);
+  return historyRequest(parseHistoryFiles, () => window.avb.gitAllFiles(payload));
 }
 
 export function readHistoryWorktrees(projectPath: string) {
   const payload = parseIpcPayload('git:worktrees', { projectPath });
-  return historyRequest(() => window.avb.gitWorktrees(payload), parseHistoryWorktrees);
+  return historyRequest(parseHistoryWorktrees, () => window.avb.gitWorktrees(payload));
 }
 
 function parseCommit(input: unknown): HistoryCommit {
@@ -147,8 +147,8 @@ function parseFileKind(input: unknown): WireFileKind {
 }
 
 async function historyRequest<Value>(
-  invoke: () => Promise<unknown>,
   parse: Parser<Value>,
+  invoke: () => Promise<unknown>,
 ): Promise<Result<Value, string>> {
   let response: unknown;
   try {

@@ -24,7 +24,7 @@ export interface RichContext extends DataContext {
   readonly entryNav?: DataPickerProps['entries'];
   readonly onStepItem?: DataPickerProps['onStepItem'];
   readonly onNeedSample?: (collection: string) => void;
-  readonly ensureQuery?: (collection: string) => string | undefined | null;
+  readonly ensureQuery?: (collection: string) => string | undefined;
 }
 export interface RichInsertAPI {
   readonly insert: (path: string) => void;
@@ -32,8 +32,8 @@ export interface RichInsertAPI {
 interface RichContentProps {
   readonly nodes: readonly InlineNode[];
   readonly onChange: (nodes: InlineNode[]) => void;
-  readonly bindCtx?: RichContext | null;
-  readonly insertRef?: MutableRefObject<RichInsertAPI | null>;
+  readonly bindContext?: RichContext | undefined;
+  readonly insertRef?: MutableRefObject<RichInsertAPI | undefined>;
 }
 interface Bubble {
   readonly x: number;
@@ -64,7 +64,7 @@ interface FormatState {
 const clamp = (value: number, minimum: number, maximum: number): number =>
   Math.min(Math.max(value, minimum), maximum);
 
-export default function RichContent({ nodes, onChange, bindCtx, insertRef }: RichContentProps) {
+export default function RichContent({ nodes, onChange, bindContext, insertRef }: RichContentProps) {
   const state = useRichState();
   const { hostRef } = state;
   const emit = () => richEmit(state, onChange);
@@ -87,23 +87,23 @@ export default function RichContent({ nodes, onChange, bindCtx, insertRef }: Ric
         onBlur={onBlur}
         onInput={emit}
         onMouseDown={onChipMouseDown}
-        onKeyDown={(e) => {
+        onKeyDown={(event) => {
           // Keep formatting shortcuts local; Enter inserts <br> (inline field).
-          if (e.key === 'Enter') {
-            e.preventDefault();
+          if (event.key === 'Enter') {
+            event.preventDefault();
             document.execCommand('insertHTML', false, '<br>');
             emit();
             return;
           }
           // Backspace against a chip takes that chip, and only that chip —
           // not the sentence it sits in.
-          if (deleteChipAtCaret(hostRef.current, e)) {
-            e.preventDefault();
+          if (deleteChipAtCaret(hostRef.current ?? undefined, event)) {
+            event.preventDefault();
             emit();
           }
         }}
       />
-      <RichChipMenu state={state} bindCtx={bindCtx} pickExpr={pickExpr} />
+      <RichChipMenu state={state} bindContext={bindContext} pickExpr={pickExpr} />
       <RichBubble state={state} emit={emit} />
     </>
   );
@@ -112,16 +112,17 @@ export default function RichContent({ nodes, onChange, bindCtx, insertRef }: Ric
 function useRichState() {
   const hostRef = useRef<HTMLDivElement>(null);
   const bubbleRef = useRef<HTMLDivElement>(null);
-  const lastEmittedRef = useRef<string | null>(null);
-  const savedRangeRef = useRef<Range | null>(null);
-  const [bubble, setBubble] = useState<Bubble | null>(null);
-  const [pos, setPos] = useState<BubblePosition | null>(null);
+  const lastEmittedRef = useRef<string | undefined>(undefined);
+  const savedRangeRef = useRef<Range | undefined>(undefined);
+  const [bubble, setBubble] = useState<Bubble | undefined>(undefined);
+  const [position, setPosition] = useState<BubblePosition | undefined>(undefined);
   const [states, setStates] = useState<FormatState>({}); // {bold, italic, …} at the selection
   const [linkMode, setLinkMode] = useState(false);
-  const [chipMenu, setChipMenu] = useState<ChipMenu | null>(null); // {chip, left, top, current}
+  // The chip menu: {chip, left, top, current}.
+  const [chipMenu, setChipMenu] = useState<ChipMenu | undefined>(undefined);
   const [linkUrl, setLinkUrl] = useState('');
 
-  const caretRef = useRef<Range | null>(null);
+  const caretRef = useRef<Range | undefined>(undefined);
   return {
     hostRef,
     bubbleRef,
@@ -130,8 +131,8 @@ function useRichState() {
     caretRef,
     bubble,
     setBubble,
-    pos,
-    setPos,
+    pos: position,
+    setPos: setPosition,
     states,
     setStates,
     linkMode,
@@ -156,23 +157,23 @@ function useRichSync(nodes: readonly InlineNode[], state: RichState) {
   // instead used to drop those updates whenever the field happened to hold
   // focus, which is exactly when an undo arrives.
   useEffect(() => {
-    const el = hostRef.current;
-    if (!el) {
+    const element = hostRef.current;
+    if (!element) {
       return;
     }
     if (html !== lastEmittedRef.current) {
-      el.innerHTML = html;
+      element.innerHTML = html;
       lastEmittedRef.current = html;
     }
   }, [html, hostRef, lastEmittedRef]);
 }
 function richEmit(state: RichState, onChange: RichContentProps['onChange']): void {
   const { hostRef, lastEmittedRef } = state;
-  const el = hostRef.current;
-  if (!el) {
+  const element = hostRef.current;
+  if (!element) {
     return;
   }
-  let next = domToNodes(el);
+  let next = domToNodes(element);
   // Deleting the last character leaves a <br> behind: a contentEditable
   // needs one line for the caret to sit on, so the browser puts a
   // placeholder there. It isn't content, and writing it out means the
@@ -194,38 +195,38 @@ function richEmit(state: RichState, onChange: RichContentProps['onChange']): voi
 // (parent, i), end (parent, i+1) — and that is exactly what surrounding the
 // selection leaves behind, so asking the anchor (the parent) whether it is
 // inside `tag` answers no about the tag it just made.
-function richTagAround(host: HTMLElement | null, tag: string): Element | null {
-  const sel = window.getSelection();
-  if (!host || !sel || sel.rangeCount === 0) {
-    return null;
+function richTagAround(host: HTMLElement | undefined, tag: string): Element | undefined {
+  const selection = window.getSelection();
+  if (!host || !selection || selection.rangeCount === 0) {
+    return undefined;
   }
-  const r = sel.getRangeAt(0);
+  const range = selection.getRangeAt(0);
   const at = (container: Node, offset: number) => {
-    const n = container.nodeType === 1 ? container.childNodes[offset] || container : container;
-    const el = isDOMElement(n) ? n : n.parentElement;
-    return el ? el.closest(tag) : null;
+    const node = container.nodeType === 1 ? container.childNodes[offset] || container : container;
+    const element = isDOMElement(node) ? node : node.parentElement;
+    return element ? element.closest(tag) : undefined;
   };
   // The end boundary points just PAST its node, so step back one.
-  const start = at(r.startContainer, r.startOffset);
-  const end = at(r.endContainer, r.endOffset - (r.endContainer.nodeType === 1 ? 1 : 0));
-  const el = start && start === end ? start : null;
-  return el && host.contains(el) && el !== host ? el : null;
+  const start = at(range.startContainer, range.startOffset);
+  const end = at(range.endContainer, range.endOffset - (range.endContainer.nodeType === 1 ? 1 : 0));
+  const element = start && start === end ? start : undefined;
+  return element && host.contains(element) && element !== host ? element : undefined;
 }
 // Formatting state at the current selection, for highlighting buttons.
-function richReadStates(host: HTMLElement | null): FormatState {
+function richReadStates(host: HTMLElement | undefined): FormatState {
   const inTag = (tag: string) => !!richTagAround(host, tag);
-  let s: FormatState = {};
+  let states: FormatState = {};
   try {
-    s = {
+    states = {
       bold: document.queryCommandState('bold'),
       italic: document.queryCommandState('italic'),
       superscript: document.queryCommandState('superscript'),
       subscript: document.queryCommandState('subscript'),
     };
   } catch {
-    s = {};
+    states = {};
   }
-  return { ...s, code: inTag('code'), span: inTag('span'), link: inTag('a') };
+  return { ...states, code: inTag('code'), span: inTag('span'), link: inTag('a') };
 }
 function useRichCaret(state: RichState): void {
   const { hostRef, caretRef } = state;
@@ -234,19 +235,19 @@ function useRichCaret(state: RichState): void {
   // caret too, and by the time the picker is open focus has left the editor.
 
   useEffect(() => {
-    const onSel = () => {
-      const el = hostRef.current;
-      const sel = window.getSelection();
-      if (!el || !sel?.rangeCount) {
+    const onSelectionChange = () => {
+      const element = hostRef.current;
+      const selection = window.getSelection();
+      if (!element || !selection?.rangeCount) {
         return;
       }
-      const r = sel.getRangeAt(0);
-      if (el.contains(r.commonAncestorContainer)) {
-        caretRef.current = r.cloneRange();
+      const range = selection.getRangeAt(0);
+      if (element.contains(range.commonAncestorContainer)) {
+        caretRef.current = range.cloneRange();
       }
     };
-    document.addEventListener('selectionchange', onSel);
-    return () => document.removeEventListener('selectionchange', onSel);
+    document.addEventListener('selectionchange', onSelectionChange);
+    return () => document.removeEventListener('selectionchange', onSelectionChange);
   }, [hostRef, caretRef]);
 }
 function useRichInsertion(
@@ -262,26 +263,26 @@ function useRichInsertion(
     }
     insertRef.current = {
       insert(path: string) {
-        const el = hostRef.current;
-        if (!el) {
+        const element = hostRef.current;
+        if (!element) {
           return;
         }
-        el.focus();
-        const sel = window.getSelection();
+        element.focus();
+        const selection = window.getSelection();
         const saved = caretRef.current;
         const range = document.createRange();
-        if (saved && el.contains(saved.commonAncestorContainer)) {
+        if (saved && element.contains(saved.commonAncestorContainer)) {
           range.setStart(saved.startContainer, saved.startOffset);
           range.setEnd(saved.endContainer, saved.endOffset);
         } else {
-          range.selectNodeContents(el);
+          range.selectNodeContents(element);
           range.collapse(false);
         }
-        if (!sel) {
+        if (!selection) {
           return;
         }
-        sel.removeAllRanges();
-        sel.addRange(range);
+        selection.removeAllRanges();
+        selection.addRange(range);
         document.execCommand(
           'insertHTML',
           false,
@@ -291,7 +292,7 @@ function useRichInsertion(
       },
     };
     return () => {
-      insertRef.current = null;
+      insertRef.current = undefined;
     };
   });
 }
@@ -299,56 +300,56 @@ function useRichSelection(state: RichState): void {
   const { linkMode, hostRef, savedRangeRef, setBubble, setStates } = state;
   // Selection bubble: track selections anchored inside the editor.
   useEffect(() => {
-    const onSelChange = () => {
+    const onSelectionChange = () => {
       if (linkMode) {
         return;
       } // keep the bubble while typing a URL
-      const el = hostRef.current;
-      const sel = window.getSelection();
+      const element = hostRef.current;
+      const selection = window.getSelection();
       if (
-        !el ||
-        !sel ||
-        sel.rangeCount === 0 ||
-        sel.isCollapsed ||
-        !el.contains(sel.anchorNode) ||
-        !el.contains(sel.focusNode)
+        !element ||
+        !selection ||
+        selection.rangeCount === 0 ||
+        selection.isCollapsed ||
+        !element.contains(selection.anchorNode) ||
+        !element.contains(selection.focusNode)
       ) {
-        setBubble(null);
+        setBubble(undefined);
         return;
       }
-      const rect = sel.getRangeAt(0).getBoundingClientRect();
+      const rect = selection.getRangeAt(0).getBoundingClientRect();
       if (!rect.width && !rect.height) {
-        setBubble(null);
+        setBubble(undefined);
         return;
       }
-      savedRangeRef.current = sel.getRangeAt(0).cloneRange();
+      savedRangeRef.current = selection.getRangeAt(0).cloneRange();
       setBubble({ x: rect.left + rect.width / 2, top: rect.top, bottom: rect.bottom });
-      setStates(richReadStates(hostRef.current));
+      setStates(richReadStates(hostRef.current ?? undefined));
     };
-    document.addEventListener('selectionchange', onSelChange);
-    return () => document.removeEventListener('selectionchange', onSelChange);
+    document.addEventListener('selectionchange', onSelectionChange);
+    return () => document.removeEventListener('selectionchange', onSelectionChange);
   }, [hostRef, savedRangeRef, linkMode, setBubble, setStates]);
 }
 function useRichPosition(state: RichState): void {
-  const { bubbleRef, bubble, linkMode, setPos } = state;
+  const { bubbleRef, bubble, linkMode, setPos: setPosition } = state;
   // Measure the rendered bubble and keep it inside the window: clamp
   // horizontally, flip below the selection when it would hit the titlebar,
   // and keep the arrow pointing at the selection midpoint.
   React.useLayoutEffect(() => {
-    const el = bubbleRef.current;
-    if (!bubble || !el) {
-      setPos(null);
+    const element = bubbleRef.current;
+    if (!bubble || !element) {
+      setPosition(undefined);
       return;
     }
-    const w = el.offsetWidth;
-    const h = el.offsetHeight;
+    const width = element.offsetWidth;
+    const height = element.offsetHeight;
     const margin = 8;
-    const left = clamp(bubble.x, margin + w / 2, window.innerWidth - margin - w / 2);
-    const below = bubble.top - h - 10 < 48;
+    const left = clamp(bubble.x, margin + width / 2, window.innerWidth - margin - width / 2);
+    const below = bubble.top - height - 10 < 48;
     const top = below ? bubble.bottom + 10 : bubble.top - 10;
-    const arrowX = clamp(bubble.x - (left - w / 2), 12, w - 12);
-    setPos({ left, top, below, arrowX });
-  }, [bubble, linkMode, bubbleRef, setPos]);
+    const arrowX = clamp(bubble.x - (left - width / 2), 12, width - 12);
+    setPosition({ left, top, below, arrowX });
+  }, [bubble, linkMode, bubbleRef, setPosition]);
 }
 // Snapshot the live selection as the range the next press restores.
 // Every action below re-reads it rather than leaving that to the
@@ -360,29 +361,29 @@ function useRichPosition(state: RichState): void {
 function richSaveSelection(state: RichState): void {
   const { hostRef, savedRangeRef } = state;
   const host = hostRef.current;
-  const sel = window.getSelection();
-  if (!host || !sel || sel.rangeCount === 0) {
+  const selection = window.getSelection();
+  if (!host || !selection || selection.rangeCount === 0) {
     return;
   }
-  const r = sel.getRangeAt(0);
-  if (host.contains(r.commonAncestorContainer)) {
-    savedRangeRef.current = r.cloneRange();
+  const range = selection.getRangeAt(0);
+  if (host.contains(range.commonAncestorContainer)) {
+    savedRangeRef.current = range.cloneRange();
   }
 }
 function richRestoreSelection(state: RichState): void {
   const { savedRangeRef } = state;
-  const r = savedRangeRef.current;
-  if (!r) {
+  const range = savedRangeRef.current;
+  if (!range) {
     return;
   }
-  const sel = window.getSelection();
-  if (!sel) {
+  const selection = window.getSelection();
+  if (!selection) {
     return;
   }
-  sel.removeAllRanges();
+  selection.removeAllRanges();
   // A clone: addRange can adopt the very range it is handed, and then
   // surroundContents below would rewrite the saved one as a side effect.
-  sel.addRange(r.cloneRange());
+  selection.addRange(range.cloneRange());
 }
 function richExec(state: RichState, command: string, emit: () => void): void {
   state.hostRef.current?.focus();
@@ -390,7 +391,7 @@ function richExec(state: RichState, command: string, emit: () => void): void {
   document.execCommand(command, false);
   emit();
   richSaveSelection(state);
-  state.setStates(richReadStates(state.hostRef.current));
+  state.setStates(richReadStates(state.hostRef.current ?? undefined));
 }
 // Take the selection out of the nearest `tag` around it, leaving its text
 // where it was. The button is a toggle — pressing one that is already lit has
@@ -398,28 +399,31 @@ function richExec(state: RichState, command: string, emit: () => void): void {
 // attributes on it yet is invisible, so one added by mistake could otherwise
 // only be removed by editing the file.
 function richUnwrapTag(state: RichState, tag: string): boolean {
-  const sel = window.getSelection();
-  const el = richTagAround(state.hostRef.current, tag);
-  if (!el) {
+  const selection = window.getSelection();
+  const element = richTagAround(state.hostRef.current ?? undefined, tag);
+  if (!element) {
     return false;
   }
-  const parent = el.parentNode;
+  const parent = element.parentNode;
   assert(parent !== null, 'RichContent: inline wrapper has a parent');
-  const first = el.firstChild;
-  const last = el.lastChild;
-  assert(el.childNodes.length <= LIMITS.treeNodesMax, 'RichContent: unwrap child limit exceeded');
-  for (const child of Array.from(el.childNodes)) {
-    parent.insertBefore(child, el);
+  const first = element.firstChild;
+  const last = element.lastChild;
+  assert(
+    element.childNodes.length <= LIMITS.treeNodesMax,
+    'RichContent: unwrap child limit exceeded',
+  );
+  for (const child of Array.from(element.childNodes)) {
+    parent.insertBefore(child, element);
   }
-  parent.removeChild(el);
+  parent.removeChild(element);
   // Keep the text selected, so the bubble stays up and the next press acts on
   // the same words.
   if (first && last) {
-    const r = document.createRange();
-    r.setStartBefore(first);
-    r.setEndAfter(last);
-    sel?.removeAllRanges();
-    sel?.addRange(r);
+    const wrappedRange = document.createRange();
+    wrappedRange.setStartBefore(first);
+    wrappedRange.setEndAfter(last);
+    selection?.removeAllRanges();
+    selection?.addRange(wrappedRange);
   }
   return true;
 }
@@ -431,29 +435,29 @@ function richWrapTag(state: RichState, tag: string, emit: () => void): void {
   if (richUnwrapTag(state, tag)) {
     emit();
     richSaveSelection(state);
-    state.setStates(richReadStates(state.hostRef.current));
+    state.setStates(richReadStates(state.hostRef.current ?? undefined));
     return;
   }
-  const sel = window.getSelection();
-  if (!sel || sel.rangeCount === 0 || sel.isCollapsed) {
+  const selection = window.getSelection();
+  if (!selection || selection.rangeCount === 0 || selection.isCollapsed) {
     return;
   }
-  const range = sel.getRangeAt(0);
-  const el = document.createElement(tag);
+  const range = selection.getRangeAt(0);
+  const element = document.createElement(tag);
   try {
-    range.surroundContents(el);
+    range.surroundContents(element);
   } catch {
     // Selection crosses element boundaries — extract and rewrap.
-    el.appendChild(range.extractContents());
-    range.insertNode(el);
+    element.appendChild(range.extractContents());
+    range.insertNode(element);
   }
-  sel.removeAllRanges();
-  const r = document.createRange();
-  r.selectNodeContents(el);
-  sel.addRange(r);
+  selection.removeAllRanges();
+  const contentsRange = document.createRange();
+  contentsRange.selectNodeContents(element);
+  selection.addRange(contentsRange);
   emit();
   richSaveSelection(state);
-  state.setStates(richReadStates(state.hostRef.current));
+  state.setStates(richReadStates(state.hostRef.current ?? undefined));
 }
 function richApplyLink(state: RichState, emit: () => void): void {
   const { linkUrl, setLinkMode, setLinkUrl, hostRef, setStates } = state;
@@ -468,13 +472,13 @@ function richApplyLink(state: RichState, emit: () => void): void {
   document.execCommand('createLink', false, url);
   emit();
   richSaveSelection(state);
-  setStates(richReadStates(hostRef.current));
+  setStates(richReadStates(hostRef.current ?? undefined));
 }
 // Buttons use onMouseDown+preventDefault so the text selection survives.
 const richButton = (
   label: React.ReactNode,
   title: string,
-  active: boolean | undefined,
+  { active }: { readonly active: boolean | undefined },
   onAct: () => void,
 ) => (
   <button
@@ -482,8 +486,8 @@ const richButton = (
     type="button"
     className={active ? 'on' : ''}
     title={title}
-    onMouseDown={(e) => {
-      e.preventDefault();
+    onMouseDown={(event) => {
+      event.preventDefault();
       onAct();
     }}
   >
@@ -495,26 +499,28 @@ function richChipActions(state: RichState, emit: () => void) {
   const { chipMenu, setChipMenu } = state;
   // Clicking a chip offers the other values in scope. mousedown rather than
   // click, and preventDefault, so the caret never lands inside the chip.
-  const onChipMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
-    const ElementType = e.currentTarget.ownerDocument.defaultView?.Element;
+  const onChipMouseDown = (event: React.MouseEvent<HTMLDivElement>) => {
+    const ElementType = event.currentTarget.ownerDocument.defaultView?.Element;
     const chip =
-      ElementType && e.target instanceof ElementType ? e.target.closest('.expr-chip') : null;
+      ElementType && event.target instanceof ElementType
+        ? event.target.closest('.expr-chip')
+        : undefined;
     if (!chip) {
       return;
     }
-    e.preventDefault();
-    const r = chip.getBoundingClientRect();
+    event.preventDefault();
+    const rect = chip.getBoundingClientRect();
     setChipMenu({
       chip,
-      left: r.left,
-      top: r.bottom + 4,
+      left: rect.left,
+      top: rect.bottom + 4,
       current: (chip.getAttribute('data-expr') || '').replace(/^\{|\}$/g, ''),
     });
   };
 
   const pickExpr = (insert: string) => {
     const chip = chipMenu?.chip;
-    setChipMenu(null);
+    setChipMenu(undefined);
     if (!chip) {
       return;
     }
@@ -531,23 +537,23 @@ function useRichChipDismiss(state: RichState): void {
     if (!chipMenu) {
       return;
     }
-    const close = (e: MouseEvent) => {
+    const close = (event: MouseEvent) => {
       // Chips are excluded, not just the menu: React flushes this effect
       // synchronously for a discrete event, so the listener is live while the
       // very mousedown that opened the menu is still propagating to document.
       // Without the exclusion the menu closes on the click that opened it —
       // and clicking straight from one chip to another would too.
       const ElementType = chipMenu.chip.ownerDocument.defaultView?.Element;
-      if (ElementType && e.target instanceof ElementType) {
-        if (e.target.closest('.bind-menu, .expr-chip')) {
+      if (ElementType && event.target instanceof ElementType) {
+        if (event.target.closest('.bind-menu, .expr-chip')) {
           return;
         }
       }
-      setChipMenu(null);
+      setChipMenu(undefined);
     };
-    const onKey = (e: KeyboardEvent): void => {
-      if (e.key === 'Escape') {
-        setChipMenu(null);
+    const onKey = (event: KeyboardEvent): void => {
+      if (event.key === 'Escape') {
+        setChipMenu(undefined);
       }
     };
     document.addEventListener('mousedown', close);
@@ -560,16 +566,16 @@ function useRichChipDismiss(state: RichState): void {
 }
 function RichChipMenu({
   state,
-  bindCtx,
+  bindContext,
   pickExpr,
 }: {
   readonly state: RichState;
-  readonly bindCtx: RichContext | null | undefined;
+  readonly bindContext: RichContext | undefined;
   readonly pickExpr: (path: string) => void;
 }) {
   const { chipMenu } = state;
   if (!chipMenu) {
-    return null;
+    return undefined;
   }
   return (
     <div
@@ -577,12 +583,14 @@ function RichChipMenu({
       style={{ left: chipMenu.left, top: chipMenu.top, width: 260 }}
     >
       <DataPicker
-        tree={dataTree(bindCtx || {})}
+        tree={dataTree(bindContext || {})}
         current={chipMenu.current}
-        entries={bindCtx?.entryNav ?? null}
-        {...(bindCtx?.onStepItem ? { onStepItem: bindCtx.onStepItem } : {})}
-        onPick={(path, query) => pickExpr(resolvePick(path, query, bindCtx))}
-        onExpand={(node) => node.query && bindCtx?.onNeedSample?.(node.query.collection)}
+        entries={bindContext?.entryNav ?? undefined}
+        {...(bindContext?.onStepItem ? { onStepItem: bindContext.onStepItem } : {})}
+        onPick={(path, query) =>
+          pickExpr(resolvePick(path, query ?? undefined, bindContext ?? undefined))
+        }
+        onExpand={(node) => node.query && bindContext?.onNeedSample?.(node.query.collection)}
         footer={false}
       />
     </div>
@@ -590,22 +598,22 @@ function RichChipMenu({
 }
 type BubbleStyle = React.CSSProperties & { readonly '--arrow-x': string };
 function RichBubble({ state, emit }: { readonly state: RichState; readonly emit: () => void }) {
-  const { bubble, bubbleRef, pos, linkMode } = state;
+  const { bubble, bubbleRef, pos: position, linkMode } = state;
   if (!bubble) {
-    return null;
+    return undefined;
   }
   const style: BubbleStyle = {
-    left: pos ? pos.left : bubble.x,
-    top: pos ? pos.top : bubble.top - 10,
-    visibility: pos ? 'visible' : 'hidden',
-    '--arrow-x': pos ? `${pos.arrowX}px` : '50%',
+    left: position ? position.left : bubble.x,
+    top: position ? position.top : bubble.top - 10,
+    visibility: position ? 'visible' : 'hidden',
+    '--arrow-x': position ? `${position.arrowX}px` : '50%',
   };
   return (
     <div
       ref={bubbleRef}
-      className={`rich-bubble ${pos?.below ? 'below' : ''}`}
+      className={`rich-bubble ${position?.below ? 'below' : ''}`}
       style={style}
-      onMouseDown={(e) => e.stopPropagation()}
+      onMouseDown={(event) => event.stopPropagation()}
     >
       {linkMode ? (
         <RichLinkInput state={state} emit={emit} />
@@ -624,12 +632,12 @@ function RichLinkInput({ state, emit }: { readonly state: RichState; readonly em
       className="rich-bubble-url"
       placeholder="https://…  (Enter to apply)"
       value={linkUrl}
-      onChange={(e) => setLinkUrl(e.target.value)}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter') {
+      onChange={(event) => setLinkUrl(event.target.value)}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter') {
           applyLink();
         }
-        if (e.key === 'Escape') {
+        if (event.key === 'Escape') {
           setLinkMode(false);
           setLinkUrl('');
         }
@@ -641,67 +649,68 @@ function RichButtons({ state, emit }: { readonly state: RichState; readonly emit
   const { states, setLinkMode } = state;
   const exec = (command: string) => richExec(state, command, emit);
   const wrapTag = (tag: string) => richWrapTag(state, tag, emit);
-  const btn = (
+  const button = (
     label: React.ReactNode,
     title: string,
+    status: { readonly active: boolean | undefined },
     onAct: () => void,
-    active: boolean | undefined,
-  ) => richButton(label, title, active, onAct);
+  ) => richButton(label, title, status, onAct);
   return (
     <>
-      {btn(<b>B</b>, 'Bold', () => exec('bold'), states.bold)}
-      {btn(<i>I</i>, 'Italic', () => exec('italic'), states.italic)}
-      {btn(
+      {button(<b>B</b>, 'Bold', { active: states.bold }, () => exec('bold'))}
+      {button(<i>I</i>, 'Italic', { active: states.italic }, () => exec('italic'))}
+      {button(
         <span>
           X<sup>2</sup>
         </span>,
         'Superscript',
+        { active: states.superscript },
         () => exec('superscript'),
-        states.superscript,
       )}
-      {btn(
+      {button(
         <span>
           X<sub>2</sub>
         </span>,
         'Subscript',
+        { active: states.subscript },
         () => exec('subscript'),
-        states.subscript,
       )}
-      {btn(<span className="mono">{'</>'}</span>, 'Code', () => wrapTag('code'), states.code)}
+      {button(<span className="mono">{'</>'}</span>, 'Code', { active: states.code }, () =>
+        wrapTag('code'),
+      )}
       {/* A span is the hook for everything else: wrap some words, then
                   give that node a class and style it like any other. Nothing is
                   written on it here — an empty span IS the useful result. */}
-      {btn(
-        <span className="mono">span</span>,
-        'Wrap in a span',
-        () => wrapTag('span'),
-        states.span,
+      {button(<span className="mono">span</span>, 'Wrap in a span', { active: states.span }, () =>
+        wrapTag('span'),
       )}
       {/* The app's own link icon, not the emoji: an emoji is drawn by
                   the system in its own colours and at its own weight, so it sat
                   in this row as the one thing that hadn't been designed. */}
-      {btn(<ElementLinkIcon size={14} />, 'Link', () => setLinkMode(true), states.link)}
+      {button(<ElementLinkIcon size={14} />, 'Link', { active: states.link }, () =>
+        setLinkMode(true),
+      )}
     </>
   );
 }
 function useRichBlur(state: RichState): () => void {
   const { linkMode, setBubble } = state;
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   useEffect(
     () => () => {
-      if (timer.current !== null) {
+      if (timer.current !== undefined) {
         clearTimeout(timer.current);
       }
     },
     [],
   );
   return () => {
-    if (timer.current !== null) {
+    if (timer.current !== undefined) {
       clearTimeout(timer.current);
     }
     timer.current = setTimeout(() => {
-      timer.current = null;
-      setBubble((bubble) => (linkMode ? bubble : null));
+      timer.current = undefined;
+      setBubble((bubble) => (linkMode ? bubble : undefined));
     }, 150);
   };
 }

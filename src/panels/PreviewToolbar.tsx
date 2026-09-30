@@ -11,19 +11,21 @@ interface DeviceDefinition {
   readonly key: FixedDevice;
   readonly Icon: React.ComponentType<IconProps>;
   readonly title: string;
-  readonly width: number | null;
+  /** The viewport width it simulates; undefined for the full available width. */
+  readonly width: number | undefined;
   readonly from?: number;
 }
 
 export const DEVICES: readonly DeviceDefinition[] = [
-  { key: 'desktop', Icon: DesktopIcon, title: 'Desktop — 1', width: null, from: 1024 },
+  { key: 'desktop', Icon: DesktopIcon, title: 'Desktop — 1', width: undefined, from: 1024 },
   { key: 'tablet', Icon: TabletIcon, title: 'Tablet (768px) — 2', width: 768, from: 768 },
   { key: 'phone', Icon: PhoneIcon, title: 'Phone (375px) — 3', width: 375, from: 0 },
-  { key: 'canvas', Icon: CanvasIcon, title: 'Canvas — all breakpoints — 4', width: null },
+  { key: 'canvas', Icon: CanvasIcon, title: 'Canvas — all breakpoints — 4', width: undefined },
 ];
 
 export interface PreviewCrumb {
-  readonly id: string | null;
+  /** The node the crumb selects; undefined for the page itself. */
+  readonly id: string | undefined;
   readonly label: string;
 }
 
@@ -39,14 +41,14 @@ interface VisibleCrumb {
 
 type ToolbarCrumb = FoldedCrumb | VisibleCrumb;
 
-export function deviceForWidth(px: number): FixedDevice | null {
+export function deviceForWidth(px: number): FixedDevice | undefined {
   if (!Number.isFinite(px) || px <= 0) {
-    return null;
+    return undefined;
   }
-  return DEVICES.find((device) => device.from !== undefined && px >= device.from)?.key ?? null;
+  return DEVICES.find((device) => device.from !== undefined && px >= device.from)?.key;
 }
 
-export function deviceWidth(device: PreviewDevice): number | null | undefined {
+export function deviceWidth(device: PreviewDevice): number | undefined {
   return DEVICES.find((entry) => entry.key === device)?.width;
 }
 
@@ -58,20 +60,23 @@ export function PreviewToolbar({
   sizing,
 }: {
   readonly crumbs: readonly PreviewCrumb[];
-  readonly onCrumb?: (id: string | null) => void;
+  readonly onCrumb?: (id: string | undefined) => void;
   readonly activeDevice: PreviewDevice;
   readonly onDevice: (device: PreviewDevice) => void;
   readonly sizing?: PreviewSizeControlsProps;
 }) {
   const shownCrumbs = useFoldedCrumbs(crumbs);
-  const buttonRefs = useRef<Partial<Record<FixedDevice, HTMLButtonElement | null>>>({});
-  const [indicator, setIndicator] = useState<{
-    readonly left: number;
-    readonly width: number;
-  } | null>(null);
+  const buttonRefs = useRef(new Map<FixedDevice, HTMLButtonElement>());
+  const [indicator, setIndicator] = useState<
+    | {
+        readonly left: number;
+        readonly width: number;
+      }
+    | undefined
+  >(undefined);
   useLayoutEffect(() => {
-    const element = activeDevice === 'custom' ? undefined : buttonRefs.current[activeDevice];
-    setIndicator(element ? { left: element.offsetLeft, width: element.offsetWidth } : null);
+    const element = activeDevice === 'custom' ? undefined : buttonRefs.current.get(activeDevice);
+    setIndicator(element ? { left: element.offsetLeft, width: element.offsetWidth } : undefined);
   }, [activeDevice]);
   return (
     <div className="preview-toolbar">
@@ -86,7 +91,12 @@ export function PreviewToolbar({
           <button
             key={key}
             ref={(element) => {
-              buttonRefs.current[key] = element;
+              // React passes null when the button unmounts.
+              if (element === null) {
+                buttonRefs.current.delete(key);
+              } else {
+                buttonRefs.current.set(key, element);
+              }
             }}
             className={activeDevice === key ? 'on' : ''}
             title={title}
@@ -136,7 +146,7 @@ function CrumbTrail({
   onExpand,
 }: {
   readonly crumbs: readonly ToolbarCrumb[];
-  readonly onCrumb?: (id: string | null) => void;
+  readonly onCrumb?: (id: string | undefined) => void;
   readonly onExpand: () => void;
 }) {
   return (

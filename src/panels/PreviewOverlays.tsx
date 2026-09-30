@@ -1,6 +1,6 @@
 import React from 'react';
 import type { Box } from '../outlineBoxes';
-import type { Spacing } from '../spacingBands';
+import type { PreviewMessage } from '../previewMessages';
 import { hoverIsSelection, onePerPlace } from '../outlineBoxes';
 import { spacingBands } from '../spacingBands';
 import {
@@ -20,7 +20,7 @@ import {
 export interface OverlayInfo {
   readonly label: string;
   readonly kind: 'component' | 'map' | 'element';
-  readonly tag: string | null;
+  readonly tag: string | undefined;
   readonly astroAsset: boolean;
   readonly dynamicTag: boolean;
   readonly nodeKind: string;
@@ -34,20 +34,23 @@ export interface SpacingHover {
   readonly labels?: Readonly<Record<string, string>>;
 }
 
-export type RectMap = Readonly<Record<string, readonly Box[] | null>>;
-export type SpacingMap = Readonly<Record<string, readonly (Spacing | null)[]>>;
+// The measurements as the canvas frame reports them (src/previewMessages.ts): a
+// path it could not measure, and a copy without spacing, are absent.
+type RectsMessage = Extract<PreviewMessage, { readonly kind: 'rects' }>;
+export type RectMap = RectsMessage['rects'];
+export type SpacingMap = RectsMessage['spacing'];
 
 interface PreviewOverlaysProps {
   readonly rects: RectMap;
   readonly spacing: SpacingMap;
-  readonly spacingHover?: SpacingHover | null;
-  readonly selPath: string | null;
-  readonly selOcc: number | null;
-  readonly hoverPath: string | null;
-  readonly hoverOcc: number | null;
-  readonly focusPath: string | null;
+  readonly spacingHover?: SpacingHover | undefined;
+  readonly selPath: string | undefined;
+  readonly selOcc: number | undefined;
+  readonly hoverPath: string | undefined;
+  readonly hoverOcc: number | undefined;
+  readonly focusPath: string | undefined;
   readonly focusWhole: boolean;
-  readonly overlayInfo?: (path: string) => OverlayInfo | null;
+  readonly overlayInfo?: (path: string) => OverlayInfo | undefined;
 }
 
 export function PreviewOverlays(props: PreviewOverlaysProps) {
@@ -60,24 +63,30 @@ export function PreviewOverlays(props: PreviewOverlaysProps) {
   );
 }
 
-function FocusOverlays({ path, rects }: { readonly path: string | null; readonly rects: RectMap }) {
+function FocusOverlays({
+  path,
+  rects,
+}: {
+  readonly path: string | undefined;
+  readonly rects: RectMap;
+}) {
   if (!path) {
-    return null;
+    return undefined;
   }
-  return onePerPlace(rects[path]).map((box, index) => (
+  return onePerPlace(rects[path] ?? undefined).map((box, index) => (
     <div key={`focus-${index}`} className="node-focus" style={boxStyle(box)} />
   ));
 }
 
 function SpacingOverlays(props: PreviewOverlaysProps) {
-  const { spacingHover, selPath } = props;
-  if (!spacingHover || !selPath) {
-    return null;
+  const { spacingHover, selPath: selectedPath } = props;
+  if (!spacingHover || !selectedPath) {
+    return undefined;
   }
-  const boxes = props.rects[selPath] ?? [];
-  const measurements = props.spacing[selPath] ?? [];
+  const boxes = props.rects[selectedPath] ?? [];
+  const measurements = props.spacing[selectedPath] ?? [];
   const box = boxes[props.selOcc ?? 0] ?? boxes[0];
-  const measurement = measurements[props.selOcc ?? 0] ?? measurements[0];
+  const measurement = measurements[props.selOcc ?? 0] ?? measurements[0] ?? undefined;
   return spacingBands(box, measurement, spacingHover.kind, spacingHover.sides).map(
     (band, index) => (
       <div
@@ -101,10 +110,11 @@ function NodeOutlines(props: PreviewOverlaysProps) {
     if (!all || !info) {
       return [];
     }
-    // `null` means the node, so draw one box per place. A number means the
-    // specific repeated copy clicked on the canvas.
-    const selected = outline.occ === null ? undefined : all[outline.occ];
-    const boxes = outline.occ === null ? onePerPlace(all) : selected ? [selected] : all.slice(0, 1);
+    // No occurrence means the node, so draw one box per place. A number means
+    // the specific repeated copy clicked on the canvas.
+    const selected = outline.occ === undefined ? undefined : all[outline.occ];
+    const boxes =
+      outline.occ === undefined ? onePerPlace(all) : selected ? [selected] : all.slice(0, 1);
     return boxes.map((box, index) => (
       <div
         key={`${outline.type}-${index}`}
@@ -123,7 +133,7 @@ function NodeOutlines(props: PreviewOverlaysProps) {
 interface OutlineTarget {
   readonly path: string;
   readonly type: 'hover' | 'sel';
-  readonly occ: number | null;
+  readonly occ: number | undefined;
 }
 
 function outlineTargets(props: PreviewOverlaysProps): readonly OutlineTarget[] {

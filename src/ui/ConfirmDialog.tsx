@@ -14,7 +14,7 @@ interface ConfirmOptions {
   readonly confirmLabel?: string;
   readonly cancelLabel?: string;
   readonly danger?: boolean;
-  readonly checkbox?: Checkbox | null;
+  readonly checkbox?: Checkbox | undefined;
 }
 type ConfirmAnswer = boolean | { readonly checked: boolean };
 interface Question {
@@ -23,18 +23,18 @@ interface Question {
   readonly confirmLabel: string;
   readonly cancelLabel: string;
   readonly danger: boolean;
-  readonly checkbox: Checkbox | null;
+  readonly checkbox: Checkbox | undefined;
   readonly resolve: (answer: ConfirmAnswer) => void;
 }
-let open: ((question: Question) => void) | null = null;
+let open: ((question: Question) => void) | undefined;
 
 export function confirmDialog({
   title,
-  body = null,
+  body,
   confirmLabel = 'Continue',
   cancelLabel = 'Cancel',
   danger = false,
-  checkbox = null,
+  checkbox,
 }: ConfirmOptions = {}): Promise<ConfirmAnswer> {
   return new Promise((resolve) => {
     if (!open) {
@@ -48,7 +48,7 @@ export function confirmDialog({
 
 /** One host owns the window's single confirmation slot. */
 export function ConfirmHost() {
-  const [ask, setAsk] = useState<Question | null>(null);
+  const [ask, setAsk] = useState<Question | undefined>(undefined);
   const [checked, setChecked] = useState(false);
   const confirmRef = useRef<HTMLButtonElement>(null);
   const cancelRef = useRef<HTMLButtonElement>(null);
@@ -61,7 +61,7 @@ export function ConfirmHost() {
     open = setAsk;
     return () => {
       if (open === setAsk) {
-        open = null;
+        open = undefined;
       }
     };
   }, []);
@@ -76,13 +76,13 @@ export function ConfirmHost() {
         return;
       }
       ask.resolve(value && ask.checkbox ? { checked } : value);
-      setAsk(null);
+      setAsk(undefined);
     },
     [ask, checked],
   );
   useConfirmKeys(ask, answer);
   if (!ask) {
-    return null;
+    return undefined;
   }
   return (
     <ConfirmSurface
@@ -96,7 +96,7 @@ export function ConfirmHost() {
   );
 }
 
-function useConfirmKeys(ask: Question | null, answer: (value: boolean) => void): void {
+function useConfirmKeys(ask: Question | undefined, answer: (value: boolean) => void): void {
   useEffect(() => {
     if (!ask) {
       return undefined;

@@ -22,7 +22,7 @@ export interface MenuItem {
   readonly onSelect?: () => void;
 }
 interface MoreMenuProps {
-  readonly items?: readonly (MenuItem | false | null | undefined)[];
+  readonly items?: readonly (MenuItem | false | undefined)[];
   readonly title?: string;
   readonly className?: string;
   readonly width?: number;
@@ -34,16 +34,16 @@ export default function MoreMenu({
   width = 150,
 }: MoreMenuProps) {
   const [open, setOpen] = useState(false);
-  const [box, setBox] = useState<CSSProperties | null>(null);
+  const [box, setBox] = useState<CSSProperties | undefined>(undefined);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
-  useDismiss(menuRef, open, () => setOpen(false));
+  useDismiss(menuRef, { active: open }, () => setOpen(false));
 
   assert((items?.length ?? 0) <= LIMITS.scanEntriesMax, 'MoreMenu: item limit exceeded');
   assert(width > 0, 'MoreMenu: positive menu width');
   const rows = (items || []).filter((item): item is MenuItem => Boolean(item));
   if (!rows.length) {
-    return null;
+    return undefined;
   }
 
   const show = () => {
@@ -69,11 +69,11 @@ export default function MoreMenu({
         aria-label={title}
         aria-haspopup="menu"
         aria-expanded={open}
-        onClick={(e) => {
+        onClick={(event) => {
           // The row underneath usually does something of its own — opens a
           // folder, picks an asset, starts a rename.
-          e.stopPropagation();
-          e.preventDefault();
+          event.stopPropagation();
+          event.preventDefault();
           if (open) {
             setOpen(false);
           } else {
@@ -91,7 +91,7 @@ export default function MoreMenu({
           menuRef={menuRef}
           close={() => setOpen(false)}
         />
-      ) : null}
+      ) : undefined}
     </>
   );
 }

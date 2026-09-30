@@ -11,20 +11,21 @@
 // object with another object inside it: those are programs, and a row that
 // pretended otherwise would lose what it could not draw.
 //
-// So this reads an array literal and answers with its items, or with null,
-// which is the field's cue to stay in the code editor.
+// So this reads an array literal and answers with its items, or with undefined,
+// which is the field's cue to stay in the code editor. A `quote` of undefined marks a
+// value written without quotes: a number, or a yes/no.
 
 export interface ScalarItem {
   readonly text: string;
-  readonly quote: string | null;
+  readonly quote: string | undefined;
   readonly fields?: undefined;
 }
 
 export interface ItemField {
   readonly key: string;
-  readonly keyQuote: string | null;
+  readonly keyQuote: string | undefined;
   readonly text: string;
-  readonly quote: string | null;
+  readonly quote: string | undefined;
 }
 
 export interface ObjectItem {
@@ -35,16 +36,16 @@ export interface ObjectItem {
 
 export type Item = ScalarItem | ObjectItem;
 
-type ItemDraft = { text: string; quote: string | null } | { fields: ItemField[] };
+type ItemDraft = { text: string; quote: string | undefined } | { fields: ItemField[] };
 
 // `{ value: "a", label: "A" }` — an object whose every value is a word or a
 // number. That is a thing with several fields, which a row can name and a popup
 // can edit; an object with a call or another object inside it is not.
-function objectFrom(source: string): { fields: ItemField[] } | null {
+function objectFrom(source: string): { fields: ItemField[] } | undefined {
   const body = source.trim().slice(1, -1);
   const parts = splitTop(body);
   if (!parts) {
-    return null;
+    return undefined;
   }
   const fields: ItemField[] = [];
   for (const [i, part] of parts.entries()) {
@@ -52,49 +53,49 @@ function objectFrom(source: string): { fields: ItemField[] } | null {
       if (i === parts.length - 1) {
         continue; // a trailing comma
       }
-      return null;
+      return undefined;
     }
     const colon = topColon(part);
     if (colon === -1) {
-      return null; // shorthand `{ value }` names something else
+      return undefined; // shorthand `{ value }` names something else
     }
     const rawKey = part.slice(0, colon).trim();
     const key = /^(['"`])(.*)\1$/.test(rawKey) ? rawKey.slice(1, -1) : rawKey;
     const first = rawKey.charAt(0);
-    const keyQuote = first === '"' || first === "'" ? first : null;
+    const keyQuote = first === '"' || first === "'" ? first : undefined;
     if (!/^[A-Za-z_$][\w$]*$/.test(key)) {
-      return null;
+      return undefined;
     }
     const value = itemFrom(part.slice(colon + 1));
     // A field holds a word or a number. An object inside an object is a shape
     // with no depth of fields to show it in, and the popup would have nowhere
     // to put it.
     if (!value || 'fields' in value) {
-      return null;
+      return undefined;
     }
     fields.push({ key, keyQuote, text: value.text, quote: value.quote });
   }
-  return fields.length ? { fields } : null;
+  return fields.length ? { fields } : undefined;
 }
 
 /** The first colon that separates a key from its value, at the top level. */
 function topColon(part: string): number {
   let depth = 0;
   for (let i = 0; i < part.length; i++) {
-    const c = part.charAt(i);
-    if (c === '"' || c === "'" || c === '`') {
-      const quote = c;
+    const character = part.charAt(i);
+    if (character === '"' || character === "'" || character === '`') {
+      const quote = character;
       i++;
       while (i < part.length && part.charAt(i) !== quote) {
         i += part.charAt(i) === '\\' ? 2 : 1;
       }
       continue;
     }
-    if (c === '[' || c === '(' || c === '{') {
+    if (character === '[' || character === '(' || character === '{') {
       depth++;
-    } else if (c === ']' || c === ')' || c === '}') {
+    } else if (character === ']' || character === ')' || character === '}') {
       depth--;
-    } else if (c === ':' && depth === 0) {
+    } else if (character === ':' && depth === 0) {
       return i;
     }
   }
@@ -102,10 +103,10 @@ function topColon(part: string): number {
 }
 
 /** A quoted string, a number, an object of those, or nothing this can show. */
-function itemFrom(source: string): ItemDraft | null {
+function itemFrom(source: string): ItemDraft | undefined {
   const text = source.trim();
   if (!text) {
-    return null;
+    return undefined;
   }
   if (text.charAt(0) === '{' && text.charAt(text.length - 1) === '}') {
     return objectFrom(text);
@@ -113,13 +114,13 @@ function itemFrom(source: string): ItemDraft | null {
   const quote = text.charAt(0);
   if (quote === '"' || quote === "'" || quote === '`') {
     if (text.length < 2 || text.charAt(text.length - 1) !== quote) {
-      return null;
+      return undefined;
     }
     const body = text.slice(1, -1);
     // A template with a hole in it is code — what it says depends on something
     // else, and a row would have to show the hole rather than the value.
     if (quote === '`' && /\$\{/.test(body)) {
-      return null;
+      return undefined;
     }
     // An unescaped quote inside means the literal ended early: two items were
     // read as one, and this is not the shape it looks like.
@@ -129,68 +130,68 @@ function itemFrom(source: string): ItemDraft | null {
         continue;
       }
       if (body.charAt(i) === quote) {
-        return null;
+        return undefined;
       }
     }
     return { text: body.replace(/\\(['"`\\])/g, '$1').replace(/\\n/g, '\n'), quote };
   }
   if (/^[-+]?(\d+\.?\d*|\.\d+)$/.test(text)) {
-    return { text, quote: null };
+    return { text, quote: undefined };
   }
-  return null;
+  return undefined;
 }
 
-/** Where the top-level commas are, or null if the source is unbalanced. */
-function splitTop(body: string): string[] | null {
+/** Where the top-level commas are, or undefined if the source is unbalanced. */
+function splitTop(body: string): string[] | undefined {
   const out: string[] = [];
   let depth = 0;
   let last = 0;
   for (let i = 0; i < body.length; i++) {
-    const c = body.charAt(i);
-    if (c === '"' || c === "'" || c === '`') {
-      const quote = c;
+    const character = body.charAt(i);
+    if (character === '"' || character === "'" || character === '`') {
+      const quote = character;
       i++;
       while (i < body.length && body.charAt(i) !== quote) {
         i += body.charAt(i) === '\\' ? 2 : 1;
       }
       if (i >= body.length) {
-        return null; // ran off the end inside a string
+        return undefined; // ran off the end inside a string
       }
       continue;
     }
-    if (c === '[' || c === '(' || c === '{') {
+    if (character === '[' || character === '(' || character === '{') {
       depth++;
-    } else if (c === ']' || c === ')' || c === '}') {
+    } else if (character === ']' || character === ')' || character === '}') {
       depth--;
       if (depth < 0) {
-        return null;
+        return undefined;
       }
-    } else if (c === ',' && depth === 0) {
+    } else if (character === ',' && depth === 0) {
       out.push(body.slice(last, i));
       last = i + 1;
     }
   }
   if (depth !== 0) {
-    return null;
+    return undefined;
   }
   out.push(body.slice(last));
   return out;
 }
 
 /**
- * The items of a simple array literal, or null when the value is anything else
- * — a name, an array with a spread or a call in it, or no value at all. An
- * empty array is an empty list, which is not the same as null: one is a list
+ * The items of a simple array literal, or undefined when the value is anything
+ * else — a name, an array with a spread or a call in it, or no value at all. An
+ * empty array is an empty list, which is not the same as undefined: one is a list
  * with nothing in it, the other is not a list.
  */
-export function arrayItems(source: unknown): Item[] | null {
+export function arrayItems(source: unknown): Item[] | undefined {
   const text = String(source ?? '').trim();
   if (!text.startsWith('[') || !text.endsWith(']')) {
-    return null;
+    return undefined;
   }
   const parts = splitTop(text.slice(1, -1));
   if (!parts) {
-    return null;
+    return undefined;
   }
   const items: Item[] = [];
   for (const [i, part] of parts.entries()) {
@@ -201,11 +202,11 @@ export function arrayItems(source: unknown): Item[] | null {
       if (i === parts.length - 1) {
         continue;
       }
-      return null;
+      return undefined;
     }
     const item = itemFrom(part);
     if (!item) {
-      return null;
+      return undefined;
     }
     items.push(item);
   }
@@ -214,15 +215,15 @@ export function arrayItems(source: unknown): Item[] | null {
 
 /** How a string is written back, in the quote it was written with. */
 function quoted(
-  item: { readonly text: string; readonly quote: string | null | undefined },
+  item: { readonly text: string; readonly quote: string | undefined | undefined },
   fallback: string,
 ): string {
-  const q = item.quote || fallback;
+  const quote = item.quote || fallback;
   const body = String(item.text)
     .replace(/\\/g, '\\\\')
-    .replace(new RegExp(q, 'g'), `\\${q}`)
+    .replace(new RegExp(quote, 'g'), `\\${quote}`)
     .replace(/\n/g, '\\n');
-  return `${q}${body}${q}`;
+  return `${quote}${body}${quote}`;
 }
 
 /**
@@ -230,35 +231,35 @@ function quoted(
  * that writes single quotes should not have double ones appear the first time
  * a list is touched — and a number stays a number.
  */
-export function arrayText(items: readonly Item[] | null | undefined): string {
+export function arrayText(items: readonly Item[] | undefined): string {
   const list = items ?? [];
   const fallback =
-    list.find((i) => i.quote)?.quote ||
-    list.flatMap((i) => i.fields ?? []).find((f) => f.quote)?.quote ||
+    list.find((item) => item.quote)?.quote ||
+    list.flatMap((item) => item.fields ?? []).find((field) => field.quote)?.quote ||
     '"';
   const one = (item: Item): string => {
     if (item.fields) {
       const inner = item.fields
         .map(
-          (f) =>
-            `${f.keyQuote ? `${f.keyQuote}${f.key}${f.keyQuote}` : f.key}: ${
-              f.quote === null ? String(f.text) : quoted(f, fallback)
+          (field) =>
+            `${field.keyQuote ? `${field.keyQuote}${field.key}${field.keyQuote}` : field.key}: ${
+              field.quote === undefined ? String(field.text) : quoted(field, fallback)
             }`,
         )
         .join(', ');
       return `{ ${inner} }`;
     }
-    return item.quote === null ? String(item.text) : quoted(item, fallback);
+    return item.quote === undefined ? String(item.text) : quoted(item, fallback);
   };
   return `[${list.map(one).join(', ')}]`;
 }
 
 export interface ObjectRow {
   readonly key: string;
-  readonly keyQuote: string | null;
+  readonly keyQuote: string | undefined;
   readonly kind: 'list' | 'boolean' | 'number' | 'text';
   readonly text?: string;
-  readonly quote?: string | null;
+  readonly quote?: string | undefined;
   readonly items?: readonly Item[];
 }
 
@@ -272,17 +273,17 @@ export interface ObjectRow {
  * whose whole value is an object has the panel to lay out, so one of its fields
  * can be a list, and that list is the same rows as anywhere else.
  *
- * Null for everything else — a name, a call, an object inside an object, a
+ * Undefined for everything else — a name, a call, an object inside an object, a
  * spread — which is the field's cue to stay in the code editor.
  */
-export function objectFields(source: unknown): ObjectRow[] | null {
+export function objectFields(source: unknown): ObjectRow[] | undefined {
   const text = String(source ?? '').trim();
   if (!text.startsWith('{') || !text.endsWith('}')) {
-    return null;
+    return undefined;
   }
   const parts = splitTop(text.slice(1, -1));
   if (!parts) {
-    return null;
+    return undefined;
   }
   const out: ObjectRow[] = [];
   for (const [i, part] of parts.entries()) {
@@ -290,24 +291,24 @@ export function objectFields(source: unknown): ObjectRow[] | null {
       if (i === parts.length - 1) {
         continue; // a trailing comma
       }
-      return null;
+      return undefined;
     }
     const colon = topColon(part);
     if (colon === -1) {
-      return null; // shorthand `{ legend }` names something else
+      return undefined; // shorthand `{ legend }` names something else
     }
     const rawKey = part.slice(0, colon).trim();
     const key = /^(['"`])(.*)\1$/.test(rawKey) ? rawKey.slice(1, -1) : rawKey;
     const first = rawKey.charAt(0);
-    const keyQuote = first === '"' || first === "'" ? first : null;
+    const keyQuote = first === '"' || first === "'" ? first : undefined;
     if (!/^[A-Za-z_$][\w$]*$/.test(key)) {
-      return null;
+      return undefined;
     }
     const raw = part.slice(colon + 1).trim();
     if (raw.startsWith('[')) {
       const items = arrayItems(raw);
       if (!items) {
-        return null; // a list this cannot show is one it must not eat
+        return undefined; // a list this cannot show is one it must not eat
       }
       out.push({ key, keyQuote, kind: 'list', items });
       continue;
@@ -316,39 +317,41 @@ export function objectFields(source: unknown): ObjectRow[] | null {
     // box to type `true` into. Only in an object: inside a list an item is a
     // row with a name on it, and "true" is not a name.
     if (raw === 'true' || raw === 'false') {
-      out.push({ key, keyQuote, kind: 'boolean', text: raw, quote: null });
+      out.push({ key, keyQuote, kind: 'boolean', text: raw, quote: undefined });
       continue;
     }
     const value = itemFrom(raw);
     // An object inside an object has no second level of fields to live in.
     if (!value || 'fields' in value) {
-      return null;
+      return undefined;
     }
     out.push({
       key,
       keyQuote,
-      kind: value.quote === null ? 'number' : 'text',
+      kind: value.quote === undefined ? 'number' : 'text',
       text: value.text,
       quote: value.quote,
     });
   }
-  return out.length ? out : null;
+  return out.length ? out : undefined;
 }
 
 /** The fields as an object literal, in the quotes the file was written with. */
-export function objectText(fields: readonly ObjectRow[] | null | undefined): string {
+export function objectText(fields: readonly ObjectRow[] | undefined): string {
   const list = fields ?? [];
   const fallback =
-    list.find((f) => f.quote)?.quote ||
-    list.flatMap((f) => f.items ?? []).find((i) => i.quote)?.quote ||
+    list.find((row) => row.quote)?.quote ||
+    list.flatMap((row) => row.items ?? []).find((item) => item.quote)?.quote ||
     '"';
-  const one = (f: ObjectRow): string => {
-    const name = f.keyQuote ? `${f.keyQuote}${f.key}${f.keyQuote}` : f.key;
-    if (f.items) {
-      return `${name}: ${arrayText(f.items)}`;
+  const one = (row: ObjectRow): string => {
+    const name = row.keyQuote ? `${row.keyQuote}${row.key}${row.keyQuote}` : row.key;
+    if (row.items) {
+      return `${name}: ${arrayText(row.items)}`;
     }
     const valueText =
-      f.quote === null ? String(f.text) : quoted({ text: f.text ?? '', quote: f.quote }, fallback);
+      row.quote === undefined
+        ? String(row.text)
+        : quoted({ text: row.text ?? '', quote: row.quote }, fallback);
     return `${name}: ${valueText}`;
   };
   return `{ ${list.map(one).join(', ')} }`;
@@ -359,7 +362,7 @@ export function objectText(fields: readonly ObjectRow[] | null | undefined): str
 // has, because a row with nothing written on it is a row nobody can aim at.
 const NAMES = ['label', 'name', 'title', 'text', 'value'] as const;
 
-export function itemLabel(item: Item | null | undefined): string {
+export function itemLabel(item: Item | undefined): string {
   if (!item) {
     return '';
   }
@@ -367,7 +370,9 @@ export function itemLabel(item: Item | null | undefined): string {
     return String(item.text);
   }
   for (const want of NAMES) {
-    const field = item.fields.find((f) => f.key === want && String(f.text).trim());
+    const field = item.fields.find((candidate) => {
+      return candidate.key === want && String(candidate.text).trim();
+    });
     if (field) {
       return String(field.text);
     }
@@ -381,18 +386,18 @@ export function itemLabel(item: Item | null | undefined): string {
  * offered a bare word as its next item would write an array the component
  * cannot read.
  */
-export function blankLike(items: readonly Item[] | null | undefined): Item {
-  const shape = (items ?? []).find((i) => i.fields);
-  const quote = (items ?? []).find((i) => i.quote)?.quote || '"';
+export function blankLike(items: readonly Item[] | undefined): Item {
+  const shape = (items ?? []).find((item) => item.fields);
+  const quote = (items ?? []).find((item) => item.quote)?.quote || '"';
   if (!shape || !shape.fields) {
     return { text: '', quote };
   }
   return {
-    fields: shape.fields.map((f) => ({
-      key: f.key,
-      keyQuote: f.keyQuote,
+    fields: shape.fields.map((field) => ({
+      key: field.key,
+      keyQuote: field.keyQuote,
       text: '',
-      quote: f.quote ?? quote,
+      quote: field.quote ?? quote,
     })),
   };
 }
@@ -403,7 +408,7 @@ export function blankLike(items: readonly Item[] | null | undefined): Item {
  * of [a, b, c] means "after b", so it comes back [b, a, c] and not [b, c, a].
  * Out-of-range or no-op moves return the list unchanged.
  */
-export function moveItem<T>(items: readonly T[] | null | undefined, from: number, to: number): T[] {
+export function moveItem<T>(items: readonly T[] | undefined, from: number, to: number): T[] {
   const list = [...(items ?? [])];
   if (!Number.isInteger(from) || from < 0 || from >= list.length) {
     return list;

@@ -45,10 +45,10 @@ const SIDES = ['top', 'right', 'bottom', 'left'] as const;
  * not somewhere to look.
  */
 export function spacingBands(
-  box: Box | null | undefined,
-  spacing: Spacing | null | undefined,
+  box: Box | undefined,
+  spacing: Spacing | undefined,
   kind: 'padding' | 'margin' | 'gap',
-  sides?: readonly string[] | null,
+  sides?: readonly string[] | undefined,
 ): readonly Band[] {
   // Gap is not four numbers on this element — it is the space between its
   // children, and where those children are is a question only the laid-out
@@ -58,8 +58,8 @@ export function spacingBands(
   if (kind === 'gap') {
     const want = new Set(sides || ['row', 'column']);
     return (spacing?.gaps || [])
-      .filter((b) => want.has(b.axis) && b.w > 0 && b.h > 0)
-      .map((b) => ({ side: b.axis, x: b.x, y: b.y, w: b.w, h: b.h }));
+      .filter((band) => want.has(band.axis) && band.w > 0 && band.h > 0)
+      .map((band) => ({ side: band.axis, x: band.x, y: band.y, w: band.w, h: band.h }));
   }
   if (!box || !spacing?.[kind]) {
     return [];

@@ -17,15 +17,15 @@ export function pageRank(name: unknown): 0 | 1 | 2 {
   return 1;
 }
 
-export function comparePageNames(a: unknown, b: unknown): number {
-  const an = String(a || '').replace(/\.(astro|mdx?)$/i, '');
-  const bn = String(b || '').replace(/\.(astro|mdx?)$/i, '');
-  return pageRank(an) - pageRank(bn) || collator.compare(an, bn);
+export function comparePageNames(left: unknown, right: unknown): number {
+  const leftName = String(left || '').replace(/\.(astro|mdx?)$/i, '');
+  const rightName = String(right || '').replace(/\.(astro|mdx?)$/i, '');
+  return pageRank(leftName) - pageRank(rightName) || collator.compare(leftName, rightName);
 }
 
 // Whether a page comes before the folders at its level rather than after
 // them. `index.astro` is not a page inside the folder — it IS the folder:
-// /about is that page and /about/story is a page beneath it, and the site's
+// `/about` is that page and `/about/story` is a page beneath it, and the site's
 // home page is the one at the root. Listed after the folders, as everything
 // used to be, a site's front door sat underneath every other page on the
 // site, which is the one place nobody looks for it.

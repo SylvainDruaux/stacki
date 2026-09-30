@@ -28,6 +28,9 @@ type Phase<T> =
 export function createCoalescedRun<T>(run: () => Promise<T>): CoalescedRun<T> {
   // The coordinator's one piece of state, owned here and never handed out.
   let phase: Phase<T> = { tag: 'idle' };
+  // A run starts the next one from its settled promise's callback, not from the stack:
+  // each run starts on its own microtask, and at most one run waits.
+  // eslint-disable-next-line stacki/bounded-recursion -- promise re-entry, not recursion
   const start = (answer: Waiting<T>): void => {
     phase = { tag: 'running', waiting: undefined };
     void Promise.resolve()

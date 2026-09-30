@@ -22,10 +22,10 @@ export function clashesOf(file: WireMergeClash): readonly Clash[] {
   return parts.filter((part): part is Clash => part.kind === 'clash');
 }
 export function defaultChoice(clash: Clash): ConflictChoice {
-  return clash.merged != null ? 'merged' : clash.changedBy === 'theirs' ? 'theirs' : 'ours';
+  return clash.merged !== undefined ? 'merged' : clash.changedBy === 'theirs' ? 'theirs' : 'ours';
 }
 export function contestedIn(file: WireMergeClash): number {
-  return clashesOf(file).filter((clash) => clash.changedBy === 'both' && clash.merged == null)
+  return clashesOf(file).filter((clash) => clash.changedBy === 'both' && clash.merged === undefined)
     .length;
 }
 export function initialConflictPicks(conflict: Conflict): ConflictPicks {
@@ -73,7 +73,7 @@ export function conflictHunks(parts: readonly WireConflictPart[]): readonly Conf
   return hunks;
 }
 export function conflictLabel(conflict: Conflict, clash: Clash): string {
-  if (clash.merged != null) {
+  if (clash.merged !== undefined) {
     return 'Both branches changed this line, in different places';
   }
   if (clash.changedBy === 'both') {

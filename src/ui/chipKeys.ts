@@ -8,7 +8,7 @@ import { assert } from '../../shared/assert';
 // with them. So the one case that matters is handled here, and everything else
 // (deleting characters, deleting a real selection) is left alone.
 
-const isChip = (node: Node | null | undefined): node is Element => {
+const isChip = (node: Node | undefined): node is Element => {
   // Use the node's realm so iframe nodes and DOM test documents narrow correctly.
   const ElementType = node?.ownerDocument?.defaultView?.Element;
   return (
@@ -17,30 +17,30 @@ const isChip = (node: Node | null | undefined): node is Element => {
 };
 
 // The chip the caret is sitting against, on the side it is about to delete
-// towards: -1 for Backspace, 1 for Delete. Null when the caret is inside text,
+// towards: -1 for Backspace, 1 for Delete. Undefined when the caret is inside text,
 // where an ordinary character delete is what was meant.
-function chipBesideCaret(host: HTMLElement, dir: -1 | 1): Element | null {
-  const sel = window.getSelection();
-  if (!sel || sel.rangeCount === 0) {
-    return null;
+function chipBesideCaret(host: HTMLElement, directory: -1 | 1): Element | undefined {
+  const selection = window.getSelection();
+  if (!selection || selection.rangeCount === 0) {
+    return undefined;
   }
-  const range = sel.getRangeAt(0);
+  const range = selection.getRangeAt(0);
   if (!range.collapsed || !host.contains(range.startContainer)) {
-    return null;
+    return undefined;
   }
   const node = range.startContainer;
   const offset = range.startOffset;
   if (node.nodeType === 3) {
     // Only from the very edge of the text: anywhere else there is a character
     // to remove, which is what the key is for.
-    if (dir < 0 ? offset > 0 : offset < (node.nodeValue?.length ?? 0)) {
-      return null;
+    if (directory < 0 ? offset > 0 : offset < (node.nodeValue?.length ?? 0)) {
+      return undefined;
     }
-    const sib = dir < 0 ? node.previousSibling : node.nextSibling;
-    return isChip(sib) ? sib : null;
+    const sibling = (directory < 0 ? node.previousSibling : node.nextSibling) ?? undefined;
+    return isChip(sibling) ? sibling : undefined;
   }
-  const child = dir < 0 ? node.childNodes[offset - 1] : node.childNodes[offset];
-  return isChip(child) ? child : null;
+  const child = directory < 0 ? node.childNodes[offset - 1] : node.childNodes[offset];
+  return isChip(child) ? child : undefined;
 }
 
 /**
@@ -49,7 +49,7 @@ function chipBesideCaret(host: HTMLElement, dir: -1 | 1): Element | null {
  * has changed without the browser's own editing having run.
  */
 export function deleteChipAtCaret(
-  host: HTMLElement | null | undefined,
+  host: HTMLElement | undefined,
   event: Pick<KeyboardEvent, 'key' | 'metaKey' | 'ctrlKey' | 'altKey'>,
 ): boolean {
   if (!host) {
@@ -75,11 +75,11 @@ export function deleteChipAtCaret(
   const range = document.createRange();
   range.setStart(parent, Math.min(at, parent.childNodes.length));
   range.collapse(true);
-  const sel = window.getSelection();
-  if (!sel) {
+  const selection = window.getSelection();
+  if (!selection) {
     return true;
   }
-  sel.removeAllRanges();
-  sel.addRange(range);
+  selection.removeAllRanges();
+  selection.addRange(range);
   return true;
 }

@@ -6,22 +6,24 @@ import { assert } from '../shared/assert';
 type Timer = ReturnType<typeof setTimeout> | number;
 export interface PreviewTimers {
   readonly setTimeout: (callback: () => void, delayMs: number) => Timer;
-  readonly clearTimeout: (timer: Timer | null) => void;
+  readonly clearTimeout: (timer: Timer | undefined) => void;
   readonly now: () => number;
 }
 interface PreviewOptions {
-  readonly probe: () => Promise<{ readonly ok: boolean } | null | undefined>;
+  readonly probe: () => Promise<{ readonly ok: boolean } | undefined>;
   readonly onRecover: () => void;
   readonly retryMs?: number;
   readonly settleMs?: number;
   readonly quietMs?: number;
-  readonly timers?: PreviewTimers | null;
+  readonly timers?: PreviewTimers | undefined;
 }
 interface PreviewWatch {
   readonly poke: () => void;
   readonly stop: () => void;
   readonly isServing: () => boolean;
 }
+// What one probe found: a page being served, or the server still failing to serve one.
+type ProbeAnswer = 'serving' | 'failing';
 type WatchState =
   | { readonly kind: 'active'; readonly serving: boolean }
   | { readonly kind: 'stopped'; readonly serving: boolean };
@@ -34,7 +36,7 @@ export function createPreviewWatch(options: PreviewOptions): PreviewWatch {
 
 class PreviewWatcher {
   private state: WatchState = { kind: 'active', serving: true };
-  private timer: Timer | null = null;
+  private timer: Timer | undefined;
   private inFlight = false;
   private askedAt = -Infinity;
   private readonly timers: PreviewTimers;
@@ -52,10 +54,10 @@ class PreviewWatcher {
       assert(duration <= 2_147_483_647, 'Preview interval exceeds timer limit');
     }
     this.timers = options.timers ?? {
-      setTimeout: (callback, delayMs) => setTimeout(callback, delayMs),
+      setTimeout: (callback, delayMs) => globalThis.setTimeout(callback, delayMs),
       clearTimeout: (timer) => {
-        if (timer !== null) {
-          clearTimeout(timer);
+        if (timer !== undefined) {
+          globalThis.clearTimeout(timer);
         }
       },
       now: () => Date.now(),
@@ -75,7 +77,7 @@ class PreviewWatcher {
   stop(): void {
     this.state = { kind: 'stopped', serving: this.state.serving };
     this.timers.clearTimeout(this.timer);
-    this.timer = null;
+    this.timer = undefined;
   }
 
   isServing(): boolean {
@@ -84,7 +86,9 @@ class PreviewWatcher {
 
   private schedule(delayMs: number): void {
     this.timers.clearTimeout(this.timer);
-    this.timer = this.timers.setTimeout(() => this.ask(), delayMs);
+    // Fire and forget: `ask` turns every probe failure into a "failing" answer,
+    // so a rejection here could only be a programmer error, which stays loud.
+    this.timer = this.timers.setTimeout(() => void this.ask(), delayMs);
   }
 
   private async ask(): Promise<void> {
@@ -98,19 +102,20 @@ class PreviewWatcher {
     this.acceptAnswer(answer);
   }
 
-  private async probe(): Promise<boolean> {
+  private async probe(): Promise<ProbeAnswer> {
     try {
-      return Boolean((await this.options.probe())?.ok);
+      return (await this.options.probe())?.ok ? 'serving' : 'failing';
     } catch {
       // An unreachable server is also not serving a page; keep recovering.
-      return false;
+      return 'failing';
     }
   }
 
-  private acceptAnswer(serving: boolean): void {
+  private acceptAnswer(answer: ProbeAnswer): void {
     if (this.state.kind === 'stopped') {
       return;
     }
+    const serving = answer === 'serving';
     const previouslyServing = this.state.serving;
     this.state = { kind: 'active', serving };
     if (!serving) {

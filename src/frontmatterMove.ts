@@ -14,7 +14,7 @@ interface NeededImport {
   readonly path: string;
 }
 interface FrontmatterRequest {
-  readonly names?: Iterable<string> | null;
+  readonly names?: Iterable<string> | undefined;
   readonly frontmatter?: string;
   readonly imports?: readonly NeededImport[];
   readonly has?: (name: string) => boolean;
@@ -126,29 +126,29 @@ function blankStrings(code: string): string {
       i++;
       let depth = 0;
       while (i < code.length) {
-        const c = code[i];
-        if (c === '\\') {
+        const character = code[i];
+        if (character === '\\') {
           i += 2;
           continue;
         }
-        if (depth === 0 && c === '`') {
+        if (depth === 0 && character === '`') {
           break;
         }
-        if (c === '$' && code[i + 1] === '{') {
+        if (character === '$' && code[i + 1] === '{') {
           depth++;
           out += ' ';
           i += 2;
           continue;
         }
         if (depth > 0) {
-          if (c === '}') {
+          if (character === '}') {
             depth--;
             out += ' ';
             i++;
             continue;
           }
           // Inside a hole: code, kept as it is.
-          out += c;
+          out += character;
           i++;
           continue;
         }
@@ -171,16 +171,16 @@ export function identifiersIn(code: unknown): Set<string> {
   );
   const out = new Set<string>();
   const re = /(\.?)\b([A-Za-z_$][\w$]*)\b(\s*:)?/g;
-  let m;
-  while ((m = re.exec(text)) !== null) {
-    const [, dot, name, colon] = m;
+  let match;
+  while ((match = re.exec(text)) !== null) {
+    const [, dot, name, colon] = match;
     if (dot) {
       continue;
     } // a property of something else, not a name of its own
-    if (colon && !/\?\s*$/.test(text.slice(0, m.index))) {
+    if (colon && !/\?\s*$/.test(text.slice(0, match.index))) {
       // `key: value` in an object literal — the key is not a reference. A
       // ternary's `:` is, which is what the lookbehind is checking for.
-      const before = text.slice(0, m.index);
+      const before = text.slice(0, match.index);
       if (/[{,]\s*$/.test(before)) {
         continue;
       }
@@ -198,46 +198,47 @@ export function identifiersIn(code: unknown): Set<string> {
  * the code attached to it — prop expressions, loop heads, conditions, `{expr}`
  * nodes.
  */
-export function namesUsedIn(nodes: readonly TreeView[] | null | undefined): Set<string> {
+export function namesUsedIn(nodes: readonly TreeView[] | undefined): Set<string> {
   const out = new Set<string>();
   const visit = treeBudget();
-  const walk = (list: readonly TreeView[] | null | undefined, depth: number): void => {
+  const walk = (list: readonly TreeView[] | undefined, depth: number): void => {
     for (const node of list || []) {
       visit(depth);
+      assert(depth <= LIMITS.treeDepthMax, 'namesUsedIn: depth limit');
       // A component is named by being rendered.
       if (node.kind === 'component' && node.name) {
         out.add(node.name);
       }
       if (node.kind === 'expr' || node.kind === 'raw-line') {
-        for (const n of identifiersIn(node.value)) {
-          out.add(n);
+        for (const name of identifiersIn(node.value)) {
+          out.add(name);
         }
       }
       if (node.kind === 'map') {
-        for (const n of identifiersIn(node.head)) {
-          out.add(n);
+        for (const name of identifiersIn(node.head)) {
+          out.add(name);
         }
       }
       if (node.kind === 'cond') {
-        for (const n of identifiersIn(node.test)) {
-          out.add(n);
+        for (const name of identifiersIn(node.test)) {
+          out.add(name);
         }
       }
       if (node.body !== undefined) {
         for (const line of node.body) {
-          for (const n of identifiersIn(line)) {
-            out.add(n);
+          for (const name of identifiersIn(line)) {
+            out.add(name);
           }
         }
       }
       for (const value of Object.values(node.props || {})) {
         if (value && (value.type === 'expr' || value.type === 'spread')) {
-          for (const n of identifiersIn(value.value)) {
-            out.add(n);
+          for (const name of identifiersIn(value.value)) {
+            out.add(name);
           }
         }
       }
-      if (node.children != null) {
+      if (node.children !== undefined) {
         walk(node.children, depth + 1);
       }
     }
@@ -249,8 +250,8 @@ export function namesUsedIn(nodes: readonly TreeView[] | null | undefined): Set<
 /** The same, for a whole page: its markup plus its own frontmatter code. */
 function namesUsedByPage(model: FrontmatterPage): Set<string> {
   const out = namesUsedIn(model.nodes);
-  for (const n of identifiersIn(model.extraFrontmatter || '')) {
-    out.add(n);
+  for (const name of identifiersIn(model.extraFrontmatter || '')) {
+    out.add(name);
   }
   return out;
 }
@@ -382,22 +383,22 @@ export function neededFrontmatter({
     }
     statements.push({ name, statement: found.statement });
     // What that declaration reads in turn.
-    for (const n of identifiersIn(found.value)) {
-      queue.push(n);
+    for (const read of identifiersIn(found.value)) {
+      queue.push(read);
     }
   }
   // In the order the file wrote them, so what arrives reads like what was left
   // behind rather than like a list of dependencies.
-  statements.sort((a, b) => code.indexOf(a.statement) - code.indexOf(b.statement));
+  statements.sort((left, right) => code.indexOf(left.statement) - code.indexOf(right.statement));
   return { imports: wantedImports, statements };
 }
 
 /** The frontmatter with those statements added at the end. */
 export function withStatements(
   code: unknown,
-  statements: readonly Statement[] | null | undefined,
+  statements: readonly Statement[] | undefined,
 ): string {
-  const lines = (statements || []).map((s) => s.statement).filter(Boolean);
+  const lines = (statements || []).map((entry) => entry.statement).filter(Boolean);
   if (!lines.length) {
     return String(code || '');
   }

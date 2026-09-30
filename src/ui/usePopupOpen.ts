@@ -22,7 +22,7 @@ const POPUPS = '[role="menu"],[role="dialog"],[role="listbox"]';
  * inside a control. Watching all of <body>'s subtree would mean a callback on
  * every render anywhere in the app.
  */
-export default function usePopupOpen(host: RefObject<HTMLElement> | null | undefined): boolean {
+export default function usePopupOpen(host: RefObject<HTMLElement> | undefined): boolean {
   const [open, setOpen] = useState(false);
   useEffect(() => {
     const look = () => setOpen(!!document.querySelector(POPUPS));

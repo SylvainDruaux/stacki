@@ -2,7 +2,7 @@ interface DynamicPickerProps {
   readonly entries: readonly { readonly label: string }[];
   readonly index: number;
   readonly onPick: (index: number) => void;
-  readonly error?: string | null;
+  readonly error?: string | undefined;
   readonly pattern: string;
 }
 import Dropdown from './Dropdown.jsx';
@@ -54,12 +54,12 @@ export default function DynamicPicker({
         className="route-dd collection"
         menuClassName="route-menu collection"
         value={String(index)}
-        options={entries.map((e, i) => ({
+        options={entries.map((entry, i) => ({
           value: String(i),
-          label: e.label,
+          label: entry.label,
           icon: <FileIcon size={12} />,
         }))}
-        onChange={(v: string) => onPick(Number(v))}
+        onChange={(value: string) => onPick(Number(value))}
         livePreview={false}
         searchable
         searchPlaceholder="Search entries…"

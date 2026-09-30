@@ -182,10 +182,10 @@ function compileShader(
   gl: WebGLRenderingContext,
   type: number,
   source: string,
-): WebGLShader | null {
+): WebGLShader | undefined {
   const shader = gl.createShader(type);
   if (!shader) {
-    return null;
+    return undefined;
   }
 
   gl.shaderSource(shader, source);
@@ -197,10 +197,10 @@ function compileShader(
 
   console.error(gl.getShaderInfoLog(shader));
   gl.deleteShader(shader);
-  return null;
+  return undefined;
 }
 
-function createProgram(gl: WebGLRenderingContext): WebGLProgram | null {
+function createProgram(gl: WebGLRenderingContext): WebGLProgram | undefined {
   const vertexShader = compileShader(gl, gl.VERTEX_SHADER, VERTEX_SHADER_SOURCE);
   const fragmentShader = compileShader(gl, gl.FRAGMENT_SHADER, FRAGMENT_SHADER_SOURCE);
   if (!vertexShader || !fragmentShader) {
@@ -210,14 +210,14 @@ function createProgram(gl: WebGLRenderingContext): WebGLProgram | null {
     if (fragmentShader) {
       gl.deleteShader(fragmentShader);
     }
-    return null;
+    return undefined;
   }
 
   const program = gl.createProgram();
   if (!program) {
     gl.deleteShader(vertexShader);
     gl.deleteShader(fragmentShader);
-    return null;
+    return undefined;
   }
 
   gl.attachShader(program, vertexShader);
@@ -233,7 +233,7 @@ function createProgram(gl: WebGLRenderingContext): WebGLProgram | null {
 
   console.error(gl.getProgramInfoLog(program));
   gl.deleteProgram(program);
-  return null;
+  return undefined;
 }
 
 interface WelcomeResources {
@@ -244,14 +244,14 @@ interface WelcomeResources {
   readonly resolutionLocation: WebGLUniformLocation;
   readonly fieldLocation: WebGLUniformLocation;
 }
-function welcomeResources(gl: WebGLRenderingContext): WelcomeResources | null {
+function welcomeResources(gl: WebGLRenderingContext): WelcomeResources | undefined {
   const program = createProgram(gl);
   const buffer = gl.createBuffer();
   const fieldTexture = gl.createTexture();
   const positionLocation = program ? gl.getAttribLocation(program, 'a_pos') : -1;
-  const timeLocation = program ? gl.getUniformLocation(program, 'u_time') : null;
-  const resolutionLocation = program ? gl.getUniformLocation(program, 'u_res') : null;
-  const fieldLocation = program ? gl.getUniformLocation(program, 'u_field') : null;
+  const timeLocation = program ? gl.getUniformLocation(program, 'u_time') : undefined;
+  const resolutionLocation = program ? gl.getUniformLocation(program, 'u_res') : undefined;
+  const fieldLocation = program ? gl.getUniformLocation(program, 'u_field') : undefined;
 
   if (
     !program ||
@@ -271,7 +271,7 @@ function welcomeResources(gl: WebGLRenderingContext): WelcomeResources | null {
     if (program) {
       gl.deleteProgram(program);
     }
-    return null;
+    return undefined;
   }
 
   gl.useProgram(program);
@@ -298,11 +298,11 @@ interface WelcomeField {
 function welcomeField(): WelcomeField {
   const fieldX = new Float32Array(FIELD_LENGTH);
   const fieldY = new Float32Array(FIELD_LENGTH);
-  const tempFieldX = new Float32Array(FIELD_LENGTH);
-  const tempFieldY = new Float32Array(FIELD_LENGTH);
+  const temporaryFieldX = new Float32Array(FIELD_LENGTH);
+  const temporaryFieldY = new Float32Array(FIELD_LENGTH);
   const fieldData = new Uint8Array(FIELD_LENGTH * 4);
 
-  return { fieldX, fieldY, tempFieldX, tempFieldY, fieldData };
+  return { fieldX, fieldY, tempFieldX: temporaryFieldX, tempFieldY: temporaryFieldY, fieldData };
 }
 interface PointerState {
   readonly mouseX: number;
@@ -329,7 +329,7 @@ function welcomePointer(previous: PointerState, event: MouseEvent): PointerState
 }
 // This session alone mutates its preallocated field buffers, avoiding per-frame arrays.
 function welcomeAnimate(
-  canvas: HTMLCanvasElement,
+  canvasElement: HTMLCanvasElement,
   gl: WebGLRenderingContext,
   resources: WelcomeResources,
 ): () => void {
@@ -352,12 +352,18 @@ function welcomeAnimate(
   };
   const render = (now: number) => {
     const devicePixelRatio = window.devicePixelRatio || 1;
-    const width = Math.max(1, Math.min(16384, Math.floor(canvas.clientWidth * devicePixelRatio)));
-    const height = Math.max(1, Math.min(16384, Math.floor(canvas.clientHeight * devicePixelRatio)));
+    const width = Math.max(
+      1,
+      Math.min(16384, Math.floor(canvasElement.clientWidth * devicePixelRatio)),
+    );
+    const height = Math.max(
+      1,
+      Math.min(16384, Math.floor(canvasElement.clientHeight * devicePixelRatio)),
+    );
 
-    if (canvas.width !== width || canvas.height !== height) {
-      canvas.width = width;
-      canvas.height = height;
+    if (canvasElement.width !== width || canvasElement.height !== height) {
+      canvasElement.width = width;
+      canvasElement.height = height;
       gl.viewport(0, 0, width, height);
     }
 
@@ -401,8 +407,8 @@ function welcomeUpdate(field: WelcomeField, pointer: PointerState, now: number):
   assert(fieldX.length === FIELD_LENGTH, 'WelcomeBackground: horizontal field has fixed size');
   assert(fieldY.length === FIELD_LENGTH, 'WelcomeBackground: vertical field has fixed size');
   const idle = now - lastMoveTime;
-  const t = Math.min(idle / 3000, 1);
-  const decay = 0.997 - t * t * 0.06;
+  const idleFraction = Math.min(idle / 3000, 1);
+  const decay = 0.997 - idleFraction * idleFraction * 0.06;
 
   for (let index = 0; index < FIELD_LENGTH; index += 1) {
     fieldX[index] = welcomeFieldValue(fieldX, index) * decay;
@@ -464,10 +470,10 @@ function welcomeInject(field: WelcomeField, pointer: PointerState): void {
   }
 }
 function welcomeBlur(field: WelcomeField): void {
-  const { fieldX, fieldY, tempFieldX, tempFieldY } = field;
+  const { fieldX, fieldY, tempFieldX: temporaryFieldX, tempFieldY: temporaryFieldY } = field;
   for (let pass = 0; pass < 3; pass += 1) {
-    tempFieldX.fill(0);
-    tempFieldY.fill(0);
+    temporaryFieldX.fill(0);
+    temporaryFieldY.fill(0);
 
     for (let gridY = 1; gridY < FIELD_SIZE - 1; gridY += 1) {
       for (let gridX = 1; gridX < FIELD_SIZE - 1; gridX += 1) {
@@ -498,13 +504,13 @@ function welcomeBlur(field: WelcomeField): void {
           welcomeFieldValue(fieldY, rowBelow + gridX) +
           welcomeFieldValue(fieldY, rowBelow + gridX + 1);
 
-        tempFieldX[index] = sumX / 10;
-        tempFieldY[index] = sumY / 10;
+        temporaryFieldX[index] = sumX / 10;
+        temporaryFieldY[index] = sumY / 10;
       }
     }
 
-    fieldX.set(tempFieldX);
-    fieldY.set(tempFieldY);
+    fieldX.set(temporaryFieldX);
+    fieldY.set(temporaryFieldY);
   }
 }
 function welcomeUpload(

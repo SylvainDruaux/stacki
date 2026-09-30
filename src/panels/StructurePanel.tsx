@@ -23,25 +23,24 @@ import { ContextMenu, NodeList } from './StructureTree';
 import { parseNavigatorDrop } from './navigatorDrop';
 
 interface StructurePanelProps {
-  readonly pageState: StructurePageState | null;
+  readonly pageState: StructurePageState | undefined;
   readonly currentPage?:
     | {
         readonly kind: string;
         readonly route?: string;
         readonly from?: string;
       }
-    | null
     | undefined;
   readonly layouts: readonly unknown[];
   readonly currentLayoutName: string;
-  readonly selectedId: string | null;
+  readonly selectedId: string | undefined;
   readonly emptyNodeIds?: ReadonlySet<string>;
   readonly hiddenNodeIds?: ReadonlySet<string>;
   readonly inertNodeIds?: ReadonlySet<string>;
   readonly liveClassesById?: ReadonlyMap<string, readonly string[]>;
   readonly revealTick?: number;
   readonly onSelect: (id: string) => void;
-  readonly onHoverNode?: (id: string | null) => void;
+  readonly onHoverNode?: (id: string | undefined) => void;
   readonly onOpenComponent?: (name: string, id: string) => void;
   /** A row holding code (frontmatter, <style>, <script>) was double-clicked. */
   readonly onOpenCode?: (id: string) => void;
@@ -138,12 +137,12 @@ function ParseErrorPage({
             Open in the code panel
           </button>
         </div>
-        {devLog ? (
+        {devLog && (
           <details className="parse-error-output">
             <summary>Astro’s output</summary>
             <pre>{devLog}</pre>
           </details>
-        ) : null}
+        )}
         <div className="code-panel-editor">
           <CodeEditor language="astro" value={projection.state.source} onChange={onCodeChange} />
         </div>
@@ -167,7 +166,7 @@ function EditableStructurePanel(props: EditableProps) {
         <ContextMenu
           position={state.contextMenu}
           canPaste={typeof props.hasClipboard === 'function' && props.hasClipboard()}
-          onClose={() => state.setContextMenu(null)}
+          onClose={() => state.setContextMenu(undefined)}
           onAction={(action) => runContextAction(action, props, state)}
         />
       )}
@@ -176,25 +175,25 @@ function EditableStructurePanel(props: EditableProps) {
 }
 
 interface TreeState {
-  readonly dropTarget: DropTarget | null;
-  readonly setDropTarget: React.Dispatch<React.SetStateAction<DropTarget | null>>;
+  readonly dropTarget: DropTarget | undefined;
+  readonly setDropTarget: React.Dispatch<React.SetStateAction<DropTarget | undefined>>;
   readonly toggled: ReadonlyMap<string, boolean>;
   readonly setToggled: React.Dispatch<React.SetStateAction<ReadonlyMap<string, boolean>>>;
   readonly allExpanded: boolean;
   readonly setAllExpanded: React.Dispatch<React.SetStateAction<boolean>>;
-  readonly contextMenu: ContextPosition | null;
-  readonly setContextMenu: React.Dispatch<React.SetStateAction<ContextPosition | null>>;
+  readonly contextMenu: ContextPosition | undefined;
+  readonly setContextMenu: React.Dispatch<React.SetStateAction<ContextPosition | undefined>>;
   readonly bodyRef: React.RefObject<HTMLDivElement>;
-  readonly tooltip: { readonly left: number; readonly top: number } | null;
+  readonly tooltip: { readonly left: number; readonly top: number } | undefined;
   readonly showTooltip: (event: React.MouseEvent<HTMLButtonElement>) => void;
   readonly hideTooltip: () => void;
 }
 
 function useTreeState(props: EditableProps): TreeState {
-  const [dropTarget, setDropTarget] = useState<DropTarget | null>(null);
+  const [dropTarget, setDropTarget] = useState<DropTarget | undefined>(undefined);
   const [toggled, setToggled] = useState<ReadonlyMap<string, boolean>>(() => new Map());
   const [allExpanded, setAllExpanded] = useState(false);
-  const [contextMenu, setContextMenu] = useState<ContextPosition | null>(null);
+  const [contextMenu, setContextMenu] = useState<ContextPosition | undefined>(undefined);
   const bodyRef = useRef<HTMLDivElement>(null);
   const tooltip = useHeaderTooltip();
   useArrowNavigation(props, toggled, setToggled);
@@ -215,11 +214,11 @@ function useTreeState(props: EditableProps): TreeState {
 }
 
 function useHeaderTooltip(): Pick<TreeState, 'tooltip' | 'showTooltip' | 'hideTooltip'> {
-  const [tooltip, setTooltip] = useState<TreeState['tooltip']>(null);
+  const [tooltip, setTooltip] = useState<TreeState['tooltip']>(undefined);
   const timer = useRef<ReturnType<typeof setTimeout>>();
   const hideTooltip = useCallback((): void => {
     clearTimeout(timer.current);
-    setTooltip(null);
+    setTooltip(undefined);
   }, []);
   const showTooltip = useCallback((event: React.MouseEvent<HTMLButtonElement>): void => {
     const bounds = event.currentTarget.getBoundingClientRect();
@@ -288,7 +287,7 @@ function arrowTarget(
   found: ReturnType<typeof findVisibleNode> & {},
   toggled: ReadonlyMap<string, boolean>,
   setToggled: React.Dispatch<React.SetStateAction<ReadonlyMap<string, boolean>>>,
-): NavigatorNode | null | undefined {
+): NavigatorNode | undefined {
   if (key === 'ArrowLeft') {
     return found.siblings[found.index - 1];
   }
@@ -296,7 +295,7 @@ function arrowTarget(
     return found.siblings[found.index + 1];
   }
   if (key === 'ArrowUp') {
-    return found.parent;
+    return found.parent; // Undefined at the root.
   }
   const children = navigatorChildren(found.node);
   if (children.length === 0 || hidesChildRows(found.node, children)) {
@@ -342,7 +341,7 @@ function expandAncestors(
 function useRevealRow(
   bodyRef: React.RefObject<HTMLDivElement>,
   revealTick: number,
-  selectedId: string | null,
+  selectedId: string | undefined,
 ): void {
   const lastReveal = useRef(revealTick);
   useEffect(() => {
@@ -353,22 +352,23 @@ function useRevealRow(
     if (!selectedId) {
       return;
     }
-    const frame = requestAnimationFrame(() => revealRow(bodyRef.current, selectedId));
+    const frame = requestAnimationFrame(() => revealRow(bodyRef.current ?? undefined, selectedId));
     return () => cancelAnimationFrame(frame);
   }, [bodyRef, revealTick, selectedId]);
 }
 
-function revealRow(body: HTMLDivElement | null, selectedId: string): void {
-  const row = body?.querySelector<HTMLElement>(`[data-node-id="${CSS.escape(selectedId)}"]`);
-  if (!body || !row) {
+function revealRow(bodyElement: HTMLDivElement | undefined, selectedId: string): void {
+  const row = bodyElement?.querySelector<HTMLElement>(`[data-node-id="${CSS.escape(selectedId)}"]`);
+  if (!bodyElement || !row) {
     return;
   }
-  const bodyBounds = body.getBoundingClientRect();
+  const bodyBounds = bodyElement.getBoundingClientRect();
   const rowBounds = row.getBoundingClientRect();
   if (rowBounds.top >= bodyBounds.top && rowBounds.bottom <= bodyBounds.bottom) {
     return;
   }
-  body.scrollTop += rowBounds.top - bodyBounds.top - (bodyBounds.height - rowBounds.height) / 2;
+  bodyElement.scrollTop +=
+    rowBounds.top - bodyBounds.top - (bodyBounds.height - rowBounds.height) / 2;
 }
 
 function treeContextOf(props: EditableProps, state: TreeState): StructureTreeContext {
@@ -384,8 +384,8 @@ function treeContextOf(props: EditableProps, state: TreeState): StructureTreeCon
     setDropTarget: state.setDropTarget,
     isCollapsed,
     isDndPayload,
-    performDrop: (event, target) => performDrop(event, target, props, state),
-    nodeById: (id) => findNavigatorNode(props.pageState.model.nodes, id),
+    performDrop: (event, target) => dropOnTree(event, target, props, state),
+    nodeById: (id) => findNavigatorNode(props.pageState.model.nodes, id) ?? undefined,
     onSelect: props.onSelect,
     ...(props.onHoverNode === undefined ? {} : { onHoverNode: props.onHoverNode }),
     ...(props.onOpenComponent === undefined ? {} : { onOpenComponent: props.onOpenComponent }),
@@ -409,7 +409,7 @@ function isDndPayload(event: React.DragEvent<HTMLElement>): boolean {
   );
 }
 
-function performDrop(
+function dropOnTree(
   event: React.DragEvent<HTMLElement>,
   target: DropLocation,
   props: EditableProps,
@@ -417,7 +417,7 @@ function performDrop(
 ): void {
   event.preventDefault();
   event.stopPropagation();
-  state.setDropTarget(null);
+  state.setDropTarget(undefined);
   const drop = parseNavigatorDrop((type) => event.dataTransfer.getData(type));
   if (drop === undefined) {
     return;
@@ -444,7 +444,7 @@ function NavigatorHeader({
   readonly nodes: readonly NavigatorNode[];
 }) {
   const toggleAll = (): void => {
-    state.setToggled(collapseMap(nodes, state.allExpanded));
+    state.setToggled(collapseMap(nodes, { collapsed: state.allExpanded }));
     state.setAllExpanded((expanded) => !expanded);
   };
   return (
@@ -487,9 +487,13 @@ function NavigatorBody({
 }) {
   const nodes = props.pageState.model.nodes;
   return (
-    <div className="panel-body" ref={state.bodyRef} onDragLeave={() => state.setDropTarget(null)}>
+    <div
+      className="panel-body"
+      ref={state.bodyRef}
+      onDragLeave={() => state.setDropTarget(undefined)}
+    >
       <FrontmatterRow props={props} />
-      <NodeList nodes={nodes} parentId={null} depth={0} {...treeContext} />
+      <NodeList nodes={nodes} parentId={undefined} depth={0} {...treeContext} />
       {nodes.length === 0 && <EmptyDropTarget props={props} state={state} />}
     </div>
   );
@@ -526,10 +530,10 @@ function EmptyDropTarget({
   readonly props: EditableProps;
   readonly state: TreeState;
 }) {
-  const location = { parentId: null, index: 0 };
+  const location = { parentId: undefined, index: 0 };
   const active =
     state.dropTarget?.kind === 'gap' &&
-    state.dropTarget.parentId === null &&
+    state.dropTarget.parentId === undefined &&
     state.dropTarget.index === 0;
   return (
     <div
@@ -540,7 +544,7 @@ function EmptyDropTarget({
           state.setDropTarget({ kind: 'gap', ...location });
         }
       }}
-      onDrop={(event) => performDrop(event, location, props, state)}
+      onDrop={(event) => dropOnTree(event, location, props, state)}
     >
       Drag components here
     </div>
@@ -549,7 +553,7 @@ function EmptyDropTarget({
 
 function runContextAction(action: ContextAction, props: EditableProps, state: TreeState): void {
   const menu = state.contextMenu;
-  state.setContextMenu(null);
+  state.setContextMenu(undefined);
   if (!menu) {
     return;
   }

@@ -21,7 +21,7 @@ import {
 
 // Every ancestor of a path, so opening the picker on an existing binding shows
 // it rather than making you find it: `post.data.title` opens post and post.data.
-function ancestorsOf(path: string | null | undefined): string[] {
+function ancestorsOf(path: string | undefined): string[] {
   const out: string[] = [];
   const pathText = path || '';
   assert(pathText.length <= LIMITS.attrCharsMax, 'DataPicker: binding path limit exceeded');
@@ -29,13 +29,13 @@ function ancestorsOf(path: string | null | undefined): string[] {
   for (const part of pathText.split('.')) {
     // Array steps ride along with the name they belong to: `posts[0]` is one
     // step down from `posts`, not two.
-    const m = part.match(/^([^[]*)((\[\d+\])*)$/);
-    acc = acc ? `${acc}.${m ? (m[1] ?? '') : part}` : m ? (m[1] ?? '') : part;
+    const match = part.match(/^([^[]*)((\[\d+\])*)$/);
+    acc = acc ? `${acc}.${match ? (match[1] ?? '') : part}` : match ? (match[1] ?? '') : part;
     if (acc !== pathText) {
       out.push(acc);
     }
-    for (const idx of (m?.[2] || '').match(/\[\d+\]/g) || []) {
-      acc += idx;
+    for (const index of (match?.[2] || '').match(/\[\d+\]/g) || []) {
+      acc += index;
       if (acc !== pathText) {
         out.push(acc);
       }
@@ -76,17 +76,17 @@ const SECTION_LABEL: Readonly<Record<string, string>> = {
 // field left unset, or data the app can't see the shape of. The path is still
 // what the chip says, so it is shown where it belongs and marked, rather than
 // leaving the picker looking like it doesn't know what the chip points at.
-function withCurrent(tree: readonly PickerNode[], current: string | null | undefined) {
+function withCurrent(tree: readonly PickerNode[], current: string | undefined) {
   const flat = flatten(tree);
   if (!current) {
     return tree;
   }
-  if (flat.some((n) => n.path === current)) {
+  if (flat.some((node) => node.path === current)) {
     return tree;
   }
-  let anchor = null;
-  for (const p of ancestorsOf(current)) {
-    const found = flat.find((n) => n.path === p);
+  let anchor: PickerNode | undefined;
+  for (const ancestor of ancestorsOf(current)) {
+    const found = flat.find((node) => node.path === ancestor);
     if (found) {
       anchor = found;
     }
@@ -96,23 +96,26 @@ function withCurrent(tree: readonly PickerNode[], current: string | null | undef
     key: anchor ? current.slice(anchor.path.length).replace(/^\./, '') : current,
     kind: 'not in this entry',
     preview: '',
-    children: null,
+    children: undefined,
     missing: true,
   };
   if (!anchor) {
     return [...(tree || []), missing];
   }
-  // The bounded flatten above proves the graft traverses at most 64 nested levels.
+  // The bounded flatten above already proved the tree stays inside the depth limit;
+  // the graft checks it again on its own walk.
   const anchorPath = anchor.path;
-  const graft = (nodes: readonly PickerNode[]): readonly PickerNode[] =>
-    nodes.map((n) =>
-      n.path === anchorPath
-        ? { ...n, children: [...(n.children || []), missing] }
-        : n.children
-          ? { ...n, children: graft(n.children) }
-          : n,
+  const graft = (nodes: readonly PickerNode[], depth: number): readonly PickerNode[] => {
+    assert(depth <= LIMITS.treeDepthMax, 'DataPicker: depth limit exceeded');
+    return nodes.map((node) =>
+      node.path === anchorPath
+        ? { ...node, children: [...(node.children || []), missing] }
+        : node.children
+          ? { ...node, children: graft(node.children, depth + 1) }
+          : node,
     );
-  return graft(tree || []);
+  };
+  return graft(tree || [], 0);
 }
 
 interface Navigation {
@@ -128,7 +131,7 @@ export interface PickerNode {
   readonly key: string;
   readonly kind: string;
   readonly preview: string;
-  readonly children: readonly PickerNode[] | null;
+  readonly children: readonly PickerNode[] | undefined;
   readonly section?: string;
   readonly nav?: Navigation;
   readonly query?: { readonly collection: string; readonly name: string };
@@ -137,14 +140,14 @@ export interface PickerNode {
   readonly missing?: boolean;
 }
 export interface DataPickerProps {
-  readonly tree?: readonly PickerNode[] | null;
-  readonly current?: string | null;
-  readonly entries?: Entries | null;
+  readonly tree?: readonly PickerNode[] | undefined;
+  readonly current?: string | undefined;
+  readonly entries?: Entries | undefined;
   readonly onStepItem?: (path: string, step: -1 | 1, count: number) => void;
-  readonly onPick: (path: string, query: PickerNode['query'] | null) => void;
+  readonly onPick: (path: string, query: PickerNode['query'] | undefined) => void;
   readonly onExpand?: (node: PickerNode) => void;
   readonly onWrite?: () => void;
-  readonly onEdit?: (() => void) | null;
+  readonly onEdit?: (() => void) | undefined;
   readonly editLabel?: string;
   readonly footer?: boolean;
 }
@@ -168,7 +171,7 @@ export default function DataPicker(props: DataPickerProps) {
           placeholder="Search data…"
           spellCheck={false}
           autoFocus
-          onChange={(e) => setQuery(e.target.value)}
+          onChange={(event) => setQuery(event.target.value)}
         />
       </div>
       <div className="dp-list" ref={listRef}>
@@ -181,7 +184,7 @@ export default function DataPicker(props: DataPickerProps) {
               node={node}
               depth={0}
               showPath
-              root={null}
+              root={undefined}
               state={state}
               onPick={onPick}
               onStepItem={onStepItem}
@@ -203,13 +206,13 @@ export default function DataPicker(props: DataPickerProps) {
           opened on a specific chip — the field's own handle opens this on
           nothing in particular, and there is no "the" value to edit then. */}
       {onEdit && (
-        <div className="dp-foot" onMouseDown={(e) => e.preventDefault()} onClick={onEdit}>
+        <div className="dp-foot" onMouseDown={(event) => event.preventDefault()} onClick={onEdit}>
           <PencilIcon size={11} />
           {editLabel}
         </div>
       )}
       {footer && (
-        <div className="dp-foot" onMouseDown={(e) => e.preventDefault()} onClick={onWrite}>
+        <div className="dp-foot" onMouseDown={(event) => event.preventDefault()} onClick={onWrite}>
           <CodeIcon size={11} />
           Write an expression…
         </div>
@@ -226,7 +229,7 @@ function useDataPicker({ tree: rawTree, current, onExpand }: DataPickerProps) {
     // Nothing bound yet: open the first root that holds anything, so the panel
     // opens on data rather than on a list of closed names.
     if (!start.size) {
-      const first = (tree || []).find((n) => n.children?.length);
+      const first = (tree || []).find((node) => node.children?.length);
       if (first) {
         start.add(first.path);
       }
@@ -255,23 +258,25 @@ function useDataPicker({ tree: rawTree, current, onExpand }: DataPickerProps) {
     list.scrollTop += rr.top - lr.top - (lr.height - rr.height) / 2;
   }, [current]);
 
-  const q = query.trim().toLowerCase();
+  const needle = query.trim().toLowerCase();
   const matches = useMemo(() => {
-    if (!q) {
-      return null;
+    if (!needle) {
+      return undefined;
     }
     return flatten(tree || []).filter(
-      (n) => n.path.toLowerCase().includes(q) || String(n.preview).toLowerCase().includes(q),
+      (node) =>
+        node.path.toLowerCase().includes(needle) ||
+        String(node.preview).toLowerCase().includes(needle),
     );
-  }, [q, tree]);
+  }, [needle, tree]);
 
   const toggle = (node: PickerNode) => {
     // A collection nobody has looked at yet has no rows until it is asked for.
     if (node.lazy && !node.children?.length) {
       onExpand?.(node);
     }
-    setOpen((prev) => {
-      const next = new Set(prev);
+    setOpen((previous) => {
+      const next = new Set(previous);
       if (next.has(node.path)) {
         next.delete(node.path);
       } else {
@@ -289,35 +294,35 @@ interface RowProps {
   readonly node: PickerNode;
   readonly depth: number;
   readonly showPath: boolean;
-  readonly root: PickerNode | null;
+  readonly root: PickerNode | undefined;
   readonly state: PickerState;
   readonly onPick: DataPickerProps['onPick'];
   readonly onStepItem: DataPickerProps['onStepItem'];
 }
-function DataRow({ node: n, depth, showPath, root, state, onPick, onStepItem }: RowProps) {
+function DataRow({ node, depth, showPath, root, state, onPick, onStepItem }: RowProps) {
   assert(depth <= LIMITS.treeDepthMax, 'DataPicker: render depth limit exceeded');
   const { open, current, selectedRef, toggle } = state;
-  const expandable = !!n.children?.length || n.lazy;
-  const isOpen = open.has(n.path);
-  const from = root || n;
-  const isCurrent = n.path === current;
+  const expandable = !!node.children?.length || node.lazy;
+  const isOpen = open.has(node.path);
+  const from = root || node;
+  const isCurrent = node.path === current;
   return (
-    <React.Fragment key={n.path}>
+    <React.Fragment key={node.path}>
       <div
         ref={isCurrent ? selectedRef : undefined}
         className={`dp-row ${isCurrent ? 'selected' : ''} ${
-          n.pickable === false ? 'path-only' : ''
-        } ${n.missing ? 'missing' : ''}`}
+          node.pickable === false ? 'path-only' : ''
+        } ${node.missing ? 'missing' : ''}`}
         style={{ paddingLeft: 6 + depth * 13 }}
-        title={`${n.path}${n.kind ? ` — ${n.kind}` : ''}`}
-        onMouseDown={(e) => e.preventDefault()}
+        title={`${node.path}${node.kind ? ` — ${node.kind}` : ''}`}
+        onMouseDown={(event) => event.preventDefault()}
         // The root carries what has to happen before this path means
         // anything — a collection the page doesn't read yet needs its query
         // written first.
         onClick={() =>
           // A row kept only so a list beneath it can be reached opens
           // instead of being chosen — there is no looping over an object.
-          n.pickable === false ? toggle(n) : onPick(n.path, from.query || null)
+          node.pickable === false ? toggle(node) : onPick(node.path, from.query || undefined)
         }
       >
         <span
@@ -326,27 +331,27 @@ function DataRow({ node: n, depth, showPath, root, state, onPick, onStepItem }: 
             expandable
               ? (event) => {
                   event.stopPropagation();
-                  toggle(n);
+                  toggle(node);
                 }
               : undefined
           }
         >
           <ChevronRightIcon size={10} />
         </span>
-        <span className="dp-key">{showPath ? n.path : n.key}</span>
+        <span className="dp-key">{showPath ? node.path : node.key}</span>
         {isCurrent && <CheckIcon size={11} className="dp-check" />}
         {/* A loop hands its item one entry of a list, and the list has more
               than one. These say which one is being read, and move it — so the
               fields below are this service's, not always the first one's. The
               row itself still picks the item, so the arrows stop the click. */}
-        {n.nav && onStepItem ? (
-          <ItemNavigation path={n.path} nav={n.nav} onStepItem={onStepItem} />
-        ) : null}
-        <span className={`dp-val ${n.preview ? '' : 'kind'}`}>{n.preview || n.kind}</span>
+        {node.nav && onStepItem ? (
+          <ItemNavigation path={node.path} nav={node.nav} onStepItem={onStepItem} />
+        ) : undefined}
+        <span className={`dp-val ${node.preview ? '' : 'kind'}`}>{node.preview || node.kind}</span>
       </div>
       {isOpen &&
-        (n.children?.length ? (
-          n.children.map((child) => (
+        (node.children?.length ? (
+          node.children.map((child) => (
             <DataRow
               key={child.path}
               node={child}
@@ -358,11 +363,11 @@ function DataRow({ node: n, depth, showPath, root, state, onPick, onStepItem }: 
               onStepItem={onStepItem}
             />
           ))
-        ) : n.lazy ? (
+        ) : node.lazy ? (
           <div className="dp-loading" style={{ paddingLeft: 19 + depth * 13 }}>
             Reading one entry…
           </div>
-        ) : null)}
+        ) : undefined)}
     </React.Fragment>
   );
 }
@@ -376,12 +381,12 @@ function ItemNavigation({
   readonly onStepItem: (path: string, step: -1 | 1, count: number) => void;
 }) {
   return (
-    <span className="dp-item-nav" onClick={(e) => e.stopPropagation()}>
+    <span className="dp-item-nav" onClick={(event) => event.stopPropagation()}>
       <button
         type="button"
         className="dp-step"
         title="Previous item"
-        onMouseDown={(e) => e.preventDefault()}
+        onMouseDown={(event) => event.preventDefault()}
         onClick={() => onStepItem(path, -1, nav.count)}
       >
         <ChevronLeftIcon size={11} />
@@ -393,7 +398,7 @@ function ItemNavigation({
         type="button"
         className="dp-step"
         title="Next item"
-        onMouseDown={(e) => e.preventDefault()}
+        onMouseDown={(event) => event.preventDefault()}
         onClick={() => onStepItem(path, 1, nav.count)}
       >
         <ChevronRightIcon size={11} />
@@ -415,19 +420,19 @@ function DataRoots({
   readonly onPick: DataPickerProps['onPick'];
   readonly onStepItem: DataPickerProps['onStepItem'];
 }) {
-  let section: string | null = null;
-  return (nodes || []).map((n) => {
-    const head = n.section && n.section !== section ? SECTION_LABEL[n.section] : null;
-    section = n.section || section;
+  let section: string | undefined;
+  return (nodes || []).map((node) => {
+    const head = node.section && node.section !== section ? SECTION_LABEL[node.section] : undefined;
+    section = node.section || section;
     return (
-      <React.Fragment key={`s:${n.path}`}>
+      <React.Fragment key={`s:${node.path}`}>
         {head && <div className="dp-section">{head}</div>}
         {
           <DataRow
-            node={n}
+            node={node}
             depth={0}
             showPath={false}
-            root={null}
+            root={undefined}
             state={state}
             onPick={onPick}
             onStepItem={onStepItem}
@@ -444,7 +449,7 @@ function EntryNavigation({ entries }: { readonly entries: Entries }) {
         type="button"
         className="dp-step"
         title="Previous entry"
-        onMouseDown={(e) => e.preventDefault()}
+        onMouseDown={(event) => event.preventDefault()}
         onClick={() => entries.onStep(-1)}
       >
         <ChevronLeftIcon size={12} />
@@ -459,7 +464,7 @@ function EntryNavigation({ entries }: { readonly entries: Entries }) {
         type="button"
         className="dp-step"
         title="Next entry"
-        onMouseDown={(e) => e.preventDefault()}
+        onMouseDown={(event) => event.preventDefault()}
         onClick={() => entries.onStep(1)}
       >
         <ChevronRightIcon size={12} />

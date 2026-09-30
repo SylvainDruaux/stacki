@@ -11,7 +11,7 @@ interface QueryMessage {
   readonly props: readonly string[];
 }
 interface PendingQuery {
-  readonly resolve: (answer: CanvasAnswer | null) => void;
+  readonly resolve: (answer: CanvasAnswer | undefined) => void;
   readonly timer: ReturnType<typeof setTimeout>;
   readonly message: QueryMessage;
   held: boolean;
@@ -30,7 +30,7 @@ interface PendingQuery {
 // through `queryCanvas`. Everything degrades to the source matcher when the
 // preview isn't up (no dev server, an errored page, a frame still loading).
 
-let frame: Pick<Window, 'postMessage'> | null = null; // the design canvas's contentWindow
+let frame: Pick<Window, 'postMessage'> | undefined = undefined; // the canvas's contentWindow
 let nextId = 1;
 const pending = new Map<number, PendingQuery>(); // id -> {resolve, timer, message, held}
 
@@ -47,15 +47,15 @@ const send = (entry: PendingQuery): boolean => {
   }
 };
 
-export function setCanvasFrame(win: Pick<Window, 'postMessage'> | null | undefined): void {
-  if (frame === win) {
+export function setCanvasFrame(target: Pick<Window, 'postMessage'> | undefined): void {
+  if (frame === target) {
     return;
   }
-  frame = win || null;
+  frame = target || undefined;
   // A new document can't answer questions the old one was asked.
   for (const [, entry] of pending) {
     clearTimeout(entry.timer);
-    entry.resolve(null);
+    entry.resolve(undefined);
   }
   pending.clear();
 }
@@ -76,19 +76,19 @@ export function tellCanvas(message: unknown): boolean {
 
 // Ask the page about one node: what it renders as, which of `selectors` target
 // it, what `compute` values resolve to on it, and its computed style for `props`.
-// Resolves null when the canvas can't answer — the caller then falls back rather
+// Resolves undefined when the canvas can't answer — the caller then falls back rather
 // than treating silence as "no".
 export function queryCanvas(
   path: string,
   selectors: readonly string[] = [],
   compute: readonly string[] = [],
   props: readonly string[] = [],
-): Promise<CanvasAnswer | null> {
+): Promise<CanvasAnswer | undefined> {
   if (!frame || typeof path !== 'string') {
-    return Promise.resolve(null);
+    return Promise.resolve(undefined);
   }
   if (pending.size >= CANVAS_LIMITS.pendingMax) {
-    return Promise.resolve(null);
+    return Promise.resolve(undefined);
   }
   assert(Number.isSafeInteger(nextId), 'Canvas query ID must remain a safe integer');
   assert(path.length <= LIMITS.attrCharsMax, 'Canvas query path exceeds limit');
@@ -99,10 +99,10 @@ export function queryCanvas(
     }
   }
   const id = nextId++;
-  return new Promise<CanvasAnswer | null>((resolve) => {
+  return new Promise<CanvasAnswer | undefined>((resolve) => {
     const timer = setTimeout(() => {
       pending.delete(id);
-      resolve(null);
+      resolve(undefined);
     }, TIMEOUT_MS);
     const entry: PendingQuery = {
       resolve,
@@ -114,7 +114,7 @@ export function queryCanvas(
     if (!send(entry)) {
       clearTimeout(timer);
       pending.delete(id);
-      resolve(null);
+      resolve(undefined);
     }
   });
 }
@@ -143,7 +143,7 @@ export function receiveCanvasReply(input: unknown): void {
     return;
   }
   // "I don't have that element" from a page that hasn't walked its markers yet
-  // means "not yet", and taking it at face value hands the panel a null it then
+  // means "not yet", and taking it at face value hands the panel an absence it then
   // only corrects on its next 1.5s poll. Hold the question instead — the page
   // announces when it's ready and noteCanvasReady re-sends it. Held once, so a
   // page that never gets there falls back on the timeout as before.
@@ -161,6 +161,6 @@ export function receiveCanvasReply(input: unknown): void {
           computed: data.computed || {},
           computedProps: data.computedProps || {},
         }
-      : null,
+      : undefined,
   );
 }

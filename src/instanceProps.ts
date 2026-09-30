@@ -1,3 +1,5 @@
+import { assert } from '../shared/assert';
+import { LIMITS } from '../shared/limits';
 import { treeBudget, type TreeView } from './treeView';
 import type { DataContext, TreeNode } from './dataSuggest';
 // What a component is being given, where it is being edited.
@@ -20,19 +22,20 @@ import { partsFromValue } from './bindings.js';
 
 // Every path the page's data tree knows a value for, flattened. Sample nodes
 // carry the value itself; a literal node carries what the source said.
-function valuesByPath(context: DataContext, depth = 4): ReadonlyMap<string, unknown> {
+function valuesByPath(context: DataContext, depthMax = 4): ReadonlyMap<string, unknown> {
   const out = new Map<string, unknown>();
   const visit = treeBudget();
-  const walk = (nodes: readonly TreeNode[], level: number): void => {
+  const walk = (nodes: readonly TreeNode[], depth: number): void => {
+    assert(depth <= LIMITS.treeDepthMax, 'valuesByPath: depth limit');
     for (const node of nodes || []) {
-      visit(level);
+      visit(depth);
       if (node.path && 'value' in node && node.value !== undefined) {
         out.set(node.path, node.value);
       } else if (node.path && node.preview !== undefined && node.preview !== '') {
         out.set(node.path, node.preview);
       }
-      if (level < depth && node.children != null) {
-        walk(node.children, level + 1);
+      if (depth < depthMax && node.children !== undefined) {
+        walk(node.children, depth + 1);
       }
     }
   };
@@ -49,8 +52,8 @@ function valuesByPath(context: DataContext, depth = 4): ReadonlyMap<string, unkn
 
 // A preview string as a value: sampled previews are quoted (`"BloomCraft"`),
 // which is how they read in the picker but not what the prop holds.
-const unquote = (v: unknown): unknown =>
-  typeof v === 'string' && /^".*"$/.test(v) ? v.slice(1, -1) : v;
+const unquote = (value: unknown): unknown =>
+  typeof value === 'string' && /^".*"$/.test(value) ? value.slice(1, -1) : value;
 
 /**
  * The props an instance passes, resolved as far as the page can be read.
@@ -61,12 +64,12 @@ const unquote = (v: unknown): unknown =>
  * for the collections it reads.
  */
 export function resolveInstanceProps(
-  node: TreeView | null | undefined,
+  node: TreeView | undefined,
   context: DataContext = {},
-): Readonly<Record<string, unknown>> | null {
+): Readonly<Record<string, unknown>> | undefined {
   const props = node?.props;
   if (!props || typeof props !== 'object') {
-    return null;
+    return undefined;
   }
   const known = valuesByPath(context);
   const out: Record<string, unknown> = {};
@@ -112,7 +115,7 @@ export function resolveInstanceProps(
     }
   }
 
-  return Object.keys(out).length ? out : null;
+  return Object.keys(out).length ? out : undefined;
 }
 
 export default resolveInstanceProps;
@@ -134,7 +137,8 @@ function resolveInstanceExpression(
     return { ok: false };
   }
   let text = '';
-  let whole: unknown = null;
+  // The value of a path on its own; the data it came from may hold a null.
+  let whole: unknown;
   let ok = true;
   for (const part of parts) {
     if (part.text !== undefined) {
@@ -151,11 +155,17 @@ function resolveInstanceExpression(
     if (parts.length === 1) {
       whole = value;
     } else {
-      text += value == null ? '' : String(value);
+      text += value === null || value === undefined ? '' : String(value);
     }
   }
   if (!ok) {
     return { ok: false };
   }
-  return { ok: true, value: parts.length === 1 && whole !== null ? whole : text };
+  if (parts.length === 1) {
+    if (whole === null || whole === undefined) {
+      return { ok: true, value: text };
+    }
+    return { ok: true, value: whole };
+  }
+  return { ok: true, value: text };
 }

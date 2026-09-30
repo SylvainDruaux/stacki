@@ -11,7 +11,7 @@ const collator = new Intl.Collator(undefined, { numeric: true });
 
 function familyPrefix(cls: string) {
   const cut = Math.max(cls.lastIndexOf('-'), cls.lastIndexOf('_'));
-  return cut > 0 ? cls.slice(0, cut + 1) : null;
+  return cut > 0 ? cls.slice(0, cut + 1) : undefined;
 }
 
 // Token editor for class-list props: each class renders as a tag, a text
@@ -19,7 +19,7 @@ function familyPrefix(cls: string) {
 // it, Backspace removes the tag before the caret), and typing filters a
 // suggestion list of every class used across the project.
 interface ClassInputProps {
-  readonly value?: string | null;
+  readonly value?: string | undefined;
   readonly suggestions?: readonly string[];
   readonly onChange: (value: string, immediate: boolean) => void;
 }
@@ -42,9 +42,9 @@ export default function ClassInput(props: ClassInputProps) {
       <div
         ref={wrapRef}
         className={`class-input ${focused ? 'focused' : ''}`}
-        onMouseDown={(e) => {
-          if (e.target === wrapRef.current) {
-            e.preventDefault();
+        onMouseDown={(event) => {
+          if (event.target === wrapRef.current) {
+            event.preventDefault();
             setCaret(tokens.length);
             inputRef.current?.focus();
           }
@@ -69,7 +69,7 @@ function useClassInput({ value, suggestions = [], onChange }: ClassInputProps) {
   const [draft, setDraft] = useState('');
   const [focused, setFocused] = useState(false);
   const [highlight, setHighlight] = useState(0);
-  const [popupPos, setPopupPos] = useState<PopupPosition | null>(null);
+  const [popupPosition, setPopupPosition] = useState<PopupPosition | undefined>(undefined);
   const wrapRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -80,11 +80,11 @@ function useClassInput({ value, suggestions = [], onChange }: ClassInputProps) {
   const matches = classMatches(draft, suggestions, tokens);
   useLayoutEffect(() => {
     if (!focused || !matches.length || !wrapRef.current) {
-      setPopupPos(null);
+      setPopupPosition(undefined);
       return;
     }
-    const r = wrapRef.current.getBoundingClientRect();
-    setPopupPos({ left: r.left, top: r.bottom + 4, width: r.width });
+    const rect = wrapRef.current.getBoundingClientRect();
+    setPopupPosition({ left: rect.left, top: rect.bottom + 4, width: rect.width });
   }, [focused, matches.length, draft]);
 
   return {
@@ -99,7 +99,7 @@ function useClassInput({ value, suggestions = [], onChange }: ClassInputProps) {
     setFocused,
     highlight,
     setHighlight,
-    popupPos,
+    popupPos: popupPosition,
     wrapRef,
     inputRef,
     matches,
@@ -117,22 +117,22 @@ function classTokenActions(options: {
 }) {
   const { tokens, at, setCaret, setDraft, onChange } = options;
   const commit = (next: readonly string[]) => {
-    const str = next.join(' ');
-    onChange(str, true);
+    const text = next.join(' ');
+    onChange(text, true);
   };
 
   const addToken = (text: string | undefined) => {
-    const t = (text ?? '').trim();
+    const token = (text ?? '').trim();
     setDraft('');
-    if (!t) {
+    if (!token) {
       return;
     }
-    if (tokens.includes(t)) {
-      setCaret(tokens.indexOf(t) + 1);
+    if (tokens.includes(token)) {
+      setCaret(tokens.indexOf(token) + 1);
       return;
     }
     const next = [...tokens];
-    next.splice(at, 0, t); // insert at the caret
+    next.splice(at, 0, token); // insert at the caret
     setCaret(at + 1);
     commit(next);
   };
@@ -153,10 +153,10 @@ function useClassFamily(tokens: readonly string[], onChange: ClassInputProps['on
   // to draw the list. It previews like the prop dropdowns do — arrowing or
   // hovering an option applies it to the page, and closing without picking
   // puts the original back.
-  const [family, setFamily] = useState<Family | null>(null);
+  const [family, setFamily] = useState<Family | undefined>(undefined);
   const [famHighlight, setFamHighlight] = useState(-1);
   const famOriginal = useRef(''); // the class that was there when it opened
-  const famPreview = useRef<string | null>(null); // last previewed class, or null
+  const famPreview = useRef<string | undefined>(undefined); // last previewed class, if any
   const famRef = useRef<HTMLDivElement>(null);
 
   const actions = classFamilyActions({
@@ -173,9 +173,13 @@ function useClassFamily(tokens: readonly string[], onChange: ClassInputProps['on
     if (!family) {
       return undefined;
     }
-    const onDown = (e: MouseEvent) => {
+    const onDown = (event: MouseEvent) => {
       const ElementType = famRef.current?.ownerDocument.defaultView?.Element;
-      if (ElementType && e.target instanceof ElementType && e.target.closest('.class-family')) {
+      if (
+        ElementType &&
+        event.target instanceof ElementType &&
+        event.target.closest('.class-family')
+      ) {
         return;
       }
       closeFamily({ revert: true });
@@ -206,10 +210,10 @@ function useClassFamily(tokens: readonly string[], onChange: ClassInputProps['on
 function classFamilyActions(options: {
   readonly tokens: readonly string[];
   readonly onChange: ClassInputProps['onChange'];
-  readonly family: Family | null;
+  readonly family: Family | undefined;
   readonly famOriginal: MutableRefObject<string>;
-  readonly famPreview: MutableRefObject<string | null>;
-  readonly setFamily: Dispatch<SetStateAction<Family | null>>;
+  readonly famPreview: MutableRefObject<string | undefined>;
+  readonly setFamily: Dispatch<SetStateAction<Family | undefined>>;
   readonly setFamHighlight: Dispatch<SetStateAction<number>>;
 }) {
   const { tokens, onChange, family, famOriginal, famPreview, setFamily, setFamHighlight } = options;
@@ -220,7 +224,7 @@ function classFamilyActions(options: {
     if (
       revert &&
       family &&
-      famPreview.current !== null &&
+      famPreview.current !== undefined &&
       famPreview.current !== famOriginal.current
     ) {
       writeClassAt(
@@ -231,17 +235,17 @@ function classFamilyActions(options: {
         onChange,
       );
     }
-    famPreview.current = null;
-    setFamily(null);
+    famPreview.current = undefined;
+    setFamily(undefined);
     setFamHighlight(-1);
   };
 
-  const previewFamily = (n: number) => {
+  const previewFamily = (index: number) => {
     if (!family) {
       return;
     }
-    setFamHighlight(n);
-    const cls = family.options[n];
+    setFamHighlight(index);
+    const cls = family.options[index];
     if (!cls) {
       return;
     }
@@ -257,14 +261,14 @@ function classFamilyActions(options: {
     writeClassAt(tokens, family.index, cls, { immediate: true, dedupe: false }, onChange);
   };
 
-  const applyFamily = (n: number) => {
+  const applyFamily = (index: number) => {
     if (!family) {
       return;
     }
-    const cls = family.options[n];
+    const cls = family.options[index];
     const i = family.index;
-    famPreview.current = null;
-    setFamily(null);
+    famPreview.current = undefined;
+    setFamily(undefined);
     setFamHighlight(-1);
     if (cls) {
       writeClassAt(tokens, i, cls, { immediate: true, dedupe: true }, onChange);
@@ -280,9 +284,9 @@ function writeClassAt(
   { immediate, dedupe }: { readonly immediate: boolean; readonly dedupe: boolean },
   onChange: ClassInputProps['onChange'],
 ): void {
-  let next = tokens.map((t, j) => (j === i ? cls : t));
+  let next = tokens.map((token, j) => (j === i ? cls : token));
   if (dedupe) {
-    next = next.filter((t, j, all) => all.indexOf(t) === j);
+    next = next.filter((token, j, all) => all.indexOf(token) === j);
   }
   onChange(next.join(' '), immediate);
 }
@@ -295,25 +299,25 @@ function classFamilyOf(cls: string, suggestions: readonly string[], tokens: read
     return [];
   }
   const pool = new Set([...suggestions, ...tokens]);
-  return [...pool].filter((s) => s.startsWith(prefix)).sort(collator.compare);
+  return [...pool].filter((name) => name.startsWith(prefix)).sort(collator.compare);
 }
 function classMatches(draft: string, suggestions: readonly string[], tokens: readonly string[]) {
   const query = draft.trim().toLowerCase();
   const matches = query
     ? suggestions
-        .filter((s) => s.toLowerCase().includes(query) && !tokens.includes(s))
-        .sort((a, b) => {
+        .filter((name) => name.toLowerCase().includes(query) && !tokens.includes(name))
+        .sort((left, right) => {
           // Prefix matches first, then shortest.
-          const ap = a.toLowerCase().startsWith(query) ? 0 : 1;
-          const bp = b.toLowerCase().startsWith(query) ? 0 : 1;
-          return ap - bp || a.length - b.length;
+          const ap = left.toLowerCase().startsWith(query) ? 0 : 1;
+          const bp = right.toLowerCase().startsWith(query) ? 0 : 1;
+          return ap - bp || left.length - right.length;
         })
         .slice(0, 12)
     : [];
 
   return matches;
 }
-function classInputKey(e: React.KeyboardEvent<HTMLInputElement>, state: ClassState): void {
+function classInputKey(event: React.KeyboardEvent<HTMLInputElement>, state: ClassState): void {
   const {
     draft,
     removeAt,
@@ -329,65 +333,65 @@ function classInputKey(e: React.KeyboardEvent<HTMLInputElement>, state: ClassSta
   } = state;
   // While the family menu is up it owns the arrows and Enter: the caret and
   // the suggestion list are both idle behind it.
-  if (classFamilyKey(e, state)) {
+  if (classFamilyKey(event, state)) {
     return;
   }
-  if (e.key === 'Backspace' && !draft) {
-    e.preventDefault();
+  if (event.key === 'Backspace' && !draft) {
+    event.preventDefault();
     removeAt(at - 1);
-  } else if (e.key === 'Delete' && !draft) {
-    e.preventDefault();
+  } else if (event.key === 'Delete' && !draft) {
+    event.preventDefault();
     removeAt(at);
-  } else if (e.key === 'ArrowLeft' && !draft) {
-    e.preventDefault();
+  } else if (event.key === 'ArrowLeft' && !draft) {
+    event.preventDefault();
     setCaret(Math.max(0, at - 1));
-  } else if (e.key === 'ArrowRight' && !draft) {
-    e.preventDefault();
+  } else if (event.key === 'ArrowRight' && !draft) {
+    event.preventDefault();
     setCaret(Math.min(tokens.length, at + 1));
-  } else if (e.key === 'ArrowDown' && matches.length) {
-    e.preventDefault();
-    setHighlight((h) => Math.min(h + 1, matches.length - 1));
-  } else if (e.key === 'ArrowUp' && matches.length) {
-    e.preventDefault();
-    setHighlight((h) => Math.max(h - 1, 0));
-  } else if (e.key === 'Enter') {
-    e.preventDefault();
+  } else if (event.key === 'ArrowDown' && matches.length) {
+    event.preventDefault();
+    setHighlight((current) => Math.min(current + 1, matches.length - 1));
+  } else if (event.key === 'ArrowUp' && matches.length) {
+    event.preventDefault();
+    setHighlight((current) => Math.max(current - 1, 0));
+  } else if (event.key === 'Enter') {
+    event.preventDefault();
     if (matches.length) {
       addToken(matches[Math.min(highlight, matches.length - 1)]);
     } else {
       addToken(draft);
     }
-  } else if (e.key === ' ') {
-    e.preventDefault();
+  } else if (event.key === ' ') {
+    event.preventDefault();
     addToken(draft);
-  } else if (e.key === 'Tab' && draft) {
-    e.preventDefault();
+  } else if (event.key === 'Tab' && draft) {
+    event.preventDefault();
     addToken(matches.length ? matches[Math.min(highlight, matches.length - 1)] : draft);
-  } else if (e.key === 'Escape') {
+  } else if (event.key === 'Escape') {
     setDraft('');
     inputRef.current?.blur();
   }
 }
-function classFamilyKey(e: React.KeyboardEvent<HTMLInputElement>, state: ClassState): boolean {
+function classFamilyKey(event: React.KeyboardEvent<HTMLInputElement>, state: ClassState): boolean {
   const { family, previewFamily, famHighlight, applyFamily, closeFamily } = state;
   if (family) {
-    if (e.key === 'ArrowDown') {
-      e.preventDefault();
+    if (event.key === 'ArrowDown') {
+      event.preventDefault();
       previewFamily(Math.min(famHighlight + 1, family.options.length - 1));
       return true;
     }
-    if (e.key === 'ArrowUp') {
-      e.preventDefault();
+    if (event.key === 'ArrowUp') {
+      event.preventDefault();
       previewFamily(Math.max(famHighlight - 1, 0));
       return true;
     }
-    if (e.key === 'Enter' || e.key === 'Tab') {
-      e.preventDefault();
+    if (event.key === 'Enter' || event.key === 'Tab') {
+      event.preventDefault();
       applyFamily(famHighlight);
       return true;
     }
-    if (e.key === 'Escape') {
-      e.preventDefault();
+    if (event.key === 'Escape') {
+      event.preventDefault();
       closeFamily({ revert: true });
       return true;
     }
@@ -408,8 +412,8 @@ function ClassCaret({ state }: { readonly state: ClassState }) {
       value={draft}
       style={draft ? { width: `${draft.length + 1}ch` } : undefined}
       spellCheck={false}
-      onChange={(e) => {
-        setDraft(e.target.value);
+      onChange={(event) => {
+        setDraft(event.target.value);
         setHighlight(0);
       }}
       onKeyDown={(event) => classInputKey(event, state)}
@@ -437,25 +441,25 @@ function ClassTokens({ state }: { readonly state: ClassState }) {
     setFamHighlight,
     setFamily,
   } = state;
-  const inputEl = <ClassCaret key="caret" state={state} />;
+  const inputElement = <ClassCaret key="caret" state={state} />;
   const items: React.ReactNode[] = [];
-  tokens.forEach((t, i) => {
+  tokens.forEach((token, i) => {
     if (i === at) {
-      items.push(inputEl);
+      items.push(inputElement);
     }
     items.push(
       <span
-        key={`${t}-${i}`}
+        key={`${token}-${i}`}
         className={`class-tag${family?.index === i ? ' open' : ''}`}
         title={
-          classFamilyOf(t, suggestions, tokens).length > 1
+          classFamilyOf(token, suggestions, tokens).length > 1
             ? 'Click to switch to a related class'
             : 'Click to place the caret after this class'
         }
-        onMouseDown={(e) => {
+        onMouseDown={(event) => {
           // preventDefault keeps the inline input from blurring.
-          e.preventDefault();
-          e.stopPropagation();
+          event.preventDefault();
+          event.stopPropagation();
           setCaret(i + 1);
           inputRef.current?.focus();
           // Clicking the open tag again closes the menu, keeping whatever was
@@ -465,46 +469,46 @@ function ClassTokens({ state }: { readonly state: ClassState }) {
             return;
           }
           closeFamily({ revert: true });
-          const options = classFamilyOf(t, suggestions, tokens);
+          const options = classFamilyOf(token, suggestions, tokens);
           if (options.length < 2) {
             return;
           }
-          const r = e.currentTarget.getBoundingClientRect();
-          famOriginal.current = t;
-          famPreview.current = null;
-          setFamHighlight(options.indexOf(t));
-          setFamily({ index: i, options, left: r.left, top: r.bottom + 5 });
+          const rect = event.currentTarget.getBoundingClientRect();
+          famOriginal.current = token;
+          famPreview.current = undefined;
+          setFamHighlight(options.indexOf(token));
+          setFamily({ index: i, options, left: rect.left, top: rect.bottom + 5 });
         }}
       >
-        {t}
+        {token}
       </span>,
     );
   });
   if (at >= tokens.length) {
-    items.push(inputEl);
+    items.push(inputElement);
   }
 
   return items;
 }
 function ClassSuggestions({ state }: { readonly state: ClassState }) {
-  const { popupPos, matches, highlight, setHighlight, addToken } = state;
-  if (!popupPos) {
-    return null;
+  const { popupPos: popupPosition, matches, highlight, setHighlight, addToken } = state;
+  if (!popupPosition) {
+    return undefined;
   }
   return (
     <div
       className="dd-popup class-suggest"
-      style={{ left: popupPos.left, top: popupPos.top, width: popupPos.width }}
+      style={{ left: popupPosition.left, top: popupPosition.top, width: popupPosition.width }}
     >
-      {matches.map((s, i) => (
+      {matches.map((suggestion, i) => (
         <div
-          key={s}
+          key={suggestion}
           className={`dd-option ${i === highlight ? 'highlight' : ''}`}
-          onMouseDown={(e) => e.preventDefault()}
+          onMouseDown={(event) => event.preventDefault()}
           onMouseEnter={() => setHighlight(i)}
-          onClick={() => addToken(s)}
+          onClick={() => addToken(suggestion)}
         >
-          <span className="dd-option-label">{s}</span>
+          <span className="dd-option-label">{suggestion}</span>
         </div>
       ))}
     </div>
@@ -513,7 +517,7 @@ function ClassSuggestions({ state }: { readonly state: ClassState }) {
 function ClassFamilyMenu({ state }: { readonly state: ClassState }) {
   const { family, famRef, famHighlight, famOriginal, previewFamily, applyFamily } = state;
   if (!family) {
-    return null;
+    return undefined;
   }
   return (
     <div
@@ -521,18 +525,20 @@ function ClassFamilyMenu({ state }: { readonly state: ClassState }) {
       className="dd-popup class-family"
       style={{ left: family.left, top: family.top }}
     >
-      {family.options.map((s, i) => (
+      {family.options.map((option, i) => (
         <div
-          key={s}
+          key={option}
           className={`dd-option ${i === famHighlight ? 'highlight' : ''} ${
-            s === famOriginal.current ? 'selected' : ''
+            option === famOriginal.current ? 'selected' : ''
           }`}
-          onMouseDown={(e) => e.preventDefault()}
+          onMouseDown={(event) => event.preventDefault()}
           onMouseEnter={() => previewFamily(i)}
           onClick={() => applyFamily(i)}
         >
-          <span className="dd-check">{s === famOriginal.current && <CheckIcon size={12} />}</span>
-          <span className="dd-option-label">{s}</span>
+          <span className="dd-check">
+            {option === famOriginal.current && <CheckIcon size={12} />}
+          </span>
+          <span className="dd-option-label">{option}</span>
         </div>
       ))}
     </div>

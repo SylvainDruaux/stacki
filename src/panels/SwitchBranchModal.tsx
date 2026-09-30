@@ -6,7 +6,7 @@ export interface SwitchBranchProps {
   readonly from: string;
   readonly to: string;
   readonly files: readonly string[];
-  readonly busy: string | null;
+  readonly busy: string | undefined;
   readonly onCancel: () => void;
   readonly onLeaveHere: () => void;
   readonly onCommitFirst: (message: string) => void;
@@ -38,7 +38,7 @@ function SwitchBranchBody({
   return (
     <div
       className="modal-overlay"
-      onMouseDown={(e) => e.target === e.currentTarget && !working && onCancel()}
+      onMouseDown={(event) => event.target === event.currentTarget && !working && onCancel()}
     >
       <div className="modal">
         <div className="modal-header">These changes can’t come with you</div>
@@ -59,9 +59,9 @@ function SwitchBranchBody({
               placeholder={`Update ${from}`}
               value={message}
               disabled={working}
-              onChange={(e) => setMessage(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !working) {
+              onChange={(event) => setMessage(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' && !working) {
                   onCommitFirst(message.trim() || `Update ${from}`);
                 }
               }}
@@ -128,7 +128,7 @@ function SwitchBranchFiles({ files }: Pick<SwitchBranchProps, 'files'>) {
   const shown = files.slice(0, 5);
   const rest = files.length - shown.length;
   if (shown.length === 0) {
-    return null;
+    return undefined;
   }
   return (
     <ul className="dirty-files">

@@ -21,31 +21,31 @@ export interface BranchTree {
 }
 
 const branchNamed = <Node extends BranchTree>(
-  node: Node | null | undefined,
+  node: Node | undefined,
   name: 'then' | 'else',
-): Node | null => {
+): Node | undefined => {
   if (!node || node.kind !== 'cond') {
-    return null;
+    return undefined;
   }
   const kids = node.children ?? [];
-  const found = kids.find((k) => k?.kind === 'branch' && (k.name === 'else') === (name === 'else'));
-  return found || null;
+  const found = kids.find((kid) => {
+    return kid?.kind === 'branch' && (kid.name === 'else') === (name === 'else');
+  });
+  return found || undefined;
 };
 
 /** The branch a condition renders when its test holds — never drawn as a row. */
-export function thenBranch<Node extends BranchTree>(node: Node | null | undefined): Node | null {
+export function thenBranch<Node extends BranchTree>(node: Node | undefined): Node | undefined {
   return branchNamed(node, 'then');
 }
 
-/** The branch it renders when the test doesn't, or null when there isn't one. */
-export function elseBranch<Node extends BranchTree>(node: Node | null | undefined): Node | null {
+/** The branch it renders when the test doesn't, or undefined when there isn't one. */
+export function elseBranch<Node extends BranchTree>(node: Node | undefined): Node | undefined {
   return branchNamed(node, 'else');
 }
 
 /** The children the tree shows under a row. */
-export function rowChildren<Node extends BranchTree>(
-  node: Node | null | undefined,
-): readonly Node[] {
+export function rowChildren<Node extends BranchTree>(node: Node | undefined): readonly Node[] {
   const then = thenBranch(node);
   if (!then) {
     return node?.children ?? [];
@@ -58,8 +58,6 @@ export function rowChildren<Node extends BranchTree>(
 }
 
 /** Where a child dropped on this row actually goes. */
-export function rowHost<Node extends BranchTree>(
-  node: Node | null | undefined,
-): Node | null | undefined {
+export function rowHost<Node extends BranchTree>(node: Node | undefined): Node | undefined {
   return thenBranch(node) || node;
 }

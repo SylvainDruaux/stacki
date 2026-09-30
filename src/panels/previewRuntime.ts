@@ -24,15 +24,15 @@ export type JudgeCanvasEvent = (
 ) => Promise<PreviewVerdict>;
 
 export interface PreviewRuntimeProps {
-  readonly selPath: string | null;
-  readonly navHoverPath?: string | null;
-  readonly focusPath?: string | null;
-  readonly focusOcc?: number | null;
+  readonly selPath: string | undefined;
+  readonly navHoverPath?: string | undefined;
+  readonly focusPath?: string | undefined;
+  readonly focusOcc?: number | undefined;
   readonly pathScope?: string;
   readonly refreshKey?: string | number;
   readonly device: PreviewDevice;
-  readonly onSelectPath?: (path: string | null, info: { readonly outside: boolean }) => void;
-  readonly onOpenPath?: (path: string | null, occurrence: number) => void;
+  readonly onSelectPath?: (path: string | undefined, info: { readonly outside: boolean }) => void;
+  readonly onOpenPath?: (path: string | undefined, occurrence: number) => void;
   readonly onSelectedClasses?: (classes: readonly string[]) => void;
   readonly onRenderedPaths?: (paths: readonly string[]) => void;
   readonly onNodeStates?: (states: {
@@ -52,27 +52,36 @@ export interface PreviewRuntime {
   readonly iframeRef: React.RefObject<HTMLIFrameElement>;
   readonly rects: RectMap;
   readonly spacing: SpacingMap;
-  readonly selOcc: number | null;
-  readonly hoverPath: string | null;
-  readonly hoverOcc: number | null;
+  readonly selOcc: number | undefined;
+  readonly hoverPath: string | undefined;
+  readonly hoverOcc: number | undefined;
   readonly registerFrame: () => void;
   readonly sendTrack: () => void;
 }
 
-export function usePreviewRuntime(props: PreviewRuntimeProps, url: string | null): PreviewRuntime {
+export function usePreviewRuntime(
+  props: PreviewRuntimeProps,
+  url: string | undefined,
+): PreviewRuntime {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [rects, setRects] = useState<RectMap>({});
   const [spacing, setSpacing] = useState<SpacingMap>({});
-  const [canvasHover, setCanvasHover] = useState<string | null>(null);
-  const [selOcc, setSelOcc] = useState<number | null>(null);
+  const [canvasHover, setCanvasHover] = useState<string | undefined>(undefined);
+  const [selectedOccurrence, setSelectedOccurrence] = useState<number | undefined>(undefined);
   const [hoverOcc, setHoverOcc] = useState(0);
   const hoverPath = props.navHoverPath ?? canvasHover;
-  const refs = useRuntimeRefs(props, selOcc);
+  const refs = useRuntimeRefs(props, selectedOccurrence);
   const setters = useMemo(
-    () => ({ setRects, setSpacing, setCanvasHover, setSelOcc, setHoverOcc }),
+    () => ({
+      setRects,
+      setSpacing,
+      setCanvasHover,
+      setSelectedOccurrence,
+      setHoverOcc,
+    }),
     [],
   );
-  useOccurrenceSelection(props.selPath, refs, setSelOcc);
+  useOccurrenceSelection(props.selPath, refs, setSelectedOccurrence);
   useMessageListener(iframeRef, refs, setters);
   // The frame measures only tracked paths, so both hover sources must use
   // the same active path for measurement requests and outline rendering.
@@ -81,7 +90,7 @@ export function usePreviewRuntime(props: PreviewRuntimeProps, url: string | null
     [props.focusPath, hoverPath, props.selPath],
   );
   const registerFrame = useCallback((): void => {
-    setCanvasFrame(iframeRef.current?.contentWindow ?? null);
+    setCanvasFrame(iframeRef.current?.contentWindow ?? undefined);
   }, []);
   const sendTrack = useCallback((): void => {
     iframeRef.current?.contentWindow?.postMessage(
@@ -102,44 +111,52 @@ export function usePreviewRuntime(props: PreviewRuntimeProps, url: string | null
     iframeRef,
     rects,
     spacing,
-    selOcc,
+    selOcc: selectedOccurrence,
     hoverPath,
-    hoverOcc: props.navHoverPath ? null : hoverOcc,
+    hoverOcc: props.navHoverPath ? undefined : hoverOcc,
     registerFrame,
     sendTrack,
   };
 }
 
+// Every value here is a React ref: the runtime's handlers read and write them
+// in place, which is what a ref is for. Functions that write one name it
+// `…Ref` where they take it out of this record.
 interface RuntimeRefs {
   readonly props: React.MutableRefObject<PreviewRuntimeProps>;
-  readonly selOcc: React.MutableRefObject<number | null>;
-  readonly selectedClasses: React.MutableRefObject<string | null>;
-  readonly clickedPath: React.MutableRefObject<string | null | undefined>;
-  readonly lastClick: React.MutableRefObject<{ readonly path: string | null } | null>;
-  readonly cameFrom: React.MutableRefObject<string | null>;
+  readonly selectedOccurrence: React.MutableRefObject<number | undefined>;
+  readonly selectedClasses: React.MutableRefObject<string | undefined>;
+  /** A canvas click selected the current path, so the selection needs no scroll. */
+  readonly clickPending: React.MutableRefObject<boolean>;
+  /** The path the last canvas click named (undefined when it named nothing). */
+  readonly lastClick: React.MutableRefObject<{ readonly path: string | undefined } | undefined>;
+  readonly cameFrom: React.MutableRefObject<string | undefined>;
   /** The rendering the frame last announced, and its token. */
   readonly render: React.MutableRefObject<PreviewRender | undefined>;
 }
 
-function useRuntimeRefs(props: PreviewRuntimeProps, selOcc: number | null): RuntimeRefs {
+function useRuntimeRefs(
+  props: PreviewRuntimeProps,
+  selectedOccurrence: number | undefined,
+): RuntimeRefs {
   const propsRef = useRef(props);
   propsRef.current = props;
-  const selOccRef = useRef(selOcc);
-  selOccRef.current = selOcc;
-  const selectedClasses = useRef<string | null>(null);
-  const clickedPath = useRef<string | null | undefined>(undefined);
-  const lastClick = useRef<{ readonly path: string | null } | null>(null);
-  const cameFrom = useRef<string | null>(null);
+  const selectedOccurrenceRef = useRef(selectedOccurrence);
+  selectedOccurrenceRef.current = selectedOccurrence;
+  const selectedClasses = useRef<string | undefined>(undefined);
+  const clickPending = useRef(false);
+  const lastClick = useRef<{ readonly path: string | undefined } | undefined>(undefined);
+  const cameFrom = useRef<string | undefined>(undefined);
   const render = useRef<PreviewRender | undefined>(undefined);
   useEffect(() => {
-    selectedClasses.current = null;
-  }, [props.selPath, selOcc]);
+    selectedClasses.current = undefined;
+  }, [props.selPath, selectedOccurrence]);
   return useMemo(
     () => ({
       props: propsRef,
-      selOcc: selOccRef,
+      selectedOccurrence: selectedOccurrenceRef,
       selectedClasses,
-      clickedPath,
+      clickPending,
       lastClick,
       cameFrom,
       render,
@@ -149,30 +166,33 @@ function useRuntimeRefs(props: PreviewRuntimeProps, selOcc: number | null): Runt
 }
 
 function useOccurrenceSelection(
-  selPath: string | null,
+  selectedPath: string | undefined,
   refs: RuntimeRefs,
-  setSelOcc: React.Dispatch<React.SetStateAction<number | null>>,
+  setSelectedOccurrence: React.Dispatch<React.SetStateAction<number | undefined>>,
 ): void {
   useEffect(() => {
-    const previous = refs.cameFrom.current;
-    refs.cameFrom.current = selPath;
-    if (refs.lastClick.current?.path === selPath) {
-      refs.lastClick.current = null;
+    const { cameFrom: cameFromRef, lastClick: lastClickRef } = refs;
+    const previous = cameFromRef.current;
+    cameFromRef.current = selectedPath;
+    const clicked = lastClickRef.current;
+    lastClickRef.current = undefined;
+    if (clicked !== undefined) {
+      if (clicked.path === selectedPath) {
+        return;
+      }
+    }
+    if (sameCopy(previous, selectedPath)) {
       return;
     }
-    refs.lastClick.current = null;
-    if (sameCopy(previous, selPath)) {
-      return;
-    }
-    setSelOcc(null);
-  }, [refs, selPath, setSelOcc]);
+    setSelectedOccurrence(undefined);
+  }, [refs, selectedPath, setSelectedOccurrence]);
 }
 
 interface RuntimeSetters {
   readonly setRects: React.Dispatch<React.SetStateAction<RectMap>>;
   readonly setSpacing: React.Dispatch<React.SetStateAction<SpacingMap>>;
-  readonly setCanvasHover: React.Dispatch<React.SetStateAction<string | null>>;
-  readonly setSelOcc: React.Dispatch<React.SetStateAction<number | null>>;
+  readonly setCanvasHover: React.Dispatch<React.SetStateAction<string | undefined>>;
+  readonly setSelectedOccurrence: React.Dispatch<React.SetStateAction<number | undefined>>;
   readonly setHoverOcc: React.Dispatch<React.SetStateAction<number>>;
 }
 
@@ -215,7 +235,7 @@ function applyMessage(message: PreviewMessage, refs: RuntimeRefs, setters: Runti
       refs.props.current.onNodeStates?.({ hidden: message.hidden, inert: message.inert });
       break;
     case 'modifiers':
-      setModifiers(message.shiftKey, message.altKey);
+      setModifiers({ shiftKey: message.shiftKey, altKey: message.altKey });
       break;
     case 'hover-node':
       // A picture, not a selection: only the rendering has to be the latest.
@@ -223,17 +243,17 @@ function applyMessage(message: PreviewMessage, refs: RuntimeRefs, setters: Runti
         setters.setCanvasHover(message.path);
         setters.setHoverOcc(message.occurrence);
       } else {
-        setters.setCanvasHover(null);
+        setters.setCanvasHover(undefined);
       }
       break;
     case 'click-node':
       gateEvent(message.token, refs, () => applyClick(message, refs, setters));
       break;
     case 'render':
-      refs.render.current = message.render;
+      announceRender(refs.render, message.render);
       break;
     case 'preview-reload':
-      refs.render.current = undefined; // The reloaded page announces its own.
+      announceRender(refs.render, undefined); // The reloaded page announces its own.
       refs.props.current.onPreviewReload?.(message.reason);
       break;
     case 'canvas-ready':
@@ -246,10 +266,17 @@ function applyMessage(message: PreviewMessage, refs: RuntimeRefs, setters: Runti
       break;
     case 'open-node':
       gateEvent(message.token, refs, () =>
-        refs.props.current.onOpenPath?.(message.path, message.occurrence),
+        refs.props.current.onOpenPath?.(message.path ?? undefined, message.occurrence),
       );
       break;
   }
+}
+
+function announceRender(
+  renderRef: React.MutableRefObject<PreviewRender | undefined>,
+  render: PreviewRender | undefined,
+): void {
+  renderRef.current = render;
 }
 
 // The gate answers after main has read the stamped files; the rendering judged
@@ -277,12 +304,13 @@ function publishSelectedClasses(
   classes: Readonly<Record<string, readonly (readonly string[])[]>>,
   refs: RuntimeRefs,
 ): void {
+  const { selectedClasses: selectedClassesRef } = refs;
   const path = refs.props.current.selPath;
   const runs = path ? (classes[path] ?? []) : [];
-  const list = runs[refs.selOcc.current ?? 0] ?? runs[0] ?? [];
+  const list = runs[refs.selectedOccurrence.current ?? 0] ?? runs[0] ?? [];
   const key = list.join(' ');
-  if (key !== refs.selectedClasses.current) {
-    refs.selectedClasses.current = key;
+  if (key !== selectedClassesRef.current) {
+    selectedClassesRef.current = key;
     refs.props.current.onSelectedClasses?.(list);
   }
 }
@@ -292,22 +320,24 @@ function applyClick(
   refs: RuntimeRefs,
   setters: RuntimeSetters,
 ): void {
-  refs.clickedPath.current = message.path;
-  refs.lastClick.current = { path: message.path };
-  setters.setSelOcc(message.occurrence);
-  refs.props.current.onSelectPath?.(message.path, { outside: message.outside });
+  const { clickPending: clickPendingRef, lastClick: lastClickRef } = refs;
+  const path = message.path;
+  clickPendingRef.current = true;
+  lastClickRef.current = { path };
+  setters.setSelectedOccurrence(message.occurrence);
+  refs.props.current.onSelectPath?.(path, { outside: message.outside });
 }
 
 function useFrameRegistration(
   props: PreviewRuntimeProps,
-  url: string | null,
+  url: string | undefined,
   registerFrame: () => void,
   sendTrack: () => void,
 ): void {
   const canvasMode = props.device === 'canvas';
   useEffect(() => {
     registerFrame();
-    return () => setCanvasFrame(null);
+    return () => setCanvasFrame(undefined);
   }, [canvasMode, props.refreshKey, registerFrame, url]);
   useEffect(() => {
     sendTrack();
@@ -329,13 +359,15 @@ function useSelectionScroll(
     if (!frame || !props.selPath) {
       return;
     }
-    if (refs.clickedPath.current !== undefined) {
-      refs.clickedPath.current = undefined;
+    const { clickPending: clickPendingRef } = refs;
+    if (clickPendingRef.current) {
+      clickPendingRef.current = false;
       return;
     }
     if (!contextChanged) {
+      // The frame reads a missing occurrence as the first copy.
       frame.postMessage(
-        { type: 'avb:scroll-to', path: props.selPath, occ: refs.selOcc.current },
+        { type: 'avb:scroll-to', path: props.selPath, occ: refs.selectedOccurrence.current },
         '*',
       );
     }
@@ -344,24 +376,29 @@ function useSelectionScroll(
 
 function useResetOnReload(
   props: PreviewRuntimeProps,
-  url: string | null,
+  url: string | undefined,
   refs: RuntimeRefs,
   setters: RuntimeSetters,
 ): void {
   const canvasMode = props.device === 'canvas';
   useEffect(() => {
+    const {
+      selectedClasses: selectedClassesRef,
+      clickPending: clickPendingRef,
+      lastClick: lastClickRef,
+    } = refs;
     setters.setRects({});
-    setters.setCanvasHover(null);
+    setters.setCanvasHover(undefined);
     setters.setSpacing({});
-    setters.setSelOcc(null);
+    setters.setSelectedOccurrence(undefined);
     setters.setHoverOcc(0);
-    refs.selectedClasses.current = null;
-    refs.clickedPath.current = undefined;
-    refs.lastClick.current = null;
-    refs.render.current = undefined; // A reloaded frame announces its rendering again.
+    selectedClassesRef.current = undefined;
+    clickPendingRef.current = false;
+    lastClickRef.current = undefined;
+    announceRender(refs.render, undefined); // A reloaded frame announces its rendering again.
   }, [canvasMode, props.refreshKey, refs, setters, url]);
 }
 
-function trackedPaths(...paths: readonly (string | null | undefined)[]): readonly string[] {
+function trackedPaths(...paths: readonly (string | undefined)[]): readonly string[] {
   return [...new Set(paths.filter((path): path is string => Boolean(path)))];
 }

@@ -11,18 +11,13 @@ interface Page {
   readonly route: string;
 }
 interface PageSwitcherProps<T extends Page> {
-  readonly pages?: readonly T[] | null;
-  readonly currentPage?: T | null;
+  readonly pages?: readonly T[] | undefined;
+  readonly currentPage?: T | undefined;
   readonly onSelect: (page: T) => void;
 }
 const pretty = (page: Page): string => page.name.replace(/\.(astro|mdx?)$/i, '');
-const PageGlyph = ({
-  page,
-  size,
-}: {
-  readonly page: Page | null | undefined;
-  readonly size: number;
-}) => (isCollectionRoute(page?.name) ? <CollectionIcon size={size} /> : <FileIcon size={size} />);
+const PageGlyph = ({ page, size }: { readonly page: Page | undefined; readonly size: number }) =>
+  isCollectionRoute(page?.name) ? <CollectionIcon size={size} /> : <FileIcon size={size} />;
 
 // Keep the selected page object intact: callers may carry source metadata beyond this projection.
 export default function PageSwitcher<T extends Page>(props: PageSwitcherProps<T>) {
@@ -56,7 +51,7 @@ function usePageSwitcher<T extends Page>({ pages, currentPage, onSelect }: PageS
   const buttonRef = useRef<HTMLButtonElement>(null);
   const popupRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const position = usePagePosition(open, buttonRef);
+  const position = usePagePosition(buttonRef, { open });
   const filtered = pageSwitcherFilter(pages, query);
   useEffect(() => {
     if (!open) {
@@ -113,10 +108,13 @@ function usePageSwitcher<T extends Page>({ pages, currentPage, onSelect }: PageS
   };
 }
 
-function usePagePosition(open: boolean, buttonRef: RefObject<HTMLButtonElement | null>) {
-  const [position, setPosition] = useState<{ readonly left: number; readonly top: number } | null>(
-    null,
-  );
+function usePagePosition(
+  buttonRef: RefObject<HTMLButtonElement>,
+  { open }: { readonly open: boolean },
+) {
+  const [position, setPosition] = useState<
+    { readonly left: number; readonly top: number } | undefined
+  >(undefined);
   useLayoutEffect(() => {
     if (!open || !buttonRef.current) {
       return;
@@ -136,7 +134,7 @@ function PageMenu<T extends Page>({
   currentPage,
 }: {
   readonly state: PageState<T>;
-  readonly currentPage: T | null | undefined;
+  readonly currentPage: T | undefined;
 }) {
   const onInputKey = (event: React.KeyboardEvent<HTMLInputElement>): void => {
     switch (event.key) {
@@ -217,10 +215,7 @@ function PageRow({
   );
 }
 
-function pageSwitcherFilter<T extends Page>(
-  pages: readonly T[] | null | undefined,
-  query: string,
-): T[] {
+function pageSwitcherFilter<T extends Page>(pages: readonly T[] | undefined, query: string): T[] {
   const search = query.trim().toLowerCase();
   return (pages || [])
     .filter(

@@ -9,8 +9,8 @@ export function DevOffline({
   devDiag,
   onRestart,
 }: {
-  readonly devLog?: string | null;
-  readonly devDiag?: DevDiagnosis | null;
+  readonly devLog?: string | undefined;
+  readonly devDiag?: DevDiagnosis | undefined;
   readonly onRestart?: () => void;
 }) {
   const [showLog, setShowLog] = useState(false);
@@ -45,7 +45,7 @@ export function DevOffline({
 
 function OfflineAction({ action }: { readonly action: OfflineMessage['action'] }) {
   if (!action) {
-    return null;
+    return undefined;
   }
   return (
     <button className="ghost" onClick={() => void window.avb.openExternal(action.url)}>
@@ -57,11 +57,11 @@ function OfflineAction({ action }: { readonly action: OfflineMessage['action'] }
 interface OfflineMessage {
   readonly known: boolean;
   readonly title: string;
-  readonly detail: string | null;
-  readonly action: { readonly label: string; readonly url: string } | null;
+  readonly detail: string | undefined;
+  readonly action: { readonly label: string; readonly url: string } | undefined;
 }
 
-function offlineMessage(diagnosis: DevDiagnosis | null | undefined): OfflineMessage {
+function offlineMessage(diagnosis: DevDiagnosis | undefined): OfflineMessage {
   if (diagnosis?.kind === 'no-node') {
     return {
       known: true,
@@ -91,8 +91,8 @@ function offlineMessage(diagnosis: DevDiagnosis | null | undefined): OfflineMess
       detail:
         'Astro was not found in node_modules. Starting the server installs them automatically — ' +
         'if that keeps failing, the log below has the reason.',
-      action: null,
+      action: undefined,
     };
   }
-  return { known: false, title: 'Preview is offline.', detail: null, action: null };
+  return { known: false, title: 'Preview is offline.', detail: undefined, action: undefined };
 }

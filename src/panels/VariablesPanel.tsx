@@ -11,8 +11,8 @@ import { ChevronLeftIcon, ChevronRightIcon, VariableIcon, FileIcon } from '../ui
 
 export interface VariablesPanelProps {
   readonly project: { readonly path: string };
-  readonly selected?: VariableSelection | null;
-  readonly onSelect: (selection: VariableSelection | null) => void;
+  readonly selected?: VariableSelection | undefined;
+  readonly onSelect: (selection: VariableSelection | undefined) => void;
 }
 
 const EMPTY_FILES: readonly VariableFile[] = [];
@@ -23,7 +23,7 @@ export default function VariablesPanel(props: VariablesPanelProps) {
   const result = useVariableFiles(project.path);
   const files = result.ok ? result.value.files : EMPTY_FILES;
   const error = result.ok ? undefined : result.error;
-  const [openFile, setOpenFile] = useState<string | null>(null);
+  const [openFile, setOpenFile] = useState<string | undefined>(undefined);
   useEffect(() => {
     if (!selected || openFile) {
       return;
@@ -44,8 +44,8 @@ export default function VariablesPanel(props: VariablesPanelProps) {
               className="ghost"
               title="All stylesheets"
               onClick={() => {
-                setOpenFile(null);
-                onSelect(null);
+                setOpenFile(undefined);
+                onSelect(undefined);
               }}
             >
               <ChevronLeftIcon size={14} />
@@ -98,6 +98,8 @@ function useVariableFiles(projectPath: string) {
     let live = true;
     let running = false;
     let pending = false;
+    // It calls itself again only from the read's callback, never on the stack.
+    // eslint-disable-next-line stacki/bounded-recursion -- Event re-entry from a promise callback.
     const refresh = () => {
       if (!live) {
         return;
@@ -131,7 +133,7 @@ function useVariableFiles(projectPath: string) {
 
 interface FileRowProps {
   readonly file: VariableFile;
-  readonly selected: VariableSelection | null | undefined;
+  readonly selected: VariableSelection | undefined;
   readonly onOpen: (file: string) => void;
   readonly onSelect: VariablesPanelProps['onSelect'];
 }
@@ -169,7 +171,7 @@ interface GroupRowProps {
   readonly group: VariableGroup;
   readonly file: string;
   readonly index: number;
-  readonly selected: VariableSelection | null | undefined;
+  readonly selected: VariableSelection | undefined;
   readonly onSelect: VariablesPanelProps['onSelect'];
 }
 function VariableGroupRow({ group, file, index, selected, onSelect }: GroupRowProps) {

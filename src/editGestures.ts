@@ -27,14 +27,14 @@ export type PropPatch = Readonly<Record<string, Attr | undefined>>;
 export function propsGesture(
   nodeId: string,
   patch: PropPatch,
-  options: { readonly coalesceKey: string | null; readonly urgency: Urgency },
+  options: { readonly coalesceKey: string | undefined; readonly urgency: Urgency },
 ): EditGesture {
   const names = Object.keys(patch);
   const [only] = names;
   return {
     coalesceKey: options.coalesceKey,
     urgency: options.urgency,
-    stream: names.length === 1 && only !== undefined ? `attribute:${nodeId}:${only}` : null,
+    stream: names.length === 1 && only !== undefined ? `attribute:${nodeId}:${only}` : undefined,
     request: (refOf) => {
       const target = refOf(nodeId);
       if (target === undefined) {
@@ -123,7 +123,7 @@ export function withNode(
   nodeId: string,
   update: (node: EditorNode) => EditorNode,
 ): EditorModel {
-  const nodes = replacedIn(model.nodes, nodeId, update, 0);
+  const nodes = replacedIn(model.nodes, nodeId, 0, update);
   return nodes === model.nodes ? model : { ...model, nodes };
 }
 
@@ -131,8 +131,8 @@ export function withNode(
 function replacedIn(
   list: readonly EditorNode[],
   nodeId: string,
-  update: (node: EditorNode) => EditorNode,
   depth: number,
+  update: (node: EditorNode) => EditorNode,
 ): readonly EditorNode[] {
   assert(depth <= LIMITS.treeDepthMax, 'A model is no deeper than its bound');
   for (const [index, node] of list.entries()) {
@@ -141,7 +141,7 @@ function replacedIn(
     }
     const children = node.children;
     if (Array.isArray(children)) {
-      const replaced = replacedIn(children, nodeId, update, depth + 1);
+      const replaced = replacedIn(children, nodeId, depth + 1, update);
       if (replaced !== children) {
         const parent = withChildren(node, replaced);
         return list.map((candidate, at) => (at === index ? parent : candidate));
@@ -161,7 +161,7 @@ function replacedIn(
 export function inlineStyleGesture(
   nodeId: string,
   styles: { readonly before: string; readonly after: string },
-  options: { readonly coalesceKey: string | null; readonly urgency: Urgency },
+  options: { readonly coalesceKey: string | undefined; readonly urgency: Urgency },
 ): EditGesture {
   const whole = propsGesture(nodeId, { style: { type: 'string', value: styles.after } }, options);
   const change = singleDeclarationChange(styles.before, styles.after);
@@ -187,10 +187,10 @@ export function inlineStyleGesture(
 
 // --- Insert and remove (the §11.6 insert/remove step) --------------------------------
 
-/** Where a new node lands: a list inside a parent (null: the page's root
+/** Where a new node lands: a list inside a parent (undefined: the page's root
  * list) and a position in it, as the insert palette and paste state it. */
 export interface InsertPlace {
-  readonly parentId: string | null;
+  readonly parentId: string | undefined;
   readonly index: number;
 }
 
@@ -203,14 +203,14 @@ type Placement = 'before' | 'after' | 'first-child' | 'last-child';
 export function insertGesture(
   model: EditorModel,
   node: EditorNode,
-  place: InsertPlace | null,
+  place: InsertPlace | undefined,
   options: { readonly urgency: Urgency },
 ): EditGesture {
   const beside = besidePlace(model, place);
   return {
-    coalesceKey: null,
+    coalesceKey: undefined,
     urgency: options.urgency,
-    stream: null,
+    stream: undefined,
     request: (refOf) => {
       if (beside === undefined && model.nodes.every(blank)) {
         return [{ tag: 'append-body', nodes: [node] }];
@@ -239,9 +239,9 @@ export function duplicateGesture(
   options: { readonly urgency: Urgency },
 ): EditGesture {
   return {
-    coalesceKey: null,
+    coalesceKey: undefined,
     urgency: options.urgency,
-    stream: null,
+    stream: undefined,
     request: (refOf) => {
       const target = refOf(nodeId);
       if (target === undefined) {
@@ -262,9 +262,9 @@ export function removalGesture(
   options: { readonly urgency: Urgency },
 ): EditGesture {
   return {
-    coalesceKey: null,
+    coalesceKey: undefined,
     urgency: options.urgency,
-    stream: null,
+    stream: undefined,
     request: (refOf) => {
       const edits: Edit[] = [];
       for (const id of nodeIds) {
@@ -320,11 +320,11 @@ function filteredList(
 export function withInserted(
   model: EditorModel,
   node: EditorNode,
-  place: InsertPlace | null,
+  place: InsertPlace | undefined,
 ): EditorModel {
-  const parentId = place?.parentId ?? null;
-  if (parentId === null || !containsNode(model.nodes, parentId)) {
-    const index = place === null || parentId !== null ? model.nodes.length : place.index;
+  const parentId = place?.parentId;
+  if (parentId === undefined || !containsNode(model.nodes, parentId)) {
+    const index = place === undefined || parentId !== undefined ? model.nodes.length : place.index;
     return { ...model, nodes: spliced(model.nodes, Math.min(index, model.nodes.length), node) };
   }
   const index = place?.index ?? 0;
@@ -393,7 +393,7 @@ function containsNode(list: readonly EditorNode[], nodeId: string): boolean {
     if (node.id === nodeId) {
       return true;
     }
-    if (Array.isArray(node.children)) {
+    if (node.children !== undefined) {
       pending.push(...node.children);
     }
   }
@@ -405,14 +405,14 @@ function containsNode(list: readonly EditorNode[], nodeId: string): boolean {
 // root nodes is a separator, never a neighbour to stand beside.
 function besidePlace(
   model: EditorModel,
-  place: InsertPlace | null,
+  place: InsertPlace | undefined,
   moving: ReadonlySet<string> = new Set(),
 ): { readonly anchorId: string; readonly placement: Placement } | undefined {
-  const parentId = place?.parentId ?? null;
-  const parent = parentId === null ? undefined : findNode(model.nodes, parentId);
+  const parentId = place?.parentId;
+  const parent = parentId === undefined ? undefined : findNode(model.nodes, parentId);
   const list = parent === undefined ? model.nodes : (parent.children ?? []);
   const index =
-    parent === undefined && parentId !== null
+    parent === undefined && parentId !== undefined
       ? list.length
       : Math.min(place?.index ?? list.length, list.length);
   // Neither a separator nor what is moving is a neighbour to stand beside.
@@ -441,7 +441,7 @@ function findNode(list: readonly EditorNode[], nodeId: string): EditorNode | und
     if (node.id === nodeId) {
       return node;
     }
-    if (Array.isArray(node.children)) {
+    if (node.children !== undefined) {
       pending.push(...node.children);
     }
   }
@@ -464,7 +464,7 @@ export interface MoveRules {
 export function moveGesture(
   model: EditorModel,
   nodeId: string,
-  place: InsertPlace | null,
+  place: InsertPlace | undefined,
   rules: MoveRules,
   options: { readonly urgency: Urgency },
 ): EditGesture | undefined {
@@ -474,7 +474,7 @@ export function moveGesture(
   }
   if (
     place?.parentId === nodeId ||
-    (place?.parentId != null && containsNode(found.node.children ?? [], place.parentId))
+    (place?.parentId !== undefined && containsNode(found.node.children ?? [], place.parentId))
   ) {
     return undefined; // Into itself: nothing to do.
   }
@@ -487,40 +487,10 @@ export function moveGesture(
   const beside = besidePlace(model, place, new Set(moving));
   const lost = lostVariables(model, landing.model, nodeId);
   return {
-    coalesceKey: null,
+    coalesceKey: undefined,
     urgency: options.urgency,
-    stream: null,
-    request: (refOf) => {
-      const target = refOf(nodeId);
-      const noteRef = note === undefined ? undefined : refOf(note.id);
-      const destination = beside === undefined ? undefined : refOf(beside.anchorId);
-      if (target === undefined || beside === undefined || destination === undefined) {
-        return undefined;
-      }
-      if (note !== undefined && noteRef === undefined) {
-        return undefined;
-      }
-      const edits: Edit[] = [];
-      if (dropSlot) {
-        edits.push({ tag: 'remove-attribute', target, name: 'slot' });
-      }
-      const move = (ref: NodeRef): Edit => ({
-        tag: 'move-node',
-        target: ref,
-        destination,
-        placement: beside.placement,
-      });
-      // Before a node, the note goes first and the node after it; after a node
-      // or into a parent, the node goes first and the note lands in front of it.
-      const order =
-        noteRef === undefined
-          ? [target]
-          : beside.placement === 'before'
-            ? [noteRef, target]
-            : [target, noteRef];
-      edits.push(...order.map(move));
-      return edits;
-    },
+    stream: undefined,
+    request: (refOf) => moveRequest({ nodeId, noteId: note?.id, beside, dropSlot }, refOf),
     apply: (current) => {
       const again = findWithList(current.nodes, nodeId);
       if (again === undefined) {
@@ -533,6 +503,50 @@ export function moveGesture(
       return moved.model;
     },
   };
+}
+
+/** A move's requests against a parse: the `slot` removal first when it goes,
+ * then the node and its note, in the order that lands them as they stood. */
+function moveRequest(
+  move: {
+    readonly nodeId: string;
+    readonly noteId: string | undefined;
+    readonly beside: { readonly anchorId: string; readonly placement: Placement } | undefined;
+    readonly dropSlot: boolean;
+  },
+  refOf: (nodeId: string) => NodeRef | undefined,
+): readonly Edit[] | undefined {
+  const { beside } = move;
+  const target = refOf(move.nodeId);
+  const noteRef = move.noteId === undefined ? undefined : refOf(move.noteId);
+  const destination = beside === undefined ? undefined : refOf(beside.anchorId);
+  if (target === undefined || beside === undefined || destination === undefined) {
+    return undefined;
+  }
+  if (move.noteId !== undefined && noteRef === undefined) {
+    return undefined;
+  }
+  const edits: Edit[] = [];
+  if (move.dropSlot) {
+    edits.push({ tag: 'remove-attribute', target, name: 'slot' });
+  }
+  const moveOf = (ref: NodeRef): Edit => ({
+    tag: 'move-node',
+    target: ref,
+    destination,
+    placement: beside.placement,
+  });
+  // Before a node, the note goes first and the node after it; after a node
+  // or into a parent, the node goes first and the note lands in front of it.
+  const order =
+    noteRef === undefined
+      ? [target]
+      : beside.placement === 'before'
+        ? [noteRef, target]
+        : [target, noteRef];
+  edits.push(...order.map(moveOf));
+  assert(edits.length > 0, 'A move states at least one edit');
+  return edits;
 }
 
 /** The loop variables the node reads at its old place and not at its new one. */
@@ -552,14 +566,14 @@ function relocated(
     readonly node: EditorNode;
   },
   moving: readonly string[],
-  place: InsertPlace | null,
+  place: InsertPlace | undefined,
   reshape: (node: EditorNode) => EditorNode = (node) => node,
 ): { readonly model: EditorModel } {
   const removeAt = found.index - (moving.length - 1);
   const without = withoutNodes(model, moving);
-  const parentId = place?.parentId ?? null;
+  const parentId = place?.parentId;
   const sameList =
-    parentId === null
+    parentId === undefined
       ? found.list === model.nodes
       : findNode(model.nodes, parentId)?.children === found.list;
   let index = place?.index ?? Number.MAX_SAFE_INTEGER;
@@ -567,7 +581,7 @@ function relocated(
     index = Math.max(removeAt, index - moving.length);
   }
   const node = reshape(found.node);
-  const landed = withInserted(without, node, place === null ? null : { parentId, index });
+  const landed = withInserted(without, node, place === undefined ? undefined : { parentId, index });
   if (moving.length === 1) {
     return { model: landed };
   }
@@ -587,12 +601,11 @@ function findWithList(
       readonly list: readonly EditorNode[];
       readonly index: number;
       readonly node: EditorNode;
-      readonly parentId: string | null;
+      readonly parentId: string | undefined;
     }
   | undefined {
-  const pending: { readonly list: readonly EditorNode[]; readonly parentId: string | null }[] = [
-    { list, parentId: null },
-  ];
+  const pending: { readonly list: readonly EditorNode[]; readonly parentId: string | undefined }[] =
+    [{ list, parentId: undefined }];
   for (let visited = 0; visited < pending.length; visited++) {
     assert(visited < LIMITS.treeNodesMax, 'A model stays inside its node bound');
     const entry = pending[visited];
@@ -618,8 +631,8 @@ function findWithList(
  * import touches its own line and nothing else. */
 export function frontmatterGesture(
   model: EditorModel,
+  options: { readonly coalesceKey: string | undefined; readonly urgency: Urgency },
   change: (model: EditorModel) => EditorModel,
-  options: { readonly coalesceKey: string | null; readonly urgency: Urgency },
 ): EditGesture {
   const after = change(model);
   return {
@@ -641,7 +654,7 @@ export function sequence(first: EditGesture, second: EditGesture): EditGesture {
   return {
     coalesceKey: first.coalesceKey,
     urgency: first.urgency,
-    stream: null,
+    stream: undefined,
     request: (refOf) => {
       const before = first.request(refOf);
       const after = second.request(refOf);
@@ -681,9 +694,9 @@ export function loopRenameGesture(
     return undefined;
   }
   return {
-    coalesceKey: null,
+    coalesceKey: undefined,
     urgency: options.urgency,
-    stream: null,
+    stream: undefined,
     request: (refOf) => {
       const target = refOf(nodeId);
       if (target === undefined) {
@@ -709,10 +722,10 @@ function onlyRenames(before: string, after: string, renames: readonly LoopRename
   }
   const old = parseLoopHead(before);
   const next = parseLoopHead(after);
-  if (old === null) {
+  if (old === undefined) {
     return false; // A hand-written head: the rename is best effort, in the model.
   }
-  if (next === null) {
+  if (next === undefined) {
     return false;
   }
   const renamed = (name: string) => renames.find((rename) => rename.from === name)?.to ?? name;
@@ -733,7 +746,7 @@ function onlyRenames(before: string, after: string, renames: readonly LoopRename
 export function nodeGesture(
   nodeId: string,
   next: EditorNode,
-  options: { readonly coalesceKey: string | null; readonly urgency: Urgency },
+  options: { readonly coalesceKey: string | undefined; readonly urgency: Urgency },
 ): EditGesture {
   assert(next.id === nodeId, 'A restated node keeps its id');
   return {
@@ -767,9 +780,9 @@ export function attributeRenameGesture(
   }
   const taken = Object.hasOwn(node.props ?? {}, names.to);
   return {
-    coalesceKey: null,
+    coalesceKey: undefined,
     urgency: true,
-    stream: null,
+    stream: undefined,
     request: (refOf) => {
       const target = refOf(nodeId);
       if (target === undefined) {
@@ -806,12 +819,12 @@ export function tagRenameGesture(
   const name = next.name;
   assert(name !== undefined, 'A renamed tag has a name');
   if (!Array.isArray(node.children) || !Array.isArray(next.children)) {
-    return nodeGesture(nodeId, next, { coalesceKey: null, urgency: options.urgency });
+    return nodeGesture(nodeId, next, { coalesceKey: undefined, urgency: options.urgency });
   }
   return {
-    coalesceKey: null,
+    coalesceKey: undefined,
     urgency: options.urgency,
-    stream: null,
+    stream: undefined,
     request: (refOf) => {
       const target = refOf(nodeId);
       if (target === undefined) {
@@ -834,9 +847,9 @@ export function wrapGesture(model: EditorModel, wrapper: EditorNode): EditGestur
   const first = standing[0];
   const last = standing[standing.length - 1];
   return {
-    coalesceKey: null,
+    coalesceKey: undefined,
     urgency: true,
-    stream: null,
+    stream: undefined,
     request: (refOf) => {
       const target = first === undefined ? undefined : refOf(first.id);
       const end = last === undefined ? undefined : refOf(last.id);
@@ -852,9 +865,9 @@ export function wrapGesture(model: EditorModel, wrapper: EditorNode): EditGestur
 /** A wrapper taken away, its children left in its place (a layout removed). */
 export function unwrapGesture(nodeId: string): EditGesture {
   return {
-    coalesceKey: null,
+    coalesceKey: undefined,
     urgency: true,
-    stream: null,
+    stream: undefined,
     request: (refOf) => {
       const target = refOf(nodeId);
       if (target === undefined) {

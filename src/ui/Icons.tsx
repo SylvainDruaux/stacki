@@ -38,155 +38,155 @@ const I = ({
   </svg>
 );
 
-export const FileIcon = (p: IconProps) => (
-  <I {...p}>
+export const FileIcon = (props: IconProps) => (
+  <I {...props}>
     <path d={fileIconPath1} />
     <path d="M8.9 1.9v3h3" />
   </I>
 );
 
 // An easing curve: what the editor behind it edits.
-export const EaseIcon = (p: IconProps) => (
-  <I {...p}>
+export const EaseIcon = (props: IconProps) => (
+  <I {...props}>
     <path d="M2 13c5.5 0 5-10 12-10" />
   </I>
 );
 
-export const ComponentIcon = (p: IconProps) => (
-  <I {...p}>
+export const ComponentIcon = (props: IconProps) => (
+  <I {...props}>
     <rect x="5.2" y="5.2" width="5.6" height="5.6" rx="0.8" transform="rotate(45 8 8)" />
   </I>
 );
 
-export const LayoutIcon = (p: IconProps) => (
-  <I {...p}>
+export const LayoutIcon = (props: IconProps) => (
+  <I {...props}>
     <rect x="2" y="2.5" width="12" height="11" rx="1.5" />
     <path d="M2 6h12M6 6v7.5" />
   </I>
 );
 
-export const TextIcon = (p: IconProps) => (
-  <I {...p}>
+export const TextIcon = (props: IconProps) => (
+  <I {...props}>
     <path d="M3.5 4.5V3.5h9v1M8 3.5v9M6.3 12.5h3.4" />
   </I>
 );
 
-export const CommentIcon = (p: IconProps) => (
-  <I {...p}>
+export const CommentIcon = (props: IconProps) => (
+  <I {...props}>
     <path d={commentIconPath1} />
   </I>
 );
 
-export const CodeIcon = (p: IconProps) => (
-  <I {...p}>
+export const CodeIcon = (props: IconProps) => (
+  <I {...props}>
     <path d="m5.5 5-3 3 3 3M10.5 5l3 3-3 3" />
   </I>
 );
 
-export const PencilIcon = (p: IconProps) => (
-  <I {...p}>
+export const PencilIcon = (props: IconProps) => (
+  <I {...props}>
     <path d="M11.2 2.6a1.3 1.3 0 0 1 1.85 1.85L5.6 11.9l-2.45.6.6-2.45Z" />
     <path d="m10.1 3.7 2.2 2.2" />
   </I>
 );
 
-export const TagIcon = (p: IconProps) => (
-  <I {...p}>
+export const TagIcon = (props: IconProps) => (
+  <I {...props}>
     <path d="m6 3.5-4 4.5 4 4.5M10 3.5l4 4.5-4 4.5" />
   </I>
 );
 
-export const ChevronLeftIcon = (p: IconProps) => (
-  <I {...p}>
+export const ChevronLeftIcon = (props: IconProps) => (
+  <I {...props}>
     <path d="m10 4-4 4 4 4" />
   </I>
 );
 
-export const ChevronRightIcon = (p: IconProps) => (
-  <I {...p}>
+export const ChevronRightIcon = (props: IconProps) => (
+  <I {...props}>
     <path d="m6 4 4 4-4 4" />
   </I>
 );
 
-export const ChevronDownIcon = (p: IconProps) => (
-  <I {...p}>
+export const ChevronDownIcon = (props: IconProps) => (
+  <I {...props}>
     <path d="m4 6 4 4 4-4" />
   </I>
 );
 
-export const PlusIcon = (p: IconProps) => (
-  <I {...p}>
+export const PlusIcon = (props: IconProps) => (
+  <I {...props}>
     <path d="M8 3v10M3 8h10" />
   </I>
 );
 
-export const RefreshIcon = (p: IconProps) => (
-  <I {...p}>
+export const RefreshIcon = (props: IconProps) => (
+  <I {...props}>
     <path d="M13 8a5 5 0 1 1-1.47-3.54" />
     <path d="M13.2 2.6v2.6h-2.6" />
   </I>
 );
 
-export const CloseIcon = (p: IconProps) => (
-  <I {...p}>
+export const CloseIcon = (props: IconProps) => (
+  <I {...props}>
     <path d="m4 4 8 8M12 4l-8 8" />
   </I>
 );
 
-export const ComponentPropertiesIcon = (p: IconProps) => (
-  <I {...p} filled>
+export const ComponentPropertiesIcon = (props: IconProps) => (
+  <I {...props} filled>
     <path fillRule="evenodd" clipRule="evenodd" d={componentPropertiesIconPath1} />
   </I>
 );
 
-export const VariableTextSizeIcon = (p: IconProps) => (
-  <I {...p} filled>
+export const VariableTextSizeIcon = (props: IconProps) => (
+  <I {...props} filled>
     <path fillRule="evenodd" clipRule="evenodd" d="M5 5H2V4H9V5H6V12H5V5Z" />
     <path fillRule="evenodd" clipRule="evenodd" d="M11 8H9V7H14V8H12V12H11V8Z" />
   </I>
 );
 
-export const FieldNumberIcon = (p: IconProps) => (
-  <I {...p} filled>
+export const FieldNumberIcon = (props: IconProps) => (
+  <I {...props} filled>
     <path fillRule="evenodd" clipRule="evenodd" d={fieldNumberIconPath1} />
   </I>
 );
 
-export const ElementComponentIcon = (p: IconProps) => (
-  <I {...p} filled>
+export const ElementComponentIcon = (props: IconProps) => (
+  <I {...props} filled>
     <path fillRule="evenodd" clipRule="evenodd" d={elementComponentIconPath1} />
   </I>
 );
 
 // Make a component out of what's selected — the component cube with a plus.
-export const ComponentPlusIcon = (p: IconProps) => (
-  <I {...p} filled>
+export const ComponentPlusIcon = (props: IconProps) => (
+  <I {...props} filled>
     <path fillRule="evenodd" clipRule="evenodd" d={componentPlusIconPath1} />
     <path d="M13 10.9999H15V11.9999H13V13.9999H12V11.9999H10V10.9999H12V8.99988H13V10.9999Z" />
   </I>
 );
 
-export const ElementSlotIcon = (p: IconProps) => (
-  <I {...p} filled>
+export const ElementSlotIcon = (props: IconProps) => (
+  <I {...props} filled>
     <path fillRule="evenodd" clipRule="evenodd" d={elementSlotIconPath1} />
   </I>
 );
 
-export const ExpandVerticalIcon = (p: IconProps) => (
-  <I {...p} filled>
+export const ExpandVerticalIcon = (props: IconProps) => (
+  <I {...props} filled>
     <path d={expandVerticalIconPath1} />
     <path d={expandVerticalIconPath2} />
   </I>
 );
 
-export const CollapseVerticalIcon = (p: IconProps) => (
-  <I {...p} filled>
+export const CollapseVerticalIcon = (props: IconProps) => (
+  <I {...props} filled>
     <path fillRule="evenodd" clipRule="evenodd" d={collapseVerticalIconPath1} />
   </I>
 );
 
-export const RepeatIcon = (p: IconProps) => (
-  <I {...p}>
+export const RepeatIcon = (props: IconProps) => (
+  <I {...props}>
     <path d="M3 6.5V6a2.5 2.5 0 0 1 2.5-2.5H13" />
     <path d="m11 1.5 2 2-2 2" />
     <path d="M13 9.5v.5a2.5 2.5 0 0 1-2.5 2.5H3" />
@@ -194,50 +194,50 @@ export const RepeatIcon = (p: IconProps) => (
   </I>
 );
 
-export const PreviewIcon = (p: IconProps) => (
-  <I {...p} filled>
+export const PreviewIcon = (props: IconProps) => (
+  <I {...props} filled>
     <path fillRule="evenodd" clipRule="evenodd" d={previewIconPath1} />
   </I>
 );
 
-export const FolderIcon = (p: IconProps) => (
-  <I {...p}>
+export const FolderIcon = (props: IconProps) => (
+  <I {...props}>
     <path d={folderIconPath1} />
   </I>
 );
 
 // Webflow's folder glyph — a filled evenodd path, so it opts into `filled`
 // rather than the stroked default the other icons use.
-export const FolderDefaultIcon = (p: IconProps) => (
-  <I filled {...p}>
+export const FolderDefaultIcon = (props: IconProps) => (
+  <I filled {...props}>
     <path fillRule="evenodd" clipRule="evenodd" d={folderDefaultIconPath1} />
   </I>
 );
 
 // Webflow's CMS glyph — a page Astro generates from a collection entry rather
 // than one someone wrote. Filled evenodd, like the rest of the Webflow set.
-export const CollectionIcon = (p: IconProps) => (
-  <I filled {...p}>
+export const CollectionIcon = (props: IconProps) => (
+  <I filled {...props}>
     <path fillRule="evenodd" clipRule="evenodd" d={collectionIconPath1} />
   </I>
 );
 
-export const FolderPlusIcon = (p: IconProps) => (
-  <I {...p}>
+export const FolderPlusIcon = (props: IconProps) => (
+  <I {...props}>
     <path d={folderPlusIconPath1} />
     <path d="M8 6.8v3.4M6.3 8.5h3.4" />
   </I>
 );
 
-export const UploadCloudIcon = (p: IconProps) => (
-  <I {...p}>
+export const UploadCloudIcon = (props: IconProps) => (
+  <I {...props}>
     <path d="M8 10.5V4M4.8 7.2 8 4l3.2 3.2" />
     <path d="M2.5 13h11" />
   </I>
 );
 
-export const BracesIcon = (p: IconProps) => (
-  <I {...p} filled>
+export const BracesIcon = (props: IconProps) => (
+  <I {...props} filled>
     <path d={bracesIconPath1} />
     <path d={bracesIconPath2} />
   </I>
@@ -245,34 +245,34 @@ export const BracesIcon = (p: IconProps) => (
 
 // --- Webflow-style element icons (filled, 16px grid) -----------------------
 
-export const CustomElementIcon = (p: IconProps) => (
-  <I {...p} filled>
+export const CustomElementIcon = (props: IconProps) => (
+  <I {...props} filled>
     <path d="M5.35353 11.3536L11.3535 5.35359L10.6464 4.64648L4.64642 10.6465L5.35353 11.3536Z" />
     <path fillRule="evenodd" clipRule="evenodd" d={customElementIconPath1} />
   </I>
 );
 
-export const ElementDivIcon = (p: IconProps) => (
-  <I {...p} filled>
+export const ElementDivIcon = (props: IconProps) => (
+  <I {...props} filled>
     <path fillRule="evenodd" clipRule="evenodd" d={elementDivIconPath1} />
   </I>
 );
 
-export const ElementImageIcon = (p: IconProps) => (
-  <I {...p} filled>
+export const ElementImageIcon = (props: IconProps) => (
+  <I {...props} filled>
     <path d={elementImageIconPath1} />
     <path fillRule="evenodd" clipRule="evenodd" d={elementImageIconPath2} />
   </I>
 );
 
-export const ElementSectionIcon = (p: IconProps) => (
-  <I {...p} filled>
+export const ElementSectionIcon = (props: IconProps) => (
+  <I {...props} filled>
     <path fillRule="evenodd" clipRule="evenodd" d={elementSectionIconPath1} />
   </I>
 );
 
-export const ElementListDefaultIcon = (p: IconProps) => (
-  <I {...p} filled>
+export const ElementListDefaultIcon = (props: IconProps) => (
+  <I {...props} filled>
     <path d={elementListDefaultIconPath1} />
     <path d="M6 4H14V3H6V4Z" />
     <path d="M6 8H14V7H6V8Z" />
@@ -282,8 +282,8 @@ export const ElementListDefaultIcon = (p: IconProps) => (
   </I>
 );
 
-export const ElementListItemIcon = (p: IconProps) => (
-  <I {...p} filled>
+export const ElementListItemIcon = (props: IconProps) => (
+  <I {...props} filled>
     <g opacity="0.4">
       <path d={elementListItemIconPath1} />
       <path d="M14 12H6V11H14V12Z" />
@@ -297,103 +297,103 @@ export const ElementListItemIcon = (p: IconProps) => (
   </I>
 );
 
-export const ElementLinkIcon = (p: IconProps) => (
-  <I {...p} filled>
+export const ElementLinkIcon = (props: IconProps) => (
+  <I {...props} filled>
     <path fillRule="evenodd" clipRule="evenodd" d={elementLinkIconPath1} />
   </I>
 );
 
-export const ElementH1Icon = (p: IconProps) => (
-  <I {...p} filled>
+export const ElementHeading1Icon = (props: IconProps) => (
+  <I {...props} filled>
     <path d="M3 12V4H4V8H7V4H8V12H7V9H4V12H3Z" />
-    <path d={elementH1IconPath1} />
+    <path d={elementHeading1IconPath1} />
   </I>
 );
 
-export const ElementH2Icon = (p: IconProps) => (
-  <I {...p} filled>
+export const ElementHeading2Icon = (props: IconProps) => (
+  <I {...props} filled>
     <path d="M3 4V12H4V9H7V12H8V4H7V8H4V4H3Z" />
-    <path d={elementH2IconPath1} />
+    <path d={elementHeading2IconPath1} />
   </I>
 );
 
-export const ElementH3Icon = (p: IconProps) => (
-  <I {...p} filled>
+export const ElementHeading3Icon = (props: IconProps) => (
+  <I {...props} filled>
     <path d="M3 12V4H4V8H7V4H8V12H7V9H4V12H3Z" />
-    <path d={elementH3IconPath1} />
+    <path d={elementHeading3IconPath1} />
   </I>
 );
 
-export const ElementH4Icon = (p: IconProps) => (
-  <I {...p} filled>
+export const ElementHeading4Icon = (props: IconProps) => (
+  <I {...props} filled>
     <path d="M3 4V12H4V9H7V12H8V4H7V8H4V4H3Z" />
-    <path d={elementH4IconPath1} />
+    <path d={elementHeading4IconPath1} />
   </I>
 );
 
-export const ElementH5Icon = (p: IconProps) => (
-  <I {...p} filled>
+export const ElementHeading5Icon = (props: IconProps) => (
+  <I {...props} filled>
     <path d="M3 4V12H4V9H7V12H8V4H7V8H4V4H3Z" />
-    <path d={elementH5IconPath1} />
+    <path d={elementHeading5IconPath1} />
   </I>
 );
 
-export const ElementH6Icon = (p: IconProps) => (
-  <I {...p} filled>
+export const ElementHeading6Icon = (props: IconProps) => (
+  <I {...props} filled>
     <path d="M3 12V4H4V8H7V4H8V12H7V9H4V12H3Z" />
-    <path fillRule="evenodd" clipRule="evenodd" d={elementH6IconPath1} />
+    <path fillRule="evenodd" clipRule="evenodd" d={elementHeading6IconPath1} />
   </I>
 );
 
-export const ElementPIcon = (p: IconProps) => (
-  <I {...p} filled>
-    <path fillRule="evenodd" clipRule="evenodd" d={elementPIconPath1} />
+export const ElementParagraphIcon = (props: IconProps) => (
+  <I {...props} filled>
+    <path fillRule="evenodd" clipRule="evenodd" d={elementParagraphIconPath1} />
   </I>
 );
 
-export const ElementVideoIcon = (p: IconProps) => (
-  <I {...p} filled>
+export const ElementVideoIcon = (props: IconProps) => (
+  <I {...props} filled>
     <path fillRule="evenodd" clipRule="evenodd" d={elementVideoIconPath1} />
   </I>
 );
 
-export const ElementFormBlockIcon = (p: IconProps) => (
-  <I {...p} filled>
+export const ElementFormBlockIcon = (props: IconProps) => (
+  <I {...props} filled>
     <path d="M14 5H2V4H14V5Z" />
     <path d="M14 8H2V7H14V8Z" />
     <path d={elementFormBlockIconPath1} />
   </I>
 );
 
-export const ElementInputIcon = (p: IconProps) => (
-  <I {...p} filled>
+export const ElementInputIcon = (props: IconProps) => (
+  <I {...props} filled>
     <path fillRule="evenodd" clipRule="evenodd" d={elementInputIconPath1} />
     <path opacity="0.6" fillRule="evenodd" clipRule="evenodd" d="M4 11V5H5V11H4Z" />
   </I>
 );
 
-export const ElementSelectIcon = (p: IconProps) => (
-  <I {...p} filled>
+export const ElementSelectIcon = (props: IconProps) => (
+  <I {...props} filled>
     <path d={elementSelectIconPath1} />
     <path fillRule="evenodd" clipRule="evenodd" d={elementSelectIconPath2} />
   </I>
 );
 
-export const ElementButtonIcon = (p: IconProps) => (
-  <I {...p} filled>
+export const ElementButtonIcon = (props: IconProps) => (
+  <I {...props} filled>
     <path d={elementButtonIconPath1} />
   </I>
 );
 
-export const ResetIcon = (p: IconProps) => (
-  <I {...p}>
+export const ResetIcon = (props: IconProps) => (
+  <I {...props}>
     <path d="M6.5 3.5 3.5 6.5l3 3" />
     <path d="M3.5 6.5h5.25a3.75 3.75 0 0 1 3.75 3.75v2.25" />
   </I>
 );
 
-export const DragIcon = (p: IconProps) => (
-  <I {...p} filled>
+export const DragIcon = (props: IconProps) => (
+  <I {...props} filled>
     <circle cx="6" cy="4" r="1" />
     <circle cx="10" cy="4" r="1" />
     <circle cx="6" cy="8" r="1" />
@@ -405,8 +405,8 @@ export const DragIcon = (p: IconProps) => (
 
 // Struck-through eye: this node put nothing on the page. Filled paths, so it
 // takes `filled` rather than the stroked default the rest of the set uses.
-export const HideIcon = (p: IconProps) => (
-  <I {...p} filled>
+export const HideIcon = (props: IconProps) => (
+  <I {...props} filled>
     <path fillRule="evenodd" clipRule="evenodd" d={hideIconPath1} />
     <path d={hideIconPath2} />
   </I>
@@ -414,29 +414,29 @@ export const HideIcon = (p: IconProps) => (
 
 // Struck-through pointer: this node is drawn but takes no clicks
 // (`pointer-events: none`). Filled, like the eye above it.
-export const PointerEventsNoneIcon = (p: IconProps) => (
-  <I {...p} filled>
+export const PointerEventsNoneIcon = (props: IconProps) => (
+  <I {...props} filled>
     <path fillRule="evenodd" clipRule="evenodd" d={pointerEventsNoneIconPath1} />
     <path d={pointerEventsNoneIconPath2} />
   </I>
 );
 
-export const CheckIcon = (p: IconProps) => (
-  <I {...p} strokeWidth={1.6}>
+export const CheckIcon = (props: IconProps) => (
+  <I {...props} strokeWidth={1.6}>
     <path d="m3.5 8.5 3 3 6-7" />
   </I>
 );
 
 // The "goes here" elbow: one side of a condition, in the navigator.
-export const CornerIcon = (p: IconProps) => (
-  <I {...p}>
+export const CornerIcon = (props: IconProps) => (
+  <I {...props}>
     <path d="M4.5 3v6.5a1 1 0 0 0 1 1h6" />
     <path d="m9.3 8.2 2.4 2.3-2.4 2.3" />
   </I>
 );
 
-export const BranchIcon = (p: IconProps) => (
-  <I {...p}>
+export const BranchIcon = (props: IconProps) => (
+  <I {...props}>
     <circle cx="4.5" cy="3.5" r="1.6" />
     <circle cx="4.5" cy="12.5" r="1.6" />
     <circle cx="11.5" cy="5" r="1.6" />
@@ -450,16 +450,16 @@ export const BranchIcon = (p: IconProps) => (
 // branch are the same three dots and a curve.
 // A clock turned back — the panel is about what the project looked like
 // before, and a plain clock would read as "scheduled".
-export const HistoryIcon = (p: IconProps) => (
-  <I {...p}>
+export const HistoryIcon = (props: IconProps) => (
+  <I {...props}>
     <path d="M2.6 7.2a5.6 5.6 0 1 1 .9 3.9" />
     <path d="M2.2 4.3v2.9h2.9" />
     <path d="M8 5.1v3.1l2.2 1.3" />
   </I>
 );
 
-export const MergeIcon = (p: IconProps) => (
-  <I {...p}>
+export const MergeIcon = (props: IconProps) => (
+  <I {...props}>
     <circle cx="4.5" cy="3.5" r="1.6" />
     <circle cx="4.5" cy="12.5" r="1.6" />
     <circle cx="11.5" cy="3.5" r="1.6" />
@@ -469,35 +469,35 @@ export const MergeIcon = (p: IconProps) => (
   </I>
 );
 
-export const ExternalIcon = (p: IconProps) => (
-  <I {...p}>
+export const ExternalIcon = (props: IconProps) => (
+  <I {...props}>
     <path d="M12.5 9.5v3.5a.5.5 0 0 1-.5.5H3.5a.5.5 0 0 1-.5-.5V4.5a.5.5 0 0 1 .5-.5H7" />
     <path d="M9.5 2.5h4v4M13.2 2.8 7.8 8.2" />
   </I>
 );
 
-export const MaximizeIcon = (p: IconProps) => (
-  <I {...p}>
+export const MaximizeIcon = (props: IconProps) => (
+  <I {...props}>
     <path d="M2.5 5.5v-3h3M13.5 5.5v-3h-3M2.5 10.5v3h3M13.5 10.5v3h-3" />
   </I>
 );
 
-export const DesktopIcon = (p: IconProps) => (
-  <I {...p}>
+export const DesktopIcon = (props: IconProps) => (
+  <I {...props}>
     <rect x="2" y="3" width="12" height="8.5" rx="1.2" />
     <path d="M6 14h4M8 11.5V14" />
   </I>
 );
 
-export const TabletIcon = (p: IconProps) => (
-  <I {...p}>
+export const TabletIcon = (props: IconProps) => (
+  <I {...props}>
     <rect x="3.5" y="2" width="9" height="12" rx="1.5" />
     <path d="M7 12h2" />
   </I>
 );
 
-export const PhoneIcon = (p: IconProps) => (
-  <I {...p}>
+export const PhoneIcon = (props: IconProps) => (
+  <I {...props}>
     <rect x="4.5" y="1.75" width="7" height="12.5" rx="1.5" />
     <path d="M7 12.25h2" />
   </I>
@@ -518,8 +518,8 @@ const I24 = ({ children, size = 24, className, style }: IconProps) => (
   </svg>
 );
 
-export const AssetManagerIcon = (p: IconProps) => (
-  <I24 {...p}>
+export const AssetManagerIcon = (props: IconProps) => (
+  <I24 {...props}>
     <path d={assetManagerIconPath1} fill="currentColor" />
     <path fillRule="evenodd" clipRule="evenodd" d={assetManagerIconPath2} fill="currentColor" />
     <g opacity="0.4">
@@ -548,23 +548,23 @@ export const CmsIcon = ({ size = 24, className, style }: IconProps) => (
   </svg>
 );
 
-export const PagePanelIcon = (p: IconProps) => (
-  <I24 {...p}>
+export const PagePanelIcon = (props: IconProps) => (
+  <I24 {...props}>
     <path fillRule="evenodd" clipRule="evenodd" d={pagePanelIconPath1} fill="currentColor" />
     <path opacity="0.4" d={pagePanelIconPath2} fill="currentColor" />
   </I24>
 );
 
-export const NavigatorIcon = (p: IconProps) => (
-  <I24 {...p}>
+export const NavigatorIcon = (props: IconProps) => (
+  <I24 {...props}>
     <path d="M2 7H17V6H2V7Z" fill="currentColor" />
     <path d="M22 12H7V11H22V12Z" fill="currentColor" />
     <path d="M22 17H7V16H22V17Z" fill="currentColor" />
   </I24>
 );
 
-export const ComponentFillIcon = (p: IconProps) => (
-  <I24 {...p}>
+export const ComponentFillIcon = (props: IconProps) => (
+  <I24 {...props}>
     <path fillRule="evenodd" clipRule="evenodd" d={componentFillIconPath1} fill="currentColor" />
     <g opacity="0.4">
       <path d={componentFillIconPath2} fill="currentColor" />
@@ -573,27 +573,27 @@ export const ComponentFillIcon = (p: IconProps) => (
   </I24>
 );
 
-export const LayersIcon = (p: IconProps) => (
-  <I {...p}>
+export const LayersIcon = (props: IconProps) => (
+  <I {...props}>
     <path d="m8 1.8 6 3.2-6 3.2-6-3.2 6-3.2Z" />
     <path d="m2.5 8.2 5.5 3 5.5-3" />
     <path d="m2.5 11.2 5.5 3 5.5-3" />
   </I>
 );
 
-export const CanvasIcon = (p: IconProps) => (
-  <I {...p}>
+export const CanvasIcon = (props: IconProps) => (
+  <I {...props}>
     <rect x="1.75" y="3" width="7" height="10" rx="1" />
     <rect x="10.75" y="4.75" width="3.5" height="6.5" rx="0.8" />
   </I>
 );
 
 // Three dots: the row's own menu, shown on hover.
-export const MoreIcon = (p: IconProps) => (
+export const MoreIcon = (props: IconProps) => (
   <svg
     viewBox="0 0 16 16"
-    width={p?.size || 14}
-    height={p?.size || 14}
+    width={props?.size || 14}
+    height={props?.size || 14}
     fill="currentColor"
     aria-hidden="true"
   >
@@ -603,8 +603,8 @@ export const MoreIcon = (p: IconProps) => (
   </svg>
 );
 
-export const CopyIcon = (p: IconProps) => (
-  <I {...p}>
+export const CopyIcon = (props: IconProps) => (
+  <I {...props}>
     <rect x="5.75" y="5.75" width="8.5" height="8.5" rx="1.5" />
     <path d={copyIconPath1} />
   </I>
@@ -612,41 +612,41 @@ export const CopyIcon = (p: IconProps) => (
 
 // --- CMS field types -------------------------------------------------------
 
-export const ParagraphIcon = (p: IconProps) => (
-  <I {...p}>
+export const ParagraphIcon = (props: IconProps) => (
+  <I {...props}>
     <path d="M2.5 3.5h11M2.5 6.5h11M2.5 9.5h11M2.5 12.5h7" />
   </I>
 );
 
-export const SwitchIcon = (p: IconProps) => (
-  <I {...p}>
+export const SwitchIcon = (props: IconProps) => (
+  <I {...props}>
     <rect x="1.75" y="4.75" width="12.5" height="6.5" rx="3.25" />
     <circle cx="11" cy="8" r="1.6" fill="currentColor" stroke="none" />
   </I>
 );
 
-export const CalendarIcon = (p: IconProps) => (
-  <I {...p}>
+export const CalendarIcon = (props: IconProps) => (
+  <I {...props}>
     <rect x="2.25" y="3.25" width="11.5" height="10.5" rx="1.5" />
     <path d="M2.25 6.5h11.5M5.5 1.75v2.5M10.5 1.75v2.5" />
   </I>
 );
 
-export const MailIcon = (p: IconProps) => (
-  <I {...p}>
+export const MailIcon = (props: IconProps) => (
+  <I {...props}>
     <rect x="1.75" y="3.75" width="12.5" height="8.5" rx="1.5" />
     <path d="m2.5 5 5.5 4 5.5-4" />
   </I>
 );
 
-export const PhoneCallIcon = (p: IconProps) => (
-  <I {...p}>
+export const PhoneCallIcon = (props: IconProps) => (
+  <I {...props}>
     <path d={phoneCallIconPath1} />
   </I>
 );
 
-export const DropletIcon = (p: IconProps) => (
-  <I {...p}>
+export const DropletIcon = (props: IconProps) => (
+  <I {...props}>
     <path d="M8 2.2s4 4 4 6.6a4 4 0 0 1-8 0C4 6.2 8 2.2 8 2.2Z" />
   </I>
 );
@@ -673,34 +673,34 @@ export const HelpCircleIcon = ({ size = 16, className, style }: IconProps) => (
   </svg>
 );
 
-export const GearIcon = (p: IconProps) => (
-  <I {...p}>
+export const GearIcon = (props: IconProps) => (
+  <I {...props}>
     <circle cx="8" cy="8" r="2.15" />
     <path d={gearIconPath1} />
   </I>
 );
 
-export const TrashIcon = (p: IconProps) => (
-  <I {...p}>
+export const TrashIcon = (props: IconProps) => (
+  <I {...props}>
     <path d="M3 4.5h10M6.5 2.5h3M5.5 4.5l.5 9h4l.5-9" />
   </I>
 );
 
-export const FolderOpenIcon = (p: IconProps) => (
-  <I {...p}>
+export const FolderOpenIcon = (props: IconProps) => (
+  <I {...props}>
     <path d="M2 12.5V3.8a.8.8 0 0 1 .8-.8h3.4l1.5 1.8h5.5a.8.8 0 0 1 .8.8v1" />
     <path d="M2 12.5 3.8 7h10.7l-1.8 5.5H2Z" />
   </I>
 );
 
-export const SparkleIcon = (p: IconProps) => (
-  <I {...p}>
+export const SparkleIcon = (props: IconProps) => (
+  <I {...props}>
     <path d={sparkleIconPath1} />
   </I>
 );
 
-export const UploadIcon = (p: IconProps) => (
-  <I {...p}>
+export const UploadIcon = (props: IconProps) => (
+  <I {...props}>
     <path d="M8 10.5V3M4.8 6.2 8 3l3.2 3.2" />
     <path d="M2.5 13h11" />
   </I>
@@ -708,8 +708,8 @@ export const UploadIcon = (p: IconProps) => (
 
 // Tag-specific element icons; anything without a dedicated icon gets the
 // generic custom-element box.
-export const HomeIcon = (p: IconProps) => (
-  <I {...p} filled>
+export const HomeIcon = (props: IconProps) => (
+  <I {...props} filled>
     <path fillRule="evenodd" clipRule="evenodd" d={homeIconPath1} />
   </I>
 );
@@ -723,13 +723,13 @@ const TAG_ICONS: Readonly<Record<string, (props: IconProps) => ReactElement>> = 
   ol: ElementListDefaultIcon,
   li: ElementListItemIcon,
   a: ElementLinkIcon,
-  h1: ElementH1Icon,
-  h2: ElementH2Icon,
-  h3: ElementH3Icon,
-  h4: ElementH4Icon,
-  h5: ElementH5Icon,
-  h6: ElementH6Icon,
-  p: ElementPIcon,
+  h1: ElementHeading1Icon,
+  h2: ElementHeading2Icon,
+  h3: ElementHeading3Icon,
+  h4: ElementHeading4Icon,
+  h5: ElementHeading5Icon,
+  h6: ElementHeading6Icon,
+  p: ElementParagraphIcon,
   video: ElementVideoIcon,
   form: ElementFormBlockIcon,
   input: ElementInputIcon,
@@ -739,22 +739,22 @@ const TAG_ICONS: Readonly<Record<string, (props: IconProps) => ReactElement>> = 
   slot: ElementSlotIcon,
 };
 
-export const SearchIcon = (p: IconProps) => (
-  <I {...p}>
+export const SearchIcon = (props: IconProps) => (
+  <I {...props}>
     <circle cx="7" cy="7" r="4.5" />
     <path d="m10.5 10.5 3 3" />
   </I>
 );
 
-export const TerminalIcon = (p: IconProps) => (
-  <I {...p}>
+export const TerminalIcon = (props: IconProps) => (
+  <I {...props}>
     <rect x="1.75" y="2.75" width="12.5" height="10.5" rx="1.5" />
     <path d="m4.75 6.5 2 1.75-2 1.75M8.5 10.25h3" />
   </I>
 );
 
-export const ArrowDownIcon = (p: IconProps) => (
-  <I {...p}>
+export const ArrowDownIcon = (props: IconProps) => (
+  <I {...props}>
     <path d="M8 3v10M4.25 9.25 8 13l3.75-3.75" />
   </I>
 );
@@ -811,8 +811,8 @@ export function astroAssetIcon(name: unknown, size = 14, className?: string) {
 }
 
 // Boolean prop — a switch, matching the True/False control the field renders.
-export const FieldSwitchIcon = (p: IconProps) => (
-  <I {...p} filled>
+export const FieldSwitchIcon = (props: IconProps) => (
+  <I {...props} filled>
     <path d={fieldSwitchIconPath1} />
     <path fillRule="evenodd" clipRule="evenodd" d={fieldSwitchIconPath2} />
   </I>
@@ -1006,39 +1006,39 @@ const elementLinkIconPath1 =
   '7.35378ZM7.35354 9.35378L10.3535 6.35378L9.64643 5.64667L6.64643 8.64667L7.' +
   '35354 9.35378Z';
 
-const elementH1IconPath1 =
+const elementHeading1IconPath1 =
   'M12 4C12 4.55228 11.5523 5 11 5H10.5V6H11C11.3643 6 11.7058 5.90261 12 5.73' + '244V12H13V4H12Z';
 
-const elementH2IconPath1 =
+const elementHeading2IconPath1 =
   'M10 7V5.5C10 4.67157 10.6716 4 11.5 4H12.5C13.328 4 13.9993 4.67092 14 5.49' +
   '879V7.12546C13.9997 7.48837 13.8679 7.83888 13.6289 8.11202L11.1019 11H14V1' +
   '2H10V10.7407L12.8763 7.45352C12.956 7.36237 13 7.24538 13 7.12426V5.5C13 5.' +
   '22386 12.7761 5 12.5 5H11.5C11.2239 5 11 5.22386 11 5.5V7H10Z';
 
-const elementH3IconPath1 =
+const elementHeading3IconPath1 =
   'M12.5 5H10V4H12.5C13.3284 4 14 4.67157 14 5.5V6.5C14 6.88418 13.8556 7.2346' +
   '2 13.6181 7.5C13.8556 7.76538 14 8.11582 14 8.5V10.5C14 11.3284 13.3284 12 ' +
   '12.5 12H10V11H12.5C12.7761 11 13 10.7761 13 10.5V8.5C13 8.22386 12.7761 8 1' +
   '2.5 8H11V7H12.5C12.7761 7 13 6.77614 13 6.5V5.5C13 5.22386 12.7761 5 12.5 5' +
   'Z';
 
-const elementH4IconPath1 =
+const elementHeading4IconPath1 =
   'M10 4V6.5C10 7.32843 10.6716 8 11.5 8H13V12H14V4H13V7H11.5C11.2239 7 11 6.7' +
   '7614 11 6.5V4H10Z';
 
-const elementH5IconPath1 =
+const elementHeading5IconPath1 =
   'M10 4V8H12.5C12.7761 8 13 8.22386 13 8.5V10.5C13 10.7761 12.7761 11 12.5 11' +
   'H10V12H12.5C13.3284 12 14 11.3284 14 10.5V8.5C14 7.67157 13.3284 7 12.5 7H1' +
   '1V5H14V4H10Z';
 
-const elementH6IconPath1 =
+const elementHeading6IconPath1 =
   'M10 5.5C10 4.67157 10.6716 4 11.5 4H13V5H11.5C11.2239 5 11 5.22386 11 5.5V7' +
   '.08535C11.1564 7.03008 11.3247 7 11.5 7H12.5C13.3284 7 14 7.67157 14 8.5V10' +
   '.5C14 11.3284 13.3284 12 12.5 12H11.5C10.6716 12 10 11.3284 10 10.5V5.5ZM11' +
   ' 8.5V10.5C11 10.7761 11.2239 11 11.5 11H12.5C12.7761 11 13 10.7761 13 10.5V' +
   '8.5C13 8.22386 12.7761 8 12.5 8H11.5C11.2239 8 11 8.22386 11 8.5Z';
 
-const elementPIconPath1 =
+const elementParagraphIconPath1 =
   'M5 4H9C10.1046 4 11 4.89543 11 6V7C11 8.10457 10.1046 9 9 9H6V12H5V4ZM6 8H9' +
   'C9.55228 8 10 7.55228 10 7V6C10 5.44772 9.55228 5 9 5H6V8Z';
 

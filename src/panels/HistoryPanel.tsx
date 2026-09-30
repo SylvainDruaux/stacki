@@ -13,25 +13,34 @@ const INITIAL_OPEN: HistoryOpen = {
   worktrees: false,
 };
 
-export default function HistoryPanel(props: HistoryPanelProps) {
-  const [open, setOpen] = useState<HistoryOpen>(INITIAL_OPEN);
+// The files and worktrees lists, read only while their section is open.
+function useHistoryInventory(props: HistoryPanelProps, open: HistoryOpen) {
   const projectPath = props.project?.path;
   const branch = props.gitInfo?.isRepo ? props.gitInfo.branch : undefined;
   const head = props.gitInfo?.isRepo ? props.gitInfo.head : undefined;
   const dirty = props.gitInfo?.isRepo ? props.gitInfo.dirty : false;
   const files = useInventory(
     projectPath,
-    open.files,
-    `${branch}:${head}:${dirty}`,
+    { enabled: open.files, revision: `${branch}:${head}:${dirty}` },
     readHistoryFiles,
   );
-  const worktrees = useInventory(projectPath, open.worktrees, branch, readHistoryWorktrees);
+  const worktrees = useInventory(
+    projectPath,
+    { enabled: open.worktrees, revision: branch },
+    readHistoryWorktrees,
+  );
+  return { branch, head, files, worktrees };
+}
+
+export default function HistoryPanel(props: HistoryPanelProps) {
+  const [open, setOpen] = useState<HistoryOpen>(INITIAL_OPEN);
+  const { branch, head, files, worktrees } = useHistoryInventory(props, open);
   const toggle = (key: keyof HistoryOpen): void => {
     setOpen((previous) => ({ ...previous, [key]: !previous[key] }));
   };
 
   if (!props.project) {
-    return null;
+    return undefined;
   }
   if (props.gitInfo && !props.gitInfo.isRepo) {
     return <HistoryUnavailable />;
@@ -87,10 +96,11 @@ export default function HistoryPanel(props: HistoryPanelProps) {
 
 function useInventory<Value>(
   projectPath: string | undefined,
-  enabled: boolean,
-  revision: unknown,
+  // `revision` changes whenever what the list shows may have changed.
+  reading: { readonly enabled: boolean; readonly revision: unknown },
   read: (path: string) => Promise<Result<readonly Value[], string>>,
 ): readonly Value[] {
+  const { enabled, revision } = reading;
   const [values, setValues] = useState<readonly Value[]>([]);
   useEffect(() => {
     let active = true;

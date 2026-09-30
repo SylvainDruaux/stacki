@@ -4,18 +4,26 @@
 // suggests `service.tags` without executing any code.
 
 import { assert } from '../shared/assert';
+import { LIMITS } from '../shared/limits';
 import { toRecord, toArray } from '../shared/record';
 
-function skipString(code: string, i: number): number {
-  const q = code.charAt(i);
-  i++;
-  while (i < code.length && code.charAt(i) !== q) {
-    if (code.charAt(i) === '\\') {
-      i++;
+const DATA_SUGGEST_LIMITS = {
+  // One level in is the useful depth for completions: `post.data` earns its place, every
+  // field of every collection does not — the picker is for browsing.
+  completionDepthMax: 2,
+} as const;
+
+// The index of the closing quote of the string that opens at `start`, or the end of the code.
+function skipString(code: string, start: number): number {
+  const quote = code.charAt(start);
+  let index = start + 1;
+  while (index < code.length && code.charAt(index) !== quote) {
+    if (code.charAt(index) === '\\') {
+      index++;
     }
-    i++;
+    index++;
   }
-  return i;
+  return index;
 }
 
 // End index (exclusive) of an expression starting at `start`: stops at a
@@ -50,13 +58,13 @@ function scanValue(code: string, start: number): number {
 export function parseDeclarations(code: string): Map<string, string> {
   const out = new Map<string, string>();
   const re = /(?:^|\n)\s*(?:export\s+)?(?:const|let|var)\s+([\w$]+)\s*=\s*/g;
-  let m;
-  while ((m = re.exec(code)) !== null) {
-    const name = m[1];
+  let match;
+  while ((match = re.exec(code)) !== null) {
+    const name = match[1];
     if (name === undefined) {
       continue;
     }
-    const start = m.index + m[0].length;
+    const start = match.index + match[0].length;
     const end = scanValue(code, start);
     out.set(name, code.slice(start, end).trim());
     re.lastIndex = end;
@@ -76,24 +84,24 @@ export interface DeclarationSpan {
 // prop bound to `{rotatingWords}` can offer to edit the `const rotatingWords
 // = […]` behind it. `start`/`end` bound the whole statement (its indentation
 // stays outside the range, and a trailing ';' inside it).
-export function findDeclaration(code: unknown, name: unknown): DeclarationSpan | null {
+export function findDeclaration(code: unknown, name: unknown): DeclarationSpan | undefined {
   const source = String(code || '');
   const ident = String(name || '');
   if (!/^[A-Za-z_$][\w$]*$/.test(ident)) {
-    return null;
+    return undefined;
   }
   const re = new RegExp(
     `(?:^|\\n)([ \\t]*)((?:export\\s+)?(?:const|let|var)\\s+` +
       `${ident.replace(/\$/g, '\\$')}\\s*=\\s*)`,
     'g',
   );
-  const m = re.exec(source);
-  const lead = m?.[1];
-  const head = m?.[2];
-  if (!m || lead === undefined || head === undefined) {
-    return null;
+  const match = re.exec(source);
+  const lead = match?.[1];
+  const head = match?.[2];
+  if (!match || lead === undefined || head === undefined) {
+    return undefined;
   }
-  const valueStart = m.index + m[0].length;
+  const valueStart = match.index + match[0].length;
   const start = valueStart - head.length;
   const valueEnd = scanValue(source, valueStart);
   const end = source.charAt(valueEnd) === ';' ? valueEnd + 1 : valueEnd;
@@ -107,20 +115,23 @@ export function findDeclaration(code: unknown, name: unknown): DeclarationSpan |
 }
 
 /**
- * The import that brings `name` into a file, as {name, spec}, or null.
+ * The import that brings `name` into a file, as {name, spec}, or undefined.
  * Covers `import x from`, `import { a, b as c } from`, `import * as ns from`
  * and type-only imports — everything a page's frontmatter can carry.
  */
-export function findImportOf(code: unknown, name: unknown): { name: string; spec: string } | null {
+export function findImportOf(
+  code: unknown,
+  name: unknown,
+): { name: string; spec: string } | undefined {
   const ident = String(name || '');
   if (!/^[A-Za-z_$][\w$]*$/.test(ident)) {
-    return null;
+    return undefined;
   }
   const re = /import\s+(?:type\s+)?([\s\S]*?)\s+from\s*['"]([^'"]+)['"]/g;
-  let m;
-  while ((m = re.exec(String(code || ''))) !== null) {
-    const clause = m[1];
-    const spec = m[2];
+  let match;
+  while ((match = re.exec(String(code || ''))) !== null) {
+    const clause = match[1];
+    const spec = match[2];
     if (clause === undefined || spec === undefined) {
       continue;
     }
@@ -130,19 +141,19 @@ export function findImportOf(code: unknown, name: unknown): { name: string; spec
     const names: string[] = [];
     const outside = clause.replace(/\{[\s\S]*\}/, '').replace(/\*\s+as\s+/, '');
     for (const part of outside.split(',')) {
-      const t = part.trim();
-      if (t) {
-        names.push(t);
+      const entry = part.trim();
+      if (entry) {
+        names.push(entry);
       }
     }
     const bracedBody = braced?.[1];
     if (bracedBody !== undefined) {
       for (const part of bracedBody.split(',')) {
-        const t = part.trim();
-        if (!t) {
+        const entry = part.trim();
+        if (!entry) {
           continue;
         }
-        const as = t.split(/\s+as\s+/);
+        const as = entry.split(/\s+as\s+/);
         names.push((as[1] || as[0] || '').trim());
       }
     }
@@ -150,46 +161,46 @@ export function findImportOf(code: unknown, name: unknown): { name: string; spec
       return { name: ident, spec };
     }
   }
-  return null;
+  return undefined;
 }
 
 // The first '{…}' object inside an array literal (or the object itself).
-export function firstObjectIn(text: string | null | undefined): string | null {
+export function firstObjectIn(text: string | undefined): string | undefined {
   if (!text) {
-    return null;
+    return undefined;
   }
-  const t = text.trim();
-  if (t.startsWith('{')) {
-    return t;
+  const trimmed = text.trim();
+  if (trimmed.startsWith('{')) {
+    return trimmed;
   }
-  if (!t.startsWith('[')) {
-    return null;
+  if (!trimmed.startsWith('[')) {
+    return undefined;
   }
   let depth = 0;
-  for (let i = 0; i < t.length; i++) {
-    const ch = t.charAt(i);
+  for (let i = 0; i < trimmed.length; i++) {
+    const ch = trimmed.charAt(i);
     if (ch === '"' || ch === "'" || ch === '`') {
-      i = skipString(t, i);
+      i = skipString(trimmed, i);
       continue;
     }
     if (ch === '{' && depth === 1) {
-      let d = 0;
-      for (let j = i; j < t.length; j++) {
-        const c = t.charAt(j);
-        if (c === '"' || c === "'" || c === '`') {
-          j = skipString(t, j);
+      let nesting = 0;
+      for (let j = i; j < trimmed.length; j++) {
+        const character = trimmed.charAt(j);
+        if (character === '"' || character === "'" || character === '`') {
+          j = skipString(trimmed, j);
           continue;
         }
-        if (c === '{') {
-          d++;
-        } else if (c === '}') {
-          d--;
-          if (d === 0) {
-            return t.slice(i, j + 1);
+        if (character === '{') {
+          nesting++;
+        } else if (character === '}') {
+          nesting--;
+          if (nesting === 0) {
+            return trimmed.slice(i, j + 1);
           }
         }
       }
-      return null;
+      return undefined;
     }
     if ('([{'.includes(ch)) {
       depth++;
@@ -197,7 +208,7 @@ export function firstObjectIn(text: string | null | undefined): string | null {
       depth--;
     }
   }
-  return null;
+  return undefined;
 }
 
 export interface ObjectEntry {
@@ -207,21 +218,21 @@ export interface ObjectEntry {
 
 // Top-level entries of an object literal: [{key, value}]. Shorthand keys
 // ({ name, url }) yield empty value text.
-export function objectEntries(text: string | null | undefined): ObjectEntry[] {
+export function objectEntries(text: string | undefined): ObjectEntry[] {
   if (!text) {
     return [];
   }
-  const t = text.trim();
-  if (!t.startsWith('{')) {
+  const trimmed = text.trim();
+  if (!trimmed.startsWith('{')) {
     return [];
   }
   const pairs: ObjectEntry[] = [];
   let depth = 0;
   let i = 0;
-  while (i < t.length) {
-    const ch = t.charAt(i);
+  while (i < trimmed.length) {
+    const ch = trimmed.charAt(i);
     if (ch === '"' || ch === "'" || ch === '`') {
-      i = skipString(t, i) + 1;
+      i = skipString(trimmed, i) + 1;
       continue;
     }
     if ('([{'.includes(ch)) {
@@ -234,37 +245,37 @@ export function objectEntries(text: string | null | undefined): ObjectEntry[] {
       i++;
       continue;
     }
-    if (depth === 1 && /[,{\s]/.test(t.charAt(i - 1) || '{')) {
-      const m = t.slice(i).match(/^([\w$]+)\s*(:)?/);
-      const key = m?.[1];
-      if (m && key !== undefined && (m[2] || /^[\w$]+\s*[,}]/.test(t.slice(i)))) {
-        if (!m[2]) {
+    if (depth === 1 && /[,{\s]/.test(trimmed.charAt(i - 1) || '{')) {
+      const match = trimmed.slice(i).match(/^([\w$]+)\s*(:)?/);
+      const key = match?.[1];
+      if (match && key !== undefined && (match[2] || /^[\w$]+\s*[,}]/.test(trimmed.slice(i)))) {
+        if (!match[2]) {
           pairs.push({ key, value: '' });
           i += key.length;
           continue;
         }
-        const vs = i + m[0].length;
-        let d = depth;
+        const vs = i + match[0].length;
+        let nesting = depth;
         let j = vs;
-        while (j < t.length) {
-          const c = t.charAt(j);
-          if (c === '"' || c === "'" || c === '`') {
-            j = skipString(t, j) + 1;
+        while (j < trimmed.length) {
+          const character = trimmed.charAt(j);
+          if (character === '"' || character === "'" || character === '`') {
+            j = skipString(trimmed, j) + 1;
             continue;
           }
-          if ('([{'.includes(c)) {
-            d++;
-          } else if (')]}'.includes(c)) {
-            d--;
-            if (d === 0) {
+          if ('([{'.includes(character)) {
+            nesting++;
+          } else if (')]}'.includes(character)) {
+            nesting--;
+            if (nesting === 0) {
               break;
             }
-          } else if (c === ',' && d === 1) {
+          } else if (character === ',' && nesting === 1) {
             break;
           }
           j++;
         }
-        pairs.push({ key, value: t.slice(vs, j).trim() });
+        pairs.push({ key, value: trimmed.slice(vs, j).trim() });
         i = j;
         continue;
       }
@@ -274,24 +285,24 @@ export function objectEntries(text: string | null | undefined): ObjectEntry[] {
   return pairs;
 }
 
-function kindOf(value: string | null | undefined): string {
+function kindOf(value: string | undefined): string {
   if (!value) {
     return '';
   }
-  const t = value.trim();
-  if (t.startsWith('[')) {
+  const trimmed = value.trim();
+  if (trimmed.startsWith('[')) {
     return 'list';
   }
-  if (t.startsWith('{')) {
+  if (trimmed.startsWith('{')) {
     return 'object';
   }
-  if (/^['"`]/.test(t)) {
+  if (/^['"`]/.test(trimmed)) {
     return 'text';
   }
-  if (/^-?\d/.test(t)) {
+  if (/^-?\d/.test(trimmed)) {
     return 'number';
   }
-  if (/^(true|false)$/.test(t)) {
+  if (/^(true|false)$/.test(trimmed)) {
     return 'boolean';
   }
   return '';
@@ -323,7 +334,7 @@ interface ImportLike {
   readonly path?: string;
 }
 
-function mayHoldData(imp: ImportLike | null | undefined): boolean {
+function mayHoldData(imp: ImportLike | undefined): boolean {
   const path = String(imp?.path || '');
   if (NON_DATA_EXT.test(path) || TOOL_MODULE.test(path)) {
     return false;
@@ -338,16 +349,16 @@ function splitTopLevel(text: string): string[] {
   let depth = 0;
   let start = 0;
   for (let i = 0; i < text.length; i++) {
-    const c = text.charAt(i);
-    if (c === '"' || c === "'" || c === '`') {
+    const character = text.charAt(i);
+    if (character === '"' || character === "'" || character === '`') {
       i = skipString(text, i);
       continue;
     }
-    if ('([{'.includes(c)) {
+    if ('([{'.includes(character)) {
       depth++;
-    } else if (')]}'.includes(c)) {
+    } else if (')]}'.includes(character)) {
       depth--;
-    } else if (c === ',' && depth === 0) {
+    } else if (character === ',' && depth === 0) {
       out.push(text.slice(start, i));
       start = i + 1;
     }
@@ -361,16 +372,16 @@ function splitTopLevel(text: string): string[] {
 function topIndexOf(text: string, ch: string): number {
   let depth = 0;
   for (let i = 0; i < text.length; i++) {
-    const c = text.charAt(i);
-    if (c === '"' || c === "'" || c === '`') {
+    const character = text.charAt(i);
+    if (character === '"' || character === "'" || character === '`') {
       i = skipString(text, i);
       continue;
     }
-    if ('([{'.includes(c)) {
+    if ('([{'.includes(character)) {
       depth++;
-    } else if (')]}'.includes(c)) {
+    } else if (')]}'.includes(character)) {
       depth--;
-    } else if (c === ch && depth === 0) {
+    } else if (character === ch && depth === 0) {
       return i;
     }
   }
@@ -404,14 +415,14 @@ export function parseDestructures(code: unknown): Destructure[] {
     let depth = 0;
     let close = -1;
     for (let i = open; i < source.length; i++) {
-      const c = source.charAt(i);
-      if (c === '"' || c === "'" || c === '`') {
+      const character = source.charAt(i);
+      if (character === '"' || character === "'" || character === '`') {
         i = skipString(source, i);
         continue;
       }
-      if ('([{'.includes(c)) {
+      if ('([{'.includes(character)) {
         depth++;
-      } else if (')]}'.includes(c)) {
+      } else if (')]}'.includes(character)) {
         depth--;
         if (depth === 0) {
           close = i;
@@ -430,28 +441,28 @@ export function parseDestructures(code: unknown): Destructure[] {
     const valueStart = close + 1 + eq[0].length;
     const from = source.slice(valueStart, scanValue(source, valueStart)).trim();
     for (const part of splitTopLevel(source.slice(open + 1, close))) {
-      const t = part.trim();
-      if (!t) {
+      const entry = part.trim();
+      if (!entry) {
         continue;
       }
-      if (t.startsWith('...')) {
-        const rest = t.slice(3).trim();
+      if (entry.startsWith('...')) {
+        const rest = entry.slice(3).trim();
         if (/^[A-Za-z_$][\w$]*$/.test(rest)) {
           out.push({ name: rest, from, kind: 'rest' });
         }
         continue;
       }
-      const colon = topIndexOf(t, ':');
-      let local = colon === -1 ? t : t.slice(colon + 1);
+      const colon = topIndexOf(entry, ':');
+      let local = colon === -1 ? entry : entry.slice(colon + 1);
       const eqAt = topIndexOf(local, '=');
-      const def = eqAt === -1 ? '' : local.slice(eqAt + 1).trim();
+      const defaultText = eqAt === -1 ? '' : local.slice(eqAt + 1).trim();
       local = (eqAt === -1 ? local : local.slice(0, eqAt)).trim();
       // A nested pattern (`{ data: { title } }`) binds names one level down —
       // this reads the flat cases, and skips what it can't name.
       if (!/^[A-Za-z_$][\w$]*$/.test(local)) {
         continue;
       }
-      out.push({ name: local, from, kind: kindOf(def) });
+      out.push({ name: local, from, kind: kindOf(defaultText) });
     }
   }
   return out;
@@ -462,10 +473,10 @@ export function parseDestructures(code: unknown): Destructure[] {
 // noise, and every page has one.
 function looksCallable(value: unknown): boolean {
   const raw = String(value || '').trim();
-  const test = (t: string): boolean =>
-    /^(async\s+)?function\b/.test(t) ||
-    /^(async\s*)?\([^()]*\)\s*(:[^=]*)?=>/.test(t) ||
-    /^(async\s+)?[A-Za-z_$][\w$]*\s*=>/.test(t);
+  const test = (candidate: string): boolean =>
+    /^(async\s+)?function\b/.test(candidate) ||
+    /^(async\s*)?\([^()]*\)\s*(:[^=]*)?=>/.test(candidate) ||
+    /^(async\s+)?[A-Za-z_$][\w$]*\s*=>/.test(candidate);
   // Both as written and with an opening paren dropped: `(href) => …` is an
   // arrow, and so is the `(async () => {…}) satisfies GetStaticPaths` that
   // wraps one.
@@ -476,11 +487,11 @@ function looksCallable(value: unknown): boolean {
 // declaration reads, when it names one outright.
 const COLLECTION_CALL = /\b(getCollection|getEntry|getEntries)\s*\(\s*['"]([\w-]+)['"]/;
 
-export function collectionCallIn(text: unknown): { fn: string; name: string } | null {
-  const m = String(text || '').match(COLLECTION_CALL);
-  const fn = m?.[1];
-  const name = m?.[2];
-  return fn !== undefined && name !== undefined ? { fn, name } : null;
+export function collectionCallIn(text: unknown): { fn: string; name: string } | undefined {
+  const match = String(text || '').match(COLLECTION_CALL);
+  const callee = match?.[1];
+  const name = match?.[2];
+  return callee !== undefined && name !== undefined ? { fn: callee, name } : undefined;
 }
 
 // `getEntry(post.data.author)` — a reference, which names no collection in the
@@ -488,44 +499,44 @@ export function collectionCallIn(text: unknown): { fn: string; name: string } | 
 // {id, collection}, so the answer is in the data the editor already has.
 const REF_CALL = /\b(getEntry|getEntries)\s*\(\s*([\w$]+(?:\.[\w$]+)*(?:\[\d+\])?)\s*\)/;
 
-export function referenceCallIn(text: unknown): { fn: string; path: string } | null {
-  const m = String(text || '').match(REF_CALL);
-  const fn = m?.[1];
-  const path = m?.[2];
-  return fn !== undefined && path !== undefined ? { fn, path } : null;
+export function referenceCallIn(text: unknown): { fn: string; path: string } | undefined {
+  const match = String(text || '').match(REF_CALL);
+  const callee = match?.[1];
+  const path = match?.[2];
+  return callee !== undefined && path !== undefined ? { fn: callee, path } : undefined;
 }
 
 /** The value at a dotted path inside sampled data: `post.data.author` → {id, collection}. */
 export function sampleAt(sample: unknown, path: unknown): unknown {
-  let cur: unknown = sample;
+  let current: unknown = sample;
   for (const step of String(path || '').split('.')) {
-    const m = step.match(/^([^[]*)((?:\[\d+\])*)$/);
-    if (!m) {
+    const match = step.match(/^([^[]*)((?:\[\d+\])*)$/);
+    if (!match) {
       return undefined;
     }
-    const name = m[1];
+    const name = match[1];
     if (name) {
-      const record = toRecord(cur);
+      const record = toRecord(current);
       if (!record) {
         return undefined;
       }
-      cur = record[name];
+      current = record[name];
     }
-    for (const idx of m[2]?.match(/\d+/g) ?? []) {
-      const list = toArray(cur);
+    for (const indexText of match[2]?.match(/\d+/g) ?? []) {
+      const list = toArray(current);
       if (!list) {
         return undefined;
       }
-      cur = list[Number(idx)];
+      current = list[Number(indexText)];
     }
   }
-  return cur;
+  return current;
 }
 
 // What an Astro reference looks like once it is data: the entry it points to,
 // named by collection and id, with nothing loaded yet.
-const isRef = (v: unknown): v is { id: string; collection: string } => {
-  const record = toRecord(v);
+const isRef = (candidate: unknown): candidate is { id: string; collection: string } => {
+  const record = toRecord(candidate);
   return (
     record !== undefined &&
     typeof record['id'] === 'string' &&
@@ -550,7 +561,7 @@ export interface ReferenceNeed {
  * props sample, since the reference's target is in the data, not the source.
  */
 export function referencesInScope(
-  frontmatter: string | null | undefined,
+  frontmatter: string | undefined,
   propsSample: unknown,
 ): ReferenceNeed[] {
   if (!propsSample) {
@@ -579,8 +590,8 @@ export function referencesInScope(
   for (const [, value] of parseDeclarations(frontmatter ?? '')) {
     consider(value);
   }
-  for (const d of parseDestructures(frontmatter ?? '')) {
-    consider(d.from);
+  for (const destructure of parseDestructures(frontmatter ?? '')) {
+    consider(destructure.from);
   }
   return out;
 }
@@ -591,28 +602,29 @@ export function referencesInScope(
 
 // The markers the dev-server sampler leaves behind for what JSON can't hold.
 // See PATHS_ENDPOINT in electron/main.js.
-const marker = (v: unknown): string | null => {
-  const tag = toRecord(v)?.['__stacki'];
-  return typeof tag === 'string' ? tag : null;
+const marker = (value: unknown): string | undefined => {
+  const tag = toRecord(value)?.['__stacki'];
+  return typeof tag === 'string' ? tag : undefined;
 };
 
-export function sampleKind(v: unknown): string {
-  if (v === null || v === undefined) {
+export function sampleKind(sample: unknown): string {
+  // A sampled JSON `null` is data the dev server sent; it reads as empty.
+  if (sample === null || sample === undefined) {
     return 'empty';
   }
-  if (Array.isArray(v)) {
+  if (Array.isArray(sample)) {
     return 'list';
   }
-  if (typeof v === 'object') {
-    return marker(v) ?? 'object';
+  if (typeof sample === 'object') {
+    return marker(sample) ?? 'object';
   }
-  if (typeof v === 'string') {
+  if (typeof sample === 'string') {
     return 'text';
   }
-  if (typeof v === 'number') {
+  if (typeof sample === 'number') {
     return 'number';
   }
-  if (typeof v === 'boolean') {
+  if (typeof sample === 'boolean') {
     return 'boolean';
   }
   return 'empty';
@@ -629,11 +641,12 @@ const ENTRY_INTERNALS = new Set([
   'legacyId',
   'assetImports',
 ]);
-const isEntry = (v: Record<string, unknown>): boolean => 'collection' in v && 'data' in v;
-const shownKeys = (v: unknown): string[] => {
-  const record = toRecord(v) ?? {};
+const isEntry = (entry: Record<string, unknown>): boolean =>
+  'collection' in entry && 'data' in entry;
+const shownKeys = (sample: unknown): string[] => {
+  const record = toRecord(sample) ?? {};
   return isEntry(record)
-    ? Object.keys(record).filter((k) => !ENTRY_INTERNALS.has(k))
+    ? Object.keys(record).filter((key) => !ENTRY_INTERNALS.has(key))
     : Object.keys(record);
 };
 
@@ -643,36 +656,36 @@ const clip = (text: unknown, max: number): string =>
 // One line saying what a value IS — the thing a designer reads down the right
 // of the picker to find the field they mean. A container says how much is in
 // it rather than showing a wall of JSON; that's what expanding it is for.
-export function samplePreview(v: unknown): string {
-  const kind = sampleKind(v);
+export function samplePreview(sample: unknown): string {
+  const kind = sampleKind(sample);
   if (kind === 'date') {
-    const value = toRecord(v)?.['value'];
+    const value = toRecord(sample)?.['value'];
     return value ? String(value).slice(0, 10) : 'date';
   }
   if (kind === 'deep') {
     return 'deeper…';
   }
   if (kind === 'more') {
-    return `${String(toRecord(v)?.['count'])} more`;
+    return `${String(toRecord(sample)?.['count'])} more`;
   }
   if (kind === 'empty') {
     return '—';
   }
   if (kind === 'text') {
-    return v === '' ? '""' : clip(`"${String(v)}"`, 42);
+    return sample === '' ? '""' : clip(`"${String(sample)}"`, 42);
   }
   if (kind === 'number' || kind === 'boolean') {
-    return String(v);
+    return String(sample);
   }
   if (kind === 'list') {
-    const list = toArray(v) ?? [];
+    const list = toArray(sample) ?? [];
     const more = list.find((x) => marker(x) === 'more');
     const shown = list.length - (more ? 1 : 0);
     const count = toRecord(more)?.['count'];
     const total = more ? shown + (typeof count === 'number' ? count : 0) : shown;
     return `${total} ${total === 1 ? 'item' : 'items'}`;
   }
-  const keys = shownKeys(v);
+  const keys = shownKeys(sample);
   return keys.length ? `${keys.length} ${keys.length === 1 ? 'field' : 'fields'}` : '{}';
 }
 
@@ -683,7 +696,7 @@ export interface TreeNode {
   key: string;
   kind: string;
   preview: string;
-  children: TreeNode[] | null;
+  children: TreeNode[] | undefined;
   section?: string;
   nav?: { index: number; count: number };
   query?: { collection: string; name: string };
@@ -692,23 +705,25 @@ export interface TreeNode {
 
 // A value the app has actually seen — every key is real, so the tree is the
 // data rather than a guess at it.
-function fromSample(value: unknown, base: string, depth: number): TreeNode[] | null {
+function fromSample(value: unknown, base: string, depth: number): TreeNode[] | undefined {
   if (depth >= TREE_DEPTH_MAX) {
-    return null;
+    return undefined;
   }
   const kind = sampleKind(value);
   if (kind === 'object') {
     const record = toRecord(value) ?? {};
-    return shownKeys(value).map((k) => sampleNode(`${base}.${k}`, k, record[k], depth + 1));
+    return shownKeys(value).map((key) => sampleNode(`${base}.${key}`, key, record[key], depth + 1));
   }
   if (kind === 'list') {
     return (toArray(value) ?? [])
-      .map((v, i) =>
-        marker(v) === 'more' ? null : sampleNode(`${base}[${i}]`, String(i), v, depth + 1),
+      .map((entry, i) =>
+        marker(entry) === 'more'
+          ? undefined
+          : sampleNode(`${base}[${i}]`, String(i), entry, depth + 1),
       )
-      .filter((n): n is TreeNode => n !== null);
+      .filter((node): node is TreeNode => node !== undefined);
   }
-  return null;
+  return undefined;
 }
 
 function sampleNode(path: string, key: string, value: unknown, depth: number): TreeNode {
@@ -718,7 +733,7 @@ function sampleNode(path: string, key: string, value: unknown, depth: number): T
     key,
     kind: sampleKind(value),
     preview: samplePreview(value),
-    children: children && children.length ? children : null,
+    children: children && children.length ? children : undefined,
   };
 }
 
@@ -727,32 +742,34 @@ const LITERAL_DEPTH_MAX = 4;
 // No live data, but the source says the shape outright: `const site = { … }`.
 // A list contributes its FIRST item, which is the only one whose shape is
 // knowable — and the one a loop over it will be handed.
-function fromLiteral(text: unknown, base: string, depth: number): TreeNode[] | null {
+function fromLiteral(text: unknown, base: string, depth: number): TreeNode[] | undefined {
   if (depth >= LITERAL_DEPTH_MAX) {
-    return null;
+    return undefined;
   }
-  const t = String(text || '').trim();
-  if (t.startsWith('{')) {
-    const entries = objectEntries(t);
+  const trimmed = String(text || '').trim();
+  if (trimmed.startsWith('{')) {
+    const entries = objectEntries(trimmed);
     return entries.length
-      ? entries.map((e) => literalNode(`${base}.${e.key}`, e.key, e.value, depth + 1))
-      : null;
+      ? entries.map((entry) =>
+          literalNode(`${base}.${entry.key}`, entry.key, entry.value, depth + 1),
+        )
+      : undefined;
   }
-  if (t.startsWith('[')) {
-    const first = firstObjectIn(t);
+  if (trimmed.startsWith('[')) {
+    const first = firstObjectIn(trimmed);
     if (!first) {
-      return null;
+      return undefined;
     }
     const item = literalNode(`${base}[0]`, '0', first, depth + 1);
-    return item.children ? [item] : null;
+    return item.children ? [item] : undefined;
   }
-  return null;
+  return undefined;
 }
 
 function literalNode(path: string, key: string, valueText: unknown, depth: number): TreeNode {
-  const t = String(valueText || '').trim();
-  const kind = kindOf(t) || 'value';
-  const children = fromLiteral(t, path, depth);
+  const trimmed = String(valueText || '').trim();
+  const kind = kindOf(trimmed) || 'value';
+  const children = fromLiteral(trimmed, path, depth);
   return {
     path,
     key,
@@ -760,8 +777,8 @@ function literalNode(path: string, key: string, valueText: unknown, depth: numbe
     // A literal IS its value, so it shows it. Anything else is an expression
     // — `await getEntry(post.data.author)` — and putting that in the value
     // column is showing a designer the code the picker exists to avoid.
-    preview: kind === 'text' || kind === 'number' || kind === 'boolean' ? clip(t, 42) : '',
-    children: children && children.length ? children : null,
+    preview: kind === 'text' || kind === 'number' || kind === 'boolean' ? clip(trimmed, 42) : '',
+    children: children && children.length ? children : undefined,
   };
 }
 
@@ -777,17 +794,17 @@ export interface MarkedQuery {
 }
 
 /** Those queries, as {name, start, end} spans in the frontmatter text. */
-export function markedQueries(frontmatter: string | null | undefined): MarkedQuery[] {
+export function markedQueries(frontmatter: string | undefined): MarkedQuery[] {
   const out: MarkedQuery[] = [];
   const re = new RegExp(
     `^[ \\t]*(?:const|let|var)\\s+([A-Za-z_$][\\w$]*)\\s*=[^\\n]*?//\\s*${QUERY_MARK}[ \\t]*$`,
     'gm',
   );
-  let m;
-  while ((m = re.exec(frontmatter ?? '')) !== null) {
-    const name = m[1];
+  let match;
+  while ((match = re.exec(frontmatter ?? '')) !== null) {
+    const name = match[1];
     if (name !== undefined) {
-      out.push({ name, start: m.index, end: m.index + m[0].length });
+      out.push({ name, start: match.index, end: match.index + match[0].length });
     }
   }
   return out;
@@ -799,7 +816,7 @@ export function markedQueries(frontmatter: string | null | undefined): MarkedQue
  * query was added, rather than a blank line where it used to be.
  */
 export function removeMarkedQuery(frontmatter: string, name: string): string {
-  const found = markedQueries(frontmatter).find((q) => q.name === name);
+  const found = markedQueries(frontmatter).find((query) => query.name === name);
   if (!found) {
     return frontmatter;
   }
@@ -818,7 +835,7 @@ export function removeMarkedQuery(frontmatter: string, name: string): string {
  * identifier holding it. What makes picking from a collection twice reuse the
  * first query instead of writing a second one for the same content.
  */
-export function queriesInScope(frontmatter: string | null | undefined): Map<string, string> {
+export function queriesInScope(frontmatter: string | undefined): Map<string, string> {
   const out = new Map<string, string>();
   for (const [name, value] of parseDeclarations(frontmatter ?? '')) {
     // `export const getStaticPaths = async () => { … getCollection("blog") … }`
@@ -837,15 +854,15 @@ export function queriesInScope(frontmatter: string | null | undefined): Map<stri
 
 /** Every name the frontmatter already binds — what an auto-named query must avoid. */
 export function namesInScope(
-  frontmatter: string | null | undefined,
-  imports: readonly ImportLike[] | null | undefined,
+  frontmatter: string | undefined,
+  imports: readonly ImportLike[] | undefined,
 ): Set<string> {
   const taken = new Set<string>();
   for (const [name] of parseDeclarations(frontmatter ?? '')) {
     taken.add(name);
   }
-  for (const d of parseDestructures(frontmatter ?? '')) {
-    taken.add(d.name);
+  for (const destructure of parseDestructures(frontmatter ?? '')) {
+    taken.add(destructure.name);
   }
   for (const i of imports ?? []) {
     if (i.name !== undefined) {
@@ -894,12 +911,10 @@ export function scopeCompletions(context: DataContext = {}): { label: string; de
     seen.add(label);
     out.push({ label, detail });
   };
-  const walk = (nodes: readonly TreeNode[] | null | undefined, depth: number): void => {
+  const walk = (nodes: readonly TreeNode[] | undefined, depth: number): void => {
     for (const node of nodes ?? []) {
       add(node.path, node.preview ? String(node.preview).slice(0, 40) : (node.section ?? ''));
-      // One level in is the useful depth: `post.data` earns its place, every
-      // field of every collection does not — the picker is for browsing.
-      if (depth < 2 && Array.isArray(node.children)) {
+      if (depth < DATA_SUGGEST_LIMITS.completionDepthMax && Array.isArray(node.children)) {
         walk(node.children, depth + 1);
       }
     }
@@ -944,7 +959,7 @@ function isTypeSyntaxIdentifier(source: string, from: number, root: string): boo
  */
 export function scopeChips(
   text: unknown,
-  names: Iterable<string> | Set<string> | null | undefined,
+  names: Iterable<string> | Set<string> | undefined,
 ): ScopeChip[] {
   const source = String(text ?? '');
   const inScope = names instanceof Set ? names : new Set(names ?? []);
@@ -1013,7 +1028,9 @@ export function scopeChips(
  */
 export function autoQueryName(collection: string, taken: ReadonlySet<string> = new Set()): string {
   const camel = String(collection)
-    .replace(/[^A-Za-z0-9]+(.)?/g, (_m: string, c?: string) => (c ? c.toUpperCase() : ''))
+    .replace(/[^A-Za-z0-9]+(.)?/g, (_whole: string, letter?: string) =>
+      letter ? letter.toUpperCase() : '',
+    )
     .replace(/^[0-9]+/, '');
   const base = `${camel || 'collection'}Entries`;
   if (!taken.has(base)) {
@@ -1028,18 +1045,18 @@ export function autoQueryName(collection: string, taken: ReadonlySet<string> = n
 }
 
 /** Which collections this file reads by name — what the app fetches a sample entry for. */
-export function collectionsInScope(frontmatter: string | null | undefined): string[] {
+export function collectionsInScope(frontmatter: string | undefined): string[] {
   const out = new Set<string>();
   for (const [, value] of parseDeclarations(frontmatter ?? '')) {
-    const c = collectionCallIn(value);
-    if (c) {
-      out.add(c.name);
+    const call = collectionCallIn(value);
+    if (call) {
+      out.add(call.name);
     }
   }
-  for (const d of parseDestructures(frontmatter ?? '')) {
-    const c = collectionCallIn(d.from);
-    if (c) {
-      out.add(c.name);
+  for (const destructure of parseDestructures(frontmatter ?? '')) {
+    const call = collectionCallIn(destructure.from);
+    if (call) {
+      out.add(call.name);
     }
   }
   return [...out];
@@ -1063,12 +1080,12 @@ function shapeNode(name: string, fields: readonly { key: string; kind: string }[
     key: '0',
     kind: 'object',
     preview: '',
-    children: fields.map((f) => ({
-      path: `${name}[0].${f.key}`,
-      key: f.key,
-      kind: f.kind,
+    children: fields.map((field) => ({
+      path: `${name}[0].${field.key}`,
+      key: field.key,
+      kind: field.kind,
       preview: '',
-      children: null,
+      children: undefined,
     })),
   };
   return { path: name, key: name, kind: 'list', preview: '', children: [item] };
@@ -1093,7 +1110,7 @@ const KEEPS_SHAPE = new RegExp(
 const PICKS_ONE =
   /^([A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*)\s*(?:\.\s*(?:find|at|pop|shift)\s*\(|\[\s*\d+\s*\])/;
 
-function addUnique(list: TreeNode[], node: TreeNode | null | undefined, seen: Set<string>): void {
+function addUnique(list: TreeNode[], node: TreeNode | undefined, seen: Set<string>): void {
   if (!node || seen.has(node.path)) {
     return;
   }
@@ -1105,18 +1122,18 @@ function addUnique(list: TreeNode[], node: TreeNode | null | undefined, seen: Se
 // no entry on the canvas to read real values from, so its own `interface
 // Props` is the only description of its data there is — and a loop over
 // `times?: ServiceTime[]` offered nothing at all without it.
-function shapeChildren(field: SchemaField | undefined, base: string): TreeNode[] | null {
+function shapeChildren(field: SchemaField | undefined, base: string): TreeNode[] | undefined {
   if (!field?.shape?.length) {
-    return null;
+    return undefined;
   }
   const shape = field.shape;
   const fields = (at: string): TreeNode[] =>
-    shape.map((f) => ({
-      path: `${at}.${f.name}`,
-      key: f.name,
-      kind: f.type === 'code' ? 'value' : (f.type ?? 'value'),
+    shape.map((field) => ({
+      path: `${at}.${field.name}`,
+      key: field.name,
+      kind: field.type === 'code' ? 'value' : (field.type ?? 'value'),
       preview: '',
-      children: null,
+      children: undefined,
     }));
   // A list is written the way a sample of one is, so everything downstream —
   // the loop item's fields, the picker's own walk — reads it the same way.
@@ -1145,27 +1162,31 @@ function buildPropNodes(
   const sampleRecord = toRecord(sample);
   const known = (name: string): boolean =>
     sampleRecord !== undefined && Object.prototype.hasOwnProperty.call(sample, name);
-  for (const d of destructures) {
-    if (!/^Astro\.props\b/.test(d.from)) {
+  for (const destructure of destructures) {
+    if (!/^Astro\.props\b/.test(destructure.from)) {
       continue;
     }
-    if (known(d.name) && sampleRecord) {
-      addUnique(props, sampleNode(d.name, d.name, sampleRecord[d.name], 0), seen);
+    if (known(destructure.name) && sampleRecord) {
+      addUnique(
+        props,
+        sampleNode(destructure.name, destructure.name, sampleRecord[destructure.name], 0),
+        seen,
+      );
       continue;
     }
-    const field = schema.find((f) => f.name === d.name);
-    const shape = shapeChildren(field, d.name);
+    const field = schema.find((field) => field.name === destructure.name);
+    const shape = shapeChildren(field, destructure.name);
     addUnique(
       props,
       {
-        path: d.name,
-        key: d.name,
+        path: destructure.name,
+        key: destructure.name,
         kind:
           shape && field?.shapeIsList
             ? 'list'
-            : d.kind === 'rest'
+            : destructure.kind === 'rest'
               ? 'rest props'
-              : field?.type || d.kind || 'prop',
+              : field?.type || destructure.kind || 'prop',
         preview: field?.default !== undefined ? String(field.default) : '',
         children: shape,
       },
@@ -1174,25 +1195,60 @@ function buildPropNodes(
   }
   // A prop the file declares but destructures elsewhere (or reads off
   // Astro.props directly) is still a prop of this file.
-  for (const f of schema) {
-    if (seen.has(f.name)) {
+  for (const field of schema) {
+    if (seen.has(field.name)) {
       continue;
     }
     addUnique(
       props,
-      known(f.name) && sampleRecord
-        ? sampleNode(f.name, f.name, sampleRecord[f.name], 0)
+      known(field.name) && sampleRecord
+        ? sampleNode(field.name, field.name, sampleRecord[field.name], 0)
         : {
-            path: f.name,
-            key: f.name,
-            kind: f.shape && f.shapeIsList ? 'list' : f.type || 'prop',
-            preview: f.default !== undefined ? String(f.default) : '',
-            children: shapeChildren(f, f.name),
+            path: field.name,
+            key: field.name,
+            kind: field.shape && field.shapeIsList ? 'list' : field.type || 'prop',
+            preview: field.default !== undefined ? String(field.default) : '',
+            children: shapeChildren(field, field.name),
           },
       seen,
     );
   }
   return props;
+}
+
+// A reference followed through the data: `getEntry(post.data.author)` is this
+// post's author, so the fields shown are that author's. Undefined when the
+// declaration follows no reference the samples resolve.
+function referenceNode(
+  name: string,
+  value: string,
+  samples: Record<string, unknown>,
+  sample: unknown,
+): TreeNode | undefined {
+  const ref = referenceCallIn(value);
+  if (ref === undefined) {
+    return undefined;
+  }
+  const at = sampleAt(sample, ref.path);
+  const targetList = toArray(at);
+  const target = targetList
+    ? targetList.find((candidate) => toRecord(candidate)?.['collection'])
+    : at;
+  const targetRecord = toRecord(target);
+  const targetCollection = targetRecord?.['collection'];
+  const targetId = targetRecord?.['id'];
+  if (typeof targetCollection !== 'string') {
+    return undefined;
+  }
+  const resolved =
+    samples[sampleKey(targetCollection, typeof targetId === 'string' ? targetId : undefined)];
+  if (!resolved) {
+    return undefined;
+  }
+  const many = ref.fn === 'getEntries';
+  const node = sampleNode(name, name, many ? [resolved] : resolved, 0);
+  node.preview = `${targetCollection} ${many ? 'entries' : 'entry'}`;
+  return node;
 }
 
 // 2. The frontmatter's own values, and one level of any object literal.
@@ -1212,7 +1268,7 @@ function buildValueNodes(
     // A collection read by name gets the real thing: one entry, sampled, with
     // the query's own shape around it — `getCollection` hands back a list.
     const call = collectionCallIn(value);
-    const entry = call ? samples[call.name] : null;
+    const entry = call ? samples[call.name] : undefined;
     if (call && entry) {
       const many = call.fn !== 'getEntry';
       const node = sampleNode(name, name, many ? [entry] : entry, 0);
@@ -1221,38 +1277,31 @@ function buildValueNodes(
       addUnique(values, node, seen);
       continue;
     }
-    // A reference followed through the data: `getEntry(post.data.author)` is
-    // this post's author, so the fields shown are that author's.
-    const ref = referenceCallIn(value);
-    const at = ref ? sampleAt(sample, ref.path) : null;
-    const targetList = toArray(at);
-    const target = targetList ? targetList.find((v) => toRecord(v)?.['collection']) : at;
-    const targetRecord = toRecord(target);
-    const targetCollection = targetRecord?.['collection'];
-    const targetId = targetRecord?.['id'];
-    const resolved =
-      typeof targetCollection === 'string'
-        ? samples[sampleKey(targetCollection, typeof targetId === 'string' ? targetId : undefined)]
-        : undefined;
-    if (resolved && ref && typeof targetCollection === 'string') {
-      const many = ref.fn === 'getEntries';
-      const node = sampleNode(name, name, many ? [resolved] : resolved, 0);
-      node.preview = `${targetCollection} ${many ? 'entries' : 'entry'}`;
-      addUnique(values, node, seen);
+    const referenced = referenceNode(name, value, samples, sample);
+    if (referenced !== undefined) {
+      addUnique(values, referenced, seen);
       continue;
     }
     addUnique(values, literalNode(name, name, value, 0), seen);
   }
-  for (const d of destructures) {
-    if (/^Astro\.props\b/.test(d.from)) {
+  for (const destructure of destructures) {
+    if (/^Astro\.props\b/.test(destructure.from)) {
       continue;
     }
-    const shape = /\brender\s*\(/.test(d.from) ? RENDER_SHAPE[d.name] : undefined;
+    const shape = /\brender\s*\(/.test(destructure.from)
+      ? RENDER_SHAPE[destructure.name]
+      : undefined;
     addUnique(
       values,
       shape
-        ? shapeNode(d.name, shape)
-        : { path: d.name, key: d.name, kind: d.kind || 'value', preview: '', children: null },
+        ? shapeNode(destructure.name, shape)
+        : {
+            path: destructure.name,
+            key: destructure.name,
+            kind: destructure.kind || 'value',
+            preview: '',
+            children: undefined,
+          },
       seen,
     );
   }
@@ -1265,7 +1314,7 @@ function buildValueNodes(
     }
     addUnique(
       values,
-      { path: imp.name, key: imp.name, kind: 'import', preview: '', children: null },
+      { path: imp.name, key: imp.name, kind: 'import', preview: '', children: undefined },
       seen,
     );
   }
@@ -1285,8 +1334,8 @@ function withDerivedShapes(
   const byName = new Map<string, TreeNode>();
   // By identity: a prop and a value may share a path.
   const replaced = new Map<TreeNode, TreeNode>();
-  for (const n of [...props, ...values]) {
-    byName.set(n.path, n);
+  for (const node of [...props, ...values]) {
+    byName.set(node.path, node);
   }
   for (const [name, value] of decls) {
     const node = byName.get(name);
@@ -1299,7 +1348,7 @@ function withDerivedShapes(
       replaced.set(node, shaped);
     }
   }
-  const latest = (n: TreeNode): TreeNode => replaced.get(n) ?? n;
+  const latest = (node: TreeNode): TreeNode => replaced.get(node) ?? node;
   const derived = { props: props.map(latest), values: values.map(latest) };
   assert(derived.props.length === props.length, 'Deriving shapes keeps every prop');
   assert(derived.values.length === values.length, 'Deriving shapes keeps every value');
@@ -1314,8 +1363,8 @@ function derivedShape(
   byName: ReadonlyMap<string, TreeNode>,
 ): TreeNode | undefined {
   const name = node.path;
-  const m = declaration.match(KEEPS_SHAPE);
-  const baseName = m?.[1];
+  const match = declaration.match(KEEPS_SHAPE);
+  const baseName = match?.[1];
   const base = baseName !== undefined ? byName.get(baseName) : undefined;
   if (base?.children) {
     const children = rebase(base.children, base.path, name);
@@ -1327,7 +1376,7 @@ function derivedShape(
   const one = declaration.match(PICKS_ONE);
   const oneName = one?.[1];
   const from = oneName !== undefined ? byName.get(oneName) : undefined;
-  const item = from?.kind === 'list' && from.children?.length === 1 ? from.children[0] : null;
+  const item = from?.kind === 'list' && from.children?.length === 1 ? from.children[0] : undefined;
   if (!item?.children) {
     return undefined;
   }
@@ -1352,21 +1401,21 @@ function buildCollectionNodes(
   const out: TreeNode[] = [];
   const queried = queriesInScope(fm);
   const taken = namesInScope(fm, imports);
-  for (const c of collections) {
-    if (queried.has(c.name)) {
+  for (const collection of collections) {
+    if (queried.has(collection.name)) {
       continue; // already read here, so it is above
     }
-    const identifier = autoQueryName(c.name, taken);
+    const identifier = autoQueryName(collection.name, taken);
     taken.add(identifier);
-    const entry = samples[c.name];
+    const entry = samples[collection.name];
     const node: TreeNode = entry
-      ? sampleNode(identifier, c.name, [entry], 0)
-      : { path: identifier, key: c.name, kind: 'list', preview: '', children: null };
-    node.key = c.name;
-    node.preview = c.count === undefined ? 'collection' : `${c.count} entries`;
+      ? sampleNode(identifier, collection.name, [entry], 0)
+      : { path: identifier, key: collection.name, kind: 'list', preview: '', children: undefined };
+    node.key = collection.name;
+    node.preview = collection.count === undefined ? 'collection' : `${collection.count} entries`;
     node.section = 'collections';
     // What picking anything under this node has to write first.
-    node.query = { collection: c.name, name: identifier };
+    node.query = { collection: collection.name, name: identifier };
     // Nothing fetched yet: the picker asks for it when this row is opened,
     // rather than the app loading every collection in the project up front.
     node.lazy = !entry;
@@ -1380,10 +1429,10 @@ function buildCollectionNodes(
 // other entry has it when that one doesn't. A field the first entry left out is
 // still a field of the item; a value from another entry is better than a blank
 // row; and which entry you are reading is a thing you can move.
-function everyField(entries: readonly TreeNode[] | undefined, at = 0): TreeNode[] | null {
+function everyField(entries: readonly TreeNode[] | undefined, at = 0): TreeNode[] | undefined {
   const first = entries?.[0];
   if (!first) {
-    return null;
+    return undefined;
   }
   const out: TreeNode[] = [];
   const seenKeys = new Set<string>();
@@ -1409,7 +1458,7 @@ function everyField(entries: readonly TreeNode[] | undefined, at = 0): TreeNode[
       out.push(child);
     }
   }
-  return out.length ? out : null;
+  return out.length ? out : undefined;
 }
 
 // 3. Loop items, resolved against everything above: an enclosing
@@ -1423,30 +1472,31 @@ function buildLoopNodes(
   seen: Set<string>,
 ): TreeNode[] {
   const byPath = new Map<string, TreeNode>();
-  const index = (list: readonly TreeNode[]): void => {
-    for (const n of list) {
-      byPath.set(n.path, n);
-      if (n.children) {
-        index(n.children);
+  const index = (list: readonly TreeNode[], depth: number): void => {
+    assert(depth <= LIMITS.treeDepthMax, 'Data tree exceeds depth limit');
+    for (const node of list) {
+      byPath.set(node.path, node);
+      if (node.children) {
+        index(node.children, depth + 1);
       }
     }
   };
-  index(props);
-  index(values);
+  index(props, 0);
+  index(values, 0);
 
   // Innermost first: the loop you are standing in is the one whose item you
   // are most likely reaching for, and an outer loop is further away in every
   // sense.
   const loops: TreeNode[] = [];
   for (const head of [...ancestorHeads].reverse()) {
-    const m = String(head).trim().match(MAP_HEAD_RE);
-    const sourceName = m?.[1];
-    const item = m?.[2];
-    if (!m || sourceName === undefined || item === undefined) {
+    const match = String(head).trim().match(MAP_HEAD_RE);
+    const sourceName = match?.[1];
+    const item = match?.[2];
+    if (!match || sourceName === undefined || item === undefined) {
       continue;
     }
     const source = byPath.get(sourceName.trim());
-    const first = source?.kind === 'list' ? source.children?.[0] : null;
+    const first = source?.kind === 'list' ? source.children?.[0] : undefined;
     // Which entry of the list the item is being read as. One list, one place
     // in it — the arrows on the row move it (see `nav` below).
     const entries = source?.kind === 'list' ? (source.children ?? []) : [];
@@ -1468,15 +1518,15 @@ function buildLoopNodes(
         // campus on one service and not another — is still a field of the item,
         // and leaving it out meant typing `service.campus` from memory to reach
         // a value the picker was already holding.
-        children: shown ? rebase(everyField(entries, at), shown.path, item) : null,
+        children: shown ? rebase(everyField(entries, at), shown.path, item) : undefined,
       },
       seen,
     );
-    const indexName = m[3];
+    const indexName = match[3];
     if (indexName !== undefined) {
       addUnique(
         loops,
-        { path: indexName, key: indexName, kind: 'number', preview: '0', children: null },
+        { path: indexName, key: indexName, kind: 'number', preview: '0', children: undefined },
         seen,
       );
     }
@@ -1499,11 +1549,11 @@ function buildLoopNodes(
  * Ordered by what you are likeliest to want: this file's props, the item of
  * each enclosing loop, the frontmatter's own values, then imports.
  */
-export function dataTree(context: DataContext | null | undefined): TreeNode[] {
+export function dataTree(context: DataContext | undefined): TreeNode[] {
   const fm = context?.frontmatter ?? '';
   const decls = parseDeclarations(fm);
   const destructures = parseDestructures(fm);
-  const sample = context?.propsSample ?? null;
+  const sample = context?.propsSample;
   const schema = context?.propsSchema ?? [];
   const samples = context?.collectionSamples ?? {};
   const imports = context?.imports ?? [];
@@ -1548,31 +1598,38 @@ export interface PickableNode extends TreeNode {
  * navigate through `post` and `post.data` to get to `post.data.tags` — but
  * they are marked unpickable, because looping over an object is not a thing.
  */
-export function listsOnly(nodes: readonly TreeNode[] | null | undefined): PickableNode[] {
+export function listsOnly(nodes: readonly TreeNode[] | undefined): PickableNode[] {
+  return listsOnlyAt(nodes, 0);
+}
+
+function listsOnlyAt(nodes: readonly TreeNode[] | undefined, depth: number): PickableNode[] {
+  assert(depth <= LIMITS.treeDepthMax, 'Data tree exceeds depth limit');
   const out: PickableNode[] = [];
-  for (const n of nodes ?? []) {
-    const children = listsOnly(n.children);
-    const pickable = LOOPABLE.has(n.kind);
+  for (const node of nodes ?? []) {
+    const children = listsOnlyAt(node.children, depth + 1);
+    const pickable = LOOPABLE.has(node.kind);
     if (!pickable && !children.length) {
       continue;
     }
-    out.push({ ...n, pickable, children: children.length ? children : null });
+    out.push({ ...node, pickable, children: children.length ? children : undefined });
   }
   return out;
 }
 
 // `posts[0].data.title` seen from inside the loop is `post.data.title`.
 function rebase(
-  nodes: readonly TreeNode[] | null | undefined,
+  nodes: readonly TreeNode[] | undefined,
   from: string,
   to: string,
-): TreeNode[] | null {
+  depth = 0,
+): TreeNode[] | undefined {
+  assert(depth <= LIMITS.treeDepthMax, 'Data tree exceeds depth limit');
   if (!nodes) {
-    return null;
+    return undefined;
   }
-  return nodes.map((n) => ({
-    ...n,
-    path: to + n.path.slice(from.length),
-    children: rebase(n.children, from, to),
+  return nodes.map((node) => ({
+    ...node,
+    path: to + node.path.slice(from.length),
+    children: rebase(node.children, from, to, depth + 1),
   }));
 }

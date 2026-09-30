@@ -12,13 +12,13 @@
 
 /**
  * @param {object} where
- * @param {string|null} where.slotName   the slot the node asks for, or null when
+ * @param {string|undefined} where.slotName   the slot the node asks for, or undefined when
  *                                       it asks for nothing (or asks in code,
  *                                       which this cannot read)
- * @param {object|null} where.host       the component the node has landed
- *                                       inside, or null for none
- * @param {object|null} where.definition what is known about that component —
- *                                       null when the project has no scan of it
+ * @param {object|undefined} where.host       the component the node has landed
+ *                                       inside, or undefined for none
+ * @param {object|undefined} where.definition what is known about that component —
+ *                                       undefined when the project has no scan of it
  * @returns {boolean} whether to keep the attribute
  */
 export function keepsSlot({
@@ -26,9 +26,9 @@ export function keepsSlot({
   host,
   definition,
 }: {
-  readonly slotName?: string | null;
-  readonly host?: object | null;
-  readonly definition?: { readonly slots?: readonly string[] } | null;
+  readonly slotName?: string | undefined;
+  readonly host?: object | undefined;
+  readonly definition?: { readonly slots?: readonly string[] } | undefined;
 }): boolean {
   // Nothing to decide: no slot asked for, or one asked for in an expression,
   // whose value this cannot know.

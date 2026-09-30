@@ -104,7 +104,7 @@ function useCmsDocument(props: CmsViewProps) {
       record: (command) => callbacks.current.props.onRecordUndo?.(command),
     }),
   );
-  useCmsReload({ props, writer, callbacks, reload, setState, setSelection });
+  useCmsReload({ props, writer, callbacks, reloadRef: reload, setState, setSelection });
   const commit = (items: readonly unknown[]) => {
     writer.queue(items);
     setState((previous) => {
@@ -146,11 +146,18 @@ interface ReloadOptions {
   readonly props: CmsViewProps;
   readonly writer: ReturnType<typeof createCmsWriter>;
   readonly callbacks: React.MutableRefObject<{ props: CmsViewProps; markSaved: () => void }>;
-  readonly reload: React.MutableRefObject<() => Promise<void>>;
+  readonly reloadRef: React.MutableRefObject<() => Promise<void>>;
   readonly setState: React.Dispatch<React.SetStateAction<DocumentState>>;
   readonly setSelection: React.Dispatch<React.SetStateAction<number>>;
 }
-function useCmsReload({ props, writer, callbacks, reload, setState, setSelection }: ReloadOptions) {
+function useCmsReload({
+  props,
+  writer,
+  callbacks,
+  reloadRef,
+  setState,
+  setSelection,
+}: ReloadOptions) {
   useEffect(() => {
     const reader = createCmsReader({
       projectPath: props.project.path,
@@ -174,7 +181,7 @@ function useCmsReload({ props, writer, callbacks, reload, setState, setSelection
         setSelection((index) => Math.min(index, Math.max(0, snapshot.items.length - 1)));
       },
     });
-    reload.current = () => reader.refresh();
+    reloadRef.current = () => reader.refresh();
     void reader.refresh();
     const unsubscribe = window.avb.onCmsChanged(() => {
       void reader.refresh();
@@ -184,7 +191,7 @@ function useCmsReload({ props, writer, callbacks, reload, setState, setSelection
       reader.dispose();
       void writer.flush();
     };
-  }, [props.project.path, props.rel, writer, callbacks, reload, setState, setSelection]);
+  }, [props.project.path, props.rel, writer, callbacks, reloadRef, setState, setSelection]);
 }
 type CmsModel = ReturnType<typeof useCmsDocument>;
 interface ContentProps {
@@ -232,7 +239,7 @@ function useCmsItems(model: CmsModel, snapshot: CmsSnapshot) {
   const { selection, setSelection, query, setQuery, commit } = model;
   const item = items[selection];
   const addItem = () => {
-    assert(collection.error === null, 'CMS edit: unreadable collection cannot be edited');
+    assert(collection.error === undefined, 'CMS edit: unreadable collection cannot be edited');
     assert(items.length < BOUNDARY_LIMITS.itemsMax, 'CMS edit: item limit exceeded');
     const next = [...items, blankItem(items)];
     commit(next);
@@ -367,7 +374,14 @@ function CmsDetailHead({ model, snapshot, actions }: ItemProps) {
           <button className="ghost" title="Duplicate item" onClick={actions.duplicate}>
             <CopyIcon size={13} />
           </button>
-          <button className="ghost danger" title="Delete item" onClick={actions.removeItem}>
+          <button
+            className="ghost danger"
+            title="Delete item"
+            onClick={() => {
+              // The confirm dialog answers; it never rejects, and a refusal changes nothing.
+              void actions.removeItem();
+            }}
+          >
             <TrashIcon size={13} />
           </button>
         </>

@@ -176,8 +176,8 @@ function parseRename(input: unknown): void {
 }
 
 async function request<Value>(
-  invoke: () => Promise<unknown>,
   parse: Parser<Value>,
+  invoke: () => Promise<unknown>,
 ): Promise<Result<Value, string>> {
   let response: unknown;
   try {
@@ -190,14 +190,14 @@ async function request<Value>(
 
 export function readContentEntries(projectPath: string, name: string) {
   const payload = parseIpcPayload('content:entries', { projectPath, name });
-  return request(() => window.avb.contentEntries(payload), parseContentEntries);
+  return request(parseContentEntries, () => window.avb.contentEntries(payload));
 }
 
 export function readContentTargets(projectPath: string, name: string) {
   const payload = parseIpcPayload('content:targets', { projectPath, name });
   return request(
-    () => window.avb.contentTargets(payload),
     (input) => list(object({ id: text, title: text }))(record(input)['targets']),
+    () => window.avb.contentTargets(payload),
   );
 }
 
@@ -210,22 +210,22 @@ export function writeContentEntry(
   const input =
     body === undefined ? { projectPath, entry, edits } : { projectPath, entry, edits, body };
   const payload = parseIpcPayload('content:writeEntry', input);
-  return request(() => window.avb.writeContentEntry(payload), parseWrite);
+  return request(parseWrite, () => window.avb.writeContentEntry(payload));
 }
 
 export function validateContentEntry(projectPath: string, collection: string, value: unknown) {
   const payload = parseIpcPayload('content:validate', { projectPath, collection, data: value });
-  return request(() => window.avb.validateContentEntry(payload), parseContentValidation);
+  return request(parseContentValidation, () => window.avb.validateContentEntry(payload));
 }
 
 export function planContentRename(projectPath: string, name: string, from: string, to: string) {
   const payload = parseIpcPayload('content:renamePlan', { projectPath, name, from, to });
-  return request(() => window.avb.contentRenamePlan(payload), parseContentRenamePlan);
+  return request(parseContentRenamePlan, () => window.avb.contentRenamePlan(payload));
 }
 
 export function renameContentEntry(projectPath: string, name: string, from: string, to: string) {
   const payload = parseIpcPayload('content:rename', { projectPath, name, from, to });
-  return request(() => window.avb.renameContentEntry(payload), parseRename);
+  return request(parseRename, () => window.avb.renameContentEntry(payload));
 }
 
 function optionalFields<Value extends Readonly<Record<string, unknown>>>(value: Value) {

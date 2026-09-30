@@ -5,24 +5,24 @@ import type { Attr } from '../shared/page-node';
 // isn't "bound" just because something deep inside it is.
 
 interface BindableNode {
-  readonly props?: Record<string, { readonly type?: string } | undefined> | null;
+  readonly props?: Record<string, { readonly type?: string } | undefined> | undefined;
   readonly children?: readonly { readonly kind?: string; readonly value?: string }[] | undefined;
 }
 
-export function isDataBound(node: BindableNode | null | undefined): boolean {
+export function isDataBound(node: BindableNode | undefined): boolean {
   if (!node) {
     return false;
   }
-  for (const v of Object.values(node.props ?? {})) {
-    if (v?.type === 'expr') {
+  for (const value of Object.values(node.props ?? {})) {
+    if (value?.type === 'expr') {
       return true;
     }
   }
-  for (const c of node.children ?? []) {
-    if (c.kind === 'expr') {
+  for (const child of node.children ?? []) {
+    if (child.kind === 'expr') {
       return true;
     }
-    if (c.kind === 'text' && /\{[^{}]*\}/.test(c.value ?? '')) {
+    if (child.kind === 'text' && /\{[^{}]*\}/.test(child.value ?? '')) {
       return true;
     }
   }
@@ -129,30 +129,30 @@ const NOT_SIMPLE = /[(){}`]|=>|\[\s*[^\d\s]/;
 
 /**
  * An expression split into the data in it and the code around it:
- * `post.data.seo.title ?? post.data.title` is chip · " ?? " · chip. Null when
+ * `post.data.seo.title ?? post.data.title` is chip · " ?? " · chip. Undefined when
  * the expression is more than that, which keeps the code editor for the cases
  * that need one.
  */
-export function codeParts(source: unknown): Part[] | null {
+export function codeParts(source: unknown): Part[] | undefined {
   const text = String(source || '');
   if (NOT_SIMPLE.test(text)) {
-    return null;
+    return undefined;
   }
   const out: Part[] = [];
   let last = 0;
   let i = 0;
   while (i < text.length) {
-    const c = text.charAt(i);
+    const character = text.charAt(i);
     // A name inside a string is text, not a reference.
-    if (c === '"' || c === "'") {
+    if (character === '"' || character === "'") {
       i += 1;
-      while (i < text.length && text.charAt(i) !== c) {
+      while (i < text.length && text.charAt(i) !== character) {
         i += text.charAt(i) === '\\' ? 2 : 1;
       }
       i += 1;
       continue;
     }
-    if (!/[A-Za-z_$]/.test(c)) {
+    if (!/[A-Za-z_$]/.test(character)) {
       i += 1;
       continue;
     }
@@ -202,9 +202,9 @@ export function codeParts(source: unknown): Part[] | null {
   }
   // Worth doing only when it is a mix: a bare path is one chip, handled above,
   // and an expression with no data in it has nothing to show.
-  return out.some((p) => p.expr !== undefined) && out.some((p) => p.text !== undefined)
+  return out.some((part) => part.expr !== undefined) && out.some((part) => part.text !== undefined)
     ? out
-    : null;
+    : undefined;
 }
 
 interface ValueLike {
@@ -218,7 +218,7 @@ interface ValueLike {
  * as written. The value itself says which, so a field never changes the
  * meaning of what it was opened on.
  */
-export function valueModeOf(value: ValueLike | null | undefined): 'text' | 'code' {
+export function valueModeOf(value: ValueLike | undefined): 'text' | 'code' {
   if (!value || value.type !== 'expr') {
     return 'text';
   }
@@ -233,11 +233,11 @@ export function valueModeOf(value: ValueLike | null | undefined): 'text' | 'code
 }
 
 /**
- * Parts for a prop value, or null when the value is code no field of chips and
+ * Parts for a prop value, or undefined when the value is code no field of chips and
  * text can hold (`items.filter(Boolean)`) — those keep the code editor, which
  * is the only thing that can show them honestly.
  */
-export function partsFromValue(value: ValueLike | null | undefined): Part[] | null {
+export function partsFromValue(value: ValueLike | undefined): Part[] | undefined {
   if (!value) {
     return [];
   }
@@ -285,14 +285,14 @@ export function partsFromValue(value: ValueLike | null | undefined): Part[] | nu
     }
     const close = body.indexOf('}', i + 2);
     if (close === -1) {
-      return null;
+      return undefined;
     }
     const expr = body.slice(i + 2, close).trim();
     // One hole that isn't a plain path makes the whole thing code: a field of
     // chips would have to show it as a chip, and a chip that can't be named
     // can't be chosen from a list either.
     if (!BIND_PATH_RE.test(expr)) {
-      return null;
+      return undefined;
     }
     if (i > last) {
       out.push({ text: unescapeTpl(body.slice(last, i)) });
@@ -313,21 +313,21 @@ export function partsFromValue(value: ValueLike | null | undefined): Part[] | nu
  * typing 3 into one of those fields doesn't quietly write `cols="3"`.
  */
 export function valueFromParts(
-  parts: readonly Part[] | null | undefined,
+  parts: readonly Part[] | undefined,
   { numeric, mode }: { readonly numeric?: boolean; readonly mode?: string } = {},
 ): Extract<Attr, { readonly type: 'string' | 'expr' }> | undefined {
-  const clean = (parts ?? []).filter((p) =>
-    p.expr !== undefined ? String(p.expr).trim() !== '' : p.text !== '',
+  const clean = (parts ?? []).filter((part) =>
+    part.expr !== undefined ? String(part.expr).trim() !== '' : part.text !== '',
   );
   if (!clean.length) {
     return undefined;
   }
   // An expression stays an expression: what is between the data in it is code,
   // so it is written as it reads rather than quoted into a template.
-  if (mode === 'code' && clean.some((p) => p.expr !== undefined)) {
+  if (mode === 'code' && clean.some((part) => part.expr !== undefined)) {
     return {
       type: 'expr',
-      value: clean.map((p) => (p.expr !== undefined ? p.expr : p.text)).join(''),
+      value: clean.map((part) => (part.expr !== undefined ? part.expr : part.text)).join(''),
     };
   }
   // One binding on its own stays one expression — `{post.data.pubDate}`, not a
@@ -336,12 +336,14 @@ export function valueFromParts(
   if (only !== undefined && only.expr !== undefined) {
     return { type: 'expr', value: String(only.expr).trim() };
   }
-  if (clean.every((p) => p.text !== undefined)) {
-    const text = clean.map((p) => p.text).join('');
+  if (clean.every((part) => part.text !== undefined)) {
+    const text = clean.map((part) => part.text).join('');
     return { type: numeric ? 'expr' : 'string', value: text };
   }
   const body = clean
-    .map((p) => (p.expr !== undefined ? `\${${String(p.expr).trim()}}` : escapeTpl(p.text)))
+    .map((part) => {
+      return part.expr !== undefined ? `\${${String(part.expr).trim()}}` : escapeTpl(part.text);
+    })
     .join('');
   return { type: 'expr', value: `\`${body}\`` };
 }
@@ -352,7 +354,7 @@ interface PickQuery {
 }
 
 interface BindContext {
-  readonly ensureQuery?: (collection: string) => string | null | undefined;
+  readonly ensureQuery?: (collection: string) => string | undefined;
 }
 
 /**
@@ -363,13 +365,13 @@ interface BindContext {
  */
 export function resolvePick(
   path: string,
-  query: PickQuery | null | undefined,
-  bindCtx: BindContext | null | undefined,
+  query: PickQuery | undefined,
+  bindContext: BindContext | undefined,
 ): string {
-  if (!query || !bindCtx?.ensureQuery) {
+  if (!query || !bindContext?.ensureQuery) {
     return path;
   }
-  const actual = bindCtx.ensureQuery(query.collection);
+  const actual = bindContext.ensureQuery(query.collection);
   if (!actual || actual === query.name) {
     return path;
   }

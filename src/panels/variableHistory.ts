@@ -16,8 +16,9 @@ export function createVariableHistory(options: HistoryOptions) {
   return async (
     files: string | undefined | readonly string[],
     label: string,
+    // Edits sharing a key collapse into one undo step; undefined keeps each its own.
+    coalesceKey: string | undefined,
     run: () => Promise<boolean | void>,
-    coalesceKey: string | null = null,
   ): Promise<boolean> => {
     const paths = [...new Set(typeof files === 'string' ? [files] : (files ?? []))];
     assert(paths.length <= LIMITS.scanEntriesMax, 'Variable undo: file limit exceeded');

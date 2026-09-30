@@ -61,7 +61,7 @@ export function summarize(files: readonly HistoryCommitFile[] | undefined): stri
   return `${labels[0]} and ${labels.length - 1} other ${noun}s`;
 }
 
-export function commitAuthor(commit: HistoryCommit, userEmail: string | null | undefined): string {
+export function commitAuthor(commit: HistoryCommit, userEmail: string | undefined): string {
   return userEmail && commit.email === userEmail ? 'You' : commit.author;
 }
 

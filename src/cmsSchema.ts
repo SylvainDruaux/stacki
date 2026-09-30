@@ -13,10 +13,10 @@ export interface Collection {
   readonly name: string;
   readonly dir: string;
   readonly label: string;
-  readonly error: string | null;
+  readonly error: string | undefined;
   readonly items: readonly unknown[];
   readonly single: boolean;
-  readonly rootKey: string | null;
+  readonly rootKey: string | undefined;
   readonly raw?: Readonly<Record<string, unknown>>;
 }
 export interface CmsField {
@@ -101,28 +101,28 @@ export function inferType(value: unknown): FieldType {
   if (isPlainObject(value)) {
     return 'object';
   }
-  const s = String(value);
-  if (IMAGE_RE.test(s)) {
+  const text = String(value);
+  if (IMAGE_RE.test(text)) {
     return 'image';
   }
-  if (COLOR_RE.test(s)) {
+  if (COLOR_RE.test(text)) {
     return 'color';
   }
-  if (DATE_RE.test(s)) {
+  if (DATE_RE.test(text)) {
     return 'date';
   }
-  if (s.startsWith('mailto:') || EMAIL_RE.test(s)) {
+  if (text.startsWith('mailto:') || EMAIL_RE.test(text)) {
     return 'email';
   }
-  if (s.startsWith('tel:')) {
+  if (text.startsWith('tel:')) {
     return 'phone';
   }
   // Only absolute URLs — a relative path is as likely to be a slug or a
   // filename as a link, and a URL input would fight the user over it.
-  if (/^https?:\/\//.test(s)) {
+  if (/^https?:\/\//.test(text)) {
     return 'link';
   }
-  if (s.length > 80 || s.includes('\n')) {
+  if (text.length > 80 || text.includes('\n')) {
     return 'longtext';
   }
   return 'text';
@@ -156,29 +156,29 @@ export function collectionOf(file: CmsFile): Collection {
     name: file.name,
     dir: file.dir,
     label: labelize(file.name),
-    error: file.error || null,
+    error: file.error || undefined,
   };
   const data = file.data;
   if (file.error || data === undefined) {
-    return { ...base, items: [], single: false, rootKey: null };
+    return { ...base, items: [], single: false, rootKey: undefined };
   }
 
   const rows = toArray(data);
   if (rows) {
-    return { ...base, rootKey: null, items: rows, single: false };
+    return { ...base, rootKey: undefined, items: rows, single: false };
   }
   if (isPlainObject(data)) {
-    const arrayKeys = Object.keys(data).filter((k) => Array.isArray(data[k]));
+    const arrayKeys = Object.keys(data).filter((key) => Array.isArray(data[key]));
     const rootKey = arrayKeys[0];
-    const rows = rootKey === undefined ? null : toArray(data[rootKey]);
+    const rows = rootKey === undefined ? undefined : toArray(data[rootKey]);
     if (arrayKeys.length === 1 && rootKey !== undefined && rows?.every(isPlainObject)) {
       // `raw` keeps the wrapper's other keys so writing back doesn't drop them.
       return { ...base, rootKey, raw: data, items: rows, single: false };
     }
-    return { ...base, rootKey: null, items: [data], single: true };
+    return { ...base, rootKey: undefined, items: [data], single: true };
   }
   // A bare string/number at the top level: one item holding that value.
-  return { ...base, rootKey: null, items: [data], single: true };
+  return { ...base, rootKey: undefined, items: [data], single: true };
 }
 
 // Puts edited items back in the shape the file had.
@@ -246,14 +246,14 @@ export function titleOf(item: unknown, index: number): string {
     return own || `Item ${index + 1}`;
   }
   for (const key of TITLE_KEYS) {
-    const v = item[key];
-    if (typeof v === 'string' && v.trim()) {
-      return v.trim();
+    const value = item[key];
+    if (typeof value === 'string' && value.trim()) {
+      return value.trim();
     }
   }
-  for (const v of Object.values(item)) {
-    if (typeof v === 'string' && v.trim() && v.length <= 60) {
-      return v.trim();
+  for (const value of Object.values(item)) {
+    if (typeof value === 'string' && value.trim() && value.length <= 60) {
+      return value.trim();
     }
   }
   return `Item ${index + 1}`;
@@ -278,8 +278,8 @@ export function blankLike(value: unknown, depth = 0): unknown {
   }
   if (type === 'object' && isPlainObject(value)) {
     const out: Record<string, unknown> = {};
-    for (const [k, v] of Object.entries(value)) {
-      out[k] = blankLike(v, depth + 1);
+    for (const [key, child] of Object.entries(value)) {
+      out[key] = blankLike(child, depth + 1);
     }
     return out;
   }
@@ -314,8 +314,8 @@ export function keyFor(name: unknown): string {
     return '';
   }
   return words
-    .map((w, i) =>
-      i === 0 ? w.toLowerCase() : w.charAt(0).toUpperCase() + w.slice(1).toLowerCase(),
+    .map((word, i) =>
+      i === 0 ? word.toLowerCase() : word.charAt(0).toUpperCase() + word.slice(1).toLowerCase(),
     )
     .join('');
 }
@@ -377,8 +377,8 @@ export function objectsAt(
   let current = items.filter(isPlainObject);
   for (const key of path) {
     const next: Record<string, unknown>[] = [];
-    for (const obj of current) {
-      const value = obj[key];
+    for (const object of current) {
+      const value = object[key];
       const values = toArray(value);
       if (values) {
         next.push(...values.filter(isPlainObject));
@@ -395,9 +395,16 @@ export function objectsAt(
 export const fieldsAt = (items: readonly unknown[], path: readonly string[]) =>
   fieldsOf(objectsAt(items, path));
 
-function transformAt(value: unknown, path: readonly string[], fn: ObjectEdit): unknown {
+function transformAt(
+  value: unknown,
+  path: readonly string[],
+  depth: number,
+  edit: ObjectEdit,
+): unknown {
+  // Each level consumes one key of a path its callers bound to depthMax.
+  assert(depth <= BOUNDARY_LIMITS.depthMax, 'CMS transform exceeds depth limit');
   if (!path.length) {
-    return isPlainObject(value) ? fn(value) : value;
+    return isPlainObject(value) ? edit(value) : value;
   }
   if (!isPlainObject(value)) {
     return value;
@@ -411,63 +418,63 @@ function transformAt(value: unknown, path: readonly string[], fn: ObjectEdit): u
   return {
     ...value,
     [key]: toArray(child)
-      ? (toArray(child) ?? []).map((c) => transformAt(c, rest, fn))
-      : transformAt(child, rest, fn),
+      ? (toArray(child) ?? []).map((entry) => transformAt(entry, rest, depth + 1, edit))
+      : transformAt(child, rest, depth + 1, edit),
   };
 }
 
 export function applyToItems(
   items: readonly unknown[],
   path: readonly string[],
-  fn: ObjectEdit,
+  edit: ObjectEdit,
 ): readonly unknown[] {
   assert(path.length <= BOUNDARY_LIMITS.depthMax, 'CMS path exceeds depth limit');
   assert(items.length <= BOUNDARY_LIMITS.itemsMax, 'CMS item count exceeds limit');
-  return items.map((item) => transformAt(item, path, fn));
+  return items.map((item) => transformAt(item, path, 0, edit));
 }
 
 // Renaming rebuilds the object so the field keeps its position in the file.
 export const renameKey =
   (from: string, to: string): ObjectEdit =>
-  (obj) => {
-    if (!(from in obj) || from === to) {
-      return obj;
+  (object) => {
+    if (!(from in object) || from === to) {
+      return object;
     }
     const out: Record<string, unknown> = {};
-    for (const [k, v] of Object.entries(obj)) {
-      out[k === from ? to : k] = v;
+    for (const [key, value] of Object.entries(object)) {
+      out[key === from ? to : key] = value;
     }
     return out;
   };
 
 export const dropKey =
   (key: string): ObjectEdit =>
-  (obj) => {
-    if (!(key in obj)) {
-      return obj;
+  (object) => {
+    if (!(key in object)) {
+      return object;
     }
-    const out = { ...obj };
+    const out = { ...object };
     delete out[key];
     return out;
   };
 
 export const putKey =
   (key: string, type: string): ObjectEdit =>
-  (obj) =>
-    key in obj ? obj : { ...obj, [key]: emptyValueFor(type) };
+  (object) =>
+    key in object ? object : { ...object, [key]: emptyValueFor(type) };
 
 export const orderKeys =
   (keys: readonly string[]): ObjectEdit =>
-  (obj) => {
+  (object) => {
     const out: Record<string, unknown> = {};
-    for (const k of keys) {
-      if (k in obj) {
-        out[k] = obj[k];
+    for (const key of keys) {
+      if (key in object) {
+        out[key] = object[key];
       }
     }
-    for (const k of Object.keys(obj)) {
-      if (!(k in out)) {
-        out[k] = obj[k];
+    for (const key of Object.keys(object)) {
+      if (!(key in out)) {
+        out[key] = object[key];
       }
     }
     return out;

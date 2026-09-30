@@ -7,15 +7,15 @@
 
 import { toRecord } from '../shared/record';
 
-export function cleanError(err: unknown): string {
-  const record = toRecord(err);
+export function cleanError(error: unknown): string {
+  const record = toRecord(error);
   const message = record?.['message'];
-  const text = typeof message === 'string' && message ? message : String(err);
+  const text = typeof message === 'string' && message ? message : String(error);
   return stripAnsi(text.replace(/^Error invoking remote method '[^']+':\s*(Error:\s*)?/, ''));
 }
 
-export function stripAnsi(s: unknown): string {
-  return String(s)
+export function stripAnsi(text: unknown): string {
+  return String(text)
     .replace(/\x1b\[[0-9;]*[A-Za-z]/g, '')
     .replace(/\x1b/g, '')
     .replace(/\[(\d{1,2})m/g, '');

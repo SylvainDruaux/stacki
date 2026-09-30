@@ -12,8 +12,8 @@ import { CodeIcon } from '../ui/Icons.jsx';
 interface CodePanelProps {
   readonly source: string;
   readonly relativePath: string;
-  readonly model: EditorModel | null;
-  readonly selectedId: string | null;
+  readonly model: EditorModel | undefined;
+  readonly selectedId: string | undefined;
   readonly onChange: (source: string, position: number) => void;
   readonly onSelect: (id: string) => void;
   readonly onOpenComponent: (name: string, id: string) => void;
@@ -55,7 +55,7 @@ export default function CodePanel(props: CodePanelProps) {
               return;
             }
             const node = sourceNodeAtOffset(model?.nodes ?? [], position);
-            if (node !== null) {
+            if (node !== undefined) {
               onSelect(node.id);
             }
           }}

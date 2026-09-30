@@ -96,16 +96,16 @@ export const ASTRO_ASSETS: readonly AstroAsset[] = [
 // grey box, needs no file on disk, and needs no remote-domain allowlisting the
 // way an http src would. A string src also has to carry width/height, so those
 // come with it; picking a real image in the props panel replaces the lot.
-export const PLACEHOLDER_SRC =
+export const PLACEHOLDER_SOURCE =
   "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg'" +
   " width='400' height='300'%3E%3Crect width='400' height='300'" +
   " fill='%23d8d8d8'/%3E%3C/svg%3E";
 export const PLACEHOLDER_PROPS: Readonly<Record<string, Attr>> = {
-  src: { type: 'string', value: PLACEHOLDER_SRC },
+  src: { type: 'string', value: PLACEHOLDER_SOURCE },
   alt: { type: 'string', value: '' },
   width: { type: 'expr', value: '400' },
   height: { type: 'expr', value: '300' },
 };
 
-export const isAstroAsset = (name: unknown) => ASTRO_ASSETS.some((a) => a.name === name);
-export const astroAsset = (name: unknown) => ASTRO_ASSETS.find((a) => a.name === name) || null;
+export const isAstroAsset = (name: unknown) => ASTRO_ASSETS.some((asset) => asset.name === name);
+export const astroAsset = (name: unknown) => ASTRO_ASSETS.find((asset) => asset.name === name);

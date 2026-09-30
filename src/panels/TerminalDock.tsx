@@ -71,9 +71,12 @@ export function tabLabels(tabs: readonly TerminalTab[]): readonly string[] {
 
 export default function TerminalDock(props: TerminalDockProps) {
   const settings = useDockSettings();
-  const terminals = useTerminalTabs(props.projectPath, props.open);
+  const terminals = useTerminalTabs(props.projectPath, { open: props.open });
   const onHandleDown = useDockResize(settings.height, settings.setHeight, settings.setDragging);
-  useVisiblePaneFit(props.open, terminals.activeId, settings.height, terminals.paneRefs.current);
+  useVisiblePaneFit(
+    { open: props.open, activeId: terminals.activeId, height: settings.height },
+    terminals.paneRefs.current,
+  );
   const autoLaunch = launchCommand(settings.mode, settings.custom);
   return (
     <div
@@ -103,7 +106,7 @@ export default function TerminalDock(props: TerminalDockProps) {
           >
             <Suspense fallback={<div className="term-pane">Loading terminal…</div>}>
               <TerminalPane
-                ref={(pane) => terminals.setPaneRef(tab.id, pane)}
+                ref={(pane) => terminals.setPaneRef(tab.id, pane ?? undefined)}
                 terminalId={tab.id}
                 projectPath={props.projectPath}
                 autoLaunch={autoLaunch}
@@ -138,18 +141,18 @@ function useDockSettings(): DockSettings {
 
 interface TerminalTabs {
   readonly tabs: readonly TerminalTab[];
-  readonly activeId: string | null;
-  readonly setActiveId: (id: string | null) => void;
+  readonly activeId: string | undefined;
+  readonly setActiveId: (id: string | undefined) => void;
   readonly createTab: () => void;
   readonly closeTab: (id: string) => void;
   readonly setTabTitle: (id: string, title: string) => void;
   readonly paneRefs: MutableRefObject<Map<string, TerminalPaneHandle>>;
-  readonly setPaneRef: (id: string, pane: TerminalPaneHandle | null) => void;
+  readonly setPaneRef: (id: string, pane: TerminalPaneHandle | undefined) => void;
 }
 
-function useTerminalTabs(projectPath: string, open: boolean): TerminalTabs {
+function useTerminalTabs(projectPath: string, dock: { readonly open: boolean }): TerminalTabs {
   const [tabs, setTabs] = useState<readonly TerminalTab[]>([]);
-  const [activeId, setActiveId] = useState<string | null>(null);
+  const [activeId, setActiveId] = useState<string | undefined>(undefined);
   const tabsRef = useRef(tabs);
   const paneRefs = useRef(new Map<string, TerminalPaneHandle>());
   const nextNumber = useRef(1);
@@ -169,19 +172,24 @@ function useTerminalTabs(projectPath: string, open: boolean): TerminalTabs {
     paneRefs.current.delete(id);
     setTabs((previous) => closeTabFromList(previous, id, setActiveId));
   }, []);
-  useProjectTerminalLifecycle(projectPath, open, createTab, {
-    tabsRef,
-    paneRefs,
-    nextNumber,
-    seeded,
-    setTabs,
-    setActiveId,
-  });
+  useProjectTerminalLifecycle(
+    projectPath,
+    dock,
+    {
+      tabsRef,
+      paneRefs,
+      nextNumber,
+      seeded,
+      setTabs,
+      setActiveId,
+    },
+    createTab,
+  );
   useTerminalProcessNames(setTabs);
   const setTabTitle = useCallback((id: string, title: string) => {
     setTabs((previous) => updateTab(previous, id, 'oscTitle', title));
   }, []);
-  const setPaneRef = useCallback((id: string, pane: TerminalPaneHandle | null) => {
+  const setPaneRef = useCallback((id: string, pane: TerminalPaneHandle | undefined) => {
     if (pane) {
       paneRefs.current.set(id, pane);
     } else {
@@ -197,15 +205,16 @@ interface LifecycleRefs {
   readonly nextNumber: MutableRefObject<number>;
   readonly seeded: MutableRefObject<boolean>;
   readonly setTabs: Dispatch<SetStateAction<readonly TerminalTab[]>>;
-  readonly setActiveId: Dispatch<SetStateAction<string | null>>;
+  readonly setActiveId: Dispatch<SetStateAction<string | undefined>>;
 }
 
 function useProjectTerminalLifecycle(
   projectPath: string,
-  open: boolean,
-  createTab: () => void,
+  dock: { readonly open: boolean },
   refs: LifecycleRefs,
+  createTab: () => void,
 ): void {
+  const { open } = dock;
   const { paneRefs, seeded, setActiveId, setTabs, tabsRef, nextNumber } = refs;
   useEffect(() => {
     const panes = paneRefs.current;
@@ -215,7 +224,7 @@ function useProjectTerminalLifecycle(
       nextNumber.current = 1;
       seeded.current = false;
       setTabs([]);
-      setActiveId(null);
+      setActiveId(undefined);
     };
   }, [projectPath, paneRefs, seeded, setActiveId, setTabs, tabsRef, nextNumber]);
   useEffect(() => {
@@ -245,7 +254,7 @@ function useTerminalProcessNames(setTabs: Dispatch<SetStateAction<readonly Termi
 function closeTabFromList(
   previous: readonly TerminalTab[],
   id: string,
-  setActiveId: Dispatch<SetStateAction<string | null>>,
+  setActiveId: Dispatch<SetStateAction<string | undefined>>,
 ): readonly TerminalTab[] {
   const index = previous.findIndex((tab) => tab.id === id);
   assert(index >= 0, 'Closed terminal tab must exist');
@@ -254,7 +263,7 @@ function closeTabFromList(
     if (current !== id) {
       return current;
     }
-    return next[Math.min(index, next.length - 1)]?.id ?? null;
+    return next[Math.min(index, next.length - 1)]?.id;
   });
   return next;
 }
@@ -273,7 +282,7 @@ function updateTab(
 
 interface TerminalBarProps {
   readonly tabs: readonly TerminalTab[];
-  readonly activeId: string | null;
+  readonly activeId: string | undefined;
   readonly createTab: () => void;
   readonly closeTab: (id: string) => void;
   readonly activate: (id: string) => void;
@@ -391,11 +400,14 @@ function useDockResize(
 }
 
 function useVisiblePaneFit(
-  open: boolean,
-  activeId: string | null,
-  height: number,
+  view: {
+    readonly open: boolean;
+    readonly activeId: string | undefined;
+    readonly height: number;
+  },
   panes: Map<string, TerminalPaneHandle>,
 ): void {
+  const { open, activeId, height } = view;
   useLayoutEffect(() => {
     if (!open || !activeId) {
       return undefined;

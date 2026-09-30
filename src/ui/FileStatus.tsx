@@ -28,11 +28,11 @@ export default function FileStatus({
   status,
   inCommit = false,
 }: {
-  readonly status?: string | null;
+  readonly status?: string | undefined;
   readonly inCommit?: boolean;
 }) {
   if (!status) {
-    return null;
+    return undefined;
   }
   const known = WORDS[status];
   // An unrecognised letter keeps the letter. Inventing a word for something

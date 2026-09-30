@@ -3,7 +3,7 @@ import type { PairedNode } from '../../shared/page-node';
 import type { NavigatorNode, DropLocation, DropTarget } from './structureModel';
 import { canContainTag } from '../elementSchemas';
 import { isDataBound } from '../bindings';
-import { clearDrag, getDrag, setDrag } from '../dragState';
+import { allowDragEffect, clearDrag, getDrag, setDrag } from '../dragState';
 import { elementLabel } from '../classNames';
 import { hidesChildRows, noteText } from '../treeSelection';
 import { thenBranch } from '../branches';
@@ -35,20 +35,20 @@ import {
 import { currentDesktopPlatform, shortcutLabel } from '../shortcutLabel';
 
 export interface StructureTreeContext {
-  readonly selectedId: string | null;
+  readonly selectedId: string | undefined;
   readonly emptyNodeIds?: ReadonlySet<string>;
   readonly hiddenNodeIds?: ReadonlySet<string>;
   readonly inertNodeIds?: ReadonlySet<string>;
   readonly liveClassesById?: ReadonlyMap<string, readonly string[]>;
   readonly currentLayoutName: string;
-  readonly dropTarget: DropTarget | null;
-  readonly setDropTarget: React.Dispatch<React.SetStateAction<DropTarget | null>>;
+  readonly dropTarget: DropTarget | undefined;
+  readonly setDropTarget: React.Dispatch<React.SetStateAction<DropTarget | undefined>>;
   readonly isCollapsed: (node: NavigatorNode) => boolean;
   readonly isDndPayload: (event: React.DragEvent<HTMLElement>) => boolean;
   readonly performDrop: (event: React.DragEvent<HTMLElement>, target: DropLocation) => void;
-  readonly nodeById: (id: string) => NavigatorNode | null;
+  readonly nodeById: (id: string) => NavigatorNode | undefined;
   readonly onSelect: (id: string) => void;
-  readonly onHoverNode?: (id: string | null) => void;
+  readonly onHoverNode?: (id: string | undefined) => void;
   readonly onOpenComponent?: (name: string, id: string) => void;
   readonly onOpenCode?: (id: string) => void;
   readonly toggleCollapse: (node: NavigatorNode) => void;
@@ -57,7 +57,8 @@ export interface StructureTreeContext {
 
 interface NodeListProps extends StructureTreeContext {
   readonly nodes: readonly NavigatorNode[];
-  readonly parentId: string | null;
+  /** The list's parent; undefined for the page's root list. */
+  readonly parentId: string | undefined;
   readonly depth: number;
 }
 
@@ -68,7 +69,7 @@ export function NodeList({ nodes, parentId, depth, ...context }: NodeListProps) 
   return (
     <>
       {nodes.map((node, index) =>
-        folded.has(index) ? null : (
+        folded.has(index) ? undefined : (
           <React.Fragment key={node.id}>
             <Gap
               parentId={parentId}
@@ -76,7 +77,7 @@ export function NodeList({ nodes, parentId, depth, ...context }: NodeListProps) 
               depth={depth}
               {...context}
             />
-            <TreeNode node={node} note={noteFor.get(index) ?? null} depth={depth} {...context} />
+            <TreeNode node={node} note={noteFor.get(index)} depth={depth} {...context} />
           </React.Fragment>
         ),
       )}
@@ -104,7 +105,7 @@ function foldedNotes(nodes: readonly NavigatorNode[]): {
 }
 
 interface GapProps extends StructureTreeContext {
-  readonly parentId: string | null;
+  readonly parentId: string | undefined;
   readonly index: number;
   readonly depth: number;
 }
@@ -113,7 +114,7 @@ function Gap(props: GapProps) {
   const { parentId, index, depth, dropTarget, setDropTarget, isDndPayload, performDrop } = props;
   const active =
     dropTarget?.kind === 'gap' && dropTarget.parentId === parentId && dropTarget.index === index;
-  const accepted = acceptsDrag(parentId === null ? null : props.nodeById(parentId));
+  const accepted = acceptsDrag(parentId === undefined ? undefined : props.nodeById(parentId));
   const location = { parentId, index };
   return (
     <div
@@ -137,7 +138,7 @@ function Gap(props: GapProps) {
   );
 }
 
-function acceptsDrag(parent: NavigatorNode | null): boolean {
+function acceptsDrag(parent: NavigatorNode | undefined): boolean {
   const drag = getDrag();
   if (!drag || drag.kind !== 'node' || drag.nodeKind !== 'element' || !drag.tag) {
     return true;
@@ -150,7 +151,7 @@ function acceptsDrag(parent: NavigatorNode | null): boolean {
 
 interface TreeNodeProps extends StructureTreeContext {
   readonly node: NavigatorNode;
-  readonly note: NavigatorNode | null;
+  readonly note: NavigatorNode | undefined;
   readonly depth: number;
 }
 
@@ -167,7 +168,7 @@ function TreeNode(props: TreeNodeProps) {
   const children = navigatorChildren(node);
   const host = navigatorHost(node);
   const showChildren = children.length > 0 && !hidesChildRows(node, children);
-  const view = nodeView(props, children, host, showChildren, selected);
+  const view = nodeView(props, { children, host, showChildren, selected });
   return (
     <>
       <TreeRow {...props} {...view} rowRef={rowRef} />
@@ -213,29 +214,27 @@ interface NodeView {
   readonly selected: boolean;
   readonly dropInto: boolean;
   readonly description: { readonly icon: React.ReactNode; readonly label: string };
-  readonly hint: string | null;
+  readonly hint: string | undefined;
 }
 
 function nodeView(
   props: TreeNodeProps,
-  children: readonly NavigatorNode[],
-  host: NavigatorNode,
-  showChildren: boolean,
-  selected: boolean,
+  shape: Pick<NodeView, 'children' | 'host' | 'showChildren' | 'selected'>,
 ): NodeView {
+  const { children, host, showChildren, selected } = shape;
   const { node } = props;
   const fragment = isFragmentNode(node);
   const layout = node.id === 'layout';
   const component = node.kind === 'component' && !node.dynamicTag && !fragment;
   let description = describeNode(node, props.liveClassesById?.get(node.id));
-  let hint: string | null = null;
+  let hint: string | undefined;
   if (layout) {
     const label = node.kind === 'component' || node.kind === 'element' ? node.name : '';
     description = { icon: <LayoutIcon size={13} />, label: label || props.currentLayoutName };
     hint =
       props.currentLayoutName && props.currentLayoutName !== description.label
         ? props.currentLayoutName
-        : null;
+        : undefined;
   }
   return {
     children,
@@ -266,7 +265,7 @@ function TreeRow(props: TreeRowProps) {
       data-node-id={node.id}
       title={props.fragment ? fragmentTitle : undefined}
       className={rowClassName(props)}
-      style={rowStyle(props.depth, props.dropInto)}
+      style={rowStyle(props.depth, props.dropInto ? 'drop-into' : 'plain')}
       draggable={node.kind !== 'chunk-group' && node.kind !== 'branch'}
       {...handlers}
     >
@@ -298,7 +297,7 @@ function treeRowHandlers(props: TreeRowProps) {
     onDragStart: (event: React.DragEvent<HTMLDivElement>): void => {
       event.stopPropagation();
       event.dataTransfer.setData('avb/node', node.id);
-      event.dataTransfer.effectAllowed = 'move';
+      allowDragEffect(event.dataTransfer, 'move');
       const tag = 'name' in node ? node.name : undefined;
       setDrag({
         kind: 'node',
@@ -333,7 +332,7 @@ function treeRowHandlers(props: TreeRowProps) {
       }
     },
     onMouseEnter: (): void => props.onHoverNode?.(node.id),
-    onMouseLeave: (): void => props.onHoverNode?.(null),
+    onMouseLeave: (): void => props.onHoverNode?.(undefined),
     onContextMenu: (event: React.MouseEvent<HTMLDivElement>): void => {
       event.preventDefault();
       event.stopPropagation();
@@ -403,7 +402,7 @@ function RowLabel({
 }: {
   readonly node: NavigatorNode;
   readonly label: string;
-  readonly note: NavigatorNode | null;
+  readonly note: NavigatorNode | undefined;
 }) {
   const noteValue = note?.kind === 'comment' ? note.value : undefined;
   return (
@@ -432,7 +431,7 @@ function NodeStatus({
   readonly inert: boolean;
 }) {
   if (!rendersNothing && !hidden && !inert) {
-    return null;
+    return undefined;
   }
   return (
     <span className="node-empty">
@@ -462,7 +461,7 @@ function canHostChildren(node: NavigatorNode): boolean {
     node.kind === 'chunk-group' ||
     node.kind === 'map' ||
     node.kind === 'branch' ||
-    thenBranch(node) !== null
+    thenBranch(node) !== undefined
   );
 }
 
@@ -482,10 +481,12 @@ function rowClassName(view: NodeView & { readonly node: NavigatorNode }): string
   ].join(' ');
 }
 
-function rowStyle(depth: number, dropInto: boolean): React.CSSProperties {
+function rowStyle(depth: number, drop: 'drop-into' | 'plain'): React.CSSProperties {
   return {
     paddingLeft: 6 + depth * 16,
-    ...(dropInto ? { borderColor: 'var(--accent)', background: 'var(--accent-soft)' } : {}),
+    ...(drop === 'drop-into'
+      ? { borderColor: 'var(--accent)', background: 'var(--accent-soft)' }
+      : {}),
   };
 }
 
@@ -633,10 +634,11 @@ export function ContextMenu({
 
 function useContextDismiss(ref: React.RefObject<HTMLDivElement>, onClose: () => void): void {
   useEffect(() => {
-    const outside = (target: EventTarget | null): boolean =>
+    // Event targets are null when the event has none; that is never inside.
+    const outside = (target: EventTarget | undefined): boolean =>
       target instanceof Node && ref.current !== null && !ref.current.contains(target);
     const onDown = (event: MouseEvent): void => {
-      if (outside(event.target)) {
+      if (outside(event.target ?? undefined)) {
         onClose();
       }
     };
@@ -646,7 +648,7 @@ function useContextDismiss(ref: React.RefObject<HTMLDivElement>, onClose: () => 
       }
     };
     const onScroll = (event: Event): void => {
-      if (outside(event.target)) {
+      if (outside(event.target ?? undefined)) {
         onClose();
       }
     };

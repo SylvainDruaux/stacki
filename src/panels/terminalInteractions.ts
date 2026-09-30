@@ -1,4 +1,5 @@
 import type { Terminal } from '@xterm/xterm';
+import type { PathStyle } from '../terminalPaste';
 import { decideTerminalPaste, escapePosixPath, quoteWindowsPath } from '../terminalPaste';
 import {
   requestNativePaste,
@@ -16,7 +17,7 @@ interface InteractionOptions {
 }
 
 export function installTerminalInteractions(options: InteractionOptions): () => void {
-  const pasteImage = (file: File | null): void => void persistImage(options, file);
+  const pasteImage = (file: File | undefined): void => void persistImage(options, file);
   const onPaste = (event: ClipboardEvent): void => {
     const data = event.clipboardData;
     if (!data) {
@@ -26,7 +27,7 @@ export function installTerminalInteractions(options: InteractionOptions): () => 
       Array.from(data.items),
       data.getData('text/plain'),
       terminalFilePath,
-      window.avb.platform === 'win32',
+      terminalPathStyle(),
     );
     if (action.kind === 'text') {
       return;
@@ -40,9 +41,10 @@ export function installTerminalInteractions(options: InteractionOptions): () => 
     }
   };
   const onDragOver = (event: DragEvent): void => {
-    if (event.dataTransfer) {
+    const transfer = event.dataTransfer;
+    if (transfer) {
       event.preventDefault();
-      event.dataTransfer.dropEffect = 'copy';
+      transfer.dropEffect = 'copy';
     }
   };
   const onDrop = (event: DragEvent): void => dropIntoTerminal(options, event, pasteImage);
@@ -59,14 +61,14 @@ export function installTerminalInteractions(options: InteractionOptions): () => 
   };
 }
 
-async function persistImage(options: InteractionOptions, file: File | null): Promise<void> {
-  const forwardControlV = (): void => {
+async function persistImage(options: InteractionOptions, file: File | undefined): Promise<void> {
+  const forwardPasteKeystroke = (): void => {
     if (!options.disposed()) {
       sendTerminalInput(options.terminalId, '\x16');
     }
   };
   if (!file || file.size > TERMINAL_IMAGE_BYTES_MAX) {
-    forwardControlV();
+    forwardPasteKeystroke();
     return;
   }
   try {
@@ -79,7 +81,7 @@ async function persistImage(options: InteractionOptions, file: File | null): Pro
       return;
     }
     if (!result.ok || !result.value.ok) {
-      forwardControlV();
+      forwardPasteKeystroke();
       return;
     }
     const path = result.value.path;
@@ -87,14 +89,14 @@ async function persistImage(options: InteractionOptions, file: File | null): Pro
       .terminal()
       ?.paste(window.avb.platform === 'win32' ? quoteWindowsPath(path) : escapePosixPath(path));
   } catch {
-    forwardControlV();
+    forwardPasteKeystroke();
   }
 }
 
 function dropIntoTerminal(
   options: InteractionOptions,
   event: DragEvent,
-  pasteImage: (file: File | null) => void,
+  pasteImage: (file: File | undefined) => void,
 ): void {
   const data = event.dataTransfer;
   if (!data) {
@@ -107,7 +109,7 @@ function dropIntoTerminal(
     Array.from(data.items),
     plainText,
     terminalFilePath,
-    window.avb.platform === 'win32',
+    terminalPathStyle(),
   );
   if (action.kind === 'paths') {
     options.terminal()?.paste(action.text);
@@ -128,4 +130,8 @@ function handlePasteShortcut(event: KeyboardEvent): void {
     event.stopImmediatePropagation();
     requestNativePaste();
   }
+}
+
+function terminalPathStyle(): PathStyle {
+  return window.avb.platform === 'win32' ? 'windows' : 'posix';
 }

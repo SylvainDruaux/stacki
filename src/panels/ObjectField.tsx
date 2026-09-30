@@ -22,7 +22,7 @@ import SegSwitch from '../ui/SegSwitch.jsx';
 // a name standing for something elsewhere. Those keep the code editor, which is
 // one press of `{}` away in either direction (see arrayValue.js).
 interface ObjectFieldProps {
-  readonly value?: string | null;
+  readonly value?: string | undefined;
   readonly onChange: (value: string, immediate: boolean) => void;
 }
 export default function ObjectField({ value, onChange }: ObjectFieldProps) {
@@ -73,7 +73,7 @@ function ObjectRowControl({ field, onChange }: RowProps) {
         value={arrayText(field.items)}
         onChange={(text, immediate) => {
           const items = arrayItems(text);
-          assert(items !== null, 'ObjectField: list editor produces an array literal');
+          assert(items !== undefined, 'ObjectField: list editor produces an array literal');
           onChange({ ...field, items }, { immediate: immediate !== false });
         }}
       />

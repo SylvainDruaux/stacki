@@ -1,3 +1,5 @@
+import { assert } from '../shared/assert';
+import { LIMITS } from '../shared/limits';
 import { treeBudget, type TreeView } from './treeView';
 // What a piece of a page reads from around it.
 //
@@ -21,12 +23,12 @@ import { parseDeclarations, scopeChips } from './dataSuggest.js';
 // bindings, which is the safe way to be wrong (a prop too many, never one too
 // few).
 function loopHead(head: unknown) {
-  const m = String(head || '').match(
+  const match = String(head || '').match(
     /^([\s\S]*?)\.map\(\s*\(\s*([A-Za-z_$][\w$]*)\s*(?:,\s*([A-Za-z_$][\w$]*)\s*)?\)\s*=>\s*\($/,
   );
-  return m?.[1] !== undefined && m[2] !== undefined
-    ? { data: m[1].trim(), item: m[2], index: m[3] || '' }
-    : null;
+  return match?.[1] !== undefined && match[2] !== undefined
+    ? { data: match[1].trim(), item: match[2], index: match[3] || '' }
+    : undefined;
 }
 
 /** Every expression a node states in its OWN scope (its children may differ). */
@@ -49,8 +51,8 @@ function expressionsOf(node: TreeView): readonly string[] {
   }
   // `Some {count} words` — the holes in a text run are expressions too.
   if (node.kind === 'text' && String(node.value ?? '').includes('{')) {
-    for (const m of String(node.value).matchAll(/\{([^{}]*)\}/g)) {
-      out.push(m[1] ?? '');
+    for (const match of String(node.value).matchAll(/\{([^{}]*)\}/g)) {
+      out.push(match[1] ?? '');
     }
   }
   return out;
@@ -65,8 +67,8 @@ function expressionsOf(node: TreeView): readonly string[] {
  * its imports, and the item of any loop the piece sits inside.
  */
 export function propsForExtraction(
-  node: TreeView | null | undefined,
-  scope: Iterable<string> | null | undefined,
+  node: TreeView | undefined,
+  scope: Iterable<string> | undefined,
 ): readonly string[] {
   const inScope = scope instanceof Set ? new Set(scope) : new Set(scope || []);
   if (!inScope.size || !node) {
@@ -84,31 +86,32 @@ export function propsForExtraction(
     }
   };
 
-  const walk = (n: TreeView, shadowed: ReadonlySet<string>, depth: number): void => {
+  const walk = (tree: TreeView, shadowed: ReadonlySet<string>, depth: number): void => {
     visit(depth);
-    if (!n || typeof n !== 'object') {
+    assert(depth <= LIMITS.treeDepthMax, 'propsForExtraction: depth limit');
+    if (!tree || typeof tree !== 'object') {
       return;
     }
-    for (const text of expressionsOf(n)) {
+    for (const text of expressionsOf(tree)) {
       take(text, shadowed);
     }
     let inner = shadowed;
-    if (n.kind === 'map') {
+    if (tree.kind === 'map') {
       // The item and index belong to this loop, and so does anything its body
       // declares — all of it travels with the markup.
-      const head = loopHead(n.head);
+      const head = loopHead(tree.head);
       const bound = [head?.item, head?.index].filter((name): name is string => !!name);
-      const body = n.body?.join('\n') ?? '';
+      const body = tree.body?.join('\n') ?? '';
       const declared = body ? [...parseDeclarations(body).keys()] : [];
       // A loop's own body lines read from OUTSIDE it (that's how it gets data).
-      for (const line of n.body ?? []) {
+      for (const line of tree.body ?? []) {
         take(line, new Set([...shadowed, ...bound]));
       }
       if (bound.length || declared.length) {
         inner = new Set([...shadowed, ...bound, ...declared]);
       }
     }
-    for (const child of n.children || []) {
+    for (const child of tree.children || []) {
       walk(child, inner, depth + 1);
     }
   };
@@ -118,7 +121,7 @@ export function propsForExtraction(
 }
 
 /** The frontmatter line a component with these props opens with. */
-export function propsDestructure(props: readonly string[] | null | undefined): string {
+export function propsDestructure(props: readonly string[] | undefined): string {
   const names = (props || []).filter(Boolean);
   if (!names.length) {
     return '';

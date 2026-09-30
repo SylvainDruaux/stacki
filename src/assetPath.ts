@@ -12,13 +12,13 @@
 // "src/assets/hero.png") — the same strings `assets:list` returns.
 
 export const isExternalAsset = (value: unknown): boolean => {
-  const v = String(value ?? '').trim();
-  return /^(https?:)?\/\//.test(v) || /^(data|blob):/i.test(v);
+  const text = String(value ?? '').trim();
+  return /^(https?:)?\/\//.test(text) || /^(data|blob):/i.test(text);
 };
 
-// Collapses "." and ".." segments. Null when the path climbs out of the
+// Collapses "." and ".." segments. Undefined when the path climbs out of the
 // project, which no asset does.
-const normalizeRel = (rel: string): string | null => {
+const normalizeRel = (rel: string): string | undefined => {
   const out: string[] = [];
   for (const seg of String(rel).split('/')) {
     if (!seg || seg === '.') {
@@ -26,77 +26,80 @@ const normalizeRel = (rel: string): string | null => {
     }
     if (seg === '..') {
       if (!out.length) {
-        return null;
+        return undefined;
       }
       out.pop();
       continue;
     }
     out.push(seg);
   }
-  return out.length ? out.join('/') : null;
+  return out.length ? out.join('/') : undefined;
 };
 
 // The rels a value could name, best guess first. More than one only for a
 // bare relative path ("hero.png"), which reads as a sibling of the file that
 // wrote it but is just as likely to mean public/.
 //
-// `baseDir` is the project-relative directory of the file the value lives in
+// `baseDirectory` is the project-relative directory of the file the value lives in
 // ("src/data"); without it a relative value can only be a public/ path.
-export function assetRelCandidates(value: unknown, baseDir?: string | null): readonly string[] {
+export function assetRelCandidates(
+  value: unknown,
+  baseDirectory?: string | undefined,
+): readonly string[] {
   const raw = String(value ?? '').trim();
   if (!raw || isExternalAsset(raw)) {
     return [];
   }
-  const p = (raw.split(/[?#]/)[0] ?? '').replace(/\\/g, '/');
-  if (!p) {
+  const path = (raw.split(/[?#]/)[0] ?? '').replace(/\\/g, '/');
+  if (!path) {
     return [];
   }
   // mailto:, tel:, blob: — anything with a scheme names no file here.
-  if (/^[a-z][a-z0-9+.-]*:/i.test(p)) {
+  if (/^[a-z][a-z0-9+.-]*:/i.test(path)) {
     return [];
   }
 
-  const alias = p.match(/^[@~]\/(.+)$/);
+  const alias = path.match(/^[@~]\/(.+)$/);
   if (alias) {
     return [normalizeRel(`src/${alias[1]}`)].filter((value): value is string => Boolean(value));
   }
 
-  if (p.startsWith('/')) {
+  if (path.startsWith('/')) {
     // Rooted paths are served out of public/, with one exception: "/src/…" is
     // the source tree, which is how a dev server hands back an unprocessed
     // file.
-    const rooted = p.startsWith('/src/') ? p.slice(1) : `public${p}`;
+    const rooted = path.startsWith('/src/') ? path.slice(1) : `public${path}`;
     return [normalizeRel(rooted)].filter((value): value is string => Boolean(value));
   }
 
-  if (/^(public|src)\//.test(p)) {
-    return [normalizeRel(p)].filter((value): value is string => Boolean(value));
+  if (/^(public|src)\//.test(path)) {
+    return [normalizeRel(path)].filter((value): value is string => Boolean(value));
   }
 
   // Explicitly relative ("./x.png", "../assets/x.png") is only ever relative
   // to the file — it never means public/.
-  const explicit = /^\.\.?\//.test(p);
-  const guesses: (string | null)[] = [];
-  if (baseDir) {
-    guesses.push(normalizeRel(`${baseDir}/${p}`));
+  const explicit = /^\.\.?\//.test(path);
+  const guesses: (string | undefined)[] = [];
+  if (baseDirectory) {
+    guesses.push(normalizeRel(`${baseDirectory}/${path}`));
   }
-  if (!explicit || !baseDir) {
-    guesses.push(normalizeRel(`public/${p}`));
+  if (!explicit || !baseDirectory) {
+    guesses.push(normalizeRel(`public/${path}`));
   }
   return guesses.filter((value): value is string => Boolean(value));
 }
 
 // The single rel a value most likely names, for messages and for opening the
 // picker in the right folder.
-export const assetRelOf = (value: unknown, baseDir?: string | null): string | null =>
-  assetRelCandidates(value, baseDir)[0] || null;
+export const assetRelOf = (value: unknown, baseDirectory?: string): string | undefined =>
+  assetRelCandidates(value, baseDirectory)[0] || undefined;
 
 // "src/data" + "src/assets/a.png" → "../assets/a.png".
 export function relativeAssetPath(
-  fromDir: string | null | undefined,
-  toRel: string | null | undefined,
+  fromDirectory: string | undefined,
+  toRel: string | undefined,
 ): string {
-  const from = String(fromDir || '')
+  const from = String(fromDirectory || '')
     .split('/')
     .filter((value): value is string => Boolean(value));
   const to = String(toRel || '')
@@ -115,15 +118,15 @@ export function relativeAssetPath(
 // and a path relative to the file for anything under src/, which is the only
 // form a bundler can follow back to the original.
 export function assetValueFor(
-  pickedRel: string | null | undefined,
-  baseDir?: string | null,
+  pickedRel: string | undefined,
+  baseDirectory?: string | undefined,
 ): string {
   const rel = String(pickedRel || '').replace(/^\/+/, '');
   if (rel.startsWith('public/')) {
     return `/${rel.slice('public/'.length)}`;
   }
-  if (baseDir) {
-    return relativeAssetPath(baseDir, rel);
+  if (baseDirectory) {
+    return relativeAssetPath(baseDirectory, rel);
   }
   return `/${rel}`;
 }

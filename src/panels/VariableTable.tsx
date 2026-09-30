@@ -75,6 +75,12 @@ interface TableProps extends SheetActions {
   readonly showHead?: boolean;
 }
 const SAVE_ON = ['Enter', 'Tab'];
+
+// The sheet's handlers report a refused edit themselves (a toast, then a
+// reload); what reaches here is an edit that could not be attempted at all.
+function reportEditFailure(error: unknown): void {
+  console.error('[stacki] variable edit failed:', error);
+}
 const LABEL_TRACKS = 'calc(var(--vars-inset) + 18px) var(--vars-name-col)';
 const valueTracks = (count: number) => `repeat(${count}, var(--vars-col))`;
 function sheetOffset(offsets: readonly SlotOffset[], index: number): SlotOffset {
@@ -127,13 +133,13 @@ function useEditableName(props: EditableNameProps) {
       return undefined;
     }
     done.current = false;
-    const el = inputRef.current;
-    el?.focus();
-    el?.select();
+    const input = inputRef.current;
+    input?.focus();
+    input?.select();
     return undefined;
   }, [editing]);
 
-  const commit = async () => {
+  const rename = async () => {
     if (done.current) {
       return;
     }
@@ -151,6 +157,9 @@ function useEditableName(props: EditableNameProps) {
     if (!ok) {
       setText(value);
     }
+  };
+  const commit = (): void => {
+    void rename().catch(reportEditFailure);
   };
   const cancel = () => {
     done.current = true;
@@ -191,16 +200,16 @@ function EditableNameView({ state }: { readonly state: ReturnType<typeof useEdit
       className={`vars-rename-input ${className || ''}`}
       value={text}
       spellCheck={false}
-      onChange={(e) => setText(e.target.value)}
+      onChange={(event) => setText(event.target.value)}
       onBlur={commit}
-      onKeyDown={(e) => {
-        e.stopPropagation();
-        if (SAVE_ON.includes(e.key)) {
-          e.preventDefault();
+      onKeyDown={(event) => {
+        event.stopPropagation();
+        if (SAVE_ON.includes(event.key)) {
+          event.preventDefault();
           commit();
         }
-        if (e.key === 'Escape') {
-          e.preventDefault();
+        if (event.key === 'Escape') {
+          event.preventDefault();
           cancel();
         }
       }}
@@ -209,7 +218,7 @@ function EditableNameView({ state }: { readonly state: ReturnType<typeof useEdit
 }
 
 function useSheet(props: SheetProps) {
-  const { blocks, group, onMove } = props;
+  const { blocks, group, onMove: moveSlots } = props;
 
   // Dragging a variable is one gesture across the whole sheet rather than one
   // per group. A group is a run of lines between two comments in the same rule,
@@ -225,7 +234,9 @@ function useSheet(props: SheetProps) {
   const { slots, offsets: slotOffsets } = useMemo(() => buildSheetSlots(blocks), [blocks]);
   const rowsDrag = useListReorder({
     count: slots.length,
-    onMove: (from, to) => onMove?.(slots, from, to),
+    onMove: (from, to) => {
+      void Promise.resolve(moveSlots?.(slots, from, to)).catch(reportEditFailure);
+    },
   });
   // Owned here rather than by any one table, for the same reason the section
   // drag is: what it coordinates is the tables against each other.
@@ -238,27 +249,27 @@ function useSheet(props: SheetProps) {
   const headRef = useRef<HTMLDivElement>(null);
   const headStripRef = useRef<HTMLDivElement>(null);
   useEffect(
-    () => scrollSync?.register(group.columns.length, headStripRef.current),
+    () => scrollSync?.register(group.columns.length, headStripRef.current ?? undefined),
     [scrollSync, group.columns.length],
   );
   // The group titles come to rest under this, so its height has to be known
   // rather than guessed — a row's height is set in CSS and read here.
   useLayoutEffect(() => {
-    const el = headRef.current;
-    if (!el || typeof ResizeObserver !== 'function') {
+    const head = headRef.current;
+    if (!head || typeof ResizeObserver !== 'function') {
       return undefined;
     }
     // Set on the scroller, not on the head itself: the group titles that read
     // it are siblings, and a custom property travels down rather than across.
-    const host = el.parentElement;
+    const host = head.parentElement;
     if (!host) {
       return undefined;
     }
-    const apply = () => host.style.setProperty('--vars-head-h', `${el.offsetHeight}px`);
+    const apply = () => host.style.setProperty('--vars-head-h', `${head.offsetHeight}px`);
     apply();
-    const ro = new ResizeObserver(apply);
-    ro.observe(el);
-    return () => ro.disconnect();
+    const observer = new ResizeObserver(apply);
+    observer.observe(head);
+    return () => observer.disconnect();
   }, []);
 
   const single = group.columns.length === 1;
@@ -294,9 +305,13 @@ function SheetView({ state }: { readonly state: ReturnType<typeof useSheet> }) {
           onSave={onSave}
           sectionDrag={{
             props:
-              block.title != null ? rowsDrag.rowProps(sheetOffset(slotOffsets, index).head) : {},
+              block.title !== undefined
+                ? rowsDrag.rowProps(sheetOffset(slotOffsets, index).head)
+                : {},
             className:
-              block.title != null ? rowsDrag.rowClass(sheetOffset(slotOffsets, index).head) : '',
+              block.title !== undefined
+                ? rowsDrag.rowClass(sheetOffset(slotOffsets, index).head)
+                : '',
           }}
           onAdd={onAdd}
           onRename={onRename}
@@ -331,13 +346,16 @@ function useNewVariable(props: NewVariableProps) {
     }
   }, [typing]);
 
-  const commit = async () => {
+  const add = async () => {
     const next = word.trim();
     setTyping(false);
     setWord('');
     if (next) {
       await onAdd?.(block, columns, next);
     }
+  };
+  const commit = (): void => {
+    void add().catch(reportEditFailure);
   };
 
   return { ...props, typing, setTyping, word, setWord, inputRef, commit };
@@ -379,15 +397,15 @@ function NewVariableView({ state }: { readonly state: ReturnType<typeof useNewVa
           value={word}
           placeholder="name"
           spellCheck={false}
-          onChange={(e) => setWord(e.target.value)}
+          onChange={(event) => setWord(event.target.value)}
           onBlur={commit}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') {
-              e.preventDefault();
+          onKeyDown={(event) => {
+            if (event.key === 'Enter') {
+              event.preventDefault();
               commit();
             }
-            if (e.key === 'Escape') {
-              e.preventDefault();
+            if (event.key === 'Escape') {
+              event.preventDefault();
               setTyping(false);
               setWord('');
             }
@@ -431,7 +449,7 @@ function useVariableTable(props: TableProps) {
   };
   // A row is two elements now, so hovering one has to light the other: :hover
   // can't reach across, and the highlight is what ties a name to its values.
-  const [hovered, setHovered] = useState<number | null>(null);
+  const [hovered, setHovered] = useState<number | undefined>(undefined);
   // The heading strip and the rows scroll together; see the note where they
   // are rendered for why they are two boxes rather than one.
   const headRef = useRef<HTMLDivElement>(null);
@@ -439,7 +457,7 @@ function useVariableTable(props: TableProps) {
   // Keyed by how many columns this table has: only tables of the same width
   // have a scroll position worth sharing.
   useEffect(
-    () => scrollSync?.register(columns.length, rowsRef.current),
+    () => scrollSync?.register(columns.length, rowsRef.current ?? undefined),
     [scrollSync, columns.length],
   );
   // Whether this table's heading is a name its rows share (renameable) or a
@@ -450,7 +468,7 @@ function useVariableTable(props: TableProps) {
   const rowProps = (index: number) => ({
     className: `vars-row ${reorder.rowClass(index)} ${hovered === index ? 'is-hover' : ''}`,
     onMouseEnter: () => setHovered(index),
-    onMouseLeave: () => setHovered((at) => (at === index ? null : at)),
+    onMouseLeave: () => setHovered((at) => (at === index ? undefined : at)),
   });
 
   return {
@@ -549,19 +567,40 @@ function SheetHeader({ state }: { readonly state: ReturnType<typeof useSheet> })
   );
 }
 
+// A comment heading's menu carries the two things that are not renaming.
+function CommentHeading({
+  state,
+  title,
+}: {
+  readonly state: ReturnType<typeof useVariableTable>;
+  readonly title: string;
+}) {
+  const { block, onRetitle, onDuplicateSection, onDeleteSection } = state;
+  const { renameSignal, setRenameSignal } = state;
+  return (
+    <>
+      <EditableName
+        className="vars-section-text"
+        value={title}
+        title={title}
+        openSignal={renameSignal}
+        onRename={(next) => onRetitle?.(block, next)}
+      />
+      <SectionMenu
+        onRename={() => setRenameSignal((signal) => signal + 1)}
+        onDuplicate={() => {
+          void Promise.resolve(onDuplicateSection?.(block)).catch(reportEditFailure);
+        }}
+        onDelete={() => {
+          void Promise.resolve(onDeleteSection?.(block)).catch(reportEditFailure);
+        }}
+      />
+    </>
+  );
+}
+
 function TableTitle({ state }: { readonly state: ReturnType<typeof useVariableTable> }) {
-  const {
-    block,
-    onRename,
-    onRetitle,
-    onDuplicateSection,
-    onDeleteSection,
-    sectionDrag,
-    labelTemplate,
-    prefix,
-    renameSignal,
-    setRenameSignal,
-  } = state;
+  const { block, onRename, sectionDrag, labelTemplate, prefix } = state;
   return (
     <>
       {block.title && (
@@ -596,24 +635,10 @@ function TableTitle({ state }: { readonly state: ReturnType<typeof useVariableTa
                 )
               }
             />
-          ) : block.titleStart != null ? (
+          ) : block.titleStart !== undefined ? (
             // A heading that is a comment above the names: renaming it writes
-            // the comment, and the names underneath are its own business. Its
-            // menu carries the two things that are not renaming.
-            <>
-              <EditableName
-                className="vars-section-text"
-                value={block.title}
-                title={block.title}
-                openSignal={renameSignal}
-                onRename={(next) => onRetitle?.(block, next)}
-              />
-              <SectionMenu
-                onRename={() => setRenameSignal((n) => n + 1)}
-                onDuplicate={() => onDuplicateSection?.(block)}
-                onDelete={() => onDeleteSection?.(block)}
-              />
-            </>
+            // the comment, and the names underneath are its own business.
+            <CommentHeading state={state} title={block.title} />
           ) : (
             <span className="vars-section-text">{block.title}</span>
           )}
@@ -715,12 +740,12 @@ function TableScrollRows({ state }: { readonly state: ReturnType<typeof useVaria
     <div
       className="vars-scroll-rows"
       ref={rowsRef}
-      onScroll={(e) => {
-        const { scrollLeft } = e.currentTarget;
+      onScroll={(event) => {
+        const { scrollLeft } = event.currentTarget;
         if (headRef.current) {
           headRef.current.scrollLeft = scrollLeft;
         }
-        scrollSync?.broadcast(columns.length, e.currentTarget, scrollLeft);
+        scrollSync?.broadcast(columns.length, event.currentTarget, scrollLeft);
       }}
     >
       {block.rows.map((row, index) => (

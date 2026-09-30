@@ -77,12 +77,12 @@ export interface EditGesture {
   readonly request: (refOf: (nodeId: string) => NodeRef | undefined) => readonly Edit[] | undefined;
   readonly apply: (model: EditorModel) => EditorModel;
   /** Groups undo steps and coalesces bursts. */
-  readonly coalesceKey: string | null;
+  readonly coalesceKey: string | undefined;
   readonly urgency: boolean | 'live';
   /** One field of one node, by the session's handle: an unsent gesture of the
-   * same stream and undo step is replaced by this one. Null for a gesture that
-   * must go out on its own. */
-  readonly stream: string | null;
+   * same stream and undo step is replaced by this one. Undefined for a gesture
+   * that must go out on its own. */
+  readonly stream: string | undefined;
 }
 
 /** The bytes a code save is a patch of (step 8). */
@@ -107,7 +107,7 @@ export type QueueEntry =
       readonly gesture: EditGesture;
       readonly record: EditsRecord;
       /** The stream of every request it states, when they share one. */
-      readonly stream: string | null;
+      readonly stream: string | undefined;
     }
   | {
       readonly tag: 'code';
@@ -147,7 +147,7 @@ export class EditDrafts {
     this.#own(path);
     const stream = gesture.stream;
     const last = this.#entries[this.#entries.length - 1];
-    if (last?.tag === 'gesture' && stream !== null) {
+    if (last?.tag === 'gesture' && stream !== undefined) {
       if (last.stream === stream && last.record === record) {
         this.#entries[this.#entries.length - 1] = { tag: 'gesture', gesture, record, stream };
         return 'queued';
@@ -229,7 +229,7 @@ export class EditDrafts {
     this.#own(path);
     const [first] = this.#entries;
     if (entry.tag === 'gesture' && first?.tag === 'code') {
-      entry.record.outcome = { tag: 'dropped' };
+      writeOutcome(entry.record, { tag: 'dropped' });
       return;
     }
     if (entry.tag === 'code' && first?.tag === 'code') {
@@ -319,10 +319,21 @@ export function recordApplied(record: EditsRecord, applied: AppliedEdit): void {
   }
   assert(outcome.waiting > 0, 'An answer arrives for a write the step waits on');
   const done = [...outcome.applied, applied];
-  record.outcome =
+  writeOutcome(
+    record,
     outcome.waiting === 1
       ? { tag: 'applied', applied: done }
-      : { tag: 'pending', waiting: outcome.waiting - 1, applied: done };
+      : { tag: 'pending', waiting: outcome.waiting - 1, applied: done },
+  );
+}
+
+/** The one writer of an undo step's outcome. A step is a cell shared by the
+ * queue, the saver and Undo by identity (see EditsRecord): its outcome changes
+ * as answers arrive, so it is written in place here rather than rebuilt. */
+export function writeOutcome(record: EditsRecord, outcome: EditsOutcome): void {
+  assert(record.outcome !== outcome, 'An outcome is written as a new value');
+  // eslint-disable-next-line no-param-reassign -- EditsRecord is a shared cell; its one writer.
+  record.outcome = outcome;
 }
 
 // The step is owed one more write.
@@ -330,14 +341,14 @@ function owe(record: EditsRecord): void {
   const outcome = record.outcome;
   switch (outcome.tag) {
     case 'pending':
-      record.outcome = { ...outcome, waiting: outcome.waiting + 1 };
+      writeOutcome(record, { ...outcome, waiting: outcome.waiting + 1 });
       return;
     case 'applied':
-      record.outcome = { tag: 'pending', waiting: 1, applied: outcome.applied };
+      writeOutcome(record, { tag: 'pending', waiting: 1, applied: outcome.applied });
       return;
     case 'folded':
     case 'dropped':
-      record.outcome = { tag: 'pending', waiting: 1, applied: [] };
+      writeOutcome(record, { tag: 'pending', waiting: 1, applied: [] });
       return;
     default: {
       const exhaustive: never = outcome;

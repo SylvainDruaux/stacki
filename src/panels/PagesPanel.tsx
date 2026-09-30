@@ -22,15 +22,15 @@ import { PageTreeView, type PageEditing, type PageTreeActions } from './PageTree
 
 interface PagesPanelProps {
   readonly scan: Pick<ScanResult, 'pages' | 'pageFolders' | 'layouts'>;
-  readonly currentPage: ScanPage | null;
+  readonly currentPage: ScanPage | undefined;
   readonly injectedRoutes?: readonly WireInjectedRoute[];
   readonly onSelectRoute?: (route: WireInjectedRoute) => void;
   readonly onSelect: (page: ScanPage) => void;
-  readonly onCreate: (name: string, layout: string | null) => void;
+  readonly onCreate: (name: string, layout: string | undefined) => void;
   readonly onDelete: (page: ScanPage) => void;
   readonly onRescan: () => void;
   readonly onMovePage: (page: ScanPage, to: string) => void;
-  readonly onCreateFolder: () => Promise<string | null>;
+  readonly onCreateFolder: () => Promise<string | undefined>;
   readonly onRenameFolder: (from: string, to: string) => void;
   readonly onDeleteFolder: (rel: string, pageCount: number) => void;
 }
@@ -40,7 +40,7 @@ export default function PagesPanel(props: PagesPanelProps) {
   const [query, setQuery] = useState('');
   const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(() => new Set());
   const [editing, setEditing] = useState<PageEditing>({ kind: 'none' });
-  const [dropDirectory, setDropDirectory] = useState<string | null>(null);
+  const [dropDirectory, setDropDirectory] = useState<string | undefined>(undefined);
   const tree = useMemo(
     () => buildPageTree(props.scan.pages, props.scan.pageFolders),
     [props.scan.pageFolders, props.scan.pages],
@@ -56,7 +56,7 @@ export default function PagesPanel(props: PagesPanelProps) {
     setCollapsed((previous) => new Set([...previous].filter((rel) => directories.has(rel))));
     setEditing((previous) => validEditing(previous, props.scan.pages, directories));
     setDropDirectory((previous) =>
-      previous !== null && directories.has(previous) ? previous : null,
+      previous !== undefined && directories.has(previous) ? previous : undefined,
     );
   }, [directories, props.scan.pages]);
 
@@ -93,7 +93,7 @@ export default function PagesPanel(props: PagesPanelProps) {
         editing={editing}
         dropDirectory={dropDirectory}
         actions={actions}
-        clearDrop={() => setDropDirectory(null)}
+        clearDrop={() => setDropDirectory(undefined)}
       />
       {showNew && (
         <NewPageModal
@@ -113,7 +113,7 @@ function usePageTreeActions(
   props: PagesPanelProps,
   setCollapsed: React.Dispatch<React.SetStateAction<ReadonlySet<string>>>,
   setEditing: React.Dispatch<React.SetStateAction<PageEditing>>,
-  setDropDirectory: React.Dispatch<React.SetStateAction<string | null>>,
+  setDropDirectory: React.Dispatch<React.SetStateAction<string | undefined>>,
 ): PageTreeActions {
   const toggleFolder = useCallback(
     (rel: string) => {
@@ -143,7 +143,7 @@ function usePageTreeActions(
     (event: React.DragEvent<HTMLDivElement>, rel: string) => {
       event.preventDefault();
       event.stopPropagation();
-      setDropDirectory(null);
+      setDropDirectory(undefined);
       moveDroppedPage(event, rel, props.scan.pages, props.onMovePage);
     },
     [props.onMovePage, props.scan.pages, setDropDirectory],
@@ -181,10 +181,10 @@ function moveDroppedPage(
 interface PageBodyProps extends PagesPanelProps {
   readonly tree: ReturnType<typeof buildPageTree>;
   readonly query: string;
-  readonly searchResults: readonly ScanPage[] | null;
+  readonly searchResults: readonly ScanPage[] | undefined;
   readonly collapsed: ReadonlySet<string>;
   readonly editing: PageEditing;
-  readonly dropDirectory: string | null;
+  readonly dropDirectory: string | undefined;
   readonly actions: PageTreeActions;
   readonly clearDrop: () => void;
 }
@@ -198,8 +198,8 @@ function PageBody(props: PageBodyProps) {
           props.clearDrop();
         }
       }}
-      onDragOver={(event) => props.searchResults === null && props.actions.dragOver(event, '')}
-      onDrop={(event) => props.searchResults === null && props.actions.drop(event, '')}
+      onDragOver={(event) => props.searchResults === undefined && props.actions.dragOver(event, '')}
+      onDrop={(event) => props.searchResults === undefined && props.actions.drop(event, '')}
     >
       {props.searchResults ? (
         <SearchResults
@@ -244,7 +244,7 @@ function SearchResults({
 }: {
   readonly pages: readonly ScanPage[];
   readonly query: string;
-  readonly currentPage: ScanPage | null;
+  readonly currentPage: ScanPage | undefined;
   readonly select: (page: ScanPage) => void;
 }) {
   if (pages.length === 0) {
@@ -275,11 +275,11 @@ function InjectedRoutes({
   select,
 }: {
   readonly routes: readonly WireInjectedRoute[];
-  readonly currentPage: ScanPage | null;
+  readonly currentPage: ScanPage | undefined;
   readonly select: ((route: WireInjectedRoute) => void) | undefined;
 }) {
   if (routes.length === 0) {
-    return null;
+    return undefined;
   }
   return (
     <div className="vars-table pages-injected">
@@ -335,10 +335,10 @@ function PagesHeader({
   );
 }
 
-function pagesForQuery(pages: readonly ScanPage[], query: string): readonly ScanPage[] | null {
+function pagesForQuery(pages: readonly ScanPage[], query: string): readonly ScanPage[] | undefined {
   const clean = query.trim().toLowerCase();
   if (!clean) {
-    return null;
+    return undefined;
   }
   return pages
     .filter(

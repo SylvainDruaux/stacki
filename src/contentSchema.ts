@@ -14,6 +14,11 @@ import type {
 } from './contentSchema.types';
 export type { FieldDescriptor, FieldMember, Control } from './contentSchema.types';
 
+// Deep structures are described one level at a time: a recursive schema has no
+// bottom, and a form only ever draws the level it is showing. Six levels cover
+// every hand-written content schema; deeper ones open level by level.
+const CONTENT_SCHEMA_LIMITS = { descriptorDepthMax: 6 } as const;
+
 interface SchemaOptions {
   readonly root?: unknown;
   readonly required?: boolean;
@@ -21,7 +26,7 @@ interface SchemaOptions {
 }
 export function describeField(
   input: unknown,
-  key: string | null,
+  key: string | undefined,
   options: SchemaOptions = {},
 ): FieldDescriptor {
   assert(Number.isSafeInteger(options.depth ?? 0), 'Schema depth must be an integer');
@@ -54,7 +59,7 @@ export function fieldsOf(input: unknown, options: SchemaOptions = {}): readonly 
 //   nullable  the key must be there      → offer an explicit "none" that
 //             but may be null              writes null
 //   default   the key may be absent and  → show the value as a placeholder and
-//             the value is filled in       do not write it unless it is chosen
+//             the value is filled in       do not write it unless it is chosen.
 
 const labelize = (key: unknown): string =>
   String(key)
@@ -62,7 +67,7 @@ const labelize = (key: unknown): string =>
     .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
     .replace(/\s+/g, ' ')
     .trim()
-    .replace(/^./, (c) => c.toUpperCase());
+    .replace(/^./, (first) => first.toUpperCase());
 
 // Names that say a string is really something else. Nothing in a zod schema
 // marks a string as markdown or as code, and the difference decides whether the
@@ -82,16 +87,16 @@ const PATTERN_HINTS: readonly (readonly [RegExp, string])[] = [
   [/^\^\[a-z0-9-\]\+\$$/, 'lowercase letters, numbers and dashes'],
 ];
 
-export function patternHint(pattern: string | null | undefined): string | null {
+export function patternHint(pattern: string | undefined): string | undefined {
   if (!pattern) {
-    return null;
+    return undefined;
   }
   for (const [test, hint] of PATTERN_HINTS) {
     if (test.test(pattern)) {
       return hint;
     }
   }
-  return null;
+  return undefined;
 }
 
 const isNullBranch = (node: ContentSchema) => node && node.type === 'null';
@@ -107,7 +112,7 @@ function unwrapNullable(node: ContentSchema): {
     return { node, nullable: false };
   }
   const nulls = branches.filter(isNullBranch);
-  const rest = branches.filter((b) => !isNullBranch(b));
+  const rest = branches.filter((branch) => !isNullBranch(branch));
   if (nulls.length !== 1 || rest.length !== 1) {
     return { node, nullable: false };
   }
@@ -116,7 +121,7 @@ function unwrapNullable(node: ContentSchema): {
   return { node: { ...only, default: node.default ?? only.default }, nullable: true };
 }
 
-const defsOf = (root: ContentSchema | undefined) => root?.$defs || {};
+const definitionsOf = (root: ContentSchema | undefined) => root?.$defs || {};
 
 function deref(
   node: ContentSchema | undefined,
@@ -129,29 +134,33 @@ function deref(
   if (name === undefined) {
     return node;
   }
-  return { ...defsOf(root)[name], recursive: name };
+  return { ...definitionsOf(root)[name], recursive: name };
 }
 
-const branchesOf = (node: ContentSchema | null | undefined) => node?.oneOf || node?.anyOf || null;
+const branchesOf = (node: ContentSchema | undefined) => node?.oneOf || node?.anyOf || undefined;
 
 // A union is a type switcher when every branch agrees on a key that is a single
 // literal — that key is what the user picks, and it decides the rest of the
 // form.
-function discriminatorOf(branches: readonly ContentSchema[] | null): string | null {
+function discriminatorOf(branches: readonly ContentSchema[] | undefined): string | undefined {
   if (!branches || branches.length < 2) {
-    return null;
+    return undefined;
   }
   const first = branches[0]?.properties || {};
   for (const key of Object.keys(first)) {
-    const values = branches.map((b) => b?.properties?.[key]);
-    if (values.every((v) => v && v.const !== undefined)) {
+    const values = branches.map((branch) => branch?.properties?.[key]);
+    if (values.every((value) => value && value.const !== undefined)) {
       return key;
     }
   }
-  return null;
+  return undefined;
 }
 
-function controlFor(node: ContentSchema | undefined, key: string, nullable: boolean): Control {
+function controlFor(
+  node: ContentSchema | undefined,
+  key: string,
+  { nullable }: { readonly nullable: boolean },
+): Control {
   if (!node || node.recursiveOnly) {
     return 'unknown';
   }
@@ -171,7 +180,8 @@ function controlFor(node: ContentSchema | undefined, key: string, nullable: bool
     return 'const';
   }
 
-  const type = typeof node.type === 'string' ? node.type : node.type?.find((t) => t !== 'null');
+  const type =
+    typeof node.type === 'string' ? node.type : node.type?.find((name) => name !== 'null');
   if (type === 'boolean') {
     return 'boolean';
   }
@@ -202,46 +212,51 @@ function controlFor(node: ContentSchema | undefined, key: string, nullable: bool
     return 'union';
   }
   if (type === 'string') {
-    if (MARKDOWN_KEYS.test(key)) {
-      return 'markdown';
-    }
-    if (CODE_KEYS.test(key)) {
-      return 'code';
-    }
-    if (node.format === 'uri') {
-      return 'url';
-    }
-    if (node.format === 'email') {
-      return 'email';
-    }
-    if ((node.maxLength && node.maxLength > 200) || LONG_KEYS.test(key)) {
-      return 'longtext';
-    }
-    return 'text';
+    return stringControlFor(node, key);
   }
   // No type at all: a value zod could not describe on the way in. It is still
   // the user's data, so it is shown as what it looks like rather than hidden.
   return nullable ? 'text' : 'unknown';
 }
 
+// A string's control: its key and its format say what kind of text it holds.
+function stringControlFor(node: ContentSchema, key: string): Control {
+  if (MARKDOWN_KEYS.test(key)) {
+    return 'markdown';
+  }
+  if (CODE_KEYS.test(key)) {
+    return 'code';
+  }
+  if (node.format === 'uri') {
+    return 'url';
+  }
+  if (node.format === 'email') {
+    return 'email';
+  }
+  if ((node.maxLength && node.maxLength > 200) || LONG_KEYS.test(key)) {
+    return 'longtext';
+  }
+  return 'text';
+}
+
 function constraintsOf(node: ContentSchema): Constraints {
   const out: ConstraintBuilder = {};
-  if (node.minLength != null) {
+  if (node.minLength !== undefined) {
     out.minLength = node.minLength;
   }
-  if (node.maxLength != null) {
+  if (node.maxLength !== undefined) {
     out.maxLength = node.maxLength;
   }
-  if (node.minimum != null) {
+  if (node.minimum !== undefined) {
     out.min = node.minimum;
   }
-  if (node.maximum != null) {
+  if (node.maximum !== undefined) {
     out.max = node.maximum;
   }
-  if (node.exclusiveMinimum != null) {
+  if (node.exclusiveMinimum !== undefined) {
     out.min = node.exclusiveMinimum + (node.type === 'integer' ? 1 : 0);
   }
-  if (node.exclusiveMaximum != null) {
+  if (node.exclusiveMaximum !== undefined) {
     out.max = node.exclusiveMaximum - (node.type === 'integer' ? 1 : 0);
   }
   if (node.type === 'integer') {
@@ -251,10 +266,10 @@ function constraintsOf(node: ContentSchema): Constraints {
     out.pattern = node.pattern;
     out.patternHint = patternHint(node.pattern);
   }
-  if (node.minItems != null) {
+  if (node.minItems !== undefined) {
     out.minItems = node.minItems;
   }
-  if (node.maxItems != null) {
+  if (node.maxItems !== undefined) {
     out.maxItems = node.maxItems;
   }
   // A number whose maximum is the largest integer JavaScript has is not really
@@ -270,51 +285,32 @@ function constraintsOf(node: ContentSchema): Constraints {
 }
 
 /**
- * One field descriptor. `key` may be null for the item type of an array.
+ * One field descriptor. `key` is undefined for the item type of an array.
  */
 function describeFieldParsed(
   rawNode: ContentSchema | undefined,
-  key: string | null,
+  key: string | undefined,
   { required = false, root, depth = 0, visit = descriptorBudget() }: FieldOptions = {},
 ): FieldDescriptor {
   visit();
   const resolved = deref(rawNode, root);
   const { node, nullable } = unwrapNullable(resolved || {});
-  const control = controlFor(node, key || '', nullable);
+  const control = controlFor(node, key || '', { nullable });
 
   const field: FieldBuilder = {
     key,
-    label: key ? labelize(key) : null,
+    label: key ? labelize(key) : undefined,
     control,
     required,
     nullable,
-    description: node.description || null,
+    description: node.description || undefined,
     constraints: constraintsOf(node),
     transform: !!node.astroTransform,
     coerced: !!node.astroCoerced,
+    ...schemaExtras(node),
   };
-  if ('default' in node) {
-    field.default = node.default;
-  }
-  if (node.enum) {
-    field.options = node.enum;
-  }
-  if (node.const !== undefined) {
-    field.const = node.const;
-  }
-  if (node.astroReference) {
-    field.target = node.astroReference;
-  }
-  if (node.items?.astroReference) {
-    field.target = node.items.astroReference;
-  }
-  if (node.recursive) {
-    field.recursive = node.recursive;
-  }
 
-  // Deep structures are described one level at a time: a recursive schema has
-  // no bottom, and a form only ever draws the level it is showing.
-  if (depth > 6) {
+  if (depth > CONTENT_SCHEMA_LIMITS.descriptorDepthMax) {
     return field;
   }
 
@@ -323,11 +319,15 @@ function describeFieldParsed(
   } else if (control === 'record') {
     field.value = describeFieldParsed(
       typeof node.additionalProperties === 'object' ? node.additionalProperties : {},
-      null,
+      undefined,
       { root, depth: depth + 1, visit },
     );
   } else if (control === 'list') {
-    field.item = describeFieldParsed(node.items || {}, null, { root, depth: depth + 1, visit });
+    field.item = describeFieldParsed(node.items || {}, undefined, {
+      root,
+      depth: depth + 1,
+      visit,
+    });
   } else if (control === 'union') {
     const branches = branchesOf(node) || [];
     const discriminator = discriminatorOf(branches);
@@ -338,12 +338,38 @@ function describeFieldParsed(
         value,
         label: labelize(String(value ?? `Option ${index + 1}`)),
         fields: fieldsOfParsed(branch, { root, depth: depth + 1, visit }).filter(
-          (f) => f.key !== discriminator,
+          (member) => member.key !== discriminator,
         ),
       };
     });
   }
   return field;
+}
+
+type SchemaExtras = Pick<FieldBuilder, 'default' | 'options' | 'const' | 'target' | 'recursive'>;
+
+// What a field's schema says beyond its control, each only when the schema says it.
+function schemaExtras(node: ContentSchema): SchemaExtras {
+  const extras: SchemaExtras = {};
+  if ('default' in node) {
+    extras.default = node.default;
+  }
+  if (node.enum) {
+    extras.options = node.enum;
+  }
+  if (node.const !== undefined) {
+    extras.const = node.const;
+  }
+  if (node.astroReference) {
+    extras.target = node.astroReference;
+  }
+  if (node.items?.astroReference) {
+    extras.target = node.items.astroReference;
+  }
+  if (node.recursive) {
+    extras.recursive = node.recursive;
+  }
+  return extras;
 }
 
 /** The fields of an object schema, in the order the schema declares them. */
@@ -371,7 +397,7 @@ export function collectionFields(input: unknown) {
   }
   const branches = branchesOf(schema);
   if (branches) {
-    const field = describeFieldParsed(schema, null, { root: schema });
+    const field = describeFieldParsed(schema, undefined, { root: schema });
     return { fields: [], union: field, freeform: false };
   }
   return { fields: fieldsOfParsed(schema), freeform: false };
@@ -379,21 +405,21 @@ export function collectionFields(input: unknown) {
 
 /** Which union member a value is, by its discriminator. */
 export function memberFor(
-  union: FieldDescriptor | null | undefined,
+  union: FieldDescriptor | undefined,
   value: unknown,
-): FieldMember | null {
+): FieldMember | undefined {
   if (!union?.members?.length) {
-    return null;
+    return undefined;
   }
   const key = union.discriminator;
   const record = toRecord(value);
   if (key && record) {
-    const found = union.members.find((m) => m.value === record[key]);
+    const found = union.members.find((member) => member.value === record[key]);
     if (found) {
       return found;
     }
   }
-  return union.members[0] ?? null;
+  return union.members[0];
 }
 
 /**
@@ -401,23 +427,24 @@ export function memberFor(
  * rules are checked by zod itself (see validateContentEntry) — this is the part
  * that can answer without a round trip.
  */
-export function fieldIssue(field: FieldDescriptor, value: unknown): string | null {
-  const c = field.constraints || {};
+export function fieldIssue(field: FieldDescriptor, value: unknown): string | undefined {
+  const rules = field.constraints || {};
+  // A stored `null` is the nullable field's explicit "none", so it reads as empty.
   if (value === undefined || value === null || value === '') {
     if (field.required && !field.nullable) {
       return 'Required';
     }
-    return null;
+    return undefined;
   }
   if (typeof value === 'string') {
-    if (c.minLength && value.length < c.minLength) {
-      return `At least ${c.minLength} characters`;
+    if (rules.minLength && value.length < rules.minLength) {
+      return `At least ${rules.minLength} characters`;
     }
-    if (c.maxLength && value.length > c.maxLength) {
-      return `At most ${c.maxLength} characters`;
+    if (rules.maxLength && value.length > rules.maxLength) {
+      return `At most ${rules.maxLength} characters`;
     }
-    if (c.pattern && !new RegExp(c.pattern).test(value)) {
-      return c.patternHint ? `Needs ${c.patternHint}` : `Does not match ${c.pattern}`;
+    if (rules.pattern && !new RegExp(rules.pattern).test(value)) {
+      return rules.patternHint ? `Needs ${rules.patternHint}` : `Does not match ${rules.pattern}`;
     }
     if (field.control === 'url' && !/^https?:\/\//i.test(value)) {
       return 'Needs a full URL, starting with http';
@@ -427,64 +454,64 @@ export function fieldIssue(field: FieldDescriptor, value: unknown): string | nul
     }
   }
   if (typeof value === 'number') {
-    if (c.integer && !Number.isInteger(value)) {
+    if (rules.integer && !Number.isInteger(value)) {
       return 'Whole numbers only';
     }
-    if (c.min != null && value < c.min) {
-      return `At least ${c.min}`;
+    if (rules.min !== undefined && value < rules.min) {
+      return `At least ${rules.min}`;
     }
-    if (c.max != null && value > c.max) {
-      return `At most ${c.max}`;
+    if (rules.max !== undefined && value > rules.max) {
+      return `At most ${rules.max}`;
     }
   }
   if (Array.isArray(value)) {
-    if (c.minItems && value.length < c.minItems) {
-      return `At least ${c.minItems}`;
+    if (rules.minItems && value.length < rules.minItems) {
+      return `At least ${rules.minItems}`;
     }
-    if (c.maxItems && value.length > c.maxItems) {
-      return `At most ${c.maxItems}`;
+    if (rules.maxItems && value.length > rules.maxItems) {
+      return `At most ${rules.maxItems}`;
     }
   }
-  return null;
+  return undefined;
 }
 
 /** A short line under a field saying what it will take. */
-export function hintFor(field: FieldDescriptor): string | null {
-  const c = field.constraints || {};
+export function hintFor(field: FieldDescriptor): string | undefined {
+  const rules = field.constraints || {};
   const bits = [];
   if (field.description) {
     bits.push(field.description);
   }
-  if (c.patternHint) {
-    bits.push(c.patternHint);
-  } else if (c.pattern) {
-    bits.push(`matches ${c.pattern}`);
+  if (rules.patternHint) {
+    bits.push(rules.patternHint);
+  } else if (rules.pattern) {
+    bits.push(`matches ${rules.pattern}`);
   }
-  if (c.minLength && c.maxLength) {
-    bits.push(`${c.minLength}–${c.maxLength} characters`);
-  } else if (c.maxLength) {
-    bits.push(`up to ${c.maxLength} characters`);
-  } else if (c.minLength) {
-    bits.push(`at least ${c.minLength} characters`);
+  if (rules.minLength && rules.maxLength) {
+    bits.push(`${rules.minLength}–${rules.maxLength} characters`);
+  } else if (rules.maxLength) {
+    bits.push(`up to ${rules.maxLength} characters`);
+  } else if (rules.minLength) {
+    bits.push(`at least ${rules.minLength} characters`);
   }
-  if (c.min != null && c.max != null) {
-    bits.push(`${c.min}–${c.max}`);
-  } else if (c.min != null) {
-    bits.push(`${c.min} or more`);
-  } else if (c.max != null) {
-    bits.push(`up to ${c.max}`);
+  if (rules.min !== undefined && rules.max !== undefined) {
+    bits.push(`${rules.min}–${rules.max}`);
+  } else if (rules.min !== undefined) {
+    bits.push(`${rules.min} or more`);
+  } else if (rules.max !== undefined) {
+    bits.push(`up to ${rules.max}`);
   }
-  if (c.minItems && c.maxItems) {
-    bits.push(`${c.minItems}–${c.maxItems} items`);
-  } else if (c.maxItems) {
-    bits.push(`up to ${c.maxItems} items`);
-  } else if (c.minItems) {
-    bits.push(`at least ${c.minItems}`);
+  if (rules.minItems && rules.maxItems) {
+    bits.push(`${rules.minItems}–${rules.maxItems} items`);
+  } else if (rules.maxItems) {
+    bits.push(`up to ${rules.maxItems} items`);
+  } else if (rules.minItems) {
+    bits.push(`at least ${rules.minItems}`);
   }
   if (field.transform) {
     bits.push('stored differently in the file than it reads here');
   }
-  return bits.join(' · ') || null;
+  return bits.join(' · ') || undefined;
 }
 
 /**
@@ -515,7 +542,9 @@ function editsBetweenVisit(
   path: readonly string[],
   visit: (depth: number) => void,
 ): readonly ContentEdit[] {
-  visit(path.length);
+  const depth = path.length;
+  assert(depth <= BOUNDARY_LIMITS.depthMax, 'Content edit exceeds depth limit');
+  visit(depth);
   const edits: ContentEdit[] = [];
   const isObject = (value: unknown): value is Record<string, unknown> =>
     toRecord(value) !== undefined;

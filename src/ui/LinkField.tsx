@@ -37,40 +37,40 @@ function linkPageLabel(page: LinkPage): string {
   return `${name}  ·  ${page.route}`;
 }
 
-function detectType(str: string, pages: readonly LinkPage[] | undefined): LinkType {
-  if (!str) {
+function detectType(text: string, pages: readonly LinkPage[] | undefined): LinkType {
+  if (!text) {
     return 'url';
   }
-  if (str.startsWith('#')) {
+  if (text.startsWith('#')) {
     return 'section';
   }
-  if (str.startsWith('mailto:')) {
+  if (text.startsWith('mailto:')) {
     return 'email';
   }
-  if (str.startsWith('tel:')) {
+  if (text.startsWith('tel:')) {
     return 'phone';
   }
-  if ((pages || []).some((p) => p.route === str)) {
+  if ((pages || []).some((page) => page.route === text)) {
     return 'page';
   }
-  if (str.startsWith('/') && /\.[a-z0-9]+$/i.test(str)) {
+  if (text.startsWith('/') && /\.[a-z0-9]+$/i.test(text)) {
     return 'asset';
   }
   return 'url';
 }
 
-function parseMailto(str: string) {
-  const m = String(str).match(/^mailto:([^?]*)(?:\?(.*))?$/);
-  if (!m) {
+function parseMailto(text: string) {
+  const match = String(text).match(/^mailto:([^?]*)(?:\?(.*))?$/);
+  if (!match) {
     return { email: '', subject: '' };
   }
   let subject = '';
   try {
-    subject = new URLSearchParams(m[2] || '').get('subject') || '';
+    subject = new URLSearchParams(match[2] || '').get('subject') || '';
   } catch {
     /* malformed query — leave subject empty */
   }
-  return { email: m[1] || '', subject };
+  return { email: match[1] || '', subject };
 }
 
 interface LinkContext {
@@ -79,7 +79,7 @@ interface LinkContext {
   readonly projectPath: string;
 }
 interface LinkFieldProps {
-  readonly value?: Attr | null;
+  readonly value?: Attr | undefined;
   readonly context: LinkContext;
   readonly onChange: (value: Attr, immediate?: boolean) => void;
 }
@@ -239,22 +239,22 @@ function LinkTypes({
   readonly type: LinkType;
   readonly setType: (type: LinkType) => void;
 }) {
-  const { rowRef, btnRefs, indicator } = useLinkIndicator(type);
+  const { rowRef, btnRefs: buttonRefs, indicator } = useLinkIndicator(type);
   return (
     <div className="link-types" ref={rowRef}>
       {indicator && <span className="link-types-indicator" style={indicator} />}
-      {TYPES.map((t) => (
+      {TYPES.map((option) => (
         <button
-          key={t.id}
+          key={option.id}
           ref={(element) => {
-            btnRefs.current[t.id] = element;
+            buttonRefs.current[option.id] = element ?? undefined;
           }}
           type="button"
-          className={type === t.id ? 'on' : ''}
-          title={t.title}
-          onClick={() => setType(t.id)}
+          className={type === option.id ? 'on' : ''}
+          title={option.title}
+          onClick={() => setType(option.id)}
         >
-          {t.icon}
+          {option.icon}
         </button>
       ))}
     </div>
@@ -269,20 +269,28 @@ function useLinkIndicator(type: LinkType) {
   // every render (the panel re-renders when the tab comes back) and whenever
   // the row itself resizes (panel drag, or gaining a box on reveal).
   const rowRef = useRef<HTMLDivElement>(null);
-  const btnRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+  const buttonRefs = useRef<Record<string, HTMLButtonElement | undefined>>({});
   const typeRef = useRef(type);
   typeRef.current = type;
-  const [indicator, setIndicator] = useState<{
-    readonly left: number;
-    readonly width: number;
-  } | null>(null);
+  const [indicator, setIndicator] = useState<
+    | {
+        readonly left: number;
+        readonly width: number;
+      }
+    | undefined
+  >(undefined);
   const measure = () => {
-    const el = btnRefs.current[typeRef.current];
-    const next = el && el.offsetWidth ? { left: el.offsetLeft, width: el.offsetWidth } : null;
+    const element = buttonRefs.current[typeRef.current];
+    const next =
+      element && element.offsetWidth
+        ? { left: element.offsetLeft, width: element.offsetWidth }
+        : undefined;
     // Same numbers must yield the same object, or measuring on every render
     // would re-render forever.
-    setIndicator((prev) =>
-      prev && next && prev.left === next.left && prev.width === next.width ? prev : next,
+    setIndicator((previous) =>
+      previous && next && previous.left === next.left && previous.width === next.width
+        ? previous
+        : next,
     );
   };
   useLayoutEffect(measure);
@@ -295,5 +303,5 @@ function useLinkIndicator(type: LinkType) {
     return () => ro.disconnect();
   }, []);
 
-  return { rowRef, btnRefs, indicator };
+  return { rowRef, btnRefs: buttonRefs, indicator };
 }

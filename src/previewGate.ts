@@ -44,8 +44,8 @@ export type CheckRender = (render: PreviewRender) => Promise<PreviewVerdict>;
 export async function judgeCanvasEvent(
   token: Digest | undefined,
   render: PreviewRender | undefined,
-  shown: () => ShownFile | undefined,
   check: CheckRender,
+  shown: () => ShownFile | undefined,
 ): Promise<PreviewVerdict> {
   const before = judgeLocally(token, render, shown());
   if (before.tag === 'stale') {
@@ -112,13 +112,13 @@ export function sameShape(left: readonly ShapeNode[], right: readonly ShapeNode[
     if (pair === undefined) {
       return true;
     }
-    const [a, b] = pair;
-    if (a.length !== b.length) {
+    const [leftLevel, rightLevel] = pair;
+    if (leftLevel.length !== rightLevel.length) {
       return false;
     }
-    for (let index = 0; index < a.length; index++) {
-      const x = a[index];
-      const y = b[index];
+    for (let index = 0; index < leftLevel.length; index++) {
+      const x = leftLevel[index];
+      const y = rightLevel[index];
       assert(x !== undefined, 'The index lies inside the left list');
       assert(y !== undefined, 'The index lies inside the right list');
       if (x.kind !== y.kind) {
@@ -137,5 +137,5 @@ export function sameShape(left: readonly ShapeNode[], right: readonly ShapeNode[
 export interface ShapeNode {
   readonly kind: string;
   readonly name?: string | undefined;
-  readonly children?: readonly ShapeNode[] | null | undefined;
+  readonly children?: readonly ShapeNode[] | undefined;
 }

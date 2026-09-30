@@ -14,13 +14,13 @@ export function parsePreviewWidth(input: string): number | undefined {
 }
 
 export function previewViewport(
-  width: number | null | undefined,
+  width: number | undefined,
   available: { readonly width: number; readonly height: number },
-  height: number | null,
+  height: number | undefined,
 ) {
   assert(Number.isFinite(available.width), 'Preview container width must be finite');
   assert(Number.isFinite(available.height), 'Preview container height must be finite');
-  const fixed = width !== null && width !== undefined;
+  const fixed = width !== undefined;
   const viewportWidth = fixed ? width : Math.max(1, available.width);
   assert(viewportWidth > 0, 'Preview width must be positive');
   const scale = fixed ? Math.min(1, Math.max(1, available.width - 24) / viewportWidth) : 1;

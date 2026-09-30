@@ -31,8 +31,8 @@ import { appTheme, appHighlight } from './CodeEditor.jsx';
 // every `${…}` hole in it. So what arrives here is a function from the text to
 // the ranges, re-run on every edit rather than mapped through it — a chip whose
 // name is typed away stops being a chip, which is the honest answer.
-export type ChipsOf = (text: string) => readonly TemplateHole[] | null;
-const setChips = StateEffect.define<ChipsOf | null>();
+export type ChipsOf = (text: string) => readonly TemplateHole[] | undefined;
+const setChips = StateEffect.define<ChipsOf | undefined>();
 
 const chipMark = Decoration.mark({ class: 'cm-chip' });
 
@@ -67,12 +67,12 @@ class ChipWidget extends WidgetType {
 
 // The function itself, kept in state so the decorations can be rebuilt from any
 // transaction — including ones that only changed the document.
-const chipFnField = StateField.define<ChipsOf | null>({
-  create: () => null,
+const chipsOfField = StateField.define<ChipsOf | undefined>({
+  create: () => undefined,
   update(value, tr) {
     for (const effect of tr.effects) {
       if (effect.is(setChips)) {
-        return effect.value || null;
+        return effect.value || undefined;
       }
     }
     return value;
@@ -88,23 +88,23 @@ function chipSets(state: EditorState): {
   readonly deco: DecorationSet;
   readonly atomic: DecorationSet;
 } {
-  const ranges = state.field(chipFnField);
+  const ranges = state.field(chipsOfField);
   if (!ranges) {
     return { deco: Decoration.none, atomic: Decoration.none };
   }
-  const doc = state.doc.toString();
+  const document = state.doc.toString();
   const deco: Range<Decoration>[] = [];
   const atomic: Range<Decoration>[] = [];
-  const chips = ranges(doc) || [];
+  const chips = ranges(document) || [];
   assert(chips.length <= LIMITS.treeNodesMax, 'ExprInput: chip limit exceeded');
   for (const range of chips) {
     const { from, to, path } = range;
     // A range that no longer fits the document is one the text moved out from
     // under; dropping it is better than throwing.
-    if (!(from >= 0 && to > from && to <= doc.length)) {
+    if (!(from >= 0 && to > from && to <= document.length)) {
       continue;
     }
-    if (doc.slice(from, to) === path) {
+    if (document.slice(from, to) === path) {
       deco.push(chipMark.range(from, to));
       continue;
     }
@@ -133,8 +133,8 @@ const chipsAreAtomic = EditorView.atomicRanges.of((view) => view.state.field(chi
 /** Ranges for a single piece of text — what a field with one chip in it wants. */
 const findOne =
   (text: string): ChipsOf =>
-  (doc) => {
-    const at = text ? doc.indexOf(text) : -1;
+  (document) => {
+    const at = text ? document.indexOf(text) : -1;
     return at < 0 ? [] : [{ from: at, to: at + text.length, path: text }];
   };
 
@@ -146,36 +146,36 @@ const findOne =
 // changes are applied through `syncValue`, which only replaces the document
 // when the text genuinely differs from what's on screen.
 export interface ExprInputAPI {
-  readonly replaceRange: (from: number, to: number, text: string) => string | null;
-  readonly insert: (text: string) => string | null;
+  readonly replaceRange: (from: number, to: number, text: string) => string | undefined;
+  readonly insert: (text: string) => string | undefined;
 }
 export interface ExprInputProps {
-  readonly value?: string | null;
+  readonly value?: string | undefined;
   readonly onChange?: ((text: string) => void) | undefined;
   readonly onCommit?: ((text: string) => void) | undefined;
   readonly placeholder?: string;
   readonly autoFocus?: boolean;
-  readonly syncValue?: string | null;
+  readonly syncValue?: string | undefined;
   readonly invalid?: boolean;
   readonly multiline?: boolean;
   readonly wrap?: boolean;
   readonly className?: string;
   readonly chip?: string;
-  readonly chipsOf?: ChipsOf | null;
-  readonly onChipClick?: (range: TemplateHole | null) => void;
-  readonly apiRef?: MutableRefObject<ExprInputAPI | null>;
+  readonly chipsOf?: ChipsOf | undefined;
+  readonly onChipClick?: (range: TemplateHole | undefined) => void;
+  readonly apiRef?: MutableRefObject<ExprInputAPI | undefined>;
   readonly completions?: readonly Completion[];
 }
 interface ExprRefs {
   readonly latest: MutableRefObject<ExprInputProps>;
-  readonly view: MutableRefObject<EditorView | null>;
+  readonly view: MutableRefObject<EditorView | undefined>;
   readonly touched: MutableRefObject<boolean>;
 }
 
 export default function ExprInput(props: ExprInputProps) {
   const { syncValue, chip = '', chipsOf, invalid, className = '' } = props;
   const hostRef = useRef<HTMLDivElement>(null);
-  const view = useRef<EditorView | null>(null);
+  const view = useRef<EditorView | undefined>(undefined);
   const touched = useRef(false);
   const latest = useRef(props);
   latest.current = props;
@@ -183,7 +183,7 @@ export default function ExprInput(props: ExprInputProps) {
   useEffect(() => {
     const parent = hostRef.current;
     assert(parent !== null, 'ExprInput: mounted host exists');
-    assert(view.current === null, 'ExprInput: only one editor owns the host');
+    assert(view.current === undefined, 'ExprInput: only one editor owns the host');
     const editor = exprCreate(parent, initial, { latest, view, touched });
     view.current = editor;
     if (initial.autoFocus) {
@@ -191,17 +191,17 @@ export default function ExprInput(props: ExprInputProps) {
     }
     return () => {
       editor.destroy();
-      view.current = null;
+      view.current = undefined;
     };
   }, [initial]);
   useExprAPI(props.apiRef, { latest, view, touched });
   // External edits replace the document, so they also invalidate chip ranges.
   useEffect(() => {
-    view.current?.dispatch({ effects: setChips.of(chipsOf || (chip ? findOne(chip) : null)) });
+    view.current?.dispatch({ effects: setChips.of(chipsOf || (chip ? findOne(chip) : undefined)) });
   }, [chip, chipsOf, syncValue]);
   useEffect(() => {
     const editor = view.current;
-    if (!editor || syncValue == null) {
+    if (!editor || syncValue === undefined) {
       return;
     }
     const current = editor.state.doc.toString();
@@ -224,12 +224,12 @@ function exprCreate(parent: HTMLElement, initial: ExprInputProps, refs: ExprRefs
         javascript(),
         // Scope is read at request time: frontmatter can change while this editor stays mounted.
         autocompletion({
-          override: [(context) => exprCompletions(context, refs.latest.current)],
+          override: [(context) => exprCompletionSource(context, refs.latest.current)],
           icons: false,
           defaultKeymap: false,
         }),
         keymap.of(completionKeymap),
-        chipFnField,
+        chipsOfField,
         chipField,
         chipsAreAtomic,
         appTheme,
@@ -264,15 +264,21 @@ function exprKeys(initial: ExprInputProps, refs: ExprRefs): readonly KeyBinding[
   ];
 }
 
+// CodeMirror's side of the completions: it reads null, not undefined, as "none".
+function exprCompletionSource(context: CompletionContext, props: ExprInputProps) {
+  // eslint-disable-next-line stacki/no-null -- CodeMirror reads null as "no completions".
+  return exprCompletions(context, props) ?? null;
+}
+
 function exprCompletions(context: CompletionContext, props: ExprInputProps) {
   const list = props.completions;
   if (!list?.length) {
-    return null;
+    return undefined;
   }
   assert(list.length <= LIMITS.treeNodesMax, 'ExprInput: completion limit exceeded');
   const before = context.matchBefore(/[\w$.]*/);
   if (!before || (before.from === before.to && !context.explicit)) {
-    return null;
+    return undefined;
   }
   const dot = before.text.lastIndexOf('.');
   const prefix = dot >= 0 ? before.text.slice(0, dot + 1) : '';
@@ -286,12 +292,13 @@ function exprCompletions(context: CompletionContext, props: ExprInputProps) {
       type: entry.type || 'variable',
     }));
   if (!options.length) {
-    return null;
+    return undefined;
   }
   return { from: before.from + prefix.length, options, validFor: /^[\w$]*$/ };
 }
 
 function exprEvents(refs: ExprRefs): Extension {
+  const touchedRef = refs.touched;
   return EditorView.domEventHandlers({
     mousedown: (event, view) => {
       const ElementType = view.dom.ownerDocument.defaultView?.Element;
@@ -303,17 +310,17 @@ function exprEvents(refs: ExprRefs): Extension {
       }
       event.preventDefault();
       const position = view.posAtCoords({ x: event.clientX, y: event.clientY });
-      const ranges = view.state.field(chipFnField)?.(view.state.doc.toString()) || [];
+      const ranges = view.state.field(chipsOfField)?.(view.state.doc.toString()) || [];
       assert(ranges.length <= LIMITS.treeNodesMax, 'ExprInput: chip limit exceeded');
       const hit =
-        position == null
-          ? null
+        position === null
+          ? undefined
           : ranges.find((range) => position >= range.from && position <= range.to);
-      refs.latest.current.onChipClick?.(hit || null);
+      refs.latest.current.onChipClick?.(hit || undefined);
       return true;
     },
     focus: () => {
-      refs.touched.current = true;
+      touchedRef.current = true;
       return false;
     },
     blur: () => {
@@ -333,7 +340,7 @@ function useExprAPI(apiRef: ExprInputProps['apiRef'], refs: ExprRefs): void {
       insert: (text) => {
         const view = refs.view.current;
         if (!view) {
-          return null;
+          return undefined;
         }
         const end = view.state.doc.length;
         const { from, to } = refs.touched.current
@@ -345,19 +352,19 @@ function useExprAPI(apiRef: ExprInputProps['apiRef'], refs: ExprRefs): void {
       },
     };
     return () => {
-      apiRef.current = null;
+      apiRef.current = undefined;
     };
   });
 }
 
 function exprReplace(
-  view: EditorView | null,
+  view: EditorView | undefined,
   from: number,
   to: number,
   text: string,
-): string | null {
+): string | undefined {
   if (!view) {
-    return null;
+    return undefined;
   }
   assert(Number.isSafeInteger(from), 'ExprInput: range start is an integer');
   assert(Number.isSafeInteger(to), 'ExprInput: range end is an integer');

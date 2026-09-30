@@ -60,7 +60,7 @@ export interface Constraints {
   readonly max?: number;
   readonly integer?: boolean;
   readonly pattern?: string;
-  readonly patternHint?: string | null;
+  readonly patternHint?: string | undefined;
   readonly minItems?: number;
   readonly maxItems?: number;
 }
@@ -70,12 +70,12 @@ export interface FieldMember {
   readonly fields: readonly FieldDescriptor[];
 }
 export interface FieldDescriptor {
-  readonly key: string | null;
-  readonly label: string | null;
+  readonly key: string | undefined;
+  readonly label: string | undefined;
   readonly control: Control;
   readonly required: boolean;
   readonly nullable: boolean;
-  readonly description: string | null;
+  readonly description: string | undefined;
   readonly constraints: Constraints;
   readonly transform: boolean;
   readonly coerced: boolean;
@@ -87,7 +87,7 @@ export interface FieldDescriptor {
   readonly fields?: readonly FieldDescriptor[];
   readonly value?: FieldDescriptor;
   readonly item?: FieldDescriptor;
-  readonly discriminator?: string | null;
+  readonly discriminator?: string | undefined;
   readonly members?: readonly FieldMember[];
 }
 export interface FieldOptions {

@@ -19,9 +19,9 @@ interface WelcomeScreenProps {
 }
 
 export default function WelcomeScreen({ onOpen, showToast }: WelcomeScreenProps) {
-  const [error, setError] = useState<string | null>(null);
-  const [newProjectDirectory, setNewProjectDirectory] = useState<string | null>(null);
-  const [starterDirectory, setStarterDirectory] = useState<string | null>(null);
+  const [error, setError] = useState<string | undefined>(undefined);
+  const [newProjectDirectory, setNewProjectDirectory] = useState<string | undefined>(undefined);
+  const [starterDirectory, setStarterDirectory] = useState<string | undefined>(undefined);
   const recent = useRecentProjects(showToast);
   const actions = useWelcomeActions(onOpen, setError, setNewProjectDirectory, setStarterDirectory);
 
@@ -44,9 +44,9 @@ export default function WelcomeScreen({ onOpen, showToast }: WelcomeScreenProps)
       {starterDirectory && (
         <StarterWizard
           parentPath={starterDirectory}
-          onClose={() => setStarterDirectory(null)}
+          onClose={() => setStarterDirectory(undefined)}
           onDone={(directory) => {
-            setStarterDirectory(null);
+            setStarterDirectory(undefined);
             showToast('Site created', 'success');
             onOpen(directory);
           }}
@@ -55,9 +55,9 @@ export default function WelcomeScreen({ onOpen, showToast }: WelcomeScreenProps)
       {newProjectDirectory && (
         <NewProjectWizard
           directory={newProjectDirectory}
-          onClose={() => setNewProjectDirectory(null)}
+          onClose={() => setNewProjectDirectory(undefined)}
           onDone={(directory) => {
-            setNewProjectDirectory(null);
+            setNewProjectDirectory(undefined);
             showToast('Project created', 'success');
             onOpen(directory);
           }}
@@ -69,12 +69,12 @@ export default function WelcomeScreen({ onOpen, showToast }: WelcomeScreenProps)
 
 function useWelcomeActions(
   onOpen: WelcomeScreenProps['onOpen'],
-  setError: React.Dispatch<React.SetStateAction<string | null>>,
-  setNewProjectDirectory: React.Dispatch<React.SetStateAction<string | null>>,
-  setStarterDirectory: React.Dispatch<React.SetStateAction<string | null>>,
+  setError: React.Dispatch<React.SetStateAction<string | undefined>>,
+  setNewProjectDirectory: React.Dispatch<React.SetStateAction<string | undefined>>,
+  setStarterDirectory: React.Dispatch<React.SetStateAction<string | undefined>>,
 ) {
   const openExisting = async (): Promise<void> => {
-    setError(null);
+    setError(undefined);
     const result = await chooseExistingProject();
     if (!result.ok) {
       setError(result.error);
@@ -85,7 +85,7 @@ function useWelcomeActions(
     }
   };
   const createNew = async (): Promise<void> => {
-    setError(null);
+    setError(undefined);
     const result = await chooseNewProjectDirectory();
     if (!result.ok) {
       setError(result.error);
@@ -96,7 +96,7 @@ function useWelcomeActions(
     }
   };
   const startFromLumos = async (): Promise<void> => {
-    setError(null);
+    setError(undefined);
     const result = await chooseStarterParent();
     if (!result.ok) {
       setError(result.error);
@@ -196,7 +196,7 @@ function WelcomeHero({
   createNew,
 }: {
   readonly hasRecents: boolean;
-  readonly error: string | null;
+  readonly error: string | undefined;
   readonly openExisting: () => void;
   readonly startFromLumos: () => void;
   readonly createNew: () => void;
@@ -235,7 +235,7 @@ function RecentRail({
   readonly remove: (projectPath: string) => void;
 }) {
   if (projects.length === 0) {
-    return null;
+    return undefined;
   }
   return (
     <div className="recents">

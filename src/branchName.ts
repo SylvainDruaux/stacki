@@ -37,43 +37,46 @@ export function sanitizeBranchName(text: unknown): string {
 }
 
 /**
- * What's wrong with this name, or null when nothing is — for the shape of the
+ * What's wrong with this name, or undefined when nothing is — for the shape of the
  * whole name, which is the part typing can't prevent character by character.
  * An empty field is not an error; there is simply nothing to create yet.
  *
  * `existing` is the branches the project already has.
  */
-export function branchNameError(name: unknown, existing: readonly string[] = []): string | null {
-  const n = String(name ?? '').trim();
-  if (!n) {
-    return null;
+export function branchNameError(
+  name: unknown,
+  existing: readonly string[] = [],
+): string | undefined {
+  const trimmed = String(name ?? '').trim();
+  if (!trimmed) {
+    return undefined;
   }
-  if (n === '@') {
+  if (trimmed === '@') {
     return '“@” is git’s own name for the current branch.';
   }
-  if (n.endsWith('/')) {
+  if (trimmed.endsWith('/')) {
     return 'A name can’t end with “/”.';
   }
-  if (n.endsWith('.')) {
+  if (trimmed.endsWith('.')) {
     return 'A name can’t end with “.”.';
   }
-  if (n.split('/').some((part) => part.endsWith('.lock'))) {
+  if (trimmed.split('/').some((part) => part.endsWith('.lock'))) {
     return '“.lock” is reserved by git.';
   }
-  const clash = existing.find((b) => String(b).toLowerCase() === n.toLowerCase());
-  if (clash === n) {
-    return `${n} already exists.`;
+  const clash = existing.find((branch) => String(branch).toLowerCase() === trimmed.toLowerCase());
+  if (clash === trimmed) {
+    return `${trimmed} already exists.`;
   }
   if (clash) {
     // Not pedantry: on macOS and Windows these are one file in .git/refs, so
     // git refuses the second one — with a message about a file, not a branch.
     return `${clash} already exists, and names differing only in case are the same branch here.`;
   }
-  return null;
+  return undefined;
 }
 
 /** Whether this name can be created as it stands. */
 export function isValidBranchName(name: unknown, existing: readonly string[] = []): boolean {
-  const n = String(name ?? '').trim();
-  return !!n && !branchNameError(n, existing);
+  const trimmed = String(name ?? '').trim();
+  return !!trimmed && !branchNameError(trimmed, existing);
 }

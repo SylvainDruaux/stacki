@@ -13,7 +13,7 @@ import {
 import type { ContentEntries, ContentEntry } from '../contentViewBridge';
 import CodeEditor from '../ui/CodeEditor.jsx';
 import { CheckIcon, ChevronRightIcon, CloseIcon, HelpCircleIcon, HideIcon } from '../ui/Icons.jsx';
-import { FieldRow, UnionField, isPlainObject, issueAt, omitField } from './ContentFields';
+import { FieldRow, UnionField, isPlainObject, issueMessageAt, omitField } from './ContentFields';
 import type { FieldContext } from './ContentFields';
 
 const SAVE_DELAY_MS = 400;
@@ -39,8 +39,8 @@ interface Draft {
 }
 interface RenameState {
   readonly to: string;
-  readonly plan: IpcResults['content:renamePlan'] | null;
-  readonly error: string | null;
+  readonly plan: IpcResults['content:renamePlan'] | undefined;
+  readonly error: string | undefined;
 }
 
 function directoryOf(file: string): string {
@@ -54,7 +54,7 @@ export default function ContentView(props: ContentViewProps) {
     [editor.state?.collection.schema],
   );
   const freeformFields = useMemo(
-    () => describeFreeformFields(shape.freeform, editor.data),
+    () => (shape.freeform ? describeFreeformFields(editor.data) : []),
     [editor.data, shape.freeform],
   );
   const context = useFieldContext(props.project.path, editor);
@@ -89,8 +89,8 @@ export default function ContentView(props: ContentViewProps) {
   );
 }
 
-function describeFreeformFields(freeform: boolean, value: Data): readonly FieldDescriptor[] {
-  if (!freeform || !isPlainObject(value)) {
+function describeFreeformFields(value: Data): readonly FieldDescriptor[] {
+  if (!isPlainObject(value)) {
     return [];
   }
   return Object.keys(value).map((key) =>
@@ -99,14 +99,14 @@ function describeFreeformFields(freeform: boolean, value: Data): readonly FieldD
 }
 
 function useContentEditor(props: ContentViewProps) {
-  const [state, setState] = useState<ContentEntries | null>(null);
+  const [state, setState] = useState<ContentEntries | undefined>(undefined);
   const [selected, setSelected] = useState(0);
   const [query, setQuery] = useState('');
-  const [draft, setDraft] = useState<Draft | null>(null);
+  const [draft, setDraft] = useState<Draft | undefined>(undefined);
   const [issues, setIssues] = useState<readonly WireValidationIssue[]>([]);
   const [saved, setSaved] = useState(false);
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set());
-  const [rename, setRename] = useState<RenameState | null>(null);
+  const [rename, setRename] = useState<RenameState | undefined>(undefined);
   const timers = useEditorTimers();
   const load = useContentLoad(props, setState, setSelected);
   useEffect(() => {
@@ -114,10 +114,10 @@ function useContentEditor(props: ContentViewProps) {
     return window.avb.onCmsChanged(() => void load());
   }, [load]);
   useEffect(() => {
-    setDraft(null);
+    setDraft(undefined);
     setIssues([]);
     setExpanded(new Set());
-    setRename(null);
+    setRename(undefined);
     timers.validationGeneration.current += 1;
     clearTimer(timers.check);
   }, [props.name, selected, timers]);
@@ -126,7 +126,7 @@ function useContentEditor(props: ContentViewProps) {
   const data = dataValue === undefined ? {} : dataValue;
   const body = draft ? draft.body : entry?.body;
   const save = useContentSave(props, entry, setState, setSaved, timers.saved);
-  const change = useContentChange(props, save, setDraft, setIssues, timers);
+  const change = useContentChange(props, setDraft, setIssues, timers, save);
   return {
     state,
     selected,
@@ -147,17 +147,20 @@ function useContentEditor(props: ContentViewProps) {
   } as const;
 }
 
+type TimerRef = React.MutableRefObject<ReturnType<typeof setTimeout> | undefined>;
+
+// Every value here is a React ref, written in place by the editor's handlers.
 interface EditorTimers {
-  readonly save: React.MutableRefObject<ReturnType<typeof setTimeout> | null>;
-  readonly check: React.MutableRefObject<ReturnType<typeof setTimeout> | null>;
-  readonly saved: React.MutableRefObject<ReturnType<typeof setTimeout> | null>;
+  readonly save: TimerRef;
+  readonly check: TimerRef;
+  readonly saved: TimerRef;
   readonly validationGeneration: React.MutableRefObject<number>;
 }
 
 function useEditorTimers(): EditorTimers {
-  const save = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const check = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const saved = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const save = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const check = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const saved = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const validationGeneration = useRef(0);
   const timers = useMemo(() => ({ save, check, saved, validationGeneration }), []);
   useEffect(
@@ -172,16 +175,16 @@ function useEditorTimers(): EditorTimers {
   return timers;
 }
 
-function clearTimer(timer: React.MutableRefObject<ReturnType<typeof setTimeout> | null>): void {
-  if (timer.current !== null) {
-    clearTimeout(timer.current);
-    timer.current = null;
+function clearTimer(timerRef: TimerRef): void {
+  if (timerRef.current !== undefined) {
+    clearTimeout(timerRef.current);
+    timerRef.current = undefined;
   }
 }
 
 function useContentLoad(
   props: ContentViewProps,
-  setState: React.Dispatch<React.SetStateAction<ContentEntries | null>>,
+  setState: React.Dispatch<React.SetStateAction<ContentEntries | undefined>>,
   setSelected: React.Dispatch<React.SetStateAction<number>>,
 ) {
   const generation = useRef(0);
@@ -205,7 +208,7 @@ function useContentLoad(
 function useContentSave(
   props: ContentViewProps,
   entry: ContentEntry | undefined,
-  setState: React.Dispatch<React.SetStateAction<ContentEntries | null>>,
+  setState: React.Dispatch<React.SetStateAction<ContentEntries | undefined>>,
   setSaved: React.Dispatch<React.SetStateAction<boolean>>,
   savedTimer: EditorTimers['saved'],
 ) {
@@ -241,20 +244,20 @@ function useContentSave(
 
 function showSaved(
   setSaved: React.Dispatch<React.SetStateAction<boolean>>,
-  timer: EditorTimers['saved'],
+  timerRef: TimerRef,
 ): void {
-  clearTimer(timer);
+  clearTimer(timerRef);
   setSaved(true);
-  timer.current = setTimeout(() => setSaved(false), SAVED_DELAY_MS);
+  timerRef.current = setTimeout(() => setSaved(false), SAVED_DELAY_MS);
 }
 
 function updateSavedEntry(
-  state: ContentEntries | null,
+  state: ContentEntries | undefined,
   file: string,
   next: Draft,
-): ContentEntries | null {
+): ContentEntries | undefined {
   if (!state) {
-    return null;
+    return undefined;
   }
   return {
     ...state,
@@ -270,19 +273,25 @@ function updateSavedEntry(
 
 function useContentChange(
   props: ContentViewProps,
-  save: (draft: Draft) => Promise<void>,
-  setDraft: React.Dispatch<React.SetStateAction<Draft | null>>,
+  setDraft: React.Dispatch<React.SetStateAction<Draft | undefined>>,
   setIssues: React.Dispatch<React.SetStateAction<readonly WireValidationIssue[]>>,
   timers: EditorTimers,
+  save: (draft: Draft) => Promise<void>,
 ) {
   return useCallback(
     (next: Draft): void => {
+      const {
+        save: saveTimerRef,
+        check: checkTimerRef,
+        validationGeneration: generationRef,
+      } = timers;
       setDraft(next);
-      clearTimer(timers.save);
-      timers.save.current = setTimeout(() => void save(next), SAVE_DELAY_MS);
-      clearTimer(timers.check);
-      const generation = ++timers.validationGeneration.current;
-      timers.check.current = setTimeout(
+      clearTimer(saveTimerRef);
+      saveTimerRef.current = setTimeout(() => void save(next), SAVE_DELAY_MS);
+      clearTimer(checkTimerRef);
+      generationRef.current += 1;
+      const generation = generationRef.current;
+      checkTimerRef.current = setTimeout(
         () => void checkContent(props, next, generation, timers, setIssues),
         CHECK_DELAY_MS,
       );
@@ -320,7 +329,7 @@ function useFieldContext(projectPath: string, editor: ReturnType<typeof useConte
       expanded,
       expand: (key) => setExpanded((current) => new Set(current).add(key)),
       inFile: (path) => dataHasPath(entry?.data, path),
-      issueAt: (path) => issueAt(issues, path),
+      issueAt: (path) => issueMessageAt(issues, path),
     }),
     [entry, expanded, issues, projectPath, setExpanded, state?.parsed, state?.parserNote],
   );
@@ -442,7 +451,9 @@ function DetailHeader(props: EntryDetailProps) {
         <button
           className="ghost content-id"
           title="The id other entries point at"
-          onClick={() => props.setRename({ to: props.entry?.id ?? '', plan: null, error: null })}
+          onClick={() =>
+            props.setRename({ to: props.entry?.id ?? '', plan: undefined, error: undefined })
+          }
         >
           {props.entry.id}
         </button>
@@ -482,7 +493,7 @@ function EntryBanners({ state }: { readonly state: ContentEntries }) {
 
 function FormIssues({ issues }: { readonly issues: readonly WireValidationIssue[] }) {
   if (issues.length === 0) {
-    return null;
+    return undefined;
   }
   return (
     <div className="cms-error">
@@ -563,7 +574,7 @@ function BodyEditor(props: EntryDetailProps & { readonly entry: ContentEntry }) 
 function RenameEditor(props: EntryDetailProps & { readonly entry: ContentEntry }) {
   const rename = props.rename;
   if (!rename) {
-    return null;
+    return undefined;
   }
   const check = (): void => {
     void checkRename(props, rename, props.entry);
@@ -579,7 +590,9 @@ function RenameEditor(props: EntryDetailProps & { readonly entry: ContentEntry }
           autoFocus
           value={rename.to}
           spellCheck={false}
-          onChange={(event) => props.setRename({ to: event.target.value, plan: null, error: null })}
+          onChange={(event) =>
+            props.setRename({ to: event.target.value, plan: undefined, error: undefined })
+          }
         />
         <button
           className="ghost"
@@ -588,7 +601,7 @@ function RenameEditor(props: EntryDetailProps & { readonly entry: ContentEntry }
         >
           Check
         </button>
-        <button className="ghost" onClick={() => props.setRename(null)}>
+        <button className="ghost" onClick={() => props.setRename(undefined)}>
           Cancel
         </button>
       </div>
@@ -611,8 +624,8 @@ async function checkRename(
   );
   props.setRename(
     result.ok
-      ? { ...rename, plan: result.value, error: null }
-      : { ...rename, plan: null, error: result.error },
+      ? { ...rename, plan: result.value, error: undefined }
+      : { ...rename, plan: undefined, error: result.error },
   );
 }
 
@@ -631,7 +644,7 @@ async function executeRename(
     props.setRename({ ...rename, error: result.error });
     return;
   }
-  props.setRename(null);
+  props.setRename(undefined);
   await props.load();
   props.onSaved?.();
 }

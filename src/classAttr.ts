@@ -27,7 +27,7 @@ const LIST = 'class:list';
 const quoted = (name: string): string => `"${name}"`;
 
 /** Every class name the attribute mentions literally. */
-export function namesIn(prop: Attr | null | undefined): readonly string[] {
+export function namesIn(prop: Attr | undefined): readonly string[] {
   if (!prop) {
     return [];
   }
@@ -38,8 +38,8 @@ export function namesIn(prop: Attr | null | undefined): readonly string[] {
   // Quoted strings in an expression, plus the words inside a template literal —
   // the literal parts only, since `${theme}` is not a name until it runs.
   const out = [];
-  for (const m of text.matchAll(/"([^"]*)"|'([^']*)'|`([^`]*)`/g)) {
-    const inner = m[1] ?? m[2] ?? m[3] ?? '';
+  for (const match of text.matchAll(/"([^"]*)"|'([^']*)'|`([^`]*)`/g)) {
+    const inner = match[1] ?? match[2] ?? match[3] ?? '';
     for (const word of inner.split(/\$\{[^}]*\}|\s+/)) {
       if (word) {
         out.push(word);
@@ -50,7 +50,7 @@ export function namesIn(prop: Attr | null | undefined): readonly string[] {
 }
 
 /** Whether the element already carries `name`, however its classes are written. */
-export function hasClass(props: ClassProps | null | undefined, name: unknown): boolean {
+export function hasClass(props: ClassProps | undefined, name: unknown): boolean {
   const clean = String(name || '').trim();
   if (!clean) {
     return true;
@@ -60,25 +60,25 @@ export function hasClass(props: ClassProps | null | undefined, name: unknown): b
 
 /**
  * The single prop to write so the element carries `name`, as
- * `{ key, value }` — or null when its classes are code that cannot be
+ * `{ key, value }` — or undefined when its classes are code that cannot be
  * extended without guessing at what it means.
  *
- * Returns null for "already there" as well: the caller has `hasClass` for
+ * Returns undefined for "already there" as well: the caller has `hasClass` for
  * telling those apart, and neither is an edit.
  */
-export function withClass(props: ClassProps | null | undefined, name: unknown): ClassEdit | null {
+export function withClass(props: ClassProps | undefined, name: unknown): ClassEdit | undefined {
   const clean = String(name || '').trim();
   if (!clean || /\s/.test(clean)) {
-    return null;
+    return undefined;
   }
   if (hasClass(props, clean)) {
-    return null;
+    return undefined;
   }
 
   const list = props?.[LIST];
   if (list) {
     if (list.type !== 'expr') {
-      return null;
+      return undefined;
     }
     const text = String(list.value || '').trim();
     const at = text.lastIndexOf(']');
@@ -126,7 +126,7 @@ export function withClass(props: ClassProps | null | undefined, name: unknown): 
       return { key: 'class', value: { type: 'expr', value: `${text.slice(0, -1)} ${clean}\`` } };
     }
   }
-  return null;
+  return undefined;
 }
 
 export default withClass;

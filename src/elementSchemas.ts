@@ -336,7 +336,7 @@ const TEXT_ONLY_PARENTS = new Set([
 ]);
 
 // Parents that accept only a fixed set of children.
-const ONLY_CHILDREN: Readonly<Record<string, readonly string[] | null>> = {
+const ONLY_CHILDREN: Readonly<Record<string, readonly string[] | undefined>> = {
   ul: ['li', 'script', 'template'],
   ol: ['li', 'script', 'template'],
   menu: ['li', 'script', 'template'],
@@ -352,7 +352,7 @@ const ONLY_CHILDREN: Readonly<Record<string, readonly string[] | null>> = {
   picture: ['source', 'img'],
   video: ['source', 'track'],
   audio: ['source', 'track'],
-  figure: null, // flow content — no restriction beyond the defaults
+  figure: undefined, // flow content — no restriction beyond the defaults
 };
 
 // Whether `childTag` is valid markup directly inside `parentTag`. Unknown or
@@ -368,7 +368,7 @@ export function canContainTag(parentTag: unknown, childTag: unknown): boolean {
   }
 
   const only = ONLY_CHILDREN[parent];
-  if (only != null) {
+  if (only !== undefined) {
     return only.includes(child);
   }
 

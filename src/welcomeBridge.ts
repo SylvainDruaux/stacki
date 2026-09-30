@@ -61,32 +61,32 @@ export function parseParentDialog(input: unknown): ParentDialog {
 
 export function listRecentProjects() {
   const payload = parseIpcPayload('recents:list', undefined);
-  return welcomeRequest(() => window.avb.listRecents(payload), parseRecentProjects);
+  return welcomeRequest(parseRecentProjects, () => window.avb.listRecents(payload));
 }
 
 export function refreshRecentThumbnail(projectPath: string) {
   const payload = parseIpcPayload('recents:refreshThumb', projectPath);
-  return welcomeRequest(() => window.avb.refreshThumb(payload), parseRefreshThumb);
+  return welcomeRequest(parseRefreshThumb, () => window.avb.refreshThumb(payload));
 }
 
 export function removeRecentProject(projectPath: string) {
   const payload = parseIpcPayload('recents:remove', projectPath);
-  return welcomeRequest(() => window.avb.removeRecent(payload), parseSuccess);
+  return welcomeRequest(parseSuccess, () => window.avb.removeRecent(payload));
 }
 
 export function chooseExistingProject() {
   const payload = parseIpcPayload('project:openDialog', undefined);
-  return welcomeRequest(() => window.avb.openProjectDialog(payload), parseProjectDialog);
+  return welcomeRequest(parseProjectDialog, () => window.avb.openProjectDialog(payload));
 }
 
 export function chooseNewProjectDirectory() {
   const payload = parseIpcPayload('project:newDialog', undefined);
-  return welcomeRequest(() => window.avb.newProjectDialog(payload), parseProjectDialog);
+  return welcomeRequest(parseProjectDialog, () => window.avb.newProjectDialog(payload));
 }
 
 export function chooseStarterParent() {
   const payload = parseIpcPayload('project:parentDialog', undefined);
-  return welcomeRequest(() => window.avb.parentDialog(payload), parseParentDialog);
+  return welcomeRequest(parseParentDialog, () => window.avb.parentDialog(payload));
 }
 
 export function createStarterProject(parentPath: string, name: string) {
@@ -95,7 +95,7 @@ export function createStarterProject(parentPath: string, name: string) {
     parentPath,
     name,
   });
-  return welcomeRequest(() => window.avb.createStarter(payload), parseStarterResult);
+  return welcomeRequest(parseStarterResult, () => window.avb.createStarter(payload));
 }
 
 export function createAstroProject(options: AstroProjectOptions) {
@@ -106,7 +106,7 @@ export function createAstroProject(options: AstroProjectOptions) {
     git: options.git,
     ai: options.ai,
   });
-  return welcomeRequest(() => window.avb.createAstroProject(payload), parseAstroResult);
+  return welcomeRequest(parseAstroResult, () => window.avb.createAstroProject(payload));
 }
 
 export function subscribeCreateLog(append: (chunk: string) => void): () => void {
@@ -146,8 +146,8 @@ function parseAstroResult(input: unknown): IpcResults['project:createAstro'] {
 }
 
 async function welcomeRequest<Value>(
-  invoke: () => Promise<unknown>,
   parse: Parser<Value>,
+  invoke: () => Promise<unknown>,
 ): Promise<Result<Value, string>> {
   let response: unknown;
   try {

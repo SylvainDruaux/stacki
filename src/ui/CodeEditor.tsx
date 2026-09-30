@@ -129,11 +129,11 @@ export const appHighlight = syntaxHighlighting(
 );
 
 export interface CodeEditorProps {
-  readonly value?: string | null | undefined;
+  readonly value?: string | undefined;
   readonly language?: string | undefined;
   readonly onChange?: ((text: string, position: number) => void) | undefined;
-  readonly revealLine?: number | null | undefined;
-  readonly activeRange?: CodeEditorRange | null | undefined;
+  readonly revealLine?: number | undefined;
+  readonly activeRange?: CodeEditorRange | undefined;
   readonly componentRanges?: readonly CodeEditorComponentRange[] | undefined;
   readonly onPositionChange?: ((position: number) => void) | undefined;
   readonly onOpenComponent?: ((name: string, id: string) => void) | undefined;
@@ -150,7 +150,7 @@ export interface CodeEditorComponentRange extends CodeEditorRange {
 }
 
 interface CodeDecorations {
-  readonly active: CodeEditorRange | null;
+  readonly active: CodeEditorRange | undefined;
   readonly components: readonly CodeEditorComponentRange[];
 }
 
@@ -169,19 +169,19 @@ const codeDecorationField = StateField.define({
 export default function CodeEditor(props: CodeEditorProps) {
   const { value, language, revealLine, activeRange, componentRanges } = props;
   const hostRef = useRef<HTMLDivElement>(null);
-  const viewRef = useRef<EditorView | null>(null);
+  const viewRef = useRef<EditorView | undefined>(undefined);
   // These values change without replacing the editor, preserving history and selection.
   const latest = useRef(props);
   latest.current = props;
   useEffect(() => {
     const parent = hostRef.current;
     assert(parent !== null, 'CodeEditor: mounted host exists');
-    assert(viewRef.current === null, 'CodeEditor: only one editor owns the host');
+    assert(viewRef.current === undefined, 'CodeEditor: only one editor owns the host');
     const view = codeEditorCreate(parent, language, latest);
     viewRef.current = view;
     return () => {
       view.destroy();
-      viewRef.current = null;
+      viewRef.current = undefined;
     };
   }, [language]);
 
@@ -256,8 +256,8 @@ export function externalChange(
 }
 
 function useCodeDecorations(
-  viewRef: MutableRefObject<EditorView | null>,
-  activeRange: CodeEditorRange | null | undefined,
+  viewRef: MutableRefObject<EditorView | undefined>,
+  activeRange: CodeEditorRange | undefined,
   componentRanges: readonly CodeEditorComponentRange[] | undefined,
 ): void {
   useEffect(() => {
@@ -267,7 +267,7 @@ function useCodeDecorations(
     }
     view.dispatch({
       effects: codeDecorations.of({
-        active: activeRange ?? null,
+        active: activeRange ?? undefined,
         components: componentRanges ?? [],
       }),
     });
@@ -312,7 +312,7 @@ function codeEditorCreate(
   });
   view.dispatch({
     effects: codeDecorations.of({
-      active: latest.current.activeRange ?? null,
+      active: latest.current.activeRange ?? undefined,
       components: latest.current.componentRanges ?? [],
     }),
   });
@@ -322,10 +322,10 @@ function codeEditorCreate(
 function codeEditorInteractions(latest: MutableRefObject<CodeEditorProps>) {
   return EditorView.domEventHandlers({
     click: (event, view) => codeEditorClick(event, view, latest),
-    keydown: (event, view) => codeEditorModifier(event.metaKey, view),
-    keyup: (event, view) => codeEditorModifier(event.metaKey, view),
-    mousemove: (event, view) => codeEditorModifier(event.metaKey, view),
-    blur: (_event, view) => codeEditorModifier(false, view),
+    keydown: (event, view) => codeEditorModifier(view, { metaHeld: event.metaKey }),
+    keyup: (event, view) => codeEditorModifier(view, { metaHeld: event.metaKey }),
+    mousemove: (event, view) => codeEditorModifier(view, { metaHeld: event.metaKey }),
+    blur: (_event, view) => codeEditorModifier(view, { metaHeld: false }),
   });
 }
 
@@ -350,8 +350,8 @@ function codeEditorClick(
   return false;
 }
 
-function codeEditorModifier(active: boolean, view: EditorView): false {
-  view.dom.classList.toggle('cm-meta-held', active);
+function codeEditorModifier(view: EditorView, { metaHeld }: { readonly metaHeld: boolean }): false {
+  view.dom.classList.toggle('cm-meta-held', metaHeld);
   return false;
 }
 
@@ -376,11 +376,11 @@ function codeEditorDecorations(length: number, state: CodeDecorations) {
 }
 
 function codeEditorRangeWithin(
-  range: CodeEditorRange | null,
+  range: CodeEditorRange | undefined,
   length: number,
-): CodeEditorRange | null {
+): CodeEditorRange | undefined {
   if (!range || range.from < 0 || range.to < range.from || range.to > length) {
-    return null;
+    return undefined;
   }
   return range;
 }

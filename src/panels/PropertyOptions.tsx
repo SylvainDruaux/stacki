@@ -25,25 +25,26 @@ export function PropertyOptions({ type, disabled, onChange }: PropertyOptionsPro
   const scalarKind = useRef<'text' | 'literal'>();
   const options = literalOptions(type);
   if (!options) {
-    return null;
+    return undefined;
   }
   const value = arrayText(options.map((option) => ({ text: optionLabel(option), quote: '"' })));
-  const change = (value: string, immediate: boolean, change: ListFieldChange): void => {
+  const change = (text: string, commit: 'immediate' | 'draft', listChange: ListFieldChange) => {
     if (disabled) {
       return;
     }
-    if (change.kind === 'edit') {
-      const original = options[change.index];
+    if (listChange.kind === 'edit') {
+      const original = options[listChange.index];
       assert(original !== undefined, 'Edited option exists');
       scalarKind.current ??= /^["']/.test(original) ? 'text' : 'literal';
     }
-    const next = changePropertyOptionList(options, value, change, scalarKind.current ?? 'text');
-    if (immediate) {
+    const kind = scalarKind.current ?? 'text';
+    const next = changePropertyOptionList(options, text, listChange, kind);
+    if (commit === 'immediate') {
       scalarKind.current = undefined;
     }
     const nextType = next.options.join(' | ');
     onChange(
-      change.kind === 'move'
+      listChange.kind === 'move'
         ? { kind: 'reorder', type: nextType }
         : { kind: 'draft', type: nextType, rename: next.rename },
     );
@@ -53,7 +54,9 @@ export function PropertyOptions({ type, disabled, onChange }: PropertyOptionsPro
       <span>Options</span>
       <ListField
         value={value}
-        onChange={change}
+        onChange={(text, immediate, listChange) =>
+          change(text, immediate ? 'immediate' : 'draft', listChange)
+        }
         disabled={disabled}
         itemsMin={1}
         itemsMax={PROPERTY_LIMITS.fieldsMax}

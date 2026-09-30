@@ -18,12 +18,12 @@ const CONTENT_KEY = '\u0000content';
 
 interface CmsPanelProps {
   readonly project: { readonly path: string };
-  readonly selectedRel: string | null;
-  readonly selectedContent: string | null;
-  readonly currentFile: string | null;
+  readonly selectedRel: string | undefined;
+  readonly selectedContent: string | undefined;
+  readonly currentFile: string | undefined;
   readonly refreshKey: string | number;
-  readonly onSelect: (rel: string | null) => void;
-  readonly onSelectContent: (name: string | null) => void;
+  readonly onSelect: (rel: string | undefined) => void;
+  readonly onSelectContent: (name: string | undefined) => void;
   readonly onOpenSettings: (rel: string) => void;
   readonly showToast: (message: string, kind: 'error') => void;
 }
@@ -35,7 +35,7 @@ interface CollectionGroup {
   readonly path: string;
   readonly items: readonly Collection[];
   readonly current: boolean;
-  readonly badge: 'this page' | 'open' | null;
+  readonly badge: 'this page' | 'open' | undefined;
 }
 
 interface CmsPanelData {
@@ -52,15 +52,15 @@ const EMPTY_CONTENT: CmsPanelContent = {
 export default function CmsPanel(props: CmsPanelProps) {
   const { files, content, refresh } = useCmsPanelData(props.project.path, props.refreshKey);
   const [creating, setCreating] = useState(false);
-  const [openKey, setOpenKey] = useState<string | null>(null);
+  const [openKey, setOpenKey] = useState<string | undefined>(undefined);
   const collections = useMemo(() => visibleCollections(files, content), [files, content]);
   const groups = useMemo(
     () => collectionGroups(collections, props.currentFile),
     [collections, props.currentFile],
   );
   useSelectedGroup(props.selectedRel, openKey, collections, setOpenKey);
-  const open = openKey === null ? undefined : groups.find((group) => group.key === openKey);
-  const create = useCreateCollection(props, refresh, setCreating, setOpenKey);
+  const open = openKey === undefined ? undefined : groups.find((group) => group.key === openKey);
+  const create = useCreateCollection(props, setCreating, setOpenKey, refresh);
   return (
     <div className="panel-section grow">
       <PanelHeader
@@ -126,9 +126,9 @@ function useCmsPanelData(projectPath: string, refreshKey: string | number): CmsP
 
 function useCreateCollection(
   props: CmsPanelProps,
-  refresh: () => Promise<void>,
   setCreating: React.Dispatch<React.SetStateAction<boolean>>,
-  setOpenKey: React.Dispatch<React.SetStateAction<string | null>>,
+  setOpenKey: React.Dispatch<React.SetStateAction<string | undefined>>,
+  refresh: () => Promise<void>,
 ): (name: string) => Promise<void> {
   return useCallback(
     async (name: string): Promise<void> => {
@@ -150,13 +150,13 @@ function useCreateCollection(
 }
 
 function useSelectedGroup(
-  selectedRel: string | null,
-  openKey: string | null,
+  selectedRel: string | undefined,
+  openKey: string | undefined,
   collections: readonly Collection[],
-  setOpenKey: React.Dispatch<React.SetStateAction<string | null>>,
+  setOpenKey: React.Dispatch<React.SetStateAction<string | undefined>>,
 ): void {
   useEffect(() => {
-    if (selectedRel === null || openKey !== null) {
+    if (selectedRel === undefined || openKey !== undefined) {
       return;
     }
     const selected = collections.find((collection) => collection.rel === selectedRel);
@@ -184,7 +184,7 @@ function ownedByContent(rel: string, covered: CmsPanelContent['covered']): boole
 
 function collectionGroups(
   collections: readonly Collection[],
-  currentFile: string | null,
+  currentFile: string | undefined,
 ): readonly CollectionGroup[] {
   const mutableGroups = new Map<
     string,
@@ -203,12 +203,12 @@ function collectionGroups(
     }
   }
   return Array.from(mutableGroups.values(), ({ identity, items }) => {
-    const current = currentFile !== null && identity.key === currentFile;
+    const current = currentFile !== undefined && identity.key === currentFile;
     const badge: CollectionGroup['badge'] = current
       ? identity.key.startsWith('pages/')
         ? 'this page'
         : 'open'
-      : null;
+      : undefined;
     return {
       ...identity,
       items,
@@ -225,21 +225,21 @@ interface GroupIdentity {
   readonly path: string;
 }
 
-function groupIdentity(rel: string, dir: string): GroupIdentity {
+function groupIdentity(rel: string, directory: string): GroupIdentity {
   if (rel.includes('#')) {
-    const base = dir.split('/').at(-1) ?? dir;
+    const base = directory.split('/').at(-1) ?? directory;
     return {
-      key: dir,
+      key: directory,
       kind: 'file',
       label: base.charAt(0).toUpperCase() + base.slice(1),
-      path: `src/${dir}`,
+      path: `src/${directory}`,
     };
   }
   return {
-    key: dir,
+    key: directory,
     kind: 'folder',
-    label: dir ? (dir.split('/').at(-1) ?? dir) : 'src',
-    path: dir ? `src/${dir}` : 'src',
+    label: directory ? (directory.split('/').at(-1) ?? directory) : 'src',
+    path: directory ? `src/${directory}` : 'src',
   };
 }
 
@@ -249,11 +249,11 @@ function directoryOf(rel: string): string {
 
 function closeGroup(
   props: Pick<CmsPanelProps, 'onSelect' | 'onSelectContent'>,
-  setOpenKey: React.Dispatch<React.SetStateAction<string | null>>,
+  setOpenKey: React.Dispatch<React.SetStateAction<string | undefined>>,
 ): void {
-  setOpenKey(null);
-  props.onSelect(null);
-  props.onSelectContent(null);
+  setOpenKey(undefined);
+  props.onSelect(undefined);
+  props.onSelectContent(undefined);
 }
 
 function PanelHeader({
@@ -263,7 +263,7 @@ function PanelHeader({
   onCreate,
 }: {
   readonly open: CollectionGroup | undefined;
-  readonly openKey: string | null;
+  readonly openKey: string | undefined;
   readonly onBack: () => void;
   readonly onCreate: () => void;
 }) {
@@ -298,13 +298,18 @@ function CreateRow({ onCreate }: { readonly onCreate: (name: string) => Promise<
           if (event.key === 'Enter') {
             event.currentTarget.blur();
           } else if (event.key === 'Escape') {
-            event.currentTarget.value = '';
+            setInputText(event.currentTarget, '');
             event.currentTarget.blur();
           }
         }}
       />
     </div>
   );
+}
+
+// An uncontrolled input's text is the element's own state, set in place.
+function setInputText(inputElement: HTMLInputElement, text: string): void {
+  inputElement.value = text;
 }
 
 function GroupList({
@@ -376,13 +381,16 @@ function ContentCollectionList({
   onSelect,
 }: {
   readonly collections: readonly CmsPanelContentCollection[];
-  readonly selected: string | null;
-  readonly onSelect: (name: string | null) => void;
+  readonly selected: string | undefined;
+  readonly onSelect: (name: string | undefined) => void;
 }) {
   return collections.map((collection) => (
     <div
       key={collection.name}
-      className={collectionClass(collection.name === selected, collection.error !== undefined)}
+      className={collectionClass({
+        selected: collection.name === selected,
+        broken: collection.error !== undefined,
+      })}
       onClick={() => onSelect(collection.name)}
       title={contentCollectionTitle(collection)}
     >
@@ -403,14 +411,17 @@ function JsonCollectionList({
   onOpenSettings,
 }: {
   readonly collections: readonly Collection[];
-  readonly selected: string | null;
-  readonly onSelect: (rel: string | null) => void;
+  readonly selected: string | undefined;
+  readonly onSelect: (rel: string | undefined) => void;
   readonly onOpenSettings: (rel: string) => void;
 }) {
   return collections.map((collection) => (
     <div
       key={collection.rel}
-      className={collectionClass(collection.rel === selected, collection.error !== null)}
+      className={collectionClass({
+        selected: collection.rel === selected,
+        broken: collection.error !== undefined,
+      })}
       onClick={() => onSelect(collection.rel)}
       title={
         collection.error ? `src/${collection.rel} — ${collection.error}` : `src/${collection.rel}`
@@ -424,11 +435,11 @@ function JsonCollectionList({
         title="Collection settings"
         onClick={(event) => {
           event.stopPropagation();
-          if (collection.error === null) {
+          if (collection.error === undefined) {
             onOpenSettings(collection.rel);
           }
         }}
-        disabled={collection.error !== null}
+        disabled={collection.error !== undefined}
       >
         <GearIcon size={13} />
       </button>
@@ -452,8 +463,8 @@ function EmptyPanel({ onCreate }: { readonly onCreate: () => void }) {
   );
 }
 
-function collectionClass(selected: boolean, broken: boolean): string {
-  return `cms-collection ${selected ? 'on' : ''} ${broken ? 'broken' : ''}`;
+function collectionClass(state: { readonly selected: boolean; readonly broken: boolean }): string {
+  return `cms-collection ${state.selected ? 'on' : ''} ${state.broken ? 'broken' : ''}`;
 }
 
 function collectionCount(countValue: number): string {
@@ -468,7 +479,7 @@ function contentEntryCount(collection: CmsPanelContentCollection): string {
 }
 
 function jsonItemCount(collection: Collection): string {
-  if (collection.error !== null) {
+  if (collection.error !== undefined) {
     return 'unreadable';
   }
   return collection.single || collection.items.length === 1

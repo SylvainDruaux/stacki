@@ -127,7 +127,7 @@ export function previewProjectPageEdit(
   return window.avb.previewPageEdit(payload).then(parsePageEditResult);
 }
 
-export function closeProject(nextProjectPath: string | null): Promise<void> {
+export function closeProject(nextProjectPath: string | undefined): Promise<void> {
   const payload = parseIpcPayload('project:close', nextProjectPath);
   return window.avb.closeProject(payload).then((input) => void parseOkResult(input));
 }
@@ -228,12 +228,13 @@ export function readContentCollections(projectPath: string): Promise<readonly Ap
     .then((input) => list(parseAppCollection)(record(input)['collections']));
 }
 
-export function readSampleEntry(devUrl: string, name: string, id?: string): Promise<Data | null> {
+export function readSampleEntry(devUrl: string, name: string, id?: string): Promise<Data> {
   const raw = id === undefined ? { devUrl, name } : { devUrl, name, id };
   const payload = parseIpcPayload('content:sampleEntry', raw);
   return window.avb.sampleEntry(payload).then((input) => {
     const entry = record(input)['entry'];
-    return entry === null ? null : data(entry);
+    // A stored `null` entry reads as absent, like a missing one.
+    return entry === null ? undefined : data(entry);
   });
 }
 
@@ -251,8 +252,8 @@ export function moveProjectPage(projectPath: string, from: string, to: string): 
   return window.avb.movePage(payload).then((input) => pathText(record(input)['newPath']));
 }
 
-export function createProjectPageFolder(projectPath: string, dir: string): Promise<void> {
-  const payload = parseIpcPayload('pagefolder:create', { projectPath, dir });
+export function createProjectPageFolder(projectPath: string, directory: string): Promise<void> {
+  const payload = parseIpcPayload('pagefolder:create', { projectPath, dir: directory });
   return window.avb.createPageFolder(payload).then((input) => void parseOkResult(input));
 }
 
@@ -265,8 +266,8 @@ export function renameProjectPageFolder(
   return window.avb.renamePageFolder(payload).then((input) => void parseOkResult(input));
 }
 
-export function deleteProjectPageFolder(projectPath: string, dir: string): Promise<void> {
-  const payload = parseIpcPayload('pagefolder:delete', { projectPath, dir });
+export function deleteProjectPageFolder(projectPath: string, directory: string): Promise<void> {
+  const payload = parseIpcPayload('pagefolder:delete', { projectPath, dir: directory });
   return window.avb.deletePageFolder(payload).then((input) => void parseOkResult(input));
 }
 
@@ -297,7 +298,7 @@ export function findImportPath(
 
 export function rebaseProjectImport(
   fromPagePath: string,
-  toPagePath: string | null,
+  toPagePath: string | undefined,
   spec: string,
 ): Promise<IpcResults['page:rebaseImport']> {
   const payload = parseIpcPayload('page:rebaseImport', {
@@ -391,8 +392,8 @@ export function restoreProjectVersion(
   });
 }
 
-export function onAppProgress(callback: (message: string | null) => void): () => void {
-  return window.avb.onProgress((input) => callback(nullableText(record(input)['message'])));
+export function onAppProgress(callback: (message: string | undefined) => void): () => void {
+  return window.avb.onProgress((input) => callback(optional(text)(record(input)['message'])));
 }
 
 export function onDevExit(callback: (log: string) => void): () => void {
@@ -538,8 +539,4 @@ function parseAppCollection(input: unknown): AppCollection {
   return collectionCount === undefined
     ? { name: text(value['name']) }
     : { name: text(value['name']), count: collectionCount };
-}
-
-function nullableText(input: unknown): string | null {
-  return input === null ? null : text(input);
 }

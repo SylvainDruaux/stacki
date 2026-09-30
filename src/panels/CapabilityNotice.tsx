@@ -11,10 +11,10 @@ interface CapabilityNoticeProps {
 
 export default function CapabilityNotice({ capability }: CapabilityNoticeProps) {
   if (capability === undefined) {
-    return null;
+    return undefined;
   }
   if (!capabilityNeedsNotice(capability)) {
-    return null;
+    return undefined;
   }
   return (
     <div className="capability-notice" role="status" data-capability={capability}>

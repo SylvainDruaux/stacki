@@ -29,37 +29,37 @@ function topLevelParts(body: string): readonly string[] {
   assert(body.length <= LIMITS.nodeValueCharsMax, 'Class expression exceeds size limit');
   const parts = [];
   let depth = 0;
-  let quote: string | null = null;
-  let cur = '';
+  let quote: string | undefined = undefined;
+  let current = '';
   for (let i = 0; i < body.length; i += 1) {
     const ch = body.charAt(i);
     if (quote) {
-      cur += ch;
+      current += ch;
       if (ch === '\\') {
-        cur += body[i + 1] ?? '';
+        current += body[i + 1] ?? '';
         i += 1;
       } else if (ch === quote) {
-        quote = null;
+        quote = undefined;
       }
       continue;
     }
     if (ch === '"' || ch === "'" || ch === '`') {
       quote = ch;
-      cur += ch;
+      current += ch;
     } else if (ch === '(' || ch === '[' || ch === '{') {
       depth += 1;
-      cur += ch;
+      current += ch;
     } else if (ch === ')' || ch === ']' || ch === '}') {
       depth -= 1;
-      cur += ch;
+      current += ch;
     } else if (ch === ',' && depth === 0) {
-      parts.push(cur);
-      cur = '';
+      parts.push(current);
+      current = '';
     } else {
-      cur += ch;
+      current += ch;
     }
   }
-  parts.push(cur);
+  parts.push(current);
   return parts;
 }
 
@@ -71,18 +71,18 @@ function fromExpression(expr: unknown): readonly string[] {
   const body = trimmed.startsWith('[') && trimmed.endsWith(']') ? trimmed.slice(1, -1) : trimmed;
   const out = [];
   for (const part of topLevelParts(body)) {
-    const m = QUOTED.exec(part.trim());
+    const match = QUOTED.exec(part.trim());
     // Unescape: the capture is the raw source between the quotes, so `\"` in
     // the literal would otherwise reach the label with its backslash.
-    if (m?.[2] !== undefined) {
-      out.push(...m[2].replace(/\\(.)/g, '$1').split(/\s+/).filter(Boolean));
+    if (match?.[2] !== undefined) {
+      out.push(...match[2].replace(/\\(.)/g, '$1').split(/\s+/).filter(Boolean));
     }
   }
   return out;
 }
 
 /** Static class names on a node, in source order. Empty when it has none. */
-export function elementClasses(node: ClassNode | null | undefined): readonly string[] {
+export function elementClasses(node: ClassNode | undefined): readonly string[] {
   const props = node?.props || {};
   const cls = props['class'];
   if (cls && cls.type === 'string') {
@@ -103,7 +103,7 @@ export function elementClasses(node: ClassNode | null | undefined): readonly str
  * class, then its tag. Every slot is spelled `slot`, so the name is the only
  * thing that tells one from another.
  */
-export function elementLabel(node: ClassNode | null | undefined): string {
+export function elementLabel(node: ClassNode | undefined): string {
   if (node?.name === 'slot') {
     const named = node.props?.['name'];
     if (named && named.type === 'string' && named.value.trim()) {

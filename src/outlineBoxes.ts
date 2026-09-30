@@ -8,8 +8,8 @@ export interface Box {
   readonly h: number;
 }
 interface Occurrence {
-  readonly path?: string | null;
-  readonly occ?: number | null;
+  readonly path?: string | undefined;
+  readonly occ?: number | undefined;
 }
 
 // One box per place.
@@ -31,29 +31,29 @@ interface Occurrence {
 // "the same" as another is rarely the same to six decimal places.
 const SLACK = 1;
 
-const covers = (a: Box, b: Box): boolean =>
-  b.x >= a.x - SLACK &&
-  b.y >= a.y - SLACK &&
-  b.x + b.w <= a.x + a.w + SLACK &&
-  b.y + b.h <= a.y + a.h + SLACK;
+const covers = (outer: Box, inner: Box): boolean =>
+  inner.x >= outer.x - SLACK &&
+  inner.y >= outer.y - SLACK &&
+  inner.x + inner.w <= outer.x + outer.w + SLACK &&
+  inner.y + inner.h <= outer.y + outer.h + SLACK;
 
 /**
  * The boxes worth drawing, in the order they were reported — which is document
  * order, so "the second copy" still means the second one down the page.
  */
-export function onePerPlace<T extends Box>(boxes: readonly T[] | null | undefined): readonly T[] {
+export function onePerPlace<T extends Box>(boxes: readonly T[] | undefined): readonly T[] {
   assert((boxes?.length ?? 0) <= LIMITS.treeNodesMax, 'Outline box count exceeds limit');
-  const list = (boxes || []).filter((b) => b && b.w > 0 && b.h > 0);
+  const list = (boxes || []).filter((box) => box && box.w > 0 && box.h > 0);
   // Largest first, so a box is measured against the ones that could contain
   // it rather than the other way round.
-  const order = [...list].sort((a, b) => b.w * b.h - a.w * a.h);
+  const order = [...list].sort((left, right) => right.w * right.h - left.w * left.h);
   const kept: T[] = [];
   for (const box of order) {
-    if (!kept.some((k) => covers(k, box))) {
+    if (!kept.some((keeper) => covers(keeper, box))) {
       kept.push(box);
     }
   }
-  return list.filter((b) => kept.includes(b));
+  return list.filter((box) => kept.includes(box));
 }
 
 /**
@@ -71,8 +71,8 @@ export function onePerPlace<T extends Box>(boxes: readonly T[] | null | undefine
  * outlines all of them — already covers whichever copy is hovered.
  */
 export function hoverIsSelection(
-  hover: Occurrence | null | undefined,
-  selection: Occurrence | null | undefined,
+  hover: Occurrence | undefined,
+  selection: Occurrence | undefined,
 ): boolean {
   if (!hover?.path || !selection?.path) {
     return false;
@@ -80,7 +80,13 @@ export function hoverIsSelection(
   if (hover.path !== selection.path) {
     return false;
   }
-  return hover.occ == null || selection.occ == null || hover.occ === selection.occ;
+  if (hover.occ === undefined) {
+    return true;
+  }
+  if (selection.occ === undefined) {
+    return true;
+  }
+  return hover.occ === selection.occ;
 }
 
 /**
@@ -103,29 +109,29 @@ export function hoverIsSelection(
  * carrying a file namespace (`src/Card.astro|0.1`) belongs to that file: a step
  * into another file's markup is not a step within a copy.
  */
-export function sameCopy(from: string | null | undefined, to: string | null | undefined): boolean {
+export function sameCopy(from: string | undefined, to: string | undefined): boolean {
   if (!from || !to || from === to) {
     return false;
   }
-  const split = (p: string) => {
-    const text = String(p);
+  const split = (path: string) => {
+    const text = String(path);
     const bar = text.lastIndexOf('|');
     return {
       file: bar === -1 ? '' : text.slice(0, bar),
       trail: text.slice(bar + 1).split('.'),
     };
   };
-  const a = split(from);
-  const b = split(to);
-  if (a.file !== b.file) {
+  const source = split(from);
+  const target = split(to);
+  if (source.file !== target.file) {
     return false;
   }
-  const shorter = Math.min(a.trail.length, b.trail.length);
+  const shorter = Math.min(source.trail.length, target.trail.length);
   // A sibling differs only in its last step; an ancestor or descendant agrees
   // the whole way down the shorter of the two.
-  const common = a.trail.length === b.trail.length ? shorter - 1 : shorter;
+  const common = source.trail.length === target.trail.length ? shorter - 1 : shorter;
   for (let i = 0; i < common; i++) {
-    if (a.trail[i] !== b.trail[i]) {
+    if (source.trail[i] !== target.trail[i]) {
       return false;
     }
   }

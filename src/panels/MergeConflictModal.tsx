@@ -18,7 +18,7 @@ import Code from '../ui/Code';
 
 export interface MergeConflictProps {
   readonly conflict: Conflict;
-  readonly busy: string | null;
+  readonly busy: string | undefined;
   readonly onCancel: () => void;
   readonly onResolve: (choices: ConflictChoices) => void;
 }
@@ -209,13 +209,13 @@ function ConflictHunkView({ model, hunk }: HunkProps) {
   const { clash, index, before, after } = hunk;
   const choice = model.picks[model.file.path]?.[index];
   return (
-    <div className={`conflict-hunk ${clash.merged != null ? 'combined' : ''}`}>
+    <div className={`conflict-hunk ${clash.merged !== undefined ? 'combined' : ''}`}>
       <div className="conflict-hunk-head">
         <span className="conflict-hunk-n">{conflictLabel(model.conflict, clash)}</span>
         <ConflictHunkChoices model={model} hunk={hunk} />
       </div>
       {before && <div className="conflict-ctx">{before}</div>}
-      {clash.merged != null && choice === 'merged' ? (
+      {clash.merged !== undefined && choice === 'merged' ? (
         <div className="conflict-side kept">
           <div className="conflict-side-label">both edits, combined</div>
           <Code text={clash.merged} filename={model.file.path} maxHeight={160} />
@@ -233,7 +233,7 @@ function ConflictHunkChoices({ model, hunk }: HunkProps) {
   const choice = picks[file.path]?.[index];
   return (
     <div className="conflict-choice">
-      {clash.merged != null && (
+      {clash.merged !== undefined && (
         <button
           className={choice === 'merged' ? 'on' : ''}
           disabled={working}
@@ -257,7 +257,7 @@ function ConflictHunkChoices({ model, hunk }: HunkProps) {
       >
         {conflict.branch}
       </button>
-      {clash.changedBy === 'both' && clash.merged == null && (
+      {clash.changedBy === 'both' && clash.merged === undefined && (
         <button
           className={choice === 'both' ? 'on' : ''}
           disabled={working}

@@ -1,7 +1,7 @@
 // Two or three choices, side by side, one of them on. The props panel's yes/no
 // and the object field's use the same one — a boolean looks the same wherever
 // it is asked about.
-export default function SegSwitch<T extends string | number | boolean | null>({
+export default function SegSwitch<T extends string | number | boolean | undefined>({
   options,
   current,
   onPick,
@@ -10,19 +10,19 @@ export default function SegSwitch<T extends string | number | boolean | null>({
   readonly current?: T;
   readonly onPick: (value: T) => void;
 }) {
-  const at = options.findIndex((o) => o.value === current);
+  const at = options.findIndex((option) => option.value === current);
   return (
     <div className={`bool-seg ${at === 1 ? 'is-second' : 'is-first'}`} role="group">
-      {options.map((o) => (
+      {options.map((option) => (
         <button
-          key={String(o.value)}
+          key={String(option.value)}
           type="button"
-          className={o.value === current ? 'on' : ''}
-          aria-pressed={o.value === current}
-          title={o.label}
-          onClick={() => onPick(o.value)}
+          className={option.value === current ? 'on' : ''}
+          aria-pressed={option.value === current}
+          title={option.label}
+          onClick={() => onPick(option.value)}
         >
-          {o.label}
+          {option.label}
         </button>
       ))}
     </div>

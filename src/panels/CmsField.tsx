@@ -191,7 +191,13 @@ function NumberField({ value, onChange }: ScalarProps) {
     />
   );
 }
-function ImageField({ value, onChange, pickAsset, projectPath, baseDir }: ValueProps) {
+function ImageField({
+  value,
+  onChange,
+  pickAsset,
+  projectPath,
+  baseDir: baseDirectory,
+}: ValueProps) {
   const asset = isExpr(value) ? value['__asset'] : undefined;
   const reference = typeof asset === 'string' ? asset : undefined;
   return (
@@ -211,7 +217,7 @@ function ImageField({ value, onChange, pickAsset, projectPath, baseDir }: ValueP
       }
       mediaKind="image"
       projectPath={projectPath}
-      baseDir={baseDir}
+      baseDir={baseDirectory}
     />
   );
 }

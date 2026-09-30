@@ -4,7 +4,7 @@ import type { TrailingSlash } from '../appTypes';
 import type { ComponentUsageFile } from '../paletteModel';
 import type { ComponentCreationSource, UsageAnchor, UsagePopup } from './PaletteDialogs';
 import { cleanError } from '../cleanError';
-import { clearDrag, setDrag } from '../dragState';
+import { allowDragEffect, clearDrag, setDrag } from '../dragState';
 import { rankInsertItems } from '../insertRank';
 import {
   componentPreviewURL,
@@ -23,7 +23,7 @@ const PREVIEW_DELAY_MS = 450;
 
 interface PalettePanelProps {
   readonly components: readonly ScanComponent[];
-  readonly devUrl: string | null;
+  readonly devUrl: string | undefined;
   readonly trailingSlash: TrailingSlash;
   readonly onInsert: (name: string) => void;
   readonly onDragBegin?: () => void;
@@ -48,7 +48,7 @@ export default function PalettePanel(props: PalettePanelProps) {
   const preview = useComponentPreview();
   const usage = useUsagePopup(props.onUsage, preview.cancel);
   const usageRef = useRef<HTMLDivElement>(null);
-  useDismiss(usageRef, usage.value !== null, usage.close);
+  useDismiss(usageRef, { active: usage.value !== undefined }, usage.close);
   useCreateRequest(props.createRequest ?? 0, props.createFrom, setCreating);
   const list = useMemo(() => rankInsertItems(props.components, query), [props.components, query]);
   const groups = useMemo(() => groupPaletteComponents(list), [list]);
@@ -95,7 +95,7 @@ function useCreateRequest(
 }
 
 function useDelayedTooltip() {
-  const [value, setValue] = useState<Point | null>(null);
+  const [value, setValue] = useState<Point | undefined>(undefined);
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   useEffect(() => () => clearTimeout(timer.current), []);
   const show = useCallback((event: React.MouseEvent<HTMLElement>): void => {
@@ -108,13 +108,15 @@ function useDelayedTooltip() {
   }, []);
   const hide = useCallback((): void => {
     clearTimeout(timer.current);
-    setValue(null);
+    setValue(undefined);
   }, []);
   return { value, show, hide };
 }
 
 function useComponentPreview() {
-  const [value, setValue] = useState<(Point & { readonly component: ScanComponent }) | null>(null);
+  const [value, setValue] = useState<(Point & { readonly component: ScanComponent }) | undefined>(
+    undefined,
+  );
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   useEffect(() => () => clearTimeout(timer.current), []);
   const schedule = useCallback((component: ScanComponent, anchor: HTMLElement): void => {
@@ -126,17 +128,17 @@ function useComponentPreview() {
   }, []);
   const cancel = useCallback((): void => {
     clearTimeout(timer.current);
-    setValue(null);
+    setValue(undefined);
   }, []);
   return { value, schedule, cancel };
 }
 
 function useUsagePopup(onUsage: PalettePanelProps['onUsage'], cancelPreview: () => void) {
-  const [value, setValue] = useState<UsagePopup | null>(null);
+  const [value, setValue] = useState<UsagePopup | undefined>(undefined);
   const request = useRef(0);
   const close = useCallback((): void => {
     request.current += 1;
-    setValue(null);
+    setValue(undefined);
   }, []);
   const open = useCallback(
     async (component: ScanComponent, element: HTMLElement): Promise<void> => {
@@ -311,7 +313,7 @@ function startComponentDrag(
 ): void {
   props.preview.cancel();
   event.dataTransfer.setData('avb/component', component.name);
-  event.dataTransfer.effectAllowed = 'copy';
+  allowDragEffect(event.dataTransfer, 'copy');
   setDrag({ kind: 'component', name: component.name });
   if (props.onDragBegin) {
     setTimeout(props.onDragBegin, 0);

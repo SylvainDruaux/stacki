@@ -51,7 +51,7 @@ export function CreateComponentModal(props: CreateComponentModalProps) {
   }, []);
   const name = toComponentName(text);
   const error = componentNameError(text, props.taken);
-  const shown = text.trim() ? error : null;
+  const shown = text.trim() ? error : undefined;
   const submit = (): void => {
     if (!error) {
       props.onCreate(name, { withProps });
@@ -106,7 +106,7 @@ function ComponentNameField({
   readonly text: string;
   readonly setText: React.Dispatch<React.SetStateAction<string>>;
   readonly name: string;
-  readonly error: string | null;
+  readonly error: string | undefined;
   readonly source: Extract<ComponentCreationSource, { readonly kind: 'ready' }>;
   readonly submit: () => void;
   readonly onClose: () => void;
@@ -150,7 +150,7 @@ function PropsOffer({
   readonly onChange: (checked: boolean) => void;
 }) {
   if (names.length === 0) {
-    return null;
+    return undefined;
   }
   return (
     <label className="check-row">
@@ -219,8 +219,10 @@ function usePopupPlacement(
   usage: UsagePopup,
   currentCount: number,
   popupRef: React.RefObject<HTMLDivElement>,
-): { readonly top: number; readonly left: number } | null {
-  const [place, setPlace] = useState<{ readonly top: number; readonly left: number } | null>(null);
+): { readonly top: number; readonly left: number } | undefined {
+  const [place, setPlace] = useState<{ readonly top: number; readonly left: number } | undefined>(
+    undefined,
+  );
   useLayoutEffect(() => {
     const element = popupRef.current;
     if (!element) {
@@ -263,7 +265,7 @@ function CurrentInstances({
   readonly onSelect: (id: string) => void;
 }) {
   if (instances.length === 0) {
-    return null;
+    return undefined;
   }
   return (
     <div className="instances-group">

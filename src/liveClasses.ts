@@ -1,3 +1,5 @@
+import { assert } from '../shared/assert';
+import { LIMITS } from '../shared/limits';
 import { treeBudget, type TreeView } from './treeView';
 // Whether a node puts an element of its OWN on the page.
 //
@@ -17,8 +19,8 @@ import { treeBudget, type TreeView } from './treeView';
 // Fragment's row `feature-image_wrap` and drew the component beneath it — a
 // component's own root shown as a page element wrapping the component.
 
-/** @param {{name?: string}|null|undefined} node */
-export function rendersOwnElement(node: { readonly name?: string } | null | undefined): boolean {
+/** @param {{name?: string}|undefined} node */
+export function rendersOwnElement(node: { readonly name?: string } | undefined): boolean {
   if (!node) {
     return false;
   }
@@ -34,25 +36,27 @@ export function rendersOwnElement(node: { readonly name?: string } | null | unde
  */
 export function liveClassesById(
   classesByPath: Readonly<Record<string, readonly string[]>>,
-  nodes: readonly TreeView[] | null | undefined,
+  nodes: readonly TreeView[] | undefined,
   prefix = '',
 ): ReadonlyMap<string, readonly string[]> {
   const byId = new Map<string, readonly string[]>();
   const visit = treeBudget();
-  const walk = (list: readonly TreeView[] | null | undefined, trail: readonly number[]): void => {
-    (list || []).forEach((node, i) => {
-      visit(trail.length);
-      const t = [...trail, i];
-      const hit = classesByPath[prefix + t.join('.')];
+  const walk = (list: readonly TreeView[] | undefined, trail: readonly number[]): void => {
+    const depth = trail.length;
+    for (const [i, node] of (list || []).entries()) {
+      visit(depth);
+      assert(depth <= LIMITS.treeDepthMax, 'liveClassesById: depth limit');
+      const path = [...trail, i];
+      const hit = classesByPath[prefix + path.join('.')];
       // Only for a node that put an element of its own there: what the page
       // reports for a Fragment is whatever the Fragment holds.
       if (hit && hit.length && rendersOwnElement(node)) {
         byId.set(node.id, hit);
       }
-      if (node.children != null) {
-        walk(node.children, t);
+      if (node.children !== undefined) {
+        walk(node.children, path);
       }
-    });
+    }
   };
   walk(nodes, []);
   return byId;

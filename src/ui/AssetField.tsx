@@ -14,7 +14,7 @@ const kindLabel = { image: 'Image', video: 'Video', audio: 'Audio', asset: 'Asse
 const ASSET_REFRESH_CHAIN_MAX = 256;
 
 const fmtSize = (bytes: number | undefined) => {
-  if (bytes == null) {
+  if (bytes === undefined) {
     return '';
   }
   if (bytes < 1024) {
@@ -63,8 +63,8 @@ function RemoteThumb({
       src={url}
       alt=""
       draggable={false}
-      onLoad={(e) =>
-        onLoad?.({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight })
+      onLoad={(event) =>
+        onLoad?.({ w: event.currentTarget.naturalWidth, h: event.currentTarget.naturalHeight })
       }
       onError={() => setFailed(true)}
     />
@@ -82,7 +82,7 @@ export interface PickedAsset {
   readonly root: string;
 }
 export interface AssetFieldProps {
-  readonly value?: string | null | undefined;
+  readonly value?: string | undefined;
   readonly onChange: (value: string, immediate?: boolean) => void;
   readonly mediaKind?: AssetRequest['mediaKind'];
   readonly projectPath: string;
@@ -91,7 +91,7 @@ export interface AssetFieldProps {
   readonly plainLabel?: string;
   readonly onDimensions?: ((dimensions: AssetDimensions) => void) | undefined;
   readonly onPickEntry?: ((entry: PickedAsset) => void) | false | undefined;
-  readonly srcRel?: string | null | undefined;
+  readonly srcRel?: string | undefined;
   readonly baseDir?: string | undefined;
   readonly onCurrentDimensions?: ((dimensions: AssetDimensions) => void) | undefined;
 }
@@ -137,8 +137,8 @@ function useAssetField({
   initialMode,
   onDimensions,
   onPickEntry,
-  srcRel,
-  baseDir,
+  srcRel: sourceRel,
+  baseDir: baseDirectory,
   onCurrentDimensions,
 }: AssetFieldProps) {
   const current = value || '';
@@ -147,7 +147,7 @@ function useAssetField({
     () => initialMode || (showModeToggle && external ? 'url' : 'asset'),
   );
   const entries = useAssetEntries(projectPath);
-  const [dims, setDims] = useState<AssetDimensions | null>(null);
+  const [dims, setDims] = useState<AssetDimensions | undefined>(undefined);
   const justPicked = React.useRef(false);
 
   // A value that turns out to be external — the host moved to another item,
@@ -163,34 +163,34 @@ function useAssetField({
   // Which project file the value names. A src/ asset reached through an import
   // is never spelled out in the value — the host resolves that one (srcRel).
   const candidates = useMemo(
-    () => (srcRel ? [srcRel] : assetRelCandidates(current, baseDir)),
-    [srcRel, current, baseDir],
+    () => (sourceRel ? [sourceRel] : assetRelCandidates(current, baseDirectory)),
+    [sourceRel, current, baseDirectory],
   );
   const byRel = useMemo(() => {
     const map = new Map<string, Extract<WireAssetEntry, { readonly isDir: false }>>();
-    for (const e of entries) {
-      if (!e.isDir) {
-        map.set(e.rel, e);
+    for (const entry of entries) {
+      if (!entry.isDir) {
+        map.set(entry.rel, entry);
       }
     }
     return map;
   }, [entries]);
   const entry = useMemo(
-    () => candidates.map((r) => byRel.get(r)).find(Boolean) || null,
+    () => candidates.map((candidate) => byRel.get(candidate)).find(Boolean) || undefined,
     [candidates, byRel],
   );
   // Where it should have been, for the picker's starting folder and for
   // saying which tree came up empty.
-  const target = candidates[0] || null;
+  const target = candidates[0] || undefined;
 
-  useEffect(() => setDims(null), [current]);
+  useEffect(() => setDims(undefined), [current]);
 
-  const noteDims = (d: AssetDimensions) => {
-    setDims(d);
-    onCurrentDimensions?.(d);
+  const noteDims = (dimensions: AssetDimensions) => {
+    setDims(dimensions);
+    onCurrentDimensions?.(dimensions);
     if (justPicked.current) {
       justPicked.current = false;
-      onDimensions?.(d);
+      onDimensions?.(dimensions);
     }
   };
 
@@ -204,7 +204,7 @@ function useAssetField({
           onPickEntry(picked || { rel: pickedRel, root: pickedRel.split('/')[0] ?? '' });
           return;
         }
-        onChange(assetValueFor(pickedRel, baseDir), true);
+        onChange(assetValueFor(pickedRel, baseDirectory), true);
       },
     });
   return { current, external, mode, setMode, dims, entry, target, noteDims, choose };
@@ -262,10 +262,10 @@ function RemoteCard({ state }: { readonly state: AssetFieldState }) {
 }
 function LocalCard({
   state,
-  srcRel,
+  srcRel: sourceRel,
 }: {
   readonly state: AssetFieldState;
-  readonly srcRel: string | null | undefined;
+  readonly srcRel: string | undefined;
 }) {
   const { entry, noteDims, current, dims, target } = state;
   return (
@@ -278,8 +278,8 @@ function LocalCard({
         )}
       </div>
       <div className="af-meta">
-        <div className="af-name" title={srcRel || current}>
-          {entry ? entry.name : srcRel || current || 'No asset selected'}
+        <div className="af-name" title={sourceRel || current}>
+          {entry ? entry.name : sourceRel || current || 'No asset selected'}
         </div>
         {dims && (
           <div className="af-sub">
@@ -287,7 +287,7 @@ function LocalCard({
           </div>
         )}
         {entry && <div className="af-sub">{fmtSize(entry.size)}</div>}
-        {!entry && (srcRel || current) && (
+        {!entry && (sourceRel || current) && (
           <div className="af-sub">
             {target
               ? `not found in ${target.startsWith('src/') ? 'src/' : 'public/'}`

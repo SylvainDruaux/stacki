@@ -59,8 +59,8 @@ export function useGitHubStatus(projectPath: string): PreflightState {
 }
 
 // GitHub remotes may use HTTPS or SSH. Other remotes retain their original form.
-export function repoSlug(url: string | null | undefined): string | null | undefined {
-  const value = url === undefined || url === null ? '' : text(url);
+export function repoSlug(url: string | undefined): string | undefined {
+  const value = url === undefined ? '' : text(url);
   const match = value.match(/github\.com[:/]+([^/]+\/[^/]+?)(?:\.git)?$/i);
   if (!match) {
     return url;
@@ -70,7 +70,7 @@ export function repoSlug(url: string | null | undefined): string | null | undefi
   assert(slug.length > 0, 'GitHub remote: matched slug must be nonempty');
   return slug;
 }
-export function webUrl(url: string | null | undefined): string | null | undefined {
+export function webUrl(url: string | undefined): string | undefined {
   const slug = repoSlug(url);
   return slug && slug !== url ? `https://github.com/${slug}` : url;
 }

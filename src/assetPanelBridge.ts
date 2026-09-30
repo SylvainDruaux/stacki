@@ -37,7 +37,7 @@ export function parseAssetListing(input: unknown): AssetListing {
 
 export function readAssetListing(projectPath: string) {
   const payload = parseIpcPayload('assets:list', toProjectPath(projectPath));
-  return request(() => window.avb.listAssets(payload), parseAssetListing);
+  return request(parseAssetListing, () => window.avb.listAssets(payload));
 }
 
 export function pickUploadAssets(projectPath: string, destinationRel: string) {
@@ -45,7 +45,7 @@ export function pickUploadAssets(projectPath: string, destinationRel: string) {
     projectPath: toProjectPath(projectPath),
     destRel: parseAssetDestination(destinationRel),
   });
-  return request(() => window.avb.pickUploadAssets(payload), parseAdded);
+  return request(parseAdded, () => window.avb.pickUploadAssets(payload));
 }
 
 export function uploadAssets(
@@ -58,7 +58,7 @@ export function uploadAssets(
     destRel: parseAssetDestination(destinationRel),
     filePaths,
   });
-  return request(() => window.avb.uploadAssets(payload), parseAdded);
+  return request(parseAdded, () => window.avb.uploadAssets(payload));
 }
 
 export function moveAsset(projectPath: string, fromRel: string, toDirectoryRel: string) {
@@ -67,7 +67,7 @@ export function moveAsset(projectPath: string, fromRel: string, toDirectoryRel: 
     fromRel: parseAssetRelativePath(fromRel),
     toDirRel: parseAssetDestination(toDirectoryRel),
   });
-  return request(() => window.avb.moveAsset(payload), parseOutcome);
+  return request(parseOutcome, () => window.avb.moveAsset(payload));
 }
 
 export function renameAsset(projectPath: string, rel: string, newName: string) {
@@ -76,7 +76,7 @@ export function renameAsset(projectPath: string, rel: string, newName: string) {
     rel: parseAssetRelativePath(rel),
     newName: parseAssetName(newName),
   });
-  return request(() => window.avb.renameAsset(payload), parseSuccess);
+  return request(parseSuccess, () => window.avb.renameAsset(payload));
 }
 
 export function deleteAsset(projectPath: string, rel: string) {
@@ -84,7 +84,7 @@ export function deleteAsset(projectPath: string, rel: string) {
     projectPath: toProjectPath(projectPath),
     rel: parseAssetRelativePath(rel),
   });
-  return request(() => window.avb.deleteAsset(payload), parseOutcome);
+  return request(parseOutcome, () => window.avb.deleteAsset(payload));
 }
 
 export function makeAssetDirectory(projectPath: string, parentRel: string, name: string) {
@@ -93,7 +93,7 @@ export function makeAssetDirectory(projectPath: string, parentRel: string, name:
     parentRel: parseAssetDestination(parentRel),
     name: parseAssetName(name),
   });
-  return request(() => window.avb.mkdirAssets(payload), parseSuccess);
+  return request(parseSuccess, () => window.avb.mkdirAssets(payload));
 }
 
 export function onAssetListingChanged(callback: () => void): () => void {
@@ -189,8 +189,8 @@ function parseSuccess(input: unknown): void {
 }
 
 async function request<Value>(
-  invoke: () => Promise<unknown>,
   parse: Parser<Value>,
+  invoke: () => Promise<unknown>,
 ): Promise<Result<Value, string>> {
   let response: unknown;
   try {

@@ -4,9 +4,9 @@ import type { HistoryCommit, HistoryCommitFile, HistoryFile } from '../historyBr
 export type HistoryGitInfo = IpcResults['git:info'];
 
 export interface HistoryPanelProps {
-  readonly project: { readonly path: string } | null;
-  readonly gitInfo: HistoryGitInfo | null;
-  readonly previewRef: string | null;
+  readonly project: { readonly path: string } | undefined;
+  readonly gitInfo: HistoryGitInfo | undefined;
+  readonly previewRef: string | undefined;
   readonly onPreviewCommit: (commit: HistoryCommit) => void;
   readonly onExitPreview: () => void;
   readonly onRestoreFile: (commit: HistoryCommit, file: HistoryCommitFile) => void;

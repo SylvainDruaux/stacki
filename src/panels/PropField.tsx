@@ -40,12 +40,12 @@ import {
 } from '../ui/Icons';
 
 export interface AssetContext {
-  readonly projectPath?: string | null | undefined;
-  readonly filePath?: string | null | undefined;
+  readonly projectPath?: string | undefined;
+  readonly filePath?: string | undefined;
   readonly nodeName?: string | undefined;
-  readonly srcDims?: AssetDimensions | null | undefined;
+  readonly srcDims?: AssetDimensions | undefined;
   readonly siblingProps?: PropValues | undefined;
-  readonly srcKind?: 'svg' | 'public' | 'asset' | 'remote' | null | undefined;
+  readonly srcKind?: 'svg' | 'public' | 'asset' | 'remote' | undefined;
   readonly onPickAsset?: ((name: string, picked: PickedAsset) => void) | false | undefined;
   readonly onPickDimensions?: ((name: string, dimensions: AssetDimensions) => void) | undefined;
   readonly onSrcDimensions?: ((dimensions: AssetDimensions) => void) | undefined;
@@ -57,7 +57,7 @@ interface AssetBinding {
 interface AssetImportFieldProps {
   readonly binding: AssetBinding;
   readonly name: string;
-  readonly assetCtx: AssetContext;
+  readonly assetContext: AssetContext;
   readonly onChange: ValueChange;
 }
 export interface PropFieldProps {
@@ -65,18 +65,18 @@ export interface PropFieldProps {
   readonly branchDefault?: string | number | undefined;
   readonly value?: Attr | undefined;
   readonly nodeKey?: string | undefined;
-  readonly bindCtx?: RichContext | null | undefined;
-  readonly slotOptions?: readonly string[] | null | undefined;
+  readonly bindContext?: RichContext | undefined;
+  readonly slotOptions?: readonly string[] | undefined;
   readonly projectClasses?: readonly string[] | undefined;
-  readonly assetCtx?: AssetContext | null | undefined;
-  readonly linkContext?: ComponentProps<typeof LinkField>['context'] | null | undefined;
-  readonly dataCtx?: SourceContext | null | undefined;
+  readonly assetContext?: AssetContext | undefined;
+  readonly linkContext?: ComponentProps<typeof LinkField>['context'] | undefined;
+  readonly dataContext?: SourceContext | undefined;
   readonly onChange: ValueChange;
 }
 interface ResetMenuProps {
-  readonly pos: FieldPosition;
+  readonly position: FieldPosition;
   readonly onReset: () => void;
-  readonly onUnbind?: (() => void) | null;
+  readonly onUnbind?: (() => void) | undefined;
   readonly unbindLabel: string;
   readonly onClose: () => void;
 }
@@ -98,39 +98,39 @@ const MEDIA_IMPORT_RE =
   /\.(png|jpe?g|gif|webp|avif|svg|ico|bmp|mp4|webm|mov|m4v|ogg|mp3|wav)(\?.*)?$/i;
 
 export function assetImportOf(expr: unknown, frontmatter: unknown) {
-  const m = String(expr ?? '')
+  const match = String(expr ?? '')
     .trim()
     .match(/^([A-Za-z_$][\w$]*)(?:\.src)?$/);
-  if (!m || !frontmatter) {
-    return null;
+  if (!match || !frontmatter) {
+    return undefined;
   }
-  const imp = findImportOf(frontmatter, m[1]);
-  if (!imp || !MEDIA_IMPORT_RE.test(imp.spec)) {
-    return null;
+  const imported = findImportOf(frontmatter, match[1]);
+  if (!imported || !MEDIA_IMPORT_RE.test(imported.spec)) {
+    return undefined;
   }
-  return { ident: m[1] ?? '', spec: imp.spec };
+  return { ident: match[1] ?? '', spec: imported.spec };
 }
 
-function AssetImportField({ binding, name, assetCtx, onChange }: AssetImportFieldProps) {
-  const [rel, setRel] = useState<string | null>(null);
+function AssetImportField({ binding, name, assetContext, onChange }: AssetImportFieldProps) {
+  const [rel, setRel] = useState<string | undefined>(undefined);
 
   useEffect(() => {
     let live = true;
-    setRel(null);
-    if (!assetCtx.projectPath || !assetCtx.filePath) {
+    setRel(undefined);
+    if (!assetContext.projectPath || !assetContext.filePath) {
       return undefined;
     }
-    void resolveAssetImport(assetCtx.projectPath, assetCtx.filePath, binding.spec).then(
+    void resolveAssetImport(assetContext.projectPath, assetContext.filePath, binding.spec).then(
       (result) => {
         if (live) {
-          setRel(result.ok ? result.rel : null);
+          setRel(result.ok ? result.rel : undefined);
         }
       },
     );
     return () => {
       live = false;
     };
-  }, [binding.spec, assetCtx.projectPath, assetCtx.filePath]);
+  }, [binding.spec, assetContext.projectPath, assetContext.filePath]);
 
   return (
     <AssetField
@@ -139,18 +139,20 @@ function AssetImportField({ binding, name, assetCtx, onChange }: AssetImportFiel
       mediaKind={/\.(mp4|webm|mov|m4v)$/i.test(binding.spec) ? 'video' : 'image'}
       initialMode="asset"
       plainLabel="URL"
-      projectPath={assetCtx.projectPath ?? ''}
-      onChange={(v, immediate) =>
-        v === ''
+      projectPath={assetContext.projectPath ?? ''}
+      onChange={(next, immediate) =>
+        next === ''
           ? onChange(undefined, immediate)
-          : onChange({ type: 'string', value: v }, immediate)
+          : onChange({ type: 'string', value: next }, immediate)
       }
       onPickEntry={
-        assetCtx.onPickAsset &&
-        ((picked) => assetCtx.onPickAsset && assetCtx.onPickAsset(name, picked))
+        assetContext.onPickAsset &&
+        ((picked) => assetContext.onPickAsset && assetContext.onPickAsset(name, picked))
       }
-      onDimensions={(d) => assetCtx.onPickDimensions?.(name, d)}
-      onCurrentDimensions={(d) => /^src$/i.test(name) && assetCtx.onSrcDimensions?.(d)}
+      onDimensions={(dimensions) => assetContext.onPickDimensions?.(name, dimensions)}
+      onCurrentDimensions={(dimensions) =>
+        /^src$/i.test(name) && assetContext.onSrcDimensions?.(dimensions)
+      }
     />
   );
 }
@@ -221,7 +223,7 @@ function isBoundValue(field: FieldDefinition, value: Attr | undefined) {
   // Anything else an array prop can hold — a name, a spread, an object per item
   // — is a program, and the code editor is the only field that can show one.
   if (field.type === 'code') {
-    return arrayItems(source) === null;
+    return arrayItems(source) === undefined;
   }
   return true;
 }
@@ -282,7 +284,7 @@ function controlWord(field: FieldDefinition) {
 export default function PropField(props: PropFieldProps) {
   const state = usePropField(props);
   if (state.reason && !state.isSet) {
-    return null;
+    return undefined;
   }
   return <PropFieldControls state={state} />;
 }
@@ -297,36 +299,37 @@ function usePropFieldModel(props: PropFieldProps) {
     value,
     nodeKey,
 
-    assetCtx,
+    assetContext,
 
-    dataCtx,
+    dataContext,
   } = props;
   const placeholderFor = (target: FieldDefinition) =>
-    propFieldPlaceholder(target, assetCtx, branchDefault);
+    propFieldPlaceholder(target, assetContext, branchDefault);
   const { name, type } = field;
   const isSet = value !== undefined;
-  const [menuPos, setMenuPos] = useState<FieldPosition | null>(null);
+  const [menuPosition, setMenuPosition] = useState<FieldPosition | undefined>(undefined);
   const lastGoodRef = useRef('');
   const [custom, setCustom] = useState(false);
-  const [insertAt, setInsertAt] = useState<FieldPosition | null>(null);
-  const bindApiRef = useRef<InsertAPI | null>(null);
+  const [insertAt, setInsertAt] = useState<FieldPosition | undefined>(undefined);
+  // A ref prop: BindField fills it with its caret API while it is mounted.
+  const bindApiRef = useRef<InsertAPI | undefined>(undefined);
   useEffect(() => setCustom(false), [nodeKey, name]);
   const bindable = type !== 'attrs' && name !== 'slot';
-  const str = attrText(value) ?? '';
-  const assetBinding = assetImportOf(str, dataCtx?.imports);
+  const valueText = attrText(value) ?? '';
+  const assetBinding = assetImportOf(valueText, dataContext?.imports);
   const shownAsAsset =
-    value?.type === 'expr' && assetBinding && assetCtx?.projectPath && assetCtx?.filePath;
+    value?.type === 'expr' && assetBinding && assetContext?.projectPath && assetContext?.filePath;
   const showExpr = bindable && (custom || (isBoundValue(field, value) && !shownAsAsset));
   const reason =
     !/^(quality|format|formats|fallbackFormat|densities|widths|sizes)$/i.test(name) ||
-    !assetCtx?.srcKind
-      ? null
-      : assetCtx.srcKind === 'svg'
+    !assetContext?.srcKind
+      ? undefined
+      : assetContext.srcKind === 'svg'
         ? 'SVG sources are passed through unoptimized, so this has no effect.'
-        : assetCtx.srcKind === 'public'
+        : assetContext.srcKind === 'public'
           ? 'Files in public/ are served as-is — import from src/assets to optimize.'
-          : null;
-  assert(str.length <= LIMITS.attrCharsMax, 'PropField: value limit exceeded');
+          : undefined;
+  assert(valueText.length <= LIMITS.attrCharsMax, 'PropField: value limit exceeded');
   assert((field.options?.length ?? 0) <= LIMITS.propOptionsMax, 'PropField: option limit exceeded');
   const isExpr = value?.type === 'expr' || (type === 'code' && value?.type !== 'string');
   const isMediaAttr = isMediaName(name);
@@ -335,8 +338,8 @@ function usePropFieldModel(props: PropFieldProps) {
     name,
     type,
     isSet,
-    menuPos,
-    setMenuPos,
+    menuPosition,
+    setMenuPosition,
     lastGoodRef,
     custom,
     setCustom,
@@ -344,7 +347,7 @@ function usePropFieldModel(props: PropFieldProps) {
     setInsertAt,
     bindApiRef,
     bindable,
-    str,
+    valueText,
     assetBinding,
     shownAsAsset,
     showExpr,
@@ -355,9 +358,9 @@ function usePropFieldModel(props: PropFieldProps) {
   };
 }
 function propFieldActions(state: ReturnType<typeof usePropFieldModel>) {
-  const { setMenuPos, onChange, setCustom, value, field, isSet, showExpr } = state;
+  const { setMenuPosition, onChange, setCustom, value, field, isSet, showExpr } = state;
   const reset = () => {
-    setMenuPos(null);
+    setMenuPosition(undefined);
     onChange(undefined, true);
   };
   const fromCustom = () => {
@@ -366,18 +369,18 @@ function propFieldActions(state: ReturnType<typeof usePropFieldModel>) {
       onChange(valueFromExpr(field, value.value), true);
     }
   };
-  const onLabelClick = (e: React.MouseEvent<HTMLSpanElement>) => {
+  const onLabelClick = (event: React.MouseEvent<HTMLSpanElement>) => {
     // A field switched to a value has something to offer even before anything
     // is set: the way back to its control.
     if (!isSet && !showExpr) {
       return;
     }
-    if (e.altKey) {
+    if (event.altKey) {
       reset();
       return;
     }
-    const rect = e.currentTarget.getBoundingClientRect();
-    setMenuPos({ left: rect.left, top: rect.bottom + 4 });
+    const rect = event.currentTarget.getBoundingClientRect();
+    setMenuPosition({ left: rect.left, top: rect.bottom + 4 });
   };
   return { reset, fromCustom, onLabelClick };
 }
@@ -404,12 +407,12 @@ function propFieldControl(view: PropControlState) {
     field,
     value,
     slotOptions,
-    assetCtx,
+    assetContext,
     linkContext,
     name,
     type,
     isSet,
-    str,
+    valueText,
     assetBinding,
     showExpr,
     isExpr,
@@ -450,16 +453,16 @@ function propFieldControl(view: PropControlState) {
   if (isHrefName(name) && !isExpr && linkContext && (type === 'string' || type === 'other')) {
     return <LinkControl state={view} />;
   }
-  if (!isExpr && assetCtx?.projectPath && (isMediaAttr || looksLikeAssetPath(str))) {
+  if (!isExpr && assetContext?.projectPath && (isMediaAttr || looksLikeAssetPath(valueText))) {
     return <MediaControl state={view} />;
   }
-  if (isExpr && assetBinding && assetCtx?.projectPath && assetCtx?.filePath) {
+  if (isExpr && assetBinding && assetContext?.projectPath && assetContext?.filePath) {
     return <ImportedAssetControl state={view} />;
   }
-  if (type === 'code' && !showExpr && str && objectFields(str)) {
+  if (type === 'code' && !showExpr && valueText && objectFields(valueText)) {
     return <ObjectControl state={view} />;
   }
-  if (type === 'code' && !showExpr && (value === undefined || arrayItems(str))) {
+  if (type === 'code' && !showExpr && (value === undefined || arrayItems(valueText))) {
     return <ListControl state={view} />;
   }
   if (isExpr) {
@@ -469,16 +472,16 @@ function propFieldControl(view: PropControlState) {
 }
 function propFieldPlaceholder(
   field: FieldDefinition,
-  assetCtx: AssetContext | null | undefined,
+  assetContext: AssetContext | undefined,
   branchDefault: string | number | undefined,
 ): string {
   const siblingNumber = (propName: string) => {
-    const v = assetCtx?.siblingProps?.[propName];
-    if (!v) {
-      return null;
+    const sibling = assetContext?.siblingProps?.[propName];
+    if (!sibling) {
+      return undefined;
     }
-    const n = parseFloat(attrText(v) ?? '');
-    return Number.isFinite(n) && n > 0 ? n : null;
+    const parsed = parseFloat(attrText(sibling) ?? '');
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
   };
 
   if (field.default !== undefined) {
@@ -487,32 +490,41 @@ function propFieldPlaceholder(
   if (branchDefault !== undefined) {
     return String(branchDefault);
   }
-  const dims = assetCtx?.srcDims;
-  if (dims) {
-    const isW = /^width$/i.test(field.name);
-    const isH = /^height$/i.test(field.name);
-    if ((isW || isH) && dims.w && dims.h) {
+  const dimensions = assetContext?.srcDims;
+  if (dimensions) {
+    const isWidth = /^width$/i.test(field.name);
+    const isHeight = /^height$/i.test(field.name);
+    if ((isWidth || isHeight) && dimensions.w && dimensions.h) {
       // Setting one dimension makes the other follow the source's aspect
       // ratio — that, not the asset's own size, is what leaving this field
       // empty now means.
-      const other = siblingNumber(isW ? 'height' : 'width');
+      const other = siblingNumber(isWidth ? 'height' : 'width');
       if (other) {
-        const ratio = isW ? dims.w / dims.h : dims.h / dims.w;
+        const ratio = isWidth ? dimensions.w / dimensions.h : dimensions.h / dimensions.w;
         return String(Math.round(other * ratio));
       }
     }
-    if (isW && dims.w) {
-      return String(dims.w);
+    if (isWidth && dimensions.w) {
+      return String(dimensions.w);
     }
-    if (isH && dims.h) {
-      return String(dims.h);
+    if (isHeight && dimensions.h) {
+      return String(dimensions.h);
     }
   }
   return field.hint || '';
 }
 function BindingControl({ state }: { readonly state: PropControlState }) {
-  const { field, value, bindCtx, dataCtx, onChange, setCustom, bindApiRef, placeholderFor, label } =
-    state;
+  const {
+    field,
+    value,
+    bindContext,
+    dataContext,
+    onChange,
+    setCustom,
+    bindApiRef,
+    placeholderFor,
+    label,
+  } = state;
 
   return (
     <div className="props-field">
@@ -522,14 +534,14 @@ function BindingControl({ state }: { readonly state: PropControlState }) {
         field={field}
         apiRef={bindApiRef}
         placeholder={placeholderFor(field)}
-        bindCtx={bindCtx}
-        dataCtx={dataCtx}
-        onChange={(v, immediate) => {
+        bindContext={bindContext}
+        dataContext={dataContext}
+        onChange={(next, immediate) => {
           // Editing holds the field open: clearing a binding on the way to
           // another one shouldn't snap the control back mid-edit. An empty
           // value unsets the prop and leaves the field where it is.
           setCustom(true);
-          onChange(v, immediate);
+          onChange(next, immediate);
         }}
       />
     </div>
@@ -559,11 +571,11 @@ function StyleControl({ state }: { readonly state: PropControlState }) {
   );
 }
 function AttributeControl({ state }: { readonly state: PropControlState }) {
-  const { field, value, bindCtx, assetCtx, onChange, pill, menu } = state;
+  const { field, value, bindContext, assetContext, onChange, pill, menu } = state;
 
-  const source = value?.type === 'expr' ? value.value : null;
+  const source = value?.type === 'expr' ? value.value : undefined;
   const entries =
-    source != null
+    source !== undefined
       ? parseObjectLiteral(source)
       : (parseObjectLiteral(typeof field.default === 'string' ? field.default : '{}') ?? []);
   if (entries) {
@@ -572,8 +584,8 @@ function AttributeControl({ state }: { readonly state: PropControlState }) {
         pill={pill}
         menu={menu}
         entries={entries}
-        bindCtx={bindCtx}
-        projectPath={assetCtx?.projectPath}
+        bindContext={bindContext}
+        projectPath={assetContext?.projectPath}
         onCommit={(next) =>
           next.length
             ? onChange({ type: 'expr', value: serializeObjectLiteral(next) }, true)
@@ -596,8 +608,10 @@ function ClassControl({ state }: { readonly state: PropControlState }) {
       <ClassInput
         value={attrText(value) || ''}
         suggestions={projectClasses || []}
-        onChange={(v, immediate) =>
-          v.trim() ? onChange({ type: 'string', value: v }, immediate) : onChange(undefined, true)
+        onChange={(next, immediate) =>
+          next.trim()
+            ? onChange({ type: 'string', value: next }, immediate)
+            : onChange(undefined, true)
         }
       />
     </div>
@@ -608,21 +622,21 @@ function SlotControl({ state }: { readonly state: PropControlState }) {
   assert(slotOptions?.length, 'Slot control: slots exist');
 
   const raw = attrText(value);
-  const named = slotOptions.filter((s) => s !== 'default');
+  const named = slotOptions.filter((slot) => slot !== 'default');
   // Keep an out-of-list current value selectable rather than losing it.
-  const opts = [
+  const choices = [
     { value: '', label: 'default', dim: true },
     ...(raw && raw !== 'default' && !named.includes(raw) ? [{ value: raw, label: raw }] : []),
-    ...named.map((s) => ({ value: s, label: s })),
+    ...named.map((slot) => ({ value: slot, label: slot })),
   ];
   return (
     <div className="props-field">
       {label}
       <Dropdown
         value={raw && raw !== 'default' ? raw : ''}
-        options={opts}
-        onChange={(v) =>
-          v === '' ? onChange(undefined, true) : onChange({ type: 'string', value: v }, true)
+        options={choices}
+        onChange={(next) =>
+          next === '' ? onChange(undefined, true) : onChange({ type: 'string', value: next }, true)
         }
       />
     </div>
@@ -632,7 +646,7 @@ function EnumControl({ state }: { readonly state: PropControlState }) {
   const { field, value, onChange, placeholderFor, label } = state;
   assert(field.options?.length, 'Enum control: options exist');
 
-  const defaultStr = field.default !== undefined ? String(field.default) : undefined;
+  const defaultText = field.default !== undefined ? String(field.default) : undefined;
   const raw = attrText(value);
   // Exactly two options, one of them the default: the same shape as a
   // boolean — an either/or with a known resting state — so it reads as one.
@@ -640,23 +654,23 @@ function EnumControl({ state }: { readonly state: PropControlState }) {
   // stay visible, and the dropdown is the only field that can show it.
   if (
     field.options.length === 2 &&
-    defaultStr !== undefined &&
-    field.options.includes(defaultStr) &&
+    defaultText !== undefined &&
+    field.options.includes(defaultText) &&
     (raw === undefined || field.options.includes(raw))
   ) {
-    const current = raw ?? defaultStr;
+    const current = raw ?? defaultText;
     return (
       <div className="props-field">
         {label}
         <SegSwitch
-          options={field.options.map((o) => ({ value: o, label: o }))}
+          options={field.options.map((option) => ({ value: option, label: option }))}
           current={current}
-          onPick={(v) =>
+          onPick={(next) =>
             // Picking the default clears the prop, exactly as the dropdown
             // does — an untouched component stays untouched in the markup.
-            v === defaultStr
+            next === defaultText
               ? onChange(undefined, true)
-              : onChange({ type: field.numeric ? 'expr' : 'string', value: v }, true)
+              : onChange({ type: field.numeric ? 'expr' : 'string', value: next }, true)
           }
         />
       </div>
@@ -665,26 +679,29 @@ function EnumControl({ state }: { readonly state: PropControlState }) {
   // The default option is encoded as '' (= prop not set), so an unset prop
   // shows its default as the selected option and picking the default
   // resets the prop rather than writing it out explicitly.
-  const cur = raw === undefined || raw === defaultStr ? '' : raw;
+  const selected = raw === undefined || raw === defaultText ? '' : raw;
   // Keep an out-of-schema current value selectable rather than losing it.
-  const opts =
+  const choices =
     raw === undefined || field.options.includes(raw) ? field.options : [raw, ...field.options];
   return (
     <div className="props-field">
       {label}
       <Dropdown
-        value={cur}
+        value={selected}
         // Says what happens when nothing is picked. For a conditional
         // default that's the condition itself — better than naming one of
         // the two answers as if it were the only one.
         placeholder={placeholderFor(field) || '(not set)'}
-        options={opts.map((o) => ({ value: o === defaultStr ? '' : o, label: o }))}
-        onChange={(v) =>
-          v === ''
+        options={choices.map((option) => ({
+          value: option === defaultText ? '' : option,
+          label: option,
+        }))}
+        // A union of numbers is still numbers: the component is typed for one,
+        // so it has to be written `cols={3}`, not `cols="3"`.
+        onChange={(next) =>
+          next === ''
             ? onChange(undefined, true)
-            : // A union of numbers is still numbers: the component is typed
-              // for one, so it has to be written `cols={3}`, not `cols="3"`.
-              onChange({ type: field.numeric ? 'expr' : 'string', value: v }, true)
+            : onChange({ type: field.numeric ? 'expr' : 'string', value: next }, true)
         }
       />
     </div>
@@ -705,10 +722,6 @@ function BooleanControl({ state }: { readonly state: PropControlState }) {
   // its absence already said.
   const fallback = field.default === undefined ? false : !!field.default;
   const current = value ? value.type !== 'expr' || value.value === 'true' : fallback;
-  const choose = (next: boolean) =>
-    next === fallback
-      ? onChange(undefined, true)
-      : onChange({ type: 'expr', value: next ? 'true' : 'false' }, true);
   return (
     <div className="props-field">
       {label}
@@ -718,7 +731,11 @@ function BooleanControl({ state }: { readonly state: PropControlState }) {
           { value: false, label: 'False' },
         ]}
         current={current}
-        onPick={choose}
+        onPick={(next) =>
+          next === fallback
+            ? onChange(undefined, true)
+            : onChange({ type: 'expr', value: next ? 'true' : 'false' }, true)
+        }
       />
     </div>
   );
@@ -730,7 +747,7 @@ function NumberControl({ state }: { readonly state: PropControlState }) {
 function numberControlState(state: PropControlState) {
   const { field, value, onChange, lastGoodRef, placeholderFor } = state;
 
-  const num = value?.type === 'expr' ? value.value : (attrText(value) ?? '');
+  const numberText = value?.type === 'expr' ? value.value : (attrText(value) ?? '');
   // What the component says it will accept (see numberRules): a bound the
   // type can't express, read from the doc comment. Typing stays free — you
   // have to be able to pass through "-" or "1." on the way to a real number
@@ -739,11 +756,11 @@ function numberControlState(state: PropControlState) {
   const { bounded, allows, clamp } = numberControlBounds(field);
   // The last value that was allowed, to fall back to. An empty field is
   // allowed — it means "unset", and the component's own default applies.
-  if (num === '' || allows(parseFloat(num))) {
-    lastGoodRef.current = num;
+  if (numberText === '' || allows(parseFloat(numberText))) {
+    lastGoodRef.current = numberText;
   }
   const revertIfRejected = () => {
-    if (!bounded || num === '' || allows(parseFloat(num))) {
+    if (!bounded || numberText === '' || allows(parseFloat(numberText))) {
       return;
     }
     const back = lastGoodRef.current;
@@ -753,42 +770,43 @@ function numberControlState(state: PropControlState) {
   // can't drift apart. Shift ×10, Option ÷10 — the modifiers the style
   // panel's number fields already use.
   const step = (
-    dir: number,
+    direction: number,
     mods: { readonly shiftKey: boolean; readonly altKey: boolean },
     from: string,
   ) => {
     const size = mods.shiftKey ? 10 : mods.altKey ? 0.1 : 1;
-    const cur = parseFloat(from);
+    const current = parseFloat(from);
     // An empty field steps from the value it is SHOWING — the placeholder is
     // the effective value (the source image's 115, the component's default),
     // so ▲ on a blank width goes to 116, not 1.
     const shown = parseFloat(placeholderFor(field));
-    const base = Number.isFinite(cur)
-      ? cur
+    const base = Number.isFinite(current)
+      ? current
       : Number.isFinite(shown)
         ? shown
         : parseFloat(String(field.default)) || 0;
     // Round away float noise (e.g. 38.1 + 0.1 = 38.199999…), then keep the
     // result inside what the component accepts — a step is an applied value,
     // so it should never land somewhere the field would reject.
-    const next = Math.round((base + dir * size) * 1e6) / 1e6;
+    const next = Math.round((base + direction * size) * 1e6) / 1e6;
     onChange({ type: 'expr', value: String(bounded ? clamp(next) : next) });
   };
-  const onStepKey = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
+  const onStepKey = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === 'Enter') {
       revertIfRejected();
       return;
     }
-    if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') {
+    if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') {
       return;
     }
-    e.preventDefault();
-    step(e.key === 'ArrowUp' ? 1 : -1, e, e.currentTarget.value);
+    event.preventDefault();
+    step(event.key === 'ArrowUp' ? 1 : -1, event, event.currentTarget.value);
   };
-  return { ...state, num, revertIfRejected, onStepKey, step };
+  return { ...state, numberText, revertIfRejected, onStepKey, step };
 }
 function NumberControlView({ state }: { readonly state: ReturnType<typeof numberControlState> }) {
-  const { label, num, placeholderFor, field, onStepKey, revertIfRejected, onChange, step } = state;
+  const { label, numberText, placeholderFor, field, onStepKey, revertIfRejected, onChange, step } =
+    state;
 
   return (
     <div className="props-field">
@@ -800,30 +818,30 @@ function NumberControlView({ state }: { readonly state: ReturnType<typeof number
         <input
           type="text"
           inputMode="decimal"
-          value={num}
+          value={numberText}
           placeholder={placeholderFor(field)}
           onKeyDown={onStepKey}
           onBlur={revertIfRejected}
           title={boundsHint(field)}
-          onChange={(e) =>
-            e.target.value === ''
+          onChange={(event) =>
+            event.target.value === ''
               ? onChange(undefined)
-              : onChange({ type: 'expr', value: e.target.value })
+              : onChange({ type: 'expr', value: event.target.value })
           }
         />
         <span className="num-steppers">
-          {[1, -1].map((dir) => (
+          {[1, -1].map((direction) => (
             <button
-              key={dir}
+              key={direction}
               type="button"
               tabIndex={-1}
-              aria-label={dir > 0 ? 'Increase' : 'Decrease'}
-              title={`${dir > 0 ? 'Increase' : 'Decrease'} — ⇧ by 10, ⌥ by 0.1`}
-              onClick={(e) => step(dir, e, num)}
+              aria-label={direction > 0 ? 'Increase' : 'Decrease'}
+              title={`${direction > 0 ? 'Increase' : 'Decrease'} — ⇧ by 10, ⌥ by 0.1`}
+              onClick={(event) => step(direction, event, numberText)}
             >
               <ChevronDownIcon
                 size={11}
-                style={dir > 0 ? { transform: 'rotate(180deg)' } : undefined}
+                style={direction > 0 ? { transform: 'rotate(180deg)' } : undefined}
               />
             </button>
           ))}
@@ -833,27 +851,27 @@ function NumberControlView({ state }: { readonly state: ReturnType<typeof number
   );
 }
 function LinkControl({ state }: { readonly state: PropControlState }) {
-  const { value, assetCtx, linkContext, onChange, label } = state;
+  const { value, assetContext, linkContext, onChange, label } = state;
   assert(linkContext, 'Link control: context exists');
 
   return (
     <div className="props-field">
       {label}
       <LinkField
-        value={value ?? null}
-        context={{ ...linkContext, projectPath: assetCtx?.projectPath ?? '' }}
+        {...(value === undefined ? {} : { value })}
+        context={{ ...linkContext, projectPath: assetContext?.projectPath ?? '' }}
         onChange={onChange}
       />
     </div>
   );
 }
 function MediaControl({ state }: { readonly state: PropControlState }) {
-  const { assetCtx, onChange, name, str, isMediaAttr, label } = state;
-  assert(assetCtx?.projectPath, 'Media control: project exists');
+  const { assetContext, onChange, name, valueText, isMediaAttr, label } = state;
+  assert(assetContext?.projectPath, 'Media control: project exists');
 
-  const nodeName = String(assetCtx.nodeName || '').toLowerCase();
-  const mediaKind = looksLikeAssetPath(str)
-    ? mediaKindFor(str)
+  const nodeName = String(assetContext.nodeName || '').toLowerCase();
+  const mediaKind = looksLikeAssetPath(valueText)
+    ? mediaKindFor(valueText)
     : /^(poster|image|logo|icon|avatar|thumb|thumbnail|photo|banner|cover)$/.test(mediaWord(name))
       ? 'image'
       : mediaWord(name) === 'video'
@@ -871,31 +889,33 @@ function MediaControl({ state }: { readonly state: PropControlState }) {
     <div className="props-field">
       {label}
       <AssetField
-        value={str}
+        value={valueText}
         mediaKind={mediaKind}
         // A non-media prop only lands here because its value is an asset
         // path, so open in asset mode; "Text" is the way back out.
         {...definedFields({ initialMode: isMediaAttr ? undefined : ('asset' as const) })}
         plainLabel={isMediaAttr ? 'URL' : 'Text'}
-        projectPath={assetCtx.projectPath ?? ''}
-        onChange={(v, immediate) =>
-          v === ''
+        projectPath={assetContext.projectPath ?? ''}
+        onChange={(next, immediate) =>
+          next === ''
             ? onChange(undefined, immediate)
-            : onChange({ type: 'string', value: v }, immediate)
+            : onChange({ type: 'string', value: next }, immediate)
         }
         onPickEntry={
-          assetCtx.onPickAsset &&
-          ((picked) => assetCtx.onPickAsset && assetCtx.onPickAsset(name, picked))
+          assetContext.onPickAsset &&
+          ((picked) => assetContext.onPickAsset && assetContext.onPickAsset(name, picked))
         }
-        onDimensions={(d) => assetCtx.onPickDimensions?.(name, d)}
-        onCurrentDimensions={(d) => /^src$/i.test(name) && assetCtx.onSrcDimensions?.(d)}
+        onDimensions={(dimensions) => assetContext.onPickDimensions?.(name, dimensions)}
+        onCurrentDimensions={(dimensions) =>
+          /^src$/i.test(name) && assetContext.onSrcDimensions?.(dimensions)
+        }
       />
     </div>
   );
 }
 function ImportedAssetControl({ state }: { readonly state: PropControlState }) {
-  const { assetCtx, onChange, name, assetBinding, label } = state;
-  assert(assetCtx, 'Imported asset: context exists');
+  const { assetContext, onChange, name, assetBinding, label } = state;
+  assert(assetContext, 'Imported asset: context exists');
   assert(assetBinding, 'Imported asset: binding exists');
 
   return (
@@ -904,33 +924,33 @@ function ImportedAssetControl({ state }: { readonly state: PropControlState }) {
       <AssetImportField
         binding={assetBinding}
         name={name}
-        assetCtx={assetCtx}
+        assetContext={assetContext}
         onChange={onChange}
       />
     </div>
   );
 }
 function ObjectControl({ state }: { readonly state: PropControlState }) {
-  const { onChange, str, label } = state;
+  const { onChange, valueText, label } = state;
 
   return (
     <div className="props-field">
       {label}
       <ObjectField
-        value={str}
+        value={valueText}
         onChange={(text, immediate) => onChange({ type: 'expr', value: text }, immediate)}
       />
     </div>
   );
 }
 function ListControl({ state }: { readonly state: PropControlState }) {
-  const { field, onChange, str, placeholderFor, label } = state;
+  const { field, onChange, valueText, placeholderFor, label } = state;
 
   return (
     <div className="props-field">
       {label}
       <ListField
-        value={str}
+        value={valueText}
         placeholder={placeholderFor(field)}
         onChange={(text, immediate) => onChange({ type: 'expr', value: text }, immediate)}
       />
@@ -938,25 +958,26 @@ function ListControl({ state }: { readonly state: PropControlState }) {
   );
 }
 function ExpressionControl({ state }: { readonly state: PropControlState }) {
-  const { field, dataCtx, onChange, str, placeholderFor, label } = state;
+  const { field, dataContext, onChange, valueText, placeholderFor, label } = state;
 
   return (
     <div className="props-field">
       {label}
       <ExprValueField
-        value={str}
+        value={valueText}
         placeholder={placeholderFor(field)}
-        dataCtx={dataCtx}
+        dataContext={dataContext}
         onChange={onChange}
       />
     </div>
   );
 }
 function TextControl({ state }: { readonly state: PropControlState }) {
-  const { field, onChange, name, str, placeholderFor, label } = state;
+  const { field, onChange, name, valueText, placeholderFor, label } = state;
   // A bare attribute has no authored text value; preserve that absence in the input.
-  const text = state.value?.type === 'bare' ? undefined : str;
-  const long = String(str).length > 48 || /text|description|content|body|paragraph/i.test(name);
+  const text = state.value?.type === 'bare' ? undefined : valueText;
+  const long =
+    String(valueText).length > 48 || /text|description|content|body|paragraph/i.test(name);
   return (
     <div className="props-field">
       {label}
@@ -964,13 +985,13 @@ function TextControl({ state }: { readonly state: PropControlState }) {
         <AutoTextarea
           value={text}
           placeholder={placeholderFor(field)}
-          onChange={(e) => onChange({ type: 'string', value: e.target.value })}
+          onChange={(event) => onChange({ type: 'string', value: event.target.value })}
         />
       ) : (
         <input
           value={text}
           placeholder={placeholderFor(field)}
-          onChange={(e) => onChange({ type: 'string', value: e.target.value })}
+          onChange={(event) => onChange({ type: 'string', value: event.target.value })}
         />
       )}
     </div>
@@ -1001,18 +1022,18 @@ function PropFieldPill({ state }: { readonly state: PropState }) {
   );
 }
 function PropFieldMenu({ state }: { readonly state: PropState }) {
-  const { field, menuPos, setMenuPos, showExpr, reset, fromCustom } = state;
+  const { field, menuPosition, setMenuPosition, showExpr, reset, fromCustom } = state;
 
   return (
-    menuPos && (
+    menuPosition && (
       <ResetMenu
-        pos={menuPos}
+        position={menuPosition}
         onReset={reset}
         // Only while the field is showing a value instead of its own control —
         // it is the way back, and there is nothing to go back FROM otherwise.
-        onUnbind={showExpr ? fromCustom : null}
+        {...(showExpr ? { onUnbind: fromCustom } : {})}
         unbindLabel={`Use the ${controlWord(field)}`}
-        onClose={() => setMenuPos(null)}
+        onClose={() => setMenuPosition(undefined)}
       />
     )
   );
@@ -1036,7 +1057,7 @@ function PropFieldLabelRow({ state }: { readonly state: PropState }) {
       {pill}
       {/* The prop's own documentation — the comment above it in the
           component's `interface Props`. */}
-      <PropTip text={field.doc ?? null} />
+      <PropTip {...(field.doc === undefined ? {} : { text: field.doc })} />
       {reason && (
         <span className="prop-inert" title={reason}>
           ignored
@@ -1064,17 +1085,17 @@ function PropFieldLabelRow({ state }: { readonly state: PropState }) {
           active={!!insertAt}
           onOpen={(host) => {
             if (insertAt) {
-              setInsertAt(null);
+              setInsertAt(undefined);
               return;
             }
-            const r = host?.getBoundingClientRect();
-            if (!r) {
+            const bounds = host?.getBoundingClientRect();
+            if (!bounds) {
               return;
             }
             setInsertAt({
-              left: r.left,
-              top: Math.min(r.bottom + 4, Math.max(60, window.innerHeight - 340)),
-              width: Math.max(r.width, 240),
+              left: bounds.left,
+              top: Math.min(bounds.bottom + 4, Math.max(60, window.innerHeight - 340)),
+              width: Math.max(bounds.width, 240),
             });
           }}
         />
@@ -1084,17 +1105,25 @@ function PropFieldLabelRow({ state }: { readonly state: PropState }) {
   );
 }
 function PropFieldPicker({ state }: { readonly state: PropState }) {
-  const { field, value, bindCtx, onChange, type, setCustom, insertAt, setInsertAt, bindApiRef } =
-    state;
+  const {
+    field,
+    value,
+    bindContext,
+    onChange,
+    type,
+    setCustom,
+    insertAt,
+    setInsertAt,
+    bindApiRef,
+  } = state;
 
   return (
     insertAt && (
       <FieldDataPicker
         pos={insertAt}
-        bindCtx={bindCtx}
-        current={null}
+        bindContext={bindContext}
         onPick={(path) => {
-          setInsertAt(null);
+          setInsertAt(undefined);
           // Into the value field's caret when there is one — so a chip can land
           // beside text already typed. Otherwise this is the field's first
           // binding, and choosing one is what turns the control into a value.
@@ -1112,32 +1141,39 @@ function PropFieldPicker({ state }: { readonly state: PropState }) {
             type === 'boolean' ||
             (type === 'enum' && field.numeric)
           );
-          const keep = numeric || type === 'enum' ? null : partsFromValue(value);
+          const keep = numeric || type === 'enum' ? undefined : partsFromValue(value);
           const next = keep?.length ? [...keep, { expr: path }] : [{ expr: path }];
           onChange(valueFromParts(next, { numeric }), true);
         }}
-        onClose={() => setInsertAt(null)}
+        onClose={() => setInsertAt(undefined)}
       />
     )
   );
 }
 
-function ResetMenu({ pos, onReset, onUnbind, unbindLabel, onClose }: ResetMenuProps) {
-  const ref = useRef<HTMLDivElement | null>(null);
+function ResetMenu({ position, onReset, onUnbind, unbindLabel, onClose }: ResetMenuProps) {
+  const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const onDown = (e: MouseEvent) => {
-      if (ref.current && !(e.target instanceof window.Node && ref.current.contains(e.target))) {
+    const onDown = (event: MouseEvent) => {
+      if (
+        ref.current &&
+        !(event.target instanceof window.Node && ref.current.contains(event.target))
+      ) {
         onClose();
       }
     };
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
         onClose();
       }
     };
-    const onScroll = (e: Event) => {
-      if (ref.current && e.target instanceof window.Node && ref.current.contains(e.target)) {
+    const onScroll = (event: Event) => {
+      if (
+        ref.current &&
+        event.target instanceof window.Node &&
+        ref.current.contains(event.target)
+      ) {
         return;
       }
       onClose();
@@ -1155,7 +1191,7 @@ function ResetMenu({ pos, onReset, onUnbind, unbindLabel, onClose }: ResetMenuPr
   }, [onClose]);
 
   return (
-    <div ref={ref} className="prop-menu" style={{ left: pos.left, top: pos.top }}>
+    <div ref={ref} className="prop-menu" style={{ left: position.left, top: position.top }}>
       {onUnbind && (
         <div className="prop-menu-item" onClick={onUnbind}>
           <CornerIcon size={12} />
@@ -1173,34 +1209,34 @@ function ResetMenu({ pos, onReset, onUnbind, unbindLabel, onClose }: ResetMenuPr
 function numberControlBounds(field: FieldDefinition) {
   const { min, max, step: grain, minExclusive, maxExclusive } = field;
   const bounded = min !== undefined || max !== undefined || grain !== undefined;
-  const allows = (n: number) => {
-    if (!Number.isFinite(n)) {
+  const allows = (candidate: number) => {
+    if (!Number.isFinite(candidate)) {
       return false;
     }
-    if (min !== undefined && (minExclusive ? n <= min : n < min)) {
+    if (min !== undefined && (minExclusive ? candidate <= min : candidate < min)) {
       return false;
     }
-    if (max !== undefined && (maxExclusive ? n >= max : n > max)) {
+    if (max !== undefined && (maxExclusive ? candidate >= max : candidate > max)) {
       return false;
     }
     // Rounded before comparing, or 0.1 + 0.2 fails a step of 0.1.
-    if (grain !== undefined && Math.abs(Math.round(n / grain) * grain - n) > 1e-9) {
+    if (grain !== undefined && Math.abs(Math.round(candidate / grain) * grain - candidate) > 1e-9) {
       return false;
     }
     return true;
   };
-  const clamp = (n: number) => {
-    let v = n;
+  const clamp = (input: number) => {
+    let clamped = input;
     if (grain !== undefined) {
-      v = Math.round(v / grain) * grain;
+      clamped = Math.round(clamped / grain) * grain;
     }
     if (min !== undefined) {
-      v = Math.max(v, minExclusive ? min + (grain ?? 1e-6) : min);
+      clamped = Math.max(clamped, minExclusive ? min + (grain ?? 1e-6) : min);
     }
     if (max !== undefined) {
-      v = Math.min(v, maxExclusive ? max - (grain ?? 1e-6) : max);
+      clamped = Math.min(clamped, maxExclusive ? max - (grain ?? 1e-6) : max);
     }
-    return Math.round(v * 1e6) / 1e6;
+    return Math.round(clamped * 1e6) / 1e6;
   };
   return { bounded, allows, clamp };
 }

@@ -71,17 +71,17 @@ export function parseCmsCreate(input: unknown): { readonly rel: string } {
 
 export function readCmsFiles(projectPath: string) {
   const payload = parseIpcPayload('cms:list', projectPath);
-  return request(() => window.avb.listCms(payload), parseCmsFiles);
+  return request(parseCmsFiles, () => window.avb.listCms(payload));
 }
 
 export function readContentCollections(projectPath: string) {
   const payload = parseIpcPayload('content:collections', projectPath);
-  return request(() => window.avb.contentCollections(payload), parseContentCollections);
+  return request(parseContentCollections, () => window.avb.contentCollections(payload));
 }
 
 export function createCmsCollection(projectPath: string, name: string) {
   const payload = parseIpcPayload('cms:create', { projectPath, name });
-  return request(() => window.avb.createCms(payload), parseCmsCreate);
+  return request(parseCmsCreate, () => window.avb.createCms(payload));
 }
 
 function parseCmsFile(input: unknown): CmsPanelFile {
@@ -145,8 +145,8 @@ function withOptionalConfigPath(
 }
 
 async function request<Value>(
-  invoke: () => Promise<unknown>,
   parse: Parser<Value>,
+  invoke: () => Promise<unknown>,
 ): Promise<Result<Value, string>> {
   let response: unknown;
   try {

@@ -23,6 +23,7 @@ import {
 import AssetThumb, { TEXT_EXT } from '../ui/AssetThumb';
 import MoreMenu from '../ui/MoreMenu';
 import { confirmDialog } from '../ui/ConfirmDialog';
+import { allowDragEffect } from '../dragState';
 
 const PICK_HOME = 'src/assets';
 const FILE_DROP_COUNT_MAX = 1_000;
@@ -43,7 +44,7 @@ interface AssetsPanelProps {
   readonly project: { readonly path: string };
   readonly showToast: Toast;
   readonly onOpenFile?: (file: { readonly rel: string; readonly name: string }) => void;
-  readonly pick?: AssetRequest | null;
+  readonly pick?: AssetRequest | undefined;
   readonly onPickCancel?: () => void;
   readonly onRecordUndo?: (command: AssetUndo) => void;
 }
@@ -53,12 +54,12 @@ interface AssetPanelState {
   readonly missing: boolean;
   readonly cwd: string;
   readonly setCwd: React.Dispatch<React.SetStateAction<string>>;
-  readonly renaming: string | null;
-  readonly setRenaming: React.Dispatch<React.SetStateAction<string | null>>;
+  readonly renaming: string | undefined;
+  readonly setRenaming: React.Dispatch<React.SetStateAction<string | undefined>>;
   readonly newFolder: boolean;
   readonly setNewFolder: React.Dispatch<React.SetStateAction<boolean>>;
-  readonly dragTarget: string | null;
-  readonly setDragTarget: React.Dispatch<React.SetStateAction<string | null>>;
+  readonly dragTarget: string | undefined;
+  readonly setDragTarget: React.Dispatch<React.SetStateAction<string | undefined>>;
 }
 
 export default function AssetsPanel(props: AssetsPanelProps) {
@@ -74,18 +75,18 @@ function useAssetPanelState(props: AssetsPanelProps): AssetPanelState {
   const [entries, setEntries] = useState<readonly AssetPanelEntry[]>([]);
   const [missing, setMissing] = useState(false);
   const [cwd, setCwd] = useState('');
-  const [renaming, setRenaming] = useState<string | null>(null);
+  const [renaming, setRenaming] = useState<string | undefined>(undefined);
   const [newFolder, setNewFolder] = useState(false);
-  const [dragTarget, setDragTarget] = useState<string | null>(null);
+  const [dragTarget, setDragTarget] = useState<string | undefined>(undefined);
   const cwdRef = useRef(cwd);
   cwdRef.current = cwd;
   useAssetListing(props.project.path, props.showToast, cwdRef, setEntries, setMissing, setCwd);
   usePickPlacement(props.project.path, props.pick, entries, setCwd);
   useEffect(() => {
     setCwd('');
-    setRenaming(null);
+    setRenaming(undefined);
     setNewFolder(false);
-    setDragTarget(null);
+    setDragTarget(undefined);
   }, [props.project.path]);
   return {
     entries,
@@ -115,6 +116,8 @@ function useAssetListing(
     let active = true;
     let reading = false;
     let pending = false;
+    // It calls itself again only after its read has settled, never on the stack.
+    // eslint-disable-next-line stacki/bounded-recursion -- Re-entry after an awaited read.
     async function refresh(): Promise<void> {
       if (reading) {
         pending = true;
@@ -163,15 +166,15 @@ function applyListingResult(
 
 function usePickPlacement(
   projectPath: string,
-  pick: AssetRequest | null | undefined,
+  pick: AssetRequest | undefined,
   entries: readonly AssetPanelEntry[],
   setCwd: React.Dispatch<React.SetStateAction<string>>,
 ): void {
-  const pickKey = pick ? `${projectPath}:${pick.mediaKind}:${pick.current}` : null;
-  const placedRef = useRef<string | null>(null);
+  const pickKey = pick ? `${projectPath}:${pick.mediaKind}:${pick.current}` : undefined;
+  const placedRef = useRef<string | undefined>(undefined);
   useEffect(() => {
     if (!pick) {
-      placedRef.current = null;
+      placedRef.current = undefined;
       return;
     }
     if (placedRef.current === pickKey) {
@@ -222,7 +225,7 @@ function useAssetActions(props: AssetsPanelProps, state: AssetPanelState): Asset
   const remove = useAssetRemove(props);
   const commitRename = useCallback(
     (entry: AssetPanelEntry, value: string): void => {
-      setRenaming(null);
+      setRenaming(undefined);
       void rename(entry, value);
     },
     [rename, setRenaming],
@@ -337,7 +340,7 @@ function useDropInto(
       (event): void => {
         event.preventDefault();
         event.stopPropagation();
-        setDragTarget(null);
+        setDragTarget(undefined);
         const payload = dropPayload(event.dataTransfer);
         if (!payload.ok) {
           showToast(payload.error, 'error');
@@ -389,7 +392,8 @@ type DropPayload =
   | { readonly kind: 'asset'; readonly rel: string }
   | { readonly kind: 'os'; readonly paths: readonly string[] };
 
-function dropPayload(transfer: DataTransfer): Result<DropPayload | null, string> {
+// A drop carrying nothing usable is ok with no payload, not an error.
+function dropPayload(transfer: DataTransfer): Result<DropPayload | undefined, string> {
   const rel = transfer.getData('avb/asset');
   if (rel) {
     try {
@@ -406,7 +410,7 @@ function dropPayload(transfer: DataTransfer): Result<DropPayload | null, string>
     .filter((path): path is string => path !== undefined && path !== '')
     .map(pathText);
   return paths.length === 0
-    ? { ok: true, value: null }
+    ? { ok: true, value: undefined }
     : { ok: true, value: { kind: 'os', paths } };
 }
 
@@ -503,11 +507,11 @@ function PickBanner({
   pick,
   onCancel,
 }: {
-  readonly pick?: AssetRequest | null;
+  readonly pick?: AssetRequest | undefined;
   readonly onCancel?: () => void;
 }) {
   if (!pick) {
-    return null;
+    return undefined;
   }
   return (
     <div className="asset-picking">
@@ -542,7 +546,7 @@ function AssetBreadcrumbs({
             }`}
             onClick={() => state.setCwd(crumb.rel)}
             onDragOver={actions.dragOverInto(crumb.rel)}
-            onDragLeave={() => state.setDragTarget(null)}
+            onDragLeave={() => state.setDragTarget(undefined)}
             onDrop={actions.dropInto(crumb.rel)}
           >
             {crumb.label}
@@ -572,7 +576,7 @@ function AssetContents({
       onDragOver={actions.dragOverInto(state.cwd)}
       onDragLeave={(event) => {
         if (event.target === event.currentTarget) {
-          state.setDragTarget(null);
+          state.setDragTarget(undefined);
         }
       }}
       onDrop={actions.dropInto(state.cwd)}
@@ -634,7 +638,7 @@ function AssetFolder({
       draggable={state.renaming !== folder.rel}
       onDragStart={(event) => startAssetDrag(event, folder.rel)}
       onDragOver={actions.dragOverInto(folder.rel)}
-      onDragLeave={() => state.setDragTarget(null)}
+      onDragLeave={() => state.setDragTarget(undefined)}
       onDrop={actions.dropInto(folder.rel)}
       onClick={() => {
         if (state.renaming !== folder.rel) {
@@ -678,7 +682,7 @@ function AssetTile({
       }`}
       draggable={state.renaming !== file.rel}
       onDragStart={(event) => startAssetDrag(event, file.rel)}
-      title={assetTitle(file, editable, Boolean(props.pick))}
+      title={assetTitle(file, { editable, picking: Boolean(props.pick) })}
       onClick={props.pick ? () => props.pick?.onPick(file.rel, file) : undefined}
     >
       <AssetThumb
@@ -822,7 +826,7 @@ function isInPickHome(rel: string): boolean {
 
 function startAssetDrag(event: React.DragEvent<HTMLElement>, rel: string): void {
   event.dataTransfer.setData('avb/asset', rel);
-  event.dataTransfer.effectAllowed = 'move';
+  allowDragEffect(event.dataTransfer, 'move');
 }
 
 function blurRenameInput(event: React.KeyboardEvent<HTMLInputElement>): void {
@@ -830,14 +834,22 @@ function blurRenameInput(event: React.KeyboardEvent<HTMLInputElement>): void {
     event.currentTarget.blur();
   }
   if (event.key === 'Escape') {
-    event.currentTarget.value = '';
+    clearInput(event.currentTarget);
     event.currentTarget.blur();
   }
 }
 
-function assetTitle(file: AssetFile, editable: boolean, picking: boolean): string {
-  if (picking) {
+// An uncontrolled input's text is the element's own state, cleared in place.
+function clearInput(inputElement: HTMLInputElement): void {
+  inputElement.value = '';
+}
+
+function assetTitle(
+  file: AssetFile,
+  mode: { readonly editable: boolean; readonly picking: boolean },
+): string {
+  if (mode.picking) {
     return `Use /${file.rel}`;
   }
-  return editable ? `/${file.rel} — click to edit` : `/${file.rel}`;
+  return mode.editable ? `/${file.rel} — click to edit` : `/${file.rel}`;
 }

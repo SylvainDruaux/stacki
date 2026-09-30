@@ -12,6 +12,7 @@ import {
   TrashIcon,
 } from '../ui/Icons';
 import { RenameInput } from './PageDialogs';
+import { allowDragEffect } from '../dragState';
 
 export type PageEditing =
   | { readonly kind: 'page'; readonly key: string }
@@ -34,10 +35,10 @@ interface PageTreeViewProps {
   readonly node: PageTreeNode;
   readonly rel: string;
   readonly depth: number;
-  readonly currentPage: ScanPage | null;
+  readonly currentPage: ScanPage | undefined;
   readonly collapsed: ReadonlySet<string>;
   readonly editing: PageEditing;
-  readonly dropDirectory: string | null;
+  readonly dropDirectory: string | undefined;
   readonly actions: PageTreeActions;
 }
 
@@ -211,7 +212,7 @@ function FolderRow({
 
 function startPageDrag(event: React.DragEvent<HTMLDivElement>, page: PageTreePage): void {
   event.dataTransfer.setData('avb/page', JSON.stringify({ path: page.path, name: page.name }));
-  event.dataTransfer.effectAllowed = 'move';
+  allowDragEffect(event.dataTransfer, 'move');
 }
 
 function commitPageRename(page: PageTreePage, text: string, actions: PageTreeActions): void {

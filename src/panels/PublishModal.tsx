@@ -197,7 +197,7 @@ function PublishPreflight({ preflight }: { readonly preflight: Preflight }) {
       </div>
     );
   }
-  return null;
+  return undefined;
 }
 function PublishProgress({ form, branch }: { readonly form: Form; readonly branch: string }) {
   if (form.state.kind === 'publishing') {
@@ -225,7 +225,7 @@ function PublishProgress({ form, branch }: { readonly form: Form; readonly branc
       }
     }
   }
-  return null;
+  return undefined;
 }
 function PublishFooter({ form, onClose }: { readonly form: Form; readonly onClose: () => void }) {
   const publishing = form.state.kind === 'publishing';

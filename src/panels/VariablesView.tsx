@@ -25,13 +25,13 @@ export { friendlyError } from './variableEdits';
 
 export interface VariableUndo {
   readonly label: string;
-  readonly coalesceKey?: string | null;
+  readonly coalesceKey?: string | undefined;
   readonly undo: () => Promise<void>;
   readonly redo: () => Promise<void>;
 }
 export interface VariablesViewProps {
   readonly project: { readonly path: string };
-  readonly selected?: VariableSelection | null;
+  readonly selected?: VariableSelection | undefined;
   readonly hidden?: boolean;
   readonly onClose?: () => void;
   readonly showToast?: ((message: string, kind: 'error') => void) | undefined;
@@ -102,7 +102,7 @@ function VariablesViewBody({ state }: { readonly state: ReturnType<typeof useVar
             value={query}
             placeholder="Search variables"
             spellCheck={false}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(event) => setQuery(event.target.value)}
           />
           <span className="cms-detail-path">{file.rel}</span>
         </div>
@@ -202,7 +202,7 @@ function useVariableModel(props: VariablesViewProps) {
   const [drafts, setDrafts] = useState<Readonly<Record<string, string>>>({});
   // `move` is defined above the point where the selected file is worked out, and
   // a drop needs to know which file it is writing to — so it reads it from here.
-  const fileRef = useRef<VariableFile | null>(null);
+  const fileRef = useRef<VariableFile | undefined>(undefined);
   const firstSelectorRef = useRef(':root');
 
   const { files, values, refresh } = useVariableData(project.path, showToast, setDrafts);
@@ -215,9 +215,9 @@ function useVariableModel(props: VariablesViewProps) {
     setHost({ ...getHost(), projectPath: project.path });
   }, [project.path]);
 
-  const file = files.find((f) => f.rel === selected?.file);
+  const file = files.find((candidate) => candidate.rel === selected?.file);
   const group = selected ? file?.groups[selected.index] : undefined;
-  fileRef.current = file || null;
+  fileRef.current = file || undefined;
   firstSelectorRef.current = group?.columns?.[0]?.selector || ':root';
 
   return {
@@ -246,29 +246,24 @@ function useVariableSave(model: VariableModel, writeWithUndo: VariableHistory) {
     async (cell: VariableCell, value: string) => {
       // One step per value, not per keystroke: the field writes as it is typed
       // and the burst collapses on the key.
-      await writeWithUndo(
-        cell.file,
-        'the value',
-        async () => {
-          const result = await bridge('setCssVariable', {
-            projectPath: project.path,
-            file: cell.file,
-            valueStart: cell.valueStart,
-            valueEnd: cell.valueEnd,
-            expect: cell.value,
-            value,
-          });
-          if (!result.ok) {
-            showToast?.(result.error || 'Could not write that value.', 'error');
-            await refresh();
-            return false;
-          }
-          markSaved();
+      await writeWithUndo(cell.file, 'the value', `var:${cell.file}:${cell.name}`, async () => {
+        const result = await bridge('setCssVariable', {
+          projectPath: project.path,
+          file: cell.file,
+          valueStart: cell.valueStart,
+          valueEnd: cell.valueEnd,
+          expect: cell.value,
+          value,
+        });
+        if (!result.ok) {
+          showToast?.(result.error || 'Could not write that value.', 'error');
           await refresh();
-          return true;
-        },
-        `var:${cell.file}:${cell.name}`,
-      );
+          return false;
+        }
+        markSaved();
+        await refresh();
+        return true;
+      });
     },
     [project.path, refresh, showToast, writeWithUndo, markSaved],
   );
@@ -295,8 +290,9 @@ function useVariableMove(model: VariableModel, writeWithUndo: VariableHistory) {
         // declared in two stylesheets, and putting back half of a move is
         // worse than not putting it back at all.
         await writeWithUndo(
-          plan.moves.map((m) => m.file),
+          plan.moves.map((move) => move.file),
           'the move',
+          undefined,
           async () => {
             const result = await bridge('moveCssVariables', {
               projectPath: project.path,
@@ -317,13 +313,13 @@ function useVariableMove(model: VariableModel, writeWithUndo: VariableHistory) {
       }
       const anchor = plan.block.rows.map((row) => row.cells.find(Boolean)).find(Boolean);
       const selectedFile = fileRef.current;
-      assert(selectedFile !== null, 'Variable move: file selection is required');
+      assert(selectedFile !== undefined, 'Variable move: file selection is required');
       const range = headingRange(plan.block);
       if (!range) {
         showToast?.('This heading is a name prefix, not a CSS comment.', 'error');
         return;
       }
-      await writeWithUndo(selectedFile.rel, 'the group', async () => {
+      await writeWithUndo(selectedFile.rel, 'the group', undefined, async () => {
         const result = await bridge(
           'moveCssHeading',
           definedFields({
@@ -371,7 +367,7 @@ function useVariableAdd(model: VariableModel, writeWithUndo: VariableHistory) {
         const anchor =
           last?.cells[index] ||
           block.rows
-            .map((r) => r.cells[index])
+            .map((row) => row.cells[index])
             .filter(Boolean)
             .pop();
         if (!anchor) {
@@ -391,8 +387,9 @@ function useVariableAdd(model: VariableModel, writeWithUndo: VariableHistory) {
         return;
       }
       await writeWithUndo(
-        adds.map((a) => a.file),
+        adds.map((added) => added.file),
         'the variable',
+        undefined,
         async () => {
           const result = await bridge('addCssVariables', { projectPath: project.path, adds });
           if (!result.ok) {
@@ -482,7 +479,7 @@ function useVariableRetitle(model: VariableModel, writeWithUndo: VariableHistory
 
   const retitle = useCallback(
     async (block: VariableBlock, title: string) => {
-      return writeWithUndo(file?.rel, 'the heading', () => retitleOnce(block, title));
+      return writeWithUndo(file?.rel, 'the heading', undefined, () => retitleOnce(block, title));
     },
     [file?.rel, writeWithUndo, retitleOnce],
   );
@@ -498,7 +495,7 @@ function useVariableSections(model: VariableModel, writeWithUndo: VariableHistor
     async (block: VariableBlock) => {
       assert(file !== undefined, 'Variable heading: file selection is required');
       const anchor = block.rows.map((row) => row.cells.find(Boolean)).find(Boolean);
-      await writeWithUndo(file?.rel, 'the group', async () => {
+      await writeWithUndo(file?.rel, 'the group', undefined, async () => {
         const result = await bridge(
           'addCssSection',
           definedFields({
@@ -528,7 +525,7 @@ function useVariableSections(model: VariableModel, writeWithUndo: VariableHistor
       if (!range) {
         return;
       }
-      await writeWithUndo(file.rel, 'deleting the group', async () => {
+      await writeWithUndo(file.rel, 'deleting the group', undefined, async () => {
         const result = await bridge('removeCssSection', {
           projectPath: project.path,
           file: file.rel,
@@ -551,21 +548,21 @@ function useVariableDrafts(model: VariableModel) {
   // What the accessibility check makes of a value right now — the file's values
   // with whatever is in the fields on top.
   const fluidOf = useCallback(
-    (cell: VariableCell | null) => {
+    (cell: VariableCell | undefined) => {
       if (!cell) {
-        return null;
+        return undefined;
       }
       const own = drafts[cell.name];
       const check = fluidCheck(resolveValue(own ?? cell.value, values, drafts));
-      return check && check.status !== 'ok' ? check : null;
+      return check && check.status !== 'ok' ? check : undefined;
     },
     [values, drafts],
   );
 
   const noteDraft = useCallback(
-    (name: string, value: string | null) => {
+    (name: string, value: string | undefined) => {
       setDrafts((current) => {
-        if (value === null) {
+        if (value === undefined) {
           if (!(name in current)) {
             return current;
           }
@@ -589,8 +586,8 @@ function useVariableDrafts(model: VariableModel) {
     if (!group) {
       return [];
     }
-    const q = query.trim().toLowerCase();
-    if (!q) {
+    const needle = query.trim().toLowerCase();
+    if (!needle) {
       return group.blocks;
     }
     return group.blocks
@@ -598,8 +595,10 @@ function useVariableDrafts(model: VariableModel) {
         ...block,
         rows: block.rows.filter(
           (row) =>
-            `${block.title || ''} ${row.label} ${row.name || ''}`.toLowerCase().includes(q) ||
-            row.cells.some((c) => c && `${c.name} ${c.value}`.toLowerCase().includes(q)),
+            `${block.title || ''} ${row.label} ${row.name || ''}`.toLowerCase().includes(needle) ||
+            row.cells.some(
+              (cell) => cell && `${cell.name} ${cell.value}`.toLowerCase().includes(needle),
+            ),
         ),
       }))
       .filter((block) => block.rows.length);

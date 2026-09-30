@@ -10,13 +10,13 @@ type ChangedFiles = React.ComponentProps<typeof FileBrowser>['files'];
 
 interface GitChipViewProps {
   readonly info: WireGitInfo;
-  readonly busy: string | null;
-  readonly error: string | null;
+  readonly busy: string | undefined;
+  readonly error: string | undefined;
   readonly open: boolean;
   readonly commitMessage: string;
   readonly newBranch: string;
   readonly picking: boolean;
-  readonly picked: readonly string[] | null;
+  readonly picked: readonly string[] | undefined;
   readonly changed: ChangedFiles;
   readonly wrapRef: React.RefObject<HTMLDivElement>;
   readonly onToggle: () => void;
@@ -51,7 +51,7 @@ interface CommitProps {
   readonly working: boolean;
   readonly message: string;
   readonly picking: boolean;
-  readonly picked: readonly string[] | null;
+  readonly picked: readonly string[] | undefined;
   readonly changed: ChangedFiles;
   readonly onMessage: (value: string) => void;
   readonly onTogglePicking: () => void;
@@ -64,7 +64,7 @@ function ChipButton({
   busy,
   onToggle,
 }: Pick<GitChipViewProps, 'info' | 'busy' | 'onToggle'>) {
-  const working = busy !== null;
+  const working = busy !== undefined;
   return (
     <button className={`git-chip ${working ? 'busy' : ''}`} onClick={onToggle}>
       {working ? (
@@ -105,7 +105,7 @@ function Branches({
           onClick={() => onSwitch(branch)}
         >
           <span className="icon" style={{ width: 14 }}>
-            {branch === info.branch ? <CheckIcon size={12} /> : null}
+            {branch === info.branch && <CheckIcon size={12} />}
           </span>
           <span className="label">{branch}</span>
           {info.parked.includes(branch) && branch !== info.branch && (
@@ -116,7 +116,7 @@ function Branches({
           <BranchActions
             branch={branch}
             current={info.branch}
-            trunk={info.trunk ?? null}
+            {...(info.trunk === undefined ? {} : { trunk: info.trunk })}
             disabled={working}
             onMerge={onMerge}
             onDelete={onDelete}
@@ -257,7 +257,7 @@ function GitHubControls({
 }
 
 function Dropdown(props: GitChipViewProps) {
-  const working = props.busy !== null;
+  const working = props.busy !== undefined;
   return (
     <div className="dropdown">
       {props.error && (

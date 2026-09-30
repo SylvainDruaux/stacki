@@ -10,7 +10,7 @@ interface ActionOptions {
 }
 interface MergeOptions extends ActionOptions {
   readonly into: string;
-  readonly trunk?: string | null;
+  readonly trunk?: string | undefined;
   readonly onConflict?: ((conflict: Conflict) => void) | undefined;
 }
 interface DeleteOptions extends ActionOptions {
@@ -70,20 +70,22 @@ export async function mergeBranchAction({
     title: `Merge “${branch}” into “${into}”?`,
     body: `Everything on ${branch} becomes part of ${into}.`,
     confirmLabel: `Merge into ${into}`,
-    checkbox: isTrunk
-      ? null
+    ...(isTrunk
+      ? {}
       : {
-          label: `Delete “${branch}” afterwards`,
-          hint: 'Its work will be on ' + into + ', so the branch has nothing left of its own.',
-          defaultChecked: true,
-        },
+          checkbox: {
+            label: `Delete “${branch}” afterwards`,
+            hint: 'Its work will be on ' + into + ', so the branch has nothing left of its own.',
+            defaultChecked: true,
+          },
+        }),
   });
   if (!answer) {
     return;
   }
   const deleteAfter = !isTrunk && typeof answer === 'object' && answer.checked;
   run(async () => {
-    const r = await gitMerge({ projectPath, branch });
+    const merged = await gitMerge({ projectPath, branch });
     // Both branches changed the same files. That is a question for the user,
     // not a failure — it comes back with both versions of each file so the app
     // can ask which to keep. Telling someone to open a terminal here would be
@@ -91,21 +93,21 @@ export async function mergeBranchAction({
     // Unsaved work in a file the merge needs to write. Not an error — git
     // stopped without moving anything — so it is offered as the choice it is:
     // set the work aside and go ahead, or leave it and deal with it first.
-    if ('dirty' in r) {
+    if ('dirty' in merged) {
       await mergeDirtyWork(
         { projectPath, branch, into, showToast, onConflict, deleteAfter },
-        r.files,
+        merged.files,
       );
       return;
     }
-    if ('conflicted' in r) {
+    if ('conflicted' in merged) {
       // The tidy-up was asked for before anyone knew there would be a clash;
       // it still applies once the clash is settled.
-      onConflict?.({ ...r, deleteAfter });
+      onConflict?.({ ...merged, deleteAfter });
       return;
     }
     if (deleteAfter) {
-      await tidyUp({ projectPath, branch, into, changed: r?.changed, showToast });
+      await tidyUp({ projectPath, branch, into, changed: merged?.changed, showToast });
       return;
     }
     // Said from in here because the caller's success message has no way to
@@ -113,8 +115,8 @@ export async function mergeBranchAction({
     // a success, and calling it "merged" would suggest work arrived that was
     // already there.
     showToast(
-      r?.changed
-        ? `Merged ${branch} into ${r.into}`
+      merged?.changed
+        ? `Merged ${branch} into ${merged.into}`
         : `${into} already has everything from ${branch}`,
       'success',
     );
@@ -140,8 +142,8 @@ export async function tidyUp({
     ? `Merged ${branch} into ${into}`
     : `${into} already had everything from ${branch}`;
   try {
-    const r = await gitDeleteBranch({ projectPath, branch });
-    if (!r.ok) {
+    const deleted = await gitDeleteBranch({ projectPath, branch });
+    if (!deleted.ok) {
       // Should not happen straight after a merge, and if it does the branch is
       // holding something the merge did not take — which is a thing to say,
       // not to force past.
@@ -149,8 +151,8 @@ export async function tidyUp({
       return;
     }
     showToast(`${merged}, and deleted ${branch}`, 'success');
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
     showToast(`${merged}. ${branch} could not be deleted: ${message}`, 'info');
   }
 }
@@ -185,13 +187,13 @@ export async function deleteBranchAction({
     return;
   }
   run(async () => {
-    const r = await gitDeleteBranch({ projectPath, branch });
-    if (!r.ok) {
+    const deleted = await gitDeleteBranch({ projectPath, branch });
+    if (!deleted.ok) {
       // A different question from the first — "this loses work" rather than
       // "are you sure" — so it is asked in those terms and in its own dialog.
       const anyway = await confirmDialog({
         title: 'This would lose work',
-        body: r.message,
+        body: deleted.message,
         confirmLabel: 'Delete anyway',
         danger: true,
       });

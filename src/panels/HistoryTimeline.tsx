@@ -25,9 +25,9 @@ type TimelineState =
 interface HistoryTimelineProps {
   readonly projectPath: string;
   readonly branch: string | undefined;
-  readonly head: string | null | undefined;
-  readonly userEmail: string | null | undefined;
-  readonly previewRef: string | null;
+  readonly head: string | undefined;
+  readonly userEmail: string | undefined;
+  readonly previewRef: string | undefined;
   readonly onPreviewCommit: (commit: HistoryCommit) => void;
   readonly onExitPreview: () => void;
   readonly onRestoreFile: (commit: HistoryCommit, file: HistoryCommitFile) => void;
@@ -36,10 +36,10 @@ interface HistoryTimelineProps {
 
 export default function HistoryTimeline(props: HistoryTimelineProps) {
   const timeline = useTimeline(props.projectPath, props.branch, props.head);
-  const [expanded, setExpanded] = useState<string | null>(null);
+  const [expanded, setExpanded] = useState<string | undefined>(undefined);
   useEffect(() => {
     setExpanded((hash) =>
-      hash && timeline.state.commits.some((commit) => commit.hash === hash) ? hash : null,
+      hash && timeline.state.commits.some((commit) => commit.hash === hash) ? hash : undefined,
     );
   }, [timeline.state.commits]);
   return (
@@ -59,7 +59,7 @@ export default function HistoryTimeline(props: HistoryTimelineProps) {
           newDay={startsDay(timeline.state.commits, index)}
           expanded={expanded === commit.hash}
           previewing={props.previewRef === commit.hash}
-          toggle={() => setExpanded(expanded === commit.hash ? null : commit.hash)}
+          toggle={() => setExpanded(expanded === commit.hash ? undefined : commit.hash)}
           {...props}
         />
       ))}
@@ -72,11 +72,7 @@ export default function HistoryTimeline(props: HistoryTimelineProps) {
   );
 }
 
-function useTimeline(
-  projectPath: string,
-  branch: string | undefined,
-  head: string | null | undefined,
-) {
+function useTimeline(projectPath: string, branch: string | undefined, head: string | undefined) {
   const [state, setState] = useState<TimelineState>({ kind: 'loading', commits: [], atEnd: false });
   const requestRef = useRef(0);
   useEffect(() => {

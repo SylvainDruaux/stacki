@@ -1,4 +1,5 @@
 import React, { useLayoutEffect, useRef, useState } from 'react';
+import type { RefCallback } from 'react';
 import { createPortal } from 'react-dom';
 
 // What a fluid clamp() costs a reader who zooms.
@@ -74,7 +75,9 @@ interface TipProps {
 }
 function Tip({ anchor, error, message, link }: TipProps) {
   const ref = useRef<HTMLDivElement>(null);
-  const [pos, setPos] = useState<{ readonly left: number; readonly top: number } | null>(null);
+  const [position, setPosition] = useState<
+    { readonly left: number; readonly top: number } | undefined
+  >(undefined);
 
   useLayoutEffect(() => {
     const height = ref.current?.offsetHeight || 90;
@@ -86,7 +89,7 @@ function Tip({ anchor, error, message, link }: TipProps) {
       Math.max(TIP_MARGIN, anchor.top + anchor.height / 2 - height / 2),
       window.innerHeight - height - TIP_MARGIN,
     );
-    setPos({ left, top });
+    setPosition({ left, top });
   }, [anchor]);
 
   return createPortal(
@@ -94,7 +97,7 @@ function Tip({ anchor, error, message, link }: TipProps) {
       ref={ref}
       className={`fluid-tip ${error ? 'is-error' : 'is-warning'}`}
       role="tooltip"
-      style={{ left: pos?.left ?? -9999, top: pos?.top ?? 0, width: TIP_WIDTH }}
+      style={{ left: position?.left ?? -9999, top: position?.top ?? 0, width: TIP_WIDTH }}
     >
       {message}
       {error && link && <span className="fluid-tip-more">Read why</span>}
@@ -104,14 +107,14 @@ function Tip({ anchor, error, message, link }: TipProps) {
 }
 
 interface FluidBadgeProps {
-  readonly fluid?: { readonly status: string; readonly link?: string } | null;
+  readonly fluid?: { readonly status: string; readonly link?: string } | undefined;
 }
 export default function FluidBadge({ fluid }: FluidBadgeProps) {
-  const ref = useRef<HTMLElement | null>(null);
-  const [anchor, setAnchor] = useState<DOMRect | null>(null);
+  const ref = useRef<HTMLElement | undefined>(undefined);
+  const [anchor, setAnchor] = useState<DOMRect | undefined>(undefined);
 
   if (!fluid || fluid.status === 'ok') {
-    return null;
+    return undefined;
   }
   const error = fluid.status === 'error';
   const message =
@@ -121,15 +124,15 @@ export default function FluidBadge({ fluid }: FluidBadgeProps) {
   // No `title`: the browser's own tooltip would say the same thing again, a
   // second later, somewhere else.
   const props = {
-    ref: (element: HTMLElement | null) => {
-      ref.current = element;
-    },
+    ref: ((element) => {
+      ref.current = element ?? undefined;
+    }) satisfies RefCallback<HTMLElement>,
     className: `fluid-badge ${error ? 'is-error' : 'is-warning'}`,
     'aria-label': label,
-    onMouseEnter: () => setAnchor(ref.current?.getBoundingClientRect() || null),
-    onMouseLeave: () => setAnchor(null),
-    onFocus: () => setAnchor(ref.current?.getBoundingClientRect() || null),
-    onBlur: () => setAnchor(null),
+    onMouseEnter: () => setAnchor(ref.current?.getBoundingClientRect() || undefined),
+    onMouseLeave: () => setAnchor(undefined),
+    onFocus: () => setAnchor(ref.current?.getBoundingClientRect() || undefined),
+    onBlur: () => setAnchor(undefined),
   };
 
   const icon = <span className="fluid-badge-icon">{error ? <ErrorIcon /> : <WarningIcon />}</span>;

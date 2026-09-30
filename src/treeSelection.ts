@@ -1,4 +1,5 @@
 import { assert } from '../shared/assert';
+import { LIMITS } from '../shared/limits';
 import { treeBudget, type TreeView } from './treeView';
 // Tree questions the navigator and the editor both ask, kept apart from both
 // so they can be reasoned about (and tested) on their own: which nodes get a
@@ -6,10 +7,12 @@ import { treeBudget, type TreeView } from './treeView';
 
 // Children the Content field fully covers: plain text and simple {expr}
 // interpolations (single braces, no JSX). These get no navigator rows.
-export function isContentOnlyChild(c: TreeView): boolean {
+export function isContentOnlyChild(child: TreeView): boolean {
   return (
-    c.kind === 'text' ||
-    (c.kind === 'expr' && /^\{[^{}]*\}$/.test(c.value ?? '') && !(c.value ?? '').includes('<'))
+    child.kind === 'text' ||
+    (child.kind === 'expr' &&
+      /^\{[^{}]*\}$/.test(child.value ?? '') &&
+      !(child.value ?? '').includes('<'))
   );
 }
 
@@ -23,10 +26,7 @@ export function isContentOnlyChild(c: TreeView): boolean {
  * `else` holding `{heading}` drew as an empty row, with the value it renders
  * reachable from nowhere at all. Same for a condition and a loop.
  */
-export function hidesChildRows(
-  node: TreeView | null | undefined,
-  kids: readonly TreeView[],
-): boolean {
+export function hidesChildRows(node: TreeView | undefined, kids: readonly TreeView[]): boolean {
   const covered = node?.kind === 'element' || node?.kind === 'component';
   return covered && kids.length > 0 && kids.every(isContentOnlyChild);
 }
@@ -55,15 +55,16 @@ const INLINE_TAGS = new Set([
 // is in there, and "this rendered nothing" is a question that can't be asked
 // of it. Mirrors isInlineRun in the parser; the two have to agree, or a node
 // nobody ever marked reads as a node that produced nothing.
-export function isInlineRun(nodes: readonly TreeView[] | null | undefined): boolean {
+export function isInlineRun(nodes: readonly TreeView[] | undefined): boolean {
   return isInlineRunWalk(nodes, 0, treeBudget());
 }
 
 function isInlineRunWalk(
-  nodes: readonly TreeView[] | null | undefined,
+  nodes: readonly TreeView[] | undefined,
   depth: number,
   visit: (depth: number) => void,
 ): boolean {
+  assert(depth <= LIMITS.treeDepthMax, 'Tree traversal exceeds depth limit');
   if (!nodes?.length) {
     return false;
   }
@@ -90,45 +91,46 @@ function isInlineRunWalk(
 // along: the two read as one row, so leaving it behind would silently re-attach
 // someone else's note to whatever ends up next.
 export function noteIndexAbove(list: readonly TreeView[], index: number): number {
-  const prev = index > 0 ? list[index - 1] : null;
-  return prev && prev.kind === 'comment' ? index - 1 : -1;
+  const previous = index > 0 ? list[index - 1] : undefined;
+  return previous && previous.kind === 'comment' ? index - 1 : -1;
 }
 
 // Node plus the list it sits in and the node holding that list.
 export function findWithParent(
   nodes: readonly TreeView[],
   id: string,
-  parent: TreeView | null = null,
-): FoundNode | null {
+  parent?: TreeView,
+): FoundNode | undefined {
   return findWithParentWalk(nodes, id, parent, 0, treeBudget());
 }
 
 interface FoundNode {
   readonly node: TreeView;
-  readonly parent: TreeView | null;
+  readonly parent: TreeView | undefined;
   readonly siblings: readonly TreeView[];
   readonly index: number;
 }
 function findWithParentWalk(
   nodes: readonly TreeView[],
   id: string,
-  parent: TreeView | null,
+  parent: TreeView | undefined,
   depth: number,
   visit: (depth: number) => void,
-): FoundNode | null {
-  for (const [i, n] of nodes.entries()) {
+): FoundNode | undefined {
+  assert(depth <= LIMITS.treeDepthMax, 'Tree traversal exceeds depth limit');
+  for (const [i, node] of nodes.entries()) {
     visit(depth);
-    if (n.id === id) {
-      return { node: n, parent, siblings: nodes, index: i };
+    if (node.id === id) {
+      return { node, parent, siblings: nodes, index: i };
     }
-    if (n.children != null) {
-      const found = findWithParentWalk(n.children, id, n, depth + 1, visit);
+    if (node.children !== undefined) {
+      const found = findWithParentWalk(node.children, id, node, depth + 1, visit);
       if (found) {
         return found;
       }
     }
   }
-  return null;
+  return undefined;
 }
 
 // Where the selection lands when a node is deleted: the row below it, else the
@@ -140,10 +142,10 @@ function findWithParentWalk(
 export function selectionAfterDelete(
   model: { readonly nodes: readonly TreeView[] },
   nodeId: string,
-): string | null {
+): string | undefined {
   const found = findWithParent(model.nodes, nodeId);
   if (!found) {
-    return null;
+    return undefined;
   }
   const { parent, siblings, index } = found;
   const gone = new Set([index]);
@@ -153,12 +155,12 @@ export function selectionAfterDelete(
   }
   const rest = siblings.filter((_, i) => !gone.has(i));
   if (!rest.length) {
-    return parent ? parent.id : null;
+    return parent ? parent.id : undefined;
   }
   // Children that are all text or simple {expr} render no rows at all, so the
   // nearest thing to select is what held them.
   if (rest.every(isContentOnlyChild)) {
-    return parent ? parent.id : null;
+    return parent ? parent.id : undefined;
   }
   // Where the hole is, in the surviving list.
   const at = siblings.slice(0, index).filter((_, i) => !gone.has(i)).length;
@@ -176,15 +178,15 @@ export function selectionAfterDelete(
   };
   for (let i = at; i < rest.length; i++) {
     if (!folded(i)) {
-      return rest[i]?.id ?? null;
+      return rest[i]?.id ?? undefined;
     }
   }
   for (let i = at - 1; i >= 0; i--) {
     if (!folded(i)) {
-      return rest[i]?.id ?? null;
+      return rest[i]?.id ?? undefined;
     }
   }
-  return parent ? parent.id : null;
+  return parent ? parent.id : undefined;
 }
 
 // A note is often written as a divider — `--------------- CTA` — which is a
@@ -206,10 +208,10 @@ export function noteText(raw: unknown): string {
   return label || full;
 }
 
-export function noteValue(previous: unknown, text: unknown): string | null {
+export function noteValue(previous: unknown, text: unknown): string | undefined {
   const body = String(text ?? '').trim();
   if (!body) {
-    return null;
+    return undefined;
   } // the caller removes the node
   const full = String(previous ?? '').trim();
   const lead = full.match(RULE);

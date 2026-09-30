@@ -14,7 +14,7 @@ export function HistorySection({
   children,
 }: {
   readonly title: string;
-  readonly count?: number | null | undefined;
+  readonly count?: number | undefined;
   readonly open: boolean;
   readonly onToggle: () => void;
   readonly children: React.ReactNode;
@@ -24,7 +24,7 @@ export function HistorySection({
       <button className="history-section-head" onClick={onToggle}>
         {open ? <ChevronDownIcon size={12} /> : <ChevronRightIcon size={12} />}
         <span className="history-section-title">{title}</span>
-        {count != null && <span className="history-section-count">{count}</span>}
+        {count !== undefined && <span className="history-section-count">{count}</span>}
       </button>
       {open && children}
     </div>
@@ -44,7 +44,7 @@ export function HistoryFiles({
 }) {
   const changed = files.filter((file) => file.status).length;
   return (
-    <HistorySection title="Files" count={changed || null} open={open} onToggle={toggle}>
+    <HistorySection title="Files" count={changed || undefined} open={open} onToggle={toggle}>
       <FileBrowser files={files} onOpen={onOpen} emptyMessage="Nothing here yet." />
     </HistorySection>
   );
@@ -58,7 +58,7 @@ export function HistoryBranches({
   onMerge,
   onDelete,
 }: {
-  readonly gitInfo: HistoryGitInfo | null;
+  readonly gitInfo: HistoryGitInfo | undefined;
   readonly open: boolean;
   readonly toggle: () => void;
   readonly onSwitch: (branch: string) => void;
@@ -95,7 +95,7 @@ export function HistoryBranches({
           <BranchActions
             branch={branch}
             current={repository.branch}
-            trunk={repository.trunk ?? null}
+            {...(repository.trunk === undefined ? {} : { trunk: repository.trunk })}
             onMerge={onMerge}
             onDelete={onDelete}
           />
@@ -117,7 +117,7 @@ export function HistoryWorktrees({
   return (
     <HistorySection
       title="Worktrees"
-      count={worktrees.length > 1 ? worktrees.length : null}
+      count={worktrees.length > 1 ? worktrees.length : undefined}
       open={open}
       onToggle={toggle}
     >

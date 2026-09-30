@@ -22,26 +22,25 @@ export interface TerminalProcessEvent {
 
 export function startTerminal(id: string, cwd: string, autoLaunch: string) {
   const payload = parseIpcPayload('terminal:start', { id, cwd, autoLaunch });
-  return terminalRequest(() => window.avb.startTerminal(payload), parseStartResult);
+  return terminalRequest(parseStartResult, () => window.avb.startTerminal(payload));
 }
 
 export function resizeTerminal(id: string, cols: number, rows: number) {
   const payload = parseIpcPayload('terminal:resize', { id, cols, rows });
-  return terminalRequest(() => window.avb.resizeTerminal(payload), parseBooleanResult);
+  return terminalRequest(parseBooleanResult, () => window.avb.resizeTerminal(payload));
 }
 
 export function closeTerminal(id: string) {
   const payload = parseIpcPayload('terminal:close', { id });
-  return terminalRequest(() => window.avb.closeTerminal(payload), parseBooleanResult);
+  return terminalRequest(parseBooleanResult, () => window.avb.closeTerminal(payload));
 }
 
 export function saveTerminalClipboardImage(bytes: Uint8Array, mime: string) {
   if (bytes.byteLength > TERMINAL_IMAGE_BYTES_MAX) {
     return Promise.resolve({ ok: false, error: 'Clipboard image exceeds 20 MB.' } as const);
   }
-  return terminalRequest(
-    () => window.avb.terminalClipboardImage(bytes, text(mime)),
-    parseClipboardResult,
+  return terminalRequest(parseClipboardResult, () =>
+    window.avb.terminalClipboardImage(bytes, text(mime)),
   );
 }
 
@@ -55,7 +54,7 @@ export function acknowledgeTerminalData(id: string, characters: number): void {
 
 export function requestNativePaste(): void {
   const payload = parseIpcPayload('native:paste', undefined);
-  void terminalRequest(() => window.avb.nativePaste(payload), parseSuccess);
+  void terminalRequest(parseSuccess, () => window.avb.nativePaste(payload));
 }
 
 export function terminalFilePath(file: File): string {
@@ -118,8 +117,8 @@ function parseSuccess(input: unknown): { readonly ok: true } {
 }
 
 async function terminalRequest<Value>(
-  invoke: () => Promise<unknown>,
   parse: Parser<Value>,
+  invoke: () => Promise<unknown>,
 ): Promise<Result<Value, string>> {
   let response: unknown;
   try {

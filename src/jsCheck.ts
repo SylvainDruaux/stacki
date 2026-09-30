@@ -37,16 +37,16 @@ function firstError(code: string): number {
   return at;
 }
 
-/** Where `pos` falls, for a message that can be acted on. */
-function lineOf(code: string, pos: number): number {
-  return code.slice(0, pos).split('\n').length;
+/** Where `position` falls, for a message that can be acted on. */
+function lineOf(code: string, position: number): number {
+  return code.slice(0, position).split('\n').length;
 }
 
 /** The token that goes wrong, so the message names something visible. */
-function tokenAt(code: string, pos: number): string {
-  const rest = code.slice(pos);
-  const m = rest.match(/^\s*([A-Za-z_$][\w$]*|[^\s\w$])/);
-  return m?.[1] ?? '';
+function tokenAt(code: string, position: number): string {
+  const rest = code.slice(position);
+  const match = rest.match(/^\s*([A-Za-z_$][\w$]*|[^\s\w$])/);
+  return match?.[1] ?? '';
 }
 
 /**

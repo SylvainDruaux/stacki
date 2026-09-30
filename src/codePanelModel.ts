@@ -12,30 +12,33 @@ export interface ComponentSourceRange extends SourceRange {
 }
 
 export function sourceRangeForSelection(
-  model: EditorModel | null,
-  selectedId: string | null,
+  model: EditorModel | undefined,
+  selectedId: string | undefined,
   sourceLength: number,
-): SourceRange | null {
+): SourceRange | undefined {
   if (!model || !selectedId) {
-    return null;
+    return undefined;
   }
   if (selectedId === 'frontmatter') {
     const end = model.bodyStart;
-    return typeof end === 'number' && end > 0 && end <= sourceLength ? { from: 0, to: end } : null;
+    if (typeof end === 'number' && end > 0 && end <= sourceLength) {
+      return { from: 0, to: end };
+    }
+    return undefined;
   }
   const node = sourceNodeById(model.nodes, selectedId);
-  return node ? sourceRangeForNode(node, sourceLength) : null;
+  return node ? sourceRangeForNode(node, sourceLength) : undefined;
 }
 
 export function sourceNodeAtOffset(
   nodes: readonly EditorNode[],
   offset: number,
-): EditorNode | null {
+): EditorNode | undefined {
   if (!Number.isSafeInteger(offset) || offset < 0) {
-    return null;
+    return undefined;
   }
   const pending = [...nodes];
-  let best: EditorNode | null = null;
+  let best: EditorNode | undefined = undefined;
   let bestWidth = Number.POSITIVE_INFINITY;
   for (let index = 0; index < pending.length; index += 1) {
     if (index >= LIMITS.treeNodesMax) {
@@ -55,7 +58,7 @@ export function sourceNodeAtOffset(
         bestWidth = width;
       }
     }
-    if (Array.isArray(node.children)) {
+    if (node.children !== undefined) {
       pending.push(...node.children);
     }
   }
@@ -89,23 +92,26 @@ export function componentSourceRanges(
         ranges.push({ id: node.id, name: node.name, from, to });
       }
     }
-    if (Array.isArray(node.children)) {
+    if (node.children !== undefined) {
       pending.push(...node.children);
     }
   }
   return ranges;
 }
 
-export function sourceLineLabel(source: string, range: SourceRange | null): string | null {
+export function sourceLineLabel(
+  source: string,
+  range: SourceRange | undefined,
+): string | undefined {
   if (!range) {
-    return null;
+    return undefined;
   }
   const startLine = sourceLineAt(source, range.from);
   const endLine = sourceLineAt(source, Math.max(range.from, range.to - 1));
   return startLine === endLine ? `L${startLine}` : `L${startLine}–${endLine}`;
 }
 
-function sourceNodeById(nodes: readonly EditorNode[], id: string): EditorNode | null {
+function sourceNodeById(nodes: readonly EditorNode[], id: string): EditorNode | undefined {
   const pending = [...nodes];
   for (let index = 0; index < pending.length; index += 1) {
     if (index >= LIMITS.treeNodesMax) {
@@ -118,21 +124,21 @@ function sourceNodeById(nodes: readonly EditorNode[], id: string): EditorNode | 
     if (node.id === id) {
       return node;
     }
-    if (Array.isArray(node.children)) {
+    if (node.children !== undefined) {
       pending.push(...node.children);
     }
   }
-  return null;
+  return undefined;
 }
 
-function sourceRangeForNode(node: EditorNode, sourceLength: number): SourceRange | null {
+function sourceRangeForNode(node: EditorNode, sourceLength: number): SourceRange | undefined {
   const start = node.start;
   const end = node.end;
   if (typeof start !== 'number' || typeof end !== 'number') {
-    return null;
+    return undefined;
   }
   if (start < 0 || end < start || end > sourceLength) {
-    return null;
+    return undefined;
   }
   return { from: start, to: end };
 }

@@ -15,16 +15,20 @@ import useListReorder from '../ui/useListReorder.js';
 const TARGET_CACHE_MAX = 128;
 type Target = { readonly id: string; readonly title: string };
 const targetCache = new Map<string, readonly Target[]>();
+// A nullable field can hold the data value null: the key stays in the entry's
+// file, with no value. It is the entry's data, not the app's absence.
+// eslint-disable-next-line stacki/no-null -- YAML and JSON null is entry data written to the file.
+const NULL_DATA: Data = null;
 
 export interface FieldContext {
   readonly projectPath: string;
   readonly baseDir: string;
   readonly parsed: boolean;
-  readonly parserNote: string | null | undefined;
+  readonly parserNote: string | undefined;
   readonly expanded: ReadonlySet<string>;
   readonly expand: (key: string) => void;
   readonly inFile: (path: readonly (string | number)[]) => boolean;
-  readonly issueAt: (path: readonly (string | number)[]) => string | null;
+  readonly issueAt: (path: readonly (string | number)[]) => string | undefined;
 }
 
 interface FieldProps {
@@ -118,9 +122,7 @@ function cacheTargets(key: string, targets: readonly Target[]): void {
 
 function useTargets(projectPath: string, name: string | undefined) {
   const key = name ? `${projectPath}:${name}` : '';
-  const [targets, setTargets] = useState<readonly Target[] | null>(
-    () => targetCache.get(key) ?? null,
-  );
+  const [targets, setTargets] = useState<readonly Target[] | undefined>(() => targetCache.get(key));
   useEffect(() => {
     if (!name) {
       setTargets([]);
@@ -156,7 +158,7 @@ function ReferenceField({ field, value, context, onChange }: FieldProps) {
         value={selected}
         onChange={(event) => {
           const next = event.target.value;
-          onChange(next === '' ? (field.nullable ? null : undefined) : next);
+          onChange(next === '' ? (field.nullable ? NULL_DATA : undefined) : next);
         }}
       >
         <option value="">{field.nullable ? 'None' : 'Choose an entry…'}</option>
@@ -430,12 +432,12 @@ function unionFields(
 
 function ListField(props: FieldProps) {
   const values = Array.isArray(props.value) ? props.value : [];
-  const [openIndex, setOpenIndex] = useState<number | null>(null);
+  const [openIndex, setOpenIndex] = useState<number | undefined>(undefined);
   const item = props.field.item;
   const minimum = props.field.constraints.minItems ?? 0;
   const maximum = props.field.constraints.maxItems ?? Number.MAX_SAFE_INTEGER;
-  const move = (from: number | null, to: number | null): void => {
-    if (from === null || to === null || from === to) {
+  const move = (from: number, to: number): void => {
+    if (from === to) {
       return;
     }
     const next = [...values];
@@ -509,13 +511,13 @@ function SimpleList(props: ListProps) {
 }
 
 interface ComplexListProps extends ListProps {
-  readonly openIndex: number | null;
-  readonly setOpenIndex: React.Dispatch<React.SetStateAction<number | null>>;
+  readonly openIndex: number | undefined;
+  readonly setOpenIndex: React.Dispatch<React.SetStateAction<number | undefined>>;
   readonly reorder: ReturnType<typeof useListReorder>;
 }
 
 function ComplexList(props: ComplexListProps) {
-  const openValue = props.openIndex === null ? undefined : props.values[props.openIndex];
+  const openValue = props.openIndex === undefined ? undefined : props.values[props.openIndex];
   return (
     <div className="cms-repeater">
       {props.values.map((value, index) => (
@@ -523,7 +525,7 @@ function ComplexList(props: ComplexListProps) {
           key={index}
           className={`cms-repeat-row ${props.reorder.rowClass(index)}`}
           {...props.reorder.rowProps(index)}
-          onClick={() => props.setOpenIndex(index === props.openIndex ? null : index)}
+          onClick={() => props.setOpenIndex(index === props.openIndex ? undefined : index)}
         >
           <span className="cms-repeat-grip">
             <DragIcon size={11} />
@@ -536,7 +538,7 @@ function ComplexList(props: ComplexListProps) {
             onClick={(event) => {
               event.stopPropagation();
               props.onChange(props.values.filter((_, itemIndex) => itemIndex !== index));
-              props.setOpenIndex(null);
+              props.setOpenIndex(undefined);
             }}
           >
             <CloseIcon size={10} />
@@ -544,7 +546,7 @@ function ComplexList(props: ComplexListProps) {
           <ChevronRightIcon size={10} />
         </div>
       ))}
-      {props.item && openValue !== undefined && props.openIndex !== null && (
+      {props.item && openValue !== undefined && props.openIndex !== undefined && (
         <div className="content-open-item">
           <FieldControl
             field={props.item}
@@ -620,7 +622,7 @@ function ScalarControl(props: FieldProps) {
       return (
         <input
           type={String(value ?? '').includes('T') ? 'text' : 'date'}
-          value={value == null ? '' : String(value)}
+          value={value === null || value === undefined ? '' : String(value)}
           onChange={(event) => onChange(event.target.value || undefined)}
         />
       );
@@ -664,7 +666,7 @@ function NumberField({ field, value, onChange }: FieldProps) {
 function EnumField({ field, value, onChange }: FieldProps) {
   return (
     <select
-      value={value == null ? '' : String(value)}
+      value={value === null || value === undefined ? '' : String(value)}
       onChange={(event) => onChange(event.target.value || undefined)}
     >
       {!field.required && <option value="">Not set</option>}
@@ -680,7 +682,7 @@ function EnumField({ field, value, onChange }: FieldProps) {
 function TextField({ field, value, onChange }: FieldProps) {
   return (
     <input
-      value={value == null ? '' : String(value)}
+      value={value === null || value === undefined ? '' : String(value)}
       placeholder={'default' in field ? String(field.default) : ''}
       spellCheck={field.control !== 'text'}
       onChange={(event) => onChange(event.target.value === '' ? undefined : event.target.value)}
@@ -779,7 +781,11 @@ export function FieldRow(props: FieldProps) {
   const present = props.value !== undefined;
   const issue =
     props.context.issueAt(props.path) ??
-    (present ? fieldIssue(props.field, props.value) : props.field.required ? 'Required' : null);
+    (present
+      ? fieldIssue(props.field, props.value)
+      : props.field.required
+        ? 'Required'
+        : undefined);
   const hint = hintFor(props.field);
   const synthesized = props.context.parsed && !props.context.inFile(props.path);
   const pathKey = props.path.join('.');
@@ -798,7 +804,7 @@ export function FieldRow(props: FieldProps) {
         <div className="content-issue">{issue}</div>
       ) : hint ? (
         <div className="content-hint">{hint}</div>
-      ) : null}
+      ) : undefined}
     </div>
   );
 }
@@ -834,7 +840,7 @@ function FieldHeader(
         <button
           className={`content-none ${props.value === null ? 'on' : ''}`}
           title="Write null — the key stays, with no value"
-          onClick={() => props.onChange(props.value === null ? blankFor(props.field) : null)}
+          onClick={() => props.onChange(props.value === null ? blankFor(props.field) : NULL_DATA)}
         >
           None
         </button>
@@ -849,7 +855,7 @@ function FieldHeader(
         </button>
       )}
       {props.synthesized && (
-        <span className="content-note" title={props.context.parserNote ?? undefined}>
+        <span className="content-note" title={props.context.parserNote}>
           from the parser
         </span>
       )}
@@ -857,14 +863,14 @@ function FieldHeader(
   );
 }
 
-export function issueAt(
+export function issueMessageAt(
   issues: readonly WireValidationIssue[],
   path: readonly (string | number)[],
-): string | null {
+): string | undefined {
   const found = issues.find(
     (issue) =>
       issue.path.length === path.length &&
       issue.path.every((part, index) => String(part) === String(path[index])),
   );
-  return found?.message ?? null;
+  return found?.message;
 }

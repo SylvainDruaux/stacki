@@ -35,18 +35,21 @@ export default function LeftRail({
   componentOpen = false,
 }: {
   readonly componentOpen?: boolean;
-  readonly active?: RailTab | null;
+  readonly active?: RailTab | undefined;
   readonly onSelect: (tab: RailTab) => void;
 }) {
-  const [tip, setTip] = useState<{
-    readonly id: RailTab;
-    readonly left: number;
-    readonly top: number;
-  } | null>(null); // {id, left, top}
+  const [tip, setTip] = useState<
+    | {
+        readonly id: RailTab;
+        readonly left: number;
+        readonly top: number;
+      }
+    | undefined
+  >(undefined); // {id, left, top}
   const timerRef = useRef<ReturnType<typeof setTimeout>>();
 
-  const showSoon = (id: RailTab) => (e: MouseEvent<HTMLButtonElement>) => {
-    const rect = e.currentTarget.getBoundingClientRect();
+  const showSoon = (id: RailTab) => (event: MouseEvent<HTMLButtonElement>) => {
+    const rect = event.currentTarget.getBoundingClientRect();
     clearTimeout(timerRef.current);
     timerRef.current = setTimeout(
       () => setTip({ id, left: rect.right + 10, top: rect.top + rect.height / 2 }),
@@ -56,15 +59,15 @@ export default function LeftRail({
 
   const hide = () => {
     clearTimeout(timerRef.current);
-    setTip(null);
+    setTip(undefined);
   };
 
   useEffect(() => () => clearTimeout(timerRef.current), []);
 
-  useRailKeys(onSelect, componentOpen);
+  useRailKeys({ componentOpen }, onSelect);
   const tabs = TABS.filter((tab) => tab.id !== 'properties' || componentOpen);
 
-  const tipTab = tip && tabs.find((t) => t.id === tip.id);
+  const tipTab = tip && tabs.find((tab) => tab.id === tip.id);
 
   return (
     <div className="rail">
@@ -93,52 +96,55 @@ export default function LeftRail({
   );
 }
 
-function useRailKeys(onSelect: (tab: RailTab) => void, componentOpen: boolean): void {
+function useRailKeys(
+  { componentOpen }: { readonly componentOpen: boolean },
+  onSelect: (tab: RailTab) => void,
+): void {
   // P / Z / ⇧A / J / ⌥C / ⌥H toggle the panels (ignored while typing in a field).
   useEffect(() => {
-    const onKey = (e: KeyboardEvent): void => {
-      if (e.metaKey || e.ctrlKey) {
+    const onKey = (event: KeyboardEvent): void => {
+      if (event.metaKey || event.ctrlKey) {
         return;
       }
-      const t = e.target;
+      const target = event.target;
       if (
-        t instanceof HTMLElement &&
-        (t.tagName === 'INPUT' ||
-          t.tagName === 'TEXTAREA' ||
-          t.tagName === 'SELECT' ||
-          t.isContentEditable)
+        target instanceof HTMLElement &&
+        (target.tagName === 'INPUT' ||
+          target.tagName === 'TEXTAREA' ||
+          target.tagName === 'SELECT' ||
+          target.isContentEditable)
       ) {
         return;
       }
-      if (e.altKey) {
+      if (event.altKey) {
         // Matched on the physical key: Option rewrites e.key ("ç" for C,
         // "˙" for H), so e.key would never equal the letter.
-        if (e.code === 'KeyC') {
-          e.preventDefault();
+        if (event.code === 'KeyC') {
+          event.preventDefault();
           onSelect('cms');
-        } else if (e.code === 'KeyH') {
-          e.preventDefault();
+        } else if (event.code === 'KeyH') {
+          event.preventDefault();
           onSelect('history');
         }
         return;
       }
-      const k = e.key.toLowerCase();
-      let id: RailTab | null = null;
-      if (k === 'p' && !e.shiftKey) {
+      const key = event.key.toLowerCase();
+      let id: RailTab | undefined;
+      if (key === 'p' && !event.shiftKey) {
         id = 'pages';
-      } else if (k === 'z' && !e.shiftKey) {
+      } else if (key === 'z' && !event.shiftKey) {
         id = 'navigator';
-      } else if (k === 'a' && e.shiftKey) {
+      } else if (key === 'a' && event.shiftKey) {
         id = 'components';
-      } else if (k === 'k' && !e.shiftKey && componentOpen) {
+      } else if (key === 'k' && !event.shiftKey && componentOpen) {
         id = 'properties';
-      } else if (k === 'j' && !e.shiftKey) {
+      } else if (key === 'j' && !event.shiftKey) {
         id = 'assets';
-      } else if (k === 'c' && !e.shiftKey) {
+      } else if (key === 'c' && !event.shiftKey) {
         id = 'code';
       }
       if (id) {
-        e.preventDefault();
+        event.preventDefault();
         onSelect(id);
       }
     };

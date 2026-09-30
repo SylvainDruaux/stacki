@@ -1,5 +1,7 @@
 import type { PageModel, PageNode } from '../../shared/page-node';
 import type { Diagnostic } from '../../shared/source-projection';
+import { assert } from '../../shared/assert';
+import { LIMITS } from '../../shared/limits';
 import { treeBudget } from '../treeView';
 import { rowChildren, rowHost } from '../branches';
 
@@ -40,17 +42,18 @@ export function structureProjection(state: StructurePageState): StructureProject
 }
 
 export type DropLocation = {
-  readonly parentId: string | null;
+  /** The parent the drop lands inside; undefined for the page's root list. */
+  readonly parentId: string | undefined;
   readonly index: number;
 };
 
 export type DropTarget =
-  | { readonly kind: 'gap'; readonly parentId: string | null; readonly index: number }
+  | { readonly kind: 'gap'; readonly parentId: string | undefined; readonly index: number }
   | { readonly kind: 'into'; readonly intoId: string };
 
 export interface FoundNavigatorNode {
   readonly node: NavigatorNode;
-  readonly parent: NavigatorNode | null;
+  readonly parent: NavigatorNode | undefined;
   readonly siblings: readonly NavigatorNode[];
   readonly index: number;
 }
@@ -74,15 +77,15 @@ export function defaultCollapsed(node: NavigatorNode): boolean {
 export function findNavigatorNode(
   nodes: readonly NavigatorNode[],
   id: string,
-): NavigatorNode | null {
+): NavigatorNode | undefined {
   return findNodeWalk(nodes, id, 0, treeBudget());
 }
 
 export function findVisibleNode(
   nodes: readonly NavigatorNode[],
   id: string,
-): FoundNavigatorNode | null {
-  return findVisibleWalk(nodes, id, null, 0, treeBudget());
+): FoundNavigatorNode | undefined {
+  return findVisibleWalk(nodes, id, undefined, 0, treeBudget());
 }
 
 export function navigatorAncestors(
@@ -92,12 +95,16 @@ export function navigatorAncestors(
   return findAncestorWalk(nodes, id, [], 0, treeBudget()) ?? [];
 }
 
+export interface CollapseOptions {
+  readonly collapsed: boolean;
+}
+
 export function collapseMap(
   nodes: readonly NavigatorNode[],
-  collapsed: boolean,
+  options: CollapseOptions,
 ): ReadonlyMap<string, boolean> {
   const result = new Map<string, boolean>();
-  collapseMapWalk(nodes, collapsed, result, 0, treeBudget());
+  collapseMapWalk(nodes, options, result, 0, treeBudget());
   return result;
 }
 
@@ -106,7 +113,8 @@ function findNodeWalk(
   id: string,
   depth: number,
   visit: (depth: number) => void,
-): NavigatorNode | null {
+): NavigatorNode | undefined {
+  assert(depth <= LIMITS.treeDepthMax, 'Navigator: tree depth limit exceeded');
   for (const node of nodes) {
     visit(depth);
     if (node.id === id) {
@@ -118,16 +126,17 @@ function findNodeWalk(
       return found;
     }
   }
-  return null;
+  return undefined;
 }
 
 function findVisibleWalk(
   nodes: readonly NavigatorNode[],
   id: string,
-  parent: NavigatorNode | null,
+  parent: NavigatorNode | undefined,
   depth: number,
   visit: (depth: number) => void,
-): FoundNavigatorNode | null {
+): FoundNavigatorNode | undefined {
+  assert(depth <= LIMITS.treeDepthMax, 'Navigator: tree depth limit exceeded');
   for (const [index, node] of nodes.entries()) {
     visit(depth);
     if (node.id === id) {
@@ -138,7 +147,7 @@ function findVisibleWalk(
       return found;
     }
   }
-  return null;
+  return undefined;
 }
 
 function findAncestorWalk(
@@ -148,6 +157,7 @@ function findAncestorWalk(
   depth: number,
   visit: (depth: number) => void,
 ): readonly NavigatorNode[] | undefined {
+  assert(depth <= LIMITS.treeDepthMax, 'Navigator: tree depth limit exceeded');
   for (const node of nodes) {
     visit(depth);
     if (node.id === id) {
@@ -163,17 +173,18 @@ function findAncestorWalk(
 
 function collapseMapWalk(
   nodes: readonly NavigatorNode[],
-  collapsed: boolean,
+  options: CollapseOptions,
   result: Map<string, boolean>,
   depth: number,
   visit: (depth: number) => void,
 ): void {
+  assert(depth <= LIMITS.treeDepthMax, 'Navigator: tree depth limit exceeded');
   for (const node of nodes) {
     visit(depth);
     const children = navigatorChildren(node);
     if (children.length > 0) {
-      result.set(node.id, collapsed);
-      collapseMapWalk(children, collapsed, result, depth + 1, visit);
+      result.set(node.id, options.collapsed);
+      collapseMapWalk(children, options, result, depth + 1, visit);
     }
   }
 }

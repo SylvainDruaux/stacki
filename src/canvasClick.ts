@@ -1,8 +1,8 @@
 // What a click on the canvas means.
 //
 // The canvas answers a click with the path of the deepest node it can map under
-// the pointer, IN THE SCOPE OF THE OPEN FILE — or null when it can't map one at
-// all. Null is the interesting case, because it has two very different causes:
+// the pointer, IN THE SCOPE OF THE OPEN FILE — or nothing when it can't map one
+// at all. Nothing is the interesting case, because it has two very different causes:
 //
 //   the click landed somewhere this file doesn't own — the page around an open
 //   component, the layout's own header — which is somebody looking away from
@@ -20,13 +20,13 @@
 
 /**
  * @param {object} click
- * @param {string|null} click.path        what the canvas mapped, or null
+ * @param {string|undefined} click.path   what the canvas mapped, or undefined
  * @param {boolean} click.outside         it mapped something, but not in this
  *                                        file/instance — the canvas narrows to
  *                                        the instance being edited, so a click
  *                                        on the page around it arrives with no
  *                                        path and this flag
- * @param {string|null} click.focusPath   the instance being edited, or null
+ * @param {string|undefined} click.focusPath the instance being edited, or undefined
  * @param {string} click.scope            the open file's path prefix ('' for a page)
  * @returns {{ kind: 'inner'|'select'|'layout'|'close'|'nothing' }}
  *   inner   — a node in the component being edited: select it
@@ -41,9 +41,9 @@ export function canvasClickAction({
   focusPath,
   scope = '',
 }: {
-  readonly path?: string | null;
+  readonly path?: string | undefined;
   readonly outside?: boolean;
-  readonly focusPath?: string | null;
+  readonly focusPath?: string | undefined;
   readonly scope?: string;
 }): { readonly kind: 'inner' | 'select' | 'layout' | 'close' | 'nothing' } {
   if (focusPath) {

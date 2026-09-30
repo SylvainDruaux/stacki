@@ -26,16 +26,16 @@ interface ObjectEntry {
   readonly raw: string;
 }
 interface AttributeEditor extends FieldPosition {
-  readonly attr: string | null;
+  readonly attr: string | undefined;
 }
 interface ObjectEditor extends FieldPosition {
-  readonly index: number | null;
+  readonly index: number | undefined;
 }
 export type SetProp = (name: string, value: Attr | undefined, immediate?: boolean) => void;
 export type SetProps = (nodeId: string, values: PropValues) => void;
 interface ContextProps {
-  readonly projectPath?: string | null | undefined;
-  readonly bindCtx?: RichContext | null | undefined;
+  readonly projectPath?: string | undefined;
+  readonly bindContext?: RichContext | undefined;
 }
 interface AttributesSectionProps extends ContextProps {
   readonly node: AttributeNode;
@@ -50,7 +50,7 @@ interface AttrEditorProps extends ContextProps {
   readonly value: string;
   readonly syntax: 'pair' | 'spread';
   readonly isNew: boolean;
-  readonly dataCtx?: SourceContext | null | undefined;
+  readonly dataContext?: SourceContext | undefined;
   readonly onCommitName: (name: string) => void;
   readonly onCommitPair: (name: string, value: string) => void;
   readonly onCommitMany: (pairs: readonly AttributePair[]) => void;
@@ -64,8 +64,12 @@ interface ObjectAttrsFieldProps extends ContextProps {
   readonly onCommit: (entries: readonly ObjectEntry[]) => void;
 }
 
-const decodeAttr = (v: Attr | null | undefined) =>
-  v == null || v.type === 'bare' ? '' : v.type === 'expr' ? `{${v.value}}` : String(v.value);
+const decodeAttr = (attribute: Attr | undefined) =>
+  attribute === undefined || attribute.type === 'bare'
+    ? ''
+    : attribute.type === 'expr'
+      ? `{${attribute.value}}`
+      : String(attribute.value);
 
 const attributeDisplayName = (name: string, value: Attr | undefined): string =>
   value?.type === 'spread' ? `{...${value.value}}` : name;
@@ -74,9 +78,9 @@ const encodeAttr = (text: string): Attr => {
   if (text === '') {
     return { type: 'bare' };
   }
-  const m = text.match(/^\{([\s\S]*)\}$/);
-  if (m) {
-    return { type: 'expr', value: (m[1] ?? '').trim() };
+  const match = text.match(/^\{([\s\S]*)\}$/);
+  if (match) {
+    return { type: 'expr', value: (match[1] ?? '').trim() };
   }
   return { type: 'string', value: text };
 };
@@ -94,7 +98,7 @@ export function AttributesSection(props: AttributesSectionProps) {
           <BracesIcon size={12} className="prop-label-icon" />
           Attributes
         </span>
-        <button className="ghost" title="Add attribute" onClick={() => openEditor(null)}>
+        <button className="ghost" title="Add attribute" onClick={() => openEditor(undefined)}>
           <PlusIcon size={12} />
         </button>
       </div>
@@ -120,10 +124,10 @@ export function AttributesSection(props: AttributesSectionProps) {
                 <button
                   className="row-action"
                   title="Delete attribute"
-                  onClick={(e) => {
-                    e.stopPropagation();
+                  onClick={(event) => {
+                    event.stopPropagation();
                     if (editor?.attr === name) {
-                      setEditor(null);
+                      setEditor(undefined);
                     }
                     onSetProp(name, undefined, true);
                   }}
@@ -144,10 +148,10 @@ export function AttributesSection(props: AttributesSectionProps) {
 function useAttributesSection(props: AttributesSectionProps) {
   const { names } = props;
   assert(names.length <= LIMITS.attrsPerNodeMax, 'Attributes: name limit exceeded');
-  const [editor, setEditor] = useState<AttributeEditor | null>(null);
-  const listRef = useRef<HTMLDivElement | null>(null);
+  const [editor, setEditor] = useState<AttributeEditor | undefined>(undefined);
+  const listRef = useRef<HTMLDivElement>(null);
 
-  const openEditor = (attr: string | null) => {
+  const openEditor = (attr: string | undefined) => {
     const rect = listRef.current?.getBoundingClientRect();
     setEditor({
       attr,
@@ -161,9 +165,9 @@ function useAttributesSection(props: AttributesSectionProps) {
 }
 type AttributesState = ReturnType<typeof useAttributesSection>;
 function AttributesSectionPopup({ state }: { readonly state: AttributesState }) {
-  const { node, projectPath, bindCtx, onSetProp, onRenameProp, editor, setEditor } = state;
+  const { node, projectPath, bindContext, onSetProp, onRenameProp, editor, setEditor } = state;
   if (!editor) {
-    return null;
+    return undefined;
   }
   const value = editor.attr ? node.props?.[editor.attr] : undefined;
   const syntax = value?.type === 'spread' ? 'spread' : 'pair';
@@ -171,24 +175,24 @@ function AttributesSectionPopup({ state }: { readonly state: AttributesState }) 
     <AttrEditor
       key={editor.attr ?? '__new'}
       pos={editor}
-      projectPath={projectPath ?? null}
-      bindCtx={bindCtx}
-      dataCtx={bindCtx}
+      projectPath={projectPath ?? undefined}
+      bindContext={bindContext}
+      dataContext={bindContext}
       name={attributeDisplayName(editor.attr ?? '', value)}
       value={syntax === 'pair' ? decodeAttr(value) : ''}
       syntax={syntax}
-      isNew={editor.attr === null}
+      isNew={editor.attr === undefined}
       onCommitName={(newName) => {
         const clean = newName.trim();
-        if (editor.attr === null) {
+        if (editor.attr === undefined) {
           // New attribute: created once a valid name exists.
           if (clean && !node.props?.[clean]) {
             onSetProp(clean, { type: 'bare' }, true);
-            setEditor((current) => (current ? { ...current, attr: clean } : null));
+            setEditor((current) => (current ? { ...current, attr: clean } : undefined));
           }
         } else if (clean && clean !== editor.attr) {
           onRenameProp(editor.attr, clean);
-          setEditor((current) => (current ? { ...current, attr: clean } : null));
+          setEditor((current) => (current ? { ...current, attr: clean } : undefined));
         }
       }}
       onChangeValue={(text) => {
@@ -208,13 +212,13 @@ function AttributesSectionPopup({ state }: { readonly state: AttributesState }) 
           onRenameProp(editor.attr, clean);
         }
         onSetProp(clean, encodeAttr(text), true);
-        setEditor((current) => (current ? { ...current, attr: clean } : null));
+        setEditor((current) => (current ? { ...current, attr: clean } : undefined));
       }}
       // Several pairs pasted at once — written together so it is one undo,
       // and the editor closes because there is no single attribute left
       // for it to be editing.
       onCommitMany={(pairs) => attributesCommitMany(state, pairs)}
-      onClose={() => setEditor(null)}
+      onClose={() => setEditor(undefined)}
     />
   );
 }
@@ -235,11 +239,11 @@ function attributesCommitMany(state: AttributesState, pairs: readonly AttributeP
   if (onSetProps) {
     onSetProps(node.id, patch);
   } else {
-    for (const [k, v] of Object.entries(patch)) {
-      onSetProp(k, v, true);
+    for (const [key, value] of Object.entries(patch)) {
+      onSetProp(key, value, true);
     }
   }
-  setEditor(null);
+  setEditor(undefined);
 }
 
 const ATTR_PASTE_RE =
@@ -251,29 +255,29 @@ export function parseAttrPaste(text: string): readonly AttributePair[] {
   }
   const out: AttributePair[] = [];
   ATTR_PASTE_RE.lastIndex = 0;
-  let m;
-  while ((m = ATTR_PASTE_RE.exec(text)) !== null) {
-    if (!m[0].trim()) {
+  let match;
+  while ((match = ATTR_PASTE_RE.exec(text)) !== null) {
+    if (!match[0].trim()) {
       continue;
     }
-    const value = m[2] ?? m[3] ?? m[4] ?? m[5];
+    const value = match[2] ?? match[3] ?? match[4] ?? match[5];
     if (out.length === LIMITS.attrsPerNodeMax) {
       return [];
     }
-    out.push({ name: m[1] ?? '', value: value === undefined ? '' : value });
+    out.push({ name: match[1] ?? '', value: value === undefined ? '' : value });
   }
   return out;
 }
 
 function AttrEditor(props: AttrEditorProps) {
   const state = useAttrEditor(props);
-  const { ref, pos, syntax, isStyleValue, assetMode, setAssetMode } = state;
+  const { ref, pos: position, syntax, isStyleValue, assetMode, setAssetMode } = state;
 
   return (
     <div
       ref={ref}
       className="attr-editor"
-      style={{ top: pos.top, left: pos.left, width: pos.width }}
+      style={{ top: position.top, left: position.left, width: position.width }}
     >
       <AttributeName state={state} />
       {/* The field sits beside its label like the name row, whichever kind it
@@ -287,7 +291,7 @@ function AttrEditor(props: AttrEditorProps) {
           <button
             className={`attr-asset-toggle ${assetMode ? 'on' : ''}`}
             title={assetMode ? 'Edit as a plain value' : 'Choose a file from public/'}
-            onClick={() => setAssetMode((v) => !v)}
+            onClick={() => setAssetMode((previous) => !previous)}
           >
             <ElementImageIcon size={12} />
           </button>
@@ -298,21 +302,21 @@ function AttrEditor(props: AttrEditorProps) {
 }
 
 function useAttrEditor(props: AttrEditorProps) {
-  const { name, value, syntax, isNew, bindCtx, onCommitName, onClose } = props;
+  const { name, value, syntax, isNew, bindContext, onCommitName, onClose } = props;
   const [draftName, setDraftName] = useState(name);
   const [draftValue, setDraftValue] = useState(value);
-  const ref = useRef<HTMLDivElement | null>(null);
+  const ref = useRef<HTMLDivElement>(null);
   // Where the purple dot's picker sits, and the field's own insert-at-the-caret
   // handle — the same pair every schema-driven field uses (see PropField).
-  const [insertAt, setInsertAt] = useState<FieldPosition | null>(null);
+  const [insertAt, setInsertAt] = useState<FieldPosition | undefined>(undefined);
   // Where the bigger value editor sits, when `=` has asked for one.
-  const [bigAt, setBigAt] = useState<FieldPosition | null>(null);
+  const [bigAt, setBigAt] = useState<FieldPosition | undefined>(undefined);
   // What this value can name, for the completions and the chips — the same list
   // the picker beside the field offers.
-  const scope = scopeCompletions(bindCtx || {});
-  const scopeNames = new Set(scope.map((c) => c.label.split('.')[0] ?? ''));
+  const scope = scopeCompletions(bindContext || {});
+  const scopeNames = new Set(scope.map((completion) => completion.label.split('.')[0] ?? ''));
   const chipsInScope = (text: string) => scopeChips(text, scopeNames);
-  const bindApiRef = useRef<InsertAPI | null>(null);
+  const bindApiRef = useRef<InsertAPI | undefined>(undefined);
 
   // Whether the value is an {expression} is settled when the popover opens,
   // so the field can't change shape halfway through typing one. The name is
@@ -368,13 +372,16 @@ function useAttrEditor(props: AttrEditorProps) {
 type AttributeState = ReturnType<typeof useAttrEditor>;
 function useAttrEditorDismiss(ref: RefObject<HTMLElement>, onClose: () => void) {
   useEffect(() => {
-    const onDown = (e: MouseEvent) => {
-      if (ref.current && !(e.target instanceof window.Node && ref.current.contains(e.target))) {
+    const onDown = (event: MouseEvent) => {
+      if (
+        ref.current &&
+        !(event.target instanceof window.Node && ref.current.contains(event.target))
+      ) {
         onClose();
       }
     };
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
         onClose();
       }
     };
@@ -406,11 +413,11 @@ function AttributeName({ state }: { readonly state: AttributeState }) {
         readOnly={syntax === 'spread'}
         placeholder="data-attribute"
         spellCheck={false}
-        onPaste={(e) => {
+        onPaste={(event) => {
           if (syntax === 'spread') {
             return;
           }
-          const text = e.clipboardData.getData('text');
+          const text = event.clipboardData.getData('text');
           // Only when it actually looks like markup — a plain name paste
           // must keep behaving like a paste into a text box.
           if (!text || !/=/.test(text)) {
@@ -420,7 +427,7 @@ function AttributeName({ state }: { readonly state: AttributeState }) {
           if (!pairs.length) {
             return;
           }
-          e.preventDefault();
+          event.preventDefault();
           const pair = pairs[0];
           if (pairs.length === 1 && pair) {
             setDraftName(pair.name);
@@ -430,9 +437,9 @@ function AttributeName({ state }: { readonly state: AttributeState }) {
             onCommitMany(pairs);
           }
         }}
-        onChange={(e) => setDraftName(e.target.value.replace(/[^\w@:.-]/g, ''))}
+        onChange={(event) => setDraftName(event.target.value.replace(/[^\w@:.-]/g, ''))}
         onBlur={commitName}
-        onKeyDown={(e) => e.key === 'Enter' && (commitName(), e.currentTarget.blur())}
+        onKeyDown={(event) => event.key === 'Enter' && (commitName(), event.currentTarget.blur())}
       />
     </div>
   );
@@ -468,9 +475,9 @@ function AttributeValue({ state }: { readonly state: AttributeState }) {
         showModeToggle={false}
         mediaKind={mediaKindFor(draftValue)}
         projectPath={projectPath ?? ''}
-        onChange={(v) => {
-          setDraftValue(v);
-          onChangeValue(v);
+        onChange={(value) => {
+          setDraftValue(value);
+          onChangeValue(value);
         }}
       />
     </div>
@@ -489,15 +496,15 @@ function AttributeBinding({ state }: { readonly state: AttributeState }) {
     draftValue,
     setDraftValue,
     onChangeValue,
-    bindCtx,
-    dataCtx,
+    bindContext,
+    dataContext,
     bindApiRef,
     insertAt,
     setInsertAt,
     ref,
     setBigAt,
   } = state;
-  const valueRef = useRef<HTMLDivElement | null>(null);
+  const valueRef = useRef<HTMLDivElement>(null);
   return (
     <>
       <div ref={valueRef} className="attr-value-field">
@@ -508,8 +515,8 @@ function AttributeBinding({ state }: { readonly state: AttributeState }) {
           // stores it as bare on the way out.
           value={draftValue === '' ? { type: 'string', value: '' } : encodeAttr(draftValue)}
           placeholder="Type, or insert data"
-          bindCtx={bindCtx}
-          dataCtx={dataCtx}
+          bindContext={bindContext}
+          dataContext={dataContext}
           wrapCode
           apiRef={bindApiRef}
           onChange={(next) => {
@@ -526,17 +533,17 @@ function AttributeBinding({ state }: { readonly state: AttributeState }) {
           active={!!insertAt}
           onOpen={(host) => {
             if (insertAt) {
-              setInsertAt(null);
+              setInsertAt(undefined);
               return;
             }
-            const r = (host || ref.current)?.getBoundingClientRect();
-            if (!r) {
+            const rect = (host || ref.current)?.getBoundingClientRect();
+            if (!rect) {
               return;
             }
             setInsertAt({
-              left: r.left,
-              top: Math.min(r.bottom + 4, Math.max(60, window.innerHeight - 340)),
-              width: Math.max(r.width, 240),
+              left: rect.left,
+              top: Math.min(rect.bottom + 4, Math.max(60, window.innerHeight - 340)),
+              width: Math.max(rect.width, 240),
             });
           }}
         />
@@ -576,7 +583,7 @@ function AttributePopups({ state }: { readonly state: AttributeState }) {
     draftValue,
     scope,
     chipsInScope,
-    bindCtx,
+    bindContext,
     setDraftValue,
     onChangeValue,
     setBigAt,
@@ -593,20 +600,20 @@ function AttributePopups({ state }: { readonly state: AttributeState }) {
           value={draftValue}
           scope={scope}
           chipsOf={chipsInScope}
-          bindCtx={bindCtx}
+          bindContext={bindContext}
           onChange={(text) => {
             setDraftValue(text);
             onChangeValue(text);
           }}
-          onClose={() => setBigAt(null)}
+          onClose={() => setBigAt(undefined)}
         />
-      ) : null}
+      ) : undefined}
       {insertAt ? (
         <FieldDataPicker
           pos={insertAt}
-          bindCtx={bindCtx}
+          bindContext={bindContext}
           onPick={(path) => {
-            setInsertAt(null);
+            setInsertAt(undefined);
             // Into the caret when the field has one, so a chip lands beside
             // what is already typed; otherwise this is the value's first
             // binding and it becomes the whole of it.
@@ -618,28 +625,28 @@ function AttributePopups({ state }: { readonly state: AttributeState }) {
             setDraftValue(text);
             onChangeValue(text);
           }}
-          onClose={() => setInsertAt(null)}
+          onClose={() => setInsertAt(undefined)}
         />
-      ) : null}
+      ) : undefined}
     </>
   );
 }
 
-export function parseObjectLiteral(input: unknown): readonly ObjectEntry[] | null {
-  const t = String(input ?? '').trim();
-  if (t.length > LIMITS.attrCharsMax) {
-    return null;
+export function parseObjectLiteral(input: unknown): readonly ObjectEntry[] | undefined {
+  const text = String(input ?? '').trim();
+  if (text.length > LIMITS.attrCharsMax) {
+    return undefined;
   }
-  const m = t.match(/^\{([\s\S]*)\}$/);
-  if (!m) {
-    return t === '' ? [] : null;
+  const match = text.match(/^\{([\s\S]*)\}$/);
+  if (!match) {
+    return text === '' ? [] : undefined;
   }
-  const inner = (m[1] ?? '').trim();
+  const inner = (match[1] ?? '').trim();
   if (!inner) {
     return [];
   }
   if (/[{}]|\.\.\./.test(inner)) {
-    return null;
+    return undefined;
   }
   const entries = [];
   const re = new RegExp(
@@ -647,18 +654,18 @@ export function parseObjectLiteral(input: unknown): readonly ObjectEntry[] | nul
       /("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|`(?:[^`\\]|\\.)*`|[^,]+?)\s*(?:,|$)/.source,
     'y',
   );
-  let pos = 0;
-  while (pos < inner.length) {
-    re.lastIndex = pos;
+  let position = 0;
+  while (position < inner.length) {
+    re.lastIndex = position;
     const em = re.exec(inner);
     if (!em) {
-      return null;
+      return undefined;
     }
     if (entries.length === LIMITS.attrsPerNodeMax) {
-      return null;
+      return undefined;
     }
     entries.push({ key: em[1] ?? em[2] ?? em[3] ?? '', raw: (em[4] ?? '').trim() });
-    pos = re.lastIndex;
+    position = re.lastIndex;
   }
   return entries;
 }
@@ -666,7 +673,10 @@ export function parseObjectLiteral(input: unknown): readonly ObjectEntry[] | nul
 export function serializeObjectLiteral(entries: readonly ObjectEntry[]) {
   assert(entries.length <= LIMITS.attrsPerNodeMax, 'Object attributes: entry limit exceeded');
   const body = entries
-    .map((e) => `${/^[A-Za-z_$][\w$]*$/.test(e.key) ? e.key : JSON.stringify(e.key)}: ${e.raw}`)
+    .map((entry) => {
+      const key = /^[A-Za-z_$][\w$]*$/.test(entry.key) ? entry.key : JSON.stringify(entry.key);
+      return `${key}: ${entry.raw}`;
+    })
     .join(', ');
   const text = `{ ${body} }`;
   assert(text.length <= LIMITS.attrCharsMax, 'Object attributes: output limit exceeded');
@@ -674,9 +684,9 @@ export function serializeObjectLiteral(entries: readonly ObjectEntry[]) {
 }
 
 const decodeRaw = (raw: string) => {
-  const m = String(raw).match(/^"((?:[^"\\]|\\.)*)"$|^'((?:[^'\\]|\\.)*)'$/);
-  if (m) {
-    return (m[1] ?? m[2] ?? '').replace(/\\(.)/g, '$1');
+  const match = String(raw).match(/^"((?:[^"\\]|\\.)*)"$|^'((?:[^'\\]|\\.)*)'$/);
+  if (match) {
+    return (match[1] ?? match[2] ?? '').replace(/\\(.)/g, '$1');
   }
   return raw === 'true' ? '' : `{${raw}}`;
 };
@@ -685,9 +695,9 @@ const encodeRaw = (text: string) => {
   if (text === '') {
     return 'true';
   }
-  const m = text.match(/^\{([\s\S]*)\}$/);
-  if (m) {
-    return (m[1] ?? '').trim() || 'true';
+  const match = text.match(/^\{([\s\S]*)\}$/);
+  if (match) {
+    return (match[1] ?? '').trim() || 'true';
   }
   return `"${text.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
 };
@@ -700,7 +710,7 @@ export function ObjectAttrsField(props: ObjectAttrsFieldProps) {
     <div className="props-field" ref={listRef}>
       <div className="props-label-row">
         {pill}
-        <button className="ghost" title="Add attribute" onClick={() => openEditor(null)}>
+        <button className="ghost" title="Add attribute" onClick={() => openEditor(undefined)}>
           <PlusIcon size={12} />
         </button>
         {menu}
@@ -720,10 +730,10 @@ export function ObjectAttrsField(props: ObjectAttrsFieldProps) {
               <button
                 className="row-action"
                 title="Delete attribute"
-                onClick={(e) => {
-                  e.stopPropagation();
+                onClick={(event) => {
+                  event.stopPropagation();
                   if (editor?.index === i) {
-                    setEditor(null);
+                    setEditor(undefined);
                   }
                   onCommit(entries.filter((_, j) => j !== i));
                 }}
@@ -743,10 +753,10 @@ export function ObjectAttrsField(props: ObjectAttrsFieldProps) {
 function useObjectAttrsField(props: ObjectAttrsFieldProps) {
   const { entries } = props;
   assert(entries.length <= LIMITS.attrsPerNodeMax, 'Object attributes: entry limit exceeded');
-  const [editor, setEditor] = useState<ObjectEditor | null>(null);
-  const listRef = useRef<HTMLDivElement | null>(null);
+  const [editor, setEditor] = useState<ObjectEditor | undefined>(undefined);
+  const listRef = useRef<HTMLDivElement>(null);
 
-  const openEditor = (index: number | null) => {
+  const openEditor = (index: number | undefined) => {
     const rect = listRef.current?.getBoundingClientRect();
     setEditor({
       index,
@@ -760,38 +770,38 @@ function useObjectAttrsField(props: ObjectAttrsFieldProps) {
 }
 type ObjectAttributesState = ReturnType<typeof useObjectAttrsField>;
 function ObjectAttrsFieldPopup({ state }: { readonly state: ObjectAttributesState }) {
-  const { entries, bindCtx, projectPath, onCommit, editor, setEditor } = state;
+  const { entries, bindContext, projectPath, onCommit, editor, setEditor } = state;
   if (!editor) {
-    return null;
+    return undefined;
   }
   return (
     <AttrEditor
       key={editor.index ?? '__new'}
       pos={editor}
-      projectPath={projectPath ?? null}
-      bindCtx={bindCtx}
-      dataCtx={bindCtx}
-      name={editor.index != null ? (entries[editor.index]?.key ?? '') : ''}
-      value={editor.index != null ? decodeRaw(entries[editor.index]?.raw ?? '') : ''}
+      projectPath={projectPath ?? undefined}
+      bindContext={bindContext}
+      dataContext={bindContext}
+      name={editor.index !== undefined ? (entries[editor.index]?.key ?? '') : ''}
+      value={editor.index !== undefined ? decodeRaw(entries[editor.index]?.raw ?? '') : ''}
       syntax="pair"
-      isNew={editor.index == null}
+      isNew={editor.index === undefined}
       onCommitName={(newName) => {
         const clean = newName.trim();
         if (!clean) {
           return;
         }
-        if (editor.index == null) {
+        if (editor.index === undefined) {
           if (entries.some((en) => en.key === clean)) {
             return;
           }
           onCommit([...entries, { key: clean, raw: 'true' }]);
-          setEditor((current) => (current ? { ...current, index: entries.length } : null));
+          setEditor((current) => (current ? { ...current, index: entries.length } : undefined));
         } else if (clean !== entries[editor.index]?.key) {
           onCommit(entries.map((en, i) => (i === editor.index ? { ...en, key: clean } : en)));
         }
       }}
       onChangeValue={(text) => {
-        if (editor.index != null) {
+        if (editor.index !== undefined) {
           onCommit(
             entries.map((en, i) => (i === editor.index ? { ...en, raw: encodeRaw(text) } : en)),
           );
@@ -808,7 +818,7 @@ function ObjectAttrsFieldPopup({ state }: { readonly state: ObjectAttributesStat
           next.push(entry);
         }
         onCommit(next);
-        setEditor((current) => (current ? { ...current, index } : null));
+        setEditor((current) => (current ? { ...current, index } : undefined));
       }}
       onCommitMany={(pairs) => {
         const replacements = new Map(entries.map((entry) => [entry.key, entry]));
@@ -816,9 +826,9 @@ function ObjectAttrsFieldPopup({ state }: { readonly state: ObjectAttributesStat
           replacements.set(pair.name, { key: pair.name, raw: encodeRaw(pair.value) });
         }
         onCommit([...replacements.values()]);
-        setEditor(null);
+        setEditor(undefined);
       }}
-      onClose={() => setEditor(null)}
+      onClose={() => setEditor(undefined)}
     />
   );
 }

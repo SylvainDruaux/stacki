@@ -9,13 +9,14 @@ interface ReorderOptions {
   readonly disabled?: boolean;
 }
 interface ReorderState {
-  readonly rows: MutableRefObject<(HTMLElement | null)[]>;
-  readonly start: MutableRefObject<{ readonly index: number; readonly y: number } | null>;
-  readonly from: number | null;
-  readonly to: number | null;
-  readonly setFrom: (value: number | null) => void;
-  readonly setTo: (value: number | null) => void;
+  readonly rows: MutableRefObject<(HTMLElement | undefined)[]>;
+  readonly start: MutableRefObject<{ readonly index: number; readonly y: number } | undefined>;
+  readonly from: number | undefined;
+  readonly to: number | undefined;
+  readonly setFrom: (value: number | undefined) => void;
+  readonly setTo: (value: number | undefined) => void;
   readonly indexAt: (clientY: number) => number;
+  readonly arm: (index: number, y: number) => void;
   readonly finish: () => void;
 }
 type RowProps = HTMLAttributes<HTMLElement> & { readonly ref: RefCallback<HTMLElement> };
@@ -26,14 +27,14 @@ export default function useListReorder({ count, onMove, disabled = false }: Reor
   assert(Number.isSafeInteger(count), 'Reorder count must be a safe integer');
   assert(count >= 0, 'Reorder count must be nonnegative');
   assert(count <= LIMITS.scanEntriesMax, 'Reorder count exceeds bounds');
-  const [from, setFrom] = useState<number | null>(null);
-  const [to, setTo] = useState<number | null>(null);
-  const rows = useRef<(HTMLElement | null)[]>([]);
-  const start = useRef<{ readonly index: number; readonly y: number } | null>(null);
+  const [from, setFrom] = useState<number | undefined>(undefined);
+  const [to, setTo] = useState<number | undefined>(undefined);
+  const rows = useRef<(HTMLElement | undefined)[]>([]);
+  const start = useRef<{ readonly index: number; readonly y: number } | undefined>(undefined);
   const finish = useCallback(() => {
-    start.current = null;
-    setFrom(null);
-    setTo(null);
+    start.current = undefined;
+    setFrom(undefined);
+    setTo(undefined);
   }, []);
   const indexAt = useCallback(
     (clientY: number): number => {
@@ -51,7 +52,12 @@ export default function useListReorder({ count, onMove, disabled = false }: Reor
     },
     [count],
   );
-  const state = { rows, start, from, to, setFrom, setTo, indexAt, finish };
+  // A press arms the gesture; the drag starts once the pointer has moved far enough.
+  const arm = useCallback((index: number, y: number) => {
+    start.current = { index, y };
+    setTo(index);
+  }, []);
+  const state = { rows, start, from, to, setFrom, setTo, indexAt, arm, finish };
   useReorderEvents(state, onMove);
   useReorderCursor(from);
   useEffect(() => {
@@ -69,11 +75,11 @@ export default function useListReorder({ count, onMove, disabled = false }: Reor
 function useReorderEvents(state: ReorderState, onMove: ReorderOptions['onMove']): void {
   const { start, from, to, setFrom, setTo, indexAt, finish } = state;
   useEffect(() => {
-    if (start.current === null && from === null) {
+    if (start.current === undefined && from === undefined) {
       return undefined;
     }
     const move = (event: PointerEvent): void => {
-      if (from === null) {
+      if (from === undefined) {
         if (!start.current || Math.abs(event.clientY - start.current.y) < 4) {
           return;
         }
@@ -83,9 +89,9 @@ function useReorderEvents(state: ReorderState, onMove: ReorderOptions['onMove'])
       setTo(indexAt(event.clientY));
     };
     const up = (event: PointerEvent): void => {
-      const target = from === null ? null : indexAt(event.clientY);
+      const target = from === undefined ? undefined : indexAt(event.clientY);
       finish();
-      if (from !== null && target !== null) {
+      if (from !== undefined && target !== undefined) {
         onMove(from, target);
       }
     };
@@ -109,9 +115,9 @@ function useReorderEvents(state: ReorderState, onMove: ReorderOptions['onMove'])
   }, [start, from, to, setFrom, setTo, indexAt, onMove, finish]);
 }
 
-function useReorderCursor(from: number | null): void {
+function useReorderCursor(from: number | undefined): void {
   useEffect(() => {
-    if (from === null) {
+    if (from === undefined) {
       return undefined;
     }
     const previous = document.body.style.cursor;
@@ -122,12 +128,12 @@ function useReorderCursor(from: number | null): void {
   }, [from]);
 }
 
-function reorderRowRef(rows: ReorderState['rows'], index: number): RefCallback<HTMLElement> {
+function reorderRowRef(rowsRef: ReorderState['rows'], index: number): RefCallback<HTMLElement> {
   assert(Number.isSafeInteger(index), 'Reorder index must be a safe integer');
   assert(index >= 0, 'Reorder index must be nonnegative');
   assert(index <= LIMITS.scanEntriesMax, 'Reorder index exceeds bounds');
   return (element) => {
-    rows.current[index] = element;
+    rowsRef.current[index] = element ?? undefined;
   };
 }
 
@@ -145,15 +151,14 @@ function reorderRowProps(
       const control =
         event.target instanceof Element
           ? event.target.closest('button, input, textarea, select, a')
-          : null;
+          : undefined;
       if (control && !control.hasAttribute('data-drag-through')) {
         return;
       }
-      state.start.current = { index, y: event.clientY };
-      state.setTo(index);
+      state.arm(index, event.clientY);
     },
     onClickCapture: (event) => {
-      if (state.from !== null) {
+      if (state.from !== undefined) {
         event.preventDefault();
         event.stopPropagation();
       }
@@ -164,12 +169,12 @@ function reorderRowProps(
 function reorderRowClass(
   index: number,
   state: {
-    readonly from: number | null;
-    readonly to: number | null;
+    readonly from: number | undefined;
+    readonly to: number | undefined;
     readonly count: number;
   },
 ): string {
-  if (state.from === null || state.to === null) {
+  if (state.from === undefined || state.to === undefined) {
     return '';
   }
   const marks: string[] = [];

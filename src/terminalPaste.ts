@@ -1,10 +1,13 @@
 import { assert } from '../shared/assert';
 import { LIMITS } from '../shared/limits';
 
+// How a pasted path is written so the platform's shells read it as one argument.
+export type PathStyle = 'posix' | 'windows';
+
 export type PasteAction =
   | { readonly kind: 'text' }
   | { readonly kind: 'paths'; readonly text: string }
-  | { readonly kind: 'image'; readonly file: File | null };
+  | { readonly kind: 'image'; readonly file: File | undefined };
 
 // Decides what a paste (or drop) into the embedded terminal should do.
 //
@@ -27,28 +30,28 @@ export type PasteAction =
 //   { kind: 'text' }            — let xterm's normal text paste run
 //   { kind: 'paths', text }     — paste resolved filesystem path(s) as text
 //   { kind: 'image', file }     — persist file's bytes, paste the temp path.
-//                                 `file` is null when an image type was
+//                                 `file` is undefined when an image type was
 //                                 advertised with no backing blob; the caller
 //                                 then falls back to forwarding 0x16.
 
 // Backslash-escape the way Terminal.app and iTerm do when pasting a copied
 // file, so the path survives a shell prompt and matches the form CLIs already
 // parse from a native drag-drop.
-export function escapePosixPath(p: string): string {
-  return p.replace(/[^A-Za-z0-9_\-./]/g, (c) => `\\${c}`);
+export function escapePosixPath(path: string): string {
+  return path.replace(/[^A-Za-z0-9_\-./]/g, (character) => `\\${character}`);
 }
 
 // Match what Explorer's drag-drop produces. Windows filenames can't contain
 // double quotes, so plain wrapping is safe for PowerShell and CLIs alike.
-export function quoteWindowsPath(p: string): string {
-  return /[\s&()^%;,=]/.test(p) ? `"${p}"` : p;
+export function quoteWindowsPath(path: string): string {
+  return /[\s&()^%;,=]/.test(path) ? `"${path}"` : path;
 }
 
 export function decideTerminalPaste(
   items: Iterable<Pick<DataTransferItem, 'type' | 'kind' | 'getAsFile'>>,
   plainText: string,
-  getPathForFile: ((file: File) => string) | null | undefined,
-  isWindows: boolean,
+  getPathForFile: ((file: File) => string) | undefined,
+  pathStyle: PathStyle,
 ): PasteAction {
   // 1. Files copied in Finder/Explorer resolve to absolute paths — paste those,
   //    escaped like a native terminal would. At a shell prompt a full path
@@ -58,7 +61,7 @@ export function decideTerminalPaste(
   //    so path resolution comes back empty and it falls to the image branch.
   const paths = [];
   let hasImage = false;
-  let imageFile: File | null = null;
+  let imageFile: File | undefined;
   let count = 0;
   for (const item of items) {
     assert(++count <= LIMITS.scanEntriesMax, 'Clipboard item count exceeds limit');
@@ -81,18 +84,18 @@ export function decideTerminalPaste(
     if (!getPathForFile) {
       continue;
     }
-    let p = '';
+    let path = '';
     try {
-      p = getPathForFile(file) || '';
+      path = getPathForFile(file) || '';
     } catch {
       /* in-memory File with no filesystem backing */
     }
-    if (p) {
-      paths.push(p);
+    if (path) {
+      paths.push(path);
     }
   }
   if (paths.length > 0) {
-    const escape = isWindows ? quoteWindowsPath : escapePosixPath;
+    const escape = pathStyle === 'windows' ? quoteWindowsPath : escapePosixPath;
     return { kind: 'paths', text: paths.map(escape).join(' ') };
   }
 

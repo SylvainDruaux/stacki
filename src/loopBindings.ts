@@ -25,14 +25,14 @@ export interface LoopHead {
   readonly index: string;
 }
 
-export function splitMapHead(head: unknown): LoopHead | null {
-  const m = String(head).trim().match(MAP_HEAD_RE);
-  const data = m?.[1];
-  const item = m?.[2];
-  if (!m || data === undefined || item === undefined) {
-    return null;
+export function splitMapHead(head: unknown): LoopHead | undefined {
+  const match = String(head).trim().match(MAP_HEAD_RE);
+  const data = match?.[1];
+  const item = match?.[2];
+  if (!match || data === undefined || item === undefined) {
+    return undefined;
   }
-  return { data: data.trim(), item, index: m[3] || '' };
+  return { data: data.trim(), item, index: match[3] || '' };
 }
 
 // Whole identifier only: `service` but never the `service` in `x.service`
@@ -52,10 +52,10 @@ const renameInBraces = (text: unknown, from: string, to: string): string =>
 const loopHeadOf = (data: string, head: LoopHead): string =>
   `${data}.map((${head.item}${head.index ? `, ${head.index}` : ''}) => (`;
 
-// The children a node has, when it has a list of them (a void element's are
-// null, a text's absent).
+// The children a node has, when it has a list of them (a void element and a
+// text have none).
 function childrenOf(node: EditorNode): readonly EditorNode[] | undefined {
-  return node.children ?? undefined;
+  return node.children;
 }
 
 // The node with new children, only when it has a list to replace.
@@ -120,7 +120,7 @@ function renamedNode(node: EditorNode, from: string, to: string, depth: number):
   switch (node.kind) {
     case 'map': {
       const head = splitMapHead(node.head);
-      if (head === null) {
+      if (head === undefined) {
         return below({ ...node, head: rename(node.head) }); // Custom head: best effort.
       }
       // Only the data expression is a reference; the parameters are this
@@ -157,14 +157,14 @@ function renamedNode(node: EditorNode, from: string, to: string, depth: number):
   }
 }
 
-// `data.map((item[, index]) => (` → its pieces, or null when the head is
+// `data.map((item[, index]) => (` → its pieces, or undefined when the head is
 // hand-written code the loop editor can't model.
 export const parseLoopHead = splitMapHead;
 
-// Whether `expr` reads from the variable `v` (`service`, `service.tags`) —
+// Whether `expr` reads from the variable `name` (`service`, `service.tags`) —
 // not merely contains its letters (`services`, `x.service`).
-const readsVar = (expr: unknown, v: string): boolean =>
-  identifierPattern(v).test(String(expr || ''));
+const readsVar = (expr: unknown, name: string): boolean =>
+  identifierPattern(name).test(String(expr || ''));
 
 /** The nodes with every loop that reads one of `vars` pointed at an empty
  * array. Switching a loop's data source orphans any loop beneath it that reads
@@ -194,20 +194,20 @@ function disconnectedNode(node: EditorNode, vars: readonly string[], depth: numb
     withChildren(next, (children) => disconnectedList(children, active, depth + 1));
   if (node.kind === 'map') {
     const head = parseLoopHead(node.head);
-    const reads = head !== null && vars.some((v) => readsVar(head.data, v));
+    const reads = head !== undefined && vars.some((name) => readsVar(head.data, name));
     const next = reads ? { ...node, head: loopHeadOf('[]', head) } : node;
     // The declarations are left alone: an empty list never calls the
     // callback, so nothing in there can run, and the code is still what the
     // user wrote for when they point it at data again. A nested loop that
     // reuses the name shadows it, so anything deeper refers to the inner one.
     const shadowed = new Set([head?.item, head?.index].filter(Boolean));
-    const rest = vars.filter((v) => !shadowed.has(v));
+    const rest = vars.filter((name) => !shadowed.has(name));
     return rest.length > 0 ? below(next, rest) : next;
   }
   if (node.kind === 'cond') {
     // A condition reading the item: false renders the else branch instead of
     // throwing.
-    const reads = vars.some((v) => readsVar(node.test, v));
+    const reads = vars.some((name) => readsVar(node.test, name));
     return below(reads ? { ...node, test: 'false' } : node, vars);
   }
   return below(node, vars);
@@ -219,7 +219,7 @@ function findPath(
   id: string,
   trail: readonly EditorNode[],
   depth: number,
-): readonly EditorNode[] | null {
+): readonly EditorNode[] | undefined {
   assert(depth <= LIMITS.treeDepthMax, `findPath: depth ${depth} exceeds parser cap`);
   for (const node of nodes) {
     const next = [...trail, node];
@@ -227,20 +227,20 @@ function findPath(
       return next;
     }
     const children = childrenOf(node);
-    const hit = children === undefined ? null : findPath(children, id, next, depth + 1);
+    const hit = children === undefined ? undefined : findPath(children, id, next, depth + 1);
     if (hit) {
       return hit;
     }
   }
-  return null;
+  return undefined;
 }
 
 // The loop variables in scope at a node: every enclosing map's item/index.
 export function loopVarsAt(nodes: readonly EditorNode[], id: string): string[] {
   const path = findPath(nodes, id, [], 0) ?? [];
   const vars = path.slice(0, -1).flatMap((node) => {
-    const head = node.kind === 'map' ? parseLoopHead(node.head) : null;
-    return [head?.item, head?.index].filter((v): v is string => Boolean(v));
+    const head = node.kind === 'map' ? parseLoopHead(node.head) : undefined;
+    return [head?.item, head?.index].filter((name): name is string => Boolean(name));
   });
   return [...new Set(vars)];
 }
@@ -365,9 +365,9 @@ function strippedLoop(
   reads: (code: string) => boolean,
 ): StrippedOwn {
   const head = parseLoopHead(node.head);
-  const repoint = head !== null && reads(head.data);
+  const repoint = head !== undefined && reads(head.data);
   const pointed = repoint ? { ...node, head: loopHeadOf('[]', head) } : node;
-  const below = active.filter((v) => v !== head?.item && v !== head?.index);
+  const below = active.filter((name) => name !== head?.item && name !== head?.index);
   if (below.length === 0 || node.body === undefined) {
     return { node: pointed, removed: repoint ? 1 : 0, below };
   }
@@ -377,7 +377,7 @@ function strippedLoop(
   // it's assigned, the same placeholder a lost text binding gets.
   const stillReads = (code: string): boolean => below.some((x) => readsVar(code, x));
   const body = node.body.map((line) => {
-    const declaration = stillReads(line) ? line.match(/^((?:const|let)\s+[^=]+=\s*)/) : null;
+    const declaration = stillReads(line) ? line.match(/^((?:const|let)\s+[^=]+=\s*)/) : undefined;
     return declaration ? `${declaration[1] ?? ''}'${UNBOUND_TEXT}';` : line;
   });
   const swapped = body.filter((line, index) => line !== node.body?.[index]).length;

@@ -28,7 +28,7 @@ interface PropertyEditorProps {
 }
 export function PropertyEditor(props: PropertyEditorProps) {
   const editorRef = useRef<HTMLDivElement>(null);
-  useDismiss(editorRef, props.access !== 'saving', props.onClose);
+  useDismiss(editorRef, { active: props.access !== 'saving' }, props.onClose);
   const draft = usePropertyEditorDraft(props);
   return (
     <div className="property-editor" ref={editorRef}>

@@ -15,17 +15,24 @@ export type Drag =
       readonly tag?: string;
     };
 
-// One window owns this single slot; null preserves the existing clear protocol.
-let current: Drag | null = null;
+// One window owns this single slot; `undefined` means nothing is being dragged.
+let current: Drag | undefined;
 
-export function setDrag(info: Drag | null | undefined): void {
-  current = info || null;
+export function setDrag(info: Drag | undefined): void {
+  current = info;
 }
 
 export function clearDrag(): void {
-  current = null;
+  current = undefined;
 }
 
-export function getDrag(): Drag | null {
+export function getDrag(): Drag | undefined {
   return current;
+}
+
+/** What a drag may do where it lands. DataTransfer is the platform's record of
+ * the drag, and the drag API takes the effect as an assignment on it. */
+export function allowDragEffect(transfer: DataTransfer, effect: 'move' | 'copy'): void {
+  // eslint-disable-next-line no-param-reassign -- The drag API is an assignment on DataTransfer.
+  transfer.effectAllowed = effect;
 }

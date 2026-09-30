@@ -43,14 +43,14 @@ export function NewPageModal({
 }: {
   readonly layouts: readonly ScanComponent[];
   readonly onClose: () => void;
-  readonly onCreate: (name: string, layout: string | null) => void;
+  readonly onCreate: (name: string, layout: string | undefined) => void;
 }) {
   const [name, setName] = useState('');
   const [layout, setLayout] = useState(layouts.at(0)?.name ?? '');
   const submit = (): void => {
     const clean = name.trim();
     if (clean) {
-      onCreate(clean, layout || null);
+      onCreate(clean, layout || undefined);
     }
   };
   return (

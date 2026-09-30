@@ -96,27 +96,31 @@ function useWindowRectangle() {
 
 function windowRectangleInitial(): Rectangle {
   // Proportional dimensions make real code usable while keeping the canvas visible.
-  const w = clamp(Math.round(window.innerWidth * 0.52), WIDTH_PX_MIN, 1040);
-  const h = clamp(Math.round(window.innerHeight * 0.78), HEIGHT_PX_MIN, window.innerHeight - 140);
-  return { x: Math.max(60, window.innerWidth - w - 80), y: 96, w, h };
+  const width = clamp(Math.round(window.innerWidth * 0.52), WIDTH_PX_MIN, 1040);
+  const height = clamp(
+    Math.round(window.innerHeight * 0.78),
+    HEIGHT_PX_MIN,
+    window.innerHeight - 140,
+  );
+  return { x: Math.max(60, window.innerWidth - width - 80), y: 96, w: width, h: height };
 }
 
 function windowRectangleResize(start: Rectangle, edge: Edge, dx: number, dy: number): Rectangle {
   // Mutation stays local to this calculation; the state is replaced atomically.
-  let { x, y, w, h } = start;
+  let { x, y, w: width, h: height } = start;
   if (edge.includes('e')) {
-    w = Math.max(WIDTH_PX_MIN, start.w + dx);
+    width = Math.max(WIDTH_PX_MIN, start.w + dx);
   }
   if (edge.includes('s')) {
-    h = Math.max(HEIGHT_PX_MIN, start.h + dy);
+    height = Math.max(HEIGHT_PX_MIN, start.h + dy);
   }
   if (edge.includes('w')) {
-    w = Math.max(WIDTH_PX_MIN, start.w - dx);
-    x = start.x + (start.w - w);
+    width = Math.max(WIDTH_PX_MIN, start.w - dx);
+    x = start.x + (start.w - width);
   }
   if (edge.includes('n')) {
-    h = Math.max(HEIGHT_PX_MIN, start.h - dy);
-    y = start.y + (start.h - h);
+    height = Math.max(HEIGHT_PX_MIN, start.h - dy);
+    y = start.y + (start.h - height);
   }
-  return { x, y, w, h };
+  return { x, y, w: width, h: height };
 }

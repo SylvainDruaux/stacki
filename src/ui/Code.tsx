@@ -22,7 +22,7 @@ import { appTheme, appHighlight } from './CodeEditor.jsx';
 // green in the editor, without a second palette to keep in step.
 
 /** The language for a path, by extension. */
-export function languageFor(filePath?: string | null) {
+export function languageFor(filePath?: string | undefined) {
   const ext = String(filePath || '')
     .toLowerCase()
     .match(/\.([a-z0-9]+)$/)?.[1];
@@ -49,11 +49,11 @@ export function languageFor(filePath?: string | null) {
     case 'tsx':
       return 'javascript';
     default:
-      return null;
+      return undefined;
   }
 }
 
-function extensionFor(language: string | null | undefined) {
+function extensionFor(language: string | undefined) {
   if (language === 'css') {
     return css();
   }
@@ -80,7 +80,7 @@ function extensionFor(language: string | null | undefined) {
   if (language === 'javascript') {
     return javascript({ typescript: true, jsx: true });
   }
-  return null;
+  return undefined;
 }
 
 /**
@@ -91,12 +91,12 @@ function extensionFor(language: string | null | undefined) {
  * same size, so a list of snippets does not jump around.
  */
 interface CodeProps {
-  readonly text?: string | null;
-  readonly language?: string | null;
-  readonly filename?: string | null;
+  readonly text?: string | undefined;
+  readonly language?: string | undefined;
+  readonly filename?: string | undefined;
   readonly maxHeight?: React.CSSProperties['maxHeight'];
 }
-export default function Code({ text, language, filename, maxHeight }: CodeProps) {
+export default function Code({ text, language, filename, maxHeight: heightMax }: CodeProps) {
   const hostRef = useRef<HTMLDivElement>(null);
   const lang = language || languageFor(filename);
 
@@ -129,7 +129,7 @@ export default function Code({ text, language, filename, maxHeight }: CodeProps)
     <div
       ref={hostRef}
       className="code-block"
-      style={maxHeight ? { maxHeight, overflow: 'auto' } : undefined}
+      style={heightMax ? { maxHeight: heightMax, overflow: 'auto' } : undefined}
     />
   );
 }

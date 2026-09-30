@@ -5,7 +5,6 @@ import {
   boolean,
   count,
   dictionary,
-  nullable,
   object,
   optional,
   pathText,
@@ -20,9 +19,9 @@ export interface VariableSelection {
   readonly index: number;
 }
 export interface VariableCell extends WireCell {
-  readonly ref?: string | null;
-  readonly resolved?: string | null;
-  readonly color?: string | null;
+  readonly ref?: string | undefined;
+  readonly resolved?: string | undefined;
+  readonly color?: string | undefined;
   readonly unknownColor?: boolean;
   readonly kind?: string;
 }
@@ -201,9 +200,9 @@ const cellShape = object({
   valueEnd: sourceOffset,
   line: count,
   column: variableText,
-  ref: optional(nullable(variableText)),
-  resolved: optional(nullable(variableText)),
-  color: optional(nullable(variableText)),
+  ref: optional(variableText),
+  resolved: optional(variableText),
+  color: optional(variableText),
   unknownColor: optional(boolean),
   kind: optional(variableText),
 });

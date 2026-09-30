@@ -32,6 +32,8 @@ export async function publishGitProject(
     }
   }
   request.onStep('Creating repository and pushing…');
-  const published = await createGitHubRepository(projectPath, payload.repoName, payload.isPrivate);
+  const published = await createGitHubRepository(projectPath, payload.repoName, {
+    isPrivate: payload.isPrivate,
+  });
   return published.ok ? { ok: true, value: published.value.url } : published;
 }

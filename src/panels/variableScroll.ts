@@ -14,7 +14,7 @@ export function createScrollSync() {
     echoing = false;
     cancelFrame = undefined;
   };
-  const register = (count: number, element: ScrollPeer | null) => {
+  const register = (count: number, element: ScrollPeer | undefined) => {
     assert(Number.isSafeInteger(count), 'Variable scroll: columns must be an integer');
     assert(count >= 0, 'Variable scroll: columns must be nonnegative');
     assert(count <= LIMITS.scanEntriesMax, 'Variable scroll: column limit exceeded');
