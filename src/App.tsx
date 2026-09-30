@@ -257,7 +257,7 @@ import {
 import { judgeCanvasEvent, type ShownFile } from './previewGate';
 import { describePreviewStale, type PreviewVerdict } from '../shared/preview-token';
 import type { JudgeCanvasEvent } from './panels/previewRuntime';
-import { describePreviewReload, type PreviewReloadReason } from './previewMessages';
+import { describePreviewReload, parseShortcutMessage, type PreviewReloadReason } from './previewMessages';
 
 // Each optional editor owns its loading boundary so opening it keeps the
 // canvas and neighboring panels visible and interactive.
@@ -2517,18 +2517,18 @@ export default function App() {
       if (!state?.editable) {
         return;
       }
-      const src = findNodeById(state.model.nodes, nodeId);
-      if (!src) {
+      const sourceNode = findNodeById(state.model.nodes, nodeId);
+      if (!sourceNode) {
         return;
       }
-      if (src.kind === 'chunk-group' || src.chunkFile) {
+      if (sourceNode.kind === 'chunk-group' || sourceNode.chunkFile) {
         showToast(
           'Chunk sections are defined in the page frontmatter and cannot be duplicated here.',
           'error'
         );
         return;
       }
-      const clone = withNewIds(src);
+      const clone = withNewIds(sourceNode);
       // Step 6, insert: the copy is the node's own bytes, spliced after it.
       commitEdit(duplicateGesture(nodeId, clone, { urgency: true }));
       setSelectedId(clone.id);
@@ -2724,31 +2724,45 @@ export default function App() {
     };
     const offMenu = window.avb.onMenu('insert', openIfEditable);
     const onMsg = (event: MessageEvent<unknown>): void => {
-      const message = toRecord(event.data);
-      if (message?.['type'] !== 'avb:shortcut') {return;}
-      if (message['name'] === 'insert') {openIfEditable();}
-      // Arrow keys pressed while the canvas iframe holds focus: replay them
-      // on the app window so tree navigation behaves the same whether the
-      // selection was made on the canvas or in the navigator.
-      else if (message['name'] === 'arrow' && typeof message['key'] === 'string') {
-        window.dispatchEvent(
-          new KeyboardEvent('keydown', { key: message['key'], bubbles: true, cancelable: true })
-        );
-      }
-      // Delete / ⌘D from the canvas. Replayed on the document rather than
-      // handled here so they go through the same guards as a keypress in the
-      // app — one definition of what those keys do, and the handler's own
-      // "am I typing in a field" check still sees a non-field target.
-      else if (message['name'] === 'key' && typeof message['key'] === 'string') {
-        document.dispatchEvent(
-          new KeyboardEvent('keydown', {
-            key: message['key'],
-            metaKey: message['meta'] === true,
-            ctrlKey: message['meta'] === true,
-            bubbles: true,
-            cancelable: true,
-          })
-        );
+      // Only a frame this document embeds may replay keys into the app: a
+      // shortcut from any other window is not a keypress the person made here.
+      const fromOwnFrame = Array.from(document.querySelectorAll('iframe')).some(
+        (frame) => frame.contentWindow === event.source,
+      );
+      if (!fromOwnFrame) {return;}
+      const message = parseShortcutMessage(event.data);
+      if (message === undefined) {return;}
+      switch (message.name) {
+        case 'insert':
+          openIfEditable();
+          return;
+        // Arrow keys pressed while the canvas iframe holds focus: replay them
+        // on the app window so tree navigation behaves the same whether the
+        // selection was made on the canvas or in the navigator.
+        case 'arrow':
+          window.dispatchEvent(
+            new KeyboardEvent('keydown', { key: message.key, bubbles: true, cancelable: true })
+          );
+          return;
+        // Delete / ⌘D from the canvas. Replayed on the document rather than
+        // handled here so they go through the same guards as a keypress in the
+        // app — one definition of what those keys do, and the handler's own
+        // "am I typing in a field" check still sees a non-field target.
+        case 'key':
+          document.dispatchEvent(
+            new KeyboardEvent('keydown', {
+              key: message.key,
+              metaKey: message.meta,
+              ctrlKey: message.meta,
+              bubbles: true,
+              cancelable: true,
+            })
+          );
+          return;
+        default: {
+          const exhaustive: never = message;
+          return exhaustive;
+        }
       }
     };
     window.addEventListener('message', onMsg);
