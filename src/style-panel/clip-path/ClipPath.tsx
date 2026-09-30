@@ -5517,9 +5517,10 @@ async function resolveCascadeWinnerClipPathStyle(
 
   const declaring = (await Promise.all(candidates.map(async (style) => {
     const declaration = await readClipPathDeclarationWithSource(style, options)
-    if (!hasClipPathDeclaration(declaration?.value)) {return null}
+    if (!declaration) {return null}
+    if (!hasClipPathDeclaration(declaration.value)) {return null}
     const namePath = await getStyleNamePath(style)
-    return { style, raw: declaration!.value, breakpoint: declaration!.breakpoint, namePath, specificity: namePath.length }
+    return { style, raw: declaration.value, breakpoint: declaration.breakpoint, namePath, specificity: namePath.length }
   }))).filter((entry): entry is { style: StyleHandle; raw: string; breakpoint: BreakpointId; namePath: string[]; specificity: number } => entry !== null)
   if (!declaring.length) {return null}
 
@@ -8634,8 +8635,10 @@ export default function ClipPath({ onApply, onClear, hideClassPicker }: {
               {(() => {
                 const center: HandleTarget = { kind: 'circle-center' }
                 const radius: HandleTarget = { kind: 'circle-radius' }
-                const centerPoint = rawEditableHandleCssPoint(shape.editable!, center)
-                const radiusPoint = rawEditableHandleCssPoint(shape.editable!, radius)
+                const editable = shape.editable
+                if (editable?.kind !== 'circle') {return null}
+                const centerPoint = rawEditableHandleCssPoint(editable, center)
+                const radiusPoint = rawEditableHandleCssPoint(editable, radius)
                 return (
                   <>
                     {centerPoint ? (
@@ -8673,8 +8676,10 @@ export default function ClipPath({ onApply, onClear, hideClassPicker }: {
                   { kind: 'ellipse-rx' },
                   { kind: 'ellipse-ry' },
                 ]
+                const editable = shape.editable
+                if (editable?.kind !== 'ellipse') {return null}
                 return handles.map((handle) => {
-                  const point = rawEditableHandleCssPoint(shape.editable!, handle)
+                  const point = rawEditableHandleCssPoint(editable, handle)
                   if (!point) {return null}
                   return (
                     <button
@@ -8719,7 +8724,9 @@ export default function ClipPath({ onApply, onClear, hideClassPicker }: {
               })}
               {shape.editable.radii ? CORNERS.map((corner) => {
                 const handle: HandleTarget = { kind: 'inset-radius', corner }
-                const point = rawEditableHandleCssPoint(shape.editable!, handle)
+                const editable = shape.editable
+                if (editable?.kind !== 'inset') {return null}
+                const point = rawEditableHandleCssPoint(editable, handle)
                 if (!point) {return null}
                 return (
                   <button
