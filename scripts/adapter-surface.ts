@@ -86,6 +86,7 @@ const EXCLUDED_RECEIVERS = new Set([
   'style',
   'dataset',
 ]);
+const DOM_ELEMENT_NAME = /[eE]lement$/;
 const RECEIVER = '([A-Za-z_$][\\w$]*(?:\\??\\.[A-Za-z_$][\\w$]*|\\[[^\\]]*\\])*)';
 
 const ASSIGN_RE = new RegExp(`${RECEIVER}\\.(?:${FIELDS})\\s*(?:=(?![=>])|\\+=|-=)`, 'g');
@@ -139,6 +140,12 @@ function receiverCounts(line: string, pattern: RegExp): number {
   for (const match of line.matchAll(pattern)) {
     const receiver = match[1] ?? '';
     const last = receiver.split(/\??\./).pop()?.replace(/\[.*$/, '') ?? '';
+    // A receiver named for a DOM element (`inputElement.value = …`) is the
+    // platform's node, not the page tree's: the same naming rule the lint
+    // exemption for in-place DOM writes uses (eslint.config.mjs).
+    if (DOM_ELEMENT_NAME.test(last)) {
+      continue;
+    }
     if (!EXCLUDED_RECEIVERS.has(last)) {
       count += 1;
     }

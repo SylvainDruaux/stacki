@@ -217,9 +217,11 @@ run in a bounded parallel pool, `--jobs=<n>` to change it — see
   can load it.
 
 A failing renderer suite fails the run while the others finish (a hung
-window cannot hold the gate hostage). The gate is:
-`build:contracts → build:electron → tsc --noEmit → eslint → ratchet → all
-test suites`, exiting non-zero if any non-quarantined suite fails.
+window cannot hold the gate hostage). The gate is: the builds, then side by
+side `tsc --noEmit` (app and scripts), ESLint with `--max-warnings 0`,
+Prettier, the policy scan, and the adapter-surface ratchet, then every test
+suite; it exits non-zero if any non-quarantined suite fails.
+`docs/enforcement.md` maps each AGENTS.md rule to the check that holds it.
 
 ## The TypeScript migration (completed 2026-09-16)
 
@@ -282,10 +284,15 @@ pain, in priority order:
    data agrees: 94 clone groups, ~3.7k duplicate LOC). Fix: after converting
    two or three sections, extract the shared field-row pattern; new sections
    become data, not components.
-4. **File size is the DX constraint.** `ClipPath.tsx` (ccx 3,173, 8.8k lines,
-   churn 3) barely changes — splitting it by tool is low-risk. The four
-   hotspots (`App` ccx 1,026, `parsePropSchema` 334, `PropField` 288,
-   `ClipPath` 776) split **after** conversion, never in the same commit.
+4. **File size is the DX constraint.** *Resolved 2026-09-30:* every function
+   is within 70 lines, enforced as an error. The hotspots were split by
+   responsibility during the lint paydown — `App` from a 4,319-line function
+   into staged hooks and shell components, `EmbedEditor`'s 2,253-line
+   component into hooks, `ClipPath`'s path readers into classes that own their
+   state — each proven with the full suite, and `ClipPath` (which has no suite)
+   with HEAD-versus-working-copy interaction harnesses and differential
+   fuzzing. The files themselves are still large; splitting them into modules
+   by tool is the remaining, now low-risk, step.
 
 Explicit non-changes: no state library (the WeakMap ack issue is
 identity-vs-version, not missing stores), no `.astro` AST dependency (loses
@@ -304,7 +311,7 @@ batching/queueing write path (already the right shape).
 | `src/style-panel/`  | CSS editing surface (TypeScript); `clip-path/`, `lib/`, shared controls           |
 | `src/ui/`           | Shared renderer widgets                                                           |
 | `shared/`           | Contract layer: types, parsers, limits, IPC contract → compiled to `shared/dist`  |
-| `scripts/`          | Dev/CI tooling (test runner, ratchet, packaging hooks)                            |
+| `scripts/`          | Dev/CI tooling (test runner, policy tooling, agent and git hooks, packaging)       |
 | `test/`             | 124 suites: round-trip, canvas-stub, contract, packaging                          |
 | `docs/`             | This file, the migration plan                                                     |
 
@@ -312,7 +319,9 @@ batching/queueing write path (already the right shape).
 
 - AGENTS.md is the normative engineering standard (strict TS, parse-don't-
   validate, discriminated unions, branded primitives, bounded everything,
-  ≤70-line functions). The ratchet and lint gate enforce it mechanically.
+  ≤70-line functions). The checks in docs/enforcement.md hold it mechanically
+  — the same code for people and for every coding agent — and CI is the gate
+  no one can skip.
 - Behavior preservation is proven per conversion by parity checks against the
   pre-conversion artifact plus the full suite — conversion review has already
   caught four real hazards (codepoint corruption, a prototype-pollution

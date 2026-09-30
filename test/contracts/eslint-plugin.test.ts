@@ -9,12 +9,19 @@ import { after, describe, it } from 'node:test';
 import { RuleTester } from '@typescript-eslint/rule-tester';
 import { rules } from '../../scripts/eslint-plugin/index.mts';
 
+// RuleTester registers through void-returning functions. node:test's return a promise the
+// runner itself awaits and reports on, so the adapters leave it to the runner.
+const voided =
+  (register: (text: string, callback: () => void) => Promise<void>) =>
+  (text: string, callback: () => void): void => {
+    void register(text, callback);
+  };
 RuleTester.afterAll = after;
-RuleTester.describe = describe;
-RuleTester.describeSkip = describe.skip;
-RuleTester.it = it;
-RuleTester.itOnly = it.only;
-RuleTester.itSkip = it.skip;
+RuleTester.describe = voided(describe);
+RuleTester.describeSkip = voided(describe.skip);
+RuleTester.it = voided(it);
+RuleTester.itOnly = voided(it.only);
+RuleTester.itSkip = voided(it.skip);
 
 // Directives in the test snippets suppress nothing, and the linter's own
 // unused-directive report would count as a second error for the case.
@@ -143,6 +150,10 @@ tester.run('bounded-recursion', rules['bounded-recursion'], {
       '  visit(node, state);\n' +
       '}',
     'function once() { return other(); }',
+    // A property's key is not in scope: these call the global or outer binding.
+    'const timers = { setTimeout: (callback, ms) => setTimeout(callback, ms) };',
+    'useScrub({ onCommit: () => { onCommit(); } });',
+    'class Branches { park() { return park(this.name); } }',
     'function walk(node, depth) {\n' +
       '  assert(depth < PARSE_LIMITS.depthMax, "deep");\n' +
       '  walk(node, depth + 1);\n' +

@@ -13,6 +13,8 @@ import {
 test('each rule of the written method counts one site', () => {
   const cases: readonly [string, number, number][] = [
     ['node.value = next;', 1, 0],
+    // An element of the page tree is still a tree node: only the DOM-name suffix is exempt.
+    ['elementNode.value = next;', 1, 0],
     ['node.children += x; node.name -= y;', 2, 0],
     ['parent.children.splice(index, 0, node);', 1, 0],
     ['delete first.blankBefore; delete n.head; delete n.children;', 1, 0],
@@ -35,6 +37,9 @@ test('comparisons, arrows, DOM and CMS objects, and comments do not count', () =
     'event.currentTarget.value = "";',
     'master.gain.value = 0.06;',
     'field.value = describe(field);',
+    // A receiver named for a DOM element is the platform's node, whatever it holds.
+    "inputElement.value = '';",
+    'rootElement.children.push(x);',
     '// node.value = next;',
     ' * node.children.push(x)',
   ];

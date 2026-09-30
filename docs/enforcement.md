@@ -10,7 +10,7 @@ a person, for Claude Code, for Codex, and for Pi, because every gate calls the s
 |---|---|---|---|
 | Agent pre-tool | Before an agent runs a command or edits a file | `scripts/agent/core.mts` verdicts | No: refusals come from the harness |
 | Agent post-tool | After an agent edits a file | Prettier (writes), policy scan, ESLint on the file | No |
-| Agent stop | When an agent tries to finish | Prettier check, scan, ESLint on every changed file, then `tsc` | After 3 refusals the session may end; the human is told |
+| Agent stop | When an agent tries to finish | Prettier check, scan, ESLint on every changed file, then `tsc` | After 3 refusals for the same findings the session may end, and the human is told; new findings start a new round |
 | `pre-commit` | `git commit` | Prettier check, scan, ESLint on staged files | `--no-verify`, which agent hooks refuse |
 | `commit-msg` | `git commit` | Typed subject ≤ 72 characters, blank line, body | As above |
 | `pre-push` | `git push` | `tsc`, full ESLint, full scan | As above |
@@ -55,7 +55,7 @@ the agent hooks are guard rails, not a sandbox. CI is the gate that cannot be ar
 | 3 | No `enum` | lint: `stacki/no-enum` |
 | 4 | No `Partial<T>` inputs | lint: `stacki/no-partial-parameter` |
 | 5 | Boundaries parse before use | lint: `no-unsafe-*` keep `JSON.parse`'s `any` from flowing anywhere; review for parser quality |
-| 6 | Immutability by default | lint: `prefer-readonly`, `no-param-reassign` (with properties); review for `readonly` types |
+| 6 | Immutability by default | lint: `prefer-readonly`, `no-param-reassign` (with properties; exempt only for DOM elements, React refs, canvas contexts, and style declarations, by name); review for `readonly` types |
 | 7 | Total functions | tsc: `strict`, `noImplicitReturns`, `noUncheckedIndexedAccess`; review |
 | 8 | Two error channels | lint: `only-throw-error`, `no-floating-promises`, `no-misused-promises`; review for channel choice |
 | 9 | A limit on everything | lint: `stacki/no-unbounded-loop`, `stacki/bounded-recursion`; review for queues and caches |

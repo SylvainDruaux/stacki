@@ -30,13 +30,15 @@ export const boundedRecursion: RuleModule<'unbounded'> = {
     interface Frame {
       readonly node: FunctionNode;
       readonly name: string | undefined;
+      readonly callee: Callee | undefined;
       recursive: boolean;
       bounded: boolean;
     }
     const frames: Frame[] = [];
 
     function enter(node: FunctionNode): void {
-      frames.push({ node, name: functionName(node), recursive: false, bounded: false });
+      const frame = { node, name: functionName(node), callee: selfCallee(node) };
+      frames.push({ ...frame, recursive: false, bounded: false });
     }
 
     function exit(node: FunctionNode): void {
@@ -60,14 +62,17 @@ export const boundedRecursion: RuleModule<'unbounded'> = {
       'FunctionExpression:exit': exit,
       'ArrowFunctionExpression:exit': exit,
       CallExpression(node) {
-        const callee = calleeName(node);
+        const callee = calleeOf(node);
         if (callee === undefined) {
           return;
         }
         // A nested closure that calls an outer function by name recurses
         // through it, so every enclosing frame of that name is marked.
         for (const frame of frames) {
-          if (frame.name === callee) {
+          if (frame.callee === undefined) {
+            continue;
+          }
+          if (frame.callee.kind === callee.kind && frame.callee.name === callee.name) {
             frame.recursive = true;
           }
         }
@@ -87,15 +92,35 @@ export const boundedRecursion: RuleModule<'unbounded'> = {
   },
 };
 
-function calleeName(node: TSESTree.CallExpression): string | undefined {
+// How a function can call itself. A declared or variable-bound function calls
+// itself by its bare name; a method or an object property only through
+// `this.name()` — a property's key is not in scope, so `{ setTimeout: (…) =>
+// setTimeout(…) }` calls the global, not itself.
+type Callee = { readonly kind: 'binding' | 'member'; readonly name: string };
+
+function selfCallee(node: FunctionNode): Callee | undefined {
+  if (node.id) {
+    return { kind: 'binding', name: node.id.name };
+  }
+  const parent = node.parent;
+  if (parent.type === 'VariableDeclarator') {
+    return parent.id.type === 'Identifier' ? { kind: 'binding', name: parent.id.name } : undefined;
+  }
+  if (parent.type === 'MethodDefinition' || parent.type === 'Property') {
+    return parent.key.type === 'Identifier' ? { kind: 'member', name: parent.key.name } : undefined;
+  }
+  return undefined;
+}
+
+function calleeOf(node: TSESTree.CallExpression): Callee | undefined {
   if (node.callee.type === 'Identifier') {
-    return node.callee.name;
+    return { kind: 'binding', name: node.callee.name };
   }
   // `this.walk(child)` inside a method named walk.
   if (node.callee.type === 'MemberExpression') {
     if (node.callee.object.type === 'ThisExpression') {
       if (node.callee.property.type === 'Identifier') {
-        return node.callee.property.name;
+        return { kind: 'member', name: node.callee.property.name };
       }
     }
   }

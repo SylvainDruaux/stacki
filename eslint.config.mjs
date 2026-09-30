@@ -8,15 +8,12 @@
 // the rules AGENTS.md states that stock ESLint cannot express live in the
 // local plugin, scripts/eslint-plugin/, loaded here without a build step.
 //
-// DEBT marks the rules the tree does not yet satisfy. They report as warnings
-// while the legacy code is brought into line, then DEBT becomes 'error' and
-// `npm run lint` runs with --max-warnings 0. Every other rule is an error now.
+// Every rule is an error, and every run uses --max-warnings 0: a finding either
+// blocks the change or carries a stated reason in an eslint-disable comment.
 import tsParser from '@typescript-eslint/parser';
 import tsPlugin from '@typescript-eslint/eslint-plugin';
 import reactHooks from 'eslint-plugin-react-hooks';
 import stacki from './scripts/eslint-plugin/index.mts';
-
-const DEBT = 'warn';
 
 // AGENTS.md §12: no abbreviations. Word → what to write instead. Checked word
 // by word on every declared name (scripts/eslint-plugin/naming.mts). Loop
@@ -114,20 +111,20 @@ const NAMING = { words: ABBREVIATIONS, quantityWords: QUANTITY_WORDS };
 // Rules that read syntax only, so they hold for JavaScript and TypeScript
 // alike. Type-aware and TypeScript-syntax rules join in the TS block.
 const STACKI_SYNTAX_RULES = {
-  'stacki/bounded-recursion': DEBT,
-  'stacki/comment-sentence': DEBT,
+  'stacki/bounded-recursion': 'error',
+  'stacki/comment-sentence': 'error',
   'stacki/division-intent': 'error',
-  'stacki/naming': [DEBT, NAMING],
+  'stacki/naming': ['error', NAMING],
   'stacki/no-compound-assert': 'error',
-  'stacki/no-null': DEBT,
+  'stacki/no-null': 'error',
   'stacki/no-unbounded-loop': 'error',
-  'stacki/require-disable-reason': DEBT,
+  'stacki/require-disable-reason': 'error',
 };
 const STACKI_TYPESCRIPT_RULES = {
   ...STACKI_SYNTAX_RULES,
-  'stacki/callback-last': DEBT,
-  'stacki/catch-unknown': DEBT,
-  'stacki/no-boolean-parameter': DEBT,
+  'stacki/callback-last': 'error',
+  'stacki/catch-unknown': 'error',
+  'stacki/no-boolean-parameter': 'error',
   'stacki/no-enum': 'error',
   'stacki/no-overloads': 'error',
   'stacki/no-partial-parameter': 'error',
@@ -344,10 +341,10 @@ export default [
       '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
       curly: ['error', 'all'],
       // Effect dependencies are correctness: a stale closure is a real bug.
-      'react-hooks/exhaustive-deps': DEBT,
+      'react-hooks/exhaustive-deps': 'error',
       'react-hooks/rules-of-hooks': 'error',
       // Type-aware safety. Error — the compiler-adjacent bug class.
-      '@typescript-eslint/no-unsafe-argument': DEBT,
+      '@typescript-eslint/no-unsafe-argument': 'error',
       '@typescript-eslint/no-unsafe-assignment': 'error',
       '@typescript-eslint/no-unsafe-member-access': 'error',
       '@typescript-eslint/no-unsafe-call': 'error',
@@ -359,36 +356,43 @@ export default [
       // node:test's registration calls are the exception: the runner owns
       // and awaits the promise each returns.
       '@typescript-eslint/no-floating-promises': [
-        DEBT,
+        'error',
         {
           allowForKnownSafeCalls: [
             { from: 'package', package: 'node:test', name: ['describe', 'it', 'suite', 'test'] },
           ],
         },
       ],
-      '@typescript-eslint/no-misused-promises': DEBT,
+      '@typescript-eslint/no-misused-promises': 'error',
       '@typescript-eslint/only-throw-error': 'error',
-      '@typescript-eslint/use-unknown-in-catch-callback-variable': DEBT,
-      eqeqeq: [DEBT, 'always'],
+      '@typescript-eslint/use-unknown-in-catch-callback-variable': 'error',
+      eqeqeq: ['error', 'always'],
       // §7: construct and return, never mutate a parameter. DOM elements,
-      // refs, canvas contexts, and style objects are mutable by platform
-      // design; a function that takes one exists to change it.
+      // React refs, canvas 2D contexts, and style declarations are mutable by
+      // platform design; a function that takes one exists to change it. The
+      // names are narrow on purpose: any other in-place write states its reason
+      // in a disable, so a rename cannot opt out of the rule.
       'no-param-reassign': [
-        DEBT,
+        'error',
         {
           props: true,
-          ignorePropertyModificationsForRegex: ['[eE]lement$', '[rR]ef$', '[cC]ontext$', '^style$'],
+          ignorePropertyModificationsForRegex: [
+            '[eE]lement$',
+            '[rR]ef$',
+            '^(?:canvas|drawing)?[cC]ontext$',
+            '^style$',
+          ],
         },
       ],
       // §11: a function fits on a screen.
-      'max-lines-per-function': [DEBT, { max: 70, skipBlankLines: true, skipComments: true }],
+      'max-lines-per-function': ['error', { max: 70, skipBlankLines: true, skipComments: true }],
     },
   },
   {
     // The Result constructor pair is the canonical `ok`/`err` of AGENTS.md §3;
     // `err` means exactly that and nothing else anywhere in the tree.
     files: ['shared/result.ts'],
-    rules: { 'stacki/naming': [DEBT, { ...NAMING, allowedNames: ['err'] }] },
+    rules: { 'stacki/naming': ['error', { ...NAMING, allowedNames: ['err'] }] },
   },
   {
     // shared/ is the validated-constructor layer (AGENTS.md §2): assertions

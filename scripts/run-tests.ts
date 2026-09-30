@@ -98,7 +98,12 @@ const staticChecks: readonly TestCommand[] = [
   {
     name: 'eslint',
     command: node,
-    argumentsList: [path.join(root, 'node_modules', 'eslint', 'bin', 'eslint.js'), '.'],
+    argumentsList: [
+      path.join(root, 'node_modules', 'eslint', 'bin', 'eslint.js'),
+      '--max-warnings',
+      '0',
+      '.',
+    ],
   },
   {
     // Line width, shell scripts, test headers, the dependency record, one
