@@ -162,14 +162,17 @@ export function planIntentThroughDiff(
 // --- Internal ----------------------------------------------------------------
 
 // A resolved remap names bytes equal to the authored identity region. Those
-// bytes are only proof of identity if they occur once in the current file: if
-// the target's region survives intact, it is an occurrence, so a unique
-// occurrence is the target (the invariant). Where they repeat, the minimum edit
-// script can still be unique and wrong — edit above, paste a copy of the target,
-// and the cheapest script maps the target onto the copy (the step-3 wrong-site
-// plans, planner.test.ts). The minimum script is not the history, so repeated
-// bytes are ambiguous whatever the script says. A distance of zero maps by
-// identity and holds nothing to guess, so the fast path and this one agree.
+// bytes are only proof of identity if they occur once in each file: if the
+// target's region survives intact, it is an occurrence, so a unique occurrence
+// is the target (the invariant) — unless another authored element held the
+// same bytes and survived while the target went. Where they repeat, the
+// minimum edit script can still be unique and wrong — edit above, paste a copy
+// of the target, and the cheapest script maps the target onto the copy (the
+// step-3 wrong-site plans, planner.test.ts); or remove the target beside its
+// twin, and the cheapest script maps the target onto the twin (step 10). The
+// minimum script is not the history, so repeated bytes are ambiguous whatever
+// the script says. A distance of zero maps by identity and holds nothing to
+// guess, so the fast path and this one agree.
 //
 // Not covered, and not coverable from bytes: a copy of the target pasted while
 // another writer rewrites the original's region. The same bytes arise from an
@@ -178,11 +181,17 @@ function uniqueOrAmbiguous(base: PlanningBase, distance: number, mapped: SpanMap
   assert(Number.isSafeInteger(distance), 'The diff distance is an integer');
   if (mapped.tag === 'resolved') {
     if (distance > 0) {
-      const region = base.current.bytes.subarray(mapped.span.start, mapped.span.end);
-      const occurrences = countOccurrences(base.current.bytes, toByteString(region), 2);
+      const region = toByteString(base.current.bytes.subarray(mapped.span.start, mapped.span.end));
+      const occurrences = countOccurrences(base.current.bytes, region, 2);
       assert(occurrences >= 1, 'The resolved region occurs where it was mapped');
+      // The resolved bytes equal the authored region, so they occur there too.
+      const authoredOccurrences = countOccurrences(base.authored.bytes, region, 2);
+      assert(authoredOccurrences >= 1, 'The resolved region is the authored region');
       if (occurrences === 1) {
-        return mapped;
+        if (authoredOccurrences === 1) {
+          return mapped;
+        }
+        return { tag: 'ambiguous' }; // A twin of the target may be the survivor.
       }
       return { tag: 'ambiguous' };
     }

@@ -1,11 +1,13 @@
 // The deterministic simulation (plan §10). One World holds a fake disk, one
 // actor per file, and the client's view of each file. Every step the seeded
-// PRNG picks one event — a visual intent, a stale preview intent, an oracle
-// gesture, a code-editor save (a patch, since step 8, often leaving the file
-// invalid), a whole-model save, an external manual edit, a pasted copy of a
-// line, an attribute added in another editor, an AI-style rewrite, a git-style
-// atomic replacement, a watcher tick, an actor step, a crash, a disk failure, a
-// submission burst — applies it, and checks the invariants.
+// PRNG picks one event — a visual intent, a stale preview intent, a Markdown
+// block intent (step 10: text typed, a block or item removed, inserted or
+// moved) fresh or from a stale preview, an oracle gesture, a code-editor save
+// (a patch, since step 8, often leaving the file invalid), a whole-model save,
+// an external manual edit, a pasted copy of a line, an attribute added in
+// another editor, an AI-style rewrite, a git-style atomic replacement, a
+// watcher tick, an actor step, a crash, a disk failure, a submission burst —
+// applies it, and checks the invariants.
 //
 // Determinism is structural, not careful: the scheduler is the only source of
 // order, the PRNG the only source of choice, the disk is in memory, and there
@@ -31,7 +33,7 @@ import {
   type RejectionReason,
   type SourceEdit,
 } from '../../dist/shared/intent.js';
-import { changedRanges, inverseEdits } from '../../dist/shared/splice.js';
+import { changedRanges, inverseEdits, orderedSplices } from '../../dist/shared/splice.js';
 import { diffCodePatch } from '../../dist/shared/code-patch.js';
 import { LIMITS } from '../../dist/shared/limits.js';
 import { toAnchorRef, toChildIndex } from '../../dist/shared/ref.js';
@@ -77,11 +79,14 @@ import {
   OriginSource,
   insertOrigins,
   lineEndingOrigins,
+  moveOrigins,
+  restoreOrigins,
   spliceOrigins,
   type Origins,
 } from './provenance.ts';
 import {
   checkMappingReference,
+  judgeBlockRemap,
   judgeOracleRemap,
   judgeRemap,
   type RemapDecision,
@@ -119,6 +124,8 @@ const HISTORY_MAX = 8;
 const ORIGINS_RETAINED_MAX = 512;
 /** Snapshots per file whose checksums the run remembers the actor holding. */
 const HELD_MAX = 16;
+/** Writes whose replaced origins wait for their commit (a crash never commits). */
+const REPLACED_RETAINED_MAX = 64;
 /** Applied edits the run can undo (step 6): the most recent ones. */
 const UNDOABLE_MAX = 8;
 
@@ -129,6 +136,10 @@ interface Undoable {
   readonly view: View;
   readonly inverse: readonly SourceEdit[];
   readonly written: ReadonlySet<number>;
+  /** The origins of the bytes the edit replaced, per splice in order: its
+   * inverse writes exactly those bytes back, so they get their origins back —
+   * a removed block restored, a moved one returned, is the same block. */
+  readonly restores: readonly Origins[] | undefined;
 }
 
 /** A snapshot as the client saw it, with the disk generation it was read at. */
@@ -144,6 +155,8 @@ const EVENTS = [
   ['oracle-gesture', 6],
   ['external-edit', 6],
   ['preview-intent', 5],
+  ['markdown-intent', 8],
+  ['markdown-preview', 4],
   ['copy-paste', 3],
   ['attribute-append', 3],
   ['code-save', 4],
@@ -209,6 +222,18 @@ class World {
   private readonly undoing = new Map<string, Undoable>();
   // Step 8: code-editor saves in flight, judged by byte origin like undo.
   private readonly patching = new Set<string>();
+  // Step 10: Markdown block intents in flight, judged by their node's survival.
+  private readonly blocks = new Set<string>();
+  // Step 10: undos in flight and the origins their write restores (see
+  // Undoable.restores). Cleared at the write or the outcome.
+  private readonly restorations = new Map<
+    string,
+    { readonly origins: readonly Origins[]; readonly generation: number }
+  >();
+  // The origins each tracked write replaced, per splice, by the generation it
+  // wrote, for the undo entry its commit becomes — a later actor step, after
+  // other files' writes, so keyed. Consumed at the commit; bounded.
+  private readonly replacedBy = new Map<number, readonly Origins[]>();
   private intents = 0;
 
   constructor(input: SimulationInput) {
@@ -278,6 +303,10 @@ class World {
         return this.submitVisual(this.clientView(this.pickPath()));
       case 'preview-intent':
         return this.submitVisual(this.staleView(this.pickPath()));
+      case 'markdown-intent':
+        return this.submitMarkdown((path) => this.clientView(path));
+      case 'markdown-preview':
+        return this.submitMarkdown((path) => this.staleView(path));
       case 'oracle-gesture':
         return this.startGesture(this.prng.pick(ORACLE_SCENARIOS));
       case 'code-save':
@@ -346,10 +375,44 @@ class World {
     const origins = this.origins.get(generationBefore);
     if (origins !== undefined) {
       const splices = before.phase.plan.splices;
-      this.keepOrigins(generation, spliceOrigins(origins, splices, this.originSource));
+      // A move relocates its node's bytes, and an undo writes back the bytes
+      // its edit replaced: either way they keep their origins (step 10).
+      const intent = before.phase.intent;
+      // Only an undo planned on exactly the bytes its edit left restores: one
+      // mapped through other writes (a whole-file replacement among them)
+      // lands where the planner put it, among bytes of other histories.
+      // And bytes a git-style replacement swapped back in are not the edit's.
+      const fresh = before.phase.base.checksum === intent.authoredChecksum;
+      const restoration = this.restorations.get(intent.id);
+      this.restorations.delete(intent.id);
+      const intact =
+        restoration !== undefined &&
+        fresh &&
+        !this.rewrittenBetween(before.path, restoration.generation, generationBefore);
+      const restored = intact ? restoration.origins : undefined;
+      let next: Origins;
+      if (intent.operation.tag === 'move-node') {
+        next = moveOrigins(origins, splices, this.originSource);
+      } else if (restored !== undefined) {
+        next = restoreOrigins(origins, splices, restored, this.originSource);
+      } else {
+        next = spliceOrigins(origins, splices, this.originSource);
+      }
+      this.keepOrigins(generation, next);
+      const replaced = orderedSplices(splices).map((splice) =>
+        origins.slice(splice.range.start, splice.range.end),
+      );
+      this.replacedBy.set(generation, replaced);
+      if (this.replacedBy.size > REPLACED_RETAINED_MAX) {
+        const [oldest] = this.replacedBy.keys();
+        assert(oldest !== undefined, 'A full store has an oldest entry');
+        this.replacedBy.delete(oldest);
+      }
     }
     const phase = before.phase;
-    if (phase.intent.operation.tag === 'apply-code-patch') {
+    // An undo of a code patch removes or retypes the same slidable run
+    // (seed 2181: the patch's `<`, not the file's, became the list's own).
+    if (BYTE_HUNK_OPERATIONS.includes(phase.intent.operation.tag)) {
       if (phase.plan.splices.some((splice) => slidable(phase.base.bytes, splice))) {
         this.count('code:slidable');
         this.slidPatches.set(before.path, [
@@ -379,6 +442,9 @@ class World {
     }
     if (this.patching.delete(intent.id)) {
       return this.judgeCodePatch(submission, result);
+    }
+    if (this.blocks.delete(intent.id)) {
+      return this.judgeBlock(submission, result);
     }
     const gesture = this.gestures.get(intent.id);
     const survival = judgedBySurvival(intent.operation.tag);
@@ -413,6 +479,15 @@ class World {
     };
     this.countAge(intent.file, head.authored.checksum, current.checksum);
     if (!survival) {
+      if (markdownBlockIntent(intent, head.authored)) {
+        // Its splices include the syntax between blocks, which belongs to no
+        // node: replaying them at their surviving bytes is no oracle once text
+        // lands between a block and its old separator. Judged, like every
+        // Markdown block intent, by where the plan sits against its node.
+        this.count(`remap-markdown-oracle:${intent.operation.tag}`);
+        this.countVerdict(intent.file, judgeBlockRemap(input));
+        return;
+      }
       const step = gesture?.scenario.steps[gesture.next - 1];
       assert(step !== undefined, 'A judged gesture intent is one of its scenario steps');
       this.countVerdict(intent.file, judgeOracleRemap(input, oracleSplices(step)));
@@ -524,7 +599,10 @@ class World {
       }
     }
     const view = { snapshot: effect.candidate, generation: effect.generation };
-    const entry = { file: path, view, inverse: inverseEdits(effect.plan.splices), written };
+    const restores = this.replacedBy.get(effect.generation);
+    this.replacedBy.delete(effect.generation);
+    const inverse = inverseEdits(effect.plan.splices);
+    const entry = { file: path, view, inverse, written, restores };
     this.undoable = [...this.undoable, entry].slice(-UNDOABLE_MAX);
   }
 
@@ -554,6 +632,12 @@ class World {
     });
     if (this.submit(intent, entry.view)) {
       this.undoing.set(intent.id, entry);
+      if (entry.restores !== undefined) {
+        this.restorations.set(intent.id, {
+          origins: entry.restores,
+          generation: entry.view.generation,
+        });
+      }
     }
   }
 
@@ -645,7 +729,11 @@ class World {
     }
     const operation = intent.operation;
     assert(operation.tag === 'apply-code-patch', 'Only code patches are judged here');
-    const verdict = codePatchVerdict(operation.hunks, decision.plan.splices, before, now);
+    const verdict = codePatchVerdict(operation.hunks, decision.plan.splices, {
+      before,
+      now,
+      bytes: authored.bytes,
+    });
     const where = `seed ${this.input.seed}`;
     assert(verdict !== 'wrong-site', `A code patch replaces its own bytes (${where})`);
     this.count(`code:${verdict}`);
@@ -661,6 +749,7 @@ class World {
     checkOutcome(outcome, this.accepted, this.terminal);
     this.terminal.set(outcome.intentId, outcome);
     this.authoredAt.delete(outcome.intentId);
+    this.restorations.delete(outcome.intentId);
     const detail = outcome.tag === 'rejected' ? ` ${outcome.reason}` : '';
     this.count(`outcome:${outcome.tag}${detail}`);
     this.log(`  outcome ${outcome.intentId} ${outcome.tag}${detail}`);
@@ -676,7 +765,8 @@ class World {
     assert(actor !== undefined, 'Every intent names a simulated file');
     const submitted = submitIntent(actor, { intent, authored: view.snapshot });
     this.actors.set(intent.file, submitted.state);
-    this.log(`  submit ${intent.id} ${intent.operation.tag} ${submitted.result.tag}`);
+    const name = intent.file.slice('/project/'.length);
+    this.log(`  submit ${intent.id} ${intent.operation.tag} ${name} ${submitted.result.tag}`);
     this.count(`submit:${submitted.result.tag}`);
     if (submitted.result.tag === 'accepted') {
       this.accepted.set(intent.id, intent);
@@ -779,6 +869,107 @@ class World {
     const target = this.prng.chance(1, 10) ? 'data-absent' : name;
     const value = { type: 'string' as const, value: this.prng.pick(ATTRIBUTE_VALUES) };
     return { tag: 'set-attribute', name: target, value };
+  }
+
+  // --- Markdown block intents (step 10) ---------------------------------------------
+
+  /** A gesture on a Markdown page's own nodes, authored against the view
+   * `viewOf` gives: typing into a block's text, or a block or item removed,
+   * put beside another, or moved beside a sibling of its list. */
+  private submitMarkdown(viewOf: (path: FilePath) => View): void {
+    const pages = [...this.actors.keys()].filter((path) => /\.mdx?$/.test(path));
+    if (pages.length === 0) {
+      this.log('  skip: no Markdown page');
+      return;
+    }
+    const view = viewOf(this.prng.pick(pages));
+    const projection = view.snapshot.projection;
+    if (projection.tag === 'parse-error') {
+      this.log('  skip: the view does not parse');
+      return;
+    }
+    const targets = projection.nodes.filter((node) => node.syntax === 'markdown');
+    if (targets.length === 0) {
+      this.log('  skip: no Markdown node in view');
+      return;
+    }
+    const node = this.prng.pick(targets);
+    const operation = this.markdownOperation(view.snapshot.bytes, projection.nodes, node);
+    const anchor = toAnchorRef({
+      span: node.span,
+      path: node.path.map(toChildIndex),
+      expectedKind: node.kind,
+    });
+    const intent = toIntent({
+      id: this.nextIntentId(),
+      file: view.snapshot.path,
+      authoredChecksum: view.snapshot.checksum,
+      anchor,
+      operation,
+    });
+    this.count(`markdown:${operation.tag}`);
+    if (this.submit(intent, view)) {
+      this.blocks.add(intent.id);
+    }
+  }
+
+  private markdownOperation(
+    bytes: ByteString,
+    nodes: readonly ProjectedNode[],
+    node: ProjectedNode,
+  ): Operation {
+    if (node.list === 'inline') {
+      // Typed at the end of the text: a word, or a new line of it.
+      const typed = this.prng.pick([' typed', '\nand a line']);
+      const end = toByteSpan(node.span.end, node.span.end);
+      return { tag: 'rewrite-node', hunks: [{ span: end, text: typed }] };
+    }
+    const siblings = nodes.filter((other) => other !== node && other.list === node.list);
+    const roll = this.prng.below(3);
+    if (roll === 0) {
+      return { tag: 'remove-node' };
+    }
+    if (roll === 1 && siblings.length > 0) {
+      const other = this.prng.pick(siblings);
+      const destination = toAnchorRef({
+        span: other.span,
+        path: other.path.map(toChildIndex),
+        expectedKind: other.kind,
+      });
+      const placement = this.prng.pick(['before', 'after'] as const);
+      return { tag: 'move-node', destination, placement };
+    }
+    const source = node.list === 'items' ? `${markerText(bytes, node)} new item` : 'New block.';
+    return { tag: 'insert-node', placement: 'after', source };
+  }
+
+  /** A stale block intent's plan, judged by its node's survival (step 10). */
+  private judgeBlock(submission: Submission, result: ActorStep): void {
+    const intent = submission.intent;
+    assert(submission.authored !== undefined, 'Simulated intents carry their authored bytes');
+    const decision = decisionFor(intent, result);
+    const current = result.state.snapshot;
+    if (decision === undefined || current === undefined) {
+      return;
+    }
+    if (submission.authored.checksum === current.checksum) {
+      this.count('markdown-mapping:identity');
+      return;
+    }
+    const authoredGeneration = this.authoredAt.get(intent.id);
+    assert(authoredGeneration !== undefined, 'Every submitted intent has an authored generation');
+    const baseGeneration = result.state.generation;
+    const verdict = judgeBlockRemap({
+      intent,
+      authored: submission.authored,
+      current,
+      authoredOrigins: this.origins.get(authoredGeneration),
+      currentOrigins: this.origins.get(baseGeneration),
+      replacedWhole: this.rewrittenBetween(intent.file, authoredGeneration, baseGeneration),
+      decision,
+    });
+    this.count(`remap-markdown:${verdict.tag}`);
+    this.countVerdict(intent.file, verdict);
   }
 
   /** The legacy whole-model save (`replace-source`, plan §3.3): the file's
@@ -1076,6 +1267,9 @@ class World {
 /** What the planner decided for the head intent in one idle step: the plan now
  * in flight, or the rejection among the step's outcomes; undefined when the
  * step rejected before planning (a failed read). */
+// Operations whose hunks a diff placed: a code patch, and the undo of one.
+const BYTE_HUNK_OPERATIONS: readonly Operation['tag'][] = ['apply-code-patch', 'revert-splices'];
+
 // Whether a splice could move one byte along the file and write the same bytes:
 // deleting one of two equal lines, or typing a character beside its twin. A
 // diff places such a change on one copy by convention (shared/code-patch.ts
@@ -1117,9 +1311,14 @@ function firstIs(run: Uint8Array, byte: number): boolean {
 function codePatchVerdict(
   hunks: readonly SourceEdit[],
   splices: readonly { readonly range: { readonly start: number; readonly end: number } }[],
-  before: Origins,
-  now: Origins,
+  origins: {
+    readonly before: Origins;
+    readonly now: Origins;
+    /** The authored bytes `before` describes. */
+    readonly bytes: ByteString;
+  },
 ): 'mapped' | 'unjudged' | 'wrong-site' {
+  const { before, now } = origins;
   assert(hunks.length === splices.length, 'A code patch plans one splice per hunk');
   const inside = (at: number) =>
     splices.some((splice) => splice.range.start <= at && at < splice.range.end);
@@ -1137,13 +1336,34 @@ function codePatchVerdict(
     if (expected.every((origin, at) => found[at] === origin)) {
       continue;
     }
-    const survives = now.some((origin, at) => !inside(at) && expected.includes(origin));
+    // Only content survives as evidence: a line break or a space is kept by
+    // whichever replacement happens to share it (spliceOrigins), so its
+    // origin says nothing about where the user's text went (step 10: seeded
+    // Markdown moves and undos move gaps around).
+    const content = expected.filter((_origin, offset) => {
+      const byte = origins.bytes[Math.max(0, from) + offset];
+      return byte !== undefined && !isSeparatorByte(byte);
+    });
+    const survives = now.some((origin, at) => !inside(at) && content.includes(origin));
     if (width > 0 && survives) {
       return 'wrong-site';
     }
     unjudged = true;
   }
   return unjudged ? 'unjudged' : 'mapped';
+}
+
+function isSeparatorByte(byte: number): boolean {
+  switch (byte) {
+    case 0x20:
+    case 0x09:
+    case 0x0a:
+    case 0x0d:
+    case 0x3e:
+      return true;
+    default:
+      return false;
+  }
 }
 
 function decisionFor(intent: Intent, result: ActorStep): RemapDecision | undefined {
@@ -1192,6 +1412,52 @@ function verdictDetail(verdict: RemapVerdict): string {
 // (remap-judge.ts): every operation that edits one tag's name or attributes.
 function judgedBySurvival(tag: Intent['operation']['tag']): boolean {
   return tag === 'set-attribute' || tag === 'rename-attribute' || tag === 'rename-tag';
+}
+
+// A tree operation or a rewrite on a Markdown node of the authored view.
+function markdownBlockIntent(intent: Intent, authored: Snapshot): boolean {
+  switch (intent.operation.tag) {
+    case 'rewrite-node':
+    case 'remove-node':
+    case 'insert-node':
+    case 'move-node':
+      break;
+    case 'set-attribute':
+    case 'remove-attribute':
+    case 'rename-binding':
+    case 'set-inline-style':
+    case 'apply-code-patch':
+    case 'revert-splices':
+    case 'edit-frontmatter-slot':
+    case 'replace-source':
+    case 'rename-tag':
+    case 'rename-attribute':
+    case 'wrap-nodes':
+    case 'append-body':
+    case 'insert-frontmatter':
+      return false;
+    default: {
+      const exhaustive: never = intent.operation;
+      return exhaustive;
+    }
+  }
+  const projection = authored.projection;
+  if (projection.tag !== 'valid') {
+    return false;
+  }
+  const path = intent.anchor.path;
+  const node = projection.nodes.find(
+    (candidate) =>
+      candidate.path.length === path.length &&
+      candidate.path.every((step, index) => step === path[index]),
+  );
+  return node?.syntax === 'markdown';
+}
+
+// A list item's marker as written: its bullet, or its number and `.` or `)`.
+function markerText(bytes: ByteString, item: ProjectedNode): string {
+  const text = Buffer.from(bytes.subarray(item.span.start, item.span.end)).toString('utf8');
+  return /^(?:[-*+]|\d{1,9}[.)])/.exec(text)?.[0] ?? '-';
 }
 
 // A tag's name as written, from its `<` to the first space, `/` or `>`.

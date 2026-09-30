@@ -94,7 +94,8 @@ test('oracle set-attribute scenarios: exact splices, fast path and diff path ali
     assert.deepEqual(planByIdentity(input, intent), fast, `${step.file}: the step-1 reference`);
     assert.equal(planned(base, intent), readFixture(step.expectedFile));
   }
-  assert.equal(checked, 3, 'the multi-file, wrong-site and encoding oracles set attributes');
+  // Step 10 adds the MDX oracle: a prop of the second of two identical blocks.
+  assert.equal(checked, 4, 'the multi-file, wrong-site, encoding and MDX oracles set attributes');
 });
 
 // duplicate-siblings.astro, one element per line:
@@ -182,13 +183,11 @@ test('stale intent, edit elsewhere: one of two identical cards is refused, not g
     'rejected: anchor-ambiguous',
   );
   // The first card retitled outside Stacki: the second card's bytes are now
-  // unique, so it resolves; same length, the splice stays at 78.
+  // unique in the current file, but they were not in the authored one — the
+  // same bytes arise from the second card retitled and the two swapped, and
+  // step 10's seed 3005 removed the target beside its twin (below). Refused.
   const mid = againstCurrent(`${HERO}${FOOTER}<Card title="Mid" />\n${CARD}`);
-  assert.equal(
-    mid.result,
-    '<Hero title="Old" />\n<Footer title="Old" />\n<Card title="Mid" />\n<Card title="New" />\n',
-  );
-  assert.deepEqual(spliceStarts(mid.base, secondCardIntent().intent), [78]);
+  assert.equal(mid.result, 'rejected: anchor-ambiguous');
   // Nothing changed: the identity path plans the second card; repetition is
   // only refused where a diff had to explain the file.
   assert.equal(againstCurrent(SIBLINGS).result, `${HERO}${FOOTER}${CARD}<Card title="New" />\n`);
@@ -274,6 +273,30 @@ test('a pasted copy after an edit above: mapped onto the copy, refused by the pl
     `<Hero title="New" />\n<Footer title="Old" data-x="1" />\n${FOOTER}${CARD}${CARD}`,
   );
   assert.equal(planned({ authored, current: appended }, footer), 'rejected: anchor-ambiguous');
+});
+
+// Found by the step-10 simulator (seed 3005, jsx-blocks.mdx). The authored
+// file holds two cards whose regions `<Card title="Old"` are identical; the
+// intent retitles the second, the one with a body. Other writers removed the
+// import line, typed a line under the heading, and removed the second card.
+// The cheapest script matches `and a line` against letters of the first card
+// and keeps the second card's region whole: resolved onto the only `<Card
+// title="Old"` left, which is the first card. The region is unique in the
+// current file only because its twin went; unique in the authored file is
+// the other half of the proof, and without it the plan is refused.
+test('a twin removed: a region unique now but repeated when authored is refused', () => {
+  const file = toFilePath('/project/jsx-blocks.mdx');
+  const head = "import Card from '../components/Card.astro';\n\n# Cards\n\n";
+  const cards = '<Card title="Old" />\n\n<Card title="Old">\n  Body text.\n</Card>\n';
+  const authored = snapshotText(`${head}${cards}`, file);
+  const second = anchorAt(authored, [3]);
+  assert.equal(second.span.start, 77, 'the anchor is the second card');
+  const intent = intentOn(authored, second, setAttribute('title', ''));
+  const current = snapshotText('# Cards\nand a line\n\n<Card title="Old" />\n', file);
+  const tables = referenceTables(authored.bytes, current.bytes);
+  const region = referenceMapSpan(tables, toByteSpan(78, 94));
+  assert.deepEqual(region, { tag: 'resolved', span: toByteSpan(21, 37) }, 'onto the first card');
+  assert.equal(planned({ authored, current }, intent), 'rejected: anchor-ambiguous');
 });
 
 // The limit of any rule that sees only bytes, pinned so it stays a stated

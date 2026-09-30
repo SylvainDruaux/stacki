@@ -8,11 +8,12 @@
 // then the same intents after an unrelated insertion above the body, which
 // must produce the expected file with that insertion. (2) Hand-written cases
 // for each operation's whitespace and placement rules and each refusal. (3) A
-// sweep over every `.astro` fixture: each operation on every node it applies
-// to either plans a candidate that parses, whose inverse (inverseEdits,
-// planned as `revert-splices` against the result) gives the input back byte
-// for byte, or rejects with a pinned reason; stale, it plans the same edit
-// shifted by the insertion or is refused as ambiguous — never anything else.
+// sweep over every `.astro`, Markdown and MDX fixture: each operation on
+// every node it applies to either plans a candidate that parses, whose
+// inverse (inverseEdits, planned as `revert-splices` against the result)
+// gives the input back byte for byte, or rejects with a pinned reason; stale,
+// it plans the same edit shifted by the insertion or is refused as ambiguous —
+// never anything else.
 // (4) Undo after an outside edit maps or rejects, and never reverts the
 // outside edit. (5) The inline-style declaration editor on its own.
 import assert from 'node:assert/strict';
@@ -83,14 +84,30 @@ function bodyStart(snapshot: Snapshot): number {
   return snapshot.bytes[0] === 0xef ? 3 : 0;
 }
 
-function withInsertion(snapshot: Snapshot): { readonly bytes: Uint8Array; readonly at: number } {
+/** What an unrelated edit above the body inserts: a comment in markup; in
+ * Markdown a paragraph and a blank line in the file's own line breaks (a
+ * comment there would open an HTML block that runs into the next line). */
+function insertedAbove(snapshot: Snapshot): string {
+  if (!/\.mdx?$/.test(snapshot.path)) {
+    return INSERTED;
+  }
+  const crlf = Buffer.from(snapshot.bytes).includes('\r\n');
+  return crlf ? 'Inserted above.\r\n\r\n' : 'Inserted above.\n\n';
+}
+
+function withInsertion(snapshot: Snapshot): {
+  readonly bytes: Uint8Array;
+  readonly at: number;
+  readonly text: string;
+} {
   const at = bodyStart(snapshot);
+  const text = insertedAbove(snapshot);
   const bytes = Buffer.concat([
     snapshot.bytes.subarray(0, at),
-    Buffer.from(INSERTED),
+    Buffer.from(text),
     snapshot.bytes.subarray(at),
   ]);
-  return { bytes, at };
+  return { bytes, at, text };
 }
 
 /** Undo, planned: the inverse of `plan` as a revert against the bytes it wrote. */
@@ -136,10 +153,10 @@ test('every oracle scenario plans its expected file with the shipping planner, f
       planned.value,
     );
     assert.ok(inverse.ok, `${step.file}: the inverse plans`);
-    if (!step.file.endsWith('.astro')) {
-      continue;
+    if (step.file.endsWith('.css')) {
+      continue; // A stylesheet has no body to insert above.
     }
-    // Stale: an unrelated comment above the body. The same edit, moved.
+    // Stale: an unrelated insertion above the body. The same edit, moved.
     const stale = withInsertion(input);
     const current = snapshotOf(input.path, encodeUtf8(Buffer.from(stale.bytes).toString('utf8')));
     const mapped = planIntent({ authored: input, current }, intent);
@@ -150,7 +167,7 @@ test('every oracle scenario plans its expected file with the shipping planner, f
     }
     const want = Buffer.concat([
       expected.subarray(0, stale.at),
-      Buffer.from(INSERTED),
+      Buffer.from(stale.text),
       expected.subarray(stale.at),
     ]);
     assert.deepEqual(
@@ -465,7 +482,7 @@ function corpusFiles(): readonly { readonly name: string; readonly text: string 
   return DIRECTORIES.flatMap((directory) =>
     fs
       .readdirSync(directory)
-      .filter((name) => name.endsWith('.astro'))
+      .filter((name) => /\.(astro|mdx?)$/.test(name) && name !== 'README.md')
       .sort()
       .map((name) => ({
         name: `${directory}/${name}`,
@@ -613,9 +630,9 @@ for (const [label, sweep] of Object.entries(SWEEPS)) {
         // the outside insertion it may take another whitespace run; what it
         // writes is the fresh result with that insertion kept, up to spacing.
         const staleText = textOf(applySplices(current.bytes, mapped.value.splices));
-        assert.ok(staleText.includes(INSERTED.trim()), `${where}: the outside edit survives`);
-        const spacing = (text: string) =>
-          text.replace(INSERTED.trim(), '').replace(/\s+/g, ' ').trim();
+        const outside = stale.text.trim();
+        assert.ok(staleText.includes(outside), `${where}: the outside edit survives`);
+        const spacing = (text: string) => text.replace(outside, '').replace(/\s+/g, ' ').trim();
         assert.equal(spacing(staleText), spacing(textOf(written.bytes)), `${where}: stale`);
         shifted += 1;
       }

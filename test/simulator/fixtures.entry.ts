@@ -8,6 +8,7 @@ import type { SimulationFile } from './world.ts';
 
 const HOSTILE = path.resolve('test/fixtures/editor-core');
 const CORPUS = path.resolve('test/corpus');
+const ROUND_TRIP = path.resolve('test/fixtures/round-trip');
 const CORPUS_SLICE = [
   'map-loop.astro',
   'nested-components.astro',
@@ -16,6 +17,10 @@ const CORPUS_SLICE = [
   'style-and-script.astro',
   'why-a-loop-exists.astro',
 ] as const;
+// Step 10: the Markdown and MDX round-trip pages join the hostile Markdown
+// fixtures, so seeded runs cover a post (with a CRLF and BOM variant) and MDX
+// with components as well as the hand-built shapes.
+const ROUND_TRIP_SLICE = ['post.md', 'post-bom-crlf.md', 'components.mdx'] as const;
 
 export interface SimulationFixtures {
   readonly files: readonly SimulationFile[];
@@ -32,6 +37,7 @@ export function loadSimulationFixtures(): SimulationFixtures {
   const files = [
     ...inputs.map((name) => ({ name, text: read(HOSTILE, name) })),
     ...CORPUS_SLICE.map((name) => ({ name, text: read(CORPUS, name) })),
+    ...ROUND_TRIP_SLICE.map((name) => ({ name, text: read(ROUND_TRIP, name) })),
   ];
   const alternates = new Map<string, readonly string[]>();
   for (const name of inputs) {

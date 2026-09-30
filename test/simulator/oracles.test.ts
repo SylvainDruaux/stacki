@@ -36,6 +36,11 @@ test('the corpus carries every hard intent class (tracker step 1 corpus gate)', 
     'frontmatter-slot',
     'wrong-site',
     'encoding',
+    // Step 10: Markdown and MDX shapes.
+    'markdown-list',
+    'markdown-fence',
+    'mdx-jsx',
+    'markdown-gap',
   ];
   assert.deepEqual([...classes].sort(), [...required].sort());
   const multiFile = ORACLE_SCENARIOS.find((scenario) => scenario.intentClass === 'multi-file');

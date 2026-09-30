@@ -1,5 +1,6 @@
-// Goal: the simulator runs seeded scenarios over the hostile corpus and a
-// slice of the round-trip corpus, every invariant holds after every event, and
+// Goal: the simulator runs seeded scenarios over the hostile corpus (its
+// Markdown shapes included since step 10) and a slice of the .astro and
+// Markdown round-trip corpora, every invariant holds after every event, and
 // a seed reproduces its run exactly (plan §10, invariant 9). From step 3 the
 // actor plans set-attribute with the shipping planner, so stale intents are
 // remapped through the diff, and every remap is judged against the byte
@@ -118,8 +119,22 @@ const REQUIRED_TALLIES = [
   // stale by their element's survival like set-attribute.
   'visual:rename-tag',
   'visual:rename-attribute',
-  // Not required: `rejected-gone` — no simulated writer deletes an element yet
-  // (tracker Step 3, corpus gaps).
+  // Step 10: Markdown block intents on the Markdown corpus — text typed, blocks
+  // and items removed, inserted and moved — fresh and from stale previews,
+  // judged by their node's survival; oracle gestures on Markdown shapes judged
+  // the same way. Markdown removals delete nodes, so `rejected-gone` (a stale
+  // intent whose node someone removed) is reached at last.
+  'markdown:rewrite-node',
+  'markdown:remove-node',
+  'markdown:insert-node',
+  'markdown:move-node',
+  'markdown-mapping:identity',
+  'remap-markdown:applied-correct',
+  'remap-markdown:conservative',
+  'remap-markdown:rejected-conflict',
+  'remap-markdown:rejected-gone',
+  'remap-markdown-oracle:insert-node',
+  'remap:rejected-gone anchor-moved',
 ] as const;
 
 const PINNED_SEED_1 = [2442144158, 3238099751, 3819917871, 2104621829] as const;

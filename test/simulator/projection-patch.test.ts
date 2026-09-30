@@ -60,11 +60,13 @@ const VALUES = [
 const REFUSED = ['"', "'", '`', '\\', '<', '>', '{', '}', '\n', '\r', '\t', '\u0000', '\u007f'];
 
 // STACKI_SIMULATOR_SEEDS raises the seed count off the gate, as in
-// simulator.test.ts; the gate runs 8.
+// simulator.test.ts; the gate runs 12. Step 10's Markdown events took a share
+// of the attribute edits this samples: 8 seeds patched 78 candidates, 12 patch
+// 120, above the 100 the sample must reach.
 function seedCount(): number {
   const raw = process.env['STACKI_SIMULATOR_SEEDS'];
   if (raw === undefined) {
-    return 8;
+    return 12;
   }
   const seeds = Number(raw);
   assert.ok(Number.isSafeInteger(seeds), 'STACKI_SIMULATOR_SEEDS is an integer');

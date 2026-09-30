@@ -165,6 +165,303 @@ export function judgeRemap(input: RemapCase): RemapVerdict {
   return { tag: 'wrong-site', detail };
 }
 
+/** Judging a stale Markdown block intent (step 10): a text typed, a block or
+ * an item removed, inserted beside, or moved. A Markdown node survives as the
+ * node of its kind that now holds most of its content bytes by origin
+ * (survivingBlock) — not by its first byte, as a tag by its `<`: a block's
+ * first line can be duplicated away from the rest of it. The plan was right
+ * when its splices sit where the operation says, at the survivor: a rewrite
+ * inside it, a removal around it, an insertion against it, a move around it
+ * and against the survivor of its destination. */
+export function judgeBlockRemap(input: RemapCase): RemapVerdict {
+  assert(input.authored.checksum !== input.current.checksum, 'Only stale intents are judged');
+  const decision = input.decision;
+  const authored = input.authored.projection;
+  const current = input.current.projection;
+  if (authored.tag === 'parse-error') {
+    return otherRejection(decision);
+  }
+  if (current.tag === 'parse-error') {
+    return otherRejection(decision);
+  }
+  if (decision.tag === 'rejected') {
+    if (!MAPPING_REASONS.includes(decision.reason)) {
+      return { tag: 'other', reason: decision.reason };
+    }
+  }
+  const authoredOrigins = input.authoredOrigins;
+  const currentOrigins = input.currentOrigins;
+  if (authoredOrigins === undefined || currentOrigins === undefined || input.replacedWhole) {
+    return { tag: 'unjudged', decision: decision.tag };
+  }
+  const origins = { authored: authoredOrigins, current: currentOrigins };
+  const node = anchoredNode(authored, input.intent);
+  const bytes = { authored: input.authored.bytes, current: input.current.bytes };
+  const survivor = survivingBlock(node, origins, current, bytes.authored, bytes.current);
+  if (decision.tag === 'rejected') {
+    const reason = decision.reason;
+    if (survivor === undefined) {
+      return { tag: 'rejected-gone', reason };
+    }
+    const kept = survivingSpan(origins.authored, node.span, origins.current);
+    const whole = kept !== undefined && kept.start === survivor.span.start;
+    return whole ? { tag: 'conservative', reason } : { tag: 'rejected-conflict', reason };
+  }
+  const { id, file, operation } = input.intent;
+  if (survivor === undefined && identicalRewritten(node, input)) {
+    // The node is gone, and a node of its kind holds exactly its bytes under
+    // other origins — rewritten identically, or restored by an undo mapped
+    // through other writes. No byte rule can tell the two apart (planner.test,
+    // BYTES CANNOT TELL): counted, not judged.
+    return { tag: 'unjudged', decision: decision.tag };
+  }
+  if (survivor === undefined) {
+    const text = JSON.stringify(sliceText(input.authored.bytes, node.span.start, node.span.end));
+    const where = `${node.kind} ${node.path.join('/')} ${text} at ${node.span.start}`;
+    const planned = splicesText(decision.plan.splices, input.current.bytes);
+    const what = `${id} ${operation.tag} on ${file}`;
+    const detail = `${what}: the node (${where}) is gone; planned ${planned}`;
+    return { tag: 'wrong-site', detail };
+  }
+  const splices = decision.plan.splices;
+  const views = {
+    authored,
+    current,
+    origins,
+    bytes: input.authored.bytes,
+    currentBytes: input.current.bytes,
+  };
+  const placed = blockPlanPlaced(operation, splices, survivor, views);
+  if (placed === 'placed') {
+    return { tag: 'applied-correct' };
+  }
+  if (placed === 'unjudged') {
+    return { tag: 'unjudged', decision: decision.tag };
+  }
+  const was = JSON.stringify(sliceText(input.authored.bytes, node.span.start, node.span.end));
+  const is = JSON.stringify(sliceText(input.current.bytes, survivor.span.start, survivor.span.end));
+  const now = `${survivor.span.start}-${survivor.span.end} (${node.kind} ${was}, now ${is})`;
+  const planned = splicesText(splices, input.current.bytes);
+  const what = `${id} ${operation.tag} on ${file}`;
+  const detail = `${what}: not at the node, now at ${now}; planned ${planned}`;
+  return { tag: 'wrong-site', detail };
+}
+
+interface BlockOrigins {
+  readonly authored: Origins;
+  readonly current: Origins;
+}
+
+// Where each operation's splices must sit relative to the survivor.
+function blockPlanPlaced(
+  operation: Intent['operation'],
+  splices: readonly Splice[],
+  survivor: ProjectedNode,
+  views: {
+    readonly authored: ValidProjection;
+    readonly current: ValidProjection;
+    readonly origins: BlockOrigins;
+    /** The authored bytes. */
+    readonly bytes: ByteString;
+    readonly currentBytes: ByteString;
+  },
+): 'placed' | 'misplaced' | 'unjudged' {
+  const span = survivor.span;
+  const verdict = (right: boolean) => (right ? 'placed' : 'misplaced');
+  switch (operation.tag) {
+    case 'rewrite-node':
+      return verdict(splices.every((splice) => within(splice.range, span)));
+    case 'remove-node':
+      return verdict(splices.some((splice) => within(span, splice.range)));
+    case 'insert-node':
+      return verdict(splices.every((splice) => touches(splice.range, span)));
+    case 'move-node': {
+      const destination = views.authored.nodes.find(
+        (candidate) =>
+          candidate.path.length === operation.destination.path.length &&
+          candidate.path.every((step, index) => step === operation.destination.path[index]),
+      );
+      assert(destination !== undefined, 'A move names a node of its authored view');
+      const there = survivingBlock(
+        destination,
+        views.origins,
+        views.current,
+        views.bytes,
+        views.currentBytes,
+      );
+      if (there === undefined) {
+        // Gone, or re-created identically under other origins: the same limit
+        // as the node's own (identicalRewritten).
+        const rewritten = identicalIn(destination, views.bytes, views.current, views.currentBytes);
+        return rewritten ? 'unjudged' : 'misplaced';
+      }
+      const out = splices.filter((splice) => within(span, splice.range));
+      const into = splices.filter((splice) => touches(splice.range, there.span));
+      return verdict(out.length > 0 && into.length > 0);
+    }
+    case 'set-attribute':
+    case 'remove-attribute':
+    case 'rename-binding':
+    case 'set-inline-style':
+    case 'apply-code-patch':
+    case 'revert-splices':
+    case 'edit-frontmatter-slot':
+    case 'replace-source':
+    case 'rename-tag':
+    case 'rename-attribute':
+    case 'wrap-nodes':
+    case 'append-body':
+    case 'insert-frontmatter':
+      throw new Error(`Assertion failed: ${operation.tag} is not a judged block operation`);
+    default: {
+      const exhaustive: never = operation;
+      return exhaustive;
+    }
+  }
+}
+
+function splicesText(splices: readonly Splice[], bytes: ByteString): string {
+  return splices
+    .map((splice) => {
+      const around = sliceText(bytes, splice.range.start - 30, splice.range.end + 30);
+      return `${splice.range.start}-${splice.range.end} in ${JSON.stringify(around)}`;
+    })
+    .join(', ');
+}
+
+function sliceText(bytes: ByteString, start: number, end: number): string {
+  return Buffer.from(bytes.subarray(Math.max(0, start), Math.min(bytes.length, end))).toString();
+}
+
+// Whether the current file holds a node of `node`'s kind whose bytes are
+// exactly the authored node's.
+function identicalRewritten(node: ProjectedNode, input: RemapCase): boolean {
+  const current = input.current.projection;
+  if (current.tag !== 'valid') {
+    return false;
+  }
+  return identicalIn(node, input.authored.bytes, current, input.current.bytes);
+}
+
+function identicalIn(
+  node: ProjectedNode,
+  bytes: ByteString,
+  current: ValidProjection,
+  currentBytes: ByteString,
+): boolean {
+  const text = sliceText(bytes, node.span.start, node.span.end);
+  return current.nodes.some(
+    (candidate) =>
+      candidate.kind === node.kind &&
+      sliceText(currentBytes, candidate.span.start, candidate.span.end) === text,
+  );
+}
+
+function within(inner: ByteSpan, outer: ByteSpan): boolean {
+  if (outer.start <= inner.start) {
+    return inner.end <= outer.end;
+  }
+  return false;
+}
+
+// Sharing a byte, or meeting at an edge.
+function touches(range: ByteSpan, span: ByteSpan): boolean {
+  if (range.start <= span.end) {
+    return span.start <= range.end;
+  }
+  return false;
+}
+
+// The node of the same kind now holding more than half of the authored node's
+// content bytes by origin (separators are rewritten around blocks, so they
+// are not counted). A list holds all of its item's bytes and a quote all of
+// its paragraph's, so of every node holding most of them the one most like
+// the authored node wins (closer). A node whose first line someone duplicated is where
+// most of it went, not where its first byte stayed; a node retyped under new
+// origins is gone.
+function survivingBlock(
+  node: ProjectedNode,
+  origins: BlockOrigins,
+  current: ValidProjection,
+  bytes: ByteString,
+  currentBytes: ByteString,
+): ProjectedNode | undefined {
+  const wanted = new Set<number>();
+  for (let at = node.span.start; at < node.span.end; at++) {
+    const byte = bytes[at];
+    const origin = origins.authored[at];
+    if (byte !== undefined && origin !== undefined && !isSeparatorByte(byte)) {
+      wanted.add(origin);
+    }
+  }
+  if (wanted.size === 0) {
+    return undefined;
+  }
+  // Every node of the kind holding most of the content; of those, the one
+  // most like the authored node.
+  const like = {
+    node,
+    text: sliceText(bytes, node.span.start, node.span.end),
+    bytes: currentBytes,
+  };
+  let best: ProjectedNode | undefined;
+  for (const candidate of current.nodes) {
+    if (candidate.kind !== node.kind) {
+      continue;
+    }
+    let count = 0;
+    for (let at = candidate.span.start; at < candidate.span.end; at++) {
+      count += wanted.has(origins.current[at] ?? -1) ? 1 : 0;
+    }
+    if (count * 2 > wanted.size) {
+      if (best === undefined || closer(candidate, best, like)) {
+        best = candidate;
+      }
+    }
+  }
+  return best;
+}
+
+function width(node: ProjectedNode): number {
+  return node.span.end - node.span.start;
+}
+
+// Whether `candidate` is more like `authored` than `other` is: holding exactly
+// its bytes, then closest in size, then at its depth. A list and its only
+// item hold the same content, and so do a quote and its paragraph; a block
+// nested since keeps its text but not its depth.
+function closer(
+  candidate: ProjectedNode,
+  other: ProjectedNode,
+  authored: { readonly node: ProjectedNode; readonly text: string; readonly bytes: ByteString },
+): boolean {
+  const same = (node: ProjectedNode) =>
+    sliceText(authored.bytes, node.span.start, node.span.end) === authored.text;
+  if (same(candidate) !== same(other)) {
+    return same(candidate);
+  }
+  const mine = Math.abs(width(candidate) - width(authored.node));
+  const theirs = Math.abs(width(other) - width(authored.node));
+  if (mine !== theirs) {
+    return mine < theirs;
+  }
+  const depth = authored.node.path.length;
+  return candidate.path.length === depth && other.path.length !== depth;
+}
+
+function isSeparatorByte(byte: number): boolean {
+  switch (byte) {
+    case 0x20:
+    case 0x09:
+    case 0x0a:
+    case 0x0d:
+    case 0x3e:
+      return true;
+    default:
+      return false;
+  }
+}
+
 /** Judging a stale oracle gesture step (step 6: every operation maps). The
  * oracle's hand-derived splices name the authored bytes the edit replaces; if
  * the origins show each of those ranges survived whole, the right result is
@@ -187,7 +484,7 @@ export function judgeOracleRemap(
   const currentOrigins = input.currentOrigins;
   const survived = authoredSplices.map((splice) => ({
     splice,
-    span: survivingSpan(authoredOrigins, splice.range, currentOrigins),
+    span: survivingRange(authoredOrigins, splice.range, currentOrigins),
   }));
   const whole = survived.every((entry) => entry.span !== undefined);
   if (decision.tag === 'rejected') {
@@ -215,8 +512,42 @@ export function judgeOracleRemap(
     return { tag: 'applied-correct' };
   }
   const { id, file, operation } = input.intent;
-  const detail = `${id} ${operation.tag} on ${file}: another result`;
+  const what = `${id} ${operation.tag} on ${file}`;
+  const detail = `${what}: another result ${firstDifference(expected, actual)}`;
   return { tag: 'wrong-site', detail };
+}
+
+// Where two results part, with a little of each: what a wrong-site report shows.
+function firstDifference(expected: ByteString, actual: ByteString): string {
+  let at = 0;
+  while (at < expected.length && at < actual.length && expected[at] === actual[at]) {
+    at++;
+  }
+  const around = (bytes: ByteString) =>
+    JSON.stringify(Buffer.from(bytes.subarray(Math.max(0, at - 12), at + 24)).toString('utf8'));
+  return `at byte ${at}: expected ${around(expected)}, planned ${around(actual)}`;
+}
+
+// A range's survivor: its own bytes whole, or — an insertion's point, which
+// holds no byte — the byte before it (the point follows it), else the byte
+// after it (the point precedes it).
+function survivingRange(
+  authored: Origins,
+  range: ByteSpan,
+  current: Origins,
+): ByteSpan | undefined {
+  if (range.start < range.end) {
+    return survivingSpan(authored, range, current);
+  }
+  if (range.start > 0) {
+    const before = survivingSpan(authored, toByteSpan(range.start - 1, range.start), current);
+    return before === undefined ? undefined : toByteSpan(before.end, before.end);
+  }
+  if (range.start < authored.length) {
+    const after = survivingSpan(authored, toByteSpan(range.start, range.start + 1), current);
+    return after === undefined ? undefined : toByteSpan(after.start, after.start);
+  }
+  return undefined;
 }
 
 function collapsed(bytes: ByteString): string {
