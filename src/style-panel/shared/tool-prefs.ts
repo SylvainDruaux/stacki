@@ -11,27 +11,27 @@ import { BOUNDARY_LIMITS } from '../../../shared/boundary';
 // default so a chosen embed (e.g. a global-CSS embed) sticks across reloads.
 const EMBED_SOURCE_KEY = 'moden.embedEditor.source';
 
-/** A stored embed source key, or null when absent or not one: storage is
+/** A stored embed source key, or undefined when absent or not one: storage is
  * shared with every earlier build, so what it holds is parsed like any input.
  * A key names a file or a node, so it is bounded as a path. */
-export function parseStoredEmbedSource(raw: unknown): string | null {
+export function parseStoredEmbedSource(raw: unknown): string | undefined {
   if (typeof raw === 'string') {
     if (raw.length > 0) {
-      return raw.length <= BOUNDARY_LIMITS.pathLengthMax ? raw : null;
+      return raw.length <= BOUNDARY_LIMITS.pathLengthMax ? raw : undefined;
     }
   }
-  return null;
+  return undefined;
 }
 
-export function loadEmbedSource(): string | null {
+export function loadEmbedSource(): string | undefined {
   try {
     return parseStoredEmbedSource(localStorage.getItem(EMBED_SOURCE_KEY));
   } catch {
-    return null;
+    return undefined;
   }
 }
 
-export function saveEmbedSource(key: string | null) {
+export function saveEmbedSource(key: string | undefined) {
   try {
     if (key) {
       localStorage.setItem(EMBED_SOURCE_KEY, key);

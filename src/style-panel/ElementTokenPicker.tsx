@@ -15,7 +15,7 @@ export default function ElementTokenPicker({
 }) {
   const tokens = useMemo(() => snapshotTokens(snapshot), [snapshot]);
   if (!tokens.length) {
-    return null;
+    return undefined;
   }
 
   const selector = tokens

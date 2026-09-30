@@ -42,11 +42,14 @@ function CenterHorizontallyIcon() {
 
 // The effective (winning) value of a side, for the centered-state check.
 function sideValue(read: Read, prop: string): string {
-  const r = read(prop);
-  if (!r) {
+  const resolved = read(prop);
+  if (!resolved) {
     return '';
   }
-  const effective = r.source === 'selected' && r.selectedValue ? r.selectedValue : r.winner;
+  const effective =
+    resolved.source === 'selected' && resolved.selectedValue
+      ? resolved.selectedValue
+      : resolved.winner;
   return effective.value.trim().toLowerCase();
 }
 

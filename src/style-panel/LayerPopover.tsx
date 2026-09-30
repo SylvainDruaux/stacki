@@ -13,7 +13,7 @@ import { inOwnedPopup } from './lib/popup-layer';
 // Closes on outside click / Escape / scroll; the anchor row is excluded from the
 // outside-click so clicking it toggles the popover shut instead of instantly reopening.
 export default function LayerPopover({
-  anchorEl,
+  anchorEl: anchorElement,
   onClose,
   ariaLabel,
   children,
@@ -25,7 +25,6 @@ export default function LayerPopover({
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const boxRef = useRef<HTMLDivElement>(null);
-  const [top, setTop] = useState<number | null>(null);
   // Whether the box has to be a scroll container. It is one so a tall layer
   // editor can't run off the screen — and a scroll container clips, which took
   // out the one thing in here that is *meant* to escape: a dropdown's menu. With
@@ -38,78 +37,9 @@ export default function LayerPopover({
   const scrolls = usePopoverOverflow(boxRef);
   // Read once, at mount, so the popover has its real width for the very first
   // layout — the flip decision below measures a height that depends on it.
-  const [span] = useState(() => panelSpan(anchorEl));
-  useLayoutEffect(() => {
-    const el = ref.current;
-    if (!el) {
-      return;
-    }
-    const a = anchorEl.getBoundingClientRect();
-    const gap = 6;
-    const h = el.offsetHeight; // rendered height (the zoomed content already collapsed it)
-    const below = a.bottom + gap + h <= window.innerHeight;
-    setTop(below ? a.bottom + gap : Math.max(gap, a.top - gap - h));
-  }, [anchorEl]);
-
-  useEffect(() => {
-    // The press that dismisses this popover is spent dismissing it. Without
-    // that, clicking a control outside to get rid of the popover also pressed
-    // the control: aiming at "Events: Auto" to close the transform editor set
-    // pointer-events on the element. One press, one thing.
-    const swallowNextClick = () => {
-      const eat = (e: MouseEvent) => {
-        e.preventDefault();
-        e.stopPropagation();
-      };
-      document.addEventListener('click', eat, { capture: true, once: true });
-      // A press that never becomes a click (a drag away, a right-click) must not
-      // leave this armed for whatever is clicked next.
-      window.setTimeout(() => document.removeEventListener('click', eat, true), 400);
-    };
-    const onDown = (e: MouseEvent) => {
-      const target = e.target;
-      if (!(target instanceof Node)) {
-        return;
-      }
-      // A popup this one opened (the colour picker from a swatch in here) is drawn
-      // through a portal, so `contains` says outside — see lib/popup-layer.
-      if (inOwnedPopup(target, ref.current)) {
-        return;
-      }
-      if (ref.current?.contains(target) || anchorEl.contains(target)) {
-        return;
-      }
-      // The anchor row is excluded above: pressing it toggles the popover shut
-      // through its own handler, which is a press meant for it.
-      swallowNextClick();
-      onClose();
-    };
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        onClose();
-      }
-    };
-    // Closing on scroll is about the page moving out from under a popover that is
-    // pinned to a rectangle it can no longer see. A list scrolling INSIDE it is
-    // not that — and a dropdown scrolls itself the moment it opens, to bring the
-    // selected option into view, which shut the editor as soon as you opened the
-    // one control most of these editors lead with.
-    const onScroll = (e: Event) => {
-      const t = e.target;
-      if (t instanceof Node && ref.current?.contains(t)) {
-        return;
-      }
-      onClose();
-    };
-    document.addEventListener('mousedown', onDown);
-    document.addEventListener('keydown', onKey);
-    window.addEventListener('scroll', onScroll, true);
-    return () => {
-      document.removeEventListener('mousedown', onDown);
-      document.removeEventListener('keydown', onKey);
-      window.removeEventListener('scroll', onScroll, true);
-    };
-  }, [onClose, anchorEl]);
+  const [span] = useState(() => panelSpan(anchorElement));
+  const top = usePopoverTop(ref, anchorElement);
+  usePopoverDismiss(ref, anchorElement, onClose);
   return createPortal(
     <div
       ref={ref}
@@ -121,7 +51,7 @@ export default function LayerPopover({
         left: span.left,
         width: span.width,
         top: top ?? 0,
-        visibility: top == null ? 'hidden' : 'visible',
+        visibility: top === undefined ? 'hidden' : 'visible',
       }}
     >
       <div
@@ -137,7 +67,97 @@ export default function LayerPopover({
   );
 }
 
-function usePopoverOverflow(boxRef: RefObject<HTMLDivElement | null>): boolean {
+// The popover's top edge: directly below the anchor row, or flipped above it
+// when there is no room to drop down. Undefined until the first measurement.
+function usePopoverTop(
+  ref: RefObject<HTMLDivElement>,
+  anchorElement: HTMLElement,
+): number | undefined {
+  const [top, setTop] = useState<number | undefined>(undefined);
+  useLayoutEffect(() => {
+    const element = ref.current;
+    if (!element) {
+      return;
+    }
+    const anchorRect = anchorElement.getBoundingClientRect();
+    const gap = 6;
+    // Rendered height (the zoomed content already collapsed it).
+    const height = element.offsetHeight;
+    const below = anchorRect.bottom + gap + height <= window.innerHeight;
+    setTop(below ? anchorRect.bottom + gap : Math.max(gap, anchorRect.top - gap - height));
+  }, [ref, anchorElement]);
+  return top;
+}
+
+// Closes on outside press, Escape, and a scroll of the page beneath.
+function usePopoverDismiss(
+  ref: RefObject<HTMLDivElement>,
+  anchorElement: HTMLElement,
+  onClose: () => void,
+): void {
+  useEffect(() => {
+    const onDown = (event: MouseEvent) => {
+      const target = event.target;
+      if (!(target instanceof Node)) {
+        return;
+      }
+      // A popup this one opened (the colour picker from a swatch in here) is drawn
+      // through a portal, so `contains` says outside — see lib/popup-layer.
+      if (inOwnedPopup(target, ref.current ?? undefined)) {
+        return;
+      }
+      if (ref.current?.contains(target) || anchorElement.contains(target)) {
+        return;
+      }
+      // The anchor row is excluded above: pressing it toggles the popover shut
+      // through its own handler, which is a press meant for it.
+      swallowNextClick();
+      onClose();
+    };
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        onClose();
+      }
+    };
+    // Closing on scroll is about the page moving out from under a popover that is
+    // pinned to a rectangle it can no longer see. A list scrolling INSIDE it is
+    // not that — and a dropdown scrolls itself the moment it opens, to bring the
+    // selected option into view, which shut the editor as soon as you opened the
+    // one control most of these editors lead with.
+    const onScroll = (event: Event) => {
+      const target = event.target;
+      if (target instanceof Node && ref.current?.contains(target)) {
+        return;
+      }
+      onClose();
+    };
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('keydown', onKey);
+    window.addEventListener('scroll', onScroll, true);
+    return () => {
+      document.removeEventListener('mousedown', onDown);
+      document.removeEventListener('keydown', onKey);
+      window.removeEventListener('scroll', onScroll, true);
+    };
+  }, [ref, onClose, anchorElement]);
+}
+
+// The press that dismisses this popover is spent dismissing it. Without that,
+// clicking a control outside to get rid of the popover also pressed the
+// control: aiming at "Events: Auto" to close the transform editor set
+// pointer-events on the element. One press, one thing.
+function swallowNextClick(): void {
+  const eat = (event: MouseEvent) => {
+    event.preventDefault();
+    event.stopPropagation();
+  };
+  document.addEventListener('click', eat, { capture: true, once: true });
+  // A press that never becomes a click (a drag away, a right-click) must not
+  // leave this armed for whatever is clicked next.
+  window.setTimeout(() => document.removeEventListener('click', eat, true), 400);
+}
+
+function usePopoverOverflow(boxRef: RefObject<HTMLDivElement>): boolean {
   const [scrolls, setScrolls] = useState(false);
   useLayoutEffect(() => {
     const box = boxRef.current;
@@ -151,7 +171,7 @@ function usePopoverOverflow(boxRef: RefObject<HTMLDivElement | null>): boolean {
     // A max-height box can keep the same border size while its contents grow,
     // so ResizeObserver alone misses the exact change that makes it scroll.
     const mutations =
-      typeof MutationObserver === 'undefined' ? null : new MutationObserver(measure);
+      typeof MutationObserver === 'undefined' ? undefined : new MutationObserver(measure);
     mutations?.observe(box, { attributes: true, childList: true, subtree: true });
     window.addEventListener('resize', measure);
     return () => {

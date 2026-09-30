@@ -7,7 +7,7 @@ import SegmentedControl from './components/SegmentedControl';
 import ColorSwatch from './components/ColorSwatch';
 import { useLiveColor } from './lib/live-color';
 import useScrub from './components/useScrub';
-import { ShadowNum, ShadowColorRow } from './ShadowFields';
+import { ShadowLength, ShadowColorRow } from './ShadowFields';
 import { handleArrowStep } from './lib/number-step';
 import { panelBounds } from './lib/panel-box';
 import { getProjectFontFamilies } from './lib/webflow';
@@ -37,7 +37,7 @@ import { commitInPlace } from './lib/commit-in-place';
 
 type SetProp = (prop: string, value: string, important: boolean) => void;
 type ClearProp = (prop: string | string[]) => void;
-type LiveSetProp = (prop: string, value: string | null, important: boolean) => void;
+type LiveSetProp = (prop: string, value: string | undefined, important: boolean) => void;
 type Read = (prop: string) => ResolvedProp | undefined;
 
 export type Props = {
@@ -89,7 +89,7 @@ function parseImportant(input: string): { value: string; important: boolean } {
   }
   return { value: input.trim(), important: false };
 }
-const joinImportant = (value: string, important: boolean) =>
+const joinImportant = ({ value, important }: { value: string; important: boolean }) =>
   important ? `${value} !important` : value;
 
 const CUSTOM = '__custom__';
@@ -288,7 +288,7 @@ const DIRECTION_LTR_MARK_PATH =
   '3.47728 3.15224 3.23463C3.25275 2.99198 3.40007 2.7715 3.58579 2.58579' +
   'C3.7715 2.40007 3.99198 2.25275 4.23463 2.15224ZM5 6L5 2H11V3H9V10H8V3H6V10H5L5 6Z';
 
-// Direction
+// Direction icons.
 function DirectionLTRIcon() {
   return (
     <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
@@ -337,7 +337,7 @@ export function PropLabel({
   label,
   prop,
   tipProps,
-  d,
+  display: display,
   contributors,
   busy,
   onClear,
@@ -348,7 +348,7 @@ export function PropLabel({
   prop: string;
   /** Properties named in the hover tooltip — defaults to the one `prop` shown. */
   tipProps?: readonly string[];
-  d: Display;
+  display: Display;
   contributors: Contributor[];
   busy: boolean;
   onClear: () => void;
@@ -356,7 +356,7 @@ export function PropLabel({
   onSelectSelector: (selector: string, prop?: string) => void;
 }) {
   const tip = tipProps ?? [prop];
-  if (d.present && !d.isSelected) {
+  if (display.present && !display.isSelected) {
     return (
       <ProvenanceLabel
         label={label}
@@ -369,19 +369,19 @@ export function PropLabel({
   }
   return (
     <FieldLabel
-      className={`embed-editor_size-label ${d.overridden ? 'is-overridden' : ''}`}
-      active={d.isSelected}
+      className={`embed-editor_size-label ${display.overridden ? 'is-overridden' : ''}`}
+      active={display.isSelected}
       disabled={busy}
       onReset={onClear}
       resetLabel="Clear"
       tooltip={<PropTip props={tip} />}
-      {...(d.overridden ? { title: `Overridden by ${d.winnerSelector}` } : {})}
+      {...(display.overridden ? { title: `Overridden by ${display.winnerSelector}` } : {})}
       menuNote={(close) => (
         <ProvenanceList
           contributors={contributors}
           prop={prop}
-          onSelect={(sel, p) => {
-            onSelectSelector(sel, p);
+          onSelect={(selector, selectorProp) => {
+            onSelectSelector(selector, selectorProp);
             close();
           }}
         />
@@ -415,8 +415,8 @@ export function GroupLabel({
   onSelectSelector: (selector: string, prop?: string) => void;
 }) {
   const prop =
-    props.find((p) => read(p)?.source === 'selected') ??
-    props.find((p) => read(p) != null) ??
+    props.find((name) => read(name)?.source === 'selected') ??
+    props.find((name) => read(name) !== undefined) ??
     props[0];
   if (prop === undefined) {
     throw new Error('Group label requires at least one property');
@@ -426,7 +426,7 @@ export function GroupLabel({
       label={label}
       prop={prop}
       tipProps={props}
-      d={displayOf(read(prop))}
+      display={displayOf(read(prop))}
       contributors={read(prop)?.contributors ?? []}
       busy={busy}
       onClear={onClear}
@@ -453,7 +453,37 @@ export function LiveInput({
   onCommit,
   onLiveCommit,
   onClear,
-}: {
+}: LiveInputProps) {
+  const field = useLiveInputEditing({ value, busy, onCommit, onLiveCommit, onClear });
+  return (
+    <VariableConnect
+      code
+      ariaLabel={`Connect ${ariaLabel || 'value'} to a variable`}
+      disabled={busy}
+      {...(prop === undefined ? {} : { prop })}
+      onPick={(binding) => onCommit(binding, false)}
+    >
+      <input
+        {...field.scrub.input}
+        ref={inputRef}
+        className={className}
+        data-prop={dataProp}
+        value={field.draft}
+        onChange={(event) => field.change(event.target.value)}
+        onFocus={field.focus}
+        onBlur={field.blur}
+        onKeyDown={field.keyDown}
+        disabled={busy}
+        spellCheck={false}
+        placeholder={placeholder}
+        aria-label={ariaLabel}
+        autoFocus={autoFocus}
+      />
+    </VariableConnect>
+  );
+}
+
+type LiveInputProps = {
   value: string;
   busy: boolean;
   placeholder?: string;
@@ -468,46 +498,27 @@ export function LiveInput({
   onCommit: (value: string, important: boolean) => void;
   onLiveCommit?: (value: string, important: boolean) => void;
   onClear: () => void;
+};
+
+// The input's editing state: a draft that follows `value` while nobody is
+// typing, live writes while someone is, and the commit (or clear) on blur.
+function useLiveInputEditing({
+  value,
+  busy,
+  onCommit,
+  onLiveCommit,
+  onClear,
+}: Pick<LiveInputProps, 'value' | 'busy' | 'onCommit' | 'onClear'> & {
+  onLiveCommit: LiveInputProps['onLiveCommit'] | undefined;
 }) {
   const [draft, setDraft] = useState(value);
   const focused = useRef(false);
-  const liveTimer = useRef<number | null>(null);
-
   useEffect(() => {
     if (!focused.current) {
       setDraft(value);
     }
   }, [value]);
-  const cancelLive = () => {
-    if (liveTimer.current != null) {
-      window.clearTimeout(liveTimer.current);
-      liveTimer.current = null;
-    }
-  };
-  useEffect(() => cancelLive, []);
-
-  // Undelayed live write for the scrub, which throttles its own — see useScrub.
-  const liveNow = (text: string) => {
-    if (!onLiveCommit) {
-      return;
-    }
-    const trimmed = text.trim();
-    if (!trimmed) {
-      return;
-    }
-    const parsed = parseImportant(trimmed);
-    onLiveCommit(parsed.value, parsed.important);
-  };
-  const scheduleLive = (text: string) => {
-    if (!onLiveCommit) {
-      return;
-    }
-    cancelLive();
-    liveTimer.current = window.setTimeout(() => {
-      liveTimer.current = null;
-      liveNow(text);
-    }, 100);
-  };
+  const { cancelLive, liveNow, scheduleLive } = useDebouncedLive(onLiveCommit);
   const commit = (text = draft) => {
     const trimmed = text.trim();
     if (!trimmed) {
@@ -527,75 +538,88 @@ export function LiveInput({
       commit(text);
     },
   });
+  return {
+    draft,
+    scrub,
+    change: (text: string) => {
+      setDraft(text);
+      scheduleLive(text);
+    },
+    focus: () => {
+      focused.current = true;
+    },
+    blur: () => {
+      focused.current = false;
+      cancelLive();
+      commit();
+    },
+    keyDown: (event: React.KeyboardEvent<HTMLInputElement>) => {
+      const stepped = stepLiveKey(event);
+      if (stepped !== undefined) {
+        setDraft(stepped);
+        scheduleLive(stepped);
+      }
+    },
+  };
+}
 
-  return (
-    <VariableConnect
-      code
-      ariaLabel={`Connect ${ariaLabel || 'value'} to a variable`}
-      disabled={busy}
-      {...(prop === undefined ? {} : { prop })}
-      onPick={(binding) => onCommit(binding, false)}
-    >
-      <input
-        {...scrub.input}
-        ref={inputRef}
-        className={className}
-        data-prop={dataProp}
-        value={draft}
-        onChange={(event) => {
-          setDraft(event.target.value);
-          scheduleLive(event.target.value);
-        }}
-        onFocus={() => {
-          focused.current = true;
-        }}
-        onBlur={() => {
-          focused.current = false;
-          cancelLive();
-          commit();
-        }}
-        onKeyDown={(event) => {
-          if (event.key === 'Enter') {
-            commitInPlace(event.currentTarget);
-            return;
-          }
-          const stepped = handleArrowStep(event);
-          if (!stepped) {
-            return;
-          }
-          event.preventDefault();
-          const el = event.currentTarget;
-          el.value = stepped.text;
-          el.setSelectionRange(stepped.caret, stepped.caret);
-          setDraft(stepped.text);
-          scheduleLive(stepped.text);
-        }}
-        disabled={busy}
-        spellCheck={false}
-        placeholder={placeholder}
-        aria-label={ariaLabel}
-        autoFocus={autoFocus}
-      />
-    </VariableConnect>
-  );
+// Live writes of typed text, split into value and `!important` — none at all
+// without a writer. `scheduleLive` debounces typing; `liveNow` is the undelayed
+// write for the scrub, which throttles its own — see useScrub.
+function useDebouncedLive(write: ((value: string, important: boolean) => void) | undefined) {
+  const liveTimer = useRef<number | undefined>(undefined);
+  const cancelLive = () => {
+    if (liveTimer.current !== undefined) {
+      window.clearTimeout(liveTimer.current);
+      liveTimer.current = undefined;
+    }
+  };
+  useEffect(() => cancelLive, []);
+  const liveNow = (text: string) => {
+    if (!write) {
+      return;
+    }
+    const trimmed = text.trim();
+    if (!trimmed) {
+      return;
+    }
+    const parsed = parseImportant(trimmed);
+    write(parsed.value, parsed.important);
+  };
+  const scheduleLive = (text: string) => {
+    if (!write) {
+      return;
+    }
+    cancelLive();
+    liveTimer.current = window.setTimeout(() => {
+      liveTimer.current = undefined;
+      liveNow(text);
+    }, 100);
+  };
+  return { cancelLive, liveNow, scheduleLive };
+}
+
+// Enter commits in place; an arrow key steps the number under the caret and
+// writes it straight into the input. Returns the stepped text, if any.
+function stepLiveKey(event: React.KeyboardEvent<HTMLInputElement>): string | undefined {
+  if (event.key === 'Enter') {
+    commitInPlace(event.currentTarget);
+    return undefined;
+  }
+  const stepped = handleArrowStep(event);
+  if (!stepped) {
+    return undefined;
+  }
+  event.preventDefault();
+  const input = event.currentTarget;
+  input.value = stepped.text;
+  input.setSelectionRange(stepped.caret, stepped.caret);
+  return stepped.text;
 }
 
 // A label + text field bound to one property. An optional swatch (color field)
 // renders inside the field to the left of the input.
-function TextField({
-  prop,
-  label,
-  placeholder,
-  swatch,
-  swatchLabel,
-  read,
-  busy,
-  setProp,
-  clearProp,
-  liveSetProp,
-  onProvenance,
-  onSelectSelector,
-}: {
+type TextFieldProps = {
   prop: string;
   label: string;
   placeholder?: string;
@@ -604,9 +628,13 @@ function TextField({
    *  rather than passed in as `swatch` so a drag on it shows in the field: the
    *  drag writes to the canvas, not to the model this field reads. */
   swatchLabel?: string;
-} & Props) {
-  const d = displayOf(read(prop));
-  const external = d.present ? joinImportant(d.value, d.important) : '';
+} & Props;
+
+function TextField(props: TextFieldProps) {
+  const { prop, label, placeholder, swatch, swatchLabel, read, busy } = props;
+  const { setProp, clearProp, liveSetProp, onProvenance, onSelectSelector } = props;
+  const display = displayOf(read(prop));
+  const external = display.present ? joinImportant(display) : '';
   const [shown, noteLive] = useLiveColor(external);
   const ownSwatch = swatchLabel ? (
     <ColorSwatch
@@ -614,7 +642,7 @@ function TextField({
       busy={busy}
       ariaLabel={swatchLabel}
       onChange={(color, live) => {
-        noteLive(live ? color : null);
+        noteLive(live ? color : undefined);
         if (live) {
           liveSetProp(prop, color, false);
         } else {
@@ -622,7 +650,7 @@ function TextField({
         }
       }}
     />
-  ) : null;
+  ) : undefined;
   const input = (
     <LiveInput
       value={shown}
@@ -637,21 +665,22 @@ function TextField({
       onClear={() => clearProp(prop)}
     />
   );
+  const fieldSwatch = ownSwatch ?? swatch;
   return (
     <>
       <PropLabel
         label={label}
         prop={prop}
-        d={d}
+        display={display}
         contributors={read(prop)?.contributors ?? []}
         busy={busy}
         onClear={() => clearProp(prop)}
         onProvenance={onProvenance}
         onSelectSelector={onSelectSelector}
       />
-      {(ownSwatch ?? swatch) ? (
+      {fieldSwatch ? (
         <div className="embed-editor_type-field">
-          {ownSwatch ?? swatch}
+          {fieldSwatch}
           {input}
         </div>
       ) : (
@@ -681,8 +710,8 @@ export function StackedField({
   label: string;
   placeholder?: string;
 } & Props) {
-  const d = displayOf(read(prop));
-  const external = d.present ? joinImportant(d.value, d.important) : '';
+  const display = displayOf(read(prop));
+  const external = display.present ? joinImportant(display) : '';
   return (
     <div className="embed-editor_type-cell">
       <LiveInput
@@ -700,7 +729,7 @@ export function StackedField({
       <PropLabel
         label={label}
         prop={prop}
-        d={d}
+        display={display}
         contributors={read(prop)?.contributors ?? []}
         busy={busy}
         onClear={() => clearProp(prop)}
@@ -763,55 +792,15 @@ function quoteFamily(name: string): string {
   return /^[a-zA-Z_-][a-zA-Z0-9_-]*$/.test(name) ? name : `"${name}"`;
 }
 
-function FontFamilyField({
-  read,
-  busy,
-  setProp,
-  clearProp,
-  liveSetProp,
-  onProvenance,
-  onSelectSelector,
-}: Props) {
-  const d = displayOf(read('font-family'));
-  const [fonts, setFonts] = useState<string[]>([]);
+function FontFamilyField(props: Props) {
+  const { read, busy, setProp, clearProp, liveSetProp, onProvenance, onSelectSelector } = props;
+  const display = displayOf(read('font-family'));
+  const fonts = useProjectFonts();
   const [forceCustom, setForceCustom] = useState(false);
-  useEffect(() => {
-    let live = true;
-    void getProjectFontFamilies().then((list) => {
-      if (live) {
-        setFonts(list);
-      }
-    });
-    return () => {
-      live = false;
-    };
-  }, []);
-
-  // The project's discovered fonts (variables + fonts used on any style) minus the ones
-  // already listed under Google/Web — what's left are the project's own custom fonts.
-  const builtInLower = new Set([...GOOGLE_FONTS, ...WEB_FONTS].map((f) => f.toLowerCase()));
-  const customFonts = fonts.filter((f) => !builtInLower.has(f.toLowerCase()));
-  const named = [...customFonts, ...GOOGLE_FONTS, ...WEB_FONTS];
-  const byPrimary = new Map(named.map((f) => [primaryFamily(f), f]));
-
-  const current = d.present ? d.value : '';
+  const { options, byPrimary } = fontOptions(fonts);
+  const current = display.present ? display.value : '';
   const matched = current ? byPrimary.get(primaryFamily(current)) : undefined;
-  const customMode = forceCustom || (d.present && !matched);
-
-  const options: SelectOption<string>[] = [{ value: '', label: 'Default' }];
-  const group = (heading: string, list: string[]) => {
-    if (!list.length) {
-      return;
-    }
-    options.push({ value: `__head_${heading}`, label: heading, heading: true });
-    for (const f of list) {
-      options.push({ value: f, label: f, indent: true });
-    }
-  };
-  group('Custom fonts', customFonts);
-  group('Google fonts', GOOGLE_FONTS);
-  group('Web fonts', WEB_FONTS);
-  options.push({ value: CUSTOM, label: 'Custom…' });
+  const customMode = forceCustom || (display.present && !matched);
 
   const pick = (value: string) => {
     if (value === CUSTOM) {
@@ -825,19 +814,20 @@ function FontFamilyField({
     }
     setProp('font-family', quoteFamily(value), false);
   };
+  const clear = () => {
+    setForceCustom(false);
+    clearProp('font-family');
+  };
 
   return (
     <div className="embed-editor_size-row">
       <PropLabel
         label="Font"
         prop="font-family"
-        d={d}
+        display={display}
         contributors={read('font-family')?.contributors ?? []}
         busy={busy}
-        onClear={() => {
-          setForceCustom(false);
-          clearProp('font-family');
-        }}
+        onClear={clear}
         onProvenance={onProvenance}
         onSelectSelector={onSelectSelector}
       />
@@ -845,9 +835,11 @@ function FontFamilyField({
         value={customMode ? CUSTOM : (matched ?? '')}
         options={options}
         onChange={pick}
-        onPreview={(value) =>
-          liveSetProp('font-family', value && value !== CUSTOM ? quoteFamily(value) : null, false)
-        }
+        onPreview={(value) => {
+          const previewed = value ?? undefined;
+          const font = previewed && previewed !== CUSTOM ? quoteFamily(previewed) : undefined;
+          liveSetProp('font-family', font, false);
+        }}
         ariaLabel="Font family"
         disabled={busy}
         searchable
@@ -858,9 +850,7 @@ function FontFamilyField({
               // Start empty when switching to Custom from a NAMED font (so typing doesn't
               // append onto e.g. "Montserrat" → "Montserratunset"); keep the current value
               // when it's already a custom one being edited.
-              value={
-                forceCustom && matched ? '' : d.present ? joinImportant(d.value, d.important) : ''
-              }
+              value={forceCustom && matched ? '' : display.present ? joinImportant(display) : ''}
               busy={busy}
               placeholder="font-family"
               ariaLabel="Font family"
@@ -869,16 +859,56 @@ function FontFamilyField({
               autoFocus={forceCustom}
               onCommit={(value, important) => setProp('font-family', value, important)}
               onLiveCommit={(value, important) => liveSetProp('font-family', value, important)}
-              onClear={() => {
-                setForceCustom(false);
-                clearProp('font-family');
-              }}
+              onClear={clear}
             />
           ) : undefined
         }
       />
     </div>
   );
+}
+
+// The project's discovered font families (variables + fonts used on any style),
+// empty until they have loaded.
+function useProjectFonts(): string[] {
+  const [fonts, setFonts] = useState<string[]>([]);
+  useEffect(() => {
+    let live = true;
+    void getProjectFontFamilies().then((list) => {
+      if (live) {
+        setFonts(list);
+      }
+    });
+    return () => {
+      live = false;
+    };
+  }, []);
+  return fonts;
+}
+
+// The dropdown's options, grouped under headings, and every named font by its
+// primary family. The project's fonts minus the ones already listed under
+// Google/Web are what's left: the project's own custom fonts.
+function fontOptions(fonts: string[]) {
+  const builtInLower = new Set([...GOOGLE_FONTS, ...WEB_FONTS].map((font) => font.toLowerCase()));
+  const customFonts = fonts.filter((font) => !builtInLower.has(font.toLowerCase()));
+  const named = [...customFonts, ...GOOGLE_FONTS, ...WEB_FONTS];
+  const byPrimary = new Map(named.map((font) => [primaryFamily(font), font]));
+  const options: SelectOption<string>[] = [{ value: '', label: 'Default' }];
+  const group = (heading: string, list: string[]) => {
+    if (!list.length) {
+      return;
+    }
+    options.push({ value: `__head_${heading}`, label: heading, heading: true });
+    for (const font of list) {
+      options.push({ value: font, label: font, indent: true });
+    }
+  };
+  group('Custom fonts', customFonts);
+  group('Google fonts', GOOGLE_FONTS);
+  group('Web fonts', WEB_FONTS);
+  options.push({ value: CUSTOM, label: 'Custom…' });
+  return { options, byPrimary };
 }
 
 // ─────────────────────────── Font weight ───────────────────────────
@@ -894,39 +924,31 @@ const WEIGHTS: ReadonlyArray<[string, string]> = [
   ['800', '800 - Extra Bold'],
   ['900', '900 - Black'],
 ];
-const WEIGHT_VALUES = new Set(WEIGHTS.map(([v]) => v));
+const WEIGHT_VALUES = new Set(WEIGHTS.map(([weight]) => weight));
+const WEIGHT_OPTIONS: SelectOption<string>[] = [
+  { value: '', label: 'Default' },
+  ...WEIGHTS.map(([value, label]) => ({ value, label })),
+  { value: CUSTOM, label: 'Custom…' },
+];
 // Map the CSS keywords onto the numeric scale so they select the right option.
 function normalizeWeight(value: string): string {
-  const v = value.trim().toLowerCase();
-  if (v === 'normal') {
+  const text = value.trim().toLowerCase();
+  if (text === 'normal') {
     return '400';
   }
-  if (v === 'bold') {
+  if (text === 'bold') {
     return '700';
   }
-  return v;
+  return text;
 }
 
-function WeightField({
-  read,
-  busy,
-  setProp,
-  clearProp,
-  liveSetProp,
-  onProvenance,
-  onSelectSelector,
-}: Props) {
-  const d = displayOf(read('font-weight'));
+function WeightField(props: Props) {
+  const { read, busy, setProp, clearProp, liveSetProp, onProvenance, onSelectSelector } = props;
+  const display = displayOf(read('font-weight'));
   const [forceCustom, setForceCustom] = useState(false);
-  const normalized = d.present ? normalizeWeight(d.value) : '';
+  const normalized = display.present ? normalizeWeight(display.value) : '';
   const matched = WEIGHT_VALUES.has(normalized) ? normalized : undefined;
-  const customMode = forceCustom || (d.present && !matched);
-
-  const options: SelectOption<string>[] = [
-    { value: '', label: 'Default' },
-    ...WEIGHTS.map(([value, label]) => ({ value, label })),
-  ];
-  options.push({ value: CUSTOM, label: 'Custom…' });
+  const customMode = forceCustom || (display.present && !matched);
 
   const pick = (value: string) => {
     if (value === CUSTOM) {
@@ -946,7 +968,7 @@ function WeightField({
       <PropLabel
         label="Weight"
         prop="font-weight"
-        d={d}
+        display={display}
         contributors={read('font-weight')?.contributors ?? []}
         busy={busy}
         onClear={() => {
@@ -958,15 +980,17 @@ function WeightField({
       />
       <Select
         value={customMode ? CUSTOM : (matched ?? '')}
-        options={options}
+        options={WEIGHT_OPTIONS}
         onChange={pick}
-        onPreview={(value) => liveSetProp('font-weight', value === CUSTOM ? null : value, false)}
+        onPreview={(value) =>
+          liveSetProp('font-weight', value === CUSTOM ? undefined : (value ?? undefined), false)
+        }
         ariaLabel="Font weight"
         disabled={busy}
         customInput={
           customMode ? (
             <LiveInput
-              value={d.present ? joinImportant(d.value, d.important) : ''}
+              value={display.present ? joinImportant(display) : ''}
               busy={busy}
               placeholder="font-weight"
               ariaLabel="Font weight"
@@ -1016,18 +1040,86 @@ function MenuItem({
 // A segmented icon bar + a dropdown arrow whose menu offers Custom; a free value
 // (anything outside the segments) shows an editable field. Mirrors the Size
 // section's overflow bar, reusing the Display control's segmented-bar CSS.
-export function SegBar({
-  segs,
-  current,
-  ariaLabel,
-  prop,
-  busy,
-  onCommit,
-  onLiveCommit,
-  onClear,
-  moreSegment,
-  moreValue = 'unset',
-}: {
+export function SegBar(props: SegBarProps) {
+  const { segs, current, ariaLabel, busy, onCommit, moreSegment, moreValue = 'unset' } = props;
+  const supported = new Set(segs.map((segment) => segment.value));
+  // `forceCustom` keeps the input open even when the seeded value happens to match a
+  // segment (e.g. Order seeds `1`, which is also the "Last" preset) — the user
+  // explicitly asked for a custom value, so don't collapse back to that segment.
+  const [forceCustom, setForceCustom] = useState(false);
+  // The just-seeded custom value. `current` derives from the committed style, which
+  // lags a beat behind the write (and won't sync into the focused input), so the seed
+  // drives the field until the user edits it or picks a segment.
+  const [seed, setSeed] = useState<string | undefined>(undefined);
+  const customMode = forceCustom || !supported.has(current);
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  useSegMenuDismiss({ open, rootRef, setOpen });
+  const dropUp = useSegMenuClamp({ open, customMode, rootRef, menuRef });
+  const { inputRef, requestFocus } = useSegCustomFocus({ customMode, busy });
+
+  // Always commit — `current` may be a CSS default (unset) or an inherited value
+  // from another selector, so clicking the shown segment must still apply it to the
+  // picked selector (turning it blue), not be treated as a no-op.
+  const pick = (next: string) => {
+    setForceCustom(false);
+    setSeed(undefined);
+    setOpen(false);
+    onCommit(next, false);
+  };
+  const enterCustom = (value: string) => {
+    setOpen(false);
+    requestFocus();
+    setForceCustom(true);
+    setSeed(value);
+    onCommit(value, false);
+  };
+
+  return (
+    <div
+      ref={rootRef}
+      className={`embed-editor_display ${customMode ? 'is-custom' : ''}`}
+      role="group"
+      aria-label={ariaLabel}
+    >
+      <SegmentPill />
+      {customMode ? (
+        <SegBarCustomInput
+          bar={props}
+          seed={seed}
+          inputRef={inputRef}
+          onSeedDone={() => setSeed(undefined)}
+          onBackToBar={() => setForceCustom(false)}
+        />
+      ) : (
+        <SegBarSegments
+          segs={segs}
+          current={current}
+          ariaLabel={ariaLabel}
+          busy={busy}
+          onPick={pick}
+          onMore={moreSegment ? () => enterCustom(moreValue) : undefined}
+        />
+      )}
+      <SegBarMenu
+        open={open}
+        dropUp={dropUp}
+        menuRef={menuRef}
+        ariaLabel={ariaLabel}
+        busy={busy}
+        customMode={customMode}
+        segs={segs}
+        current={current}
+        onToggle={() => setOpen((value) => !value)}
+        onPick={pick}
+        onEnterCustom={() => enterCustom(moreValue)}
+      />
+    </div>
+  );
+}
+
+type SegBarProps = {
   segs: readonly Seg[];
   /** The resolved value, already defaulted to a concrete segment when unset. */
   current: string;
@@ -1045,24 +1137,174 @@ export function SegBar({
       segment or the dropdown's "Custom" item. Lets a control preset a sensible
       starting value (e.g. `2` for Order); defaults to `unset` (e.g. Align). */
   moreValue?: string;
-}) {
-  const supported = new Set(segs.map((s) => s.value));
-  // `forceCustom` keeps the input open even when the seeded value happens to match a
-  // segment (e.g. Order seeds `1`, which is also the "Last" preset) — the user
-  // explicitly asked for a custom value, so don't collapse back to that segment.
-  const [forceCustom, setForceCustom] = useState(false);
-  // The just-seeded custom value. `current` derives from the committed style, which
-  // lags a beat behind the write (and won't sync into the focused input), so the seed
-  // drives the field until the user edits it or picks a segment.
-  const [seed, setSeed] = useState<string | null>(null);
-  const customMode = forceCustom || !supported.has(current);
-  const [open, setOpen] = useState(false);
-  const [dropUp, setDropUp] = useState(false);
-  const rootRef = useRef<HTMLDivElement>(null);
-  const menuRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
-  const wantFocus = useRef(false);
+};
 
+// The free-value field of a bar in custom mode. Typing a value that matches a
+// segment collapses back to the bar; clearing/emptying the field does too. Either
+// way the seed override is done.
+function SegBarCustomInput({
+  bar,
+  seed,
+  inputRef,
+  onSeedDone,
+  onBackToBar,
+}: {
+  bar: SegBarProps;
+  seed: string | undefined;
+  inputRef: React.RefObject<HTMLInputElement>;
+  onSeedDone: () => void;
+  onBackToBar: () => void;
+}) {
+  const supported = new Set(bar.segs.map((segment) => segment.value));
+  return (
+    <LiveInput
+      value={seed ?? bar.current}
+      busy={bar.busy}
+      placeholder="custom value"
+      ariaLabel={bar.ariaLabel}
+      className="embed-editor_value-input embed-editor_display-input"
+      prop={bar.prop}
+      inputRef={inputRef}
+      onCommit={(value, important) => {
+        onSeedDone();
+        if (supported.has(value.trim().toLowerCase())) {
+          onBackToBar();
+        }
+        bar.onCommit(value, important);
+      }}
+      onLiveCommit={bar.onLiveCommit}
+      onClear={() => {
+        onBackToBar();
+        onSeedDone();
+        bar.onClear();
+      }}
+    />
+  );
+}
+
+// The bar's segments, and the trailing "…" segment when the bar has one.
+function SegBarSegments({
+  segs,
+  current,
+  ariaLabel,
+  busy,
+  onPick,
+  onMore,
+}: {
+  segs: readonly Seg[];
+  current: string;
+  ariaLabel: string;
+  busy: boolean;
+  onPick: (value: string) => void;
+  onMore: (() => void) | undefined;
+}) {
+  return (
+    <>
+      {segs.map((seg) => (
+        <button
+          key={seg.value}
+          type="button"
+          role="radio"
+          aria-checked={current === seg.value}
+          className={`embed-editor_display-seg ${current === seg.value ? 'is-selected' : ''}`}
+          disabled={busy}
+          aria-label={seg.label}
+          title={seg.label}
+          onClick={() => onPick(seg.value)}
+        >
+          {seg.icon}
+        </button>
+      ))}
+      {onMore ? (
+        <button
+          type="button"
+          className="embed-editor_display-seg"
+          disabled={busy}
+          aria-label={`Custom ${ariaLabel}`}
+          title={`Custom ${ariaLabel}`}
+          onClick={onMore}
+        >
+          <MoreIcon />
+        </button>
+      ) : undefined}
+    </>
+  );
+}
+
+// The dropdown arrow and its menu: "Custom" from the bar, or the segments to
+// switch back to from a custom value.
+function SegBarMenu({
+  open,
+  dropUp,
+  menuRef,
+  ariaLabel,
+  busy,
+  customMode,
+  segs,
+  current,
+  onToggle,
+  onPick,
+  onEnterCustom,
+}: {
+  open: boolean;
+  dropUp: boolean;
+  menuRef: React.RefObject<HTMLDivElement>;
+  ariaLabel: string;
+  busy: boolean;
+  customMode: boolean;
+  segs: readonly Seg[];
+  current: string;
+  onToggle: () => void;
+  onPick: (value: string) => void;
+  onEnterCustom: () => void;
+}) {
+  return (
+    <>
+      <button
+        type="button"
+        className="embed-editor_display-arrow"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-label={`More ${ariaLabel} options`}
+        disabled={busy}
+        onClick={onToggle}
+      >
+        <ChevronIcon />
+      </button>
+      {open ? (
+        <div
+          ref={menuRef}
+          className={`embed-editor_display-menu ${dropUp ? 'is-up' : ''}`}
+          role="menu"
+        >
+          {customMode ? (
+            segs.map((seg) => (
+              <MenuItem
+                key={seg.value}
+                label={seg.label}
+                selected={current === seg.value}
+                onClick={() => onPick(seg.value)}
+              />
+            ))
+          ) : (
+            <MenuItem label="Custom" selected={false} onClick={onEnterCustom} />
+          )}
+        </div>
+      ) : undefined}
+    </>
+  );
+}
+
+// While the menu is open, a press outside the bar or Escape closes it.
+function useSegMenuDismiss({
+  open,
+  rootRef,
+  setOpen,
+}: {
+  open: boolean;
+  rootRef: React.RefObject<HTMLDivElement>;
+  setOpen: (open: boolean) => void;
+}): void {
   useEffect(() => {
     if (!open) {
       return;
@@ -1083,21 +1325,35 @@ export function SegBar({
       document.removeEventListener('mousedown', onDown);
       document.removeEventListener('keydown', onKey);
     };
-  }, [open]);
+  }, [open, rootRef, setOpen]);
+}
 
-  // Keep the (right-anchored) dropdown inside the panel: shift it right when its left
-  // edge would run off (a narrow column), and flip it above when it would overflow the
-  // bottom (this is the bottom row). Mirrors FieldLabel's menu clamp.
+// Keep the (right-anchored) dropdown inside the panel: shift it right when its left
+// edge would run off (a narrow column), and flip it above when it would overflow the
+// bottom (this is the bottom row). Mirrors FieldLabel's menu clamp. Returns whether
+// the menu drops up.
+function useSegMenuClamp({
+  open,
+  customMode,
+  rootRef,
+  menuRef,
+}: {
+  open: boolean;
+  customMode: boolean;
+  rootRef: React.RefObject<HTMLDivElement>;
+  menuRef: React.RefObject<HTMLDivElement>;
+}): boolean {
+  const [dropUp, setDropUp] = useState(false);
   useLayoutEffect(() => {
-    const el = menuRef.current;
+    const menu = menuRef.current;
     const root = rootRef.current;
-    if (!open || !el || !root) {
+    if (!open || !menu || !root) {
       return;
     }
     const margin = 8;
     const bounds = panelBounds(root);
     const rootRect = root.getBoundingClientRect();
-    const naturalLeft = rootRect.right - el.offsetWidth;
+    const naturalLeft = rootRect.right - menu.offsetWidth;
     const naturalRight = rootRect.right;
     const shift =
       naturalLeft < bounds.left + margin
@@ -1105,11 +1361,18 @@ export function SegBar({
         : naturalRight > bounds.right - margin
           ? bounds.right - margin - naturalRight
           : 0;
-    el.style.transform = shift ? `translateX(${shift}px)` : '';
-    const overflowsBelow = rootRect.bottom + el.offsetHeight + margin > bounds.bottom;
+    menu.style.transform = shift ? `translateX(${shift}px)` : '';
+    const overflowsBelow = rootRect.bottom + menu.offsetHeight + margin > bounds.bottom;
     setDropUp(overflowsBelow && rootRect.top - bounds.top > bounds.bottom - rootRect.bottom);
-  }, [open, customMode]);
+  }, [open, customMode, rootRef, menuRef]);
+  return dropUp;
+}
 
+// Focus the custom field after switching to Custom, once its seeded write
+// settles: the request is remembered until the field exists and is enabled.
+function useSegCustomFocus({ customMode, busy }: { customMode: boolean; busy: boolean }) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const wantFocus = useRef(false);
   useEffect(() => {
     if (customMode && wantFocus.current && !busy) {
       wantFocus.current = false;
@@ -1117,123 +1380,12 @@ export function SegBar({
       inputRef.current?.select();
     }
   }, [customMode, busy]);
-
-  // Always commit — `current` may be a CSS default (unset) or an inherited value
-  // from another selector, so clicking the shown segment must still apply it to the
-  // picked selector (turning it blue), not be treated as a no-op.
-  const pick = (next: string) => {
-    setForceCustom(false);
-    setSeed(null);
-    setOpen(false);
-    onCommit(next, false);
+  return {
+    inputRef,
+    requestFocus: () => {
+      wantFocus.current = true;
+    },
   };
-  const enterCustom = (value: string) => {
-    setOpen(false);
-    wantFocus.current = true;
-    setForceCustom(true);
-    setSeed(value);
-    onCommit(value, false);
-  };
-  // Typing a value that matches a segment collapses back to the bar; clearing/emptying
-  // the field does too. Either way the seed override is done.
-  const commitCustom = (value: string, important: boolean) => {
-    setSeed(null);
-    if (supported.has(value.trim().toLowerCase())) {
-      setForceCustom(false);
-    }
-    onCommit(value, important);
-  };
-  const clearCustom = () => {
-    setForceCustom(false);
-    setSeed(null);
-    onClear();
-  };
-
-  return (
-    <div
-      ref={rootRef}
-      className={`embed-editor_display ${customMode ? 'is-custom' : ''}`}
-      role="group"
-      aria-label={ariaLabel}
-    >
-      <SegmentPill />
-      {customMode ? (
-        <LiveInput
-          value={seed ?? current}
-          busy={busy}
-          placeholder="custom value"
-          ariaLabel={ariaLabel}
-          className="embed-editor_value-input embed-editor_display-input"
-          prop={prop}
-          inputRef={inputRef}
-          onCommit={commitCustom}
-          onLiveCommit={onLiveCommit}
-          onClear={clearCustom}
-        />
-      ) : (
-        <>
-          {segs.map((seg) => (
-            <button
-              key={seg.value}
-              type="button"
-              role="radio"
-              aria-checked={current === seg.value}
-              className={`embed-editor_display-seg ${current === seg.value ? 'is-selected' : ''}`}
-              disabled={busy}
-              aria-label={seg.label}
-              title={seg.label}
-              onClick={() => pick(seg.value)}
-            >
-              {seg.icon}
-            </button>
-          ))}
-          {moreSegment ? (
-            <button
-              type="button"
-              className="embed-editor_display-seg"
-              disabled={busy}
-              aria-label={`Custom ${ariaLabel}`}
-              title={`Custom ${ariaLabel}`}
-              onClick={() => enterCustom(moreValue)}
-            >
-              <MoreIcon />
-            </button>
-          ) : null}
-        </>
-      )}
-      <button
-        type="button"
-        className="embed-editor_display-arrow"
-        aria-haspopup="menu"
-        aria-expanded={open}
-        aria-label={`More ${ariaLabel} options`}
-        disabled={busy}
-        onClick={() => setOpen((value) => !value)}
-      >
-        <ChevronIcon />
-      </button>
-      {open ? (
-        <div
-          ref={menuRef}
-          className={`embed-editor_display-menu ${dropUp ? 'is-up' : ''}`}
-          role="menu"
-        >
-          {customMode ? (
-            segs.map((seg) => (
-              <MenuItem
-                key={seg.value}
-                label={seg.label}
-                selected={current === seg.value}
-                onClick={() => pick(seg.value)}
-              />
-            ))
-          ) : (
-            <MenuItem label="Custom" selected={false} onClick={() => enterCustom(moreValue)} />
-          )}
-        </div>
-      ) : null}
-    </div>
-  );
 }
 
 const ALIGN_SEGS: readonly Seg[] = [
@@ -1252,13 +1404,13 @@ function AlignRow({
   onProvenance,
   onSelectSelector,
 }: Props) {
-  const d = displayOf(read('text-align'));
+  const display = displayOf(read('text-align'));
   // Nothing set here → what the page computes for this element (text-align inherits,
   // so that's usually a parent's), falling back to `left` (start, LTR).
   const current = useHighlight(
-    d.present ? d.value.trim().toLowerCase() : '',
+    display.present ? display.value.trim().toLowerCase() : '',
     'text-align',
-    ALIGN_SEGS.map((s) => s.value),
+    ALIGN_SEGS.map((segment) => segment.value),
     'left',
   );
   return (
@@ -1266,7 +1418,7 @@ function AlignRow({
       <PropLabel
         label="Align"
         prop="text-align"
-        d={d}
+        display={display}
         contributors={read('text-align')?.contributors ?? []}
         busy={busy}
         onClear={() => clearProp('text-align')}
@@ -1301,17 +1453,20 @@ function DecorRow(props: Props) {
   // `text-decoration-line` longhand is silently dropped by the Style API — so edits /
   // clear target the shorthand. Display reads the shorthand, falling back to the
   // longhand an embed might use.
-  const d = displayOf(read('text-decoration'));
-  const raw = d.present ? d.value : displayOf(read('text-decoration-line')).value;
+  const display = displayOf(read('text-decoration'));
+  const raw = display.present ? display.value : displayOf(read('text-decoration-line')).value;
   const parts = parseDecoration(raw);
   // The bar reflects only the line facet — a single keyword, or None (X). Combos and
   // the divider style/color live in the "…" popover, so picking a segment recomposes
   // the shorthand while preserving any style/color already set.
   const current = parts.lines.length
-    ? (LINE_ORDER.find((l) => parts.lines.includes(l)) ?? 'none')
+    ? (LINE_ORDER.find((line) => parts.lines.includes(line)) ?? 'none')
     : 'none';
-  const writeLine = (value: string, important: boolean, live: boolean) => {
-    const put = live ? liveSetProp : setProp;
+  const writeLine = (
+    { value, important }: { value: string; important: boolean },
+    mode: 'live' | 'commit',
+  ) => {
+    const put = mode === 'live' ? liveSetProp : setProp;
     const low = value.trim().toLowerCase();
     if (DECOR_KEYWORDS.includes(low)) {
       put(
@@ -1320,8 +1475,9 @@ function DecorRow(props: Props) {
         important,
       );
     } else {
+      // A custom value typed in the bar.
       put('text-decoration', value, important);
-    } // a custom value typed in the bar
+    }
   };
   const anySet = DECOR_PROPS.some((prop) => read(prop)?.source === 'selected');
   return (
@@ -1329,7 +1485,7 @@ function DecorRow(props: Props) {
       <PropLabel
         label="Decor"
         prop="text-decoration"
-        d={d}
+        display={display}
         contributors={read('text-decoration')?.contributors ?? []}
         busy={busy}
         onClear={() => clearProp(['text-decoration', 'text-decoration-line'])}
@@ -1343,8 +1499,8 @@ function DecorRow(props: Props) {
           ariaLabel="Text decoration"
           prop="text-decoration"
           busy={busy}
-          onCommit={(value, important) => writeLine(value, important, false)}
-          onLiveCommit={(value, important) => writeLine(value, important, true)}
+          onCommit={(value, important) => writeLine({ value, important }, 'commit')}
+          onLiveCommit={(value, important) => writeLine({ value, important }, 'live')}
           onClear={() => clearProp(['text-decoration', 'text-decoration-line'])}
         />
         <MorePopover title="Decoration & underline" active={anySet} busy={busy}>
@@ -1394,11 +1550,11 @@ function SegCell({
   segs: readonly Seg[];
   fallback: string;
 } & Props) {
-  const d = displayOf(read(prop));
+  const display = displayOf(read(prop));
   const current = useHighlight(
-    d.present ? d.value.trim().toLowerCase() : '',
+    display.present ? display.value.trim().toLowerCase() : '',
     prop,
-    segs.map((s) => s.value),
+    segs.map((segment) => segment.value),
     fallback,
   );
   return (
@@ -1416,7 +1572,7 @@ function SegCell({
       <PropLabel
         label={label}
         prop={prop}
-        d={d}
+        display={display}
         contributors={read(prop)?.contributors ?? []}
         busy={busy}
         onClear={() => clearProp(prop)}
@@ -1521,25 +1677,25 @@ function PopLabel({
   onClear?: () => void;
 } & Pick<Props, 'read' | 'busy' | 'clearProp' | 'onProvenance' | 'onSelectSelector'>) {
   const resolved = read(prop);
-  const d = displayOf(resolved);
-  if (d.present && !d.isSelected) {
+  const display = displayOf(resolved);
+  if (display.present && !display.isSelected) {
     return <ProvenanceLabel label={label} props={[prop]} busy={busy} onProvenance={onProvenance} />;
   }
   return (
     <FieldLabel
-      className={`embed-editor_size-label ${d.overridden ? 'is-overridden' : ''}`}
-      active={active ?? d.isSelected}
+      className={`embed-editor_size-label ${display.overridden ? 'is-overridden' : ''}`}
+      active={active ?? display.isSelected}
       disabled={busy}
       onReset={onClear ?? (() => clearProp(prop))}
       resetLabel="Clear"
       tooltip={<PropTip props={[prop]} />}
-      {...(d.overridden ? { title: `Overridden by ${d.winnerSelector}` } : {})}
+      {...(display.overridden ? { title: `Overridden by ${display.winnerSelector}` } : {})}
       menuNote={(close) => (
         <ProvenanceList
           contributors={resolved?.contributors ?? []}
           prop={prop}
-          onSelect={(sel, p) => {
-            onSelectSelector(sel, p);
+          onSelect={(selector, selectorProp) => {
+            onSelectSelector(selector, selectorProp);
             close();
           }}
         />
@@ -1551,7 +1707,7 @@ function PopLabel({
 }
 
 // A length-field row inside the popover (Gap / divider Width).
-function LenRow({
+function LengthRow({
   prop,
   label,
   placeholder,
@@ -1570,8 +1726,8 @@ function LenRow({
   Props,
   'read' | 'busy' | 'setProp' | 'clearProp' | 'liveSetProp' | 'onProvenance' | 'onSelectSelector'
 >) {
-  const d = displayOf(read(prop));
-  const external = d.present ? joinImportant(d.value, d.important) : '';
+  const display = displayOf(read(prop));
+  const external = display.present ? joinImportant(display) : '';
   return (
     <div className="embed-editor_size-row">
       <PopLabel
@@ -1611,11 +1767,11 @@ function RuleStyleRow({
   Props,
   'read' | 'busy' | 'setProp' | 'clearProp' | 'liveSetProp' | 'onProvenance' | 'onSelectSelector'
 >) {
-  const d = displayOf(read('column-rule-style'));
+  const display = displayOf(read('column-rule-style'));
   const current = useHighlight(
-    d.present ? d.value.trim().toLowerCase() : '',
+    display.present ? display.value.trim().toLowerCase() : '',
     'column-rule-style',
-    RULE_STYLE_SEGS.map((s) => s.value),
+    RULE_STYLE_SEGS.map((segment) => segment.value),
     'none',
   );
   return (
@@ -1655,8 +1811,8 @@ function RuleColorRow({
   Props,
   'read' | 'busy' | 'setProp' | 'clearProp' | 'liveSetProp' | 'onProvenance' | 'onSelectSelector'
 >) {
-  const d = displayOf(read('column-rule-color'));
-  const external = d.present ? joinImportant(d.value, d.important) : '';
+  const display = displayOf(read('column-rule-color'));
+  const external = display.present ? joinImportant(display) : '';
   // A live drag writes to the canvas, not to the model this row reads — so the
   // colour it emitted is what the swatch and the field show until the model
   // catches up. Without this the page moved under the pointer while the number
@@ -1667,12 +1823,12 @@ function RuleColorRow({
       value={shown.replace(/\s*!important\s*$/i, '').trim()}
       busy={busy}
       ariaLabel="Divider color"
-      onChange={(c, live) => {
-        noteLive(live ? c : null);
+      onChange={(color, live) => {
+        noteLive(live ? color : undefined);
         if (live) {
-          liveSetProp('column-rule-color', c, false);
+          liveSetProp('column-rule-color', color, false);
         } else {
-          setProp('column-rule-color', c, false);
+          setProp('column-rule-color', color, false);
         }
       }}
     />
@@ -1715,10 +1871,10 @@ function SpanRow({
   onProvenance,
   onSelectSelector,
 }: Pick<Props, 'read' | 'busy' | 'setProp' | 'clearProp' | 'onProvenance' | 'onSelectSelector'>) {
-  const d = displayOf(read('column-span'));
+  const display = displayOf(read('column-span'));
   const value =
     useHighlight(
-      d.present ? d.value.trim().toLowerCase() : '',
+      display.present ? display.value.trim().toLowerCase() : '',
       'column-span',
       ['none', 'all'],
       'none',
@@ -1781,38 +1937,7 @@ function MorePopover({
 }) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (!open) {
-      return;
-    }
-    const onDown = (event: MouseEvent) => {
-      const target = event.target;
-      if (!(target instanceof Element)) {
-        setOpen(false);
-        return;
-      }
-      if (rootRef.current?.contains(target)) {
-        return;
-      }
-      // A label inside the popover can open the provenance popover, which is portaled
-      // to <body> (outside this wrapper) — clicks there must not close the popover.
-      if (target?.closest?.('.embed-editor_provenance')) {
-        return;
-      }
-      setOpen(false);
-    };
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        setOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', onDown);
-    document.addEventListener('keydown', onKey);
-    return () => {
-      document.removeEventListener('mousedown', onDown);
-      document.removeEventListener('keydown', onKey);
-    };
-  }, [open]);
+  useMorePopoverDismiss({ open, rootRef, setOpen });
   return (
     <div ref={rootRef} className="embed-editor_more">
       <button
@@ -1841,9 +1966,54 @@ function MorePopover({
           </div>
           {children}
         </div>
-      ) : null}
+      ) : undefined}
     </div>
   );
+}
+
+// While the popover is open, a press outside it (other than in the provenance
+// popover one of its labels opened) or Escape closes it.
+function useMorePopoverDismiss({
+  open,
+  rootRef,
+  setOpen,
+}: {
+  open: boolean;
+  rootRef: React.RefObject<HTMLDivElement>;
+  setOpen: (open: boolean) => void;
+}): void {
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+    const onDown = (event: MouseEvent) => {
+      const target = event.target;
+      if (!(target instanceof Element)) {
+        setOpen(false);
+        return;
+      }
+      if (rootRef.current?.contains(target)) {
+        return;
+      }
+      // A label inside the popover can open the provenance popover, which is portaled
+      // to <body> (outside this wrapper) — clicks there must not close the popover.
+      if (target.closest('.embed-editor_provenance')) {
+        return;
+      }
+      setOpen(false);
+    };
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDown);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [open, rootRef, setOpen]);
 }
 
 // The advanced-columns popover body: multi-column Gap, the column-rule divider
@@ -1853,12 +2023,12 @@ function ColumnsPopover(props: Props) {
   return (
     <>
       <div className="embed-editor_more-group">
-        <LenRow prop="column-gap" label="Gap" placeholder="0px" {...props} />
+        <LengthRow prop="column-gap" label="Gap" placeholder="0px" {...props} />
       </div>
       <div className="embed-editor_more-group">
         <p className="embed-editor_more-heading">Divider settings</p>
         <RuleStyleRow {...props} />
-        <LenRow prop="column-rule-width" label="Width" placeholder="0px" {...props} />
+        <LengthRow prop="column-rule-width" label="Width" placeholder="0px" {...props} />
         <RuleColorRow {...props} />
       </div>
       <div className="embed-editor_more-group">
@@ -1926,12 +2096,12 @@ function parseDecoration(value: string): DecorParts {
   return { lines, style, color: color.join(' ') };
 }
 function composeDecoration({ lines, style, color }: DecorParts): string {
-  const ordered = LINE_ORDER.filter((l) => lines.includes(l));
+  const ordered = LINE_ORDER.filter((line) => lines.includes(line));
   return [...ordered, style, color].filter(Boolean).join(' ').trim() || 'none';
 }
 // The canonical Line-select key for a parsed value (ordered keywords, or 'none').
 function lineKey(lines: string[]): string {
-  const ordered = LINE_ORDER.filter((l) => lines.includes(l));
+  const ordered = LINE_ORDER.filter((line) => lines.includes(line));
   return ordered.length ? ordered.join(' ') : 'none';
 }
 
@@ -1991,116 +2161,56 @@ const SKIP_INK_OPTIONS: SelectOption<string>[] = [
 // The Decoration & underline popover body: Line / Style / Color compose the
 // `text-decoration` shorthand; Thick and Skip ink are their own longhands.
 function DecorationPopover(props: Props) {
-  const { read, busy, setProp, clearProp, liveSetProp, onProvenance, onSelectSelector } = props;
-  const d = displayOf(read('text-decoration'));
-  const raw = d.present ? d.value : displayOf(read('text-decoration-line')).value;
+  const { read, busy, setProp, liveSetProp } = props;
+  const display = displayOf(read('text-decoration'));
+  const raw = display.present ? display.value : displayOf(read('text-decoration-line')).value;
   const parts = parseDecoration(raw);
-  const shorthandSet = d.isSelected;
-  const write = (next: DecorParts, live = false) =>
-    (live ? liveSetProp : setProp)('text-decoration', composeDecoration(next), d.important);
-
+  const write: DecorationWrite = (next, mode = 'commit') =>
+    (mode === 'live' ? liveSetProp : setProp)(
+      'text-decoration',
+      composeDecoration(next),
+      display.important,
+    );
+  // A preview that ends (the menu closed without a pick) puts the live write back.
+  const preview = (value: string | undefined, next: (value: string) => DecorParts) => {
+    if (value === undefined) {
+      liveSetProp('text-decoration', undefined, display.important);
+    } else {
+      write(next(value), 'live');
+    }
+  };
+  const rowProps = { props, parts, shorthandSet: display.isSelected, write };
   const skip = displayOf(read('text-decoration-skip-ink'));
 
   return (
     <div className="embed-editor_more-group">
+      <DecorationSelectRow
+        {...rowProps}
+        label="Line"
+        facet="lines"
+        value={lineKey(parts.lines)}
+        options={DECOR_LINE_OPTIONS}
+        toParts={(value) => ({ ...parts, lines: value === 'none' ? [] : value.split(' ') })}
+        preview={preview}
+      />
+      <DecorationSelectRow
+        {...rowProps}
+        label="Style"
+        facet="style"
+        value={parts.style || 'solid'}
+        options={DECOR_STYLE_OPTIONS}
+        toParts={(value) => ({ ...parts, style: value === 'solid' ? '' : value })}
+        preview={preview}
+      />
+      <LengthRow prop="text-decoration-thickness" label="Thick" placeholder="Auto" {...props} />
+      <DecorationColorRow {...rowProps} />
       <div className="embed-editor_size-row">
-        <PopLabel
-          label="Line"
-          prop="text-decoration"
-          read={read}
-          busy={busy}
-          clearProp={clearProp}
-          onProvenance={onProvenance}
-          onSelectSelector={onSelectSelector}
-          active={shorthandSet}
-          onClear={() => clearProp(['text-decoration', 'text-decoration-line'])}
-        />
-        <Select
-          value={lineKey(parts.lines)}
-          options={DECOR_LINE_OPTIONS}
-          onChange={(value) => write({ ...parts, lines: value === 'none' ? [] : value.split(' ') })}
-          onPreview={(value) =>
-            value == null
-              ? liveSetProp('text-decoration', null, d.important)
-              : write({ ...parts, lines: value === 'none' ? [] : value.split(' ') }, true)
-          }
-          ariaLabel="Decoration line"
-          disabled={busy}
-        />
-      </div>
-      <div className="embed-editor_size-row">
-        <PopLabel
-          label="Style"
-          prop="text-decoration"
-          read={read}
-          busy={busy}
-          clearProp={clearProp}
-          onProvenance={onProvenance}
-          onSelectSelector={onSelectSelector}
-          active={shorthandSet && parts.style !== ''}
-          onClear={() => write({ ...parts, style: '' })}
-        />
-        <Select
-          value={parts.style || 'solid'}
-          options={DECOR_STYLE_OPTIONS}
-          onChange={(value) => write({ ...parts, style: value === 'solid' ? '' : value })}
-          onPreview={(value) =>
-            value == null
-              ? liveSetProp('text-decoration', null, d.important)
-              : write({ ...parts, style: value === 'solid' ? '' : value }, true)
-          }
-          ariaLabel="Decoration style"
-          disabled={busy}
-        />
-      </div>
-      <LenRow prop="text-decoration-thickness" label="Thick" placeholder="Auto" {...props} />
-      <div className="embed-editor_size-row">
-        <PopLabel
-          label="Color"
-          prop="text-decoration"
-          read={read}
-          busy={busy}
-          clearProp={clearProp}
-          onProvenance={onProvenance}
-          onSelectSelector={onSelectSelector}
-          active={shorthandSet && parts.color !== ''}
-          onClear={() => write({ ...parts, color: '' })}
-        />
-        <div className="embed-editor_type-field">
-          <ColorSwatch
-            value={parts.color}
-            busy={busy}
-            ariaLabel="Decoration color"
-            onChange={(c, live) => write({ ...parts, color: c }, live)}
-          />
-          <LiveInput
-            value={parts.color}
-            busy={busy}
-            placeholder="Set a color"
-            ariaLabel="Decoration color"
-            className="u-input embed-editor_size-input"
-            prop="color"
-            onCommit={(value) => write({ ...parts, color: value })}
-            onLiveCommit={(value) => write({ ...parts, color: value }, true)}
-            onClear={() => write({ ...parts, color: '' })}
-          />
-        </div>
-      </div>
-      <div className="embed-editor_size-row">
-        <PopLabel
-          label="Skip ink"
-          prop="text-decoration-skip-ink"
-          read={read}
-          busy={busy}
-          clearProp={clearProp}
-          onProvenance={onProvenance}
-          onSelectSelector={onSelectSelector}
-        />
+        <PopLabel label="Skip ink" prop="text-decoration-skip-ink" {...props} />
         <Select
           value={skip.present ? skip.value.trim().toLowerCase() : 'auto'}
           options={SKIP_INK_OPTIONS}
           onChange={(value) => setProp('text-decoration-skip-ink', value, false)}
-          onPreview={(value) => liveSetProp('text-decoration-skip-ink', value, false)}
+          onPreview={(value) => liveSetProp('text-decoration-skip-ink', value ?? undefined, false)}
           ariaLabel="Skip ink"
           disabled={busy}
         />
@@ -2112,11 +2222,105 @@ function DecorationPopover(props: Props) {
   );
 }
 
+// Writes the `text-decoration` shorthand composed from its facets, committed by
+// default or as a live preview.
+type DecorationWrite = (next: DecorParts, mode?: 'live' | 'commit') => void;
+
+type DecorationRowProps = {
+  props: Props;
+  parts: DecorParts;
+  /** Whether the picked selector sets the shorthand these rows edit. */
+  shorthandSet: boolean;
+  write: DecorationWrite;
+};
+
+// The Line or Style row: one facet of the shorthand, picked from a dropdown.
+function DecorationSelectRow({
+  props,
+  parts,
+  shorthandSet,
+  write,
+  label,
+  facet,
+  value,
+  options,
+  toParts,
+  preview,
+}: DecorationRowProps & {
+  label: string;
+  facet: 'lines' | 'style';
+  value: string;
+  options: SelectOption<string>[];
+  toParts: (value: string) => DecorParts;
+  preview: (value: string | undefined, next: (value: string) => DecorParts) => void;
+}) {
+  // The Line label clears the whole shorthand (and the longhand an embed may use);
+  // the Style label clears only its own facet.
+  const lines = facet === 'lines';
+  return (
+    <div className="embed-editor_size-row">
+      <PopLabel
+        label={label}
+        prop="text-decoration"
+        {...props}
+        active={lines ? shorthandSet : shorthandSet && parts.style !== ''}
+        onClear={() =>
+          lines
+            ? props.clearProp(['text-decoration', 'text-decoration-line'])
+            : write({ ...parts, style: '' })
+        }
+      />
+      <Select
+        value={value}
+        options={options}
+        onChange={(next) => write(toParts(next))}
+        onPreview={(next) => preview(next ?? undefined, toParts)}
+        ariaLabel={lines ? 'Decoration line' : 'Decoration style'}
+        disabled={props.busy}
+      />
+    </div>
+  );
+}
+
+// The Color row: a swatch and a field for the shorthand's colour facet.
+function DecorationColorRow({ props, parts, shorthandSet, write }: DecorationRowProps) {
+  return (
+    <div className="embed-editor_size-row">
+      <PopLabel
+        label="Color"
+        prop="text-decoration"
+        {...props}
+        active={shorthandSet && parts.color !== ''}
+        onClear={() => write({ ...parts, color: '' })}
+      />
+      <div className="embed-editor_type-field">
+        <ColorSwatch
+          value={parts.color}
+          busy={props.busy}
+          ariaLabel="Decoration color"
+          onChange={(color, live) => write({ ...parts, color }, live ? 'live' : 'commit')}
+        />
+        <LiveInput
+          value={parts.color}
+          busy={props.busy}
+          placeholder="Set a color"
+          ariaLabel="Decoration color"
+          className="u-input embed-editor_size-input"
+          prop="color"
+          onCommit={(value) => write({ ...parts, color: value })}
+          onLiveCommit={(value) => write({ ...parts, color: value }, 'live')}
+          onClear={() => write({ ...parts, color: '' })}
+        />
+      </div>
+    </div>
+  );
+}
+
 // ─────────────── Breaking (word-break / white-space) ───────────────
 
 // One "Breaking" row holds two dropdowns — Word (word-break) and Line
 // (white-space) — each stacked over its own clickable label (mirrors Webflow).
-type BreakDef = {
+type BreakDefinition = {
   prop: string;
   label: string;
   ariaLabel: string;
@@ -2126,7 +2330,7 @@ type BreakDef = {
   options: ReadonlyArray<readonly [string, string]>;
 };
 
-const WORD_BREAK: BreakDef = {
+const WORD_BREAK: BreakDefinition = {
   prop: 'word-break',
   label: 'Word',
   ariaLabel: 'Word breaking',
@@ -2137,7 +2341,7 @@ const WORD_BREAK: BreakDef = {
     ['keep-all', 'Keep all'],
   ],
 };
-const WHITE_SPACE: BreakDef = {
+const WHITE_SPACE: BreakDefinition = {
   prop: 'white-space',
   label: 'Line',
   ariaLabel: 'Line breaking',
@@ -2157,63 +2361,46 @@ const WHITE_SPACE: BreakDef = {
 // mode with a free-text field for an unknown value (mirrors WeightField). Writes
 // target the picked selector; the caller owns `forceCustom` so its label's Clear
 // can also drop out of custom mode.
-function EnumSelect({
-  prop,
-  ariaLabel,
-  fallback,
-  options: opts,
-  forceCustom,
-  setForceCustom,
-  read,
-  busy,
-  setProp,
-  clearProp,
-  liveSetProp,
-}: {
+type EnumSelectProps = {
   prop: string;
   ariaLabel: string;
   fallback: string;
   options: ReadonlyArray<readonly [string, string]>;
   forceCustom: boolean;
   setForceCustom: (value: boolean) => void;
-} & Pick<Props, 'read' | 'busy' | 'setProp' | 'clearProp' | 'liveSetProp'>) {
-  const d = displayOf(read(prop));
-  const values = new Set(opts.map(([value]) => value));
-  const current = d.present ? d.value.trim().toLowerCase() : '';
+} & Pick<Props, 'read' | 'busy' | 'setProp' | 'clearProp' | 'liveSetProp'>;
+
+function EnumSelect(props: EnumSelectProps) {
+  const { prop, ariaLabel, fallback, options: choices, forceCustom, setForceCustom } = props;
+  const { read, busy, setProp, clearProp, liveSetProp } = props;
+  const display = displayOf(read(prop));
+  const values = new Set(choices.map(([value]) => value));
+  const current = display.present ? display.value.trim().toLowerCase() : '';
   const matched = values.has(current) ? current : undefined;
   // Unset → show what the page computes for this element (an inherited value, a rule
   // the panel's matcher can't see), and only then the CSS default.
   const shownComputed = useHighlight(
     '',
     matched ? '' : prop,
-    opts.map(([value]) => value),
+    choices.map(([value]) => value),
     fallback,
   );
-  const customMode = forceCustom || (d.present && !matched);
+  const customMode = forceCustom || (display.present && !matched);
 
-  const options: SelectOption<string>[] = opts.map(([value, optLabel]) => ({
-    value,
-    label: optLabel,
-  }));
-  options.push({ value: CUSTOM, label: 'Custom…' });
+  const options: SelectOption<string>[] = [
+    ...choices.map(([value, optionLabel]) => ({ value, label: optionLabel })),
+    { value: CUSTOM, label: 'Custom…' },
+  ];
 
   // Focus + select the custom field once its `unset` write settles (busy clears), so
   // its draft has synced to `unset` — autoFocus would grab it before the write lands.
-  const wantFocus = useRef(false);
-  const inputRef = useRef<HTMLInputElement>(null);
-  useEffect(() => {
-    if (customMode && wantFocus.current && !busy) {
-      wantFocus.current = false;
-      inputRef.current?.focus();
-      inputRef.current?.select();
-    }
-  }, [customMode, busy]);
+  const { inputRef, requestFocus } = useSegCustomFocus({ customMode, busy });
 
   const pick = (value: string) => {
     if (value === CUSTOM) {
       // Always seed Custom with `unset` — a valid default that applies immediately and
       // that the user can type over (selected on focus), rather than a blank/stale field.
-      wantFocus.current = true;
+      requestFocus();
       setForceCustom(true);
       setProp(prop, 'unset', false);
       return;
@@ -2227,14 +2414,16 @@ function EnumSelect({
       value={customMode ? CUSTOM : (matched ?? shownComputed)}
       options={options}
       onChange={pick}
-      onPreview={(value) => liveSetProp(prop, value === CUSTOM ? null : value, false)}
+      onPreview={(value) =>
+        liveSetProp(prop, value === CUSTOM ? undefined : (value ?? undefined), false)
+      }
       ariaLabel={ariaLabel}
       disabled={busy}
       customInput={
         customMode ? (
           <LiveInput
             inputRef={inputRef}
-            value={d.present ? joinImportant(d.value, d.important) : 'unset'}
+            value={display.present ? joinImportant(display) : 'unset'}
             busy={busy}
             placeholder={prop}
             ariaLabel={ariaLabel}
@@ -2255,7 +2444,7 @@ function EnumSelect({
 
 // A dropdown cell: the value Select stacked over its clickable label.
 function BreakSelect({
-  def,
+  definition,
   read,
   busy,
   setProp,
@@ -2263,10 +2452,10 @@ function BreakSelect({
   liveSetProp,
   onProvenance,
   onSelectSelector,
-}: { def: BreakDef } & Props) {
-  const { prop, label, ariaLabel, fallback, options } = def;
+}: { definition: BreakDefinition } & Props) {
+  const { prop, label, ariaLabel, fallback, options } = definition;
   const [forceCustom, setForceCustom] = useState(false);
-  const d = displayOf(read(prop));
+  const display = displayOf(read(prop));
   const onClear = () => {
     setForceCustom(false);
     clearProp(prop);
@@ -2289,7 +2478,7 @@ function BreakSelect({
       <PropLabel
         label={label}
         prop={prop}
-        d={d}
+        display={display}
         contributors={read(prop)?.contributors ?? []}
         busy={busy}
         onClear={onClear}
@@ -2307,8 +2496,8 @@ function BreakingRow(props: Props) {
     <div className="embed-editor_break-row">
       <span className="embed-editor_size-label embed-editor_break-title">Breaking</span>
       <div className="embed-editor_break-pair">
-        <BreakSelect def={WORD_BREAK} {...props} />
-        <BreakSelect def={WHITE_SPACE} {...props} />
+        <BreakSelect definition={WORD_BREAK} {...props} />
+        <BreakSelect definition={WHITE_SPACE} {...props} />
       </div>
     </div>
   );
@@ -2333,7 +2522,7 @@ function WrapRow({
   onSelectSelector,
 }: Props) {
   const [forceCustom, setForceCustom] = useState(false);
-  const d = displayOf(read('overflow-wrap'));
+  const display = displayOf(read('overflow-wrap'));
   const onClear = () => {
     setForceCustom(false);
     clearProp('overflow-wrap');
@@ -2343,7 +2532,7 @@ function WrapRow({
       <PropLabel
         label="Wrap"
         prop="overflow-wrap"
-        d={d}
+        display={display}
         contributors={read('overflow-wrap')?.contributors ?? []}
         busy={busy}
         onClear={onClear}
@@ -2372,15 +2561,15 @@ function WrapRow({
 // ─────────────── Truncate (text-overflow) ───────────────
 
 function TruncateRow({ read, busy, setProp, clearProp, onProvenance, onSelectSelector }: Props) {
-  const d = displayOf(read('text-overflow'));
+  const display = displayOf(read('text-overflow'));
   const shownOverflow = useHighlight(
     '',
-    d.present ? '' : 'text-overflow',
+    display.present ? '' : 'text-overflow',
     ['clip', 'ellipsis'],
     'clip',
   );
-  const current = d.present
-    ? d.value.trim().toLowerCase() === 'ellipsis'
+  const current = display.present
+    ? display.value.trim().toLowerCase() === 'ellipsis'
       ? 'ellipsis'
       : 'clip'
     : shownOverflow;
@@ -2389,7 +2578,7 @@ function TruncateRow({ read, busy, setProp, clearProp, onProvenance, onSelectSel
       <PropLabel
         label="Truncate"
         prop="text-overflow"
-        d={d}
+        display={display}
         contributors={read('text-overflow')?.contributors ?? []}
         busy={busy}
         onClear={() => clearProp('text-overflow')}
@@ -2402,7 +2591,7 @@ function TruncateRow({ read, busy, setProp, clearProp, onProvenance, onSelectSel
           { value: 'ellipsis', label: 'Ellipsis' },
         ]}
         value={current}
-        onChange={(v) => setProp('text-overflow', v, false)}
+        onChange={(value) => setProp('text-overflow', value, false)}
         ariaLabel="Truncate"
         disabled={busy}
       />
@@ -2412,33 +2601,19 @@ function TruncateRow({ read, busy, setProp, clearProp, onProvenance, onSelectSel
 
 // ─────────────── Stroke (-webkit-text-stroke) ───────────────
 
-function StrokeRow({
-  read,
-  busy,
-  setProp,
-  clearProp,
-  liveSetProp,
-  onProvenance,
-  onSelectSelector,
-}: Props) {
-  const wd = displayOf(read('-webkit-text-stroke-width'));
-  const cd = displayOf(read('-webkit-text-stroke-color'));
+function StrokeRow(props: Props) {
+  const { read, busy, clearProp, onProvenance, onSelectSelector } = props;
+  const widthDisplay = displayOf(read('-webkit-text-stroke-width'));
+  const colorDisplay = displayOf(read('-webkit-text-stroke-color'));
   // The "Stroke" title reflects either longhand being set and clears both; each cell's
   // caption (Width/Color) owns its own provenance/clear.
-  const combined: Display = {
-    present: wd.present || cd.present,
-    isSelected: wd.isSelected || cd.isSelected,
-    overridden: false,
-    winnerSelector: '',
-    value: '',
-    important: false,
-  };
+  const combined = eitherDisplay(widthDisplay, colorDisplay);
   return (
     <div className="embed-editor_break-row">
       <PropLabel
         label="Stroke"
         prop="-webkit-text-stroke-width"
-        d={combined}
+        display={combined}
         contributors={read('-webkit-text-stroke-width')?.contributors ?? []}
         busy={busy}
         onClear={() => clearProp(['-webkit-text-stroke-width', '-webkit-text-stroke-color'])}
@@ -2447,69 +2622,121 @@ function StrokeRow({
       />
       <div className="embed-editor_break-pair embed-editor_stroke-pair">
         <div className="embed-editor_type-cell">
-          <LiveInput
-            value={wd.present ? joinImportant(wd.value, wd.important) : ''}
-            busy={busy}
+          <StrokeInput
+            prop="-webkit-text-stroke-width"
+            display={widthDisplay}
             placeholder="0px"
             ariaLabel="Stroke width"
-            className="u-input embed-editor_size-input"
-            dataProp="-webkit-text-stroke-width"
-            prop="-webkit-text-stroke-width"
-            onCommit={(v, imp) => setProp('-webkit-text-stroke-width', v, imp)}
-            onLiveCommit={(v, imp) => liveSetProp('-webkit-text-stroke-width', v, imp)}
-            onClear={() => clearProp('-webkit-text-stroke-width')}
+            {...props}
           />
-          <PropLabel
+          <StrokeCaption
             label="Width"
             prop="-webkit-text-stroke-width"
-            d={wd}
-            contributors={read('-webkit-text-stroke-width')?.contributors ?? []}
-            busy={busy}
-            onClear={() => clearProp('-webkit-text-stroke-width')}
-            onProvenance={onProvenance}
-            onSelectSelector={onSelectSelector}
+            display={widthDisplay}
+            {...props}
           />
         </div>
         <div className="embed-editor_type-cell">
           <div className="embed-editor_type-field">
             <ColorSwatch
-              value={cd.present ? cd.value : ''}
+              value={colorDisplay.present ? colorDisplay.value : ''}
               busy={busy}
               ariaLabel="Stroke color"
-              onChange={(c, live) => {
+              onChange={(color, live) => {
                 if (live) {
-                  liveSetProp('-webkit-text-stroke-color', c, false);
+                  props.liveSetProp('-webkit-text-stroke-color', color, false);
                 } else {
-                  setProp('-webkit-text-stroke-color', c, false);
+                  props.setProp('-webkit-text-stroke-color', color, false);
                 }
               }}
             />
-            <LiveInput
-              value={cd.present ? joinImportant(cd.value, cd.important) : ''}
-              busy={busy}
+            <StrokeInput
+              prop="-webkit-text-stroke-color"
+              display={colorDisplay}
               placeholder="black"
               ariaLabel="Stroke color"
-              className="u-input embed-editor_size-input"
-              dataProp="-webkit-text-stroke-color"
-              prop="-webkit-text-stroke-color"
-              onCommit={(v, imp) => setProp('-webkit-text-stroke-color', v, imp)}
-              onLiveCommit={(v, imp) => liveSetProp('-webkit-text-stroke-color', v, imp)}
-              onClear={() => clearProp('-webkit-text-stroke-color')}
+              {...props}
             />
           </div>
-          <PropLabel
+          <StrokeCaption
             label="Color"
             prop="-webkit-text-stroke-color"
-            d={cd}
-            contributors={read('-webkit-text-stroke-color')?.contributors ?? []}
-            busy={busy}
-            onClear={() => clearProp('-webkit-text-stroke-color')}
-            onProvenance={onProvenance}
-            onSelectSelector={onSelectSelector}
+            display={colorDisplay}
+            {...props}
           />
         </div>
       </div>
     </div>
+  );
+}
+
+// A label state for two longhands at once: set when either is, blue when either
+// is set on the picked selector.
+function eitherDisplay(first: Display, second: Display): Display {
+  return {
+    present: first.present || second.present,
+    isSelected: first.isSelected || second.isSelected,
+    overridden: false,
+    winnerSelector: '',
+    value: '',
+    important: false,
+  };
+}
+
+// The field for one stroke longhand.
+function StrokeInput({
+  prop,
+  display,
+  placeholder,
+  ariaLabel,
+  busy,
+  setProp,
+  clearProp,
+  liveSetProp,
+}: {
+  prop: string;
+  display: Display;
+  placeholder: string;
+  ariaLabel: string;
+} & Props) {
+  return (
+    <LiveInput
+      value={display.present ? joinImportant(display) : ''}
+      busy={busy}
+      placeholder={placeholder}
+      ariaLabel={ariaLabel}
+      className="u-input embed-editor_size-input"
+      dataProp={prop}
+      prop={prop}
+      onCommit={(value, important) => setProp(prop, value, important)}
+      onLiveCommit={(value, important) => liveSetProp(prop, value, important)}
+      onClear={() => clearProp(prop)}
+    />
+  );
+}
+
+// The caption under one stroke cell, which owns that longhand's provenance/clear.
+function StrokeCaption({
+  label,
+  prop,
+  display,
+  read,
+  busy,
+  clearProp,
+  onProvenance,
+  onSelectSelector,
+}: { label: string; prop: string; display: Display } & Props) {
+  return (
+    <PropLabel
+      label={label}
+      prop={prop}
+      display={display}
+      contributors={read(prop)?.contributors ?? []}
+      busy={busy}
+      onClear={() => clearProp(prop)}
+      onProvenance={onProvenance}
+      onSelectSelector={onSelectSelector}
+    />
   );
 }
 
@@ -2534,31 +2761,31 @@ function ShadowEditor({
 }) {
   return (
     <div className="embed-editor_type-shadow-editor">
-      <ShadowNum
+      <ShadowLength
         label="X"
         value={shadow.x}
         busy={busy}
-        onCommit={(v) => onChange({ x: v }, false)}
-        onLive={(v) => onChange({ x: v }, true)}
+        onCommit={(value) => onChange({ x: value }, false)}
+        onLive={(value) => onChange({ x: value }, true)}
       />
-      <ShadowNum
+      <ShadowLength
         label="Y"
         value={shadow.y}
         busy={busy}
-        onCommit={(v) => onChange({ y: v }, false)}
-        onLive={(v) => onChange({ y: v }, true)}
+        onCommit={(value) => onChange({ y: value }, false)}
+        onLive={(value) => onChange({ y: value }, true)}
       />
-      <ShadowNum
+      <ShadowLength
         label="Blur"
         value={shadow.blur}
         busy={busy}
-        onCommit={(v) => onChange({ blur: v }, false)}
-        onLive={(v) => onChange({ blur: v }, true)}
+        onCommit={(value) => onChange({ blur: value }, false)}
+        onLive={(value) => onChange({ blur: value }, true)}
       />
       <ShadowColorRow
         color={shadow.color}
         busy={busy}
-        onChange={(c, live) => onChange({ color: c }, live)}
+        onChange={(color, live) => onChange({ color: color }, live)}
       />
     </div>
   );
@@ -2568,69 +2795,15 @@ function ShadowEditor({
 const SHADOW_PREVIEW_CHECKERBOARD =
   'conic-gradient(#8883 25%, transparent 0 50%, #8883 0 75%, transparent 0) 0 0 / 10px 10px';
 
-function TextShadowsRow({
-  read,
-  busy,
-  setProp,
-  clearProp,
-  liveSetProp,
-  onProvenance,
-  onSelectSelector,
-}: Props) {
-  const d = displayOf(read('text-shadow'));
-  const rows = parseHideable(d.present ? d.value : '', ',', parseShadows);
-  const shadows = rows.map((r) => r.item);
-  const [openIdx, setOpenIdx] = useState<number | null>(null);
-  const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
-  const write = (next: Array<Hideable<Shadow>>, live: boolean) => {
-    const value = serializeHideable(next, ',', serializeShadows);
-    if (live) {
-      if (value) {
-        liveSetProp('text-shadow', value, false);
-      }
-      return;
-    }
-    if (value) {
-      setProp('text-shadow', value, false);
-    } else {
-      clearProp('text-shadow');
-    }
-  };
-  const add = () => {
-    const next = [...rows, { item: blankShadow(), hidden: false }];
-    write(next, false);
-    setOpenIdx(next.length - 1);
-  };
-  const remove = (i: number) => {
-    write(
-      rows.filter((_, j) => j !== i),
-      false,
-    );
-    setOpenIdx((cur) => (cur === i ? null : cur != null && cur > i ? cur - 1 : cur));
-  };
-  const reorder = (from: number, to: number) => {
-    if (from === to) {
-      return;
-    }
-    const next = [...rows];
-    const [moved] = next.splice(from, 1);
-    if (moved === undefined) {
-      return;
-    }
-    next.splice(to, 0, moved);
-    write(next, false);
-    setOpenIdx((cur) => (cur === from ? to : cur));
-  };
-  const patch = (i: number, p: ShadowPatch, live: boolean) =>
-    write(
-      rows.map((r, j) => (j === i ? { ...r, item: { ...r.item, ...p } } : r)),
-      live,
-    );
-  const toggle = (i: number) =>
-    write(
-      rows.map((r, j) => (j === i ? { ...r, hidden: !r.hidden } : r)),
-      false,
-    );
+function TextShadowsRow(props: Props) {
+  const { read, busy, clearProp, onProvenance, onSelectSelector } = props;
+  const display = displayOf(read('text-shadow'));
+  const rows = parseHideable(display.present ? display.value : '', ',', parseShadows);
+  const shadows = rows.map((row) => row.item);
+  const [openIndex, setOpenIndex] = useState<number | undefined>(undefined);
+  const [anchorElement, setAnchorElement] = useState<HTMLElement | undefined>(undefined);
+  const edit = shadowRowEdits({ rows, props, setOpenIndex });
+  const openShadow = openIndex === undefined ? undefined : shadows[openIndex];
 
   return (
     <div className="embed-editor_type-shadows">
@@ -2638,7 +2811,7 @@ function TextShadowsRow({
         <PropLabel
           label="Text shadows"
           prop="text-shadow"
-          d={d}
+          display={display}
           contributors={read('text-shadow')?.contributors ?? []}
           busy={busy}
           onClear={() => clearProp('text-shadow')}
@@ -2648,7 +2821,7 @@ function TextShadowsRow({
         <button
           type="button"
           className="embed-editor_icon-btn"
-          onClick={add}
+          onClick={edit.add}
           disabled={busy}
           title="Add a shadow"
           aria-label="Add a text shadow"
@@ -2660,49 +2833,122 @@ function TextShadowsRow({
         count={shadows.length}
         busy={busy}
         ariaLabel="Text shadows"
-        onOpen={(i, el) => {
-          setOpenIdx((cur) => (cur === i ? null : i));
-          setAnchorEl(el);
+        onOpen={(i, element) => {
+          setOpenIndex((current) => (current === i ? undefined : i));
+          setAnchorElement(element);
         }}
-        onReorder={reorder}
-        onRemove={remove}
+        onReorder={edit.reorder}
+        onRemove={edit.remove}
         isHidden={(i) => rows[i]?.hidden ?? false}
-        onToggleHidden={toggle}
-        renderRow={(i) => {
-          const shadow = shadows[i];
-          if (shadow === undefined) {
-            throw new Error(`Text shadow ${i} is missing`);
-          }
-          const colorLayer = `linear-gradient(${shadow.color}, ${shadow.color})`;
-          return {
-            preview: (
-              <span
-                className="embed-editor_bg-layer-preview"
-                style={{
-                  background: `${colorLayer}, ${SHADOW_PREVIEW_CHECKERBOARD}`,
-                }}
-                aria-hidden="true"
-              />
-            ),
-            label: shadowLabel(shadow),
-          };
-        }}
+        onToggleHidden={edit.toggle}
+        renderRow={(i) => shadowLayerRow(shadows[i], i)}
       />
-      {openIdx != null && anchorEl && shadows[openIdx] ? (
-        <LayerPopover anchorEl={anchorEl} ariaLabel="Text shadow" onClose={() => setOpenIdx(null)}>
+      {openIndex !== undefined && anchorElement && openShadow ? (
+        <LayerPopover
+          anchorEl={anchorElement}
+          ariaLabel="Text shadow"
+          onClose={() => setOpenIndex(undefined)}
+        >
           <ShadowEditor
-            shadow={shadows[openIdx]}
+            shadow={openShadow}
             busy={busy}
-            onChange={(p, live) => {
-              if (openIdx !== null) {
-                patch(openIdx, p, live);
-              }
-            }}
+            onChange={(shadowPatch, live) =>
+              edit.patch(openIndex, shadowPatch, live ? 'live' : 'commit')
+            }
           />
         </LayerPopover>
-      ) : null}
+      ) : undefined}
     </div>
   );
+}
+
+// A shadow's row in the layer list: its colour over a checkerboard, and its label.
+function shadowLayerRow(shadow: Shadow | undefined, index: number) {
+  if (shadow === undefined) {
+    throw new Error(`Text shadow ${index} is missing`);
+  }
+  const colorLayer = `linear-gradient(${shadow.color}, ${shadow.color})`;
+  return {
+    preview: (
+      <span
+        className="embed-editor_bg-layer-preview"
+        style={{
+          background: `${colorLayer}, ${SHADOW_PREVIEW_CHECKERBOARD}`,
+        }}
+        aria-hidden="true"
+      />
+    ),
+    label: shadowLabel(shadow),
+  };
+}
+
+// The edits the shadow list makes, each written back as the whole `text-shadow`
+// value; the open editor's index follows the row it belongs to.
+function shadowRowEdits({
+  rows,
+  props,
+  setOpenIndex,
+}: {
+  rows: Array<Hideable<Shadow>>;
+  props: Props;
+  setOpenIndex: React.Dispatch<React.SetStateAction<number | undefined>>;
+}) {
+  const write = (next: Array<Hideable<Shadow>>, mode: 'live' | 'commit') => {
+    const value = serializeHideable(next, ',', serializeShadows);
+    if (mode === 'live') {
+      if (value) {
+        props.liveSetProp('text-shadow', value, false);
+      }
+      return;
+    }
+    if (value) {
+      props.setProp('text-shadow', value, false);
+    } else {
+      props.clearProp('text-shadow');
+    }
+  };
+  return {
+    add: () => {
+      const next = [...rows, { item: blankShadow(), hidden: false }];
+      write(next, 'commit');
+      setOpenIndex(next.length - 1);
+    },
+    remove: (i: number) => {
+      write(
+        rows.filter((_, j) => j !== i),
+        'commit',
+      );
+      setOpenIndex((current) => {
+        if (current === i) {
+          return undefined;
+        }
+        return current !== undefined && current > i ? current - 1 : current;
+      });
+    },
+    reorder: (from: number, to: number) => {
+      if (from === to) {
+        return;
+      }
+      const next = [...rows];
+      const [moved] = next.splice(from, 1);
+      if (moved === undefined) {
+        return;
+      }
+      next.splice(to, 0, moved);
+      write(next, 'commit');
+      setOpenIndex((current) => (current === from ? to : current));
+    },
+    patch: (i: number, shadowPatch: ShadowPatch, mode: 'live' | 'commit') =>
+      write(
+        rows.map((row, j) => (j === i ? { ...row, item: { ...row.item, ...shadowPatch } } : row)),
+        mode,
+      ),
+    toggle: (i: number) =>
+      write(
+        rows.map((row, j) => (j === i ? { ...row, hidden: !row.hidden } : row)),
+        'commit',
+      ),
+  };
 }
 
 // ─────────────────────────── Section ───────────────────────────

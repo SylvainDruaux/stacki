@@ -6,7 +6,8 @@
 // so switching selector/context/state just re-derives — no re-scan.
 
 import { compareCascade } from './cascade';
-import type { RuleModel } from './cascade';
+import type { MatchedRule, RuleModel } from './cascade';
+import { assert } from '../../../shared/assert';
 import { canonicalCompound, compareSpecificity, normalizePseudoElement } from './selectors';
 import type { BreakpointId, ParsedRule, Specificity } from './types';
 
@@ -24,10 +25,10 @@ export type StyleContext = {
   /** Stable id used as the panel's `context` value. '' = Base. */
   key: string;
   label: string;
-  /** The Webflow breakpoint native reads/writes target here, or null. */
-  breakpoint: BreakpointId | null;
-  /** The embed at-context to match embed rules against ('' = base), or null. */
-  embedAtContext: string | null;
+  /** The Webflow breakpoint native reads/writes target here, or undefined. */
+  breakpoint: BreakpointId | undefined;
+  /** The embed at-context to match embed rules against ('' = base), or undefined. */
+  embedAtContext: string | undefined;
 };
 
 /** One property value contributed by a native Webflow class style. */
@@ -67,12 +68,12 @@ export type NativeResolveInput = {
   source: SourceKey;
   /** Native contributions for the current context + state (already filtered). */
   contribs: NativeContribution[];
-  /** The native style index that is the editable target (source==='native'), else null. */
-  selectedIndex: number | null;
+  /** The native style index that is the editable target (source==='native'), else undefined. */
+  selectedIndex: number | undefined;
   /** In embed mode, the embed whose rule is the editable (blue) target — scopes
    *  `isSelected`/`selectedRule` to that one embed so each embed is edited on its
-   *  own. Null/undefined → don't scope (any matching embed rule counts). */
-  selectedEmbedKey?: string | null;
+   *  own. Undefined → don't scope (any matching embed rule counts). */
+  selectedEmbedKey?: string | undefined;
   /** The current breakpoint's cascade tier (top of the chain). A native value is
    *  "set here" (blue) only at this tier; a lower tier means it's inherited from a
    *  wider breakpoint (orange). Undefined → don't gate (Base / non-breakpoint). */
@@ -133,8 +134,8 @@ export type ResolvedProp = {
 
 export type ResolvedStyle = {
   props: Map<string, ResolvedProp>;
-  /** The selected selector's rule in this context/state, or null (create on edit). */
-  selectedRule: ParsedRule | null;
+  /** The selected selector's rule in this context/state, or undefined (create on edit). */
+  selectedRule: ParsedRule | undefined;
   /** Distinct contexts present for this element (Base first) — drives the switcher. */
   contexts: ContextKey[];
   states: readonly StateKey[];
@@ -162,7 +163,7 @@ export type ContextInfo = {
   /** Simple token-combos (chip-representable) with styles here, strongest first. */
   styledCombos: string[][];
   /** The strongest such combo — what to auto-select when switching here. */
-  bestTokens: string[] | null;
+  bestTokens: string[] | undefined;
 };
 
 /**
@@ -185,18 +186,18 @@ export function indexContexts(model: RuleModel, contextKeys: ContextKey[]): Cont
         continue;
       }
       hasStyles = true;
-      for (const sel of matched.matchedSelectors) {
-        if (sel.pseudoElement != null) {
+      for (const selector of matched.matchedSelectors) {
+        if (selector.pseudoElement !== undefined) {
           continue;
         } // styles a generated box, not the element
-        const canon = canonicalCompound(sel.text);
+        const canon = canonicalCompound(selector.text);
         if (!canon.simple) {
           continue;
         }
-        combos.push({ tokens: canon.tokens, specificity: sel.specificity });
+        combos.push({ tokens: canon.tokens, specificity: selector.specificity });
       }
     }
-    combos.sort((a, b) => compareSpecificity(b.specificity, a.specificity));
+    combos.sort((left, right) => compareSpecificity(right.specificity, left.specificity));
     // Dedup combos (by token set) keeping strongest-first order.
     const seen = new Set<string>();
     const styledCombos: string[][] = [];
@@ -208,7 +209,7 @@ export function indexContexts(model: RuleModel, contextKeys: ContextKey[]): Cont
       seen.add(id);
       styledCombos.push(combo.tokens);
     }
-    return { key, hasStyles, styledCombos, bestTokens: styledCombos[0] ?? null };
+    return { key, hasStyles, styledCombos, bestTokens: styledCombos[0] };
   });
 }
 
@@ -285,8 +286,8 @@ export function selectorKey(text: string): string {
 }
 
 /** Whether two selectors are the same target (subject compound / full selector). */
-export function selectorsMatch(a: string, b: string): boolean {
-  return selectorKey(a) === selectorKey(b);
+export function selectorsMatch(left: string, right: string): boolean {
+  return selectorKey(left) === selectorKey(right);
 }
 
 /** The interaction state a selector targets, from its subject pseudo-classes. */
@@ -306,10 +307,18 @@ export function listMatchedSelectors(model: RuleModel, context: ContextKey): Mat
   const all = [...model.base, ...model.conditional];
   const byKey = new Map<string, MatchedSelector>();
   let order = 0; // source-order rank, assigned on first appearance
-  const addChip = (chip: MatchedSelectorCandidate) => {
-    const key = selectorKey(chip.text);
-    const existing = byKey.get(key);
-    if (existing) {
+  for (const matched of all) {
+    if (matched.rule.declarations.length === 0) {
+      continue;
+    }
+    const inContext = contextKeyOf(matched.rule) === context;
+    for (const chip of chipsForRule(matched, { inContext })) {
+      const key = selectorKey(chip.text);
+      const existing = byKey.get(key);
+      if (existing === undefined) {
+        byKey.set(key, { ...chip, key, order: order++ });
+        continue;
+      }
       // A selector styled in several contexts is one chip. When a later match lives in
       // the viewed context, adopt its in-context flag AND its query display so the `@`
       // marker attaches even though an out-of-query rule (iterated first) created it.
@@ -322,75 +331,79 @@ export function listMatchedSelectors(model: RuleModel, context: ContextKey): Mat
       if (chip.fromComponent) {
         existing.fromComponent = true;
       }
-      return;
     }
-    byKey.set(key, {
-      ...chip,
-      key,
-      order: order++,
-    });
-  };
+  }
+  assert(order === byKey.size, 'listMatchedSelectors: one order rank per chip');
+  return [...byKey.values()].sort(
+    (left, right) =>
+      compareSpecificity(left.specificity, right.specificity) ||
+      left.text.localeCompare(right.text),
+  );
+}
 
-  for (const matched of all) {
-    if (matched.rule.declarations.length === 0) {
+// The chips one matched rule contributes. A splittable selector (`.card::before`) gets
+// its own chip — editing it splits it out of the grouped rule. Complex matched
+// selectors (`:not(.x) > :is(...)`, which can't be cleanly split) are folded into ONE
+// chip showing the rule's FULL grouped selector, so it's clear that editing touches
+// every selector/element it targets.
+function chipsForRule(
+  matched: MatchedRule,
+  options: { readonly inContext: boolean },
+): MatchedSelectorCandidate[] {
+  const { inContext } = options;
+  const chips: MatchedSelectorCandidate[] = [];
+  let complexSpec: Specificity | undefined;
+  for (const selector of matched.matchedSelectors) {
+    const canon = canonicalCompound(selector.text);
+    if (isBareSelector(canon)) {
       continue;
     }
-    const inContext = contextKeyOf(matched.rule) === context;
-    // A splittable selector (`.card::before`) gets its own chip — editing it splits it
-    // out of the grouped rule. Complex matched selectors (`:not(.x) > :is(...)`, which
-    // can't be cleanly split) are folded into ONE chip showing the rule's FULL grouped
-    // selector, so it's clear that editing touches every selector/element it targets.
-    let complexSpec: Specificity | null = null;
-    for (const sel of matched.matchedSelectors) {
-      const canon = canonicalCompound(sel.text);
-      // A BARE pseudo-element (`::before`, `*::before`) styles every element's box with
-      // no element-specific selector — it'd pollute every element's list; skip it.
-      if (canon.pseudoElement && canon.oneCompound && canon.tokens.length === 0) {
-        continue;
-      }
-      // A lone universal (`*`) matches everything — too generic to be a useful chip on
-      // its own. Skip it UNLESS it's part of a more specific selector (a combinator,
-      // a state, or a pseudo-element makes it non-bare, so it isn't caught here).
-      if (
-        canon.universal &&
-        canon.oneCompound &&
-        canon.tokens.length === 0 &&
-        !canon.pseudoElement &&
-        canon.pseudoClasses.length === 0
-      ) {
-        continue;
-      }
-      if (canon.splittable) {
-        addChip(
-          listMatchedSelectorsCandidate({
-            rule: matched.rule,
-            text: sel.text,
-            simple: canon.simple,
-            state: stateOf(canon.pseudoClasses),
-            specificity: sel.specificity,
-            inContext,
-          }),
-        );
-      } else if (!complexSpec || compareSpecificity(sel.specificity, complexSpec) > 0) {
-        complexSpec = sel.specificity;
-      }
-    }
-    if (complexSpec) {
-      const canon = canonicalCompound(matched.rule.selectorText);
-      addChip(
+    if (canon.splittable) {
+      chips.push(
         listMatchedSelectorsCandidate({
           rule: matched.rule,
-          text: matched.rule.selectorText,
-          simple: false,
+          text: selector.text,
+          simple: canon.simple,
           state: stateOf(canon.pseudoClasses),
-          specificity: complexSpec,
+          specificity: selector.specificity,
           inContext,
         }),
       );
+    } else if (!complexSpec || compareSpecificity(selector.specificity, complexSpec) > 0) {
+      complexSpec = selector.specificity;
     }
   }
-  return [...byKey.values()].sort(
-    (a, b) => compareSpecificity(a.specificity, b.specificity) || a.text.localeCompare(b.text),
+  if (complexSpec) {
+    const canon = canonicalCompound(matched.rule.selectorText);
+    chips.push(
+      listMatchedSelectorsCandidate({
+        rule: matched.rule,
+        text: matched.rule.selectorText,
+        simple: false,
+        state: stateOf(canon.pseudoClasses),
+        specificity: complexSpec,
+        inContext,
+      }),
+    );
+  }
+  return chips;
+}
+
+function isBareSelector(canon: ReturnType<typeof canonicalCompound>): boolean {
+  // A BARE pseudo-element (`::before`, `*::before`) styles every element's box with
+  // no element-specific selector — it'd pollute every element's list; skip it.
+  if (canon.pseudoElement && canon.oneCompound && canon.tokens.length === 0) {
+    return true;
+  }
+  // A lone universal (`*`) matches everything — too generic to be a useful chip on
+  // its own. Skip it UNLESS it's part of a more specific selector (a combinator,
+  // a state, or a pseudo-element makes it non-bare, so it isn't caught here).
+  return (
+    canon.universal &&
+    canon.oneCompound &&
+    canon.tokens.length === 0 &&
+    !canon.pseudoElement &&
+    canon.pseudoClasses.length === 0
   );
 }
 
@@ -407,115 +420,28 @@ export function resolveStyle(
   // the ::before box. Picking a `::before` chip shows only that box's styles (not the
   // element's); picking the element (no pseudo-element) hides `::before`/`::after`.
   const activeCanon = canonicalCompound(activeSelector);
-  const state = stateOf(activeCanon.pseudoClasses);
-  const activePseudo = activeCanon.pseudoElement;
-
-  // Distinct contexts (Base first, others in first-appearance order).
-  const contexts: ContextKey[] = [];
-  for (const matched of all) {
-    const key = contextKeyOf(matched.rule);
-    if (!contexts.includes(key)) {
-      contexts.push(key);
-    }
-  }
-  contexts.sort((a, b) => (a === '' ? -1 : b === '' ? 1 : 0));
+  const view: ResolveView = {
+    context,
+    activeSelector,
+    state: stateOf(activeCanon.pseudoClasses),
+    activePseudo: activeCanon.pseudoElement,
+  };
 
   const byProp = new Map<string, Contributor[]>();
-  let selectedRule: ParsedRule | null = null;
-
+  let selectedRule: ParsedRule | undefined;
   for (const matched of all) {
-    const ruleCtx = contextKeyOf(matched.rule);
-    // Show the current context's OWN rules plus the ones it inherits from — base ('')
-    // and any ancestor query it nests inside — so a query view surfaces the base styles
-    // it builds on (as inherited/orange), not only its own overrides. Mirrors how a
-    // Webflow breakpoint shows wider-breakpoint values. Sibling queries don't apply.
-    const atContext = ruleCtx === context;
-    const inherited = !atContext && (ruleCtx === '' || context.startsWith(`${ruleCtx} › `));
-    if (!atContext && !inherited) {
+    const folded = foldEmbedRule(matched, view);
+    if (folded === undefined) {
       continue;
     }
-
-    // Pick this rule's strongest selector that applies in the view state: the base
-    // state ('') always applies, and under a :hover/… view the state's own selectors
-    // apply on top — so both fold in (base shows as inherited/orange). Other
-    // interaction states (viewing :hover → a :focus rule) don't apply.
-    let best: { text: string; specificity: Specificity; simple: boolean; tokens: string[] } | null =
-      null;
-    for (const sel of matched.matchedSelectors) {
-      // Only fold selectors targeting the SAME pseudo-element box as the view: the
-      // element itself ('') hides `::before`/`::after`, and a `::before` view shows
-      // only `::before` selectors.
-      if (normalizePseudoElement(sel.pseudoElement) !== activePseudo) {
-        continue;
-      }
-      const canon = canonicalCompound(sel.text);
-      const selState = stateOf(canon.pseudoClasses);
-      if (selState !== '' && selState !== state) {
-        continue;
-      }
-      if (!best || compareSpecificity(sel.specificity, best.specificity) > 0) {
-        best = {
-          text: sel.text,
-          specificity: sel.specificity,
-          simple: canon.simple,
-          tokens: canon.tokens,
-        };
-      }
-    }
-    if (!best) {
-      continue;
-    }
-    // `best` is reassigned by the loop above; the callbacks below read this settled one.
-    const winner = best;
-
-    // A rule is "selected" (blue, editable) when it carries a matched selector — in
-    // the active state — equal to the active selector (by selector identity: `.a.b`
-    // == `.b.a`, complex by text). This is NOT scoped to the source dropdown: the
-    // dropdown only picks where NEW styles go, while an existing rule is edited in
-    // whichever embed it already lives in (selectedRule carries that embed). So the
-    // active selector shows blue regardless of which embed defines it.
-    // Also selected when the active selector IS this rule's full grouped selector —
-    // that's the single chip we show for a rule of complex (non-splittable) selectors.
-    // Only a rule IN the current context is editable-here (blue) / the selectedRule.
-    // An inherited (base/ancestor) rule shows as orange; editing it creates an override
-    // in the current context rather than mutating the inherited rule.
-    const isSelected =
-      atContext &&
-      (selectorsMatch(matched.rule.selectorText, activeSelector) ||
-        matched.matchedSelectors.some(
-          (sel) =>
-            normalizePseudoElement(sel.pseudoElement) === activePseudo &&
-            stateOf(canonicalCompound(sel.text).pseudoClasses) === state &&
-            selectorsMatch(sel.text, activeSelector),
-        ));
-    if (isSelected && !selectedRule) {
+    if (folded.isSelected && !selectedRule) {
       selectedRule = matched.rule;
     }
-
-    // One contributor per (rule, prop) — the last decl wins within a rule.
-    const lastByProp = new Map<string, { value: string; important: boolean }>();
-    for (const decl of matched.rule.declarations) {
-      lastByProp.set(decl.prop, { value: decl.value, important: decl.important });
+    for (const contributor of folded.contributors) {
+      const list = byProp.get(contributor.prop) ?? [];
+      list.push(contributor.contributor);
+      byProp.set(contributor.prop, list);
     }
-    lastByProp.forEach((decl, prop) => {
-      const list = byProp.get(prop) ?? [];
-      list.push({
-        selectorText: winner.text,
-        value: decl.value,
-        important: decl.important,
-        specificity: winner.specificity,
-        order: matched.rule.order,
-        ruleId: matched.rule.ruleId,
-        origin: 'embed',
-        embedKey: matched.rule.embedKey,
-        embedLabel: matched.rule.embedLabel,
-        fromComponent: matched.rule.fromComponent,
-        isSelected,
-        winning: false,
-        complexOnly: !winner.simple,
-      });
-      byProp.set(prop, list);
-    });
   }
 
   // Fold native Webflow class-style values in as extra contributors. They carry a
@@ -523,75 +449,222 @@ export function resolveStyle(
   // rules on a cascade tie (embed CSS is injected after Webflow's stylesheet).
   // Skip them entirely for a pseudo-element view — native class styles belong to the
   // element, not its generated `::before`/`::after` box.
-  const source = native?.source ?? 'embed';
-  for (const nc of activePseudo ? [] : (native?.contribs ?? [])) {
-    const list = byProp.get(nc.prop) ?? [];
-    list.push({
-      selectorText: nc.selector,
-      value: nc.value,
-      important: false,
-      specificity: [0, nc.classDepth, 0],
-      // A narrower breakpoint's value (higher bpTier) wins the same-specificity
-      // tie over the inherited base value; both stay below any embed rule.
-      order: NATIVE_ORDER_BASE + nc.bpTier * 1_000 + nc.styleIndex,
-      ruleId: `native:${nc.styleIndex}:${nc.bpTier}:${nc.atState ? 's' : 'b'}:${nc.prop}`,
-      origin: 'native',
-      styleIndex: nc.styleIndex,
-      bpTier: nc.bpTier,
-      atState: nc.atState,
-      isSelected: false,
-      winning: false,
-      complexOnly: false,
-    });
-    byProp.set(nc.prop, list);
+  for (const contribution of view.activePseudo ? [] : (native?.contribs ?? [])) {
+    const list = byProp.get(contribution.prop) ?? [];
+    list.push(nativeContributor(contribution));
+    byProp.set(contribution.prop, list);
   }
 
   const props = new Map<string, ResolvedProp>();
   byProp.forEach((list, prop) => {
-    list.sort((a, b) => compareCascade(a, b, a.order, b.order));
-    const winner = list[0];
-    if (winner === undefined) {
-      throw new Error(`Resolved style invariant failed: ${prop} has no contributors`);
-    }
-    winner.winning = true;
-    // The editable (blue) contributor depends on the chosen source: the picked
-    // native style when editing natively, else the picked embed selector. A native
-    // value only counts as "set here" at the current breakpoint tier — a value
-    // carried down from a wider breakpoint stays orange (inherited).
-    // Native-first, embed-fallback: when editing natively, the picked native
-    // style is the editable value; but if it doesn't set this prop, the picked
-    // embed's value (a fallback write, or a pre-existing embed rule) is editable
-    // too. In embed-only mode (no native layer) the picked embed is the target.
-    // A native value is editable-here only at the current breakpoint tier AND the
-    // view's interaction state — a base-state value shown under a :hover view is
-    // inherited (orange), and editing it creates the :hover override.
-    const nativeSelected = list.find(
-      (c) =>
-        c.origin === 'native' &&
-        c.styleIndex === native?.selectedIndex &&
-        (native?.currentTier == null || c.bpTier === native.currentTier) &&
-        c.atState !== false,
-    );
-    const embedSelected = list.find((c) => c.origin === 'embed' && c.isSelected);
-    const selected = source === 'native' ? (nativeSelected ?? embedSelected) : embedSelected;
-    // Mark the contributor whose value is the one being edited (the picked selector's)
-    // so the provenance list can highlight it rather than the cascade winner.
-    if (selected) {
-      selected.editing = true;
-    }
-    props.set(prop, {
-      prop,
-      source: selected ? 'selected' : 'other',
-      ...(selected === undefined ? {} : { selectedOrigin: selected.origin }),
-      ...(selected === undefined
-        ? {}
-        : { selectedValue: { value: selected.value, important: selected.important } }),
-      winner,
-      // The picked selector sets it, but a more specific selector wins the cascade.
-      overridden: selected !== undefined && winner !== selected,
-      contributors: list,
-    });
+    props.set(prop, resolveProp(prop, list, native));
   });
+  assert(props.size === byProp.size, 'resolveStyle: one resolved entry per property');
+  return { props, selectedRule, contexts: contextsOf(all), states: STATES };
+}
 
-  return { props, selectedRule, contexts, states: STATES };
+/** What resolveStyle is looking at: the context, the active selector, and its view. */
+type ResolveView = {
+  readonly context: ContextKey;
+  readonly activeSelector: string;
+  readonly state: StateKey;
+  readonly activePseudo: string;
+};
+
+// Distinct contexts (Base first, others in first-appearance order).
+function contextsOf(all: readonly MatchedRule[]): ContextKey[] {
+  const contexts: ContextKey[] = [];
+  for (const matched of all) {
+    const key = contextKeyOf(matched.rule);
+    if (!contexts.includes(key)) {
+      contexts.push(key);
+    }
+  }
+  contexts.sort((left, right) => (left === '' ? -1 : right === '' ? 1 : 0));
+  return contexts;
+}
+
+type ViewSelector = { text: string; specificity: Specificity; simple: boolean; tokens: string[] };
+
+// Pick this rule's strongest selector that applies in the view state: the base
+// state ('') always applies, and under a :hover/… view the state's own selectors
+// apply on top — so both fold in (base shows as inherited/orange). Other
+// interaction states (viewing :hover → a :focus rule) don't apply.
+function strongestInView(matched: MatchedRule, view: ResolveView): ViewSelector | undefined {
+  let best: ViewSelector | undefined;
+  for (const selector of matched.matchedSelectors) {
+    // Only fold selectors targeting the SAME pseudo-element box as the view: the
+    // element itself ('') hides `::before`/`::after`, and a `::before` view shows
+    // only `::before` selectors.
+    if (normalizePseudoElement(selector.pseudoElement) !== view.activePseudo) {
+      continue;
+    }
+    const canon = canonicalCompound(selector.text);
+    const selectorState = stateOf(canon.pseudoClasses);
+    if (selectorState !== '' && selectorState !== view.state) {
+      continue;
+    }
+    if (!best || compareSpecificity(selector.specificity, best.specificity) > 0) {
+      best = {
+        text: selector.text,
+        specificity: selector.specificity,
+        simple: canon.simple,
+        tokens: canon.tokens,
+      };
+    }
+  }
+  return best;
+}
+
+type FoldedRule = {
+  readonly isSelected: boolean;
+  readonly contributors: ReadonlyArray<{
+    readonly prop: string;
+    readonly contributor: Contributor;
+  }>;
+};
+
+// One embed rule's contributors in this view, or undefined when the rule does not
+// apply to it.
+function foldEmbedRule(matched: MatchedRule, view: ResolveView): FoldedRule | undefined {
+  const ruleContext = contextKeyOf(matched.rule);
+  // Show the current context's OWN rules plus the ones it inherits from — base ('')
+  // and any ancestor query it nests inside — so a query view surfaces the base styles
+  // it builds on (as inherited/orange), not only its own overrides. Mirrors how a
+  // Webflow breakpoint shows wider-breakpoint values. Sibling queries don't apply.
+  const atContext = ruleContext === view.context;
+  const inherited =
+    !atContext && (ruleContext === '' || view.context.startsWith(`${ruleContext} › `));
+  if (!atContext && !inherited) {
+    return undefined;
+  }
+  const winner = strongestInView(matched, view);
+  if (!winner) {
+    return undefined;
+  }
+  const isSelected = atContext && isSelectedRule(matched, view);
+
+  // One contributor per (rule, prop) — the last decl wins within a rule.
+  const lastByProp = new Map<string, { value: string; important: boolean }>();
+  for (const decl of matched.rule.declarations) {
+    lastByProp.set(decl.prop, { value: decl.value, important: decl.important });
+  }
+  const contributors = [...lastByProp].map(([prop, decl]) => ({
+    prop,
+    contributor: {
+      selectorText: winner.text,
+      value: decl.value,
+      important: decl.important,
+      specificity: winner.specificity,
+      order: matched.rule.order,
+      ruleId: matched.rule.ruleId,
+      origin: 'embed' as const,
+      embedKey: matched.rule.embedKey,
+      embedLabel: matched.rule.embedLabel,
+      fromComponent: matched.rule.fromComponent,
+      isSelected,
+      winning: false,
+      complexOnly: !winner.simple,
+    },
+  }));
+  return { isSelected, contributors };
+}
+
+// A rule is "selected" (blue, editable) when it carries a matched selector — in
+// the active state — equal to the active selector (by selector identity: `.a.b`
+// == `.b.a`, complex by text). This is NOT scoped to the source dropdown: the
+// dropdown only picks where NEW styles go, while an existing rule is edited in
+// whichever embed it already lives in (selectedRule carries that embed). So the
+// active selector shows blue regardless of which embed defines it.
+// Also selected when the active selector IS this rule's full grouped selector —
+// that's the single chip we show for a rule of complex (non-splittable) selectors.
+// Only a rule IN the current context is editable-here (blue) / the selectedRule.
+// An inherited (base/ancestor) rule shows as orange; editing it creates an override
+// in the current context rather than mutating the inherited rule.
+function isSelectedRule(matched: MatchedRule, view: ResolveView): boolean {
+  return (
+    selectorsMatch(matched.rule.selectorText, view.activeSelector) ||
+    matched.matchedSelectors.some(
+      (selector) =>
+        normalizePseudoElement(selector.pseudoElement) === view.activePseudo &&
+        stateOf(canonicalCompound(selector.text).pseudoClasses) === view.state &&
+        selectorsMatch(selector.text, view.activeSelector),
+    )
+  );
+}
+
+function nativeContributor(contribution: NativeContribution): Contributor {
+  return {
+    selectorText: contribution.selector,
+    value: contribution.value,
+    important: false,
+    specificity: [0, contribution.classDepth, 0],
+    // A narrower breakpoint's value (higher bpTier) wins the same-specificity
+    // tie over the inherited base value; both stay below any embed rule.
+    order: NATIVE_ORDER_BASE + contribution.bpTier * 1_000 + contribution.styleIndex,
+    ruleId:
+      `native:${contribution.styleIndex}:${contribution.bpTier}:` +
+      `${contribution.atState ? 's' : 'b'}:${contribution.prop}`,
+    origin: 'native',
+    styleIndex: contribution.styleIndex,
+    bpTier: contribution.bpTier,
+    atState: contribution.atState,
+    isSelected: false,
+    winning: false,
+    complexOnly: false,
+  };
+}
+
+// Rank one property's contributors and mark its winner and its editable one.
+function resolveProp(
+  prop: string,
+  list: Contributor[],
+  native: NativeResolveInput | undefined,
+): ResolvedProp {
+  const source = native?.source ?? 'embed';
+  list.sort((left, right) => compareCascade(left, right, left.order, right.order));
+  const winner = list[0];
+  if (winner === undefined) {
+    throw new Error(`Resolved style invariant failed: ${prop} has no contributors`);
+  }
+  winner.winning = true;
+  // The editable (blue) contributor depends on the chosen source: the picked
+  // native style when editing natively, else the picked embed selector. A native
+  // value only counts as "set here" at the current breakpoint tier — a value
+  // carried down from a wider breakpoint stays orange (inherited).
+  // Native-first, embed-fallback: when editing natively, the picked native
+  // style is the editable value; but if it doesn't set this prop, the picked
+  // embed's value (a fallback write, or a pre-existing embed rule) is editable
+  // too. In embed-only mode (no native layer) the picked embed is the target.
+  // A native value is editable-here only at the current breakpoint tier AND the
+  // view's interaction state — a base-state value shown under a :hover view is
+  // inherited (orange), and editing it creates the :hover override.
+  const nativeSelected = list.find(
+    (contribution) =>
+      contribution.origin === 'native' &&
+      contribution.styleIndex === native?.selectedIndex &&
+      (native?.currentTier === undefined || contribution.bpTier === native.currentTier) &&
+      contribution.atState !== false,
+  );
+  const embedSelected = list.find(
+    (contribution) => contribution.origin === 'embed' && contribution.isSelected,
+  );
+  const selected = source === 'native' ? (nativeSelected ?? embedSelected) : embedSelected;
+  // Mark the contributor whose value is the one being edited (the picked selector's)
+  // so the provenance list can highlight it rather than the cascade winner.
+  if (selected) {
+    selected.editing = true;
+  }
+  return {
+    prop,
+    source: selected ? 'selected' : 'other',
+    ...(selected === undefined ? {} : { selectedOrigin: selected.origin }),
+    ...(selected === undefined
+      ? {}
+      : { selectedValue: { value: selected.value, important: selected.important } }),
+    winner,
+    // The picked selector sets it, but a more specific selector wins the cascade.
+    overridden: selected !== undefined && winner !== selected,
+    contributors: list,
+  };
 }

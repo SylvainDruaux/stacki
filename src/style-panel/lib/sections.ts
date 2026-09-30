@@ -19,7 +19,7 @@ export type SectionId =
   | 'effects'
   | 'other';
 
-export type SectionDef = {
+export type SectionDefinition = {
   id: SectionId;
   label: string;
   /** Canonical property order within the section (lowercased, matches decl.prop). */
@@ -28,7 +28,7 @@ export type SectionDef = {
 
 // The taxonomy + canonical order. `other` has no fixed order — it keeps source
 // order (see groupDeclarations) and catches anything unclassified.
-export const SECTIONS: readonly SectionDef[] = [
+export const SECTIONS: readonly SectionDefinition[] = [
   {
     // Properties that apply when the element is a child of a flex/grid container.
     // Sits above Layout so a selected flex item's sizing/alignment reads top-down.
@@ -251,7 +251,7 @@ export const SECTIONS: readonly SectionDef[] = [
   { id: 'other', label: 'Custom properties', order: [] },
 ];
 
-// prop → section, and prop → its canonical index within that section. Built once
+// Property → section, and property → its canonical index within that section. Built once
 // from SECTIONS so the taxonomy is the single source of truth.
 export const PROPERTY_SECTION: ReadonlyMap<string, SectionId> = (() => {
   const map = new Map<string, SectionId>();
@@ -302,7 +302,7 @@ export function sectionOf(prop: string): SectionId {
 }
 
 export type SectionGroup = {
-  def: SectionDef;
+  def: SectionDefinition;
   /** Present declarations for this section, canonically ordered. */
   decls: ParsedDeclaration[];
 };
@@ -334,27 +334,27 @@ export function groupDeclarations(
   });
 
   const groups: SectionGroup[] = [];
-  for (const def of SECTIONS) {
-    const list = buckets.get(def.id) ?? [];
+  for (const definition of SECTIONS) {
+    const list = buckets.get(definition.id) ?? [];
     const has = list.length > 0;
-    if (!has && !alwaysShow.includes(def.id)) {
+    if (!has && !alwaysShow.includes(definition.id)) {
       continue;
     }
-    if (has && def.id !== 'other') {
+    if (has && definition.id !== 'other') {
       // Stable sort by canonical index; equal ranks keep their source order.
       list
         .map((decl, index) => ({ decl, index, rank: PROPERTY_ORDER.get(decl.prop) ?? UNRANKED }))
-        .sort((a, b) => a.rank - b.rank || a.index - b.index)
+        .sort((left, right) => left.rank - right.rank || left.index - right.index)
         .forEach((entry, i) => {
           list[i] = entry.decl;
         });
     }
-    groups.push({ def, decls: list });
+    groups.push({ def: definition, decls: list });
   }
   return groups;
 }
 
-export type SectionPropGroup = { def: SectionDef; props: string[] };
+export type SectionPropGroup = { def: SectionDefinition; props: string[] };
 
 /** Like groupDeclarations but over bare property names (for the resolved model). */
 export function groupProps(
@@ -373,21 +373,21 @@ export function groupProps(
   });
 
   const groups: SectionPropGroup[] = [];
-  for (const def of SECTIONS) {
-    const list = buckets.get(def.id) ?? [];
+  for (const definition of SECTIONS) {
+    const list = buckets.get(definition.id) ?? [];
     const has = list.length > 0;
-    if (!has && !alwaysShow.includes(def.id)) {
+    if (!has && !alwaysShow.includes(definition.id)) {
       continue;
     }
-    if (has && def.id !== 'other') {
+    if (has && definition.id !== 'other') {
       list
         .map((prop, index) => ({ prop, index, rank: PROPERTY_ORDER.get(prop) ?? UNRANKED }))
-        .sort((a, b) => a.rank - b.rank || a.index - b.index)
+        .sort((left, right) => left.rank - right.rank || left.index - right.index)
         .forEach((entry, i) => {
           list[i] = entry.prop;
         });
     }
-    groups.push({ def, props: list });
+    groups.push({ def: definition, props: list });
   }
   return groups;
 }

@@ -15,7 +15,8 @@ import { useEffect, useRef, useState } from 'react';
 // The model still arrives and still wins: when the save finishes, the field
 // shows whatever the file now says — including a value from a rule further
 // down the cascade, which was there all along and is now the one that applies.
-export function useFieldDraft(external: string, busy: boolean) {
+export function useFieldDraft(external: string, options: { readonly busy: boolean }) {
+  const { busy } = options;
   const [draft, setDraft] = useState(external);
   const focused = useRef(false);
 
@@ -34,7 +35,9 @@ export function useFieldDraft(external: string, busy: boolean) {
     if (!busy && !focused.current) {
       setDraft(external);
     }
-  }, [busy]);
+    // `external` is listed for truthfulness: a change to it alone is already handled
+    // by the effect above, and setting the same draft twice is a no-op.
+  }, [busy, external]);
 
   return { draft, setDraft, focused, cleared: () => setDraft('') };
 }

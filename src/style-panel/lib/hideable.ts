@@ -136,7 +136,7 @@ export function serializeHideable<T>(
 ): string {
   const parts = rows
     .map((row) => ({ text: serializeAll([row.item]).trim(), hidden: row.hidden }))
-    .filter((p) => p.text);
+    .filter((part) => part.text);
   if (!parts.length) {
     return '';
   }
@@ -168,4 +168,4 @@ export function serializeHideable<T>(
 
 /** Whether every layer is hidden — the caller may prefer to clear the property. */
 export const allHidden = <T>(rows: ReadonlyArray<Hideable<T>>): boolean =>
-  rows.length > 0 && rows.every((r) => r.hidden);
+  rows.length > 0 && rows.every((row) => row.hidden);

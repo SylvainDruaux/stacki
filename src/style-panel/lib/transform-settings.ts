@@ -32,7 +32,7 @@ export const CENTER: Origin = { x: '50%', y: '50%', z: '' };
 function splitSpaces(value: string): string[] {
   const out: string[] = [];
   let depth = 0;
-  let cur = '';
+  let current = '';
   for (let i = 0; i < value.length; i++) {
     const ch = value[i] ?? '';
     if (ch === '(') {
@@ -41,16 +41,16 @@ function splitSpaces(value: string): string[] {
       depth--;
     }
     if (depth === 0 && /\s/.test(ch)) {
-      if (cur.trim()) {
-        out.push(cur.trim());
+      if (current.trim()) {
+        out.push(current.trim());
       }
-      cur = '';
+      current = '';
       continue;
     }
-    cur += ch;
+    current += ch;
   }
-  if (cur.trim()) {
-    out.push(cur.trim());
+  if (current.trim()) {
+    out.push(current.trim());
   }
   return out;
 }
@@ -68,15 +68,15 @@ export function parseOrigin(value: string): Origin {
   if (!parts.length) {
     return { ...CENTER };
   }
-  const lower = parts.map((p) => p.toLowerCase());
+  const lower = parts.map((part) => part.toLowerCase());
 
   if (parts.length === 1) {
-    const w = lower[0] ?? '';
-    if (w in Y_WORD && !(w in X_WORD)) {
-      return { x: '50%', y: Y_WORD[w] ?? '50%', z: '' };
+    const first = lower[0] ?? '';
+    if (first in Y_WORD && !(first in X_WORD)) {
+      return { x: '50%', y: Y_WORD[first] ?? '50%', z: '' };
     }
-    if (w in X_WORD) {
-      return { x: X_WORD[w] ?? '50%', y: '50%', z: '' };
+    if (first in X_WORD) {
+      return { x: X_WORD[first] ?? '50%', y: '50%', z: '' };
     }
     return { x: parts[0] ?? '50%', y: '50%', z: '' };
   }
@@ -98,10 +98,10 @@ export function parseOrigin(value: string): Origin {
 }
 
 /** An origin back to a value ('' when it is the plain default). */
-export function serializeOrigin(o: Origin): string {
-  const x = (o.x || '').trim() || '50%';
-  const y = (o.y || '').trim() || '50%';
-  const z = (o.z || '').trim();
+export function serializeOrigin(origin: Origin): string {
+  const x = (origin.x || '').trim() || '50%';
+  const y = (origin.y || '').trim() || '50%';
+  const z = (origin.z || '').trim();
   if (!z && x === '50%' && y === '50%') {
     return '';
   }
@@ -123,18 +123,20 @@ export const ORIGIN_PRESETS: ReadonlyArray<{ x: string; y: string; label: string
 
 // `0` and `0%` are the same place, and a field showing `0` should still light up
 // the corner. Only the three pad positions need comparing, so this is enough.
-const samePos = (a: string, b: string): boolean => {
-  const n = (v: string) =>
-    v
+const samePosition = (left: string, right: string): boolean => {
+  const normalize = (text: string) =>
+    text
       .trim()
       .toLowerCase()
       .replace(/^0(?:px|%|em|rem)$/, '0');
-  return n(a) === n(b);
+  return normalize(left) === normalize(right);
 };
 
 /** Which pad dot an origin sits on, or -1 when it is somewhere in between. */
-export const originPreset = (o: Origin): number =>
-  ORIGIN_PRESETS.findIndex((p) => samePos(p.x, o.x) && samePos(p.y, o.y));
+export const originPreset = (origin: Origin): number =>
+  ORIGIN_PRESETS.findIndex(
+    (preset) => samePosition(preset.x, origin.x) && samePosition(preset.y, origin.y),
+  );
 
 /**
  * Lift a `perspective()` out of a transform value.
@@ -169,12 +171,12 @@ export function takeSelfPerspective(value: string): { distance: string; rest: st
       // A name boundary, so `my-perspective(…)` is left alone.
       if (at && (i === 0 || !/[\w-]/.test(text[i - 1] ?? ''))) {
         let j = i + at[0].length;
-        let d = 1;
-        while (j < text.length && d > 0) {
+        let nesting = 1;
+        while (j < text.length && nesting > 0) {
           if ((text[j] ?? '') === '(') {
-            d++;
+            nesting++;
           } else if ((text[j] ?? '') === ')') {
-            d--;
+            nesting--;
           }
           j++;
         }
@@ -194,11 +196,11 @@ export function takeSelfPerspective(value: string): { distance: string; rest: st
 
 /** Put a `perspective()` back at the front of a transform value. */
 export function withSelfPerspective(rest: string, distance: string): string {
-  const d = (distance || '').trim();
+  const trimmed = (distance || '').trim();
   const body = (rest || '').trim();
   // No distance, or a zero one: there is nothing to write. `perspective(0)` is
   // not a smaller perspective, it is an invalid one.
-  if (!d || /^0(?:[a-z]*|%)$/i.test(d)) {
+  if (!trimmed || /^0(?:[a-z]*|%)$/i.test(trimmed)) {
     return body;
   }
   // `none` is the placeholder written when every layer is hidden (see
@@ -207,5 +209,5 @@ export function withSelfPerspective(rest: string, distance: string): string {
   // `perspective(500px) none` is not a valid transform, which would drop the
   // declaration and every hidden layer's comment with it.
   const layers = body.replace(/^none\b\s*/i, '');
-  return layers ? `perspective(${d}) ${layers}` : `perspective(${d})`;
+  return layers ? `perspective(${trimmed}) ${layers}` : `perspective(${trimmed})`;
 }

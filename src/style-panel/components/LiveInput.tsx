@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
-import type { ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import type { KeyboardEvent, ReactNode } from 'react';
 import VariableConnect from '../VariableConnect';
 import { handleArrowStep } from '../lib/number-step';
 import { commitInPlace } from '../lib/commit-in-place';
@@ -24,20 +24,7 @@ import useScrub from './useScrub';
 // both, not to the input alone — a ring drawn around the input cuts the unit
 // out of the field it belongs to.
 
-export default function LiveInput({
-  value,
-  busy,
-  readOnly = false,
-  ariaLabel,
-  placeholder,
-  prop,
-  suffix,
-  min,
-  wrapClassName = 'embed-editor_field',
-  onLive,
-  onCommit,
-  onVariablePick,
-}: {
+type LiveInputProps = {
   value: string;
   busy: boolean;
   readOnly?: boolean;
@@ -56,38 +43,33 @@ export default function LiveInput({
   onLive: (value: string) => void;
   onCommit: (value: string) => void;
   onVariablePick?: (binding: string) => void;
-}) {
-  const [draft, setDraft] = useState(value);
-  const focused = useRef(false);
-  const liveTimer = useRef<number | null>(null);
-  useEffect(() => {
-    if (!focused.current) {
-      setDraft(value);
-    }
-  }, [value]);
-  const cancelLive = () => {
-    if (liveTimer.current != null) {
-      window.clearTimeout(liveTimer.current);
-      liveTimer.current = null;
-    }
-  };
-  useEffect(() => cancelLive, []);
-  const scheduleLive = (text: string) => {
-    cancelLive();
-    liveTimer.current = window.setTimeout(() => {
-      liveTimer.current = null;
-      onLive(text);
-    }, 100);
+};
+
+export default function LiveInput({
+  value,
+  busy,
+  readOnly = false,
+  ariaLabel,
+  placeholder,
+  prop,
+  suffix,
+  min,
+  wrapClassName = 'embed-editor_field',
+  onLive,
+  onCommit,
+  onVariablePick,
+}: LiveInputProps) {
+  const { draft, setDraft, focused, cancelLive, scheduleLive } = useLiveDraft(value, onLive);
+  const commitScrub = (text: string) => {
+    setDraft(text);
+    onCommit(text);
   };
   const scrub = useScrub({
     value: draft,
     disabled: busy || readOnly,
     onPreview: setDraft,
     onInput: onLive,
-    onCommit: (text) => {
-      setDraft(text);
-      onCommit(text);
-    },
+    onCommit: commitScrub,
   });
   return (
     <div className={wrapClassName}>
@@ -116,20 +98,11 @@ export default function LiveInput({
             onCommit(draft);
           }}
           onKeyDown={(event) => {
-            if (event.key === 'Enter') {
-              commitInPlace(event.currentTarget);
-              return;
+            const stepped = keyDownStep(event, min);
+            if (stepped !== undefined) {
+              setDraft(stepped);
+              scheduleLive(stepped);
             }
-            const stepped = handleArrowStep(event, min);
-            if (!stepped) {
-              return;
-            }
-            event.preventDefault();
-            const el = event.currentTarget;
-            el.value = stepped.text;
-            el.setSelectionRange(stepped.caret, stepped.caret);
-            setDraft(stepped.text);
-            scheduleLive(stepped.text);
           }}
           disabled={busy}
           readOnly={readOnly}
@@ -138,7 +111,65 @@ export default function LiveInput({
           aria-label={ariaLabel}
         />
       </VariableConnect>
-      {suffix != null ? <span className="embed-editor_field-suffix">{suffix}</span> : null}
+      {suffixSpan(suffix)}
     </div>
   );
+}
+
+// The unit after the value. A ReactNode suffix may arrive as null from a caller;
+// either way there is none.
+function suffixSpan(suffix: ReactNode): ReactNode {
+  const shown = suffix ?? undefined;
+  return shown !== undefined ? (
+    <span className="embed-editor_field-suffix">{shown}</span>
+  ) : undefined;
+}
+
+// Enter commits in place; an arrow key steps the number under the caret and returns
+// the stepped text (already written into the field), or undefined when nothing stepped.
+function keyDownStep(
+  event: KeyboardEvent<HTMLInputElement>,
+  min: number | undefined,
+): string | undefined {
+  if (event.key === 'Enter') {
+    commitInPlace(event.currentTarget);
+    return undefined;
+  }
+  const stepped = handleArrowStep(event, min);
+  if (!stepped) {
+    return undefined;
+  }
+  event.preventDefault();
+  const element = event.currentTarget;
+  element.value = stepped.text;
+  element.setSelectionRange(stepped.caret, stepped.caret);
+  return stepped.text;
+}
+
+// The typed draft, re-synced from `value` while the field isn't focused, and a
+// debounced live write of what is typed.
+function useLiveDraft(value: string, onLive: (value: string) => void) {
+  const [draft, setDraft] = useState(value);
+  const focused = useRef(false);
+  const liveTimer = useRef<number | undefined>(undefined);
+  useEffect(() => {
+    if (!focused.current) {
+      setDraft(value);
+    }
+  }, [value]);
+  const cancelLive = useCallback(() => {
+    if (liveTimer.current !== undefined) {
+      window.clearTimeout(liveTimer.current);
+      liveTimer.current = undefined;
+    }
+  }, []);
+  useEffect(() => cancelLive, [cancelLive]);
+  const scheduleLive = (text: string) => {
+    cancelLive();
+    liveTimer.current = window.setTimeout(() => {
+      liveTimer.current = undefined;
+      onLive(text);
+    }, 100);
+  };
+  return { draft, setDraft, focused, cancelLive, scheduleLive };
 }

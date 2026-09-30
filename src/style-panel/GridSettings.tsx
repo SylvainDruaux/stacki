@@ -48,17 +48,19 @@ type LabelProps = {
   onSelectSelector: OnSelectSelector;
 };
 
-const val = (read: Read, prop: string): string => {
-  const r = read(prop);
-  if (!r) {
+const resolvedValue = (read: Read, prop: string): string => {
+  const resolved = read(prop);
+  if (!resolved) {
     return '';
   }
   return (
-    r.source === 'selected' && r.selectedValue ? r.selectedValue.value : r.winner.value
+    resolved.source === 'selected' && resolved.selectedValue
+      ? resolved.selectedValue.value
+      : resolved.winner.value
   ).trim();
 };
 
-// ── icons ──
+// Icons.
 const CloseIcon = () => (
   <svg viewBox="0 0 16 16" fill="none" aria-hidden="true" width="16" height="16">
     <path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
@@ -118,7 +120,7 @@ const WarnIcon = () => (
 // (↔ columns, ↕ rows) and the faint grid lines flank that same axis.
 const FAINT_ROW = 'M1 1H15V2H1V1ZM1 14H15V15H1V14Z';
 const FAINT_COL = 'M1 1V15H2V1H1ZM14 1V15H15V1H14Z';
-const GEAR_D =
+const GEAR_PATH =
   'M7.00002 3.25C7.00002 3.11193 7.11195 3 7.25002 3L8.75002 3' +
   'C8.88809 3 9.00002 3.11193 9.00002 3.25V4.43301' +
   'C9.00002 4.52233 9.04767 4.60486 9.12502 4.64952L10.3391 5.35046' +
@@ -144,10 +146,10 @@ const GEAR_D =
   'C6.95237 4.60486 7.00002 4.52233 7.00002 4.43301V3.25ZM7.99997 9.5' +
   'C8.82839 9.5 9.49997 8.82843 9.49997 8C9.49997 7.17157 8.82839 6.5 7.99997 6.5' +
   'C7.17154 6.5 6.49997 7.17157 6.49997 8C6.49997 8.82843 7.17154 9.5 7.99997 9.5Z';
-const AUTO_D =
+const AUTO_PATH =
   'M8.87418 4H7.12589L4.77295 12H5.8153L6.39552 10.0273H9.6046L10.1848 12H11.2272L8.87418 4' +
   'ZM8.12592 4.9999L9.31048 9.02728H6.68963L7.87416 4.9999H8.12592Z';
-const ARROW_D =
+const ARROW_PATH =
   'M8.52731 3.70718L10.6738 5.85363L11.3809 5.14652L8.02731 1.79297L4.67375 5.14652' +
   'L5.38086 5.85363L7.52731 3.70718L7.52731 12.293L5.38086 10.1465L4.67375 10.8536' +
   'L8.02731 14.2072L11.3809 10.8536L10.6738 10.1465L8.52731 12.293L8.52731 3.70718Z';
@@ -163,12 +165,12 @@ function TrackIcon({ track, axis }: { track: string; axis: 'column' | 'row' }) {
         fill="currentColor"
       />
       {kind === 'minmax' ? (
-        <path fillRule="evenodd" clipRule="evenodd" d={GEAR_D} fill="currentColor" />
+        <path fillRule="evenodd" clipRule="evenodd" d={GEAR_PATH} fill="currentColor" />
       ) : kind === 'auto' || kind === 'content' ? (
-        <path fillRule="evenodd" clipRule="evenodd" d={AUTO_D} fill="currentColor" />
+        <path fillRule="evenodd" clipRule="evenodd" d={AUTO_PATH} fill="currentColor" />
       ) : (
         <path
-          d={ARROW_D}
+          d={ARROW_PATH}
           fill="currentColor"
           transform={axis === 'column' ? 'rotate(90 8 8)' : undefined}
         />
@@ -177,7 +179,7 @@ function TrackIcon({ track, axis }: { track: string; axis: 'column' | 'row' }) {
   );
 }
 
-// ── a single track's value input (default size, or a minmax bound) ──
+// A single track's value input (default size, or a minmax bound).
 function TrackInput({
   value,
   placeholder,
@@ -189,7 +191,7 @@ function TrackInput({
   placeholder: string;
   ariaLabel: string;
   busy: boolean;
-  onCommit: (v: string) => void;
+  onCommit: (value: string) => void;
 }) {
   const [text, setText] = useState(value);
   const focused = useRef(false);
@@ -200,14 +202,15 @@ function TrackInput({
   }, [value]);
   // No onInput: a track list has no preview channel, only the real write, so the drag
   // moves the field's text and writes once on release rather than at pointer speed.
+  const commitScrub = (next: string) => {
+    setText(next);
+    onCommit(next.trim());
+  };
   const scrub = useScrub({
     value: text,
     disabled: busy,
     onPreview: setText,
-    onCommit: (next) => {
-      setText(next);
-      onCommit(next.trim());
-    },
+    onCommit: commitScrub,
   });
   return (
     <VariableConnect
@@ -226,7 +229,7 @@ function TrackInput({
         disabled={busy}
         aria-label={ariaLabel}
         placeholder={placeholder}
-        onChange={(e) => setText(e.target.value)}
+        onChange={(event) => setText(event.target.value)}
         onFocus={() => {
           focused.current = true;
         }}
@@ -234,25 +237,34 @@ function TrackInput({
           focused.current = false;
           onCommit(text.trim());
         }}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter') {
-            e.currentTarget.blur();
-            return;
+        onKeyDown={(event) => {
+          const stepped = stepTrackInput(event);
+          if (stepped !== undefined) {
+            setText(stepped);
+            onCommit(stepped.trim());
           }
-          // ↑/↓ step the number under the caret (unit preserved) and apply immediately.
-          const stepped = handleArrowStep(e);
-          if (!stepped) {
-            return;
-          }
-          e.preventDefault();
-          e.currentTarget.value = stepped.text;
-          e.currentTarget.setSelectionRange(stepped.caret, stepped.caret);
-          setText(stepped.text);
-          onCommit(stepped.text.trim());
         }}
       />
     </VariableConnect>
   );
+}
+
+// Enter blurs (which commits); ↑/↓ step the number under the caret (unit preserved) in
+// place. Returns the stepped text to apply immediately, or undefined.
+function stepTrackInput(event: React.KeyboardEvent<HTMLInputElement>): string | undefined {
+  const input = event.currentTarget;
+  if (event.key === 'Enter') {
+    input.blur();
+    return undefined;
+  }
+  const stepped = handleArrowStep(event);
+  if (!stepped) {
+    return undefined;
+  }
+  event.preventDefault();
+  input.value = stepped.text;
+  input.setSelectionRange(stepped.caret, stepped.caret);
+  return stepped.text;
 }
 
 const SIZING_OPTIONS: ReadonlyArray<SegmentedOption<'default' | 'minmax'>> = [
@@ -261,6 +273,29 @@ const SIZING_OPTIONS: ReadonlyArray<SegmentedOption<'default' | 'minmax'>> = [
 ];
 
 type AutoFit = { on: boolean; can: boolean; onToggle: (on: boolean) => void };
+
+// The size a sizing-mode switch writes. When Auto-fit is on the track is
+// `repeat(auto-fit, <inner>)`; switching the mode operates on that INNER track and drops
+// the wrapper — writing the unwrapped value also unchecks Auto-fit (rawTemplate no
+// longer contains repeat(auto-fit, …)), instead of nesting the whole repeat() inside the
+// new minmax's max.
+function switchedSize(track: string, mode: 'default' | 'minmax'): TrackSize {
+  const match = track.match(/^repeat\(\s*auto-fit\s*,\s*(.+)\)\s*$/is);
+  const base = match ? parseTrackSize((match[1] ?? '').trim()) : parseTrackSize(track);
+  if (mode === 'minmax') {
+    if (base.mode === 'minmax') {
+      return base;
+    }
+    // Min 0px (Webflow's minmax default) so a track can shrink to nothing rather than
+    // being held open by its content — matches the count stepper's new-column default.
+    // The unit matters: a bare `0` makes Webflow read the grid-template as a custom value.
+    return { mode: 'minmax', min: '0px', max: base.value || '1fr' };
+  }
+  if (base.mode === 'default') {
+    return base;
+  }
+  return { mode: 'default', value: base.max || base.min || 'auto' };
+}
 
 // The per-track editor: Default (a single size) or Min/Max (a minmax pair). Track lists
 // (not the auto sections) also get the Auto-fit toggle + its constraint warning.
@@ -276,35 +311,9 @@ function TrackSizeEditor({
   onChange: (size: TrackSize) => void;
 }) {
   const size = parseTrackSize(track);
-  // When Auto-fit is on the track is `repeat(auto-fit, <inner>)`. Switching the sizing
-  // mode operates on that INNER track and drops the wrapper — writing the unwrapped
-  // value also unchecks Auto-fit (rawTemplate no longer contains repeat(auto-fit, …)),
-  // instead of nesting the whole repeat() inside the new minmax's max.
-  const autoFitInner = (() => {
-    const m = track.match(/^repeat\(\s*auto-fit\s*,\s*(.+)\)\s*$/is);
-    return m ? parseTrackSize((m[1] ?? '').trim()) : null;
-  })();
   const switchMode = (mode: 'default' | 'minmax') => {
-    if (mode === size.mode) {
-      return;
-    }
-    const base = autoFitInner ?? size;
-    if (mode === 'minmax') {
-      if (base.mode === 'minmax') {
-        onChange(base);
-      }
-      // Min 0px (Webflow's minmax default) so a track can shrink to nothing rather than
-      // being held open by its content — matches the count stepper's new-column default.
-      // The unit matters: a bare `0` makes Webflow read the grid-template as a custom value.
-      else {
-        onChange({ mode: 'minmax', min: '0px', max: base.value || '1fr' });
-      }
-    } else {
-      if (base.mode === 'default') {
-        onChange(base);
-      } else {
-        onChange({ mode: 'default', value: base.max || base.min || 'auto' });
-      }
+    if (mode !== size.mode) {
+      onChange(switchedSize(track, mode));
     }
   };
   return (
@@ -319,67 +328,93 @@ function TrackSizeEditor({
           disabled={busy}
         />
       </div>
-      {size.mode === 'default' ? (
-        <div className="embed-editor_size-row">
-          <span className="embed-editor_size-label embed-editor_bg-caption">Size</span>
-          <TrackInput
-            value={size.value}
-            placeholder="1fr"
-            ariaLabel="Track size"
-            busy={busy}
-            onCommit={(v) => onChange({ mode: 'default', value: v || 'auto' })}
-          />
-        </div>
-      ) : (
-        <>
-          <div className="embed-editor_size-row">
-            <span className="embed-editor_size-label embed-editor_bg-caption">Min</span>
-            <TrackInput
-              value={size.min}
-              placeholder="auto"
-              ariaLabel="Track min"
-              busy={busy}
-              onCommit={(v) => onChange({ mode: 'minmax', min: v || 'auto', max: size.max })}
-            />
-          </div>
-          <div className="embed-editor_size-row">
-            <span className="embed-editor_size-label embed-editor_bg-caption">Max</span>
-            <TrackInput
-              value={size.max}
-              placeholder="1fr"
-              ariaLabel="Track max"
-              busy={busy}
-              onCommit={(v) => onChange({ mode: 'minmax', min: size.min, max: v || '1fr' })}
-            />
-          </div>
-        </>
-      )}
-      {autoFit ? (
-        <>
-          <label className="embed-editor_grad-check embed-editor_grid-autofit">
-            <input
-              type="checkbox"
-              checked={autoFit.on}
-              disabled={busy || (!autoFit.can && !autoFit.on)}
-              onChange={(e) => autoFit.onToggle(e.target.checked)}
-            />
-            <span>Auto-fit</span>
-          </label>
-          {!autoFit.can && !autoFit.on ? (
-            <div className="embed-editor_grid-warning">
-              <span className="embed-editor_grid-warning-icon">
-                <WarnIcon />
-              </span>
-              <span>
-                Auto-fit can’t be enabled when there are auto, flexible (FR), minmax(auto, fr),
-                minmax(auto, auto), or other auto-fit columns or rows.
-              </span>
-            </div>
-          ) : null}
-        </>
-      ) : null}
+      <TrackSizeFields size={size} busy={busy} onChange={onChange} />
+      {autoFit ? <AutoFitToggle autoFit={autoFit} busy={busy} /> : undefined}
     </div>
   );
+}
+
+// Default: one Size field; Min/Max: the two bounds.
+function TrackSizeFields({
+  size,
+  busy,
+  onChange,
+}: {
+  size: TrackSize;
+  busy: boolean;
+  onChange: (size: TrackSize) => void;
+}) {
+  if (size.mode === 'default') {
+    return (
+      <div className="embed-editor_size-row">
+        <span className="embed-editor_size-label embed-editor_bg-caption">Size</span>
+        <TrackInput
+          value={size.value}
+          placeholder="1fr"
+          ariaLabel="Track size"
+          busy={busy}
+          onCommit={(next) => onChange({ mode: 'default', value: next || 'auto' })}
+        />
+      </div>
+    );
+  }
+  return (
+    <>
+      <div className="embed-editor_size-row">
+        <span className="embed-editor_size-label embed-editor_bg-caption">Min</span>
+        <TrackInput
+          value={size.min}
+          placeholder="auto"
+          ariaLabel="Track min"
+          busy={busy}
+          onCommit={(next) => onChange({ mode: 'minmax', min: next || 'auto', max: size.max })}
+        />
+      </div>
+      <div className="embed-editor_size-row">
+        <span className="embed-editor_size-label embed-editor_bg-caption">Max</span>
+        <TrackInput
+          value={size.max}
+          placeholder="1fr"
+          ariaLabel="Track max"
+          busy={busy}
+          onCommit={(next) => onChange({ mode: 'minmax', min: size.min, max: next || '1fr' })}
+        />
+      </div>
+    </>
+  );
+}
+
+function AutoFitToggle({ autoFit, busy }: { autoFit: AutoFit; busy: boolean }) {
+  return (
+    <>
+      <label className="embed-editor_grad-check embed-editor_grid-autofit">
+        <input
+          type="checkbox"
+          checked={autoFit.on}
+          disabled={busy || (!autoFit.can && !autoFit.on)}
+          onChange={(event) => autoFit.onToggle(event.target.checked)}
+        />
+        <span>Auto-fit</span>
+      </label>
+      {!autoFit.can && !autoFit.on ? (
+        <div className="embed-editor_grid-warning">
+          <span className="embed-editor_grid-warning-icon">
+            <WarnIcon />
+          </span>
+          <span>
+            Auto-fit can’t be enabled when there are auto, flexible (FR), minmax(auto, fr),
+            minmax(auto, auto), or other auto-fit columns or rows.
+          </span>
+        </div>
+      ) : undefined}
+    </>
+  );
+}
+
+interface PopoverPosition {
+  readonly top: number;
+  readonly caretLeft: number;
+  readonly below: boolean;
 }
 
 // The size editor as an anchored POPUP (Webflow's track popover), not an inline
@@ -387,52 +422,96 @@ function TrackSizeEditor({
 // when there isn't room), with a caret pointing at it. Closes on outside click /
 // Escape / scroll.
 function TrackPopover({
-  anchorEl,
+  anchorElement,
   onClose,
   children,
 }: {
-  anchorEl: HTMLElement;
+  anchorElement: HTMLElement;
   onClose: () => void;
   children: ReactNode;
 }) {
   const ref = useRef<HTMLDivElement>(null);
-  const [pos, setPos] = useState<{ top: number; caretLeft: number; below: boolean } | null>(null);
+  const [position, setPosition] = useState<PopoverPosition | undefined>(undefined);
   // The panel's span, read at mount so the first layout (which measures this
   // popover's height) already has the right width. The anchor lives inside the
   // grid modal — itself portaled — so this falls back to the published box.
-  const [span] = useState(() => panelSpan(anchorEl));
+  const [span] = useState(() => panelSpan(anchorElement));
   useLayoutEffect(() => {
-    const el = ref.current;
-    if (!el) {
+    const popover = ref.current;
+    if (!popover) {
       return;
     }
-    const anchor = anchorEl.getBoundingClientRect();
-    const gap = 8;
-    const h = el.offsetHeight;
-    const below = anchor.bottom + gap + h <= window.innerHeight;
-    const top = below ? anchor.bottom + gap : Math.max(gap, anchor.top - gap - h);
-    // The caret is absolutely positioned inside the popover, so its x is local
-    // to the popover's left edge — not the window's.
-    const caretLeft = Math.min(
-      Math.max(anchor.left + anchor.width / 2 - span.left, 16),
-      span.width - 16,
-    );
-    setPos({ top, caretLeft, below });
-  }, [anchorEl]);
+    setPosition(popoverPosition(anchorElement, popover.offsetHeight, span));
+  }, [anchorElement, span]);
+  usePopoverDismiss({ ref, anchorElement, onClose });
+  return createPortal(
+    <div
+      ref={ref}
+      className={`embed-editor_grid-popover ${position && !position.below ? 'is-above' : ''}`}
+      role="dialog"
+      style={{
+        position: 'fixed',
+        left: span.left,
+        width: span.width,
+        top: position?.top ?? 0,
+        visibility: position === undefined ? 'hidden' : 'visible',
+      }}
+    >
+      <span
+        className="embed-editor_grid-popover-caret"
+        style={{ left: position?.caretLeft ?? 16 }}
+        aria-hidden="true"
+      />
+      {children}
+    </div>,
+    document.body,
+  );
+}
+
+// Below the anchor when the popover fits there, else above it; the caret points at
+// the anchor's middle.
+function popoverPosition(
+  anchorElement: HTMLElement,
+  height: number,
+  span: { left: number; width: number },
+): PopoverPosition {
+  const anchor = anchorElement.getBoundingClientRect();
+  const gap = 8;
+  const below = anchor.bottom + gap + height <= window.innerHeight;
+  const top = below ? anchor.bottom + gap : Math.max(gap, anchor.top - gap - height);
+  // The caret is absolutely positioned inside the popover, so its x is local
+  // to the popover's left edge — not the window's.
+  const caretLeft = Math.min(
+    Math.max(anchor.left + anchor.width / 2 - span.left, 16),
+    span.width - 16,
+  );
+  return { top, caretLeft, below };
+}
+
+// Closes the popover on an outside click, Escape, or any scroll.
+function usePopoverDismiss({
+  ref,
+  anchorElement,
+  onClose,
+}: {
+  ref: React.RefObject<HTMLDivElement>;
+  anchorElement: HTMLElement;
+  onClose: () => void;
+}) {
   useEffect(() => {
     // Ignore clicks on the trigger row — its own onClick toggles the popover closed;
     // if this handler closed it first, that same click would immediately re-open it.
-    const onDown = (e: MouseEvent) => {
-      const target = e.target;
+    const onDown = (event: MouseEvent) => {
+      const target = event.target;
       if (
         !(target instanceof Node) ||
-        (!ref.current?.contains(target) && !anchorEl.contains(target))
+        (!ref.current?.contains(target) && !anchorElement.contains(target))
       ) {
         onClose();
       }
     };
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
         onClose();
       }
     };
@@ -445,31 +524,8 @@ function TrackPopover({
       document.removeEventListener('keydown', onKey);
       window.removeEventListener('scroll', onScroll, true);
     };
-  }, [onClose, anchorEl]);
-  return createPortal(
-    <div
-      ref={ref}
-      className={`embed-editor_grid-popover ${pos && !pos.below ? 'is-above' : ''}`}
-      role="dialog"
-      style={{
-        position: 'fixed',
-        left: span.left,
-        width: span.width,
-        top: pos?.top ?? 0,
-        visibility: pos == null ? 'hidden' : 'visible',
-      }}
-    >
-      <span
-        className="embed-editor_grid-popover-caret"
-        style={{ left: pos?.caretLeft ?? 16 }}
-        aria-hidden="true"
-      />
-      {children}
-    </div>,
-    document.body,
-  );
+  }, [onClose, anchorElement, ref]);
 }
-
 const BRACES_ICON_PATH =
   'M6.4 2.5c-1.2 0-1.7.6-1.7 1.7v1.9c0 1-.3 1.4-1.2 1.4v1c.9 0 1.2.4 1.2 1.4v1.9' +
   'c0 1.1.5 1.7 1.7 1.7M9.6 2.5c1.2 0 1.7.6 1.7 1.7v1.9c0 1 .3 1.4 1.2 1.4v1' +
@@ -520,9 +576,9 @@ function ExpressionField({
   // Whatever is in the field is the value, `!important` included — this is the
   // way in for everything the track controls have no way to say.
   const commit = (typed: string) => {
-    const v = typed.trim();
-    const m = v.match(/!\s*important\s*$/i);
-    onCommit(m ? v.slice(0, m.index).trim() : v, !!m);
+    const trimmed = typed.trim();
+    const match = trimmed.match(/!\s*important\s*$/i);
+    onCommit(match ? trimmed.slice(0, match.index).trim() : trimmed, !!match);
   };
   return (
     <VariableConnect
@@ -545,19 +601,19 @@ function ExpressionField({
         disabled={busy}
         aria-label={`${title} expression`}
         placeholder="repeat(auto-fit, minmax(12rem, 1fr))"
-        onChange={(e) => setText(e.target.value)}
+        onChange={(event) => setText(event.target.value)}
         onFocus={() => {
           focused.current = true;
         }}
-        onBlur={(e) => {
+        onBlur={(event) => {
           focused.current = false;
-          commit(e.currentTarget.value);
+          commit(event.currentTarget.value);
         }}
-        onKeyDown={(e) => {
+        onKeyDown={(event) => {
           // A CSS value has no need for a line break, so Enter is "done".
-          if (e.key === 'Enter' && !e.shiftKey) {
-            e.preventDefault();
-            e.currentTarget.blur();
+          if (event.key === 'Enter' && !event.shiftKey) {
+            event.preventDefault();
+            event.currentTarget.blur();
           }
         }}
       />
@@ -599,30 +655,104 @@ function RepeatSwitch({
         checked={on}
         disabled={busy || !can}
         aria-label={`Use repeat() for ${title.toLowerCase()}`}
-        onChange={(e) => onChange(e.target.checked)}
+        onChange={(event) => onChange(event.target.checked)}
       />
       <span className="embed-editor_switch-label">repeat()</span>
     </label>
   );
 }
 
-// A reorderable track list (Columns / Rows). Drag the grip to reorder, click a row to
-// open its size editor (popup), trash to remove, + to append a 1fr track.
-function TrackSection({
-  title,
-  prop,
-  axis,
-  setProp,
-  labels,
-}: {
+// Whether a list is several copies of one track — the only lists a repeat() can say.
+const sameTracks = (list: string[]) => list.length > 1 && list.every((x) => x === list[0]);
+
+interface TrackSectionProps {
   title: string;
   prop: string;
   axis: 'column' | 'row';
   setProp: SetProp;
   labels: LabelProps;
-}) {
-  const { read, busy, clearProp, onProvenance, onSelectSelector } = labels;
-  const rawTemplate = val(read, prop);
+}
+
+// A reorderable track list (Columns / Rows). Drag the grip to reorder, click a row to
+// open its size editor (popup), trash to remove, + to append a 1fr track.
+function TrackSection({ title, prop, axis, setProp, labels }: TrackSectionProps) {
+  const { busy, clearProp } = labels;
+  const list = useTrackList({ prop, setProp, labels });
+  const { tracks, rawTemplate, important } = list;
+  // Editing the value as text rather than as tracks. Asked for with the braces
+  // — or forced, when the value is one the track list cannot hold: showing
+  // `var(--columns)` or an !important as tracks would read it as a track with a
+  // strange name, and the first edit would write that reading back over it. In
+  // that case the braces are pressed and stuck, which is the honest state.
+  const [expression, setExpression] = useState(false);
+  const tracksCanHold = canEditAsTracks(important ? `${rawTemplate} !important` : rawTemplate);
+  const asExpression = expression || !tracksCanHold;
+  const edits = useTrackEdits({ tracks, axis, write: list.write });
+  const { open } = edits;
+  const openTrack = open === undefined ? undefined : tracks[open];
+
+  return (
+    <section className="embed-editor_grid-section">
+      <TrackSectionHead
+        title={title}
+        prop={prop}
+        labels={labels}
+        list={list}
+        setProp={setProp}
+        tracksCanHold={tracksCanHold}
+        asExpression={asExpression}
+        onToggleExpression={() => setExpression((wasOn) => !wasOn)}
+        onAdd={edits.add}
+      />
+      {asExpression ? (
+        <ExpressionField
+          prop={prop}
+          value={list.shown}
+          title={title}
+          busy={busy}
+          onCommit={(next, imp) => {
+            if (next) {
+              setProp(prop, next, imp);
+            } else {
+              clearProp(prop);
+            }
+          }}
+        />
+      ) : tracks.length ? (
+        <ul className="embed-editor_grid-track-list">
+          {tracks.map((track, i) => (
+            <TrackRow key={i} track={track} index={i} axis={axis} busy={busy} edits={edits} />
+          ))}
+        </ul>
+      ) : (
+        <div className="embed-editor_grid-empty">No {title.toLowerCase()}</div>
+      )}
+      {open !== undefined && edits.anchorElement && openTrack ? (
+        <TrackPopover anchorElement={edits.anchorElement} onClose={() => edits.setOpen(undefined)}>
+          <TrackSizeEditor
+            track={openTrack}
+            busy={busy}
+            autoFit={list.autoFit}
+            onChange={(size) => edits.setTrack(open, size)}
+          />
+        </TrackPopover>
+      ) : undefined}
+    </section>
+  );
+}
+
+type TrackList = ReturnType<typeof useTrackList>;
+
+// The track list as the value says it, and how it is written back. Every edit writes
+// the list in the form the repeat() switch is showing, so adding a track to a
+// repeat() keeps it one.
+function useTrackList({
+  prop,
+  setProp,
+  labels,
+}: Pick<TrackSectionProps, 'prop' | 'setProp' | 'labels'>) {
+  const { read, clearProp } = labels;
+  const rawTemplate = resolvedValue(read, prop);
   // `!important` is carried beside the value, not in it — the field shows it,
   // since the field is where it can be typed.
   const important = !!(read(prop)?.selectedValue ?? read(prop)?.winner)?.important;
@@ -633,7 +763,6 @@ function TrackSection({
   // where the question doesn't arise yet: no tracks, or one. A new grid is a
   // repeat(), which is what the count stepper writes, so that is the default.
   const form = trackForm(rawTemplate);
-  const same = (list: string[]) => list.length > 1 && list.every((x) => x === list[0]);
   const [preferRepeat, setPreferRepeat] = useState(true);
   // A value that says which form it is IS the setting; remember it for the next
   // time the value can't say (emptied, down to one track).
@@ -646,26 +775,48 @@ function TrackSection({
   }, [form]);
   // Under two tracks there is nothing a repeat() would say differently, so the
   // switch stays available and simply waits.
-  const canRepeat = tracks.length < 2 || same(tracks);
+  const canRepeat = tracks.length < 2 || sameTracks(tracks);
   const repeatOn = form === 'repeat' ? true : form === 'list' ? false : canRepeat && preferRepeat;
-  // Every edit writes the list back in the form the switch is showing, so
-  // adding a track to a repeat() keeps it one.
   const asWritten = (next: string[]) =>
-    repeatOn && same(next) ? `repeat(${next.length}, ${next[0]})` : serializeTrackList(next);
+    repeatOn && sameTracks(next) ? `repeat(${next.length}, ${next[0]})` : serializeTrackList(next);
   const write = (next: string[]) => {
-    const s = asWritten(next);
-    if (s) {
-      setProp(prop, s, false);
+    const written = asWritten(next);
+    if (written) {
+      setProp(prop, written, false);
     } else {
       clearProp(prop);
     }
   };
-  // Auto-fit wraps the whole track list in repeat(auto-fit, …) — valid only when every
-  // track is a `<fixed-size>` (a fixed length or a minmax() with a fixed min, e.g.
-  // minmax(20rem, 1fr)); otherwise the warning explains why.
-  const autoFitOn = /\bauto-fit\b/i.test(rawTemplate);
-  const autoFit: AutoFit = {
-    on: autoFitOn,
+  const autoFit = autoFitFor({ prop, rawTemplate, tracks, setProp });
+  return {
+    rawTemplate,
+    important,
+    shown,
+    tracks,
+    canRepeat,
+    repeatOn,
+    setPreferRepeat,
+    write,
+    autoFit,
+  };
+}
+
+// Auto-fit wraps the whole track list in repeat(auto-fit, …) — valid only when every
+// track is a `<fixed-size>` (a fixed length or a minmax() with a fixed min, e.g.
+// minmax(20rem, 1fr)); otherwise the warning explains why.
+function autoFitFor({
+  prop,
+  rawTemplate,
+  tracks,
+  setProp,
+}: {
+  prop: string;
+  rawTemplate: string;
+  tracks: string[];
+  setProp: SetProp;
+}): AutoFit {
+  return {
+    on: /\bauto-fit\b/i.test(rawTemplate),
     can: tracks.length > 0 && tracks.every(isFixedSizeTrack),
     onToggle: (on: boolean) => {
       if (on) {
@@ -675,32 +826,38 @@ function TrackSection({
         const pattern = trackKind(base) === 'length' ? `minmax(${base}, 1fr)` : base;
         setProp(prop, `repeat(auto-fit, ${pattern})`, false);
       } else {
-        const m = rawTemplate.match(/repeat\(\s*auto-fit\s*,\s*(.+)\)\s*$/is);
-        setProp(prop, m ? (m[1] ?? '').trim() : (tracks[0] ?? '1fr'), false);
+        const match = rawTemplate.match(/repeat\(\s*auto-fit\s*,\s*(.+)\)\s*$/is);
+        setProp(prop, match ? (match[1] ?? '').trim() : (tracks[0] ?? '1fr'), false);
       }
     },
   };
-  // Editing the value as text rather than as tracks. Asked for with the braces
-  // — or forced, when the value is one the track list cannot hold: showing
-  // `var(--columns)` or an !important as tracks would read it as a track with a
-  // strange name, and the first edit would write that reading back over it. In
-  // that case the braces are pressed and stuck, which is the honest state.
-  const [expression, setExpression] = useState(false);
-  const tracksCanHold = canEditAsTracks(important ? `${rawTemplate} !important` : rawTemplate);
-  const asExpression = expression || !tracksCanHold;
-  const [open, setOpen] = useState<number | null>(null);
-  const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
-  const [dragFrom, setDragFrom] = useState<number | null>(null);
-  const [dragOver, setDragOver] = useState<number | null>(null);
-  const openAt = (i: number, el: HTMLElement) => {
+}
+
+type TrackEdits = ReturnType<typeof useTrackEdits>;
+
+// Which track's popover is open (and the row it hangs from), the drag in progress,
+// and the list edits — each written back through `write`.
+function useTrackEdits({
+  tracks,
+  axis,
+  write,
+}: {
+  tracks: string[];
+  axis: 'column' | 'row';
+  write: (next: string[]) => void;
+}) {
+  const [open, setOpen] = useState<number | undefined>(undefined);
+  const [anchorElement, setAnchorElement] = useState<HTMLElement | undefined>(undefined);
+  const [dragFrom, setDragFrom] = useState<number | undefined>(undefined);
+  const [dragOver, setDragOver] = useState<number | undefined>(undefined);
+  const openAt = (i: number, element: HTMLElement) => {
     if (open === i) {
-      setOpen(null);
+      setOpen(undefined);
       return;
     }
     setOpen(i);
-    setAnchorEl(el.closest('li') ?? el);
+    setAnchorElement(element.closest('li') ?? element);
   };
-
   // New tracks use Webflow's defaults: a column is minmax(0px, 1fr) (fills its share but can
   // shrink so content can't overflow the grid), a row is auto (content-sized). The min needs
   // a unit — a bare `0` makes Webflow read the whole grid-template as a custom value.
@@ -709,20 +866,17 @@ function TrackSection({
   // would differ by a character (`minmax(0px, 1fr)` vs `minmax(0, 1fr)`) and
   // quietly break the list into one that can no longer be a repeat().
   const add = () => {
-    const fresh = same(tracks)
-      ? (tracks[0] ?? (axis === 'column' ? 'minmax(0px, 1fr)' : 'auto'))
-      : axis === 'column'
-        ? 'minmax(0px, 1fr)'
-        : 'auto';
+    const fallback = axis === 'column' ? 'minmax(0px, 1fr)' : 'auto';
+    const fresh = sameTracks(tracks) ? (tracks[0] ?? fallback) : fallback;
     write([...tracks, fresh]);
     setOpen(tracks.length);
   };
   const remove = (i: number) => {
-    write(tracks.filter((_, k) => k !== i));
-    setOpen((o) => (o === i ? null : o != null && o > i ? o - 1 : o));
+    write(tracks.filter((_, other) => other !== i));
+    setOpen((previous) => openAfterRemoval(previous, i));
   };
   const setTrack = (i: number, size: TrackSize) =>
-    write(tracks.map((t, k) => (k === i ? serializeTrackSize(size) : t)));
+    write(tracks.map((track, other) => (other === i ? serializeTrackSize(size) : track)));
   const duplicate = (i: number) => {
     const track = tracks[i];
     if (track === undefined) {
@@ -741,217 +895,263 @@ function TrackSection({
     }
     next.splice(to, 0, moved);
     write(next);
-    setOpen((o) => (o === from ? to : o));
+    setOpen((previous) => (previous === from ? to : previous));
   };
+  const drag = { dragFrom, dragOver, setDragFrom, setDragOver };
+  return { open, setOpen, anchorElement, openAt, add, remove, setTrack, duplicate, reorder, drag };
+}
 
+// The open popover after removing track `removed`: closed if it was that track's,
+// shifted down one if it was a later track's.
+function openAfterRemoval(open: number | undefined, removed: number): number | undefined {
+  if (open === undefined) {
+    return undefined;
+  }
+  if (open === removed) {
+    return undefined;
+  }
+  return open > removed ? open - 1 : open;
+}
+
+// The section head: label, then how the value is written, then the field for writing
+// it by hand — all packed left, so the eye reads along the row instead of crossing a
+// gap between them. The + stays where every other section keeps its add.
+function TrackSectionHead({
+  title,
+  prop,
+  labels,
+  list,
+  setProp,
+  tracksCanHold,
+  asExpression,
+  onToggleExpression,
+  onAdd,
+}: {
+  title: string;
+  prop: string;
+  labels: LabelProps;
+  list: TrackList;
+  setProp: SetProp;
+  tracksCanHold: boolean;
+  asExpression: boolean;
+  onToggleExpression: () => void;
+  onAdd: () => void;
+}) {
+  const { read, busy, clearProp, onProvenance, onSelectSelector } = labels;
+  const { tracks, repeatOn } = list;
   return (
-    <section className="embed-editor_grid-section">
-      <div className="embed-editor_grid-section-head">
-        {/* Label, then how the value is written, then the field for writing it
-            by hand — all packed left, so the eye reads along the row instead of
-            crossing a gap between them. The + stays where every other section
-            keeps its add. */}
-        <span className="embed-editor_grid-section-title">
-          <GroupLabel
-            label={title}
-            props={[prop]}
-            read={read}
-            busy={busy}
-            onClear={() => clearProp(prop)}
-            onProvenance={onProvenance}
-            onSelectSelector={onSelectSelector}
-          />
-          <span className="embed-editor_grid-section-count">({tracks.length})</span>
-        </span>
-        <RepeatSwitch
-          on={repeatOn}
-          can={canRepeat && !asExpression}
-          why={
-            repeatOn ? `Written as repeat(${tracks.length}, …)` : 'Write these tracks as repeat()'
-          }
+    <div className="embed-editor_grid-section-head">
+      <span className="embed-editor_grid-section-title">
+        <GroupLabel
+          label={title}
+          props={[prop]}
+          read={read}
           busy={busy}
-          title={title}
-          onChange={(next) => {
-            setPreferRepeat(next);
-            if (!tracks.length) {
-              return;
-            }
-            const value = next ? asRepeat(rawTemplate) : asTrackList(rawTemplate);
-            if (value) {
-              setProp(prop, value, false);
-            }
-          }}
+          onClear={() => clearProp(prop)}
+          onProvenance={onProvenance}
+          onSelectSelector={onSelectSelector}
         />
+        <span className="embed-editor_grid-section-count">({tracks.length})</span>
+      </span>
+      <RepeatSwitch
+        on={repeatOn}
+        can={list.canRepeat && !asExpression}
+        why={repeatOn ? `Written as repeat(${tracks.length}, …)` : 'Write these tracks as repeat()'}
+        busy={busy}
+        title={title}
+        onChange={(next) => switchRepeat({ next, prop, list, setProp })}
+      />
+      <ExpressionToggle
+        title={title}
+        busy={busy}
+        tracksCanHold={tracksCanHold}
+        asExpression={asExpression}
+        onToggle={onToggleExpression}
+      />
+      {asExpression ? undefined : (
         <button
           type="button"
-          className={`embed-editor_icon-btn ${asExpression ? 'is-active' : ''}`}
-          disabled={busy || !tracksCanHold}
-          aria-pressed={asExpression}
-          aria-label={`Edit ${title.toLowerCase()} as an expression`}
-          title={
-            !tracksCanHold
-              ? 'This value can’t be shown as tracks'
-              : asExpression
-                ? 'Back to tracks'
-                : 'Edit the whole value as an expression'
-          }
-          onClick={() => setExpression((v) => !v)}
+          className="embed-editor_icon-btn"
+          onClick={onAdd}
+          disabled={busy}
+          title={`Add a ${title.toLowerCase().replace(/s$/, '')}`}
+          aria-label={`Add a ${title}`}
         >
-          <BracesIcon />
+          <PlusIcon />
         </button>
-        {asExpression ? null : (
-          <button
-            type="button"
-            className="embed-editor_icon-btn"
-            onClick={add}
-            disabled={busy}
-            title={`Add a ${title.toLowerCase().replace(/s$/, '')}`}
-            aria-label={`Add a ${title}`}
-          >
-            <PlusIcon />
-          </button>
-        )}
-      </div>
-      {asExpression ? (
-        <ExpressionField
-          prop={prop}
-          value={shown}
-          title={title}
-          busy={busy}
-          onCommit={(v, imp) => {
-            if (v) {
-              setProp(prop, v, imp);
-            } else {
-              clearProp(prop);
-            }
-          }}
-        />
-      ) : tracks.length ? (
-        <ul className="embed-editor_grid-track-list">
-          {tracks.map((track, i) => {
-            const isOpen = open === i;
-            return (
-              <li
-                key={i}
-                className={
-                  `embed-editor_grid-track ${isOpen ? 'is-open' : ''} ` +
-                  `${dragOver === i ? 'is-drop-target' : ''} ${dragFrom === i ? 'is-dragging' : ''}`
-                }
-                onDragOver={(e) => {
-                  e.preventDefault();
-                  setDragOver(i);
-                }}
-                onDrop={(e) => {
-                  e.preventDefault();
-                  if (dragFrom != null) {
-                    reorder(dragFrom, i);
-                  }
-                  setDragFrom(null);
-                  setDragOver(null);
-                }}
-              >
-                <div className="embed-editor_grid-track-row">
-                  <span
-                    className="embed-editor_bg-grip"
-                    draggable={!busy}
-                    onDragStart={(e) => {
-                      setDragFrom(i);
-                      e.dataTransfer.effectAllowed = 'move';
-                      e.dataTransfer.setData('text/plain', String(i));
-                    }}
-                    onDragEnd={() => {
-                      setDragFrom(null);
-                      setDragOver(null);
-                    }}
-                    title="Drag to reorder"
-                    aria-label="Drag to reorder"
-                  >
-                    <GripIcon />
-                  </span>
-                  <button
-                    type="button"
-                    className="embed-editor_grid-track-main"
-                    onClick={(e) => openAt(i, e.currentTarget)}
-                    disabled={busy}
-                  >
-                    <span className="embed-editor_grid-track-glyph" aria-hidden="true">
-                      <TrackIcon track={track} axis={axis} />
-                    </span>
-                    <span className="embed-editor_grid-track-label">{trackLabel(track)}</span>
-                  </button>
-                  <div className="embed-editor_grid-track-actions">
-                    <button
-                      type="button"
-                      className="embed-editor_grid-track-action"
-                      onClick={() => duplicate(i)}
-                      disabled={busy}
-                      title="Duplicate track"
-                      aria-label="Duplicate track"
-                    >
-                      <DuplicateIcon />
-                    </button>
-                    <button
-                      type="button"
-                      className={
-                        'embed-editor_grid-track-action ' + 'embed-editor_grid-track-action-danger'
-                      }
-                      onClick={() => remove(i)}
-                      disabled={busy}
-                      title="Remove track"
-                      aria-label="Remove track"
-                    >
-                      <TrashIcon />
-                    </button>
-                  </div>
-                </div>
-              </li>
-            );
-          })}
-        </ul>
-      ) : (
-        <div className="embed-editor_grid-empty">No {title.toLowerCase()}</div>
       )}
-      {open != null && anchorEl && tracks[open] ? (
-        <TrackPopover anchorEl={anchorEl} onClose={() => setOpen(null)}>
-          <TrackSizeEditor
-            track={tracks[open]}
-            busy={busy}
-            autoFit={autoFit}
-            onChange={(s) => setTrack(open, s)}
-          />
-        </TrackPopover>
-      ) : null}
-    </section>
+    </div>
+  );
+}
+
+// Flipping the repeat() switch remembers the choice, then rewrites a non-empty list
+// in the chosen form.
+function switchRepeat({
+  next,
+  prop,
+  list,
+  setProp,
+}: {
+  next: boolean;
+  prop: string;
+  list: TrackList;
+  setProp: SetProp;
+}) {
+  list.setPreferRepeat(next);
+  if (!list.tracks.length) {
+    return;
+  }
+  const value = next ? asRepeat(list.rawTemplate) : asTrackList(list.rawTemplate);
+  if (value) {
+    setProp(prop, value, false);
+  }
+}
+
+// The braces: edit the whole value as an expression, or back to tracks.
+function ExpressionToggle({
+  title,
+  busy,
+  tracksCanHold,
+  asExpression,
+  onToggle,
+}: {
+  title: string;
+  busy: boolean;
+  tracksCanHold: boolean;
+  asExpression: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      className={`embed-editor_icon-btn ${asExpression ? 'is-active' : ''}`}
+      disabled={busy || !tracksCanHold}
+      aria-pressed={asExpression}
+      aria-label={`Edit ${title.toLowerCase()} as an expression`}
+      title={
+        !tracksCanHold
+          ? 'This value can’t be shown as tracks'
+          : asExpression
+            ? 'Back to tracks'
+            : 'Edit the whole value as an expression'
+      }
+      onClick={onToggle}
+    >
+      <BracesIcon />
+    </button>
+  );
+}
+
+// One track row: the drag grip, the track (click to open its size popover), and its
+// duplicate / remove actions. The row is also the drop target while dragging.
+function TrackRow({
+  track,
+  index,
+  axis,
+  busy,
+  edits,
+}: {
+  track: string;
+  index: number;
+  axis: 'column' | 'row';
+  busy: boolean;
+  edits: TrackEdits;
+}) {
+  const { dragFrom, dragOver, setDragFrom, setDragOver } = edits.drag;
+  const isOpen = edits.open === index;
+  return (
+    <li
+      className={
+        `embed-editor_grid-track ${isOpen ? 'is-open' : ''} ` +
+        `${dragOver === index ? 'is-drop-target' : ''} ${dragFrom === index ? 'is-dragging' : ''}`
+      }
+      onDragOver={(event) => {
+        event.preventDefault();
+        setDragOver(index);
+      }}
+      onDrop={(event) => {
+        event.preventDefault();
+        if (dragFrom !== undefined) {
+          edits.reorder(dragFrom, index);
+        }
+        setDragFrom(undefined);
+        setDragOver(undefined);
+      }}
+    >
+      <div className="embed-editor_grid-track-row">
+        <span
+          className="embed-editor_bg-grip"
+          draggable={!busy}
+          onDragStart={(event) => {
+            setDragFrom(index);
+            const transfer = event.dataTransfer;
+            transfer.effectAllowed = 'move';
+            transfer.setData('text/plain', String(index));
+          }}
+          onDragEnd={() => {
+            setDragFrom(undefined);
+            setDragOver(undefined);
+          }}
+          title="Drag to reorder"
+          aria-label="Drag to reorder"
+        >
+          <GripIcon />
+        </span>
+        <button
+          type="button"
+          className="embed-editor_grid-track-main"
+          onClick={(event) => edits.openAt(index, event.currentTarget)}
+          disabled={busy}
+        >
+          <span className="embed-editor_grid-track-glyph" aria-hidden="true">
+            <TrackIcon track={track} axis={axis} />
+          </span>
+          <span className="embed-editor_grid-track-label">{trackLabel(track)}</span>
+        </button>
+        <TrackActions index={index} busy={busy} edits={edits} />
+      </div>
+    </li>
+  );
+}
+
+function TrackActions({ index, busy, edits }: { index: number; busy: boolean; edits: TrackEdits }) {
+  return (
+    <div className="embed-editor_grid-track-actions">
+      <button
+        type="button"
+        className="embed-editor_grid-track-action"
+        onClick={() => edits.duplicate(index)}
+        disabled={busy}
+        title="Duplicate track"
+        aria-label="Duplicate track"
+      >
+        <DuplicateIcon />
+      </button>
+      <button
+        type="button"
+        className={'embed-editor_grid-track-action ' + 'embed-editor_grid-track-action-danger'}
+        onClick={() => edits.remove(index)}
+        disabled={busy}
+        title="Remove track"
+        aria-label="Remove track"
+      >
+        <TrashIcon />
+      </button>
+    </div>
   );
 }
 
 // The auto-generated track size (grid-auto-columns / grid-auto-rows) — like any other
 // track: a single clickable row whose popup edits the value (grid-auto-columns/-rows).
-function AutoSection({
-  title,
-  prop,
-  axis,
-  setProp,
-  labels,
-}: {
-  title: string;
-  prop: string;
-  axis: 'column' | 'row';
-  setProp: SetProp;
-  labels: LabelProps;
-}) {
+function AutoSection({ title, prop, axis, setProp, labels }: TrackSectionProps) {
   const { read, busy, clearProp, onProvenance, onSelectSelector } = labels;
-  const current = val(read, prop) || 'auto';
+  const current = resolvedValue(read, prop) || 'auto';
   const [open, setOpen] = useState(false);
-  const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
-  const note =
-    axis === 'column'
-      ? 'Define the sizing for all automatically created columns.'
-      : 'Define the sizing for all automatically created rows.';
+  const [anchorElement, setAnchorElement] = useState<HTMLElement | undefined>(undefined);
   const setSize = (size: TrackSize) => {
-    const v = serializeTrackSize(size);
-    if (v && v.toLowerCase() !== 'auto') {
-      setProp(prop, v, false);
+    const serialized = serializeTrackSize(size);
+    if (serialized && serialized.toLowerCase() !== 'auto') {
+      setProp(prop, serialized, false);
     } else {
       clearProp(prop);
     }
@@ -978,11 +1178,11 @@ function AutoSection({
             <button
               type="button"
               className="embed-editor_grid-track-main"
-              onClick={(e) => {
-                setOpen((o) => !o);
-                setAnchorEl(
-                  e.currentTarget.closest<HTMLElement>('.embed-editor_grid-track-list') ??
-                    e.currentTarget,
+              onClick={(event) => {
+                setOpen((wasOpen) => !wasOpen);
+                setAnchorElement(
+                  event.currentTarget.closest<HTMLElement>('.embed-editor_grid-track-list') ??
+                    event.currentTarget,
                 );
               }}
               disabled={busy}
@@ -995,20 +1195,48 @@ function AutoSection({
           </div>
         </div>
       </div>
-      {open && anchorEl ? (
-        <TrackPopover anchorEl={anchorEl} onClose={() => setOpen(false)}>
-          <TrackSizeEditor track={current} busy={busy} onChange={setSize} />
-          <div className="embed-editor_grid-popover-note">{note}</div>
-          <button
-            type="button"
-            className="embed-editor_grid-popover-ok"
-            onClick={() => setOpen(false)}
-          >
-            Ok, got it
-          </button>
-        </TrackPopover>
-      ) : null}
+      {open && anchorElement ? (
+        <AutoTrackPopover
+          anchorElement={anchorElement}
+          track={current}
+          axis={axis}
+          busy={busy}
+          onChange={setSize}
+          onClose={() => setOpen(false)}
+        />
+      ) : undefined}
     </section>
+  );
+}
+
+// The auto track's size editor, with a note saying what it sizes.
+function AutoTrackPopover({
+  anchorElement,
+  track,
+  axis,
+  busy,
+  onChange,
+  onClose,
+}: {
+  anchorElement: HTMLElement;
+  track: string;
+  axis: 'column' | 'row';
+  busy: boolean;
+  onChange: (size: TrackSize) => void;
+  onClose: () => void;
+}) {
+  const note =
+    axis === 'column'
+      ? 'Define the sizing for all automatically created columns.'
+      : 'Define the sizing for all automatically created rows.';
+  return (
+    <TrackPopover anchorElement={anchorElement} onClose={onClose}>
+      <TrackSizeEditor track={track} busy={busy} onChange={onChange} />
+      <div className="embed-editor_grid-popover-note">{note}</div>
+      <button type="button" className="embed-editor_grid-popover-ok" onClick={onClose}>
+        Ok, got it
+      </button>
+    </TrackPopover>
   );
 }
 
@@ -1045,9 +1273,9 @@ function AreaNameInput({
     }
   }, [value]);
   const commit = () => {
-    const t = text.trim();
-    if (t) {
-      onCommit(t);
+    const trimmed = text.trim();
+    if (trimmed) {
+      onCommit(trimmed);
     } else {
       setText(value);
     }
@@ -1059,7 +1287,7 @@ function AreaNameInput({
       spellCheck={false}
       disabled={busy}
       aria-label="Area name"
-      onChange={(e) => setText(e.target.value.replace(/\s+/g, ''))}
+      onChange={(event) => setText(event.target.value.replace(/\s+/g, ''))}
       onFocus={() => {
         focused.current = true;
       }}
@@ -1067,9 +1295,9 @@ function AreaNameInput({
         focused.current = false;
         commit();
       }}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter') {
-          e.currentTarget.blur();
+      onKeyDown={(event) => {
+        if (event.key === 'Enter') {
+          event.currentTarget.blur();
         }
       }}
     />
@@ -1077,7 +1305,7 @@ function AreaNameInput({
 }
 
 // A 1-based grid-cell number field (Column/Row start/end) with ↑/↓ stepping.
-function AreaNumInput({
+function AreaNumberInput({
   value,
   ariaLabel,
   busy,
@@ -1095,14 +1323,14 @@ function AreaNumInput({
       setText(String(value));
     }
   }, [value]);
-  const clampN = (n: number) => Math.max(1, Math.min(999, n));
-  const commit = (t: string) => {
-    const n = parseInt(t, 10);
-    if (Number.isNaN(n)) {
+  const clampCell = (cell: number) => Math.max(1, Math.min(999, cell));
+  const commit = (entered: string) => {
+    const parsed = parseInt(entered, 10);
+    if (Number.isNaN(parsed)) {
       setText(String(value));
       return;
     }
-    onCommit(clampN(n));
+    onCommit(clampCell(parsed));
   };
   return (
     <input
@@ -1112,7 +1340,7 @@ function AreaNumInput({
       spellCheck={false}
       disabled={busy}
       aria-label={ariaLabel}
-      onChange={(e) => setText(e.target.value)}
+      onChange={(event) => setText(event.target.value)}
       onFocus={() => {
         focused.current = true;
       }}
@@ -1120,17 +1348,17 @@ function AreaNumInput({
         focused.current = false;
         commit(text);
       }}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter') {
-          e.currentTarget.blur();
+      onKeyDown={(event) => {
+        if (event.key === 'Enter') {
+          event.currentTarget.blur();
           return;
         }
-        if (e.key === 'ArrowUp') {
-          e.preventDefault();
-          onCommit(clampN(value + 1));
-        } else if (e.key === 'ArrowDown') {
-          e.preventDefault();
-          onCommit(clampN(value - 1));
+        if (event.key === 'ArrowUp') {
+          event.preventDefault();
+          onCommit(clampCell(value + 1));
+        } else if (event.key === 'ArrowDown') {
+          event.preventDefault();
+          onCommit(clampCell(value - 1));
         }
       }}
     />
@@ -1158,34 +1386,34 @@ function AreaEditor({
         <div className="embed-editor_grid-area-fields">
           <div className="embed-editor_grid-area-pair">
             <div className="embed-editor_grid-area-inputs">
-              <AreaNumInput
+              <AreaNumberInput
                 value={area.colStart}
                 ariaLabel="Column start"
                 busy={busy}
-                onCommit={(n) => onChange({ colStart: n })}
+                onCommit={(cell) => onChange({ colStart: cell })}
               />
-              <AreaNumInput
+              <AreaNumberInput
                 value={area.colEnd}
                 ariaLabel="Column end"
                 busy={busy}
-                onCommit={(n) => onChange({ colEnd: n })}
+                onCommit={(cell) => onChange({ colEnd: cell })}
               />
             </div>
             <span className="embed-editor_grid-area-cap">Column: start/end</span>
           </div>
           <div className="embed-editor_grid-area-pair">
             <div className="embed-editor_grid-area-inputs">
-              <AreaNumInput
+              <AreaNumberInput
                 value={area.rowStart}
                 ariaLabel="Row start"
                 busy={busy}
-                onCommit={(n) => onChange({ rowStart: n })}
+                onCommit={(cell) => onChange({ rowStart: cell })}
               />
-              <AreaNumInput
+              <AreaNumberInput
                 value={area.rowEnd}
                 ariaLabel="Row end"
                 busy={busy}
-                onCommit={(n) => onChange({ rowEnd: n })}
+                onCommit={(cell) => onChange({ rowEnd: cell })}
               />
             </div>
             <span className="embed-editor_grid-area-cap">Row: start/end</span>
@@ -1201,52 +1429,10 @@ function AreaEditor({
 // open editor.
 function AreasSection({ setProp, labels }: { setProp: SetProp; labels: LabelProps }) {
   const { read, busy, clearProp, onProvenance, onSelectSelector } = labels;
-  const areas = parseAreas(val(read, 'grid-template-areas'));
-  const write = (next: GridArea[]) => {
-    const s = serializeAreas(next);
-    if (s) {
-      setProp('grid-template-areas', s, false);
-    } else {
-      clearProp('grid-template-areas');
-    }
-  };
-  const [openName, setOpenName] = useState<string | null>(null);
-  const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
-  const openArea = openName != null ? (areas.find((a) => a.name === openName) ?? null) : null;
-
-  const add = () => {
-    const maxRow = areas.reduce((m, a) => Math.max(m, a.rowEnd), 0);
-    write([
-      ...areas,
-      {
-        name: nextAreaName(areas),
-        colStart: 1,
-        colEnd: 1,
-        rowStart: maxRow + 1,
-        rowEnd: maxRow + 1,
-      },
-    ]);
-  };
-  const update = (name: string, patch: GridAreaPatch) => {
-    write(areas.map((a) => (a.name === name ? { ...a, ...patch } : a)));
-    const renamed = 'name' in patch ? patch.name : '';
-    if (renamed) {
-      setOpenName(renamed);
-    } // follow a rename so the editor stays open
-  };
-  const remove = (name: string) => {
-    write(areas.filter((a) => a.name !== name));
-    setOpenName((o) => (o === name ? null : o));
-  };
-  const openAt = (name: string, el: HTMLElement) => {
-    if (openName === name) {
-      setOpenName(null);
-      return;
-    }
-    setOpenName(name);
-    setAnchorEl(el.closest('li') ?? el);
-  };
-
+  const areas = parseAreas(resolvedValue(read, 'grid-template-areas'));
+  const edits = useAreaEdits({ areas, setProp, clearProp });
+  const openArea =
+    edits.openName !== undefined ? areas.find((area) => area.name === edits.openName) : undefined;
   return (
     <section className="embed-editor_grid-section">
       <div className="embed-editor_grid-section-head">
@@ -1265,7 +1451,7 @@ function AreasSection({ setProp, labels }: { setProp: SetProp; labels: LabelProp
         <button
           type="button"
           className="embed-editor_icon-btn"
-          onClick={add}
+          onClick={edits.add}
           disabled={busy}
           title="Add an area"
           aria-label="Add an area"
@@ -1275,61 +1461,125 @@ function AreasSection({ setProp, labels }: { setProp: SetProp; labels: LabelProp
       </div>
       {areas.length ? (
         <ul className="embed-editor_grid-track-list">
-          {areas.map((area) => {
-            const isOpen = openName === area.name;
-            return (
-              <li key={area.name} className={`embed-editor_grid-track ${isOpen ? 'is-open' : ''}`}>
-                <div className="embed-editor_grid-track-row">
-                  <button
-                    type="button"
-                    className="embed-editor_grid-track-main"
-                    onClick={(e) => openAt(area.name, e.currentTarget)}
-                    disabled={busy}
-                  >
-                    <span className="embed-editor_grid-track-glyph" aria-hidden="true">
-                      <AreaIcon />
-                    </span>
-                    <span className="embed-editor_grid-track-label">{areaLabel(area)}</span>
-                  </button>
-                  <div className="embed-editor_grid-track-actions">
-                    <button
-                      type="button"
-                      className={
-                        'embed-editor_grid-track-action ' + 'embed-editor_grid-track-action-danger'
-                      }
-                      onClick={() => remove(area.name)}
-                      disabled={busy}
-                      title="Remove area"
-                      aria-label="Remove area"
-                    >
-                      <TrashIcon />
-                    </button>
-                  </div>
-                </div>
-              </li>
-            );
-          })}
+          {areas.map((area) => (
+            <AreaRow key={area.name} area={area} busy={busy} edits={edits} />
+          ))}
         </ul>
       ) : (
         <div className="embed-editor_grid-empty">No Areas</div>
       )}
-      {openArea && anchorEl ? (
-        <TrackPopover anchorEl={anchorEl} onClose={() => setOpenName(null)}>
+      {openArea && edits.anchorElement ? (
+        <TrackPopover
+          anchorElement={edits.anchorElement}
+          onClose={() => edits.setOpenName(undefined)}
+        >
           <AreaEditor
             area={openArea}
             busy={busy}
-            onChange={(patch) => update(openArea.name, patch)}
+            onChange={(patch) => edits.update(openArea.name, patch)}
           />
         </TrackPopover>
-      ) : null}
+      ) : undefined}
     </section>
+  );
+}
+
+type AreaEdits = ReturnType<typeof useAreaEdits>;
+
+// Which area's editor is open (and the row it hangs from), and the list edits — each
+// written back as grid-template-areas, or cleared when none are left.
+function useAreaEdits({
+  areas,
+  setProp,
+  clearProp,
+}: {
+  areas: GridArea[];
+  setProp: SetProp;
+  clearProp: ClearProp;
+}) {
+  const [openName, setOpenName] = useState<string | undefined>(undefined);
+  const [anchorElement, setAnchorElement] = useState<HTMLElement | undefined>(undefined);
+  const write = (next: GridArea[]) => {
+    const serialized = serializeAreas(next);
+    if (serialized) {
+      setProp('grid-template-areas', serialized, false);
+    } else {
+      clearProp('grid-template-areas');
+    }
+  };
+  const add = () => {
+    const maxRow = areas.reduce((highest, area) => Math.max(highest, area.rowEnd), 0);
+    write([
+      ...areas,
+      {
+        name: nextAreaName(areas),
+        colStart: 1,
+        colEnd: 1,
+        rowStart: maxRow + 1,
+        rowEnd: maxRow + 1,
+      },
+    ]);
+  };
+  const update = (name: string, patch: GridAreaPatch) => {
+    write(areas.map((area) => (area.name === name ? { ...area, ...patch } : area)));
+    const renamed = 'name' in patch ? patch.name : '';
+    // Follow a rename so the editor stays open.
+    if (renamed) {
+      setOpenName(renamed);
+    }
+  };
+  const remove = (name: string) => {
+    write(areas.filter((area) => area.name !== name));
+    setOpenName((previous) => (previous === name ? undefined : previous));
+  };
+  const openAt = (name: string, element: HTMLElement) => {
+    if (openName === name) {
+      setOpenName(undefined);
+      return;
+    }
+    setOpenName(name);
+    setAnchorElement(element.closest('li') ?? element);
+  };
+  return { openName, setOpenName, anchorElement, add, update, remove, openAt };
+}
+
+function AreaRow({ area, busy, edits }: { area: GridArea; busy: boolean; edits: AreaEdits }) {
+  const isOpen = edits.openName === area.name;
+  return (
+    <li className={`embed-editor_grid-track ${isOpen ? 'is-open' : ''}`}>
+      <div className="embed-editor_grid-track-row">
+        <button
+          type="button"
+          className="embed-editor_grid-track-main"
+          onClick={(event) => edits.openAt(area.name, event.currentTarget)}
+          disabled={busy}
+        >
+          <span className="embed-editor_grid-track-glyph" aria-hidden="true">
+            <AreaIcon />
+          </span>
+          <span className="embed-editor_grid-track-label">{areaLabel(area)}</span>
+        </button>
+        <div className="embed-editor_grid-track-actions">
+          <button
+            type="button"
+            className={'embed-editor_grid-track-action ' + 'embed-editor_grid-track-action-danger'}
+            onClick={() => edits.remove(area.name)}
+            disabled={busy}
+            title="Remove area"
+            aria-label="Remove area"
+          >
+            <TrashIcon />
+          </button>
+        </div>
+      </div>
+    </li>
   );
 }
 
 function Modal({ onClose, children }: { onClose: () => void; children: ReactNode }) {
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
         onClose();
       }
     };
@@ -1339,8 +1589,8 @@ function Modal({ onClose, children }: { onClose: () => void; children: ReactNode
   return createPortal(
     <div
       className="embed-editor_bg-modal-backdrop style-panel-surface"
-      onMouseDown={(e) => {
-        if (e.target === e.currentTarget) {
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) {
           onClose();
         }
       }}

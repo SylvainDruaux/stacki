@@ -45,12 +45,12 @@ export const CSS_PROPERTIES: readonly string[] = Object.freeze(
           (!prop.startsWith('-') || prop.startsWith('-webkit-')),
       ),
     ),
-  ].sort((a, b) => {
+  ].sort((left, right) => {
     // Standard properties first (a leading `-` otherwise sorts the 260+ `-webkit-` names
     // to the very top, burying accent-color/align-*); alphabetical within each group.
-    const av = a.startsWith('-') ? 1 : 0;
-    const bv = b.startsWith('-') ? 1 : 0;
-    return av - bv || a.localeCompare(b);
+    const av = left.startsWith('-') ? 1 : 0;
+    const bv = right.startsWith('-') ? 1 : 0;
+    return av - bv || left.localeCompare(right);
   }),
 );
 
@@ -69,17 +69,17 @@ export function filterCssProperties(
   query: string,
   custom: readonly string[] = [],
 ): readonly string[] {
-  const q = query.trim().toLowerCase();
-  if (!q) {
+  const normalized = query.trim().toLowerCase();
+  if (!normalized) {
     return custom.length ? [...custom, ...CSS_PROPERTIES] : CSS_PROPERTIES;
   }
-  const dashed = q.startsWith('-');
+  const dashed = normalized.startsWith('-');
   const prefix: string[] = [];
   const substring: string[] = [];
   const customPrefix: string[] = [];
   const customSubstring: string[] = [];
   for (const prop of custom) {
-    const at = prop.toLowerCase().indexOf(q);
+    const at = prop.toLowerCase().indexOf(normalized);
     if (at === 0) {
       customPrefix.push(prop);
     } else if (at > 0) {
@@ -87,7 +87,7 @@ export function filterCssProperties(
     }
   }
   for (const prop of CSS_PROPERTIES) {
-    const at = prop.indexOf(q);
+    const at = prop.indexOf(normalized);
     if (at === 0) {
       prefix.push(prop);
     } else if (at > 0) {
@@ -152,5 +152,5 @@ export function clampNonNegative(prop: string, value: string): string {
   if (!isNonNegative(prop) || value.includes('(')) {
     return value;
   }
-  return value.replace(NEGATIVE_LENGTH, (_m, lead: string) => `${lead}0`);
+  return value.replace(NEGATIVE_LENGTH, (_match, lead: string) => `${lead}0`);
 }

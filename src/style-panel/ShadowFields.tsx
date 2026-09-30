@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import type { KeyboardEvent } from 'react';
 import DragSlider from './components/DragSlider';
 import ColorSwatch from './components/ColorSwatch';
 import useScrub from './components/useScrub';
@@ -20,14 +21,14 @@ export const SHADOW_RANGE: Record<string, { min: number; max: number }> = {
   Size: { min: -50, max: 50 },
 };
 
-// Split "2px" → { num: 2, unit: 'px' } (a bare number defaults to px); null when the
-// value isn't a plain length (var()/calc()/…), so the slider is disabled.
-export function parseLen(value: string): { num: number; unit: string } | null {
+// Split "2px" → { amount: 2, unit: 'px' } (a bare number defaults to px); undefined
+// when the value isn't a plain length (var()/calc()/…), so the slider is disabled.
+function parseLength(value: string): { amount: number; unit: string } | undefined {
   const match = value.trim().match(/^(-?\d*\.?\d+)\s*([a-z%]*)$/i);
   if (!match) {
-    return null;
+    return undefined;
   }
-  return { num: parseFloat(match[1] ?? ''), unit: match[2] || 'px' };
+  return { amount: parseFloat(match[1] ?? ''), unit: match[2] || 'px' };
 }
 
 // A live text field for a shadow sub-value (length or color): live on type
@@ -52,42 +53,67 @@ function ShadowTextInput({
   /** The CSS property this sub-value maps to — filters the variable picker
    *  (a length for X/Y/Blur/Size, `color` for the color row). */
   prop: string;
-  onCommit: (v: string) => void;
-  onLive: (v: string) => void;
+  onCommit: (value: string) => void;
+  onLive: (value: string) => void;
+  onClear: () => void;
+}) {
+  const field = useShadowDraft({ value, busy, onCommit, onLive, onClear });
+  return (
+    <VariableConnect
+      code
+      ariaLabel={`Connect ${ariaLabel} to a variable`}
+      disabled={busy}
+      className="is-fill"
+      prop={prop}
+      onPick={(binding) => onCommit(binding)}
+    >
+      <input
+        {...field.scrub.input}
+        className={className}
+        value={field.draft}
+        onChange={(event) => field.change(event.target.value)}
+        onFocus={field.focus}
+        onBlur={field.blur}
+        onKeyDown={field.keyDown}
+        disabled={busy}
+        spellCheck={false}
+        placeholder={placeholder}
+        aria-label={ariaLabel}
+      />
+    </VariableConnect>
+  );
+}
+
+// The text field's editing state: a draft that follows `value` while nobody is
+// typing, live previews on a debounce while someone is, and the commit on blur.
+function useShadowDraft({
+  value,
+  busy,
+  onCommit,
+  onLive,
+  onClear,
+}: {
+  value: string;
+  busy: boolean;
+  onCommit: (value: string) => void;
+  onLive: (value: string) => void;
   onClear: () => void;
 }) {
   const [draft, setDraft] = useState(value);
   const focused = useRef(false);
-  const timer = useRef<number | null>(null);
   useEffect(() => {
     if (!focused.current) {
       setDraft(value);
     }
   }, [value]);
-  const cancel = () => {
-    if (timer.current != null) {
-      window.clearTimeout(timer.current);
-      timer.current = null;
-    }
-  };
-  useEffect(() => cancel, []);
-  const liveNow = (text: string) => {
-    const t = text.trim();
-    if (t) {
-      onLive(t);
-    }
-  };
-  const live = (text: string) => {
-    cancel();
-    timer.current = window.setTimeout(() => liveNow(text), 100);
-  };
+  const { cancel, liveNow, live } = useDebouncedLive(onLive);
   const commit = (text = draft) => {
-    const t = text.trim();
-    if (!t) {
+    const trimmed = text.trim();
+    if (!trimmed) {
       onClear();
       return;
     }
-    onCommit(t);
+    onCommit(trimmed);
   };
   const scrub = useScrub({
     value: draft,
@@ -99,59 +125,77 @@ function ShadowTextInput({
       commit(text);
     },
   });
-  return (
-    <VariableConnect
-      code
-      ariaLabel={`Connect ${ariaLabel} to a variable`}
-      disabled={busy}
-      className="is-fill"
-      prop={prop}
-      onPick={(binding) => onCommit(binding)}
-    >
-      <input
-        {...scrub.input}
-        className={className}
-        value={draft}
-        onChange={(e) => {
-          setDraft(e.target.value);
-          live(e.target.value);
-        }}
-        onFocus={() => {
-          focused.current = true;
-        }}
-        onBlur={() => {
-          focused.current = false;
-          cancel();
-          commit();
-        }}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter') {
-            e.currentTarget.blur();
-            return;
-          }
-          const stepped = handleArrowStep(e);
-          if (!stepped) {
-            return;
-          }
-          e.preventDefault();
-          e.currentTarget.value = stepped.text;
-          e.currentTarget.setSelectionRange(stepped.caret, stepped.caret);
-          setDraft(stepped.text);
-          live(stepped.text);
-        }}
-        disabled={busy}
-        spellCheck={false}
-        placeholder={placeholder}
-        aria-label={ariaLabel}
-      />
-    </VariableConnect>
-  );
+  return {
+    draft,
+    scrub,
+    change: (text: string) => {
+      setDraft(text);
+      live(text);
+    },
+    focus: () => {
+      focused.current = true;
+    },
+    blur: () => {
+      focused.current = false;
+      cancel();
+      commit();
+    },
+    keyDown: (event: KeyboardEvent<HTMLInputElement>) => {
+      const stepped = stepShadowKey(event);
+      if (stepped !== undefined) {
+        setDraft(stepped);
+        live(stepped);
+      }
+    },
+  };
+}
+
+// Live previews of typed text: debounced while typing, immediate for a scrub.
+// Blank text is never previewed.
+function useDebouncedLive(onLive: (value: string) => void) {
+  const timer = useRef<number | undefined>(undefined);
+  const cancel = () => {
+    if (timer.current !== undefined) {
+      window.clearTimeout(timer.current);
+      timer.current = undefined;
+    }
+  };
+  useEffect(() => cancel, []);
+  const liveNow = (text: string) => {
+    const trimmed = text.trim();
+    if (trimmed) {
+      onLive(trimmed);
+    }
+  };
+  const live = (text: string) => {
+    cancel();
+    timer.current = window.setTimeout(() => liveNow(text), 100);
+  };
+  return { cancel, liveNow, live };
+}
+
+// Enter commits by blurring; an arrow key steps the number under the caret and
+// writes it straight into the input. Returns the stepped text, if any.
+function stepShadowKey(event: KeyboardEvent<HTMLInputElement>): string | undefined {
+  if (event.key === 'Enter') {
+    event.currentTarget.blur();
+    return undefined;
+  }
+  const stepped = handleArrowStep(event);
+  if (!stepped) {
+    return undefined;
+  }
+  event.preventDefault();
+  const input = event.currentTarget;
+  input.value = stepped.text;
+  input.setSelectionRange(stepped.caret, stepped.caret);
+  return stepped.text;
 }
 
 // One shadow length (X / Y / Blur / Size): a draggable slider (coarse) beside a
 // number field (precise). The slider drives the numeric part and re-attaches the
 // value's unit; a non-length value keeps the field but disables the slider.
-export function ShadowNum({
+export function ShadowLength({
   label,
   value,
   busy,
@@ -163,40 +207,41 @@ export function ShadowNum({
   label: string;
   value: string;
   busy: boolean;
-  onCommit: (v: string) => void;
-  onLive: (v: string) => void;
+  onCommit: (value: string) => void;
+  onLive: (value: string) => void;
   /** Override the coarse slider range (defaults to the SHADOW_RANGE for `label`). */
   range?: { min: number; max: number };
   /** Unit shown/re-attached when there's no length yet, and on clear (defaults to px).
    *  The number field keeps whatever unit the value carries (em/rem/%/…). */
   defaultUnit?: string;
 }) {
-  const parsed = parseLen(value);
-  const r = range ?? SHADOW_RANGE[label] ?? { min: -50, max: 50 };
+  const parsed = parseLength(value);
+  const sliderRange = range ?? SHADOW_RANGE[label] ?? { min: -50, max: 50 };
   const unit = parsed?.unit ?? defaultUnit;
   // While the slider is dragged, show its live value in the number field (the model
   // `value` only catches up on commit). Cleared whenever `value` actually changes, so
   // after a commit the field falls back to the model with no flash.
-  const [live, setLive] = useState<string | null>(null);
+  const [live, setLive] = useState<string | undefined>(undefined);
   useEffect(() => {
-    setLive(null);
+    setLive(undefined);
   }, [value]);
   // A bare typed number gets the current/default unit ("150" → "150%", "5" → "5px");
   // a value that already carries a unit (em/rem/%/var()/…) passes through untouched.
-  const withUnit = (v: string): string => (/^-?[\d.]+$/.test(v.trim()) ? `${v.trim()}${unit}` : v);
+  const withUnit = (text: string): string =>
+    /^-?[\d.]+$/.test(text.trim()) ? `${text.trim()}${unit}` : text;
   return (
     <div className="embed-editor_size-row">
       <span className="embed-editor_size-label embed-editor_bg-caption">{label}</span>
       <div className="embed-editor_shadow-field">
         <DragSlider
-          value={parsed?.num ?? 0}
-          min={r.min}
-          max={r.max}
+          value={parsed?.amount ?? 0}
+          min={sliderRange.min}
+          max={sliderRange.max}
           disabled={busy || !parsed}
           ariaLabel={label}
-          onPreview={(n) => setLive(`${n}${unit}`)}
-          onInput={(n) => onLive(`${n}${unit}`)}
-          onCommit={(n) => onCommit(`${n}${unit}`)}
+          onPreview={(amount) => setLive(`${amount}${unit}`)}
+          onInput={(amount) => onLive(`${amount}${unit}`)}
+          onCommit={(amount) => onCommit(`${amount}${unit}`)}
         />
         <ShadowTextInput
           value={live ?? value}
@@ -205,8 +250,8 @@ export function ShadowNum({
           placeholder={`0${defaultUnit}`}
           className="u-input embed-editor_size-input embed-editor_shadow-num"
           prop="width"
-          onCommit={(v) => onCommit(withUnit(v))}
-          onLive={(v) => onLive(withUnit(v))}
+          onCommit={(text) => onCommit(withUnit(text))}
+          onLive={(text) => onLive(withUnit(text))}
           onClear={() => onCommit(`0${defaultUnit}`)}
         />
       </div>
@@ -239,9 +284,9 @@ export function ShadowColorRow({
           value={shown}
           busy={busy}
           ariaLabel="Shadow color"
-          onChange={(c, live) => {
-            noteLive(live ? c : null);
-            onChange(c, live);
+          onChange={(next, live) => {
+            noteLive(live ? next : undefined);
+            onChange(next, live);
           }}
         />
         <ShadowTextInput
@@ -251,13 +296,13 @@ export function ShadowColorRow({
           placeholder="rgba(0, 0, 0, 0.2)"
           className="u-input embed-editor_size-input"
           prop="color"
-          onCommit={(c) => {
-            noteLive(null);
-            onChange(c, false);
+          onCommit={(next) => {
+            noteLive(undefined);
+            onChange(next, false);
           }}
-          onLive={(c) => onChange(c, true)}
+          onLive={(next) => onChange(next, true)}
           onClear={() => {
-            noteLive(null);
+            noteLive(undefined);
             onChange('', false);
           }}
         />

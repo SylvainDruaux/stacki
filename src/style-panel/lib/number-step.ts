@@ -50,9 +50,12 @@ function stepSizeFor(mode: StepMode, unit: string): number {
 }
 
 // Next multiple of `step` strictly past `value` in the given direction.
-function snapStep(value: number, step: number, dir: 1 | -1): number {
-  const q = value / step;
-  const raw = dir > 0 ? (Math.floor(q + 1e-9) + 1) * step : (Math.ceil(q - 1e-9) - 1) * step;
+function snapStep(value: number, step: number, direction: 1 | -1): number {
+  const quotient = value / step;
+  const raw =
+    direction > 0
+      ? (Math.floor(quotient + 1e-9) + 1) * step
+      : (Math.ceil(quotient - 1e-9) - 1) * step;
   return Math.round(raw * 1e5) / 1e5; // shed float dust (0.1 + 0.2 …)
 }
 
@@ -60,19 +63,19 @@ function snapStep(value: number, step: number, dir: 1 | -1): number {
 function numberRuns(text: string): NumberRun[] {
   NUMBER_UNIT_RE.lastIndex = 0;
   const runs: NumberRun[] = [];
-  let match: RegExpExecArray | null;
-  while ((match = NUMBER_UNIT_RE.exec(text))) {
+  // A global regex advances `lastIndex` on every match, so each run is visited once.
+  for (let match = NUMBER_UNIT_RE.exec(text); match !== null; match = NUMBER_UNIT_RE.exec(text)) {
     const start = match.index;
     const raw = match[1] ?? '';
     const unit = match[2] ?? '';
-    const numEnd = start + raw.length;
-    runs.push({ start, numEnd, end: numEnd + unit.length, raw, unit });
+    const numberEnd = start + raw.length;
+    runs.push({ start, numEnd: numberEnd, end: numberEnd + unit.length, raw, unit });
   }
   return runs;
 }
 
 /**
- * Step the number whose number-or-unit the caret sits inside/touches; null if none.
+ * Step the number whose number-or-unit the caret sits inside/touches; undefined if none.
  *
  * `min` is a floor the step stops at — for a field whose property refuses to go
  * below it. Stepping past a floor and letting the write clamp it would leave the
@@ -81,25 +84,25 @@ function numberRuns(text: string): NumberRun[] {
 export function stepNumberAtCaret(
   text: string,
   caret: number,
-  dir: 1 | -1,
+  direction: 1 | -1,
   mode: StepMode,
   min?: number,
-): { text: string; caret: number } | null {
+): { text: string; caret: number } | undefined {
   const hit = numberRuns(text).find((run) => caret >= run.start && caret <= run.end);
   if (!hit) {
-    return null;
+    return undefined;
   }
-  const num = Number.parseFloat(hit.raw);
-  if (!Number.isFinite(num)) {
-    return null;
+  const parsed = Number.parseFloat(hit.raw);
+  if (!Number.isFinite(parsed)) {
+    return undefined;
   }
-  const stepped = snapStep(num, stepSizeFor(mode, hit.unit.toLowerCase()), dir);
-  const nextStr = String(min != null && stepped < min ? min : stepped);
+  const stepped = snapStep(parsed, stepSizeFor(mode, hit.unit.toLowerCase()), direction);
+  const nextText = String(min !== undefined && stepped < min ? min : stepped);
   // Keep the caret where it was: end of the new number if it was in the number,
   // else shift it along with the unit by the number's length change.
   const nextCaret =
-    caret <= hit.numEnd ? hit.start + nextStr.length : caret + (nextStr.length - hit.raw.length);
-  return { text: text.slice(0, hit.start) + nextStr + text.slice(hit.numEnd), caret: nextCaret };
+    caret <= hit.numEnd ? hit.start + nextText.length : caret + (nextText.length - hit.raw.length);
+  return { text: text.slice(0, hit.start) + nextText + text.slice(hit.numEnd), caret: nextCaret };
 }
 
 // ───────────────────────────── Pointer scrubbing ─────────────────────────────
@@ -174,15 +177,15 @@ function isScrubbable(text: string, run: NumberRun): boolean {
  * The number a scrub starting at `caret` should drag: the run under the pointer, else
  * the nearest one (ties go left). Lets you grab any of `0 2px 4px` by pressing over it,
  * and still does the sensible thing when you land on whitespace or on `solid`.
- * Returns null when the value holds no number worth dragging.
+ * Returns undefined when the value holds no number worth dragging.
  */
-export function findScrubTarget(text: string, caret: number): NumberRun | null {
+export function findScrubTarget(text: string, caret: number): NumberRun | undefined {
   const runs = numberRuns(text).filter((run) => isScrubbable(text, run));
   const under = runs.find((run) => caret >= run.start && caret <= run.end);
   if (under) {
     return under;
   }
-  let best: NumberRun | null = null;
+  let best: NumberRun | undefined;
   let bestDistance = Infinity;
   for (const run of runs) {
     const distance = caret < run.start ? run.start - caret : caret - run.end;
@@ -196,7 +199,7 @@ export function findScrubTarget(text: string, caret: number): NumberRun | null {
 
 /** True when a value has anything a scrub could drag — drives the ew-resize cursor. */
 export function hasScrubTarget(text: string): boolean {
-  return findScrubTarget(text, 0) !== null;
+  return findScrubTarget(text, 0) !== undefined;
 }
 
 /**
@@ -222,20 +225,20 @@ export function stepModeOf(event: { shiftKey: boolean; altKey: boolean }): StepM
 
 /**
  * Handle an Up/Down key on a text field: if the caret is on a number, return the
- * stepped text + caret (the caller applies it + preventDefault). Returns null for
+ * stepped text + caret (the caller applies it + preventDefault). Returns undefined for
  * any other key or when the caret isn't on a number.
  */
 export function handleArrowStep(
   event: KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>,
   min?: number,
-): { text: string; caret: number } | null {
+): { text: string; caret: number } | undefined {
   if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') {
-    return null;
+    return undefined;
   }
-  const el = event.currentTarget;
+  const element = event.currentTarget;
   return stepNumberAtCaret(
-    el.value,
-    el.selectionStart ?? el.value.length,
+    element.value,
+    element.selectionStart ?? element.value.length,
     event.key === 'ArrowUp' ? 1 : -1,
     stepModeOf(event),
     min,

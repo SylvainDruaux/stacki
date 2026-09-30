@@ -47,11 +47,14 @@ export function snapshotTokens(snapshot: ElementSnapshot | undefined): ClassToke
 
 /**
  * The class tokens (from `tokens`, in token order) named by a selector's subject
- * compound — the inverse of tokensToSelector for class selectors. Returns null
+ * compound — the inverse of tokensToSelector for class selectors. Returns undefined
  * when the selector isn't a plain class chain on this element (has a class the
  * element lacks, or no classes at all), so the caller can leave the pick alone.
  */
-export function selectorToClassTokens(selectorText: string, tokens: ClassToken[]): string[] | null {
+export function selectorToClassTokens(
+  selectorText: string,
+  tokens: ClassToken[],
+): string[] | undefined {
   // The subject is the last compound (after any descendant / combinator).
   const subject =
     selectorText
@@ -59,10 +62,10 @@ export function selectorToClassTokens(selectorText: string, tokens: ClassToken[]
       .filter(Boolean)
       .pop() ?? '';
   const wanted = new Set(
-    [...subject.matchAll(/\.([\w-]+)/g)].map((m) => (m[1] ?? '').toLowerCase()),
+    [...subject.matchAll(/\.([\w-]+)/g)].map((match) => (match[1] ?? '').toLowerCase()),
   );
   if (!wanted.size) {
-    return null;
+    return undefined;
   }
   const picked: string[] = [];
   const matched = new Set<string>();
@@ -77,7 +80,7 @@ export function selectorToClassTokens(selectorText: string, tokens: ClassToken[]
     }
   }
   // Every class the selector names must exist on the element, or we can't select it.
-  return matched.size === wanted.size && picked.length ? picked : null;
+  return matched.size === wanted.size && picked.length ? picked : undefined;
 }
 
 /**

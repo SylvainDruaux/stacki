@@ -114,6 +114,45 @@ const codeEditorBasicSetup = {
   lintKeymap: false,
 };
 
+// Report the caret whenever the selection moves, and after a click, a key or focus
+// (the frame's wait lets CodeMirror settle the selection first).
+function selectionListeners(onSelectionChange: (head: number) => void) {
+  return [
+    EditorView.updateListener.of((update) => {
+      if (update.selectionSet) {
+        onSelectionChange(update.state.selection.main.head);
+      }
+    }),
+    EditorView.domEventHandlers({
+      pointerup: (_event, view) => {
+        window.requestAnimationFrame(() => onSelectionChange(view.state.selection.main.head));
+        return false;
+      },
+      keyup: (_event, view) => {
+        onSelectionChange(view.state.selection.main.head);
+        return false;
+      },
+      focus: (_event, view) => {
+        window.requestAnimationFrame(() => onSelectionChange(view.state.selection.main.head));
+        return false;
+      },
+    }),
+  ];
+}
+
+// Mark each token highlight, dropping any that no longer fit the document.
+function highlightDecorations(highlights: ReadonlyArray<CodeEditorTokenHighlight>) {
+  return EditorView.decorations.of((view) => {
+    const documentLength = view.state.doc.length;
+    const ranges = highlights
+      .filter((highlight) => highlight.to <= documentLength)
+      .map((highlight) =>
+        Decoration.mark({ class: highlight.className }).range(highlight.from, highlight.to),
+      );
+    return Decoration.set(ranges, true);
+  });
+}
+
 export function CodeEditor({
   id,
   value,
@@ -121,7 +160,7 @@ export function CodeEditor({
   readOnly = false,
   ariaLabel,
   className,
-  minHeight = '124px',
+  minHeight: heightMin = '124px',
   tokenHighlights = [],
   onChange,
   onSelectionChange,
@@ -132,48 +171,14 @@ export function CodeEditor({
         (highlight) =>
           highlight.from >= 0 && highlight.to > highlight.from && highlight.to <= value.length,
       )
-      .sort((a, b) => a.from - b.from || a.to - b.to);
-
-    const selectionExtensions = onSelectionChange
-      ? [
-          EditorView.updateListener.of((update) => {
-            if (update.selectionSet) {
-              onSelectionChange(update.state.selection.main.head);
-            }
-          }),
-          EditorView.domEventHandlers({
-            pointerup: (_event, view) => {
-              window.requestAnimationFrame(() => onSelectionChange(view.state.selection.main.head));
-              return false;
-            },
-            keyup: (_event, view) => {
-              onSelectionChange(view.state.selection.main.head);
-              return false;
-            },
-            focus: (_event, view) => {
-              window.requestAnimationFrame(() => onSelectionChange(view.state.selection.main.head));
-              return false;
-            },
-          }),
-        ]
-      : [];
-
+      .sort((left, right) => left.from - right.from || left.to - right.to);
+    const selectionExtensions = onSelectionChange ? selectionListeners(onSelectionChange) : [];
     if (!highlights.length) {
       return [...codeEditorExtensions[language], ...selectionExtensions];
     }
-
     return [
       ...codeEditorExtensions[language],
-      EditorView.decorations.of((view) => {
-        const docLength = view.state.doc.length;
-        const ranges = highlights
-          .filter((highlight) => highlight.to <= docLength)
-          .map((highlight) =>
-            Decoration.mark({ class: highlight.className }).range(highlight.from, highlight.to),
-          );
-
-        return Decoration.set(ranges, true);
-      }),
+      highlightDecorations(highlights),
       ...selectionExtensions,
     ];
   }, [language, onSelectionChange, tokenHighlights, value.length]);
@@ -188,7 +193,7 @@ export function CodeEditor({
       extensions={extensions}
       basicSetup={codeEditorBasicSetup}
       theme="none"
-      minHeight={minHeight}
+      minHeight={heightMin}
       readOnly={readOnly}
       editable={!readOnly}
       indentWithTab={!readOnly}

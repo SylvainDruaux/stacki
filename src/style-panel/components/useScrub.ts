@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { PointerEvent as ReactPointerEvent } from 'react';
+import type { MutableRefObject, PointerEvent as ReactPointerEvent } from 'react';
 import { caretAtX } from '../lib/caret-at-x';
 import { findScrubTarget, hasScrubTarget, scrubNumber, stepModeOf } from '../lib/number-step';
 import type { NumberRun, StepMode } from '../lib/number-step';
@@ -35,7 +35,7 @@ type Drag = {
   mode: StepMode;
   moved: boolean;
   latestX: number;
-  raf: number | null;
+  raf: number | undefined;
   lastWriteAt: number;
   text: string;
 };
@@ -50,13 +50,7 @@ export type ScrubHandlers = {
   onPointerLeave: () => void;
 };
 
-export default function useScrub({
-  value,
-  disabled = false,
-  onPreview,
-  onInput,
-  onCommit,
-}: {
+type ScrubOptions = {
   /** The field's current text. The scrub rewrites exactly this string. */
   value: string;
   disabled?: boolean;
@@ -68,64 +62,83 @@ export default function useScrub({
   onInput?: (text: string) => void;
   /** Once, on release, with the final text: the authoritative write. */
   onCommit: (text: string) => void;
-}): { input: ScrubHandlers; label: ScrubHandlers } {
+};
+
+type DragRef = MutableRefObject<Drag | undefined>;
+type LatestOptions = MutableRefObject<ScrubOptions>;
+
+export default function useScrub(options: ScrubOptions): {
+  input: ScrubHandlers;
+  label: ScrubHandlers;
+} {
   // The pointer handlers outlive the render that installed them, so read callbacks and
-  // the value through refs rather than closing over a stale render's copies.
-  const valueRef = useRef(value);
-  valueRef.current = value;
-  const disabledRef = useRef(disabled);
-  disabledRef.current = disabled;
-  const onPreviewRef = useRef(onPreview);
-  onPreviewRef.current = onPreview;
-  const onInputRef = useRef(onInput);
-  onInputRef.current = onInput;
-  const onCommitRef = useRef(onCommit);
-  onCommitRef.current = onCommit;
+  // the value through a ref rather than closing over a stale render's copies.
+  const latest = useRef(options);
+  latest.current = options;
+  const drag = useRef<Drag | undefined>(undefined);
+  const { frame, finish } = useDragFrames(drag, latest);
+  const { onPointerMove, onPointerUp } = useDragMoves(drag, frame, finish);
+  const hover = useScrubHover({ disabled: options.disabled ?? false, value: options.value });
+  const { onInputPointerDown, onLabelPointerDown } = useScrubPresses(drag, latest);
 
-  const drag = useRef<Drag | null>(null);
+  const shared = {
+    onPointerMove,
+    onPointerUp,
+    onPointerCancel: onPointerUp,
+    onLostPointerCapture: onPointerUp,
+    onPointerLeave: hover.onPointerLeave,
+  };
+  return {
+    input: {
+      ...shared,
+      onPointerDown: onInputPointerDown,
+      onPointerEnter: hover.onInputPointerEnter,
+    },
+    label: {
+      ...shared,
+      onPointerDown: onLabelPointerDown,
+      onPointerEnter: hover.onLabelPointerEnter,
+    },
+  };
+}
 
-  // Hover state for the ew-resize affordance. `armed` is what the cursor reflects: over a
-  // label it's enough to be hovering a value with a number in it; over an input you also
-  // have to be holding the modifier that would start the scrub.
-  const hoverEl = useRef<HTMLElement | null>(null);
-  const hoverSurface = useRef<Surface>('input');
-  const [hovering, setHovering] = useState(false);
-  const [modifierHeld, setModifierHeld] = useState(false);
-
+// One animation frame of the drag (recompute the text from the press's base value,
+// preview it, write it when the throttle allows) and the end of a drag.
+function useDragFrames(dragRef: DragRef, latest: LatestOptions) {
   const frame = useCallback(() => {
-    const d = drag.current;
-    if (!d) {
+    const state = dragRef.current;
+    if (!state) {
       return;
     }
-    d.raf = null;
-    const steps = Math.round((d.latestX - d.startX) / PX_PER_STEP);
-    const text = scrubNumber(d.base, d.run, steps, d.mode);
-    if (text === d.text) {
+    state.raf = undefined;
+    const steps = Math.round((state.latestX - state.startX) / PX_PER_STEP);
+    const text = scrubNumber(state.base, state.run, steps, state.mode);
+    if (text === state.text) {
       return;
     }
-    d.text = text;
-    onPreviewRef.current?.(text);
+    state.text = text;
+    latest.current.onPreview?.(text);
     const now = performance.now();
-    if (now - d.lastWriteAt >= WRITE_MS) {
-      d.lastWriteAt = now;
-      onInputRef.current?.(text);
+    if (now - state.lastWriteAt >= WRITE_MS) {
+      state.lastWriteAt = now;
+      latest.current.onInput?.(text);
     }
-  }, []);
+  }, [dragRef, latest]);
 
   const finish = useCallback(() => {
-    const d = drag.current;
-    if (!d) {
+    const state = dragRef.current;
+    if (!state) {
       return;
     }
-    drag.current = null;
-    if (d.raf != null) {
-      cancelAnimationFrame(d.raf);
+    dragRef.current = undefined;
+    if (state.raf !== undefined) {
+      cancelAnimationFrame(state.raf);
     }
     document.body.classList.remove('is-scrubbing');
-    if (!d.moved) {
+    if (!state.moved) {
       return;
     } // never crossed the dead zone: it was a click, leave it be
-    // The press that ended a drag must not also register as a click — on a label that
+    // The press that ended a dragRef must not also register as a click — on a label that
     // would pop the reset menu open the moment you let go.
     const swallow = (event: MouseEvent) => {
       event.preventDefault();
@@ -133,82 +146,78 @@ export default function useScrub({
     };
     window.addEventListener('click', swallow, { capture: true, once: true });
     window.setTimeout(() => window.removeEventListener('click', swallow, { capture: true }), 0);
-    onCommitRef.current(d.text);
-  }, []);
+    latest.current.onCommit(state.text);
+  }, [dragRef, latest]);
 
-  // A drag can outlive its field — a commit elsewhere may re-render the section away.
+  // A dragRef can outlive its field — a commit elsewhere may re-render the section away.
   useEffect(() => finish, [finish]);
+  return { frame, finish };
+}
 
-  const begin = useCallback(
-    (event: ReactPointerEvent<HTMLElement>, base: string, run: NumberRun) => {
-      if (drag.current) {
-        return;
-      } // a second pointer (touch) must not hijack the one in flight
-      // Capture so the drag survives leaving the field — and so pointerup still lands here
-      // when the pointer is released halfway across the window.
-      event.currentTarget.setPointerCapture(event.pointerId);
-      drag.current = {
-        pointerId: event.pointerId,
-        startX: event.clientX,
-        base,
-        run,
-        mode: stepModeOf(event),
-        moved: false,
-        latestX: event.clientX,
-        raf: null,
-        lastWriteAt: performance.now(),
-        text: base,
-      };
-    },
-    [],
-  );
-
+function useDragMoves(dragRef: DragRef, frame: () => void, finish: () => void) {
   const onPointerMove = useCallback(
     (event: ReactPointerEvent<HTMLElement>) => {
-      const d = drag.current;
-      if (!d || event.pointerId !== d.pointerId) {
+      const state = dragRef.current;
+      if (!state || event.pointerId !== state.pointerId) {
         return;
       }
-      d.latestX = event.clientX;
-      d.mode = stepModeOf(event);
-      if (!d.moved) {
-        if (Math.abs(event.clientX - d.startX) < DEAD_ZONE) {
+      state.latestX = event.clientX;
+      state.mode = stepModeOf(event);
+      if (!state.moved) {
+        if (Math.abs(event.clientX - state.startX) < DEAD_ZONE) {
           return;
         }
-        d.moved = true;
-        // One class on <body> beats a per-drag <style> tag: the cursor has to win over
+        state.moved = true;
+        // One class on <body> beats a per-dragRef <style> tag: the cursor has to win over
         // every element the pointer crosses, including the ones it's captured away from.
         document.body.classList.add('is-scrubbing');
       }
-      if (d.raf == null) {
-        d.raf = requestAnimationFrame(frame);
+      if (state.raf === undefined) {
+        state.raf = requestAnimationFrame(frame);
       }
     },
-    [frame],
+    [dragRef, frame],
   );
 
   const onPointerUp = useCallback(
     (event: ReactPointerEvent<HTMLElement>) => {
-      const d = drag.current;
-      if (!d || event.pointerId !== d.pointerId) {
+      const state = dragRef.current;
+      if (!state || event.pointerId !== state.pointerId) {
         return;
       }
       // Land on where the pointer actually was released, not on the last frame we drew.
-      if (d.moved) {
-        d.latestX = event.clientX;
-        if (d.raf != null) {
-          cancelAnimationFrame(d.raf);
-          d.raf = null;
+      if (state.moved) {
+        state.latestX = event.clientX;
+        if (state.raf !== undefined) {
+          cancelAnimationFrame(state.raf);
+          state.raf = undefined;
         }
         frame();
       }
       finish();
     },
-    [finish, frame],
+    [dragRef, finish, frame],
   );
+  return { onPointerMove, onPointerUp };
+}
+
+// Hover state for the ew-resize affordance. `armed` is what the cursor reflects: over a
+// label it's enough to be hovering a value with a number in it; over an input you also
+// have to be holding the modifier that would start the scrub.
+function useScrubHover({
+  disabled,
+  value,
+}: {
+  readonly disabled: boolean;
+  readonly value: string;
+}) {
+  const hoverElement = useRef<HTMLElement | undefined>(undefined);
+  const hoverSurface = useRef<Surface>('input');
+  const [hovering, setHovering] = useState(false);
+  const [modifierHeld, setModifierHeld] = useState(false);
 
   const enter = useCallback((surface: Surface, event: ReactPointerEvent<HTMLElement>) => {
-    hoverEl.current = event.currentTarget;
+    hoverElement.current = event.currentTarget;
     hoverSurface.current = surface;
     setModifierHeld(event.altKey || event.shiftKey);
     setHovering(true);
@@ -221,9 +230,8 @@ export default function useScrub({
     (event: ReactPointerEvent<HTMLElement>) => enter('label', event),
     [enter],
   );
-
   const onPointerLeave = useCallback(() => {
-    hoverEl.current = null;
+    hoverElement.current = undefined;
     setHovering(false);
   }, []);
 
@@ -245,70 +253,86 @@ export default function useScrub({
   // Set the cursor on the element itself rather than through a class the caller has to
   // merge into its own className — every field would otherwise pay for the plumbing.
   useEffect(() => {
-    const el = hoverEl.current;
-    if (!el || !hovering) {
+    const element = hoverElement.current;
+    if (!element || !hovering) {
       return;
     }
     const armed =
-      !disabled &&
-      hasScrubTarget(valueRef.current) &&
-      (hoverSurface.current === 'label' || modifierHeld);
-    el.style.cursor = armed ? 'ew-resize' : '';
+      !disabled && hasScrubTarget(value) && (hoverSurface.current === 'label' || modifierHeld);
+    element.style.cursor = armed ? 'ew-resize' : '';
     return () => {
-      el.style.cursor = '';
+      element.style.cursor = '';
     };
   }, [hovering, modifierHeld, disabled, value]);
+  return { onInputPointerEnter, onLabelPointerEnter, onPointerLeave };
+}
+
+// A press that may start a dragRef: on the input only with Alt or Shift (a bare dragRef
+// there still selects text), on the label always.
+function useScrubPresses(dragRef: DragRef, latest: LatestOptions) {
+  const begin = useCallback(
+    (event: ReactPointerEvent<HTMLElement>, base: string, run: NumberRun) => {
+      if (dragRef.current) {
+        return;
+      } // a second pointer (touch) must not hijack the one in flight
+      // Capture so the dragRef survives leaving the field — and so pointerup still lands here
+      // when the pointer is released halfway across the window.
+      event.currentTarget.setPointerCapture(event.pointerId);
+      dragRef.current = {
+        pointerId: event.pointerId,
+        startX: event.clientX,
+        base,
+        run,
+        mode: stepModeOf(event),
+        moved: false,
+        latestX: event.clientX,
+        raf: undefined,
+        lastWriteAt: performance.now(),
+        text: base,
+      };
+    },
+    [dragRef],
+  );
 
   const onInputPointerDown = useCallback(
     (event: ReactPointerEvent<HTMLElement>) => {
-      if (disabledRef.current || event.button !== 0) {
+      if (latest.current.disabled || event.button !== 0) {
         return;
       }
       if (!event.altKey && !event.shiftKey) {
         return;
-      } // a bare drag is still a text selection
-      const el = event.currentTarget;
-      if (!(el instanceof HTMLInputElement) && !(el instanceof HTMLTextAreaElement)) {
+      } // a bare dragRef is still a text selection
+      const element = event.currentTarget;
+      if (!(element instanceof HTMLInputElement) && !(element instanceof HTMLTextAreaElement)) {
         return;
       }
-      const run = findScrubTarget(el.value, caretAtX(el, event.clientX));
+      const run = findScrubTarget(element.value, caretAtX(element, event.clientX));
       if (!run) {
         return;
       }
       // Stops the caret from moving and the selection from starting. It also drops the
       // click, which is fine: a modifier-click on a value field means nothing else.
       event.preventDefault();
-      begin(event, el.value, run);
+      begin(event, element.value, run);
     },
-    [begin],
+    [begin, latest],
   );
 
   const onLabelPointerDown = useCallback(
     (event: ReactPointerEvent<HTMLElement>) => {
-      if (disabledRef.current || event.button !== 0) {
+      if (latest.current.disabled || event.button !== 0) {
         return;
       }
-      const run = findScrubTarget(valueRef.current, 0);
+      const run = findScrubTarget(latest.current.value, 0);
       if (!run) {
         return;
       }
-      // Deliberately no preventDefault: a press that never turns into a drag has to reach
+      // Deliberately no preventDefault: a press that never turns into a dragRef has to reach
       // the label as a click and open its reset menu. Text selection is handled instead by
       // the body class, which lands the moment the dead zone is crossed.
-      begin(event, valueRef.current, run);
+      begin(event, latest.current.value, run);
     },
-    [begin],
+    [begin, latest],
   );
-
-  const shared = {
-    onPointerMove,
-    onPointerUp,
-    onPointerCancel: onPointerUp,
-    onLostPointerCapture: onPointerUp,
-    onPointerLeave,
-  };
-  return {
-    input: { ...shared, onPointerDown: onInputPointerDown, onPointerEnter: onInputPointerEnter },
-    label: { ...shared, onPointerDown: onLabelPointerDown, onPointerEnter: onLabelPointerEnter },
-  };
+  return { onInputPointerDown, onLabelPointerDown };
 }

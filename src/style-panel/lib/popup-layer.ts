@@ -12,7 +12,7 @@
 // missing link: the picker's anchor sits inside the popover, so a press inside the
 // picker is a press inside the popover, however far apart the two are in the DOM.
 
-type Layer = { el: HTMLElement; anchor: HTMLElement | null };
+type Layer = { readonly element: HTMLElement; readonly anchor: HTMLElement | undefined };
 
 const layers: Layer[] = [];
 
@@ -20,11 +20,14 @@ const layers: Layer[] = [];
  * Register an open popup and where it was opened from. Call in an effect and run
  * the returned cleanup when it closes.
  */
-export function registerPopupLayer(el: HTMLElement | null, anchor: HTMLElement | null): () => void {
-  if (!el) {
+export function registerPopupLayer(
+  element: HTMLElement | undefined,
+  anchor: HTMLElement | undefined,
+): () => void {
+  if (!element) {
     return () => {};
   }
-  const layer: Layer = { el, anchor: anchor ?? null };
+  const layer: Layer = { element, anchor };
   layers.push(layer);
   return () => {
     const i = layers.indexOf(layer);
@@ -35,8 +38,8 @@ export function registerPopupLayer(el: HTMLElement | null, anchor: HTMLElement |
 }
 
 /** Does `root` have a popup of its own open — one opened from inside it? */
-export function hasOwnedPopup(root: HTMLElement | null): boolean {
-  return !!root && layers.some((l) => l.anchor && root.contains(l.anchor));
+export function hasOwnedPopup(root: HTMLElement | undefined): boolean {
+  return !!root && layers.some((layer) => layer.anchor && root.contains(layer.anchor));
 }
 
 /**
@@ -44,12 +47,12 @@ export function hasOwnedPopup(root: HTMLElement | null): boolean {
  * within a popup that was? Walks the chain of anchors, so a picker opened from a
  * field in a popover opened from a layer row still counts as inside the layer row.
  */
-export function inOwnedPopup(target: Node | null, root: HTMLElement | null): boolean {
+export function inOwnedPopup(target: Node | undefined, root: HTMLElement | undefined): boolean {
   if (!target || !root) {
     return false;
   }
   const seen = new Set<Layer>();
-  let layer = layers.find((l) => l.el.contains(target));
+  let layer = layers.find((layer) => layer.element.contains(target));
   while (layer && !seen.has(layer)) {
     seen.add(layer);
     const anchor = layer.anchor;
@@ -59,7 +62,7 @@ export function inOwnedPopup(target: Node | null, root: HTMLElement | null): boo
     if (root.contains(anchor)) {
       return true;
     }
-    layer = layers.find((l) => l !== layer && l.el.contains(anchor));
+    layer = layers.find((other) => other !== layer && other.element.contains(anchor));
   }
   return false;
 }

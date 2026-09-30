@@ -113,7 +113,7 @@ export const TRANSITION_GROUPS: ReadonlyArray<{
 ];
 
 const PROP_LABEL = new Map(
-  TRANSITION_GROUPS.flatMap((g) => g.items).map((i) => [i.value, i.label]),
+  TRANSITION_GROUPS.flatMap((group) => group.items).map((i) => [i.value, i.label]),
 );
 export function transitionPropLabel(prop: string): string {
   return PROP_LABEL.get(prop.trim().toLowerCase()) ?? prop.trim();
@@ -129,8 +129,12 @@ const TIMING_KEYWORDS = new Set([
   'step-end',
 ]);
 function isTiming(token: string): boolean {
-  const v = token.trim().toLowerCase();
-  return TIMING_KEYWORDS.has(v) || v.startsWith('cubic-bezier(') || v.startsWith('steps(');
+  const normalized = token.trim().toLowerCase();
+  return (
+    TIMING_KEYWORDS.has(normalized) ||
+    normalized.startsWith('cubic-bezier(') ||
+    normalized.startsWith('steps(')
+  );
 }
 function isTime(token: string): boolean {
   return /^-?[\d.]+m?s$/i.test(token.trim());
@@ -142,15 +146,15 @@ function isTime(token: string): boolean {
  *  or `var(--x)` isn't a recognized <time> or <easing>, so the old token-role scan
  *  dropped it — here we key off position instead. */
 export function parseTransitions(value: string): Transition[] {
-  const v = value.trim();
-  if (!v || v.toLowerCase() === 'none') {
+  const trimmed = value.trim();
+  if (!trimmed || trimmed.toLowerCase() === 'none') {
     return [];
   }
-  return splitTopLevelCommas(v)
+  return splitTopLevelCommas(trimmed)
     .filter(Boolean)
     .map((part) => {
       const tokens = splitTopLevelSpaces(part)
-        .map((t) => t.trim())
+        .map((token) => token.trim())
         .filter(Boolean);
       // A leading token that's neither a time nor an easing is the property. Our own
       // output always leads with it; external CSS may omit it (defaults to `all`).
@@ -172,11 +176,11 @@ export function parseTransitions(value: string): Transition[] {
       }
       let timing = '';
       let delay = '';
-      for (const t of rest) {
-        if (isTime(t)) {
-          delay = t;
+      for (const token of rest) {
+        if (isTime(token)) {
+          delay = token;
         } else {
-          timing = t;
+          timing = token;
         }
       }
       return { property, duration, delay, timing };
@@ -189,9 +193,9 @@ export function serializeTransitions(list: Transition[]): string {
     return '';
   }
   return list
-    .map((t) =>
-      [t.property || 'all', t.duration || '0s', t.timing, t.delay]
-        .filter((p) => p && p.trim())
+    .map((token) =>
+      [token.property || 'all', token.duration || '0s', token.timing, token.delay]
+        .filter((part) => part && part.trim())
         .join(' '),
     )
     .join(', ');
@@ -202,8 +206,8 @@ export function blankTransition(): Transition {
 }
 
 /** A collapsed-row label ("Opacity: 200ms"). */
-export function transitionLabel(t: Transition): string {
-  return `${transitionPropLabel(t.property)}: ${t.duration || '0s'}`;
+export function transitionLabel(transition: Transition): string {
+  return `${transitionPropLabel(transition.property)}: ${transition.duration || '0s'}`;
 }
 
 // ─────────────────────────── Easing ───────────────────────────
@@ -219,17 +223,19 @@ export function transitionLabel(t: Transition): string {
  * alone rather than mangled.
  */
 export function isEasing(value: string): boolean {
-  const v = String(value ?? '')
+  const normalized = String(value ?? '')
     .trim()
     .toLowerCase();
-  if (/^(?:ease|linear|ease-in|ease-out|ease-in-out)$/.test(v)) {
+  if (/^(?:ease|linear|ease-in|ease-out|ease-in-out)$/.test(normalized)) {
     return true;
   }
-  return /^cubic-bezier\(\s*[\d.-]+\s*,\s*[\d.-]+\s*,\s*[\d.-]+\s*,\s*[\d.-]+\s*\)$/.test(v);
+  return /^cubic-bezier\(\s*[\d.-]+\s*,\s*[\d.-]+\s*,\s*[\d.-]+\s*,\s*[\d.-]+\s*\)$/.test(
+    normalized,
+  );
 }
 
 export function easingToBezier(timing: string): [number, number, number, number] {
-  const v = timing.trim().toLowerCase();
+  const normalized = timing.trim().toLowerCase();
   const named: Record<string, [number, number, number, number]> = {
     ease: [0.25, 0.1, 0.25, 1],
     linear: [0, 0, 1, 1],
@@ -237,24 +243,24 @@ export function easingToBezier(timing: string): [number, number, number, number]
     'ease-out': [0, 0, 0.58, 1],
     'ease-in-out': [0.42, 0, 0.58, 1],
   };
-  if (named[v]) {
-    return named[v];
+  if (named[normalized]) {
+    return named[normalized];
   }
-  const m = v.match(
+  const match = normalized.match(
     /^cubic-bezier\(\s*([\d.-]+)\s*,\s*([\d.-]+)\s*,\s*([\d.-]+)\s*,\s*([\d.-]+)\s*\)$/,
   );
-  if (m) {
+  if (match) {
     return [
-      parseFloat(m[1] ?? ''),
-      parseFloat(m[2] ?? ''),
-      parseFloat(m[3] ?? ''),
-      parseFloat(m[4] ?? ''),
+      parseFloat(match[1] ?? ''),
+      parseFloat(match[2] ?? ''),
+      parseFloat(match[3] ?? ''),
+      parseFloat(match[4] ?? ''),
     ];
   }
   return [0.25, 0.1, 0.25, 1]; // fall back to ease
 }
 
-const round = (n: number) => Math.round(n * 1000) / 1000;
+const round = (value: number) => Math.round(value * 1000) / 1000;
 /** Serialize four bezier values to a timing-function, collapsing to a keyword when exact. */
 export function bezierToEasing([x1, y1, x2, y2]: [number, number, number, number]): string {
   const key = `${round(x1)},${round(y1)},${round(x2)},${round(y2)}`;

@@ -18,8 +18,10 @@
 // just text with CSS regions in it, and a stylesheet is that with one region
 // covering the whole file.
 
-import { collectRules, renderEmbed, splitEmbed } from './css';
+import { collectRules, parseRegion, renderEmbed, splitEmbed } from './css';
+import { assert } from '../../../shared/assert';
 import postcss from 'postcss';
+import type { CanvasAnswer } from '../../canvasReply';
 import { findNode, getHost, onHostChange, propText, walkNodes, type HostNode } from './host';
 import type { StateKey } from './resolved';
 import type {
@@ -37,12 +39,16 @@ import { readAstroStyleFiles, readStyleFiles } from '../../stylePanelBridge';
 import { variableEdit } from '../../panels/variableEdits';
 import type { NativeStyleOptions } from './native-styles';
 
-type AnyEl = unknown;
+type AnyElement = unknown;
 
 // ───────────────────────────── Identity helpers ─────────────────────────────
 
 export function serializeElementId(id: unknown): string {
-  if (id == null) {
+  if (id === undefined) {
+    return '';
+  }
+  // An element id handed through the Designer-shaped API may spell "none" as null.
+  if (id === null) {
     return '';
   }
   if (typeof id === 'string') {
@@ -77,8 +83,8 @@ type Unsub = () => void;
 
 export function webflowApi() {
   return {
-    getSelectedElement: async (): Promise<AnyEl | null> => nodeById(getHost().selectedId),
-    subscribe: (event: string, cb: (value: unknown) => void): Unsub => {
+    getSelectedElement: async (): Promise<AnyElement> => nodeById(getHost().selectedId),
+    subscribe: (event: string, callback: (value: unknown) => void): Unsub => {
       if (event === 'selectedelement') {
         let last = getHost().selectedId;
         return onHostChange(() => {
@@ -87,7 +93,7 @@ export function webflowApi() {
             return;
           }
           last = now;
-          cb(nodeById(now));
+          callback(nodeById(now));
         });
       }
       if (event === 'mediaquery') {
@@ -98,7 +104,7 @@ export function webflowApi() {
             return;
           }
           last = now;
-          void getCurrentBreakpoint().then(cb);
+          void getCurrentBreakpoint().then(callback);
         });
       }
       return () => {};
@@ -106,8 +112,8 @@ export function webflowApi() {
   };
 }
 
-const nodeById = (id: string | null): HostNode | null =>
-  id ? findNode(getHost().nodes, id) : null;
+const nodeById = (id: string | undefined): HostNode | undefined =>
+  id ? findNode(getHost().nodes, id) : undefined;
 
 // A node's classes. `class="a b"` is readable straight from the source, but
 // `class:list={[…]}` / `class={expr}` are expressions with no class text at
@@ -122,7 +128,7 @@ const nodeById = (id: string | null): HostNode | null =>
 // skipped: only the rendered element knows what they became. Values that aren't
 // class-shaped (selectors, URLs, sentences) are dropped.
 const CLASS_RE = /^[A-Za-z_-][A-Za-z0-9_-]*$/;
-const literalClasses = (node: HostNode | null, name: string): string[] => {
+const literalClasses = (node: HostNode | undefined, name: string): string[] => {
   const prop = node?.props?.[name];
   if (!prop || prop.type !== 'expr') {
     return [];
@@ -142,7 +148,7 @@ const literalClasses = (node: HostNode | null, name: string): string[] => {
   return out;
 };
 
-const classTokens = (node: HostNode | null): string[] => {
+const classTokens = (node: HostNode | undefined): string[] => {
   // A class can be named in more than one place (`class` plus `class:list`, or
   // twice within one list) — the element still carries it once.
   const authored = [
@@ -179,15 +185,16 @@ function isHostNode(value: unknown): value is HostNode {
   return false;
 }
 
-export async function buildSnapshot(el: AnyEl): Promise<ElementSnapshot> {
-  const node = typeof el === 'string' ? nodeById(el) : isHostNode(el) ? el : null;
+export async function buildSnapshot(element: AnyElement): Promise<ElementSnapshot> {
+  const node =
+    typeof element === 'string' ? nodeById(element) : isHostNode(element) ? element : undefined;
   const classes = classTokens(node);
   const attributes: Record<string, string> = {};
-  for (const [k, v] of Object.entries(node?.props || {})) {
-    if (v && v.type === 'string') {
-      attributes[k] = String(v.value ?? '');
-    } else if (v && v.type === 'bare') {
-      attributes[k] = '';
+  for (const [key, value] of Object.entries(node?.props || {})) {
+    if (value && value.type === 'string') {
+      attributes[key] = String(value.value ?? '');
+    } else if (value && value.type === 'bare') {
+      attributes[key] = '';
     }
   }
   const id = propText(node, 'id');
@@ -200,16 +207,16 @@ export async function buildSnapshot(el: AnyEl): Promise<ElementSnapshot> {
   return {
     // A component instance renders markup we can't see from here, so it has
     // no tag of its own — selectors match it by class only.
-    tag: node?.kind === 'element' ? String(node.name || '').toLowerCase() : null,
+    tag: node?.kind === 'element' ? String(node.name || '').toLowerCase() : undefined,
     webflowType: node?.kind === 'component' ? 'Component' : node?.kind || 'Element',
-    id: id || null,
+    id: id || undefined,
     classes,
     classList: classes,
     attributes,
   };
 }
 
-export async function resolveIdentityElement(selected: AnyEl): Promise<AnyEl> {
+export async function resolveIdentityElement(selected: AnyElement): Promise<AnyElement> {
   return selected;
 }
 
@@ -220,10 +227,10 @@ export type EmbedSource = {
   label: string;
   classNames: string[];
   fromComponent: boolean;
-  componentName: string | null;
+  componentName: string | undefined;
   order: number;
-  element: AnyEl;
-  instance?: AnyEl;
+  element: AnyElement;
+  instance?: AnyElement;
   /** Where the CSS lives — the panel writes back through this. `astro` is a
    *  component file whose `<style is:global>` blocks are edited in place. */
   origin:
@@ -232,12 +239,50 @@ export type EmbedSource = {
     | { kind: 'astro'; path: string };
 };
 
-export type EmbedDoc = {
-  source: EmbedSource;
-  code: string;
-  segments: string[];
-  regions: StyleRegion[];
-};
+/** One source's CSS, parsed into live regions. Its code advances only through its own
+ *  methods: a write records what the source now holds, and a reload replaces the
+ *  regions with a fresh read. The regions' postcss roots are edited in place. */
+export class EmbedDocument {
+  readonly source: EmbedSource;
+  #code: string;
+  #segments: string[];
+  #regions: StyleRegion[];
+
+  constructor(source: EmbedSource, code: string, segments: string[], regions: StyleRegion[]) {
+    // Segments interleave the regions: one before each, and one after the last.
+    assert(segments.length === regions.length + 1, 'EmbedDocument: segments around regions');
+    this.source = source;
+    this.#code = code;
+    this.#segments = segments;
+    this.#regions = regions;
+  }
+
+  /** What the source held when last read or written. */
+  get code(): string {
+    return this.#code;
+  }
+
+  get segments(): string[] {
+    return this.#segments;
+  }
+
+  get regions(): StyleRegion[] {
+    return this.#regions;
+  }
+
+  /** The source now holds `code`, serialized from these regions. */
+  recordWritten(code: string): void {
+    this.#code = code;
+  }
+
+  /** Take on a fresh read of the same source. */
+  replaceWith(fresh: EmbedDocument): void {
+    assert(fresh.source.key === this.source.key, 'EmbedDocument: reload of the same source');
+    this.#segments = fresh.segments;
+    this.#regions = fresh.regions;
+    this.#code = fresh.code;
+  }
+}
 
 export type EmbedScan = {
   parentByKey: Map<string, string>;
@@ -252,17 +297,17 @@ export type PageScan = {
   childrenByKey: Map<string, string[]>;
   elementByKey: Map<string, HostNode>;
   pageEmbeds: EmbedSource[];
-  instances: AnyEl[];
+  instances: AnyElement[];
   inComponentContext: boolean;
 };
 
 export function dedupeByKey(sources: EmbedSource[]): EmbedSource[] {
   const seen = new Set<string>();
-  return sources.filter((s) => {
-    if (seen.has(s.key)) {
+  return sources.filter((source) => {
+    if (seen.has(source.key)) {
       return false;
     }
-    seen.add(s.key);
+    seen.add(source.key);
     return true;
   });
 }
@@ -282,22 +327,22 @@ function styleSources(): EmbedSource[] {
   let order = 0;
   const openComponentName =
     host.openFileKind === 'component'
-      ? (host.openFilePath
+      ? host.openFilePath
           ?.split(/[\\/]/)
           .pop()
-          ?.replace(/\.[^.]+$/, '') ?? null)
-      : null;
+          ?.replace(/\.[^.]+$/, '')
+      : undefined;
 
-  for (const f of host.files) {
+  for (const file of host.files) {
     out.push({
-      key: `file:${f.path}`,
-      label: f.rel,
+      key: `file:${file.path}`,
+      label: file.rel,
       classNames: [],
       fromComponent: false,
-      componentName: null,
+      componentName: undefined,
       order: order++,
-      element: f.path,
-      origin: { kind: 'file', path: f.path },
+      element: file.path,
+      origin: { kind: 'file', path: file.path },
     });
   }
 
@@ -307,36 +352,36 @@ function styleSources(): EmbedSource[] {
   // empty panel even though the element is clearly styled on the canvas. The
   // open file is skipped: its own <style> blocks come from the model below,
   // and reading it twice would let the two copies write over each other.
-  for (const f of host.astroFiles) {
-    if (host.openFilePath && f.path === host.openFilePath) {
+  for (const file of host.astroFiles) {
+    if (host.openFilePath && file.path === host.openFilePath) {
       continue;
     }
     out.push({
-      key: `astro:${f.path}`,
-      label: f.name,
+      key: `astro:${file.path}`,
+      label: file.name,
       classNames: [],
       fromComponent: true,
-      componentName: f.name.replace(/\.astro$/i, ''),
+      componentName: file.name.replace(/\.astro$/i, ''),
       order: order++,
-      element: f.path,
-      origin: { kind: 'astro', path: f.path },
+      element: file.path,
+      origin: { kind: 'astro', path: file.path },
     });
   }
 
-  walkNodes(host.nodes, (n) => {
-    if (n.kind !== 'raw' || n.name !== 'style') {
+  walkNodes(host.nodes, (node) => {
+    if (node.kind !== 'raw' || node.name !== 'style') {
       return;
     }
-    const isGlobal = !!n.props?.['is:global'];
+    const isGlobal = !!node.props?.['is:global'];
     out.push({
-      key: `node:${n.id}`,
+      key: `node:${node.id}`,
       label: isGlobal ? '<style is:global>' : '<style>',
       classNames: [],
       fromComponent: host.openFileKind === 'component',
       componentName: openComponentName,
       order: order++,
-      element: n.id,
-      origin: { kind: 'node', nodeId: n.id },
+      element: node.id,
+      origin: { kind: 'node', nodeId: node.id },
     });
   });
 
@@ -368,7 +413,7 @@ export async function scanAllComponents(
   return embeds;
 }
 
-export function scanHasElement(scan: EmbedScan, selected: AnyEl): boolean {
+export function scanHasElement(scan: EmbedScan, selected: AnyElement): boolean {
   return scan.elementByKey.has(serializeElementId(selected));
 }
 
@@ -393,12 +438,12 @@ function buildTreeMaps() {
   const parentByKey = new Map<string, string>();
   const childrenByKey = new Map<string, string[]>();
   const elementByKey = new Map<string, HostNode>();
-  walkNodes(getHost().nodes, (n, parent) => {
-    elementByKey.set(n.id, n);
+  walkNodes(getHost().nodes, (node, parent) => {
+    elementByKey.set(node.id, node);
     if (parent) {
-      parentByKey.set(n.id, parent.id);
+      parentByKey.set(node.id, parent.id);
       const kids = childrenByKey.get(parent.id) || [];
-      kids.push(n.id);
+      kids.push(node.id);
       childrenByKey.set(parent.id, kids);
     }
   });
@@ -415,36 +460,22 @@ function buildTreeMaps() {
  *  only its own component? A block with no opening tag recorded (a stylesheet)
  *  is global by definition. */
 function isGlobalRegion(region: StyleRegion): boolean {
-  return region.openTag == null || /\bis:global\b/.test(region.openTag);
+  return region.openTag === undefined || /\bis:global\b/.test(region.openTag);
 }
 
-function docForSource(source: EmbedSource, code: string): EmbedDoc {
+function documentForSource(source: EmbedSource, code: string): EmbedDocument {
   // A component file is markup with <style> blocks in it — the shape the embed
   // model was built for. Only its global blocks are parsed; a scoped block is
   // left as untouched text, so renderEmbed writes it back verbatim and
-  // rebuildRules (which skips region.root === null) never offers its rules for
+  // rebuildRules (which skips a region without a root) never offers its rules for
   // an element in another component.
   if (source.origin.kind === 'astro') {
     const { segments, regions } = splitEmbed(code);
-    for (const region of regions) {
-      if (!isGlobalRegion(region)) {
-        continue;
-      }
-      try {
-        region.root = postcss.parse(region.css);
-      } catch (error: unknown) {
-        region.parseError = error instanceof Error ? error.message : String(error);
-      }
-    }
-    return { source, code, segments, regions };
+    const parsed = regions.map((region) => (isGlobalRegion(region) ? parseRegion(region) : region));
+    return new EmbedDocument(source, code, segments, parsed);
   }
-  const region: StyleRegion = { start: 0, end: code.length, css: code, root: null };
-  try {
-    region.root = postcss.parse(code);
-  } catch (error: unknown) {
-    region.parseError = error instanceof Error ? error.message : String(error);
-  }
-  return { source, code, segments: ['', ''], regions: [region] };
+  const region = parseRegion({ start: 0, end: code.length, css: code, root: undefined });
+  return new EmbedDocument(source, code, ['', ''], [region]);
 }
 
 async function readSource(source: EmbedSource): Promise<string> {
@@ -459,11 +490,11 @@ async function readSource(source: EmbedSource): Promise<string> {
 /** The text this doc's source file should now hold. A stylesheet or a <style>
  *  node is all CSS; a component file is its markup with only the edited
  *  regions re-stringified. */
-function serializeDoc(doc: EmbedDoc): string {
-  if (doc.source.origin.kind === 'astro') {
-    return renderEmbed(doc.segments, doc.regions);
+function serializeDocument(embedDocument: EmbedDocument): string {
+  if (embedDocument.source.origin.kind === 'astro') {
+    return renderEmbed(embedDocument.segments, embedDocument.regions);
   }
-  return doc.regions[0]?.root?.toString() ?? doc.regions[0]?.css ?? '';
+  return embedDocument.regions[0]?.root?.toString() ?? embedDocument.regions[0]?.css ?? '';
 }
 
 /**
@@ -476,17 +507,17 @@ function serializeDoc(doc: EmbedDoc): string {
  */
 export async function loadEmbedDocs(
   sources: EmbedSource[],
-  onDoc?: (doc: EmbedDoc) => void,
-): Promise<{ docs: EmbedDoc[]; errors: Array<{ label: string; message: string }> }> {
+  onDocument?: (doc: EmbedDocument) => void,
+): Promise<{ docs: EmbedDocument[]; errors: Array<{ label: string; message: string }> }> {
   const loaded = await Promise.all(
     sources.map(async (source) => {
       try {
-        const doc = docForSource(source, await readSource(source));
-        onDoc?.(doc);
-        return { doc, error: null };
+        const embedDocument = documentForSource(source, await readSource(source));
+        onDocument?.(embedDocument);
+        return { doc: embedDocument, error: undefined };
       } catch (error: unknown) {
         return {
-          doc: null,
+          doc: undefined,
           error: {
             label: source.label,
             message: error instanceof Error ? error.message : String(error),
@@ -495,7 +526,7 @@ export async function loadEmbedDocs(
       }
     }),
   );
-  const docs: EmbedDoc[] = [];
+  const docs: EmbedDocument[] = [];
   const errors: Array<{ label: string; message: string }> = [];
   for (const entry of loaded) {
     if (entry.doc) {
@@ -508,30 +539,33 @@ export async function loadEmbedDocs(
   return { docs, errors };
 }
 
-export async function writeEmbedDoc(
-  doc: EmbedDoc,
+export async function writeEmbedDocument(
+  embedDocument: EmbedDocument,
   /** A live (scrubbing / mid-typing) write — for a <style> node it coalesces with the
    *  ones around it instead of saving the page per tick. A committed edit saves at once,
    *  so the canvas doesn't wait out a typing debounce for a single click. */
   live = false,
 ): Promise<{ ok: true; code: string } | { ok: false; error: string }> {
-  const code = serializeDoc(doc);
+  const code = serializeDocument(embedDocument);
   // What the file held before this write — the undo target, captured before
   // doc.code is advanced below.
-  const before = doc.code;
+  const before = embedDocument.code;
   try {
-    if (doc.source.origin.kind === 'file' || doc.source.origin.kind === 'astro') {
-      const { path } = doc.source.origin;
+    if (
+      embedDocument.source.origin.kind === 'file' ||
+      embedDocument.source.origin.kind === 'astro'
+    ) {
+      const { path } = embedDocument.source.origin;
       await window.avb.writeStyleFile({ filePath: path, css: code });
       // A <style> node's write goes through the page model, which the app
       // already snapshots — only stylesheets need their own history entry.
       if (before !== code) {
         getHost().recordUndo?.({
-          label: `styles in ${doc.source.label}`,
+          label: `styles in ${embedDocument.source.label}`,
           // One step per file per burst: a slider drag writes on every tick.
           coalesceKey: `css:${path}`,
-          undo: () => writeStyleFileAndReload(doc, path, before),
-          redo: () => writeStyleFileAndReload(doc, path, code),
+          undo: () => writeStyleFileAndReload(embedDocument, path, before),
+          redo: () => writeStyleFileAndReload(embedDocument, path, code),
         });
       }
     } else {
@@ -543,16 +577,16 @@ export async function writeEmbedDoc(
       // is no such node in the model being edited. The write used to find
       // nothing and quietly do nothing, leaving the panel to report a save the
       // canvas would never show.
-      if (write(doc.source.origin.nodeId, code, !live) === false) {
+      if (write(embedDocument.source.origin.nodeId, code, !live) === false) {
         return { ok: false, error: "Couldn't find that <style> block in the open file." };
       }
     }
-    doc.code = code;
+    embedDocument.recordWritten(code);
     return { ok: true, code };
-  } catch (err) {
+  } catch (error: unknown) {
     // An empty message says nothing, so it falls back to the thrown value itself.
-    const message = err instanceof Error ? err.message : '';
-    return { ok: false, error: message || String(err) };
+    const message = error instanceof Error ? error.message : '';
+    return { ok: false, error: message || String(error) };
   }
 }
 
@@ -560,47 +594,48 @@ export async function writeEmbedDoc(
 // write from next has to be brought back in step — otherwise the next edit
 // would serialize the stale AST and quietly resurrect what was just undone.
 const docsReloaded = new Set<() => void>();
-export function onDocsReloaded(fn: () => void): () => void {
-  docsReloaded.add(fn);
+export function onDocsReloaded(listener: () => void): () => void {
+  docsReloaded.add(listener);
   return () => {
-    docsReloaded.delete(fn);
+    docsReloaded.delete(listener);
   };
 }
 
-async function writeStyleFileAndReload(doc: EmbedDoc, path: string, text: string): Promise<void> {
+async function writeStyleFileAndReload(
+  embedDocument: EmbedDocument,
+  path: string,
+  text: string,
+): Promise<void> {
   await window.avb.writeStyleFile({ filePath: path, css: text });
   // Re-derive the doc from what the file now holds, the same way it was first
   // read — for a component file that means re-splitting its markup, not
   // treating the whole file as one region of CSS.
-  const fresh = docForSource(doc.source, text);
-  doc.segments = fresh.segments;
-  doc.regions = fresh.regions;
-  doc.code = text;
-  for (const fn of docsReloaded) {
-    fn();
+  embedDocument.replaceWith(documentForSource(embedDocument.source, text));
+  for (const listener of docsReloaded) {
+    listener();
   }
 }
 
-export function rebuildRules(docs: EmbedDoc[]): ParsedRule[] {
+export function rebuildRules(docs: EmbedDocument[]): ParsedRule[] {
   const rules: ParsedRule[] = [];
   // One running counter across every source, so document order — and with it
   // the cascade — is comparable between a stylesheet and a <style> block.
   const order = { n: 0 };
-  const ordered = [...docs].sort((a, b) => a.source.order - b.source.order);
+  const ordered = [...docs].sort((left, right) => left.source.order - right.source.order);
 
-  for (const doc of ordered) {
-    doc.regions.forEach((region, regionIndex) => {
+  for (const embedDocument of ordered) {
+    embedDocument.regions.forEach((region, regionIndex) => {
       if (!region.root) {
         return;
       }
       rules.push(
         ...collectRules(region, {
-          embedKey: doc.source.key,
-          embedLabel: doc.source.label,
-          fromComponent: doc.source.fromComponent,
-          componentName: doc.source.componentName,
+          embedKey: embedDocument.source.key,
+          embedLabel: embedDocument.source.label,
+          fromComponent: embedDocument.source.fromComponent,
+          componentName: embedDocument.source.componentName,
           regionIndex,
-          idSeed: doc.source.key,
+          idSeed: embedDocument.source.key,
           order,
         }),
       );
@@ -681,12 +716,12 @@ const PSEUDO_ELEMENT_RE = new RegExp(
   'g',
 );
 
-function askableForm(text: string): string | null {
+function askableForm(text: string): string | undefined {
   const bare = text.replace(PSEUDO_ELEMENT_RE, '').replace(STATE_PSEUDO_RE, '').trim();
   // What's left has to still be a selector: `:hover {}` on its own strips to
   // nothing, and `.a > :hover` to a dangling combinator.
   if (!bare || /[>+~]\s*$/.test(bare) || bare.startsWith('>')) {
-    return null;
+    return undefined;
   }
   return bare;
 }
@@ -698,16 +733,16 @@ function askableSelectors(rules: ParsedRule[]): Map<string, string[]> {
   // it — `.a:hover` and `.a` ask the same question of the DOM.
   const askedFor = new Map<string, string[]>();
   for (const rule of rules) {
-    for (const sel of rule.selectors) {
-      const ask = askableForm(sel.text);
+    for (const selector of rule.selectors) {
+      const ask = askableForm(selector.text);
       if (!ask) {
         continue;
       }
       const list = askedFor.get(ask);
       if (list) {
-        list.push(sel.text);
+        list.push(selector.text);
       } else {
-        askedFor.set(ask, [sel.text]);
+        askedFor.set(ask, [selector.text]);
       }
     }
   }
@@ -718,14 +753,47 @@ function askableSelectors(rules: ParsedRule[]): Map<string, string[]> {
  *  asked-for selectors target it. */
 export type CanvasIdentity = {
   tag: string;
-  id?: string | null;
+  id?: string | undefined;
   classes: string[];
   attributes: Record<string, string>;
 };
-export type CanvasAsk = {
-  answer: { identity: CanvasIdentity | null; matched: Record<string, boolean | null> } | null;
-  askedFor: Map<string, string[]>;
-};
+/** One round trip's worth of answers. `unasked` means there was nothing to ask (no
+ *  path for the node, or no canvas), which callers pass straight through so they
+ *  don't ask again; an `asked` answer is undefined when the canvas didn't reply. */
+export type CanvasAsk =
+  | { readonly kind: 'unasked' }
+  | {
+      readonly kind: 'asked';
+      readonly answer:
+        | {
+            readonly identity: CanvasIdentity | undefined;
+            readonly matched: Readonly<Record<string, boolean>>;
+          }
+        | undefined;
+      readonly askedFor: Map<string, string[]>;
+    };
+
+// The panel's identity of the element the canvas described. An element without
+// an id carries no `id` key, as the page's own element does.
+function canvasIdentityOf(identity: CanvasAnswer['identity']): CanvasIdentity | undefined {
+  if (identity === undefined) {
+    return undefined;
+  }
+  const { id, ...rest } = identity;
+  return id === undefined ? rest : { ...rest, id };
+}
+
+// Only a yes or a no is an answer; a selector the engine refused (absent) falls
+// back to the source matcher.
+function matchedAnswers(matched: CanvasAnswer['matched']): Record<string, boolean> {
+  const out: Record<string, boolean> = {};
+  for (const [selector, hit] of Object.entries(matched)) {
+    if (typeof hit === 'boolean') {
+      out[selector] = hit;
+    }
+  }
+  return out;
+}
 
 /**
  * Ask the page everything the panel needs about the selected element, in ONE
@@ -734,24 +802,25 @@ export type CanvasAsk = {
  * its own 1.5s timeout, and the second couldn't start until the first came
  * back. The chips stayed blank for the sum of the two.
  *
- * Returns null when there's nothing to ask (no path for the node, or no
+ * Returns `unasked` when there's nothing to ask (no path for the node, or no
  * canvas), which callers pass straight through so they don't ask again.
  */
-export async function askCanvasAbout(
-  rootKey: string,
-  rules: ParsedRule[],
-): Promise<CanvasAsk | null> {
+export async function askCanvasAbout(rootKey: string, rules: ParsedRule[]): Promise<CanvasAsk> {
   const path = getHost().pathOf?.(rootKey);
   if (!path || !hasCanvas()) {
-    return null;
+    return { kind: 'unasked' };
   }
   const askedFor = askableSelectors(rules);
   const answer = await queryCanvas(path, [...askedFor.keys()]);
   return {
+    kind: 'asked',
     answer:
-      answer === null
-        ? null
-        : { identity: answer.identity ?? null, matched: { ...answer.matched } },
+      answer === undefined
+        ? undefined
+        : {
+            identity: canvasIdentityOf(answer.identity),
+            matched: matchedAnswers(answer.matched),
+          },
     askedFor,
   };
 }
@@ -765,28 +834,35 @@ export async function askCanvasAbout(
  * Selectors the engine can't be asked about (or a canvas that doesn't answer)
  * are simply left out of the map, so they fall back to the source matcher.
  *
- * Pass `asked` (including null) to reuse an answer already in hand; omit it and
- * this asks on its own.
+ * Pass `asked` (including `unasked`) to reuse an answer already in hand; omit it
+ * and this asks on its own.
  */
 export async function primeDomMatches(
+  /** The match target to fill in place: the matcher reads it after this resolves. */
   target: MatchTarget,
   rules: ParsedRule[],
-  asked?: CanvasAsk | null,
+  asked?: CanvasAsk,
 ): Promise<void> {
-  const ask = asked !== undefined ? asked : await askCanvasAbout(target.rootKey, rules);
-  if (!ask?.answer) {
+  const ask = asked ?? (await askCanvasAbout(target.rootKey, rules));
+  if (ask.kind === 'unasked') {
+    return;
+  }
+  if (!ask.answer) {
     return;
   }
   const matched = new Map<string, boolean>();
   for (const [text, hit] of matchedTexts(ask)) {
     matched.set(text, hit);
   }
+  // The target's identity is the cache key (EmbedEditor's primedRef compares it),
+  // so its match cache is filled in place rather than copied.
+  // eslint-disable-next-line no-param-reassign -- fills the matcher's cache slot by design
   target.domMatched = matched;
 }
 
-function* matchedTexts(ask: CanvasAsk): Generator<[string, boolean]> {
-  for (const [sel, texts] of ask.askedFor) {
-    const hit = ask.answer?.matched[sel];
+function* matchedTexts(ask: Extract<CanvasAsk, { kind: 'asked' }>): Generator<[string, boolean]> {
+  for (const [selector, texts] of ask.askedFor) {
+    const hit = ask.answer?.matched[selector];
     if (typeof hit !== 'boolean') {
       continue;
     } // the engine refused it — fall back
@@ -799,36 +875,36 @@ function* matchedTexts(ask: CanvasAsk): Generator<[string, boolean]> {
 // ───────────────────────────── Match target ─────────────────────────────
 
 export async function resolveTarget(
-  selected: AnyEl,
+  selected: AnyElement,
   scan: EmbedScan,
-  /** An answer already in hand (see askCanvasAbout) — including null, which
+  /** An answer already in hand (see askCanvasAbout) — including `unasked`, which
    *  means "there was nothing to ask". Omit it and this asks the page itself. */
-  asked?: CanvasAsk | null,
+  asked?: CanvasAsk,
 ): Promise<{ target: MatchTarget; rootSnapshot: ElementSnapshot }> {
   const rootKey = serializeElementId(selected);
-  const snapshots = new Map<string, ElementSnapshot | null>();
+  const snapshots = new Map<string, ElementSnapshot | undefined>();
   const view: TreeView = {
     // The whole page model is in hand, so ancestors are never unknown.
     truncated: false,
-    parentKey: (key) => scan.parentByKey.get(key) ?? null,
+    parentKey: (key) => scan.parentByKey.get(key),
     childKeys: (key) => scan.childrenByKey.get(key) ?? [],
     elementChildKeys: (key) => {
       const kids = scan.childrenByKey.get(key) ?? [];
-      const nodes = kids.map((k) => scan.elementByKey.get(k));
+      const nodes = kids.map((childKey) => scan.elementByKey.get(childKey));
       // A loop or a bare expression renders any number of elements (including
       // none), so positions around one can't be pinned down — say "unknown"
       // rather than count it as a single sibling.
-      if (nodes.some((n) => n && OPAQUE_COUNT_KINDS.has(n.kind))) {
-        return null;
+      if (nodes.some((node) => node && OPAQUE_COUNT_KINDS.has(node.kind))) {
+        return undefined;
       }
       return kids.filter((_, i) => ELEMENT_KINDS.has(nodes[i]?.kind ?? ''));
     },
     snapshot: async (key) => {
       if (snapshots.has(key)) {
-        return snapshots.get(key) ?? null;
+        return snapshots.get(key);
       }
-      const el = scan.elementByKey.get(key);
-      const snap = el ? await buildSnapshot(el) : null;
+      const element = scan.elementByKey.get(key);
+      const snap = element ? await buildSnapshot(element) : undefined;
       snapshots.set(key, snap);
       return snap;
     },
@@ -840,11 +916,11 @@ export async function resolveTarget(
   // `<section class="section">` it produces — so the header, the chips, and
   // every selector composed from them were describing the call site rather
   // than the element on the page. The canvas knows the difference.
-  let identity: CanvasIdentity | null | undefined = asked?.answer?.identity;
+  let identity = asked?.kind === 'asked' ? asked.answer?.identity : undefined;
   if (asked === undefined) {
     const path = getHost().pathOf?.(rootKey);
     if (path && hasCanvas()) {
-      identity = (await queryCanvas(path, []))?.identity;
+      identity = canvasIdentityOf((await queryCanvas(path, []))?.identity);
     }
   }
   if (identity) {
@@ -904,10 +980,10 @@ export function nativeStylingAvailable(): boolean {
 
 const EMPTY_NATIVE: NativeModel = { styles: [], read: false };
 
-export type NativeWriteTarget = { namePath: string[]; index: number | null };
+export type NativeWriteTarget = { namePath: string[]; index: number | undefined };
 
 export async function readNativeStyles(
-  _el: AnyEl,
+  _element: AnyElement,
   _states: readonly StateKey[],
   onPhase?: (model: NativeModel) => void,
 ): Promise<NativeModel> {
@@ -933,7 +1009,7 @@ const NO_NATIVE: {
 };
 
 export async function applyNativePropertyAt(
-  _element: AnyEl,
+  _element: AnyElement,
   _target: NativeWriteTarget,
   _prop: string,
   _value: string,
@@ -943,7 +1019,7 @@ export async function applyNativePropertyAt(
 }
 
 export async function removeNativePropertyAt(
-  _element: AnyEl,
+  _element: AnyElement,
   _target: NativeWriteTarget,
   _props: readonly string[],
   _options?: NativeStyleOptions,
@@ -952,7 +1028,7 @@ export async function removeNativePropertyAt(
 }
 
 export async function applyNativeToNewBaseClass(
-  _element: AnyEl,
+  _element: AnyElement,
   _className: string,
   _prop: string,
   _value: string,
@@ -999,8 +1075,8 @@ const supports = (prop: string, value: string): boolean => {
 const CSS_WIDE_RE = /^(inherit|initial|unset|revert|revert-layer)$/i;
 
 const varKind = (name: string, value: string): string => {
-  const v = value.trim();
-  if (CSS_WIDE_RE.test(v)) {
+  const trimmed = value.trim();
+  if (CSS_WIDE_RE.test(trimmed)) {
     return 'String';
   }
   // A value that still carries a var() reference (an alias into CSS we never read, or a
@@ -1009,23 +1085,26 @@ const varKind = (name: string, value: string): string => {
   // came back as a Color — and then the font field's picker, which shows only
   // FontFamily, had nothing to show. Ask CSS.supports only about resolved values and
   // leave the rest to the literal-syntax regexes, which need real syntax to match.
-  const unresolved = /var\(/i.test(v);
-  if ((!unresolved && supports('color', v)) || /^#|^rgba?\(|^hsla?\(|^color(-mix)?\(/i.test(v)) {
+  const unresolved = /var\(/i.test(trimmed);
+  if (
+    (!unresolved && supports('color', trimmed)) ||
+    /^#|^rgba?\(|^hsla?\(|^color(-mix)?\(/i.test(trimmed)
+  ) {
     return 'Color';
   }
   // Fluid sizing — `clamp(var(--space-5-min) / 16 * 1rem, …)` — keeps var() references
   // inside it that we can't resolve, but math functions only ever produce a length or a
   // number, so the wrapper alone is enough to call it a Size.
-  if (/^(calc|clamp|min|max)\(/i.test(v)) {
+  if (/^(calc|clamp|min|max)\(/i.test(trimmed)) {
     return 'Size';
   }
   if (
-    (!unresolved && supports('width', v)) ||
-    /^-?[\d.]+(px|rem|em|%|vw|vh|vmin|vmax|ch|ex|pt|cm|mm|in)$/i.test(v)
+    (!unresolved && supports('width', trimmed)) ||
+    /^-?[\d.]+(px|rem|em|%|vw|vh|vmin|vmax|ch|ex|pt|cm|mm|in)$/i.test(trimmed)
   ) {
     return 'Size';
   }
-  if (/^-?[\d.]+$/.test(v)) {
+  if (/^-?[\d.]+$/.test(trimmed)) {
     return 'Number';
   }
   // Nothing in the value to go on — a font stack has no distinguishing syntax, so the
@@ -1041,18 +1120,23 @@ const varKind = (name: string, value: string): string => {
 // of the chain, so varKind has real syntax to read. Falls back to the var()'s own
 // fallback, then gives up and returns what it was handed.
 const ALIAS_RE = /^var\(\s*(--[A-Za-z0-9_-]+)\s*(?:,([\s\S]*))?\)$/;
+// Hops followed before giving up: a chain this long is a cycle, not a design.
+const ALIAS_LIMITS = { depthMax: 8 } as const;
 function resolveAlias(value: string, values: Map<string, string>, depth = 0): string {
-  const v = value.trim();
-  const m = depth > 8 ? null : ALIAS_RE.exec(v);
-  if (!m) {
-    return v;
+  const trimmed = value.trim();
+  if (depth > ALIAS_LIMITS.depthMax) {
+    return trimmed;
   }
-  const target = values.get((m[1] ?? '').slice(2));
-  if (target != null) {
+  const match = ALIAS_RE.exec(trimmed);
+  if (!match) {
+    return trimmed;
+  }
+  const target = values.get((match[1] ?? '').slice(2));
+  if (target !== undefined) {
     return resolveAlias(target, values, depth + 1);
   }
-  const fallback = m[2]?.trim();
-  return fallback ? resolveAlias(fallback, values, depth + 1) : v;
+  const fallback = match[2]?.trim();
+  return fallback ? resolveAlias(fallback, values, depth + 1) : trimmed;
 }
 
 // Custom properties declared anywhere in the project's CSS. The rule they sit
@@ -1078,12 +1162,12 @@ async function readAllProjectCss(): Promise<Array<{ label: string; css: string }
   // panel is doing its own cold scan, so the two were queueing behind each other.
   // Promise.all keeps the order, so the cascade still reads as it does on disk.
   const read = await Promise.all(
-    files.map(async (f) => {
+    files.map(async (file) => {
       try {
-        const result = await variableEdit('readStyleFile', f.path);
-        return { label: f.rel, css: result.ok ? (result.css ?? '') : '' };
+        const result = await variableEdit('readStyleFile', file.path);
+        return { label: file.rel, css: result.ok ? (result.css ?? '') : '' };
       } catch {
-        return null; // unreadable — skip it rather than fail the whole scan
+        return undefined; // unreadable — skip it rather than fail the whole scan
       }
     }),
   );
@@ -1104,12 +1188,12 @@ async function readAllProjectCss(): Promise<Array<{ label: string; css: string }
     }
   }
   const readAstro = await Promise.all(
-    astro.map(async (f) => {
+    astro.map(async (file) => {
       try {
-        const result = await variableEdit('readStyleFile', f.path);
-        return { name: f.name, css: result.ok ? (result.css ?? '') : '' };
+        const result = await variableEdit('readStyleFile', file.path);
+        return { name: file.name, css: result.ok ? (result.css ?? '') : '' };
       } catch {
-        return null; // unreadable — skip it rather than fail the whole scan
+        return undefined; // unreadable — skip it rather than fail the whole scan
       }
     }),
   );
@@ -1123,9 +1207,9 @@ async function readAllProjectCss(): Promise<Array<{ label: string; css: string }
       }
     }
   }
-  walkNodes(host.nodes, (n) => {
-    if (n.kind === 'raw' && n.name === 'style') {
-      out.push({ label: '<style>', css: String(n.inner ?? '') });
+  walkNodes(host.nodes, (node) => {
+    if (node.kind === 'raw' && node.name === 'style') {
+      out.push({ label: '<style>', css: String(node.inner ?? '') });
     }
   });
   return out;
@@ -1178,7 +1262,7 @@ export async function streamProjectVariables(
     }
     parsed.push({ label, root });
     root.walkDecls((decl) => {
-      const key = decl.prop.startsWith('--') ? decl.prop.slice(2) : null;
+      const key = decl.prop.startsWith('--') ? decl.prop.slice(2) : undefined;
       if (key && !values.has(key)) {
         values.set(key, decl.value.trim());
       }
@@ -1197,7 +1281,7 @@ export async function streamProjectVariables(
         return;
       }
       seen.add(name);
-      const v: ProjectVariable = {
+      const variable: ProjectVariable = {
         collection: label,
         group: ruleSelectorOf(decl.parent) || ':root',
         name,
@@ -1205,8 +1289,8 @@ export async function streamProjectVariables(
         binding: `var(${decl.prop})`,
         type: varKind(name, resolveAlias(decl.value, values)),
       };
-      all.push(v);
-      onAdd(v);
+      all.push(variable);
+      onAdd(variable);
     });
   }
   return all;
@@ -1239,7 +1323,7 @@ export async function getProjectFontFamilies(): Promise<string[]> {
       });
     });
   }
-  return [...families].sort((a, b) => a.localeCompare(b));
+  return [...families].sort((left, right) => left.localeCompare(right));
 }
 
 export type ImageAsset = { id: string; name: string; url: string };
@@ -1268,26 +1352,26 @@ function isFlexNumber(token: string): boolean {
   return /^-?(\d+\.?\d*|\.\d+)$/.test(token);
 }
 
-export function parseFlexShorthand(value: string): Record<string, string> | null {
-  const v = value.trim().toLowerCase();
-  if (v === 'none') {
+export function parseFlexShorthand(value: string): Record<string, string> | undefined {
+  const normalized = value.trim().toLowerCase();
+  if (normalized === 'none') {
     return { 'flex-grow': '0', 'flex-shrink': '0', 'flex-basis': 'auto' };
   }
-  if (v === 'auto') {
+  if (normalized === 'auto') {
     return { 'flex-grow': '1', 'flex-shrink': '1', 'flex-basis': 'auto' };
   }
-  if (v === 'initial') {
+  if (normalized === 'initial') {
     return { 'flex-grow': '0', 'flex-shrink': '1', 'flex-basis': 'auto' };
   }
-  if (v === '' || /^(inherit|unset|revert|revert-layer)$/.test(v)) {
-    return null;
+  if (normalized === '' || /^(inherit|unset|revert|revert-layer)$/.test(normalized)) {
+    return undefined;
   }
-  if (/[a-z-]+\(/i.test(v)) {
-    return null;
+  if (/[a-z-]+\(/i.test(normalized)) {
+    return undefined;
   }
-  const tokens = v.split(/\s+/);
+  const tokens = normalized.split(/\s+/);
   if (tokens.length > 3) {
-    return null;
+    return undefined;
   }
   let grow: string, shrink: string, basis: string;
   if (tokens.length === 1) {
@@ -1317,7 +1401,7 @@ export function parseFlexShorthand(value: string): Record<string, string> | null
     basis = tokens[2] ?? '';
   }
   if (!isFlexNumber(grow) || !isFlexNumber(shrink)) {
-    return null;
+    return undefined;
   }
   return { 'flex-grow': grow, 'flex-shrink': shrink, 'flex-basis': basis };
 }

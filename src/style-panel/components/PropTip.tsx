@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { HoverTooltip } from './SegmentedControl';
 
@@ -23,7 +23,7 @@ export function PropTip({ props, note }: { props: readonly string[]; note?: Reac
   return (
     <>
       <span className="u-prop-tip">{props.join(', ')}</span>
-      {note ? <div className="u-prop-tip-note">{note}</div> : null}
+      {note ? <div className="u-prop-tip-note">{note}</div> : undefined}
     </>
   );
 }
@@ -34,27 +34,28 @@ export function PropTip({ props, note }: { props: readonly string[]; note?: Reac
  * matter where). `hide` dismisses it early — e.g. when a click opens a menu.
  */
 export function useHoverTip<T extends HTMLElement>(content: ReactNode) {
-  const ref = useRef<T | null>(null);
+  const ref = useRef<T>(null);
   const [open, setOpen] = useState(false);
-  const timer = useRef<number | null>(null);
-  const cancel = () => {
-    if (timer.current != null) {
+  const timer = useRef<number | undefined>(undefined);
+  // Stable: they touch only a ref and a state setter, so effects can depend on them.
+  const cancel = useCallback(() => {
+    if (timer.current !== undefined) {
       window.clearTimeout(timer.current);
-      timer.current = null;
+      timer.current = undefined;
     }
-  };
-  useEffect(() => cancel, []);
+  }, []);
+  useEffect(() => cancel, [cancel]);
 
-  const hide = () => {
+  const hide = useCallback(() => {
     cancel();
     setOpen(false);
-  };
+  }, [cancel]);
   const hoverProps = content
     ? {
         onMouseEnter: () => {
           cancel();
           timer.current = window.setTimeout(() => {
-            timer.current = null;
+            timer.current = undefined;
             setOpen(true);
           }, TIP_DELAY_MS);
         },
@@ -73,8 +74,13 @@ export function useHoverTip<T extends HTMLElement>(content: ReactNode) {
       return undefined;
     }
     const away = (event: Event) => {
-      const el = ref.current;
-      if (!el || !el.isConnected || !(event.target instanceof Node) || !el.contains(event.target)) {
+      const element = ref.current;
+      if (
+        !element ||
+        !element.isConnected ||
+        !(event.target instanceof Node) ||
+        !element.contains(event.target)
+      ) {
         hide();
       }
     };
@@ -91,7 +97,7 @@ export function useHoverTip<T extends HTMLElement>(content: ReactNode) {
       window.removeEventListener('scroll', close, true);
       window.removeEventListener('blur', close);
     };
-  }, [open]);
+  }, [open, hide]);
 
   return {
     ref,
@@ -100,7 +106,7 @@ export function useHoverTip<T extends HTMLElement>(content: ReactNode) {
     tip:
       open && content && ref.current ? (
         <HoverTooltip anchor={ref.current}>{content}</HoverTooltip>
-      ) : null,
+      ) : undefined,
   };
 }
 

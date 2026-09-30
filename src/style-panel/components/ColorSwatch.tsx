@@ -18,7 +18,7 @@ export default function ColorSwatch({
   ariaLabel?: string;
 }) {
   const ref = useRef<HTMLButtonElement>(null);
-  const [anchor, setAnchor] = useState<DOMRect | null>(null);
+  const [anchor, setAnchor] = useState<DOMRect | undefined>(undefined);
   // The colour being dragged, not the one the model still holds: a drag writes
   // to the canvas and deliberately doesn't rebuild the panel's model, so `value`
   // only catches up on release — and the swatch is the thing that has to keep up
@@ -39,7 +39,9 @@ export default function ColorSwatch({
         disabled={busy}
         aria-label={ariaLabel}
         onClick={() =>
-          setAnchor((a) => (a ? null : (ref.current?.getBoundingClientRect() ?? null)))
+          setAnchor((previous) =>
+            previous ? undefined : (ref.current?.getBoundingClientRect() ?? undefined),
+          )
         }
       >
         <span
@@ -51,14 +53,14 @@ export default function ColorSwatch({
         <ColorPicker
           value={value}
           anchor={anchor}
-          trigger={ref.current}
+          trigger={ref.current ?? undefined}
           onChange={(color, live) => {
-            noteLive(live ? color : null);
+            noteLive(live ? color : undefined);
             onChange(color, live);
           }}
-          onClose={() => setAnchor(null)}
+          onClose={() => setAnchor(undefined)}
         />
-      ) : null}
+      ) : undefined}
     </>
   );
 }

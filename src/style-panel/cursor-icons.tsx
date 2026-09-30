@@ -4,18 +4,18 @@ import type { ReactNode } from 'react';
 // option in the Cursor dropdown (EffectsSection). Rendered at 16px; most share the
 // 24×24 viewBox, `not-allowed` is 16×16.
 
-function I({ vb = '0 0 24 24', d }: { vb?: string; d: string }) {
+function I({ vb = '0 0 24 24', d: path }: { vb?: string; d: string }) {
   return (
     <svg width="16" height="16" viewBox={vb} fill="none" aria-hidden="true">
-      <path d={d} fill="currentColor" />
+      <path d={path} fill="currentColor" />
     </svg>
   );
 }
 function IMulti({ paths }: { paths: Array<[string, number?]> }) {
   return (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      {paths.map(([d, opacity], i) => (
-        <path key={i} d={d} fill="currentColor" opacity={opacity} />
+      {paths.map(([path, opacity], i) => (
+        <path key={i} d={path} fill="currentColor" opacity={opacity} />
       ))}
     </svg>
   );

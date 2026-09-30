@@ -15,6 +15,7 @@ import {
   type MatchTarget,
 } from './selectors';
 import type { ParsedRule, SelectorInfo, Specificity } from './types';
+import { assert } from '../../../shared/assert';
 
 export type RuleKind = 'base' | 'pseudo-class' | 'pseudo-element' | 'at-rule';
 
@@ -31,7 +32,7 @@ function subjectHasState(text: string): boolean {
 export type DeclStatus = {
   winning: boolean;
   /** Selector of the declaration that overrides this one, when not winning. */
-  overriddenBy: string | null;
+  overriddenBy: string | undefined;
 };
 
 export type MatchedRule = {
@@ -55,7 +56,7 @@ export type RuleModel = {
 type Hit = {
   rule: ParsedRule;
   matchedSelectors: SelectorInfo[];
-  strongestBase: { selector: SelectorInfo; specificity: Specificity } | null;
+  strongestBase: { selector: SelectorInfo; specificity: Specificity } | undefined;
   conditional: boolean;
   kind: RuleKind;
   label: string;
@@ -67,25 +68,25 @@ type Hit = {
  * the resolved-style model (lib/resolved.ts) so both agree on who wins.
  */
 export function compareCascade(
-  a: { important: boolean; specificity: Specificity },
-  b: { important: boolean; specificity: Specificity },
-  aOrder: number,
-  bOrder: number,
+  left: { important: boolean; specificity: Specificity },
+  right: { important: boolean; specificity: Specificity },
+  leftOrder: number,
+  rightOrder: number,
 ): number {
-  if (a.important !== b.important) {
-    return a.important ? -1 : 1;
+  if (left.important !== right.important) {
+    return left.important ? -1 : 1;
   }
-  const spec = compareSpecificity(b.specificity, a.specificity);
+  const spec = compareSpecificity(right.specificity, left.specificity);
   if (spec !== 0) {
     return spec;
   }
-  return bOrder - aOrder; // later wins on a tie
+  return rightOrder - leftOrder; // later wins on a tie
 }
 
 function strongestOf(
   selectors: SelectorInfo[],
-): { selector: SelectorInfo; specificity: Specificity } | null {
-  let best: { selector: SelectorInfo; specificity: Specificity } | null = null;
+): { selector: SelectorInfo; specificity: Specificity } | undefined {
+  let best: { selector: SelectorInfo; specificity: Specificity } | undefined;
   for (const selector of selectors) {
     if (!best || compareSpecificity(selector.specificity, best.specificity) > 0) {
       best = { selector, specificity: selector.specificity };
@@ -99,57 +100,71 @@ export async function computeRuleModel(
   target: MatchTarget,
 ): Promise<RuleModel> {
   const hits: Hit[] = [];
-
   for (const rule of rules) {
     const results = await matchSelectorList(rule.selectorText, target);
     const matchedSelectors = rule.selectors.filter((_, index) => results[index]?.matched);
-    if (!matchedSelectors.length) {
-      continue;
+    if (matchedSelectors.length) {
+      hits.push(classifyHit(rule, matchedSelectors));
     }
-
-    // Show every selector in the rule that actually targets this element — so a
-    // grouped rule like `::before, ::after { … }` lists both halves.
-    const selectorText = matchedSelectors.map((s) => s.text).join(', ');
-
-    let conditional: boolean;
-    let kind: RuleKind;
-    let strongestBase: Hit['strongestBase'] = null;
-    let label: string;
-
-    if (rule.atContext.length > 0) {
-      conditional = true;
-      kind = 'at-rule';
-      label = `${rule.atContext.join(' › ')} ${selectorText}`;
-    } else {
-      const baseSelectors = matchedSelectors.filter(
-        (s) => !subjectHasState(s.text) && s.pseudoElement == null,
-      );
-      if (baseSelectors.length) {
-        conditional = false;
-        kind = 'base';
-        strongestBase = strongestOf(baseSelectors);
-        label = selectorText;
-      } else {
-        conditional = true;
-        kind = matchedSelectors.some((s) => s.pseudoElement != null)
-          ? 'pseudo-element'
-          : 'pseudo-class';
-        label = selectorText;
-      }
-    }
-
-    hits.push({ rule, matchedSelectors, strongestBase, conditional, kind, label });
   }
 
-  // Cascade winners among base hits, keyed by property.
-  type Contribution = {
-    declId: string;
-    prop: string;
-    important: boolean;
-    specificity: Specificity;
-    seq: number;
-    selectorText: string;
-  };
+  const winners = cascadeWinners(hits);
+  const base: MatchedRule[] = [];
+  const conditional: MatchedRule[] = [];
+  for (const hit of hits) {
+    const matched: MatchedRule = {
+      rule: hit.rule,
+      matchedSelectors: hit.matchedSelectors,
+      kind: hit.kind,
+      conditional: hit.conditional,
+      label: hit.label,
+      declStatus: declStatusOf(hit, winners),
+    };
+    (hit.conditional ? conditional : base).push(matched);
+  }
+
+  base.sort((left, right) => left.rule.order - right.rule.order);
+  conditional.sort((left, right) => left.rule.order - right.rule.order);
+  assert(base.length + conditional.length === hits.length, 'Every hit lands in one bucket');
+  return { base, conditional, matchedRuleCount: hits.length };
+}
+
+// Which bucket a matched rule belongs in, and the label its chip shows.
+function classifyHit(rule: ParsedRule, matchedSelectors: SelectorInfo[]): Hit {
+  assert(matchedSelectors.length > 0, 'classifyHit: a hit matched at least one selector');
+  // Show every selector in the rule that actually targets this element — so a
+  // grouped rule like `::before, ::after { … }` lists both halves.
+  const selectorText = matchedSelectors.map((selector) => selector.text).join(', ');
+  const hit = { rule, matchedSelectors, strongestBase: undefined };
+  if (rule.atContext.length > 0) {
+    const label = `${rule.atContext.join(' › ')} ${selectorText}`;
+    return { ...hit, conditional: true, kind: 'at-rule', label };
+  }
+  const baseSelectors = matchedSelectors.filter(
+    (selector) => !subjectHasState(selector.text) && selector.pseudoElement === undefined,
+  );
+  if (baseSelectors.length) {
+    const strongestBase = strongestOf(baseSelectors);
+    return { ...hit, strongestBase, conditional: false, kind: 'base', label: selectorText };
+  }
+  const kind = matchedSelectors.some((selector) => selector.pseudoElement !== undefined)
+    ? 'pseudo-element'
+    : 'pseudo-class';
+  return { ...hit, conditional: true, kind, label: selectorText };
+}
+
+type Contribution = {
+  declId: string;
+  prop: string;
+  important: boolean;
+  specificity: Specificity;
+  seq: number;
+  selectorText: string;
+};
+type Winner = { declId: string; selectorText: string };
+
+// Cascade winners among base hits, keyed by property.
+function cascadeWinners(hits: readonly Hit[]): Map<string, Winner> {
   const contributions: Contribution[] = [];
   let seq = 0;
   for (const hit of hits) {
@@ -168,51 +183,38 @@ export async function computeRuleModel(
     }
   }
 
-  const winners = new Map<string, { declId: string; selectorText: string }>();
+  const winners = new Map<string, Winner>();
   const byProp = new Map<string, Contribution[]>();
-  contributions.forEach((c) => {
-    const list = byProp.get(c.prop) ?? [];
-    list.push(c);
-    byProp.set(c.prop, list);
+  contributions.forEach((contribution) => {
+    const list = byProp.get(contribution.prop) ?? [];
+    list.push(contribution);
+    byProp.set(contribution.prop, list);
   });
   byProp.forEach((list, prop) => {
-    const winner = [...list].sort((a, b) => compareCascade(a, b, a.seq, b.seq))[0];
+    const winner = [...list].sort((left, right) =>
+      compareCascade(left, right, left.seq, right.seq),
+    )[0];
     if (winner === undefined) {
       throw new Error(`Cascade invariant failed: ${prop} has no contributions`);
     }
     winners.set(prop, { declId: winner.declId, selectorText: winner.selectorText });
   });
+  assert(winners.size === byProp.size, 'One winner per contested property');
+  return winners;
+}
 
-  const base: MatchedRule[] = [];
-  const conditional: MatchedRule[] = [];
-
-  for (const hit of hits) {
-    const declStatus: Record<string, DeclStatus> = {};
-    for (const decl of hit.rule.declarations) {
-      if (hit.conditional) {
-        declStatus[decl.declId] = { winning: true, overriddenBy: null };
-        continue;
-      }
-      const winner = winners.get(decl.prop);
-      declStatus[decl.declId] =
-        winner && winner.declId === decl.declId
-          ? { winning: true, overriddenBy: null }
-          : { winning: false, overriddenBy: winner ? winner.selectorText : null };
+function declStatusOf(hit: Hit, winners: ReadonlyMap<string, Winner>): Record<string, DeclStatus> {
+  const declStatus: Record<string, DeclStatus> = {};
+  for (const decl of hit.rule.declarations) {
+    if (hit.conditional) {
+      declStatus[decl.declId] = { winning: true, overriddenBy: undefined };
+      continue;
     }
-
-    const matched: MatchedRule = {
-      rule: hit.rule,
-      matchedSelectors: hit.matchedSelectors,
-      kind: hit.kind,
-      conditional: hit.conditional,
-      label: hit.label,
-      declStatus,
-    };
-    (hit.conditional ? conditional : base).push(matched);
+    const winner = winners.get(decl.prop);
+    declStatus[decl.declId] =
+      winner && winner.declId === decl.declId
+        ? { winning: true, overriddenBy: undefined }
+        : { winning: false, overriddenBy: winner ? winner.selectorText : undefined };
   }
-
-  base.sort((a, b) => a.rule.order - b.rule.order);
-  conditional.sort((a, b) => a.rule.order - b.rule.order);
-
-  return { base, conditional, matchedRuleCount: hits.length };
+  return declStatus;
 }

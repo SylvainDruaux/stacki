@@ -31,11 +31,11 @@ function isLength(token: string): boolean {
 
 /** Parse a `box-shadow` value into an ordered shadow list (`none`/'' → empty). */
 export function parseBoxShadows(value: string): BoxShadow[] {
-  const v = value.trim();
-  if (!v || v.toLowerCase() === 'none') {
+  const trimmed = value.trim();
+  if (!trimmed || trimmed.toLowerCase() === 'none') {
     return [];
   }
-  return splitTopLevelCommas(v)
+  return splitTopLevelCommas(trimmed)
     .filter(Boolean)
     .map((part) => {
       const lengths: string[] = [];
@@ -75,7 +75,11 @@ export function serializeBoxShadows(shadows: BoxShadow[]): string {
     return '';
   }
   return shadows
-    .map((s) => `${s.inset ? 'inset ' : ''}${boxShadowLengths(s)}${s.color ? ` ${s.color}` : ''}`)
+    .map(
+      (shadow) =>
+        `${shadow.inset ? 'inset ' : ''}${boxShadowLengths(shadow)}` +
+        (shadow.color ? ` ${shadow.color}` : ''),
+    )
     .join(', ');
 }
 
@@ -92,6 +96,6 @@ export function blankBoxShadow(): BoxShadow {
 }
 
 /** A short label for a collapsed row ("Outer shadow: 0px 2px 5px 0px"). */
-export function boxShadowLabel(s: BoxShadow): string {
-  return `${s.inset ? 'Inner' : 'Outer'} shadow: ${boxShadowLengths(s)}`;
+export function boxShadowLabel(shadow: BoxShadow): string {
+  return `${shadow.inset ? 'Inner' : 'Outer'} shadow: ${boxShadowLengths(shadow)}`;
 }

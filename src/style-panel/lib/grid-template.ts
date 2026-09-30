@@ -9,25 +9,25 @@
 export function splitTracks(value: string): string[] {
   const parts: string[] = [];
   let depth = 0;
-  let cur = '';
+  let current = '';
   for (const ch of value.trim()) {
     if (ch === '(' || ch === '[') {
       depth += 1;
-      cur += ch;
+      current += ch;
     } else if (ch === ')' || ch === ']') {
       depth = Math.max(0, depth - 1);
-      cur += ch;
+      current += ch;
     } else if (/\s/.test(ch) && depth === 0) {
-      if (cur) {
-        parts.push(cur);
-        cur = '';
+      if (current) {
+        parts.push(current);
+        current = '';
       }
     } else {
-      cur += ch;
+      current += ch;
     }
   }
-  if (cur) {
-    parts.push(cur);
+  if (current) {
+    parts.push(current);
   }
   return parts;
 }
@@ -35,24 +35,24 @@ export function splitTracks(value: string): string[] {
 /** The visible tracks a grid-template value defines — `repeat(n, a b)` expands to n×
  *  its sub-tracks; [line-name] tokens are dropped. Empty for none / unset. */
 export function parseTrackList(value: string): string[] {
-  const v = value.trim();
-  if (!v || v.toLowerCase() === 'none') {
+  const trimmed = value.trim();
+  if (!trimmed || trimmed.toLowerCase() === 'none') {
     return [];
   }
   const out: string[] = [];
-  for (const t of splitTracks(v)) {
-    if (t.startsWith('[')) {
+  for (const track of splitTracks(trimmed)) {
+    if (track.startsWith('[')) {
       continue;
     }
-    const rep = t.match(/^repeat\(\s*(\d+)\s*,(.*)\)$/is);
+    const rep = track.match(/^repeat\(\s*(\d+)\s*,(.*)\)$/is);
     if (rep) {
-      const n = parseInt(rep[1] ?? '0', 10);
+      const count = parseInt(rep[1] ?? '0', 10);
       const sub = splitTracks(rep[2] ?? '').filter((x) => !x.startsWith('['));
-      for (let i = 0; i < n && sub.length; i += 1) {
+      for (let i = 0; i < count && sub.length; i += 1) {
         out.push(...sub);
       }
     } else {
-      out.push(t);
+      out.push(track);
     }
   }
   return out;
@@ -62,7 +62,7 @@ export function parseTrackList(value: string): string[] {
 export function serializeTrackList(tracks: string[]): string {
   return tracks.length
     ? tracks
-        .map((t) => t.trim())
+        .map((track) => track.trim())
         .filter(Boolean)
         .join(' ')
     : '';
@@ -85,11 +85,11 @@ export function serializeTrackList(tracks: string[]): string {
  * could be a repeat(), tracks that differ (so they could not), or nothing.
  */
 export function trackForm(value: string): 'repeat' | 'list' | 'mixed' | 'none' {
-  const v = value.trim();
-  if (!v || v.toLowerCase() === 'none') {
+  const trimmed = value.trim();
+  if (!trimmed || trimmed.toLowerCase() === 'none') {
     return 'none';
   }
-  const top = splitTracks(v).filter((x) => !x.startsWith('['));
+  const top = splitTracks(trimmed).filter((x) => !x.startsWith('['));
   if (top.length === 1) {
     // `repeat(3, 1fr)` — a count and one track. `repeat(auto-fit, …)` is not a
     // count and has its own control, so it is left alone here.
@@ -98,7 +98,7 @@ export function trackForm(value: string): 'repeat' | 'list' | 'mixed' | 'none' {
       return 'repeat';
     }
   }
-  const tracks = parseTrackList(v);
+  const tracks = parseTrackList(trimmed);
   if (tracks.length > 1 && tracks.every((x) => x === tracks[0])) {
     return 'list';
   }
@@ -121,21 +121,21 @@ export function asTrackList(value: string): string {
  * keeps those in the expression field and says the tracks are not available.
  */
 export function canEditAsTracks(value: string): boolean {
-  const v = value.trim();
-  if (!v) {
+  const trimmed = value.trim();
+  if (!trimmed) {
     return true;
   }
-  if (/!\s*important/i.test(v)) {
+  if (/!\s*important/i.test(trimmed)) {
     return false;
   }
-  const lower = v.toLowerCase();
+  const lower = trimmed.toLowerCase();
   if (/^(inherit|initial|unset|revert|revert-layer)$/.test(lower)) {
     return false;
   }
   if (/\b(subgrid|masonry)\b/.test(lower)) {
     return false;
   }
-  const tracks = parseTrackList(v);
+  const tracks = parseTrackList(trimmed);
   if (!tracks.length) {
     return lower === 'none';
   }
@@ -161,9 +161,9 @@ export type TrackSize =
 
 /** Parse a single track into its sizing (a minmax pair, or a single value). */
 export function parseTrackSize(track: string): TrackSize {
-  const m = track.trim().match(/^minmax\(\s*(.+?)\s*,\s*(.+?)\s*\)$/is);
-  if (m) {
-    return { mode: 'minmax', min: (m[1] ?? '').trim(), max: (m[2] ?? '').trim() };
+  const match = track.trim().match(/^minmax\(\s*(.+?)\s*,\s*(.+?)\s*\)$/is);
+  if (match) {
+    return { mode: 'minmax', min: (match[1] ?? '').trim(), max: (match[2] ?? '').trim() };
   }
   return { mode: 'default', value: track.trim() };
 }
@@ -179,20 +179,20 @@ export type TrackKind = 'auto' | 'fr' | 'length' | 'minmax' | 'content' | 'other
 
 /** Coarse classification for the row icon. */
 export function trackKind(track: string): TrackKind {
-  const t = track.trim().toLowerCase();
-  if (/^minmax\(/.test(t) || /^fit-content\(/.test(t)) {
+  const normalized = track.trim().toLowerCase();
+  if (/^minmax\(/.test(normalized) || /^fit-content\(/.test(normalized)) {
     return 'minmax';
   }
-  if (t === 'auto') {
+  if (normalized === 'auto') {
     return 'auto';
   }
-  if (t === 'min-content' || t === 'max-content') {
+  if (normalized === 'min-content' || normalized === 'max-content') {
     return 'content';
   }
-  if (/^-?[\d.]+fr$/.test(t)) {
+  if (/^-?[\d.]+fr$/.test(normalized)) {
     return 'fr';
   }
-  if (/^-?[\d.]+(px|%|rem|em|vw|vh|ch|vmin|vmax|pt|cm|mm|in)$/.test(t)) {
+  if (/^-?[\d.]+(px|%|rem|em|vw|vh|ch|vmin|vmax|pt|cm|mm|in)$/.test(normalized)) {
     return 'length';
   }
   return 'other';
@@ -209,8 +209,9 @@ export function trackKind(track: string): TrackKind {
  * Bare `fr`, `auto`, `min|max-content`, and `fit-content()` are NOT fixed-size.
  */
 export function isFixedSizeTrack(track: string): boolean {
-  const isFixedBreadth = (s: string) => trackKind(s) === 'length';
-  const isInflexibleBreadth = (s: string) => ['length', 'auto', 'content'].includes(trackKind(s));
+  const isFixedBreadth = (track: string) => trackKind(track) === 'length';
+  const isInflexibleBreadth = (track: string) =>
+    ['length', 'auto', 'content'].includes(trackKind(track));
   const size = parseTrackSize(track);
   if (size.mode === 'default') {
     return isFixedBreadth(size.value);
@@ -220,12 +221,12 @@ export function isFixedSizeTrack(track: string): boolean {
 
 /** Short human label for a track row (Webflow-style). */
 export function trackLabel(track: string): string {
-  const s = parseTrackSize(track);
-  if (s.mode === 'minmax') {
-    return `Min/Max: ${s.min} / ${s.max}`;
+  const size = parseTrackSize(track);
+  if (size.mode === 'minmax') {
+    return `Min/Max: ${size.min} / ${size.max}`;
   }
-  const t = s.value.trim();
-  return t.toLowerCase() === 'auto' || !t ? 'Auto' : t;
+  const sizeValue = size.value.trim();
+  return sizeValue.toLowerCase() === 'auto' || !sizeValue ? 'Auto' : sizeValue;
 }
 
 // ── grid-template-areas ──
@@ -250,67 +251,75 @@ export type GridAreaPatch =
 /** Parse a `grid-template-areas` value into its named areas (in first-appearance
  *  order), each as the bounding box of the cells its name occupies. `.` = empty. */
 export function parseAreas(value: string): GridArea[] {
-  const v = value.trim();
-  if (!v || v.toLowerCase() === 'none') {
+  const trimmed = value.trim();
+  if (!trimmed || trimmed.toLowerCase() === 'none') {
     return [];
   }
-  const rowStrings = v.match(/"[^"]*"|'[^']*'/g);
+  const rowStrings = trimmed.match(/"[^"]*"|'[^']*'/g);
   if (!rowStrings) {
     return [];
   }
-  const grid = rowStrings.map((r) => r.slice(1, -1).trim().split(/\s+/).filter(Boolean));
+  const grid = rowStrings.map((row) => row.slice(1, -1).trim().split(/\s+/).filter(Boolean));
   const bounds = new Map<string, { r0: number; r1: number; c0: number; c1: number }>();
   const order: string[] = [];
-  grid.forEach((cells, r) =>
-    cells.forEach((name, c) => {
+  grid.forEach((cells, rowIndex) =>
+    cells.forEach((name, columnIndex) => {
       if (name === '.') {
         return;
       }
-      const b = bounds.get(name);
-      if (!b) {
-        bounds.set(name, { r0: r, r1: r, c0: c, c1: c });
+      const bound = bounds.get(name);
+      if (!bound) {
+        bounds.set(name, { r0: rowIndex, r1: rowIndex, c0: columnIndex, c1: columnIndex });
         order.push(name);
       } else {
-        b.r0 = Math.min(b.r0, r);
-        b.r1 = Math.max(b.r1, r);
-        b.c0 = Math.min(b.c0, c);
-        b.c1 = Math.max(b.c1, c);
+        bound.r0 = Math.min(bound.r0, rowIndex);
+        bound.r1 = Math.max(bound.r1, rowIndex);
+        bound.c0 = Math.min(bound.c0, columnIndex);
+        bound.c1 = Math.max(bound.c1, columnIndex);
       }
     }),
   );
   return order.map((name) => {
-    const b = bounds.get(name);
-    if (b === undefined) {
+    const bound = bounds.get(name);
+    if (bound === undefined) {
       throw new Error(`Grid area invariant failed for ${name}`);
     }
-    return { name, colStart: b.c0 + 1, colEnd: b.c1 + 1, rowStart: b.r0 + 1, rowEnd: b.r1 + 1 };
+    return {
+      name,
+      colStart: bound.c0 + 1,
+      colEnd: bound.c1 + 1,
+      rowStart: bound.r0 + 1,
+      rowEnd: bound.r1 + 1,
+    };
   });
 }
 
 /** Emit a `grid-template-areas` value from named areas — paints each area's rectangle
  *  into a grid sized to the furthest extent, `.` for uncovered cells ('' → clear). */
 export function serializeAreas(areas: GridArea[]): string {
-  const valid = areas.filter((a) => a.name.trim() && a.colStart >= 1 && a.rowStart >= 1);
+  const valid = areas.filter(
+    (area) => area.name.trim() && area.colStart >= 1 && area.rowStart >= 1,
+  );
   if (!valid.length) {
     return '';
   }
-  const rows = Math.max(...valid.map((a) => Math.max(a.rowStart, a.rowEnd)));
-  const cols = Math.max(...valid.map((a) => Math.max(a.colStart, a.colEnd)));
+  const rows = Math.max(...valid.map((area) => Math.max(area.rowStart, area.rowEnd)));
+  const cols = Math.max(...valid.map((area) => Math.max(area.colStart, area.colEnd)));
   const grid: string[][] = Array.from({ length: rows }, () =>
     Array.from({ length: cols }, () => '.'),
   );
-  for (const a of valid) {
-    const r0 = Math.min(a.rowStart, a.rowEnd),
-      r1 = Math.max(a.rowStart, a.rowEnd);
-    const c0 = Math.min(a.colStart, a.colEnd),
-      c1 = Math.max(a.colStart, a.colEnd);
-    for (let r = r0; r <= r1; r += 1) {
-      const row = grid[r - 1];
+  for (const area of valid) {
+    const rowFirst = Math.min(area.rowStart, area.rowEnd),
+      rowLast = Math.max(area.rowStart, area.rowEnd);
+    const columnFirst = Math.min(area.colStart, area.colEnd),
+      columnLast = Math.max(area.colStart, area.colEnd);
+    for (let rowNumber = rowFirst; rowNumber <= rowLast; rowNumber += 1) {
+      const row = grid[rowNumber - 1];
       if (row === undefined) {
-        throw new Error(`Grid row ${r} is outside its bounds`);
+        throw new Error(`Grid row ${rowNumber} is outside its bounds`);
       }
-      for (let c = c0; c <= c1; c += 1) {
-        row[c - 1] = a.name.trim();
+      for (let column = columnFirst; column <= columnLast; column += 1) {
+        row[column - 1] = area.name.trim();
       }
     }
   }
@@ -318,13 +327,13 @@ export function serializeAreas(areas: GridArea[]): string {
 }
 
 /** The list-row label: `{name} Row {rowStart} / Col {colStart}` (Webflow-style). */
-export function areaLabel(a: GridArea): string {
-  return `${a.name} Row ${a.rowStart} / Col ${a.colStart}`;
+export function areaLabel(area: GridArea): string {
+  return `${area.name} Row ${area.rowStart} / Col ${area.colStart}`;
 }
 
 /** A unique `Area` / `Area-2` / … name not already used. */
 export function nextAreaName(areas: GridArea[]): string {
-  const used = new Set(areas.map((a) => a.name));
+  const used = new Set(areas.map((area) => area.name));
   if (!used.has('Area')) {
     return 'Area';
   }

@@ -11,20 +11,20 @@ import type { BreakpointId, NativeModel } from './types';
 
 export type NativeStyleOptions = { breakpoint?: BreakpointId; pseudo?: string };
 
-export type BreakpointDef = {
+export type BreakpointDefinition = {
   id: BreakpointId;
   label: string;
   /** Canonical `@media` condition, used to merge an equivalent embed query. */
-  media: string | null;
+  media: string | undefined;
 };
 
 // Webflow's fixed breakpoint scale, largest → smallest (the order the dropdown
 // lists them after Base). `main` is the base breakpoint (= the panel's Base).
-export const BREAKPOINTS: readonly BreakpointDef[] = [
+export const BREAKPOINTS: readonly BreakpointDefinition[] = [
   { id: 'xxl', label: 'Desktop ≥1920', media: '(min-width: 1920px)' },
   { id: 'xl', label: 'Desktop ≥1440', media: '(min-width: 1440px)' },
   { id: 'large', label: 'Desktop ≥1280', media: '(min-width: 1280px)' },
-  { id: 'main', label: 'Base', media: null },
+  { id: 'main', label: 'Base', media: undefined },
   { id: 'medium', label: 'Tablet', media: '(max-width: 991px)' },
   { id: 'small', label: 'Mobile (L)', media: '(max-width: 767px)' },
   { id: 'tiny', label: 'Mobile', media: '(max-width: 479px)' },
@@ -41,9 +41,9 @@ function isBreakpointId(value: string): value is BreakpointId {
 // desktop ones — when it carries styles — so a project that does use them still
 // sees them, and one that does not is not asked to scroll past them.
 
-// The panel's interaction state → Webflow pseudo (null = base / noPseudo).
-const PSEUDO_FOR_STATE: Record<StateKey, string | null> = {
-  '': null,
+// The panel's interaction state → Webflow pseudo (undefined = base / noPseudo).
+const PSEUDO_FOR_STATE: Record<StateKey, string | undefined> = {
+  '': undefined,
   ':hover': 'hover',
   ':focus': 'focus',
   ':active': 'active',
@@ -52,9 +52,10 @@ const PSEUDO_FOR_STATE: Record<StateKey, string | null> = {
 export const breakpointLabel = (id: BreakpointId): string =>
   BREAKPOINTS.find((bp) => bp.id === id)?.label ?? id;
 
-/** The `@media` condition for a breakpoint (e.g. `(max-width: 767px)`), or null for main/base. */
-export const mediaParamsForBreakpoint = (id: BreakpointId): string | null =>
-  BREAKPOINTS.find((bp) => bp.id === id)?.media ?? null;
+/** The `@media` condition for a breakpoint (e.g. `(max-width: 767px)`), or undefined for
+ *  main/base. */
+export const mediaParamsForBreakpoint = (id: BreakpointId): string | undefined =>
+  BREAKPOINTS.find((bp) => bp.id === id)?.media;
 
 // Same compilation Webflow applies to a class display name → CSS class name.
 // Duplicated (not imported from webflow.ts) to keep this module free of the
@@ -82,14 +83,14 @@ export function nativeContextKey(breakpoint: BreakpointId, state: StateKey): str
 }
 
 /** The Webflow breakpoint an embed at-context is equivalent to, if any. */
-export function breakpointForAtContext(atContext: string): BreakpointId | null {
+export function breakpointForAtContext(atContext: string): BreakpointId | undefined {
   const norm = normalizeMedia(atContext);
   for (const bp of BREAKPOINTS) {
     if (bp.media && normalizeMedia(bp.media) === norm) {
       return bp.id;
     }
   }
-  return null;
+  return undefined;
 }
 
 /**
@@ -136,7 +137,7 @@ export function optionsFor(context: StyleContext, state: StateKey): NativeStyleO
 // ─────────────────────────── Projection into the panel ───────────────────────────
 
 /** Breakpoints where any applied style has native values (across read states). */
-export function nativeBreakpointsWithValues(model: NativeModel | null): Set<BreakpointId> {
+export function nativeBreakpointsWithValues(model: NativeModel | undefined): Set<BreakpointId> {
   const out = new Set<BreakpointId>();
   if (!model) {
     return out;
@@ -153,7 +154,7 @@ export function nativeBreakpointsWithValues(model: NativeModel | null): Set<Brea
 }
 
 /** True when a breakpoint has any native value (drives the dropdown dot). */
-export function nativeHasValues(model: NativeModel | null, breakpoint: BreakpointId): boolean {
+export function nativeHasValues(model: NativeModel | undefined, breakpoint: BreakpointId): boolean {
   return nativeBreakpointsWithValues(model).has(breakpoint);
 }
 
@@ -166,8 +167,8 @@ export function nativeHasValues(model: NativeModel | null, breakpoint: Breakpoin
  */
 export function buildStyleContexts(
   embedContextKeys: string[],
-  model: NativeModel | null,
-  currentBreakpoint: BreakpointId | null,
+  model: NativeModel | undefined,
+  currentBreakpoint: BreakpointId | undefined,
   /** Embed at-contexts where the selected element actually has styles. Custom
    *  queries and up-breakpoints only appear in the list when they're in here. */
   styledEmbedContexts: ReadonlySet<string> = new Set(),
@@ -216,27 +217,34 @@ export function buildStyleContexts(
       if (!styledEmbedContexts.has(key)) {
         return;
       }
-      list.push({ key, label: key, breakpoint: null, embedAtContext: key });
+      list.push({ key, label: key, breakpoint: undefined, embedAtContext: key });
     }
   });
 
   // Any breakpoint the loop above did not reach, on the same terms: it is
   // listed because something is written there, not because it exists.
-  for (const def of BREAKPOINTS) {
-    if (def.id === 'main' || usedBp.has(def.id)) {
+  for (const definition of BREAKPOINTS) {
+    if (definition.id === 'main' || usedBp.has(definition.id)) {
       continue;
     }
-    if (!nativeBps.has(def.id)) {
+    if (!nativeBps.has(definition.id)) {
       continue;
     }
-    usedBp.add(def.id);
-    list.push({ key: `bp:${def.id}`, label: def.label, breakpoint: def.id, embedAtContext: null });
+    usedBp.add(definition.id);
+    list.push({
+      key: `bp:${definition.id}`,
+      label: definition.label,
+      breakpoint: definition.id,
+      embedAtContext: undefined,
+    });
   }
 
   return list
     .map((context, index) => ({ context, index }))
     .sort(
-      (a, b) => rank(a.context, ownContexts) - rank(b.context, ownContexts) || a.index - b.index,
+      (left, right) =>
+        rank(left.context, ownContexts) - rank(right.context, ownContexts) ||
+        left.index - right.index,
     )
     .map((entry) => entry.context);
 }
@@ -262,14 +270,14 @@ function rank(context: StyleContext, ownContexts: ReadonlySet<string>): number {
  * the exact bucket would hide inherited base styles when viewing a breakpoint.
  */
 export function breakpointCascade(target: BreakpointId): BreakpointId[] {
-  const t = BREAKPOINTS.findIndex((bp) => bp.id === target);
-  const m = BREAKPOINTS.findIndex((bp) => bp.id === 'main');
-  if (t < 0 || t === m) {
+  const targetIndex = BREAKPOINTS.findIndex((bp) => bp.id === target);
+  const mainIndex = BREAKPOINTS.findIndex((bp) => bp.id === 'main');
+  if (targetIndex < 0 || targetIndex === mainIndex) {
     return ['main'];
   }
   const chain: BreakpointId[] = ['main'];
-  const step = t > m ? 1 : -1;
-  for (let i = m + step; i !== t + step; i += step) {
+  const step = targetIndex > mainIndex ? 1 : -1;
+  for (let i = mainIndex + step; i !== targetIndex + step; i += step) {
     const breakpoint = BREAKPOINTS[i];
     if (breakpoint === undefined) {
       throw new Error(`Breakpoint cascade index ${i} is outside its bounds`);
@@ -293,7 +301,7 @@ export function breakpointTier(target: BreakpointId): number {
  * context.
  */
 export function nativeContribsFor(
-  model: NativeModel | null,
+  model: NativeModel | undefined,
   context: StyleContext,
   state: StateKey,
 ): NativeContribution[] {
@@ -363,7 +371,7 @@ export type NativeSelectorChip = {
  * selectors from every query are listed.
  */
 export function nativeSelectorChips(
-  model: NativeModel | null,
+  model: NativeModel | undefined,
   breakpoint: BreakpointId,
 ): NativeSelectorChip[] {
   if (!model) {
@@ -375,8 +383,8 @@ export function nativeSelectorChips(
     const base = `.${style.namePath.map(compileClass).join('.')}`;
     for (const state of STATES) {
       const hasAnywhere = BREAKPOINTS.some((bp) => {
-        const p = style.propsByContext.get(nativeContextKey(bp.id, state));
-        return !!(p && p.size);
+        const props = style.propsByContext.get(nativeContextKey(bp.id, state));
+        return !!(props && props.size);
       });
       if (!hasAnywhere) {
         continue;
@@ -388,20 +396,20 @@ export function nativeSelectorChips(
   return out;
 }
 
-/** The picked tokens as a plain compiled class chain, or null (tag/attr present). */
-function pickedClassNames(selectedTokens: string[]): string[] | null {
+/** The picked tokens as a plain compiled class chain, or undefined (tag/attr present). */
+function pickedClassNames(selectedTokens: string[]): string[] | undefined {
   const names: string[] = [];
   for (const token of selectedTokens) {
     if (!token.startsWith('class:')) {
-      return null;
+      return undefined;
     }
     names.push(compileClass(token.slice('class:'.length)));
   }
-  return names.length ? names : null;
+  return names.length ? names : undefined;
 }
 
 /**
- * The native style whose class chain matches the picked class tokens, or null —
+ * The native style whose class chain matches the picked class tokens, or undefined —
  * returns the position in `model.styles` (the index used for reads/writes).
  * A combo style at applied index i represents classes[0..i], so native editing is
  * offered when the pick equals that whole prefix set. A single picked class also
@@ -410,15 +418,15 @@ function pickedClassNames(selectedTokens: string[]): string[] | null {
  * panel, yet a Webflow class of that name exists and is editable.
  */
 export function selectedNativeIndexFor(
-  model: NativeModel | null,
+  model: NativeModel | undefined,
   selectedTokens: string[],
-): number | null {
+): number | undefined {
   if (!model) {
-    return null;
+    return undefined;
   }
   const picked = pickedClassNames(selectedTokens);
   if (!picked) {
-    return null;
+    return undefined;
   }
   const pickedSet = new Set(picked);
 
@@ -447,5 +455,5 @@ export function selectedNativeIndexFor(
       return model.styles.indexOf(standalone);
     }
   }
-  return null;
+  return undefined;
 }

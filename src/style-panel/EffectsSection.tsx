@@ -17,7 +17,7 @@ import LayerList from './LayerList';
 import LayerPopover from './LayerPopover';
 import { CURSOR_ICONS } from './cursor-icons';
 import { useComputedValue, useHighlight } from './lib/computed-style';
-import { ShadowNum, ShadowColorRow } from './ShadowFields';
+import { ShadowLength, ShadowColorRow } from './ShadowFields';
 import {
   parseBoxShadows,
   serializeBoxShadows,
@@ -72,7 +72,7 @@ import { commitInPlace } from './lib/commit-in-place';
 
 type SetProp = (prop: string, value: string, important: boolean) => void;
 type ClearProp = (prop: string | string[]) => void;
-type LiveSetProp = (prop: string, value: string | null, important: boolean) => void;
+type LiveSetProp = (prop: string, value: string | undefined, important: boolean) => void;
 type Read = (prop: string) => ResolvedProp | undefined;
 
 type Props = {
@@ -125,30 +125,212 @@ function parseImportant(input: string): { value: string; important: boolean } {
   return { value: input.trim(), important: false };
 }
 
+// How a write lands: live while typing or dragging, or committed.
+interface WriteOptions {
+  readonly live: boolean;
+}
+
+// A field's draft: it mirrors external edits, but never clobbers what the user is
+// typing (while `focused` holds).
+function useExternalDraft(external: string) {
+  const [draft, setDraft] = useState(external);
+  const focused = useRef(false);
+  useEffect(() => {
+    if (!focused.current) {
+      setDraft(external);
+    }
+  }, [external]);
+  return { draft, setDraft, focused };
+}
+
+// Debounces live writes while typing: the text reaches `liveNow` 100ms after the last
+// keystroke; `cancel` drops a pending one.
+function useLiveTimer(liveNow: (text: string) => void) {
+  const timer = useRef<number | undefined>(undefined);
+  const cancel = () => {
+    if (timer.current !== undefined) {
+      window.clearTimeout(timer.current);
+      timer.current = undefined;
+    }
+  };
+  useEffect(() => cancel, []);
+  const live = (text: string) => {
+    cancel();
+    timer.current = window.setTimeout(() => liveNow(text), 100);
+  };
+  return { live, cancel };
+}
+
+// Enter commits in place; ↑/↓ step the number under the caret (unit preserved) in the
+// field itself. Returns the stepped text, or undefined when the key did not step.
+function stepInPlace(event: React.KeyboardEvent<HTMLInputElement>): string | undefined {
+  const input = event.currentTarget;
+  if (event.key === 'Enter') {
+    commitInPlace(input);
+    return undefined;
+  }
+  const stepped = handleArrowStep(event);
+  if (!stepped) {
+    return undefined;
+  }
+  event.preventDefault();
+  input.value = stepped.text;
+  input.setSelectionRange(stepped.caret, stepped.caret);
+  return stepped.text;
+}
+
+// A draft field's own handlers, spread onto the input after the scrub's: typing
+// schedules a live write, blur cancels it and commits, ↑/↓ step in place.
+function draftInputHandlers({
+  focusedRef,
+  setDraft,
+  live,
+  cancel,
+  commit,
+}: {
+  focusedRef: React.MutableRefObject<boolean>;
+  setDraft: (draft: string) => void;
+  live: (text: string) => void;
+  cancel: () => void;
+  commit: () => void;
+}) {
+  return {
+    onChange: (event: React.ChangeEvent<HTMLInputElement>) => {
+      setDraft(event.target.value);
+      live(event.target.value);
+    },
+    onFocus: () => {
+      focusedRef.current = true;
+    },
+    onBlur: () => {
+      focusedRef.current = false;
+      cancel();
+      commit();
+    },
+    onKeyDown: (event: React.KeyboardEvent<HTMLInputElement>) => {
+      const stepped = stepInPlace(event);
+      if (stepped !== undefined) {
+        setDraft(stepped);
+        live(stepped);
+      }
+    },
+  };
+}
+
+// Write a whole property value: live writes skip an empty value; a committed empty
+// value clears the property.
+function writeValue(
+  prop: string,
+  value: string,
+  options: WriteOptions,
+  writers: Pick<Props, 'setProp' | 'clearProp' | 'liveSetProp'>,
+) {
+  if (options.live) {
+    if (value) {
+      writers.liveSetProp(prop, value, false);
+    }
+    return;
+  }
+  if (value) {
+    writers.setProp(prop, value, false);
+  } else {
+    writers.clearProp(prop);
+  }
+}
+
+// The open popover after removing row `removed`: closed if it was that row's, shifted
+// down one if it was a later row's.
+function openAfterRemoval(open: number | undefined, removed: number): number | undefined {
+  if (open === undefined) {
+    return undefined;
+  }
+  if (open === removed) {
+    return undefined;
+  }
+  return open > removed ? open - 1 : open;
+}
+
+// A layered effect's rows (see lib/hideable.ts) and which row's editor popover is open:
+// add, remove, reorder, hide, and edit a row, each written back through `write`.
+function useLayerRows<T>({
+  rows,
+  blank,
+  write,
+}: {
+  rows: Array<Hideable<T>>;
+  blank: () => T;
+  write: (next: Array<Hideable<T>>, options: WriteOptions) => void;
+}) {
+  const [openIndex, setOpenIndex] = useState<number | undefined>(undefined);
+  const [anchorElement, setAnchorElement] = useState<HTMLElement | undefined>(undefined);
+  const add = () => {
+    const next = [...rows, { item: blank(), hidden: false }];
+    write(next, { live: false });
+    setOpenIndex(next.length - 1);
+  };
+  const remove = (i: number) => {
+    write(
+      rows.filter((_, other) => other !== i),
+      { live: false },
+    );
+    setOpenIndex((previous) => openAfterRemoval(previous, i));
+  };
+  const reorder = (from: number, to: number) => {
+    if (from === to) {
+      return;
+    }
+    const next = [...rows];
+    const [moved] = next.splice(from, 1);
+    if (moved === undefined) {
+      return;
+    }
+    next.splice(to, 0, moved);
+    write(next, { live: false });
+    setOpenIndex((previous) => (previous === from ? to : previous));
+  };
+  const update = (i: number, options: WriteOptions, change: (item: T) => T) =>
+    write(
+      rows.map((row, other) => (other === i ? { ...row, item: change(row.item) } : row)),
+      options,
+    );
+  const toggle = (i: number) =>
+    write(
+      rows.map((row, other) => (other === i ? { ...row, hidden: !row.hidden } : row)),
+      { live: false },
+    );
+  const open = (i: number, element: HTMLElement) => {
+    setOpenIndex((previous) => (previous === i ? undefined : i));
+    setAnchorElement(element);
+  };
+  const close = () => setOpenIndex(undefined);
+  const isHidden = (i: number) => rows[i]?.hidden ?? false;
+  return { openIndex, anchorElement, add, remove, reorder, update, toggle, open, close, isHidden };
+}
+
 // The property label: blue/active when the picked selector sets it (with a clear
 // menu + provenance), orange when it's set through another selector.
 function EffLabel({ label, prop, props }: { label: string; prop: string; props: Props }) {
   const { read, busy, clearProp, onProvenance, onSelectSelector } = props;
-  const d = displayOf(read(prop));
+  const display = displayOf(read(prop));
   const contributors: Contributor[] = read(prop)?.contributors ?? [];
-  if (d.present && !d.isSelected) {
+  if (display.present && !display.isSelected) {
     return <ProvenanceLabel label={label} props={[prop]} busy={busy} onProvenance={onProvenance} />;
   }
   return (
     <FieldLabel
-      className={`embed-editor_size-label ${d.overridden ? 'is-overridden' : ''}`}
-      active={d.isSelected}
+      className={`embed-editor_size-label ${display.overridden ? 'is-overridden' : ''}`}
+      active={display.isSelected}
       disabled={busy}
       onReset={() => clearProp(prop)}
       resetLabel="Clear"
       tooltip={<PropTip props={[prop]} />}
-      {...(d.overridden ? { title: `Overridden by ${d.winnerSelector}` } : {})}
+      {...(display.overridden ? { title: `Overridden by ${display.winnerSelector}` } : {})}
       menuNote={(close) => (
         <ProvenanceList
           contributors={contributors}
           prop={prop}
-          onSelect={(sel, p) => {
-            onSelectSelector(sel, p);
+          onSelect={(selector, selectedProp) => {
+            onSelectSelector(selector, selectedProp);
             close();
           }}
         />
@@ -172,12 +354,12 @@ function OutlineColor({ props, value }: { props: Props; value: string }) {
         value={shown}
         busy={busy}
         ariaLabel="Outline color"
-        onChange={(c, live) => {
-          noteLive(live ? c : null);
+        onChange={(color, live) => {
+          noteLive(live ? color : undefined);
           if (live) {
-            liveSetProp('outline-color', c, false);
+            liveSetProp('outline-color', color, false);
           } else {
-            setProp('outline-color', c, false);
+            setProp('outline-color', color, false);
           }
         }}
       />
@@ -204,54 +386,39 @@ function LiveText({
   dragging?: string;
 }) {
   const { read, busy, setProp, clearProp, liveSetProp } = props;
-  const d = displayOf(read(prop));
+  const display = displayOf(read(prop));
   // `dragging` is what a swatch beside this field is showing mid-drag.
-  const external = dragging ?? (d.present ? (d.important ? `${d.value} !important` : d.value) : '');
-  const [draft, setDraft] = useState(external);
-  const focused = useRef(false);
-  const timer = useRef<number | null>(null);
-  useEffect(() => {
-    if (!focused.current) {
-      setDraft(external);
-    }
-  }, [external]);
-  const cancel = () => {
-    if (timer.current != null) {
-      window.clearTimeout(timer.current);
-      timer.current = null;
-    }
-  };
-  useEffect(() => cancel, []);
+  const written = display.important ? `${display.value} !important` : display.value;
+  const external = dragging ?? (display.present ? written : '');
+  const { draft, setDraft, focused } = useExternalDraft(external);
   // Undelayed live write for the scrub, which throttles its own — see useScrub.
   const liveNow = (text: string) => {
-    const t = text.trim();
-    if (t) {
-      const p = parseImportant(t);
-      liveSetProp(prop, p.value, p.important);
+    const trimmed = text.trim();
+    if (trimmed) {
+      const parsed = parseImportant(trimmed);
+      liveSetProp(prop, parsed.value, parsed.important);
     }
   };
-  const live = (text: string) => {
-    cancel();
-    timer.current = window.setTimeout(() => liveNow(text), 100);
-  };
+  const { live, cancel } = useLiveTimer(liveNow);
   const commit = (text = draft) => {
-    const t = text.trim();
-    if (!t) {
+    const trimmed = text.trim();
+    if (!trimmed) {
       clearProp(prop);
       return;
     }
-    const p = parseImportant(t);
-    setProp(prop, p.value, p.important);
+    const parsed = parseImportant(trimmed);
+    setProp(prop, parsed.value, parsed.important);
+  };
+  const commitScrub = (text: string) => {
+    setDraft(text);
+    commit(text);
   };
   const scrub = useScrub({
     value: draft,
     disabled: busy,
     onPreview: setDraft,
     onInput: liveNow,
-    onCommit: (text) => {
-      setDraft(text);
-      commit(text);
-    },
+    onCommit: commitScrub,
   });
   return (
     <VariableConnect
@@ -267,33 +434,7 @@ function LiveText({
         className="u-input embed-editor_size-input embed-editor_eff-value"
         data-prop={prop}
         value={draft}
-        onChange={(e) => {
-          setDraft(e.target.value);
-          live(e.target.value);
-        }}
-        onFocus={() => {
-          focused.current = true;
-        }}
-        onBlur={() => {
-          focused.current = false;
-          cancel();
-          commit();
-        }}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter') {
-            commitInPlace(e.currentTarget);
-            return;
-          }
-          const stepped = handleArrowStep(e);
-          if (!stepped) {
-            return;
-          }
-          e.preventDefault();
-          e.currentTarget.value = stepped.text;
-          e.currentTarget.setSelectionRange(stepped.caret, stepped.caret);
-          setDraft(stepped.text);
-          live(stepped.text);
-        }}
+        {...draftInputHandlers({ focusedRef: focused, setDraft, live, cancel, commit })}
         disabled={busy}
         spellCheck={false}
         placeholder={placeholder}
@@ -322,18 +463,18 @@ const BLEND_MODES: SelectOption<string>[] = [
   'saturation',
   'color',
   'luminosity',
-].map((v) => ({
-  value: v,
+].map((mode) => ({
+  value: mode,
   label:
-    v === 'color-burn'
+    mode === 'color-burn'
       ? 'Color burn'
-      : v === 'color-dodge'
+      : mode === 'color-dodge'
         ? 'Color dodge'
-        : v === 'soft-light'
+        : mode === 'soft-light'
           ? 'Soft light'
-          : v === 'hard-light'
+          : mode === 'hard-light'
             ? 'Hard light'
-            : (v[0] ?? '').toUpperCase() + v.slice(1),
+            : (mode[0] ?? '').toUpperCase() + mode.slice(1),
 }));
 
 // Grouped like Webflow's cursor menu: a non-selectable heading per group, each
@@ -367,12 +508,17 @@ const CURSOR_GROUPS: ReadonlyArray<{ heading: string; values: string[] }> = [
     ],
   },
 ];
-const CURSORS: SelectOption<string>[] = CURSOR_GROUPS.flatMap((g) => [
-  { value: `__${g.heading}`, label: g.heading, heading: true },
-  ...g.values.map((v) => ({ value: v, label: v, icon: CURSOR_ICONS[v], indent: true })),
+const CURSORS: SelectOption<string>[] = CURSOR_GROUPS.flatMap((group) => [
+  { value: `__${group.heading}`, label: group.heading, heading: true },
+  ...group.values.map((cursor) => ({
+    value: cursor,
+    label: cursor,
+    icon: CURSOR_ICONS[cursor],
+    indent: true,
+  })),
 ]);
 
-const OUTLINE_OPTS: readonly SegOption[] = [
+const OUTLINE_OPTIONS: readonly SegOption[] = [
   { value: 'none', label: '✕', menuLabel: 'None', ariaLabel: 'None' },
   {
     value: 'solid',
@@ -393,7 +539,7 @@ const OUTLINE_OPTS: readonly SegOption[] = [
     ariaLabel: 'Dotted',
   },
 ];
-const EVENTS_OPTS: readonly SegOption[] = [
+const EVENTS_OPTIONS: readonly SegOption[] = [
   { value: 'auto', label: 'Auto', menuLabel: 'Auto' },
   { value: 'none', label: 'None', menuLabel: 'None' },
 ];
@@ -407,23 +553,13 @@ const PlusIcon = () => (
 // The "Custom…" sentinel + preset value sets (values that ARE listed in the dropdown,
 // so anything else counts as a custom value that opens the input).
 const CUSTOM = '__custom__';
-const BLEND_SET = new Set(BLEND_MODES.map((o) => o.value));
-const CURSOR_SET = new Set(CURSOR_GROUPS.flatMap((g) => g.values));
+const BLEND_SET = new Set(BLEND_MODES.map((option) => option.value));
+const CURSOR_SET = new Set(CURSOR_GROUPS.flatMap((group) => group.values));
 
 // The free-text input the Select swaps in when "Custom…" is picked (or the current
 // value isn't a listed preset). Empty when just switched from a preset, so you type
 // a fresh value; committing empty clears the property and returns to the dropdown.
-function CustomInput({
-  prop,
-  value,
-  placeholder,
-  busy,
-  autoFocus,
-  setProp,
-  liveSetProp,
-  clearProp,
-  onExit,
-}: {
+interface CustomInputProps {
   prop: string;
   value: string;
   placeholder: string;
@@ -433,41 +569,26 @@ function CustomInput({
   liveSetProp: LiveSetProp;
   clearProp: ClearProp;
   onExit: () => void;
-}) {
-  const [draft, setDraft] = useState(value);
-  const focused = useRef(false);
-  const timer = useRef<number | null>(null);
-  useEffect(() => {
-    if (!focused.current) {
-      setDraft(value);
+}
+function CustomInput(props: CustomInputProps) {
+  const { prop, value, placeholder, busy, setProp, liveSetProp, clearProp, onExit } = props;
+  const { draft, setDraft, focused } = useExternalDraft(value);
+  const { live, cancel } = useLiveTimer((text) => {
+    const trimmed = text.trim();
+    if (trimmed) {
+      const parsed = parseImportant(trimmed);
+      liveSetProp(prop, parsed.value, parsed.important);
     }
-  }, [value]);
-  const cancel = () => {
-    if (timer.current != null) {
-      window.clearTimeout(timer.current);
-      timer.current = null;
-    }
-  };
-  useEffect(() => cancel, []);
-  const live = (text: string) => {
-    cancel();
-    timer.current = window.setTimeout(() => {
-      const t = text.trim();
-      if (t) {
-        const p = parseImportant(t);
-        liveSetProp(prop, p.value, p.important);
-      }
-    }, 100);
-  };
+  });
   const commit = () => {
-    const t = draft.trim();
-    if (!t) {
+    const trimmed = draft.trim();
+    if (!trimmed) {
       clearProp(prop);
       onExit();
       return;
     }
-    const p = parseImportant(t);
-    setProp(prop, p.value, p.important);
+    const parsed = parseImportant(trimmed);
+    setProp(prop, parsed.value, parsed.important);
   };
   return (
     <VariableConnect
@@ -479,10 +600,10 @@ function CustomInput({
       <input
         className="u-input u-select-custom-input"
         value={draft}
-        autoFocus={autoFocus}
-        onChange={(e) => {
-          setDraft(e.target.value);
-          live(e.target.value);
+        autoFocus={props.autoFocus}
+        onChange={(event) => {
+          setDraft(event.target.value);
+          live(event.target.value);
         }}
         onFocus={() => {
           focused.current = true;
@@ -492,9 +613,9 @@ function CustomInput({
           cancel();
           commit();
         }}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter') {
-            commitInPlace(e.currentTarget);
+        onKeyDown={(event) => {
+          if (event.key === 'Enter') {
+            commitInPlace(event.currentTarget);
           }
         }}
         disabled={busy}
@@ -508,16 +629,7 @@ function CustomInput({
 
 // A preset dropdown whose last option is "Custom…" — picking it (or an existing
 // value not in the list) swaps the trigger for a free-text input.
-function PresetSelectRow({
-  prop,
-  label,
-  options,
-  presets,
-  fallback,
-  placeholder,
-  props,
-  allowCustom = true,
-}: {
+interface PresetSelectRowProps {
   prop: string;
   label: string;
   options: SelectOption<string>[];
@@ -528,44 +640,41 @@ function PresetSelectRow({
   /** Offer a "Custom…" free-value option. Off for enumerated props (e.g. cursor)
    *  where Webflow won't store arbitrary/CSS-wide values anyway. */
   allowCustom?: boolean;
-}) {
+}
+function PresetSelectRow(row: PresetSelectRowProps) {
+  const { prop, label, options, presets, props, allowCustom = true } = row;
   const { read, busy, setProp, liveSetProp, clearProp } = props;
-  const d = displayOf(read(prop));
-  const current = d.present ? d.value.trim() : '';
+  const display = displayOf(read(prop));
+  const current = display.present ? display.value.trim() : '';
   // Nothing authored → highlight what the page actually computes for this element,
   // falling back to the CSS initial value when there's no canvas to ask.
   const shown = useHighlight(
     current,
     prop,
-    options.map((o) => o.value),
-    fallback,
+    options.map((option) => option.value),
+    row.fallback,
   );
   const isPreset = !current || presets.has(current);
   const [forceCustom, setForceCustom] = useState(false);
-  const customMode = allowCustom && (forceCustom || (d.present && !isPreset));
-  const pick = (v: string) => {
-    if (v === CUSTOM) {
+  const customMode = allowCustom && (forceCustom || (display.present && !isPreset));
+  const pick = (choice: string) => {
+    if (choice === CUSTOM) {
       setForceCustom(true);
       return;
     }
     setForceCustom(false);
-    setProp(prop, v, false);
+    setProp(prop, choice, false);
   };
-  const inputValue =
-    forceCustom && isPreset
-      ? ''
-      : d.present
-        ? d.important
-          ? `${d.value} !important`
-          : d.value
-        : '';
-  // With Custom off, still surface a pre-existing non-preset value so the trigger
-  // shows it (rather than silently falling back to the first option).
-  const selectOptions = allowCustom
-    ? [...options, { value: CUSTOM, label: 'Custom…' }]
-    : d.present && !isPreset
-      ? [...options, { value: current, label: current }]
-      : options;
+  // "Custom…" has no value of its own to show, so landing on it reverts the preview.
+  const preview = (option: string | undefined) =>
+    liveSetProp(prop, option === CUSTOM ? undefined : option, false);
+  const written = display.important ? `${display.value} !important` : display.value;
+  const inputValue = forceCustom && isPreset ? '' : display.present ? written : '';
+  const selectOptions = presetSelectOptions({
+    options,
+    allowCustom,
+    stray: display.present && !isPreset ? current : undefined,
+  });
   return (
     <div className="embed-editor_size-row">
       <EffLabel label={label} prop={prop} props={props} />
@@ -573,7 +682,7 @@ function PresetSelectRow({
         value={customMode ? CUSTOM : shown}
         options={selectOptions}
         onChange={pick}
-        onPreview={(v) => liveSetProp(prop, v === CUSTOM ? null : v, false)}
+        onPreview={(option) => preview(option ?? undefined)}
         ariaLabel={label}
         disabled={busy}
         customInput={
@@ -581,7 +690,7 @@ function PresetSelectRow({
             <CustomInput
               prop={prop}
               value={inputValue}
-              placeholder={placeholder}
+              placeholder={row.placeholder}
               busy={busy}
               autoFocus={forceCustom}
               setProp={setProp}
@@ -596,168 +705,230 @@ function PresetSelectRow({
   );
 }
 
+// The dropdown's options: the presets, then "Custom…". With Custom off, a pre-existing
+// non-preset value (`stray`) is still surfaced so the trigger shows it (rather than
+// silently falling back to the first option).
+function presetSelectOptions({
+  options,
+  allowCustom,
+  stray,
+}: {
+  options: SelectOption<string>[];
+  allowCustom: boolean;
+  stray: string | undefined;
+}): SelectOption<string>[] {
+  if (allowCustom) {
+    return [...options, { value: CUSTOM, label: 'Custom…' }];
+  }
+  if (stray !== undefined) {
+    return [...options, { value: stray, label: stray }];
+  }
+  return options;
+}
+
 // ─────────────────────────── Rows ───────────────────────────
+
+/** The percentage a value reads as, or undefined when it isn't a number at all. */
+function percentOf(value: string): number | undefined {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return undefined;
+  }
+  const amount = parseFloat(trimmed);
+  if (Number.isNaN(amount) || !/^[-+]?[\d.]+%?$/.test(trimmed)) {
+    return undefined;
+  }
+  return Math.round(trimmed.includes('%') ? amount : amount * 100);
+}
+const opacityCss = (percent: number) =>
+  percent >= 100 ? '1' : percent <= 0 ? '0' : String(Math.round(percent) / 100);
+const clampPercent = (percent: number) => Math.min(100, Math.max(0, Math.round(percent)));
+// The unit is part of the value the field shows — `100%`, the way it reads in CSS —
+// rather than a chip pinned beside it.
+const percentText = (percent: number) => `${percent}%`;
+// Typing the % (or leaving it off) both work: the parse only wants the number.
+function parsePercent(text: string): number | undefined {
+  const amount = parseFloat(text);
+  return Number.isNaN(amount) ? undefined : clampPercent(amount);
+}
 
 function OpacityRow({ props }: { props: Props }) {
   const { read, busy, setProp, liveSetProp } = props;
-  const d = displayOf(read('opacity'));
-  const raw = d.present ? d.value.trim() : '';
-  /** The percentage a value reads as, or null when it isn't a number at all. */
-  const pctOf = (v: string): number | null => {
-    const t = v.trim();
-    if (!t) {
-      return null;
-    }
-    const n = parseFloat(t);
-    if (Number.isNaN(n) || !/^[-+]?[\d.]+%?$/.test(t)) {
-      return null;
-    }
-    return Math.round(t.includes('%') ? n : n * 100);
-  };
-  const authored = pctOf(raw);
+  const display = displayOf(read('opacity'));
+  const raw = display.present ? display.value.trim() : '';
+  const authored = percentOf(raw);
   // `opacity: var(--fade)` is a number the panel can't read — but the page can, and
   // a slider parked at 100% while the element is half faded is just wrong. Ask for
   // the computed value in that case (only then: a plain `0.4` needs no round trip).
-  const computed = pctOf(useComputedValue(authored == null && raw ? 'opacity' : ''));
-  const pct = authored ?? computed ?? 100;
+  const computed = percentOf(useComputedValue(authored === undefined && raw ? 'opacity' : ''));
+  const percent = authored ?? computed ?? 100;
   // A value the panel can't express as a number stays in the field as it was
   // written, so the variable chip shows and editing around it doesn't flatten it.
-  const asNumber = authored != null || !raw;
-  const toCss = (p: number) => (p >= 100 ? '1' : p <= 0 ? '0' : String(Math.round(p) / 100));
-  const clamp = (p: number) => Math.min(100, Math.max(0, Math.round(p)));
+  const asNumber = authored !== undefined || !raw;
   // Drag previews live (DragSlider already throttles the writes); release commits.
-  const live = (p: number) => liveSetProp('opacity', toCss(clamp(p)), false);
-  const commit = (p: number) => setProp('opacity', toCss(clamp(p)), false);
+  const live = (value: number) => liveSetProp('opacity', opacityCss(clampPercent(value)), false);
+  const commit = (value: number) => setProp('opacity', opacityCss(clampPercent(value)), false);
 
-  // The number field's local draft: typing previews live; blur / Enter commits. The
-  // unit is part of the value the field shows — `100%`, the way it reads in CSS —
-  // rather than a chip pinned beside it. Typing the % (or leaving it off) both work:
-  // the parse only wants the number.
-  const shown = (p: number) => `${p}%`;
-  const fieldText = asNumber ? shown(pct) : raw;
-  const [text, setText] = useState(fieldText);
-  const focused = useRef(false);
-  useEffect(() => {
-    if (!focused.current) {
-      setText(fieldText);
-    }
-  }, [fieldText]);
-  const parse = (t: string) => {
-    const n = parseFloat(t);
-    return Number.isNaN(n) ? null : clamp(n);
-  };
-  const scrub = useScrub({
-    value: text,
-    disabled: busy,
-    onPreview: setText,
-    onInput: (t) => {
-      const n = parse(t);
-      if (n != null) {
-        live(n);
-      }
-    },
-    onCommit: (t) => {
-      setText(t);
-      const n = parse(t);
-      if (n != null) {
-        commit(n);
-      } else {
-        setText(String(pct));
-      }
-    },
-  });
+  // The number field's local draft: typing previews live; blur / Enter commits.
+  const fieldText = asNumber ? percentText(percent) : raw;
+  const field = useExternalDraft(fieldText);
 
   return (
     <div className="embed-editor_size-row">
       <EffLabel label="Opacity" prop="opacity" props={props} />
       <div className="embed-editor_shadow-field">
         <DragSlider
-          value={pct}
+          value={percent}
           min={0}
           max={100}
           disabled={busy}
           ariaLabel="Opacity"
-          onPreview={(p) => {
-            if (!focused.current) {
-              setText(shown(p));
+          onPreview={(value) => {
+            if (!field.focused.current) {
+              field.setDraft(percentText(value));
             }
           }}
           onInput={live}
-          onCommit={(p) => {
-            if (!focused.current) {
-              setText(shown(p));
+          onCommit={(value) => {
+            if (!field.focused.current) {
+              field.setDraft(percentText(value));
             }
-            commit(p);
+            commit(value);
           }}
         />
-        <div className="embed-editor_field embed-editor_grad-num embed-editor_opacity-num">
-          <VariableConnect
-            className="is-fill"
-            ariaLabel="Connect Opacity to a variable"
-            disabled={busy}
-            prop="opacity"
-            onPick={(binding) => setProp('opacity', binding, false)}
-          >
-            <input
-              {...scrub.input}
-              className="u-input embed-editor_size-input"
-              value={text}
-              inputMode="decimal"
-              spellCheck={false}
-              disabled={busy}
-              aria-label="Opacity percent"
-              onFocus={() => {
-                focused.current = true;
-              }}
-              onChange={(e) => {
-                setText(e.target.value);
-                const n = pctOf(e.target.value);
-                if (n != null) {
-                  live(n);
-                }
-              }}
-              onBlur={() => {
-                focused.current = false;
-                const t = text.trim();
-                if (t === fieldText) {
-                  return;
-                } // untouched — a var()/expression stays as it is
-                const n = pctOf(t);
-                // A number becomes an opacity; anything else (a var(), a calc()) is
-                // written as it stands, so a variable typed in here survives.
-                if (n != null) {
-                  commit(n);
-                  setText(shown(clamp(n)));
-                } else if (t) {
-                  setProp('opacity', t, false);
-                } else {
-                  setText(fieldText);
-                }
-              }}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  commitInPlace(e.currentTarget);
-                  return;
-                }
-                const stepped = handleArrowStep(e);
-                if (!stepped) {
-                  return;
-                }
-                e.preventDefault();
-                e.currentTarget.value = stepped.text;
-                e.currentTarget.setSelectionRange(stepped.caret, stepped.caret);
-                setText(stepped.text);
-                const n = parse(stepped.text);
-                if (n != null) {
-                  live(n);
-                }
-              }}
-            />
-          </VariableConnect>
-        </div>
+        <OpacityNumberField
+          text={field.draft}
+          setText={field.setDraft}
+          focusedRef={field.focused}
+          fieldText={fieldText}
+          percent={percent}
+          busy={busy}
+          live={live}
+          commit={commit}
+          setProp={setProp}
+        />
       </div>
     </div>
   );
+}
+
+// The opacity percent as text: typing and stepping preview live; blur commits a
+// number as an opacity and anything else (a var(), a calc()) as written.
+interface OpacityFieldProps {
+  text: string;
+  setText: (text: string) => void;
+  focusedRef: React.MutableRefObject<boolean>;
+  fieldText: string;
+  percent: number;
+  busy: boolean;
+  live: (value: number) => void;
+  commit: (value: number) => void;
+  setProp: SetProp;
+}
+
+function OpacityNumberField(props: OpacityFieldProps) {
+  const { text, setText, focusedRef, busy, live, setProp } = props;
+  const { scrub, commitTyped } = useOpacityField(props);
+  return (
+    <div className="embed-editor_field embed-editor_grad-num embed-editor_opacity-num">
+      <VariableConnect
+        className="is-fill"
+        ariaLabel="Connect Opacity to a variable"
+        disabled={busy}
+        prop="opacity"
+        onPick={(binding) => setProp('opacity', binding, false)}
+      >
+        <input
+          {...scrub.input}
+          className="u-input embed-editor_size-input"
+          value={text}
+          inputMode="decimal"
+          spellCheck={false}
+          disabled={busy}
+          aria-label="Opacity percent"
+          onFocus={() => {
+            focusedRef.current = true;
+          }}
+          onChange={(event) => {
+            setText(event.target.value);
+            const value = percentOf(event.target.value);
+            if (value !== undefined) {
+              live(value);
+            }
+          }}
+          onBlur={() => {
+            focusedRef.current = false;
+            commitTyped();
+          }}
+          onKeyDown={(event) => {
+            const stepped = stepInPlace(event);
+            if (stepped === undefined) {
+              return;
+            }
+            setText(stepped);
+            const value = parsePercent(stepped);
+            if (value !== undefined) {
+              live(value);
+            }
+          }}
+        />
+      </VariableConnect>
+    </div>
+  );
+}
+
+// The field's scrub (a scrub commits a number, or puts the percent back) and its
+// commit on blur.
+function useOpacityField({
+  text,
+  setText,
+  fieldText,
+  percent,
+  busy,
+  live,
+  commit,
+  setProp,
+}: OpacityFieldProps) {
+  const commitScrub = (next: string) => {
+    setText(next);
+    const value = parsePercent(next);
+    if (value !== undefined) {
+      commit(value);
+    } else {
+      setText(String(percent));
+    }
+  };
+  const scrub = useScrub({
+    value: text,
+    disabled: busy,
+    onPreview: setText,
+    onInput: (next) => {
+      const value = parsePercent(next);
+      if (value !== undefined) {
+        live(value);
+      }
+    },
+    onCommit: commitScrub,
+  });
+  const commitTyped = () => {
+    const trimmed = text.trim();
+    // Untouched — a var()/expression stays as it is.
+    if (trimmed === fieldText) {
+      return;
+    }
+    const value = percentOf(trimmed);
+    // A number becomes an opacity; anything else (a var(), a calc()) is
+    // written as it stands, so a variable typed in here survives.
+    if (value !== undefined) {
+      commit(value);
+      setText(percentText(clampPercent(value)));
+    } else if (trimmed) {
+      setProp('opacity', trimmed, false);
+    } else {
+      setText(fieldText);
+    }
+  };
+  return { scrub, commitTyped };
 }
 
 // ─────────────── 2D & 3D transforms (layered, mirrors text-shadow) ───────────────
@@ -796,62 +967,16 @@ const FilterGlyph = () => (
 // The Filters / Backdrop filters row: a stack of filter functions (blur/brightness/…/
 // drop-shadow) edited as one CSS `filter` value. Mirrors TransformsRow.
 function FiltersRow({ prop, label, props }: { prop: string; label: string; props: Props }) {
-  const { read, busy, setProp, clearProp, liveSetProp } = props;
-  const d = displayOf(read(prop));
+  const { read, busy } = props;
+  const display = displayOf(read(prop));
   // Shared by Filters and Backdrop filters, so both get the eye from here.
-  const rows = parseHideable(d.present ? d.value : '', ' ', parseFilters);
-  const layers = rows.map((r) => r.item);
-  const [openIdx, setOpenIdx] = useState<number | null>(null);
-  const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
-  const write = (next: Array<Hideable<Filter>>, live: boolean) => {
-    const value = serializeHideable(next, ' ', serializeFilters);
-    if (live) {
-      if (value) {
-        liveSetProp(prop, value, false);
-      }
-      return;
-    }
-    if (value) {
-      setProp(prop, value, false);
-    } else {
-      clearProp(prop);
-    }
-  };
-  const add = () => {
-    const next = [...rows, { item: blankFilter(), hidden: false }];
-    write(next, false);
-    setOpenIdx(next.length - 1);
-  };
-  const remove = (i: number) => {
-    write(
-      rows.filter((_, j) => j !== i),
-      false,
-    );
-    setOpenIdx((cur) => (cur === i ? null : cur != null && cur > i ? cur - 1 : cur));
-  };
-  const reorder = (from: number, to: number) => {
-    if (from === to) {
-      return;
-    }
-    const next = [...rows];
-    const [moved] = next.splice(from, 1);
-    if (moved === undefined) {
-      return;
-    }
-    next.splice(to, 0, moved);
-    write(next, false);
-    setOpenIdx((cur) => (cur === from ? to : cur));
-  };
-  const patch = (i: number, next: Filter, live: boolean) =>
-    write(
-      rows.map((r, j) => (j === i ? { ...r, item: next } : r)),
-      live,
-    );
-  const toggle = (i: number) =>
-    write(
-      rows.map((r, j) => (j === i ? { ...r, hidden: !r.hidden } : r)),
-      false,
-    );
+  const rows = parseHideable(display.present ? display.value : '', ' ', parseFilters);
+  const layers = rows.map((row) => row.item);
+  const write = (next: Array<Hideable<Filter>>, options: WriteOptions) =>
+    writeValue(prop, serializeHideable(next, ' ', serializeFilters), options, props);
+  const stack = useLayerRows({ rows, blank: blankFilter, write });
+  const { openIndex } = stack;
+  const openLayer = openIndex === undefined ? undefined : layers[openIndex];
   return (
     <div className="embed-editor_type-shadows">
       <div className="embed-editor_bg-layers-head">
@@ -859,7 +984,7 @@ function FiltersRow({ prop, label, props }: { prop: string; label: string; props
         <button
           type="button"
           className="embed-editor_icon-btn"
-          onClick={add}
+          onClick={stack.add}
           disabled={busy}
           title={`Add a ${label.toLowerCase()} filter`}
           aria-label="Add a filter"
@@ -871,14 +996,11 @@ function FiltersRow({ prop, label, props }: { prop: string; label: string; props
         count={layers.length}
         busy={busy}
         ariaLabel={label}
-        onOpen={(i, el) => {
-          setOpenIdx((cur) => (cur === i ? null : i));
-          setAnchorEl(el);
-        }}
-        onReorder={reorder}
-        onRemove={remove}
-        isHidden={(i) => rows[i]?.hidden ?? false}
-        onToggleHidden={toggle}
+        onOpen={stack.open}
+        onReorder={stack.reorder}
+        onRemove={stack.remove}
+        isHidden={stack.isHidden}
+        onToggleHidden={stack.toggle}
         renderRow={(i) => {
           const layer = layers[i];
           if (layer === undefined) {
@@ -887,19 +1009,15 @@ function FiltersRow({ prop, label, props }: { prop: string; label: string; props
           return { preview: <FilterGlyph />, label: filterLabel(layer) };
         }}
       />
-      {openIdx != null && anchorEl && layers[openIdx] ? (
-        <LayerPopover anchorEl={anchorEl} ariaLabel={label} onClose={() => setOpenIdx(null)}>
+      {openIndex !== undefined && stack.anchorElement && openLayer ? (
+        <LayerPopover anchorEl={stack.anchorElement} ariaLabel={label} onClose={stack.close}>
           <FilterEditor
-            filter={layers[openIdx]}
+            filter={openLayer}
             busy={busy}
-            onChange={(next, live) => {
-              if (openIdx !== null) {
-                patch(openIdx, next, live);
-              }
-            }}
+            onChange={(next, live) => stack.update(openIndex, { live }, () => next)}
           />
         </LayerPopover>
-      ) : null}
+      ) : undefined}
     </div>
   );
 }
@@ -908,7 +1026,10 @@ function FiltersRow({ prop, label, props }: { prop: string; label: string; props
 // units), and how many slider steps map to one unit. The slider is integer-only, so
 // `scale` (0–2) runs in hundredths for sub-integer precision; the number field always
 // allows a precise value outside the range.
-const AXIS_CFG: Record<TransformType, { unit: string; min: number; max: number; steps: number }> = {
+const AXIS_CONFIG: Record<
+  TransformType,
+  { unit: string; min: number; max: number; steps: number }
+> = {
   // Move is in rem unless the value itself says otherwise — `steps` is how many
   // slider notches make one unit, so 100 gives hundredths of a rem across a
   // range wide enough to push something off its own width.
@@ -919,32 +1040,23 @@ const AXIS_CFG: Record<TransformType, { unit: string; min: number; max: number; 
 };
 
 // Split "10px" / "1.5" / "45deg" into number + unit (bare number → the type's default
-// unit); null for var()/calc()/… so the slider disables but the field stays editable.
-function parseAxis(value: string, fallbackUnit: string): { num: number; unit: string } | null {
-  const m = value.trim().match(/^(-?\d*\.?\d+)\s*([a-z%]*)$/i);
-  if (!m) {
-    return null;
+// unit); undefined for var()/calc()/… so the slider disables but the field stays editable.
+function parseAxis(value: string, fallbackUnit: string): { num: number; unit: string } | undefined {
+  const match = value.trim().match(/^(-?\d*\.?\d+)\s*([a-z%]*)$/i);
+  if (!match) {
+    return undefined;
   }
   // `none` isn't a real axis unit — never re-attach it (that's what produces `1none`).
-  const unit = m[2] ?? '';
+  const unit = match[2] ?? '';
   const raw = unit.toLowerCase() === 'none' ? '' : unit;
-  return { num: parseFloat(m[1] ?? ''), unit: raw || fallbackUnit };
+  return { num: parseFloat(match[1] ?? ''), unit: raw || fallbackUnit };
 }
 
 // One transform axis (X / Y / Z): a coarse drag slider beside a precise number field,
-// mirroring text-shadow's ShadowNum. The slider drives the numeric part and re-attaches
+// mirroring text-shadow's ShadowLength. The slider drives the numeric part and re-attaches
 // the value's unit; the field holds the full value (e.g. `10px`) so var()/calc() and any
 // unit survive.
-function AxisInput({
-  type,
-  label,
-  value,
-  placeholder,
-  busy,
-  onPreview,
-  onLive,
-  onCommit,
-}: {
+interface AxisInputProps {
   type: TransformType;
   label: 'X' | 'Y' | 'Z';
   value: string;
@@ -952,56 +1064,26 @@ function AxisInput({
   busy: boolean;
   /** Per-frame during a slider drag (before the throttled onLive) — lets a linked pair
    *  mirror this axis smoothly, not just on the throttled write. */
-  onPreview?: (v: string) => void;
-  onLive: (v: string) => void;
-  onCommit: (v: string) => void;
-}) {
-  const cfg = AXIS_CFG[type];
-  const parsed = parseAxis(value, cfg.unit);
-  const unit = parsed?.unit ?? cfg.unit;
-  const fmt = (slider: number): string => `${Number((slider / cfg.steps).toFixed(4))}${unit}`;
-
-  const [draft, setDraft] = useState(value);
-  const focused = useRef(false);
-  const timer = useRef<number | null>(null);
-  useEffect(() => {
-    if (!focused.current) {
-      setDraft(value);
-    }
-  }, [value]);
-  const cancel = () => {
-    if (timer.current != null) {
-      window.clearTimeout(timer.current);
-      timer.current = null;
-    }
-  };
-  useEffect(() => cancel, []);
-  const liveNow = (text: string) => {
-    const t = text.trim();
-    if (t) {
-      onLive(t);
-    }
-  };
-  const live = (text: string) => {
-    cancel();
-    timer.current = window.setTimeout(() => liveNow(text), 100);
-  };
-  const commit = (text = draft) => {
-    const t = text.trim();
-    onCommit(t || placeholder);
-  };
-  const scrub = useScrub({
-    value: draft,
-    disabled: busy,
-    onPreview: (text) => {
-      setDraft(text);
-      onPreview?.(text);
-    },
-    onInput: liveNow,
-    onCommit: (text) => {
-      setDraft(text);
-      commit(text);
-    },
+  onPreview?: (value: string) => void;
+  onLive: (value: string) => void;
+  onCommit: (value: string) => void;
+}
+function AxisInput(props: AxisInputProps) {
+  const { type, label, value, placeholder, busy, onPreview, onLive, onCommit } = props;
+  const config = AXIS_CONFIG[type];
+  const parsed = parseAxis(value, config.unit);
+  const unit = parsed?.unit ?? config.unit;
+  const fmt = (slider: number): string => `${Number((slider / config.steps).toFixed(4))}${unit}`;
+  const { draft, setDraft, focused } = useExternalDraft(value);
+  const field = useAxisField({
+    draft,
+    setDraft,
+    focused,
+    placeholder,
+    busy,
+    onPreview,
+    onLive,
+    onCommit,
   });
   return (
     <div className="embed-editor_size-row">
@@ -1013,52 +1095,26 @@ function AxisInput({
       </span>
       <div className="embed-editor_shadow-field">
         <DragSlider
-          value={Math.round((parsed?.num ?? 0) * cfg.steps)}
-          min={cfg.min * cfg.steps}
-          max={cfg.max * cfg.steps}
+          value={Math.round((parsed?.num ?? 0) * config.steps)}
+          min={config.min * config.steps}
+          max={config.max * config.steps}
           disabled={busy || !parsed}
           ariaLabel={label}
-          onPreview={(s) => {
-            const v = fmt(s);
+          onPreview={(slider) => {
+            const formatted = fmt(slider);
             if (!focused.current) {
-              setDraft(v);
+              setDraft(formatted);
             }
-            onPreview?.(v);
+            onPreview?.(formatted);
           }}
-          onInput={(s) => onLive(fmt(s))}
-          onCommit={(s) => onCommit(fmt(s))}
+          onInput={(slider) => onLive(fmt(slider))}
+          onCommit={(slider) => onCommit(fmt(slider))}
         />
         <input
-          {...scrub.input}
+          {...field.scrub.input}
           className="u-input embed-editor_size-input embed-editor_shadow-num"
           value={draft}
-          onChange={(e) => {
-            setDraft(e.target.value);
-            live(e.target.value);
-          }}
-          onFocus={() => {
-            focused.current = true;
-          }}
-          onBlur={() => {
-            focused.current = false;
-            cancel();
-            commit();
-          }}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') {
-              commitInPlace(e.currentTarget);
-              return;
-            }
-            const stepped = handleArrowStep(e);
-            if (!stepped) {
-              return;
-            }
-            e.preventDefault();
-            e.currentTarget.value = stepped.text;
-            e.currentTarget.setSelectionRange(stepped.caret, stepped.caret);
-            setDraft(stepped.text);
-            live(stepped.text);
-          }}
+          {...field.handlers}
           disabled={busy}
           spellCheck={false}
           placeholder={placeholder}
@@ -1067,6 +1123,57 @@ function AxisInput({
       </div>
     </div>
   );
+}
+
+// The axis field's typing behavior: live writes 100ms after typing stops (undelayed for
+// the scrub, which also previews every frame), commit on blur (an empty field commits
+// the placeholder), and ↑/↓ stepping. The handlers spread after the scrub's.
+function useAxisField({
+  draft,
+  setDraft,
+  focused,
+  placeholder,
+  busy,
+  onPreview,
+  onLive,
+  onCommit,
+}: {
+  draft: string;
+  setDraft: (draft: string) => void;
+  focused: React.MutableRefObject<boolean>;
+  placeholder: string;
+  busy: boolean;
+  onPreview: ((value: string) => void) | undefined;
+  onLive: (value: string) => void;
+  onCommit: (value: string) => void;
+}) {
+  const liveNow = (text: string) => {
+    const trimmed = text.trim();
+    if (trimmed) {
+      onLive(trimmed);
+    }
+  };
+  const { live, cancel } = useLiveTimer(liveNow);
+  const commit = (text = draft) => {
+    onCommit(text.trim() || placeholder);
+  };
+  const previewScrub = (text: string) => {
+    setDraft(text);
+    onPreview?.(text);
+  };
+  const commitScrub = (text: string) => {
+    setDraft(text);
+    commit(text);
+  };
+  const scrub = useScrub({
+    value: draft,
+    disabled: busy,
+    onPreview: previewScrub,
+    onInput: liveNow,
+    onCommit: commitScrub,
+  });
+  const handlers = draftInputHandlers({ focusedRef: focused, setDraft, live, cancel, commit });
+  return { scrub, handlers };
 }
 
 // The per-layer editor: a Type toggle (Move/Scale/Rotate/Skew) + X/Y/Z fields (Z is
@@ -1080,45 +1187,24 @@ function TransformEditor({
   busy: boolean;
   onChange: (patch: TransformPatch, live: boolean) => void;
 }) {
-  const id = IDENTITY[layer.type];
+  const placeholder = IDENTITY[layer.type];
   // Scale defaults to linked X & Y (uniform scale, like Webflow); the lock toggles it.
   const [locked, setLocked] = useState(true);
   const linkXY = layer.type === 'scale' && locked;
-  // Optimistic axis values so a LINKED drag moves BOTH sliders together, every frame. A
-  // live/preview write previews to the canvas but doesn't refresh the read model `layer`
-  // derives from, so the partner slider (driven by its value prop) would otherwise sit
-  // still until release. Mirror every edit here and feed these to the fields.
-  const [live, setLive] = useState<{ x: string; y: string; z: string }>({
-    x: layer.x,
-    y: layer.y,
-    z: layer.z,
+  const { values, bump } = useAxisValues(layer);
+  // An axis field's handlers, given the patch one of its edits makes.
+  const emit = (patch: TransformPatch, options: WriteOptions) => {
+    bump(patch);
+    onChange(patch, options.live);
+  };
+  const handlersFor = (patchOf: (value: string) => TransformPatch) => ({
+    onPreview: (value: string) => bump(patchOf(value)),
+    onLive: (value: string) => emit(patchOf(value), { live: true }),
+    onCommit: (value: string) => emit(patchOf(value), { live: false }),
   });
-  useEffect(() => {
-    setLive({ x: layer.x, y: layer.y, z: layer.z });
-  }, [layer.x, layer.y, layer.z]);
-  const bump = (patch: TransformPatch) =>
-    setLive((cur) => {
-      const next = { ...cur, ...patch };
-      return { x: next.x, y: next.y, z: next.z };
-    });
-  // One axis edit → the axes it actually drives (X and Y move together when linked).
-  const px = (v: string): TransformPatch => (linkXY ? { x: v, y: v } : { x: v });
-  const py = (v: string): TransformPatch => (linkXY ? { x: v, y: v } : { y: v });
-  const pz = (v: string): TransformPatch => ({ z: v });
-  const preview = (p: TransformPatch) => bump(p);
-  const emitLive = (p: TransformPatch) => {
-    bump(p);
-    onChange(p, true);
-  };
-  const emitCommit = (p: TransformPatch) => {
-    bump(p);
-    onChange(p, false);
-  };
-  const retype = (type: TransformType) => {
-    const p = retypeTransform(type);
-    bump(p);
-    onChange(p, false);
-  };
+  const axes = axisFields({ values, linkXY, handlersFor });
+  const retype = (type: TransformType) => emit(retypeTransform(type), { live: false });
+  const shared = { placeholder, busy };
   return (
     <div className="embed-editor_type-shadow-editor">
       <div className="embed-editor_size-row">
@@ -1133,229 +1219,170 @@ function TransformEditor({
       {layer.type === 'scale' ? (
         <div className="embed-editor_transform-lock-group">
           <div className="embed-editor_transform-lock-rows">
-            <AxisInput
-              type="scale"
-              label="X"
-              value={live.x}
-              placeholder={id}
-              busy={busy}
-              onPreview={(v) => preview(px(v))}
-              onLive={(v) => emitLive(px(v))}
-              onCommit={(v) => emitCommit(px(v))}
-            />
-            <AxisInput
-              type="scale"
-              label="Y"
-              value={live.y}
-              placeholder={id}
-              busy={busy}
-              onPreview={(v) => preview(py(v))}
-              onLive={(v) => emitLive(py(v))}
-              onCommit={(v) => emitCommit(py(v))}
-            />
+            <AxisInput type="scale" label="X" {...shared} {...axes.x} />
+            <AxisInput type="scale" label="Y" {...shared} {...axes.y} />
           </div>
-          <button
-            type="button"
-            className={`embed-editor_transform-lock ${locked ? 'is-locked' : ''}`}
-            onClick={() => setLocked((v) => !v)}
-            disabled={busy}
-            aria-pressed={locked}
-            title={locked ? 'Unlink X & Y' : 'Link X & Y'}
-            aria-label={locked ? 'Unlink X and Y' : 'Link X and Y'}
-          >
-            {locked ? LockIcon : UnlockIcon}
-          </button>
+          <ScaleLock
+            locked={locked}
+            busy={busy}
+            onToggle={() => setLocked((wasLocked) => !wasLocked)}
+          />
         </div>
       ) : (
         <>
-          <AxisInput
-            type={layer.type}
-            label="X"
-            value={live.x}
-            placeholder={id}
-            busy={busy}
-            onPreview={(v) => preview(px(v))}
-            onLive={(v) => emitLive(px(v))}
-            onCommit={(v) => emitCommit(px(v))}
-          />
-          <AxisInput
-            type={layer.type}
-            label="Y"
-            value={live.y}
-            placeholder={id}
-            busy={busy}
-            onPreview={(v) => preview(py(v))}
-            onLive={(v) => emitLive(py(v))}
-            onCommit={(v) => emitCommit(py(v))}
-          />
+          <AxisInput type={layer.type} label="X" {...shared} {...axes.x} />
+          <AxisInput type={layer.type} label="Y" {...shared} {...axes.y} />
         </>
       )}
-      {!hasZ(layer.type) ? null : layer.type === 'scale' ? (
+      {!hasZ(layer.type) ? undefined : layer.type === 'scale' ? (
         // Z reserves the same right gutter the lock button occupies, so its slider +
         // number field line up with X and Y.
         <div className="embed-editor_transform-lock-group">
           <div className="embed-editor_transform-lock-rows">
-            <AxisInput
-              type="scale"
-              label="Z"
-              value={live.z}
-              placeholder={id}
-              busy={busy}
-              onPreview={(v) => preview(pz(v))}
-              onLive={(v) => emitLive(pz(v))}
-              onCommit={(v) => emitCommit(pz(v))}
-            />
+            <AxisInput type="scale" label="Z" {...shared} {...axes.z} />
           </div>
           <span className="embed-editor_transform-lock-spacer" aria-hidden="true" />
         </div>
       ) : (
-        <AxisInput
-          type={layer.type}
-          label="Z"
-          value={live.z}
-          placeholder={id}
-          busy={busy}
-          onPreview={(v) => preview(pz(v))}
-          onLive={(v) => emitLive(pz(v))}
-          onCommit={(v) => emitCommit(pz(v))}
-        />
+        <AxisInput type={layer.type} label="Z" {...shared} {...axes.z} />
       )}
     </div>
+  );
+}
+
+// One axis edit → the axes it actually drives (X and Y move together when linked).
+function axisFields({
+  values,
+  linkXY,
+  handlersFor,
+}: {
+  values: { x: string; y: string; z: string };
+  linkXY: boolean;
+  handlersFor: (patchOf: (value: string) => TransformPatch) => Omit<AxisField, 'value'>;
+}): AxisFields {
+  const xPatch = (value: string): TransformPatch =>
+    linkXY ? { x: value, y: value } : { x: value };
+  const yPatch = (value: string): TransformPatch =>
+    linkXY ? { x: value, y: value } : { y: value };
+  return {
+    x: { value: values.x, ...handlersFor(xPatch) },
+    y: { value: values.y, ...handlersFor(yPatch) },
+    z: { value: values.z, ...handlersFor((value) => ({ z: value })) },
+  };
+}
+
+// One axis field's value and the handlers its edits call.
+interface AxisField {
+  value: string;
+  onPreview: (value: string) => void;
+  onLive: (value: string) => void;
+  onCommit: (value: string) => void;
+}
+type AxisFields = Record<'x' | 'y' | 'z', AxisField>;
+
+// Optimistic axis values so a LINKED drag moves BOTH sliders together, every frame. A
+// live/preview write previews to the canvas but doesn't refresh the read model `layer`
+// derives from, so the partner slider (driven by its value prop) would otherwise sit
+// still until release. Every edit is mirrored here (`bump`) and these feed the fields.
+function useAxisValues(layer: Transform) {
+  const [values, setValues] = useState<{ x: string; y: string; z: string }>({
+    x: layer.x,
+    y: layer.y,
+    z: layer.z,
+  });
+  useEffect(() => {
+    setValues({ x: layer.x, y: layer.y, z: layer.z });
+  }, [layer.x, layer.y, layer.z]);
+  const bump = (patch: TransformPatch) =>
+    setValues((current) => {
+      const next = { ...current, ...patch };
+      return { x: next.x, y: next.y, z: next.z };
+    });
+  return { values, bump };
+}
+
+function ScaleLock({
+  locked,
+  busy,
+  onToggle,
+}: {
+  locked: boolean;
+  busy: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      className={`embed-editor_transform-lock ${locked ? 'is-locked' : ''}`}
+      onClick={onToggle}
+      disabled={busy}
+      aria-pressed={locked}
+      title={locked ? 'Unlink X & Y' : 'Link X & Y'}
+      aria-label={locked ? 'Unlink X and Y' : 'Link X and Y'}
+    >
+      {locked ? LockIcon : UnlockIcon}
+    </button>
   );
 }
 
 // The transform stack: header + add, a reorderable/removable layer list, and the
 // per-layer editor in a popup — the same layer + component functionality as text-shadow.
 function TransformsRow({ props }: { props: Props }) {
-  const { read, busy, setProp, clearProp, liveSetProp } = props;
-  const d = displayOf(read('transform'));
+  const { read, busy, setProp, clearProp } = props;
+  const display = displayOf(read('transform'));
   // A self perspective lives in this same value, as a perspective() function,
   // and parseTransforms drops every function it doesn't recognise — so lift it
   // out before the layers are read and put it back in front on the way out, or
   // it vanishes the next time any layer is touched. See lib/transform-settings.
-  const { distance: selfPerspective, rest } = takeSelfPerspective(d.present ? d.value : '');
+  const { distance: selfPerspective, rest } = takeSelfPerspective(
+    display.present ? display.value : '',
+  );
   // Rows rather than bare layers: a hidden one is still in the list and still
   // in the CSS, commented out (see lib/hideable.ts).
   const rows = parseHideable(rest, ' ', parseTransforms);
-  const layers = rows.map((r) => r.item);
-  const [openIdx, setOpenIdx] = useState<number | null>(null);
-  const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
+  const layers = rows.map((row) => row.item);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const settingsRef = useRef<HTMLButtonElement>(null);
-  const put = (next: Array<Hideable<Transform>>, distance: string, live: boolean) => {
+  const put = (next: Array<Hideable<Transform>>, distance: string, options: WriteOptions) => {
     const value = withSelfPerspective(serializeHideable(next, ' ', serializeTransforms), distance);
-    if (live) {
-      if (value) {
-        liveSetProp('transform', value, false);
-      }
-      return;
-    }
-    if (value) {
-      setProp('transform', value, false);
-    } else {
-      clearProp('transform');
-    }
+    writeValue('transform', value, options, props);
   };
-  const write = (next: Array<Hideable<Transform>>, live: boolean) =>
-    put(next, selfPerspective, live);
-  const setSelfPerspective = (distance: string, live: boolean) => put(rows, distance, live);
-  const add = () => {
-    const next = [...rows, { item: blankTransform(), hidden: false }];
-    write(next, false);
-    setOpenIdx(next.length - 1);
-  };
-  const remove = (i: number) => {
-    write(
-      rows.filter((_, j) => j !== i),
-      false,
-    );
-    setOpenIdx((cur) => (cur === i ? null : cur != null && cur > i ? cur - 1 : cur));
-  };
-  const reorder = (from: number, to: number) => {
-    if (from === to) {
-      return;
-    }
-    const next = [...rows];
-    const [moved] = next.splice(from, 1);
-    if (moved === undefined) {
-      return;
-    }
-    next.splice(to, 0, moved);
-    write(next, false);
-    setOpenIdx((cur) => (cur === from ? to : cur));
-  };
-  const patch = (i: number, p: TransformPatch, live: boolean) =>
-    write(
-      rows.map((r, j) => (j === i ? { ...r, item: { ...r.item, ...p } } : r)),
-      live,
-    );
-  const toggle = (i: number) =>
-    write(
-      rows.map((r, j) => (j === i ? { ...r, hidden: !r.hidden } : r)),
-      false,
-    );
+  const write = (next: Array<Hideable<Transform>>, options: WriteOptions) =>
+    put(next, selfPerspective, options);
+  const stack = useLayerRows({ rows, blank: blankTransform, write });
+  const { openIndex } = stack;
+  const openLayer = openIndex === undefined ? undefined : layers[openIndex];
   return (
     <div className="embed-editor_type-shadows">
-      <div className="embed-editor_bg-layers-head">
-        <EffLabel label="2D & 3D transforms" prop="transform" props={props} />
-        <div className="embed-editor_bg-layers-actions">
-          <button
-            type="button"
-            ref={settingsRef}
-            className={`embed-editor_icon-btn ${settingsOpen ? 'is-active' : ''}`}
-            onClick={() => setSettingsOpen((o) => !o)}
-            disabled={busy}
-            title="Transform settings"
-            aria-label="Transform settings"
-            aria-expanded={settingsOpen}
-          >
-            <MoreIcon />
-          </button>
-          <button
-            type="button"
-            className="embed-editor_icon-btn"
-            onClick={add}
-            disabled={busy}
-            title="Add a transform"
-            aria-label="Add a transform"
-          >
-            <TransformPlusIcon />
-          </button>
-        </div>
-      </div>
+      <TransformsHead
+        props={props}
+        settingsOpen={settingsOpen}
+        settingsRef={settingsRef}
+        onToggleSettings={() => setSettingsOpen((wasOpen) => !wasOpen)}
+        onAdd={stack.add}
+      />
       <LayerList
         count={layers.length}
         busy={busy}
         ariaLabel="Transforms"
-        onOpen={(i, el) => {
-          setOpenIdx((cur) => (cur === i ? null : i));
-          setAnchorEl(el);
-        }}
-        onReorder={reorder}
-        onRemove={remove}
-        isHidden={(i) => rows[i]?.hidden ?? false}
-        onToggleHidden={toggle}
-        renderRow={(i) => {
-          const layer = layers[i];
-          if (layer === undefined) {
-            throw new Error(`Transform layer ${i} is missing`);
-          }
-          return { preview: transformTypeIcon(layer.type), label: transformLabel(layer) };
-        }}
+        onOpen={stack.open}
+        onReorder={stack.reorder}
+        onRemove={stack.remove}
+        isHidden={stack.isHidden}
+        onToggleHidden={stack.toggle}
+        renderRow={(i) => transformRow(layers, i)}
       />
-      {openIdx != null && anchorEl && layers[openIdx] ? (
-        <LayerPopover anchorEl={anchorEl} ariaLabel="Transform" onClose={() => setOpenIdx(null)}>
+      {openIndex !== undefined && stack.anchorElement && openLayer ? (
+        <LayerPopover anchorEl={stack.anchorElement} ariaLabel="Transform" onClose={stack.close}>
           <TransformEditor
-            layer={layers[openIdx]}
+            layer={openLayer}
             busy={busy}
-            onChange={(p, live) => {
-              if (openIdx !== null) {
-                patch(openIdx, p, live);
-              }
-            }}
+            onChange={(patch, live) =>
+              stack.update(openIndex, { live }, (item) => ({ ...item, ...patch }))
+            }
           />
         </LayerPopover>
-      ) : null}
+      ) : undefined}
       {settingsOpen && settingsRef.current ? (
         <LayerPopover
           anchorEl={settingsRef.current}
@@ -1368,10 +1395,65 @@ function TransformsRow({ props }: { props: Props }) {
             setProp={setProp}
             clearProp={clearProp}
             selfPerspective={selfPerspective}
-            onSelfPerspective={setSelfPerspective}
+            onSelfPerspective={(distance, live) => put(rows, distance, { live })}
           />
         </LayerPopover>
-      ) : null}
+      ) : undefined}
+    </div>
+  );
+}
+
+// A row of the transform list: its type's glyph and its label.
+function transformRow(layers: Transform[], i: number) {
+  const layer = layers[i];
+  if (layer === undefined) {
+    throw new Error(`Transform layer ${i} is missing`);
+  }
+  return { preview: transformTypeIcon(layer.type), label: transformLabel(layer) };
+}
+
+// The transforms header: the label, the settings (⋯) toggle, and add.
+function TransformsHead({
+  props,
+  settingsOpen,
+  settingsRef,
+  onToggleSettings,
+  onAdd,
+}: {
+  props: Props;
+  settingsOpen: boolean;
+  settingsRef: React.RefObject<HTMLButtonElement>;
+  onToggleSettings: () => void;
+  onAdd: () => void;
+}) {
+  const { busy } = props;
+  return (
+    <div className="embed-editor_bg-layers-head">
+      <EffLabel label="2D & 3D transforms" prop="transform" props={props} />
+      <div className="embed-editor_bg-layers-actions">
+        <button
+          type="button"
+          ref={settingsRef}
+          className={`embed-editor_icon-btn ${settingsOpen ? 'is-active' : ''}`}
+          onClick={onToggleSettings}
+          disabled={busy}
+          title="Transform settings"
+          aria-label="Transform settings"
+          aria-expanded={settingsOpen}
+        >
+          <MoreIcon />
+        </button>
+        <button
+          type="button"
+          className="embed-editor_icon-btn"
+          onClick={onAdd}
+          disabled={busy}
+          title="Add a transform"
+          aria-label="Add a transform"
+        >
+          <TransformPlusIcon />
+        </button>
+      </div>
     </div>
   );
 }
@@ -1391,13 +1473,13 @@ const ClockIcon = () => (
   </svg>
 );
 function EaseCurveIcon({ timing }: { timing: string }) {
-  const b = easingToBezier(timing || 'ease');
-  const S = 16;
-  const pt = (x: number, y: number) => `${(x * S).toFixed(1)} ${(S - y * S).toFixed(1)}`;
+  const bezier = easingToBezier(timing || 'ease');
+  const size = 16;
+  const pt = (x: number, y: number) => `${(x * size).toFixed(1)} ${(size - y * size).toFixed(1)}`;
   return (
-    <svg viewBox={`-2 -5 ${S + 4} ${S + 10}`} width="16" height="16" aria-hidden="true">
+    <svg viewBox={`-2 -5 ${size + 4} ${size + 10}`} width="16" height="16" aria-hidden="true">
       <path
-        d={`M ${pt(0, 0)} C ${pt(b[0], b[1])} ${pt(b[2], b[3])} ${pt(1, 1)}`}
+        d={`M ${pt(0, 0)} C ${pt(bezier[0], bezier[1])} ${pt(bezier[2], bezier[3])} ${pt(1, 1)}`}
         fill="none"
         stroke="currentColor"
         strokeWidth="1.4"
@@ -1406,21 +1488,21 @@ function EaseCurveIcon({ timing }: { timing: string }) {
   );
 }
 
-function durationToMs(v: string): number {
-  const m = v
+function durationToMs(value: string): number {
+  const match = value
     .trim()
     .toLowerCase()
     .match(/^(-?[\d.]+)(ms|s)?$/);
-  if (!m) {
+  if (!match) {
     return 0;
   }
-  const n = parseFloat(m[1] ?? '');
-  return m[2] === 's' ? Math.round(n * 1000) : Math.round(n);
+  const amount = parseFloat(match[1] ?? '');
+  return match[2] === 's' ? Math.round(amount * 1000) : Math.round(amount);
 }
 // The value's current time unit (so the slider keeps writing seconds when the value
 // is in seconds instead of silently rewriting 1.2s → 1200ms). Non-time values → ms.
-function durationUnit(v: string): 'ms' | 's' {
-  return /^-?[\d.]+s$/i.test(v.trim()) ? 's' : 'ms';
+function durationUnit(value: string): 'ms' | 's' {
+  return /^-?[\d.]+s$/i.test(value.trim()) ? 's' : 'ms';
 }
 // Format a slider's ms value back into the given unit (seconds rounded to 2 dp).
 function fmtDuration(ms: number, unit: 'ms' | 's'): string {
@@ -1445,7 +1527,7 @@ function DurationField({
   // While the slider is being dragged the field shows where it is; the rest of
   // the time it shows what is set. The field is the panel's own (components/
   // LiveInput), so a duration can be a variable here like anywhere else.
-  const [preview, setPreview] = useState<string | null>(null);
+  const [preview, setPreview] = useState<string | undefined>(undefined);
   return (
     <div className="embed-editor_trans-duration">
       <DragSlider
@@ -1454,11 +1536,11 @@ function DurationField({
         max={2000}
         disabled={busy}
         ariaLabel="Duration"
-        onPreview={(n) => setPreview(fmtDuration(n, unit))}
-        onInput={(n) => onLive(fmtDuration(n, unit))}
-        onCommit={(n) => {
-          setPreview(null);
-          onCommit(fmtDuration(n, unit));
+        onPreview={(milliseconds) => setPreview(fmtDuration(milliseconds, unit))}
+        onInput={(milliseconds) => onLive(fmtDuration(milliseconds, unit))}
+        onCommit={(milliseconds) => {
+          setPreview(undefined);
+          onCommit(fmtDuration(milliseconds, unit));
         }}
       />
       <LiveInput
@@ -1467,8 +1549,8 @@ function DurationField({
         ariaLabel="Duration"
         placeholder="0ms"
         prop="transition-duration"
-        onLive={(v) => onLive(v.trim() || '0ms')}
-        onCommit={(v) => onCommit(v.trim() || '0ms')}
+        onLive={(next) => onLive(next.trim() || '0ms')}
+        onCommit={(next) => onCommit(next.trim() || '0ms')}
       />
     </div>
   );
@@ -1506,7 +1588,7 @@ function EasingField({
         placeholder="ease"
         prop="transition-timing-function"
         onLive={() => {}}
-        onCommit={(v) => onCommit(v.trim() || 'ease')}
+        onCommit={(next) => onCommit(next.trim() || 'ease')}
       />
     </div>
   );
@@ -1534,7 +1616,7 @@ function TransitionEditor({
         <Select
           value={transition.property}
           options={options}
-          onChange={(v) => onChange({ property: v }, false)}
+          onChange={(next) => onChange({ property: next }, false)}
           ariaLabel="Transition type"
           disabled={busy}
           searchable
@@ -1545,8 +1627,8 @@ function TransitionEditor({
         <DurationField
           value={transition.duration}
           busy={busy}
-          onCommit={(v) => onChange({ duration: v }, false)}
-          onLive={(v) => onChange({ duration: v }, true)}
+          onCommit={(next) => onChange({ duration: next }, false)}
+          onLive={(next) => onChange({ duration: next }, true)}
         />
       </div>
       <div className="embed-editor_size-row">
@@ -1554,7 +1636,7 @@ function TransitionEditor({
         <EasingField
           value={transition.timing}
           busy={busy}
-          onCommit={(v) => onChange({ timing: v }, false)}
+          onCommit={(next) => onChange({ timing: next }, false)}
           onEditEasing={onEditEasing}
         />
       </div>
@@ -1563,64 +1645,22 @@ function TransitionEditor({
 }
 
 function TransitionsRow({ props }: { props: Props }) {
-  const { read, busy, setProp, clearProp, liveSetProp } = props;
-  const d = displayOf(read('transition'));
+  const { read, busy } = props;
+  const display = displayOf(read('transition'));
   // `transition` is comma-separated, unlike transform and filter.
-  const rows = parseHideable(d.present ? d.value : '', ',', parseTransitions);
-  const list = rows.map((r) => r.item);
-  const [openIdx, setOpenIdx] = useState<number | null>(null);
-  const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
+  const rows = parseHideable(display.present ? display.value : '', ',', parseTransitions);
+  const list = rows.map((row) => row.item);
   const [easingOpen, setEasingOpen] = useState(false);
-  const write = (next: Array<Hideable<Transition>>, live: boolean) => {
-    const value = serializeHideable(next, ',', serializeTransitions);
-    if (live) {
-      if (value) {
-        liveSetProp('transition', value, false);
-      }
-      return;
-    }
-    if (value) {
-      setProp('transition', value, false);
-    } else {
-      clearProp('transition');
+  const write = (next: Array<Hideable<Transition>>, options: WriteOptions) =>
+    writeValue('transition', serializeHideable(next, ',', serializeTransitions), options, props);
+  const stack = useLayerRows({ rows, blank: blankTransition, write });
+  const { openIndex } = stack;
+  const current = openIndex !== undefined ? list[openIndex] : undefined;
+  const patch = (changes: TransitionPatch, options: WriteOptions) => {
+    if (openIndex !== undefined) {
+      stack.update(openIndex, options, (item) => ({ ...item, ...changes }));
     }
   };
-  const add = () => {
-    const next = [...rows, { item: blankTransition(), hidden: false }];
-    write(next, false);
-    setOpenIdx(next.length - 1);
-  };
-  const remove = (i: number) => {
-    write(
-      rows.filter((_, j) => j !== i),
-      false,
-    );
-    setOpenIdx((cur) => (cur === i ? null : cur != null && cur > i ? cur - 1 : cur));
-  };
-  const reorder = (from: number, to: number) => {
-    if (from === to) {
-      return;
-    }
-    const next = [...rows];
-    const [moved] = next.splice(from, 1);
-    if (moved === undefined) {
-      return;
-    }
-    next.splice(to, 0, moved);
-    write(next, false);
-    setOpenIdx((cur) => (cur === from ? to : cur));
-  };
-  const patch = (i: number, p: TransitionPatch, live: boolean) =>
-    write(
-      rows.map((r, j) => (j === i ? { ...r, item: { ...r.item, ...p } } : r)),
-      live,
-    );
-  const toggle = (i: number) =>
-    write(
-      rows.map((r, j) => (j === i ? { ...r, hidden: !r.hidden } : r)),
-      false,
-    );
-  const cur = openIdx != null ? list[openIdx] : null;
 
   return (
     <div className="embed-editor_type-shadows embed-editor_transitions">
@@ -1632,7 +1672,7 @@ function TransitionsRow({ props }: { props: Props }) {
           disabled={busy}
           title="Add transition"
           aria-label="Add transition"
-          onClick={add}
+          onClick={stack.add}
         >
           <PlusIcon />
         </button>
@@ -1641,14 +1681,11 @@ function TransitionsRow({ props }: { props: Props }) {
         count={list.length}
         busy={busy}
         ariaLabel="Transitions"
-        onOpen={(i, el) => {
-          setOpenIdx((cur) => (cur === i ? null : i));
-          setAnchorEl(el);
-        }}
-        onReorder={reorder}
-        onRemove={remove}
-        isHidden={(i) => rows[i]?.hidden ?? false}
-        onToggleHidden={toggle}
+        onOpen={stack.open}
+        onReorder={stack.reorder}
+        onRemove={stack.remove}
+        isHidden={stack.isHidden}
+        onToggleHidden={stack.toggle}
         renderRow={(i) => ({
           preview: (
             <span className="embed-editor_trans-clock" aria-hidden="true">
@@ -1658,31 +1695,23 @@ function TransitionsRow({ props }: { props: Props }) {
           label: transitionLabel(list[i] ?? blankTransition()),
         })}
       />
-      {openIdx != null && anchorEl && cur ? (
-        <LayerPopover anchorEl={anchorEl} ariaLabel="Transition" onClose={() => setOpenIdx(null)}>
+      {openIndex !== undefined && stack.anchorElement && current ? (
+        <LayerPopover anchorEl={stack.anchorElement} ariaLabel="Transition" onClose={stack.close}>
           <TransitionEditor
-            transition={cur}
+            transition={current}
             busy={busy}
-            onChange={(p, live) => {
-              if (openIdx !== null) {
-                patch(openIdx, p, live);
-              }
-            }}
+            onChange={(changes, live) => patch(changes, { live })}
             onEditEasing={() => setEasingOpen(true)}
           />
         </LayerPopover>
-      ) : null}
-      {easingOpen && cur ? (
+      ) : undefined}
+      {easingOpen && current ? (
         <EasingEditor
-          value={cur.timing || 'ease'}
+          value={current.timing || 'ease'}
           onClose={() => setEasingOpen(false)}
-          onChange={(timing) => {
-            if (openIdx !== null) {
-              patch(openIdx, { timing }, false);
-            }
-          }}
+          onChange={(timing) => patch({ timing }, { live: false })}
         />
-      ) : null}
+      ) : undefined}
     </div>
   );
 }
@@ -1712,43 +1741,43 @@ function BoxShadowEditor({
         <SegmentedControl
           value={shadow.inset ? 'inset' : 'outset'}
           options={BOX_SHADOW_TYPES}
-          onChange={(v) => onChange({ inset: v === 'inset' }, false)}
+          onChange={(next) => onChange({ inset: next === 'inset' }, false)}
           ariaLabel="Shadow type"
           disabled={busy}
         />
       </div>
-      <ShadowNum
+      <ShadowLength
         label="X"
         value={shadow.x}
         busy={busy}
-        onCommit={(v) => onChange({ x: v }, false)}
-        onLive={(v) => onChange({ x: v }, true)}
+        onCommit={(next) => onChange({ x: next }, false)}
+        onLive={(next) => onChange({ x: next }, true)}
       />
-      <ShadowNum
+      <ShadowLength
         label="Y"
         value={shadow.y}
         busy={busy}
-        onCommit={(v) => onChange({ y: v }, false)}
-        onLive={(v) => onChange({ y: v }, true)}
+        onCommit={(next) => onChange({ y: next }, false)}
+        onLive={(next) => onChange({ y: next }, true)}
       />
-      <ShadowNum
+      <ShadowLength
         label="Blur"
         value={shadow.blur}
         busy={busy}
-        onCommit={(v) => onChange({ blur: v }, false)}
-        onLive={(v) => onChange({ blur: v }, true)}
+        onCommit={(next) => onChange({ blur: next }, false)}
+        onLive={(next) => onChange({ blur: next }, true)}
       />
-      <ShadowNum
+      <ShadowLength
         label="Size"
         value={shadow.spread}
         busy={busy}
-        onCommit={(v) => onChange({ spread: v }, false)}
-        onLive={(v) => onChange({ spread: v }, true)}
+        onCommit={(next) => onChange({ spread: next }, false)}
+        onLive={(next) => onChange({ spread: next }, true)}
       />
       <ShadowColorRow
         color={shadow.color}
         busy={busy}
-        onChange={(c, live) => onChange({ color: c }, live)}
+        onChange={(color, live) => onChange({ color: color }, live)}
       />
     </div>
   );
@@ -1761,61 +1790,15 @@ const BOX_SHADOW_PREVIEW_CHECKERBOARD =
 // The box-shadow stack: header + add, a reorderable/removable layer list, and the
 // per-shadow editor in a popup — the same layer + component functionality as text-shadow.
 function BoxShadowsRow({ props }: { props: Props }) {
-  const { read, busy, setProp, clearProp, liveSetProp } = props;
-  const d = displayOf(read('box-shadow'));
-  const rows = parseHideable(d.present ? d.value : '', ',', parseBoxShadows);
-  const shadows = rows.map((r) => r.item);
-  const [openIdx, setOpenIdx] = useState<number | null>(null);
-  const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
-  const write = (next: Array<Hideable<BoxShadow>>, live: boolean) => {
-    const value = serializeHideable(next, ',', serializeBoxShadows);
-    if (live) {
-      if (value) {
-        liveSetProp('box-shadow', value, false);
-      }
-      return;
-    }
-    if (value) {
-      setProp('box-shadow', value, false);
-    } else {
-      clearProp('box-shadow');
-    }
-  };
-  const add = () => {
-    const next = [...rows, { item: blankBoxShadow(), hidden: false }];
-    write(next, false);
-    setOpenIdx(next.length - 1);
-  };
-  const remove = (i: number) => {
-    write(
-      rows.filter((_, j) => j !== i),
-      false,
-    );
-    setOpenIdx((cur) => (cur === i ? null : cur != null && cur > i ? cur - 1 : cur));
-  };
-  const reorder = (from: number, to: number) => {
-    if (from === to) {
-      return;
-    }
-    const next = [...rows];
-    const [moved] = next.splice(from, 1);
-    if (moved === undefined) {
-      return;
-    }
-    next.splice(to, 0, moved);
-    write(next, false);
-    setOpenIdx((cur) => (cur === from ? to : cur));
-  };
-  const patch = (i: number, p: BoxShadowPatch, live: boolean) =>
-    write(
-      rows.map((r, j) => (j === i ? { ...r, item: { ...r.item, ...p } } : r)),
-      live,
-    );
-  const toggle = (i: number) =>
-    write(
-      rows.map((r, j) => (j === i ? { ...r, hidden: !r.hidden } : r)),
-      false,
-    );
+  const { read, busy } = props;
+  const display = displayOf(read('box-shadow'));
+  const rows = parseHideable(display.present ? display.value : '', ',', parseBoxShadows);
+  const shadows = rows.map((row) => row.item);
+  const write = (next: Array<Hideable<BoxShadow>>, options: WriteOptions) =>
+    writeValue('box-shadow', serializeHideable(next, ',', serializeBoxShadows), options, props);
+  const stack = useLayerRows({ rows, blank: blankBoxShadow, write });
+  const { openIndex } = stack;
+  const openShadow = openIndex === undefined ? undefined : shadows[openIndex];
   return (
     <div className="embed-editor_type-shadows">
       <div className="embed-editor_bg-layers-head">
@@ -1823,7 +1806,7 @@ function BoxShadowsRow({ props }: { props: Props }) {
         <button
           type="button"
           className="embed-editor_icon-btn"
-          onClick={add}
+          onClick={stack.add}
           disabled={busy}
           title="Add a shadow"
           aria-label="Add a box shadow"
@@ -1835,50 +1818,48 @@ function BoxShadowsRow({ props }: { props: Props }) {
         count={shadows.length}
         busy={busy}
         ariaLabel="Box shadows"
-        onOpen={(i, el) => {
-          setOpenIdx((cur) => (cur === i ? null : i));
-          setAnchorEl(el);
-        }}
-        onReorder={reorder}
-        onRemove={remove}
-        isHidden={(i) => rows[i]?.hidden ?? false}
-        onToggleHidden={toggle}
-        renderRow={(i) => {
-          const shadow = shadows[i];
-          if (shadow === undefined) {
-            throw new Error(`Box shadow ${i} is missing`);
-          }
-          return {
-            preview: (
-              <span
-                className="embed-editor_bg-layer-preview"
-                style={{
-                  background:
-                    `linear-gradient(${shadow.color}, ${shadow.color}), ` +
-                    BOX_SHADOW_PREVIEW_CHECKERBOARD,
-                }}
-                aria-hidden="true"
-              />
-            ),
-            label: boxShadowLabel(shadow),
-          };
-        }}
+        onOpen={stack.open}
+        onReorder={stack.reorder}
+        onRemove={stack.remove}
+        isHidden={stack.isHidden}
+        onToggleHidden={stack.toggle}
+        renderRow={(i) => boxShadowRow(shadows, i)}
       />
-      {openIdx != null && anchorEl && shadows[openIdx] ? (
-        <LayerPopover anchorEl={anchorEl} ariaLabel="Box shadow" onClose={() => setOpenIdx(null)}>
+      {openIndex !== undefined && stack.anchorElement && openShadow ? (
+        <LayerPopover anchorEl={stack.anchorElement} ariaLabel="Box shadow" onClose={stack.close}>
           <BoxShadowEditor
-            shadow={shadows[openIdx]}
+            shadow={openShadow}
             busy={busy}
-            onChange={(p, live) => {
-              if (openIdx !== null) {
-                patch(openIdx, p, live);
-              }
-            }}
+            onChange={(patch, live) =>
+              stack.update(openIndex, { live }, (item) => ({ ...item, ...patch }))
+            }
           />
         </LayerPopover>
-      ) : null}
+      ) : undefined}
     </div>
   );
+}
+
+// A row of the box-shadow list: its colour over a transparency checkerboard, and its
+// label.
+function boxShadowRow(shadows: BoxShadow[], i: number) {
+  const shadow = shadows[i];
+  if (shadow === undefined) {
+    throw new Error(`Box shadow ${i} is missing`);
+  }
+  return {
+    preview: (
+      <span
+        className="embed-editor_bg-layer-preview"
+        style={{
+          background:
+            `linear-gradient(${shadow.color}, ${shadow.color}), ` + BOX_SHADOW_PREVIEW_CHECKERBOARD,
+        }}
+        aria-hidden="true"
+      />
+    ),
+    label: boxShadowLabel(shadow),
+  };
 }
 
 // ─────────────────────────── Section ───────────────────────────
@@ -1968,32 +1949,36 @@ function ClipGlyph({ type }: { type: string }) {
 // A cheap classifier for the trigger label — names the shape without pulling the huge
 // editor module (and its full parser) into the main bundle.
 function clipPathType(value: string): string {
-  const v = value.trim().toLowerCase();
-  if (!v || v === 'none') {
+  const normalized = value.trim().toLowerCase();
+  if (!normalized || normalized === 'none') {
     return 'None';
   }
-  if (v.startsWith('polygon')) {
+  if (normalized.startsWith('polygon')) {
     return 'Polygon';
   }
-  if (v.startsWith('circle')) {
+  if (normalized.startsWith('circle')) {
     return 'Circle';
   }
-  if (v.startsWith('ellipse')) {
+  if (normalized.startsWith('ellipse')) {
     return 'Ellipse';
   }
-  if (v.startsWith('inset') || v.startsWith('rect') || v.startsWith('xywh')) {
+  if (
+    normalized.startsWith('inset') ||
+    normalized.startsWith('rect') ||
+    normalized.startsWith('xywh')
+  ) {
     return 'Inset';
   }
-  if (v.startsWith('path')) {
+  if (normalized.startsWith('path')) {
     return 'Path';
   }
-  if (v.startsWith('shape')) {
+  if (normalized.startsWith('shape')) {
     return 'Shape';
   }
-  if (v.startsWith('url')) {
+  if (normalized.startsWith('url')) {
     return 'SVG';
   }
-  if (v.startsWith('var')) {
+  if (normalized.startsWith('var')) {
     return 'Variable';
   }
   return 'Custom';
@@ -2004,45 +1989,12 @@ function clipPathType(value: string): string {
 // editor's clip-path writes are routed to the panel's selected selector via
 // setProp/clearProp (so its own class picker is hidden).
 function ClipPathModal({ props, onClose }: { props: Props; onClose: () => void }) {
-  const { setProp, liveSetProp, clearProp } = props;
-  const pending = useRef<string | null>(null);
-  const timer = useRef<number | null>(null);
-  const commit = () => {
-    if (timer.current != null) {
-      window.clearTimeout(timer.current);
-      timer.current = null;
-    }
-    if (pending.current != null) {
-      setProp('clip-path', pending.current, false);
-      pending.current = null;
-    }
-  };
-  // Flush any un-committed edit if the popup closes before it settles.
-  useEffect(() => commit, []);
-  // Stream fast previews as the shape is dragged; commit authoritatively (with the
-  // panel's native→embed fallback) once edits settle, so a drag doesn't fire a
-  // read-back per frame.
-  const onApply = (value: string) => {
-    liveSetProp('clip-path', value, false);
-    pending.current = value;
-    if (timer.current != null) {
-      window.clearTimeout(timer.current);
-    }
-    timer.current = window.setTimeout(commit, 350);
-  };
-  const onClear = () => {
-    if (timer.current != null) {
-      window.clearTimeout(timer.current);
-      timer.current = null;
-    }
-    pending.current = null;
-    clearProp('clip-path');
-  };
+  const { onApply, onClear } = useSettledClipPath(props);
   return createPortal(
     <div
       className="embed-editor_bg-modal-backdrop"
-      onMouseDown={(e) => {
-        if (e.target === e.currentTarget) {
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) {
           onClose();
         }
       }}
@@ -2080,12 +2032,54 @@ function ClipPathModal({ props, onClose }: { props: Props; onClose: () => void }
   );
 }
 
+// Stream fast previews as the shape is dragged; commit authoritatively (with the
+// panel's native→embed fallback) once edits settle, so a drag doesn't fire a read-back
+// per frame. Any un-committed edit is flushed when the popup closes before it settles.
+function useSettledClipPath({ setProp, liveSetProp, clearProp }: Props) {
+  const pending = useRef<string | undefined>(undefined);
+  const timer = useRef<number | undefined>(undefined);
+  const commit = () => {
+    if (timer.current !== undefined) {
+      window.clearTimeout(timer.current);
+      timer.current = undefined;
+    }
+    if (pending.current !== undefined) {
+      setProp('clip-path', pending.current, false);
+      pending.current = undefined;
+    }
+  };
+  // The unmount flush calls the latest render's commit, through a ref, so the effect
+  // runs once.
+  const commitRef = useRef(commit);
+  useEffect(() => {
+    commitRef.current = commit;
+  });
+  useEffect(() => () => commitRef.current(), []);
+  const onApply = (value: string) => {
+    liveSetProp('clip-path', value, false);
+    pending.current = value;
+    if (timer.current !== undefined) {
+      window.clearTimeout(timer.current);
+    }
+    timer.current = window.setTimeout(commit, 350);
+  };
+  const onClear = () => {
+    if (timer.current !== undefined) {
+      window.clearTimeout(timer.current);
+      timer.current = undefined;
+    }
+    pending.current = undefined;
+    clearProp('clip-path');
+  };
+  return { onApply, onClear };
+}
+
 // The Clip row: the label (blue/clear/provenance like every other prop) + a button
 // showing the current clip-path type. Clicking opens the visual editor popup.
 function ClipPathRow({ props }: { props: Props }) {
   const { read, busy } = props;
-  const d = displayOf(read('clip-path'));
-  const raw = d.present ? d.value : displayOf(read('-webkit-clip-path')).value;
+  const display = displayOf(read('clip-path'));
+  const raw = display.present ? display.value : displayOf(read('-webkit-clip-path')).value;
   const [open, setOpen] = useState(false);
   const type = clipPathType(raw);
   return (
@@ -2104,15 +2098,13 @@ function ClipPathRow({ props }: { props: Props }) {
         </span>
         <ClipEditIcon />
       </button>
-      {open ? <ClipPathModal props={props} onClose={() => setOpen(false)} /> : null}
+      {open ? <ClipPathModal props={props} onClose={() => setOpen(false)} /> : undefined}
     </div>
   );
 }
 
 export default function EffectsSection(props: Props) {
   const { read, busy, setProp } = props;
-  const outline = displayOf(read('outline-style'));
-  const outlineColor = displayOf(read('outline-color'));
   const events = displayOf(read('pointer-events'));
 
   return (
@@ -2128,34 +2120,7 @@ export default function EffectsSection(props: Props) {
       />
 
       <OpacityRow props={props} />
-
-      <div className="embed-editor_size-row">
-        <EffLabel label="Outline" prop="outline-style" props={props} />
-        <SegmentedField
-          value={outline.present ? outline.value : ''}
-          important={outline.important}
-          options={OUTLINE_OPTS}
-          prop="outline-style"
-          fallback="none"
-          busy={busy}
-          onCommit={(v, imp) => setProp('outline-style', v, imp)}
-          ariaLabel="Outline style"
-        />
-      </div>
-      <div className="embed-editor_size-row">
-        <EffLabel label="Width" prop="outline-width" props={props} />
-        <div className="embed-editor_eff-outline-pair">
-          <LiveText prop="outline-width" placeholder="0" props={props} />
-          <EffLabel label="Offset" prop="outline-offset" props={props} />
-          <LiveText prop="outline-offset" placeholder="0" props={props} />
-        </div>
-      </div>
-      <div className="embed-editor_size-row">
-        <EffLabel label="Color" prop="outline-color" props={props} />
-        <div className="embed-editor_bg-inline">
-          <OutlineColor props={props} value={outlineColor.present ? outlineColor.value : ''} />
-        </div>
-      </div>
+      <OutlineRows props={props} />
 
       <BoxShadowsRow props={props} />
       <TransformsRow props={props} />
@@ -2181,14 +2146,52 @@ export default function EffectsSection(props: Props) {
         <SegmentedField
           value={events.present ? events.value : ''}
           important={events.important}
-          options={EVENTS_OPTS}
+          options={EVENTS_OPTIONS}
           prop="pointer-events"
           fallback="auto"
           busy={busy}
-          onCommit={(v, imp) => setProp('pointer-events', v, imp)}
+          onCommit={(next, imp) => setProp('pointer-events', next, imp)}
           ariaLabel="Pointer events"
         />
       </div>
     </div>
+  );
+}
+
+// Outline: its style, width and offset, and colour.
+function OutlineRows({ props }: { props: Props }) {
+  const { read, busy, setProp } = props;
+  const outline = displayOf(read('outline-style'));
+  const outlineColor = displayOf(read('outline-color'));
+  return (
+    <>
+      <div className="embed-editor_size-row">
+        <EffLabel label="Outline" prop="outline-style" props={props} />
+        <SegmentedField
+          value={outline.present ? outline.value : ''}
+          important={outline.important}
+          options={OUTLINE_OPTIONS}
+          prop="outline-style"
+          fallback="none"
+          busy={busy}
+          onCommit={(next, imp) => setProp('outline-style', next, imp)}
+          ariaLabel="Outline style"
+        />
+      </div>
+      <div className="embed-editor_size-row">
+        <EffLabel label="Width" prop="outline-width" props={props} />
+        <div className="embed-editor_eff-outline-pair">
+          <LiveText prop="outline-width" placeholder="0" props={props} />
+          <EffLabel label="Offset" prop="outline-offset" props={props} />
+          <LiveText prop="outline-offset" placeholder="0" props={props} />
+        </div>
+      </div>
+      <div className="embed-editor_size-row">
+        <EffLabel label="Color" prop="outline-color" props={props} />
+        <div className="embed-editor_bg-inline">
+          <OutlineColor props={props} value={outlineColor.present ? outlineColor.value : ''} />
+        </div>
+      </div>
+    </>
   );
 }

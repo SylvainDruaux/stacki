@@ -13,20 +13,20 @@
 // overflow-x clipped whatever hung past its edge.
 
 /** The panel's visible box — what a popover must stay inside. */
-export function panelBox(anchor: Element): HTMLElement | null {
+export function panelBox(anchor: Element): HTMLElement | undefined {
   // `.app_body` first (moden), where `.embed-editor_root` is an inner box and
   // the wrong answer; `closest` on both at once would pick the nearer root.
   return (
     anchor.closest<HTMLElement>('.app_body') ??
     anchor.closest<HTMLElement>('.embed-editor_root') ??
-    null
+    undefined
   );
 }
 
 /** That box's rect, or the window when the panel isn't found. */
 export function panelBounds(anchor: Element): DOMRect {
-  const el = panelBox(anchor);
-  return (el ?? document.documentElement).getBoundingClientRect();
+  const box = panelBox(anchor);
+  return (box ?? document.documentElement).getBoundingClientRect();
 }
 
 /**
@@ -39,10 +39,10 @@ export function panelBounds(anchor: Element): DOMRect {
  * variables for that case (see StylePanel.tsx).
  */
 export function panelSpan(anchor: Element): { left: number; width: number } {
-  const el = panelBox(anchor);
-  if (el) {
-    const r = el.getBoundingClientRect();
-    return { left: r.left, width: r.width };
+  const box = panelBox(anchor);
+  if (box) {
+    const bounds = box.getBoundingClientRect();
+    return { left: bounds.left, width: bounds.width };
   }
   const root = getComputedStyle(document.documentElement);
   const left = parseFloat(root.getPropertyValue('--style-panel-left'));

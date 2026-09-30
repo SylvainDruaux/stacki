@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import type { CSSProperties, ReactNode } from 'react';
+import type { CSSProperties, KeyboardEvent as ReactKeyboardEvent, ReactNode } from 'react';
 import FieldLabel from './components/FieldLabel';
 import { PropTip, ProvenanceLabel } from './components/PropTip';
 import { useHighlight } from './lib/computed-style';
@@ -31,7 +31,7 @@ import { commitInPlace } from './lib/commit-in-place';
 
 type SetProp = (prop: string, value: string, important: boolean) => void;
 type ClearProp = (prop: string | string[]) => void;
-type LiveSetProp = (prop: string, value: string | null, important: boolean) => void;
+type LiveSetProp = (prop: string, value: string | undefined, important: boolean) => void;
 type Read = (prop: string) => ResolvedProp | undefined;
 
 type Props = {
@@ -92,7 +92,7 @@ function parseImportant(input: string): { value: string; important: boolean } {
 function SizeLabel({
   label,
   prop,
-  d,
+  display,
   contributors,
   busy,
   scrubProps,
@@ -102,7 +102,7 @@ function SizeLabel({
 }: {
   label: string;
   prop: string;
-  d: Display;
+  display: Display;
   contributors: Contributor[];
   busy: boolean;
   scrubProps?: ScrubHandlers;
@@ -110,24 +110,24 @@ function SizeLabel({
   onProvenance: (prop: string, anchor: DOMRect) => void;
   onSelectSelector: (selector: string, prop?: string) => void;
 }) {
-  if (d.present && !d.isSelected) {
+  if (display.present && !display.isSelected) {
     return <ProvenanceLabel label={label} props={[prop]} busy={busy} onProvenance={onProvenance} />;
   }
   return (
     <FieldLabel
-      className={`embed-editor_size-label ${d.overridden ? 'is-overridden' : ''}`}
-      active={d.isSelected}
+      className={`embed-editor_size-label ${display.overridden ? 'is-overridden' : ''}`}
+      active={display.isSelected}
       disabled={busy}
       onReset={onClear}
       resetLabel="Clear"
       tooltip={<PropTip props={[prop]} />}
-      {...(d.overridden ? { title: `Overridden by ${d.winnerSelector}` } : {})}
+      {...(display.overridden ? { title: `Overridden by ${display.winnerSelector}` } : {})}
       menuNote={(close) => (
         <ProvenanceList
           contributors={contributors}
           prop={prop}
-          onSelect={(sel, p) => {
-            onSelectSelector(sel, p);
+          onSelect={(selector, selectorProp) => {
+            onSelectSelector(selector, selectorProp);
             close();
           }}
         />
@@ -157,72 +157,18 @@ function LivePropField({
   label: string;
   placeholder: string;
 } & Props) {
-  const d = displayOf(read(prop));
-  const external = d.present ? (d.important ? `${d.value} !important` : d.value) : '';
-  const { draft, setDraft, focused, cleared } = useFieldDraft(external, busy);
-  const liveTimer = useRef<number | null>(null);
-
-  const cancelLive = () => {
-    if (liveTimer.current != null) {
-      window.clearTimeout(liveTimer.current);
-      liveTimer.current = null;
-    }
-  };
-  useEffect(() => cancelLive, []);
-
-  // Undelayed live write for the scrub, which does its own throttling — a debounce reset
-  // by every mouse move would never fire mid-drag.
-  const liveNow = (text: string) => {
-    const trimmed = text.trim();
-    if (!trimmed) {
-      return;
-    }
-    const parsed = parseImportant(trimmed);
-    liveSetProp(prop, parsed.value, parsed.important);
-  };
-
-  const scheduleLive = (text: string) => {
-    cancelLive();
-    liveTimer.current = window.setTimeout(() => {
-      liveTimer.current = null;
-      liveNow(text);
-    }, 100);
-  };
-
-  const commit = (text = draft) => {
-    const trimmed = text.trim();
-    if (!trimmed) {
-      clearProp(prop);
-      return;
-    }
-    const parsed = parseImportant(trimmed);
-    setProp(prop, parsed.value, parsed.important);
-  };
-
-  const scrub = useScrub({
-    value: draft,
-    disabled: busy,
-    onPreview: setDraft,
-    onInput: liveNow,
-    onCommit: (text) => {
-      setDraft(text);
-      commit(text);
-    },
-  });
-
+  const display = displayOf(read(prop));
+  const field = useLivePropEditing({ prop, display, busy, setProp, clearProp, liveSetProp });
   return (
     <>
       <SizeLabel
         label={label}
         prop={prop}
-        d={d}
+        display={display}
         contributors={read(prop)?.contributors ?? []}
         busy={busy}
-        scrubProps={scrub.label}
-        onClear={() => {
-          cleared();
-          clearProp(prop);
-        }}
+        scrubProps={field.scrub.label}
+        onClear={field.clear}
         onProvenance={onProvenance}
         onSelectSelector={onSelectSelector}
       />
@@ -234,38 +180,14 @@ function LivePropField({
         onPick={(binding) => setProp(prop, binding, false)}
       >
         <input
-          {...scrub.input}
+          {...field.scrub.input}
           className="u-input embed-editor_size-input"
           data-prop={prop}
-          value={draft}
-          onChange={(event) => {
-            setDraft(event.target.value);
-            scheduleLive(event.target.value);
-          }}
-          onFocus={() => {
-            focused.current = true;
-          }}
-          onBlur={() => {
-            focused.current = false;
-            cancelLive();
-            commit();
-          }}
-          onKeyDown={(event) => {
-            if (event.key === 'Enter') {
-              commitInPlace(event.currentTarget);
-              return;
-            }
-            const stepped = handleArrowStep(event);
-            if (!stepped) {
-              return;
-            }
-            event.preventDefault();
-            const el = event.currentTarget;
-            el.value = stepped.text;
-            el.setSelectionRange(stepped.caret, stepped.caret);
-            setDraft(stepped.text);
-            scheduleLive(stepped.text);
-          }}
+          value={field.draft}
+          onChange={(event) => field.change(event.target.value)}
+          onFocus={field.focus}
+          onBlur={field.blur}
+          onKeyDown={field.keyDown}
           disabled={busy}
           spellCheck={false}
           placeholder={placeholder}
@@ -274,6 +196,143 @@ function LivePropField({
       </VariableConnect>
     </>
   );
+}
+
+// The length field's editing state: the draft that follows the model while
+// nobody is typing, live writes while someone is, and the commit on blur.
+function useLivePropEditing({
+  prop,
+  display,
+  busy,
+  setProp,
+  clearProp,
+  liveSetProp,
+}: {
+  prop: string;
+  display: Display;
+  busy: boolean;
+  setProp: SetProp;
+  clearProp: ClearProp;
+  liveSetProp: LiveSetProp;
+}) {
+  const external = display.present ? withImportant(display) : '';
+  const { draft, setDraft, focused, cleared } = useFieldDraft(external, { busy });
+  const { cancelLive, liveNow, scheduleLive } = useDebouncedLive((value, important) =>
+    liveSetProp(prop, value, important),
+  );
+  const commit = (text = draft) => {
+    const trimmed = text.trim();
+    if (!trimmed) {
+      clearProp(prop);
+      return;
+    }
+    const parsed = parseImportant(trimmed);
+    setProp(prop, parsed.value, parsed.important);
+  };
+  const scrub = useScrub({
+    value: draft,
+    disabled: busy,
+    onPreview: setDraft,
+    onInput: liveNow,
+    onCommit: (text) => {
+      setDraft(text);
+      commit(text);
+    },
+  });
+  return {
+    draft,
+    scrub,
+    clear: () => {
+      cleared();
+      clearProp(prop);
+    },
+    change: (text: string) => {
+      setDraft(text);
+      scheduleLive(text);
+    },
+    focus: () => {
+      focused.current = true;
+    },
+    blur: () => {
+      focused.current = false;
+      cancelLive();
+      commit();
+    },
+    keyDown: (event: ReactKeyboardEvent<HTMLInputElement>) => {
+      const stepped = stepSizeKey(event);
+      if (stepped !== undefined) {
+        setDraft(stepped);
+        scheduleLive(stepped);
+      }
+    },
+  };
+}
+
+// ─────────────────── Shared field plumbing ───────────────────
+
+const withImportant = ({ value, important }: { value: string; important: boolean }) =>
+  important ? `${value} !important` : value;
+
+// A draft that follows `value` while the field is not focused, so an edit made
+// elsewhere shows up without overwriting what someone is typing.
+function useFollowingDraft(value: string) {
+  const [draft, setDraft] = useState(value);
+  const focused = useRef(false);
+  useEffect(() => {
+    if (!focused.current) {
+      setDraft(value);
+    }
+  }, [value]);
+  return { draft, setDraft, focused };
+}
+
+// Live writes of typed text, split into value and `!important`. `scheduleLive`
+// debounces typing; `liveNow` is the undelayed write for a scrub, which does its
+// own throttling — a debounce reset by every mouse move would never fire
+// mid-drag. Blank text is never written live.
+function useDebouncedLive(write: (value: string, important: boolean) => void) {
+  const liveTimer = useRef<number | undefined>(undefined);
+  const cancelLive = () => {
+    if (liveTimer.current !== undefined) {
+      window.clearTimeout(liveTimer.current);
+      liveTimer.current = undefined;
+    }
+  };
+  useEffect(() => cancelLive, []);
+  const liveNow = (text: string) => {
+    const trimmed = text.trim();
+    if (!trimmed) {
+      return;
+    }
+    const parsed = parseImportant(trimmed);
+    write(parsed.value, parsed.important);
+  };
+  const scheduleLive = (text: string) => {
+    cancelLive();
+    liveTimer.current = window.setTimeout(() => {
+      liveTimer.current = undefined;
+      liveNow(text);
+    }, 100);
+  };
+  return { cancelLive, liveNow, scheduleLive };
+}
+
+// Enter commits in place; an arrow key steps the number under the caret and
+// writes it straight into the input. Returns the stepped text, if any.
+function stepSizeKey(event: ReactKeyboardEvent<HTMLInputElement>): string | undefined {
+  if (event.key === 'Enter') {
+    commitInPlace(event.currentTarget);
+    return undefined;
+  }
+  const stepped = handleArrowStep(event);
+  if (!stepped) {
+    return undefined;
+  }
+  event.preventDefault();
+  const input = event.currentTarget;
+  input.value = stepped.text;
+  input.setSelectionRange(stepped.caret, stepped.caret);
+  return stepped.text;
 }
 
 const LENGTH_FIELDS: ReadonlyArray<{ prop: string; label: string; placeholder: string }> = [
@@ -402,18 +461,17 @@ const OVERFLOW_SEGS: ReadonlyArray<{ value: string; icon?: ReactNode; label: str
   { value: 'scroll', icon: <ScrollIcon />, label: 'Scroll' },
   { value: 'auto', label: 'Auto' },
 ];
-const OVERFLOW_SUPPORTED = new Set(OVERFLOW_SEGS.map((seg) => seg.value));
 const OVERFLOW_VALUES = OVERFLOW_SEGS.map((seg) => seg.value);
 
-// Editable free-value field (unset, var(), …) shown in the overflow bar's custom mode.
-function OverflowCustomInput({
+// Editable free-value field (unset, var(), …) shown in a segment bar's custom mode.
+function SegmentCustomInput({
   value,
   busy,
   inputRef,
   onCommit,
   onLiveCommit,
   onClear,
-  ariaLabel = 'Overflow value',
+  ariaLabel,
   placeholder = 'custom value',
 }: {
   value: string;
@@ -422,36 +480,11 @@ function OverflowCustomInput({
   onCommit: (value: string, important: boolean) => void;
   onLiveCommit: (value: string, important: boolean) => void;
   onClear: () => void;
-  ariaLabel?: string;
+  ariaLabel: string;
   placeholder?: string;
 }) {
-  const [draft, setDraft] = useState(value);
-  const focused = useRef(false);
-  const liveTimer = useRef<number | null>(null);
-  useEffect(() => {
-    if (!focused.current) {
-      setDraft(value);
-    }
-  }, [value]);
-  const cancelLive = () => {
-    if (liveTimer.current != null) {
-      window.clearTimeout(liveTimer.current);
-      liveTimer.current = null;
-    }
-  };
-  useEffect(() => cancelLive, []);
-  const scheduleLive = (text: string) => {
-    cancelLive();
-    liveTimer.current = window.setTimeout(() => {
-      liveTimer.current = null;
-      const trimmed = text.trim();
-      if (!trimmed) {
-        return;
-      }
-      const parsed = parseImportant(trimmed);
-      onLiveCommit(parsed.value, parsed.important);
-    }, 100);
-  };
+  const { draft, setDraft, focused } = useFollowingDraft(value);
+  const { cancelLive, scheduleLive } = useDebouncedLive(onLiveCommit);
   const commit = () => {
     const trimmed = draft.trim();
     if (!trimmed) {
@@ -523,29 +556,233 @@ const OVERFLOW_TOOLTIPS: Record<string, ReactNode> = {
   ),
 };
 
+// One segment of a bar: its value, what the button shows, how it is announced,
+// and how the menu lists it.
+type BarSegment = { value: string; content: ReactNode; ariaLabel: string; menuLabel: string };
+
+// What distinguishes one segment bar from another: its segments, the value an
+// unset property shows, per-value tooltips, and its accessible names.
+type SegmentBarConfig = {
+  segments: readonly BarSegment[];
+  fallback: string;
+  tooltips: Record<string, ReactNode>;
+  groupLabel: string;
+  moreLabel: string;
+  customLabel: string;
+};
+
 // Segmented icon bar (visible/hidden/clip/scroll/auto) + a dropdown arrow whose
 // menu offers Custom; a free value shows the editable field. Mirrors DisplayControl.
-function OverflowBar({
-  value,
-  busy,
-  onCommit,
-  onLiveCommit,
-  onClear,
-}: {
+// No overflow set → CSS defaults to `visible`, so that segment shows as active.
+const OVERFLOW_BAR: SegmentBarConfig = {
+  segments: OVERFLOW_SEGS.map((seg) => ({
+    value: seg.value,
+    content: seg.icon ?? seg.label,
+    ariaLabel: seg.label,
+    menuLabel: seg.label,
+  })),
+  fallback: 'visible',
+  tooltips: OVERFLOW_TOOLTIPS,
+  groupLabel: 'Overflow',
+  moreLabel: 'More overflow options',
+  customLabel: 'Overflow value',
+};
+
+type SegmentBarProps = {
+  config: SegmentBarConfig;
   value: string;
   busy: boolean;
   onCommit: (value: string, important: boolean) => void;
   onLiveCommit: (value: string, important: boolean) => void;
   onClear: () => void;
-}) {
-  // No overflow set → CSS defaults to `visible`, so show that segment as active.
-  const current = value.trim().toLowerCase() || 'visible';
-  const customMode = !OVERFLOW_SUPPORTED.has(current);
+};
+
+// A segmented bar with a trailing dropdown arrow whose menu offers Custom; a
+// free value (var(), `unset`, …) shows the editable field instead of segments.
+function SegmentBar({ config, value, busy, onCommit, onLiveCommit, onClear }: SegmentBarProps) {
+  const current = value.trim().toLowerCase() || config.fallback;
+  const customMode = !config.segments.some((segment) => segment.value === current);
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
-  const wantFocus = useRef(false);
+  useMenuDismiss({ open, rootRef, setOpen });
+  const { inputRef, requestFocus } = useCustomFocus({ customMode, busy });
+  const tip = useSegmentTooltip({ rootRef, tooltips: config.tooltips });
 
+  const pick = (next: string) => {
+    setOpen(false);
+    if (next !== current) {
+      onCommit(next, false);
+    }
+  };
+  const enterCustom = () => {
+    setOpen(false);
+    requestFocus();
+    onCommit('unset', false);
+  };
+
+  return (
+    <div
+      ref={rootRef}
+      className={`embed-editor_display ${customMode ? 'is-custom' : ''}`}
+      role="group"
+      aria-label={config.groupLabel}
+    >
+      <SegmentPill />
+      {customMode ? (
+        <SegmentCustomInput
+          value={value}
+          busy={busy}
+          inputRef={inputRef}
+          onCommit={onCommit}
+          onLiveCommit={onLiveCommit}
+          onClear={onClear}
+          ariaLabel={config.customLabel}
+        />
+      ) : (
+        <SegmentButtons
+          segments={config.segments}
+          current={current}
+          busy={busy}
+          onPick={pick}
+          onHoverStart={tip.startHover}
+          onHoverEnd={tip.endHover}
+        />
+      )}
+      <SegmentMenu
+        open={open}
+        moreLabel={config.moreLabel}
+        busy={busy}
+        customMode={customMode}
+        current={current}
+        segments={config.segments}
+        onToggle={() => setOpen((previous) => !previous)}
+        onPick={pick}
+        onEnterCustom={enterCustom}
+      />
+      <SegmentTooltip
+        content={tip.hoveredValue === undefined ? undefined : config.tooltips[tip.hoveredValue]}
+        arrowRight={tip.arrowRight}
+      />
+    </div>
+  );
+}
+
+// The hovered segment's tooltip, its arrow pointing down at that segment.
+function SegmentTooltip({ content, arrowRight }: { content: ReactNode; arrowRight: number }) {
+  if (!content) {
+    return undefined;
+  }
+  return (
+    <div className="u-segmented-tooltip" role="tooltip" style={tooltipArrowStyle(arrowRight)}>
+      {content}
+      <span className="u-segmented-tooltip-arrow" aria-hidden="true" />
+    </div>
+  );
+}
+
+// The bar's segments; a press ends any pending tooltip before it picks.
+function SegmentButtons({
+  segments,
+  current,
+  busy,
+  onPick,
+  onHoverStart,
+  onHoverEnd,
+}: {
+  segments: readonly BarSegment[];
+  current: string;
+  busy: boolean;
+  onPick: (value: string) => void;
+  onHoverStart: (value: string, element: HTMLElement) => void;
+  onHoverEnd: () => void;
+}) {
+  return segments.map((segment) => (
+    <button
+      key={segment.value}
+      type="button"
+      role="radio"
+      aria-checked={current === segment.value}
+      className={`embed-editor_display-seg ${current === segment.value ? 'is-selected' : ''}`}
+      disabled={busy}
+      aria-label={segment.ariaLabel}
+      onClick={() => {
+        onHoverEnd();
+        onPick(segment.value);
+      }}
+      onMouseEnter={(event) => onHoverStart(segment.value, event.currentTarget)}
+      onMouseLeave={onHoverEnd}
+    >
+      {segment.content}
+    </button>
+  ));
+}
+
+// The trailing arrow and its menu: "Custom" from the bar, or the listed values
+// to switch back to from a custom value.
+function SegmentMenu({
+  open,
+  moreLabel,
+  busy,
+  customMode,
+  current,
+  segments,
+  onToggle,
+  onPick,
+  onEnterCustom,
+}: {
+  open: boolean;
+  moreLabel: string;
+  busy: boolean;
+  customMode: boolean;
+  current: string;
+  segments: readonly BarSegment[];
+  onToggle: () => void;
+  onPick: (value: string) => void;
+  onEnterCustom: () => void;
+}) {
+  return (
+    <>
+      <button
+        type="button"
+        className="embed-editor_display-arrow"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-label={moreLabel}
+        disabled={busy}
+        onClick={onToggle}
+      >
+        <ChevronIcon />
+      </button>
+      {open ? (
+        <div className="embed-editor_display-menu" role="menu">
+          {customMode ? (
+            segments.map((segment) => (
+              <MenuItem
+                key={segment.value}
+                label={segment.menuLabel}
+                selected={current === segment.value}
+                onClick={() => onPick(segment.value)}
+              />
+            ))
+          ) : (
+            <MenuItem label="Custom" selected={false} onClick={onEnterCustom} />
+          )}
+        </div>
+      ) : undefined}
+    </>
+  );
+}
+
+// While the menu is open, a press outside the bar or Escape closes it.
+function useMenuDismiss({
+  open,
+  rootRef,
+  setOpen,
+}: {
+  open: boolean;
+  rootRef: React.RefObject<HTMLDivElement>;
+  setOpen: (open: boolean) => void;
+}): void {
   useEffect(() => {
     if (!open) {
       return;
@@ -566,8 +803,14 @@ function OverflowBar({
       document.removeEventListener('mousedown', onDown);
       document.removeEventListener('keydown', onKey);
     };
-  }, [open]);
+  }, [open, rootRef, setOpen]);
+}
 
+// Focus the custom field after switching to Custom, once its `unset` write
+// settles: the request is remembered until the field exists and is enabled.
+function useCustomFocus({ customMode, busy }: { customMode: boolean; busy: boolean }) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const wantFocus = useRef(false);
   useEffect(() => {
     if (customMode && wantFocus.current && !busy) {
       wantFocus.current = false;
@@ -575,125 +818,53 @@ function OverflowBar({
       inputRef.current?.select();
     }
   }, [customMode, busy]);
-
-  const pick = (next: string) => {
-    setOpen(false);
-    if (next !== current) {
-      onCommit(next, false);
-    }
+  return {
+    inputRef,
+    requestFocus: () => {
+      wantFocus.current = true;
+    },
   };
-  const enterCustom = () => {
-    setOpen(false);
-    wantFocus.current = true;
-    onCommit('unset', false);
-  };
+}
 
-  // Delayed hover tooltip, right-anchored with a down-arrow to the hovered segment.
-  const [hoveredValue, setHoveredValue] = useState<string | null>(null);
+// Delayed hover tooltip, right-anchored with a down-arrow to the hovered segment.
+function useSegmentTooltip({
+  rootRef,
+  tooltips,
+}: {
+  rootRef: React.RefObject<HTMLDivElement>;
+  tooltips: Record<string, ReactNode>;
+}) {
+  const [hoveredValue, setHoveredValue] = useState<string | undefined>(undefined);
   const [arrowRight, setArrowRight] = useState(0);
-  const hoverTimer = useRef<number | null>(null);
+  const hoverTimer = useRef<number | undefined>(undefined);
   const clearHoverTimer = () => {
-    if (hoverTimer.current != null) {
+    if (hoverTimer.current !== undefined) {
       window.clearTimeout(hoverTimer.current);
-      hoverTimer.current = null;
+      hoverTimer.current = undefined;
     }
   };
   useEffect(() => clearHoverTimer, []);
-  const startHover = (segValue: string, el: HTMLElement) => {
-    if (!OVERFLOW_TOOLTIPS[segValue]) {
+  const startHover = (segmentValue: string, element: HTMLElement) => {
+    if (!tooltips[segmentValue]) {
       return;
     }
     clearHoverTimer();
     hoverTimer.current = window.setTimeout(() => {
-      hoverTimer.current = null;
+      hoverTimer.current = undefined;
       const root = rootRef.current;
       if (root) {
         const trackRect = root.getBoundingClientRect();
-        const buttonRect = el.getBoundingClientRect();
+        const buttonRect = element.getBoundingClientRect();
         setArrowRight(trackRect.right - (buttonRect.left + buttonRect.width / 2));
       }
-      setHoveredValue(segValue);
+      setHoveredValue(segmentValue);
     }, TOOLTIP_DELAY_MS);
   };
   const endHover = () => {
     clearHoverTimer();
-    setHoveredValue(null);
+    setHoveredValue(undefined);
   };
-
-  return (
-    <div
-      ref={rootRef}
-      className={`embed-editor_display ${customMode ? 'is-custom' : ''}`}
-      role="group"
-      aria-label="Overflow"
-    >
-      <SegmentPill />
-      {customMode ? (
-        <OverflowCustomInput
-          value={value}
-          busy={busy}
-          inputRef={inputRef}
-          onCommit={onCommit}
-          onLiveCommit={onLiveCommit}
-          onClear={onClear}
-        />
-      ) : (
-        OVERFLOW_SEGS.map((seg) => (
-          <button
-            key={seg.value}
-            type="button"
-            role="radio"
-            aria-checked={current === seg.value}
-            className={`embed-editor_display-seg ${current === seg.value ? 'is-selected' : ''}`}
-            disabled={busy}
-            aria-label={seg.label}
-            onClick={() => {
-              endHover();
-              pick(seg.value);
-            }}
-            onMouseEnter={(event) => startHover(seg.value, event.currentTarget)}
-            onMouseLeave={endHover}
-          >
-            {seg.icon ?? seg.label}
-          </button>
-        ))
-      )}
-      <button
-        type="button"
-        className="embed-editor_display-arrow"
-        aria-haspopup="menu"
-        aria-expanded={open}
-        aria-label="More overflow options"
-        disabled={busy}
-        onClick={() => setOpen((value) => !value)}
-      >
-        <ChevronIcon />
-      </button>
-      {open ? (
-        <div className="embed-editor_display-menu" role="menu">
-          {customMode ? (
-            OVERFLOW_SEGS.map((seg) => (
-              <MenuItem
-                key={seg.value}
-                label={seg.label}
-                selected={current === seg.value}
-                onClick={() => pick(seg.value)}
-              />
-            ))
-          ) : (
-            <MenuItem label="Custom" selected={false} onClick={enterCustom} />
-          )}
-        </div>
-      ) : null}
-
-      {hoveredValue && OVERFLOW_TOOLTIPS[hoveredValue] ? (
-        <div className="u-segmented-tooltip" role="tooltip" style={tooltipArrowStyle(arrowRight)}>
-          {OVERFLOW_TOOLTIPS[hoveredValue]}
-          <span className="u-segmented-tooltip-arrow" aria-hidden="true" />
-        </div>
-      ) : null}
-    </div>
-  );
+  return { hoveredValue, arrowRight, startHover, endHover };
 }
 
 // One overflow control row bound to a single property. `fallback` is the value it
@@ -702,7 +873,7 @@ function OverflowBar({
 function OverflowRow({
   label,
   prop,
-  d,
+  display,
   contributors,
   fallback,
   toggle,
@@ -715,7 +886,7 @@ function OverflowRow({
 }: {
   label: string;
   prop: string;
-  d: Display;
+  display: Display;
   contributors: Contributor[];
   fallback: string;
   /** Optional disclosure control rendered next to the label (main row only). */
@@ -730,16 +901,16 @@ function OverflowRow({
   // Nothing authored here → the page's own computed overflow, then the caller's
   // fallback (the shorthand's value, for the X / Y rows).
   const value = useHighlight(
-    d.present ? d.value.toLowerCase() : fallback || '',
+    display.present ? display.value.toLowerCase() : fallback || '',
     prop,
     OVERFLOW_VALUES,
     '',
   );
-  const labelEl = (
+  const labelElement = (
     <SizeLabel
       label={label}
       prop={prop}
-      d={{ ...d, value, important: false }}
+      display={{ ...display, value, important: false }}
       contributors={contributors}
       busy={busy}
       onClear={() => clearProp(prop)}
@@ -751,13 +922,14 @@ function OverflowRow({
     <div className="embed-editor_size-row">
       {toggle ? (
         <div className="embed-editor_overflow-head">
-          {labelEl}
+          {labelElement}
           {toggle}
         </div>
       ) : (
-        labelEl
+        labelElement
       )}
-      <OverflowBar
+      <SegmentBar
+        config={OVERFLOW_BAR}
         value={value}
         busy={busy}
         onCommit={(next, important) => setProp(prop, next, important)}
@@ -810,7 +982,7 @@ function OverflowField({
       <OverflowRow
         label="Overflow"
         prop="overflow"
-        d={shorthand}
+        display={shorthand}
         contributors={read('overflow')?.contributors ?? []}
         fallback=""
         toggle={toggle}
@@ -821,7 +993,7 @@ function OverflowField({
           <OverflowRow
             label="Overflow X"
             prop="overflow-x"
-            d={x}
+            display={x}
             contributors={read('overflow-x')?.contributors ?? []}
             fallback={mainValue}
             {...rowProps}
@@ -829,13 +1001,13 @@ function OverflowField({
           <OverflowRow
             label="Overflow Y"
             prop="overflow-y"
-            d={y}
+            display={y}
             contributors={read('overflow-y')?.contributors ?? []}
             fallback={mainValue}
             {...rowProps}
           />
         </>
-      ) : null}
+      ) : undefined}
     </>
   );
 }
@@ -920,186 +1092,23 @@ const BOX_OPTIONS: ReadonlyArray<SegmentedOption<string>> = [
     ),
   },
 ];
-// box-sizing keywords the segmented bar shows; anything else drops to the custom field.
-const BOX_SUPPORTED = new Set(BOX_OPTIONS.map((o) => o.value));
-const BOX_TOOLTIPS: Record<string, ReactNode> = Object.fromEntries(
-  BOX_OPTIONS.map((o) => [o.value, o.tooltip]),
-);
-
 // Segmented icon bar (border-box / content-box) + a dropdown arrow whose menu offers
-// Custom; a free value (`inherit`, `unset`, var(…)…) shows the editable field. Mirrors
-// OverflowBar so box-sizing matches the Overflow / Display controls.
-function BoxSizingBar({
-  value,
-  busy,
-  onCommit,
-  onLiveCommit,
-  onClear,
-}: {
-  value: string;
-  busy: boolean;
-  onCommit: (value: string, important: boolean) => void;
-  onLiveCommit: (value: string, important: boolean) => void;
-  onClear: () => void;
-}) {
-  // No box-sizing set → Webflow assumes border-box, so show that segment active.
-  const current = value.trim().toLowerCase() || 'border-box';
-  const customMode = !BOX_SUPPORTED.has(current);
-  const [open, setOpen] = useState(false);
-  const rootRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
-  const wantFocus = useRef(false);
-
-  useEffect(() => {
-    if (!open) {
-      return;
-    }
-    const onDown = (event: MouseEvent) => {
-      if (!(event.target instanceof Node) || !rootRef.current?.contains(event.target)) {
-        setOpen(false);
-      }
-    };
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        setOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', onDown);
-    document.addEventListener('keydown', onKey);
-    return () => {
-      document.removeEventListener('mousedown', onDown);
-      document.removeEventListener('keydown', onKey);
-    };
-  }, [open]);
-
-  useEffect(() => {
-    if (customMode && wantFocus.current && !busy) {
-      wantFocus.current = false;
-      inputRef.current?.focus();
-      inputRef.current?.select();
-    }
-  }, [customMode, busy]);
-
-  const pick = (next: string) => {
-    setOpen(false);
-    if (next !== current) {
-      onCommit(next, false);
-    }
-  };
-  const enterCustom = () => {
-    setOpen(false);
-    wantFocus.current = true;
-    onCommit('unset', false);
-  };
-
-  // Delayed hover tooltip, right-anchored with a down-arrow to the hovered segment.
-  const [hoveredValue, setHoveredValue] = useState<string | null>(null);
-  const [arrowRight, setArrowRight] = useState(0);
-  const hoverTimer = useRef<number | null>(null);
-  const clearHoverTimer = () => {
-    if (hoverTimer.current != null) {
-      window.clearTimeout(hoverTimer.current);
-      hoverTimer.current = null;
-    }
-  };
-  useEffect(() => clearHoverTimer, []);
-  const startHover = (segValue: string, el: HTMLElement) => {
-    if (!BOX_TOOLTIPS[segValue]) {
-      return;
-    }
-    clearHoverTimer();
-    hoverTimer.current = window.setTimeout(() => {
-      hoverTimer.current = null;
-      const root = rootRef.current;
-      if (root) {
-        const trackRect = root.getBoundingClientRect();
-        const buttonRect = el.getBoundingClientRect();
-        setArrowRight(trackRect.right - (buttonRect.left + buttonRect.width / 2));
-      }
-      setHoveredValue(segValue);
-    }, TOOLTIP_DELAY_MS);
-  };
-  const endHover = () => {
-    clearHoverTimer();
-    setHoveredValue(null);
-  };
-
-  return (
-    <div
-      ref={rootRef}
-      className={`embed-editor_display ${customMode ? 'is-custom' : ''}`}
-      role="group"
-      aria-label="Box sizing"
-    >
-      <SegmentPill />
-      {customMode ? (
-        <OverflowCustomInput
-          value={value}
-          busy={busy}
-          inputRef={inputRef}
-          onCommit={onCommit}
-          onLiveCommit={onLiveCommit}
-          onClear={onClear}
-          ariaLabel="Box sizing value"
-        />
-      ) : (
-        BOX_OPTIONS.map((seg) => (
-          <button
-            key={seg.value}
-            type="button"
-            role="radio"
-            aria-checked={current === seg.value}
-            className={`embed-editor_display-seg ${current === seg.value ? 'is-selected' : ''}`}
-            disabled={busy}
-            aria-label={seg.ariaLabel}
-            onClick={() => {
-              endHover();
-              pick(seg.value);
-            }}
-            onMouseEnter={(event) => startHover(seg.value, event.currentTarget)}
-            onMouseLeave={endHover}
-          >
-            {seg.label}
-          </button>
-        ))
-      )}
-      <button
-        type="button"
-        className="embed-editor_display-arrow"
-        aria-haspopup="menu"
-        aria-expanded={open}
-        aria-label="More box-sizing options"
-        disabled={busy}
-        onClick={() => setOpen((v) => !v)}
-      >
-        <ChevronIcon />
-      </button>
-      {open ? (
-        <div className="embed-editor_display-menu" role="menu">
-          {customMode ? (
-            BOX_OPTIONS.map((seg) => (
-              <MenuItem
-                key={seg.value}
-                label={seg.ariaLabel ?? seg.value}
-                selected={current === seg.value}
-                onClick={() => pick(seg.value)}
-              />
-            ))
-          ) : (
-            <MenuItem label="Custom" selected={false} onClick={enterCustom} />
-          )}
-        </div>
-      ) : null}
-
-      {hoveredValue && BOX_TOOLTIPS[hoveredValue] ? (
-        <div className="u-segmented-tooltip" role="tooltip" style={tooltipArrowStyle(arrowRight)}>
-          {BOX_TOOLTIPS[hoveredValue]}
-          <span className="u-segmented-tooltip-arrow" aria-hidden="true" />
-        </div>
-      ) : null}
-    </div>
-  );
-}
+// Custom; a free value (`inherit`, `unset`, var(…)…) shows the editable field — the
+// same bar as Overflow, so box-sizing matches the Overflow / Display controls. No
+// box-sizing set → Webflow assumes border-box, so that segment shows as active.
+const BOX_SIZING_BAR: SegmentBarConfig = {
+  segments: BOX_OPTIONS.map((option) => ({
+    value: option.value,
+    content: option.label,
+    ariaLabel: option.ariaLabel ?? option.value,
+    menuLabel: option.ariaLabel ?? option.value,
+  })),
+  fallback: 'border-box',
+  tooltips: Object.fromEntries(BOX_OPTIONS.map((option) => [option.value, option.tooltip])),
+  groupLabel: 'Box sizing',
+  moreLabel: 'More box-sizing options',
+  customLabel: 'Box sizing value',
+};
 
 // ─────────────────────────── Aspect ratio ───────────────────────────
 
@@ -1113,34 +1122,36 @@ const RATIO_PRESETS: ReadonlyArray<{ value: string; label: string }> = [
 ];
 
 // Parse an aspect-ratio value into width/height numbers (single number → n/1).
-function parseRatio(value: string): { w: string; h: string } | null {
-  const v = value.trim().toLowerCase();
-  if (!v || v === 'auto') {
-    return null;
+function parseRatio(value: string): { width: string; height: string } | undefined {
+  const text = value.trim().toLowerCase();
+  if (!text || text === 'auto') {
+    return undefined;
   }
-  if (v.includes('/')) {
-    const [w, h] = v.split('/').map((part) => part.trim());
-    if (w && /^[\d.]+$/.test(w) && (!h || /^[\d.]+$/.test(h))) {
-      return { w, h: h || '1' };
+  if (text.includes('/')) {
+    const [width, height] = text.split('/').map((part) => part.trim());
+    if (width && /^[\d.]+$/.test(width) && (!height || /^[\d.]+$/.test(height))) {
+      return { width, height: height || '1' };
     }
-    return null;
+    return undefined;
   }
-  return /^[\d.]+$/.test(v) ? { w: v, h: '1' } : null;
+  return /^[\d.]+$/.test(text) ? { width: text, height: '1' } : undefined;
 }
 
 // Which dropdown option the value represents: 'auto', a preset value, 'custom'
 // (a non-preset numeric ratio → the W:H pair) or 'other' (a free value like
 // unset / var(--x) / calc(…) → the plain text field).
 function ratioKeyOf(value: string): string {
-  const v = value.trim().toLowerCase();
-  if (!v || v === 'auto') {
+  const text = value.trim().toLowerCase();
+  if (!text || text === 'auto') {
     return 'auto';
   }
   const parsed = parseRatio(value);
   if (!parsed) {
     return 'other';
   }
-  const match = RATIO_PRESETS.find((preset) => preset.value === `${parsed.w} / ${parsed.h}`);
+  const match = RATIO_PRESETS.find(
+    (preset) => preset.value === `${parsed.width} / ${parsed.height}`,
+  );
   return match ? match.value : 'custom';
 }
 
@@ -1158,23 +1169,18 @@ function RatioNumberInput({
   onLive: (value: string) => void;
   onCommit: (value: string) => void;
 }) {
-  const [draft, setDraft] = useState(value);
-  const focused = useRef(false);
-  useEffect(() => {
-    if (!focused.current) {
-      setDraft(value);
-    }
-  }, [value]);
+  const { draft, setDraft, focused } = useFollowingDraft(value);
   const sanitize = (raw: string) => raw.replace(/[^\d.]/g, '');
+  const commitScrub = (text: string) => {
+    setDraft(text);
+    onCommit(text);
+  };
   const scrub = useScrub({
     value: draft,
     disabled: busy,
     onPreview: setDraft,
     onInput: onLive,
-    onCommit: (text) => {
-      setDraft(text);
-      onCommit(text);
-    },
+    onCommit: commitScrub,
   });
 
   return (
@@ -1196,20 +1202,11 @@ function RatioNumberInput({
         onCommit(draft);
       }}
       onKeyDown={(event) => {
-        if (event.key === 'Enter') {
-          commitInPlace(event.currentTarget);
-          return;
+        const stepped = stepSizeKey(event);
+        if (stepped !== undefined) {
+          setDraft(stepped);
+          onLive(stepped);
         }
-        const stepped = handleArrowStep(event);
-        if (!stepped) {
-          return;
-        }
-        event.preventDefault();
-        const el = event.currentTarget;
-        el.value = stepped.text;
-        el.setSelectionRange(stepped.caret, stepped.caret);
-        setDraft(stepped.text);
-        onLive(stepped.text);
       }}
       disabled={busy}
       spellCheck={false}
@@ -1222,17 +1219,7 @@ function RatioNumberInput({
 // custom fields. Any value (unset, var(--x), calc(…), …) live-updates as you type
 // and commits on blur; emptying it clears the property. Focuses itself when the
 // mode is first entered (once the seeding write clears `busy`) — and only then.
-export function RatioOtherInput({
-  value,
-  busy,
-  prop,
-  autoFocus = false,
-  onCommit,
-  onLiveCommit,
-  onClear,
-  ariaLabel = 'Aspect ratio value',
-  placeholder = 'unset, var(--x)…',
-}: {
+type RatioOtherInputProps = {
   value: string;
   busy: boolean;
   /** The CSS property being edited — filters the variable list to what fits it. */
@@ -1244,25 +1231,23 @@ export function RatioOtherInput({
   onClear: () => void;
   ariaLabel?: string;
   placeholder?: string;
-}) {
-  const [draft, setDraft] = useState(value);
-  const focused = useRef(false);
-  const liveTimer = useRef<number | null>(null);
+};
+
+export function RatioOtherInput({
+  value,
+  busy,
+  prop,
+  autoFocus = false,
+  onCommit,
+  onLiveCommit,
+  onClear,
+  ariaLabel = 'Aspect ratio value',
+  placeholder = 'unset, var(--x)…',
+}: RatioOtherInputProps) {
+  const { draft, setDraft, focused } = useFollowingDraft(value);
+  const { cancelLive, scheduleLive } = useDebouncedLive(onLiveCommit);
   const inputRef = useRef<HTMLInputElement>(null);
   const didFocus = useRef(false);
-
-  useEffect(() => {
-    if (!focused.current) {
-      setDraft(value);
-    }
-  }, [value]);
-  const cancelLive = () => {
-    if (liveTimer.current != null) {
-      window.clearTimeout(liveTimer.current);
-      liveTimer.current = null;
-    }
-  };
-  useEffect(() => cancelLive, []);
 
   // Only when this field was ASKED for — picking "Other" from the menu, where
   // the next thing anyone does is type. It used to focus on mount whatever
@@ -1278,19 +1263,6 @@ export function RatioOtherInput({
     inputRef.current?.focus();
     inputRef.current?.select();
   }, [autoFocus, busy]);
-
-  const scheduleLive = (text: string) => {
-    cancelLive();
-    liveTimer.current = window.setTimeout(() => {
-      liveTimer.current = null;
-      const trimmed = text.trim();
-      if (!trimmed) {
-        return;
-      }
-      const parsed = parseImportant(trimmed);
-      onLiveCommit(parsed.value, parsed.important);
-    }, 100);
-  };
 
   const commit = () => {
     const trimmed = draft.trim();
@@ -1345,6 +1317,13 @@ export function RatioOtherInput({
   );
 }
 
+const RATIO_OPTIONS: SelectOption<string>[] = [
+  { value: 'auto', label: 'Auto' },
+  ...RATIO_PRESETS.map((preset) => ({ value: preset.value, label: preset.label })),
+  { value: 'custom', label: 'Custom' },
+  { value: 'other', label: 'Other' },
+];
+
 function AspectRatioField({
   read,
   busy,
@@ -1354,39 +1333,97 @@ function AspectRatioField({
   onProvenance,
   onSelectSelector,
 }: Props) {
-  const d = displayOf(read('aspect-ratio'));
-  const current = d.present ? d.value : '';
-  const derivedKey = d.present ? ratioKeyOf(current) : 'auto';
-  // Custom (W:H pair) and Other (free text) stick once chosen — even when the
-  // value happens to match a preset (1 / 1 vs Square) — until a preset/Auto is
-  // picked. Everything else derives straight from the value.
-  const [forced, setForced] = useState<'custom' | 'other' | null>(null);
+  const display = displayOf(read('aspect-ratio'));
+  const current = display.present ? display.value : '';
+  const derivedKey = display.present ? ratioKeyOf(current) : 'auto';
+  const { key, askedForOther, onSelect, clear } = useRatioMode({
+    current,
+    derivedKey,
+    setProp,
+    clearProp,
+  });
+
+  return (
+    <>
+      <div className="embed-editor_size-row">
+        <SizeLabel
+          label="Ratio"
+          prop="aspect-ratio"
+          display={{ ...display, value: current }}
+          contributors={read('aspect-ratio')?.contributors ?? []}
+          busy={busy}
+          onClear={clear}
+          onProvenance={onProvenance}
+          onSelectSelector={onSelectSelector}
+        />
+        <Select
+          className="embed-editor_ratio-select"
+          value={key}
+          options={RATIO_OPTIONS}
+          ariaLabel="Aspect ratio"
+          disabled={busy}
+          onChange={onSelect}
+          onPreview={(choice) =>
+            liveSetProp(
+              'aspect-ratio',
+              choice === 'custom' || choice === 'other' ? undefined : (choice ?? undefined),
+              false,
+            )
+          }
+          customInput={
+            key === 'other' ? (
+              <RatioOtherInput
+                value={display.present ? withImportant({ ...display, value: current }) : ''}
+                busy={busy}
+                prop="aspect-ratio"
+                autoFocus={askedForOther.current}
+                onCommit={(value, important) => setProp('aspect-ratio', value, important)}
+                onLiveCommit={(value, important) => liveSetProp('aspect-ratio', value, important)}
+                onClear={clear}
+              />
+            ) : undefined
+          }
+        />
+      </div>
+      {key === 'custom' ? (
+        <RatioPair current={current} busy={busy} setProp={setProp} liveSetProp={liveSetProp} />
+      ) : undefined}
+    </>
+  );
+}
+
+// Which option the ratio dropdown shows. Custom (W:H pair) and Other (free text)
+// stick once chosen — even when the value happens to match a preset (1 / 1 vs
+// Square) — until a preset/Auto is picked. Everything else derives straight from
+// the value.
+function useRatioMode({
+  current,
+  derivedKey,
+  setProp,
+  clearProp,
+}: {
+  current: string;
+  derivedKey: string;
+  setProp: SetProp;
+  clearProp: ClearProp;
+}) {
+  const [forced, setForced] = useState<'custom' | 'other' | undefined>(undefined);
   // Whether "Other" was just chosen here, as opposed to the value simply being
   // one the bar can't show. Only the first of those wants the caret.
   const askedForOther = useRef(false);
-  const key = forced ?? derivedKey;
-  const parsed = parseRatio(current) ?? { w: '1', h: '1' };
-
-  const options: SelectOption<string>[] = [
-    { value: 'auto', label: 'Auto' },
-    ...RATIO_PRESETS.map((preset) => ({ value: preset.value, label: preset.label })),
-    { value: 'custom', label: 'Custom' },
-    { value: 'other', label: 'Other' },
-  ];
-
   const onSelect = (choice: string) => {
     // "Auto" writes the explicit `aspect-ratio: auto` (the CSS initial value);
     // removing the property is the label's Clear action, not this.
     askedForOther.current = false;
     if (choice === 'auto') {
-      setForced(null);
+      setForced(undefined);
       setProp('aspect-ratio', 'auto', false);
       return;
     }
     if (choice === 'custom') {
       setForced('custom');
-      const p = parseRatio(current);
-      setProp('aspect-ratio', p ? `${p.w} / ${p.h}` : '1 / 1', false);
+      const ratio = parseRatio(current);
+      setProp('aspect-ratio', ratio ? `${ratio.width} / ${ratio.height}` : '1 / 1', false);
       return;
     }
     if (choice === 'other') {
@@ -1398,95 +1435,63 @@ function AspectRatioField({
       }
       return;
     }
-    setForced(null);
+    setForced(undefined);
     setProp('aspect-ratio', choice, false);
   };
+  const clear = () => {
+    setForced(undefined);
+    clearProp('aspect-ratio');
+  };
+  return { key: forced ?? derivedKey, askedForOther, onSelect, clear };
+}
 
-  const write = (w: string, h: string, live: boolean) => {
-    const value = `${w || '0'} / ${h || '0'}`;
-    if (live) {
+// The Custom W:H pair: two number fields that write `W / H` (a blank side as 0).
+function RatioPair({
+  current,
+  busy,
+  setProp,
+  liveSetProp,
+}: {
+  current: string;
+  busy: boolean;
+  setProp: SetProp;
+  liveSetProp: LiveSetProp;
+}) {
+  const parsed = parseRatio(current) ?? { width: '1', height: '1' };
+  const write = (width: string, height: string, mode: 'live' | 'commit') => {
+    const value = `${width || '0'} / ${height || '0'}`;
+    if (mode === 'live') {
       liveSetProp('aspect-ratio', value, false);
     } else {
       setProp('aspect-ratio', value, false);
     }
   };
-
   return (
-    <>
-      <div className="embed-editor_size-row">
-        <SizeLabel
-          label="Ratio"
-          prop="aspect-ratio"
-          d={{ ...d, value: current }}
-          contributors={read('aspect-ratio')?.contributors ?? []}
-          busy={busy}
-          onClear={() => {
-            setForced(null);
-            clearProp('aspect-ratio');
-          }}
-          onProvenance={onProvenance}
-          onSelectSelector={onSelectSelector}
-        />
-        <Select
-          className="embed-editor_ratio-select"
-          value={key}
-          options={options}
-          ariaLabel="Aspect ratio"
-          disabled={busy}
-          onChange={onSelect}
-          onPreview={(choice) =>
-            liveSetProp(
-              'aspect-ratio',
-              choice === 'custom' || choice === 'other' ? null : choice,
-              false,
-            )
-          }
-          customInput={
-            key === 'other' ? (
-              <RatioOtherInput
-                value={d.present ? (d.important ? `${current} !important` : current) : ''}
-                busy={busy}
-                prop="aspect-ratio"
-                autoFocus={askedForOther.current}
-                onCommit={(value, important) => setProp('aspect-ratio', value, important)}
-                onLiveCommit={(value, important) => liveSetProp('aspect-ratio', value, important)}
-                onClear={() => {
-                  setForced(null);
-                  clearProp('aspect-ratio');
-                }}
-              />
-            ) : undefined
-          }
-        />
-      </div>
-      {key === 'custom' ? (
-        <div className="embed-editor_ratio-custom">
-          <div className="embed-editor_ratio-pair">
-            <div className="embed-editor_ratio-cell">
-              <RatioNumberInput
-                value={parsed.w}
-                busy={busy}
-                ariaLabel="Ratio width"
-                onLive={(w) => write(w, parsed.h, true)}
-                onCommit={(w) => write(w, parsed.h, false)}
-              />
-              <span className="embed-editor_ratio-caption">Width</span>
-            </div>
-            <span className="embed-editor_ratio-colon">:</span>
-            <div className="embed-editor_ratio-cell">
-              <RatioNumberInput
-                value={parsed.h}
-                busy={busy}
-                ariaLabel="Ratio height"
-                onLive={(h) => write(parsed.w, h, true)}
-                onCommit={(h) => write(parsed.w, h, false)}
-              />
-              <span className="embed-editor_ratio-caption">Height</span>
-            </div>
-          </div>
+    <div className="embed-editor_ratio-custom">
+      <div className="embed-editor_ratio-pair">
+        <div className="embed-editor_ratio-cell">
+          <RatioNumberInput
+            value={parsed.width}
+            busy={busy}
+            ariaLabel="Ratio width"
+            onLive={(width) => write(width, parsed.height, 'live')}
+            onCommit={(width) => write(width, parsed.height, 'commit')}
+          />
+          <span className="embed-editor_ratio-caption">Width</span>
         </div>
-      ) : null}
-    </>
+        <span className="embed-editor_ratio-colon">:</span>
+        <div className="embed-editor_ratio-cell">
+          <RatioNumberInput
+            value={parsed.height}
+            busy={busy}
+            ariaLabel="Ratio height"
+            onLive={(height) => write(parsed.width, height, 'live')}
+            onCommit={(height) => write(parsed.width, height, 'commit')}
+          />
+          <span className="embed-editor_ratio-caption">Height</span>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -1499,21 +1504,22 @@ function BoxSizingField({
   onProvenance,
   onSelectSelector,
 }: Props) {
-  const d = displayOf(read('box-sizing'));
+  const display = displayOf(read('box-sizing'));
   return (
     <div className="embed-editor_size-row">
       <SizeLabel
         label="Box size"
         prop="box-sizing"
-        d={d}
+        display={display}
         contributors={read('box-sizing')?.contributors ?? []}
         busy={busy}
         onClear={() => clearProp('box-sizing')}
         onProvenance={onProvenance}
         onSelectSelector={onSelectSelector}
       />
-      <BoxSizingBar
-        value={d.present ? d.value : ''}
+      <SegmentBar
+        config={BOX_SIZING_BAR}
+        value={display.present ? display.value : ''}
         busy={busy}
         onCommit={(next, important) => setProp('box-sizing', next, important)}
         onLiveCommit={(next, important) => liveSetProp('box-sizing', next, important)}
@@ -1534,19 +1540,25 @@ const FIT_OPTIONS: SelectOption<string>[] = [
 ];
 const FIT_CUSTOM = '__custom__';
 
-const OBJ_POS_PCT = ['0%', '50%', '100%'];
+const OBJECT_POSITION_PERCENTS = ['0%', '50%', '100%'];
 // Which of the 3 grid columns/rows a position token lands on (−1 = a custom offset).
 // Empty → center: object-position's initial value is 50% 50%, so an unset position
 // reads as centered (unlike background-position, which defaults to the top-left).
-function objPosAxis(token: string): number {
-  const t = token.trim().toLowerCase();
-  if (t === '' || t === 'center' || t === '50%') {
+function objectPositionAxis(token: string): number {
+  const normalized = token.trim().toLowerCase();
+  if (normalized === '' || normalized === 'center' || normalized === '50%') {
     return 1;
   }
-  if (t === 'left' || t === 'top' || t === '0' || t === '0%' || t === '0px') {
+  if (
+    normalized === 'left' ||
+    normalized === 'top' ||
+    normalized === '0' ||
+    normalized === '0%' ||
+    normalized === '0px'
+  ) {
     return 0;
   }
-  if (t === 'right' || t === 'bottom' || t === '100%') {
+  if (normalized === 'right' || normalized === 'bottom' || normalized === '100%') {
     return 2;
   }
   return -1;
@@ -1567,7 +1579,7 @@ function DotsIcon() {
 // popup read as a different app. The input holds the RAW value, so any unit works
 // (10px, 50%, unset, var(--x)…); a bare number still commits as a percentage, which
 // is what the placeholder says.
-function PosInput({
+function ObjectPositionInput({
   value,
   busy,
   label,
@@ -1577,30 +1589,20 @@ function PosInput({
   value: string;
   busy: boolean;
   label: string;
-  onLive: (v: string) => void;
-  onCommit: (v: string) => void;
+  onLive: (value: string) => void;
+  onCommit: (value: string) => void;
 }) {
-  const [draft, setDraft] = useState(value);
-  const focused = useRef(false);
-  useEffect(() => {
-    if (!focused.current) {
-      setDraft(value);
-    }
-  }, [value]);
-  const isBareNum = (s: string) => /^-?[\d.]+$/.test(s.trim());
-  const norm = (t: string) => {
-    const s = t.trim();
-    return s === '' ? '' : isBareNum(s) ? `${s}%` : s;
+  const { draft, setDraft, focused } = useFollowingDraft(value);
+  const commitScrub = (text: string) => {
+    setDraft(text);
+    onCommit(asPositionOffset(text));
   };
   const scrub = useScrub({
     value: draft,
     disabled: busy,
     onPreview: setDraft,
-    onInput: (text) => onLive(norm(text)),
-    onCommit: (text) => {
-      setDraft(text);
-      onCommit(norm(text));
-    },
+    onInput: (text) => onLive(asPositionOffset(text)),
+    onCommit: commitScrub,
   });
   return (
     <VariableConnect
@@ -1618,44 +1620,45 @@ function PosInput({
         aria-label={label}
         disabled={busy}
         spellCheck={false}
-        onChange={(e) => {
-          setDraft(e.target.value);
-          onLive(norm(e.target.value));
+        onChange={(event) => {
+          setDraft(event.target.value);
+          onLive(asPositionOffset(event.target.value));
         }}
         onFocus={() => {
           focused.current = true;
         }}
         onBlur={() => {
           focused.current = false;
-          onCommit(norm(draft));
+          onCommit(asPositionOffset(draft));
         }}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter') {
-            commitInPlace(e.currentTarget);
-            return;
+        onKeyDown={(event) => {
+          const stepped = stepSizeKey(event);
+          if (stepped !== undefined) {
+            setDraft(stepped);
+            onLive(asPositionOffset(stepped));
           }
-          const stepped = handleArrowStep(e);
-          if (!stepped) {
-            return;
-          }
-          e.preventDefault();
-          const el = e.currentTarget;
-          el.value = stepped.text;
-          el.setSelectionRange(stepped.caret, stepped.caret);
-          setDraft(stepped.text);
-          onLive(norm(stepped.text));
         }}
       />
     </VariableConnect>
   );
 }
 
+// A typed offset as written: a bare number is a percentage, anything else (a
+// unit, a keyword, a var()) passes through, and blank stays blank.
+function asPositionOffset(typed: string): string {
+  const text = typed.trim();
+  if (text === '') {
+    return '';
+  }
+  return /^-?[\d.]+$/.test(text) ? `${text}%` : text;
+}
+
 // Popup shell over the panel — the same darkening backdrop the transform / shadow
 // editors use; closes on backdrop click or Escape.
 function PositionModal({ onClose, children }: { onClose: () => void; children: ReactNode }) {
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
         onClose();
       }
     };
@@ -1665,8 +1668,8 @@ function PositionModal({ onClose, children }: { onClose: () => void; children: R
   return createPortal(
     <div
       className="embed-editor_bg-modal-backdrop"
-      onMouseDown={(e) => {
-        if (e.target === e.currentTarget) {
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) {
           onClose();
         }
       }}
@@ -1694,42 +1697,151 @@ function ImageFitField({
   onSelectSelector,
 }: Props) {
   const fit = displayOf(read('object-fit'));
-  const posD = displayOf(read('object-position'));
-  const [posOpen, setPosOpen] = useState(false);
-  const [forceCustom, setForceCustom] = useState(false);
-  // Delayed hover tooltip on the "…" button (same rich popup the segmented controls use).
+  const positionDisplay = displayOf(read('object-position'));
+  const [positionOpen, setPositionOpen] = useState(false);
+  const positionRaw = positionDisplay.present ? positionDisplay.value.trim() : '';
+  const positionSet = positionRaw !== '' && positionRaw.toLowerCase() !== 'unset';
+
+  return (
+    <>
+      <div className="embed-editor_size-row">
+        <SizeLabel
+          label="Image fit"
+          prop="object-fit"
+          display={fit}
+          contributors={read('object-fit')?.contributors ?? []}
+          busy={busy}
+          onClear={() => clearProp('object-fit')}
+          onProvenance={onProvenance}
+          onSelectSelector={onSelectSelector}
+        />
+        <div className="embed-editor_imgfit-controls">
+          <ObjectFitSelect
+            fit={fit}
+            busy={busy}
+            setProp={setProp}
+            clearProp={clearProp}
+            liveSetProp={liveSetProp}
+          />
+          <ObjectPositionButton
+            busy={busy}
+            positionSet={positionSet}
+            positionOpen={positionOpen}
+            onToggle={() => setPositionOpen((open) => !open)}
+          />
+        </div>
+      </div>
+      {positionOpen ? (
+        <PositionModal onClose={() => setPositionOpen(false)}>
+          <ObjectPositionEditor
+            positionRaw={positionRaw}
+            positionSet={positionSet}
+            busy={busy}
+            setProp={setProp}
+            clearProp={clearProp}
+            liveSetProp={liveSetProp}
+          />
+        </PositionModal>
+      ) : undefined}
+    </>
+  );
+}
+
+// The "…" button that opens the object-position popup, lit while a position is
+// set, with a delayed hover tooltip (the same rich popup the segmented controls
+// use).
+function ObjectPositionButton({
+  busy,
+  positionSet,
+  positionOpen,
+  onToggle,
+}: {
+  busy: boolean;
+  positionSet: boolean;
+  positionOpen: boolean;
+  onToggle: () => void;
+}) {
   const moreRef = useRef<HTMLButtonElement>(null);
-  const [tipOpen, setTipOpen] = useState(false);
-  const tipTimer = useRef<number | null>(null);
+  const tip = useDelayedTip();
+  return (
+    <>
+      <button
+        ref={moreRef}
+        type="button"
+        className={
+          'embed-editor_icon-btn embed-editor_imgfit-more ' + (positionSet ? 'is-active' : '')
+        }
+        disabled={busy}
+        aria-haspopup="dialog"
+        aria-expanded={positionOpen}
+        aria-label="Object position settings"
+        onClick={() => {
+          tip.end();
+          onToggle();
+        }}
+        onMouseEnter={tip.start}
+        onMouseLeave={tip.end}
+      >
+        <DotsIcon />
+      </button>
+      {tip.open && moreRef.current && !positionOpen ? (
+        <HoverTooltip anchor={moreRef.current}>Object position settings</HoverTooltip>
+      ) : undefined}
+    </>
+  );
+}
+
+// A tooltip that opens after a hover delay and closes the moment the pointer
+// leaves (or the anchor is pressed).
+function useDelayedTip() {
+  const [open, setOpen] = useState(false);
+  const tipTimer = useRef<number | undefined>(undefined);
   const clearTip = () => {
-    if (tipTimer.current != null) {
+    if (tipTimer.current !== undefined) {
       window.clearTimeout(tipTimer.current);
-      tipTimer.current = null;
+      tipTimer.current = undefined;
     }
   };
   useEffect(() => clearTip, []);
-  const startTip = () => {
+  const start = () => {
     clearTip();
     tipTimer.current = window.setTimeout(() => {
-      tipTimer.current = null;
-      setTipOpen(true);
+      tipTimer.current = undefined;
+      setOpen(true);
     }, 400);
   };
-  const endTip = () => {
+  const end = () => {
     clearTip();
-    setTipOpen(false);
+    setOpen(false);
   };
+  return { open, start, end };
+}
 
-  // "Custom" as the last option: seed `unset` and reveal a free-text field for any
-  // value (a var()/keyword/etc. Webflow doesn't offer in the preset list).
+// The object-fit dropdown. "Custom" as the last option: seed `unset` and reveal
+// a free-text field for any value (a var()/keyword/etc. Webflow doesn't offer in
+// the preset list).
+function ObjectFitSelect({
+  fit,
+  busy,
+  setProp,
+  clearProp,
+  liveSetProp,
+}: {
+  fit: Display;
+  busy: boolean;
+  setProp: SetProp;
+  clearProp: ClearProp;
+  liveSetProp: LiveSetProp;
+}) {
+  const [forceCustom, setForceCustom] = useState(false);
   const fitValue = fit.value.trim().toLowerCase();
-  const knownFit = FIT_OPTIONS.some((o) => o.value === fitValue);
+  const knownFit = FIT_OPTIONS.some((option) => option.value === fitValue);
   const fitCustom = forceCustom || (fit.present && fitValue !== '' && !knownFit);
   // Chosen from the menu, as opposed to a value the list can't show — the field
   // is the same either way, but only the first wants the caret.
   const askedForCustom = useRef(false);
-  const pickFit = (v: string) => {
-    if (v === FIT_CUSTOM) {
+  const pickFit = (choice: string) => {
+    if (choice === FIT_CUSTOM) {
       setForceCustom(true);
       askedForCustom.current = true;
       setProp('object-fit', 'unset', false);
@@ -1737,19 +1849,62 @@ function ImageFitField({
     }
     askedForCustom.current = false;
     setForceCustom(false);
-    setProp('object-fit', v, false);
+    setProp('object-fit', choice, false);
   };
+  return (
+    <Select
+      className="embed-editor_imgfit-select"
+      value={fitCustom ? FIT_CUSTOM : fit.present ? fitValue : 'fill'}
+      options={[...FIT_OPTIONS, { value: FIT_CUSTOM, label: 'Custom' }]}
+      ariaLabel="Object fit"
+      disabled={busy}
+      onChange={pickFit}
+      onPreview={(choice) =>
+        liveSetProp('object-fit', choice === FIT_CUSTOM ? undefined : (choice ?? undefined), false)
+      }
+      customInput={
+        fitCustom ? (
+          <RatioOtherInput
+            value={fit.present ? withImportant(fit) : ''}
+            busy={busy}
+            prop="object-fit"
+            autoFocus={askedForCustom.current}
+            ariaLabel="Object fit value"
+            onCommit={(value, important) => setProp('object-fit', value, important)}
+            onLiveCommit={(value, important) => liveSetProp('object-fit', value, important)}
+            onClear={() => {
+              setForceCustom(false);
+              clearProp('object-fit');
+            }}
+          />
+        ) : undefined
+      }
+    />
+  );
+}
 
-  const posRaw = posD.present ? posD.value.trim() : '';
-  const posParts = splitTopLevelSpaces(posRaw).filter(Boolean);
-  const px = posParts[0] ?? '';
-  const py = posParts[1] ?? '';
-  const posSet = posRaw !== '' && posRaw.toLowerCase() !== 'unset';
-  const activeCol = objPosAxis(px);
-  const activeRow = objPosAxis(py);
-
-  const writePos = (value: string, live: boolean) => {
-    if (live) {
+// The object-position popup: a 3×3 preset grid beside Left / Top offset fields.
+function ObjectPositionEditor({
+  positionRaw,
+  positionSet,
+  busy,
+  setProp,
+  clearProp,
+  liveSetProp,
+}: {
+  positionRaw: string;
+  positionSet: boolean;
+  busy: boolean;
+  setProp: SetProp;
+  clearProp: ClearProp;
+  liveSetProp: LiveSetProp;
+}) {
+  const positionParts = splitTopLevelSpaces(positionRaw).filter(Boolean);
+  const left = positionParts[0] ?? '';
+  const top = positionParts[1] ?? '';
+  // A live write only previews a value; a commit of nothing clears the property.
+  const writePosition = (value: string, mode: 'live' | 'commit') => {
+    if (mode === 'live') {
       if (value) {
         liveSetProp('object-position', value, false);
       }
@@ -1761,141 +1916,113 @@ function ImageFitField({
       clearProp('object-position');
     }
   };
-
   return (
-    <>
-      <div className="embed-editor_size-row">
-        <SizeLabel
-          label="Image fit"
-          prop="object-fit"
-          d={fit}
-          contributors={read('object-fit')?.contributors ?? []}
+    <div className="embed-editor_imgfit-pos">
+      <FieldLabel
+        className="embed-editor_imgfit-pos-label"
+        active={positionSet}
+        disabled={busy}
+        onReset={() => clearProp('object-position')}
+        resetLabel="Clear"
+        tooltip={<PropTip props={['object-position']} />}
+      >
+        Position
+      </FieldLabel>
+      <div className="embed-editor_bg-position">
+        <ObjectPositionGrid
+          activeColumn={objectPositionAxis(left)}
+          activeRow={objectPositionAxis(top)}
           busy={busy}
-          onClear={() => clearProp('object-fit')}
-          onProvenance={onProvenance}
-          onSelectSelector={onSelectSelector}
+          onPick={(value) => writePosition(value, 'commit')}
         />
-        <div className="embed-editor_imgfit-controls">
-          <Select
-            className="embed-editor_imgfit-select"
-            value={fitCustom ? FIT_CUSTOM : fit.present ? fitValue : 'fill'}
-            options={[...FIT_OPTIONS, { value: FIT_CUSTOM, label: 'Custom' }]}
-            ariaLabel="Object fit"
-            disabled={busy}
-            onChange={pickFit}
-            onPreview={(v) => liveSetProp('object-fit', v === FIT_CUSTOM ? null : v, false)}
-            customInput={
-              fitCustom ? (
-                <RatioOtherInput
-                  value={fit.present ? (fit.important ? `${fit.value} !important` : fit.value) : ''}
-                  busy={busy}
-                  prop="object-fit"
-                  autoFocus={askedForCustom.current}
-                  ariaLabel="Object fit value"
-                  onCommit={(v, important) => setProp('object-fit', v, important)}
-                  onLiveCommit={(v, important) => liveSetProp('object-fit', v, important)}
-                  onClear={() => {
-                    setForceCustom(false);
-                    clearProp('object-fit');
-                  }}
-                />
-              ) : undefined
-            }
-          />
+        {/* Divs, not labels. The field these hold is the rich token editor with
+          the real <input> hidden behind it — and a <label> hands a click to the
+          control it wraps, so clicking into the editor focused that hidden input
+          instead and the caret vanished the instant it appeared. The inputs carry
+          their own aria-label. */}
+        <ObjectPositionFields left={left} top={top} busy={busy} writePosition={writePosition} />
+      </div>
+    </div>
+  );
+}
+
+// The Left / Top offset fields. A live edit previews both sides (a blank side as
+// 50%); a commit writes both, or clears the position when both are blank.
+function ObjectPositionFields({
+  left,
+  top,
+  busy,
+  writePosition,
+}: {
+  left: string;
+  top: string;
+  busy: boolean;
+  writePosition: (value: string, mode: 'live' | 'commit') => void;
+}) {
+  return (
+    <div className="embed-editor_bg-posfields">
+      <div className="embed-editor_bg-posfield">
+        <span className="embed-editor_bg-posfield-cap">Left</span>
+        <ObjectPositionInput
+          value={left}
+          busy={busy}
+          label="Object position left"
+          onLive={(value) => writePosition(`${value || '50%'} ${top || '50%'}`, 'live')}
+          onCommit={(value) =>
+            writePosition(value || top ? `${value || '50%'} ${top || '50%'}` : '', 'commit')
+          }
+        />
+      </div>
+      <div className="embed-editor_bg-posfield">
+        <span className="embed-editor_bg-posfield-cap">Top</span>
+        <ObjectPositionInput
+          value={top}
+          busy={busy}
+          label="Object position top"
+          onLive={(value) => writePosition(`${left || '50%'} ${value || '50%'}`, 'live')}
+          onCommit={(value) =>
+            writePosition(left || value ? `${left || '50%'} ${value || '50%'}` : '', 'commit')
+          }
+        />
+      </div>
+    </div>
+  );
+}
+
+// The 3×3 preset grid: each cell pins the image to that column and row.
+function ObjectPositionGrid({
+  activeColumn,
+  activeRow,
+  busy,
+  onPick,
+}: {
+  activeColumn: number;
+  activeRow: number;
+  busy: boolean;
+  onPick: (value: string) => void;
+}) {
+  return (
+    <div className="embed-editor_bg-posgrid" role="group" aria-label="Object position preset">
+      {[0, 1, 2].flatMap((row) =>
+        [0, 1, 2].map((column) => (
           <button
-            ref={moreRef}
+            key={`${row}-${column}`}
             type="button"
             className={
-              'embed-editor_icon-btn embed-editor_imgfit-more ' + (posSet ? 'is-active' : '')
+              'embed-editor_bg-poscell ' +
+              (activeColumn === column && activeRow === row ? 'is-active' : '')
             }
             disabled={busy}
-            aria-haspopup="dialog"
-            aria-expanded={posOpen}
-            aria-label="Object position settings"
-            onClick={() => {
-              endTip();
-              setPosOpen((o) => !o);
-            }}
-            onMouseEnter={startTip}
-            onMouseLeave={endTip}
-          >
-            <DotsIcon />
-          </button>
-          {tipOpen && moreRef.current && !posOpen ? (
-            <HoverTooltip anchor={moreRef.current}>Object position settings</HoverTooltip>
-          ) : null}
-        </div>
-      </div>
-      {posOpen ? (
-        <PositionModal onClose={() => setPosOpen(false)}>
-          <div className="embed-editor_imgfit-pos">
-            <FieldLabel
-              className="embed-editor_imgfit-pos-label"
-              active={posSet}
-              disabled={busy}
-              onReset={() => clearProp('object-position')}
-              resetLabel="Clear"
-              tooltip={<PropTip props={['object-position']} />}
-            >
-              Position
-            </FieldLabel>
-            <div className="embed-editor_bg-position">
-              <div
-                className="embed-editor_bg-posgrid"
-                role="group"
-                aria-label="Object position preset"
-              >
-                {[0, 1, 2].flatMap((row) =>
-                  [0, 1, 2].map((col) => (
-                    <button
-                      key={`${row}-${col}`}
-                      type="button"
-                      className={
-                        'embed-editor_bg-poscell ' +
-                        (activeCol === col && activeRow === row ? 'is-active' : '')
-                      }
-                      disabled={busy}
-                      aria-label={
-                        `${['Left', 'Center', 'Right'][col]} ` +
-                        `${['top', 'center', 'bottom'][row]}`
-                      }
-                      onClick={() => writePos(`${OBJ_POS_PCT[col]} ${OBJ_POS_PCT[row]}`, false)}
-                    />
-                  )),
-                )}
-              </div>
-              {/* Divs, not labels. The field these hold is the rich token editor with
-                the real <input> hidden behind it — and a <label> hands a click to the
-                control it wraps, so clicking into the editor focused that hidden input
-                instead and the caret vanished the instant it appeared. The inputs carry
-                their own aria-label. */}
-              <div className="embed-editor_bg-posfields">
-                <div className="embed-editor_bg-posfield">
-                  <span className="embed-editor_bg-posfield-cap">Left</span>
-                  <PosInput
-                    value={px}
-                    busy={busy}
-                    label="Object position left"
-                    onLive={(v) => writePos(`${v || '50%'} ${py || '50%'}`, true)}
-                    onCommit={(v) => writePos(v || py ? `${v || '50%'} ${py || '50%'}` : '', false)}
-                  />
-                </div>
-                <div className="embed-editor_bg-posfield">
-                  <span className="embed-editor_bg-posfield-cap">Top</span>
-                  <PosInput
-                    value={py}
-                    busy={busy}
-                    label="Object position top"
-                    onLive={(v) => writePos(`${px || '50%'} ${v || '50%'}`, true)}
-                    onCommit={(v) => writePos(px || v ? `${px || '50%'} ${v || '50%'}` : '', false)}
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-        </PositionModal>
-      ) : null}
-    </>
+            aria-label={
+              `${['Left', 'Center', 'Right'][column]} ` + `${['top', 'center', 'bottom'][row]}`
+            }
+            onClick={() =>
+              onPick(`${OBJECT_POSITION_PERCENTS[column]} ${OBJECT_POSITION_PERCENTS[row]}`)
+            }
+          />
+        )),
+      )}
+    </div>
   );
 }
 

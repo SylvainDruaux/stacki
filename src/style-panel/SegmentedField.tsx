@@ -19,7 +19,7 @@ function parseImportant(input: string): { value: string; important: boolean } {
   }
   return { value: input.trim(), important: false };
 }
-const joinImportant = (value: string, important: boolean) =>
+const joinImportant = ({ value, important }: { value: string; important: boolean }) =>
   important ? `${value} !important` : value;
 
 function ChevronIcon() {
@@ -73,11 +73,11 @@ function CustomField({
   inputRef: React.RefObject<HTMLInputElement>;
   onCommit: (value: string, important: boolean) => void;
 }) {
-  const [draft, setDraft] = useState(joinImportant(value, important));
+  const [draft, setDraft] = useState(joinImportant({ value, important }));
   const focused = useRef(false);
   useEffect(() => {
     if (!focused.current) {
-      setDraft(joinImportant(value, important));
+      setDraft(joinImportant({ value, important }));
     }
   }, [value, important]);
   const commit = () => {
@@ -91,7 +91,7 @@ function CustomField({
       ref={inputRef}
       className="embed-editor_value-input embed-editor_display-input"
       value={draft}
-      onChange={(e) => setDraft(e.target.value)}
+      onChange={(event) => setDraft(event.target.value)}
       onFocus={() => {
         focused.current = true;
       }}
@@ -99,9 +99,9 @@ function CustomField({
         focused.current = false;
         commit();
       }}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter') {
-          e.currentTarget.blur();
+      onKeyDown={(event) => {
+        if (event.key === 'Enter') {
+          event.currentTarget.blur();
         }
       }}
       disabled={busy}
@@ -112,16 +112,7 @@ function CustomField({
   );
 }
 
-export default function SegmentedField({
-  value,
-  important,
-  options,
-  prop,
-  fallback,
-  busy,
-  onCommit,
-  ariaLabel,
-}: {
+type SegmentedFieldProps = {
   value: string;
   important: boolean;
   options: readonly SegOption[];
@@ -133,53 +124,33 @@ export default function SegmentedField({
   busy: boolean;
   onCommit: (value: string, important: boolean) => void;
   ariaLabel?: string;
-}) {
+};
+
+export default function SegmentedField({
+  value,
+  important,
+  options,
+  prop,
+  fallback,
+  busy,
+  onCommit,
+  ariaLabel,
+}: SegmentedFieldProps) {
   const current = value.trim().toLowerCase();
-  const supported = new Set(options.map((o) => o.value));
+  const supported = new Set(options.map((option) => option.value));
   // The bar represents a listed value with no !important; anything else is custom.
   const customMode = !((supported.has(current) || !current) && !important);
   const active = useHighlight(
     current,
     prop ?? '',
-    options.map((o) => o.value),
+    options.map((option) => option.value),
     fallback,
   );
 
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
-  const wantFocus = useRef(false);
-
-  useEffect(() => {
-    if (!open) {
-      return;
-    }
-    const onDown = (event: MouseEvent) => {
-      if (!(event.target instanceof Node) || !rootRef.current?.contains(event.target)) {
-        setOpen(false);
-      }
-    };
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        setOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', onDown);
-    document.addEventListener('keydown', onKey);
-    return () => {
-      document.removeEventListener('mousedown', onDown);
-      document.removeEventListener('keydown', onKey);
-    };
-  }, [open]);
-
-  // Focus the field after switching to Custom, once its `unset` write settles.
-  useEffect(() => {
-    if (customMode && wantFocus.current && !busy) {
-      wantFocus.current = false;
-      inputRef.current?.focus();
-      inputRef.current?.select();
-    }
-  }, [customMode, busy]);
+  useMenuDismiss({ open, rootRef, setOpen });
+  const { inputRef, requestFocus } = useCustomFocus({ customMode, busy });
 
   const pick = (next: string) => {
     setOpen(false);
@@ -189,7 +160,7 @@ export default function SegmentedField({
   };
   const enterCustom = () => {
     setOpen(false);
-    wantFocus.current = true;
+    requestFocus();
     onCommit('unset', false);
   };
 
@@ -210,22 +181,45 @@ export default function SegmentedField({
           onCommit={onCommit}
         />
       ) : (
-        options.map((o) => (
-          <button
-            key={o.value}
-            type="button"
-            role="radio"
-            aria-checked={active === o.value}
-            aria-label={o.ariaLabel ?? o.menuLabel}
-            className={`embed-editor_display-seg ${active === o.value ? 'is-selected' : ''}`}
-            disabled={busy}
-            onClick={() => pick(o.value)}
-          >
-            {o.label}
-          </button>
-        ))
+        <SegmentButtons options={options} active={active} busy={busy} onPick={pick} />
       )}
+      <SegmentMenu
+        open={open}
+        busy={busy}
+        customMode={customMode}
+        current={current}
+        options={options}
+        onToggle={() => setOpen((previous) => !previous)}
+        onPick={pick}
+        onEnterCustom={enterCustom}
+      />
+    </div>
+  );
+}
 
+// The trailing arrow and its menu: "Custom" from the bar, or the built-in
+// values to switch back to from a custom value.
+function SegmentMenu({
+  open,
+  busy,
+  customMode,
+  current,
+  options,
+  onToggle,
+  onPick,
+  onEnterCustom,
+}: {
+  open: boolean;
+  busy: boolean;
+  customMode: boolean;
+  current: string;
+  options: readonly SegOption[];
+  onToggle: () => void;
+  onPick: (value: string) => void;
+  onEnterCustom: () => void;
+}) {
+  return (
+    <>
       <button
         type="button"
         className="embed-editor_display-arrow"
@@ -233,7 +227,7 @@ export default function SegmentedField({
         aria-expanded={open}
         aria-label="More options"
         disabled={busy}
-        onClick={() => setOpen((v) => !v)}
+        onClick={onToggle}
       >
         <ChevronIcon />
       </button>
@@ -241,19 +235,100 @@ export default function SegmentedField({
       {open ? (
         <div className="embed-editor_display-menu" role="menu">
           {customMode ? (
-            options.map((o) => (
+            options.map((option) => (
               <MenuItem
-                key={o.value}
-                label={o.menuLabel}
-                selected={current === o.value}
-                onClick={() => pick(o.value)}
+                key={option.value}
+                label={option.menuLabel}
+                selected={current === option.value}
+                onClick={() => onPick(option.value)}
               />
             ))
           ) : (
-            <MenuItem label="Custom" selected={false} onClick={enterCustom} />
+            <MenuItem label="Custom" selected={false} onClick={onEnterCustom} />
           )}
         </div>
-      ) : null}
-    </div>
+      ) : undefined}
+    </>
   );
+}
+
+// The bar's segments, one per listed value.
+function SegmentButtons({
+  options,
+  active,
+  busy,
+  onPick,
+}: {
+  options: readonly SegOption[];
+  active: string;
+  busy: boolean;
+  onPick: (value: string) => void;
+}) {
+  return options.map((option) => (
+    <button
+      key={option.value}
+      type="button"
+      role="radio"
+      aria-checked={active === option.value}
+      aria-label={option.ariaLabel ?? option.menuLabel}
+      className={`embed-editor_display-seg ${active === option.value ? 'is-selected' : ''}`}
+      disabled={busy}
+      onClick={() => onPick(option.value)}
+    >
+      {option.label}
+    </button>
+  ));
+}
+
+// While the menu is open, a press outside the field or Escape closes it.
+function useMenuDismiss({
+  open,
+  rootRef,
+  setOpen,
+}: {
+  open: boolean;
+  rootRef: React.RefObject<HTMLDivElement>;
+  setOpen: (open: boolean) => void;
+}): void {
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+    const onDown = (event: MouseEvent) => {
+      if (!(event.target instanceof Node) || !rootRef.current?.contains(event.target)) {
+        setOpen(false);
+      }
+    };
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDown);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [open, rootRef, setOpen]);
+}
+
+// Focus the custom field after switching to Custom, once its `unset` write
+// settles: the request is remembered until the field exists and is enabled.
+function useCustomFocus({ customMode, busy }: { customMode: boolean; busy: boolean }) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const wantFocus = useRef(false);
+  useEffect(() => {
+    if (customMode && wantFocus.current && !busy) {
+      wantFocus.current = false;
+      inputRef.current?.focus();
+      inputRef.current?.select();
+    }
+  }, [customMode, busy]);
+  return {
+    inputRef,
+    requestFocus: () => {
+      wantFocus.current = true;
+    },
+  };
 }

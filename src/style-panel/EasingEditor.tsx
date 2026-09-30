@@ -86,46 +86,49 @@ function framedStyle(frame: { left: number; width: number }): { left: number; wi
   return { left, width };
 }
 
-const bezEq = (a: Bezier, b: Bezier) => a.every((n, i) => Math.abs(n - (b[i] ?? 0)) < 0.005);
-const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, n));
+const bezEq = (left: Bezier, right: Bezier) =>
+  left.every((coordinate, i) => Math.abs(coordinate - (right[i] ?? 0)) < 0.005);
+const clamp = (value: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, value));
 // One coordinate of the unit cubic-bezier (0,0)->(1,1) at parameter s.
 // Each bisection halves the interval: 2⁻²⁴ is far finer than a rendered curve.
 const BISECTION_PASSES_MAX = 24;
-const bezAt = (s: number, a: number, b: number) =>
-  3 * (1 - s) ** 2 * s * a + 3 * (1 - s) * s ** 2 * b + s ** 3;
+const bezAt = (parameter: number, firstControl: number, secondControl: number) =>
+  3 * (1 - parameter) ** 2 * parameter * firstControl +
+  3 * (1 - parameter) * parameter ** 2 * secondControl +
+  parameter ** 3;
 // The eased PROGRESS (output) at input time t: solve x(s)=t for the parameter s, then
 // read y(s). This is what makes the playback follow the ease — the parameter s is NOT
 // time, so tracing the curve by s alone moves at the wrong (uniform) rate.
-function easeProgress(t: number, x1: number, y1: number, x2: number, y2: number): number {
-  if (t <= 0) {
+function easeProgress(time: number, x1: number, y1: number, x2: number, y2: number): number {
+  if (time <= 0) {
     return 0;
   }
-  if (t >= 1) {
+  if (time >= 1) {
     return 1;
   }
   let lo = 0,
     hi = 1,
-    s = t;
+    parameter = time;
   for (let i = 0; i < BISECTION_PASSES_MAX; i += 1) {
-    const x = bezAt(s, x1, x2);
-    if (Math.abs(x - t) < 1e-4) {
+    const x = bezAt(parameter, x1, x2);
+    if (Math.abs(x - time) < 1e-4) {
       break;
     }
-    if (x < t) {
-      lo = s;
+    if (x < time) {
+      lo = parameter;
     } else {
-      hi = s;
+      hi = parameter;
     }
-    s = (lo + hi) / 2;
+    parameter = (lo + hi) / 2;
   }
-  return bezAt(s, y1, y2);
+  return bezAt(parameter, y1, y2);
 }
 // The matched preset's name ("Ease", "Ease In Sine"), else "Custom".
-function presetName(b: Bezier): string {
-  for (const g of PRESETS) {
-    for (const item of g.items) {
-      if (bezEq(item.b, b)) {
-        return g.heading === 'Default' ? item.label : `${g.heading} ${item.label}`;
+function presetName(bezier: Bezier): string {
+  for (const group of PRESETS) {
+    for (const item of group.items) {
+      if (bezEq(item.b, bezier)) {
+        return group.heading === 'Default' ? item.label : `${group.heading} ${item.label}`;
       }
     }
   }
@@ -158,13 +161,21 @@ const PauseIcon = () => (
 // A small preview curve for a preset button (unit bezier drawn in a 24×24 box).
 /** The curve itself, at glyph size: a preset's thumbnail here, and the icon on
  *  the button that opens this editor from the variables sheet. */
-export function MiniCurve({ b }: { b: Bezier }) {
-  const S = 24;
-  const p = (x: number, y: number) => `${(x * S).toFixed(1)} ${(S - y * S).toFixed(1)}`;
+export function MiniCurve({ b: bezier }: { b: Bezier }) {
+  const size = 24;
+  const point = (x: number, y: number) =>
+    `${(x * size).toFixed(1)} ${(size - y * size).toFixed(1)}`;
   return (
-    <svg viewBox={`-3 -8 ${S + 6} ${S + 16}`} className="embed-editor_ease-mini" aria-hidden="true">
+    <svg
+      viewBox={`-3 -8 ${size + 6} ${size + 16}`}
+      className="embed-editor_ease-mini"
+      aria-hidden="true"
+    >
       <path
-        d={`M ${p(0, 0)} C ${p(b[0], b[1])} ${p(b[2], b[3])} ${p(1, 1)}`}
+        d={
+          `M ${point(0, 0)} C ${point(bezier[0], bezier[1])} ` +
+          `${point(bezier[2], bezier[3])} ${point(1, 1)}`
+        }
         fill="none"
         stroke="currentColor"
         strokeWidth="1.5"
@@ -176,28 +187,19 @@ export function MiniCurve({ b }: { b: Bezier }) {
 function BezierEditor({
   value,
   onChange,
-  playT,
+  playTime,
 }: {
   value: Bezier;
   onChange: (b: Bezier) => void;
-  playT: number | null;
+  playTime: number | undefined;
 }) {
-  const S = 280;
   const svgRef = useRef<SVGSVGElement>(null);
   const areaRef = useRef<SVGRectElement>(null);
-  const [drag, setDrag] = useState<0 | 1 | null>(null);
-  const sx = (x: number) => x * S;
-  const sy = (y: number) => S - y * S;
-  // The play point: x is linear elapsed time; y is the EASED progress at that time
-  // (so the dot rides the curve and the right-edge playhead slides up at the eased
-  // rate, not uniformly).
-  const pd =
-    playT != null
-      ? { x: sx(playT), y: sy(easeProgress(playT, value[0], value[1], value[2], value[3])) }
-      : null;
+  const [drag, setDrag] = useState<0 | 1 | undefined>(undefined);
+  const playPoint = playTime === undefined ? undefined : playPointAt(playTime, value);
 
   const move = (event: ReactPointerEvent<SVGSVGElement>) => {
-    if (drag == null) {
+    if (drag === undefined) {
       return;
     }
     const rect = areaRef.current?.getBoundingClientRect();
@@ -215,80 +217,181 @@ function BezierEditor({
   return (
     <svg
       ref={svgRef}
-      viewBox={`-58 -90 ${S + 100} ${S + 210}`}
+      viewBox={`-58 -90 ${CURVE_SIZE + 100} ${CURVE_SIZE + 210}`}
       className="embed-editor_ease-curve"
       onPointerMove={move}
-      onPointerUp={() => setDrag(null)}
+      onPointerUp={() => setDrag(undefined)}
     >
-      <rect ref={areaRef} x="0" y="0" width={S} height={S} className="embed-editor_ease-grid" />
-      <text
-        transform={`translate(-34 ${S / 2}) rotate(-90)`}
-        textAnchor="middle"
-        className="embed-editor_ease-axis"
-      >
-        PROGRESS
-      </text>
-      <text x={S / 2} y={S + 42} textAnchor="middle" className="embed-editor_ease-axis">
-        TIME
-      </text>
-      {[1, 2, 3, 4, 5, 6, 7].map((i) => (
-        <g key={i} className="embed-editor_ease-gridline">
-          <line x1={(S / 8) * i} y1="0" x2={(S / 8) * i} y2={S} />
-          <line x1="0" y1={(S / 8) * i} x2={S} y2={(S / 8) * i} />
-        </g>
-      ))}
-      {/* Handle guide lines from the endpoints to the control points. */}
-      <line
-        x1={sx(0)}
-        y1={sy(0)}
-        x2={sx(value[0])}
-        y2={sy(value[1])}
-        className="embed-editor_ease-handle-line"
+      <rect
+        ref={areaRef}
+        x="0"
+        y="0"
+        width={CURVE_SIZE}
+        height={CURVE_SIZE}
+        className="embed-editor_ease-grid"
       />
-      <line
-        x1={sx(1)}
-        y1={sy(1)}
-        x2={sx(value[2])}
-        y2={sy(value[3])}
-        className="embed-editor_ease-handle-line"
-      />
-      {/* The easing curve. */}
-      <path
-        d={
-          `M ${sx(0)} ${sy(0)} C ${sx(value[0])} ${sy(value[1])} ` +
-          `${sx(value[2])} ${sy(value[3])} ${sx(1)} ${sy(1)}`
-        }
-        className="embed-editor_ease-path"
-      />
-      {/* Playhead on the right edge — slides up with the current progress. */}
-      {pd ? (
-        <polygon
-          points={
-            `${S},${pd.y} ${S + 9},${pd.y - 9} ${S + 27},${pd.y - 9} ` +
-            `${S + 27},${pd.y + 9} ${S + 9},${pd.y + 9}`
-          }
-          className="embed-editor_ease-playhead"
-        />
-      ) : null}
-      {/* Play-preview dot tracing the curve. */}
-      {pd ? <circle cx={pd.x} cy={pd.y} r="6" className="embed-editor_ease-play-dot" /> : null}
+      <CurveAxes />
+      <CurveLines value={value} />
+      {playPoint ? <CurvePlayhead point={playPoint} /> : undefined}
       {/* Draggable control points. */}
       {([0, 1] as const).map((i) => (
         <circle
           key={i}
-          cx={sx(value[i === 0 ? 0 : 2])}
-          cy={sy(value[i === 0 ? 1 : 3])}
+          cx={curveX(value[i === 0 ? 0 : 2])}
+          cy={curveY(value[i === 0 ? 1 : 3])}
           r="7"
           className="embed-editor_ease-handle"
-          onPointerDown={(e) => {
-            e.preventDefault();
+          onPointerDown={(event) => {
+            event.preventDefault();
             setDrag(i);
-            svgRef.current?.setPointerCapture(e.pointerId);
+            svgRef.current?.setPointerCapture(event.pointerId);
           }}
         />
       ))}
     </svg>
   );
+}
+
+// The play point: x is linear elapsed time; y is the EASED progress at that time (so the
+// dot rides the curve and the right-edge playhead slides up at the eased rate, not
+// uniformly).
+function playPointAt(playTime: number, value: Bezier): { x: number; y: number } {
+  const progress = easeProgress(playTime, value[0], value[1], value[2], value[3]);
+  return { x: curveX(playTime), y: curveY(progress) };
+}
+
+// The curve's drawing box, in SVG units, and the unit square mapped onto it (y up).
+const CURVE_SIZE = 280;
+const curveX = (x: number) => x * CURVE_SIZE;
+const curveY = (y: number) => CURVE_SIZE - y * CURVE_SIZE;
+
+// The axis captions and the 8×8 grid.
+function CurveAxes() {
+  return (
+    <>
+      <text
+        transform={`translate(-34 ${CURVE_SIZE / 2}) rotate(-90)`}
+        textAnchor="middle"
+        className="embed-editor_ease-axis"
+      >
+        PROGRESS
+      </text>
+      <text
+        x={CURVE_SIZE / 2}
+        y={CURVE_SIZE + 42}
+        textAnchor="middle"
+        className="embed-editor_ease-axis"
+      >
+        TIME
+      </text>
+      {[1, 2, 3, 4, 5, 6, 7].map((i) => (
+        <g key={i} className="embed-editor_ease-gridline">
+          <line x1={(CURVE_SIZE / 8) * i} y1="0" x2={(CURVE_SIZE / 8) * i} y2={CURVE_SIZE} />
+          <line x1="0" y1={(CURVE_SIZE / 8) * i} x2={CURVE_SIZE} y2={(CURVE_SIZE / 8) * i} />
+        </g>
+      ))}
+    </>
+  );
+}
+
+// The handle guide lines and the easing curve itself.
+function CurveLines({ value }: { value: Bezier }) {
+  return (
+    <>
+      {/* Handle guide lines from the endpoints to the control points. */}
+      <line
+        x1={curveX(0)}
+        y1={curveY(0)}
+        x2={curveX(value[0])}
+        y2={curveY(value[1])}
+        className="embed-editor_ease-handle-line"
+      />
+      <line
+        x1={curveX(1)}
+        y1={curveY(1)}
+        x2={curveX(value[2])}
+        y2={curveY(value[3])}
+        className="embed-editor_ease-handle-line"
+      />
+      {/* The easing curve. */}
+      <path
+        d={
+          `M ${curveX(0)} ${curveY(0)} C ${curveX(value[0])} ${curveY(value[1])} ` +
+          `${curveX(value[2])} ${curveY(value[3])} ${curveX(1)} ${curveY(1)}`
+        }
+        className="embed-editor_ease-path"
+      />
+    </>
+  );
+}
+
+// The playhead on the right edge — it slides up with the current progress — and the
+// play-preview dot tracing the curve.
+function CurvePlayhead({ point }: { point: { x: number; y: number } }) {
+  const size = CURVE_SIZE;
+  return (
+    <>
+      <polygon
+        points={
+          `${size},${point.y} ${size + 9},${point.y - 9} ${size + 27},${point.y - 9} ` +
+          `${size + 27},${point.y + 9} ${size + 9},${point.y + 9}`
+        }
+        className="embed-editor_ease-playhead"
+      />
+      <circle cx={point.x} cy={point.y} r="6" className="embed-editor_ease-play-dot" />
+    </>
+  );
+}
+
+// The looping preview: the playhead + dot trace the easing. It LOOPS — play → brief
+// hold → restart — until paused (matching Webflow); the button toggles play/pause.
+function usePlayback() {
+  const [playTime, setPlayTime] = useState<number | undefined>(undefined);
+  const [playing, setPlaying] = useState(false);
+  const playRaf = useRef<number | undefined>(undefined);
+  useEffect(
+    () => () => {
+      if (playRaf.current !== undefined) {
+        cancelAnimationFrame(playRaf.current);
+      }
+    },
+    [],
+  );
+  const stopPlay = () => {
+    if (playRaf.current !== undefined) {
+      cancelAnimationFrame(playRaf.current);
+      playRaf.current = undefined;
+    }
+    setPlaying(false);
+    setPlayTime(undefined);
+  };
+  const startPlay = () => {
+    setPlaying(true);
+    const DUR = 1200,
+      HOLD = 350;
+    let start = performance.now();
+    const step = (now: number) => {
+      const elapsed = now - start;
+      if (elapsed < DUR) {
+        setPlayTime(elapsed / DUR);
+      } else if (elapsed < DUR + HOLD) {
+        setPlayTime(1);
+      } else {
+        start = now;
+        setPlayTime(0);
+      }
+      playRaf.current = requestAnimationFrame(step);
+    };
+    playRaf.current = requestAnimationFrame(step);
+  };
+  const togglePlay = () => {
+    if (playing) {
+      stopPlay();
+    } else {
+      startPlay();
+    }
+  };
+  return { playTime, playing, togglePlay };
 }
 
 export default function EasingEditor({
@@ -304,81 +407,26 @@ export default function EasingEditor({
    *  window. The style panel opens it full width (its own panel IS the width);
    *  the variables sheet passes its own box so the editor covers the sheet it
    *  was opened from instead of the panel beside it. */
-  frame?: { left: number; width: number } | null;
+  frame?: { left: number; width: number };
 }) {
   const [bezier, setBezier] = useState<Bezier>(() => easingToBezier(value));
-  // What is being typed into the value field, until it is committed. Null while
+  // What is being typed into the value field, until it is committed. Undefined while
   // the field simply shows the curve.
-  const [draft, setDraft] = useState<string | null>(null);
-  const [playT, setPlayT] = useState<number | null>(null);
-  const [playing, setPlaying] = useState(false);
-  const playRaf = useRef<number | null>(null);
+  const [draft, setDraft] = useState<string | undefined>(undefined);
+  const { playTime, playing, togglePlay } = usePlayback();
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
         onClose();
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
-  useEffect(
-    () => () => {
-      if (playRaf.current != null) {
-        cancelAnimationFrame(playRaf.current);
-      }
-    },
-    [],
-  );
-  const apply = (b: Bezier) => {
-    setDraft(null);
-    setBezier(b);
-    onChange(bezierToEasing(b));
-  };
-  /** Take what was typed, if it is a curve this editor can show. */
-  const commitText = () => {
-    const text = (draft ?? '').trim();
-    setDraft(null);
-    if (!text || !isEasing(text)) {
-      return;
-    }
-    apply(easingToBezier(text));
-  };
-  // Preview: the playhead + dot trace the easing. It LOOPS — play → brief hold → restart
-  // — until paused (matching Webflow); the button toggles play/pause.
-  const stopPlay = () => {
-    if (playRaf.current != null) {
-      cancelAnimationFrame(playRaf.current);
-      playRaf.current = null;
-    }
-    setPlaying(false);
-    setPlayT(null);
-  };
-  const startPlay = () => {
-    setPlaying(true);
-    const DUR = 1200,
-      HOLD = 350;
-    let start = performance.now();
-    const step = (now: number) => {
-      const e = now - start;
-      if (e < DUR) {
-        setPlayT(e / DUR);
-      } else if (e < DUR + HOLD) {
-        setPlayT(1);
-      } else {
-        start = now;
-        setPlayT(0);
-      }
-      playRaf.current = requestAnimationFrame(step);
-    };
-    playRaf.current = requestAnimationFrame(step);
-  };
-  const togglePlay = () => {
-    if (playing) {
-      stopPlay();
-    } else {
-      startPlay();
-    }
+  const apply = (next: Bezier) => {
+    setDraft(undefined);
+    setBezier(next);
+    onChange(bezierToEasing(next));
   };
 
   return createPortal(
@@ -386,8 +434,8 @@ export default function EasingEditor({
       className={
         'embed-editor_bg-modal-backdrop embed-editor_ease-backdrop' + (frame ? ' is-framed' : '')
       }
-      onMouseDown={(e) => {
-        if (e.target === e.currentTarget) {
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) {
           onClose();
         }
       }}
@@ -399,26 +447,7 @@ export default function EasingEditor({
         aria-modal="true"
         aria-label="Easing editor"
       >
-        <header className="embed-editor_ease-head">
-          <span className="embed-editor_ease-title">
-            <GearIcon /> Easing Editor
-          </span>
-          <button
-            type="button"
-            className="embed-editor_icon-btn"
-            onClick={onClose}
-            aria-label="Close"
-          >
-            <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
-              <path
-                d="M4 4l8 8M12 4l-8 8"
-                stroke="currentColor"
-                strokeWidth="1.4"
-                strokeLinecap="round"
-              />
-            </svg>
-          </button>
-        </header>
+        <EasingHeader onClose={onClose} />
         <div className="embed-editor_ease-body">
           <div className="embed-editor_ease-main">
             <div className="embed-editor_ease-main-head">
@@ -432,66 +461,116 @@ export default function EasingEditor({
               </button>
               <span className="embed-editor_ease-name">{presetName(bezier)}</span>
             </div>
-            <BezierEditor value={bezier} onChange={apply} playT={playT} />
-            {/* The value as text, editable: the same code field the variables
-                sheet uses, so it is coloured as you read it and a curve can be
-                typed or pasted rather than only dragged. A value that is not a
-                curve the editor can show (a steps(), a half-typed one) reverts
-                on commit — the curve above it is the source of truth. */}
-            <div className="embed-editor_ease-value">
-              <VariableConnect
-                className="is-fill"
-                code
-                prop="transition-timing-function"
-                ariaLabel="Timing function"
-                onPick={(binding) => setDraft(binding)}
-              >
-                <input
-                  className="u-input embed-editor_ease-input"
-                  value={draft ?? bezierToEasing(bezier)}
-                  spellCheck={false}
-                  aria-label="Timing function"
-                  onChange={(e) => setDraft(e.target.value)}
-                  onBlur={() => commitText()}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      commitText();
-                    }
-                    if (e.key === 'Escape') {
-                      e.preventDefault();
-                      setDraft(null);
-                    }
-                  }}
-                />
-              </VariableConnect>
-            </div>
+            <BezierEditor value={bezier} onChange={apply} playTime={playTime} />
+            <EasingValueField bezier={bezier} draft={draft} setDraft={setDraft} apply={apply} />
           </div>
-          <div className="embed-editor_ease-presets">
-            {PRESETS.map((group) => (
-              <div key={group.heading} className="embed-editor_ease-group">
-                <h4 className="embed-editor_ease-group-title">{group.heading}</h4>
-                <div className="embed-editor_ease-grid-presets">
-                  {group.items.map((preset) => (
-                    <button
-                      key={preset.label}
-                      type="button"
-                      className={
-                        'embed-editor_ease-preset ' + (bezEq(preset.b, bezier) ? 'is-active' : '')
-                      }
-                      title={`${group.heading} ${preset.label}`}
-                      onClick={() => apply(preset.b)}
-                    >
-                      <MiniCurve b={preset.b} />
-                    </button>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
+          <EasingPresets bezier={bezier} apply={apply} />
         </div>
       </div>
     </div>,
     document.body,
+  );
+}
+
+function EasingHeader({ onClose }: { onClose: () => void }) {
+  return (
+    <header className="embed-editor_ease-head">
+      <span className="embed-editor_ease-title">
+        <GearIcon /> Easing Editor
+      </span>
+      <button type="button" className="embed-editor_icon-btn" onClick={onClose} aria-label="Close">
+        <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
+          <path
+            d="M4 4l8 8M12 4l-8 8"
+            stroke="currentColor"
+            strokeWidth="1.4"
+            strokeLinecap="round"
+          />
+        </svg>
+      </button>
+    </header>
+  );
+}
+
+// The value as text, editable: the same code field the variables sheet uses, so it is
+// coloured as you read it and a curve can be typed or pasted rather than only dragged.
+// A value that is not a curve the editor can show (a steps(), a half-typed one) reverts
+// on commit — the curve above it is the source of truth.
+function EasingValueField({
+  bezier,
+  draft,
+  setDraft,
+  apply,
+}: {
+  bezier: Bezier;
+  draft: string | undefined;
+  setDraft: (draft: string | undefined) => void;
+  apply: (next: Bezier) => void;
+}) {
+  /** Take what was typed, if it is a curve this editor can show. */
+  const commitText = () => {
+    const text = (draft ?? '').trim();
+    setDraft(undefined);
+    if (!text || !isEasing(text)) {
+      return;
+    }
+    apply(easingToBezier(text));
+  };
+  return (
+    <div className="embed-editor_ease-value">
+      <VariableConnect
+        className="is-fill"
+        code
+        prop="transition-timing-function"
+        ariaLabel="Timing function"
+        onPick={(binding) => setDraft(binding)}
+      >
+        <input
+          className="u-input embed-editor_ease-input"
+          value={draft ?? bezierToEasing(bezier)}
+          spellCheck={false}
+          aria-label="Timing function"
+          onChange={(event) => setDraft(event.target.value)}
+          onBlur={() => commitText()}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter') {
+              event.preventDefault();
+              commitText();
+            }
+            if (event.key === 'Escape') {
+              event.preventDefault();
+              setDraft(undefined);
+            }
+          }}
+        />
+      </VariableConnect>
+    </div>
+  );
+}
+
+function EasingPresets({ bezier, apply }: { bezier: Bezier; apply: (next: Bezier) => void }) {
+  return (
+    <div className="embed-editor_ease-presets">
+      {PRESETS.map((group) => (
+        <div key={group.heading} className="embed-editor_ease-group">
+          <h4 className="embed-editor_ease-group-title">{group.heading}</h4>
+          <div className="embed-editor_ease-grid-presets">
+            {group.items.map((preset) => (
+              <button
+                key={preset.label}
+                type="button"
+                className={
+                  'embed-editor_ease-preset ' + (bezEq(preset.b, bezier) ? 'is-active' : '')
+                }
+                title={`${group.heading} ${preset.label}`}
+                onClick={() => apply(preset.b)}
+              >
+                <MiniCurve b={preset.b} />
+              </button>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
   );
 }

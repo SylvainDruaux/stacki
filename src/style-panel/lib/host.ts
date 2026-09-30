@@ -6,6 +6,9 @@
 // answers the panel's questions from it. One panel, one selection, so a
 // module-level record is enough.
 
+import { assert } from '../../../shared/assert';
+import { LIMITS } from '../../../shared/limits';
+
 type HostAttr = { readonly type: string; readonly value?: string };
 
 // A page node as the panel reads it: the panel never edits the tree (its
@@ -14,7 +17,7 @@ export type HostNode = {
   readonly id: string;
   readonly kind: string;
   readonly name?: string;
-  readonly props?: Readonly<Record<string, HostAttr | null>>;
+  readonly props?: Readonly<Record<string, HostAttr>>;
   readonly children?: readonly HostNode[] | undefined;
   readonly inner?: string;
 };
@@ -34,10 +37,10 @@ export type ClassOutcome =
   { readonly tag: 'applied' } | { readonly tag: 'refused'; readonly message: string };
 
 export type HostState = {
-  projectPath: string | null;
+  projectPath: string | undefined;
   /** The page (or open component) being edited. */
   nodes: readonly HostNode[];
-  selectedId: string | null;
+  selectedId: string | undefined;
   /** Canvas breakpoint: desktop | tablet | phone. */
   device: string;
   /** Stylesheets in the project, from style:listFiles. */
@@ -48,10 +51,10 @@ export type HostState = {
   astroFiles: Array<{ rel: string; name: string; path: string; size: number }>;
   /** Absolute path of the file being edited — its own <style> blocks come from
    *  the model, so it must not also be read off disk. */
-  openFilePath: string | null;
+  openFilePath: string | undefined;
   /** Whether the open editable file is a page or a component. Style nodes have
    *  the same model shape in both, so their provenance must be carried separately. */
-  openFileKind: 'page' | 'component' | null;
+  openFileKind: 'page' | 'component' | undefined;
   /**
    * Bumped by the app whenever undo or redo runs. The panel reads its rules
    * from files and from the page model, and an undo rewrites both behind its
@@ -76,57 +79,58 @@ export type HostState = {
    *  that node isn't in the file currently open (a page's block while a component
    *  is being edited) — the panel then keeps the edit and flushes it on exit
    *  rather than reporting a save that never happened. */
-  writeStyleNode: ((nodeId: string, css: string, immediate?: boolean) => boolean | void) | null;
+  writeStyleNode:
+    ((nodeId: string, css: string, immediate?: boolean) => boolean | void) | undefined;
   /** Select a node in the app (used when navigating from a provenance chip). */
-  selectNode: ((nodeId: string) => void) | null;
+  selectNode: ((nodeId: string) => void) | undefined;
   /** Put a class on the selected element. Typing a bare class in the selector
    *  box should land it on the element, the way a class field would — a rule
    *  for a class the element doesn't carry would never apply. Resolves once the
    *  page edit reached disk or was refused: the stylesheet rule for that class
    *  is written only after it applied (step 6, plan §3.3 — outcome-gated). */
-  addClass: ((className: string) => Promise<ClassOutcome>) | null;
+  addClass: ((className: string) => Promise<ClassOutcome>) | undefined;
   /** What the spacing box is pointing at, for the canvas to draw over the
    *  selected element: hovering `padding-top` lights the strip of the page that
-   *  padding-top holds open. Null when the pointer leaves it. */
-  onSpacingHover: ((hover: SpacingHover | null) => void) | null;
+   *  padding-top holds open. Undefined when the pointer leaves it. */
+  onSpacingHover: ((hover: SpacingHover | undefined) => void) | undefined;
   /**
    * A node's path in the rendered page (`0.1.2`), which is how the canvas
    * addresses elements. Lets the panel ask the real DOM about the selected
    * element instead of inferring it from the source tree.
    */
-  pathOf: ((nodeId: string) => string | null) | null;
+  pathOf: ((nodeId: string) => string | undefined) | undefined;
   /** Record an already-applied change on the app's undo stack. Stylesheet edits
    *  don't go through the page model, so without this ⌘Z would skip straight
    *  past them to the last layout change. */
-  recordUndo: ((cmd: UndoCommand) => void) | null;
+  recordUndo: ((command: UndoCommand) => void) | undefined;
 };
 
 export type UndoCommand = {
   label?: string;
   /** Edits sharing a key inside one burst collapse into a single step. */
-  coalesceKey?: string | null;
+  coalesceKey?: string;
   undo: () => void | Promise<void>;
   redo: () => void | Promise<void>;
 };
 
 const state: HostState = {
-  projectPath: null,
+  projectPath: undefined,
   nodes: [],
-  selectedId: null,
-  pathOf: null,
+  selectedId: undefined,
+  pathOf: undefined,
   historyTick: 0,
   device: 'desktop',
   files: [],
   astroFiles: [],
-  openFilePath: null,
-  openFileKind: null,
+  openFilePath: undefined,
+  openFileKind: undefined,
   renderedClasses: [],
   projectClasses: [],
-  writeStyleNode: null,
-  selectNode: null,
-  recordUndo: null,
-  addClass: null,
-  onSpacingHover: null,
+  writeStyleNode: undefined,
+  selectNode: undefined,
+  recordUndo: undefined,
+  addClass: undefined,
+  onSpacingHover: undefined,
 };
 
 // Which modifiers are held, from wherever they were pressed.
@@ -141,13 +145,13 @@ type Modifiers = { shiftKey: boolean; altKey: boolean };
 let modifiers: Modifiers = { shiftKey: false, altKey: false };
 const modifierListeners = new Set<(held: Modifiers) => void>();
 
-export function setModifiers(shiftKey: boolean, altKey: boolean) {
-  if (modifiers.shiftKey === shiftKey && modifiers.altKey === altKey) {
+export function setModifiers(held: Readonly<Modifiers>) {
+  if (modifiers.shiftKey === held.shiftKey && modifiers.altKey === held.altKey) {
     return;
   }
-  modifiers = { shiftKey, altKey };
-  for (const fn of modifierListeners) {
-    fn(modifiers);
+  modifiers = { shiftKey: held.shiftKey, altKey: held.altKey };
+  for (const listener of modifierListeners) {
+    listener(modifiers);
   }
 }
 
@@ -155,10 +159,10 @@ export function getModifiers(): Modifiers {
   return modifiers;
 }
 
-export function onModifiers(fn: (held: Modifiers) => void) {
-  modifierListeners.add(fn);
+export function onModifiers(listener: (held: Modifiers) => void) {
+  modifierListeners.add(listener);
   return () => {
-    modifierListeners.delete(fn);
+    modifierListeners.delete(listener);
   };
 }
 
@@ -178,8 +182,8 @@ function notifyHost() {
   notifying = true;
   queueMicrotask(() => {
     notifying = false;
-    for (const fn of listeners) {
-      fn();
+    for (const listener of listeners) {
+      listener();
     }
   });
 }
@@ -208,49 +212,61 @@ export function getHost(): HostState {
   return state;
 }
 
-export function onHostChange(fn: () => void): () => void {
-  listeners.add(fn);
+export function onHostChange(listener: () => void): () => void {
+  listeners.add(listener);
   return () => {
-    listeners.delete(fn);
+    listeners.delete(listener);
   };
 }
 
-// Depth-first walk of the page model.
+// Depth-first walk of the page model. Page trees are parsed at the boundary with
+// LIMITS.treeDepthMax, so a deeper walk means the model was built wrong.
 export function walkNodes(
-  nodes: readonly HostNode[] | null | undefined,
-  visit: (node: HostNode, parent: HostNode | null) => void,
-  parent: HostNode | null = null,
+  nodes: readonly HostNode[] | undefined,
+  visit: (node: HostNode, parent: HostNode | undefined) => void,
 ) {
-  for (const n of nodes || []) {
-    visit(n, parent);
-    if (Array.isArray(n.children)) {
-      walkNodes(n.children, visit, n);
+  walkNodesFrom(nodes, undefined, 0, visit);
+}
+
+function walkNodesFrom(
+  nodes: readonly HostNode[] | undefined,
+  parent: HostNode | undefined,
+  depth: number,
+  visit: (node: HostNode, parent: HostNode | undefined) => void,
+) {
+  assert(depth <= LIMITS.treeDepthMax, 'walkNodes: depth limit');
+  for (const node of nodes || []) {
+    visit(node, parent);
+    if (Array.isArray(node.children)) {
+      walkNodesFrom(node.children, node, depth + 1, visit);
     }
   }
 }
 
 export function findNode(
-  nodes: readonly HostNode[] | null | undefined,
+  nodes: readonly HostNode[] | undefined,
   id: string,
-): HostNode | null {
+  depth = 0,
+): HostNode | undefined {
+  assert(depth <= LIMITS.treeDepthMax, 'findNode: depth limit');
   for (const node of nodes || []) {
     if (node.id === id) {
       return node;
     }
-    const found = node.children && findNode(node.children, id);
+    const found = node.children && findNode(node.children, id, depth + 1);
     if (found) {
       return found;
     }
   }
-  return null;
+  return undefined;
 }
 
 // A prop's literal string value, or '' for expressions and bare attributes —
 // the panel matches selectors against text, and `class={x}` has no text.
-export function propText(node: HostNode | null | undefined, name: string): string {
-  const p = node?.props?.[name];
-  if (!p || p.type !== 'string') {
+export function propText(node: HostNode | undefined, name: string): string {
+  const attribute = node?.props?.[name];
+  if (!attribute || attribute.type !== 'string') {
     return '';
   }
-  return String(p.value ?? '');
+  return String(attribute.value ?? '');
 }

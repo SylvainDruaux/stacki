@@ -71,10 +71,10 @@ export default function HelpPopover({ title, children, label = 'Help', className
       />
       {open ? (
         <div className="help-popover_panel" role="dialog" aria-label={title ?? label}>
-          {title ? <div className="help-popover_title">{title}</div> : null}
+          {title ? <div className="help-popover_title">{title}</div> : undefined}
           <div className="help-popover_body">{children}</div>
         </div>
-      ) : null}
+      ) : undefined}
     </div>
   );
 }

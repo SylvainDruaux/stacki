@@ -1,5 +1,5 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
-import type { MouseEvent, ReactNode } from 'react';
+import type { MouseEvent, ReactNode, RefObject } from 'react';
 import { panelBounds } from '../lib/panel-box';
 import { useHoverTip } from './PropTip';
 import type { ScrubHandlers } from './useScrub';
@@ -41,37 +41,153 @@ type Props = {
  * to reset the field; Option/Alt-clicking it resets immediately. Reusable across
  * tools for any "clearable" input.
  */
-export default function FieldLabel({
-  children,
-  active,
-  onReset,
-  resetLabel = 'Reset',
-  disabled = false,
-  title,
-  menuNote,
-  onMouseDown,
-  scrubProps,
-  className,
-  tooltip,
-}: Props) {
+export default function FieldLabel(props: Props) {
+  const { children, active, disabled = false, title, onMouseDown, scrubProps, tooltip } = props;
   const [open, setOpen] = useState(false);
-  const [dropUp, setDropUp] = useState(false);
-  const rootRef = useRef<HTMLSpanElement | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const menuId = useId();
   // The hover tooltip anchors to whichever element this state renders (the dim
   // caption's span or the active pill's wrapper) and swallows the native `title`.
-  const hoverTip = useHoverTip<HTMLSpanElement>(
-    tooltip ? (
-      <>
-        {tooltip}
-        {title ? <div className="u-prop-tip-note">{title}</div> : null}
-      </>
-    ) : null,
-  );
+  const hoverTip = useHoverTip<HTMLSpanElement>(tipContent(tooltip, title));
   const nativeTitle = tooltip ? undefined : title;
+  // While active (the only time the menu can be open), the tooltip's anchor IS the
+  // label's root: the wrapper span below.
+  const rootRef = hoverTip.ref;
+  useDismissOnOutside({ open, rootRef, setOpen });
+  const dropUp = useMenuPlacement({ open, rootRef, menuRef });
 
-  // Close on outside click / Escape while open.
+  // If the field is cleared elsewhere, drop back to the plain caption.
+  useEffect(() => {
+    if (!active) {
+      setOpen(false);
+    }
+  }, [active]);
+
+  if (!active) {
+    return <DimCaption props={props} hoverTip={hoverTip} nativeTitle={nativeTitle} />;
+  }
+
+  const reset = () => {
+    props.onReset();
+    setOpen(false);
+  };
+
+  const onLabelClick = labelClickHandler({
+    disabled,
+    reset,
+    toggle: () => setOpen((value) => !value),
+    hideTip: hoverTip.hide,
+  });
+
+  return (
+    <span
+      ref={hoverTip.ref}
+      className={['u-field-label-wrap', props.className].filter(Boolean).join(' ')}
+      {...hoverTip.hoverProps}
+    >
+      <button
+        type="button"
+        className="u-field-label is-active"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-controls={open ? menuId : undefined}
+        disabled={disabled}
+        title={nativeTitle}
+        onMouseDown={onMouseDown}
+        {...scrubProps}
+        onClick={onLabelClick}
+      >
+        {children}
+      </button>
+      {open ? (
+        <FieldLabelMenu
+          id={menuId}
+          menuRef={menuRef}
+          dropUp={dropUp}
+          resetLabel={props.resetLabel ?? 'Reset'}
+          menuNote={props.menuNote}
+          onReset={reset}
+          onClose={() => setOpen(false)}
+        />
+      ) : undefined}
+      {/* Portaled to <body>, so nesting it here costs nothing but keeps it with
+          the element it's anchored to. */}
+      {hoverTip.tip}
+    </span>
+  );
+}
+
+// The tooltip's content: the property it names, with the native title as a note.
+function tipContent(tooltip: ReactNode, title: string | undefined): ReactNode {
+  return tooltip ? (
+    <>
+      {tooltip}
+      {title ? <div className="u-prop-tip-note">{title}</div> : undefined}
+    </>
+  ) : undefined;
+}
+
+// A click on the active label toggles its menu; Option/Alt-click resets at once.
+function labelClickHandler(actions: {
+  readonly disabled: boolean;
+  readonly reset: () => void;
+  readonly toggle: () => void;
+  readonly hideTip: () => void;
+}) {
+  return (event: MouseEvent<HTMLButtonElement>) => {
+    // preventDefault so this works even when nested in a <label>.
+    event.preventDefault();
+    actions.hideTip();
+    if (actions.disabled) {
+      return;
+    }
+    if (event.altKey) {
+      actions.reset();
+      return;
+    }
+    actions.toggle();
+  };
+}
+
+// A dim caption is normally click-through (it can sit over the field it labels);
+// one with a tooltip takes pointer events so it can be hovered. `scrubProps` is the
+// drag that changes the value it labels.
+function DimCaption({
+  props,
+  hoverTip,
+  nativeTitle,
+}: {
+  props: Props;
+  hoverTip: ReturnType<typeof useHoverTip<HTMLSpanElement>>;
+  nativeTitle: string | undefined;
+}) {
+  return (
+    <span
+      ref={hoverTip.ref}
+      className={['u-field-label', props.tooltip ? 'is-hoverable' : '', props.className]
+        .filter(Boolean)
+        .join(' ')}
+      title={nativeTitle}
+      onMouseDown={props.onMouseDown}
+      {...props.scrubProps}
+      {...hoverTip.hoverProps}
+    >
+      {props.children}
+      {hoverTip.tip}
+    </span>
+  );
+}
+
+// Close on outside click / Escape while open.
+function useDismissOnOutside({
+  open,
+  rootRef,
+  setOpen,
+}: {
+  readonly open: boolean;
+  readonly rootRef: RefObject<HTMLElement>;
+  readonly setOpen: (open: boolean) => void;
+}): void {
   useEffect(() => {
     if (!open) {
       return;
@@ -93,33 +209,38 @@ export default function FieldLabel({
       document.removeEventListener('mousedown', onDown);
       document.removeEventListener('keydown', onKey);
     };
-  }, [open]);
+  }, [open, rootRef, setOpen]);
+}
 
-  // If the field is cleared elsewhere, drop back to the plain caption.
-  useEffect(() => {
-    if (!active) {
-      setOpen(false);
-    }
-  }, [active]);
-
-  // Once open, keep the menu inside the panel. The menu is right-anchored (right:0) to
-  // the label, so its natural box is [labelRight - width, labelRight]; a left-column
-  // label pushes the left edge off-screen. Derive the shift from the LABEL (stable) +
-  // the menu's own width — NOT the just-mounted menu's rect, which measured wrong on the
-  // first open (correcting only on a later re-measure). Applied imperatively so it's in
-  // place before the first paint (no visible jump). Bounds = the app's scroll container
-  // (the panel can be a sub-region of a much wider Designer window).
+// Once open, keep the menu inside the panel. The menu is right-anchored (right:0) to
+// the label, so its natural box is [labelRight - width, labelRight]; a left-column
+// label pushes the left edge off-screen. Derive the shift from the LABEL (stable) +
+// the menu's own width — NOT the just-mounted menu's rect, which measured wrong on the
+// first open (correcting only on a later re-measure). Applied imperatively so it's in
+// place before the first paint (no visible jump). Bounds = the app's scroll container
+// (the panel can be a sub-region of a much wider Designer window). Returns whether
+// the menu opens upward.
+function useMenuPlacement({
+  open,
+  rootRef,
+  menuRef,
+}: {
+  readonly open: boolean;
+  readonly rootRef: RefObject<HTMLElement>;
+  readonly menuRef: RefObject<HTMLDivElement>;
+}): boolean {
+  const [dropUp, setDropUp] = useState(false);
   useLayoutEffect(() => {
-    const el = menuRef.current;
+    const element = menuRef.current;
     const root = rootRef.current;
-    if (!open || !el || !root) {
+    if (!open || !element || !root) {
       return;
     }
     const margin = 8;
     const bounds = panelBounds(root);
     const rootRect = root.getBoundingClientRect();
     const naturalRight = rootRect.right;
-    const naturalLeft = rootRect.right - el.offsetWidth;
+    const naturalLeft = rootRect.right - element.offsetWidth;
     const leftLimit = bounds.left + margin;
     const rightLimit = bounds.right - margin;
     const next =
@@ -128,112 +249,63 @@ export default function FieldLabel({
         : naturalRight > rightLimit
           ? rightLimit - naturalRight
           : 0;
-    el.style.transform = next ? `translateX(${next}px)` : '';
+    element.style.transform = next ? `translateX(${next}px)` : '';
     // Vertical flip: if opening below would overflow the container's bottom and
     // there's more room above (a bottom-row label), open the menu above the label.
-    const overflowsBelow = rootRect.bottom + el.offsetHeight + margin > bounds.bottom;
+    const overflowsBelow = rootRect.bottom + element.offsetHeight + margin > bounds.bottom;
     const spaceAbove = rootRect.top - bounds.top;
     const spaceBelow = bounds.bottom - rootRect.bottom;
     setDropUp(overflowsBelow && spaceAbove > spaceBelow);
-  }, [open]);
+  }, [open, rootRef, menuRef]);
+  return dropUp;
+}
 
-  if (!active) {
-    return (
-      // A dim caption is normally click-through (it can sit over the field it
-      // labels); one with a tooltip takes pointer events so it can be hovered.
-      // `scrubProps` is the drag that changes the value it labels.
-      <span
-        ref={hoverTip.ref}
-        className={['u-field-label', tooltip ? 'is-hoverable' : '', className]
-          .filter(Boolean)
-          .join(' ')}
-        title={nativeTitle}
-        onMouseDown={onMouseDown}
-        {...scrubProps}
-        {...hoverTip.hoverProps}
-      >
-        {children}
-        {hoverTip.tip}
-      </span>
-    );
-  }
-
-  const reset = () => {
-    onReset();
-    setOpen(false);
-  };
-
-  const onLabelClick = (event: MouseEvent<HTMLButtonElement>) => {
-    // preventDefault so this works even when nested in a <label>.
-    event.preventDefault();
-    hoverTip.hide();
-    if (disabled) {
-      return;
-    }
-    if (event.altKey) {
-      reset();
-      return;
-    }
-    setOpen((value) => !value);
-  };
-
+function FieldLabelMenu({
+  id,
+  menuRef,
+  dropUp,
+  resetLabel,
+  menuNote,
+  onReset,
+  onClose,
+}: {
+  id: string;
+  menuRef: RefObject<HTMLDivElement>;
+  dropUp: boolean;
+  resetLabel: string;
+  menuNote: Props['menuNote'];
+  onReset: () => void;
+  onClose: () => void;
+}) {
   return (
-    <span
-      ref={(el) => {
-        rootRef.current = el;
-        hoverTip.ref.current = el;
-      }}
-      className={['u-field-label-wrap', className].filter(Boolean).join(' ')}
-      {...hoverTip.hoverProps}
+    <div
+      id={id}
+      ref={menuRef}
+      className={['u-field-label-menu', dropUp ? 'is-up' : ''].filter(Boolean).join(' ')}
+      role="menu"
     >
       <button
         type="button"
-        className="u-field-label is-active"
-        aria-haspopup="menu"
-        aria-expanded={open}
-        aria-controls={open ? menuId : undefined}
-        disabled={disabled}
-        title={nativeTitle}
-        onMouseDown={onMouseDown}
-        {...scrubProps}
-        onClick={onLabelClick}
+        className="u-field-label-menu-item"
+        role="menuitem"
+        onClick={(event) => {
+          // preventDefault so this works even when nested in a <label>.
+          event.preventDefault();
+          onReset();
+        }}
       >
-        {children}
+        <svg className="u-field-label-menu-icon" viewBox="0 0 16 16" aria-hidden="true">
+          <path d="M5.2 5.2H2.2V2.2" />
+          <path d="M2.6 5.2A5.5 5.5 0 1 1 4 12.2" />
+        </svg>
+        <span>{resetLabel}</span>
+        <span className="u-field-label-menu-shortcut">Option + click</span>
       </button>
-      {open ? (
-        <div
-          id={menuId}
-          ref={menuRef}
-          className={['u-field-label-menu', dropUp ? 'is-up' : ''].filter(Boolean).join(' ')}
-          role="menu"
-        >
-          <button
-            type="button"
-            className="u-field-label-menu-item"
-            role="menuitem"
-            onClick={(event) => {
-              // preventDefault so this works even when nested in a <label>.
-              event.preventDefault();
-              reset();
-            }}
-          >
-            <svg className="u-field-label-menu-icon" viewBox="0 0 16 16" aria-hidden="true">
-              <path d="M5.2 5.2H2.2V2.2" />
-              <path d="M2.6 5.2A5.5 5.5 0 1 1 4 12.2" />
-            </svg>
-            <span>{resetLabel}</span>
-            <span className="u-field-label-menu-shortcut">Option + click</span>
-          </button>
-          {menuNote ? (
-            <div className="u-field-label-menu-note">
-              {typeof menuNote === 'function' ? menuNote(() => setOpen(false)) : menuNote}
-            </div>
-          ) : null}
+      {menuNote ? (
+        <div className="u-field-label-menu-note">
+          {typeof menuNote === 'function' ? menuNote(onClose) : menuNote}
         </div>
-      ) : null}
-      {/* Portaled to <body>, so nesting it here costs nothing but keeps it with
-          the element it's anchored to. */}
-      {hoverTip.tip}
-    </span>
+      ) : undefined}
+    </div>
   );
 }

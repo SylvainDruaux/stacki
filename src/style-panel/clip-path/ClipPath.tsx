@@ -1,9 +1,21 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import type { CSSProperties, MutableRefObject } from 'react';
 import { createPortal } from 'react-dom';
 import { CodeEditor, type CodeEditorTokenHighlight } from '../components/CodeEditor';
 import SegmentedControl from '../components/SegmentedControl';
 import ClassPicker from '../components/ClassPicker';
 import './clip-path.css';
+import type {
+  ApiNullable,
+  BreakpointId,
+  ElementAttributeHandle,
+  ElementStyleSource,
+  StyleHandle,
+  StyleTargetOptions,
+  WebflowApi,
+  WebflowStyleEditor,
+  WebflowStyleLookup,
+} from './webflow-designer';
 
 type Point = { x: number; y: number };
 type CornerName = 'topLeft' | 'topRight' | 'bottomRight' | 'bottomLeft';
@@ -83,52 +95,6 @@ type DragTarget = HandleTarget & {
   dragOrigin?: { pointer: Point; handle: Point };
 };
 
-type StyleHandle = {
-  readonly id?: string;
-  getName?: () => Promise<string>;
-  setProperty?: (k: string, v: string, options?: StyleTargetOptions) => Promise<null | void>;
-  getProperty?: (k: string, options?: StyleTargetOptions) => Promise<string | null | undefined>;
-  getProperties?: (
-    options?: StyleTargetOptions,
-  ) => Promise<Record<string, unknown> | null | undefined>;
-  removeProperty?: (k: string, options?: StyleTargetOptions) => Promise<null | void>;
-  getParent?: () => Promise<StyleHandle | null>;
-};
-type ElementAttributeHandle = { name?: unknown; value?: unknown };
-type ElementStyleSource = {
-  readonly id?: unknown;
-  getStyles?: () => Promise<Array<StyleHandle | null> | null>;
-  getStyle?: () => Promise<StyleHandle | null>;
-  getAttributeValue?: (name: string) => Promise<unknown>;
-  getResolvedAttributeValue?: (name: string) => Promise<unknown>;
-  getAttributes?: () => Promise<Array<ElementAttributeHandle> | null>;
-  getResolvedAttributes?: () => Promise<Array<ElementAttributeHandle> | null>;
-  getCustomAttribute?: (name: string) => Promise<unknown>;
-  getAllCustomAttributes?: () => Promise<Array<ElementAttributeHandle> | null>;
-};
-type WebflowStyleLookup = {
-  getStyleByName?: (nameOrPath: string | string[]) => Promise<StyleHandle | null>;
-  getAllStyles?: () => Promise<StyleHandle[]>;
-};
-type WebflowStyleEditor = WebflowStyleLookup & {
-  createStyle?: (name: string, options?: { parent?: StyleHandle }) => Promise<StyleHandle>;
-};
-type WebflowSelectionApi = WebflowStyleLookup & {
-  getSelectedElement?: () => Promise<unknown | null>;
-};
-type BreakpointId = 'xxl' | 'xl' | 'large' | 'main' | 'medium' | 'small' | 'tiny';
-type StyleTargetOptions = { breakpoint?: BreakpointId };
-type WebflowBreakpointApi = {
-  getMediaQuery?: () => Promise<BreakpointId>;
-  subscribe?: {
-    (
-      event: 'selectedelement',
-      callback: (element: unknown | null) => void,
-    ): (() => void) | undefined;
-    (event: 'mediaquery', callback: (breakpoint: BreakpointId) => void): (() => void) | undefined;
-  };
-};
-type WebflowApi = WebflowStyleEditor & WebflowSelectionApi & WebflowBreakpointApi;
 type StylePropertyRead = { value: string; breakpoint: BreakpointId };
 type StyleLookupDiagnostic = {
   candidate: string | string[];
@@ -136,7 +102,7 @@ type StyleLookupDiagnostic = {
   timedOut?: boolean;
   found: boolean;
   path?: string[];
-  id?: string | null;
+  id?: string | undefined;
 };
 type CanvasSize = { width: number; height: number };
 type CanvasHandleBounds = { minX: number; maxX: number; minY: number; maxY: number };
@@ -145,7 +111,7 @@ type PolygonDisplayEdge = 'prev' | 'next';
 type PolygonDisplayProjection = { side: BoundsSide; edge: PolygonDisplayEdge };
 type SelectionRect = { left: number; top: number; width: number; height: number };
 type SnapGuides = { x: number[]; y: number[] };
-type SnapAxisResult = { value: number; guide: number | null };
+type SnapAxisResult = { value: number; guide: number | undefined };
 type SnapPointResult = { point: Point; guides: SnapGuides };
 type ShapeResizeCorner = CornerName;
 type PolygonSelectionDrag = {
@@ -242,8 +208,8 @@ type PastedShapeSvgCache = {
 type ShortcutHelpItem = { keys: string; description: string };
 type ShortcutHelpGroup = { title: string; items: ShortcutHelpItem[] };
 
-function isDefined<T>(value: T | null | undefined): value is T {
-  return value !== undefined && value !== null;
+function isDefined<T>(value: T | undefined): value is T {
+  return value !== undefined && value !== undefined;
 }
 
 function parseFillRule(value: string | undefined): ShapeFunctionShape['fillRule'] {
@@ -268,10 +234,10 @@ function isElementStyleSource(candidate: unknown): candidate is ElementStyleSour
   return typeof candidate === 'object' && candidate !== null;
 }
 
-function readWebflowApi(): WebflowApi | null {
+function readWebflowApi(): WebflowApi | undefined {
   const descriptor = Object.getOwnPropertyDescriptor(globalThis, 'webflow');
   const candidate: unknown = descriptor?.value;
-  return isWebflowApi(candidate) ? candidate : null;
+  return isWebflowApi(candidate) ? candidate : undefined;
 }
 
 const BREAKPOINT_LABELS: Record<BreakpointId, string> = {
@@ -449,7 +415,7 @@ function addSnapGuide(guides: SnapGuides, axis: keyof SnapGuides, value: number)
 
 function snapAxisToAnchors(value: number, anchors: number[], _startValue?: number): SnapAxisResult {
   let closest = value;
-  let guide: number | null = null;
+  let guide: number | undefined = undefined;
   let closestDistance = EDGE_SNAP_DISTANCE;
 
   anchors.forEach((anchor) => {
@@ -475,10 +441,10 @@ function snapPointToAnchors(
   const snappedY = snapAxisToAnchors(y, yAnchors, start?.y);
   const guides = emptySnapGuides();
 
-  if (snappedX.guide !== null) {
+  if (snappedX.guide !== undefined) {
     addSnapGuide(guides, 'x', snappedX.guide);
   }
-  if (snappedY.guide !== null) {
+  if (snappedY.guide !== undefined) {
     addSnapGuide(guides, 'y', snappedY.guide);
   }
 
@@ -516,28 +482,28 @@ function mergeSnapGuides(...items: SnapGuides[]) {
   return merged;
 }
 
-function normalizeSnapGuides(guides: SnapGuides): SnapGuides | null {
+function normalizeSnapGuides(guides: SnapGuides): SnapGuides | undefined {
   const x = guides.x.filter(
     (value, index, values) => values.findIndex((item) => Math.abs(item - value) < 0.01) === index,
   );
   const y = guides.y.filter(
     (value, index, values) => values.findIndex((item) => Math.abs(item - value) < 0.01) === index,
   );
-  return x.length || y.length ? { x, y } : null;
+  return x.length || y.length ? { x, y } : undefined;
 }
 
 function clampValue(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
 }
 
-function rectFromPoints(a: Point, b: Point): SelectionRect {
-  const left = Math.min(a.x, b.x);
-  const top = Math.min(a.y, b.y);
+function rectFromPoints(start: Point, end: Point): SelectionRect {
+  const left = Math.min(start.x, end.x);
+  const top = Math.min(start.y, end.y);
   return {
     left,
     top,
-    width: Math.max(a.x, b.x) - left,
-    height: Math.max(a.y, b.y) - top,
+    width: Math.max(start.x, end.x) - left,
+    height: Math.max(start.y, end.y) - top,
   };
 }
 
@@ -556,7 +522,7 @@ function addShapeSnapCandidate(
   next: number,
   target: number,
   delta: number,
-  sticky: boolean,
+  { sticky }: { sticky: boolean },
 ) {
   const distance = Math.abs(next - target);
   if (
@@ -611,23 +577,23 @@ function snappedShapeMoveDelta(
   const xCandidates: Array<{ delta: number; distance: number; guide: number }> = [];
   const yCandidates: Array<{ delta: number; distance: number; guide: number }> = [];
 
-  addShapeSnapCandidate(xCandidates, bounds.left, bounds.left + dx, 0, -bounds.left, sticky);
-  addShapeSnapCandidate(xCandidates, right, right + dx, 100, 100 - right, sticky);
+  addShapeSnapCandidate(xCandidates, bounds.left, bounds.left + dx, 0, -bounds.left, { sticky });
+  addShapeSnapCandidate(xCandidates, right, right + dx, 100, 100 - right, { sticky });
   [0, 50, 100].forEach((target) => {
-    addShapeSnapCandidate(xCandidates, centerX, centerX + dx, target, target - centerX, sticky);
+    addShapeSnapCandidate(xCandidates, centerX, centerX + dx, target, target - centerX, { sticky });
   });
 
-  addShapeSnapCandidate(yCandidates, bounds.top, bounds.top + dy, 0, -bounds.top, sticky);
-  addShapeSnapCandidate(yCandidates, bottom, bottom + dy, 100, 100 - bottom, sticky);
+  addShapeSnapCandidate(yCandidates, bounds.top, bounds.top + dy, 0, -bounds.top, { sticky });
+  addShapeSnapCandidate(yCandidates, bottom, bottom + dy, 100, 100 - bottom, { sticky });
   [0, 50, 100].forEach((target) => {
-    addShapeSnapCandidate(yCandidates, centerY, centerY + dy, target, target - centerY, sticky);
+    addShapeSnapCandidate(yCandidates, centerY, centerY + dy, target, target - centerY, { sticky });
   });
 
   const closest = (
     candidates: Array<{ delta: number; distance: number; guide: number }>,
     fallback: number,
   ) =>
-    candidates.sort((a, b) => a.distance - b.distance)[0] || {
+    candidates.sort((nearer, farther) => nearer.distance - farther.distance)[0] || {
       delta: fallback,
       distance: Infinity,
       guide: NaN,
@@ -648,13 +614,13 @@ function snappedShapeMoveDelta(
   };
 }
 
-function boundsClose(a: CanvasHandleBounds | null, b: CanvasHandleBounds) {
+function boundsClose(left: CanvasHandleBounds | undefined, right: CanvasHandleBounds) {
   return Boolean(
-    a &&
-    Math.abs(a.minX - b.minX) < 0.1 &&
-    Math.abs(a.maxX - b.maxX) < 0.1 &&
-    Math.abs(a.minY - b.minY) < 0.1 &&
-    Math.abs(a.maxY - b.maxY) < 0.1,
+    left &&
+    Math.abs(left.minX - right.minX) < 0.1 &&
+    Math.abs(left.maxX - right.maxX) < 0.1 &&
+    Math.abs(left.minY - right.minY) < 0.1 &&
+    Math.abs(left.maxY - right.maxY) < 0.1,
   );
 }
 
@@ -667,12 +633,12 @@ function pointInBounds(point: Point, bounds: CanvasHandleBounds) {
   );
 }
 
-function distanceSquared(a: Point, b: Point) {
-  return (a.x - b.x) ** 2 + (a.y - b.y) ** 2;
+function distanceSquared(from: Point, to: Point) {
+  return (from.x - to.x) ** 2 + (from.y - to.y) ** 2;
 }
 
-function pointsNearlyEqual(a: Point, b: Point) {
-  return Math.abs(a.x - b.x) < 0.1 && Math.abs(a.y - b.y) < 0.1;
+function pointsNearlyEqual(left: Point, right: Point) {
+  return Math.abs(left.x - right.x) < 0.1 && Math.abs(left.y - right.y) < 0.1;
 }
 
 function outsideBoundsSides(point: Point, bounds: CanvasHandleBounds) {
@@ -709,27 +675,27 @@ function addUniqueIntersection(
   intersections.push(intersection);
 }
 
-function segmentBoundsIntersections(a: Point, b: Point, bounds: CanvasHandleBounds) {
+function segmentBoundsIntersections(start: Point, end: Point, bounds: CanvasHandleBounds) {
   const intersections: Array<{ point: Point; side: BoundsSide }> = [];
-  const dx = b.x - a.x;
-  const dy = b.y - a.y;
-  const addAtT = (t: number, side: BoundsSide) => {
-    if (t < 0 || t > 1) {
+  const dx = end.x - start.x;
+  const dy = end.y - start.y;
+  const addAtFraction = (fraction: number, side: BoundsSide) => {
+    if (fraction < 0 || fraction > 1) {
       return;
     }
-    const point = { x: a.x + dx * t, y: a.y + dy * t };
+    const point = { x: start.x + dx * fraction, y: start.y + dy * fraction };
     if (pointInBounds(point, bounds)) {
       addUniqueIntersection(intersections, { point, side });
     }
   };
 
   if (Math.abs(dx) > 0.0001) {
-    addAtT((bounds.minX - a.x) / dx, 'left');
-    addAtT((bounds.maxX - a.x) / dx, 'right');
+    addAtFraction((bounds.minX - start.x) / dx, 'left');
+    addAtFraction((bounds.maxX - start.x) / dx, 'right');
   }
   if (Math.abs(dy) > 0.0001) {
-    addAtT((bounds.minY - a.y) / dy, 'top');
-    addAtT((bounds.maxY - a.y) / dy, 'bottom');
+    addAtFraction((bounds.minY - start.y) / dy, 'top');
+    addAtFraction((bounds.maxY - start.y) / dy, 'bottom');
   }
 
   return intersections;
@@ -749,21 +715,21 @@ function closestPolygonProjection(
 function polygonHandleDisplayPoint(
   points: Point[],
   index: number,
-  bounds: CanvasHandleBounds | null,
+  bounds: CanvasHandleBounds | undefined,
   preferred?: PolygonDisplayProjection,
-): { point: Point; projection: PolygonDisplayProjection | null } {
+): { point: Point; projection: PolygonDisplayProjection | undefined } {
   const point = points[index];
   if (!point) {
-    return { point: { x: 0, y: 0 }, projection: null };
+    return { point: { x: 0, y: 0 }, projection: undefined };
   }
   if (!bounds || pointInBounds(point, bounds)) {
-    return { point, projection: null };
+    return { point, projection: undefined };
   }
 
-  const prev = points[(index - 1 + points.length) % points.length] ?? point;
+  const previous = points[(index - 1 + points.length) % points.length] ?? point;
   const next = points[(index + 1) % points.length] ?? point;
   const sides = outsideBoundsSides(point, bounds);
-  const incomingIntersections = segmentBoundsIntersections(prev, point, bounds);
+  const incomingIntersections = segmentBoundsIntersections(previous, point, bounds);
   const outgoingIntersections = segmentBoundsIntersections(point, next, bounds);
   const candidatesForSide = (side: BoundsSide) => [
     ...incomingIntersections
@@ -813,7 +779,7 @@ function polygonHandleDisplayPoint(
       x: clampValue(point.x, bounds.minX, bounds.maxX),
       y: clampValue(point.y, bounds.minY, bounds.maxY),
     },
-    projection: null,
+    projection: undefined,
   };
 }
 
@@ -867,14 +833,15 @@ function makeInsetRadii(radius: number): CornerRadii {
   };
 }
 
-function radiusValuesClose(a: number, b: number) {
-  return Math.abs(a - b) < 1;
+function radiusValuesClose(left: number, right: number) {
+  return Math.abs(left - right) < 1;
 }
 
-function radiiClose(a: CornerRadii, b: CornerRadii) {
+function radiiClose(left: CornerRadii, right: CornerRadii) {
   return CORNERS.every(
     (corner) =>
-      radiusValuesClose(a[corner].x, b[corner].x) && radiusValuesClose(a[corner].y, b[corner].y),
+      radiusValuesClose(left[corner].x, right[corner].x) &&
+      radiusValuesClose(left[corner].y, right[corner].y),
   );
 }
 
@@ -971,7 +938,7 @@ function oppositeInsetSide(side: InsetSide): InsetSide {
   return 'right';
 }
 
-function insetSideForHandle(handle: HandleTarget): InsetSide | null {
+function insetSideForHandle(handle: HandleTarget): InsetSide | undefined {
   if (handle.kind === 'inset-top') {
     return 'top';
   }
@@ -984,19 +951,19 @@ function insetSideForHandle(handle: HandleTarget): InsetSide | null {
   if (handle.kind === 'inset-left') {
     return 'left';
   }
-  return null;
+  return undefined;
 }
 
 function insetModifierModeFromKeys(modifiers: KeyboardModifiers): InsetModifierMode {
   return modifiers.shiftKey ? 'all' : modifiers.altKey ? 'opposite' : 'single';
 }
 
-function isInsetHandle(handle: HandleTarget | null) {
+function isInsetHandle(handle: HandleTarget | undefined) {
   return Boolean(handle && (handle.kind === 'inset-radius' || insetSideForHandle(handle)));
 }
 
 function isInsetHandleAffected(
-  activeHandle: HandleTarget | null,
+  activeHandle: HandleTarget | undefined,
   candidate: HandleTarget,
   mode: InsetModifierMode,
 ) {
@@ -1030,126 +997,134 @@ function cornerLabel(corner: CornerName) {
   return 'bottom left';
 }
 
-function pointsClose(a: Point[], b: Point[]) {
-  if (a.length !== b.length) {
+function pointsClose(left: Point[], right: Point[]) {
+  if (left.length !== right.length) {
     return false;
   }
-  return a.every((point, index) => {
-    const other = b[index];
+  return left.every((point, index) => {
+    const other = right[index];
     return (
       other !== undefined && Math.abs(point.x - other.x) < 1 && Math.abs(point.y - other.y) < 1
     );
   });
 }
 
-function shapesClose(a: ClipShape, b: ClipShape) {
-  if (a.kind !== b.kind) {
+function shapesClose(left: ClipShape, right: ClipShape) {
+  if (left.kind !== right.kind) {
     return false;
   }
-  if (a.kind === 'none' && b.kind === 'none') {
+  if (left.kind === 'none' && right.kind === 'none') {
     return true;
   }
-  if (a.kind === 'raw' && b.kind === 'raw') {
-    return a.value === b.value;
+  if (left.kind === 'raw' && right.kind === 'raw') {
+    return left.value === right.value;
   }
-  if (a.kind === 'polygon' && b.kind === 'polygon') {
-    return pointsClose(a.points, b.points);
+  if (left.kind === 'polygon' && right.kind === 'polygon') {
+    return pointsClose(left.points, right.points);
   }
-  if (a.kind === 'circle' && b.kind === 'circle') {
+  if (left.kind === 'circle' && right.kind === 'circle') {
     return (
-      Math.abs(a.radius - b.radius) < 1 && Math.abs(a.cx - b.cx) < 1 && Math.abs(a.cy - b.cy) < 1
+      Math.abs(left.radius - right.radius) < 1 &&
+      Math.abs(left.cx - right.cx) < 1 &&
+      Math.abs(left.cy - right.cy) < 1
     );
   }
-  if (a.kind === 'ellipse' && b.kind === 'ellipse') {
+  if (left.kind === 'ellipse' && right.kind === 'ellipse') {
     return (
-      Math.abs(a.rx - b.rx) < 1 &&
-      Math.abs(a.ry - b.ry) < 1 &&
-      Math.abs(a.cx - b.cx) < 1 &&
-      Math.abs(a.cy - b.cy) < 1
+      Math.abs(left.rx - right.rx) < 1 &&
+      Math.abs(left.ry - right.ry) < 1 &&
+      Math.abs(left.cx - right.cx) < 1 &&
+      Math.abs(left.cy - right.cy) < 1
     );
   }
-  if (a.kind === 'inset' && b.kind === 'inset') {
+  if (left.kind === 'inset' && right.kind === 'inset') {
     return (
-      Math.abs(a.top - b.top) < 1 &&
-      Math.abs(a.right - b.right) < 1 &&
-      Math.abs(a.bottom - b.bottom) < 1 &&
-      Math.abs(a.left - b.left) < 1 &&
-      radiiClose(a.radii, b.radii)
+      Math.abs(left.top - right.top) < 1 &&
+      Math.abs(left.right - right.right) < 1 &&
+      Math.abs(left.bottom - right.bottom) < 1 &&
+      Math.abs(left.left - right.left) < 1 &&
+      radiiClose(left.radii, right.radii)
     );
   }
-  if (a.kind === 'shape' && b.kind === 'shape') {
-    return a.value === b.value && (a.fillRule || 'nonzero') === (b.fillRule || 'nonzero');
+  if (left.kind === 'shape' && right.kind === 'shape') {
+    return (
+      left.value === right.value && (left.fillRule || 'nonzero') === (right.fillRule || 'nonzero')
+    );
   }
   return false;
 }
 
-function pointsEqual(a: Point[], b: Point[]) {
-  if (a.length !== b.length) {
+function pointsEqual(left: Point[], right: Point[]) {
+  if (left.length !== right.length) {
     return false;
   }
-  return a.every((point, index) => {
-    const other = b[index];
+  return left.every((point, index) => {
+    const other = right[index];
     return other !== undefined && point.x === other.x && point.y === other.y;
   });
 }
 
-function radiiEqual(a: CornerRadii, b: CornerRadii) {
-  return CORNERS.every((corner) => a[corner].x === b[corner].x && a[corner].y === b[corner].y);
+function radiiEqual(left: CornerRadii, right: CornerRadii) {
+  return CORNERS.every(
+    (corner) => left[corner].x === right[corner].x && left[corner].y === right[corner].y,
+  );
 }
 
-function shapesEqual(a: ClipShape, b: ClipShape) {
-  if (a.kind !== b.kind) {
+function shapesEqual(left: ClipShape, right: ClipShape) {
+  if (left.kind !== right.kind) {
     return false;
   }
-  if (a.kind === 'none' && b.kind === 'none') {
+  if (left.kind === 'none' && right.kind === 'none') {
     return true;
   }
-  if (a.kind === 'raw' && b.kind === 'raw') {
-    return a.value === b.value;
+  if (left.kind === 'raw' && right.kind === 'raw') {
+    return left.value === right.value;
   }
-  if (a.kind === 'polygon' && b.kind === 'polygon') {
-    return pointsEqual(a.points, b.points);
+  if (left.kind === 'polygon' && right.kind === 'polygon') {
+    return pointsEqual(left.points, right.points);
   }
-  if (a.kind === 'circle' && b.kind === 'circle') {
-    return a.radius === b.radius && a.cx === b.cx && a.cy === b.cy;
+  if (left.kind === 'circle' && right.kind === 'circle') {
+    return left.radius === right.radius && left.cx === right.cx && left.cy === right.cy;
   }
-  if (a.kind === 'ellipse' && b.kind === 'ellipse') {
-    return a.rx === b.rx && a.ry === b.ry && a.cx === b.cx && a.cy === b.cy;
-  }
-  if (a.kind === 'inset' && b.kind === 'inset') {
+  if (left.kind === 'ellipse' && right.kind === 'ellipse') {
     return (
-      a.top === b.top &&
-      a.right === b.right &&
-      a.bottom === b.bottom &&
-      a.left === b.left &&
-      radiiEqual(a.radii, b.radii)
+      left.rx === right.rx && left.ry === right.ry && left.cx === right.cx && left.cy === right.cy
     );
   }
-  if (a.kind === 'shape' && b.kind === 'shape') {
+  if (left.kind === 'inset' && right.kind === 'inset') {
     return (
-      a.value === b.value &&
-      (a.fillRule || 'nonzero') === (b.fillRule || 'nonzero') &&
-      (a.pathData || '') === (b.pathData || '')
+      left.top === right.top &&
+      left.right === right.right &&
+      left.bottom === right.bottom &&
+      left.left === right.left &&
+      radiiEqual(left.radii, right.radii)
+    );
+  }
+  if (left.kind === 'shape' && right.kind === 'shape') {
+    return (
+      left.value === right.value &&
+      (left.fillRule || 'nonzero') === (right.fillRule || 'nonzero') &&
+      (left.pathData || '') === (right.pathData || '')
     );
   }
   return false;
 }
 
-function handlesMatch(a: HandleTarget | null, b: HandleTarget) {
-  if (!a || a.kind !== b.kind) {
+function handlesMatch(left: HandleTarget | undefined, right: HandleTarget) {
+  if (!left || left.kind !== right.kind) {
     return false;
   }
-  if (a.kind === 'polygon-point' && b.kind === 'polygon-point') {
-    return a.index === b.index;
+  if (left.kind === 'polygon-point' && right.kind === 'polygon-point') {
+    return left.index === right.index;
   }
-  if (a.kind === 'inset-radius' && b.kind === 'inset-radius') {
-    return a.corner === b.corner;
+  if (left.kind === 'inset-radius' && right.kind === 'inset-radius') {
+    return left.corner === right.corner;
   }
-  return a.kind !== 'polygon-point' && a.kind !== 'inset-radius';
+  return left.kind !== 'polygon-point' && left.kind !== 'inset-radius';
 }
 
 function isPolygonPointHandle(
-  handle: HandleTarget | null | undefined,
+  handle: HandleTarget | undefined,
 ): handle is Extract<HandleTarget, { kind: 'polygon-point' }> {
   return handle?.kind === 'polygon-point';
 }
@@ -1178,7 +1153,7 @@ function previousSurvivingPolygonIndex(
       return index;
     }
   }
-  return null;
+  return undefined;
 }
 
 function remapPolygonIndexAfterDelete(index: number, deletedIndexes: Set<number>) {
@@ -1331,7 +1306,9 @@ const PRESETS: Record<string, ClipShape> = {
 const PRESET_NAMES = Object.keys(PRESETS);
 
 function formatPolygon(points: Point[]) {
-  const coords = points.map((p) => `${formatPercent(p.x)} ${formatPercent(p.y)}`).join(', ');
+  const coords = points
+    .map((point) => `${formatPercent(point.x)} ${formatPercent(point.y)}`)
+    .join(', ');
   return `polygon(${coords})`;
 }
 
@@ -1394,14 +1371,15 @@ function formatShapeValueFromCssSubpaths(subpaths: ShapeCssSubpath[]) {
     }
     return 'close';
   };
-  const subpathCommands = (subpath: ShapeCssSubpath, isFirstSubpath: boolean) => [
-    `${isFirstSubpath ? 'from' : 'move to'} ${formatShapeCssPoint(subpath.start)}`,
+  // The first subpath opens `from` its start; each later one opens with a `move to`.
+  const subpathCommands = (subpath: ShapeCssSubpath, opening: 'from' | 'move to') => [
+    `${opening} ${formatShapeCssPoint(subpath.start)}`,
     ...subpath.commands.map(commandToShapeValue),
   ];
 
   return [
-    ...subpathCommands(firstSubpath, true),
-    ...restSubpaths.flatMap((subpath) => subpathCommands(subpath, false)),
+    ...subpathCommands(firstSubpath, 'from'),
+    ...restSubpaths.flatMap((subpath) => subpathCommands(subpath, 'move to')),
   ].join(', ');
 }
 
@@ -1489,10 +1467,10 @@ function svgShapeSubpathPoints(subpaths: SvgShapeSubpath[]) {
   ]);
 }
 
-function svgShapeSubpathBounds(subpaths: SvgShapeSubpath[]): SvgShapeBounds | null {
+function svgShapeSubpathBounds(subpaths: SvgShapeSubpath[]): SvgShapeBounds | undefined {
   const points = svgShapeSubpathPoints(subpaths);
   if (!points.length) {
-    return null;
+    return undefined;
   }
 
   const minX = Math.min(...points.map((point) => point.x));
@@ -1502,15 +1480,15 @@ function svgShapeSubpathBounds(subpaths: SvgShapeSubpath[]): SvgShapeBounds | nu
   const width = maxX - minX;
   const height = maxY - minY;
   if (width <= SVG_POINT_EPSILON || height <= SVG_POINT_EPSILON) {
-    return null;
+    return undefined;
   }
 
   return { minX, maxX, minY, maxY, width, height };
 }
 
-function svgShapeBoundsFromViewBox(viewBox: SvgViewBox): SvgShapeBounds | null {
+function svgShapeBoundsFromViewBox(viewBox: SvgViewBox): SvgShapeBounds | undefined {
   if (viewBox.width <= SVG_POINT_EPSILON || viewBox.height <= SVG_POINT_EPSILON) {
-    return null;
+    return undefined;
   }
   return {
     minX: viewBox.x,
@@ -1542,11 +1520,11 @@ function mapSvgShapeCommandPoints(
 
 function fitShapeSubpathsToPercentBox(
   subpaths: SvgShapeSubpath[],
-  preferredBounds?: SvgShapeBounds | null,
+  preferredBounds?: SvgShapeBounds | undefined,
 ) {
   const bounds = preferredBounds || svgShapeSubpathBounds(subpaths);
   if (!bounds) {
-    return null;
+    return undefined;
   }
 
   const fitPoint = (point: Point) => ({
@@ -1585,9 +1563,10 @@ function resolveShapeScaleVarNames(options: ShapeScaleOptions = DEFAULT_SHAPE_SC
   };
 }
 
-// span = WU (x) or HU (y); size = S (cqw); offset = OL/OT. See SHAPE_OFFSET_COORDINATE_PATTERN.
+// The span is WU (x) or HU (y); size = S (cqw); offset = OL/OT. See
+// SHAPE_OFFSET_COORDINATE_PATTERN.
 function formatShapeOffsetCoordinate(
-  u: number,
+  position: number,
   span: number,
   size: number,
   offset: number,
@@ -1603,7 +1582,7 @@ function formatShapeOffsetCoordinate(
   const offsetToken = offsetVar
     ? `var(${offsetVar}, ${formatCssScaleNumber(offset)})`
     : formatCssScaleNumber(offset);
-  const positionTerm = `${formatCssScaleNumber(u)} * ${sizeToken}`;
+  const positionTerm = `${formatCssScaleNumber(position)} * ${sizeToken}`;
   const spanTerm = `${formatCssScaleNumber(span)} * ${sizeToken}`;
   return `calc(${positionTerm} + ${offsetToken} * (100${travelUnit} - ${spanTerm}))`;
 }
@@ -1621,9 +1600,9 @@ type ShapeOffsetBounds = {
 // Decompose a set of canvas points (0..100, 50 = center) into the offset model: size stays 100
 // (the shape's width lives in WU), with OL/OT derived from the shape's near-edge position so the
 // on-canvas appearance is preserved.
-function shapeOffsetBoundsFromCanvasPoints(points: Point[]): ShapeOffsetBounds | null {
+function shapeOffsetBoundsFromCanvasPoints(points: Point[]): ShapeOffsetBounds | undefined {
   if (!points.length) {
-    return null;
+    return undefined;
   }
   const axs = points.map((point) => (point.x - 50) / 100);
   const ays = points.map((point) => (point.y - 50) / 100);
@@ -1676,12 +1655,12 @@ function formatShapeOffsetPoint(
 
 function containShapeSubpathsToCss(
   subpaths: SvgShapeSubpath[],
-  preferredBounds?: SvgShapeBounds | null,
+  preferredBounds?: SvgShapeBounds | undefined,
   options: ShapeScaleOptions = DEFAULT_SHAPE_SCALE_OPTIONS,
 ) {
   const bounds = preferredBounds || svgShapeSubpathBounds(subpaths);
   if (!bounds) {
-    return null;
+    return undefined;
   }
 
   const names = resolveShapeScaleVarNames(options);
@@ -1951,86 +1930,92 @@ function previewCssCoordinatePair(xToken: string, yToken: string, size: CanvasSi
 function formatRawClipPathStringForPreview(value: string, size: CanvasSize) {
   const polygonMatch = value.match(/^polygon\s*\((.*)\)$/is);
   if (polygonMatch?.[1]) {
-    const parts = splitShapeCommandList(polygonMatch[1]);
-    const fillRule = /^(evenodd|nonzero)$/i.test(parts[0] || '') ? parts[0] : null;
-    const pointParts = fillRule ? parts.slice(1) : parts;
-    const points = pointParts.map((part) => {
-      const tokens = splitTopLevelWhitespace(part);
-      return tokens.length === 2
-        ? previewCssCoordinatePair(tokens[0] ?? '', tokens[1] ?? '', size)
-        : part;
-    });
-    return `polygon(${[fillRule, ...points].filter(Boolean).join(', ')})`;
+    return previewRawPolygon(polygonMatch[1], size);
   }
-
   const circleMatch = value.match(/^circle\s*\((.*)\)$/is);
   if (circleMatch?.[1]) {
-    const [radiusPart, centerPart] = splitTopLevelKeyword(circleMatch[1], 'at');
-    const radiusTokens = splitTopLevelWhitespace(radiusPart);
-    const centerTokens = centerPart ? splitTopLevelWhitespace(centerPart) : [];
-    const radius = radiusTokens[0]
-      ? previewCssCoordinateToken(radiusTokens[0], 'x', size)
-      : radiusPart;
-    const center =
-      centerTokens.length === 2
-        ? ` at ${previewCssCoordinatePair(centerTokens[0] ?? '', centerTokens[1] ?? '', size)}`
-        : centerPart
-          ? ` at ${centerPart}`
-          : '';
-    return `circle(${radius}${center})`;
+    return previewRawCircle(circleMatch[1], size);
   }
-
   const ellipseMatch = value.match(/^ellipse\s*\((.*)\)$/is);
   if (ellipseMatch?.[1]) {
-    const [radiiPart, centerPart] = splitTopLevelKeyword(ellipseMatch[1], 'at');
-    const radii = splitTopLevelWhitespace(radiiPart);
-    const centerTokens = centerPart ? splitTopLevelWhitespace(centerPart) : [];
-    const previewRadii =
-      radii.length === 2
-        ? previewCssCoordinatePair(radii[0] ?? '', radii[1] ?? '', size)
-        : radiiPart;
-    const center =
-      centerTokens.length === 2
-        ? ` at ${previewCssCoordinatePair(centerTokens[0] ?? '', centerTokens[1] ?? '', size)}`
-        : centerPart
-          ? ` at ${centerPart}`
-          : '';
-    return `ellipse(${previewRadii}${center})`;
+    return previewRawEllipse(ellipseMatch[1], size);
   }
-
   const insetMatch = value.match(/^inset\s*\((.*)\)$/is);
   if (insetMatch?.[1]) {
-    const [insetPart, roundPart] = splitTopLevelKeyword(insetMatch[1], 'round');
-    const sides = splitTopLevelWhitespace(insetPart);
-    const previewSides =
-      sides.length >= 1 && sides.length <= 4
-        ? expandCssShorthandTokens(sides)
-            .map((token, index) =>
-              previewCssCoordinateToken(token, index % 2 === 0 ? 'y' : 'x', size),
-            )
-            .join(' ')
-        : insetPart;
-    if (!roundPart) {
-      return `inset(${previewSides})`;
-    }
-
-    const radiusParts = splitTopLevelChar(roundPart, '/');
-    const horizontalTokens = splitTopLevelWhitespace(radiusParts[0] || '');
-    const verticalTokens = splitTopLevelWhitespace(radiusParts[1] || radiusParts[0] || '');
-    const horizontal = expandCssShorthandTokens(horizontalTokens)
-      .map((token) => previewCssCoordinateToken(token, 'x', size))
-      .join(' ');
-    const vertical = expandCssShorthandTokens(verticalTokens)
-      .map((token) => previewCssCoordinateToken(token, 'y', size))
-      .join(' ');
-    const verticalSuffix = horizontal === vertical ? '' : ` / ${vertical}`;
-    return `inset(${previewSides} round ${horizontal}${verticalSuffix})`;
+    return previewRawInset(insetMatch[1], size);
   }
-
   return addPreviewVariableFallbacks(value);
 }
 
-function formatClipPathForPreview(shape: ClipShape, css: string, size: CanvasSize | null) {
+// `polygon(…)`'s arguments with each coordinate resolved for the preview canvas.
+function previewRawPolygon(argument: string, size: CanvasSize) {
+  const parts = splitShapeCommandList(argument);
+  const fillRule = /^(evenodd|nonzero)$/i.test(parts[0] || '') ? parts[0] : undefined;
+  const pointParts = fillRule ? parts.slice(1) : parts;
+  const points = pointParts.map((part) => {
+    const tokens = splitTopLevelWhitespace(part);
+    return tokens.length === 2
+      ? previewCssCoordinatePair(tokens[0] ?? '', tokens[1] ?? '', size)
+      : part;
+  });
+  return `polygon(${[fillRule, ...points].filter(Boolean).join(', ')})`;
+}
+
+// The ` at <x> <y>` of a circle or ellipse, resolved for the preview canvas.
+function previewCenterSuffix(centerPart: string | undefined, size: CanvasSize) {
+  const centerTokens = centerPart ? splitTopLevelWhitespace(centerPart) : [];
+  if (centerTokens.length === 2) {
+    return ` at ${previewCssCoordinatePair(centerTokens[0] ?? '', centerTokens[1] ?? '', size)}`;
+  }
+  return centerPart ? ` at ${centerPart}` : '';
+}
+
+function previewRawCircle(argument: string, size: CanvasSize) {
+  const [radiusPart, centerPart] = splitTopLevelKeyword(argument, 'at');
+  const radiusTokens = splitTopLevelWhitespace(radiusPart);
+  const radius = radiusTokens[0]
+    ? previewCssCoordinateToken(radiusTokens[0], 'x', size)
+    : radiusPart;
+  return `circle(${radius}${previewCenterSuffix(centerPart, size)})`;
+}
+
+function previewRawEllipse(argument: string, size: CanvasSize) {
+  const [radiiPart, centerPart] = splitTopLevelKeyword(argument, 'at');
+  const radii = splitTopLevelWhitespace(radiiPart);
+  const previewRadii =
+    radii.length === 2 ? previewCssCoordinatePair(radii[0] ?? '', radii[1] ?? '', size) : radiiPart;
+  return `ellipse(${previewRadii}${previewCenterSuffix(centerPart, size)})`;
+}
+
+function previewRawInset(argument: string, size: CanvasSize) {
+  const [insetPart, roundPart] = splitTopLevelKeyword(argument, 'round');
+  const sides = splitTopLevelWhitespace(insetPart);
+  const previewSides =
+    sides.length >= 1 && sides.length <= 4
+      ? expandCssShorthandTokens(sides)
+          .map((token, index) =>
+            previewCssCoordinateToken(token, index % 2 === 0 ? 'y' : 'x', size),
+          )
+          .join(' ')
+      : insetPart;
+  if (!roundPart) {
+    return `inset(${previewSides})`;
+  }
+
+  const radiusParts = splitTopLevelChar(roundPart, '/');
+  const horizontalTokens = splitTopLevelWhitespace(radiusParts[0] || '');
+  const verticalTokens = splitTopLevelWhitespace(radiusParts[1] || radiusParts[0] || '');
+  const horizontal = expandCssShorthandTokens(horizontalTokens)
+    .map((token) => previewCssCoordinateToken(token, 'x', size))
+    .join(' ');
+  const vertical = expandCssShorthandTokens(verticalTokens)
+    .map((token) => previewCssCoordinateToken(token, 'y', size))
+    .join(' ');
+  const verticalSuffix = horizontal === vertical ? '' : ` / ${vertical}`;
+  return `inset(${previewSides} round ${horizontal}${verticalSuffix})`;
+}
+
+function formatClipPathForPreview(shape: ClipShape, css: string, size: CanvasSize | undefined) {
   if (shape.kind === 'none') {
     return 'polygon(0% 0%, 100% 0%, 100% 100%, 0% 100%)';
   }
@@ -2073,7 +2058,7 @@ function functionContentRange(value: string) {
   const close = value.lastIndexOf(')');
   return open >= 0 && close > open
     ? { from: open + 1, to: close, content: value.slice(open + 1, close) }
-    : null;
+    : undefined;
 }
 
 function splitPolygonCoordinateTokens(value: string) {
@@ -2151,11 +2136,7 @@ function buildClipPathCodeHighlights(
 ): ClipPathCodeHighlight[] {
   const ranges = clipPathValueTokenRanges(value, shape);
   const highlights: ClipPathCodeHighlight[] = [];
-  const addHighlight = (
-    range: { from: number; to: number } | undefined,
-    handles: HandleTarget[],
-    colorClass?: string,
-  ) => {
+  const addHighlight: AddCodeHighlight = (range, handles, colorClass) => {
     const firstHandle = handles[0];
     if (!range || !firstHandle) {
       return;
@@ -2168,108 +2149,22 @@ function buildClipPathCodeHighlights(
       className: codeTokenClassName(resolvedColorClass),
     });
   };
-
-  if (shape.kind === 'raw' && shape.editable) {
-    const editable = shape.editable;
-
-    if (editable.kind === 'polygon') {
-      editable.points.forEach((_, index) => {
-        const handle: HandleTarget = { kind: 'polygon-point', index };
-        const colorClass = polygonPointColorClass(index, polygonPointColors);
-        addHighlight(ranges[index * 2], [handle], colorClass);
-        addHighlight(ranges[index * 2 + 1], [handle], colorClass);
-      });
-      return highlights;
-    }
-
-    if (editable.kind === 'circle') {
-      const radiusHandle: HandleTarget = { kind: 'circle-radius' };
-      const centerHandle: HandleTarget = { kind: 'circle-center' };
-      addHighlight(ranges[0], [radiusHandle]);
-      addHighlight(ranges[1], [centerHandle]);
-      addHighlight(ranges[2], [centerHandle]);
-      return highlights;
-    }
-
-    if (editable.kind === 'ellipse') {
-      const rxHandle: HandleTarget = { kind: 'ellipse-rx' };
-      const ryHandle: HandleTarget = { kind: 'ellipse-ry' };
-      const centerHandle: HandleTarget = { kind: 'ellipse-center' };
-      addHighlight(ranges[0], [rxHandle]);
-      addHighlight(ranges[1], [ryHandle]);
-      addHighlight(ranges[2], [centerHandle]);
-      addHighlight(ranges[3], [centerHandle]);
-      return highlights;
-    }
-
-    if (editable.kind === 'inset') {
-      const roundMatch = value.match(/\bround\b/i);
-      const roundIndex = roundMatch?.index ?? -1;
-      const sideRanges =
-        roundIndex >= 0 ? ranges.filter((range) => range.from < roundIndex) : ranges;
-      const radiusRanges = roundIndex >= 0 ? ranges.filter((range) => range.from > roundIndex) : [];
-      const sideHandles: HandleTarget[] = [
-        { kind: 'inset-top' },
-        { kind: 'inset-right' },
-        { kind: 'inset-bottom' },
-        { kind: 'inset-left' },
-      ];
-      shorthandGroups(sideHandles, sideRanges.length).forEach((handles, index) => {
-        addHighlight(
-          sideRanges[index],
-          handles,
-          HANDLE_COLOR_CLASSES[index % HANDLE_COLOR_CLASSES.length],
-        );
-      });
-
-      const radiusHandles: HandleTarget[] = CORNERS.map((corner) => ({
-        kind: 'inset-radius',
-        corner,
-      }));
-      const slashIndex = roundIndex >= 0 ? value.indexOf('/', roundIndex) : -1;
-      const horizontalRadiusRanges =
-        slashIndex >= 0 ? radiusRanges.filter((range) => range.from < slashIndex) : radiusRanges;
-      const verticalRadiusRanges =
-        slashIndex >= 0 ? radiusRanges.filter((range) => range.from > slashIndex) : [];
-
-      shorthandGroups(radiusHandles, horizontalRadiusRanges.length).forEach((handles, index) => {
-        addHighlight(
-          horizontalRadiusRanges[index],
-          handles,
-          HANDLE_COLOR_CLASSES[(index + 4) % HANDLE_COLOR_CLASSES.length],
-        );
-      });
-      shorthandGroups(radiusHandles, verticalRadiusRanges.length).forEach((handles, index) => {
-        addHighlight(
-          verticalRadiusRanges[index],
-          handles,
-          HANDLE_COLOR_CLASSES[(index + 4) % HANDLE_COLOR_CLASSES.length],
-        );
-      });
-      return highlights;
-    }
-  }
-
-  if (shape.kind === 'polygon') {
-    shape.points.forEach((_, index) => {
+  // A raw value is highlighted by the geometry it was parsed into, a shape by its own.
+  const geometry = shape.kind === 'raw' ? shape.editable : shape;
+  if (geometry?.kind === 'polygon') {
+    geometry.points.forEach((_, index) => {
       const handle: HandleTarget = { kind: 'polygon-point', index };
       const colorClass = polygonPointColorClass(index, polygonPointColors);
       addHighlight(ranges[index * 2], [handle], colorClass);
       addHighlight(ranges[index * 2 + 1], [handle], colorClass);
     });
-    return highlights;
-  }
-
-  if (shape.kind === 'circle') {
+  } else if (geometry?.kind === 'circle') {
     const radiusHandle: HandleTarget = { kind: 'circle-radius' };
     const centerHandle: HandleTarget = { kind: 'circle-center' };
     addHighlight(ranges[0], [radiusHandle]);
     addHighlight(ranges[1], [centerHandle]);
     addHighlight(ranges[2], [centerHandle]);
-    return highlights;
-  }
-
-  if (shape.kind === 'ellipse') {
+  } else if (geometry?.kind === 'ellipse') {
     const rxHandle: HandleTarget = { kind: 'ellipse-rx' };
     const ryHandle: HandleTarget = { kind: 'ellipse-ry' };
     const centerHandle: HandleTarget = { kind: 'ellipse-center' };
@@ -2277,69 +2172,77 @@ function buildClipPathCodeHighlights(
     addHighlight(ranges[1], [ryHandle]);
     addHighlight(ranges[2], [centerHandle]);
     addHighlight(ranges[3], [centerHandle]);
-    return highlights;
+  } else if (geometry?.kind === 'inset') {
+    addInsetCodeHighlights(value, ranges, addHighlight);
   }
-
-  if (shape.kind === 'inset') {
-    const roundMatch = value.match(/\bround\b/i);
-    const roundIndex = roundMatch?.index ?? -1;
-    const sideRanges = roundIndex >= 0 ? ranges.filter((range) => range.from < roundIndex) : ranges;
-    const radiusRanges = roundIndex >= 0 ? ranges.filter((range) => range.from > roundIndex) : [];
-    const sideHandles: HandleTarget[] = [
-      { kind: 'inset-top' },
-      { kind: 'inset-right' },
-      { kind: 'inset-bottom' },
-      { kind: 'inset-left' },
-    ];
-    shorthandGroups(sideHandles, sideRanges.length).forEach((handles, index) => {
-      addHighlight(
-        sideRanges[index],
-        handles,
-        HANDLE_COLOR_CLASSES[index % HANDLE_COLOR_CLASSES.length],
-      );
-    });
-
-    const radiusHandles: HandleTarget[] = CORNERS.map((corner) => ({
-      kind: 'inset-radius',
-      corner,
-    }));
-    const slashIndex = roundIndex >= 0 ? value.indexOf('/', roundIndex) : -1;
-    const horizontalRadiusRanges =
-      slashIndex >= 0 ? radiusRanges.filter((range) => range.from < slashIndex) : radiusRanges;
-    const verticalRadiusRanges =
-      slashIndex >= 0 ? radiusRanges.filter((range) => range.from > slashIndex) : [];
-
-    shorthandGroups(radiusHandles, horizontalRadiusRanges.length).forEach((handles, index) => {
-      addHighlight(
-        horizontalRadiusRanges[index],
-        handles,
-        HANDLE_COLOR_CLASSES[(index + 4) % HANDLE_COLOR_CLASSES.length],
-      );
-    });
-    shorthandGroups(radiusHandles, verticalRadiusRanges.length).forEach((handles, index) => {
-      addHighlight(
-        verticalRadiusRanges[index],
-        handles,
-        HANDLE_COLOR_CLASSES[(index + 4) % HANDLE_COLOR_CLASSES.length],
-      );
-    });
-  }
-
   return highlights;
 }
 
-function parsePercent(value: string): number | null {
+// Records one highlighted code range and the handles it belongs to.
+type AddCodeHighlight = (
+  range: { from: number; to: number } | undefined,
+  handles: HandleTarget[],
+  colorClass?: string,
+) => void;
+
+// An inset's code ranges: the side lengths before `round`, then the horizontal and
+// vertical radii either side of the `/`, each shorthand token owning the handles it
+// sets.
+function addInsetCodeHighlights(
+  value: string,
+  ranges: Array<{ from: number; to: number }>,
+  addHighlight: AddCodeHighlight,
+): void {
+  const roundMatch = value.match(/\bround\b/i);
+  const roundIndex = roundMatch?.index ?? -1;
+  const sideRanges = roundIndex >= 0 ? ranges.filter((range) => range.from < roundIndex) : ranges;
+  const radiusRanges = roundIndex >= 0 ? ranges.filter((range) => range.from > roundIndex) : [];
+  const sideHandles: HandleTarget[] = [
+    { kind: 'inset-top' },
+    { kind: 'inset-right' },
+    { kind: 'inset-bottom' },
+    { kind: 'inset-left' },
+  ];
+  shorthandGroups(sideHandles, sideRanges.length).forEach((handles, index) => {
+    addHighlight(
+      sideRanges[index],
+      handles,
+      HANDLE_COLOR_CLASSES[index % HANDLE_COLOR_CLASSES.length],
+    );
+  });
+
+  const radiusHandles: HandleTarget[] = CORNERS.map((corner) => ({
+    kind: 'inset-radius',
+    corner,
+  }));
+  const slashIndex = roundIndex >= 0 ? value.indexOf('/', roundIndex) : -1;
+  const horizontalRadiusRanges =
+    slashIndex >= 0 ? radiusRanges.filter((range) => range.from < slashIndex) : radiusRanges;
+  const verticalRadiusRanges =
+    slashIndex >= 0 ? radiusRanges.filter((range) => range.from > slashIndex) : [];
+  for (const radiusRangeList of [horizontalRadiusRanges, verticalRadiusRanges]) {
+    shorthandGroups(radiusHandles, radiusRangeList.length).forEach((handles, index) => {
+      addHighlight(
+        radiusRangeList[index],
+        handles,
+        HANDLE_COLOR_CLASSES[(index + 4) % HANDLE_COLOR_CLASSES.length],
+      );
+    });
+  }
+}
+
+function parsePercent(value: string): number | undefined {
   if (value.trim() === '0') {
     return 0;
   }
-  const m = value.trim().match(/^(-?\d+(?:\.\d+)?)\s*%$/);
-  return m?.[1] ? parseFloat(m[1]) : null;
+  const match = value.trim().match(/^(-?\d+(?:\.\d+)?)\s*%$/);
+  return match?.[1] ? parseFloat(match[1]) : undefined;
 }
 
 function splitTopLevelWhitespace(value: string) {
   const tokens: string[] = [];
   let depth = 0;
-  let start: number | null = null;
+  let start: number | undefined = undefined;
 
   for (let index = 0; index < value.length; index += 1) {
     const char = value[index];
@@ -2351,16 +2254,16 @@ function splitTopLevelWhitespace(value: string) {
     }
 
     if (char !== undefined && /\s/.test(char) && depth === 0) {
-      if (start !== null) {
+      if (start !== undefined) {
         tokens.push(value.slice(start, index));
-        start = null;
+        start = undefined;
       }
-    } else if (start === null) {
+    } else if (start === undefined) {
       start = index;
     }
   }
 
-  if (start !== null) {
+  if (start !== undefined) {
     tokens.push(value.slice(start));
   }
   return tokens.map((token) => token.trim()).filter(Boolean);
@@ -2451,35 +2354,35 @@ function isCssLengthPercentageToken(value: string) {
   return false;
 }
 
-function parseCssUnitValue(value: string): CssUnitValue | null {
+function parseCssUnitValue(value: string): CssUnitValue | undefined {
   const token = value.trim();
   const match = token.match(/^([-+]?(?:\d+\.?\d*|\.\d+)(?:e[-+]?\d+)?)(%|[a-z][a-z0-9]*)?$/i);
   if (!match) {
-    return null;
+    return undefined;
   }
   const parsed = Number(match[1]);
   if (!Number.isFinite(parsed)) {
-    return null;
+    return undefined;
   }
   const unit = match[2] || (parsed === 0 ? '%' : '');
-  return unit ? { value: parsed, unit } : null;
+  return unit ? { value: parsed, unit } : undefined;
 }
 
-function parseCssCoordinateValue(value: string): CssCoordinateValue | null {
+function parseCssCoordinateValue(value: string): CssCoordinateValue | undefined {
   const unitValue = parseCssUnitValue(value);
   if (unitValue) {
     return unitValue;
   }
-  return isCssLengthPercentageToken(value) ? { expression: value.trim() } : null;
+  return isCssLengthPercentageToken(value) ? { expression: value.trim() } : undefined;
 }
 
 function parseCssUnitList(value: string, min: number, max: number) {
   const tokens = splitTopLevelWhitespace(value);
   if (tokens.length < min || tokens.length > max) {
-    return null;
+    return undefined;
   }
   const values = tokens.map(parseCssUnitValue);
-  return values.every(isDefined) ? values.filter(isDefined) : null;
+  return values.every(isDefined) ? values.filter(isDefined) : undefined;
 }
 
 function validLengthPercentageList(value: string, min: number, max: number) {
@@ -2491,84 +2394,84 @@ function validRawCenter(value: string | undefined) {
   return !value || validLengthPercentageList(value, 2, 2);
 }
 
-function parsePolygon(value: string): Point[] | null {
+function parsePolygon(value: string): Point[] | undefined {
   if (!value) {
-    return null;
+    return undefined;
   }
-  const m = value.match(/polygon\s*\(([^)]+)\)/i);
-  const content = m?.[1];
+  const match = value.match(/polygon\s*\(([^)]+)\)/i);
+  const content = match?.[1];
   if (!content) {
-    return null;
+    return undefined;
   }
   const parts = content.split(',');
   const points: Point[] = [];
   for (const part of parts) {
     const tokens = part.trim().split(/\s+/);
     if (tokens.length !== 2) {
-      return null;
+      return undefined;
     }
     const x = parsePercent(tokens[0] ?? '');
     const y = parsePercent(tokens[1] ?? '');
-    if (x === null || y === null) {
-      return null;
+    if (x === undefined || y === undefined) {
+      return undefined;
     }
     points.push({ x, y });
   }
-  return points.length >= 3 ? points : null;
+  return points.length >= 3 ? points : undefined;
 }
 
-function parseCenter(value: string): Point | null {
+function parseCenter(value: string): Point | undefined {
   const tokens = value.trim().split(/\s+/);
   if (tokens.length !== 2) {
-    return null;
+    return undefined;
   }
   const x = parsePercent(tokens[0] ?? '');
   const y = parsePercent(tokens[1] ?? '');
-  return x === null || y === null ? null : { x, y };
+  return x === undefined || y === undefined ? undefined : { x, y };
 }
 
-function parseCircle(value: string): CircleShape | null {
-  const m = value.match(/^circle\s*\((.*)\)$/i);
-  const content = m?.[1];
+function parseCircle(value: string): CircleShape | undefined {
+  const match = value.match(/^circle\s*\((.*)\)$/i);
+  const content = match?.[1];
   if (!content) {
-    return null;
+    return undefined;
   }
   const [radiusPart = '', centerPart] = content.split(/\s+at\s+/i).map((part) => part.trim());
   const radius = parsePercent(radiusPart);
-  if (radius === null) {
-    return null;
+  if (radius === undefined) {
+    return undefined;
   }
   const center = centerPart ? parseCenter(centerPart) : { x: 50, y: 50 };
-  return center ? { kind: 'circle', radius, cx: center.x, cy: center.y } : null;
+  return center ? { kind: 'circle', radius, cx: center.x, cy: center.y } : undefined;
 }
 
-function parseEllipse(value: string): EllipseShape | null {
-  const m = value.match(/^ellipse\s*\((.*)\)$/i);
-  const content = m?.[1];
+function parseEllipse(value: string): EllipseShape | undefined {
+  const match = value.match(/^ellipse\s*\((.*)\)$/i);
+  const content = match?.[1];
   if (!content) {
-    return null;
+    return undefined;
   }
   const [radiiPart = '', centerPart] = content.split(/\s+at\s+/i).map((part) => part.trim());
   const radii = radiiPart.split(/\s+/);
   if (radii.length !== 2) {
-    return null;
+    return undefined;
   }
   const rx = parsePercent(radii[0] ?? '');
   const ry = parsePercent(radii[1] ?? '');
-  if (rx === null || ry === null) {
-    return null;
+  if (rx === undefined || ry === undefined) {
+    return undefined;
   }
   const center = centerPart ? parseCenter(centerPart) : { x: 50, y: 50 };
-  return center ? { kind: 'ellipse', rx, ry, cx: center.x, cy: center.y } : null;
+  return center ? { kind: 'ellipse', rx, ry, cx: center.x, cy: center.y } : undefined;
 }
 
-function expandRadiusValues(values: number[]): [number, number, number, number] | null {
+function expandRadiusValues(values: number[]): [number, number, number, number] | undefined {
   if (values.length < 1 || values.length > 4) {
-    return null;
+    return undefined;
   }
   const topLeft = values[0];
   if (topLeft === undefined) {
-    return null;
+    return undefined;
   }
   const topRight = values[1] ?? topLeft;
   const bottomRight = values[2] ?? topLeft;
@@ -2576,29 +2479,29 @@ function expandRadiusValues(values: number[]): [number, number, number, number] 
   return [topLeft, topRight, bottomRight, bottomLeft];
 }
 
-function parseRadiusList(value: string): [number, number, number, number] | null {
+function parseRadiusList(value: string): [number, number, number, number] | undefined {
   const values = value.trim().split(/\s+/).filter(Boolean).map(parsePercent);
-  if (values.length < 1 || values.length > 4 || values.some((item) => item === null)) {
-    return null;
+  if (values.length < 1 || values.length > 4 || values.some((item) => item === undefined)) {
+    return undefined;
   }
   return expandRadiusValues(values.filter(isDefined));
 }
 
-function parseInsetRadii(value: string | undefined): CornerRadii | null {
+function parseInsetRadii(value: string | undefined): CornerRadii | undefined {
   if (!value) {
     return makeInsetRadii(0);
   }
   const parts = value.split(/\s*\/\s*/);
   if (parts.length > 2) {
-    return null;
+    return undefined;
   }
   const horizontal = parseRadiusList(parts[0] ?? '');
   if (!horizontal) {
-    return null;
+    return undefined;
   }
   const vertical = parts[1] ? parseRadiusList(parts[1]) : horizontal;
   if (!vertical) {
-    return null;
+    return undefined;
   }
 
   return {
@@ -2609,27 +2512,27 @@ function parseInsetRadii(value: string | undefined): CornerRadii | null {
   };
 }
 
-function parseInset(value: string): InsetShape | null {
-  const m = value.match(/^inset\s*\((.*)\)$/i);
-  const content = m?.[1];
+function parseInset(value: string): InsetShape | undefined {
+  const match = value.match(/^inset\s*\((.*)\)$/i);
+  const content = match?.[1];
   if (!content) {
-    return null;
+    return undefined;
   }
   const [insetPart = '', roundPart] = content.split(/\s+round\s+/i);
   const values = insetPart.trim().split(/\s+/).map(parsePercent);
-  if (values.length < 1 || values.length > 4 || values.some((item) => item === null)) {
-    return null;
+  if (values.length < 1 || values.length > 4 || values.some((item) => item === undefined)) {
+    return undefined;
   }
   const nums = values.filter(isDefined);
   const top = nums[0];
   if (top === undefined) {
-    return null;
+    return undefined;
   }
   const right = nums[1] ?? top;
   const bottom = nums[2] ?? top;
   const left = nums[3] ?? nums[1] ?? top;
   const radii = parseInsetRadii(roundPart);
-  return radii ? { kind: 'inset', top, right, bottom, left, radii } : null;
+  return radii ? { kind: 'inset', top, right, bottom, left, radii } : undefined;
 }
 
 function isCssRadiusToken(value: string) {
@@ -2654,18 +2557,18 @@ function validRawInsetRadii(value: string | undefined) {
   );
 }
 
-function parseRawPolygon(value: string): RawClipPathShape | null {
-  const m = value.match(/^polygon\s*\((.*)\)$/is);
-  const content = m?.[1];
+function parseRawPolygon(value: string): RawClipPathShape | undefined {
+  const match = value.match(/^polygon\s*\((.*)\)$/is);
+  const content = match?.[1];
   if (!content) {
-    return null;
+    return undefined;
   }
 
   const parts = splitShapeCommandList(content);
   const fillRule = parseFillRule(parts[0]);
   const pointParts = fillRule ? parts.slice(1) : parts;
   if (pointParts.length < 3) {
-    return null;
+    return undefined;
   }
 
   const parsedPoints: CssCoordinatePoint[] = [];
@@ -2681,7 +2584,7 @@ function parseRawPolygon(value: string): RawClipPathShape | null {
   });
 
   if (!valid) {
-    return null;
+    return undefined;
   }
   const editable =
     parsedPoints.length === pointParts.length
@@ -2695,18 +2598,18 @@ function parseRawPolygon(value: string): RawClipPathShape | null {
   };
 }
 
-function parseRawCircle(value: string): RawClipPathShape | null {
-  const m = value.match(/^circle\s*\((.*)\)$/is);
-  const content = m?.[1];
+function parseRawCircle(value: string): RawClipPathShape | undefined {
+  const match = value.match(/^circle\s*\((.*)\)$/is);
+  const content = match?.[1];
   if (!content) {
-    return null;
+    return undefined;
   }
 
   const [radiusPart, centerPart] = splitTopLevelKeyword(content, 'at');
   const radiusTokens = splitTopLevelWhitespace(radiusPart);
   const validRadius = radiusTokens.length === 1 && isCssRadiusToken(radiusTokens[0] ?? '');
   if (!validRadius || !validRawCenter(centerPart)) {
-    return null;
+    return undefined;
   }
 
   const centerTokens = centerPart ? splitTopLevelWhitespace(centerPart) : [];
@@ -2722,16 +2625,16 @@ function parseRawCircle(value: string): RawClipPathShape | null {
   };
 }
 
-function parseRawEllipse(value: string): RawClipPathShape | null {
-  const m = value.match(/^ellipse\s*\((.*)\)$/is);
-  const content = m?.[1];
+function parseRawEllipse(value: string): RawClipPathShape | undefined {
+  const match = value.match(/^ellipse\s*\((.*)\)$/is);
+  const content = match?.[1];
   if (!content) {
-    return null;
+    return undefined;
   }
 
   const [radiiPart, centerPart] = splitTopLevelKeyword(content, 'at');
   if (!validRawRadiusList(radiiPart, 2, 2) || !validRawCenter(centerPart)) {
-    return null;
+    return undefined;
   }
 
   const radii = splitTopLevelWhitespace(radiiPart);
@@ -2749,16 +2652,16 @@ function parseRawEllipse(value: string): RawClipPathShape | null {
   };
 }
 
-function parseRawInset(value: string): RawClipPathShape | null {
-  const m = value.match(/^inset\s*\((.*)\)$/is);
-  const content = m?.[1];
+function parseRawInset(value: string): RawClipPathShape | undefined {
+  const match = value.match(/^inset\s*\((.*)\)$/is);
+  const content = match?.[1];
   if (!content) {
-    return null;
+    return undefined;
   }
 
   const [insetPart, roundPart] = splitTopLevelKeyword(content, 'round');
   if (!validLengthPercentageList(insetPart, 1, 4) || !validRawInsetRadii(roundPart)) {
-    return null;
+    return undefined;
   }
 
   const sideValues = parseCssUnitList(insetPart, 1, 4);
@@ -2767,8 +2670,8 @@ function parseRawInset(value: string): RawClipPathShape | null {
   const bottom = sideValues?.[2] ?? sideValues?.[0];
   const left = sideValues?.[3] ?? sideValues?.[1] ?? sideValues?.[0];
   const radiusParts = roundPart ? splitTopLevelChar(roundPart, '/') : [];
-  const horizontal = radiusParts[0] ? parseCssUnitList(radiusParts[0], 1, 4) : null;
-  const vertical = radiusParts[1] ? parseCssUnitList(radiusParts[1], 1, 4) : null;
+  const horizontal = radiusParts[0] ? parseCssUnitList(radiusParts[0], 1, 4) : undefined;
+  const vertical = radiusParts[1] ? parseCssUnitList(radiusParts[1], 1, 4) : undefined;
   const editable =
     top && right && bottom && left && (!roundPart || horizontal)
       ? {
@@ -2789,7 +2692,7 @@ function parseRawInset(value: string): RawClipPathShape | null {
   };
 }
 
-function parseRawBasicClipPath(value: string): RawClipPathShape | null {
+function parseRawBasicClipPath(value: string): RawClipPathShape | undefined {
   return (
     parseRawPolygon(value) ||
     parseRawCircle(value) ||
@@ -2798,11 +2701,11 @@ function parseRawBasicClipPath(value: string): RawClipPathShape | null {
   );
 }
 
-function parseCustomClipPath(value: string): RawClipPathShape | null {
+function parseCustomClipPath(value: string): RawClipPathShape | undefined {
   const trimmed = value.trim().replace(/;$/, '');
   const lowerValue = trimmed.toLowerCase();
   if (!trimmed || lowerValue === 'none') {
-    return null;
+    return undefined;
   }
   if (CSS_GLOBAL_CLIP_PATH_VALUES.has(lowerValue)) {
     return { kind: 'raw', value: trimmed, preset: CUSTOM_PRESET };
@@ -2813,14 +2716,14 @@ function parseCustomClipPath(value: string): RawClipPathShape | null {
   if (/^[a-z][a-z0-9-]*\s*\(/is.test(trimmed) && hasBalancedParens(trimmed)) {
     return { kind: 'raw', value: trimmed, preset: CUSTOM_PRESET };
   }
-  return null;
+  return undefined;
 }
 
-function parseShape(value: string): ShapeFunctionShape | null {
-  const m = value.match(/^shape\s*\((.*)\)$/is);
-  const initialContent = m?.[1];
+function parseShape(value: string): ShapeFunctionShape | undefined {
+  const match = value.match(/^shape\s*\((.*)\)$/is);
+  const initialContent = match?.[1];
   if (!initialContent) {
-    return null;
+    return undefined;
   }
 
   let content = initialContent.trim();
@@ -2833,7 +2736,7 @@ function parseShape(value: string): ShapeFunctionShape | null {
 
   return /^from\b/i.test(content)
     ? { kind: 'shape', value: content, ...(fillRule ? { fillRule } : {}) }
-    : null;
+    : undefined;
 }
 
 function splitShapeCommandList(value: string) {
@@ -2917,7 +2820,7 @@ const SHAPE_OFFSET_COORDINATE_Y_EXACT_RE = new RegExp(
 const SHAPE_OFFSET_LEFT_VARIABLE_NAME_RE = new RegExp(SHAPE_OFFSET_COORDINATE_PATTERN_X, 'i');
 const SHAPE_OFFSET_TOP_VARIABLE_NAME_RE = new RegExp(SHAPE_OFFSET_COORDINATE_PATTERN_Y, 'i');
 // Offset patterns must come first so the longer, more specific match wins coordinate splitting.
-const SHAPE_CALC_COORDINATE_RE = new RegExp(
+const SHAPE_CALCULATED_COORDINATE_RE = new RegExp(
   `^(?:${[
     SHAPE_OFFSET_COORDINATE_PATTERN_X,
     SHAPE_OFFSET_COORDINATE_PATTERN_Y,
@@ -2933,7 +2836,10 @@ const SHAPE_SCALE_COORDINATE_RE = new RegExp(`^${SHAPE_SCALE_COORDINATE_PATTERN}
 const SHAPE_SCALE_COORDINATE_EXACT_RE = new RegExp(`^${SHAPE_SCALE_COORDINATE_PATTERN}$`, 'i');
 const SHAPE_SCALE_VARIABLE_NAME_RE = new RegExp(SHAPE_SCALE_COORDINATE_PATTERN, 'i');
 
-function parseShapeOffsetCoordinate(value: string, exact = false): ShapeOffsetCoordinate | null {
+function parseShapeOffsetCoordinate(
+  value: string,
+  exact = false,
+): ShapeOffsetCoordinate | undefined {
   const trimmed = value.trim();
   const xMatch = trimmed.match(
     exact ? SHAPE_OFFSET_COORDINATE_X_EXACT_RE : SHAPE_OFFSET_COORDINATE_X_RE,
@@ -2942,18 +2848,18 @@ function parseShapeOffsetCoordinate(value: string, exact = false): ShapeOffsetCo
     xMatch ||
     trimmed.match(exact ? SHAPE_OFFSET_COORDINATE_Y_EXACT_RE : SHAPE_OFFSET_COORDINATE_Y_RE);
   if (!match) {
-    return null;
+    return undefined;
   }
-  const u = Number(match[1]);
+  const position = Number(match[1]);
   const size = Number(match[3] ?? match[4]);
   const offset = Number(match[6] ?? match[7]);
   const span = Number(match[8]);
-  if (![u, size, offset, span].every(Number.isFinite)) {
-    return null;
+  if (![position, size, offset, span].every(Number.isFinite)) {
+    return undefined;
   }
   return {
     axis: xMatch ? 'x' : 'y',
-    u,
+    u: position,
     size,
     offset,
     span,
@@ -2970,21 +2876,21 @@ function shapeOffsetVariableNamesFromValue(value: string) {
   const xMatch = value.match(SHAPE_OFFSET_LEFT_VARIABLE_NAME_RE);
   const yMatch = value.match(SHAPE_OFFSET_TOP_VARIABLE_NAME_RE);
   if (!xMatch && !yMatch) {
-    return null;
+    return undefined;
   }
   return {
-    sizeVar: xMatch?.[2] || yMatch?.[2] || null,
-    offsetLeftVar: xMatch?.[5] || null,
-    offsetTopVar: yMatch?.[5] || null,
+    sizeVar: xMatch?.[2] || yMatch?.[2] || undefined,
+    offsetLeftVar: xMatch?.[5] || undefined,
+    offsetTopVar: yMatch?.[5] || undefined,
   };
 }
 
-function shapeCalcCoordinateOffset(value: string, exact = false) {
+function shapeCalculatedCoordinateOffset(value: string, exact = false) {
   const trimmed = value.trim();
   const offsetParsed = parseShapeOffsetCoordinate(trimmed, exact);
   if (offsetParsed) {
     const canvas = shapeOffsetCoordinateToCanvas(offsetParsed);
-    return Number.isFinite(canvas) ? canvas - 50 : null;
+    return Number.isFinite(canvas) ? canvas - 50 : undefined;
   }
 
   const minMatch = trimmed.match(
@@ -2993,7 +2899,7 @@ function shapeCalcCoordinateOffset(value: string, exact = false) {
   if (minMatch) {
     const offset = Number(minMatch[2]);
     if (!Number.isFinite(offset)) {
-      return null;
+      return undefined;
     }
     return minMatch[1] === '-' ? -offset : offset;
   }
@@ -3004,7 +2910,7 @@ function shapeCalcCoordinateOffset(value: string, exact = false) {
   if (scaleMatch) {
     const offset = Number(scaleMatch[2]) * 100;
     if (!Number.isFinite(offset)) {
-      return null;
+      return undefined;
     }
     return scaleMatch[1] === '-' ? -offset : offset;
   }
@@ -3013,17 +2919,17 @@ function shapeCalcCoordinateOffset(value: string, exact = false) {
     exact ? SHAPE_CQW_COORDINATE_EXACT_RE : new RegExp(`^${SHAPE_CQW_COORDINATE_PATTERN}`, 'i'),
   );
   if (!match) {
-    return null;
+    return undefined;
   }
 
   if (match[3] !== undefined) {
     const offset = Number(match[3]);
-    return Number.isFinite(offset) ? offset : null;
+    return Number.isFinite(offset) ? offset : undefined;
   }
 
   const offset = Number(match[2]);
   if (!Number.isFinite(offset)) {
-    return null;
+    return undefined;
   }
   return match[1] === '-' ? -offset : offset;
 }
@@ -3038,20 +2944,20 @@ function readShapeCssCoordinate(value: string) {
     };
   }
 
-  const calcMatch = trimmed.match(SHAPE_CALC_COORDINATE_RE);
-  if (calcMatch) {
+  const calculatedMatch = trimmed.match(SHAPE_CALCULATED_COORDINATE_RE);
+  if (calculatedMatch) {
     return {
-      coordinate: calcMatch[0],
-      rest: trimmed.slice(calcMatch[0].length).trimStart(),
+      coordinate: calculatedMatch[0],
+      rest: trimmed.slice(calculatedMatch[0].length).trimStart(),
     };
   }
 
-  return null;
+  return undefined;
 }
 
-function parseShapeCssPoint(value: string): ShapeCssPoint | null {
+function parseShapeCssPoint(value: string): ShapeCssPoint | undefined {
   const parsed = readShapeCssPoint(value);
-  return parsed && !parsed.rest ? parsed.point : null;
+  return parsed && !parsed.rest ? parsed.point : undefined;
 }
 
 function hasContainerQueryUnit(value: string) {
@@ -3063,18 +2969,18 @@ function shapeScaleVariableNameFromValue(value: string) {
   if (offsetNames?.sizeVar) {
     return offsetNames.sizeVar;
   }
-  return value.match(SHAPE_SCALE_VARIABLE_NAME_RE)?.[3] || null;
+  return value.match(SHAPE_SCALE_VARIABLE_NAME_RE)?.[3] || undefined;
 }
 
 function readShapeCssPoint(value: string) {
   const x = readShapeCssCoordinate(value);
   if (!x) {
-    return null;
+    return undefined;
   }
 
   const y = readShapeCssCoordinate(x.rest);
   if (!y) {
-    return null;
+    return undefined;
   }
 
   return {
@@ -3085,30 +2991,32 @@ function readShapeCssPoint(value: string) {
 
 function shapeCoordinateOffset(value: string) {
   const percent = parsePercent(value);
-  if (percent !== null) {
+  if (percent !== undefined) {
     return percent - 50;
   }
 
-  return shapeCalcCoordinateOffset(value, true);
+  return shapeCalculatedCoordinateOffset(value, true);
 }
 
-function shapeCssPointToCanvasPoint(point: ShapeCssPoint): Point | null {
+function shapeCssPointToCanvasPoint(point: ShapeCssPoint): Point | undefined {
   const xOffset = shapeCoordinateOffset(point.x);
   const yOffset = shapeCoordinateOffset(point.y);
-  return xOffset === null || yOffset === null ? null : { x: 50 + xOffset, y: 50 + yOffset };
+  return xOffset === undefined || yOffset === undefined
+    ? undefined
+    : { x: 50 + xOffset, y: 50 + yOffset };
 }
 
-function shapeCssBounds(shape: ShapeFunctionShape): SelectionRect | null {
+function shapeCssBounds(shape: ShapeFunctionShape): SelectionRect | undefined {
   const subpaths = parseShapeCssSubpaths(shape.value);
   if (!subpaths) {
-    return null;
+    return undefined;
   }
 
   const points = collectShapeCssPoints(subpaths)
     .map(shapeCssPointToCanvasPoint)
     .filter((point): point is Point => Boolean(point));
   if (!points.length) {
-    return null;
+    return undefined;
   }
 
   const xs = points.map((point) => point.x);
@@ -3120,16 +3028,16 @@ function shapeCssBounds(shape: ShapeFunctionShape): SelectionRect | null {
   return { left: minX, top: minY, width: maxX - minX, height: maxY - minY };
 }
 
-function parseShapeCssSubpaths(value: string): ShapeCssSubpath[] | null {
+function parseShapeCssSubpaths(value: string): ShapeCssSubpath[] | undefined {
   const subpaths: ShapeCssSubpath[] = [];
-  let activeSubpath: ShapeCssSubpath | null = null;
+  let activeSubpath: ShapeCssSubpath | undefined = undefined;
 
   for (const command of splitShapeCommandList(value)) {
     const moveMatch = command.match(/^(from|move\s+to)\s+(.+)$/i);
     if (moveMatch?.[2]) {
       const start = parseShapeCssPoint(moveMatch[2]);
       if (!start) {
-        return null;
+        return undefined;
       }
       activeSubpath = { start, commands: [] };
       subpaths.push(activeSubpath);
@@ -3137,14 +3045,14 @@ function parseShapeCssSubpaths(value: string): ShapeCssSubpath[] | null {
     }
 
     if (!activeSubpath) {
-      return null;
+      return undefined;
     }
 
     const lineMatch = command.match(/^line\s+to\s+(.+)$/i);
     if (lineMatch?.[1]) {
       const to = parseShapeCssPoint(lineMatch[1]);
       if (!to) {
-        return null;
+        return undefined;
       }
       activeSubpath.commands.push({ kind: 'line', to });
       continue;
@@ -3154,17 +3062,17 @@ function parseShapeCssSubpaths(value: string): ShapeCssSubpath[] | null {
     if (curveMatch?.[1]) {
       const to = readShapeCssPoint(curveMatch[1]);
       if (!to) {
-        return null;
+        return undefined;
       }
 
       const withMatch = to.rest.match(/^with\s+(.+)$/i);
       if (!withMatch?.[1]) {
-        return null;
+        return undefined;
       }
 
       const control1 = readShapeCssPoint(withMatch[1]);
       if (!control1) {
-        return null;
+        return undefined;
       }
 
       const controlRest = control1.rest.trim();
@@ -3174,9 +3082,9 @@ function parseShapeCssSubpaths(value: string): ShapeCssSubpath[] | null {
       }
 
       const control2Match = controlRest.match(/^\/\s*(.+)$/);
-      const control2 = control2Match?.[1] ? parseShapeCssPoint(control2Match[1]) : null;
+      const control2 = control2Match?.[1] ? parseShapeCssPoint(control2Match[1]) : undefined;
       if (!control2) {
-        return null;
+        return undefined;
       }
 
       activeSubpath.commands.push({
@@ -3193,10 +3101,10 @@ function parseShapeCssSubpaths(value: string): ShapeCssSubpath[] | null {
       continue;
     }
 
-    return null;
+    return undefined;
   }
 
-  return subpaths.length ? subpaths : null;
+  return subpaths.length ? subpaths : undefined;
 }
 
 function collectShapeCssPoints(subpaths: ShapeCssSubpath[]) {
@@ -3242,13 +3150,13 @@ function mapShapeCssSubpathPoints(
 function emitContainCssFromSubpaths(
   subpaths: ShapeCssSubpath[],
   options: ShapeScaleOptions,
-): ShapeCssSubpath[] | null {
+): ShapeCssSubpath[] | undefined {
   const canvasPoints = collectShapeCssPoints(subpaths)
     .map(shapeCssPointToCanvasPoint)
     .filter((point): point is Point => Boolean(point));
   const bounds = shapeOffsetBoundsFromCanvasPoints(canvasPoints);
   if (!bounds) {
-    return null;
+    return undefined;
   }
   const names = resolveShapeScaleVarNames(options);
   return mapShapeCssSubpathPoints(subpaths, (point) => {
@@ -3259,23 +3167,23 @@ function emitContainCssFromSubpaths(
 
 // Parse a contain shape that is already in the offset encoding into its structured model.
 // Returns null if any coordinate is not in the new format (legacy/foreign shapes).
-function containModelFromShape(shape: ShapeFunctionShape): ShapeContainModel | null {
+function containModelFromShape(shape: ShapeFunctionShape): ShapeContainModel | undefined {
   const subpaths = parseShapeCssSubpaths(shape.value);
   if (!subpaths) {
-    return null;
+    return undefined;
   }
   const cssPoints = collectShapeCssPoints(subpaths);
   if (!cssPoints.length) {
-    return null;
+    return undefined;
   }
 
   const points: Array<{ ux: number; uy: number }> = [];
-  let header: Omit<ShapeContainModel, 'points'> | null = null;
+  let header: Omit<ShapeContainModel, 'points'> | undefined = undefined;
   for (const point of cssPoints) {
     const px = parseShapeOffsetCoordinate(point.x, true);
     const py = parseShapeOffsetCoordinate(point.y, true);
     if (!px || px.axis !== 'x' || !py || py.axis !== 'y') {
-      return null;
+      return undefined;
     }
     points.push({ ux: px.u, uy: py.u });
     if (!header) {
@@ -3292,7 +3200,7 @@ function containModelFromShape(shape: ShapeFunctionShape): ShapeContainModel | n
     }
   }
   if (!header) {
-    return null;
+    return undefined;
   }
   return { points, ...header };
 }
@@ -3393,16 +3301,16 @@ function convertShapeFitMode(
   shape: ShapeFunctionShape,
   fitMode: ShapeFitMode,
   options: ShapeScaleOptions = DEFAULT_SHAPE_SCALE_OPTIONS,
-): ShapeFunctionShape | null {
+): ShapeFunctionShape | undefined {
   const subpaths = parseShapeCssSubpaths(shape.value);
   if (!subpaths) {
-    return null;
+    return undefined;
   }
 
   if (fitMode === 'contain') {
     const contained = emitContainCssFromSubpaths(subpaths, options);
     if (!contained) {
-      return null;
+      return undefined;
     }
     return {
       ...shape,
@@ -3412,12 +3320,12 @@ function convertShapeFitMode(
 
   const xOffsets = collectShapeCssPoints(subpaths)
     .map((point) => shapeCoordinateOffset(point.x))
-    .filter((offset): offset is number => offset !== null);
+    .filter((offset): offset is number => offset !== undefined);
   const yOffsets = collectShapeCssPoints(subpaths)
     .map((point) => shapeCoordinateOffset(point.y))
-    .filter((offset): offset is number => offset !== null);
+    .filter((offset): offset is number => offset !== undefined);
   if (!xOffsets.length || !yOffsets.length) {
-    return null;
+    return undefined;
   }
 
   const minXOffset = Math.min(...xOffsets);
@@ -3427,15 +3335,21 @@ function convertShapeFitMode(
   const xOffsetRange = maxXOffset - minXOffset;
   const yOffsetRange = maxYOffset - minYOffset;
   if (xOffsetRange <= SVG_POINT_EPSILON || yOffsetRange <= SVG_POINT_EPSILON) {
-    return null;
+    return undefined;
   }
 
   const stretched = mapShapeCssSubpathPoints(subpaths, (point) => {
     const xOffset = shapeCoordinateOffset(point.x);
     const yOffset = shapeCoordinateOffset(point.y);
     return {
-      x: xOffset === null ? point.x : formatPercent(((xOffset - minXOffset) / xOffsetRange) * 100),
-      y: yOffset === null ? point.y : formatPercent(((yOffset - minYOffset) / yOffsetRange) * 100),
+      x:
+        xOffset === undefined
+          ? point.x
+          : formatPercent(((xOffset - minXOffset) / xOffsetRange) * 100),
+      y:
+        yOffset === undefined
+          ? point.y
+          : formatPercent(((yOffset - minYOffset) / yOffsetRange) * 100),
     };
   });
 
@@ -3448,14 +3362,14 @@ function convertShapeFitMode(
 function cacheFromShapeFitVariants(
   shape: ShapeFunctionShape,
   options: ShapeScaleOptions = DEFAULT_SHAPE_SCALE_OPTIONS,
-): PastedShapeSvgCache | null {
+): PastedShapeSvgCache | undefined {
   const isContain = hasContainerQueryUnit(shape.value);
   const stretch = isContain ? convertShapeFitMode(shape, 'stretch', options) : shape;
   const contain = isContain
     ? normalizeContainShapeCoordinates(shape, options)
     : convertShapeFitMode(shape, 'contain', options);
 
-  return stretch && contain ? { source: 'shape()', stretch, contain } : null;
+  return stretch && contain ? { source: 'shape()', stretch, contain } : undefined;
 }
 
 function normalizeContainShapeCoordinates(
@@ -3491,11 +3405,11 @@ function normalizeContainShapeCoordinates(
 }
 
 function normalizeShapeFitCache(
-  cache: PastedShapeSvgCache | null | undefined,
+  cache: PastedShapeSvgCache | undefined,
   options: ShapeScaleOptions = DEFAULT_SHAPE_SCALE_OPTIONS,
 ) {
   if (!cache) {
-    return null;
+    return undefined;
   }
   const stretch = hasContainerQueryUnit(cache.stretch.value)
     ? convertShapeFitMode(cache.stretch, 'stretch', options) || cache.stretch
@@ -3528,10 +3442,10 @@ function transformShapeCanvasPoints(
   fitMode: ShapeFitMode,
   options: ShapeScaleOptions,
   transform: (point: Point) => Point,
-): ShapeFunctionShape | null {
+): ShapeFunctionShape | undefined {
   const subpaths = parseShapeCssSubpaths(shape.value);
   if (!subpaths) {
-    return null;
+    return undefined;
   }
 
   const transformed = mapShapeCssSubpathPoints(subpaths, (point) => {
@@ -3566,7 +3480,7 @@ function shapeFromPastedSvgCache(cache: PastedShapeSvgCache, fitMode: ShapeFitMo
   return fitMode === 'contain' ? cache.contain : cache.stretch;
 }
 
-function parseClipPath(value: string): ClipShape | null {
+function parseClipPath(value: string): ClipShape | undefined {
   if (value.trim().toLowerCase() === 'none') {
     return NONE_SHAPE;
   }
@@ -3587,10 +3501,10 @@ function parseClipPath(value: string): ClipShape | null {
   );
 }
 
-function parseClipPathInput(value: string): ClipShape | null {
+function parseClipPathInput(value: string): ClipShape | undefined {
   const trimmed = value.trim();
   if (!trimmed) {
-    return null;
+    return undefined;
   }
 
   const declarationMatch = trimmed.match(/(?:^|[;{\s])(?:-webkit-)?clip-path\s*:\s*([^;}]+)/i);
@@ -3598,19 +3512,19 @@ function parseClipPathInput(value: string): ClipShape | null {
   return parseClipPath(clipPathValue.trim().replace(/;$/, ''));
 }
 
-function parseSvgNumber(value: string | null | undefined) {
+function parseSvgNumber(value: string | undefined) {
   if (!value) {
-    return null;
+    return undefined;
   }
   const match = value.trim().match(/^[-+]?(?:\d+\.?\d*|\.\d+)(?:e[-+]?\d+)?/i);
   if (!match) {
-    return null;
+    return undefined;
   }
   const parsed = Number(match[0]);
-  return Number.isFinite(parsed) ? parsed : null;
+  return Number.isFinite(parsed) ? parsed : undefined;
 }
 
-function parseSvgNumberList(value: string | null | undefined) {
+function parseSvgNumberList(value: string | undefined) {
   if (!value) {
     return [];
   }
@@ -3620,7 +3534,7 @@ function parseSvgNumberList(value: string | null | undefined) {
 }
 
 function extractSvgMarkup(value: string) {
-  return value.match(/<svg\b[\s\S]*<\/svg>/i)?.[0] || null;
+  return value.match(/<svg\b[\s\S]*<\/svg>/i)?.[0] || undefined;
 }
 
 function svgTagName(element: Element) {
@@ -3630,15 +3544,15 @@ function svgTagName(element: Element) {
 function svgStyleValue(element: Element, property: string) {
   const style = element.getAttribute('style');
   if (!style) {
-    return null;
+    return undefined;
   }
 
   const match = style.match(new RegExp(`(?:^|;)\\s*${property}\\s*:\\s*([^;]+)`, 'i'));
-  return match?.[1]?.trim() || null;
+  return match?.[1]?.trim() || undefined;
 }
 
 function inheritedSvgAttribute(element: Element, attribute: string) {
-  let current: Element | null = element;
+  let current: Element | undefined = element;
   while (current) {
     const styleValue = svgStyleValue(current, attribute);
     if (styleValue) {
@@ -3650,10 +3564,10 @@ function inheritedSvgAttribute(element: Element, attribute: string) {
       return value;
     }
 
-    current = current.parentElement;
+    current = current.parentElement ?? undefined;
   }
 
-  return null;
+  return undefined;
 }
 
 function isRenderableSvgElement(element: Element) {
@@ -3693,20 +3607,26 @@ function isInsideSkippedSvgElement(element: Element) {
 }
 
 function hasSvgTransform(element: Element) {
-  let current: Element | null = element;
+  let current: Element | undefined = element;
   while (current && svgTagName(current) !== 'svg') {
     const transform = current.getAttribute('transform');
     if (transform && transform.trim()) {
       return true;
     }
-    current = current.parentElement;
+    current = current.parentElement ?? undefined;
   }
 
   return false;
 }
 
-function parseSvgViewBox(svg: Element, contours: Point[][]): SvgViewBox | null {
-  const viewBoxValues = parseSvgNumberList(svg.getAttribute('viewBox'));
+// An SVG attribute's text, or undefined when the element doesn't carry it (the
+// DOM's own answer for that is null).
+function svgAttribute(element: Element, name: string): string | undefined {
+  return element.getAttribute(name) ?? undefined;
+}
+
+function parseSvgViewBox(svg: Element, contours: Point[][]): SvgViewBox | undefined {
+  const viewBoxValues = parseSvgNumberList(svgAttribute(svg, 'viewBox'));
   const [x, y, widthViewBox, heightViewBox] = viewBoxValues;
   if (
     x !== undefined &&
@@ -3720,15 +3640,15 @@ function parseSvgViewBox(svg: Element, contours: Point[][]): SvgViewBox | null {
     return { x, y, width: widthViewBox, height: heightViewBox };
   }
 
-  const width = parseSvgNumber(svg.getAttribute('width'));
-  const height = parseSvgNumber(svg.getAttribute('height'));
-  if (width !== null && height !== null && width > 0 && height > 0) {
+  const width = parseSvgNumber(svgAttribute(svg, 'width'));
+  const height = parseSvgNumber(svgAttribute(svg, 'height'));
+  if (width !== undefined && height !== undefined && width > 0 && height > 0) {
     return { x: 0, y: 0, width, height };
   }
 
   const points = contours.flat();
   if (!points.length) {
-    return null;
+    return undefined;
   }
 
   const minX = Math.min(...points.map((point) => point.x));
@@ -3736,22 +3656,25 @@ function parseSvgViewBox(svg: Element, contours: Point[][]): SvgViewBox | null {
   const minY = Math.min(...points.map((point) => point.y));
   const maxY = Math.max(...points.map((point) => point.y));
   if (maxX <= minX || maxY <= minY) {
-    return null;
+    return undefined;
   }
 
   return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
 }
 
-function svgPointsAlmostEqual(a: Point, b: Point) {
-  return Math.abs(a.x - b.x) < SVG_POINT_EPSILON && Math.abs(a.y - b.y) < SVG_POINT_EPSILON;
+function svgPointsAlmostEqual(left: Point, right: Point) {
+  return (
+    Math.abs(left.x - right.x) < SVG_POINT_EPSILON && Math.abs(left.y - right.y) < SVG_POINT_EPSILON
+  );
 }
 
-function isSvgPointCollinear(a: Point, b: Point, c: Point) {
-  const area = (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
+function isSvgPointCollinear(first: Point, second: Point, third: Point) {
+  const area =
+    (second.x - first.x) * (third.y - first.y) - (second.y - first.y) * (third.x - first.x);
   return Math.abs(area) < SVG_POINT_EPSILON;
 }
 
-function simplifySvgContour(points: Point[]) {
+function simplifySvgContour(points: readonly Point[]) {
   const withoutDuplicates = points.reduce<Point[]>((unique, point) => {
     const previous = unique[unique.length - 1];
     if (!previous || !svgPointsAlmostEqual(previous, point)) {
@@ -3792,10 +3715,10 @@ function simplifySvgContour(points: Point[]) {
   return simplified.length >= 3 ? simplified : [];
 }
 
-function parseSvgPoints(value: string | null | undefined) {
+function parseSvgPoints(value: string | undefined) {
   const values = parseSvgNumberList(value);
   if (values.length < 6 || values.length % 2 !== 0) {
-    return null;
+    return undefined;
   }
 
   const points: Point[] = [];
@@ -3803,7 +3726,7 @@ function parseSvgPoints(value: string | null | undefined) {
     const x = values[index];
     const y = values[index + 1];
     if (x === undefined || y === undefined) {
-      return null;
+      return undefined;
     }
     points.push({ x, y });
   }
@@ -3811,10 +3734,10 @@ function parseSvgPoints(value: string | null | undefined) {
   return simplifySvgContour(points);
 }
 
-function parseClosedSvgPolyline(value: string | null | undefined) {
+function parseClosedSvgPolyline(value: string | undefined) {
   const values = parseSvgNumberList(value);
   if (values.length < 8 || values.length % 2 !== 0) {
-    return null;
+    return undefined;
   }
 
   const points: Point[] = [];
@@ -3822,31 +3745,31 @@ function parseClosedSvgPolyline(value: string | null | undefined) {
     const x = values[index];
     const y = values[index + 1];
     if (x === undefined || y === undefined) {
-      return null;
+      return undefined;
     }
     points.push({ x, y });
   }
   const firstPoint = points[0];
   const lastPoint = points[points.length - 1];
   if (!firstPoint || !lastPoint || !svgPointsAlmostEqual(firstPoint, lastPoint)) {
-    return null;
+    return undefined;
   }
 
   return simplifySvgContour(points);
 }
 
 function parseSvgRect(element: Element) {
-  const rx = parseSvgNumber(element.getAttribute('rx')) || 0;
-  const ry = parseSvgNumber(element.getAttribute('ry')) || 0;
+  const rx = parseSvgNumber(svgAttribute(element, 'rx')) || 0;
+  const ry = parseSvgNumber(svgAttribute(element, 'ry')) || 0;
   if (rx > 0 || ry > 0) {
-    return null;
+    return undefined;
   }
 
-  const x = parseSvgNumber(element.getAttribute('x')) || 0;
-  const y = parseSvgNumber(element.getAttribute('y')) || 0;
-  const width = parseSvgNumber(element.getAttribute('width'));
-  const height = parseSvgNumber(element.getAttribute('height'));
-  if (width === null || height === null || width <= 0 || height <= 0) {
+  const x = parseSvgNumber(svgAttribute(element, 'x')) || 0;
+  const y = parseSvgNumber(svgAttribute(element, 'y')) || 0;
+  const width = parseSvgNumber(svgAttribute(element, 'width'));
+  const height = parseSvgNumber(svgAttribute(element, 'height'));
+  if (width === undefined || height === undefined || width <= 0 || height <= 0) {
     return [];
   }
 
@@ -3879,16 +3802,16 @@ function closeSvgSubpath(subpath: SvgShapeSubpath) {
 }
 
 function parseSvgRectShape(element: Element) {
-  const x = parseSvgNumber(element.getAttribute('x')) || 0;
-  const y = parseSvgNumber(element.getAttribute('y')) || 0;
-  const width = parseSvgNumber(element.getAttribute('width'));
-  const height = parseSvgNumber(element.getAttribute('height'));
-  if (width === null || height === null || width <= 0 || height <= 0) {
+  const x = parseSvgNumber(svgAttribute(element, 'x')) || 0;
+  const y = parseSvgNumber(svgAttribute(element, 'y')) || 0;
+  const width = parseSvgNumber(svgAttribute(element, 'width'));
+  const height = parseSvgNumber(svgAttribute(element, 'height'));
+  if (width === undefined || height === undefined || width <= 0 || height <= 0) {
     return [];
   }
 
-  const rawRx = parseSvgNumber(element.getAttribute('rx'));
-  const rawRy = parseSvgNumber(element.getAttribute('ry'));
+  const rawRx = parseSvgNumber(svgAttribute(element, 'rx'));
+  const rawRy = parseSvgNumber(svgAttribute(element, 'ry'));
   const rx = Math.min(width / 2, Math.max(0, rawRx ?? rawRy ?? 0));
   const ry = Math.min(height / 2, Math.max(0, rawRy ?? rawRx ?? 0));
   const right = x + width;
@@ -3990,24 +3913,24 @@ function parseSvgEllipseShape(cx: number, cy: number, rx: number, ry: number) {
 }
 
 function parseSvgCircleShape(element: Element) {
-  const cx = parseSvgNumber(element.getAttribute('cx')) || 0;
-  const cy = parseSvgNumber(element.getAttribute('cy')) || 0;
-  const r = parseSvgNumber(element.getAttribute('r')) || 0;
-  return parseSvgEllipseShape(cx, cy, r, r);
+  const cx = parseSvgNumber(svgAttribute(element, 'cx')) || 0;
+  const cy = parseSvgNumber(svgAttribute(element, 'cy')) || 0;
+  const radius = parseSvgNumber(svgAttribute(element, 'r')) || 0;
+  return parseSvgEllipseShape(cx, cy, radius, radius);
 }
 
 function parseSvgEllipseElementShape(element: Element) {
-  const cx = parseSvgNumber(element.getAttribute('cx')) || 0;
-  const cy = parseSvgNumber(element.getAttribute('cy')) || 0;
-  const rx = parseSvgNumber(element.getAttribute('rx')) || 0;
-  const ry = parseSvgNumber(element.getAttribute('ry')) || 0;
+  const cx = parseSvgNumber(svgAttribute(element, 'cx')) || 0;
+  const cy = parseSvgNumber(svgAttribute(element, 'cy')) || 0;
+  const rx = parseSvgNumber(svgAttribute(element, 'rx')) || 0;
+  const ry = parseSvgNumber(svgAttribute(element, 'ry')) || 0;
   return parseSvgEllipseShape(cx, cy, rx, ry);
 }
 
 function parseSvgPolygonShape(element: Element, requireClosed = true) {
-  const values = parseSvgNumberList(element.getAttribute('points'));
+  const values = parseSvgNumberList(svgAttribute(element, 'points'));
   if (values.length < 6 || values.length % 2 !== 0) {
-    return null;
+    return undefined;
   }
 
   const points: Point[] = [];
@@ -4015,7 +3938,7 @@ function parseSvgPolygonShape(element: Element, requireClosed = true) {
     const x = values[index];
     const y = values[index + 1];
     if (x === undefined || y === undefined) {
-      return null;
+      return undefined;
     }
     points.push({ x, y });
   }
@@ -4025,7 +3948,7 @@ function parseSvgPolygonShape(element: Element, requireClosed = true) {
     requireClosed &&
     (!firstPoint || !lastPoint || !svgPointsAlmostEqual(firstPoint, lastPoint))
   ) {
-    return null;
+    return undefined;
   }
 
   const simplified = simplifySvgContour(points);
@@ -4049,123 +3972,224 @@ function isSvgPathCommand(token: string) {
   return /^[a-z]$/i.test(token);
 }
 
-function parseSimpleSvgPath(element: Element) {
-  const d = element.getAttribute('d');
-  const tokens = d?.match(/[a-zA-Z]|[-+]?(?:\d+\.?\d*|\.\d+)(?:e[-+]?\d+)?/g);
-  if (!tokens?.length) {
-    return null;
-  }
+// The command letters and numbers of an element's `d` attribute, or undefined when it
+// has none.
+function svgPathTokens(element: Element): string[] | undefined {
+  const pathData = element.getAttribute('d');
+  const tokens = pathData?.match(/[a-zA-Z]|[-+]?(?:\d+\.?\d*|\.\d+)(?:e[-+]?\d+)?/g);
+  return tokens?.length ? tokens : undefined;
+}
 
+// Reads a path's tokens in order: a command letter, then the numbers after it.
+type SvgPathCursor = {
+  done: () => boolean;
+  // The next token when it is a command letter, consumed; undefined otherwise.
+  takeCommand: () => string | undefined;
+  hasNumber: () => boolean;
+  readNumber: () => number | undefined;
+  // `count` numbers, or undefined when any is missing or not finite.
+  readNumbers: (count: number) => number[] | undefined;
+};
+
+function svgPathCursor(tokens: readonly string[]): SvgPathCursor {
   let index = 0;
-  let command = '';
-  let current: Point = { x: 0, y: 0 };
-  let start: Point | null = null;
-  let closed = false;
-  const points: Point[] = [];
-
   const hasNumber = () => {
     const token = tokens[index];
     return token !== undefined && !isSvgPathCommand(token);
   };
   const readNumber = () => {
     if (!hasNumber()) {
-      return null;
+      return undefined;
     }
     const value = Number(tokens[index] ?? '');
     index += 1;
-    return Number.isFinite(value) ? value : null;
+    return Number.isFinite(value) ? value : undefined;
   };
-  const lineTo = (point: Point) => {
-    current = point;
-    points.push(point);
+  return {
+    done: () => index >= tokens.length,
+    takeCommand: () => {
+      const token = tokens[index];
+      if (token !== undefined && isSvgPathCommand(token)) {
+        index += 1;
+        return token;
+      }
+      return undefined;
+    },
+    hasNumber,
+    readNumber,
+    readNumbers: (count) => {
+      const values: number[] = [];
+      for (let i = 0; i < count; i++) {
+        const value = readNumber();
+        if (value === undefined) {
+          return undefined;
+        }
+        values.push(value);
+      }
+      return values;
+    },
   };
+}
 
-  while (index < tokens.length) {
-    const token = tokens[index];
-    if (token !== undefined && isSvgPathCommand(token)) {
-      command = token;
-      index += 1;
-    }
-    if (!command) {
-      return null;
-    }
+// The pen of a straight-edged path: where it is, where the path began, and the
+// corners so far. The reader owns that state and changes it only through its own
+// methods, so the command helpers below ask it to move instead of writing its fields.
+class SimpleSvgPathReader {
+  #command = '';
+  #current: Point = { x: 0, y: 0 };
+  #start: Point | undefined = undefined;
+  #closed = false;
+  readonly #corners: Point[] = [];
 
-    const relative = command === command.toLowerCase();
-    switch (command.toUpperCase()) {
-      case 'M': {
-        if (points.length) {
-          return null;
-        }
-        const x = readNumber();
-        const y = readNumber();
-        if (x === null || y === null) {
-          return null;
-        }
-        current = relative ? { x: current.x + x, y: current.y + y } : { x, y };
-        start = current;
-        points.push(current);
-        command = relative ? 'l' : 'L';
-        closed = false;
-        break;
-      }
-      case 'L': {
-        while (hasNumber()) {
-          const x = readNumber();
-          const y = readNumber();
-          if (x === null || y === null) {
-            return null;
-          }
-          lineTo(relative ? { x: current.x + x, y: current.y + y } : { x, y });
-        }
-        break;
-      }
-      case 'H': {
-        while (hasNumber()) {
-          const x = readNumber();
-          if (x === null) {
-            return null;
-          }
-          lineTo({ x: relative ? current.x + x : x, y: current.y });
-        }
-        break;
-      }
-      case 'V': {
-        while (hasNumber()) {
-          const y = readNumber();
-          if (y === null) {
-            return null;
-          }
-          lineTo({ x: current.x, y: relative ? current.y + y : y });
-        }
-        break;
-      }
-      case 'Z': {
-        if (!start) {
-          return null;
-        }
-        current = start;
-        closed = true;
-        command = '';
-        break;
-      }
-      default:
-        return null;
+  // The command whose numbers are being read; empty after a close-path.
+  get command(): string {
+    return this.#command;
+  }
+
+  get current(): Point {
+    return this.#current;
+  }
+
+  get closed(): boolean {
+    return this.#closed;
+  }
+
+  get corners(): readonly Point[] {
+    return this.#corners;
+  }
+
+  // Takes the next command letter when there is one; otherwise the numbers that
+  // follow repeat the command before them.
+  takeCommand(cursor: SvgPathCursor): string {
+    this.#command = cursor.takeCommand() ?? this.#command;
+    return this.#command;
+  }
+
+  // Starts the path at `point`. Numbers after a move-to are line-tos, relative when
+  // the move was.
+  moveTo(point: Point, { relative }: { relative: boolean }): void {
+    this.#current = point;
+    this.#start = point;
+    this.#corners.push(point);
+    this.#command = relative ? 'l' : 'L';
+    this.#closed = false;
+  }
+
+  lineTo(point: Point): void {
+    this.#current = point;
+    this.#corners.push(point);
+  }
+
+  // Returns the pen to where the path began. False when the path never began.
+  close(): boolean {
+    if (!this.#start) {
+      return false;
+    }
+    this.#current = this.#start;
+    this.#closed = true;
+    this.#command = '';
+    return true;
+  }
+}
+
+function parseSimpleSvgPath(element: Element) {
+  const tokens = svgPathTokens(element);
+  if (!tokens) {
+    return undefined;
+  }
+  const cursor = svgPathCursor(tokens);
+  const reader = new SimpleSvgPathReader();
+  while (!cursor.done()) {
+    if (!reader.takeCommand(cursor)) {
+      return undefined;
+    }
+    if (!applySimpleSvgCommand(reader, cursor)) {
+      return undefined;
     }
   }
 
+  const points = reader.corners;
   const firstPoint = points[0];
   const lastPoint = points[points.length - 1];
   if (
-    !closed &&
+    !reader.closed &&
     firstPoint &&
     lastPoint &&
     points.length > 1 &&
     !svgPointsAlmostEqual(firstPoint, lastPoint)
   ) {
-    return null;
+    return undefined;
   }
-
   return simplifySvgContour(points);
+}
+
+// One command of a straight-edged path. False when the path is not one this reads.
+function applySimpleSvgCommand(reader: SimpleSvgPathReader, cursor: SvgPathCursor): boolean {
+  const relative = reader.command === reader.command.toLowerCase();
+  switch (reader.command.toUpperCase()) {
+    case 'M':
+      return simpleSvgMove(reader, cursor, { relative });
+    case 'L':
+      while (cursor.hasNumber()) {
+        const numbers = cursor.readNumbers(2);
+        if (!numbers) {
+          return false;
+        }
+        reader.lineTo(offsetSvgPoint(reader.current, numbers, { relative }));
+      }
+      return true;
+    case 'H':
+      while (cursor.hasNumber()) {
+        const x = cursor.readNumber();
+        if (x === undefined) {
+          return false;
+        }
+        const current = reader.current;
+        reader.lineTo({ x: relative ? current.x + x : x, y: current.y });
+      }
+      return true;
+    case 'V':
+      while (cursor.hasNumber()) {
+        const y = cursor.readNumber();
+        if (y === undefined) {
+          return false;
+        }
+        const current = reader.current;
+        reader.lineTo({ x: current.x, y: relative ? current.y + y : y });
+      }
+      return true;
+    case 'Z':
+      return reader.close();
+    default:
+      return false;
+  }
+}
+
+// A straight-edged path starts once: a second move-to is a second contour, which
+// this reader does not take.
+function simpleSvgMove(
+  reader: SimpleSvgPathReader,
+  cursor: SvgPathCursor,
+  { relative }: { relative: boolean },
+): boolean {
+  if (reader.corners.length) {
+    return false;
+  }
+  const numbers = cursor.readNumbers(2);
+  if (!numbers) {
+    return false;
+  }
+  reader.moveTo(offsetSvgPoint(reader.current, numbers, { relative }), { relative });
+  return true;
+}
+
+// The point `[x, y]` names: as written, or from `current` for a relative command.
+function offsetSvgPoint(
+  current: Point,
+  [x = 0, y = 0]: readonly number[],
+  { relative }: { relative: boolean },
+): Point {
+  return relative ? { x: current.x + x, y: current.y + y } : { x, y };
 }
 
 function transformSvgArcPoint(point: Point, cosPhi: number, sinPhi: number, center: Point) {
@@ -4187,8 +4211,7 @@ function svgArcToCubicCurves(
   rawRx: number,
   rawRy: number,
   rotation: number,
-  largeArc: boolean,
-  sweep: boolean,
+  { largeArc, sweep }: { largeArc: boolean; sweep: boolean },
   to: Point,
 ) {
   if (svgPointsAlmostEqual(from, to)) {
@@ -4206,10 +4229,10 @@ function svgArcToCubicCurves(
   const sinPhi = Math.sin(phi);
   const dx = (from.x - to.x) / 2;
   const dy = (from.y - to.y) / 2;
-  const x1p = cosPhi * dx + sinPhi * dy;
-  const y1p = -sinPhi * dx + cosPhi * dy;
+  const rotatedX = cosPhi * dx + sinPhi * dy;
+  const rotatedY = -sinPhi * dx + cosPhi * dy;
 
-  const radiusScale = (x1p * x1p) / (rx * rx) + (y1p * y1p) / (ry * ry);
+  const radiusScale = (rotatedX * rotatedX) / (rx * rx) + (rotatedY * rotatedY) / (ry * ry);
   if (radiusScale > 1) {
     const scale = Math.sqrt(radiusScale);
     rx *= scale;
@@ -4218,25 +4241,28 @@ function svgArcToCubicCurves(
 
   const rx2 = rx * rx;
   const ry2 = ry * ry;
-  const x1p2 = x1p * x1p;
-  const y1p2 = y1p * y1p;
-  const denominator = rx2 * y1p2 + ry2 * x1p2;
+  const rotatedXSquared = rotatedX * rotatedX;
+  const rotatedYSquared = rotatedY * rotatedY;
+  const denominator = rx2 * rotatedYSquared + ry2 * rotatedXSquared;
   if (denominator === 0) {
     return [{ kind: 'line' as const, to }];
   }
 
   const sign = largeArc === sweep ? -1 : 1;
   const coefficient =
-    sign * Math.sqrt(Math.max(0, (rx2 * ry2 - rx2 * y1p2 - ry2 * x1p2) / denominator));
-  const cxp = (coefficient * (rx * y1p)) / ry;
-  const cyp = (coefficient * (-ry * x1p)) / rx;
+    sign *
+    Math.sqrt(
+      Math.max(0, (rx2 * ry2 - rx2 * rotatedYSquared - ry2 * rotatedXSquared) / denominator),
+    );
+  const cxp = (coefficient * (rx * rotatedY)) / ry;
+  const cyp = (coefficient * (-ry * rotatedX)) / rx;
   const center = {
     x: cosPhi * cxp - sinPhi * cyp + (from.x + to.x) / 2,
     y: sinPhi * cxp + cosPhi * cyp + (from.y + to.y) / 2,
   };
-  const startVector = { x: (x1p - cxp) / rx, y: (y1p - cyp) / ry };
-  const endVector = { x: (-x1p - cxp) / rx, y: (-y1p - cyp) / ry };
-  let startAngle = svgVectorAngle(1, 0, startVector.x, startVector.y);
+  const startVector = { x: (rotatedX - cxp) / rx, y: (rotatedY - cyp) / ry };
+  const endVector = { x: (-rotatedX - cxp) / rx, y: (-rotatedY - cyp) / ry };
+  const startAngle = svgVectorAngle(1, 0, startVector.x, startVector.y);
   let deltaAngle = svgVectorAngle(startVector.x, startVector.y, endVector.x, endVector.y);
 
   if (!sweep && deltaAngle > 0) {
@@ -4246,32 +4272,7 @@ function svgArcToCubicCurves(
     deltaAngle += Math.PI * 2;
   }
 
-  const segments = Math.ceil(Math.abs(deltaAngle) / (Math.PI / 2));
-  const segmentAngle = deltaAngle / segments;
-  const curves: SvgShapeCommand[] = [];
-
-  for (let segment = 0; segment < segments; segment += 1) {
-    const nextAngle = startAngle + segmentAngle;
-    const alpha = (4 / 3) * Math.tan((nextAngle - startAngle) / 4);
-    const p2 = { x: rx * Math.cos(nextAngle), y: ry * Math.sin(nextAngle) };
-    const c1 = {
-      x: rx * (Math.cos(startAngle) - alpha * Math.sin(startAngle)),
-      y: ry * (Math.sin(startAngle) + alpha * Math.cos(startAngle)),
-    };
-    const c2 = {
-      x: rx * (Math.cos(nextAngle) + alpha * Math.sin(nextAngle)),
-      y: ry * (Math.sin(nextAngle) - alpha * Math.cos(nextAngle)),
-    };
-
-    curves.push({
-      kind: 'curve',
-      to: transformSvgArcPoint(p2, cosPhi, sinPhi, center),
-      control1: transformSvgArcPoint(c1, cosPhi, sinPhi, center),
-      control2: transformSvgArcPoint(c2, cosPhi, sinPhi, center),
-    });
-    startAngle = nextAngle;
-  }
-
+  const curves = svgArcSegments({ rx, ry, cosPhi, sinPhi, center, startAngle, deltaAngle });
   const lastCurve = curves[curves.length - 1];
   if (lastCurve?.kind === 'curve') {
     lastCurve.to = to;
@@ -4279,274 +4280,365 @@ function svgArcToCubicCurves(
   return curves;
 }
 
-function parseSvgPathShape(element: Element) {
-  const d = element.getAttribute('d');
-  const tokens = d?.match(/[a-zA-Z]|[-+]?(?:\d+\.?\d*|\.\d+)(?:e[-+]?\d+)?/g);
-  if (!tokens?.length) {
-    return null;
+// The arc from `startAngle` through `deltaAngle` on the ellipse (rx, ry) rotated by
+// phi about `center`, as cubic curves of at most a quarter turn each.
+function svgArcSegments({
+  rx,
+  ry,
+  cosPhi,
+  sinPhi,
+  center,
+  startAngle: firstAngle,
+  deltaAngle,
+}: {
+  rx: number;
+  ry: number;
+  cosPhi: number;
+  sinPhi: number;
+  center: Point;
+  startAngle: number;
+  deltaAngle: number;
+}): SvgShapeCommand[] {
+  const segments = Math.ceil(Math.abs(deltaAngle) / (Math.PI / 2));
+  const segmentAngle = deltaAngle / segments;
+  const curves: SvgShapeCommand[] = [];
+  let startAngle = firstAngle;
+
+  for (let segment = 0; segment < segments; segment += 1) {
+    const nextAngle = startAngle + segmentAngle;
+    const alpha = (4 / 3) * Math.tan((nextAngle - startAngle) / 4);
+    const arcEnd = { x: rx * Math.cos(nextAngle), y: ry * Math.sin(nextAngle) };
+    const control1 = {
+      x: rx * (Math.cos(startAngle) - alpha * Math.sin(startAngle)),
+      y: ry * (Math.sin(startAngle) + alpha * Math.cos(startAngle)),
+    };
+    const control2 = {
+      x: rx * (Math.cos(nextAngle) + alpha * Math.sin(nextAngle)),
+      y: ry * (Math.sin(nextAngle) - alpha * Math.cos(nextAngle)),
+    };
+
+    curves.push({
+      kind: 'curve',
+      to: transformSvgArcPoint(arcEnd, cosPhi, sinPhi, center),
+      control1: transformSvgArcPoint(control1, cosPhi, sinPhi, center),
+      control2: transformSvgArcPoint(control2, cosPhi, sinPhi, center),
+    });
+    startAngle = nextAngle;
+  }
+  return curves;
+}
+
+// The pen of a curved path: where it is, the subpath it is drawing, the control
+// points a smooth curve reflects, and the subpaths finished so far. The reader owns
+// that state and changes it only through its own methods, so the command helpers
+// below ask it to draw instead of writing its fields.
+class SvgShapePathReader {
+  #command = '';
+  #current: Point = { x: 0, y: 0 };
+  #activeSubpath: SvgShapeSubpath | undefined = undefined;
+  #previousCubicControl: Point | undefined = undefined;
+  #previousQuadraticControl: Point | undefined = undefined;
+  #previousCommand = '';
+  readonly #subpaths: SvgShapeSubpath[] = [];
+
+  // The command whose numbers are being read; empty after a close-path.
+  get command(): string {
+    return this.#command;
   }
 
-  let index = 0;
-  let command = '';
-  let current: Point = { x: 0, y: 0 };
-  let activeSubpath: SvgShapeSubpath | null = null;
-  let previousCubicControl: Point | null = null;
-  let previousQuadraticControl: Point | null = null;
-  let previousCommand = '';
-  const subpaths: SvgShapeSubpath[] = [];
+  get current(): Point {
+    return this.#current;
+  }
 
-  const hasNumber = () => {
-    const token = tokens[index];
-    return token !== undefined && !isSvgPathCommand(token);
-  };
-  const readNumber = () => {
-    if (!hasNumber()) {
-      return null;
+  get previousCubicControl(): Point | undefined {
+    return this.#previousCubicControl;
+  }
+
+  get previousQuadraticControl(): Point | undefined {
+    return this.#previousQuadraticControl;
+  }
+
+  // The letter of the last command read, which decides whether a smooth curve
+  // reflects a control point.
+  get previousCommand(): string {
+    return this.#previousCommand;
+  }
+
+  // Takes the next command letter when there is one; otherwise the numbers that
+  // follow repeat the command before them.
+  takeCommand(cursor: SvgPathCursor): string {
+    this.#command = cursor.takeCommand() ?? this.#command;
+    return this.#command;
+  }
+
+  // A move-to ends the subpath being drawn and starts the next at `point`. Numbers
+  // after it are line-tos, relative when the move was.
+  moveTo(point: Point, { relative }: { relative: boolean }): void {
+    this.#finishSubpath();
+    this.#current = point;
+    this.#activeSubpath = { start: point, commands: [] };
+    this.forgetControlPoints();
+    this.#previousCommand = 'M';
+    this.#command = relative ? 'l' : 'L';
+  }
+
+  lineTo(to: Point): void {
+    this.#addCommand({ kind: 'line', to });
+  }
+
+  cubicTo(to: Point, control1: Point, control2: Point): void {
+    this.#addCommand({ kind: 'curve', to, control1, control2 });
+    this.#previousCubicControl = control2;
+    this.#previousQuadraticControl = undefined;
+  }
+
+  quadraticTo(to: Point, control1: Point): void {
+    this.#addCommand({ kind: 'curve', to, control1 });
+    this.#previousQuadraticControl = control1;
+    this.#previousCubicControl = undefined;
+  }
+
+  // An arc arrives as the cubic curves that approximate it; a smooth curve after it
+  // reflects nothing.
+  arcTo(curves: readonly SvgShapeCommand[]): void {
+    for (const curve of curves) {
+      this.#addCommand(curve);
     }
-    const value = Number(tokens[index] ?? '');
-    index += 1;
-    return Number.isFinite(value) ? value : null;
-  };
-  const toPoint = (x: number, y: number, relative: boolean) =>
-    relative ? { x: current.x + x, y: current.y + y } : { x, y };
-  const ensureSubpath = () => {
-    if (!activeSubpath) {
-      activeSubpath = { start: current, commands: [] };
+    this.forgetControlPoints();
+  }
+
+  forgetControlPoints(): void {
+    this.#previousCubicControl = undefined;
+    this.#previousQuadraticControl = undefined;
+  }
+
+  // Records the letter of a command once all its numbers are read.
+  recordCommand(letter: string): void {
+    this.#previousCommand = letter;
+  }
+
+  // A close-path returns the pen to the subpath's start and ends the subpath. False
+  // when no subpath is being drawn.
+  close(): boolean {
+    const subpath = this.#activeSubpath;
+    if (!subpath) {
+      return false;
     }
-    return activeSubpath;
-  };
-  const finishSubpath = () => {
-    if (!activeSubpath) {
+    subpath.commands.push({ kind: 'close' });
+    this.#current = subpath.start;
+    this.#finishSubpath();
+    this.forgetControlPoints();
+    this.#previousCommand = 'Z';
+    this.#command = '';
+    return true;
+  }
+
+  // Ends the path: the subpath being drawn is finished, and the subpaths kept are
+  // returned.
+  finish(): SvgShapeSubpath[] {
+    this.#finishSubpath();
+    return this.#subpaths;
+  }
+
+  #addCommand(nextCommand: SvgShapeCommand): void {
+    if (!this.#activeSubpath) {
+      this.#activeSubpath = { start: this.#current, commands: [] };
+    }
+    this.#activeSubpath.commands.push(nextCommand);
+    if (nextCommand.kind !== 'close') {
+      this.#current = nextCommand.to;
+    }
+  }
+
+  // Closes the subpath being drawn and keeps it when it encloses anything.
+  #finishSubpath(): void {
+    if (!this.#activeSubpath) {
       return;
     }
-    const closed = closeSvgSubpath(activeSubpath);
+    const closed = closeSvgSubpath(this.#activeSubpath);
     if (svgSubpathHasArea(closed)) {
-      subpaths.push(closed);
+      this.#subpaths.push(closed);
     }
-    activeSubpath = null;
-  };
-  const addCommand = (nextCommand: SvgShapeCommand) => {
-    ensureSubpath().commands.push(nextCommand);
-    if (nextCommand.kind !== 'close') {
-      current = nextCommand.to;
-    }
-  };
-  const resetControlPoints = () => {
-    previousCubicControl = null;
-    previousQuadraticControl = null;
-  };
+    this.#activeSubpath = undefined;
+  }
+}
 
-  while (index < tokens.length) {
-    const token = tokens[index];
-    if (token !== undefined && isSvgPathCommand(token)) {
-      command = token;
-      index += 1;
+function parseSvgPathShape(element: Element) {
+  const tokens = svgPathTokens(element);
+  if (!tokens) {
+    return undefined;
+  }
+  const cursor = svgPathCursor(tokens);
+  const reader = new SvgShapePathReader();
+  while (!cursor.done()) {
+    if (!reader.takeCommand(cursor)) {
+      return undefined;
     }
-    if (!command) {
-      return null;
-    }
-
-    const relative = command === command.toLowerCase();
-    switch (command.toUpperCase()) {
-      case 'M': {
-        const x = readNumber();
-        const y = readNumber();
-        if (x === null || y === null) {
-          return null;
-        }
-        finishSubpath();
-        current = toPoint(x, y, relative);
-        activeSubpath = { start: current, commands: [] };
-        resetControlPoints();
-        previousCommand = 'M';
-        command = relative ? 'l' : 'L';
-        break;
-      }
-      case 'L': {
-        while (hasNumber()) {
-          const x = readNumber();
-          const y = readNumber();
-          if (x === null || y === null) {
-            return null;
-          }
-          addCommand({ kind: 'line', to: toPoint(x, y, relative) });
-        }
-        resetControlPoints();
-        previousCommand = 'L';
-        break;
-      }
-      case 'H': {
-        while (hasNumber()) {
-          const x = readNumber();
-          if (x === null) {
-            return null;
-          }
-          addCommand({ kind: 'line', to: { x: relative ? current.x + x : x, y: current.y } });
-        }
-        resetControlPoints();
-        previousCommand = 'H';
-        break;
-      }
-      case 'V': {
-        while (hasNumber()) {
-          const y = readNumber();
-          if (y === null) {
-            return null;
-          }
-          addCommand({ kind: 'line', to: { x: current.x, y: relative ? current.y + y : y } });
-        }
-        resetControlPoints();
-        previousCommand = 'V';
-        break;
-      }
-      case 'C': {
-        while (hasNumber()) {
-          const x1 = readNumber();
-          const y1 = readNumber();
-          const x2 = readNumber();
-          const y2 = readNumber();
-          const x = readNumber();
-          const y = readNumber();
-          if (
-            x1 === null ||
-            y1 === null ||
-            x2 === null ||
-            y2 === null ||
-            x === null ||
-            y === null
-          ) {
-            return null;
-          }
-          const control1 = toPoint(x1, y1, relative);
-          const control2 = toPoint(x2, y2, relative);
-          const to = toPoint(x, y, relative);
-          addCommand({ kind: 'curve', to, control1, control2 });
-          previousCubicControl = control2;
-          previousQuadraticControl = null;
-        }
-        previousCommand = 'C';
-        break;
-      }
-      case 'S': {
-        while (hasNumber()) {
-          const x2 = readNumber();
-          const y2 = readNumber();
-          const x = readNumber();
-          const y = readNumber();
-          if (x2 === null || y2 === null || x === null || y === null) {
-            return null;
-          }
-          const control1: Point =
-            previousCubicControl && ['C', 'S'].includes(previousCommand)
-              ? {
-                  x: current.x * 2 - previousCubicControl.x,
-                  y: current.y * 2 - previousCubicControl.y,
-                }
-              : current;
-          const control2 = toPoint(x2, y2, relative);
-          const to = toPoint(x, y, relative);
-          addCommand({ kind: 'curve', to, control1, control2 });
-          previousCubicControl = control2;
-          previousQuadraticControl = null;
-        }
-        previousCommand = 'S';
-        break;
-      }
-      case 'Q': {
-        while (hasNumber()) {
-          const x1 = readNumber();
-          const y1 = readNumber();
-          const x = readNumber();
-          const y = readNumber();
-          if (x1 === null || y1 === null || x === null || y === null) {
-            return null;
-          }
-          const control1 = toPoint(x1, y1, relative);
-          const to = toPoint(x, y, relative);
-          addCommand({ kind: 'curve', to, control1 });
-          previousQuadraticControl = control1;
-          previousCubicControl = null;
-        }
-        previousCommand = 'Q';
-        break;
-      }
-      case 'T': {
-        while (hasNumber()) {
-          const x = readNumber();
-          const y = readNumber();
-          if (x === null || y === null) {
-            return null;
-          }
-          const control1: Point =
-            previousQuadraticControl && ['Q', 'T'].includes(previousCommand)
-              ? {
-                  x: current.x * 2 - previousQuadraticControl.x,
-                  y: current.y * 2 - previousQuadraticControl.y,
-                }
-              : current;
-          const to = toPoint(x, y, relative);
-          addCommand({ kind: 'curve', to, control1 });
-          previousQuadraticControl = control1;
-          previousCubicControl = null;
-        }
-        previousCommand = 'T';
-        break;
-      }
-      case 'A': {
-        while (hasNumber()) {
-          const rx = readNumber();
-          const ry = readNumber();
-          const rotation = readNumber();
-          const largeArc = readNumber();
-          const sweep = readNumber();
-          const x = readNumber();
-          const y = readNumber();
-          if (
-            rx === null ||
-            ry === null ||
-            rotation === null ||
-            largeArc === null ||
-            sweep === null ||
-            x === null ||
-            y === null
-          ) {
-            return null;
-          }
-          const to = toPoint(x, y, relative);
-          const arcCommands = svgArcToCubicCurves(
-            current,
-            rx,
-            ry,
-            rotation,
-            largeArc !== 0,
-            sweep !== 0,
-            to,
-          );
-          arcCommands.forEach(addCommand);
-          resetControlPoints();
-        }
-        previousCommand = 'A';
-        break;
-      }
-      case 'Z': {
-        if (!activeSubpath) {
-          return null;
-        }
-        activeSubpath.commands.push({ kind: 'close' });
-        current = activeSubpath.start;
-        finishSubpath();
-        resetControlPoints();
-        previousCommand = 'Z';
-        command = '';
-        break;
-      }
-      default:
-        return null;
+    if (!applySvgShapeCommand(reader, cursor)) {
+      return undefined;
     }
   }
+  return reader.finish();
+}
 
-  finishSubpath();
-  return subpaths;
+// One command of a curved path. False when the path is not one this reads.
+function applySvgShapeCommand(reader: SvgShapePathReader, cursor: SvgPathCursor): boolean {
+  const relative = reader.command === reader.command.toLowerCase();
+  const letter = reader.command.toUpperCase();
+  switch (letter) {
+    case 'M':
+      return svgShapeMove(reader, cursor, { relative });
+    case 'L':
+    case 'H':
+    case 'V':
+      return svgShapeLines(reader, cursor, { relative, letter });
+    case 'C':
+    case 'S':
+      return svgShapeCubics(reader, cursor, { relative, smooth: letter === 'S' });
+    case 'Q':
+    case 'T':
+      return svgShapeQuadratics(reader, cursor, { relative, smooth: letter === 'T' });
+    case 'A':
+      return svgShapeArcs(reader, cursor, { relative });
+    case 'Z':
+      return reader.close();
+    default:
+      return false;
+  }
+}
+
+function svgShapeTo(
+  reader: SvgShapePathReader,
+  x: number,
+  y: number,
+  { relative }: { relative: boolean },
+): Point {
+  const current = reader.current;
+  return relative ? { x: current.x + x, y: current.y + y } : { x, y };
+}
+
+// A move-to ends the subpath being drawn and starts the next; numbers after it are
+// line-tos.
+function svgShapeMove(
+  reader: SvgShapePathReader,
+  cursor: SvgPathCursor,
+  { relative }: { relative: boolean },
+): boolean {
+  const numbers = cursor.readNumbers(2);
+  if (!numbers) {
+    return false;
+  }
+  reader.moveTo(offsetSvgPoint(reader.current, numbers, { relative }), { relative });
+  return true;
+}
+
+// Line-tos: to a point (L), along x (H), or along y (V).
+function svgShapeLines(
+  reader: SvgShapePathReader,
+  cursor: SvgPathCursor,
+  { relative, letter }: { relative: boolean; letter: 'L' | 'H' | 'V' },
+): boolean {
+  while (cursor.hasNumber()) {
+    const numbers = cursor.readNumbers(letter === 'L' ? 2 : 1);
+    if (!numbers) {
+      return false;
+    }
+    const current = reader.current;
+    const [first = 0] = numbers;
+    const to =
+      letter === 'L'
+        ? offsetSvgPoint(current, numbers, { relative })
+        : letter === 'H'
+          ? { x: relative ? current.x + first : first, y: current.y }
+          : { x: current.x, y: relative ? current.y + first : first };
+    reader.lineTo(to);
+  }
+  reader.forgetControlPoints();
+  reader.recordCommand(letter);
+  return true;
+}
+
+// Cubic curves (C); a smooth one (S) reflects the previous curve's second control
+// point for its first.
+function svgShapeCubics(
+  reader: SvgShapePathReader,
+  cursor: SvgPathCursor,
+  { relative, smooth }: { relative: boolean; smooth: boolean },
+): boolean {
+  while (cursor.hasNumber()) {
+    const numbers = cursor.readNumbers(smooth ? 4 : 6);
+    if (!numbers) {
+      return false;
+    }
+    const current = reader.current;
+    const previous = reader.previousCubicControl;
+    const [x1 = 0, y1 = 0] = numbers;
+    const control1: Point = !smooth
+      ? svgShapeTo(reader, x1, y1, { relative })
+      : previous && ['C', 'S'].includes(reader.previousCommand)
+        ? { x: current.x * 2 - previous.x, y: current.y * 2 - previous.y }
+        : current;
+    const [x2 = 0, y2 = 0, x = 0, y = 0] = smooth ? numbers : numbers.slice(2);
+    const control2 = svgShapeTo(reader, x2, y2, { relative });
+    const to = svgShapeTo(reader, x, y, { relative });
+    reader.cubicTo(to, control1, control2);
+  }
+  reader.recordCommand(smooth ? 'S' : 'C');
+  return true;
+}
+
+// Quadratic curves (Q); a smooth one (T) reflects the previous curve's control point.
+function svgShapeQuadratics(
+  reader: SvgShapePathReader,
+  cursor: SvgPathCursor,
+  { relative, smooth }: { relative: boolean; smooth: boolean },
+): boolean {
+  while (cursor.hasNumber()) {
+    const numbers = cursor.readNumbers(smooth ? 2 : 4);
+    if (!numbers) {
+      return false;
+    }
+    const current = reader.current;
+    const previous = reader.previousQuadraticControl;
+    const [x1 = 0, y1 = 0] = numbers;
+    const control1: Point = !smooth
+      ? svgShapeTo(reader, x1, y1, { relative })
+      : previous && ['Q', 'T'].includes(reader.previousCommand)
+        ? { x: current.x * 2 - previous.x, y: current.y * 2 - previous.y }
+        : current;
+    const [x = 0, y = 0] = smooth ? numbers : numbers.slice(2);
+    const to = svgShapeTo(reader, x, y, { relative });
+    reader.quadraticTo(to, control1);
+  }
+  reader.recordCommand(smooth ? 'T' : 'Q');
+  return true;
+}
+
+// Elliptical arcs, drawn as the cubic curves that approximate them.
+function svgShapeArcs(
+  reader: SvgShapePathReader,
+  cursor: SvgPathCursor,
+  { relative }: { relative: boolean },
+): boolean {
+  while (cursor.hasNumber()) {
+    const numbers = cursor.readNumbers(7);
+    if (!numbers) {
+      return false;
+    }
+    const [rx = 0, ry = 0, rotation = 0, largeArc = 0, sweep = 0, x = 0, y = 0] = numbers;
+    const to = svgShapeTo(reader, x, y, { relative });
+    const arcCommands = svgArcToCubicCurves(
+      reader.current,
+      rx,
+      ry,
+      rotation,
+      { largeArc: largeArc !== 0, sweep: sweep !== 0 },
+      to,
+    );
+    reader.arcTo(arcCommands);
+  }
+  reader.recordCommand('A');
+  return true;
 }
 
 function isAxisAlignedSvgContour(points: Point[]) {
@@ -4598,7 +4690,7 @@ function pointInsidePolygon(point: Point, polygon: Point[]) {
 
 function sortedUniqueSvgValues(values: number[]) {
   return [...new Set(values.map((value) => Math.round(value * 100000) / 100000))].sort(
-    (a, b) => a - b,
+    (left, right) => left - right,
   );
 }
 
@@ -4634,7 +4726,7 @@ function traceSvgBoundary(edges: SvgBoundaryEdge[]) {
 
       edge = (outgoing.get(edge.to) || []).find((candidate) => unused.has(candidate));
       if (!edge) {
-        return null;
+        return undefined;
       }
     }
 
@@ -4660,8 +4752,8 @@ function rotateClosedSvgContour(points: Point[], startIndex: number) {
   return firstPoint ? [...rotated, firstPoint] : [];
 }
 
-function closestSvgLoopPair(source: Point[], targets: Point[][]): SvgLoopPair | null {
-  let best: SvgLoopPair | null = null;
+function closestSvgLoopPair(source: Point[], targets: Point[][]): SvgLoopPair | undefined {
+  let best: SvgLoopPair | undefined = undefined;
 
   for (let sourceIndex = 0; sourceIndex < source.length; sourceIndex += 1) {
     const sourcePoint = source[sourceIndex];
@@ -4689,8 +4781,8 @@ function closestSvgLoopPair(source: Point[], targets: Point[][]): SvgLoopPair | 
   return best;
 }
 
-function closestSvgPointToLoop(point: Point, targets: Point[][]): SvgLoopPoint | null {
-  let best: SvgLoopPoint | null = null;
+function closestSvgPointToLoop(point: Point, targets: Point[][]): SvgLoopPoint | undefined {
+  let best: SvgLoopPoint | undefined = undefined;
 
   for (let targetLoopIndex = 0; targetLoopIndex < targets.length; targetLoopIndex += 1) {
     const target = targets[targetLoopIndex];
@@ -4714,24 +4806,24 @@ function closestSvgPointToLoop(point: Point, targets: Point[][]): SvgLoopPoint |
 
 function connectSvgBoundaryLoops(loops: Point[][]) {
   if (!loops.length) {
-    return null;
+    return undefined;
   }
   if (loops.length === 1) {
     return loops[0];
   }
 
-  const sortedLoops = [...loops].sort((a, b) => {
-    const boundsA = svgContourBounds(a);
-    const boundsB = svgContourBounds(b);
-    return boundsA.minY - boundsB.minY || boundsA.minX - boundsB.minX;
+  const sortedLoops = [...loops].sort((left, right) => {
+    const leftBounds = svgContourBounds(left);
+    const rightBounds = svgContourBounds(right);
+    return leftBounds.minY - rightBounds.minY || leftBounds.minX - rightBounds.minX;
   });
   const [firstLoop, ...restLoops] = sortedLoops;
   if (!firstLoop) {
-    return null;
+    return undefined;
   }
   const firstBridge = closestSvgLoopPair(firstLoop, restLoops);
   if (!firstBridge) {
-    return null;
+    return undefined;
   }
 
   const connected = rotateClosedSvgContour(firstLoop, firstBridge.sourceIndex);
@@ -4747,11 +4839,11 @@ function connectSvgBoundaryLoops(loops: Point[][]) {
 
     const currentPoint = currentLoop[currentIndex];
     if (!currentPoint) {
-      return null;
+      return undefined;
     }
     const nextBridge = closestSvgPointToLoop(currentPoint, restLoops);
     if (!nextBridge) {
-      return null;
+      return undefined;
     }
 
     currentLoop = restLoops[nextBridge.targetLoopIndex];
@@ -4762,45 +4854,79 @@ function connectSvgBoundaryLoops(loops: Point[][]) {
   return connected;
 }
 
-function unionAxisAlignedSvgContours(contours: Point[][]): SvgClipPathOutline | null {
+function unionAxisAlignedSvgContours(contours: Point[][]): SvgClipPathOutline | undefined {
   const xs = sortedUniqueSvgValues(contours.flatMap((contour) => contour.map((point) => point.x)));
   const ys = sortedUniqueSvgValues(contours.flatMap((contour) => contour.map((point) => point.y)));
   if (xs.length < 2 || ys.length < 2) {
-    return null;
+    return undefined;
   }
   if ((xs.length - 1) * (ys.length - 1) > SVG_PARSE_CELL_LIMIT) {
-    return null;
+    return undefined;
   }
 
-  const filled = new Set<string>();
-  const cellKey = (xIndex: number, yIndex: number) => `${xIndex}:${yIndex}`;
-  const isFilled = (xIndex: number, yIndex: number) => filled.has(cellKey(xIndex, yIndex));
+  const filled = filledSvgGridCells(xs, ys, contours);
+  if (!filled?.size) {
+    return undefined;
+  }
+  const edges = svgGridBoundaryEdges(xs, ys, filled);
+  if (!edges) {
+    return undefined;
+  }
+  const loops = traceSvgBoundary(edges);
+  if (!loops) {
+    return undefined;
+  }
 
+  const connectedPoints = connectSvgBoundaryLoops(loops);
+  return connectedPoints ? { points: connectedPoints, loops } : undefined;
+}
+
+const svgGridCellKey = (xIndex: number, yIndex: number) => `${xIndex}:${yIndex}`;
+
+// The cell between grid lines (xIndex, yIndex): its corners, or undefined when a
+// line is missing.
+function svgGridCell(xs: number[], ys: number[], xIndex: number, yIndex: number) {
+  const xStart = xs[xIndex];
+  const xEnd = xs[xIndex + 1];
+  const yStart = ys[yIndex];
+  const yEnd = ys[yIndex + 1];
+  if (xStart === undefined || xEnd === undefined || yStart === undefined || yEnd === undefined) {
+    return undefined;
+  }
+  return { xStart, xEnd, yStart, yEnd };
+}
+
+// The grid cells (by key) whose centres fall inside any of the contours. Undefined
+// when the grid is malformed.
+function filledSvgGridCells(
+  xs: number[],
+  ys: number[],
+  contours: Point[][],
+): Set<string> | undefined {
+  const filled = new Set<string>();
   for (let xIndex = 0; xIndex < xs.length - 1; xIndex += 1) {
     for (let yIndex = 0; yIndex < ys.length - 1; yIndex += 1) {
-      const xStart = xs[xIndex];
-      const xEnd = xs[xIndex + 1];
-      const yStart = ys[yIndex];
-      const yEnd = ys[yIndex + 1];
-      if (
-        xStart === undefined ||
-        xEnd === undefined ||
-        yStart === undefined ||
-        yEnd === undefined
-      ) {
-        return null;
+      const cell = svgGridCell(xs, ys, xIndex, yIndex);
+      if (!cell) {
+        return undefined;
       }
-      const center = { x: (xStart + xEnd) / 2, y: (yStart + yEnd) / 2 };
+      const center = { x: (cell.xStart + cell.xEnd) / 2, y: (cell.yStart + cell.yEnd) / 2 };
       if (contours.some((contour) => pointInsidePolygon(center, contour))) {
-        filled.add(cellKey(xIndex, yIndex));
+        filled.add(svgGridCellKey(xIndex, yIndex));
       }
     }
   }
+  return filled;
+}
 
-  if (!filled.size) {
-    return null;
-  }
-
+// The outline of the filled cells: every cell side that has no filled neighbour
+// across it, oriented clockwise. Undefined when the grid is malformed.
+function svgGridBoundaryEdges(
+  xs: number[],
+  ys: number[],
+  filled: Set<string>,
+): SvgBoundaryEdge[] | undefined {
+  const isFilled = (xIndex: number, yIndex: number) => filled.has(svgGridCellKey(xIndex, yIndex));
   const edges: SvgBoundaryEdge[] = [];
   const addEdge = (fromPoint: Point, toPoint: Point) => {
     edges.push({
@@ -4816,23 +4942,14 @@ function unionAxisAlignedSvgContours(contours: Point[][]): SvgClipPathOutline | 
       if (!isFilled(xIndex, yIndex)) {
         continue;
       }
-
-      const xStart = xs[xIndex];
-      const xEnd = xs[xIndex + 1];
-      const yStart = ys[yIndex];
-      const yEnd = ys[yIndex + 1];
-      if (
-        xStart === undefined ||
-        xEnd === undefined ||
-        yStart === undefined ||
-        yEnd === undefined
-      ) {
-        return null;
+      const cell = svgGridCell(xs, ys, xIndex, yIndex);
+      if (!cell) {
+        return undefined;
       }
-      const topLeft = { x: xStart, y: yStart };
-      const topRight = { x: xEnd, y: yStart };
-      const bottomRight = { x: xEnd, y: yEnd };
-      const bottomLeft = { x: xStart, y: yEnd };
+      const topLeft = { x: cell.xStart, y: cell.yStart };
+      const topRight = { x: cell.xEnd, y: cell.yStart };
+      const bottomRight = { x: cell.xEnd, y: cell.yEnd };
+      const bottomLeft = { x: cell.xStart, y: cell.yEnd };
 
       if (!isFilled(xIndex, yIndex - 1)) {
         addEdge(topLeft, topRight);
@@ -4848,14 +4965,7 @@ function unionAxisAlignedSvgContours(contours: Point[][]): SvgClipPathOutline | 
       }
     }
   }
-
-  const loops = traceSvgBoundary(edges);
-  if (!loops) {
-    return null;
-  }
-
-  const connectedPoints = connectSvgBoundaryLoops(loops);
-  return connectedPoints ? { points: connectedPoints, loops } : null;
+  return edges;
 }
 
 function parseSvgElementContour(element: Element) {
@@ -4864,15 +4974,15 @@ function parseSvgElementContour(element: Element) {
     return parseSvgRect(element);
   }
   if (tagName === 'polygon') {
-    return parseSvgPoints(element.getAttribute('points'));
+    return parseSvgPoints(svgAttribute(element, 'points'));
   }
   if (tagName === 'polyline') {
-    return parseClosedSvgPolyline(element.getAttribute('points'));
+    return parseClosedSvgPolyline(svgAttribute(element, 'points'));
   }
   if (tagName === 'path') {
     return parseSimpleSvgPath(element);
   }
-  return null;
+  return undefined;
 }
 
 function parseSvgElementShape(element: Element) {
@@ -4895,7 +5005,7 @@ function parseSvgElementShape(element: Element) {
   if (tagName === 'path') {
     return parseSvgPathShape(element);
   }
-  return null;
+  return undefined;
 }
 
 function svgShapeFillRule(
@@ -4918,31 +5028,31 @@ function normalizeSvgContourToPercent(points: Point[], viewBox: SvgViewBox) {
   return normalized.every((point) => Number.isFinite(point.x) && Number.isFinite(point.y)) &&
     normalized.length >= 3
     ? normalized
-    : null;
+    : undefined;
 }
 
 function parseSvgDocument(value: string) {
   const markup = extractSvgMarkup(value);
   if (!markup || typeof DOMParser === 'undefined') {
-    return null;
+    return undefined;
   }
 
   const document = new DOMParser().parseFromString(markup, 'image/svg+xml');
   if (document.querySelector('parsererror')) {
-    return null;
+    return undefined;
   }
 
   const svg =
     svgTagName(document.documentElement) === 'svg'
       ? document.documentElement
       : document.querySelector('svg');
-  return svg ? { document, svg } : null;
+  return svg ? { document, svg } : undefined;
 }
 
-function parseSvgClipPathOutline(value: string): SvgClipPathOutline | null {
+function parseSvgClipPathOutline(value: string): SvgClipPathOutline | undefined {
   const parsedDocument = parseSvgDocument(value);
   if (!parsedDocument) {
-    return null;
+    return undefined;
   }
   const { svg } = parsedDocument;
 
@@ -4951,7 +5061,7 @@ function parseSvgClipPathOutline(value: string): SvgClipPathOutline | null {
     (element) => !isInsideSkippedSvgElement(element) && isRenderableSvgElement(element),
   );
   if (unsupportedElements.length) {
-    return null;
+    return undefined;
   }
 
   const contours: Point[][] = [];
@@ -4960,12 +5070,12 @@ function parseSvgClipPathOutline(value: string): SvgClipPathOutline | null {
       continue;
     }
     if (hasSvgTransform(element)) {
-      return null;
+      return undefined;
     }
 
     const contour = parseSvgElementContour(element);
-    if (contour === null) {
-      return null;
+    if (contour === undefined) {
+      return undefined;
     }
     if (contour.length >= 3) {
       contours.push(simplifySvgContour(contour));
@@ -4973,41 +5083,41 @@ function parseSvgClipPathOutline(value: string): SvgClipPathOutline | null {
   }
 
   if (!contours.length) {
-    return null;
+    return undefined;
   }
 
   const outline =
     contours.length === 1
       ? contours[0]
         ? { points: contours[0], loops: [contours[0]] }
-        : null
+        : undefined
       : contours.every(isAxisAlignedSvgContour)
         ? unionAxisAlignedSvgContours(contours)
-        : null;
+        : undefined;
   if (!outline?.points.length) {
-    return null;
+    return undefined;
   }
 
   const viewBox = parseSvgViewBox(svg, contours);
   if (!viewBox) {
-    return null;
+    return undefined;
   }
 
   const points = normalizeSvgContourToPercent(outline.points, viewBox);
   const loops = outline.loops
     .map((loop) => normalizeSvgContourToPercent(loop, viewBox))
     .filter((loop): loop is Point[] => Boolean(loop?.length));
-  return points && loops.length ? { points, loops } : null;
+  return points && loops.length ? { points, loops } : undefined;
 }
 
 function parseSvgClipPathShape(
   value: string,
   fitMode: ShapeFitMode = 'stretch',
   options: ShapeScaleOptions = DEFAULT_SHAPE_SCALE_OPTIONS,
-): ShapeFunctionShape | null {
+): ShapeFunctionShape | undefined {
   const parsedDocument = parseSvgDocument(value);
   if (!parsedDocument) {
-    return null;
+    return undefined;
   }
   const { svg } = parsedDocument;
 
@@ -5018,7 +5128,7 @@ function parseSvgClipPathShape(
     (element) => !isInsideSkippedSvgElement(element) && isRenderableSvgElement(element),
   );
   if (unsupportedElements.length) {
-    return null;
+    return undefined;
   }
 
   const renderedElements: Element[] = [];
@@ -5028,12 +5138,12 @@ function parseSvgClipPathShape(
       continue;
     }
     if (hasSvgTransform(element)) {
-      return null;
+      return undefined;
     }
 
     const elementSubpaths = parseSvgElementShape(element);
-    if (elementSubpaths === null) {
-      return null;
+    if (elementSubpaths === undefined) {
+      return undefined;
     }
     if (elementSubpaths.length) {
       renderedElements.push(element);
@@ -5042,10 +5152,10 @@ function parseSvgClipPathShape(
   }
 
   const viewBox = parseSvgViewBox(svg, [svgShapeSubpathPoints(subpaths)]);
-  const viewBoxBounds = viewBox ? svgShapeBoundsFromViewBox(viewBox) : null;
+  const viewBoxBounds = viewBox ? svgShapeBoundsFromViewBox(viewBox) : undefined;
   const fitted = fitShapeSubpathsToPercentBox(subpaths, viewBoxBounds);
   if (!fitted) {
-    return null;
+    return undefined;
   }
 
   const fillRule = svgShapeFillRule(svg, renderedElements);
@@ -5058,22 +5168,22 @@ function parseSvgClipPathShape(
           ...(fillRule ? { fillRule } : {}),
           pathData: formatPathDataFromSubpaths(fitted),
         }
-      : null;
+      : undefined;
   }
 
   return shapeFromSvgSubpaths(fitted, fillRule);
 }
 
-function parseSvgClipPathPolygon(value: string): PolygonShape | null {
+function parseSvgClipPathPolygon(value: string): PolygonShape | undefined {
   const outline = parseSvgClipPathOutline(value);
-  return outline ? { kind: 'polygon', points: outline.points } : null;
+  return outline ? { kind: 'polygon', points: outline.points } : undefined;
 }
 
-function isNoneClipPathValue(value: string | null | undefined) {
+function isNoneClipPathValue(value: string | undefined) {
   return !value || value.trim().toLowerCase() === 'none';
 }
 
-function normalizeClipPathValue(value: string | null | undefined) {
+function normalizeClipPathValue(value: string | undefined) {
   if (isNoneClipPathValue(value)) {
     return { shape: NONE_SHAPE, css: 'none' };
   }
@@ -5092,121 +5202,141 @@ function shortcutShapeKind(shape: ClipShape) {
   return shape.editable?.kind || 'raw';
 }
 
+// The shortcuts that hold for every shape.
+const GENERAL_SHORTCUTS: ShortcutHelpGroup = {
+  title: 'General',
+  items: [
+    { keys: 'Arrow keys', description: 'Move the selected handle by 1%.' },
+    { keys: 'Space + Arrow keys', description: 'Move by 10% instead of 1%.' },
+    { keys: 'Cmd/Ctrl + Z', description: 'Undo the last change.' },
+    { keys: 'Cmd/Ctrl + Shift + Z', description: 'Redo the last change.' },
+    { keys: 'Paste SVG', description: 'Paste an SVG to build a shape.' },
+  ],
+};
+
+const POLYGON_SHORTCUTS: ShortcutHelpGroup[] = [
+  {
+    title: 'Polygon',
+    items: [
+      { keys: 'Drag to select', description: 'Drag to select over multiple points.' },
+      { keys: 'Shift + click point', description: 'Select multiple points.' },
+      {
+        keys: 'Option/Alt + drag point',
+        description: 'Duplicate a point by dragging it while holding option/alt.',
+      },
+      { keys: 'Delete / Backspace', description: 'Delete selected points (3 must remain).' },
+      { keys: 'Cmd/Ctrl + D', description: 'Duplicate the selected point.' },
+    ],
+  },
+];
+
+const CIRCLE_SHORTCUTS: ShortcutHelpGroup[] = [
+  { title: 'Center', items: [{ keys: 'drag/arrow keys', description: 'Move the center.' }] },
+  { title: 'Radius', items: [{ keys: 'drag/arrow keys', description: 'Resize the radius.' }] },
+];
+
+const ELLIPSE_SHORTCUTS: ShortcutHelpGroup[] = [
+  { title: 'Center', items: [{ keys: 'drag/arrow keys', description: 'Move the center.' }] },
+  {
+    title: 'Radius',
+    items: [
+      { keys: 'drag/arrow keys', description: 'Resize the selected radius.' },
+      {
+        keys: 'Shift + drag/arrow keys',
+        description: 'Scale both radii, keeping the aspect ratio.',
+      },
+    ],
+  },
+];
+
+const INSET_SHORTCUTS: ShortcutHelpGroup[] = [
+  {
+    title: 'Sides',
+    items: [
+      { keys: 'drag/arrow keys', description: 'Adjust the selected side.' },
+      {
+        keys: 'Option/Alt + drag/arrow keys',
+        description: 'Adjust this side and its opposite side together.',
+      },
+      { keys: 'Shift + drag/arrow keys', description: 'Adjust all sides together.' },
+    ],
+  },
+  {
+    title: 'Corners',
+    items: [
+      { keys: 'drag/arrow keys', description: 'Round the selected corner.' },
+      {
+        keys: 'Option/Alt + drag/arrow keys',
+        description: 'Round this corner and its opposite together.',
+      },
+      { keys: 'Shift + drag/arrow keys', description: 'Match all corners to this one.' },
+      {
+        keys: 'U + drag/arrow keys',
+        description: 'Set horizontal and vertical radius separately.',
+      },
+    ],
+  },
+];
+
+const SCALED_SHAPE_SHORTCUTS: ShortcutHelpGroup[] = [
+  {
+    title: 'Shape',
+    items: [
+      { keys: 'Drag/arrow keys', description: 'Move the shape.' },
+      { keys: 'Drag corner', description: 'Resize toward the opposite corner.' },
+      { keys: 'Option/Alt + drag corner', description: 'Resize from the center.' },
+    ],
+  },
+];
+
+const STRETCHED_SHAPE_SHORTCUTS: ShortcutHelpGroup[] = [
+  {
+    title: 'Shape',
+    items: [{ keys: 'Stretch mode', description: 'Switch to Scale to move or resize.' }],
+  },
+];
+
+const NONE_SHORTCUTS: ShortcutHelpGroup[] = [
+  {
+    title: 'None',
+    items: [
+      { keys: 'Paste SVG', description: 'Paste an SVG to build a shape.' },
+      { keys: 'Dropdown', description: 'Pick a preset to start editing.' },
+    ],
+  },
+];
+
+const CUSTOM_SHORTCUTS: ShortcutHelpGroup[] = [
+  {
+    title: 'Custom',
+    items: [
+      { keys: 'Code editor', description: 'Edit the raw clip-path value.' },
+      { keys: 'Paste SVG', description: 'Paste an SVG to make it editable.' },
+    ],
+  },
+];
+
+// The shortcut help by the kind of shape being edited; anything else is custom.
+const SHORTCUTS_BY_KIND: Partial<Record<string, ShortcutHelpGroup[]>> = {
+  polygon: POLYGON_SHORTCUTS,
+  circle: CIRCLE_SHORTCUTS,
+  ellipse: ELLIPSE_SHORTCUTS,
+  inset: INSET_SHORTCUTS,
+  none: NONE_SHORTCUTS,
+};
+
+// The shortcut help for the shape being edited, then the general shortcuts.
 function clipPathShortcutGroups(shape: ClipShape, shapeFitMode: ShapeFitMode): ShortcutHelpGroup[] {
   const kind = shortcutShapeKind(shape);
-  const general: ShortcutHelpGroup = {
-    title: 'General',
-    items: [
-      { keys: 'Arrow keys', description: 'Move the selected handle by 1%.' },
-      { keys: 'Space + Arrow keys', description: 'Move by 10% instead of 1%.' },
-      { keys: 'Cmd/Ctrl + Z', description: 'Undo the last change.' },
-      { keys: 'Cmd/Ctrl + Shift + Z', description: 'Redo the last change.' },
-      { keys: 'Paste SVG', description: 'Paste an SVG to build a shape.' },
-    ],
-  };
-  const groups: ShortcutHelpGroup[] = [];
-
-  if (kind === 'polygon') {
-    groups.push({
-      title: 'Polygon',
-      items: [
-        { keys: 'Drag to select', description: 'Drag to select over multiple points.' },
-        { keys: 'Shift + click point', description: 'Select multiple points.' },
-        {
-          keys: 'Option/Alt + drag point',
-          description: 'Duplicate a point by dragging it while holding option/alt.',
-        },
-        { keys: 'Delete / Backspace', description: 'Delete selected points (3 must remain).' },
-        { keys: 'Cmd/Ctrl + D', description: 'Duplicate the selected point.' },
-      ],
-    });
-  } else if (kind === 'circle') {
-    groups.push({
-      title: 'Center',
-      items: [{ keys: 'drag/arrow keys', description: 'Move the center.' }],
-    });
-    groups.push({
-      title: 'Radius',
-      items: [{ keys: 'drag/arrow keys', description: 'Resize the radius.' }],
-    });
-  } else if (kind === 'ellipse') {
-    groups.push({
-      title: 'Center',
-      items: [{ keys: 'drag/arrow keys', description: 'Move the center.' }],
-    });
-    groups.push({
-      title: 'Radius',
-      items: [
-        { keys: 'drag/arrow keys', description: 'Resize the selected radius.' },
-        {
-          keys: 'Shift + drag/arrow keys',
-          description: 'Scale both radii, keeping the aspect ratio.',
-        },
-      ],
-    });
-  } else if (kind === 'inset') {
-    groups.push({
-      title: 'Sides',
-      items: [
-        { keys: 'drag/arrow keys', description: 'Adjust the selected side.' },
-        {
-          keys: 'Option/Alt + drag/arrow keys',
-          description: 'Adjust this side and its opposite side together.',
-        },
-        { keys: 'Shift + drag/arrow keys', description: 'Adjust all sides together.' },
-      ],
-    });
-    groups.push({
-      title: 'Corners',
-      items: [
-        { keys: 'drag/arrow keys', description: 'Round the selected corner.' },
-        {
-          keys: 'Option/Alt + drag/arrow keys',
-          description: 'Round this corner and its opposite together.',
-        },
-        { keys: 'Shift + drag/arrow keys', description: 'Match all corners to this one.' },
-        {
-          keys: 'U + drag/arrow keys',
-          description: 'Set horizontal and vertical radius separately.',
-        },
-      ],
-    });
-  } else if (kind === 'shape') {
-    groups.push({
-      title: 'Shape',
-      items:
-        shapeFitMode === 'contain'
-          ? [
-              { keys: 'Drag/arrow keys', description: 'Move the shape.' },
-              { keys: 'Drag corner', description: 'Resize toward the opposite corner.' },
-              { keys: 'Option/Alt + drag corner', description: 'Resize from the center.' },
-            ]
-          : [{ keys: 'Stretch mode', description: 'Switch to Scale to move or resize.' }],
-    });
-  } else if (kind === 'none') {
-    groups.push({
-      title: 'None',
-      items: [
-        { keys: 'Paste SVG', description: 'Paste an SVG to build a shape.' },
-        { keys: 'Dropdown', description: 'Pick a preset to start editing.' },
-      ],
-    });
-  } else {
-    groups.push({
-      title: 'Custom',
-      items: [
-        { keys: 'Code editor', description: 'Edit the raw clip-path value.' },
-        { keys: 'Paste SVG', description: 'Paste an SVG to make it editable.' },
-      ],
-    });
+  if (kind === 'shape') {
+    const shapeGroups =
+      shapeFitMode === 'contain' ? SCALED_SHAPE_SHORTCUTS : STRETCHED_SHAPE_SHORTCUTS;
+    return [...shapeGroups, GENERAL_SHORTCUTS];
   }
-
-  groups.push(general);
-
-  return groups;
+  return [...(SHORTCUTS_BY_KIND[kind] ?? CUSTOM_SHORTCUTS), GENERAL_SHORTCUTS];
 }
 
-function matchPreset(shape: ClipShape): string | null {
+function matchPreset(shape: ClipShape): string | undefined {
   if (shape.kind === 'polygon') {
     return 'Polygon';
   }
@@ -5223,7 +5353,7 @@ function matchPreset(shape: ClipShape): string | null {
     return 'Shape';
   }
   if (shape.kind === 'raw') {
-    return shape.preset || null;
+    return shape.preset || undefined;
   }
 
   for (const [name, preset] of Object.entries(PRESETS)) {
@@ -5231,7 +5361,7 @@ function matchPreset(shape: ClipShape): string | null {
       return name;
     }
   }
-  return null;
+  return undefined;
 }
 
 function presetOptionId(name: string) {
@@ -5269,8 +5399,8 @@ function cssUnitValueToken(value: CssUnitValue) {
   return formatCssUnitValue(value);
 }
 
-function cssUnitCalcToken(a: CssUnitValue, operator: '+' | '-', b: CssUnitValue) {
-  return `calc(${cssUnitValueToken(a)} ${operator} ${cssUnitValueToken(b)})`;
+function cssUnitCalculationToken(left: CssUnitValue, operator: '+' | '-', right: CssUnitValue) {
+  return `calc(${cssUnitValueToken(left)} ${operator} ${cssUnitValueToken(right)})`;
 }
 
 function insetBox(shape: InsetShape) {
@@ -5312,7 +5442,7 @@ function cssCoordinateExpressionToCanvasPercent(
   const rect = canvas.getBoundingClientRect();
   const axisSize = axis === 'x' ? rect.width : rect.height;
   if (axisSize <= 0 || typeof document === 'undefined') {
-    return null;
+    return undefined;
   }
 
   const probe = document.createElement('div');
@@ -5341,7 +5471,7 @@ function cssCoordinateExpressionToCanvasPercent(
 
   const offset = axis === 'x' ? probeRect.left - rect.left : probeRect.top - rect.top;
   if (!Number.isFinite(offset)) {
-    return null;
+    return undefined;
   }
   return (offset / axisSize) * 100;
 }
@@ -5359,11 +5489,11 @@ function cssCoordinateValueToCanvasPercent(
 function partialCssCoordinatePointToCanvasPoint(
   point: CssCoordinatePoint,
   canvas: HTMLElement,
-): Point | null {
+): Point | undefined {
   const x = cssCoordinateValueToCanvasPercent(point.x, 'x', canvas);
   const y = cssCoordinateValueToCanvasPercent(point.y, 'y', canvas);
-  if (x === null && y === null) {
-    return null;
+  if (x === undefined && y === undefined) {
+    return undefined;
   }
   return {
     x: x ?? 0,
@@ -5390,10 +5520,10 @@ function rawEditableHandlePoint(
   editable: RawEditableClipPath,
   handle: HandleTarget,
   canvas: HTMLElement,
-): Point | null {
+): Point | undefined {
   if (handle.kind === 'polygon-point' && editable.kind === 'polygon') {
     const point = editable.points[handle.index];
-    return point ? partialCssCoordinatePointToCanvasPoint(point, canvas) : null;
+    return point ? partialCssCoordinatePointToCanvasPoint(point, canvas) : undefined;
   }
 
   if (editable.kind === 'circle') {
@@ -5439,9 +5569,17 @@ function rawEditableHandlePoint(
   }
 
   if (editable.kind !== 'inset') {
-    return null;
+    return undefined;
   }
+  return rawInsetHandlePoint(editable, handle, canvas);
+}
 
+// Where a raw inset's edge or corner-radius handle sits on the canvas.
+function rawInsetHandlePoint(
+  editable: Extract<RawEditableClipPath, { kind: 'inset' }>,
+  handle: HandleTarget,
+  canvas: HTMLElement,
+): Point | undefined {
   const box = rawInsetBox(editable, canvas);
   if (handle.kind === 'inset-top') {
     return { x: box.x0 + box.width / 2, y: box.y0 };
@@ -5463,7 +5601,7 @@ function rawEditableHandlePoint(
     const horizontalRadius = horizontal[index];
     const verticalRadius = vertical[index];
     if (!horizontalRadius || !verticalRadius) {
-      return null;
+      return undefined;
     }
     const radiusX = cssUnitValueToCanvasPercent(horizontalRadius, 'x', canvas);
     const radiusY = cssUnitValueToCanvasPercent(verticalRadius, 'y', canvas);
@@ -5479,13 +5617,13 @@ function rawEditableHandlePoint(
     return { x: box.x0 + radiusX, y: box.y1 - radiusY };
   }
 
-  return null;
+  return undefined;
 }
 
 function rawEditableHandleCssPoint(
   editable: RawEditableClipPath,
   handle: HandleTarget,
-): { x: string; y: string } | null {
+): { x: string; y: string } | undefined {
   if (handle.kind === 'polygon-point' && editable.kind === 'polygon') {
     const point = editable.points[handle.index];
     return point
@@ -5493,7 +5631,7 @@ function rawEditableHandleCssPoint(
           x: formatCssCoordinateValueForPreview(point.x),
           y: formatCssCoordinateValueForPreview(point.y),
         }
-      : null;
+      : undefined;
   }
 
   if (editable.kind === 'circle') {
@@ -5502,7 +5640,7 @@ function rawEditableHandleCssPoint(
     }
     if (handle.kind === 'circle-radius') {
       return {
-        x: cssUnitCalcToken(editable.cx, '+', editable.radius),
+        x: cssUnitCalculationToken(editable.cx, '+', editable.radius),
         y: cssUnitValueToken(editable.cy),
       };
     }
@@ -5514,22 +5652,29 @@ function rawEditableHandleCssPoint(
     }
     if (handle.kind === 'ellipse-rx') {
       return {
-        x: cssUnitCalcToken(editable.cx, '+', editable.rx),
+        x: cssUnitCalculationToken(editable.cx, '+', editable.rx),
         y: cssUnitValueToken(editable.cy),
       };
     }
     if (handle.kind === 'ellipse-ry') {
       return {
         x: cssUnitValueToken(editable.cx),
-        y: cssUnitCalcToken(editable.cy, '+', editable.ry),
+        y: cssUnitCalculationToken(editable.cy, '+', editable.ry),
       };
     }
   }
 
   if (editable.kind !== 'inset') {
-    return null;
+    return undefined;
   }
+  return rawInsetHandleCssPoint(editable, handle);
+}
 
+// Where a raw inset's edge or corner-radius handle sits, as CSS the preview resolves.
+function rawInsetHandleCssPoint(
+  editable: Extract<RawEditableClipPath, { kind: 'inset' }>,
+  handle: HandleTarget,
+): { x: string; y: string } | undefined {
   const left = cssUnitValueToken(editable.left);
   const top = cssUnitValueToken(editable.top);
   const right = `calc(100% - ${cssUnitValueToken(editable.right)})`;
@@ -5554,18 +5699,18 @@ function rawEditableHandleCssPoint(
     const radiusX = horizontal[index];
     const radiusY = vertical[index];
     if (!radiusX || !radiusY) {
-      return null;
+      return undefined;
     }
     if (handle.corner === 'topLeft') {
       return {
-        x: cssUnitCalcToken(editable.left, '+', radiusX),
-        y: cssUnitCalcToken(editable.top, '+', radiusY),
+        x: cssUnitCalculationToken(editable.left, '+', radiusX),
+        y: cssUnitCalculationToken(editable.top, '+', radiusY),
       };
     }
     if (handle.corner === 'topRight') {
       return {
         x: `calc(100% - ${cssUnitValueToken(editable.right)} - ${cssUnitValueToken(radiusX)})`,
-        y: cssUnitCalcToken(editable.top, '+', radiusY),
+        y: cssUnitCalculationToken(editable.top, '+', radiusY),
       };
     }
     if (handle.corner === 'bottomRight') {
@@ -5575,12 +5720,12 @@ function rawEditableHandleCssPoint(
       };
     }
     return {
-      x: cssUnitCalcToken(editable.left, '+', radiusX),
+      x: cssUnitCalculationToken(editable.left, '+', radiusX),
       y: `calc(100% - ${cssUnitValueToken(editable.bottom)} - ${cssUnitValueToken(radiusY)})`,
     };
   }
 
-  return null;
+  return undefined;
 }
 
 const MEDIUM_BREAKPOINT_ICON_PATH =
@@ -5660,343 +5805,445 @@ function PresetIcon({ shape }: { shape: ClipShape }) {
       aria-hidden="true"
     >
       {shape.kind === 'polygon' ? (
-        <polygon points={shape.points.map((p) => `${p.x},${p.y}`).join(' ')} />
-      ) : null}
-      {shape.kind === 'circle' ? <circle cx={shape.cx} cy={shape.cy} r={shape.radius} /> : null}
+        <polygon points={shape.points.map((point) => `${point.x},${point.y}`).join(' ')} />
+      ) : undefined}
+      {shape.kind === 'circle' ? (
+        <circle cx={shape.cx} cy={shape.cy} r={shape.radius} />
+      ) : undefined}
       {shape.kind === 'ellipse' ? (
         <ellipse cx={shape.cx} cy={shape.cy} rx={shape.rx} ry={shape.ry} />
-      ) : null}
+      ) : undefined}
       {shape.kind === 'inset' ? (
         <rect x="0" y="0" width="100" height="100" rx={insetIconRadius} ry={insetIconRadius} />
-      ) : null}
+      ) : undefined}
       {shape.kind === 'shape' ? (
         <path d={shape.pathData || DEFAULT_SHAPE_PATH_DATA} fillRule={shape.fillRule} />
-      ) : null}
+      ) : undefined}
       {shape.kind === 'raw' ? (
         <path d="M16 70C16 42 34 24 56 28C82 32 84 56 62 58C44 60 42 80 62 84C78 88 92 78 92 58" />
-      ) : null}
+      ) : undefined}
     </svg>
   );
 }
+
+// How a drag bends a shape: which sides and corners move together, whether the
+// radii stay round, whether an ellipse keeps its proportions, and the canvas the
+// raw CSS units are measured against.
+type ShapeDragOptions = {
+  insetSideMode?: InsetSideMode;
+  insetRadiusMode?: InsetRadiusMode;
+  insetRadiusUnlocked?: boolean;
+  ellipseScaleProportional?: boolean;
+  canvas?: HTMLElement | undefined;
+};
+type RawEditable<Kind extends RawEditableClipPath['kind']> = Extract<
+  RawEditableClipPath,
+  { kind: Kind }
+>;
 
 function updateShapeForDrag(
   shape: ClipShape,
   target: DragTarget,
   x: number,
   y: number,
-  options: {
-    insetSideMode?: InsetSideMode;
-    insetRadiusMode?: InsetRadiusMode;
-    insetRadiusUnlocked?: boolean;
-    ellipseScaleProportional?: boolean;
-    canvas?: HTMLElement | null;
-  } = {},
+  options: ShapeDragOptions = {},
 ): ClipShape {
   if (shape.kind === 'none') {
     return shape;
   }
-
   if (shape.kind === 'raw' && shape.editable && options.canvas) {
-    const canvas = options.canvas;
-
-    if (target.kind === 'polygon-point' && shape.editable.kind === 'polygon') {
-      const selectedIndexes = new Set(
-        target.polygonPointIndexes?.length ? target.polygonPointIndexes : [target.index],
-      );
-      const beforeEditable =
-        target.before.kind === 'raw' && target.before.editable?.kind === 'polygon'
-          ? target.before.editable
-          : shape.editable;
-      const beforePoint = beforeEditable.points[target.index];
-      if (!beforePoint) {
-        return shape;
-      }
-      if (!isCssUnitValue(beforePoint.x) && !isCssUnitValue(beforePoint.y)) {
-        return shape;
-      }
-      const beforeCanvasPoint = {
-        x: isCssUnitValue(beforePoint.x)
-          ? cssUnitValueToCanvasPercent(beforePoint.x, 'x', canvas)
-          : x,
-        y: isCssUnitValue(beforePoint.y)
-          ? cssUnitValueToCanvasPercent(beforePoint.y, 'y', canvas)
-          : y,
-      };
-      const dx = isCssUnitValue(beforePoint.x) ? x - beforeCanvasPoint.x : 0;
-      const dy = isCssUnitValue(beforePoint.y) ? y - beforeCanvasPoint.y : 0;
-      const nextEditable: RawEditableClipPath = {
-        ...shape.editable,
-        points: shape.editable.points.map((point, index) => {
-          if (!selectedIndexes.has(index)) {
-            return point;
-          }
-          const beforeSelected = beforeEditable.points[index] || point;
-          const beforeSelectedCanvas = {
-            x: isCssUnitValue(beforeSelected.x)
-              ? cssUnitValueToCanvasPercent(beforeSelected.x, 'x', canvas)
-              : 0,
-            y: isCssUnitValue(beforeSelected.y)
-              ? cssUnitValueToCanvasPercent(beforeSelected.y, 'y', canvas)
-              : 0,
-          };
-          return {
-            x:
-              isCssUnitValue(point.x) && isCssUnitValue(beforeSelected.x)
-                ? canvasPercentToCssUnitValue(
-                    beforeSelectedCanvas.x + dx,
-                    'x',
-                    point.x.unit,
-                    canvas,
-                  )
-                : point.x,
-            y:
-              isCssUnitValue(point.y) && isCssUnitValue(beforeSelected.y)
-                ? canvasPercentToCssUnitValue(
-                    beforeSelectedCanvas.y + dy,
-                    'y',
-                    point.y.unit,
-                    canvas,
-                  )
-                : point.y,
-          };
-        }),
-      };
-      return { ...shape, editable: nextEditable, value: formatRawEditableClipPath(nextEditable) };
-    }
-
-    if (shape.editable.kind === 'circle') {
-      const editable = shape.editable;
-      if (target.kind === 'circle-center') {
-        const nextEditable: RawEditableClipPath = {
-          ...editable,
-          cx: canvasPercentToCssUnitValue(x, 'x', editable.cx.unit, canvas),
-          cy: canvasPercentToCssUnitValue(y, 'y', editable.cy.unit, canvas),
-        };
-        return { ...shape, editable: nextEditable, value: formatRawEditableClipPath(nextEditable) };
-      }
-
-      if (target.kind === 'circle-radius') {
-        const center = {
-          x: cssUnitValueToCanvasPercent(editable.cx, 'x', canvas),
-          y: cssUnitValueToCanvasPercent(editable.cy, 'y', canvas),
-        };
-        const rect = canvas.getBoundingClientRect();
-        const distancePx = Math.hypot(
-          ((x - center.x) / 100) * rect.width,
-          ((y - center.y) / 100) * rect.height,
-        );
-        const unitPx = cssUnitPx(editable.radius.unit, 'x', canvas);
-        const nextEditable: RawEditableClipPath = {
-          ...editable,
-          radius: {
-            value: unitPx > 0 ? distancePx / unitPx : editable.radius.value,
-            unit: editable.radius.unit,
-          },
-        };
-        return { ...shape, editable: nextEditable, value: formatRawEditableClipPath(nextEditable) };
-      }
-    }
-
-    if (shape.editable.kind === 'ellipse') {
-      const editable = shape.editable;
-      if (target.kind === 'ellipse-center') {
-        const nextEditable: RawEditableClipPath = {
-          ...editable,
-          cx: canvasPercentToCssUnitValue(x, 'x', editable.cx.unit, canvas),
-          cy: canvasPercentToCssUnitValue(y, 'y', editable.cy.unit, canvas),
-        };
-        return { ...shape, editable: nextEditable, value: formatRawEditableClipPath(nextEditable) };
-      }
-
-      if (target.kind === 'ellipse-rx') {
-        const centerX = cssUnitValueToCanvasPercent(editable.cx, 'x', canvas);
-        const nextRxPercent = Math.abs(x - centerX);
-        const nextEditable: RawEditableClipPath = {
-          ...editable,
-          rx: canvasPercentToCssUnitValue(nextRxPercent, 'x', editable.rx.unit, canvas),
-        };
-        if (options.ellipseScaleProportional) {
-          const currentRxPercent = cssUnitValueToCanvasPercent(editable.rx, 'x', canvas);
-          if (currentRxPercent > 0) {
-            const scale = nextRxPercent / currentRxPercent;
-            nextEditable.ry = {
-              value: Math.max(0, editable.ry.value * scale),
-              unit: editable.ry.unit,
-            };
-          }
-        }
-        return { ...shape, editable: nextEditable, value: formatRawEditableClipPath(nextEditable) };
-      }
-
-      if (target.kind === 'ellipse-ry') {
-        const centerY = cssUnitValueToCanvasPercent(editable.cy, 'y', canvas);
-        const nextRyPercent = Math.abs(y - centerY);
-        const nextEditable: RawEditableClipPath = {
-          ...editable,
-          ry: canvasPercentToCssUnitValue(nextRyPercent, 'y', editable.ry.unit, canvas),
-        };
-        if (options.ellipseScaleProportional) {
-          const currentRyPercent = cssUnitValueToCanvasPercent(editable.ry, 'y', canvas);
-          if (currentRyPercent > 0) {
-            const scale = nextRyPercent / currentRyPercent;
-            nextEditable.rx = {
-              value: Math.max(0, editable.rx.value * scale),
-              unit: editable.rx.unit,
-            };
-          }
-        }
-        return { ...shape, editable: nextEditable, value: formatRawEditableClipPath(nextEditable) };
-      }
-    }
-
-    if (shape.editable.kind === 'inset') {
-      const editable = shape.editable;
-      const side = insetSideForHandle(target);
-      if (side) {
-        const nextEditable: Extract<RawEditableClipPath, { kind: 'inset' }> = { ...editable };
-        const setSide = (nextSide: InsetSide, value: CssUnitValue) => {
-          nextEditable[nextSide] = value;
-        };
-        const sideValue =
-          side === 'top'
-            ? canvasPercentToCssUnitValue(y, 'y', editable.top.unit, canvas)
-            : side === 'right'
-              ? canvasPercentToCssUnitValue(100 - x, 'x', editable.right.unit, canvas)
-              : side === 'bottom'
-                ? canvasPercentToCssUnitValue(100 - y, 'y', editable.bottom.unit, canvas)
-                : canvasPercentToCssUnitValue(x, 'x', editable.left.unit, canvas);
-        const mode = options.insetSideMode || 'single';
-
-        if (mode === 'all') {
-          setSide('top', { ...sideValue, unit: editable.top.unit });
-          setSide('right', { ...sideValue, unit: editable.right.unit });
-          setSide('bottom', { ...sideValue, unit: editable.bottom.unit });
-          setSide('left', { ...sideValue, unit: editable.left.unit });
-        } else if (mode === 'opposite') {
-          setSide(side, sideValue);
-          const opposite = oppositeInsetSide(side);
-          const oppositeUnit = editable[opposite].unit;
-          setSide(opposite, { ...sideValue, unit: oppositeUnit });
-        } else {
-          setSide(side, sideValue);
-        }
-        return { ...shape, editable: nextEditable, value: formatRawEditableClipPath(nextEditable) };
-      }
-
-      if (target.kind === 'inset-radius' && editable.radii) {
-        const box = rawInsetBox(editable, canvas);
-        const horizontal = expandCssUnitValues(editable.radii.horizontal);
-        const vertical = expandCssUnitValues(editable.radii.vertical || editable.radii.horizontal);
-        const cornerIndex = CORNERS.indexOf(target.corner);
-        const localXPercent =
-          target.corner === 'topRight' || target.corner === 'bottomRight'
-            ? Math.max(0, box.x1 - x)
-            : Math.max(0, x - box.x0);
-        const localYPercent =
-          target.corner === 'bottomRight' || target.corner === 'bottomLeft'
-            ? Math.max(0, box.y1 - y)
-            : Math.max(0, y - box.y0);
-        const nextHorizontal = [...horizontal];
-        const nextVertical = [...vertical];
-        const currentHorizontal = horizontal[cornerIndex];
-        const currentVertical = vertical[cornerIndex];
-        if (!currentHorizontal || !currentVertical) {
-          return shape;
-        }
-        const radiusX = canvasPercentToCssUnitValue(
-          localXPercent,
-          'x',
-          currentHorizontal.unit,
-          canvas,
-        );
-        const radiusY = canvasPercentToCssUnitValue(
-          localYPercent,
-          'y',
-          currentVertical.unit,
-          canvas,
-        );
-        const unlocked = options.insetRadiusUnlocked;
-        const radius = unlocked
-          ? { x: radiusX, y: radiusY }
-          : {
-              x: radiusX,
-              y: { value: radiusX.value, unit: currentVertical.unit },
-            };
-        const setRadius = (corner: CornerName) => {
-          const index = CORNERS.indexOf(corner);
-          const horizontalValue = nextHorizontal[index];
-          const verticalValue = nextVertical[index];
-          if (!horizontalValue || !verticalValue) {
-            return;
-          }
-          nextHorizontal[index] =
-            index === cornerIndex
-              ? radius.x
-              : { value: radius.x.value, unit: horizontalValue.unit };
-          nextVertical[index] =
-            index === cornerIndex ? radius.y : { value: radius.y.value, unit: verticalValue.unit };
-        };
-        const mode = options.insetRadiusMode || 'single';
-        if (mode === 'all') {
-          CORNERS.forEach(setRadius);
-        } else if (mode === 'opposite') {
-          setRadius(target.corner);
-          setRadius(oppositeCorner(target.corner));
-        } else {
-          setRadius(target.corner);
-        }
-        const nextEditable: RawEditableClipPath = {
-          ...editable,
-          radii: { horizontal: nextHorizontal, vertical: nextVertical },
-        };
-        return { ...shape, editable: nextEditable, value: formatRawEditableClipPath(nextEditable) };
-      }
+    const next = updateRawShapeForDrag(shape, target, { x, y }, options, options.canvas);
+    if (next) {
+      return next;
     }
   }
-
   if (target.kind === 'polygon-point' && shape.kind === 'polygon') {
-    if (target.before.kind === 'polygon' && target.polygonPointIndexes?.length) {
-      const beforePoint = target.before.points[target.index];
-      if (!beforePoint) {
-        return shape;
-      }
+    return dragPolygonPoint(shape, target, x, y);
+  }
+  if (shape.kind === 'circle' || shape.kind === 'ellipse') {
+    return dragRoundShape(shape, target, x, y, options);
+  }
+  if (shape.kind === 'inset') {
+    return dragInset(shape, target, x, y, options);
+  }
+  return shape;
+}
 
-      const selectedIndexes = new Set(target.polygonPointIndexes);
-      const dx = x - beforePoint.x;
-      const dy = y - beforePoint.y;
-
-      return {
-        kind: 'polygon',
-        points: shape.points.map((point, index) => {
-          const beforeSelectedPoint =
-            target.before.kind === 'polygon' ? target.before.points[index] : null;
-          return selectedIndexes.has(index) && beforeSelectedPoint
-            ? { x: beforeSelectedPoint.x + dx, y: beforeSelectedPoint.y + dy }
-            : point;
-        }),
-      };
+// A drag on a shape written in raw CSS units, converted through the canvas. Undefined
+// when the handle is not one this shape has.
+function updateRawShapeForDrag(
+  shape: RawClipPathShape,
+  target: DragTarget,
+  point: Point,
+  options: ShapeDragOptions,
+  canvas: HTMLElement,
+): ClipShape | undefined {
+  const editable = shape.editable;
+  if (target.kind === 'polygon-point' && editable?.kind === 'polygon') {
+    return dragRawPolygonPoint(shape, editable, target, point, canvas);
+  }
+  if (editable?.kind === 'circle') {
+    return dragRawCircle(shape, editable, target, point, canvas);
+  }
+  if (editable?.kind === 'ellipse') {
+    return dragRawEllipse(shape, editable, target, point, options, canvas);
+  }
+  if (editable?.kind === 'inset') {
+    const side = insetSideForHandle(target);
+    if (side) {
+      return dragRawInsetSide(shape, editable, side, point, options, canvas);
     }
+    if (target.kind === 'inset-radius' && editable.radii) {
+      return dragRawInsetRadius(shape, editable, target.corner, point, options, canvas);
+    }
+  }
+  return undefined;
+}
+
+// The shape with its raw editable replaced, and its CSS rewritten to match.
+function withRawEditable(shape: RawClipPathShape, nextEditable: RawEditableClipPath): ClipShape {
+  return { ...shape, editable: nextEditable, value: formatRawEditableClipPath(nextEditable) };
+}
+
+// Moves the dragged raw polygon point, and the other selected points with it.
+function dragRawPolygonPoint(
+  shape: RawClipPathShape,
+  editable: RawEditable<'polygon'>,
+  target: DragTarget & { kind: 'polygon-point' },
+  { x, y }: Point,
+  canvas: HTMLElement,
+): ClipShape {
+  const selectedIndexes = new Set(
+    target.polygonPointIndexes?.length ? target.polygonPointIndexes : [target.index],
+  );
+  const beforeEditable =
+    target.before.kind === 'raw' && target.before.editable?.kind === 'polygon'
+      ? target.before.editable
+      : editable;
+  const beforePoint = beforeEditable.points[target.index];
+  if (!beforePoint) {
+    return shape;
+  }
+  if (!isCssUnitValue(beforePoint.x) && !isCssUnitValue(beforePoint.y)) {
+    return shape;
+  }
+  const beforeCanvasPoint = {
+    x: isCssUnitValue(beforePoint.x) ? cssUnitValueToCanvasPercent(beforePoint.x, 'x', canvas) : x,
+    y: isCssUnitValue(beforePoint.y) ? cssUnitValueToCanvasPercent(beforePoint.y, 'y', canvas) : y,
+  };
+  const dx = isCssUnitValue(beforePoint.x) ? x - beforeCanvasPoint.x : 0;
+  const dy = isCssUnitValue(beforePoint.y) ? y - beforeCanvasPoint.y : 0;
+  const nextEditable: RawEditableClipPath = {
+    ...editable,
+    points: editable.points.map((point, index) => {
+      if (!selectedIndexes.has(index)) {
+        return point;
+      }
+      return offsetRawPoint(point, beforeEditable.points[index] || point, { dx, dy }, canvas);
+    }),
+  };
+  return withRawEditable(shape, nextEditable);
+}
+
+// A selected raw point moved by the drag: its coordinates that are plain units
+// follow, measured from where the point was when the drag began.
+function offsetRawPoint(
+  point: CssCoordinatePoint,
+  beforeSelected: CssCoordinatePoint,
+  { dx, dy }: { dx: number; dy: number },
+  canvas: HTMLElement,
+): CssCoordinatePoint {
+  const beforeSelectedCanvas = {
+    x: isCssUnitValue(beforeSelected.x)
+      ? cssUnitValueToCanvasPercent(beforeSelected.x, 'x', canvas)
+      : 0,
+    y: isCssUnitValue(beforeSelected.y)
+      ? cssUnitValueToCanvasPercent(beforeSelected.y, 'y', canvas)
+      : 0,
+  };
+  return {
+    x:
+      isCssUnitValue(point.x) && isCssUnitValue(beforeSelected.x)
+        ? canvasPercentToCssUnitValue(beforeSelectedCanvas.x + dx, 'x', point.x.unit, canvas)
+        : point.x,
+    y:
+      isCssUnitValue(point.y) && isCssUnitValue(beforeSelected.y)
+        ? canvasPercentToCssUnitValue(beforeSelectedCanvas.y + dy, 'y', point.y.unit, canvas)
+        : point.y,
+  };
+}
+
+// Moves a raw circle's centre, or sets its radius to the pointer's distance from it.
+function dragRawCircle(
+  shape: RawClipPathShape,
+  editable: RawEditable<'circle'>,
+  target: DragTarget,
+  { x, y }: Point,
+  canvas: HTMLElement,
+): ClipShape | undefined {
+  if (target.kind === 'circle-center') {
+    return withRawEditable(shape, {
+      ...editable,
+      cx: canvasPercentToCssUnitValue(x, 'x', editable.cx.unit, canvas),
+      cy: canvasPercentToCssUnitValue(y, 'y', editable.cy.unit, canvas),
+    });
+  }
+  if (target.kind !== 'circle-radius') {
+    return undefined;
+  }
+  const center = {
+    x: cssUnitValueToCanvasPercent(editable.cx, 'x', canvas),
+    y: cssUnitValueToCanvasPercent(editable.cy, 'y', canvas),
+  };
+  const rect = canvas.getBoundingClientRect();
+  const distancePx = Math.hypot(
+    ((x - center.x) / 100) * rect.width,
+    ((y - center.y) / 100) * rect.height,
+  );
+  const unitPx = cssUnitPx(editable.radius.unit, 'x', canvas);
+  return withRawEditable(shape, {
+    ...editable,
+    radius: {
+      value: unitPx > 0 ? distancePx / unitPx : editable.radius.value,
+      unit: editable.radius.unit,
+    },
+  });
+}
+
+// Moves a raw ellipse's centre, or sets one radius (scaling the other with it when
+// proportional).
+function dragRawEllipse(
+  shape: RawClipPathShape,
+  editable: RawEditable<'ellipse'>,
+  target: DragTarget,
+  { x, y }: Point,
+  options: ShapeDragOptions,
+  canvas: HTMLElement,
+): ClipShape | undefined {
+  if (target.kind === 'ellipse-center') {
+    return withRawEditable(shape, {
+      ...editable,
+      cx: canvasPercentToCssUnitValue(x, 'x', editable.cx.unit, canvas),
+      cy: canvasPercentToCssUnitValue(y, 'y', editable.cy.unit, canvas),
+    });
+  }
+  if (target.kind === 'ellipse-rx') {
+    const centerX = cssUnitValueToCanvasPercent(editable.cx, 'x', canvas);
+    const nextRxPercent = Math.abs(x - centerX);
+    const nextEditable: RawEditableClipPath = {
+      ...editable,
+      rx: canvasPercentToCssUnitValue(nextRxPercent, 'x', editable.rx.unit, canvas),
+    };
+    if (options.ellipseScaleProportional) {
+      const currentRxPercent = cssUnitValueToCanvasPercent(editable.rx, 'x', canvas);
+      if (currentRxPercent > 0) {
+        const scale = nextRxPercent / currentRxPercent;
+        nextEditable.ry = { value: Math.max(0, editable.ry.value * scale), unit: editable.ry.unit };
+      }
+    }
+    return withRawEditable(shape, nextEditable);
+  }
+  if (target.kind === 'ellipse-ry') {
+    const centerY = cssUnitValueToCanvasPercent(editable.cy, 'y', canvas);
+    const nextRyPercent = Math.abs(y - centerY);
+    const nextEditable: RawEditableClipPath = {
+      ...editable,
+      ry: canvasPercentToCssUnitValue(nextRyPercent, 'y', editable.ry.unit, canvas),
+    };
+    if (options.ellipseScaleProportional) {
+      const currentRyPercent = cssUnitValueToCanvasPercent(editable.ry, 'y', canvas);
+      if (currentRyPercent > 0) {
+        const scale = nextRyPercent / currentRyPercent;
+        nextEditable.rx = { value: Math.max(0, editable.rx.value * scale), unit: editable.rx.unit };
+      }
+    }
+    return withRawEditable(shape, nextEditable);
+  }
+  return undefined;
+}
+
+// Moves a raw inset edge — alone, with its opposite, or all four together.
+function dragRawInsetSide(
+  shape: RawClipPathShape,
+  editable: RawEditable<'inset'>,
+  side: InsetSide,
+  { x, y }: Point,
+  options: ShapeDragOptions,
+  canvas: HTMLElement,
+): ClipShape {
+  const nextEditable: Extract<RawEditableClipPath, { kind: 'inset' }> = { ...editable };
+  const setSide = (nextSide: InsetSide, value: CssUnitValue) => {
+    nextEditable[nextSide] = value;
+  };
+  const sideValue =
+    side === 'top'
+      ? canvasPercentToCssUnitValue(y, 'y', editable.top.unit, canvas)
+      : side === 'right'
+        ? canvasPercentToCssUnitValue(100 - x, 'x', editable.right.unit, canvas)
+        : side === 'bottom'
+          ? canvasPercentToCssUnitValue(100 - y, 'y', editable.bottom.unit, canvas)
+          : canvasPercentToCssUnitValue(x, 'x', editable.left.unit, canvas);
+  const mode = options.insetSideMode || 'single';
+
+  if (mode === 'all') {
+    setSide('top', { ...sideValue, unit: editable.top.unit });
+    setSide('right', { ...sideValue, unit: editable.right.unit });
+    setSide('bottom', { ...sideValue, unit: editable.bottom.unit });
+    setSide('left', { ...sideValue, unit: editable.left.unit });
+  } else if (mode === 'opposite') {
+    setSide(side, sideValue);
+    const opposite = oppositeInsetSide(side);
+    const oppositeUnit = editable[opposite].unit;
+    setSide(opposite, { ...sideValue, unit: oppositeUnit });
+  } else {
+    setSide(side, sideValue);
+  }
+  return withRawEditable(shape, nextEditable);
+}
+
+// Sets a raw inset corner radius from the pointer — alone, with the opposite corner,
+// or all four — round unless the radius is unlocked.
+function dragRawInsetRadius(
+  shape: RawClipPathShape,
+  editable: RawEditable<'inset'>,
+  corner: CornerName,
+  { x, y }: Point,
+  options: ShapeDragOptions,
+  canvas: HTMLElement,
+): ClipShape {
+  const radii = editable.radii;
+  if (!radii) {
+    return shape;
+  }
+  const box = rawInsetBox(editable, canvas);
+  const horizontal = expandCssUnitValues(radii.horizontal);
+  const vertical = expandCssUnitValues(radii.vertical || radii.horizontal);
+  const cornerIndex = CORNERS.indexOf(corner);
+  const localXPercent =
+    corner === 'topRight' || corner === 'bottomRight'
+      ? Math.max(0, box.x1 - x)
+      : Math.max(0, x - box.x0);
+  const localYPercent =
+    corner === 'bottomRight' || corner === 'bottomLeft'
+      ? Math.max(0, box.y1 - y)
+      : Math.max(0, y - box.y0);
+  const currentHorizontal = horizontal[cornerIndex];
+  const currentVertical = vertical[cornerIndex];
+  if (!currentHorizontal || !currentVertical) {
+    return shape;
+  }
+  const radiusX = canvasPercentToCssUnitValue(localXPercent, 'x', currentHorizontal.unit, canvas);
+  const radiusY = canvasPercentToCssUnitValue(localYPercent, 'y', currentVertical.unit, canvas);
+  const radius = options.insetRadiusUnlocked
+    ? { x: radiusX, y: radiusY }
+    : { x: radiusX, y: { value: radiusX.value, unit: currentVertical.unit } };
+  const next = setRawInsetRadii(
+    { horizontal, vertical },
+    { corner, cornerIndex, radius, mode: options.insetRadiusMode || 'single' },
+  );
+  return withRawEditable(shape, { ...editable, radii: next });
+}
+
+// The radii with the dragged corner — and, by mode, its opposite or every corner —
+// set to `radius`, each keeping its own unit.
+function setRawInsetRadii(
+  { horizontal, vertical }: { horizontal: CssUnitValue[]; vertical: CssUnitValue[] },
+  {
+    corner,
+    cornerIndex,
+    radius,
+    mode,
+  }: {
+    corner: CornerName;
+    cornerIndex: number;
+    radius: { x: CssUnitValue; y: CssUnitValue };
+    mode: InsetRadiusMode;
+  },
+): { horizontal: CssUnitValue[]; vertical: CssUnitValue[] } {
+  const nextHorizontal = [...horizontal];
+  const nextVertical = [...vertical];
+  const setRadius = (target: CornerName) => {
+    const index = CORNERS.indexOf(target);
+    const horizontalValue = nextHorizontal[index];
+    const verticalValue = nextVertical[index];
+    if (!horizontalValue || !verticalValue) {
+      return;
+    }
+    nextHorizontal[index] =
+      index === cornerIndex ? radius.x : { value: radius.x.value, unit: horizontalValue.unit };
+    nextVertical[index] =
+      index === cornerIndex ? radius.y : { value: radius.y.value, unit: verticalValue.unit };
+  };
+  if (mode === 'all') {
+    CORNERS.forEach(setRadius);
+  } else if (mode === 'opposite') {
+    setRadius(corner);
+    setRadius(oppositeCorner(corner));
+  } else {
+    setRadius(corner);
+  }
+  return { horizontal: nextHorizontal, vertical: nextVertical };
+}
+
+// Moves the dragged polygon point; with several selected, all of them move by the
+// same offset from where the drag began.
+function dragPolygonPoint(
+  shape: PolygonShape,
+  target: DragTarget & { kind: 'polygon-point' },
+  x: number,
+  y: number,
+): ClipShape {
+  if (target.before.kind === 'polygon' && target.polygonPointIndexes?.length) {
+    const beforePoint = target.before.points[target.index];
+    if (!beforePoint) {
+      return shape;
+    }
+
+    const selectedIndexes = new Set(target.polygonPointIndexes);
+    const dx = x - beforePoint.x;
+    const dy = y - beforePoint.y;
 
     return {
       kind: 'polygon',
-      points: shape.points.map((point, index) => (index === target.index ? { x, y } : point)),
+      points: shape.points.map((point, index) => {
+        const beforeSelectedPoint =
+          target.before.kind === 'polygon' ? target.before.points[index] : undefined;
+        return selectedIndexes.has(index) && beforeSelectedPoint
+          ? { x: beforeSelectedPoint.x + dx, y: beforeSelectedPoint.y + dy }
+          : point;
+      }),
     };
   }
 
-  if (target.kind === 'circle-center' && shape.kind === 'circle') {
+  return {
+    kind: 'polygon',
+    points: shape.points.map((point, index) => (index === target.index ? { x, y } : point)),
+  };
+}
+
+// Moves a circle or ellipse's centre, or sets a radius from the pointer (an ellipse
+// scaling its other radius with it when proportional).
+function dragRoundShape(
+  shape: CircleShape | EllipseShape,
+  target: DragTarget,
+  x: number,
+  y: number,
+  options: ShapeDragOptions,
+): ClipShape {
+  if (shape.kind === 'circle') {
+    if (target.kind === 'circle-center') {
+      return { ...shape, cx: x, cy: y };
+    }
+    if (target.kind === 'circle-radius') {
+      const radius = Math.sqrt((x - shape.cx) ** 2 + (y - shape.cy) ** 2);
+      return { ...shape, radius: Math.max(0, radius) };
+    }
+    return shape;
+  }
+  if (target.kind === 'ellipse-center') {
     return { ...shape, cx: x, cy: y };
   }
-
-  if (target.kind === 'circle-radius' && shape.kind === 'circle') {
-    const radius = Math.sqrt((x - shape.cx) ** 2 + (y - shape.cy) ** 2);
-    return { ...shape, radius: Math.max(0, radius) };
-  }
-
-  if (target.kind === 'ellipse-center' && shape.kind === 'ellipse') {
-    return { ...shape, cx: x, cy: y };
-  }
-
-  if (target.kind === 'ellipse-rx' && shape.kind === 'ellipse') {
+  if (target.kind === 'ellipse-rx') {
     const nextRx = Math.max(0, Math.abs(x - shape.cx));
     if (options.ellipseScaleProportional && shape.rx > 0) {
       const scale = nextRx / shape.rx;
@@ -6004,8 +6251,7 @@ function updateShapeForDrag(
     }
     return { ...shape, rx: nextRx };
   }
-
-  if (target.kind === 'ellipse-ry' && shape.kind === 'ellipse') {
+  if (target.kind === 'ellipse-ry') {
     const nextRy = Math.max(0, Math.abs(y - shape.cy));
     if (options.ellipseScaleProportional && shape.ry > 0) {
       const scale = nextRy / shape.ry;
@@ -6013,78 +6259,95 @@ function updateShapeForDrag(
     }
     return { ...shape, ry: nextRy };
   }
-
-  if (shape.kind === 'inset') {
-    const insetSideByTarget: Partial<Record<DragTarget['kind'], InsetSide>> = {
-      'inset-top': 'top',
-      'inset-right': 'right',
-      'inset-bottom': 'bottom',
-      'inset-left': 'left',
-    };
-    const side = insetSideByTarget[target.kind];
-
-    if (side) {
-      const value =
-        side === 'top' ? y : side === 'right' ? 100 - x : side === 'bottom' ? 100 - y : x;
-      const oppositeSide = oppositeInsetSide(side);
-      const mode = options.insetSideMode || 'single';
-      const next: InsetShape = { ...shape };
-
-      if (mode === 'all') {
-        next.top = value;
-        next.right = value;
-        next.bottom = value;
-        next.left = value;
-      } else if (mode === 'opposite') {
-        next[side] = value;
-        next[oppositeSide] = value;
-      } else {
-        next[side] = value;
-      }
-
-      return next;
-    }
-  }
-
-  if (target.kind === 'inset-radius' && shape.kind === 'inset') {
-    const { width, height, x1: rightEdge, y1: bottomEdge } = insetBox(shape);
-    const localX =
-      target.corner === 'topRight' || target.corner === 'bottomRight'
-        ? Math.max(0, rightEdge - x)
-        : Math.max(0, x - shape.left);
-    const localY =
-      target.corner === 'bottomRight' || target.corner === 'bottomLeft'
-        ? Math.max(0, bottomEdge - y)
-        : Math.max(0, y - shape.top);
-    const radiusX = width > 0 ? (localX / width) * 100 : 0;
-    const radiusY = height > 0 ? (localY / height) * 100 : 0;
-    const radiusValue = Math.max(0, (radiusX + radiusY) / 2);
-    const radius = options.insetRadiusUnlocked
-      ? { x: radiusX, y: radiusY }
-      : { x: radiusValue, y: radiusValue };
-    const nextRadii = { ...shape.radii };
-    const setRadius = (corner: CornerName) => {
-      nextRadii[corner] = { ...radius };
-    };
-
-    const insetRadiusMode = options.insetRadiusMode || 'single';
-
-    if (insetRadiusMode === 'all') {
-      CORNERS.forEach(setRadius);
-    } else if (insetRadiusMode === 'opposite') {
-      setRadius(target.corner);
-      setRadius(oppositeCorner(target.corner));
-    } else {
-      setRadius(target.corner);
-    }
-
-    return {
-      ...shape,
-      radii: nextRadii,
-    };
-  }
-
   return shape;
+}
+
+// Moves an inset edge, or sets a corner radius from the pointer.
+function dragInset(
+  shape: InsetShape,
+  target: DragTarget,
+  x: number,
+  y: number,
+  options: ShapeDragOptions,
+): ClipShape {
+  const insetSideByTarget: Partial<Record<DragTarget['kind'], InsetSide>> = {
+    'inset-top': 'top',
+    'inset-right': 'right',
+    'inset-bottom': 'bottom',
+    'inset-left': 'left',
+  };
+  const side = insetSideByTarget[target.kind];
+
+  if (side) {
+    const value = side === 'top' ? y : side === 'right' ? 100 - x : side === 'bottom' ? 100 - y : x;
+    const oppositeSide = oppositeInsetSide(side);
+    const mode = options.insetSideMode || 'single';
+    const next: InsetShape = { ...shape };
+
+    if (mode === 'all') {
+      next.top = value;
+      next.right = value;
+      next.bottom = value;
+      next.left = value;
+    } else if (mode === 'opposite') {
+      next[side] = value;
+      next[oppositeSide] = value;
+    } else {
+      next[side] = value;
+    }
+
+    return next;
+  }
+  if (target.kind === 'inset-radius') {
+    return dragInsetRadius(shape, target.corner, x, y, options);
+  }
+  return shape;
+}
+
+// Sets an inset corner radius from the pointer — alone, with the opposite corner,
+// or all four — round unless the radius is unlocked.
+function dragInsetRadius(
+  shape: InsetShape,
+  corner: CornerName,
+  x: number,
+  y: number,
+  options: ShapeDragOptions,
+): ClipShape {
+  const { width, height, x1: rightEdge, y1: bottomEdge } = insetBox(shape);
+  const localX =
+    corner === 'topRight' || corner === 'bottomRight'
+      ? Math.max(0, rightEdge - x)
+      : Math.max(0, x - shape.left);
+  const localY =
+    corner === 'bottomRight' || corner === 'bottomLeft'
+      ? Math.max(0, bottomEdge - y)
+      : Math.max(0, y - shape.top);
+  const radiusX = width > 0 ? (localX / width) * 100 : 0;
+  const radiusY = height > 0 ? (localY / height) * 100 : 0;
+  const radiusValue = Math.max(0, (radiusX + radiusY) / 2);
+  const radius = options.insetRadiusUnlocked
+    ? { x: radiusX, y: radiusY }
+    : { x: radiusValue, y: radiusValue };
+  const nextRadii = { ...shape.radii };
+  const setRadius = (target: CornerName) => {
+    nextRadii[target] = { ...radius };
+  };
+
+  const insetRadiusMode = options.insetRadiusMode || 'single';
+
+  if (insetRadiusMode === 'all') {
+    CORNERS.forEach(setRadius);
+  } else if (insetRadiusMode === 'opposite') {
+    setRadius(corner);
+    setRadius(oppositeCorner(corner));
+  } else {
+    setRadius(corner);
+  }
+
+  return {
+    ...shape,
+    radii: nextRadii,
+  };
 }
 
 function isSpaceKey(key: string, code?: string) {
@@ -6095,10 +6358,10 @@ function isRadiusUnlockKey(key: string, code?: string) {
   return key.toLowerCase() === 'u' || code === 'KeyU';
 }
 
-function stopKeyboardEvent(e: React.KeyboardEvent<HTMLElement>) {
-  e.preventDefault();
-  e.stopPropagation();
-  e.nativeEvent.stopImmediatePropagation?.();
+function stopKeyboardEvent(event: React.KeyboardEvent<HTMLElement>) {
+  event.preventDefault();
+  event.stopPropagation();
+  event.nativeEvent.stopImmediatePropagation?.();
 }
 
 function isArrowKey(key: string): key is ArrowKey {
@@ -6118,7 +6381,7 @@ function arrowDelta(key: string, step = KEYBOARD_STEP) {
   if (key === 'ArrowDown') {
     return { x: 0, y: step };
   }
-  return null;
+  return undefined;
 }
 
 function ellipseRadiusValueDelta(
@@ -6202,99 +6465,152 @@ function lockedRadiusValue(radius: CornerRadius) {
   return Math.max(0, (radius.x + radius.y) / 2);
 }
 
+// How an arrow key bends a shape: the drag options, plus the circle's radius angle,
+// the selected polygon points, and the step.
+type ShapeKeyboardOptions = {
+  canvas?: HTMLElement | undefined;
+  insetSideMode?: InsetSideMode;
+  insetRadiusMode?: InsetRadiusMode;
+  insetRadiusUnlocked?: boolean;
+  ellipseScaleProportional?: boolean;
+  circleRadiusAngle?: number;
+  polygonPointIndexes?: number[];
+  step?: number;
+};
+// The shape after a key, and the circle radius handle's new angle when it moved.
+type ShapeKeyboardResult = { shape: ClipShape; circleRadiusAngle?: number };
+
 function updateShapeForKeyboard(
   shape: ClipShape,
   handle: HandleTarget,
   key: string,
-  options: {
-    canvas?: HTMLElement | null;
-    insetSideMode?: InsetSideMode;
-    insetRadiusMode?: InsetRadiusMode;
-    insetRadiusUnlocked?: boolean;
-    ellipseScaleProportional?: boolean;
-    circleRadiusAngle?: number;
-    polygonPointIndexes?: number[];
-    step?: number;
-  } = {},
-) {
+  options: ShapeKeyboardOptions = {},
+): ShapeKeyboardResult {
   const step = options.step || KEYBOARD_STEP;
   const delta = arrowDelta(key, step);
   if (!delta || shape.kind === 'none') {
     return { shape };
   }
-
   if (shape.kind === 'raw' && shape.editable && options.canvas) {
-    const currentPoint = rawEditableHandlePoint(shape.editable, handle, options.canvas);
-    if (!currentPoint) {
-      return { shape };
-    }
-    const target: DragTarget = {
-      ...handle,
-      before: shape,
-      ...(isPolygonPointHandle(handle) && options.polygonPointIndexes
-        ? { polygonPointIndexes: options.polygonPointIndexes }
-        : {}),
-    };
-    const dragOptions = {
-      canvas: options.canvas,
-      ...(options.insetRadiusMode ? { insetRadiusMode: options.insetRadiusMode } : {}),
-      ...(options.insetRadiusUnlocked !== undefined
-        ? { insetRadiusUnlocked: options.insetRadiusUnlocked }
-        : {}),
-      ...(options.insetSideMode ? { insetSideMode: options.insetSideMode } : {}),
-      ...(options.ellipseScaleProportional !== undefined
-        ? { ellipseScaleProportional: options.ellipseScaleProportional }
-        : {}),
-    };
-    return {
-      shape: updateShapeForDrag(
-        shape,
-        target,
-        currentPoint.x + delta.x,
-        currentPoint.y + delta.y,
-        dragOptions,
-      ),
-    };
+    return keyRawShape(shape, shape.editable, handle, delta, options, options.canvas);
   }
-
   if (handle.kind === 'polygon-point' && shape.kind === 'polygon') {
-    const point = shape.points[handle.index];
-    if (!point) {
-      return { shape };
-    }
-    const selectedIndexes = new Set(
-      options.polygonPointIndexes?.length ? options.polygonPointIndexes : [handle.index],
-    );
-    return {
-      shape: {
-        kind: 'polygon' as const,
-        points: shape.points.map((item, index) =>
-          selectedIndexes.has(index) ? { x: item.x + delta.x, y: item.y + delta.y } : item,
-        ),
-      },
-    };
+    return keyPolygonPoints(shape, handle.index, delta, options);
   }
+  if (shape.kind === 'circle') {
+    return keyCircle(shape, handle, delta, options);
+  }
+  if (shape.kind === 'ellipse') {
+    return keyEllipse(shape, handle, { key, step, delta }, options);
+  }
+  if (shape.kind === 'inset') {
+    return keyInset(shape, handle, { key, step }, options);
+  }
+  return { shape };
+}
 
-  if (handle.kind === 'circle-center' && shape.kind === 'circle') {
+// A key on a shape written in raw CSS units: the drag the key amounts to, from the
+// handle's current place.
+function keyRawShape(
+  shape: RawClipPathShape,
+  editable: RawEditableClipPath,
+  handle: HandleTarget,
+  delta: Point,
+  options: ShapeKeyboardOptions,
+  canvas: HTMLElement,
+): ShapeKeyboardResult {
+  const currentPoint = rawEditableHandlePoint(editable, handle, canvas);
+  if (!currentPoint) {
+    return { shape };
+  }
+  const target: DragTarget = {
+    ...handle,
+    before: shape,
+    ...(isPolygonPointHandle(handle) && options.polygonPointIndexes
+      ? { polygonPointIndexes: options.polygonPointIndexes }
+      : {}),
+  };
+  const dragOptions = {
+    canvas,
+    ...(options.insetRadiusMode ? { insetRadiusMode: options.insetRadiusMode } : {}),
+    ...(options.insetRadiusUnlocked !== undefined
+      ? { insetRadiusUnlocked: options.insetRadiusUnlocked }
+      : {}),
+    ...(options.insetSideMode ? { insetSideMode: options.insetSideMode } : {}),
+    ...(options.ellipseScaleProportional !== undefined
+      ? { ellipseScaleProportional: options.ellipseScaleProportional }
+      : {}),
+  };
+  return {
+    shape: updateShapeForDrag(
+      shape,
+      target,
+      currentPoint.x + delta.x,
+      currentPoint.y + delta.y,
+      dragOptions,
+    ),
+  };
+}
+
+// Moves the selected polygon points (or the one with the key) by the key's step.
+function keyPolygonPoints(
+  shape: PolygonShape,
+  index: number,
+  delta: Point,
+  options: ShapeKeyboardOptions,
+): ShapeKeyboardResult {
+  const point = shape.points[index];
+  if (!point) {
+    return { shape };
+  }
+  const selectedIndexes = new Set(
+    options.polygonPointIndexes?.length ? options.polygonPointIndexes : [index],
+  );
+  return {
+    shape: {
+      kind: 'polygon' as const,
+      points: shape.points.map((item, itemIndex) =>
+        selectedIndexes.has(itemIndex) ? { x: item.x + delta.x, y: item.y + delta.y } : item,
+      ),
+    },
+  };
+}
+
+// Moves a circle's centre, or its radius handle around and away from the centre.
+function keyCircle(
+  shape: CircleShape,
+  handle: HandleTarget,
+  delta: Point,
+  options: ShapeKeyboardOptions,
+): ShapeKeyboardResult {
+  if (handle.kind === 'circle-center') {
     return { shape: { ...shape, cx: shape.cx + delta.x, cy: shape.cy + delta.y } };
   }
-
-  if (handle.kind === 'circle-radius' && shape.kind === 'circle') {
-    const angle = options.circleRadiusAngle ?? 0;
-    const x = shape.cx + Math.cos(angle) * shape.radius + delta.x;
-    const y = shape.cy + Math.sin(angle) * shape.radius + delta.y;
-    const radius = Math.max(0, Math.sqrt((x - shape.cx) ** 2 + (y - shape.cy) ** 2));
-    return {
-      shape: { ...shape, radius },
-      circleRadiusAngle: radius > 0 ? Math.atan2(y - shape.cy, x - shape.cx) : angle,
-    };
+  if (handle.kind !== 'circle-radius') {
+    return { shape };
   }
+  const angle = options.circleRadiusAngle ?? 0;
+  const x = shape.cx + Math.cos(angle) * shape.radius + delta.x;
+  const y = shape.cy + Math.sin(angle) * shape.radius + delta.y;
+  const radius = Math.max(0, Math.sqrt((x - shape.cx) ** 2 + (y - shape.cy) ** 2));
+  return {
+    shape: { ...shape, radius },
+    circleRadiusAngle: radius > 0 ? Math.atan2(y - shape.cy, x - shape.cx) : angle,
+  };
+}
 
-  if (handle.kind === 'ellipse-center' && shape.kind === 'ellipse') {
+// Moves an ellipse's centre, or grows a radius (scaling the other with it when
+// proportional).
+function keyEllipse(
+  shape: EllipseShape,
+  handle: HandleTarget,
+  { key, step, delta }: { key: string; step: number; delta: Point },
+  options: ShapeKeyboardOptions,
+): ShapeKeyboardResult {
+  if (handle.kind === 'ellipse-center') {
     return { shape: { ...shape, cx: shape.cx + delta.x, cy: shape.cy + delta.y } };
   }
-
-  if (handle.kind === 'ellipse-rx' && shape.kind === 'ellipse') {
+  if (handle.kind === 'ellipse-rx') {
     const radiusDelta = ellipseRadiusValueDelta(handle, key, step);
     if (!radiusDelta) {
       return { shape };
@@ -6306,8 +6622,7 @@ function updateShapeForKeyboard(
     }
     return { shape: { ...shape, rx: nextRx } };
   }
-
-  if (handle.kind === 'ellipse-ry' && shape.kind === 'ellipse') {
+  if (handle.kind === 'ellipse-ry') {
     const radiusDelta = ellipseRadiusValueDelta(handle, key, step);
     if (!radiusDelta) {
       return { shape };
@@ -6319,83 +6634,90 @@ function updateShapeForKeyboard(
     }
     return { shape: { ...shape, ry: nextRy } };
   }
+  return { shape };
+}
 
-  if (shape.kind === 'inset') {
-    const side = insetSideForHandle(handle);
-    if (side) {
-      const mode = options.insetSideMode || 'single';
-      const next: InsetShape = { ...shape };
-
-      if (mode === 'all') {
-        const valueDelta = insetValueDelta(side, key, step);
-        if (!valueDelta) {
-          return { shape };
-        }
-        const value = next[side] + valueDelta;
-        next.top = value;
-        next.right = value;
-        next.bottom = value;
-        next.left = value;
-        return { shape: next };
-      }
-
-      const valueDelta = insetValueDelta(side, key, step);
-      if (!valueDelta) {
-        return { shape };
-      }
-      if (mode === 'opposite') {
-        const oppositeSide = oppositeInsetSide(side);
-        next[side] += valueDelta;
-        next[oppositeSide] += valueDelta;
-        return { shape: next };
-      }
-
-      next[side] += valueDelta;
+// Moves an inset edge (alone, with its opposite, or all four), or grows a corner
+// radius.
+function keyInset(
+  shape: InsetShape,
+  handle: HandleTarget,
+  { key, step }: { key: string; step: number },
+  options: ShapeKeyboardOptions,
+): ShapeKeyboardResult {
+  const side = insetSideForHandle(handle);
+  if (side) {
+    const mode = options.insetSideMode || 'single';
+    const next: InsetShape = { ...shape };
+    const valueDelta = insetValueDelta(side, key, step);
+    if (!valueDelta) {
+      return { shape };
+    }
+    if (mode === 'all') {
+      const value = next[side] + valueDelta;
+      next.top = value;
+      next.right = value;
+      next.bottom = value;
+      next.left = value;
       return { shape: next };
     }
-
-    if (handle.kind === 'inset-radius') {
-      const mode = options.insetRadiusMode || 'single';
-      const radiusDelta = cornerRadiusDelta(handle.corner, key, step);
-      if (!radiusDelta.x && !radiusDelta.y) {
-        return { shape };
-      }
-      const nextRadii = { ...shape.radii };
-      const activeRadius = shape.radii[handle.corner];
-      const radiusDeltaValue = radiusDelta.x || radiusDelta.y;
-      const nextRadius = options.insetRadiusUnlocked
-        ? {
-            x: Math.max(0, activeRadius.x + radiusDelta.x),
-            y: Math.max(0, activeRadius.y + radiusDelta.y),
-          }
-        : (() => {
-            const value = Math.max(0, lockedRadiusValue(activeRadius) + radiusDeltaValue);
-            return { x: value, y: value };
-          })();
-      const setRadius = (corner: CornerName) => {
-        nextRadii[corner] = { ...nextRadius };
-      };
-
-      if (mode === 'all') {
-        CORNERS.forEach(setRadius);
-      } else if (mode === 'opposite') {
-        setRadius(handle.corner);
-        const opposite = oppositeCorner(handle.corner);
-        setRadius(opposite);
-      } else {
-        setRadius(handle.corner);
-      }
-
-      return { shape: { ...shape, radii: nextRadii } };
+    if (mode === 'opposite') {
+      const oppositeSide = oppositeInsetSide(side);
+      next[side] += valueDelta;
+      next[oppositeSide] += valueDelta;
+      return { shape: next };
     }
+    next[side] += valueDelta;
+    return { shape: next };
+  }
+  if (handle.kind === 'inset-radius') {
+    return keyInsetRadius(shape, handle.corner, { key, step }, options);
+  }
+  return { shape };
+}
+
+// Grows an inset corner radius — alone, with the opposite corner, or all four —
+// round unless the radius is unlocked.
+function keyInsetRadius(
+  shape: InsetShape,
+  corner: CornerName,
+  { key, step }: { key: string; step: number },
+  options: ShapeKeyboardOptions,
+): ShapeKeyboardResult {
+  const mode = options.insetRadiusMode || 'single';
+  const radiusDelta = cornerRadiusDelta(corner, key, step);
+  if (!radiusDelta.x && !radiusDelta.y) {
+    return { shape };
+  }
+  const nextRadii = { ...shape.radii };
+  const activeRadius = shape.radii[corner];
+  const radiusDeltaValue = radiusDelta.x || radiusDelta.y;
+  const lockedValue = Math.max(0, lockedRadiusValue(activeRadius) + radiusDeltaValue);
+  const nextRadius = options.insetRadiusUnlocked
+    ? {
+        x: Math.max(0, activeRadius.x + radiusDelta.x),
+        y: Math.max(0, activeRadius.y + radiusDelta.y),
+      }
+    : { x: lockedValue, y: lockedValue };
+  const setRadius = (target: CornerName) => {
+    nextRadii[target] = { ...nextRadius };
+  };
+
+  if (mode === 'all') {
+    CORNERS.forEach(setRadius);
+  } else if (mode === 'opposite') {
+    setRadius(corner);
+    setRadius(oppositeCorner(corner));
+  } else {
+    setRadius(corner);
   }
 
-  return { shape };
+  return { shape: { ...shape, radii: nextRadii } };
 }
 
 async function writePastedShapeMetadata(
   style: StyleHandle,
-  cache: PastedShapeSvgCache | null,
+  cache: PastedShapeSvgCache | undefined,
   options?: StyleTargetOptions,
 ) {
   const writeProperty = async (property: string, nextValue: string) => {
@@ -6431,7 +6753,10 @@ async function writePastedShapeMetadata(
 async function writeClipPathToStyle(
   style: StyleHandle,
   value: string,
-  options: { shapeSvgCache?: PastedShapeSvgCache | null; styleOptions?: StyleTargetOptions } = {},
+  options: {
+    shapeSvgCache?: PastedShapeSvgCache | undefined;
+    styleOptions?: StyleTargetOptions;
+  } = {},
 ) {
   const styleOptions = options.styleOptions;
   if (isNoneClipPathValue(value)) {
@@ -6443,15 +6768,19 @@ async function writeClipPathToStyle(
       await style.setProperty?.('clip-path', 'none', styleOptions);
     }
 
-    await writePastedShapeMetadata(style, null, styleOptions);
+    await writePastedShapeMetadata(style, undefined, styleOptions);
     return;
   }
 
   await style.setProperty?.('clip-path', value, styleOptions);
-  await writePastedShapeMetadata(style, options.shapeSvgCache || null, styleOptions);
+  await writePastedShapeMetadata(style, options.shapeSvgCache || undefined, styleOptions);
 }
 
-function isStyleHandle(style: StyleHandle | null | undefined): style is StyleHandle {
+// The styles an element reports, as the Designer API delivers them: the list, or
+// null, holding handles or nulls.
+type StyleHandleList = ApiNullable<Array<ApiNullable<StyleHandle>>>;
+
+function isStyleHandle(style: ApiNullable<StyleHandle> | undefined): style is StyleHandle {
   return Boolean(
     style?.getProperty || style?.getProperties || style?.setProperty || style?.removeProperty,
   );
@@ -6468,7 +6797,7 @@ function debugClipPath(label: string, details?: unknown) {
   }
 }
 
-function canWriteClipPathValue(style: StyleHandle | null | undefined, value: string) {
+function canWriteClipPathValue(style: ApiNullable<StyleHandle> | undefined, value: string) {
   if (!style) {
     return false;
   }
@@ -6477,7 +6806,7 @@ function canWriteClipPathValue(style: StyleHandle | null | undefined, value: str
     : Boolean(style.setProperty);
 }
 
-function getStyleHandles(styles: Array<StyleHandle | null> | null | undefined) {
+function getStyleHandles(styles: StyleHandleList | undefined) {
   return Array.isArray(styles) ? styles.filter(isStyleHandle) : [];
 }
 
@@ -6520,7 +6849,7 @@ async function readOptionalWithTimeout<T>(
     return undefined;
   }
 
-  let timeoutId: number | null = null;
+  let timeoutId: number | undefined = undefined;
   try {
     return await Promise.race([
       reader(),
@@ -6531,7 +6860,7 @@ async function readOptionalWithTimeout<T>(
   } catch {
     return undefined;
   } finally {
-    if (timeoutId !== null) {
+    if (timeoutId !== undefined) {
       window.clearTimeout(timeoutId);
     }
   }
@@ -6539,11 +6868,11 @@ async function readOptionalWithTimeout<T>(
 
 function selectedElementKey(element: unknown) {
   if (!isElementStyleSource(element)) {
-    return null;
+    return undefined;
   }
   const id = element.id;
   if (!id) {
-    return null;
+    return undefined;
   }
   if (typeof id === 'string') {
     return id;
@@ -6558,7 +6887,7 @@ function selectedElementKey(element: unknown) {
 
 function addStyleHandles(
   styles: StyleHandle[],
-  nextStyles: Array<StyleHandle | null> | null | undefined,
+  nextStyles: StyleHandleList | undefined,
   seenRefs: Set<StyleHandle>,
   seenIds: Set<string>,
 ) {
@@ -6600,7 +6929,7 @@ function addClassNamesFromValue(classNames: Set<string>, value: unknown) {
 
 function addClassNamesFromAttributes(
   classNames: Set<string>,
-  attributes: Array<ElementAttributeHandle> | null | undefined,
+  attributes: ApiNullable<Array<ElementAttributeHandle>> | undefined,
 ) {
   if (!Array.isArray(attributes)) {
     return;
@@ -6615,7 +6944,7 @@ function addClassNamesFromAttributes(
 
 async function addClassNamesFromStyleHandles(
   classNames: Set<string>,
-  styles: Array<StyleHandle | null> | null | undefined,
+  styles: StyleHandleList | undefined,
 ) {
   const styleNames = await Promise.all(
     getStyleHandles(styles).map((style) =>
@@ -6628,7 +6957,7 @@ async function addClassNamesFromStyleHandles(
     .forEach((name) => classNames.add(name.trim()));
 }
 
-async function getElementClassNames(element: unknown, styles?: Array<StyleHandle | null> | null) {
+async function getElementClassNames(element: unknown, styles?: StyleHandleList | undefined) {
   if (!isElementStyleSource(element)) {
     return [];
   }
@@ -6696,8 +7025,13 @@ function getStandaloneStyleLookupCandidates(classNames: string[]) {
   return [...new Set(classNames)];
 }
 
+// How far up a style's parent chain the editor reads. A Webflow combo class nests
+// one level per class in the combo, so 20 is far past any real selector; a chain
+// longer than that is treated as unreadable rather than followed.
+const CLIP_PATH_LIMITS = { styleDepthMax: 20 } as const;
+
 async function getStyleNamePath(style: StyleHandle, depth = 0): Promise<string[]> {
-  if (depth > 20) {
+  if (depth > CLIP_PATH_LIMITS.styleDepthMax) {
     return [];
   }
 
@@ -6716,7 +7050,7 @@ async function lookupStyleByNameCandidate(
   candidate: string | string[],
 ) {
   const timeout = Symbol('timeout');
-  let timeoutId: number | null = null;
+  let timeoutId: number | undefined = undefined;
 
   try {
     const result = await Promise.race([
@@ -6739,12 +7073,12 @@ async function lookupStyleByNameCandidate(
       source: 'getStyleByName' as const,
       found: true,
       style: result,
-      id: result.id || null,
+      id: result.id || undefined,
     };
   } catch {
     return { candidate, source: 'getStyleByName' as const, found: false };
   } finally {
-    if (timeoutId !== null) {
+    if (timeoutId !== undefined) {
       window.clearTimeout(timeoutId);
     }
   }
@@ -6789,7 +7123,7 @@ async function getClassStyleHandlesWithDiagnostics(
 async function getElementClassStyleHandles(
   element: unknown,
   webflowApi: WebflowStyleLookup,
-  elementStyles?: Array<StyleHandle | null> | null,
+  elementStyles?: StyleHandleList | undefined,
 ) {
   const { styles } = await getClassStyleHandlesWithDiagnostics(
     await getElementClassNames(element, elementStyles),
@@ -6799,20 +7133,20 @@ async function getElementClassStyleHandles(
 }
 
 function normalizeStylePropertyValue(value: unknown) {
-  return typeof value === 'string' ? value : null;
+  return typeof value === 'string' ? value : undefined;
 }
 
-function hasClipPathDeclaration(value: string | null | undefined) {
+function hasClipPathDeclaration(value: string | undefined) {
   return Boolean(value && value.trim());
 }
 
 function styleOptionsForBreakpoint(
-  breakpoint: BreakpointId | null | undefined,
+  breakpoint: BreakpointId | undefined,
 ): StyleTargetOptions | undefined {
   return breakpoint && breakpoint !== 'main' ? { breakpoint } : undefined;
 }
 
-function inheritedBreakpointChain(breakpoint: BreakpointId | null | undefined) {
+function inheritedBreakpointChain(breakpoint: BreakpointId | undefined) {
   if (breakpoint === 'xxl') {
     return ['xxl', 'xl', 'large', 'main'] as const;
   }
@@ -6835,7 +7169,7 @@ function inheritedBreakpointChain(breakpoint: BreakpointId | null | undefined) {
 }
 
 function clipPathStyleOriginFromSource(
-  sourceBreakpoint: BreakpointId | null | undefined,
+  sourceBreakpoint: BreakpointId | undefined,
   activeBreakpoint: BreakpointId,
 ): ClipPathStyleOrigin {
   if (!sourceBreakpoint) {
@@ -6873,14 +7207,14 @@ async function readStylePropertyDeclarationAt(
       ),
     );
     if (!hasClipPathDeclaration(raw)) {
-      return null;
+      return undefined;
     }
     if (property === 'clip-path' && propertiesWereRead && isNoneClipPathValue(raw)) {
-      return null;
+      return undefined;
     }
     return raw;
   } catch {
-    return null;
+    return undefined;
   }
 }
 
@@ -6888,7 +7222,7 @@ async function readStylePropertyDeclarationWithSource(
   style: StyleHandle,
   property: string,
   options?: StyleTargetOptions,
-): Promise<StylePropertyRead | null> {
+): Promise<StylePropertyRead | undefined> {
   for (const breakpoint of inheritedBreakpointChain(options?.breakpoint || 'main')) {
     const value = await readStylePropertyDeclarationAt(
       style,
@@ -6899,7 +7233,7 @@ async function readStylePropertyDeclarationWithSource(
       return { value, breakpoint };
     }
   }
-  return null;
+  return undefined;
 }
 
 async function readStylePropertyDeclaration(
@@ -6907,16 +7241,18 @@ async function readStylePropertyDeclaration(
   property: string,
   options?: StyleTargetOptions,
 ) {
-  return (await readStylePropertyDeclarationWithSource(style, property, options))?.value || null;
+  return (
+    (await readStylePropertyDeclarationWithSource(style, property, options))?.value || undefined
+  );
 }
 
 async function readClipPathDeclarationWithSource(style: StyleHandle, options?: StyleTargetOptions) {
   return readStylePropertyDeclarationWithSource(style, 'clip-path', options);
 }
 
-function parseStoredShapeVariant(value: string | null | undefined) {
+function parseStoredShapeVariant(value: string | undefined) {
   const parsed = parseClipPathInput(value || '');
-  return parsed?.kind === 'shape' ? parsed : null;
+  return parsed?.kind === 'shape' ? parsed : undefined;
 }
 
 async function readPastedShapeMetadata(style: StyleHandle, options?: StyleTargetOptions) {
@@ -6927,16 +7263,16 @@ async function readPastedShapeMetadata(style: StyleHandle, options?: StyleTarget
   const stretch = parseStoredShapeVariant(stretchValue);
   const contain = parseStoredShapeVariant(containValue);
 
-  return stretch && contain ? { source: 'style', stretch, contain } : null;
+  return stretch && contain ? { source: 'style', stretch, contain } : undefined;
 }
 
 async function findClipPathStyle(
-  styles: Array<StyleHandle | null> | null | undefined,
+  styles: StyleHandleList | undefined,
   options?: StyleTargetOptions,
 ) {
   const styleHandles = getStyleHandles(styles);
   if (!styleHandles.length) {
-    return null;
+    return undefined;
   }
 
   const reads = await Promise.all(
@@ -6945,11 +7281,11 @@ async function findClipPathStyle(
         const declaration = await readClipPathDeclarationWithSource(style, options);
         return {
           style,
-          raw: declaration?.value || null,
-          breakpoint: declaration?.breakpoint || null,
+          raw: declaration?.value || undefined,
+          breakpoint: declaration?.breakpoint || undefined,
         };
       } catch {
-        return { style, raw: null, breakpoint: null };
+        return { style, raw: undefined, breakpoint: undefined };
       }
     }),
   );
@@ -6969,9 +7305,9 @@ async function debugStyleSummary(style: StyleHandle, options?: StyleTargetOption
     readClipPathDeclarationWithSource(style, options),
   ]);
   return {
-    id: style.id || null,
+    id: style.id || undefined,
     path,
-    name: path[path.length - 1] || null,
+    name: path[path.length - 1] || undefined,
     canSet: Boolean(style.setProperty),
     canRemove: Boolean(style.removeProperty),
     propertiesClipPath: normalizeStylePropertyValue(properties?.['clip-path']),
@@ -6981,20 +7317,20 @@ async function debugStyleSummary(style: StyleHandle, options?: StyleTargetOption
 }
 
 async function debugStyleSummaries(
-  styles: Array<StyleHandle | null> | null | undefined,
+  styles: StyleHandleList | undefined,
   options?: StyleTargetOptions,
 ) {
   return Promise.all(getStyleHandles(styles).map((style) => debugStyleSummary(style, options)));
 }
 
 async function resolveWritableClipPathStyleForElement(
-  element: unknown | null,
+  element: unknown | undefined,
   webflowApi: WebflowStyleLookup,
   value: string,
   options?: StyleTargetOptions,
 ) {
   if (!element) {
-    return null;
+    return undefined;
   }
 
   const primaryStyles = await getElementPrimaryStyleHandles(element);
@@ -7002,12 +7338,12 @@ async function resolveWritableClipPathStyleForElement(
   const classStyles = await getElementClassStyleHandles(element, webflowApi, primaryStyles);
   const classMatch = classStyles.length
     ? await findClipPathStyle([...classStyles, ...primaryStyles], options)
-    : null;
+    : undefined;
   const candidates: StyleHandle[] = [];
   const seenRefs = new Set<StyleHandle>();
   const seenIds = new Set<string>();
 
-  const addCandidate = (style: StyleHandle | null | undefined) => {
+  const addCandidate = (style: ApiNullable<StyleHandle> | undefined) => {
     if (isStyleHandle(style)) {
       addUniqueStyleHandle(candidates, style, seenRefs, seenIds);
     }
@@ -7021,7 +7357,7 @@ async function resolveWritableClipPathStyleForElement(
   addStyleHandles(candidates, primaryStyles, seenRefs, seenIds);
   addStyleHandles(candidates, classStyles, seenRefs, seenIds);
 
-  return candidates.find((style) => canWriteClipPathValue(style, value)) || null;
+  return candidates.find((style) => canWriteClipPathValue(style, value)) || undefined;
 }
 
 // Resolve the style for an exact class path — `['clip-path']` → standalone
@@ -7036,25 +7372,25 @@ async function resolveWritableClipPathStyleForElement(
 async function findStyleForClassPath(
   names: string[],
   api: WebflowStyleLookup,
-): Promise<StyleHandle | null> {
+): Promise<StyleHandle | undefined> {
   if (!names.length) {
-    return null;
+    return undefined;
   }
   const candidate = names.length === 1 ? names[0] : names;
   if (!candidate) {
-    return null;
+    return undefined;
   }
   const existing = await readOptionalWithTimeout(
     () => api.getStyleByName?.(candidate),
     STYLE_LOOKUP_TIMEOUT_MS,
   );
   if (!isStyleHandle(existing)) {
-    return null;
+    return undefined;
   }
   const path = await getStyleNamePath(existing);
   return path.length === names.length && path.every((name, index) => name === names[index])
     ? existing
-    : null;
+    : undefined;
 }
 
 // Like findStyleForClassPath, but creates the exact standalone/combo (and any
@@ -7062,9 +7398,13 @@ async function findStyleForClassPath(
 async function resolveOrCreateStyleForClassPath(
   names: string[],
   api: WebflowStyleEditor,
-): Promise<StyleHandle | null> {
+  depth = 0,
+): Promise<StyleHandle | undefined> {
   if (!names.length) {
-    return null;
+    return undefined;
+  }
+  if (depth > CLIP_PATH_LIMITS.styleDepthMax) {
+    return undefined;
   }
 
   const existing = await findStyleForClassPath(names, api);
@@ -7072,28 +7412,28 @@ async function resolveOrCreateStyleForClassPath(
     return existing;
   }
   if (!api.createStyle) {
-    return null;
+    return undefined;
   }
 
   if (names.length === 1) {
     const name = names[0];
     if (!name) {
-      return null;
+      return undefined;
     }
     const created = await readOptional(() => api.createStyle?.(name));
-    return isStyleHandle(created) ? created : null;
+    return isStyleHandle(created) ? created : undefined;
   }
 
-  const parent = await resolveOrCreateStyleForClassPath(names.slice(0, -1), api);
+  const parent = await resolveOrCreateStyleForClassPath(names.slice(0, -1), api, depth + 1);
   if (!isStyleHandle(parent)) {
-    return null;
+    return undefined;
   }
   const name = names[names.length - 1];
   if (!name) {
-    return null;
+    return undefined;
   }
   const created = await readOptional(() => api.createStyle?.(name, { parent }));
-  return isStyleHandle(created) ? created : null;
+  return isStyleHandle(created) ? created : undefined;
 }
 
 // Resolve which selector's clip-path actually wins the CSS cascade for this
@@ -7107,15 +7447,53 @@ async function resolveCascadeWinnerClipPathStyle(
   primaryStyles: StyleHandle[],
   options: StyleTargetOptions | undefined,
   api: WebflowStyleLookup,
-): Promise<{
+): Promise<
+  | {
+      style: StyleHandle;
+      raw: string;
+      breakpoint: BreakpointId;
+      namePath: string[];
+    }
+  | undefined
+> {
+  const declaring = await readDeclaringCascadeCandidates(classNames, primaryStyles, options, api);
+  if (!declaring.length) {
+    return undefined;
+  }
+
+  const maxSpecificity = Math.max(...declaring.map((entry) => entry.specificity));
+  const topTier = declaring.filter((entry) => entry.specificity === maxSpecificity);
+  const winner = await latestInStylesheet(topTier, api);
+  if (!winner) {
+    return undefined;
+  }
+  return {
+    style: winner.style,
+    raw: winner.raw,
+    breakpoint: winner.breakpoint,
+    namePath: winner.namePath,
+  };
+}
+
+// A style whose clip-path could win the cascade, with what the cascade compares.
+type CascadeCandidate = {
   style: StyleHandle;
   raw: string;
   breakpoint: BreakpointId;
   namePath: string[];
-} | null> {
-  // Gather candidates (element combo chain + each class's standalone) and read
-  // each one's clip-path + name-path IN PARALLEL — this runs on the polling path,
-  // so sequential round-trips to the Designer would block the read loop.
+  specificity: number;
+};
+
+// The candidates (element combo chain + each class's standalone) that declare a
+// clip-path. Each one's clip-path and name-path are read IN PARALLEL — this runs on
+// the polling path, so sequential round-trips to the Designer would block the read
+// loop.
+async function readDeclaringCascadeCandidates(
+  classNames: string[],
+  primaryStyles: StyleHandle[],
+  options: StyleTargetOptions | undefined,
+  api: WebflowStyleLookup,
+): Promise<CascadeCandidate[]> {
   const standalones = await Promise.all(
     classNames.map((name) => findStyleForClassPath([name], api)),
   );
@@ -7129,75 +7507,58 @@ async function resolveCascadeWinnerClipPathStyle(
     }
   }
 
-  const declaring = (
-    await Promise.all(
-      candidates.map(async (style) => {
-        const declaration = await readClipPathDeclarationWithSource(style, options);
-        if (!declaration) {
-          return null;
-        }
-        if (!hasClipPathDeclaration(declaration.value)) {
-          return null;
-        }
-        const namePath = await getStyleNamePath(style);
-        return {
-          style,
-          raw: declaration.value,
-          breakpoint: declaration.breakpoint,
-          namePath,
-          specificity: namePath.length,
-        };
-      }),
-    )
-  ).filter(
-    (
-      entry,
-    ): entry is {
-      style: StyleHandle;
-      raw: string;
-      breakpoint: BreakpointId;
-      namePath: string[];
-      specificity: number;
-    } => entry !== null,
+  const reads = await Promise.all(
+    candidates.map(async (style): Promise<CascadeCandidate | undefined> => {
+      const declaration = await readClipPathDeclarationWithSource(style, options);
+      if (!declaration) {
+        return undefined;
+      }
+      if (!hasClipPathDeclaration(declaration.value)) {
+        return undefined;
+      }
+      const namePath = await getStyleNamePath(style);
+      return {
+        style,
+        raw: declaration.value,
+        breakpoint: declaration.breakpoint,
+        namePath,
+        specificity: namePath.length,
+      };
+    }),
   );
-  if (!declaring.length) {
-    return null;
-  }
+  return reads.filter((entry): entry is CascadeCandidate => entry !== undefined);
+}
 
-  const maxSpecificity = Math.max(...declaring.map((entry) => entry.specificity));
-  const topTier = declaring.filter((entry) => entry.specificity === maxSpecificity);
-
+// Among equally specific candidates, the one defined latest in the stylesheet wins.
+// The (potentially large) full style list is fetched only when there's a real tie.
+async function latestInStylesheet(
+  topTier: CascadeCandidate[],
+  api: WebflowStyleLookup,
+): Promise<CascadeCandidate | undefined> {
   const firstWinner = topTier[0];
   if (!firstWinner) {
-    return null;
+    return undefined;
   }
+  if (topTier.length <= 1) {
+    return firstWinner;
+  }
+  const allStyles =
+    (await readOptionalWithTimeout(() => api.getAllStyles?.(), STYLE_LOOKUP_TIMEOUT_MS)) || [];
+  const orderById = new Map<string, number>();
+  allStyles.forEach((style, index) => {
+    if (style?.id) {
+      orderById.set(style.id, index);
+    }
+  });
+  const orderOf = (entry: CascadeCandidate) =>
+    entry.style.id ? (orderById.get(entry.style.id) ?? -1) : -1;
   let winner = firstWinner;
-  if (topTier.length > 1) {
-    // Equal specificity → the one defined latest in the stylesheet wins. Only
-    // fetch the (potentially large) full style list when there's a real tie.
-    const allStyles =
-      (await readOptionalWithTimeout(() => api.getAllStyles?.(), STYLE_LOOKUP_TIMEOUT_MS)) || [];
-    const orderById = new Map<string, number>();
-    allStyles.forEach((style, index) => {
-      if (style?.id) {
-        orderById.set(style.id, index);
-      }
-    });
-    const orderOf = (entry: (typeof topTier)[number]) =>
-      entry.style.id ? (orderById.get(entry.style.id) ?? -1) : -1;
-    for (const entry of topTier.slice(1)) {
-      if (orderOf(entry) > orderOf(winner)) {
-        winner = entry;
-      }
+  for (const entry of topTier.slice(1)) {
+    if (orderOf(entry) > orderOf(winner)) {
+      winner = entry;
     }
   }
-
-  return {
-    style: winner.style,
-    raw: winner.raw,
-    breakpoint: winner.breakpoint,
-    namePath: winner.namePath,
-  };
+  return winner;
 }
 
 // The keyboard and pointer hints read out after each canvas handle's name.
@@ -7212,11 +7573,19 @@ const INSET_RADIUS_HANDLE_HINT =
   'Hold U to unlock separate horizontal and vertical radii. ' +
   'Hold Shift for all corners or Option for this corner and the opposite corner.';
 
-export default function ClipPath({
-  onApply,
-  onClear,
-  hideClassPicker,
-}: {
+// A field the user types into: the canvas's keyboard shortcuts leave it alone.
+function isEditableTarget(target: HTMLElement | undefined) {
+  return Boolean(
+    target &&
+    (target.tagName === 'INPUT' ||
+      target.tagName === 'SELECT' ||
+      target.tagName === 'TEXTAREA' ||
+      target.isContentEditable),
+  );
+}
+
+// The props of the editor when it is embedded in the Style panel.
+type ClipPathProps = {
   /** When provided (embedded in the Style panel's Effects popup), clip-path is
       persisted through these — the panel's own writers, which target the user's
       selected selector — instead of the tool resolving its own class style, and the
@@ -7224,22 +7593,70 @@ export default function ClipPath({
   onApply?: (value: string) => void;
   onClear?: () => void;
   hideClassPicker?: boolean;
-} = {}) {
+};
+
+// The shape being edited, its code text, and the preset menu.
+function useShapeState() {
   const [shape, setShape] = useState<ClipShape>(NONE_SHAPE);
   const [codeValue, setCodeValue] = useState(formatCodeValue(NONE_SHAPE));
   const [activePreset, setActivePreset] = useState<string>(NONE_PRESET);
   const [isPresetOpen, setIsPresetOpen] = useState(false);
   const [isCodeTransitioning, setIsCodeTransitioning] = useState(false);
   const [circleRadiusAngle, setCircleRadiusAngle] = useState(0);
-  const [selectedHandle, setSelectedHandle] = useState<HandleTarget | null>(null);
+  return {
+    shape,
+    setShape,
+    codeValue,
+    setCodeValue,
+    activePreset,
+    setActivePreset,
+    isPresetOpen,
+    setIsPresetOpen,
+    isCodeTransitioning,
+    setIsCodeTransitioning,
+    circleRadiusAngle,
+    setCircleRadiusAngle,
+  };
+}
+
+type EditorAfterShapeState = ClipPathProps & ReturnType<typeof useShapeState>;
+
+// Which handles are selected, and what the canvas measures.
+function useHandleSelectionState() {
+  const [selectedHandle, setSelectedHandle] = useState<HandleTarget | undefined>(undefined);
   const [selectedCodeHandles, setSelectedCodeHandles] = useState<HandleTarget[]>([]);
   const [isShapeTransformSelected, setIsShapeTransformSelected] = useState(false);
   const [activeInsetModifierMode, setActiveInsetModifierMode] =
     useState<InsetModifierMode>('single');
   const [activePresetIndex, setActivePresetIndex] = useState(PRESET_NAMES.indexOf(NONE_PRESET));
-  const [handleBounds, setHandleBounds] = useState<CanvasHandleBounds | null>(null);
-  const [canvasSize, setCanvasSize] = useState<CanvasSize | null>(null);
+  const [handleBounds, setHandleBounds] = useState<CanvasHandleBounds | undefined>(undefined);
+  const [canvasSize, setCanvasSize] = useState<CanvasSize | undefined>(undefined);
   const [polygonPointColors, setPolygonPointColors] = useState<string[]>([]);
+  return {
+    selectedHandle,
+    setSelectedHandle,
+    selectedCodeHandles,
+    setSelectedCodeHandles,
+    isShapeTransformSelected,
+    setIsShapeTransformSelected,
+    activeInsetModifierMode,
+    setActiveInsetModifierMode,
+    activePresetIndex,
+    setActivePresetIndex,
+    handleBounds,
+    setHandleBounds,
+    canvasSize,
+    setCanvasSize,
+    polygonPointColors,
+    setPolygonPointColors,
+  };
+}
+
+type EditorAfterHandleSelectionState = EditorAfterShapeState &
+  ReturnType<typeof useHandleSelectionState>;
+
+// How a pasted shape fits the element, and the drag guides.
+function useShapeFitState() {
   const [shapeFitMode, setShapeFitMode] = useState<ShapeFitMode>('contain');
   const [shapeScaleUseVariable, setShapeScaleUseVariable] = useState(false);
   const [shapeScaleVariableName, setShapeScaleVariableName] = useState(
@@ -7251,55 +7668,129 @@ export default function ClipPath({
   const [shapeOffsetTopVariableName, setShapeOffsetTopVariableName] = useState(
     DEFAULT_SHAPE_OFFSET_TOP_VARIABLE_NAME,
   );
-  const [selectionRect, setSelectionRect] = useState<SelectionRect | null>(null);
-  const [snapGuides, setSnapGuides] = useState<SnapGuides | null>(null);
+  const [selectionRect, setSelectionRect] = useState<SelectionRect | undefined>(undefined);
+  const [snapGuides, setSnapGuides] = useState<SnapGuides | undefined>(undefined);
+  return {
+    shapeFitMode,
+    setShapeFitMode,
+    shapeScaleUseVariable,
+    setShapeScaleUseVariable,
+    shapeScaleVariableName,
+    setShapeScaleVariableName,
+    shapeOffsetLeftVariableName,
+    setShapeOffsetLeftVariableName,
+    shapeOffsetTopVariableName,
+    setShapeOffsetTopVariableName,
+    selectionRect,
+    setSelectionRect,
+    snapGuides,
+    setSnapGuides,
+  };
+}
+
+type EditorAfterShapeFitState = EditorAfterHandleSelectionState &
+  ReturnType<typeof useShapeFitState>;
+
+// Where the clip-path is read from and written to, and the popovers over it.
+function useStyleSourceState() {
   const [clipPathStyleOrigin, setClipPathStyleOrigin] = useState<ClipPathStyleOrigin>('none');
   const [elementClassNames, setElementClassNames] = useState<string[]>([]);
-  const [appliedClassName, setAppliedClassName] = useState<string | null>(null);
+  const [appliedClassName, setAppliedClassName] = useState<string | undefined>(undefined);
   const [selectedClassNames, setSelectedClassNames] = useState<string[]>([]);
   // Where the rendered clip-path actually comes from (for the orange "inherited"
   // label's "Value comes from:" popover) — its selector classes and breakpoint.
   const [clipPathSourceSelector, setClipPathSourceSelector] = useState<string[]>([]);
-  const [clipPathSourceBreakpoint, setClipPathSourceBreakpoint] = useState<BreakpointId | null>(
-    null,
-  );
+  const [clipPathSourceBreakpoint, setClipPathSourceBreakpoint] = useState<
+    BreakpointId | undefined
+  >(undefined);
   const [isClipPathLabelMenuOpen, setIsClipPathLabelMenuOpen] = useState(false);
   const [isShortcutHelpOpen, setIsShortcutHelpOpen] = useState(false);
-  const [shortcutHelpPortalTarget, setShortcutHelpPortalTarget] = useState<HTMLElement | null>(
-    null,
+  const [shortcutHelpPortalTarget, setShortcutHelpPortalTarget] = useState<HTMLElement | undefined>(
+    undefined,
   );
+  return {
+    clipPathStyleOrigin,
+    setClipPathStyleOrigin,
+    elementClassNames,
+    setElementClassNames,
+    appliedClassName,
+    setAppliedClassName,
+    selectedClassNames,
+    setSelectedClassNames,
+    clipPathSourceSelector,
+    setClipPathSourceSelector,
+    clipPathSourceBreakpoint,
+    setClipPathSourceBreakpoint,
+    isClipPathLabelMenuOpen,
+    setIsClipPathLabelMenuOpen,
+    isShortcutHelpOpen,
+    setIsShortcutHelpOpen,
+    shortcutHelpPortalTarget,
+    setShortcutHelpPortalTarget,
+  };
+}
 
+type EditorAfterStyleSourceState = EditorAfterShapeFitState &
+  ReturnType<typeof useStyleSourceState>;
+
+// Mutable state of the canvas: its elements, and the drags in flight.
+function useCanvasRefs() {
   // Memoized cascade-winner per (classNames + cheap effective value) so a refining
   // re-read can reuse the existing shape-cache-aware load path instead of blocking
   // the first paint. Keyed so it auto-invalidates when the situation changes.
-  const cascadeWinnerCacheRef = useRef<{
-    key: string;
-    winner: Awaited<ReturnType<typeof resolveCascadeWinnerClipPathStyle>>;
-  } | null>(null);
-  const canvasWrapRef = useRef<HTMLDivElement | null>(null);
-  const canvasRef = useRef<HTMLDivElement | null>(null);
-  const clipPathLabelRef = useRef<HTMLDivElement | null>(null);
-  const shortcutHelpRef = useRef<HTMLDivElement | null>(null);
-  const presetDropdownRef = useRef<HTMLDivElement | null>(null);
-  const presetButtonRef = useRef<HTMLButtonElement | null>(null);
-  const presetListRef = useRef<HTMLDivElement | null>(null);
+  const cascadeWinnerCacheRef = useRef<
+    | {
+        key: string;
+        winner: Awaited<ReturnType<typeof resolveCascadeWinnerClipPathStyle>>;
+      }
+    | undefined
+  >(undefined);
+  const canvasWrapRef = useRef<HTMLDivElement>(null);
+  const canvasRef = useRef<HTMLDivElement>(null);
+  const clipPathLabelRef = useRef<HTMLDivElement>(null);
+  const shortcutHelpRef = useRef<HTMLDivElement>(null);
+  const presetDropdownRef = useRef<HTMLDivElement>(null);
+  const presetButtonRef = useRef<HTMLButtonElement>(null);
+  const presetListRef = useRef<HTMLDivElement>(null);
   const presetTypeaheadRef = useRef('');
-  const presetTypeaheadTimerRef = useRef<number | null>(null);
-  const dragTargetRef = useRef<DragTarget | null>(null);
-  const polygonSelectionDragRef = useRef<PolygonSelectionDrag | null>(null);
-  const shapeTransformDragRef = useRef<ShapeTransformDrag | null>(null);
-  const activePointerIdRef = useRef<number | null>(null);
-  const activePointerCaptureRef = useRef<HTMLElement | null>(null);
+  const presetTypeaheadTimerRef = useRef<number | undefined>(undefined);
+  const dragTargetRef = useRef<DragTarget | undefined>(undefined);
+  const polygonSelectionDragRef = useRef<PolygonSelectionDrag | undefined>(undefined);
+  const shapeTransformDragRef = useRef<ShapeTransformDrag | undefined>(undefined);
+  const activePointerIdRef = useRef<number | undefined>(undefined);
+  const activePointerCaptureRef = useRef<HTMLElement | undefined>(undefined);
+  return {
+    cascadeWinnerCacheRef,
+    canvasWrapRef,
+    canvasRef,
+    clipPathLabelRef,
+    shortcutHelpRef,
+    presetDropdownRef,
+    presetButtonRef,
+    presetListRef,
+    presetTypeaheadRef,
+    presetTypeaheadTimerRef,
+    dragTargetRef,
+    polygonSelectionDragRef,
+    shapeTransformDragRef,
+    activePointerIdRef,
+    activePointerCaptureRef,
+  };
+}
 
-  const styleRef = useRef<StyleHandle | null>(null);
+type EditorAfterCanvasRefs = EditorAfterStyleSourceState & ReturnType<typeof useCanvasRefs>;
+
+// Mutable state of the write path and of the keyboard.
+function useWriteRefs() {
+  const styleRef = useRef<StyleHandle | undefined>(undefined);
   const latestCssRef = useRef<string>('');
-  const lastWrittenRef = useRef<string | null>(null);
-  const writeTimerRef = useRef<number | null>(null);
+  const lastWrittenRef = useRef<string | undefined>(undefined);
+  const writeTimerRef = useRef<number | undefined>(undefined);
   const localWritePendingRef = useRef(false);
-  const selectedHandleRef = useRef<HandleTarget | null>(null);
+  const selectedHandleRef = useRef<HandleTarget | undefined>(undefined);
   const selectedHandlesRef = useRef<HandleTarget[]>([]);
   const isShapeTransformSelectedRef = useRef(false);
-  const handleBoundsRef = useRef<CanvasHandleBounds | null>(null);
+  const handleBoundsRef = useRef<CanvasHandleBounds | undefined>(undefined);
   const polygonPointColorsRef = useRef<string[]>([]);
   const spaceKeyPressedRef = useRef(false);
   const radiusUnlockKeyPressedRef = useRef(false);
@@ -7310,29 +7801,77 @@ export default function ClipPath({
   });
   const pressedArrowKeysRef = useRef<Set<ArrowKey>>(new Set());
   const handledKeyboardEventsRef = useRef<WeakSet<Event>>(new WeakSet());
-  const keyboardMoveDelayTimerRef = useRef<number | null>(null);
-  const keyboardMoveTimerRef = useRef<number | null>(null);
+  return {
+    styleRef,
+    latestCssRef,
+    lastWrittenRef,
+    writeTimerRef,
+    localWritePendingRef,
+    selectedHandleRef,
+    selectedHandlesRef,
+    isShapeTransformSelectedRef,
+    handleBoundsRef,
+    polygonPointColorsRef,
+    spaceKeyPressedRef,
+    radiusUnlockKeyPressedRef,
+    keyboardModifiersRef,
+    pressedArrowKeysRef,
+    handledKeyboardEventsRef,
+  };
+}
+
+type EditorAfterWriteRefs = EditorAfterCanvasRefs & ReturnType<typeof useWriteRefs>;
+
+// Timers and bookkeeping for keyboard moves, the code transition, and selection reads.
+function useSelectionRefs() {
+  const keyboardMoveDelayTimerRef = useRef<number | undefined>(undefined);
+  const keyboardMoveTimerRef = useRef<number | undefined>(undefined);
   const polygonDisplayProjectionsRef = useRef<Map<number, PolygonDisplayProjection>>(new Map());
   const isPresetOpenRef = useRef(false);
   const circleRadiusAngleRef = useRef(0);
   const codeChangedShapeRef = useRef(false);
-  const codeTransitionTimerRef = useRef<number | null>(null);
+  const codeTransitionTimerRef = useRef<number | undefined>(undefined);
   const selectionReadSeqRef = useRef(0);
   const selectionReadInProgressRef = useRef(false);
-  const selectionReadTimerRef = useRef<number | null>(null);
-  const selectedElementKeyRef = useRef<string | null>(null);
+  const selectionReadTimerRef = useRef<number | undefined>(undefined);
+  const selectedElementKeyRef = useRef<string | undefined>(undefined);
   const selectedClassNamesRef = useRef<string[]>([]);
   // True while the selection is the auto-derived cascade winner (not a manual
   // click) — lets it keep following the winner as styles/classes change.
   const selectionIsDefaultRef = useRef(true);
-  const refreshSelectedElementRef = useRef<((options?: SelectionReadOptions) => void) | null>(null);
+  const refreshSelectedElementRef = useRef<((options?: SelectionReadOptions) => void) | undefined>(
+    undefined,
+  );
+  return {
+    keyboardMoveDelayTimerRef,
+    keyboardMoveTimerRef,
+    polygonDisplayProjectionsRef,
+    isPresetOpenRef,
+    circleRadiusAngleRef,
+    codeChangedShapeRef,
+    codeTransitionTimerRef,
+    selectionReadSeqRef,
+    selectionReadInProgressRef,
+    selectionReadTimerRef,
+    selectedElementKeyRef,
+    selectedClassNamesRef,
+    selectionIsDefaultRef,
+    refreshSelectedElementRef,
+  };
+}
+
+type EditorAfterSelectionRefs = EditorAfterWriteRefs & ReturnType<typeof useSelectionRefs>;
+
+// Mirrors of the latest shape settings and embed callbacks, and the undo history.
+function useShapeRefs(editor: EditorAfterSelectionRefs) {
+  const { onApply, onClear } = editor;
   const shapeRef = useRef<ClipShape>(NONE_SHAPE);
   const shapeFitModeRef = useRef<ShapeFitMode>('contain');
   const shapeScaleUseVariableRef = useRef(false);
   const shapeScaleVariableNameRef = useRef(DEFAULT_SHAPE_SCALE_VARIABLE_NAME);
   const shapeOffsetLeftVariableNameRef = useRef(DEFAULT_SHAPE_OFFSET_LEFT_VARIABLE_NAME);
   const shapeOffsetTopVariableNameRef = useRef(DEFAULT_SHAPE_OFFSET_TOP_VARIABLE_NAME);
-  const pastedShapeSvgCacheRef = useRef<PastedShapeSvgCache | null>(null);
+  const pastedShapeSvgCacheRef = useRef<PastedShapeSvgCache | undefined>(undefined);
   const activeBreakpointRef = useRef<BreakpointId>('main');
   // Mirror the embed callbacks into refs so the write effect (keyed on [css]) always
   // sees the latest without re-subscribing.
@@ -7343,7 +7882,27 @@ export default function ClipPath({
 
   const historyRef = useRef<ClipShape[]>([NONE_SHAPE]);
   const historyIndexRef = useRef<number>(0);
+  return {
+    shapeRef,
+    shapeFitModeRef,
+    shapeScaleUseVariableRef,
+    shapeScaleVariableNameRef,
+    shapeOffsetLeftVariableNameRef,
+    shapeOffsetTopVariableNameRef,
+    pastedShapeSvgCacheRef,
+    activeBreakpointRef,
+    onApplyRef,
+    onClearRef,
+    historyRef,
+    historyIndexRef,
+  };
+}
 
+type EditorAfterShapeRefs = EditorAfterSelectionRefs & ReturnType<typeof useShapeRefs>;
+
+// The CSS the shape writes, and the code editor's token colours.
+function useCodeHighlights(editor: EditorAfterShapeRefs) {
+  const { shape, canvasSize, codeValue, polygonPointColors } = editor;
   const css = useMemo(() => formatClipPath(shape), [shape]);
   const previewCss = useMemo(
     () => formatClipPathForPreview(shape, css, canvasSize),
@@ -7362,6 +7921,14 @@ export default function ClipPath({
     });
     return colorClasses;
   }, [codeTokenHighlights]);
+  return { css, previewCss, codeTokenHighlights, codeHandleColorClasses };
+}
+
+type EditorAfterCodeHighlights = EditorAfterShapeRefs & ReturnType<typeof useCodeHighlights>;
+
+// The code tokens of the selected handles, drawn over the rest.
+function useSelectedCodeHighlights(editor: EditorAfterCodeHighlights) {
+  const { selectedCodeHandles, selectedHandle, codeTokenHighlights, codeValue } = editor;
   const selectedCodeTokenHighlights = useMemo<CodeEditorTokenHighlight[]>(() => {
     const selectedHandles = selectedCodeHandles.length
       ? selectedCodeHandles
@@ -7378,7 +7945,7 @@ export default function ClipPath({
     selectedHandles.forEach((selected) => {
       const ranges = codeTokenHighlights
         .filter((highlight) => highlight.handles.some((handle) => handlesMatch(selected, handle)))
-        .sort((a, b) => a.from - b.from || a.to - b.to);
+        .sort((left, right) => left.from - right.from || left.to - right.to);
 
       let group: ClipPathCodeHighlight[] = [];
       const flushGroup = () => {
@@ -7414,6 +7981,22 @@ export default function ClipPath({
 
     return [...selectionHighlights, ...codeTokenHighlights];
   }, [codeTokenHighlights, codeValue, selectedCodeHandles, selectedHandle]);
+  return { selectedCodeTokenHighlights };
+}
+
+type EditorAfterSelectedCodeHighlights = EditorAfterCodeHighlights &
+  ReturnType<typeof useSelectedCodeHighlights>;
+
+// The shortcut help, and the refs that mirror this render's state for the listeners
+// registered once.
+function useLatestMirrors(editor: EditorAfterSelectedCodeHighlights) {
+  const { shape, shapeFitMode, latestCssRef, css, shapeRef, shapeFitModeRef } = editor;
+  const { shapeScaleUseVariableRef, shapeScaleUseVariable, shapeScaleVariableNameRef } = editor;
+  const { shapeScaleVariableName, shapeOffsetLeftVariableNameRef } = editor;
+  const { shapeOffsetLeftVariableName, shapeOffsetTopVariableNameRef } = editor;
+  const { shapeOffsetTopVariableName, isShapeTransformSelectedRef } = editor;
+  const { isShapeTransformSelected, handleBoundsRef, handleBounds, isPresetOpenRef } = editor;
+  const { isPresetOpen, circleRadiusAngleRef, circleRadiusAngle } = editor;
   const shortcutHelpGroups = useMemo(
     () => clipPathShortcutGroups(shape, shapeFitMode),
     [shape, shapeFitMode],
@@ -7429,7 +8012,17 @@ export default function ClipPath({
   handleBoundsRef.current = handleBounds;
   isPresetOpenRef.current = isPresetOpen;
   circleRadiusAngleRef.current = circleRadiusAngle;
+  return { shortcutHelpGroups };
+}
 
+type EditorAfterLatestMirrors = EditorAfterSelectedCodeHighlights &
+  ReturnType<typeof useLatestMirrors>;
+
+// Keeping presets, pending writes, and point colours in step with the shape.
+function shapeSyncActions(editor: EditorAfterLatestMirrors) {
+  const { setActivePreset, setActivePresetIndex, writeTimerRef, selectionReadSeqRef } = editor;
+  const { selectionReadTimerRef, localWritePendingRef, polygonPointColorsRef } = editor;
+  const { setPolygonPointColors } = editor;
   const syncPresetForShape = (next: ClipShape) => {
     const matchedPreset = matchPreset(next);
     const nextPreset = matchedPreset || NONE_PRESET;
@@ -7438,17 +8031,17 @@ export default function ClipPath({
   };
 
   const clearPendingWrite = () => {
-    if (writeTimerRef.current !== null) {
+    if (writeTimerRef.current !== undefined) {
       window.clearTimeout(writeTimerRef.current);
-      writeTimerRef.current = null;
+      writeTimerRef.current = undefined;
     }
   };
 
   const cancelPendingSelectionRead = () => {
     selectionReadSeqRef.current += 1;
-    if (selectionReadTimerRef.current !== null) {
+    if (selectionReadTimerRef.current !== undefined) {
       window.clearTimeout(selectionReadTimerRef.current);
-      selectionReadTimerRef.current = null;
+      selectionReadTimerRef.current = undefined;
     }
   };
 
@@ -7470,7 +8063,25 @@ export default function ClipPath({
       next.kind === 'polygon' ? normalizePolygonPointColors(next.points.length, colors) : [],
     );
   };
+  return {
+    syncPresetForShape,
+    clearPendingWrite,
+    cancelPendingSelectionRead,
+    markLocalShapeChange,
+    syncPolygonPointColors,
+    syncPolygonPointColorsForShape,
+  };
+}
 
+type EditorAfterShapeSyncActions = EditorAfterLatestMirrors & ReturnType<typeof shapeSyncActions>;
+
+// Keeping the shape-scale options and fit mode in step with a loaded shape.
+function shapeScaleSyncActions(editor: EditorAfterShapeSyncActions) {
+  const { shapeScaleUseVariableRef, shapeScaleVariableNameRef } = editor;
+  const { shapeOffsetLeftVariableNameRef, shapeOffsetTopVariableNameRef } = editor;
+  const { setShapeScaleUseVariable, setShapeScaleVariableName } = editor;
+  const { setShapeOffsetLeftVariableName, setShapeOffsetTopVariableName, shapeFitModeRef } = editor;
+  const { setShapeFitMode } = editor;
   const currentShapeScaleOptions = (
     overrides: ShapeScaleOptionOverrides = {},
   ): ShapeScaleOptions => ({
@@ -7517,9 +8128,23 @@ export default function ClipPath({
     shapeFitModeRef.current = nextMode;
     setShapeFitMode(nextMode);
   };
+  return {
+    currentShapeScaleOptions,
+    syncShapeScaleOptionsForLoadedShape,
+    syncShapeFitModeForLoadedShape,
+  };
+}
 
+type EditorAfterShapeScaleSyncActions = EditorAfterShapeSyncActions &
+  ReturnType<typeof shapeScaleSyncActions>;
+
+// The pasted-SVG cache, point colours, the keyboard move loop, and snap guides.
+function pastedCacheActions(editor: EditorAfterShapeScaleSyncActions) {
+  const { pastedShapeSvgCacheRef, currentShapeScaleOptions, polygonPointColorsRef } = editor;
+  const { syncPolygonPointColors, setActiveInsetModifierMode, keyboardMoveDelayTimerRef } = editor;
+  const { keyboardMoveTimerRef, pressedArrowKeysRef, setSnapGuides } = editor;
   const clearPastedShapeSvgCache = () => {
-    pastedShapeSvgCacheRef.current = null;
+    pastedShapeSvgCacheRef.current = undefined;
   };
 
   const shapeMatchesPastedSvgCache = (next: ClipShape, cache = pastedShapeSvgCacheRef.current) =>
@@ -7531,14 +8156,16 @@ export default function ClipPath({
     options: ShapeScaleOptions = currentShapeScaleOptions(),
   ) => {
     const cache = normalizeShapeFitCache(pastedShapeSvgCacheRef.current, options);
-    return next.kind === 'shape' && cache && shapeMatchesPastedSvgCache(next, cache) ? cache : null;
+    return next.kind === 'shape' && cache && shapeMatchesPastedSvgCache(next, cache)
+      ? cache
+      : undefined;
   };
 
-  const cacheFromPastedShapeSvgSource = (source: string): PastedShapeSvgCache | null => {
+  const cacheFromPastedShapeSvgSource = (source: string): PastedShapeSvgCache | undefined => {
     const stretch = parseSvgClipPathShape(source, 'stretch');
     const contain = parseSvgClipPathShape(source, 'contain', currentShapeScaleOptions());
     return normalizeShapeFitCache(
-      stretch && contain ? { source, stretch, contain } : null,
+      stretch && contain ? { source, stretch, contain } : undefined,
       currentShapeScaleOptions(),
     );
   };
@@ -7558,13 +8185,13 @@ export default function ClipPath({
   };
 
   const stopKeyboardMoveLoop = (clearKeys = true) => {
-    if (keyboardMoveDelayTimerRef.current !== null) {
+    if (keyboardMoveDelayTimerRef.current !== undefined) {
       window.clearTimeout(keyboardMoveDelayTimerRef.current);
-      keyboardMoveDelayTimerRef.current = null;
+      keyboardMoveDelayTimerRef.current = undefined;
     }
-    if (keyboardMoveTimerRef.current !== null) {
+    if (keyboardMoveTimerRef.current !== undefined) {
       window.clearInterval(keyboardMoveTimerRef.current);
-      keyboardMoveTimerRef.current = null;
+      keyboardMoveTimerRef.current = undefined;
     }
     if (clearKeys) {
       pressedArrowKeysRef.current.clear();
@@ -7576,9 +8203,29 @@ export default function ClipPath({
   };
 
   const clearSnapGuides = () => {
-    setSnapGuides(null);
+    setSnapGuides(undefined);
   };
+  return {
+    clearPastedShapeSvgCache,
+    shapeMatchesPastedSvgCache,
+    matchingPastedSvgCacheForShape,
+    cacheFromPastedShapeSvgSource,
+    insertPolygonPointColor,
+    syncInsetModifierMode,
+    stopKeyboardMoveLoop,
+    showSnapGuides,
+    clearSnapGuides,
+  };
+}
 
+type EditorAfterPastedCacheActions = EditorAfterShapeScaleSyncActions &
+  ReturnType<typeof pastedCacheActions>;
+
+// Selecting handles, and reading the polygon selection.
+function handleSelectionActions(editor: EditorAfterPastedCacheActions) {
+  const { isShapeTransformSelectedRef, setIsShapeTransformSelected, selectedHandleRef } = editor;
+  const { stopKeyboardMoveLoop, clearSnapGuides, selectedHandlesRef, setSelectedHandle } = editor;
+  const { setSelectedCodeHandles, setActiveInsetModifierMode, spaceKeyPressedRef } = editor;
   const setShapeTransformSelection = (selected: boolean) => {
     isShapeTransformSelectedRef.current = selected;
     setIsShapeTransformSelected(selected);
@@ -7590,14 +8237,17 @@ export default function ClipPath({
       return;
     }
 
-    selectedHandleRef.current = null;
+    selectedHandleRef.current = undefined;
     selectedHandlesRef.current = [];
-    setSelectedHandle(null);
+    setSelectedHandle(undefined);
     setSelectedCodeHandles([]);
     setActiveInsetModifierMode('single');
   };
 
-  const setHandleSelection = (handle: HandleTarget | null, handles = handle ? [handle] : []) => {
+  const setHandleSelection = (
+    handle: HandleTarget | undefined,
+    handles = handle ? [handle] : [],
+  ) => {
     if (isShapeTransformSelectedRef.current) {
       isShapeTransformSelectedRef.current = false;
       setIsShapeTransformSelected(false);
@@ -7615,7 +8265,7 @@ export default function ClipPath({
     }
   };
 
-  const selectHandle = (handle: HandleTarget | null) => {
+  const selectHandle = (handle: HandleTarget | undefined) => {
     setHandleSelection(handle);
   };
 
@@ -7640,8 +8290,24 @@ export default function ClipPath({
     const selectedHandle = selectedHandleRef.current;
     return isPolygonPointHandle(selectedHandle) ? [selectedHandle] : [];
   };
+  return {
+    setShapeTransformSelection,
+    setHandleSelection,
+    selectHandle,
+    getPolygonSelection,
+    getPolygonSelectionIndexes,
+    getActivePolygonSelection,
+  };
+}
 
-  const selectHandleFromPointer = (handle: HandleTarget, additive: boolean) => {
+type EditorAfterHandleSelectionActions = EditorAfterPastedCacheActions &
+  ReturnType<typeof handleSelectionActions>;
+
+// Selecting handles from the pointer and the keyboard.
+function pointerSelectionActions(editor: EditorAfterHandleSelectionActions) {
+  const { selectedHandlesRef, setHandleSelection, selectedHandleRef, setSelectedHandle } = editor;
+  const { selectHandle, canvasRef } = editor;
+  const selectHandleFromPointer = (handle: HandleTarget, { additive }: { additive: boolean }) => {
     if (isPolygonPointHandle(handle)) {
       const selectedPolygonHandles = selectedHandlesRef.current.filter(isPolygonPointHandle);
       if (additive) {
@@ -7670,21 +8336,29 @@ export default function ClipPath({
     selectHandle(handle);
   };
 
-  const canvasPointFromClient = (clientX: number, clientY: number): Point | null => {
+  const canvasPointFromClient = (clientX: number, clientY: number): Point | undefined => {
     const canvas = canvasRef.current;
     if (!canvas) {
-      return null;
+      return undefined;
     }
     const rect = canvas.getBoundingClientRect();
     if (rect.width <= 0 || rect.height <= 0) {
-      return null;
+      return undefined;
     }
     return {
       x: ((clientX - rect.left) / rect.width) * 100,
       y: ((clientY - rect.top) / rect.height) * 100,
     };
   };
+  return { selectHandleFromPointer, selectHandleForKeyboard, canvasPointFromClient };
+}
 
+type EditorAfterPointerSelectionActions = EditorAfterHandleSelectionActions &
+  ReturnType<typeof pointerSelectionActions>;
+
+// The marquee selection of polygon points.
+function polygonSelectionActions(editor: EditorAfterPointerSelectionActions) {
+  const { handleBoundsRef, polygonDisplayProjectionsRef, shapeRef, setHandleSelection } = editor;
   const polygonDisplayPointForSelection = (points: Point[], index: number): Point => {
     const display = polygonHandleDisplayPoint(
       points,
@@ -7721,7 +8395,7 @@ export default function ClipPath({
       ? uniqueHandles([...validBaseHandles, ...selectedByRect])
       : selectedByRect;
     const nextPrimary =
-      selectedByRect[selectedByRect.length - 1] || nextHandles[nextHandles.length - 1] || null;
+      selectedByRect[selectedByRect.length - 1] || nextHandles[nextHandles.length - 1] || undefined;
 
     setHandleSelection(nextPrimary, nextHandles);
   };
@@ -7733,21 +8407,67 @@ export default function ClipPath({
         ?.focus({ preventScroll: true });
     });
   };
+  return { polygonDisplayPointForSelection, applyPolygonSelectionRect, focusSelectedHandle };
+}
 
+type EditorAfterPolygonSelectionActions = EditorAfterPointerSelectionActions &
+  ReturnType<typeof polygonSelectionActions>;
+
+// Pointer capture, the undo commit, and closing what a drag leaves open.
+function dragSupportActions(editor: EditorAfterPolygonSelectionActions) {
+  const { activePointerIdRef, activePointerCaptureRef, historyRef, historyIndexRef } = editor;
+  const { setIsPresetOpen, codeTransitionTimerRef, setIsCodeTransitioning } = editor;
   const releaseActivePointerCapture = () => {
     const pointerId = activePointerIdRef.current;
     const captureTarget = activePointerCaptureRef.current;
-    if (pointerId !== null && captureTarget?.hasPointerCapture?.(pointerId)) {
+    if (pointerId !== undefined && captureTarget?.hasPointerCapture?.(pointerId)) {
       try {
         captureTarget.releasePointerCapture(pointerId);
       } catch {
         /* pointer capture can already be gone after pointerup/cancel */
       }
     }
-    activePointerIdRef.current = null;
-    activePointerCaptureRef.current = null;
+    activePointerIdRef.current = undefined;
+    activePointerCaptureRef.current = undefined;
+  };
+  const commit = (next: ClipShape) => {
+    const current = historyRef.current[historyIndexRef.current];
+    if (current && shapesClose(current, next)) {
+      return;
+    }
+    const truncated = historyRef.current.slice(0, historyIndexRef.current + 1);
+    truncated.push(next);
+    if (truncated.length > HISTORY_LIMIT) {
+      truncated.shift();
+    }
+    historyRef.current = truncated;
+    historyIndexRef.current = truncated.length - 1;
   };
 
+  const closePresetDropdown = () => {
+    setIsPresetOpen(false);
+  };
+
+  const stopCodeTransition = () => {
+    if (codeTransitionTimerRef.current !== undefined) {
+      window.clearTimeout(codeTransitionTimerRef.current);
+      codeTransitionTimerRef.current = undefined;
+    }
+    setIsCodeTransitioning(false);
+  };
+  return { releaseActivePointerCapture, commit, closePresetDropdown, stopCodeTransition };
+}
+
+type EditorAfterDragSupportActions = EditorAfterPolygonSelectionActions &
+  ReturnType<typeof dragSupportActions>;
+
+// Ending a handle drag and a marquee drag.
+function dragFinishActions(editor: EditorAfterDragSupportActions) {
+  const { keyboardModifiersRef, dragTargetRef, setShape, commit, clearSnapGuides } = editor;
+  const { releaseActivePointerCapture, radiusUnlockKeyPressedRef, selectedHandleRef } = editor;
+  const { syncInsetModifierMode, setActiveInsetModifierMode, focusSelectedHandle } = editor;
+  const { polygonSelectionDragRef, applyPolygonSelectionRect, selectHandle } = editor;
+  const { setSelectionRect } = editor;
   const finishDrag = (
     focusHandle = true,
     modifiers: KeyboardModifiers = keyboardModifiersRef.current,
@@ -7759,7 +8479,7 @@ export default function ClipPath({
         return current;
       });
     }
-    dragTargetRef.current = null;
+    dragTargetRef.current = undefined;
     clearSnapGuides();
     releaseActivePointerCapture();
     keyboardModifiersRef.current = {
@@ -7786,21 +8506,30 @@ export default function ClipPath({
     if (applySelection && selection.didMove) {
       applyPolygonSelectionRect(selection);
     } else if (applySelection && !selection.additive) {
-      selectHandle(null);
+      selectHandle(undefined);
     }
 
-    polygonSelectionDragRef.current = null;
-    setSelectionRect(null);
+    polygonSelectionDragRef.current = undefined;
+    setSelectionRect(undefined);
     clearSnapGuides();
     releaseActivePointerCapture();
   };
+  return { finishDrag, finishPolygonSelectionDrag };
+}
 
+type EditorAfterDragFinishActions = EditorAfterDragSupportActions &
+  ReturnType<typeof dragFinishActions>;
+
+// Moving and resizing a whole shape by its bounding box.
+function transformDragActions(editor: EditorAfterDragFinishActions) {
+  const { keyboardModifiersRef, showSnapGuides, clearSnapGuides } = editor;
   const shapeFromTransformDrag = (
     drag: ShapeTransformDrag,
     point: Point,
     modifiers: KeyboardModifiers = keyboardModifiersRef.current,
   ) => {
-    const containModel = drag.fitMode === 'contain' ? containModelFromShape(drag.before) : null;
+    const containModel =
+      drag.fitMode === 'contain' ? containModelFromShape(drag.before) : undefined;
 
     if (drag.mode === 'move') {
       const rawDx = point.x - drag.start.x;
@@ -7819,7 +8548,7 @@ export default function ClipPath({
     }
 
     if (!drag.corner) {
-      return null;
+      return undefined;
     }
     // Resize toward the opposite corner by default (it stays pinned). Hold Option/Alt to resize
     // from the shape's center instead.
@@ -7834,7 +8563,7 @@ export default function ClipPath({
     const nextVector = { x: point.x - anchor.x, y: point.y - anchor.y };
     const startLengthSquared = startVector.x ** 2 + startVector.y ** 2;
     if (startLengthSquared <= SVG_POINT_EPSILON) {
-      return null;
+      return undefined;
     }
 
     const rawScale =
@@ -7854,7 +8583,22 @@ export default function ClipPath({
       }),
     );
   };
+  return { shapeFromTransformDrag };
+}
 
+type EditorAfterTransformDragActions = EditorAfterDragFinishActions &
+  ReturnType<typeof transformDragActions>;
+
+// Ending a shape drag, and loading a shape read from the selection.
+function selectionLoadActions(editor: EditorAfterTransformDragActions) {
+  const { shapeTransformDragRef, setShape, commit, clearSnapGuides } = editor;
+  const { releaseActivePointerCapture, clearPendingWrite, localWritePendingRef } = editor;
+  const { shapeMatchesPastedSvgCache, clearPastedShapeSvgCache, dragTargetRef } = editor;
+  const { polygonSelectionDragRef, setSelectionRect, selectHandle, codeChangedShapeRef } = editor;
+  const { closePresetDropdown, stopCodeTransition, shapeRef } = editor;
+  const { syncPolygonPointColorsForShape, syncPresetForShape } = editor;
+  const { syncShapeFitModeForLoadedShape, setCodeValue, lastWrittenRef, historyRef } = editor;
+  const { historyIndexRef } = editor;
   const finishShapeTransformDrag = (commitChange = true) => {
     const drag = shapeTransformDragRef.current;
     if (drag && commitChange) {
@@ -7863,7 +8607,7 @@ export default function ClipPath({
         return current;
       });
     }
-    shapeTransformDragRef.current = null;
+    shapeTransformDragRef.current = undefined;
     clearSnapGuides();
     releaseActivePointerCapture();
   };
@@ -7874,13 +8618,13 @@ export default function ClipPath({
     if (!shapeMatchesPastedSvgCache(next)) {
       clearPastedShapeSvgCache();
     }
-    dragTargetRef.current = null;
-    polygonSelectionDragRef.current = null;
-    shapeTransformDragRef.current = null;
-    setSelectionRect(null);
+    dragTargetRef.current = undefined;
+    polygonSelectionDragRef.current = undefined;
+    shapeTransformDragRef.current = undefined;
+    setSelectionRect(undefined);
     clearSnapGuides();
     releaseActivePointerCapture();
-    selectHandle(null);
+    selectHandle(undefined);
     codeChangedShapeRef.current = false;
     closePresetDropdown();
     stopCodeTransition();
@@ -7895,21 +8639,16 @@ export default function ClipPath({
     historyRef.current = [next];
     historyIndexRef.current = 0;
   };
+  return { finishShapeTransformDrag, loadShapeFromSelection };
+}
 
-  const commit = (next: ClipShape) => {
-    const current = historyRef.current[historyIndexRef.current];
-    if (current && shapesClose(current, next)) {
-      return;
-    }
-    const truncated = historyRef.current.slice(0, historyIndexRef.current + 1);
-    truncated.push(next);
-    if (truncated.length > HISTORY_LIMIT) {
-      truncated.shift();
-    }
-    historyRef.current = truncated;
-    historyIndexRef.current = truncated.length - 1;
-  };
+type EditorAfterSelectionLoadActions = EditorAfterTransformDragActions &
+  ReturnType<typeof selectionLoadActions>;
 
+// Undo and redo.
+function historyActions(editor: EditorAfterSelectionLoadActions) {
+  const { historyIndexRef, markLocalShapeChange, clearPastedShapeSvgCache, historyRef } = editor;
+  const { setShape, syncPolygonPointColorsForShape, syncPresetForShape } = editor;
   const undo = () => {
     if (historyIndexRef.current <= 0) {
       return;
@@ -7941,7 +8680,17 @@ export default function ClipPath({
     syncPolygonPointColorsForShape(next);
     syncPresetForShape(next);
   };
+  return { undo, redo };
+}
 
+type EditorAfterHistoryActions = EditorAfterSelectionLoadActions &
+  ReturnType<typeof historyActions>;
+
+// Deleting the selected polygon points.
+function pointDeleteActions(editor: EditorAfterHistoryActions) {
+  const { shapeRef, getActivePolygonSelection, selectedHandleRef, polygonPointColorsRef } = editor;
+  const { markLocalShapeChange, setHandleSelection, syncPolygonPointColors, setShape } = editor;
+  const { commit, syncPresetForShape, focusSelectedHandle } = editor;
   const deleteSelectedPolygonPoints = () => {
     const current = shapeRef.current;
     if (current.kind !== 'polygon') {
@@ -7954,7 +8703,7 @@ export default function ClipPath({
           .map((handle) => handle.index)
           .filter((index) => index >= 0 && index < current.points.length),
       ),
-    ).sort((a, b) => a - b);
+    ).sort((left, right) => left - right);
     if (!selectedIndexes.length || current.points.length - selectedIndexes.length < 3) {
       return false;
     }
@@ -7974,11 +8723,13 @@ export default function ClipPath({
       activeIndex,
     );
     const previousNewIndex =
-      previousOldIndex === null
-        ? null
+      previousOldIndex === undefined
+        ? undefined
         : remapPolygonIndexAfterDelete(previousOldIndex, indexesToDelete);
-    const nextSelectedHandle: HandleTarget | null =
-      previousNewIndex === null ? null : { kind: 'polygon-point', index: previousNewIndex };
+    const nextSelectedHandle: HandleTarget | undefined =
+      previousNewIndex === undefined
+        ? undefined
+        : { kind: 'polygon-point', index: previousNewIndex };
     const next: ClipShape = {
       kind: 'polygon',
       points: current.points.filter((_, index) => !indexesToDelete.has(index)),
@@ -8000,19 +8751,29 @@ export default function ClipPath({
     }
     return true;
   };
+  return { deleteSelectedPolygonPoints };
+}
 
+type EditorAfterPointDeleteActions = EditorAfterHistoryActions &
+  ReturnType<typeof pointDeleteActions>;
+
+// Duplicating polygon points, and opening the preset menu.
+function pointDuplicateActions(editor: EditorAfterPointDeleteActions) {
+  const { shapeRef, markLocalShapeChange, insertPolygonPointColor, setShape, commit } = editor;
+  const { syncPresetForShape, setHandleSelection, getActivePolygonSelection } = editor;
+  const { presetListRef, activePreset, setActivePresetIndex, setIsPresetOpen } = editor;
   const duplicatePolygonPoint = (
     index: number,
     options: { commitChange?: boolean; selectDuplicate?: boolean } = {},
   ) => {
     const current = shapeRef.current;
     if (current.kind !== 'polygon') {
-      return null;
+      return undefined;
     }
 
     const point = current.points[index];
     if (!point) {
-      return null;
+      return undefined;
     }
 
     const duplicateIndex = index + 1;
@@ -8049,10 +8810,6 @@ export default function ClipPath({
     return Boolean(duplicatePolygonPoint(firstSelectedPoint.index));
   };
 
-  const closePresetDropdown = () => {
-    setIsPresetOpen(false);
-  };
-
   const focusPresetList = () => {
     window.requestAnimationFrame(() => presetListRef.current?.focus());
   };
@@ -8063,7 +8820,27 @@ export default function ClipPath({
     setIsPresetOpen(true);
     focusPresetList();
   };
+  return {
+    duplicatePolygonPoint,
+    duplicateSelectedPolygonPoint,
+    focusPresetList,
+    openPresetDropdown,
+  };
+}
 
+type EditorAfterPointDuplicateActions = EditorAfterPointDeleteActions &
+  ReturnType<typeof pointDuplicateActions>;
+
+// Choosing a preset shape.
+function presetChoiceActions(editor: EditorAfterPointDuplicateActions) {
+  const { markLocalShapeChange, clearPastedShapeSvgCache, selectHandle, clearSnapGuides } = editor;
+  const { setCircleRadiusAngle, shapeScaleUseVariableRef, shapeScaleVariableNameRef } = editor;
+  const { shapeOffsetLeftVariableNameRef, shapeOffsetTopVariableNameRef } = editor;
+  const { setShapeScaleUseVariable, setShapeScaleVariableName } = editor;
+  const { setShapeOffsetLeftVariableName, setShapeOffsetTopVariableName } = editor;
+  const { pastedShapeSvgCacheRef, shapeFitModeRef, setShapeFitMode, setActivePreset } = editor;
+  const { shapeRef, setCodeValue, setShape, syncPolygonPointColorsForShape, commit } = editor;
+  const { setIsPresetOpen, presetButtonRef } = editor;
   const choosePreset = (name: string) => {
     const preset = PRESETS[name];
     if (!preset) {
@@ -8072,7 +8849,7 @@ export default function ClipPath({
     let nextPreset = preset;
     markLocalShapeChange();
     clearPastedShapeSvgCache();
-    selectHandle(null);
+    selectHandle(undefined);
     clearSnapGuides();
     if (preset.kind === 'circle') {
       setCircleRadiusAngle(0);
@@ -8103,7 +8880,19 @@ export default function ClipPath({
     setIsPresetOpen(false);
     window.requestAnimationFrame(() => presetButtonRef.current?.focus());
   };
+  return { choosePreset };
+}
 
+type EditorAfterPresetChoiceActions = EditorAfterPointDuplicateActions &
+  ReturnType<typeof presetChoiceActions>;
+
+// Resetting the breakpoint's clip-path, class selection, and the source label.
+function breakpointActions(editor: EditorAfterPresetChoiceActions) {
+  const { onClearRef, setIsClipPathLabelMenuOpen, clearPendingWrite } = editor;
+  const { localWritePendingRef, lastWrittenRef, setClipPathStyleOrigin, styleRef } = editor;
+  const { cancelPendingSelectionRead, activeBreakpointRef, refreshSelectedElementRef } = editor;
+  const { selectedClassNamesRef, selectionIsDefaultRef, setSelectedClassNames } = editor;
+  const { closePresetDropdown, clipPathStyleOrigin } = editor;
   const resetCurrentBreakpointClipPath = async () => {
     // Embedded mode: the parent owns the write target, so clear through it.
     if (onClearRef.current) {
@@ -8111,7 +8900,7 @@ export default function ClipPath({
       clearPendingWrite();
       localWritePendingRef.current = false;
       onClearRef.current();
-      lastWrittenRef.current = null;
+      lastWrittenRef.current = undefined;
       setClipPathStyleOrigin('none');
       return;
     }
@@ -8128,8 +8917,8 @@ export default function ClipPath({
     const styleOptions = styleOptionsForBreakpoint(activeBreakpointRef.current);
     try {
       await style.removeProperty?.('clip-path', styleOptions);
-      await writePastedShapeMetadata(style, null, styleOptions);
-      lastWrittenRef.current = null;
+      await writePastedShapeMetadata(style, undefined, styleOptions);
+      lastWrittenRef.current = undefined;
       setClipPathStyleOrigin('none');
       refreshSelectedElementRef.current?.({ force: true, resetStyle: true });
     } catch {
@@ -8148,37 +8937,40 @@ export default function ClipPath({
     refreshSelectedElementRef.current?.({ force: true, resetStyle: true });
   };
 
-  const onClipPathLabelClick = (e: React.MouseEvent<HTMLButtonElement>) => {
+  const onClipPathLabelClick = (event: React.MouseEvent<HTMLButtonElement>) => {
     // Current → reset menu (Option-click resets immediately). Inherited → a
     // read-only "Value comes from:" popover. None → nothing.
     if (clipPathStyleOrigin === 'none') {
       return;
     }
 
-    if (clipPathStyleOrigin === 'current' && e.altKey) {
+    if (clipPathStyleOrigin === 'current' && event.altKey) {
       void resetCurrentBreakpointClipPath();
       return;
     }
 
     setIsClipPathLabelMenuOpen((isOpen) => !isOpen);
   };
+  return { resetCurrentBreakpointClipPath, handleClassSelectionChange, onClipPathLabelClick };
+}
 
-  const stopCodeTransition = () => {
-    if (codeTransitionTimerRef.current !== null) {
-      window.clearTimeout(codeTransitionTimerRef.current);
-      codeTransitionTimerRef.current = null;
-    }
-    setIsCodeTransitioning(false);
-  };
+type EditorAfterBreakpointActions = EditorAfterPresetChoiceActions &
+  ReturnType<typeof breakpointActions>;
 
+// Editing the shape as code.
+function codeEditActions(editor: EditorAfterBreakpointActions) {
+  const { codeTransitionTimerRef, setIsCodeTransitioning, setCodeValue, shape } = editor;
+  const { markLocalShapeChange, clearPastedShapeSvgCache, selectHandle } = editor;
+  const { codeChangedShapeRef, setShape, syncPolygonPointColorsForShape, commit } = editor;
+  const { syncPresetForShape, setCircleRadiusAngle, syncShapeFitModeForLoadedShape } = editor;
   const startCodeTransition = () => {
-    if (codeTransitionTimerRef.current !== null) {
+    if (codeTransitionTimerRef.current !== undefined) {
       window.clearTimeout(codeTransitionTimerRef.current);
     }
     setIsCodeTransitioning(true);
     codeTransitionTimerRef.current = window.setTimeout(() => {
       setIsCodeTransitioning(false);
-      codeTransitionTimerRef.current = null;
+      codeTransitionTimerRef.current = undefined;
     }, 420);
   };
 
@@ -8191,7 +8983,7 @@ export default function ClipPath({
 
       markLocalShapeChange();
       clearPastedShapeSvgCache();
-      selectHandle(null);
+      selectHandle(undefined);
       codeChangedShapeRef.current = true;
       startCodeTransition();
       setShape(NONE_SHAPE);
@@ -8211,7 +9003,7 @@ export default function ClipPath({
     }
     markLocalShapeChange();
     clearPastedShapeSvgCache();
-    selectHandle(null);
+    selectHandle(undefined);
     codeChangedShapeRef.current = true;
     startCodeTransition();
     if (parsed.kind === 'none') {
@@ -8226,7 +9018,18 @@ export default function ClipPath({
     commit(parsed);
     syncPresetForShape(parsed);
   };
+  return { startCodeTransition, onCodeChange };
+}
 
+type EditorAfterCodeEditActions = EditorAfterBreakpointActions & ReturnType<typeof codeEditActions>;
+
+// Selecting in the code, and applying a pasted SVG.
+function codeSelectionActions(editor: EditorAfterCodeEditActions) {
+  const { dragTargetRef, codeTokenHighlights, selectHandle, setHandleSelection } = editor;
+  const { pastedShapeSvgCacheRef, currentShapeScaleOptions } = editor;
+  const { syncShapeFitModeForLoadedShape, shapeRef, markLocalShapeChange } = editor;
+  const { codeChangedShapeRef, startCodeTransition, syncPolygonPointColorsForShape } = editor;
+  const { setCodeValue, setShape, commit, syncPresetForShape } = editor;
   const onCodeSelectionChange = (position: number) => {
     if (dragTargetRef.current) {
       return;
@@ -8240,21 +9043,26 @@ export default function ClipPath({
       (highlight) => position >= highlight.from && position <= highlight.to,
     );
     if (!match) {
-      selectHandle(null);
+      selectHandle(undefined);
       return;
     }
 
     const [primaryHandle] = match.handles;
-    setHandleSelection(primaryHandle || null, match.handles);
+    setHandleSelection(primaryHandle || undefined, match.handles);
   };
 
   const applyPastedSvgClipPath = (
     next: ClipShape,
-    options: { shapeSvgCache?: PastedShapeSvgCache | null; shapeFitMode?: ShapeFitMode } = {},
+    // `cacheUpdate` replaces the pasted-SVG cache — with nothing, when its `cache` is
+    // absent — and leaving it out keeps the cache as it is.
+    options: {
+      cacheUpdate?: { cache: PastedShapeSvgCache | undefined };
+      shapeFitMode?: ShapeFitMode;
+    } = {},
   ) => {
-    if (options.shapeSvgCache !== undefined) {
+    if (options.cacheUpdate !== undefined) {
       pastedShapeSvgCacheRef.current = normalizeShapeFitCache(
-        options.shapeSvgCache,
+        options.cacheUpdate.cache,
         currentShapeScaleOptions(),
       );
     }
@@ -8266,7 +9074,7 @@ export default function ClipPath({
     }
 
     markLocalShapeChange();
-    selectHandle(null);
+    selectHandle(undefined);
     codeChangedShapeRef.current = false;
     startCodeTransition();
     shapeRef.current = next;
@@ -8276,7 +9084,17 @@ export default function ClipPath({
     commit(next);
     syncPresetForShape(next);
   };
+  return { onCodeSelectionChange, applyPastedSvgClipPath };
+}
 
+type EditorAfterCodeSelectionActions = EditorAfterCodeEditActions &
+  ReturnType<typeof codeSelectionActions>;
+
+// Reading a pasted SVG, and switching how a shape fits.
+function shapeFitActions(editor: EditorAfterCodeSelectionActions) {
+  const { cacheFromPastedShapeSvgSource, shapeFitModeRef, shapeRef } = editor;
+  const { currentShapeScaleOptions, matchingPastedSvgCacheForShape, setShapeFitMode } = editor;
+  const { pastedShapeSvgCacheRef, applyPastedSvgClipPath } = editor;
   const parseClipboardSvgShape = (text: string, html: string, fitMode: ShapeFitMode) => {
     const textCache = cacheFromPastedShapeSvgSource(text);
     if (textCache) {
@@ -8286,7 +9104,7 @@ export default function ClipPath({
     const htmlCache = cacheFromPastedShapeSvgSource(html);
     return htmlCache
       ? { shape: shapeFromPastedSvgCache(htmlCache, fitMode), cache: htmlCache }
-      : null;
+      : undefined;
   };
 
   const setShapeFitModeFromControl = (nextMode: ShapeFitMode) => {
@@ -8315,9 +9133,22 @@ export default function ClipPath({
     if (cache) {
       pastedShapeSvgCacheRef.current = cache;
     }
-    applyPastedSvgClipPath(nextShape, { shapeSvgCache: cache, shapeFitMode: nextMode });
+    applyPastedSvgClipPath(nextShape, { cacheUpdate: { cache }, shapeFitMode: nextMode });
   };
+  return { parseClipboardSvgShape, setShapeFitModeFromControl };
+}
 
+type EditorAfterShapeFitActions = EditorAfterCodeSelectionActions &
+  ReturnType<typeof shapeFitActions>;
+
+// The shape-scale variables, and moving through the presets.
+function shapeScaleActions(editor: EditorAfterShapeFitActions) {
+  const { shapeRef, currentShapeScaleOptions, shapeOffsetLeftVariableNameRef } = editor;
+  const { shapeOffsetTopVariableNameRef, shapeScaleUseVariableRef } = editor;
+  const { shapeScaleVariableNameRef, setShapeScaleUseVariable, setShapeScaleVariableName } = editor;
+  const { setShapeOffsetLeftVariableName, setShapeOffsetTopVariableName } = editor;
+  const { matchingPastedSvgCacheForShape, pastedShapeSvgCacheRef, shapeFitModeRef } = editor;
+  const { applyPastedSvgClipPath, setActivePresetIndex } = editor;
   const setShapeScaleOptionsFromControl = (nextOptions: ShapeScaleOptions) => {
     const currentShape = shapeRef.current;
     const previousOptions = currentShapeScaleOptions();
@@ -8351,7 +9182,9 @@ export default function ClipPath({
     const currentCache =
       matchingPastedSvgCacheForShape(currentShape, previousOptions) ||
       cacheFromShapeFitVariants(currentShape, previousOptions);
-    const nextCache = currentCache ? normalizeShapeFitCache(currentCache, normalizedOptions) : null;
+    const nextCache = currentCache
+      ? normalizeShapeFitCache(currentCache, normalizedOptions)
+      : undefined;
     if (nextCache) {
       pastedShapeSvgCacheRef.current = nextCache;
     }
@@ -8362,25 +9195,36 @@ export default function ClipPath({
 
     const nextShape =
       nextCache?.contain || normalizeContainShapeCoordinates(currentShape, normalizedOptions);
-    applyPastedSvgClipPath(nextShape, { shapeSvgCache: nextCache, shapeFitMode: 'contain' });
+    applyPastedSvgClipPath(nextShape, {
+      cacheUpdate: { cache: nextCache },
+      shapeFitMode: 'contain',
+    });
   };
 
   const moveActivePreset = (nextIndex: number) => {
     const wrappedIndex = (nextIndex + PRESET_NAMES.length) % PRESET_NAMES.length;
     setActivePresetIndex(wrappedIndex);
   };
+  return { setShapeScaleOptionsFromControl, moveActivePreset };
+}
 
+type EditorAfterShapeScaleActions = EditorAfterShapeFitActions &
+  ReturnType<typeof shapeScaleActions>;
+
+// The alignment guide a handle snaps to.
+function guideActions(editor: EditorAfterShapeScaleActions) {
+  const { circleRadiusAngleRef, canvasRef } = editor;
   const guidePointForHandle = (
     targetShape: ClipShape,
     handle: HandleTarget,
     circleAngle = circleRadiusAngleRef.current,
-  ): Point | null => {
+  ): Point | undefined => {
     if (targetShape.kind === 'raw' && targetShape.editable && canvasRef.current) {
       return rawEditableHandlePoint(targetShape.editable, handle, canvasRef.current);
     }
 
     if (handle.kind === 'polygon-point' && targetShape.kind === 'polygon') {
-      return targetShape.points[handle.index] || null;
+      return targetShape.points[handle.index] || undefined;
     }
 
     if (handle.kind === 'circle-center' && targetShape.kind === 'circle') {
@@ -8407,7 +9251,7 @@ export default function ClipPath({
     }
 
     if (targetShape.kind !== 'inset') {
-      return null;
+      return undefined;
     }
 
     const { x0, y0, x1, y1, width, height } = insetBox(targetShape);
@@ -8439,9 +9283,16 @@ export default function ClipPath({
       return { x: targetShape.left + canvasRadius.x, y: y1 - canvasRadius.y };
     }
 
-    return null;
+    return undefined;
   };
+  return { guidePointForHandle };
+}
 
+type EditorAfterGuideActions = EditorAfterShapeScaleActions & ReturnType<typeof guideActions>;
+
+// Where a drag puts its handle, and the guides a keyboard move shows.
+function dragPointActions(editor: EditorAfterGuideActions) {
+  const { guidePointForHandle, circleRadiusAngleRef } = editor;
   const targetWithDragOrigin = (target: DragTarget, pointer: Point): DragTarget => {
     const handlePoint = guidePointForHandle(target.before, handleFromDragTarget(target));
     return handlePoint ? { ...target, dragOrigin: { pointer, handle: handlePoint } } : target;
@@ -8484,13 +9335,21 @@ export default function ClipPath({
 
     return mergeSnapGuides(...guides);
   };
+  return { targetWithDragOrigin, dragPointForTarget, keyboardGuidesForHandles };
+}
 
+type EditorAfterDragPointActions = EditorAfterGuideActions & ReturnType<typeof dragPointActions>;
+
+// Typing a preset's name to jump to it.
+function presetTypeaheadActions(editor: EditorAfterDragPointActions) {
+  const { presetTypeaheadTimerRef, presetTypeaheadRef, activePresetIndex } = editor;
+  const { setActivePresetIndex } = editor;
   const handlePresetTypeahead = (key: string) => {
     if (key.length !== 1) {
       return false;
     }
 
-    if (presetTypeaheadTimerRef.current !== null) {
+    if (presetTypeaheadTimerRef.current !== undefined) {
       window.clearTimeout(presetTypeaheadTimerRef.current);
     }
 
@@ -8498,7 +9357,7 @@ export default function ClipPath({
     presetTypeaheadRef.current = query;
     presetTypeaheadTimerRef.current = window.setTimeout(() => {
       presetTypeaheadRef.current = '';
-      presetTypeaheadTimerRef.current = null;
+      presetTypeaheadTimerRef.current = undefined;
     }, 700);
 
     const startIndex = (activePresetIndex + 1) % PRESET_NAMES.length;
@@ -8511,76 +9370,93 @@ export default function ClipPath({
     setActivePresetIndex(PRESET_NAMES.indexOf(match));
     return true;
   };
+  return { handlePresetTypeahead };
+}
 
-  const onPresetButtonKeyDown = (e: React.KeyboardEvent<HTMLButtonElement>) => {
-    if (e.altKey || e.ctrlKey || e.metaKey) {
+type EditorAfterPresetTypeaheadActions = EditorAfterDragPointActions &
+  ReturnType<typeof presetTypeaheadActions>;
+
+// The preset button's keys.
+function presetButtonActions(editor: EditorAfterPresetTypeaheadActions) {
+  const { openPresetDropdown, handlePresetTypeahead, setIsPresetOpen, focusPresetList } = editor;
+  const onPresetButtonKeyDown = (event: React.KeyboardEvent<HTMLButtonElement>) => {
+    if (event.altKey || event.ctrlKey || event.metaKey) {
       return;
     }
 
-    if (e.key === 'ArrowDown') {
-      e.preventDefault();
+    if (event.key === 'ArrowDown') {
+      event.preventDefault();
       openPresetDropdown();
       return;
     }
 
-    if (e.key === 'ArrowUp') {
-      e.preventDefault();
+    if (event.key === 'ArrowUp') {
+      event.preventDefault();
       openPresetDropdown(PRESET_NAMES.length - 1);
       return;
     }
 
-    if (e.key === 'Enter' || e.key === ' ') {
-      e.preventDefault();
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
       openPresetDropdown();
       return;
     }
 
-    if (e.key === 'Home') {
-      e.preventDefault();
+    if (event.key === 'Home') {
+      event.preventDefault();
       openPresetDropdown(0);
       return;
     }
 
-    if (e.key === 'End') {
-      e.preventDefault();
+    if (event.key === 'End') {
+      event.preventDefault();
       openPresetDropdown(PRESET_NAMES.length - 1);
       return;
     }
 
-    if (handlePresetTypeahead(e.key)) {
-      e.preventDefault();
+    if (handlePresetTypeahead(event.key)) {
+      event.preventDefault();
       setIsPresetOpen(true);
       focusPresetList();
     }
   };
+  return { onPresetButtonKeyDown };
+}
 
-  const onPresetListKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
-    if (e.key === 'ArrowDown') {
-      e.preventDefault();
+type EditorAfterPresetButtonActions = EditorAfterPresetTypeaheadActions &
+  ReturnType<typeof presetButtonActions>;
+
+// The preset list's keys.
+function presetListActions(editor: EditorAfterPresetButtonActions) {
+  const { moveActivePreset, activePresetIndex, setActivePresetIndex, choosePreset } = editor;
+  const { closePresetDropdown, presetButtonRef, handlePresetTypeahead } = editor;
+  const onPresetListKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === 'ArrowDown') {
+      event.preventDefault();
       moveActivePreset(activePresetIndex + 1);
       return;
     }
 
-    if (e.key === 'ArrowUp') {
-      e.preventDefault();
+    if (event.key === 'ArrowUp') {
+      event.preventDefault();
       moveActivePreset(activePresetIndex - 1);
       return;
     }
 
-    if (e.key === 'Home') {
-      e.preventDefault();
+    if (event.key === 'Home') {
+      event.preventDefault();
       setActivePresetIndex(0);
       return;
     }
 
-    if (e.key === 'End') {
-      e.preventDefault();
+    if (event.key === 'End') {
+      event.preventDefault();
       setActivePresetIndex(PRESET_NAMES.length - 1);
       return;
     }
 
-    if (e.key === 'Enter' || e.key === ' ') {
-      e.preventDefault();
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
       const presetName = PRESET_NAMES[activePresetIndex];
       if (presetName) {
         choosePreset(presetName);
@@ -8588,23 +9464,35 @@ export default function ClipPath({
       return;
     }
 
-    if (e.key === 'Escape') {
-      e.preventDefault();
+    if (event.key === 'Escape') {
+      event.preventDefault();
       closePresetDropdown();
       presetButtonRef.current?.focus();
       return;
     }
 
-    if (e.key === 'Tab') {
+    if (event.key === 'Tab') {
       closePresetDropdown();
       return;
     }
 
-    if (handlePresetTypeahead(e.key)) {
-      e.preventDefault();
+    if (handlePresetTypeahead(event.key)) {
+      event.preventDefault();
     }
   };
+  return { onPresetListKeyDown };
+}
 
+type EditorAfterPresetListActions = EditorAfterPresetButtonActions &
+  ReturnType<typeof presetListActions>;
+
+// Moving a handle with the keyboard.
+function handleKeyboardActions(editor: EditorAfterPresetListActions) {
+  const { shapeRef, latestCssRef, syncInsetModifierMode, radiusUnlockKeyPressedRef } = editor;
+  const { getPolygonSelectionIndexes, canvasRef, circleRadiusAngleRef } = editor;
+  const { spaceKeyPressedRef, markLocalShapeChange, cancelPendingSelectionRead } = editor;
+  const { setCircleRadiusAngle, setShape, commit, syncPresetForShape, showSnapGuides } = editor;
+  const { keyboardGuidesForHandles } = editor;
   const moveHandleWithKeyboard = (
     handle: HandleTarget,
     key: string,
@@ -8622,7 +9510,7 @@ export default function ClipPath({
     const insetRadiusUnlocked = modifiers.radiusUnlocked ?? radiusUnlockKeyPressedRef.current;
     const polygonPointIndexes = getPolygonSelectionIndexes(handle);
     const result = updateShapeForKeyboard(currentShape, handle, key, {
-      canvas: canvasRef.current,
+      canvas: canvasRef.current ?? undefined,
       circleRadiusAngle: circleRadiusAngleRef.current,
       insetRadiusMode,
       insetRadiusUnlocked,
@@ -8663,7 +9551,17 @@ export default function ClipPath({
     showSnapGuides(keyboardGuidesForHandles(result.shape, guideHandles, nextCircleAngle));
     return true;
   };
+  return { moveHandleWithKeyboard };
+}
 
+type EditorAfterHandleKeyboardActions = EditorAfterPresetListActions &
+  ReturnType<typeof handleKeyboardActions>;
+
+// Moving the whole shape with the keyboard.
+function shapeKeyboardActions(editor: EditorAfterHandleKeyboardActions) {
+  const { shapeRef, spaceKeyPressedRef, shapeFitModeRef, currentShapeScaleOptions } = editor;
+  const { showSnapGuides, markLocalShapeChange, clearPastedShapeSvgCache, setShape } = editor;
+  const { commit, setActivePreset } = editor;
   const moveShapeWithKeyboard = (key: ArrowKey) => {
     const currentShape = shapeRef.current;
     if (currentShape.kind !== 'shape') {
@@ -8684,7 +9582,7 @@ export default function ClipPath({
       shapeFitModeRef.current === 'contain' || hasContainerQueryUnit(currentShape.value)
         ? 'contain'
         : 'stretch';
-    const containModel = fitMode === 'contain' ? containModelFromShape(currentShape) : null;
+    const containModel = fitMode === 'contain' ? containModelFromShape(currentShape) : undefined;
     const next = containModel
       ? shapeFromContainModel(currentShape, moveContainModel(containModel, delta.x, delta.y))
       : transformShapeCanvasPoints(currentShape, fitMode, currentShapeScaleOptions(), (point) => ({
@@ -8705,7 +9603,18 @@ export default function ClipPath({
     setActivePreset('Shape');
     return true;
   };
+  return { moveShapeWithKeyboard };
+}
 
+type EditorAfterShapeKeyboardActions = EditorAfterHandleKeyboardActions &
+  ReturnType<typeof shapeKeyboardActions>;
+
+// The repeating keyboard move and the modifier refs it reads.
+function keyboardLoopActions(editor: EditorAfterShapeKeyboardActions) {
+  const { selectedHandleRef, isShapeTransformSelectedRef, isPresetOpenRef } = editor;
+  const { stopKeyboardMoveLoop, pressedArrowKeysRef, moveHandleWithKeyboard } = editor;
+  const { keyboardModifiersRef, moveShapeWithKeyboard, keyboardMoveDelayTimerRef } = editor;
+  const { keyboardMoveTimerRef, radiusUnlockKeyPressedRef, syncInsetModifierMode } = editor;
   const runKeyboardMoveTick = () => {
     const handle = selectedHandleRef.current;
     const shapeSelected = isShapeTransformSelectedRef.current;
@@ -8730,11 +9639,14 @@ export default function ClipPath({
   };
 
   const startKeyboardMoveLoop = () => {
-    if (keyboardMoveDelayTimerRef.current !== null || keyboardMoveTimerRef.current !== null) {
+    if (
+      keyboardMoveDelayTimerRef.current !== undefined ||
+      keyboardMoveTimerRef.current !== undefined
+    ) {
       return;
     }
     keyboardMoveDelayTimerRef.current = window.setTimeout(() => {
-      keyboardMoveDelayTimerRef.current = null;
+      keyboardMoveDelayTimerRef.current = undefined;
       runKeyboardMoveTick();
       keyboardMoveTimerRef.current = window.setInterval(runKeyboardMoveTick, KEYBOARD_REPEAT_MS);
     }, KEYBOARD_REPEAT_DELAY_MS);
@@ -8750,7 +9662,19 @@ export default function ClipPath({
       syncInsetModifierMode(keyboardModifiersRef.current);
     }
   };
+  return { runKeyboardMoveTick, startKeyboardMoveLoop, updateKeyboardModifierRefs };
+}
 
+type EditorAfterKeyboardLoopActions = EditorAfterShapeKeyboardActions &
+  ReturnType<typeof keyboardLoopActions>;
+
+// Pressing and releasing move keys, and following a shape drag.
+function keyboardKeyActions(editor: EditorAfterKeyboardLoopActions) {
+  const { updateKeyboardModifierRefs, selectHandleForKeyboard, pressedArrowKeysRef } = editor;
+  const { moveHandleWithKeyboard, keyboardModifiersRef, startKeyboardMoveLoop } = editor;
+  const { setShapeTransformSelection, moveShapeWithKeyboard, stopKeyboardMoveLoop } = editor;
+  const { shapeTransformDragRef, canvasPointFromClient, shapeFromTransformDrag, shapeRef } = editor;
+  const { markLocalShapeChange, setShape, setActivePreset } = editor;
   const pressKeyboardMoveKey = (
     handle: HandleTarget,
     key: ArrowKey,
@@ -8785,235 +9709,336 @@ export default function ClipPath({
     }
   };
 
-  useEffect(() => {
-    const updateShapeTransformDrag = (e: PointerEvent) => {
-      const drag = shapeTransformDragRef.current;
-      if (!drag) {
-        return false;
-      }
-      if (e.pointerId !== drag.pointerId) {
-        return true;
-      }
-
-      const point = canvasPointFromClient(e.clientX, e.clientY);
-      if (!point) {
-        return true;
-      }
-
-      updateKeyboardModifierRefs(e);
-      const next = shapeFromTransformDrag(drag, point, keyboardModifiersRef.current);
-      if (!next || shapesEqual(shapeRef.current, next)) {
-        return true;
-      }
-
-      markLocalShapeChange();
-      shapeRef.current = next;
-      setShape(next);
-      setActivePreset('Shape');
+  const updateShapeTransformDrag = (event: PointerEvent) => {
+    const drag = shapeTransformDragRef.current;
+    if (!drag) {
+      return false;
+    }
+    if (event.pointerId !== drag.pointerId) {
       return true;
-    };
+    }
 
-    const updatePolygonSelectionDrag = (e: PointerEvent) => {
-      const selection = polygonSelectionDragRef.current;
-      if (!selection) {
-        return false;
-      }
-      if (e.pointerId !== selection.pointerId) {
-        return true;
-      }
-
-      const point = canvasPointFromClient(e.clientX, e.clientY);
-      if (!point) {
-        return true;
-      }
-
-      selection.current = point;
-      const dx = e.clientX - selection.startClient.x;
-      const dy = e.clientY - selection.startClient.y;
-      if (!selection.didMove && Math.hypot(dx, dy) >= SELECTION_DRAG_THRESHOLD_PX) {
-        selection.didMove = true;
-      }
-
-      if (selection.didMove) {
-        const rect = rectFromPoints(selection.start, selection.current);
-        setSelectionRect(rect);
-        applyPolygonSelectionRect(selection);
-      }
-
+    const point = canvasPointFromClient(event.clientX, event.clientY);
+    if (!point) {
       return true;
+    }
+
+    updateKeyboardModifierRefs(event);
+    const next = shapeFromTransformDrag(drag, point, keyboardModifiersRef.current);
+    if (!next || shapesEqual(shapeRef.current, next)) {
+      return true;
+    }
+
+    markLocalShapeChange();
+    shapeRef.current = next;
+    setShape(next);
+    setActivePreset('Shape');
+    return true;
+  };
+  return {
+    pressKeyboardMoveKey,
+    pressShapeMoveKey,
+    releaseKeyboardMoveKey,
+    updateShapeTransformDrag,
+  };
+}
+
+type EditorAfterKeyboardKeyActions = EditorAfterKeyboardLoopActions &
+  ReturnType<typeof keyboardKeyActions>;
+
+// Following a marquee drag.
+function marqueeMoveActions(editor: EditorAfterKeyboardKeyActions) {
+  const { polygonSelectionDragRef, canvasPointFromClient, setSelectionRect } = editor;
+  const { applyPolygonSelectionRect } = editor;
+  const updatePolygonSelectionDrag = (event: PointerEvent) => {
+    const selection = polygonSelectionDragRef.current;
+    if (!selection) {
+      return false;
+    }
+    if (event.pointerId !== selection.pointerId) {
+      return true;
+    }
+
+    const point = canvasPointFromClient(event.clientX, event.clientY);
+    if (!point) {
+      return true;
+    }
+
+    selection.current = point;
+    const dx = event.clientX - selection.startClient.x;
+    const dy = event.clientY - selection.startClient.y;
+    if (!selection.didMove && Math.hypot(dx, dy) >= SELECTION_DRAG_THRESHOLD_PX) {
+      selection.didMove = true;
+    }
+
+    if (selection.didMove) {
+      const rect = rectFromPoints(selection.start, selection.current);
+      setSelectionRect(rect);
+      applyPolygonSelectionRect(selection);
+    }
+
+    return true;
+  };
+  return { updatePolygonSelectionDrag };
+}
+
+type EditorAfterMarqueeMoveActions = EditorAfterKeyboardKeyActions &
+  ReturnType<typeof marqueeMoveActions>;
+
+// Duplicating a polygon point by Option-dragging it.
+function pointDuplicateDragActions(editor: EditorAfterMarqueeMoveActions) {
+  const { shapeRef, insertPolygonPointColor, setHandleSelection, setShape, dragTargetRef } = editor;
+  // Option-dragging a polygon point leaves a copy behind: the first move with
+  // Option held inserts the duplicate, and the drag carries on with that. Returns
+  // the new drag target, or undefined when the point is gone.
+  const duplicateDraggedPolygonPoint = (
+    index: number,
+    beforeShape: PolygonShape,
+    rawPoint: Point,
+  ): DragTarget | undefined => {
+    const originalPoint = beforeShape.points[index];
+    if (!originalPoint) {
+      return undefined;
+    }
+    const currentShape = shapeRef.current;
+    const draggedPoint =
+      currentShape.kind === 'polygon' ? currentShape.points[index] || originalPoint : originalPoint;
+    const duplicatePoint = pointsNearlyEqual(draggedPoint, originalPoint)
+      ? offsetDuplicatePoint(originalPoint)
+      : draggedPoint;
+    const duplicateIndex = index + 1;
+    const duplicateShape: PolygonShape = {
+      kind: 'polygon',
+      points: [
+        ...beforeShape.points.slice(0, duplicateIndex),
+        duplicatePoint,
+        ...beforeShape.points.slice(duplicateIndex),
+      ],
     };
+    const duplicateHandle: HandleTarget = { kind: 'polygon-point', index: duplicateIndex };
+    insertPolygonPointColor(duplicateIndex, beforeShape.points.length);
+    setHandleSelection(duplicateHandle);
+    shapeRef.current = duplicateShape;
+    setShape(duplicateShape);
+    const target: DragTarget = {
+      ...duplicateHandle,
+      before: duplicateShape,
+      polygonPointIndexes: [duplicateIndex],
+      optionDuplicated: true,
+      dragOrigin: { pointer: rawPoint, handle: duplicatePoint },
+    };
+    dragTargetRef.current = target;
+    return target;
+  };
+  return { duplicateDraggedPolygonPoint };
+}
 
-    const onMove = (e: PointerEvent) => {
-      if (shapeTransformDragRef.current && updateShapeTransformDrag(e)) {
-        return;
-      }
-      if (polygonSelectionDragRef.current && updatePolygonSelectionDrag(e)) {
-        return;
-      }
+type EditorAfterPointDuplicateDragActions = EditorAfterMarqueeMoveActions &
+  ReturnType<typeof pointDuplicateDragActions>;
 
-      let target = dragTargetRef.current;
-      if (!target || !canvasRef.current) {
-        return;
+// Following a handle drag.
+function handleDragActions(editor: EditorAfterPointDuplicateDragActions) {
+  const { dragPointForTarget, shapeRef, circleRadiusAngleRef, setCircleRadiusAngle } = editor;
+  const { syncInsetModifierMode, radiusUnlockKeyPressedRef, setShape, showSnapGuides } = editor;
+  const { canvasRef, markLocalShapeChange, setActivePreset } = editor;
+  // Moves the dragged handle to the pointer (snapped), writing the shape live.
+  const dragShapeTo = (target: DragTarget, rawPoint: Point, event: PointerEvent) => {
+    const dragPoint = dragPointForTarget(target, rawPoint);
+    const snapResult = snapDragPointForTarget(shapeRef.current, target, dragPoint.x, dragPoint.y);
+    const snappedPoint = snapResult.point;
+    const { x, y } = snappedPoint;
+    if (target.kind === 'circle-radius' && shapeRef.current.kind === 'circle') {
+      const dx = x - shapeRef.current.cx;
+      const dy = y - shapeRef.current.cy;
+      if (Math.abs(dx) > 0.1 || Math.abs(dy) > 0.1) {
+        const nextAngle = Math.atan2(dy, dx);
+        circleRadiusAngleRef.current = nextAngle;
+        setCircleRadiusAngle(nextAngle);
       }
-      if (activePointerIdRef.current !== null && e.pointerId !== activePointerIdRef.current) {
-        return;
-      }
-      if (e.pointerType === 'mouse' && e.buttons === 0) {
-        finishDrag();
-        return;
-      }
-      const rect = canvasRef.current.getBoundingClientRect();
-      const rawX = ((e.clientX - rect.left) / rect.width) * 100;
-      const rawY = ((e.clientY - rect.top) / rect.height) * 100;
-      const rawPoint = { x: rawX, y: rawY };
-
-      if (
+    }
+    const insetModifierMode = syncInsetModifierMode(event);
+    const insetRadiusMode: InsetRadiusMode = insetModifierMode;
+    const insetSideMode: InsetSideMode = insetModifierMode;
+    const insetRadiusUnlocked = radiusUnlockKeyPressedRef.current;
+    setShape((current) => {
+      const dragShape =
         target.kind === 'polygon-point' &&
-        e.altKey &&
-        !target.optionDuplicated &&
-        target.before.kind === 'polygon'
-      ) {
-        const beforeShape = target.before;
-        const originalPoint = beforeShape.points[target.index];
-        if (originalPoint) {
-          const currentShape = shapeRef.current;
-          const draggedPoint =
-            currentShape.kind === 'polygon'
-              ? currentShape.points[target.index] || originalPoint
-              : originalPoint;
-          const duplicatePoint = pointsNearlyEqual(draggedPoint, originalPoint)
-            ? offsetDuplicatePoint(originalPoint)
-            : draggedPoint;
-          const duplicateIndex = target.index + 1;
-          const duplicateShape: PolygonShape = {
-            kind: 'polygon',
-            points: [
-              ...beforeShape.points.slice(0, duplicateIndex),
-              duplicatePoint,
-              ...beforeShape.points.slice(duplicateIndex),
-            ],
-          };
-          const duplicateHandle: HandleTarget = { kind: 'polygon-point', index: duplicateIndex };
-          insertPolygonPointColor(duplicateIndex, beforeShape.points.length);
-          setHandleSelection(duplicateHandle);
-          shapeRef.current = duplicateShape;
-          setShape(duplicateShape);
-          target = {
-            ...duplicateHandle,
-            before: duplicateShape,
-            polygonPointIndexes: [duplicateIndex],
-            optionDuplicated: true,
-            dragOrigin: { pointer: rawPoint, handle: duplicatePoint },
-          };
-          dragTargetRef.current = target;
-        }
-      }
-
-      const dragPoint = dragPointForTarget(target, rawPoint);
-      const snapResult = snapDragPointForTarget(shapeRef.current, target, dragPoint.x, dragPoint.y);
-      const snappedPoint = snapResult.point;
-      const { x, y } = snappedPoint;
-      if (target.kind === 'circle-radius' && shapeRef.current.kind === 'circle') {
-        const dx = x - shapeRef.current.cx;
-        const dy = y - shapeRef.current.cy;
-        if (Math.abs(dx) > 0.1 || Math.abs(dy) > 0.1) {
-          const nextAngle = Math.atan2(dy, dx);
-          circleRadiusAngleRef.current = nextAngle;
-          setCircleRadiusAngle(nextAngle);
-        }
-      }
-      const insetModifierMode = syncInsetModifierMode(e);
-      const insetRadiusMode: InsetRadiusMode = insetModifierMode;
-      const insetSideMode: InsetSideMode = insetModifierMode;
-      const insetRadiusUnlocked = radiusUnlockKeyPressedRef.current;
-      setShape((current) => {
-        const dragShape =
-          target.kind === 'polygon-point' &&
-          target.before.kind === 'polygon' &&
-          current.kind === 'polygon' &&
-          target.before.points.length > current.points.length
-            ? target.before
-            : current;
-        const activeDragPoint = dragPointForTarget(target, rawPoint);
-        const activeSnapResult =
-          dragShape === shapeRef.current
-            ? snapResult
-            : snapDragPointForTarget(dragShape, target, activeDragPoint.x, activeDragPoint.y);
-        showSnapGuides(activeSnapResult.guides);
-        const point = activeSnapResult.point;
-        const next = updateShapeForDrag(dragShape, target, point.x, point.y, {
-          canvas: canvasRef.current,
-          insetRadiusMode,
-          insetRadiusUnlocked,
-          insetSideMode,
-          ellipseScaleProportional: e.shiftKey,
-        });
-        if (!shapesClose(dragShape, next)) {
-          markLocalShapeChange();
-          setActivePreset(matchPreset(next) || NONE_PRESET);
-        }
-        shapeRef.current = next;
-        return next;
+        target.before.kind === 'polygon' &&
+        current.kind === 'polygon' &&
+        target.before.points.length > current.points.length
+          ? target.before
+          : current;
+      const activeDragPoint = dragPointForTarget(target, rawPoint);
+      const activeSnapResult =
+        dragShape === shapeRef.current
+          ? snapResult
+          : snapDragPointForTarget(dragShape, target, activeDragPoint.x, activeDragPoint.y);
+      showSnapGuides(activeSnapResult.guides);
+      const point = activeSnapResult.point;
+      const next = updateShapeForDrag(dragShape, target, point.x, point.y, {
+        canvas: canvasRef.current ?? undefined,
+        insetRadiusMode,
+        insetRadiusUnlocked,
+        insetSideMode,
+        ellipseScaleProportional: event.shiftKey,
       });
-    };
-    const onUp = (e: PointerEvent) => {
-      const shapeTransform = shapeTransformDragRef.current;
-      if (shapeTransform) {
-        if (e.pointerId !== shapeTransform.pointerId) {
-          return;
-        }
-        updateShapeTransformDrag(e);
-        finishShapeTransformDrag(true);
-        return;
+      if (!shapesClose(dragShape, next)) {
+        markLocalShapeChange();
+        setActivePreset(matchPreset(next) || NONE_PRESET);
       }
-      const selection = polygonSelectionDragRef.current;
-      if (selection) {
-        if (e.pointerId !== selection.pointerId) {
-          return;
-        }
-        updatePolygonSelectionDrag(e);
-        finishPolygonSelectionDrag(true);
-        return;
-      }
-      if (activePointerIdRef.current !== null && e.pointerId !== activePointerIdRef.current) {
-        return;
-      }
-      finishDrag(true, e);
-    };
-    const onCancel = (e: PointerEvent) => {
-      const shapeTransform = shapeTransformDragRef.current;
-      if (shapeTransform) {
-        if (e.pointerId !== shapeTransform.pointerId) {
-          return;
-        }
-        finishShapeTransformDrag(false);
-        return;
-      }
-      const selection = polygonSelectionDragRef.current;
-      if (selection) {
-        if (e.pointerId !== selection.pointerId) {
-          return;
-        }
-        finishPolygonSelectionDrag(false);
-        return;
-      }
-      if (activePointerIdRef.current !== null && e.pointerId !== activePointerIdRef.current) {
-        return;
-      }
-      finishDrag(false, e);
-    };
-    const onBlur = () => {
-      if (shapeTransformDragRef.current) {
-        finishShapeTransformDrag(false);
-        return;
-      }
-      if (polygonSelectionDragRef.current) {
-        finishPolygonSelectionDrag(false);
-        return;
-      }
-      finishDrag(false);
-    };
+      shapeRef.current = next;
+      return next;
+    });
+  };
+  return { dragShapeTo };
+}
 
+type EditorAfterHandleDragActions = EditorAfterPointDuplicateDragActions &
+  ReturnType<typeof handleDragActions>;
+
+// The window's pointer moves during any drag.
+function pointerMoveActions(editor: EditorAfterHandleDragActions) {
+  const { shapeTransformDragRef, updateShapeTransformDrag, polygonSelectionDragRef } = editor;
+  const { updatePolygonSelectionDrag, dragTargetRef, canvasRef, activePointerIdRef } = editor;
+  const { finishDrag, duplicateDraggedPolygonPoint, dragShapeTo } = editor;
+  const onWindowPointerMove = (event: PointerEvent) => {
+    if (shapeTransformDragRef.current && updateShapeTransformDrag(event)) {
+      return;
+    }
+    if (polygonSelectionDragRef.current && updatePolygonSelectionDrag(event)) {
+      return;
+    }
+
+    let target = dragTargetRef.current;
+    if (!target || !canvasRef.current) {
+      return;
+    }
+    if (
+      activePointerIdRef.current !== undefined &&
+      event.pointerId !== activePointerIdRef.current
+    ) {
+      return;
+    }
+    if (event.pointerType === 'mouse' && event.buttons === 0) {
+      finishDrag();
+      return;
+    }
+    const rect = canvasRef.current.getBoundingClientRect();
+    const rawX = ((event.clientX - rect.left) / rect.width) * 100;
+    const rawY = ((event.clientY - rect.top) / rect.height) * 100;
+    const rawPoint = { x: rawX, y: rawY };
+
+    if (
+      target.kind === 'polygon-point' &&
+      event.altKey &&
+      !target.optionDuplicated &&
+      target.before.kind === 'polygon'
+    ) {
+      target = duplicateDraggedPolygonPoint(target.index, target.before, rawPoint) ?? target;
+    }
+    dragShapeTo(target, rawPoint, event);
+  };
+  return { onWindowPointerMove };
+}
+
+type EditorAfterPointerMoveActions = EditorAfterHandleDragActions &
+  ReturnType<typeof pointerMoveActions>;
+
+// The window's pointer releases during any drag.
+function pointerEndActions(editor: EditorAfterPointerMoveActions) {
+  const { shapeTransformDragRef, updateShapeTransformDrag, finishShapeTransformDrag } = editor;
+  const { polygonSelectionDragRef, updatePolygonSelectionDrag } = editor;
+  const { finishPolygonSelectionDrag, activePointerIdRef, finishDrag } = editor;
+  const onWindowPointerUp = (event: PointerEvent) => {
+    const shapeTransform = shapeTransformDragRef.current;
+    if (shapeTransform) {
+      if (event.pointerId !== shapeTransform.pointerId) {
+        return;
+      }
+      updateShapeTransformDrag(event);
+      finishShapeTransformDrag(true);
+      return;
+    }
+    const selection = polygonSelectionDragRef.current;
+    if (selection) {
+      if (event.pointerId !== selection.pointerId) {
+        return;
+      }
+      updatePolygonSelectionDrag(event);
+      finishPolygonSelectionDrag(true);
+      return;
+    }
+    if (
+      activePointerIdRef.current !== undefined &&
+      event.pointerId !== activePointerIdRef.current
+    ) {
+      return;
+    }
+    finishDrag(true, event);
+  };
+  const onWindowPointerCancel = (event: PointerEvent) => {
+    const shapeTransform = shapeTransformDragRef.current;
+    if (shapeTransform) {
+      if (event.pointerId !== shapeTransform.pointerId) {
+        return;
+      }
+      finishShapeTransformDrag(false);
+      return;
+    }
+    const selection = polygonSelectionDragRef.current;
+    if (selection) {
+      if (event.pointerId !== selection.pointerId) {
+        return;
+      }
+      finishPolygonSelectionDrag(false);
+      return;
+    }
+    if (
+      activePointerIdRef.current !== undefined &&
+      event.pointerId !== activePointerIdRef.current
+    ) {
+      return;
+    }
+    finishDrag(false, event);
+  };
+  return { onWindowPointerUp, onWindowPointerCancel };
+}
+
+type EditorAfterPointerEndActions = EditorAfterPointerMoveActions &
+  ReturnType<typeof pointerEndActions>;
+
+// The window pointer listeners for drags.
+function useWindowPointerListeners(editor: EditorAfterPointerEndActions) {
+  const { shapeTransformDragRef, finishShapeTransformDrag, polygonSelectionDragRef } = editor;
+  const { finishPolygonSelectionDrag, finishDrag, onWindowPointerMove, onWindowPointerUp } = editor;
+  const { onWindowPointerCancel } = editor;
+  const onWindowBlurDuringDrag = () => {
+    if (shapeTransformDragRef.current) {
+      finishShapeTransformDrag(false);
+      return;
+    }
+    if (polygonSelectionDragRef.current) {
+      finishPolygonSelectionDrag(false);
+      return;
+    }
+    finishDrag(false);
+  };
+
+  // Window pointer listeners, registered once: they reach the current render's
+  // handlers through this ref, so a drag always works with the latest state.
+  const windowPointerHandlers = {
+    onWindowPointerMove,
+    onWindowPointerUp,
+    onWindowPointerCancel,
+    onWindowBlurDuringDrag,
+  };
+  const windowPointerRef = useRef(windowPointerHandlers);
+  windowPointerRef.current = windowPointerHandlers;
+  useEffect(() => {
+    const onMove = (event: PointerEvent) => windowPointerRef.current.onWindowPointerMove(event);
+    const onUp = (event: PointerEvent) => windowPointerRef.current.onWindowPointerUp(event);
+    const onCancel = (event: PointerEvent) => windowPointerRef.current.onWindowPointerCancel(event);
+    const onBlur = () => windowPointerRef.current.onWindowBlurDuringDrag();
     window.addEventListener('pointermove', onMove);
     window.addEventListener('pointerup', onUp);
     window.addEventListener('pointercancel', onCancel);
@@ -9024,12 +10049,22 @@ export default function ClipPath({
       window.removeEventListener('pointercancel', onCancel);
       window.removeEventListener('blur', onBlur);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  return { onWindowBlurDuringDrag, windowPointerHandlers, windowPointerRef };
+}
 
+type EditorAfterWindowPointerListeners = EditorAfterPointerEndActions &
+  ReturnType<typeof useWindowPointerListeners>;
+
+// The shortcut-help target, and closing the menus and popovers on an outside press.
+function useDismissListeners(editor: EditorAfterWindowPointerListeners) {
+  const { setShortcutHelpPortalTarget, isPresetOpen, presetDropdownRef, setIsPresetOpen } = editor;
+  const { isClipPathLabelMenuOpen, clipPathLabelRef } = editor;
+  const { setIsClipPathLabelMenuOpen, isShortcutHelpOpen, shortcutHelpRef } = editor;
+  const { setIsShortcutHelpOpen } = editor;
   useEffect(() => {
-    setShortcutHelpPortalTarget(document.getElementById('clip-path_header-shortcuts'));
-  }, []);
+    setShortcutHelpPortalTarget(document.getElementById('clip-path_header-shortcuts') ?? undefined);
+  }, [setShortcutHelpPortalTarget]);
 
   useEffect(() => {
     if (!isPresetOpen) {
@@ -9040,12 +10075,13 @@ export default function ClipPath({
       if (event.target instanceof Node && presetDropdownRef.current?.contains(event.target)) {
         return;
       }
-      closePresetDropdown();
+      // What closePresetDropdown does, with the setter React keeps stable.
+      setIsPresetOpen(false);
     };
 
     document.addEventListener('mousedown', onPointerDown);
     return () => document.removeEventListener('mousedown', onPointerDown);
-  }, [isPresetOpen]);
+  }, [isPresetOpen, presetDropdownRef, setIsPresetOpen]);
 
   useEffect(() => {
     if (!isClipPathLabelMenuOpen) {
@@ -9061,7 +10097,7 @@ export default function ClipPath({
 
     document.addEventListener('mousedown', onPointerDown);
     return () => document.removeEventListener('mousedown', onPointerDown);
-  }, [isClipPathLabelMenuOpen]);
+  }, [isClipPathLabelMenuOpen, clipPathLabelRef, setIsClipPathLabelMenuOpen]);
 
   useEffect(() => {
     if (!isShortcutHelpOpen) {
@@ -9086,40 +10122,58 @@ export default function ClipPath({
       document.removeEventListener('mousedown', onPointerDown);
       window.removeEventListener('keydown', onKeyDown);
     };
-  }, [isShortcutHelpOpen]);
+  }, [isShortcutHelpOpen, shortcutHelpRef, setIsShortcutHelpOpen]);
+}
 
+// Clearing the selection on an outside press.
+function useDeselectListener(editor: EditorAfterWindowPointerListeners) {
+  const { selectedHandleRef, isShapeTransformSelectedRef, dragTargetRef } = editor;
+  const { shapeTransformDragRef, setShapeTransformSelection, selectHandle } = editor;
+  const onDocumentPointerDownDeselect = (event: MouseEvent) => {
+    if (
+      (!selectedHandleRef.current && !isShapeTransformSelectedRef.current) ||
+      dragTargetRef.current ||
+      shapeTransformDragRef.current
+    ) {
+      return;
+    }
+    const target = event.target;
+    if (target instanceof Element && target.closest('.clip-path_handle')) {
+      return;
+    }
+    if (target instanceof Element && target.closest('.clip-path_shape-move')) {
+      return;
+    }
+    if (target instanceof Element && target.closest('.clip-path_shape-resize')) {
+      return;
+    }
+    if (target instanceof Element && target.closest('.code-editor')) {
+      return;
+    }
+    if (isShapeTransformSelectedRef.current) {
+      setShapeTransformSelection(false);
+    }
+    selectHandle(undefined);
+  };
+
+  // A press anywhere but a handle, the shape, or the code clears the selection. Registered
+  // once; the ref reaches the current render's handler.
+  const documentPointerDownRef = useRef(onDocumentPointerDownDeselect);
+  documentPointerDownRef.current = onDocumentPointerDownDeselect;
   useEffect(() => {
-    const onPointerDown = (event: MouseEvent) => {
-      if (
-        (!selectedHandleRef.current && !isShapeTransformSelectedRef.current) ||
-        dragTargetRef.current ||
-        shapeTransformDragRef.current
-      ) {
-        return;
-      }
-      const target = event.target;
-      if (target instanceof Element && target.closest('.clip-path_handle')) {
-        return;
-      }
-      if (target instanceof Element && target.closest('.clip-path_shape-move')) {
-        return;
-      }
-      if (target instanceof Element && target.closest('.clip-path_shape-resize')) {
-        return;
-      }
-      if (target instanceof Element && target.closest('.code-editor')) {
-        return;
-      }
-      if (isShapeTransformSelectedRef.current) {
-        setShapeTransformSelection(false);
-      }
-      selectHandle(null);
-    };
-
-    document.addEventListener('mousedown', onPointerDown);
-    return () => document.removeEventListener('mousedown', onPointerDown);
+    const listener = (event: MouseEvent) => documentPointerDownRef.current(event);
+    document.addEventListener('mousedown', listener);
+    return () => document.removeEventListener('mousedown', listener);
   }, []);
+  return { onDocumentPointerDownDeselect, documentPointerDownRef };
+}
 
+type EditorAfterDeselectListener = EditorAfterWindowPointerListeners &
+  ReturnType<typeof useDeselectListener>;
+
+// Measuring the canvas and the space its handles may use.
+function useCanvasMeasure(editor: EditorAfterDeselectListener) {
+  const { canvasRef, canvasWrapRef, setCanvasSize, setHandleBounds } = editor;
   useLayoutEffect(() => {
     const updateBounds = () => {
       const canvas = canvasRef.current;
@@ -9155,7 +10209,7 @@ export default function ClipPath({
 
     updateBounds();
 
-    let observer: ResizeObserver | null = null;
+    let observer: ResizeObserver | undefined = undefined;
     if (typeof ResizeObserver !== 'undefined') {
       observer = new ResizeObserver(updateBounds);
       if (canvasRef.current) {
@@ -9171,8 +10225,14 @@ export default function ClipPath({
       observer?.disconnect();
       window.removeEventListener('resize', updateBounds);
     };
-  }, []);
+  }, [canvasRef, canvasWrapRef, setCanvasSize, setHandleBounds]);
+}
 
+// Scrolling the preset list, the code text, and the shortcut keys.
+function useCodeSyncEffects(editor: EditorAfterDeselectListener) {
+  const { isPresetOpen, presetListRef, activePreset, codeChangedShapeRef, setCodeValue } = editor;
+  const { shape, css, getActivePolygonSelection, deleteSelectedPolygonPoints } = editor;
+  const { duplicateSelectedPolygonPoint, undo, redo } = editor;
   useLayoutEffect(() => {
     if (!isPresetOpen) {
       return;
@@ -9181,7 +10241,7 @@ export default function ClipPath({
     const list = presetListRef.current;
     const selectedOption = list?.querySelector<HTMLElement>('[aria-selected="true"]');
     selectedOption?.scrollIntoView({ block: 'nearest' });
-  }, [activePreset, isPresetOpen]);
+  }, [activePreset, isPresetOpen, presetListRef]);
 
   useEffect(() => {
     if (codeChangedShapeRef.current) {
@@ -9190,198 +10250,237 @@ export default function ClipPath({
     }
 
     setCodeValue(formatCodeValue(shape));
-  }, [css, shape]);
+  }, [css, shape, codeChangedShapeRef, setCodeValue]);
 
+  const onShortcutKeyDown = (event: KeyboardEvent) => {
+    const target = event.target instanceof HTMLElement ? event.target : undefined;
+    if (
+      target &&
+      (target.tagName === 'INPUT' ||
+        target.tagName === 'SELECT' ||
+        target.tagName === 'TEXTAREA' ||
+        target.isContentEditable)
+    ) {
+      return;
+    }
+    const mod = event.metaKey || event.ctrlKey;
+    const key = event.key.toLowerCase();
+
+    if (!mod && (key === 'backspace' || key === 'delete')) {
+      if (getActivePolygonSelection().length) {
+        event.preventDefault();
+        deleteSelectedPolygonPoints();
+      }
+      return;
+    }
+
+    if (!mod) {
+      return;
+    }
+
+    if (key === 'd' && !event.shiftKey) {
+      if (duplicateSelectedPolygonPoint()) {
+        event.preventDefault();
+      }
+      return;
+    }
+
+    if (key === 'z' && !event.shiftKey) {
+      event.preventDefault();
+      undo();
+    } else if ((key === 'z' && event.shiftKey) || key === 'y') {
+      event.preventDefault();
+      redo();
+    }
+  };
+  return { onShortcutKeyDown };
+}
+
+type EditorAfterCodeSyncEffects = EditorAfterDeselectListener &
+  ReturnType<typeof useCodeSyncEffects>;
+
+// The keyboard shortcut and paste listeners.
+function useShortcutListeners(editor: EditorAfterCodeSyncEffects) {
+  const { onShortcutKeyDown, shapeFitModeRef, parseClipboardSvgShape } = editor;
+  const { applyPastedSvgClipPath, clearPastedShapeSvgCache } = editor;
+  // Delete, duplicate, undo and redo from the keyboard. Registered once; the ref reaches
+  // the current render's handler.
+  const shortcutKeyRef = useRef(onShortcutKeyDown);
+  shortcutKeyRef.current = onShortcutKeyDown;
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      const target = e.target instanceof HTMLElement ? e.target : null;
-      if (
-        target &&
-        (target.tagName === 'INPUT' ||
-          target.tagName === 'SELECT' ||
-          target.tagName === 'TEXTAREA' ||
-          target.isContentEditable)
-      ) {
-        return;
-      }
-      const mod = e.metaKey || e.ctrlKey;
-      const key = e.key.toLowerCase();
-
-      if (!mod && (key === 'backspace' || key === 'delete')) {
-        if (getActivePolygonSelection().length) {
-          e.preventDefault();
-          deleteSelectedPolygonPoints();
-        }
-        return;
-      }
-
-      if (!mod) {
-        return;
-      }
-
-      if (key === 'd' && !e.shiftKey) {
-        if (duplicateSelectedPolygonPoint()) {
-          e.preventDefault();
-        }
-        return;
-      }
-
-      if (key === 'z' && !e.shiftKey) {
-        e.preventDefault();
-        undo();
-      } else if ((key === 'z' && e.shiftKey) || key === 'y') {
-        e.preventDefault();
-        redo();
-      }
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    const listener = (event: KeyboardEvent) => shortcutKeyRef.current(event);
+    window.addEventListener('keydown', listener);
+    return () => window.removeEventListener('keydown', listener);
   }, []);
 
-  useEffect(() => {
-    const onPaste = (event: ClipboardEvent) => {
-      const text = event.clipboardData?.getData('text/plain') || '';
-      const html = event.clipboardData?.getData('text/html') || '';
-      const next = parseSvgClipPathPolygon(text) || parseSvgClipPathPolygon(html);
-      if (!next) {
-        const fitMode = shapeFitModeRef.current;
-        const nextShape = parseClipboardSvgShape(text, html, fitMode);
-        if (!nextShape) {
-          return;
-        }
-
-        event.preventDefault();
-        event.stopPropagation();
-        applyPastedSvgClipPath(nextShape.shape, {
-          shapeSvgCache: nextShape.cache,
-          shapeFitMode: fitMode,
-        });
+  const onWindowPaste = (event: ClipboardEvent) => {
+    const text = event.clipboardData?.getData('text/plain') || '';
+    const html = event.clipboardData?.getData('text/html') || '';
+    const next = parseSvgClipPathPolygon(text) || parseSvgClipPathPolygon(html);
+    if (!next) {
+      const fitMode = shapeFitModeRef.current;
+      const nextShape = parseClipboardSvgShape(text, html, fitMode);
+      if (!nextShape) {
         return;
       }
 
       event.preventDefault();
       event.stopPropagation();
-      clearPastedShapeSvgCache();
-      applyPastedSvgClipPath(next);
-    };
+      applyPastedSvgClipPath(nextShape.shape, {
+        cacheUpdate: { cache: nextShape.cache },
+        shapeFitMode: fitMode,
+      });
+      return;
+    }
 
-    window.addEventListener('paste', onPaste, true);
-    return () => window.removeEventListener('paste', onPaste, true);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    event.preventDefault();
+    event.stopPropagation();
+    clearPastedShapeSvgCache();
+    applyPastedSvgClipPath(next);
+  };
 
+  // Pasting an SVG (or a clip-path) replaces the shape. Registered once, in the capture
+  // phase; the ref reaches the current render's handler.
+  const windowPasteRef = useRef(onWindowPaste);
+  windowPasteRef.current = onWindowPaste;
   useEffect(() => {
-    const shouldIgnoreTarget = (target: HTMLElement | null) =>
-      Boolean(
-        target &&
-        (target.tagName === 'INPUT' ||
-          target.tagName === 'SELECT' ||
-          target.tagName === 'TEXTAREA' ||
-          target.isContentEditable),
-      );
+    const listener = (event: ClipboardEvent) => windowPasteRef.current(event);
+    window.addEventListener('paste', listener, true);
+    return () => window.removeEventListener('paste', listener, true);
+  }, []);
+  return { shortcutKeyRef, onWindowPaste, windowPasteRef };
+}
 
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (handledKeyboardEventsRef.current.has(e)) {
-        return;
-      }
-      if (e.metaKey || e.ctrlKey || isPresetOpenRef.current) {
-        return;
-      }
+type EditorAfterShortcutListeners = EditorAfterCodeSyncEffects &
+  ReturnType<typeof useShortcutListeners>;
 
-      const target = e.target instanceof HTMLElement ? e.target : null;
-      const handle = selectedHandleRef.current;
-      const shapeSelected = isShapeTransformSelectedRef.current;
-      const shouldIgnore = shouldIgnoreTarget(target) && !dragTargetRef.current;
-      const isHandleTarget =
-        target instanceof Element && Boolean(target.closest('.clip-path_handle'));
+// The window's key presses that move handles.
+function windowKeyDownActions(editor: EditorAfterShortcutListeners) {
+  const { handledKeyboardEventsRef, isPresetOpenRef, selectedHandleRef } = editor;
+  const { isShapeTransformSelectedRef, dragTargetRef, radiusUnlockKeyPressedRef } = editor;
+  const { updateKeyboardModifierRefs, spaceKeyPressedRef, pressKeyboardMoveKey } = editor;
+  const { pressShapeMoveKey } = editor;
+  const onWindowKeyDown = (event: KeyboardEvent) => {
+    if (handledKeyboardEventsRef.current.has(event)) {
+      return;
+    }
+    if (event.metaKey || event.ctrlKey || isPresetOpenRef.current) {
+      return;
+    }
 
-      if (isRadiusUnlockKey(e.key, e.code)) {
-        if (!shouldIgnore) {
-          radiusUnlockKeyPressedRef.current = true;
-          updateKeyboardModifierRefs({
-            altKey: e.altKey,
-            shiftKey: e.shiftKey,
-            radiusUnlocked: true,
-          });
-        }
-        return;
-      }
+    const target = event.target instanceof HTMLElement ? event.target : undefined;
+    const handle = selectedHandleRef.current;
+    const shapeSelected = isShapeTransformSelectedRef.current;
+    const shouldIgnore = isEditableTarget(target) && !dragTargetRef.current;
+    const isHandleTarget =
+      target instanceof Element && Boolean(target.closest('.clip-path_handle'));
 
-      if ((!handle && !shapeSelected) || shouldIgnore) {
-        return;
-      }
-
-      if (isHandleTarget && (isSpaceKey(e.key, e.code) || isArrowKey(e.key))) {
-        return;
-      }
-
-      updateKeyboardModifierRefs(e);
-
-      if (isSpaceKey(e.key, e.code)) {
-        e.preventDefault();
-        spaceKeyPressedRef.current = true;
-        return;
-      }
-
-      if (!isArrowKey(e.key)) {
-        return;
-      }
-
-      e.preventDefault();
-      if (handle) {
-        pressKeyboardMoveKey(handle, e.key, e);
-      } else {
-        pressShapeMoveKey(e.key, e);
-      }
-    };
-
-    const onKeyUp = (e: KeyboardEvent) => {
-      if (handledKeyboardEventsRef.current.has(e)) {
-        return;
-      }
-      const target = e.target instanceof HTMLElement ? e.target : null;
-      const isHandleTarget =
-        target instanceof Element && Boolean(target.closest('.clip-path_handle'));
-
-      if (isRadiusUnlockKey(e.key, e.code)) {
-        radiusUnlockKeyPressedRef.current = false;
+    if (isRadiusUnlockKey(event.key, event.code)) {
+      if (!shouldIgnore) {
+        radiusUnlockKeyPressedRef.current = true;
         updateKeyboardModifierRefs({
-          altKey: e.altKey,
-          shiftKey: e.shiftKey,
-          radiusUnlocked: false,
+          altKey: event.altKey,
+          shiftKey: event.shiftKey,
+          radiusUnlocked: true,
         });
-        return;
       }
+      return;
+    }
 
-      if (isHandleTarget && (isSpaceKey(e.key, e.code) || isArrowKey(e.key))) {
-        return;
-      }
+    if ((!handle && !shapeSelected) || shouldIgnore) {
+      return;
+    }
 
-      if (isSpaceKey(e.key, e.code)) {
-        spaceKeyPressedRef.current = false;
-        if (selectedHandleRef.current || isShapeTransformSelectedRef.current) {
-          e.preventDefault();
-        }
-        return;
-      }
+    if (isHandleTarget && (isSpaceKey(event.key, event.code) || isArrowKey(event.key))) {
+      return;
+    }
 
-      updateKeyboardModifierRefs(e);
-      if (!isArrowKey(e.key)) {
-        return;
-      }
+    updateKeyboardModifierRefs(event);
 
-      releaseKeyboardMoveKey(e.key, e);
-    };
+    if (isSpaceKey(event.key, event.code)) {
+      event.preventDefault();
+      spaceKeyPressedRef.current = true;
+      return;
+    }
 
-    const onBlur = () => {
-      spaceKeyPressedRef.current = false;
+    if (!isArrowKey(event.key)) {
+      return;
+    }
+
+    event.preventDefault();
+    if (handle) {
+      pressKeyboardMoveKey(handle, event.key, event);
+    } else {
+      pressShapeMoveKey(event.key, event);
+    }
+  };
+  return { onWindowKeyDown };
+}
+
+type EditorAfterWindowKeyDownActions = EditorAfterShortcutListeners &
+  ReturnType<typeof windowKeyDownActions>;
+
+// The window key listeners that move handles.
+function useWindowKeyListeners(editor: EditorAfterWindowKeyDownActions) {
+  const { handledKeyboardEventsRef, radiusUnlockKeyPressedRef } = editor;
+  const { updateKeyboardModifierRefs, spaceKeyPressedRef, selectedHandleRef } = editor;
+  const { isShapeTransformSelectedRef, releaseKeyboardMoveKey, keyboardModifiersRef } = editor;
+  const { stopKeyboardMoveLoop, setActiveInsetModifierMode, onWindowKeyDown } = editor;
+  const onWindowKeyUp = (event: KeyboardEvent) => {
+    if (handledKeyboardEventsRef.current.has(event)) {
+      return;
+    }
+    const target = event.target instanceof HTMLElement ? event.target : undefined;
+    const isHandleTarget =
+      target instanceof Element && Boolean(target.closest('.clip-path_handle'));
+
+    if (isRadiusUnlockKey(event.key, event.code)) {
       radiusUnlockKeyPressedRef.current = false;
-      keyboardModifiersRef.current = { altKey: false, shiftKey: false, radiusUnlocked: false };
-      stopKeyboardMoveLoop();
-      setActiveInsetModifierMode('single');
-    };
+      updateKeyboardModifierRefs({
+        altKey: event.altKey,
+        shiftKey: event.shiftKey,
+        radiusUnlocked: false,
+      });
+      return;
+    }
 
+    if (isHandleTarget && (isSpaceKey(event.key, event.code) || isArrowKey(event.key))) {
+      return;
+    }
+
+    if (isSpaceKey(event.key, event.code)) {
+      spaceKeyPressedRef.current = false;
+      if (selectedHandleRef.current || isShapeTransformSelectedRef.current) {
+        event.preventDefault();
+      }
+      return;
+    }
+
+    updateKeyboardModifierRefs(event);
+    if (!isArrowKey(event.key)) {
+      return;
+    }
+
+    releaseKeyboardMoveKey(event.key, event);
+  };
+
+  const onWindowKeyBlur = () => {
+    spaceKeyPressedRef.current = false;
+    radiusUnlockKeyPressedRef.current = false;
+    keyboardModifiersRef.current = { altKey: false, shiftKey: false, radiusUnlocked: false };
+    stopKeyboardMoveLoop();
+    setActiveInsetModifierMode('single');
+  };
+
+  // Window key listeners, registered once: they reach the current render's
+  // handlers through this ref.
+  const windowKeyHandlers = { onWindowKeyDown, onWindowKeyUp, onWindowKeyBlur };
+  const windowKeyRef = useRef(windowKeyHandlers);
+  windowKeyRef.current = windowKeyHandlers;
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => windowKeyRef.current.onWindowKeyDown(event);
+    const onKeyUp = (event: KeyboardEvent) => windowKeyRef.current.onWindowKeyUp(event);
+    const onBlur = () => windowKeyRef.current.onWindowKeyBlur();
     window.addEventListener('keydown', onKeyDown);
     window.addEventListener('keyup', onKeyUp);
     window.addEventListener('blur', onBlur);
@@ -9390,549 +10489,759 @@ export default function ClipPath({
       window.removeEventListener('keyup', onKeyUp);
       window.removeEventListener('blur', onBlur);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  return { onWindowKeyUp, onWindowKeyBlur, windowKeyHandlers, windowKeyRef };
+}
 
+type EditorAfterWindowKeyListeners = EditorAfterWindowKeyDownActions &
+  ReturnType<typeof useWindowKeyListeners>;
+
+// Reading the Webflow selection.
+function useSelectionSync(editor: EditorAfterWindowKeyListeners) {
+  const { selectionReadInProgressRef, selectionReadSeqRef, selectionReadTimerRef } = editor;
+  const { activeBreakpointRef, setIsClipPathLabelMenuOpen, refreshSelectedElementRef } = editor;
+  // The listeners below outlive this render; they read the editor through this ref.
+  const readerRef = useRef(editor);
+  readerRef.current = editor;
   useEffect(() => {
     const webflowApi = readWebflowApi();
     if (!webflowApi) {
       return;
     }
-    let cancelled = false;
-
-    const loadNoneIfChanged = (force: boolean) => {
-      styleRef.current = null;
-      setClipPathStyleOrigin('none');
-      setAppliedClassName(null);
-      setClipPathSourceSelector([]);
-      setClipPathSourceBreakpoint(null);
-      setIsClipPathLabelMenuOpen(false);
-      if (
-        force ||
-        lastWrittenRef.current !== 'none' ||
-        !shapesClose(shapeRef.current, NONE_SHAPE)
-      ) {
-        loadShapeFromSelection(NONE_SHAPE, 'none');
-      }
-    };
-
-    const shouldReloadNone = (force: boolean) =>
-      force || lastWrittenRef.current !== 'none' || !shapesClose(shapeRef.current, NONE_SHAPE);
-
-    const loadNoneForWritableStyle = (style: StyleHandle | null | undefined, force: boolean) => {
-      styleRef.current = style || null;
-      setClipPathStyleOrigin('none');
-      setAppliedClassName(null);
-      setClipPathSourceSelector([]);
-      setClipPathSourceBreakpoint(null);
-      setIsClipPathLabelMenuOpen(false);
-      if (shouldReloadNone(force)) {
-        loadShapeFromSelection(NONE_SHAPE, 'none');
-      }
-    };
-
-    const readSelectedElement = async (
-      element: unknown | null,
-      options: SelectionReadOptions = {},
-    ) => {
-      const force = options.force ?? false;
-      if (selectionReadInProgressRef.current && !force && !options.resetStyle) {
-        return;
-      }
-      selectionReadInProgressRef.current = true;
-      const readSeq = ++selectionReadSeqRef.current;
-      const nextElementKey = selectedElementKey(element);
-      const selectionChanged = nextElementKey !== selectedElementKeyRef.current;
-      const debugRead = CLIP_PATH_DEBUG && (force || options.resetStyle || selectionChanged);
-
-      if (debugRead) {
-        debugClipPath('readSelectedElement:start', {
-          activeBreakpoint: activeBreakpointRef.current,
-          elementKey: nextElementKey,
-          force,
-          resetStyle: Boolean(options.resetStyle),
-          selectionChanged,
-        });
-      }
-
-      if (selectionChanged) {
-        selectedElementKeyRef.current = nextElementKey;
-        selectedClassNamesRef.current = [];
-        selectionIsDefaultRef.current = true;
-        cascadeWinnerCacheRef.current = null;
-        setSelectedClassNames([]);
-        clearPendingWrite();
-        localWritePendingRef.current = false;
-        loadNoneIfChanged(true);
-      }
-
-      if (options.resetStyle) {
-        clearPendingWrite();
-        localWritePendingRef.current = false;
-        styleRef.current = null;
-      } else if (
-        !selectionChanged &&
-        (localWritePendingRef.current || writeTimerRef.current !== null || dragTargetRef.current)
-      ) {
-        selectionReadInProgressRef.current = false;
-        return;
-      }
-
-      if (!element) {
-        if (debugRead) {
-          debugClipPath('readSelectedElement:no-element');
-        }
-        if (!cancelled && readSeq === selectionReadSeqRef.current) {
-          setElementClassNames([]);
-          selectedClassNamesRef.current = [];
-          selectionIsDefaultRef.current = true;
-          setSelectedClassNames([]);
-          loadNoneIfChanged(force);
-        }
-        if (readSeq === selectionReadSeqRef.current) {
-          selectionReadInProgressRef.current = false;
-        }
-        return;
-      }
-
-      try {
-        const styleOptions = styleOptionsForBreakpoint(activeBreakpointRef.current);
-        const styles = await getElementPrimaryStyleHandles(element);
-        if (cancelled) {
-          return;
-        }
-        if (readSeq !== selectionReadSeqRef.current) {
-          return;
-        }
-
-        let selectedStyle = await findClipPathStyle(styles, styleOptions);
-        const classNames = await getElementClassNames(element, styles);
-        if (!cancelled && readSeq === selectionReadSeqRef.current) {
-          setElementClassNames(classNames);
-        }
-        // Drop any manually selected classes that are no longer on the element
-        // (e.g. removed in the Designer) so we don't keep resolving their style
-        // globally and showing a stale preview.
-        if (selectedClassNamesRef.current.some((name) => !classNames.includes(name))) {
-          const stillPresent = selectedClassNamesRef.current.filter((name) =>
-            classNames.includes(name),
-          );
-          selectedClassNamesRef.current = stillPresent;
-          if (!cancelled && readSeq === selectionReadSeqRef.current) {
-            setSelectedClassNames(stillPresent);
-          }
-        }
-        if (debugRead) {
-          debugClipPath('readSelectedElement:primary-styles', {
-            classNames,
-            lookupCandidates: getStyleLookupCandidates(classNames),
-            styles: await debugStyleSummaries(styles, styleOptions),
-            selectedStyle: selectedStyle
-              ? await debugStyleSummary(selectedStyle.style, styleOptions)
-              : null,
-            selectedRaw: selectedStyle?.raw || null,
-            selectedBreakpoint: selectedStyle?.breakpoint || null,
-          });
-        }
-        if (!hasClipPathDeclaration(selectedStyle?.raw)) {
-          if (debugRead) {
-            debugClipPath('readSelectedElement:class-lookup-start', {
-              classNames,
-              lookupCandidates: getStyleLookupCandidates(classNames),
-            });
-          }
-          const classLookup = await getClassStyleHandlesWithDiagnostics(classNames, webflowApi);
-          const classStyles = classLookup.styles;
-          if (cancelled) {
-            return;
-          }
-          if (readSeq !== selectionReadSeqRef.current) {
-            return;
-          }
-
-          let classSelectedStyle: Awaited<ReturnType<typeof findClipPathStyle>> | null = null;
-          if (classStyles.length) {
-            classSelectedStyle = await findClipPathStyle([...classStyles, ...styles], styleOptions);
-            if (hasClipPathDeclaration(classSelectedStyle?.raw) || !selectedStyle) {
-              selectedStyle = classSelectedStyle;
-            }
-          }
-          if (debugRead) {
-            debugClipPath('readSelectedElement:class-styles', {
-              lookupResults: classLookup.diagnostics,
-              classStyles: await debugStyleSummaries(classStyles, styleOptions),
-              classSelectedStyle: classSelectedStyle
-                ? await debugStyleSummary(classSelectedStyle.style, styleOptions)
-                : null,
-              classSelectedRaw: classSelectedStyle?.raw || null,
-              classSelectedBreakpoint: classSelectedStyle?.breakpoint || null,
-              finalSelectedRaw: selectedStyle?.raw || null,
-              finalSelectedBreakpoint: selectedStyle?.breakpoint || null,
-            });
-          }
-        }
-        if (cancelled) {
-          return;
-        }
-        if (readSeq !== selectionReadSeqRef.current) {
-          return;
-        }
-
-        let writeStyleHandle: StyleHandle | null = null;
-        let originOverride: ClipPathStyleOrigin | null = null;
-        let appliedNameOverride: { name: string | null } | null = null;
-        // Set when an inherited class showed its cheap effective value and still
-        // needs the exact cascade winner resolved (in the background) afterward.
-        let inheritedWinnerRefineKey: string | null = null;
-
-        // The clip-path that actually renders is the CSS cascade winner (highest
-        // specificity, then latest stylesheet position). Resolve it lazily — only
-        // when we need the effective value (auto-default, or to show an inherited
-        // value for a class that has none of its own) — memoized per read so the
-        // common case (the selected class has its own clip-path) stays cheap.
-        let winnerResolved = false;
-        let cascadeWinner: Awaited<ReturnType<typeof resolveCascadeWinnerClipPathStyle>> = null;
-        const getCascadeWinner = async () => {
-          if (!winnerResolved) {
-            winnerResolved = true;
-            cascadeWinner = hasClipPathDeclaration(selectedStyle?.raw)
-              ? await resolveCascadeWinnerClipPathStyle(
-                  classNames,
-                  styles,
-                  styleOptions,
-                  webflowApi,
-                )
-              : null;
-          }
-          return cascadeWinner;
-        };
-
-        // While the selection is still the auto-default (user hasn't manually
-        // picked a class), keep it locked to the current cascade winner so it
-        // follows style resets and class add/remove on the same element — not
-        // just on element change.
-        if (selectionIsDefaultRef.current) {
-          const winner = await getCascadeWinner();
-          if (cancelled) {
-            return;
-          }
-          if (readSeq !== selectionReadSeqRef.current) {
-            return;
-          }
-          const defaultSelection = winner
-            ? winner.namePath.filter((name) => classNames.includes(name))
-            : [];
-          if (winner) {
-            selectedStyle = { style: winner.style, raw: winner.raw, breakpoint: winner.breakpoint };
-          }
-          const current = selectedClassNamesRef.current;
-          const changed =
-            defaultSelection.length !== current.length ||
-            defaultSelection.some((name, index) => name !== current[index]);
-          if (changed) {
-            selectedClassNamesRef.current = defaultSelection;
-            setSelectedClassNames(defaultSelection);
-          }
-        }
-
-        // When a class is selected, target it for reading/writing. If it has no
-        // clip-path of its own, show the effective (cascade-winner) value and mark
-        // it inherited — like a larger-breakpoint inheritance.
-        const selNames = selectedClassNamesRef.current;
-        if (selNames.length) {
-          // Resolve the exact standalone class (`.clip-path`) for a single
-          // selection, or the exact combo (`.hero.clip-path`) for several —
-          // path-verified so we never grab a combo whose leaf name merely
-          // matches, and never the element's own most-specific combo handle.
-          const targetStyle = await findStyleForClassPath(selNames, webflowApi);
-          if (cancelled) {
-            return;
-          }
-          if (readSeq !== selectionReadSeqRef.current) {
-            return;
-          }
-
-          const targetDecl = targetStyle
-            ? await readClipPathDeclarationWithSource(targetStyle, styleOptions)
-            : null;
-          if (cancelled) {
-            return;
-          }
-          if (readSeq !== selectionReadSeqRef.current) {
-            return;
-          }
-
-          if (targetStyle && targetDecl && hasClipPathDeclaration(targetDecl.value)) {
-            writeStyleHandle = targetStyle;
-            selectedStyle = {
-              style: targetStyle,
-              raw: targetDecl.value,
-              breakpoint: targetDecl.breakpoint,
-            };
-            appliedNameOverride = { name: selNames[selNames.length - 1] ?? null };
-          } else if (hasClipPathDeclaration(selectedStyle?.raw)) {
-            // Selected class has no clip-path of its own, but the element shows an
-            // effective one → inherited. Paint the orange label + the cheap
-            // effective value INSTANTLY; resolve the exact cascade winner (slower)
-            // afterward and only re-read if it actually differs.
-            if (targetStyle) {
-              writeStyleHandle = targetStyle;
-            }
-            originOverride = 'inherited';
-            if (!cancelled && readSeq === selectionReadSeqRef.current) {
-              setClipPathStyleOrigin('inherited');
-            }
-            const winnerKey =
-              `${classNames.join('\u0000')}|` +
-              `${selectedStyle?.style?.id ?? ''}|${selectedStyle?.raw ?? ''}`;
-            const cached = cascadeWinnerCacheRef.current;
-            if (cached && cached.key === winnerKey) {
-              // Exact winner already known — use it directly (no flash).
-              if (cached.winner) {
-                selectedStyle = {
-                  style: cached.winner.style,
-                  raw: cached.winner.raw,
-                  breakpoint: cached.winner.breakpoint,
-                };
-              }
-            } else {
-              // Show the cheap effective value now; refine after this read.
-              inheritedWinnerRefineKey = winnerKey;
-            }
-          } else {
-            // Nothing renders → none on the (writable) selected class.
-            if (targetStyle) {
-              writeStyleHandle = targetStyle;
-            }
-            loadNoneForWritableStyle(targetStyle, force);
-            return;
-          }
-        }
-
-        if (!selectedStyle) {
-          if (debugRead) {
-            debugClipPath('readSelectedElement:result-none-no-style');
-          }
-          loadNoneIfChanged(force);
-          return;
-        }
-
-        if (!hasClipPathDeclaration(selectedStyle.raw)) {
-          if (debugRead) {
-            debugClipPath('readSelectedElement:result-none-writable-style', {
-              style: await debugStyleSummary(selectedStyle.style, styleOptions),
-            });
-          }
-          loadNoneForWritableStyle(selectedStyle.style, force);
-          return;
-        }
-
-        // In class-selection mode never fall back to the element's combo handle;
-        // a null target here means "create the selected class/combo on write".
-        styleRef.current = selNames.length
-          ? writeStyleHandle
-          : writeStyleHandle || selectedStyle.style;
-        setClipPathStyleOrigin(
-          originOverride ||
-            clipPathStyleOriginFromSource(selectedStyle.breakpoint, activeBreakpointRef.current),
-        );
-        // The selector + breakpoint the rendered value actually comes from, for
-        // the "Value comes from:" popover on the inherited (orange) label.
-        const sourceNamePath = await getStyleNamePath(selectedStyle.style);
-        if (!cancelled && readSeq === selectionReadSeqRef.current) {
-          const sourceClasses = sourceNamePath.filter((name) => classNames.includes(name));
-          setClipPathSourceSelector(sourceClasses.length ? sourceClasses : sourceNamePath);
-          setClipPathSourceBreakpoint(selectedStyle.breakpoint);
-          setAppliedClassName(
-            appliedNameOverride
-              ? appliedNameOverride.name
-              : sourceNamePath[sourceNamePath.length - 1] || null,
-          );
-        }
-        const normalized = normalizeClipPathValue(selectedStyle.raw);
-        if (debugRead) {
-          debugClipPath('readSelectedElement:result-detected', {
-            raw: selectedStyle.raw,
-            normalizedCss: normalized.css,
-            preset: matchPreset(normalized.shape),
-            sourceBreakpoint: selectedStyle.breakpoint,
-            style: await debugStyleSummary(selectedStyle.style, styleOptions),
-          });
-        }
-        const loadedScaleVariableName =
-          normalized.shape.kind === 'shape'
-            ? shapeScaleVariableNameFromValue(normalized.shape.value)
-            : null;
-        const loadedOffsetNames =
-          normalized.shape.kind === 'shape'
-            ? shapeOffsetVariableNamesFromValue(normalized.shape.value)
-            : null;
-        const loadedShapeScaleOptions = loadedScaleVariableName
-          ? {
-              useVariable: true,
-              variableName: loadedScaleVariableName,
-              offsetLeftVariableName:
-                loadedOffsetNames?.offsetLeftVar || DEFAULT_SHAPE_OFFSET_LEFT_VARIABLE_NAME,
-              offsetTopVariableName:
-                loadedOffsetNames?.offsetTopVar || DEFAULT_SHAPE_OFFSET_TOP_VARIABLE_NAME,
-            }
-          : currentShapeScaleOptions({ useVariable: false });
-        let rawShapeSvgCache: PastedShapeSvgCache | null = null;
-        if (normalized.shape.kind === 'shape') {
-          rawShapeSvgCache =
-            matchingPastedSvgCacheForShape(normalized.shape, loadedShapeScaleOptions) ||
-            (await readPastedShapeMetadata(selectedStyle.style, styleOptions)) ||
-            cacheFromShapeFitVariants(normalized.shape, loadedShapeScaleOptions);
-        }
-        const shapeSvgCache = normalizeShapeFitCache(rawShapeSvgCache, loadedShapeScaleOptions);
-        const loadedShape =
-          normalized.shape.kind === 'shape' &&
-          rawShapeSvgCache &&
-          shapeSvgCache &&
-          shapesClose(normalized.shape, rawShapeSvgCache.contain)
-            ? shapeSvgCache.contain
-            : normalized.shape;
-        if (cancelled) {
-          return;
-        }
-        if (readSeq !== selectionReadSeqRef.current) {
-          return;
-        }
-
-        // An inherited class just painted its cheap effective value. Resolve the
-        // exact cascade winner in the background; cache it and, if it actually
-        // differs from what we showed, re-read (which now hits the cache and loads
-        // the winner through the normal shape-aware path).
-        if (inheritedWinnerRefineKey) {
-          const refineKey = inheritedWinnerRefineKey;
-          void (async () => {
-            const winner = await resolveCascadeWinnerClipPathStyle(
-              classNames,
-              styles,
-              styleOptions,
-              webflowApi,
-            );
-            if (cancelled || readSeq !== selectionReadSeqRef.current) {
-              return;
-            }
-            cascadeWinnerCacheRef.current = { key: refineKey, winner };
-            const winnerCss = winner ? normalizeClipPathValue(winner.raw).css : null;
-            if (winnerCss && winnerCss !== lastWrittenRef.current) {
-              refreshSelectedElementRef.current?.({ force: true });
-            }
-          })();
-        }
-
-        // Skip the reload when the value is unchanged from what we already have —
-        // even on a forced re-read. `loadShapeFromSelection` wipes the undo stack,
-        // and a forced re-read can fire right after applying to a NEW class (the
-        // createStyle triggers a selection event), which would otherwise destroy
-        // the just-created undo step. styleRef/origin/source are already set above,
-        // so this only avoids the needless reload.
-        if (
-          lastWrittenRef.current === normalized.css &&
-          shapesClose(shapeRef.current, loadedShape)
-        ) {
-          if (shapeSvgCache && shapeMatchesPastedSvgCache(loadedShape, shapeSvgCache)) {
-            pastedShapeSvgCacheRef.current = shapeSvgCache;
-          }
-          return;
-        }
-
-        loadShapeFromSelection(loadedShape, normalized.css);
-        if (shapeSvgCache && shapeMatchesPastedSvgCache(loadedShape, shapeSvgCache)) {
-          pastedShapeSvgCacheRef.current = shapeSvgCache;
-        }
-      } catch (error) {
-        if (debugRead) {
-          debugClipPath('readSelectedElement:error', error);
-        }
-        if (!cancelled && readSeq === selectionReadSeqRef.current) {
-          if (force) {
-            loadNoneIfChanged(force);
-          }
-        }
-      } finally {
-        if (readSeq === selectionReadSeqRef.current) {
-          selectionReadInProgressRef.current = false;
-        }
-      }
-    };
-
-    const readCurrentSelectedElement = async (options: SelectionReadOptions = {}) => {
-      try {
-        await readSelectedElement(await webflowApi.getSelectedElement?.(), options);
-      } catch {
-        if (!cancelled && options.force) {
-          loadNoneIfChanged(options.force);
-        }
-      }
-    };
-
+    const session: SelectionSession = { cancelled: false, webflowApi, readerRef };
     refreshSelectedElementRef.current = (options: SelectionReadOptions = {}) => {
-      void readCurrentSelectedElement(options);
+      void readCurrentSelectedElement(session, options);
     };
-
-    const scheduleCurrentSelectedElementRead = () => {
-      if (selectionReadTimerRef.current !== null) {
-        window.clearTimeout(selectionReadTimerRef.current);
-      }
-
-      selectionReadTimerRef.current = window.setTimeout(() => {
-        selectionReadTimerRef.current = null;
-        void readCurrentSelectedElement({ force: true, resetStyle: true });
-      }, 120);
-    };
-
-    const syncCurrentBreakpoint = async () => {
-      try {
-        activeBreakpointRef.current = (await webflowApi.getMediaQuery?.()) || 'main';
-      } catch {
-        activeBreakpointRef.current = 'main';
-      }
-    };
-
-    const unsubscribeSelectedElement = webflowApi.subscribe?.(
-      'selectedelement',
-      scheduleCurrentSelectedElementRead,
-    );
+    const scheduleRead = () => scheduleCurrentSelectedElementRead(session, selectionReadTimerRef);
+    const unsubscribeSelectedElement = webflowApi.subscribe?.('selectedelement', scheduleRead);
     const unsubscribeMediaQuery = webflowApi.subscribe?.('mediaquery', (breakpoint) => {
       activeBreakpointRef.current = breakpoint || 'main';
       setIsClipPathLabelMenuOpen(false);
-      scheduleCurrentSelectedElementRead();
+      scheduleRead();
     });
-
     const styleRefreshTimer = window.setInterval(() => {
       if (selectionReadInProgressRef.current) {
         return;
       }
-      void readCurrentSelectedElement();
+      void readCurrentSelectedElement(session);
     }, STYLE_REFRESH_MS);
 
-    void syncCurrentBreakpoint().then(() =>
-      readCurrentSelectedElement({ force: true, resetStyle: true }),
+    void syncCurrentBreakpoint(webflowApi, activeBreakpointRef).then(() =>
+      readCurrentSelectedElement(session, { force: true, resetStyle: true }),
     );
 
     return () => {
-      cancelled = true;
+      session.cancelled = true;
       selectionReadSeqRef.current += 1;
       selectionReadInProgressRef.current = false;
       window.clearInterval(styleRefreshTimer);
-      if (selectionReadTimerRef.current !== null) {
+      if (selectionReadTimerRef.current !== undefined) {
         window.clearTimeout(selectionReadTimerRef.current);
-        selectionReadTimerRef.current = null;
+        selectionReadTimerRef.current = undefined;
       }
       unsubscribeSelectedElement?.();
       unsubscribeMediaQuery?.();
-      refreshSelectedElementRef.current = null;
+      refreshSelectedElementRef.current = undefined;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [
+    selectionReadInProgressRef,
+    selectionReadSeqRef,
+    selectionReadTimerRef,
+    activeBreakpointRef,
+    setIsClipPathLabelMenuOpen,
+    refreshSelectedElementRef,
+  ]);
+}
 
+// What a selection read reads and records.
+type SelectionReader = EditorAfterWindowKeyListeners;
+
+// One subscription to the Designer's selection, cancelled when the editor unmounts.
+// The reader is the latest render's editor.
+type SelectionSession = {
+  cancelled: boolean;
+  readonly webflowApi: WebflowApi;
+  readonly readerRef: MutableRefObject<SelectionReader>;
+};
+
+// The bookkeeping of one read: its sequence number, whether it was forced, and
+// whether it is logged.
+type SelectionRead = { readSeq: number; force: boolean; debugRead: boolean };
+
+// The styles an element carries and the clip-path style found among them.
+type FoundClipPathStyle = Awaited<ReturnType<typeof findClipPathStyle>>;
+type ElementStyles = {
+  styles: StyleHandle[];
+  classNames: string[];
+  selectedStyle: FoundClipPathStyle;
+  styleOptions: StyleTargetOptions | undefined;
+};
+
+// Whether this read still counts: not cancelled, and not superseded by a later one.
+function isCurrentRead(session: SelectionSession, read: SelectionRead): boolean {
+  if (session.cancelled) {
+    return false;
+  }
+  return read.readSeq === session.readerRef.current.selectionReadSeqRef.current;
+}
+
+async function syncCurrentBreakpoint(
+  webflowApi: WebflowApi,
+  activeBreakpointRef: MutableRefObject<BreakpointId>,
+): Promise<void> {
+  try {
+    activeBreakpointRef.current = (await webflowApi.getMediaQuery?.()) || 'main';
+  } catch {
+    activeBreakpointRef.current = 'main';
+  }
+}
+
+// A selection change reads the new element a beat later, once the Designer settles.
+function scheduleCurrentSelectedElementRead(
+  session: SelectionSession,
+  selectionReadTimerRef: MutableRefObject<number | undefined>,
+): void {
+  if (selectionReadTimerRef.current !== undefined) {
+    window.clearTimeout(selectionReadTimerRef.current);
+  }
+  selectionReadTimerRef.current = window.setTimeout(() => {
+    selectionReadTimerRef.current = undefined;
+    void readCurrentSelectedElement(session, { force: true, resetStyle: true });
+  }, 120);
+}
+
+async function readCurrentSelectedElement(
+  session: SelectionSession,
+  options: SelectionReadOptions = {},
+): Promise<void> {
+  try {
+    await readSelectedElement(session, await session.webflowApi.getSelectedElement?.(), options);
+  } catch {
+    if (!session.cancelled && options.force) {
+      loadNoneIfChanged(session.readerRef.current, { force: options.force });
+    }
+  }
+}
+
+// No clip-path on the selection: forget the style and show none.
+function loadNoneIfChanged(reader: SelectionReader, { force }: { force: boolean }): void {
+  const { styleRef } = reader;
+  styleRef.current = undefined;
+  showNoClipPathSource(reader);
+  if (shouldReloadNone(reader, { force })) {
+    reader.loadShapeFromSelection(NONE_SHAPE, 'none');
+  }
+}
+
+// No clip-path on the selection, which a later write can go to `style`.
+function loadNoneForWritableStyle(
+  reader: SelectionReader,
+  style: StyleHandle | undefined,
+  { force }: { force: boolean },
+): void {
+  const { styleRef } = reader;
+  styleRef.current = style || undefined;
+  showNoClipPathSource(reader);
+  if (shouldReloadNone(reader, { force })) {
+    reader.loadShapeFromSelection(NONE_SHAPE, 'none');
+  }
+}
+
+function showNoClipPathSource(reader: SelectionReader): void {
+  reader.setClipPathStyleOrigin('none');
+  reader.setAppliedClassName(undefined);
+  reader.setClipPathSourceSelector([]);
+  reader.setClipPathSourceBreakpoint(undefined);
+  reader.setIsClipPathLabelMenuOpen(false);
+}
+
+function shouldReloadNone(reader: SelectionReader, { force }: { force: boolean }): boolean {
+  return (
+    force ||
+    reader.lastWrittenRef.current !== 'none' ||
+    !shapesClose(reader.shapeRef.current, NONE_SHAPE)
+  );
+}
+
+async function readSelectedElement(
+  session: SelectionSession,
+  element: unknown,
+  options: SelectionReadOptions = {},
+): Promise<void> {
+  const read = startSelectionRead(session, element, options);
+  if (!read) {
+    return;
+  }
+  try {
+    await readElementClipPath(session, read, element);
+  } catch (error: unknown) {
+    if (read.debugRead) {
+      debugClipPath('readSelectedElement:error', error);
+    }
+    if (isCurrentRead(session, read)) {
+      if (read.force) {
+        loadNoneIfChanged(session.readerRef.current, { force: read.force });
+      }
+    }
+  } finally {
+    const reader = session.readerRef.current;
+    if (read.readSeq === reader.selectionReadSeqRef.current) {
+      reader.selectionReadInProgressRef.current = false;
+    }
+  }
+}
+
+// Claims the read and handles what needs no styles: a read already running, a
+// write about to land, a new element, no element at all. Undefined when the read
+// is over.
+function startSelectionRead(
+  session: SelectionSession,
+  element: unknown,
+  options: SelectionReadOptions,
+): SelectionRead | undefined {
+  const reader = session.readerRef.current;
+  const force = options.force ?? false;
+  if (reader.selectionReadInProgressRef.current && !force && !options.resetStyle) {
+    return undefined;
+  }
+  reader.selectionReadInProgressRef.current = true;
+  const readSeq = ++reader.selectionReadSeqRef.current;
+  const nextElementKey = selectedElementKey(element);
+  const selectionChanged = nextElementKey !== reader.selectedElementKeyRef.current;
+  const debugRead = Boolean(CLIP_PATH_DEBUG && (force || options.resetStyle || selectionChanged));
+  if (debugRead) {
+    debugClipPath('readSelectedElement:start', {
+      activeBreakpoint: reader.activeBreakpointRef.current,
+      elementKey: nextElementKey,
+      force,
+      resetStyle: Boolean(options.resetStyle),
+      selectionChanged,
+    });
+  }
+  if (selectionChanged) {
+    forgetPreviousElement(reader, nextElementKey);
+  }
+  if (options.resetStyle) {
+    reader.clearPendingWrite();
+    reader.localWritePendingRef.current = false;
+    reader.styleRef.current = undefined;
+  } else if (!selectionChanged && writeInFlight(reader)) {
+    reader.selectionReadInProgressRef.current = false;
+    return undefined;
+  }
+  const read = { readSeq, force, debugRead };
+  if (!element) {
+    finishEmptySelectionRead(session, read);
+    return undefined;
+  }
+  return read;
+}
+
+// A write (or a drag that will write) is pending; a read now would undo it.
+function writeInFlight(reader: SelectionReader): boolean {
+  return Boolean(
+    reader.localWritePendingRef.current ||
+    reader.writeTimerRef.current !== undefined ||
+    reader.dragTargetRef.current,
+  );
+}
+
+// A different element: its classes, selection, and pending write start over.
+function forgetPreviousElement(reader: SelectionReader, nextElementKey: string | undefined): void {
+  const { selectedElementKeyRef, selectedClassNamesRef, selectionIsDefaultRef } = reader;
+  const { cascadeWinnerCacheRef, localWritePendingRef } = reader;
+  selectedElementKeyRef.current = nextElementKey;
+  selectedClassNamesRef.current = [];
+  selectionIsDefaultRef.current = true;
+  cascadeWinnerCacheRef.current = undefined;
+  reader.setSelectedClassNames([]);
+  reader.clearPendingWrite();
+  localWritePendingRef.current = false;
+  loadNoneIfChanged(reader, { force: true });
+}
+
+// Nothing selected: no classes, and no clip-path.
+function finishEmptySelectionRead(session: SelectionSession, read: SelectionRead): void {
+  const reader = session.readerRef.current;
+  if (read.debugRead) {
+    debugClipPath('readSelectedElement:no-element');
+  }
+  if (isCurrentRead(session, read)) {
+    reader.setElementClassNames([]);
+    reader.selectedClassNamesRef.current = [];
+    reader.selectionIsDefaultRef.current = true;
+    reader.setSelectedClassNames([]);
+    loadNoneIfChanged(reader, { force: read.force });
+  }
+  if (read.readSeq === reader.selectionReadSeqRef.current) {
+    reader.selectionReadInProgressRef.current = false;
+  }
+}
+
+// Reads the element's clip-path — from its own styles, its classes, the cascade
+// winner, or the classes picked in the tags — and loads it into the editor.
+async function readElementClipPath(
+  session: SelectionSession,
+  read: SelectionRead,
+  element: unknown,
+): Promise<void> {
+  const found = await readElementStyles(session, read, element);
+  if (!found) {
+    return;
+  }
+  const defaultStyle = await followDefaultSelection(session, read, found);
+  if (defaultStyle === 'stale') {
+    return;
+  }
+  const target = await targetSelectedClasses(session, read, {
+    ...found,
+    selectedStyle: defaultStyle,
+  });
+  if (target.kind === 'done') {
+    return;
+  }
+  const selectedStyle = await applySelectedStyle(session, read, found, target);
+  if (!selectedStyle) {
+    return;
+  }
+  await loadSelectedShape(session, read, found, {
+    selectedStyle,
+    refineKey: target.inheritedWinnerRefineKey,
+  });
+}
+
+// The element's styles and class names, and the style its clip-path comes from:
+// its own styles first, then its classes' styles. Undefined when the read is stale.
+async function readElementStyles(
+  session: SelectionSession,
+  read: SelectionRead,
+  element: unknown,
+): Promise<ElementStyles | undefined> {
+  const reader = session.readerRef.current;
+  const styleOptions = styleOptionsForBreakpoint(reader.activeBreakpointRef.current);
+  const styles = await getElementPrimaryStyleHandles(element);
+  if (!isCurrentRead(session, read)) {
+    return undefined;
+  }
+  let selectedStyle = await findClipPathStyle(styles, styleOptions);
+  const classNames = await getElementClassNames(element, styles);
+  if (isCurrentRead(session, read)) {
+    reader.setElementClassNames(classNames);
+  }
+  dropRemovedSelectedClasses(session, read, classNames);
+  if (read.debugRead) {
+    debugClipPath('readSelectedElement:primary-styles', {
+      classNames,
+      lookupCandidates: getStyleLookupCandidates(classNames),
+      styles: await debugStyleSummaries(styles, styleOptions),
+      selectedStyle: selectedStyle
+        ? await debugStyleSummary(selectedStyle.style, styleOptions)
+        : undefined,
+      selectedRaw: selectedStyle?.raw || undefined,
+      selectedBreakpoint: selectedStyle?.breakpoint || undefined,
+    });
+  }
+  const found = { styles, classNames, selectedStyle, styleOptions };
+  if (!hasClipPathDeclaration(selectedStyle?.raw)) {
+    const fromClasses = await lookupClassClipPathStyle(session, read, found);
+    if (fromClasses === 'stale') {
+      return undefined;
+    }
+    selectedStyle = fromClasses;
+  }
+  if (!isCurrentRead(session, read)) {
+    return undefined;
+  }
+  return { ...found, selectedStyle };
+}
+
+// Drop any manually selected classes that are no longer on the element (e.g.
+// removed in the Designer) so we don't keep resolving their style globally and
+// showing a stale preview.
+function dropRemovedSelectedClasses(
+  session: SelectionSession,
+  read: SelectionRead,
+  classNames: string[],
+): void {
+  const reader = session.readerRef.current;
+  if (!reader.selectedClassNamesRef.current.some((name) => !classNames.includes(name))) {
+    return;
+  }
+  const stillPresent = reader.selectedClassNamesRef.current.filter((name) =>
+    classNames.includes(name),
+  );
+  reader.selectedClassNamesRef.current = stillPresent;
+  if (isCurrentRead(session, read)) {
+    reader.setSelectedClassNames(stillPresent);
+  }
+}
+
+// The element's own styles declare no clip-path: look through its classes' styles.
+async function lookupClassClipPathStyle(
+  session: SelectionSession,
+  read: SelectionRead,
+  { styles, classNames, selectedStyle, styleOptions }: ElementStyles,
+): Promise<FoundClipPathStyle | 'stale'> {
+  if (read.debugRead) {
+    debugClipPath('readSelectedElement:class-lookup-start', {
+      classNames,
+      lookupCandidates: getStyleLookupCandidates(classNames),
+    });
+  }
+  const classLookup = await getClassStyleHandlesWithDiagnostics(classNames, session.webflowApi);
+  const classStyles = classLookup.styles;
+  if (!isCurrentRead(session, read)) {
+    return 'stale';
+  }
+  let classSelectedStyle: FoundClipPathStyle = undefined;
+  let nextSelectedStyle = selectedStyle;
+  if (classStyles.length) {
+    classSelectedStyle = await findClipPathStyle([...classStyles, ...styles], styleOptions);
+    if (hasClipPathDeclaration(classSelectedStyle?.raw) || !selectedStyle) {
+      nextSelectedStyle = classSelectedStyle;
+    }
+  }
+  if (read.debugRead) {
+    debugClipPath('readSelectedElement:class-styles', {
+      lookupResults: classLookup.diagnostics,
+      classStyles: await debugStyleSummaries(classStyles, styleOptions),
+      classSelectedStyle: classSelectedStyle
+        ? await debugStyleSummary(classSelectedStyle.style, styleOptions)
+        : undefined,
+      classSelectedRaw: classSelectedStyle?.raw || undefined,
+      classSelectedBreakpoint: classSelectedStyle?.breakpoint || undefined,
+      finalSelectedRaw: nextSelectedStyle?.raw || undefined,
+      finalSelectedBreakpoint: nextSelectedStyle?.breakpoint || undefined,
+    });
+  }
+  return nextSelectedStyle;
+}
+
+// While the selection is still the auto-default (user hasn't manually picked a
+// class), keep it locked to the current cascade winner — the clip-path that
+// actually renders: highest specificity, then latest stylesheet position — so it
+// follows style resets and class add/remove on the same element, not just on
+// element change.
+async function followDefaultSelection(
+  session: SelectionSession,
+  read: SelectionRead,
+  found: ElementStyles,
+): Promise<FoundClipPathStyle | 'stale'> {
+  const reader = session.readerRef.current;
+  if (!reader.selectionIsDefaultRef.current) {
+    return found.selectedStyle;
+  }
+  const winner = hasClipPathDeclaration(found.selectedStyle?.raw)
+    ? await resolveCascadeWinnerClipPathStyle(
+        found.classNames,
+        found.styles,
+        found.styleOptions,
+        session.webflowApi,
+      )
+    : undefined;
+  if (!isCurrentRead(session, read)) {
+    return 'stale';
+  }
+  const defaultSelection = winner
+    ? winner.namePath.filter((name) => found.classNames.includes(name))
+    : [];
+  const current = reader.selectedClassNamesRef.current;
+  const changed =
+    defaultSelection.length !== current.length ||
+    defaultSelection.some((name, index) => name !== current[index]);
+  if (changed) {
+    reader.selectedClassNamesRef.current = defaultSelection;
+    reader.setSelectedClassNames(defaultSelection);
+  }
+  return winner
+    ? { style: winner.style, raw: winner.raw, breakpoint: winner.breakpoint }
+    : found.selectedStyle;
+}
+
+// Where the read lands for the classes picked in the tags, or 'done' when it has
+// already settled on none.
+type SelectedClassTarget =
+  | { kind: 'done' }
+  | {
+      kind: 'style';
+      selectedStyle: FoundClipPathStyle;
+      selectedNames: string[];
+      writeStyleHandle: StyleHandle | undefined;
+      originOverride: ClipPathStyleOrigin | undefined;
+      appliedNameOverride: { name: string | undefined } | undefined;
+      // Set when an inherited class showed its cheap effective value and still needs
+      // the exact cascade winner resolved (in the background) afterward.
+      inheritedWinnerRefineKey: string | undefined;
+    };
+type ClassStyleTarget = Extract<SelectedClassTarget, { kind: 'style' }>;
+
+// When classes are picked in the tags, target them for reading and writing. If
+// they have no clip-path of their own, show the effective (cascade-winner) value
+// and mark it inherited — like a larger-breakpoint inheritance.
+async function targetSelectedClasses(
+  session: SelectionSession,
+  read: SelectionRead,
+  found: ElementStyles,
+): Promise<SelectedClassTarget> {
+  const reader = session.readerRef.current;
+  const selectedNames = reader.selectedClassNamesRef.current;
+  const untargeted: ClassStyleTarget = {
+    kind: 'style',
+    selectedStyle: found.selectedStyle,
+    selectedNames,
+    writeStyleHandle: undefined,
+    originOverride: undefined,
+    appliedNameOverride: undefined,
+    inheritedWinnerRefineKey: undefined,
+  };
+  if (!selectedNames.length) {
+    return untargeted;
+  }
+  // Resolve the exact standalone class (`.clip-path`) for a single selection, or
+  // the exact combo (`.hero.clip-path`) for several — path-verified so we never
+  // grab a combo whose leaf name merely matches, and never the element's own
+  // most-specific combo handle.
+  const targetStyle = await findStyleForClassPath(selectedNames, session.webflowApi);
+  if (!isCurrentRead(session, read)) {
+    return { kind: 'done' };
+  }
+  const targetDeclaration = targetStyle
+    ? await readClipPathDeclarationWithSource(targetStyle, found.styleOptions)
+    : undefined;
+  if (!isCurrentRead(session, read)) {
+    return { kind: 'done' };
+  }
+  if (targetStyle && targetDeclaration && hasClipPathDeclaration(targetDeclaration.value)) {
+    return {
+      ...untargeted,
+      writeStyleHandle: targetStyle,
+      selectedStyle: {
+        style: targetStyle,
+        raw: targetDeclaration.value,
+        breakpoint: targetDeclaration.breakpoint,
+      },
+      appliedNameOverride: { name: selectedNames[selectedNames.length - 1] ?? undefined },
+    };
+  }
+  if (hasClipPathDeclaration(found.selectedStyle?.raw)) {
+    return inheritForSelectedClasses(session, read, found, {
+      ...untargeted,
+      writeStyleHandle: targetStyle,
+    });
+  }
+  // Nothing renders → none on the (writable) selected class.
+  loadNoneForWritableStyle(reader, targetStyle, { force: read.force });
+  return { kind: 'done' };
+}
+
+// The selected class has no clip-path of its own, but the element shows an
+// effective one → inherited. Paint the orange label + the cheap effective value
+// INSTANTLY; resolve the exact cascade winner (slower) afterward and only re-read
+// if it actually differs.
+function inheritForSelectedClasses(
+  session: SelectionSession,
+  read: SelectionRead,
+  found: ElementStyles,
+  target: ClassStyleTarget,
+): ClassStyleTarget {
+  const reader = session.readerRef.current;
+  if (isCurrentRead(session, read)) {
+    reader.setClipPathStyleOrigin('inherited');
+  }
+  const inherited: ClassStyleTarget = { ...target, originOverride: 'inherited' };
+  const winnerKey =
+    `${found.classNames.join('\u0000')}|` +
+    `${found.selectedStyle?.style?.id ?? ''}|${found.selectedStyle?.raw ?? ''}`;
+  const cached = reader.cascadeWinnerCacheRef.current;
+  if (cached && cached.key === winnerKey) {
+    // Exact winner already known — use it directly (no flash).
+    if (!cached.winner) {
+      return inherited;
+    }
+    return {
+      ...inherited,
+      selectedStyle: {
+        style: cached.winner.style,
+        raw: cached.winner.raw,
+        breakpoint: cached.winner.breakpoint,
+      },
+    };
+  }
+  // Show the cheap effective value now; refine after this read.
+  return { ...inherited, inheritedWinnerRefineKey: winnerKey };
+}
+
+// Points the editor at the style the value comes from and fills in the source
+// label. Undefined when there is no clip-path to load (none has been shown).
+async function applySelectedStyle(
+  session: SelectionSession,
+  read: SelectionRead,
+  found: ElementStyles,
+  target: ClassStyleTarget,
+): Promise<NonNullable<FoundClipPathStyle> | undefined> {
+  const reader = session.readerRef.current;
+  const { selectedStyle } = target;
+  if (!selectedStyle) {
+    if (read.debugRead) {
+      debugClipPath('readSelectedElement:result-none-no-style');
+    }
+    loadNoneIfChanged(reader, { force: read.force });
+    return undefined;
+  }
+  if (!hasClipPathDeclaration(selectedStyle.raw)) {
+    if (read.debugRead) {
+      debugClipPath('readSelectedElement:result-none-writable-style', {
+        style: await debugStyleSummary(selectedStyle.style, found.styleOptions),
+      });
+    }
+    loadNoneForWritableStyle(reader, selectedStyle.style, { force: read.force });
+    return undefined;
+  }
+  // In class-selection mode never fall back to the element's combo handle; an
+  // undefined target here means "create the selected class/combo on write".
+  reader.styleRef.current = target.selectedNames.length
+    ? target.writeStyleHandle
+    : target.writeStyleHandle || selectedStyle.style;
+  reader.setClipPathStyleOrigin(
+    target.originOverride ||
+      clipPathStyleOriginFromSource(selectedStyle.breakpoint, reader.activeBreakpointRef.current),
+  );
+  // The selector + breakpoint the rendered value actually comes from, for the
+  // "Value comes from:" popover on the inherited (orange) label.
+  const sourceNamePath = await getStyleNamePath(selectedStyle.style);
+  if (isCurrentRead(session, read)) {
+    const sourceClasses = sourceNamePath.filter((name) => found.classNames.includes(name));
+    reader.setClipPathSourceSelector(sourceClasses.length ? sourceClasses : sourceNamePath);
+    reader.setClipPathSourceBreakpoint(selectedStyle.breakpoint);
+    reader.setAppliedClassName(
+      target.appliedNameOverride
+        ? target.appliedNameOverride.name
+        : sourceNamePath[sourceNamePath.length - 1] || undefined,
+    );
+  }
+  return selectedStyle;
+}
+
+// Loads the selected style's clip-path into the editor, with its pasted-SVG
+// variants when it has them.
+async function loadSelectedShape(
+  session: SelectionSession,
+  read: SelectionRead,
+  found: ElementStyles,
+  {
+    selectedStyle,
+    refineKey,
+  }: { selectedStyle: NonNullable<FoundClipPathStyle>; refineKey: string | undefined },
+): Promise<void> {
+  const reader = session.readerRef.current;
+  const normalized = normalizeClipPathValue(selectedStyle.raw);
+  if (read.debugRead) {
+    debugClipPath('readSelectedElement:result-detected', {
+      raw: selectedStyle.raw,
+      normalizedCss: normalized.css,
+      preset: matchPreset(normalized.shape),
+      sourceBreakpoint: selectedStyle.breakpoint,
+      style: await debugStyleSummary(selectedStyle.style, found.styleOptions),
+    });
+  }
+  const loadedShapeScaleOptions = loadedShapeScaleOptionsFor(reader, normalized.shape);
+  let rawShapeSvgCache: PastedShapeSvgCache | undefined = undefined;
+  if (normalized.shape.kind === 'shape') {
+    rawShapeSvgCache =
+      reader.matchingPastedSvgCacheForShape(normalized.shape, loadedShapeScaleOptions) ||
+      (await readPastedShapeMetadata(selectedStyle.style, found.styleOptions)) ||
+      cacheFromShapeFitVariants(normalized.shape, loadedShapeScaleOptions);
+  }
+  const shapeSvgCache = normalizeShapeFitCache(rawShapeSvgCache, loadedShapeScaleOptions);
+  const loadedShape =
+    normalized.shape.kind === 'shape' &&
+    rawShapeSvgCache &&
+    shapeSvgCache &&
+    shapesClose(normalized.shape, rawShapeSvgCache.contain)
+      ? shapeSvgCache.contain
+      : normalized.shape;
+  if (!isCurrentRead(session, read)) {
+    return;
+  }
+  if (refineKey) {
+    // Best effort: the lookups behind it swallow their own failures, and a winner
+    // it cannot resolve leaves the effective value already on screen.
+    void refineInheritedWinner(session, read, found, refineKey);
+  }
+  // Skip the reload when the value is unchanged from what we already have — even
+  // on a forced re-read. `loadShapeFromSelection` wipes the undo stack, and a forced
+  // re-read can fire right after applying to a NEW class (the createStyle triggers a
+  // selection event), which would otherwise destroy the just-created undo step.
+  // styleRef/origin/source are already set above, so this only avoids the needless
+  // reload.
+  const unchanged =
+    reader.lastWrittenRef.current === normalized.css &&
+    shapesClose(reader.shapeRef.current, loadedShape);
+  if (!unchanged) {
+    reader.loadShapeFromSelection(loadedShape, normalized.css);
+  }
+  if (shapeSvgCache && reader.shapeMatchesPastedSvgCache(loadedShape, shapeSvgCache)) {
+    reader.pastedShapeSvgCacheRef.current = shapeSvgCache;
+  }
+}
+
+// The scale options a loaded shape was written with: its own variables, or the
+// editor's current ones without a variable for a shape that names none.
+function loadedShapeScaleOptionsFor(reader: SelectionReader, shape: ClipShape): ShapeScaleOptions {
+  const loadedScaleVariableName =
+    shape.kind === 'shape' ? shapeScaleVariableNameFromValue(shape.value) : undefined;
+  const loadedOffsetNames =
+    shape.kind === 'shape' ? shapeOffsetVariableNamesFromValue(shape.value) : undefined;
+  if (!loadedScaleVariableName) {
+    return reader.currentShapeScaleOptions({ useVariable: false });
+  }
+  return {
+    useVariable: true,
+    variableName: loadedScaleVariableName,
+    offsetLeftVariableName:
+      loadedOffsetNames?.offsetLeftVar || DEFAULT_SHAPE_OFFSET_LEFT_VARIABLE_NAME,
+    offsetTopVariableName:
+      loadedOffsetNames?.offsetTopVar || DEFAULT_SHAPE_OFFSET_TOP_VARIABLE_NAME,
+  };
+}
+
+// An inherited class just painted its cheap effective value. Resolve the exact
+// cascade winner in the background; cache it and, if it actually differs from what
+// we showed, re-read (which now hits the cache and loads the winner through the
+// normal shape-aware path).
+async function refineInheritedWinner(
+  session: SelectionSession,
+  read: SelectionRead,
+  found: ElementStyles,
+  refineKey: string,
+): Promise<void> {
+  const winner = await resolveCascadeWinnerClipPathStyle(
+    found.classNames,
+    found.styles,
+    found.styleOptions,
+    session.webflowApi,
+  );
+  if (!isCurrentRead(session, read)) {
+    return;
+  }
+  const reader = session.readerRef.current;
+  reader.cascadeWinnerCacheRef.current = { key: refineKey, winner };
+  const winnerCss = winner ? normalizeClipPathValue(winner.raw).css : undefined;
+  if (winnerCss && winnerCss !== reader.lastWrittenRef.current) {
+    reader.refreshSelectedElementRef.current?.({ force: true });
+  }
+}
+
+// Writing the clip-path.
+function useClipPathWrite(editor: EditorAfterWindowKeyListeners) {
+  const { styleRef, onApplyRef, css, localWritePendingRef, lastWrittenRef, writeTimerRef } = editor;
+  // The flush runs after this render is gone; it reads the editor through this ref.
+  const writerRef = useRef(editor);
+  writerRef.current = editor;
   useEffect(() => {
     const style = styleRef.current;
     const webflowApi = readWebflowApi();
-    const canResolveSelectedStyle = webflowApi !== null;
+    const canResolveSelectedStyle = webflowApi !== undefined;
     // Embedded mode (onApply): the parent panel owns the write target, so the tool's own
     // ability to reach a Webflow style handle says nothing about whether the value can be
     // written. Without this the gate below returned early every time outside the
@@ -9946,126 +11255,193 @@ export default function ClipPath({
       localWritePendingRef.current = false;
       return;
     }
-    if (writeTimerRef.current !== null) {
+    if (writeTimerRef.current !== undefined) {
       return;
     }
+    scheduleClipPathFlush(writerRef, webflowApi);
+  }, [css, styleRef, onApplyRef, localWritePendingRef, lastWrittenRef, writeTimerRef]);
+}
 
-    const flush = async () => {
-      const valueToWrite = latestCssRef.current;
-      writeTimerRef.current = null;
-      if (lastWrittenRef.current === valueToWrite) {
-        return;
+// What a clip-path write reads and records.
+type ClipPathWriter = EditorAfterWindowKeyListeners;
+
+// Writes the latest CSS once the throttle has passed.
+function scheduleClipPathFlush(
+  writerRef: MutableRefObject<ClipPathWriter>,
+  webflowApi: WebflowApi | undefined,
+): void {
+  writerRef.current.writeTimerRef.current = window.setTimeout(() => {
+    // Nothing to handle here: the flush catches its own failures, and a failed
+    // write is retried by the next change.
+    void flushClipPathWrite(writerRef, webflowApi);
+  }, WRITE_THROTTLE_MS);
+}
+
+// Writes the latest CSS, then schedules another write if it changed meanwhile.
+async function flushClipPathWrite(
+  writerRef: MutableRefObject<ClipPathWriter>,
+  webflowApi: WebflowApi | undefined,
+): Promise<void> {
+  const writer = writerRef.current;
+  const valueToWrite = writer.latestCssRef.current;
+  writer.writeTimerRef.current = undefined;
+  if (writer.lastWrittenRef.current === valueToWrite) {
+    return;
+  }
+  const settled = writer.onApplyRef.current
+    ? applyClipPathToEmbed(writer, valueToWrite)
+    : await writeClipPathToWebflow(writer, webflowApi, valueToWrite);
+  if (settled === 'stop') {
+    return;
+  }
+  if (
+    writer.latestCssRef.current !== writer.lastWrittenRef.current &&
+    writer.writeTimerRef.current === undefined
+  ) {
+    scheduleClipPathFlush(writerRef, webflowApi);
+  }
+}
+
+// Embedded mode: the parent style panel owns the write target (the user's selected
+// selector + breakpoint), so hand it the raw value and skip all of the tool's own
+// class/style resolution.
+function applyClipPathToEmbed(writer: ClipPathWriter, valueToWrite: string): 'continue' {
+  const { lastWrittenRef, localWritePendingRef } = writer;
+  try {
+    if (isNoneClipPathValue(valueToWrite)) {
+      writer.onClearRef.current?.();
+    } else {
+      writer.onApplyRef.current?.(valueToWrite);
+    }
+  } catch {
+    /* parent write failed — next change retries */
+  }
+  lastWrittenRef.current = valueToWrite;
+  writer.setClipPathStyleOrigin(isNoneClipPathValue(valueToWrite) ? 'none' : 'current');
+  writer.setAppliedClassName(undefined);
+  localWritePendingRef.current = writer.latestCssRef.current !== valueToWrite;
+  return 'continue';
+}
+
+// Writes to the element's clip-path style in the Designer, resolving (or creating)
+// the style first when the one in hand can't take the value. 'stop' when there is
+// nothing that can.
+async function writeClipPathToWebflow(
+  writer: ClipPathWriter,
+  webflowApi: WebflowApi | undefined,
+  valueToWrite: string,
+): Promise<'continue' | 'stop'> {
+  const { localWritePendingRef, pastedShapeSvgCacheRef, lastWrittenRef } = writer;
+  try {
+    const targetStyle = await resolveClipPathWriteTarget(writer, webflowApi, valueToWrite);
+    if (!canWriteClipPathValue(targetStyle, valueToWrite)) {
+      localWritePendingRef.current = false;
+      return 'stop';
+    }
+    if (targetStyle) {
+      const shapeSvgCache = writer.matchingPastedSvgCacheForShape(writer.shapeRef.current);
+      if (shapeSvgCache) {
+        pastedShapeSvgCacheRef.current = shapeSvgCache;
       }
+      const styleOptions = styleOptionsForBreakpoint(writer.activeBreakpointRef.current);
+      await writeClipPathToStyle(targetStyle, valueToWrite, {
+        ...(shapeSvgCache ? { shapeSvgCache } : {}),
+        ...(styleOptions ? { styleOptions } : {}),
+      });
+    }
+    lastWrittenRef.current = valueToWrite;
+    await recordClipPathWrite(writer, targetStyle, valueToWrite);
+    localWritePendingRef.current = writer.latestCssRef.current !== valueToWrite;
+  } catch {
+    localWritePendingRef.current = false;
+    /* swallow — next change will retry */
+  }
+  return 'continue';
+}
 
-      // Embedded mode: the parent style panel owns the write target (the user's
-      // selected selector + breakpoint), so hand it the raw value and skip all of the
-      // tool's own class/style resolution.
-      if (onApplyRef.current) {
-        try {
-          if (isNoneClipPathValue(valueToWrite)) {
-            onClearRef.current?.();
-          } else {
-            onApplyRef.current(valueToWrite);
-          }
-        } catch {
-          /* parent write failed — next change retries */
-        }
-        lastWrittenRef.current = valueToWrite;
-        setClipPathStyleOrigin(isNoneClipPathValue(valueToWrite) ? 'none' : 'current');
-        setAppliedClassName(null);
-        localWritePendingRef.current = latestCssRef.current !== valueToWrite;
-        if (latestCssRef.current !== lastWrittenRef.current && writeTimerRef.current === null) {
-          writeTimerRef.current = window.setTimeout(flush, WRITE_THROTTLE_MS);
-        }
-        return;
-      }
+// The style a write lands on: the one in hand when it can take the value; else, in
+// class-selection mode, the exact selected class/combo (created if it doesn't exist
+// — never the element's own combo); else the element's writable clip-path style.
+async function resolveClipPathWriteTarget(
+  writer: ClipPathWriter,
+  webflowApi: WebflowApi | undefined,
+  valueToWrite: string,
+): Promise<StyleHandle | undefined> {
+  const { styleRef } = writer;
+  let targetStyle = styleRef.current;
+  const selectedNames = writer.selectedClassNamesRef.current;
+  if (selectedNames.length && webflowApi && !canWriteClipPathValue(targetStyle, valueToWrite)) {
+    targetStyle = await resolveOrCreateStyleForClassPath(selectedNames, webflowApi);
+    if (targetStyle) {
+      styleRef.current = targetStyle;
+    }
+  } else if (
+    !selectedNames.length &&
+    !canWriteClipPathValue(targetStyle, valueToWrite) &&
+    webflowApi
+  ) {
+    targetStyle = await resolveWritableClipPathStyleForElement(
+      (await webflowApi.getSelectedElement?.()) || undefined,
+      webflowApi,
+      valueToWrite,
+      styleOptionsForBreakpoint(writer.activeBreakpointRef.current),
+    );
+    if (targetStyle) {
+      styleRef.current = targetStyle;
+    }
+  }
+  return targetStyle;
+}
 
-      try {
-        let targetStyle = styleRef.current;
-        const selNames = selectedClassNamesRef.current;
-        if (selNames.length && webflowApi && !canWriteClipPathValue(targetStyle, valueToWrite)) {
-          // Class-selection mode: write to the exact selected class/combo,
-          // creating it if it doesn't exist — never the element's own combo.
-          targetStyle = await resolveOrCreateStyleForClassPath(selNames, webflowApi);
-          if (targetStyle) {
-            styleRef.current = targetStyle;
-          }
-        } else if (
-          !selNames.length &&
-          !canWriteClipPathValue(targetStyle, valueToWrite) &&
-          webflowApi
-        ) {
-          targetStyle = await resolveWritableClipPathStyleForElement(
-            (await webflowApi.getSelectedElement?.()) || null,
-            webflowApi,
-            valueToWrite,
-            styleOptionsForBreakpoint(activeBreakpointRef.current),
-          );
-          if (targetStyle) {
-            styleRef.current = targetStyle;
-          }
-        }
+// After a write: the label's origin (none, or set at this breakpoint) and the class
+// it was written to.
+async function recordClipPathWrite(
+  writer: ClipPathWriter,
+  targetStyle: StyleHandle | undefined,
+  valueToWrite: string,
+): Promise<void> {
+  const nextOrigin =
+    isNoneClipPathValue(valueToWrite) &&
+    !styleOptionsForBreakpoint(writer.activeBreakpointRef.current)
+      ? 'none'
+      : 'current';
+  writer.setClipPathStyleOrigin(nextOrigin);
+  if (nextOrigin === 'current' && targetStyle) {
+    const writtenStyleNamePath = await getStyleNamePath(targetStyle);
+    writer.setAppliedClassName(writtenStyleNamePath[writtenStyleNamePath.length - 1] || undefined);
+  } else {
+    writer.setAppliedClassName(undefined);
+  }
+}
 
-        if (!canWriteClipPathValue(targetStyle, valueToWrite)) {
-          localWritePendingRef.current = false;
-          return;
-        }
-
-        if (targetStyle) {
-          const shapeSvgCache = matchingPastedSvgCacheForShape(shapeRef.current);
-          if (shapeSvgCache) {
-            pastedShapeSvgCacheRef.current = shapeSvgCache;
-          }
-          const styleOptions = styleOptionsForBreakpoint(activeBreakpointRef.current);
-          await writeClipPathToStyle(targetStyle, valueToWrite, {
-            ...(shapeSvgCache ? { shapeSvgCache } : {}),
-            ...(styleOptions ? { styleOptions } : {}),
-          });
-        }
-        lastWrittenRef.current = valueToWrite;
-        const nextOrigin =
-          isNoneClipPathValue(valueToWrite) &&
-          !styleOptionsForBreakpoint(activeBreakpointRef.current)
-            ? 'none'
-            : 'current';
-        setClipPathStyleOrigin(nextOrigin);
-        if (nextOrigin === 'current' && targetStyle) {
-          const writtenStyleNamePath = await getStyleNamePath(targetStyle);
-          setAppliedClassName(writtenStyleNamePath[writtenStyleNamePath.length - 1] || null);
-        } else {
-          setAppliedClassName(null);
-        }
-        localWritePendingRef.current = latestCssRef.current !== valueToWrite;
-      } catch {
-        localWritePendingRef.current = false;
-        /* swallow — next change will retry */
-      }
-
-      if (latestCssRef.current !== lastWrittenRef.current && writeTimerRef.current === null) {
-        writeTimerRef.current = window.setTimeout(flush, WRITE_THROTTLE_MS);
-      }
-    };
-
-    writeTimerRef.current = window.setTimeout(flush, WRITE_THROTTLE_MS);
-  }, [css]);
-
+// Clearing the timers on unmount, the preset option ids, and handle classes.
+function useTimerCleanup(editor: EditorAfterWindowKeyListeners) {
+  const { writeTimerRef, presetTypeaheadTimerRef, codeTransitionTimerRef } = editor;
+  const { stopKeyboardMoveLoop, activePreset, shape, activePresetIndex } = editor;
+  const { codeHandleColorClasses, polygonPointColors, selectedHandle } = editor;
+  const { selectedCodeHandles, activeInsetModifierMode } = editor;
+  // The cleanup runs once, on unmount; it stops the loop through the latest render's
+  // handler.
+  const stopKeyboardMoveLoopRef = useRef(stopKeyboardMoveLoop);
+  stopKeyboardMoveLoopRef.current = stopKeyboardMoveLoop;
   useEffect(() => {
+    const stopLatestKeyboardMoveLoop = () => stopKeyboardMoveLoopRef.current();
     return () => {
-      if (writeTimerRef.current !== null) {
+      if (writeTimerRef.current !== undefined) {
         window.clearTimeout(writeTimerRef.current);
-        writeTimerRef.current = null;
+        writeTimerRef.current = undefined;
       }
-      if (presetTypeaheadTimerRef.current !== null) {
+      if (presetTypeaheadTimerRef.current !== undefined) {
         window.clearTimeout(presetTypeaheadTimerRef.current);
-        presetTypeaheadTimerRef.current = null;
+        presetTypeaheadTimerRef.current = undefined;
       }
-      if (codeTransitionTimerRef.current !== null) {
+      if (codeTransitionTimerRef.current !== undefined) {
         window.clearTimeout(codeTransitionTimerRef.current);
-        codeTransitionTimerRef.current = null;
+        codeTransitionTimerRef.current = undefined;
       }
-      stopKeyboardMoveLoop();
+      stopLatestKeyboardMoveLoop();
     };
-  }, []);
+  }, [writeTimerRef, presetTypeaheadTimerRef, codeTransitionTimerRef]);
 
   const selectedPresetShape = PRESETS[activePreset] || shape;
   const activePresetOptionName = PRESET_NAMES[activePresetIndex] || PRESET_NAMES[0] || NONE_PRESET;
@@ -10103,15 +11479,31 @@ export default function ClipPath({
   const isHandleSelected = (handle: HandleTarget) =>
     handlesMatch(selectedHandle, handle) ||
     selectedCodeHandles.some((selected) => handlesMatch(selected, handle));
+  return {
+    selectedPresetShape,
+    activePresetOptionName,
+    activePresetOptionId,
+    handleDisplayColorClass,
+    handleClassName,
+    isHandleSelected,
+  };
+}
 
-  const onAddPoint = (e: React.MouseEvent) => {
+type EditorAfterTimerCleanup = EditorAfterWindowKeyListeners & ReturnType<typeof useTimerCleanup>;
+
+// Adding and removing polygon points.
+function pointEditActions(editor: EditorAfterTimerCleanup) {
+  const { canvasRef, shape, markLocalShapeChange, insertPolygonPointColor, setShape } = editor;
+  const { shapeRef, commit, setActivePreset, polygonPointColorsRef, setHandleSelection } = editor;
+  const { syncPolygonPointColors, focusSelectedHandle } = editor;
+  const onAddPoint = (event: React.MouseEvent) => {
     if (!canvasRef.current || shape.kind !== 'polygon') {
       return;
     }
     markLocalShapeChange();
     const rect = canvasRef.current.getBoundingClientRect();
-    const x = ((e.clientX - rect.left) / rect.width) * 100;
-    const y = ((e.clientY - rect.top) / rect.height) * 100;
+    const x = ((event.clientX - rect.left) / rect.width) * 100;
+    const y = ((event.clientY - rect.top) / rect.height) * 100;
     insertPolygonPointColor(shape.points.length, shape.points.length);
     setShape((current) => {
       if (current.kind !== 'polygon') {
@@ -10136,11 +11528,13 @@ export default function ClipPath({
       index,
     );
     const previousNewIndex =
-      previousOldIndex === null
-        ? null
+      previousOldIndex === undefined
+        ? undefined
         : remapPolygonIndexAfterDelete(previousOldIndex, indexesToDelete);
-    const nextSelectedHandle: HandleTarget | null =
-      previousNewIndex === null ? null : { kind: 'polygon-point', index: previousNewIndex };
+    const nextSelectedHandle: HandleTarget | undefined =
+      previousNewIndex === undefined
+        ? undefined
+        : { kind: 'polygon-point', index: previousNewIndex };
     const next: ClipShape = {
       kind: 'polygon',
       points: shape.points.filter((_, i) => i !== index),
@@ -10161,9 +11555,19 @@ export default function ClipPath({
       focusSelectedHandle();
     }
   };
+  return { onAddPoint, onRemovePoint };
+}
 
-  const beginPolygonSelectionDrag = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (e.pointerType === 'mouse' && e.button !== 0) {
+type EditorAfterPointEditActions = EditorAfterTimerCleanup & ReturnType<typeof pointEditActions>;
+
+// Starting a marquee selection.
+function marqueeStartActions(editor: EditorAfterPointEditActions) {
+  const { dragTargetRef, polygonSelectionDragRef, shapeRef, canvasPointFromClient } = editor;
+  const { cancelPendingSelectionRead, closePresetDropdown, stopCodeTransition } = editor;
+  const { stopKeyboardMoveLoop, selectedHandlesRef, setSelectionRect, activePointerIdRef } = editor;
+  const { activePointerCaptureRef, finishPolygonSelectionDrag } = editor;
+  const beginPolygonSelectionDrag = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (event.pointerType === 'mouse' && event.button !== 0) {
       return;
     }
     if (dragTargetRef.current || polygonSelectionDragRef.current) {
@@ -10172,11 +11576,11 @@ export default function ClipPath({
     if (shapeRef.current.kind !== 'polygon') {
       return;
     }
-    if (e.target instanceof Element && e.target.closest('.clip-path_handle')) {
+    if (event.target instanceof Element && event.target.closest('.clip-path_handle')) {
       return;
     }
 
-    const start = canvasPointFromClient(e.clientX, e.clientY);
+    const start = canvasPointFromClient(event.clientX, event.clientY);
     if (!start) {
       return;
     }
@@ -10185,24 +11589,26 @@ export default function ClipPath({
     closePresetDropdown();
     stopCodeTransition();
     stopKeyboardMoveLoop();
-    const baseHandles = e.shiftKey ? selectedHandlesRef.current.filter(isPolygonPointHandle) : [];
+    const baseHandles = event.shiftKey
+      ? selectedHandlesRef.current.filter(isPolygonPointHandle)
+      : [];
 
     polygonSelectionDragRef.current = {
-      pointerId: e.pointerId,
+      pointerId: event.pointerId,
       start,
       current: start,
-      startClient: { x: e.clientX, y: e.clientY },
+      startClient: { x: event.clientX, y: event.clientY },
       didMove: false,
-      additive: e.shiftKey,
+      additive: event.shiftKey,
       baseHandles,
     };
-    setSelectionRect(null);
-    activePointerIdRef.current = e.pointerId;
-    activePointerCaptureRef.current = e.currentTarget;
+    setSelectionRect(undefined);
+    activePointerIdRef.current = event.pointerId;
+    activePointerCaptureRef.current = event.currentTarget;
 
     try {
-      e.currentTarget.setPointerCapture(e.pointerId);
-      e.currentTarget.addEventListener(
+      event.currentTarget.setPointerCapture(event.pointerId);
+      event.currentTarget.addEventListener(
         'lostpointercapture',
         () => finishPolygonSelectionDrag(false),
         { once: true },
@@ -10211,11 +11617,24 @@ export default function ClipPath({
       /* setPointerCapture can fail if the host has already cancelled the pointer */
     }
   };
+  return { beginPolygonSelectionDrag };
+}
 
+type EditorAfterMarqueeStartActions = EditorAfterPointEditActions &
+  ReturnType<typeof marqueeStartActions>;
+
+// Starting a shape move or resize.
+function transformStartActions(editor: EditorAfterMarqueeStartActions) {
+  const { dragTargetRef, polygonSelectionDragRef, shapeTransformDragRef, shapeRef } = editor;
+  const { shapeFitModeRef, canvasPointFromClient, cancelPendingSelectionRead } = editor;
+  const { closePresetDropdown, clearPastedShapeSvgCache, selectHandle } = editor;
+  const { stopCodeTransition, stopKeyboardMoveLoop, setShapeTransformSelection } = editor;
+  const { currentShapeScaleOptions, activePointerIdRef, activePointerCaptureRef } = editor;
+  const { finishShapeTransformDrag } = editor;
   const beginShapeTransformDrag =
     (mode: ShapeTransformDrag['mode'], corner?: ShapeResizeCorner) =>
-    (e: React.PointerEvent<HTMLElement>) => {
-      if (e.pointerType === 'mouse' && e.button !== 0) {
+    (event: React.PointerEvent<HTMLElement>) => {
+      if (event.pointerType === 'mouse' && event.button !== 0) {
         return;
       }
       if (
@@ -10234,18 +11653,18 @@ export default function ClipPath({
         return;
       }
 
-      const start = canvasPointFromClient(e.clientX, e.clientY);
+      const start = canvasPointFromClient(event.clientX, event.clientY);
       const bounds = shapeCssBounds(currentShape);
       if (!start || !bounds) {
         return;
       }
 
-      e.preventDefault();
-      e.stopPropagation();
+      event.preventDefault();
+      event.stopPropagation();
       cancelPendingSelectionRead();
       closePresetDropdown();
       clearPastedShapeSvgCache();
-      selectHandle(null);
+      selectHandle(undefined);
       stopCodeTransition();
       stopKeyboardMoveLoop();
       setShapeTransformSelection(true);
@@ -10255,7 +11674,7 @@ export default function ClipPath({
           ? 'contain'
           : 'stretch';
       shapeTransformDragRef.current = {
-        pointerId: e.pointerId,
+        pointerId: event.pointerId,
         mode,
         ...(corner ? { corner } : {}),
         start,
@@ -10264,12 +11683,12 @@ export default function ClipPath({
         fitMode,
         scaleOptions: currentShapeScaleOptions(),
       };
-      activePointerIdRef.current = e.pointerId;
-      activePointerCaptureRef.current = e.currentTarget;
+      activePointerIdRef.current = event.pointerId;
+      activePointerCaptureRef.current = event.currentTarget;
 
       try {
-        e.currentTarget.setPointerCapture(e.pointerId);
-        e.currentTarget.addEventListener(
+        event.currentTarget.setPointerCapture(event.pointerId);
+        event.currentTarget.addEventListener(
           'lostpointercapture',
           () => finishShapeTransformDrag(false),
           { once: true },
@@ -10278,24 +11697,35 @@ export default function ClipPath({
         /* setPointerCapture can fail if the host has already cancelled the pointer */
       }
     };
+  return { beginShapeTransformDrag };
+}
 
-  const beginDrag = (target: DragTarget) => (e: React.PointerEvent<HTMLButtonElement>) => {
-    if (e.pointerType === 'mouse' && e.button !== 0) {
+type EditorAfterTransformStartActions = EditorAfterMarqueeStartActions &
+  ReturnType<typeof transformStartActions>;
+
+// Starting a handle drag.
+function dragStartActions(editor: EditorAfterTransformStartActions) {
+  const { canvasPointFromClient, cancelPendingSelectionRead, duplicatePolygonPoint } = editor;
+  const { setHandleSelection, selectHandleFromPointer, polygonDisplayProjectionsRef } = editor;
+  const { syncInsetModifierMode, stopCodeTransition, dragTargetRef, targetWithDragOrigin } = editor;
+  const { activePointerIdRef, activePointerCaptureRef, finishDrag } = editor;
+  const beginDrag = (target: DragTarget) => (event: React.PointerEvent<HTMLButtonElement>) => {
+    if (event.pointerType === 'mouse' && event.button !== 0) {
       return;
     }
-    const pointerStart = canvasPointFromClient(e.clientX, e.clientY);
+    const pointerStart = canvasPointFromClient(event.clientX, event.clientY);
     if (!pointerStart) {
       return;
     }
 
-    e.preventDefault();
+    event.preventDefault();
     cancelPendingSelectionRead();
-    e.currentTarget.focus({ preventScroll: true });
+    event.currentTarget.focus({ preventScroll: true });
     let handle = handleFromDragTarget(target);
     let dragStartTarget = target;
     let nextSelection: HandleTarget[];
 
-    if (target.kind === 'polygon-point' && e.altKey) {
+    if (target.kind === 'polygon-point' && event.altKey) {
       const duplicate = duplicatePolygonPoint(target.index, {
         commitChange: false,
         selectDuplicate: false,
@@ -10306,10 +11736,10 @@ export default function ClipPath({
         setHandleSelection(duplicate.handle);
         nextSelection = [duplicate.handle];
       } else {
-        nextSelection = selectHandleFromPointer(handle, e.shiftKey);
+        nextSelection = selectHandleFromPointer(handle, { additive: event.shiftKey });
       }
     } else {
-      nextSelection = selectHandleFromPointer(handle, e.shiftKey);
+      nextSelection = selectHandleFromPointer(handle, { additive: event.shiftKey });
     }
 
     const selectedPolygonIndexes = isPolygonPointHandle(handle)
@@ -10325,54 +11755,65 @@ export default function ClipPath({
         polygonDisplayProjectionsRef.current.delete(index);
       });
     }
-    syncInsetModifierMode(e);
+    syncInsetModifierMode(event);
     stopCodeTransition();
     dragTargetRef.current = targetWithDragOrigin(nextTarget, pointerStart);
-    activePointerIdRef.current = e.pointerId;
-    activePointerCaptureRef.current = e.currentTarget;
+    activePointerIdRef.current = event.pointerId;
+    activePointerCaptureRef.current = event.currentTarget;
     try {
-      e.currentTarget.setPointerCapture(e.pointerId);
-      e.currentTarget.addEventListener('lostpointercapture', () => finishDrag(false), {
+      event.currentTarget.setPointerCapture(event.pointerId);
+      event.currentTarget.addEventListener('lostpointercapture', () => finishDrag(false), {
         once: true,
       });
     } catch {
       /* setPointerCapture can fail if the host has already cancelled the pointer */
     }
   };
+  return { beginDrag };
+}
 
-  const onHandleKeyDown = (handle: HandleTarget) => (e: React.KeyboardEvent<HTMLButtonElement>) => {
-    if (isSpaceKey(e.key, e.code)) {
-      handledKeyboardEventsRef.current.add(e.nativeEvent);
-      stopKeyboardEvent(e);
-      selectHandleForKeyboard(handle);
-      spaceKeyPressedRef.current = true;
-      return;
-    }
+type EditorAfterDragStartActions = EditorAfterTransformStartActions &
+  ReturnType<typeof dragStartActions>;
 
-    if (!isArrowKey(e.key) || e.metaKey || e.ctrlKey) {
-      return;
-    }
-    handledKeyboardEventsRef.current.add(e.nativeEvent);
-    stopKeyboardEvent(e);
-    pressKeyboardMoveKey(handle, e.key, e);
-  };
+// The handles' keys, and where the inset handles sit.
+function handleGeometry(editor: EditorAfterDragStartActions) {
+  const { handledKeyboardEventsRef, selectHandleForKeyboard, spaceKeyPressedRef } = editor;
+  const { pressKeyboardMoveKey, updateKeyboardModifierRefs, releaseKeyboardMoveKey } = editor;
+  const { shape } = editor;
+  const onHandleKeyDown =
+    (handle: HandleTarget) => (event: React.KeyboardEvent<HTMLButtonElement>) => {
+      if (isSpaceKey(event.key, event.code)) {
+        handledKeyboardEventsRef.current.add(event.nativeEvent);
+        stopKeyboardEvent(event);
+        selectHandleForKeyboard(handle);
+        spaceKeyPressedRef.current = true;
+        return;
+      }
 
-  const onHandleKeyUp = (e: React.KeyboardEvent<HTMLButtonElement>) => {
-    if (isSpaceKey(e.key, e.code)) {
-      handledKeyboardEventsRef.current.add(e.nativeEvent);
-      stopKeyboardEvent(e);
+      if (!isArrowKey(event.key) || event.metaKey || event.ctrlKey) {
+        return;
+      }
+      handledKeyboardEventsRef.current.add(event.nativeEvent);
+      stopKeyboardEvent(event);
+      pressKeyboardMoveKey(handle, event.key, event);
+    };
+
+  const onHandleKeyUp = (event: React.KeyboardEvent<HTMLButtonElement>) => {
+    if (isSpaceKey(event.key, event.code)) {
+      handledKeyboardEventsRef.current.add(event.nativeEvent);
+      stopKeyboardEvent(event);
       spaceKeyPressedRef.current = false;
       return;
     }
 
-    updateKeyboardModifierRefs(e);
-    if (!isArrowKey(e.key)) {
+    updateKeyboardModifierRefs(event);
+    if (!isArrowKey(event.key)) {
       return;
     }
 
-    handledKeyboardEventsRef.current.add(e.nativeEvent);
-    stopKeyboardEvent(e);
-    releaseKeyboardMoveKey(e.key, e);
+    handledKeyboardEventsRef.current.add(event.nativeEvent);
+    stopKeyboardEvent(event);
+    releaseKeyboardMoveKey(event.key, event);
   };
 
   const insetWidth = shape.kind === 'inset' ? 100 - shape.left - shape.right : 0;
@@ -10397,6 +11838,24 @@ export default function ClipPath({
     }
     return { x: shape.left + canvasRadius.x, y: 100 - shape.bottom - canvasRadius.y };
   };
+  return {
+    onHandleKeyDown,
+    onHandleKeyUp,
+    insetWidth,
+    insetHeight,
+    insetCenterX,
+    insetCenterY,
+    insetRadii,
+    insetRadiusHandlePosition,
+  };
+}
+
+type EditorAfterHandleGeometry = EditorAfterDragStartActions & ReturnType<typeof handleGeometry>;
+
+// Where the circle handle and the shape bounds sit, and the source label.
+function renderGeometry(editor: EditorAfterHandleGeometry) {
+  const { shape, circleRadiusAngle, handleBounds, canvasSize, clipPathStyleOrigin } = editor;
+  const { selectedClassNames } = editor;
   const circleRadiusHandleX =
     shape.kind === 'circle' ? shape.cx + Math.cos(circleRadiusAngle) * shape.radius : 0;
   const circleRadiusHandleY =
@@ -10429,7 +11888,7 @@ export default function ClipPath({
         : previewY;
     return { left, top };
   };
-  const activeShapeBounds = shape.kind === 'shape' ? shapeCssBounds(shape) : null;
+  const activeShapeBounds = shape.kind === 'shape' ? shapeCssBounds(shape) : undefined;
   const shapeBoundsStyle = activeShapeBounds
     ? {
         left: `${activeShapeBounds.left}%`,
@@ -10448,8 +11907,62 @@ export default function ClipPath({
     .join(' ');
   const selectedSelector = selectedClassNames.length
     ? selectedClassNames.map((name) => `.${name}`).join('')
-    : null;
-  const classTagsControl = elementClassNames.length ? (
+    : undefined;
+  return {
+    circleRadiusHandleX,
+    circleRadiusHandleY,
+    handlePositionStyle,
+    handleCssPositionStyle,
+    activeShapeBounds,
+    shapeBoundsStyle,
+    clipPathLabelClassName,
+    selectedSelector,
+  };
+}
+
+type EditorAfterRenderGeometry = EditorAfterHandleGeometry & ReturnType<typeof renderGeometry>;
+
+// The editor as the view components read it.
+type ClipPathEditor = EditorAfterRenderGeometry;
+type EditorProps = { editor: ClipPathEditor };
+
+// The editor: the class tags, the preset menu, the canvas, and the code.
+function ClipPathView({ editor }: EditorProps) {
+  const { shortcutHelpPortalTarget, hideClassPicker, codeValue } = editor;
+  const { selectedCodeTokenHighlights, onCodeChange, onCodeSelectionChange } = editor;
+  return (
+    <div className="clip-path_component">
+      {shortcutHelpPortalTarget
+        ? createPortal(<ShortcutHelpControl editor={editor} />, shortcutHelpPortalTarget)
+        : undefined}
+      {hideClassPicker ? undefined : <ClassTagsControl editor={editor} />}
+      <PresetControl editor={editor} />
+      <ClipPathCanvas editor={editor} />
+      <ShapeFitControl editor={editor} />
+      <ShapeScaleVariableControl editor={editor} />
+
+      <CodeEditor
+        id="clip-path_css-output"
+        className="clip-path_code"
+        value={codeValue}
+        language="css"
+        ariaLabel="Editable clip-path CSS"
+        tokenHighlights={selectedCodeTokenHighlights}
+        onChange={onCodeChange}
+        onSelectionChange={onCodeSelectionChange}
+      />
+    </div>
+  );
+}
+
+// The element's classes as tags; picking some targets their style.
+function ClassTagsControl({ editor }: EditorProps) {
+  const { elementClassNames, selectedClassNames, handleClassSelectionChange } = editor;
+  const { selectedSelector } = editor;
+  if (!elementClassNames.length) {
+    return undefined;
+  }
+  return (
     <ClassPicker
       className="clip-path_classes"
       tokens={elementClassNames.map((name) => ({ name, kind: 'class' }))}
@@ -10461,8 +11974,15 @@ export default function ClipPath({
           : `Edit clip path on .${token.name} — Shift/Option-click to combine`
       }
     />
-  ) : null;
-  const presetControl = (
+  );
+}
+
+// The "Clip Path" label (with its reset menu or its source popover) and the preset
+// dropdown.
+function PresetControl({ editor }: EditorProps) {
+  const { isPresetOpen, isClipPathLabelMenuOpen, clipPathStyleOrigin } = editor;
+  const { isShortcutHelpOpen } = editor;
+  return (
     <div
       className={[
         'clip-path_control-row',
@@ -10473,176 +11993,222 @@ export default function ClipPath({
         .filter(Boolean)
         .join(' ')}
     >
-      <div className="clip-path_control-label-wrap" ref={clipPathLabelRef}>
-        {clipPathStyleOrigin !== 'none' ? (
-          <button
-            id="clip-path_preset-label"
-            type="button"
-            className={`${clipPathLabelClassName} clip-path_control-label-button`}
-            aria-haspopup={clipPathStyleOrigin === 'current' ? 'menu' : 'dialog'}
-            aria-expanded={isClipPathLabelMenuOpen}
-            onClick={onClipPathLabelClick}
-          >
-            Clip Path
-          </button>
-        ) : (
-          <span className={clipPathLabelClassName} id="clip-path_preset-label">
-            Clip Path
-          </span>
-        )}
-        {isClipPathLabelMenuOpen && clipPathStyleOrigin === 'current' ? (
-          <div className="clip-path_label-menu" role="menu">
-            <button
-              type="button"
-              className="clip-path_label-menu-item"
-              role="menuitem"
-              onClick={() => void resetCurrentBreakpointClipPath()}
-            >
-              <svg className="clip-path_label-menu-icon" viewBox="0 0 16 16" aria-hidden="true">
-                <path d="M5.2 5.2H2.2V2.2" />
-                <path d="M2.6 5.2A5.5 5.5 0 1 1 4 12.2" />
-              </svg>
-              <span>Reset</span>
-              <span className="clip-path_label-menu-shortcut">Option + click</span>
-            </button>
-          </div>
-        ) : null}
-        {isClipPathLabelMenuOpen && clipPathStyleOrigin === 'inherited' ? (
-          <div
-            className="clip-path_label-menu clip-path_source-menu"
-            role="dialog"
-            aria-label="Clip path value source"
-          >
-            <span className="clip-path_source-title">Value comes from:</span>
-            <div className="clip-path_source-row">
-              {clipPathSourceBreakpoint ? (
-                <span
-                  className="clip-path_source-breakpoint"
-                  title={BREAKPOINT_LABELS[clipPathSourceBreakpoint]}
-                >
-                  <BreakpointIcon breakpoint={clipPathSourceBreakpoint} />
-                  {BREAKPOINT_LABELS[clipPathSourceBreakpoint]}
-                </span>
-              ) : null}
-              {(clipPathSourceSelector.length
-                ? clipPathSourceSelector
-                : appliedClassName
-                  ? [appliedClassName]
-                  : []
-              ).map((name) => (
-                <span className="clip-path_source-class" key={name}>
-                  {name}
-                </span>
-              ))}
-            </div>
-          </div>
-        ) : null}
-      </div>
+      <ClipPathLabel editor={editor} />
       <div className="clip-path_control-field">
-        <div className="clip-path_preset" ref={presetDropdownRef}>
-          <button
-            id="clip-path_preset-button"
-            ref={presetButtonRef}
-            type="button"
-            className="clip-path_preset-button"
-            aria-haspopup="listbox"
-            aria-expanded={isPresetOpen}
-            aria-controls="clip-path_preset-listbox"
-            aria-labelledby="clip-path_preset-label clip-path_preset-button"
-            onClick={() => {
-              if (isPresetOpen) {
-                closePresetDropdown();
-              } else {
-                setIsShortcutHelpOpen(false);
-                openPresetDropdown();
-              }
-            }}
-            onKeyDown={onPresetButtonKeyDown}
-          >
-            <span className="clip-path_preset-value">
-              <PresetIcon shape={selectedPresetShape} />
-              <span className="clip-path_preset-name">{activePreset}</span>
-            </span>
-            <svg className="clip-path_preset-chevron" viewBox="0 0 16 16" aria-hidden="true">
-              <path d="M4.2 6.2 8 10l3.8-3.8" />
-            </svg>
-          </button>
-
-          {isPresetOpen ? (
-            <div
-              id="clip-path_preset-listbox"
-              ref={presetListRef}
-              className="clip-path_preset-list"
-              role="listbox"
-              tabIndex={-1}
-              aria-labelledby="clip-path_preset-label"
-              aria-activedescendant={activePresetOptionId}
-              onKeyDown={onPresetListKeyDown}
-            >
-              {PRESET_NAMES.map((name, index) => {
-                const optionShape = PRESETS[name];
-                if (!optionShape) {
-                  return null;
-                }
-                const isSelected = activePreset === name;
-
-                return (
-                  <div
-                    key={name}
-                    id={presetOptionId(name)}
-                    className={[
-                      'clip-path_preset-option',
-                      index === activePresetIndex ? 'is-active' : '',
-                      isSelected ? 'is-selected' : '',
-                    ]
-                      .filter(Boolean)
-                      .join(' ')}
-                    role="option"
-                    aria-selected={isSelected}
-                    onMouseEnter={() => setActivePresetIndex(index)}
-                    onClick={() => choosePreset(name)}
-                  >
-                    <PresetIcon shape={optionShape} />
-                    <span className="clip-path_preset-name">{name}</span>
-                  </div>
-                );
-              })}
-            </div>
-          ) : null}
-        </div>
+        <PresetDropdown editor={editor} />
       </div>
     </div>
   );
-  const shapeFitControl =
-    activePreset === 'Shape' ? (
-      <div className="clip-path_control-row clip-path_control-row--with-help">
-        <label className="clip-path_control-label" id="clip-path_shape-fit-label">
-          Fit
-        </label>
-        <div className="clip-path_control-field">
-          <SegmentedControl<ShapeFitMode>
-            ariaLabel="Fit"
-            value={shapeFitMode}
-            onChange={setShapeFitModeFromControl}
-            options={[
-              { value: 'contain', label: 'Scale' },
-              { value: 'stretch', label: 'Stretch' },
-            ]}
-          />
-        </div>
-        {shapeFitMode === 'contain' ? (
-          <p className="clip-path_control-help">
-            <svg className="clip-path_control-help-icon" viewBox="0 0 16 16" aria-hidden="true">
-              <circle cx="8" cy="8" r="6" />
-              <path d="M6.5 6.2a2 2 0 0 1 3.8.9c0 1.8-2.2 1.6-2.2 3" />
-              <path d="M8 12.2h.01" />
+}
+
+// The label: blue when this breakpoint sets the clip-path (a menu to reset it),
+// orange when it is inherited (a popover naming where it comes from).
+function ClipPathLabel({ editor }: EditorProps) {
+  const { clipPathLabelRef, clipPathStyleOrigin, clipPathLabelClassName } = editor;
+  const { isClipPathLabelMenuOpen, onClipPathLabelClick, resetCurrentBreakpointClipPath } = editor;
+  return (
+    <div className="clip-path_control-label-wrap" ref={clipPathLabelRef}>
+      {clipPathStyleOrigin !== 'none' ? (
+        <button
+          id="clip-path_preset-label"
+          type="button"
+          className={`${clipPathLabelClassName} clip-path_control-label-button`}
+          aria-haspopup={clipPathStyleOrigin === 'current' ? 'menu' : 'dialog'}
+          aria-expanded={isClipPathLabelMenuOpen}
+          onClick={onClipPathLabelClick}
+        >
+          Clip Path
+        </button>
+      ) : (
+        <span className={clipPathLabelClassName} id="clip-path_preset-label">
+          Clip Path
+        </span>
+      )}
+      {isClipPathLabelMenuOpen && clipPathStyleOrigin === 'current' ? (
+        <div className="clip-path_label-menu" role="menu">
+          <button
+            type="button"
+            className="clip-path_label-menu-item"
+            role="menuitem"
+            onClick={() => void resetCurrentBreakpointClipPath()}
+          >
+            <svg className="clip-path_label-menu-icon" viewBox="0 0 16 16" aria-hidden="true">
+              <path d="M5.2 5.2H2.2V2.2" />
+              <path d="M2.6 5.2A5.5 5.5 0 1 1 4 12.2" />
             </svg>
-            <span>Apply container-type: size; to the parent</span>
-          </p>
-        ) : null}
+            <span>Reset</span>
+            <span className="clip-path_label-menu-shortcut">Option + click</span>
+          </button>
+        </div>
+      ) : undefined}
+      {isClipPathLabelMenuOpen && clipPathStyleOrigin === 'inherited' ? (
+        <ClipPathSourceMenu editor={editor} />
+      ) : undefined}
+    </div>
+  );
+}
+
+// Where an inherited clip-path comes from: its breakpoint and its selector.
+function ClipPathSourceMenu({ editor }: EditorProps) {
+  const { clipPathSourceBreakpoint, clipPathSourceSelector, appliedClassName } = editor;
+  return (
+    <div
+      className="clip-path_label-menu clip-path_source-menu"
+      role="dialog"
+      aria-label="Clip path value source"
+    >
+      <span className="clip-path_source-title">Value comes from:</span>
+      <div className="clip-path_source-row">
+        {clipPathSourceBreakpoint ? (
+          <span
+            className="clip-path_source-breakpoint"
+            title={BREAKPOINT_LABELS[clipPathSourceBreakpoint]}
+          >
+            <BreakpointIcon breakpoint={clipPathSourceBreakpoint} />
+            {BREAKPOINT_LABELS[clipPathSourceBreakpoint]}
+          </span>
+        ) : undefined}
+        {(clipPathSourceSelector.length
+          ? clipPathSourceSelector
+          : appliedClassName
+            ? [appliedClassName]
+            : []
+        ).map((name) => (
+          <span className="clip-path_source-class" key={name}>
+            {name}
+          </span>
+        ))}
       </div>
-    ) : null;
-  const renderShapeVariableLabel = (id: string, text: string, tip: string) => (
+    </div>
+  );
+}
+
+// The preset button and, while open, its listbox.
+function PresetDropdown({ editor }: EditorProps) {
+  const { presetDropdownRef, presetButtonRef, isPresetOpen, closePresetDropdown } = editor;
+  const { setIsShortcutHelpOpen, openPresetDropdown, onPresetButtonKeyDown } = editor;
+  const { selectedPresetShape, activePreset } = editor;
+  return (
+    <div className="clip-path_preset" ref={presetDropdownRef}>
+      <button
+        id="clip-path_preset-button"
+        ref={presetButtonRef}
+        type="button"
+        className="clip-path_preset-button"
+        aria-haspopup="listbox"
+        aria-expanded={isPresetOpen}
+        aria-controls="clip-path_preset-listbox"
+        aria-labelledby="clip-path_preset-label clip-path_preset-button"
+        onClick={() => {
+          if (isPresetOpen) {
+            closePresetDropdown();
+          } else {
+            setIsShortcutHelpOpen(false);
+            openPresetDropdown();
+          }
+        }}
+        onKeyDown={onPresetButtonKeyDown}
+      >
+        <span className="clip-path_preset-value">
+          <PresetIcon shape={selectedPresetShape} />
+          <span className="clip-path_preset-name">{activePreset}</span>
+        </span>
+        <svg className="clip-path_preset-chevron" viewBox="0 0 16 16" aria-hidden="true">
+          <path d="M4.2 6.2 8 10l3.8-3.8" />
+        </svg>
+      </button>
+
+      {isPresetOpen ? <PresetList editor={editor} /> : undefined}
+    </div>
+  );
+}
+
+// The presets, each with its icon; hovering one makes it the active option.
+function PresetList({ editor }: EditorProps) {
+  const { presetListRef, activePresetOptionId, onPresetListKeyDown, activePreset } = editor;
+  const { activePresetIndex, setActivePresetIndex, choosePreset } = editor;
+  return (
+    <div
+      id="clip-path_preset-listbox"
+      ref={presetListRef}
+      className="clip-path_preset-list"
+      role="listbox"
+      tabIndex={-1}
+      aria-labelledby="clip-path_preset-label"
+      aria-activedescendant={activePresetOptionId}
+      onKeyDown={onPresetListKeyDown}
+    >
+      {PRESET_NAMES.map((name, index) => {
+        const optionShape = PRESETS[name];
+        if (!optionShape) {
+          return undefined;
+        }
+        const isSelected = activePreset === name;
+
+        return (
+          <div
+            key={name}
+            id={presetOptionId(name)}
+            className={[
+              'clip-path_preset-option',
+              index === activePresetIndex ? 'is-active' : '',
+              isSelected ? 'is-selected' : '',
+            ]
+              .filter(Boolean)
+              .join(' ')}
+            role="option"
+            aria-selected={isSelected}
+            onMouseEnter={() => setActivePresetIndex(index)}
+            onClick={() => choosePreset(name)}
+          >
+            <PresetIcon shape={optionShape} />
+            <span className="clip-path_preset-name">{name}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// How a pasted shape fits the element: scaled to the container, or stretched.
+function ShapeFitControl({ editor }: EditorProps) {
+  const { activePreset, shapeFitMode, setShapeFitModeFromControl } = editor;
+  if (activePreset !== 'Shape') {
+    return undefined;
+  }
+  return (
+    <div className="clip-path_control-row clip-path_control-row--with-help">
+      <label className="clip-path_control-label" id="clip-path_shape-fit-label">
+        Fit
+      </label>
+      <div className="clip-path_control-field">
+        <SegmentedControl<ShapeFitMode>
+          ariaLabel="Fit"
+          value={shapeFitMode}
+          onChange={setShapeFitModeFromControl}
+          options={[
+            { value: 'contain', label: 'Scale' },
+            { value: 'stretch', label: 'Stretch' },
+          ]}
+        />
+      </div>
+      {shapeFitMode === 'contain' ? (
+        <p className="clip-path_control-help">
+          <svg className="clip-path_control-help-icon" viewBox="0 0 16 16" aria-hidden="true">
+            <circle cx="8" cy="8" r="6" />
+            <path d="M6.5 6.2a2 2 0 0 1 3.8.9c0 1.8-2.2 1.6-2.2 3" />
+            <path d="M8 12.2h.01" />
+          </svg>
+          <span>Apply container-type: size; to the parent</span>
+        </p>
+      ) : undefined}
+    </div>
+  );
+}
+
+// A shape-variable row's label, with its explanation on hover.
+function ShapeVariableLabel({ id, text, tip }: { id: string; text: string; tip: string }) {
+  return (
     <div className="clip-path_label-with-help">
       <label className="clip-path_control-label" id={id}>
         {text}
@@ -10661,13 +12227,23 @@ export default function ClipPath({
       </span>
     </div>
   );
-  const renderShapeVariableInput = (
-    id: string,
-    labelId: string,
-    value: string,
-    placeholder: string,
-    apply: (name: string) => void,
-  ) => (
+}
+
+// A shape-variable name field; the name is tidied into a custom property on blur.
+function ShapeVariableInput({
+  id,
+  labelId,
+  value,
+  placeholder,
+  apply,
+}: {
+  id: string;
+  labelId: string;
+  value: string;
+  placeholder: string;
+  apply: (name: string) => void;
+}) {
+  return (
     <div className="clip-path_control-field clip-path_variable-field">
       <input
         id={id}
@@ -10689,63 +12265,74 @@ export default function ClipPath({
       />
     </div>
   );
-  const shapeScaleVariableControl =
-    activePreset === 'Shape' && shapeFitMode === 'contain' ? (
-      <>
-        <div className="clip-path_control-row">
-          {renderShapeVariableLabel(
-            'clip-path_shape-variable-label',
-            'Size',
-            'This optional variable allows us to animate shape size or change size based on ' +
-              'screen size',
-          )}
-          {renderShapeVariableInput(
-            'clip-path_shape-variable-input',
-            'clip-path_shape-variable-label',
-            shapeScaleVariableName,
-            SHAPE_SCALE_VARIABLE_PLACEHOLDER,
-            (name) =>
-              setShapeScaleOptionsFromControl(currentShapeScaleOptions({ variableName: name })),
-          )}
-        </div>
-        <div className="clip-path_control-row">
-          {renderShapeVariableLabel(
-            'clip-path_shape-offset-left-label',
-            'Offset X',
-            'Optional variable to animate or shift the shape horizontally (0 = left, 1 = right).',
-          )}
-          {renderShapeVariableInput(
-            'clip-path_shape-offset-left-input',
-            'clip-path_shape-offset-left-label',
-            shapeOffsetLeftVariableName,
-            SHAPE_OFFSET_LEFT_VARIABLE_PLACEHOLDER,
-            (name) =>
-              setShapeScaleOptionsFromControl(
-                currentShapeScaleOptions({ offsetLeftVariableName: name }),
-              ),
-          )}
-        </div>
-        <div className="clip-path_control-row">
-          {renderShapeVariableLabel(
-            'clip-path_shape-offset-top-label',
-            'Offset Y',
-            'Optional variable to animate or shift the shape vertically (0 = top, 1 = bottom).',
-          )}
-          {renderShapeVariableInput(
-            'clip-path_shape-offset-top-input',
-            'clip-path_shape-offset-top-label',
-            shapeOffsetTopVariableName,
-            SHAPE_OFFSET_TOP_VARIABLE_PLACEHOLDER,
-            (name) =>
-              setShapeScaleOptionsFromControl(
-                currentShapeScaleOptions({ offsetTopVariableName: name }),
-              ),
-          )}
-        </div>
-      </>
-    ) : null;
+}
 
-  const shortcutHelpControl = (
+// The variables a scaled shape reads: its size and its X / Y offsets.
+function ShapeScaleVariableControl({ editor }: EditorProps) {
+  const { activePreset, shapeFitMode, shapeScaleVariableName } = editor;
+  const { setShapeScaleOptionsFromControl, currentShapeScaleOptions } = editor;
+  const { shapeOffsetLeftVariableName, shapeOffsetTopVariableName } = editor;
+  if (activePreset !== 'Shape' || shapeFitMode !== 'contain') {
+    return undefined;
+  }
+  const apply = (overrides: ShapeScaleOptionOverrides) =>
+    setShapeScaleOptionsFromControl(currentShapeScaleOptions(overrides));
+  return (
+    <>
+      <div className="clip-path_control-row">
+        <ShapeVariableLabel
+          id="clip-path_shape-variable-label"
+          text="Size"
+          tip={
+            'This optional variable allows us to animate shape size or change size based on ' +
+            'screen size'
+          }
+        />
+        <ShapeVariableInput
+          id="clip-path_shape-variable-input"
+          labelId="clip-path_shape-variable-label"
+          value={shapeScaleVariableName}
+          placeholder={SHAPE_SCALE_VARIABLE_PLACEHOLDER}
+          apply={(name) => apply({ variableName: name })}
+        />
+      </div>
+      <div className="clip-path_control-row">
+        <ShapeVariableLabel
+          id="clip-path_shape-offset-left-label"
+          text="Offset X"
+          tip="Optional variable to animate or shift the shape horizontally (0 = left, 1 = right)."
+        />
+        <ShapeVariableInput
+          id="clip-path_shape-offset-left-input"
+          labelId="clip-path_shape-offset-left-label"
+          value={shapeOffsetLeftVariableName}
+          placeholder={SHAPE_OFFSET_LEFT_VARIABLE_PLACEHOLDER}
+          apply={(name) => apply({ offsetLeftVariableName: name })}
+        />
+      </div>
+      <div className="clip-path_control-row">
+        <ShapeVariableLabel
+          id="clip-path_shape-offset-top-label"
+          text="Offset Y"
+          tip="Optional variable to animate or shift the shape vertically (0 = top, 1 = bottom)."
+        />
+        <ShapeVariableInput
+          id="clip-path_shape-offset-top-input"
+          labelId="clip-path_shape-offset-top-label"
+          value={shapeOffsetTopVariableName}
+          placeholder={SHAPE_OFFSET_TOP_VARIABLE_PLACEHOLDER}
+          apply={(name) => apply({ offsetTopVariableName: name })}
+        />
+      </div>
+    </>
+  );
+}
+
+// The "?" button in the header and its keyboard-shortcut popover.
+function ShortcutHelpControl({ editor }: EditorProps) {
+  const { shortcutHelpRef, isShortcutHelpOpen, closePresetDropdown } = editor;
+  const { setIsShortcutHelpOpen, selectedPresetShape, activePreset } = editor;
+  return (
     <div className="clip-path_shortcuts" ref={shortcutHelpRef}>
       <button
         type="button"
@@ -10778,444 +12365,546 @@ export default function ClipPath({
               <span className="clip-path_shortcuts-preset-name">{activePreset}</span>
             </span>
           </div>
-          <div className="clip-path_shortcuts-body">
-            {shortcutHelpGroups.map((group) => (
-              <section className="clip-path_shortcuts-group" key={group.title}>
-                <h3>{group.title}</h3>
-                <dl>
-                  {group.items.map((item) => (
-                    <div key={`${group.title}-${item.keys}`}>
-                      <dt>
-                        {item.keys.split(' + ').map((key, index) => (
-                          <kbd className="clip-path_shortcuts-key" key={index}>
-                            {key}
-                          </kbd>
-                        ))}
-                      </dt>
-                      <dd>{item.description}</dd>
-                    </div>
-                  ))}
-                </dl>
-              </section>
-            ))}
-          </div>
+          <ShortcutHelpGroups editor={editor} />
         </div>
-      ) : null}
+      ) : undefined}
     </div>
   );
+}
 
+// The shortcuts for the current shape, grouped.
+function ShortcutHelpGroups({ editor }: EditorProps) {
+  const { shortcutHelpGroups } = editor;
   return (
-    <div className="clip-path_component">
-      {shortcutHelpPortalTarget
-        ? createPortal(shortcutHelpControl, shortcutHelpPortalTarget)
-        : null}
-      {hideClassPicker ? null : classTagsControl}
-      {presetControl}
+    <div className="clip-path_shortcuts-body">
+      {shortcutHelpGroups.map((group) => (
+        <section className="clip-path_shortcuts-group" key={group.title}>
+          <h3>{group.title}</h3>
+          <dl>
+            {group.items.map((item) => (
+              <div key={`${group.title}-${item.keys}`}>
+                <dt>
+                  {item.keys.split(' + ').map((key, index) => (
+                    <kbd className="clip-path_shortcuts-key" key={index}>
+                      {key}
+                    </kbd>
+                  ))}
+                </dt>
+                <dd>{item.description}</dd>
+              </div>
+            ))}
+          </dl>
+        </section>
+      ))}
+    </div>
+  );
+}
 
+// The canvas: the clipped preview, the drag guides and marquee, and the handles.
+function ClipPathCanvas({ editor }: EditorProps) {
+  const { canvasWrapRef, beginPolygonSelectionDrag, isCodeTransitioning, canvasRef } = editor;
+  const { shape, onAddPoint, previewCss } = editor;
+  return (
+    <div
+      className="clip-path_canvas-wrap"
+      ref={canvasWrapRef}
+      onPointerDown={beginPolygonSelectionDrag}
+    >
       <div
-        className="clip-path_canvas-wrap"
-        ref={canvasWrapRef}
-        onPointerDown={beginPolygonSelectionDrag}
+        className={['clip-path_canvas', isCodeTransitioning ? 'is-code-transitioning' : '']
+          .filter(Boolean)
+          .join(' ')}
+        ref={canvasRef}
+        onDoubleClick={shape.kind === 'polygon' ? onAddPoint : undefined}
       >
         <div
-          className={['clip-path_canvas', isCodeTransitioning ? 'is-code-transitioning' : '']
+          className={['clip-path_preview', isCodeTransitioning ? 'is-code-transitioning' : '']
             .filter(Boolean)
             .join(' ')}
-          ref={canvasRef}
-          onDoubleClick={shape.kind === 'polygon' ? onAddPoint : undefined}
-        >
-          <div
-            className={['clip-path_preview', isCodeTransitioning ? 'is-code-transitioning' : '']
-              .filter(Boolean)
-              .join(' ')}
-            style={{ clipPath: previewCss, WebkitClipPath: previewCss }}
-          />
-          {snapGuides ? (
-            <>
-              {snapGuides.x.map((x) => (
-                <div
-                  key={`x-${x}`}
-                  className="clip-path_snap-guide is-x"
-                  style={{ left: `${x}%` }}
-                />
-              ))}
-              {snapGuides.y.map((y) => (
-                <div
-                  key={`y-${y}`}
-                  className="clip-path_snap-guide is-y"
-                  style={{ top: `${y}%` }}
-                />
-              ))}
-            </>
-          ) : null}
-          {selectionRect ? (
-            <div
-              className="clip-path_selection-box"
-              style={{
-                left: `${selectionRect.left}%`,
-                top: `${selectionRect.top}%`,
-                width: `${selectionRect.width}%`,
-                height: `${selectionRect.height}%`,
-              }}
-            />
-          ) : null}
-          {shape.kind === 'shape' && activeShapeBounds && shapeFitMode === 'contain' ? (
-            <>
-              <div
-                className={['clip-path_shape-bounds', isShapeTransformSelected ? 'is-selected' : '']
-                  .filter(Boolean)
-                  .join(' ')}
-                style={shapeBoundsStyle}
-                aria-hidden="true"
-              />
-              <div
-                className="clip-path_shape-move"
-                style={shapeBoundsStyle}
-                onPointerDown={beginShapeTransformDrag('move')}
-                aria-label="Move shape"
-                role="button"
-                tabIndex={-1}
-              />
-              {CORNERS.map((corner) => {
-                const point = shapeResizeCornerPoint(activeShapeBounds, corner);
-                return (
-                  <button
-                    key={corner}
-                    type="button"
-                    className={[
-                      'clip-path_shape-resize',
-                      `is-${corner}`,
-                      isShapeTransformSelected ? 'is-selected' : '',
-                    ]
-                      .filter(Boolean)
-                      .join(' ')}
-                    style={handlePositionStyle(point.x, point.y)}
-                    onPointerDown={beginShapeTransformDrag('resize', corner)}
-                    aria-label={`Resize shape from ${cornerLabel(corner)} corner`}
-                  />
-                );
-              })}
-            </>
-          ) : null}
-          {shape.kind === 'raw' && shape.editable?.kind === 'polygon'
-            ? shape.editable.points.map((point, index) => {
-                const handle: HandleTarget = { kind: 'polygon-point', index };
-                return (
-                  <button
-                    key={index}
-                    className={handleClassName(handle)}
-                    style={handleCssPositionStyle(
-                      formatCssCoordinateValueForPreview(point.x),
-                      formatCssCoordinateValueForPreview(point.y),
-                    )}
-                    onPointerDown={beginDrag({ ...handle, before: shape })}
-                    onKeyDown={onHandleKeyDown(handle)}
-                    onKeyUp={onHandleKeyUp}
-                    aria-pressed={isHandleSelected(handle)}
-                    aria-label={`Point ${index + 1}. Drag or use arrow keys to move.`}
-                  />
-                );
-              })
-            : null}
-          {shape.kind === 'raw' && shape.editable?.kind === 'circle' ? (
-            <>
-              {(() => {
-                const center: HandleTarget = { kind: 'circle-center' };
-                const radius: HandleTarget = { kind: 'circle-radius' };
-                const editable = shape.editable;
-                if (editable?.kind !== 'circle') {
-                  return null;
-                }
-                const centerPoint = rawEditableHandleCssPoint(editable, center);
-                const radiusPoint = rawEditableHandleCssPoint(editable, radius);
-                return (
-                  <>
-                    {centerPoint ? (
-                      <button
-                        className={handleClassName(center, 'is-center')}
-                        style={handleCssPositionStyle(centerPoint.x, centerPoint.y)}
-                        onPointerDown={beginDrag({ ...center, before: shape })}
-                        onKeyDown={onHandleKeyDown(center)}
-                        onKeyUp={onHandleKeyUp}
-                        aria-pressed={isHandleSelected(center)}
-                        aria-label="Circle center. Drag or use arrow keys to move."
-                      />
-                    ) : null}
-                    {radiusPoint ? (
-                      <button
-                        className={handleClassName(radius)}
-                        style={handleCssPositionStyle(radiusPoint.x, radiusPoint.y)}
-                        onPointerDown={beginDrag({ ...radius, before: shape })}
-                        onKeyDown={onHandleKeyDown(radius)}
-                        onKeyUp={onHandleKeyUp}
-                        aria-pressed={isHandleSelected(radius)}
-                        aria-label="Circle radius. Drag or use arrow keys to resize."
-                      />
-                    ) : null}
-                  </>
-                );
-              })()}
-            </>
-          ) : null}
-          {shape.kind === 'raw' && shape.editable?.kind === 'ellipse' ? (
-            <>
-              {(() => {
-                const handles: HandleTarget[] = [
-                  { kind: 'ellipse-center' },
-                  { kind: 'ellipse-rx' },
-                  { kind: 'ellipse-ry' },
-                ];
-                const editable = shape.editable;
-                if (editable?.kind !== 'ellipse') {
-                  return null;
-                }
-                return handles.map((handle) => {
-                  const point = rawEditableHandleCssPoint(editable, handle);
-                  if (!point) {
-                    return null;
-                  }
-                  const handleLabel =
-                    handle.kind === 'ellipse-center'
-                      ? 'Ellipse center'
-                      : handle.kind === 'ellipse-rx'
-                        ? 'Ellipse horizontal radius'
-                        : 'Ellipse vertical radius';
-                  return (
-                    <button
-                      key={handle.kind}
-                      className={handleClassName(
-                        handle,
-                        handle.kind === 'ellipse-center' ? 'is-center' : undefined,
-                      )}
-                      style={handleCssPositionStyle(point.x, point.y)}
-                      onPointerDown={beginDrag({ ...handle, before: shape })}
-                      onKeyDown={onHandleKeyDown(handle)}
-                      onKeyUp={onHandleKeyUp}
-                      aria-pressed={isHandleSelected(handle)}
-                      aria-label={`${handleLabel}. ${HANDLE_ADJUST_HINT}`}
-                    />
-                  );
-                });
-              })()}
-            </>
-          ) : null}
-          {shape.kind === 'raw' && shape.editable?.kind === 'inset' ? (
-            <>
-              {(
-                [
-                  { kind: 'inset-top' },
-                  { kind: 'inset-right' },
-                  { kind: 'inset-bottom' },
-                  { kind: 'inset-left' },
-                ] satisfies HandleTarget[]
-              ).map((handle) => {
-                const editable = shape.editable;
-                if (editable?.kind !== 'inset') {
-                  return null;
-                }
-                const point = rawEditableHandleCssPoint(editable, handle);
-                if (!point) {
-                  return null;
-                }
-                return (
-                  <button
-                    key={handle.kind}
-                    className={handleClassName(handle, 'is-inset-side')}
-                    style={handleCssPositionStyle(point.x, point.y)}
-                    onPointerDown={beginDrag({ ...handle, before: shape })}
-                    onKeyDown={onHandleKeyDown(handle)}
-                    onKeyUp={onHandleKeyUp}
-                    aria-pressed={isHandleSelected(handle)}
-                    aria-label="Inset edge. Drag or use arrow keys to resize."
-                  />
-                );
-              })}
-              {shape.editable.radii
-                ? CORNERS.map((corner) => {
-                    const handle: HandleTarget = { kind: 'inset-radius', corner };
-                    const editable = shape.editable;
-                    if (editable?.kind !== 'inset') {
-                      return null;
-                    }
-                    const point = rawEditableHandleCssPoint(editable, handle);
-                    if (!point) {
-                      return null;
-                    }
-                    const cornerName = cornerLabel(corner);
-                    return (
-                      <button
-                        key={corner}
-                        className={handleClassName(handle, 'is-radius')}
-                        style={handleCssPositionStyle(point.x, point.y)}
-                        onPointerDown={beginDrag({ ...handle, before: shape })}
-                        onKeyDown={onHandleKeyDown(handle)}
-                        onKeyUp={onHandleKeyUp}
-                        aria-pressed={isHandleSelected(handle)}
-                        aria-label={`Inset ${cornerName} corner radius. ${HANDLE_ADJUST_HINT}`}
-                      />
-                    );
-                  })
-                : null}
-            </>
-          ) : null}
-          {shape.kind === 'polygon'
-            ? shape.points.map((p, i) => {
-                const handle: HandleTarget = { kind: 'polygon-point', index: i };
-                const display = polygonHandleDisplayPoint(
-                  shape.points,
-                  i,
-                  handleBounds,
-                  polygonDisplayProjectionsRef.current.get(i),
-                );
-                if (display.projection) {
-                  polygonDisplayProjectionsRef.current.set(i, display.projection);
-                } else {
-                  polygonDisplayProjectionsRef.current.delete(i);
-                }
-                return (
-                  <button
-                    key={i}
-                    className={handleClassName(handle)}
-                    style={handlePositionStyle(display.point.x, display.point.y)}
-                    onPointerDown={beginDrag({ ...handle, before: shape })}
-                    onKeyDown={onHandleKeyDown(handle)}
-                    onKeyUp={onHandleKeyUp}
-                    onDoubleClick={(e) => {
-                      e.stopPropagation();
-                      onRemovePoint(i);
-                    }}
-                    aria-pressed={isHandleSelected(handle)}
-                    aria-label={`Point ${i + 1}. ${POINT_HANDLE_HINT}`}
-                  />
-                );
-              })
-            : null}
-          {shape.kind === 'circle' ? (
-            <>
-              <button
-                className={handleClassName({ kind: 'circle-center' }, 'is-center')}
-                style={handlePositionStyle(shape.cx, shape.cy)}
-                onPointerDown={beginDrag({ kind: 'circle-center', before: shape })}
-                onKeyDown={onHandleKeyDown({ kind: 'circle-center' })}
-                onKeyUp={onHandleKeyUp}
-                aria-pressed={isHandleSelected({ kind: 'circle-center' })}
-                aria-label="Circle center. Drag or use arrow keys to move."
-              />
-              <button
-                className={handleClassName({ kind: 'circle-radius' })}
-                style={handlePositionStyle(circleRadiusHandleX, circleRadiusHandleY)}
-                onPointerDown={beginDrag({ kind: 'circle-radius', before: shape })}
-                onKeyDown={onHandleKeyDown({ kind: 'circle-radius' })}
-                onKeyUp={onHandleKeyUp}
-                aria-pressed={isHandleSelected({ kind: 'circle-radius' })}
-                aria-label="Circle radius. Drag or use arrow keys to resize."
-              />
-            </>
-          ) : null}
-          {shape.kind === 'ellipse' ? (
-            <>
-              <button
-                className={handleClassName({ kind: 'ellipse-center' }, 'is-center')}
-                style={handlePositionStyle(shape.cx, shape.cy)}
-                onPointerDown={beginDrag({ kind: 'ellipse-center', before: shape })}
-                onKeyDown={onHandleKeyDown({ kind: 'ellipse-center' })}
-                onKeyUp={onHandleKeyUp}
-                aria-pressed={isHandleSelected({ kind: 'ellipse-center' })}
-                aria-label="Ellipse center. Drag or use arrow keys to move."
-              />
-              <button
-                className={handleClassName({ kind: 'ellipse-rx' })}
-                style={handlePositionStyle(shape.cx + shape.rx, shape.cy)}
-                onPointerDown={beginDrag({ kind: 'ellipse-rx', before: shape })}
-                onKeyDown={onHandleKeyDown({ kind: 'ellipse-rx' })}
-                onKeyUp={onHandleKeyUp}
-                aria-pressed={isHandleSelected({ kind: 'ellipse-rx' })}
-                aria-label="Ellipse horizontal radius. Drag or use any arrow key to resize."
-              />
-              <button
-                className={handleClassName({ kind: 'ellipse-ry' })}
-                style={handlePositionStyle(shape.cx, shape.cy + shape.ry)}
-                onPointerDown={beginDrag({ kind: 'ellipse-ry', before: shape })}
-                onKeyDown={onHandleKeyDown({ kind: 'ellipse-ry' })}
-                onKeyUp={onHandleKeyUp}
-                aria-pressed={isHandleSelected({ kind: 'ellipse-ry' })}
-                aria-label="Ellipse vertical radius. Drag or use any arrow key to resize."
-              />
-            </>
-          ) : null}
-          {shape.kind === 'inset' ? (
-            <>
-              <button
-                className={handleClassName({ kind: 'inset-top' }, 'is-inset-side')}
-                style={handlePositionStyle(insetCenterX, shape.top)}
-                onPointerDown={beginDrag({ kind: 'inset-top', before: shape })}
-                onKeyDown={onHandleKeyDown({ kind: 'inset-top' })}
-                onKeyUp={onHandleKeyUp}
-                aria-pressed={isHandleSelected({ kind: 'inset-top' })}
-                aria-label={`Inset top edge. ${INSET_EDGE_HANDLE_HINT}`}
-              />
-              <button
-                className={handleClassName({ kind: 'inset-right' }, 'is-inset-side')}
-                style={handlePositionStyle(100 - shape.right, insetCenterY)}
-                onPointerDown={beginDrag({ kind: 'inset-right', before: shape })}
-                onKeyDown={onHandleKeyDown({ kind: 'inset-right' })}
-                onKeyUp={onHandleKeyUp}
-                aria-pressed={isHandleSelected({ kind: 'inset-right' })}
-                aria-label={`Inset right edge. ${INSET_EDGE_HANDLE_HINT}`}
-              />
-              <button
-                className={handleClassName({ kind: 'inset-bottom' }, 'is-inset-side')}
-                style={handlePositionStyle(insetCenterX, 100 - shape.bottom)}
-                onPointerDown={beginDrag({ kind: 'inset-bottom', before: shape })}
-                onKeyDown={onHandleKeyDown({ kind: 'inset-bottom' })}
-                onKeyUp={onHandleKeyUp}
-                aria-pressed={isHandleSelected({ kind: 'inset-bottom' })}
-                aria-label={`Inset bottom edge. ${INSET_EDGE_HANDLE_HINT}`}
-              />
-              <button
-                className={handleClassName({ kind: 'inset-left' }, 'is-inset-side')}
-                style={handlePositionStyle(shape.left, insetCenterY)}
-                onPointerDown={beginDrag({ kind: 'inset-left', before: shape })}
-                onKeyDown={onHandleKeyDown({ kind: 'inset-left' })}
-                onKeyUp={onHandleKeyUp}
-                aria-pressed={isHandleSelected({ kind: 'inset-left' })}
-                aria-label={`Inset left edge. ${INSET_EDGE_HANDLE_HINT}`}
-              />
-              {CORNERS.map((corner) => {
-                const position = insetRadiusHandlePosition(corner);
-                const handle: HandleTarget = { kind: 'inset-radius', corner };
-                const cornerName = cornerLabel(corner);
-                return (
-                  <button
-                    key={corner}
-                    className={handleClassName(handle, 'is-radius')}
-                    style={handlePositionStyle(position.x, position.y)}
-                    onPointerDown={beginDrag({ ...handle, before: shape })}
-                    onKeyDown={onHandleKeyDown(handle)}
-                    onKeyUp={onHandleKeyUp}
-                    aria-pressed={isHandleSelected(handle)}
-                    aria-label={`Inset ${cornerName} corner radius. ${INSET_RADIUS_HANDLE_HINT}`}
-                  />
-                );
-              })}
-            </>
-          ) : null}
-        </div>
+          style={{ clipPath: previewCss, WebkitClipPath: previewCss }}
+        />
+        <CanvasGuides editor={editor} />
+        <ShapeBoundsControls editor={editor} />
+        <RawPolygonHandles editor={editor} />
+        <RawCircleHandles editor={editor} />
+        <RawEllipseHandles editor={editor} />
+        <RawInsetHandles editor={editor} />
+        <PolygonHandles editor={editor} />
+        <CircleHandles editor={editor} />
+        <EllipseHandles editor={editor} />
+        <InsetHandles editor={editor} />
       </div>
-
-      {shapeFitControl}
-      {shapeScaleVariableControl}
-
-      <CodeEditor
-        id="clip-path_css-output"
-        className="clip-path_code"
-        value={codeValue}
-        language="css"
-        ariaLabel="Editable clip-path CSS"
-        tokenHighlights={selectedCodeTokenHighlights}
-        onChange={onCodeChange}
-        onSelectionChange={onCodeSelectionChange}
-      />
     </div>
   );
+}
+
+// The snap guides of a drag in progress, and the marquee.
+function CanvasGuides({ editor }: EditorProps) {
+  const { snapGuides, selectionRect } = editor;
+  return (
+    <>
+      {snapGuides ? (
+        <>
+          {snapGuides.x.map((x) => (
+            <div key={`x-${x}`} className="clip-path_snap-guide is-x" style={{ left: `${x}%` }} />
+          ))}
+          {snapGuides.y.map((y) => (
+            <div key={`y-${y}`} className="clip-path_snap-guide is-y" style={{ top: `${y}%` }} />
+          ))}
+        </>
+      ) : undefined}
+      {selectionRect ? (
+        <div
+          className="clip-path_selection-box"
+          style={{
+            left: `${selectionRect.left}%`,
+            top: `${selectionRect.top}%`,
+            width: `${selectionRect.width}%`,
+            height: `${selectionRect.height}%`,
+          }}
+        />
+      ) : undefined}
+    </>
+  );
+}
+
+// A scaled shape's bounding box: drag inside it to move, drag a corner to resize.
+function ShapeBoundsControls({ editor }: EditorProps) {
+  const { shape, activeShapeBounds, shapeFitMode, isShapeTransformSelected } = editor;
+  const { shapeBoundsStyle, beginShapeTransformDrag, handlePositionStyle } = editor;
+  if (shape.kind !== 'shape' || !activeShapeBounds || shapeFitMode !== 'contain') {
+    return undefined;
+  }
+  return (
+    <>
+      <div
+        className={['clip-path_shape-bounds', isShapeTransformSelected ? 'is-selected' : '']
+          .filter(Boolean)
+          .join(' ')}
+        style={shapeBoundsStyle}
+        aria-hidden="true"
+      />
+      <div
+        className="clip-path_shape-move"
+        style={shapeBoundsStyle}
+        onPointerDown={beginShapeTransformDrag('move')}
+        aria-label="Move shape"
+        role="button"
+        tabIndex={-1}
+      />
+      {CORNERS.map((corner) => {
+        const point = shapeResizeCornerPoint(activeShapeBounds, corner);
+        return (
+          <button
+            key={corner}
+            type="button"
+            className={[
+              'clip-path_shape-resize',
+              `is-${corner}`,
+              isShapeTransformSelected ? 'is-selected' : '',
+            ]
+              .filter(Boolean)
+              .join(' ')}
+            style={handlePositionStyle(point.x, point.y)}
+            onPointerDown={beginShapeTransformDrag('resize', corner)}
+            aria-label={`Resize shape from ${cornerLabel(corner)} corner`}
+          />
+        );
+      })}
+    </>
+  );
+}
+
+// One canvas handle: placed, selectable, draggable, and moved by the arrow keys.
+function HandleButton({
+  editor,
+  handle,
+  extra,
+  style,
+  label,
+  onDoubleClick,
+}: EditorProps & {
+  handle: HandleTarget;
+  extra?: string;
+  style: CSSProperties;
+  label: string;
+  onDoubleClick?: (event: React.MouseEvent<HTMLButtonElement>) => void;
+}) {
+  const { shape, handleClassName, beginDrag, onHandleKeyDown, onHandleKeyUp } = editor;
+  const { isHandleSelected } = editor;
+  return (
+    <button
+      className={handleClassName(handle, extra)}
+      style={style}
+      onPointerDown={beginDrag({ ...handle, before: shape })}
+      onKeyDown={onHandleKeyDown(handle)}
+      onKeyUp={onHandleKeyUp}
+      onDoubleClick={onDoubleClick}
+      aria-pressed={isHandleSelected(handle)}
+      aria-label={label}
+    />
+  );
+}
+
+// The points of a polygon written in units the canvas cannot place as plain
+// percentages.
+function RawPolygonHandles({ editor }: EditorProps) {
+  const { shape, handleCssPositionStyle } = editor;
+  if (shape.kind !== 'raw' || shape.editable?.kind !== 'polygon') {
+    return undefined;
+  }
+  return shape.editable.points.map((point, index) => {
+    const handle: HandleTarget = { kind: 'polygon-point', index };
+    return (
+      <HandleButton
+        key={index}
+        editor={editor}
+        handle={handle}
+        style={handleCssPositionStyle(
+          formatCssCoordinateValueForPreview(point.x),
+          formatCssCoordinateValueForPreview(point.y),
+        )}
+        label={`Point ${index + 1}. Drag or use arrow keys to move.`}
+      />
+    );
+  });
+}
+
+// The centre and radius of a circle written in raw CSS units.
+function RawCircleHandles({ editor }: EditorProps) {
+  const { shape, handleCssPositionStyle } = editor;
+  if (shape.kind !== 'raw' || shape.editable?.kind !== 'circle') {
+    return undefined;
+  }
+  const center: HandleTarget = { kind: 'circle-center' };
+  const radius: HandleTarget = { kind: 'circle-radius' };
+  const centerPoint = rawEditableHandleCssPoint(shape.editable, center);
+  const radiusPoint = rawEditableHandleCssPoint(shape.editable, radius);
+  return (
+    <>
+      {centerPoint ? (
+        <HandleButton
+          editor={editor}
+          handle={center}
+          extra="is-center"
+          style={handleCssPositionStyle(centerPoint.x, centerPoint.y)}
+          label="Circle center. Drag or use arrow keys to move."
+        />
+      ) : undefined}
+      {radiusPoint ? (
+        <HandleButton
+          editor={editor}
+          handle={radius}
+          style={handleCssPositionStyle(radiusPoint.x, radiusPoint.y)}
+          label="Circle radius. Drag or use arrow keys to resize."
+        />
+      ) : undefined}
+    </>
+  );
+}
+
+// The centre and radii of an ellipse written in raw CSS units.
+function RawEllipseHandles({ editor }: EditorProps) {
+  const { shape, handleCssPositionStyle } = editor;
+  if (shape.kind !== 'raw' || shape.editable?.kind !== 'ellipse') {
+    return undefined;
+  }
+  const editable = shape.editable;
+  const handles: HandleTarget[] = [
+    { kind: 'ellipse-center' },
+    { kind: 'ellipse-rx' },
+    { kind: 'ellipse-ry' },
+  ];
+  return handles.map((handle) => {
+    const point = rawEditableHandleCssPoint(editable, handle);
+    if (!point) {
+      return undefined;
+    }
+    const handleLabel =
+      handle.kind === 'ellipse-center'
+        ? 'Ellipse center'
+        : handle.kind === 'ellipse-rx'
+          ? 'Ellipse horizontal radius'
+          : 'Ellipse vertical radius';
+    return (
+      <HandleButton
+        key={handle.kind}
+        editor={editor}
+        handle={handle}
+        {...(handle.kind === 'ellipse-center' ? { extra: 'is-center' } : {})}
+        style={handleCssPositionStyle(point.x, point.y)}
+        label={`${handleLabel}. ${HANDLE_ADJUST_HINT}`}
+      />
+    );
+  });
+}
+
+// The edges and corner radii of an inset written in raw CSS units.
+function RawInsetHandles({ editor }: EditorProps) {
+  const { shape, handleCssPositionStyle } = editor;
+  if (shape.kind !== 'raw' || shape.editable?.kind !== 'inset') {
+    return undefined;
+  }
+  const editable = shape.editable;
+  const sides: HandleTarget[] = [
+    { kind: 'inset-top' },
+    { kind: 'inset-right' },
+    { kind: 'inset-bottom' },
+    { kind: 'inset-left' },
+  ];
+  const cornerHandle = (corner: CornerName): HandleTarget => ({ kind: 'inset-radius', corner });
+  return (
+    <>
+      {sides.map((handle) => {
+        const point = rawEditableHandleCssPoint(editable, handle);
+        if (!point) {
+          return undefined;
+        }
+        return (
+          <HandleButton
+            key={handle.kind}
+            editor={editor}
+            handle={handle}
+            extra="is-inset-side"
+            style={handleCssPositionStyle(point.x, point.y)}
+            label="Inset edge. Drag or use arrow keys to resize."
+          />
+        );
+      })}
+      {editable.radii
+        ? CORNERS.map((corner) => {
+            const point = rawEditableHandleCssPoint(editable, cornerHandle(corner));
+            if (!point) {
+              return undefined;
+            }
+            return (
+              <HandleButton
+                key={corner}
+                editor={editor}
+                handle={cornerHandle(corner)}
+                extra="is-radius"
+                style={handleCssPositionStyle(point.x, point.y)}
+                label={`Inset ${cornerLabel(corner)} corner radius. ${HANDLE_ADJUST_HINT}`}
+              />
+            );
+          })
+        : undefined}
+    </>
+  );
+}
+
+// A polygon's points. A point outside the canvas is drawn on its edge; the side it
+// was projected to is remembered so the handle doesn't jump between sides.
+function PolygonHandles({ editor }: EditorProps) {
+  const { shape, handleBounds, polygonDisplayProjectionsRef, handlePositionStyle } = editor;
+  const { onRemovePoint } = editor;
+  if (shape.kind !== 'polygon') {
+    return undefined;
+  }
+  return shape.points.map((point, i) => {
+    const handle: HandleTarget = { kind: 'polygon-point', index: i };
+    const display = polygonHandleDisplayPoint(
+      shape.points,
+      i,
+      handleBounds,
+      polygonDisplayProjectionsRef.current.get(i),
+    );
+    if (display.projection) {
+      polygonDisplayProjectionsRef.current.set(i, display.projection);
+    } else {
+      polygonDisplayProjectionsRef.current.delete(i);
+    }
+    return (
+      <HandleButton
+        key={i}
+        editor={editor}
+        handle={handle}
+        style={handlePositionStyle(display.point.x, display.point.y)}
+        onDoubleClick={(event) => {
+          event.stopPropagation();
+          onRemovePoint(i);
+        }}
+        label={`Point ${i + 1}. ${POINT_HANDLE_HINT}`}
+      />
+    );
+  });
+}
+
+// A circle's centre and radius.
+function CircleHandles({ editor }: EditorProps) {
+  const { shape, handlePositionStyle, circleRadiusHandleX, circleRadiusHandleY } = editor;
+  if (shape.kind !== 'circle') {
+    return undefined;
+  }
+  return (
+    <>
+      <HandleButton
+        editor={editor}
+        handle={{ kind: 'circle-center' }}
+        extra="is-center"
+        style={handlePositionStyle(shape.cx, shape.cy)}
+        label="Circle center. Drag or use arrow keys to move."
+      />
+      <HandleButton
+        editor={editor}
+        handle={{ kind: 'circle-radius' }}
+        style={handlePositionStyle(circleRadiusHandleX, circleRadiusHandleY)}
+        label="Circle radius. Drag or use arrow keys to resize."
+      />
+    </>
+  );
+}
+
+// An ellipse's centre and its two radii.
+function EllipseHandles({ editor }: EditorProps) {
+  const { shape, handlePositionStyle } = editor;
+  if (shape.kind !== 'ellipse') {
+    return undefined;
+  }
+  return (
+    <>
+      <HandleButton
+        editor={editor}
+        handle={{ kind: 'ellipse-center' }}
+        extra="is-center"
+        style={handlePositionStyle(shape.cx, shape.cy)}
+        label="Ellipse center. Drag or use arrow keys to move."
+      />
+      <HandleButton
+        editor={editor}
+        handle={{ kind: 'ellipse-rx' }}
+        style={handlePositionStyle(shape.cx + shape.rx, shape.cy)}
+        label="Ellipse horizontal radius. Drag or use any arrow key to resize."
+      />
+      <HandleButton
+        editor={editor}
+        handle={{ kind: 'ellipse-ry' }}
+        style={handlePositionStyle(shape.cx, shape.cy + shape.ry)}
+        label="Ellipse vertical radius. Drag or use any arrow key to resize."
+      />
+    </>
+  );
+}
+
+// An inset's four edges and its corner radii.
+function InsetHandles({ editor }: EditorProps) {
+  const { shape, handlePositionStyle, insetCenterX, insetCenterY } = editor;
+  const { insetRadiusHandlePosition } = editor;
+  if (shape.kind !== 'inset') {
+    return undefined;
+  }
+  const edges: Array<{ handle: HandleTarget; x: number; y: number; name: string }> = [
+    { handle: { kind: 'inset-top' }, x: insetCenterX, y: shape.top, name: 'top' },
+    { handle: { kind: 'inset-right' }, x: 100 - shape.right, y: insetCenterY, name: 'right' },
+    { handle: { kind: 'inset-bottom' }, x: insetCenterX, y: 100 - shape.bottom, name: 'bottom' },
+    { handle: { kind: 'inset-left' }, x: shape.left, y: insetCenterY, name: 'left' },
+  ];
+  return (
+    <>
+      {edges.map((edge) => (
+        <HandleButton
+          key={edge.name}
+          editor={editor}
+          handle={edge.handle}
+          extra="is-inset-side"
+          style={handlePositionStyle(edge.x, edge.y)}
+          label={`Inset ${edge.name} edge. ${INSET_EDGE_HANDLE_HINT}`}
+        />
+      ))}
+      {CORNERS.map((corner) => {
+        const position = insetRadiusHandlePosition(corner);
+        return (
+          <HandleButton
+            key={corner}
+            editor={editor}
+            handle={{ kind: 'inset-radius', corner }}
+            extra="is-radius"
+            style={handlePositionStyle(position.x, position.y)}
+            label={`Inset ${cornerLabel(corner)} corner radius. ${INSET_RADIUS_HANDLE_HINT}`}
+          />
+        );
+      })}
+    </>
+  );
+}
+
+function useClipPathEditorPart1(editor: ClipPathProps) {
+  const stage1 = Object.assign(editor, useShapeState());
+  const stage2 = Object.assign(stage1, useHandleSelectionState());
+  const stage3 = Object.assign(stage2, useShapeFitState());
+  const stage4 = Object.assign(stage3, useStyleSourceState());
+  const stage5 = Object.assign(stage4, useCanvasRefs());
+  const stage6 = Object.assign(stage5, useWriteRefs());
+  const stage7 = Object.assign(stage6, useSelectionRefs());
+  const stage8 = Object.assign(stage7, useShapeRefs(stage7));
+  const stage9 = Object.assign(stage8, useCodeHighlights(stage8));
+  const stage10 = Object.assign(stage9, useSelectedCodeHighlights(stage9));
+  const stage11 = Object.assign(stage10, useLatestMirrors(stage10));
+  const stage12 = Object.assign(stage11, shapeSyncActions(stage11));
+  const stage13 = Object.assign(stage12, shapeScaleSyncActions(stage12));
+  const stage14 = Object.assign(stage13, pastedCacheActions(stage13));
+  const stage15 = Object.assign(stage14, handleSelectionActions(stage14));
+  const stage16 = Object.assign(stage15, pointerSelectionActions(stage15));
+  const stage17 = Object.assign(stage16, polygonSelectionActions(stage16));
+  const stage18 = Object.assign(stage17, dragSupportActions(stage17));
+  const stage19 = Object.assign(stage18, dragFinishActions(stage18));
+  const stage20 = Object.assign(stage19, transformDragActions(stage19));
+  const stage21 = Object.assign(stage20, selectionLoadActions(stage20));
+  const stage22 = Object.assign(stage21, historyActions(stage21));
+  const stage23 = Object.assign(stage22, pointDeleteActions(stage22));
+  const stage24 = Object.assign(stage23, pointDuplicateActions(stage23));
+  const stage25 = Object.assign(stage24, presetChoiceActions(stage24));
+  const stage26 = Object.assign(stage25, breakpointActions(stage25));
+  const stage27 = Object.assign(stage26, codeEditActions(stage26));
+  const stage28 = Object.assign(stage27, codeSelectionActions(stage27));
+  return stage28;
+}
+
+function useClipPathEditorPart2(editor: EditorAfterCodeSelectionActions) {
+  const stage1 = Object.assign(editor, shapeFitActions(editor));
+  const stage2 = Object.assign(stage1, shapeScaleActions(stage1));
+  const stage3 = Object.assign(stage2, guideActions(stage2));
+  const stage4 = Object.assign(stage3, dragPointActions(stage3));
+  const stage5 = Object.assign(stage4, presetTypeaheadActions(stage4));
+  const stage6 = Object.assign(stage5, presetButtonActions(stage5));
+  const stage7 = Object.assign(stage6, presetListActions(stage6));
+  const stage8 = Object.assign(stage7, handleKeyboardActions(stage7));
+  const stage9 = Object.assign(stage8, shapeKeyboardActions(stage8));
+  const stage10 = Object.assign(stage9, keyboardLoopActions(stage9));
+  const stage11 = Object.assign(stage10, keyboardKeyActions(stage10));
+  const stage12 = Object.assign(stage11, marqueeMoveActions(stage11));
+  const stage13 = Object.assign(stage12, pointDuplicateDragActions(stage12));
+  const stage14 = Object.assign(stage13, handleDragActions(stage13));
+  const stage15 = Object.assign(stage14, pointerMoveActions(stage14));
+  const stage16 = Object.assign(stage15, pointerEndActions(stage15));
+  const stage17 = Object.assign(stage16, useWindowPointerListeners(stage16));
+  useDismissListeners(stage17);
+  const stage18 = Object.assign(stage17, useDeselectListener(stage17));
+  useCanvasMeasure(stage18);
+  const stage19 = Object.assign(stage18, useCodeSyncEffects(stage18));
+  const stage20 = Object.assign(stage19, useShortcutListeners(stage19));
+  const stage21 = Object.assign(stage20, windowKeyDownActions(stage20));
+  const stage22 = Object.assign(stage21, useWindowKeyListeners(stage21));
+  useSelectionSync(stage22);
+  useClipPathWrite(stage22);
+  const stage23 = Object.assign(stage22, useTimerCleanup(stage22));
+  const stage24 = Object.assign(stage23, pointEditActions(stage23));
+  return stage24;
+}
+
+function useClipPathEditorPart3(editor: EditorAfterPointEditActions) {
+  const stage1 = Object.assign(editor, marqueeStartActions(editor));
+  const stage2 = Object.assign(stage1, transformStartActions(stage1));
+  const stage3 = Object.assign(stage2, dragStartActions(stage2));
+  const stage4 = Object.assign(stage3, handleGeometry(stage3));
+  const stage5 = Object.assign(stage4, renderGeometry(stage4));
+  return stage5;
+}
+
+export default function ClipPath(props: ClipPathProps = {}) {
+  // A copy: the composers widen the object they are given into the editor.
+  const editor = useClipPathEditorPart3(
+    useClipPathEditorPart2(useClipPathEditorPart1({ ...props })),
+  );
+  return <ClipPathView editor={editor} />;
 }

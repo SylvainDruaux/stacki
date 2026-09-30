@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import type { KeyboardEvent } from 'react';
 import { useGapHover, type GapAxis } from './lib/gap-hover';
 import FieldLabel from './components/FieldLabel';
 import Select, { type SelectOption } from './components/Select';
@@ -18,7 +19,7 @@ import { splitTopLevelSpaces } from './lib/background';
 
 type SetProp = (prop: string, value: string, important: boolean) => void;
 type ClearProp = (prop: string | string[]) => void;
-type LiveSetProp = (prop: string, value: string | null, important: boolean) => void;
+type LiveSetProp = (prop: string, value: string | undefined, important: boolean) => void;
 
 type Props = {
   rule: ParsedRule;
@@ -44,7 +45,7 @@ const LABELS: Record<string, string> = {
   wrap: 'Wrap',
   'wrap-reverse': 'Wrap reverse',
 };
-const optLabel = (value: string) => LABELS[value] ?? cap(value);
+const optionLabel = (value: string) => LABELS[value] ?? cap(value);
 
 const WRAP = ['nowrap', 'wrap', 'wrap-reverse'];
 const JUSTIFY_FLEX = [
@@ -72,7 +73,7 @@ const GRID_FLOW: ReadonlyArray<SegmentedOption<string>> = [
 function buildOptions(known: string[], current: string): SelectOption<string>[] {
   const options: SelectOption<string>[] = [
     { value: '', label: '—' },
-    ...known.map((value) => ({ value, label: optLabel(value) })),
+    ...known.map((value) => ({ value, label: optionLabel(value) })),
   ];
   if (current && !known.includes(current)) {
     options.push({ value: current, label: current });
@@ -118,7 +119,7 @@ function SelectRow({
         ariaLabel={label}
         disabled={busy}
         onChange={(choice) => (choice ? onSetProp(prop, choice, false) : onClearProp(prop))}
-        onPreview={(choice) => onLiveSetProp(prop, choice || null, false)}
+        onPreview={(choice) => onLiveSetProp(prop, choice || undefined, false)}
       />
     </div>
   );
@@ -197,27 +198,20 @@ function UnlockedIcon() {
 
 // Split a `gap` value into its row / column parts. One token → both equal (a
 // linked gap); two tokens → `gap: <row> <column>` per the CSS shorthand.
-function parseGap(value: string): { row: string; col: string } {
+function parseGap(value: string): { row: string; column: string } {
   const parts = splitTopLevelSpaces(value).filter(Boolean);
   if (parts.length === 0) {
-    return { row: '', col: '' };
+    return { row: '', column: '' };
   }
   if (parts.length === 1) {
-    return { row: parts[0] ?? '', col: parts[0] ?? '' };
+    return { row: parts[0] ?? '', column: parts[0] ?? '' };
   }
-  return { row: parts[0] ?? '', col: parts[1] ?? '' };
+  return { row: parts[0] ?? '', column: parts[1] ?? '' };
 }
 
 // A length field with live-as-you-type updates, a commit on blur, and ↑/↓ number
 // stepping — the shared gap-cell input (mirrors PropField, minus the property binding).
-function GapInput({
-  value,
-  busy,
-  ariaLabel,
-  axes,
-  onLive,
-  onCommit,
-}: {
+type GapInputProps = {
   value: string;
   busy: boolean;
   ariaLabel: string;
@@ -225,39 +219,21 @@ function GapInput({
   axes: GapAxis[];
   onLive: (value: string) => void;
   onCommit: (value: string) => void;
-}) {
-  const [draft, setDraft] = useState(value);
-  const focused = useRef(false);
-  const liveTimer = useRef<number | null>(null);
-  useEffect(() => {
-    if (!focused.current) {
-      setDraft(value);
-    }
-  }, [value]);
-  const cancelLive = () => {
-    if (liveTimer.current != null) {
-      window.clearTimeout(liveTimer.current);
-      liveTimer.current = null;
-    }
-  };
-  useEffect(() => cancelLive, []);
-  const scheduleLive = (text: string) => {
-    cancelLive();
-    liveTimer.current = window.setTimeout(() => {
-      liveTimer.current = null;
-      onLive(text);
-    }, 100);
-  };
+};
+function GapInput({ value, busy, ariaLabel, axes, onLive, onCommit }: GapInputProps) {
+  const { draft, setDraft, focused } = useFollowingDraft(value);
+  const { cancelLive, scheduleLive } = useDebouncedLive(onLive);
   const gapHover = useGapHover(axes, draft || value);
+  const commitScrub = (text: string) => {
+    setDraft(text);
+    onCommit(text);
+  };
   const scrub = useScrub({
     value: draft,
     disabled: busy,
     onPreview: setDraft,
     onInput: onLive,
-    onCommit: (text) => {
-      setDraft(text);
-      onCommit(text);
-    },
+    onCommit: commitScrub,
   });
   return (
     <VariableConnect
@@ -288,20 +264,11 @@ function GapInput({
           onCommit(draft);
         }}
         onKeyDown={(event) => {
-          if (event.key === 'Enter') {
-            event.currentTarget.blur();
-            return;
+          const stepped = stepGapKey(event);
+          if (stepped !== undefined) {
+            setDraft(stepped);
+            scheduleLive(stepped);
           }
-          const stepped = handleArrowStep(event);
-          if (!stepped) {
-            return;
-          }
-          event.preventDefault();
-          const el = event.currentTarget;
-          el.value = stepped.text;
-          el.setSelectionRange(stepped.caret, stepped.caret);
-          setDraft(stepped.text);
-          scheduleLive(stepped.text);
         }}
         disabled={busy}
         spellCheck={false}
@@ -310,6 +277,57 @@ function GapInput({
       />
     </VariableConnect>
   );
+}
+
+// A draft that follows `value` while the field is not focused, so an edit made
+// elsewhere shows up without overwriting what someone is typing.
+function useFollowingDraft(value: string) {
+  const [draft, setDraft] = useState(value);
+  const focused = useRef(false);
+  useEffect(() => {
+    if (!focused.current) {
+      setDraft(value);
+    }
+  }, [value]);
+  return { draft, setDraft, focused };
+}
+
+// Live previews on a debounce, so typing a value does not write every keystroke.
+function useDebouncedLive(onLive: (value: string) => void) {
+  const liveTimer = useRef<number | undefined>(undefined);
+  const cancelLive = () => {
+    if (liveTimer.current !== undefined) {
+      window.clearTimeout(liveTimer.current);
+      liveTimer.current = undefined;
+    }
+  };
+  useEffect(() => cancelLive, []);
+  const scheduleLive = (text: string) => {
+    cancelLive();
+    liveTimer.current = window.setTimeout(() => {
+      liveTimer.current = undefined;
+      onLive(text);
+    }, 100);
+  };
+  return { cancelLive, scheduleLive };
+}
+
+// Enter commits by blurring; an arrow key steps the number under the caret and
+// writes it straight into the input. Returns the stepped text, if any.
+function stepGapKey(event: KeyboardEvent<HTMLInputElement>): string | undefined {
+  if (event.key === 'Enter') {
+    event.currentTarget.blur();
+    return undefined;
+  }
+  const stepped = handleArrowStep(event);
+  if (!stepped) {
+    return undefined;
+  }
+  event.preventDefault();
+  const input = event.currentTarget;
+  input.value = stepped.text;
+  input.setSelectionRange(stepped.caret, stepped.caret);
+  return stepped.text;
 }
 
 // The Gap control: a lock toggle plus one field (linked → `gap: 2rem`) or two
@@ -330,28 +348,19 @@ function GapControl({
 }) {
   const found = readProp(rule, 'gap');
   const value = found ? found.value.trim() : '';
-  const { row, col } = parseGap(value);
-  const [linkOverride, setLinkOverride] = useState<boolean | null>(null);
-  const linked = linkOverride ?? row === col;
+  const { row, column } = parseGap(value);
+  const [linkOverride, setLinkOverride] = useState<boolean | undefined>(undefined);
+  const linked = linkOverride ?? row === column;
 
-  const writeLinked = (next: string, live: boolean) => {
-    const v = next.trim();
-    if (!v) {
-      if (!live) {
+  // A blank value clears the gap on commit and previews nothing while live.
+  const write = (next: string, mode: WriteMode) => {
+    if (!next) {
+      if (mode === 'commit') {
         onClearProp('gap');
       }
       return;
     }
-    (live ? onLiveSetProp : onSetProp)('gap', v, false);
-  };
-  const writeSplit = (r: string, c: string, live: boolean) => {
-    if (!r.trim() && !c.trim()) {
-      if (!live) {
-        onClearProp('gap');
-      }
-      return;
-    }
-    (live ? onLiveSetProp : onSetProp)('gap', `${r.trim() || '0'} ${c.trim() || '0'}`, false);
+    (mode === 'live' ? onLiveSetProp : onSetProp)('gap', next, false);
   };
 
   const toggleLink = () => {
@@ -360,7 +369,7 @@ function GapControl({
       return;
     }
     setLinkOverride(true);
-    const single = row || col;
+    const single = row || column;
     if (single) {
       onSetProp('gap', single, false);
     } else {
@@ -375,7 +384,7 @@ function GapControl({
         active={Boolean(found)}
         disabled={busy}
         onReset={() => {
-          setLinkOverride(null);
+          setLinkOverride(undefined);
           onClearProp('gap');
         }}
         resetLabel="Clear"
@@ -383,57 +392,101 @@ function GapControl({
         Gap
       </FieldLabel>
       <div className="embed-editor_gap">
-        {linked ? (
-          <GapInput
-            value={row}
-            busy={busy}
-            ariaLabel="Gap"
-            axes={['row', 'column']}
-            onLive={(v) => writeLinked(v, true)}
-            onCommit={(v) => writeLinked(v, false)}
-          />
-        ) : (
-          <>
-            <div className="embed-editor_gap-cell">
-              <GapInput
-                value={col}
-                busy={busy}
-                ariaLabel="Column gap"
-                axes={['column']}
-                onLive={(v) => writeSplit(row, v, true)}
-                onCommit={(v) => writeSplit(row, v, false)}
-              />
-              <span className="embed-editor_gap-caption">Columns</span>
-            </div>
-            <div className="embed-editor_gap-cell">
-              <GapInput
-                value={row}
-                busy={busy}
-                ariaLabel="Row gap"
-                axes={['row']}
-                onLive={(v) => writeSplit(v, col, true)}
-                onCommit={(v) => writeSplit(v, col, false)}
-              />
-              <span className="embed-editor_gap-caption">Rows</span>
-            </div>
-          </>
-        )}
-        <button
-          type="button"
-          className={`embed-editor_icon-btn embed-editor_gap-link ${linked ? 'is-active' : ''}`}
-          disabled={busy}
-          aria-pressed={linked}
-          title={
-            linked
-              ? 'Linked — one gap for rows and columns'
-              : 'Unlinked — separate row and column gaps'
-          }
-          onClick={toggleLink}
-        >
-          {linked ? <LockedIcon /> : <UnlockedIcon />}
-        </button>
+        <GapFields linked={linked} row={row} column={column} busy={busy} write={write} />
+        <GapLinkButton linked={linked} busy={busy} onToggle={toggleLink} />
       </div>
     </div>
+  );
+}
+
+// Whether a gap write is a live preview or the committed value.
+type WriteMode = 'live' | 'commit';
+
+// One field for a linked gap, or a column field and a row field for a split one.
+function GapFields({
+  linked,
+  row,
+  column,
+  busy,
+  write,
+}: {
+  linked: boolean;
+  row: string;
+  column: string;
+  busy: boolean;
+  write: (next: string, mode: WriteMode) => void;
+}) {
+  if (linked) {
+    return (
+      <GapInput
+        value={row}
+        busy={busy}
+        ariaLabel="Gap"
+        axes={['row', 'column']}
+        onLive={(next) => write(next.trim(), 'live')}
+        onCommit={(next) => write(next.trim(), 'commit')}
+      />
+    );
+  }
+  return (
+    <>
+      <div className="embed-editor_gap-cell">
+        <GapInput
+          value={column}
+          busy={busy}
+          ariaLabel="Column gap"
+          axes={['column']}
+          onLive={(next) => write(splitGap(row, next), 'live')}
+          onCommit={(next) => write(splitGap(row, next), 'commit')}
+        />
+        <span className="embed-editor_gap-caption">Columns</span>
+      </div>
+      <div className="embed-editor_gap-cell">
+        <GapInput
+          value={row}
+          busy={busy}
+          ariaLabel="Row gap"
+          axes={['row']}
+          onLive={(next) => write(splitGap(next, column), 'live')}
+          onCommit={(next) => write(splitGap(next, column), 'commit')}
+        />
+        <span className="embed-editor_gap-caption">Rows</span>
+      </div>
+    </>
+  );
+}
+
+// `gap: <row> <column>`, with a blank side written as 0; blank when both are.
+function splitGap(row: string, column: string): string {
+  if (!row.trim() && !column.trim()) {
+    return '';
+  }
+  return `${row.trim() || '0'} ${column.trim() || '0'}`;
+}
+
+// The lock that links or unlinks the row and column gaps.
+function GapLinkButton({
+  linked,
+  busy,
+  onToggle,
+}: {
+  linked: boolean;
+  busy: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      className={`embed-editor_icon-btn embed-editor_gap-link ${linked ? 'is-active' : ''}`}
+      disabled={busy}
+      aria-pressed={linked}
+      title={
+        linked ? 'Linked — one gap for rows and columns' : 'Unlinked — separate row and column gaps'
+      }
+      onClick={onToggle}
+    >
+      {linked ? <LockedIcon /> : <UnlockedIcon />}
+    </button>
   );
 }
 
@@ -455,41 +508,41 @@ const GRID_CONTENT = [
 function splitTracks(value: string): string[] {
   const parts: string[] = [];
   let depth = 0;
-  let cur = '';
+  let current = '';
   for (const ch of value.trim()) {
     if (ch === '(' || ch === '[') {
       depth += 1;
-      cur += ch;
+      current += ch;
     } else if (ch === ')' || ch === ']') {
       depth = Math.max(0, depth - 1);
-      cur += ch;
+      current += ch;
     } else if (/\s/.test(ch) && depth === 0) {
-      if (cur) {
-        parts.push(cur);
-        cur = '';
+      if (current) {
+        parts.push(current);
+        current = '';
       }
     } else {
-      cur += ch;
+      current += ch;
     }
   }
-  if (cur) {
-    parts.push(cur);
+  if (current) {
+    parts.push(current);
   }
   return parts;
 }
 // The number of tracks a grid-template value defines — expands `repeat(n, …)` and
 // ignores [line-name] tokens. 0 when unset / none.
 function countTracks(value: string): number {
-  const v = value.trim().toLowerCase();
-  if (!v || v === 'none') {
+  const text = value.trim().toLowerCase();
+  if (!text || text === 'none') {
     return 0;
   }
   let count = 0;
-  for (const t of splitTracks(v)) {
-    if (t.startsWith('[')) {
+  for (const track of splitTracks(text)) {
+    if (track.startsWith('[')) {
       continue;
     }
-    const rep = t.match(/^repeat\(\s*(\d+)\s*,(.*)\)$/i);
+    const rep = track.match(/^repeat\(\s*(\d+)\s*,(.*)\)$/i);
     if (rep) {
       count +=
         parseInt(rep[1] ?? '0', 10) *
@@ -506,15 +559,16 @@ function countTracks(value: string): number {
 // reads the whole grid-template as a custom value. Mirrors GridControls' count stepper.
 const NEW_COLUMN = 'minmax(0px, 1fr)';
 const NEW_ROW = 'auto';
-const uniformTracks = (n: number, fill: string) =>
-  Array.from({ length: Math.max(0, n) }, () => fill).join(' ');
+const uniformTracks = (count: number, fill: string) =>
+  Array.from({ length: Math.max(0, count) }, () => fill).join(' ');
 
 // grid-auto-flow is a direction (row | column) optionally packed `dense`.
-function parseFlow(value: string): { dir: string; dense: boolean } {
-  const v = value.toLowerCase();
-  return { dir: v.includes('column') ? 'column' : 'row', dense: v.includes('dense') };
+type Flow = { direction: string; dense: boolean };
+function parseFlow(value: string): Flow {
+  const text = value.toLowerCase();
+  return { direction: text.includes('column') ? 'column' : 'row', dense: text.includes('dense') };
 }
-const buildFlow = (dir: string, dense: boolean) => (dense ? `${dir} dense` : dir);
+const buildFlow = ({ direction, dense }: Flow) => (dense ? `${direction} dense` : direction);
 
 const ChevUp = () => (
   <svg viewBox="0 0 16 16" fill="none" aria-hidden="true" width="12" height="12">
@@ -577,7 +631,7 @@ function CountField({
   value: number;
   busy: boolean;
   ariaLabel: string;
-  onCommit: (n: number) => void;
+  onCommit: (count: number) => void;
 }) {
   const [text, setText] = useState(value > 0 ? String(value) : '');
   const focused = useRef(false);
@@ -586,16 +640,15 @@ function CountField({
       setText(value > 0 ? String(value) : '');
     }
   }, [value]);
-  const clampN = (n: number) => Math.min(500, Math.max(1, n));
-  const commit = (t: string) => {
-    const n = parseInt(t, 10);
-    if (Number.isNaN(n)) {
+  const commit = (typed: string) => {
+    const count = parseInt(typed, 10);
+    if (Number.isNaN(count)) {
       setText(value > 0 ? String(value) : '');
       return;
     }
-    onCommit(clampN(n));
+    onCommit(clampCount(count));
   };
-  const step = (delta: number) => onCommit(clampN((value || 0) + delta));
+  const step = (delta: number) => onCommit(clampCount((value || 0) + delta));
   return (
     <div className="embed-editor_grid-count">
       <input
@@ -606,7 +659,7 @@ function CountField({
         disabled={busy}
         aria-label={ariaLabel}
         placeholder="0"
-        onChange={(e) => setText(e.target.value)}
+        onChange={(event) => setText(event.target.value)}
         onFocus={() => {
           focused.current = true;
         }}
@@ -614,40 +667,51 @@ function CountField({
           focused.current = false;
           commit(text);
         }}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter') {
-            e.currentTarget.blur();
+        onKeyDown={(event) => {
+          if (event.key === 'Enter') {
+            event.currentTarget.blur();
             return;
           }
-          if (e.key === 'ArrowUp') {
-            e.preventDefault();
+          if (event.key === 'ArrowUp') {
+            event.preventDefault();
             step(1);
-          } else if (e.key === 'ArrowDown') {
-            e.preventDefault();
+          } else if (event.key === 'ArrowDown') {
+            event.preventDefault();
             step(-1);
           }
         }}
       />
-      <div className="embed-editor_grid-count-steppers">
-        <button
-          type="button"
-          tabIndex={-1}
-          disabled={busy}
-          aria-label="Increase"
-          onClick={() => step(1)}
-        >
-          <ChevUp />
-        </button>
-        <button
-          type="button"
-          tabIndex={-1}
-          disabled={busy}
-          aria-label="Decrease"
-          onClick={() => step(-1)}
-        >
-          <ChevDown />
-        </button>
-      </div>
+      <CountSteppers busy={busy} onStep={step} />
+    </div>
+  );
+}
+
+// A track count is at least one and at most 500 — past that the grid is a
+// mistake, not a layout.
+const clampCount = (count: number) => Math.min(500, Math.max(1, count));
+
+// The ▲▼ buttons beside a count field; out of the tab order, like Webflow's.
+function CountSteppers({ busy, onStep }: { busy: boolean; onStep: (delta: number) => void }) {
+  return (
+    <div className="embed-editor_grid-count-steppers">
+      <button
+        type="button"
+        tabIndex={-1}
+        disabled={busy}
+        aria-label="Increase"
+        onClick={() => onStep(1)}
+      >
+        <ChevUp />
+      </button>
+      <button
+        type="button"
+        tabIndex={-1}
+        disabled={busy}
+        aria-label="Decrease"
+        onClick={() => onStep(-1)}
+      >
+        <ChevDown />
+      </button>
     </div>
   );
 }
@@ -686,8 +750,8 @@ function GridTracksRow({
             value={cols}
             busy={busy}
             ariaLabel="Grid columns"
-            onCommit={(n) =>
-              onSetProp('grid-template-columns', uniformTracks(n, NEW_COLUMN), false)
+            onCommit={(count) =>
+              onSetProp('grid-template-columns', uniformTracks(count, NEW_COLUMN), false)
             }
           />
           <span className="embed-editor_gap-caption">Columns</span>
@@ -697,7 +761,9 @@ function GridTracksRow({
             value={rows}
             busy={busy}
             ariaLabel="Grid rows"
-            onCommit={(n) => onSetProp('grid-template-rows', uniformTracks(n, NEW_ROW), false)}
+            onCommit={(count) =>
+              onSetProp('grid-template-rows', uniformTracks(count, NEW_ROW), false)
+            }
           />
           <span className="embed-editor_gap-caption">Rows</span>
         </div>
@@ -719,7 +785,7 @@ function GridDirectionRow({
   onClearProp: ClearProp;
 }) {
   const found = readProp(rule, 'grid-auto-flow');
-  const { dir, dense } = found ? parseFlow(found.value) : { dir: 'row', dense: false };
+  const { direction, dense } = found ? parseFlow(found.value) : { direction: 'row', dense: false };
   return (
     <div className="embed-editor_size-row">
       <FieldLabel
@@ -733,11 +799,13 @@ function GridDirectionRow({
       </FieldLabel>
       <div className="embed-editor_grid-direction">
         <SegmentedControl
-          value={dir}
+          value={direction}
           options={GRID_FLOW}
           ariaLabel="Grid direction"
           disabled={busy}
-          onChange={(d) => onSetProp('grid-auto-flow', buildFlow(d, dense), false)}
+          onChange={(next) =>
+            onSetProp('grid-auto-flow', buildFlow({ direction: next, dense }), false)
+          }
         />
         <button
           type="button"
@@ -745,7 +813,9 @@ function GridDirectionRow({
           disabled={busy}
           aria-pressed={dense}
           title="Dense — backfill earlier gaps in the grid"
-          onClick={() => onSetProp('grid-auto-flow', buildFlow(dir, !dense), false)}
+          onClick={() =>
+            onSetProp('grid-auto-flow', buildFlow({ direction, dense: !dense }), false)
+          }
         >
           <DenseIcon />
         </button>
@@ -772,17 +842,17 @@ function GridAlignRow({
   const ai = readProp(rule, 'align-items');
   const axis = (axisLabel: string, prop: string) => {
     const found = readProp(rule, prop);
-    const cur = found ? found.value.trim().toLowerCase() : '';
+    const current = found ? found.value.trim().toLowerCase() : '';
     return (
       <div className="embed-editor_grid-axis">
         <span className="embed-editor_grid-axis-label">{axisLabel}</span>
         <Select
-          value={cur}
-          options={buildOptions(JUSTIFY_GRID, cur)}
+          value={current}
+          options={buildOptions(JUSTIFY_GRID, current)}
           ariaLabel={`Align ${axisLabel}`}
           disabled={busy}
           onChange={(choice) => (choice ? onSetProp(prop, choice, false) : onClearProp(prop))}
-          onPreview={(choice) => onLiveSetProp(prop, choice || null, false)}
+          onPreview={(choice) => onLiveSetProp(prop, choice || undefined, false)}
         />
       </div>
     );
@@ -817,6 +887,7 @@ export default function LayoutSection({
   const display = displayFound ? displayFound.value.trim().toLowerCase() : '';
   const isFlex = display === 'flex' || display === 'inline-flex';
   const isGrid = display === 'grid' || display === 'inline-grid';
+  const rowProps = { rule, busy, onSetProp, onClearProp, onLiveSetProp };
 
   return (
     <div className="embed-editor_layout">
@@ -838,103 +909,53 @@ export default function LayoutSection({
           onCommit={(value, important) => onSetProp('display', value, important)}
         />
       </div>
-
-      {isFlex ? (
-        <>
-          <SegRow
-            rule={rule}
-            busy={busy}
-            prop="flex-direction"
-            label="Direction"
-            options={FLEX_DIRECTION}
-            onSetProp={onSetProp}
-            onClearProp={onClearProp}
-          />
-          <SelectRow
-            rule={rule}
-            busy={busy}
-            prop="flex-wrap"
-            label="Wrap"
-            values={WRAP}
-            onSetProp={onSetProp}
-            onClearProp={onClearProp}
-            onLiveSetProp={onLiveSetProp}
-          />
-          <SelectRow
-            rule={rule}
-            busy={busy}
-            prop="justify-content"
-            label="Justify"
-            values={JUSTIFY_FLEX}
-            onSetProp={onSetProp}
-            onClearProp={onClearProp}
-            onLiveSetProp={onLiveSetProp}
-          />
-          <SelectRow
-            rule={rule}
-            busy={busy}
-            prop="align-items"
-            label="Align"
-            values={ALIGN_FLEX}
-            onSetProp={onSetProp}
-            onClearProp={onClearProp}
-            onLiveSetProp={onLiveSetProp}
-          />
-          <GapControl
-            rule={rule}
-            busy={busy}
-            onSetProp={onSetProp}
-            onClearProp={onClearProp}
-            onLiveSetProp={onLiveSetProp}
-          />
-        </>
-      ) : null}
-
-      {isGrid ? (
-        <>
-          <GridTracksRow rule={rule} busy={busy} onSetProp={onSetProp} onClearProp={onClearProp} />
-          <GridDirectionRow
-            rule={rule}
-            busy={busy}
-            onSetProp={onSetProp}
-            onClearProp={onClearProp}
-          />
-          <GridAlignRow
-            rule={rule}
-            busy={busy}
-            onSetProp={onSetProp}
-            onClearProp={onClearProp}
-            onLiveSetProp={onLiveSetProp}
-          />
-          <GapControl
-            rule={rule}
-            busy={busy}
-            onSetProp={onSetProp}
-            onClearProp={onClearProp}
-            onLiveSetProp={onLiveSetProp}
-          />
-          <SelectRow
-            rule={rule}
-            busy={busy}
-            prop="justify-content"
-            label="Justify content"
-            values={GRID_CONTENT}
-            onSetProp={onSetProp}
-            onClearProp={onClearProp}
-            onLiveSetProp={onLiveSetProp}
-          />
-          <SelectRow
-            rule={rule}
-            busy={busy}
-            prop="align-content"
-            label="Align content"
-            values={GRID_CONTENT}
-            onSetProp={onSetProp}
-            onClearProp={onClearProp}
-            onLiveSetProp={onLiveSetProp}
-          />
-        </>
-      ) : null}
+      {isFlex ? <FlexRows {...rowProps} /> : undefined}
+      {isGrid ? <GridRows {...rowProps} /> : undefined}
     </div>
+  );
+}
+
+// The flex container's controls.
+function FlexRows(props: Props) {
+  return (
+    <>
+      <SegRow
+        rule={props.rule}
+        busy={props.busy}
+        prop="flex-direction"
+        label="Direction"
+        options={FLEX_DIRECTION}
+        onSetProp={props.onSetProp}
+        onClearProp={props.onClearProp}
+      />
+      <SelectRow {...props} prop="flex-wrap" label="Wrap" values={WRAP} />
+      <SelectRow {...props} prop="justify-content" label="Justify" values={JUSTIFY_FLEX} />
+      <SelectRow {...props} prop="align-items" label="Align" values={ALIGN_FLEX} />
+      <GapControl {...props} />
+    </>
+  );
+}
+
+// The grid container's controls.
+function GridRows(props: Props) {
+  return (
+    <>
+      <GridTracksRow
+        rule={props.rule}
+        busy={props.busy}
+        onSetProp={props.onSetProp}
+        onClearProp={props.onClearProp}
+      />
+      <GridDirectionRow
+        rule={props.rule}
+        busy={props.busy}
+        onSetProp={props.onSetProp}
+        onClearProp={props.onClearProp}
+      />
+      <GridAlignRow {...props} />
+      <GapControl {...props} />
+      <SelectRow {...props} prop="justify-content" label="Justify content" values={GRID_CONTENT} />
+      <SelectRow {...props} prop="align-content" label="Align content" values={GRID_CONTENT} />
+    </>
   );
 }

@@ -20,7 +20,7 @@ import { commitInPlace } from './lib/commit-in-place';
 // picked selector sets it, clear menu on the label).
 
 type SetProp = (prop: string, value: string, important: boolean) => void;
-type LiveSetProp = (prop: string, value: string | null, important: boolean) => void;
+type LiveSetProp = (prop: string, value: string | undefined, important: boolean) => void;
 type ClearProp = (prop: string | string[]) => void;
 type Read = (prop: string) => ResolvedProp | undefined;
 
@@ -217,7 +217,7 @@ const LABELS: Record<string, string> = {
   center: 'Center',
   stretch: 'Stretch',
 };
-const cap = (s: string) => (s ? (s[0] ?? '').toUpperCase() + s.slice(1) : s);
+const cap = (word: string) => (word ? (word[0] ?? '').toUpperCase() + word.slice(1) : word);
 
 // ── content-distribution glyphs (justify-content = Columns, align-content = Rows) ──
 // Webflow's grid content icons: Column variants for justify-content, Row variants for
@@ -332,70 +332,74 @@ const CONTENT_PATHS: Record<string, { col: string[]; row: string[] }> = {
 function ContentIcon({ value, vertical }: { value: string; vertical: boolean }) {
   const set = CONTENT_PATHS[value] ?? CONTENT_PATHS['space-around'];
   if (set === undefined) {
-    return null;
+    return undefined;
   }
   return (
     <svg viewBox="0 0 16 16" width="16" height="16" fill="none" aria-hidden="true">
-      {(vertical ? set.row : set.col).map((d, i) => (
-        <path key={i} d={d} fillRule="evenodd" clipRule="evenodd" fill="currentColor" />
+      {(vertical ? set.row : set.col).map((path, i) => (
+        <path key={i} d={path} fillRule="evenodd" clipRule="evenodd" fill="currentColor" />
       ))}
     </svg>
   );
 }
-const contentOptions = (vertical: boolean): ReadonlyArray<SegmentedOption<string>> => {
-  // vertical → align-content (Rows); otherwise justify-content (Columns). The tooltip
+const contentOptions = ({
+  vertical,
+}: {
+  readonly vertical: boolean;
+}): ReadonlyArray<SegmentedOption<string>> => {
+  // Vertical → align-content (Rows); otherwise justify-content (Columns). The tooltip
   // names the property, like Webflow ("Justify Content: Center").
   const propName = vertical ? 'Align Content' : 'Justify Content';
-  return GRID_CONTENT.map((v) => {
-    const name = `${propName}: ${LABELS[v] ?? cap(v)}`;
+  return GRID_CONTENT.map((option) => {
+    const name = `${propName}: ${LABELS[option] ?? cap(option)}`;
     return {
-      value: v,
-      label: <ContentIcon value={v} vertical={vertical} />,
+      value: option,
+      label: <ContentIcon value={option} vertical={vertical} />,
       ariaLabel: name,
       tooltip: name,
     };
   });
 };
 
-// ── grid-template track counting ──
+// Grid-template track counting.
 function splitTracks(value: string): string[] {
   const parts: string[] = [];
   let depth = 0;
-  let cur = '';
+  let current = '';
   for (const ch of value.trim()) {
     if (ch === '(' || ch === '[') {
       depth += 1;
-      cur += ch;
+      current += ch;
     } else if (ch === ')' || ch === ']') {
       depth = Math.max(0, depth - 1);
-      cur += ch;
+      current += ch;
     } else if (/\s/.test(ch) && depth === 0) {
-      if (cur) {
-        parts.push(cur);
-        cur = '';
+      if (current) {
+        parts.push(current);
+        current = '';
       }
     } else {
-      cur += ch;
+      current += ch;
     }
   }
-  if (cur) {
-    parts.push(cur);
+  if (current) {
+    parts.push(current);
   }
   return parts;
 }
 // Number of tracks a grid-template value defines — expands `repeat(n, …)`, ignores
 // [line-name] tokens. 0 when unset / none.
 function countTracks(value: string): number {
-  const v = value.trim().toLowerCase();
-  if (!v || v === 'none') {
+  const normalized = value.trim().toLowerCase();
+  if (!normalized || normalized === 'none') {
     return 0;
   }
   let count = 0;
-  for (const t of splitTracks(v)) {
-    if (t.startsWith('[')) {
+  for (const track of splitTracks(normalized)) {
+    if (track.startsWith('[')) {
       continue;
     }
-    const rep = t.match(/^repeat\(\s*(\d+)\s*,(.*)\)$/i);
+    const rep = track.match(/^repeat\(\s*(\d+)\s*,(.*)\)$/i);
     if (rep) {
       count +=
         parseInt(rep[1] ?? '0', 10) *
@@ -415,16 +419,23 @@ const NEW_ROW = 'auto';
 // `repeat()` form — e.g. 2 columns → `repeat(2, minmax(0, 1fr))`. It's the "how many
 // tracks" control, so it normalises ALL tracks, not just newly-added ones; per-track
 // custom sizes are set/kept in the Configure-grid modal instead (its "+" preserves them).
-const repeatTracks = (n: number, cell: string) => `repeat(${Math.max(1, n)}, ${cell})`;
+const repeatTracks = (count: number, cell: string) => `repeat(${Math.max(1, count)}, ${cell})`;
 
 // grid-auto-flow is a direction (row | column) optionally packed `dense`.
-function parseFlow(value: string): { dir: string; dense: boolean } {
-  const v = value.toLowerCase();
-  return { dir: v.includes('column') ? 'column' : 'row', dense: v.includes('dense') };
+interface Flow {
+  readonly direction: string;
+  readonly dense: boolean;
 }
-const buildFlow = (dir: string, dense: boolean) => (dense ? `${dir} dense` : dir);
+function parseFlow(value: string): Flow {
+  const lowered = value.toLowerCase();
+  return {
+    direction: lowered.includes('column') ? 'column' : 'row',
+    dense: lowered.includes('dense'),
+  };
+}
+const buildFlow = ({ direction, dense }: Flow) => (dense ? `${direction} dense` : direction);
 
-// ── icons ──
+// Icons.
 const ChevUp = () => (
   <svg viewBox="0 0 16 16" fill="none" aria-hidden="true" width="12" height="12">
     <path
@@ -497,64 +508,167 @@ const CustomizeIcon = () => (
 // a single `repeat(n, <one track>)`, or N identical explicit tracks. Anything else (mixed
 // sizes) is "custom" and belongs in the Configure-grid modal.
 const isUniformTracks = (value: string) => {
-  const t = splitTracks(value.trim()).filter((x) => !x.startsWith('['));
-  if (t.length === 0) {
+  const tracks = splitTracks(value.trim()).filter((x) => !x.startsWith('['));
+  if (tracks.length === 0) {
     return false;
   }
-  if (t.length === 1) {
-    const rep = (t[0] ?? '').match(/^repeat\(\s*\d+\s*,(.*)\)$/i);
+  if (tracks.length === 1) {
+    const rep = (tracks[0] ?? '').match(/^repeat\(\s*\d+\s*,(.*)\)$/i);
     if (rep) {
       return splitTracks(rep[1] ?? '').filter((x) => !x.startsWith('[')).length === 1;
     }
   }
-  return t.every((x) => x === t[0]);
+  return tracks.every((x) => x === tracks[0]);
 };
 
 // grid-auto-flow is a preset when every token is row / column / dense; anything else
 // (a CSS-wide keyword, var(), …) is a custom value edited in the text field.
 function isPresetFlow(value: string): boolean {
-  const v = value.trim().toLowerCase();
-  if (!v) {
+  const normalized = value.trim().toLowerCase();
+  if (!normalized) {
     return true;
   }
-  return v.split(/\s+/).every((t) => t === 'row' || t === 'column' || t === 'dense');
+  return normalized
+    .split(/\s+/)
+    .every((token) => token === 'row' || token === 'column' || token === 'dense');
 }
 function parseImportant(input: string): { value: string; important: boolean } {
-  const m = input.match(/!\s*important\s*$/i);
-  return m
-    ? { value: input.slice(0, m.index).trim(), important: true }
+  const match = input.match(/!\s*important\s*$/i);
+  return match
+    ? { value: input.slice(0, match.index).trim(), important: true }
     : { value: input.trim(), important: false };
 }
 
 // The grid Direction control: the row/column segments (with Horizontal/Vertical
 // tooltips) + a dense toggle, plus a chevron menu with a "Custom" escape hatch that
 // swaps the bar for a free-value grid-auto-flow field (mirrors the other button lists).
-function GridDirectionControl({
-  value,
-  busy,
-  onSet,
-  onCommitCustom,
-}: {
+interface GridDirectionControlProps {
   value: string;
   busy: boolean;
   onSet: (value: string) => void;
   onCommitCustom: (value: string, important: boolean) => void;
-}) {
-  const { dir, dense } = value ? parseFlow(value) : { dir: 'row', dense: false };
+}
+function GridDirectionControl({ value, busy, onSet, onCommitCustom }: GridDirectionControlProps) {
+  const { direction, dense } = value ? parseFlow(value) : { direction: 'row', dense: false };
   const [forceCustom, setForceCustom] = useState(false);
   const customMode = forceCustom || (!!value.trim() && !isPresetFlow(value));
+  const menu = useCustomMenu({ customMode, busy });
+
+  const enterCustom = () => {
+    menu.setOpen(false);
+    setForceCustom(true);
+    menu.requestFocus();
+    onCommitCustom('unset', false);
+  };
+  const pickPreset = (next: string) => {
+    menu.setOpen(false);
+    setForceCustom(false);
+    onSet(buildFlow({ direction: next, dense }));
+  };
+
+  return (
+    <div ref={menu.rootRef} className="embed-editor_grid-direction">
+      {/* The segments (or custom field) + the dropdown arrow share one pill so the
+          arrow belongs to the direction control; the dense toggle sits outside it. */}
+      <div className={`embed-editor_grid-dir-bar ${customMode ? 'is-custom' : ''}`}>
+        {customMode ? (
+          <GridCustomInput
+            value={value}
+            busy={busy}
+            inputRef={menu.inputRef}
+            placeholder="e.g. row dense"
+            ariaLabel="Grid auto flow"
+            onCommitCustom={onCommitCustom}
+          />
+        ) : (
+          <SegmentedControl
+            value={direction}
+            options={GRID_FLOW}
+            ariaLabel="Grid direction"
+            disabled={busy}
+            onChange={(next) => onSet(buildFlow({ direction: next, dense }))}
+          />
+        )}
+        <MenuArrow
+          open={menu.open}
+          busy={busy}
+          ariaLabel="More direction options"
+          onToggle={menu.toggle}
+        />
+        {menu.open ? (
+          <DirectionMenu
+            customMode={customMode}
+            pickPreset={pickPreset}
+            enterCustom={enterCustom}
+          />
+        ) : undefined}
+      </div>
+      {!customMode ? (
+        <DenseToggle
+          dense={dense}
+          busy={busy}
+          onToggle={() => onSet(buildFlow({ direction, dense: !dense }))}
+        />
+      ) : undefined}
+    </div>
+  );
+}
+
+// From custom mode: back to Horizontal or Vertical; from the bar: on to Custom.
+function DirectionMenu({
+  customMode,
+  pickPreset,
+  enterCustom,
+}: {
+  customMode: boolean;
+  pickPreset: (direction: string) => void;
+  enterCustom: () => void;
+}) {
+  return (
+    <div className="embed-editor_display-menu" role="menu">
+      {customMode ? (
+        <>
+          <MenuButton label="Horizontal" onClick={() => pickPreset('row')} />
+          <MenuButton label="Vertical" onClick={() => pickPreset('column')} />
+        </>
+      ) : (
+        <MenuButton label="Custom" onClick={enterCustom} />
+      )}
+    </div>
+  );
+}
+
+function DenseToggle({
+  dense,
+  busy,
+  onToggle,
+}: {
+  dense: boolean;
+  busy: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      className={`embed-editor_icon-btn ${dense ? 'is-active' : ''}`}
+      disabled={busy}
+      aria-pressed={dense}
+      title="Dense — backfill earlier gaps in the grid"
+      onClick={onToggle}
+    >
+      <DenseIcon />
+    </button>
+  );
+}
+
+// A custom-mode control's shared state: the chevron menu (closed again on an outside
+// click or Escape), and the request to focus the free-value field once custom mode is
+// on and the control is no longer busy.
+function useCustomMenu({ customMode, busy }: { customMode: boolean; busy: boolean }) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const wantFocus = useRef(false);
-  const [draft, setDraft] = useState(value);
-  const focused = useRef(false);
-  useEffect(() => {
-    if (!focused.current) {
-      setDraft(value);
-    }
-  }, [value]);
-
   useEffect(() => {
     if (!open) {
       return;
@@ -564,8 +678,8 @@ function GridDirectionControl({
         setOpen(false);
       }
     };
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
         setOpen(false);
       }
     };
@@ -576,7 +690,6 @@ function GridDirectionControl({
       document.removeEventListener('keydown', onKey);
     };
   }, [open]);
-
   // Focus the field after switching to Custom, once its `unset` write settles.
   useEffect(() => {
     if (customMode && wantFocus.current && !busy) {
@@ -585,120 +698,111 @@ function GridDirectionControl({
       inputRef.current?.select();
     }
   }, [customMode, busy]);
+  return {
+    open,
+    setOpen,
+    toggle: () => setOpen((wasOpen) => !wasOpen),
+    rootRef,
+    inputRef,
+    requestFocus: () => {
+      wantFocus.current = true;
+    },
+  };
+}
 
-  const enterCustom = () => {
-    setOpen(false);
-    setForceCustom(true);
-    wantFocus.current = true;
-    onCommitCustom('unset', false);
-  };
-  const pickPreset = (d: string) => {
-    setOpen(false);
-    setForceCustom(false);
-    onSet(buildFlow(d, dense));
-  };
+// The free-value field of custom mode: commits on blur (with !important parsed off).
+// It mounts only in custom mode, starting from the current value, and mirrors external
+// edits unless the user is typing.
+function GridCustomInput({
+  value,
+  busy,
+  inputRef,
+  placeholder,
+  ariaLabel,
+  onCommitCustom,
+}: {
+  value: string;
+  busy: boolean;
+  inputRef: React.RefObject<HTMLInputElement>;
+  placeholder: string;
+  ariaLabel: string;
+  onCommitCustom: (value: string, important: boolean) => void;
+}) {
+  const [draft, setDraft] = useState(value);
+  const focused = useRef(false);
+  useEffect(() => {
+    if (!focused.current) {
+      setDraft(value);
+    }
+  }, [value]);
   const commitCustom = () => {
-    const p = parseImportant(draft);
-    if (p.value) {
-      onCommitCustom(p.value, p.important);
+    const parsed = parseImportant(draft);
+    if (parsed.value) {
+      onCommitCustom(parsed.value, parsed.important);
     }
   };
-
   return (
-    <div ref={rootRef} className="embed-editor_grid-direction">
-      {/* The segments (or custom field) + the dropdown arrow share one pill so the
-          arrow belongs to the direction control; the dense toggle sits outside it. */}
-      <div className={`embed-editor_grid-dir-bar ${customMode ? 'is-custom' : ''}`}>
-        {customMode ? (
-          <input
-            ref={inputRef}
-            className="embed-editor_value-input embed-editor_display-input"
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            onFocus={() => {
-              focused.current = true;
-            }}
-            onBlur={() => {
-              focused.current = false;
-              commitCustom();
-            }}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                commitInPlace(e.currentTarget);
-              }
-            }}
-            disabled={busy}
-            spellCheck={false}
-            placeholder="e.g. row dense"
-            aria-label="Grid auto flow"
-          />
-        ) : (
-          <SegmentedControl
-            value={dir}
-            options={GRID_FLOW}
-            ariaLabel="Grid direction"
-            disabled={busy}
-            onChange={(d) => onSet(buildFlow(d, dense))}
-          />
-        )}
-        <button
-          type="button"
-          className="embed-editor_display-arrow"
-          aria-haspopup="menu"
-          aria-expanded={open}
-          aria-label="More direction options"
-          disabled={busy}
-          onClick={() => setOpen((v) => !v)}
-        >
-          <ChevDown />
-        </button>
-        {open ? (
-          <div className="embed-editor_display-menu" role="menu">
-            {customMode ? (
-              <>
-                <button
-                  type="button"
-                  role="menuitem"
-                  className="embed-editor_display-menu-item"
-                  onClick={() => pickPreset('row')}
-                >
-                  Horizontal
-                </button>
-                <button
-                  type="button"
-                  role="menuitem"
-                  className="embed-editor_display-menu-item"
-                  onClick={() => pickPreset('column')}
-                >
-                  Vertical
-                </button>
-              </>
-            ) : (
-              <button
-                type="button"
-                role="menuitem"
-                className="embed-editor_display-menu-item"
-                onClick={enterCustom}
-              >
-                Custom
-              </button>
-            )}
-          </div>
-        ) : null}
-      </div>
-      {!customMode ? (
-        <button
-          type="button"
-          className={`embed-editor_icon-btn ${dense ? 'is-active' : ''}`}
-          disabled={busy}
-          aria-pressed={dense}
-          title="Dense — backfill earlier gaps in the grid"
-          onClick={() => onSet(buildFlow(dir, !dense))}
-        >
-          <DenseIcon />
-        </button>
-      ) : null}
-    </div>
+    <input
+      ref={inputRef}
+      className="embed-editor_value-input embed-editor_display-input"
+      value={draft}
+      onChange={(event) => setDraft(event.target.value)}
+      onFocus={() => {
+        focused.current = true;
+      }}
+      onBlur={() => {
+        focused.current = false;
+        commitCustom();
+      }}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter') {
+          commitInPlace(event.currentTarget);
+        }
+      }}
+      disabled={busy}
+      spellCheck={false}
+      placeholder={placeholder}
+      aria-label={ariaLabel}
+    />
+  );
+}
+
+function MenuArrow({
+  open,
+  busy,
+  ariaLabel,
+  onToggle,
+}: {
+  open: boolean;
+  busy: boolean;
+  ariaLabel: string;
+  onToggle: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      className="embed-editor_display-arrow"
+      aria-haspopup="menu"
+      aria-expanded={open}
+      aria-label={ariaLabel}
+      disabled={busy}
+      onClick={onToggle}
+    >
+      <ChevDown />
+    </button>
+  );
+}
+
+function MenuButton({ label, onClick }: { label: string; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      role="menuitem"
+      className="embed-editor_display-menu-item"
+      onClick={onClick}
+    >
+      {label}
+    </button>
   );
 }
 
@@ -706,15 +810,7 @@ function GridDirectionControl({
 // segments + a dropdown arrow whose menu swaps to a free-value field (a value outside
 // the presets — a CSS-wide keyword, var(), … — shows the field automatically).
 // Mirrors GridDirectionControl.
-function GridContentControl({
-  value,
-  prop,
-  vertical,
-  ariaLabel,
-  busy,
-  onSet,
-  onCommitCustom,
-}: {
+interface GridContentControlProps {
   value: string;
   /** The property this bar edits — its computed value highlights an unset control. */
   prop: string;
@@ -723,148 +819,90 @@ function GridContentControl({
   busy: boolean;
   onSet: (value: string) => void;
   onCommitCustom: (value: string, important: boolean) => void;
-}) {
-  const cur = gridKeyword(value.trim().toLowerCase());
+}
+function GridContentControl(props: GridContentControlProps) {
+  const { value, prop, vertical, ariaLabel, busy, onSet, onCommitCustom } = props;
+  const current = gridKeyword(value.trim().toLowerCase());
   const shownContent = gridKeyword(
-    useHighlight('', cur ? '' : prop, [...GRID_CONTENT, ...Object.keys(GRID_SYNONYMS)], 'stretch'),
+    useHighlight(
+      '',
+      current ? '' : prop,
+      [...GRID_CONTENT, ...Object.keys(GRID_SYNONYMS)],
+      'stretch',
+    ),
   );
   const [forceCustom, setForceCustom] = useState(false);
-  const customMode = forceCustom || (!!cur && !GRID_CONTENT.includes(cur));
-  const [open, setOpen] = useState(false);
-  const rootRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
-  const wantFocus = useRef(false);
-  const [draft, setDraft] = useState(value);
-  const focused = useRef(false);
-  useEffect(() => {
-    if (!focused.current) {
-      setDraft(value);
-    }
-  }, [value]);
-
-  useEffect(() => {
-    if (!open) {
-      return;
-    }
-    const onDown = (event: MouseEvent) => {
-      if (!(event.target instanceof Node) || !rootRef.current?.contains(event.target)) {
-        setOpen(false);
-      }
-    };
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        setOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', onDown);
-    document.addEventListener('keydown', onKey);
-    return () => {
-      document.removeEventListener('mousedown', onDown);
-      document.removeEventListener('keydown', onKey);
-    };
-  }, [open]);
-
-  useEffect(() => {
-    if (customMode && wantFocus.current && !busy) {
-      wantFocus.current = false;
-      inputRef.current?.focus();
-      inputRef.current?.select();
-    }
-  }, [customMode, busy]);
+  const customMode = forceCustom || (!!current && !GRID_CONTENT.includes(current));
+  const menu = useCustomMenu({ customMode, busy });
 
   const enterCustom = () => {
-    setOpen(false);
+    menu.setOpen(false);
     setForceCustom(true);
-    wantFocus.current = true;
+    menu.requestFocus();
   };
-  const pickPreset = (v: string) => {
-    setOpen(false);
+  const pickPreset = (option: string) => {
+    menu.setOpen(false);
     setForceCustom(false);
-    onSet(v);
-  };
-  const commitCustom = () => {
-    const p = parseImportant(draft);
-    if (p.value) {
-      onCommitCustom(p.value, p.important);
-    }
+    onSet(option);
   };
   // Unset → show stretch selected (grid's default); a known value shows itself.
-  const segValue = cur ? (GRID_CONTENT.includes(cur) ? cur : '') : shownContent;
+  const segValue = current ? (GRID_CONTENT.includes(current) ? current : '') : shownContent;
 
   return (
-    <div ref={rootRef} className={`embed-editor_grid-dir-bar ${customMode ? 'is-custom' : ''}`}>
+    <div
+      ref={menu.rootRef}
+      className={`embed-editor_grid-dir-bar ${customMode ? 'is-custom' : ''}`}
+    >
       {customMode ? (
-        <input
-          ref={inputRef}
-          className="embed-editor_value-input embed-editor_display-input"
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          onFocus={() => {
-            focused.current = true;
-          }}
-          onBlur={() => {
-            focused.current = false;
-            commitCustom();
-          }}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') {
-              commitInPlace(e.currentTarget);
-            }
-          }}
-          disabled={busy}
-          spellCheck={false}
+        <GridCustomInput
+          value={value}
+          busy={busy}
+          inputRef={menu.inputRef}
           placeholder="custom value"
-          aria-label={ariaLabel}
+          ariaLabel={ariaLabel}
+          onCommitCustom={onCommitCustom}
         />
       ) : (
         <SegmentedControl
           value={segValue}
-          options={contentOptions(vertical)}
+          options={contentOptions({ vertical })}
           ariaLabel={ariaLabel}
           disabled={busy}
           onChange={onSet}
         />
       )}
-      <button
-        type="button"
-        className="embed-editor_display-arrow"
-        aria-haspopup="menu"
-        aria-expanded={open}
-        aria-label={`More ${ariaLabel} options`}
-        disabled={busy}
-        onClick={() => setOpen((v) => !v)}
-      >
-        <ChevDown />
-      </button>
-      {open ? (
+      <MenuArrow
+        open={menu.open}
+        busy={busy}
+        ariaLabel={`More ${ariaLabel} options`}
+        onToggle={menu.toggle}
+      />
+      {menu.open ? (
         <div className="embed-editor_display-menu" role="menu">
           {customMode ? (
-            GRID_CONTENT.map((v) => (
-              <button
-                key={v}
-                type="button"
-                role="menuitem"
-                className="embed-editor_display-menu-item"
-                onClick={() => pickPreset(v)}
-              >
-                {LABELS[v] ?? cap(v)}
-              </button>
-            ))
+            <ContentPresetItems pickPreset={pickPreset} />
           ) : (
-            <button
-              type="button"
-              role="menuitem"
-              className="embed-editor_display-menu-item"
-              onClick={enterCustom}
-            >
-              Custom
-            </button>
+            <MenuButton label="Custom" onClick={enterCustom} />
           )}
         </div>
-      ) : null}
+      ) : undefined}
     </div>
   );
 }
+
+// From custom mode: every preset, to switch back to the bar.
+function ContentPresetItems({ pickPreset }: { pickPreset: (option: string) => void }) {
+  return GRID_CONTENT.map((option) => (
+    <MenuButton
+      key={option}
+      label={LABELS[option] ?? cap(option)}
+      onClick={() => pickPreset(option)}
+    />
+  ));
+}
+
+// A track count stays between 1 and 500.
+const clampCount = (count: number) => Math.min(500, Math.max(1, count));
 
 // A whole-number track-count field with ▲▼ steppers (Webflow's Columns/Rows inputs).
 function CountField({
@@ -885,14 +923,13 @@ function CountField({
       setText(value > 0 ? String(value) : '');
     }
   }, [value]);
-  const clampN = (n: number) => Math.min(500, Math.max(1, n));
-  const commit = (t: string) => {
-    const n = parseInt(t, 10);
-    if (Number.isNaN(n)) {
+  const commit = (entered: string) => {
+    const parsed = parseInt(entered, 10);
+    if (Number.isNaN(parsed)) {
       setText(value > 0 ? String(value) : '');
       return;
     }
-    onCommit(clampN(n));
+    onCommit(clampCount(parsed));
   };
   // Step from the DISPLAYED value and update it immediately: while the input is focused
   // (arrow-key stepping) the `value`→`text` sync is suppressed, so without this the field
@@ -900,7 +937,7 @@ function CountField({
   // `text` also keeps rapid presses correct while the native write round-trips.
   const step = (delta: number) => {
     const base = parseInt(text, 10);
-    const next = clampN((Number.isNaN(base) ? value || 0 : base) + delta);
+    const next = clampCount((Number.isNaN(base) ? value || 0 : base) + delta);
     setText(String(next));
     onCommit(next);
   };
@@ -914,7 +951,7 @@ function CountField({
         disabled={busy}
         aria-label={ariaLabel}
         placeholder="0"
-        onChange={(e) => setText(e.target.value)}
+        onChange={(event) => setText(event.target.value)}
         onFocus={() => {
           focused.current = true;
         }}
@@ -922,40 +959,46 @@ function CountField({
           focused.current = false;
           commit(text);
         }}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter') {
-            commitInPlace(e.currentTarget);
+        onKeyDown={(event) => {
+          if (event.key === 'Enter') {
+            commitInPlace(event.currentTarget);
             return;
           }
-          if (e.key === 'ArrowUp') {
-            e.preventDefault();
+          if (event.key === 'ArrowUp') {
+            event.preventDefault();
             step(1);
-          } else if (e.key === 'ArrowDown') {
-            e.preventDefault();
+          } else if (event.key === 'ArrowDown') {
+            event.preventDefault();
             step(-1);
           }
         }}
       />
-      <div className="embed-editor_grid-count-steppers">
-        <button
-          type="button"
-          tabIndex={-1}
-          disabled={busy}
-          aria-label="Increase"
-          onClick={() => step(1)}
-        >
-          <ChevUp />
-        </button>
-        <button
-          type="button"
-          tabIndex={-1}
-          disabled={busy}
-          aria-label="Decrease"
-          onClick={() => step(-1)}
-        >
-          <ChevDown />
-        </button>
-      </div>
+      <CountSteppers busy={busy} step={step} />
+    </div>
+  );
+}
+
+function CountSteppers({ busy, step }: { busy: boolean; step: (delta: number) => void }) {
+  return (
+    <div className="embed-editor_grid-count-steppers">
+      <button
+        type="button"
+        tabIndex={-1}
+        disabled={busy}
+        aria-label="Increase"
+        onClick={() => step(1)}
+      >
+        <ChevUp />
+      </button>
+      <button
+        type="button"
+        tabIndex={-1}
+        disabled={busy}
+        aria-label="Decrease"
+        onClick={() => step(-1)}
+      >
+        <ChevDown />
+      </button>
     </div>
   );
 }
@@ -1046,9 +1089,9 @@ function GridAxisCustomInput({
     }
   }, [value]);
   const commit = () => {
-    const t = draft.trim();
-    if (t) {
-      onCommit(t);
+    const trimmed = draft.trim();
+    if (trimmed) {
+      onCommit(trimmed);
     } else {
       onClear();
     }
@@ -1057,7 +1100,7 @@ function GridAxisCustomInput({
     <input
       className="u-select-custom-input"
       value={draft}
-      onChange={(e) => setDraft(e.target.value)}
+      onChange={(event) => setDraft(event.target.value)}
       onFocus={() => {
         focused.current = true;
       }}
@@ -1065,9 +1108,9 @@ function GridAxisCustomInput({
         focused.current = false;
         commit();
       }}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter') {
-          commitInPlace(e.currentTarget);
+      onKeyDown={(event) => {
+        if (event.key === 'Enter') {
+          commitInPlace(event.currentTarget);
         }
       }}
       disabled={busy}
@@ -1079,34 +1122,39 @@ function GridAxisCustomInput({
   );
 }
 
+// An align axis's dropdown options: the presets with their axis's labels and icons,
+// then "Custom".
+function alignAxisOptions(axis: 'X' | 'Y'): SelectOption<string>[] {
+  const labels = axis === 'X' ? X_ALIGN_LABELS : Y_ALIGN_LABELS;
+  const icons = axis === 'X' ? X_ALIGN_ICONS : Y_ALIGN_ICONS;
+  const options: SelectOption<string>[] = GRID_ITEM_ALIGN.map((option) => ({
+    value: option,
+    label: labels[option] ?? cap(option),
+    icon: <GridAlignIcon paths={icons[option] ?? []} />,
+  }));
+  options.push({ value: AXIS_CUSTOM, label: 'Custom' });
+  return options;
+}
+
 // One grid align axis (X = justify-items, Y = align-items): the icon dropdown plus a
 // trailing "Custom" option that seeds `unset` and swaps in a free-value field for any
 // keyword the presets don't cover (matching the flex Align axes). The X / Y label owns
 // clear / provenance for that axis's property, so the two reset independently.
-function GridAlignAxis({
-  axis,
-  prop,
-  value,
-  busy,
-  read,
-  onSet,
-  onPreview,
-  onClear,
-  onProvenance,
-  onSelectSelector,
-}: {
+interface GridAlignAxisProps {
   axis: 'X' | 'Y';
   prop: string;
   value: string;
   busy: boolean;
   read: Read;
   onSet: (value: string) => void;
-  /** Live-preview the hovered option; `null` restores the committed value. */
-  onPreview: (value: string | null) => void;
+  /** Live-preview the hovered option; `undefined` restores the committed value. */
+  onPreview: (value: string | undefined) => void;
   onClear: () => void;
   onProvenance: (prop: string, anchor: DOMRect) => void;
   onSelectSelector: (selector: string, prop?: string) => void;
-}) {
+}
+function GridAlignAxis(props: GridAlignAxisProps) {
+  const { axis, prop, value, busy, onSet, onPreview, onClear } = props;
   const [forceCustom, setForceCustom] = useState(false);
   const present = Boolean(value);
   const shown = gridKeyword(value);
@@ -1115,33 +1163,29 @@ function GridAlignAxis({
   // Unset → what the page computes for this element before falling back to grid's
   // own `stretch` default.
   const shownAlign = useHighlight('', present ? '' : prop, GRID_ITEM_ALIGN, 'stretch');
-  const labels = axis === 'X' ? X_ALIGN_LABELS : Y_ALIGN_LABELS;
-  const icons = axis === 'X' ? X_ALIGN_ICONS : Y_ALIGN_ICONS;
-  const options: SelectOption<string>[] = GRID_ITEM_ALIGN.map((v) => ({
-    value: v,
-    label: labels[v] ?? cap(v),
-    icon: <GridAlignIcon paths={icons[v] ?? []} />,
-  }));
-  options.push({ value: AXIS_CUSTOM, label: 'Custom' });
-  const pick = (v: string) => {
-    if (v === AXIS_CUSTOM) {
+  const options = alignAxisOptions(axis);
+  // "Custom" has no value of its own to show, so landing on it reverts the preview.
+  const preview = (option: string | undefined) =>
+    onPreview(option === AXIS_CUSTOM ? undefined : option);
+  const pick = (choice: string) => {
+    if (choice === AXIS_CUSTOM) {
       setForceCustom(true);
       onSet('unset');
       return;
     }
     setForceCustom(false);
-    onSet(v);
+    onSet(choice);
   };
   return (
     <div className="embed-editor_align-axis">
       <GroupLabel
         label={axis}
         props={[prop]}
-        read={read}
+        read={props.read}
         busy={busy}
         onClear={onClear}
-        onProvenance={onProvenance}
-        onSelectSelector={onSelectSelector}
+        onProvenance={props.onProvenance}
+        onSelectSelector={props.onSelectSelector}
       />
       {/* Grid's initial justify-items / align-items behave as stretch, so an unset axis
           shows Stretch (Webflow's default). Clear via this axis's X / Y label. */}
@@ -1152,7 +1196,7 @@ function GridAlignAxis({
         disabled={busy}
         hideTriggerIcon
         onChange={pick}
-        onPreview={(v) => onPreview(v === AXIS_CUSTOM ? null : v)}
+        onPreview={(option) => preview(option ?? undefined)}
         customInput={
           customMode ? (
             <GridAxisCustomInput
@@ -1160,7 +1204,7 @@ function GridAlignAxis({
               busy={busy}
               ariaLabel={`Align ${axis}`}
               autoFocus={forceCustom}
-              onCommit={(v) => onSet(v)}
+              onCommit={(next) => onSet(next)}
               onClear={() => {
                 setForceCustom(false);
                 onClear();
@@ -1173,15 +1217,7 @@ function GridAlignAxis({
   );
 }
 
-export default function GridControls({
-  read,
-  busy,
-  setProp,
-  clearProp,
-  liveSetProp,
-  onProvenance,
-  onSelectSelector,
-}: {
+interface GridControlsProps {
   read: Read;
   busy: boolean;
   setProp: SetProp;
@@ -1189,60 +1225,247 @@ export default function GridControls({
   liveSetProp: LiveSetProp;
   onProvenance: (prop: string, anchor: DOMRect) => void;
   onSelectSelector: (selector: string, prop?: string) => void;
-}) {
-  const val = (prop: string) => {
-    const r = read(prop);
-    if (!r) {
-      return '';
-    }
-    return (
-      r.source === 'selected' && r.selectedValue ? r.selectedValue.value : r.winner.value
-    ).trim();
-  };
+}
 
-  const colsRaw = val('grid-template-columns');
-  const rowsRaw = val('grid-template-rows');
-  const cols = countTracks(colsRaw);
-  const rows = countTracks(rowsRaw);
-  const flow = val('grid-auto-flow');
-  // The inline row shows raw grid-template fields (instead of count steppers) when a
-  // track list isn't just N equal 1fr tracks — those can't be represented as a count.
-  // The gear opens the full Grid settings modal for per-track sizing / reordering.
-  const nonUniform =
-    (!!colsRaw && !isUniformTracks(colsRaw)) || (!!rowsRaw && !isUniformTracks(rowsRaw));
-  const customTracks = nonUniform;
+// The value the picked selector sets, else the winning one — trimmed, '' when unset.
+function resolvedValue(read: Read, prop: string): string {
+  const resolved = read(prop);
+  if (!resolved) {
+    return '';
+  }
+  const source =
+    resolved.source === 'selected' && resolved.selectedValue
+      ? resolved.selectedValue
+      : resolved.winner;
+  return source.value.trim();
+}
+
+export default function GridControls(props: GridControlsProps) {
+  const { read, busy, setProp, clearProp } = props;
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const labelProps = {
+    read,
+    busy,
+    onProvenance: props.onProvenance,
+    onSelectSelector: props.onSelectSelector,
+  };
+  return (
+    <>
+      <GridTracksRow props={props} onConfigure={() => setSettingsOpen(true)} />
+      <div className="embed-editor_size-row">
+        <GroupLabel
+          label="Direction"
+          props={['grid-auto-flow']}
+          {...labelProps}
+          onClear={() => clearProp('grid-auto-flow')}
+        />
+        <GridDirectionControl
+          value={resolvedValue(read, 'grid-auto-flow')}
+          busy={busy}
+          onSet={(next) => setProp('grid-auto-flow', next, false)}
+          onCommitCustom={(next, important) => setProp('grid-auto-flow', next, important)}
+        />
+      </div>
+      <GridAlignRow props={props} />
+      <ContentRow label="Columns" prop="justify-content" vertical={false} props={props} />
+      <ContentRow label="Rows" prop="align-content" vertical props={props} />
+      {settingsOpen ? (
+        <GridSettings
+          read={read}
+          busy={busy}
+          setProp={setProp}
+          clearProp={clearProp}
+          onProvenance={props.onProvenance}
+          onSelectSelector={props.onSelectSelector}
+          onClose={() => setSettingsOpen(false)}
+        />
+      ) : undefined}
+    </>
+  );
+}
 
-  // Rich "Configure grid" tooltip on the gear, shown after a short hover (matches the
-  // Direction / Content segmented tooltips instead of the OS-native `title`).
+// Columns / Rows track counts and the gear that opens the Configure-grid modal.
+function GridTracksRow({
+  props,
+  onConfigure,
+}: {
+  props: GridControlsProps;
+  onConfigure: () => void;
+}) {
+  const { read, busy, setProp, clearProp } = props;
+  const labelProps = {
+    read,
+    busy,
+    onProvenance: props.onProvenance,
+    onSelectSelector: props.onSelectSelector,
+  };
+  const columnsRaw = resolvedValue(read, 'grid-template-columns');
+  const rowsRaw = resolvedValue(read, 'grid-template-rows');
+  // The gear lights up when a track list isn't just N equal tracks — those can't be
+  // represented as a count, so per-track sizing / reordering lives in the modal.
+  const customTracks =
+    (!!columnsRaw && !isUniformTracks(columnsRaw)) || (!!rowsRaw && !isUniformTracks(rowsRaw));
+  return (
+    <div className="embed-editor_size-row embed-editor_bg-row-top">
+      <GroupLabel
+        label="Grid"
+        props={['grid-template-columns', 'grid-template-rows']}
+        {...labelProps}
+        onClear={() => clearProp(['grid-template-columns', 'grid-template-rows'])}
+      />
+      <div className="embed-editor_grid-tracks">
+        <div className="embed-editor_gap-cell">
+          {/* Always the track COUNT — changing it adds/removes tracks while keeping the
+              earlier tracks' sizes. Per-track values live behind the configure gear. */}
+          <CountField
+            value={countTracks(columnsRaw)}
+            busy={busy}
+            ariaLabel="Grid columns"
+            onCommit={(count) =>
+              setProp('grid-template-columns', repeatTracks(count, NEW_COLUMN), false)
+            }
+          />
+          <GroupLabel
+            label="Columns"
+            props={['grid-template-columns']}
+            {...labelProps}
+            onClear={() => clearProp('grid-template-columns')}
+          />
+        </div>
+        <div className="embed-editor_gap-cell">
+          <CountField
+            value={countTracks(rowsRaw)}
+            busy={busy}
+            ariaLabel="Grid rows"
+            onCommit={(count) => setProp('grid-template-rows', repeatTracks(count, NEW_ROW), false)}
+          />
+          <GroupLabel
+            label="Rows"
+            props={['grid-template-rows']}
+            {...labelProps}
+            onClear={() => clearProp('grid-template-rows')}
+          />
+        </div>
+        <ConfigureGridButton busy={busy} customTracks={customTracks} onOpen={onConfigure} />
+      </div>
+    </div>
+  );
+}
+
+// The gear, with a rich "Configure grid" tooltip shown after a short hover (matches the
+// Direction / Content segmented tooltips instead of the OS-native `title`).
+function ConfigureGridButton({
+  busy,
+  customTracks,
+  onOpen,
+}: {
+  busy: boolean;
+  customTracks: boolean;
+  onOpen: () => void;
+}) {
   const gearRef = useRef<HTMLButtonElement>(null);
   const [gearTip, setGearTip] = useState(false);
-  const gearTimer = useRef<number | null>(null);
+  const gearTimer = useRef<number | undefined>(undefined);
   const clearGearTimer = () => {
-    if (gearTimer.current != null) {
+    if (gearTimer.current !== undefined) {
       window.clearTimeout(gearTimer.current);
-      gearTimer.current = null;
+      gearTimer.current = undefined;
     }
   };
   useEffect(() => clearGearTimer, []);
+  return (
+    <>
+      <button
+        ref={gearRef}
+        type="button"
+        className={
+          'embed-editor_icon-btn embed-editor_grid-gear ' + (customTracks ? 'is-active' : '')
+        }
+        disabled={busy}
+        aria-label="Configure grid"
+        onMouseEnter={() => {
+          clearGearTimer();
+          gearTimer.current = window.setTimeout(() => setGearTip(true), 500);
+        }}
+        onMouseLeave={() => {
+          clearGearTimer();
+          setGearTip(false);
+        }}
+        onClick={() => {
+          clearGearTimer();
+          setGearTip(false);
+          onOpen();
+        }}
+      >
+        <CustomizeIcon />
+      </button>
+      {gearTip && gearRef.current ? (
+        <HoverTooltip anchor={gearRef.current}>Configure grid</HoverTooltip>
+      ) : undefined}
+    </>
+  );
+}
 
+// Align: the preview box and the X (justify-items) / Y (align-items) axis dropdowns.
+function GridAlignRow({ props }: { props: GridControlsProps }) {
+  const { read, busy, setProp, clearProp, liveSetProp } = props;
   const alignAxis = (axis: 'X' | 'Y', prop: string) => (
     <GridAlignAxis
       axis={axis}
       prop={prop}
-      value={val(prop).toLowerCase()}
+      value={resolvedValue(read, prop).toLowerCase()}
       busy={busy}
       read={read}
-      onSet={(v) => setProp(prop, v, false)}
-      onPreview={(v) => liveSetProp(prop, v, false)}
+      onSet={(next) => setProp(prop, next, false)}
+      onPreview={(next) => liveSetProp(prop, next, false)}
       onClear={() => clearProp(prop)}
-      onProvenance={onProvenance}
-      onSelectSelector={onSelectSelector}
+      onProvenance={props.onProvenance}
+      onSelectSelector={props.onSelectSelector}
     />
   );
-  // Content distribution as a Webflow-style icon segmented control. `vertical` rotates
-  // the glyphs for the Rows (align-content) axis; the row's label owns clear/provenance.
-  const contentRow = (label: string, prop: string, vertical: boolean) => (
+  return (
+    <div className="embed-editor_size-row embed-editor_bg-row-top embed-editor_align-row">
+      {/* Inert caption — the X / Y labels below own clear / provenance per axis. */}
+      <FieldLabel
+        className="embed-editor_size-label"
+        active={false}
+        disabled={busy}
+        onReset={() => {}}
+        tooltip={<PropTip props={['justify-items', 'align-items']} />}
+      >
+        Align
+      </FieldLabel>
+      <div className="embed-editor_align">
+        <GridAlignBox
+          justifyItems={gridKeyword(resolvedValue(read, 'justify-items').toLowerCase())}
+          alignItems={gridKeyword(resolvedValue(read, 'align-items').toLowerCase())}
+          busy={busy}
+          onSet={(prop, next) => setProp(prop, next, false)}
+        />
+        <div className="embed-editor_align-axes">
+          {alignAxis('X', 'justify-items')}
+          {alignAxis('Y', 'align-items')}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Content distribution as a Webflow-style icon segmented control. `vertical` rotates
+// the glyphs for the Rows (align-content) axis; the row's label owns clear/provenance.
+function ContentRow({
+  label,
+  prop,
+  vertical,
+  props,
+}: {
+  label: string;
+  prop: string;
+  vertical: boolean;
+  props: GridControlsProps;
+}) {
+  const { read, busy, setProp, clearProp } = props;
+  return (
     <div className="embed-editor_size-row">
       <GroupLabel
         label={label}
@@ -1250,157 +1473,18 @@ export default function GridControls({
         read={read}
         busy={busy}
         onClear={() => clearProp(prop)}
-        onProvenance={onProvenance}
-        onSelectSelector={onSelectSelector}
+        onProvenance={props.onProvenance}
+        onSelectSelector={props.onSelectSelector}
       />
       <GridContentControl
-        value={val(prop)}
+        value={resolvedValue(read, prop)}
         prop={prop}
         vertical={vertical}
         ariaLabel={label}
         busy={busy}
-        onSet={(v) => setProp(prop, v, false)}
-        onCommitCustom={(v, imp) => setProp(prop, v, imp)}
+        onSet={(next) => setProp(prop, next, false)}
+        onCommitCustom={(next, important) => setProp(prop, next, important)}
       />
     </div>
-  );
-
-  return (
-    <>
-      <div className="embed-editor_size-row embed-editor_bg-row-top">
-        <GroupLabel
-          label="Grid"
-          props={['grid-template-columns', 'grid-template-rows']}
-          read={read}
-          busy={busy}
-          onClear={() => clearProp(['grid-template-columns', 'grid-template-rows'])}
-          onProvenance={onProvenance}
-          onSelectSelector={onSelectSelector}
-        />
-        <div className="embed-editor_grid-tracks">
-          <div className="embed-editor_gap-cell">
-            {/* Always the track COUNT — changing it adds/removes tracks while keeping the
-                earlier tracks' sizes. Per-track values live behind the configure gear. */}
-            <CountField
-              value={cols}
-              busy={busy}
-              ariaLabel="Grid columns"
-              onCommit={(n) => setProp('grid-template-columns', repeatTracks(n, NEW_COLUMN), false)}
-            />
-            <GroupLabel
-              label="Columns"
-              props={['grid-template-columns']}
-              read={read}
-              busy={busy}
-              onClear={() => clearProp('grid-template-columns')}
-              onProvenance={onProvenance}
-              onSelectSelector={onSelectSelector}
-            />
-          </div>
-          <div className="embed-editor_gap-cell">
-            <CountField
-              value={rows}
-              busy={busy}
-              ariaLabel="Grid rows"
-              onCommit={(n) => setProp('grid-template-rows', repeatTracks(n, NEW_ROW), false)}
-            />
-            <GroupLabel
-              label="Rows"
-              props={['grid-template-rows']}
-              read={read}
-              busy={busy}
-              onClear={() => clearProp('grid-template-rows')}
-              onProvenance={onProvenance}
-              onSelectSelector={onSelectSelector}
-            />
-          </div>
-          <button
-            ref={gearRef}
-            type="button"
-            className={
-              'embed-editor_icon-btn embed-editor_grid-gear ' + (customTracks ? 'is-active' : '')
-            }
-            disabled={busy}
-            aria-label="Configure grid"
-            onMouseEnter={() => {
-              clearGearTimer();
-              gearTimer.current = window.setTimeout(() => setGearTip(true), 500);
-            }}
-            onMouseLeave={() => {
-              clearGearTimer();
-              setGearTip(false);
-            }}
-            onClick={() => {
-              clearGearTimer();
-              setGearTip(false);
-              setSettingsOpen(true);
-            }}
-          >
-            <CustomizeIcon />
-          </button>
-          {gearTip && gearRef.current ? (
-            <HoverTooltip anchor={gearRef.current}>Configure grid</HoverTooltip>
-          ) : null}
-        </div>
-      </div>
-
-      <div className="embed-editor_size-row">
-        <GroupLabel
-          label="Direction"
-          props={['grid-auto-flow']}
-          read={read}
-          busy={busy}
-          onClear={() => clearProp('grid-auto-flow')}
-          onProvenance={onProvenance}
-          onSelectSelector={onSelectSelector}
-        />
-        <GridDirectionControl
-          value={flow}
-          busy={busy}
-          onSet={(v) => setProp('grid-auto-flow', v, false)}
-          onCommitCustom={(v, important) => setProp('grid-auto-flow', v, important)}
-        />
-      </div>
-
-      <div className="embed-editor_size-row embed-editor_bg-row-top embed-editor_align-row">
-        {/* Inert caption — the X / Y labels below own clear / provenance per axis. */}
-        <FieldLabel
-          className="embed-editor_size-label"
-          active={false}
-          disabled={busy}
-          onReset={() => {}}
-          tooltip={<PropTip props={['justify-items', 'align-items']} />}
-        >
-          Align
-        </FieldLabel>
-        <div className="embed-editor_align">
-          <GridAlignBox
-            justifyItems={gridKeyword(val('justify-items').toLowerCase())}
-            alignItems={gridKeyword(val('align-items').toLowerCase())}
-            busy={busy}
-            onSet={(p, v) => setProp(p, v, false)}
-          />
-          <div className="embed-editor_align-axes">
-            {alignAxis('X', 'justify-items')}
-            {alignAxis('Y', 'align-items')}
-          </div>
-        </div>
-      </div>
-
-      {contentRow('Columns', 'justify-content', false)}
-      {contentRow('Rows', 'align-content', true)}
-
-      {settingsOpen ? (
-        <GridSettings
-          read={read}
-          busy={busy}
-          setProp={setProp}
-          clearProp={clearProp}
-          onProvenance={onProvenance}
-          onSelectSelector={onSelectSelector}
-          onClose={() => setSettingsOpen(false)}
-        />
-      ) : null}
-    </>
   );
 }

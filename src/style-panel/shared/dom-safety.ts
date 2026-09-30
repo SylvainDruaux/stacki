@@ -12,7 +12,7 @@
 // Scope: patches Node.prototype inside the extension's own iframe only. Install once, before
 // React mounts.
 
-function describe(node: Node | null | undefined): string {
+function describe(node: Node | undefined): string {
   if (!node) {
     return 'none';
   }
@@ -44,7 +44,7 @@ export function installDomSafetyGuards(): void {
       console.warn('[moden] removeChild guard — node already detached:', {
         expectedParent: describe(this),
         child: describe(child),
-        actualParent: describe(child.parentNode),
+        actualParent: describe(child.parentNode ?? undefined),
       });
       return child;
     }
@@ -55,7 +55,8 @@ export function installDomSafetyGuards(): void {
   Node.prototype.insertBefore = function insertBeforeGuarded<T extends Node>(
     this: Node,
     node: T,
-    ref: Node | null,
+    // The platform's own parameter type: the DOM passes `null` to mean "append".
+    ref: Parameters<Node['insertBefore']>[1],
   ): T {
     if (ref && ref.parentNode !== this) {
       // The reference node moved — append instead of crashing on a stale reference.
@@ -63,9 +64,10 @@ export function installDomSafetyGuards(): void {
         parent: describe(this),
         node: describe(node),
         ref: describe(ref),
-        refActualParent: describe(ref.parentNode),
+        refActualParent: describe(ref.parentNode ?? undefined),
       });
-      return originalInsertBefore.call(this, node, null) as T;
+      // Appending is what insertBefore does with no reference node.
+      return this.appendChild(node);
     }
     return originalInsertBefore.call(this, node, ref) as T;
   };

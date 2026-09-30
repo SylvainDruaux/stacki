@@ -2,7 +2,9 @@ import { useEffect, useRef, useState } from 'react';
 import type {
   CSSProperties,
   KeyboardEvent as ReactKeyboardEvent,
+  MutableRefObject,
   PointerEvent as ReactPointerEvent,
+  RefObject,
 } from 'react';
 
 function sliderStyle(percent: number): CSSProperties & { readonly '--pct': string } {
@@ -49,47 +51,149 @@ export default function DragSlider({
     }
   }, [value]);
 
-  const valueAt = (clientX: number): number => {
-    const track = trackRef.current;
-    if (!track) {
-      return local;
-    }
-    const rect = track.getBoundingClientRect();
-    if (rect.width <= 0) {
-      return local;
-    }
-    const ratio = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width));
-    return Math.round(min + ratio * (max - min));
-  };
+  const { down, move, up, key } = useSliderDrag({
+    trackRef,
+    dragging,
+    local,
+    setLocal,
+    min,
+    max,
+    disabled,
+    onPreview,
+    onInput,
+    onCommit,
+  });
+  const percent = max > min ? Math.min(100, Math.max(0, ((local - min) / (max - min)) * 100)) : 0;
+  return (
+    <div
+      ref={trackRef}
+      className={['u-drag-slider', disabled ? 'is-disabled' : '', className]
+        .filter(Boolean)
+        .join(' ')}
+      role="slider"
+      tabIndex={disabled ? -1 : 0}
+      aria-label={ariaLabel}
+      aria-valuemin={min}
+      aria-valuemax={max}
+      aria-valuenow={local}
+      aria-disabled={disabled || undefined}
+      style={sliderStyle(percent)}
+      onPointerDown={down}
+      onPointerMove={move}
+      onPointerUp={up}
+      onPointerCancel={up}
+      onKeyDown={key}
+    >
+      <span className="u-drag-slider-fill" aria-hidden="true" />
+      <span className="u-drag-slider-thumb" aria-hidden="true" />
+    </div>
+  );
+}
 
-  // A pointer fires far faster than Webflow's async style write can drain (high-Hz
-  // mice/trackpads emit many moves per frame). Emitting onInput on every move backs
-  // the writes up into a growing lag. So we coalesce: the thumb (local state) updates
-  // once per animation frame, and the actual write is time-throttled to WRITE_MS —
-  // fast enough to feel live, slow enough never to queue. The final position always
-  // commits on release, so no move is lost.
+// Arrow keys, Home and End commit a clamped value at once.
+function sliderKeyHandler(drag: SliderDrag) {
+  return (event: ReactKeyboardEvent<HTMLDivElement>) => {
+    if (drag.disabled) {
+      return;
+    }
+    const next = keyedValue(event, drag.local, drag.min, drag.max);
+    if (next === undefined) {
+      return;
+    }
+    event.preventDefault();
+    const clamped = Math.min(drag.max, Math.max(drag.min, next));
+    drag.setLocal(clamped);
+    drag.onCommit(clamped);
+  };
+}
+
+// The value a key asks for: arrows step by one (Shift = ×10), Home/End jump to the
+// ends. Undefined for any other key.
+function keyedValue(
+  event: ReactKeyboardEvent<HTMLDivElement>,
+  local: number,
+  min: number,
+  max: number,
+): number | undefined {
+  const step = event.shiftKey ? 10 : 1;
+  if (event.key === 'ArrowLeft' || event.key === 'ArrowDown') {
+    return local - step;
+  }
+  if (event.key === 'ArrowRight' || event.key === 'ArrowUp') {
+    return local + step;
+  }
+  if (event.key === 'Home') {
+    return min;
+  }
+  if (event.key === 'End') {
+    return max;
+  }
+  return undefined;
+}
+
+// The slider value under a pointer at `clientX`; `fallback` while the track can't be
+// measured.
+function valueAtX(
+  track: HTMLDivElement | undefined,
+  clientX: number,
+  range: { readonly min: number; readonly max: number; readonly fallback: number },
+): number {
+  if (!track) {
+    return range.fallback;
+  }
+  const rect = track.getBoundingClientRect();
+  if (rect.width <= 0) {
+    return range.fallback;
+  }
+  const ratio = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width));
+  return Math.round(range.min + ratio * (range.max - range.min));
+}
+
+type SliderDrag = {
+  readonly trackRef: RefObject<HTMLDivElement>;
+  readonly dragging: MutableRefObject<boolean>;
+  readonly local: number;
+  readonly setLocal: (value: number) => void;
+  readonly min: number;
+  readonly max: number;
+  readonly disabled: boolean;
+  readonly onPreview: ((n: number) => void) | undefined;
+  readonly onInput: (n: number) => void;
+  readonly onCommit: (n: number) => void;
+};
+
+// A pointer fires far faster than Webflow's async style write can drain (high-Hz
+// mice/trackpads emit many moves per frame). Emitting onInput on every move backs
+// the writes up into a growing lag. So we coalesce: the thumb (local state) updates
+// once per animation frame, and the actual write is time-throttled to WRITE_MS —
+// fast enough to feel live, slow enough never to queue. The final position always
+// commits on release, so no move is lost.
+function useSliderDrag(drag: SliderDrag) {
+  const { trackRef, dragging, local, setLocal, min, max, disabled } = drag;
   const WRITE_MS = 50;
-  const rafId = useRef<number | null>(null);
+  const rafId = useRef<number | undefined>(undefined);
   const latestX = useRef(0);
   const lastWriteAt = useRef(0);
   useEffect(
     () => () => {
-      if (rafId.current != null) {
+      if (rafId.current !== undefined) {
         cancelAnimationFrame(rafId.current);
       }
     },
     [],
   );
+  const valueAt = (clientX: number) =>
+    valueAtX(trackRef.current ?? undefined, clientX, { min, max, fallback: local });
 
   const frame = () => {
-    rafId.current = null;
+    rafId.current = undefined;
     const next = valueAt(latestX.current);
     setLocal(next);
-    onPreview?.(next); // every frame — cheap UI (number readout) tracks the thumb
+    drag.onPreview?.(next); // every frame — cheap UI (number readout) tracks the thumb
     const now = performance.now();
     if (now - lastWriteAt.current >= WRITE_MS) {
       lastWriteAt.current = now;
-      onInput(next);
+      drag.onInput(next);
     }
   };
   const down = (event: ReactPointerEvent<HTMLDivElement>) => {
@@ -104,8 +208,8 @@ export default function DragSlider({
     lastWriteAt.current = performance.now();
     const next = valueAt(event.clientX);
     setLocal(next);
-    onPreview?.(next);
-    onInput(next);
+    drag.onPreview?.(next);
+    drag.onInput(next);
   };
   const move = (event: ReactPointerEvent<HTMLDivElement>) => {
     // Once a drag is in progress (pointer captured), keep tracking even if `disabled`
@@ -115,7 +219,7 @@ export default function DragSlider({
       return;
     }
     latestX.current = event.clientX;
-    if (rafId.current == null) {
+    if (rafId.current === undefined) {
       rafId.current = requestAnimationFrame(frame);
     }
   };
@@ -124,61 +228,15 @@ export default function DragSlider({
       return;
     }
     event.currentTarget.releasePointerCapture(event.pointerId);
-    if (rafId.current != null) {
+    if (rafId.current !== undefined) {
       cancelAnimationFrame(rafId.current);
-      rafId.current = null;
+      rafId.current = undefined;
     }
     dragging.current = false;
     const next = valueAt(event.clientX);
     setLocal(next);
-    onCommit(next);
+    drag.onCommit(next);
   };
-  const key = (event: ReactKeyboardEvent<HTMLDivElement>) => {
-    if (disabled) {
-      return;
-    }
-    const step = event.shiftKey ? 10 : 1;
-    let next: number | null = null;
-    if (event.key === 'ArrowLeft' || event.key === 'ArrowDown') {
-      next = local - step;
-    } else if (event.key === 'ArrowRight' || event.key === 'ArrowUp') {
-      next = local + step;
-    } else if (event.key === 'Home') {
-      next = min;
-    } else if (event.key === 'End') {
-      next = max;
-    }
-    if (next == null) {
-      return;
-    }
-    event.preventDefault();
-    const clamped = Math.min(max, Math.max(min, next));
-    setLocal(clamped);
-    onCommit(clamped);
-  };
-  const pct = max > min ? Math.min(100, Math.max(0, ((local - min) / (max - min)) * 100)) : 0;
-  return (
-    <div
-      ref={trackRef}
-      className={['u-drag-slider', disabled ? 'is-disabled' : '', className]
-        .filter(Boolean)
-        .join(' ')}
-      role="slider"
-      tabIndex={disabled ? -1 : 0}
-      aria-label={ariaLabel}
-      aria-valuemin={min}
-      aria-valuemax={max}
-      aria-valuenow={local}
-      aria-disabled={disabled || undefined}
-      style={sliderStyle(pct)}
-      onPointerDown={down}
-      onPointerMove={move}
-      onPointerUp={up}
-      onPointerCancel={up}
-      onKeyDown={key}
-    >
-      <span className="u-drag-slider-fill" aria-hidden="true" />
-      <span className="u-drag-slider-thumb" aria-hidden="true" />
-    </div>
-  );
+  const key = sliderKeyHandler(drag);
+  return { down, move, up, key };
 }

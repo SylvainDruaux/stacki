@@ -48,7 +48,7 @@ export function PositionGrid({
 // A number field with a unit suffix (used for Left/Top and a stop's position).
 // The value carries its unit in the CSS but not in the field — you type `50`,
 // not `50%` — so the unit is put back on the way out.
-export function NumField({
+export function NumberField({
   value,
   unit,
   label,
@@ -66,21 +66,21 @@ export function NumField({
   onLive: (v: string) => void;
   onCommit: (v: string) => void;
 }) {
-  const num = value.replace(/[a-z%]+$/i, '').trim();
-  const withUnit = (t: string) => {
-    const s = t.trim();
-    return s === '' ? '' : /[a-z%]$/i.test(s) ? s : `${s}${unit}`;
+  const number = value.replace(/[a-z%]+$/i, '').trim();
+  const withUnit = (text: string) => {
+    const trimmed = text.trim();
+    return trimmed === '' ? '' : /[a-z%]$/i.test(trimmed) ? trimmed : `${trimmed}${unit}`;
   };
   return (
     <LiveInput
-      value={num}
+      value={number}
       busy={busy}
       ariaLabel={label}
       prop={prop}
       suffix={unit}
       wrapClassName="embed-editor_field embed-editor_grad-num"
-      onLive={(v) => onLive(withUnit(v))}
-      onCommit={(v) => onCommit(withUnit(v))}
+      onLive={(value) => onLive(withUnit(value))}
+      onCommit={(value) => onCommit(withUnit(value))}
       onVariablePick={(binding) => onCommit(binding)}
     />
   );

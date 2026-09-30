@@ -69,63 +69,67 @@ function isFilterType(value: string): value is FilterType {
 }
 
 const DROP_DEFAULT = { x: '0px', y: '2px', blur: '5px', color: 'rgba(0, 0, 0, 0.7)' };
-const round = (n: number) => Math.round(n * 100) / 100;
+const round = (value: number) => Math.round(value * 100) / 100;
 
-const fnName = (fn: string): string => fn.slice(0, fn.indexOf('(')).trim().toLowerCase();
-const fnInner = (fn: string): string => {
-  const o = fn.indexOf('(');
-  const c = fn.lastIndexOf(')');
-  return o < 0 || c <= o ? '' : fn.slice(o + 1, c).trim();
+const functionName = (call: string): string =>
+  call.slice(0, call.indexOf('(')).trim().toLowerCase();
+const innerOf = (call: string): string => {
+  const openIndex = call.indexOf('(');
+  const closeIndex = call.lastIndexOf(')');
+  return openIndex < 0 || closeIndex <= openIndex
+    ? ''
+    : call.slice(openIndex + 1, closeIndex).trim();
 };
-const isLength = (t: string): boolean => /^-?[\d.]+(px|em|rem|%|vw|vh|vmin|vmax)?$/i.test(t.trim());
+const isLength = (token: string): boolean =>
+  /^-?[\d.]+(px|em|rem|%|vw|vh|vmin|vmax)?$/i.test(token.trim());
 
 // Normalize a value filter's argument to the meta unit: %-filters store a percentage
 // (a unitless `1.5` → `150%`), deg-filters store degrees, blur stores px. A value we
 // can't parse (var()/calc()) is kept verbatim.
 function normalizeAmount(type: FilterType, inner: string): string {
   const meta = FILTER_META[type];
-  const m = inner.trim().match(/^(-?[\d.]+)(%|px|deg|rad|turn|grad|em|rem)?$/i);
-  if (!m) {
+  const match = inner.trim().match(/^(-?[\d.]+)(%|px|deg|rad|turn|grad|em|rem)?$/i);
+  if (!match) {
     return inner.trim();
   }
-  let n = parseFloat(m[1] ?? '');
-  const unit = (m[2] || '').toLowerCase();
+  let amount = parseFloat(match[1] ?? '');
+  const unit = (match[2] || '').toLowerCase();
   if (meta.unit === '%') {
-    return `${round(unit === '%' ? n : n * 100)}%`;
+    return `${round(unit === '%' ? amount : amount * 100)}%`;
   }
   if (meta.unit === 'deg') {
     if (unit === 'turn') {
-      n *= 360;
+      amount *= 360;
     } else if (unit === 'grad') {
-      n *= 0.9;
+      amount *= 0.9;
     } else if (unit === 'rad') {
-      n = (n * 180) / Math.PI;
+      amount = (amount * 180) / Math.PI;
     }
-    return `${round(n)}deg`;
+    return `${round(amount)}deg`;
   }
-  return `${round(n)}${unit || 'px'}`;
+  return `${round(amount)}${unit || 'px'}`;
 }
 
 /** Parse a `filter` value into ordered layers (`none`/'' → empty). */
 export function parseFilters(value: string): Filter[] {
-  const v = value.trim();
-  if (!v || v.toLowerCase() === 'none') {
+  const trimmed = value.trim();
+  if (!trimmed || trimmed.toLowerCase() === 'none') {
     return [];
   }
   const out: Filter[] = [];
-  for (const fn of splitTopLevelSpaces(v).filter((f) => f.includes('('))) {
-    const name = fnName(fn);
+  for (const call of splitTopLevelSpaces(trimmed).filter((token) => token.includes('('))) {
+    const name = functionName(call);
     if (!isFilterType(name)) {
       continue;
     }
     if (name === 'drop-shadow') {
       const lens: string[] = [];
       let color = '';
-      for (const p of splitTopLevelSpaces(fnInner(fn))) {
-        if (isLength(p)) {
-          lens.push(p);
+      for (const argument of splitTopLevelSpaces(innerOf(call))) {
+        if (isLength(argument)) {
+          lens.push(argument);
         } else {
-          color = p;
+          color = argument;
         }
       }
       out.push({
@@ -137,21 +141,21 @@ export function parseFilters(value: string): Filter[] {
         color: color || DROP_DEFAULT.color,
       });
     } else {
-      out.push({ ...blankFilter(name), amount: normalizeAmount(name, fnInner(fn)) });
+      out.push({ ...blankFilter(name), amount: normalizeAmount(name, innerOf(call)) });
     }
   }
   return out;
 }
 
-function serializeOne(f: Filter): string {
-  if (f.type === 'drop-shadow') {
-    const x = f.x.trim() || '0px',
-      y = f.y.trim() || '0px',
-      blur = f.blur.trim() || '0px';
-    const color = f.color.trim() || DROP_DEFAULT.color;
+function serializeOne(filter: Filter): string {
+  if (filter.type === 'drop-shadow') {
+    const x = filter.x.trim() || '0px',
+      y = filter.y.trim() || '0px',
+      blur = filter.blur.trim() || '0px';
+    const color = filter.color.trim() || DROP_DEFAULT.color;
     return `drop-shadow(${x} ${y} ${blur} ${color})`;
   }
-  return `${f.type}(${f.amount.trim() || FILTER_META[f.type].def})`;
+  return `${filter.type}(${filter.amount.trim() || FILTER_META[filter.type].def})`;
 }
 
 /** Serialize layers back to a `filter` value ('' when empty). */
@@ -177,10 +181,11 @@ export function retypeFilter(type: FilterType): Filter {
 }
 
 /** A short label for a collapsed row. */
-export function filterLabel(f: Filter): string {
-  const meta = FILTER_META[f.type];
-  if (f.type === 'drop-shadow') {
-    return `${meta.label}: ${[f.x, f.y, f.blur].map((s) => s.trim() || '0px').join(' ')}`;
+export function filterLabel(filter: Filter): string {
+  const meta = FILTER_META[filter.type];
+  if (filter.type === 'drop-shadow') {
+    const lengths = [filter.x, filter.y, filter.blur].map((length) => length.trim() || '0px');
+    return `${meta.label}: ${lengths.join(' ')}`;
   }
-  return `${meta.label}: ${f.amount.trim() || meta.def}`;
+  return `${meta.label}: ${filter.amount.trim() || meta.def}`;
 }

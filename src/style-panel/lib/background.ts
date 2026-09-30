@@ -31,7 +31,7 @@ export type BackgroundLonghands = {
 export function splitTopLevelCommas(value: string): string[] {
   const parts: string[] = [];
   let depth = 0;
-  let quote: string | null = null;
+  let quote: string | undefined;
   let start = 0;
   for (let i = 0; i < value.length; i += 1) {
     const ch = value[i];
@@ -39,7 +39,7 @@ export function splitTopLevelCommas(value: string): string[] {
       if (ch === '\\') {
         i += 1;
       } else if (ch === quote) {
-        quote = null;
+        quote = undefined;
       }
       continue;
     }
@@ -60,39 +60,39 @@ export function splitTopLevelCommas(value: string): string[] {
 
 /** A "color overlay" is a solid-fill layer, expressed in CSS as a linear-gradient
  *  whose stops are all the SAME colour (Webflow's Color-overlay layer type). Returns
- *  that colour, or null when the value isn't a solid-colour gradient. */
-export function colorOverlayOf(image: string): string | null {
+ *  that colour, or undefined when the value isn't a solid-colour gradient. */
+export function colorOverlayOf(image: string): string | undefined {
   const match = image.trim().match(/^linear-gradient\((.*)\)$/is);
   if (!match) {
-    return null;
+    return undefined;
   }
   const parts = splitTopLevelCommas(match[1] ?? '');
   if (!parts.length) {
-    return null;
+    return undefined;
   }
-  const isDirection = (s: string) =>
-    /^to\s/i.test(s.trim()) || /^-?[\d.]+(deg|grad|rad|turn)$/i.test(s.trim());
+  const isDirection = (text: string) =>
+    /^to\s/i.test(text.trim()) || /^-?[\d.]+(deg|grad|rad|turn)$/i.test(text.trim());
   const stops = isDirection(parts[0] ?? '') ? parts.slice(1) : parts;
   if (stops.length < 2) {
-    return null;
+    return undefined;
   }
   // Strip a trailing stop position (e.g. `#000 0%`, `red 10px`) to compare colours.
-  const colours = stops.map((s) =>
-    s
+  const colours = stops.map((stop) =>
+    stop
       .trim()
       .replace(/\s+-?[\d.]+(%|px|em|rem|vw|vh|vmin|vmax)?$/i, '')
       .trim(),
   );
   const first = colours[0];
-  return first && colours.every((c) => c === first) ? first : null;
+  return first && colours.every((colour) => colour === first) ? first : undefined;
 }
 
 /** Build a color-overlay layer image from a single colour. Matches Webflow's
  *  canonical solid-overlay serialization (explicit 180deg + duplicated stop) so
  *  Webflow's own panel has the best chance of categorizing it as a Color layer. */
 export function colorOverlayImage(color: string): string {
-  const c = color.trim() || '#000000';
-  return `linear-gradient(180deg, ${c}, ${c})`;
+  const trimmed = color.trim() || '#000000';
+  return `linear-gradient(180deg, ${trimmed}, ${trimmed})`;
 }
 
 /** Split on whitespace runs that are NOT inside parentheses, brackets or
@@ -100,41 +100,41 @@ export function colorOverlayImage(color: string): string {
 export function splitTopLevelSpaces(value: string): string[] {
   const parts: string[] = [];
   let depth = 0;
-  let quote: string | null = null;
-  let cur = '';
+  let quote: string | undefined;
+  let current = '';
   const chars = [...value.trim()];
   for (let i = 0; i < chars.length; i += 1) {
     const ch = chars[i] ?? '';
     if (quote) {
-      cur += ch;
+      current += ch;
       if (ch === '\\' && i + 1 < chars.length) {
-        cur += chars[i + 1];
+        current += chars[i + 1];
         i += 1;
       } else if (ch === quote) {
-        quote = null;
+        quote = undefined;
       }
       continue;
     }
     if (ch === '"' || ch === "'") {
       quote = ch;
-      cur += ch;
+      current += ch;
     } else if (ch === '(' || ch === '[') {
       depth += 1;
-      cur += ch;
+      current += ch;
     } else if (ch === ')' || ch === ']') {
       depth = Math.max(0, depth - 1);
-      cur += ch;
+      current += ch;
     } else if (/\s/.test(ch) && depth === 0) {
-      if (cur) {
-        parts.push(cur);
-        cur = '';
+      if (current) {
+        parts.push(current);
+        current = '';
       }
     } else {
-      cur += ch;
+      current += ch;
     }
   }
-  if (cur) {
-    parts.push(cur);
+  if (current) {
+    parts.push(current);
   }
   return parts;
 }
@@ -142,84 +142,45 @@ export function splitTopLevelSpaces(value: string): string[] {
 const REPEAT_KW = new Set(['repeat', 'repeat-x', 'repeat-y', 'no-repeat', 'space', 'round']);
 const ATTACH_KW = new Set(['scroll', 'fixed', 'local']);
 const BOX_KW = new Set(['border-box', 'padding-box', 'content-box']);
-const isImageToken = (t: string) =>
-  /^(url|(repeating-)?(linear|radial|conic)-gradient)\(/i.test(t) || t.toLowerCase() === 'none';
-const isPositionToken = (t: string) =>
-  /^(left|right|top|bottom|center)$/i.test(t) ||
-  /^-?[\d.]+(px|%|em|rem|vw|vh|vmin|vmax|ch|fr)?$/i.test(t);
+const isImageToken = (token: string) =>
+  /^(url|(repeating-)?(linear|radial|conic)-gradient)\(/i.test(token) ||
+  token.toLowerCase() === 'none';
+const isPositionToken = (token: string) =>
+  /^(left|right|top|bottom|center)$/i.test(token) ||
+  /^-?[\d.]+(px|%|em|rem|vw|vh|vmin|vmax|ch|fr)?$/i.test(token);
 
 /** Parse a `background` shorthand into the five longhands + the (single) color.
  *  Order-tolerant per CSS; a `pos / size` group is split on the top-level slash.
  *  Longhands only some layer sets come back ''; color only from the last layer. */
 export function splitBackgroundShorthand(bg: string): BackgroundLonghands & { color: string } {
-  const layerStrs = splitTopLevelCommas(bg);
+  const layerTexts = splitTopLevelCommas(bg);
   const images: string[] = [];
   const sizes: string[] = [];
   const positions: string[] = [];
   const repeats: string[] = [];
   const attachments: string[] = [];
   let color = '';
-  layerStrs.forEach((layerStr, li) => {
-    // Normalize `a / b` (with or without spaces around the slash) into tokens.
-    const tokens = splitTopLevelSpaces(layerStr.replace(/\s*\/\s*/g, ' / '));
-    let image = '';
-    let repeat = '';
-    let attachment = '';
-    const posTokens: string[] = [];
-    const sizeTokens: string[] = [];
-    let afterSlash = false;
-    for (const t of tokens) {
-      const lt = t.toLowerCase();
-      if (t === '/') {
-        afterSlash = true;
-        continue;
-      }
-      if (isImageToken(t)) {
-        image = t;
-        continue;
-      }
-      if (REPEAT_KW.has(lt)) {
-        repeat = repeat ? `${repeat} ${lt}` : lt;
-        continue;
-      }
-      if (ATTACH_KW.has(lt)) {
-        attachment = lt;
-        continue;
-      }
-      if (BOX_KW.has(lt)) {
-        continue;
-      } // origin / clip — not modeled here
-      if (afterSlash) {
-        sizeTokens.push(t);
-        continue;
-      }
-      if (isPositionToken(t)) {
-        posTokens.push(t);
-        continue;
-      }
-      // A leftover (non-position) token in the LAST layer is the background-color
-      // (covers named colours like `white` too, without a colour lookup table).
-      if (li === layerStrs.length - 1) {
-        color = t;
-        continue;
-      }
-      posTokens.push(t); // best effort for a stray token in a non-final layer
+  layerTexts.forEach((layerText, layerIndex) => {
+    const isLastLayer = layerIndex === layerTexts.length - 1;
+    const layer = parseBackgroundLayer(layerText, { isLastLayer });
+    if (layer.color) {
+      color = layer.color;
     }
     // A layer with no image is just the trailing colour — don't emit it as a layer.
-    if (!image) {
-      if (li === layerStrs.length - 1 && !color) {
-        color = posTokens.join(' ').trim();
+    if (!layer.image) {
+      if (isLastLayer && !color) {
+        color = layer.positionTokens.join(' ').trim();
       }
       return;
     }
-    images.push(image || 'none');
-    sizes.push(sizeTokens.join(' '));
-    positions.push(posTokens.join(' '));
-    repeats.push(repeat);
-    attachments.push(attachment);
+    images.push(layer.image || 'none');
+    sizes.push(layer.sizeTokens.join(' '));
+    positions.push(layer.positionTokens.join(' '));
+    repeats.push(layer.repeat);
+    attachments.push(layer.attachment);
   });
   const join = (list: string[], initial: string) =>
-    list.some((v) => v.trim()) ? list.map((v) => v.trim() || initial).join(', ') : '';
+    list.some((item) => item.trim()) ? list.map((item) => item.trim() || initial).join(', ') : '';
   return {
     image: images.join(', '),
     size: join(sizes, 'auto'),
@@ -230,32 +191,94 @@ export function splitBackgroundShorthand(bg: string): BackgroundLonghands & { co
   };
 }
 
+type BackgroundLayerTokens = {
+  image: string;
+  repeat: string;
+  attachment: string;
+  positionTokens: string[];
+  sizeTokens: string[];
+  /** The leftover token that names the background colour ('' when none). */
+  color: string;
+};
+
+// Sort one layer's tokens into its longhands. Only the LAST layer may carry the colour.
+function parseBackgroundLayer(
+  layerText: string,
+  options: { readonly isLastLayer: boolean },
+): BackgroundLayerTokens {
+  // Normalize `a / b` (with or without spaces around the slash) into tokens.
+  const tokens = splitTopLevelSpaces(layerText.replace(/\s*\/\s*/g, ' / '));
+  const layer: BackgroundLayerTokens = {
+    image: '',
+    repeat: '',
+    attachment: '',
+    positionTokens: [],
+    sizeTokens: [],
+    color: '',
+  };
+  let afterSlash = false;
+  for (const token of tokens) {
+    const lower = token.toLowerCase();
+    if (token === '/') {
+      afterSlash = true;
+    } else if (isImageToken(token)) {
+      layer.image = token;
+    } else if (REPEAT_KW.has(lower)) {
+      layer.repeat = layer.repeat ? `${layer.repeat} ${lower}` : lower;
+    } else if (ATTACH_KW.has(lower)) {
+      layer.attachment = lower;
+    } else if (BOX_KW.has(lower)) {
+      // Origin / clip — not modeled here.
+    } else if (afterSlash) {
+      layer.sizeTokens.push(token);
+    } else if (isPositionToken(token)) {
+      layer.positionTokens.push(token);
+    } else if (options.isLastLayer) {
+      // A leftover (non-position) token in the LAST layer is the background-color
+      // (covers named colours like `white` too, without a colour lookup table).
+      layer.color = token;
+    } else {
+      layer.positionTokens.push(token); // best effort for a stray token in a non-final layer
+    }
+  }
+  return layer;
+}
+
 /** Which kind of layer an image value is, from its function/keyword. */
 export function layerKind(image: string): LayerKind {
-  const v = image.trim().toLowerCase();
-  if (v.startsWith('url(')) {
+  const normalized = image.trim().toLowerCase();
+  if (normalized.startsWith('url(')) {
     return 'image';
   }
-  if (colorOverlayOf(image) != null) {
+  if (colorOverlayOf(image) !== undefined) {
     return 'color';
   }
-  if (v.startsWith('linear-gradient') || v.startsWith('repeating-linear-gradient')) {
+  if (
+    normalized.startsWith('linear-gradient') ||
+    normalized.startsWith('repeating-linear-gradient')
+  ) {
     return 'linear';
   }
-  if (v.startsWith('radial-gradient') || v.startsWith('repeating-radial-gradient')) {
+  if (
+    normalized.startsWith('radial-gradient') ||
+    normalized.startsWith('repeating-radial-gradient')
+  ) {
     return 'radial';
   }
-  if (v.startsWith('conic-gradient') || v.startsWith('repeating-conic-gradient')) {
+  if (
+    normalized.startsWith('conic-gradient') ||
+    normalized.startsWith('repeating-conic-gradient')
+  ) {
     return 'conic';
   }
   return 'other';
 }
 
-/** The file name inside a `url(…)`, or null when the value isn't a url(). */
-export function urlFileName(image: string): string | null {
+/** The file name inside a `url(…)`, or undefined when the value isn't a url(). */
+export function urlFileName(image: string): string | undefined {
   const match = image.match(/url\(\s*['"]?([^'")]+?)['"]?\s*\)/i);
   if (!match) {
-    return null;
+    return undefined;
   }
   const path = (match[1] ?? '').split('?')[0] ?? '';
   const file = path.split(/[\\/]/).pop() ?? path;
@@ -318,11 +341,11 @@ export function serializeLayers(layers: BgLayer[]): BackgroundLonghands {
     return { image: '', size: '', position: '', repeat: '', attachment: '' };
   }
   const list = (key: 'size' | 'position' | 'repeat' | 'attachment'): string =>
-    layers.some((l) => l[key].trim())
-      ? layers.map((l) => l[key].trim() || INITIAL[key]).join(', ')
+    layers.some((layer) => layer[key].trim())
+      ? layers.map((layer) => layer[key].trim() || INITIAL[key]).join(', ')
       : '';
   return {
-    image: layers.map((l) => l.image.trim()).join(', '),
+    image: layers.map((layer) => layer.image.trim()).join(', '),
     size: list('size'),
     position: list('position'),
     repeat: list('repeat'),

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import type { ReactNode } from 'react';
+import type { KeyboardEvent as ReactKeyboardEvent, ReactNode } from 'react';
 import Select from './components/Select';
 import FieldLabel from './components/FieldLabel';
 import { PropTip, ProvenanceLabel } from './components/PropTip';
@@ -20,7 +20,7 @@ import { commitInPlace } from './lib/commit-in-place';
 
 type SetProp = (prop: string, value: string, important: boolean) => void;
 type ClearProp = (prop: string | string[]) => void;
-type LiveSetProp = (prop: string, value: string | null, important: boolean) => void;
+type LiveSetProp = (prop: string, value: string | undefined, important: boolean) => void;
 type Read = (prop: string) => ResolvedProp | undefined;
 
 type Props = {
@@ -266,7 +266,7 @@ function parseImportant(input: string): { value: string; important: boolean } {
   }
   return { value: input.trim(), important: false };
 }
-const joinImportant = (value: string, important: boolean) =>
+const joinImportant = ({ value, important }: { value: string; important: boolean }) =>
   important ? `${value} !important` : value;
 
 type Display = { present: boolean; value: string; important: boolean };
@@ -280,7 +280,8 @@ function displayOf(resolved: ResolvedProp | undefined): Display {
       : resolved.winner;
   return { present: true, value: source.value, important: source.important };
 }
-const effVal = (read: Read, prop: string) => displayOf(read(prop)).value.trim().toLowerCase();
+const effectiveValue = (read: Read, prop: string) =>
+  displayOf(read(prop)).value.trim().toLowerCase();
 
 // ─────────────────────────── Live text field ───────────────────────────
 
@@ -300,39 +301,59 @@ function LiveField({
   placeholder: string;
   ariaLabel: string;
 } & Props) {
-  const d = displayOf(read(prop));
-  const external = d.present ? joinImportant(d.value, d.important) : '';
+  const display = displayOf(read(prop));
+  const external = display.present ? joinImportant(display) : '';
+  const field = useLiveFieldEditing({ prop, external, busy, setProp, clearProp, liveSetProp });
+  return (
+    <VariableConnect
+      code
+      ariaLabel={`Connect ${ariaLabel} to a variable`}
+      disabled={busy}
+      prop={prop}
+      onPick={(binding) => setProp(prop, binding, false)}
+    >
+      <input
+        {...field.scrub.input}
+        className="u-input embed-editor_position-input"
+        value={field.draft}
+        placeholder={placeholder}
+        spellCheck={false}
+        disabled={busy}
+        onChange={(event) => field.change(event.target.value)}
+        onFocus={field.focus}
+        onBlur={field.blur}
+        onKeyDown={field.keyDown}
+        aria-label={ariaLabel}
+      />
+    </VariableConnect>
+  );
+}
+
+// The live field's editing state: a draft that follows the model while nobody
+// is typing, live writes while someone is, and the commit (or clear) on blur.
+function useLiveFieldEditing({
+  prop,
+  external,
+  busy,
+  setProp,
+  clearProp,
+  liveSetProp,
+}: {
+  prop: string;
+  external: string;
+  busy: boolean;
+  setProp: SetProp;
+  clearProp: ClearProp;
+  liveSetProp: LiveSetProp;
+}) {
   const [draft, setDraft] = useState(external);
   const focused = useRef(false);
-  const timer = useRef<number | null>(null);
   useEffect(() => {
     if (!focused.current) {
       setDraft(external);
     }
   }, [external]);
-  const cancel = () => {
-    if (timer.current != null) {
-      window.clearTimeout(timer.current);
-      timer.current = null;
-    }
-  };
-  useEffect(() => cancel, []);
-  // Undelayed live write for the scrub, which throttles its own — see useScrub.
-  const liveNow = (text: string) => {
-    const trimmed = text.trim();
-    if (!trimmed) {
-      return;
-    }
-    const parsed = parseImportant(trimmed);
-    liveSetProp(prop, parsed.value, parsed.important);
-  };
-  const live = (text: string) => {
-    cancel();
-    timer.current = window.setTimeout(() => {
-      timer.current = null;
-      liveNow(text);
-    }, 100);
-  };
+  const { cancel, liveNow, live } = useDebouncedLiveWrite(prop, liveSetProp);
   const commit = (text = draft) => {
     const trimmed = text.trim();
     if (!trimmed) {
@@ -352,53 +373,76 @@ function LiveField({
       commit(text);
     },
   });
-  return (
-    <VariableConnect
-      code
-      ariaLabel={`Connect ${ariaLabel} to a variable`}
-      disabled={busy}
-      prop={prop}
-      onPick={(binding) => setProp(prop, binding, false)}
-    >
-      <input
-        {...scrub.input}
-        className="u-input embed-editor_position-input"
-        value={draft}
-        placeholder={placeholder}
-        spellCheck={false}
-        disabled={busy}
-        onChange={(event) => {
-          setDraft(event.target.value);
-          live(event.target.value);
-        }}
-        onFocus={() => {
-          focused.current = true;
-        }}
-        onBlur={() => {
-          focused.current = false;
-          cancel();
-          commit();
-        }}
-        onKeyDown={(event) => {
-          if (event.key === 'Enter') {
-            commitInPlace(event.currentTarget);
-            return;
-          }
-          const stepped = handleArrowStep(event);
-          if (!stepped) {
-            return;
-          }
-          event.preventDefault();
-          const el = event.currentTarget;
-          el.value = stepped.text;
-          el.setSelectionRange(stepped.caret, stepped.caret);
-          setDraft(stepped.text);
-          live(stepped.text);
-        }}
-        aria-label={ariaLabel}
-      />
-    </VariableConnect>
-  );
+  return {
+    draft,
+    scrub,
+    change: (text: string) => {
+      setDraft(text);
+      live(text);
+    },
+    focus: () => {
+      focused.current = true;
+    },
+    blur: () => {
+      focused.current = false;
+      cancel();
+      commit();
+    },
+    keyDown: (event: ReactKeyboardEvent<HTMLInputElement>) => {
+      const stepped = stepLiveFieldKey(event);
+      if (stepped !== undefined) {
+        setDraft(stepped);
+        live(stepped);
+      }
+    },
+  };
+}
+
+// Live writes of typed text on a debounce; `liveNow` is the undelayed write for
+// the scrub, which throttles its own — see useScrub.
+function useDebouncedLiveWrite(prop: string, liveSetProp: LiveSetProp) {
+  const timer = useRef<number | undefined>(undefined);
+  const cancel = () => {
+    if (timer.current !== undefined) {
+      window.clearTimeout(timer.current);
+      timer.current = undefined;
+    }
+  };
+  useEffect(() => cancel, []);
+  const liveNow = (text: string) => {
+    const trimmed = text.trim();
+    if (!trimmed) {
+      return;
+    }
+    const parsed = parseImportant(trimmed);
+    liveSetProp(prop, parsed.value, parsed.important);
+  };
+  const live = (text: string) => {
+    cancel();
+    timer.current = window.setTimeout(() => {
+      timer.current = undefined;
+      liveNow(text);
+    }, 100);
+  };
+  return { cancel, liveNow, live };
+}
+
+// Enter commits in place; an arrow key steps the number under the caret and
+// writes it straight into the input. Returns the stepped text, if any.
+function stepLiveFieldKey(event: ReactKeyboardEvent<HTMLInputElement>): string | undefined {
+  if (event.key === 'Enter') {
+    commitInPlace(event.currentTarget);
+    return undefined;
+  }
+  const stepped = handleArrowStep(event);
+  if (!stepped) {
+    return undefined;
+  }
+  event.preventDefault();
+  const input = event.currentTarget;
+  input.value = stepped.text;
+  input.setSelectionRange(stepped.caret, stepped.caret);
+  return stepped.text;
 }
 
 // ─────────────────────────── Position dropdown ───────────────────────────
@@ -410,7 +454,7 @@ const POSITION_PRESETS: ReadonlyArray<{ value: string; label: string; icon: Reac
   { value: 'fixed', label: 'Fixed', icon: <FixedIcon /> },
   { value: 'sticky', label: 'Sticky', icon: <StickyIcon /> },
 ];
-const POSITION_PRESET_VALUES = new Set(POSITION_PRESETS.map((p) => p.value));
+const POSITION_PRESET_VALUES = new Set(POSITION_PRESETS.map((preset) => preset.value));
 const CUSTOM = '__custom__';
 
 // The editable field shown inside the position dropdown's trigger in custom mode.
@@ -423,8 +467,8 @@ function PositionCustomField({
   busy: boolean;
   setProp: SetProp;
 }) {
-  const d = displayOf(read('position'));
-  const external = d.present ? joinImportant(d.value, d.important) : '';
+  const display = displayOf(read('position'));
+  const external = display.present ? joinImportant(display) : '';
   const [draft, setDraft] = useState(external);
   const focused = useRef(false);
   useEffect(() => {
@@ -434,7 +478,8 @@ function PositionCustomField({
   }, [external]);
   const commit = () => {
     const parsed = parseImportant(draft);
-    if (parsed.value && (parsed.value !== d.value.trim() || parsed.important !== d.important)) {
+    const changed = parsed.value !== display.value.trim() || parsed.important !== display.important;
+    if (parsed.value && changed) {
       setProp('position', parsed.value, parsed.important);
     }
   };
@@ -481,14 +526,14 @@ function PositionControl({
   setProp: SetProp;
   liveSetProp: LiveSetProp;
 }) {
-  const current = effVal(read, 'position');
+  const current = effectiveValue(read, 'position');
   const isPreset = POSITION_PRESET_VALUES.has(current);
   // Unset → what the page computes (a `*` rule the panel can't see, a UA default),
   // then `static`.
   const shownPosition = useHighlight(
     current,
     'position',
-    POSITION_PRESETS.map((p) => p.value),
+    POSITION_PRESETS.map((preset) => preset.value),
     'static',
   );
   // Custom whenever position is a free value (var()/unset/…) or !important, or the user
@@ -508,7 +553,11 @@ function PositionControl({
       className="embed-editor_position-select"
       value={custom ? CUSTOM : shownPosition}
       options={[
-        ...POSITION_PRESETS.map((p) => ({ value: p.value, label: p.label, icon: p.icon })),
+        ...POSITION_PRESETS.map((preset) => ({
+          value: preset.value,
+          label: preset.label,
+          icon: preset.icon,
+        })),
         { value: CUSTOM, label: 'Custom' },
       ]}
       customInput={
@@ -524,7 +573,9 @@ function PositionControl({
           setProp('position', next, false);
         }
       }}
-      onPreview={(next) => liveSetProp('position', next === CUSTOM ? null : next, false)}
+      onPreview={(next) =>
+        liveSetProp('position', next === CUSTOM ? undefined : (next ?? undefined), false)
+      }
       ariaLabel="Position"
     />
   );
@@ -548,11 +599,21 @@ const INSET_SIDES = ['top', 'right', 'bottom', 'left'] as const;
 type InsetSide = (typeof INSET_SIDES)[number];
 
 // A hint of the element's box, and the part of it being pinned.
-function InsetIcon({ x, y, w, h }: { x: number; y: number; w: number; h: number }) {
+function InsetIcon({
+  x,
+  y,
+  width,
+  height,
+}: {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}) {
   return (
     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
       <rect x="3" y="3" width="10" height="10" rx="1.5" stroke="currentColor" opacity="0.4" />
-      <rect x={x} y={y} width={w} height={h} rx="0.75" fill="currentColor" />
+      <rect x={x} y={y} width={width} height={height} rx="0.75" fill="currentColor" />
     </svg>
   );
 }
@@ -567,55 +628,55 @@ const INSET_PRESETS: ReadonlyArray<{
     value: 'top-left',
     label: 'Top left',
     sides: ['top', 'left'],
-    icon: <InsetIcon x={3.5} y={3.5} w={4} h={4} />,
+    icon: <InsetIcon x={3.5} y={3.5} width={4} height={4} />,
   },
   {
     value: 'top-right',
     label: 'Top right',
     sides: ['top', 'right'],
-    icon: <InsetIcon x={8.5} y={3.5} w={4} h={4} />,
+    icon: <InsetIcon x={8.5} y={3.5} width={4} height={4} />,
   },
   {
     value: 'bottom-left',
     label: 'Bottom left',
     sides: ['bottom', 'left'],
-    icon: <InsetIcon x={3.5} y={8.5} w={4} h={4} />,
+    icon: <InsetIcon x={3.5} y={8.5} width={4} height={4} />,
   },
   {
     value: 'bottom-right',
     label: 'Bottom right',
     sides: ['bottom', 'right'],
-    icon: <InsetIcon x={8.5} y={8.5} w={4} h={4} />,
+    icon: <InsetIcon x={8.5} y={8.5} width={4} height={4} />,
   },
   {
     value: 'left',
     label: 'Left edge',
     sides: ['top', 'bottom', 'left'],
-    icon: <InsetIcon x={3.5} y={3.5} w={3} h={9} />,
+    icon: <InsetIcon x={3.5} y={3.5} width={3} height={9} />,
   },
   {
     value: 'right',
     label: 'Right edge',
     sides: ['top', 'bottom', 'right'],
-    icon: <InsetIcon x={9.5} y={3.5} w={3} h={9} />,
+    icon: <InsetIcon x={9.5} y={3.5} width={3} height={9} />,
   },
   {
     value: 'bottom',
     label: 'Bottom edge',
     sides: ['left', 'right', 'bottom'],
-    icon: <InsetIcon x={3.5} y={9.5} w={9} h={3} />,
+    icon: <InsetIcon x={3.5} y={9.5} width={9} height={3} />,
   },
   {
     value: 'top',
     label: 'Top edge',
     sides: ['left', 'right', 'top'],
-    icon: <InsetIcon x={3.5} y={3.5} w={9} h={3} />,
+    icon: <InsetIcon x={3.5} y={3.5} width={9} height={3} />,
   },
   {
     value: 'full',
     label: 'Fill',
     sides: ['top', 'right', 'bottom', 'left'],
-    icon: <InsetIcon x={3.5} y={3.5} w={9} h={9} />,
+    icon: <InsetIcon x={3.5} y={3.5} width={9} height={9} />,
   },
 ];
 
@@ -624,12 +685,14 @@ function InsetPresets({ read, busy, setProp, clearProp }: Props) {
   // whether they are still 0. Nudging a corner to `12px` has not stopped it
   // being pinned to that corner, and the row should go on saying so.
   const pinned = INSET_SIDES.filter((side) => {
-    const v = (effVal(read, side) || '').trim().toLowerCase();
-    return v !== '' && v !== 'auto';
+    const value = (effectiveValue(read, side) || '').trim().toLowerCase();
+    return value !== '' && value !== 'auto';
   });
   const current =
     INSET_PRESETS.find(
-      (p) => p.sides.length === pinned.length && p.sides.every((side) => pinned.includes(side)),
+      (preset) =>
+        preset.sides.length === pinned.length &&
+        preset.sides.every((side) => pinned.includes(side)),
     )?.value ?? '';
 
   const apply = (preset: (typeof INSET_PRESETS)[number]) => {
@@ -722,6 +785,13 @@ type Seg = { value: string; icon: ReactNode; label: string };
 // An icon segmented bar (Float / Clear) + a chevron menu whose only item enters a
 // Custom free-value mode (var()/unset), and offers the presets to switch back —
 // mirroring the Overflow / Display controls.
+type SegmentedIconControlProps = {
+  prop: string;
+  ariaLabel: string;
+  segments: readonly Seg[];
+  current: string;
+} & Props & { read?: Read };
+
 function SegmentedIconControl({
   prop,
   ariaLabel,
@@ -731,21 +801,250 @@ function SegmentedIconControl({
   setProp,
   liveSetProp,
   clearProp,
-}: {
-  prop: string;
-  ariaLabel: string;
-  segments: readonly Seg[];
-  current: string;
-} & Props & { read?: Read }) {
-  const supported = new Set(segments.map((s) => s.value));
+}: SegmentedIconControlProps) {
+  const supported = new Set(segments.map((segment) => segment.value));
   const customMode = !supported.has(current);
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
+  useMenuDismiss({ open, rootRef, setOpen });
+  const { inputRef, requestFocus } = useCustomFocus({ customMode, busy });
+
+  const pick = (next: string) => {
+    setOpen(false);
+    if (next !== current) {
+      setProp(prop, next, false);
+    }
+  };
+  const enterCustom = () => {
+    setOpen(false);
+    requestFocus();
+    setProp(prop, 'unset', false);
+  };
+
+  return (
+    <div
+      ref={rootRef}
+      className={`embed-editor_display ${customMode ? 'is-custom' : ''}`}
+      role="group"
+      aria-label={ariaLabel}
+    >
+      <SegmentPill />
+      {customMode ? (
+        <SegmentCustomInput
+          prop={prop}
+          ariaLabel={ariaLabel}
+          current={current}
+          busy={busy}
+          inputRef={inputRef}
+          setProp={setProp}
+          liveSetProp={liveSetProp}
+          clearProp={clearProp}
+        />
+      ) : (
+        <SegmentButtons segments={segments} current={current} busy={busy} onPick={pick} />
+      )}
+      <SegmentMenu
+        open={open}
+        ariaLabel={ariaLabel}
+        busy={busy}
+        customMode={customMode}
+        current={current}
+        segments={segments}
+        onToggle={() => setOpen((value) => !value)}
+        onPick={pick}
+        onEnterCustom={enterCustom}
+      />
+    </div>
+  );
+}
+
+// The free-value field of a segmented control in Custom mode: live as you type,
+// committed (or cleared, when blank) on blur.
+function SegmentCustomInput({
+  prop,
+  ariaLabel,
+  current,
+  busy,
+  inputRef,
+  setProp,
+  liveSetProp,
+  clearProp,
+}: Pick<
+  SegmentedIconControlProps,
+  'prop' | 'ariaLabel' | 'current' | 'busy' | 'setProp' | 'liveSetProp' | 'clearProp'
+> & { inputRef: React.RefObject<HTMLInputElement> }) {
+  const [draft, setDraft] = useState(current);
+  const focused = useRef(false);
+  useEffect(() => {
+    if (!focused.current) {
+      setDraft(current);
+    }
+  }, [current]);
+  const commitCustom = () => {
+    const trimmed = draft.trim();
+    if (!trimmed) {
+      clearProp(prop);
+      return;
+    }
+    const parsed = parseImportant(trimmed);
+    setProp(prop, parsed.value, parsed.important);
+  };
+  return (
+    <VariableConnect
+      code
+      ariaLabel={`Connect ${ariaLabel} to a variable`}
+      disabled={busy}
+      prop={prop}
+      onPick={(binding) => setProp(prop, binding, false)}
+    >
+      <input
+        ref={inputRef}
+        className="embed-editor_value-input embed-editor_display-input"
+        value={draft}
+        placeholder="custom value"
+        spellCheck={false}
+        disabled={busy}
+        onChange={(event) => {
+          setDraft(event.target.value);
+          const trimmed = event.target.value.trim();
+          if (trimmed) {
+            const parsed = parseImportant(trimmed);
+            liveSetProp(prop, parsed.value, parsed.important);
+          }
+        }}
+        onFocus={() => {
+          focused.current = true;
+        }}
+        onBlur={() => {
+          focused.current = false;
+          commitCustom();
+        }}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter') {
+            commitInPlace(event.currentTarget);
+          }
+        }}
+        aria-label={`${ariaLabel} value`}
+      />
+    </VariableConnect>
+  );
+}
+
+// The icon segments of the bar, one per preset.
+function SegmentButtons({
+  segments,
+  current,
+  busy,
+  onPick,
+}: {
+  segments: readonly Seg[];
+  current: string;
+  busy: boolean;
+  onPick: (value: string) => void;
+}) {
+  return segments.map((segment) => (
+    <button
+      key={segment.value}
+      type="button"
+      role="radio"
+      aria-checked={current === segment.value}
+      className={`embed-editor_display-seg ${current === segment.value ? 'is-selected' : ''}`}
+      disabled={busy}
+      title={segment.label}
+      aria-label={segment.label}
+      onClick={() => onPick(segment.value)}
+    >
+      {segment.icon}
+    </button>
+  ));
+}
+
+// The chevron and its menu: "Custom" from the bar, or the presets to switch back
+// to from a custom value.
+function SegmentMenu({
+  open,
+  ariaLabel,
+  busy,
+  customMode,
+  current,
+  segments,
+  onToggle,
+  onPick,
+  onEnterCustom,
+}: {
+  open: boolean;
+  ariaLabel: string;
+  busy: boolean;
+  customMode: boolean;
+  current: string;
+  segments: readonly Seg[];
+  onToggle: () => void;
+  onPick: (value: string) => void;
+  onEnterCustom: () => void;
+}) {
+  return (
+    <>
+      <button
+        type="button"
+        className="embed-editor_display-arrow"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-label={`More ${ariaLabel} options`}
+        disabled={busy}
+        onClick={onToggle}
+      >
+        <ChevronIcon />
+      </button>
+      {open ? (
+        <div className="embed-editor_display-menu" role="menu">
+          {customMode ? (
+            segments.map((segment) => (
+              <MenuItem
+                key={segment.value}
+                label={segment.label}
+                selected={current === segment.value}
+                onClick={() => onPick(segment.value)}
+              />
+            ))
+          ) : (
+            <MenuItem label="Custom" selected={false} onClick={onEnterCustom} />
+          )}
+        </div>
+      ) : undefined}
+    </>
+  );
+}
+
+// Focus the custom field after switching to Custom, once its `unset` write
+// settles: the request is remembered until the field exists and is enabled.
+function useCustomFocus({ customMode, busy }: { customMode: boolean; busy: boolean }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const wantFocus = useRef(false);
-  const [draft, setDraft] = useState('');
-  const focused = useRef(false);
+  useEffect(() => {
+    if (customMode && wantFocus.current && !busy) {
+      wantFocus.current = false;
+      inputRef.current?.focus();
+      inputRef.current?.select();
+    }
+  }, [customMode, busy]);
+  return {
+    inputRef,
+    requestFocus: () => {
+      wantFocus.current = true;
+    },
+  };
+}
 
+// While the menu is open, a press outside the control or Escape closes it.
+function useMenuDismiss({
+  open,
+  rootRef,
+  setOpen,
+}: {
+  open: boolean;
+  rootRef: React.RefObject<HTMLDivElement>;
+  setOpen: (open: boolean) => void;
+}): void {
   useEffect(() => {
     if (!open) {
       return;
@@ -766,133 +1065,7 @@ function SegmentedIconControl({
       document.removeEventListener('mousedown', onDown);
       document.removeEventListener('keydown', onKey);
     };
-  }, [open]);
-  useEffect(() => {
-    if (customMode && !focused.current) {
-      setDraft(current);
-    }
-  }, [customMode, current]);
-  useEffect(() => {
-    if (customMode && wantFocus.current && !busy) {
-      wantFocus.current = false;
-      inputRef.current?.focus();
-      inputRef.current?.select();
-    }
-  }, [customMode, busy]);
-
-  const pick = (next: string) => {
-    setOpen(false);
-    if (next !== current) {
-      setProp(prop, next, false);
-    }
-  };
-  const enterCustom = () => {
-    setOpen(false);
-    wantFocus.current = true;
-    setProp(prop, 'unset', false);
-  };
-  const commitCustom = () => {
-    const trimmed = draft.trim();
-    if (!trimmed) {
-      clearProp(prop);
-      return;
-    }
-    const parsed = parseImportant(trimmed);
-    setProp(prop, parsed.value, parsed.important);
-  };
-
-  return (
-    <div
-      ref={rootRef}
-      className={`embed-editor_display ${customMode ? 'is-custom' : ''}`}
-      role="group"
-      aria-label={ariaLabel}
-    >
-      <SegmentPill />
-      {customMode ? (
-        <VariableConnect
-          code
-          ariaLabel={`Connect ${ariaLabel} to a variable`}
-          disabled={busy}
-          prop={prop}
-          onPick={(binding) => setProp(prop, binding, false)}
-        >
-          <input
-            ref={inputRef}
-            className="embed-editor_value-input embed-editor_display-input"
-            value={draft}
-            placeholder="custom value"
-            spellCheck={false}
-            disabled={busy}
-            onChange={(event) => {
-              setDraft(event.target.value);
-              const t = event.target.value.trim();
-              if (t) {
-                const p = parseImportant(t);
-                liveSetProp(prop, p.value, p.important);
-              }
-            }}
-            onFocus={() => {
-              focused.current = true;
-            }}
-            onBlur={() => {
-              focused.current = false;
-              commitCustom();
-            }}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter') {
-                commitInPlace(event.currentTarget);
-              }
-            }}
-            aria-label={`${ariaLabel} value`}
-          />
-        </VariableConnect>
-      ) : (
-        segments.map((seg) => (
-          <button
-            key={seg.value}
-            type="button"
-            role="radio"
-            aria-checked={current === seg.value}
-            className={`embed-editor_display-seg ${current === seg.value ? 'is-selected' : ''}`}
-            disabled={busy}
-            title={seg.label}
-            aria-label={seg.label}
-            onClick={() => pick(seg.value)}
-          >
-            {seg.icon}
-          </button>
-        ))
-      )}
-      <button
-        type="button"
-        className="embed-editor_display-arrow"
-        aria-haspopup="menu"
-        aria-expanded={open}
-        aria-label={`More ${ariaLabel} options`}
-        disabled={busy}
-        onClick={() => setOpen((value) => !value)}
-      >
-        <ChevronIcon />
-      </button>
-      {open ? (
-        <div className="embed-editor_display-menu" role="menu">
-          {customMode ? (
-            segments.map((seg) => (
-              <MenuItem
-                key={seg.value}
-                label={seg.label}
-                selected={current === seg.value}
-                onClick={() => pick(seg.value)}
-              />
-            ))
-          ) : (
-            <MenuItem label="Custom" selected={false} onClick={enterCustom} />
-          )}
-        </div>
-      ) : null}
-    </div>
-  );
+  }, [open, rootRef, setOpen]);
 }
 
 const FLOAT_SEGS: readonly Seg[] = [
@@ -952,8 +1125,8 @@ function RowLabel({
               <ProvenanceList
                 contributors={contributors}
                 prop={prop}
-                onSelect={(sel, p) => {
-                  onSelectSelector(sel, p);
+                onSelect={(selector, selectorProp) => {
+                  onSelectSelector(selector, selectorProp);
                   close();
                 }}
               />
@@ -1024,7 +1197,7 @@ export default function PositionSection(props: Props) {
           prop="float"
           ariaLabel="Float"
           segments={FLOAT_SEGS}
-          current={effVal(read, 'float') || 'none'}
+          current={effectiveValue(read, 'float') || 'none'}
           {...props}
         />
       </Row>
@@ -1033,7 +1206,7 @@ export default function PositionSection(props: Props) {
           prop="clear"
           ariaLabel="Clear"
           segments={CLEAR_SEGS}
-          current={effVal(read, 'clear') || 'none'}
+          current={effectiveValue(read, 'clear') || 'none'}
           {...props}
         />
       </Row>

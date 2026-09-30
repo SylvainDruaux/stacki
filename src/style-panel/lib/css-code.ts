@@ -7,6 +7,8 @@
 // nesting to track, so a regex tokeniser and the browser's own caret are
 // enough, and the field stays a contentEditable that chips can live inside.
 
+import { LIMITS } from '../../../shared/limits';
+
 /** One coloured run of the value. `text` is raw (unescaped) source. */
 export type CssToken = { kind: string; text: string };
 
@@ -38,34 +40,34 @@ export function cssTokens(value: string): CssToken[] {
   };
   let rest = value;
   while (rest) {
-    let m: RegExpMatchArray | null;
+    let match: RegExpMatchArray | undefined;
     let consumedLength = 0;
-    if ((m = rest.match(COMMENT))) {
-      push('comment', m[0]);
-      consumedLength = m[0].length;
-    } else if ((m = rest.match(STRING))) {
-      push('string', m[0]);
-      consumedLength = m[0].length;
-    } else if ((m = rest.match(CUSTOM_PROP))) {
-      push('prop', m[0]);
-      consumedLength = m[0].length;
-    } else if ((m = rest.match(FUNCTION))) {
-      push('fn', m[0]);
-      consumedLength = m[0].length;
-    } else if ((m = rest.match(HEX))) {
-      push('hex', m[0]);
-      consumedLength = m[0].length;
-    } else if ((m = rest.match(NUMBER))) {
-      push('num', m[0]);
-      consumedLength = m[0].length;
-      const unit = rest.slice(m[0].length).match(UNIT);
+    if ((match = rest.match(COMMENT) ?? undefined)) {
+      push('comment', match[0]);
+      consumedLength = match[0].length;
+    } else if ((match = rest.match(STRING) ?? undefined)) {
+      push('string', match[0]);
+      consumedLength = match[0].length;
+    } else if ((match = rest.match(CUSTOM_PROP) ?? undefined)) {
+      push('prop', match[0]);
+      consumedLength = match[0].length;
+    } else if ((match = rest.match(FUNCTION) ?? undefined)) {
+      push('fn', match[0]);
+      consumedLength = match[0].length;
+    } else if ((match = rest.match(HEX) ?? undefined)) {
+      push('hex', match[0]);
+      consumedLength = match[0].length;
+    } else if ((match = rest.match(NUMBER) ?? undefined)) {
+      push('num', match[0]);
+      consumedLength = match[0].length;
+      const unit = rest.slice(match[0].length).match(UNIT);
       if (unit) {
         push('unit', unit[0]);
         consumedLength += unit[0].length;
       }
-    } else if ((m = rest.match(IDENT))) {
-      push('ident', m[0]);
-      consumedLength = m[0].length;
+    } else if ((match = rest.match(IDENT) ?? undefined)) {
+      push('ident', match[0]);
+      consumedLength = match[0].length;
     } else {
       const plain = rest[0] ?? '';
       push('plain', plain);
@@ -76,18 +78,18 @@ export function cssTokens(value: string): CssToken[] {
   return out;
 }
 
-function escapeHtml(s: string): string {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+function escapeHtml(text: string): string {
+  return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
 /** The value as coloured HTML. `plain` runs stay bare text so the markup — and
  *  the DOM the caret walks — is no deeper than it needs to be. */
 export function highlightCss(value: string): string {
   return cssTokens(value)
-    .map((t) =>
-      t.kind === 'plain'
-        ? escapeHtml(t.text)
-        : `<span class="cx-${t.kind}">${escapeHtml(t.text)}</span>`,
+    .map((token) =>
+      token.kind === 'plain'
+        ? escapeHtml(token.text)
+        : `<span class="cx-${token.kind}">${escapeHtml(token.text)}</span>`,
     )
     .join('');
 }
@@ -95,11 +97,11 @@ export function highlightCss(value: string): string {
 // ───────────────────────────── Arrow-key stepping ─────────────────────────────
 
 /** How much one press moves the number: a tenth with alt, ten with shift. */
-export function stepSize(e: { altKey?: boolean; shiftKey?: boolean }): number {
-  if (e.altKey) {
+export function stepSize(event: { altKey?: boolean; shiftKey?: boolean }): number {
+  if (event.altKey) {
     return 0.1;
   }
-  if (e.shiftKey) {
+  if (event.shiftKey) {
     return 10;
   }
   return 1;
@@ -121,7 +123,7 @@ function precisionOf(text: string, step: number): number {
  * Step the number the caret is in (or touching) by `delta`.
  *
  * Returns the new text and where the number now ends, so the caller can put the
- * caret back where the user left it, or null when there's no number to step —
+ * caret back where the user left it, or undefined when there's no number to step —
  * in which case the key should do its normal thing.
  */
 export function stepNumberAt(
@@ -130,11 +132,11 @@ export function stepNumberAt(
   delta: number,
   /** Floor for the stepped number — padding stops at 0, a margin doesn't. */
   min?: number,
-): { text: string; caret: number } | null {
+): { text: string; caret: number } | undefined {
   NUMBER_AT.lastIndex = 0;
-  let match: RegExpExecArray | null;
-  let hit: { start: number; end: number; text: string } | null = null;
-  while ((match = NUMBER_AT.exec(text))) {
+  let hit: { start: number; end: number; text: string } | undefined;
+  // A global regex advances `lastIndex` on every match, so this visits each number once.
+  for (let match = NUMBER_AT.exec(text); match !== null; match = NUMBER_AT.exec(text)) {
     const start = match.index;
     const end = start + match[0].length;
     // Touching counts: the caret sits at an edge as often as inside, and after
@@ -148,7 +150,7 @@ export function stepNumberAt(
     } // numbers only get further away from here
   }
   if (!hit) {
-    return null;
+    return undefined;
   }
   // A `-` immediately before, and not part of a larger expression, is this
   // number's sign — `-4px` steps up to `-3px`, not to `-5px`.
@@ -159,9 +161,9 @@ export function stepNumberAt(
   const start = signed ? hit.start - 1 : hit.start;
   const current = Number((signed ? '-' : '') + hit.text);
   if (!Number.isFinite(current)) {
-    return null;
+    return undefined;
   }
-  const next = min == null ? current + delta : Math.max(min, current + delta);
+  const next = min === undefined ? current + delta : Math.max(min, current + delta);
   // Float arithmetic: 0.1 + 0.2 must read 0.3 in a field someone is watching.
   const shown = next
     .toFixed(precisionOf(hit.text, delta))
@@ -181,21 +183,27 @@ export function stepNumberAt(
 // are gone by then. A chip counts as one character, matching the placeholder
 // the value serialiser uses.
 
-const isChip = (n: Node): boolean => n instanceof HTMLElement && n.dataset['chip'] != null;
+const isChip = (node: Node): boolean =>
+  node instanceof HTMLElement && node.dataset['chip'] !== undefined;
 
 /** Where the caret is, as an offset into the field's text. */
-export function caretOffset(root: HTMLElement): number | null {
-  const sel = root.ownerDocument.getSelection();
-  if (!sel || sel.rangeCount === 0) {
-    return null;
+export function caretOffset(root: HTMLElement): number | undefined {
+  const selection = root.ownerDocument.getSelection();
+  if (!selection || selection.rangeCount === 0) {
+    return undefined;
   }
-  const range = sel.getRangeAt(0);
+  const range = selection.getRangeAt(0);
   if (!root.contains(range.endContainer)) {
-    return null;
+    return undefined;
   }
   let offset = 0;
   let found = false;
-  const walk = (node: Node) => {
+  // The field's markup is spans and chips a level or two deep; the tree bound is a
+  // backstop against a malformed paste, whose deeper content is not counted.
+  const walk = (node: Node, depth: number) => {
+    if (depth > LIMITS.treeDepthMax) {
+      return;
+    }
     if (found) {
       return;
     }
@@ -206,7 +214,7 @@ export function caretOffset(root: HTMLElement): number | null {
         if (i++ >= range.endOffset) {
           break;
         }
-        walk(child);
+        walk(child, depth + 1);
       }
       found = true;
       return;
@@ -224,31 +232,31 @@ export function caretOffset(root: HTMLElement): number | null {
       offset += 1;
       return;
     }
-    node.childNodes.forEach(walk);
+    node.childNodes.forEach((child) => walk(child, depth + 1));
   };
-  root.childNodes.forEach(walk);
-  return found ? offset : null;
+  root.childNodes.forEach((child) => walk(child, 0));
+  return found ? offset : undefined;
 }
 
 /** Put the caret back at `offset` characters into the field. */
 export function setCaretOffset(root: HTMLElement, offset: number): void {
-  const doc = root.ownerDocument;
-  const sel = doc.getSelection();
-  if (!sel) {
+  const ownerDocument = root.ownerDocument;
+  const selection = ownerDocument.getSelection();
+  if (!selection) {
     return;
   }
   let left = offset;
-  const target: { value: { node: Node; at: number } | null } = { value: null };
+  const target: { value: { node: Node; at: number } | undefined } = { value: undefined };
   const walk = (node: Node) => {
     if (target.value) {
       return;
     }
     if (node.nodeType === Node.TEXT_NODE) {
-      const len = (node.textContent ?? '').length;
-      if (left <= len) {
+      const length = (node.textContent ?? '').length;
+      if (left <= length) {
         target.value = { node, at: left };
       } else {
-        left -= len;
+        left -= length;
       }
       return;
     }
@@ -267,7 +275,7 @@ export function setCaretOffset(root: HTMLElement, offset: number): void {
     node.childNodes.forEach(walk);
   };
   root.childNodes.forEach(walk);
-  const range = doc.createRange();
+  const range = ownerDocument.createRange();
   if (target.value) {
     range.setStart(target.value.node, target.value.at);
   } else {
@@ -275,6 +283,6 @@ export function setCaretOffset(root: HTMLElement, offset: number): void {
     range.collapse(false);
   }
   range.collapse(true);
-  sel.removeAllRanges();
-  sel.addRange(range);
+  selection.removeAllRanges();
+  selection.addRange(range);
 }

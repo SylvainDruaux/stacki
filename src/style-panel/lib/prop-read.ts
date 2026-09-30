@@ -5,11 +5,11 @@ import type { ParsedRule } from './types';
 
 export type Found = { value: string; important: boolean };
 
-/** The current declaration for `prop` on a rule (last one wins), or null. */
-export function readProp(rule: ParsedRule, prop: string): Found | null {
+/** The current declaration for `prop` on a rule (last one wins), or undefined. */
+export function readProp(rule: ParsedRule, prop: string): Found | undefined {
   const list = rule.declarations.filter((decl) => decl.prop === prop);
   if (!list.length) {
-    return null;
+    return undefined;
   }
   const decl = list[list.length - 1];
   if (decl === undefined) {

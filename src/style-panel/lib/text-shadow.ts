@@ -14,11 +14,11 @@ function isLength(token: string): boolean {
 
 /** Parse a `text-shadow` value into an ordered shadow list (`none`/'' → empty). */
 export function parseShadows(value: string): Shadow[] {
-  const v = value.trim();
-  if (!v || v.toLowerCase() === 'none') {
+  const trimmed = value.trim();
+  if (!trimmed || trimmed.toLowerCase() === 'none') {
     return [];
   }
-  return splitTopLevelCommas(v)
+  return splitTopLevelCommas(trimmed)
     .filter(Boolean)
     .map((part) => {
       const lengths: string[] = [];
@@ -45,7 +45,11 @@ export function serializeShadows(shadows: Shadow[]): string {
     return '';
   }
   return shadows
-    .map((s) => `${s.x || '0px'} ${s.y || '0px'} ${s.blur || '0px'}${s.color ? ` ${s.color}` : ''}`)
+    .map(
+      (shadow) =>
+        `${shadow.x || '0px'} ${shadow.y || '0px'} ${shadow.blur || '0px'}` +
+        (shadow.color ? ` ${shadow.color}` : ''),
+    )
     .join(', ');
 }
 
@@ -55,6 +59,6 @@ export function blankShadow(): Shadow {
 }
 
 /** A short label for a collapsed shadow row ("Text shadow: 0px 1px 1px"). */
-export function shadowLabel(s: Shadow): string {
-  return `Text shadow: ${s.x || '0px'} ${s.y || '0px'} ${s.blur || '0px'}`;
+export function shadowLabel(shadow: Shadow): string {
+  return `Text shadow: ${shadow.x || '0px'} ${shadow.y || '0px'} ${shadow.blur || '0px'}`;
 }

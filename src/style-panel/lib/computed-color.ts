@@ -26,24 +26,24 @@ import { createQueryCache } from './query-cache';
  * for `#fff`.
  */
 export function needsPage(value: string): boolean {
-  const v = String(value ?? '')
+  const normalized = String(value ?? '')
     .trim()
     .toLowerCase();
-  if (!v) {
+  if (!normalized) {
     return false;
   }
   return (
-    v.includes('var(') ||
-    v.includes('color-mix(') ||
-    v.includes('light-dark(') ||
-    v.includes('currentcolor') ||
-    v.startsWith('--')
+    normalized.includes('var(') ||
+    normalized.includes('color-mix(') ||
+    normalized.includes('light-dark(') ||
+    normalized.includes('currentcolor') ||
+    normalized.startsWith('--')
   );
 }
 
 const cache = createQueryCache(async (path, values) => {
   const answer = await queryCanvas(path, [], values);
-  return answer?.computed ?? null;
+  return answer?.computed;
 });
 
 /** Forget everything: the page changed under us, so the answers may have too. */
@@ -57,7 +57,7 @@ export function forgetComputedColors(): void {
 // answerable as any other.
 function pathOfSelection(): string {
   const host = getHost();
-  return (host.selectedId ? host.pathOf?.(host.selectedId) : null) ?? '';
+  return (host.selectedId ? host.pathOf?.(host.selectedId) : undefined) ?? '';
 }
 
 /**
@@ -80,13 +80,13 @@ export function useResolvedColor(value: string): string {
   const path = pathOfSelection();
   const pageDependent = needsPage(raw);
   const enabled = pageDependent && hasCanvas();
-  const resolved = enabled ? cache.read(path, raw) : null;
+  const cached = enabled ? cache.read(path, raw) : undefined;
 
   useEffect(() => {
     if (!pageDependent) {
       return undefined;
     }
-    const sync = () => bump((n) => n + 1);
+    const sync = () => bump((count) => count + 1);
     const offCache = cache.subscribe(sync);
     const offHost = onHostChange(sync);
     return () => {
@@ -96,10 +96,12 @@ export function useResolvedColor(value: string): string {
   }, [pageDependent]);
 
   useEffect(() => {
-    if (enabled && resolved === undefined) {
+    if (cached?.kind === 'pending') {
+      // The answer arrives through the subscription above, which re-renders.
       void cache.request(path, raw);
     }
   });
 
+  const resolved = cached?.kind === 'settled' ? cached.answer : undefined;
   return resolved || raw;
 }

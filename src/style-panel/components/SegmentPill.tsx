@@ -17,7 +17,7 @@ import { useLayoutEffect, useRef, useState } from 'react';
 // Drop it inside the track as the first child. It measures its own siblings.
 export default function SegmentPill() {
   const ref = useRef<HTMLSpanElement>(null);
-  const [box, setBox] = useState<{ x: number; width: number } | null>(null);
+  const [box, setBox] = useState<{ x: number; width: number } | undefined>(undefined);
   const [animated, setAnimated] = useState(false);
 
   useLayoutEffect(() => {
@@ -42,7 +42,7 @@ export default function SegmentPill() {
       // Layout offsets, not getBoundingClientRect: under a CSS `zoom` ancestor a
       // rect comes back in scaled coordinates while the inline px below is
       // re-zoomed, which doubles the scaling. Offsets are zoom-independent.
-      setBox(selected ? { x: selected.offsetLeft, width: selected.offsetWidth } : null);
+      setBox(selected ? { x: selected.offsetLeft, width: selected.offsetWidth } : undefined);
     }
     measure();
     // A click changes which button carries `is-selected`; a value arriving from

@@ -16,16 +16,16 @@ import { useEffect, useState } from 'react';
 /**
  * `[shown, note]` — the value to display, and where to report a live one.
  *
- * Call `note(colour)` on a live drag and `note(null)` when it commits (or is
+ * Call `note(colour)` on a live drag and `note(undefined)` when it commits (or is
  * abandoned): the display drops back to `external`, which by then is the same
  * colour, arriving from the model.
  */
-export function useLiveColor(external: string): [string, (value: string | null) => void] {
-  const [live, setLive] = useState<string | null>(null);
+export function useLiveColor(external: string): [string, (value: string | undefined) => void] {
+  const [live, setLive] = useState<string | undefined>(undefined);
   // The model has answered — whatever it says now is more authoritative than a
   // value this control emitted a moment ago.
   useEffect(() => {
-    setLive(null);
+    setLive(undefined);
   }, [external]);
   return [live ?? external, setLive];
 }

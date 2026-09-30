@@ -22,16 +22,16 @@ const cache = createQueryCache(async (path, props) => {
   const answer = await queryCanvas(path, [], [], props);
   const tag = answer?.identity?.tag;
   if (tag && expected && tag !== expected) {
-    return null;
+    return undefined;
   }
   return answer?.computedProps
     ? Object.fromEntries(
         Object.entries(answer.computedProps).map(([key, value]) => [
           key,
-          typeof value === 'string' ? value.trim() : null,
+          typeof value === 'string' ? value.trim() : undefined,
         ]),
       )
-    : null;
+    : undefined;
 });
 
 function currentCache() {
@@ -52,26 +52,26 @@ export function forgetComputedStyles(): void {
   cache.clear();
 }
 
-function pathOfSelection(): string | null {
+function pathOfSelection(): string | undefined {
   const host = getHost();
-  return host.selectedId ? (host.pathOf?.(host.selectedId) ?? null) : null;
+  return host.selectedId ? host.pathOf?.(host.selectedId) : undefined;
 }
 
 // The selected node's HTML tag, when it has one. A component instance's name is its
 // component ('Card'), which says nothing about the tag it renders, so only a plain
 // lowercase name counts — those are the ones a rendered tag can be checked against.
-function selectedTag(): string | null {
+function selectedTag(): string | undefined {
   const host = getHost();
-  const node = host.selectedId ? findNode(host.nodes, host.selectedId) : null;
+  const node = host.selectedId ? findNode(host.nodes, host.selectedId) : undefined;
   if (node?.kind !== 'element') {
-    return null;
+    return undefined;
   }
   const name = node.name ?? '';
-  return /^[a-z][a-z0-9-]*$/.test(name) ? name : null;
+  return /^[a-z][a-z0-9-]*$/.test(name) ? name : undefined;
 }
 
 /** An answer from the page: what it said, and whether it is still being asked. */
-type Answer = { value: string; pending: boolean; path: string | null };
+type Answer = { value: string; pending: boolean; path: string | undefined };
 
 /**
  * What the page has already said about `prop`, read straight from the store.
@@ -85,18 +85,21 @@ type Answer = { value: string; pending: boolean; path: string | null };
  */
 function answeredNow(prop: string): Answer {
   if (!prop) {
-    return { value: '', pending: false, path: null };
+    return { value: '', pending: false, path: undefined };
   }
   // `hasCanvas` is checked HERE, not once on mount: the panel can render before
   // the preview frame registers, and that first pass must not opt out for good.
-  const path = hasCanvas() ? pathOfSelection() : null;
+  const path = hasCanvas() ? pathOfSelection() : undefined;
   // Nothing to ask — so nothing is pending either. No answer is ever coming, and
   // a control waiting forever would never show anything.
   if (!path) {
-    return { value: '', pending: false, path: null };
+    return { value: '', pending: false, path: undefined };
   }
   const known = currentCache().read(path, prop);
-  return { value: known ?? '', pending: known === undefined, path };
+  if (known.kind === 'pending') {
+    return { value: '', pending: true, path };
+  }
+  return { value: known.answer ?? '', pending: false, path };
 }
 
 // `pending` is the part worth having. '' means two different things — "the page
@@ -109,7 +112,7 @@ function useComputedAnswer(prop: string): Answer {
     if (!prop) {
       return undefined;
     }
-    const sync = () => bump((n) => n + 1);
+    const sync = () => bump((count) => count + 1);
     const offCache = cache.subscribe(sync);
     // The selection moves, or the page re-renders under it: ask for the element
     // that's selected now.

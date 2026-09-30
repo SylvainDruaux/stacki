@@ -12,8 +12,10 @@
 
 /** `!important` and whatever whitespace led up to it, kept aside and put back. */
 function splitImportant(value: string): { body: string; suffix: string } {
-  const m = value.match(/(\s*!\s*important\s*)$/i);
-  return m ? { body: value.slice(0, m.index), suffix: m[1] ?? '' } : { body: value, suffix: '' };
+  const match = value.match(/(\s*!\s*important\s*)$/i);
+  return match
+    ? { body: value.slice(0, match.index), suffix: match[1] ?? '' }
+    : { body: value, suffix: '' };
 }
 
 const LONE_VAR = /^var\(\s*--[A-Za-z0-9_-]+\s*(?:,[^)]*)?\)$/i;
@@ -28,46 +30,47 @@ const LONE_VAR = /^var\(\s*--[A-Za-z0-9_-]+\s*(?:,[^)]*)?\)$/i;
  */
 export function replacesWholeValue(value: string): boolean {
   const { body } = splitImportant(String(value ?? ''));
-  const t = body.trim();
-  if (!t) {
+  const trimmed = body.trim();
+  if (!trimmed) {
     return true;
   }
-  if (LONE_VAR.test(t)) {
+  if (LONE_VAR.test(trimmed)) {
     return true;
   }
   // A function call — calc(), clamp(), color-mix(), min(), any of them.
-  if (t.includes('(')) {
+  if (trimmed.includes('(')) {
     return false;
   }
   // `1px solid red`: three parts, and a variable is being picked for one of
   // them. Replacing would drop the other two.
-  if (/\s/.test(t)) {
+  if (/\s/.test(trimmed)) {
     return false;
   }
   return true;
 }
 
 /** The `var(…)` around `caret`, if the caret is inside one. */
-function varAround(value: string, caret: number): { start: number; end: number } | null {
+function varAround(value: string, caret: number): { start: number; end: number } | undefined {
   const re = /var\(\s*--[A-Za-z0-9_-]+\s*(?:,[^)]*)?\)/gi;
-  for (let m = re.exec(value); m; m = re.exec(value)) {
-    const start = m.index;
-    const end = start + m[0].length;
+  // A global regex advances `lastIndex` on every match, so each `var()` is visited once.
+  for (let match = re.exec(value); match !== null; match = re.exec(value)) {
+    const start = match.index;
+    const end = start + match[0].length;
     if (caret >= start && caret <= end) {
       return { start, end };
     }
   }
-  return null;
+  return undefined;
 }
 
 /**
  * The value to write when `binding` is picked for a field currently holding
- * `value`, with the caret at `caret` (null when it isn't known).
+ * `value`, with the caret at `caret` (undefined when it isn't known).
  *
  * `!important` survives either way: dropping it silently would change what the
  * declaration does, and nobody picking a variable asked for that.
  */
-export function insertBinding(value: string, binding: string, caret: number | null): string {
+export function insertBinding(value: string, binding: string, caret: number | undefined): string {
   const text = String(value ?? '');
   const { body, suffix } = splitImportant(text);
 
@@ -85,7 +88,7 @@ export function insertBinding(value: string, binding: string, caret: number | nu
   // one outcome nobody could want and the one that is hardest to undo. A
   // variable stuck on the end is visibly wrong and takes a second to fix; a
   // calc() that has vanished has to be written again from memory.
-  if (caret == null) {
+  if (caret === undefined) {
     const existing = body.match(/var\(\s*--[A-Za-z0-9_-]+\s*(?:,[^)]*)?\)/i);
     return existing ? text.replace(existing[0], binding) : body + binding + suffix;
   }

@@ -12,15 +12,16 @@
 // straight back, caret where it was.
 
 /** Run a field's blur-commit and return focus (and the caret) to it. */
-export function commitInPlace(el: HTMLInputElement | HTMLTextAreaElement): void {
-  const { selectionStart, selectionEnd } = el;
-  el.blur();
-  el.focus();
+export function commitInPlace(element: HTMLInputElement | HTMLTextAreaElement): void {
+  const { selectionStart, selectionEnd } = element;
+  element.blur();
+  element.focus();
   // After focus, because a field that selects its text on focus would otherwise
   // undo this.
-  if (selectionStart != null && selectionEnd != null) {
+  // The platform reports "no selection" as null (a number or colour field).
+  if (selectionStart !== null && selectionEnd !== null) {
     try {
-      el.setSelectionRange(selectionStart, selectionEnd);
+      element.setSelectionRange(selectionStart, selectionEnd);
     } catch {
       /* a field whose type has no selection (number, colour) — nothing to put back */
     }

@@ -43,8 +43,9 @@ export function ClassPicker({
 }: ClassPickerProps) {
   const order = tokens.map((token) => token.name);
 
-  const selectToken = (name: string, additive: boolean) => {
-    const next = additive
+  // Additive (Shift/Alt) toggles a token in or out of the combo; plain replaces it.
+  const selectToken = (name: string, options: { readonly additive: boolean }) => {
+    const next = options.additive
       ? selected.includes(name)
         ? // Toggling off — but never empty the selection; at least one stays selected.
           selected.length > 1
@@ -53,7 +54,7 @@ export function ClassPicker({
         : [...selected, name]
       : [name];
     // Keep the combo order matching the token order.
-    const ordered = [...next].sort((a, b) => order.indexOf(a) - order.indexOf(b));
+    const ordered = [...next].sort((left, right) => order.indexOf(left) - order.indexOf(right));
     // No-op guard so a click on the sole selected token doesn't churn.
     if (
       ordered.length === selected.length &&
@@ -65,7 +66,7 @@ export function ClassPicker({
   };
 
   if (!tokens.length) {
-    return null;
+    return undefined;
   }
 
   return (
@@ -89,7 +90,9 @@ export function ClassPicker({
                 ? tagTitle(token, isActive)
                 : `${token.label ?? token.name} — Shift-click to combine`
             }
-            onClick={(event) => selectToken(token.name, event.shiftKey || event.altKey)}
+            onClick={(event) =>
+              selectToken(token.name, { additive: event.shiftKey || event.altKey })
+            }
           >
             {token.label ?? token.name}
           </button>

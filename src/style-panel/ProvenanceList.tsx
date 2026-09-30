@@ -8,7 +8,7 @@ export type EmbedNav = {
   open: (embedKey: string) => void;
   labelFor: (embedKey: string) => string;
 };
-export const ProvenanceEmbedNav = createContext<EmbedNav | null>(null);
+export const ProvenanceEmbedNav = createContext<EmbedNav | undefined>(undefined);
 
 // A little `</>` glyph, echoing the embed chip in the source dropdown.
 function EmbedGlyph() {
@@ -38,43 +38,26 @@ export default function ProvenanceList({
 }) {
   const nav = useContext(ProvenanceEmbedNav);
   if (!contributors.length) {
-    return null;
+    return undefined;
   }
   // Emphasize the row you're editing (the picked selector's value); with nothing
   // being edited (e.g. an orange property's popover) fall back to the winner.
-  const editingIdx = contributors.findIndex((c) => c.editing);
-  const activeIdx = editingIdx >= 0 ? editingIdx : contributors.findIndex((c) => c.winning);
+  const editingIndex = contributors.findIndex((contributor) => contributor.editing);
+  const activeIndex =
+    editingIndex >= 0 ? editingIndex : contributors.findIndex((contributor) => contributor.winning);
   return (
     <ul className="embed-editor_provenance-list">
-      {contributors.map((c, index) => {
-        const cls = `embed-editor_provenance-item ${index === activeIdx ? 'is-active' : ''}`;
-        const embedKey = c.embedKey;
-        const embedName = embedKey && nav ? nav.labelFor(embedKey) : null;
-        const origin =
-          c.origin === 'native' ? (
-            <span className="embed-editor_provenance-origin">Webflow</span>
-          ) : embedKey && nav && embedName ? (
-            // A span (not a button) so it's valid inside the clickable row button;
-            // stopPropagation keeps the row's selector-jump from also firing.
-            <span
-              className={`embed-editor_provenance-embed ${c.fromComponent ? 'is-component' : ''}`}
-              role="button"
-              title={`Select ${embedName} on the canvas`}
-              onClick={(event) => {
-                event.stopPropagation();
-                nav.open(embedKey);
-              }}
-            >
-              <EmbedGlyph />
-              <span className="embed-editor_provenance-embed-label">{embedName}</span>
-            </span>
-          ) : null;
-        const rawValue = c.important ? `${c.value} !important` : c.value;
+      {contributors.map((contributor, index) => {
+        const activeClass = index === activeIndex ? 'is-active' : '';
+        const className = `embed-editor_provenance-item ${activeClass}`;
+        const rawValue = contributor.important
+          ? `${contributor.value} !important`
+          : contributor.value;
         const body = (
           <>
-            {origin}
+            <ProvenanceOrigin contributor={contributor} nav={nav} />
             <div className="embed-editor_provenance-line">
-              <code className="embed-editor_provenance-sel">{c.selectorText}</code>
+              <code className="embed-editor_provenance-sel">{contributor.selectorText}</code>
               <span className="embed-editor_provenance-val" title={rawValue}>
                 {rawValue}
               </span>
@@ -83,24 +66,63 @@ export default function ProvenanceList({
         );
         // The row for the selector you're already editing isn't a navigation
         // target — it stays a plain (non-clickable) row.
-        const select = c.editing ? undefined : onSelect;
+        const select = contributor.editing ? undefined : onSelect;
         return (
           <li key={index}>
             {select ? (
               <button
                 type="button"
-                className={`${cls} is-clickable`}
-                title={`Edit ${c.selectorText}`}
-                onClick={() => select(c.selectorText, prop)}
+                className={`${className} is-clickable`}
+                title={`Edit ${contributor.selectorText}`}
+                onClick={() => select(contributor.selectorText, prop)}
               >
                 {body}
               </button>
             ) : (
-              <div className={cls}>{body}</div>
+              <div className={className}>{body}</div>
             )}
           </li>
         );
       })}
     </ul>
+  );
+}
+
+// Where a contributor's value comes from: a plain "Webflow" tag for a native
+// class, or the source embed as a chip that selects it on the canvas.
+function ProvenanceOrigin({
+  contributor,
+  nav,
+}: {
+  contributor: Contributor;
+  nav: EmbedNav | undefined;
+}) {
+  if (contributor.origin === 'native') {
+    return <span className="embed-editor_provenance-origin">Webflow</span>;
+  }
+  const embedKey = contributor.embedKey;
+  if (!embedKey || !nav) {
+    return undefined;
+  }
+  const embedName = nav.labelFor(embedKey);
+  if (!embedName) {
+    return undefined;
+  }
+  const componentClass = contributor.fromComponent ? 'is-component' : '';
+  return (
+    // A span (not a button) so it's valid inside the clickable row button;
+    // stopPropagation keeps the row's selector-jump from also firing.
+    <span
+      className={`embed-editor_provenance-embed ${componentClass}`}
+      role="button"
+      title={`Select ${embedName} on the canvas`}
+      onClick={(event) => {
+        event.stopPropagation();
+        nav.open(embedKey);
+      }}
+    >
+      <EmbedGlyph />
+      <span className="embed-editor_provenance-embed-label">{embedName}</span>
+    </span>
   );
 }

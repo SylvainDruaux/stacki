@@ -15,8 +15,8 @@ export type StyleRegion = {
   /** Offset in the embed code where the inner CSS ends (just before `</style>`). */
   end: number;
   css: string;
-  root: Root | null;
-  parseError?: string;
+  root: Root | undefined;
+  parseError?: string | undefined;
   /** The region's opening tag verbatim (`<style is:global>`) — what tells a
    *  component's global block from a scoped one. */
   openTag?: string;
@@ -32,8 +32,8 @@ export type SelectorInfo = {
   specificity: Specificity;
   /** True when the selector carries a pseudo-class (`:hover`, `:focus`, …). */
   hasPseudoClass: boolean;
-  /** The pseudo-element (`::before`) if present, else null. */
-  pseudoElement: string | null;
+  /** The pseudo-element (`::before`) if present, else undefined. */
+  pseudoElement: string | undefined;
   /** True when matching had to guess (e.g. sibling combinator we can't verify). */
   approximate: boolean;
 };
@@ -48,7 +48,7 @@ export type ParsedRule = {
   embedLabel: string;
   /** True when the embed lives in a component definition (shared across instances). */
   fromComponent: boolean;
-  componentName: string | null;
+  componentName: string | undefined;
   regionIndex: number;
   node: Rule;
   selectorText: string;
@@ -122,11 +122,11 @@ export type NativeModel = {
 
 /** Identity of the selected element, used for selector matching. */
 export type ElementSnapshot = {
-  /** Resolved lowercase HTML tag, or null when unknown. */
-  tag: string | null;
+  /** Resolved lowercase HTML tag, or undefined when unknown. */
+  tag: string | undefined;
   webflowType: string;
-  /** DOM id attribute, or null. */
-  id: string | null;
+  /** DOM id attribute, or undefined. */
+  id: string | undefined;
   /** CSS class tokens (compiled names + normalized display names). */
   classes: string[];
   /** Ordered compiled class list (primary first, then combos) for scaffolding. */

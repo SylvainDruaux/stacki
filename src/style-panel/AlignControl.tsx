@@ -24,8 +24,8 @@ type Props = {
   /** Resolved model, for the X / Y labels' blue / orange / clear states. */
   read: (prop: string) => ResolvedProp | undefined;
   onSet: (prop: string, value: string) => void;
-  /** Live preview; `null` = drop the preview and restore the committed value. */
-  onLive: (prop: string, value: string | null) => void;
+  /** Live preview; `undefined` = drop the preview and restore the committed value. */
+  onLive: (prop: string, value: string | undefined) => void;
   onClear: (prop: string) => void;
   onProvenance: (prop: string, anchor: DOMRect) => void;
   onSelectSelector: (selector: string, prop?: string) => void;
@@ -165,7 +165,7 @@ function iconFor(value: string, prop: string, axis: 'x' | 'y'): ReactNode {
 // a baseline — a letter "A" and a down arrow, each with an underline tick — instead of
 // item bars, matching Webflow. They're distributed by the OTHER axis (justify-content),
 // so Space-between pushes them to the edges, Center sits them together, etc.
-const BASELINE_A = (
+const BASELINE_LETTER = (
   <svg viewBox="0 0 14 16" width="14" height="16" fill="none" aria-hidden="true">
     <path
       d="M2.6 10 L7 3 L11.4 10 M4.1 7.6 H9.9"
@@ -211,14 +211,14 @@ const ALIGN_VALUES = ['flex-start', 'center', 'flex-end', 'stretch', 'baseline']
 
 // Map assorted spellings onto the canonical values used above.
 function norm(value: string): string {
-  const v = value.trim().toLowerCase();
-  if (v === 'start' || v === 'self-start' || v === 'left') {
+  const spelling = value.trim().toLowerCase();
+  if (spelling === 'start' || spelling === 'self-start' || spelling === 'left') {
     return 'flex-start';
   }
-  if (v === 'end' || v === 'self-end' || v === 'right') {
+  if (spelling === 'end' || spelling === 'self-end' || spelling === 'right') {
     return 'flex-end';
   }
-  return v;
+  return spelling;
 }
 
 // Labels track the screen axis, not the property: start/end read as Left/Right on
@@ -267,33 +267,16 @@ function CustomInput({
 }) {
   const [draft, setDraft] = useState(value);
   const focused = useRef(false);
-  const liveTimer = useRef<number | null>(null);
   useEffect(() => {
     if (!focused.current) {
       setDraft(value);
     }
   }, [value]);
-  const cancelLive = () => {
-    if (liveTimer.current != null) {
-      window.clearTimeout(liveTimer.current);
-      liveTimer.current = null;
-    }
-  };
-  useEffect(() => cancelLive, []);
-  const scheduleLive = (text: string) => {
-    cancelLive();
-    liveTimer.current = window.setTimeout(() => {
-      liveTimer.current = null;
-      const t = text.trim();
-      if (t) {
-        onLive(t);
-      }
-    }, 100);
-  };
+  const { scheduleLive, cancelLive } = useLiveTimer(onLive);
   const commit = () => {
-    const t = draft.trim();
-    if (t) {
-      onCommit(t);
+    const trimmed = draft.trim();
+    if (trimmed) {
+      onCommit(trimmed);
     } else {
       onClear();
     }
@@ -328,92 +311,111 @@ function CustomInput({
   );
 }
 
+// Debounces live previews while typing: a trimmed, non-empty draft reaches `onLive`
+// 100ms after the last keystroke; `cancelLive` drops a pending one.
+function useLiveTimer(onLive: (value: string) => void) {
+  const liveTimer = useRef<number | undefined>(undefined);
+  const cancelLive = () => {
+    if (liveTimer.current !== undefined) {
+      window.clearTimeout(liveTimer.current);
+      liveTimer.current = undefined;
+    }
+  };
+  useEffect(() => cancelLive, []);
+  const scheduleLive = (text: string) => {
+    cancelLive();
+    liveTimer.current = window.setTimeout(() => {
+      liveTimer.current = undefined;
+      const trimmed = text.trim();
+      if (trimmed) {
+        onLive(trimmed);
+      }
+    }, 100);
+  };
+  return { scheduleLive, cancelLive };
+}
+
+// The options of one axis dropdown: its values with their screen-axis labels and
+// icons, then "Custom".
+function axisOptions(
+  values: readonly string[],
+  prop: string,
+  axis: 'x' | 'y',
+): SelectOption<string>[] {
+  const options: SelectOption<string>[] = values.map((option) => ({
+    value: option,
+    label: axisLabel(option, axis),
+    icon: iconFor(option, prop, axis),
+  }));
+  options.push({ value: CUSTOM, label: 'Custom' });
+  return options;
+}
+
 // One axis dropdown. `prop` is the CSS property this axis edits (justify-content or
 // align-items, per direction); `fallback` is the CSS default shown when unset. The
 // last option is always "Custom", which seeds `unset` and reveals a free-text field
 // for any other value.
-function AxisSelect({
-  axis,
-  label,
-  prop,
-  value,
-  values,
-  fallback,
-  busy,
-  read,
-  onSet,
-  onLive,
-  onClear,
-  onProvenance,
-  onSelectSelector,
-}: {
+type AxisSelectProps = Pick<
+  Props,
+  'busy' | 'read' | 'onSet' | 'onLive' | 'onClear' | 'onProvenance' | 'onSelectSelector'
+> & {
   axis: 'x' | 'y';
   label: string;
   prop: string;
   value: string;
   values: string[];
   fallback: string;
-  busy: boolean;
-  read: (prop: string) => ResolvedProp | undefined;
-  onSet: (prop: string, value: string) => void;
-  /** Live preview; `null` = drop the preview and restore the committed value. */
-  onLive: (prop: string, value: string | null) => void;
-  onClear: (prop: string) => void;
-  onProvenance: (prop: string, anchor: DOMRect) => void;
-  onSelectSelector: (selector: string, prop?: string) => void;
-}) {
+};
+function AxisSelect(props: AxisSelectProps) {
+  const { axis, prop, value, values, fallback, busy, onSet, onLive, onClear } = props;
   const [forceCustom, setForceCustom] = useState(false);
   const ariaLabel = axis === 'x' ? 'Horizontal alignment' : 'Vertical alignment';
   const present = Boolean(value.trim());
-  const n = norm(value);
-  const known = values.includes(n);
+  const normalized = norm(value);
+  const known = values.includes(normalized);
   // Unset → what the page computes for this element, which catches a rule the
   // panel's matcher can't see; `normal` and friends aren't options, so those fall
   // through to the CSS default below.
   const shownComputed = useHighlight('', present ? '' : prop, values, fallback);
   const customMode = forceCustom || (present && !known);
-  const options: SelectOption<string>[] = values.map((v) => ({
-    value: v,
-    label: axisLabel(v, axis),
-    icon: iconFor(v, prop, axis),
-  }));
-  options.push({ value: CUSTOM, label: 'Custom' });
+  const options = axisOptions(values, prop, axis);
 
-  const pick = (v: string) => {
-    if (v === CUSTOM) {
+  const pick = (choice: string) => {
+    if (choice === CUSTOM) {
       setForceCustom(true);
       onSet(prop, 'unset');
       return;
     }
     setForceCustom(false);
-    onSet(prop, v);
+    onSet(prop, choice);
   };
   // Hover scrub: preview the option under the pointer on the canvas, and put the
   // original back when the list closes without a pick. "Custom" has no value of its own
   // to show, so landing on it reverts rather than previewing `unset`.
-  const preview = (v: string | null) => onLive(prop, v === CUSTOM ? null : v);
+  const preview = (option: string | undefined) =>
+    onLive(prop, option === CUSTOM ? undefined : option);
 
   return (
     <div className="embed-editor_align-axis">
       {/* The axis label — not the row's "Align" caption — carries this property's
           blue / orange state and its clear menu, so X and Y reset independently. */}
       <GroupLabel
-        label={label}
+        label={props.label}
         props={[prop]}
-        read={read}
+        read={props.read}
         busy={busy}
         onClear={() => onClear(prop)}
-        onProvenance={onProvenance}
-        onSelectSelector={onSelectSelector}
+        onProvenance={props.onProvenance}
+        onSelectSelector={props.onSelectSelector}
       />
       <Select
-        value={customMode ? CUSTOM : present ? n : shownComputed}
+        value={customMode ? CUSTOM : present ? normalized : shownComputed}
         options={options}
         ariaLabel={ariaLabel}
         disabled={busy}
         hideTriggerIcon
         onChange={pick}
-        onPreview={preview}
+        onPreview={(option) => preview(option ?? undefined)}
         customInput={
           customMode ? (
             <CustomInput
@@ -421,8 +423,8 @@ function AxisSelect({
               busy={busy}
               ariaLabel={ariaLabel}
               autoFocus={forceCustom}
-              onCommit={(val) => onSet(prop, val)}
-              onLive={(val) => onLive(prop, val)}
+              onCommit={(next) => onSet(prop, next)}
+              onLive={(next) => onLive(prop, next)}
               onClear={() => {
                 setForceCustom(false);
                 onClear(prop);
@@ -431,6 +433,36 @@ function AxisSelect({
           ) : undefined
         }
       />
+    </div>
+  );
+}
+
+const ALIGN_POSITIONS = ['flex-start', 'center', 'flex-end'];
+
+// The 3×3 click targets: start / center / end on each screen axis.
+function AlignDots({ column, busy, onSet }: Pick<Props, 'column' | 'busy' | 'onSet'>) {
+  // Screen X → horizontal property, screen Y → vertical property (flip on column).
+  const xProp = column ? 'align-items' : 'justify-content';
+  const yProp = column ? 'justify-content' : 'align-items';
+  return (
+    <div className="embed-editor_align-dots">
+      {ALIGN_POSITIONS.map((ry) =>
+        ALIGN_POSITIONS.map((cx) => (
+          <button
+            key={`${ry}-${cx}`}
+            type="button"
+            className="embed-editor_align-dot"
+            disabled={busy}
+            aria-label={`Align ${axisLabel(cx, 'x')} ${axisLabel(ry, 'y')}`}
+            onClick={() => {
+              onSet(xProp, cx);
+              onSet(yProp, ry);
+            }}
+          >
+            <span />
+          </button>
+        )),
+      )}
     </div>
   );
 }
@@ -444,13 +476,13 @@ function AlignBox({
   busy,
   onSet,
 }: Pick<Props, 'justify' | 'align' | 'column' | 'busy' | 'onSet'>) {
-  const j = norm(justify) || 'flex-start';
-  const a = norm(align) || 'stretch';
-  const isBaseline = a === 'baseline';
+  const justifyValue = norm(justify) || 'flex-start';
+  const alignValue = norm(align) || 'stretch';
+  const isBaseline = alignValue === 'baseline';
   // Stretch → let the real align-items fill the cross axis (omit the size); every
   // other value → a short fixed-length bar that align-items then positions (Webflow
   // shows the children as small ticks unless they're stretched).
-  const cross = a === 'stretch' ? undefined : '28%';
+  const cross = alignValue === 'stretch' ? undefined : '28%';
   const barStyle: CSSProperties = column
     ? { height: 2, width: cross }
     : { width: 2, height: cross };
@@ -459,55 +491,36 @@ function AlignBox({
   // (justify-content) still positions it left/center/right.
   const previewStyle: CSSProperties = {
     flexDirection: column ? 'column' : 'row',
-    justifyContent: j,
-    alignItems: isBaseline ? 'flex-start' : a,
+    justifyContent: justifyValue,
+    alignItems: isBaseline ? 'flex-start' : alignValue,
   };
-  const positions = ['flex-start', 'center', 'flex-end'];
-  // Screen X → horizontal property, screen Y → vertical property (flip on column).
-  const xProp = column ? 'align-items' : 'justify-content';
-  const yProp = column ? 'justify-content' : 'align-items';
   return (
     <div className="embed-editor_align-box">
-      <div className="embed-editor_align-dots">
-        {positions.map((ry) =>
-          positions.map((cx) => (
-            <button
-              key={`${ry}-${cx}`}
-              type="button"
-              className="embed-editor_align-dot"
-              disabled={busy}
-              aria-label={`Align ${axisLabel(cx, 'x')} ${axisLabel(ry, 'y')}`}
-              onClick={() => {
-                onSet(xProp, cx);
-                onSet(yProp, ry);
-              }}
-            >
-              <span />
-            </button>
-          )),
-        )}
-      </div>
+      <AlignDots column={column} busy={busy} onSet={onSet} />
       <div className="embed-editor_align-preview" style={previewStyle} aria-hidden="true">
         {isBaseline ? (
           <>
-            <span className="embed-editor_align-baseline">{BASELINE_A}</span>
+            <span className="embed-editor_align-baseline">{BASELINE_LETTER}</span>
             <span className="embed-editor_align-baseline">{BASELINE_ARROW}</span>
           </>
         ) : (
           // Double-click the clustered bars → space-between; double-click a spread bar
           // → collapse the main axis to that bar's position (start / center / end).
-          positions.map((pos, i) => (
+          ALIGN_POSITIONS.map((position, i) => (
             <span
               key={i}
               className="embed-editor_align-bar"
               style={barStyle}
               title={
-                j === 'space-between'
+                justifyValue === 'space-between'
                   ? 'Double-click to align here'
                   : 'Double-click for Space between'
               }
               onDoubleClick={() =>
-                onSet('justify-content', j === 'space-between' ? pos : 'space-between')
+                onSet(
+                  'justify-content',
+                  justifyValue === 'space-between' ? position : 'space-between',
+                )
               }
             />
           ))

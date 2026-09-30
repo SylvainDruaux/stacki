@@ -50,9 +50,10 @@ const RADIAL_SIZE_KW = new Set([
   'farthest-side',
   'farthest-corner',
 ]);
-const isAngle = (t: string) => /^-?[\d.]+(deg|grad|rad|turn)$/i.test(t.trim());
-const isLength = (t: string) => /^-?[\d.]+(px|%|em|rem|vw|vh|vmin|vmax|ch|fr)?$/i.test(t.trim());
-const POS_KW: Record<string, string> = {
+const isAngle = (token: string) => /^-?[\d.]+(deg|grad|rad|turn)$/i.test(token.trim());
+const isLength = (token: string) =>
+  /^-?[\d.]+(px|%|em|rem|vw|vh|vmin|vmax|ch|fr)?$/i.test(token.trim());
+const POSITION_KEYWORDS: Record<string, string> = {
   left: '0%',
   right: '100%',
   top: '0%',
@@ -61,9 +62,9 @@ const POS_KW: Record<string, string> = {
 };
 
 /** Map a position keyword/length to a percentage string (best effort). */
-function posValue(token: string): string {
-  const t = token.trim().toLowerCase();
-  return POS_KW[t] ?? token.trim();
+function positionValue(token: string): string {
+  const normalized = token.trim().toLowerCase();
+  return POSITION_KEYWORDS[normalized] ?? token.trim();
 }
 
 /** Parse `x y` (or a single value → x, y=center) into { posX, posY }. */
@@ -74,14 +75,14 @@ function parseCenter(text: string): { posX: string; posY: string } {
   }
   if (toks.length === 1) {
     const first = toks[0] ?? '';
-    const v = posValue(first);
+    const position = positionValue(first);
     // A lone vertical keyword sets Y; anything else sets X (center the other axis).
     if (/^(top|bottom)$/i.test(first)) {
-      return { posX: '50%', posY: v };
+      return { posX: '50%', posY: position };
     }
-    return { posX: v, posY: '50%' };
+    return { posX: position, posY: '50%' };
   }
-  return { posX: posValue(toks[0] ?? ''), posY: posValue(toks[1] ?? '') };
+  return { posX: positionValue(toks[0] ?? ''), posY: positionValue(toks[1] ?? '') };
 }
 
 /** Split one stop into color + optional trailing position (handles rgba()/color-mix). */
@@ -95,12 +96,12 @@ function parseStop(part: string): GradientStop {
 
 /** Is the first comma-group a prelude (direction/shape/size/position) vs a color stop? */
 function isPrelude(type: GradientType, part: string): boolean {
-  const p = part.trim().toLowerCase();
+  const normalized = part.trim().toLowerCase();
   if (type === 'linear') {
-    return p.startsWith('to ') || isAngle(p);
+    return normalized.startsWith('to ') || isAngle(normalized);
   }
   if (type === 'conic') {
-    return p.startsWith('from ') || p.startsWith('at ');
+    return normalized.startsWith('from ') || normalized.startsWith('at ');
   }
   // radial: shape / size keyword / explicit size / an `at <pos>`.
   //
@@ -112,115 +113,94 @@ function isPrelude(type: GradientType, part: string): boolean {
   // unparseable: `radial-gradient(red 0%, blue 100%)` — ordinary, valid CSS —
   // could not be read by the editor at all.
   if (
-    p.startsWith('circle') ||
-    p.startsWith('ellipse') ||
-    p.includes(' at ') ||
-    p.startsWith('at ')
+    normalized.startsWith('circle') ||
+    normalized.startsWith('ellipse') ||
+    normalized.includes(' at ') ||
+    normalized.startsWith('at ')
   ) {
     return true;
   }
-  if (RADIAL_SIZE_KW.has(p)) {
+  if (RADIAL_SIZE_KW.has(normalized)) {
     return true;
   }
-  const tokens = splitTopLevelSpaces(p);
+  const tokens = splitTopLevelSpaces(normalized);
   return (
-    tokens.length > 0 && tokens.every((t) => RADIAL_SIZE_KW.has(t.toLowerCase()) || isLength(t))
+    tokens.length > 0 &&
+    tokens.every((token) => RADIAL_SIZE_KW.has(token.toLowerCase()) || isLength(token))
   );
 }
 
-export function parseGradient(image: string): Gradient | null {
-  const m = GRADIENT_RE.exec(image.trim());
-  if (!m) {
-    return null;
+export function parseGradient(image: string): Gradient | undefined {
+  const match = GRADIENT_RE.exec(image.trim());
+  if (!match) {
+    return undefined;
   }
-  const typeText = (m[2] ?? '').toLowerCase();
+  const typeText = (match[2] ?? '').toLowerCase();
   if (typeText !== 'linear' && typeText !== 'radial' && typeText !== 'conic') {
-    return null;
+    return undefined;
   }
   const type: GradientType = typeText;
-  const parts = splitTopLevelCommas(m[3] ?? '').filter((s) => s.length);
+  const parts = splitTopLevelCommas(match[3] ?? '').filter((part) => part.length);
   if (!parts.length) {
-    return null;
+    return undefined;
   }
-
-  const g: Gradient = {
-    type,
-    repeating: !!m[1],
-    angle: '',
-    shape: '',
-    size: '',
-    from: '',
-    posX: '',
-    posY: '',
-    stops: [],
-  };
-  let rest = parts;
-  if (isPrelude(type, parts[0] ?? '')) {
-    parsePrelude(g, parts[0] ?? '');
-    rest = parts.slice(1);
-  }
-  g.stops = rest.map(parseStop).filter((s) => s.color);
-  if (g.stops.length < 2) {
-    return null;
+  const hasPrelude = isPrelude(type, parts[0] ?? '');
+  const geometry = hasPrelude ? parsePrelude(type, parts[0] ?? '') : {};
+  const rest = hasPrelude ? parts.slice(1) : parts;
+  const stops = rest.map(parseStop).filter((stop) => stop.color);
+  if (stops.length < 2) {
+    return undefined;
   } // not a usable gradient
-  return g;
+  return { ...blankGradientOf(type), repeating: !!match[1], ...geometry, stops };
 }
 
-function parsePrelude(g: Gradient, prelude: string) {
-  const p = prelude.trim();
-  if (g.type === 'linear') {
-    g.angle = p;
-    return;
+type Geometry = Partial<Pick<Gradient, 'angle' | 'shape' | 'size' | 'from' | 'posX' | 'posY'>>;
+
+// The geometry a prelude spells: a linear angle, a conic `from … at …`, or a radial
+// `<shape?> <size?> at <pos?>`. Fields it doesn't mention are left out.
+function parsePrelude(type: GradientType, prelude: string): Geometry {
+  const trimmed = prelude.trim();
+  if (type === 'linear') {
+    return { angle: trimmed };
   }
-  if (g.type === 'conic') {
-    const at = p.split(/\bat\b/i);
+  const at = trimmed.split(/\bat\b/i);
+  const center = at[1] ? parseCenter(at[1]) : {};
+  if (type === 'conic') {
     const fromPart = (at[0] ?? '').replace(/^from\s+/i, '').trim();
-    if (fromPart) {
-      g.from = fromPart;
-    }
-    if (at[1]) {
-      const c = parseCenter(at[1]);
-      g.posX = c.posX;
-      g.posY = c.posY;
-    }
-    return;
+    return { ...(fromPart ? { from: fromPart } : {}), ...center };
   }
-  // radial: `<shape?> <size?> at <pos?>`
-  const at = p.split(/\bat\b/i);
-  for (const tok of splitTopLevelSpaces(at[0] ?? '')) {
-    const lt = tok.toLowerCase();
-    if (lt === 'circle' || lt === 'ellipse') {
-      g.shape = lt;
-    } else if (RADIAL_SIZE_KW.has(lt) || isLength(tok)) {
-      g.size = g.size ? `${g.size} ${tok}` : tok;
+  let shape = '';
+  let size = '';
+  for (const token of splitTopLevelSpaces(at[0] ?? '')) {
+    const lower = token.toLowerCase();
+    if (lower === 'circle' || lower === 'ellipse') {
+      shape = lower;
+    } else if (RADIAL_SIZE_KW.has(lower) || isLength(token)) {
+      size = size ? `${size} ${token}` : token;
     }
   }
-  if (at[1]) {
-    const c = parseCenter(at[1]);
-    g.posX = c.posX;
-    g.posY = c.posY;
-  }
+  return { shape, size, ...center };
 }
 
 /** The effective center as percentages (defaults to 50%/50% = center). */
-export function gradientCenter(g: Gradient): { x: string; y: string } {
-  return { x: g.posX.trim() || '50%', y: g.posY.trim() || '50%' };
+export function gradientCenter(gradient: Gradient): { x: string; y: string } {
+  return { x: gradient.posX.trim() || '50%', y: gradient.posY.trim() || '50%' };
 }
 
-function radialPrelude(g: Gradient): string {
-  const shapeSize = [g.shape.trim(), g.size.trim()].filter(Boolean).join(' ');
-  const x = g.posX.trim();
-  const y = g.posY.trim();
+function radialPrelude(gradient: Gradient): string {
+  const shapeSize = [gradient.shape.trim(), gradient.size.trim()].filter(Boolean).join(' ');
+  const x = gradient.posX.trim();
+  const y = gradient.posY.trim();
   // Emit `at x y` only when the center isn't the default center.
   const centered = (!x || x === '50%') && (!y || y === '50%');
   const at = centered ? '' : `at ${x || '50%'} ${y || '50%'}`;
   return [shapeSize, at].filter(Boolean).join(' ');
 }
 
-function conicPrelude(g: Gradient): string {
-  const from = g.from.trim() ? `from ${g.from.trim()}` : '';
-  const x = g.posX.trim();
-  const y = g.posY.trim();
+function conicPrelude(gradient: Gradient): string {
+  const from = gradient.from.trim() ? `from ${gradient.from.trim()}` : '';
+  const x = gradient.posX.trim();
+  const y = gradient.posY.trim();
   const centered = (!x || x === '50%') && (!y || y === '50%');
   const at = centered ? '' : `at ${x || '50%'} ${y || '50%'}`;
   return [from, at].filter(Boolean).join(' ');
@@ -249,14 +229,20 @@ export function blankGradientOf(type: GradientType): Gradient {
   };
 }
 
-export function serializeGradient(g: Gradient): string {
-  const fn = `${g.repeating ? 'repeating-' : ''}${g.type}-gradient`;
+export function serializeGradient(gradient: Gradient): string {
+  const functionName = `${gradient.repeating ? 'repeating-' : ''}${gradient.type}-gradient`;
   const prelude =
-    g.type === 'linear' ? g.angle.trim() : g.type === 'radial' ? radialPrelude(g) : conicPrelude(g);
-  const stops = g.stops
-    .map((s) => (s.pos.trim() ? `${s.color.trim()} ${s.pos.trim()}` : s.color.trim()))
+    gradient.type === 'linear'
+      ? gradient.angle.trim()
+      : gradient.type === 'radial'
+        ? radialPrelude(gradient)
+        : conicPrelude(gradient);
+  const stops = gradient.stops
+    .map((stop) =>
+      stop.pos.trim() ? `${stop.color.trim()} ${stop.pos.trim()}` : stop.color.trim(),
+    )
     .join(', ');
-  return `${fn}(${prelude ? `${prelude}, ` : ''}${stops})`;
+  return `${functionName}(${prelude ? `${prelude}, ` : ''}${stops})`;
 }
 
 /** A horizontal CSS gradient string previewing the stops (for the editor bar). */
@@ -264,9 +250,9 @@ export function stopsBarCss(stops: GradientStop[]): string {
   if (stops.length < 2) {
     return 'transparent';
   }
-  const parts = stops.map((s, i) => {
-    const pos = s.pos.trim() || `${Math.round((i / (stops.length - 1)) * 100)}%`;
-    return `${s.color.trim() || 'transparent'} ${pos}`;
+  const parts = stops.map((stop, i) => {
+    const position = stop.pos.trim() || `${Math.round((i / (stops.length - 1)) * 100)}%`;
+    return `${stop.color.trim() || 'transparent'} ${position}`;
   });
   return `linear-gradient(90deg, ${parts.join(', ')})`;
 }
@@ -274,9 +260,9 @@ export function stopsBarCss(stops: GradientStop[]): string {
 /** A stop's numeric position (0–100), inferring evenly-spaced when unset. */
 export function stopPercent(stops: GradientStop[], i: number): number {
   const raw = stops[i]?.pos.trim();
-  const m = raw ? /^(-?[\d.]+)%$/.exec(raw) : null;
-  if (m) {
-    return Math.max(0, Math.min(100, parseFloat(m[1] ?? '')));
+  const match = raw ? /^(-?[\d.]+)%$/.exec(raw) : undefined;
+  if (match) {
+    return Math.max(0, Math.min(100, parseFloat(match[1] ?? '')));
   }
   return stops.length > 1 ? (i / (stops.length - 1)) * 100 : 0;
 }
@@ -298,28 +284,28 @@ const SIDE_DEG: Record<string, number> = {
 
 /** A linear gradient's direction in degrees (defaults to 180 = top→bottom, per CSS). */
 export function angleToDegrees(angle: string): number {
-  const t = angle.trim().toLowerCase();
-  if (!t) {
+  const normalized = angle.trim().toLowerCase();
+  if (!normalized) {
     return 180;
   }
-  const m = t.match(/^(-?[\d.]+)(deg|grad|rad|turn)$/);
-  if (m) {
-    const n = parseFloat(m[1] ?? '');
-    switch (m[2]) {
+  const match = normalized.match(/^(-?[\d.]+)(deg|grad|rad|turn)$/);
+  if (match) {
+    const amount = parseFloat(match[1] ?? '');
+    switch (match[2]) {
       case 'turn':
-        return n * 360;
+        return amount * 360;
       case 'grad':
-        return n * 0.9;
+        return amount * 0.9;
       case 'rad':
-        return (n * 180) / Math.PI;
+        return (amount * 180) / Math.PI;
       case 'deg':
-        return n;
+        return amount;
       case undefined:
-        return n;
+        return amount;
     }
   }
-  if (t.startsWith('to ')) {
-    const sides = t.slice(3).trim().split(/\s+/).filter(Boolean).sort().join(' ');
+  if (normalized.startsWith('to ')) {
+    const sides = normalized.slice(3).trim().split(/\s+/).filter(Boolean).sort().join(' ');
     return SIDE_DEG[sides] ?? 180;
   }
   return 180;
@@ -334,90 +320,91 @@ export function degreesToAngle(deg: number): string {
 
 type RGBA = [number, number, number, number];
 
-/** Parse a hex or rgb()/rgba() colour to RGBA; null for names/var()/hsl (no mix). */
-function parseColor(input: string): RGBA | null {
-  const c = input.trim().toLowerCase();
-  const hex = c.match(/^#([0-9a-f]{3,8})$/i);
+/** Parse a hex or rgb()/rgba() colour to RGBA; undefined for names/var()/hsl (no mix). */
+function parseColor(input: string): RGBA | undefined {
+  const normalized = input.trim().toLowerCase();
+  const hex = normalized.match(/^#([0-9a-f]{3,8})$/i);
   if (hex) {
-    let h = hex[1] ?? '';
-    if (h.length === 3 || h.length === 4) {
-      h = h
+    let hexDigits = hex[1] ?? '';
+    if (hexDigits.length === 3 || hexDigits.length === 4) {
+      hexDigits = hexDigits
         .split('')
         .map((x) => x + x)
         .join('');
     }
-    if (h.length === 6) {
-      h += 'ff';
+    if (hexDigits.length === 6) {
+      hexDigits += 'ff';
     }
-    if (h.length !== 8) {
-      return null;
+    if (hexDigits.length !== 8) {
+      return undefined;
     }
     return [
-      parseInt(h.slice(0, 2), 16),
-      parseInt(h.slice(2, 4), 16),
-      parseInt(h.slice(4, 6), 16),
-      parseInt(h.slice(6, 8), 16) / 255,
+      parseInt(hexDigits.slice(0, 2), 16),
+      parseInt(hexDigits.slice(2, 4), 16),
+      parseInt(hexDigits.slice(4, 6), 16),
+      parseInt(hexDigits.slice(6, 8), 16) / 255,
     ];
   }
-  const rgb = c.match(/^rgba?\(([^)]+)\)$/);
+  const rgb = normalized.match(/^rgba?\(([^)]+)\)$/);
   if (rgb) {
-    const p = (rgb[1] ?? '').split(',').map((s) => parseFloat(s.trim()));
-    if (p.length < 3 || p.slice(0, 3).some((n) => Number.isNaN(n))) {
-      return null;
+    const parts = (rgb[1] ?? '').split(',').map((part) => parseFloat(part.trim()));
+    if (parts.length < 3 || parts.slice(0, 3).some((channel) => Number.isNaN(channel))) {
+      return undefined;
     }
-    const [red = 0, green = 0, blue = 0, alpha] = p;
-    return [red, green, blue, alpha == null || Number.isNaN(alpha) ? 1 : alpha];
+    const [red = 0, green = 0, blue = 0, alpha] = parts;
+    return [red, green, blue, alpha === undefined || Number.isNaN(alpha) ? 1 : alpha];
   }
-  return null;
+  return undefined;
 }
 
-function formatColor([r, g, b, a]: RGBA): string {
-  const hx = (n: number) =>
-    Math.max(0, Math.min(255, Math.round(n)))
+function formatColor([red, green, blue, alpha]: RGBA): string {
+  const hx = (channel: number) =>
+    Math.max(0, Math.min(255, Math.round(channel)))
       .toString(16)
       .padStart(2, '0');
-  if (a >= 1) {
-    return `#${hx(r)}${hx(g)}${hx(b)}`;
+  if (alpha >= 1) {
+    return `#${hx(red)}${hx(green)}${hx(blue)}`;
   }
-  return `rgba(${Math.round(r)}, ${Math.round(g)}, ${Math.round(b)}, ${Math.round(a * 100) / 100})`;
+  const channels = `${Math.round(red)}, ${Math.round(green)}, ${Math.round(blue)}`;
+  return `rgba(${channels}, ${Math.round(alpha * 100) / 100})`;
 }
 
 /** Mix two colours (t in 0–1). Falls back to `a` when either can't be parsed. */
-export function mixColors(a: string, b: string, t: number): string {
-  const ca = parseColor(a);
-  const cb = parseColor(b);
-  if (!ca || !cb) {
-    return a;
+export function mixColors(left: string, right: string, amount: number): string {
+  const leftColor = parseColor(left);
+  const rightColor = parseColor(right);
+  if (!leftColor || !rightColor) {
+    return left;
   }
   return formatColor([
-    ca[0] + (cb[0] - ca[0]) * t,
-    ca[1] + (cb[1] - ca[1]) * t,
-    ca[2] + (cb[2] - ca[2]) * t,
-    ca[3] + (cb[3] - ca[3]) * t,
+    leftColor[0] + (rightColor[0] - leftColor[0]) * amount,
+    leftColor[1] + (rightColor[1] - leftColor[1]) * amount,
+    leftColor[2] + (rightColor[2] - leftColor[2]) * amount,
+    leftColor[3] + (rightColor[3] - leftColor[3]) * amount,
   ]);
 }
 
 /** The interpolated colour of the ramp at percentage `p` (0–100) — for a new stop. */
-export function colorAt(stops: GradientStop[], p: number): string {
+export function colorAt(stops: GradientStop[], percent: number): string {
   if (!stops.length) {
     return 'transparent';
   }
   const last = stops.length - 1;
-  const pct = stops.map((_, i) => stopPercent(stops, i));
+  const percents = stops.map((_, i) => stopPercent(stops, i));
   const firstStop = stops[0];
   const lastStop = stops[last];
   if (firstStop === undefined || lastStop === undefined) {
     throw new Error('Gradient stop invariant failed');
   }
-  if (p <= (pct[0] ?? 0)) {
+  if (percent <= (percents[0] ?? 0)) {
     return firstStop.color;
   }
-  if (p >= (pct[last] ?? 100)) {
+  if (percent >= (percents[last] ?? 100)) {
     return lastStop.color;
   }
   for (let i = 0; i < last; i += 1) {
-    const leftPercent = pct[i];
-    const rightPercent = pct[i + 1];
+    const leftPercent = percents[i];
+    const rightPercent = percents[i + 1];
     const leftStop = stops[i];
     const rightStop = stops[i + 1];
     if (leftPercent === undefined || rightPercent === undefined) {
@@ -426,9 +413,13 @@ export function colorAt(stops: GradientStop[], p: number): string {
     if (leftStop === undefined || rightStop === undefined) {
       continue;
     }
-    if (p >= leftPercent && p <= rightPercent) {
+    if (percent >= leftPercent && percent <= rightPercent) {
       const span = rightPercent - leftPercent;
-      return mixColors(leftStop.color, rightStop.color, span === 0 ? 0 : (p - leftPercent) / span);
+      return mixColors(
+        leftStop.color,
+        rightStop.color,
+        span === 0 ? 0 : (percent - leftPercent) / span,
+      );
     }
   }
   return lastStop.color;

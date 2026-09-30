@@ -7,21 +7,21 @@
 
 // Matches one hsl()/hsla() function. `[^)]*` can't span a nested paren, so an
 // hsl(var(--x) …) with an inner function is left alone (returned unchanged below).
-const HSL_FN_RE = /hsla?\(\s*[^)]*\)/gi;
+const HSL_FUNCTION_RE = /hsla?\(\s*[^)]*\)/gi;
 
 /** Rewrite every hsl()/hsla() colour in a CSS value to rgb()/rgba(). */
 export function hslaToRgba(value: string): string {
   if (!value || !/hsl/i.test(value)) {
     return value;
   }
-  return value.replace(HSL_FN_RE, (match) => {
+  return value.replace(HSL_FUNCTION_RE, (match) => {
     const inner = match.slice(match.indexOf('(') + 1, -1);
     return convertHsl(inner) ?? match;
   });
 }
 
-function convertHsl(inner: string): string | null {
-  let alpha: string | null = null;
+function convertHsl(inner: string): string | undefined {
+  let alpha: string | undefined;
   let body = inner.trim();
   // Modern slash-alpha syntax: `h s l / a`.
   const slash = body.indexOf('/');
@@ -32,108 +32,112 @@ function convertHsl(inner: string): string | null {
 
   const parts = body.split(/[\s,]+/).filter(Boolean);
   if (parts.length < 3) {
-    return null;
+    return undefined;
   }
-  if (alpha == null && parts.length >= 4) {
-    alpha = parts[3] ?? null;
+  if (alpha === undefined && parts.length >= 4) {
+    alpha = parts[3];
   } // legacy `h, s, l, a`
 
-  const h = parseHue(parts[0] ?? '');
-  const s = parsePercent(parts[1] ?? '');
-  const l = parsePercent(parts[2] ?? '');
-  if (h == null || s == null || l == null) {
-    return null;
+  const hue = parseHue(parts[0] ?? '');
+  const saturation = parsePercent(parts[1] ?? '');
+  const lightness = parsePercent(parts[2] ?? '');
+  if (hue === undefined || saturation === undefined || lightness === undefined) {
+    return undefined;
   }
 
-  const [r, g, b] = hslToRgb(h, s, l);
-  if (alpha != null) {
-    const a = parseAlpha(alpha);
-    if (a == null) {
-      return null;
+  const [red, green, blue] = hslToRgb(hue, saturation, lightness);
+  if (alpha !== undefined) {
+    const alphaAmount = parseAlpha(alpha);
+    if (alphaAmount === undefined) {
+      return undefined;
     }
-    if (a < 1) {
-      return `rgba(${r}, ${g}, ${b}, ${round(a)})`;
+    if (alphaAmount < 1) {
+      return `rgba(${red}, ${green}, ${blue}, ${round(alphaAmount)})`;
     }
   }
-  return `rgb(${r}, ${g}, ${b})`;
+  return `rgb(${red}, ${green}, ${blue})`;
 }
 
 /** Hue with an optional angle unit → degrees in [0, 360). */
-function parseHue(token: string): number | null {
-  const m = token.match(/^(-?[\d.]+)(deg|grad|rad|turn)?$/i);
-  if (!m) {
-    return null;
+function parseHue(token: string): number | undefined {
+  const match = token.match(/^(-?[\d.]+)(deg|grad|rad|turn)?$/i);
+  if (!match) {
+    return undefined;
   }
-  let n = parseFloat(m[1] ?? '');
-  switch ((m[2] || 'deg').toLowerCase()) {
+  let degrees = parseFloat(match[1] ?? '');
+  switch ((match[2] || 'deg').toLowerCase()) {
     case 'grad':
-      n *= 0.9;
+      degrees *= 0.9;
       break;
     case 'rad':
-      n = (n * 180) / Math.PI;
+      degrees = (degrees * 180) / Math.PI;
       break;
     case 'turn':
-      n *= 360;
+      degrees *= 360;
       break;
   }
-  return ((n % 360) + 360) % 360;
+  return ((degrees % 360) + 360) % 360;
 }
 
 /** Saturation/lightness → 0–1 (a bare 0–100 number is treated as a percentage). */
-function parsePercent(token: string): number | null {
-  const m = token.match(/^(-?[\d.]+)%?$/);
-  if (!m) {
-    return null;
+function parsePercent(token: string): number | undefined {
+  const match = token.match(/^(-?[\d.]+)%?$/);
+  if (!match) {
+    return undefined;
   }
-  let n = parseFloat(m[1] ?? '');
-  if (token.trim().endsWith('%') || n > 1) {
-    n /= 100;
+  let fraction = parseFloat(match[1] ?? '');
+  if (token.trim().endsWith('%') || fraction > 1) {
+    fraction /= 100;
   }
-  return Math.max(0, Math.min(1, n));
+  return Math.max(0, Math.min(1, fraction));
 }
 
 /** Alpha as a 0–1 number or a percentage. */
-function parseAlpha(token: string): number | null {
-  const m = token.match(/^(-?[\d.]+)%?$/);
-  if (!m) {
-    return null;
+function parseAlpha(token: string): number | undefined {
+  const match = token.match(/^(-?[\d.]+)%?$/);
+  if (!match) {
+    return undefined;
   }
-  let n = parseFloat(m[1] ?? '');
+  let fraction = parseFloat(match[1] ?? '');
   if (token.trim().endsWith('%')) {
-    n /= 100;
+    fraction /= 100;
   }
-  return Math.max(0, Math.min(1, n));
+  return Math.max(0, Math.min(1, fraction));
 }
 
 /** HSL (h 0–360, s/l 0–1) → 8-bit RGB. */
-function hslToRgb(h: number, s: number, l: number): [number, number, number] {
-  const c = (1 - Math.abs(2 * l - 1)) * s;
-  const hp = h / 60;
-  const x = c * (1 - Math.abs((hp % 2) - 1));
-  let r = 0,
-    g = 0,
-    b = 0;
+function hslToRgb(hue: number, saturation: number, lightness: number): [number, number, number] {
+  const chroma = (1 - Math.abs(2 * lightness - 1)) * saturation;
+  const hp = hue / 60;
+  const x = chroma * (1 - Math.abs((hp % 2) - 1));
+  let red = 0,
+    green = 0,
+    blue = 0;
   if (hp < 1) {
-    r = c;
-    g = x;
+    red = chroma;
+    green = x;
   } else if (hp < 2) {
-    r = x;
-    g = c;
+    red = x;
+    green = chroma;
   } else if (hp < 3) {
-    g = c;
-    b = x;
+    green = chroma;
+    blue = x;
   } else if (hp < 4) {
-    g = x;
-    b = c;
+    green = x;
+    blue = chroma;
   } else if (hp < 5) {
-    r = x;
-    b = c;
+    red = x;
+    blue = chroma;
   } else {
-    r = c;
-    b = x;
+    red = chroma;
+    blue = x;
   }
-  const m = l - c / 2;
-  return [Math.round((r + m) * 255), Math.round((g + m) * 255), Math.round((b + m) * 255)];
+  const offset = lightness - chroma / 2;
+  return [
+    Math.round((red + offset) * 255),
+    Math.round((green + offset) * 255),
+    Math.round((blue + offset) * 255),
+  ];
 }
 
-const round = (n: number) => Math.round(n * 1000) / 1000;
+const round = (value: number) => Math.round(value * 1000) / 1000;

@@ -32,7 +32,7 @@ export function useGapHover(axes: GapAxis[], value: string) {
     getHost().onSpacingHover?.({
       kind: 'gap',
       sides: axes,
-      labels: Object.fromEntries(axes.map((a) => [a, shown])),
+      labels: Object.fromEntries(axes.map((axis) => [axis, shown])),
     });
   };
 
@@ -40,7 +40,7 @@ export function useGapHover(axes: GapAxis[], value: string) {
     if (hovering.current || holding.current) {
       return;
     }
-    getHost().onSpacingHover?.(null);
+    getHost().onSpacingHover?.(undefined);
   };
 
   // A field that unmounts while lit — the panel changing selection, the link
@@ -48,7 +48,7 @@ export function useGapHover(axes: GapAxis[], value: string) {
   // canvas with nothing left to take them down.
   useEffect(
     () => () => {
-      getHost().onSpacingHover?.(null);
+      getHost().onSpacingHover?.(undefined);
     },
     [],
   );

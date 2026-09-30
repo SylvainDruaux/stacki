@@ -117,8 +117,8 @@ function parseImportant(input: string): { value: string; important: boolean } {
   }
   return { value: input.trim(), important: false };
 }
-const joinImportant = (value: string, important: boolean) =>
-  important ? `${value} !important` : value;
+const joinImportant = (parsed: { readonly value: string; readonly important: boolean }) =>
+  parsed.important ? `${parsed.value} !important` : parsed.value;
 
 function ChevronIcon() {
   return (
@@ -171,13 +171,13 @@ function CustomValueField({
   inputRef: React.RefObject<HTMLInputElement>;
   onCommit: (value: string, important: boolean) => void;
 }) {
-  const [draft, setDraft] = useState(joinImportant(value, important));
+  const [draft, setDraft] = useState(joinImportant({ value, important }));
   const focused = useRef(false);
 
   // Mirror external edits, but never clobber what the user is typing.
   useEffect(() => {
     if (!focused.current) {
-      setDraft(joinImportant(value, important));
+      setDraft(joinImportant({ value, important }));
     }
   }, [value, important]);
 
@@ -230,38 +230,11 @@ export default function DisplayControl({
   // — contents, unset, var(--x), or a supported token made !important — is custom.
   const segmented = isDisplayValueSupported(current) && !important;
   const customMode = !segmented;
-  const isPrimary = PRIMARY.some((value) => value === current);
-  // The 4th segment shows the chosen inline/none value, or None as the default.
-  const fourth = isPrimary ? 'none' : current;
 
-  const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const wantFocus = useRef(false);
-
-  // Close the menu on outside click / Escape.
-  useEffect(() => {
-    if (!open) {
-      return;
-    }
-    const onDown = (event: MouseEvent) => {
-      if (event.target instanceof Node && rootRef.current?.contains(event.target)) {
-        return;
-      }
-      setOpen(false);
-    };
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        setOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', onDown);
-    document.addEventListener('keydown', onKey);
-    return () => {
-      document.removeEventListener('mousedown', onDown);
-      document.removeEventListener('keydown', onKey);
-    };
-  }, [open]);
+  const [open, setOpen] = useDismissibleMenu(rootRef);
 
   // After choosing Custom, focus (and select) the field once its `unset` write
   // settles — the input is disabled mid-save, so we wait for busy to clear.
@@ -288,38 +261,7 @@ export default function DisplayControl({
     onCommit('unset', false);
   };
 
-  // Delayed hover tooltip for the segments (reuses the segmented-control tooltip,
-  // right-anchored with a down-arrow to the hovered segment).
-  const [hoveredValue, setHoveredValue] = useState<string | null>(null);
-  const [arrowRight, setArrowRight] = useState(0);
-  const hoverTimer = useRef<number | null>(null);
-  const clearHoverTimer = () => {
-    if (hoverTimer.current != null) {
-      window.clearTimeout(hoverTimer.current);
-      hoverTimer.current = null;
-    }
-  };
-  useEffect(() => clearHoverTimer, []);
-  const startHover = (segValue: string, el: HTMLElement) => {
-    if (!TOOLTIPS[segValue]) {
-      return;
-    }
-    clearHoverTimer();
-    hoverTimer.current = window.setTimeout(() => {
-      hoverTimer.current = null;
-      const root = rootRef.current;
-      if (root) {
-        const trackRect = root.getBoundingClientRect();
-        const buttonRect = el.getBoundingClientRect();
-        setArrowRight(trackRect.right - (buttonRect.left + buttonRect.width / 2));
-      }
-      setHoveredValue(segValue);
-    }, TOOLTIP_DELAY_MS);
-  };
-  const endHover = () => {
-    clearHoverTimer();
-    setHoveredValue(null);
-  };
+  const tooltip = useSegmentTooltip(rootRef);
 
   return (
     <div
@@ -337,121 +279,260 @@ export default function DisplayControl({
           onCommit={onCommit}
         />
       ) : (
-        <>
-          <SegmentPill />
-          {PRIMARY.map((option) => (
-            <button
-              key={option}
-              type="button"
-              role="radio"
-              aria-checked={current === option}
-              className={`embed-editor_display-seg ${current === option ? 'is-selected' : ''}`}
-              disabled={busy}
-              onClick={() => {
-                endHover();
-                pick(option);
-              }}
-              onMouseEnter={(event) => startHover(option, event.currentTarget)}
-              onMouseLeave={endHover}
-            >
-              {cap(option)}
-            </button>
-          ))}
-          <button
-            type="button"
-            role="radio"
-            aria-checked={!isPrimary}
-            className={`embed-editor_display-seg ${!isPrimary ? 'is-selected' : ''}`}
-            disabled={busy}
-            onClick={() => {
-              endHover();
-              pick(fourth);
-            }}
-            onMouseEnter={(event) => startHover(fourth, event.currentTarget)}
-            onMouseLeave={endHover}
-          >
-            {SHORT[fourth]}
-          </button>
-        </>
+        <DisplaySegments current={current} busy={busy} tooltip={tooltip} pick={pick} />
       )}
 
+      <MenuArrow open={open} busy={busy} onToggle={() => setOpen((value) => !value)} />
+      {open ? (
+        <DisplayMenu
+          customMode={customMode}
+          current={current}
+          pick={pick}
+          enterCustom={enterCustom}
+        />
+      ) : undefined}
+      <SegmentTooltipBubble tooltip={tooltip} />
+    </div>
+  );
+}
+
+// The menu's open state, closed again on an outside click or Escape.
+function useDismissibleMenu(rootRef: React.RefObject<HTMLDivElement>) {
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+    const onDown = (event: MouseEvent) => {
+      if (event.target instanceof Node && rootRef.current?.contains(event.target)) {
+        return;
+      }
+      setOpen(false);
+    };
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDown);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [open, rootRef]);
+  return [open, setOpen] as const;
+}
+
+interface SegmentTooltip {
+  readonly hoveredValue: string | undefined;
+  readonly arrowRight: number;
+  readonly startHover: (segmentValue: string, element: HTMLElement) => void;
+  readonly endHover: () => void;
+}
+
+// Delayed hover tooltip for the segments (reuses the segmented-control tooltip,
+// right-anchored with a down-arrow to the hovered segment).
+function useSegmentTooltip(rootRef: React.RefObject<HTMLDivElement>): SegmentTooltip {
+  const [hoveredValue, setHoveredValue] = useState<string | undefined>(undefined);
+  const [arrowRight, setArrowRight] = useState(0);
+  const hoverTimer = useRef<number | undefined>(undefined);
+  const clearHoverTimer = () => {
+    if (hoverTimer.current !== undefined) {
+      window.clearTimeout(hoverTimer.current);
+      hoverTimer.current = undefined;
+    }
+  };
+  useEffect(() => clearHoverTimer, []);
+  const startHover = (segmentValue: string, element: HTMLElement) => {
+    if (!TOOLTIPS[segmentValue]) {
+      return;
+    }
+    clearHoverTimer();
+    hoverTimer.current = window.setTimeout(() => {
+      hoverTimer.current = undefined;
+      const root = rootRef.current;
+      if (root) {
+        const trackRect = root.getBoundingClientRect();
+        const buttonRect = element.getBoundingClientRect();
+        setArrowRight(trackRect.right - (buttonRect.left + buttonRect.width / 2));
+      }
+      setHoveredValue(segmentValue);
+    }, TOOLTIP_DELAY_MS);
+  };
+  const endHover = () => {
+    clearHoverTimer();
+    setHoveredValue(undefined);
+  };
+  return { hoveredValue, arrowRight, startHover, endHover };
+}
+
+function MenuArrow({
+  open,
+  busy,
+  onToggle,
+}: {
+  open: boolean;
+  busy: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      className="embed-editor_display-arrow"
+      aria-haspopup="menu"
+      aria-expanded={open}
+      aria-label="More display options"
+      disabled={busy}
+      onClick={onToggle}
+    >
+      <ChevronIcon />
+    </button>
+  );
+}
+
+function SegmentTooltipBubble({ tooltip }: { tooltip: SegmentTooltip }) {
+  if (tooltip.hoveredValue === undefined) {
+    return undefined;
+  }
+  const text = TOOLTIPS[tooltip.hoveredValue];
+  if (!text) {
+    return undefined;
+  }
+  return (
+    <div
+      className="u-segmented-tooltip"
+      role="tooltip"
+      style={tooltipArrowStyle(tooltip.arrowRight)}
+    >
+      {text}
+      <span className="u-segmented-tooltip-arrow" aria-hidden="true" />
+    </div>
+  );
+}
+
+// The bar: Block / Flex / Grid, then the 4th slot.
+function DisplaySegments({
+  current,
+  busy,
+  tooltip,
+  pick,
+}: {
+  current: string;
+  busy: boolean;
+  tooltip: SegmentTooltip;
+  pick: (next: string) => void;
+}) {
+  const isPrimary = PRIMARY.some((value) => value === current);
+  // The 4th segment shows the chosen inline/none value, or None as the default.
+  const fourth = isPrimary ? 'none' : current;
+  return (
+    <>
+      <SegmentPill />
+      {PRIMARY.map((option) => (
+        <button
+          key={option}
+          type="button"
+          role="radio"
+          aria-checked={current === option}
+          className={`embed-editor_display-seg ${current === option ? 'is-selected' : ''}`}
+          disabled={busy}
+          onClick={() => {
+            tooltip.endHover();
+            pick(option);
+          }}
+          onMouseEnter={(event) => tooltip.startHover(option, event.currentTarget)}
+          onMouseLeave={tooltip.endHover}
+        >
+          {cap(option)}
+        </button>
+      ))}
       <button
         type="button"
-        className="embed-editor_display-arrow"
-        aria-haspopup="menu"
-        aria-expanded={open}
-        aria-label="More display options"
+        role="radio"
+        aria-checked={!isPrimary}
+        className={`embed-editor_display-seg ${!isPrimary ? 'is-selected' : ''}`}
         disabled={busy}
-        onClick={() => setOpen((value) => !value)}
+        onClick={() => {
+          tooltip.endHover();
+          pick(fourth);
+        }}
+        onMouseEnter={(event) => tooltip.startHover(fourth, event.currentTarget)}
+        onMouseLeave={tooltip.endHover}
       >
-        <ChevronIcon />
+        {SHORT[fourth]}
       </button>
+    </>
+  );
+}
 
-      {open ? (
-        <div className="embed-editor_display-menu" role="menu">
-          {customMode ? (
-            // From a custom value: offer every built-in to switch back to the bar.
-            <>
-              {PRIMARY.map((option) => (
-                <MenuItem
-                  key={option}
-                  label={cap(option)}
-                  selected={current === option}
-                  onClick={() => pick(option)}
-                />
-              ))}
-              <div className="embed-editor_display-menu-divider" />
-              {INLINE.map((option) => (
-                <MenuItem
-                  key={option}
-                  label={FULL[option] ?? cap(option)}
-                  selected={current === option}
-                  onClick={() => pick(option)}
-                />
-              ))}
-              <div className="embed-editor_display-menu-divider" />
-              {BOXLESS.map((option) => (
-                <MenuItem
-                  key={option}
-                  label={FULL[option] ?? cap(option)}
-                  selected={current === option}
-                  onClick={() => pick(option)}
-                />
-              ))}
-            </>
-          ) : (
-            // From the bar: inline values, None, and an escape hatch to Custom.
-            <>
-              {INLINE.map((option) => (
-                <MenuItem
-                  key={option}
-                  label={FULL[option] ?? cap(option)}
-                  selected={current === option}
-                  onClick={() => pick(option)}
-                />
-              ))}
-              <div className="embed-editor_display-menu-divider" />
-              {BOXLESS.map((option) => (
-                <MenuItem
-                  key={option}
-                  label={FULL[option] ?? cap(option)}
-                  selected={current === option}
-                  onClick={() => pick(option)}
-                />
-              ))}
-              <div className="embed-editor_display-menu-divider" />
-              <MenuItem label="Custom" selected={false} onClick={enterCustom} />
-            </>
-          )}
-        </div>
-      ) : null}
-
-      {hoveredValue && TOOLTIPS[hoveredValue] ? (
-        <div className="u-segmented-tooltip" role="tooltip" style={tooltipArrowStyle(arrowRight)}>
-          {TOOLTIPS[hoveredValue]}
-          <span className="u-segmented-tooltip-arrow" aria-hidden="true" />
-        </div>
-      ) : null}
+function DisplayMenu({
+  customMode,
+  current,
+  pick,
+  enterCustom,
+}: {
+  customMode: boolean;
+  current: string;
+  pick: (next: string) => void;
+  enterCustom: () => void;
+}) {
+  return (
+    <div className="embed-editor_display-menu" role="menu">
+      {customMode ? (
+        // From a custom value: offer every built-in to switch back to the bar.
+        <>
+          {PRIMARY.map((option) => (
+            <MenuItem
+              key={option}
+              label={cap(option)}
+              selected={current === option}
+              onClick={() => pick(option)}
+            />
+          ))}
+          <div className="embed-editor_display-menu-divider" />
+          {INLINE.map((option) => (
+            <MenuItem
+              key={option}
+              label={FULL[option] ?? cap(option)}
+              selected={current === option}
+              onClick={() => pick(option)}
+            />
+          ))}
+          <div className="embed-editor_display-menu-divider" />
+          {BOXLESS.map((option) => (
+            <MenuItem
+              key={option}
+              label={FULL[option] ?? cap(option)}
+              selected={current === option}
+              onClick={() => pick(option)}
+            />
+          ))}
+        </>
+      ) : (
+        // From the bar: inline values, None, and an escape hatch to Custom.
+        <>
+          {INLINE.map((option) => (
+            <MenuItem
+              key={option}
+              label={FULL[option] ?? cap(option)}
+              selected={current === option}
+              onClick={() => pick(option)}
+            />
+          ))}
+          <div className="embed-editor_display-menu-divider" />
+          {BOXLESS.map((option) => (
+            <MenuItem
+              key={option}
+              label={FULL[option] ?? cap(option)}
+              selected={current === option}
+              onClick={() => pick(option)}
+            />
+          ))}
+          <div className="embed-editor_display-menu-divider" />
+          <MenuItem label="Custom" selected={false} onClick={enterCustom} />
+        </>
+      )}
     </div>
   );
 }

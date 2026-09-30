@@ -262,15 +262,15 @@ function flexCurrent(read: Props['read']): string {
     shrink = parsed['flex-shrink'] ?? '1';
     basis = parsed['flex-basis'] ?? 'auto';
   } else {
-    const g = displayOf(read('flex-grow'));
-    const s = displayOf(read('flex-shrink'));
-    const b = displayOf(read('flex-basis'));
-    if (!g.present && !s.present && !b.present) {
+    const growDisplay = displayOf(read('flex-grow'));
+    const shrinkDisplay = displayOf(read('flex-shrink'));
+    const basisDisplay = displayOf(read('flex-basis'));
+    if (!growDisplay.present && !shrinkDisplay.present && !basisDisplay.present) {
       return '0 1 auto';
     }
-    grow = g.present ? norm(g.value) : '0';
-    shrink = s.present ? norm(s.value) : '1';
-    basis = b.present ? norm(b.value) : 'auto';
+    grow = growDisplay.present ? norm(growDisplay.value) : '0';
+    shrink = shrinkDisplay.present ? norm(shrinkDisplay.value) : '1';
+    basis = basisDisplay.present ? norm(basisDisplay.value) : 'auto';
   }
   return `${grow} ${shrink} ${canonBasis(basis)}`;
 }
@@ -281,45 +281,45 @@ function flexCurrent(read: Props['read']): string {
 const FLEX_PROPS = ['flex', 'flex-grow', 'flex-shrink', 'flex-basis'] as const;
 function flexLabelProp(read: Props['read']): string {
   return (
-    FLEX_PROPS.find((p) => read(p)?.source === 'selected') ??
-    FLEX_PROPS.find((p) => read(p) != null) ??
+    FLEX_PROPS.find((prop) => read(prop)?.source === 'selected') ??
+    FLEX_PROPS.find((prop) => read(prop) !== undefined) ??
     'flex'
   );
 }
 
 function alignSelfCurrent(read: Props['read']): string {
-  const d = displayOf(read('align-self'));
-  if (!d.present) {
+  const display = displayOf(read('align-self'));
+  if (!display.present) {
     return 'auto';
   }
-  const v = norm(d.value);
-  if (v === 'start' || v === 'self-start') {
+  const normalized = norm(display.value);
+  if (normalized === 'start' || normalized === 'self-start') {
     return 'flex-start';
   }
-  if (v === 'end' || v === 'self-end') {
+  if (normalized === 'end' || normalized === 'self-end') {
     return 'flex-end';
   }
-  return v || 'auto';
+  return normalized || 'auto';
 }
 
 function justifySelfCurrent(read: Props['read']): string {
-  const d = displayOf(read('justify-self'));
-  if (!d.present) {
+  const display = displayOf(read('justify-self'));
+  if (!display.present) {
     return 'auto';
   }
-  const v = norm(d.value);
-  if (v === 'flex-start' || v === 'self-start' || v === 'left') {
+  const normalized = norm(display.value);
+  if (normalized === 'flex-start' || normalized === 'self-start' || normalized === 'left') {
     return 'start';
   }
-  if (v === 'flex-end' || v === 'self-end' || v === 'right') {
+  if (normalized === 'flex-end' || normalized === 'self-end' || normalized === 'right') {
     return 'end';
   }
-  return v || 'auto';
+  return normalized || 'auto';
 }
 
 function orderCurrent(read: Props['read']): string {
-  const d = displayOf(read('order'));
-  return d.present ? norm(d.value) : '0';
+  const display = displayOf(read('order'));
+  return display.present ? norm(display.value) : '0';
 }
 
 // ─────────────────────────── Sizing (flex) ───────────────────────────
@@ -328,61 +328,13 @@ function orderCurrent(read: Props['read']): string {
 // the Grow / Shrink / Basis longhand inputs below (Webflow's "Customize grow and shrink
 // behavior"), and a dropdown arrow to switch the whole `flex` to a single custom value
 // (`unset`, `var(…)`) that can't be split into longhands.
-const FLEX_SEG_VALUES = new Set(FLEX_SEGS.map((s) => s.value));
+const FLEX_SEG_VALUES = new Set(FLEX_SEGS.map((segment) => segment.value));
 
 function SizingControl(props: Props) {
-  const { read, busy, setProp, clearProp, liveSetProp, onProvenance, onSelectSelector } = props;
-  const current = flexCurrent(read);
-  const isPreset = FLEX_SEG_VALUES.has(current);
-  // Decomposable values resolve to a `G S B` triple; a single leftover token is a whole
-  // custom value (unset / var() / a keyword) that belongs in the single input.
-  const isTriple = splitTopLevelSpaces(current).length === 3;
-  const [panelOpen, setPanelOpen] = useState(false);
-  const [singleCustom, setSingleCustom] = useState(false);
-  const [menuOpen, setMenuOpen] = useState(false);
-  const rootRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!menuOpen) {
-      return;
-    }
-    const onDown = (event: MouseEvent) => {
-      if (!(event.target instanceof Node) || !rootRef.current?.contains(event.target)) {
-        setMenuOpen(false);
-      }
-    };
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        setMenuOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', onDown);
-    document.addEventListener('keydown', onKey);
-    return () => {
-      document.removeEventListener('mousedown', onDown);
-      document.removeEventListener('keydown', onKey);
-    };
-  }, [menuOpen]);
-
-  const showSingle = singleCustom || (!isPreset && !isTriple);
-  const showPanel = !showSingle && panelOpen;
-  const customTriple = !isPreset && isTriple;
-  const clearFlex = () => clearProp(['flex', 'flex-grow', 'flex-shrink', 'flex-basis']);
+  const { read, busy, setProp, liveSetProp, onProvenance, onSelectSelector } = props;
+  const sizing = useFlexSizing(props);
+  const { current, showSingle, showPanel, clearFlex, pickPreset } = sizing;
   const flexProp = flexLabelProp(read);
-
-  const pickPreset = (value: string) => {
-    setMenuOpen(false);
-    setSingleCustom(false);
-    setPanelOpen(false);
-    setProp('flex', value, false);
-  };
-  const togglePanel = () => {
-    // Opening from a preset seeds a sensible custom starting point (grow 1 / shrink 0 / auto).
-    if (!panelOpen && isPreset) {
-      setProp('flex', '1 0 auto', false);
-    }
-    setPanelOpen((value) => !value);
-  };
 
   return (
     <>
@@ -390,7 +342,7 @@ function SizingControl(props: Props) {
         <PropLabel
           label="Sizing"
           prop={flexProp}
-          d={displayOf(read(flexProp))}
+          display={displayOf(read(flexProp))}
           contributors={read(flexProp)?.contributors ?? []}
           busy={busy}
           onClear={clearFlex}
@@ -398,7 +350,7 @@ function SizingControl(props: Props) {
           onSelectSelector={onSelectSelector}
         />
         <div
-          ref={rootRef}
+          ref={sizing.rootRef}
           className={`embed-editor_display ${showSingle ? 'is-custom' : ''}`}
           role="group"
           aria-label="Flex sizing"
@@ -414,78 +366,25 @@ function SizingControl(props: Props) {
               prop="flex"
               onCommit={(value, important) => setProp('flex', value, important)}
               onLiveCommit={(value, important) => liveSetProp('flex', value, important)}
-              onClear={() => {
-                setSingleCustom(false);
-                clearFlex();
-              }}
+              onClear={sizing.clearSingle}
             />
           ) : (
-            <>
-              {FLEX_SEGS.map((seg) => (
-                <button
-                  key={seg.value}
-                  type="button"
-                  role="radio"
-                  aria-checked={current === seg.value}
-                  className={
-                    'embed-editor_display-seg ' + (current === seg.value ? 'is-selected' : '')
-                  }
-                  disabled={busy}
-                  aria-label={seg.label}
-                  title={seg.label}
-                  onClick={() => pickPreset(seg.value)}
-                >
-                  {seg.icon}
-                </button>
-              ))}
-              <button
-                type="button"
-                className={
-                  'embed-editor_display-seg ' + (showPanel || customTriple ? 'is-selected' : '')
-                }
-                disabled={busy}
-                aria-pressed={showPanel || customTriple}
-                aria-label="Customize grow and shrink behavior"
-                title="Customize grow and shrink behavior"
-                onClick={togglePanel}
-              >
-                <MoreDotsIcon />
-              </button>
-            </>
+            <FlexSegments
+              current={current}
+              busy={busy}
+              customized={sizing.customized}
+              pickPreset={pickPreset}
+              togglePanel={sizing.togglePanel}
+            />
           )}
-          <button
-            type="button"
-            className="embed-editor_display-arrow"
-            aria-haspopup="menu"
-            aria-expanded={menuOpen}
-            aria-label="More flex sizing options"
-            disabled={busy}
-            onClick={() => setMenuOpen((value) => !value)}
-          >
-            <ChevronIcon />
-          </button>
-          {menuOpen ? (
-            <div className="embed-editor_display-menu" role="menu">
-              {showSingle ? (
-                FLEX_SEGS.map((seg) => (
-                  <MenuItem
-                    key={seg.value}
-                    label={seg.label}
-                    onClick={() => pickPreset(seg.value)}
-                  />
-                ))
-              ) : (
-                <MenuItem
-                  label="Custom"
-                  onClick={() => {
-                    setMenuOpen(false);
-                    setPanelOpen(false);
-                    setSingleCustom(true);
-                  }}
-                />
-              )}
-            </div>
-          ) : null}
+          <FlexSizingMenu
+            open={sizing.menuOpen}
+            showSingle={showSingle}
+            busy={busy}
+            onToggle={sizing.toggleMenu}
+            pickPreset={pickPreset}
+            enterSingleCustom={sizing.enterSingleCustom}
+          />
         </div>
       </div>
       {showPanel ? (
@@ -494,15 +393,195 @@ function SizingControl(props: Props) {
           <StackedField prop="flex-shrink" label="Shrink" placeholder="1" {...props} />
           <StackedField prop="flex-basis" label="Basis" placeholder="auto" {...props} />
         </div>
-      ) : null}
+      ) : undefined}
+    </>
+  );
+}
+
+// The Sizing control's state: which of the three shapes shows (presets, the longhand
+// panel, or a single custom value), its menu, and the writes each choice makes.
+function useFlexSizing({ read, setProp, clearProp }: Props) {
+  const current = flexCurrent(read);
+  const isPreset = FLEX_SEG_VALUES.has(current);
+  // Decomposable values resolve to a `G S B` triple; a single leftover token is a whole
+  // custom value (unset / var() / a keyword) that belongs in the single input.
+  const isTriple = splitTopLevelSpaces(current).length === 3;
+  const [panelOpen, setPanelOpen] = useState(false);
+  const [singleCustom, setSingleCustom] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+  useMenuDismiss({ open: menuOpen, rootRef, setOpen: setMenuOpen });
+
+  const showSingle = singleCustom || (!isPreset && !isTriple);
+  const showPanel = !showSingle && panelOpen;
+  const clearFlex = () => clearProp(['flex', 'flex-grow', 'flex-shrink', 'flex-basis']);
+
+  const pickPreset = (value: string) => {
+    setMenuOpen(false);
+    setSingleCustom(false);
+    setPanelOpen(false);
+    setProp('flex', value, false);
+  };
+  const togglePanel = () => {
+    // Opening from a preset seeds a sensible custom starting point (grow 1 / shrink 0 / auto).
+    if (!panelOpen && isPreset) {
+      setProp('flex', '1 0 auto', false);
+    }
+    setPanelOpen((value) => !value);
+  };
+  const enterSingleCustom = () => {
+    setMenuOpen(false);
+    setPanelOpen(false);
+    setSingleCustom(true);
+  };
+  const clearSingle = () => {
+    setSingleCustom(false);
+    clearFlex();
+  };
+  return {
+    current,
+    rootRef,
+    menuOpen,
+    showSingle,
+    showPanel,
+    customized: showPanel || (!isPreset && isTriple),
+    clearFlex,
+    clearSingle,
+    pickPreset,
+    togglePanel,
+    enterSingleCustom,
+    toggleMenu: () => setMenuOpen((value) => !value),
+  };
+}
+
+// Closes the open menu on an outside click or Escape.
+function useMenuDismiss({
+  open,
+  rootRef,
+  setOpen,
+}: {
+  open: boolean;
+  rootRef: React.RefObject<HTMLDivElement>;
+  setOpen: (open: boolean) => void;
+}) {
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+    const onDown = (event: MouseEvent) => {
+      if (!(event.target instanceof Node) || !rootRef.current?.contains(event.target)) {
+        setOpen(false);
+      }
+    };
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDown);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [open, rootRef, setOpen]);
+}
+
+// The three presets and the "…" that opens the Grow / Shrink / Basis inputs.
+function FlexSegments({
+  current,
+  busy,
+  customized,
+  pickPreset,
+  togglePanel,
+}: {
+  current: string;
+  busy: boolean;
+  customized: boolean;
+  pickPreset: (value: string) => void;
+  togglePanel: () => void;
+}) {
+  return (
+    <>
+      {FLEX_SEGS.map((seg) => (
+        <button
+          key={seg.value}
+          type="button"
+          role="radio"
+          aria-checked={current === seg.value}
+          className={'embed-editor_display-seg ' + (current === seg.value ? 'is-selected' : '')}
+          disabled={busy}
+          aria-label={seg.label}
+          title={seg.label}
+          onClick={() => pickPreset(seg.value)}
+        >
+          {seg.icon}
+        </button>
+      ))}
+      <button
+        type="button"
+        className={'embed-editor_display-seg ' + (customized ? 'is-selected' : '')}
+        disabled={busy}
+        aria-pressed={customized}
+        aria-label="Customize grow and shrink behavior"
+        title="Customize grow and shrink behavior"
+        onClick={togglePanel}
+      >
+        <MoreDotsIcon />
+      </button>
+    </>
+  );
+}
+
+// The dropdown arrow and its menu: back to a preset from a single custom value, or on
+// to Custom from the bar.
+function FlexSizingMenu({
+  open,
+  showSingle,
+  busy,
+  onToggle,
+  pickPreset,
+  enterSingleCustom,
+}: {
+  open: boolean;
+  showSingle: boolean;
+  busy: boolean;
+  onToggle: () => void;
+  pickPreset: (value: string) => void;
+  enterSingleCustom: () => void;
+}) {
+  return (
+    <>
+      <button
+        type="button"
+        className="embed-editor_display-arrow"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-label="More flex sizing options"
+        disabled={busy}
+        onClick={onToggle}
+      >
+        <ChevronIcon />
+      </button>
+      {open ? (
+        <div className="embed-editor_display-menu" role="menu">
+          {showSingle ? (
+            FLEX_SEGS.map((seg) => (
+              <MenuItem key={seg.value} label={seg.label} onClick={() => pickPreset(seg.value)} />
+            ))
+          ) : (
+            <MenuItem label="Custom" onClick={enterSingleCustom} />
+          )}
+        </div>
+      ) : undefined}
     </>
   );
 }
 
 // ─────────────────────────── Grid-item position ───────────────────────────
 
-const rawOf = (d: ReturnType<typeof displayOf>) =>
-  d.present ? (d.important ? `${d.value} !important` : d.value) : '';
+const rawOf = (display: ReturnType<typeof displayOf>) =>
+  display.present ? (display.important ? `${display.value} !important` : display.value) : '';
 
 // Split a `grid-column` / `grid-row` shorthand into its start / end line values
 // (`auto / span 2` → ['auto', 'span 2']); a lone value is the start (end blank).
@@ -515,12 +594,12 @@ function splitSlash(value: string): [string, string] {
 // `auto / span 2`, or just `2` when the end is auto. Webflow's grid-child placement reads
 // this shorthand — the *-start / *-end longhands land in Custom properties instead.
 function buildLine(start: string, end: string): string {
-  const s = start.trim() || 'auto';
-  const e = end.trim() || 'auto';
-  if (s === 'auto' && e === 'auto') {
+  const startLine = start.trim() || 'auto';
+  const endLine = end.trim() || 'auto';
+  if (startLine === 'auto' && endLine === 'auto') {
     return '';
   }
-  return e === 'auto' ? s : `${s} / ${e}`;
+  return endLine === 'auto' ? startLine : `${startLine} / ${endLine}`;
 }
 
 // One axis (Column or Row): its Start / End line fields. Reads the explicit longhands,
@@ -542,13 +621,17 @@ function AxisRow({
   const endProp = `grid-${axis}-end`;
   const shortProp = `grid-${axis}`;
   const siblingProp = axis === 'column' ? 'grid-row' : 'grid-column';
-  const startD = displayOf(read(startProp));
-  const endD = displayOf(read(endProp));
-  const shortD = displayOf(read(shortProp));
-  const [shStart, shEnd] = shortD.present ? splitSlash(shortD.value) : ['', ''];
+  const startDisplay = displayOf(read(startProp));
+  const endDisplay = displayOf(read(endProp));
+  const shorthandDisplay = displayOf(read(shortProp));
+  const [shStart, shEnd] = shorthandDisplay.present ? splitSlash(shorthandDisplay.value) : ['', ''];
   // Prefer the shorthand (what we write); fall back to any legacy *-start / *-end longhands.
-  const startVal = shortD.present ? shStart : startD.present ? rawOf(startD) : '';
-  const endVal = shortD.present ? shEnd : endD.present ? rawOf(endD) : '';
+  const startValue = shorthandDisplay.present
+    ? shStart
+    : startDisplay.present
+      ? rawOf(startDisplay)
+      : '';
+  const endValue = shorthandDisplay.present ? shEnd : endDisplay.present ? rawOf(endDisplay) : '';
 
   // Clear THIS axis's placement. Webflow keeps grid-column & grid-row together as one grid
   // placement, so clearing one also drops the other in the native panel — re-assert the
@@ -564,9 +647,10 @@ function AxisRow({
   // Write the grid-column / grid-row SHORTHAND, combining this edit with the other axis end.
   // Webflow's grid-child placement reads the shorthand; the *-start / *-end longhands park in
   // Custom properties instead. Live updates as you type (the shorthand replaces itself cleanly).
-  const commit = (which: 'start' | 'end', value: string, important: boolean, live: boolean) => {
-    const start = (which === 'start' ? value : startVal).trim();
-    const end = (which === 'end' ? value : endVal).trim();
+  const commit = (which: 'start' | 'end', value: string, options: CommitOptions) => {
+    const { important, live } = options;
+    const start = (which === 'start' ? value : startValue).trim();
+    const end = (which === 'end' ? value : endValue).trim();
     const line = buildLine(start, end);
     if (live) {
       if (line) {
@@ -580,29 +664,12 @@ function AxisRow({
     }
     setProp(shortProp, line, important);
     // Drop any legacy longhands so they can't shadow the shorthand we just wrote.
-    if (startD.present || endD.present) {
+    if (startDisplay.present || endDisplay.present) {
       clearProp([startProp, endProp]);
     }
   };
 
-  // The blue, clearable label is the AXIS (Column / Row) — we write the axis shorthand, so
-  // Start / End are just plain captions under their inputs.
-  const cell = (which: 'start' | 'end', caption: string, value: string) => (
-    <div className="embed-editor_line-cell">
-      <LiveInput
-        value={value}
-        busy={busy}
-        placeholder={which === 'end' ? 'span 1' : 'auto'}
-        ariaLabel={`${label} ${caption}`}
-        className="u-input embed-editor_size-input"
-        onCommit={(v, imp) => commit(which, v, imp, false)}
-        onLiveCommit={(v, imp) => commit(which, v, imp, true)}
-        onClear={() => commit(which, '', false, false)}
-      />
-      <span className="embed-editor_line-caption">{caption}</span>
-    </div>
-  );
-
+  const cellProps = { axisLabel: label, busy, commit };
   return (
     <div className="embed-editor_size-row embed-editor_line-row">
       <GroupLabel
@@ -615,9 +682,50 @@ function AxisRow({
         onSelectSelector={onSelectSelector}
       />
       <div className="embed-editor_line-cells">
-        {cell('start', 'Start', startVal)}
-        {cell('end', 'End', endVal)}
+        <LineCell which="start" caption="Start" value={startValue} {...cellProps} />
+        <LineCell which="end" caption="End" value={endValue} {...cellProps} />
       </div>
+    </div>
+  );
+}
+
+// How a line edit lands: with or without !important, live while typing or committed.
+interface CommitOptions {
+  readonly important: boolean;
+  readonly live: boolean;
+}
+
+// One line field (Start or End) with its caption. The blue, clearable label is the AXIS
+// (Column / Row) — we write the axis shorthand, so Start / End are just plain captions
+// under their inputs.
+function LineCell({
+  which,
+  caption,
+  value,
+  axisLabel,
+  busy,
+  commit,
+}: {
+  which: 'start' | 'end';
+  caption: string;
+  value: string;
+  axisLabel: string;
+  busy: boolean;
+  commit: (which: 'start' | 'end', value: string, options: CommitOptions) => void;
+}) {
+  return (
+    <div className="embed-editor_line-cell">
+      <LiveInput
+        value={value}
+        busy={busy}
+        placeholder={which === 'end' ? 'span 1' : 'auto'}
+        ariaLabel={`${axisLabel} ${caption}`}
+        className="u-input embed-editor_size-input"
+        onCommit={(next, important) => commit(which, next, { important, live: false })}
+        onLiveCommit={(next, important) => commit(which, next, { important, live: true })}
+        onClear={() => commit(which, '', { important: false, live: false })}
+      />
+      <span className="embed-editor_line-caption">{caption}</span>
     </div>
   );
 }
@@ -636,80 +744,83 @@ function PositionControl(props: Props) {
 // ─────────────────────────── Section ───────────────────────────
 
 export default function FlexChildSection(props: Props) {
-  const { read, busy, setProp, clearProp, liveSetProp, onProvenance, onSelectSelector } = props;
+  const { read } = props;
   return (
     <>
       <SizingControl {...props} />
       <PositionControl {...props} />
-
-      <div className="embed-editor_size-row">
-        <PropLabel
-          label="Align"
-          prop="align-self"
-          d={displayOf(read('align-self'))}
-          contributors={read('align-self')?.contributors ?? []}
-          busy={busy}
-          onClear={() => clearProp('align-self')}
-          onProvenance={onProvenance}
-          onSelectSelector={onSelectSelector}
-        />
-        <SegBar
-          segs={ALIGN_SELF_SEGS}
-          current={alignSelfCurrent(read)}
-          ariaLabel="Align self"
-          prop="align-self"
-          busy={busy}
-          onCommit={(value, important) => setProp('align-self', value, important)}
-          onLiveCommit={(value, important) => liveSetProp('align-self', value, important)}
-          onClear={() => clearProp('align-self')}
-        />
-      </div>
-      <div className="embed-editor_size-row">
-        <PropLabel
-          label="Justify"
-          prop="justify-self"
-          d={displayOf(read('justify-self'))}
-          contributors={read('justify-self')?.contributors ?? []}
-          busy={busy}
-          onClear={() => clearProp('justify-self')}
-          onProvenance={onProvenance}
-          onSelectSelector={onSelectSelector}
-        />
-        <SegBar
-          segs={JUSTIFY_SELF_SEGS}
-          current={justifySelfCurrent(read)}
-          ariaLabel="Justify self"
-          prop="justify-self"
-          busy={busy}
-          onCommit={(value, important) => setProp('justify-self', value, important)}
-          onLiveCommit={(value, important) => liveSetProp('justify-self', value, important)}
-          onClear={() => clearProp('justify-self')}
-        />
-      </div>
-      <div className="embed-editor_size-row">
-        <PropLabel
-          label="Order"
-          prop="order"
-          d={displayOf(read('order'))}
-          contributors={read('order')?.contributors ?? []}
-          busy={busy}
-          onClear={() => clearProp('order')}
-          onProvenance={onProvenance}
-          onSelectSelector={onSelectSelector}
-        />
-        <SegBar
-          segs={ORDER_SEGS}
-          current={orderCurrent(read)}
-          ariaLabel="Order"
-          prop="order"
-          busy={busy}
-          moreSegment
-          moreValue="2"
-          onCommit={(value, important) => setProp('order', value, important)}
-          onLiveCommit={(value, important) => liveSetProp('order', value, important)}
-          onClear={() => clearProp('order')}
-        />
-      </div>
+      <SelfRow
+        label="Align"
+        prop="align-self"
+        segs={ALIGN_SELF_SEGS}
+        current={alignSelfCurrent(read)}
+        ariaLabel="Align self"
+        props={props}
+      />
+      <SelfRow
+        label="Justify"
+        prop="justify-self"
+        segs={JUSTIFY_SELF_SEGS}
+        current={justifySelfCurrent(read)}
+        ariaLabel="Justify self"
+        props={props}
+      />
+      <SelfRow
+        label="Order"
+        prop="order"
+        segs={ORDER_SEGS}
+        current={orderCurrent(read)}
+        ariaLabel="Order"
+        more={{ value: '2' }}
+        props={props}
+      />
     </>
+  );
+}
+
+// One labelled segmented row for a single property (align-self, justify-self, order).
+// `more` adds the trailing "more" segment that seeds its value.
+function SelfRow({
+  label,
+  prop,
+  segs,
+  current,
+  ariaLabel,
+  more,
+  props,
+}: {
+  label: string;
+  prop: string;
+  segs: readonly Seg[];
+  current: string;
+  ariaLabel: string;
+  more?: { readonly value: string };
+  props: Props;
+}) {
+  const { read, busy, setProp, clearProp, liveSetProp, onProvenance, onSelectSelector } = props;
+  return (
+    <div className="embed-editor_size-row">
+      <PropLabel
+        label={label}
+        prop={prop}
+        display={displayOf(read(prop))}
+        contributors={read(prop)?.contributors ?? []}
+        busy={busy}
+        onClear={() => clearProp(prop)}
+        onProvenance={onProvenance}
+        onSelectSelector={onSelectSelector}
+      />
+      <SegBar
+        segs={segs}
+        current={current}
+        ariaLabel={ariaLabel}
+        prop={prop}
+        busy={busy}
+        {...(more === undefined ? {} : { moreSegment: true, moreValue: more.value })}
+        onCommit={(value, important) => setProp(prop, value, important)}
+        onLiveCommit={(value, important) => liveSetProp(prop, value, important)}
+        onClear={() => clearProp(prop)}
+      />
+    </div>
   );
 }

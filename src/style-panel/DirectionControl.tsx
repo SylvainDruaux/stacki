@@ -222,7 +222,7 @@ type Flow = {
   primary?: boolean;
 };
 
-const dirPhrase: Record<string, string> = {
+const directionPhrase: Record<string, string> = {
   row: 'left to right',
   'row-reverse': 'right to left',
   column: 'top to bottom',
@@ -242,7 +242,8 @@ const flow = (
   label,
   primary,
 });
-const tipFor = (f: Flow) => `Stack children ${dirPhrase[f.direction]}, ${f.label.toLowerCase()}`;
+const tipFor = (option: Flow) =>
+  `Stack children ${directionPhrase[option.direction]}, ${option.label.toLowerCase()}`;
 
 // The chevron menu, grouped by primary direction. The two `primary` rows double as
 // the fixed → / ↓ segments.
@@ -290,7 +291,7 @@ function requiredFlow(value: string): Flow {
 }
 const ROW = requiredFlow('row');
 const COLUMN = requiredFlow('column');
-const NONSTANDARD = ALL.filter((f) => !f.primary);
+const NONSTANDARD = ALL.filter((option) => !option.primary);
 const DEFAULT_THIRD = requiredFlow('row wrap');
 
 const TOOLTIP_DELAY_MS = 500;
@@ -304,8 +305,8 @@ function parseImportant(input: string): { value: string; important: boolean } {
   }
   return { value: input.trim(), important: false };
 }
-const joinImportant = (value: string, important: boolean) =>
-  important ? `${value} !important` : value;
+const joinImportant = (parsed: { readonly value: string; readonly important: boolean }) =>
+  parsed.important ? `${parsed.value} !important` : parsed.value;
 
 function CustomField({
   value,
@@ -320,11 +321,11 @@ function CustomField({
   inputRef: React.RefObject<HTMLInputElement>;
   onCommit: (value: string, important: boolean) => void;
 }) {
-  const [draft, setDraft] = useState(joinImportant(value, important));
+  const [draft, setDraft] = useState(joinImportant({ value, important }));
   const focused = useRef(false);
   useEffect(() => {
     if (!focused.current) {
-      setDraft(joinImportant(value, important));
+      setDraft(joinImportant({ value, important }));
     }
   }, [value, important]);
   const commit = () => {
@@ -379,19 +380,120 @@ export default function DirectionControl({
   onCommitCustom: (value: string, important: boolean) => void;
 }) {
   const current = value.trim().toLowerCase() || 'row';
-  const dir = rawDirection.trim().toLowerCase();
+  const direction = rawDirection.trim().toLowerCase();
   // Custom whenever flex-direction is a free value, or carries !important.
-  const customMode = important || (dir !== '' && !FLEX_DIRECTIONS.includes(dir));
-
-  const thirdMatch = NONSTANDARD.find((f) => f.value === current);
-  const third = thirdMatch ?? DEFAULT_THIRD;
+  const customMode = important || (direction !== '' && !FLEX_DIRECTIONS.includes(direction));
 
   const [open, setOpen] = useState(false);
-  const [hovered, setHovered] = useState<Flow | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const wantFocus = useRef(false);
+  useMenuDismiss({ open, rootRef, setOpen });
+  const requestFocus = useFocusOnceReady({ customMode, busy, inputRef });
 
+  const pick = (next: Flow) => {
+    setOpen(false);
+    if (customMode || next.value !== current) {
+      onCommit(next.direction, next.wrap);
+    }
+  };
+  const enterCustom = () => {
+    setOpen(false);
+    requestFocus();
+    onCommitCustom('unset', false);
+  };
+  const tip = useSegmentTip(rootRef);
+
+  return (
+    <div
+      ref={rootRef}
+      className={`embed-editor_display ${customMode ? 'is-custom' : ''}`}
+      role="group"
+      aria-label="Direction"
+    >
+      {customMode ? (
+        <CustomField
+          value={rawDirection}
+          important={important}
+          busy={busy}
+          inputRef={inputRef}
+          onCommit={onCommitCustom}
+        />
+      ) : (
+        <FlowSegments current={current} busy={busy} tip={tip} pick={pick} />
+      )}
+      <MenuArrow open={open} busy={busy} onToggle={() => setOpen((value) => !value)} />
+
+      {open ? (
+        <DirectionMenu
+          customMode={customMode}
+          current={current}
+          pick={pick}
+          enterCustom={enterCustom}
+        />
+      ) : undefined}
+      <SegmentTipBubble tip={tip.shown} />
+    </div>
+  );
+}
+
+function MenuArrow({
+  open,
+  busy,
+  onToggle,
+}: {
+  open: boolean;
+  busy: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      className="embed-editor_display-arrow"
+      aria-haspopup="menu"
+      aria-expanded={open}
+      aria-label="More direction options"
+      disabled={busy}
+      onClick={onToggle}
+    >
+      <ChevronIcon />
+    </button>
+  );
+}
+
+// Focus the custom field once its `unset` write settles (input is disabled mid-save).
+// Returns the request to make when entering custom mode.
+function useFocusOnceReady({
+  customMode,
+  busy,
+  inputRef,
+}: {
+  customMode: boolean;
+  busy: boolean;
+  inputRef: React.RefObject<HTMLInputElement>;
+}) {
+  const wantFocus = useRef(false);
+  useEffect(() => {
+    if (customMode && wantFocus.current && !busy) {
+      wantFocus.current = false;
+      inputRef.current?.focus();
+      inputRef.current?.select();
+    }
+  }, [customMode, busy, inputRef]);
+  return () => {
+    wantFocus.current = true;
+  };
+}
+
+// Closes the open menu on an outside click or Escape.
+function useMenuDismiss({
+  open,
+  rootRef,
+  setOpen,
+}: {
+  open: boolean;
+  rootRef: React.RefObject<HTMLDivElement>;
+  setOpen: (open: boolean) => void;
+}) {
   useEffect(() => {
     if (!open) {
       return;
@@ -412,184 +514,173 @@ export default function DirectionControl({
       document.removeEventListener('mousedown', onDown);
       document.removeEventListener('keydown', onKey);
     };
-  }, [open]);
-  useEffect(() => {
-    if (!open) {
-      setHovered(null);
-    }
-  }, [open]);
+  }, [open, rootRef, setOpen]);
+}
 
-  // Focus the custom field once its `unset` write settles (input is disabled mid-save).
-  useEffect(() => {
-    if (customMode && wantFocus.current && !busy) {
-      wantFocus.current = false;
-      inputRef.current?.focus();
-      inputRef.current?.select();
-    }
-  }, [customMode, busy]);
+interface ShownTip {
+  readonly text: string;
+  readonly arrowRight: number;
+}
+interface SegmentTip {
+  readonly shown: ShownTip | undefined;
+  readonly startTip: (text: string, element: HTMLElement) => void;
+  readonly endTip: () => void;
+}
 
-  const pick = (next: Flow) => {
-    setOpen(false);
-    if (customMode || next.value !== current) {
-      onCommit(next.direction, next.wrap);
-    }
-  };
-  const enterCustom = () => {
-    setOpen(false);
-    wantFocus.current = true;
-    onCommitCustom('unset', false);
-  };
-
-  // Delayed segment tooltip (right-anchored, arrow pointing to the hovered button).
-  const [tip, setTip] = useState<{ text: string; arrowRight: number } | null>(null);
-  const tipTimer = useRef<number | null>(null);
+// Delayed segment tooltip (right-anchored, arrow pointing to the hovered button).
+function useSegmentTip(rootRef: React.RefObject<HTMLDivElement>): SegmentTip {
+  const [shown, setShown] = useState<ShownTip | undefined>(undefined);
+  const tipTimer = useRef<number | undefined>(undefined);
   const clearTipTimer = () => {
-    if (tipTimer.current != null) {
+    if (tipTimer.current !== undefined) {
       window.clearTimeout(tipTimer.current);
-      tipTimer.current = null;
+      tipTimer.current = undefined;
     }
   };
   useEffect(() => clearTipTimer, []);
-  const startTip = (text: string, el: HTMLElement) => {
+  const startTip = (text: string, element: HTMLElement) => {
     clearTipTimer();
     tipTimer.current = window.setTimeout(() => {
-      tipTimer.current = null;
+      tipTimer.current = undefined;
       const root = rootRef.current;
       if (!root) {
         return;
       }
       const track = root.getBoundingClientRect();
-      const button = el.getBoundingClientRect();
-      setTip({ text, arrowRight: track.right - (button.left + button.width / 2) });
+      const button = element.getBoundingClientRect();
+      setShown({ text, arrowRight: track.right - (button.left + button.width / 2) });
     }, TOOLTIP_DELAY_MS);
   };
   const endTip = () => {
     clearTipTimer();
-    setTip(null);
+    setShown(undefined);
   };
+  return { shown, startTip, endTip };
+}
 
-  const seg = (f: Flow, active: boolean) => (
+function SegmentTipBubble({ tip }: { tip: ShownTip | undefined }) {
+  if (tip === undefined) {
+    return undefined;
+  }
+  return (
+    <div className="u-segmented-tooltip" role="tooltip" style={tooltipArrowStyle(tip.arrowRight)}>
+      {tip.text}
+      <span className="u-segmented-tooltip-arrow" aria-hidden="true" />
+    </div>
+  );
+}
+
+// The two fixed segments (→ single row, ↓ single column) and the third slot.
+function FlowSegments({
+  current,
+  busy,
+  tip,
+  pick,
+}: {
+  current: string;
+  busy: boolean;
+  tip: SegmentTip;
+  pick: (next: Flow) => void;
+}) {
+  const thirdMatch = NONSTANDARD.find((option) => option.value === current);
+  const third = thirdMatch ?? DEFAULT_THIRD;
+  const segment = (option: Flow, selection: { readonly active: boolean }) => (
     <button
       type="button"
       role="radio"
-      aria-checked={active}
-      className={`embed-editor_display-seg ${active ? 'is-selected' : ''}`}
+      aria-checked={selection.active}
+      className={`embed-editor_display-seg ${selection.active ? 'is-selected' : ''}`}
       disabled={busy}
-      aria-label={tipFor(f)}
+      aria-label={tipFor(option)}
       onClick={() => {
-        endTip();
-        pick(f);
+        tip.endTip();
+        pick(option);
       }}
-      onMouseEnter={(event) => startTip(tipFor(f), event.currentTarget)}
-      onMouseLeave={endTip}
+      onMouseEnter={(event) => tip.startTip(tipFor(option), event.currentTarget)}
+      onMouseLeave={tip.endTip}
     >
-      {f.icon}
+      {option.icon}
     </button>
   );
-
   return (
-    <div
-      ref={rootRef}
-      className={`embed-editor_display ${customMode ? 'is-custom' : ''}`}
-      role="group"
-      aria-label="Direction"
-    >
-      {customMode ? (
-        <CustomField
-          value={rawDirection}
-          important={important}
-          busy={busy}
-          inputRef={inputRef}
-          onCommit={onCommitCustom}
-        />
-      ) : (
-        <>
-          <SegmentPill />
-          {seg(ROW, current === ROW.value)}
-          {seg(COLUMN, current === COLUMN.value)}
-          {seg(third, !!thirdMatch)}
-        </>
-      )}
-      <button
-        type="button"
-        className="embed-editor_display-arrow"
-        aria-haspopup="menu"
-        aria-expanded={open}
-        aria-label="More direction options"
-        disabled={busy}
-        onClick={() => setOpen((value) => !value)}
-      >
-        <ChevronIcon />
-      </button>
+    <>
+      <SegmentPill />
+      {segment(ROW, { active: current === ROW.value })}
+      {segment(COLUMN, { active: current === COLUMN.value })}
+      {segment(third, { active: !!thirdMatch })}
+    </>
+  );
+}
 
-      {open ? (
-        <div className="embed-editor_direction-menu" role="menu">
-          {GROUPS.map((group) => {
-            // Primaries (single row / single column) live on the segments; only surface
-            // them in the menu while in custom mode, so there's a way back to them.
-            const options = customMode
-              ? group.options
-              : group.options.filter((option) => !option.primary);
-            return (
-              <div className="embed-editor_direction-group" key={group.header}>
-                <div className="embed-editor_direction-header">{group.header}</div>
-                {options.map((option) => (
-                  <button
-                    key={option.value}
-                    type="button"
-                    role="menuitemradio"
-                    aria-checked={!customMode && current === option.value}
-                    className={
-                      'embed-editor_direction-item ' +
-                      (!customMode && current === option.value ? 'is-selected' : '')
-                    }
-                    onClick={() => pick(option)}
-                    onMouseEnter={() => setHovered(option)}
-                    onMouseLeave={() => setHovered(null)}
-                  >
-                    <span className="embed-editor_direction-item-icon">{option.icon}</span>
-                    <span>{option.label}</span>
-                  </button>
-                ))}
-              </div>
-            );
-          })}
-          <div className="embed-editor_direction-group">
-            <button
-              type="button"
-              role="menuitemradio"
-              aria-checked={customMode}
-              className={`embed-editor_direction-item ${customMode ? 'is-selected' : ''}`}
-              onClick={enterCustom}
-              onMouseEnter={() => setHovered(null)}
-            >
-              <span className="embed-editor_direction-item-icon" />
-              <span>Custom</span>
-            </button>
+// The grouped menu. It mounts only while open, so the hovered option (the footer's
+// subject) starts empty each time it opens.
+function DirectionMenu({
+  customMode,
+  current,
+  pick,
+  enterCustom,
+}: {
+  customMode: boolean;
+  current: string;
+  pick: (next: Flow) => void;
+  enterCustom: () => void;
+}) {
+  const [hovered, setHovered] = useState<Flow | undefined>(undefined);
+  return (
+    <div className="embed-editor_direction-menu" role="menu">
+      {GROUPS.map((group) => {
+        // Primaries (single row / single column) live on the segments; only surface
+        // them in the menu while in custom mode, so there's a way back to them.
+        const options = customMode
+          ? group.options
+          : group.options.filter((option) => !option.primary);
+        return (
+          <div className="embed-editor_direction-group" key={group.header}>
+            <div className="embed-editor_direction-header">{group.header}</div>
+            {options.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                role="menuitemradio"
+                aria-checked={!customMode && current === option.value}
+                className={
+                  'embed-editor_direction-item ' +
+                  (!customMode && current === option.value ? 'is-selected' : '')
+                }
+                onClick={() => pick(option)}
+                onMouseEnter={() => setHovered(option)}
+                onMouseLeave={() => setHovered(undefined)}
+              >
+                <span className="embed-editor_direction-item-icon">{option.icon}</span>
+                <span>{option.label}</span>
+              </button>
+            ))}
           </div>
-          <div className="embed-editor_direction-footer">
-            {hovered ? (
-              <>
-                <code>flex-direction: {hovered.direction}</code>
-                <code>flex-wrap: {hovered.wrap}</code>
-              </>
-            ) : (
-              'Hover an option to see direction and wrap values.'
-            )}
-          </div>
-        </div>
-      ) : null}
-
-      {tip ? (
-        <div
-          className="u-segmented-tooltip"
-          role="tooltip"
-          style={tooltipArrowStyle(tip.arrowRight)}
+        );
+      })}
+      <div className="embed-editor_direction-group">
+        <button
+          type="button"
+          role="menuitemradio"
+          aria-checked={customMode}
+          className={`embed-editor_direction-item ${customMode ? 'is-selected' : ''}`}
+          onClick={enterCustom}
+          onMouseEnter={() => setHovered(undefined)}
         >
-          {tip.text}
-          <span className="u-segmented-tooltip-arrow" aria-hidden="true" />
-        </div>
-      ) : null}
+          <span className="embed-editor_direction-item-icon" />
+          <span>Custom</span>
+        </button>
+      </div>
+      <div className="embed-editor_direction-footer">
+        {hovered ? (
+          <>
+            <code>flex-direction: {hovered.direction}</code>
+            <code>flex-wrap: {hovered.wrap}</code>
+          </>
+        ) : (
+          'Hover an option to see direction and wrap values.'
+        )}
+      </div>
     </div>
   );
 }
