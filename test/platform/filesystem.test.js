@@ -19,7 +19,7 @@ const { spawn } = require('node:child_process');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { protocolLeftovers, realHost, scratch, sha256 } = require('./support.js');
+const { protocolLeftovers, realHost, scratch, sha256 } = require('../helpers/platformSupport.js');
 
 const posixOnly = { skip: process.platform === 'win32' ? 'POSIX permissions and links' : false };
 

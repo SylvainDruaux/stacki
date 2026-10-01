@@ -29,8 +29,8 @@ import { LIMITS } from '#dist/shared/core/limits.js';
 import { err } from '#dist/shared/core/result.js';
 import { encodeUtf8, toByteSpan } from '#dist/shared/core/span.js';
 import { SIMULATOR_PROJECTOR } from './candidate.ts';
-import { planEngine } from './engine-planner.ts';
-import { FakeDisk } from './fake-disk.ts';
+import { planEngine } from './enginePlanner.ts';
+import { FakeDisk } from './fakeDisk.ts';
 import { sha256 } from './project.ts';
 
 const PAGE = toFilePath('/project/page.astro');

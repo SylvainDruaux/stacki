@@ -223,7 +223,7 @@ export function planRevertSplices(
  * rejection, and every hunk is written at its own range with its authored
  * bytes as the witness. The result may not parse — a raw page, a stylesheet —
  * so the candidate is not required to. Agrees exactly with the step-1
- * reference (test/simulator/reference-planner.ts). */
+ * reference (test/simulator/referencePlanner.ts). */
 export function planRewriteText(
   context: PlanContext,
   anchor: AnchorRef,

@@ -7,7 +7,7 @@
 // Method, in three parts:
 //   1. Mapping correctness. SPIKE_SEEDS seeded runs of the simulator, whose
 //      actor plans set-attribute with the shipping planner and whose judge
-//      (remap-judge.ts) decides every stale plan again from recorded byte
+//      (remapJudge.ts) decides every stale plan again from recorded byte
 //      origins; the verdicts are tallied per fixture. The runs count wrong-site
 //      plans instead of failing on them (the gate fails), and list each one.
 //   2. Engine latency on the six named large fixtures (manifest-checked): the
@@ -26,7 +26,7 @@ import { createHash } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { writeVerified } from './verified-write.entry.ts';
+import { writeVerified } from './verifiedWrite.entry.ts';
 import { parsePage } from '#dist/electron/parse/astroParser.js';
 import { toFilePath, toIntentId } from '#dist/shared/core/brand.js';
 import { capabilityAcceptsVisualIntent } from '#dist/shared/page/capability.js';

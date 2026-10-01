@@ -31,11 +31,11 @@ import type { AnchorRef } from '#dist/shared/page/ref.js';
 import type { Snapshot } from '#dist/shared/page/snapshot.js';
 import type { ProjectedNode } from '#dist/shared/page/sourceProjection.js';
 import { decodeUtf8, encodeUtf8, toByteSpan, type ByteString } from '#dist/shared/core/span.js';
-import { anchorAt, oracleIntent, oracleSplices } from './oracle-intent.ts';
+import { anchorAt, oracleIntent, oracleSplices } from './oracleIntent.ts';
 import { ORACLE_SCENARIOS } from './oracles.ts';
 import { snapshotOf } from './project.ts';
-import { referenceMapSpan, referenceTables } from './reference-diff.ts';
-import { planByIdentity } from './reference-planner.ts';
+import { referenceMapSpan, referenceTables } from './referenceDiff.ts';
+import { planByIdentity } from './referencePlanner.ts';
 import { applySplices } from '#dist/shared/engine/splice.js';
 import { diffCodePatch } from '#dist/shared/engine/codePatch.js';
 

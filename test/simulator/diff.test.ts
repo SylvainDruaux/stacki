@@ -3,7 +3,7 @@
 // approximate diff — when a budget runs out (plan §10, §14).
 // Method: (1) seeded random byte strings over tiny alphabets, where repeats and
 // tied scripts are the norm, checked against the brute-force full tables in
-// reference-diff.ts: the total distance, the prefix and suffix distance at
+// referenceDiff.ts: the total distance, the prefix and suffix distance at
 // every point of the edit graph, and a traceback whose hunks rebuild the
 // target and cost exactly the distance; (2) hand-built edge cases — empty
 // files, identical files, pure insertions and deletions; (3) each budget at,
@@ -22,7 +22,7 @@ import {
 import { LIMITS } from '#dist/shared/core/limits.js';
 import { encodeUtf8, toByteString, type ByteString } from '#dist/shared/core/span.js';
 import { Prng } from './prng.ts';
-import { referenceTables } from './reference-diff.ts';
+import { referenceTables } from './referenceDiff.ts';
 
 const SEEDS = 1_500;
 

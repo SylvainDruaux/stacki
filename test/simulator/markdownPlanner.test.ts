@@ -8,7 +8,7 @@
 // each side. Items move only among items with their marker; lines whose
 // container is not written out (a quote's lazy line) are never moved.
 // Method: snapshots through the real Markdown parser and projection
-// (project.ts); intents authored as the client authors them (oracle-intent.ts
+// (project.ts); intents authored as the client authors them (oracleIntent.ts
 // anchors); plans applied to the bytes and compared with hand-written output.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
@@ -19,7 +19,7 @@ import type { AnchorRef } from '#dist/shared/page/ref.js';
 import type { Snapshot } from '#dist/shared/page/snapshot.js';
 import { decodeUtf8, encodeUtf8 } from '#dist/shared/core/span.js';
 import { applySplices } from '#dist/shared/engine/splice.js';
-import { anchorAt } from './oracle-intent.ts';
+import { anchorAt } from './oracleIntent.ts';
 import { snapshotOf } from './project.ts';
 
 const PAGE = toFilePath('/project/page.md');

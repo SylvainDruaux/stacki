@@ -34,7 +34,7 @@ import { toByteSpan, type ByteSpan, type ByteString } from '#dist/shared/core/sp
 import { applySplices } from '#dist/shared/engine/splice.js';
 import type { Splice } from '#dist/shared/engine/planner.js';
 import { survivingSpan, type Origins } from './provenance.ts';
-import { referenceMapSpan, referenceTables } from './reference-diff.ts';
+import { referenceMapSpan, referenceTables } from './referenceDiff.ts';
 
 export type RemapDecision =
   | { readonly tag: 'planned'; readonly plan: Plan }

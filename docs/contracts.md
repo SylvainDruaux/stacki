@@ -165,7 +165,7 @@ no operation replaces a whole file.
 - `mapSpan.ts` (step 2) — `mapSpan(lastKnown, current, span, budget)` →
   `resolved` (every minimum edit script keeps the span whole at one place) |
   `gone` (none keeps it whole) | `ambiguous` (they disagree) | `too-costly`.
-  Decided from two columns of the span; `test/simulator/reference-diff.ts`
+  Decided from two columns of the span; `test/simulator/referenceDiff.ts`
   checks every column and the suites assert they agree.
 - `planner.ts` (step 2) — `Splice`, `Plan`, and the pure
   `planIntent({ authored, current }, intent)` → `Result<Plan, RejectionReason>`.
@@ -224,7 +224,7 @@ operation with `shared/engine/planner.ts` (mapped through the diff when stale); 
 queued intent carries the snapshot it was authored against. Every stale
 decision on a tag's name or attributes, and (step 10) every stale Markdown
 block edit, removal, insertion and move, is judged against byte origins the
-simulator records for every writer (`provenance.ts`, `remap-judge.ts`): a
+simulator records for every writer (`provenance.ts`, `remapJudge.ts`): a
 wrong-site plan fails the run. Its
 `diff`, `map-span` and `planner` suites hold the step-2 modules to their
 brute-force references and to hand-derived byte ranges.

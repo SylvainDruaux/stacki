@@ -16,9 +16,9 @@
 // seed and the fixtures, and its digest proves it (invariant 9).
 //
 // From step 3 the actor plans set-attribute with the shipping planner, mapped
-// through the diff when the intent is stale (engine-planner.ts). Every writer
+// through the diff when the intent is stale (enginePlanner.ts). Every writer
 // here also records where each byte came from (provenance.ts), and every stale
-// set-attribute decision is judged against those origins (remap-judge.ts): a
+// set-attribute decision is judged against those origins (remapJudge.ts): a
 // plan at any other element than the one the authored element became fails the
 // run (`wrongSite: 'fail'`, the gate) or is counted (`'count'`, the spike
 // report). The judgements are tallied per file.
@@ -62,8 +62,8 @@ import {
   type Submission,
 } from '#dist/shared/engine/documentActor.js';
 import { SIMULATOR_PROJECTOR } from './candidate.ts';
-import { planEngine } from './engine-planner.ts';
-import { FakeDisk } from './fake-disk.ts';
+import { planEngine } from './enginePlanner.ts';
+import { FakeDisk } from './fakeDisk.ts';
 import {
   checkBounds,
   checkCommitted,
@@ -71,7 +71,7 @@ import {
   checkOutcome,
   checkQuiescent,
 } from './invariants.ts';
-import { oracleIntent, oracleSplices } from './oracle-intent.ts';
+import { oracleIntent, oracleSplices } from './oracleIntent.ts';
 import { ORACLE_SCENARIOS, type OracleScenario } from './oracles.ts';
 import { Prng } from './prng.ts';
 import { sha256, snapshotOf } from './project.ts';
@@ -91,7 +91,7 @@ import {
   judgeRemap,
   type RemapDecision,
   type RemapVerdict,
-} from './remap-judge.ts';
+} from './remapJudge.ts';
 
 export interface SimulationFile {
   /** Fixture name; the file lives at `/project/<name>` on the fake disk. */
@@ -1420,7 +1420,7 @@ function verdictDetail(verdict: RemapVerdict): string {
 }
 
 // Tags whose planned stale intents are judged by whether their element survived
-// (remap-judge.ts): every operation that edits one tag's name or attributes.
+// (remapJudge.ts): every operation that edits one tag's name or attributes.
 function judgedBySurvival(tag: Intent['operation']['tag']): boolean {
   return tag === 'set-attribute' || tag === 'rename-attribute' || tag === 'rename-tag';
 }

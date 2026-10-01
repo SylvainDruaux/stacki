@@ -17,10 +17,10 @@ import { toFilePath, toIntentId } from '#dist/shared/core/brand.js';
 import { LIMITS } from '#dist/shared/core/limits.js';
 import type { ProjectedNode } from '#dist/shared/page/sourceProjection.js';
 import { encodeUtf8 } from '#dist/shared/core/span.js';
-import { oracleIntent, oracleSplices } from './oracle-intent.ts';
+import { oracleIntent, oracleSplices } from './oracleIntent.ts';
 import { ORACLE_SCENARIOS, type IntentClass } from './oracles.ts';
 import { snapshotOf } from './project.ts';
-import { planByIdentity } from './reference-planner.ts';
+import { planByIdentity } from './referencePlanner.ts';
 import { applySplices } from '#dist/shared/engine/splice.js';
 
 const FIXTURES = path.resolve('test/fixtures/editor-core');

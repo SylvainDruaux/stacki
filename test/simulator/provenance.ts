@@ -3,7 +3,7 @@
 // number, and a byte a writer keeps keeps its origin. The simulator knows what
 // each writer did — it did it — so "where did the authored element go?" has an
 // exact answer that owes nothing to the diff: follow the origins. The mapper
-// never sees them; the judge (remap-judge.ts) compares its answer with theirs.
+// never sees them; the judge (remapJudge.ts) compares its answer with theirs.
 //
 // Origins are unique within one version of a file: fresh ones come from one
 // counter per run, and every writer below keeps an existing origin at most once.

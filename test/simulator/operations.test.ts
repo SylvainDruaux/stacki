@@ -30,7 +30,7 @@ import type { Snapshot } from '#dist/shared/page/snapshot.js';
 import type { ProjectedNode } from '#dist/shared/page/sourceProjection.js';
 import { decodeUtf8, encodeUtf8, toByteSpan } from '#dist/shared/core/span.js';
 import { applySplices, inverseEdits } from '#dist/shared/engine/splice.js';
-import { anchorAt, oracleIntent, oracleSplices } from './oracle-intent.ts';
+import { anchorAt, oracleIntent, oracleSplices } from './oracleIntent.ts';
 import { ORACLE_SCENARIOS } from './oracles.ts';
 import { snapshotOf } from './project.ts';
 

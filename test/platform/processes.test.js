@@ -10,7 +10,7 @@
 // is broken by the next one, because its owner is gone, and the temporary file
 // a crash before the rename leaves behind is inert: the target is untouched
 // and the watcher ignores it.
-// Method: test/platform/child.js runs a real host in a child process; the crash
+// Method: test/helpers/platformChild.js runs a real host in a child process; the crash
 // jobs kill themselves with SIGKILL at the rename. Real files in the OS temp
 // directory; nothing is faked.
 const test = require('node:test');
@@ -20,7 +20,13 @@ const os = require('node:os');
 const path = require('node:path');
 const { reconcileUncertain } = require('#dist/shared/engine/documentActor.js');
 const { isAtomicTemporary } = require('#dist/electron/documents/atomicWrite.js');
-const { protocolLeftovers, realHost, runChild, scratch, sha256 } = require('./support.js');
+const {
+  protocolLeftovers,
+  realHost,
+  runChild,
+  scratch,
+  sha256,
+} = require('../helpers/platformSupport.js');
 
 const WRITERS = 4;
 const ROUNDS = 40;

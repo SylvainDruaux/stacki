@@ -6,7 +6,7 @@
 // save goes through. On a case-insensitive disk every spelling of a name is one
 // file, so it must be one actor and one lock.
 // Method: runs on native Windows, or on WSL against the NTFS temp folder with a
-// Windows PowerShell process holding the file (support.js detects both, and
+// Windows PowerShell process holding the file (helpers/platformSupport.js detects both, and
 // the tests skip with the reason anywhere else). Real files, real processes.
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -19,7 +19,7 @@ const {
   scratch,
   sha256,
   windowsFilesystem,
-} = require('./support.js');
+} = require('../helpers/platformSupport.js');
 
 const windows = windowsFilesystem();
 const onWindows = { skip: windows.skip ?? false, timeout: 60_000 };

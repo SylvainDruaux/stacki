@@ -148,7 +148,7 @@ function classify(filePath: string): Omit<Row, 'name'> {
   }
 }
 
-const expectations = readExpectations(path.join(root, 'test/expectations.json'));
+const expectations = readExpectations(path.join(root, 'test/corpus/expectations.json'));
 const target = process.argv[2];
 const base = target ? path.resolve(target) : corpusDirectory;
 const files = collect(base);

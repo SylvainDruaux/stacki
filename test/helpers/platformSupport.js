@@ -92,11 +92,15 @@ function holdFromWindows(windows, file, share) {
   });
 }
 
-/** Run test/platform/child.js with a JSON job; resolves with its exit and output. */
+/** Run test/helpers/platformChild.js with a JSON job; resolves with its exit and output. */
 function runChild(job) {
-  const child = spawn(process.execPath, [path.join(__dirname, 'child.js'), JSON.stringify(job)], {
-    stdio: ['ignore', 'pipe', 'inherit'],
-  });
+  const child = spawn(
+    process.execPath,
+    [path.join(__dirname, 'platformChild.js'), JSON.stringify(job)],
+    {
+      stdio: ['ignore', 'pipe', 'inherit'],
+    },
+  );
   let output = '';
   child.stdout.on('data', (chunk) => {
     output += String(chunk);

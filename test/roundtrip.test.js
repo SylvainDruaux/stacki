@@ -31,7 +31,7 @@ const { parsePage, serializePage } = require('#dist/electron/parse/astroParser.j
 const { LIMITS } = require('#dist/shared/core/limits.js');
 
 const CORPUS_DIRECTORY = path.join(__dirname, 'corpus');
-const expectations = JSON.parse(fs.readFileSync(repoPath('test/expectations.json'), 'utf8'));
+const expectations = JSON.parse(fs.readFileSync(repoPath('test/corpus/expectations.json'), 'utf8'));
 
 const DEFAULT_EXPECTATION = { editable: true, identity: 'pass' };
 
@@ -168,7 +168,7 @@ describe('parse -> serialize returns the original bytes', () => {
       assert.notEqual(
         output,
         source,
-        `${name} now round-trips cleanly — delete its entry from test/expectations.json ` +
+        `${name} now round-trips cleanly — delete its entry from test/corpus/expectations.json ` +
           `so this fixture starts guarding the fix.`,
       );
     });

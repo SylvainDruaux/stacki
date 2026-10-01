@@ -13,7 +13,7 @@
 //   the crash window of plan §3.5. It never reaches its verifying read.
 const fs = require('node:fs');
 const path = require('node:path');
-const { realHost, sha256 } = require('./support.js');
+const { realHost, sha256 } = require('./platformSupport.js');
 
 const job = JSON.parse(process.argv[2]);
 const print = (event) => process.stdout.write(`${JSON.stringify(event)}\n`);

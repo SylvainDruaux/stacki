@@ -3,7 +3,7 @@
 // "the third matching node" (plan §4). Wrong-site mapping is the target, so the
 // pinned cases assert the exact resolved byte range, not just the outcome
 // (plan §3.4).
-// Method: (1) agreement with the brute-force reference (reference-diff.ts),
+// Method: (1) agreement with the brute-force reference (referenceDiff.ts),
 // which checks every column of the span against every target byte, over every
 // span of seeded random inputs on tiny alphabets — the fast mapper decides from
 // two columns, so this is the proof that two suffice; all three outcomes must
@@ -25,7 +25,7 @@ import {
   type ByteString,
 } from '#dist/shared/core/span.js';
 import { Prng } from './prng.ts';
-import { referenceMapSpan, referenceTables } from './reference-diff.ts';
+import { referenceMapSpan, referenceTables } from './referenceDiff.ts';
 
 const SEEDS = 2_000;
 

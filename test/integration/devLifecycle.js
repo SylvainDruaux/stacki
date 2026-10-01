@@ -1,5 +1,5 @@
 // Optional integration smoke test; deliberately outside the offline npm gate.
-// Run: node test/integration/dev-lifecycle.js
+// Run: node test/integration/devLifecycle.js
 // Installs pinned Astro into an isolated temporary project, runs the actual
 // Electron main IPC handlers with a hidden empty window, then removes all data.
 const assert = require('node:assert/strict');

@@ -16,7 +16,7 @@ import { createHash } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { writeVerified } from './verified-write.entry.ts';
+import { writeVerified } from './verifiedWrite.entry.ts';
 import { parsePage, serializePage } from '#dist/electron/parse/astroParser.js';
 import { LIMITS } from '#dist/shared/core/limits.js';
 
