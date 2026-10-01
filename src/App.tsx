@@ -63,7 +63,7 @@ import {
   type PageSaver,
 } from './pagePersistence';
 import { createEntrySender, previewGestures } from './pageSender';
-import { createCoalescedRun } from './coalescedRun';
+import { createCoalescedRun } from './lib/coalescedRun';
 import { carryHandles, seedOf } from './nodeHandles';
 import {
   EditDrafts,
@@ -120,7 +120,7 @@ import { toComponentName } from './componentName';
 import { resolveInstanceProps } from './instanceProps';
 import { propsForExtraction } from './extractProps';
 import TerminalDock from './panels/TerminalDock';
-import { cleanError, stripAnsi } from './cleanError';
+import { cleanError, stripAnsi } from './lib/cleanError';
 import { elementLabel } from './classNames';
 import {
   autoQueryName,
@@ -157,8 +157,8 @@ import type { VariableSelection } from './variablesBridge';
 import type { InsertTarget } from './insertTarget';
 import type { InsertItem } from './ui/InsertSearch';
 import { toRecord } from '../shared/record';
-import { projectRelativePath } from './projectPath';
-import { currentDesktopPlatform, shortcutLabel } from './shortcutLabel';
+import { projectRelativePath } from './lib/projectPath';
+import { currentDesktopPlatform, shortcutLabel } from './lib/shortcutLabel';
 import { sourceNodeAtOffset } from './codePanelModel';
 import {
   codeWindowFor,
@@ -3894,7 +3894,7 @@ function useScans(coreState: ReturnType<typeof useCoreState>) {
   // Project lifecycle
   // ----------------------------------------------------------------
 
-  // One scan in flight per project and at most one waiting (src/coalescedRun.ts):
+  // One scan in flight per project and at most one waiting (src/lib/coalescedRun.ts):
   // mutations and watcher events that ask together share the scan after them,
   // so every caller — above all one deciding a file was deleted — sees a scan
   // that began after it asked. A scan is applied only when nothing newer waits
@@ -5292,7 +5292,7 @@ function useFileEvents(
 
   useEffect(() => {
     // Every file an event named since the last reconcile read them. A burst
-    // of events shares one reconcile after it (src/coalescedRun.ts): one scan
+    // of events shares one reconcile after it (src/lib/coalescedRun.ts): one scan
     // and one read per tick, and a reconcile begun after the last event sees
     // every file — no counter decides which answer wins.
     const pendingFiles = new Set<string>();

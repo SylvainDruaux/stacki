@@ -3,7 +3,7 @@ import { reassemble } from '../cmsSchema';
 import { writeCms } from '../cmsBridge';
 import { assert } from '../../shared/assert';
 import { BOUNDARY_LIMITS } from '../../shared/boundary';
-import { createCoalescedRun } from '../coalescedRun';
+import { createCoalescedRun } from '../lib/coalescedRun';
 
 export interface CmsUndo {
   readonly label: string;
@@ -42,7 +42,7 @@ export function createCmsWriter(options: WriterOptions) {
 }
 
 // One writer belongs to one file. Mutation stays private here. A burst replaces
-// one queued write; writes run one at a time (src/coalescedRun.ts), so a write
+// one queued write; writes run one at a time (src/lib/coalescedRun.ts), so a write
 // can never overwrite a newer edit on disk, and a flush is answered by a write
 // that began after it was asked — every edit queued before it is on disk, or a
 // write failed and kept it queued.

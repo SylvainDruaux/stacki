@@ -5,7 +5,7 @@ import type { createCmsWriter } from './cmsWriter';
 import { collectionOf } from '../cmsSchema';
 import { readCms, readCmsMeta } from '../cmsBridge';
 import { assert } from '../../shared/assert';
-import { createCoalescedRun } from '../coalescedRun';
+import { createCoalescedRun } from '../lib/coalescedRun';
 
 export interface CmsSnapshot {
   readonly collection: Collection;
@@ -31,7 +31,7 @@ export function cmsCollection(rel: string, data: unknown, error?: string): Colle
 }
 
 // One active read and one pending refresh bound watcher bursts
-// (src/coalescedRun.ts: a burst costs at most two reads). The writer's
+// (src/lib/coalescedRun.ts: a burst costs at most two reads). The writer's
 // revision prevents a read that started before an edit from replacing that edit.
 class CmsReader {
   private state: ReadState = { kind: 'open' };

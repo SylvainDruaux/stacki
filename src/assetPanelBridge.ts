@@ -4,7 +4,7 @@ import type { WireAssetEntry } from '../shared/ipc-results';
 import { BOUNDARY_LIMITS, boolean, count, list, pathText, record, text } from '../shared/boundary';
 import { parseIpcPayload } from '../shared/ipc-payloads';
 import { toProjectPath } from '../shared/brand';
-import { cleanError } from './cleanError';
+import { cleanError } from './lib/cleanError';
 import { parseAssetEntry } from './assetBridge';
 
 export type AssetRoot = 'public' | 'src';

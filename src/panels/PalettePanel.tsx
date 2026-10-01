@@ -3,7 +3,7 @@ import type { ScanComponent } from '../../shared/scan';
 import type { TrailingSlash } from '../pageState';
 import type { ComponentUsageFile } from '../paletteModel';
 import type { ComponentCreationSource, UsageAnchor, UsagePopup } from './PaletteDialogs';
-import { cleanError } from '../cleanError';
+import { cleanError } from '../lib/cleanError';
 import { allowDragEffect, clearDrag, setDrag } from '../dragState';
 import { rankInsertItems } from '../insertRank';
 import {
@@ -16,7 +16,7 @@ import {
 import { ComponentPlusIcon, ElementComponentIcon, LayoutIcon } from '../ui/Icons';
 import useDismiss from '../ui/useDismiss';
 import { CreateComponentModal, InstancesPopup } from './PaletteDialogs';
-import { currentDesktopPlatform, shortcutLabel } from '../shortcutLabel';
+import { currentDesktopPlatform, shortcutLabel } from '../lib/shortcutLabel';
 
 const TOOLTIP_DELAY_MS = 500;
 const PREVIEW_DELAY_MS = 450;

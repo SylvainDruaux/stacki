@@ -1,7 +1,7 @@
 import type { Result } from '../shared/result';
 import { count, list, object, pathText, text } from '../shared/boundary';
 import { parseIpcPayload } from '../shared/ipc-payloads';
-import { cleanError } from './cleanError';
+import { cleanError } from './lib/cleanError';
 
 const styleFile = object({ rel: pathText, name: text, path: pathText, size: count });
 

@@ -47,7 +47,7 @@ test(
     state.writer.queue([{ title: 'Discarded intermediate' }]);
     state.writer.queue(last);
     // A flush asked during a write is answered by the one write after it, which
-    // every flush asked meanwhile shares (src/coalescedRun.ts).
+    // every flush asked meanwhile shares (src/lib/coalescedRun.ts).
     const follow = state.writer.flush();
     assert.notEqual(follow, pending);
     assert.equal(state.writer.flush(), follow);

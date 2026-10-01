@@ -14,7 +14,7 @@ import { createServer, type ViteDevServer } from 'vite';
 const MODULES_MAX = 32;
 // Repository paths; the dev server serves each at `/<path>`.
 const ENTRY_MODULES: ReadonlyArray<{ readonly file: string; readonly exportName: string }> = [
-  { file: 'src/cleanError.ts', exportName: 'cleanError' },
+  { file: 'src/lib/cleanError.ts', exportName: 'cleanError' },
   { file: 'src/bridge.ts', exportName: 'scanProject' },
   { file: 'src/dataSuggest.ts', exportName: 'dataTree' },
   { file: 'src/loopBindings.ts', exportName: 'renamedLoopVar' },

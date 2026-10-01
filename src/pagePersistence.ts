@@ -3,7 +3,7 @@
 // record of what is unsaved — nothing tracks which state object was written —
 // and one flush sends the entries it finds when it starts: an edit made while
 // it runs is queued behind them and has its own save scheduled, so there is no
-// drain loop to bound. Flushes run one at a time (src/coalescedRun.ts), and a
+// drain loop to bound. Flushes run one at a time (src/lib/coalescedRun.ts), and a
 // caller is answered by a flush that began after it asked: everything queued
 // before the call has been sent, or a refusal is holding it back.
 //
@@ -12,7 +12,7 @@
 import { assert } from '../shared/assert';
 import { LIMITS } from '../shared/limits';
 import type { ScanResult } from '../shared/scan';
-import { createCoalescedRun } from './coalescedRun';
+import { createCoalescedRun } from './lib/coalescedRun';
 import type { EditDrafts, QueueEntry } from './pageEdits';
 
 /** How sending one entry ended. The sender has already shown the outcome on

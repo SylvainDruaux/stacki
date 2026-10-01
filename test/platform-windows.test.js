@@ -24,7 +24,7 @@ const bundleDirectory = repoPath('node_modules/.stacki-test');
 fs.mkdirSync(bundleDirectory, { recursive: true });
 const projectPathBundle = path.join(bundleDirectory, 'project-path.cjs');
 esbuild.buildSync({
-  entryPoints: [repoPath('src/projectPath.ts')],
+  entryPoints: [repoPath('src/lib/projectPath.ts')],
   outfile: projectPathBundle,
   bundle: true,
   format: 'cjs',
@@ -45,7 +45,7 @@ esbuild.buildSync({
 const { sourceCandidates } = require(assetURLBundle);
 const shortcutBundle = path.join(bundleDirectory, 'shortcut-label.cjs');
 esbuild.buildSync({
-  entryPoints: [repoPath('src/shortcutLabel.ts')],
+  entryPoints: [repoPath('src/lib/shortcutLabel.ts')],
   outfile: shortcutBundle,
   bundle: true,
   format: 'cjs',

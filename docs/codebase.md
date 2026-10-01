@@ -161,7 +161,7 @@ gesture → edit requests (page:edit) → main: intent → document actor
   document actor last wrote (`DocumentActors.echoes`, plan §11.9).
 - `electron/projectWatcher.ts` detects genuine outside edits (AI assistants,
   editors, git operations) and triggers a rescan; each rescan, panel read and
-  panel write is one run of `src/coalescedRun.ts` (one in flight, one
+  panel write is one run of `src/lib/coalescedRun.ts` (one in flight, one
   waiting), so a burst costs at most two.
 - Printing a whole file is fenced by lint to new files (`componentFile.ts`)
   and the parsers' own round-trip oracles (`eslint.config.mjs`); no write

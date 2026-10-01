@@ -8,7 +8,7 @@ import type { Parser } from '../shared/boundary';
 import { boolean, list, optional, pathText, record, text } from '../shared/boundary';
 import { parseIpcPayload } from '../shared/ipc-payloads';
 import type { Result } from '../shared/result';
-import { cleanError } from './cleanError';
+import { cleanError } from './lib/cleanError';
 
 export type HistoryFile = IpcResults['git:allFiles'][number];
 export type HistoryCommitFile = NonNullable<WireCommitInfo['files']>[number];

@@ -3,7 +3,7 @@ import type { Result } from '../shared/result';
 import type { Parser } from '../shared/boundary';
 import { boolean, count, list, object, optional, pathText, record, text } from '../shared/boundary';
 import { parseIpcPayload } from '../shared/ipc-payloads';
-import { cleanError } from './cleanError';
+import { cleanError } from './lib/cleanError';
 import { parseMergeResult } from './gitBridge';
 
 const repository = object({

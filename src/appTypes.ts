@@ -5,7 +5,7 @@ import type { Data } from '../shared/boundary';
 import type { IpcResults, WireGitInfo, WireInjectedRoute } from '../shared/ipc-results';
 import type { ScanResult } from '../shared/scan';
 import type { AssetRequest } from './assetPick';
-import type { CoalescedRun } from './coalescedRun';
+import type { CoalescedRun } from './lib/coalescedRun';
 import type { EditsRecord } from './pageEdits';
 import type { EditorNode } from './pageView';
 import type { VariableSelection } from './variablesBridge';

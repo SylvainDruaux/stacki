@@ -3,7 +3,7 @@ import type { Parser } from '../shared/boundary';
 import { boolean, count, list, optional, pathText, record, text } from '../shared/boundary';
 import { parseIpcPayload } from '../shared/ipc-payloads';
 import type { Result } from '../shared/result';
-import { cleanError } from './cleanError';
+import { cleanError } from './lib/cleanError';
 
 export type RecentProject = IpcResults['recents:list'][number];
 export type ProjectDialog = IpcResults['project:openDialog'];

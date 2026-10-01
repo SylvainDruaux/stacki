@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import type { IpcResults, WireGitInfo } from '../../shared/ipc-results';
 import type { Result } from '../../shared/result';
 import { assert } from '../../shared/assert';
-import { cleanError } from '../cleanError';
+import { cleanError } from '../lib/cleanError';
 import { deleteBranchAction, mergeBranchAction, tidyUp } from '../gitActions';
 import {
   checkoutGitBranch,

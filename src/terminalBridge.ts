@@ -3,7 +3,7 @@ import type { Parser } from '../shared/boundary';
 import { boolean, count, pathText, record, text } from '../shared/boundary';
 import { parseIpcPayload } from '../shared/ipc-payloads';
 import type { Result } from '../shared/result';
-import { cleanError } from './cleanError';
+import { cleanError } from './lib/cleanError';
 
 export const TERMINAL_IMAGE_BYTES_MAX = 20 * 1024 * 1024;
 

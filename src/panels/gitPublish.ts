@@ -4,7 +4,7 @@ import type { Result } from '../../shared/result';
 import { boolean, optional, record, text } from '../../shared/boundary';
 import { parseIpcPayload } from '../../shared/ipc-payloads';
 import { assert } from '../../shared/assert';
-import { cleanError } from '../cleanError';
+import { cleanError } from '../lib/cleanError';
 
 type GitHubStatus = IpcResults['git:ghStatus'];
 type PreflightState =

@@ -1,12 +1,12 @@
 import type { Result } from '../../shared/result';
 import type { VariablesSnapshot } from '../variablesBridge';
 import { assert } from '../../shared/assert';
-import { createCoalescedRun } from '../coalescedRun';
+import { createCoalescedRun } from '../lib/coalescedRun';
 import { readCSSVariables } from '../variablesBridge';
 
 type RefreshState = { readonly kind: 'open' | 'disposed' };
 
-// Watchers and edits share one read and one pending refresh (src/coalescedRun.ts:
+// Watchers and edits share one read and one pending refresh (src/lib/coalescedRun.ts:
 // a burst costs at most two reads). Disposed project instances can never
 // publish another result.
 export function createVariableRefresh(

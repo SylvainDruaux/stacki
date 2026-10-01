@@ -12,7 +12,7 @@ import { ChevronDownIcon, CloseIcon, PlusIcon } from '../ui/Icons';
 import { usePointerDrag } from '../ui/usePointerDrag';
 import { closeTerminal, onTerminalProcess } from '../terminalBridge';
 import type { TerminalPaneHandle } from './TerminalPane';
-import { currentDesktopPlatform, shortcutLabel } from '../shortcutLabel';
+import { currentDesktopPlatform, shortcutLabel } from '../lib/shortcutLabel';
 
 const TerminalPane = lazy(() => import('./TerminalPane'));
 

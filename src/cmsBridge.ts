@@ -12,7 +12,7 @@ import {
   text,
 } from '../shared/boundary';
 import { parseIpcPayload } from '../shared/ipc-payloads';
-import { cleanError } from './cleanError';
+import { cleanError } from './lib/cleanError';
 import { parseDeclaredTypes } from './panels/cmsTypes';
 
 export function parseCmsRead(input: unknown) {

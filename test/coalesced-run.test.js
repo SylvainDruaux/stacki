@@ -1,4 +1,4 @@
-// Goal: src/coalescedRun.ts keeps its one promise — a request is answered by a
+// Goal: src/lib/coalescedRun.ts keeps its one promise — a request is answered by a
 // run that began no earlier than the request — with one run in flight and at
 // most one waiting, so a burst of any size costs at most two runs. It replaced
 // the rescan chain and the panels' drain loops (plan §11.9), which followed
@@ -8,7 +8,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const load = require('./helpers/rendererModule');
-const { createCoalescedRun } = load('src/coalescedRun.ts');
+const { createCoalescedRun } = load('src/lib/coalescedRun.ts');
 
 const tick = () => new Promise((resolve) => setImmediate(resolve));
 

@@ -2,7 +2,7 @@ import type { Data, Parser } from '../shared/boundary';
 import type { Result } from '../shared/result';
 import { boolean, count, data, list, optional, pathText, record, text } from '../shared/boundary';
 import { parseIpcPayload } from '../shared/ipc-payloads';
-import { cleanError } from './cleanError';
+import { cleanError } from './lib/cleanError';
 
 export interface CmsPanelFile {
   readonly rel: string;

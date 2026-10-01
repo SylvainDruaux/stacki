@@ -6,7 +6,7 @@ import { assert } from '../../shared/assert';
 import { fieldsAt, keyFor } from '../cmsSchema';
 import { withDeclaredTypes } from './cmsTypes';
 import { readCmsUsage, deleteCms } from '../cmsBridge';
-import { cleanError } from '../cleanError';
+import { cleanError } from '../lib/cleanError';
 import { confirmDialog } from '../ui/ConfirmDialog';
 import useListReorder from '../ui/useListReorder';
 import { useCmsDialog } from './CmsField';

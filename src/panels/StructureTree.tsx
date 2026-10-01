@@ -28,7 +28,7 @@ import {
 } from '../ui/Icons';
 import { defaultCollapsed, navigatorChildren, navigatorHost } from './structureModel';
 import { isFragmentNode } from '../liveClasses';
-import { currentDesktopPlatform, shortcutLabel } from '../shortcutLabel';
+import { currentDesktopPlatform, shortcutLabel } from '../lib/shortcutLabel';
 
 export interface StructureTreeContext {
   readonly selectedId: string | undefined;

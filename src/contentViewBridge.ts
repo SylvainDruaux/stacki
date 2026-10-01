@@ -22,7 +22,7 @@ import {
   text,
 } from '../shared/boundary';
 import { parseIpcPayload } from '../shared/ipc-payloads';
-import { cleanError } from './cleanError';
+import { cleanError } from './lib/cleanError';
 
 const locatorPart = (input: unknown): string | number =>
   typeof input === 'string' ? text(input) : count(input);
