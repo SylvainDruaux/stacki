@@ -1,7 +1,7 @@
 import type { Result } from '../../shared/result';
 import { assert } from '../../shared/assert';
 import { LIMITS } from '../../shared/limits';
-import { variableEdit } from './variableEdits';
+import { variableEdit } from '../ipc/variableEditBridge';
 
 // One undoable variable edit, as the app's history records it.
 export interface VariableUndo {

@@ -9,7 +9,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const loadRenderer = require('./helpers/rendererModule');
 
-const bridgeModule = loadRenderer('src/appBridge.ts');
+const bridgeModule = loadRenderer('src/ipc/appBridge.ts');
 // A legacy bridge answered a cancelled dialog with null; the parser still reads it as a
 // cancellation, so the stub sends null as JSON would carry it.
 const legacyCancel = JSON.parse('null');

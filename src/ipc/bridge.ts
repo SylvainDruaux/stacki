@@ -1,4 +1,4 @@
-import type { PreloadBridge } from '../shared/preload-api';
+import type { PreloadBridge } from '../../shared/preload-api';
 // The renderer's typed face of window.avb. Raw IPC results are unknown; every
 // call through here is parsed by the contract layer (shared/) before any
 // renderer code sees it. A contract violation throws — a malformed payload is
@@ -8,10 +8,10 @@ import type { PreloadBridge } from '../shared/preload-api';
 // New and converted code imports from here, not from window.avb.
 
 // Vite consumes the ESM sources; dist/shared is CommonJS for Electron and Node.
-import { toProjectPath, toFilePath } from '../shared/brand';
-import { parseScanResult, type ScanResult } from '../shared/scan';
-import { parsePageReadResult, type ParsePageResult } from '../shared/page-node';
-import { parsePageDiskRead, type PageDiskRead } from '../shared/page-save';
+import { toProjectPath, toFilePath } from '../../shared/brand';
+import { parseScanResult, type ScanResult } from '../../shared/scan';
+import { parsePageReadResult, type ParsePageResult } from '../../shared/page-node';
+import { parsePageDiskRead, type PageDiskRead } from '../../shared/page-save';
 import {
   parseSymbolReadResult,
   parseResolvePathResult,
@@ -19,7 +19,7 @@ import {
   parseOkResult,
   type SymbolReadResult,
   type ResolvePathResult,
-} from '../shared/ipc';
+} from '../../shared/ipc';
 
 // Raw results stay unknown. Renderer boundary modules parse them before use.
 declare global {

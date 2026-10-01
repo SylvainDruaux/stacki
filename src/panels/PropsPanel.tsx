@@ -6,7 +6,7 @@ import type { SourceContext, FieldPosition } from './propBindings';
 import type { RichContext, RichInsertAPI, InlineNode } from '../ui/RichContent';
 import type { AssetDimensions } from '../ui/AssetThumb';
 import type { PickedAsset } from '../ui/AssetField';
-import { resolveAssetImport, readAssetDimensions } from '../assetBridge';
+import { resolveAssetImport, readAssetDimensions } from '../ipc/assetBridge';
 import { MapEditor, TagField } from './propNodeEditors';
 import PropField, { assetImportOf } from './PropField';
 import { AttributesSection } from './propAttributes';

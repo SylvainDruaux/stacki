@@ -1629,7 +1629,7 @@ async function installDependencies(directory: string) {
   }
 }
 
-// Clears the progress line: no message (src/appBridge.ts, onAppProgress). IPC is
+// Clears the progress line: no message (src/ipc/appBridge.ts, onAppProgress). IPC is
 // a structured clone, which keeps the absent value.
 const PROGRESS_CLEARED = { message: undefined } as const;
 

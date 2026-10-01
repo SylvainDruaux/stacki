@@ -34,9 +34,9 @@ import type {
 } from './types';
 import type { MatchTarget, TreeView } from './selectors';
 import { hasCanvas, queryCanvas } from '../../canvasQuery';
-import { listAssetEntries } from '../../assetBridge';
+import { listAssetEntries } from '../../ipc/assetBridge';
 import { readAstroStyleFiles, readStyleFiles } from '../../stylePanelBridge';
-import { variableEdit } from '../../panels/variableEdits';
+import { variableEdit } from '../../ipc/variableEditBridge';
 import type { NativeStyleOptions } from './native-styles';
 
 type AnyElement = unknown;

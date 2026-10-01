@@ -5,7 +5,7 @@ import { BOUNDARY_LIMITS, boolean, count, list, pathText, record, text } from '.
 import { parseIpcPayload } from '../shared/ipc-payloads';
 import { toProjectPath } from '../shared/brand';
 import { cleanError } from './lib/cleanError';
-import { parseAssetEntry } from './assetBridge';
+import { parseAssetEntry } from './ipc/assetBridge';
 
 export type AssetRoot = 'public' | 'src';
 export type AssetPanelEntry = WireAssetEntry & { readonly root: AssetRoot };

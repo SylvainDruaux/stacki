@@ -10,7 +10,7 @@ const { BOUNDARY_LIMITS } = require('#dist/shared/boundary.js');
 // so the negative space below includes it. It is read from JSON, because our own
 // code never writes a null.
 const PLATFORM_NULL = JSON.parse('null');
-const { variableEdit, friendlyError } = load('src/panels/variableEdits.ts');
+const { variableEdit, friendlyError } = load('src/ipc/variableEditBridge.ts');
 const { createVariableHistory } = load('src/panels/variableHistory.ts');
 const { createVariableRefresh } = load('src/panels/variableRefresh.ts');
 const base = { projectPath: '/project', file: 'a.css' };

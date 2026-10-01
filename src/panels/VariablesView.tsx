@@ -10,7 +10,7 @@ import type { VariableSlot, VariableRename } from './variableRows';
 import { assert } from '../../shared/assert';
 import { LIMITS } from '../../shared/limits';
 import { definedFields } from '../../shared/boundary';
-import { variableEdit as bridge } from './variableEdits';
+import { variableEdit as bridge } from '../ipc/variableEditBridge';
 import { createVariableHistory, type VariableUndo } from './variableHistory';
 import { createVariableRefresh } from './variableRefresh';
 import { dropPlan, stemOf } from './variableRows';
@@ -21,7 +21,7 @@ import Sheet from './VariableTable';
 import '../style-panel/utilities.css';
 export { dropPlan, movesForDrop } from './variableRows';
 export { createScrollSync } from './variableScroll';
-export { friendlyError } from './variableEdits';
+export { friendlyError } from '../ipc/variableEditBridge';
 
 export interface VariablesViewProps {
   readonly project: { readonly path: string };

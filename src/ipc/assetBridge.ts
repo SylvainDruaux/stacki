@@ -1,11 +1,20 @@
-import { parseResolvePathResult } from '../shared/ipc';
-import type { ResolvePathResult } from '../shared/ipc';
-import { toProjectPath, toFilePath } from '../shared/brand';
+import { parseResolvePathResult } from '../../shared/ipc';
+import type { ResolvePathResult } from '../../shared/ipc';
+import { toProjectPath, toFilePath } from '../../shared/brand';
 // Asset cards only consume the entry list. Parse every entry before a path or
 // dimension reaches a DOM attribute; unrelated result metadata stays opaque.
-import { boolean, count, list, object, optional, pathText, record, text } from '../shared/boundary';
-import type { WireAssetEntry } from '../shared/ipc-results';
-import type { Result } from '../shared/result';
+import {
+  boolean,
+  count,
+  list,
+  object,
+  optional,
+  pathText,
+  record,
+  text,
+} from '../../shared/boundary';
+import type { WireAssetEntry } from '../../shared/ipc-results';
+import type { Result } from '../../shared/result';
 
 const entryBase = object({ rel: pathText, name: text, parent: pathText, root: text });
 const entryFile = object({ abs: pathText, size: count });

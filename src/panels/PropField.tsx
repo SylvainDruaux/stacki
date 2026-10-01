@@ -9,7 +9,7 @@ import type { PickedAsset } from '../ui/AssetField';
 import { assert } from '../../shared/assert';
 import { LIMITS } from '../../shared/limits';
 import { definedFields } from '../../shared/boundary';
-import { resolveAssetImport } from '../assetBridge';
+import { resolveAssetImport } from '../ipc/assetBridge';
 import { findImportOf } from '../dataSuggest';
 import { arrayItems, objectFields } from '../arrayValue';
 import { partsFromValue, valueFromParts } from '../bindings';

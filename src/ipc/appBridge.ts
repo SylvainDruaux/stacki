@@ -1,11 +1,11 @@
-import type { Data } from '../shared/boundary';
+import type { Data } from '../../shared/boundary';
 import type {
   IpcResults,
   WireDataRecord,
   WireInjectedRoute,
   WireRouteParams,
   WireUsageFile,
-} from '../shared/ipc-results';
+} from '../../shared/ipc-results';
 import {
   boolean,
   count,
@@ -16,17 +16,17 @@ import {
   pathText,
   record,
   text,
-} from '../shared/boundary';
-import { parseIpcPayload } from '../shared/ipc-payloads';
-import { parseOkResult } from '../shared/ipc';
-import type { EditRequest } from '../shared/edit-request';
-import { parsePageEditResult, type PageEditError, type PageEdited } from '../shared/page-save';
+} from '../../shared/boundary';
+import { parseIpcPayload } from '../../shared/ipc-payloads';
+import { parseOkResult } from '../../shared/ipc';
+import type { EditRequest } from '../../shared/edit-request';
+import { parsePageEditResult, type PageEditError, type PageEdited } from '../../shared/page-save';
 import {
   parsePreviewVerdict,
   type PreviewRender,
   type PreviewVerdict,
-} from '../shared/preview-token';
-import type { Result } from '../shared/result';
+} from '../../shared/preview-token';
+import type { Result } from '../../shared/result';
 
 export interface PageChangeEvent {
   readonly external: boolean;

@@ -198,7 +198,7 @@ now the authoritative description:
   `shared/record.ts` — the invariant/Result/branding/unknown-narrowing
   primitives.
 
-The renderer consumes contracts through `src/bridge.ts`, a typed, validating
+The renderer consumes contracts through `src/ipc/bridge.ts`, a typed, validating
 wrapper over `window.avb` — the renderer never calls raw `ipcRenderer`.
 
 ## Tests
@@ -243,7 +243,7 @@ green at every commit.
   tests (round-trip, negative space, invariant violations). Found and fixed a
   real bug: a lone top-level component was not treated as a layout.
 - **Phase 2 (done)** — `shared/` compiles to `dist/shared` (CJS + `.d.ts`;
-  the Electron runtime artifact; Vite reads the TS sources); the renderer's `src/bridge.ts` validates at the
+  the Electron runtime artifact; Vite reads the TS sources); the renderer's `src/ipc/bridge.ts` validates at the
   boundary; packaging unpacks `shared/dist` for the dev server. A first live
   end-to-end open (a real project, on a user's Windows machine) then exposed a
   wrong wire shape — the scan payload's component schema was contracted as a

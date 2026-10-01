@@ -28,7 +28,12 @@ import {
 import { setSoundEnabled } from './ui/sound';
 import { createPreviewWatch } from './previewRecovery';
 import { tellCanvas } from './canvasQuery';
-import { parsePageSource as parseSourcePage, readPage, readSymbol, scanProject } from './bridge';
+import {
+  parsePageSource as parseSourcePage,
+  readPage,
+  readSymbol,
+  scanProject,
+} from './ipc/bridge';
 import { checkoutGitBranch, readGitInfo } from './gitChipBridge';
 import { LIMITS } from '../shared/limits';
 import { assert } from '../shared/assert';
@@ -253,7 +258,7 @@ import {
   checkPreviewRender,
   type AppCollection,
   type ImportPaths,
-} from './appBridge';
+} from './ipc/appBridge';
 import { judgeCanvasEvent, type CheckRender, type ShownFile } from './previewGate';
 import { describePreviewStale, type PreviewVerdict } from '../shared/preview-token';
 import type { JudgeCanvasEvent } from './panels/previewRuntime';
