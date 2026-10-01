@@ -7,7 +7,7 @@ import type { SetStateAction } from 'react';
 import type { Attr, ImportDecl, PageModel, PageNode, PairedNode } from '../shared/page-node';
 import type { ScanComponent, ScanPage, ScanResult } from '../shared/scan';
 import type { WireCommitInfo, WireInjectedRoute } from '../shared/ipc-results';
-import WelcomeScreen from './panels/WelcomeScreen';
+import WelcomeScreen from './features/welcome/WelcomeScreen';
 import PagesPanel from './panels/PagesPanel';
 import PalettePanel from './panels/PalettePanel';
 import StructurePanel from './panels/StructurePanel';

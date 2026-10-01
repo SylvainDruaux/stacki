@@ -4,7 +4,7 @@ import {
   createStarterProject,
   subscribeCreateLog,
   type ProjectTemplate,
-} from '../welcomeBridge';
+} from './welcomeBridge';
 
 const CREATE_LOG_CHARS_MAX = 20_000;
 const TEMPLATES = [

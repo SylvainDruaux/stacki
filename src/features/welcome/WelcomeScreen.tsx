@@ -7,10 +7,10 @@ import {
   refreshRecentThumbnail,
   removeRecentProject,
   type RecentProject,
-} from '../welcomeBridge';
-import { CloseIcon, LayersIcon } from '../ui/Icons';
-import StackiLogo from '../ui/StackiLogo';
-import WelcomeBackground from '../ui/WelcomeBackground';
+} from './welcomeBridge';
+import { CloseIcon, LayersIcon } from '../../ui/Icons';
+import StackiLogo from './StackiLogo';
+import WelcomeBackground from './WelcomeBackground';
 import { NewProjectWizard, StarterWizard } from './WelcomeWizards';
 
 interface WelcomeScreenProps {

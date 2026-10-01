@@ -256,7 +256,7 @@ function fakeAudio() {
     'src/App.tsx',
     'src/panels/PagesPanel.tsx',
     'src/panels/TerminalDock.tsx',
-    'src/panels/WelcomeScreen.tsx',
+    'src/features/welcome/WelcomeScreen.tsx',
   ].filter((file) => /<SoundHere>/.test(read(file)));
   check('and nothing else is', scopes.length === 0, scopes.join(', '));
 

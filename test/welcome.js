@@ -39,7 +39,7 @@ const PIXEL =
   fs.mkdirSync(buildDirectory, { recursive: true });
   const bundlePath = path.join(buildDirectory, 'welcome.bundle.js');
   await esbuild.build({
-    entryPoints: [repoPath('src/panels/WelcomeScreen.tsx')],
+    entryPoints: [repoPath('src/features/welcome/WelcomeScreen.tsx')],
     outfile: bundlePath,
     bundle: true,
     format: 'cjs',
