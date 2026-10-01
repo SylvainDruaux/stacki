@@ -10,7 +10,7 @@ import type { WireCommitInfo, WireInjectedRoute } from '../shared/ipc-results';
 import WelcomeScreen from './features/welcome/WelcomeScreen';
 import PagesPanel from './features/pages/PagesPanel';
 import PalettePanel from './features/palette/PalettePanel';
-import StructurePanel from './panels/StructurePanel';
+import StructurePanel from './features/structure/StructurePanel';
 import {
   findWithParent,
   isInlineRun,

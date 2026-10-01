@@ -7,7 +7,9 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { LIMITS } = require('#dist/shared/limits.js');
-const { parseNavigatorDrop } = require('./helpers/rendererModule')('src/panels/navigatorDrop.ts');
+const { parseNavigatorDrop } = require('./helpers/rendererModule')(
+  'src/features/structure/navigatorDrop.ts',
+);
 
 const transfer = (data) => (type) => data[type] ?? '';
 

@@ -130,7 +130,7 @@ const WORDS = elementNode('words', 'p', [{ id: 'w-text', kind: 'expr', value: '{
   // --- the rows ---------------------------------------------------------------
   const bundlePath = path.join(buildDirectory, 'structure.bundle.js');
   await esbuild.build({
-    entryPoints: [repoPath('src/panels/StructurePanel.tsx')],
+    entryPoints: [repoPath('src/features/structure/StructurePanel.tsx')],
     outfile: bundlePath,
     bundle: true,
     format: 'cjs',

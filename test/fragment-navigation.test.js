@@ -73,10 +73,12 @@ async function checkFragment(syntax) {
   fs.mkdirSync(buildDirectory, { recursive: true });
   await esbuild.build({
     stdin: {
-      contents:
-        "export {default as StructurePanel} from './src/panels/StructurePanel.tsx'; export " +
-        "{liveClassesById} from './src/editor/liveClasses.ts'; export {createTreeIndex} from " +
-        "'./src/editor/editorTree.ts';",
+      // One export per line, so a moved file's longer path still fits.
+      contents: [
+        "export {default as StructurePanel} from './src/features/structure/StructurePanel.tsx';",
+        "export {liveClassesById} from './src/editor/liveClasses.ts';",
+        "export {createTreeIndex} from './src/editor/editorTree.ts';",
+      ].join('\n'),
       loader: 'jsx',
       resolveDir: ROOT,
     },

@@ -162,7 +162,7 @@ async function checkNavigator(StructurePanel) {
     await bundle('src/features/code/codeWindowTarget.ts', 'code-window-target.cjs'),
   );
   const { default: StructurePanel } = await bundle(
-    'src/panels/StructurePanel.tsx',
+    'src/features/structure/StructurePanel.tsx',
     'navigator-open-code.cjs',
   );
   await checkNavigator(StructurePanel);

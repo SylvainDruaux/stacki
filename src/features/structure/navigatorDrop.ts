@@ -2,7 +2,7 @@
 // moved within the tree (PalettePanel and StructureTree set these types). Drag
 // data can come from any window, so it is parsed like any other input: a name
 // or id past the page-tree bound is no drop at all.
-import { LIMITS } from '../../shared/limits';
+import { LIMITS } from '../../../shared/limits';
 
 export type NavigatorDrop =
   | { readonly kind: 'component'; readonly name: string }

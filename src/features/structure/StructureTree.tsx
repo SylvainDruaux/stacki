@@ -1,12 +1,12 @@
 import React, { useEffect, useRef } from 'react';
-import type { PairedNode } from '../../shared/page-node';
+import type { PairedNode } from '../../../shared/page-node';
 import type { NavigatorNode, DropLocation, DropTarget } from './structureModel';
-import { canContainTag } from '../editor/elementSchemas';
-import { isDataBound } from '../editor/bindings';
-import { allowDragEffect, clearDrag, getDrag, setDrag } from '../editor/dragState';
-import { elementLabel } from '../editor/classNames';
-import { hidesChildRows, noteText } from '../editor/treeSelection';
-import { thenBranch } from '../editor/branches';
+import { canContainTag } from '../../editor/elementSchemas';
+import { isDataBound } from '../../editor/bindings';
+import { allowDragEffect, clearDrag, getDrag, setDrag } from '../../editor/dragState';
+import { elementLabel } from '../../editor/classNames';
+import { hidesChildRows, noteText } from '../../editor/treeSelection';
+import { thenBranch } from '../../editor/branches';
 import {
   BranchIcon,
   ChevronDownIcon,
@@ -25,10 +25,10 @@ import {
   CommentIcon,
   astroAssetIcon,
   elementIcon,
-} from '../ui/Icons';
+} from '../../ui/Icons';
 import { defaultCollapsed, navigatorChildren, navigatorHost } from './structureModel';
-import { isFragmentNode } from '../editor/liveClasses';
-import { currentDesktopPlatform, shortcutLabel } from '../lib/shortcutLabel';
+import { isFragmentNode } from '../../editor/liveClasses';
+import { currentDesktopPlatform, shortcutLabel } from '../../lib/shortcutLabel';
 
 export interface StructureTreeContext {
   readonly selectedId: string | undefined;

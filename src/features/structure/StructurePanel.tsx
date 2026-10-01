@@ -7,8 +7,8 @@ import type {
   DropTarget,
 } from './structureModel';
 import type { ContextAction, ContextPosition, StructureTreeContext } from './StructureTree';
-import { CollapseVerticalIcon, CodeIcon, DragIcon, ExpandVerticalIcon } from '../ui/Icons';
-import { hidesChildRows } from '../editor/treeSelection';
+import { CollapseVerticalIcon, CodeIcon, DragIcon, ExpandVerticalIcon } from '../../ui/Icons';
+import { hidesChildRows } from '../../editor/treeSelection';
 import {
   collapseMap,
   defaultCollapsed,
@@ -18,7 +18,7 @@ import {
   navigatorChildren,
   structureProjection,
 } from './structureModel';
-import CodeEditor from '../ui/CodeEditor';
+import CodeEditor from '../../ui/CodeEditor';
 import { ContextMenu, NodeList } from './StructureTree';
 import { parseNavigatorDrop } from './navigatorDrop';
 

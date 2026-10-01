@@ -1,9 +1,9 @@
-import type { PageModel, PageNode } from '../../shared/page-node';
-import type { Diagnostic } from '../../shared/source-projection';
-import { assert } from '../../shared/assert';
-import { LIMITS } from '../../shared/limits';
-import { treeBudget } from '../editor/treeView';
-import { rowChildren, rowHost } from '../editor/branches';
+import type { PageModel, PageNode } from '../../../shared/page-node';
+import type { Diagnostic } from '../../../shared/source-projection';
+import { assert } from '../../../shared/assert';
+import { LIMITS } from '../../../shared/limits';
+import { treeBudget } from '../../editor/treeView';
+import { rowChildren, rowHost } from '../../editor/branches';
 
 export type NavigatorNode = PageNode;
 export type NavigatorModel = Pick<PageModel, 'nodes' | 'imports'>;

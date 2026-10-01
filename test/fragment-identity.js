@@ -79,7 +79,7 @@ const check = (what, condition, detail) => {
   // --- the navigator, with the map the app would build -------------------------
   const bundlePath = path.join(buildDirectory, 'fragment-identity.bundle.js');
   await esbuild.build({
-    entryPoints: [repoPath('src/panels/StructurePanel.tsx')],
+    entryPoints: [repoPath('src/features/structure/StructurePanel.tsx')],
     outfile: bundlePath,
     bundle: true,
     format: 'cjs',

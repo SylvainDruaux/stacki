@@ -128,7 +128,7 @@ const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
     fs.mkdirSync(buildDirectory, { recursive: true });
     const bundlePath = path.join(buildDirectory, 'node-states.bundle.js');
     await esbuild.build({
-      entryPoints: [repoPath('src/panels/StructurePanel.tsx')],
+      entryPoints: [repoPath('src/features/structure/StructurePanel.tsx')],
       outfile: bundlePath,
       bundle: true,
       format: 'cjs',
