@@ -2,7 +2,7 @@
 
 **Status: living document.** Migration status updated after the Astro parser
 conversion on `main`, following PR #26 and `v0.1.26`. Sections marked
-"migration" describe in-flight work; see `docs/migration-tracker.md` for verification.
+"migration" describe in-flight work; see `docs/archive/migration-tracker.md` for verification.
 
 ## What Stacki is
 
@@ -108,7 +108,7 @@ Four cooperating processes, each with one job:
 
 ## The rendering pipeline
 
-The path from source to canvas, per REFACTOR.md:
+The path from source to canvas, per the refactor notes (`docs/archive/refactor-notes.md`):
 
 1. **Parse** — the page's own `.astro`, every component it imports, its layout
    chain, and its style sources become one serializable tree. No shared
@@ -230,7 +230,7 @@ suite; it exits non-zero if any non-quarantined suite fails.
 
 ## The TypeScript migration (completed 2026-09-16)
 
-Continues on `main` after PR #26; plan in `docs/ts-migration-plan.md`.
+Continues on `main` after PR #26; plan in `docs/archive/ts-migration-plan.md`.
 Motivation: the app is built heavily with AI assistance, and plain JS gave
 the model no contract to fulfill — bugs landed at runtime. The migration
 prioritizes **safety, performance, DX** in that order, and is executed
@@ -336,7 +336,7 @@ batching/queueing write path (already the right shape).
 | `scripts/policy/`, `agent/`, `eslintPlugin/` | The gates: policy scan and git hooks, agent hooks, lint rules |
 | `scripts/lib/`, `move/` | Script helpers; the move tool for the layout restructure |
 | `test/` | Suites (round-trip, canvas-stub, contract, packaging); harnesses in `test/helpers/` |
-| `docs/` | This file, the contracts, the enforcement map, the editor-core plan |
+| `docs/` | This file, the contracts, the enforcement map, the editor-core plan; `archive/` for finished plans |
 
 The contract layer's folders are areas too (`SHARED_AREAS`): `core` is the
 floor, the page model and the property contracts sit on it, the engine on

@@ -182,7 +182,7 @@ test('test/ mirrors the source: suites in their area, helpers apart', () => {
     assert.deepEqual(rules(file, header), [], file);
   }
   for (const file of [
-    'test/hoverCost.test.js',
+    'test/sampleSuite.test.js',
     'test/misc/sample.test.js',
     'test/renderer/sample.test.js',
     'test/renderer/style/harness.js',

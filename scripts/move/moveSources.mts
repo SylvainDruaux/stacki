@@ -55,13 +55,8 @@ const MANIFEST = 'scripts/move/moveSources.json';
 const HISTORICAL = new Set([
   '.git-blame-ignore-revs',
   '.ripwire_notes',
-  'REFACTOR.md',
-  'docs/editor-core-handoff.md',
-  'docs/editor-core-prompts.md',
   'docs/editor-core-tracker.md',
-  'docs/migration-tracker.md',
   'docs/stacki-editor-core-plan.md',
-  'docs/ts-migration-plan.md',
   'package-lock.json',
   MANIFEST,
 ]);

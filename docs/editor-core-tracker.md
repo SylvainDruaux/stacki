@@ -2612,7 +2612,7 @@ update on every step):
 
 ## How to work this tracker
 
-The executor's workflow lives in `docs/editor-core-prompts.md` — one prompt
+The executor's workflow lives in `docs/archive/editor-core-prompts.md` — one prompt
 per step, PROMPT-0 first, PROMPT-ALIGN last. This tracker is the audit trail
 the prompts update.
 
