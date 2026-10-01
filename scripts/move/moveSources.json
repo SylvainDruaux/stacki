@@ -361,7 +361,7 @@
         ],
         [
           "src/componentPropertiesBridge.ts",
-          "src/features/componentProperties/componentPropertiesBridge.ts"
+          "src/features/componentProperties/propertiesBridge.ts"
         ],
         ["src/ui/PropertiesIcon.tsx", "src/features/componentProperties/PropertiesIcon.tsx"]
       ]
