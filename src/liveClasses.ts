@@ -1,4 +1,5 @@
 import { assert } from '../shared/assert';
+import type { PageNode } from '../shared/page-node';
 import { LIMITS } from '../shared/limits';
 import { treeBudget, type TreeView } from './treeView';
 // Whether a node puts an element of its OWN on the page.
@@ -18,6 +19,11 @@ import { treeBudget, type TreeView } from './treeView';
 // knows: a Fragment is a Fragment. Without that, the navigator labelled the
 // Fragment's row `feature-image_wrap` and drew the component beneath it — a
 // component's own root shown as a page element wrapping the component.
+
+/** A `<Fragment>` wrapper: it groups children and renders no element of its own. */
+export function isFragmentNode(node: PageNode): boolean {
+  return (node.kind === 'component' || node.kind === 'element') && node.name === 'Fragment';
+}
 
 /** @param {{name?: string}|undefined} node */
 export function rendersOwnElement(node: { readonly name?: string } | undefined): boolean {

@@ -26,12 +26,8 @@ import {
   astroAssetIcon,
   elementIcon,
 } from '../ui/Icons';
-import {
-  defaultCollapsed,
-  isFragmentNode,
-  navigatorChildren,
-  navigatorHost,
-} from './structureModel';
+import { defaultCollapsed, navigatorChildren, navigatorHost } from './structureModel';
+import { isFragmentNode } from '../liveClasses';
 import { currentDesktopPlatform, shortcutLabel } from '../shortcutLabel';
 
 export interface StructureTreeContext {

@@ -12,7 +12,7 @@ import PropField, { assetImportOf } from './PropField';
 import { AttributesSection } from './propAttributes';
 import { ConditionField, BindHandle, FieldDataPicker } from './propBindings';
 import { createPropRules } from './propRules';
-import { isFragmentNode } from './structureModel';
+import { isFragmentNode } from '../liveClasses';
 import { assert } from '../../shared/assert';
 import { LIMITS } from '../../shared/limits';
 import React, { useEffect, useRef, useState } from 'react';

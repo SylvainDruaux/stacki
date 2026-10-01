@@ -11,7 +11,6 @@ import WelcomeScreen from './panels/WelcomeScreen';
 import PagesPanel from './panels/PagesPanel';
 import PalettePanel from './panels/PalettePanel';
 import StructurePanel from './panels/StructurePanel';
-import { isFragmentNode } from './panels/structureModel';
 import {
   findWithParent,
   isInlineRun,
@@ -21,7 +20,11 @@ import {
   selectionAfterDelete,
 } from './treeSelection';
 import { canvasClickAction } from './canvasClick';
-import { liveClassesById as classesByNodeId, rendersOwnElement } from './liveClasses';
+import {
+  isFragmentNode,
+  liveClassesById as classesByNodeId,
+  rendersOwnElement,
+} from './liveClasses';
 import { setSoundEnabled } from './ui/sound';
 import { createPreviewWatch } from './previewRecovery';
 import { tellCanvas } from './canvasQuery';

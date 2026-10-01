@@ -58,10 +58,6 @@ export interface FoundNavigatorNode {
   readonly index: number;
 }
 
-export function isFragmentNode(node: NavigatorNode): boolean {
-  return (node.kind === 'component' || node.kind === 'element') && node.name === 'Fragment';
-}
-
 export function navigatorChildren(node: NavigatorNode): readonly NavigatorNode[] {
   return rowChildren(node);
 }
