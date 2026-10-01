@@ -1,5 +1,5 @@
 import { LIMITS } from '../shared/limits';
-import type { EditorModel, EditorNode } from './appTypes';
+import type { EditorModel, EditorNode } from './pageView';
 
 export interface SourceRange {
   readonly from: number;

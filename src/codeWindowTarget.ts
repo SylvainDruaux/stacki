@@ -1,5 +1,15 @@
 import { assert } from '../shared/assert';
-import type { CodeWindowState, EditorNode } from './appTypes';
+import type { EditorNode } from './pageView';
+
+export interface CodeWindowState {
+  readonly kind?: 'file';
+  readonly area?: 'src';
+  readonly targetId?: string;
+  readonly rel?: string;
+  readonly title: string;
+  readonly language: string;
+  readonly revealLine?: number;
+}
 
 /** The page frontmatter: selectable like a node, but it is not one. */
 export interface FrontmatterSubject {

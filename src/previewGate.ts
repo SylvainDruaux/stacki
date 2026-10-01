@@ -26,7 +26,7 @@ import {
   type PreviewRender,
   type PreviewVerdict,
 } from '../shared/preview-token';
-import type { EditorPageState } from './appTypes';
+import type { EditorPageState } from './pageState';
 
 /** The file open for editing, as the gate needs it. */
 export interface ShownFile {

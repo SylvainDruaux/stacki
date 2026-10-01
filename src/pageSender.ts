@@ -21,7 +21,7 @@ import {
   toEditorPageState,
   type EditablePageState,
   type EditorPageState,
-} from './appTypes';
+} from './pageState';
 import { sendCode } from './codeEdits';
 import { carryHandles, seedOf } from './nodeHandles';
 import {

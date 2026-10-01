@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ScanComponent } from '../../shared/scan';
-import type { TrailingSlash } from '../appTypes';
+import type { TrailingSlash } from '../pageState';
 import type { ComponentUsageFile } from '../paletteModel';
 import type { ComponentCreationSource, UsageAnchor, UsagePopup } from './PaletteDialogs';
 import { cleanError } from '../cleanError';

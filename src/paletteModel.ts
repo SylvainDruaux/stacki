@@ -1,5 +1,5 @@
 import type { ScanComponent } from '../shared/scan';
-import type { TrailingSlash } from './appTypes';
+import type { TrailingSlash } from './pageState';
 import { count, list, optional, pathText, record, text } from '../shared/boundary';
 
 export interface ComponentUsageFile {
