@@ -8,7 +8,7 @@ import type { Attr, ImportDecl, PageModel, PageNode, PairedNode } from '../share
 import type { ScanComponent, ScanPage, ScanResult } from '../shared/scan';
 import type { WireCommitInfo, WireInjectedRoute } from '../shared/ipc-results';
 import WelcomeScreen from './features/welcome/WelcomeScreen';
-import PagesPanel from './panels/PagesPanel';
+import PagesPanel from './features/pages/PagesPanel';
 import PalettePanel from './panels/PalettePanel';
 import StructurePanel from './panels/StructurePanel';
 import {
@@ -44,7 +44,7 @@ import { ConfirmHost, confirmDialog } from './ui/ConfirmDialog';
 import { mergeBranchAction, deleteBranchAction } from './features/git/gitActions';
 import LeftRail from './ui/LeftRail';
 import { lazyPanel } from './ui/lazyPanel';
-import PageSwitcher from './ui/PageSwitcher';
+import PageSwitcher from './features/pages/PageSwitcher';
 import DynamicPicker from './ui/DynamicPicker';
 import {
   ASTRO_ASSETS,

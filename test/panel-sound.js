@@ -254,7 +254,7 @@ function fakeAudio() {
   check('so is the style panel', /<SoundHere>/.test(style));
   const scopes = [
     'src/App.tsx',
-    'src/panels/PagesPanel.tsx',
+    'src/features/pages/PagesPanel.tsx',
     'src/features/terminal/TerminalDock.tsx',
     'src/features/welcome/WelcomeScreen.tsx',
   ].filter((file) => /<SoundHere>/.test(read(file)));

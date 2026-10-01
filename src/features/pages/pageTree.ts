@@ -1,6 +1,6 @@
-import type { ScanPage } from '../shared/scan';
-import { assert } from '../shared/assert';
-import { BOUNDARY_LIMITS, pathText, record } from '../shared/boundary';
+import type { ScanPage } from '../../../shared/scan';
+import { assert } from '../../../shared/assert';
+import { BOUNDARY_LIMITS, pathText, record } from '../../../shared/boundary';
 
 export interface PageTreePage extends ScanPage {
   readonly base: string;

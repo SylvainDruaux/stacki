@@ -1,14 +1,14 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import type { WireInjectedRoute } from '../../shared/ipc-results';
-import type { ScanPage, ScanResult } from '../../shared/scan';
+import type { WireInjectedRoute } from '../../../shared/ipc-results';
+import type { ScanPage, ScanResult } from '../../../shared/scan';
 import {
   buildPageTree,
   collectPageTreeDirectories,
   pageDirectory,
   parsePageDragText,
   stripPageExtension,
-} from '../pageTree';
-import { comparePageNames, isCollectionRoute } from '../pageOrder';
+} from './pageTree';
+import { comparePageNames, isCollectionRoute } from './pageOrder';
 import {
   CollectionIcon,
   FileIcon,
@@ -16,7 +16,7 @@ import {
   FolderPlusIcon,
   PlusIcon,
   RefreshIcon,
-} from '../ui/Icons';
+} from '../../ui/Icons';
 import { NewPageModal } from './PageDialogs';
 import { PageTreeView, type PageEditing, type PageTreeActions } from './PageTreeView';
 

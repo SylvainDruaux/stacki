@@ -1,8 +1,8 @@
 import React from 'react';
-import type { ScanPage } from '../../shared/scan';
-import type { PageTreeNode, PageTreePage } from '../pageTree';
-import { comparePageNames, isCollectionRoute, leadsFolders } from '../pageOrder';
-import { countTreePages, pageDirectory, pageExtension, stripPageExtension } from '../pageTree';
+import type { ScanPage } from '../../../shared/scan';
+import type { PageTreeNode, PageTreePage } from './pageTree';
+import { comparePageNames, isCollectionRoute, leadsFolders } from './pageOrder';
+import { countTreePages, pageDirectory, pageExtension, stripPageExtension } from './pageTree';
 import {
   CloseIcon,
   CollectionIcon,
@@ -10,9 +10,9 @@ import {
   FolderIcon,
   FolderOpenIcon,
   TrashIcon,
-} from '../ui/Icons';
+} from '../../ui/Icons';
 import { RenameInput } from './PageDialogs';
-import { allowDragEffect } from '../editor/dragState';
+import { allowDragEffect } from '../../editor/dragState';
 
 export type PageEditing =
   | { readonly kind: 'page'; readonly key: string }

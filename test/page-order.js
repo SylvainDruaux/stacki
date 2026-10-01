@@ -33,7 +33,7 @@ const check = (what, condition, detail) => {
   // --- the rule ---------------------------------------------------------------
   const orderOut = path.join(buildDirectory, 'page-order.bundle.mjs');
   await esbuild.build({
-    entryPoints: [repoPath('src/pageOrder.ts')],
+    entryPoints: [repoPath('src/features/pages/pageOrder.ts')],
     outfile: orderOut,
     bundle: true,
     format: 'esm',
@@ -74,7 +74,7 @@ const check = (what, condition, detail) => {
   fs.writeFileSync(
     entry,
     `export { default as PagesPanel } from ${JSON.stringify(
-      repoPath('src/panels/PagesPanel.tsx'),
+      repoPath('src/features/pages/PagesPanel.tsx'),
     )};\n`,
   );
   const bundle = path.join(buildDirectory, 'page-order.bundle.js');
