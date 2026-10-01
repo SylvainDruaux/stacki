@@ -100,11 +100,21 @@ test('edits to the files that define the gates ask a human', () => {
     '.pi/extensions/stacki-policy/index.ts',
     '.github/workflows/check.yml',
     'shared/limits.ts',
+    // The bounds stay protected in a shared/ area folder, where the restructure moves them.
+    'shared/core/limits.ts',
   ];
   for (const file of gates) {
     assert.equal(pathVerdict(file).kind, 'ask', file);
   }
-  for (const file of ['src/App.tsx', 'shared/page-node.ts', 'scripts/release.ts', 'README.md']) {
+  const allowed = [
+    'src/App.tsx',
+    'shared/page-node.ts',
+    'shared/core/limitsOfText.ts',
+    'shared/core/deeper/limits.ts',
+    'scripts/release.ts',
+    'README.md',
+  ];
+  for (const file of allowed) {
     assert.equal(pathVerdict(file).kind, 'allow', file);
   }
   assert.equal(pathVerdict('.git/config').kind, 'deny');

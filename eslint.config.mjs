@@ -287,14 +287,7 @@ const ENGINE_CONTRACTS = [
 
 export default [
   {
-    ignores: [
-      'node_modules/**',
-      'dist/**',
-      'release/**',
-      'coverage/**',
-      'test/.stacki-test/**',
-      '**/generated/**',
-    ],
+    ignores: ['node_modules/**', 'dist/**', 'release/**', 'coverage/**', '**/generated/**'],
   },
   {
     // The JavaScript left in the tree: ESM configs and content-tool modules,

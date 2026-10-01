@@ -39,7 +39,8 @@ const POLICY_PATTERNS: readonly RegExp[] = [
   /^\.codex\//,
   /^\.pi\//,
   /^\.github\/workflows\//,
-  /^shared\/limits\.ts$/,
+  // In any folder of shared/, so the protection follows the file when it moves.
+  /^shared\/(?:[^/]+\/)?limits\.ts$/,
   /^docs\/enforcement\.md$/,
 ];
 
