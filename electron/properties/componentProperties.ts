@@ -10,15 +10,15 @@ import { readPropertyConsumers, readBoundedSource, filesystemError } from './pro
 import { randomUUID } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import { assert } from '../../shared/assert';
-import { LIMITS } from '../../shared/limits';
+import { assert } from '../../shared/core/assert';
+import { LIMITS } from '../../shared/core/limits';
 import { PROPERTY_LIMITS } from '../../shared/component-properties';
 import type {
   ComponentProperties,
   PropertyChange,
   PropertyOptionRename,
 } from '../../shared/component-properties';
-import { err, ok, type Result } from '../../shared/result';
+import { err, ok, type Result } from '../../shared/core/result';
 import { literalOptions } from '../../shared/property-options';
 import { sameFilesystemPath } from '../lib/platform';
 import { digestOf } from '../documents/atomicWrite';

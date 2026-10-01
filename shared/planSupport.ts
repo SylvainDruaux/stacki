@@ -9,12 +9,12 @@
 // mapped through the diff. The mapper never guesses, and a region whose bytes
 // repeat in the file is ambiguous (planner.ts, uniqueOrAmbiguous), so a
 // resolved node is the node the intent was authored against, moved whole.
-import { assert } from './assert';
+import { assert } from './core/assert';
 import { capabilityAcceptsVisualIntent } from './capability';
-import { LIMITS } from './limits';
+import { LIMITS } from './core/limits';
 import type { SpanMapping } from './mapSpan';
 import type { AnchorRef, NodeKind, StructuralPath } from './ref';
-import { err, ok, type Result } from './result';
+import { err, ok, type Result } from './core/result';
 import type { RejectionReason } from './intent';
 import type { Snapshot } from './snapshot';
 import type { ProjectedNode, Projection } from './source-projection';
@@ -26,8 +26,8 @@ import {
   utf16ToByteOffsets,
   type ByteSpan,
   type ByteString,
-} from './span';
-import { toUtf16Offset } from './brand';
+} from './core/span';
+import { toUtf16Offset } from './core/brand';
 
 export type SpanMapper = (span: ByteSpan) => SpanMapping;
 

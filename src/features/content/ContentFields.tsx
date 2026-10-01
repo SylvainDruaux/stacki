@@ -1,8 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
-import type { Data, DataRecord } from '../../../shared/boundary';
-import { data } from '../../../shared/boundary';
+import type { Data, DataRecord } from '../../../shared/core/boundary';
+import { data } from '../../../shared/core/boundary';
 import type { WireValidationIssue } from '../../../shared/ipc-results';
-import { assert } from '../../../shared/assert';
+import { assert } from '../../../shared/core/assert';
 import { labelize, memberFor, fieldIssue, hintFor } from './contentSchema';
 import type { FieldDescriptor } from './contentSchema';
 import { readContentTargets } from './contentViewBridge';

@@ -2,11 +2,11 @@
 // §3.1). The exact bytes last read, their checksum, and a disposable projection
 // of them. There is no version field — the checksum already answers "which
 // file is this?" — and a snapshot is never edited; a new one replaces it.
-import { assert } from './assert';
-import type { Digest, FilePath } from './brand';
-import { LIMITS } from './limits';
+import { assert } from './core/assert';
+import type { Digest, FilePath } from './core/brand';
+import { LIMITS } from './core/limits';
 import type { Projection } from './source-projection';
-import type { ByteString } from './span';
+import type { ByteString } from './core/span';
 
 export interface Snapshot {
   readonly path: FilePath;

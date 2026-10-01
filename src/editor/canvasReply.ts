@@ -1,7 +1,15 @@
 // Replies come from a project's iframe, so validate before resolving a pending
 // query. Invalid messages remain unanswered and use the normal timeout fallback.
-import { boolean, count, dictionary, list, object, optional, text } from '../../shared/boundary';
-import { err, ok, type Result } from '../../shared/result';
+import {
+  boolean,
+  count,
+  dictionary,
+  list,
+  object,
+  optional,
+  text,
+} from '../../shared/core/boundary';
+import { err, ok, type Result } from '../../shared/core/result';
 
 const identity = object({
   tag: text,

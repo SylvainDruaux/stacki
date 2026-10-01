@@ -1,5 +1,5 @@
 // Every bound the policy tooling holds, in one place (AGENTS.md §5, §10). The
-// app's bounds live in shared/limits.ts; these bound the tooling itself, so a
+// app's bounds live in shared/core/limits.ts; these bound the tooling itself, so a
 // runaway repository or hook payload fails fast instead of hanging a gate.
 
 export const POLICY_LIMITS = {

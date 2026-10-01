@@ -4,12 +4,12 @@
 // emits and rejects everything else — the boundary is where malformed data
 // dies, and inward code never re-validates.
 
-import { assert } from './assert';
-import type { NodeId, Utf16Offset } from './brand';
-import { toNodeId, toUtf16Offset } from './brand';
-import { LIMITS } from './limits';
+import { assert } from './core/assert';
+import type { NodeId, Utf16Offset } from './core/brand';
+import { toNodeId, toUtf16Offset } from './core/brand';
+import { LIMITS } from './core/limits';
 import { parseImportSlots, type ImportSlot } from './frontmatter';
-import { parseUtf16Span, spanContains, spansAscending, type Utf16Span } from './span';
+import { parseUtf16Span, spanContains, spansAscending, type Utf16Span } from './core/span';
 
 export type Attr =
   | { readonly type: 'string'; readonly value: string }

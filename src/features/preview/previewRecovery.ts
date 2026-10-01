@@ -1,7 +1,7 @@
 // A compile-error page has no HMR client. Poll only after a change or a failed
 // probe, and reload on the recovering-to-serving edge so ordinary edits keep
 // their live patches. One timer and one in-flight probe bound this event loop.
-import { assert } from '../../../shared/assert';
+import { assert } from '../../../shared/core/assert';
 
 type Timer = ReturnType<typeof setTimeout> | number;
 export interface PreviewTimers {

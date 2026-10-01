@@ -7,8 +7,8 @@ import {
   placeholder as cmPlaceholder,
 } from '@codemirror/view';
 import { EditorState } from '@codemirror/state';
-import { assert } from '../../../shared/assert';
-import { LIMITS } from '../../../shared/limits';
+import { assert } from '../../../shared/core/assert';
+import { LIMITS } from '../../../shared/core/limits';
 import { StreamLanguage } from '@codemirror/language';
 import type { StringStream } from '@codemirror/language';
 import { history, historyKeymap, defaultKeymap } from '@codemirror/commands';

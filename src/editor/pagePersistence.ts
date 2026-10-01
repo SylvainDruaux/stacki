@@ -9,8 +9,8 @@
 //
 // Every write names the checksum it was authored against, and a refusal (the
 // file changed on disk) stops autosave instead of retrying (plan §7).
-import { assert } from '../../shared/assert';
-import { LIMITS } from '../../shared/limits';
+import { assert } from '../../shared/core/assert';
+import { LIMITS } from '../../shared/core/limits';
 import type { ScanResult } from '../../shared/scan';
 import { createCoalescedRun } from '../lib/coalescedRun';
 import type { EditDrafts, QueueEntry } from './pageEdits';

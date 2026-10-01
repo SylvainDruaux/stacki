@@ -15,7 +15,7 @@ const { parsePage } = require('#dist/electron/parse/astroParser.js');
 const { parseMarkdownPage } = require('#dist/electron/parse/markdownParser.js');
 const { createNodeDocumentActors } = require('#dist/electron/documents/documentActors.js');
 const { buildEdit } = require('#dist/electron/documents/editRequests.js');
-const { decodeUtf8 } = require('#dist/shared/span.js');
+const { decodeUtf8 } = require('#dist/shared/core/span.js');
 const { repoPath, stubPanels } = require('./sources.js');
 
 const sha256 = (text) => createHash('sha256').update(text).digest('hex');

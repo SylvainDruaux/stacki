@@ -23,7 +23,7 @@ import {
   toByteString,
   type ByteSpan,
   type ByteString,
-} from '#dist/shared/span.js';
+} from '#dist/shared/core/span.js';
 import { Prng } from './prng.ts';
 import { referenceMapSpan, referenceTables } from './reference-diff.ts';
 

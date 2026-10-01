@@ -1,7 +1,7 @@
 import type { CmsField, FieldType } from './cmsSchema';
 import { CMS_FIELD_TYPES, inferType } from './cmsSchema';
-import { assert } from '../../../shared/assert';
-import { BOUNDARY_LIMITS, dictionary, text } from '../../../shared/boundary';
+import { assert } from '../../../shared/core/assert';
+import { BOUNDARY_LIMITS, dictionary, text } from '../../../shared/core/boundary';
 
 export type DeclaredTypes = Readonly<Record<string, FieldType>>;
 const STRUCTURAL: readonly FieldType[] = ['object', 'objects', 'list', 'boolean', 'number'];

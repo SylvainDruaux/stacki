@@ -7,7 +7,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { buildSync } = require('esbuild');
 const { JSDOM } = require('jsdom');
-const { BOUNDARY_LIMITS } = require('#dist/shared/boundary.js');
+const { BOUNDARY_LIMITS } = require('#dist/shared/core/boundary.js');
 const { ROOT, repoPath } = require('./helpers/sources.js');
 
 // Null as a boundary receives it, parsed from JSON: inputs may hold it; our values never do.

@@ -1,4 +1,4 @@
-import { assert } from '../../../../shared/assert';
+import { assert } from '../../../../shared/core/assert';
 
 /** What the page said about one key: its value, or undefined when it could not answer. */
 export type Answer = string | undefined;

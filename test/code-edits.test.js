@@ -20,7 +20,7 @@ const path = require('node:path');
 const esbuild = require('esbuild');
 const { parsePageDiskRead, parsePageEditResult } = require('#dist/shared/page-save.js');
 const { applyCodePatch } = require('#dist/shared/code-patch.js');
-const { LIMITS } = require('#dist/shared/limits.js');
+const { LIMITS } = require('#dist/shared/core/limits.js');
 const { repoPath } = require('./helpers/sources.js');
 
 const buildDirectory = repoPath('node_modules/.stacki-test/code-edits');

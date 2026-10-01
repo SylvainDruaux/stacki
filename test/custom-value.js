@@ -19,7 +19,7 @@
 const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
-const { LIMITS } = require('#dist/shared/limits.js');
+const { LIMITS } = require('#dist/shared/core/limits.js');
 const { ROOT, repoPath } = require('./helpers/sources.js');
 
 const failures = [];

@@ -20,8 +20,8 @@
 // in sorted canonical order, each file witnessed by its `before` checksum. With
 // one thread two batches cannot interleave today; the sorted order is what
 // keeps them from deadlocking once acquisition can wait.
-import { assert } from '../../shared/assert';
-import { toIntentId, type Digest } from '../../shared/brand';
+import { assert } from '../../shared/core/assert';
+import { toIntentId, type Digest } from '../../shared/core/brand';
 import {
   actorQuiescent,
   createActor,
@@ -49,9 +49,9 @@ import {
 import { commitChain, minimalSplices, rebaseIntent, type CommitRecord } from '../../shared/rebase';
 import type { Snapshot } from '../../shared/snapshot';
 import { inverseEdits } from '../../shared/splice';
-import { LIMITS } from '../../shared/limits';
-import { err, ok, type Result } from '../../shared/result';
-import { decodeUtf8, encodeUtf8, toByteSpan, type ByteString } from '../../shared/span';
+import { LIMITS } from '../../shared/core/limits';
+import { err, ok, type Result } from '../../shared/core/result';
+import { decodeUtf8, encodeUtf8, toByteSpan, type ByteString } from '../../shared/core/span';
 import { diffCodePatch } from '../../shared/code-patch';
 import { planIntent } from '../../shared/planner';
 import {

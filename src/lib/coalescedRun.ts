@@ -6,7 +6,7 @@
 // loops, which followed newer requests in a loop capped by rescanChainMax and
 // saveDrainMax: there is no loop left to cap. Each run is one tick, started by
 // a request, and the requests that arrive while one waits share its answer.
-import { assert } from '../../shared/assert';
+import { assert } from '../../shared/core/assert';
 
 export interface CoalescedRun<T> {
   /** The result of a run that starts no earlier than this call. */

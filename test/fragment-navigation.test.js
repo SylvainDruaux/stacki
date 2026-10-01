@@ -7,7 +7,7 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { LIMITS } = require('#dist/shared/limits.js');
+const { LIMITS } = require('#dist/shared/core/limits.js');
 const fs = require('node:fs');
 const path = require('node:path');
 const esbuild = require('esbuild');

@@ -3,7 +3,7 @@
 // field, which is blurred, decayed, and uploaded as a texture the shader
 // samples to displace its UVs. Ported from the Stacki prototype.
 import { useEffect, useRef } from 'react';
-import { assert } from '../../../shared/assert';
+import { assert } from '../../../shared/core/assert';
 
 const FIELD_SIZE = 64;
 const FIELD_LENGTH = FIELD_SIZE * FIELD_SIZE;

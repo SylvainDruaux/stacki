@@ -36,10 +36,10 @@
 import { createHash, randomUUID } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import { assert } from '../../shared/assert';
-import { toDigest, type Digest } from '../../shared/brand';
-import { LIMITS } from '../../shared/limits';
-import { err, ok, type Result } from '../../shared/result';
+import { assert } from '../../shared/core/assert';
+import { toDigest, type Digest } from '../../shared/core/brand';
+import { LIMITS } from '../../shared/core/limits';
+import { err, ok, type Result } from '../../shared/core/result';
 
 /** Why a write did not happen, or did without a durability promise. */
 export type AtomicWriteError =

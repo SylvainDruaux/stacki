@@ -17,9 +17,9 @@ import { mainHarness } from '../helpers/mainHarness.ts';
 import { IPC_PAYLOADS, parseIpcPayload } from '#dist/shared/ipc-payloads.js';
 import { parsePageDiskRead, parsePageEditResult } from '#dist/shared/page-save.js';
 import { diffCodePatch } from '#dist/shared/code-patch.js';
-import { toDigest } from '#dist/shared/brand.js';
+import { toDigest } from '#dist/shared/core/brand.js';
 import type { PageDiskRead } from '#dist/shared/page-save.js';
-import { toRecord } from '#dist/shared/record.js';
+import { toRecord } from '#dist/shared/core/record.js';
 
 // Null as a boundary receives it, parsed from JSON: inputs may hold it; our values never do.
 const jsonNull: unknown = JSON.parse('null');

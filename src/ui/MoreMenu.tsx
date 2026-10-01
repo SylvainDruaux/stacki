@@ -1,7 +1,7 @@
 import React, { useRef, useState } from 'react';
 import type { CSSProperties, RefObject } from 'react';
-import { assert } from '../../shared/assert';
-import { LIMITS } from '../../shared/limits';
+import { assert } from '../../shared/core/assert';
+import { LIMITS } from '../../shared/core/limits';
 import { createPortal } from 'react-dom';
 import { MoreIcon } from './Icons';
 import useDismiss from './useDismiss';

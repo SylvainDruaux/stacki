@@ -1,7 +1,7 @@
 // Standalone palette previews need sample inputs for guarded text content.
 // Authored defaults run inside the component; preview data never evaluates source expressions.
 import { parsePropSchema } from '../parse/astroParser';
-import { assert } from '../../shared/assert';
+import { assert } from '../../shared/core/assert';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 

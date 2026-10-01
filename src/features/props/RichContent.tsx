@@ -7,8 +7,8 @@ import type { DataContext } from '../../editor/dataSuggest';
 import { resolvePick } from '../../editor/bindings';
 import { deleteChipAtCaret } from './chipKeys';
 import { ElementLinkIcon } from '../../ui/Icons';
-import { assert } from '../../../shared/assert';
-import { LIMITS } from '../../../shared/limits';
+import { assert } from '../../../shared/core/assert';
+import { LIMITS } from '../../../shared/core/limits';
 import { nodesToHtml, isChippable, domToNodes, isDOMElement } from './richContentModel';
 import type { InlineNode } from './richContentModel';
 export {

@@ -188,15 +188,15 @@ now the authoritative description:
 - `shared/scan.ts`, `shared/ipc.ts` — the project scan shape and the typed
   IPC contract (`IpcContract`, per-channel request/response pairs, the
   `AvbBridge` surface).
-- `shared/limits.ts` — every runtime bound (parser depth/size, component
+- `shared/core/limits.ts` — every runtime bound (parser depth/size, component
   nesting, pending intents, retained snapshots) in one importable module,
   enforced at boundaries.
 - `shared/htmlText.ts` — a text node's value: entity decoding and encoding
   and the whitespace rule (`textValue`). The parser reads text with it, and
   the Content field emits `textValueCanonical` values so the save echo comes
   back identical to what it emitted (a differing echo resets its caret).
-- `shared/assert.ts`, `shared/result.ts`, `shared/brand.ts`,
-  `shared/record.ts` — the invariant/Result/branding/unknown-narrowing
+- `shared/core/assert.ts`, `shared/core/result.ts`, `shared/core/brand.ts`,
+  `shared/core/record.ts` — the invariant/Result/branding/unknown-narrowing
   primitives.
 
 The renderer consumes contracts through `src/ipc/bridge.ts`, a typed, validating

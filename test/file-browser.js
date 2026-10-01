@@ -14,7 +14,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { LIMITS } = require('#dist/shared/limits.js');
+const { LIMITS } = require('#dist/shared/core/limits.js');
 const { repoPath } = require('./helpers/sources.js');
 
 const failures = [];

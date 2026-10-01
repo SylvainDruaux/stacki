@@ -1,4 +1,4 @@
-import { assert } from '../../../shared/assert';
+import { assert } from '../../../shared/core/assert';
 
 export const PREVIEW_WIDTH_LIMITS = { minimum: 280, maximum: 7_680 } as const;
 

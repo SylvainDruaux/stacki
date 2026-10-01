@@ -1,4 +1,4 @@
-import { LIMITS } from '../../../shared/limits';
+import { LIMITS } from '../../../shared/core/limits';
 import type { EditorModel, EditorNode } from '../../editor/pageView';
 
 export interface SourceRange {

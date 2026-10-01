@@ -6,7 +6,7 @@ import type {
   ConflictPicks,
   ConflictHunk,
 } from './gitConflictModel';
-import { assert } from '../../../shared/assert';
+import { assert } from '../../../shared/core/assert';
 import {
   choicesForSend,
   conflictHunks,

@@ -84,7 +84,7 @@ the rules that remain for review.
 - Git hooks check staged files, commit messages, and pushes. Never skip them
   (`--no-verify`); the agent hooks refuse it, and CI runs the same checks.
 - The files that define the gates (this file, lint and compiler configs,
-  `scripts/{eslint-plugin,policy,agent}/`, hook configs, `shared/limits.ts`)
+  `scripts/{eslint-plugin,policy,agent}/`, hook configs, `shared/core/limits.ts`)
   change only with a human's approval.
 
 ---

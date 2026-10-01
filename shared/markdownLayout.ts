@@ -6,8 +6,8 @@
 // planner separates Markdown blocks with it, and main prints a node's new
 // text with it, so a line added to a paragraph inside a quote stays inside
 // the quote. Pure: bytes in, a string out.
-import { assert } from './assert';
-import type { ByteString } from './span';
+import { assert } from './core/assert';
+import type { ByteString } from './core/span';
 
 const NEWLINE = 0x0a;
 const SPACE = 0x20;

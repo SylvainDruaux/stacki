@@ -10,7 +10,7 @@
 // each phase transition is visible. `reconcileUncertain` is pinned as a table.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { toFilePath, toIntentId, type Digest } from '#dist/shared/brand.js';
+import { toFilePath, toIntentId, type Digest } from '#dist/shared/core/brand.js';
 import {
   actorQuiescent,
   createActor,
@@ -25,9 +25,9 @@ import {
 import { toIntent, type Intent, type Outcome } from '#dist/shared/intent.js';
 import { diffCodePatch } from '#dist/shared/code-patch.js';
 import { createLazySnapshot } from '#dist/shared/snapshot.js';
-import { LIMITS } from '#dist/shared/limits.js';
-import { err } from '#dist/shared/result.js';
-import { encodeUtf8, toByteSpan } from '#dist/shared/span.js';
+import { LIMITS } from '#dist/shared/core/limits.js';
+import { err } from '#dist/shared/core/result.js';
+import { encodeUtf8, toByteSpan } from '#dist/shared/core/span.js';
 import { SIMULATOR_PROJECTOR } from './candidate.ts';
 import { planEngine } from './engine-planner.ts';
 import { FakeDisk } from './fake-disk.ts';

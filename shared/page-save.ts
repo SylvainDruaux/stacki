@@ -4,13 +4,13 @@
 // it cannot be placed on the bytes the file holds now. That refusal is an
 // expected operating failure, so it arrives as a Result value. A reply that
 // breaks this shape is a programmer error and throws here.
-import { toDigest, type Digest } from './brand';
+import { toDigest, type Digest } from './core/brand';
 import { parseRejectionReason, type RejectionReason, type SourceEdit } from './intent';
-import { LIMITS } from './limits';
+import { LIMITS } from './core/limits';
 import { parsePageReadResult, type ParsePageResult } from './page-node';
-import { toArray, toRecord } from './record';
-import { err, ok, type Result } from './result';
-import { parseByteSpan, spansAscending } from './span';
+import { toArray, toRecord } from './core/record';
+import { err, ok, type Result } from './core/result';
+import { parseByteSpan, spansAscending } from './core/span';
 
 /** A page as read from (or just written to) disk. */
 export type PageDiskRead = ParsePageResult & {

@@ -1,5 +1,5 @@
 import type { RefObject } from 'react';
-import { toRecord } from '../../shared/record';
+import { toRecord } from '../../shared/core/record';
 import { useEffect } from 'react';
 
 // Closing a popup when the user goes somewhere else.

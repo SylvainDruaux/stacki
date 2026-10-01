@@ -25,14 +25,14 @@
 // Undo steps (EditsRecord) learn their inverses as replies arrive. An entry
 // carrying several steps' bytes in one write (typing) gives its inverse to the
 // newest step; the older ones are `folded` into it.
-import { assert } from '../../shared/assert';
-import type { Digest } from '../../shared/brand';
+import { assert } from '../../shared/core/assert';
+import type { Digest } from '../../shared/core/brand';
 import type { Edit, EditRequest, NodeRef } from '../../shared/edit-request';
 import type { RejectionReason, SourceEdit } from '../../shared/intent';
-import { LIMITS } from '../../shared/limits';
+import { LIMITS } from '../../shared/core/limits';
 import type { PageEditError, PageEdited } from '../../shared/page-save';
 import type { PageModel, PageNode } from '../../shared/page-node';
-import type { Result } from '../../shared/result';
+import type { Result } from '../../shared/core/result';
 import type { EditorModel } from './pageView';
 import type { SaveState } from './saveState';
 

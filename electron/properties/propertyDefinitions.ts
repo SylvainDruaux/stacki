@@ -6,7 +6,7 @@ import type { SchemaField } from '../parse/astroParserTypes';
 import { createPropertyTypeReader } from './propertyTypes';
 import { bindComponentDefault } from './propertyRename';
 import ts from 'typescript';
-import { assert } from '../../shared/assert';
+import { assert } from '../../shared/core/assert';
 import type {
   ComponentProperties,
   ComponentProperty,
@@ -14,7 +14,7 @@ import type {
   PropertyEditing,
 } from '../../shared/component-properties';
 import { PROPERTY_LIMITS } from '../../shared/component-properties';
-import { err, ok, type Result } from '../../shared/result';
+import { err, ok, type Result } from '../../shared/core/result';
 import { parsePropSchema } from '../parse/astroParser';
 import {
   applySourceEdits,

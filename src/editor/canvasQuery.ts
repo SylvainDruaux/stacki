@@ -1,5 +1,5 @@
-import { assert } from '../../shared/assert';
-import { LIMITS } from '../../shared/limits';
+import { assert } from '../../shared/core/assert';
+import { LIMITS } from '../../shared/core/limits';
 import { parseCanvasReply, type CanvasAnswer } from './canvasReply';
 export const CANVAS_LIMITS = { pendingMax: 1024 } as const;
 interface QueryMessage {

@@ -6,7 +6,7 @@
 // name or id one past the bound).
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { LIMITS } = require('#dist/shared/limits.js');
+const { LIMITS } = require('#dist/shared/core/limits.js');
 const { parseNavigatorDrop } = require('./helpers/rendererModule')(
   'src/features/structure/navigatorDrop.ts',
 );

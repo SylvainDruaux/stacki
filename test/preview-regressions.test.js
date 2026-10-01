@@ -15,8 +15,8 @@ const { repoPath } = require('./helpers/sources.js');
 const source = fs.readFileSync(repoPath('dist/electron/previewClient/morphClient.js'), 'utf8');
 const dom = new JSDOM('<!doctype html><html><head></head><body></body></html>');
 const document = dom.window.document;
-// Main prepends the patcher's bounds from shared/limits.ts (step 7).
-const { LIMITS } = require('#dist/shared/limits.js');
+// Main prepends the patcher's bounds from shared/core/limits.ts (step 7).
+const { LIMITS } = require('#dist/shared/core/limits.js');
 const morph = new Function(
   'document',
   'AVB_PREVIEW_LIMITS',

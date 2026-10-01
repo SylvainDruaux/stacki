@@ -3,7 +3,7 @@ import path from 'path';
 import { createRequire } from 'module';
 import { spawn, type ChildProcess } from 'child_process';
 
-import { toRecord, toArray } from '../../shared/record';
+import { toRecord, toArray } from '../../shared/core/record';
 import { MAIN_LIMITS } from '../lib/mainLimits';
 import { contentWorkerPath } from '../lib/runtimePaths';
 

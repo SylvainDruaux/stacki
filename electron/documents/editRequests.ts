@@ -16,7 +16,7 @@
 // outlived the compat adapter at step 9 (tracker, Step 9): the renderer names
 // nodes by the path, kind and UTF-16 range of the parse it shows, and only main
 // holds the bytes those become, so the translation stays here.
-import { assert } from '../../shared/assert';
+import { assert } from '../../shared/core/assert';
 import type { Edit, NodeRef } from '../../shared/edit-request';
 import type { BuiltEdit, EditBase, IntentDraft } from './documentActors';
 import { TAG_NAME_RE } from '../../shared/intent';
@@ -32,7 +32,7 @@ import {
 } from '../../shared/planSupport';
 import { parsePageResult, type PageNode } from '../../shared/page-node';
 import { toAnchorRef, type AnchorRef } from '../../shared/ref';
-import { err, ok, type Result } from '../../shared/result';
+import { err, ok, type Result } from '../../shared/core/result';
 import type { Snapshot } from '../../shared/snapshot';
 import {
   byteStringsEqual,
@@ -41,7 +41,7 @@ import {
   spansAscending,
   toByteSpan,
   toByteString,
-} from '../../shared/span';
+} from '../../shared/core/span';
 import { parsePage, serializeNodes, serializePage } from '../parse/astroParser';
 import {
   frontmatterSlot,

@@ -13,17 +13,17 @@
 //
 // The adapter half in main dies at step 9, when the renderer holds
 // projections and authors intents directly.
-import { assert } from './assert';
-import type { Digest } from './brand';
-import { digest, pathText } from './boundary';
+import { assert } from './core/assert';
+import type { Digest } from './core/brand';
+import { digest, pathText } from './core/boundary';
 import type { CodeHunk } from './code-patch';
 import type { AttributeValue, Placement, SourceEdit, StyleDeclaration } from './intent';
 import { PLACEMENTS, TAG_NAME_RE } from './intent';
-import { LIMITS } from './limits';
+import { LIMITS } from './core/limits';
 import { parsePageModel, parsePageNode, type PageModel, type PageNode } from './page-node';
-import { toArray, toRecord } from './record';
+import { toArray, toRecord } from './core/record';
 import { NODE_KINDS, STRUCTURAL_PATH_STEPS_MAX, type NodeKind } from './ref';
-import { parseByteSpan, parseUtf16Span, spansAscending, type Utf16Span } from './span';
+import { parseByteSpan, parseUtf16Span, spansAscending, type Utf16Span } from './core/span';
 
 /** A node of the parse the request was authored against. */
 export interface NodeRef {

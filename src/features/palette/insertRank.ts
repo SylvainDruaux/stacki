@@ -1,5 +1,5 @@
-import { assert } from '../../../shared/assert';
-import { LIMITS } from '../../../shared/limits';
+import { assert } from '../../../shared/core/assert';
+import { LIMITS } from '../../../shared/core/limits';
 
 export interface SearchItem {
   readonly name?: string;

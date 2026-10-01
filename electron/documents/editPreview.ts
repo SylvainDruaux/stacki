@@ -9,13 +9,13 @@
 // Pure: no actor, no disk. The bytes stand for the file at `authoredChecksum`,
 // and planning with nothing between authored and current is the planner's
 // exact path.
-import { assert } from '../../shared/assert';
-import { toFilePath, toIntentId, type Digest } from '../../shared/brand';
+import { assert } from '../../shared/core/assert';
+import { toFilePath, toIntentId, type Digest } from '../../shared/core/brand';
 import type { Edit } from '../../shared/edit-request';
 import { toIntent, type RejectionReason, type SourceEdit } from '../../shared/intent';
 import { planIntent } from '../../shared/planner';
-import { err, ok, type Result } from '../../shared/result';
-import type { ByteString } from '../../shared/span';
+import { err, ok, type Result } from '../../shared/core/result';
+import type { ByteString } from '../../shared/core/span';
 import { applySplices, inverseEdits } from '../../shared/splice';
 import { NODE_PROJECTOR } from './documentDisk';
 import { buildEditIntent } from './editRequests';

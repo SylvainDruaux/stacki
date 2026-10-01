@@ -5,7 +5,7 @@
 // without a private copy to keep in step. Renderer-only: nothing crosses a
 // process boundary in this shape (shared/page-node.ts is the contract).
 import type { Attr, PageModel, PageNode } from '../../shared/page-node';
-import { toNodeId, type NodeId } from '../../shared/brand';
+import { toNodeId, type NodeId } from '../../shared/core/brand';
 
 // The fields every node kind may carry, readable on any node without first
 // narrowing its kind: panels read `node.props` or `node.children` whatever
@@ -29,7 +29,7 @@ export type EditorNode = PageNode & EditorNodeCommon;
 export type EditorModel = Omit<PageModel, 'nodes'> & { readonly nodes: readonly EditorNode[] };
 
 /** A node id the renderer makes (a gesture's new node, the layout wrapper),
- * checked against the id grammar (shared/brand.ts). */
+ * checked against the id grammar (shared/core/brand.ts). */
 export function nodeId(value: string): NodeId {
   return toNodeId(value);
 }

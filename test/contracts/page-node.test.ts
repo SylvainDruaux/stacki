@@ -16,7 +16,7 @@ import {
   parsePageResult,
   assertTreeInvariants,
 } from '#dist/shared/page-node.js';
-import { LIMITS } from '#dist/shared/limits.js';
+import { LIMITS } from '#dist/shared/core/limits.js';
 
 // Null as a boundary receives it, parsed from JSON: inputs may hold it; our values never do.
 const jsonNull: unknown = JSON.parse('null');

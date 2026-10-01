@@ -25,14 +25,14 @@
 // The actor never retries and never merges: every accepted intent reaches
 // exactly one terminal outcome (plan §3.5), and a rejected one needs a
 // deliberate resubmission by the persistence layer.
-import { assert } from './assert';
-import type { Digest, FilePath } from './brand';
+import { assert } from './core/assert';
+import type { Digest, FilePath } from './core/brand';
 import type { Intent, Outcome, RejectionReason, SubmissionResult } from './intent';
-import { LIMITS } from './limits';
+import { LIMITS } from './core/limits';
 import type { Plan, PlanningBase } from './planner';
-import { err, ok, type Result } from './result';
+import { err, ok, type Result } from './core/result';
 import type { Snapshot } from './snapshot';
-import type { ByteString } from './span';
+import type { ByteString } from './core/span';
 import { applySplices, changedRanges, witnessesHold } from './splice';
 
 // --- Injected dependencies -----------------------------------------------------

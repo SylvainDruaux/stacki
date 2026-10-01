@@ -7,9 +7,9 @@
 import { createHash } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { assert } from '../../shared/assert';
-import { toDigest, type Digest } from '../../shared/brand';
-import { LIMITS } from '../../shared/limits';
+import { assert } from '../../shared/core/assert';
+import { toDigest, type Digest } from '../../shared/core/brand';
+import { LIMITS } from '../../shared/core/limits';
 import {
   judgePreviewRender,
   type PreviewRender,

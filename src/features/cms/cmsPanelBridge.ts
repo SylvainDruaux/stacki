@@ -1,5 +1,5 @@
-import type { Data, Parser } from '../../../shared/boundary';
-import type { Result } from '../../../shared/result';
+import type { Data, Parser } from '../../../shared/core/boundary';
+import type { Result } from '../../../shared/core/result';
 import {
   boolean,
   count,
@@ -9,7 +9,7 @@ import {
   pathText,
   record,
   text,
-} from '../../../shared/boundary';
+} from '../../../shared/core/boundary';
 import { parseIpcPayload } from '../../../shared/ipc-payloads';
 import { cleanError } from '../../lib/cleanError';
 

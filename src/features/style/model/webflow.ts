@@ -19,7 +19,7 @@
 // covering the whole file.
 
 import { collectRules, parseRegion, renderEmbed, splitEmbed } from './css';
-import { assert } from '../../../../shared/assert';
+import { assert } from '../../../../shared/core/assert';
 import postcss from 'postcss';
 import type { CanvasAnswer } from '../../../editor/canvasReply';
 import { findNode, getHost, onHostChange, propText, walkNodes, type HostNode } from './host';

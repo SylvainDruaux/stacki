@@ -7,7 +7,7 @@
 
 import { compareCascade } from './cascade';
 import type { MatchedRule, RuleModel } from './cascade';
-import { assert } from '../../../../shared/assert';
+import { assert } from '../../../../shared/core/assert';
 import { canonicalCompound, compareSpecificity, normalizePseudoElement } from './selectors';
 import type { BreakpointId, ParsedRule, Specificity } from './styleTypes';
 

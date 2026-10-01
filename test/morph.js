@@ -44,9 +44,9 @@ global.document = dom.window.document;
 const source = fs.readFileSync(repoPath('dist/electron/previewClient/morphClient.js'), 'utf8');
 const start = source.indexOf('const isAnchor =');
 const end = source.indexOf('// A script that CHANGED, or one that is GONE');
-// Main prepends the patcher's bounds from shared/limits.ts (step 7); the lifted
+// Main prepends the patcher's bounds from shared/core/limits.ts (step 7); the lifted
 // half takes them as a parameter, so the cap tests below can shrink them.
-const { LIMITS } = require('#dist/shared/limits.js');
+const { LIMITS } = require('#dist/shared/core/limits.js');
 const assert = require('node:assert/strict');
 const lift = (limits) =>
   new Function(
@@ -543,7 +543,7 @@ const LIVE_TABS = (labels, active) =>
     'the next patch starts with the whole budget',
     reasonOf(() => tiny.patchChildren(...again)) === undefined,
   );
-  // The shipped bounds are the ones in shared/limits.ts, prepended by main.
+  // The shipped bounds are the ones in shared/core/limits.ts, prepended by main.
   const main = fs.readFileSync(repoPath('dist/electron/main.js'), 'utf8');
   check(
     'main prepends the patcher its bounds from LIMITS',

@@ -9,7 +9,7 @@
 
 import selectorParser from 'postcss-selector-parser';
 import type { ElementSnapshot, SelectorInfo, Specificity } from './styleTypes';
-import { assert } from '../../../../shared/assert';
+import { assert } from '../../../../shared/core/assert';
 
 type Combinator = ' ' | '>' | '+' | '~';
 type HasAxis = 'descendant' | 'child' | 'sibling' | 'adjacent';

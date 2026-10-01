@@ -1,6 +1,6 @@
 import type { PreloadBridge } from '../../shared/preload-api';
 import { parseIpcPayload } from '../../shared/ipc-payloads';
-import { boolean, record, text } from '../../shared/boundary';
+import { boolean, record, text } from '../../shared/core/boundary';
 
 const RESTART = 'Stacki needs to be restarted before this can be used.';
 export type VariableEditResult =

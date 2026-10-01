@@ -4,7 +4,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const load = require('./helpers/rendererModule');
-const { BOUNDARY_LIMITS } = require('#dist/shared/boundary.js');
+const { BOUNDARY_LIMITS } = require('#dist/shared/core/boundary.js');
 
 // Null as a boundary receives it, parsed from JSON: inputs may hold it; our values never do.
 const jsonNull = JSON.parse('null');

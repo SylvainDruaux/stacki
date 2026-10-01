@@ -9,7 +9,7 @@ import { literalOptions } from '../../../shared/property-options';
 export { literalOptions };
 import { useRef, useState } from 'react';
 import useDismiss from '../../ui/useDismiss';
-import { assert } from '../../../shared/assert';
+import { assert } from '../../../shared/core/assert';
 import type {
   ComponentProperty,
   PropertyChange,

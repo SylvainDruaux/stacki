@@ -6,7 +6,7 @@
 // construction). Kept as the simulator's one seam for the planner.
 import type { Intent, RejectionReason } from '#dist/shared/intent.js';
 import { planIntent, type Plan, type PlanningBase } from '#dist/shared/planner.js';
-import type { Result } from '#dist/shared/result.js';
+import type { Result } from '#dist/shared/core/result.js';
 
 export function planEngine(base: PlanningBase, intent: Intent): Result<Plan, RejectionReason> {
   return planIntent(base, intent);

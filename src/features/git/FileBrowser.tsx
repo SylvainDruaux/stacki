@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronDownIcon, ChevronRightIcon, FolderIcon, FolderOpenIcon } from '../../ui/Icons';
 import FileStatus from './FileStatus';
-import { assert } from '../../../shared/assert';
+import { assert } from '../../../shared/core/assert';
 
 const FILE_LIMITS = { entriesMax: 100_000, pathCharsMax: 8_192, depthMax: 64 } as const;
 export interface BrowserFile {

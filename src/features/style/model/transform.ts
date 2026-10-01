@@ -4,7 +4,7 @@
 // survive. Mirrors lib/text-shadow.ts (the layered text-shadow model).
 
 import { splitTopLevelCommas, splitTopLevelSpaces } from './background';
-import { assert } from '../../../../shared/assert';
+import { assert } from '../../../../shared/core/assert';
 
 export type TransformType = 'move' | 'scale' | 'rotate' | 'skew';
 /** One transform layer: a type + its per-axis values (skew ignores z). */

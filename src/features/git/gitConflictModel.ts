@@ -3,8 +3,8 @@ import type {
   WireConflictPart,
   WireMergeOutcome,
 } from '../../../shared/ipc-results';
-import { assert } from '../../../shared/assert';
-import { BOUNDARY_LIMITS } from '../../../shared/boundary';
+import { assert } from '../../../shared/core/assert';
+import { BOUNDARY_LIMITS } from '../../../shared/core/boundary';
 
 export type Conflict = Extract<WireMergeOutcome, { readonly conflicted: true }>;
 export type Clash = Extract<WireConflictPart, { readonly kind: 'clash' }>;

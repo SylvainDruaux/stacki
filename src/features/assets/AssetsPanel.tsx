@@ -1,8 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { AssetRequest } from '../../ui/assetPick';
 import type { AssetPanelEntry } from './assetPanelBridge';
-import type { Result } from '../../../shared/result';
-import { BOUNDARY_LIMITS, pathText } from '../../../shared/boundary';
+import type { Result } from '../../../shared/core/result';
+import { BOUNDARY_LIMITS, pathText } from '../../../shared/core/boundary';
 import {
   deleteAsset,
   makeAssetDirectory,

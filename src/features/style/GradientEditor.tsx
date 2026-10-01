@@ -15,7 +15,7 @@ import {
 } from './model/gradient';
 import { commitInPlace } from './model/commitInPlace';
 import { PositionGrid, NumberField } from './components/PositionGrid';
-import { assert } from '../../../shared/assert';
+import { assert } from '../../../shared/core/assert';
 
 function tooltipArrowStyle(
   arrowRight: number,

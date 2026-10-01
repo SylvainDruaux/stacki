@@ -15,9 +15,9 @@
 // modules that are.
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
-import { assert } from '../../shared/assert';
-import { toDigest } from '../../shared/brand';
-import { LIMITS } from '../../shared/limits';
+import { assert } from '../../shared/core/assert';
+import { toDigest } from '../../shared/core/brand';
+import { LIMITS } from '../../shared/core/limits';
 import { stampComment, stampPathProblem } from '../../shared/preview-token';
 import { markChunkHtml, parsePage, resolveChunks, serializePageMarked } from '../parse/astroParser';
 

@@ -10,14 +10,14 @@ import { createHash } from 'node:crypto';
 import { test } from 'node:test';
 import { parsePage } from '#dist/electron/parse/astroParser.js';
 import { parseMarkdownPage } from '#dist/electron/parse/markdownParser.js';
-import { toDigest, toFilePath } from '#dist/shared/brand.js';
+import { toDigest, toFilePath } from '#dist/shared/core/brand.js';
 import {
   CAPABILITIES,
   capabilityAcceptsVisualIntent,
   describeCapability,
   parseCapability,
 } from '#dist/shared/capability.js';
-import { LIMITS } from '#dist/shared/limits.js';
+import { LIMITS } from '#dist/shared/core/limits.js';
 import { parsePageResult } from '#dist/shared/page-node.js';
 import { createSnapshot } from '#dist/shared/snapshot.js';
 import {
@@ -26,7 +26,7 @@ import {
   projectPage,
   type ProjectedNode,
 } from '#dist/shared/source-projection.js';
-import { encodeUtf8, type ByteString } from '#dist/shared/span.js';
+import { encodeUtf8, type ByteString } from '#dist/shared/core/span.js';
 
 const project = (text: string) =>
   projectPage(text, parsePageResult(parsePage(text, { locs: true })));

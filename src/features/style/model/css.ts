@@ -16,8 +16,8 @@ import postcss, {
 import type { ParsedDeclaration, ParsedRule, StyleRegion } from './styleTypes';
 import { parseSelectorList, selectorListMembers } from './selectors';
 import { selectorKey } from './resolved';
-import { assert } from '../../../../shared/assert';
-import { LIMITS } from '../../../../shared/limits';
+import { assert } from '../../../../shared/core/assert';
+import { LIMITS } from '../../../../shared/core/limits';
 
 /** A declaration's value and whether it is `!important` — the two always travel together. */
 export type DeclarationValue = { readonly value: string; readonly important: boolean };

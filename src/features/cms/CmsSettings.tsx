@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import type { Collection, CmsField, FieldType } from './cmsSchema';
 import type { DeclaredTypes } from './cmsTypes';
-import { BOUNDARY_LIMITS } from '../../../shared/boundary';
-import { assert } from '../../../shared/assert';
+import { BOUNDARY_LIMITS } from '../../../shared/core/boundary';
+import { assert } from '../../../shared/core/assert';
 import { fieldsAt, keyFor } from './cmsSchema';
 import { withDeclaredTypes } from './cmsTypes';
 import { readCmsUsage, deleteCms } from './cmsBridge';

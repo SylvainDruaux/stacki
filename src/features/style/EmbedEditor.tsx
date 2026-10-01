@@ -83,7 +83,7 @@ import {
   type NativeStyleOptions,
 } from './model/nativeStyles';
 import type { AtRule, Declaration } from 'postcss';
-import { assert } from '../../../shared/assert';
+import { assert } from '../../../shared/core/assert';
 import {
   addDeclaration,
   appendDecl,

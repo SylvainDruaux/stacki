@@ -1,8 +1,8 @@
 import React from 'react';
 import { arrayItems, arrayText, objectFields, objectText } from './arrayValue';
 import type { ObjectRow } from './arrayValue';
-import { assert } from '../../../shared/assert';
-import { LIMITS } from '../../../shared/limits';
+import { assert } from '../../../shared/core/assert';
+import { LIMITS } from '../../../shared/core/limits';
 import ListField from './ListField';
 import SegSwitch from './SegSwitch';
 

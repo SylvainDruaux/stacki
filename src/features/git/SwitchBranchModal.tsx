@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { BOUNDARY_LIMITS } from '../../../shared/boundary';
-import { assert } from '../../../shared/assert';
+import { BOUNDARY_LIMITS } from '../../../shared/core/boundary';
+import { assert } from '../../../shared/core/assert';
 
 export interface SwitchBranchProps {
   readonly from: string;

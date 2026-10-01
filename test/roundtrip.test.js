@@ -28,7 +28,7 @@ const path = require('node:path');
 const { repoPath } = require('./helpers/sources.js');
 
 const { parsePage, serializePage } = require('#dist/electron/parse/astroParser.js');
-const { LIMITS } = require('#dist/shared/limits.js');
+const { LIMITS } = require('#dist/shared/core/limits.js');
 
 const CORPUS_DIRECTORY = path.join(__dirname, 'corpus');
 const expectations = JSON.parse(fs.readFileSync(repoPath('test/expectations.json'), 'utf8'));

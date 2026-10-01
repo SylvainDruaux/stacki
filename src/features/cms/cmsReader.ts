@@ -1,10 +1,10 @@
-import type { Result } from '../../../shared/result';
+import type { Result } from '../../../shared/core/result';
 import type { Collection } from './cmsSchema';
 import type { DeclaredTypes } from './cmsTypes';
 import type { createCmsWriter } from './cmsWriter';
 import { collectionOf } from './cmsSchema';
 import { readCms, readCmsMeta } from './cmsBridge';
-import { assert } from '../../../shared/assert';
+import { assert } from '../../../shared/core/assert';
 import { createCoalescedRun } from '../../lib/coalescedRun';
 
 export interface CmsSnapshot {

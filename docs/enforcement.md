@@ -31,7 +31,7 @@ Commands for people and agents:
 
 Some files define the gates themselves: `AGENTS.md`, `CLAUDE.md`, `eslint.config.mjs`, the
 Prettier config, every `tsconfig*.json`, `scripts/{eslint-plugin,policy,agent}/`, `.githooks/`,
-the agent configs, `.github/workflows/`, `shared/limits.ts`, and this page. An agent that edits one
+the agent configs, `.github/workflows/`, `shared/core/limits.ts`, and this page. An agent that edits one
 — with an edit tool, or with a shell command that writes it — is stopped for a human decision:
 Claude Code asks; Codex and Pi refuse and tell the agent to ask. A human who starts an agent with
 `STACKI_ALLOW_POLICY_EDITS=1` has approved such edits for that session (the agent cannot set it:

@@ -66,8 +66,8 @@ const FOOTER = `
     const source = fs.readFileSync(repoPath('dist/electron/previewClient/morphClient.js'), 'utf8');
     const start = source.indexOf('const isAnchor =');
     const end = source.indexOf('// Never looked inside.');
-    // Main prepends the patcher's bounds from shared/limits.ts (step 7).
-    const { LIMITS } = require('#dist/shared/limits.js');
+    // Main prepends the patcher's bounds from shared/core/limits.ts (step 7).
+    const { LIMITS } = require('#dist/shared/core/limits.js');
     const syncAnchors = new Function(
       'document',
       'AVB_PREVIEW_LIMITS',

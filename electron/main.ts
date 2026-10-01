@@ -25,7 +25,7 @@ import {
   installDocumentHost,
   writeProjectText,
 } from './documents/documentWrites';
-import { definedFields } from '../shared/boundary';
+import { definedFields } from '../shared/core/boundary';
 import { gitErrorDetail } from './git/git';
 import {
   commandNeedsShell,
@@ -45,15 +45,15 @@ import type {
   OpenDialogOptions,
 } from 'electron';
 import type { ChildProcess, ExecFileOptions } from 'child_process';
-import { toRecord, toArray } from '../shared/record';
-import { assert } from '../shared/assert';
+import { toRecord, toArray } from '../shared/core/record';
+import { assert } from '../shared/core/assert';
 import type { IpcPayloads } from '../shared/ipc-payloads';
 import type { IpcResults, WirePageEditError, WirePageWriteFailure } from '../shared/ipc-results';
 import { describeRejection, type RejectionReason } from '../shared/intent';
-import { decodeUtf8, encodeUtf8 } from '../shared/span';
-import type { Digest } from '../shared/brand';
-import { LIMITS } from '../shared/limits';
-import { ok } from '../shared/result';
+import { decodeUtf8, encodeUtf8 } from '../shared/core/span';
+import type { Digest } from '../shared/core/brand';
+import { LIMITS } from '../shared/core/limits';
+import { ok } from '../shared/core/result';
 import type { SchemaField } from './parse/astroParserTypes';
 import {
   parseData,
@@ -3743,7 +3743,7 @@ const json = (body) =>
 // browser and not in this process. If it cannot be read, pages simply reload
 // the way they always did.
 //
-// Its bounds come from shared/limits.ts, prepended here — the bridge boundary —
+// Its bounds come from shared/core/limits.ts, prepended here — the bridge boundary —
 // so the patcher in the page answers to the same numbers as the rest of the app
 // (step 7). The patcher declares the constant and reads nothing else.
 let MORPH_CLIENT = '';

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import type { Result } from '../../../shared/result';
+import type { Result } from '../../../shared/core/result';
 import type {
   VariableFile,
   VariableGroup,

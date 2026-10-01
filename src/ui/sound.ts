@@ -1,4 +1,4 @@
-import { assert } from '../../shared/assert';
+import { assert } from '../../shared/core/assert';
 interface Tone {
   readonly cutoff: number;
   readonly gain: number;

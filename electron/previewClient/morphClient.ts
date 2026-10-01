@@ -31,7 +31,7 @@ declare global {
   }
 }
 
-// The patcher's bounds (plan §9, step 7), from shared/limits.ts: main prepends
+// The patcher's bounds (plan §9, step 7), from shared/core/limits.ts: main prepends
 // this constant when it hands the source to the dev plugin — the bridge
 // boundary — so the page and the app answer to one number. Past either, the
 // page reloads instead of patching, and tells the app why.

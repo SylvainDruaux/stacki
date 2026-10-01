@@ -1,4 +1,4 @@
-// The tooling's copy of shared/assert.ts, with the same contract. The policy
+// The tooling's copy of shared/core/assert.ts, with the same contract. The policy
 // tooling runs natively under Node's type stripping, and importing shared/ from
 // there makes Node reparse a typeless-package .ts file as ESM with a warning on
 // every run; shared/ stays compiled to CommonJS for the app. One meaning, two

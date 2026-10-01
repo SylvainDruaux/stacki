@@ -17,9 +17,9 @@
 //      bytes its stamp names on disk (main reads them: preview:check).
 //
 // Hover is a picture, not a selection: it needs (1) only, so it never waits.
-import { assert } from '../../../shared/assert';
-import type { Digest } from '../../../shared/brand';
-import { LIMITS } from '../../../shared/limits';
+import { assert } from '../../../shared/core/assert';
+import type { Digest } from '../../../shared/core/brand';
+import { LIMITS } from '../../../shared/core/limits';
 import {
   judgeEventToken,
   judgeShownFile,

@@ -7,8 +7,8 @@
 // shows. Main's projection of the same bytes must agree on all three before
 // the reference becomes an anchor; a mismatch means the renderer's parse is
 // not of these bytes, and the edit is refused as moved — never guessed.
-import { assert } from '../../shared/assert';
-import { toUtf16Offset } from '../../shared/brand';
+import { assert } from '../../shared/core/assert';
+import { toUtf16Offset } from '../../shared/core/brand';
 import { diffCodePatch } from '../../shared/code-patch';
 import { DIFF_BUDGET, diffBytes, type ByteDiff } from '../../shared/diff';
 import type { NodeRef } from '../../shared/edit-request';
@@ -16,7 +16,7 @@ import type { RejectionReason, SourceEdit } from '../../shared/intent';
 import { mapSpanThroughDiff } from '../../shared/mapSpan';
 import { nodeAtPath, type ValidProjection } from '../../shared/planSupport';
 import { toAnchorRef, toChildIndex, type AnchorRef } from '../../shared/ref';
-import { err, ok, type Result } from '../../shared/result';
+import { err, ok, type Result } from '../../shared/core/result';
 import type { Snapshot } from '../../shared/snapshot';
 import type { ProjectedNode } from '../../shared/source-projection';
 import {
@@ -25,7 +25,7 @@ import {
   toByteSpan,
   utf16ToByteOffsets,
   type ByteSpan,
-} from '../../shared/span';
+} from '../../shared/core/span';
 
 /** How a page is written: its file's extension decides the parser. */
 export type PageFormat = 'astro' | 'md' | 'mdx';

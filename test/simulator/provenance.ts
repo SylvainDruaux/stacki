@@ -7,9 +7,14 @@
 //
 // Origins are unique within one version of a file: fresh ones come from one
 // counter per run, and every writer below keeps an existing origin at most once.
-import { assert } from '#dist/shared/assert.js';
+import { assert } from '#dist/shared/core/assert.js';
 import type { Splice } from '#dist/shared/planner.js';
-import { toByteSpan, toByteString, type ByteSpan, type ByteString } from '#dist/shared/span.js';
+import {
+  toByteSpan,
+  toByteString,
+  type ByteSpan,
+  type ByteString,
+} from '#dist/shared/core/span.js';
 import { orderedSplices } from '#dist/shared/splice.js';
 
 /** One origin per byte of one version of a file. */

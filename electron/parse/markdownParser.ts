@@ -38,10 +38,10 @@
 // the container's prefix on every line after the first. Offsets are UTF-16,
 // into the text as read, a leading byte-order mark included.
 
-import { assert } from '../../shared/assert';
-import { LIMITS } from '../../shared/limits';
+import { assert } from '../../shared/core/assert';
+import { LIMITS } from '../../shared/core/limits';
 import type { Attr, AttrSpan } from '../../shared/page-node';
-import { toUtf16Span } from '../../shared/span';
+import { toUtf16Span } from '../../shared/core/span';
 import { parseTemplate, serializeNodes } from './astroParser';
 
 /** A line as one container sees it: its text with the container's own syntax

@@ -7,7 +7,7 @@ import { parsePreviewMessage } from './previewMessages';
 import { sameCopy } from './outlineBoxes';
 import { setModifiers } from '../../editor/heldModifiers';
 import { noteCanvasReady, receiveCanvasReply, setCanvasFrame } from '../../editor/canvasQuery';
-import type { Digest } from '../../../shared/brand';
+import type { Digest } from '../../../shared/core/brand';
 import {
   judgeEventToken,
   type PreviewRender,

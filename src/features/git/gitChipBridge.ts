@@ -1,6 +1,6 @@
 import type { IpcResults, WireFileKind, WireGitInfo } from '../../../shared/ipc-results';
-import type { Result } from '../../../shared/result';
-import type { Parser } from '../../../shared/boundary';
+import type { Result } from '../../../shared/core/result';
+import type { Parser } from '../../../shared/core/boundary';
 import {
   boolean,
   count,
@@ -10,7 +10,7 @@ import {
   pathText,
   record,
   text,
-} from '../../../shared/boundary';
+} from '../../../shared/core/boundary';
 import { parseIpcPayload } from '../../../shared/ipc-payloads';
 import { cleanError } from '../../lib/cleanError';
 import { parseMergeResult } from './gitBridge';

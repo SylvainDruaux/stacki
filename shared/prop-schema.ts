@@ -1,9 +1,9 @@
 // Component schemas travel as arrays over IPC and as Maps in local symbol reads.
 // Parse the metadata the props panel consumes, including branch-specific defaults,
 // rather than carrying unknown shapes into control and visibility decisions.
-import { LIMITS } from './limits';
-import { toArray, toRecord } from './record';
-import { definedFields } from './boundary';
+import { LIMITS } from './core/limits';
+import { toArray, toRecord } from './core/record';
+import { definedFields } from './core/boundary';
 
 export type PropDefault = string | number | boolean;
 export interface DefaultRule {

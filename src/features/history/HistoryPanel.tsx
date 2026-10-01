@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import type { Result } from '../../../shared/result';
+import type { Result } from '../../../shared/core/result';
 import { readHistoryFiles, readHistoryWorktrees } from './historyBridge';
 export { dayGroup, relativeTime, summarize } from './historyModel';
 import { HistoryBranches, HistoryFiles, HistorySection, HistoryWorktrees } from './HistorySections';

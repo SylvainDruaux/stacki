@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import type { Result } from '../../../shared/result';
-import { BOUNDARY_LIMITS } from '../../../shared/boundary';
+import type { Result } from '../../../shared/core/result';
+import { BOUNDARY_LIMITS } from '../../../shared/core/boundary';
 import { CheckIcon, ExternalIcon } from '../../ui/Icons';
 import { repoSlug, useGitHubStatus } from './gitPublish';
 

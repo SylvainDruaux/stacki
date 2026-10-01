@@ -5,7 +5,7 @@
  * Best-effort: any read failure falls back to no preference rather than
  * throwing, so a corrupt value never blocks the app from loading.
  */
-import { BOUNDARY_LIMITS } from '../../../../shared/boundary';
+import { BOUNDARY_LIMITS } from '../../../../shared/core/boundary';
 
 // The embed the Style Editor last targeted for new custom styles — restored as the
 // default so a chosen embed (e.g. a global-CSS embed) sticks across reloads.

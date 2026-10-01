@@ -12,8 +12,8 @@
 // certainty — a loop head that is not `data.map((item, index) => …`, a
 // condition whose test it cannot delimit — is `undefined`, and the caller
 // refuses rather than guesses.
-import { assert } from './assert';
-import { LIMITS } from './limits';
+import { assert } from './core/assert';
+import { LIMITS } from './core/limits';
 import {
   ancestorsOf,
   byteOffsetsIn,
@@ -26,7 +26,7 @@ import {
 } from './planSupport';
 import type { StructuralPath } from './ref';
 import type { ProjectedNode } from './source-projection';
-import { toByteSpan, type ByteSpan, type ByteString } from './span';
+import { toByteSpan, type ByteSpan, type ByteString } from './core/span';
 
 export interface LoopParameter {
   readonly name: string;

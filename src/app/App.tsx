@@ -35,8 +35,8 @@ import {
   scanProject,
 } from '../ipc/bridge';
 import { checkoutGitBranch, readGitInfo } from '../features/git/gitChipBridge';
-import { LIMITS } from '../../shared/limits';
-import { assert } from '../../shared/assert';
+import { LIMITS } from '../../shared/core/limits';
+import { assert } from '../../shared/core/assert';
 import PreviewPane from '../features/preview/PreviewPane';
 import GitChip from '../features/git/GitChip';
 import HistoryPanel, { relativeTime } from '../features/history/HistoryPanel';
@@ -108,7 +108,7 @@ import SaveConflictNotice from './SaveConflictNotice';
 import CapabilityNotice from './CapabilityNotice';
 import { nodeCapability } from '../editor/nodeCapability';
 import type { PageEdited } from '../../shared/page-save';
-import type { Digest, NodeId } from '../../shared/brand';
+import type { Digest, NodeId } from '../../shared/core/brand';
 import { ancestorChain, createTreeIndex, nodeAtPath, pathOfNode } from '../editor/editorTree';
 import { readFrontmatter, writeFrontmatter } from '../../electron/frontmatter';
 import {
@@ -170,7 +170,7 @@ import type { SpacingHover } from '../features/preview/PreviewOverlays';
 import type { VariableSelection } from '../features/variables/variablesBridge';
 import type { InsertTarget } from '../editor/insertTarget';
 import type { InsertItem } from '../features/palette/InsertSearch';
-import { toRecord } from '../../shared/record';
+import { toRecord } from '../../shared/core/record';
 import { projectRelativePath } from '../lib/projectPath';
 import { currentDesktopPlatform, shortcutLabel } from '../lib/shortcutLabel';
 import { sourceNodeAtOffset } from '../features/code/codePanelModel';

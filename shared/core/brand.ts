@@ -68,7 +68,7 @@ export function toProjectPath(value: string): ProjectPath {
 
 /** A position in a file's UTF-8 bytes: what splices, witnesses and anchors use
  * (plan §3.2). Distinct from Utf16Offset so the two can never be mixed; the one
- * conversion between them is utf16ToByteOffsets in shared/span.ts. */
+ * conversion between them is utf16ToByteOffsets in shared/core/span.ts. */
 export type ByteOffset = Brand<number, 'ByteOffset'>;
 
 /** A position in a decoded source string, as JavaScript indexes it (UTF-16

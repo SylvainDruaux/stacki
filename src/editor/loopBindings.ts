@@ -11,8 +11,8 @@
 // (shared/loopScope.ts).
 // ---------------------------------------------------------------------------
 
-import { LIMITS } from '../../shared/limits';
-import { assert } from '../../shared/assert';
+import { LIMITS } from '../../shared/core/limits';
+import { assert } from '../../shared/core/assert';
 import type { EditorNode } from './pageView';
 import type { Attr } from '../../shared/page-node';
 

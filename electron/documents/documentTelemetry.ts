@@ -7,8 +7,8 @@
 // usernames — and never carries source bytes, disk error text or intent
 // payloads. No pipeline, no dashboard, no dependency.
 import { createHash } from 'node:crypto';
-import { assert } from '../../shared/assert';
-import type { FilePath, IntentId } from '../../shared/brand';
+import { assert } from '../../shared/core/assert';
+import type { FilePath, IntentId } from '../../shared/core/brand';
 import { REJECTION_REASONS, type Outcome, type RejectionReason } from '../../shared/intent';
 
 /** What one line records. (The step-0 save guard's `conflict` went with the

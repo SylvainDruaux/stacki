@@ -1,5 +1,5 @@
 import ts from 'typescript';
-import { assert } from '../../shared/assert';
+import { assert } from '../../shared/core/assert';
 import { PROPERTY_LIMITS } from '../../shared/component-properties';
 
 interface TypeWork {

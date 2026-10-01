@@ -6,8 +6,8 @@
 import { createHash } from 'node:crypto';
 import { parsePage } from '#dist/electron/parse/astroParser.js';
 import { parseMarkdownPage } from '#dist/electron/parse/markdownParser.js';
-import { assert } from '#dist/shared/assert.js';
-import { toDigest, type Digest, type FilePath } from '#dist/shared/brand.js';
+import { assert } from '#dist/shared/core/assert.js';
+import { toDigest, type Digest, type FilePath } from '#dist/shared/core/brand.js';
 import { parsePageResult } from '#dist/shared/page-node.js';
 import { createSnapshot, type Snapshot } from '#dist/shared/snapshot.js';
 import {
@@ -15,7 +15,7 @@ import {
   projectPage,
   type Projection,
 } from '#dist/shared/source-projection.js';
-import { decodeUtf8, type ByteString } from '#dist/shared/span.js';
+import { decodeUtf8, type ByteString } from '#dist/shared/core/span.js';
 
 export function sha256(bytes: ByteString): Digest {
   return toDigest(createHash('sha256').update(bytes).digest('hex'));

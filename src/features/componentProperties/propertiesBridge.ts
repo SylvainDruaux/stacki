@@ -4,8 +4,8 @@ import {
   parsePropertiesResult,
 } from '../../../shared/component-properties';
 import type { ComponentProperties, PropertyChange } from '../../../shared/component-properties';
-import { toRecord } from '../../../shared/record';
-import type { Result } from '../../../shared/result';
+import { toRecord } from '../../../shared/core/record';
+import type { Result } from '../../../shared/core/result';
 
 export async function readComponentProperties(
   projectPath: string,

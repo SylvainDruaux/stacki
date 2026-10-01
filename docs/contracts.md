@@ -33,7 +33,7 @@ enforce these invariants:
   data. A parse/write round trip must retain them even when the editor does not
   display them.
 - Every tree, depth, attribute collection, import list, string, and Markdown
-  metadata collection is bounded by `shared/limits.ts`.
+  metadata collection is bounded by `shared/core/limits.ts`.
 
 The renderer reads the parsed model itself, readonly, through
 `src/editor/pageView.ts` (a renderer-only view in which any node's optional fields can be
@@ -64,7 +64,7 @@ a deleted side of a merge clash, an empty grid cell). Structured clone keeps
 as JSON — a file on disk, a child process's or dev server's reply — is read
 with `null` accepted as absent, at the reader that parses it, because JSON
 cannot say `undefined`. JSON's own `null` inside project data (`Data` in
-`shared/boundary.ts`) is a value and round-trips as `null`.
+`shared/core/boundary.ts`) is a value and round-trips as `null`.
 
 Expected operating failures use `Result` or an explicit result union. A shape
 that violates the declared wire contract is a programmer error and throws at
@@ -75,7 +75,7 @@ the boundary. Do not catch that assertion and turn it into an operating result.
 `shared/page-save.ts` is the save contract (plan §11 step 0; since step 10
 every page save is an edit). `page:read` results carry `checksum`: the SHA-256
 of the exact bytes read, as 64 lowercase hex characters (`Digest` in
-`shared/brand.ts`, built only by `toDigest`). A page changes only through
+`shared/core/brand.ts`, built only by `toDigest`). A page changes only through
 `page:edit` (Visual edits and Code editor below), whose request names the
 checksum it was authored against; the whole-model `page:write` (retired at
 step 10 with `page:serialize`) and the code editor's `page:writeRaw` (retired
@@ -353,7 +353,7 @@ after). The generated config itself lives in `node_modules/.avb`.
 - The canvas patch (`electron/previewClient/morphClient.ts`) is bounded by
   `previewMarkersMax` markers per rendering and `previewMorphWorkMax`
   child-list matrix cells per patch; main prepends `AVB_PREVIEW_LIMITS` from
-  `shared/limits.ts` to the source it serves. Past either the page reloads and
+  `shared/core/limits.ts` to the source it serves. Past either the page reloads and
   first posts `avb:preview-reload` `{ reason }` (`markers-over-cap`,
   `diff-over-cap`, `scripts-changed`, `patch-failed`); the app shows the caps.
 

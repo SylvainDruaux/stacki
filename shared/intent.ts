@@ -4,13 +4,19 @@
 // Submission and terminal results are separate types, because backpressure is
 // not a rejection: a backpressured intent was never accepted and still belongs
 // to the persistence layer.
-import { assert } from './assert';
-import { toFilePath, toIntentId, type Digest, type FilePath, type IntentId } from './brand';
-import { digest, pathText } from './boundary';
-import { LIMITS } from './limits';
-import { toArray, toRecord } from './record';
+import { assert } from './core/assert';
+import { toFilePath, toIntentId, type Digest, type FilePath, type IntentId } from './core/brand';
+import { digest, pathText } from './core/boundary';
+import { LIMITS } from './core/limits';
+import { toArray, toRecord } from './core/record';
 import { isNodeKind, parseAnchorRef, type AnchorKind, type AnchorRef } from './ref';
-import { parseByteSpan, spanContains, spansAscending, utf8ByteLength, type ByteSpan } from './span';
+import {
+  parseByteSpan,
+  spanContains,
+  spansAscending,
+  utf8ByteLength,
+  type ByteSpan,
+} from './core/span';
 
 export type AttributeValue =
   | { readonly type: 'string'; readonly value: string }

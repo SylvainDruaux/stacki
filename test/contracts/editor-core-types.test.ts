@@ -12,7 +12,7 @@ import {
   type ByteOffset,
   type Digest,
   type IntentId,
-} from '#dist/shared/brand.js';
+} from '#dist/shared/core/brand.js';
 import type { Capability } from '#dist/shared/capability.js';
 import type { ByteDiff, DiffOutcome } from '#dist/shared/diff.js';
 import type { Outcome, RejectionReason, SubmissionResult } from '#dist/shared/intent.js';
@@ -21,7 +21,7 @@ import type { Plan, PlanningBase } from '#dist/shared/planner.js';
 import type { AnchorRef } from '#dist/shared/ref.js';
 import type { Snapshot } from '#dist/shared/snapshot.js';
 import type { Projection } from '#dist/shared/source-projection.js';
-import { utf16ToByteOffsets, type ByteSpan, type Utf16Span } from '#dist/shared/span.js';
+import { utf16ToByteOffsets, type ByteSpan, type Utf16Span } from '#dist/shared/core/span.js';
 
 function byteOnly(offset: ByteOffset): ByteOffset {
   return offset;

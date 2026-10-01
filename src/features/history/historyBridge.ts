@@ -4,10 +4,10 @@ import type {
   WireFileKind,
   WireWorktreeInfo,
 } from '../../../shared/ipc-results';
-import type { Parser } from '../../../shared/boundary';
-import { boolean, list, optional, pathText, record, text } from '../../../shared/boundary';
+import type { Parser } from '../../../shared/core/boundary';
+import { boolean, list, optional, pathText, record, text } from '../../../shared/core/boundary';
 import { parseIpcPayload } from '../../../shared/ipc-payloads';
-import type { Result } from '../../../shared/result';
+import type { Result } from '../../../shared/core/result';
 import { cleanError } from '../../lib/cleanError';
 
 export type HistoryFile = IpcResults['git:allFiles'][number];

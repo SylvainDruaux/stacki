@@ -20,14 +20,14 @@
 // checks every witness against the current bytes, so a rebased set-attribute
 // replaces whatever the actor's own previous commit left there — the user's
 // latest word on that attribute.
-import { assert } from './assert';
+import { assert } from './core/assert';
 import { toIntent, type Intent, type Operation, type RejectionReason } from './intent';
-import { LIMITS } from './limits';
+import { LIMITS } from './core/limits';
 import type { Splice } from './planner';
 import { isNodeKind, toAnchorRef, type AnchorRef } from './ref';
-import { err, ok, type Result } from './result';
+import { err, ok, type Result } from './core/result';
 import type { Snapshot } from './snapshot';
-import { toByteSpan, toByteString, type ByteSpan } from './span';
+import { toByteSpan, toByteString, type ByteSpan } from './core/span';
 import { orderedSplices } from './splice';
 
 /** One commit an actor made: the bytes it started from, the bytes it left,

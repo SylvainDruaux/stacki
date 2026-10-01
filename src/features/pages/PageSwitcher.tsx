@@ -2,8 +2,8 @@ import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { RefObject } from 'react';
 import { comparePageNames, isCollectionRoute } from './pageOrder';
 import { FileIcon, CollectionIcon, ChevronDownIcon, CheckIcon } from '../../ui/Icons';
-import { assert } from '../../../shared/assert';
-import { LIMITS } from '../../../shared/limits';
+import { assert } from '../../../shared/core/assert';
+import { LIMITS } from '../../../shared/core/limits';
 
 interface Page {
   readonly name: string;

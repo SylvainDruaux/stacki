@@ -1,6 +1,6 @@
 // Main-process state is owned here; mutable fields never cross IPC by reference.
 import type { ChildProcess } from 'child_process';
-import type { Data } from '../../shared/boundary';
+import type { Data } from '../../shared/core/boundary';
 
 export interface RecentProject {
   readonly path: string;

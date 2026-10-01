@@ -3,12 +3,12 @@
 // parent, and the expected kind says what must be found there. Resolution
 // happens at use time against current bytes; nothing here is an identity that
 // survives between snapshots, and an ambiguous resolution is a rejection.
-import { assert } from './assert';
-import type { Brand } from './brand';
-import { LIMITS } from './limits';
+import { assert } from './core/assert';
+import type { Brand } from './core/brand';
+import { LIMITS } from './core/limits';
 import type { PageNode } from './page-node';
-import { toRecord, toArray } from './record';
-import { parseByteSpan, type ByteSpan } from './span';
+import { toRecord, toArray } from './core/record';
+import { parseByteSpan, type ByteSpan } from './core/span';
 
 export const NODE_KINDS = [
   'component',

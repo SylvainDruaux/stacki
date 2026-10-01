@@ -1,6 +1,6 @@
 import React, { useRef, useState } from 'react';
-import { assert } from '../../shared/assert';
-import { BOUNDARY_LIMITS } from '../../shared/boundary';
+import { assert } from '../../shared/core/assert';
+import { BOUNDARY_LIMITS } from '../../shared/core/boundary';
 import { FileIcon, CodeIcon } from './Icons';
 
 export const IMAGE_EXT = /\.(png|jpe?g|gif|webp|avif|svg|ico|bmp)$/i;

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { Data } from '../../../shared/boundary';
+import type { Data } from '../../../shared/core/boundary';
 import type { IpcResults, WireValidationIssue } from '../../../shared/ipc-results';
 import { collectionFields, describeField, editsBetween, labelize } from './contentSchema';
 import type { FieldDescriptor } from './contentSchema';

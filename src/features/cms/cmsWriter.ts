@@ -1,8 +1,8 @@
 import type { Collection } from './cmsSchema';
 import { reassemble } from './cmsSchema';
 import { writeCms } from './cmsBridge';
-import { assert } from '../../../shared/assert';
-import { BOUNDARY_LIMITS } from '../../../shared/boundary';
+import { assert } from '../../../shared/core/assert';
+import { BOUNDARY_LIMITS } from '../../../shared/core/boundary';
 import { createCoalescedRun } from '../../lib/coalescedRun';
 
 export interface CmsUndo {

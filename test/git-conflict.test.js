@@ -8,7 +8,7 @@ const path = require('node:path');
 const { buildSync } = require('esbuild');
 const { JSDOM } = require('jsdom');
 const load = require('./helpers/rendererModule');
-const { BOUNDARY_LIMITS } = require('#dist/shared/boundary.js');
+const { BOUNDARY_LIMITS } = require('#dist/shared/core/boundary.js');
 const { parseMergeResult, parseConflictPart } = load('src/features/git/gitBridge.ts');
 const { initialConflictPicks, choicesForSend, conflictHunks } = load(
   'src/features/git/gitConflictModel.ts',

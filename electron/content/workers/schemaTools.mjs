@@ -2,7 +2,7 @@ import { createRequire } from 'node:module';
 import { z } from 'astro/zod';
 
 const META = Symbol.for('stacki.astro.schema-meta');
-// This file is copied alone into the project to run there, so it cannot import shared/limits.
+// This file is copied alone into the project to run there, so it cannot import shared/core/limits.
 // A chain of refinements is written by hand, one call per rule; 64 is far past any real one.
 const SCHEMA_LIMITS = { effectsDepthMax: 64 };
 export const definitionOf = (schema) => schema?._zod?.def || schema?._def || undefined;

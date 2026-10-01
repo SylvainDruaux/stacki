@@ -6,7 +6,7 @@
 // stub localStorage, including one whose read throws.
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { BOUNDARY_LIMITS } = require('#dist/shared/boundary.js');
+const { BOUNDARY_LIMITS } = require('#dist/shared/core/boundary.js');
 const { parseStoredEmbedSource, loadEmbedSource } = require('./helpers/rendererModule')(
   'src/features/style/model/toolPreferences.ts',
 );

@@ -25,14 +25,14 @@ import {
   type PageDiskRead,
 } from '#dist/shared/page-save.js';
 import { parsePageNode, type PageNode } from '#dist/shared/page-node.js';
-import { toUtf16Span } from '#dist/shared/span.js';
+import { toUtf16Span } from '#dist/shared/core/span.js';
 
 // Null as a boundary receives it, parsed from JSON: inputs may hold it; our values never do.
 const jsonNull: unknown = JSON.parse('null');
 
 const sha256 = (bytes: string | Buffer): string => createHash('sha256').update(bytes).digest('hex');
 const DIGEST = 'a'.repeat(64);
-// A node a gesture created: the renderer's own handle (shared/brand.ts).
+// A node a gesture created: the renderer's own handle (shared/core/brand.ts).
 const GESTURE_ID = `g${'1'.repeat(32)}`;
 const REF = { path: [0], kind: 'element', span: { start: 0, end: 4 } };
 

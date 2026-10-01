@@ -1,5 +1,5 @@
-import type { Result } from '../../../shared/result';
-import type { Parser } from '../../../shared/boundary';
+import type { Result } from '../../../shared/core/result';
+import type { Parser } from '../../../shared/core/boundary';
 import type { DeclaredTypes } from './cmsTypes';
 import {
   boolean,
@@ -10,7 +10,7 @@ import {
   pathText,
   record,
   text,
-} from '../../../shared/boundary';
+} from '../../../shared/core/boundary';
 import { parseIpcPayload } from '../../../shared/ipc-payloads';
 import { cleanError } from '../../lib/cleanError';
 import { parseDeclaredTypes } from './cmsTypes';

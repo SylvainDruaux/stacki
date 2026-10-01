@@ -21,9 +21,9 @@ import { readFrontmatter, writeFrontmatter } from '../frontmatter';
 import type { FrontmatterModel, ImportMember } from '../frontmatter';
 import { assertTreeInvariants } from '../../shared/page-node';
 import type { Attr, AttrSpan } from '../../shared/page-node';
-import { toUtf16Span } from '../../shared/span';
-import { assert } from '../../shared/assert';
-import { LIMITS } from '../../shared/limits';
+import { toUtf16Span } from '../../shared/core/span';
+import { assert } from '../../shared/core/assert';
+import { LIMITS } from '../../shared/core/limits';
 import type {
   ParserNode,
   MapNode,

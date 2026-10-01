@@ -2,9 +2,9 @@
 // bounding source/DOM traversal. DOM reads produce fresh nodes without source IDs.
 import { BIND_PATH_RE } from '../../editor/bindings';
 import type { Attr } from '../../../shared/page-node';
-import { assert } from '../../../shared/assert';
+import { assert } from '../../../shared/core/assert';
 import { textValueCanonical } from '../../../shared/htmlText';
-import { LIMITS } from '../../../shared/limits';
+import { LIMITS } from '../../../shared/core/limits';
 
 export interface InlineCandidate {
   readonly kind: string;

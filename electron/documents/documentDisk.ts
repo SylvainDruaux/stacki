@@ -20,8 +20,8 @@ import { randomUUID } from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { assert } from '../../shared/assert';
-import { toFilePath, type FilePath } from '../../shared/brand';
+import { assert } from '../../shared/core/assert';
+import { toFilePath, type FilePath } from '../../shared/core/brand';
 import type {
   DiskError,
   DiskLock,
@@ -35,15 +35,15 @@ import { parsePageResult } from '../../shared/page-node';
 import { parseMarkdownPage } from '../parse/markdownParser';
 import type { Plan } from '../../shared/planner';
 import { projectValueSplice } from '../../shared/projection-patch';
-import { toRecord } from '../../shared/record';
-import { err, ok, type Result } from '../../shared/result';
+import { toRecord } from '../../shared/core/record';
+import { err, ok, type Result } from '../../shared/core/result';
 import { createLazySnapshot, createSnapshot, type Snapshot } from '../../shared/snapshot';
 import {
   projectOpaqueDocument,
   projectPage,
   type Projection,
 } from '../../shared/source-projection';
-import { decodeUtf8, toByteString, type ByteString } from '../../shared/span';
+import { decodeUtf8, toByteString, type ByteString } from '../../shared/core/span';
 import { parsePage } from '../parse/astroParser';
 import {
   createFileExclusive,

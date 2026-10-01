@@ -9,7 +9,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { countOccurrences } from '#dist/shared/byteSearch.js';
-import { encodeUtf8, toByteString, type ByteString } from '#dist/shared/span.js';
+import { encodeUtf8, toByteString, type ByteString } from '#dist/shared/core/span.js';
 import { Prng } from './prng.ts';
 
 const count = (haystack: string, needle: string, countMax = 1_000) =>

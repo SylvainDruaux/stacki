@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 
-import { toArray } from '../../shared/record';
+import { toArray } from '../../shared/core/record';
 import { writeProjectText } from '../documents/documentWrites';
 import { parseConflict, renderResolved } from './conflicts';
 import type { ConflictPart } from './conflicts';

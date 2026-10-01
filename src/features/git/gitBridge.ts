@@ -11,7 +11,7 @@ import {
   optional,
   record,
   text,
-} from '../../../shared/boundary';
+} from '../../../shared/core/boundary';
 import type { IpcPayloads } from '../../../shared/ipc-payloads';
 import type {
   WireMergeOutcome,

@@ -5,7 +5,7 @@ import * as path from 'node:path';
 import * as vm from 'node:vm';
 import { createRequire } from 'node:module';
 import { EventEmitter } from 'node:events';
-import { toRecord } from '#dist/shared/record.js';
+import { toRecord } from '#dist/shared/core/record.js';
 
 export interface MainHarness {
   readonly handlers: ReadonlyMap<string, (event: unknown, input?: unknown) => unknown>;

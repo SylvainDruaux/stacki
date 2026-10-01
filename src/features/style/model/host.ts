@@ -6,8 +6,8 @@
 // answers the panel's questions from it. One panel, one selection, so a
 // module-level record is enough.
 
-import { assert } from '../../../../shared/assert';
-import { LIMITS } from '../../../../shared/limits';
+import { assert } from '../../../../shared/core/assert';
+import { LIMITS } from '../../../../shared/core/limits';
 
 type HostAttr = { readonly type: string; readonly value?: string };
 

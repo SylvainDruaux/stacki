@@ -40,8 +40,8 @@ import {
   type PreviewStamp,
   type StampedFileState,
 } from '#dist/shared/preview-token.js';
-import { toDigest } from '#dist/shared/brand.js';
-import { LIMITS } from '#dist/shared/limits.js';
+import { toDigest } from '#dist/shared/core/brand.js';
+import { LIMITS } from '#dist/shared/core/limits.js';
 
 // Null as a boundary receives it, parsed from JSON: inputs may hold it; our values never do.
 const jsonNull: unknown = JSON.parse('null');
@@ -353,7 +353,7 @@ test('markers live in memory only; the token follows the rendering chain', async
           }) +
           ');\n',
       ),
-      'the served patcher opens with the bounds from shared/limits.ts',
+      'the served patcher opens with the bounds from shared/core/limits.ts',
     );
     const load = (rel: string): string => {
       const code = plugin.load(`${root}/${rel}`);

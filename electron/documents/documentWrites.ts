@@ -9,8 +9,8 @@
 // host holds no intent: hosts run each intent to its outcome synchronously, so
 // a replaced host has nothing in flight, and the lock file and the re-read
 // under it (documentDisk.ts) still serialize any two actors of one file.
-import { assert } from '../../shared/assert';
-import type { Digest } from '../../shared/brand';
+import { assert } from '../../shared/core/assert';
+import type { Digest } from '../../shared/core/brand';
 import { createNodeDocumentActors, type DocumentActors, type WriteReport } from './documentActors';
 
 interface DocumentHost {

@@ -9,8 +9,8 @@
 // them (an editor, git), and a cooperating writer (another Stacki) is modelled
 // by holding the next lock attempt. A crashed actor's lock is broken by the
 // world, as the real disk breaks a lock whose owner process is gone.
-import { assert } from '#dist/shared/assert.js';
-import type { FilePath } from '#dist/shared/brand.js';
+import { assert } from '#dist/shared/core/assert.js';
+import type { FilePath } from '#dist/shared/core/brand.js';
 import type {
   DiskError,
   DiskLock,
@@ -19,8 +19,8 @@ import type {
   LockError,
   ReplaceError,
 } from '#dist/shared/documentActor.js';
-import { err, ok, type Result } from '#dist/shared/result.js';
-import { toByteString, type ByteString } from '#dist/shared/span.js';
+import { err, ok, type Result } from '#dist/shared/core/result.js';
+import { toByteString, type ByteString } from '#dist/shared/core/span.js';
 
 export type { DiskRead, DocumentDisk };
 

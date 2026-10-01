@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import type { Item } from './arrayValue';
-import { assert } from '../../../shared/assert';
-import { LIMITS } from '../../../shared/limits';
+import { assert } from '../../../shared/core/assert';
+import { LIMITS } from '../../../shared/core/limits';
 import { PlusIcon, CloseIcon } from '../../ui/Icons';
 import ListFieldRow from '../../ui/ListFieldRow';
 import { allowDragEffect } from '../../editor/dragState';

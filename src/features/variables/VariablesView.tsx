@@ -7,9 +7,9 @@ import type {
 } from './variablesBridge';
 import type { WireColumn } from '../../../shared/ipc-results';
 import type { VariableSlot, VariableRename } from './variableRows';
-import { assert } from '../../../shared/assert';
-import { LIMITS } from '../../../shared/limits';
-import { definedFields } from '../../../shared/boundary';
+import { assert } from '../../../shared/core/assert';
+import { LIMITS } from '../../../shared/core/limits';
+import { definedFields } from '../../../shared/core/boundary';
 import { variableEdit as bridge } from '../../ipc/variableEditBridge';
 import { createVariableHistory, type VariableUndo } from './variableHistory';
 import { createVariableRefresh } from './variableRefresh';

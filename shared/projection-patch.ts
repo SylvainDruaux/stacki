@@ -52,11 +52,17 @@
 // This is an argument, not a proof. The brute-force reference — a full reparse
 // deep-equal to every patched projection — runs on every applied intent in the
 // simulator and on the large fixtures (test/simulator/projection-patch.test.ts).
-import { assert } from './assert';
-import { LIMITS } from './limits';
+import { assert } from './core/assert';
+import { LIMITS } from './core/limits';
 import type { Splice } from './planner';
 import type { ProjectedAttribute, ProjectedNode, Projection } from './source-projection';
-import { byteStringsEqual, toByteSpan, toByteString, type ByteSpan, type ByteString } from './span';
+import {
+  byteStringsEqual,
+  toByteSpan,
+  toByteString,
+  type ByteSpan,
+  type ByteString,
+} from './core/span';
 
 type ValidProjection = Extract<Projection, { tag: 'valid' }>;
 

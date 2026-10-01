@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
 import type { IpcResults } from '../../../shared/ipc-results';
-import type { Result } from '../../../shared/result';
-import { boolean, optional, record, text } from '../../../shared/boundary';
+import type { Result } from '../../../shared/core/result';
+import { boolean, optional, record, text } from '../../../shared/core/boundary';
 import { parseIpcPayload } from '../../../shared/ipc-payloads';
-import { assert } from '../../../shared/assert';
+import { assert } from '../../../shared/core/assert';
 import { cleanError } from '../../lib/cleanError';
 
 type GitHubStatus = IpcResults['git:ghStatus'];

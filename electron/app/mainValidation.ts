@@ -12,9 +12,9 @@ import {
   pathText,
   record,
   text,
-} from '../../shared/boundary';
-import { toRecord } from '../../shared/record';
-import type { Data } from '../../shared/boundary';
+} from '../../shared/core/boundary';
+import { toRecord } from '../../shared/core/record';
+import type { Data } from '../../shared/core/boundary';
 import type { ContentCollection } from '../content/contentEntries';
 import type { DynamicEntry } from './mainTypes';
 

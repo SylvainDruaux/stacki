@@ -11,7 +11,7 @@ import {
   serializePageMarked,
 } from '#dist/electron/parse/astroParser.js';
 import { assertTreeInvariants, parsePageNode, parsePageResult } from '#dist/shared/page-node.js';
-import { LIMITS } from '#dist/shared/limits.js';
+import { LIMITS } from '#dist/shared/core/limits.js';
 import type { ParserNode } from '#dist/electron/parse/astroParserTypes.js';
 
 // Null as a boundary receives it, parsed from JSON: inputs may hold it; our values never do.

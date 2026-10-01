@@ -17,7 +17,7 @@
 // compared: they still take the legacy path in the app. Byte-identical
 // results are counted and reported; a model difference fails.
 const assert = require('node:assert/strict');
-const { LIMITS } = require('#dist/shared/limits.js');
+const { LIMITS } = require('#dist/shared/core/limits.js');
 const { test } = require('node:test');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -25,14 +25,14 @@ const crypto = require('node:crypto');
 const esbuild = require('esbuild');
 const { parsePage, serializePage } = require('#dist/electron/parse/astroParser.js');
 const { buildEditIntent } = require('#dist/electron/documents/editRequests.js');
-const { toDigest, toFilePath, toIntentId } = require('#dist/shared/brand.js');
+const { toDigest, toFilePath, toIntentId } = require('#dist/shared/core/brand.js');
 const { toIntent } = require('#dist/shared/intent.js');
 const { parsePageResult } = require('#dist/shared/page-node.js');
 const { planIntent } = require('#dist/shared/planner.js');
 const { rebaseIntent, minimalSplices } = require('#dist/shared/rebase.js');
 const { createSnapshot } = require('#dist/shared/snapshot.js');
 const { projectPage } = require('#dist/shared/source-projection.js');
-const { decodeUtf8, encodeUtf8 } = require('#dist/shared/span.js');
+const { decodeUtf8, encodeUtf8 } = require('#dist/shared/core/span.js');
 const { applySplices } = require('#dist/shared/splice.js');
 const { repoPath } = require('./helpers/sources.js');
 

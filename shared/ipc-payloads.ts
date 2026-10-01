@@ -15,9 +15,9 @@ import {
   dictionary,
   data,
   digest,
-} from './boundary';
-import type { Parsed } from './boundary';
-import { toArray } from './record';
+} from './core/boundary';
+import type { Parsed } from './core/boundary';
+import { toArray } from './core/record';
 
 const nothing = (input: unknown): undefined => {
   if (input !== undefined) {

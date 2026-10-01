@@ -5,7 +5,7 @@
 // into a full page reload — which drops the open project and lands you back on
 // the dashboard mid-edit.
 
-import { toRecord } from '../../shared/record';
+import { toRecord } from '../../shared/core/record';
 
 export function cleanError(error: unknown): string {
   const record = toRecord(error);

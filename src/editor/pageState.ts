@@ -1,8 +1,8 @@
 // The open page as the editor holds it: which file is open, and its state —
 // an editable model with the origin its edits are stated against, or the raw
 // source of a page the visual model cannot hold.
-import type { Digest } from '../../shared/brand';
-import { LIMITS } from '../../shared/limits';
+import type { Digest } from '../../shared/core/brand';
+import { LIMITS } from '../../shared/core/limits';
 import type { ParsePageResult } from '../../shared/page-node';
 import { carryHandles, randomSeed, seedOf } from './nodeHandles';
 import type { PageOrigin } from './pageEdits';

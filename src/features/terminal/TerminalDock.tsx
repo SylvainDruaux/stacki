@@ -5,7 +5,7 @@ import type {
   PointerEvent as ReactPointerEvent,
   SetStateAction,
 } from 'react';
-import { assert } from '../../../shared/assert';
+import { assert } from '../../../shared/core/assert';
 import Dropdown from '../../ui/Dropdown';
 import type { DropdownOption } from '../../ui/Dropdown';
 import { ChevronDownIcon, CloseIcon, PlusIcon } from '../../ui/Icons';

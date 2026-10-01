@@ -17,7 +17,7 @@ import {
   REJECTION_REASONS,
   type OperationTag,
 } from '#dist/shared/intent.js';
-import { LIMITS } from '#dist/shared/limits.js';
+import { LIMITS } from '#dist/shared/core/limits.js';
 import { parseAnchorRef, STRUCTURAL_PATH_STEPS_MAX } from '#dist/shared/ref.js';
 
 // Null as a boundary receives it, parsed from JSON: inputs may hold it; our values never do.

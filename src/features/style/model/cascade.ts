@@ -15,7 +15,7 @@ import {
   type MatchTarget,
 } from './selectors';
 import type { ParsedRule, SelectorInfo, Specificity } from './styleTypes';
-import { assert } from '../../../../shared/assert';
+import { assert } from '../../../../shared/core/assert';
 
 export type RuleKind = 'base' | 'pseudo-class' | 'pseudo-element' | 'at-rule';
 

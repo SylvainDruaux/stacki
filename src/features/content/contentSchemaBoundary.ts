@@ -10,7 +10,7 @@ import {
   object,
   optional,
   text,
-} from '../../../shared/boundary';
+} from '../../../shared/core/boundary';
 import type { ContentSchema } from './contentSchemaTypes';
 
 const finite = (input: unknown): number => {

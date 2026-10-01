@@ -9,13 +9,13 @@
 // a gesture created, from that gesture's own prediction (src/editor/nodeHandles.ts).
 // When nothing more is queued, the page shows the reply itself: clean, and
 // every node the user was looking at under the handle it had.
-import { assert } from '../../shared/assert';
-import { LIMITS } from '../../shared/limits';
-import type { Digest } from '../../shared/brand';
+import { assert } from '../../shared/core/assert';
+import { LIMITS } from '../../shared/core/limits';
+import type { Digest } from '../../shared/core/brand';
 import type { EditRequest } from '../../shared/edit-request';
 import { describeRejection, type RejectionReason } from '../../shared/intent';
 import type { PageDiskRead, PageEditError, PageEdited } from '../../shared/page-save';
-import type { Result } from '../../shared/result';
+import type { Result } from '../../shared/core/result';
 import {
   carriedParse,
   toEditorPageState,

@@ -1,4 +1,4 @@
-import type { Data } from '../../shared/boundary';
+import type { Data } from '../../shared/core/boundary';
 import type {
   IpcResults,
   WireDataRecord,
@@ -16,7 +16,7 @@ import {
   pathText,
   record,
   text,
-} from '../../shared/boundary';
+} from '../../shared/core/boundary';
 import { parseIpcPayload } from '../../shared/ipc-payloads';
 import { parseOkResult } from '../../shared/ipc';
 import type { EditRequest } from '../../shared/edit-request';
@@ -26,7 +26,7 @@ import {
   type PreviewRender,
   type PreviewVerdict,
 } from '../../shared/preview-token';
-import type { Result } from '../../shared/result';
+import type { Result } from '../../shared/core/result';
 
 export interface PageChangeEvent {
   readonly external: boolean;

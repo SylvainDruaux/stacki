@@ -11,7 +11,7 @@ import type { ProjectVariable } from './model/webflow';
 import { selectorsMatch, type ResolvedProp } from './model/resolved';
 import { getHost } from './model/host';
 import { getModifiers, onModifiers, setModifiers } from '../../editor/heldModifiers';
-import { assert } from '../../../shared/assert';
+import { assert } from '../../../shared/core/assert';
 
 // Shared "spacing box" primitives: Webflow's masked-SVG frame with draggable side
 // handles, click-to-edit value labels, and a popover editor. Used by SpacingSection

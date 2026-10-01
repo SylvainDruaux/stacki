@@ -7,7 +7,7 @@
 // nesting to track, so a regex tokeniser and the browser's own caret are
 // enough, and the field stays a contentEditable that chips can live inside.
 
-import { LIMITS } from '../../../../shared/limits';
+import { LIMITS } from '../../../../shared/core/limits';
 
 /** One coloured run of the value. `text` is raw (unescaped) source. */
 export type CssToken = { kind: string; text: string };

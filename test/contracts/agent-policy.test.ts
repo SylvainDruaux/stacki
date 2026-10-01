@@ -99,7 +99,7 @@ test('edits to the files that define the gates ask a human', () => {
     '.codex/hooks.json',
     '.pi/extensions/stacki-policy/index.ts',
     '.github/workflows/check.yml',
-    'shared/limits.ts',
+    'shared/core/limits.ts',
     // The bounds stay protected in a shared/ area folder, where the restructure moves them.
     'shared/core/limits.ts',
   ];

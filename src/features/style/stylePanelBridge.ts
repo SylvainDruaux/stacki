@@ -1,5 +1,5 @@
-import type { Result } from '../../../shared/result';
-import { count, list, object, pathText, text } from '../../../shared/boundary';
+import type { Result } from '../../../shared/core/result';
+import { count, list, object, pathText, text } from '../../../shared/core/boundary';
 import { parseIpcPayload } from '../../../shared/ipc-payloads';
 import { cleanError } from '../../lib/cleanError';
 

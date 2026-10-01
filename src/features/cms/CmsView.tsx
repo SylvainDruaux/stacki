@@ -3,9 +3,9 @@ import type { PickedAsset } from '../../ui/AssetField';
 import type { CmsUndo } from './cmsWriter';
 import type { CmsSnapshot } from './cmsReader';
 import type { DeclaredTypes } from './cmsTypes';
-import { assert } from '../../../shared/assert';
-import { BOUNDARY_LIMITS } from '../../../shared/boundary';
-import { toRecord } from '../../../shared/record';
+import { assert } from '../../../shared/core/assert';
+import { BOUNDARY_LIMITS } from '../../../shared/core/boundary';
+import { toRecord } from '../../../shared/core/record';
 import { importCmsAsset, writeCmsMeta } from './cmsBridge';
 import { confirmDialog } from '../../ui/ConfirmDialog';
 import {

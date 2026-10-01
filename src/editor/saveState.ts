@@ -6,8 +6,8 @@
 //
 // Transitions are pure and total over the states they accept; a transition
 // asked of a state it does not apply to is a programmer error and asserts.
-import { assert } from '../../shared/assert';
-import type { Digest } from '../../shared/brand';
+import { assert } from '../../shared/core/assert';
+import type { Digest } from '../../shared/core/brand';
 
 export type SaveState =
   | { readonly tag: 'clean'; readonly checksum: Digest }

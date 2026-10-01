@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 
-import { toRecord, toArray } from '../../shared/record';
+import { toRecord, toArray } from '../../shared/core/record';
 import { MAIN_LIMITS } from '../lib/mainLimits';
 
 // Finds the files that import a JSON collection, and rewrites them to stop:

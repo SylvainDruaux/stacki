@@ -1,5 +1,5 @@
 import { useRef } from 'react';
-import { assert } from '../../../shared/assert';
+import { assert } from '../../../shared/core/assert';
 import { PROPERTY_LIMITS } from '../../../shared/component-properties';
 import type { PropertyOptionRename } from '../../../shared/component-properties';
 import { arrayItems, arrayText, moveItem } from '../props/arrayValue';

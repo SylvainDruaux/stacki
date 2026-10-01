@@ -18,8 +18,8 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { test } from 'node:test';
 import { parsePage } from '#dist/electron/parse/astroParser.js';
-import { toFilePath } from '#dist/shared/brand.js';
-import { LIMITS } from '#dist/shared/limits.js';
+import { toFilePath } from '#dist/shared/core/brand.js';
+import { LIMITS } from '#dist/shared/core/limits.js';
 import type { Splice } from '#dist/shared/planner.js';
 import {
   hostContext,
@@ -34,7 +34,7 @@ import {
   toByteString,
   type ByteSpan,
   type ByteString,
-} from '#dist/shared/span.js';
+} from '#dist/shared/core/span.js';
 import { patchCounts } from './candidate.ts';
 import { Prng } from './prng.ts';
 import { loadSimulationFixtures } from './fixtures.entry.ts';

@@ -1,4 +1,4 @@
-import { assert } from '../../../shared/assert';
+import { assert } from '../../../shared/core/assert';
 import { PROPERTY_LIMITS } from '../../../shared/component-properties';
 import { DragIcon } from '../../ui/Icons';
 

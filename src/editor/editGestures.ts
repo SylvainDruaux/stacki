@@ -6,11 +6,11 @@
 // readonly, src/editor/pageView.ts). A gesture with no request against the origin is
 // refused up front or, once sent, taken back with a notice — never saved some
 // other way (src/editor/pageSender.ts).
-import { assert } from '../../shared/assert';
+import { assert } from '../../shared/core/assert';
 import type { EditorModel, EditorNode } from './pageView';
 import type { Edit, NodeRef } from '../../shared/edit-request';
 import { singleDeclarationChange } from '../../shared/inlineStyle';
-import { LIMITS } from '../../shared/limits';
+import { LIMITS } from '../../shared/core/limits';
 import type { Attr } from '../../shared/page-node';
 import { renamedAttr } from './attrOrder';
 import { loopVarsAt, parseLoopHead, renamedLoopVar, strippedBindings } from './loopBindings';

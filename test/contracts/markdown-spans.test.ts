@@ -26,11 +26,11 @@ import {
   printMarkdownNode,
   serializeMarkdownPage,
 } from '#dist/electron/parse/markdownParser.js';
-import { LIMITS } from '#dist/shared/limits.js';
+import { LIMITS } from '#dist/shared/core/limits.js';
 import { markdownPrefix } from '#dist/shared/markdownLayout.js';
 import { parsePageResult, type PageModel, type PageNode } from '#dist/shared/page-node.js';
 import { projectPage, type ProjectedNode } from '#dist/shared/source-projection.js';
-import { encodeUtf8, type ByteString } from '#dist/shared/span.js';
+import { encodeUtf8, type ByteString } from '#dist/shared/core/span.js';
 import { generatedMarkdown, type MarkdownDocument } from '../helpers/markdownCorpus.ts';
 
 const DIRECTORIES = ['test/fixtures/round-trip', 'test/fixtures/editor-core', 'test/corpus'];

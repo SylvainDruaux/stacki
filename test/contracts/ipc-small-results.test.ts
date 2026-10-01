@@ -12,7 +12,7 @@ import {
   parseSymbolReadResult,
   parseTextResult,
 } from '#dist/shared/ipc.js';
-import { BOUNDARY_LIMITS } from '#dist/shared/boundary.js';
+import { BOUNDARY_LIMITS } from '#dist/shared/core/boundary.js';
 
 // Null as a boundary receives it, parsed from JSON: inputs may hold it; our values never do.
 const jsonNull: unknown = JSON.parse('null');

@@ -2,8 +2,8 @@
 // Branch consequences never restrict the discriminator that can remove them.
 import type { Attr } from '../../../shared/page-node';
 import type { PropField, PropUnion, UnionBranch } from '../../../shared/prop-schema';
-import { assert } from '../../../shared/assert';
-import { LIMITS } from '../../../shared/limits';
+import { assert } from '../../../shared/core/assert';
+import { LIMITS } from '../../../shared/core/limits';
 
 export type FieldDefinition = Omit<PropField, 'optional'> & { readonly optional?: boolean };
 export type PropValues = Readonly<Record<string, Attr | undefined>>;

@@ -7,12 +7,12 @@
 // until their steps ship them.
 //
 // Pure (plan §5.2): snapshot and intent in, Result out. No disk, no clock.
-import { assert } from '#dist/shared/assert.js';
+import { assert } from '#dist/shared/core/assert.js';
 import { capabilityAcceptsVisualIntent } from '#dist/shared/capability.js';
 import type { Intent, RejectionReason } from '#dist/shared/intent.js';
-import { LIMITS } from '#dist/shared/limits.js';
+import { LIMITS } from '#dist/shared/core/limits.js';
 import type { AnchorRef, StructuralPath } from '#dist/shared/ref.js';
-import { err, ok, type Result } from '#dist/shared/result.js';
+import { err, ok, type Result } from '#dist/shared/core/result.js';
 import type { Snapshot } from '#dist/shared/snapshot.js';
 import type { ProjectedNode, Projection } from '#dist/shared/source-projection.js';
 import {
@@ -21,7 +21,7 @@ import {
   toByteString,
   type ByteSpan,
   type ByteString,
-} from '#dist/shared/span.js';
+} from '#dist/shared/core/span.js';
 import type { CandidatePolicy, Plan, PostKind } from '#dist/shared/planner.js';
 import type { Splice } from '#dist/shared/planner.js';
 

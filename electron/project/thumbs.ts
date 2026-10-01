@@ -3,7 +3,7 @@ import path from 'path';
 import crypto from 'crypto';
 import { BrowserWindow } from 'electron';
 
-import { toRecord } from '../../shared/record';
+import { toRecord } from '../../shared/core/record';
 
 // The picture of a project on the start screen.
 //

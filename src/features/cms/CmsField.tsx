@@ -1,10 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react';
-import type { Result } from '../../../shared/result';
+import type { Result } from '../../../shared/core/result';
 import type { FieldType } from './cmsSchema';
 import type { PickedAsset } from '../../ui/AssetField';
-import { assert } from '../../../shared/assert';
-import { BOUNDARY_LIMITS } from '../../../shared/boundary';
-import { toArray, toRecord } from '../../../shared/record';
+import { assert } from '../../../shared/core/assert';
+import { BOUNDARY_LIMITS } from '../../../shared/core/boundary';
+import { toArray, toRecord } from '../../../shared/core/record';
 import { blankItem, fieldsOf, isExpr, titleOf, EXPR_KEY } from './cmsSchema';
 import { ChevronRightIcon, CloseIcon, DragIcon, PlusIcon, TrashIcon } from '../../ui/Icons';
 import AssetField from '../../ui/AssetField';

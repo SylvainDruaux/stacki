@@ -2,7 +2,7 @@ import React, { useEffect, useLayoutEffect, useRef } from 'react';
 import { basicSetup, EditorView } from 'codemirror';
 import type { MutableRefObject } from 'react';
 import type { LanguageSupport } from '@codemirror/language';
-import { assert } from '../../shared/assert';
+import { assert } from '../../shared/core/assert';
 import { Annotation, EditorState, StateEffect, StateField, Transaction } from '@codemirror/state';
 import { Decoration } from '@codemirror/view';
 import { css } from '@codemirror/lang-css';

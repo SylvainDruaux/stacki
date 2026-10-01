@@ -281,7 +281,7 @@ const ENGINE_CONTRACTS = [
   'shared/ref.ts',
   'shared/snapshot.ts',
   'shared/source-projection.ts',
-  'shared/span.ts',
+  'shared/core/span.ts',
   'shared/splice.ts',
 ];
 
@@ -448,7 +448,7 @@ export default [
   {
     // The Result constructor pair is the canonical `ok`/`err` of AGENTS.md §3;
     // `err` means exactly that and nothing else anywhere in the tree.
-    files: ['shared/result.ts'],
+    files: ['shared/core/result.ts'],
     rules: { 'stacki/naming': ['error', { ...NAMING, allowedNames: ['err'] }] },
   },
   {

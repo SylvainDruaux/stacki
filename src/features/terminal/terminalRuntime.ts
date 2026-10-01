@@ -1,6 +1,6 @@
 import { FitAddon } from '@xterm/addon-fit';
 import { Terminal } from '@xterm/xterm';
-import { assert } from '../../../shared/assert';
+import { assert } from '../../../shared/core/assert';
 import {
   acknowledgeTerminalData,
   onTerminalData,

@@ -15,7 +15,7 @@
 // the parser will hand back unchanged. Every save echoes through the parser,
 // and an echo that differs from what the field emitted rewrites the field
 // mid-keystroke, sending the caret to the start of the line.
-import { assert } from './assert';
+import { assert } from './core/assert';
 
 // The named entities that turn up in hand-written markup. Not the full HTML
 // table — that is 2231 names, nearly all of them for characters nobody types —

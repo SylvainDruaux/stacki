@@ -23,14 +23,14 @@
 // The same case also holds the fast mapper to the brute-force reference on the
 // scenario's real bytes (plan §10), and checks that the planner's decision is
 // the one the mapping implies.
-import { assert } from '#dist/shared/assert.js';
+import { assert } from '#dist/shared/core/assert.js';
 import { DIFF_BUDGET } from '#dist/shared/diff.js';
 import type { Intent, RejectionReason } from '#dist/shared/intent.js';
 import { mapSpan, type SpanMapping } from '#dist/shared/mapSpan.js';
 import type { Plan } from '#dist/shared/planner.js';
 import type { Snapshot } from '#dist/shared/snapshot.js';
 import type { ProjectedNode, Projection } from '#dist/shared/source-projection.js';
-import { toByteSpan, type ByteSpan, type ByteString } from '#dist/shared/span.js';
+import { toByteSpan, type ByteSpan, type ByteString } from '#dist/shared/core/span.js';
 import { applySplices } from '#dist/shared/splice.js';
 import type { Splice } from '#dist/shared/planner.js';
 import { survivingSpan, type Origins } from './provenance.ts';

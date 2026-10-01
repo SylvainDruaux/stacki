@@ -7,7 +7,7 @@ const path = require('node:path');
 const fs = require('node:fs');
 const { buildSync } = require('esbuild');
 const { JSDOM } = require('jsdom');
-const { BOUNDARY_LIMITS } = require('#dist/shared/boundary.js');
+const { BOUNDARY_LIMITS } = require('#dist/shared/core/boundary.js');
 const { ROOT, repoPath } = require('./helpers/sources.js');
 const output = repoPath('node_modules/.stacki-test/cms-field.cjs');
 fs.mkdirSync(path.dirname(output), { recursive: true });

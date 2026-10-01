@@ -2,7 +2,7 @@
 // Fake postMessage avoids a browser; real promises expose cancellation and limits.
 const assert = require('node:assert/strict');
 const loadRenderer = require('./helpers/rendererModule.js');
-const { BOUNDARY_LIMITS } = require('#dist/shared/boundary.js');
+const { BOUNDARY_LIMITS } = require('#dist/shared/core/boundary.js');
 
 // A boundary can receive null — JSON, structured clone and postMessage all carry it —
 // so the negative space below includes it. It is read from JSON, because our own

@@ -8,9 +8,9 @@ import type { RichContext } from './RichContent';
 import type { BindInputHandle } from './BindInput';
 import type { ChipsOf, ExprInputAPI } from '../../ui/ExprInput';
 import type { PickerNode } from './DataPicker';
-import { assert } from '../../../shared/assert';
-import { LIMITS } from '../../../shared/limits';
-import { definedFields } from '../../../shared/boundary';
+import { assert } from '../../../shared/core/assert';
+import { LIMITS } from '../../../shared/core/limits';
+import { definedFields } from '../../../shared/core/boundary';
 import {
   dataTree,
   findDeclaration,

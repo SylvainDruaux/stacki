@@ -1,7 +1,7 @@
 // The application shell's own types: history, toasts, tabs, the project and
 // what the shell keeps about it. A page's state is src/editor/pageState.ts.
 import type { CSSProperties } from 'react';
-import type { Data } from '../../shared/boundary';
+import type { Data } from '../../shared/core/boundary';
 import type { IpcResults, WireGitInfo, WireInjectedRoute } from '../../shared/ipc-results';
 import type { ScanResult } from '../../shared/scan';
 import type { AssetRequest } from '../ui/assetPick';

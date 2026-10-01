@@ -1,6 +1,6 @@
-import type { Result } from '../../../shared/result';
+import type { Result } from '../../../shared/core/result';
 import type { PublishRequest } from './PublishModal';
-import { assert } from '../../../shared/assert';
+import { assert } from '../../../shared/core/assert';
 import { parseIpcPayload } from '../../../shared/ipc-payloads';
 import { commitGitChanges, createGitHubRepository, readGitInfo } from './gitChipBridge';
 

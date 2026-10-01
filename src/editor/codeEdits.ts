@@ -13,13 +13,13 @@
 // was sent (the merged outside edit). The typing since is then merged into the
 // reply's text before the next patch is diffed (`mergeTyping`), so the next
 // save never takes the merged edit back out.
-import { assert } from '../../shared/assert';
-import type { Digest } from '../../shared/brand';
+import { assert } from '../../shared/core/assert';
+import type { Digest } from '../../shared/core/brand';
 import { diffCodePatch, mergeTyping } from '../../shared/code-patch';
 import type { EditRequest } from '../../shared/edit-request';
 import { describeRejection, type RejectionReason, type SourceEdit } from '../../shared/intent';
 import type { PageDiskRead, PageEditError, PageEdited } from '../../shared/page-save';
-import type { Result } from '../../shared/result';
+import type { Result } from '../../shared/core/result';
 import type { CodeBaseline, EditDrafts } from './pageEdits';
 
 /** How one code save ended. */

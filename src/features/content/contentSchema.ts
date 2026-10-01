@@ -1,6 +1,6 @@
-import { assert } from '../../../shared/assert';
-import { BOUNDARY_LIMITS } from '../../../shared/boundary';
-import { toRecord } from '../../../shared/record';
+import { assert } from '../../../shared/core/assert';
+import { BOUNDARY_LIMITS } from '../../../shared/core/boundary';
+import { toRecord } from '../../../shared/core/record';
 import { parseContentSchema } from './contentSchemaBoundary';
 import type {
   ContentSchema,

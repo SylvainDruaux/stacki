@@ -21,10 +21,10 @@
 //
 // Pure: the hash is injected (the frame has only Web Crypto, main has
 // node:crypto), and main supplies the current checksums it read from disk.
-import { assert } from './assert';
-import { toDigest, type Digest } from './brand';
-import { LIMITS } from './limits';
-import { err, ok, type Result } from './result';
+import { assert } from './core/assert';
+import { toDigest, type Digest } from './core/brand';
+import { LIMITS } from './core/limits';
+import { err, ok, type Result } from './core/result';
 
 /** Comment data that opens a stamp. The node markers are `avb-s:` and `avb-e:`. */
 export const PREVIEW_STAMP_PREFIX = 'avb-d:';

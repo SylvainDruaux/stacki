@@ -2,7 +2,7 @@
 // editable records; their slots retain the code and whitespace between them.
 // No renderer or Node dependencies: this module is also loaded by Astro.
 
-import { assert } from '../shared/assert';
+import { assert } from '../shared/core/assert';
 
 import type { ImportMember, ImportSlot, FrontmatterLayout } from '../shared/frontmatter';
 export type { ImportMember, ImportSlot, FrontmatterLayout } from '../shared/frontmatter';

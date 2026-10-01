@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { assert } from '../../../shared/assert';
-import { LIMITS } from '../../../shared/limits';
+import { assert } from '../../../shared/core/assert';
+import { LIMITS } from '../../../shared/core/limits';
 import { HTML_TAGS } from '../../editor/elementSchemas';
 import { rankInsertItems } from './insertRank';
 import { ASTRO_ASSETS } from './astroAssets';

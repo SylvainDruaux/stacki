@@ -25,11 +25,11 @@
 // path, kind and range (src/editor/pageEdits.ts), and main checks those. Markdown and
 // MDX pages are carried the same way: since step 10 every node of theirs has
 // its source range too.
-import { assert } from '../../shared/assert';
-import { toNodeId, toUtf16Offset, type Digest } from '../../shared/brand';
+import { assert } from '../../shared/core/assert';
+import { toNodeId, toUtf16Offset, type Digest } from '../../shared/core/brand';
 import { DIFF_BUDGET, diffBytes } from '../../shared/diff';
 import type { SourceEdit } from '../../shared/intent';
-import { LIMITS } from '../../shared/limits';
+import { LIMITS } from '../../shared/core/limits';
 import { mapSpanThroughDiff } from '../../shared/mapSpan';
 import type { PageModel, PageNode } from '../../shared/page-node';
 import type { Splice } from '../../shared/planner';
@@ -42,7 +42,7 @@ import {
   utf16ToByteOffsets,
   type ByteSpan,
   type ByteString,
-} from '../../shared/span';
+} from '../../shared/core/span';
 import { applySplices, witnessesHold } from '../../shared/splice';
 
 /** A parse and the text it is a parse of: node ranges are UTF-16 offsets into it. */

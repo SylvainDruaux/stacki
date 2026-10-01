@@ -8,10 +8,10 @@
 // Invalid source is a first-class state, not an exception: the code editor and
 // external writers may leave a file that does not parse, and visual intents
 // then reject with `source-invalid` while the bytes stay in the snapshot.
-import { assert } from './assert';
-import { toUtf16Offset, type Utf16Offset } from './brand';
+import { assert } from './core/assert';
+import { toUtf16Offset, type Utf16Offset } from './core/brand';
 import type { Capability } from './capability';
-import { LIMITS } from './limits';
+import { LIMITS } from './core/limits';
 import type { Attr, AttrSpan, PageModel, PageNode, ParsePageResult } from './page-node';
 import { toChildIndex, type NodeKind, type StructuralPath } from './ref';
 import {
@@ -23,7 +23,7 @@ import {
   utf8ByteLength,
   type ByteSpan,
   type Utf16Span,
-} from './span';
+} from './core/span';
 
 export interface ProjectedAttribute {
   readonly name: string;

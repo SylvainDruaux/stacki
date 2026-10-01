@@ -1,7 +1,7 @@
 // One contract for all invoke channels. Payload parsers run in main before
 // side effects; result types are checked at registration. Rejected operating
 // errors keep Electron's existing Promise-rejection channel during migration.
-import { count, pathText, record, text } from './boundary';
+import { count, pathText, record, text } from './core/boundary';
 import type { IpcChannel, IpcPayloads } from './ipc-payloads';
 import type { IpcResults } from './ipc-results';
 export { parseIpcPayload, IPC_PAYLOADS } from './ipc-payloads';

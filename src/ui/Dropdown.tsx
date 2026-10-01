@@ -3,8 +3,8 @@ import type { KeyboardEvent, MutableRefObject, ReactNode, RefObject } from 'reac
 import { endDragNotes, hoverNote } from './sound';
 import { useSoundHere } from './soundScope';
 import { ChevronDownIcon, CheckIcon } from './Icons';
-import { assert } from '../../shared/assert';
-import { LIMITS } from '../../shared/limits';
+import { assert } from '../../shared/core/assert';
+import { LIMITS } from '../../shared/core/limits';
 
 export const POPUP_GAP = 4;
 const POPUP_EDGE = 8;

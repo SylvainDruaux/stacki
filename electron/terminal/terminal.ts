@@ -10,7 +10,7 @@ import type { PseudoTerminal, SpawnOptions } from 'node-pty';
 import { parseTerminalAck, parseTerminalInput } from '../../shared/ipc-payloads';
 import type { IpcPayloads } from '../../shared/ipc-payloads';
 import type { IpcResults } from '../../shared/ipc-results';
-import { toRecord } from '../../shared/record';
+import { toRecord } from '../../shared/core/record';
 import {
   isPathWithin,
   mergeToolPaths,

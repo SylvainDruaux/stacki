@@ -20,7 +20,7 @@ import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { test } from 'node:test';
-import { toFilePath, toIntentId } from '#dist/shared/brand.js';
+import { toFilePath, toIntentId } from '#dist/shared/core/brand.js';
 import { editInlineStyle, singleDeclarationChange } from '#dist/shared/inlineStyle.js';
 import { toIntent, type Intent, type Operation } from '#dist/shared/intent.js';
 import { renameSites } from '#dist/shared/loopScope.js';
@@ -28,7 +28,7 @@ import { planIntent, planIntentThroughDiff, type Plan } from '#dist/shared/plann
 import { toAnchorRef, type AnchorRef } from '#dist/shared/ref.js';
 import type { Snapshot } from '#dist/shared/snapshot.js';
 import type { ProjectedNode } from '#dist/shared/source-projection.js';
-import { decodeUtf8, encodeUtf8, toByteSpan } from '#dist/shared/span.js';
+import { decodeUtf8, encodeUtf8, toByteSpan } from '#dist/shared/core/span.js';
 import { applySplices, inverseEdits } from '#dist/shared/splice.js';
 import { anchorAt, oracleIntent, oracleSplices } from './oracle-intent.ts';
 import { ORACLE_SCENARIOS } from './oracles.ts';

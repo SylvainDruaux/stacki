@@ -4,10 +4,10 @@
 // function the same question — one classification, not a second opinion. A node
 // the engine would refuse says so beside its panels instead of looking
 // editable and saving some other way.
-import { assert } from '../../shared/assert';
+import { assert } from '../../shared/core/assert';
 import type { Capability } from '../../shared/capability';
 import type { EditorModel, EditorNode } from './pageView';
-import { LIMITS } from '../../shared/limits';
+import { LIMITS } from '../../shared/core/limits';
 import { classifyNode } from '../../shared/source-projection';
 
 /** The capability of node `nodeId` in `model`, or undefined when the model has

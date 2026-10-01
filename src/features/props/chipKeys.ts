@@ -1,4 +1,4 @@
-import { assert } from '../../../shared/assert';
+import { assert } from '../../../shared/core/assert';
 // Backspace or Delete beside a chip should take the chip — one press, the
 // whole thing, and nothing either side of it.
 //

@@ -7,8 +7,8 @@
 // compared with Buffer.byteLength of every prefix (slow and obviously right).
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { toByteOffset, toIntentId, toUtf16Offset } from '#dist/shared/brand.js';
-import { LIMITS } from '#dist/shared/limits.js';
+import { toByteOffset, toIntentId, toUtf16Offset } from '#dist/shared/core/brand.js';
+import { LIMITS } from '#dist/shared/core/limits.js';
 import {
   byteStringsEqual,
   decodeUtf8,
@@ -22,7 +22,7 @@ import {
   toUtf16Span,
   utf16ToByteOffsets,
   utf8ByteLength,
-} from '#dist/shared/span.js';
+} from '#dist/shared/core/span.js';
 
 // Null as a boundary receives it, parsed from JSON: inputs may hold it; our values never do.
 const jsonNull: unknown = JSON.parse('null');

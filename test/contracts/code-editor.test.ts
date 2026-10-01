@@ -20,9 +20,9 @@ import * as path from 'node:path';
 import { mainHarness } from '../helpers/mainHarness.ts';
 import { diffCodePatch, type CodeHunk } from '#dist/shared/code-patch.js';
 import { parseEditRequest, type Edit } from '#dist/shared/edit-request.js';
-import { LIMITS } from '#dist/shared/limits.js';
+import { LIMITS } from '#dist/shared/core/limits.js';
 import type { PageNode } from '#dist/shared/page-node.js';
-import { toByteSpan, toUtf16Span } from '#dist/shared/span.js';
+import { toByteSpan, toUtf16Span } from '#dist/shared/core/span.js';
 import {
   parsePageDiskRead,
   parsePageEditResult,

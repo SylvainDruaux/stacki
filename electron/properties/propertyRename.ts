@@ -4,10 +4,10 @@ import { parse } from '@astrojs/compiler/sync';
 import type { Node, AttributeNode } from '@astrojs/compiler/types';
 import ts from 'typescript';
 import { readPropertyContracts } from './propertyContracts';
-import { assert } from '../../shared/assert';
+import { assert } from '../../shared/core/assert';
 import { PROPERTY_LIMITS } from '../../shared/component-properties';
 import type { PropertyOptionRename } from '../../shared/component-properties';
-import { err, ok, type Result } from '../../shared/result';
+import { err, ok, type Result } from '../../shared/core/result';
 import {
   applySourceEdits,
   isAstroProps,

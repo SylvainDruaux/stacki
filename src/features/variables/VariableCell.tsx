@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import type { VariableCell } from './variablesBridge';
 import { VARIABLES_LIMITS } from './variablesBridge';
-import { assert } from '../../../shared/assert';
+import { assert } from '../../../shared/core/assert';
 import ColorSwatch from '../style/components/ColorSwatch';
 import VariableConnect, { connectCustomField } from '../style/VariableConnect';
 import EasingEditor, { MiniCurve } from '../style/EasingEditor';

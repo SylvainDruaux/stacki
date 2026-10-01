@@ -1,8 +1,8 @@
 import fs from 'fs';
 import path from 'path';
 
-import { LIMITS } from '../../shared/limits';
-import { toRecord, toArray } from '../../shared/record';
+import { LIMITS } from '../../shared/core/limits';
+import { toRecord, toArray } from '../../shared/core/record';
 import { MAIN_LIMITS } from '../lib/mainLimits';
 import { writeProjectText } from '../documents/documentWrites';
 import * as frontmatter from './formats/markdownEntry';

@@ -26,12 +26,12 @@
 // operations that name byte ranges directly (a loop rename's sites, a
 // frontmatter slot, code patches, reverts, node rewrites, the whole-file
 // replacement). Step 6 (plan §11) shipped the first set; step 9 the rest.
-import { assert } from './assert';
+import { assert } from './core/assert';
 import { countOccurrences } from './byteSearch';
 import { diffBytes, DIFF_BUDGET } from './diff';
 import { editInlineStyle } from './inlineStyle';
 import type { AttributeValue, Intent, Operation, RejectionReason } from './intent';
-import { LIMITS } from './limits';
+import { LIMITS } from './core/limits';
 import { mapSpanThroughDiff, type SpanMapping } from './mapSpan';
 import {
   byteOffsetsIn,
@@ -67,7 +67,7 @@ import {
   planRewriteNode,
 } from './planText';
 import type { AnchorRef, NodeKind, StructuralPath } from './ref';
-import { err, ok, type Result } from './result';
+import { err, ok, type Result } from './core/result';
 import type { Snapshot } from './snapshot';
 import type { ProjectedAttribute, ProjectedNode } from './source-projection';
 import {
@@ -77,7 +77,7 @@ import {
   toByteString,
   type ByteSpan,
   type ByteString,
-} from './span';
+} from './core/span';
 
 /** The only write primitive (plan §3.4): replace `range` with
  * `replacementBytes`, but only while it still holds `expectedBytes`. An

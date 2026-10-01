@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { assert } from '../../../shared/assert';
+import { assert } from '../../../shared/core/assert';
 import type { HistoryCommit, HistoryCommitFile } from './historyBridge';
 import { readHistoryLog } from './historyBridge';
 import { commitAuthor, dayGroup, relativeTime, summarize } from './historyModel';
