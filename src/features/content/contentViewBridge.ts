@@ -6,10 +6,10 @@ import type {
   WireMove,
   WirePointer,
   WireValidationIssue,
-} from '../shared/ipc-results';
-import type { Parser } from '../shared/boundary';
-import type { Data } from '../shared/boundary';
-import type { Result } from '../shared/result';
+} from '../../../shared/ipc-results';
+import type { Parser } from '../../../shared/boundary';
+import type { Data } from '../../../shared/boundary';
+import type { Result } from '../../../shared/result';
 import {
   boolean,
   count,
@@ -20,9 +20,9 @@ import {
   pathText,
   record,
   text,
-} from '../shared/boundary';
-import { parseIpcPayload } from '../shared/ipc-payloads';
-import { cleanError } from './lib/cleanError';
+} from '../../../shared/boundary';
+import { parseIpcPayload } from '../../../shared/ipc-payloads';
+import { cleanError } from '../../lib/cleanError';
 
 const locatorPart = (input: unknown): string | number =>
   typeof input === 'string' ? text(input) : count(input);

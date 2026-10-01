@@ -9,9 +9,9 @@ const { BOUNDARY_LIMITS } = require('#dist/shared/boundary.js');
 // so the negative space below includes it. It is read from JSON, because our own
 // code never writes a null.
 const PLATFORM_NULL = JSON.parse('null');
-const schema = loadRenderer('src/contentSchema.ts');
+const schema = loadRenderer('src/features/content/contentSchema.ts');
 const cms = loadRenderer('src/features/cms/cmsSchema.ts');
-const { parseContentSchema } = loadRenderer('src/contentSchemaBoundary.ts');
+const { parseContentSchema } = loadRenderer('src/features/content/contentSchemaBoundary.ts');
 const fixture = {
   type: 'object',
   required: ['title', 'choice'],

@@ -1,18 +1,18 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { Data } from '../../shared/boundary';
-import type { IpcResults, WireValidationIssue } from '../../shared/ipc-results';
-import { collectionFields, describeField, editsBetween, labelize } from '../contentSchema';
-import type { FieldDescriptor } from '../contentSchema';
+import type { Data } from '../../../shared/boundary';
+import type { IpcResults, WireValidationIssue } from '../../../shared/ipc-results';
+import { collectionFields, describeField, editsBetween, labelize } from './contentSchema';
+import type { FieldDescriptor } from './contentSchema';
 import {
   planContentRename,
   readContentEntries,
   renameContentEntry,
   validateContentEntry,
   writeContentEntry,
-} from '../contentViewBridge';
-import type { ContentEntries, ContentEntry } from '../contentViewBridge';
-import CodeEditor from '../ui/CodeEditor';
-import { CheckIcon, ChevronRightIcon, CloseIcon, HelpCircleIcon, HideIcon } from '../ui/Icons';
+} from './contentViewBridge';
+import type { ContentEntries, ContentEntry } from './contentViewBridge';
+import CodeEditor from '../../ui/CodeEditor';
+import { CheckIcon, ChevronRightIcon, CloseIcon, HelpCircleIcon, HideIcon } from '../../ui/Icons';
 import { FieldRow, UnionField, isPlainObject, issueMessageAt, omitField } from './ContentFields';
 import type { FieldContext } from './ContentFields';
 

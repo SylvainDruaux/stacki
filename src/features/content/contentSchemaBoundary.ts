@@ -10,8 +10,8 @@ import {
   object,
   optional,
   text,
-} from '../shared/boundary';
-import type { ContentSchema } from './contentSchema.types';
+} from '../../../shared/boundary';
+import type { ContentSchema } from './contentSchemaTypes';
 
 const finite = (input: unknown): number => {
   if (typeof input !== 'number' || !Number.isFinite(input)) {

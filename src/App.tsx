@@ -284,7 +284,7 @@ const StylePanel = lazyPanel(() => import('./panels/StylePanel'));
 const CodeWindow = lazyPanel(() => import('./features/code/CodeWindow'));
 const CmsPanel = lazyPanel(() => import('./features/cms/CmsPanel'));
 const CmsView = lazyPanel(() => import('./features/cms/CmsView'));
-const ContentView = lazyPanel(() => import('./panels/ContentView'));
+const ContentView = lazyPanel(() => import('./features/content/ContentView'));
 const VariablesPanel = lazyPanel(() => import('./panels/VariablesPanel'));
 const VariablesView = lazyPanel(() => import('./panels/VariablesView'));
 const CodePanel = lazyPanel(() => import('./features/code/CodePanel'));

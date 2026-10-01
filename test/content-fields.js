@@ -2,7 +2,7 @@
 //
 //   node test/content-fields.js [projectDir]
 //
-// src/contentSchema.ts turns a collection's JSON Schema into field
+// src/features/content/contentSchema.ts turns a collection's JSON Schema into field
 // descriptors — which control to draw, whether a value is required, what it is
 // bounded by. The failure mode is quiet: a misread constraint shows the user an
 // error on content that is perfectly valid, or a control that cannot express
@@ -49,7 +49,7 @@ const isPlainObject = (value) => !!value && typeof value === 'object' && !Array.
   }
   // The renderer's module, loaded the way the renderer loads it.
   const { collectionFields, describeField, fieldIssue, editsBetween, memberFor, hintFor } =
-    loadRenderer('src/contentSchema.ts');
+    loadRenderer('src/features/content/contentSchema.ts');
 
   const config = await readContentConfig(source, { force: true });
   if (config.error) {

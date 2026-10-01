@@ -3,7 +3,7 @@
 // fields and bounds, then script preload calls to separate I/O from contract bugs.
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const bridge = require('./helpers/rendererModule')('src/contentViewBridge.ts');
+const bridge = require('./helpers/rendererModule')('src/features/content/contentViewBridge.ts');
 
 // Null as a boundary receives it, parsed from JSON: inputs may hold it; our values never do.
 const jsonNull = JSON.parse('null');

@@ -1,6 +1,6 @@
-import { assert } from '../shared/assert';
-import { BOUNDARY_LIMITS } from '../shared/boundary';
-import { toRecord } from '../shared/record';
+import { assert } from '../../../shared/assert';
+import { BOUNDARY_LIMITS } from '../../../shared/boundary';
+import { toRecord } from '../../../shared/record';
 import { parseContentSchema } from './contentSchemaBoundary';
 import type {
   ContentSchema,
@@ -11,8 +11,8 @@ import type {
   FieldDescriptor,
   FieldMember,
   FieldOptions,
-} from './contentSchema.types';
-export type { FieldDescriptor, FieldMember, Control } from './contentSchema.types';
+} from './contentSchemaTypes';
+export type { FieldDescriptor, FieldMember, Control } from './contentSchemaTypes';
 
 // Deep structures are described one level at a time: a recursive schema has no
 // bottom, and a form only ever draws the level it is showing. Six levels cover

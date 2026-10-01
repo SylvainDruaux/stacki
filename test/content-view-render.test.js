@@ -16,7 +16,7 @@ test('ContentView renders parsed entries and saves only the edited field', async
   fs.mkdirSync(directory, { recursive: true });
   const output = path.join(directory, 'content-view-render.bundle.cjs');
   buildSync({
-    entryPoints: [repoPath('src/panels/ContentView.tsx')],
+    entryPoints: [repoPath('src/features/content/ContentView.tsx')],
     outfile: output,
     bundle: true,
     platform: 'node',
