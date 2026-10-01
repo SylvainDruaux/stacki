@@ -3862,7 +3862,7 @@ function useDevEvents(
   //
   // The route is read through `livePathRef` rather than named as a dependency:
   // it is assigned far below this hook, so a dep array mentioning it reads it
-  // before its declaration and the whole app throws (see test/appRenders.test.js,
+  // before its declaration and the whole app throws (see test/renderer/app/appRenders.test.js,
   // which is here because that has happened before). The ref is current by the
   // time a probe actually runs, and the watch has no reason to be rebuilt just
   // because the route changed.

@@ -270,7 +270,7 @@ file checked against the bytes the batch left — and answers with the redo
 token. Main keeps the batches; the renderer holds tokens only.
 
 The renderer's half (`src/editor/pageEdits.ts`, `src/editor/editGestures.ts`) and the gesture
-parity suite (`test/gestureParity.test.js`) are described in the tracker,
+parity suite (`test/renderer/editor/gestureParity.test.js`) are described in the tracker,
 Step 6.
 
 ## Code editor (step 8)

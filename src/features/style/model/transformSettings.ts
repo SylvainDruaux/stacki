@@ -12,7 +12,7 @@
 // The function is the one with a trap in it. It is legal anywhere in the list,
 // so nothing complains, but the result depends on WHERE — `perspective(500px)
 // rotateY(45deg)` and `rotateY(45deg) perspective(500px)` compute to different
-// matrices (checked in Chromium, see test/transformSettings.test.js). It has to lead
+// matrices (checked in Chromium, see test/renderer/style/transformSettings.test.js). It has to lead
 // the list, and it has to survive every edit made to the layers after it —
 // parseTransforms drops any function it does not recognise, so a self
 // perspective left in the value would disappear the next time a layer moved.

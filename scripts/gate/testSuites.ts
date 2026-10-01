@@ -26,16 +26,16 @@ export const TEST_SUITES: Readonly<Record<string, SuiteOptions>> = {
     phase: 'alone',
     flaky: 'measures hover cost in milliseconds; a loaded machine can miss the budget',
   },
-  'test/popoverDropdown.test.js': {
+  'test/renderer/style/popoverDropdown.test.js': {
     phase: 'alone',
     flaky: 'drives a real window, whose focus another window can take',
   },
   // A stylesheet read that starts before an edit can land after it under load
   // and restore the old value; until that race is understood, it runs where
   // its timing assumptions hold.
-  'test/selectorWell.test.js': { phase: 'alone' },
+  'test/renderer/style/selectorWell.test.js': { phase: 'alone' },
   'test/electron/project/thumbs.test.js': { phase: 'alone', runner: 'electron' },
-  'test/viteModules.test.ts': { nodeArguments: ['--experimental-vm-modules'] },
-  'test/contentFields.test.js': { nodeArguments: QUIET_TYPELESS },
-  'test/fluid.test.js': { nodeArguments: QUIET_TYPELESS },
+  'test/renderer/app/viteModules.test.ts': { nodeArguments: ['--experimental-vm-modules'] },
+  'test/renderer/content/contentFields.test.js': { nodeArguments: QUIET_TYPELESS },
+  'test/renderer/variables/fluid.test.js': { nodeArguments: QUIET_TYPELESS },
 };
