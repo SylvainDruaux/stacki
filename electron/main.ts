@@ -5,7 +5,7 @@ import {
   revertComponentProperties,
   updateComponentProperties,
   type FileChange,
-} from './componentProperties';
+} from './properties/componentProperties';
 import { renderComponentPreviewPage } from './previewServer/componentPreview';
 import { createIpcRegistrar } from './lib/ipcRegistrar';
 import { RUNTIME_PATHS, resourcePath } from './lib/runtimePaths';
@@ -135,7 +135,7 @@ import * as windowBoundsModule from './windowBounds';
 const { openingBounds } = windowBoundsModule;
 import * as componentFileModule from './documents/componentFile';
 const { componentFile, newPageText } = componentFileModule;
-import * as componentUsageModule from './componentUsage';
+import * as componentUsageModule from './properties/componentUsage';
 const { componentUsage, instancesIn } = componentUsageModule;
 import * as contentEntriesModule from './content/contentEntries';
 const { listEntries, writeEntry, countEntries, coveredPaths } = contentEntriesModule;

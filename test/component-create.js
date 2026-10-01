@@ -482,7 +482,9 @@ const check = (what, condition, detail) => {
   // same 23, found the same way, or the popup is missing something the count
   // promised and nothing says which of them is lying.
   {
-    const { componentUsage, countIn } = require(repoPath('dist/electron/componentUsage.js'));
+    const { componentUsage, countIn } = require(
+      repoPath('dist/electron/properties/componentUsage.js'),
+    );
     const proj = fs.mkdtempSync(path.join(os.tmpdir(), 'stacki-usage-'));
     const put = (rel, text) => {
       const abs = path.join(proj, rel);

@@ -1,7 +1,7 @@
 import ts from 'typescript';
-import { assert } from '../shared/assert';
-import { PROPERTY_LIMITS } from '../shared/component-properties';
-import type { PropertyOrigin, PropertySource } from '../shared/component-properties';
+import { assert } from '../../shared/assert';
+import { PROPERTY_LIMITS } from '../../shared/component-properties';
+import type { PropertyOrigin, PropertySource } from '../../shared/component-properties';
 import { propertyKey, syntaxNodes } from './propertySyntax';
 import type { PropertySyntax } from './propertySyntax';
 

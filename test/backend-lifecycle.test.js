@@ -376,8 +376,9 @@ test(
 );
 
 function loadThumbs(BrowserWindow) {
-  const source = fs.readFileSync(repoPath('dist/electron/thumbs.js'), 'utf8');
-  const runtimeRequire = createRequire(repoPath('dist/electron/main.js'));
+  const modulePath = repoPath('dist/electron/thumbs.js');
+  const source = fs.readFileSync(modulePath, 'utf8');
+  const runtimeRequire = createRequire(modulePath);
   const mod = { exports: {} };
   vm.runInNewContext('(function(require, module, exports) {' + source + '\n})', {
     setTimeout: (callback, ms) => setTimeout(callback, Math.min(ms, 5)),

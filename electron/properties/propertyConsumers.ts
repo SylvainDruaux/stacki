@@ -2,12 +2,12 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import ts from 'typescript';
-import { assert } from '../shared/assert';
-import { PROPERTY_LIMITS } from '../shared/component-properties';
-import { err, ok, type Result } from '../shared/result';
-import { aliasMap, resolveSpec, type Alias } from './content/cmsRefs';
+import { assert } from '../../shared/assert';
+import { PROPERTY_LIMITS } from '../../shared/component-properties';
+import { err, ok, type Result } from '../../shared/result';
+import { aliasMap, resolveSpec, type Alias } from '../content/cmsRefs';
 import { importsOf } from './componentUsage';
-import { sameFilesystemPath } from './lib/platform';
+import { sameFilesystemPath } from '../lib/platform';
 import { readPropertySyntax, syntaxNodes } from './propertySyntax';
 
 export interface PropertyConsumer {

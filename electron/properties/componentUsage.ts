@@ -12,10 +12,10 @@
 import fs from 'fs';
 import path from 'path';
 
-import { aliasMap, boundNames, resolveSpec } from './content/cmsRefs';
-import type { Alias } from './content/cmsRefs';
-import { MAIN_LIMITS } from './lib/mainLimits';
-import { sameFilesystemPath } from './lib/platform';
+import { aliasMap, boundNames, resolveSpec } from '../content/cmsRefs';
+import type { Alias } from '../content/cmsRefs';
+import { MAIN_LIMITS } from '../lib/mainLimits';
+import { sameFilesystemPath } from '../lib/platform';
 
 const toPosix = (filePath: string): string => filePath.split(path.sep).join('/');
 

@@ -9,19 +9,19 @@ const path = require('node:path');
 const {
   readComponentProperties,
   editPropertyDefinition,
-} = require('#dist/electron/propertyDefinitions.js');
+} = require('#dist/electron/properties/propertyDefinitions.js');
 const {
   renameComponentOptionValues,
   renameComponentReferences,
-} = require('#dist/electron/propertyRename.js');
+} = require('#dist/electron/properties/propertyRename.js');
 const {
   inverseBatch,
   loadComponentProperties,
   PropertyUndoStore,
   revertComponentProperties,
   updateComponentProperties,
-} = require('#dist/electron/componentProperties.js');
-const { applySourceEdits } = require('#dist/electron/propertySyntax.js');
+} = require('#dist/electron/properties/componentProperties.js');
+const { applySourceEdits } = require('#dist/electron/properties/propertySyntax.js');
 const { documentHost } = require('#dist/electron/documents/documentWrites.js');
 
 // Every batch write goes through the document actors (plan §3.3, step 5).

@@ -12,7 +12,7 @@ const { ROOT, repoPath } = require('./helpers/sources.js');
 const {
   readComponentProperties,
   editPropertyDefinition,
-} = require('#dist/electron/propertyDefinitions.js');
+} = require('#dist/electron/properties/propertyDefinitions.js');
 
 test('component properties lifecycle and controls', async () => {
   const directory = repoPath('node_modules/.stacki-test/properties');
@@ -415,7 +415,7 @@ test('component properties lifecycle and controls', async () => {
   const {
     readComponentProperties,
     editPropertyDefinition,
-  } = require('#dist/electron/propertyDefinitions.js');
+  } = require('#dist/electron/properties/propertyDefinitions.js');
   const inherited = `---
 import type { HTMLAttributes } from 'astro/types';
 type ContainerGap = 'small' | 'medium' | 'large';
