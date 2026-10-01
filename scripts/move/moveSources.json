@@ -1,3 +1,14 @@
 {
-  "steps": []
+  "steps": [
+    {
+      "step": "test-helpers",
+      "moves": [
+        ["test/renderer-module.js", "test/helpers/rendererModule.js"],
+        ["test/source-text.js", "test/helpers/sourceText.js"],
+        ["test/app-gestures.js", "test/helpers/appGestures.js"],
+        ["test/contracts/main-harness.ts", "test/helpers/mainHarness.ts"],
+        ["test/contracts/markdown-corpus.ts", "test/helpers/markdownCorpus.ts"]
+      ]
+    }
+  ]
 }
