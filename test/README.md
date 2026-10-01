@@ -5,23 +5,29 @@ npm test                                   # the gate — run this before every 
 npm run roundtrip:report                   # where the parser stands, and what is left to fix
 node dist/scripts/reports/roundtripReport.js ~/a-site  # same report against any Astro project
 STACKI_CORPUS=~/a-site npm test            # crash-sweep a real project as part of the gate
-npm test -- querycache
+npm test -- queryCache                     # one suite, by name (case and dashes do not matter)
+npm test -- simulator/                     # every suite under a folder
+npm test -- --list                         # the suites the gate runs
 npm run performance:report -- d9f9c05      # compare preview diff with the pre-refactor checkpoint
 npm run integration:dev                    # real Electron/Astro lifecycle smoke test
 ```
 
-The gate discovers every `test:*` command in `package.json` and runs the commands
-directly, reporting all failures. Add a new standalone test command there once;
-there is no second list to update. Files named `*.test.js` are already included by
-the Node test runner. Individual `npm run test:...` commands remain available.
+The gate runs every file named `*.test.js` or `*.test.ts` under `test/`
+(`scripts/gate/testDiscovery.ts`), each as `node <file>` in its own process,
+outside `fixtures/`, `corpus/`, `helpers/` and `integration/`. A new test is in
+the gate the moment it exists; there is no list to add it to. The few suites
+that need a different runner, Node flags or to run alone say so in
+`scripts/gate/testSuites.ts`, keyed by path. Harnesses live in `helpers/`, and
+`helpers/sources.js` is how a test names a repository file (see
+`sourcePaths.test.js`).
 
-`test:simulator` runs the editor-core simulator (`simulator/`): seeded runs of
+`npm test -- simulator/` runs the editor-core simulator (`simulator/`): seeded runs of
 the step-wise actor over a fake disk, checked against the nine invariants of
 plan §10, plus the oracle scenarios over the hostile corpus in
 `fixtures/editor-core/`, and the step-2 suites (`diff`, `map-span`, `planner`)
 that hold `shared/engine/diff.ts`, `shared/engine/mapSpan.ts` and `shared/engine/planner.ts` to the
 brute-force references in `simulator/reference-diff.ts`.
-`STACKI_SIMULATOR_SEEDS=2000 npm run test:simulator` is
+`STACKI_SIMULATOR_SEEDS=2000 npm test -- simulator/` is
 the long run. From step 3 the simulator's actor plans `set-attribute` with the
 shipping planner, and every stale plan is judged against the byte origins the
 simulator recorded (`simulator/provenance.ts`, `simulator/remap-judge.ts`); a

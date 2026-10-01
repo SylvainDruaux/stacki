@@ -19,7 +19,7 @@ import type { Git } from './git';
 // says what to do instead, or a question the UI can ask.
 //
 // Kept out of main.js so the behaviour can be tested against a real repository
-// (test/git-branches.js) rather than only through the app.
+// (test/gitBranches.test.js) rather than only through the app.
 //
 // `git` is passed in rather than imported: main.js runs git through a PATH it
 // has had to repair for the packaged app, and the tests run it plainly.

@@ -1,9 +1,16 @@
 #!/usr/bin/env node
-// Every test:* command belongs to the gate. The manifest is parsed before use
-// so an invalid script entry cannot become an unchecked shell command.
+// The gate: builds, static checks, then every test suite under test/.
+//
+//   npm test                         everything
+//   npm test -- hoverCost electron/  suites by name, or every suite under a folder
+//   npm test -- --list               the suites, without running them
+//   npm test -- --jobs=4             at most four suites at once
+//
+// Suites are found by name (testDiscovery.ts); the few that need a different
+// runner, Node flags or to run alone say so in testSuites.ts. Each runs as a
+// direct spawn with an argument list, never a shell line.
 
 import { spawnSync } from 'node:child_process';
-import fs = require('node:fs');
 import os = require('node:os');
 import path = require('node:path');
 import {
@@ -14,56 +21,30 @@ import {
   type TestOutcome,
 } from './testPool';
 import { repositoryRoot } from '../lib/repoRoot';
-
-interface PackageScripts {
-  readonly [name: string]: string;
-}
+import { discoverTestFiles, selectSuites, suitesFor, type Suite } from './testDiscovery';
 
 type GateCommand = readonly [label: string, command: string, argumentsList: readonly string[]];
 
-function readScripts(packagePath: string): PackageScripts {
-  const input: unknown = JSON.parse(fs.readFileSync(packagePath, 'utf8'));
-  if (typeof input !== 'object' || input === null || !('scripts' in input)) {
-    throw new Error('package.json: expected scripts object');
-  }
-  const value = input.scripts;
-  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
-    throw new Error('package.json.scripts: expected object');
-  }
-  const scripts: Record<string, string> = {};
-  for (const [name, command] of Object.entries(value)) {
-    if (typeof command !== 'string') {
-      throw new Error(`package.json.scripts.${name}: expected string`);
-    }
-    scripts[name] = command;
-  }
-  return scripts;
-}
-
 const root = repositoryRoot();
-const scripts = readScripts(path.join(root, 'package.json'));
 const flags = process.argv.slice(2).filter((argument) => argument.startsWith('--'));
-const unknownFlags = flags.filter((flag) => !flag.startsWith('--jobs='));
+const unknownFlags = flags.filter((flag) => !flag.startsWith('--jobs=') && flag !== '--list');
 if (unknownFlags.length > 0) {
-  console.error(`Unknown flag: ${unknownFlags.join(', ')} (supported: --jobs=<n>)`);
+  console.error(`Unknown flag: ${unknownFlags.join(', ')} (supported: --jobs=<n>, --list)`);
   process.exit(1);
 }
 const jobs = parseJobs(
   flags.find((flag) => flag.startsWith('--jobs='))?.slice('--jobs='.length),
   os.availableParallelism(),
 );
-const requested = process.argv
-  .slice(2)
-  .filter((argument) => !argument.startsWith('--'))
-  .map((name) => (name.startsWith('test:') ? name : `test:${name}`));
-const names =
-  requested.length > 0
-    ? requested
-    : Object.keys(scripts).filter((name) => name.startsWith('test:'));
-const unknown = names.filter((name) => scripts[name] === undefined);
-if (names.length === 0 || unknown.length > 0) {
-  console.error(`Unknown test command: ${unknown.join(', ')}`);
+const queries = process.argv.slice(2).filter((argument) => !argument.startsWith('--'));
+const { selected, unmatched } = selectSuites(suitesFor(discoverTestFiles(root)), queries);
+if (selected.length === 0 || unmatched.length > 0) {
+  console.error(`No test suite matches: ${unmatched.join(', ')} (npm test -- --list)`);
   process.exit(1);
+}
+if (flags.includes('--list')) {
+  console.log(selected.map((suite) => `${suite.name}  (${suite.file})`).join('\n'));
+  process.exit(0);
 }
 
 const startedMs = Date.now();
@@ -149,26 +130,23 @@ for (const [label, command, argumentsList] of staticGates) {
   console.log(`[gate] ${label} done in ${((Date.now() - gateStartedMs) / 1000).toFixed(1)}s`);
 }
 
-// Three phases. Exclusive commands rebuild output the others read, so they run
-// first and alone. Load-sensitive commands measure timing or drive a real
-// window, so they run last and alone. Everything else shares the pool.
-// selectorwell is here because a stylesheet read that starts before an edit can
-// land after it under load and restore the old value; until that race is
-// understood, it runs where its timing assumptions hold.
-const exclusive = ['test:contracts'];
-const alone = ['test:hovercost', 'test:popoverdropdown', 'test:selectorwell', 'test:thumbs'];
-const toCommand = (name: string): TestCommand => {
-  const command = scripts[name];
-  if (command === undefined) {
-    throw new Error(`Missing validated test command ${name}`);
+// Two phases: the shared pool, then the suites that run alone (they measure
+// timing or drive a real window) one at a time with nothing else running.
+// The Electron binary's path is what the electron package exports.
+const electronInput: unknown = require('electron');
+const electronBinary = typeof electronInput === 'string' ? electronInput : 'electron';
+const toCommand = (suite: Suite): TestCommand => {
+  if (suite.options.runner === 'electron') {
+    return { name: suite.name, command: electronBinary, argumentsList: [suite.file] };
   }
-  return { name, command };
+  const nodeArguments = suite.options.nodeArguments ?? [];
+  return { name: suite.name, command: node, argumentsList: [...nodeArguments, suite.file] };
 };
 const phases: readonly (readonly TestCommand[])[] = [
-  names.filter((name) => exclusive.includes(name)).map(toCommand),
-  names.filter((name) => !exclusive.includes(name) && !alone.includes(name)).map(toCommand),
-  names.filter((name) => alone.includes(name)).map(toCommand),
+  selected.filter((suite) => suite.options.phase !== 'alone').map(toCommand),
+  selected.filter((suite) => suite.options.phase === 'alone').map(toCommand),
 ];
+const names = selected.map((suite) => suite.name);
 process.on('SIGINT', () => {
   stopTestPool();
   process.exit(130);
@@ -204,10 +182,10 @@ async function runStaticChecks(): Promise<void> {
 async function runPhases(): Promise<readonly TestOutcome[]> {
   await runStaticChecks();
   testsStartedMs = Date.now();
-  console.log(`\n[gate] ${names.length} test commands, ${jobs} at a time`);
+  console.log(`\n[gate] ${names.length} test suites, ${jobs} at a time`);
   const outcomes: TestOutcome[] = [];
   for (const [index, phase] of phases.entries()) {
-    const phaseJobs = index === 1 ? jobs : 1;
+    const phaseJobs = index === 0 ? jobs : 1;
     const options = { cwd: root, environment, jobs: phaseJobs };
     outcomes.push(...(await runTestPool(phase, options, report)));
   }
@@ -220,13 +198,15 @@ function summarize(outcomes: readonly TestOutcome[]): void {
     .slice(0, 5)
     .map((outcome) => `${outcome.name} ${(outcome.durationMs / 1000).toFixed(1)}s`);
   const testSeconds = ((Date.now() - testsStartedMs) / 1000).toFixed(1);
-  console.log(`\nTest commands took ${testSeconds}s. Slowest: ${named.join(', ')}`);
+  console.log(`\nTest suites took ${testSeconds}s. Slowest: ${named.join(', ')}`);
 
   const quarantined: readonly string[] = [];
-  const flaky = ['test:hovercost', 'test:popoverdropdown'] as const;
+  const flaky = selected
+    .filter((suite) => suite.options.flaky !== undefined)
+    .map((suite) => suite.name);
   const durationSeconds = ((Date.now() - startedMs) / 1000).toFixed(1);
   const passed = names.length - failed.length;
-  console.log(`\n${passed}/${names.length} test commands passed in ${durationSeconds}s.`);
+  console.log(`\n${passed}/${names.length} test suites passed in ${durationSeconds}s.`);
   if (failed.length > 0) {
     console.error(`Failed: ${failed.join(', ')}`);
   }

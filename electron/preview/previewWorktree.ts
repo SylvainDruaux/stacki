@@ -33,7 +33,7 @@
 //
 // The dev server that runs against it is spawned by main.js, which owns ports
 // and process handling. Everything here is the filesystem and git side, so it
-// can be tested (test/preview-worktree.js) without booting Astro.
+// can be tested (test/previewWorktree.test.js) without booting Astro.
 
 import fs from 'fs';
 import path from 'path';

@@ -143,7 +143,7 @@ const asText = (node: Node): node is Text => node.nodeType === 3;
 const asComment = (node: Node): node is Comment => node.nodeType === 8;
 const asDocument = (node: Node): node is Document => node.nodeType === 9;
 
-// test/morph.js lifts the patching half out of this file by slicing from the
+// test/morph.test.js lifts the patching half out of this file by slicing from the
 // `const isAnchor =` line, so the type guards live below that marker, before
 // their first use. That keeps the lifted source self-contained.
 
@@ -664,7 +664,7 @@ interface ScriptInfo {
 // A script that CHANGED, or one that is GONE, cannot be patched in: rewriting
 // one does not run it, and nothing can un-run one. Both are wrong, so the page
 // reloads. (Kept below the erased interface: comments attached to a type
-// declaration are dropped at emit, and test/morph.js slices this file by this
+// declaration are dropped at emit, and test/morph.test.js slices this file by this
 // comment.)
 //
 // A script that only APPEARED is a different matter, and it is the common one.
@@ -775,7 +775,7 @@ function runScripts(added: readonly ScriptInfo[]): void {
 //
 // The patch cannot do this itself: a <script> cloned out of a fetched document
 // is inert — the parser that made it had no browsing context, so inserting it
-// into this one runs nothing (measured; see test/morph.js). An element made
+// into this one runs nothing (measured; see test/morph.test.js). An element made
 // here does run, and running one of these modules is what injects its CSS.
 //
 // A stylesheet whose component is no longer rendered is left loaded. Its rules
@@ -969,6 +969,6 @@ window.addEventListener('message', (event: MessageEvent) => {
 });
 
 // `update` is the module's entry; scriptSignature is not referenced internally
-// but is part of the tested surface — test/morph.js slices it out of this
+// but is part of the tested surface — test/morph.test.js slices it out of this
 // source, so deleting it would delete coverage of the script-diff decision.
 export { update, scriptSignature };

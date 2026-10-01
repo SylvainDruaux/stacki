@@ -5,7 +5,7 @@
 // a file as it was, and which worktrees exist. Nothing here writes.
 //
 // It is a separate module from gitBranches.js for the same reason that one
-// exists — so it can be tested against real repositories (test/git-history.js)
+// exists — so it can be tested against real repositories (test/gitHistory.test.js)
 // rather than only through the app — and it takes the `git` runner as its
 // first argument for the same reason: main.js runs git through a PATH it has
 // had to repair for the packaged app, and the tests run it plainly.

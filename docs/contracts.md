@@ -217,7 +217,7 @@ hand-written `*.expected.*` output; `test/simulator/oracles.ts` holds the
 hand-derived splices. `test/fixtures/large/manifest.json` pins the generated
 large fixtures (`npm run fixtures:large` writes the files).
 
-The simulator (`test/simulator/`, `npm run test:simulator`) drives the real
+The simulator (`test/simulator/`, `npm test -- simulator/`) drives the real
 parser, the planner and a step-wise actor over a fake disk with a seeded PRNG,
 and checks the nine invariants after every event. The actor plans every
 operation with `shared/engine/planner.ts` (mapped through the diff when stale); each
@@ -270,7 +270,7 @@ file checked against the bytes the batch left — and answers with the redo
 token. Main keeps the batches; the renderer holds tokens only.
 
 The renderer's half (`src/editor/pageEdits.ts`, `src/editor/editGestures.ts`) and the gesture
-parity suite (`test/gesture-parity.test.js`) are described in the tracker,
+parity suite (`test/gestureParity.test.js`) are described in the tracker,
 Step 6.
 
 ## Code editor (step 8)
@@ -407,19 +407,19 @@ build (`test/legacy-parity.bench.js`) was retired at step 10 with the
 
 Run `env -u ELECTRON_RUN_AS_NODE npm test` before merging. The gate cleans and
 rebuilds `dist/`, compiles Electron, preload, and shared contracts, builds the
-renderer, runs strict `tsc --noEmit`, ESLint, the migration ratchet, and every
-`test:*` command. Generated JavaScript belongs only in `dist/`; source folders
-must contain TypeScript and source assets.
+renderer, runs strict `tsc --noEmit`, ESLint, Prettier, the policy scan and the
+adapter-surface ratchet, and then every test suite: each `*.test.js` and
+`*.test.ts` under `test/`, found by name (`scripts/gate/testDiscovery.ts`).
+Generated JavaScript belongs only in `dist/`; source folders must contain
+TypeScript and source assets.
 
-The builds run in order; `tsc --noEmit`, ESLint and the two ratchets
-(`ratchet-check`, `adapter-surface`) then run side by side, and the test
-commands run in a bounded pool (`scripts/gate/testPool.ts`, default one fewer than
-the CPUs, `npm test -- --jobs=<n>` to change it,
-`--jobs=1` for a serial run). A passing command prints one line; a failing one
-prints its full output. `test:contracts` runs first and alone because it
-rebuilds `dist/shared`, which the others read. `test:hovercost`,
-`test:popoverdropdown`, `test:selectorwell` and `test:thumbs` run last and
-alone because they measure timing, depend on read ordering, or drive a real
-window. A new test must write only to its own scratch path under
+The builds run in order; the static checks then run side by side, and the
+suites run in a bounded pool (`scripts/gate/testPool.ts`, default one fewer
+than the CPUs, `npm test -- --jobs=<n>` to change it, `--jobs=1` for a serial
+run). A passing suite prints one line; a failing one prints its full output.
+The suites that measure timing, depend on read ordering, or drive a real
+window run last and alone, as `scripts/gate/testSuites.ts` says, which also
+names the two whose failures are tolerated and why.
+A new test must write only to its own scratch path under
 `node_modules/.stacki-test/` (or a `mkdtemp` directory) and bind no fixed
 port, so it can share the pool.
