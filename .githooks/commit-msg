@@ -4,7 +4,7 @@
 const childProcess = require('node:child_process');
 const path = require('node:path');
 
-const entry = path.join(__dirname, '..', 'scripts', 'policy', 'git-hooks.mts');
+const entry = path.join(__dirname, '..', 'scripts/policy/git-hooks.mts');
 const hookArguments = ['commit-msg', ...process.argv.slice(2)];
 const result = childProcess.spawnSync(process.execPath, [entry, ...hookArguments], {
   stdio: 'inherit',
