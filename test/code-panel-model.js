@@ -5,13 +5,14 @@
 const assert = require('node:assert/strict');
 const path = require('node:path');
 const esbuild = require('esbuild');
-const { parsePage } = require('../dist/electron/astroParser.js');
+const { parsePage } = require('#dist/electron/astroParser.js');
+const { repoPath } = require('./helpers/sources.js');
 
-const output = path.join(__dirname, '../node_modules/.stacki-test/code-panel-model.cjs');
+const output = repoPath('node_modules/.stacki-test/code-panel-model.cjs');
 
 (async () => {
   await esbuild.build({
-    entryPoints: [path.join(__dirname, '../src/codePanelModel.ts')],
+    entryPoints: [repoPath('src/codePanelModel.ts')],
     outfile: output,
     bundle: true,
     platform: 'node',

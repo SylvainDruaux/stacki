@@ -40,8 +40,9 @@ const check = (what, condition, detail) => {
   }
 };
 
-const jc = require('../dist/electron/jsCollections.js');
-const ar = require('../dist/electron/assetRefs.js');
+const jc = require('#dist/electron/jsCollections.js');
+const ar = require('#dist/electron/assetRefs.js');
+const { repoPath } = require('./helpers/sources.js');
 
 const SCAN = { requireExport: false, allowPlainLists: true };
 const read = (source) =>
@@ -314,11 +315,11 @@ const SCREENS = [
   const { inferType } = require('esbuild').buildSync
     ? (() => {
         const esbuild = require('esbuild');
-        const directory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
+        const directory = repoPath('node_modules/.stacki-test');
         fs.mkdirSync(directory, { recursive: true });
         const out = path.join(directory, 'cms-schema.cjs');
         esbuild.buildSync({
-          entryPoints: [path.join(__dirname, '..', 'src', 'cmsSchema.js')],
+          entryPoints: [repoPath('src/cmsSchema.ts')],
           outfile: out,
           bundle: true,
           format: 'cjs',
@@ -345,11 +346,8 @@ const SCREENS = [
   );
 }
 {
-  const view = fs.readFileSync(path.join(__dirname, '..', 'src', 'panels', 'CmsView.tsx'), 'utf8');
-  const field = fs.readFileSync(
-    path.join(__dirname, '..', 'src', 'panels', 'CmsField.tsx'),
-    'utf8',
-  );
+  const view = fs.readFileSync(repoPath('src/panels/CmsView.tsx'), 'utf8');
+  const field = fs.readFileSync(repoPath('src/panels/CmsField.tsx'), 'utf8');
   check(
     'the image field shows the file the name is bound to',
     /srcRel=\{reference\}/.test(field),
@@ -365,7 +363,7 @@ const SCREENS = [
     /pickAsset: model\.rel\.includes\('#'\) \? model\.pickAsset : undefined/.test(view),
     'a JSON file would be handed an identifier',
   );
-  const main = fs.readFileSync(path.join(__dirname, '..', 'dist', 'electron', 'main.js'), 'utf8');
+  const main = fs.readFileSync(repoPath('dist/electron/main.js'), 'utf8');
   check(
     'a picked public/ file is a URL, not an import',
     /if \(root === 'public'\) \{\s*return \{ value: '\/' \+/.test(main),

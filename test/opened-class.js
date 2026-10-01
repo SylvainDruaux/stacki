@@ -21,6 +21,7 @@
 const fs = require('fs');
 const path = require('path');
 const Module = require('module');
+const { repoPath } = require('./helpers/sources.js');
 
 const failures = [];
 let checked = 0;
@@ -31,7 +32,7 @@ const check = (what, condition, detail) => {
   }
 };
 
-const PRELOAD = path.join(__dirname, '..', 'dist', 'electron', 'preload.js');
+const PRELOAD = repoPath('dist/electron/preload.js');
 const { JSDOM } = require('jsdom');
 
 const marked = (nodePath, html) => `<!--avb-s:${nodePath}-->${html}<!--avb-e:${nodePath}-->`;

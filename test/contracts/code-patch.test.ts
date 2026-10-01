@@ -20,10 +20,10 @@ import {
   diffCodePatch,
   mergeTyping,
   type CodeHunk,
-} from '../../dist/shared/code-patch.js';
-import { LIMITS } from '../../dist/shared/limits.js';
-import { shiftUntouched } from '../../dist/shared/rebase.js';
-import { encodeUtf8, toByteSpan } from '../../dist/shared/span.js';
+} from '#dist/shared/code-patch.js';
+import { LIMITS } from '#dist/shared/limits.js';
+import { shiftUntouched } from '#dist/shared/rebase.js';
+import { encodeUtf8, toByteSpan } from '#dist/shared/span.js';
 
 const ROOT = path.join(import.meta.dirname, '..');
 const FIXTURE_DIRECTORIES = ['corpus', 'fixtures/editor-core', 'fixtures/round-trip'];

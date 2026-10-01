@@ -18,6 +18,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { repoPath } = require('./helpers/sources.js');
 
 const failures = [];
 let checked = 0;
@@ -31,11 +32,11 @@ const settle = (ms = 30) => new Promise((resolve) => setTimeout(resolve, ms));
 
 (async () => {
   const esbuild = require('esbuild');
-  const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
+  const buildDirectory = repoPath('node_modules/.stacki-test');
   fs.mkdirSync(buildDirectory, { recursive: true });
   const bundlePath = path.join(buildDirectory, 'close-project.bundle.js');
   await esbuild.build({
-    entryPoints: [path.join(__dirname, '..', 'src', 'App.tsx')],
+    entryPoints: [repoPath('src/App.tsx')],
     outfile: bundlePath,
     bundle: true,
     format: 'cjs',
@@ -200,7 +201,7 @@ const settle = (ms = 30) => new Promise((resolve) => setTimeout(resolve, ms));
   );
 
   // --- what main does with it -------------------------------------------------------------
-  const main = fs.readFileSync(path.join(__dirname, '..', 'dist', 'electron', 'main.js'), 'utf8');
+  const main = fs.readFileSync(repoPath('dist/electron/main.js'), 'utf8');
   check(
     'the File menu offers a way in',
     /label: 'Open Project…'/.test(main),
@@ -239,10 +240,7 @@ const settle = (ms = 30) => new Promise((resolve) => setTimeout(resolve, ms));
     'the next window comes back holding the last project',
   );
 
-  const preload = fs.readFileSync(
-    path.join(__dirname, '..', 'dist', 'electron', 'preload.js'),
-    'utf8',
-  );
+  const preload = fs.readFileSync(repoPath('dist/electron/preload.js'), 'utf8');
   check(
     'the app can ask for both',
     /closeProject: invoke\('project:close'\)/.test(preload) &&

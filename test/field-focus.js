@@ -23,6 +23,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { ROOT, repoPath, sourceSpecifier } = require('./helpers/sources.js');
 
 const failures = [];
 let checked = 0;
@@ -47,8 +48,8 @@ const check = (what, condition, detail) => {
   }
 
   const esbuild = require('esbuild');
-  const root = path.join(__dirname, '..');
-  const buildDirectory = path.join(root, 'node_modules', '.stacki-test');
+  const root = ROOT;
+  const buildDirectory = repoPath('node_modules/.stacki-test');
   const pageDirectory = path.join(buildDirectory, 'field-focus');
   fs.mkdirSync(pageDirectory, { recursive: true });
 
@@ -56,15 +57,13 @@ const check = (what, condition, detail) => {
   // gradient centre it was copied from.
   const entry = path.join(buildDirectory, 'field-focus.entry.jsx');
   // The module specifier of a style-panel source file, written into the entry below.
-  const stylePanelImport = (...parts) =>
-    JSON.stringify(path.join(root, 'src', 'style-panel', ...parts));
   fs.writeFileSync(
     entry,
     `import React from 'react'
      import { createRoot } from 'react-dom/client'
-     import EffectsSection from ${stylePanelImport('EffectsSection')}
-     import GradientEditor from ${stylePanelImport('GradientEditor')}
-     import { parseGradient } from ${stylePanelImport('lib', 'gradient')}
+     import EffectsSection from ${sourceSpecifier('src/style-panel/EffectsSection.tsx')}
+     import GradientEditor from ${sourceSpecifier('src/style-panel/GradientEditor.tsx')}
+     import { parseGradient } from ${sourceSpecifier('src/style-panel/lib/gradient.ts')}
      const decls = { transform: 'rotateZ(45deg)' }
      const read = (p) => decls[p] != null
        ? { source:'selected', overridden:false, contributors:[],

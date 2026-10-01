@@ -14,6 +14,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { ROOT, repoPath, stubSources } = require('./helpers/sources.js');
 
 const failures = [];
 let checked = 0;
@@ -26,14 +27,15 @@ const check = (what, condition, detail) => {
 
 (async () => {
   const esbuild = require('esbuild');
-  const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
+  const buildDirectory = repoPath('node_modules/.stacki-test');
   fs.mkdirSync(buildDirectory, { recursive: true });
   const bundlePath = path.join(buildDirectory, 'popup-layers.bundle.js');
   await esbuild.build({
     stdin: {
       contents:
-        `export { registerPopupLayer, inOwnedPopup, hasOwnedPopup } ` + `from './lib/popup-layer'`,
-      resolveDir: path.join(__dirname, '..', 'src', 'style-panel'),
+        `export { registerPopupLayer, inOwnedPopup, hasOwnedPopup } ` +
+        `from './src/style-panel/lib/popup-layer'`,
+      resolveDir: ROOT,
       loader: 'ts',
     },
     outfile: bundlePath,
@@ -84,19 +86,19 @@ const check = (what, condition, detail) => {
 
   // The wiring: the popovers that close on an outside press have to ask.
   const files = {
-    'LayerPopover.tsx': 'the layer editor',
-    'SpacingBox.tsx': 'the spacing editor',
+    'src/style-panel/LayerPopover.tsx': 'the layer editor',
+    'src/style-panel/SpacingBox.tsx': 'the spacing editor',
   };
   for (const [file, what] of Object.entries(files)) {
-    const source = fs.readFileSync(path.join(__dirname, '..', 'src', 'style-panel', file), 'utf8');
+    const source = fs.readFileSync(repoPath(file), 'utf8');
     check(`${what} asks before closing on a press`, /inOwnedPopup\(/.test(source), file);
   }
   const pickers = {
-    'components/ColorPicker.tsx': 'the colour picker',
-    'VariableConnect.tsx': 'the variable picker',
+    'src/style-panel/components/ColorPicker.tsx': 'the colour picker',
+    'src/style-panel/VariableConnect.tsx': 'the variable picker',
   };
   for (const [file, what] of Object.entries(pickers)) {
-    const source = fs.readFileSync(path.join(__dirname, '..', 'src', 'style-panel', file), 'utf8');
+    const source = fs.readFileSync(repoPath(file), 'utf8');
     check(`${what} says where it was opened from`, /registerPopupLayer\(/.test(source), file);
   }
 
@@ -110,7 +112,7 @@ const check = (what, condition, detail) => {
   {
     const popupBundle = path.join(buildDirectory, 'popup-layers-spacing.bundle.js');
     await esbuild.build({
-      entryPoints: [path.join(__dirname, '..', 'src', 'style-panel', 'SpacingBox.tsx')],
+      entryPoints: [repoPath('src/style-panel/SpacingBox.tsx')],
       outfile: popupBundle,
       bundle: true,
       format: 'cjs',
@@ -120,15 +122,9 @@ const check = (what, condition, detail) => {
       loader: { '.css': 'empty' },
       logLevel: 'silent',
       plugins: [
-        {
-          name: 'stub-variables',
-          setup(build) {
-            build.onResolve({ filter: /lib\/webflow$/ }, () => ({
-              path: 'stub-webflow',
-              namespace: 'stub',
-            }));
-            build.onLoad({ filter: /.*/, namespace: 'stub' }, () => ({
-              contents: `
+        stubSources('stub-variables', {
+          'src/style-panel/lib/webflow.ts': () => ({
+            contents: `
                 export function streamProjectVariables(onAdd) {
                   onAdd({
                     name: 'site-margin', collection: 'Sizes', group: '', value: '2rem',
@@ -137,10 +133,9 @@ const check = (what, condition, detail) => {
                   return Promise.resolve([]);
                 }
               `,
-              loader: 'js',
-            }));
-          },
-        },
+            loader: 'js',
+          }),
+        }),
       ],
     });
 

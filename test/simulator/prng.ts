@@ -3,7 +3,7 @@
 // same stream on every machine, which is what makes invariant 9 structural.
 // Only 32-bit integer arithmetic (Math.imul, >>> 0), so no float rounding can
 // make two platforms diverge.
-import { assert } from '../../dist/shared/assert.js';
+import { assert } from '#dist/shared/assert.js';
 
 /** Rejection sampling draws again at most this often; each draw is rejected
  * with probability below 1/2, so hitting the cap means a broken generator. */

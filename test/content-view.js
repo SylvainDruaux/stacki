@@ -19,14 +19,15 @@ const {
   readContentConfig,
   validateEntry,
   stopAllServices,
-} = require('../dist/electron/contentConfig.js');
+} = require('#dist/electron/contentConfig.js');
 const {
   listEntries,
   writeEntry,
   countEntries,
   coveredPaths,
-} = require('../dist/electron/contentEntries.js');
-const frontmatter = require('../dist/electron/formats/frontmatter.js');
+} = require('#dist/electron/contentEntries.js');
+const frontmatter = require('#dist/electron/formats/frontmatter.js');
+const { repoPath } = require('./helpers/sources.js');
 
 const DEFAULT_FIXTURE = path.join(os.homedir(), 'Downloads', 'awesome-client-main');
 const source = path.resolve(
@@ -62,11 +63,11 @@ const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
   // --- the panel, compiled ---------------------------------------------------
   const esbuild = require('esbuild');
   // Inside the repo, so `react` resolves the way it does for the app.
-  const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
+  const buildDirectory = repoPath('node_modules/.stacki-test');
   fs.mkdirSync(buildDirectory, { recursive: true });
   const bundlePath = path.join(buildDirectory, 'content-view.bundle.js');
   await esbuild.build({
-    entryPoints: [path.join(__dirname, '..', 'src', 'panels', 'ContentView.tsx')],
+    entryPoints: [repoPath('src/panels/ContentView.tsx')],
     outfile: bundlePath,
     bundle: true,
     format: 'cjs',

@@ -30,6 +30,7 @@
 const fs = require('fs');
 const path = require('path');
 const Module = require('module');
+const { repoPath } = require('./helpers/sources.js');
 
 const failures = [];
 let checked = 0;
@@ -62,14 +63,11 @@ const FOOTER = `
 
     // morphClient is an ES module the dev server serves to the page; the one
     // function under test is lifted out rather than imported.
-    const source = fs.readFileSync(
-      path.join(__dirname, '..', 'dist', 'electron', 'morphClient.js'),
-      'utf8',
-    );
+    const source = fs.readFileSync(repoPath('dist/electron/morphClient.js'), 'utf8');
     const start = source.indexOf('const isAnchor =');
     const end = source.indexOf('// Never looked inside.');
     // Main prepends the patcher's bounds from shared/limits.ts (step 7).
-    const { LIMITS } = require('../dist/shared/limits.js');
+    const { LIMITS } = require('#dist/shared/limits.js');
     const syncAnchors = new Function(
       'document',
       'AVB_PREVIEW_LIMITS',
@@ -158,7 +156,7 @@ const FOOTER = `
       return id === 'electron' ? electron : realRequire.apply(this, arguments);
     };
     process.isMainFrame = false;
-    require(path.join(__dirname, '..', 'dist', 'electron', 'preload.js'));
+    require(repoPath('dist/electron/preload.js'));
     Module.prototype.require = realRequire;
     await settle(60);
 

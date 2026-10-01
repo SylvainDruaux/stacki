@@ -15,6 +15,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { repoPath } = require('./helpers/sources.js');
 
 const failures = [];
 let checked = 0;
@@ -27,13 +28,12 @@ const check = (what, condition, detail) => {
 
 (async () => {
   const esbuild = require('esbuild');
-  const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
+  const buildDirectory = repoPath('node_modules/.stacki-test');
   fs.mkdirSync(buildDirectory, { recursive: true });
   const entry = path.join(buildDirectory, 'chip-edit.entry.jsx');
   fs.writeFileSync(
     entry,
-    `export { BindField } ` +
-      `from ${JSON.stringify(path.join(__dirname, '..', 'src', 'panels', 'PropsPanel.jsx'))};\n`,
+    `export { BindField } ` + `from ${JSON.stringify(repoPath('src/panels/PropsPanel.tsx'))};\n`,
   );
   const bundle = path.join(buildDirectory, 'chip-edit.bundle.js');
   await esbuild.build({

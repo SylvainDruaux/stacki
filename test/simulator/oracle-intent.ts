@@ -1,14 +1,14 @@
 // Oracle steps as engine values: the intent a client would submit for a step,
 // authored against a snapshot of the step's input file, and the splices the
 // oracle expects. Shared by the oracle suite and the simulator.
-import { assert } from '../../dist/shared/assert.js';
-import type { IntentId } from '../../dist/shared/brand.js';
-import { toIntent, type Intent } from '../../dist/shared/intent.js';
-import { isNodeKind, toAnchorRef, toChildIndex, type AnchorRef } from '../../dist/shared/ref.js';
-import type { Snapshot } from '../../dist/shared/snapshot.js';
-import { encodeUtf8, toByteSpan, utf8ByteLength, type ByteSpan } from '../../dist/shared/span.js';
+import { assert } from '#dist/shared/assert.js';
+import type { IntentId } from '#dist/shared/brand.js';
+import { toIntent, type Intent } from '#dist/shared/intent.js';
+import { isNodeKind, toAnchorRef, toChildIndex, type AnchorRef } from '#dist/shared/ref.js';
+import type { Snapshot } from '#dist/shared/snapshot.js';
+import { encodeUtf8, toByteSpan, utf8ByteLength, type ByteSpan } from '#dist/shared/span.js';
 import type { OracleStep } from './oracles.ts';
-import type { Splice } from '../../dist/shared/planner.js';
+import type { Splice } from '#dist/shared/planner.js';
 
 export function oracleSpans(step: OracleStep): readonly ByteSpan[] {
   return step.splices.map((splice) =>

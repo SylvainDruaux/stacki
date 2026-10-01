@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { test } from 'node:test';
-import { record, text } from '../../dist/shared/boundary.js';
+import { record, text } from '#dist/shared/boundary.js';
 
 const root = resolve(import.meta.dirname, '../..');
 const filesMax = 1000;

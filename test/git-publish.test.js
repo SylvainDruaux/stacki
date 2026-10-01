@@ -7,12 +7,14 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { buildSync } = require('esbuild');
 const { JSDOM } = require('jsdom');
-const { BOUNDARY_LIMITS } = require('../dist/shared/boundary.js');
+const { BOUNDARY_LIMITS } = require('#dist/shared/boundary.js');
+const { ROOT, repoPath } = require('./helpers/sources.js');
 
 // Null as a boundary receives it, parsed from JSON: inputs may hold it; our values never do.
 const jsonNull = JSON.parse('null');
-const { parseGitHubStatus, readGitHubStatus, repoSlug, webUrl } =
-  require('./renderer-module')('panels/gitPublish.ts');
+const { parseGitHubStatus, readGitHubStatus, repoSlug, webUrl } = require('./renderer-module')(
+  'src/panels/gitPublish.ts',
+);
 
 test('GitHub preflight parses each state and rejects impossible or oversized data', async () => {
   for (const status of [
@@ -58,15 +60,15 @@ test('GitHub preflight parses each state and rejects impossible or oversized dat
 });
 
 test('publish dialog passes its project to preflight and ignores old replies', async () => {
-  const output = path.join(__dirname, '../node_modules/.stacki-test/git-publish.cjs');
+  const output = repoPath('node_modules/.stacki-test/git-publish.cjs');
   fs.mkdirSync(path.dirname(output), { recursive: true });
   buildSync({
     stdin: {
       contents:
-        "export { default as PublishModal } from '../src/panels/PublishModal.tsx';\n" +
-        "export { default as SwitchBranchModal } from '../src/panels/SwitchBranchModal.tsx';\n",
+        "export { default as PublishModal } from './src/panels/PublishModal.tsx';\n" +
+        "export { default as SwitchBranchModal } from './src/panels/SwitchBranchModal.tsx';\n",
       loader: 'js',
-      resolveDir: __dirname,
+      resolveDir: ROOT,
     },
     outfile: output,
     bundle: true,

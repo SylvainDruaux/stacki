@@ -7,7 +7,8 @@ const path = require('node:path');
 const { buildSync } = require('esbuild');
 const React = require('react');
 const { renderToStaticMarkup } = require('react-dom/server');
-const directory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
+const { ROOT, repoPath } = require('./helpers/sources.js');
+const directory = repoPath('node_modules/.stacki-test');
 fs.mkdirSync(directory, { recursive: true });
 const output = path.join(directory, 'renderer-pickers.bundle.cjs');
 buildSync({
@@ -15,7 +16,7 @@ buildSync({
     contents: `export { default as DataPicker } from './src/ui/DataPicker.tsx';
     export { default as InsertSearch } from './src/ui/InsertSearch.tsx';
     export { default as LinkField } from './src/ui/LinkField.tsx';`,
-    resolveDir: path.join(__dirname, '..'),
+    resolveDir: ROOT,
   },
   outfile: output,
   bundle: true,

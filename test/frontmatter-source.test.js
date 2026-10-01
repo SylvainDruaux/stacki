@@ -8,8 +8,9 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const path = require('node:path');
-const { readFrontmatter, writeFrontmatter } = require('../dist/electron/frontmatter');
-const { parsePage, serializePage, serializePageMarked } = require('../dist/electron/astroParser');
+const { readFrontmatter, writeFrontmatter } = require('#dist/electron/frontmatter.js');
+const { parsePage, serializePage, serializePageMarked } = require('#dist/electron/astroParser.js');
+const { repoPath } = require('./helpers/sources.js');
 
 const SOURCE = `---
 
@@ -68,7 +69,7 @@ test(
       '../node_modules/.stacki-test/frontmatter-bindings.bundle.js',
     );
     await require('esbuild').build({
-      entryPoints: [path.join(__dirname, '../src/dataSuggest.js')],
+      entryPoints: [repoPath('src/dataSuggest.ts')],
       outfile,
       bundle: true,
       platform: 'node',

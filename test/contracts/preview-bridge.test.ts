@@ -39,9 +39,9 @@ import {
   type PreviewRender,
   type PreviewStamp,
   type StampedFileState,
-} from '../../dist/shared/preview-token.js';
-import { toDigest } from '../../dist/shared/brand.js';
-import { LIMITS } from '../../dist/shared/limits.js';
+} from '#dist/shared/preview-token.js';
+import { toDigest } from '#dist/shared/brand.js';
+import { LIMITS } from '#dist/shared/limits.js';
 
 // Null as a boundary receives it, parsed from JSON: inputs may hold it; our values never do.
 const jsonNull: unknown = JSON.parse('null');

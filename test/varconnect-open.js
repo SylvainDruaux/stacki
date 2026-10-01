@@ -14,7 +14,8 @@
 const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
-const { LIMITS } = require('../dist/shared/limits.js');
+const { LIMITS } = require('#dist/shared/limits.js');
+const { repoPath, stubSources } = require('./helpers/sources.js');
 
 const failures = [];
 let checked = 0;
@@ -27,11 +28,11 @@ const check = (what, condition, detail) => {
 
 (async () => {
   const esbuild = require('esbuild');
-  const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
+  const buildDirectory = repoPath('node_modules/.stacki-test');
   fs.mkdirSync(buildDirectory, { recursive: true });
   const bundlePath = path.join(buildDirectory, 'varconnect-open.bundle.js');
   await esbuild.build({
-    entryPoints: [path.join(__dirname, '..', 'src', 'style-panel', 'VariableConnect.tsx')],
+    entryPoints: [repoPath('src/style-panel/VariableConnect.tsx')],
     outfile: bundlePath,
     bundle: true,
     format: 'cjs',
@@ -41,18 +42,12 @@ const check = (what, condition, detail) => {
     loader: { '.css': 'empty' },
     logLevel: 'silent',
     plugins: [
-      {
-        // The picker asks the project for its variables. There is no project
-        // here, and the list only has to be non-empty for a row to exist to
-        // press — which is the point of the test below.
-        name: 'stub-variables',
-        setup(build) {
-          build.onResolve({ filter: /lib\/webflow$/ }, () => ({
-            path: 'stub-webflow',
-            namespace: 'stub',
-          }));
-          build.onLoad({ filter: /.*/, namespace: 'stub' }, () => ({
-            contents: `
+      // The picker asks the project for its variables. There is no project
+      // here, and the list only has to be non-empty for a row to exist to
+      // press — which is the point of the test below.
+      stubSources('stub-variables', {
+        'src/style-panel/lib/webflow.ts': () => ({
+          contents: `
               export async function streamProjectVariables(onAdd) {
                 onAdd({
                   name: 'brand', collection: 'Colors', group: '', value: '#f00',
@@ -62,10 +57,9 @@ const check = (what, condition, detail) => {
               }
               export const __stub = true;
             `,
-            loader: 'js',
-          }));
-        },
-      },
+          loader: 'js',
+        }),
+      }),
     ],
   });
 

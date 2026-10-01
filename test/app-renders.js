@@ -25,6 +25,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { repoPath } = require('./helpers/sources.js');
 
 const failures = [];
 let checked = 0;
@@ -37,12 +38,12 @@ const check = (what, condition, detail) => {
 
 (async () => {
   const esbuild = require('esbuild');
-  const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
+  const buildDirectory = repoPath('node_modules/.stacki-test');
   fs.mkdirSync(buildDirectory, { recursive: true });
   const bundlePath = path.join(buildDirectory, 'app.bundle.js');
 
   await esbuild.build({
-    entryPoints: [path.join(__dirname, '..', 'src', 'App.tsx')],
+    entryPoints: [repoPath('src/App.tsx')],
     outfile: bundlePath,
     bundle: true,
     format: 'cjs',
@@ -173,7 +174,7 @@ const check = (what, condition, detail) => {
   // Native confirm()/alert() are a different application interrupting this one:
   // system chrome, system type, a title bar naming localhost, and two buttons
   // that can only say OK and Cancel. They are replaced by the app's own dialog
-  // (src/ui/ConfirmDialog.jsx), and the bundle is checked rather than the
+  // (src/ui/ConfirmDialog.tsx), and the bundle is checked rather than the
   // source so a call reintroduced through any import is caught too.
   {
     const bundle = fs.readFileSync(bundlePath, 'utf8');

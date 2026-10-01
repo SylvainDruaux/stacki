@@ -7,13 +7,18 @@ const assert = require('node:assert/strict');
 const path = require('node:path');
 const fs = require('node:fs');
 const esbuild = require('esbuild');
+const { repoPath } = require('./helpers/sources.js');
 
-const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test', 'renderer-core');
+const buildDirectory = repoPath('node_modules/.stacki-test/renderer-core');
 fs.mkdirSync(buildDirectory, { recursive: true });
 esbuild.buildSync({
-  entryPoints: ['editorTree', 'loopBindings', 'pagePersistence', 'pageEdits'].map((name) =>
-    path.join(__dirname, '..', 'src', `${name}.ts`),
-  ),
+  // Named entries: each output is <name>.js wherever its source lives.
+  entryPoints: {
+    editorTree: repoPath('src/editorTree.ts'),
+    loopBindings: repoPath('src/loopBindings.ts'),
+    pagePersistence: repoPath('src/pagePersistence.ts'),
+    pageEdits: repoPath('src/pageEdits.ts'),
+  },
   outdir: buildDirectory,
   bundle: true,
   format: 'cjs',

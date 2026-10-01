@@ -19,7 +19,8 @@
 const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
-const { LIMITS } = require('../dist/shared/limits.js');
+const { LIMITS } = require('#dist/shared/limits.js');
+const { ROOT, repoPath } = require('./helpers/sources.js');
 
 const failures = [];
 let checked = 0;
@@ -32,16 +33,16 @@ const check = (what, condition, detail) => {
 
 (async () => {
   const esbuild = require('esbuild');
-  const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
+  const buildDirectory = repoPath('node_modules/.stacki-test');
   fs.mkdirSync(buildDirectory, { recursive: true });
   const out = path.join(buildDirectory, 'instance-props.bundle.js');
   await esbuild.build({
     stdin: {
       contents: [
-        "export { resolveInstanceProps } from './src/instanceProps.js'",
-        "export { dataTree } from './src/dataSuggest.js'",
+        "export { resolveInstanceProps } from './src/instanceProps.ts'",
+        "export { dataTree } from './src/dataSuggest.ts'",
       ].join('\n'),
-      resolveDir: path.join(__dirname, '..'),
+      resolveDir: ROOT,
       loader: 'js',
     },
     outfile: out,
@@ -181,7 +182,7 @@ const check = (what, condition, detail) => {
   // The file this was written for, if it's on this machine.
   const REAL = '/Users/timothyricks/Documents/Projects/remarkable-agency/src/pages/index.astro';
   if (fs.existsSync(REAL)) {
-    const { parsePage } = require(path.join(__dirname, '..', 'dist', 'electron', 'astroParser.js'));
+    const { parsePage } = require(repoPath('dist/electron/astroParser.js'));
     const page = parsePage(fs.readFileSync(REAL, 'utf8'));
     const found = [];
     const walk = (list, chain) => {

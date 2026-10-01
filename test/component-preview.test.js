@@ -10,12 +10,13 @@ const esbuild = require('esbuild');
 const { createHash } = require('node:crypto');
 // Disk replies carry the SHA-256 of the bytes, as main's do.
 const sha256 = (text) => createHash('sha256').update(text).digest('hex');
-const { parsePage } = require('../dist/electron/astroParser.js');
-const { NODE_PROJECTOR } = require('../dist/electron/documentDisk.js');
-const { buildEditIntent } = require('../dist/electron/editRequests.js');
-const { toIntent } = require('../dist/shared/intent.js');
-const { planIntent } = require('../dist/shared/planner.js');
-const { applySplices, inverseEdits } = require('../dist/shared/splice.js');
+const { parsePage } = require('#dist/electron/astroParser.js');
+const { NODE_PROJECTOR } = require('#dist/electron/documentDisk.js');
+const { buildEditIntent } = require('#dist/electron/editRequests.js');
+const { toIntent } = require('#dist/shared/intent.js');
+const { planIntent } = require('#dist/shared/planner.js');
+const { applySplices, inverseEdits } = require('#dist/shared/splice.js');
+const { repoPath, stubPanels } = require('./helpers/sources.js');
 
 // A visual edit request as main's handler applies it (step 9: every edit of an
 // .astro file is splices): main's translation and planner, on the text held.
@@ -42,16 +43,10 @@ const deferred = () => {
 test(
   'component navigation keeps the real iframe ' + 'and inspector mounted while loading and saving',
   async () => {
-    const buildDirectory = path.join(
-      __dirname,
-      '..',
-      'node_modules',
-      '.stacki-test',
-      'component-preview',
-    );
+    const buildDirectory = repoPath('node_modules/.stacki-test/component-preview');
     fs.mkdirSync(buildDirectory, { recursive: true });
     await esbuild.build({
-      entryPoints: [path.join(__dirname, '..', 'src', 'App.tsx')],
+      entryPoints: [repoPath('src/App.tsx')],
       outfile: path.join(buildDirectory, 'app.js'),
       bundle: true,
       format: 'cjs',
@@ -61,34 +56,28 @@ test(
       loader: { '.css': 'empty', '.svg': 'empty', '.png': 'empty' },
       logLevel: 'silent',
       plugins: [
-        {
-          name: 'capture-inspectors',
-          setup(build) {
-            build.onLoad({ filter: /\/src\/panels\/[^/]+\.[jt]sx$/ }, (args) => {
-              const name = path.basename(args.path, path.extname(args.path));
-              // Keep both preview components real: a mocked pane cannot reveal frame
-              // replacement, navigation, or an inspector vanishing beside the frame.
-              if (
-                [
-                  'PreviewPane',
-                  'CanvasView',
-                  'DevOffline',
-                  'PreviewOverlays',
-                  'PreviewToolbar',
-                  'PreviewSizeControls',
-                ].includes(name)
-              ) {
-                return;
-              }
-              return {
-                contents:
-                  `export const relativeTime = () => ''; export default function Panel(props) { ` +
-                  `globalThis.__componentPanels[${JSON.stringify(name)}] = props; return null; }`,
-                loader: 'jsx',
-              };
-            });
-          },
-        },
+        stubPanels('capture-inspectors', (name) => {
+          // Keep both preview components real: a mocked pane cannot reveal frame
+          // replacement, navigation, or an inspector vanishing beside the frame.
+          if (
+            [
+              'PreviewPane',
+              'CanvasView',
+              'DevOffline',
+              'PreviewOverlays',
+              'PreviewToolbar',
+              'PreviewSizeControls',
+            ].includes(name)
+          ) {
+            return;
+          }
+          return {
+            contents:
+              `export const relativeTime = () => ''; export default function Panel(props) { ` +
+              `globalThis.__componentPanels[${JSON.stringify(name)}] = props; return null; }`,
+            loader: 'jsx',
+          };
+        }),
       ],
     });
     const { JSDOM } = require('jsdom');

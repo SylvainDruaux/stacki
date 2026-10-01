@@ -20,6 +20,7 @@ const fs = require('fs');
 const path = require('path');
 const { pathToFileURL } = require('url');
 const { containsCode } = require('./source-text.js');
+const { repoPath } = require('./helpers/sources.js');
 
 const failures = [];
 let checked = 0;
@@ -32,11 +33,11 @@ const check = (what, condition, detail) => {
 
 (async () => {
   const esbuild = require('esbuild');
-  const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
+  const buildDirectory = repoPath('node_modules/.stacki-test');
   fs.mkdirSync(buildDirectory, { recursive: true });
   const out = path.join(buildDirectory, 'canvas-click.bundle.mjs');
   await esbuild.build({
-    entryPoints: [path.join(__dirname, '..', 'src', 'canvasClick.js')],
+    entryPoints: [repoPath('src/canvasClick.ts')],
     outfile: out,
     bundle: true,
     format: 'esm',
@@ -105,7 +106,7 @@ const check = (what, condition, detail) => {
   );
 
   // --- the panel asks -----------------------------------------------------------
-  const app = fs.readFileSync(path.join(__dirname, '..', 'src', 'App.tsx'), 'utf8');
+  const app = fs.readFileSync(repoPath('src/App.tsx'), 'utf8');
   check('the canvas handler goes through it', /canvasClickAction\(\{/.test(app));
   check('and passes what the canvas said about the click', /outside: !!info\?\.outside/.test(app));
 
@@ -113,10 +114,7 @@ const check = (what, condition, detail) => {
   // one `<Button/>` written three times gives each its own path, so the opened
   // one has a single run, and requiring two meant no narrowing: three outlines
   // at once, and a scroll-to that went to whichever came first in the document.
-  const preload = fs.readFileSync(
-    path.join(__dirname, '..', 'dist', 'electron', 'preload.js'),
-    'utf8',
-  );
+  const preload = fs.readFileSync(repoPath('dist/electron/preload.js'), 'utf8');
   check(
     'one run is enough to narrow to the instance',
     /if \(runs\.length\) \{[\s\S]*?focusCache = \{ roots: runs\[focusOcc\]/.test(preload),

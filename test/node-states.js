@@ -14,6 +14,7 @@
 const fs = require('fs');
 const path = require('path');
 const Module = require('module');
+const { repoPath } = require('./helpers/sources.js');
 
 const failures = [];
 let checked = 0;
@@ -68,7 +69,7 @@ const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
       return id === 'electron' ? electron : realRequire.apply(this, arguments);
     };
     process.isMainFrame = false;
-    require(path.join(__dirname, '..', 'dist', 'electron', 'preload.js'));
+    require(repoPath('dist/electron/preload.js'));
     Module.prototype.require = realRequire;
     await settle(60);
 
@@ -123,11 +124,11 @@ const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
   // --- what the navigator draws ------------------------------------------------
   {
     const esbuild = require('esbuild');
-    const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
+    const buildDirectory = repoPath('node_modules/.stacki-test');
     fs.mkdirSync(buildDirectory, { recursive: true });
     const bundlePath = path.join(buildDirectory, 'node-states.bundle.js');
     await esbuild.build({
-      entryPoints: [path.join(__dirname, '..', 'src', 'panels', 'StructurePanel.tsx')],
+      entryPoints: [repoPath('src/panels/StructurePanel.tsx')],
       outfile: bundlePath,
       bundle: true,
       format: 'cjs',

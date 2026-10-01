@@ -15,12 +15,13 @@ const path = require('node:path');
 const Module = require('node:module');
 const { createHash } = require('node:crypto');
 const { JSDOM } = require('jsdom');
+const { repoPath } = require('./helpers/sources.js');
 const {
   canonicalManifest,
   manifestOf,
   stampComment,
   parsePreviewRender,
-} = require('../dist/shared/preview-token.js');
+} = require('#dist/shared/preview-token.js');
 
 const settle = (ms = 80) => new Promise((resolve) => setTimeout(resolve, ms));
 const FIRST_CHECKSUM = 'a'.repeat(64);
@@ -67,7 +68,7 @@ async function frame(html) {
     return id === 'electron' ? electron : realRequire.apply(this, arguments);
   };
   process.isMainFrame = false;
-  const entry = path.join(__dirname, '..', 'dist', 'electron', 'preload.js');
+  const entry = repoPath('dist/electron/preload.js');
   delete require.cache[entry];
   try {
     require(entry);

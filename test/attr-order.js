@@ -37,17 +37,18 @@ const {
   serializePage,
   parseTemplate,
   serializeNodes,
-} = require('../dist/electron/astroParser.js');
+} = require('#dist/electron/astroParser.js');
 
-// `src/attrOrder.js` is the renderer's module, so it comes in the way the app
+// `src/attrOrder.ts` is the renderer's module, so it comes in the way the app
 // gets it rather than as a copy of its rules.
 const fs = require('fs');
 const path = require('path');
-const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
+const { repoPath } = require('./helpers/sources.js');
+const buildDirectory = repoPath('node_modules/.stacki-test');
 fs.mkdirSync(buildDirectory, { recursive: true });
 const bundled = path.join(buildDirectory, 'attr-order.cjs');
 require('esbuild').buildSync({
-  entryPoints: [path.join(__dirname, '..', 'src', 'attrOrder.js')],
+  entryPoints: [repoPath('src/attrOrder.ts')],
   outfile: bundled,
   bundle: true,
   format: 'cjs',
@@ -249,7 +250,7 @@ const INPUT = '<Input variant="first-name" required />';
 // The app's rename goes through it — a second copy of the rule elsewhere would
 // be a second answer to where a renamed prop lives.
 {
-  const gestures = fs.readFileSync(path.join(__dirname, '..', 'src', 'editGestures.ts'), 'utf8');
+  const gestures = fs.readFileSync(repoPath('src/editGestures.ts'), 'utf8');
   check(
     'the app renames props through that module',
     /renamedAttr\(found, names\.from, names\.to\)/.test(gestures),
@@ -277,7 +278,7 @@ const INPUT = '<Input variant="first-name" required />';
 // where it goes; it keeps the place the canvas writer gives it, which is after
 // what the tag already had.
 {
-  const { serializePageMarked } = require('../dist/electron/astroParser.js');
+  const { serializePageMarked } = require('#dist/electron/astroParser.js');
   const marks = (body) => {
     const parsed = parsePage(page(body));
     return serializePageMarked(parsed.model, 'src/pages/index.astro');

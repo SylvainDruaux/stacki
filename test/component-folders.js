@@ -17,6 +17,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { pathToFileURL } = require('url');
+const { repoPath } = require('./helpers/sources.js');
 
 const failures = [];
 let checked = 0;
@@ -135,11 +136,11 @@ const toPosix = (filePath) => filePath.split(path.sep).join('/');
 
   // --- searching by where it lives --------------------------------------------------
   const esbuild = require('esbuild');
-  const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
+  const buildDirectory = repoPath('node_modules/.stacki-test');
   fs.mkdirSync(buildDirectory, { recursive: true });
   const out = path.join(buildDirectory, 'component-folders.bundle.mjs');
   await esbuild.build({
-    entryPoints: [path.join(__dirname, '..', 'src', 'insertRank.js')],
+    entryPoints: [repoPath('src/insertRank.ts')],
     outfile: out,
     bundle: true,
     format: 'esm',
@@ -198,16 +199,13 @@ const toPosix = (filePath) => filePath.split(path.sep).join('/');
   );
 
   // The panel and the palette ask the same question of the same list.
-  const panel = fs.readFileSync(
-    path.join(__dirname, '..', 'src', 'panels', 'PalettePanel.tsx'),
-    'utf8',
-  );
+  const panel = fs.readFileSync(repoPath('src/panels/PalettePanel.tsx'), 'utf8');
   check(
     'the components panel searches by that rule too',
     /rankInsertItems\(props\.components, query\)/.test(panel),
     'the panel has its own idea of what matches',
   );
-  const model = fs.readFileSync(path.join(__dirname, '..', 'src', 'paletteModel.ts'), 'utf8');
+  const model = fs.readFileSync(repoPath('src/paletteModel.ts'), 'utf8');
   check(
     'and still groups what comes back by folder',
     /const folder = component\.folder;/.test(model),

@@ -6,8 +6,8 @@
 // name or id one past the bound).
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { LIMITS } = require('../dist/shared/limits.js');
-const { parseNavigatorDrop } = require('./renderer-module')('panels/navigatorDrop.ts');
+const { LIMITS } = require('#dist/shared/limits.js');
+const { parseNavigatorDrop } = require('./renderer-module')('src/panels/navigatorDrop.ts');
 
 const transfer = (data) => (type) => data[type] ?? '';
 

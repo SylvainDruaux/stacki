@@ -16,6 +16,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { ROOT, repoPath } = require('./helpers/sources.js');
 
 const failures = [];
 let checked = 0;
@@ -28,16 +29,16 @@ const check = (what, condition, detail) => {
 
 (async () => {
   const esbuild = require('esbuild');
-  const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
+  const buildDirectory = repoPath('node_modules/.stacki-test');
   fs.mkdirSync(buildDirectory, { recursive: true });
   const bundlePath = path.join(buildDirectory, 'enter-stays.bundle.js');
   await esbuild.build({
     stdin: {
       contents: `
-        export { default as SizeSection } from './SizeSection'
-        export { commitInPlace } from './lib/commit-in-place'
+        export { default as SizeSection } from './src/style-panel/SizeSection'
+        export { commitInPlace } from './src/style-panel/lib/commit-in-place'
       `,
-      resolveDir: path.join(__dirname, '..', 'src', 'style-panel'),
+      resolveDir: ROOT,
       loader: 'tsx',
     },
     outfile: bundlePath,

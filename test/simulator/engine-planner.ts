@@ -4,9 +4,9 @@
 // every operation, mapped through the diff when the intent is stale, so the
 // simulator exercises exactly what ships (plan §10, invariant 9 by
 // construction). Kept as the simulator's one seam for the planner.
-import type { Intent, RejectionReason } from '../../dist/shared/intent.js';
-import { planIntent, type Plan, type PlanningBase } from '../../dist/shared/planner.js';
-import type { Result } from '../../dist/shared/result.js';
+import type { Intent, RejectionReason } from '#dist/shared/intent.js';
+import { planIntent, type Plan, type PlanningBase } from '#dist/shared/planner.js';
+import type { Result } from '#dist/shared/result.js';
 
 export function planEngine(base: PlanningBase, intent: Intent): Result<Plan, RejectionReason> {
   return planIntent(base, intent);

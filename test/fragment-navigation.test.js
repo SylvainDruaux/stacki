@@ -7,11 +7,12 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { LIMITS } = require('../dist/shared/limits.js');
+const { LIMITS } = require('#dist/shared/limits.js');
 const fs = require('node:fs');
 const path = require('node:path');
 const esbuild = require('esbuild');
-const { parsePage } = require('../dist/electron/astroParser.js');
+const { parsePage } = require('#dist/electron/astroParser.js');
+const { ROOT, repoPath } = require('./helpers/sources.js');
 
 // The shape that made the real SermonSearch subtree disappear into one opaque
 // expression: a conditional returning multiple roots through shorthand Fragment.
@@ -68,22 +69,16 @@ async function checkFragment(syntax) {
     false,
   );
 
-  const buildDirectory = path.join(
-    __dirname,
-    '..',
-    'node_modules',
-    '.stacki-test',
-    'fragment-navigation',
-  );
+  const buildDirectory = repoPath('node_modules/.stacki-test/fragment-navigation');
   fs.mkdirSync(buildDirectory, { recursive: true });
   await esbuild.build({
     stdin: {
       contents:
         "export {default as StructurePanel} from './src/panels/StructurePanel.tsx'; export " +
-        "{liveClassesById} from './src/liveClasses.js'; export {createTreeIndex} from " +
-        "'./src/editorTree.js';",
+        "{liveClassesById} from './src/liveClasses.ts'; export {createTreeIndex} from " +
+        "'./src/editorTree.ts';",
       loader: 'jsx',
-      resolveDir: path.join(__dirname, '..'),
+      resolveDir: ROOT,
     },
     outfile: path.join(buildDirectory, 'navigator.js'),
     bundle: true,

@@ -57,7 +57,8 @@ const check = (what, condition, detail) => {
   }
 };
 
-const { parsePage, serializePageMarked } = require('../dist/electron/astroParser.js');
+const { parsePage, serializePageMarked } = require('#dist/electron/astroParser.js');
+const { repoPath } = require('./helpers/sources.js');
 
 const marked = (
   body,
@@ -233,7 +234,7 @@ const marked = (
       'is:inline no longer leaves a tag',
     );
     // And what the dev config now writes.
-    const main = fs.readFileSync(path.join(__dirname, '..', 'dist', 'electron', 'main.js'), 'utf8');
+    const main = fs.readFileSync(repoPath('dist/electron/main.js'), 'utf8');
     check(
       'the dev config writes the hoistable form',
       new RegExp(
@@ -246,7 +247,7 @@ const marked = (
 
   // --- markdown blocks ------------------------------------------------------------
   {
-    const main = fs.readFileSync(path.join(__dirname, '..', 'dist', 'electron', 'main.js'), 'utf8');
+    const main = fs.readFileSync(repoPath('dist/electron/main.js'), 'utf8');
     check(
       'a markdown block is marked with comments',
       /insertBefore\(node, \{ type: 'html', value: '<!--avb-s:' \+ path \+ '-->' \}\)/.test(main),
@@ -277,10 +278,7 @@ const marked = (
 
   // --- the canvas still reads what it is served ------------------------------------
   {
-    const preload = fs.readFileSync(
-      path.join(__dirname, '..', 'dist', 'electron', 'preload.js'),
-      'utf8',
-    );
+    const preload = fs.readFileSync(repoPath('dist/electron/preload.js'), 'utf8');
     check(
       'a comment is a marker',
       /if \(isComment\(node\)\) \{[\s\S]*?avb-\$\{kind\}:/.test(preload),

@@ -12,13 +12,13 @@
 // anchors); plans applied to the bytes and compared with hand-written output.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { toFilePath, toIntentId } from '../../dist/shared/brand.js';
-import { toIntent, type Operation } from '../../dist/shared/intent.js';
-import { planIntent } from '../../dist/shared/planner.js';
-import type { AnchorRef } from '../../dist/shared/ref.js';
-import type { Snapshot } from '../../dist/shared/snapshot.js';
-import { decodeUtf8, encodeUtf8 } from '../../dist/shared/span.js';
-import { applySplices } from '../../dist/shared/splice.js';
+import { toFilePath, toIntentId } from '#dist/shared/brand.js';
+import { toIntent, type Operation } from '#dist/shared/intent.js';
+import { planIntent } from '#dist/shared/planner.js';
+import type { AnchorRef } from '#dist/shared/ref.js';
+import type { Snapshot } from '#dist/shared/snapshot.js';
+import { decodeUtf8, encodeUtf8 } from '#dist/shared/span.js';
+import { applySplices } from '#dist/shared/splice.js';
 import { anchorAt } from './oracle-intent.ts';
 import { snapshotOf } from './project.ts';
 

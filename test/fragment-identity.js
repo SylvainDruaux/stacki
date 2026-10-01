@@ -19,6 +19,7 @@
 const fs = require('fs');
 const path = require('path');
 const { pathToFileURL } = require('url');
+const { repoPath } = require('./helpers/sources.js');
 
 const failures = [];
 let checked = 0;
@@ -31,11 +32,11 @@ const check = (what, condition, detail) => {
 
 (async () => {
   const esbuild = require('esbuild');
-  const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
+  const buildDirectory = repoPath('node_modules/.stacki-test');
   fs.mkdirSync(buildDirectory, { recursive: true });
   const out = path.join(buildDirectory, 'renders-element.bundle.mjs');
   await esbuild.build({
-    entryPoints: [path.join(__dirname, '..', 'src', 'liveClasses.js')],
+    entryPoints: [repoPath('src/liveClasses.ts')],
     outfile: out,
     bundle: true,
     format: 'esm',
@@ -60,7 +61,7 @@ const check = (what, condition, detail) => {
   check('and nothing at all is nothing', rendersOwnElement(undefined) === false);
 
   // --- and who asks -----------------------------------------------------------
-  const app = fs.readFileSync(path.join(__dirname, '..', 'src', 'App.tsx'), 'utf8');
+  const app = fs.readFileSync(repoPath('src/App.tsx'), 'utf8');
   check(
     'the app builds its labels through it',
     /classesByNodeId\(nodeClasses, model\.nodes/.test(app),
@@ -78,7 +79,7 @@ const check = (what, condition, detail) => {
   // --- the navigator, with the map the app would build -------------------------
   const bundlePath = path.join(buildDirectory, 'fragment-identity.bundle.js');
   await esbuild.build({
-    entryPoints: [path.join(__dirname, '..', 'src', 'panels', 'StructurePanel.tsx')],
+    entryPoints: [repoPath('src/panels/StructurePanel.tsx')],
     outfile: bundlePath,
     bundle: true,
     format: 'cjs',

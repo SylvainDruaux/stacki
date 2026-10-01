@@ -14,6 +14,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { repoPath } = require('./helpers/sources.js');
 
 const failures = [];
 let checked = 0;
@@ -72,13 +73,13 @@ const WORDS = elementNode('words', 'p', [{ id: 'w-text', kind: 'expr', value: '{
 
 (async () => {
   const esbuild = require('esbuild');
-  const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
+  const buildDirectory = repoPath('node_modules/.stacki-test');
   fs.mkdirSync(buildDirectory, { recursive: true });
 
   // --- the rule itself --------------------------------------------------------
   const rulePath = path.join(buildDirectory, 'branches.bundle.js');
   await esbuild.build({
-    entryPoints: [path.join(__dirname, '..', 'src', 'branches.js')],
+    entryPoints: [repoPath('src/branches.ts')],
     outfile: rulePath,
     bundle: true,
     format: 'cjs',
@@ -129,7 +130,7 @@ const WORDS = elementNode('words', 'p', [{ id: 'w-text', kind: 'expr', value: '{
   // --- the rows ---------------------------------------------------------------
   const bundlePath = path.join(buildDirectory, 'structure.bundle.js');
   await esbuild.build({
-    entryPoints: [path.join(__dirname, '..', 'src', 'panels', 'StructurePanel.tsx')],
+    entryPoints: [repoPath('src/panels/StructurePanel.tsx')],
     outfile: bundlePath,
     bundle: true,
     format: 'cjs',
@@ -354,7 +355,7 @@ const WORDS = elementNode('words', 'p', [{ id: 'w-text', kind: 'expr', value: '{
   // A condition dropped from the palette starts as the one thing it is: a
   // test and what it shows. The else is a switch in the props panel.
   {
-    const app = fs.readFileSync(path.join(__dirname, '..', 'src', 'App.tsx'), 'utf8');
+    const app = fs.readFileSync(repoPath('src/App.tsx'), 'utf8');
     const insert = app.slice(
       app.indexOf("item.type === 'cond'"),
       app.indexOf("item.type === 'comment'"),
@@ -377,7 +378,7 @@ const WORDS = elementNode('words', 'p', [{ id: 'w-text', kind: 'expr', value: '{
   // is checked here is the contrast it ends up with — not the colour it is
   // written as.
   {
-    const css = fs.readFileSync(path.join(__dirname, '..', 'src', 'styles.css'), 'utf8');
+    const css = fs.readFileSync(repoPath('src/styles.css'), 'utf8');
     const rule = css.slice(css.indexOf('.node-note {'));
     const note = /color:\s*rgba\(([^)]+)\)/.exec(rule.slice(0, rule.indexOf('}')));
     check('the note is written as a colour with alpha', !!note, rule.slice(0, rule.indexOf('}')));

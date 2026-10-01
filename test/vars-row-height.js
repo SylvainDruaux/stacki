@@ -23,6 +23,7 @@
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
+const { ROOT, repoPath } = require('./helpers/sources.js');
 
 const failures = [];
 let checked = 0;
@@ -65,18 +66,18 @@ const STYLESHEET = `:root {
   fs.mkdirSync(path.join(directory, 'src', 'styles'), { recursive: true });
   fs.writeFileSync(path.join(directory, 'src', 'styles', 'tokens.css'), STYLESHEET);
 
-  const cssVars = require('../dist/electron/cssVars.js');
+  const cssVars = require('#dist/electron/cssVars.js');
   const data = cssVars.readVariables(directory);
 
   const esbuild = require('esbuild');
-  const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test', 'varsrow');
+  const buildDirectory = repoPath('node_modules/.stacki-test/varsrow');
   fs.mkdirSync(buildDirectory, { recursive: true });
   await esbuild.build({
     stdin: {
       contents: `
         import React from 'react'
         import { createRoot } from 'react-dom/client'
-        import VariablesView from './src/panels/VariablesView.jsx'
+        import VariablesView from './src/panels/VariablesView.tsx'
         import './src/styles.css'
         const root = createRoot(document.getElementById('root'))
         window.__show = (index) => root.render(
@@ -90,7 +91,7 @@ const STYLESHEET = `:root {
         )
         window.__show(0)
       `,
-      resolveDir: path.join(__dirname, '..'),
+      resolveDir: ROOT,
       loader: 'jsx',
     },
     outfile: path.join(buildDirectory, 'bundle.js'),

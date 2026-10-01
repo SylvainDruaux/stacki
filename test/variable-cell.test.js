@@ -6,12 +6,13 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { buildSync } = require('esbuild');
 const { JSDOM } = require('jsdom');
+const { repoPath } = require('./helpers/sources.js');
 
 test('variable cells keep hook order across sparse matrix updates', async () => {
-  const output = path.join(__dirname, '../node_modules/.stacki-test/variable-cell.cjs');
+  const output = repoPath('node_modules/.stacki-test/variable-cell.cjs');
   fs.mkdirSync(path.dirname(output), { recursive: true });
   buildSync({
-    entryPoints: [path.join(__dirname, '../src/panels/VariableCell.tsx')],
+    entryPoints: [repoPath('src/panels/VariableCell.tsx')],
     outfile: output,
     bundle: true,
     platform: 'node',

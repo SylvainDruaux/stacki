@@ -14,6 +14,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { repoPath } = require('./helpers/sources.js');
 
 const failures = [];
 let checked = 0;
@@ -27,28 +28,26 @@ const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
 
 (async () => {
   const esbuild = require('esbuild');
-  const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
+  const buildDirectory = repoPath('node_modules/.stacki-test');
   fs.mkdirSync(buildDirectory, { recursive: true });
   const entry = path.join(buildDirectory, 'spacing.entry.jsx');
   fs.writeFileSync(
     entry,
     `export { SpacingFill, SpacingLabel } from ${JSON.stringify(
-      path.join(__dirname, '..', 'src', 'style-panel', 'SpacingBox.tsx'),
+      repoPath('src/style-panel/SpacingBox.tsx'),
     )};\n` +
       `export { clampNonNegative, isNonNegative } from ${JSON.stringify(
-        path.join(__dirname, '..', 'src', 'style-panel', 'lib', 'css-properties.ts'),
+        repoPath('src/style-panel/lib/css-properties.ts'),
       )};\n` +
       `export { stepNumberAtCaret } from ${JSON.stringify(
-        path.join(__dirname, '..', 'src', 'style-panel', 'lib', 'number-step.ts'),
+        repoPath('src/style-panel/lib/number-step.ts'),
       )};\n` +
       `export { sectionOf } from ${JSON.stringify(
-        path.join(__dirname, '..', 'src', 'style-panel', 'lib', 'sections.ts'),
+        repoPath('src/style-panel/lib/sections.ts'),
       )};\n` +
-      `export { spacingBands } from ${JSON.stringify(
-        path.join(__dirname, '..', 'src', 'spacingBands.js'),
-      )};\n` +
+      `export { spacingBands } from ${JSON.stringify(repoPath('src/spacingBands.ts'))};\n` +
       `export { getHost, setHost, setModifiers } from ${JSON.stringify(
-        path.join(__dirname, '..', 'src', 'style-panel', 'lib', 'host.ts'),
+        repoPath('src/style-panel/lib/host.ts'),
       )};\n`,
   );
   const bundlePath = path.join(buildDirectory, 'spacing.bundle.js');
@@ -735,10 +734,7 @@ const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
 
   // --- the canvas draws what it is told ---------------------------------------
   {
-    const frame = fs.readFileSync(
-      path.join(__dirname, '..', 'dist', 'electron', 'preload.js'),
-      'utf8',
-    );
+    const frame = fs.readFileSync(repoPath('dist/electron/preload.js'), 'utf8');
     check(
       'the page forwards the modifiers it hears',
       /type: 'avb:modifiers'/.test(frame),
@@ -747,31 +743,25 @@ const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
     check(
       'and the app passes them to the panel',
       /case 'modifiers':[\s\S]{0,100}setModifiers\(/.test(
-        fs.readFileSync(path.join(__dirname, '..', 'src', 'panels', 'previewRuntime.ts'), 'utf8'),
+        fs.readFileSync(repoPath('src/panels/previewRuntime.ts'), 'utf8'),
       ),
       'the message arrives and goes nowhere',
     );
-    const pane = fs.readFileSync(
-      path.join(__dirname, '..', 'src', 'panels', 'PreviewOverlays.tsx'),
-      'utf8',
-    );
+    const pane = fs.readFileSync(repoPath('src/panels/PreviewOverlays.tsx'), 'utf8');
     check('the preview draws the bands', /spacingBands\(/.test(pane));
     check('over the selected element', /rects\[selectedPath\]/.test(pane));
     check('from what the page measured', /spacing\[selectedPath\]/.test(pane));
-    const css = fs.readFileSync(path.join(__dirname, '..', 'src', 'styles.css'), 'utf8');
+    const css = fs.readFileSync(repoPath('src/styles.css'), 'utf8');
     check('padding is pink', /\.spacing-band\.is-padding \{\s*--band: #ec4899;\s*\}/.test(css));
     check('and margin is blue', /\.spacing-band\.is-margin \{\s*--band: #3b82f6;\s*\}/.test(css));
-    const app = fs.readFileSync(path.join(__dirname, '..', 'src', 'App.tsx'), 'utf8');
+    const app = fs.readFileSync(repoPath('src/App.tsx'), 'utf8');
     check(
       'the panel is wired to the canvas',
       /onSpacingHover=\{(app\.)?setSpacingHover\}/.test(app) &&
         /spacingHover=\{(app\.)?spacingHover\}/.test(app),
       'the style panel reports a hover nothing is listening to',
     );
-    const preload = fs.readFileSync(
-      path.join(__dirname, '..', 'dist', 'electron', 'preload.js'),
-      'utf8',
-    );
+    const preload = fs.readFileSync(repoPath('dist/electron/preload.js'), 'utf8');
     check(
       'and the page reports its spacing',
       /spacing\[nodePath\] = spacingForPath\(nodePath\)/.test(preload),

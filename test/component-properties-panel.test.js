@@ -8,22 +8,23 @@ const fs = require('node:fs');
 const path = require('node:path');
 const esbuild = require('esbuild');
 const { JSDOM } = require('jsdom');
+const { ROOT, repoPath } = require('./helpers/sources.js');
 const {
   readComponentProperties,
   editPropertyDefinition,
-} = require('../dist/electron/propertyDefinitions');
+} = require('#dist/electron/propertyDefinitions.js');
 
 test('component properties lifecycle and controls', async () => {
-  const directory = path.join(__dirname, '../node_modules/.stacki-test/properties');
+  const directory = repoPath('node_modules/.stacki-test/properties');
   fs.mkdirSync(directory, { recursive: true });
   const bundle = path.join(directory, 'panel.js');
   await esbuild.build({
     stdin: {
-      contents: `export {default as Panel} from './panels/ComponentPropertiesPanel';
-     export {default as Rail} from './ui/LeftRail';
-     export {literalOptions} from './panels/PropertyEditor';
-     export {movePropertyItem} from './panels/PropertyReorder';`,
-      resolveDir: path.join(__dirname, '../src'),
+      contents: `export {default as Panel} from './src/panels/ComponentPropertiesPanel';
+     export {default as Rail} from './src/ui/LeftRail';
+     export {literalOptions} from './src/panels/PropertyEditor';
+     export {movePropertyItem} from './src/panels/PropertyReorder';`,
+      resolveDir: ROOT,
       loader: 'tsx',
     },
     outfile: bundle,
@@ -413,7 +414,7 @@ test('component properties lifecycle and controls', async () => {
   const {
     readComponentProperties,
     editPropertyDefinition,
-  } = require('../dist/electron/propertyDefinitions');
+  } = require('#dist/electron/propertyDefinitions.js');
   const inherited = `---
 import type { HTMLAttributes } from 'astro/types';
 type ContainerGap = 'small' | 'medium' | 'large';

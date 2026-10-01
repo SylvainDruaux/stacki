@@ -18,7 +18,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
-import { parsePageResult, assertTreeInvariants } from '../../dist/shared/page-node.js';
+import { parsePageResult, assertTreeInvariants } from '#dist/shared/page-node.js';
 
 const require = createRequire(import.meta.url);
 // CJS module boundary; every value it returns is validated by the contract parsers.
@@ -26,7 +26,7 @@ const require = createRequire(import.meta.url);
 const astroParser: {
   parsePage: (source: string) => unknown;
   serializeNodes: (nodes: readonly unknown[]) => string;
-} = require('../../dist/electron/astroParser.js');
+} = require('#dist/electron/astroParser.js');
 const { parsePage, serializeNodes } = astroParser;
 
 // mulberry32 — deterministic, so a failure replays exactly.

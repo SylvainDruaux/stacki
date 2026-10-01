@@ -25,12 +25,13 @@ const { test, describe } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
+const { repoPath } = require('./helpers/sources.js');
 
-const { parsePage, serializePage } = require('../dist/electron/astroParser.js');
-const { LIMITS } = require('../dist/shared/limits.js');
+const { parsePage, serializePage } = require('#dist/electron/astroParser.js');
+const { LIMITS } = require('#dist/shared/limits.js');
 
 const CORPUS_DIRECTORY = path.join(__dirname, 'corpus');
-const expectations = JSON.parse(fs.readFileSync(path.join(__dirname, 'expectations.json'), 'utf8'));
+const expectations = JSON.parse(fs.readFileSync(repoPath('test/expectations.json'), 'utf8'));
 
 const DEFAULT_EXPECTATION = { editable: true, identity: 'pass' };
 

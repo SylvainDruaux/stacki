@@ -8,25 +8,25 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { test } from 'node:test';
-import { parsePage } from '../../dist/electron/astroParser.js';
-import { parseMarkdownPage } from '../../dist/electron/markdownParser.js';
-import { toDigest, toFilePath } from '../../dist/shared/brand.js';
+import { parsePage } from '#dist/electron/astroParser.js';
+import { parseMarkdownPage } from '#dist/electron/markdownParser.js';
+import { toDigest, toFilePath } from '#dist/shared/brand.js';
 import {
   CAPABILITIES,
   capabilityAcceptsVisualIntent,
   describeCapability,
   parseCapability,
-} from '../../dist/shared/capability.js';
-import { LIMITS } from '../../dist/shared/limits.js';
-import { parsePageResult } from '../../dist/shared/page-node.js';
-import { createSnapshot } from '../../dist/shared/snapshot.js';
+} from '#dist/shared/capability.js';
+import { LIMITS } from '#dist/shared/limits.js';
+import { parsePageResult } from '#dist/shared/page-node.js';
+import { createSnapshot } from '#dist/shared/snapshot.js';
 import {
   projectionAcceptsVisualIntents,
   projectOpaqueDocument,
   projectPage,
   type ProjectedNode,
-} from '../../dist/shared/source-projection.js';
-import { encodeUtf8, type ByteString } from '../../dist/shared/span.js';
+} from '#dist/shared/source-projection.js';
+import { encodeUtf8, type ByteString } from '#dist/shared/span.js';
 
 const project = (text: string) =>
   projectPage(text, parsePageResult(parsePage(text, { locs: true })));

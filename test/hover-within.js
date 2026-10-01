@@ -21,7 +21,8 @@
 const fs = require('fs');
 const path = require('path');
 const Module = require('module');
-const { parsePreviewMessage } = require('./renderer-module')('previewMessages.ts');
+const { parsePreviewMessage } = require('./renderer-module')('src/previewMessages.ts');
+const { repoPath } = require('./helpers/sources.js');
 
 const failures = [];
 let checked = 0;
@@ -122,7 +123,7 @@ const settle = (ms = 40) => new Promise((resolve) => setTimeout(resolve, ms));
     return id === 'electron' ? electron : realRequire.apply(this, arguments);
   };
   process.isMainFrame = false;
-  require(path.join(__dirname, '..', 'dist', 'electron', 'preload.js'));
+  require(repoPath('dist/electron/preload.js'));
   Module.prototype.require = realRequire;
   await settle(60);
 

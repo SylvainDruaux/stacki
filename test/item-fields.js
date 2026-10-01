@@ -23,6 +23,7 @@
 const fs = require('fs');
 const path = require('path');
 const { compactSource } = require('./source-text.js');
+const { repoPath } = require('./helpers/sources.js');
 
 const failures = [];
 let checked = 0;
@@ -35,11 +36,11 @@ const check = (what, condition, detail) => {
 
 (async () => {
   const esbuild = require('esbuild');
-  const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
+  const buildDirectory = repoPath('node_modules/.stacki-test');
   fs.mkdirSync(buildDirectory, { recursive: true });
   const out = path.join(buildDirectory, 'item-fields.cjs');
   await esbuild.build({
-    entryPoints: [path.join(__dirname, '..', 'src', 'dataSuggest.js')],
+    entryPoints: [repoPath('src/dataSuggest.ts')],
     outfile: out,
     bundle: true,
     format: 'cjs',
@@ -47,7 +48,7 @@ const check = (what, condition, detail) => {
     logLevel: 'silent',
   });
   const { dataTree } = require(out);
-  const { parsePropSchema } = require('../dist/electron/astroParser.js');
+  const { parsePropSchema } = require('#dist/electron/astroParser.js');
 
   const itemOf = (context, name = 'service') =>
     dataTree(context).find((node) => node.path === name);
@@ -330,10 +331,7 @@ const { posts = [] } = Astro.props;`;
   }
   {
     // The row draws them, and the app moves the index they show.
-    const picker = fs.readFileSync(
-      path.join(__dirname, '..', 'src', 'ui', 'DataPicker.tsx'),
-      'utf8',
-    );
+    const picker = fs.readFileSync(repoPath('src/ui/DataPicker.tsx'), 'utf8');
     check(
       'the row draws the arrows when the item has somewhere to go',
       /node\.nav && onStepItem/.test(picker),
@@ -344,9 +342,7 @@ const { posts = [] } = Astro.props;`;
       /className="dp-item-nav" onClick=\{\(event\) => event\.stopPropagation\(\)\}/.test(picker),
       'stepping would choose the item as the binding',
     );
-    const app = fs
-      .readFileSync(path.join(__dirname, '..', 'src', 'App.tsx'), 'utf8')
-      .replace(/\r\n/g, '\n');
+    const app = fs.readFileSync(repoPath('src/App.tsx'), 'utf8').replace(/\r\n/g, '\n');
     check(
       'the app keeps a place per item name',
       /itemIndex,\n\s*onStepItem:/.test(app),

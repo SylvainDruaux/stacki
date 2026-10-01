@@ -16,6 +16,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { repoPath } = require('./helpers/sources.js');
 
 const failures = [];
 let checked = 0;
@@ -28,13 +29,13 @@ const check = (what, condition, detail) => {
 
 (async () => {
   const esbuild = require('esbuild');
-  const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
+  const buildDirectory = repoPath('node_modules/.stacki-test');
   fs.mkdirSync(buildDirectory, { recursive: true });
   const entry = path.join(buildDirectory, 'token-field.entry.jsx');
   fs.writeFileSync(
     entry,
     `export { buildTokenHtml, serializeTokens } from ${JSON.stringify(
-      path.join(__dirname, '..', 'src', 'style-panel', 'VariableConnect.tsx'),
+      repoPath('src/style-panel/VariableConnect.tsx'),
     )};\n`,
   );
   const out = path.join(buildDirectory, 'token-field.bundle.js');
@@ -151,10 +152,7 @@ const check = (what, condition, detail) => {
   );
 
   // --- the rule that makes it visible --------------------------------------------
-  const css = fs.readFileSync(
-    path.join(__dirname, '..', 'src', 'style-panel', 'embed-editor.css'),
-    'utf8',
-  );
+  const css = fs.readFileSync(repoPath('src/style-panel/embed-editor.css'), 'utf8');
   const rule = css.slice(css.indexOf('.embed-editor_varconnect-space'));
   check(
     "the space keeps its width against the field's nowrap",

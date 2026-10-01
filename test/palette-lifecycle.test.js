@@ -7,6 +7,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const esbuild = require('esbuild');
 const { JSDOM } = require('jsdom');
+const { repoPath } = require('./helpers/sources.js');
 
 function deferred() {
   let resolve;
@@ -17,11 +18,11 @@ function deferred() {
 }
 
 test('component usage popup ignores replies after close and from older opens', async () => {
-  const directory = path.join(__dirname, '..', 'node_modules', '.stacki-test', 'palette-lifecycle');
+  const directory = repoPath('node_modules/.stacki-test/palette-lifecycle');
   const bundle = path.join(directory, 'panel.js');
   fs.mkdirSync(directory, { recursive: true });
   await esbuild.build({
-    entryPoints: [path.join(__dirname, '..', 'src', 'panels', 'PalettePanel.tsx')],
+    entryPoints: [repoPath('src/panels/PalettePanel.tsx')],
     outfile: bundle,
     bundle: true,
     format: 'cjs',

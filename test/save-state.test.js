@@ -7,11 +7,12 @@ const assert = require('node:assert/strict');
 const path = require('node:path');
 const fs = require('node:fs');
 const esbuild = require('esbuild');
+const { repoPath } = require('./helpers/sources.js');
 
-const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test', 'save-state');
+const buildDirectory = repoPath('node_modules/.stacki-test/save-state');
 fs.mkdirSync(buildDirectory, { recursive: true });
 esbuild.buildSync({
-  entryPoints: [path.join(__dirname, '..', 'src', 'saveState.ts')],
+  entryPoints: [repoPath('src/saveState.ts')],
   outdir: buildDirectory,
   bundle: true,
   format: 'cjs',

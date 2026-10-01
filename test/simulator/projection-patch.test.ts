@@ -17,16 +17,16 @@ import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { test } from 'node:test';
-import { parsePage } from '../../dist/electron/astroParser.js';
-import { toFilePath } from '../../dist/shared/brand.js';
-import { LIMITS } from '../../dist/shared/limits.js';
-import type { Splice } from '../../dist/shared/planner.js';
+import { parsePage } from '#dist/electron/astroParser.js';
+import { toFilePath } from '#dist/shared/brand.js';
+import { LIMITS } from '#dist/shared/limits.js';
+import type { Splice } from '#dist/shared/planner.js';
 import {
   hostContext,
   projectValueSplice,
   valueBytesNeutral,
-} from '../../dist/shared/projection-patch.js';
-import type { ProjectedNode, Projection } from '../../dist/shared/source-projection.js';
+} from '#dist/shared/projection-patch.js';
+import type { ProjectedNode, Projection } from '#dist/shared/source-projection.js';
 import {
   decodeUtf8,
   encodeUtf8,
@@ -34,12 +34,12 @@ import {
   toByteString,
   type ByteSpan,
   type ByteString,
-} from '../../dist/shared/span.js';
+} from '#dist/shared/span.js';
 import { patchCounts } from './candidate.ts';
 import { Prng } from './prng.ts';
 import { loadSimulationFixtures } from './fixtures.entry.ts';
 import { projectBytes } from './project.ts';
-import { applySplices } from '../../dist/shared/splice.js';
+import { applySplices } from '#dist/shared/splice.js';
 import { runSimulation } from './world.ts';
 
 const DIRECTORIES = ['test/corpus', 'test/fixtures/round-trip', 'test/fixtures/editor-core'];

@@ -21,6 +21,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { sourceBlock } = require('./source-text.js');
+const { repoPath } = require('./helpers/sources.js');
 
 const failures = [];
 let checked = 0;
@@ -34,11 +35,11 @@ const check = (what, condition, detail) => {
 (async () => {
   // ── The name ──────────────────────────────────────────────────────────────
   const esbuild = require('esbuild');
-  const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
+  const buildDirectory = repoPath('node_modules/.stacki-test');
   fs.mkdirSync(buildDirectory, { recursive: true });
   const namesBundle = path.join(buildDirectory, 'component-name.bundle.js');
   await esbuild.build({
-    entryPoints: [path.join(__dirname, '..', 'src', 'componentName.js')],
+    entryPoints: [repoPath('src/componentName.ts')],
     outfile: namesBundle,
     bundle: true,
     format: 'cjs',
@@ -93,7 +94,7 @@ const check = (what, condition, detail) => {
   // values it was reading are exactly the props the component wants.
   const propsBundle = path.join(buildDirectory, 'extract-props.bundle.js');
   await esbuild.build({
-    entryPoints: [path.join(__dirname, '..', 'src', 'extractProps.js')],
+    entryPoints: [repoPath('src/extractProps.ts')],
     outfile: propsBundle,
     bundle: true,
     format: 'cjs',
@@ -236,9 +237,7 @@ const check = (what, condition, detail) => {
   check('and there is none without props', propsDestructure([]) === '', propsDestructure([]));
 
   // ── The file ──────────────────────────────────────────────────────────────
-  const { componentFile } = require(
-    path.join(__dirname, '..', 'dist', 'electron', 'componentFile.js'),
-  );
+  const { componentFile } = require(repoPath('dist/electron/componentFile.js'));
   const project = fs.mkdtempSync(path.join(os.tmpdir(), 'stacki-comp-'));
   fs.mkdirSync(path.join(project, 'src', 'components'), { recursive: true });
   fs.mkdirSync(path.join(project, 'src', 'pages'), { recursive: true });
@@ -367,9 +366,7 @@ const check = (what, condition, detail) => {
   check(
     'and the props panel can read them back',
     (() => {
-      const { parsePropSchema } = require(
-        path.join(__dirname, '..', 'dist', 'electron', 'astroParser.js'),
-      );
+      const { parsePropSchema } = require(repoPath('dist/electron/astroParser.js'));
       const schema = parsePropSchema(withProps.text);
       return (
         schema.some((field) => field.name === 'title') &&
@@ -457,7 +454,7 @@ const check = (what, condition, detail) => {
   // ── It round-trips ────────────────────────────────────────────────────────
   // The file it writes is a file the app can open again: parsed back, it is the
   // same element it was cut from.
-  const { parsePage } = require(path.join(__dirname, '..', 'dist', 'electron', 'astroParser.js'));
+  const { parsePage } = require(repoPath('dist/electron/astroParser.js'));
   const reparsed = parsePage(fs.readFileSync(made.path, 'utf8'));
   const root = reparsed.model.nodes.find((node) => node.kind === 'element');
   check('the written file parses back', !!root, JSON.stringify(reparsed.model.nodes));
@@ -485,9 +482,7 @@ const check = (what, condition, detail) => {
   // same 23, found the same way, or the popup is missing something the count
   // promised and nothing says which of them is lying.
   {
-    const { componentUsage, countIn } = require(
-      path.join(__dirname, '..', 'dist', 'electron', 'componentUsage.js'),
-    );
+    const { componentUsage, countIn } = require(repoPath('dist/electron/componentUsage.js'));
     const proj = fs.mkdtempSync(path.join(os.tmpdir(), 'stacki-usage-'));
     const put = (rel, text) => {
       const abs = path.join(proj, rel);
@@ -596,7 +591,7 @@ const check = (what, condition, detail) => {
     check(
       'the palette counts with this same function',
       /instancesIn\(text,\s*\{\s*file,\s*targetPath:\s*comp\.path/.test(
-        fs.readFileSync(path.join(__dirname, '..', 'dist', 'electron', 'main.js'), 'utf8'),
+        fs.readFileSync(repoPath('dist/electron/main.js'), 'utf8'),
       ),
       'project:scan counts instances its own way again',
     );
@@ -639,7 +634,7 @@ const check = (what, condition, detail) => {
   {
     const panelBundle = path.join(buildDirectory, 'palette-panel.bundle.js');
     await esbuild.build({
-      entryPoints: [path.join(__dirname, '..', 'src', 'panels', 'PalettePanel.tsx')],
+      entryPoints: [repoPath('src/panels/PalettePanel.tsx')],
       outfile: panelBundle,
       bundle: true,
       format: 'cjs',
@@ -907,7 +902,7 @@ const check = (what, condition, detail) => {
     );
 
     // The press itself is bound in the app, which this can only read.
-    const appSource = fs.readFileSync(path.join(__dirname, '..', 'src', 'App.tsx'), 'utf8');
+    const appSource = fs.readFileSync(repoPath('src/App.tsx'), 'utf8');
     // The whole `if` that tests for the key, body included, however it is wrapped.
     const binding = sourceBlock(
       appSource,

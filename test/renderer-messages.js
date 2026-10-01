@@ -2,14 +2,14 @@
 // Fake postMessage avoids a browser; real promises expose cancellation and limits.
 const assert = require('node:assert/strict');
 const loadRenderer = require('./renderer-module.js');
-const { BOUNDARY_LIMITS } = require('../dist/shared/boundary.js');
+const { BOUNDARY_LIMITS } = require('#dist/shared/boundary.js');
 
 // A boundary can receive null — JSON, structured clone and postMessage all carry it —
 // so the negative space below includes it. It is read from JSON, because our own
 // code never writes a null.
 const PLATFORM_NULL = JSON.parse('null');
-const { parseCanvasReply } = loadRenderer('canvasReply.ts');
-const canvas = loadRenderer('canvasQuery.ts');
+const { parseCanvasReply } = loadRenderer('src/canvasReply.ts');
+const canvas = loadRenderer('src/canvasQuery.ts');
 
 const valid = {
   id: 1,
@@ -93,7 +93,7 @@ async function main() {
     true,
   );
 
-  const { createPreviewWatch } = loadRenderer('previewRecovery.ts');
+  const { createPreviewWatch } = loadRenderer('src/previewRecovery.ts');
   for (const duration of [-1, NaN, Infinity, 0.5, 2_147_483_648]) {
     assert.throws(
       () =>

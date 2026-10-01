@@ -4,7 +4,7 @@
 //
 // Double-click a Button to open it, click that same button on the canvas, and
 // the component closed. What the app does with a click is decided by
-// src/canvasClick.js (test/canvas-click.js), and it was deciding correctly: the
+// src/canvasClick.ts (test/canvas-click.js), and it was deciding correctly: the
 // canvas told it the click landed on something the open file does not own,
 // which is somebody looking away from what they are editing.
 //
@@ -22,6 +22,7 @@
 const fs = require('fs');
 const path = require('path');
 const Module = require('module');
+const { ROOT, repoPath } = require('./helpers/sources.js');
 
 const failures = [];
 let checked = 0;
@@ -32,18 +33,17 @@ const check = (what, condition, detail) => {
   }
 };
 
-const ROOT = path.join(__dirname, '..');
-const PRELOAD = path.join(ROOT, 'dist', 'electron', 'preload.js');
+const PRELOAD = repoPath('dist/electron/preload.js');
 const SCOPE = 'src/components/Button.astro|';
 const ROOT_PATH = `${SCOPE}0.0.0`;
 
 (async () => {
   const esbuild = require('esbuild');
-  const buildDirectory = path.join(ROOT, 'node_modules', '.stacki-test');
+  const buildDirectory = repoPath('node_modules/.stacki-test');
   fs.mkdirSync(buildDirectory, { recursive: true });
   const bundle = path.join(buildDirectory, 'opened-click.cjs');
   await esbuild.build({
-    entryPoints: [path.join(ROOT, 'src', 'canvasClick.js')],
+    entryPoints: [repoPath('src/canvasClick.ts')],
     outfile: bundle,
     bundle: true,
     format: 'cjs',

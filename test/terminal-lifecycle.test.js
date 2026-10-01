@@ -7,6 +7,7 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const path = require('node:path');
+const { repoPath } = require('./helpers/sources.js');
 
 test(
   'terminals load on demand, retain scrollback ' +
@@ -18,7 +19,7 @@ test(
     );
     global.__terminalTest = { loads: 0, terminals: [], dimensions: { cols: 80, rows: 24 } };
     await require('esbuild').build({
-      entryPoints: [path.join(__dirname, '../src/panels/TerminalDock.tsx')],
+      entryPoints: [repoPath('src/panels/TerminalDock.tsx')],
       outfile: output,
       bundle: true,
       platform: 'node',

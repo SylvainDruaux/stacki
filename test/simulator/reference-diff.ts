@@ -6,9 +6,9 @@
 // script keeps the span whole at one place, gone when none keeps it whole,
 // ambiguous otherwise. The fast mapper decides from two columns and Myers
 // frontiers; the tests assert the two agree on every input they generate.
-import { assert } from '../../dist/shared/assert.js';
-import type { SpanMapping } from '../../dist/shared/mapSpan.js';
-import { toByteSpan, type ByteSpan, type ByteString } from '../../dist/shared/span.js';
+import { assert } from '#dist/shared/assert.js';
+import type { SpanMapping } from '#dist/shared/mapSpan.js';
+import { toByteSpan, type ByteSpan, type ByteString } from '#dist/shared/span.js';
 
 /** Largest table the reference builds: 4 M cells, a few MB per table. */
 export const REFERENCE_CELLS_MAX = 4_000_000;

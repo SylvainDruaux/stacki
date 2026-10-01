@@ -22,6 +22,7 @@
 const fs = require('fs');
 const path = require('path');
 const { pathToFileURL } = require('url');
+const { repoPath } = require('./helpers/sources.js');
 
 const failures = [];
 let checked = 0;
@@ -34,11 +35,11 @@ const check = (what, condition, detail) => {
 
 (async () => {
   const esbuild = require('esbuild');
-  const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
+  const buildDirectory = repoPath('node_modules/.stacki-test');
   fs.mkdirSync(buildDirectory, { recursive: true });
   const out = path.join(buildDirectory, 'insert-rank.bundle.mjs');
   await esbuild.build({
-    entryPoints: [path.join(__dirname, '..', 'src', 'insertRank.js')],
+    entryPoints: [repoPath('src/insertRank.ts')],
     outfile: out,
     bundle: true,
     format: 'esm',
@@ -213,10 +214,7 @@ const check = (what, condition, detail) => {
   }
 
   // --- the palette asks for this ----------------------------------------------------------
-  const palette = fs.readFileSync(
-    path.join(__dirname, '..', 'src', 'ui', 'InsertSearch.tsx'),
-    'utf8',
-  );
+  const palette = fs.readFileSync(repoPath('src/ui/InsertSearch.tsx'), 'utf8');
   check(
     'the palette ranks through it',
     /rankInsertItems\(items, query\)/.test(palette),

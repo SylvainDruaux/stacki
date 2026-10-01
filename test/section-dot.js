@@ -22,6 +22,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { ROOT, repoPath } = require('./helpers/sources.js');
 
 const failures = [];
 let checked = 0;
@@ -34,7 +35,7 @@ const check = (what, condition, detail) => {
 
 (async () => {
   const esbuild = require('esbuild');
-  const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
+  const buildDirectory = repoPath('node_modules/.stacki-test');
   fs.mkdirSync(buildDirectory, { recursive: true });
 
   const { JSDOM } = require('jsdom');
@@ -64,10 +65,10 @@ const check = (what, condition, detail) => {
   await esbuild.build({
     stdin: {
       contents: `
-        export { default as EmbedEditor } from './EmbedEditor'
-        export { setHost } from './lib/host'
+        export { default as EmbedEditor } from './src/style-panel/EmbedEditor'
+        export { setHost } from './src/style-panel/lib/host'
       `,
-      resolveDir: path.join(__dirname, '..', 'src', 'style-panel'),
+      resolveDir: ROOT,
       loader: 'tsx',
     },
     outfile: bundle,

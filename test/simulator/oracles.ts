@@ -16,9 +16,9 @@
 // between two blocks one line break apart (the gap becomes blank lines).
 //
 // Fixtures: test/fixtures/editor-core/<file> and <name>.expected.<extension>.
-import type { Operation, RejectionReason } from '../../dist/shared/intent.js';
-import type { AnchorKind, AnchorRef, NodeKind } from '../../dist/shared/ref.js';
-import type { ByteSpan } from '../../dist/shared/span.js';
+import type { Operation, RejectionReason } from '#dist/shared/intent.js';
+import type { AnchorKind, AnchorRef, NodeKind } from '#dist/shared/ref.js';
+import type { ByteSpan } from '#dist/shared/span.js';
 
 export type IntentClass =
   | 'multi-span'

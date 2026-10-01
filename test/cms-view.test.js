@@ -7,10 +7,11 @@ const path = require('node:path');
 const fs = require('node:fs');
 const { buildSync } = require('esbuild');
 const { JSDOM } = require('jsdom');
-const output = path.join(__dirname, '../node_modules/.stacki-test/cms-view.cjs');
+const { repoPath } = require('./helpers/sources.js');
+const output = repoPath('node_modules/.stacki-test/cms-view.cjs');
 fs.mkdirSync(path.dirname(output), { recursive: true });
 buildSync({
-  entryPoints: [path.join(__dirname, '../src/panels/CmsView.tsx')],
+  entryPoints: [repoPath('src/panels/CmsView.tsx')],
   outfile: output,
   bundle: true,
   platform: 'node',

@@ -39,7 +39,8 @@ const check = (what, condition, detail) => {
 };
 const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
 
-const { parsePage, serializePageMarked } = require('../dist/electron/astroParser.js');
+const { parsePage, serializePageMarked } = require('#dist/electron/astroParser.js');
+const { repoPath } = require('./helpers/sources.js');
 
 // ── What the serializer writes ──────────────────────────────────────────────
 {
@@ -261,7 +262,7 @@ const { parsePage, serializePageMarked } = require('../dist/electron/astroParser
     return id === 'electron' ? electron : realRequire.apply(this, arguments);
   };
   process.isMainFrame = false;
-  require(path.join(__dirname, '..', 'dist', 'electron', 'preload.js'));
+  require(repoPath('dist/electron/preload.js'));
   Module.prototype.require = realRequire;
   await settle(60);
 

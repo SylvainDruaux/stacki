@@ -3,7 +3,7 @@
 // projection, raw-tree lookup, ancestor/collapse state, then cross both bounds.
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const model = require('./renderer-module')('panels/structureModel.ts');
+const model = require('./renderer-module')('src/panels/structureModel.ts');
 
 const element = (id, children = []) => ({
   id,

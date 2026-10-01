@@ -2,7 +2,7 @@
 //
 //   node test/content-fields.js [projectDir]
 //
-// src/contentSchema.js turns a collection's JSON Schema into field
+// src/contentSchema.ts turns a collection's JSON Schema into field
 // descriptors — which control to draw, whether a value is required, what it is
 // bounded by. The failure mode is quiet: a misread constraint shows the user an
 // error on content that is perfectly valid, or a control that cannot express
@@ -17,14 +17,14 @@ const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
-const { LIMITS } = require('../dist/shared/limits.js');
+const { LIMITS } = require('#dist/shared/limits.js');
 const loadRenderer = require('./renderer-module.js');
 const {
   readContentConfig,
   stopAllServices,
   validateEntry,
-} = require('../dist/electron/contentConfig.js');
-const { listEntries } = require('../dist/electron/contentEntries.js');
+} = require('#dist/electron/contentConfig.js');
+const { listEntries } = require('#dist/electron/contentEntries.js');
 
 const DEFAULT_FIXTURE = path.join(os.homedir(), 'Downloads', 'awesome-client-main');
 const source = path.resolve(
@@ -49,7 +49,7 @@ const isPlainObject = (value) => !!value && typeof value === 'object' && !Array.
   }
   // The renderer's module, loaded the way the renderer loads it.
   const { collectionFields, describeField, fieldIssue, editsBetween, memberFor, hintFor } =
-    loadRenderer('contentSchema.ts');
+    loadRenderer('src/contentSchema.ts');
 
   const config = await readContentConfig(source, { force: true });
   if (config.error) {

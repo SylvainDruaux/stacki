@@ -23,6 +23,7 @@
 const fs = require('fs');
 const path = require('path');
 const Module = require('module');
+const { repoPath } = require('./helpers/sources.js');
 
 const failures = [];
 let checked = 0;
@@ -34,7 +35,7 @@ const check = (what, condition, detail) => {
 };
 const settle = (ms = 40) => new Promise((resolve) => setTimeout(resolve, ms));
 
-const PRELOAD = path.join(__dirname, '..', 'dist', 'electron', 'preload.js');
+const PRELOAD = repoPath('dist/electron/preload.js');
 
 // Both frames run the same file; the hash is the only thing that tells them
 // apart, so each one gets its own module instance and its own document.

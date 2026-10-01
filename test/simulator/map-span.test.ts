@@ -15,15 +15,15 @@
 // precondition breach asserts with a pinned message.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { diffBytes, DIFF_BUDGET } from '../../dist/shared/diff.js';
-import { mapSpan, mapSpanThroughDiff, type SpanMapping } from '../../dist/shared/mapSpan.js';
+import { diffBytes, DIFF_BUDGET } from '#dist/shared/diff.js';
+import { mapSpan, mapSpanThroughDiff, type SpanMapping } from '#dist/shared/mapSpan.js';
 import {
   encodeUtf8,
   toByteSpan,
   toByteString,
   type ByteSpan,
   type ByteString,
-} from '../../dist/shared/span.js';
+} from '#dist/shared/span.js';
 import { Prng } from './prng.ts';
 import { referenceMapSpan, referenceTables } from './reference-diff.ts';
 

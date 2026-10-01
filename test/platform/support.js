@@ -7,10 +7,10 @@ const { spawn, spawnSync } = require('node:child_process');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { DocumentActors } = require('../../dist/electron/documentActors.js');
-const { NODE_PROJECTOR, NodeDocumentDisk } = require('../../dist/electron/documentDisk.js');
-const { createDocumentTelemetry } = require('../../dist/electron/documentTelemetry.js');
-const { planIntent } = require('../../dist/shared/planner.js');
+const { DocumentActors } = require('#dist/electron/documentActors.js');
+const { NODE_PROJECTOR, NodeDocumentDisk } = require('#dist/electron/documentDisk.js');
+const { createDocumentTelemetry } = require('#dist/electron/documentTelemetry.js');
+const { planIntent } = require('#dist/shared/planner.js');
 
 const sha256 = (bytes) => createHash('sha256').update(bytes).digest('hex');
 

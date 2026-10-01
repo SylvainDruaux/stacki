@@ -26,6 +26,7 @@
 
 const fs = require('node:fs');
 const path = require('node:path');
+const { repoPath } = require('./helpers/sources.js');
 
 // The largest source a test reads. App.tsx is well under a megabyte; the bound
 // keeps the brace walk in sourceBlock finite by construction.
@@ -33,7 +34,7 @@ const SOURCE_CHARACTERS_MAX = 4 * 1024 * 1024;
 
 // Reads a file relative to the repository root, with line endings normalized.
 function readSource(relativePath) {
-  const text = fs.readFileSync(path.join(__dirname, '..', relativePath), 'utf8');
+  const text = fs.readFileSync(repoPath(relativePath), 'utf8');
   if (text.length > SOURCE_CHARACTERS_MAX) {
     throw new Error(`source-text: ${relativePath} exceeds ${SOURCE_CHARACTERS_MAX} characters`);
   }

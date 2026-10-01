@@ -9,14 +9,10 @@ import {
   serializeNodes,
   serializePage,
   serializePageMarked,
-} from '../../dist/electron/astroParser.js';
-import {
-  assertTreeInvariants,
-  parsePageNode,
-  parsePageResult,
-} from '../../dist/shared/page-node.js';
-import { LIMITS } from '../../dist/shared/limits.js';
-import type { ParserNode } from '../../dist/electron/astroParser.types.js';
+} from '#dist/electron/astroParser.js';
+import { assertTreeInvariants, parsePageNode, parsePageResult } from '#dist/shared/page-node.js';
+import { LIMITS } from '#dist/shared/limits.js';
+import type { ParserNode } from '#dist/electron/astroParser.types.js';
 
 // Null as a boundary receives it, parsed from JSON: inputs may hold it; our values never do.
 const jsonNull: unknown = JSON.parse('null');

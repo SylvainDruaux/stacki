@@ -13,8 +13,9 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 
-const { readContentConfig, stopAllServices } = require('../dist/electron/contentConfig.js');
-const { listEntries, countEntries, coveredPaths } = require('../dist/electron/contentEntries.js');
+const { readContentConfig, stopAllServices } = require('#dist/electron/contentConfig.js');
+const { listEntries, countEntries, coveredPaths } = require('#dist/electron/contentEntries.js');
+const { repoPath } = require('./helpers/sources.js');
 
 const DEFAULT_FIXTURE = path.join(os.homedir(), 'Downloads', 'awesome-client-main');
 const source = path.resolve(
@@ -79,11 +80,11 @@ function listCms(root) {
   }
 
   const esbuild = require('esbuild');
-  const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
+  const buildDirectory = repoPath('node_modules/.stacki-test');
   fs.mkdirSync(buildDirectory, { recursive: true });
   const bundlePath = path.join(buildDirectory, 'cms-panel.bundle.js');
   await esbuild.build({
-    entryPoints: [path.join(__dirname, '..', 'src', 'panels', 'CmsPanel.tsx')],
+    entryPoints: [repoPath('src/panels/CmsPanel.tsx')],
     outfile: bundlePath,
     bundle: true,
     format: 'cjs',

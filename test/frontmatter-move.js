@@ -22,6 +22,7 @@
 const fs = require('fs');
 const path = require('path');
 const { pathToFileURL } = require('url');
+const { repoPath } = require('./helpers/sources.js');
 
 const failures = [];
 let checked = 0;
@@ -34,11 +35,11 @@ const check = (what, condition, detail) => {
 
 (async () => {
   const esbuild = require('esbuild');
-  const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
+  const buildDirectory = repoPath('node_modules/.stacki-test');
   fs.mkdirSync(buildDirectory, { recursive: true });
   const out = path.join(buildDirectory, 'frontmatter-move.bundle.mjs');
   await esbuild.build({
-    entryPoints: [path.join(__dirname, '..', 'src', 'frontmatterMove.js')],
+    entryPoints: [repoPath('src/frontmatterMove.ts')],
     outfile: out,
     bundle: true,
     format: 'esm',
@@ -279,7 +280,7 @@ const check = (what, condition, detail) => {
   }
 
   // --- the app asks for both ----------------------------------------------------------
-  const app = fs.readFileSync(path.join(__dirname, '..', 'src', 'App.tsx'), 'utf8');
+  const app = fs.readFileSync(repoPath('src/App.tsx'), 'utf8');
   check(
     'deleting prunes what it made dead',
     /const dead = unusedDeclarations\(next\)/.test(app),

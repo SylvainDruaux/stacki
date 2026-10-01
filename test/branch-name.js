@@ -16,6 +16,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { repoPath } = require('./helpers/sources.js');
 
 const failures = [];
 let checked = 0;
@@ -28,11 +29,11 @@ const check = (what, condition, detail) => {
 
 (async () => {
   const esbuild = require('esbuild');
-  const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
+  const buildDirectory = repoPath('node_modules/.stacki-test');
   fs.mkdirSync(buildDirectory, { recursive: true });
   const bundlePath = path.join(buildDirectory, 'branch-name.bundle.js');
   await esbuild.build({
-    entryPoints: [path.join(__dirname, '..', 'src', 'branchName.js')],
+    entryPoints: [repoPath('src/branchName.ts')],
     outfile: bundlePath,
     bundle: true,
     format: 'cjs',
@@ -107,10 +108,7 @@ const check = (what, condition, detail) => {
   check('and an empty field is never valid', !ok('', existing) && !ok('   ', existing));
 
   // --- the field really asks ---------------------------------------------------
-  const chip = fs.readFileSync(
-    path.join(__dirname, '..', 'src', 'panels', 'GitChipView.tsx'),
-    'utf8',
-  );
+  const chip = fs.readFileSync(repoPath('src/panels/GitChipView.tsx'), 'utf8');
   check(
     'the field cleans what is typed',
     /onChange=\{\(event\) => onNewBranch\(sanitizeBranchName\(/.test(chip),

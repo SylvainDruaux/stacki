@@ -15,14 +15,15 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const esbuild = require('esbuild');
+const { repoPath } = require('./helpers/sources.js');
 
-const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
+const buildDirectory = repoPath('node_modules/.stacki-test');
 const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const bundle = async (entry, name) => {
   const outfile = path.join(buildDirectory, name);
   await esbuild.build({
-    entryPoints: [path.join(__dirname, '..', 'src', ...entry)],
+    entryPoints: [repoPath(entry)],
     outfile,
     bundle: true,
     format: 'cjs',
@@ -157,9 +158,9 @@ async function checkNavigator(StructurePanel) {
 
 (async () => {
   fs.mkdirSync(buildDirectory, { recursive: true });
-  checkCodeWindowRule(await bundle(['codeWindowTarget.ts'], 'code-window-target.cjs'));
+  checkCodeWindowRule(await bundle('src/codeWindowTarget.ts', 'code-window-target.cjs'));
   const { default: StructurePanel } = await bundle(
-    ['panels', 'StructurePanel.tsx'],
+    'src/panels/StructurePanel.tsx',
     'navigator-open-code.cjs',
   );
   await checkNavigator(StructurePanel);

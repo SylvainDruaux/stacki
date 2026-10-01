@@ -14,6 +14,7 @@
 const fs = require('fs');
 const path = require('path');
 const { pathToFileURL } = require('url');
+const { repoPath } = require('./helpers/sources.js');
 
 const failures = [];
 let checked = 0;
@@ -26,13 +27,13 @@ const check = (what, condition, detail) => {
 
 (async () => {
   const esbuild = require('esbuild');
-  const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
+  const buildDirectory = repoPath('node_modules/.stacki-test');
   fs.mkdirSync(buildDirectory, { recursive: true });
 
   // --- the rule ---------------------------------------------------------------
   const orderOut = path.join(buildDirectory, 'page-order.bundle.mjs');
   await esbuild.build({
-    entryPoints: [path.join(__dirname, '..', 'src', 'pageOrder.js')],
+    entryPoints: [repoPath('src/pageOrder.ts')],
     outfile: orderOut,
     bundle: true,
     format: 'esm',
@@ -73,7 +74,7 @@ const check = (what, condition, detail) => {
   fs.writeFileSync(
     entry,
     `export { default as PagesPanel } from ${JSON.stringify(
-      path.join(__dirname, '..', 'src', 'panels', 'PagesPanel.tsx'),
+      repoPath('src/panels/PagesPanel.tsx'),
     )};\n`,
   );
   const bundle = path.join(buildDirectory, 'page-order.bundle.js');

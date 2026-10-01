@@ -32,7 +32,8 @@ const check = (what, condition, detail) => {
   }
 };
 
-const { parseSlots, defaultSlotInline } = require('../dist/electron/astroParser.js');
+const { parseSlots, defaultSlotInline } = require('#dist/electron/astroParser.js');
+const { repoPath } = require('./helpers/sources.js');
 
 // The DOM answers "none" with null. The fakes below that stand in for DOM APIs
 // return the platform's own value, read from JSON because our code never writes one.
@@ -246,11 +247,11 @@ if (fs.existsSync(LUMOS)) {
 // ── The field it was all for ────────────────────────────────────────────────
 (async () => {
   const esbuild = require('esbuild');
-  const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
+  const buildDirectory = repoPath('node_modules/.stacki-test');
   fs.mkdirSync(buildDirectory, { recursive: true });
   const bundle = path.join(buildDirectory, 'slot-api.bundle.js');
   await esbuild.build({
-    entryPoints: [path.join(__dirname, '..', 'src', 'panels', 'PropsPanel.jsx')],
+    entryPoints: [repoPath('src/panels/PropsPanel.tsx')],
     outfile: bundle,
     bundle: true,
     format: 'cjs',

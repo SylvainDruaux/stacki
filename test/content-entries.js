@@ -14,15 +14,15 @@
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
-const { readContentConfig, stopAllServices } = require('../dist/electron/contentConfig.js');
-const { listEntries, writeEntry } = require('../dist/electron/contentEntries.js');
+const { readContentConfig, stopAllServices } = require('#dist/electron/contentConfig.js');
+const { listEntries, writeEntry } = require('#dist/electron/contentEntries.js');
 const formats = {
-  json: require('../dist/electron/formats/json.js'),
-  yaml: require('../dist/electron/formats/yaml.js'),
-  toml: require('../dist/electron/formats/toml.js'),
-  csv: require('../dist/electron/formats/csv.js'),
-  ndjson: require('../dist/electron/formats/ndjson.js'),
-  frontmatter: require('../dist/electron/formats/frontmatter.js'),
+  json: require('#dist/electron/formats/json.js'),
+  yaml: require('#dist/electron/formats/yaml.js'),
+  toml: require('#dist/electron/formats/toml.js'),
+  csv: require('#dist/electron/formats/csv.js'),
+  ndjson: require('#dist/electron/formats/ndjson.js'),
+  frontmatter: require('#dist/electron/formats/frontmatter.js'),
 };
 
 const DEFAULT_FIXTURE = path.join(os.homedir(), 'Downloads', 'awesome-client-main');

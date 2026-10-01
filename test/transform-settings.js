@@ -16,6 +16,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { repoPath, sourceSpecifier } = require('./helpers/sources.js');
 
 const failures = [];
 let checked = 0;
@@ -28,16 +29,17 @@ const check = (what, condition, detail) => {
 
 (async () => {
   const esbuild = require('esbuild');
-  const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
+  const buildDirectory = repoPath('node_modules/.stacki-test');
   fs.mkdirSync(buildDirectory, { recursive: true });
-  const lib = (file) =>
-    JSON.stringify(path.join(__dirname, '..', 'src', 'style-panel', 'lib', file));
   const entry = path.join(buildDirectory, 'transform-settings.entry.ts');
+  const reexports = [
+    ['*', 'src/style-panel/lib/transform-settings.ts'],
+    ['{ parseTransforms, serializeTransforms }', 'src/style-panel/lib/transform.ts'],
+    ['{ parseHideable, serializeHideable }', 'src/style-panel/lib/hideable.ts'],
+  ];
   fs.writeFileSync(
     entry,
-    `export * from ${lib('transform-settings.ts')};\n` +
-      `export { parseTransforms, serializeTransforms } from ${lib('transform.ts')};\n` +
-      `export { parseHideable, serializeHideable } from ${lib('hideable.ts')};\n`,
+    reexports.map(([names, file]) => `export ${names} from ${sourceSpecifier(file)};\n`).join(''),
   );
   const bundlePath = path.join(buildDirectory, 'transform-settings.bundle.js');
   await esbuild.build({
@@ -346,7 +348,7 @@ const check = (what, condition, detail) => {
   {
     const bundle2 = path.join(buildDirectory, 'effects.bundle.js');
     await esbuild.build({
-      entryPoints: [path.join(__dirname, '..', 'src', 'style-panel', 'EffectsSection.tsx')],
+      entryPoints: [repoPath('src/style-panel/EffectsSection.tsx')],
       outfile: bundle2,
       bundle: true,
       format: 'cjs',

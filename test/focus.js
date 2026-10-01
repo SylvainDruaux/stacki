@@ -16,6 +16,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { repoPath } = require('./helpers/sources.js');
 
 const failures = [];
 let checked = 0;
@@ -28,13 +29,13 @@ const check = (what, condition, detail) => {
 
 (async () => {
   const esbuild = require('esbuild');
-  const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
+  const buildDirectory = repoPath('node_modules/.stacki-test');
   fs.mkdirSync(buildDirectory, { recursive: true });
   const entry = path.join(buildDirectory, 'focus.entry.jsx');
   fs.writeFileSync(
     entry,
     `export { RatioOtherInput } from ${JSON.stringify(
-      path.join(__dirname, '..', 'src', 'style-panel', 'SizeSection.tsx'),
+      repoPath('src/style-panel/SizeSection.tsx'),
     )};\n`,
   );
   const out = path.join(buildDirectory, 'focus.bundle.js');
@@ -142,10 +143,7 @@ const check = (what, condition, detail) => {
   });
 
   // --- both fields it serves ----------------------------------------------------
-  const size = fs.readFileSync(
-    path.join(__dirname, '..', 'src', 'style-panel', 'SizeSection.tsx'),
-    'utf8',
-  );
+  const size = fs.readFileSync(repoPath('src/style-panel/SizeSection.tsx'), 'utf8');
   check(
     'Ratio asks for the caret only when Other was picked',
     /autoFocus=\{askedForOther\.current\}/.test(size),
@@ -167,7 +165,7 @@ const check = (what, condition, detail) => {
   // Every other custom-value field gates its focus on a ref set when the mode is
   // entered. This one focused on mount, which is the whole bug — so the rule is
   // checked across the panel rather than in the one file that broke it.
-  const panel = path.join(__dirname, '..', 'src', 'style-panel');
+  const panel = repoPath('src/style-panel');
   // A popover is different: it exists only because it was opened, so mounting
   // IS the request. The spacing box's side editor is one — pressing a side is
   // what puts it on screen, and it should be ready to type in. The rule is

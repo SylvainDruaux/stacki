@@ -16,6 +16,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { ROOT, repoPath } = require('./helpers/sources.js');
 
 const failures = [];
 let checked = 0;
@@ -28,16 +29,16 @@ const check = (what, condition, detail) => {
 
 (async () => {
   const esbuild = require('esbuild');
-  const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
+  const buildDirectory = repoPath('node_modules/.stacki-test');
   fs.mkdirSync(buildDirectory, { recursive: true });
   const bundlePath = path.join(buildDirectory, 'gap-hover.bundle.js');
   await esbuild.build({
     stdin: {
       contents: `
-        export { default as GapControl } from './GapControl'
-        export { setHost } from './lib/host'
+        export { default as GapControl } from './src/style-panel/GapControl'
+        export { setHost } from './src/style-panel/lib/host'
       `,
-      resolveDir: path.join(__dirname, '..', 'src', 'style-panel'),
+      resolveDir: ROOT,
       loader: 'tsx',
     },
     outfile: bundlePath,

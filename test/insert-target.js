@@ -20,6 +20,7 @@
 const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
+const { repoPath } = require('./helpers/sources.js');
 
 const failures = [];
 let checked = 0;
@@ -32,11 +33,11 @@ const check = (what, condition, detail) => {
 
 (async () => {
   const esbuild = require('esbuild');
-  const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
+  const buildDirectory = repoPath('node_modules/.stacki-test');
   fs.mkdirSync(buildDirectory, { recursive: true });
   const bundle = path.join(buildDirectory, 'insert-target.bundle.js');
   await esbuild.build({
-    entryPoints: [path.join(__dirname, '..', 'src', 'insertTarget.js')],
+    entryPoints: [repoPath('src/insertTarget.ts')],
     outfile: bundle,
     bundle: true,
     format: 'cjs',
@@ -44,7 +45,7 @@ const check = (what, condition, detail) => {
     logLevel: 'silent',
   });
   const { insertTargetFor, acceptsChildren, tagOfComponent } = require(bundle);
-  const { parseSlots, rootTag } = require('../dist/electron/astroParser.js');
+  const { parseSlots, rootTag } = require('#dist/electron/astroParser.js');
 
   // The page from the report: a <Section> with children, inside a layout.
   const model = {

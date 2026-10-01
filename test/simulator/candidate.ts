@@ -5,12 +5,12 @@
 // reference (plan §10). A patched projection that differs from the reparse by
 // one byte fails the run at the event.
 import assert from 'node:assert/strict';
-import type { FilePath } from '../../dist/shared/brand.js';
-import type { Projector } from '../../dist/shared/documentActor.js';
-import type { Plan } from '../../dist/shared/planner.js';
-import { projectValueSplice } from '../../dist/shared/projection-patch.js';
-import { createSnapshot, type Snapshot } from '../../dist/shared/snapshot.js';
-import type { ByteString } from '../../dist/shared/span.js';
+import type { FilePath } from '#dist/shared/brand.js';
+import type { Projector } from '#dist/shared/documentActor.js';
+import type { Plan } from '#dist/shared/planner.js';
+import { projectValueSplice } from '#dist/shared/projection-patch.js';
+import { createSnapshot, type Snapshot } from '#dist/shared/snapshot.js';
+import type { ByteString } from '#dist/shared/span.js';
 import { projectBytes, sha256, snapshotOf } from './project.ts';
 
 export interface PatchCounts {

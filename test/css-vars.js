@@ -25,7 +25,7 @@ const {
   readDeclarations,
   groupRules,
   labelForRule,
-} = require('../dist/electron/cssVars.js');
+} = require('#dist/electron/cssVars.js');
 
 const DEFAULT = path.join(os.homedir(), 'Documents', 'Projects', 'lumos-framework');
 const source = path.resolve(process.argv[2] || process.env.STACKI_CSS_FIXTURE || DEFAULT);
@@ -435,7 +435,7 @@ if (!fs.existsSync(path.join(source, 'src', 'styles'))) {
   );
 
   // The panel resolves values against this map as they are typed (see
-  // src/fluid.js), so it has to carry everything a value can reference.
+  // src/fluid.ts), so it has to carry everything a value can reference.
   const { values } = readVariables(source);
   check(
     'every variable is in the resolution map',

@@ -4,13 +4,15 @@ const { buildSync } = require('esbuild');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
+const { repoPath } = require('./helpers/sources.js');
 
-module.exports = function loadRenderer(name) {
+// `file` is a repository path: loadRenderer('src/editor/pageEdits.ts').
+module.exports = function loadRenderer(file) {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'stacki-renderer-module-'));
   const output = path.join(directory, 'module.cjs');
   try {
     buildSync({
-      entryPoints: [path.join(__dirname, '..', 'src', name)],
+      entryPoints: [repoPath(file)],
       outfile: output,
       bundle: true,
       platform: 'node',

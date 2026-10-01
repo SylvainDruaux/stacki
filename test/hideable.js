@@ -15,6 +15,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { repoPath, sourceSpecifier } = require('./helpers/sources.js');
 
 const failures = [];
 let checked = 0;
@@ -27,19 +28,20 @@ const check = (what, condition, detail) => {
 
 (async () => {
   const esbuild = require('esbuild');
-  const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
+  const buildDirectory = repoPath('node_modules/.stacki-test');
   fs.mkdirSync(buildDirectory, { recursive: true });
   const entry = path.join(buildDirectory, 'hideable.entry.ts');
-  const lib = (file) =>
-    JSON.stringify(path.join(__dirname, '..', 'src', 'style-panel', 'lib', file));
+  const reexports = [
+    ['*', 'src/style-panel/lib/hideable.ts'],
+    ['{ parseFilters, serializeFilters }', 'src/style-panel/lib/filter.ts'],
+    ['{ parseTransforms, serializeTransforms }', 'src/style-panel/lib/transform.ts'],
+    ['{ parseTransitions, serializeTransitions }', 'src/style-panel/lib/transition.ts'],
+    ['{ parseBoxShadows, serializeBoxShadows }', 'src/style-panel/lib/box-shadow.ts'],
+    ['{ parseShadows, serializeShadows }', 'src/style-panel/lib/text-shadow.ts'],
+  ];
   fs.writeFileSync(
     entry,
-    `export * from ${lib('hideable.ts')};\n` +
-      `export { parseFilters, serializeFilters } from ${lib('filter.ts')};\n` +
-      `export { parseTransforms, serializeTransforms } from ${lib('transform.ts')};\n` +
-      `export { parseTransitions, serializeTransitions } from ${lib('transition.ts')};\n` +
-      `export { parseBoxShadows, serializeBoxShadows } from ${lib('box-shadow.ts')};\n` +
-      `export { parseShadows, serializeShadows } from ${lib('text-shadow.ts')};\n`,
+    reexports.map(([names, file]) => `export ${names} from ${sourceSpecifier(file)};\n`).join(''),
   );
   const bundlePath = path.join(buildDirectory, 'hideable.bundle.js');
   await esbuild.build({

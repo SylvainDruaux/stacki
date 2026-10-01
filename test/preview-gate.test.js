@@ -12,11 +12,12 @@ const assert = require('node:assert/strict');
 const path = require('node:path');
 const fs = require('node:fs');
 const esbuild = require('esbuild');
+const { repoPath } = require('./helpers/sources.js');
 
-const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test', 'preview-gate');
+const buildDirectory = repoPath('node_modules/.stacki-test/preview-gate');
 fs.mkdirSync(buildDirectory, { recursive: true });
 esbuild.buildSync({
-  entryPoints: [path.join(__dirname, '..', 'src', 'previewGate.ts')],
+  entryPoints: [repoPath('src/previewGate.ts')],
   outdir: buildDirectory,
   bundle: true,
   format: 'cjs',

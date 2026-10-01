@@ -16,6 +16,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { repoPath } = require('./helpers/sources.js');
 
 const failures = [];
 let checked = 0;
@@ -28,11 +29,11 @@ const check = (what, condition, detail) => {
 
 (async () => {
   const esbuild = require('esbuild');
-  const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
+  const buildDirectory = repoPath('node_modules/.stacki-test');
   fs.mkdirSync(buildDirectory, { recursive: true });
   const out = path.join(buildDirectory, 'popup-scroll.bundle.js');
   await esbuild.build({
-    entryPoints: [path.join(__dirname, '..', 'src', 'ui', 'usePopupOpen.js')],
+    entryPoints: [repoPath('src/ui/usePopupOpen.ts')],
     outfile: out,
     bundle: true,
     format: 'cjs',
@@ -154,7 +155,7 @@ const check = (what, condition, detail) => {
   });
 
   // --- the rule that does the work ---------------------------------------------
-  const css = fs.readFileSync(path.join(__dirname, '..', 'src', 'styles.css'), 'utf8');
+  const css = fs.readFileSync(repoPath('src/styles.css'), 'utf8');
   check(
     'the locked panel stops scrolling',
     /\.style-panel-host\.is-locked > \* \{\s*overflow-y: hidden;\s*\}/.test(css),
@@ -163,10 +164,7 @@ const check = (what, condition, detail) => {
     'and its gutter is reserved, so losing the bar costs no layout',
     /scrollbar-gutter:\s*stable/.test(css),
   );
-  const panel = fs.readFileSync(
-    path.join(__dirname, '..', 'src', 'panels', 'StylePanel.tsx'),
-    'utf8',
-  );
+  const panel = fs.readFileSync(repoPath('src/panels/StylePanel.tsx'), 'utf8');
   check('the panel asks', /usePopupOpen\(hostRef\)/.test(panel));
   check('and wears the answer', /popupOpen \? 'is-locked' : ''/.test(panel));
 

@@ -14,7 +14,7 @@ const {
   resolveAssetImport,
   parseAssetDimensions,
   readAssetDimensions,
-} = loadRenderer('assetBridge.ts');
+} = loadRenderer('src/assetBridge.ts');
 const file = {
   rel: 'public/a.png',
   name: 'a.png',

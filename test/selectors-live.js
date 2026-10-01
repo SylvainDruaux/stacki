@@ -12,6 +12,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { ROOT, repoPath } = require('./helpers/sources.js');
 
 // A boundary can receive null — JSON, structured clone and postMessage all carry it —
 // so the negative space below includes it. It is read from JSON, because our own
@@ -29,21 +30,21 @@ const check = (what, condition, detail) => {
 
 (async () => {
   const esbuild = require('esbuild');
-  const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
+  const buildDirectory = repoPath('node_modules/.stacki-test');
   fs.mkdirSync(buildDirectory, { recursive: true });
   const bundlePath = path.join(buildDirectory, 'selectors-live.bundle.js');
   await esbuild.build({
     stdin: {
       contents: `
-        import { useRemovedClasses, withoutClasses } from './EmbedEditor'
+        import { useRemovedClasses, withoutClasses } from './src/style-panel/EmbedEditor'
         export { withoutClasses }
-        export { setHost } from './lib/host'
+        export { setHost } from './src/style-panel/lib/host'
         export function Probe() {
           const removed = useRemovedClasses()
           return <div data-removed={[...removed].join(',')} />
         }
       `,
-      resolveDir: path.join(__dirname, '..', 'src', 'style-panel'),
+      resolveDir: ROOT,
       loader: 'tsx',
     },
     outfile: bundlePath,

@@ -9,7 +9,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { parseJobs, runTestPool, POOL_LIMITS } = require('../dist/scripts/test-pool.js');
+const { parseJobs, runTestPool, POOL_LIMITS } = require('#dist/scripts/test-pool.js');
 
 const node = JSON.stringify(process.execPath);
 const options = (jobs) => ({ jobs, cwd: process.cwd(), environment: process.env });

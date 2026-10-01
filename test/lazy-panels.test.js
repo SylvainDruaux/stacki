@@ -11,13 +11,14 @@ const esbuild = require('esbuild');
 const { createHash } = require('node:crypto');
 const sha256 = (text) => createHash('sha256').update(text).digest('hex');
 const { JSDOM } = require('jsdom');
-const { parsePage } = require('../dist/electron/astroParser.js');
-const { applyCodePatch } = require('../dist/shared/code-patch.js');
-const { NODE_PROJECTOR } = require('../dist/electron/documentDisk.js');
-const { buildEditIntent } = require('../dist/electron/editRequests.js');
-const { toIntent } = require('../dist/shared/intent.js');
-const { planIntent } = require('../dist/shared/planner.js');
-const { applySplices, inverseEdits } = require('../dist/shared/splice.js');
+const { parsePage } = require('#dist/electron/astroParser.js');
+const { applyCodePatch } = require('#dist/shared/code-patch.js');
+const { NODE_PROJECTOR } = require('#dist/electron/documentDisk.js');
+const { buildEditIntent } = require('#dist/electron/editRequests.js');
+const { toIntent } = require('#dist/shared/intent.js');
+const { planIntent } = require('#dist/shared/planner.js');
+const { applySplices, inverseEdits } = require('#dist/shared/splice.js');
+const { repoPath, stubPanels, stubSources } = require('./helpers/sources.js');
 
 // A visual edit request as main's handler applies it, on the fake's disk: the
 // real translation and planner, against the bytes it names (step 9 — every
@@ -39,17 +40,21 @@ function applyEditRequest(text, edit) {
   return { text: written, inverse: inverseEdits(planned.value.splices) };
 }
 
-const PANEL_PATHS = [
-  './panels/PropsPanel',
-  './panels/StylePanel',
-  './ui/CodeWindow',
-  './panels/CmsPanel',
-  './panels/CmsView',
-  './panels/ContentView',
-  './panels/VariablesPanel',
-  './panels/VariablesView',
-  './panels/CodePanel',
+// The editors App.tsx loads lazily, by component name. The test reads the
+// lazyPanel(() => import(…)) calls from App.tsx itself, so this list pins which
+// editors are lazy without pinning where their files live.
+const LAZY_PANELS = [
+  'PropsPanel',
+  'StylePanel',
+  'CodeWindow',
+  'CmsPanel',
+  'CmsView',
+  'ContentView',
+  'VariablesPanel',
+  'VariablesView',
+  'CodePanel',
 ];
+const LAZY_IMPORT = /lazyPanel\(\(\) => import\('([^']+)'\)\)/g;
 const REAL_PREVIEW = new Set([
   'PreviewPane',
   'CanvasView',
@@ -94,7 +99,7 @@ test('all optional editors load without hiding the app or replacing its preview'
     await checkCMS(context);
     await checkCodePanel(context);
     await checkCodeWindow(context);
-    assert.equal(gates.requested.size, PANEL_PATHS.length, 'Every lazy editor was exercised');
+    assert.equal(gates.requested.size, LAZY_PANELS.length, 'Every lazy editor was exercised');
   } finally {
     await act(() => root.unmount());
     dom.window.close();
@@ -240,9 +245,8 @@ function createImportGates() {
   const pending = new Map();
   return {
     requested,
-    load(modulePath, load) {
-      assert.ok(PANEL_PATHS.includes(modulePath), `Unexpected lazy module: ${modulePath}`);
-      const name = path.basename(modulePath);
+    load(name, load) {
+      assert.ok(LAZY_PANELS.includes(name), `Unexpected lazy module: ${name}`);
       assert.equal(requested.has(name), false, `${name} should request its module once`);
       requested.add(name);
       // Nine fixed entries bound the queue, and release owns its only mutation.
@@ -258,10 +262,10 @@ function createImportGates() {
 }
 
 async function buildApp() {
-  const bundle = path.join(__dirname, '../node_modules/.stacki-test/lazy-panels.cjs');
+  const bundle = repoPath('node_modules/.stacki-test/lazy-panels.cjs');
   fs.mkdirSync(path.dirname(bundle), { recursive: true });
   await esbuild.build({
-    entryPoints: [path.join(__dirname, '../src/App.tsx')],
+    entryPoints: [repoPath('src/App.tsx')],
     outfile: bundle,
     bundle: true,
     platform: 'node',
@@ -271,28 +275,25 @@ async function buildApp() {
     loader: { '.css': 'empty', '.svg': 'empty', '.png': 'empty' },
     logLevel: 'silent',
     plugins: [
-      {
-        name: 'deferred-panel-imports',
-        setup(build) {
-          build.onLoad({ filter: /\/src\/App\.tsx$/ }, ({ path: filename }) => {
-            const source = fs.readFileSync(filename, 'utf8');
-            const contents = PANEL_PATHS.reduce((code, name) => {
-              const expression = `import('${name}')`;
-              assert.ok(code.includes(expression), `${name} remains a real lazy import`);
-              const deferredImport = `globalThis.__loadTestPanel('${name}', () => ${expression})`;
-              return code.replace(expression, deferredImport);
-            }, source);
-            return { contents, loader: 'tsx' };
-          });
-          build.onLoad({ filter: /\/src\/(?:panels\/[^/]+|ui\/CodeWindow)\.tsx$/ }, (args) => {
-            const name = path.basename(args.path, '.tsx');
-            if (REAL_PREVIEW.has(name)) {
-              return undefined;
-            }
-            return { contents: panelStub(name), loader: 'tsx' };
-          });
+      stubSources('deferred-panel-imports', {
+        'src/App.tsx': (filename) => {
+          const source = fs.readFileSync(filename, 'utf8');
+          const found = [...source.matchAll(LAZY_IMPORT)].map((match) => match[1]);
+          const names = found.map((specifier) => path.basename(specifier));
+          assert.deepEqual(names, LAZY_PANELS, 'App.tsx loads exactly these editors lazily');
+          const contents = found.reduce((code, specifier) => {
+            const expression = `import('${specifier}')`;
+            const name = path.basename(specifier);
+            const deferredImport = `globalThis.__loadTestPanel('${name}', () => ${expression})`;
+            return code.replace(expression, deferredImport);
+          }, source);
+          return { contents, loader: 'tsx' };
         },
-      },
+        'src/ui/CodeWindow.tsx': () => ({ contents: panelStub('CodeWindow'), loader: 'tsx' }),
+      }),
+      stubPanels('lazy-panel-bodies', (name) =>
+        REAL_PREVIEW.has(name) ? undefined : { contents: panelStub(name), loader: 'tsx' },
+      ),
     ],
   });
   return bundle;

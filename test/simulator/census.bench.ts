@@ -15,24 +15,19 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { toFilePath } from '../../dist/shared/brand.js';
-import { capabilityAcceptsVisualIntent } from '../../dist/shared/capability.js';
-import { LIMITS } from '../../dist/shared/limits.js';
-import type { Splice } from '../../dist/shared/planner.js';
+import { toFilePath } from '#dist/shared/brand.js';
+import { capabilityAcceptsVisualIntent } from '#dist/shared/capability.js';
+import { LIMITS } from '#dist/shared/limits.js';
+import type { Splice } from '#dist/shared/planner.js';
 import {
   hostContext,
   projectValueSplice,
   valueBytesNeutral,
-} from '../../dist/shared/projection-patch.js';
-import type { Projection } from '../../dist/shared/source-projection.js';
-import {
-  encodeUtf8,
-  toByteString,
-  type ByteSpan,
-  type ByteString,
-} from '../../dist/shared/span.js';
+} from '#dist/shared/projection-patch.js';
+import type { Projection } from '#dist/shared/source-projection.js';
+import { encodeUtf8, toByteString, type ByteSpan, type ByteString } from '#dist/shared/span.js';
 import { projectBytes } from './project.ts';
-import { applySplices } from '../../dist/shared/splice.js';
+import { applySplices } from '#dist/shared/splice.js';
 
 const PAGE = toFilePath('/project/page.astro');
 const FILES_MAX = 10_000;

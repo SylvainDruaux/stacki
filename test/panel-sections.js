@@ -21,6 +21,7 @@
 const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
+const { repoPath } = require('./helpers/sources.js');
 
 // Source folders nest a handful deep; a walk past this has met a cycle or a
 // generated tree, and should stop loudly rather than recurse on.
@@ -37,11 +38,11 @@ const check = (what, condition, detail) => {
 
 (async () => {
   const esbuild = require('esbuild');
-  const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
+  const buildDirectory = repoPath('node_modules/.stacki-test');
   fs.mkdirSync(buildDirectory, { recursive: true });
   const out = path.join(buildDirectory, 'sections.bundle.js');
   await esbuild.build({
-    entryPoints: [path.join(__dirname, '..', 'src', 'style-panel', 'lib', 'sections.ts')],
+    entryPoints: [repoPath('src/style-panel/lib/sections.ts')],
     outfile: out,
     bundle: true,
     format: 'cjs',
@@ -111,9 +112,10 @@ const check = (what, condition, detail) => {
   // actual controls, show each value and commit an edit before treating them as
   // covered. Dead adapters or a matching comment cannot satisfy these checks.
   await esbuild.build({
-    entryPoints: ['BordersSection', 'FlexChildSection'].map((name) =>
-      path.join(__dirname, '..', 'src', 'style-panel', `${name}.tsx`),
-    ),
+    entryPoints: {
+      BordersSection: repoPath('src/style-panel/BordersSection.tsx'),
+      FlexChildSection: repoPath('src/style-panel/FlexChildSection.tsx'),
+    },
     outdir: path.join(buildDirectory, 'section-controls'),
     bundle: true,
     format: 'cjs',
@@ -279,7 +281,7 @@ const check = (what, condition, detail) => {
   // Heuristic in one direction only — a name that appears for another reason
   // (`inset` is also a box-shadow keyword) can hide a missing control, which is
   // why the list above is spelled out by hand as well.
-  const panelDirectory = path.join(__dirname, '..', 'src', 'style-panel');
+  const panelDirectory = repoPath('src/style-panel');
   const sources = [];
   const walk = (directory, depth) => {
     assert.ok(depth <= WALK_LIMITS.directoryDepthMax, 'walk: depth limit');

@@ -6,10 +6,11 @@ const path = require('node:path');
 const vm = require('node:vm');
 const esbuild = require('esbuild');
 const loadRenderer = require('./renderer-module.js');
+const { repoPath, stubSources } = require('./helpers/sources.js');
 
 // Null as a boundary receives it, parsed from JSON: inputs may hold it; our values never do.
 const jsonNull = JSON.parse('null');
-const { parseMergeResult, parseDeleteResult } = loadRenderer('gitBridge.ts');
+const { parseMergeResult, parseDeleteResult } = loadRenderer('src/gitBridge.ts');
 const success = { ok: true, into: 'main', changed: true };
 const dirty = { ok: false, dirty: true, from: 'topic', branch: 'main', files: ['a.astro'] };
 const conflict = {
@@ -46,26 +47,19 @@ for (const result of [jsonNull, {}, { ok: false }, { ok: false, unmerged: true, 
 
 async function main() {
   const built = await esbuild.build({
-    entryPoints: [path.join(__dirname, '..', 'src', 'gitActions.ts')],
+    entryPoints: [repoPath('src/gitActions.ts')],
     write: false,
     bundle: true,
     format: 'cjs',
     platform: 'node',
     logLevel: 'silent',
     plugins: [
-      {
-        name: 'script-confirmations',
-        setup(build) {
-          build.onResolve({ filter: /ui\/ConfirmDialog$/ }, () => ({
-            path: 'confirm',
-            namespace: 'fake',
-          }));
-          build.onLoad({ filter: /.*/, namespace: 'fake' }, () => ({
-            contents:
-              'export const confirmDialog = (question) => globalThis.confirmQuestion(question);',
-          }));
-        },
-      },
+      stubSources('script-confirmations', {
+        'src/ui/ConfirmDialog.tsx': () => ({
+          contents:
+            'export const confirmDialog = (question) => globalThis.confirmQuestion(question);',
+        }),
+      }),
     ],
   });
   async function scenario(action, answers, responses, extra = {}) {

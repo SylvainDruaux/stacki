@@ -17,13 +17,13 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { test } from 'node:test';
-import type { Edit, NodeRef } from '../../dist/shared/edit-request.js';
-import { parsePageNode, type PageModel, type PageNode } from '../../dist/shared/page-node.js';
+import type { Edit, NodeRef } from '#dist/shared/edit-request.js';
+import { parsePageNode, type PageModel, type PageNode } from '#dist/shared/page-node.js';
 import {
   parsePageDiskRead,
   parsePageEditResult,
   type PageDiskRead,
-} from '../../dist/shared/page-save.js';
+} from '#dist/shared/page-save.js';
 import { mainHarness } from './main-harness.ts';
 
 const sha256 = (bytes: string | Buffer): string => createHash('sha256').update(bytes).digest('hex');

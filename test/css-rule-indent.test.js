@@ -9,7 +9,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const loadRenderer = require('./renderer-module.js');
 
-const css = loadRenderer('style-panel/lib/css.ts');
+const css = loadRenderer('src/style-panel/lib/css.ts');
 
 const render = (page, selector, prop, value) => {
   const { segments, regions } = css.splitEmbed(page);

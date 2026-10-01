@@ -18,13 +18,14 @@ const path = require('node:path');
 const esbuild = require('esbuild');
 const { createHash } = require('node:crypto');
 const { JSDOM } = require('jsdom');
-const { parsePage } = require('../dist/electron/astroParser.js');
-const { NODE_PROJECTOR } = require('../dist/electron/documentDisk.js');
-const { buildEditIntent } = require('../dist/electron/editRequests.js');
-const { toIntent } = require('../dist/shared/intent.js');
-const { planIntent } = require('../dist/shared/planner.js');
-const { applySplices, inverseEdits } = require('../dist/shared/splice.js');
-const { applyCodePatch } = require('../dist/shared/code-patch.js');
+const { parsePage } = require('#dist/electron/astroParser.js');
+const { NODE_PROJECTOR } = require('#dist/electron/documentDisk.js');
+const { buildEditIntent } = require('#dist/electron/editRequests.js');
+const { toIntent } = require('#dist/shared/intent.js');
+const { planIntent } = require('#dist/shared/planner.js');
+const { applySplices, inverseEdits } = require('#dist/shared/splice.js');
+const { applyCodePatch } = require('#dist/shared/code-patch.js');
+const { repoPath, stubPanels } = require('./helpers/sources.js');
 
 const tick = () => new Promise((resolve) => setTimeout(resolve, 10));
 const deferred = () => {
@@ -58,10 +59,10 @@ function applyEdit(file, text, edit) {
 }
 
 test('out-of-order page reads and external reads cannot replace the current edit', async () => {
-  const directory = path.join(__dirname, '..', 'node_modules', '.stacki-test', 'page-navigation');
+  const directory = repoPath('node_modules/.stacki-test/page-navigation');
   fs.mkdirSync(directory, { recursive: true });
   await esbuild.build({
-    entryPoints: [path.join(__dirname, '..', 'src', 'App.tsx')],
+    entryPoints: [repoPath('src/App.tsx')],
     outfile: path.join(directory, 'app.js'),
     bundle: true,
     format: 'cjs',
@@ -71,19 +72,13 @@ test('out-of-order page reads and external reads cannot replace the current edit
     loader: { '.css': 'empty', '.svg': 'empty', '.png': 'empty' },
     logLevel: 'silent',
     plugins: [
-      {
-        name: 'capture-panels',
-        setup(build) {
-          build.onLoad({ filter: /\/src\/panels\/[^/]+\.[jt]sx$/ }, (args) => {
-            const name = path.basename(args.path, path.extname(args.path));
-            const contents =
-              "export const relativeTime = () => ''; " +
-              'export default function Panel(props) { ' +
-              `globalThis.__panels[${JSON.stringify(name)}] = props; return null; }`;
-            return { contents, loader: 'jsx' };
-          });
-        },
-      },
+      stubPanels('capture-panels', (name) => {
+        const contents =
+          "export const relativeTime = () => ''; " +
+          'export default function Panel(props) { ' +
+          `globalThis.__panels[${JSON.stringify(name)}] = props; return null; }`;
+        return { contents, loader: 'jsx' };
+      }),
     ],
   });
   const url = 'http://localhost/';

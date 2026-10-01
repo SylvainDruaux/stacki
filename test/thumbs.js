@@ -19,7 +19,7 @@ const path = require('path');
 const http = require('http');
 const { app, nativeImage } = require('electron');
 
-const thumbs = require('../dist/electron/thumbs.js');
+const thumbs = require('#dist/electron/thumbs.js');
 
 const failures = [];
 let checked = 0;

@@ -7,23 +7,23 @@
 // until their steps ship them.
 //
 // Pure (plan §5.2): snapshot and intent in, Result out. No disk, no clock.
-import { assert } from '../../dist/shared/assert.js';
-import { capabilityAcceptsVisualIntent } from '../../dist/shared/capability.js';
-import type { Intent, RejectionReason } from '../../dist/shared/intent.js';
-import { LIMITS } from '../../dist/shared/limits.js';
-import type { AnchorRef, StructuralPath } from '../../dist/shared/ref.js';
-import { err, ok, type Result } from '../../dist/shared/result.js';
-import type { Snapshot } from '../../dist/shared/snapshot.js';
-import type { ProjectedNode, Projection } from '../../dist/shared/source-projection.js';
+import { assert } from '#dist/shared/assert.js';
+import { capabilityAcceptsVisualIntent } from '#dist/shared/capability.js';
+import type { Intent, RejectionReason } from '#dist/shared/intent.js';
+import { LIMITS } from '#dist/shared/limits.js';
+import type { AnchorRef, StructuralPath } from '#dist/shared/ref.js';
+import { err, ok, type Result } from '#dist/shared/result.js';
+import type { Snapshot } from '#dist/shared/snapshot.js';
+import type { ProjectedNode, Projection } from '#dist/shared/source-projection.js';
 import {
   byteStringsEqual,
   encodeUtf8,
   toByteString,
   type ByteSpan,
   type ByteString,
-} from '../../dist/shared/span.js';
-import type { CandidatePolicy, Plan, PostKind } from '../../dist/shared/planner.js';
-import type { Splice } from '../../dist/shared/planner.js';
+} from '#dist/shared/span.js';
+import type { CandidatePolicy, Plan, PostKind } from '#dist/shared/planner.js';
+import type { Splice } from '#dist/shared/planner.js';
 
 const QUOTE_DOUBLE = 0x22;
 const QUOTE_SINGLE = 0x27;

@@ -10,7 +10,8 @@
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const cssVars = require('../dist/electron/cssVars.js');
+const cssVars = require('#dist/electron/cssVars.js');
+const { repoPath } = require('./helpers/sources.js');
 
 const failures = [];
 let checked = 0;
@@ -88,11 +89,11 @@ const STYLESHEET = `/* =========================================================
   fs.writeFileSync(file, STYLESHEET);
 
   const esbuild = require('esbuild');
-  const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
+  const buildDirectory = repoPath('node_modules/.stacki-test');
   fs.mkdirSync(buildDirectory, { recursive: true });
   const bundlePath = path.join(buildDirectory, 'vars-view.bundle.js');
   await esbuild.build({
-    entryPoints: [path.join(__dirname, '..', 'src', 'panels', 'VariablesView.jsx')],
+    entryPoints: [repoPath('src/panels/VariablesView.tsx')],
     outfile: bundlePath,
     bundle: true,
     format: 'cjs',

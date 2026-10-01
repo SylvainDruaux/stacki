@@ -7,15 +7,16 @@ const fs = require('node:fs');
 const path = require('node:path');
 const esbuild = require('esbuild');
 const { JSDOM } = require('jsdom');
+const { ROOT, repoPath } = require('./helpers/sources.js');
 
-const directory = path.join(__dirname, '..', 'node_modules', '.stacki-test', 'preview-lifecycle');
+const directory = repoPath('node_modules/.stacki-test/preview-lifecycle');
 fs.mkdirSync(directory, { recursive: true });
 esbuild.buildSync({
   stdin: {
     contents:
       "export { default as PreviewPane, deviceForWidth } from './src/panels/PreviewPane.tsx';" +
-      " export { hasCanvas, queryCanvas } from './src/canvasQuery.js';",
-    resolveDir: path.join(__dirname, '..'),
+      " export { hasCanvas, queryCanvas } from './src/canvasQuery.ts';",
+    resolveDir: ROOT,
     loader: 'jsx',
   },
   outfile: path.join(directory, 'preview.js'),

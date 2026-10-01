@@ -7,14 +7,9 @@ const fs = require('node:fs');
 const path = require('node:path');
 const esbuild = require('esbuild');
 const { JSDOM } = require('jsdom');
+const { repoPath } = require('./helpers/sources.js');
 
-const buildDirectory = path.join(
-  __dirname,
-  '..',
-  'node_modules',
-  '.stacki-test',
-  'asset-panel-lifecycle',
-);
+const buildDirectory = repoPath('node_modules/.stacki-test/asset-panel-lifecycle');
 const bundlePath = path.join(buildDirectory, 'panel.js');
 
 function deferred() {
@@ -32,7 +27,7 @@ function rootEntry(root) {
 test('asset listings ignore stale projects and coalesce watcher bursts', async () => {
   fs.mkdirSync(buildDirectory, { recursive: true });
   await esbuild.build({
-    entryPoints: [path.join(__dirname, '..', 'src', 'panels', 'AssetsPanel.tsx')],
+    entryPoints: [repoPath('src/panels/AssetsPanel.tsx')],
     outfile: bundlePath,
     bundle: true,
     format: 'cjs',

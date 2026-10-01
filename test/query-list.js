@@ -17,6 +17,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { ROOT, repoPath } = require('./helpers/sources.js');
 
 const failures = [];
 let checked = 0;
@@ -49,7 +50,7 @@ const SHEET = `.card {
 
 (async () => {
   const esbuild = require('esbuild');
-  const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
+  const buildDirectory = repoPath('node_modules/.stacki-test');
   fs.mkdirSync(buildDirectory, { recursive: true });
 
   // ── The rewrite itself ────────────────────────────────────────────────────
@@ -57,7 +58,7 @@ const SHEET = `.card {
   {
     const cssBundle = path.join(buildDirectory, 'query-css.bundle.js');
     await esbuild.build({
-      entryPoints: [path.join(__dirname, '..', 'src', 'style-panel', 'lib', 'css.ts')],
+      entryPoints: [repoPath('src/style-panel/lib/css.ts')],
       outfile: cssBundle,
       bundle: true,
       format: 'cjs',
@@ -158,7 +159,7 @@ const SHEET = `.card {
   {
     const nsBundle = path.join(buildDirectory, 'query-contexts.bundle.js');
     await esbuild.build({
-      entryPoints: [path.join(__dirname, '..', 'src', 'style-panel', 'lib', 'native-styles.ts')],
+      entryPoints: [repoPath('src/style-panel/lib/native-styles.ts')],
       outfile: nsBundle,
       bundle: true,
       format: 'cjs',
@@ -214,9 +215,9 @@ const SHEET = `.card {
   await esbuild.build({
     stdin: {
       contents:
-        `export { default as EmbedEditor } from './EmbedEditor'\n` +
-        `export { setHost } from './lib/host'`,
-      resolveDir: path.join(__dirname, '..', 'src', 'style-panel'),
+        `export { default as EmbedEditor } from './src/style-panel/EmbedEditor'\n` +
+        `export { setHost } from './src/style-panel/lib/host'`,
+      resolveDir: ROOT,
       loader: 'tsx',
     },
     outfile: bundlePath,

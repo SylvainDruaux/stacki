@@ -6,9 +6,9 @@
 
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { parsePage, serializePage, parseAttrs } = require('../dist/electron/astroParser');
-const { decodeEntities, encodeText } = require('../dist/shared/htmlText');
-const { packageOf } = require('../dist/electron/injectedRoutes');
+const { parsePage, serializePage, parseAttrs } = require('#dist/electron/astroParser.js');
+const { decodeEntities, encodeText } = require('#dist/shared/htmlText.js');
+const { packageOf } = require('#dist/electron/injectedRoutes.js');
 
 test('empty frontmatter closes before body text beginning with dashes', () => {
   const source = '---\n---\n--- this belongs to the page\n<p>Text</p>\n';

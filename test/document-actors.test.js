@@ -21,11 +21,11 @@ const { createHash } = require('node:crypto');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { DocumentActors } = require('../dist/electron/documentActors.js');
-const { NODE_PROJECTOR, NodeDocumentDisk } = require('../dist/electron/documentDisk.js');
-const { createDocumentTelemetry, hashPath } = require('../dist/electron/documentTelemetry.js');
-const { LIMITS } = require('../dist/shared/limits.js');
-const { planIntent } = require('../dist/shared/planner.js');
+const { DocumentActors } = require('#dist/electron/documentActors.js');
+const { NODE_PROJECTOR, NodeDocumentDisk } = require('#dist/electron/documentDisk.js');
+const { createDocumentTelemetry, hashPath } = require('#dist/electron/documentTelemetry.js');
+const { LIMITS } = require('#dist/shared/limits.js');
+const { planIntent } = require('#dist/shared/planner.js');
 
 const sha256 = (text) => createHash('sha256').update(text).digest('hex');
 

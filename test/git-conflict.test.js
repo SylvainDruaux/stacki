@@ -8,10 +8,13 @@ const path = require('node:path');
 const { buildSync } = require('esbuild');
 const { JSDOM } = require('jsdom');
 const load = require('./renderer-module');
-const { BOUNDARY_LIMITS } = require('../dist/shared/boundary.js');
-const { parseMergeResult, parseConflictPart } = load('gitBridge.ts');
-const { initialConflictPicks, choicesForSend, conflictHunks } = load('panels/gitConflictModel.ts');
-const { parseConflict } = require('../dist/electron/conflicts.js');
+const { BOUNDARY_LIMITS } = require('#dist/shared/boundary.js');
+const { parseMergeResult, parseConflictPart } = load('src/gitBridge.ts');
+const { initialConflictPicks, choicesForSend, conflictHunks } = load(
+  'src/panels/gitConflictModel.ts',
+);
+const { parseConflict } = require('#dist/electron/conflicts.js');
+const { repoPath } = require('./helpers/sources.js');
 
 // Null as a boundary receives it, parsed from JSON: inputs may hold it; our values never do.
 const jsonNull = JSON.parse('null');
@@ -75,10 +78,10 @@ test('merge contracts reject unknown parts and bound total files plus parts', ()
 });
 
 test('merge dialog sends exact selected choices and locks binary choices while busy', async () => {
-  const output = path.join(__dirname, '../node_modules/.stacki-test/git-conflict.cjs');
+  const output = repoPath('node_modules/.stacki-test/git-conflict.cjs');
   fs.mkdirSync(path.dirname(output), { recursive: true });
   buildSync({
-    entryPoints: [path.join(__dirname, '../src/panels/MergeConflictModal.tsx')],
+    entryPoints: [repoPath('src/panels/MergeConflictModal.tsx')],
     outfile: output,
     bundle: true,
     format: 'cjs',

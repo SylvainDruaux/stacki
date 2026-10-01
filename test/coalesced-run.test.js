@@ -8,7 +8,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const load = require('./renderer-module');
-const { createCoalescedRun } = load('coalescedRun.ts');
+const { createCoalescedRun } = load('src/coalescedRun.ts');
 
 const tick = () => new Promise((resolve) => setImmediate(resolve));
 

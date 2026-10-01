@@ -12,6 +12,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { repoPath } = require('./helpers/sources.js');
 
 const failures = [];
 let checked = 0;
@@ -25,11 +26,11 @@ const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
 
 (async () => {
   const esbuild = require('esbuild');
-  const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
+  const buildDirectory = repoPath('node_modules/.stacki-test');
   fs.mkdirSync(buildDirectory, { recursive: true });
   const bundlePath = path.join(buildDirectory, 'dynamic-picker.bundle.js');
   await esbuild.build({
-    entryPoints: [path.join(__dirname, '..', 'src', 'ui', 'DynamicPicker.jsx')],
+    entryPoints: [repoPath('src/ui/DynamicPicker.tsx')],
     outfile: bundlePath,
     bundle: true,
     format: 'cjs',
@@ -215,7 +216,7 @@ const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
       await (async () => {
         const out = path.join(buildDirectory, 'dropdown.bundle.js');
         await esbuild.build({
-          entryPoints: [path.join(__dirname, '..', 'src', 'ui', 'Dropdown.jsx')],
+          entryPoints: [repoPath('src/ui/Dropdown.tsx')],
           outfile: out,
           bundle: true,
           format: 'cjs',

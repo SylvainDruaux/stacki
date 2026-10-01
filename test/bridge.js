@@ -11,7 +11,7 @@
 // panel did nothing for exactly that reason — `onAddClass` was on <AssetsPanel>.
 //
 // The renderer reaches the main process through one object — `window.avb`,
-// assembled in electron/preload.js — and a call to something that is not on it
+// assembled in electron/preload.ts — and a call to something that is not on it
 // fails the way a missing feature does: an async handler throws into nothing,
 // the button does nothing, and no error appears anywhere. The same shape of
 // silence covers a typo, a rename, and a method whose IPC handler was never
@@ -23,8 +23,9 @@
 const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
+const { ROOT, repoPath } = require('./helpers/sources.js');
 
-const root = path.join(__dirname, '..');
+const root = ROOT;
 const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
@@ -54,7 +55,7 @@ const walk = (directory, test, out = [], depth = 0) => {
 };
 
 // --- what the renderer calls ------------------------------------------------
-const sources = walk(path.join(root, 'src'), (name) => /\.(jsx?|tsx?)$/.test(name));
+const sources = walk(repoPath('src'), (name) => /\.(jsx?|tsx?)$/.test(name));
 const used = new Map(); // method -> [files]
 for (const file of sources) {
   const text = fs.readFileSync(file, 'utf8');
@@ -73,7 +74,7 @@ for (const file of sources) {
 }
 
 // --- what the preload exposes -----------------------------------------------
-const preload = fs.readFileSync(path.join(root, 'dist', 'electron', 'preload.js'), 'utf8');
+const preload = fs.readFileSync(repoPath('dist/electron/preload.js'), 'utf8');
 const exposed = new Set();
 const bridgeStart = preload.indexOf('contextBridge.exposeInMainWorld');
 const bridgeText = preload.slice(bridgeStart);
@@ -82,11 +83,11 @@ for (const match of bridgeText.matchAll(/^\s+([A-Za-z_$][\w$]*)\s*:/gm)) {
 }
 
 // --- what the main process handles ------------------------------------------
-const main = fs.readFileSync(path.join(root, 'dist', 'electron', 'main.js'), 'utf8');
+const main = fs.readFileSync(repoPath('dist/electron/main.js'), 'utf8');
 const handled = new Set();
 // A handler counts wherever it is registered, as long as the main process
 // loads the module that registers it — the terminal keeps its own (and its
-// pty bookkeeping) in electron/terminal.js rather than in main.js.
+// pty bookkeeping) in electron/terminal.ts rather than in main.js.
 const mainSide = [main];
 for (const match of main.matchAll(/require\(\s*['"]\.\/([\w.-]+?)(?:\.js)?['"]\s*\)/g)) {
   try {
@@ -117,7 +118,7 @@ for (const [method, files] of [...used].sort()) {
   check(
     `window.avb.${method} exists on the bridge`,
     exposed.has(method),
-    `called from ${files.join(', ')} — add it to electron/preload.js`,
+    `called from ${files.join(', ')} — add it to electron/preload.ts`,
   );
 }
 
@@ -125,7 +126,7 @@ for (const [method, channel] of [...channels].sort()) {
   check(
     `${method} has a handler for ${channel}`,
     handled.has(channel),
-    `electron/preload.js invokes '${channel}', which no ipcMain.handle registers`,
+    `electron/preload.ts invokes '${channel}', which no ipcMain.handle registers`,
   );
 }
 

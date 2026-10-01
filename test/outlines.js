@@ -20,6 +20,7 @@
 const fs = require('fs');
 const path = require('path');
 const Module = require('module');
+const { repoPath } = require('./helpers/sources.js');
 
 const failures = [];
 let checked = 0;
@@ -37,11 +38,11 @@ const stacked = (layers, opacity = 0.14) => 1 - (1 - opacity) ** layers;
 
 (async () => {
   const esbuild = require('esbuild');
-  const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
+  const buildDirectory = repoPath('node_modules/.stacki-test');
   fs.mkdirSync(buildDirectory, { recursive: true });
   const bundlePath = path.join(buildDirectory, 'outline-boxes.bundle.js');
   await esbuild.build({
-    entryPoints: [path.join(__dirname, '..', 'src', 'outlineBoxes.js')],
+    entryPoints: [repoPath('src/outlineBoxes.ts')],
     outfile: bundlePath,
     bundle: true,
     format: 'cjs',
@@ -155,14 +156,8 @@ const stacked = (layers, opacity = 0.14) => 1 - (1 - opacity) ** layers;
   check('and neither is standing still', !sameCopy('0.1', '0.1'));
 
   // --- the overlay uses it ---------------------------------------------------
-  const runtime = fs.readFileSync(
-    path.join(__dirname, '..', 'src', 'panels', 'previewRuntime.ts'),
-    'utf8',
-  );
-  const overlays = fs.readFileSync(
-    path.join(__dirname, '..', 'src', 'panels', 'PreviewOverlays.tsx'),
-    'utf8',
-  );
+  const runtime = fs.readFileSync(repoPath('src/panels/previewRuntime.ts'), 'utf8');
+  const overlays = fs.readFileSync(repoPath('src/panels/PreviewOverlays.tsx'), 'utf8');
   check(
     'a navigator hover draws one box per place',
     /outline\.occ === undefined \? onePerPlace\(all\)/.test(overlays),
@@ -299,7 +294,7 @@ const stacked = (layers, opacity = 0.14) => 1 - (1 - opacity) ** layers;
     return id === 'electron' ? electron : realRequire.apply(this, arguments);
   };
   process.isMainFrame = false; // the preview frame, not the app's own window
-  require(path.join(__dirname, '..', 'dist', 'electron', 'preload.js'));
+  require(repoPath('dist/electron/preload.js'));
   Module.prototype.require = realRequire;
   // The markers are walked when the document is done parsing, which for jsdom
   // is a turn or two after it is handed over.

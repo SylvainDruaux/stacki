@@ -7,15 +7,16 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { buildSync } = require('esbuild');
 const { JSDOM } = require('jsdom');
+const { repoPath } = require('./helpers/sources.js');
 
 const settle = (milliseconds = 0) => new Promise((resolve) => setTimeout(resolve, milliseconds));
 
 test('ContentView renders parsed entries and saves only the edited field', async () => {
-  const directory = path.join(__dirname, '../node_modules/.stacki-test');
+  const directory = repoPath('node_modules/.stacki-test');
   fs.mkdirSync(directory, { recursive: true });
   const output = path.join(directory, 'content-view-render.bundle.cjs');
   buildSync({
-    entryPoints: [path.join(__dirname, '../src/panels/ContentView.tsx')],
+    entryPoints: [repoPath('src/panels/ContentView.tsx')],
     outfile: output,
     bundle: true,
     platform: 'node',

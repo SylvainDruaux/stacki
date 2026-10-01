@@ -7,10 +7,10 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseField, parsePropSchema } from '../../dist/shared/prop-schema.js';
-import { parsePropSchema as parseAstroSchema } from '../../dist/electron/astroParser.js';
-import { parseScanResult } from '../../dist/shared/scan.js';
-import { LIMITS } from '../../dist/shared/limits.js';
+import { parseField, parsePropSchema } from '#dist/shared/prop-schema.js';
+import { parsePropSchema as parseAstroSchema } from '#dist/electron/astroParser.js';
+import { parseScanResult } from '#dist/shared/scan.js';
+import { LIMITS } from '#dist/shared/limits.js';
 
 // Null as a boundary receives it, parsed from JSON: inputs may hold it; our values never do.
 const jsonNull: unknown = JSON.parse('null');

@@ -7,13 +7,14 @@ const path = require('node:path');
 const fs = require('node:fs');
 const { buildSync } = require('esbuild');
 const { JSDOM } = require('jsdom');
-const output = path.join(__dirname, '../node_modules/.stacki-test/cms-settings.cjs');
+const { ROOT, repoPath } = require('./helpers/sources.js');
+const output = repoPath('node_modules/.stacki-test/cms-settings.cjs');
 fs.mkdirSync(path.dirname(output), { recursive: true });
 buildSync({
   stdin: {
-    contents: `export {default as Settings} from './panels/CmsSettings';
-      export {ConfirmHost} from './ui/ConfirmDialog';`,
-    resolveDir: path.join(__dirname, '../src'),
+    contents: `export {default as Settings} from './src/panels/CmsSettings';
+      export {ConfirmHost} from './src/ui/ConfirmDialog';`,
+    resolveDir: ROOT,
     loader: 'ts',
   },
   outfile: output,

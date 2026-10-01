@@ -24,6 +24,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { repoPath } = require('./helpers/sources.js');
 
 const failures = [];
 let checked = 0;
@@ -34,10 +35,10 @@ const check = (what, condition, detail) => {
   }
 };
 
-const read = (...segments) => fs.readFileSync(path.join(__dirname, '..', ...segments), 'utf8');
-const app = read('src', 'App.tsx');
-const preload = read('dist', 'electron', 'preload.js');
-const main = read('dist', 'electron', 'main.js');
+const read = (file) => fs.readFileSync(repoPath(file), 'utf8');
+const app = read('src/App.tsx');
+const preload = read('dist/electron/preload.js');
+const main = read('dist/electron/main.js');
 
 // The handler, from the line that registers it to the one that registers redo.
 const undoHandler = app.slice(
@@ -98,8 +99,7 @@ check(
 // inverse; nothing else can work it out afterwards. These are the ones that do,
 // and the check is that they still do — the variables panel had three edits
 // that wrote and said nothing, which is what "undo doesn't work here" was.
-const vars =
-  read('src', 'panels', 'VariablesView.tsx') + read('src', 'panels', 'variableHistory.ts');
+const vars = read('src/panels/VariablesView.tsx') + read('src/panels/variableHistory.ts');
 for (const [what, near] of [
   ['a value', 'const save = useCallback'],
   ['a new variable', 'const add = useCallback'],
@@ -135,9 +135,9 @@ check(
   'writeWithUndo still takes one file',
 );
 
-const assets = read('src', 'panels', 'AssetsPanel.tsx');
+const assets = read('src/panels/AssetsPanel.tsx');
 check('the assets panel records a move', /onRecordUndo\?\.\(\{/.test(assets));
-const cms = read('src', 'panels', 'cmsWriter.ts');
+const cms = read('src/panels/cmsWriter.ts');
 check('and the CMS records a save', /this\.options\.record\(\{/.test(cms));
 
 if (failures.length) {

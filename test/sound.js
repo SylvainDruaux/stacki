@@ -16,6 +16,7 @@
 const fs = require('fs');
 const path = require('path');
 const { pathToFileURL } = require('url');
+const { repoPath } = require('./helpers/sources.js');
 
 const failures = [];
 let checked = 0;
@@ -130,11 +131,11 @@ function fakeAudio() {
 
 (async () => {
   const esbuild = require('esbuild');
-  const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
+  const buildDirectory = repoPath('node_modules/.stacki-test');
   fs.mkdirSync(buildDirectory, { recursive: true });
   const out = path.join(buildDirectory, 'sound.bundle.mjs');
   await esbuild.build({
-    entryPoints: [path.join(__dirname, '..', 'src', 'ui', 'sound.js')],
+    entryPoints: [repoPath('src/ui/sound.ts')],
     outfile: out,
     bundle: true,
     format: 'esm',
@@ -525,11 +526,8 @@ function fakeAudio() {
     fs.writeFileSync(
       entry,
       `export { default as Select } from ${JSON.stringify(
-        path.join(__dirname, '..', 'src', 'style-panel', 'components', 'Select.tsx'),
-      )};\n` +
-        `export { setSoundEnabled } from ${JSON.stringify(
-          path.join(__dirname, '..', 'src', 'ui', 'sound.js'),
-        )};\n`,
+        repoPath('src/style-panel/components/Select.tsx'),
+      )};\n` + `export { setSoundEnabled } from ${JSON.stringify(repoPath('src/ui/sound.ts'))};\n`,
     );
     const bundle = path.join(buildDirectory, 'rows.bundle.js');
     await esbuild.build({
@@ -683,10 +681,7 @@ function fakeAudio() {
   }
 
   // --- the wiring --------------------------------------------------------------
-  const picker = fs.readFileSync(
-    path.join(__dirname, '..', 'src', 'style-panel', 'components', 'ColorPicker.tsx'),
-    'utf8',
-  );
+  const picker = fs.readFileSync(repoPath('src/style-panel/components/ColorPicker.tsx'), 'utf8');
   check(
     'the colour drag plays the note',
     /if \(phase === 'live'\) \{\s*dragNote\(fx, tall \? fy : undefined\)/.test(picker),
@@ -709,7 +704,7 @@ function fakeAudio() {
     ),
   );
 
-  const main = fs.readFileSync(path.join(__dirname, '..', 'dist', 'electron', 'main.js'), 'utf8');
+  const main = fs.readFileSync(repoPath('dist/electron/main.js'), 'utf8');
   check('the setting is a menu item', /label: 'Interface Sounds'/.test(main));
   check('a checkbox, so it reads as a toggle', /type: 'checkbox'/.test(main));
   check('off unless it has been turned on', /SETTINGS_DEFAULTS = \{ sound: false \}/.test(main));
@@ -718,10 +713,7 @@ function fakeAudio() {
     /writeSettings\(\)/.test(main) && /settings:get/.test(main),
   );
 
-  const select = fs.readFileSync(
-    path.join(__dirname, '..', 'src', 'style-panel', 'components', 'Select.tsx'),
-    'utf8',
-  );
+  const select = fs.readFileSync(repoPath('src/style-panel/components/Select.tsx'), 'utf8');
   check(
     'the menu sounds its highlight',
     /hoverNote\(activeIndex, displayed\.length\)/.test(select),
@@ -740,17 +732,14 @@ function fakeAudio() {
     'the highlight the menu opens with should not sound',
   );
 
-  const panel = fs.readFileSync(
-    path.join(__dirname, '..', 'src', 'panels', 'StylePanel.tsx'),
-    'utf8',
-  );
+  const panel = fs.readFileSync(repoPath('src/panels/StylePanel.tsx'), 'utf8');
   check(
     'the style panel taps on a button press',
     /closest\('button'\)/.test(panel) && /clickNote\(\)/.test(panel),
   );
   check('but not on a disabled one', /!button\.disabled/.test(panel));
 
-  const app = fs.readFileSync(path.join(__dirname, '..', 'src', 'App.tsx'), 'utf8');
+  const app = fs.readFileSync(repoPath('src/App.tsx'), 'utf8');
   check('the app reads it on load', /readAppSettings\(\)\s*\.then/.test(app));
   check('and follows the menu after that', /onSoundSettingChanged\(/.test(app));
 

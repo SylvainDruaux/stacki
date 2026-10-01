@@ -9,10 +9,10 @@ import * as path from 'node:path';
 import * as net from 'node:net';
 import { createHash } from 'node:crypto';
 import { mainHarness } from './main-harness.ts';
-import { IPC_PAYLOADS } from '../../dist/shared/ipc-payloads.js';
-import { toRecord } from '../../dist/shared/record.js';
-import { parseMarkdownPage } from '../../dist/electron/markdownParser.js';
-import { parsePageModel } from '../../dist/shared/page-node.js';
+import { IPC_PAYLOADS } from '#dist/shared/ipc-payloads.js';
+import { toRecord } from '#dist/shared/record.js';
+import { parseMarkdownPage } from '#dist/electron/markdownParser.js';
+import { parsePageModel } from '#dist/shared/page-node.js';
 import {
   parseContentConfig,
   parseDynamicPaths,
@@ -22,9 +22,9 @@ import {
   parseAliases,
   parseAstroLock,
   parseValidationResult,
-} from '../../dist/electron/main.validation.js';
-import { directoryBudget, MAIN_LIMITS } from '../../dist/electron/main.bounds.js';
-import { LIMITS } from '../../dist/shared/limits.js';
+} from '#dist/electron/main.validation.js';
+import { directoryBudget, MAIN_LIMITS } from '#dist/electron/main.bounds.js';
+import { LIMITS } from '#dist/shared/limits.js';
 
 // Null as a boundary receives it, parsed from JSON: inputs may hold it; our values never do.
 const jsonNull: unknown = JSON.parse('null');

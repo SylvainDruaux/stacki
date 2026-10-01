@@ -26,9 +26,10 @@ const check = (what, condition, detail) => {
 
 // Test the implementation itself so source-selection rules cannot drift into copied fixtures.
 const { sourceChip, withSource, parseMapHead } = require('./renderer-module')(
-  'panels/propNodeEditors.tsx',
+  'src/panels/propNodeEditors.tsx',
 );
 const assert = require('node:assert/strict');
+const { repoPath } = require('./helpers/sources.js');
 assert.deepEqual(parseMapHead('posts.map((post, index) => ('), {
   data: 'posts',
   item: 'post',
@@ -48,14 +49,8 @@ assert.throws(() => withSource('posts', 'x'.repeat(1_000_001)), /path limit exce
 (async () => {
   // The panel's own copies, so a change there fails here rather than drifting.
   const source =
-    require('fs').readFileSync(
-      path.join(__dirname, '..', 'src', 'panels', 'propNodeEditors.tsx'),
-      'utf8',
-    ) +
-    require('fs').readFileSync(
-      path.join(__dirname, '..', 'src', 'panels', 'propBindings.tsx'),
-      'utf8',
-    );
+    require('fs').readFileSync(repoPath('src/panels/propNodeEditors.tsx'), 'utf8') +
+    require('fs').readFileSync(repoPath('src/panels/propBindings.tsx'), 'utf8');
   check('the panel still derives the source the same way', source.includes('function sourceChip('));
   check('and still swaps it in place', source.includes('function withSource('));
   check(
@@ -129,10 +124,7 @@ assert.throws(() => withSource('posts', 'x'.repeat(1_000_001)), /path limit exce
 
   // The chip is a mark over text, so the value never contains anything but the
   // expression itself.
-  const expr = require('fs').readFileSync(
-    path.join(__dirname, '..', 'src', 'ui', 'ExprInput.tsx'),
-    'utf8',
-  );
+  const expr = require('fs').readFileSync(repoPath('src/ui/ExprInput.tsx'), 'utf8');
   check(
     'the chip is a mark, not a widget',
     /Decoration\.mark\(\{ class: 'cm-chip' \}\)/.test(expr),

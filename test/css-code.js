@@ -13,6 +13,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { ROOT, repoPath } = require('./helpers/sources.js');
 
 const failures = [];
 let checked = 0;
@@ -31,16 +32,16 @@ const same = (what, got, want) =>
 
 (async () => {
   const esbuild = require('esbuild');
-  const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
+  const buildDirectory = repoPath('node_modules/.stacki-test');
   fs.mkdirSync(buildDirectory, { recursive: true });
   const bundlePath = path.join(buildDirectory, 'css-code.bundle.js');
   await esbuild.build({
     stdin: {
       contents: `
-        export * from './css-code'
-        export * from './css-rule-view'
+        export * from './src/style-panel/lib/css-code'
+        export * from './src/style-panel/lib/css-rule-view'
       `,
-      resolveDir: path.join(__dirname, '..', 'src', 'style-panel', 'lib'),
+      resolveDir: ROOT,
       loader: 'ts',
     },
     outfile: bundlePath,

@@ -13,15 +13,15 @@ import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { test } from 'node:test';
-import { toFilePath, toIntentId } from '../../dist/shared/brand.js';
-import { LIMITS } from '../../dist/shared/limits.js';
-import type { ProjectedNode } from '../../dist/shared/source-projection.js';
-import { encodeUtf8 } from '../../dist/shared/span.js';
+import { toFilePath, toIntentId } from '#dist/shared/brand.js';
+import { LIMITS } from '#dist/shared/limits.js';
+import type { ProjectedNode } from '#dist/shared/source-projection.js';
+import { encodeUtf8 } from '#dist/shared/span.js';
 import { oracleIntent, oracleSplices } from './oracle-intent.ts';
 import { ORACLE_SCENARIOS, type IntentClass } from './oracles.ts';
 import { snapshotOf } from './project.ts';
 import { planByIdentity } from './reference-planner.ts';
-import { applySplices } from '../../dist/shared/splice.js';
+import { applySplices } from '#dist/shared/splice.js';
 
 const FIXTURES = path.resolve('test/fixtures/editor-core');
 const snapshotFile = (name: string) =>

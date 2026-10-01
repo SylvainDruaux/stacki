@@ -20,7 +20,7 @@ const {
   digestOf,
   isAtomicTemporary,
   replaceFileAtomic,
-} = require('../dist/electron/atomicWrite.js');
+} = require('#dist/electron/atomicWrite.js');
 
 const sha256 = (bytes) => createHash('sha256').update(bytes).digest('hex');
 

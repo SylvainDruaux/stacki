@@ -2,7 +2,7 @@
 //
 //   node test/morph.js
 //
-// The canvas patches the page instead of reloading it (electron/morphClient.js).
+// The canvas patches the page instead of reloading it (electron/morphClient.ts).
 // The patch is a diff between the server's PREVIOUS rendering and its new one,
 // applied to the live document — three trees, and the live one is written only
 // where the other two disagree. Finding the live node that stands for a server
@@ -35,20 +35,18 @@ const check = (what, condition, detail) => {
 };
 
 const { JSDOM } = require('jsdom');
+const { repoPath } = require('./helpers/sources.js');
 const dom = new JSDOM('<!doctype html><body></body>');
 global.document = dom.window.document;
 
 // morphClient is an ES module the dev server serves to the page; the patching
 // half is lifted out rather than imported, as in test/comment-region.js.
-const source = fs.readFileSync(
-  path.join(__dirname, '..', 'dist', 'electron', 'morphClient.js'),
-  'utf8',
-);
+const source = fs.readFileSync(repoPath('dist/electron/morphClient.js'), 'utf8');
 const start = source.indexOf('const isAnchor =');
 const end = source.indexOf('// A script that CHANGED, or one that is GONE');
 // Main prepends the patcher's bounds from shared/limits.ts (step 7); the lifted
 // half takes them as a parameter, so the cap tests below can shrink them.
-const { LIMITS } = require('../dist/shared/limits.js');
+const { LIMITS } = require('#dist/shared/limits.js');
 const assert = require('node:assert/strict');
 const lift = (limits) =>
   new Function(
@@ -546,7 +544,7 @@ const LIVE_TABS = (labels, active) =>
     reasonOf(() => tiny.patchChildren(...again)) === undefined,
   );
   // The shipped bounds are the ones in shared/limits.ts, prepended by main.
-  const main = fs.readFileSync(path.join(__dirname, '..', 'dist', 'electron', 'main.js'), 'utf8');
+  const main = fs.readFileSync(repoPath('dist/electron/main.js'), 'utf8');
   check(
     'main prepends the patcher its bounds from LIMITS',
     /const AVB_PREVIEW_LIMITS = Object\.freeze\(\$\{JSON\.stringify\(bounds\)\}\)/.test(main) &&

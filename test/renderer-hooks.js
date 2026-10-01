@@ -8,14 +8,15 @@ const { JSDOM } = require('jsdom');
 const React = require('react');
 const { act } = React;
 const { createRoot } = require('react-dom/client');
-const directory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
+const { ROOT, repoPath } = require('./helpers/sources.js');
+const directory = repoPath('node_modules/.stacki-test');
 fs.mkdirSync(directory, { recursive: true });
 const output = path.join(directory, 'renderer-hooks.bundle.cjs');
 buildSync({
   stdin: {
     contents: `export { default as useListReorder } from './src/ui/useListReorder.ts';
     export { usePointerDrag } from './src/ui/usePointerDrag.ts';`,
-    resolveDir: path.join(__dirname, '..'),
+    resolveDir: ROOT,
   },
   outfile: output,
   bundle: true,

@@ -6,11 +6,12 @@ const path = require('node:path');
 const fs = require('node:fs');
 const { buildSync } = require('esbuild');
 const { JSDOM } = require('jsdom');
-const directory = path.join(__dirname, '../node_modules/.stacki-test');
+const { repoPath } = require('./helpers/sources.js');
+const directory = repoPath('node_modules/.stacki-test');
 fs.mkdirSync(directory, { recursive: true });
 const output = path.join(directory, 'prop-attributes.cjs');
 buildSync({
-  entryPoints: [path.join(__dirname, '../src/panels/propAttributes.tsx')],
+  entryPoints: [repoPath('src/panels/propAttributes.tsx')],
   outfile: output,
   bundle: true,
   platform: 'node',

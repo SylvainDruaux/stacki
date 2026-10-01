@@ -12,17 +12,12 @@ const assert = require('node:assert/strict');
 const path = require('node:path');
 const fs = require('node:fs');
 const esbuild = require('esbuild');
+const { repoPath } = require('./helpers/sources.js');
 
-const buildDirectory = path.join(
-  __dirname,
-  '..',
-  'node_modules',
-  '.stacki-test',
-  'node-capability',
-);
+const buildDirectory = repoPath('node_modules/.stacki-test/node-capability');
 fs.mkdirSync(buildDirectory, { recursive: true });
 esbuild.buildSync({
-  entryPoints: [path.join(__dirname, '..', 'src', 'nodeCapability.ts')],
+  entryPoints: [repoPath('src/nodeCapability.ts')],
   outdir: buildDirectory,
   bundle: true,
   format: 'cjs',
@@ -32,10 +27,10 @@ esbuild.buildSync({
 const { nodeCapability, capabilityNeedsNotice } = require(
   path.join(buildDirectory, 'nodeCapability.js'),
 );
-const { parsePage } = require('../dist/electron/astroParser.js');
-const { parseMarkdownPage } = require('../dist/electron/markdownParser.js');
-const { projectPage } = require('../dist/shared/source-projection.js');
-const { CAPABILITIES } = require('../dist/shared/capability.js');
+const { parsePage } = require('#dist/electron/astroParser.js');
+const { parseMarkdownPage } = require('#dist/electron/markdownParser.js');
+const { projectPage } = require('#dist/shared/source-projection.js');
+const { CAPABILITIES } = require('#dist/shared/capability.js');
 
 const corpus = path.join(__dirname, 'corpus');
 

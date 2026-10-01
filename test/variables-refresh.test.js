@@ -6,12 +6,13 @@ const path = require('node:path');
 const fs = require('node:fs');
 const { buildSync } = require('esbuild');
 const { JSDOM } = require('jsdom');
+const { repoPath } = require('./helpers/sources.js');
 
 test('variables refresh coalesces watcher bursts and ignores obsolete projects', async () => {
-  const output = path.join(__dirname, '../node_modules/.stacki-test/variables-refresh.cjs');
+  const output = repoPath('node_modules/.stacki-test/variables-refresh.cjs');
   fs.mkdirSync(path.dirname(output), { recursive: true });
   buildSync({
-    entryPoints: [path.join(__dirname, '../src/panels/VariablesPanel.tsx')],
+    entryPoints: [repoPath('src/panels/VariablesPanel.tsx')],
     outfile: output,
     bundle: true,
     platform: 'node',

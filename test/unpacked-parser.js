@@ -27,6 +27,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { execFileSync } = require('child_process');
+const { ROOT, repoPath } = require('./helpers/sources.js');
 
 const failures = [];
 let checked = 0;
@@ -37,7 +38,6 @@ const check = (what, condition, detail) => {
   }
 };
 
-const ROOT = path.join(__dirname, '..');
 const ENTRIES = ['astroParser.js', 'componentPreview.js', 'previewMarkers.js'].map((name) =>
   path.join('dist', 'electron', name),
 );
@@ -96,10 +96,10 @@ const covers = (pattern, rel) => {
   return re.test(rel);
 };
 
-const pkg = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8'));
+const pkg = JSON.parse(fs.readFileSync(repoPath('package.json'), 'utf8'));
 const patterns = pkg.build?.asarUnpack || [];
 const files = [...ENTRIES.reduce((seen, entry) => closureOf(entry, seen), new Set())];
-const main = fs.readFileSync(path.join(ROOT, 'dist', 'electron', 'main.js'), 'utf8');
+const main = fs.readFileSync(repoPath('dist/electron/main.js'), 'utf8');
 
 for (const entry of ENTRIES) {
   check(

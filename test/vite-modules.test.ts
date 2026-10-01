@@ -12,12 +12,13 @@ import { SourceTextModule } from 'node:vm';
 import { createServer, type ViteDevServer } from 'vite';
 
 const MODULES_MAX = 32;
-const ENTRY_MODULES: ReadonlyArray<{ readonly path: string; readonly exportName: string }> = [
-  { path: '/src/cleanError.ts', exportName: 'cleanError' },
-  { path: '/src/bridge.ts', exportName: 'scanProject' },
-  { path: '/src/dataSuggest.ts', exportName: 'dataTree' },
-  { path: '/src/loopBindings.ts', exportName: 'renamedLoopVar' },
-  { path: '/src/pagePersistence.ts', exportName: 'createPageSaver' },
+// Repository paths; the dev server serves each at `/<path>`.
+const ENTRY_MODULES: ReadonlyArray<{ readonly file: string; readonly exportName: string }> = [
+  { file: 'src/cleanError.ts', exportName: 'cleanError' },
+  { file: 'src/bridge.ts', exportName: 'scanProject' },
+  { file: 'src/dataSuggest.ts', exportName: 'dataTree' },
+  { file: 'src/loopBindings.ts', exportName: 'renamedLoopVar' },
+  { file: 'src/pagePersistence.ts', exportName: 'createPageSaver' },
 ];
 
 test('Vite development modules link the renderer contract dependencies', async () => {
@@ -33,15 +34,15 @@ test('Vite development modules link the renderer contract dependencies', async (
   try {
     const loadModule = createModuleLoader(server);
     for (const entry of ENTRY_MODULES) {
-      const module = await loadModule(entry.path);
+      const module = await loadModule(`/${entry.file}`);
       await module.link(loadModule);
       await module.evaluate({ timeout: 1_000, breakOnSigint: false });
-      assert.equal(module.status, 'evaluated', `${entry.path} must run before React mounts`);
+      assert.equal(module.status, 'evaluated', `${entry.file} must run before React mounts`);
       const namespace: unknown = module.namespace;
       assert.ok(typeof namespace === 'object');
       assert.ok(namespace);
       const exported: unknown = Reflect.get(namespace, entry.exportName);
-      assert.equal(typeof exported, 'function', `${entry.path} keeps its public API`);
+      assert.equal(typeof exported, 'function', `${entry.file} keeps its public API`);
     }
   } finally {
     await server.close();

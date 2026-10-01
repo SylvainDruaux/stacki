@@ -11,11 +11,12 @@ const path = require('node:path');
 const { createHash } = require('node:crypto');
 const esbuild = require('esbuild');
 const { JSDOM } = require('jsdom');
-const { parsePage } = require('../dist/electron/astroParser.js');
-const { parseMarkdownPage } = require('../dist/electron/markdownParser.js');
-const { createNodeDocumentActors } = require('../dist/electron/documentActors.js');
-const { buildEdit } = require('../dist/electron/editRequests.js');
-const { decodeUtf8 } = require('../dist/shared/span.js');
+const { parsePage } = require('#dist/electron/astroParser.js');
+const { parseMarkdownPage } = require('#dist/electron/markdownParser.js');
+const { createNodeDocumentActors } = require('#dist/electron/documentActors.js');
+const { buildEdit } = require('#dist/electron/editRequests.js');
+const { decodeUtf8 } = require('#dist/shared/span.js');
+const { repoPath, stubPanels } = require('./helpers/sources.js');
 
 const sha256 = (text) => createHash('sha256').update(text).digest('hex');
 const tick = () => new Promise((resolve) => setTimeout(resolve, 10));
@@ -36,10 +37,10 @@ const panelStub = (name) =>
   `globalThis.__panels[${JSON.stringify(name)}] = props; return null; }`;
 
 async function mountApp(root, files, build) {
-  const directory = path.join(__dirname, '..', 'node_modules', '.stacki-test', build);
+  const directory = path.join(repoPath('node_modules/.stacki-test'), build);
   fs.mkdirSync(directory, { recursive: true });
   await esbuild.build({
-    entryPoints: [path.join(__dirname, '..', 'src', 'App.tsx')],
+    entryPoints: [repoPath('src/App.tsx')],
     outfile: path.join(directory, 'app.js'),
     bundle: true,
     format: 'cjs',
@@ -49,18 +50,12 @@ async function mountApp(root, files, build) {
     loader: { '.css': 'empty', '.svg': 'empty', '.png': 'empty' },
     logLevel: 'silent',
     plugins: [
-      {
-        name: 'capture-panels',
-        setup(build) {
-          build.onLoad({ filter: /\/src\/panels\/[^/]+\.[jt]sx$/ }, (args) => {
-            const name = path.basename(args.path, path.extname(args.path));
-            return {
-              contents: panelStub(name),
-              loader: 'jsx',
-            };
-          });
-        },
-      },
+      stubPanels('capture-panels', (name) => {
+        return {
+          contents: panelStub(name),
+          loader: 'jsx',
+        };
+      }),
     ],
   });
   const dom = new JSDOM('<!doctype html><div id="root"></div>', {

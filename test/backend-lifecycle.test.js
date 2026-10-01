@@ -16,8 +16,9 @@ const path = require('node:path');
 const vm = require('node:vm');
 const { createRequire } = require('node:module');
 const { EventEmitter } = require('node:events');
-const { createSerialQueue } = require('../dist/electron/serialQueue');
-const { watchProject } = require('../dist/electron/projectWatcher');
+const { createSerialQueue } = require('#dist/electron/serialQueue.js');
+const { watchProject } = require('#dist/electron/projectWatcher.js');
+const { repoPath } = require('./helpers/sources.js');
 
 const tick = () => new Promise((resolve) => setImmediate(resolve));
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -70,11 +71,8 @@ function contentHarness(context) {
       },
     },
   };
-  const source = fs.readFileSync(
-    path.join(__dirname, '..', 'dist', 'electron', 'contentConfig.js'),
-    'utf8',
-  );
-  const runtimeRequire = createRequire(path.join(__dirname, '../dist/electron/main.js'));
+  const source = fs.readFileSync(repoPath('dist/electron/contentConfig.js'), 'utf8');
+  const runtimeRequire = createRequire(repoPath('dist/electron/main.js'));
   const mod = { exports: {} };
   const moduleFactory = vm.runInNewContext(
     '(function(require, module, __dirname, exports) {' + source + '\n})',
@@ -91,7 +89,7 @@ function contentHarness(context) {
   moduleFactory(
     (name) => mocks[name] || runtimeRequire(name),
     mod,
-    path.join(__dirname, '..', 'dist', 'electron'),
+    repoPath('dist/electron'),
     mod.exports,
   );
   context.after(() => {
@@ -323,7 +321,7 @@ test(
 test(
   'dev starts share a result only for the same ' + 'project and serialize different projects',
   async () => {
-    const { createKeyedQueue } = require('../dist/electron/serialQueue');
+    const { createKeyedQueue } = require('#dist/electron/serialQueue.js');
     const queue = createKeyedQueue();
     const release = deferred();
     const started = [];
@@ -355,7 +353,7 @@ test(
 test(
   'closing a project cancels active and queued ' + 'starts without poisoning the next start',
   async () => {
-    const { createKeyedQueue } = require('../dist/electron/serialQueue');
+    const { createKeyedQueue } = require('#dist/electron/serialQueue.js');
     const queue = createKeyedQueue();
     const release = deferred();
     const active = queue.run('one', async (assertActive) => {
@@ -376,11 +374,8 @@ test(
 );
 
 function loadThumbs(BrowserWindow) {
-  const source = fs.readFileSync(
-    path.join(__dirname, '..', 'dist', 'electron', 'thumbs.js'),
-    'utf8',
-  );
-  const runtimeRequire = createRequire(path.join(__dirname, '../dist/electron/main.js'));
+  const source = fs.readFileSync(repoPath('dist/electron/thumbs.js'), 'utf8');
+  const runtimeRequire = createRequire(repoPath('dist/electron/main.js'));
   const mod = { exports: {} };
   vm.runInNewContext('(function(require, module, exports) {' + source + '\n})', {
     setTimeout: (callback, ms) => setTimeout(callback, Math.min(ms, 5)),
@@ -518,10 +513,7 @@ test(
       process.platform === 'win32' ? 'junction' : 'dir',
     );
     const staged = path.join(staging, 'schemaTools.mjs');
-    fs.copyFileSync(
-      path.join(__dirname, '..', 'dist', 'electron', 'content', 'schemaTools.mjs'),
-      staged,
-    );
+    fs.copyFileSync(repoPath('dist/electron/content/schemaTools.mjs'), staged);
     assert.equal(fs.existsSync(path.join(modules, 'zod-to-json-schema')), false);
     const { toJsonSchema } = await import(require('node:url').pathToFileURL(staged).href);
     assert.deepEqual(toJsonSchema({ source: 'private Astro dependency' }), {

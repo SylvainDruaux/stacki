@@ -9,20 +9,20 @@ const path = require('node:path');
 const {
   readComponentProperties,
   editPropertyDefinition,
-} = require('../dist/electron/propertyDefinitions');
+} = require('#dist/electron/propertyDefinitions.js');
 const {
   renameComponentOptionValues,
   renameComponentReferences,
-} = require('../dist/electron/propertyRename');
+} = require('#dist/electron/propertyRename.js');
 const {
   inverseBatch,
   loadComponentProperties,
   PropertyUndoStore,
   revertComponentProperties,
   updateComponentProperties,
-} = require('../dist/electron/componentProperties');
-const { applySourceEdits } = require('../dist/electron/propertySyntax');
-const { documentHost } = require('../dist/electron/documentWrites');
+} = require('#dist/electron/componentProperties.js');
+const { applySourceEdits } = require('#dist/electron/propertySyntax.js');
+const { documentHost } = require('#dist/electron/documentWrites.js');
 
 // Every batch write goes through the document actors (plan §3.3, step 5).
 const writer = { documents: documentHost().documents, noteWrite: () => {} };
@@ -58,7 +58,7 @@ const {
   parsePropertyChange,
   parsePropertiesResult,
   PROPERTY_LIMITS,
-} = require('../dist/shared/component-properties');
+} = require('#dist/shared/component-properties.js');
 
 // Null as a boundary receives it, parsed from JSON: inputs may hold it; our values never do.
 const jsonNull = JSON.parse('null');

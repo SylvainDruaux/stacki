@@ -12,6 +12,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { ROOT, repoPath } = require('./helpers/sources.js');
 
 const failures = [];
 let checked = 0;
@@ -24,13 +25,13 @@ const check = (what, condition, detail) => {
 
 (async () => {
   const esbuild = require('esbuild');
-  const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
+  const buildDirectory = repoPath('node_modules/.stacki-test');
   fs.mkdirSync(buildDirectory, { recursive: true });
   const bundlePath = path.join(buildDirectory, 'computed-color.bundle.js');
   await esbuild.build({
     stdin: {
-      contents: `export { needsPage } from './lib/computed-color'`,
-      resolveDir: path.join(__dirname, '..', 'src', 'style-panel'),
+      contents: `export { needsPage } from './src/style-panel/lib/computed-color'`,
+      resolveDir: ROOT,
       loader: 'ts',
     },
     outfile: bundlePath,
@@ -64,19 +65,13 @@ const check = (what, condition, detail) => {
   // when there is no selection to ask about — which is the variables panel's
   // whole situation.
   {
-    const preload = fs.readFileSync(
-      path.join(__dirname, '..', 'dist', 'electron', 'preload.js'),
-      'utf8',
-    );
+    const preload = fs.readFileSync(repoPath('dist/electron/preload.js'), 'utf8');
     check(
       'with no element named, the page answers about itself',
       /const host = els\[0\] \|\| document\.documentElement;/.test(preload),
       'a value with nothing selected gets no answer at all',
     );
-    const lib = fs.readFileSync(
-      path.join(__dirname, '..', 'src', 'style-panel', 'lib', 'computed-color.ts'),
-      'utf8',
-    );
+    const lib = fs.readFileSync(repoPath('src/style-panel/lib/computed-color.ts'), 'utf8');
     check(
       'and the app asks even with nothing selected',
       /function pathOfSelection\(\): string \{/.test(lib) &&

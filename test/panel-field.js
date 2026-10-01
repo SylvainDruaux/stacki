@@ -18,6 +18,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { ROOT, repoPath } = require('./helpers/sources.js');
 
 const failures = [];
 let checked = 0;
@@ -30,7 +31,7 @@ const check = (what, condition, detail) => {
 
 (async () => {
   const esbuild = require('esbuild');
-  const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test', 'field');
+  const buildDirectory = repoPath('node_modules/.stacki-test/field');
   fs.mkdirSync(buildDirectory, { recursive: true });
 
   const entry = `
@@ -84,7 +85,7 @@ const check = (what, condition, detail) => {
     )
   `;
   await esbuild.build({
-    stdin: { contents: entry, resolveDir: path.join(__dirname, '..'), loader: 'jsx' },
+    stdin: { contents: entry, resolveDir: ROOT, loader: 'jsx' },
     outfile: path.join(buildDirectory, 'bundle.js'),
     bundle: true,
     format: 'iife',

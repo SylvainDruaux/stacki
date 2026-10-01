@@ -25,6 +25,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { repoPath } = require('./helpers/sources.js');
 
 // The DOM answers "none" with null. The fakes below that stand in for DOM APIs
 // return the platform's own value, read from JSON because our code never writes one.
@@ -81,11 +82,11 @@ const BUTTON = [
 
 (async () => {
   const esbuild = require('esbuild');
-  const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
+  const buildDirectory = repoPath('node_modules/.stacki-test');
   fs.mkdirSync(buildDirectory, { recursive: true });
   const bundle = path.join(buildDirectory, 'variant-options.bundle.js');
   await esbuild.build({
-    entryPoints: [path.join(__dirname, '..', 'src', 'panels', 'PropsPanel.jsx')],
+    entryPoints: [repoPath('src/panels/PropsPanel.tsx')],
     outfile: bundle,
     bundle: true,
     format: 'cjs',
@@ -136,7 +137,7 @@ const BUTTON = [
   const { createRoot } = require('react-dom/client');
   const { act } = React;
   const PropsPanel = require(bundle).default;
-  const { parsePropSchema } = require('../dist/electron/astroParser.js');
+  const { parsePropSchema } = require('#dist/electron/astroParser.js');
 
   const parsed = parsePropSchema(BUTTON);
   const schema = Array.isArray(parsed) ? parsed : [...parsed.values()];
@@ -330,10 +331,7 @@ const BUTTON = [
   }
 
   // --- the rule, stated where it lives -------------------------------------------
-  const rules = fs.readFileSync(
-    path.join(__dirname, '..', 'src', 'panels', 'propRules.ts'),
-    'utf8',
-  );
+  const rules = fs.readFileSync(repoPath('src/panels/propRules.ts'), 'utf8');
   check(
     'narrowing asks whether the prop chooses the branch',
     /choosesBranch\(union, field\.name\)/.test(rules),

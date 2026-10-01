@@ -3,15 +3,15 @@
 // wrapper keys and expression metadata while editing nested item collections.
 const assert = require('node:assert/strict');
 const loadRenderer = require('./renderer-module.js');
-const { BOUNDARY_LIMITS } = require('../dist/shared/boundary.js');
+const { BOUNDARY_LIMITS } = require('#dist/shared/boundary.js');
 
 // A boundary can receive null — JSON, structured clone and postMessage all carry it —
 // so the negative space below includes it. It is read from JSON, because our own
 // code never writes a null.
 const PLATFORM_NULL = JSON.parse('null');
-const schema = loadRenderer('contentSchema.ts');
-const cms = loadRenderer('cmsSchema.ts');
-const { parseContentSchema } = loadRenderer('contentSchemaBoundary.ts');
+const schema = loadRenderer('src/contentSchema.ts');
+const cms = loadRenderer('src/cmsSchema.ts');
+const { parseContentSchema } = loadRenderer('src/contentSchemaBoundary.ts');
 const fixture = {
   type: 'object',
   required: ['title', 'choice'],

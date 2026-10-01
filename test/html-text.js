@@ -19,7 +19,7 @@
 const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
-const { LIMITS } = require('../dist/shared/limits.js');
+const { LIMITS } = require('#dist/shared/limits.js');
 
 const failures = [];
 let checked = 0;
@@ -30,8 +30,8 @@ const check = (what, condition, detail) => {
   }
 };
 
-const { decodeEntities, encodeText } = require('../dist/shared/htmlText.js');
-const { parsePage, serializePage } = require('../dist/electron/astroParser.js');
+const { decodeEntities, encodeText } = require('#dist/shared/htmlText.js');
+const { parsePage, serializePage } = require('#dist/electron/astroParser.js');
 
 // ── Reading ─────────────────────────────────────────────────────────────────
 const reads = (raw, want) =>

@@ -21,7 +21,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { execFile } = require('child_process');
-const snap = require('../dist/electron/gitSnapshot.js');
+const snap = require('#dist/electron/gitSnapshot.js');
 
 const failures = [];
 let checked = 0;

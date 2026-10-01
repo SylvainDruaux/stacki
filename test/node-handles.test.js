@@ -13,15 +13,15 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { createHash } = require('node:crypto');
 const load = require('./renderer-module');
-const { parsePage } = require('../dist/electron/astroParser.js');
-const { LIMITS } = require('../dist/shared/limits.js');
-const { parsePageResult } = require('../dist/shared/page-node.js');
-const { NODE_PROJECTOR } = require('../dist/electron/documentDisk.js');
-const { buildEditIntent } = require('../dist/electron/editRequests.js');
-const { toIntent } = require('../dist/shared/intent.js');
-const { planIntent } = require('../dist/shared/planner.js');
-const { applySplices, inverseEdits } = require('../dist/shared/splice.js');
-const { carryHandles } = load('nodeHandles.ts');
+const { parsePage } = require('#dist/electron/astroParser.js');
+const { LIMITS } = require('#dist/shared/limits.js');
+const { parsePageResult } = require('#dist/shared/page-node.js');
+const { NODE_PROJECTOR } = require('#dist/electron/documentDisk.js');
+const { buildEditIntent } = require('#dist/electron/editRequests.js');
+const { toIntent } = require('#dist/shared/intent.js');
+const { planIntent } = require('#dist/shared/planner.js');
+const { applySplices, inverseEdits } = require('#dist/shared/splice.js');
+const { carryHandles } = load('src/nodeHandles.ts');
 
 const sha256 = (text) => createHash('sha256').update(text).digest('hex');
 const parse = (source) => {

@@ -5,15 +5,16 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const esbuild = require('esbuild');
+const { repoPath } = require('./helpers/sources.js');
 
 // The DOM answers "none" with null. The fakes below that stand in for DOM APIs
 // return the platform's own value, read from JSON because our code never writes one.
 const PLATFORM_NULL = JSON.parse('null');
 const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'stacki-renderer-leaves-'));
-const load = (name) => {
-  const output = path.join(directory, `${name}.cjs`);
+const load = (file) => {
+  const output = path.join(directory, `${path.basename(file, '.ts')}.cjs`);
   esbuild.buildSync({
-    entryPoints: [path.join(__dirname, '..', 'src', `${name}.ts`)],
+    entryPoints: [repoPath(file)],
     outfile: output,
     bundle: true,
     platform: 'node',
@@ -24,7 +25,8 @@ const load = (name) => {
 };
 
 try {
-  const { requestAsset, onAssetRequest, clearAssetRequest, getPendingAsset } = load('assetPick');
+  const { requestAsset, onAssetRequest, clearAssetRequest, getPendingAsset } =
+    load('src/assetPick.ts');
   const first = [];
   const second = [];
   const unsubscribe = onAssetRequest((request) => first.push(request));
@@ -38,13 +40,13 @@ try {
   assert.deepEqual(second, [request, undefined]);
   assert.equal(getPendingAsset(), undefined);
 
-  const { setDrag, getDrag, clearDrag } = load('dragState');
+  const { setDrag, getDrag, clearDrag } = load('src/dragState.ts');
   setDrag({ kind: 'component', name: 'Card' });
   assert.deepEqual(getDrag(), { kind: 'component', name: 'Card' });
   clearDrag();
   assert.equal(getDrag(), undefined);
 
-  const { renamedAttr } = load('attrOrder');
+  const { renamedAttr } = load('src/attrOrder.ts');
   const value = { type: 'expr', value: 'someCall()', metadata: 'preserve' };
   const node = { props: { old: value }, attrOrder: ['old'] };
   const renamed = renamedAttr(node, 'old', 'new');
@@ -54,26 +56,26 @@ try {
   const tooLong = 'x'.repeat(8193);
   assert.throws(() => renamedAttr(renamed, 'new', tooLong), /Attribute name exceeds limit/);
 
-  const { checkStatement } = load('jsCheck');
+  const { checkStatement } = load('src/jsCheck.ts');
   assert.equal(checkStatement(' '.repeat(1_000_000)).ok, true);
   assert.deepEqual(checkStatement(' '.repeat(1_000_001)), {
     ok: false,
     message: 'This statement exceeds the editor size limit.',
   });
-  const { componentNameError } = load('componentName');
+  const { componentNameError } = load('src/componentName.ts');
   assert.equal(componentNameError('Card', Array(10_000).fill('Other')), undefined);
   assert.throws(() => componentNameError('Card', Array(10_001).fill('Other')), /scan limit/);
 
-  const { onePerPlace } = load('outlineBoxes');
+  const { onePerPlace } = load('src/outlineBoxes.ts');
   const box = { x: 0, y: 0, w: 10, h: 10 };
   assert.deepEqual(onePerPlace([box, { ...box }, { x: 1, y: 1, w: 2, h: 2 }]), [box]);
   assert.deepEqual(onePerPlace(Array.from({ length: 20_000 }, () => ({ ...box }))), [box]);
   assert.throws(() => onePerPlace(Array(20_001).fill(box)), /Outline box count exceeds limit/);
 
-  const { rankInsertItems } = load('insertRank');
+  const { rankInsertItems } = load('src/insertRank.ts');
   assert.equal(rankInsertItems(Array(10_000).fill({ name: 'Card' }), '').length, 10_000);
   assert.throws(() => rankInsertItems(Array(10_001).fill({ name: 'Card' }), ''), /item count/);
-  const { elementClasses } = load('classNames');
+  const { elementClasses } = load('src/classNames.ts');
   assert.throws(
     () =>
       elementClasses({
@@ -82,14 +84,14 @@ try {
     /Class expression exceeds size limit/,
   );
 
-  const { decideTerminalPaste } = load('terminalPaste');
+  const { decideTerminalPaste } = load('src/terminalPaste.ts');
   const item = { type: 'text/plain', kind: 'string', getAsFile: () => PLATFORM_NULL };
   assert.deepEqual(decideTerminalPaste([item], 'hello', undefined, 'posix'), { kind: 'text' });
   assert.throws(
     () => decideTerminalPaste(Array(10_001).fill(item), '', undefined, 'posix'),
     /item count/,
   );
-  const { findWithParent, isInlineRun } = load('treeSelection');
+  const { findWithParent, isInlineRun } = load('src/treeSelection.ts');
   const cycle = { id: 'cycle', kind: 'element', name: 'span', children: [] };
   cycle.children.push(cycle);
   assert.throws(() => findWithParent([cycle], 'missing'), /Tree traversal exceeds depth limit/);
@@ -97,11 +99,11 @@ try {
   const leaf = { id: 'text', kind: 'text', value: 'hello' };
   assert.equal(isInlineRun(Array(20_000).fill(leaf)), true);
   assert.throws(() => isInlineRun(Array(20_001).fill(leaf)), /Tree traversal exceeds node limit/);
-  const { liveClassesById } = load('liveClasses');
+  const { liveClassesById } = load('src/liveClasses.ts');
   assert.throws(() => liveClassesById({}, [cycle]), /Tree traversal exceeds depth limit/);
-  const { propsForExtraction } = load('extractProps');
+  const { propsForExtraction } = load('src/extractProps.ts');
   assert.throws(() => propsForExtraction(cycle, ['title']), /Tree traversal exceeds depth limit/);
-  const { evaluate } = load('fluid');
+  const { evaluate } = load('src/fluid.ts');
   assert.equal(evaluate('(2rem + 16px) * 2', 0), 6);
   assert.equal(evaluate('('.repeat(66) + '1' + ')'.repeat(66), 0), undefined);
   assert.equal(evaluate('1'.repeat(1_000_001), 0), undefined);

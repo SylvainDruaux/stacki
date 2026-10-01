@@ -13,16 +13,16 @@ import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { test } from 'node:test';
-import { parseAttrs, parsePage } from '../../dist/electron/astroParser.js';
-import { LIMITS } from '../../dist/shared/limits.js';
-import { parsePageResult, type PageNode } from '../../dist/shared/page-node.js';
-import type { ParserNode } from '../../dist/electron/astroParser.types.js';
-import { projectPage } from '../../dist/shared/source-projection.js';
+import { parseAttrs, parsePage } from '#dist/electron/astroParser.js';
+import { LIMITS } from '#dist/shared/limits.js';
+import { parsePageResult, type PageNode } from '#dist/shared/page-node.js';
+import type { ParserNode } from '#dist/electron/astroParser.types.js';
+import { projectPage } from '#dist/shared/source-projection.js';
 import {
   generateLargeFixtures,
   manifestEntry,
   parserNodeCounter,
-} from '../../dist/scripts/large-fixtures.js';
+} from '#dist/scripts/large-fixtures.js';
 
 const DIRECTORIES = ['test/corpus', 'test/fixtures/round-trip', 'test/fixtures/editor-core'];
 const collapse = (text: string) => text.replace(/\s+/g, ' ').trim();

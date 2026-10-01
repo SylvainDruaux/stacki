@@ -7,7 +7,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const childProcess = require('node:child_process');
-const ROOT = path.resolve(__dirname, '..', '..');
+const { ROOT, repoPath } = require('../helpers/sources.js');
 const ASTRO_VERSION = '5.13.10';
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -142,7 +142,7 @@ async function inElectron() {
   // application from issuing unrelated IPC or loading any user project.
   const Module = require('node:module');
   const originalLoad = Module._load;
-  const mainPath = path.join(ROOT, 'dist', 'electron', 'main.js');
+  const mainPath = repoPath('dist/electron/main.js');
   function HiddenWindow(options) {
     const win = new BrowserWindow({ ...options, show: false, webPreferences: { sandbox: true } });
     win.loadFile = () => win.loadURL('data:text/html,<title>Stacki lifecycle smoke</title>');
@@ -206,7 +206,7 @@ async function inElectron() {
     return html;
   };
   const say = (message) => fs.writeSync(1, message + '\n');
-  const content = require(path.join(ROOT, 'dist', 'electron', 'contentConfig.js'));
+  const content = require(repoPath('dist/electron/contentConfig.js'));
   try {
     const configs = await Promise.all([
       content.readContentConfig(project),
@@ -257,7 +257,7 @@ async function inElectron() {
         contents: [
           "import { z } from 'astro/zod';",
           `import { withMetadata, toJsonSchema } from ${JSON.stringify(
-            path.join(ROOT, 'dist', 'electron', 'content', 'schemaTools.mjs'),
+            repoPath('dist/electron/content/schemaTools.mjs'),
           )};`,
           'export const result = toJsonSchema(z.object({ title: z.string().min(3), hero: ' +
             'withMetadata(z.string(), { astroImage: true }), date: z.coerce.date(), flag: ' +
@@ -319,12 +319,12 @@ async function inElectron() {
     await waitForExit([...servers]);
     // Exercise the production bundle and real preload against the isolated
     // empty userData, after project teardown has returned to the welcome screen.
-    const dist = path.join(ROOT, 'dist', 'renderer', 'index.html');
+    const dist = repoPath('dist/renderer/index.html');
     if (fs.existsSync(dist)) {
       const renderer = new BrowserWindow({
         show: false,
         webPreferences: {
-          preload: path.join(ROOT, 'dist', 'electron', 'preload.js'),
+          preload: repoPath('dist/electron/preload.js'),
           contextIsolation: true,
           nodeIntegration: false,
         },

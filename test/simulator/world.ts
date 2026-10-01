@@ -23,8 +23,8 @@
 // run (`wrongSite: 'fail'`, the gate) or is counted (`'count'`, the spike
 // report). The judgements are tallied per file.
 import { createHash } from 'node:crypto';
-import { assert } from '../../dist/shared/assert.js';
-import { toFilePath, toIntentId, type Digest, type FilePath } from '../../dist/shared/brand.js';
+import { assert } from '#dist/shared/assert.js';
+import { toFilePath, toIntentId, type Digest, type FilePath } from '#dist/shared/brand.js';
 import {
   toIntent,
   type Intent,
@@ -32,13 +32,13 @@ import {
   type Outcome,
   type RejectionReason,
   type SourceEdit,
-} from '../../dist/shared/intent.js';
-import { changedRanges, inverseEdits, orderedSplices } from '../../dist/shared/splice.js';
-import { diffCodePatch } from '../../dist/shared/code-patch.js';
-import { LIMITS } from '../../dist/shared/limits.js';
-import { toAnchorRef, toChildIndex } from '../../dist/shared/ref.js';
-import type { Snapshot } from '../../dist/shared/snapshot.js';
-import type { ProjectedNode } from '../../dist/shared/source-projection.js';
+} from '#dist/shared/intent.js';
+import { changedRanges, inverseEdits, orderedSplices } from '#dist/shared/splice.js';
+import { diffCodePatch } from '#dist/shared/code-patch.js';
+import { LIMITS } from '#dist/shared/limits.js';
+import { toAnchorRef, toChildIndex } from '#dist/shared/ref.js';
+import type { Snapshot } from '#dist/shared/snapshot.js';
+import type { ProjectedNode } from '#dist/shared/source-projection.js';
 import {
   type ByteString,
   decodeUtf8,
@@ -46,7 +46,7 @@ import {
   toByteSpan,
   toByteString,
   utf8ByteLength,
-} from '../../dist/shared/span.js';
+} from '#dist/shared/span.js';
 import {
   actorHasWork,
   crashActor,
@@ -60,7 +60,7 @@ import {
   type ActorState,
   type ActorStep,
   type Submission,
-} from '../../dist/shared/documentActor.js';
+} from '#dist/shared/documentActor.js';
 import { SIMULATOR_PROJECTOR } from './candidate.ts';
 import { planEngine } from './engine-planner.ts';
 import { FakeDisk } from './fake-disk.ts';

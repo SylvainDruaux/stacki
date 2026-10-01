@@ -15,6 +15,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { ROOT, repoPath } = require('./helpers/sources.js');
 
 const failures = [];
 let checked = 0;
@@ -32,15 +33,15 @@ const START = 'rgb(1, 2, 3)';
 
 (async () => {
   const esbuild = require('esbuild');
-  const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
+  const buildDirectory = repoPath('node_modules/.stacki-test');
   fs.mkdirSync(buildDirectory, { recursive: true });
   const bundlePath = path.join(buildDirectory, 'color-live.bundle.js');
   await esbuild.build({
     stdin: {
       contents:
-        `export { default as BackgroundSection } from './BackgroundSection'\n` +
-        `export { default as ColorSwatch } from './components/ColorSwatch'`,
-      resolveDir: path.join(__dirname, '..', 'src', 'style-panel'),
+        `export { default as BackgroundSection } from './src/style-panel/BackgroundSection'\n` +
+        `export { default as ColorSwatch } from './src/style-panel/components/ColorSwatch'`,
+      resolveDir: ROOT,
       loader: 'tsx',
     },
     outfile: bundlePath,

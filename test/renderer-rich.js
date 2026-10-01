@@ -3,7 +3,7 @@
 const assert = require('node:assert/strict');
 const { JSDOM } = require('jsdom');
 const loadRenderer = require('./renderer-module');
-const { domToNodes, nodesToHtml, isInlineOnly } = loadRenderer('ui/richContentModel.ts');
+const { domToNodes, nodesToHtml, isInlineOnly } = loadRenderer('src/ui/richContentModel.ts');
 const dom = new JSDOM('<!doctype html><div id="host"></div>');
 const host = dom.window.document.getElementById('host');
 host.innerHTML = 'Hello <b title="drop">world</b><div>{post.title}</div><br>';

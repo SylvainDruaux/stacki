@@ -7,6 +7,7 @@
 
 const assert = require('node:assert/strict');
 const path = require('node:path');
+const { ROOT } = require('./helpers/sources.js');
 
 (async () => {
   const outfile = path.join(
@@ -16,9 +17,9 @@ const path = require('node:path');
   await require('esbuild').build({
     stdin: {
       contents:
-        `export { default as CodeEditor } from './src/ui/CodeEditor.jsx'; export { EditorView ` +
+        `export { default as CodeEditor } from './src/ui/CodeEditor.tsx'; export { EditorView ` +
         `} from '@codemirror/view';`,
-      resolveDir: path.join(__dirname, '..'),
+      resolveDir: ROOT,
       loader: 'jsx',
     },
     outfile,

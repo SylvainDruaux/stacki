@@ -18,14 +18,14 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { mainHarness } from './main-harness.ts';
-import { parseEditRequest, type Edit, type NodeRef } from '../../dist/shared/edit-request.js';
+import { parseEditRequest, type Edit, type NodeRef } from '#dist/shared/edit-request.js';
 import {
   parsePageDiskRead,
   parsePageEditResult,
   type PageDiskRead,
-} from '../../dist/shared/page-save.js';
-import { parsePageNode, type PageNode } from '../../dist/shared/page-node.js';
-import { toUtf16Span } from '../../dist/shared/span.js';
+} from '#dist/shared/page-save.js';
+import { parsePageNode, type PageNode } from '#dist/shared/page-node.js';
+import { toUtf16Span } from '#dist/shared/span.js';
 
 // Null as a boundary receives it, parsed from JSON: inputs may hold it; our values never do.
 const jsonNull: unknown = JSON.parse('null');

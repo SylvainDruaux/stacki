@@ -20,6 +20,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { ROOT, repoPath, sourceSpecifier } = require('./helpers/sources.js');
 
 const failures = [];
 let checked = 0;
@@ -44,19 +45,17 @@ const check = (what, condition, detail) => {
   }
 
   const esbuild = require('esbuild');
-  const root = path.join(__dirname, '..');
-  const pageDirectory = path.join(root, 'node_modules', '.stacki-test', 'panel-surface');
+  const root = ROOT;
+  const pageDirectory = repoPath('node_modules/.stacki-test/panel-surface');
   fs.mkdirSync(pageDirectory, { recursive: true });
 
   const entry = path.join(pageDirectory, 'entry.jsx');
   // The module specifier of a style-panel source file, written into the entry below.
-  const stylePanelImport = (...parts) =>
-    JSON.stringify(path.join(root, 'src', 'style-panel', ...parts));
   fs.writeFileSync(
     entry,
     `import React from 'react'
      import { createRoot } from 'react-dom/client'
-     import GridSettings from ${stylePanelImport('GridSettings')}
+     import GridSettings from ${sourceSpecifier('src/style-panel/GridSettings.tsx')}
      const decls = { 'grid-template-columns': '200px 1fr minmax(0, 2fr)' }
      const read = (p) => decls[p] != null
        ? { source:'selected', overridden:false, contributors:[],

@@ -22,6 +22,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { repoPath } = require('./helpers/sources.js');
 
 // The DOM answers "none" with null. The fakes below that stand in for DOM APIs
 // return the platform's own value, read from JSON because our code never writes one.
@@ -38,14 +39,14 @@ const check = (what, condition, detail) => {
 
 (async () => {
   const esbuild = require('esbuild');
-  const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
+  const buildDirectory = repoPath('node_modules/.stacki-test');
   fs.mkdirSync(buildDirectory, { recursive: true });
 
   // --- The checker -----------------------------------------------------------
   {
     const out = path.join(buildDirectory, 'js-check.bundle.js');
     await esbuild.build({
-      entryPoints: [path.join(__dirname, '..', 'src', 'jsCheck.js')],
+      entryPoints: [repoPath('src/jsCheck.ts')],
       outfile: out,
       bundle: true,
       format: 'cjs',
@@ -110,7 +111,7 @@ const check = (what, condition, detail) => {
   fs.writeFileSync(
     entry,
     `export { BindField } ` +
-      `from ${JSON.stringify(path.join(__dirname, '..', 'src', 'panels', 'PropsPanel.jsx'))};\n` +
+      `from ${JSON.stringify(repoPath('src/panels/PropsPanel.tsx'))};\n` +
       // CodeMirror's own way in from a DOM node — the editor here is a real one.
       `export { EditorView } from '@codemirror/view';\n`,
   );

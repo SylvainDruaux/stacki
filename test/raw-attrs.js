@@ -19,6 +19,7 @@
 const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
+const { repoPath } = require('./helpers/sources.js');
 
 // The DOM answers "none" with null. The fakes below that stand in for DOM APIs
 // return the platform's own value, read from JSON because our code never writes one.
@@ -36,8 +37,8 @@ const check = (what, condition, detail) => {
 (async () => {
   // --- The file keeps them ---------------------------------------------------
   {
-    const { parsePage, serializePage } = require('../dist/electron/astroParser.js');
-    const { LIMITS } = require('../dist/shared/limits.js');
+    const { parsePage, serializePage } = require('#dist/electron/astroParser.js');
+    const { LIMITS } = require('#dist/shared/limits.js');
     const findRaw = (nodes, depth = 0) => {
       assert.ok(depth <= LIMITS.treeDepthMax, 'findRaw: depth limit');
       for (const node of nodes || []) {
@@ -122,11 +123,11 @@ const check = (what, condition, detail) => {
 
   // --- The panel offers them -------------------------------------------------
   const esbuild = require('esbuild');
-  const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
+  const buildDirectory = repoPath('node_modules/.stacki-test');
   fs.mkdirSync(buildDirectory, { recursive: true });
   const bundle = path.join(buildDirectory, 'raw-attrs.bundle.js');
   await esbuild.build({
-    entryPoints: [path.join(__dirname, '..', 'src', 'panels', 'PropsPanel.jsx')],
+    entryPoints: [repoPath('src/panels/PropsPanel.tsx')],
     outfile: bundle,
     bundle: true,
     format: 'cjs',

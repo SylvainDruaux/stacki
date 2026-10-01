@@ -8,6 +8,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const esbuild = require('esbuild');
 const { JSDOM } = require('jsdom');
+const { repoPath } = require('./helpers/sources.js');
 
 const HOVER_WAIT_MS = 490;
 const COMPONENTS = [
@@ -163,10 +164,10 @@ function itemInFolder(folder) {
 }
 
 async function buildPalette() {
-  const output = path.join(__dirname, '../node_modules/.stacki-test/palette-preview.cjs');
+  const output = repoPath('node_modules/.stacki-test/palette-preview.cjs');
   fs.mkdirSync(path.dirname(output), { recursive: true });
   await esbuild.build({
-    entryPoints: [path.join(__dirname, '../src/panels/PalettePanel.tsx')],
+    entryPoints: [repoPath('src/panels/PalettePanel.tsx')],
     outfile: output,
     bundle: true,
     format: 'cjs',

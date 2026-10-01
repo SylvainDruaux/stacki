@@ -3,7 +3,7 @@
 // totals, duplicates, and collection bounds; also pin grouping and preview URLs.
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const model = require('./renderer-module')('paletteModel.ts');
+const model = require('./renderer-module')('src/paletteModel.ts');
 
 // A boundary can receive null — JSON, structured clone and postMessage all carry it —
 // so the negative space below includes it. It is read from JSON, because our own

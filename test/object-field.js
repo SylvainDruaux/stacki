@@ -16,6 +16,7 @@
 const fs = require('fs');
 const path = require('path');
 const { pathToFileURL } = require('url');
+const { repoPath } = require('./helpers/sources.js');
 
 const failures = [];
 let checked = 0;
@@ -28,13 +29,13 @@ const check = (what, condition, detail) => {
 
 (async () => {
   const esbuild = require('esbuild');
-  const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
+  const buildDirectory = repoPath('node_modules/.stacki-test');
   fs.mkdirSync(buildDirectory, { recursive: true });
 
   // --- what the reader accepts ------------------------------------------------
   const modOut = path.join(buildDirectory, 'object-value.bundle.mjs');
   await esbuild.build({
-    entryPoints: [path.join(__dirname, '..', 'src', 'arrayValue.js')],
+    entryPoints: [repoPath('src/arrayValue.ts')],
     outfile: modOut,
     bundle: true,
     format: 'esm',
@@ -107,7 +108,7 @@ const check = (what, condition, detail) => {
   fs.writeFileSync(
     entry,
     `export { default as ObjectField } from ${JSON.stringify(
-      path.join(__dirname, '..', 'src', 'panels', 'ObjectField.jsx'),
+      repoPath('src/panels/ObjectField.tsx'),
     )};\n`,
   );
   const bundle = path.join(buildDirectory, 'object-field.bundle.js');
@@ -245,10 +246,7 @@ const check = (what, condition, detail) => {
   );
 
   // --- the panel reaches for it --------------------------------------------------
-  const panel = fs.readFileSync(
-    path.join(__dirname, '..', 'src', 'panels', 'PropField.tsx'),
-    'utf8',
-  );
+  const panel = fs.readFileSync(repoPath('src/panels/PropField.tsx'), 'utf8');
   check(
     'a code prop holding an object gets the fields',
     /type === 'code' && !showExpr && valueText && objectFields\(valueText\)/.test(panel),

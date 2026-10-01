@@ -4,18 +4,18 @@
 // every other file is an opaque document addressed only whole. Invalid UTF-8
 // is a parse-error projection, never a lossy decode (plan §3.2).
 import { createHash } from 'node:crypto';
-import { parsePage } from '../../dist/electron/astroParser.js';
-import { parseMarkdownPage } from '../../dist/electron/markdownParser.js';
-import { assert } from '../../dist/shared/assert.js';
-import { toDigest, type Digest, type FilePath } from '../../dist/shared/brand.js';
-import { parsePageResult } from '../../dist/shared/page-node.js';
-import { createSnapshot, type Snapshot } from '../../dist/shared/snapshot.js';
+import { parsePage } from '#dist/electron/astroParser.js';
+import { parseMarkdownPage } from '#dist/electron/markdownParser.js';
+import { assert } from '#dist/shared/assert.js';
+import { toDigest, type Digest, type FilePath } from '#dist/shared/brand.js';
+import { parsePageResult } from '#dist/shared/page-node.js';
+import { createSnapshot, type Snapshot } from '#dist/shared/snapshot.js';
 import {
   projectOpaqueDocument,
   projectPage,
   type Projection,
-} from '../../dist/shared/source-projection.js';
-import { decodeUtf8, type ByteString } from '../../dist/shared/span.js';
+} from '#dist/shared/source-projection.js';
+import { decodeUtf8, type ByteString } from '#dist/shared/span.js';
 
 export function sha256(bytes: ByteString): Digest {
   return toDigest(createHash('sha256').update(bytes).digest('hex'));

@@ -23,6 +23,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { ROOT, repoPath, sourceSpecifier, stubSources } = require('./helpers/sources.js');
 
 const failures = [];
 let checked = 0;
@@ -35,8 +36,8 @@ const check = (what, condition, detail) => {
 
 (async () => {
   const esbuild = require('esbuild');
-  const root = path.join(__dirname, '..');
-  const buildDirectory = path.join(root, 'node_modules', '.stacki-test');
+  const root = ROOT;
+  const buildDirectory = repoPath('node_modules/.stacki-test');
   fs.mkdirSync(buildDirectory, { recursive: true });
 
   // Stand in for the preview frame, so the round trip can be held open and the
@@ -52,14 +53,14 @@ const check = (what, condition, detail) => {
     });
   `;
   const entry = path.join(buildDirectory, 'computed-hold.entry.jsx');
-  // The module specifier of a style-panel source file, written into the entry below.
-  const stylePanelImport = (...parts) =>
-    JSON.stringify(path.join(root, 'src', 'style-panel', ...parts));
+  const reexports = [
+    ['{ default as EffectsSection }', 'src/style-panel/EffectsSection.tsx'],
+    ['{ setHost }', 'src/style-panel/lib/host.ts'],
+    ['{ forgetComputedStyles }', 'src/style-panel/lib/computed-style.ts'],
+  ];
   fs.writeFileSync(
     entry,
-    `export { default as EffectsSection } from ${stylePanelImport('EffectsSection')}
-     export { setHost } from ${stylePanelImport('lib', 'host')}
-     export { forgetComputedStyles } from ${stylePanelImport('lib', 'computed-style')}`,
+    reexports.map(([names, file]) => `export ${names} from ${sourceSpecifier(file)};\n`).join(''),
   );
   const bundlePath = path.join(buildDirectory, 'computed-hold.bundle.js');
   await esbuild.build({
@@ -72,20 +73,13 @@ const check = (what, condition, detail) => {
     external: ['react', 'react-dom', 'react-dom/client', 'react/jsx-runtime'],
     loader: { '.css': 'empty' },
     plugins: [
-      {
-        name: 'stub-canvas',
-        setup(build) {
-          build.onResolve({ filter: /canvasQuery\.js$/ }, () => ({
-            path: 'canvas',
-            namespace: 'stub',
-          }));
-          build.onLoad({ filter: /.*/, namespace: 'stub' }, () => ({
-            contents: stub,
-            loader: 'js',
-            resolveDir: root,
-          }));
-        },
-      },
+      stubSources('stub-canvas', {
+        'src/canvasQuery.ts': () => ({
+          contents: stub,
+          loader: 'js',
+          resolveDir: root,
+        }),
+      }),
     ],
     logLevel: 'silent',
   });

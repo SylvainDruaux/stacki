@@ -4,15 +4,15 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const load = require('./renderer-module');
-const { BOUNDARY_LIMITS } = require('../dist/shared/boundary.js');
+const { BOUNDARY_LIMITS } = require('#dist/shared/boundary.js');
 
 // A boundary can receive null — JSON, structured clone and postMessage all carry it —
 // so the negative space below includes it. It is read from JSON, because our own
 // code never writes a null.
 const PLATFORM_NULL = JSON.parse('null');
-const { variableEdit, friendlyError } = load('panels/variableEdits.ts');
-const { createVariableHistory } = load('panels/variableHistory.ts');
-const { createVariableRefresh } = load('panels/variableRefresh.ts');
+const { variableEdit, friendlyError } = load('src/panels/variableEdits.ts');
+const { createVariableHistory } = load('src/panels/variableHistory.ts');
+const { createVariableRefresh } = load('src/panels/variableRefresh.ts');
 const base = { projectPath: '/project', file: 'a.css' };
 const range = { ...base, start: 0, end: 10, expect: 'Colors' };
 const calls = {

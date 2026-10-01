@@ -5,7 +5,7 @@
 //   STACKI_CONTENT_FIXTURE=/path/to/project node test/content-config.js
 //
 // The reader loads src/content.config.ts with astro:content and astro/loaders
-// stubbed, and reports what each collection is (see electron/contentConfig.js).
+// stubbed, and reports what each collection is (see electron/contentConfig.ts).
 // Everything asserted here is something an editor gets wrong if the reader is
 // wrong, and wrong in a way that damages a repo rather than just looking odd:
 //
@@ -32,7 +32,7 @@
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
-const { readContentConfig, stopAllServices } = require('../dist/electron/contentConfig.js');
+const { readContentConfig, stopAllServices } = require('#dist/electron/contentConfig.js');
 
 const DEFAULT_FIXTURE = path.join(os.homedir(), 'Downloads', 'awesome-client-main');
 const projectPath = path.resolve(

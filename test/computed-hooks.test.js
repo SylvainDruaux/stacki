@@ -8,6 +8,7 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const path = require('node:path');
+const { ROOT, stubSources } = require('./helpers/sources.js');
 
 // The canvas protocol answers an unresolved value as absent (`undefined`); the
 // probe hands it over as the wire carries it.
@@ -15,7 +16,7 @@ const path = require('node:path');
 test(
   'computed hooks discard stale selections and ' + 'documents without waking literal swatches',
   async () => {
-    const rootPath = path.join(__dirname, '..');
+    const rootPath = ROOT;
     const outfile = path.join(rootPath, 'node_modules/.stacki-test/computed-hooks.bundle.js');
     await require('esbuild').build({
       stdin: {
@@ -33,23 +34,16 @@ test(
       external: ['react'],
       logLevel: 'silent',
       plugins: [
-        {
-          name: 'canvas-probe',
-          setup(build) {
-            build.onResolve({ filter: /canvasQuery\.js$/ }, () => ({
-              path: 'canvas',
-              namespace: 'probe',
-            }));
-            build.onLoad({ filter: /.*/, namespace: 'probe' }, () => ({
-              contents: `export const hasCanvas = () => true;
+        stubSources('canvas-probe', {
+          'src/canvasQuery.ts': () => ({
+            contents: `export const hasCanvas = () => true;
           export const queryCanvas = (path, selectors, colors, props = []) =>
             new Promise((resolve) => {
             globalThis.__computedQueries.push({ path, colors, props, resolve });
           });`,
-              loader: 'js',
-            }));
-          },
-        },
+            loader: 'js',
+          }),
+        }),
       ],
     });
     const { JSDOM } = require('jsdom');

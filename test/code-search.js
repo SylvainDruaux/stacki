@@ -17,6 +17,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { ROOT } = require('./helpers/sources.js');
 
 const failures = [];
 let checked = 0;
@@ -27,7 +28,7 @@ const check = (what, condition, detail) => {
   }
 };
 
-const root = path.join(__dirname, '..');
+const root = ROOT;
 const read = (rel) => fs.readFileSync(path.join(root, rel), 'utf8').replace(/\r\n/g, '\n');
 
 // ── What CodeMirror actually renders ────────────────────────────────────────

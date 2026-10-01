@@ -18,6 +18,7 @@
 const fs = require('fs');
 const path = require('path');
 const { containsCode } = require('./source-text.js');
+const { ROOT, repoPath } = require('./helpers/sources.js');
 
 const failures = [];
 let checked = 0;
@@ -30,13 +31,15 @@ const check = (what, condition, detail) => {
 
 (async () => {
   const esbuild = require('esbuild');
-  const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
+  const buildDirectory = repoPath('node_modules/.stacki-test');
   fs.mkdirSync(buildDirectory, { recursive: true });
   const out = path.join(buildDirectory, 'custom-property.cjs');
   await esbuild.build({
     stdin: {
-      contents: `export { filterCssProperties, CSS_PROPERTIES } from './lib/css-properties'`,
-      resolveDir: path.join(__dirname, '..', 'src', 'style-panel'),
+      contents:
+        'export { filterCssProperties, CSS_PROPERTIES } from ' +
+        "'./src/style-panel/lib/css-properties'",
+      resolveDir: ROOT,
       loader: 'tsx',
     },
     outfile: out,
@@ -99,10 +102,7 @@ const check = (what, condition, detail) => {
   );
 
   // --- Enter goes where the rest of the answer is ------------------------------------
-  const source = fs.readFileSync(
-    path.join(__dirname, '..', 'src', 'style-panel', 'EmbedEditor.tsx'),
-    'utf8',
-  );
+  const source = fs.readFileSync(repoPath('src/style-panel/EmbedEditor.tsx'), 'utf8');
   check(
     'Enter on a named property with no value moves to the value field',
     containsCode(

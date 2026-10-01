@@ -18,9 +18,9 @@ import {
   DIFF_BUDGET,
   type ByteDiff,
   type DiffBudget,
-} from '../../dist/shared/diff.js';
-import { LIMITS } from '../../dist/shared/limits.js';
-import { encodeUtf8, toByteString, type ByteString } from '../../dist/shared/span.js';
+} from '#dist/shared/diff.js';
+import { LIMITS } from '#dist/shared/limits.js';
+import { encodeUtf8, toByteString, type ByteString } from '#dist/shared/span.js';
 import { Prng } from './prng.ts';
 import { referenceTables } from './reference-diff.ts';
 

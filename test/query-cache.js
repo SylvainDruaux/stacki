@@ -6,11 +6,12 @@
 const assert = require('node:assert/strict');
 const path = require('node:path');
 const esbuild = require('esbuild');
+const { repoPath } = require('./helpers/sources.js');
 
 (async () => {
-  const outfile = path.join(__dirname, '../node_modules/.stacki-test/query-cache.bundle.js');
+  const outfile = repoPath('node_modules/.stacki-test/query-cache.bundle.js');
   await esbuild.build({
-    entryPoints: [path.join(__dirname, '../src/style-panel/lib/query-cache.ts')],
+    entryPoints: [repoPath('src/style-panel/lib/query-cache.ts')],
     outfile,
     bundle: true,
     platform: 'node',

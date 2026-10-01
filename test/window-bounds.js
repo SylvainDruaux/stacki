@@ -9,7 +9,8 @@
 
 const fs = require('fs');
 const path = require('path');
-const { openingBounds, WIDTH_PX_MIN, HEIGHT_PX_MIN } = require('../dist/electron/windowBounds.js');
+const { openingBounds, WIDTH_PX_MIN, HEIGHT_PX_MIN } = require('#dist/electron/windowBounds.js');
+const { repoPath } = require('./helpers/sources.js');
 
 const failures = [];
 let checked = 0;
@@ -74,7 +75,7 @@ check(
 );
 
 // --- the app opens with them -------------------------------------------------
-const main = fs.readFileSync(path.join(__dirname, '..', 'dist', 'electron', 'main.js'), 'utf8');
+const main = fs.readFileSync(repoPath('dist/electron/main.js'), 'utf8');
 check(
   'the window is opened with these bounds',
   /\.\.\.bounds,/.test(main),

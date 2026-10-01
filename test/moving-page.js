@@ -22,6 +22,7 @@
 const fs = require('fs');
 const path = require('path');
 const Module = require('module');
+const { repoPath } = require('./helpers/sources.js');
 
 const failures = [];
 let checked = 0;
@@ -35,11 +36,11 @@ const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 (async () => {
   const esbuild = require('esbuild');
-  const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
+  const buildDirectory = repoPath('node_modules/.stacki-test');
   fs.mkdirSync(buildDirectory, { recursive: true });
   const bundlePath = path.join(buildDirectory, 'moving-page.bundle.js');
   await esbuild.build({
-    entryPoints: [path.join(__dirname, '..', 'src', 'outlineBoxes.js')],
+    entryPoints: [repoPath('src/outlineBoxes.ts')],
     outfile: bundlePath,
     bundle: true,
     format: 'cjs',
@@ -135,7 +136,7 @@ const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
     return id === 'electron' ? electron : realRequire.apply(this, arguments);
   };
   process.isMainFrame = false; // the preview frame, not the app's own window
-  require(path.join(__dirname, '..', 'dist', 'electron', 'preload.js'));
+  require(repoPath('dist/electron/preload.js'));
   Module.prototype.require = realRequire;
   await wait(50);
 
@@ -246,14 +247,8 @@ const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
   // A canvas click picks the copy under the pointer. Every other route to a
   // selection points at the node, and the node is every copy of it — outlining
   // only the first read as the app ignoring the rest of the strip.
-  const runtime = fs.readFileSync(
-    path.join(__dirname, '..', 'src', 'panels', 'previewRuntime.ts'),
-    'utf8',
-  );
-  const overlays = fs.readFileSync(
-    path.join(__dirname, '..', 'src', 'panels', 'PreviewOverlays.tsx'),
-    'utf8',
-  );
+  const runtime = fs.readFileSync(repoPath('src/panels/previewRuntime.ts'), 'utf8');
+  const overlays = fs.readFileSync(repoPath('src/panels/PreviewOverlays.tsx'), 'utf8');
   check(
     'a selection from anywhere but the canvas means the node',
     /setSelectedOccurrence\(undefined\)/.test(runtime) &&

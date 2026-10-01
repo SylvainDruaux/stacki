@@ -25,6 +25,7 @@
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
+const { ROOT, repoPath } = require('./helpers/sources.js');
 
 const failures = [];
 let checked = 0;
@@ -37,15 +38,15 @@ const check = (what, condition, detail) => {
 
 (async () => {
   const esbuild = require('esbuild');
-  const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
+  const buildDirectory = repoPath('node_modules/.stacki-test');
   fs.mkdirSync(buildDirectory, { recursive: true });
   const bundlePath = path.join(buildDirectory, 'vars-drop.bundle.js');
   await esbuild.build({
     stdin: {
       contents:
         `export { movesForDrop, dropPlan, friendlyError } ` +
-        `from './src/panels/VariablesView.jsx'`,
-      resolveDir: path.join(__dirname, '..'),
+        `from './src/panels/VariablesView.tsx'`,
+      resolveDir: ROOT,
       loader: 'js',
     },
     outfile: bundlePath,
@@ -309,7 +310,7 @@ const check = (what, condition, detail) => {
   // reads past the comment that ends the group. Nothing catches that except
   // moving a line in a real file and reading the groups back.
   {
-    const cssVars = require('../dist/electron/cssVars.js');
+    const cssVars = require('#dist/electron/cssVars.js');
     const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'stacki-drop-'));
     fs.mkdirSync(path.join(directory, 'src', 'styles'), { recursive: true });
     const sheet = path.join(directory, 'src', 'styles', 't.css');

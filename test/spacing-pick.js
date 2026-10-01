@@ -15,6 +15,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { repoPath, stubSources } = require('./helpers/sources.js');
 
 const failures = [];
 let checked = 0;
@@ -27,11 +28,11 @@ const check = (what, condition, detail) => {
 
 (async () => {
   const esbuild = require('esbuild');
-  const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
+  const buildDirectory = repoPath('node_modules/.stacki-test');
   fs.mkdirSync(buildDirectory, { recursive: true });
   const bundlePath = path.join(buildDirectory, 'spacing-pick.bundle.js');
   await esbuild.build({
-    entryPoints: [path.join(__dirname, '..', 'src', 'style-panel', 'SpacingBox.tsx')],
+    entryPoints: [repoPath('src/style-panel/SpacingBox.tsx')],
     outfile: bundlePath,
     bundle: true,
     format: 'cjs',
@@ -41,16 +42,10 @@ const check = (what, condition, detail) => {
     loader: { '.css': 'empty' },
     logLevel: 'silent',
     plugins: [
-      {
-        // The picker asks the project for its variables; there is no project here.
-        name: 'stub-variables',
-        setup(build) {
-          build.onResolve({ filter: /lib\/webflow$/ }, () => ({
-            path: 'stub-webflow',
-            namespace: 'stub',
-          }));
-          build.onLoad({ filter: /.*/, namespace: 'stub' }, () => ({
-            contents: `
+      // The picker asks the project for its variables; there is no project here.
+      stubSources('stub-variables', {
+        'src/style-panel/lib/webflow.ts': () => ({
+          contents: `
               export async function streamProjectVariables(onAdd) {
                 onAdd({
                   name: 'site-margin', collection: 'Sizes', group: '', value: '2rem',
@@ -59,10 +54,9 @@ const check = (what, condition, detail) => {
                 return [];
               }
             `,
-            loader: 'js',
-          }));
-        },
-      },
+          loader: 'js',
+        }),
+      }),
     ],
   });
 

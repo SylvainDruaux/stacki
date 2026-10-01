@@ -13,13 +13,13 @@
 //   7. The actor never commits an older snapshot over a newer one. (checkGeneration)
 //   8. Queue, parser, diff and snapshot bounds hold.          (checkBounds)
 //   9. The same seed produces the same results.               (the suite runs seeds twice)
-import { assert } from '../../dist/shared/assert.js';
-import type { Intent, Outcome } from '../../dist/shared/intent.js';
-import { LIMITS } from '../../dist/shared/limits.js';
-import { isNodeKind } from '../../dist/shared/ref.js';
-import type { ActorEffect, ActorState } from '../../dist/shared/documentActor.js';
-import { orderedSplices } from '../../dist/shared/splice.js';
-import { tagNameEnd } from '../../dist/shared/planSupport.js';
+import { assert } from '#dist/shared/assert.js';
+import type { Intent, Outcome } from '#dist/shared/intent.js';
+import { LIMITS } from '#dist/shared/limits.js';
+import { isNodeKind } from '#dist/shared/ref.js';
+import type { ActorEffect, ActorState } from '#dist/shared/documentActor.js';
+import { orderedSplices } from '#dist/shared/splice.js';
+import { tagNameEnd } from '#dist/shared/planSupport.js';
 
 type Committed = Extract<ActorEffect, { tag: 'committed' }>;
 

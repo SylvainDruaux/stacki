@@ -10,12 +10,13 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const { JSDOM } = require('jsdom');
+const { repoPath } = require('./helpers/sources.js');
 
-const source = fs.readFileSync(path.join(__dirname, '../dist/electron/morphClient.js'), 'utf8');
+const source = fs.readFileSync(repoPath('dist/electron/morphClient.js'), 'utf8');
 const dom = new JSDOM('<!doctype html><html><head></head><body></body></html>');
 const document = dom.window.document;
 // Main prepends the patcher's bounds from shared/limits.ts (step 7).
-const { LIMITS } = require('../dist/shared/limits.js');
+const { LIMITS } = require('#dist/shared/limits.js');
 const morph = new Function(
   'document',
   'AVB_PREVIEW_LIMITS',

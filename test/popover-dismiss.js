@@ -13,6 +13,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { ROOT, repoPath } = require('./helpers/sources.js');
 
 const failures = [];
 let checked = 0;
@@ -26,13 +27,13 @@ const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
 
 (async () => {
   const esbuild = require('esbuild');
-  const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
+  const buildDirectory = repoPath('node_modules/.stacki-test');
   fs.mkdirSync(buildDirectory, { recursive: true });
   const bundlePath = path.join(buildDirectory, 'popover.bundle.js');
   await esbuild.build({
     stdin: {
-      contents: `export { default as LayerPopover } from './LayerPopover'`,
-      resolveDir: path.join(__dirname, '..', 'src', 'style-panel'),
+      contents: `export { default as LayerPopover } from './src/style-panel/LayerPopover'`,
+      resolveDir: ROOT,
       loader: 'tsx',
     },
     outfile: bundlePath,

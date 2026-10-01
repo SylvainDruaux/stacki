@@ -15,6 +15,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { repoPath, sourceSpecifier } = require('./helpers/sources.js');
 
 const failures = [];
 let checked = 0;
@@ -76,17 +77,16 @@ function fakeAudio() {
 
 (async () => {
   const esbuild = require('esbuild');
-  const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
+  const buildDirectory = repoPath('node_modules/.stacki-test');
   fs.mkdirSync(buildDirectory, { recursive: true });
   const entry = path.join(buildDirectory, 'panel-sound.entry.jsx');
-  const ui = (file) => JSON.stringify(path.join(__dirname, '..', 'src', 'ui', file));
   // One bundle, so the dropdown and the switch that turns sound on are looking
   // at the same module.
   fs.writeFileSync(
     entry,
-    `export { default as Dropdown } from ${ui('Dropdown.jsx')};\n` +
-      `export { SoundHere } from ${ui('soundScope.jsx')};\n` +
-      `export { setSoundEnabled } from ${ui('sound.js')};\n`,
+    `export { default as Dropdown } from ${sourceSpecifier('src/ui/Dropdown.tsx')};\n` +
+      `export { SoundHere } from ${sourceSpecifier('src/ui/soundScope.tsx')};\n` +
+      `export { setSoundEnabled } from ${sourceSpecifier('src/ui/sound.ts')};\n`,
   );
   const bundle = path.join(buildDirectory, 'panel-sound.bundle.js');
   await esbuild.build({
@@ -242,9 +242,9 @@ function fakeAudio() {
   }
 
   // --- the two panels, and only those -------------------------------------------------
-  const read = (...segments) => fs.readFileSync(path.join(__dirname, '..', ...segments), 'utf8');
-  const props = read('src', 'panels', 'PropsPanel.tsx');
-  const style = read('src', 'panels', 'StylePanel.tsx');
+  const read = (file) => fs.readFileSync(repoPath(file), 'utf8');
+  const props = read('src/panels/PropsPanel.tsx');
+  const style = read('src/panels/StylePanel.tsx');
   check(
     'the settings panel taps on a button press',
     /closest\('button'\)/.test(props) && /clickNote\(\)/.test(props),
@@ -253,11 +253,11 @@ function fakeAudio() {
   check('and it is a sound scope', /<SoundHere>/.test(props), 'its dropdowns would be silent');
   check('so is the style panel', /<SoundHere>/.test(style));
   const scopes = [
-    'App.tsx',
-    'panels/PagesPanel.tsx',
-    'panels/TerminalDock.tsx',
-    'panels/WelcomeScreen.tsx',
-  ].filter((file) => /<SoundHere>/.test(read('src', ...file.split('/'))));
+    'src/App.tsx',
+    'src/panels/PagesPanel.tsx',
+    'src/panels/TerminalDock.tsx',
+    'src/panels/WelcomeScreen.tsx',
+  ].filter((file) => /<SoundHere>/.test(read(file)));
   check('and nothing else is', scopes.length === 0, scopes.join(', '));
 
   if (failures.length) {

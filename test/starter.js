@@ -18,7 +18,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { execFileSync } = require('child_process');
-const { createStarter, STARTERS } = require('../dist/electron/starter.js');
+const { createStarter, STARTERS } = require('#dist/electron/starter.js');
 
 const failures = [];
 let checked = 0;

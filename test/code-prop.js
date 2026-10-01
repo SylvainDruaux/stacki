@@ -14,6 +14,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { repoPath } = require('./helpers/sources.js');
 
 const failures = [];
 let checked = 0;
@@ -26,14 +27,12 @@ const check = (what, condition, detail) => {
 
 (async () => {
   const esbuild = require('esbuild');
-  const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
+  const buildDirectory = repoPath('node_modules/.stacki-test');
   fs.mkdirSync(buildDirectory, { recursive: true });
   const entry = path.join(buildDirectory, 'code-prop.entry.jsx');
   fs.writeFileSync(
     entry,
-    `export { BindField } from ${JSON.stringify(
-      path.join(__dirname, '..', 'src', 'panels', 'PropsPanel.jsx'),
-    )};\n`,
+    `export { BindField } from ${JSON.stringify(repoPath('src/panels/PropsPanel.tsx'))};\n`,
   );
   const bundle = path.join(buildDirectory, 'code-prop.bundle.js');
   await esbuild.build({
@@ -217,9 +216,7 @@ const check = (what, condition, detail) => {
   // destructuring, where there is no type to read, and came back as `other`:
   // no expression, no list control, a page of JSON in a text box.
   {
-    const { parsePropSchema } = require(
-      path.join(__dirname, '..', 'dist', 'electron', 'astroParser.js'),
-    );
+    const { parsePropSchema } = require(repoPath('dist/electron/astroParser.js'));
     const withType = (decl) => {
       const source =
         `---\ninterface Props {\n  ${decl}\n}\n` + `const { items } = Astro.props;\n---\n<div/>\n`;
@@ -272,9 +269,7 @@ const check = (what, condition, detail) => {
   // a branch offers. A member it cannot read is a prop that branch does not
   // know it has.
   {
-    const { parsePropSchema } = require(
-      path.join(__dirname, '..', 'dist', 'electron', 'astroParser.js'),
-    );
+    const { parsePropSchema } = require(repoPath('dist/electron/astroParser.js'));
     const source =
       `---\ntype Props =\n  | { variant: "list"; items: { title: string; text: string }[] }\n` +
       `  | { variant: "plain"; text: string };\nconst { variant } = Astro.props as Props;\n` +
@@ -295,10 +290,7 @@ const check = (what, condition, detail) => {
   }
 
   // --- the rule, where it lives ---------------------------------------------------
-  const panel = fs.readFileSync(
-    path.join(__dirname, '..', 'src', 'panels', 'propBindings.tsx'),
-    'utf8',
-  );
+  const panel = fs.readFileSync(repoPath('src/panels/propBindings.tsx'), 'utf8');
   check(
     'a code prop is written as an expression',
     /field\?\.type === 'code' \|\|/.test(panel),

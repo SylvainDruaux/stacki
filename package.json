@@ -4,6 +4,9 @@
   "version": "0.1.34",
   "description": "Stacki — a visual builder for Astro projects, with live preview and publishing.",
   "main": "dist/electron/main.js",
+  "imports": {
+    "#dist/*": "./dist/*"
+  },
   "author": "Timothy Ricks <hello@timothyricks.com>",
   "license": "MIT",
   "engines": {

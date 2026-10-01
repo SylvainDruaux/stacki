@@ -17,7 +17,7 @@
 // on a close button, whose label defaults to Close. Counting the values the
 // clause names does not depend on guessing which words a sentence might use.
 
-const { parsePropSchema } = require('../dist/electron/astroParser.js');
+const { parsePropSchema } = require('#dist/electron/astroParser.js');
 
 const failures = [];
 let checked = 0;

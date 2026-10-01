@@ -93,7 +93,9 @@ const STRIP_ROOTS = ['src/', 'electron/', 'shared/'];
 const PATH_ROOTS = 'dist|docs|electron|scripts|shared|src|test';
 // A repository path written as text: a root folder at a word boundary, not
 // inside a relative specifier (`../src/x` is a module specifier, not a path).
-const PATH_TOKEN = new RegExp(`(?<![\\w./#$-])(#?)((?:${PATH_ROOTS})/[\\w./-]*)`, 'g');
+// A `#dist/` import and a `./src/` specifier in an esbuild stdin resolved from
+// the repository root are repository paths with a prefix.
+const PATH_TOKEN = new RegExp(`(?<![\\w./#$-])(#|\\./)?((?:${PATH_ROOTS})/[\\w./-]*)`, 'g');
 
 export function isCodeFile(file: string): boolean {
   return SCRIPT_KINDS.has(path.posix.extname(file));

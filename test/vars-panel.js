@@ -10,7 +10,8 @@
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const cssVars = require('../dist/electron/cssVars.js');
+const cssVars = require('#dist/electron/cssVars.js');
+const { repoPath } = require('./helpers/sources.js');
 
 const failures = [];
 let checked = 0;
@@ -41,11 +42,11 @@ const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
     ':root { --ease: linear; --duration: 200ms; --_private: 1; }\n',
   );
   const esbuild = require('esbuild');
-  const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
+  const buildDirectory = repoPath('node_modules/.stacki-test');
   fs.mkdirSync(buildDirectory, { recursive: true });
   const bundlePath = path.join(buildDirectory, 'vars-panel.bundle.js');
   await esbuild.build({
-    entryPoints: [path.join(__dirname, '..', 'src', 'panels', 'VariablesPanel.jsx')],
+    entryPoints: [repoPath('src/panels/VariablesPanel.tsx')],
     outfile: bundlePath,
     bundle: true,
     format: 'cjs',

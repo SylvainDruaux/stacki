@@ -7,6 +7,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const esbuild = require('esbuild');
 const Module = require('node:module');
+const { repoPath } = require('./helpers/sources.js');
 
 const {
   commandNeedsShell,
@@ -17,13 +18,13 @@ const {
   sameFilesystemPath,
   setPathEnvironment,
   staticToolPathGuesses,
-} = require('../dist/electron/platform.js');
+} = require('#dist/electron/platform.js');
 
-const bundleDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
+const bundleDirectory = repoPath('node_modules/.stacki-test');
 fs.mkdirSync(bundleDirectory, { recursive: true });
 const projectPathBundle = path.join(bundleDirectory, 'project-path.cjs');
 esbuild.buildSync({
-  entryPoints: [path.join(__dirname, '..', 'src', 'projectPath.ts')],
+  entryPoints: [repoPath('src/projectPath.ts')],
   outfile: projectPathBundle,
   bundle: true,
   format: 'cjs',
@@ -33,7 +34,7 @@ esbuild.buildSync({
 const { projectRelativePath } = require(projectPathBundle);
 const assetURLBundle = path.join(bundleDirectory, 'asset-url.cjs');
 esbuild.buildSync({
-  entryPoints: [path.join(__dirname, '..', 'src', 'ui', 'AssetThumb.tsx')],
+  entryPoints: [repoPath('src/ui/AssetThumb.tsx')],
   outfile: assetURLBundle,
   bundle: true,
   format: 'cjs',
@@ -44,7 +45,7 @@ esbuild.buildSync({
 const { sourceCandidates } = require(assetURLBundle);
 const shortcutBundle = path.join(bundleDirectory, 'shortcut-label.cjs');
 esbuild.buildSync({
-  entryPoints: [path.join(__dirname, '..', 'src', 'shortcutLabel.ts')],
+  entryPoints: [repoPath('src/shortcutLabel.ts')],
   outfile: shortcutBundle,
   bundle: true,
   format: 'cjs',
@@ -155,7 +156,7 @@ test('a missing native terminal binding does not prevent app startup', async () 
     }
     return originalLoad.call(this, request, parent, isMain);
   };
-  const terminalPath = require.resolve('../dist/electron/terminal.js');
+  const terminalPath = require.resolve('#dist/electron/terminal.js');
   delete require.cache[terminalPath];
   try {
     const terminal = require(terminalPath);

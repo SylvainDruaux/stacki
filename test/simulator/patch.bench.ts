@@ -22,30 +22,30 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { writeVerified } from './verified-write.entry.ts';
-import { toFilePath, toIntentId } from '../../dist/shared/brand.js';
-import { countOccurrences } from '../../dist/shared/byteSearch.js';
-import { capabilityAcceptsVisualIntent } from '../../dist/shared/capability.js';
-import { toIntent, type Intent } from '../../dist/shared/intent.js';
-import { LIMITS } from '../../dist/shared/limits.js';
-import { planIntent, type Splice } from '../../dist/shared/planner.js';
+import { toFilePath, toIntentId } from '#dist/shared/brand.js';
+import { countOccurrences } from '#dist/shared/byteSearch.js';
+import { capabilityAcceptsVisualIntent } from '#dist/shared/capability.js';
+import { toIntent, type Intent } from '#dist/shared/intent.js';
+import { LIMITS } from '#dist/shared/limits.js';
+import { planIntent, type Splice } from '#dist/shared/planner.js';
 import {
   hostContext,
   projectValueSplice,
   valueBytesNeutral,
-} from '../../dist/shared/projection-patch.js';
-import { toAnchorRef, toChildIndex } from '../../dist/shared/ref.js';
-import { createSnapshot, type Snapshot } from '../../dist/shared/snapshot.js';
-import type { ProjectedNode } from '../../dist/shared/source-projection.js';
+} from '#dist/shared/projection-patch.js';
+import { toAnchorRef, toChildIndex } from '#dist/shared/ref.js';
+import { createSnapshot, type Snapshot } from '#dist/shared/snapshot.js';
+import type { ProjectedNode } from '#dist/shared/source-projection.js';
 import {
   byteStringsEqual,
   decodeUtf8,
   encodeUtf8,
   toByteString,
   type ByteString,
-} from '../../dist/shared/span.js';
+} from '#dist/shared/span.js';
 import { Prng } from './prng.ts';
 import { projectBytes, sha256, snapshotOf } from './project.ts';
-import { applySplices, witnessesHold } from '../../dist/shared/splice.js';
+import { applySplices, witnessesHold } from '#dist/shared/splice.js';
 
 // A fixture with no unique element in this many draws fails the bench loudly.
 const UNIQUE_DRAWS_MAX = 500;

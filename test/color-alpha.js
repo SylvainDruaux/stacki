@@ -15,6 +15,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { repoPath } = require('./helpers/sources.js');
 
 const failures = [];
 let checked = 0;
@@ -31,13 +32,13 @@ const SIZE = 240;
 
 (async () => {
   const esbuild = require('esbuild');
-  const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
+  const buildDirectory = repoPath('node_modules/.stacki-test');
   fs.mkdirSync(buildDirectory, { recursive: true });
   const entry = path.join(buildDirectory, 'color-alpha.entry.jsx');
   fs.writeFileSync(
     entry,
     `export { default as ColorPicker } from ${JSON.stringify(
-      path.join(__dirname, '..', 'src', 'style-panel', 'components', 'ColorPicker.tsx'),
+      repoPath('src/style-panel/components/ColorPicker.tsx'),
     )};\n`,
   );
   const out = path.join(buildDirectory, 'color-alpha.bundle.js');
@@ -323,10 +324,7 @@ const SIZE = 240;
 
   // The panel writes what was authored, and only converts on the way to a native
   // Webflow style — which is not a thing that exists here.
-  const editor = fs.readFileSync(
-    path.join(__dirname, '..', 'src', 'style-panel', 'EmbedEditor.tsx'),
-    'utf8',
-  );
+  const editor = fs.readFileSync(repoPath('src/style-panel/EmbedEditor.tsx'), 'utf8');
   const setPropAt = editor.indexOf('const setProp = (prop: string');
   check(
     'a committed write is not converted on its way out',
@@ -345,10 +343,7 @@ const SIZE = 240;
   );
 
   // --- the hex field ------------------------------------------------------------
-  const css = fs.readFileSync(
-    path.join(__dirname, '..', 'src', 'style-panel', 'utilities.css'),
-    'utf8',
-  );
+  const css = fs.readFileSync(repoPath('src/style-panel/utilities.css'), 'utf8');
   const wide = css.slice(css.indexOf('.u-color-field.is-wide .u-color-field-input'));
   check(
     'the hex field has room at the edge its text starts from',
@@ -360,7 +355,7 @@ const SIZE = 240;
   // `input:hover` outranked the panel's own field styling and the fields
   // flickered on the way past. What matters is that no such rule reaches them —
   // whether by being scoped away or by not existing.
-  const app = fs.readFileSync(path.join(__dirname, '..', 'src', 'styles.css'), 'utf8');
+  const app = fs.readFileSync(repoPath('src/styles.css'), 'utf8');
   const unscoped = app
     .split('\n')
     .filter((line) => /^\s*(input|select|textarea):hover[^{]*\{/.test(line))

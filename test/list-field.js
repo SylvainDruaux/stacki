@@ -19,6 +19,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { repoPath } = require('./helpers/sources.js');
 
 const failures = [];
 let checked = 0;
@@ -31,13 +32,13 @@ const check = (what, condition, detail) => {
 
 (async () => {
   const esbuild = require('esbuild');
-  const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
+  const buildDirectory = repoPath('node_modules/.stacki-test');
   fs.mkdirSync(buildDirectory, { recursive: true });
   const entry = path.join(buildDirectory, 'list-field.entry.jsx');
   fs.writeFileSync(
     entry,
     `export { default as ListField } from ${JSON.stringify(
-      path.join(__dirname, '..', 'src', 'panels', 'ListField.jsx'),
+      repoPath('src/panels/ListField.tsx'),
     )};\n`,
   );
   const bundle = path.join(buildDirectory, 'list-field.bundle.js');
@@ -515,10 +516,7 @@ const check = (what, condition, detail) => {
   }
 
   // --- and the field it belongs to ----------------------------------------------------------
-  const panel = fs.readFileSync(
-    path.join(__dirname, '..', 'src', 'panels', 'PropField.tsx'),
-    'utf8',
-  );
+  const panel = fs.readFileSync(repoPath('src/panels/PropField.tsx'), 'utf8');
   check(
     'an array prop shows the list rather than a code field',
     /type === 'code' && !showExpr && \(value === undefined \|\| arrayItems\(valueText\)\)\)/.test(
@@ -544,7 +542,7 @@ const check = (what, condition, detail) => {
   check('the toggle calls it a list', /field\.type === 'code'\) \{\s*return 'list'/.test(panel));
 
   // Alone in the box, the button's own top rule would double the box's edge.
-  const css = fs.readFileSync(path.join(__dirname, '..', 'src', 'styles.css'), 'utf8');
+  const css = fs.readFileSync(repoPath('src/styles.css'), 'utf8');
   check(
     'a button alone in the box draws no line above itself',
     /\.list-field-add:first-child\s*\{[^}]*border-top:\s*0/.test(css),

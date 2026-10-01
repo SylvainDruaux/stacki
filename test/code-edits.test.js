@@ -18,16 +18,19 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const esbuild = require('esbuild');
-const { parsePageDiskRead, parsePageEditResult } = require('../dist/shared/page-save.js');
-const { applyCodePatch } = require('../dist/shared/code-patch.js');
-const { LIMITS } = require('../dist/shared/limits.js');
+const { parsePageDiskRead, parsePageEditResult } = require('#dist/shared/page-save.js');
+const { applyCodePatch } = require('#dist/shared/code-patch.js');
+const { LIMITS } = require('#dist/shared/limits.js');
+const { repoPath } = require('./helpers/sources.js');
 
-const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test', 'code-edits');
+const buildDirectory = repoPath('node_modules/.stacki-test/code-edits');
 fs.mkdirSync(buildDirectory, { recursive: true });
 esbuild.buildSync({
-  entryPoints: ['pageEdits', 'codeEdits'].map((name) =>
-    path.join(__dirname, '..', 'src', `${name}.ts`),
-  ),
+  // Named entries: each output is <name>.js wherever its source lives.
+  entryPoints: {
+    pageEdits: repoPath('src/pageEdits.ts'),
+    codeEdits: repoPath('src/codeEdits.ts'),
+  },
   outdir: buildDirectory,
   bundle: true,
   format: 'cjs',

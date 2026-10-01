@@ -14,6 +14,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { repoPath } = require('./helpers/sources.js');
 
 const failures = [];
 let checked = 0;
@@ -26,11 +27,11 @@ const check = (what, condition, detail) => {
 
 (async () => {
   const esbuild = require('esbuild');
-  const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
+  const buildDirectory = repoPath('node_modules/.stacki-test');
   fs.mkdirSync(buildDirectory, { recursive: true });
   const bundlePath = path.join(buildDirectory, 'grid-tracks.bundle.js');
   await esbuild.build({
-    entryPoints: [path.join(__dirname, '..', 'src', 'style-panel', 'lib', 'grid-template.ts')],
+    entryPoints: [repoPath('src/style-panel/lib/grid-template.ts')],
     outfile: bundlePath,
     bundle: true,
     format: 'cjs',
@@ -103,7 +104,7 @@ const check = (what, condition, detail) => {
     fs.writeFileSync(
       entry,
       `export { default as GridSettings } from ${JSON.stringify(
-        path.join(__dirname, '..', 'src', 'style-panel', 'GridSettings.tsx'),
+        repoPath('src/style-panel/GridSettings.tsx'),
       )};\n`,
     );
     const uiPath = path.join(buildDirectory, 'grid-settings.bundle.js');
@@ -308,12 +309,7 @@ const check = (what, condition, detail) => {
     );
     check(
       'and it says it is already the room a long value needs',
-      /expanded/.test(
-        fs.readFileSync(
-          path.join(__dirname, '..', 'src', 'style-panel', 'GridSettings.tsx'),
-          'utf8',
-        ),
-      ),
+      /expanded/.test(fs.readFileSync(repoPath('src/style-panel/GridSettings.tsx'), 'utf8')),
       'a long value would open the popup over this field',
     );
     check(
@@ -437,10 +433,7 @@ const check = (what, condition, detail) => {
 
   // --- a field that is already big doesn't open a box over itself -------------
   {
-    const vc = fs.readFileSync(
-      path.join(__dirname, '..', 'src', 'style-panel', 'VariableConnect.tsx'),
-      'utf8',
-    );
+    const vc = fs.readFileSync(repoPath('src/style-panel/VariableConnect.tsx'), 'utf8');
     check(
       'a field can say it is already expanded',
       /expanded\?: boolean/.test(vc),
@@ -463,7 +456,7 @@ const check = (what, condition, detail) => {
   // track list), and the settings are a modal — so an editor that sits on the
   // app's own scale opens behind the thing that opened it.
   {
-    const css = fs.readFileSync(path.join(__dirname, '..', 'src', 'styles.css'), 'utf8');
+    const css = fs.readFileSync(repoPath('src/styles.css'), 'utf8');
     const block = css.slice(css.indexOf('.var-custom {'), css.indexOf('.var-custom-head'));
     const z = Number((block.match(/z-index:\s*(\d+)/) || [])[1]);
     check('the custom value editor has a z-index', Number.isFinite(z), block.slice(0, 120));
@@ -473,10 +466,7 @@ const check = (what, condition, detail) => {
   }
 
   // --- the settings offer it --------------------------------------------------
-  const settings = fs.readFileSync(
-    path.join(__dirname, '..', 'src', 'style-panel', 'GridSettings.tsx'),
-    'utf8',
-  );
+  const settings = fs.readFileSync(repoPath('src/style-panel/GridSettings.tsx'), 'utf8');
   check('the grid settings have the switch', /function RepeatSwitch/.test(settings));
   check('on both track lists, since each is written its own way', /<RepeatSwitch/.test(settings));
   check(

@@ -15,6 +15,7 @@
 const fs = require('fs');
 const path = require('path');
 const { pathToFileURL } = require('url');
+const { repoPath } = require('./helpers/sources.js');
 
 const failures = [];
 let checked = 0;
@@ -27,11 +28,11 @@ const check = (what, condition, detail) => {
 
 (async () => {
   const esbuild = require('esbuild');
-  const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
+  const buildDirectory = repoPath('node_modules/.stacki-test');
   fs.mkdirSync(buildDirectory, { recursive: true });
   const out = path.join(buildDirectory, 'slot-attr.bundle.mjs');
   await esbuild.build({
-    entryPoints: [path.join(__dirname, '..', 'src', 'slotAttr.js')],
+    entryPoints: [repoPath('src/slotAttr.ts')],
     outfile: out,
     bundle: true,
     format: 'esm',
@@ -102,7 +103,7 @@ const check = (what, condition, detail) => {
   );
 
   // --- the move asks -----------------------------------------------------------------
-  const app = fs.readFileSync(path.join(__dirname, '..', 'src', 'App.tsx'), 'utf8');
+  const app = fs.readFileSync(repoPath('src/App.tsx'), 'utf8');
   const move = app.slice(
     app.indexOf('const moveNode = useCallback'),
     app.indexOf('const removeNode = useCallback'),
@@ -115,10 +116,7 @@ const check = (what, condition, detail) => {
   // Step 6: the move is a gesture (src/editGestures.ts, moveGesture), which
   // asks the app's rule of the model after the move and removes the slot
   // first — as a request, and from the shown model.
-  const gestureSource = fs.readFileSync(
-    path.join(__dirname, '..', 'src', 'editGestures.ts'),
-    'utf8',
-  );
+  const gestureSource = fs.readFileSync(repoPath('src/editGestures.ts'), 'utf8');
   check(
     'and drops it when the answer is no',
     /tag: 'remove-attribute', target, name: 'slot'/.test(gestureSource) &&

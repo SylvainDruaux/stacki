@@ -16,6 +16,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { ROOT, repoPath } = require('./helpers/sources.js');
 
 const failures = [];
 let checked = 0;
@@ -28,7 +29,7 @@ const check = (what, condition, detail) => {
 
 (async () => {
   const esbuild = require('esbuild');
-  const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
+  const buildDirectory = repoPath('node_modules/.stacki-test');
   fs.mkdirSync(buildDirectory, { recursive: true });
   const bundlePath = path.join(buildDirectory, 'style-target.bundle.js');
   await esbuild.build({
@@ -36,16 +37,16 @@ const check = (what, condition, detail) => {
     // own directory so its imports resolve the way they do in the app.
     stdin: {
       contents: `
-        export { resolveTarget, scanPage } from './lib/webflow'
-        export { setHost, onHostChange, getHost } from './lib/host'
-        export { matchSelectorList } from './lib/selectors'
+        export { resolveTarget, scanPage } from './src/style-panel/lib/webflow'
+        export { setHost, onHostChange, getHost } from './src/style-panel/lib/host'
+        export { matchSelectorList } from './src/style-panel/lib/selectors'
         export {
           defaultSelectorTokens,
           tokensToSelector,
           snapshotTokens,
-        } from './lib/element-tokens'
+        } from './src/style-panel/lib/element-tokens'
       `,
-      resolveDir: path.join(__dirname, '..', 'src', 'style-panel'),
+      resolveDir: ROOT,
       loader: 'ts',
     },
     outfile: bundlePath,
@@ -285,10 +286,7 @@ const check = (what, condition, detail) => {
     );
 
     // …and the panel actually asks.
-    const editor = fs.readFileSync(
-      path.join(__dirname, '..', 'src', 'style-panel', 'EmbedEditor.tsx'),
-      'utf8',
-    );
+    const editor = fs.readFileSync(repoPath('src/style-panel/EmbedEditor.tsx'), 'utf8');
     check(
       'the panel defaults through it',
       /const next = defaultSelectorTokens\(tokens\)/.test(editor),

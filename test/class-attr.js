@@ -16,7 +16,8 @@
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const { parsePage, serializePage } = require('../dist/electron/astroParser.js');
+const { parsePage, serializePage } = require('#dist/electron/astroParser.js');
+const { repoPath } = require('./helpers/sources.js');
 
 const failures = [];
 let checked = 0;
@@ -32,11 +33,11 @@ const stringValue = (value) => ({ type: 'string', value });
 
 (async () => {
   const esbuild = require('esbuild');
-  const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
+  const buildDirectory = repoPath('node_modules/.stacki-test');
   fs.mkdirSync(buildDirectory, { recursive: true });
   const bundlePath = path.join(buildDirectory, 'class-attr.bundle.js');
   await esbuild.build({
-    entryPoints: [path.join(__dirname, '..', 'src', 'classAttr.js')],
+    entryPoints: [repoPath('src/classAttr.ts')],
     outfile: bundlePath,
     bundle: true,
     format: 'cjs',
@@ -174,7 +175,7 @@ const { class: className } = Astro.props;
   check('once', (written.match(/"hero"/g) || []).length === 1, written);
 
   // --- the panel is wired to it ----------------------------------------------
-  const app = fs.readFileSync(path.join(__dirname, '..', 'src', 'App.tsx'), 'utf8');
+  const app = fs.readFileSync(repoPath('src/App.tsx'), 'utf8');
   check(
     'the style panel is the one given onAddClass',
     /<StylePanel[\s\S]{0,2000}?onAddClass=/.test(app),
@@ -190,7 +191,7 @@ const { class: className } = Astro.props;
   // Step 6 (plan §3.3): the class is a page edit, the rule a stylesheet edit
   // that depends on it — written only after the page edit applied, and never
   // submitted when it was refused.
-  const embedFile = path.join(__dirname, '..', 'src', 'style-panel', 'EmbedEditor.tsx');
+  const embedFile = repoPath('src/style-panel/EmbedEditor.tsx');
   const embed = fs.readFileSync(embedFile, 'utf8');
   check(
     "the class answers with the page edit's outcome",

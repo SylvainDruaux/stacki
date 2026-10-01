@@ -18,6 +18,7 @@
 const fs = require('fs');
 const path = require('path');
 const { pathToFileURL } = require('url');
+const { ROOT, repoPath } = require('./helpers/sources.js');
 
 const failures = [];
 let checked = 0;
@@ -30,13 +31,13 @@ const check = (what, condition, detail) => {
 
 (async () => {
   const esbuild = require('esbuild');
-  const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
+  const buildDirectory = repoPath('node_modules/.stacki-test');
   fs.mkdirSync(buildDirectory, { recursive: true });
 
-  const bundle = async (rel, name) => {
+  const bundle = async (file, name) => {
     const out = path.join(buildDirectory, name);
     await esbuild.build({
-      entryPoints: [path.join(__dirname, '..', rel)],
+      entryPoints: [repoPath(file)],
       bundle: true,
       format: 'esm',
       platform: 'node',
@@ -46,7 +47,7 @@ const check = (what, condition, detail) => {
     return import(pathToFileURL(out).href);
   };
 
-  const { partsFromValue, valueFromParts } = await bundle('src/bindings.js', 'bindings.bundle.mjs');
+  const { partsFromValue, valueFromParts } = await bundle('src/bindings.ts', 'bindings.bundle.mjs');
 
   // ── values ↔ parts ────────────────────────────────────────────────────────
   const J = JSON.stringify;
@@ -138,7 +139,7 @@ const check = (what, condition, detail) => {
   // `a ?? b` is not one thing to bind, it is two with a fallback between them.
   // The data in it chips; the code around it stays text you can edit.
   const { valueModeOf, codeParts, templateHoles } = await bundle(
-    'src/bindings.js',
+    'src/bindings.ts',
     'bindings2.bundle.mjs',
   );
   const expr = (value) => ({ type: 'expr', value: value });
@@ -221,7 +222,7 @@ const check = (what, condition, detail) => {
   );
 
   // ── a keypress against a chip ─────────────────────────────────────────────
-  const { deleteChipAtCaret } = await bundle('src/ui/chipKeys.js', 'chipkeys.bundle.mjs');
+  const { deleteChipAtCaret } = await bundle('src/ui/chipKeys.ts', 'chipkeys.bundle.mjs');
   const { JSDOM } = require('jsdom');
   const dom = new JSDOM('<!doctype html><body><div id="host" contenteditable></div></body>');
   global.window = dom.window;
@@ -319,7 +320,7 @@ const check = (what, condition, detail) => {
     queriesInScope,
     removeMarkedQuery,
     QUERY_MARK,
-  } = await bundle('src/dataSuggest.js', 'datasuggest.bundle.mjs');
+  } = await bundle('src/dataSuggest.ts', 'datasuggest.bundle.mjs');
 
   check('a collection query is named for what it holds', autoQueryName('blog') === 'blogEntries');
   check(
@@ -480,7 +481,7 @@ const check = (what, condition, detail) => {
   // The picker edits someone's source file. What matters is that what it adds
   // comes back the same way (the marker included, or cleanup could never find
   // it again) and that removing it leaves the file as it was.
-  const astro = require(path.join(__dirname, '..', 'dist', 'electron', 'astroParser.js'));
+  const astro = require(repoPath('dist/electron/astroParser.js'));
   const original = [
     '---',
     'import Layout from "@/layouts/BaseLayout.astro";',
@@ -534,10 +535,7 @@ const check = (what, condition, detail) => {
   );
 
   // The field really draws them, and pressing one repoints that hole alone.
-  const panel = require('fs').readFileSync(
-    require('path').join(__dirname, '..', 'src', 'panels', 'propBindings.tsx'),
-    'utf8',
-  );
+  const panel = require('fs').readFileSync(repoPath('src/panels/propBindings.tsx'), 'utf8');
   // The holes are half of it now: the field also chips a value the code names
   // outright (`variantClasses` in a class list), so what it marks is the union.
   check('the code field marks its holes', /const holes = templateHoles\(text\)/.test(panel));
@@ -570,8 +568,8 @@ const check = (what, condition, detail) => {
     const out = path.join(buildDirectory, 'bindinput.bundle.js');
     await esbuild.build({
       stdin: {
-        contents: "export { default as BindInput } from './src/ui/BindInput.jsx'",
-        resolveDir: path.join(__dirname, '..'),
+        contents: "export { default as BindInput } from './src/ui/BindInput.tsx'",
+        resolveDir: ROOT,
         loader: 'jsx',
       },
       outfile: out,
@@ -698,9 +696,7 @@ const check = (what, condition, detail) => {
     const entry = path.join(buildDirectory, 'chip.entry.jsx');
     fs.writeFileSync(
       entry,
-      `export { default as ExprInput } from ${JSON.stringify(
-        path.join(__dirname, '..', 'src', 'ui', 'ExprInput.jsx'),
-      )};\n`,
+      `export { default as ExprInput } from ${JSON.stringify(repoPath('src/ui/ExprInput.tsx'))};\n`,
     );
     const out = path.join(buildDirectory, 'chip.bundle.js');
     await esbuild.build({

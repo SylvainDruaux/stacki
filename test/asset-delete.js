@@ -14,6 +14,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { repoPath } = require('./helpers/sources.js');
 
 const failures = [];
 let checked = 0;
@@ -26,17 +27,15 @@ const check = (what, condition, detail) => {
 
 (async () => {
   const esbuild = require('esbuild');
-  const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
+  const buildDirectory = repoPath('node_modules/.stacki-test');
   fs.mkdirSync(buildDirectory, { recursive: true });
   const entry = path.join(buildDirectory, 'asset-delete.entry.jsx');
   fs.writeFileSync(
     entry,
     `export { default as AssetsPanel } from ${JSON.stringify(
-      path.join(__dirname, '..', 'src', 'panels', 'AssetsPanel.tsx'),
+      repoPath('src/panels/AssetsPanel.tsx'),
     )};\n` +
-      `export { ConfirmHost } from ${JSON.stringify(
-        path.join(__dirname, '..', 'src', 'ui', 'ConfirmDialog.jsx'),
-      )};\n`,
+      `export { ConfirmHost } from ${JSON.stringify(repoPath('src/ui/ConfirmDialog.tsx'))};\n`,
   );
   const bundle = path.join(buildDirectory, 'asset-delete.bundle.js');
   await esbuild.build({
@@ -249,7 +248,7 @@ const check = (what, condition, detail) => {
   );
 
   // --- the file goes somewhere it can be got back from --------------------------------
-  const main = fs.readFileSync(path.join(__dirname, '..', 'dist', 'electron', 'main.js'), 'utf8');
+  const main = fs.readFileSync(repoPath('dist/electron/main.js'), 'utf8');
   const handler = main.slice(
     main.indexOf("ipcMain.handle('assets:delete'"),
     main.indexOf('// Text assets (css/js'),
@@ -265,10 +264,7 @@ const check = (what, condition, detail) => {
     /assetAbs\(projectPath, rel\)/.test(handler),
     handler.slice(0, 200),
   );
-  const panel = fs.readFileSync(
-    path.join(__dirname, '..', 'src', 'panels', 'AssetsPanel.tsx'),
-    'utf8',
-  );
+  const panel = fs.readFileSync(repoPath('src/panels/AssetsPanel.tsx'), 'utf8');
   check(
     'the dialog says where it went',
     /moves to your Bin/.test(panel),

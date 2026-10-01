@@ -7,14 +7,15 @@ const path = require('node:path');
 const fs = require('node:fs');
 const { buildSync } = require('esbuild');
 const { JSDOM } = require('jsdom');
-const { BOUNDARY_LIMITS } = require('../dist/shared/boundary.js');
-const output = path.join(__dirname, '../node_modules/.stacki-test/cms-field.cjs');
+const { BOUNDARY_LIMITS } = require('#dist/shared/boundary.js');
+const { ROOT, repoPath } = require('./helpers/sources.js');
+const output = repoPath('node_modules/.stacki-test/cms-field.cjs');
 fs.mkdirSync(path.dirname(output), { recursive: true });
 buildSync({
   stdin: {
-    contents: `export {default as Field} from './panels/CmsField';
-      export {getPendingAsset} from './assetPick';`,
-    resolveDir: path.join(__dirname, '../src'),
+    contents: `export {default as Field} from './src/panels/CmsField';
+      export {getPendingAsset} from './src/assetPick';`,
+    resolveDir: ROOT,
     loader: 'ts',
   },
   outfile: output,

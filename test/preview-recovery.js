@@ -30,6 +30,7 @@
 const fs = require('fs');
 const path = require('path');
 const http = require('http');
+const { repoPath } = require('./helpers/sources.js');
 
 const failures = [];
 let checked = 0;
@@ -45,7 +46,7 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 (async () => {
   // --- The probe, against a server that really answers ----------------------
   {
-    const { probeUrl } = require('../dist/electron/devProbe.js');
+    const { probeUrl } = require('#dist/electron/devProbe.js');
 
     // Flips between serving a page and serving an error, like a dev server
     // either side of a compile error.
@@ -111,11 +112,11 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
   // --- The watch ------------------------------------------------------------
   const { createPreviewWatch } = await (async () => {
     const esbuild = require('esbuild');
-    const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
+    const buildDirectory = repoPath('node_modules/.stacki-test');
     fs.mkdirSync(buildDirectory, { recursive: true });
     const out = path.join(buildDirectory, 'preview-recovery.bundle.js');
     await esbuild.build({
-      entryPoints: [path.join(__dirname, '..', 'src', 'previewRecovery.js')],
+      entryPoints: [repoPath('src/previewRecovery.ts')],
       outfile: out,
       bundle: true,
       format: 'cjs',
@@ -309,11 +310,8 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
   // the rule: every change under src/ says so, before any of the branches that
   // return for the kinds this app does not edit.
   {
-    const main = fs.readFileSync(path.join(__dirname, '..', 'dist', 'electron', 'main.js'), 'utf8');
-    const source = fs.readFileSync(
-      path.join(__dirname, '..', 'dist', 'electron', 'projectWatcher.js'),
-      'utf8',
-    );
+    const main = fs.readFileSync(repoPath('dist/electron/main.js'), 'utf8');
+    const source = fs.readFileSync(repoPath('dist/electron/projectWatcher.js'), 'utf8');
     const at = source.indexOf('watchers.push(watch(sourceDirectory');
     const handler = source.slice(at, source.indexOf('const publicDir', at));
     check('the src watcher is still there', at !== -1);

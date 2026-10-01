@@ -3,7 +3,7 @@
 // duplicate records, and verify transport failures remain explicit Result values.
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const welcome = require('./renderer-module')('welcomeBridge.ts');
+const welcome = require('./renderer-module')('src/welcomeBridge.ts');
 
 // A boundary can receive null — JSON, structured clone and postMessage all carry it —
 // so the negative space below includes it. It is read from JSON, because our own

@@ -24,6 +24,7 @@ const fs = require('fs');
 const path = require('path');
 const { pathToFileURL } = require('url');
 const { containsCode } = require('./source-text.js');
+const { repoPath } = require('./helpers/sources.js');
 
 const failures = [];
 let checked = 0;
@@ -37,14 +38,14 @@ const settle = (ms = 20) => new Promise((resolve) => setTimeout(resolve, ms));
 
 (async () => {
   const esbuild = require('esbuild');
-  const buildDirectory = path.join(__dirname, '..', 'node_modules', '.stacki-test');
+  const buildDirectory = repoPath('node_modules/.stacki-test');
   fs.mkdirSync(buildDirectory, { recursive: true });
 
   // --- the canvas patches when it is asked to ---------------------------------
   // The real client, in a real document, told by a message rather than by HMR.
   const bundle = path.join(buildDirectory, 'morph-client.bundle.js');
   await esbuild.build({
-    entryPoints: [path.join(__dirname, '..', 'dist', 'electron', 'morphClient.js')],
+    entryPoints: [repoPath('dist/electron/morphClient.js')],
     outfile: bundle,
     bundle: true,
     format: 'cjs',
@@ -55,8 +56,8 @@ const settle = (ms = 20) => new Promise((resolve) => setTimeout(resolve, ms));
     // Main prepends the patcher's bounds from shared/limits.ts (step 7).
     banner: {
       js: `const AVB_PREVIEW_LIMITS = Object.freeze(${JSON.stringify({
-        previewMarkersMax: require('../dist/shared/limits.js').LIMITS.previewMarkersMax,
-        previewMorphWorkMax: require('../dist/shared/limits.js').LIMITS.previewMorphWorkMax,
+        previewMarkersMax: require('#dist/shared/limits.js').LIMITS.previewMarkersMax,
+        previewMorphWorkMax: require('#dist/shared/limits.js').LIMITS.previewMorphWorkMax,
       })});`,
     },
     logLevel: 'silent',
@@ -125,7 +126,7 @@ const settle = (ms = 20) => new Promise((resolve) => setTimeout(resolve, ms));
   // --- a word to the canvas that needs no answer --------------------------------
   const queryBundle = path.join(buildDirectory, 'canvas-query.bundle.mjs');
   await esbuild.build({
-    entryPoints: [path.join(__dirname, '..', 'src', 'canvasQuery.js')],
+    entryPoints: [repoPath('src/canvasQuery.ts')],
     outfile: queryBundle,
     bundle: true,
     format: 'esm',
@@ -150,11 +151,8 @@ const settle = (ms = 20) => new Promise((resolve) => setTimeout(resolve, ms));
   );
 
   // --- who says it, and when -----------------------------------------------------
-  const main = fs.readFileSync(path.join(__dirname, '..', 'dist', 'electron', 'main.js'), 'utf8');
-  const watcher = fs.readFileSync(
-    path.join(__dirname, '..', 'dist', 'electron', 'projectWatcher.js'),
-    'utf8',
-  );
+  const main = fs.readFileSync(repoPath('dist/electron/main.js'), 'utf8');
+  const watcher = fs.readFileSync(repoPath('dist/electron/projectWatcher.js'), 'utf8');
   check(
     'a change the app did not make is marked as coming from outside',
     // The document actors hear it too (plan §7): a hint to re-read, not an authority.
@@ -175,16 +173,13 @@ const settle = (ms = 20) => new Promise((resolve) => setTimeout(resolve, ms));
     'an outside edit batched with an app write loses the flag',
   );
 
-  const app = fs.readFileSync(path.join(__dirname, '..', 'src', 'App.tsx'), 'utf8');
+  const app = fs.readFileSync(repoPath('src/App.tsx'), 'utf8');
   check(
     'the app tells the canvas about an outside edit',
     containsCode(app, "if (event.external) { tellCanvas({ type: 'avb:patch-now' }); }"),
     'nothing reaches the canvas when the socket is quiet',
   );
-  const morph = fs.readFileSync(
-    path.join(__dirname, '..', 'dist', 'electron', 'morphClient.js'),
-    'utf8',
-  );
+  const morph = fs.readFileSync(repoPath('dist/electron/morphClient.js'), 'utf8');
   check(
     'and the client still listens to the socket as well',
     /import\.meta\.hot\.on\('avb:page-changed', \(\) => \{[\s\S]{0,200}?void update\(\);/.test(
@@ -203,7 +198,7 @@ const settle = (ms = 20) => new Promise((resolve) => setTimeout(resolve, ms));
   {
     const os = require('os');
     const { createHash } = require('crypto');
-    const { diffCodePatch } = require('../dist/shared/code-patch.js');
+    const { diffCodePatch } = require('#dist/shared/code-patch.js');
     const { mainHarness } = await import('./contracts/main-harness.ts');
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'stacki-outside-edit-'));
     fs.mkdirSync(path.join(root, 'src', 'pages'), { recursive: true });
