@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { usePointerDrag } from '../ui/usePointerDrag';
+import { usePointerDrag } from '../../ui/usePointerDrag';
 import CanvasView from './CanvasView';
 import type { DevDiagnosis } from './DevOffline';
 import type { OverlayInfo, SpacingHover } from './PreviewOverlays';
@@ -8,8 +8,8 @@ import { DevOffline } from './DevOffline';
 import { PreviewOverlays } from './PreviewOverlays';
 import { PreviewToolbar, deviceForWidth, deviceWidth } from './PreviewToolbar';
 import { usePreviewRuntime, type JudgeCanvasEvent } from './previewRuntime';
-import type { PreviewVerdict } from '../../shared/preview-token';
-import type { PreviewReloadReason } from '../previewMessages';
+import type { PreviewVerdict } from '../../../shared/preview-token';
+import type { PreviewReloadReason } from './previewMessages';
 import { PREVIEW_WIDTH_LIMITS, previewViewport } from './previewViewport';
 import './previewViewport.css';
 

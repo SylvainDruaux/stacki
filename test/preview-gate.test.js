@@ -3,7 +3,7 @@
 // the preview token: the frame's latest token, the open file's stamp against
 // the page state, then main's disk check — and the page state read again after
 // main answers, because it can change while the disk is being read.
-// Method: bundle src/previewGate.ts and drive it with renderings, page states
+// Method: bundle src/features/preview/previewGate.ts and drive it with renderings, page states
 // and a fake main check. Each rejection is exercised along with the valid case
 // beside it — a clean page, then the same page one save later; unsaved text,
 // then an unsaved move.
@@ -17,7 +17,7 @@ const { repoPath } = require('./helpers/sources.js');
 const buildDirectory = repoPath('node_modules/.stacki-test/preview-gate');
 fs.mkdirSync(buildDirectory, { recursive: true });
 esbuild.buildSync({
-  entryPoints: [repoPath('src/previewGate.ts')],
+  entryPoints: [repoPath('src/features/preview/previewGate.ts')],
   outdir: buildDirectory,
   bundle: true,
   format: 'cjs',

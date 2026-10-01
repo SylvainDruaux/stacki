@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import type { IpcResults } from '../../shared/ipc-results';
+import type { IpcResults } from '../../../shared/ipc-results';
 
 const NODE_URL = 'https://nodejs.org/en/download';
 export type DevDiagnosis = IpcResults['dev:diagnose'];

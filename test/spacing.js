@@ -45,7 +45,9 @@ const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
       `export { sectionOf } from ${JSON.stringify(
         repoPath('src/features/style/model/sections.ts'),
       )};\n` +
-      `export { spacingBands } from ${JSON.stringify(repoPath('src/spacingBands.ts'))};\n` +
+      `export { spacingBands } from ${JSON.stringify(
+        repoPath('src/features/preview/spacingBands.ts'),
+      )};\n` +
       `export { getHost, setHost } from ${JSON.stringify(
         repoPath('src/features/style/model/host.ts'),
       )};\n` +
@@ -744,11 +746,11 @@ const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
     check(
       'and the app passes them to the panel',
       /case 'modifiers':[\s\S]{0,100}setModifiers\(/.test(
-        fs.readFileSync(repoPath('src/panels/previewRuntime.ts'), 'utf8'),
+        fs.readFileSync(repoPath('src/features/preview/previewRuntime.ts'), 'utf8'),
       ),
       'the message arrives and goes nowhere',
     );
-    const pane = fs.readFileSync(repoPath('src/panels/PreviewOverlays.tsx'), 'utf8');
+    const pane = fs.readFileSync(repoPath('src/features/preview/PreviewOverlays.tsx'), 'utf8');
     check('the preview draws the bands', /spacingBands\(/.test(pane));
     check('over the selected element', /rects\[selectedPath\]/.test(pane));
     check('from what the page measured', /spacing\[selectedPath\]/.test(pane));

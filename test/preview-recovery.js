@@ -116,7 +116,7 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
     fs.mkdirSync(buildDirectory, { recursive: true });
     const out = path.join(buildDirectory, 'preview-recovery.bundle.js');
     await esbuild.build({
-      entryPoints: [repoPath('src/previewRecovery.ts')],
+      entryPoints: [repoPath('src/features/preview/previewRecovery.ts')],
       outfile: out,
       bundle: true,
       format: 'cjs',

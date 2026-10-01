@@ -42,7 +42,7 @@ const stacked = (layers, opacity = 0.14) => 1 - (1 - opacity) ** layers;
   fs.mkdirSync(buildDirectory, { recursive: true });
   const bundlePath = path.join(buildDirectory, 'outline-boxes.bundle.js');
   await esbuild.build({
-    entryPoints: [repoPath('src/outlineBoxes.ts')],
+    entryPoints: [repoPath('src/features/preview/outlineBoxes.ts')],
     outfile: bundlePath,
     bundle: true,
     format: 'cjs',
@@ -156,8 +156,8 @@ const stacked = (layers, opacity = 0.14) => 1 - (1 - opacity) ** layers;
   check('and neither is standing still', !sameCopy('0.1', '0.1'));
 
   // --- the overlay uses it ---------------------------------------------------
-  const runtime = fs.readFileSync(repoPath('src/panels/previewRuntime.ts'), 'utf8');
-  const overlays = fs.readFileSync(repoPath('src/panels/PreviewOverlays.tsx'), 'utf8');
+  const runtime = fs.readFileSync(repoPath('src/features/preview/previewRuntime.ts'), 'utf8');
+  const overlays = fs.readFileSync(repoPath('src/features/preview/PreviewOverlays.tsx'), 'utf8');
   check(
     'a navigator hover draws one box per place',
     /outline\.occ === undefined \? onePerPlace\(all\)/.test(overlays),

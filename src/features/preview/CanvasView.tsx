@@ -1,5 +1,5 @@
 import React from 'react';
-import { usePointerDrag } from '../ui/usePointerDrag';
+import { usePointerDrag } from '../../ui/usePointerDrag';
 
 const BREAKPOINTS = [
   { key: 'desktop', label: 'Desktop', width: 1_440, viewportHeight: 900 },

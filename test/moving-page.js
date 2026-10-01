@@ -40,7 +40,7 @@ const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
   fs.mkdirSync(buildDirectory, { recursive: true });
   const bundlePath = path.join(buildDirectory, 'moving-page.bundle.js');
   await esbuild.build({
-    entryPoints: [repoPath('src/outlineBoxes.ts')],
+    entryPoints: [repoPath('src/features/preview/outlineBoxes.ts')],
     outfile: bundlePath,
     bundle: true,
     format: 'cjs',
@@ -247,8 +247,8 @@ const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
   // A canvas click picks the copy under the pointer. Every other route to a
   // selection points at the node, and the node is every copy of it — outlining
   // only the first read as the app ignoring the rest of the strip.
-  const runtime = fs.readFileSync(repoPath('src/panels/previewRuntime.ts'), 'utf8');
-  const overlays = fs.readFileSync(repoPath('src/panels/PreviewOverlays.tsx'), 'utf8');
+  const runtime = fs.readFileSync(repoPath('src/features/preview/previewRuntime.ts'), 'utf8');
+  const overlays = fs.readFileSync(repoPath('src/features/preview/PreviewOverlays.tsx'), 'utf8');
   check(
     'a selection from anywhere but the canvas means the node',
     /setSelectedOccurrence\(undefined\)/.test(runtime) &&

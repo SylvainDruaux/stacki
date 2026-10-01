@@ -13,9 +13,11 @@ const directory = repoPath('node_modules/.stacki-test/preview-lifecycle');
 fs.mkdirSync(directory, { recursive: true });
 esbuild.buildSync({
   stdin: {
-    contents:
-      "export { default as PreviewPane, deviceForWidth } from './src/panels/PreviewPane.tsx';" +
-      " export { hasCanvas, queryCanvas } from './src/editor/canvasQuery.ts';",
+    contents: [
+      'export { default as PreviewPane, deviceForWidth }',
+      "  from './src/features/preview/PreviewPane.tsx';",
+      "export { hasCanvas, queryCanvas } from './src/editor/canvasQuery.ts';",
+    ].join('\n'),
     resolveDir: ROOT,
     loader: 'jsx',
   },

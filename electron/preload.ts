@@ -18,7 +18,8 @@ type GapRow = { top: number; bottom: number; items: DOMRect[] };
 
 // The canvas protocol spells absence `undefined`, like every other value in
 // the app (AGENTS.md §6): postMessage is a structured clone, which keeps it,
-// and the app's parsers (src/previewMessages.ts, src/editor/canvasReply.ts) read it.
+// and the app's parsers (src/features/preview/previewMessages.ts,
+// src/editor/canvasReply.ts) read it.
 
 // How deep the frame walks the page. An HTML parser stops nesting elements at
 // 512 (Chromium's limit), and style rules nest far less; a deeper tree did not

@@ -66,7 +66,7 @@ try {
   assert.equal(componentNameError('Card', Array(10_000).fill('Other')), undefined);
   assert.throws(() => componentNameError('Card', Array(10_001).fill('Other')), /scan limit/);
 
-  const { onePerPlace } = load('src/outlineBoxes.ts');
+  const { onePerPlace } = load('src/features/preview/outlineBoxes.ts');
   const box = { x: 0, y: 0, w: 10, h: 10 };
   assert.deepEqual(onePerPlace([box, { ...box }, { x: 1, y: 1, w: 2, h: 2 }]), [box]);
   assert.deepEqual(onePerPlace(Array.from({ length: 20_000 }, () => ({ ...box }))), [box]);

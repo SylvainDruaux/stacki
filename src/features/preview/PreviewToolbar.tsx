@@ -1,6 +1,6 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import type { IconProps } from '../ui/Icons';
-import { CanvasIcon, ChevronRightIcon, DesktopIcon, PhoneIcon, TabletIcon } from '../ui/Icons';
+import type { IconProps } from '../../ui/Icons';
+import { CanvasIcon, ChevronRightIcon, DesktopIcon, PhoneIcon, TabletIcon } from '../../ui/Icons';
 import { PreviewSizeControls } from './PreviewSizeControls';
 import type { PreviewSizeControlsProps } from './PreviewSizeControls';
 

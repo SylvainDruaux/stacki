@@ -1,8 +1,8 @@
 import React from 'react';
-import type { Box } from '../outlineBoxes';
-import type { PreviewMessage } from '../previewMessages';
-import { hoverIsSelection, onePerPlace } from '../outlineBoxes';
-import { spacingBands } from '../spacingBands';
+import type { Box } from './outlineBoxes';
+import type { PreviewMessage } from './previewMessages';
+import { hoverIsSelection, onePerPlace } from './outlineBoxes';
+import { spacingBands } from './spacingBands';
 import {
   BranchIcon,
   CodeIcon,
@@ -15,7 +15,7 @@ import {
   TextIcon,
   astroAssetIcon,
   elementIcon,
-} from '../ui/Icons';
+} from '../../ui/Icons';
 
 export interface OverlayInfo {
   readonly label: string;
@@ -34,7 +34,7 @@ export interface SpacingHover {
   readonly labels?: Readonly<Record<string, string>>;
 }
 
-// The measurements as the canvas frame reports them (src/previewMessages.ts): a
+// The measurements as the canvas frame reports them (src/features/preview/previewMessages.ts): a
 // path it could not measure, and a copy without spacing, are absent.
 type RectsMessage = Extract<PreviewMessage, { readonly kind: 'rects' }>;
 export type RectMap = RectsMessage['rects'];

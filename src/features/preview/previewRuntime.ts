@@ -2,20 +2,20 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type React from 'react';
 import type { RectMap, SpacingMap } from './PreviewOverlays';
 import type { PreviewDevice } from './PreviewToolbar';
-import type { PreviewMessage, PreviewReloadReason } from '../previewMessages';
-import { parsePreviewMessage } from '../previewMessages';
-import { sameCopy } from '../outlineBoxes';
-import { setModifiers } from '../editor/heldModifiers';
-import { noteCanvasReady, receiveCanvasReply, setCanvasFrame } from '../editor/canvasQuery';
-import type { Digest } from '../../shared/brand';
+import type { PreviewMessage, PreviewReloadReason } from './previewMessages';
+import { parsePreviewMessage } from './previewMessages';
+import { sameCopy } from './outlineBoxes';
+import { setModifiers } from '../../editor/heldModifiers';
+import { noteCanvasReady, receiveCanvasReply, setCanvasFrame } from '../../editor/canvasQuery';
+import type { Digest } from '../../../shared/brand';
 import {
   judgeEventToken,
   type PreviewRender,
   type PreviewVerdict,
-} from '../../shared/preview-token';
+} from '../../../shared/preview-token';
 
 /** Whether a click or double-click on the canvas may select what it names
- * (src/previewGate.ts). Hover needs only the token to be the latest. */
+ * (src/features/preview/previewGate.ts). Hover needs only the token to be the latest. */
 export type JudgeCanvasEvent = (
   token: Digest | undefined,
   render: PreviewRender | undefined,

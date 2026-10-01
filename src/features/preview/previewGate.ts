@@ -17,16 +17,16 @@
 //      bytes its stamp names on disk (main reads them: preview:check).
 //
 // Hover is a picture, not a selection: it needs (1) only, so it never waits.
-import { assert } from '../shared/assert';
-import type { Digest } from '../shared/brand';
-import { LIMITS } from '../shared/limits';
+import { assert } from '../../../shared/assert';
+import type { Digest } from '../../../shared/brand';
+import { LIMITS } from '../../../shared/limits';
 import {
   judgeEventToken,
   judgeShownFile,
   type PreviewRender,
   type PreviewVerdict,
-} from '../shared/preview-token';
-import type { EditorPageState } from './editor/pageState';
+} from '../../../shared/preview-token';
+import type { EditorPageState } from '../../editor/pageState';
 
 /** The file open for editing, as the gate needs it. */
 export interface ShownFile {

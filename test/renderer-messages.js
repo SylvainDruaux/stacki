@@ -93,7 +93,7 @@ async function main() {
     true,
   );
 
-  const { createPreviewWatch } = loadRenderer('src/previewRecovery.ts');
+  const { createPreviewWatch } = loadRenderer('src/features/preview/previewRecovery.ts');
   for (const duration of [-1, NaN, Infinity, 0.5, 2_147_483_648]) {
     assert.throws(
       () =>

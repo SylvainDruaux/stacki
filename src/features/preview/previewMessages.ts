@@ -9,9 +9,9 @@ import {
   optional,
   pathText,
   record,
-} from '../shared/boundary';
-import type { Digest } from '../shared/brand';
-import { parsePreviewRender, type PreviewRender } from '../shared/preview-token';
+} from '../../../shared/boundary';
+import type { Digest } from '../../../shared/brand';
+import { parsePreviewRender, type PreviewRender } from '../../../shared/preview-token';
 
 export type PreviewMessage =
   | {

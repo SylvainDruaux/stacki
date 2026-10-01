@@ -26,7 +26,7 @@ import {
   rendersOwnElement,
 } from './editor/liveClasses';
 import { setSoundEnabled } from './ui/sound';
-import { createPreviewWatch } from './previewRecovery';
+import { createPreviewWatch } from './features/preview/previewRecovery';
 import { tellCanvas } from './editor/canvasQuery';
 import {
   parsePageSource as parseSourcePage,
@@ -37,7 +37,7 @@ import {
 import { checkoutGitBranch, readGitInfo } from './features/git/gitChipBridge';
 import { LIMITS } from '../shared/limits';
 import { assert } from '../shared/assert';
-import PreviewPane from './panels/PreviewPane';
+import PreviewPane from './features/preview/PreviewPane';
 import GitChip from './features/git/GitChip';
 import HistoryPanel, { relativeTime } from './features/history/HistoryPanel';
 import { ConfirmHost, confirmDialog } from './ui/ConfirmDialog';
@@ -160,13 +160,13 @@ import type {
 import type { InlineNode } from './features/props/RichContent';
 import type { Rename, TagOption } from './features/props/propNodeEditors';
 import type { FieldDefinition, PropValues } from './features/props/propRules';
-import type { OverlayInfo } from './panels/PreviewOverlays';
-import type { PreviewCrumb } from './panels/PreviewToolbar';
+import type { OverlayInfo } from './features/preview/PreviewOverlays';
+import type { PreviewCrumb } from './features/preview/PreviewToolbar';
 import type { AstroAsset } from './features/palette/astroAssets';
 import type { ComponentCreationSource } from './features/palette/PaletteDialogs';
-import type { DevDiagnosis } from './panels/DevOffline';
-import type { PreviewDevice } from './panels/PreviewToolbar';
-import type { SpacingHover } from './panels/PreviewOverlays';
+import type { DevDiagnosis } from './features/preview/DevOffline';
+import type { PreviewDevice } from './features/preview/PreviewToolbar';
+import type { SpacingHover } from './features/preview/PreviewOverlays';
 import type { VariableSelection } from './variablesBridge';
 import type { InsertTarget } from './editor/insertTarget';
 import type { InsertItem } from './features/palette/InsertSearch';
@@ -268,14 +268,14 @@ import {
   type AppCollection,
   type ImportPaths,
 } from './ipc/appBridge';
-import { judgeCanvasEvent, type CheckRender, type ShownFile } from './previewGate';
+import { judgeCanvasEvent, type CheckRender, type ShownFile } from './features/preview/previewGate';
 import { describePreviewStale, type PreviewVerdict } from '../shared/preview-token';
-import type { JudgeCanvasEvent } from './panels/previewRuntime';
+import type { JudgeCanvasEvent } from './features/preview/previewRuntime';
 import {
   describePreviewReload,
   parseShortcutMessage,
   type PreviewReloadReason,
-} from './previewMessages';
+} from './features/preview/previewMessages';
 
 // Each optional editor owns its loading boundary so opening it keeps the
 // canvas and neighboring panels visible and interactive.
@@ -3853,7 +3853,7 @@ function useDevEvents(
   // Recovering the preview after a compile error
   // ----------------------------------------------------------------
   //
-  // See src/previewRecovery.js for what this is for and why it asks the server
+  // See src/features/preview/previewRecovery.ts for what this is for and why it asks the server
   // rather than reading the error screen or the log.
   //
   // The route is read through `livePathRef` rather than named as a dependency:
