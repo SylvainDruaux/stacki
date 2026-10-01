@@ -391,12 +391,16 @@ function mapPathToken(token: string, input: PathTextInput): TokenMapping {
   }
   const trimmed = token.endsWith('/') ? token.slice(0, -1) : token;
   const directory = input.directories.get(trimmed);
-  if (directory !== undefined) {
+  // A root (`test/`) names the whole tree, which no step moves.
+  if (directory !== undefined && trimmed.includes('/')) {
     const target = movedDirectory(trimmed, directory, input.moves);
     if (target.kind !== 'mapped') {
       return target;
     }
     return { kind: 'mapped', text: token.endsWith('/') ? `${target.text}/` : target.text };
+  }
+  if (directory !== undefined) {
+    return SAME;
   }
   const resolution = resolvePath(input.files, trimmed);
   if (resolution === undefined) {
