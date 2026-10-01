@@ -67,7 +67,7 @@ import {
   parseDynamicPaths,
   parseSampleEntry,
   parseAstroLock,
-} from './main.validation';
+} from './app/mainValidation';
 import type {
   RecentProject,
   AssetEntry,
@@ -76,7 +76,7 @@ import type {
   GitInfo,
   DevServer,
   PreviewServer,
-} from './main.types';
+} from './app/mainTypes';
 
 import * as electronModule from 'electron';
 const {
@@ -131,7 +131,7 @@ import * as injectedRoutesModule from './preview/injectedRoutes';
 const { readInjectedRoutes } = injectedRoutesModule;
 import * as starterModule from './project/starter';
 const { createStarter } = starterModule;
-import * as windowBoundsModule from './windowBounds';
+import * as windowBoundsModule from './app/windowBounds';
 const { openingBounds } = windowBoundsModule;
 import * as componentFileModule from './documents/componentFile';
 const { componentFile, newPageText } = componentFileModule;

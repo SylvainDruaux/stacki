@@ -9,7 +9,11 @@
 
 const fs = require('fs');
 const path = require('path');
-const { openingBounds, WIDTH_PX_MIN, HEIGHT_PX_MIN } = require('#dist/electron/windowBounds.js');
+const {
+  openingBounds,
+  WIDTH_PX_MIN,
+  HEIGHT_PX_MIN,
+} = require('#dist/electron/app/windowBounds.js');
 const { repoPath } = require('./helpers/sources.js');
 
 const failures = [];

@@ -22,7 +22,7 @@ import {
   parseAliases,
   parseAstroLock,
   parseValidationResult,
-} from '#dist/electron/main.validation.js';
+} from '#dist/electron/app/mainValidation.js';
 import { directoryBudget, MAIN_LIMITS } from '#dist/electron/lib/mainLimits.js';
 import { LIMITS } from '#dist/shared/limits.js';
 
