@@ -46,7 +46,7 @@ const SEG = (TRACK - PAD * 2) / 4;
   fs.writeFileSync(
     entry,
     `export { default as DisplayControl } from ${JSON.stringify(
-      repoPath('src/style-panel/DisplayControl.tsx'),
+      repoPath('src/features/style/DisplayControl.tsx'),
     )};\n`,
   );
   const out = path.join(buildDirectory, 'segmented.bundle.js');
@@ -218,7 +218,7 @@ const SEG = (TRACK - PAD * 2) / 4;
 
   // It is offered in the menu too — both ways round, since the menu that opens
   // from the bar and the one that opens from a custom value are different lists.
-  const display = fs.readFileSync(repoPath('src/style-panel/DisplayControl.tsx'), 'utf8');
+  const display = fs.readFileSync(repoPath('src/features/style/DisplayControl.tsx'), 'utf8');
   check(
     'the menu lists it beside None, whichever menu it is',
     (display.match(/\{BOXLESS\.map\(/g) || []).length === 2,
@@ -238,7 +238,7 @@ const SEG = (TRACK - PAD * 2) / 4;
   // class, so a pill for one of them and not the others leaves the others with
   // no selection at all — which is exactly what happened to Direction and
   // Overflow when Display got the pill first.
-  const panel = repoPath('src/style-panel');
+  const panel = repoPath('src/features/style');
   const bars = [
     'DisplayControl.tsx',
     'DirectionControl.tsx',
@@ -274,7 +274,7 @@ const SEG = (TRACK - PAD * 2) / 4;
   );
 
   // --- what the CSS says --------------------------------------------------------
-  const css = fs.readFileSync(repoPath('src/style-panel/embed-editor.css'), 'utf8');
+  const css = fs.readFileSync(repoPath('src/features/style/embedEditor.css'), 'utf8');
   // Every rule with this selector, joined — `.embed-editor_display-seg` is
   // declared twice in the file, and reading only the first says the opposite of
   // what the page renders.

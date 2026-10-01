@@ -62,9 +62,9 @@ const contrastRatio = (first, second) => {
   await esbuild.build({
     stdin: {
       contents: `
-        export { SelectorPicker } from './src/style-panel/EmbedEditor'
-        export { listMatchedSelectors } from './src/style-panel/lib/resolved'
-        export { selectorDependsOnAncestor } from './src/style-panel/lib/selectors'
+        export { SelectorPicker } from './src/features/style/EmbedEditor'
+        export { listMatchedSelectors } from './src/features/style/model/resolved'
+        export { selectorDependsOnAncestor } from './src/features/style/model/selectors'
       `,
       resolveDir: ROOT,
       loader: 'tsx',
@@ -351,8 +351,8 @@ const contrastRatio = (first, second) => {
   await esbuild.build({
     stdin: {
       contents: `
-        export { default as EmbedEditor } from './src/style-panel/EmbedEditor'
-        export { setHost } from './src/style-panel/lib/host'
+        export { default as EmbedEditor } from './src/features/style/EmbedEditor'
+        export { setHost } from './src/features/style/model/host'
         export { setCanvasFrame } from './src/editor/canvasQuery.ts'
         export { EditorView } from '@codemirror/view'
       `,
@@ -606,7 +606,7 @@ const contrastRatio = (first, second) => {
   // not there is anything to reveal. Both used to appear/grow on arrival, which
   // moved everything under them just as the panel became usable.
   {
-    const css = fs.readFileSync(repoPath('src/style-panel/embed-editor.css'), 'utf8');
+    const css = fs.readFileSync(repoPath('src/features/style/embedEditor.css'), 'utf8');
     const chipHeight = /--embed-editor_chip-h:/.test(css);
     check('a chip row has one stated height', chipHeight);
     const codeBody = css.slice(css.indexOf('.embed-editor_css-code-body {'));
@@ -639,7 +639,7 @@ const contrastRatio = (first, second) => {
         /--color-component-tag-bg-active/.test(componentChip.slice(0, 800)),
       componentChip.slice(0, 800),
     );
-    const tokens = fs.readFileSync(repoPath('src/style-panel/tokens.css'), 'utf8');
+    const tokens = fs.readFileSync(repoPath('src/features/style/tokens.css'), 'utf8');
     const activeGreen = tokens.match(/--color-component-tag-bg-active:\s*(#[0-9a-f]{6})/i)?.[1];
     const activeContrast = activeGreen ? contrastRatio('#ffffff', activeGreen) : undefined;
     check(
@@ -653,7 +653,7 @@ const contrastRatio = (first, second) => {
       /min-height: var\(--embed-editor_chip-h\)/.test(loading.slice(0, loading.indexOf('}'))),
       loading.slice(0, loading.indexOf('}')),
     );
-    const source = fs.readFileSync(repoPath('src/style-panel/EmbedEditor.tsx'), 'utf8');
+    const source = fs.readFileSync(repoPath('src/features/style/EmbedEditor.tsx'), 'utf8');
     const check_ = source.slice(source.indexOf('embed-editor_selector-filter'));
     check(
       'the globals checkbox is not conditional on having any',

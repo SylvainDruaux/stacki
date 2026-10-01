@@ -33,9 +33,9 @@ const check = (what, condition, detail) => {
   fs.mkdirSync(buildDirectory, { recursive: true });
   const entry = path.join(buildDirectory, 'transform-settings.entry.ts');
   const reexports = [
-    ['*', 'src/style-panel/lib/transform-settings.ts'],
-    ['{ parseTransforms, serializeTransforms }', 'src/style-panel/lib/transform.ts'],
-    ['{ parseHideable, serializeHideable }', 'src/style-panel/lib/hideable.ts'],
+    ['*', 'src/features/style/model/transformSettings.ts'],
+    ['{ parseTransforms, serializeTransforms }', 'src/features/style/model/transform.ts'],
+    ['{ parseHideable, serializeHideable }', 'src/features/style/model/hideable.ts'],
   ];
   fs.writeFileSync(
     entry,
@@ -348,7 +348,7 @@ const check = (what, condition, detail) => {
   {
     const bundle2 = path.join(buildDirectory, 'effects.bundle.js');
     await esbuild.build({
-      entryPoints: [repoPath('src/style-panel/EffectsSection.tsx')],
+      entryPoints: [repoPath('src/features/style/EffectsSection.tsx')],
       outfile: bundle2,
       bundle: true,
       format: 'cjs',

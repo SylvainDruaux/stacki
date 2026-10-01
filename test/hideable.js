@@ -32,12 +32,12 @@ const check = (what, condition, detail) => {
   fs.mkdirSync(buildDirectory, { recursive: true });
   const entry = path.join(buildDirectory, 'hideable.entry.ts');
   const reexports = [
-    ['*', 'src/style-panel/lib/hideable.ts'],
-    ['{ parseFilters, serializeFilters }', 'src/style-panel/lib/filter.ts'],
-    ['{ parseTransforms, serializeTransforms }', 'src/style-panel/lib/transform.ts'],
-    ['{ parseTransitions, serializeTransitions }', 'src/style-panel/lib/transition.ts'],
-    ['{ parseBoxShadows, serializeBoxShadows }', 'src/style-panel/lib/box-shadow.ts'],
-    ['{ parseShadows, serializeShadows }', 'src/style-panel/lib/text-shadow.ts'],
+    ['*', 'src/features/style/model/hideable.ts'],
+    ['{ parseFilters, serializeFilters }', 'src/features/style/model/filter.ts'],
+    ['{ parseTransforms, serializeTransforms }', 'src/features/style/model/transform.ts'],
+    ['{ parseTransitions, serializeTransitions }', 'src/features/style/model/transition.ts'],
+    ['{ parseBoxShadows, serializeBoxShadows }', 'src/features/style/model/boxShadow.ts'],
+    ['{ parseShadows, serializeShadows }', 'src/features/style/model/textShadow.ts'],
   ];
   fs.writeFileSync(
     entry,

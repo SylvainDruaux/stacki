@@ -35,7 +35,7 @@ const check = (what, condition, detail) => {
   fs.writeFileSync(
     entry,
     `export { buildTokenHtml, serializeTokens } from ${JSON.stringify(
-      repoPath('src/style-panel/VariableConnect.tsx'),
+      repoPath('src/features/style/VariableConnect.tsx'),
     )};\n`,
   );
   const out = path.join(buildDirectory, 'token-field.bundle.js');
@@ -152,7 +152,7 @@ const check = (what, condition, detail) => {
   );
 
   // --- the rule that makes it visible --------------------------------------------
-  const css = fs.readFileSync(repoPath('src/style-panel/embed-editor.css'), 'utf8');
+  const css = fs.readFileSync(repoPath('src/features/style/embedEditor.css'), 'utf8');
   const rule = css.slice(css.indexOf('.embed-editor_varconnect-space'));
   check(
     "the space keeps its width against the field's nowrap",

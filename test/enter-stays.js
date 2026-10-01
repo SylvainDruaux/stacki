@@ -35,8 +35,8 @@ const check = (what, condition, detail) => {
   await esbuild.build({
     stdin: {
       contents: `
-        export { default as SizeSection } from './src/style-panel/SizeSection'
-        export { commitInPlace } from './src/style-panel/lib/commit-in-place'
+        export { default as SizeSection } from './src/features/style/SizeSection'
+        export { commitInPlace } from './src/features/style/model/commitInPlace'
       `,
       resolveDir: ROOT,
       loader: 'tsx',

@@ -2,12 +2,12 @@ import React, { useEffect, useRef, useState } from 'react';
 import type { VariableCell } from '../variablesBridge';
 import { VARIABLES_LIMITS } from '../variablesBridge';
 import { assert } from '../../shared/assert';
-import ColorSwatch from '../style-panel/components/ColorSwatch';
-import VariableConnect, { connectCustomField } from '../style-panel/VariableConnect';
-import EasingEditor, { MiniCurve } from '../style-panel/EasingEditor';
-import { easingToBezier, isEasing } from '../style-panel/lib/transition';
+import ColorSwatch from '../features/style/components/ColorSwatch';
+import VariableConnect, { connectCustomField } from '../features/style/VariableConnect';
+import EasingEditor, { MiniCurve } from '../features/style/EasingEditor';
+import { easingToBezier, isEasing } from '../features/style/model/transition';
 import FluidBadge from '../ui/FluidBadge';
-import CustomValue, { doesNotFit, isLong, withBinding } from '../ui/CustomValueEditor';
+import CustomValue, { doesNotFit, isLong, withBinding } from '../features/style/CustomValueEditor';
 
 type CellValue = VariableCell & {
   readonly fluid?: React.ComponentProps<typeof FluidBadge>['fluid'];
@@ -263,7 +263,7 @@ function CellColor({ state }: { readonly state: CellState }) {
           // knowable.
           //
           // Handed the value instead, the swatch resolves it the way every
-          // other swatch in the app does (see computed-color): substituted text
+          // other swatch in the app does (see computedColor.ts): substituted text
           // paints anywhere, and a reference that leads outside this file is
           // answered by the page.
           value={cell.color || cell.resolved || value}

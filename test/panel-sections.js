@@ -42,7 +42,7 @@ const check = (what, condition, detail) => {
   fs.mkdirSync(buildDirectory, { recursive: true });
   const out = path.join(buildDirectory, 'sections.bundle.js');
   await esbuild.build({
-    entryPoints: [repoPath('src/style-panel/lib/sections.ts')],
+    entryPoints: [repoPath('src/features/style/model/sections.ts')],
     outfile: out,
     bundle: true,
     format: 'cjs',
@@ -113,8 +113,8 @@ const check = (what, condition, detail) => {
   // covered. Dead adapters or a matching comment cannot satisfy these checks.
   await esbuild.build({
     entryPoints: {
-      BordersSection: repoPath('src/style-panel/BordersSection.tsx'),
-      FlexChildSection: repoPath('src/style-panel/FlexChildSection.tsx'),
+      BordersSection: repoPath('src/features/style/BordersSection.tsx'),
+      FlexChildSection: repoPath('src/features/style/FlexChildSection.tsx'),
     },
     outdir: path.join(buildDirectory, 'section-controls'),
     bundle: true,
@@ -281,7 +281,8 @@ const check = (what, condition, detail) => {
   // Heuristic in one direction only — a name that appears for another reason
   // (`inset` is also a box-shadow keyword) can hide a missing control, which is
   // why the list above is spelled out by hand as well.
-  const panelDirectory = repoPath('src/style-panel');
+  const panelDirectory = repoPath('src/features/style');
+  const sectionsFile = repoPath('src/features/style/model/sections.ts');
   const sources = [];
   const walk = (directory, depth) => {
     assert.ok(depth <= WALK_LIMITS.directoryDepthMax, 'walk: depth limit');
@@ -289,10 +290,7 @@ const check = (what, condition, detail) => {
       const file = path.join(directory, entry.name);
       if (entry.isDirectory()) {
         walk(file, depth + 1);
-      } else if (
-        /\.(tsx|ts)$/.test(entry.name) &&
-        !file.endsWith(path.join('lib', 'sections.ts'))
-      ) {
+      } else if (/\.(tsx|ts)$/.test(entry.name) && file !== sectionsFile) {
         sources.push(fs.readFileSync(file, 'utf8'));
       }
     }
@@ -300,7 +298,7 @@ const check = (what, condition, detail) => {
   walk(panelDirectory, 0);
   const text = sources.join('\n');
 
-  const sectionsSource = fs.readFileSync(path.join(panelDirectory, 'lib', 'sections.ts'), 'utf8');
+  const sectionsSource = fs.readFileSync(sectionsFile, 'utf8');
   const ordered = [
     ...new Set(
       [...sectionsSource.matchAll(/order: \[([\s\S]*?)\]/g)].flatMap((match) =>

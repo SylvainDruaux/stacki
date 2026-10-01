@@ -31,7 +31,7 @@ const check = (what, condition, detail) => {
   fs.mkdirSync(buildDirectory, { recursive: true });
   const bundlePath = path.join(buildDirectory, 'inset-presets.bundle.js');
   await esbuild.build({
-    entryPoints: [repoPath('src/style-panel/PositionSection.tsx')],
+    entryPoints: [repoPath('src/features/style/PositionSection.tsx')],
     outfile: bundlePath,
     bundle: true,
     format: 'cjs',

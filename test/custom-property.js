@@ -38,7 +38,7 @@ const check = (what, condition, detail) => {
     stdin: {
       contents:
         'export { filterCssProperties, CSS_PROPERTIES } from ' +
-        "'./src/style-panel/lib/css-properties'",
+        "'./src/features/style/model/cssProperties'",
       resolveDir: ROOT,
       loader: 'tsx',
     },
@@ -102,7 +102,7 @@ const check = (what, condition, detail) => {
   );
 
   // --- Enter goes where the rest of the answer is ------------------------------------
-  const source = fs.readFileSync(repoPath('src/style-panel/EmbedEditor.tsx'), 'utf8');
+  const source = fs.readFileSync(repoPath('src/features/style/EmbedEditor.tsx'), 'utf8');
   check(
     'Enter on a named property with no value moves to the value field',
     containsCode(

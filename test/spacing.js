@@ -34,20 +34,20 @@ const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
   fs.writeFileSync(
     entry,
     `export { SpacingFill, SpacingLabel } from ${JSON.stringify(
-      repoPath('src/style-panel/SpacingBox.tsx'),
+      repoPath('src/features/style/SpacingBox.tsx'),
     )};\n` +
       `export { clampNonNegative, isNonNegative } from ${JSON.stringify(
-        repoPath('src/style-panel/lib/css-properties.ts'),
+        repoPath('src/features/style/model/cssProperties.ts'),
       )};\n` +
       `export { stepNumberAtCaret } from ${JSON.stringify(
-        repoPath('src/style-panel/lib/number-step.ts'),
+        repoPath('src/features/style/model/numberStep.ts'),
       )};\n` +
       `export { sectionOf } from ${JSON.stringify(
-        repoPath('src/style-panel/lib/sections.ts'),
+        repoPath('src/features/style/model/sections.ts'),
       )};\n` +
       `export { spacingBands } from ${JSON.stringify(repoPath('src/spacingBands.ts'))};\n` +
       `export { getHost, setHost } from ${JSON.stringify(
-        repoPath('src/style-panel/lib/host.ts'),
+        repoPath('src/features/style/model/host.ts'),
       )};\n` +
       `export { setModifiers } from ${JSON.stringify(repoPath('src/editor/heldModifiers.ts'))};\n`,
   );

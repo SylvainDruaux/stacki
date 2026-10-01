@@ -21,9 +21,10 @@ test(
     await require('esbuild').build({
       stdin: {
         contents: `export { useResolvedColor, forgetComputedColors }
-          from './src/style-panel/lib/computed-color';
-        export { useHighlight, forgetComputedStyles } from './src/style-panel/lib/computed-style';
-        export { setHost } from './src/style-panel/lib/host';`,
+          from './src/features/style/model/computedColor';
+        export { useHighlight, forgetComputedStyles }
+          from './src/features/style/model/computedStyle';
+        export { setHost } from './src/features/style/model/host';`,
         loader: 'ts',
         resolveDir: rootPath,
       },

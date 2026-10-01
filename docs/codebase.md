@@ -97,7 +97,7 @@ Four cooperating processes, each with one job:
 - **Renderer** (`src/`, React 19 + Vite, ESM): `App.tsx` (~4.9k lines) is the
   application shell and owns the page model; `src/panels/` are the side views
   (Structure, Props, Style, Pages, Assets, CMS, Git history, terminal…);
-  `src/style-panel/` is the CSS editing surface (mostly TypeScript);
+  `src/features/style/` is the CSS editing surface (mostly TypeScript);
   `src/ui/` holds shared widgets.
 - **Astro dev server**: the _user's project's own_ dev server. Stacki renders
   the canvas by embedding it, so the preview is always exactly what Astro
@@ -308,7 +308,7 @@ batching/queueing write path (already the right shape).
 | `electron/formats/` | Leaf parsers for data files (JSON/YAML/TOML/CSV/NDJSON/frontmatter)               |
 | `src/`              | Renderer: `App.tsx` shell, tree/persistence/binding logic, `bridge.ts`            |
 | `src/panels/`       | Side panels (Structure, Props, Style, Pages, Assets, CMS, History, Git, terminal) |
-| `src/style-panel/`  | CSS editing surface (TypeScript); `clip-path/`, `lib/`, shared controls           |
+| `src/features/style/`  | CSS editing surface (TypeScript); `clip-path/`, `lib/`, shared controls           |
 | `src/ui/`           | Shared renderer widgets                                                           |
 | `shared/`           | Contract layer: types, parsers, limits, IPC contract → compiled to `shared/dist`  |
 | `scripts/`          | Dev/CI tooling (test runner, policy tooling, agent and git hooks, packaging)       |

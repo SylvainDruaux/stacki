@@ -32,7 +32,7 @@ const check = (what, condition, detail) => {
   fs.mkdirSync(buildDirectory, { recursive: true });
   const bundlePath = path.join(buildDirectory, 'spacing-pick.bundle.js');
   await esbuild.build({
-    entryPoints: [repoPath('src/style-panel/SpacingBox.tsx')],
+    entryPoints: [repoPath('src/features/style/SpacingBox.tsx')],
     outfile: bundlePath,
     bundle: true,
     format: 'cjs',
@@ -44,7 +44,7 @@ const check = (what, condition, detail) => {
     plugins: [
       // The picker asks the project for its variables; there is no project here.
       stubSources('stub-variables', {
-        'src/style-panel/lib/webflow.ts': () => ({
+        'src/features/style/model/webflow.ts': () => ({
           contents: `
               export async function streamProjectVariables(onAdd) {
                 onAdd({

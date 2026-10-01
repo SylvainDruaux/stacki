@@ -65,8 +65,8 @@ const check = (what, condition, detail) => {
   await esbuild.build({
     stdin: {
       contents: `
-        export { default as EmbedEditor } from './src/style-panel/EmbedEditor'
-        export { setHost } from './src/style-panel/lib/host'
+        export { default as EmbedEditor } from './src/features/style/EmbedEditor'
+        export { setHost } from './src/features/style/model/host'
       `,
       resolveDir: ROOT,
       loader: 'tsx',

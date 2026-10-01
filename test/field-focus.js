@@ -61,9 +61,9 @@ const check = (what, condition, detail) => {
     entry,
     `import React from 'react'
      import { createRoot } from 'react-dom/client'
-     import EffectsSection from ${sourceSpecifier('src/style-panel/EffectsSection.tsx')}
-     import GradientEditor from ${sourceSpecifier('src/style-panel/GradientEditor.tsx')}
-     import { parseGradient } from ${sourceSpecifier('src/style-panel/lib/gradient.ts')}
+     import EffectsSection from ${sourceSpecifier('src/features/style/EffectsSection.tsx')}
+     import GradientEditor from ${sourceSpecifier('src/features/style/GradientEditor.tsx')}
+     import { parseGradient } from ${sourceSpecifier('src/features/style/model/gradient.ts')}
      const decls = { transform: 'rotateZ(45deg)' }
      const read = (p) => decls[p] != null
        ? { source:'selected', overridden:false, contributors:[],
@@ -98,7 +98,7 @@ const check = (what, condition, detail) => {
   // which only exists in the CSS.
   fs.writeFileSync(
     path.join(pageDirectory, 'app.css'),
-    ['src/styles.css', 'src/style-panel/utilities.css', 'src/style-panel/embed-editor.css']
+    ['src/styles.css', 'src/features/style/utilities.css', 'src/features/style/embedEditor.css']
       .map((file) => fs.readFileSync(path.join(root, file), 'utf8'))
       .join('\n'),
   );

@@ -30,7 +30,7 @@ const check = (what, condition, detail) => {
   const bundlePath = path.join(buildDirectory, 'computed-color.bundle.js');
   await esbuild.build({
     stdin: {
-      contents: `export { needsPage } from './src/style-panel/lib/computed-color'`,
+      contents: `export { needsPage } from './src/features/style/model/computedColor'`,
       resolveDir: ROOT,
       loader: 'ts',
     },
@@ -71,7 +71,7 @@ const check = (what, condition, detail) => {
       /const host = els\[0\] \|\| document\.documentElement;/.test(preload),
       'a value with nothing selected gets no answer at all',
     );
-    const lib = fs.readFileSync(repoPath('src/style-panel/lib/computed-color.ts'), 'utf8');
+    const lib = fs.readFileSync(repoPath('src/features/style/model/computedColor.ts'), 'utf8');
     check(
       'and the app asks even with nothing selected',
       /function pathOfSelection\(\): string \{/.test(lib) &&

@@ -402,9 +402,9 @@ export default [
     // bridge before constructing trusted application values. AGENTS.md §2
     // permits assertions inside validated constructors and type guards.
     files: [
-      'src/style-panel/lib/css.ts',
-      'src/style-panel/lib/host.ts',
-      'src/style-panel/lib/webflow.ts',
+      'src/features/style/model/css.ts',
+      'src/features/style/model/host.ts',
+      'src/features/style/model/webflow.ts',
     ],
     rules: {
       'no-restricted-syntax': ['error', ...NO_WHOLE_FILE_REGENERATION],

@@ -37,13 +37,13 @@ const check = (what, condition, detail) => {
   const entry = `
     import React from 'react'
     import { createRoot } from 'react-dom/client'
-    import { NumberField } from './src/style-panel/components/PositionGrid'
-    import SizeSection from './src/style-panel/SizeSection'
-    import EffectsSection from './src/style-panel/EffectsSection'
-    import { setHost } from './src/style-panel/lib/host'
-    import './src/style-panel/tokens.css'
-    import './src/style-panel/utilities.css'
-    import './src/style-panel/embed-editor.css'
+    import { NumberField } from './src/features/style/components/PositionGrid'
+    import SizeSection from './src/features/style/SizeSection'
+    import EffectsSection from './src/features/style/EffectsSection'
+    import { setHost } from './src/features/style/model/host'
+    import './src/features/style/tokens.css'
+    import './src/features/style/utilities.css'
+    import './src/features/style/embedEditor.css'
 
     setHost({ projectPath: '/p', nodes: [], selectedId: null, files: [], astroFiles: [] })
     const resolved = (value) => ({

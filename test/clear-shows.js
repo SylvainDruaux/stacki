@@ -34,7 +34,7 @@ const check = (what, condition, detail) => {
   const bundlePath = path.join(buildDirectory, 'clear-shows.bundle.js');
   await esbuild.build({
     stdin: {
-      contents: `export { default as SizeSection } from './src/style-panel/SizeSection'`,
+      contents: `export { default as SizeSection } from './src/features/style/SizeSection'`,
       resolveDir: ROOT,
       loader: 'tsx',
     },

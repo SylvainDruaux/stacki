@@ -34,7 +34,7 @@ const check = (what, condition, detail) => {
     stdin: {
       contents:
         `export { registerPopupLayer, inOwnedPopup, hasOwnedPopup } ` +
-        `from './src/style-panel/lib/popup-layer'`,
+        `from './src/features/style/model/popupLayer'`,
       resolveDir: ROOT,
       loader: 'ts',
     },
@@ -86,16 +86,16 @@ const check = (what, condition, detail) => {
 
   // The wiring: the popovers that close on an outside press have to ask.
   const files = {
-    'src/style-panel/LayerPopover.tsx': 'the layer editor',
-    'src/style-panel/SpacingBox.tsx': 'the spacing editor',
+    'src/features/style/LayerPopover.tsx': 'the layer editor',
+    'src/features/style/SpacingBox.tsx': 'the spacing editor',
   };
   for (const [file, what] of Object.entries(files)) {
     const source = fs.readFileSync(repoPath(file), 'utf8');
     check(`${what} asks before closing on a press`, /inOwnedPopup\(/.test(source), file);
   }
   const pickers = {
-    'src/style-panel/components/ColorPicker.tsx': 'the colour picker',
-    'src/style-panel/VariableConnect.tsx': 'the variable picker',
+    'src/features/style/components/ColorPicker.tsx': 'the colour picker',
+    'src/features/style/VariableConnect.tsx': 'the variable picker',
   };
   for (const [file, what] of Object.entries(pickers)) {
     const source = fs.readFileSync(repoPath(file), 'utf8');
@@ -112,7 +112,7 @@ const check = (what, condition, detail) => {
   {
     const popupBundle = path.join(buildDirectory, 'popup-layers-spacing.bundle.js');
     await esbuild.build({
-      entryPoints: [repoPath('src/style-panel/SpacingBox.tsx')],
+      entryPoints: [repoPath('src/features/style/SpacingBox.tsx')],
       outfile: popupBundle,
       bundle: true,
       format: 'cjs',
@@ -123,7 +123,7 @@ const check = (what, condition, detail) => {
       logLevel: 'silent',
       plugins: [
         stubSources('stub-variables', {
-          'src/style-panel/lib/webflow.ts': () => ({
+          'src/features/style/model/webflow.ts': () => ({
             contents: `
                 export function streamProjectVariables(onAdd) {
                   onAdd({

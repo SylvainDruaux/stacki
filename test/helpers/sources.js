@@ -88,7 +88,7 @@ const PANEL_SOURCES = Object.freeze([
   'src/panels/SaveConflictNotice.tsx',
   'src/panels/StructurePanel.tsx',
   'src/panels/StructureTree.tsx',
-  'src/panels/StylePanel.tsx',
+  'src/features/style/StylePanel.tsx',
   'src/features/git/SwitchBranchModal.tsx',
   'src/features/terminal/TerminalDock.tsx',
   'src/features/terminal/TerminalPane.tsx',

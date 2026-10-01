@@ -35,8 +35,8 @@ const check = (what, condition, detail) => {
   await esbuild.build({
     stdin: {
       contents: `
-        export { default as GapControl } from './src/style-panel/GapControl'
-        export { setHost } from './src/style-panel/lib/host'
+        export { default as GapControl } from './src/features/style/GapControl'
+        export { setHost } from './src/features/style/model/host'
       `,
       resolveDir: ROOT,
       loader: 'tsx',

@@ -27,7 +27,7 @@ const check = (what, condition, detail) => {
   fs.mkdirSync(buildDirectory, { recursive: true });
   const bundlePath = path.join(buildDirectory, 'transform.bundle.js');
   await esbuild.build({
-    entryPoints: [repoPath('src/style-panel/lib/transform.ts')],
+    entryPoints: [repoPath('src/features/style/model/transform.ts')],
     outfile: bundlePath,
     bundle: true,
     format: 'cjs',
@@ -79,7 +79,7 @@ const check = (what, condition, detail) => {
   // --- what the slider re-attaches ---------------------------------------------
   // The slider drives the number and puts the value's own unit back on it; only
   // when the value has none does it fall back to the axis default.
-  const effects = fs.readFileSync(repoPath('src/style-panel/EffectsSection.tsx'), 'utf8');
+  const effects = fs.readFileSync(repoPath('src/features/style/EffectsSection.tsx'), 'utf8');
   const axisConfigSource = effects.slice(
     effects.indexOf('const AXIS_CONFIG'),
     effects.indexOf('/** Split'),

@@ -38,7 +38,7 @@ const SIZE = 240;
   fs.writeFileSync(
     entry,
     `export { default as ColorPicker } from ${JSON.stringify(
-      repoPath('src/style-panel/components/ColorPicker.tsx'),
+      repoPath('src/features/style/components/ColorPicker.tsx'),
     )};\n`,
   );
   const out = path.join(buildDirectory, 'color-alpha.bundle.js');
@@ -324,7 +324,7 @@ const SIZE = 240;
 
   // The panel writes what was authored, and only converts on the way to a native
   // Webflow style — which is not a thing that exists here.
-  const editor = fs.readFileSync(repoPath('src/style-panel/EmbedEditor.tsx'), 'utf8');
+  const editor = fs.readFileSync(repoPath('src/features/style/EmbedEditor.tsx'), 'utf8');
   const setPropAt = editor.indexOf('const setProp = (prop: string');
   check(
     'a committed write is not converted on its way out',
@@ -343,7 +343,7 @@ const SIZE = 240;
   );
 
   // --- the hex field ------------------------------------------------------------
-  const css = fs.readFileSync(repoPath('src/style-panel/utilities.css'), 'utf8');
+  const css = fs.readFileSync(repoPath('src/features/style/utilities.css'), 'utf8');
   const wide = css.slice(css.indexOf('.u-color-field.is-wide .u-color-field-input'));
   check(
     'the hex field has room at the edge its text starts from',

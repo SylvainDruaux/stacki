@@ -39,8 +39,8 @@ const START = 'rgb(1, 2, 3)';
   await esbuild.build({
     stdin: {
       contents:
-        `export { default as BackgroundSection } from './src/style-panel/BackgroundSection'\n` +
-        `export { default as ColorSwatch } from './src/style-panel/components/ColorSwatch'`,
+        `export { default as BackgroundSection } from './src/features/style/BackgroundSection'\n` +
+        `export { default as ColorSwatch } from './src/features/style/components/ColorSwatch'`,
       resolveDir: ROOT,
       loader: 'tsx',
     },

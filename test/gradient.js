@@ -33,7 +33,7 @@ const check = (what, condition, detail) => {
   fs.mkdirSync(buildDirectory, { recursive: true });
   const bundlePath = path.join(buildDirectory, 'gradient.bundle.js');
   await esbuild.build({
-    entryPoints: [repoPath('src/style-panel/lib/gradient.ts')],
+    entryPoints: [repoPath('src/features/style/model/gradient.ts')],
     outfile: bundlePath,
     bundle: true,
     format: 'cjs',

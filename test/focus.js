@@ -35,7 +35,7 @@ const check = (what, condition, detail) => {
   fs.writeFileSync(
     entry,
     `export { RatioOtherInput } from ${JSON.stringify(
-      repoPath('src/style-panel/SizeSection.tsx'),
+      repoPath('src/features/style/SizeSection.tsx'),
     )};\n`,
   );
   const out = path.join(buildDirectory, 'focus.bundle.js');
@@ -143,7 +143,7 @@ const check = (what, condition, detail) => {
   });
 
   // --- both fields it serves ----------------------------------------------------
-  const size = fs.readFileSync(repoPath('src/style-panel/SizeSection.tsx'), 'utf8');
+  const size = fs.readFileSync(repoPath('src/features/style/SizeSection.tsx'), 'utf8');
   check(
     'Ratio asks for the caret only when Other was picked',
     /autoFocus=\{askedForOther\.current\}/.test(size),
@@ -165,7 +165,7 @@ const check = (what, condition, detail) => {
   // Every other custom-value field gates its focus on a ref set when the mode is
   // entered. This one focused on mount, which is the whole bug — so the rule is
   // checked across the panel rather than in the one file that broke it.
-  const panel = repoPath('src/style-panel');
+  const panel = repoPath('src/features/style');
   // A popover is different: it exists only because it was opened, so mounting
   // IS the request. The spacing box's side editor is one — pressing a side is
   // what puts it on screen, and it should be ready to type in. The rule is

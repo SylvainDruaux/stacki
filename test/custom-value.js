@@ -40,8 +40,8 @@ const check = (what, condition, detail) => {
     // The editor and the picker field the app hands it (connectCustomField).
     stdin: {
       contents:
-        "export * from './src/ui/CustomValueEditor.tsx';\n" +
-        "export { connectCustomField } from './src/style-panel/VariableConnect.tsx';\n",
+        "export * from './src/features/style/CustomValueEditor.tsx';\n" +
+        "export { connectCustomField } from './src/features/style/VariableConnect.tsx';\n",
       resolveDir: ROOT,
       loader: 'ts',
     },

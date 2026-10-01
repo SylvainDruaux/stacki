@@ -37,14 +37,14 @@ const check = (what, condition, detail) => {
     // own directory so its imports resolve the way they do in the app.
     stdin: {
       contents: `
-        export { resolveTarget, scanPage } from './src/style-panel/lib/webflow'
-        export { setHost, onHostChange, getHost } from './src/style-panel/lib/host'
-        export { matchSelectorList } from './src/style-panel/lib/selectors'
+        export { resolveTarget, scanPage } from './src/features/style/model/webflow'
+        export { setHost, onHostChange, getHost } from './src/features/style/model/host'
+        export { matchSelectorList } from './src/features/style/model/selectors'
         export {
           defaultSelectorTokens,
           tokensToSelector,
           snapshotTokens,
-        } from './src/style-panel/lib/element-tokens'
+        } from './src/features/style/model/elementTokens'
       `,
       resolveDir: ROOT,
       loader: 'ts',
@@ -286,7 +286,7 @@ const check = (what, condition, detail) => {
     );
 
     // …and the panel actually asks.
-    const editor = fs.readFileSync(repoPath('src/style-panel/EmbedEditor.tsx'), 'utf8');
+    const editor = fs.readFileSync(repoPath('src/features/style/EmbedEditor.tsx'), 'utf8');
     check(
       'the panel defaults through it',
       /const next = defaultSelectorTokens\(tokens\)/.test(editor),

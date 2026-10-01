@@ -55,7 +55,7 @@ const check = (what, condition, detail) => {
     entry,
     `import React from 'react'
      import { createRoot } from 'react-dom/client'
-     import GridSettings from ${sourceSpecifier('src/style-panel/GridSettings.tsx')}
+     import GridSettings from ${sourceSpecifier('src/features/style/GridSettings.tsx')}
      const decls = { 'grid-template-columns': '200px 1fr minmax(0, 2fr)' }
      const read = (p) => decls[p] != null
        ? { source:'selected', overridden:false, contributors:[],
@@ -86,10 +86,10 @@ const check = (what, condition, detail) => {
   fs.writeFileSync(
     path.join(pageDirectory, 'app.css'),
     [
-      'src/style-panel/tokens.css',
+      'src/features/style/tokens.css',
       'src/styles.css',
-      'src/style-panel/utilities.css',
-      'src/style-panel/embed-editor.css',
+      'src/features/style/utilities.css',
+      'src/features/style/embedEditor.css',
     ]
       .map((file) => fs.readFileSync(path.join(root, file), 'utf8'))
       .join('\n'),

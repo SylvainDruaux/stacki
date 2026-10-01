@@ -526,7 +526,7 @@ function fakeAudio() {
     fs.writeFileSync(
       entry,
       `export { default as Select } from ${JSON.stringify(
-        repoPath('src/style-panel/components/Select.tsx'),
+        repoPath('src/features/style/components/Select.tsx'),
       )};\n` + `export { setSoundEnabled } from ${JSON.stringify(repoPath('src/ui/sound.ts'))};\n`,
     );
     const bundle = path.join(buildDirectory, 'rows.bundle.js');
@@ -681,7 +681,7 @@ function fakeAudio() {
   }
 
   // --- the wiring --------------------------------------------------------------
-  const picker = fs.readFileSync(repoPath('src/style-panel/components/ColorPicker.tsx'), 'utf8');
+  const picker = fs.readFileSync(repoPath('src/features/style/components/ColorPicker.tsx'), 'utf8');
   check(
     'the colour drag plays the note',
     /if \(phase === 'live'\) \{\s*dragNote\(fx, tall \? fy : undefined\)/.test(picker),
@@ -713,7 +713,7 @@ function fakeAudio() {
     /writeSettings\(\)/.test(main) && /settings:get/.test(main),
   );
 
-  const select = fs.readFileSync(repoPath('src/style-panel/components/Select.tsx'), 'utf8');
+  const select = fs.readFileSync(repoPath('src/features/style/components/Select.tsx'), 'utf8');
   check(
     'the menu sounds its highlight',
     /hoverNote\(activeIndex, displayed\.length\)/.test(select),
@@ -732,7 +732,7 @@ function fakeAudio() {
     'the highlight the menu opens with should not sound',
   );
 
-  const panel = fs.readFileSync(repoPath('src/panels/StylePanel.tsx'), 'utf8');
+  const panel = fs.readFileSync(repoPath('src/features/style/StylePanel.tsx'), 'utf8');
   check(
     'the style panel taps on a button press',
     /closest\('button'\)/.test(panel) && /clickNote\(\)/.test(panel),

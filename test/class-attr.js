@@ -191,7 +191,7 @@ const { class: className } = Astro.props;
   // Step 6 (plan §3.3): the class is a page edit, the rule a stylesheet edit
   // that depends on it — written only after the page edit applied, and never
   // submitted when it was refused.
-  const embedFile = repoPath('src/style-panel/EmbedEditor.tsx');
+  const embedFile = repoPath('src/features/style/EmbedEditor.tsx');
   const embed = fs.readFileSync(embedFile, 'utf8');
   check(
     "the class answers with the page edit's outcome",

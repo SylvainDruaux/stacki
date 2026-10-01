@@ -32,7 +32,7 @@ const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
   const bundlePath = path.join(buildDirectory, 'popover.bundle.js');
   await esbuild.build({
     stdin: {
-      contents: `export { default as LayerPopover } from './src/style-panel/LayerPopover'`,
+      contents: `export { default as LayerPopover } from './src/features/style/LayerPopover'`,
       resolveDir: ROOT,
       loader: 'tsx',
     },

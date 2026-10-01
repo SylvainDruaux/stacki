@@ -3,7 +3,7 @@
 // both endpoints through a scripted transport failure and payload capture.
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const bridge = require('./helpers/rendererModule')('src/stylePanelBridge.ts');
+const bridge = require('./helpers/rendererModule')('src/features/style/stylePanelBridge.ts');
 
 // A boundary can receive null — JSON, structured clone and postMessage all carry it —
 // so the negative space below includes it. It is read from JSON, because our own

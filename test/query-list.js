@@ -58,7 +58,7 @@ const SHEET = `.card {
   {
     const cssBundle = path.join(buildDirectory, 'query-css.bundle.js');
     await esbuild.build({
-      entryPoints: [repoPath('src/style-panel/lib/css.ts')],
+      entryPoints: [repoPath('src/features/style/model/css.ts')],
       outfile: cssBundle,
       bundle: true,
       format: 'cjs',
@@ -159,7 +159,7 @@ const SHEET = `.card {
   {
     const nsBundle = path.join(buildDirectory, 'query-contexts.bundle.js');
     await esbuild.build({
-      entryPoints: [repoPath('src/style-panel/lib/native-styles.ts')],
+      entryPoints: [repoPath('src/features/style/model/nativeStyles.ts')],
       outfile: nsBundle,
       bundle: true,
       format: 'cjs',
@@ -215,8 +215,8 @@ const SHEET = `.card {
   await esbuild.build({
     stdin: {
       contents:
-        `export { default as EmbedEditor } from './src/style-panel/EmbedEditor'\n` +
-        `export { setHost } from './src/style-panel/lib/host'`,
+        `export { default as EmbedEditor } from './src/features/style/EmbedEditor'\n` +
+        `export { setHost } from './src/features/style/model/host'`,
       resolveDir: ROOT,
       loader: 'tsx',
     },

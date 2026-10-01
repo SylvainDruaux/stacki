@@ -11,7 +11,7 @@ const { repoPath } = require('./helpers/sources.js');
 (async () => {
   const outfile = repoPath('node_modules/.stacki-test/query-cache.bundle.js');
   await esbuild.build({
-    entryPoints: [repoPath('src/style-panel/lib/query-cache.ts')],
+    entryPoints: [repoPath('src/features/style/model/queryCache.ts')],
     outfile,
     bundle: true,
     platform: 'node',

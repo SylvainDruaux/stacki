@@ -30,7 +30,7 @@ const check = (what, condition, detail) => {
   fs.mkdirSync(buildDirectory, { recursive: true });
   const bundlePath = path.join(buildDirectory, 'insert-binding.bundle.js');
   await esbuild.build({
-    entryPoints: [repoPath('src/style-panel/lib/insert-binding.ts')],
+    entryPoints: [repoPath('src/features/style/model/insertBinding.ts')],
     outfile: bundlePath,
     bundle: true,
     format: 'cjs',

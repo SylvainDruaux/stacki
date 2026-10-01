@@ -33,7 +33,7 @@ const check = (what, condition, detail) => {
   fs.mkdirSync(buildDirectory, { recursive: true });
   const out = path.join(buildDirectory, 'popup-scroll.bundle.js');
   await esbuild.build({
-    entryPoints: [repoPath('src/ui/usePopupOpen.ts')],
+    entryPoints: [repoPath('src/features/style/usePopupOpen.ts')],
     outfile: out,
     bundle: true,
     format: 'cjs',
@@ -164,7 +164,7 @@ const check = (what, condition, detail) => {
     'and its gutter is reserved, so losing the bar costs no layout',
     /scrollbar-gutter:\s*stable/.test(css),
   );
-  const panel = fs.readFileSync(repoPath('src/panels/StylePanel.tsx'), 'utf8');
+  const panel = fs.readFileSync(repoPath('src/features/style/StylePanel.tsx'), 'utf8');
   check('the panel asks', /usePopupOpen\(hostRef\)/.test(panel));
   check('and wears the answer', /popupOpen \? 'is-locked' : ''/.test(panel));
 

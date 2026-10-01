@@ -30,8 +30,8 @@ test('a ready canvas tells each registered cache, until it unsubscribes', () => 
 
 test('the computed-value caches forget on a ready canvas', () => {
   for (const [file, forget] of [
-    ['src/style-panel/lib/computed-color.ts', 'forgetComputedColors'],
-    ['src/style-panel/lib/computed-style.ts', 'forgetComputedStyles'],
+    ['src/features/style/model/computedColor.ts', 'forgetComputedColors'],
+    ['src/features/style/model/computedStyle.ts', 'forgetComputedStyles'],
   ]) {
     const source = fs.readFileSync(repoPath(file), 'utf8');
     assert.match(source, new RegExp(`^onCanvasReady\\(${forget}\\);$`, 'm'), file);

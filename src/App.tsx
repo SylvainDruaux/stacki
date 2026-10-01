@@ -1,7 +1,7 @@
 import { usePropertySaveGuard } from './usePropertySaveGuard';
 import ComponentPropertiesPanel from './panels/ComponentPropertiesPanel';
 import { revertComponentProperties } from './componentPropertiesBridge';
-import type { ClassOutcome } from './style-panel/lib/host';
+import type { ClassOutcome } from './features/style/model/host';
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { SetStateAction } from 'react';
 import type { Attr, ImportDecl, PageModel, PageNode, PairedNode } from '../shared/page-node';
@@ -280,7 +280,7 @@ import {
 // Each optional editor owns its loading boundary so opening it keeps the
 // canvas and neighboring panels visible and interactive.
 const PropsPanel = lazyPanel(() => import('./panels/PropsPanel'));
-const StylePanel = lazyPanel(() => import('./panels/StylePanel'));
+const StylePanel = lazyPanel(() => import('./features/style/StylePanel'));
 const CodeWindow = lazyPanel(() => import('./features/code/CodeWindow'));
 const CmsPanel = lazyPanel(() => import('./features/cms/CmsPanel'));
 const CmsView = lazyPanel(() => import('./features/cms/CmsView'));

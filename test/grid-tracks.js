@@ -31,7 +31,7 @@ const check = (what, condition, detail) => {
   fs.mkdirSync(buildDirectory, { recursive: true });
   const bundlePath = path.join(buildDirectory, 'grid-tracks.bundle.js');
   await esbuild.build({
-    entryPoints: [repoPath('src/style-panel/lib/grid-template.ts')],
+    entryPoints: [repoPath('src/features/style/model/gridTemplate.ts')],
     outfile: bundlePath,
     bundle: true,
     format: 'cjs',
@@ -104,7 +104,7 @@ const check = (what, condition, detail) => {
     fs.writeFileSync(
       entry,
       `export { default as GridSettings } from ${JSON.stringify(
-        repoPath('src/style-panel/GridSettings.tsx'),
+        repoPath('src/features/style/GridSettings.tsx'),
       )};\n`,
     );
     const uiPath = path.join(buildDirectory, 'grid-settings.bundle.js');
@@ -309,7 +309,7 @@ const check = (what, condition, detail) => {
     );
     check(
       'and it says it is already the room a long value needs',
-      /expanded/.test(fs.readFileSync(repoPath('src/style-panel/GridSettings.tsx'), 'utf8')),
+      /expanded/.test(fs.readFileSync(repoPath('src/features/style/GridSettings.tsx'), 'utf8')),
       'a long value would open the popup over this field',
     );
     check(
@@ -433,7 +433,7 @@ const check = (what, condition, detail) => {
 
   // --- a field that is already big doesn't open a box over itself -------------
   {
-    const vc = fs.readFileSync(repoPath('src/style-panel/VariableConnect.tsx'), 'utf8');
+    const vc = fs.readFileSync(repoPath('src/features/style/VariableConnect.tsx'), 'utf8');
     check(
       'a field can say it is already expanded',
       /expanded\?: boolean/.test(vc),
@@ -466,7 +466,7 @@ const check = (what, condition, detail) => {
   }
 
   // --- the settings offer it --------------------------------------------------
-  const settings = fs.readFileSync(repoPath('src/style-panel/GridSettings.tsx'), 'utf8');
+  const settings = fs.readFileSync(repoPath('src/features/style/GridSettings.tsx'), 'utf8');
   check('the grid settings have the switch', /function RepeatSwitch/.test(settings));
   check('on both track lists, since each is written its own way', /<RepeatSwitch/.test(settings));
   check(

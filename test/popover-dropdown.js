@@ -41,11 +41,11 @@ const check = (what, condition, detail) => {
   const entry = `
     import React, { useState } from 'react'
     import { createRoot } from 'react-dom/client'
-    import LayerPopover from './src/style-panel/LayerPopover'
-    import Select from './src/style-panel/components/Select'
-    import './src/style-panel/tokens.css'
-    import './src/style-panel/utilities.css'
-    import './src/style-panel/embed-editor.css'
+    import LayerPopover from './src/features/style/LayerPopover'
+    import Select from './src/features/style/components/Select'
+    import './src/features/style/tokens.css'
+    import './src/features/style/utilities.css'
+    import './src/features/style/embedEditor.css'
 
     const OPTIONS = Array.from(
       { length: 24 },

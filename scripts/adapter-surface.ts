@@ -8,7 +8,7 @@
 // Method (a grep, written down so anyone can re-run it by hand):
 //
 //   Files   src/**/*.ts and src/**/*.tsx. Node mutations and prop-index writes
-//           exclude src/style-panel/, which edits CSS rules, not the page tree.
+//           exclude src/features/style/, which edits CSS rules, not the page tree.
 //           Wrapper call sites cover all of src/: applyEdit lives there.
 //   Fields  the page-node fields a mutation can change: props, children,
 //           attrOrder, attrSource, kind, name, value, id, dynamicTag, slots,
@@ -58,7 +58,7 @@ interface Counts {
  * expansion and at step 9 (the tracker's adapter table). Lower these; never
  * raise them. Step 9 ends with the page tree readonly (src/editor/pageView.ts):
  * no node is edited in place, anywhere in src/. The four applyEdit( sites left
- * are the style panel's CSS-rule edits (src/style-panel/EmbedEditor.tsx), which
+ * are the style panel's CSS-rule edits (src/features/style/EmbedEditor.tsx), which
  * never touch the page tree. */
 const BASELINE: Counts = {
   mutations: 0,
@@ -220,7 +220,7 @@ function measure(root: string): {
   readonly byFile: ReadonlyMap<string, number>;
 } {
   const source = path.join(root, 'src');
-  const stylePanel = path.join(source, 'style-panel') + path.sep;
+  const stylePanel = path.join(source, 'features', 'style') + path.sep;
   let mutations = 0;
   let propIndexWrites = 0;
   let mutateModelCalls = 0;

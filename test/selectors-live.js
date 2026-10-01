@@ -36,9 +36,9 @@ const check = (what, condition, detail) => {
   await esbuild.build({
     stdin: {
       contents: `
-        import { useRemovedClasses, withoutClasses } from './src/style-panel/EmbedEditor'
+        import { useRemovedClasses, withoutClasses } from './src/features/style/EmbedEditor'
         export { withoutClasses }
-        export { setHost } from './src/style-panel/lib/host'
+        export { setHost } from './src/features/style/model/host'
         export function Probe() {
           const removed = useRemovedClasses()
           return <div data-removed={[...removed].join(',')} />

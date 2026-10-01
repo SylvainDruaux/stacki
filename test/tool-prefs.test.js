@@ -8,7 +8,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { BOUNDARY_LIMITS } = require('#dist/shared/boundary.js');
 const { parseStoredEmbedSource, loadEmbedSource } = require('./helpers/rendererModule')(
-  'src/style-panel/shared/tool-prefs.ts',
+  'src/features/style/model/toolPreferences.ts',
 );
 
 // A boundary can receive null — JSON, structured clone and postMessage all carry it —

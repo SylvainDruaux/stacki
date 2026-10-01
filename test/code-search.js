@@ -209,7 +209,7 @@ check(
 // has run tends to leave you — the panel lands over the very lines it found.
 for (const [what, file] of [
   ['the app editor', 'src/ui/CodeEditor.tsx'],
-  ['the style panel editor', 'src/style-panel/components/CodeEditor.tsx'],
+  ['the style panel editor', 'src/features/style/components/CssCodeEditor.tsx'],
 ]) {
   check(`${what} opens find at the top`, /search\(\{\s*top:\s*true\s*\}\)/.test(read(file)), file);
 }
@@ -228,7 +228,7 @@ check(
 // the editors' themes, and a rule in styles.css would be a coin toss.
 for (const [what, file] of [
   ['the app editor', 'src/ui/CodeEditor.tsx'],
-  ['the style panel editor', 'src/style-panel/components/CodeEditor.tsx'],
+  ['the style panel editor', 'src/features/style/components/CssCodeEditor.tsx'],
 ]) {
   const source = read(file);
   check(`${what} themes its search matches`, /'\.cm-searchMatch'/.test(source), file);

@@ -244,7 +244,7 @@ function fakeAudio() {
   // --- the two panels, and only those -------------------------------------------------
   const read = (file) => fs.readFileSync(repoPath(file), 'utf8');
   const props = read('src/panels/PropsPanel.tsx');
-  const style = read('src/panels/StylePanel.tsx');
+  const style = read('src/features/style/StylePanel.tsx');
   check(
     'the settings panel taps on a button press',
     /closest\('button'\)/.test(props) && /clickNote\(\)/.test(props),

@@ -55,9 +55,9 @@ const check = (what, condition, detail) => {
   `;
   const entry = path.join(buildDirectory, 'computed-hold.entry.jsx');
   const reexports = [
-    ['{ default as EffectsSection }', 'src/style-panel/EffectsSection.tsx'],
-    ['{ setHost }', 'src/style-panel/lib/host.ts'],
-    ['{ forgetComputedStyles }', 'src/style-panel/lib/computed-style.ts'],
+    ['{ default as EffectsSection }', 'src/features/style/EffectsSection.tsx'],
+    ['{ setHost }', 'src/features/style/model/host.ts'],
+    ['{ forgetComputedStyles }', 'src/features/style/model/computedStyle.ts'],
   ];
   fs.writeFileSync(
     entry,

@@ -32,7 +32,7 @@ const check = (what, condition, detail) => {
   fs.mkdirSync(buildDirectory, { recursive: true });
   const bundlePath = path.join(buildDirectory, 'varconnect-open.bundle.js');
   await esbuild.build({
-    entryPoints: [repoPath('src/style-panel/VariableConnect.tsx')],
+    entryPoints: [repoPath('src/features/style/VariableConnect.tsx')],
     outfile: bundlePath,
     bundle: true,
     format: 'cjs',
@@ -46,7 +46,7 @@ const check = (what, condition, detail) => {
       // here, and the list only has to be non-empty for a row to exist to
       // press — which is the point of the test below.
       stubSources('stub-variables', {
-        'src/style-panel/lib/webflow.ts': () => ({
+        'src/features/style/model/webflow.ts': () => ({
           contents: `
               export async function streamProjectVariables(onAdd) {
                 onAdd({

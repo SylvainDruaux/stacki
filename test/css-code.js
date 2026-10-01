@@ -38,8 +38,8 @@ const same = (what, got, want) =>
   await esbuild.build({
     stdin: {
       contents: `
-        export * from './src/style-panel/lib/css-code'
-        export * from './src/style-panel/lib/css-rule-view'
+        export * from './src/features/style/model/cssCode'
+        export * from './src/features/style/model/cssRuleView'
       `,
       resolveDir: ROOT,
       loader: 'ts',
