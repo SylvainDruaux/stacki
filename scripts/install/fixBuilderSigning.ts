@@ -6,7 +6,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import fs = require('node:fs');
 import { createRequire } from 'node:module';
 import path = require('node:path');
-import { repositoryRoot } from './lib/repoRoot';
+import { repositoryRoot } from '../lib/repoRoot';
 
 const BUILDER_VERSION = '25.1.8';
 const ORIGINAL_HASH = 'ab30cf9755231ef0c279fc4a13f31b405b0a88b2cab657a57604e85bbb7ebbfd';

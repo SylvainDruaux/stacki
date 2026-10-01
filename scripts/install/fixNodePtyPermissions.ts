@@ -3,7 +3,7 @@
 
 import fs = require('node:fs');
 import path = require('node:path');
-import { repositoryRoot } from './lib/repoRoot';
+import { repositoryRoot } from '../lib/repoRoot';
 
 const EXEC_MODE = 0o755;
 

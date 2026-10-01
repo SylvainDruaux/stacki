@@ -16,7 +16,7 @@ const { test } = require('node:test');
 const {
   patchSigningSource,
   fixElectronBuilderSigning,
-} = require('#dist/scripts/fix-electron-builder-signing.js');
+} = require('#dist/scripts/install/fixBuilderSigning.js');
 
 const builderRequire = createRequire(require.resolve('electron-builder/package.json'));
 const signingFile = builderRequire.resolve('app-builder-lib/out/codeSign/macCodeSign.js');

@@ -5,7 +5,7 @@ import fs = require('node:fs');
 import path = require('node:path');
 import type { AfterPackContext } from 'app-builder-lib';
 import { Arch } from 'builder-util';
-import { fixNodePtyPermissions } from './fix-node-pty-permissions';
+import { fixNodePtyPermissions } from './install/fixNodePtyPermissions';
 
 function windowsArchitecture(architecture: Arch): 'arm64' | 'x64' {
   if (architecture === Arch.arm64) {
