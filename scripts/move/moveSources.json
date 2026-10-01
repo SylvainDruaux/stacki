@@ -449,6 +449,122 @@
         ["src/panels/CapabilityNotice.tsx", "src/app/CapabilityNotice.tsx"],
         ["src/panels/SaveConflictNotice.tsx", "src/app/SaveConflictNotice.tsx"]
       ]
+    },
+    {
+      "step": "electron-lib",
+      "moves": [
+        ["electron/main.bounds.ts", "electron/lib/mainLimits.ts"],
+        ["electron/ipc.ts", "electron/lib/ipcRegistrar.ts"],
+        ["electron/platform.ts", "electron/lib/platform.ts"],
+        ["electron/serialQueue.ts", "electron/lib/serialQueue.ts"]
+      ]
+    },
+    {
+      "step": "electron-parse",
+      "moves": [
+        ["electron/astroParser.ts", "electron/parse/astroParser.ts"],
+        ["electron/markdownParser.ts", "electron/parse/markdownParser.ts"],
+        ["electron/astroParser.types.ts", "electron/parse/astroParserTypes.ts"],
+        ["electron/astroParser.validation.ts", "electron/parse/astroParserValidation.ts"]
+      ]
+    },
+    {
+      "step": "electron-runtimes",
+      "moves": [
+        ["electron/previewMarkers.ts", "electron/previewServer/previewMarkers.ts"],
+        ["electron/componentPreview.ts", "electron/previewServer/componentPreview.ts"],
+        ["electron/morphClient.ts", "electron/previewClient/morphClient.ts"],
+        ["electron/preload.ts", "electron/preload/preload.ts"],
+        ["electron/preload-process.d.ts", "electron/preload/preloadProcess.d.ts"]
+      ]
+    },
+    {
+      "step": "electron-documents",
+      "moves": [
+        ["electron/documentActors.ts", "electron/documents/documentActors.ts"],
+        ["electron/documentDisk.ts", "electron/documents/documentDisk.ts"],
+        ["electron/documentTelemetry.ts", "electron/documents/documentTelemetry.ts"],
+        ["electron/documentWrites.ts", "electron/documents/documentWrites.ts"],
+        ["electron/atomicWrite.ts", "electron/documents/atomicWrite.ts"],
+        ["electron/editRequests.ts", "electron/documents/editRequests.ts"],
+        ["electron/editAnchors.ts", "electron/documents/editAnchors.ts"],
+        ["electron/editPreview.ts", "electron/documents/editPreview.ts"],
+        ["electron/markdownEdits.ts", "electron/documents/markdownEdits.ts"],
+        ["electron/componentFile.ts", "electron/documents/componentFile.ts"]
+      ]
+    },
+    {
+      "step": "electron-content",
+      "moves": [
+        ["electron/contentConfig.ts", "electron/content/contentConfig.ts"],
+        ["electron/contentEntries.ts", "electron/content/contentEntries.ts"],
+        ["electron/contentRefs.ts", "electron/content/contentRefs.ts"],
+        ["electron/jsCollections.ts", "electron/content/jsCollections.ts"],
+        ["electron/cmsRefs.ts", "electron/content/cmsRefs.ts"],
+        ["electron/formats/csv.ts", "electron/content/formats/csv.ts"],
+        ["electron/formats/frontmatter.ts", "electron/content/formats/markdownEntry.ts"],
+        ["electron/formats/json.ts", "electron/content/formats/json.ts"],
+        ["electron/formats/ndjson.ts", "electron/content/formats/ndjson.ts"],
+        ["electron/formats/toml.ts", "electron/content/formats/toml.ts"],
+        ["electron/formats/transplant.ts", "electron/content/formats/transplant.ts"],
+        ["electron/formats/yaml.ts", "electron/content/formats/yaml.ts"],
+        ["electron/content/introspect.mjs", "electron/content/workers/introspect.mjs"],
+        ["electron/content/schemaTools.mjs", "electron/content/workers/schemaTools.mjs"],
+        [
+          "electron/content/stub-astro-content.mjs",
+          "electron/content/workers/stubAstroContent.mjs"
+        ],
+        ["electron/content/stub-astro-loaders.mjs", "electron/content/workers/stubAstroLoaders.mjs"]
+      ]
+    },
+    {
+      "step": "electron-properties",
+      "moves": [
+        ["electron/componentProperties.ts", "electron/properties/componentProperties.ts"],
+        ["electron/propertyConsumers.ts", "electron/properties/propertyConsumers.ts"],
+        ["electron/propertyContracts.ts", "electron/properties/propertyContracts.ts"],
+        ["electron/propertyDefinitions.ts", "electron/properties/propertyDefinitions.ts"],
+        ["electron/propertyOrigins.ts", "electron/properties/propertyOrigins.ts"],
+        ["electron/propertyRename.ts", "electron/properties/propertyRename.ts"],
+        ["electron/propertySyntax.ts", "electron/properties/propertySyntax.ts"],
+        ["electron/propertyTypes.ts", "electron/properties/propertyTypes.ts"],
+        ["electron/componentUsage.ts", "electron/properties/componentUsage.ts"]
+      ]
+    },
+    {
+      "step": "electron-project",
+      "moves": [
+        ["electron/scaffold.ts", "electron/project/scaffold.ts"],
+        ["electron/starter.ts", "electron/project/starter.ts"],
+        ["electron/projectWatcher.ts", "electron/project/projectWatcher.ts"],
+        ["electron/thumbs.ts", "electron/project/thumbs.ts"],
+        ["electron/assetRefs.ts", "electron/project/assetRefs.ts"],
+        ["electron/cssVars.ts", "electron/project/cssVars.ts"]
+      ]
+    },
+    {
+      "step": "electron-services",
+      "moves": [
+        ["electron/git.ts", "electron/git/git.ts"],
+        ["electron/gitBranches.ts", "electron/git/gitBranches.ts"],
+        ["electron/gitHistory.ts", "electron/git/gitHistory.ts"],
+        ["electron/gitSnapshot.ts", "electron/git/gitSnapshot.ts"],
+        ["electron/conflicts.ts", "electron/git/conflicts.ts"],
+        ["electron/devProbe.ts", "electron/preview/devProbe.ts"],
+        ["electron/previewCheck.ts", "electron/preview/previewCheck.ts"],
+        ["electron/previewWorktree.ts", "electron/preview/previewWorktree.ts"],
+        ["electron/injectedRoutes.ts", "electron/preview/injectedRoutes.ts"],
+        ["electron/terminal.ts", "electron/terminal/terminal.ts"],
+        ["electron/node-pty.d.ts", "electron/terminal/nodePty.d.ts"]
+      ]
+    },
+    {
+      "step": "electron-app",
+      "moves": [
+        ["electron/main.types.ts", "electron/app/mainTypes.ts"],
+        ["electron/main.validation.ts", "electron/app/mainValidation.ts"],
+        ["electron/windowBounds.ts", "electron/app/windowBounds.ts"]
+      ]
     }
   ]
 }
