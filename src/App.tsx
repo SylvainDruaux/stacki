@@ -1,6 +1,6 @@
 import { usePropertySaveGuard } from './usePropertySaveGuard';
-import ComponentPropertiesPanel from './panels/ComponentPropertiesPanel';
-import { revertComponentProperties } from './componentPropertiesBridge';
+import ComponentPropertiesPanel from './features/componentProperties/ComponentPropertiesPanel';
+import { revertComponentProperties } from './features/componentProperties/propertiesBridge';
 import type { ClassOutcome } from './features/style/model/host';
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { SetStateAction } from 'react';

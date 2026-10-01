@@ -20,10 +20,11 @@ test('component properties lifecycle and controls', async () => {
   const bundle = path.join(directory, 'panel.js');
   await esbuild.build({
     stdin: {
-      contents: `export {default as Panel} from './src/panels/ComponentPropertiesPanel';
+      contents: `export {default as Panel}
+       from './src/features/componentProperties/ComponentPropertiesPanel';
      export {default as Rail} from './src/ui/LeftRail';
-     export {literalOptions} from './src/panels/PropertyEditor';
-     export {movePropertyItem} from './src/panels/PropertyReorder';`,
+     export {literalOptions} from './src/features/componentProperties/PropertyEditor';
+     export {movePropertyItem} from './src/features/componentProperties/PropertyReorder';`,
       resolveDir: ROOT,
       loader: 'tsx',
     },

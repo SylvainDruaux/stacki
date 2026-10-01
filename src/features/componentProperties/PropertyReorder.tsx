@@ -1,6 +1,6 @@
-import { assert } from '../../shared/assert';
-import { PROPERTY_LIMITS } from '../../shared/component-properties';
-import { DragIcon } from '../ui/Icons';
+import { assert } from '../../../shared/assert';
+import { PROPERTY_LIMITS } from '../../../shared/component-properties';
+import { DragIcon } from '../../ui/Icons';
 
 // Drop targets are gaps before removal, matching the shared list gesture hook.
 export function movePropertyItem<Value>(

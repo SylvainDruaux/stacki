@@ -1,10 +1,10 @@
 import { useState } from 'react';
-import type { ComponentProperty } from '../../shared/component-properties';
-import { PROPERTY_LIMITS } from '../../shared/component-properties';
-import { literalOptions } from '../../shared/property-options';
-import Dropdown from '../ui/Dropdown';
-import { BracesIcon } from '../ui/Icons';
-import { ExpressionBindingField } from './propBindings';
+import type { ComponentProperty } from '../../../shared/component-properties';
+import { PROPERTY_LIMITS } from '../../../shared/component-properties';
+import { literalOptions } from '../../../shared/property-options';
+import Dropdown from '../../ui/Dropdown';
+import { BracesIcon } from '../../ui/Icons';
+import { ExpressionBindingField } from '../../panels/propBindings';
 
 interface DefaultProps {
   readonly property: ComponentProperty;

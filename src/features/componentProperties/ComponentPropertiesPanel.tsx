@@ -5,13 +5,13 @@ import type {
   ComponentProperties,
   ComponentProperty,
   PropertyChange,
-} from '../../shared/component-properties';
-import useListReorder from '../ui/useListReorder';
-import { literalOptions } from '../../shared/property-options';
-import ListFieldRow from '../ui/ListFieldRow';
-import { ComponentPropertiesIcon, FieldNumberIcon, FieldSwitchIcon } from '../ui/Icons';
+} from '../../../shared/component-properties';
+import useListReorder from '../../ui/useListReorder';
+import { literalOptions } from '../../../shared/property-options';
+import ListFieldRow from '../../ui/ListFieldRow';
+import { ComponentPropertiesIcon, FieldNumberIcon, FieldSwitchIcon } from '../../ui/Icons';
 import { PropertyGrip, movePropertyItem } from './PropertyReorder';
-import { PropertiesIcon } from '../ui/PropertiesIcon';
+import { PropertiesIcon } from './PropertiesIcon';
 import { PropertyEditor } from './PropertyEditor';
 import './componentProperties.css';
 

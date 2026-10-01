@@ -1,8 +1,11 @@
-import { parseIpcPayload } from '../shared/ipc-payloads';
-import { parseComponentProperties, parsePropertiesResult } from '../shared/component-properties';
-import type { ComponentProperties, PropertyChange } from '../shared/component-properties';
-import { toRecord } from '../shared/record';
-import type { Result } from '../shared/result';
+import { parseIpcPayload } from '../../../shared/ipc-payloads';
+import {
+  parseComponentProperties,
+  parsePropertiesResult,
+} from '../../../shared/component-properties';
+import type { ComponentProperties, PropertyChange } from '../../../shared/component-properties';
+import { toRecord } from '../../../shared/record';
+import type { Result } from '../../../shared/result';
 
 export async function readComponentProperties(
   projectPath: string,

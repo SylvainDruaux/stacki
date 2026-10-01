@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { PROPERTY_LIMITS } from '../../shared/component-properties';
-import { literalOptions } from '../../shared/property-options';
-import Dropdown from '../ui/Dropdown';
-import type { DropdownOption } from '../ui/Dropdown';
+import { PROPERTY_LIMITS } from '../../../shared/component-properties';
+import { literalOptions } from '../../../shared/property-options';
+import Dropdown from '../../ui/Dropdown';
+import type { DropdownOption } from '../../ui/Dropdown';
 import {
   BracesIcon,
   CalendarIcon,
@@ -20,7 +20,7 @@ import {
   SparkleIcon,
   TagIcon,
   TextIcon,
-} from '../ui/Icons';
+} from '../../ui/Icons';
 
 const UNION_TYPE = '"Option 1" | "Option 2"';
 // These are authored type expressions, not types used to bypass the app's own checking.

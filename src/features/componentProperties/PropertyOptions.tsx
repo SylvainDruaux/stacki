@@ -1,11 +1,11 @@
 import { useRef } from 'react';
-import { assert } from '../../shared/assert';
-import { PROPERTY_LIMITS } from '../../shared/component-properties';
-import type { PropertyOptionRename } from '../../shared/component-properties';
-import { arrayItems, arrayText, moveItem } from '../arrayValue';
-import { literalOptions } from '../../shared/property-options';
-import ListField from './ListField';
-import type { ListFieldChange } from './ListField';
+import { assert } from '../../../shared/assert';
+import { PROPERTY_LIMITS } from '../../../shared/component-properties';
+import type { PropertyOptionRename } from '../../../shared/component-properties';
+import { arrayItems, arrayText, moveItem } from '../../arrayValue';
+import { literalOptions } from '../../../shared/property-options';
+import ListField from '../../panels/ListField';
+import type { ListFieldChange } from '../../panels/ListField';
 
 export type PropertyOptionChange =
   | {

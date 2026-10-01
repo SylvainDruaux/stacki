@@ -1,5 +1,5 @@
-import type { ComponentProperty } from '../../shared/component-properties';
-import { HelpCircleIcon } from '../ui/Icons';
+import type { ComponentProperty } from '../../../shared/component-properties';
+import { HelpCircleIcon } from '../../ui/Icons';
 
 // Declaration locations are metadata, not runtime value bindings.
 export function PropertyDeclarationInfo({ property }: { readonly property: ComponentProperty }) {

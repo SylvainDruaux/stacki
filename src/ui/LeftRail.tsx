@@ -1,4 +1,4 @@
-import { PropertiesIcon } from './PropertiesIcon';
+import { PropertiesIcon } from '../features/componentProperties/PropertiesIcon';
 import type { MouseEvent } from 'react';
 import { useEffect, useRef, useState } from 'react';
 import {

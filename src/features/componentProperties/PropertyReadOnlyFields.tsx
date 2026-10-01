@@ -1,4 +1,4 @@
-import type { ComponentProperty } from '../../shared/component-properties';
+import type { ComponentProperty } from '../../../shared/component-properties';
 
 export default function PropertyReadOnlyFields({
   property,

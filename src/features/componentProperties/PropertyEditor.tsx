@@ -1,21 +1,21 @@
 import PropertyReadOnlyFields from './PropertyReadOnlyFields';
 import { PropertyConditions, PropertyDeclarationInfo } from './PropertyDeclarationInfo';
-import { TrashIcon } from '../ui/Icons';
+import { TrashIcon } from '../../ui/Icons';
 import { PropertyOptions } from './PropertyOptions';
 import type { PropertyOptionChange } from './PropertyOptions';
 import { PropertyType } from './PropertyType';
 import { PropertyDefault, propertyDefaultText } from './PropertyDefault';
-import { literalOptions } from '../../shared/property-options';
+import { literalOptions } from '../../../shared/property-options';
 export { literalOptions };
 import { useRef, useState } from 'react';
-import useDismiss from '../ui/useDismiss';
-import { assert } from '../../shared/assert';
+import useDismiss from '../../ui/useDismiss';
+import { assert } from '../../../shared/assert';
 import type {
   ComponentProperty,
   PropertyChange,
   PropertyOptionRename,
-} from '../../shared/component-properties';
-import { PROPERTY_LIMITS } from '../../shared/component-properties';
+} from '../../../shared/component-properties';
+import { PROPERTY_LIMITS } from '../../../shared/component-properties';
 
 interface PropertyEditorProps {
   readonly property: ComponentProperty;

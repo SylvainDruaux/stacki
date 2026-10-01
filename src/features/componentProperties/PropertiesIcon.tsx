@@ -1,4 +1,4 @@
-import type { IconProps } from './Icons';
+import type { IconProps } from '../../ui/Icons';
 
 export function PropertiesIcon({ size = 24 }: IconProps) {
   return (
