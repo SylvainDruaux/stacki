@@ -565,6 +565,74 @@
         ["electron/main.validation.ts", "electron/app/mainValidation.ts"],
         ["electron/windowBounds.ts", "electron/app/windowBounds.ts"]
       ]
+    },
+    {
+      "step": "shared-core",
+      "moves": [
+        ["shared/assert.ts", "shared/core/assert.ts"],
+        ["shared/result.ts", "shared/core/result.ts"],
+        ["shared/brand.ts", "shared/core/brand.ts"],
+        ["shared/record.ts", "shared/core/record.ts"],
+        ["shared/boundary.ts", "shared/core/boundary.ts"],
+        ["shared/limits.ts", "shared/core/limits.ts"],
+        ["shared/span.ts", "shared/core/span.ts"]
+      ]
+    },
+    {
+      "step": "shared-page",
+      "moves": [
+        ["shared/page-node.ts", "shared/page/pageNode.ts"],
+        ["shared/frontmatter.ts", "shared/page/frontmatter.ts"],
+        ["shared/source-projection.ts", "shared/page/sourceProjection.ts"],
+        ["shared/snapshot.ts", "shared/page/snapshot.ts"],
+        ["shared/ref.ts", "shared/page/ref.ts"],
+        ["shared/capability.ts", "shared/page/capability.ts"],
+        ["shared/htmlText.ts", "shared/page/htmlText.ts"],
+        ["shared/preview-token.ts", "shared/page/previewToken.ts"],
+        ["electron/frontmatter.ts", "shared/page/frontmatterSource.ts"]
+      ]
+    },
+    {
+      "step": "shared-engine",
+      "moves": [
+        ["shared/intent.ts", "shared/engine/intent.ts"],
+        ["shared/edit-request.ts", "shared/engine/editRequest.ts"],
+        ["shared/planner.ts", "shared/engine/planner.ts"],
+        ["shared/planSupport.ts", "shared/engine/planSupport.ts"],
+        ["shared/planText.ts", "shared/engine/planText.ts"],
+        ["shared/planTree.ts", "shared/engine/planTree.ts"],
+        ["shared/planMarkdown.ts", "shared/engine/planMarkdown.ts"],
+        ["shared/markdownLayout.ts", "shared/engine/markdownLayout.ts"],
+        ["shared/loopScope.ts", "shared/engine/loopScope.ts"],
+        ["shared/inlineStyle.ts", "shared/engine/inlineStyle.ts"],
+        ["shared/rebase.ts", "shared/engine/rebase.ts"],
+        ["shared/splice.ts", "shared/engine/splice.ts"],
+        ["shared/mapSpan.ts", "shared/engine/mapSpan.ts"],
+        ["shared/diff.ts", "shared/engine/diff.ts"],
+        ["shared/byteSearch.ts", "shared/engine/byteSearch.ts"],
+        ["shared/documentActor.ts", "shared/engine/documentActor.ts"],
+        ["shared/projection-patch.ts", "shared/engine/projectionPatch.ts"],
+        ["shared/code-patch.ts", "shared/engine/codePatch.ts"]
+      ]
+    },
+    {
+      "step": "shared-properties",
+      "moves": [
+        ["shared/component-properties.ts", "shared/properties/propertyEditing.ts"],
+        ["shared/property-options.ts", "shared/properties/propertyOptions.ts"],
+        ["shared/prop-schema.ts", "shared/properties/propSchema.ts"],
+        ["shared/scan.ts", "shared/properties/projectScan.ts"]
+      ]
+    },
+    {
+      "step": "shared-ipc",
+      "moves": [
+        ["shared/ipc.ts", "shared/ipc/ipcContract.ts"],
+        ["shared/ipc-payloads.ts", "shared/ipc/ipcPayloads.ts"],
+        ["shared/ipc-results.ts", "shared/ipc/ipcResults.ts"],
+        ["shared/preload-api.ts", "shared/ipc/preloadApi.ts"],
+        ["shared/page-save.ts", "shared/ipc/pageSave.ts"]
+      ]
     }
   ]
 }
