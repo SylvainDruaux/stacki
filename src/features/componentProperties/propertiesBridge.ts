@@ -1,4 +1,4 @@
-import { parseIpcPayload } from '../../../shared/ipc-payloads';
+import { parseIpcPayload } from '../../../shared/ipc/ipcPayloads';
 import {
   parseComponentProperties,
   parsePropertiesResult,

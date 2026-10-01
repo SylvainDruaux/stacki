@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { ElementImageIcon } from './Icons';
 import { listAssetEntries, onAssetEntriesChanged } from '../ipc/assetBridge';
-import type { WireAssetEntry } from '../../shared/ipc-results';
+import type { WireAssetEntry } from '../../shared/ipc/ipcResults';
 import type { AssetRequest } from './assetPick';
 import type { AssetDimensions } from './AssetThumb';
 import AssetThumb from './AssetThumb';

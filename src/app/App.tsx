@@ -6,7 +6,7 @@ import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useSta
 import type { SetStateAction } from 'react';
 import type { Attr, ImportDecl, PageModel, PageNode, PairedNode } from '../../shared/page/pageNode';
 import type { ScanComponent, ScanPage, ScanResult } from '../../shared/properties/projectScan';
-import type { WireCommitInfo, WireInjectedRoute } from '../../shared/ipc-results';
+import type { WireCommitInfo, WireInjectedRoute } from '../../shared/ipc/ipcResults';
 import WelcomeScreen from '../features/welcome/WelcomeScreen';
 import PagesPanel from '../features/pages/PagesPanel';
 import PalettePanel from '../features/palette/PalettePanel';
@@ -107,7 +107,7 @@ import {
 import SaveConflictNotice from './SaveConflictNotice';
 import CapabilityNotice from './CapabilityNotice';
 import { nodeCapability } from '../editor/nodeCapability';
-import type { PageEdited } from '../../shared/page-save';
+import type { PageEdited } from '../../shared/ipc/pageSave';
 import type { Digest, NodeId } from '../../shared/core/brand';
 import { ancestorChain, createTreeIndex, nodeAtPath, pathOfNode } from '../editor/editorTree';
 import { readFrontmatter, writeFrontmatter } from '../../shared/page/frontmatterSource';

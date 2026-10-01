@@ -1,4 +1,4 @@
-// Goal: the small result unions in shared/ipc.ts — a symbol read, a resolved
+// Goal: the small result unions in shared/ipc/ipcContract.ts — a symbol read, a resolved
 // path, a text reply and a bare ok — accept exactly the shapes main returns and
 // refuse everything else, including values past the wire bounds.
 // Methodology: one known-good value per variant must round-trip unchanged; each
@@ -11,7 +11,7 @@ import {
   parseResolvePathResult,
   parseSymbolReadResult,
   parseTextResult,
-} from '#dist/shared/ipc.js';
+} from '#dist/shared/ipc/ipcContract.js';
 import { BOUNDARY_LIMITS } from '#dist/shared/core/boundary.js';
 
 // Null as a boundary receives it, parsed from JSON: inputs may hold it; our values never do.

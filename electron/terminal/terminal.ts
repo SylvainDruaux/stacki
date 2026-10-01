@@ -7,9 +7,9 @@ import fs from 'node:fs';
 import { Buffer } from 'node:buffer';
 import type { PseudoTerminal, SpawnOptions } from 'node-pty';
 
-import { parseTerminalAck, parseTerminalInput } from '../../shared/ipc-payloads';
-import type { IpcPayloads } from '../../shared/ipc-payloads';
-import type { IpcResults } from '../../shared/ipc-results';
+import { parseTerminalAck, parseTerminalInput } from '../../shared/ipc/ipcPayloads';
+import type { IpcPayloads } from '../../shared/ipc/ipcPayloads';
+import type { IpcResults } from '../../shared/ipc/ipcResults';
 import { toRecord } from '../../shared/core/record';
 import {
   isPathWithin,

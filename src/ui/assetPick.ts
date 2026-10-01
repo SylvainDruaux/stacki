@@ -1,4 +1,4 @@
-import type { WireAssetEntry } from '../../shared/ipc-results';
+import type { WireAssetEntry } from '../../shared/ipc/ipcResults';
 
 // "Choose an asset" requests, from a field to the Assets panel.
 //

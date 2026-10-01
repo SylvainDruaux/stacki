@@ -185,7 +185,7 @@ now the authoritative description:
 - `shared/properties/propSchema.ts` — the prop-field model the props panel generates
   from, including `readonly` as a value shape (a `const`-initialized string
   is an exact value, not a default).
-- `shared/properties/projectScan.ts`, `shared/ipc.ts` — the project scan shape and the typed
+- `shared/properties/projectScan.ts`, `shared/ipc/ipcContract.ts` — the project scan shape and the typed
   IPC contract (`IpcContract`, per-channel request/response pairs, the
   `AvbBridge` surface).
 - `shared/core/limits.ts` — every runtime bound (parser depth/size, component

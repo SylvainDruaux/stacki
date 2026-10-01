@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import type { IpcResults, WireGitInfo } from '../../../shared/ipc-results';
+import type { IpcResults, WireGitInfo } from '../../../shared/ipc/ipcResults';
 import type { Result } from '../../../shared/core/result';
 import { assert } from '../../../shared/core/assert';
 import { cleanError } from '../../lib/cleanError';

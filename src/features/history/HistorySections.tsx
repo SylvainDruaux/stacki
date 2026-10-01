@@ -1,5 +1,5 @@
 import React from 'react';
-import type { WireWorktreeInfo } from '../../../shared/ipc-results';
+import type { WireWorktreeInfo } from '../../../shared/ipc/ipcResults';
 import type { HistoryFile } from './historyBridge';
 import BranchActions from '../git/BranchActions';
 import FileBrowser from '../git/FileBrowser';

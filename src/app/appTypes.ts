@@ -2,7 +2,7 @@
 // what the shell keeps about it. A page's state is src/editor/pageState.ts.
 import type { CSSProperties } from 'react';
 import type { Data } from '../../shared/core/boundary';
-import type { IpcResults, WireGitInfo, WireInjectedRoute } from '../../shared/ipc-results';
+import type { IpcResults, WireGitInfo, WireInjectedRoute } from '../../shared/ipc/ipcResults';
 import type { ScanResult } from '../../shared/properties/projectScan';
 import type { AssetRequest } from '../ui/assetPick';
 import type { CoalescedRun } from '../lib/coalescedRun';

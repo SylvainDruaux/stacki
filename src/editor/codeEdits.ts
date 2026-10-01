@@ -22,7 +22,7 @@ import {
   type RejectionReason,
   type SourceEdit,
 } from '../../shared/engine/intent';
-import type { PageDiskRead, PageEditError, PageEdited } from '../../shared/page-save';
+import type { PageDiskRead, PageEditError, PageEdited } from '../../shared/ipc/pageSave';
 import type { Result } from '../../shared/core/result';
 import type { CodeBaseline, EditDrafts } from './pageEdits';
 

@@ -1,7 +1,7 @@
 import type { Result } from '../../../shared/core/result';
 import type { PublishRequest } from './PublishModal';
 import { assert } from '../../../shared/core/assert';
-import { parseIpcPayload } from '../../../shared/ipc-payloads';
+import { parseIpcPayload } from '../../../shared/ipc/ipcPayloads';
 import { commitGitChanges, createGitHubRepository, readGitInfo } from './gitChipBridge';
 
 // The owner flushes editor writes before this workflow reads the working tree.

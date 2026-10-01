@@ -1,5 +1,5 @@
 import React from 'react';
-import type { WireGitInfo } from '../../../shared/ipc-results';
+import type { WireGitInfo } from '../../../shared/ipc/ipcResults';
 import { branchNameError, sanitizeBranchName } from './branchName';
 import BranchActions from './BranchActions';
 import FileBrowser from './FileBrowser';

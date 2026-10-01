@@ -1,4 +1,4 @@
-import type { PreloadBridge } from '../../shared/preload-api';
+import type { PreloadBridge } from '../../shared/ipc/preloadApi';
 // The renderer's typed face of window.avb. Raw IPC results are unknown; every
 // call through here is parsed by the contract layer (shared/) before any
 // renderer code sees it. A contract violation throws — a malformed payload is
@@ -11,7 +11,7 @@ import type { PreloadBridge } from '../../shared/preload-api';
 import { toProjectPath, toFilePath } from '../../shared/core/brand';
 import { parseScanResult, type ScanResult } from '../../shared/properties/projectScan';
 import { parsePageReadResult, type ParsePageResult } from '../../shared/page/pageNode';
-import { parsePageDiskRead, type PageDiskRead } from '../../shared/page-save';
+import { parsePageDiskRead, type PageDiskRead } from '../../shared/ipc/pageSave';
 import {
   parseSymbolReadResult,
   parseResolvePathResult,
@@ -19,7 +19,7 @@ import {
   parseOkResult,
   type SymbolReadResult,
   type ResolvePathResult,
-} from '../../shared/ipc';
+} from '../../shared/ipc/ipcContract';
 
 // Raw results stay unknown. Renderer boundary modules parse them before use.
 declare global {

@@ -1,5 +1,5 @@
-import type { PreloadBridge } from '../../shared/preload-api';
-import type { IpcChannel, IpcPayloads } from '../../shared/ipc-payloads';
+import type { PreloadBridge } from '../../shared/ipc/preloadApi';
+import type { IpcChannel, IpcPayloads } from '../../shared/ipc/ipcPayloads';
 import { contextBridge, ipcRenderer, webUtils } from 'electron';
 
 // The boxes this file measures and the shapes it reports, shared by the

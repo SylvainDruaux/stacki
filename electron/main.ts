@@ -47,8 +47,8 @@ import type {
 import type { ChildProcess, ExecFileOptions } from 'child_process';
 import { toRecord, toArray } from '../shared/core/record';
 import { assert } from '../shared/core/assert';
-import type { IpcPayloads } from '../shared/ipc-payloads';
-import type { IpcResults, WirePageEditError, WirePageWriteFailure } from '../shared/ipc-results';
+import type { IpcPayloads } from '../shared/ipc/ipcPayloads';
+import type { IpcResults, WirePageEditError, WirePageWriteFailure } from '../shared/ipc/ipcResults';
 import { describeRejection, type RejectionReason } from '../shared/engine/intent';
 import { decodeUtf8, encodeUtf8 } from '../shared/core/span';
 import type { Digest } from '../shared/core/brand';

@@ -27,7 +27,7 @@ import {
   parsePageDiskRead,
   parsePageEditResult,
   type PageDiskRead,
-} from '#dist/shared/page-save.js';
+} from '#dist/shared/ipc/pageSave.js';
 
 // Null as a boundary receives it, parsed from JSON: inputs may hold it; our values never do.
 const jsonNull: unknown = JSON.parse('null');

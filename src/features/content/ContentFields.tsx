@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import type { Data, DataRecord } from '../../../shared/core/boundary';
 import { data } from '../../../shared/core/boundary';
-import type { WireValidationIssue } from '../../../shared/ipc-results';
+import type { WireValidationIssue } from '../../../shared/ipc/ipcResults';
 import { assert } from '../../../shared/core/assert';
 import { labelize, memberFor, fieldIssue, hintFor } from './contentSchema';
 import type { FieldDescriptor } from './contentSchema';

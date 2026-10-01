@@ -1,6 +1,6 @@
 // The preload surface shares payload types with main registration. Results remain
 // unknown until a renderer boundary parses them; this file has no runtime imports.
-import type { IpcPayloads } from './ipc-payloads';
+import type { IpcPayloads } from './ipcPayloads';
 
 interface InvokeChannels {
   readonly openProjectDialog: 'project:openDialog';

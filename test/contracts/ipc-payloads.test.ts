@@ -9,9 +9,9 @@ import {
   CLIPBOARD_BYTES_MAX,
   parseTerminalAck,
   parseTerminalInput,
-} from '#dist/shared/ipc-payloads.js';
+} from '#dist/shared/ipc/ipcPayloads.js';
 import { BOUNDARY_LIMITS, data, object, text, optional } from '#dist/shared/core/boundary.js';
-import type { IpcContract } from '#dist/shared/ipc.js';
+import type { IpcContract } from '#dist/shared/ipc/ipcContract.js';
 
 // Null as a boundary receives it, parsed from JSON: inputs may hold it; our values never do.
 const jsonNull: unknown = JSON.parse('null');

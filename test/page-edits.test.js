@@ -17,7 +17,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const esbuild = require('esbuild');
-const { parsePageDiskRead, parsePageEditResult } = require('#dist/shared/page-save.js');
+const { parsePageDiskRead, parsePageEditResult } = require('#dist/shared/ipc/pageSave.js');
 const { repoPath } = require('./helpers/sources.js');
 
 const buildDirectory = repoPath('node_modules/.stacki-test/page-edits');

@@ -1,9 +1,9 @@
 // Electron passes untyped structured-clone data. Parse before side effects and
 // check each producer's result at compile time without changing wire errors.
 import type { IpcMainInvokeEvent } from 'electron';
-import { parseIpcPayload } from '../../shared/ipc-payloads';
-import type { IpcChannel, IpcPayloads } from '../../shared/ipc-payloads';
-import type { IpcResults } from '../../shared/ipc-results';
+import { parseIpcPayload } from '../../shared/ipc/ipcPayloads';
+import type { IpcChannel, IpcPayloads } from '../../shared/ipc/ipcPayloads';
+import type { IpcResults } from '../../shared/ipc/ipcResults';
 
 export function createIpcRegistrar(ipcMain: Pick<Electron.IpcMain, 'handle'>) {
   return function handle<K extends IpcChannel>(

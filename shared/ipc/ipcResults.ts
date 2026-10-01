@@ -1,9 +1,9 @@
-import type { ComponentProperties } from './properties/propertyEditing';
-import type { PreviewVerdict } from './page/previewToken';
-import type { Result } from './core/result';
+import type { ComponentProperties } from '../properties/propertyEditing';
+import type { PreviewVerdict } from '../page/previewToken';
+import type { Result } from '../core/result';
 // Invoke results mirror the handlers' wire shapes; absence is `undefined` (AGENTS.md §6).
 // Main's typed registrar checks every handler against this inventory.
-import type { Data } from './core/boundary';
+import type { Data } from '../core/boundary';
 
 export type WirePageRead =
   | { readonly source: string; readonly editable: true; readonly model: WireMarkdownModel }

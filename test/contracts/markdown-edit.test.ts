@@ -23,7 +23,7 @@ import {
   parsePageDiskRead,
   parsePageEditResult,
   type PageDiskRead,
-} from '#dist/shared/page-save.js';
+} from '#dist/shared/ipc/pageSave.js';
 import { mainHarness } from '../helpers/mainHarness.ts';
 
 const sha256 = (bytes: string | Buffer): string => createHash('sha256').update(bytes).digest('hex');

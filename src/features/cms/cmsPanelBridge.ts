@@ -10,7 +10,7 @@ import {
   record,
   text,
 } from '../../../shared/core/boundary';
-import { parseIpcPayload } from '../../../shared/ipc-payloads';
+import { parseIpcPayload } from '../../../shared/ipc/ipcPayloads';
 import { cleanError } from '../../lib/cleanError';
 
 export interface CmsPanelFile {

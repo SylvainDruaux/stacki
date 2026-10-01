@@ -9,7 +9,7 @@ import * as path from 'node:path';
 import * as net from 'node:net';
 import { createHash } from 'node:crypto';
 import { mainHarness } from '../helpers/mainHarness.ts';
-import { IPC_PAYLOADS } from '#dist/shared/ipc-payloads.js';
+import { IPC_PAYLOADS } from '#dist/shared/ipc/ipcPayloads.js';
 import { toRecord } from '#dist/shared/core/record.js';
 import { parseMarkdownPage } from '#dist/electron/parse/markdownParser.js';
 import { parsePageModel } from '#dist/shared/page/pageNode.js';

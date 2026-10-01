@@ -2,7 +2,7 @@ import type {
   WireMergeClash,
   WireConflictPart,
   WireMergeOutcome,
-} from '../../../shared/ipc-results';
+} from '../../../shared/ipc/ipcResults';
 import { assert } from '../../../shared/core/assert';
 import { BOUNDARY_LIMITS } from '../../../shared/core/boundary';
 

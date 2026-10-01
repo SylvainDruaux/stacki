@@ -5,7 +5,7 @@ import type {
   VariableFile,
   VariableSelection,
 } from './variablesBridge';
-import type { WireColumn } from '../../../shared/ipc-results';
+import type { WireColumn } from '../../../shared/ipc/ipcResults';
 import type { VariableSlot, VariableRename } from './variableRows';
 import { assert } from '../../../shared/core/assert';
 import { LIMITS } from '../../../shared/core/limits';

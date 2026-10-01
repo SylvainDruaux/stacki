@@ -1,4 +1,4 @@
-import type { IpcResults } from '../../../shared/ipc-results';
+import type { IpcResults } from '../../../shared/ipc/ipcResults';
 import type { Parser } from '../../../shared/core/boundary';
 import {
   boolean,
@@ -9,7 +9,7 @@ import {
   record,
   text,
 } from '../../../shared/core/boundary';
-import { parseIpcPayload } from '../../../shared/ipc-payloads';
+import { parseIpcPayload } from '../../../shared/ipc/ipcPayloads';
 import type { Result } from '../../../shared/core/result';
 import { cleanError } from '../../lib/cleanError';
 

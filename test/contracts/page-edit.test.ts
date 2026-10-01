@@ -23,7 +23,7 @@ import {
   parsePageDiskRead,
   parsePageEditResult,
   type PageDiskRead,
-} from '#dist/shared/page-save.js';
+} from '#dist/shared/ipc/pageSave.js';
 import { parsePageNode, type PageNode } from '#dist/shared/page/pageNode.js';
 import { toUtf16Span } from '#dist/shared/core/span.js';
 

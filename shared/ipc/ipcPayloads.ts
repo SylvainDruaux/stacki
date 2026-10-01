@@ -1,6 +1,6 @@
-import { parsePropertyChange, propertySource } from './properties/propertyEditing';
-import { parseEdit, parseEditRequest } from './engine/editRequest';
-import { parsePreviewRender } from './page/previewToken';
+import { parsePropertyChange, propertySource } from '../properties/propertyEditing';
+import { parseEdit, parseEditRequest } from '../engine/editRequest';
+import { parsePreviewRender } from '../page/previewToken';
 // Complete invoke-channel inventory. Every main-process listener receives the
 // parsed shape below; payload field names retain the existing renderer protocol.
 import {
@@ -15,9 +15,9 @@ import {
   dictionary,
   data,
   digest,
-} from './core/boundary';
-import type { Parsed } from './core/boundary';
-import { toArray } from './core/record';
+} from '../core/boundary';
+import type { Parsed } from '../core/boundary';
+import { toArray } from '../core/record';
 
 const nothing = (input: unknown): undefined => {
   if (input !== undefined) {

@@ -1,4 +1,4 @@
-import type { IpcResults, WireWorktreeInfo } from '../../../shared/ipc-results';
+import type { IpcResults, WireWorktreeInfo } from '../../../shared/ipc/ipcResults';
 import type { HistoryCommit, HistoryCommitFile, HistoryFile } from './historyBridge';
 
 export type HistoryGitInfo = IpcResults['git:info'];

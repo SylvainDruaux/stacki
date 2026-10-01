@@ -5,7 +5,7 @@ import type {
   WireInjectedRoute,
   WireRouteParams,
   WireUsageFile,
-} from '../../shared/ipc-results';
+} from '../../shared/ipc/ipcResults';
 import {
   boolean,
   count,
@@ -17,10 +17,14 @@ import {
   record,
   text,
 } from '../../shared/core/boundary';
-import { parseIpcPayload } from '../../shared/ipc-payloads';
-import { parseOkResult } from '../../shared/ipc';
+import { parseIpcPayload } from '../../shared/ipc/ipcPayloads';
+import { parseOkResult } from '../../shared/ipc/ipcContract';
 import type { EditRequest } from '../../shared/engine/editRequest';
-import { parsePageEditResult, type PageEditError, type PageEdited } from '../../shared/page-save';
+import {
+  parsePageEditResult,
+  type PageEditError,
+  type PageEdited,
+} from '../../shared/ipc/pageSave';
 import {
   parsePreviewVerdict,
   type PreviewRender,

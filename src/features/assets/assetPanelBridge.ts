@@ -1,6 +1,6 @@
 import type { Parser } from '../../../shared/core/boundary';
 import type { Result } from '../../../shared/core/result';
-import type { WireAssetEntry } from '../../../shared/ipc-results';
+import type { WireAssetEntry } from '../../../shared/ipc/ipcResults';
 import {
   BOUNDARY_LIMITS,
   boolean,
@@ -10,7 +10,7 @@ import {
   record,
   text,
 } from '../../../shared/core/boundary';
-import { parseIpcPayload } from '../../../shared/ipc-payloads';
+import { parseIpcPayload } from '../../../shared/ipc/ipcPayloads';
 import { toProjectPath } from '../../../shared/core/brand';
 import { cleanError } from '../../lib/cleanError';
 import { parseAssetEntry } from '../../ipc/assetBridge';

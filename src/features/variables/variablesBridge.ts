@@ -1,6 +1,6 @@
 import type { Parser } from '../../../shared/core/boundary';
 import type { Result } from '../../../shared/core/result';
-import type { WireCell, WireColumn } from '../../../shared/ipc-results';
+import type { WireCell, WireColumn } from '../../../shared/ipc/ipcResults';
 import {
   boolean,
   count,

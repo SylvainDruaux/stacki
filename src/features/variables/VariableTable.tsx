@@ -1,6 +1,6 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { VariableBlock, VariableGroup } from './variablesBridge';
-import type { WireColumn } from '../../../shared/ipc-results';
+import type { WireColumn } from '../../../shared/ipc/ipcResults';
 import type { VariableCellProps } from './VariableCell';
 import type { VariableSlot, VariableRename, SlotOffset } from './variableRows';
 import { assert } from '../../../shared/core/assert';

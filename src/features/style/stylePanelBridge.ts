@@ -1,6 +1,6 @@
 import type { Result } from '../../../shared/core/result';
 import { count, list, object, pathText, text } from '../../../shared/core/boundary';
-import { parseIpcPayload } from '../../../shared/ipc-payloads';
+import { parseIpcPayload } from '../../../shared/ipc/ipcPayloads';
 import { cleanError } from '../../lib/cleanError';
 
 const styleFile = object({ rel: pathText, name: text, path: pathText, size: count });

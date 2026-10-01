@@ -12,12 +12,12 @@ import {
   record,
   text,
 } from '../../../shared/core/boundary';
-import type { IpcPayloads } from '../../../shared/ipc-payloads';
+import type { IpcPayloads } from '../../../shared/ipc/ipcPayloads';
 import type {
   WireMergeOutcome,
   WireDeleteOutcome,
   WireConflictPart,
-} from '../../../shared/ipc-results';
+} from '../../../shared/ipc/ipcResults';
 
 const mergeFile = object({ path: pathText });
 const commonPart = object({ text });

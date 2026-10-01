@@ -30,7 +30,7 @@ import type { Digest } from '../../shared/core/brand';
 import type { Edit, EditRequest, NodeRef } from '../../shared/engine/editRequest';
 import type { RejectionReason, SourceEdit } from '../../shared/engine/intent';
 import { LIMITS } from '../../shared/core/limits';
-import type { PageEditError, PageEdited } from '../../shared/page-save';
+import type { PageEditError, PageEdited } from '../../shared/ipc/pageSave';
 import type { PageModel, PageNode } from '../../shared/page/pageNode';
 import type { Result } from '../../shared/core/result';
 import type { EditorModel } from './pageView';

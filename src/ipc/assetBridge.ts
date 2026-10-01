@@ -1,5 +1,5 @@
-import { parseResolvePathResult } from '../../shared/ipc';
-import type { ResolvePathResult } from '../../shared/ipc';
+import { parseResolvePathResult } from '../../shared/ipc/ipcContract';
+import type { ResolvePathResult } from '../../shared/ipc/ipcContract';
 import { toProjectPath, toFilePath } from '../../shared/core/brand';
 // Asset cards only consume the entry list. Parse every entry before a path or
 // dimension reaches a DOM attribute; unrelated result metadata stays opaque.
@@ -13,7 +13,7 @@ import {
   record,
   text,
 } from '../../shared/core/boundary';
-import type { WireAssetEntry } from '../../shared/ipc-results';
+import type { WireAssetEntry } from '../../shared/ipc/ipcResults';
 import type { Result } from '../../shared/core/result';
 
 const entryBase = object({ rel: pathText, name: text, parent: pathText, root: text });

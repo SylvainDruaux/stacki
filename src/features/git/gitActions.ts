@@ -1,4 +1,4 @@
-import type { WireMergeOutcome } from '../../../shared/ipc-results';
+import type { WireMergeOutcome } from '../../../shared/ipc/ipcResults';
 type Conflict = Extract<WireMergeOutcome, { readonly conflicted: true }> & {
   readonly deleteAfter: boolean;
 };

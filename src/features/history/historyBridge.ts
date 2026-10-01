@@ -3,10 +3,10 @@ import type {
   WireCommitInfo,
   WireFileKind,
   WireWorktreeInfo,
-} from '../../../shared/ipc-results';
+} from '../../../shared/ipc/ipcResults';
 import type { Parser } from '../../../shared/core/boundary';
 import { boolean, list, optional, pathText, record, text } from '../../../shared/core/boundary';
-import { parseIpcPayload } from '../../../shared/ipc-payloads';
+import { parseIpcPayload } from '../../../shared/ipc/ipcPayloads';
 import type { Result } from '../../../shared/core/result';
 import { cleanError } from '../../lib/cleanError';
 

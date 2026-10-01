@@ -43,8 +43,8 @@ effect builds a new model, and the file changes only through intents (step 9;
 
 ## IPC
 
-`shared/ipc-payloads.ts` is the channel-to-payload inventory and
-`shared/ipc-results.ts` is the channel-to-result inventory. `shared/preload-api.ts`
+`shared/ipc/ipcPayloads.ts` is the channel-to-payload inventory and
+`shared/ipc/ipcResults.ts` is the channel-to-result inventory. `shared/ipc/preloadApi.ts`
 maps the public preload method names to those channels. A new or changed channel
 must update all three files and add known-good and malformed cases under
 `test/contracts/` or the renderer boundary's focused test.
@@ -72,7 +72,7 @@ the boundary. Do not catch that assertion and turn it into an operating result.
 
 ## Page saves
 
-`shared/page-save.ts` is the save contract (plan §11 step 0; since step 10
+`shared/ipc/pageSave.ts` is the save contract (plan §11 step 0; since step 10
 every page save is an edit). `page:read` results carry `checksum`: the SHA-256
 of the exact bytes read, as 64 lowercase hex characters (`Digest` in
 `shared/core/brand.ts`, built only by `toDigest`). A page changes only through
@@ -254,7 +254,7 @@ and UTF-16 range of its parse — against that parse's checksum. Main turns it
 into an intent (`electron/documents/editRequests.ts`: references checked against its own
 projection, ranges converted to bytes, new nodes and the frontmatter block
 printed, loop-rename sites found) and the page's actor plans and writes
-splices. The reply (`shared/page-save.ts`, `parsePageEditResult`) is the page
+splices. The reply (`shared/ipc/pageSave.ts`, `parsePageEditResult`) is the page
 as written and the inverse hunks Undo sends back as a `revert` request; a
 refusal is `rejected` with the actor's reason and the checksum on disk. An edit
 authored before the actor's own recent commits is rebased exactly

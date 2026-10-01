@@ -14,7 +14,7 @@ import { LIMITS } from '../../shared/core/limits';
 import type { Digest } from '../../shared/core/brand';
 import type { EditRequest } from '../../shared/engine/editRequest';
 import { describeRejection, type RejectionReason } from '../../shared/engine/intent';
-import type { PageDiskRead, PageEditError, PageEdited } from '../../shared/page-save';
+import type { PageDiskRead, PageEditError, PageEdited } from '../../shared/ipc/pageSave';
 import type { Result } from '../../shared/core/result';
 import {
   carriedParse,

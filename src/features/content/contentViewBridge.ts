@@ -6,7 +6,7 @@ import type {
   WireMove,
   WirePointer,
   WireValidationIssue,
-} from '../../../shared/ipc-results';
+} from '../../../shared/ipc/ipcResults';
 import type { Parser } from '../../../shared/core/boundary';
 import type { Data } from '../../../shared/core/boundary';
 import type { Result } from '../../../shared/core/result';
@@ -21,7 +21,7 @@ import {
   record,
   text,
 } from '../../../shared/core/boundary';
-import { parseIpcPayload } from '../../../shared/ipc-payloads';
+import { parseIpcPayload } from '../../../shared/ipc/ipcPayloads';
 import { cleanError } from '../../lib/cleanError';
 
 const locatorPart = (input: unknown): string | number =>
