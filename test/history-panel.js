@@ -29,7 +29,7 @@ const check = (what, condition, detail) => {
   fs.mkdirSync(buildDirectory, { recursive: true });
   const bundlePath = path.join(buildDirectory, 'history-panel.bundle.js');
   await esbuild.build({
-    entryPoints: [repoPath('src/panels/HistoryPanel.tsx')],
+    entryPoints: [repoPath('src/features/history/HistoryPanel.tsx')],
     outfile: bundlePath,
     bundle: true,
     format: 'cjs',

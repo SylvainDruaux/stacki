@@ -1,9 +1,9 @@
 import React from 'react';
-import type { WireWorktreeInfo } from '../../shared/ipc-results';
-import type { HistoryFile } from '../historyBridge';
-import BranchActions from '../features/git/BranchActions';
-import FileBrowser from '../features/git/FileBrowser';
-import { BranchIcon, CheckIcon, ChevronDownIcon, ChevronRightIcon } from '../ui/Icons';
+import type { WireWorktreeInfo } from '../../../shared/ipc-results';
+import type { HistoryFile } from './historyBridge';
+import BranchActions from '../git/BranchActions';
+import FileBrowser from '../git/FileBrowser';
+import { BranchIcon, CheckIcon, ChevronDownIcon, ChevronRightIcon } from '../../ui/Icons';
 import type { HistoryGitInfo } from './historyPanelTypes';
 
 export function HistorySection({

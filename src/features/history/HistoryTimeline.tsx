@@ -1,10 +1,10 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { assert } from '../../shared/assert';
-import type { HistoryCommit, HistoryCommitFile } from '../historyBridge';
-import { readHistoryLog } from '../historyBridge';
-import { commitAuthor, dayGroup, relativeTime, summarize } from '../historyModel';
-import { ChevronRightIcon, PreviewIcon } from '../ui/Icons';
-import FileStatus from '../features/git/FileStatus';
+import { assert } from '../../../shared/assert';
+import type { HistoryCommit, HistoryCommitFile } from './historyBridge';
+import { readHistoryLog } from './historyBridge';
+import { commitAuthor, dayGroup, relativeTime, summarize } from './historyModel';
+import { ChevronRightIcon, PreviewIcon } from '../../ui/Icons';
+import FileStatus from '../git/FileStatus';
 
 const HISTORY_COMMITS_MAX = 10_000;
 

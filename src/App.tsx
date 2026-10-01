@@ -39,7 +39,7 @@ import { LIMITS } from '../shared/limits';
 import { assert } from '../shared/assert';
 import PreviewPane from './panels/PreviewPane';
 import GitChip from './features/git/GitChip';
-import HistoryPanel, { relativeTime } from './panels/HistoryPanel';
+import HistoryPanel, { relativeTime } from './features/history/HistoryPanel';
 import { ConfirmHost, confirmDialog } from './ui/ConfirmDialog';
 import { mergeBranchAction, deleteBranchAction } from './features/git/gitActions';
 import LeftRail from './ui/LeftRail';
@@ -152,7 +152,11 @@ import {
   TerminalIcon,
 } from './ui/Icons';
 import type { PickedAsset } from './ui/AssetField';
-import type { HistoryCommit, HistoryCommitFile, HistoryFile } from './historyBridge';
+import type {
+  HistoryCommit,
+  HistoryCommitFile,
+  HistoryFile,
+} from './features/history/historyBridge';
 import type { InlineNode } from './ui/RichContent';
 import type { Rename, TagOption } from './panels/propNodeEditors';
 import type { FieldDefinition, PropValues } from './panels/propRules';

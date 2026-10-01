@@ -52,7 +52,7 @@ must update all three files and add known-good and malformed cases under
 Electron handlers call `parseIpcPayload` before using input. Renderer modules do
 the same before invoking preload and parse every reply before returning it to a
 component. Shared parsers cover common records; feature boundary modules such as
-`src/ipc/appBridge.ts`, `src/historyBridge.ts`, and `src/features/terminal/terminalBridge.ts` preserve
+`src/ipc/appBridge.ts`, `src/features/history/historyBridge.ts`, and `src/features/terminal/terminalBridge.ts` preserve
 only the fields their consumers use while still validating nested values and
 bounds.
 

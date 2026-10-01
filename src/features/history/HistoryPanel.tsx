@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import type { Result } from '../../shared/result';
-import { readHistoryFiles, readHistoryWorktrees } from '../historyBridge';
-export { dayGroup, relativeTime, summarize } from '../historyModel';
+import type { Result } from '../../../shared/result';
+import { readHistoryFiles, readHistoryWorktrees } from './historyBridge';
+export { dayGroup, relativeTime, summarize } from './historyModel';
 import { HistoryBranches, HistoryFiles, HistorySection, HistoryWorktrees } from './HistorySections';
 import HistoryTimeline from './HistoryTimeline';
 import type { HistoryOpen, HistoryPanelProps } from './historyPanelTypes';

@@ -3,7 +3,7 @@
 // duplicate identities, then verify transport failures remain Result values.
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const history = require('./helpers/rendererModule')('src/historyBridge.ts');
+const history = require('./helpers/rendererModule')('src/features/history/historyBridge.ts');
 
 const file = {
   status: 'M',
