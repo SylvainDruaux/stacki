@@ -2,7 +2,7 @@
 //
 //   node test/gapHover.test.js
 //
-// test/gapBands.test.js checks where the bands go; this checks that they are asked
+// test/electron/preload/gapBands.test.js checks where the bands go; this checks that they are asked
 // for at all. Hovering the field tells the canvas which spaces that number
 // holds open, the same way hovering a padding side does — and it stopped
 // working the moment the field grew a syntax-highlighted editor: that editor

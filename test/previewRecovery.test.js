@@ -317,7 +317,7 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
     check('the src watcher is still there', at !== -1);
     // `(true)` — the watcher only ever hears about changes the app did not
     // make, and saying which kind it was is what lets the canvas be told
-    // directly (see test/outsideEdit.test.js).
+    // directly (see test/electron/previewClient/outsideEdit.test.js).
     const poke = handler.indexOf('notePageMayHaveChanged(true)');
     const firstBranchReturn = handler.indexOf('sourceChangeChannel(');
     check('a change under src says the site may have changed', poke !== -1, handler.slice(0, 300));

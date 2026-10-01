@@ -35,6 +35,11 @@ const RULES = [
     message: 'a #dist import names its file with the extension: #dist/…/x.js',
   },
   {
+    // A test's own folder is not where the fixtures are once the test moves.
+    pattern: /__dirname,\s*'(?:corpus|fixtures|helpers)'/,
+    message: "a test folder from __dirname: write repoPath('test/corpus') and the like",
+  },
+  {
     pattern: /import\.meta\.dirname,\s*'\.\./,
     message: 'the repository root from import.meta.dirname: use the working directory',
   },
@@ -100,6 +105,7 @@ test('the rules catch each spelling they name', () => {
     "path.join(__dirname, '../src/Sample.tsx')",
     "'../node_modules/.stacki-test/sample.bundle.js'",
     "require('#dist/electron/sample')",
+    "path.join(__dirname, 'corpus')",
     'build.onLoad({ filter: /\\/src\\/panels\\/[^/]+$/ })',
   ];
   for (const sample of samples) {

@@ -22,7 +22,7 @@ export interface SuiteOptions {
 const QUIET_TYPELESS = ['--disable-warning=MODULE_TYPELESS_PACKAGE_JSON'];
 
 export const TEST_SUITES: Readonly<Record<string, SuiteOptions>> = {
-  'test/hoverCost.test.js': {
+  'test/electron/preload/hoverCost.test.js': {
     phase: 'alone',
     flaky: 'measures hover cost in milliseconds; a loaded machine can miss the budget',
   },
@@ -34,7 +34,7 @@ export const TEST_SUITES: Readonly<Record<string, SuiteOptions>> = {
   // and restore the old value; until that race is understood, it runs where
   // its timing assumptions hold.
   'test/selectorWell.test.js': { phase: 'alone' },
-  'test/thumbs.test.js': { phase: 'alone', runner: 'electron' },
+  'test/electron/project/thumbs.test.js': { phase: 'alone', runner: 'electron' },
   'test/viteModules.test.ts': { nodeArguments: ['--experimental-vm-modules'] },
   'test/contentFields.test.js': { nodeArguments: QUIET_TYPELESS },
   'test/fluid.test.js': { nodeArguments: QUIET_TYPELESS },

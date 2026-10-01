@@ -138,7 +138,7 @@ const STYLESHEET = `:root {
   if (typeof electronPath !== 'string') {
     console.log(
       'vars-row-height: skipped — no Electron to lay it out in ' +
-        '(see test/gapBands.test.js for the pattern)',
+        '(see test/electron/preload/gapBands.test.js for the pattern)',
     );
     return;
   }

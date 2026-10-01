@@ -1,5 +1,5 @@
 // Goal: the shipping planner's Markdown rules (plan §11 step 10), pinned where
-// the end-to-end suite (test/contracts/markdown-edit.test.ts) does not reach.
+// the end-to-end suite (test/electron/documents/markdownEdit.test.ts) does not reach.
 // A Markdown block is no tag: every tag operation refuses it. A list shares its
 // first byte with its first item, and each still resolves to itself, fresh and
 // after an outside edit above it. A block's inline text is never removed,

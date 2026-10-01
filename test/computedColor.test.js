@@ -95,7 +95,8 @@ const check = (what, condition, detail) => {
   if (typeof electronPath !== 'string') {
     console.log(
       `computed-color: ${checked} passed  ` +
-        `[needsPage; the probe needs a browser — see test/thumbs.test.js for the pattern]`,
+        '[needsPage; the probe needs a browser — see ' +
+        'test/electron/project/thumbs.test.js for the pattern]',
     );
     return;
   }

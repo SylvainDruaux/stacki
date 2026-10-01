@@ -32,7 +32,7 @@ const { parseMarkdownPage } = require('#dist/electron/parse/markdownParser.js');
 const { projectPage } = require('#dist/shared/page/sourceProjection.js');
 const { CAPABILITIES } = require('#dist/shared/page/capability.js');
 
-const corpus = path.join(__dirname, 'corpus');
+const corpus = repoPath('test/corpus');
 
 function nodesWithPaths(roots) {
   const out = [];
@@ -96,7 +96,7 @@ test('only plain editable nodes go without a notice', () => {
 test('a Markdown page gets its projection capability; an absent node has none', () => {
   // Step 10: Markdown and MDX are classified like any page — a table or an ESM
   // block is kept verbatim, everything else is editable.
-  const roundTrip = path.join(__dirname, 'fixtures', 'round-trip');
+  const roundTrip = repoPath('test/fixtures/round-trip');
   let compared = 0;
   for (const name of ['post.md', 'components.mdx']) {
     const text = fs.readFileSync(path.join(roundTrip, name), 'utf8');

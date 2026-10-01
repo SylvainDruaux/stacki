@@ -60,7 +60,7 @@ touched — reformatted markup, reordered imports, lost blank lines. That turns 
 one-prop change into a whole-file diff in their git history, and in the worst case
 changes what the page does.
 
-`roundtrip.test.js` checks five properties against every fixture in `corpus/`:
+`roundtripCorpus.test.js` checks five properties against every fixture in `corpus/`:
 
 | # | Property | Why |
 |---|---|---|

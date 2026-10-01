@@ -1,0 +1,275 @@
+// Goal: real main-process handlers honor the wire contract and preserve source.
+// Methodology: register main in a windowless VM, use isolated disk fixtures, and
+// exercise disk/network parsers plus the failure boundaries before side effects.
+import assert from 'node:assert/strict';
+import { test } from 'node:test';
+import * as fs from 'node:fs';
+import * as os from 'node:os';
+import * as path from 'node:path';
+import * as net from 'node:net';
+import { createHash } from 'node:crypto';
+import { mainHarness } from '../../helpers/mainHarness.ts';
+import { IPC_PAYLOADS } from '#dist/shared/ipc/ipcPayloads.js';
+import { toRecord } from '#dist/shared/core/record.js';
+import { parseMarkdownPage } from '#dist/electron/parse/markdownParser.js';
+import { parsePageModel } from '#dist/shared/page/pageNode.js';
+import {
+  parseContentConfig,
+  parseDynamicPaths,
+  parseSampleEntry,
+  parseSettings,
+  parseRecents,
+  parseAliases,
+  parseAstroLock,
+  parseValidationResult,
+} from '#dist/electron/app/mainValidation.js';
+import { directoryBudget, MAIN_LIMITS } from '#dist/electron/lib/mainLimits.js';
+import { LIMITS } from '#dist/shared/core/limits.js';
+
+// Null as a boundary receives it, parsed from JSON: inputs may hold it; our values never do.
+const jsonNull: unknown = JSON.parse('null');
+
+const sha256 = (text: string): string => createHash('sha256').update(text).digest('hex');
+
+function fixture() {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'stacki-main-contract-'));
+  fs.mkdirSync(path.join(root, 'src/pages'), { recursive: true });
+  fs.mkdirSync(path.join(root, 'src/data'), { recursive: true });
+  fs.mkdirSync(path.join(root, 'user'));
+  fs.writeFileSync(path.join(root, 'package.json'), '{"dependencies":{"astro":"*"}}');
+  const harness = mainHarness(path.join(root, 'user'));
+  return {
+    root,
+    ...harness,
+    dispose: () => {
+      harness.dispose();
+      fs.rmSync(root, { recursive: true, force: true });
+    },
+  };
+}
+
+test('the complete channel inventory matches real main and terminal registration', (context) => {
+  const harness = fixture();
+  context.after(harness.dispose);
+  const terminal = fs.readFileSync(path.resolve('dist/electron/terminal/terminal.js'), 'utf8');
+  const terminalChannels = [...terminal.matchAll(/ipcMain\.handle\(['"]([^'"]+)['"]/g)].map(
+    (match) => match[1],
+  );
+  // Step 8 retired page:writeRaw; step 9 added page:previewEdit; step 10
+  // retired page:write and page:serialize, the Markdown whole-model save.
+  assert.equal(harness.handlers.size, 116);
+  assert.equal(terminalChannels.length, 4);
+  assert.deepEqual(
+    [...Object.keys(IPC_PAYLOADS)].sort(),
+    [...harness.handlers.keys(), ...terminalChannels].sort(),
+  );
+  // One-way `send` listeners bypass the invoke registrar, so each must name
+  // its own parser before touching the payload.
+  const sendChannels = [...terminal.matchAll(/ipcMain\.on\(['"]([^'"]+)['"]/g)].map(
+    (match) => match[1],
+  );
+  assert.deepEqual(sendChannels, ['terminal:input', 'terminal:ack']);
+  for (const channel of sendChannels) {
+    assert.match(terminal, new RegExp(`parseSendPayload\\('${channel}'`), `${channel} is parsed`);
+  }
+});
+
+test('malformed writes fail before altering disk; valid writes still work', async (context) => {
+  const harness = fixture();
+  context.after(harness.dispose);
+  const file = path.join(harness.root, 'src/pages/index.astro');
+  fs.writeFileSync(file, '<h1>Before</h1>\n');
+  await harness.invoke('project:scan', harness.root);
+  await assert.rejects(
+    harness.invoke('src:writeText', {
+      projectPath: harness.root,
+      rel: 'src/pages/index.astro',
+      text: 42,
+    }),
+    /Expected string/,
+  );
+  const patch = {
+    tag: 'code-patch',
+    hunks: [{ span: { start: 4, end: 10 }, expected: 'Before', text: 'After' }],
+  };
+  await assert.rejects(
+    harness.invoke('page:edit', { pagePath: file, authoredChecksum: 'nope', edit: patch }),
+    /Digest: expected 64 lowercase hex characters/,
+  );
+  assert.equal(fs.readFileSync(file, 'utf8'), '<h1>Before</h1>\n');
+  const baseChecksum = sha256('<h1>Before</h1>\n');
+  const written = toRecord(
+    await harness.invoke('page:edit', {
+      pagePath: file,
+      authoredChecksum: baseChecksum,
+      edit: patch,
+    }),
+  );
+  assert.equal(fs.readFileSync(file, 'utf8'), '<h1>After</h1>\n');
+  assert.equal(written?.['source'], '<h1>After</h1>\n');
+  const result = toRecord(await harness.invoke('page:read', file));
+  assert.equal(result?.['editable'], true);
+  assert.equal(result?.['source'], '<h1>After</h1>\n');
+  const parsed = toRecord(
+    await harness.invoke('page:parse', { pagePath: file, source: '<main>Draft</main>\n' }),
+  );
+  assert.equal(parsed?.['editable'], true);
+  assert.equal(parsed?.['source'], '<main>Draft</main>\n');
+  assert.equal(
+    fs.readFileSync(file, 'utf8'),
+    '<h1>After</h1>\n',
+    'parsing a code draft has no disk side effect',
+  );
+});
+
+test('the Markdown wire model keeps source metadata and rejects corrupted fields', () => {
+  for (const source of ['# Title\n\nParagraph.\n\n', '---\r\ntitle: Title\r\n---\r\nHello\r\n']) {
+    const parsed = parseMarkdownPage(source);
+    assert.ok(parsed.editable);
+    const { model } = parsed;
+    const wire = parsePageModel(model);
+    assert.equal(wire.mdEol, model.mdEol);
+    assert.equal(wire.bodyStart, model.bodyStart);
+    assert.throws(() => parsePageModel({ ...model, mdEndsWithNewline: 'yes' }), /boolean/);
+    const blank = { id: 'n0', kind: 'text', value: 'a', mdBlanksBefore: -1 };
+    assert.throws(() => parsePageModel({ ...model, nodes: [blank] }), /nonnegative/);
+    assert.throws(() => parsePageModel({ ...model, bodyStart: -1 }), /nonnegative/);
+  }
+});
+
+test('disk parsers validate known shapes and fail on corrupt data', () => {
+  assert.deepEqual(parseSettings({ sound: true }), { sound: true });
+  assert.throws(() => parseSettings({ sound: 'yes' }), /boolean/);
+  const recent = { path: '/site', name: 'Site', openedAt: 1000 };
+  assert.deepEqual(parseRecents([recent]), [recent]);
+  assert.throws(() => parseRecents([{ ...recent, openedAt: -1 }]), /nonnegative/);
+  assert.deepEqual(parseAliases({ compilerOptions: { paths: { '@/*': ['src/*'] } } }), [
+    ['@/', ['src/']],
+  ]);
+  assert.throws(() => parseAliases({ compilerOptions: { paths: { '@/*': [12] } } }), /string/);
+  assert.deepEqual(parseAstroLock({ url: 'http://localhost:4321' }), {
+    url: 'http://localhost:4321',
+  });
+  assert.throws(() => parseAstroLock({ url: [] }), /string/);
+});
+
+test('content validation replies keep their issues and refuse corrupt or oversized ones', () => {
+  const issue = { path: ['posts', 0, 'title'], message: 'Required', code: 'invalid_type' };
+  assert.deepEqual(parseValidationResult({ issues: [issue] }), { issues: [issue] });
+  assert.deepEqual(parseValidationResult({ issues: [], unchecked: true, error: 'no schema' }), {
+    issues: [],
+    unchecked: true,
+    error: 'no schema',
+  });
+  const bad: readonly unknown[] = [
+    undefined,
+    { issues: 'none' },
+    { issues: [{ ...issue, path: [-1] }] },
+    { issues: [{ ...issue, path: [1.5] }] },
+    { issues: [{ ...issue, message: 3 }] },
+    { issues: [{ path: [], message: 'm' }] },
+    { issues: [], unchecked: 'yes' },
+    { issues: [], error: 'x'.repeat(LIMITS.ipcFieldCharsMax + 1) },
+    { issues: Array.from({ length: LIMITS.ipcItemsMax + 1 }, () => issue) },
+  ];
+  for (const input of bad) {
+    assert.throws(() => parseValidationResult(input));
+  }
+});
+
+test('dev-server parsers support current and legacy responses', () => {
+  assert.deepEqual(parseDynamicPaths({ entries: [{ slug: 'a' }] }).entries, [
+    { params: { slug: 'a' }, props: undefined },
+  ]);
+  assert.deepEqual(
+    parseDynamicPaths({ entries: [{ params: { slug: 'a' }, props: { n: 1 } }] }).entries,
+    [{ params: { slug: 'a' }, props: { n: 1 } }],
+  );
+  assert.throws(() => parseDynamicPaths({ entries: [42] }), /object/);
+  assert.throws(() => parseDynamicPaths({ entries: [], error: 42 }), /string/);
+  assert.deepEqual(parseSampleEntry({ entry: jsonNull, error: 'offline' }), {
+    entry: jsonNull,
+    error: 'offline',
+  });
+  assert.throws(() => parseSampleEntry([]), /object/);
+  assert.throws(() => parseContentConfig({ collections: [{ name: 12 }] }), /string/);
+  assert.deepEqual(parseContentConfig({ collections: [{ name: 'broken', error: 'bad' }] }), {
+    collections: [{ name: 'broken', error: 'bad' }],
+  });
+  assert.throws(
+    () => parseContentConfig({ collections: [{ name: 'posts', crossFieldChecks: 'yes' }] }),
+    /boolean/,
+  );
+  const manifest = {
+    collections: [
+      {
+        name: 'posts',
+        loader: { kind: 'glob', base: './posts' },
+        schema: { type: 'object' },
+        crossFieldChecks: true,
+      },
+    ],
+  };
+  assert.equal(parseContentConfig(manifest).collections[0]?.name, 'posts');
+});
+
+test('directory budgets reject both deep and wide projects without partial results', () => {
+  const budget = directoryBudget('/site');
+  assert.throws(() => budget('/site', -1), /Directory entry count must be nonnegative/);
+  assert.throws(() => budget('/site', 1.5), /Directory entry count must be an integer/);
+  assert.throws(() => directoryBudget('/site')('/site', MAIN_LIMITS.directoryEntriesMax), /limit/);
+  const deep = '/site/' + 'nested/'.repeat(MAIN_LIMITS.directoryDepthMax + 1);
+  assert.throws(() => directoryBudget('/site')(deep, 0), /depth/);
+});
+
+test('port search skips busy sockets and rejects invalid starts', async (context) => {
+  const harness = fixture();
+  context.after(harness.dispose);
+  const server = net.createServer();
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+  context.after(() => server.close());
+  const address = server.address();
+  assert.ok(address && typeof address === 'object');
+  const port = await harness.call('findFreePort', address.port);
+  assert.equal(typeof port, 'number');
+  assert.notEqual(port, address.port);
+  await assert.rejects(
+    async () => harness.call('findFreePort', -1),
+    /Starting port must be positive/,
+  );
+});
+
+test('Markdown array metadata and source-file size have explicit bounds', async (context) => {
+  const harness = fixture();
+  context.after(harness.dispose);
+  const parsed = parseMarkdownPage('Hello\n');
+  assert.ok(parsed.editable);
+  const { model } = parsed;
+  model.nodes.mdTrailingBlanks = Number.MAX_SAFE_INTEGER;
+  assert.throws(() => parsePageModel(model), /exceeds blank-line limit/);
+  const file = path.join(harness.root, 'src/pages/large.astro');
+  fs.writeFileSync(file, '');
+  fs.truncateSync(file, LIMITS.sourceBytesMax + 1);
+  await assert.rejects(harness.invoke('page:read', file), /Source file exceeds 10 MB limit/);
+});
+
+test('an empty tsconfig alias map takes precedence over jsconfig', async (context) => {
+  const harness = fixture();
+  context.after(harness.dispose);
+  const config = path.join(harness.root, 'tsconfig.json');
+  fs.writeFileSync(config, '{"compilerOptions":{"paths":{}}}');
+  fs.writeFileSync(
+    path.join(harness.root, 'jsconfig.json'),
+    '{"compilerOptions":{"paths":{"@/*":["src/*"]}}}',
+  );
+  fs.writeFileSync(path.join(harness.root, 'src/data/site.ts'), 'export const title = "Site";');
+  await harness.invoke('project:scan', harness.root);
+  const payload = {
+    projectPath: harness.root,
+    fromFile: path.join(harness.root, 'src/pages/index.astro'),
+    spec: '@/data/site',
+  };
+  assert.equal(toRecord(await harness.invoke('src:resolvePath', payload))?.['ok'], false);
+  fs.writeFileSync(config, '{"compilerOptions":{}}');
+  assert.equal(toRecord(await harness.invoke('src:resolvePath', payload))?.['ok'], true);
+});

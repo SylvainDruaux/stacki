@@ -204,18 +204,22 @@ wrapper over `window.avb` — the renderer never calls raw `ipcRenderer`.
 
 ## Tests
 
-Suites under `test/`, run by `scripts/gate/runTests.ts` (`npm test`; test commands
-run in a bounded parallel pool, `--jobs=<n>` to change it — see
-`docs/contracts.md`, Required gate):
+Suites under `test/`, found by name and run by `scripts/gate/runTests.ts`
+(`npm test`; suites run in a bounded parallel pool, `--jobs=<n>` to change
+it — see `docs/contracts.md`, Required gate). They mirror the source:
+`test/renderer/<layer or feature>/`, `test/electron/<area>/`,
+`test/shared/<area>/` and `test/scripts/<area>/` hold the suites for that
+folder, with the simulator in `test/simulator/` and the harnesses in
+`test/helpers/`.
 
-- **Round-trip tests** (the majority) parse → mutate → write → re-parse and
-  assert stability, under the runtime's own parsers.
+- **Round-trip tests** parse → mutate → write → re-parse and assert
+  stability, under the runtime's own parsers.
 - **Canvas tests** stub the iframe and run the real modules with esbuild.
-- **Node test-runner suites** (`*.test.js`, `test/contracts/`) exercise pure
+- **Contract suites** (`test/shared/`, much of `test/electron/`) exercise pure
   and contract code directly.
-- `test/scripts/release/unpackedParser.test.js` verifies the packaged app: the parser's whole
-  `require` closure must be unpacked from the asar so the Astro dev server
-  can load it.
+- `test/scripts/release/unpackedParser.test.js` verifies the packaged app: the
+  parser's whole `require` closure must be unpacked from the asar so the Astro
+  dev server can load it.
 
 A failing renderer suite fails the run while the others finish (a hung
 window cannot hold the gate hostage). The gate is: the builds, then side by

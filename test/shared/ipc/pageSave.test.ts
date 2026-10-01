@@ -250,7 +250,7 @@ test('every round-trip fixture opens as read and takes an edit of its bytes', as
     assert.equal(read.checksum, sha256(original));
     assert.ok(fs.readFileSync(file).equals(original), `${name}: opening writes nothing`);
     if (name.endsWith('.astro')) {
-      continue; // .astro gestures on these bytes: page-edit.test.ts.
+      continue; // .astro gestures on these bytes: pageEdit.test.ts.
     }
     // A Markdown page's first heading one level down: `#` becomes `##`, and
     // every other byte — the mark, the line endings — stays.

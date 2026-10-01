@@ -47,7 +47,7 @@ effect builds a new model, and the file changes only through intents (step 9;
 `shared/ipc/ipcResults.ts` is the channel-to-result inventory. `shared/ipc/preloadApi.ts`
 maps the public preload method names to those channels. A new or changed channel
 must update all three files and add known-good and malformed cases under
-`test/contracts/` or the renderer boundary's focused test.
+`test/shared/ipc/` or the renderer boundary's focused test.
 
 Electron handlers call `parseIpcPayload` before using input. Renderer modules do
 the same before invoking preload and parse every reply before returning it to a
@@ -203,7 +203,7 @@ and requires the reported text back, in UTF-16 and in bytes. The Markdown
 parser (step 10) reports the same for `.md` and `.mdx`: every node's range,
 however deep its containers, and a `markdown` attribute span for what Markdown
 writes in its own syntax (an image's alt, source and title, a fence's
-language, a list's first number); `test/contracts/markdown-spans.test.ts`
+language, a list's first number); `test/electron/parse/markdownSpans.test.ts`
 holds every Markdown fixture and a seeded corpus to it.
 
 Every bound lives in `limits.ts`, including `sourceBytesMax` (merged up from
@@ -324,7 +324,7 @@ The canvas is the project's own dev server in an iframe. Its source markers
 exist only in memory: the generated preview config's Vite plugin hands Astro
 `electron/previewServer/previewMarkers.ts`'s marked copy of each `.astro` file under `src`,
 and that module reads and returns strings — it writes nothing, and no app
-module imports it (`test/contracts/preview-bridge.test.ts` holds both, and runs
+module imports it (`test/electron/previewServer/previewBridge.test.ts` holds both, and runs
 the real generated plugin over a project whose bytes it compares before and
 after). The generated config itself lives in `node_modules/.avb`.
 
@@ -382,9 +382,9 @@ JSON line per outcome, backpressure, save-guard conflict and leaked lock, with
 a running count, the intent id and a 16-hex-character path hash — never a path
 or source bytes.
 
-Proofs: `test/contracts/single-writer.test.ts` inventories every file-writing
+Proofs: `test/electron/documents/singleWriter.test.ts` inventories every file-writing
 call in `electron/` against a reasoned allowlist and pins one owner each for
-the write primitives, the disk and the host; `test/platform/` runs the write
+the write primitives, the disk and the host; `test/electron/documents/` runs the write
 protocol on real filesystems and processes (modes, ownership, flush order,
 symlinks, continuous readers, cooperating writers, crashes between replace and
 verify, NTFS replacement semantics and case-insensitive names where a Windows

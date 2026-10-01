@@ -2,8 +2,8 @@
 //
 //   node test/varsView.test.js [projectDir]
 //
-// The model decides what the tables are (see test/cssVars.test.js); this checks the
-// sheet actually draws them — a header per column, a row per name, a swatch
+// The model decides what the tables are (see test/electron/project/cssVars.test.js); this checks
+// the sheet actually draws them — a header per column, a row per name, a swatch
 // where a value resolves to a colour — and that typing a new value into a cell
 // writes it to the file it came from and nothing else.
 

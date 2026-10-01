@@ -9,7 +9,7 @@
 // so the rename is atomic), are flushed, and replace the target in one rename.
 // The target holds the old bytes or the new ones, never a mixture.
 //
-// The OS-facing contract, pinned by the platform suite (test/platform/):
+// The OS-facing contract, pinned by the platform suite (test/electron/documents/):
 // - Flush: `fsync` on the temporary file before the rename, then `fsync` on the
 //   directory after it, so the rename itself survives a power loss. On Windows
 //   Node cannot open a directory for flushing; NTFS journals the rename, and

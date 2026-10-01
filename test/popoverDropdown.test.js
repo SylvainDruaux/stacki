@@ -106,7 +106,7 @@ const check = (what, condition, detail) => {
   if (typeof electronPath !== 'string') {
     console.log(
       'popover-dropdown: skipped — no Electron to lay it out in ' +
-        '(see test/gapBands.test.js for the pattern)',
+        '(see test/electron/preload/gapBands.test.js for the pattern)',
     );
     return;
   }

@@ -79,8 +79,8 @@ check(
   'inEditable no longer covers the three',
 );
 
-// The bridge that hands it back. test/bridge.test.js checks every exposed method has
-// a handler; this says which methods have to exist at all.
+// The bridge that hands it back. test/electron/preload/bridge.test.js checks every exposed method
+// has a handler; this says which methods have to exist at all.
 check('the bridge offers a native undo', /nativeUndo: invoke\('native:undo'\)/.test(preload));
 check('and a native redo', /nativeRedo: invoke\('native:redo'\)/.test(preload));
 check(
