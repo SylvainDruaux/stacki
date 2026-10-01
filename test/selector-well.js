@@ -353,7 +353,7 @@ const contrastRatio = (first, second) => {
       contents: `
         export { default as EmbedEditor } from './src/style-panel/EmbedEditor'
         export { setHost } from './src/style-panel/lib/host'
-        export { setCanvasFrame } from './src/canvasQuery.ts'
+        export { setCanvasFrame } from './src/editor/canvasQuery.ts'
         export { EditorView } from '@codemirror/view'
       `,
       resolveDir: ROOT,

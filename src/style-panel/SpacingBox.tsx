@@ -10,7 +10,7 @@ import VariableConnect, { useSharedVars } from './VariableConnect';
 import type { ProjectVariable } from './lib/webflow';
 import { selectorsMatch, type ResolvedProp } from './lib/resolved';
 import { getHost } from './lib/host';
-import { getModifiers, onModifiers, setModifiers } from '../heldModifiers';
+import { getModifiers, onModifiers, setModifiers } from '../editor/heldModifiers';
 import { assert } from '../../shared/assert';
 
 // Shared "spacing box" primitives: Webflow's masked-SVG frame with draggable side

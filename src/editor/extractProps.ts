@@ -1,5 +1,5 @@
-import { assert } from '../shared/assert';
-import { LIMITS } from '../shared/limits';
+import { assert } from '../../shared/assert';
+import { LIMITS } from '../../shared/limits';
 import { treeBudget, type TreeView } from './treeView';
 // What a piece of a page reads from around it.
 //

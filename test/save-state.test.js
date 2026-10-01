@@ -1,5 +1,5 @@
 // Goal: pin every SaveState transition (plan §7), the refused ones included.
-// Method: bundle src/saveState.ts and apply each transition to each state. A
+// Method: bundle src/editor/saveState.ts and apply each transition to each state. A
 // transition a state does not accept is a programmer error, so those cases
 // assert and the test pins the message; the accepted ones pin the result.
 const test = require('node:test');
@@ -12,7 +12,7 @@ const { repoPath } = require('./helpers/sources.js');
 const buildDirectory = repoPath('node_modules/.stacki-test/save-state');
 fs.mkdirSync(buildDirectory, { recursive: true });
 esbuild.buildSync({
-  entryPoints: [repoPath('src/saveState.ts')],
+  entryPoints: [repoPath('src/editor/saveState.ts')],
   outdir: buildDirectory,
   bundle: true,
   format: 'cjs',

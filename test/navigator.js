@@ -79,7 +79,7 @@ const WORDS = elementNode('words', 'p', [{ id: 'w-text', kind: 'expr', value: '{
   // --- the rule itself --------------------------------------------------------
   const rulePath = path.join(buildDirectory, 'branches.bundle.js');
   await esbuild.build({
-    entryPoints: [repoPath('src/branches.ts')],
+    entryPoints: [repoPath('src/editor/branches.ts')],
     outfile: rulePath,
     bundle: true,
     format: 'cjs',

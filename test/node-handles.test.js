@@ -1,4 +1,4 @@
-// Goal: src/nodeHandles.ts carries a session's node handles onto a fresh parse
+// Goal: src/editor/nodeHandles.ts carries a session's node handles onto a fresh parse
 // by the mapping every edit uses (plan §4), never by position or likeness:
 // through the app's own splices exactly — the edited node, a renamed tag, a
 // moved node and the nodes an insertion created keep or take their handles —
@@ -21,7 +21,7 @@ const { buildEditIntent } = require('#dist/electron/editRequests.js');
 const { toIntent } = require('#dist/shared/intent.js');
 const { planIntent } = require('#dist/shared/planner.js');
 const { applySplices, inverseEdits } = require('#dist/shared/splice.js');
-const { carryHandles } = load('src/nodeHandles.ts');
+const { carryHandles } = load('src/editor/nodeHandles.ts');
 
 const sha256 = (text) => createHash('sha256').update(text).digest('hex');
 const parse = (source) => {

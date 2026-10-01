@@ -16,9 +16,9 @@ const MODULES_MAX = 32;
 const ENTRY_MODULES: ReadonlyArray<{ readonly file: string; readonly exportName: string }> = [
   { file: 'src/lib/cleanError.ts', exportName: 'cleanError' },
   { file: 'src/ipc/bridge.ts', exportName: 'scanProject' },
-  { file: 'src/dataSuggest.ts', exportName: 'dataTree' },
-  { file: 'src/loopBindings.ts', exportName: 'renamedLoopVar' },
-  { file: 'src/pagePersistence.ts', exportName: 'createPageSaver' },
+  { file: 'src/editor/dataSuggest.ts', exportName: 'dataTree' },
+  { file: 'src/editor/loopBindings.ts', exportName: 'renamedLoopVar' },
+  { file: 'src/editor/pagePersistence.ts', exportName: 'createPageSaver' },
 ];
 
 test('Vite development modules link the renderer contract dependencies', async () => {

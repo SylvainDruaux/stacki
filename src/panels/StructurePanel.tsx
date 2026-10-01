@@ -8,7 +8,7 @@ import type {
 } from './structureModel';
 import type { ContextAction, ContextPosition, StructureTreeContext } from './StructureTree';
 import { CollapseVerticalIcon, CodeIcon, DragIcon, ExpandVerticalIcon } from '../ui/Icons';
-import { hidesChildRows } from '../treeSelection';
+import { hidesChildRows } from '../editor/treeSelection';
 import {
   collapseMap,
   defaultCollapsed,

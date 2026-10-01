@@ -11,7 +11,7 @@ import type { MutableRefObject } from 'react';
 import type { DecorationSet, KeyBinding } from '@codemirror/view';
 import type { Extension, Range } from '@codemirror/state';
 import type { Completion, CompletionContext } from '@codemirror/autocomplete';
-import type { TemplateHole } from '../bindings';
+import type { TemplateHole } from '../editor/bindings';
 import { assert } from '../../shared/assert';
 import { LIMITS } from '../../shared/limits';
 import { EditorState, StateEffect, StateField } from '@codemirror/state';

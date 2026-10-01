@@ -39,8 +39,8 @@ const check = (what, condition, detail) => {
   await esbuild.build({
     stdin: {
       contents: [
-        "export { resolveInstanceProps } from './src/instanceProps.ts'",
-        "export { dataTree } from './src/dataSuggest.ts'",
+        "export { resolveInstanceProps } from './src/editor/instanceProps.ts'",
+        "export { dataTree } from './src/editor/dataSuggest.ts'",
       ].join('\n'),
       resolveDir: ROOT,
       loader: 'js',

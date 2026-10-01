@@ -1,5 +1,5 @@
-import { assert } from '../shared/assert';
-import { LIMITS } from '../shared/limits';
+import { assert } from '../../shared/assert';
+import { LIMITS } from '../../shared/limits';
 
 // Read-only projections accept both parsed pages and the live editing tree.
 // They keep source metadata opaque while the existing editor still owns mutation.

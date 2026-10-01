@@ -37,7 +37,7 @@ const check = (what, condition, detail) => {
   fs.mkdirSync(buildDirectory, { recursive: true });
   const out = path.join(buildDirectory, 'canvas-click.bundle.mjs');
   await esbuild.build({
-    entryPoints: [repoPath('src/canvasClick.ts')],
+    entryPoints: [repoPath('src/editor/canvasClick.ts')],
     outfile: out,
     bundle: true,
     format: 'esm',

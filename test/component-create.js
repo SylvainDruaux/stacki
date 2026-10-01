@@ -94,7 +94,7 @@ const check = (what, condition, detail) => {
   // values it was reading are exactly the props the component wants.
   const propsBundle = path.join(buildDirectory, 'extract-props.bundle.js');
   await esbuild.build({
-    entryPoints: [repoPath('src/extractProps.ts')],
+    entryPoints: [repoPath('src/editor/extractProps.ts')],
     outfile: propsBundle,
     bundle: true,
     format: 'cjs',

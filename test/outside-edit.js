@@ -126,7 +126,7 @@ const settle = (ms = 20) => new Promise((resolve) => setTimeout(resolve, ms));
   // --- a word to the canvas that needs no answer --------------------------------
   const queryBundle = path.join(buildDirectory, 'canvas-query.bundle.mjs');
   await esbuild.build({
-    entryPoints: [repoPath('src/canvasQuery.ts')],
+    entryPoints: [repoPath('src/editor/canvasQuery.ts')],
     outfile: queryBundle,
     bundle: true,
     format: 'esm',

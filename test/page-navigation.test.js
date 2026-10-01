@@ -4,7 +4,7 @@
 // an .astro page reaches disk as edit requests stated against the bytes the
 // app last read or wrote, a burst of watcher events shares one scan and one
 // read (src/lib/coalescedRun.ts), and node handles are carried from one read to
-// the next by the byte diff (src/nodeHandles.ts).
+// the next by the byte diff (src/editor/nodeHandles.ts).
 // Method: render the real App in jsdom with stub panels that capture their
 // props, drive it through those callbacks, and hold every disk read on a
 // deferred so each interleaving is chosen by the test. Each page is a real

@@ -37,7 +37,7 @@ const stringValue = (value) => ({ type: 'string', value });
   fs.mkdirSync(buildDirectory, { recursive: true });
   const bundlePath = path.join(buildDirectory, 'class-attr.bundle.js');
   await esbuild.build({
-    entryPoints: [repoPath('src/classAttr.ts')],
+    entryPoints: [repoPath('src/editor/classAttr.ts')],
     outfile: bundlePath,
     bundle: true,
     format: 'cjs',

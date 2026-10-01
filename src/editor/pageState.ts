@@ -1,9 +1,9 @@
 // The open page as the editor holds it: which file is open, and its state —
 // an editable model with the origin its edits are stated against, or the raw
 // source of a page the visual model cannot hold.
-import type { Digest } from '../shared/brand';
-import { LIMITS } from '../shared/limits';
-import type { ParsePageResult } from '../shared/page-node';
+import type { Digest } from '../../shared/brand';
+import { LIMITS } from '../../shared/limits';
+import type { ParsePageResult } from '../../shared/page-node';
 import { carryHandles, randomSeed, seedOf } from './nodeHandles';
 import type { PageOrigin } from './pageEdits';
 import type { EditorModel, EditorNode } from './pageView';
@@ -42,7 +42,7 @@ export interface EditablePageState extends PageStateBase {
   readonly model: EditorModel;
   /** The text `model` is a parse of — for nodes a gesture changed or made,
    * the parse the gesture was applied to. Its source ranges index this text,
-   * and handles are carried from it onto the next parse (src/nodeHandles.ts). */
+   * and handles are carried from it onto the next parse (src/editor/nodeHandles.ts). */
   readonly parsedFrom: string;
   /** The page as the app's last read or reply left it: edit requests are
    * stated against it when they are sent. Undefined only while typed code has
@@ -136,7 +136,7 @@ export function toEditorPageState(
 }
 
 /** A fresh parse with the session's handles, carried from the page state it
- * replaces by the byte diff (src/nodeHandles.ts): a reload, typed code's
+ * replaces by the byte diff (src/editor/nodeHandles.ts): a reload, typed code's
  * parse, a code save's reply. Replies to the app's own gestures are carried
  * from the origin by the saver, with the gesture's own prediction — never
  * from the view, which also holds newer gestures' nodes. Unchanged when

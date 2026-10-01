@@ -6,15 +6,15 @@
 // rewriting, since the children hold code as strings.
 //
 // Every function here takes nodes and returns new ones: they build a gesture's
-// prediction (src/editGestures.ts) and never touch the model the page shows.
+// prediction (src/editor/editGestures.ts) and never touch the model the page shows.
 // The bytes are rewritten by the engine's form of the same rules
 // (shared/loopScope.ts).
 // ---------------------------------------------------------------------------
 
-import { LIMITS } from '../shared/limits';
-import { assert } from '../shared/assert';
+import { LIMITS } from '../../shared/limits';
+import { assert } from '../../shared/assert';
 import type { EditorNode } from './pageView';
-import type { Attr } from '../shared/page-node';
+import type { Attr } from '../../shared/page-node';
 
 const MAP_HEAD_RE =
   /^([\s\S]+?)\.map\(\s*\(\s*([A-Za-z_$][\w$]*)\s*(?:,\s*([A-Za-z_$][\w$]*)\s*)?\)\s*=>\s*\($/;

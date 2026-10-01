@@ -5,8 +5,8 @@ import type { PreviewDevice } from './PreviewToolbar';
 import type { PreviewMessage, PreviewReloadReason } from '../previewMessages';
 import { parsePreviewMessage } from '../previewMessages';
 import { sameCopy } from '../outlineBoxes';
-import { setModifiers } from '../heldModifiers';
-import { noteCanvasReady, receiveCanvasReply, setCanvasFrame } from '../canvasQuery';
+import { setModifiers } from '../editor/heldModifiers';
+import { noteCanvasReady, receiveCanvasReply, setCanvasFrame } from '../editor/canvasQuery';
 import type { Digest } from '../../shared/brand';
 import {
   judgeEventToken,

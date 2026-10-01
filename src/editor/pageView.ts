@@ -1,11 +1,11 @@
 // The page model as the renderer reads it: the parsed PageModel itself, with
 // the fields any node kind may carry readable on every node. It is readonly —
-// a gesture's effect builds a new model (src/editGestures.ts), and the bytes
+// a gesture's effect builds a new model (src/editor/editGestures.ts), and the bytes
 // change only through intents (plan §11.9) — so a parse is shown as it came,
 // without a private copy to keep in step. Renderer-only: nothing crosses a
 // process boundary in this shape (shared/page-node.ts is the contract).
-import type { Attr, PageModel, PageNode } from '../shared/page-node';
-import { toNodeId, type NodeId } from '../shared/brand';
+import type { Attr, PageModel, PageNode } from '../../shared/page-node';
+import { toNodeId, type NodeId } from '../../shared/brand';
 
 // The fields every node kind may carry, readable on any node without first
 // narrowing its kind: panels read `node.props` or `node.children` whatever

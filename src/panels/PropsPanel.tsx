@@ -12,18 +12,18 @@ import PropField, { assetImportOf } from './PropField';
 import { AttributesSection } from './propAttributes';
 import { ConditionField, BindHandle, FieldDataPicker } from './propBindings';
 import { createPropRules } from './propRules';
-import { isFragmentNode } from '../liveClasses';
+import { isFragmentNode } from '../editor/liveClasses';
 import { assert } from '../../shared/assert';
 import { LIMITS } from '../../shared/limits';
 import React, { useEffect, useRef, useState } from 'react';
-import { VOID_TAGS } from '../elementSchemas';
+import { VOID_TAGS } from '../editor/elementSchemas';
 import { elementIcon } from '../ui/Icons';
 import AutoTextarea from '../ui/AutoTextarea';
 import { clickNote } from '../ui/sound';
 import { SoundHere } from '../ui/soundScope';
 import ExprInput from '../ui/ExprInput';
 import RichContent, { isInlineOnly } from '../ui/RichContent';
-import { scopeChips, scopeCompletions } from '../dataSuggest';
+import { scopeChips, scopeCompletions } from '../editor/dataSuggest';
 import LinkField from '../ui/LinkField';
 import {
   VariableTextSizeIcon,

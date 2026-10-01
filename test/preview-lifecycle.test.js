@@ -15,7 +15,7 @@ esbuild.buildSync({
   stdin: {
     contents:
       "export { default as PreviewPane, deviceForWidth } from './src/panels/PreviewPane.tsx';" +
-      " export { hasCanvas, queryCanvas } from './src/canvasQuery.ts';",
+      " export { hasCanvas, queryCanvas } from './src/editor/canvasQuery.ts';",
     resolveDir: ROOT,
     loader: 'jsx',
   },

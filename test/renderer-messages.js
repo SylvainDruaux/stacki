@@ -8,8 +8,8 @@ const { BOUNDARY_LIMITS } = require('#dist/shared/boundary.js');
 // so the negative space below includes it. It is read from JSON, because our own
 // code never writes a null.
 const PLATFORM_NULL = JSON.parse('null');
-const { parseCanvasReply } = loadRenderer('src/canvasReply.ts');
-const canvas = loadRenderer('src/canvasQuery.ts');
+const { parseCanvasReply } = loadRenderer('src/editor/canvasReply.ts');
+const canvas = loadRenderer('src/editor/canvasQuery.ts');
 
 const valid = {
   id: 1,

@@ -1,10 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ScanComponent } from '../../shared/scan';
-import type { TrailingSlash } from '../pageState';
+import type { TrailingSlash } from '../editor/pageState';
 import type { ComponentUsageFile } from '../paletteModel';
 import type { ComponentCreationSource, UsageAnchor, UsagePopup } from './PaletteDialogs';
 import { cleanError } from '../lib/cleanError';
-import { allowDragEffect, clearDrag, setDrag } from '../dragState';
+import { allowDragEffect, clearDrag, setDrag } from '../editor/dragState';
 import { rankInsertItems } from '../insertRank';
 import {
   componentPreviewURL,

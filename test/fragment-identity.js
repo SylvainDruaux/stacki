@@ -36,7 +36,7 @@ const check = (what, condition, detail) => {
   fs.mkdirSync(buildDirectory, { recursive: true });
   const out = path.join(buildDirectory, 'renders-element.bundle.mjs');
   await esbuild.build({
-    entryPoints: [repoPath('src/liveClasses.ts')],
+    entryPoints: [repoPath('src/editor/liveClasses.ts')],
     outfile: out,
     bundle: true,
     format: 'esm',

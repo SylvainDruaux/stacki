@@ -27,7 +27,7 @@ export type Digest = Brand<string, 'Digest'>;
 /** Node ids name nodes within one tree (plan §4: nothing keys on them across
  * snapshots). `n<path>` is the Astro parser's structural path (`n0.2.1`);
  * `m<N>` the Markdown parser's, until step 10; `layout` the layout wrapper.
- * The renderer carries its own handles across parses (src/nodeHandles.ts):
+ * The renderer carries its own handles across parses (src/editor/nodeHandles.ts):
  * `s<16 hex>.<path>` names a node by the snapshot it first appeared in, and
  * `g<32 hex>` a node a gesture created, before any parse has seen it. */
 const NODE_ID_RE =

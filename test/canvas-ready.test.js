@@ -12,7 +12,7 @@ const loadRenderer = require('./helpers/rendererModule.js');
 const { repoPath } = require('./helpers/sources.js');
 
 test('a ready canvas tells each registered cache, until it unsubscribes', () => {
-  const canvas = loadRenderer('src/canvasQuery.ts');
+  const canvas = loadRenderer('src/editor/canvasQuery.ts');
   let first = 0;
   let second = 0;
   const stopFirst = canvas.onCanvasReady(() => {

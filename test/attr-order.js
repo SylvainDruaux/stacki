@@ -39,7 +39,7 @@ const {
   serializeNodes,
 } = require('#dist/electron/astroParser.js');
 
-// `src/attrOrder.ts` is the renderer's module, so it comes in the way the app
+// `src/editor/attrOrder.ts` is the renderer's module, so it comes in the way the app
 // gets it rather than as a copy of its rules.
 const fs = require('fs');
 const path = require('path');
@@ -48,7 +48,7 @@ const buildDirectory = repoPath('node_modules/.stacki-test');
 fs.mkdirSync(buildDirectory, { recursive: true });
 const bundled = path.join(buildDirectory, 'attr-order.cjs');
 require('esbuild').buildSync({
-  entryPoints: [repoPath('src/attrOrder.ts')],
+  entryPoints: [repoPath('src/editor/attrOrder.ts')],
   outfile: bundled,
   bundle: true,
   format: 'cjs',
@@ -250,7 +250,7 @@ const INPUT = '<Input variant="first-name" required />';
 // The app's rename goes through it — a second copy of the rule elsewhere would
 // be a second answer to where a renamed prop lives.
 {
-  const gestures = fs.readFileSync(repoPath('src/editGestures.ts'), 'utf8');
+  const gestures = fs.readFileSync(repoPath('src/editor/editGestures.ts'), 'utf8');
   check(
     'the app renames props through that module',
     /renamedAttr\(found, names\.from, names\.to\)/.test(gestures),

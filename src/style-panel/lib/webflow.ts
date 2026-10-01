@@ -21,7 +21,7 @@
 import { collectRules, parseRegion, renderEmbed, splitEmbed } from './css';
 import { assert } from '../../../shared/assert';
 import postcss from 'postcss';
-import type { CanvasAnswer } from '../../canvasReply';
+import type { CanvasAnswer } from '../../editor/canvasReply';
 import { findNode, getHost, onHostChange, propText, walkNodes, type HostNode } from './host';
 import type { StateKey } from './resolved';
 import type {
@@ -33,7 +33,7 @@ import type {
   StyleRegion,
 } from './types';
 import type { MatchTarget, TreeView } from './selectors';
-import { hasCanvas, queryCanvas } from '../../canvasQuery';
+import { hasCanvas, queryCanvas } from '../../editor/canvasQuery';
 import { listAssetEntries } from '../../ipc/assetBridge';
 import { readAstroStyleFiles, readStyleFiles } from '../../stylePanelBridge';
 import { variableEdit } from '../../ipc/variableEditBridge';

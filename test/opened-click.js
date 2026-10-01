@@ -4,7 +4,7 @@
 //
 // Double-click a Button to open it, click that same button on the canvas, and
 // the component closed. What the app does with a click is decided by
-// src/canvasClick.ts (test/canvas-click.js), and it was deciding correctly: the
+// src/editor/canvasClick.ts (test/canvas-click.js), and it was deciding correctly: the
 // canvas told it the click landed on something the open file does not own,
 // which is somebody looking away from what they are editing.
 //
@@ -43,7 +43,7 @@ const ROOT_PATH = `${SCOPE}0.0.0`;
   fs.mkdirSync(buildDirectory, { recursive: true });
   const bundle = path.join(buildDirectory, 'opened-click.cjs');
   await esbuild.build({
-    entryPoints: [repoPath('src/canvasClick.ts')],
+    entryPoints: [repoPath('src/editor/canvasClick.ts')],
     outfile: bundle,
     bundle: true,
     format: 'cjs',

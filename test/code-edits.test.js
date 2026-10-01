@@ -1,6 +1,6 @@
 // Goal: the renderer's half of step 8 — typed code is saved as a patch through
-// the page's actor (src/codeEdits.ts) from the baseline the text descends from
-// (src/pageEdits.ts, the `code` queue) — keeps plan §3.6 and §7. Typing takes
+// the page's actor (src/editor/codeEdits.ts) from the baseline the text descends from
+// (src/editor/pageEdits.ts, the `code` queue) — keeps plan §3.6 and §7. Typing takes
 // its baseline from the page as shown and keeps it until the page is clean; a
 // refused page's text is patched over the disk only after "Save this version";
 // a save that lands while the user kept typing, holding more than it sent,
@@ -28,8 +28,8 @@ fs.mkdirSync(buildDirectory, { recursive: true });
 esbuild.buildSync({
   // Named entries: each output is <name>.js wherever its source lives.
   entryPoints: {
-    pageEdits: repoPath('src/pageEdits.ts'),
-    codeEdits: repoPath('src/codeEdits.ts'),
+    pageEdits: repoPath('src/editor/pageEdits.ts'),
+    codeEdits: repoPath('src/editor/codeEdits.ts'),
   },
   outdir: buildDirectory,
   bundle: true,

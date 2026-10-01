@@ -49,7 +49,7 @@ const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
       `export { getHost, setHost } from ${JSON.stringify(
         repoPath('src/style-panel/lib/host.ts'),
       )};\n` +
-      `export { setModifiers } from ${JSON.stringify(repoPath('src/heldModifiers.ts'))};\n`,
+      `export { setModifiers } from ${JSON.stringify(repoPath('src/editor/heldModifiers.ts'))};\n`,
   );
   const bundlePath = path.join(buildDirectory, 'spacing.bundle.js');
   await esbuild.build({

@@ -75,7 +75,7 @@ const check = (what, condition, detail) => {
     loader: { '.css': 'empty' },
     plugins: [
       stubSources('stub-canvas', {
-        'src/canvasQuery.ts': () => ({
+        'src/editor/canvasQuery.ts': () => ({
           contents: stub,
           loader: 'js',
           resolveDir: root,

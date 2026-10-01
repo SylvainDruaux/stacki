@@ -69,7 +69,7 @@ test(
       '../node_modules/.stacki-test/frontmatter-bindings.bundle.js',
     );
     await require('esbuild').build({
-      entryPoints: [repoPath('src/dataSuggest.ts')],
+      entryPoints: [repoPath('src/editor/dataSuggest.ts')],
       outfile,
       bundle: true,
       platform: 'node',

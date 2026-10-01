@@ -75,8 +75,8 @@ async function checkFragment(syntax) {
     stdin: {
       contents:
         "export {default as StructurePanel} from './src/panels/StructurePanel.tsx'; export " +
-        "{liveClassesById} from './src/liveClasses.ts'; export {createTreeIndex} from " +
-        "'./src/editorTree.ts';",
+        "{liveClassesById} from './src/editor/liveClasses.ts'; export {createTreeIndex} from " +
+        "'./src/editor/editorTree.ts';",
       loader: 'jsx',
       resolveDir: ROOT,
     },

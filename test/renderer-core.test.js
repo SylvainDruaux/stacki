@@ -14,10 +14,10 @@ fs.mkdirSync(buildDirectory, { recursive: true });
 esbuild.buildSync({
   // Named entries: each output is <name>.js wherever its source lives.
   entryPoints: {
-    editorTree: repoPath('src/editorTree.ts'),
-    loopBindings: repoPath('src/loopBindings.ts'),
-    pagePersistence: repoPath('src/pagePersistence.ts'),
-    pageEdits: repoPath('src/pageEdits.ts'),
+    editorTree: repoPath('src/editor/editorTree.ts'),
+    loopBindings: repoPath('src/editor/loopBindings.ts'),
+    pagePersistence: repoPath('src/editor/pagePersistence.ts'),
+    pageEdits: repoPath('src/editor/pageEdits.ts'),
   },
   outdir: buildDirectory,
   bundle: true,
@@ -179,7 +179,7 @@ test('a loop still running keeps its declarations, reading a placeholder instead
   assert.equal(stripped.node.children[0].value, 'x content {row.z}');
 });
 
-// Page saver harness: a real queue (src/pageEdits.ts) and a send held on a
+// Page saver harness: a real queue (src/editor/pageEdits.ts) and a send held on a
 // gate per entry, so each test decides exactly when disk answers.
 const edits = require(path.join(buildDirectory, 'pageEdits.js'));
 const step = () => ({ outcome: { tag: 'applied', applied: [] } });

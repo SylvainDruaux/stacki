@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import type { EditorModel } from '../pageView';
+import type { EditorModel } from '../editor/pageView';
 import {
   componentSourceRanges,
   sourceLineLabel,

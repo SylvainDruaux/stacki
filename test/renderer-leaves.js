@@ -40,13 +40,13 @@ try {
   assert.deepEqual(second, [request, undefined]);
   assert.equal(getPendingAsset(), undefined);
 
-  const { setDrag, getDrag, clearDrag } = load('src/dragState.ts');
+  const { setDrag, getDrag, clearDrag } = load('src/editor/dragState.ts');
   setDrag({ kind: 'component', name: 'Card' });
   assert.deepEqual(getDrag(), { kind: 'component', name: 'Card' });
   clearDrag();
   assert.equal(getDrag(), undefined);
 
-  const { renamedAttr } = load('src/attrOrder.ts');
+  const { renamedAttr } = load('src/editor/attrOrder.ts');
   const value = { type: 'expr', value: 'someCall()', metadata: 'preserve' };
   const node = { props: { old: value }, attrOrder: ['old'] };
   const renamed = renamedAttr(node, 'old', 'new');
@@ -75,7 +75,7 @@ try {
   const { rankInsertItems } = load('src/insertRank.ts');
   assert.equal(rankInsertItems(Array(10_000).fill({ name: 'Card' }), '').length, 10_000);
   assert.throws(() => rankInsertItems(Array(10_001).fill({ name: 'Card' }), ''), /item count/);
-  const { elementClasses } = load('src/classNames.ts');
+  const { elementClasses } = load('src/editor/classNames.ts');
   assert.throws(
     () =>
       elementClasses({
@@ -91,7 +91,7 @@ try {
     () => decideTerminalPaste(Array(10_001).fill(item), '', undefined, 'posix'),
     /item count/,
   );
-  const { findWithParent, isInlineRun } = load('src/treeSelection.ts');
+  const { findWithParent, isInlineRun } = load('src/editor/treeSelection.ts');
   const cycle = { id: 'cycle', kind: 'element', name: 'span', children: [] };
   cycle.children.push(cycle);
   assert.throws(() => findWithParent([cycle], 'missing'), /Tree traversal exceeds depth limit/);
@@ -99,9 +99,9 @@ try {
   const leaf = { id: 'text', kind: 'text', value: 'hello' };
   assert.equal(isInlineRun(Array(20_000).fill(leaf)), true);
   assert.throws(() => isInlineRun(Array(20_001).fill(leaf)), /Tree traversal exceeds node limit/);
-  const { liveClassesById } = load('src/liveClasses.ts');
+  const { liveClassesById } = load('src/editor/liveClasses.ts');
   assert.throws(() => liveClassesById({}, [cycle]), /Tree traversal exceeds depth limit/);
-  const { propsForExtraction } = load('src/extractProps.ts');
+  const { propsForExtraction } = load('src/editor/extractProps.ts');
   assert.throws(() => propsForExtraction(cycle, ['title']), /Tree traversal exceeds depth limit/);
   const { evaluate } = load('src/fluid.ts');
   assert.equal(evaluate('(2rem + 16px) * 2', 0), 6);

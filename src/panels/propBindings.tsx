@@ -3,7 +3,7 @@ import type { MutableRefObject, RefObject } from 'react';
 import type { Completion } from '@codemirror/autocomplete';
 import type { Attr } from '../../shared/page-node';
 import type { FieldDefinition } from './propRules';
-import type { TemplateHole } from '../bindings';
+import type { TemplateHole } from '../editor/bindings';
 import type { RichContext } from '../ui/RichContent';
 import type { BindInputHandle } from '../ui/BindInput';
 import type { ChipsOf, ExprInputAPI } from '../ui/ExprInput';
@@ -17,14 +17,14 @@ import {
   findImportOf,
   scopeChips,
   scopeCompletions,
-} from '../dataSuggest';
+} from '../editor/dataSuggest';
 import {
   partsFromValue,
   resolvePick,
   templateHoles,
   valueFromParts,
   valueModeOf,
-} from '../bindings';
+} from '../editor/bindings';
 import { checkStatement } from '../jsCheck';
 import BindInput from '../ui/BindInput';
 import DataPicker from '../ui/DataPicker';

@@ -47,7 +47,10 @@ const check = (what, condition, detail) => {
     return import(pathToFileURL(out).href);
   };
 
-  const { partsFromValue, valueFromParts } = await bundle('src/bindings.ts', 'bindings.bundle.mjs');
+  const { partsFromValue, valueFromParts } = await bundle(
+    'src/editor/bindings.ts',
+    'bindings.bundle.mjs',
+  );
 
   // ── values ↔ parts ────────────────────────────────────────────────────────
   const J = JSON.stringify;
@@ -139,7 +142,7 @@ const check = (what, condition, detail) => {
   // `a ?? b` is not one thing to bind, it is two with a fallback between them.
   // The data in it chips; the code around it stays text you can edit.
   const { valueModeOf, codeParts, templateHoles } = await bundle(
-    'src/bindings.ts',
+    'src/editor/bindings.ts',
     'bindings2.bundle.mjs',
   );
   const expr = (value) => ({ type: 'expr', value: value });
@@ -320,7 +323,7 @@ const check = (what, condition, detail) => {
     queriesInScope,
     removeMarkedQuery,
     QUERY_MARK,
-  } = await bundle('src/dataSuggest.ts', 'datasuggest.bundle.mjs');
+  } = await bundle('src/editor/dataSuggest.ts', 'datasuggest.bundle.mjs');
 
   check('a collection query is named for what it holds', autoQueryName('blog') === 'blogEntries');
   check(

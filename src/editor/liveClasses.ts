@@ -1,6 +1,6 @@
-import { assert } from '../shared/assert';
-import type { PageNode } from '../shared/page-node';
-import { LIMITS } from '../shared/limits';
+import { assert } from '../../shared/assert';
+import type { PageNode } from '../../shared/page-node';
+import { LIMITS } from '../../shared/limits';
 import { treeBudget, type TreeView } from './treeView';
 // Whether a node puts an element of its OWN on the page.
 //

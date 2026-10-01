@@ -4,7 +4,7 @@ import { assert } from '../../shared/assert';
 import { LIMITS } from '../../shared/limits';
 import { PlusIcon, CloseIcon } from '../ui/Icons';
 import ListFieldRow from '../ui/ListFieldRow';
-import { allowDragEffect } from '../dragState';
+import { allowDragEffect } from '../editor/dragState';
 import { arrayItems, arrayText, blankLike, itemLabel, moveItem } from '../arrayValue';
 
 // A prop that takes a list, edited as a list.

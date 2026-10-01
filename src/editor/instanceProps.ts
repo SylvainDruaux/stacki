@@ -1,5 +1,5 @@
-import { assert } from '../shared/assert';
-import { LIMITS } from '../shared/limits';
+import { assert } from '../../shared/assert';
+import { LIMITS } from '../../shared/limits';
 import { treeBudget, type TreeView } from './treeView';
 import type { DataContext, TreeNode } from './dataSuggest';
 // What a component is being given, where it is being edited.

@@ -3,7 +3,7 @@
 // loop — a multi-span intent — and a move out of a loop leaves references to
 // the loop's item behind, which the move replaces with placeholder text, so an
 // expression node becomes text (a kind-changing intent). The renderer's model
-// version of both rules is src/loopBindings.ts (renamedLoopVar,
+// version of both rules is src/editor/loopBindings.ts (renamedLoopVar,
 // strippedBindings); this module reads the same things off the bytes, so the
 // byte edit and the model edit agree, and the gesture parity suite holds them
 // to each other on the corpus.
@@ -47,10 +47,10 @@ export interface SourceReplacement {
   readonly text: string;
 }
 
-/** What a dropped binding becomes (src/loopBindings.ts, UNBOUND_TEXT). */
+/** What a dropped binding becomes (src/editor/loopBindings.ts, UNBOUND_TEXT). */
 export const UNBOUND_TEXT = 'content';
 
-// The renderer's form (src/loopBindings.ts, MAP_HEAD_RE): parenthesized
+// The renderer's form (src/editor/loopBindings.ts, MAP_HEAD_RE): parenthesized
 // parameters, then an arrow to markup `(` or to a statement body `{`.
 const IDENTIFIER = '[A-Za-z_$][\\w$]*';
 const HEAD_RE = new RegExp(
@@ -427,7 +427,7 @@ function braceSpans(bytes: ByteString, span: ByteSpan): readonly ByteSpan[] {
 }
 
 /** Whole-identifier occurrences of `name` in a code span: `service`, never the
- * `service` of `x.service` or of `services` (src/loopBindings.ts). */
+ * `service` of `x.service` or of `services` (src/editor/loopBindings.ts). */
 function identifierSpans(bytes: ByteString, span: ByteSpan, name: string): readonly ByteSpan[] {
   const text = textOf(bytes, span);
   const found: number[] = [];

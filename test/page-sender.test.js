@@ -1,4 +1,4 @@
-// Goal: src/pageSender.ts shows each queue entry's outcome on the page as plan
+// Goal: src/editor/pageSender.ts shows each queue entry's outcome on the page as plan
 // §7 and §11.9 require: an applied gesture moves the origin on — and, when
 // nothing more is owed, the page is the reply itself, clean, every handle
 // carried; a gesture refused over unchanged bytes (no form the engine can plan)
@@ -21,9 +21,9 @@ const { buildEditIntent } = require('#dist/electron/editRequests.js');
 const { toIntent } = require('#dist/shared/intent.js');
 const { planIntent } = require('#dist/shared/planner.js');
 const { applySplices, inverseEdits } = require('#dist/shared/splice.js');
-const { createEntrySender, previewGestures } = load('src/pageSender.ts');
-const edits = load('src/pageEdits.ts');
-const editGestures = load('src/editGestures.ts');
+const { createEntrySender, previewGestures } = load('src/editor/pageSender.ts');
+const edits = load('src/editor/pageEdits.ts');
+const editGestures = load('src/editor/editGestures.ts');
 
 const sha256 = (text) => createHash('sha256').update(text).digest('hex');
 const PATH = '/project/src/pages/index.astro';

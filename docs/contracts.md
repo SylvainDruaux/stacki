@@ -17,7 +17,7 @@ enforce these invariants:
   `n0.2.1` — assigned once a tree is complete, so a parse is a pure function
   of its text (the Markdown parser's since step 10). `layout` names the layout
   wrapper. The renderer carries its own handles from one parse to the next by
-  span mapping (`src/nodeHandles.ts`): `s<16 hex>.<path>` for a node first
+  span mapping (`src/editor/nodeHandles.ts`): `s<16 hex>.<path>` for a node first
   seen in that snapshot, `g<32 hex>` for a node a gesture created.
 - `text`, `expr`, `raw-line`, `comment`, and `raw` nodes are leaves.
   Components and elements carry `children: undefined` only when self-closing.
@@ -36,7 +36,7 @@ enforce these invariants:
   metadata collection is bounded by `shared/limits.ts`.
 
 The renderer reads the parsed model itself, readonly, through
-`src/pageView.ts` (a renderer-only view in which any node's optional fields can be
+`src/editor/pageView.ts` (a renderer-only view in which any node's optional fields can be
 read without narrowing its kind). Nothing edits a tree in place: a gesture's
 effect builds a new model, and the file changes only through intents (step 9;
 `scripts/adapter-surface.ts` holds the in-place edit count at zero).
@@ -86,7 +86,7 @@ recreated; `filesystem` and `write-race` cover the rest, `uncertain` is a
 write that may have landed and could not be verified (plan §3.5), and
 `backpressured` a full actor queue (the edit was never accepted). The renderer
 keeps its queued edits on every failure, and the next send names the same
-origin. The renderer's `SaveState` union (`src/saveState.ts`) turns a
+origin. The renderer's `SaveState` union (`src/editor/saveState.ts`) turns a
 refusal against other bytes into `conflicted`: autosave stops, the edits stay,
 and only "Reload from disk" or a reviewed "Save this version" leaves that
 state.
@@ -143,7 +143,7 @@ no operation replaces a whole file.
   it (the loop body is code), and a stale intent whose node changed capability
   since it was authored — wrapped in a loop outside Stacki — is refused
   `region-externally-modified`. The renderer shows every other capability
-  beside the selection (`src/nodeCapability.ts`, `CapabilityNotice`).
+  beside the selection (`src/editor/nodeCapability.ts`, `CapabilityNotice`).
 - `source-projection.ts` — the `Projection` sum (`valid` with byte-addressed
   nodes, paths, attribute spans and capabilities, and the text's UTF-16 length,
   which the parser bounds; or `parse-error` with bounded diagnostics). Named so
@@ -269,7 +269,7 @@ token, and `component:revertProperties` applies that batch's inverse — every
 file checked against the bytes the batch left — and answers with the redo
 token. Main keeps the batches; the renderer holds tokens only.
 
-The renderer's half (`src/pageEdits.ts`, `src/editGestures.ts`) and the gesture
+The renderer's half (`src/editor/pageEdits.ts`, `src/editor/editGestures.ts`) and the gesture
 parity suite (`test/gesture-parity.test.js`) are described in the tracker,
 Step 6.
 
@@ -290,7 +290,7 @@ or is refused `merge-conflict`, as is one whose bytes the host no longer holds
 or whose witness does not hold; behind the app's own commits it rebases only
 where no commit touched a hunk (`shared/rebase.ts`, `shiftUntouched`). Code
 patches apply to `.md` and `.mdx` pages too. The renderer's side
-(`src/codeEdits.ts`, the `code` queue in `src/pageEdits.ts`) is described in
+(`src/editor/codeEdits.ts`, the `code` queue in `src/editor/pageEdits.ts`) is described in
 the tracker, Step 8.
 
 ## Markdown and MDX (step 10)

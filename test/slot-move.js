@@ -32,7 +32,7 @@ const check = (what, condition, detail) => {
   fs.mkdirSync(buildDirectory, { recursive: true });
   const out = path.join(buildDirectory, 'slot-attr.bundle.mjs');
   await esbuild.build({
-    entryPoints: [repoPath('src/slotAttr.ts')],
+    entryPoints: [repoPath('src/editor/slotAttr.ts')],
     outfile: out,
     bundle: true,
     format: 'esm',
@@ -113,10 +113,10 @@ const check = (what, condition, detail) => {
     /keepsSlotAttribute\(\{ slotName, host, definition \}\)/.test(move),
     'the slot is not reconsidered on a move',
   );
-  // Step 6: the move is a gesture (src/editGestures.ts, moveGesture), which
+  // Step 6: the move is a gesture (src/editor/editGestures.ts, moveGesture), which
   // asks the app's rule of the model after the move and removes the slot
   // first — as a request, and from the shown model.
-  const gestureSource = fs.readFileSync(repoPath('src/editGestures.ts'), 'utf8');
+  const gestureSource = fs.readFileSync(repoPath('src/editor/editGestures.ts'), 'utf8');
   check(
     'and drops it when the answer is no',
     /tag: 'remove-attribute', target, name: 'slot'/.test(gestureSource) &&

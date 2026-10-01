@@ -1,5 +1,5 @@
-// Goal: the renderer's edit queue (src/pageEdits.ts) and gestures
-// (src/editGestures.ts) keep plan §7's rules as step 9 left them: gestures
+// Goal: the renderer's edit queue (src/editor/pageEdits.ts) and gestures
+// (src/editor/editGestures.ts) keep plan §7's rules as step 9 left them: gestures
 // coalesce within one stream of one undo step while unsent; typing drops the
 // gestures its text does not hold; the queue is bounded, and a gesture past it
 // is refused, never queued; a gesture is stated when it is sent, and one that
@@ -25,8 +25,8 @@ fs.mkdirSync(buildDirectory, { recursive: true });
 esbuild.buildSync({
   // Named entries: each output is <name>.js wherever its source lives.
   entryPoints: {
-    pageEdits: repoPath('src/pageEdits.ts'),
-    editGestures: repoPath('src/editGestures.ts'),
+    pageEdits: repoPath('src/editor/pageEdits.ts'),
+    editGestures: repoPath('src/editor/editGestures.ts'),
   },
   outdir: buildDirectory,
   bundle: true,

@@ -6,8 +6,8 @@
 // engine's may differ from the input only where it spliced.
 // Method: for every node of every `.astro` fixture (corpus, round-trip,
 // editor-core), each shipped gesture runs both ways: the adapter's effect
-// (src/editGestures.ts) on the parsed model, reprinted by serializePage; and
-// the adapter's requests (src/pageEdits.ts, nodeRefIn) through main's
+// (src/editor/editGestures.ts) on the parsed model, reprinted by serializePage; and
+// the adapter's requests (src/editor/pageEdits.ts, nodeRefIn) through main's
 // translator (electron/editRequests.ts) and the shipping planner, a later
 // request of one gesture rebased through the earlier ones as the host does
 // (shared/rebase.ts). The two results are parsed and compared with layout
@@ -41,8 +41,8 @@ fs.mkdirSync(buildDirectory, { recursive: true });
 esbuild.buildSync({
   // Named entries: each output is <name>.js wherever its source lives.
   entryPoints: {
-    pageEdits: repoPath('src/pageEdits.ts'),
-    editGestures: repoPath('src/editGestures.ts'),
+    pageEdits: repoPath('src/editor/pageEdits.ts'),
+    editGestures: repoPath('src/editor/editGestures.ts'),
   },
   outdir: buildDirectory,
   bundle: true,

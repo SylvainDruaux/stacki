@@ -3,7 +3,7 @@
 // the engine keeps verbatim is edited in the code panel, and a page outside the
 // engine says so. A fallback is visible, never silent.
 import { describeCapability, type Capability } from '../../shared/capability';
-import { capabilityNeedsNotice } from '../nodeCapability';
+import { capabilityNeedsNotice } from '../editor/nodeCapability';
 
 interface CapabilityNoticeProps {
   readonly capability: Capability | undefined;

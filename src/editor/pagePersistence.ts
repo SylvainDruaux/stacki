@@ -1,4 +1,4 @@
-// The page saver (plan §7, §11.9): the open page's queue (src/pageEdits.ts)
+// The page saver (plan §7, §11.9): the open page's queue (src/editor/pageEdits.ts)
 // sent to its actor, one entry at a time, in order. The queue is the only
 // record of what is unsaved — nothing tracks which state object was written —
 // and one flush sends the entries it finds when it starts: an edit made while
@@ -9,10 +9,10 @@
 //
 // Every write names the checksum it was authored against, and a refusal (the
 // file changed on disk) stops autosave instead of retrying (plan §7).
-import { assert } from '../shared/assert';
-import { LIMITS } from '../shared/limits';
-import type { ScanResult } from '../shared/scan';
-import { createCoalescedRun } from './lib/coalescedRun';
+import { assert } from '../../shared/assert';
+import { LIMITS } from '../../shared/limits';
+import type { ScanResult } from '../../shared/scan';
+import { createCoalescedRun } from '../lib/coalescedRun';
 import type { EditDrafts, QueueEntry } from './pageEdits';
 
 /** How sending one entry ended. The sender has already shown the outcome on

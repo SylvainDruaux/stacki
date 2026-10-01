@@ -1,6 +1,6 @@
 import { findWithParent } from './treeSelection';
 import type { TreeView } from './treeView';
-import { LIMITS } from '../shared/limits';
+import { LIMITS } from '../../shared/limits';
 interface Insertable {
   readonly name: string;
   readonly slots?: readonly string[];

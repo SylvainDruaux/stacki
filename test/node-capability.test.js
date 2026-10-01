@@ -2,7 +2,7 @@
 // (plan §6, step 7) — the same classification the projection makes, so a node
 // the engine treats as repeated, opaque or unsupported says so beside its
 // panels instead of looking plainly editable.
-// Method: parse corpus pages with the real parser, bundle src/nodeCapability.ts,
+// Method: parse corpus pages with the real parser, bundle src/editor/nodeCapability.ts,
 // and compare its answer for every node with the projection's capability at the
 // same path (shared/source-projection.ts run on the same bytes), for .astro
 // corpus pages and Markdown and MDX pages alike. Absent ids are the negative
@@ -17,7 +17,7 @@ const { repoPath } = require('./helpers/sources.js');
 const buildDirectory = repoPath('node_modules/.stacki-test/node-capability');
 fs.mkdirSync(buildDirectory, { recursive: true });
 esbuild.buildSync({
-  entryPoints: [repoPath('src/nodeCapability.ts')],
+  entryPoints: [repoPath('src/editor/nodeCapability.ts')],
   outdir: buildDirectory,
   bundle: true,
   format: 'cjs',

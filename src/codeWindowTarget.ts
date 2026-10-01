@@ -1,5 +1,5 @@
 import { assert } from '../shared/assert';
-import type { EditorNode } from './pageView';
+import type { EditorNode } from './editor/pageView';
 
 export interface CodeWindowState {
   readonly kind?: 'file';

@@ -1,7 +1,7 @@
-import { assert } from '../shared/assert';
-import { LIMITS } from '../shared/limits';
+import { assert } from '../../shared/assert';
+import { LIMITS } from '../../shared/limits';
 
-import type { Attr } from '../shared/page-node';
+import type { Attr } from '../../shared/page-node';
 export interface ClassNode {
   readonly name?: string;
   readonly props?: Readonly<Record<string, Attr>>;

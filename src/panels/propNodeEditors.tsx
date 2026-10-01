@@ -5,8 +5,8 @@ import type { ExprInputAPI } from '../ui/ExprInput';
 import type { FieldPosition, SourceContext } from './propBindings';
 import { assert } from '../../shared/assert';
 import { LIMITS } from '../../shared/limits';
-import { HTML_TAGS } from '../elementSchemas';
-import { dataTree, listsOnly } from '../dataSuggest';
+import { HTML_TAGS } from '../editor/elementSchemas';
+import { dataTree, listsOnly } from '../editor/dataSuggest';
 import ExprInput from '../ui/ExprInput';
 import { BindHandle, FieldDataPicker, SourceEditButton, referencedName } from './propBindings';
 import {

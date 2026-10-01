@@ -1,17 +1,17 @@
 // Gestures in their intent form (plan §11 step 6; every .astro gesture since
 // step 9): each is the edit requests it becomes against the page's origin,
 // and its effect on the shown model — the prediction the page shows until the
-// reply lands, and whose new nodes pair with the reply's (src/nodeHandles.ts).
+// reply lands, and whose new nodes pair with the reply's (src/editor/nodeHandles.ts).
 // The effect builds a new model and never edits one in place (the model is
-// readonly, src/pageView.ts). A gesture with no request against the origin is
+// readonly, src/editor/pageView.ts). A gesture with no request against the origin is
 // refused up front or, once sent, taken back with a notice — never saved some
-// other way (src/pageSender.ts).
-import { assert } from '../shared/assert';
+// other way (src/editor/pageSender.ts).
+import { assert } from '../../shared/assert';
 import type { EditorModel, EditorNode } from './pageView';
-import type { Edit, NodeRef } from '../shared/edit-request';
-import { singleDeclarationChange } from '../shared/inlineStyle';
-import { LIMITS } from '../shared/limits';
-import type { Attr } from '../shared/page-node';
+import type { Edit, NodeRef } from '../../shared/edit-request';
+import { singleDeclarationChange } from '../../shared/inlineStyle';
+import { LIMITS } from '../../shared/limits';
+import type { Attr } from '../../shared/page-node';
 import { renamedAttr } from './attrOrder';
 import { loopVarsAt, parseLoopHead, renamedLoopVar, strippedBindings } from './loopBindings';
 import type { EditGesture } from './pageEdits';

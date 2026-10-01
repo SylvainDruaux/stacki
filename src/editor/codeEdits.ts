@@ -1,6 +1,6 @@
 // The code editor's save (plan §3.6, §7; step 8). The page's unsaved edits are
 // its text; one save sends the byte diff from the baseline that text descends
-// from (src/pageEdits.ts, `CodeBaseline`) through `page:edit`, where the page's
+// from (src/editor/pageEdits.ts, `CodeBaseline`) through `page:edit`, where the page's
 // actor splices it like any other edit. Nothing here writes a whole file.
 //
 // Why a baseline and not the text: the actor maps a patch through an outside
@@ -13,13 +13,13 @@
 // was sent (the merged outside edit). The typing since is then merged into the
 // reply's text before the next patch is diffed (`mergeTyping`), so the next
 // save never takes the merged edit back out.
-import { assert } from '../shared/assert';
-import type { Digest } from '../shared/brand';
-import { diffCodePatch, mergeTyping } from '../shared/code-patch';
-import type { EditRequest } from '../shared/edit-request';
-import { describeRejection, type RejectionReason, type SourceEdit } from '../shared/intent';
-import type { PageDiskRead, PageEditError, PageEdited } from '../shared/page-save';
-import type { Result } from '../shared/result';
+import { assert } from '../../shared/assert';
+import type { Digest } from '../../shared/brand';
+import { diffCodePatch, mergeTyping } from '../../shared/code-patch';
+import type { EditRequest } from '../../shared/edit-request';
+import { describeRejection, type RejectionReason, type SourceEdit } from '../../shared/intent';
+import type { PageDiskRead, PageEditError, PageEdited } from '../../shared/page-save';
+import type { Result } from '../../shared/result';
 import type { CodeBaseline, EditDrafts } from './pageEdits';
 
 /** How one code save ended. */

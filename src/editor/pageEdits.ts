@@ -12,7 +12,7 @@
 //     whole model: a gesture that cannot be stated — its node is gone, or
 //     lives in another file — is refused.
 //   - typed code (step 8): the page's text, saved as one patch from the
-//     baseline the typing descends from (src/codeEdits.ts). At most one, and
+//     baseline the typing descends from (src/editor/codeEdits.ts). At most one, and
 //     first: typing replaces the unsent gestures, which the text it was typed
 //     into does not hold.
 //
@@ -25,20 +25,20 @@
 // Undo steps (EditsRecord) learn their inverses as replies arrive. An entry
 // carrying several steps' bytes in one write (typing) gives its inverse to the
 // newest step; the older ones are `folded` into it.
-import { assert } from '../shared/assert';
-import type { Digest } from '../shared/brand';
-import type { Edit, EditRequest, NodeRef } from '../shared/edit-request';
-import type { RejectionReason, SourceEdit } from '../shared/intent';
-import { LIMITS } from '../shared/limits';
-import type { PageEditError, PageEdited } from '../shared/page-save';
-import type { PageModel, PageNode } from '../shared/page-node';
-import type { Result } from '../shared/result';
+import { assert } from '../../shared/assert';
+import type { Digest } from '../../shared/brand';
+import type { Edit, EditRequest, NodeRef } from '../../shared/edit-request';
+import type { RejectionReason, SourceEdit } from '../../shared/intent';
+import { LIMITS } from '../../shared/limits';
+import type { PageEditError, PageEdited } from '../../shared/page-save';
+import type { PageModel, PageNode } from '../../shared/page-node';
+import type { Result } from '../../shared/result';
 import type { EditorModel } from './pageView';
 import type { SaveState } from './saveState';
 
 /** The page as the app's last read or reply left it: its checksum, its text,
  * and that text's parse, keyed by the session's node handles
- * (src/nodeHandles.ts). Requests are stated against it. */
+ * (src/editor/nodeHandles.ts). Requests are stated against it. */
 export interface PageOrigin {
   readonly checksum: Digest;
   readonly source: string;

@@ -22,18 +22,18 @@
 // A node nothing carries gets a fresh handle named by the snapshot it came
 // from — its checksum and its path — so no counter is kept and two snapshots
 // never mint the same one. Handles never reach main: requests name nodes by
-// path, kind and range (src/pageEdits.ts), and main checks those. Markdown and
+// path, kind and range (src/editor/pageEdits.ts), and main checks those. Markdown and
 // MDX pages are carried the same way: since step 10 every node of theirs has
 // its source range too.
-import { assert } from '../shared/assert';
-import { toNodeId, toUtf16Offset, type Digest } from '../shared/brand';
-import { DIFF_BUDGET, diffBytes } from '../shared/diff';
-import type { SourceEdit } from '../shared/intent';
-import { LIMITS } from '../shared/limits';
-import { mapSpanThroughDiff } from '../shared/mapSpan';
-import type { PageModel, PageNode } from '../shared/page-node';
-import type { Splice } from '../shared/planner';
-import { rebaseSpan } from '../shared/rebase';
+import { assert } from '../../shared/assert';
+import { toNodeId, toUtf16Offset, type Digest } from '../../shared/brand';
+import { DIFF_BUDGET, diffBytes } from '../../shared/diff';
+import type { SourceEdit } from '../../shared/intent';
+import { LIMITS } from '../../shared/limits';
+import { mapSpanThroughDiff } from '../../shared/mapSpan';
+import type { PageModel, PageNode } from '../../shared/page-node';
+import type { Splice } from '../../shared/planner';
+import { rebaseSpan } from '../../shared/rebase';
 import {
   byteStringsEqual,
   encodeUtf8,
@@ -42,8 +42,8 @@ import {
   utf16ToByteOffsets,
   type ByteSpan,
   type ByteString,
-} from '../shared/span';
-import { applySplices, witnessesHold } from '../shared/splice';
+} from '../../shared/span';
+import { applySplices, witnessesHold } from '../../shared/splice';
 
 /** A parse and the text it is a parse of: node ranges are UTF-16 offsets into it. */
 export interface ParsedText {

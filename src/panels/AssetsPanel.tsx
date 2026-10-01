@@ -23,7 +23,7 @@ import {
 import AssetThumb, { TEXT_EXT } from '../ui/AssetThumb';
 import MoreMenu from '../ui/MoreMenu';
 import { confirmDialog } from '../ui/ConfirmDialog';
-import { allowDragEffect } from '../dragState';
+import { allowDragEffect } from '../editor/dragState';
 
 const PICK_HOME = 'src/assets';
 const FILE_DROP_COUNT_MAX = 1_000;

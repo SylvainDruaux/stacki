@@ -1,5 +1,5 @@
-import { assert } from '../shared/assert';
-import { LIMITS } from '../shared/limits';
+import { assert } from '../../shared/assert';
+import { LIMITS } from '../../shared/limits';
 import { treeBudget, type TreeView } from './treeView';
 // Tree questions the navigator and the editor both ask, kept apart from both
 // so they can be reasoned about (and tested) on their own: which nodes get a

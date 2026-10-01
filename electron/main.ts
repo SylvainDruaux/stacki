@@ -3044,7 +3044,7 @@ ipcMain.handle('cms:delete', async (_event, { projectPath, rel }) => {
 // config can reuse it (see writeMarkerConfig). The page editor shows a
 // chunk's markup in the navigator and never writes it: no page save is a whole
 // model any more (step 9), and a chunk file has no node intents of its own
-// yet — its content is edited in code (src/nodeCapability.ts).
+// yet — its content is edited in code (src/editor/nodeCapability.ts).
 // ---------------------------------------------------------------------------
 
 // ---------------------------------------------------------------------------

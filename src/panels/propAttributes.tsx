@@ -6,7 +6,7 @@ import type { RichContext } from '../ui/RichContent';
 import type { SourceContext, FieldPosition, InsertAPI } from './propBindings';
 import { assert } from '../../shared/assert';
 import { LIMITS } from '../../shared/limits';
-import { scopeChips, scopeCompletions } from '../dataSuggest';
+import { scopeChips, scopeCompletions } from '../editor/dataSuggest';
 import StyleEditor, { collapseDeclarations } from '../ui/StyleEditor';
 import AssetField from '../ui/AssetField';
 import { looksLikeAssetPath, mediaKindFor } from '../ui/AssetThumb';

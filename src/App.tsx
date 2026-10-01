@@ -18,16 +18,16 @@ import {
   noteText,
   noteValue,
   selectionAfterDelete,
-} from './treeSelection';
-import { canvasClickAction } from './canvasClick';
+} from './editor/treeSelection';
+import { canvasClickAction } from './editor/canvasClick';
 import {
   isFragmentNode,
   liveClassesById as classesByNodeId,
   rendersOwnElement,
-} from './liveClasses';
+} from './editor/liveClasses';
 import { setSoundEnabled } from './ui/sound';
 import { createPreviewWatch } from './previewRecovery';
-import { tellCanvas } from './canvasQuery';
+import { tellCanvas } from './editor/canvasQuery';
 import {
   parsePageSource as parseSourcePage,
   readPage,
@@ -54,22 +54,22 @@ import {
 } from './astroAssets';
 import InsertSearch from './ui/InsertSearch';
 import AssetsPanel from './panels/AssetsPanel';
-import { getElementSchema, GLOBAL_ATTRS, HTML_TAGS, VOID_TAGS } from './elementSchemas';
-import { insertTargetFor as placeInsert } from './insertTarget';
+import { getElementSchema, GLOBAL_ATTRS, HTML_TAGS, VOID_TAGS } from './editor/elementSchemas';
+import { insertTargetFor as placeInsert } from './editor/insertTarget';
 import { isInlineOnly } from './ui/RichContent';
 import { onAssetRequest, clearAssetRequest } from './assetPick';
-import { isDataBound } from './bindings';
-import { thenBranch } from './branches';
-import { keepsSlot as keepsSlotAttribute } from './slotAttr';
+import { isDataBound } from './editor/bindings';
+import { thenBranch } from './editor/branches';
+import { keepsSlot as keepsSlotAttribute } from './editor/slotAttr';
 import {
   createFileSaver,
   createPageSaver,
   scanContainsFile,
   type PageSaver,
-} from './pagePersistence';
-import { createEntrySender, previewGestures } from './pageSender';
+} from './editor/pagePersistence';
+import { createEntrySender, previewGestures } from './editor/pageSender';
 import { createCoalescedRun } from './lib/coalescedRun';
-import { carryHandles, seedOf } from './nodeHandles';
+import { carryHandles, seedOf } from './editor/nodeHandles';
 import {
   EditDrafts,
   nodeRefIn,
@@ -78,7 +78,7 @@ import {
   type EditGesture,
   type EditsRecord,
   type QueueEntry,
-} from './pageEdits';
+} from './editor/pageEdits';
 import { describeRejection, type RejectionReason } from '../shared/intent';
 import {
   type InsertPlace,
@@ -97,14 +97,19 @@ import {
   unwrapGesture,
   withChildren,
   wrapGesture,
-} from './editGestures';
-import { saveStateAccepted, saveStateBase, saveStateEdited, saveStateRefused } from './saveState';
+} from './editor/editGestures';
+import {
+  saveStateAccepted,
+  saveStateBase,
+  saveStateEdited,
+  saveStateRefused,
+} from './editor/saveState';
 import SaveConflictNotice from './panels/SaveConflictNotice';
 import CapabilityNotice from './panels/CapabilityNotice';
-import { nodeCapability } from './nodeCapability';
+import { nodeCapability } from './editor/nodeCapability';
 import type { PageEdited } from '../shared/page-save';
 import type { Digest, NodeId } from '../shared/brand';
-import { ancestorChain, createTreeIndex, nodeAtPath, pathOfNode } from './editorTree';
+import { ancestorChain, createTreeIndex, nodeAtPath, pathOfNode } from './editor/editorTree';
 import { readFrontmatter, writeFrontmatter } from '../electron/frontmatter';
 import {
   renamedLoopVar,
@@ -112,21 +117,21 @@ import {
   disconnectedLoops,
   loopVarsAt,
   strippedBindings,
-} from './loopBindings';
+} from './editor/loopBindings';
 import {
   namesUsedIn,
   neededFrontmatter,
   unusedDeclarations,
   withStatements,
   withoutDeclarations,
-} from './frontmatterMove';
-import { hasClass, namesIn, withClass } from './classAttr';
+} from './editor/frontmatterMove';
+import { hasClass, namesIn, withClass } from './editor/classAttr';
 import { toComponentName } from './componentName';
-import { resolveInstanceProps } from './instanceProps';
-import { propsForExtraction } from './extractProps';
+import { resolveInstanceProps } from './editor/instanceProps';
+import { propsForExtraction } from './editor/extractProps';
 import TerminalDock from './panels/TerminalDock';
 import { cleanError, stripAnsi } from './lib/cleanError';
-import { elementLabel } from './classNames';
+import { elementLabel } from './editor/classNames';
 import {
   autoQueryName,
   collectionsInScope,
@@ -137,7 +142,7 @@ import {
   QUERY_MARK,
   referencesInScope,
   removeMarkedQuery,
-} from './dataSuggest';
+} from './editor/dataSuggest';
 import {
   PreviewIcon,
   RefreshIcon,
@@ -159,7 +164,7 @@ import type { DevDiagnosis } from './panels/DevOffline';
 import type { PreviewDevice } from './panels/PreviewToolbar';
 import type { SpacingHover } from './panels/PreviewOverlays';
 import type { VariableSelection } from './variablesBridge';
-import type { InsertTarget } from './insertTarget';
+import type { InsertTarget } from './editor/insertTarget';
 import type { InsertItem } from './ui/InsertSearch';
 import { toRecord } from '../shared/record';
 import { projectRelativePath } from './lib/projectPath';
@@ -207,8 +212,8 @@ import {
   type PageStateSnapshot,
   type TrailingSlash,
   isOpenFile,
-} from './pageState';
-import { nodeId, type EditorModel, type EditorNode } from './pageView';
+} from './editor/pageState';
+import { nodeId, type EditorModel, type EditorNode } from './editor/pageView';
 import {
   addRecentProject,
   closeProject,
@@ -282,7 +287,7 @@ const CodePanel = lazyPanel(() => import('./panels/CodePanel'));
 
 // A node a gesture creates has no parse yet to name it: its handle is random,
 // unique without a counter, and carried onto the reply that first contains it
-// (src/nodeHandles.ts). It never reaches main.
+// (src/editor/nodeHandles.ts). It never reaches main.
 const newId = () => nodeId(`g${crypto.randomUUID().replace(/-/g, '')}`);
 
 // A copy of `node` in which it and every node below it take fresh ids: a
@@ -1564,7 +1569,7 @@ async function reloadChangedPage(
     return;
   }
   // The nodes the outside edit left alone keep their handles — the
-  // selection with them — by the byte diff (plan §4, src/nodeHandles.ts).
+  // selection with them — by the byte diff (plan §4, src/editor/nodeHandles.ts).
   context.setPageState(toEditorPageState(carriedParse(shownPage, parsed)));
   // Undo steps keep their inverses: after an outside edit they map
   // through it or are refused — they never revert it (plan §11).
@@ -5611,7 +5616,7 @@ function useMoveNode(
         return;
       }
       // `slot` is a word addressed to the component the node sat inside, and
-      // means nothing anywhere else (src/slotAttr.js).
+      // means nothing anywhere else (src/editor/slotAttr.ts).
       const rules = {
         keepsSlot: (model: EditorModel, id: string): boolean => {
           const slot = findNodeById(model.nodes, id)?.props?.['slot'];

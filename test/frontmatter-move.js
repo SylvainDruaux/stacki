@@ -39,7 +39,7 @@ const check = (what, condition, detail) => {
   fs.mkdirSync(buildDirectory, { recursive: true });
   const out = path.join(buildDirectory, 'frontmatter-move.bundle.mjs');
   await esbuild.build({
-    entryPoints: [repoPath('src/frontmatterMove.ts')],
+    entryPoints: [repoPath('src/editor/frontmatterMove.ts')],
     outfile: out,
     bundle: true,
     format: 'esm',

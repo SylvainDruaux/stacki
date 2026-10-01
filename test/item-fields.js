@@ -40,7 +40,7 @@ const check = (what, condition, detail) => {
   fs.mkdirSync(buildDirectory, { recursive: true });
   const out = path.join(buildDirectory, 'item-fields.cjs');
   await esbuild.build({
-    entryPoints: [repoPath('src/dataSuggest.ts')],
+    entryPoints: [repoPath('src/editor/dataSuggest.ts')],
     outfile: out,
     bundle: true,
     format: 'cjs',

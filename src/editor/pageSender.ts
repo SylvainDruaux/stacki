@@ -1,21 +1,21 @@
-// Sending one queue entry of the open page (src/pageEdits.ts) and showing how
-// it ended (plan §7, §11.9). The page saver (src/pagePersistence.ts) decides
+// Sending one queue entry of the open page (src/editor/pageEdits.ts) and showing how
+// it ended (plan §7, §11.9). The page saver (src/editor/pagePersistence.ts) decides
 // when and in what order; this decides what each entry becomes on the wire,
 // what a reply means for the page state, and what a refusal shows.
 //
 // After each applied write the page's origin — the bytes later requests are
 // stated against — is the reply, its parse keyed by the session's handles:
 // carried from the origin through the write's own splices, and, for the nodes
-// a gesture created, from that gesture's own prediction (src/nodeHandles.ts).
+// a gesture created, from that gesture's own prediction (src/editor/nodeHandles.ts).
 // When nothing more is queued, the page shows the reply itself: clean, and
 // every node the user was looking at under the handle it had.
-import { assert } from '../shared/assert';
-import { LIMITS } from '../shared/limits';
-import type { Digest } from '../shared/brand';
-import type { EditRequest } from '../shared/edit-request';
-import { describeRejection, type RejectionReason } from '../shared/intent';
-import type { PageDiskRead, PageEditError, PageEdited } from '../shared/page-save';
-import type { Result } from '../shared/result';
+import { assert } from '../../shared/assert';
+import { LIMITS } from '../../shared/limits';
+import type { Digest } from '../../shared/brand';
+import type { EditRequest } from '../../shared/edit-request';
+import { describeRejection, type RejectionReason } from '../../shared/intent';
+import type { PageDiskRead, PageEditError, PageEdited } from '../../shared/page-save';
+import type { Result } from '../../shared/result';
 import {
   carriedParse,
   toEditorPageState,

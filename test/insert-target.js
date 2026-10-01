@@ -37,7 +37,7 @@ const check = (what, condition, detail) => {
   fs.mkdirSync(buildDirectory, { recursive: true });
   const bundle = path.join(buildDirectory, 'insert-target.bundle.js');
   await esbuild.build({
-    entryPoints: [repoPath('src/insertTarget.ts')],
+    entryPoints: [repoPath('src/editor/insertTarget.ts')],
     outfile: bundle,
     bundle: true,
     format: 'cjs',

@@ -12,7 +12,7 @@ import {
   TrashIcon,
 } from '../ui/Icons';
 import { RenameInput } from './PageDialogs';
-import { allowDragEffect } from '../dragState';
+import { allowDragEffect } from '../editor/dragState';
 
 export type PageEditing =
   | { readonly kind: 'page'; readonly key: string }

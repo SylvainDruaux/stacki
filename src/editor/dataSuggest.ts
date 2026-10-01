@@ -3,9 +3,9 @@
 // reading object literals — the keys nested inside them, so `service`
 // suggests `service.tags` without executing any code.
 
-import { assert } from '../shared/assert';
-import { LIMITS } from '../shared/limits';
-import { toRecord, toArray } from '../shared/record';
+import { assert } from '../../shared/assert';
+import { LIMITS } from '../../shared/limits';
+import { toRecord, toArray } from '../../shared/record';
 
 const DATA_SUGGEST_LIMITS = {
   // One level in is the useful depth for completions: `post.data` earns its place, every

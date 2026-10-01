@@ -35,7 +35,7 @@ test(
       logLevel: 'silent',
       plugins: [
         stubSources('canvas-probe', {
-          'src/canvasQuery.ts': () => ({
+          'src/editor/canvasQuery.ts': () => ({
             contents: `export const onCanvasReady = () => () => {};
     export const hasCanvas = () => true;
           export const queryCanvas = (path, selectors, colors, props = []) =>

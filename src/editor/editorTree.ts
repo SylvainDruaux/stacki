@@ -1,7 +1,7 @@
 // Read-only tree queries. Mutation code uses the live readers; rendering builds
 // one index per immutable model so hovering and selecting never rescan it.
 
-import type { Attr, PageNode } from '../shared/page-node';
+import type { Attr, PageNode } from '../../shared/page-node';
 
 interface TreeNodeLike<Node> {
   readonly id: string;
