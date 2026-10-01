@@ -672,6 +672,31 @@
         ["scripts/test-pool.ts", "scripts/gate/testPool.ts"],
         ["scripts/adapter-surface.ts", "scripts/gate/adapterSurface.ts"]
       ]
+    },
+    {
+      "step": "scripts-policy-names",
+      "moves": [
+        ["scripts/agent/check-changed.mts", "scripts/agent/checkChanged.mts"],
+        ["scripts/agent/stop-state.mts", "scripts/agent/stopState.mts"],
+        ["scripts/eslint-plugin/ast.mts", "scripts/eslintPlugin/ast.mts"],
+        [
+          "scripts/eslint-plugin/bounded-recursion.mts",
+          "scripts/eslintPlugin/boundedRecursion.mts"
+        ],
+        ["scripts/eslint-plugin/comments.mts", "scripts/eslintPlugin/comments.mts"],
+        ["scripts/eslint-plugin/index.mts", "scripts/eslintPlugin/index.mts"],
+        ["scripts/eslint-plugin/naming.mts", "scripts/eslintPlugin/naming.mts"],
+        [
+          "scripts/eslint-plugin/no-boolean-parameter.mts",
+          "scripts/eslintPlugin/noBooleanParameter.mts"
+        ],
+        ["scripts/eslint-plugin/no-null.mts", "scripts/eslintPlugin/noNull.mts"],
+        ["scripts/eslint-plugin/sourceLayers.mts", "scripts/eslintPlugin/sourceLayers.mts"],
+        ["scripts/eslint-plugin/statements.mts", "scripts/eslintPlugin/statements.mts"],
+        ["scripts/policy/commit-message.mts", "scripts/policy/commitMessage.mts"],
+        ["scripts/policy/git-hooks.mts", "scripts/policy/gitHooks.mts"],
+        ["scripts/policy/install-git-hooks.mts", "scripts/policy/installGitHooks.mts"]
+      ]
     }
   ]
 }
