@@ -1,11 +1,19 @@
-import type { Parser } from '../shared/boundary';
-import type { Result } from '../shared/result';
-import type { WireAssetEntry } from '../shared/ipc-results';
-import { BOUNDARY_LIMITS, boolean, count, list, pathText, record, text } from '../shared/boundary';
-import { parseIpcPayload } from '../shared/ipc-payloads';
-import { toProjectPath } from '../shared/brand';
-import { cleanError } from './lib/cleanError';
-import { parseAssetEntry } from './ipc/assetBridge';
+import type { Parser } from '../../../shared/boundary';
+import type { Result } from '../../../shared/result';
+import type { WireAssetEntry } from '../../../shared/ipc-results';
+import {
+  BOUNDARY_LIMITS,
+  boolean,
+  count,
+  list,
+  pathText,
+  record,
+  text,
+} from '../../../shared/boundary';
+import { parseIpcPayload } from '../../../shared/ipc-payloads';
+import { toProjectPath } from '../../../shared/brand';
+import { cleanError } from '../../lib/cleanError';
+import { parseAssetEntry } from '../../ipc/assetBridge';
 
 export type AssetRoot = 'public' | 'src';
 export type AssetPanelEntry = WireAssetEntry & { readonly root: AssetRoot };

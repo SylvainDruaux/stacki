@@ -46,7 +46,7 @@ function stubSources(name, stubs) {
 // The components App.tsx reaches as panels. Harnesses that mount the real App
 // replace them with stubs that record their props (stubPanels).
 const PANEL_SOURCES = Object.freeze([
-  'src/panels/AssetsPanel.tsx',
+  'src/features/assets/AssetsPanel.tsx',
   'src/panels/CanvasView.tsx',
   'src/panels/CapabilityNotice.tsx',
   'src/panels/CmsField.tsx',

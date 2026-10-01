@@ -53,7 +53,7 @@ import {
   astroAsset as astroAssetDef,
 } from './features/palette/astroAssets';
 import InsertSearch from './features/palette/InsertSearch';
-import AssetsPanel from './panels/AssetsPanel';
+import AssetsPanel from './features/assets/AssetsPanel';
 import { getElementSchema, GLOBAL_ATTRS, HTML_TAGS, VOID_TAGS } from './editor/elementSchemas';
 import { insertTargetFor as placeInsert } from './editor/insertTarget';
 import { isInlineOnly } from './ui/RichContent';

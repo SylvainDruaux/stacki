@@ -33,7 +33,7 @@ const check = (what, condition, detail) => {
   fs.writeFileSync(
     entry,
     `export { default as AssetsPanel } from ${JSON.stringify(
-      repoPath('src/panels/AssetsPanel.tsx'),
+      repoPath('src/features/assets/AssetsPanel.tsx'),
     )};\n` +
       `export { ConfirmHost } from ${JSON.stringify(repoPath('src/ui/ConfirmDialog.tsx'))};\n`,
   );
@@ -264,7 +264,7 @@ const check = (what, condition, detail) => {
     /assetAbs\(projectPath, rel\)/.test(handler),
     handler.slice(0, 200),
   );
-  const panel = fs.readFileSync(repoPath('src/panels/AssetsPanel.tsx'), 'utf8');
+  const panel = fs.readFileSync(repoPath('src/features/assets/AssetsPanel.tsx'), 'utf8');
   check(
     'the dialog says where it went',
     /moves to your Bin/.test(panel),

@@ -27,7 +27,7 @@ function rootEntry(root) {
 test('asset listings ignore stale projects and coalesce watcher bursts', async () => {
   fs.mkdirSync(buildDirectory, { recursive: true });
   await esbuild.build({
-    entryPoints: [repoPath('src/panels/AssetsPanel.tsx')],
+    entryPoints: [repoPath('src/features/assets/AssetsPanel.tsx')],
     outfile: bundlePath,
     bundle: true,
     format: 'cjs',

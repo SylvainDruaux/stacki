@@ -1,8 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { AssetRequest } from '../ui/assetPick';
-import type { AssetPanelEntry } from '../assetPanelBridge';
-import type { Result } from '../../shared/result';
-import { BOUNDARY_LIMITS, pathText } from '../../shared/boundary';
+import type { AssetRequest } from '../../ui/assetPick';
+import type { AssetPanelEntry } from './assetPanelBridge';
+import type { Result } from '../../../shared/result';
+import { BOUNDARY_LIMITS, pathText } from '../../../shared/boundary';
 import {
   deleteAsset,
   makeAssetDirectory,
@@ -12,18 +12,18 @@ import {
   readAssetListing,
   renameAsset,
   uploadAssets,
-} from '../assetPanelBridge';
+} from './assetPanelBridge';
 import {
   ChevronRightIcon,
   FolderIcon,
   FolderPlusIcon,
   TrashIcon,
   UploadCloudIcon,
-} from '../ui/Icons';
-import AssetThumb, { TEXT_EXT } from '../ui/AssetThumb';
-import MoreMenu from '../ui/MoreMenu';
-import { confirmDialog } from '../ui/ConfirmDialog';
-import { allowDragEffect } from '../editor/dragState';
+} from '../../ui/Icons';
+import AssetThumb, { TEXT_EXT } from '../../ui/AssetThumb';
+import MoreMenu from '../../ui/MoreMenu';
+import { confirmDialog } from '../../ui/ConfirmDialog';
+import { allowDragEffect } from '../../editor/dragState';
 
 const PICK_HOME = 'src/assets';
 const FILE_DROP_COUNT_MAX = 1_000;
