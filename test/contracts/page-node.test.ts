@@ -1,4 +1,4 @@
-// Goal: shared/page-node.ts is the trust boundary for the page tree — anything
+// Goal: shared/page/pageNode.ts is the trust boundary for the page tree — anything
 // electron/parse/astroParser or a future producer emits must survive it, and
 // everything malformed must die here with a useful message.
 //
@@ -15,7 +15,7 @@ import {
   parsePageModel,
   parsePageResult,
   assertTreeInvariants,
-} from '#dist/shared/page-node.js';
+} from '#dist/shared/page/pageNode.js';
 import { LIMITS } from '#dist/shared/core/limits.js';
 
 // Null as a boundary receives it, parsed from JSON: inputs may hold it; our values never do.

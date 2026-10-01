@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import type { ComponentProps } from 'react';
-import type { Attr } from '../../../shared/page-node';
+import type { Attr } from '../../../shared/page/pageNode';
 import type { FieldDefinition, PropValues } from './propRules';
 import type { RichContext } from './RichContent';
 import type { SourceContext, ValueChange, FieldPosition, InsertAPI } from './propBindings';

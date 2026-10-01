@@ -9,7 +9,7 @@ import { toFilePath, toIntentId, type Digest, type FilePath, type IntentId } fro
 import { digest, pathText } from './core/boundary';
 import { LIMITS } from './core/limits';
 import { toArray, toRecord } from './core/record';
-import { isNodeKind, parseAnchorRef, type AnchorKind, type AnchorRef } from './ref';
+import { isNodeKind, parseAnchorRef, type AnchorKind, type AnchorRef } from './page/ref';
 import {
   parseByteSpan,
   spanContains,

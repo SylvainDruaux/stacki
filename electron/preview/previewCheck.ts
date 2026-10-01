@@ -15,7 +15,7 @@ import {
   type PreviewRender,
   type PreviewVerdict,
   type StampedFileState,
-} from '../../shared/preview-token';
+} from '../../shared/page/previewToken';
 
 /** Judge `render` against the files under `projectPath` now. */
 export function checkPreviewRender(projectPath: string, render: PreviewRender): PreviewVerdict {

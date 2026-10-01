@@ -8,7 +8,7 @@ import { DevOffline } from './DevOffline';
 import { PreviewOverlays } from './PreviewOverlays';
 import { PreviewToolbar, deviceForWidth, deviceWidth } from './PreviewToolbar';
 import { usePreviewRuntime, type JudgeCanvasEvent } from './previewRuntime';
-import type { PreviewVerdict } from '../../../shared/preview-token';
+import type { PreviewVerdict } from '../../../shared/page/previewToken';
 import type { PreviewReloadReason } from './previewMessages';
 import { PREVIEW_WIDTH_LIMITS, previewViewport } from './previewViewport';
 import './previewViewport.css';

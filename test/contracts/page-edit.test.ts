@@ -24,7 +24,7 @@ import {
   parsePageEditResult,
   type PageDiskRead,
 } from '#dist/shared/page-save.js';
-import { parsePageNode, type PageNode } from '#dist/shared/page-node.js';
+import { parsePageNode, type PageNode } from '#dist/shared/page/pageNode.js';
 import { toUtf16Span } from '#dist/shared/core/span.js';
 
 // Null as a boundary receives it, parsed from JSON: inputs may hold it; our values never do.

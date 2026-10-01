@@ -4,8 +4,8 @@
 import { assert } from '#dist/shared/core/assert.js';
 import type { IntentId } from '#dist/shared/core/brand.js';
 import { toIntent, type Intent } from '#dist/shared/intent.js';
-import { isNodeKind, toAnchorRef, toChildIndex, type AnchorRef } from '#dist/shared/ref.js';
-import type { Snapshot } from '#dist/shared/snapshot.js';
+import { isNodeKind, toAnchorRef, toChildIndex, type AnchorRef } from '#dist/shared/page/ref.js';
+import type { Snapshot } from '#dist/shared/page/snapshot.js';
 import { encodeUtf8, toByteSpan, utf8ByteLength, type ByteSpan } from '#dist/shared/core/span.js';
 import type { OracleStep } from './oracles.ts';
 import type { Splice } from '#dist/shared/planner.js';

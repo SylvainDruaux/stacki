@@ -47,7 +47,7 @@ import {
   type SourceEdit,
 } from '../../shared/intent';
 import { commitChain, minimalSplices, rebaseIntent, type CommitRecord } from '../../shared/rebase';
-import type { Snapshot } from '../../shared/snapshot';
+import type { Snapshot } from '../../shared/page/snapshot';
 import { inverseEdits } from '../../shared/splice';
 import { LIMITS } from '../../shared/core/limits';
 import { err, ok, type Result } from '../../shared/core/result';

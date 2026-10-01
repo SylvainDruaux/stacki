@@ -552,7 +552,7 @@ if (!process.isMainFrame) {
   // manifest of this rendering, and its token — the SHA-256 of the manifest's
   // canonical text — rides on every located event, so the app can refuse a
   // click from a rendering the files have since moved past. Mirrors
-  // shared/preview-token.ts, which this sandboxed preload cannot require; the
+  // shared/page/previewToken.ts, which this sandboxed preload cannot require; the
   // contract test (test/contracts/preview-bridge.test.ts) pins the two to each
   // other. The patcher gathers the stamps at the document's end after each
   // patch; the page arrives with them wherever each file rendered.

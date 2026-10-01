@@ -4,7 +4,7 @@
 // panels instead of looking plainly editable.
 // Method: parse corpus pages with the real parser, bundle src/editor/nodeCapability.ts,
 // and compare its answer for every node with the projection's capability at the
-// same path (shared/source-projection.ts run on the same bytes), for .astro
+// same path (shared/page/sourceProjection.ts run on the same bytes), for .astro
 // corpus pages and Markdown and MDX pages alike. Absent ids are the negative
 // space.
 const test = require('node:test');
@@ -29,8 +29,8 @@ const { nodeCapability, capabilityNeedsNotice } = require(
 );
 const { parsePage } = require('#dist/electron/parse/astroParser.js');
 const { parseMarkdownPage } = require('#dist/electron/parse/markdownParser.js');
-const { projectPage } = require('#dist/shared/source-projection.js');
-const { CAPABILITIES } = require('#dist/shared/capability.js');
+const { projectPage } = require('#dist/shared/page/sourceProjection.js');
+const { CAPABILITIES } = require('#dist/shared/page/capability.js');
 
 const corpus = path.join(__dirname, 'corpus');
 

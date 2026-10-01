@@ -36,7 +36,7 @@ import {
   type Target,
   type ValidProjection,
 } from './planSupport';
-import { toChildIndex, type AnchorRef } from './ref';
+import { toChildIndex, type AnchorRef } from './page/ref';
 import { err, ok, type Result } from './core/result';
 import { markdownPrefix } from './markdownLayout';
 import {
@@ -47,7 +47,7 @@ import {
   markdownRemoved,
   reprefixed,
 } from './planMarkdown';
-import type { NodeList, ProjectedNode } from './source-projection';
+import type { NodeList, ProjectedNode } from './page/sourceProjection';
 import { encodeUtf8, toByteSpan, toByteString, type ByteSpan, type ByteString } from './core/span';
 
 const NEWLINE = 0x0a;

@@ -1,18 +1,18 @@
 // The projection: a disposable, byte-addressed view of one version of a file
 // (plan §3.6, §2 Layer 1). It is derived from the bytes, never edited, and
 // replaced whole when the bytes change. Named so that nothing in it can be
-// mistaken for the page tree in page-node.ts, which stays the wire model until
+// mistaken for the page tree in pageNode.ts, which stays the wire model until
 // step 9: a ProjectedNode has a byte span, a structural path and a capability,
 // and no id — identity is resolved at use time (plan §4).
 //
 // Invalid source is a first-class state, not an exception: the code editor and
 // external writers may leave a file that does not parse, and visual intents
 // then reject with `source-invalid` while the bytes stay in the snapshot.
-import { assert } from './core/assert';
-import { toUtf16Offset, type Utf16Offset } from './core/brand';
+import { assert } from '../core/assert';
+import { toUtf16Offset, type Utf16Offset } from '../core/brand';
 import type { Capability } from './capability';
-import { LIMITS } from './core/limits';
-import type { Attr, AttrSpan, PageModel, PageNode, ParsePageResult } from './page-node';
+import { LIMITS } from '../core/limits';
+import type { Attr, AttrSpan, PageModel, PageNode, ParsePageResult } from './pageNode';
 import { toChildIndex, type NodeKind, type StructuralPath } from './ref';
 import {
   encodeUtf8,
@@ -23,7 +23,7 @@ import {
   utf8ByteLength,
   type ByteSpan,
   type Utf16Span,
-} from './core/span';
+} from '../core/span';
 
 export interface ProjectedAttribute {
   readonly name: string;

@@ -15,7 +15,7 @@ import * as path from 'node:path';
 import { test } from 'node:test';
 import { toFilePath, toIntentId } from '#dist/shared/core/brand.js';
 import { LIMITS } from '#dist/shared/core/limits.js';
-import type { ProjectedNode } from '#dist/shared/source-projection.js';
+import type { ProjectedNode } from '#dist/shared/page/sourceProjection.js';
 import { encodeUtf8 } from '#dist/shared/core/span.js';
 import { oracleIntent, oracleSplices } from './oracle-intent.ts';
 import { ORACLE_SCENARIOS, type IntentClass } from './oracles.ts';

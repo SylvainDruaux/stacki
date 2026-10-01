@@ -31,18 +31,18 @@ import type {
   Projector,
   ReplaceError,
 } from '../../shared/documentActor';
-import { parsePageResult } from '../../shared/page-node';
+import { parsePageResult } from '../../shared/page/pageNode';
 import { parseMarkdownPage } from '../parse/markdownParser';
 import type { Plan } from '../../shared/planner';
 import { projectValueSplice } from '../../shared/projection-patch';
 import { toRecord } from '../../shared/core/record';
 import { err, ok, type Result } from '../../shared/core/result';
-import { createLazySnapshot, createSnapshot, type Snapshot } from '../../shared/snapshot';
+import { createLazySnapshot, createSnapshot, type Snapshot } from '../../shared/page/snapshot';
 import {
   projectOpaqueDocument,
   projectPage,
   type Projection,
-} from '../../shared/source-projection';
+} from '../../shared/page/sourceProjection';
 import { decodeUtf8, toByteString, type ByteString } from '../../shared/core/span';
 import { parsePage } from '../parse/astroParser';
 import {
@@ -290,7 +290,7 @@ function projectText(file: FilePath, text: string): Projection {
 const hashBytes = (bytes: ByteString) => digestOf(bytes);
 
 /** The actor's projector in the app. Snapshots derive their projection when
- * first read (shared/snapshot.ts, createLazySnapshot), so a save that only
+ * first read (shared/page/snapshot.ts, createLazySnapshot), so a save that only
  * replaces the whole file parses nothing it does not use. A single value
  * splice derives its candidate from the base projection
  * (shared/projection-patch.ts); the simulator holds that patch to a full

@@ -7,7 +7,7 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { parsePage, serializePage, parseAttrs } = require('#dist/electron/parse/astroParser.js');
-const { decodeEntities, encodeText } = require('#dist/shared/htmlText.js');
+const { decodeEntities, encodeText } = require('#dist/shared/page/htmlText.js');
 const { packageOf } = require('#dist/electron/preview/injectedRoutes.js');
 
 test('empty frontmatter closes before body text beginning with dashes', () => {

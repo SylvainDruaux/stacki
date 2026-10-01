@@ -108,7 +108,7 @@ test('edits to the files that define the gates ask a human', () => {
   }
   const allowed = [
     'src/Sample.tsx',
-    'shared/page-node.ts',
+    'shared/page/pageNode.ts',
     'shared/core/limitsOfText.ts',
     'shared/core/deeper/limits.ts',
     'scripts/release.ts',

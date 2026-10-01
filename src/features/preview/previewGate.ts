@@ -25,7 +25,7 @@ import {
   judgeShownFile,
   type PreviewRender,
   type PreviewVerdict,
-} from '../../../shared/preview-token';
+} from '../../../shared/page/previewToken';
 import type { EditorPageState } from '../../editor/pageState';
 
 /** The file open for editing, as the gate needs it. */

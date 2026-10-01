@@ -12,7 +12,7 @@ import { mainHarness } from '../helpers/mainHarness.ts';
 import { IPC_PAYLOADS } from '#dist/shared/ipc-payloads.js';
 import { toRecord } from '#dist/shared/core/record.js';
 import { parseMarkdownPage } from '#dist/electron/parse/markdownParser.js';
-import { parsePageModel } from '#dist/shared/page-node.js';
+import { parsePageModel } from '#dist/shared/page/pageNode.js';
 import {
   parseContentConfig,
   parseDynamicPaths,

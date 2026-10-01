@@ -4,7 +4,7 @@ import { revertComponentProperties } from '../features/componentProperties/prope
 import type { ClassOutcome } from '../features/style/model/host';
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { SetStateAction } from 'react';
-import type { Attr, ImportDecl, PageModel, PageNode, PairedNode } from '../../shared/page-node';
+import type { Attr, ImportDecl, PageModel, PageNode, PairedNode } from '../../shared/page/pageNode';
 import type { ScanComponent, ScanPage, ScanResult } from '../../shared/scan';
 import type { WireCommitInfo, WireInjectedRoute } from '../../shared/ipc-results';
 import WelcomeScreen from '../features/welcome/WelcomeScreen';
@@ -110,7 +110,7 @@ import { nodeCapability } from '../editor/nodeCapability';
 import type { PageEdited } from '../../shared/page-save';
 import type { Digest, NodeId } from '../../shared/core/brand';
 import { ancestorChain, createTreeIndex, nodeAtPath, pathOfNode } from '../editor/editorTree';
-import { readFrontmatter, writeFrontmatter } from '../../electron/frontmatter';
+import { readFrontmatter, writeFrontmatter } from '../../shared/page/frontmatterSource';
 import {
   renamedLoopVar,
   parseLoopHead,
@@ -273,7 +273,7 @@ import {
   type CheckRender,
   type ShownFile,
 } from '../features/preview/previewGate';
-import { describePreviewStale, type PreviewVerdict } from '../../shared/preview-token';
+import { describePreviewStale, type PreviewVerdict } from '../../shared/page/previewToken';
 import type { JudgeCanvasEvent } from '../features/preview/previewRuntime';
 import {
   describePreviewReload,

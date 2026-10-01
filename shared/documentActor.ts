@@ -31,7 +31,7 @@ import type { Intent, Outcome, RejectionReason, SubmissionResult } from './inten
 import { LIMITS } from './core/limits';
 import type { Plan, PlanningBase } from './planner';
 import { err, ok, type Result } from './core/result';
-import type { Snapshot } from './snapshot';
+import type { Snapshot } from './page/snapshot';
 import type { ByteString } from './core/span';
 import { applySplices, changedRanges, witnessesHold } from './splice';
 

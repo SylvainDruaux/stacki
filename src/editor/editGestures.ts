@@ -11,7 +11,7 @@ import type { EditorModel, EditorNode } from './pageView';
 import type { Edit, NodeRef } from '../../shared/edit-request';
 import { singleDeclarationChange } from '../../shared/inlineStyle';
 import { LIMITS } from '../../shared/core/limits';
-import type { Attr } from '../../shared/page-node';
+import type { Attr } from '../../shared/page/pageNode';
 import { renamedAttr } from './attrOrder';
 import { loopVarsAt, parseLoopHead, renamedLoopVar, strippedBindings } from './loopBindings';
 import type { EditGesture } from './pageEdits';

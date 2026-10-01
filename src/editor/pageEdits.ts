@@ -31,7 +31,7 @@ import type { Edit, EditRequest, NodeRef } from '../../shared/edit-request';
 import type { RejectionReason, SourceEdit } from '../../shared/intent';
 import { LIMITS } from '../../shared/core/limits';
 import type { PageEditError, PageEdited } from '../../shared/page-save';
-import type { PageModel, PageNode } from '../../shared/page-node';
+import type { PageModel, PageNode } from '../../shared/page/pageNode';
 import type { Result } from '../../shared/core/result';
 import type { EditorModel } from './pageView';
 import type { SaveState } from './saveState';

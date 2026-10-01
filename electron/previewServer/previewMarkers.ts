@@ -4,7 +4,7 @@
 // marked copy of every .astro file under src as Vite loads it: each node sits
 // between <!--avb-s:path--> / <!--avb-e:path--> comments, and each file carries
 // one stamp, <!--avb-d:<checksum>:<file>-->, naming the exact bytes it was
-// marked from (shared/preview-token.ts). The marked text exists only as the
+// marked from (shared/page/previewToken.ts). The marked text exists only as the
 // module Vite compiles. This module reads project files and returns strings; it
 // never writes, and nothing that writes project text imports it — so no marker
 // can change what the project itself builds or serves. The single-writer
@@ -18,7 +18,7 @@ import { readFileSync } from 'node:fs';
 import { assert } from '../../shared/core/assert';
 import { toDigest } from '../../shared/core/brand';
 import { LIMITS } from '../../shared/core/limits';
-import { stampComment, stampPathProblem } from '../../shared/preview-token';
+import { stampComment, stampPathProblem } from '../../shared/page/previewToken';
 import { markChunkHtml, parsePage, resolveChunks, serializePageMarked } from '../parse/astroParser';
 
 export interface MarkedSource {

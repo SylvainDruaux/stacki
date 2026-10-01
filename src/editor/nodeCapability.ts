@@ -1,14 +1,14 @@
 // What the visual editor may do with the node it shows as selected (plan §6,
-// step 7). The engine classifies projected nodes (shared/source-projection.ts);
+// step 7). The engine classifies projected nodes (shared/page/sourceProjection.ts);
 // the renderer holds the same parse as a page tree, so it asks the same
 // function the same question — one classification, not a second opinion. A node
 // the engine would refuse says so beside its panels instead of looking
 // editable and saving some other way.
 import { assert } from '../../shared/core/assert';
-import type { Capability } from '../../shared/capability';
+import type { Capability } from '../../shared/page/capability';
 import type { EditorModel, EditorNode } from './pageView';
 import { LIMITS } from '../../shared/core/limits';
-import { classifyNode } from '../../shared/source-projection';
+import { classifyNode } from '../../shared/page/sourceProjection';
 
 /** The capability of node `nodeId` in `model`, or undefined when the model has
  * no such node (the frontmatter subject, a node already gone). Markdown and MDX

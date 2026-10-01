@@ -39,7 +39,7 @@ import {
   type PreviewRender,
   type PreviewStamp,
   type StampedFileState,
-} from '#dist/shared/preview-token.js';
+} from '#dist/shared/page/previewToken.js';
 import { toDigest } from '#dist/shared/core/brand.js';
 import { LIMITS } from '#dist/shared/core/limits.js';
 

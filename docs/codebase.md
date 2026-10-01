@@ -49,7 +49,7 @@ everything else**. Concretely:
   `PageNode` tree. Nodes carry their **source ranges** (`.at` offsets), and
   anything not modeled (attributes in unusual order, raw `<script>`, unknown
   constructs) is kept verbatim and re-emitted on write.
-- Frontmatter (`electron/frontmatter.ts`) is _not_ treated as a code blob:
+- Frontmatter (`shared/page/frontmatterSource.ts`) is _not_ treated as a code blob:
   imports become editable records whose **slots** retain the exact source,
   whitespace, and position between them. Edits to the declarations field are
   mapped back to import positions by a line-based diff (`moveOffsets`) that
@@ -174,7 +174,7 @@ gesture → edit requests (page:edit) → main: intent → document actor
 The contract layer (`shared/`, introduced by the migration — see below) is
 now the authoritative description:
 
-- `shared/page-node.ts` — the `PageNode` discriminated union (10 kinds:
+- `shared/page/pageNode.ts` — the `PageNode` discriminated union (10 kinds:
   component, element, raw, text, expr, raw-line, comment, map, cond, branch,
   chunk-group), `PropValue` (`string | number | boolean | expr | raw`), the
   `PageModel` envelope (nodes, imports, layout chain, frontmatter slots), and
@@ -191,7 +191,7 @@ now the authoritative description:
 - `shared/core/limits.ts` — every runtime bound (parser depth/size, component
   nesting, pending intents, retained snapshots) in one importable module,
   enforced at boundaries.
-- `shared/htmlText.ts` — a text node's value: entity decoding and encoding
+- `shared/page/htmlText.ts` — a text node's value: entity decoding and encoding
   and the whitespace rule (`textValue`). The parser reads text with it, and
   the Content field emits `textValueCanonical` values so the save echo comes
   back identical to what it emitted (a differing echo resets its caret).

@@ -30,7 +30,7 @@ const check = (what, condition, detail) => {
   }
 };
 
-const { decodeEntities, encodeText } = require('#dist/shared/htmlText.js');
+const { decodeEntities, encodeText } = require('#dist/shared/page/htmlText.js');
 const { parsePage, serializePage } = require('#dist/electron/parse/astroParser.js');
 
 // ── Reading ─────────────────────────────────────────────────────────────────

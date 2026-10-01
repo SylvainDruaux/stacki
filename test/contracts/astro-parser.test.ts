@@ -10,7 +10,11 @@ import {
   serializePage,
   serializePageMarked,
 } from '#dist/electron/parse/astroParser.js';
-import { assertTreeInvariants, parsePageNode, parsePageResult } from '#dist/shared/page-node.js';
+import {
+  assertTreeInvariants,
+  parsePageNode,
+  parsePageResult,
+} from '#dist/shared/page/pageNode.js';
 import { LIMITS } from '#dist/shared/core/limits.js';
 import type { ParserNode } from '#dist/electron/parse/astroParserTypes.js';
 

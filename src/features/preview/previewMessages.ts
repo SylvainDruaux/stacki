@@ -11,7 +11,7 @@ import {
   record,
 } from '../../../shared/core/boundary';
 import type { Digest } from '../../../shared/core/brand';
-import { parsePreviewRender, type PreviewRender } from '../../../shared/preview-token';
+import { parsePreviewRender, type PreviewRender } from '../../../shared/page/previewToken';
 
 export type PreviewMessage =
   | {

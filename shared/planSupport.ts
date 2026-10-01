@@ -10,14 +10,14 @@
 // repeat in the file is ambiguous (planner.ts, uniqueOrAmbiguous), so a
 // resolved node is the node the intent was authored against, moved whole.
 import { assert } from './core/assert';
-import { capabilityAcceptsVisualIntent } from './capability';
+import { capabilityAcceptsVisualIntent } from './page/capability';
 import { LIMITS } from './core/limits';
 import type { SpanMapping } from './mapSpan';
-import type { AnchorRef, NodeKind, StructuralPath } from './ref';
+import type { AnchorRef, NodeKind, StructuralPath } from './page/ref';
 import { err, ok, type Result } from './core/result';
 import type { RejectionReason } from './intent';
-import type { Snapshot } from './snapshot';
-import type { ProjectedNode, Projection } from './source-projection';
+import type { Snapshot } from './page/snapshot';
+import type { ProjectedNode, Projection } from './page/sourceProjection';
 import {
   byteStringsEqual,
   decodeUtf8,

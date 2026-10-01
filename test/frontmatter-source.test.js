@@ -8,7 +8,7 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const path = require('node:path');
-const { readFrontmatter, writeFrontmatter } = require('#dist/electron/frontmatter.js');
+const { readFrontmatter, writeFrontmatter } = require('#dist/shared/page/frontmatterSource.js');
 const {
   parsePage,
   serializePage,

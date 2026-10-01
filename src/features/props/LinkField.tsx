@@ -1,5 +1,5 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import type { Attr } from '../../../shared/page-node';
+import type { Attr } from '../../../shared/page/pageNode';
 import { assert } from '../../../shared/core/assert';
 import { LIMITS } from '../../../shared/core/limits';
 import Dropdown from '../../ui/Dropdown';

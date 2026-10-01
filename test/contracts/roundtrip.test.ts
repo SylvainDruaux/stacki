@@ -1,5 +1,5 @@
 // Goal: prove the contract and the real parser agree — every tree the
-// serializer writes must re-parse editable, validate against shared/page-node,
+// serializer writes must re-parse editable, validate against shared/page/pageNode,
 // and preserve structure. A fuzzer proves the presence of bugs, never their
 // absence (AGENTS.md testing), so this hunts the roundtrip boundary with
 // generated trees, not hand-picked ones.
@@ -18,7 +18,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
-import { parsePageResult, assertTreeInvariants } from '#dist/shared/page-node.js';
+import { parsePageResult, assertTreeInvariants } from '#dist/shared/page/pageNode.js';
 
 const require = createRequire(import.meta.url);
 // CJS module boundary; every value it returns is validated by the contract parsers.

@@ -9,7 +9,7 @@ import type { FilePath } from '#dist/shared/core/brand.js';
 import type { Projector } from '#dist/shared/documentActor.js';
 import type { Plan } from '#dist/shared/planner.js';
 import { projectValueSplice } from '#dist/shared/projection-patch.js';
-import { createSnapshot, type Snapshot } from '#dist/shared/snapshot.js';
+import { createSnapshot, type Snapshot } from '#dist/shared/page/snapshot.js';
 import type { ByteString } from '#dist/shared/core/span.js';
 import { projectBytes, sha256, snapshotOf } from './project.ts';
 

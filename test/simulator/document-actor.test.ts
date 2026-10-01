@@ -24,7 +24,7 @@ import {
 } from '#dist/shared/documentActor.js';
 import { toIntent, type Intent, type Outcome } from '#dist/shared/intent.js';
 import { diffCodePatch } from '#dist/shared/code-patch.js';
-import { createLazySnapshot } from '#dist/shared/snapshot.js';
+import { createLazySnapshot } from '#dist/shared/page/snapshot.js';
 import { LIMITS } from '#dist/shared/core/limits.js';
 import { err } from '#dist/shared/core/result.js';
 import { encodeUtf8, toByteSpan } from '#dist/shared/core/span.js';
@@ -251,7 +251,7 @@ function digestOf(text: string): Digest {
 }
 
 // The app's projector derives a snapshot's projection only when something
-// reads it (shared/snapshot.ts): once, memoized, measured against its bytes.
+// reads it (shared/page/snapshot.ts): once, memoized, measured against its bytes.
 // Found by the step-8 long run (seed 139), reduced by line: outside edits left a
 // comment inside two tags, which the parser reads as bare attributes. The
 // planner appends an attribute where it sees the <img>'s tag end — inside the

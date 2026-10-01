@@ -25,7 +25,7 @@ import {
   parsePreviewVerdict,
   type PreviewRender,
   type PreviewVerdict,
-} from '../../shared/preview-token';
+} from '../../shared/page/previewToken';
 import type { Result } from '../../shared/core/result';
 
 export interface PageChangeEvent {

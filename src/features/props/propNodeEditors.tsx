@@ -1,5 +1,5 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import type { MapNode } from '../../../shared/page-node';
+import type { MapNode } from '../../../shared/page/pageNode';
 import type { RichContext } from './RichContent';
 import type { ExprInputAPI } from '../../ui/ExprInput';
 import type { FieldPosition, SourceContext } from './propBindings';

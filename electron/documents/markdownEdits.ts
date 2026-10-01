@@ -23,12 +23,12 @@ import { assert } from '../../shared/core/assert';
 import type { Edit, NodeRef } from '../../shared/edit-request';
 import type { AttributeValue, Placement, RejectionReason } from '../../shared/intent';
 import { blankLinePrefix, markdownPrefix } from '../../shared/markdownLayout';
-import { parsePageResult, type Attr, type PageNode } from '../../shared/page-node';
+import { parsePageResult, type Attr, type PageNode } from '../../shared/page/pageNode';
 import { markdownBeside } from '../../shared/planMarkdown';
 import { nodeAtPath, parentPath, textOf } from '../../shared/planSupport';
-import { toAnchorRef } from '../../shared/ref';
+import { toAnchorRef } from '../../shared/page/ref';
 import { err, ok, type Result } from '../../shared/core/result';
-import type { ProjectedNode } from '../../shared/source-projection';
+import type { ProjectedNode } from '../../shared/page/sourceProjection';
 import { toByteSpan } from '../../shared/core/span';
 import type { IntentDraft } from './documentActors';
 import {

@@ -263,7 +263,7 @@ const DETERMINISM_RULES = {
 };
 // Pure engine contracts, fenced like the simulator: they will run inside it.
 const ENGINE_CONTRACTS = [
-  'shared/capability.ts',
+  'shared/page/capability.ts',
   'shared/code-patch.ts',
   'shared/diff.ts',
   'shared/documentActor.ts',
@@ -278,9 +278,9 @@ const ENGINE_CONTRACTS = [
   'shared/planText.ts',
   'shared/planTree.ts',
   'shared/rebase.ts',
-  'shared/ref.ts',
-  'shared/snapshot.ts',
-  'shared/source-projection.ts',
+  'shared/page/ref.ts',
+  'shared/page/snapshot.ts',
+  'shared/page/sourceProjection.ts',
   'shared/core/span.ts',
   'shared/splice.ts',
 ];
@@ -315,8 +315,6 @@ const SOURCE_LAYERS = {
     ],
   },
   outside: ['shared'],
-  // The frontmatter reader is shared with main and moves into shared/.
-  outsideEdges: { 'app/App': ['electron/frontmatter'] },
 };
 
 // The main process's areas (docs/codebase.md, "Directory map"): each folder
@@ -332,9 +330,7 @@ const ELECTRON_AREAS = {
   areas: {
     main: ['*'],
     lib: [],
-    // frontmatter.ts is a root file until it moves into shared/.
-    frontmatter: [],
-    parse: ['lib', 'frontmatter'],
+    parse: ['lib'],
     documents: ['lib', 'parse'],
     content: ['lib', 'documents'],
     project: ['lib', 'documents'],

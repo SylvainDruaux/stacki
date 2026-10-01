@@ -27,9 +27,10 @@ export const POLICY_LIMITS = {
   commitSubjectCharsMax: 72,
   /**
    * Assertions per function in shared/, averaged. AGENTS.md §9 asks for 2;
-   * shared/ measured 0.56 when the scan landed (271 across 482 functions). The
-   * floor holds what exists and only rises: raise it with each file that gains
-   * real invariants, never lower it.
+   * shared/ measured 0.56 when the scan landed (271 across 482 functions) and
+   * 0.57 once the frontmatter source joined shared/ with its invariants
+   * asserted (291 across 509). The floor holds what exists and only rises:
+   * raise it with each file that gains real invariants, never lower it.
    */
-  sharedAssertionsPerFunctionMin: 0.56,
+  sharedAssertionsPerFunctionMin: 0.57,
 } as const satisfies Record<string, number>;

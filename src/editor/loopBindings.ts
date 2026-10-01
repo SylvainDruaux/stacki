@@ -14,7 +14,7 @@
 import { LIMITS } from '../../shared/core/limits';
 import { assert } from '../../shared/core/assert';
 import type { EditorNode } from './pageView';
-import type { Attr } from '../../shared/page-node';
+import type { Attr } from '../../shared/page/pageNode';
 
 const MAP_HEAD_RE =
   /^([\s\S]+?)\.map\(\s*\(\s*([A-Za-z_$][\w$]*)\s*(?:,\s*([A-Za-z_$][\w$]*)\s*)?\)\s*=>\s*\($/;

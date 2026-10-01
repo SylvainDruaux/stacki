@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import type { MutableRefObject, RefObject } from 'react';
 import type { Completion } from '@codemirror/autocomplete';
-import type { Attr } from '../../../shared/page-node';
+import type { Attr } from '../../../shared/page/pageNode';
 import type { FieldDefinition } from './propRules';
 import type { TemplateHole } from '../../editor/bindings';
 import type { RichContext } from './RichContent';

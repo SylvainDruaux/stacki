@@ -31,7 +31,7 @@ import { DIFF_BUDGET, diffBytes } from '../../shared/diff';
 import type { SourceEdit } from '../../shared/intent';
 import { LIMITS } from '../../shared/core/limits';
 import { mapSpanThroughDiff } from '../../shared/mapSpan';
-import type { PageModel, PageNode } from '../../shared/page-node';
+import type { PageModel, PageNode } from '../../shared/page/pageNode';
 import type { Splice } from '../../shared/planner';
 import { rebaseSpan } from '../../shared/rebase';
 import {

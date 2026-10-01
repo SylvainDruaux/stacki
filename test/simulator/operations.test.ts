@@ -25,9 +25,9 @@ import { editInlineStyle, singleDeclarationChange } from '#dist/shared/inlineSty
 import { toIntent, type Intent, type Operation } from '#dist/shared/intent.js';
 import { renameSites } from '#dist/shared/loopScope.js';
 import { planIntent, planIntentThroughDiff, type Plan } from '#dist/shared/planner.js';
-import { toAnchorRef, type AnchorRef } from '#dist/shared/ref.js';
-import type { Snapshot } from '#dist/shared/snapshot.js';
-import type { ProjectedNode } from '#dist/shared/source-projection.js';
+import { toAnchorRef, type AnchorRef } from '#dist/shared/page/ref.js';
+import type { Snapshot } from '#dist/shared/page/snapshot.js';
+import type { ProjectedNode } from '#dist/shared/page/sourceProjection.js';
 import { decodeUtf8, encodeUtf8, toByteSpan } from '#dist/shared/core/span.js';
 import { applySplices, inverseEdits } from '#dist/shared/splice.js';
 import { anchorAt, oracleIntent, oracleSplices } from './oracle-intent.ts';

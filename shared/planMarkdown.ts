@@ -30,7 +30,7 @@ import {
   type ValidProjection,
 } from './planSupport';
 import { toByteSpan, type ByteSpan, type ByteString } from './core/span';
-import type { ProjectedNode } from './source-projection';
+import type { ProjectedNode } from './page/sourceProjection';
 
 const NEWLINE = 0x0a;
 const CARRIAGE = 0x0d;

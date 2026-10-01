@@ -1,5 +1,5 @@
-import type { PageModel, PageNode } from '../../../shared/page-node';
-import type { Diagnostic } from '../../../shared/source-projection';
+import type { PageModel, PageNode } from '../../../shared/page/pageNode';
+import type { Diagnostic } from '../../../shared/page/sourceProjection';
 import { assert } from '../../../shared/core/assert';
 import { LIMITS } from '../../../shared/core/limits';
 import { treeBudget } from '../../editor/treeView';

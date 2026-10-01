@@ -16,16 +16,16 @@ import {
   capabilityAcceptsVisualIntent,
   describeCapability,
   parseCapability,
-} from '#dist/shared/capability.js';
+} from '#dist/shared/page/capability.js';
 import { LIMITS } from '#dist/shared/core/limits.js';
-import { parsePageResult } from '#dist/shared/page-node.js';
-import { createSnapshot } from '#dist/shared/snapshot.js';
+import { parsePageResult } from '#dist/shared/page/pageNode.js';
+import { createSnapshot } from '#dist/shared/page/snapshot.js';
 import {
   projectionAcceptsVisualIntents,
   projectOpaqueDocument,
   projectPage,
   type ProjectedNode,
-} from '#dist/shared/source-projection.js';
+} from '#dist/shared/page/sourceProjection.js';
 import { encodeUtf8, type ByteString } from '#dist/shared/core/span.js';
 
 const project = (text: string) =>

@@ -1,9 +1,9 @@
 // Inline serialization preserves expression spelling and harmless markup while
 // bounding source/DOM traversal. DOM reads produce fresh nodes without source IDs.
 import { BIND_PATH_RE } from '../../editor/bindings';
-import type { Attr } from '../../../shared/page-node';
+import type { Attr } from '../../../shared/page/pageNode';
 import { assert } from '../../../shared/core/assert';
-import { textValueCanonical } from '../../../shared/htmlText';
+import { textValueCanonical } from '../../../shared/page/htmlText';
 import { LIMITS } from '../../../shared/core/limits';
 
 export interface InlineCandidate {
@@ -86,7 +86,7 @@ export function isInlineOnly<T extends InlineCandidate>(
       return false;
     }
     // A void element (`<br>`) carries `children: undefined`; a node with no
-    // `children` key at all is malformed (shared/page-node.ts: PairedNode).
+    // `children` key at all is malformed (shared/page/pageNode.ts: PairedNode).
     if (!('children' in node)) {
       return false;
     }

@@ -66,10 +66,10 @@ import {
   planRevertSplices,
   planRewriteNode,
 } from './planText';
-import type { AnchorRef, NodeKind, StructuralPath } from './ref';
+import type { AnchorRef, NodeKind, StructuralPath } from './page/ref';
 import { err, ok, type Result } from './core/result';
-import type { Snapshot } from './snapshot';
-import type { ProjectedAttribute, ProjectedNode } from './source-projection';
+import type { Snapshot } from './page/snapshot';
+import type { ProjectedAttribute, ProjectedNode } from './page/sourceProjection';
 import {
   byteStringsEqual,
   encodeUtf8,

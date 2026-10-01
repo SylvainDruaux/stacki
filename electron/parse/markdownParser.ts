@@ -40,7 +40,7 @@
 
 import { assert } from '../../shared/core/assert';
 import { LIMITS } from '../../shared/core/limits';
-import type { Attr, AttrSpan } from '../../shared/page-node';
+import type { Attr, AttrSpan } from '../../shared/page/pageNode';
 import { toUtf16Span } from '../../shared/core/span';
 import { parseTemplate, serializeNodes } from './astroParser';
 

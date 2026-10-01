@@ -54,7 +54,7 @@ assert.throws(() => domToNodes(host), /DOM depth limit exceeded/);
 // Text the field emits is the value the parser will hold once the save is
 // written and read back: whitespace runs squeeze to one space, with one space
 // kept at either boundary. The save echo comes back through the parser's own
-// rule (textValue in shared/htmlText.ts), so anything looser made the echoed
+// rule (textValue in shared/page/htmlText.ts), so anything looser made the echoed
 // value differ from the last emission and the field's sync reset the caret
 // mid-word.
 host.textContent = 'hello  ';

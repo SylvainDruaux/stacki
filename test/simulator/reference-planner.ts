@@ -8,13 +8,13 @@
 //
 // Pure (plan §5.2): snapshot and intent in, Result out. No disk, no clock.
 import { assert } from '#dist/shared/core/assert.js';
-import { capabilityAcceptsVisualIntent } from '#dist/shared/capability.js';
+import { capabilityAcceptsVisualIntent } from '#dist/shared/page/capability.js';
 import type { Intent, RejectionReason } from '#dist/shared/intent.js';
 import { LIMITS } from '#dist/shared/core/limits.js';
-import type { AnchorRef, StructuralPath } from '#dist/shared/ref.js';
+import type { AnchorRef, StructuralPath } from '#dist/shared/page/ref.js';
 import { err, ok, type Result } from '#dist/shared/core/result.js';
-import type { Snapshot } from '#dist/shared/snapshot.js';
-import type { ProjectedNode, Projection } from '#dist/shared/source-projection.js';
+import type { Snapshot } from '#dist/shared/page/snapshot.js';
+import type { ProjectedNode, Projection } from '#dist/shared/page/sourceProjection.js';
 import {
   byteStringsEqual,
   encodeUtf8,

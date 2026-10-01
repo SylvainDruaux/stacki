@@ -17,7 +17,7 @@
 //
 // Fixtures: test/fixtures/editor-core/<file> and <name>.expected.<extension>.
 import type { Operation, RejectionReason } from '#dist/shared/intent.js';
-import type { AnchorKind, AnchorRef, NodeKind } from '#dist/shared/ref.js';
+import type { AnchorKind, AnchorRef, NodeKind } from '#dist/shared/page/ref.js';
 import type { ByteSpan } from '#dist/shared/core/span.js';
 
 export type IntentClass =

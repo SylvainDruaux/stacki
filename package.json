@@ -274,7 +274,6 @@
     "asarUnpack": [
       "dist/electron/parse/**",
       "dist/electron/previewServer/**",
-      "dist/electron/frontmatter.js",
       "dist/shared/**",
       "**/node_modules/node-pty/**"
     ],
@@ -331,7 +330,6 @@
     }
   },
   "exports": {
-    ".": "./dist/electron/main.js",
-    "./frontmatter": "./dist/electron/frontmatter.js"
+    ".": "./dist/electron/main.js"
   }
 }

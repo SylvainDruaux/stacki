@@ -3,7 +3,7 @@
 // source of a page the visual model cannot hold.
 import type { Digest } from '../../shared/core/brand';
 import { LIMITS } from '../../shared/core/limits';
-import type { ParsePageResult } from '../../shared/page-node';
+import type { ParsePageResult } from '../../shared/page/pageNode';
 import { carryHandles, randomSeed, seedOf } from './nodeHandles';
 import type { PageOrigin } from './pageEdits';
 import type { EditorModel, EditorNode } from './pageView';

@@ -24,9 +24,9 @@ import { assert } from './core/assert';
 import { toIntent, type Intent, type Operation, type RejectionReason } from './intent';
 import { LIMITS } from './core/limits';
 import type { Splice } from './planner';
-import { isNodeKind, toAnchorRef, type AnchorRef } from './ref';
+import { isNodeKind, toAnchorRef, type AnchorRef } from './page/ref';
 import { err, ok, type Result } from './core/result';
-import type { Snapshot } from './snapshot';
+import type { Snapshot } from './page/snapshot';
 import { toByteSpan, toByteString, type ByteSpan } from './core/span';
 import { orderedSplices } from './splice';
 

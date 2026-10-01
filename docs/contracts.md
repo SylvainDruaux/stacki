@@ -8,7 +8,7 @@ that boundary check succeeds.
 
 ## Page trees
 
-`shared/page-node.ts` is the canonical page model for Astro, Markdown, and MDX.
+`shared/page/pageNode.ts` is the canonical page model for Astro, Markdown, and MDX.
 `parsePageNode`, `parsePageTree`, `parsePageModel`, and `parsePageReadResult`
 enforce these invariants:
 
@@ -144,10 +144,10 @@ no operation replaces a whole file.
   since it was authored — wrapped in a loop outside Stacki — is refused
   `region-externally-modified`. The renderer shows every other capability
   beside the selection (`src/editor/nodeCapability.ts`, `CapabilityNotice`).
-- `source-projection.ts` — the `Projection` sum (`valid` with byte-addressed
+- `sourceProjection.ts` — the `Projection` sum (`valid` with byte-addressed
   nodes, paths, attribute spans and capabilities, and the text's UTF-16 length,
   which the parser bounds; or `parse-error` with bounded diagnostics). Named so
-  nothing in it can be confused with the `page-node.ts` wire model. `.astro`,
+  nothing in it can be confused with the `pageNode.ts` wire model. `.astro`,
   and since step 10 `.md` and `.mdx`: each node says how it is written
   (`syntax`: `markup` or `markdown`) and which list it sits in (`list`:
   `markup`, `blocks`, `items` or `inline`), which the planner's Markdown rules
@@ -328,7 +328,7 @@ module imports it (`test/contracts/preview-bridge.test.ts` holds both, and runs
 the real generated plugin over a project whose bytes it compares before and
 after). The generated config itself lives in `node_modules/.avb`.
 
-- `preview-token.ts` — every marked file also carries one stamp,
+- `previewToken.ts` — every marked file also carries one stamp,
   `<!--avb-d:<sha256>:<project-relative path>-->`, for the exact bytes it was
   marked from. The frame collects a rendering's stamps into a manifest (sorted
   by path, one entry per file, at most `previewManifestFilesMax`; one file with

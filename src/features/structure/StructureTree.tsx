@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import type { PairedNode } from '../../../shared/page-node';
+import type { PairedNode } from '../../../shared/page/pageNode';
 import type { NavigatorNode, DropLocation, DropTarget } from './structureModel';
 import { canContainTag } from '../../editor/elementSchemas';
 import { isDataBound } from '../../editor/bindings';

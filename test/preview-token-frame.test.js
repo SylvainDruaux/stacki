@@ -1,5 +1,5 @@
 // Goal: the canvas frame announces the token the app and main compute (plan §9,
-// step 7). The sandboxed preload cannot require shared/preview-token.ts, so it
+// step 7). The sandboxed preload cannot require shared/page/previewToken.ts, so it
 // carries its own copy of the manifest rules; this pins the copy to the
 // original: the same stamps — wherever the page put them, before <html>, in
 // <head>, in the body, once per rendered copy — give the same token, and every
@@ -8,7 +8,7 @@
 // refused rather than vouched for.
 // Method: run the real built preload in jsdom as a canvas frame, with the
 // parent's postMessage captured; compare its `avb:render` announcement with
-// shared/preview-token.ts's manifestOf + canonicalManifest + SHA-256.
+// shared/page/previewToken.ts's manifestOf + canonicalManifest + SHA-256.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const path = require('node:path');
@@ -21,7 +21,7 @@ const {
   manifestOf,
   stampComment,
   parsePreviewRender,
-} = require('#dist/shared/preview-token.js');
+} = require('#dist/shared/page/previewToken.js');
 
 const settle = (ms = 80) => new Promise((resolve) => setTimeout(resolve, ms));
 const FIRST_CHECKSUM = 'a'.repeat(64);

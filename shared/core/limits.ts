@@ -107,7 +107,7 @@ export const LIMITS = {
    * editor on a page too big to diff (step 7). */
   previewMorphWorkMax: 4_000_000,
   /** Distinct files one preview render's manifest may name: the page, its
-   * layouts and every component that rendered (shared/preview-token.ts). A
+   * layouts and every component that rendered (shared/page/previewToken.ts). A
    * render past it has no token, and its events are refused. */
   previewManifestFilesMax: 512,
   /** UTF-16 units of one project-relative path in a preview stamp. */

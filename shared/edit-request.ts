@@ -20,9 +20,9 @@ import type { CodeHunk } from './code-patch';
 import type { AttributeValue, Placement, SourceEdit, StyleDeclaration } from './intent';
 import { PLACEMENTS, TAG_NAME_RE } from './intent';
 import { LIMITS } from './core/limits';
-import { parsePageModel, parsePageNode, type PageModel, type PageNode } from './page-node';
+import { parsePageModel, parsePageNode, type PageModel, type PageNode } from './page/pageNode';
 import { toArray, toRecord } from './core/record';
-import { NODE_KINDS, STRUCTURAL_PATH_STEPS_MAX, type NodeKind } from './ref';
+import { NODE_KINDS, STRUCTURAL_PATH_STEPS_MAX, type NodeKind } from './page/ref';
 import { parseByteSpan, parseUtf16Span, spansAscending, type Utf16Span } from './core/span';
 
 /** A node of the parse the request was authored against. */

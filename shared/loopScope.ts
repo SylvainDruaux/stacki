@@ -24,8 +24,8 @@ import {
   whitespaceBefore,
   type ValidProjection,
 } from './planSupport';
-import type { StructuralPath } from './ref';
-import type { ProjectedNode } from './source-projection';
+import type { StructuralPath } from './page/ref';
+import type { ProjectedNode } from './page/sourceProjection';
 import { toByteSpan, type ByteSpan, type ByteString } from './core/span';
 
 export interface LoopParameter {

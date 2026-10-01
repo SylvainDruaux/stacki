@@ -1,4 +1,4 @@
-import type { Attr } from '../../../shared/page-node';
+import type { Attr } from '../../../shared/page/pageNode';
 import type { BuiltinField } from '../../editor/elementSchemas';
 export interface AstroAsset {
   readonly name: string;

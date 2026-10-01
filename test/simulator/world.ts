@@ -36,9 +36,9 @@ import {
 import { changedRanges, inverseEdits, orderedSplices } from '#dist/shared/splice.js';
 import { diffCodePatch } from '#dist/shared/code-patch.js';
 import { LIMITS } from '#dist/shared/core/limits.js';
-import { toAnchorRef, toChildIndex } from '#dist/shared/ref.js';
-import type { Snapshot } from '#dist/shared/snapshot.js';
-import type { ProjectedNode } from '#dist/shared/source-projection.js';
+import { toAnchorRef, toChildIndex } from '#dist/shared/page/ref.js';
+import type { Snapshot } from '#dist/shared/page/snapshot.js';
+import type { ProjectedNode } from '#dist/shared/page/sourceProjection.js';
 import {
   type ByteString,
   decodeUtf8,

@@ -16,7 +16,7 @@ import { createHash } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { toFilePath } from '#dist/shared/core/brand.js';
-import { capabilityAcceptsVisualIntent } from '#dist/shared/capability.js';
+import { capabilityAcceptsVisualIntent } from '#dist/shared/page/capability.js';
 import { LIMITS } from '#dist/shared/core/limits.js';
 import type { Splice } from '#dist/shared/planner.js';
 import {
@@ -24,7 +24,7 @@ import {
   projectValueSplice,
   valueBytesNeutral,
 } from '#dist/shared/projection-patch.js';
-import type { Projection } from '#dist/shared/source-projection.js';
+import type { Projection } from '#dist/shared/page/sourceProjection.js';
 import {
   encodeUtf8,
   toByteString,

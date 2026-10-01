@@ -1,4 +1,4 @@
-import type { Attr } from '../../shared/page-node';
+import type { Attr } from '../../shared/page/pageNode';
 type ClassProps = Readonly<Record<string, Attr>>;
 interface ClassEdit {
   readonly key: string;

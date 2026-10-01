@@ -55,7 +55,7 @@
 import { assert } from './core/assert';
 import { LIMITS } from './core/limits';
 import type { Splice } from './planner';
-import type { ProjectedAttribute, ProjectedNode, Projection } from './source-projection';
+import type { ProjectedAttribute, ProjectedNode, Projection } from './page/sourceProjection';
 import {
   byteStringsEqual,
   toByteSpan,

@@ -4,7 +4,7 @@ import type {
   ChunkGroupNode,
   Attr,
   ValueNode,
-} from '../../../shared/page-node';
+} from '../../../shared/page/pageNode';
 import type { FieldDefinition, PropValues } from './propRules';
 import type { SetProp, SetProps } from './propAttributes';
 import type { SetText, TagOption, TagFieldProps } from './propNodeEditors';

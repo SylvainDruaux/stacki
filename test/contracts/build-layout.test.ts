@@ -33,7 +33,9 @@ test('package entry and sandboxed preload use the built runtime', () => {
   assert.equal(main, 'dist/electron/main.js');
   assert.ok(existsSync(resolve(root, main)));
   const exports = record(manifest['exports']);
-  assert.equal(exports['./frontmatter'], './dist/electron/frontmatter.js');
+  // The renderer reads the frontmatter source from shared/ directly; the package exports
+  // only its entry.
+  assert.deepEqual(Object.keys(exports), ['.']);
   const preload = readFileSync(resolve(root, 'dist/electron/preload/preload.js'), 'utf8');
   const imports = [...preload.matchAll(/require\(["']([^"']+)["']\)/g)];
   assert.ok(imports.length > 0);

@@ -7,7 +7,7 @@
 import { toDigest, type Digest } from './core/brand';
 import { parseRejectionReason, type RejectionReason, type SourceEdit } from './intent';
 import { LIMITS } from './core/limits';
-import { parsePageReadResult, type ParsePageResult } from './page-node';
+import { parsePageReadResult, type ParsePageResult } from './page/pageNode';
 import { toArray, toRecord } from './core/record';
 import { err, ok, type Result } from './core/result';
 import { parseByteSpan, spansAscending } from './core/span';

@@ -26,7 +26,7 @@ import {
   projectValueSplice,
   valueBytesNeutral,
 } from '#dist/shared/projection-patch.js';
-import type { ProjectedNode, Projection } from '#dist/shared/source-projection.js';
+import type { ProjectedNode, Projection } from '#dist/shared/page/sourceProjection.js';
 import {
   decodeUtf8,
   encodeUtf8,

@@ -1,5 +1,5 @@
 import type { ComponentProperties } from './component-properties';
-import type { PreviewVerdict } from './preview-token';
+import type { PreviewVerdict } from './page/previewToken';
 import type { Result } from './core/result';
 // Invoke results mirror the handlers' wire shapes; absence is `undefined` (AGENTS.md §6).
 // Main's typed registrar checks every handler against this inventory.

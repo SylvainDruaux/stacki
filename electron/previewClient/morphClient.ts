@@ -63,7 +63,7 @@ function stripTemplateMarkers(root: ParentNode): void {
 
 // Every comment the editor puts in a page: the node markers (`avb-s:`,
 // `avb-e:`) and each marked file's stamp (`avb-d:`, the bytes it was marked
-// from — shared/preview-token.ts). None of them is content, and none takes part
+// from — shared/page/previewToken.ts). None of them is content, and none takes part
 // in the comparison.
 const isAnchor = (node: Node | undefined): boolean => {
   const comment = node !== undefined && asComment(node) ? node : undefined;

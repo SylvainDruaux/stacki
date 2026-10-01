@@ -15,9 +15,9 @@ import * as path from 'node:path';
 import { test } from 'node:test';
 import { parseAttrs, parsePage } from '#dist/electron/parse/astroParser.js';
 import { LIMITS } from '#dist/shared/core/limits.js';
-import { parsePageResult, type PageNode } from '#dist/shared/page-node.js';
+import { parsePageResult, type PageNode } from '#dist/shared/page/pageNode.js';
 import type { ParserNode } from '#dist/electron/parse/astroParserTypes.js';
-import { projectPage } from '#dist/shared/source-projection.js';
+import { projectPage } from '#dist/shared/page/sourceProjection.js';
 import {
   generateLargeFixtures,
   manifestEntry,

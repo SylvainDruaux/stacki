@@ -1,4 +1,4 @@
-import type { Attr } from '../../shared/page-node';
+import type { Attr } from '../../shared/page/pageNode';
 // Whether a node renders data rather than fixed markup — an expression prop
 // (`href={service.link}`), an `{expr}` child, or text with an interpolation
 // in it. Only the node's own props and its direct children count: a section

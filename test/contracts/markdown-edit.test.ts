@@ -18,7 +18,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { test } from 'node:test';
 import type { Edit, NodeRef } from '#dist/shared/edit-request.js';
-import { parsePageNode, type PageModel, type PageNode } from '#dist/shared/page-node.js';
+import { parsePageNode, type PageModel, type PageNode } from '#dist/shared/page/pageNode.js';
 import {
   parsePageDiskRead,
   parsePageEditResult,

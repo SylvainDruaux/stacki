@@ -3,8 +3,12 @@
 // reject missing fields, invalid offsets, flags, and oversized collections.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { readFrontmatter } from '#dist/electron/frontmatter.js';
-import { parseImportSlots, parseImportSlot, parseImportMember } from '#dist/shared/frontmatter.js';
+import { readFrontmatter } from '#dist/shared/page/frontmatterSource.js';
+import {
+  parseImportSlots,
+  parseImportSlot,
+  parseImportMember,
+} from '#dist/shared/page/frontmatter.js';
 import { LIMITS } from '#dist/shared/core/limits.js';
 
 // Null as a boundary receives it, parsed from JSON: inputs may hold it; our values never do.

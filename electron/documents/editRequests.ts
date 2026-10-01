@@ -30,10 +30,10 @@ import {
   tagNameEnd,
   textOf,
 } from '../../shared/planSupport';
-import { parsePageResult, type PageNode } from '../../shared/page-node';
-import { toAnchorRef, type AnchorRef } from '../../shared/ref';
+import { parsePageResult, type PageNode } from '../../shared/page/pageNode';
+import { toAnchorRef, type AnchorRef } from '../../shared/page/ref';
 import { err, ok, type Result } from '../../shared/core/result';
-import type { Snapshot } from '../../shared/snapshot';
+import type { Snapshot } from '../../shared/page/snapshot';
 import {
   byteStringsEqual,
   decodeUtf8,

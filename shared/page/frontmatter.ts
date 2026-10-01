@@ -1,7 +1,7 @@
 // Source slots cross IPC with the page model. Keep their validated contract
 // independent of Electron so the renderer and source writer share one shape.
-import { LIMITS } from './core/limits';
-import { toArray, toRecord } from './core/record';
+import { LIMITS } from '../core/limits';
+import { toArray, toRecord } from '../core/record';
 
 export interface ImportMember {
   readonly name: string;

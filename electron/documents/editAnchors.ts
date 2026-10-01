@@ -15,10 +15,10 @@ import type { NodeRef } from '../../shared/edit-request';
 import type { RejectionReason, SourceEdit } from '../../shared/intent';
 import { mapSpanThroughDiff } from '../../shared/mapSpan';
 import { nodeAtPath, type ValidProjection } from '../../shared/planSupport';
-import { toAnchorRef, toChildIndex, type AnchorRef } from '../../shared/ref';
+import { toAnchorRef, toChildIndex, type AnchorRef } from '../../shared/page/ref';
 import { err, ok, type Result } from '../../shared/core/result';
-import type { Snapshot } from '../../shared/snapshot';
-import type { ProjectedNode } from '../../shared/source-projection';
+import type { Snapshot } from '../../shared/page/snapshot';
+import type { ProjectedNode } from '../../shared/page/sourceProjection';
 import {
   encodeUtf8,
   spansAscending,

@@ -2,10 +2,10 @@
 // editable records; their slots retain the code and whitespace between them.
 // No renderer or Node dependencies: this module is also loaded by Astro.
 
-import { assert } from '../shared/core/assert';
+import { assert } from '../core/assert';
 
-import type { ImportMember, ImportSlot, FrontmatterLayout } from '../shared/frontmatter';
-export type { ImportMember, ImportSlot, FrontmatterLayout } from '../shared/frontmatter';
+import type { ImportMember, ImportSlot, FrontmatterLayout } from './frontmatter';
+export type { ImportMember, ImportSlot, FrontmatterLayout } from './frontmatter';
 
 type SerializableImport = Omit<ImportMember, 'at'> & { readonly at?: number };
 
@@ -23,6 +23,7 @@ const MEMBER = /^(type\s+)?([A-Za-z_$][\w$]*)(?:\s+as\s+([A-Za-z_$][\w$]*))?$/;
 
 function skipQuoted(text: string, start: number): number {
   const quote = text.charAt(start);
+  assert('\'"`'.includes(quote), 'skipQuoted: starts at a quote');
   let i = start + 1;
   for (; i < text.length; i++) {
     if (text.charAt(i) === '\\') {
@@ -33,6 +34,7 @@ function skipQuoted(text: string, start: number): number {
       i = skipBraced(text, i + 1) - 1;
     }
   }
+  assert(i > start, 'skipQuoted: a quoted run consumes its opening quote');
   return i;
 }
 
@@ -77,6 +79,7 @@ function skipCodeToken(text: string, i: number): number {
 }
 
 function skipBraced(text: string, start: number): number {
+  assert(text.charAt(start) === '{', 'skipBraced: starts at an opening brace');
   let depth = 0;
   for (let i = start; i < text.length; i++) {
     const skipped = skipCodeToken(text, i);
@@ -285,7 +288,10 @@ function withWhitespace(raw: string, value = ''): string {
   }
   const from = raw.length - raw.trimStart().length;
   const to = Math.max(from, raw.trimEnd().length);
-  return raw.slice(0, from) + value + raw.slice(to);
+  const result = raw.slice(0, from) + value + raw.slice(to);
+  // Only the whitespace around the old value is kept.
+  assert(result.trim() === value.trim(), 'withWhitespace: the value is replaced whole');
+  return result;
 }
 
 // Map import slots through edits to the declarations field. Work on lines so
@@ -359,6 +365,7 @@ function moveOffsets(before: string, after: string, offsets: readonly number[]):
   while (slot++ < offsets.length) {
     moved.push(newAt);
   }
+  assert(moved.length === offsets.length, 'moveOffsets: every slot is moved');
   return safeImportOffsets(after, moved);
 }
 
@@ -433,6 +440,11 @@ function safeImportOffsets(text: string, offsets: readonly number[]): number[] {
   while (slot++ < offsets.length) {
     safe.push(text.length);
   }
+  assert(safe.length === offsets.length, 'safeImportOffsets: every slot keeps a place');
+  assert(
+    safe.every((offset) => offset <= text.length),
+    'safeImportOffsets: every place is inside the text',
+  );
   return safe;
 }
 

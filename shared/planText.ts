@@ -17,7 +17,7 @@ import {
   validProjections,
   type PlanContext,
 } from './planSupport';
-import type { AnchorRef } from './ref';
+import type { AnchorRef } from './page/ref';
 import { err, ok, type Result } from './core/result';
 import {
   byteStringsEqual,

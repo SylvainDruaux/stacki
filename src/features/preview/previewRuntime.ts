@@ -12,7 +12,7 @@ import {
   judgeEventToken,
   type PreviewRender,
   type PreviewVerdict,
-} from '../../../shared/preview-token';
+} from '../../../shared/page/previewToken';
 
 /** Whether a click or double-click on the canvas may select what it names
  * (src/features/preview/previewGate.ts). Hover needs only the token to be the latest. */
