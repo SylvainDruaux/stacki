@@ -310,7 +310,7 @@ const check = (what, condition, detail) => {
   // reads past the comment that ends the group. Nothing catches that except
   // moving a line in a real file and reading the groups back.
   {
-    const cssVars = require('#dist/electron/cssVars.js');
+    const cssVars = require('#dist/electron/project/cssVars.js');
     const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'stacki-drop-'));
     fs.mkdirSync(path.join(directory, 'src', 'styles'), { recursive: true });
     const sheet = path.join(directory, 'src', 'styles', 't.css');

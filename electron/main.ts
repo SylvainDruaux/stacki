@@ -114,22 +114,22 @@ import {
   rootTag,
 } from './parse/astroParser';
 import { parseMarkdownPage } from './parse/markdownParser';
-import * as scaffoldModule from './scaffold';
+import * as scaffoldModule from './project/scaffold';
 const { scaffoldProject } = scaffoldModule;
 import * as jsCollectionsModule from './content/jsCollections';
 const { findCollections, replaceCollection, readGeneral, writeGeneral, GENERAL } =
   jsCollectionsModule;
-import * as assetRefsModule from './assetRefs';
+import * as assetRefsModule from './project/assetRefs';
 const { defaultImports, addImport, importName, importSpecFor, withAssets } = assetRefsModule;
 import * as cmsRefsModule from './content/cmsRefs';
 const { aliasMap, importersOf, resolveImport } = cmsRefsModule;
 import * as contentConfigModule from './content/contentConfig';
 const { readContentConfig, validateEntry, stopAllServices } = contentConfigModule;
-import * as thumbs from './thumbs';
-import * as cssVars from './cssVars';
+import * as thumbs from './project/thumbs';
+import * as cssVars from './project/cssVars';
 import * as injectedRoutesModule from './injectedRoutes';
 const { readInjectedRoutes } = injectedRoutesModule;
-import * as starterModule from './starter';
+import * as starterModule from './project/starter';
 const { createStarter } = starterModule;
 import * as windowBoundsModule from './windowBounds';
 const { openingBounds } = windowBoundsModule;
@@ -151,7 +151,7 @@ import * as previewWorktree from './previewWorktree';
 import { checkPreviewRender } from './previewCheck';
 import * as terminalModule from './terminal';
 const { registerTerminalHandlers, cleanupTerminals } = terminalModule;
-import * as projectWatcherModule from './projectWatcher';
+import * as projectWatcherModule from './project/projectWatcher';
 const { watchProject } = projectWatcherModule;
 import * as serialQueueModule from './lib/serialQueue';
 const { createSerialQueue, createKeyedQueue } = serialQueueModule;

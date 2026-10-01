@@ -4,7 +4,7 @@ import { createPortal } from 'react-dom';
 
 // What a fluid clamp() costs a reader who zooms.
 //
-// The maths is in electron/cssVars.js; this is what it looks like. Two states,
+// The maths is in electron/project/cssVars.ts; this is what it looks like. Two states,
 // never both — a value that fails the ratio test shows only that, because
 // fixing it is the same edit either way.
 //

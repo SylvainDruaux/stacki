@@ -35,7 +35,7 @@ const {
   addSection,
   moveHeading,
   readVariables,
-} = require('#dist/electron/cssVars.js');
+} = require('#dist/electron/project/cssVars.js');
 
 // A project of the shape the screenshots came from: a group of sizes, a couple
 // of modes declaring the same names, references from another stylesheet and

@@ -1,9 +1,9 @@
 import fs from 'fs';
 import path from 'path';
 import postcss from 'postcss';
-import { writeProjectText } from './documents/documentWrites';
-import { MAIN_LIMITS } from './lib/mainLimits';
-import { assert } from '../shared/assert';
+import { writeProjectText } from '../documents/documentWrites';
+import { MAIN_LIMITS } from '../lib/mainLimits';
+import { assert } from '../../shared/assert';
 import type { Declaration, Rule as PostcssRule } from 'postcss';
 
 // Reading a project's CSS custom properties as something an editor can show.

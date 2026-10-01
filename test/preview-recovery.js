@@ -311,7 +311,7 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
   // return for the kinds this app does not edit.
   {
     const main = fs.readFileSync(repoPath('dist/electron/main.js'), 'utf8');
-    const source = fs.readFileSync(repoPath('dist/electron/projectWatcher.js'), 'utf8');
+    const source = fs.readFileSync(repoPath('dist/electron/project/projectWatcher.js'), 'utf8');
     const at = source.indexOf('watchers.push(watch(sourceDirectory');
     const handler = source.slice(at, source.indexOf('const publicDir', at));
     check('the src watcher is still there', at !== -1);

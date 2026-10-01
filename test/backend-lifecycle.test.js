@@ -17,7 +17,7 @@ const vm = require('node:vm');
 const { createRequire } = require('node:module');
 const { EventEmitter } = require('node:events');
 const { createSerialQueue } = require('#dist/electron/lib/serialQueue.js');
-const { watchProject } = require('#dist/electron/projectWatcher.js');
+const { watchProject } = require('#dist/electron/project/projectWatcher.js');
 const { repoPath } = require('./helpers/sources.js');
 
 const tick = () => new Promise((resolve) => setImmediate(resolve));
@@ -376,7 +376,7 @@ test(
 );
 
 function loadThumbs(BrowserWindow) {
-  const modulePath = repoPath('dist/electron/thumbs.js');
+  const modulePath = repoPath('dist/electron/project/thumbs.js');
   const source = fs.readFileSync(modulePath, 'utf8');
   const runtimeRequire = createRequire(modulePath);
   const mod = { exports: {} };

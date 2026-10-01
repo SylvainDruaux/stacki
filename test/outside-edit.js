@@ -152,7 +152,7 @@ const settle = (ms = 20) => new Promise((resolve) => setTimeout(resolve, ms));
 
   // --- who says it, and when -----------------------------------------------------
   const main = fs.readFileSync(repoPath('dist/electron/main.js'), 'utf8');
-  const watcher = fs.readFileSync(repoPath('dist/electron/projectWatcher.js'), 'utf8');
+  const watcher = fs.readFileSync(repoPath('dist/electron/project/projectWatcher.js'), 'utf8');
   check(
     'a change the app did not make is marked as coming from outside',
     // The document actors hear it too (plan §7): a hint to re-read, not an authority.

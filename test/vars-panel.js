@@ -10,7 +10,7 @@
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const cssVars = require('#dist/electron/cssVars.js');
+const cssVars = require('#dist/electron/project/cssVars.js');
 const { repoPath } = require('./helpers/sources.js');
 
 const failures = [];

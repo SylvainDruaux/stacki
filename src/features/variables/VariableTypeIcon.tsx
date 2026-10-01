@@ -2,7 +2,7 @@
 // picker uses — a colour is a droplet in both places, a bare number is a number
 // in both — so a variable looks like itself wherever you meet it.
 //
-// The kind is decided in electron/cssVars.js, from the value once it has been
+// The kind is decided in electron/project/cssVars.ts, from the value once it has been
 // resolved through whatever it references.
 
 const PATHS: Readonly<Record<string, string>> = {

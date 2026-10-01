@@ -179,7 +179,7 @@ function CellView({ state }: { readonly state: CellState }) {
       <CellColor state={state} />
       <CellInput state={state} />
       {/* Only drawn when the value is a fluid clamp with something wrong with
-          it — see fluidCheck in electron/cssVars.js. */}
+          it — see fluidCheck in electron/project/cssVars.ts. */}
       <CellFluidBadge report={fluidOf ? fluidOf(cell) : cell.fluid} />
       <CellCustomValue state={state} />
     </div>

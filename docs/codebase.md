@@ -160,7 +160,7 @@ gesture → edit requests (page:edit) → main: intent → document actor
 - The file watcher tells the app's own saves from outside edits by bytes:
   a tick is the app's echo only while the file holds exactly what its
   document actor last wrote (`DocumentActors.echoes`, plan §11.9).
-- `electron/projectWatcher.ts` detects genuine outside edits (AI assistants,
+- `electron/project/projectWatcher.ts` detects genuine outside edits (AI assistants,
   editors, git operations) and triggers a rescan; each rescan, panel read and
   panel write is one run of `src/lib/coalescedRun.ts` (one in flight, one
   waiting), so a burst costs at most two.

@@ -80,16 +80,16 @@ const ALLOWED: Readonly<Record<string, Readonly<Record<string, Allowed>>>> = {
   'electron/previewWorktree.ts': {
     appendFileSync: { count: 1, reason: 'git exclude file of the preview worktree' },
   },
-  'electron/scaffold.ts': {
+  'electron/project/scaffold.ts': {
     writeFileSync: { count: 1, reason: 'a new project, scaffolded before it is opened' },
   },
-  'electron/starter.ts': {
+  'electron/project/starter.ts': {
     writeFileSync: { count: 1, reason: 'package.json of a new project from a starter' },
   },
   'electron/terminal.ts': {
     writeFileSync: { count: 1, reason: 'a pasted clipboard image in the app temp directory' },
   },
-  'electron/thumbs.ts': {
+  'electron/project/thumbs.ts': {
     writeFileSync: { count: 2, reason: 'project thumbnails in userData' },
   },
 };

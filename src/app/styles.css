@@ -6252,7 +6252,7 @@ body > .embed-editor_provenance {
 /* Variables sheet -----------------------------------------------------------
    The same sheet the CMS uses, with a table in it. Columns are either the
    rules a variable is declared in (a theme and its modes) or the things a
-   family of names describes (h1…h6) — see electron/cssVars.js. */
+   family of names describes (h1…h6) — see electron/project/cssVars.ts. */
 .vars-view .cms-detail {
   width: 100%;
 }

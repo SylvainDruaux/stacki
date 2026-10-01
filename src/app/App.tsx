@@ -906,7 +906,7 @@ const effective = (list: HistoryEntry[]): HistoryEntry | undefined => {
 
 // The welcome screen's thumbnails are taken in the main process now, from
 // the project's home page rendered in a window of its own (see
-// electron/thumbs.js). Photographing this window was what put the editor's
+// electron/project/thumbs.ts). Photographing this window was what put the editor's
 // own panels — and whatever page and scroll position the user left — into
 // the picture that is supposed to show the site.
 
