@@ -23,6 +23,7 @@
 import fs = require('node:fs');
 import path = require('node:path');
 import { createHash } from 'node:crypto';
+import { repositoryRoot } from './lib/repoRoot';
 
 export interface FixtureLimits {
   readonly sourceBytesMax: number;
@@ -209,8 +210,9 @@ function fillerText(bytes: number): string {
 
 // --- CLI: node dist/scripts/large-fixtures.js [--write] ---------------------
 
+// A built module, named by its repository path (dist/…).
 function loadRecord(modulePath: string): Record<string, unknown> {
-  const input: unknown = require(modulePath);
+  const input: unknown = require(path.join(repositoryRoot(), modulePath));
   if (typeof input !== 'object' || input === null) {
     throw new Error(`${modulePath}: expected module object`);
   }
@@ -218,7 +220,7 @@ function loadRecord(modulePath: string): Record<string, unknown> {
 }
 
 function cliLimits(): FixtureLimits {
-  const limits = loadRecord('../shared/limits.js')['LIMITS'];
+  const limits = loadRecord('dist/shared/core/limits.js')['LIMITS'];
   if (typeof limits !== 'object' || limits === null) {
     throw new Error('limits: expected LIMITS object');
   }
@@ -265,8 +267,8 @@ function countTree(roots: unknown): number {
 }
 
 function main(): void {
-  const root = path.join(__dirname, '..', '..');
-  const parsePage = loadRecord('../electron/astroParser.js')['parsePage'];
+  const root = repositoryRoot();
+  const parsePage = loadRecord('dist/electron/parse/astroParser.js')['parsePage'];
   if (typeof parsePage !== 'function') {
     throw new Error('astroParser: expected parsePage');
   }

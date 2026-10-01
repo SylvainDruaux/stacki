@@ -6,6 +6,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import fs = require('node:fs');
 import { createRequire } from 'node:module';
 import path = require('node:path');
+import { repositoryRoot } from './lib/repoRoot';
 
 const BUILDER_VERSION = '25.1.8';
 const ORIGINAL_HASH = 'ab30cf9755231ef0c279fc4a13f31b405b0a88b2cab657a57604e85bbb7ebbfd';
@@ -63,9 +64,7 @@ function isModuleNotFound(error: unknown): boolean {
   return error instanceof Error && 'code' in error && error.code === 'MODULE_NOT_FOUND';
 }
 
-export function fixElectronBuilderSigning(
-  projectDirectory = path.resolve(__dirname, '..', '..'),
-): SigningFixResult {
+export function fixElectronBuilderSigning(projectDirectory = repositoryRoot()): SigningFixResult {
   const projectRequire = createRequire(path.join(projectDirectory, 'package.json'));
   let builderPackage: string;
   try {

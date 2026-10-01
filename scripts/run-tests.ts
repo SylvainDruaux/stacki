@@ -13,6 +13,7 @@ import {
   type TestCommand,
   type TestOutcome,
 } from './test-pool';
+import { repositoryRoot } from './lib/repoRoot';
 
 interface PackageScripts {
   readonly [name: string]: string;
@@ -39,7 +40,7 @@ function readScripts(packagePath: string): PackageScripts {
   return scripts;
 }
 
-const root = path.join(__dirname, '..', '..');
+const root = repositoryRoot();
 const scripts = readScripts(path.join(root, 'package.json'));
 const flags = process.argv.slice(2).filter((argument) => argument.startsWith('--'));
 const unknownFlags = flags.filter((flag) => !flag.startsWith('--jobs='));
@@ -76,13 +77,13 @@ const node = process.execPath;
 const typeScript = path.join(root, 'node_modules', 'typescript', 'bin', 'tsc');
 const staticGates: readonly GateCommand[] = [
   // Node >= 22.18 strips types itself (package.json engines).
-  ['build:clean', node, [path.join(root, 'scripts', 'clean-build.mts')]],
+  ['build:clean', node, [path.join(root, 'scripts/clean-build.mts')]],
   ['build:contracts', node, [typeScript, '-p', path.join('shared', 'tsconfig.json')]],
   ['build:electron', node, [typeScript, '-p', path.join('electron', 'tsconfig.json')]],
   ['build:scripts', node, [typeScript, '-p', path.join('scripts', 'tsconfig.build.json')]],
   ['build:morph', node, [typeScript, '-p', path.join('electron', 'tsconfig.morph.json')]],
   ['build:preload', node, [typeScript, '-p', path.join('electron', 'tsconfig.preload.json')]],
-  ['stage:runtime', node, [path.join(root, 'dist', 'scripts', 'stage-runtime.js')]],
+  ['stage:runtime', node, [path.join(root, 'dist/scripts/stage-runtime.js')]],
   ['build:web', node, [path.join(root, 'node_modules', 'vite', 'bin', 'vite.js'), 'build']],
 ];
 // The checks only read what the builds produced, so they run side by side.
@@ -110,7 +111,7 @@ const staticChecks: readonly TestCommand[] = [
     // lockfile, agent instructions, assertion density (docs/enforcement.md).
     name: 'policy scan',
     command: node,
-    argumentsList: [path.join(root, 'scripts', 'policy', 'scan.mts')],
+    argumentsList: [path.join(root, 'scripts/policy/scan.mts')],
   },
   {
     name: 'prettier',
@@ -126,7 +127,7 @@ const staticChecks: readonly TestCommand[] = [
   {
     name: 'adapter-surface',
     command: node,
-    argumentsList: [path.join(root, 'dist', 'scripts', 'adapter-surface.js')],
+    argumentsList: [path.join(root, 'dist/scripts/adapter-surface.js')],
   },
 ];
 

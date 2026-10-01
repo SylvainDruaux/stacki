@@ -5,6 +5,7 @@
 
 import childProcess = require('node:child_process');
 import path = require('node:path');
+import { repositoryRoot } from './lib/repoRoot';
 
 const UNSIGNED_OVERRIDES = [
   '-c.mac.forceCodeSigning=false',
@@ -12,7 +13,7 @@ const UNSIGNED_OVERRIDES = [
   '-c.mac.identity=null',
 ] as const;
 
-const root = path.join(__dirname, '..', '..');
+const root = repositoryRoot();
 const builder = path.join(root, 'node_modules', 'electron-builder', 'cli.js');
 const result = childProcess.spawnSync(process.execPath, [builder, '--mac', ...UNSIGNED_OVERRIDES], {
   cwd: root,

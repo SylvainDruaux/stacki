@@ -19,5 +19,5 @@
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true
   },
-  "include": ["**/*.ts", "*.mts", "build/*.mts"]
+  "include": ["**/*.ts"]
 }

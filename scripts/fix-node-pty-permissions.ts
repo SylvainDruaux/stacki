@@ -3,6 +3,7 @@
 
 import fs = require('node:fs');
 import path = require('node:path');
+import { repositoryRoot } from './lib/repoRoot';
 
 const EXEC_MODE = 0o755;
 
@@ -43,7 +44,7 @@ function main(): void {
   if (process.platform === 'win32') {
     return;
   }
-  const root = path.join(__dirname, '..', '..');
+  const root = repositoryRoot();
   const nodePtyDirectory = path.join(root, 'node_modules', 'node-pty');
   if (!fs.existsSync(nodePtyDirectory)) {
     return;

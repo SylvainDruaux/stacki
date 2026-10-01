@@ -1,11 +1,20 @@
 #!/usr/bin/env node
 // Compare the preview diff against a Git checkpoint without changing checkout.
+//
+//   node dist/scripts/performance-report.js [<ref> [<source path at ref>]]
+//
+// The current diff is read from the build; a reference is read from its
+// source at <ref> (the morph client's source path by default; name the path
+// the file had at that revision when it differs) and transpiled when it is
+// TypeScript.
 
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import fs = require('node:fs');
 import path = require('node:path');
 import { performance } from 'node:perf_hooks';
+import ts = require('typescript');
+import { repositoryRoot } from './lib/repoRoot';
 
 interface DiffImplementation {
   readonly diff: (before: readonly string[], after: readonly string[]) => unknown;
@@ -13,8 +22,9 @@ interface DiffImplementation {
   readonly reset: () => void;
 }
 
-const root = path.join(__dirname, '..', '..');
-const sourcePath = 'electron/previewClient/morphClient.ts';
+const root = repositoryRoot();
+const BUILT_PATH = 'dist/electron/previewClient/morphClient.js';
+const SOURCE_PATH = 'electron/previewClient/morphClient.ts';
 
 function load(source: string): DiffImplementation {
   let allocatedBytes = 0;
@@ -27,14 +37,18 @@ function load(source: string): DiffImplementation {
     allocatedBytes += size * Int32Array.BYTES_PER_ELEMENT;
     return new Int32Array(size);
   }
+  // The diff charges a per-patch work budget (spendMorphWork) in revisions
+  // that have one; the report measures the diff, so the budget is a no-op.
   const factoryInput: unknown = Reflect.construct(Function, [
     'Int32Array',
+    'spendMorphWork',
     `${source.slice(startIndex, endIndex)}\nreturn diffChildren;`,
   ]);
   if (typeof factoryInput !== 'function') {
     throw new Error('Preview diff source did not produce a factory');
   }
-  const candidate: unknown = Reflect.apply(factoryInput, undefined, [TrackedArray]);
+  const spendMorphWork = (): void => undefined;
+  const candidate: unknown = Reflect.apply(factoryInput, undefined, [TrackedArray, spendMorphWork]);
   if (typeof candidate !== 'function') {
     throw new Error('Preview diff source did not produce a function');
   }
@@ -68,16 +82,24 @@ function measure(
   };
 }
 
-const current = load(fs.readFileSync(path.join(root, 'dist', sourcePath), 'utf8'));
+const current = load(fs.readFileSync(path.join(root, BUILT_PATH), 'utf8'));
 const reference = process.argv[2];
-const before = reference
-  ? load(
-      execFileSync('git', ['show', `${reference}:${sourcePath}`], {
-        cwd: root,
-        encoding: 'utf8',
-      }),
-    )
-  : undefined;
+const referencePath = process.argv[3] ?? SOURCE_PATH;
+const before = reference ? load(referenceSource(reference, referencePath)) : undefined;
+
+// A revision's source, as JavaScript: a TypeScript file is transpiled, which
+// keeps the comments the diff's own markers are found by.
+function referenceSource(revision: string, file: string): string {
+  const source = execFileSync('git', ['show', `${revision}:${file}`], {
+    cwd: root,
+    encoding: 'utf8',
+  });
+  if (!file.endsWith('.ts')) {
+    return source;
+  }
+  const options = { compilerOptions: { target: ts.ScriptTarget.ES2022, removeComments: false } };
+  return ts.transpileModule(source, options).outputText;
+}
 const keys = Array.from({ length: 2_000 }, (_, index) => `node:${index}`);
 const cases: ReadonlyArray<
   readonly [label: string, oldKeys: readonly string[], newKeys: readonly string[]]

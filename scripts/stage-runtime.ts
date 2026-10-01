@@ -2,8 +2,9 @@
 // copied beside compiled code so development and packaged paths stay identical.
 import fileSystemPromises = require('node:fs/promises');
 import path = require('node:path');
+import { repositoryRoot } from './lib/repoRoot';
 
-const root = path.resolve(__dirname, '..', '..');
+const root = repositoryRoot();
 // An explicit inventory bounds the copy and excludes signing material.
 const files = [
   'electron/content/workers/introspect.mjs',

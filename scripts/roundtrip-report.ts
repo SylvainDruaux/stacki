@@ -4,6 +4,7 @@
 
 import fs = require('node:fs');
 import path = require('node:path');
+import { repositoryRoot } from './lib/repoRoot';
 
 type Status = 'differs' | 'identical' | 'not-editable' | 'threw';
 interface Row {
@@ -21,7 +22,7 @@ interface ParserAPI {
 }
 
 const FILES_MAX = 100_000;
-const root = path.join(__dirname, '..', '..');
+const root = repositoryRoot();
 const corpusDirectory = path.join(root, 'test', 'corpus');
 const skipDirectories = new Set(['node_modules', '.git', 'dist', '.astro', 'release', 'build']);
 
@@ -147,7 +148,7 @@ function classify(filePath: string): Omit<Row, 'name'> {
   }
 }
 
-const expectations = readExpectations(path.join(root, 'test', 'expectations.json'));
+const expectations = readExpectations(path.join(root, 'test/expectations.json'));
 const target = process.argv[2];
 const base = target ? path.resolve(target) : corpusDirectory;
 const files = collect(base);

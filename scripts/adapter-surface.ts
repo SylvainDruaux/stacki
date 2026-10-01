@@ -45,6 +45,7 @@
 
 import fs = require('node:fs');
 import path = require('node:path');
+import { repositoryRoot } from './lib/repoRoot';
 
 interface Counts {
   readonly mutations: number;
@@ -247,7 +248,7 @@ function measure(root: string): {
 }
 
 function main(): void {
-  const root = path.join(__dirname, '..', '..');
+  const root = repositoryRoot();
   const { counts, byFile } = measure(root);
   const labels: Readonly<Record<keyof Counts, string>> = {
     mutations: 'direct node-mutation sites',
