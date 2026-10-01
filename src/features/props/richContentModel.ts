@@ -1,10 +1,10 @@
 // Inline serialization preserves expression spelling and harmless markup while
 // bounding source/DOM traversal. DOM reads produce fresh nodes without source IDs.
-import { BIND_PATH_RE } from '../editor/bindings';
-import type { Attr } from '../../shared/page-node';
-import { assert } from '../../shared/assert';
-import { textValueCanonical } from '../../shared/htmlText';
-import { LIMITS } from '../../shared/limits';
+import { BIND_PATH_RE } from '../../editor/bindings';
+import type { Attr } from '../../../shared/page-node';
+import { assert } from '../../../shared/assert';
+import { textValueCanonical } from '../../../shared/htmlText';
+import { LIMITS } from '../../../shared/limits';
 
 export interface InlineCandidate {
   readonly kind: string;

@@ -86,7 +86,7 @@ const BUTTON = [
   fs.mkdirSync(buildDirectory, { recursive: true });
   const bundle = path.join(buildDirectory, 'variant-options.bundle.js');
   await esbuild.build({
-    entryPoints: [repoPath('src/panels/PropsPanel.tsx')],
+    entryPoints: [repoPath('src/features/props/PropsPanel.tsx')],
     outfile: bundle,
     bundle: true,
     format: 'cjs',
@@ -331,7 +331,7 @@ const BUTTON = [
   }
 
   // --- the rule, stated where it lives -------------------------------------------
-  const rules = fs.readFileSync(repoPath('src/panels/propRules.ts'), 'utf8');
+  const rules = fs.readFileSync(repoPath('src/features/props/propRules.ts'), 'utf8');
   check(
     'narrowing asks whether the prop chooses the branch',
     /choosesBranch\(union, field\.name\)/.test(rules),

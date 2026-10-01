@@ -32,7 +32,7 @@ const check = (what, condition, detail) => {
   const entry = path.join(buildDirectory, 'code-prop.entry.jsx');
   fs.writeFileSync(
     entry,
-    `export { BindField } from ${JSON.stringify(repoPath('src/panels/PropsPanel.tsx'))};\n`,
+    `export { BindField } from ${JSON.stringify(repoPath('src/features/props/PropsPanel.tsx'))};\n`,
   );
   const bundle = path.join(buildDirectory, 'code-prop.bundle.js');
   await esbuild.build({
@@ -290,7 +290,7 @@ const check = (what, condition, detail) => {
   }
 
   // --- the rule, where it lives ---------------------------------------------------
-  const panel = fs.readFileSync(repoPath('src/panels/propBindings.tsx'), 'utf8');
+  const panel = fs.readFileSync(repoPath('src/features/props/propBindings.tsx'), 'utf8');
   check(
     'a code prop is written as an expression',
     /field\?\.type === 'code' \|\|/.test(panel),

@@ -331,7 +331,7 @@ const { posts = [] } = Astro.props;`;
   }
   {
     // The row draws them, and the app moves the index they show.
-    const picker = fs.readFileSync(repoPath('src/ui/DataPicker.tsx'), 'utf8');
+    const picker = fs.readFileSync(repoPath('src/features/props/DataPicker.tsx'), 'utf8');
     check(
       'the row draws the arrows when the item has somewhere to go',
       /node\.nav && onStepItem/.test(picker),

@@ -38,7 +38,7 @@ const check = (what, condition, detail) => {
   fs.writeFileSync(
     entry,
     `export { default as ListField } from ${JSON.stringify(
-      repoPath('src/panels/ListField.tsx'),
+      repoPath('src/features/props/ListField.tsx'),
     )};\n`,
   );
   const bundle = path.join(buildDirectory, 'list-field.bundle.js');
@@ -516,7 +516,7 @@ const check = (what, condition, detail) => {
   }
 
   // --- and the field it belongs to ----------------------------------------------------------
-  const panel = fs.readFileSync(repoPath('src/panels/PropField.tsx'), 'utf8');
+  const panel = fs.readFileSync(repoPath('src/features/props/PropField.tsx'), 'utf8');
   check(
     'an array prop shows the list rather than a code field',
     /type === 'code' && !showExpr && \(value === undefined \|\| arrayItems\(valueText\)\)\)/.test(

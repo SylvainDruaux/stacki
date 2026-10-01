@@ -251,7 +251,7 @@ if (fs.existsSync(LUMOS)) {
   fs.mkdirSync(buildDirectory, { recursive: true });
   const bundle = path.join(buildDirectory, 'slot-api.bundle.js');
   await esbuild.build({
-    entryPoints: [repoPath('src/panels/PropsPanel.tsx')],
+    entryPoints: [repoPath('src/features/props/PropsPanel.tsx')],
     outfile: bundle,
     bundle: true,
     format: 'cjs',

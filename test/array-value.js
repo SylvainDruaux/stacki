@@ -33,7 +33,7 @@ const check = (what, condition, detail) => {
   fs.mkdirSync(buildDirectory, { recursive: true });
   const out = path.join(buildDirectory, 'array-value.bundle.mjs');
   await esbuild.build({
-    entryPoints: [repoPath('src/arrayValue.ts')],
+    entryPoints: [repoPath('src/features/props/arrayValue.ts')],
     outfile: out,
     bundle: true,
     format: 'esm',

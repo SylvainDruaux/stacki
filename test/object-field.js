@@ -35,7 +35,7 @@ const check = (what, condition, detail) => {
   // --- what the reader accepts ------------------------------------------------
   const modOut = path.join(buildDirectory, 'object-value.bundle.mjs');
   await esbuild.build({
-    entryPoints: [repoPath('src/arrayValue.ts')],
+    entryPoints: [repoPath('src/features/props/arrayValue.ts')],
     outfile: modOut,
     bundle: true,
     format: 'esm',
@@ -108,7 +108,7 @@ const check = (what, condition, detail) => {
   fs.writeFileSync(
     entry,
     `export { default as ObjectField } from ${JSON.stringify(
-      repoPath('src/panels/ObjectField.tsx'),
+      repoPath('src/features/props/ObjectField.tsx'),
     )};\n`,
   );
   const bundle = path.join(buildDirectory, 'object-field.bundle.js');
@@ -246,7 +246,7 @@ const check = (what, condition, detail) => {
   );
 
   // --- the panel reaches for it --------------------------------------------------
-  const panel = fs.readFileSync(repoPath('src/panels/PropField.tsx'), 'utf8');
+  const panel = fs.readFileSync(repoPath('src/features/props/PropField.tsx'), 'utf8');
   check(
     'a code prop holding an object gets the fields',
     /type === 'code' && !showExpr && valueText && objectFields\(valueText\)/.test(panel),

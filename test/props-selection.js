@@ -10,7 +10,7 @@ const directory = repoPath('node_modules/.stacki-test');
 fs.mkdirSync(directory, { recursive: true });
 const output = path.join(directory, 'props-selection.cjs');
 buildSync({
-  entryPoints: [repoPath('src/panels/PropsPanel.tsx')],
+  entryPoints: [repoPath('src/features/props/PropsPanel.tsx')],
   outfile: output,
   bundle: true,
   platform: 'node',

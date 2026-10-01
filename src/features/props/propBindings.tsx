@@ -1,35 +1,35 @@
 import React, { useEffect, useRef, useState } from 'react';
 import type { MutableRefObject, RefObject } from 'react';
 import type { Completion } from '@codemirror/autocomplete';
-import type { Attr } from '../../shared/page-node';
+import type { Attr } from '../../../shared/page-node';
 import type { FieldDefinition } from './propRules';
-import type { TemplateHole } from '../editor/bindings';
-import type { RichContext } from '../ui/RichContent';
-import type { BindInputHandle } from '../ui/BindInput';
-import type { ChipsOf, ExprInputAPI } from '../ui/ExprInput';
-import type { PickerNode } from '../ui/DataPicker';
-import { assert } from '../../shared/assert';
-import { LIMITS } from '../../shared/limits';
-import { definedFields } from '../../shared/boundary';
+import type { TemplateHole } from '../../editor/bindings';
+import type { RichContext } from './RichContent';
+import type { BindInputHandle } from './BindInput';
+import type { ChipsOf, ExprInputAPI } from '../../ui/ExprInput';
+import type { PickerNode } from './DataPicker';
+import { assert } from '../../../shared/assert';
+import { LIMITS } from '../../../shared/limits';
+import { definedFields } from '../../../shared/boundary';
 import {
   dataTree,
   findDeclaration,
   findImportOf,
   scopeChips,
   scopeCompletions,
-} from '../editor/dataSuggest';
+} from '../../editor/dataSuggest';
 import {
   partsFromValue,
   resolvePick,
   templateHoles,
   valueFromParts,
   valueModeOf,
-} from '../editor/bindings';
-import { checkStatement } from '../jsCheck';
-import BindInput from '../ui/BindInput';
-import DataPicker from '../ui/DataPicker';
-import ExprInput from '../ui/ExprInput';
-import { CodeIcon, CloseIcon, PencilIcon, PlusIcon } from '../ui/Icons';
+} from '../../editor/bindings';
+import { checkStatement } from './jsCheck';
+import BindInput from './BindInput';
+import DataPicker from './DataPicker';
+import ExprInput from '../../ui/ExprInput';
+import { CodeIcon, CloseIcon, PencilIcon, PlusIcon } from '../../ui/Icons';
 
 export interface FieldPosition {
   readonly left: number;

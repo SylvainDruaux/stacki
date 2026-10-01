@@ -26,7 +26,7 @@ const check = (what, condition, detail) => {
 
 // Test the implementation itself so source-selection rules cannot drift into copied fixtures.
 const { sourceChip, withSource, parseMapHead } = require('./helpers/rendererModule')(
-  'src/panels/propNodeEditors.tsx',
+  'src/features/props/propNodeEditors.tsx',
 );
 const assert = require('node:assert/strict');
 const { repoPath } = require('./helpers/sources.js');
@@ -49,8 +49,8 @@ assert.throws(() => withSource('posts', 'x'.repeat(1_000_001)), /path limit exce
 (async () => {
   // The panel's own copies, so a change there fails here rather than drifting.
   const source =
-    require('fs').readFileSync(repoPath('src/panels/propNodeEditors.tsx'), 'utf8') +
-    require('fs').readFileSync(repoPath('src/panels/propBindings.tsx'), 'utf8');
+    require('fs').readFileSync(repoPath('src/features/props/propNodeEditors.tsx'), 'utf8') +
+    require('fs').readFileSync(repoPath('src/features/props/propBindings.tsx'), 'utf8');
   check('the panel still derives the source the same way', source.includes('function sourceChip('));
   check('and still swaps it in place', source.includes('function withSource('));
   check(

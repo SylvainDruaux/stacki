@@ -26,7 +26,7 @@ renderer dependency family; split per language so only what is used ships.
 
 ### `@lezer/highlight`, `@lezer/javascript`
 
-**Does:** syntax-highlight tags for the editors, and the JavaScript parser behind `src/jsCheck.ts`.
+**Does:** syntax-highlight tags for the editors, and the JavaScript parser behind `src/features/props/jsCheck.ts`.
 **Why not the platform:** no incremental JS parser exists in the browser. **Cost:** small; already
 a transitive dependency of CodeMirror, declared because we import it directly.
 

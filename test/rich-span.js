@@ -36,7 +36,7 @@ const check = (what, condition, detail) => {
   fs.mkdirSync(buildDirectory, { recursive: true });
   const bundle = path.join(buildDirectory, 'rich-span.bundle.js');
   await esbuild.build({
-    entryPoints: [repoPath('src/ui/RichContent.tsx')],
+    entryPoints: [repoPath('src/features/props/RichContent.tsx')],
     outfile: bundle,
     bundle: true,
     format: 'cjs',

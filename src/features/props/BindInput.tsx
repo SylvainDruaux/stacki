@@ -1,7 +1,7 @@
 import React, { forwardRef, useEffect, useImperativeHandle, useRef } from 'react';
-import type { Part } from '../editor/bindings';
-import { assert } from '../../shared/assert';
-import { LIMITS } from '../../shared/limits';
+import type { Part } from '../../editor/bindings';
+import { assert } from '../../../shared/assert';
+import { LIMITS } from '../../../shared/limits';
 import { deleteChipAtCaret } from './chipKeys';
 
 // A prop's value as a field you can type in, with the data in it shown as

@@ -1,17 +1,17 @@
 import React, { useEffect, useRef, useState } from 'react';
 import type { ReactNode, RefObject } from 'react';
-import type { Attr } from '../../shared/page-node';
+import type { Attr } from '../../../shared/page-node';
 import type { PropValues } from './propRules';
-import type { RichContext } from '../ui/RichContent';
+import type { RichContext } from './RichContent';
 import type { SourceContext, FieldPosition, InsertAPI } from './propBindings';
-import { assert } from '../../shared/assert';
-import { LIMITS } from '../../shared/limits';
-import { scopeChips, scopeCompletions } from '../editor/dataSuggest';
-import StyleEditor, { collapseDeclarations } from '../ui/StyleEditor';
-import AssetField from '../ui/AssetField';
-import { looksLikeAssetPath, mediaKindFor } from '../ui/AssetThumb';
+import { assert } from '../../../shared/assert';
+import { LIMITS } from '../../../shared/limits';
+import { scopeChips, scopeCompletions } from '../../editor/dataSuggest';
+import StyleEditor, { collapseDeclarations } from './StyleEditor';
+import AssetField from '../../ui/AssetField';
+import { looksLikeAssetPath, mediaKindFor } from '../../ui/AssetThumb';
 import { BindField, BindHandle, FieldDataPicker, ValueCodeEditor } from './propBindings';
-import { BracesIcon, PlusIcon, TrashIcon, ElementImageIcon, MaximizeIcon } from '../ui/Icons';
+import { BracesIcon, PlusIcon, TrashIcon, ElementImageIcon, MaximizeIcon } from '../../ui/Icons';
 
 interface AttributeNode {
   readonly id: string;

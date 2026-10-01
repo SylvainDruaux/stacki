@@ -56,7 +56,7 @@ import InsertSearch from './features/palette/InsertSearch';
 import AssetsPanel from './features/assets/AssetsPanel';
 import { getElementSchema, GLOBAL_ATTRS, HTML_TAGS, VOID_TAGS } from './editor/elementSchemas';
 import { insertTargetFor as placeInsert } from './editor/insertTarget';
-import { isInlineOnly } from './ui/RichContent';
+import { isInlineOnly } from './features/props/RichContent';
 import { onAssetRequest, clearAssetRequest } from './ui/assetPick';
 import { isDataBound } from './editor/bindings';
 import { thenBranch } from './editor/branches';
@@ -157,9 +157,9 @@ import type {
   HistoryCommitFile,
   HistoryFile,
 } from './features/history/historyBridge';
-import type { InlineNode } from './ui/RichContent';
-import type { Rename, TagOption } from './panels/propNodeEditors';
-import type { FieldDefinition, PropValues } from './panels/propRules';
+import type { InlineNode } from './features/props/RichContent';
+import type { Rename, TagOption } from './features/props/propNodeEditors';
+import type { FieldDefinition, PropValues } from './features/props/propRules';
 import type { OverlayInfo } from './panels/PreviewOverlays';
 import type { PreviewCrumb } from './panels/PreviewToolbar';
 import type { AstroAsset } from './features/palette/astroAssets';
@@ -279,7 +279,7 @@ import {
 
 // Each optional editor owns its loading boundary so opening it keeps the
 // canvas and neighboring panels visible and interactive.
-const PropsPanel = lazyPanel(() => import('./panels/PropsPanel'));
+const PropsPanel = lazyPanel(() => import('./features/props/PropsPanel'));
 const StylePanel = lazyPanel(() => import('./features/style/StylePanel'));
 const CodeWindow = lazyPanel(() => import('./features/code/CodeWindow'));
 const CmsPanel = lazyPanel(() => import('./features/cms/CmsPanel'));

@@ -1,6 +1,6 @@
 import React, { useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { assert } from '../../shared/assert';
-import { LIMITS } from '../../shared/limits';
+import { assert } from '../../../shared/assert';
+import { LIMITS } from '../../../shared/limits';
 import {
   ChevronRightIcon,
   ChevronLeftIcon,
@@ -8,7 +8,7 @@ import {
   CodeIcon,
   SearchIcon,
   PencilIcon,
-} from './Icons';
+} from '../../ui/Icons';
 
 // The data behind the page, as something you can look through rather than
 // something you have to already know. Every row is a value that is in scope

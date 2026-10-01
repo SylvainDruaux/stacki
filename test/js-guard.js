@@ -46,7 +46,7 @@ const check = (what, condition, detail) => {
   {
     const out = path.join(buildDirectory, 'js-check.bundle.js');
     await esbuild.build({
-      entryPoints: [repoPath('src/jsCheck.ts')],
+      entryPoints: [repoPath('src/features/props/jsCheck.ts')],
       outfile: out,
       bundle: true,
       format: 'cjs',
@@ -111,7 +111,7 @@ const check = (what, condition, detail) => {
   fs.writeFileSync(
     entry,
     `export { BindField } ` +
-      `from ${JSON.stringify(repoPath('src/panels/PropsPanel.tsx'))};\n` +
+      `from ${JSON.stringify(repoPath('src/features/props/PropsPanel.tsx'))};\n` +
       // CodeMirror's own way in from a DOM node — the editor here is a real one.
       `export { EditorView } from '@codemirror/view';\n`,
   );

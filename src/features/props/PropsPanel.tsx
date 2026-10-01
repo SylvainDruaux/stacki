@@ -1,30 +1,36 @@
-import type { PageNode, PairedNode, ChunkGroupNode, Attr, ValueNode } from '../../shared/page-node';
+import type {
+  PageNode,
+  PairedNode,
+  ChunkGroupNode,
+  Attr,
+  ValueNode,
+} from '../../../shared/page-node';
 import type { FieldDefinition, PropValues } from './propRules';
 import type { SetProp, SetProps } from './propAttributes';
 import type { SetText, TagOption, TagFieldProps } from './propNodeEditors';
 import type { SourceContext, FieldPosition } from './propBindings';
-import type { RichContext, RichInsertAPI, InlineNode } from '../ui/RichContent';
-import type { AssetDimensions } from '../ui/AssetThumb';
-import type { PickedAsset } from '../ui/AssetField';
-import { resolveAssetImport, readAssetDimensions } from '../ipc/assetBridge';
+import type { RichContext, RichInsertAPI, InlineNode } from './RichContent';
+import type { AssetDimensions } from '../../ui/AssetThumb';
+import type { PickedAsset } from '../../ui/AssetField';
+import { resolveAssetImport, readAssetDimensions } from '../../ipc/assetBridge';
 import { MapEditor, TagField } from './propNodeEditors';
 import PropField, { assetImportOf } from './PropField';
 import { AttributesSection } from './propAttributes';
 import { ConditionField, BindHandle, FieldDataPicker } from './propBindings';
 import { createPropRules } from './propRules';
-import { isFragmentNode } from '../editor/liveClasses';
-import { assert } from '../../shared/assert';
-import { LIMITS } from '../../shared/limits';
+import { isFragmentNode } from '../../editor/liveClasses';
+import { assert } from '../../../shared/assert';
+import { LIMITS } from '../../../shared/limits';
 import React, { useEffect, useRef, useState } from 'react';
-import { VOID_TAGS } from '../editor/elementSchemas';
-import { elementIcon } from '../ui/Icons';
-import AutoTextarea from '../ui/AutoTextarea';
-import { clickNote } from '../ui/sound';
-import { SoundHere } from '../ui/soundScope';
-import ExprInput from '../ui/ExprInput';
-import RichContent, { isInlineOnly } from '../ui/RichContent';
-import { scopeChips, scopeCompletions } from '../editor/dataSuggest';
-import LinkField from '../ui/LinkField';
+import { VOID_TAGS } from '../../editor/elementSchemas';
+import { elementIcon } from '../../ui/Icons';
+import AutoTextarea from '../../ui/AutoTextarea';
+import { clickNote } from '../../ui/sound';
+import { SoundHere } from '../../ui/soundScope';
+import ExprInput from '../../ui/ExprInput';
+import RichContent, { isInlineOnly } from './RichContent';
+import { scopeChips, scopeCompletions } from '../../editor/dataSuggest';
+import LinkField from './LinkField';
 import {
   VariableTextSizeIcon,
   CustomElementIcon,
@@ -35,7 +41,7 @@ import {
   ChevronRightIcon,
   BranchIcon,
   CornerIcon,
-} from '../ui/Icons';
+} from '../../ui/Icons';
 
 type SelectedNode = PageNode | { readonly kind: 'frontmatter'; readonly id: string };
 type ElementNode = (PairedNode | ChunkGroupNode) & { readonly props?: PropValues };

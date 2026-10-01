@@ -33,7 +33,8 @@ const check = (what, condition, detail) => {
   const entry = path.join(buildDirectory, 'chip-edit.entry.jsx');
   fs.writeFileSync(
     entry,
-    `export { BindField } ` + `from ${JSON.stringify(repoPath('src/panels/PropsPanel.tsx'))};\n`,
+    `export { BindField } ` +
+      `from ${JSON.stringify(repoPath('src/features/props/PropsPanel.tsx'))};\n`,
   );
   const bundle = path.join(buildDirectory, 'chip-edit.bundle.js');
   await esbuild.build({

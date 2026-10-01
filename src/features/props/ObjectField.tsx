@@ -1,10 +1,10 @@
 import React from 'react';
-import { arrayItems, arrayText, objectFields, objectText } from '../arrayValue';
-import type { ObjectRow } from '../arrayValue';
-import { assert } from '../../shared/assert';
-import { LIMITS } from '../../shared/limits';
+import { arrayItems, arrayText, objectFields, objectText } from './arrayValue';
+import type { ObjectRow } from './arrayValue';
+import { assert } from '../../../shared/assert';
+import { LIMITS } from '../../../shared/limits';
 import ListField from './ListField';
-import SegSwitch from '../ui/SegSwitch';
+import SegSwitch from './SegSwitch';
 
 // A prop whose value is an object, edited as the fields it holds.
 //

@@ -13,9 +13,9 @@ fs.mkdirSync(directory, { recursive: true });
 const output = path.join(directory, 'renderer-pickers.bundle.cjs');
 buildSync({
   stdin: {
-    contents: `export { default as DataPicker } from './src/ui/DataPicker.tsx';
+    contents: `export { default as DataPicker } from './src/features/props/DataPicker.tsx';
     export { default as InsertSearch } from './src/features/palette/InsertSearch.tsx';
-    export { default as LinkField } from './src/ui/LinkField.tsx';`,
+    export { default as LinkField } from './src/features/props/LinkField.tsx';`,
     resolveDir: ROOT,
   },
   outfile: output,

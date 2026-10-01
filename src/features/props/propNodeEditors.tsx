@@ -1,13 +1,13 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import type { MapNode } from '../../shared/page-node';
-import type { RichContext } from '../ui/RichContent';
-import type { ExprInputAPI } from '../ui/ExprInput';
+import type { MapNode } from '../../../shared/page-node';
+import type { RichContext } from './RichContent';
+import type { ExprInputAPI } from '../../ui/ExprInput';
 import type { FieldPosition, SourceContext } from './propBindings';
-import { assert } from '../../shared/assert';
-import { LIMITS } from '../../shared/limits';
-import { HTML_TAGS } from '../editor/elementSchemas';
-import { dataTree, listsOnly } from '../editor/dataSuggest';
-import ExprInput from '../ui/ExprInput';
+import { assert } from '../../../shared/assert';
+import { LIMITS } from '../../../shared/limits';
+import { HTML_TAGS } from '../../editor/elementSchemas';
+import { dataTree, listsOnly } from '../../editor/dataSuggest';
+import ExprInput from '../../ui/ExprInput';
 import { BindHandle, FieldDataPicker, SourceEditButton, referencedName } from './propBindings';
 import {
   elementIcon,
@@ -16,7 +16,7 @@ import {
   ElementComponentIcon,
   CodeIcon,
   TagIcon,
-} from '../ui/Icons';
+} from '../../ui/Icons';
 
 export interface Rename {
   readonly from: string;

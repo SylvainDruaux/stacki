@@ -1,11 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react';
-import type { Item } from '../arrayValue';
-import { assert } from '../../shared/assert';
-import { LIMITS } from '../../shared/limits';
-import { PlusIcon, CloseIcon } from '../ui/Icons';
-import ListFieldRow from '../ui/ListFieldRow';
-import { allowDragEffect } from '../editor/dragState';
-import { arrayItems, arrayText, blankLike, itemLabel, moveItem } from '../arrayValue';
+import type { Item } from './arrayValue';
+import { assert } from '../../../shared/assert';
+import { LIMITS } from '../../../shared/limits';
+import { PlusIcon, CloseIcon } from '../../ui/Icons';
+import ListFieldRow from '../../ui/ListFieldRow';
+import { allowDragEffect } from '../../editor/dragState';
+import { arrayItems, arrayText, blankLike, itemLabel, moveItem } from './arrayValue';
 
 // A prop that takes a list, edited as a list.
 //

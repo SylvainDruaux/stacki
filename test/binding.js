@@ -225,7 +225,10 @@ const check = (what, condition, detail) => {
   );
 
   // ── a keypress against a chip ─────────────────────────────────────────────
-  const { deleteChipAtCaret } = await bundle('src/ui/chipKeys.ts', 'chipkeys.bundle.mjs');
+  const { deleteChipAtCaret } = await bundle(
+    'src/features/props/chipKeys.ts',
+    'chipkeys.bundle.mjs',
+  );
   const { JSDOM } = require('jsdom');
   const dom = new JSDOM('<!doctype html><body><div id="host" contenteditable></div></body>');
   global.window = dom.window;
@@ -538,7 +541,7 @@ const check = (what, condition, detail) => {
   );
 
   // The field really draws them, and pressing one repoints that hole alone.
-  const panel = require('fs').readFileSync(repoPath('src/panels/propBindings.tsx'), 'utf8');
+  const panel = require('fs').readFileSync(repoPath('src/features/props/propBindings.tsx'), 'utf8');
   // The holes are half of it now: the field also chips a value the code names
   // outright (`variantClasses` in a class list), so what it marks is the union.
   check('the code field marks its holes', /const holes = templateHoles\(text\)/.test(panel));
@@ -571,7 +574,7 @@ const check = (what, condition, detail) => {
     const out = path.join(buildDirectory, 'bindinput.bundle.js');
     await esbuild.build({
       stdin: {
-        contents: "export { default as BindInput } from './src/ui/BindInput.tsx'",
+        contents: "export { default as BindInput } from './src/features/props/BindInput.tsx'",
         resolveDir: ROOT,
         loader: 'jsx',
       },

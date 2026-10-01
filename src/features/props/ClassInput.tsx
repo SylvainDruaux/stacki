@@ -1,8 +1,8 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { Dispatch, MutableRefObject, SetStateAction } from 'react';
-import { assert } from '../../shared/assert';
-import { LIMITS } from '../../shared/limits';
-import { CheckIcon } from './Icons';
+import { assert } from '../../../shared/assert';
+import { LIMITS } from '../../../shared/limits';
+import { CheckIcon } from '../../ui/Icons';
 
 // Classes in a scale are named for it: gap-2 sits beside gap-1 and gap-4,
 // margin-top-6 beside margin-top-2. Everything up to the last dash or

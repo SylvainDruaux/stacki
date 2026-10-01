@@ -56,7 +56,7 @@ try {
   const tooLong = 'x'.repeat(8193);
   assert.throws(() => renamedAttr(renamed, 'new', tooLong), /Attribute name exceeds limit/);
 
-  const { checkStatement } = load('src/jsCheck.ts');
+  const { checkStatement } = load('src/features/props/jsCheck.ts');
   assert.equal(checkStatement(' '.repeat(1_000_000)).ok, true);
   assert.deepEqual(checkStatement(' '.repeat(1_000_001)), {
     ok: false,

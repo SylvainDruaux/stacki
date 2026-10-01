@@ -1,31 +1,31 @@
 import React, { useEffect, useRef, useState } from 'react';
 import type { ComponentProps } from 'react';
-import type { Attr } from '../../shared/page-node';
+import type { Attr } from '../../../shared/page-node';
 import type { FieldDefinition, PropValues } from './propRules';
-import type { RichContext } from '../ui/RichContent';
+import type { RichContext } from './RichContent';
 import type { SourceContext, ValueChange, FieldPosition, InsertAPI } from './propBindings';
-import type { AssetDimensions } from '../ui/AssetThumb';
-import type { PickedAsset } from '../ui/AssetField';
-import { assert } from '../../shared/assert';
-import { LIMITS } from '../../shared/limits';
-import { definedFields } from '../../shared/boundary';
-import { resolveAssetImport } from '../ipc/assetBridge';
-import { findImportOf } from '../editor/dataSuggest';
-import { arrayItems, objectFields } from '../arrayValue';
-import { partsFromValue, valueFromParts } from '../editor/bindings';
+import type { AssetDimensions } from '../../ui/AssetThumb';
+import type { PickedAsset } from '../../ui/AssetField';
+import { assert } from '../../../shared/assert';
+import { LIMITS } from '../../../shared/limits';
+import { definedFields } from '../../../shared/boundary';
+import { resolveAssetImport } from '../../ipc/assetBridge';
+import { findImportOf } from '../../editor/dataSuggest';
+import { arrayItems, objectFields } from './arrayValue';
+import { partsFromValue, valueFromParts } from '../../editor/bindings';
 import { BindField, BindHandle, FieldDataPicker, ExprValueField } from './propBindings';
 import { ObjectAttrsField, parseObjectLiteral, serializeObjectLiteral } from './propAttributes';
-import { looksLikeAssetPath, mediaKindFor } from '../ui/AssetThumb';
-import AssetField from '../ui/AssetField';
-import LinkField from '../ui/LinkField';
+import { looksLikeAssetPath, mediaKindFor } from '../../ui/AssetThumb';
+import AssetField from '../../ui/AssetField';
+import LinkField from './LinkField';
 import ListField from './ListField';
 import ObjectField from './ObjectField';
-import ClassInput from '../ui/ClassInput';
-import PropTip from '../ui/PropTip';
-import Dropdown from '../ui/Dropdown';
-import AutoTextarea from '../ui/AutoTextarea';
-import SegSwitch from '../ui/SegSwitch';
-import StyleEditor, { collapseDeclarations } from '../ui/StyleEditor';
+import ClassInput from './ClassInput';
+import PropTip from './PropTip';
+import Dropdown from '../../ui/Dropdown';
+import AutoTextarea from '../../ui/AutoTextarea';
+import SegSwitch from './SegSwitch';
+import StyleEditor, { collapseDeclarations } from './StyleEditor';
 import {
   ResetIcon,
   FieldNumberIcon,
@@ -37,7 +37,7 @@ import {
   VariableTextSizeIcon,
   ChevronDownIcon,
   CornerIcon,
-} from '../ui/Icons';
+} from '../../ui/Icons';
 
 export interface AssetContext {
   readonly projectPath?: string | undefined;
