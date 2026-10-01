@@ -1,8 +1,15 @@
 import type { Result } from '../../shared/result';
-import type { VariableUndo } from './VariablesView';
 import { assert } from '../../shared/assert';
 import { LIMITS } from '../../shared/limits';
 import { variableEdit } from './variableEdits';
+
+// One undoable variable edit, as the app's history records it.
+export interface VariableUndo {
+  readonly label: string;
+  readonly coalesceKey?: string | undefined;
+  readonly undo: () => Promise<void>;
+  readonly redo: () => Promise<void>;
+}
 
 type FileTexts = Readonly<Record<string, string>>;
 interface HistoryOptions {

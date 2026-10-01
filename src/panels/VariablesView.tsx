@@ -11,7 +11,7 @@ import { assert } from '../../shared/assert';
 import { LIMITS } from '../../shared/limits';
 import { definedFields } from '../../shared/boundary';
 import { variableEdit as bridge } from './variableEdits';
-import { createVariableHistory } from './variableHistory';
+import { createVariableHistory, type VariableUndo } from './variableHistory';
 import { createVariableRefresh } from './variableRefresh';
 import { dropPlan, stemOf } from './variableRows';
 import { fluidCheck, resolveValue } from '../fluid';
@@ -23,12 +23,6 @@ export { dropPlan, movesForDrop } from './variableRows';
 export { createScrollSync } from './variableScroll';
 export { friendlyError } from './variableEdits';
 
-export interface VariableUndo {
-  readonly label: string;
-  readonly coalesceKey?: string | undefined;
-  readonly undo: () => Promise<void>;
-  readonly redo: () => Promise<void>;
-}
 export interface VariablesViewProps {
   readonly project: { readonly path: string };
   readonly selected?: VariableSelection | undefined;
