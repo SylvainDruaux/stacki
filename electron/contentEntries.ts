@@ -3,7 +3,7 @@ import path from 'path';
 
 import { LIMITS } from '../shared/limits';
 import { toRecord, toArray } from '../shared/record';
-import { MAIN_LIMITS } from './main.bounds';
+import { MAIN_LIMITS } from './lib/mainLimits';
 import { writeProjectText } from './documentWrites';
 import * as frontmatter from './formats/frontmatter';
 import * as jsonFormat from './formats/json';

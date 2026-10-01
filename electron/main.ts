@@ -7,9 +7,9 @@ import {
   type FileChange,
 } from './componentProperties';
 import { renderComponentPreviewPage } from './componentPreview';
-import { createIpcRegistrar } from './ipc';
+import { createIpcRegistrar } from './lib/ipcRegistrar';
 import { RUNTIME_PATHS, resourcePath } from './lib/runtimePaths';
-import { MAIN_LIMITS, readSource, directoryBudget } from './main.bounds';
+import { MAIN_LIMITS, readSource, directoryBudget } from './lib/mainLimits';
 import { isAtomicTemporary } from './atomicWrite';
 import { createNodeDocumentActors, type EditReport, type WriteReport } from './documentActors';
 import { buildEdit } from './editRequests';
@@ -32,7 +32,7 @@ import {
   sameFilesystemPath,
   setPathEnvironment,
   staticToolPathGuesses,
-} from './platform';
+} from './lib/platform';
 import { userInfo } from 'os';
 import type {
   BrowserWindow as Window,
@@ -149,7 +149,7 @@ import * as terminalModule from './terminal';
 const { registerTerminalHandlers, cleanupTerminals } = terminalModule;
 import * as projectWatcherModule from './projectWatcher';
 const { watchProject } = projectWatcherModule;
-import * as serialQueueModule from './serialQueue';
+import * as serialQueueModule from './lib/serialQueue';
 const { createSerialQueue, createKeyedQueue } = serialQueueModule;
 import * as electronupdaterModule from 'electron-updater';
 const { autoUpdater } = electronupdaterModule;

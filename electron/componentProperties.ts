@@ -20,7 +20,7 @@ import type {
 } from '../shared/component-properties';
 import { err, ok, type Result } from '../shared/result';
 import { literalOptions } from '../shared/property-options';
-import { sameFilesystemPath } from './platform';
+import { sameFilesystemPath } from './lib/platform';
 import { digestOf } from './atomicWrite';
 import type { DocumentActors, WriteReport } from './documentActors';
 import { editPropertyDefinition, readComponentProperties } from './propertyDefinitions';

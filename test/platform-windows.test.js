@@ -18,7 +18,7 @@ const {
   sameFilesystemPath,
   setPathEnvironment,
   staticToolPathGuesses,
-} = require('#dist/electron/platform.js');
+} = require('#dist/electron/lib/platform.js');
 
 const bundleDirectory = repoPath('node_modules/.stacki-test');
 fs.mkdirSync(bundleDirectory, { recursive: true });

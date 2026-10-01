@@ -1,5 +1,5 @@
 import { ipcMain as nativeIpcMain } from 'electron';
-import { createIpcRegistrar } from './ipc';
+import { createIpcRegistrar } from './lib/ipcRegistrar';
 
 import path from 'node:path';
 import os from 'node:os';
@@ -17,7 +17,7 @@ import {
   pathEnvironmentValue,
   setPathEnvironment,
   staticToolPathGuesses,
-} from './platform';
+} from './lib/platform';
 
 // Embedded terminal — a real login shell in the open project, hosted by
 // node-pty and rendered by xterm in the bottom dock.

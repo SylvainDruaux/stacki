@@ -52,7 +52,7 @@ import {
   writeTargetOf,
   type AtomicWriteError,
 } from './atomicWrite';
-import { readSourceBytes } from './main.bounds';
+import { readSourceBytes } from './lib/mainLimits';
 
 /** A lock older than this whose owner cannot be asked is abandoned: no save
  * holds its lock for more than one read, one write and one read-back. */

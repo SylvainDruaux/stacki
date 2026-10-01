@@ -39,7 +39,7 @@ export const LIMITS = {
 
   // Editor core (plan §8). The projection reuses treeNodesMax and treeDepthMax:
   // a projected node is a page-tree node, so one name keeps one meaning.
-  /** Bytes of one source file. Merged up from electron/main.bounds.ts so the
+  /** Bytes of one source file. Merged up from electron/lib/mainLimits.ts so the
    * renderer, the actor and the disk readers answer to one number. */
   sourceBytesMax: 10 * 1024 * 1024,
   /** Intents accepted by one document actor and not yet terminal. Past this,

@@ -14,8 +14,8 @@ import path from 'path';
 
 import { aliasMap, boundNames, resolveSpec } from './cmsRefs';
 import type { Alias } from './cmsRefs';
-import { MAIN_LIMITS } from './main.bounds';
-import { sameFilesystemPath } from './platform';
+import { MAIN_LIMITS } from './lib/mainLimits';
+import { sameFilesystemPath } from './lib/platform';
 
 const toPosix = (filePath: string): string => filePath.split(path.sep).join('/');
 

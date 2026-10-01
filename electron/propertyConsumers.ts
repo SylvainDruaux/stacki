@@ -7,7 +7,7 @@ import { PROPERTY_LIMITS } from '../shared/component-properties';
 import { err, ok, type Result } from '../shared/result';
 import { aliasMap, resolveSpec, type Alias } from './cmsRefs';
 import { importsOf } from './componentUsage';
-import { sameFilesystemPath } from './platform';
+import { sameFilesystemPath } from './lib/platform';
 import { readPropertySyntax, syntaxNodes } from './propertySyntax';
 
 export interface PropertyConsumer {

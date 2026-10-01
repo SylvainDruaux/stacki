@@ -23,7 +23,7 @@ import {
   parseAstroLock,
   parseValidationResult,
 } from '#dist/electron/main.validation.js';
-import { directoryBudget, MAIN_LIMITS } from '#dist/electron/main.bounds.js';
+import { directoryBudget, MAIN_LIMITS } from '#dist/electron/lib/mainLimits.js';
 import { LIMITS } from '#dist/shared/limits.js';
 
 // Null as a boundary receives it, parsed from JSON: inputs may hold it; our values never do.

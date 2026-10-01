@@ -207,7 +207,7 @@ language, a list's first number); `test/contracts/markdown-spans.test.ts`
 holds every Markdown fixture and a seeded corpus to it.
 
 Every bound lives in `limits.ts`, including `sourceBytesMax` (merged up from
-`electron/main.bounds.ts`) and the engine bounds of plan §8.
+`electron/lib/mainLimits.ts`) and the engine bounds of plan §8.
 
 Fixtures: `test/fixtures/editor-core/` is the hostile corpus (loop rename,
 kind-changing move, page + stylesheet, frontmatter slot, identical siblings,

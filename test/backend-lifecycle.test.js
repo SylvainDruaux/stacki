@@ -16,7 +16,7 @@ const path = require('node:path');
 const vm = require('node:vm');
 const { createRequire } = require('node:module');
 const { EventEmitter } = require('node:events');
-const { createSerialQueue } = require('#dist/electron/serialQueue.js');
+const { createSerialQueue } = require('#dist/electron/lib/serialQueue.js');
 const { watchProject } = require('#dist/electron/projectWatcher.js');
 const { repoPath } = require('./helpers/sources.js');
 
@@ -321,7 +321,7 @@ test(
 test(
   'dev starts share a result only for the same ' + 'project and serialize different projects',
   async () => {
-    const { createKeyedQueue } = require('#dist/electron/serialQueue.js');
+    const { createKeyedQueue } = require('#dist/electron/lib/serialQueue.js');
     const queue = createKeyedQueue();
     const release = deferred();
     const started = [];
@@ -353,7 +353,7 @@ test(
 test(
   'closing a project cancels active and queued ' + 'starts without poisoning the next start',
   async () => {
-    const { createKeyedQueue } = require('#dist/electron/serialQueue.js');
+    const { createKeyedQueue } = require('#dist/electron/lib/serialQueue.js');
     const queue = createKeyedQueue();
     const release = deferred();
     const active = queue.run('one', async (assertActive) => {
