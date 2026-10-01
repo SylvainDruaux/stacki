@@ -30,7 +30,7 @@ const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
   fs.mkdirSync(buildDirectory, { recursive: true });
   const bundlePath = path.join(buildDirectory, 'dynamic-picker.bundle.js');
   await esbuild.build({
-    entryPoints: [repoPath('src/ui/DynamicPicker.tsx')],
+    entryPoints: [repoPath('src/app/DynamicPicker.tsx')],
     outfile: bundlePath,
     bundle: true,
     format: 'cjs',

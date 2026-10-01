@@ -902,7 +902,7 @@ const check = (what, condition, detail) => {
     );
 
     // The press itself is bound in the app, which this can only read.
-    const appSource = fs.readFileSync(repoPath('src/App.tsx'), 'utf8');
+    const appSource = fs.readFileSync(repoPath('src/app/App.tsx'), 'utf8');
     // The whole `if` that tests for the key, body included, however it is wrapped.
     const binding = sourceBlock(
       appSource,

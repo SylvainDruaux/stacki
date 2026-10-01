@@ -342,7 +342,7 @@ const { posts = [] } = Astro.props;`;
       /className="dp-item-nav" onClick=\{\(event\) => event\.stopPropagation\(\)\}/.test(picker),
       'stepping would choose the item as the binding',
     );
-    const app = fs.readFileSync(repoPath('src/App.tsx'), 'utf8').replace(/\r\n/g, '\n');
+    const app = fs.readFileSync(repoPath('src/app/App.tsx'), 'utf8').replace(/\r\n/g, '\n');
     check(
       'the app keeps a place per item name',
       /itemIndex,\n\s*onStepItem:/.test(app),

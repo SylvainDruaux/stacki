@@ -754,10 +754,10 @@ const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
     check('the preview draws the bands', /spacingBands\(/.test(pane));
     check('over the selected element', /rects\[selectedPath\]/.test(pane));
     check('from what the page measured', /spacing\[selectedPath\]/.test(pane));
-    const css = fs.readFileSync(repoPath('src/styles.css'), 'utf8');
+    const css = fs.readFileSync(repoPath('src/app/styles.css'), 'utf8');
     check('padding is pink', /\.spacing-band\.is-padding \{\s*--band: #ec4899;\s*\}/.test(css));
     check('and margin is blue', /\.spacing-band\.is-margin \{\s*--band: #3b82f6;\s*\}/.test(css));
-    const app = fs.readFileSync(repoPath('src/App.tsx'), 'utf8');
+    const app = fs.readFileSync(repoPath('src/app/App.tsx'), 'utf8');
     check(
       'the panel is wired to the canvas',
       /onSpacingHover=\{(app\.)?setSpacingHover\}/.test(app) &&

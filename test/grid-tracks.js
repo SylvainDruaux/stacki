@@ -456,7 +456,7 @@ const check = (what, condition, detail) => {
   // track list), and the settings are a modal — so an editor that sits on the
   // app's own scale opens behind the thing that opened it.
   {
-    const css = fs.readFileSync(repoPath('src/styles.css'), 'utf8');
+    const css = fs.readFileSync(repoPath('src/app/styles.css'), 'utf8');
     const block = css.slice(css.indexOf('.var-custom {'), css.indexOf('.var-custom-head'));
     const z = Number((block.match(/z-index:\s*(\d+)/) || [])[1]);
     check('the custom value editor has a z-index', Number.isFinite(z), block.slice(0, 120));

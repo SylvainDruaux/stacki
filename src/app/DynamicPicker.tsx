@@ -5,8 +5,8 @@ interface DynamicPickerProps {
   readonly error?: string | undefined;
   readonly pattern: string;
 }
-import Dropdown from './Dropdown';
-import { FileIcon } from './Icons';
+import Dropdown from '../ui/Dropdown';
+import { FileIcon } from '../ui/Icons';
 
 // Which entry of a dynamic route ([slug].astro) the canvas is rendered against.
 //

@@ -542,7 +542,7 @@ const check = (what, condition, detail) => {
   check('the toggle calls it a list', /field\.type === 'code'\) \{\s*return 'list'/.test(panel));
 
   // Alone in the box, the button's own top rule would double the box's edge.
-  const css = fs.readFileSync(repoPath('src/styles.css'), 'utf8');
+  const css = fs.readFileSync(repoPath('src/app/styles.css'), 'utf8');
   check(
     'a button alone in the box draws no line above itself',
     /\.list-field-add:first-child\s*\{[^}]*border-top:\s*0/.test(css),

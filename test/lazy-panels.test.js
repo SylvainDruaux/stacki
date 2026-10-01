@@ -265,7 +265,7 @@ async function buildApp() {
   const bundle = repoPath('node_modules/.stacki-test/lazy-panels.cjs');
   fs.mkdirSync(path.dirname(bundle), { recursive: true });
   await esbuild.build({
-    entryPoints: [repoPath('src/App.tsx')],
+    entryPoints: [repoPath('src/app/App.tsx')],
     outfile: bundle,
     bundle: true,
     platform: 'node',
@@ -276,7 +276,7 @@ async function buildApp() {
     logLevel: 'silent',
     plugins: [
       stubSources('deferred-panel-imports', {
-        'src/App.tsx': (filename) => {
+        'src/app/App.tsx': (filename) => {
           const source = fs.readFileSync(filename, 'utf8');
           const found = [...source.matchAll(LAZY_IMPORT)].map((match) => match[1]);
           const names = found.map((specifier) => path.basename(specifier));

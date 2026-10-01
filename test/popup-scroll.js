@@ -155,7 +155,7 @@ const check = (what, condition, detail) => {
   });
 
   // --- the rule that does the work ---------------------------------------------
-  const css = fs.readFileSync(repoPath('src/styles.css'), 'utf8');
+  const css = fs.readFileSync(repoPath('src/app/styles.css'), 'utf8');
   check(
     'the locked panel stops scrolling',
     /\.style-panel-host\.is-locked > \* \{\s*overflow-y: hidden;\s*\}/.test(css),

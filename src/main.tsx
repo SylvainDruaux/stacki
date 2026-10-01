@@ -1,8 +1,8 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import { assert } from '../shared/assert';
-import App from './App';
-import './styles.css';
+import App from './app/App';
+import './app/styles.css';
 
 const rootElement = document.getElementById('root');
 assert(rootElement !== null, 'Renderer root element exists.');

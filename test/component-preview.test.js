@@ -46,7 +46,7 @@ test(
     const buildDirectory = repoPath('node_modules/.stacki-test/component-preview');
     fs.mkdirSync(buildDirectory, { recursive: true });
     await esbuild.build({
-      entryPoints: [repoPath('src/App.tsx')],
+      entryPoints: [repoPath('src/app/App.tsx')],
       outfile: path.join(buildDirectory, 'app.js'),
       bundle: true,
       format: 'cjs',

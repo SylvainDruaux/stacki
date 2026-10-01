@@ -107,7 +107,7 @@ test('edits to the files that define the gates ask a human', () => {
     assert.equal(pathVerdict(file).kind, 'ask', file);
   }
   const allowed = [
-    'src/App.tsx',
+    'src/Sample.tsx',
     'shared/page-node.ts',
     'shared/core/limitsOfText.ts',
     'shared/core/deeper/limits.ts',
@@ -126,8 +126,8 @@ test('path verdicts assert their precondition: repository-relative, forward slas
 });
 
 test('repository paths: inside is relative, outside is absent', () => {
-  assert.equal(repositoryPath(ROOT, ROOT, path.join(ROOT, 'src', 'App.tsx')), 'src/App.tsx');
-  assert.equal(repositoryPath(ROOT, path.join(ROOT, 'src'), 'App.tsx'), 'src/App.tsx');
+  assert.equal(repositoryPath(ROOT, ROOT, path.join(ROOT, 'src', 'Sample.tsx')), 'src/Sample.tsx');
+  assert.equal(repositoryPath(ROOT, path.join(ROOT, 'src'), 'Sample.tsx'), 'src/Sample.tsx');
   assert.equal(repositoryPath(ROOT, ROOT, '/etc/passwd'), undefined);
   assert.equal(repositoryPath(ROOT, ROOT, '../elsewhere.ts'), undefined);
 });
@@ -161,13 +161,13 @@ test('hook payloads: known-good parses; each known-bad shape fails', () => {
       session_id: 'abc-123',
       cwd: ROOT,
       tool_name: 'Edit',
-      tool_input: { file_path: 'src/App.tsx' },
+      tool_input: { file_path: 'src/Sample.tsx' },
     }),
     'pre-tool',
   );
   assert.equal(good.ok, true);
   if (good.ok) {
-    assert.deepEqual(good.value.paths, ['src/App.tsx']);
+    assert.deepEqual(good.value.paths, ['src/Sample.tsx']);
     assert.equal(good.value.command, undefined);
   }
   const bad: readonly [string, string][] = [

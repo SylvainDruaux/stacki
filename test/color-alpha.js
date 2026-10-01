@@ -355,7 +355,7 @@ const SIZE = 240;
   // `input:hover` outranked the panel's own field styling and the fields
   // flickered on the way past. What matters is that no such rule reaches them —
   // whether by being scoped away or by not existing.
-  const app = fs.readFileSync(repoPath('src/styles.css'), 'utf8');
+  const app = fs.readFileSync(repoPath('src/app/styles.css'), 'utf8');
   const unscoped = app
     .split('\n')
     .filter((line) => /^\s*(input|select|textarea):hover[^{]*\{/.test(line))

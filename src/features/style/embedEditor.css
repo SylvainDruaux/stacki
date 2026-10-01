@@ -1062,7 +1062,7 @@
   cursor: grabbing;
 }
 /* The ROW owns the hover feedback. Without this the app-wide `button:hover`
-   (src/styles.css) also washes the label area, so hovering drew a second, lighter
+   (src/app/styles.css) also washes the label area, so hovering drew a second, lighter
    box inside the row — which read as a separate control. */
 .embed-editor_bg-layer-main:hover:not(:disabled) {
   background: none;
@@ -2896,7 +2896,7 @@ textarea.embed-editor_value-input.is-expanded {
 }
 /* The chosen one keeps its own surface under the pointer: it is the answer, not
    an offer. Stated rather than left alone because the app's blanket
-   `button:hover` (src/styles.css) outweighs a class-only background and was
+   `button:hover` (src/app/styles.css) outweighs a class-only background and was
    repainting it — the same reason the shared segmented control below needs a
    hover of its own. */
 

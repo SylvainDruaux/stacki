@@ -40,7 +40,7 @@ async function mountApp(root, files, build) {
   const directory = path.join(repoPath('node_modules/.stacki-test'), build);
   fs.mkdirSync(directory, { recursive: true });
   await esbuild.build({
-    entryPoints: [repoPath('src/App.tsx')],
+    entryPoints: [repoPath('src/app/App.tsx')],
     outfile: path.join(directory, 'app.js'),
     bundle: true,
     format: 'cjs',

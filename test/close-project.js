@@ -36,7 +36,7 @@ const settle = (ms = 30) => new Promise((resolve) => setTimeout(resolve, ms));
   fs.mkdirSync(buildDirectory, { recursive: true });
   const bundlePath = path.join(buildDirectory, 'close-project.bundle.js');
   await esbuild.build({
-    entryPoints: [repoPath('src/App.tsx')],
+    entryPoints: [repoPath('src/app/App.tsx')],
     outfile: bundlePath,
     bundle: true,
     format: 'cjs',

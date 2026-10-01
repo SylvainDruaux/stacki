@@ -1,16 +1,16 @@
 import { usePropertySaveGuard } from './usePropertySaveGuard';
-import ComponentPropertiesPanel from './features/componentProperties/ComponentPropertiesPanel';
-import { revertComponentProperties } from './features/componentProperties/propertiesBridge';
-import type { ClassOutcome } from './features/style/model/host';
+import ComponentPropertiesPanel from '../features/componentProperties/ComponentPropertiesPanel';
+import { revertComponentProperties } from '../features/componentProperties/propertiesBridge';
+import type { ClassOutcome } from '../features/style/model/host';
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { SetStateAction } from 'react';
-import type { Attr, ImportDecl, PageModel, PageNode, PairedNode } from '../shared/page-node';
-import type { ScanComponent, ScanPage, ScanResult } from '../shared/scan';
-import type { WireCommitInfo, WireInjectedRoute } from '../shared/ipc-results';
-import WelcomeScreen from './features/welcome/WelcomeScreen';
-import PagesPanel from './features/pages/PagesPanel';
-import PalettePanel from './features/palette/PalettePanel';
-import StructurePanel from './features/structure/StructurePanel';
+import type { Attr, ImportDecl, PageModel, PageNode, PairedNode } from '../../shared/page-node';
+import type { ScanComponent, ScanPage, ScanResult } from '../../shared/scan';
+import type { WireCommitInfo, WireInjectedRoute } from '../../shared/ipc-results';
+import WelcomeScreen from '../features/welcome/WelcomeScreen';
+import PagesPanel from '../features/pages/PagesPanel';
+import PalettePanel from '../features/palette/PalettePanel';
+import StructurePanel from '../features/structure/StructurePanel';
 import {
   findWithParent,
   isInlineRun,
@@ -18,58 +18,58 @@ import {
   noteText,
   noteValue,
   selectionAfterDelete,
-} from './editor/treeSelection';
-import { canvasClickAction } from './editor/canvasClick';
+} from '../editor/treeSelection';
+import { canvasClickAction } from '../editor/canvasClick';
 import {
   isFragmentNode,
   liveClassesById as classesByNodeId,
   rendersOwnElement,
-} from './editor/liveClasses';
-import { setSoundEnabled } from './ui/sound';
-import { createPreviewWatch } from './features/preview/previewRecovery';
-import { tellCanvas } from './editor/canvasQuery';
+} from '../editor/liveClasses';
+import { setSoundEnabled } from '../ui/sound';
+import { createPreviewWatch } from '../features/preview/previewRecovery';
+import { tellCanvas } from '../editor/canvasQuery';
 import {
   parsePageSource as parseSourcePage,
   readPage,
   readSymbol,
   scanProject,
-} from './ipc/bridge';
-import { checkoutGitBranch, readGitInfo } from './features/git/gitChipBridge';
-import { LIMITS } from '../shared/limits';
-import { assert } from '../shared/assert';
-import PreviewPane from './features/preview/PreviewPane';
-import GitChip from './features/git/GitChip';
-import HistoryPanel, { relativeTime } from './features/history/HistoryPanel';
-import { ConfirmHost, confirmDialog } from './ui/ConfirmDialog';
-import { mergeBranchAction, deleteBranchAction } from './features/git/gitActions';
-import LeftRail from './ui/LeftRail';
-import { lazyPanel } from './ui/lazyPanel';
-import PageSwitcher from './features/pages/PageSwitcher';
-import DynamicPicker from './ui/DynamicPicker';
+} from '../ipc/bridge';
+import { checkoutGitBranch, readGitInfo } from '../features/git/gitChipBridge';
+import { LIMITS } from '../../shared/limits';
+import { assert } from '../../shared/assert';
+import PreviewPane from '../features/preview/PreviewPane';
+import GitChip from '../features/git/GitChip';
+import HistoryPanel, { relativeTime } from '../features/history/HistoryPanel';
+import { ConfirmHost, confirmDialog } from '../ui/ConfirmDialog';
+import { mergeBranchAction, deleteBranchAction } from '../features/git/gitActions';
+import LeftRail from './LeftRail';
+import { lazyPanel } from './lazyPanel';
+import PageSwitcher from '../features/pages/PageSwitcher';
+import DynamicPicker from './DynamicPicker';
 import {
   ASTRO_ASSETS,
   ASTRO_ASSETS_MODULE,
   PLACEHOLDER_PROPS,
   astroAsset as astroAssetDef,
-} from './features/palette/astroAssets';
-import InsertSearch from './features/palette/InsertSearch';
-import AssetsPanel from './features/assets/AssetsPanel';
-import { getElementSchema, GLOBAL_ATTRS, HTML_TAGS, VOID_TAGS } from './editor/elementSchemas';
-import { insertTargetFor as placeInsert } from './editor/insertTarget';
-import { isInlineOnly } from './features/props/RichContent';
-import { onAssetRequest, clearAssetRequest } from './ui/assetPick';
-import { isDataBound } from './editor/bindings';
-import { thenBranch } from './editor/branches';
-import { keepsSlot as keepsSlotAttribute } from './editor/slotAttr';
+} from '../features/palette/astroAssets';
+import InsertSearch from '../features/palette/InsertSearch';
+import AssetsPanel from '../features/assets/AssetsPanel';
+import { getElementSchema, GLOBAL_ATTRS, HTML_TAGS, VOID_TAGS } from '../editor/elementSchemas';
+import { insertTargetFor as placeInsert } from '../editor/insertTarget';
+import { isInlineOnly } from '../features/props/RichContent';
+import { onAssetRequest, clearAssetRequest } from '../ui/assetPick';
+import { isDataBound } from '../editor/bindings';
+import { thenBranch } from '../editor/branches';
+import { keepsSlot as keepsSlotAttribute } from '../editor/slotAttr';
 import {
   createFileSaver,
   createPageSaver,
   scanContainsFile,
   type PageSaver,
-} from './editor/pagePersistence';
-import { createEntrySender, previewGestures } from './editor/pageSender';
-import { createCoalescedRun } from './lib/coalescedRun';
-import { carryHandles, seedOf } from './editor/nodeHandles';
+} from '../editor/pagePersistence';
+import { createEntrySender, previewGestures } from '../editor/pageSender';
+import { createCoalescedRun } from '../lib/coalescedRun';
+import { carryHandles, seedOf } from '../editor/nodeHandles';
 import {
   EditDrafts,
   nodeRefIn,
@@ -78,8 +78,8 @@ import {
   type EditGesture,
   type EditsRecord,
   type QueueEntry,
-} from './editor/pageEdits';
-import { describeRejection, type RejectionReason } from '../shared/intent';
+} from '../editor/pageEdits';
+import { describeRejection, type RejectionReason } from '../../shared/intent';
 import {
   type InsertPlace,
   attributeRenameGesture,
@@ -97,41 +97,41 @@ import {
   unwrapGesture,
   withChildren,
   wrapGesture,
-} from './editor/editGestures';
+} from '../editor/editGestures';
 import {
   saveStateAccepted,
   saveStateBase,
   saveStateEdited,
   saveStateRefused,
-} from './editor/saveState';
-import SaveConflictNotice from './panels/SaveConflictNotice';
-import CapabilityNotice from './panels/CapabilityNotice';
-import { nodeCapability } from './editor/nodeCapability';
-import type { PageEdited } from '../shared/page-save';
-import type { Digest, NodeId } from '../shared/brand';
-import { ancestorChain, createTreeIndex, nodeAtPath, pathOfNode } from './editor/editorTree';
-import { readFrontmatter, writeFrontmatter } from '../electron/frontmatter';
+} from '../editor/saveState';
+import SaveConflictNotice from './SaveConflictNotice';
+import CapabilityNotice from './CapabilityNotice';
+import { nodeCapability } from '../editor/nodeCapability';
+import type { PageEdited } from '../../shared/page-save';
+import type { Digest, NodeId } from '../../shared/brand';
+import { ancestorChain, createTreeIndex, nodeAtPath, pathOfNode } from '../editor/editorTree';
+import { readFrontmatter, writeFrontmatter } from '../../electron/frontmatter';
 import {
   renamedLoopVar,
   parseLoopHead,
   disconnectedLoops,
   loopVarsAt,
   strippedBindings,
-} from './editor/loopBindings';
+} from '../editor/loopBindings';
 import {
   namesUsedIn,
   neededFrontmatter,
   unusedDeclarations,
   withStatements,
   withoutDeclarations,
-} from './editor/frontmatterMove';
-import { hasClass, namesIn, withClass } from './editor/classAttr';
-import { toComponentName } from './features/palette/componentName';
-import { resolveInstanceProps } from './editor/instanceProps';
-import { propsForExtraction } from './editor/extractProps';
-import TerminalDock from './features/terminal/TerminalDock';
-import { cleanError, stripAnsi } from './lib/cleanError';
-import { elementLabel } from './editor/classNames';
+} from '../editor/frontmatterMove';
+import { hasClass, namesIn, withClass } from '../editor/classAttr';
+import { toComponentName } from '../features/palette/componentName';
+import { resolveInstanceProps } from '../editor/instanceProps';
+import { propsForExtraction } from '../editor/extractProps';
+import TerminalDock from '../features/terminal/TerminalDock';
+import { cleanError, stripAnsi } from '../lib/cleanError';
+import { elementLabel } from '../editor/classNames';
 import {
   autoQueryName,
   collectionsInScope,
@@ -142,7 +142,7 @@ import {
   QUERY_MARK,
   referencesInScope,
   removeMarkedQuery,
-} from './editor/dataSuggest';
+} from '../editor/dataSuggest';
 import {
   PreviewIcon,
   RefreshIcon,
@@ -150,37 +150,37 @@ import {
   ChevronLeftIcon,
   ElementComponentIcon,
   TerminalIcon,
-} from './ui/Icons';
-import type { PickedAsset } from './ui/AssetField';
+} from '../ui/Icons';
+import type { PickedAsset } from '../ui/AssetField';
 import type {
   HistoryCommit,
   HistoryCommitFile,
   HistoryFile,
-} from './features/history/historyBridge';
-import type { InlineNode } from './features/props/RichContent';
-import type { Rename, TagOption } from './features/props/propNodeEditors';
-import type { FieldDefinition, PropValues } from './features/props/propRules';
-import type { OverlayInfo } from './features/preview/PreviewOverlays';
-import type { PreviewCrumb } from './features/preview/PreviewToolbar';
-import type { AstroAsset } from './features/palette/astroAssets';
-import type { ComponentCreationSource } from './features/palette/PaletteDialogs';
-import type { DevDiagnosis } from './features/preview/DevOffline';
-import type { PreviewDevice } from './features/preview/PreviewToolbar';
-import type { SpacingHover } from './features/preview/PreviewOverlays';
-import type { VariableSelection } from './features/variables/variablesBridge';
-import type { InsertTarget } from './editor/insertTarget';
-import type { InsertItem } from './features/palette/InsertSearch';
-import { toRecord } from '../shared/record';
-import { projectRelativePath } from './lib/projectPath';
-import { currentDesktopPlatform, shortcutLabel } from './lib/shortcutLabel';
-import { sourceNodeAtOffset } from './features/code/codePanelModel';
+} from '../features/history/historyBridge';
+import type { InlineNode } from '../features/props/RichContent';
+import type { Rename, TagOption } from '../features/props/propNodeEditors';
+import type { FieldDefinition, PropValues } from '../features/props/propRules';
+import type { OverlayInfo } from '../features/preview/PreviewOverlays';
+import type { PreviewCrumb } from '../features/preview/PreviewToolbar';
+import type { AstroAsset } from '../features/palette/astroAssets';
+import type { ComponentCreationSource } from '../features/palette/PaletteDialogs';
+import type { DevDiagnosis } from '../features/preview/DevOffline';
+import type { PreviewDevice } from '../features/preview/PreviewToolbar';
+import type { SpacingHover } from '../features/preview/PreviewOverlays';
+import type { VariableSelection } from '../features/variables/variablesBridge';
+import type { InsertTarget } from '../editor/insertTarget';
+import type { InsertItem } from '../features/palette/InsertSearch';
+import { toRecord } from '../../shared/record';
+import { projectRelativePath } from '../lib/projectPath';
+import { currentDesktopPlatform, shortcutLabel } from '../lib/shortcutLabel';
+import { sourceNodeAtOffset } from '../features/code/codePanelModel';
 import {
   codeWindowFor,
   FRONTMATTER_SUBJECT,
   type CodeSubject,
   type CodeWindowState,
   type FrontmatterSubject,
-} from './features/code/codeWindowTarget';
+} from '../features/code/codeWindowTarget';
 import {
   type AppHistory,
   type AssetPick,
@@ -216,8 +216,8 @@ import {
   type PageStateSnapshot,
   type TrailingSlash,
   isOpenFile,
-} from './editor/pageState';
-import { nodeId, type EditorModel, type EditorNode } from './editor/pageView';
+} from '../editor/pageState';
+import { nodeId, type EditorModel, type EditorNode } from '../editor/pageView';
 import {
   addRecentProject,
   closeProject,
@@ -267,27 +267,31 @@ import {
   checkPreviewRender,
   type AppCollection,
   type ImportPaths,
-} from './ipc/appBridge';
-import { judgeCanvasEvent, type CheckRender, type ShownFile } from './features/preview/previewGate';
-import { describePreviewStale, type PreviewVerdict } from '../shared/preview-token';
-import type { JudgeCanvasEvent } from './features/preview/previewRuntime';
+} from '../ipc/appBridge';
+import {
+  judgeCanvasEvent,
+  type CheckRender,
+  type ShownFile,
+} from '../features/preview/previewGate';
+import { describePreviewStale, type PreviewVerdict } from '../../shared/preview-token';
+import type { JudgeCanvasEvent } from '../features/preview/previewRuntime';
 import {
   describePreviewReload,
   parseShortcutMessage,
   type PreviewReloadReason,
-} from './features/preview/previewMessages';
+} from '../features/preview/previewMessages';
 
 // Each optional editor owns its loading boundary so opening it keeps the
 // canvas and neighboring panels visible and interactive.
-const PropsPanel = lazyPanel(() => import('./features/props/PropsPanel'));
-const StylePanel = lazyPanel(() => import('./features/style/StylePanel'));
-const CodeWindow = lazyPanel(() => import('./features/code/CodeWindow'));
-const CmsPanel = lazyPanel(() => import('./features/cms/CmsPanel'));
-const CmsView = lazyPanel(() => import('./features/cms/CmsView'));
-const ContentView = lazyPanel(() => import('./features/content/ContentView'));
-const VariablesPanel = lazyPanel(() => import('./features/variables/VariablesPanel'));
-const VariablesView = lazyPanel(() => import('./features/variables/VariablesView'));
-const CodePanel = lazyPanel(() => import('./features/code/CodePanel'));
+const PropsPanel = lazyPanel(() => import('../features/props/PropsPanel'));
+const StylePanel = lazyPanel(() => import('../features/style/StylePanel'));
+const CodeWindow = lazyPanel(() => import('../features/code/CodeWindow'));
+const CmsPanel = lazyPanel(() => import('../features/cms/CmsPanel'));
+const CmsView = lazyPanel(() => import('../features/cms/CmsView'));
+const ContentView = lazyPanel(() => import('../features/content/ContentView'));
+const VariablesPanel = lazyPanel(() => import('../features/variables/VariablesPanel'));
+const VariablesView = lazyPanel(() => import('../features/variables/VariablesView'));
+const CodePanel = lazyPanel(() => import('../features/code/CodePanel'));
 
 // A node a gesture creates has no parse yet to name it: its handle is random,
 // unique without a counter, and carried onto the reply that first contains it

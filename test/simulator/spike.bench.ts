@@ -18,7 +18,7 @@
 //      read-back). `fresh`: nothing changed since the intent was authored.
 //      `stale`: another editor changed a different attribute first. Edits keep
 //      byte length, because bytes-100 sits exactly at sourceBytesMax.
-//   3. Last keystroke → disk: the 300 ms typing batch (src/App.tsx:462-470,
+//   3. Last keystroke → disk: the 300 ms typing batch (src/app/App.tsx:462-470,
 //      saveDelay) as a real timer, then the fresh pipeline.
 // Percentiles are nearest-rank over the recorded samples, after WARMUP unrecorded
 // runs per series. Run: npm run spike:editor-core (after npm run fixtures:large).
@@ -46,7 +46,7 @@ import { runSimulation } from './world.ts';
 
 const THRESHOLD_INTENT_MS = 50;
 const THRESHOLD_KEYSTROKE_MS = 350;
-/** The typing batch the persistence layer owns (src/App.tsx saveDelay). */
+/** The typing batch the persistence layer owns (src/app/App.tsx saveDelay). */
 const TYPING_BATCH_MS = 300;
 const SIMULATION_STEPS = 400;
 const WARMUP = 2;

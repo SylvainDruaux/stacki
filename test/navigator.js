@@ -355,7 +355,7 @@ const WORDS = elementNode('words', 'p', [{ id: 'w-text', kind: 'expr', value: '{
   // A condition dropped from the palette starts as the one thing it is: a
   // test and what it shows. The else is a switch in the props panel.
   {
-    const app = fs.readFileSync(repoPath('src/App.tsx'), 'utf8');
+    const app = fs.readFileSync(repoPath('src/app/App.tsx'), 'utf8');
     const insert = app.slice(
       app.indexOf("item.type === 'cond'"),
       app.indexOf("item.type === 'comment'"),
@@ -378,7 +378,7 @@ const WORDS = elementNode('words', 'p', [{ id: 'w-text', kind: 'expr', value: '{
   // is checked here is the contrast it ends up with — not the colour it is
   // written as.
   {
-    const css = fs.readFileSync(repoPath('src/styles.css'), 'utf8');
+    const css = fs.readFileSync(repoPath('src/app/styles.css'), 'utf8');
     const rule = css.slice(css.indexOf('.node-note {'));
     const note = /color:\s*rgba\(([^)]+)\)/.exec(rule.slice(0, rule.indexOf('}')));
     check('the note is written as a colour with alpha', !!note, rule.slice(0, rule.indexOf('}')));

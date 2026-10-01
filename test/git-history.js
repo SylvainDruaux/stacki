@@ -494,7 +494,7 @@ const commit = async (directory, subject) => {
     check('and is marked a component', describe('src/components/Card.astro').kind === 'component');
     check('a layout is marked a layout', describe('src/layouts/Base.astro').kind === 'layout');
     check('something in public is an asset', describe('public/logo.svg').kind === 'asset');
-    check('a stylesheet is a style', describe('src/styles.css').kind === 'style');
+    check('a stylesheet is a style', describe('src/app/styles.css').kind === 'style');
     check('package.json is config', describe('package.json').kind === 'config');
     // A path this knows nothing about keeps its own name. Guessing a label for
     // it would be worse than saying the path.

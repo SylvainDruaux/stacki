@@ -75,7 +75,7 @@ Four cooperating processes, each with one job:
                │ contextBridge (typed)     │ spawns
 ┌──────────────┴─────────────┐   ┌─────────▼─────────────┐
 │ Renderer (React + Vite)    │   │ astro dev (the user's │
-│  src/App.tsx + panels      │   │ project, its deps)    │
+│  src/app/App.tsx + panels      │   │ project, its deps)    │
 │  Edits the PageNode model  │   │ Serves the live page  │
 └──────────────┬─────────────┘   └─────────▲─────────────┘
                │ iframe embed + injected   │ HMR on save
@@ -95,7 +95,7 @@ Four cooperating processes, each with one job:
   allowlisted `window.avb` API via `contextBridge`. Must stay CommonJS
   (Electron ≥ 33 sandbox requirement).
 - **Renderer** (`src/`, React 19 + Vite, ESM): `App.tsx` (~4.9k lines) is the
-  application shell and owns the page model; `src/panels/` are the side views
+  application shell and owns the page model; `src/app/` are the side views
   (Structure, Props, Style, Pages, Assets, CMS, Git history, terminal…);
   `src/features/style/` is the CSS editing surface (mostly TypeScript);
   `src/ui/` holds shared widgets.
@@ -307,7 +307,7 @@ batching/queueing write path (already the right shape).
 | `electron/content/` | Astro content-collection introspection + stubs injected into the dev server       |
 | `electron/formats/` | Leaf parsers for data files (JSON/YAML/TOML/CSV/NDJSON/frontmatter)               |
 | `src/`              | Renderer: `App.tsx` shell, tree/persistence/binding logic, `bridge.ts`            |
-| `src/panels/`       | Side panels (Structure, Props, Style, Pages, Assets, CMS, History, Git, terminal) |
+| `src/app/`       | Side panels (Structure, Props, Style, Pages, Assets, CMS, History, Git, terminal) |
 | `src/features/style/`  | CSS editing surface (TypeScript); `clip-path/`, `lib/`, shared controls           |
 | `src/ui/`           | Shared renderer widgets                                                           |
 | `shared/`           | Contract layer: types, parsers, limits, IPC contract → compiled to `shared/dist`  |

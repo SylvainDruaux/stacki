@@ -98,7 +98,7 @@ const document = dom.window.document;
 
 // ── What our stylesheet says about it ───────────────────────────────────────
 const postcss = require('postcss');
-const sheet = postcss.parse(read('src/styles.css'));
+const sheet = postcss.parse(read('src/app/styles.css'));
 const panelRules = [];
 const narrowRules = [];
 sheet.walkRules((rule) => {
@@ -242,7 +242,7 @@ check(
 );
 check(
   'the search-match colours are not left to a stylesheet, where they would tie',
-  !/\.cm-searchMatch/.test(read('src/styles.css')),
+  !/\.cm-searchMatch/.test(read('src/app/styles.css')),
   'styles.css sets .cm-searchMatch — a base theme ties with it',
 );
 

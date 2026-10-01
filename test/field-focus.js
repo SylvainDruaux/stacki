@@ -98,7 +98,7 @@ const check = (what, condition, detail) => {
   // which only exists in the CSS.
   fs.writeFileSync(
     path.join(pageDirectory, 'app.css'),
-    ['src/styles.css', 'src/features/style/utilities.css', 'src/features/style/embedEditor.css']
+    ['src/app/styles.css', 'src/features/style/utilities.css', 'src/features/style/embedEditor.css']
       .map((file) => fs.readFileSync(path.join(root, file), 'utf8'))
       .join('\n'),
   );

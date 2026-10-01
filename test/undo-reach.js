@@ -36,7 +36,7 @@ const check = (what, condition, detail) => {
 };
 
 const read = (file) => fs.readFileSync(repoPath(file), 'utf8');
-const app = read('src/App.tsx');
+const app = read('src/app/App.tsx');
 const preload = read('dist/electron/preload.js');
 const main = read('dist/electron/main.js');
 

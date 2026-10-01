@@ -61,7 +61,7 @@ const check = (what, condition, detail) => {
   check('and nothing at all is nothing', rendersOwnElement(undefined) === false);
 
   // --- and who asks -----------------------------------------------------------
-  const app = fs.readFileSync(repoPath('src/App.tsx'), 'utf8');
+  const app = fs.readFileSync(repoPath('src/app/App.tsx'), 'utf8');
   check(
     'the app builds its labels through it',
     /classesByNodeId\(nodeClasses, model\.nodes/.test(app),

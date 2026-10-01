@@ -22,7 +22,7 @@ test('component properties lifecycle and controls', async () => {
     stdin: {
       contents: `export {default as Panel}
        from './src/features/componentProperties/ComponentPropertiesPanel';
-     export {default as Rail} from './src/ui/LeftRail';
+     export {default as Rail} from './src/app/LeftRail';
      export {literalOptions} from './src/features/componentProperties/PropertyEditor';
      export {movePropertyItem} from './src/features/componentProperties/PropertyReorder';`,
       resolveDir: ROOT,

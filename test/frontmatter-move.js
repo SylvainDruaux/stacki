@@ -280,7 +280,7 @@ const check = (what, condition, detail) => {
   }
 
   // --- the app asks for both ----------------------------------------------------------
-  const app = fs.readFileSync(repoPath('src/App.tsx'), 'utf8');
+  const app = fs.readFileSync(repoPath('src/app/App.tsx'), 'utf8');
   check(
     'deleting prunes what it made dead',
     /const dead = unusedDeclarations\(next\)/.test(app),

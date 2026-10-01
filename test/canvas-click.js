@@ -106,7 +106,7 @@ const check = (what, condition, detail) => {
   );
 
   // --- the panel asks -----------------------------------------------------------
-  const app = fs.readFileSync(repoPath('src/App.tsx'), 'utf8');
+  const app = fs.readFileSync(repoPath('src/app/App.tsx'), 'utf8');
   check('the canvas handler goes through it', /canvasClickAction\(\{/.test(app));
   check('and passes what the canvas said about the click', /outside: !!info\?\.outside/.test(app));
 

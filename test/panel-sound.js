@@ -253,7 +253,7 @@ function fakeAudio() {
   check('and it is a sound scope', /<SoundHere>/.test(props), 'its dropdowns would be silent');
   check('so is the style panel', /<SoundHere>/.test(style));
   const scopes = [
-    'src/App.tsx',
+    'src/app/App.tsx',
     'src/features/pages/PagesPanel.tsx',
     'src/features/terminal/TerminalDock.tsx',
     'src/features/welcome/WelcomeScreen.tsx',

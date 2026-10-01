@@ -43,7 +43,7 @@ const check = (what, condition, detail) => {
   const bundlePath = path.join(buildDirectory, 'app.bundle.js');
 
   await esbuild.build({
-    entryPoints: [repoPath('src/App.tsx')],
+    entryPoints: [repoPath('src/app/App.tsx')],
     outfile: bundlePath,
     bundle: true,
     format: 'cjs',

@@ -103,7 +103,7 @@ const check = (what, condition, detail) => {
   );
 
   // --- the move asks -----------------------------------------------------------------
-  const app = fs.readFileSync(repoPath('src/App.tsx'), 'utf8');
+  const app = fs.readFileSync(repoPath('src/app/App.tsx'), 'utf8');
   const move = app.slice(
     app.indexOf('const moveNode = useCallback'),
     app.indexOf('const removeNode = useCallback'),

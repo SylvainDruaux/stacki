@@ -78,7 +78,7 @@ const STYLESHEET = `:root {
         import React from 'react'
         import { createRoot } from 'react-dom/client'
         import VariablesView from './src/features/variables/VariablesView.tsx'
-        import './src/styles.css'
+        import './src/app/styles.css'
         const root = createRoot(document.getElementById('root'))
         window.__show = (index) => root.render(
           <VariablesView

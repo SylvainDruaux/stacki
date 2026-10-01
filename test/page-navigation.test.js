@@ -62,7 +62,7 @@ test('out-of-order page reads and external reads cannot replace the current edit
   const directory = repoPath('node_modules/.stacki-test/page-navigation');
   fs.mkdirSync(directory, { recursive: true });
   await esbuild.build({
-    entryPoints: [repoPath('src/App.tsx')],
+    entryPoints: [repoPath('src/app/App.tsx')],
     outfile: path.join(directory, 'app.js'),
     bundle: true,
     format: 'cjs',

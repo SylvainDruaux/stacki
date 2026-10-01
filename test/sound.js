@@ -739,7 +739,7 @@ function fakeAudio() {
   );
   check('but not on a disabled one', /!button\.disabled/.test(panel));
 
-  const app = fs.readFileSync(repoPath('src/App.tsx'), 'utf8');
+  const app = fs.readFileSync(repoPath('src/app/App.tsx'), 'utf8');
   check('the app reads it on load', /readAppSettings\(\)\s*\.then/.test(app));
   check('and follows the menu after that', /onSoundSettingChanged\(/.test(app));
 

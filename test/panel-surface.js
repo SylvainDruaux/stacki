@@ -87,7 +87,7 @@ const check = (what, condition, detail) => {
     path.join(pageDirectory, 'app.css'),
     [
       'src/features/style/tokens.css',
-      'src/styles.css',
+      'src/app/styles.css',
       'src/features/style/utilities.css',
       'src/features/style/embedEditor.css',
     ]
