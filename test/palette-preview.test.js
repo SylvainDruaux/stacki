@@ -167,7 +167,7 @@ async function buildPalette() {
   const output = repoPath('node_modules/.stacki-test/palette-preview.cjs');
   fs.mkdirSync(path.dirname(output), { recursive: true });
   await esbuild.build({
-    entryPoints: [repoPath('src/panels/PalettePanel.tsx')],
+    entryPoints: [repoPath('src/features/palette/PalettePanel.tsx')],
     outfile: output,
     bundle: true,
     format: 'cjs',

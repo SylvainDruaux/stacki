@@ -140,7 +140,7 @@ const toPosix = (filePath) => filePath.split(path.sep).join('/');
   fs.mkdirSync(buildDirectory, { recursive: true });
   const out = path.join(buildDirectory, 'component-folders.bundle.mjs');
   await esbuild.build({
-    entryPoints: [repoPath('src/insertRank.ts')],
+    entryPoints: [repoPath('src/features/palette/insertRank.ts')],
     outfile: out,
     bundle: true,
     format: 'esm',
@@ -199,13 +199,13 @@ const toPosix = (filePath) => filePath.split(path.sep).join('/');
   );
 
   // The panel and the palette ask the same question of the same list.
-  const panel = fs.readFileSync(repoPath('src/panels/PalettePanel.tsx'), 'utf8');
+  const panel = fs.readFileSync(repoPath('src/features/palette/PalettePanel.tsx'), 'utf8');
   check(
     'the components panel searches by that rule too',
     /rankInsertItems\(props\.components, query\)/.test(panel),
     'the panel has its own idea of what matches',
   );
-  const model = fs.readFileSync(repoPath('src/paletteModel.ts'), 'utf8');
+  const model = fs.readFileSync(repoPath('src/features/palette/paletteModel.ts'), 'utf8');
   check(
     'and still groups what comes back by folder',
     /const folder = component\.folder;/.test(model),

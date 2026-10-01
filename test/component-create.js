@@ -39,7 +39,7 @@ const check = (what, condition, detail) => {
   fs.mkdirSync(buildDirectory, { recursive: true });
   const namesBundle = path.join(buildDirectory, 'component-name.bundle.js');
   await esbuild.build({
-    entryPoints: [repoPath('src/componentName.ts')],
+    entryPoints: [repoPath('src/features/palette/componentName.ts')],
     outfile: namesBundle,
     bundle: true,
     format: 'cjs',
@@ -634,7 +634,7 @@ const check = (what, condition, detail) => {
   {
     const panelBundle = path.join(buildDirectory, 'palette-panel.bundle.js');
     await esbuild.build({
-      entryPoints: [repoPath('src/panels/PalettePanel.tsx')],
+      entryPoints: [repoPath('src/features/palette/PalettePanel.tsx')],
       outfile: panelBundle,
       bundle: true,
       format: 'cjs',

@@ -1,22 +1,22 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { ScanComponent } from '../../shared/scan';
-import type { TrailingSlash } from '../editor/pageState';
-import type { ComponentUsageFile } from '../paletteModel';
+import type { ScanComponent } from '../../../shared/scan';
+import type { TrailingSlash } from '../../editor/pageState';
+import type { ComponentUsageFile } from './paletteModel';
 import type { ComponentCreationSource, UsageAnchor, UsagePopup } from './PaletteDialogs';
-import { cleanError } from '../lib/cleanError';
-import { allowDragEffect, clearDrag, setDrag } from '../editor/dragState';
-import { rankInsertItems } from '../insertRank';
+import { cleanError } from '../../lib/cleanError';
+import { allowDragEffect, clearDrag, setDrag } from '../../editor/dragState';
+import { rankInsertItems } from './insertRank';
 import {
   componentPreviewURL,
   groupPaletteComponents,
   parseComponentPreviewMessage,
   parseComponentUsage,
   prettyComponentName,
-} from '../paletteModel';
-import { ComponentPlusIcon, ElementComponentIcon, LayoutIcon } from '../ui/Icons';
-import useDismiss from '../ui/useDismiss';
+} from './paletteModel';
+import { ComponentPlusIcon, ElementComponentIcon, LayoutIcon } from '../../ui/Icons';
+import useDismiss from '../../ui/useDismiss';
 import { CreateComponentModal, InstancesPopup } from './PaletteDialogs';
-import { currentDesktopPlatform, shortcutLabel } from '../lib/shortcutLabel';
+import { currentDesktopPlatform, shortcutLabel } from '../../lib/shortcutLabel';
 
 const TOOLTIP_DELAY_MS = 500;
 const PREVIEW_DELAY_MS = 450;

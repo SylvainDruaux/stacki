@@ -39,7 +39,7 @@ const check = (what, condition, detail) => {
   fs.mkdirSync(buildDirectory, { recursive: true });
   const out = path.join(buildDirectory, 'insert-rank.bundle.mjs');
   await esbuild.build({
-    entryPoints: [repoPath('src/insertRank.ts')],
+    entryPoints: [repoPath('src/features/palette/insertRank.ts')],
     outfile: out,
     bundle: true,
     format: 'esm',
@@ -214,7 +214,7 @@ const check = (what, condition, detail) => {
   }
 
   // --- the palette asks for this ----------------------------------------------------------
-  const palette = fs.readFileSync(repoPath('src/ui/InsertSearch.tsx'), 'utf8');
+  const palette = fs.readFileSync(repoPath('src/features/palette/InsertSearch.tsx'), 'utf8');
   check(
     'the palette ranks through it',
     /rankInsertItems\(items, query\)/.test(palette),

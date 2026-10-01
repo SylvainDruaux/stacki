@@ -9,7 +9,7 @@ import type { ScanComponent, ScanPage, ScanResult } from '../shared/scan';
 import type { WireCommitInfo, WireInjectedRoute } from '../shared/ipc-results';
 import WelcomeScreen from './features/welcome/WelcomeScreen';
 import PagesPanel from './features/pages/PagesPanel';
-import PalettePanel from './panels/PalettePanel';
+import PalettePanel from './features/palette/PalettePanel';
 import StructurePanel from './panels/StructurePanel';
 import {
   findWithParent,
@@ -51,8 +51,8 @@ import {
   ASTRO_ASSETS_MODULE,
   PLACEHOLDER_PROPS,
   astroAsset as astroAssetDef,
-} from './astroAssets';
-import InsertSearch from './ui/InsertSearch';
+} from './features/palette/astroAssets';
+import InsertSearch from './features/palette/InsertSearch';
 import AssetsPanel from './panels/AssetsPanel';
 import { getElementSchema, GLOBAL_ATTRS, HTML_TAGS, VOID_TAGS } from './editor/elementSchemas';
 import { insertTargetFor as placeInsert } from './editor/insertTarget';
@@ -126,7 +126,7 @@ import {
   withoutDeclarations,
 } from './editor/frontmatterMove';
 import { hasClass, namesIn, withClass } from './editor/classAttr';
-import { toComponentName } from './componentName';
+import { toComponentName } from './features/palette/componentName';
 import { resolveInstanceProps } from './editor/instanceProps';
 import { propsForExtraction } from './editor/extractProps';
 import TerminalDock from './features/terminal/TerminalDock';
@@ -162,14 +162,14 @@ import type { Rename, TagOption } from './panels/propNodeEditors';
 import type { FieldDefinition, PropValues } from './panels/propRules';
 import type { OverlayInfo } from './panels/PreviewOverlays';
 import type { PreviewCrumb } from './panels/PreviewToolbar';
-import type { AstroAsset } from './astroAssets';
-import type { ComponentCreationSource } from './panels/PaletteDialogs';
+import type { AstroAsset } from './features/palette/astroAssets';
+import type { ComponentCreationSource } from './features/palette/PaletteDialogs';
 import type { DevDiagnosis } from './panels/DevOffline';
 import type { PreviewDevice } from './panels/PreviewToolbar';
 import type { SpacingHover } from './panels/PreviewOverlays';
 import type { VariableSelection } from './variablesBridge';
 import type { InsertTarget } from './editor/insertTarget';
-import type { InsertItem } from './ui/InsertSearch';
+import type { InsertItem } from './features/palette/InsertSearch';
 import { toRecord } from '../shared/record';
 import { projectRelativePath } from './lib/projectPath';
 import { currentDesktopPlatform, shortcutLabel } from './lib/shortcutLabel';

@@ -1,5 +1,5 @@
-import { assert } from '../shared/assert';
-import { LIMITS } from '../shared/limits';
+import { assert } from '../../../shared/assert';
+import { LIMITS } from '../../../shared/limits';
 
 // What a component may be called.
 //

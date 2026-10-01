@@ -22,7 +22,7 @@ test('component usage popup ignores replies after close and from older opens', a
   const bundle = path.join(directory, 'panel.js');
   fs.mkdirSync(directory, { recursive: true });
   await esbuild.build({
-    entryPoints: [repoPath('src/panels/PalettePanel.tsx')],
+    entryPoints: [repoPath('src/features/palette/PalettePanel.tsx')],
     outfile: bundle,
     bundle: true,
     format: 'cjs',

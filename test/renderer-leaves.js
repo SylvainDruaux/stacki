@@ -62,7 +62,7 @@ try {
     ok: false,
     message: 'This statement exceeds the editor size limit.',
   });
-  const { componentNameError } = load('src/componentName.ts');
+  const { componentNameError } = load('src/features/palette/componentName.ts');
   assert.equal(componentNameError('Card', Array(10_000).fill('Other')), undefined);
   assert.throws(() => componentNameError('Card', Array(10_001).fill('Other')), /scan limit/);
 
@@ -72,7 +72,7 @@ try {
   assert.deepEqual(onePerPlace(Array.from({ length: 20_000 }, () => ({ ...box }))), [box]);
   assert.throws(() => onePerPlace(Array(20_001).fill(box)), /Outline box count exceeds limit/);
 
-  const { rankInsertItems } = load('src/insertRank.ts');
+  const { rankInsertItems } = load('src/features/palette/insertRank.ts');
   assert.equal(rankInsertItems(Array(10_000).fill({ name: 'Card' }), '').length, 10_000);
   assert.throws(() => rankInsertItems(Array(10_001).fill({ name: 'Card' }), ''), /item count/);
   const { elementClasses } = load('src/editor/classNames.ts');

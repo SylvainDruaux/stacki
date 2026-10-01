@@ -1,8 +1,8 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import type { ComponentUsageFile } from '../paletteModel';
-import { componentNameError, toComponentName } from '../componentName';
-import { prettyComponentName, usageFileLabel } from '../paletteModel';
-import { CloseIcon, ElementComponentIcon, FileIcon, LayoutIcon } from '../ui/Icons';
+import type { ComponentUsageFile } from './paletteModel';
+import { componentNameError, toComponentName } from './componentName';
+import { prettyComponentName, usageFileLabel } from './paletteModel';
+import { CloseIcon, ElementComponentIcon, FileIcon, LayoutIcon } from '../../ui/Icons';
 
 export type ComponentCreationSource =
   | {

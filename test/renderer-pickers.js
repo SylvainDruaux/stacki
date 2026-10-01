@@ -14,7 +14,7 @@ const output = path.join(directory, 'renderer-pickers.bundle.cjs');
 buildSync({
   stdin: {
     contents: `export { default as DataPicker } from './src/ui/DataPicker.tsx';
-    export { default as InsertSearch } from './src/ui/InsertSearch.tsx';
+    export { default as InsertSearch } from './src/features/palette/InsertSearch.tsx';
     export { default as LinkField } from './src/ui/LinkField.tsx';`,
     resolveDir: ROOT,
   },

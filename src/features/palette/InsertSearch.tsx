@@ -1,9 +1,9 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { assert } from '../../shared/assert';
-import { LIMITS } from '../../shared/limits';
-import { HTML_TAGS } from '../editor/elementSchemas';
-import { rankInsertItems } from '../insertRank';
-import { ASTRO_ASSETS } from '../astroAssets';
+import { assert } from '../../../shared/assert';
+import { LIMITS } from '../../../shared/limits';
+import { HTML_TAGS } from '../../editor/elementSchemas';
+import { rankInsertItems } from './insertRank';
+import { ASTRO_ASSETS } from './astroAssets';
 import {
   elementIcon,
   ElementComponentIcon,
@@ -15,7 +15,7 @@ import {
   CodeIcon,
   SearchIcon,
   astroAssetIcon,
-} from './Icons';
+} from '../../ui/Icons';
 
 const TABS = [
   { key: 'all', label: 'All results' },
@@ -115,7 +115,7 @@ function useInsertSearch({ components, allowSlot }: InsertSearchProps) {
     () => insertItems(components ?? [], { allowSlot }),
     [components, allowSlot],
   );
-  // The words, and where they land: see src/insertRank.js. The trailing space
+  // The words, and where they land: see src/features/palette/insertRank.ts. The trailing space
   // is meaningful, so the query is not trimmed on the way in.
   const results = useMemo(() => {
     const items = allItems.filter((i) => tab === 'all' || i.cat === tab);
