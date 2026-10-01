@@ -70,6 +70,7 @@ test(
         '  <!-- note -->',
         '</main>',
         '<script>let a = 1;</script>',
+        '<style>.page { color: red; }</style>',
       ].join('\n'),
     );
     const byPath = new Map(nodes.map((node) => [node.path.join('/'), node]));
@@ -92,7 +93,9 @@ test(
     assert.equal(byPath.get('0/1/0/0')?.capability, 'repeated-source-node');
     assert.equal(byPath.get('0/2')?.capability, 'read-only-opaque');
     assert.equal(byPath.get('0/3')?.capability, 'editable');
-    assert.equal(byPath.get('1')?.capability, 'read-only-opaque');
+    assert.equal(byPath.get('1')?.capability, 'read-only-opaque', 'a script is code kept verbatim');
+    // Same-file styles (plan §6): the style panel restates a page's own rules.
+    assert.equal(byPath.get('2')?.capability, 'editable', "a page's own <style> is editable");
   },
 );
 

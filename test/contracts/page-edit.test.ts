@@ -659,3 +659,55 @@ test('two frontmatter requests against one read add each import once', async (co
       "import C from './C.astro';\n---\n<A />\n",
   );
 });
+
+// The style panel restates a page's own <style> rules by rewriting the block's
+// body (plan §6: same-file styles are visually editable). A <script> body is
+// code kept verbatim, so the same rewrite of it is still refused.
+const STYLED = [
+  '<h1 class="hero">Hi</h1>',
+  '<style>',
+  '  .hero {',
+  '    font-size: 48px;',
+  '  }',
+  '</style>',
+  '<script>',
+  '  let count = 1;',
+  '</script>',
+  '',
+].join('\n');
+
+test("a page's <style> block is rewritten in place; a <script> is not", async (context) => {
+  const harness = fixture();
+  context.after(harness.dispose);
+  const file = path.join(harness.root, 'src/pages/index.astro');
+  fs.writeFileSync(file, STYLED);
+  const page = await read(harness, file);
+  const style = nodeAt(page, [1]);
+  assert.ok(style.kind === 'raw' && style.name === 'style', 'the second node is the <style>');
+  const restyled = { ...style, inner: style.inner.replace('48px', '30px') };
+  const applied = await edit(harness, file, page.checksum, {
+    tag: 'replace-node',
+    target: refAt(page, [1]),
+    node: restyled,
+  });
+  assert.ok(applied.ok, 'the <style> rewrite applies');
+  assert.equal(
+    fs.readFileSync(file, 'utf8'),
+    STYLED.replace('48px', '30px'),
+    'only the value moved',
+  );
+
+  const current = await read(harness, file);
+  const script = nodeAt(current, [2]);
+  assert.ok(script.kind === 'raw' && script.name === 'script', 'the third node is the <script>');
+  const refused = await edit(harness, file, current.checksum, {
+    tag: 'replace-node',
+    target: refAt(current, [2]),
+    node: { ...script, inner: script.inner.replace('1', '2') },
+  });
+  assert.ok(!refused.ok, 'a <script> body stays code-only');
+  if (!refused.ok) {
+    assert.equal(refused.error.code, 'rejected');
+  }
+  assert.equal(fs.readFileSync(file, 'utf8'), STYLED.replace('48px', '30px'), 'nothing else moved');
+});

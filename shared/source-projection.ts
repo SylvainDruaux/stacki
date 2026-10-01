@@ -419,9 +419,9 @@ function projectNode(entry: PendingNode, convert: SpanConverter): ProjectedNode 
   };
 }
 
-/** Plan §6: native elements, component invocations, text, comments and the
- * structural nodes are visually editable; opaque code is not; anything inside a
- * loop body is one source node rendered many times. */
+/** Plan §6: native elements, component invocations, text, comments, a page's
+ * own `<style>` and the structural nodes are visually editable; opaque code is
+ * not; anything inside a loop body is one source node rendered many times. */
 export function classifyNode(
   node: PageNode,
   placement: { readonly repeated: boolean },
@@ -433,8 +433,12 @@ export function classifyNode(
     case 'component':
     case 'element':
       return writesChildrenAtRuntime(node.props) ? 'read-only-opaque' : 'editable';
-    case 'expr':
     case 'raw':
+      // A page's own <style> is same-file styles (plan §6: visually editable):
+      // the style panel restates its rules. A <script> is code the editor does
+      // not read, kept verbatim.
+      return node.name === 'style' ? 'editable' : 'read-only-opaque';
+    case 'expr':
     case 'raw-line':
       return 'read-only-opaque';
     case 'chunk-group':
