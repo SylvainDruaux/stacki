@@ -1404,6 +1404,25 @@ type VariableConnectProps = {
   children: ReactNode;
 };
 
+/**
+ * The custom-value editor's text field, connected to the variable picker.
+ * What comes back is the finished value, not a bare binding: the field has
+ * already decided whether the variable replaces what was there or goes in at
+ * the caret (see insert-binding.ts). Running withBinding over it again was a
+ * second opinion on a question already answered — and when the first answer
+ * was "replace", it turned a picked variable into a wiped value.
+ */
+export function connectCustomField(
+  field: ReactElement,
+  onDraft: (value: string) => void,
+): ReactNode {
+  return (
+    <VariableConnect className="is-multiline" code onDraft={onDraft} onPick={onDraft}>
+      {field}
+    </VariableConnect>
+  );
+}
+
 export default function VariableConnect(props: VariableConnectProps) {
   const { onPick, disabled, ariaLabel = 'Connect to variable', prop } = props;
   const connect = useVariableConnect(props);
@@ -1601,6 +1620,7 @@ function ConnectPopups({
       ) : undefined}
       {big ? (
         <CustomValue
+          connectField={connectCustomField}
           value={liveValue()}
           label={label}
           anchor={big}

@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import type { CSSProperties, RefObject } from 'react';
+import type { CSSProperties, ReactElement, ReactNode, RefObject } from 'react';
 import { createPortal } from 'react-dom';
-import VariableConnect from '../style-panel/VariableConnect';
 import { registerPopupLayer } from '../style-panel/lib/popup-layer';
 import { popupBox } from './Dropdown';
 
@@ -63,6 +62,12 @@ interface CustomValueProps {
   readonly anchorEl?: HTMLElement | undefined;
   readonly onCancel: () => void;
   readonly onSave: (value: string) => void;
+  /**
+   * Wraps the text field in the variable picker (VariableConnect's
+   * connectCustomField). Passed in rather than imported: the picker opens this
+   * editor, so importing it back would make the two modules a cycle.
+   */
+  readonly connectField: (field: ReactElement, onDraft: (value: string) => void) => ReactNode;
 }
 function CustomValue(props: CustomValueProps) {
   const state = useCustomValue(props);
@@ -82,18 +87,7 @@ function CustomValue(props: CustomValueProps) {
         <span>Custom value</span>
         <span className="var-custom-name">{label}</span>
       </div>
-      {/* What comes back is the finished value, not a bare binding: the field
-          has already decided whether the variable replaces what was there or
-          goes in at the caret (see insert-binding.ts). Running withBinding over
-          it again was a second opinion on a question already answered — and
-          when the first answer was "replace", it turned a picked variable into
-          a wiped value. */}
-      <VariableConnect
-        className="is-multiline"
-        code
-        onDraft={state.setDraft}
-        onPick={(next) => state.setDraft(next)}
-      >
+      {props.connectField(
         <textarea
           ref={state.fieldRef}
           className="var-custom-input"
@@ -104,8 +98,9 @@ function CustomValue(props: CustomValueProps) {
           /* Enter is handled for the whole box (see the key listener above) — a
              CSS value has no need for a line break, and the field that actually
              has focus is usually the rich one in front of this. */
-        />
-      </VariableConnect>
+        />,
+        state.setDraft,
+      )}
       <div className="var-custom-foot">
         <span>Enter to save · Escape to cancel</span>
       </div>

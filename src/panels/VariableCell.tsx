@@ -3,7 +3,7 @@ import type { VariableCell } from '../variablesBridge';
 import { VARIABLES_LIMITS } from '../variablesBridge';
 import { assert } from '../../shared/assert';
 import ColorSwatch from '../style-panel/components/ColorSwatch';
-import VariableConnect from '../style-panel/VariableConnect';
+import VariableConnect, { connectCustomField } from '../style-panel/VariableConnect';
 import EasingEditor, { MiniCurve } from '../style-panel/EasingEditor';
 import { easingToBezier, isEasing } from '../style-panel/lib/transition';
 import FluidBadge from '../ui/FluidBadge';
@@ -289,6 +289,7 @@ function CellCustomValue({ state }: { readonly state: CellState }) {
     <>
       {custom && (
         <CustomValue
+          connectField={connectCustomField}
           value={value}
           label={cell.name}
           anchor={custom}

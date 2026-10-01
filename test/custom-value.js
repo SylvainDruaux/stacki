@@ -20,7 +20,7 @@ const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
 const { LIMITS } = require('#dist/shared/limits.js');
-const { repoPath } = require('./helpers/sources.js');
+const { ROOT, repoPath } = require('./helpers/sources.js');
 
 const failures = [];
 let checked = 0;
@@ -37,7 +37,14 @@ const check = (what, condition, detail) => {
   fs.mkdirSync(buildDirectory, { recursive: true });
   const bundlePath = path.join(buildDirectory, 'custom-value.bundle.js');
   await esbuild.build({
-    entryPoints: [repoPath('src/ui/CustomValueEditor.tsx')],
+    // The editor and the picker field the app hands it (connectCustomField).
+    stdin: {
+      contents:
+        "export * from './src/ui/CustomValueEditor.tsx';\n" +
+        "export { connectCustomField } from './src/style-panel/VariableConnect.tsx';\n",
+      resolveDir: ROOT,
+      loader: 'ts',
+    },
     outfile: bundlePath,
     bundle: true,
     format: 'cjs',
@@ -188,7 +195,7 @@ const check = (what, condition, detail) => {
     const React = require('react');
     const { createRoot } = require('react-dom/client');
     const { act } = require('react');
-    const { CustomValue } = require(bundlePath);
+    const { CustomValue, connectCustomField } = require(bundlePath);
     const saved = [];
     const root = createRoot(win.document.getElementById('root'));
     const settle = () =>
@@ -199,6 +206,7 @@ const check = (what, condition, detail) => {
     await act(async () => {
       root.render(
         React.createElement(CustomValue, {
+          connectField: connectCustomField,
           value: 'calc(2rem + )var(--nav-height)',
           label: 'width',
           anchor: { left: 10, top: 10, bottom: 40, right: 200, width: 190, height: 30 },
