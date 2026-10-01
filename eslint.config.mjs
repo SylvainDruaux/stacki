@@ -189,8 +189,8 @@ const NO_WHOLE_FILE_REGENERATION = [...NO_ASTRO_PRINTING, ...NO_MARKDOWN_PRINTIN
 // an edit adds, printed alone (editRequests.ts); and Markdown's HTML blocks.
 const ASTRO_PRINTER_BOUNDARY = [
   'electron/parse/astroParser.ts',
-  'electron/componentFile.ts',
-  'electron/editRequests.ts',
+  'electron/documents/componentFile.ts',
+  'electron/documents/editRequests.ts',
 ];
 // Markdown's parser module holds the page printer — the round-trip oracle the
 // tests hold it to, never a write path (step 10: a Markdown page reaches disk

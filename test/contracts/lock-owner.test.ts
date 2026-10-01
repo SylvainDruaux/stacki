@@ -4,13 +4,13 @@
 // Methodology: write lock files into a temporary directory — a known-good owner,
 // then each known-bad shape (not JSON, not an object, a mistyped or missing
 // field, an unsafe pid, a file one byte past the bound) — and read each with the
-// built electron/documentDisk.ts.
+// built electron/documents/documentDisk.ts.
 import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { test } from 'node:test';
-import { LOCK_OWNER_CHARS_MAX, readLockOwner } from '#dist/electron/documentDisk.js';
+import { LOCK_OWNER_CHARS_MAX, readLockOwner } from '#dist/electron/documents/documentDisk.js';
 
 function lockFile(context: { after: (fn: () => void) => void }, contents: string): string {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'stacki-lock-owner-'));

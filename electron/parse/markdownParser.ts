@@ -2,7 +2,7 @@
 // with the source range of every node and of every attribute Markdown writes,
 // and prints Markdown nodes: the new ones an edit adds, and a node before and
 // after an edit, so the edit reaches disk as the difference between the two
-// (electron/markdownEdits.ts; plan §3.4, §11 step 10). A Markdown page is
+// (electron/documents/markdownEdits.ts; plan §3.4, §11 step 10). A Markdown page is
 // never printed whole to be saved.
 //
 // The tree uses the node kinds the rest of the app already understands, so the

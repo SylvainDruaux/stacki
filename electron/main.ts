@@ -10,17 +10,21 @@ import { renderComponentPreviewPage } from './previewServer/componentPreview';
 import { createIpcRegistrar } from './lib/ipcRegistrar';
 import { RUNTIME_PATHS, resourcePath } from './lib/runtimePaths';
 import { MAIN_LIMITS, readSource, directoryBudget } from './lib/mainLimits';
-import { isAtomicTemporary } from './atomicWrite';
-import { createNodeDocumentActors, type EditReport, type WriteReport } from './documentActors';
-import { buildEdit } from './editRequests';
-import { previewEdit } from './editPreview';
+import { isAtomicTemporary } from './documents/atomicWrite';
+import {
+  createNodeDocumentActors,
+  type EditReport,
+  type WriteReport,
+} from './documents/documentActors';
+import { buildEdit } from './documents/editRequests';
+import { previewEdit } from './documents/editPreview';
 import {
   createProjectText,
   describeWriteReport,
   documentHost,
   installDocumentHost,
   writeProjectText,
-} from './documentWrites';
+} from './documents/documentWrites';
 import { definedFields } from '../shared/boundary';
 import { gitErrorDetail } from './git';
 import {
@@ -129,7 +133,7 @@ import * as starterModule from './starter';
 const { createStarter } = starterModule;
 import * as windowBoundsModule from './windowBounds';
 const { openingBounds } = windowBoundsModule;
-import * as componentFileModule from './componentFile';
+import * as componentFileModule from './documents/componentFile';
 const { componentFile, newPageText } = componentFileModule;
 import * as componentUsageModule from './componentUsage';
 const { componentUsage, instancesIn } = componentUsageModule;
@@ -3185,7 +3189,7 @@ function pageEditError(
 }
 
 // A visual edit planned against the bytes the renderer sends and never
-// written (electron/editPreview.ts): reviewing a conflicted page in code
+// written (electron/documents/editPreview.ts): reviewing a conflicted page in code
 // shows its unsaved gestures as the splices they are. The reply has page:edit's
 // shape, so the renderer states the next request against it as it would
 // against a write.

@@ -1,6 +1,6 @@
 // The real App in jsdom, with stub panels that capture their props, over a
 // bridge whose page reads parse real files and whose edits go through main's
-// own translation and a real document host (electron/documentActors.ts):
+// own translation and a real document host (electron/documents/documentActors.ts):
 // what the step-9 and step-10 gesture suites drive. A gesture is run through a
 // captured panel callback, then its save is waited for; ⌘Z is the user's undo.
 // Pages are parsed by extension, as main does: .md and .mdx by the Markdown
@@ -13,8 +13,8 @@ const esbuild = require('esbuild');
 const { JSDOM } = require('jsdom');
 const { parsePage } = require('#dist/electron/parse/astroParser.js');
 const { parseMarkdownPage } = require('#dist/electron/parse/markdownParser.js');
-const { createNodeDocumentActors } = require('#dist/electron/documentActors.js');
-const { buildEdit } = require('#dist/electron/editRequests.js');
+const { createNodeDocumentActors } = require('#dist/electron/documents/documentActors.js');
+const { buildEdit } = require('#dist/electron/documents/editRequests.js');
 const { decodeUtf8 } = require('#dist/shared/span.js');
 const { repoPath, stubPanels } = require('./sources.js');
 

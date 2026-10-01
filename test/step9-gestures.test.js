@@ -7,7 +7,7 @@
 // Method: the real App in jsdom with stub panels that capture their props, as
 // in page-navigation.test.js. The bridge serves a real file in a temporary
 // folder: `page:read` parses it with the real parser, and `page:edit` does
-// what main's handler does — the real document host (electron/documentActors.ts)
+// what main's handler does — the real document host (electron/documents/documentActors.ts)
 // submits each request through main's own translation (editRequests.ts), so
 // requests of one gesture rebase through the host's commit log exactly as in
 // the app. Undo is the ⌘Z the user presses.

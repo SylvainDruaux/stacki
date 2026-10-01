@@ -20,8 +20,8 @@
 // in sorted canonical order, each file witnessed by its `before` checksum. With
 // one thread two batches cannot interleave today; the sorted order is what
 // keeps them from deadlocking once acquisition can wait.
-import { assert } from '../shared/assert';
-import { toIntentId, type Digest } from '../shared/brand';
+import { assert } from '../../shared/assert';
+import { toIntentId, type Digest } from '../../shared/brand';
 import {
   actorQuiescent,
   createActor,
@@ -36,7 +36,7 @@ import {
   type Planner,
   type Projector,
   type Reconciliation,
-} from '../shared/documentActor';
+} from '../../shared/documentActor';
 import {
   describeRejection,
   intentPayloadBytes,
@@ -45,15 +45,15 @@ import {
   type Outcome,
   type RejectionReason,
   type SourceEdit,
-} from '../shared/intent';
-import { commitChain, minimalSplices, rebaseIntent, type CommitRecord } from '../shared/rebase';
-import type { Snapshot } from '../shared/snapshot';
-import { inverseEdits } from '../shared/splice';
-import { LIMITS } from '../shared/limits';
-import { err, ok, type Result } from '../shared/result';
-import { decodeUtf8, encodeUtf8, toByteSpan, type ByteString } from '../shared/span';
-import { diffCodePatch } from '../shared/code-patch';
-import { planIntent } from '../shared/planner';
+} from '../../shared/intent';
+import { commitChain, minimalSplices, rebaseIntent, type CommitRecord } from '../../shared/rebase';
+import type { Snapshot } from '../../shared/snapshot';
+import { inverseEdits } from '../../shared/splice';
+import { LIMITS } from '../../shared/limits';
+import { err, ok, type Result } from '../../shared/result';
+import { decodeUtf8, encodeUtf8, toByteSpan, type ByteString } from '../../shared/span';
+import { diffCodePatch } from '../../shared/code-patch';
+import { planIntent } from '../../shared/planner';
 import {
   NODE_PROJECTOR,
   NodeDocumentDisk,

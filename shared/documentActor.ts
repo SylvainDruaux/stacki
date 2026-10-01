@@ -1,7 +1,7 @@
 // The document actor (plan §2 layer 2, §5.2), as pure steps. One actor per
 // canonical file. Each call does one unit of the write protocol and returns the
 // next state plus what happened; whoever drives it — the simulator's seeded
-// scheduler, or the Electron host (electron/documentActors.ts) — decides what
+// scheduler, or the Electron host (electron/documents/documentActors.ts) — decides what
 // runs between two steps. Disk I/O, parsing and hashing are injected, so this
 // module has no clock, no timer, no promise and no OS (plan §10), and the
 // simulator exercises exactly the state machine that ships.

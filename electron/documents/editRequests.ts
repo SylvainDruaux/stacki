@@ -16,12 +16,12 @@
 // outlived the compat adapter at step 9 (tracker, Step 9): the renderer names
 // nodes by the path, kind and UTF-16 range of the parse it shows, and only main
 // holds the bytes those become, so the translation stays here.
-import { assert } from '../shared/assert';
-import type { Edit, NodeRef } from '../shared/edit-request';
+import { assert } from '../../shared/assert';
+import type { Edit, NodeRef } from '../../shared/edit-request';
 import type { BuiltEdit, EditBase, IntentDraft } from './documentActors';
-import { TAG_NAME_RE } from '../shared/intent';
-import type { Operation, Placement, RejectionReason, SourceEdit } from '../shared/intent';
-import { renameSites } from '../shared/loopScope';
+import { TAG_NAME_RE } from '../../shared/intent';
+import type { Operation, Placement, RejectionReason, SourceEdit } from '../../shared/intent';
+import { renameSites } from '../../shared/loopScope';
 import {
   closeTagStart,
   lineIndent,
@@ -29,11 +29,11 @@ import {
   openTagEnd,
   tagNameEnd,
   textOf,
-} from '../shared/planSupport';
-import { parsePageResult, type PageNode } from '../shared/page-node';
-import { toAnchorRef, type AnchorRef } from '../shared/ref';
-import { err, ok, type Result } from '../shared/result';
-import type { Snapshot } from '../shared/snapshot';
+} from '../../shared/planSupport';
+import { parsePageResult, type PageNode } from '../../shared/page-node';
+import { toAnchorRef, type AnchorRef } from '../../shared/ref';
+import { err, ok, type Result } from '../../shared/result';
+import type { Snapshot } from '../../shared/snapshot';
 import {
   byteStringsEqual,
   decodeUtf8,
@@ -41,8 +41,8 @@ import {
   spansAscending,
   toByteSpan,
   toByteString,
-} from '../shared/span';
-import { parsePage, serializeNodes, serializePage } from './parse/astroParser';
+} from '../../shared/span';
+import { parsePage, serializeNodes, serializePage } from '../parse/astroParser';
 import {
   frontmatterSlot,
   pageFormat,

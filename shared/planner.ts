@@ -277,7 +277,7 @@ function planAttributeOperation(
   }
   if (!writtenAsTag(target.current)) {
     // Markdown writes no attributes in tags; the ones it has (an image's alt)
-    // are its syntax, rewritten as the node's text (electron/markdownEdits.ts).
+    // are its syntax, rewritten as the node's text (electron/documents/markdownEdits.ts).
     return err('unsupported-operation');
   }
   if (tagNameEnd(context.current.bytes, target.current) === target.current.span.start + 1) {

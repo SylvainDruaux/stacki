@@ -14,7 +14,7 @@
 //      plan §5.2 pipeline on a real disk — read and hash, rebuild the snapshot
 //      if the bytes changed, plan (diffing when stale), verify witnesses,
 //      splice, reparse and reproject the candidate, re-read and hash again,
-//      and write through electron/atomicWrite.ts (temp file, fsync, rename,
+//      and write through electron/documents/atomicWrite.ts (temp file, fsync, rename,
 //      read-back). `fresh`: nothing changed since the intent was authored.
 //      `stale`: another editor changed a different attribute first. Edits keep
 //      byte length, because bytes-100 sits exactly at sourceBytesMax.

@@ -64,7 +64,7 @@ export const LIMITS = {
    * intent, rejects with `resource-limit`; the renderer re-authors against the
    * refreshed snapshot, where no diff is needed. */
   diffDistanceMax: 2_048,
-  /** Document actors one host keeps (electron/documentActors.ts). An actor
+  /** Document actors one host keeps (electron/documents/documentActors.ts). An actor
    * holds only its snapshot between intents, so the least recently used idle
    * one is dropped past this bound and re-reads the disk on its next intent. */
   documentActorsMax: 512,

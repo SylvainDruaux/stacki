@@ -8,7 +8,7 @@
 // editor-core), each shipped gesture runs both ways: the adapter's effect
 // (src/editor/editGestures.ts) on the parsed model, reprinted by serializePage; and
 // the adapter's requests (src/editor/pageEdits.ts, nodeRefIn) through main's
-// translator (electron/editRequests.ts) and the shipping planner, a later
+// translator (electron/documents/editRequests.ts) and the shipping planner, a later
 // request of one gesture rebased through the earlier ones as the host does
 // (shared/rebase.ts). The two results are parsed and compared with layout
 // metadata removed (ids, source ranges, and the fields that only remember
@@ -24,7 +24,7 @@ const path = require('node:path');
 const crypto = require('node:crypto');
 const esbuild = require('esbuild');
 const { parsePage, serializePage } = require('#dist/electron/parse/astroParser.js');
-const { buildEditIntent } = require('#dist/electron/editRequests.js');
+const { buildEditIntent } = require('#dist/electron/documents/editRequests.js');
 const { toDigest, toFilePath, toIntentId } = require('#dist/shared/brand.js');
 const { toIntent } = require('#dist/shared/intent.js');
 const { parsePageResult } = require('#dist/shared/page-node.js');

@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'path';
 
 import { toArray } from '../shared/record';
-import { writeProjectText } from './documentWrites';
+import { writeProjectText } from './documents/documentWrites';
 import { parseConflict, renderResolved } from './conflicts';
 import type { ConflictPart } from './conflicts';
 import { gitErrorDetail, gitErrorFull } from './git';

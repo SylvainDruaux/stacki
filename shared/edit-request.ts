@@ -4,7 +4,7 @@
 // ranges on every node, and the checksum of those bytes; it does not hold the
 // bytes, the byte offsets, or the printer that writes a new node. Main does:
 // it turns a request into an Intent against the snapshot of the named
-// checksum (electron/editRequests.ts), and the actor plans it like any other.
+// checksum (electron/documents/editRequests.ts), and the actor plans it like any other.
 //
 // A node is referred to by the facts of that parse — its path, its kind and
 // its source range — and main checks them against its own projection of the
@@ -353,7 +353,7 @@ function parseHunks(input: unknown): readonly SourceEdit[] {
 // The shape only: at least one hunk, ascending and disjoint, each text inside
 // the payload bound. Whether the witnesses hold, whether the hunks sit on code
 // points, and whether the summed payload fits are main's to check against the
-// bytes (electron/editRequests.ts, the host) — a typed refusal, not a throw.
+// bytes (electron/documents/editRequests.ts, the host) — a typed refusal, not a throw.
 function parseCodeHunks(input: unknown): readonly CodeHunk[] {
   const hunks = toArray(input);
   if (hunks === undefined) {

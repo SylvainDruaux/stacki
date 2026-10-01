@@ -237,7 +237,7 @@ const check = (what, condition, detail) => {
   check('and there is none without props', propsDestructure([]) === '', propsDestructure([]));
 
   // ── The file ──────────────────────────────────────────────────────────────
-  const { componentFile } = require(repoPath('dist/electron/componentFile.js'));
+  const { componentFile } = require(repoPath('dist/electron/documents/componentFile.js'));
   const project = fs.mkdtempSync(path.join(os.tmpdir(), 'stacki-comp-'));
   fs.mkdirSync(path.join(project, 'src', 'components'), { recursive: true });
   fs.mkdirSync(path.join(project, 'src', 'pages'), { recursive: true });

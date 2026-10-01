@@ -20,8 +20,8 @@ import { randomUUID } from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { assert } from '../shared/assert';
-import { toFilePath, type FilePath } from '../shared/brand';
+import { assert } from '../../shared/assert';
+import { toFilePath, type FilePath } from '../../shared/brand';
 import type {
   DiskError,
   DiskLock,
@@ -30,17 +30,21 @@ import type {
   LockError,
   Projector,
   ReplaceError,
-} from '../shared/documentActor';
-import { parsePageResult } from '../shared/page-node';
-import { parseMarkdownPage } from './parse/markdownParser';
-import type { Plan } from '../shared/planner';
-import { projectValueSplice } from '../shared/projection-patch';
-import { toRecord } from '../shared/record';
-import { err, ok, type Result } from '../shared/result';
-import { createLazySnapshot, createSnapshot, type Snapshot } from '../shared/snapshot';
-import { projectOpaqueDocument, projectPage, type Projection } from '../shared/source-projection';
-import { decodeUtf8, toByteString, type ByteString } from '../shared/span';
-import { parsePage } from './parse/astroParser';
+} from '../../shared/documentActor';
+import { parsePageResult } from '../../shared/page-node';
+import { parseMarkdownPage } from '../parse/markdownParser';
+import type { Plan } from '../../shared/planner';
+import { projectValueSplice } from '../../shared/projection-patch';
+import { toRecord } from '../../shared/record';
+import { err, ok, type Result } from '../../shared/result';
+import { createLazySnapshot, createSnapshot, type Snapshot } from '../../shared/snapshot';
+import {
+  projectOpaqueDocument,
+  projectPage,
+  type Projection,
+} from '../../shared/source-projection';
+import { decodeUtf8, toByteString, type ByteString } from '../../shared/span';
+import { parsePage } from '../parse/astroParser';
 import {
   createFileExclusive,
   digestOf,
@@ -52,7 +56,7 @@ import {
   writeTargetOf,
   type AtomicWriteError,
 } from './atomicWrite';
-import { readSourceBytes } from './lib/mainLimits';
+import { readSourceBytes } from '../lib/mainLimits';
 
 /** A lock older than this whose owner cannot be asked is abandoned: no save
  * holds its lock for more than one read, one write and one read-back. */

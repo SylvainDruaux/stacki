@@ -1,4 +1,4 @@
-// Goal: electron/atomicWrite.ts, the primitives under the document actor's
+// Goal: electron/documents/atomicWrite.ts, the primitives under the document actor's
 // disk, replaces a file all at once or not at all, never leaves its temporary
 // file behind, keeps the target's mode, writes through symlinks and refuses a
 // dangling one, creates without ever overwriting, and reports a directory it
@@ -20,7 +20,7 @@ const {
   digestOf,
   isAtomicTemporary,
   replaceFileAtomic,
-} = require('#dist/electron/atomicWrite.js');
+} = require('#dist/electron/documents/atomicWrite.js');
 
 const sha256 = (bytes) => createHash('sha256').update(bytes).digest('hex');
 

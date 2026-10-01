@@ -94,7 +94,7 @@ state.
 Since step 5 every write of project text — page, chunk, style re-write,
 stylesheet, code window, CMS and asset edits, component-property batches — is
 an intent to the file's document actor (see Document actors below), which
-writes through `electron/atomicWrite.ts`: a same-directory temporary file
+writes through `electron/documents/atomicWrite.ts`: a same-directory temporary file
 (`wx`, the target's mode and owner, fsync), one rename, a directory fsync, then
 the actor's own read-back, which reports another writer as `write-race`.
 Encoding: files are UTF-8; page reads decode strictly (invalid
@@ -104,7 +104,7 @@ nothing rewrites a file whole, never touched by a write.
 Reviewing a conflicted page's unsaved edits in code (plan §7): the page's
 queued gestures go through `page:previewEdit` — an `EditRequest` plus
 `source`, the bytes at its `authoredChecksum` — which main plans exactly as
-`page:edit` would and never writes (`electron/editPreview.ts`); the reply has
+`page:edit` would and never writes (`electron/documents/editPreview.ts`); the reply has
 `page:edit`'s shape, so the next request is stated against it. A request that
 names other bytes than it sends is a broken caller and throws. The reviewed
 text is the origin's bytes spliced, never a reprint. `test/fixtures/round-trip/`
@@ -251,7 +251,7 @@ legacy tree-mutation surface (method in its header).
 `page:edit` carries an `EditRequest` (`shared/edit-request.ts`): a gesture in
 the terms of the page the renderer shows — node references are the path, kind
 and UTF-16 range of its parse — against that parse's checksum. Main turns it
-into an intent (`electron/editRequests.ts`: references checked against its own
+into an intent (`electron/documents/editRequests.ts`: references checked against its own
 projection, ranges converted to bytes, new nodes and the frontmatter block
 printed, loop-rename sites found) and the page's actor plans and writes
 splices. The reply (`shared/page-save.ts`, `parsePageEditResult`) is the page
@@ -298,14 +298,14 @@ the tracker, Step 8.
 `.md` and `.mdx` pages are on the engine like `.astro` pages: their gestures
 are `page:edit` requests, their actor projects them with the Markdown parser,
 and nothing prints one whole. Main drafts a Markdown node's intents
-(`electron/markdownEdits.ts`): new content — typed text, a heading level, an
+(`electron/documents/markdownEdits.ts`): new content — typed text, a heading level, an
 image's source or alt, a fence's language, a list's first number — is the node
 printed before and after the edit at its place (its containers' line prefix,
 `shared/markdownLayout.ts`, and the file's line breaks), the difference placed
 on the node's own bytes as `rewrite-node`; new blocks and items are printed
 where they go and inserted beside a neighbour; the YAML frontmatter is the
 slot that differs or, on a page without one, `insert-frontmatter` at its top.
-Markup inside MDX is drafted as on an `.astro` page. `electron/editAnchors.ts`
+Markup inside MDX is drafted as on an `.astro` page. `electron/documents/editAnchors.ts`
 holds what both front ends share.
 
 The planner's Markdown rules (`shared/planMarkdown.ts`): a Markdown block is
@@ -359,7 +359,7 @@ after). The generated config itself lives in `node_modules/.avb`.
 
 ## Document actors (step 5)
 
-`electron/documentActors.ts` hosts one actor per canonical file in the main
+`electron/documents/documentActors.ts` hosts one actor per canonical file in the main
 process and steps each submission to its outcome before returning (main's
 handlers run one at a time; the queue bound still holds). `documentWrites.ts`
 installs the process's host and is the only entry point for writing project

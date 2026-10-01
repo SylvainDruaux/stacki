@@ -19,7 +19,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { reconcileUncertain } = require('#dist/shared/documentActor.js');
-const { isAtomicTemporary } = require('#dist/electron/atomicWrite.js');
+const { isAtomicTemporary } = require('#dist/electron/documents/atomicWrite.js');
 const { protocolLeftovers, realHost, runChild, scratch, sha256 } = require('./support.js');
 
 const WRITERS = 4;

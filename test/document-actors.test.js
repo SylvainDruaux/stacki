@@ -1,4 +1,4 @@
-// Goal: electron/documentActors.ts, the host of the main process's document
+// Goal: electron/documents/documentActors.ts, the host of the main process's document
 // actors, keeps the plan's promises on a real disk: a program's text write (a
 // `rewrite-text` of the diff, since step 10) applies and hands back the
 // checksum the persistence layer adopts (§5.2); a stale
@@ -21,9 +21,12 @@ const { createHash } = require('node:crypto');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { DocumentActors } = require('#dist/electron/documentActors.js');
-const { NODE_PROJECTOR, NodeDocumentDisk } = require('#dist/electron/documentDisk.js');
-const { createDocumentTelemetry, hashPath } = require('#dist/electron/documentTelemetry.js');
+const { DocumentActors } = require('#dist/electron/documents/documentActors.js');
+const { NODE_PROJECTOR, NodeDocumentDisk } = require('#dist/electron/documents/documentDisk.js');
+const {
+  createDocumentTelemetry,
+  hashPath,
+} = require('#dist/electron/documents/documentTelemetry.js');
 const { LIMITS } = require('#dist/shared/limits.js');
 const { planIntent } = require('#dist/shared/planner.js');
 

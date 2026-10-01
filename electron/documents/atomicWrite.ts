@@ -1,5 +1,5 @@
 // The OS-facing write primitives under the document actor's disk
-// (electron/documentDisk.ts, plan §5.2 steps 7–8). Nothing else may import the
+// (electron/documents/documentDisk.ts, plan §5.2 steps 7–8). Nothing else may import the
 // writing functions here: the actor is the only writer of a page, chunk or
 // stylesheet (plan §3.3), and eslint.config.mjs fences the names.
 //
@@ -36,10 +36,10 @@
 import { createHash, randomUUID } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import { assert } from '../shared/assert';
-import { toDigest, type Digest } from '../shared/brand';
-import { LIMITS } from '../shared/limits';
-import { err, ok, type Result } from '../shared/result';
+import { assert } from '../../shared/assert';
+import { toDigest, type Digest } from '../../shared/brand';
+import { LIMITS } from '../../shared/limits';
+import { err, ok, type Result } from '../../shared/result';
 
 /** Why a write did not happen, or did without a durability promise. */
 export type AtomicWriteError =

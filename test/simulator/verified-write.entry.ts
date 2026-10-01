@@ -5,7 +5,7 @@
 // comparable one-to-one with the numbers recorded in the tracker.
 import { createHash } from 'node:crypto';
 import * as fs from 'node:fs';
-import { replaceFileAtomic } from '#dist/electron/atomicWrite.js';
+import { replaceFileAtomic } from '#dist/electron/documents/atomicWrite.js';
 import { toDigest, type Digest } from '#dist/shared/brand.js';
 import { err, ok, type Result } from '#dist/shared/result.js';
 

@@ -19,17 +19,17 @@
 // Markup inside MDX (a component and its children) returns `undefined`: it is
 // drafted by editRequests.ts as on an .astro page. So are removals, moves and
 // copies, which the planner places for markup and Markdown alike.
-import { assert } from '../shared/assert';
-import type { Edit, NodeRef } from '../shared/edit-request';
-import type { AttributeValue, Placement, RejectionReason } from '../shared/intent';
-import { blankLinePrefix, markdownPrefix } from '../shared/markdownLayout';
-import { parsePageResult, type Attr, type PageNode } from '../shared/page-node';
-import { markdownBeside } from '../shared/planMarkdown';
-import { nodeAtPath, parentPath, textOf } from '../shared/planSupport';
-import { toAnchorRef } from '../shared/ref';
-import { err, ok, type Result } from '../shared/result';
-import type { ProjectedNode } from '../shared/source-projection';
-import { toByteSpan } from '../shared/span';
+import { assert } from '../../shared/assert';
+import type { Edit, NodeRef } from '../../shared/edit-request';
+import type { AttributeValue, Placement, RejectionReason } from '../../shared/intent';
+import { blankLinePrefix, markdownPrefix } from '../../shared/markdownLayout';
+import { parsePageResult, type Attr, type PageNode } from '../../shared/page-node';
+import { markdownBeside } from '../../shared/planMarkdown';
+import { nodeAtPath, parentPath, textOf } from '../../shared/planSupport';
+import { toAnchorRef } from '../../shared/ref';
+import { err, ok, type Result } from '../../shared/result';
+import type { ProjectedNode } from '../../shared/source-projection';
+import { toByteSpan } from '../../shared/span';
 import type { IntentDraft } from './documentActors';
 import {
   frontmatterSlot,
@@ -45,7 +45,7 @@ import {
   printMarkdownItem,
   printMarkdownNode,
   type MarkdownLayout,
-} from './parse/markdownParser';
+} from '../parse/markdownParser';
 
 type Drafted = Result<IntentDraft, RejectionReason> | undefined;
 

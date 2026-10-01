@@ -22,7 +22,7 @@ const {
   updateComponentProperties,
 } = require('#dist/electron/componentProperties.js');
 const { applySourceEdits } = require('#dist/electron/propertySyntax.js');
-const { documentHost } = require('#dist/electron/documentWrites.js');
+const { documentHost } = require('#dist/electron/documents/documentWrites.js');
 
 // Every batch write goes through the document actors (plan §3.3, step 5).
 const writer = { documents: documentHost().documents, noteWrite: () => {} };

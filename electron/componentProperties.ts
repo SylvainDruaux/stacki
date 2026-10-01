@@ -21,8 +21,8 @@ import type {
 import { err, ok, type Result } from '../shared/result';
 import { literalOptions } from '../shared/property-options';
 import { sameFilesystemPath } from './lib/platform';
-import { digestOf } from './atomicWrite';
-import type { DocumentActors, WriteReport } from './documentActors';
+import { digestOf } from './documents/atomicWrite';
+import type { DocumentActors, WriteReport } from './documents/documentActors';
 import { editPropertyDefinition, readComponentProperties } from './propertyDefinitions';
 import { renameComponentOptionValues, renameComponentReferences } from './propertyRename';
 

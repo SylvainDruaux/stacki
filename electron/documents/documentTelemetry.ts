@@ -7,9 +7,9 @@
 // usernames — and never carries source bytes, disk error text or intent
 // payloads. No pipeline, no dashboard, no dependency.
 import { createHash } from 'node:crypto';
-import { assert } from '../shared/assert';
-import type { FilePath, IntentId } from '../shared/brand';
-import { REJECTION_REASONS, type Outcome, type RejectionReason } from '../shared/intent';
+import { assert } from '../../shared/assert';
+import type { FilePath, IntentId } from '../../shared/brand';
+import { REJECTION_REASONS, type Outcome, type RejectionReason } from '../../shared/intent';
 
 /** What one line records. (The step-0 save guard's `conflict` went with the
  * last whole-file save at step 10: a stale edit is an outcome, `rejected`.) */
