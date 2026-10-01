@@ -1,6 +1,6 @@
 // What the dev server loads has to be a real file on disk.
 //
-//   node test/unpackedParser.test.js
+//   node test/scripts/release/unpackedParser.test.js
 //
 // The preview runs on a config Stacki generates into the project, and that
 // config requires this app's own parser — the thing that puts the markers in
@@ -27,7 +27,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { execFileSync } = require('child_process');
-const { ROOT, repoPath } = require('./helpers/sources.js');
+const { ROOT, repoPath } = require('../../helpers/sources.js');
 
 const failures = [];
 let checked = 0;

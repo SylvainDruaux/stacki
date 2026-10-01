@@ -30,6 +30,9 @@ export interface Tree {
   readonly files: ReadonlySet<string>;
   // The text of each file whose references may need rewriting.
   readonly texts: ReadonlyMap<string, string>;
+  // Files whose repository paths are data (samples, exemption lists): their
+  // imports follow a move, their path text never does.
+  readonly pathData?: ReadonlySet<string>;
 }
 
 export interface StepPlan {
@@ -126,10 +129,12 @@ export function planStep(tree: Tree, moves: ReadonlyMap<string, string>): StepPl
       next = imports.text;
       reports.push(...imports.reports);
     }
-    const paths = rewritePathText({ file, text: next, files: tree.files, directories, moves });
-    next = paths.text;
-    reports.push(...paths.reports);
-    reports.push(...renamedNameReports(file, next, moves));
+    if (tree.pathData?.has(file) !== true) {
+      const paths = rewritePathText({ file, text: next, files: tree.files, directories, moves });
+      next = paths.text;
+      reports.push(...paths.reports);
+      reports.push(...renamedNameReports(file, next, moves));
+    }
     if (next !== text) {
       writes.set(moves.get(file) ?? file, next);
     }

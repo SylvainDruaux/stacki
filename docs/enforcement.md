@@ -111,6 +111,7 @@ the agent hooks are guard rails, not a sandbox. CI is the gate that cannot be ar
 ## Changing a rule
 
 1. Change the rule where it lives (the table above says where), with its test:
-   `test/contracts/eslint-plugin.test.ts`, `policy-scan.test.ts`, or `agent-policy.test.ts`.
+   `test/scripts/eslintPlugin/eslintPlugin.test.ts`,
+   `test/scripts/policy/policyScan.test.ts`, or `test/scripts/agent/agentPolicy.test.ts`.
 2. Update this page and AGENTS.md in the same commit.
 3. The commit touches gate files, so an agent needs a human's approval to make it.

@@ -113,7 +113,7 @@ exhaustiveness). **Cost:** lint time; about 80 s for a full run.
 
 ### `@typescript-eslint/rule-tester`
 
-**Does:** runs the local plugin's rule tests (`test/contracts/eslint-plugin.test.ts`) under
+**Does:** runs the local plugin's rule tests (`test/scripts/eslintPlugin/eslintPlugin.test.ts`) under
 `node:test`. **Why not the platform:** ESLint's own `RuleTester` is typed for ESLint's rule shape,
 not typescript-eslint's, so the tests would need type assertions (AGENTS.md non-negotiable 2).
 **Cost:** tests only; same release line as the parser.

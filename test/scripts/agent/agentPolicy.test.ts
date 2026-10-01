@@ -18,10 +18,10 @@ import {
   patchPaths,
   repositoryPath,
   tokenize,
-} from '../../scripts/agent/core.mts';
-import { parseHookPayload } from '../../scripts/agent/payload.mts';
-import { decideStop, parseStopState, reportDigest } from '../../scripts/agent/stopState.mts';
-import { commitMessageProblems } from '../../scripts/policy/commitMessage.mts';
+} from '../../../scripts/agent/core.mts';
+import { parseHookPayload } from '../../../scripts/agent/payload.mts';
+import { decideStop, parseStopState, reportDigest } from '../../../scripts/agent/stopState.mts';
+import { commitMessageProblems } from '../../../scripts/policy/commitMessage.mts';
 
 // The runner starts every suite at the repository root.
 const ROOT = process.cwd();

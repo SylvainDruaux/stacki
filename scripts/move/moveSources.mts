@@ -64,11 +64,15 @@ const HISTORICAL = new Set([
   'docs/ts-migration-plan.md',
   'package-lock.json',
   MANIFEST,
-  // The tool and its test hold paths as data, not as references.
+]);
+// Files that hold repository paths as data — the tool, its test, and the
+// source-path rules' samples and exemptions: their imports follow a move,
+// their path text does not.
+const PATH_DATA = new Set([
   'scripts/move/moveSources.mts',
   'scripts/move/moveSourcesPlan.mts',
-  'test/contracts/move-sources.test.ts',
-  'test/sourcePaths.test.js',
+  'test/scripts/gate/sourcePaths.test.js',
+  'test/scripts/move/moveSources.test.ts',
 ]);
 const UNTOUCHED_PREFIXES = ['docs/archive/', 'test/fixtures/', 'test/corpus/'];
 
@@ -206,7 +210,7 @@ function readTree(root: string): Tree {
     }
     texts.set(file, bytes.toString('utf8'));
   }
-  return { files, texts };
+  return { files, texts, pathData: PATH_DATA };
 }
 
 function runStep(root: string, steps: readonly Step[], name: string, write: WriteMode): number {
@@ -377,6 +381,9 @@ function stalePathProblems(tree: Tree, steps: readonly Step[]): string[] {
   const directories = directoryIndex(tree.files);
   const problems: string[] = [];
   for (const [file, text] of tree.texts) {
+    if (PATH_DATA.has(file)) {
+      continue;
+    }
     for (const match of text.matchAll(STALE_PATH_TOKEN)) {
       const written = stripExtension((match[1] ?? '').replace(/\.+$/, ''));
       const bare = written.startsWith('dist/') ? written.slice('dist/'.length) : written;

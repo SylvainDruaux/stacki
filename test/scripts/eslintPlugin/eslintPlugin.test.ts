@@ -8,7 +8,7 @@
 import path from 'node:path';
 import { after, describe, it } from 'node:test';
 import { RuleTester } from '@typescript-eslint/rule-tester';
-import { rules } from '../../scripts/eslintPlugin/index.mts';
+import { rules } from '../../../scripts/eslintPlugin/index.mts';
 
 // RuleTester registers through void-returning functions. node:test's return a promise the
 // runner itself awaits and reports on, so the adapters leave it to the runner.
@@ -264,7 +264,7 @@ tester.run('comment-sentence', rules['comment-sentence'], {
 });
 
 // A blanket `eslint-disable` suppresses this rule too, so the policy scan
-// holds that case (test/contracts/policy-scan.test.ts).
+// holds that case (test/scripts/policy/policyScan.test.ts).
 tester.run('require-disable-reason', rules['require-disable-reason'], {
   valid: [
     '// eslint-disable-next-line no-console -- the CLI prints\nconsole.log(1);',

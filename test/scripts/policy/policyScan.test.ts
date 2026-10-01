@@ -7,15 +7,15 @@
 // are exercised at their boundary: exactly 100 columns passes, 101 fails.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { countFile } from '../../scripts/policy/density.mts';
-import { POLICY_LIMITS } from '../../scripts/policy/limits.mts';
+import { countFile } from '../../../scripts/policy/density.mts';
+import { POLICY_LIMITS } from '../../../scripts/policy/limits.mts';
 import {
   dependencyViolations,
   isExempt,
   layoutUniquenessViolations,
   normalizePath,
   scanFile,
-} from '../../scripts/policy/scan.mts';
+} from '../../../scripts/policy/scan.mts';
 
 function rules(file: string, text: string): readonly string[] {
   return scanFile(file, text).map((violation) => violation.rule);
@@ -136,7 +136,7 @@ test('layout names: camelCase folders and modules, PascalCase components', () =>
     'scripts/policy/commitMessage.mts',
     'scripts/move/moveSources.json',
     // Outside the layout roots the rule does not apply.
-    'test/contracts/policy-scan.test.ts',
+    'test/scripts/policy/policyScan.test.ts',
   ]) {
     assert.deepEqual(rules(file, header), [], file);
   }

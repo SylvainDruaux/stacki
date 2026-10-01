@@ -13,8 +13,8 @@ import {
   planStep,
   resolvePath,
   type StepPlan,
-} from '../../scripts/move/moveSourcesPlan.mts';
-import { nameProblem, parseManifest } from '../../scripts/move/moveSources.mts';
+} from '../../../scripts/move/moveSourcesPlan.mts';
+import { nameProblem, parseManifest } from '../../../scripts/move/moveSources.mts';
 
 function plan(texts: Readonly<Record<string, string>>, moves: Record<string, string>): StepPlan {
   const files = new Set(Object.keys(texts));
@@ -166,6 +166,29 @@ describe('repository paths written as text', () => {
       { 'src/pages.ts': 'src/lib/pages.ts' },
     );
     assert.equal(result.writes.size, 0);
+  });
+});
+
+describe('files that hold paths as data', () => {
+  it('follow a move in their imports, never in their path text', () => {
+    const texts = {
+      'test/meta.test.js': "require('./helpers/sources.js');\nconst sample = 'src/a.ts';\n",
+      'test/helpers/sources.js': '',
+      'src/a.ts': '',
+    };
+    const result = planStep(
+      {
+        files: new Set(Object.keys(texts)),
+        texts: new Map(Object.entries(texts)),
+        pathData: new Set(['test/meta.test.js']),
+      },
+      new Map([
+        ['test/meta.test.js', 'test/gate/meta.test.js'],
+        ['src/a.ts', 'src/lib/a.ts'],
+      ]),
+    );
+    const text = "require('../helpers/sources.js');\nconst sample = 'src/a.ts';\n";
+    assert.equal(result.writes.get('test/gate/meta.test.js'), text);
   });
 });
 

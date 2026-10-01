@@ -10,7 +10,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const { execFileSync } = require('node:child_process');
-const { ROOT, repoPath } = require('./helpers/sources.js');
+const { ROOT, repoPath } = require('../../helpers/sources.js');
 
 const ROOTS = 'src|dist|electron|shared|scripts|test';
 const RULES = [
@@ -55,10 +55,10 @@ const STALE_NAME = new RegExp(
 // rules' cases, and this test), and the helper that is the one place the root
 // is found from __dirname.
 const EXEMPT = new Set([
-  'test/contracts/eslint-plugin.test.ts',
-  'test/contracts/move-sources.test.ts',
+  'test/scripts/eslintPlugin/eslintPlugin.test.ts',
+  'test/scripts/move/moveSources.test.ts',
   'test/helpers/sources.js',
-  'test/sourcePaths.test.js',
+  'test/scripts/gate/sourcePaths.test.js',
 ]);
 
 function testFiles() {
@@ -99,7 +99,7 @@ test('the rules catch each spelling they name', () => {
     "require('../dist/electron/main.js')",
     "path.join(__dirname, '../src/Sample.tsx')",
     "'../node_modules/.stacki-test/sample.bundle.js'",
-    "require('#dist/electron/serialQueue')",
+    "require('#dist/electron/sample')",
     'build.onLoad({ filter: /\\/src\\/panels\\/[^/]+$/ })',
   ];
   for (const sample of samples) {

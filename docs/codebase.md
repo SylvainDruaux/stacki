@@ -213,7 +213,7 @@ run in a bounded parallel pool, `--jobs=<n>` to change it — see
 - **Canvas tests** stub the iframe and run the real modules with esbuild.
 - **Node test-runner suites** (`*.test.js`, `test/contracts/`) exercise pure
   and contract code directly.
-- `test/unpackedParser.test.js` verifies the packaged app: the parser's whole
+- `test/scripts/release/unpackedParser.test.js` verifies the packaged app: the parser's whole
   `require` closure must be unpacked from the asar so the Astro dev server
   can load it.
 
