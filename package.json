@@ -185,7 +185,7 @@
     "dist:mac": "npm run build && electron-builder --mac",
     "dist:win": "npm run build && electron-builder --win",
     "dist:mac:unsigned": "npm run build && node dist/scripts/release/distMacUnsigned.js",
-    "test": "npm run build:scripts && node dist/scripts/run-tests.js",
+    "test": "npm run build:scripts && node dist/scripts/gate/runTests.js",
     "test:docdefaults": "node test/doc-defaults.js",
     "test:querycache": "node test/query-cache.js",
     "test:codeeditorlifecycle": "node test/code-editor-lifecycle.js",

@@ -8,7 +8,7 @@ import {
   countWholeFileWrites,
   countTreeEdits,
   countWrapperCalls,
-} from '#dist/scripts/adapter-surface.js';
+} from '#dist/scripts/gate/adapterSurface.js';
 
 test('each rule of the written method counts one site', () => {
   const cases: readonly [string, number, number][] = [

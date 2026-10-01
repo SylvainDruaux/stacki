@@ -39,7 +39,7 @@ The renderer reads the parsed model itself, readonly, through
 `src/editor/pageView.ts` (a renderer-only view in which any node's optional fields can be
 read without narrowing its kind). Nothing edits a tree in place: a gesture's
 effect builds a new model, and the file changes only through intents (step 9;
-`scripts/adapter-surface.ts` holds the in-place edit count at zero).
+`scripts/gate/adapterSurface.ts` holds the in-place edit count at zero).
 
 ## IPC
 
@@ -238,12 +238,12 @@ files: a component made from a piece of a page, a new page),
 `editRequests.ts` (only the nodes and frontmatter block an edit adds) and
 `markdownParser.ts`; `serializeMarkdownPage` only in `markdownParser.ts`,
 where it is the round-trip oracle and never a write path (step 10). Tests may
-use both. `scripts/adapter-surface.ts` also counts whole-file write sites (the
+use both. `scripts/gate/adapterSurface.ts` also counts whole-file write sites (the
 `replace-source` operation or a `replaceSource(` call) in `electron/`,
 `shared/` and `src/`: zero since step 10. The simulator core (all but its `*.test.ts` and
 `*.bench.ts` entry points and the `*.entry.ts` modules they import) and the
 engine contract modules may not use timers, clocks, promises, `Math.random`,
-`process` or I/O modules. `scripts/adapter-surface.ts` runs in the gate as a ratchet on the
+`process` or I/O modules. `scripts/gate/adapterSurface.ts` runs in the gate as a ratchet on the
 legacy tree-mutation surface (method in its header).
 
 ## Visual edits (step 6)
@@ -413,7 +413,7 @@ must contain TypeScript and source assets.
 
 The builds run in order; `tsc --noEmit`, ESLint and the two ratchets
 (`ratchet-check`, `adapter-surface`) then run side by side, and the test
-commands run in a bounded pool (`scripts/test-pool.ts`, default one fewer than
+commands run in a bounded pool (`scripts/gate/testPool.ts`, default one fewer than
 the CPUs, `npm test -- --jobs=<n>` to change it,
 `--jobs=1` for a serial run). A passing command prints one line; a failing one
 prints its full output. `test:contracts` runs first and alone because it

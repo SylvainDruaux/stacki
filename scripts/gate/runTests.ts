@@ -12,8 +12,8 @@ import {
   stopTestPool,
   type TestCommand,
   type TestOutcome,
-} from './test-pool';
-import { repositoryRoot } from './lib/repoRoot';
+} from './testPool';
+import { repositoryRoot } from '../lib/repoRoot';
 
 interface PackageScripts {
   readonly [name: string]: string;
@@ -127,7 +127,7 @@ const staticChecks: readonly TestCommand[] = [
   {
     name: 'adapter-surface',
     command: node,
-    argumentsList: [path.join(root, 'dist/scripts/adapter-surface.js')],
+    argumentsList: [path.join(root, 'dist/scripts/gate/adapterSurface.js')],
   },
 ];
 

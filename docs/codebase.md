@@ -204,7 +204,7 @@ wrapper over `window.avb` — the renderer never calls raw `ipcRenderer`.
 
 ## Tests
 
-Suites under `test/`, run by `scripts/run-tests.ts` (`npm test`; test commands
+Suites under `test/`, run by `scripts/gate/runTests.ts` (`npm test`; test commands
 run in a bounded parallel pool, `--jobs=<n>` to change it — see
 `docs/contracts.md`, Required gate):
 

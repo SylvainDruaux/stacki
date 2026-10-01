@@ -45,7 +45,7 @@
 
 import fs = require('node:fs');
 import path = require('node:path');
-import { repositoryRoot } from './lib/repoRoot';
+import { repositoryRoot } from '../lib/repoRoot';
 
 interface Counts {
   readonly mutations: number;
@@ -276,7 +276,7 @@ function main(): void {
       console.error(`     grew by ${grown}: ${rule}.`);
     } else if (now < baseline) {
       const below = baseline - now;
-      const where = `BASELINE.${key} in scripts/adapter-surface.ts`;
+      const where = `BASELINE.${key} in scripts/gate/adapterSurface.ts`;
       console.log(`     ${below} below baseline — lower ${where}.`);
     }
   }
