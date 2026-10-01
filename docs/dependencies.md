@@ -128,7 +128,7 @@ JSX. **Cost:** build-time only.
 **Does:** the `dev` script: runs Vite and Electron together, and waits for the dev server port.
 **Why not the platform:** npm scripts have no cross-platform process orchestration. **Cost:**
 dev-only; candidates to fold into one TypeScript script, as the dev server URL already was
-(`scripts/dev-electron.ts`).
+(`scripts/build/devElectron.ts`).
 
 ### `electron`
 

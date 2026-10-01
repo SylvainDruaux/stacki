@@ -77,13 +77,13 @@ const node = process.execPath;
 const typeScript = path.join(root, 'node_modules', 'typescript', 'bin', 'tsc');
 const staticGates: readonly GateCommand[] = [
   // Node >= 22.18 strips types itself (package.json engines).
-  ['build:clean', node, [path.join(root, 'scripts/clean-build.mts')]],
+  ['build:clean', node, [path.join(root, 'scripts/build/cleanBuild.mts')]],
   ['build:contracts', node, [typeScript, '-p', path.join('shared', 'tsconfig.json')]],
   ['build:electron', node, [typeScript, '-p', path.join('electron', 'tsconfig.json')]],
   ['build:scripts', node, [typeScript, '-p', path.join('scripts', 'tsconfig.build.json')]],
   ['build:morph', node, [typeScript, '-p', path.join('electron', 'tsconfig.morph.json')]],
   ['build:preload', node, [typeScript, '-p', path.join('electron', 'tsconfig.preload.json')]],
-  ['stage:runtime', node, [path.join(root, 'dist/scripts/stage-runtime.js')]],
+  ['stage:runtime', node, [path.join(root, 'dist/scripts/build/stageRuntime.js')]],
   ['build:web', node, [path.join(root, 'node_modules', 'vite', 'bin', 'vite.js'), 'build']],
 ];
 // The checks only read what the builds produced, so they run side by side.

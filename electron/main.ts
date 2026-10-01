@@ -173,7 +173,7 @@ let devServer: DevServer | undefined = undefined; // {proc, url, projectPath}
 // re-spawns us with the same argv, so there's nothing to hand forward there),
 // landing back where you were instead of on the welcome screen.
 const isDev = !!process.env['VITE_DEV_SERVER_URL'];
-// Exiting with this asks scripts/dev-electron.ts to start us again. Not
+// Exiting with this asks scripts/build/devElectron.ts to start us again. Not
 // app.relaunch(): `npm run dev` runs us under `concurrently -k`, so quitting
 // would take the Vite server down with us and the new process would load a
 // dead localhost:5173.

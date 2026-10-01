@@ -2,7 +2,7 @@
 // copied beside compiled code so development and packaged paths stay identical.
 import fileSystemPromises = require('node:fs/promises');
 import path = require('node:path');
-import { repositoryRoot } from './lib/repoRoot';
+import { repositoryRoot } from '../lib/repoRoot';
 
 const root = repositoryRoot();
 // An explicit inventory bounds the copy and excludes signing material.
