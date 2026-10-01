@@ -5,7 +5,7 @@ const assert = require('node:assert/strict');
 const path = require('node:path');
 const vm = require('node:vm');
 const esbuild = require('esbuild');
-const loadRenderer = require('./renderer-module.js');
+const loadRenderer = require('./helpers/rendererModule.js');
 const { repoPath, stubSources } = require('./helpers/sources.js');
 
 // Null as a boundary receives it, parsed from JSON: inputs may hold it; our values never do.

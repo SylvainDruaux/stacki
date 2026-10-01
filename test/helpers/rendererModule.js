@@ -4,7 +4,7 @@ const { buildSync } = require('esbuild');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { repoPath } = require('./helpers/sources.js');
+const { repoPath } = require('./sources.js');
 
 // `file` is a repository path: loadRenderer('src/editor/pageEdits.ts').
 module.exports = function loadRenderer(file) {

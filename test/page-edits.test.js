@@ -286,7 +286,7 @@ test('requests reach the page as splices; the undo step restores every byte', as
   fs.mkdirSync(path.join(root, 'src/pages'), { recursive: true });
   fs.mkdirSync(path.join(root, 'user'));
   fs.writeFileSync(path.join(root, 'package.json'), '{"dependencies":{"astro":"*"}}');
-  const { mainHarness } = await import('./contracts/main-harness.ts');
+  const { mainHarness } = await import('./helpers/mainHarness.ts');
   const harness = mainHarness(path.join(root, 'user'));
   context.after(() => {
     harness.dispose();

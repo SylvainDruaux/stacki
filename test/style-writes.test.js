@@ -5,7 +5,7 @@
 // rewrite of it; and the panel's commit restates the CSS its live writes
 // already put in the model, a request that changes nothing, which the planner
 // refuses too.
-// Method: the real App in jsdom with stub panels (test/app-gestures.js), over
+// Method: the real App in jsdom with stub panels (test/helpers/appGestures.js), over
 // a bridge whose edits go through main's own translation and a real document
 // host. The style panel's callback is driven exactly as the panel drives it:
 // live writes while a value is typed, then the commit of the same CSS.
@@ -14,7 +14,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { gesture, mountApp, nodeAt, select } = require('./app-gestures.js');
+const { gesture, mountApp, nodeAt, select } = require('./helpers/appGestures.js');
 
 const PAGE = [
   '<h1 class="hero">Hi</h1>',

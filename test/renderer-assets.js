@@ -1,7 +1,7 @@
 // Asset response contracts reject malformed paths, sizes, and collections before
 // rendering. Scripted preload calls distinguish disk failures from contract bugs.
 const assert = require('node:assert/strict');
-const loadRenderer = require('./renderer-module');
+const loadRenderer = require('./helpers/rendererModule');
 
 // A boundary can receive null — JSON, structured clone and postMessage all carry it —
 // so the negative space below includes it. It is read from JSON, because our own

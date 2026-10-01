@@ -1,7 +1,7 @@
 // Exercise the pure union core through variant changes, restoration, invalid
 // existing markup and bounded inputs. Frozen inputs make accidental mutation loud.
 const assert = require('node:assert/strict');
-const { createPropRules } = require('./renderer-module')('src/panels/propRules.ts');
+const { createPropRules } = require('./helpers/rendererModule')('src/panels/propRules.ts');
 const branch = (pins, forbids, defaults = {}, rules = {}) =>
   Object.freeze({ pins, forbids, defaults, rules, docs: {} });
 const union = Object.freeze({

@@ -17,7 +17,7 @@ import { createHash } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { mainHarness } from './main-harness.ts';
+import { mainHarness } from '../helpers/mainHarness.ts';
 import { parseEditRequest, type Edit, type NodeRef } from '#dist/shared/edit-request.js';
 import {
   parsePageDiskRead,

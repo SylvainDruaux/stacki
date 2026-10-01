@@ -18,7 +18,7 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 const { LIMITS } = require('#dist/shared/limits.js');
-const loadRenderer = require('./renderer-module.js');
+const loadRenderer = require('./helpers/rendererModule.js');
 const {
   readContentConfig,
   stopAllServices,

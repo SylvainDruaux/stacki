@@ -26,7 +26,7 @@
 
 const fs = require('node:fs');
 const path = require('node:path');
-const { repoPath } = require('./helpers/sources.js');
+const { repoPath } = require('./sources.js');
 
 // The largest source a test reads. App.tsx is well under a megabyte; the bound
 // keeps the brace walk in sourceBlock finite by construction.

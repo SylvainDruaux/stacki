@@ -23,7 +23,7 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { mainHarness } from './main-harness.ts';
+import { mainHarness } from '../helpers/mainHarness.ts';
 import {
   canonicalManifest,
   judgePreviewRender,

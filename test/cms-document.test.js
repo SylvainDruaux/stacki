@@ -3,7 +3,7 @@
 // pinned without timer sleeps or an Electron process.
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const load = require('./renderer-module');
+const load = require('./helpers/rendererModule');
 
 // Null as a boundary receives it, parsed from JSON: inputs may hold it; our values never do.
 const jsonNull = JSON.parse('null');

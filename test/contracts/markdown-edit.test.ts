@@ -24,7 +24,7 @@ import {
   parsePageEditResult,
   type PageDiskRead,
 } from '#dist/shared/page-save.js';
-import { mainHarness } from './main-harness.ts';
+import { mainHarness } from '../helpers/mainHarness.ts';
 
 const sha256 = (bytes: string | Buffer): string => createHash('sha256').update(bytes).digest('hex');
 const GESTURE_ID = `g${'1'.repeat(32)}`;

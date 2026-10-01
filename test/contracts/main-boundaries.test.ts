@@ -8,7 +8,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import * as net from 'node:net';
 import { createHash } from 'node:crypto';
-import { mainHarness } from './main-harness.ts';
+import { mainHarness } from '../helpers/mainHarness.ts';
 import { IPC_PAYLOADS } from '#dist/shared/ipc-payloads.js';
 import { toRecord } from '#dist/shared/record.js';
 import { parseMarkdownPage } from '#dist/electron/markdownParser.js';

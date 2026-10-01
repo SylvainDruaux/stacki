@@ -22,7 +22,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { compactSource } = require('./source-text.js');
+const { compactSource } = require('./helpers/sourceText.js');
 const { repoPath } = require('./helpers/sources.js');
 
 const failures = [];

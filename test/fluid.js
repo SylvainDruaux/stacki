@@ -11,7 +11,7 @@
 // The numbers are read out of the expression rather than from input fields, so
 // this covers the ways a clamp() can be written as well as the maths.
 
-const loadRenderer = require('./renderer-module.js');
+const loadRenderer = require('./helpers/rendererModule.js');
 
 const failures = [];
 let checked = 0;

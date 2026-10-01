@@ -16,7 +16,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { gesture, mountApp, nodeAt, select, tick, undo } = require('./app-gestures.js');
+const { gesture, mountApp, nodeAt, select, tick, undo } = require('./helpers/appGestures.js');
 
 const PAGE = [
   '---',

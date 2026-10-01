@@ -7,7 +7,7 @@
 // panel uses, and renders the page back; the output is compared byte for byte.
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const loadRenderer = require('./renderer-module.js');
+const loadRenderer = require('./helpers/rendererModule.js');
 
 const css = loadRenderer('src/style-panel/lib/css.ts');
 

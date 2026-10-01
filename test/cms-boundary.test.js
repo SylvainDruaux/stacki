@@ -3,7 +3,7 @@
 // metadata, and reject oversized or unknown field declarations at the boundary.
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const load = require('./renderer-module');
+const load = require('./helpers/rendererModule');
 const { BOUNDARY_LIMITS } = require('#dist/shared/boundary.js');
 
 // Null as a boundary receives it, parsed from JSON: inputs may hold it; our values never do.

@@ -9,7 +9,7 @@ const assert = require('node:assert/strict');
 // code never writes a null.
 const PLATFORM_NULL = JSON.parse('null');
 const { parsePreviewMessage, parseShortcutMessage, describePreviewReload, PREVIEW_RELOAD_REASONS } =
-  require('./renderer-module')('src/previewMessages.ts');
+  require('./helpers/rendererModule')('src/previewMessages.ts');
 
 const box = { x: -1.5, y: 2, w: 30, h: 40 };
 const TOKEN = 'a'.repeat(64);

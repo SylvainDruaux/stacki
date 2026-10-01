@@ -7,7 +7,7 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const loadRenderer = require('./renderer-module');
+const loadRenderer = require('./helpers/rendererModule');
 
 const bridgeModule = loadRenderer('src/appBridge.ts');
 // A legacy bridge answered a cancelled dialog with null; the parser still reads it as a

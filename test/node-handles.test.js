@@ -12,7 +12,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { createHash } = require('node:crypto');
-const load = require('./renderer-module');
+const load = require('./helpers/rendererModule');
 const { parsePage } = require('#dist/electron/astroParser.js');
 const { LIMITS } = require('#dist/shared/limits.js');
 const { parsePageResult } = require('#dist/shared/page-node.js');

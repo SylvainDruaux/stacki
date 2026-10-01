@@ -3,7 +3,7 @@
 // visible, and deferred reads must coalesce without publishing after disposal.
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const load = require('./renderer-module');
+const load = require('./helpers/rendererModule');
 const { BOUNDARY_LIMITS } = require('#dist/shared/boundary.js');
 
 // A boundary can receive null — JSON, structured clone and postMessage all carry it —

@@ -263,7 +263,7 @@ test('typed code reaches the page as patches: invalid, merged, refused, kept', a
   fs.mkdirSync(path.join(root, 'src/pages'), { recursive: true });
   fs.mkdirSync(path.join(root, 'user'));
   fs.writeFileSync(path.join(root, 'package.json'), '{"dependencies":{"astro":"*"}}');
-  const { mainHarness } = await import('./contracts/main-harness.ts');
+  const { mainHarness } = await import('./helpers/mainHarness.ts');
   const main = mainHarness(path.join(root, 'user'));
   context.after(() => {
     main.dispose();

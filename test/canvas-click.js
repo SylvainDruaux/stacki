@@ -19,7 +19,7 @@
 const fs = require('fs');
 const path = require('path');
 const { pathToFileURL } = require('url');
-const { containsCode } = require('./source-text.js');
+const { containsCode } = require('./helpers/sourceText.js');
 const { repoPath } = require('./helpers/sources.js');
 
 const failures = [];

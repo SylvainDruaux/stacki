@@ -5,7 +5,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const bridge = require('./renderer-module')('src/gitChipBridge.ts');
+const bridge = require('./helpers/rendererModule')('src/gitChipBridge.ts');
 const { repoPath } = require('./helpers/sources.js');
 
 // Null as a boundary receives it, parsed from JSON: inputs may hold it; our values never do.

@@ -4,7 +4,7 @@
 // only their own bytes — the layout a new YAML frontmatter block at the top of
 // a post without one — and undoing every gesture restores the file byte for
 // byte. No whole-model save exists to fall back on.
-// Method: the real App in jsdom (test/app-gestures.js): stub panels capture
+// Method: the real App in jsdom (test/helpers/appGestures.js): stub panels capture
 // their props, the bridge parses the real file with the Markdown parser, and
 // each request goes through main's own translation (editRequests.ts,
 // markdownEdits.ts) and a real document host. Undo is the ⌘Z the user presses.
@@ -13,7 +13,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { gesture, mountApp, nodeAt, select, undo } = require('./app-gestures.js');
+const { gesture, mountApp, nodeAt, select, undo } = require('./helpers/appGestures.js');
 
 const POST = ['# Title', '', 'Some text.', '', '- one', '- two', ''].join('\n');
 

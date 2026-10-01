@@ -23,7 +23,7 @@
 const fs = require('fs');
 const path = require('path');
 const { pathToFileURL } = require('url');
-const { containsCode } = require('./source-text.js');
+const { containsCode } = require('./helpers/sourceText.js');
 const { repoPath } = require('./helpers/sources.js');
 
 const failures = [];
@@ -199,7 +199,7 @@ const settle = (ms = 20) => new Promise((resolve) => setTimeout(resolve, ms));
     const os = require('os');
     const { createHash } = require('crypto');
     const { diffCodePatch } = require('#dist/shared/code-patch.js');
-    const { mainHarness } = await import('./contracts/main-harness.ts');
+    const { mainHarness } = await import('./helpers/mainHarness.ts');
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'stacki-outside-edit-'));
     fs.mkdirSync(path.join(root, 'src', 'pages'), { recursive: true });
     fs.mkdirSync(path.join(root, 'user'));

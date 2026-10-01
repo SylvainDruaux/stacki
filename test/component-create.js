@@ -20,7 +20,7 @@
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const { sourceBlock } = require('./source-text.js');
+const { sourceBlock } = require('./helpers/sourceText.js');
 const { repoPath } = require('./helpers/sources.js');
 
 const failures = [];

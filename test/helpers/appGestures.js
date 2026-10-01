@@ -16,7 +16,7 @@ const { parseMarkdownPage } = require('#dist/electron/markdownParser.js');
 const { createNodeDocumentActors } = require('#dist/electron/documentActors.js');
 const { buildEdit } = require('#dist/electron/editRequests.js');
 const { decodeUtf8 } = require('#dist/shared/span.js');
-const { repoPath, stubPanels } = require('./helpers/sources.js');
+const { repoPath, stubPanels } = require('./sources.js');
 
 const sha256 = (text) => createHash('sha256').update(text).digest('hex');
 const tick = () => new Promise((resolve) => setTimeout(resolve, 10));

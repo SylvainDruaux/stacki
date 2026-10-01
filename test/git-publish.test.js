@@ -12,9 +12,8 @@ const { ROOT, repoPath } = require('./helpers/sources.js');
 
 // Null as a boundary receives it, parsed from JSON: inputs may hold it; our values never do.
 const jsonNull = JSON.parse('null');
-const { parseGitHubStatus, readGitHubStatus, repoSlug, webUrl } = require('./renderer-module')(
-  'src/panels/gitPublish.ts',
-);
+const { parseGitHubStatus, readGitHubStatus, repoSlug, webUrl } =
+  require('./helpers/rendererModule')('src/panels/gitPublish.ts');
 
 test('GitHub preflight parses each state and rejects impossible or oversized data', async () => {
   for (const status of [

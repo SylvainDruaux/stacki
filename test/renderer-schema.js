@@ -2,7 +2,7 @@
 // between missing, nullable, defaulted and union fields. CMS operations must keep
 // wrapper keys and expression metadata while editing nested item collections.
 const assert = require('node:assert/strict');
-const loadRenderer = require('./renderer-module.js');
+const loadRenderer = require('./helpers/rendererModule.js');
 const { BOUNDARY_LIMITS } = require('#dist/shared/boundary.js');
 
 // A boundary can receive null — JSON, structured clone and postMessage all carry it —

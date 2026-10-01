@@ -3,7 +3,7 @@
 // malformed JSON, invalid paths, excessive depth, and oversized live trees.
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const model = require('./renderer-module')('src/pageTree.ts');
+const model = require('./helpers/rendererModule')('src/pageTree.ts');
 
 const page = (name) => ({ path: `/project/src/pages/${name}`, name, route: `/${name}` });
 

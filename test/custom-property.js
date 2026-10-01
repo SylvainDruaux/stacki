@@ -17,7 +17,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { containsCode } = require('./source-text.js');
+const { containsCode } = require('./helpers/sourceText.js');
 const { ROOT, repoPath } = require('./helpers/sources.js');
 
 const failures = [];

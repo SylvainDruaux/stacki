@@ -25,7 +25,7 @@ const check = (what, condition, detail) => {
 };
 
 // Test the implementation itself so source-selection rules cannot drift into copied fixtures.
-const { sourceChip, withSource, parseMapHead } = require('./renderer-module')(
+const { sourceChip, withSource, parseMapHead } = require('./helpers/rendererModule')(
   'src/panels/propNodeEditors.tsx',
 );
 const assert = require('node:assert/strict');

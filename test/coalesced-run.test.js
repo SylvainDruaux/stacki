@@ -7,7 +7,7 @@
 // interleaving below is explicit; no timers.
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const load = require('./renderer-module');
+const load = require('./helpers/rendererModule');
 const { createCoalescedRun } = load('src/coalescedRun.ts');
 
 const tick = () => new Promise((resolve) => setImmediate(resolve));

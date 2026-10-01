@@ -2,7 +2,7 @@
 // supported markup and expressions, flatten unknown wrappers, and reject bounds.
 const assert = require('node:assert/strict');
 const { JSDOM } = require('jsdom');
-const loadRenderer = require('./renderer-module');
+const loadRenderer = require('./helpers/rendererModule');
 const { domToNodes, nodesToHtml, isInlineOnly } = loadRenderer('src/ui/richContentModel.ts');
 const dom = new JSDOM('<!doctype html><div id="host"></div>');
 const host = dom.window.document.getElementById('host');
