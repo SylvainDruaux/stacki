@@ -5,6 +5,7 @@ import { spawn, type ChildProcess } from 'child_process';
 
 import { toRecord, toArray } from '../shared/record';
 import { MAIN_LIMITS } from './main.bounds';
+import { contentWorkerPath } from './lib/runtimePaths';
 
 // Reads a project's Astro content config — src/content.config.ts — and reports
 // what collections it declares.
@@ -95,7 +96,7 @@ function stageRunner(projectPath: string, configAbs: string): { directory: strin
   ]) {
     fs.writeFileSync(
       path.join(directory, name),
-      fs.readFileSync(path.join(__dirname, 'content', name), 'utf8'),
+      fs.readFileSync(contentWorkerPath(name), 'utf8'),
       'utf8',
     );
   }

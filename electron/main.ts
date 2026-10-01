@@ -8,6 +8,7 @@ import {
 } from './componentProperties';
 import { renderComponentPreviewPage } from './componentPreview';
 import { createIpcRegistrar } from './ipc';
+import { RUNTIME_PATHS, resourcePath } from './lib/runtimePaths';
 import { MAIN_LIMITS, readSource, directoryBudget } from './main.bounds';
 import { isAtomicTemporary } from './atomicWrite';
 import { createNodeDocumentActors, type EditReport, type WriteReport } from './documentActors';
@@ -257,7 +258,7 @@ async function serveFile(abs: string, request: Request) {
 // Window
 // ---------------------------------------------------------------------------
 
-const resource = (name: string) => path.join(__dirname, '..', 'resources', name);
+const resource = resourcePath;
 
 // electron-builder stamps the icon onto packaged builds (build.mac.icon), but
 // `npm run dev` runs the bare Electron binary, which shows its own icon in the
@@ -304,7 +305,7 @@ function createWindow() {
     // Windows/Linux taskbar + window chrome; macOS uses the Dock icon above.
     icon: resource(process.platform === 'darwin' ? 'icon.icns' : isWin ? 'icon.ico' : 'icon.png'),
     webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
+      preload: RUNTIME_PATHS.preload,
       contextIsolation: true,
       nodeIntegration: false,
       // Run the preload in preview iframes too, so they can report their
@@ -317,7 +318,7 @@ function createWindow() {
   // A renderer that does not load leaves an empty window; the log says why.
   const loaded = process.env['VITE_DEV_SERVER_URL']
     ? mainWindow.loadURL(process.env['VITE_DEV_SERVER_URL'])
-    : mainWindow.loadFile(path.join(__dirname, '..', 'renderer', 'index.html'));
+    : mainWindow.loadFile(RUNTIME_PATHS.rendererIndex);
   loaded.catch((error: unknown) => {
     console.error('[window] the renderer did not load:', error);
   });
@@ -3749,7 +3750,7 @@ try {
   };
   MORPH_CLIENT =
     `const AVB_PREVIEW_LIMITS = Object.freeze(${JSON.stringify(bounds)});\n` +
-    readSource(path.join(__dirname, 'morphClient.js'));
+    readSource(RUNTIME_PATHS.morphClient);
 } catch {
   MORPH_CLIENT = '';
 }
@@ -3797,17 +3798,9 @@ function writeMarkerConfig(projectPath: string) {
     const userConfig = ['astro.config.mjs', 'astro.config.js', 'astro.config.ts'].find((name) =>
       fs.existsSync(path.join(projectPath, name)),
     );
-    // The dev server is a plain Node process, and plain Node can't read
-    // inside app.asar — it would fail the config import and take the whole
-    // preview down. build.asarUnpack keeps a real copy on disk beside the
-    // archive; this points at that copy. Unpacked in dev too (no asar in the
-    // path), so the replace is a no-op there.
-    const markersPath = path
-      .join(__dirname, 'previewMarkers.js')
-      .replace(`app.asar${path.sep}`, `app.asar.unpacked${path.sep}`);
-    const previewHelperPath = path
-      .join(__dirname, 'componentPreview.js')
-      .replace(`app.asar${path.sep}`, `app.asar.unpacked${path.sep}`);
+    // Unpacked copies: the dev server is plain Node (see runtimePaths.ts).
+    const markersPath = RUNTIME_PATHS.previewMarkers;
+    const previewHelperPath = RUNTIME_PATHS.componentPreview;
     // Vite normally resolves symlinks before loading source (including
     // macOS /var -> /private/var). Match both spellings because a project's
     // preserveSymlinks option can keep the original one instead.

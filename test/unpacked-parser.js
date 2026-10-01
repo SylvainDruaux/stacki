@@ -38,9 +38,11 @@ const check = (what, condition, detail) => {
   }
 };
 
-const ENTRIES = ['astroParser.js', 'componentPreview.js', 'previewMarkers.js'].map((name) =>
-  path.join('dist', 'electron', name),
-);
+const ENTRIES = [
+  'dist/electron/astroParser.js',
+  'dist/electron/componentPreview.js',
+  'dist/electron/previewMarkers.js',
+];
 
 // Every local file the entry pulls in, transitively. Only relative requires:
 // a bare specifier is a package, which asar handles for the app itself and
@@ -99,7 +101,11 @@ const covers = (pattern, rel) => {
 const pkg = JSON.parse(fs.readFileSync(repoPath('package.json'), 'utf8'));
 const patterns = pkg.build?.asarUnpack || [];
 const files = [...ENTRIES.reduce((seen, entry) => closureOf(entry, seen), new Set())];
-const main = fs.readFileSync(repoPath('dist/electron/main.js'), 'utf8');
+// Main finds the preview's files through runtimePaths; the parser, through
+// the generated configuration main writes.
+const main = ['dist/electron/main.js', 'dist/electron/lib/runtimePaths.js']
+  .map((file) => fs.readFileSync(repoPath(file), 'utf8'))
+  .join('\n');
 
 for (const entry of ENTRIES) {
   check(
