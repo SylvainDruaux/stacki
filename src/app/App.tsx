@@ -5,7 +5,7 @@ import type { ClassOutcome } from '../features/style/model/host';
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { SetStateAction } from 'react';
 import type { Attr, ImportDecl, PageModel, PageNode, PairedNode } from '../../shared/page/pageNode';
-import type { ScanComponent, ScanPage, ScanResult } from '../../shared/scan';
+import type { ScanComponent, ScanPage, ScanResult } from '../../shared/properties/projectScan';
 import type { WireCommitInfo, WireInjectedRoute } from '../../shared/ipc-results';
 import WelcomeScreen from '../features/welcome/WelcomeScreen';
 import PagesPanel from '../features/pages/PagesPanel';

@@ -11,7 +11,7 @@
 // file changed on disk) stops autosave instead of retrying (plan §7).
 import { assert } from '../../shared/core/assert';
 import { LIMITS } from '../../shared/core/limits';
-import type { ScanResult } from '../../shared/scan';
+import type { ScanResult } from '../../shared/properties/projectScan';
 import { createCoalescedRun } from '../lib/coalescedRun';
 import type { EditDrafts, QueueEntry } from './pageEdits';
 

@@ -1,6 +1,6 @@
 import ts from 'typescript';
 import { assert } from '../../shared/core/assert';
-import { PROPERTY_LIMITS } from '../../shared/component-properties';
+import { PROPERTY_LIMITS } from '../../shared/properties/propertyEditing';
 
 interface TypeWork {
   readonly node: ts.TypeNode;

@@ -1,4 +1,4 @@
-import type { ScanPage } from '../../../shared/scan';
+import type { ScanPage } from '../../../shared/properties/projectScan';
 import { assert } from '../../../shared/core/assert';
 import { BOUNDARY_LIMITS, pathText, record } from '../../../shared/core/boundary';
 

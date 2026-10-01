@@ -1,7 +1,7 @@
 import ts from 'typescript';
 import { assert } from '../../shared/core/assert';
-import { PROPERTY_LIMITS } from '../../shared/component-properties';
-import type { PropertyEditing } from '../../shared/component-properties';
+import { PROPERTY_LIMITS } from '../../shared/properties/propertyEditing';
+import type { PropertyEditing } from '../../shared/properties/propertyEditing';
 import { isAstroProps, propertyKey, syntaxNodes } from './propertySyntax';
 import type { PropertySyntax } from './propertySyntax';
 

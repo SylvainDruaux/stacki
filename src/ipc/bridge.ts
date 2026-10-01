@@ -9,7 +9,7 @@ import type { PreloadBridge } from '../../shared/preload-api';
 
 // Vite consumes the ESM sources; dist/shared is CommonJS for Electron and Node.
 import { toProjectPath, toFilePath } from '../../shared/core/brand';
-import { parseScanResult, type ScanResult } from '../../shared/scan';
+import { parseScanResult, type ScanResult } from '../../shared/properties/projectScan';
 import { parsePageReadResult, type ParsePageResult } from '../../shared/page/pageNode';
 import { parsePageDiskRead, type PageDiskRead } from '../../shared/page-save';
 import {

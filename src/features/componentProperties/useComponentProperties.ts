@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { MutableRefObject } from 'react';
-import type { ComponentProperties, PropertyChange } from '../../../shared/component-properties';
+import type {
+  ComponentProperties,
+  PropertyChange,
+} from '../../../shared/properties/propertyEditing';
 import { onFilesChanged } from '../../ipc/appBridge';
 import { editComponentProperties, readComponentProperties } from './propertiesBridge';
 

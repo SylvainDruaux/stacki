@@ -1,4 +1,4 @@
-import { PROPERTY_LIMITS } from './component-properties';
+import { PROPERTY_LIMITS } from './propertyEditing';
 
 // Only literal unions expose option controls. Complex unions remain in the type editor.
 export function literalOptions(type: string): readonly string[] | undefined {

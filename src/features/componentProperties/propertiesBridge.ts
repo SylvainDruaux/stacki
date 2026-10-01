@@ -2,8 +2,11 @@ import { parseIpcPayload } from '../../../shared/ipc-payloads';
 import {
   parseComponentProperties,
   parsePropertiesResult,
-} from '../../../shared/component-properties';
-import type { ComponentProperties, PropertyChange } from '../../../shared/component-properties';
+} from '../../../shared/properties/propertyEditing';
+import type {
+  ComponentProperties,
+  PropertyChange,
+} from '../../../shared/properties/propertyEditing';
 import { toRecord } from '../../../shared/core/record';
 import type { Result } from '../../../shared/core/result';
 

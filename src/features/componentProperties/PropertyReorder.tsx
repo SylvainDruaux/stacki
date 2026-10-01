@@ -1,5 +1,5 @@
 import { assert } from '../../../shared/core/assert';
-import { PROPERTY_LIMITS } from '../../../shared/component-properties';
+import { PROPERTY_LIMITS } from '../../../shared/properties/propertyEditing';
 import { DragIcon } from '../../ui/Icons';
 
 // Drop targets are gaps before removal, matching the shared list gesture hook.

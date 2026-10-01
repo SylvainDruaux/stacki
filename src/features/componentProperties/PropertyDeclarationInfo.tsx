@@ -1,4 +1,4 @@
-import type { ComponentProperty } from '../../../shared/component-properties';
+import type { ComponentProperty } from '../../../shared/properties/propertyEditing';
 import { HelpCircleIcon } from '../../ui/Icons';
 
 // Declaration locations are metadata, not runtime value bindings.

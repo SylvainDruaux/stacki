@@ -1,5 +1,5 @@
 import React from 'react';
-import type { ScanPage } from '../../../shared/scan';
+import type { ScanPage } from '../../../shared/properties/projectScan';
 import type { PageTreeNode, PageTreePage } from './pageTree';
 import { comparePageNames, isCollectionRoute, leadsFolders } from './pageOrder';
 import { countTreePages, pageDirectory, pageExtension, stripPageExtension } from './pageTree';

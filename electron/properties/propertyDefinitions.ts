@@ -12,8 +12,8 @@ import type {
   ComponentProperty,
   PropertyChange,
   PropertyEditing,
-} from '../../shared/component-properties';
-import { PROPERTY_LIMITS } from '../../shared/component-properties';
+} from '../../shared/properties/propertyEditing';
+import { PROPERTY_LIMITS } from '../../shared/properties/propertyEditing';
 import { err, ok, type Result } from '../../shared/core/result';
 import { parsePropSchema } from '../parse/astroParser';
 import {

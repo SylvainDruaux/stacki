@@ -1,4 +1,4 @@
-import type { ComponentProperties } from './component-properties';
+import type { ComponentProperties } from './properties/propertyEditing';
 import type { PreviewVerdict } from './page/previewToken';
 import type { Result } from './core/result';
 // Invoke results mirror the handlers' wire shapes; absence is `undefined` (AGENTS.md §6).

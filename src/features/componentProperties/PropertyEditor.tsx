@@ -5,7 +5,7 @@ import { PropertyOptions } from './PropertyOptions';
 import type { PropertyOptionChange } from './PropertyOptions';
 import { PropertyType } from './PropertyType';
 import { PropertyDefault, propertyDefaultText } from './PropertyDefault';
-import { literalOptions } from '../../../shared/property-options';
+import { literalOptions } from '../../../shared/properties/propertyOptions';
 export { literalOptions };
 import { useRef, useState } from 'react';
 import useDismiss from '../../ui/useDismiss';
@@ -14,8 +14,8 @@ import type {
   ComponentProperty,
   PropertyChange,
   PropertyOptionRename,
-} from '../../../shared/component-properties';
-import { PROPERTY_LIMITS } from '../../../shared/component-properties';
+} from '../../../shared/properties/propertyEditing';
+import { PROPERTY_LIMITS } from '../../../shared/properties/propertyEditing';
 
 interface PropertyEditorProps {
   readonly property: ComponentProperty;

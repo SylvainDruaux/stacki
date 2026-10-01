@@ -2,8 +2,8 @@
 // separate arrays in the payload; the contract keeps them separate so the
 // renderer can never confuse a page route with a component folder.
 
-import { LIMITS } from './core/limits';
-import { parseField, type PropField } from './prop-schema';
+import { LIMITS } from '../core/limits';
+import { parseField, type PropField } from './propSchema';
 
 export interface ScanPage {
   readonly path: string;

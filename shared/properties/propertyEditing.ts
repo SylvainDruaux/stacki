@@ -1,8 +1,8 @@
 // Source text is the revision token: edits cannot overwrite a newer disk revision.
-import { boolean, count, list, object, optional, text } from './core/boundary';
-import { LIMITS } from './core/limits';
-import { toRecord } from './core/record';
-import type { Result } from './core/result';
+import { boolean, count, list, object, optional, text } from '../core/boundary';
+import { LIMITS } from '../core/limits';
+import { toRecord } from '../core/record';
+import type { Result } from '../core/result';
 
 export const PROPERTY_LIMITS = {
   fieldsMax: LIMITS.propSchemaFieldsMax,

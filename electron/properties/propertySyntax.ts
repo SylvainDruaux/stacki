@@ -1,7 +1,7 @@
 // TypeScript owns syntax; source-range edits retain code outside the edited declaration.
 import ts from 'typescript';
 import { assert } from '../../shared/core/assert';
-import { PROPERTY_LIMITS } from '../../shared/component-properties';
+import { PROPERTY_LIMITS } from '../../shared/properties/propertyEditing';
 import { err, ok, type Result } from '../../shared/core/result';
 
 export interface SourceEdit {

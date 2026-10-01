@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import type { WireInjectedRoute } from '../../../shared/ipc-results';
-import type { ScanPage, ScanResult } from '../../../shared/scan';
+import type { ScanPage, ScanResult } from '../../../shared/properties/projectScan';
 import {
   buildPageTree,
   collectPageTreeDirectories,

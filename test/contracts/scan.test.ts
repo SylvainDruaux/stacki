@@ -1,4 +1,4 @@
-// Goal: shared/scan.ts validates the 'project:scan' payload — the project's
+// Goal: shared/properties/projectScan.ts validates the 'project:scan' payload — the project's
 // inventory as the renderer sees it. Every panel indexes into this; a bad
 // entry poisons selection, routing, and the palette.
 //
@@ -7,7 +7,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseScanResult } from '#dist/shared/scan.js';
+import { parseScanResult } from '#dist/shared/properties/projectScan.js';
 import { LIMITS } from '#dist/shared/core/limits.js';
 
 // Null as a boundary receives it, parsed from JSON: inputs may hold it; our values never do.

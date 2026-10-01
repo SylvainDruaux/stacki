@@ -1,4 +1,4 @@
-// Goal: shared/prop-schema.ts validates the component prop Map that
+// Goal: shared/properties/propSchema.ts validates the component prop Map that
 // parsePropSchema infers from user source — the data every panel field is
 // built from. A bad schema means wrong controls, silently.
 //
@@ -7,9 +7,9 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseField, parsePropSchema } from '#dist/shared/prop-schema.js';
+import { parseField, parsePropSchema } from '#dist/shared/properties/propSchema.js';
 import { parsePropSchema as parseAstroSchema } from '#dist/electron/parse/astroParser.js';
-import { parseScanResult } from '#dist/shared/scan.js';
+import { parseScanResult } from '#dist/shared/properties/projectScan.js';
 import { LIMITS } from '#dist/shared/core/limits.js';
 
 // Null as a boundary receives it, parsed from JSON: inputs may hold it; our values never do.

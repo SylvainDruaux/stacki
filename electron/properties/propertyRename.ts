@@ -5,8 +5,8 @@ import type { Node, AttributeNode } from '@astrojs/compiler/types';
 import ts from 'typescript';
 import { readPropertyContracts } from './propertyContracts';
 import { assert } from '../../shared/core/assert';
-import { PROPERTY_LIMITS } from '../../shared/component-properties';
-import type { PropertyOptionRename } from '../../shared/component-properties';
+import { PROPERTY_LIMITS } from '../../shared/properties/propertyEditing';
+import type { PropertyOptionRename } from '../../shared/properties/propertyEditing';
 import { err, ok, type Result } from '../../shared/core/result';
 import {
   applySourceEdits,

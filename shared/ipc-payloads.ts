@@ -1,4 +1,4 @@
-import { parsePropertyChange, propertySource } from './component-properties';
+import { parsePropertyChange, propertySource } from './properties/propertyEditing';
 import { parseEdit, parseEditRequest } from './engine/editRequest';
 import { parsePreviewRender } from './page/previewToken';
 // Complete invoke-channel inventory. Every main-process listener receives the

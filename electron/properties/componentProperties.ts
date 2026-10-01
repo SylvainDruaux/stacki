@@ -12,14 +12,14 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { assert } from '../../shared/core/assert';
 import { LIMITS } from '../../shared/core/limits';
-import { PROPERTY_LIMITS } from '../../shared/component-properties';
+import { PROPERTY_LIMITS } from '../../shared/properties/propertyEditing';
 import type {
   ComponentProperties,
   PropertyChange,
   PropertyOptionRename,
-} from '../../shared/component-properties';
+} from '../../shared/properties/propertyEditing';
 import { err, ok, type Result } from '../../shared/core/result';
-import { literalOptions } from '../../shared/property-options';
+import { literalOptions } from '../../shared/properties/propertyOptions';
 import { sameFilesystemPath } from '../lib/platform';
 import { digestOf } from '../documents/atomicWrite';
 import type { DocumentActors, WriteReport } from '../documents/documentActors';

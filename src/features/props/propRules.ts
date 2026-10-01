@@ -1,7 +1,7 @@
 // Union rules are pure so switching variants can be checked without mounting a panel.
 // Branch consequences never restrict the discriminator that can remove them.
 import type { Attr } from '../../../shared/page/pageNode';
-import type { PropField, PropUnion, UnionBranch } from '../../../shared/prop-schema';
+import type { PropField, PropUnion, UnionBranch } from '../../../shared/properties/propSchema';
 import { assert } from '../../../shared/core/assert';
 import { LIMITS } from '../../../shared/core/limits';
 

@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import type { ComponentProperty } from '../../../shared/component-properties';
-import { PROPERTY_LIMITS } from '../../../shared/component-properties';
-import { literalOptions } from '../../../shared/property-options';
+import type { ComponentProperty } from '../../../shared/properties/propertyEditing';
+import { PROPERTY_LIMITS } from '../../../shared/properties/propertyEditing';
+import { literalOptions } from '../../../shared/properties/propertyOptions';
 import Dropdown from '../../ui/Dropdown';
 import { BracesIcon } from '../../ui/Icons';
 import { ExpressionBindingField } from '../props/propBindings';

@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import type { ScanComponent } from '../../../shared/scan';
+import type { ScanComponent } from '../../../shared/properties/projectScan';
 import Dropdown from '../../ui/Dropdown';
 
 export function RenameInput({

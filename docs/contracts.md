@@ -396,9 +396,9 @@ build (`test/legacy-parity.bench.js`) was retired at step 10 with the
 
 - `brand.ts` constructs `NodeId`, `FilePath`, `ProjectPath`, `Digest`,
   `ByteOffset`, `Utf16Offset`, and `IntentId` after validating the primitive value.
-- `scan.ts` validates project pages, layouts, components, schemas, and scan
+- `projectScan.ts` validates project pages, layouts, components, schemas, and scan
   collection limits.
-- `prop-schema.ts` validates component field schemas and their nested options.
+- `propSchema.ts` validates component field schemas and their nested options.
 - `frontmatter.ts` validates import members and source slots.
 - `boundary.ts` supplies bounded primitive, list, dictionary, and data parsers.
 - `result.ts` defines the expected-failure channel.

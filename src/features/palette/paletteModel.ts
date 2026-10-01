@@ -1,4 +1,4 @@
-import type { ScanComponent } from '../../../shared/scan';
+import type { ScanComponent } from '../../../shared/properties/projectScan';
 import type { TrailingSlash } from '../../editor/pageState';
 import { count, list, optional, pathText, record, text } from '../../../shared/core/boundary';
 

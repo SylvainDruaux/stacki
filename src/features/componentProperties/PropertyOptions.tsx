@@ -1,9 +1,9 @@
 import { useRef } from 'react';
 import { assert } from '../../../shared/core/assert';
-import { PROPERTY_LIMITS } from '../../../shared/component-properties';
-import type { PropertyOptionRename } from '../../../shared/component-properties';
+import { PROPERTY_LIMITS } from '../../../shared/properties/propertyEditing';
+import type { PropertyOptionRename } from '../../../shared/properties/propertyEditing';
 import { arrayItems, arrayText, moveItem } from '../props/arrayValue';
-import { literalOptions } from '../../../shared/property-options';
+import { literalOptions } from '../../../shared/properties/propertyOptions';
 import ListField from '../props/ListField';
 import type { ListFieldChange } from '../props/ListField';
 
