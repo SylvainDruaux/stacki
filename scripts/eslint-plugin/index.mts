@@ -9,6 +9,7 @@ import { commentSentence, requireDisableReason } from './comments.mts';
 import { naming } from './naming.mts';
 import { noBooleanParameter } from './no-boolean-parameter.mts';
 import { noNull } from './no-null.mts';
+import { sourceLayers } from './sourceLayers.mts';
 import {
   callbackLast,
   catchUnknown,
@@ -35,6 +36,7 @@ export const rules = {
   'no-partial-parameter': noPartialParameter,
   'no-unbounded-loop': noUnboundedLoop,
   'require-disable-reason': requireDisableReason,
+  'source-layers': sourceLayers,
 } as const;
 
 export default {

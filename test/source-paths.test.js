@@ -47,9 +47,11 @@ const STALE_NAME = new RegExp(
   `(?<![\\w./#$-])(?:#|\\./)?((?:${ROOTS})/[\\w./-]+)\\.(js|jsx)\\b`,
   'g',
 );
-// Files that hold these spellings as data (the tool's own test, and this
-// one), and the helper that is the one place the root is found from __dirname.
+// Files that hold these spellings as data (the move tool's test, the lint
+// rules' cases, and this test), and the helper that is the one place the root
+// is found from __dirname.
 const EXEMPT = new Set([
+  'test/contracts/eslint-plugin.test.ts',
   'test/contracts/move-sources.test.ts',
   'test/helpers/sources.js',
   'test/source-paths.test.js',

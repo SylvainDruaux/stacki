@@ -6,8 +6,9 @@
 //   node scripts/policy/scan.mts --files a b     just these files (hooks)
 //
 // File checks run in both modes: line width, shell scripts, test headers,
-// the no-check directive. Repository checks run only in full mode: the dependency record,
-// one lockfile, the CLAUDE.md import, and assertion density in shared/.
+// the no-check directive, layout names. Repository checks run only in full
+// mode: the dependency record, one lockfile, the CLAUDE.md import, unique
+// layout names, and assertion density in shared/.
 // Output is one line per violation, `path:line  rule  message`; exit 1 on any.
 
 import fs from 'node:fs';
@@ -55,6 +56,18 @@ const BLANKET_DISABLE = /(?:\/\/|\/\*)\s*eslint-disabl[e](?:-next-line|-line)?\s
 // Spelled in two pieces so this file does not match itself.
 const NO_CHECK_DIRECTIVE = '@ts-' + 'nocheck';
 
+// The layout's naming rule (docs/codebase.md, "Directory map"): under these
+// roots folders are camelCase, TypeScript modules camelCase and components
+// PascalCase, so a name says what a file holds and a root spells names one
+// way. Each phase of the layout restructure adds its root here.
+const LAYOUT_ROOTS = ['src/'];
+const LAYOUT_FOLDER = /^[a-z][A-Za-z0-9]*$/;
+const LAYOUT_NAMES = [
+  /^[a-z][A-Za-z0-9]*(?:\.d)?\.ts$/, // A module, or a declaration file.
+  /^[A-Za-z][A-Za-z0-9]*\.tsx$/, // A component, or a module that renders JSX.
+  /^[A-Za-z][A-Za-z0-9]*\.css$/, // A component's stylesheet, or a shared one.
+];
+
 export function scanFile(file: string, text: string): readonly Violation[] {
   assert(!path.isAbsolute(file), 'scanFile: paths are repository-relative');
   assert(!file.includes('\\'), 'scanFile: paths use forward slashes');
@@ -68,6 +81,7 @@ export function scanFile(file: string, text: string): readonly Violation[] {
   if (WIDTH_EXTENSIONS.has(extension)) {
     found.push(...lineWidthViolations(file, lines));
   }
+  found.push(...layoutNameViolations(file));
   if (CODE_EXTENSIONS.has(extension)) {
     const index = lines.findIndex((line) => line.includes(NO_CHECK_DIRECTIVE));
     if (index >= 0) {
@@ -96,6 +110,49 @@ function lineWidthViolations(file: string, lines: readonly string[]): readonly V
       found.push({ file, line: index + 1, rule: 'line-width', message });
     }
   });
+  return found;
+}
+
+export function layoutNameViolations(file: string): readonly Violation[] {
+  const root = LAYOUT_ROOTS.find((prefix) => file.startsWith(prefix));
+  if (root === undefined) {
+    return [];
+  }
+  const parts = file.slice(root.length).split('/');
+  const name = parts.pop();
+  assert(name !== undefined, 'layoutNameViolations: a path has a name');
+  const found: Violation[] = [];
+  const folder = parts.find((part) => !LAYOUT_FOLDER.test(part));
+  if (folder !== undefined) {
+    const message = `Folder '${folder}' is not camelCase (docs/codebase.md, "Directory map").`;
+    found.push({ file, line: 1, rule: 'layout-name', message });
+  }
+  if (!LAYOUT_NAMES.some((pattern) => pattern.test(name))) {
+    const message =
+      `'${name}' is neither a camelCase module nor a PascalCase component: no hyphens, ` +
+      'underscores or extra dots.';
+    found.push({ file, line: 1, rule: 'layout-name', message });
+  }
+  return found;
+}
+
+// Names are unique within a layout root, ignoring case, so a file named in a
+// test, a lint list or a conversation is one file.
+export function layoutUniquenessViolations(files: readonly string[]): readonly Violation[] {
+  const found: Violation[] = [];
+  for (const root of LAYOUT_ROOTS) {
+    const seen = new Map<string, string>();
+    for (const file of files.filter((candidate) => candidate.startsWith(root))) {
+      const name = path.posix.basename(file).toLowerCase();
+      const first = seen.get(name);
+      if (first === undefined) {
+        seen.set(name, file);
+      } else {
+        const message = `Its name is taken by ${first}; names are unique within ${root}.`;
+        found.push({ file, line: 1, rule: 'layout-unique', message });
+      }
+    }
+  }
   return found;
 }
 
@@ -193,6 +250,7 @@ export function repositoryViolations(root: string, files: readonly string[]): re
     const message = 'CLAUDE.md must import the standards with a line reading `@AGENTS.md`.';
     found.push({ file: 'CLAUDE.md', line: 1, rule: 'agent-instructions', message });
   }
+  found.push(...layoutUniquenessViolations(files));
   const density = sharedAssertionDensity(root, files);
   if (density.perFunction < POLICY_LIMITS.sharedAssertionsPerFunctionMin) {
     const measured = density.perFunction.toFixed(2);

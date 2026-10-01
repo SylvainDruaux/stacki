@@ -12,6 +12,7 @@ import { POLICY_LIMITS } from '../../scripts/policy/limits.mts';
 import {
   dependencyViolations,
   isExempt,
+  layoutUniquenessViolations,
   normalizePath,
   scanFile,
 } from '../../scripts/policy/scan.mts';
@@ -117,4 +118,43 @@ test('assertion density counts block-bodied functions and assert calls only', ()
     '// assert(this is a comment)',
   ].join('\n');
   assert.deepEqual(countFile('shared/a.ts', text), { functions: 2, assertions: 2 });
+});
+
+test('layout names: camelCase folders and modules, PascalCase components', () => {
+  const header = '// Header.\n';
+  for (const file of [
+    'src/features/style/model/cssRuleView.ts',
+    'src/features/style/clipPath/webflowDesigner.d.ts',
+    'src/features/props/PropsPanel.tsx',
+    'src/features/props/propBindings.tsx',
+    'src/features/style/embedEditor.css',
+    'src/features/style/components/ClassPicker.css',
+    'src/main.tsx',
+    // Outside the layout roots the rule does not apply yet.
+    'scripts/policy/commit-message.mts',
+  ]) {
+    assert.deepEqual(rules(file, header), [], file);
+  }
+  for (const file of [
+    'src/features/style/model/css-rule-view.ts',
+    'src/features/style-panel/Gap.tsx',
+    'src/features/content/contentSchema.types.ts',
+    'src/features/props/Props_Panel.tsx',
+    'src/features/props/PropsPanel.ts',
+  ]) {
+    assert.deepEqual(rules(file, header), ['layout-name'], file);
+  }
+});
+
+test('layout names are unique within a root, ignoring case', () => {
+  const unique = ['src/ui/CodeEditor.tsx', 'src/features/style/components/CssCodeEditor.tsx'];
+  assert.deepEqual(layoutUniquenessViolations(unique), []);
+  const clash = ['src/ui/CodeEditor.tsx', 'src/features/style/components/codeEditor.tsx'];
+  const found = layoutUniquenessViolations(clash);
+  assert.deepEqual(
+    found.map((violation) => [violation.file, violation.rule]),
+    [['src/features/style/components/codeEditor.tsx', 'layout-unique']],
+  );
+  // Outside the layout roots, names may repeat (every tsconfig.json, for one).
+  assert.deepEqual(layoutUniquenessViolations(['shared/a.ts', 'electron/a.ts']), []);
 });

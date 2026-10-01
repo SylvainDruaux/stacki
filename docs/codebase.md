@@ -75,7 +75,7 @@ Four cooperating processes, each with one job:
                │ contextBridge (typed)     │ spawns
 ┌──────────────┴─────────────┐   ┌─────────▼─────────────┐
 │ Renderer (React + Vite)    │   │ astro dev (the user's │
-│  src/app/App.tsx + panels      │   │ project, its deps)    │
+│  src/app/App.tsx + features│   │ project, its deps)    │
 │  Edits the PageNode model  │   │ Serves the live page  │
 └──────────────┬─────────────┘   └─────────▲─────────────┘
                │ iframe embed + injected   │ HMR on save
@@ -94,11 +94,12 @@ Four cooperating processes, each with one job:
 - **Preload** (`electron/preload.js`): a sandboxed bridge exposing an
   allowlisted `window.avb` API via `contextBridge`. Must stay CommonJS
   (Electron ≥ 33 sandbox requirement).
-- **Renderer** (`src/`, React 19 + Vite, ESM): `App.tsx` (~4.9k lines) is the
-  application shell and owns the page model; `src/app/` are the side views
-  (Structure, Props, Style, Pages, Assets, CMS, Git history, terminal…);
-  `src/features/style/` is the CSS editing surface (mostly TypeScript);
-  `src/ui/` holds shared widgets.
+- **Renderer** (`src/`, React 19 + Vite, ESM): layered folders under one
+  entry, `src/main.tsx`. `src/app/App.tsx` is the application shell and owns
+  the page model; each side view (structure, props, style, pages, assets,
+  CMS, history, git, terminal…) is a folder in `src/features/`; the editing
+  core every feature builds on is `src/editor/`; `src/ui/` holds the widgets
+  more than one feature draws. See the directory map below.
 - **Astro dev server**: the _user's project's own_ dev server. Stacki renders
   the canvas by embedding it, so the preview is always exactly what Astro
   produces — no re-implementation of Astro semantics. A small injected client
@@ -301,19 +302,32 @@ batching/queueing write path (already the right shape).
 
 ## Directory map
 
-| Path                | What lives there                                                                  |
-| ------------------- | --------------------------------------------------------------------------------- |
-| `electron/`         | Main process: IPC registry, parsers, git, watcher, terminal, packaging helpers    |
-| `electron/content/` | Astro content-collection introspection + stubs injected into the dev server       |
-| `electron/formats/` | Leaf parsers for data files (JSON/YAML/TOML/CSV/NDJSON/frontmatter)               |
-| `src/`              | Renderer: `App.tsx` shell, tree/persistence/binding logic, `bridge.ts`            |
-| `src/app/`       | Side panels (Structure, Props, Style, Pages, Assets, CMS, History, Git, terminal) |
-| `src/features/style/`  | CSS editing surface (TypeScript); `clip-path/`, `lib/`, shared controls           |
-| `src/ui/`           | Shared renderer widgets                                                           |
-| `shared/`           | Contract layer: types, parsers, limits, IPC contract → compiled to `shared/dist`  |
-| `scripts/`          | Dev/CI tooling (test runner, policy tooling, agent and git hooks, packaging)       |
-| `test/`             | 124 suites: round-trip, canvas-stub, contract, packaging                          |
-| `docs/`             | This file, the migration plan                                                     |
+| Path | What lives there |
+| --- | --- |
+| `electron/` | Main process: IPC registry, parsers, git, watcher, terminal, packaging helpers |
+| `electron/content/` | Astro content-collection introspection + stubs injected into the dev server |
+| `electron/formats/` | Leaf parsers for data files (JSON/YAML/TOML/CSV/NDJSON/frontmatter) |
+| `src/main.tsx` | The renderer's entry: mounts `src/app/App.tsx` |
+| `src/lib/` | Generic utilities that know nothing of pages or features |
+| `src/ipc/` | The typed bridges to main that more than one feature uses |
+| `src/editor/` | The page-editing core: model and view, edits, persistence, tree, canvas queries |
+| `src/ui/` | Widgets more than one feature draws |
+| `src/features/<feature>/` | One folder per feature: its panel, components, models, bridge and CSS |
+| `src/app/` | The application shell: `App.tsx`, global styles, the rail, shell types |
+| `shared/` | Contract layer: types, parsers, limits, IPC contract → compiled to `dist/shared` |
+| `scripts/` | Dev/CI tooling (test runner, policy tooling, agent and git hooks, packaging) |
+| `test/` | Suites (round-trip, canvas-stub, contract, packaging); harnesses in `test/helpers/` |
+| `docs/` | This file, the contracts, the enforcement map, the editor-core plan |
+
+The renderer's folders are layers, lowest first: `lib` → `ipc` → `editor` →
+`ui` → `features` → `app`. A module imports only the layers below its own,
+and a feature imports another feature only along the edges listed in
+`eslint.config.mjs` (`SOURCE_LAYERS`): the variables panel edits values with
+the style panel's editors, component properties use the props panel's
+fields, and history draws with git's widgets. The lint rule
+`stacki/source-layers` holds the order; the policy scan holds the names —
+camelCase folders and modules, PascalCase components, every name unique
+under `src/`.
 
 ## Standing rules
 

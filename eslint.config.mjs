@@ -285,6 +285,40 @@ const ENGINE_CONTRACTS = [
   'shared/splice.ts',
 ];
 
+// The renderer's layers (docs/codebase.md, "Directory map"), lowest first: a
+// module imports only the layers below its own. A feature imports another
+// feature only along an edge listed here, by file, never through a barrel —
+// a barrel would pull eager stylesheets and lazy panels into its importers.
+const SOURCE_LAYERS = {
+  repository: import.meta.dirname,
+  root: 'src',
+  layers: ['lib', 'ipc', 'editor', 'ui', 'features', 'app'],
+  featureLayer: 'features',
+  featureEdges: {
+    // Property defaults and options are edited with the props panel's fields.
+    componentProperties: [
+      'features/props/ListField',
+      'features/props/arrayValue',
+      'features/props/propBindings',
+    ],
+    // The history panel draws commits with git's file and branch widgets.
+    history: ['features/git/BranchActions', 'features/git/FileBrowser', 'features/git/FileStatus'],
+    // A variable's value is edited with the style panel's value editors.
+    variables: [
+      'features/style/CustomValueEditor',
+      'features/style/EasingEditor',
+      'features/style/VariableConnect',
+      'features/style/components/ColorSwatch',
+      'features/style/model/host',
+      'features/style/model/transition',
+      'features/style/utilities',
+    ],
+  },
+  outside: ['shared'],
+  // The frontmatter reader is shared with main and moves into shared/.
+  outsideEdges: { 'app/App': ['electron/frontmatter'] },
+};
+
 export default [
   {
     ignores: ['node_modules/**', 'dist/**', 'release/**', 'coverage/**', '**/generated/**'],
@@ -396,6 +430,10 @@ export default [
       '@typescript-eslint/consistent-type-assertions': 'off',
       'no-restricted-syntax': ['error', ...NO_WHOLE_FILE_REGENERATION],
     },
+  },
+  {
+    files: ['src/**/*.{ts,tsx}'],
+    rules: { 'stacki/source-layers': ['error', SOURCE_LAYERS] },
   },
   {
     // These adapters validate values from PostCSS, DOM storage, and the host

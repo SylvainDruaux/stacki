@@ -100,6 +100,8 @@ the agent hooks are guard rails, not a sandbox. CI is the gate that cannot be ar
 | 14 | Index, count, size brands | review |
 | 15 | Performance | review |
 | 16 | File order | review |
+| 16 | Renderer layers and feature edges | lint: `stacki/source-layers` (`SOURCE_LAYERS` in `eslint.config.mjs`) |
+| 12, 16 | Layout names: camelCase folders and modules, PascalCase components, unique per root | scan: `layout-name`, `layout-unique` |
 | 17 | Dependencies justified | scan: `dependency-record` (`docs/dependencies.md` ↔ `package.json`) |
 | 17 | One lockfile | scan: `one-lockfile` |
 | 17 | Scripts are TypeScript | scan: `no-shell-script` |

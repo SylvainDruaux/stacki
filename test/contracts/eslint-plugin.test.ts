@@ -5,6 +5,7 @@
 // accept — including each documented exemption — and the negative space it
 // must reject, with the message id pinned so a changed diagnosis is a failure.
 // A rule's fixer, where it has one, is pinned by its output.
+import path from 'node:path';
 import { after, describe, it } from 'node:test';
 import { RuleTester } from '@typescript-eslint/rule-tester';
 import { rules } from '../../scripts/eslint-plugin/index.mts';
@@ -323,6 +324,89 @@ tester.run('callback-last', rules['callback-last'], {
     {
       code: 'function watch(onChange: () => void, path: string) {}',
       errors: [{ messageId: 'callbackNotLast' }],
+    },
+  ],
+});
+
+// The layer order and edges are given here as options, as eslint.config.mjs
+// gives them; each case names the file it lints, since the verdict depends on
+// where the importing module sits. Sample paths name no real file.
+const LAYER_OPTIONS: [
+  {
+    readonly repository: string;
+    readonly root: string;
+    readonly layers: readonly string[];
+    readonly featureLayer: string;
+    readonly featureEdges: Readonly<Record<string, readonly string[]>>;
+    readonly outside: readonly string[];
+    readonly outsideEdges: Readonly<Record<string, readonly string[]>>;
+  },
+] = [
+  {
+    repository: process.cwd(),
+    root: 'src',
+    layers: ['lib', 'editor', 'features', 'app'],
+    featureLayer: 'features',
+    featureEdges: { left: ['features/right/Shared'] },
+    outside: ['shared'],
+    outsideEdges: { 'app/Shell': ['electron/reader'] },
+  },
+];
+const layerCase = (file: string, code: string) => ({
+  code,
+  filename: path.join(process.cwd(), file),
+  options: LAYER_OPTIONS,
+});
+
+tester.run('source-layers', rules['source-layers'], {
+  valid: [
+    layerCase('src/features/left/Panel.tsx', "import { a } from '../../lib/sample';"),
+    layerCase('src/features/left/Panel.tsx', "import { a } from './model';"),
+    layerCase('src/features/left/Panel.tsx', "import './panel.css';"),
+    layerCase('src/features/left/Panel.tsx', "import { a } from '../right/Shared';"),
+    layerCase('src/features/left/Panel.tsx', "import { a } from '../../../shared/sample';"),
+    layerCase('src/features/left/Panel.tsx', "import React from 'react';"),
+    layerCase('src/app/Shell.tsx', "import { a } from '../../electron/reader';"),
+    layerCase('src/main.tsx', "import Shell from './app/Shell';"),
+    // Files outside the root are not the renderer's.
+    layerCase('electron/sample.ts', "import { a } from '../src/app/Shell';"),
+  ],
+  invalid: [
+    {
+      ...layerCase('src/lib/sample.ts', "import { a } from '../editor/model';"),
+      errors: [{ messageId: 'layerOrder' }],
+    },
+    {
+      ...layerCase('src/editor/model.ts', "export { a } from '../app/Shell';"),
+      errors: [{ messageId: 'layerOrder' }],
+    },
+    {
+      ...layerCase('src/editor/model.ts', "const panel = import('../features/left/Panel');"),
+      errors: [{ messageId: 'layerOrder' }],
+    },
+    {
+      ...layerCase('src/features/left/Panel.tsx', "import { a } from '../right/Private';"),
+      errors: [{ messageId: 'crossFeature' }],
+    },
+    {
+      ...layerCase('src/features/right/Panel.tsx', "import { a } from '../left/Panel';"),
+      errors: [{ messageId: 'crossFeature' }],
+    },
+    {
+      ...layerCase('src/features/left/Panel.tsx', "import { a } from '../../../electron/reader';"),
+      errors: [{ messageId: 'outsideRoot' }],
+    },
+    {
+      ...layerCase('src/editor/model.ts', "import { a } from '../main';"),
+      errors: [{ messageId: 'layerOrder' }],
+    },
+    {
+      ...layerCase('src/features/left/Panel.tsx', "import { a } from './model.ts';"),
+      errors: [{ messageId: 'extension' }],
+    },
+    {
+      ...layerCase('src/features/left/Panel.tsx', "import type { A } from './model.js';"),
+      errors: [{ messageId: 'extension' }],
     },
   ],
 });
