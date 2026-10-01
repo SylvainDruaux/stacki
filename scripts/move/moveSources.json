@@ -633,6 +633,45 @@
         ["shared/preload-api.ts", "shared/ipc/preloadApi.ts"],
         ["shared/page-save.ts", "shared/ipc/pageSave.ts"]
       ]
+    },
+    {
+      "step": "scripts-build",
+      "moves": [
+        ["scripts/clean-build.mts", "scripts/build/cleanBuild.mts"],
+        ["scripts/stage-runtime.ts", "scripts/build/stageRuntime.ts"],
+        ["scripts/dev-electron.ts", "scripts/build/devElectron.ts"]
+      ]
+    },
+    {
+      "step": "scripts-install",
+      "moves": [
+        ["scripts/fix-node-pty-permissions.ts", "scripts/install/fixNodePtyPermissions.ts"],
+        ["scripts/fix-electron-builder-signing.ts", "scripts/install/fixElectronBuilderSigning.ts"]
+      ]
+    },
+    {
+      "step": "scripts-release",
+      "moves": [
+        ["scripts/afterPack.ts", "scripts/release/afterPack.ts"],
+        ["scripts/release.ts", "scripts/release/release.ts"],
+        ["scripts/dist-mac-unsigned.ts", "scripts/release/distMacUnsigned.ts"]
+      ]
+    },
+    {
+      "step": "scripts-reports",
+      "moves": [
+        ["scripts/performance-report.ts", "scripts/reports/performanceReport.ts"],
+        ["scripts/roundtrip-report.ts", "scripts/reports/roundtripReport.ts"],
+        ["scripts/large-fixtures.ts", "scripts/reports/largeFixtures.ts"]
+      ]
+    },
+    {
+      "step": "scripts-gate",
+      "moves": [
+        ["scripts/run-tests.ts", "scripts/gate/runTests.ts"],
+        ["scripts/test-pool.ts", "scripts/gate/testPool.ts"],
+        ["scripts/adapter-surface.ts", "scripts/gate/adapterSurface.ts"]
+      ]
     }
   ]
 }
