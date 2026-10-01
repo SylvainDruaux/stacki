@@ -95,7 +95,7 @@ describe('module specifiers', () => {
 });
 
 describe('repository paths written as text', () => {
-  it('rewrite file paths, stale extensions and #dist build paths', () => {
+  it('rewrite file paths, .js names (keeping .js) and #dist build paths', () => {
     const result = plan(
       {
         'test/a.js':
@@ -110,7 +110,7 @@ describe('repository paths written as text', () => {
       },
     );
     const text =
-      "load('src/features/props/Props.tsx');\nrequire('#dist/electron/parse/astroParser.js');\n" +
+      "load('src/features/props/Props.jsx');\nrequire('#dist/electron/parse/astroParser.js');\n" +
       '// See src/features/props/Props.tsx.\n';
     assert.equal(result.writes.get('test/a.js'), text);
   });
@@ -166,6 +166,27 @@ describe('repository paths written as text', () => {
       { 'src/pages.ts': 'src/lib/pages.ts' },
     );
     assert.equal(result.writes.size, 0);
+  });
+});
+
+describe('esbuild stdin specifiers resolved from the root', () => {
+  it('follow their file, keeping the extension they were written with', () => {
+    const before = [
+      "export { x } from './src/ui/Dropdown.jsx';",
+      "export { y } from './src/ui/Icons';",
+    ].join('\n');
+    const after = [
+      "export { x } from './src/ui/menus/Dropdown.jsx';",
+      "export { y } from './src/lib/Icons';",
+    ].join('\n');
+    const result = plan(
+      { 'test/a.js': before, 'src/ui/Dropdown.tsx': '', 'src/ui/Icons.tsx': '' },
+      {
+        'src/ui/Dropdown.tsx': 'src/ui/menus/Dropdown.tsx',
+        'src/ui/Icons.tsx': 'src/lib/Icons.tsx',
+      },
+    );
+    assert.equal(result.writes.get('test/a.js'), after);
   });
 });
 

@@ -416,8 +416,11 @@ function mapPathToken(token: string, input: PathTextInput): TokenMapping {
     case 'directory':
       return { kind: 'mapped', text: path.posix.dirname(target) };
     case 'exact':
-    case 'alias':
       return { kind: 'mapped', text: target };
+    case 'alias':
+      // A `.js` name for a TypeScript file can mean the build output
+      // (dist-relative or in a script); keep the extension it was written with.
+      return { kind: 'mapped', text: stripExtension(target) + resolution.form.extension };
     default: {
       const exhaustive: never = resolution.form;
       return exhaustive;
