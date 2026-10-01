@@ -322,10 +322,19 @@ batching/queueing write path (already the right shape).
 | `src/ui/` | Widgets more than one feature draws |
 | `src/features/<feature>/` | One folder per feature: its panel, components, models, bridge and CSS |
 | `src/app/` | The application shell: `App.tsx`, global styles, the rail, shell types |
-| `shared/` | Contract layer: types, parsers, limits, IPC contract → compiled to `dist/shared` |
+| `shared/core/` | The primitives: assert, Result, brands, record and boundary parsers, limits, spans |
+| `shared/page/` | The page model: page nodes, frontmatter, projection, snapshots, capability |
+| `shared/engine/` | The edit engine: intents, the planner, splices, rebase, diffs, patches |
+| `shared/properties/` | Component-property and prop-schema contracts, the project scan |
+| `shared/ipc/` | The IPC contract: channels, payload parsers, results, the preload API |
 | `scripts/` | Dev/CI tooling (test runner, policy tooling, agent and git hooks, packaging) |
 | `test/` | Suites (round-trip, canvas-stub, contract, packaging); harnesses in `test/helpers/` |
 | `docs/` | This file, the contracts, the enforcement map, the editor-core plan |
+
+The contract layer's folders are areas too (`SHARED_AREAS`): `core` is the
+floor, the page model and the property contracts sit on it, the engine on
+the page model, and the IPC contract may name any of them; `shared/`
+imports nothing outside itself.
 
 The main process's folders are areas, each importing only the areas listed
 for it in `eslint.config.mjs` (`ELECTRON_AREAS`): `lib` is the floor, the
@@ -341,7 +350,7 @@ the style panel's editors, component properties use the props panel's
 fields, and history draws with git's widgets. The lint rule
 `stacki/source-layers` holds the order; the policy scan holds the names —
 camelCase folders and modules, PascalCase components, every name unique
-under `src/` and under `electron/`.
+under `src/`, under `electron/` and under `shared/`.
 
 ## Standing rules
 

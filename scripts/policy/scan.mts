@@ -60,7 +60,7 @@ const NO_CHECK_DIRECTIVE = '@ts-' + 'nocheck';
 // roots folders are camelCase, TypeScript modules camelCase and components
 // PascalCase, so a name says what a file holds and a root spells names one
 // way. Each phase of the layout restructure adds its root here.
-const LAYOUT_ROOTS = ['src/', 'electron/'];
+const LAYOUT_ROOTS = ['src/', 'electron/', 'shared/'];
 const LAYOUT_FOLDER = /^[a-z][A-Za-z0-9]*$/;
 const LAYOUT_NAMES = [
   /^[a-z][A-Za-z0-9]*(?:\.d)?\.ts$/, // A module, or a declaration file.

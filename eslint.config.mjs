@@ -345,6 +345,23 @@ const ELECTRON_AREAS = {
   },
 };
 
+// The contract layer's areas (docs/codebase.md, "Directory map"): core is the
+// floor; the page model and the property contracts sit on it, the edit engine
+// on the page model, and the IPC contract may name any of them. shared/
+// reaches nothing outside itself: main and the renderer both depend on it.
+const SHARED_AREAS = {
+  repository: import.meta.dirname,
+  root: 'shared',
+  outside: [],
+  areas: {
+    core: [],
+    page: ['core'],
+    properties: ['core'],
+    engine: ['core', 'page'],
+    ipc: ['core', 'page', 'engine', 'properties'],
+  },
+};
+
 export default [
   {
     ignores: ['node_modules/**', 'dist/**', 'release/**', 'coverage/**', '**/generated/**'],
@@ -464,6 +481,10 @@ export default [
   {
     files: ['electron/**/*.ts'],
     rules: { 'stacki/source-layers': ['error', ELECTRON_AREAS] },
+  },
+  {
+    files: ['shared/**/*.ts'],
+    rules: { 'stacki/source-layers': ['error', SHARED_AREAS] },
   },
   {
     // These adapters validate values from PostCSS, DOM storage, and the host
