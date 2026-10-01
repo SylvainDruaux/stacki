@@ -1,6 +1,10 @@
-import type { WireMergeClash, WireConflictPart, WireMergeOutcome } from '../../shared/ipc-results';
-import { assert } from '../../shared/assert';
-import { BOUNDARY_LIMITS } from '../../shared/boundary';
+import type {
+  WireMergeClash,
+  WireConflictPart,
+  WireMergeOutcome,
+} from '../../../shared/ipc-results';
+import { assert } from '../../../shared/assert';
+import { BOUNDARY_LIMITS } from '../../../shared/boundary';
 
 export type Conflict = Extract<WireMergeOutcome, { readonly conflicted: true }>;
 export type Clash = Extract<WireConflictPart, { readonly kind: 'clash' }>;

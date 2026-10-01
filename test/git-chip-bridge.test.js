@@ -5,7 +5,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const bridge = require('./helpers/rendererModule')('src/gitChipBridge.ts');
+const bridge = require('./helpers/rendererModule')('src/features/git/gitChipBridge.ts');
 const { repoPath } = require('./helpers/sources.js');
 
 // Null as a boundary receives it, parsed from JSON: inputs may hold it; our values never do.
@@ -136,7 +136,7 @@ test('GitChip transport failures are values and malformed replies throw', async 
 });
 
 test('GitChip routes every direct Git operation through the parsed bridge', () => {
-  const source = fs.readFileSync(repoPath('src/panels/GitChip.tsx'), 'utf8');
+  const source = fs.readFileSync(repoPath('src/features/git/GitChip.tsx'), 'utf8');
   assert.doesNotMatch(
     source,
     /window\.avb\.git(?:Info|Status|Checkout|Commit|Init|Push|ResolveMerge)/,

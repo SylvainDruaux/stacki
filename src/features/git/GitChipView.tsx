@@ -1,9 +1,9 @@
 import React from 'react';
-import type { WireGitInfo } from '../../shared/ipc-results';
-import { branchNameError, sanitizeBranchName } from '../branchName';
-import BranchActions from '../ui/BranchActions';
-import FileBrowser from '../ui/FileBrowser';
-import { BranchIcon, CheckIcon, CloseIcon, ExternalIcon } from '../ui/Icons';
+import type { WireGitInfo } from '../../../shared/ipc-results';
+import { branchNameError, sanitizeBranchName } from './branchName';
+import BranchActions from './BranchActions';
+import FileBrowser from './FileBrowser';
+import { BranchIcon, CheckIcon, CloseIcon, ExternalIcon } from '../../ui/Icons';
 import { repoSlug, webUrl } from './gitPublish';
 
 type ChangedFiles = React.ComponentProps<typeof FileBrowser>['files'];

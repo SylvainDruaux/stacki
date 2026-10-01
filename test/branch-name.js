@@ -33,7 +33,7 @@ const check = (what, condition, detail) => {
   fs.mkdirSync(buildDirectory, { recursive: true });
   const bundlePath = path.join(buildDirectory, 'branch-name.bundle.js');
   await esbuild.build({
-    entryPoints: [repoPath('src/branchName.ts')],
+    entryPoints: [repoPath('src/features/git/branchName.ts')],
     outfile: bundlePath,
     bundle: true,
     format: 'cjs',
@@ -108,7 +108,7 @@ const check = (what, condition, detail) => {
   check('and an empty field is never valid', !ok('', existing) && !ok('   ', existing));
 
   // --- the field really asks ---------------------------------------------------
-  const chip = fs.readFileSync(repoPath('src/panels/GitChipView.tsx'), 'utf8');
+  const chip = fs.readFileSync(repoPath('src/features/git/GitChipView.tsx'), 'utf8');
   check(
     'the field cleans what is typed',
     /onChange=\{\(event\) => onNewBranch\(sanitizeBranchName\(/.test(chip),

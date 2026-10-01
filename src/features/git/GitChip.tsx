@@ -1,9 +1,9 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import type { IpcResults, WireGitInfo } from '../../shared/ipc-results';
-import type { Result } from '../../shared/result';
-import { assert } from '../../shared/assert';
-import { cleanError } from '../lib/cleanError';
-import { deleteBranchAction, mergeBranchAction, tidyUp } from '../gitActions';
+import type { IpcResults, WireGitInfo } from '../../../shared/ipc-results';
+import type { Result } from '../../../shared/result';
+import { assert } from '../../../shared/assert';
+import { cleanError } from '../../lib/cleanError';
+import { deleteBranchAction, mergeBranchAction, tidyUp } from './gitActions';
 import {
   checkoutGitBranch,
   commitGitChanges,
@@ -12,9 +12,9 @@ import {
   readGitInfo,
   readGitStatus,
   resolveGitMerge,
-} from '../gitChipBridge';
-import { BranchIcon } from '../ui/Icons';
-import useDismiss from '../ui/useDismiss';
+} from './gitChipBridge';
+import { BranchIcon } from '../../ui/Icons';
+import useDismiss from '../../ui/useDismiss';
 import type { Conflict, ConflictChoices } from './gitConflictModel';
 import GitChipView, { openGitRemote } from './GitChipView';
 import MergeConflictModal from './MergeConflictModal';

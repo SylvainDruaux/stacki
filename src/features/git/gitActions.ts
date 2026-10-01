@@ -1,4 +1,4 @@
-import type { WireMergeOutcome } from '../shared/ipc-results';
+import type { WireMergeOutcome } from '../../../shared/ipc-results';
 type Conflict = Extract<WireMergeOutcome, { readonly conflicted: true }> & {
   readonly deleteAfter: boolean;
 };
@@ -37,7 +37,7 @@ interface DirtyOptions extends TidyOptions {
 // here is the asking: which questions get put to the user, in what order, and
 // in what words.
 
-import { confirmDialog } from './ui/ConfirmDialog';
+import { confirmDialog } from '../../ui/ConfirmDialog';
 import { gitMerge, gitDeleteBranch, gitPark, gitUnpark } from './gitBridge';
 
 /**

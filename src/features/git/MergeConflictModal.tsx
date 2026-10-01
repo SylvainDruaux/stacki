@@ -6,7 +6,7 @@ import type {
   ConflictPicks,
   ConflictHunk,
 } from './gitConflictModel';
-import { assert } from '../../shared/assert';
+import { assert } from '../../../shared/assert';
 import {
   choicesForSend,
   conflictHunks,
@@ -14,7 +14,7 @@ import {
   contestedIn,
   initialConflictPicks,
 } from './gitConflictModel';
-import Code from '../ui/Code';
+import Code from './Code';
 
 export interface MergeConflictProps {
   readonly conflict: Conflict;

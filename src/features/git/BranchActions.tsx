@@ -6,7 +6,7 @@ interface BranchActionsProps {
   readonly onDelete?: (branch: string) => void;
   readonly disabled?: boolean;
 }
-import { MergeIcon, TrashIcon } from './Icons';
+import { MergeIcon, TrashIcon } from '../../ui/Icons';
 
 // The merge and delete buttons on a branch row.
 //

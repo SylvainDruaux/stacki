@@ -4,7 +4,7 @@ import type { HistoryCommit, HistoryCommitFile } from '../historyBridge';
 import { readHistoryLog } from '../historyBridge';
 import { commitAuthor, dayGroup, relativeTime, summarize } from '../historyModel';
 import { ChevronRightIcon, PreviewIcon } from '../ui/Icons';
-import FileStatus from '../ui/FileStatus';
+import FileStatus from '../features/git/FileStatus';
 
 const HISTORY_COMMITS_MAX = 10_000;
 

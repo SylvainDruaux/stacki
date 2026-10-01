@@ -4,9 +4,9 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { parseGitCommit, parseGitInfo, parseGitPublish, parseGitSuccess } =
-  require('./helpers/rendererModule')('src/gitChipBridge.ts');
+  require('./helpers/rendererModule')('src/features/git/gitChipBridge.ts');
 const { publishGitProject } = require('./helpers/rendererModule')(
-  'src/panels/gitPublishWorkflow.ts',
+  'src/features/git/gitPublishWorkflow.ts',
 );
 
 // Null as a boundary receives it, parsed from JSON: inputs may hold it; our values never do.

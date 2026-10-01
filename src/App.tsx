@@ -34,14 +34,14 @@ import {
   readSymbol,
   scanProject,
 } from './ipc/bridge';
-import { checkoutGitBranch, readGitInfo } from './gitChipBridge';
+import { checkoutGitBranch, readGitInfo } from './features/git/gitChipBridge';
 import { LIMITS } from '../shared/limits';
 import { assert } from '../shared/assert';
 import PreviewPane from './panels/PreviewPane';
-import GitChip from './panels/GitChip';
+import GitChip from './features/git/GitChip';
 import HistoryPanel, { relativeTime } from './panels/HistoryPanel';
 import { ConfirmHost, confirmDialog } from './ui/ConfirmDialog';
-import { mergeBranchAction, deleteBranchAction } from './gitActions';
+import { mergeBranchAction, deleteBranchAction } from './features/git/gitActions';
 import LeftRail from './ui/LeftRail';
 import { lazyPanel } from './ui/lazyPanel';
 import PageSwitcher from './ui/PageSwitcher';

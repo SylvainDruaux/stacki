@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
-import type { Result } from '../../shared/result';
-import { BOUNDARY_LIMITS } from '../../shared/boundary';
-import { CheckIcon, ExternalIcon } from '../ui/Icons';
+import type { Result } from '../../../shared/result';
+import { BOUNDARY_LIMITS } from '../../../shared/boundary';
+import { CheckIcon, ExternalIcon } from '../../ui/Icons';
 import { repoSlug, useGitHubStatus } from './gitPublish';
 
 export interface PublishRequest {

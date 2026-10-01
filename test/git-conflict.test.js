@@ -9,9 +9,9 @@ const { buildSync } = require('esbuild');
 const { JSDOM } = require('jsdom');
 const load = require('./helpers/rendererModule');
 const { BOUNDARY_LIMITS } = require('#dist/shared/boundary.js');
-const { parseMergeResult, parseConflictPart } = load('src/gitBridge.ts');
+const { parseMergeResult, parseConflictPart } = load('src/features/git/gitBridge.ts');
 const { initialConflictPicks, choicesForSend, conflictHunks } = load(
-  'src/panels/gitConflictModel.ts',
+  'src/features/git/gitConflictModel.ts',
 );
 const { parseConflict } = require('#dist/electron/conflicts.js');
 const { repoPath } = require('./helpers/sources.js');
@@ -81,7 +81,7 @@ test('merge dialog sends exact selected choices and locks binary choices while b
   const output = repoPath('node_modules/.stacki-test/git-conflict.cjs');
   fs.mkdirSync(path.dirname(output), { recursive: true });
   buildSync({
-    entryPoints: [repoPath('src/panels/MergeConflictModal.tsx')],
+    entryPoints: [repoPath('src/features/git/MergeConflictModal.tsx')],
     outfile: output,
     bundle: true,
     format: 'cjs',

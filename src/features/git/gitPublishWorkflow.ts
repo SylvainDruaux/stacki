@@ -1,8 +1,8 @@
-import type { Result } from '../../shared/result';
+import type { Result } from '../../../shared/result';
 import type { PublishRequest } from './PublishModal';
-import { assert } from '../../shared/assert';
-import { parseIpcPayload } from '../../shared/ipc-payloads';
-import { commitGitChanges, createGitHubRepository, readGitInfo } from '../gitChipBridge';
+import { assert } from '../../../shared/assert';
+import { parseIpcPayload } from '../../../shared/ipc-payloads';
+import { commitGitChanges, createGitHubRepository, readGitInfo } from './gitChipBridge';
 
 // The owner flushes editor writes before this workflow reads the working tree.
 // Each operating failure stops the next destructive step; no parser is caught.
