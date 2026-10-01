@@ -44,7 +44,7 @@ test('package entry and sandboxed preload use the built runtime', () => {
 });
 
 test('runtime workers and icons are copied without changing their contents', () => {
-  for (const directory of ['electron/content', 'resources']) {
+  for (const directory of ['electron/content/workers', 'resources']) {
     const files = readdirSync(resolve(root, directory));
     assert.ok(files.length < filesMax);
     for (const file of files) {

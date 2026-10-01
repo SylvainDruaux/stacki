@@ -1,8 +1,8 @@
 import fs from 'fs';
 import path from 'path';
 
-import { LIMITS } from '../shared/limits';
-import { toRecord, toArray } from '../shared/record';
+import { LIMITS } from '../../shared/limits';
+import { toRecord, toArray } from '../../shared/record';
 import { listEntries, writeEntry } from './contentEntries';
 import type { Entry as ListedEntry } from './contentEntries';
 

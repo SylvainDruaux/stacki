@@ -45,7 +45,7 @@ export function fieldsOf(input: unknown, options: SchemaOptions = {}): readonly 
 // A collection's schema, turned into the fields an editor can draw.
 //
 // What arrives from the main process is JSON Schema — zod's own rendering of
-// the project's content config (see electron/content/introspect.mjs). It says
+// the project's content config (see electron/content/workers/introspect.mjs). It says
 // everything, in a shape meant for validators rather than forms: optionality
 // lives in a list of required keys somewhere above the field, nullability is an
 // anyOf with a null branch, a union is a bare oneOf, and recursion is a $ref.

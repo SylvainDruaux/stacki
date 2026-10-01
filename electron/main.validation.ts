@@ -15,7 +15,7 @@ import {
 } from '../shared/boundary';
 import { toRecord } from '../shared/record';
 import type { Data } from '../shared/boundary';
-import type { ContentCollection } from './contentEntries';
+import type { ContentCollection } from './content/contentEntries';
 import type { DynamicEntry } from './main.types';
 
 export { data as parseData, record as parseRecord, text as parseString };

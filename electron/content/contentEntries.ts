@@ -1,11 +1,11 @@
 import fs from 'fs';
 import path from 'path';
 
-import { LIMITS } from '../shared/limits';
-import { toRecord, toArray } from '../shared/record';
-import { MAIN_LIMITS } from './lib/mainLimits';
-import { writeProjectText } from './documents/documentWrites';
-import * as frontmatter from './formats/frontmatter';
+import { LIMITS } from '../../shared/limits';
+import { toRecord, toArray } from '../../shared/record';
+import { MAIN_LIMITS } from '../lib/mainLimits';
+import { writeProjectText } from '../documents/documentWrites';
+import * as frontmatter from './formats/markdownEntry';
 import * as jsonFormat from './formats/json';
 import * as yamlFormat from './formats/yaml';
 import * as tomlFormat from './formats/toml';

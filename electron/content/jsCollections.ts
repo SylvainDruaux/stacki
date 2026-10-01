@@ -12,9 +12,9 @@
 // Only the array's own span is replaced on write, so everything around it —
 // imports, comments above the export, other constants — is untouched.
 
-import { assert } from '../shared/assert';
-import { LIMITS } from '../shared/limits';
-import { toRecord } from '../shared/record';
+import { assert } from '../../shared/assert';
+import { LIMITS } from '../../shared/limits';
+import { toRecord } from '../../shared/record';
 
 // A template nested in a template's `${…}`, nested again: hand-written code
 // stops after two or three. Past this bound the scanner treats the rest of the

@@ -1,8 +1,8 @@
 import fs from 'fs';
 import path from 'path';
 
-import { toRecord, toArray } from '../shared/record';
-import { MAIN_LIMITS } from './lib/mainLimits';
+import { toRecord, toArray } from '../../shared/record';
+import { MAIN_LIMITS } from '../lib/mainLimits';
 
 // Finds the files that import a JSON collection, and rewrites them to stop:
 // `import clients from '../data/clients.json'` becomes `const clients = []`,

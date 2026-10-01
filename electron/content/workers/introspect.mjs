@@ -11,7 +11,7 @@
 // the way in — the last one being the difference between what the file holds
 // and what an entry holds.
 import { z } from 'astro/zod';
-import { LOADER } from './stub-astro-loaders.mjs';
+import { LOADER } from './stubAstroLoaders.mjs';
 import { withMetadata, hasCrossFieldChecks, toJsonSchema } from './schemaTools.mjs';
 
 // Only these carry a body; the same loader over .json or .yaml does not.

@@ -206,7 +206,7 @@ async function inElectron() {
     return html;
   };
   const say = (message) => fs.writeSync(1, message + '\n');
-  const content = require(repoPath('dist/electron/contentConfig.js'));
+  const content = require(repoPath('dist/electron/content/contentConfig.js'));
   try {
     const configs = await Promise.all([
       content.readContentConfig(project),
@@ -257,7 +257,7 @@ async function inElectron() {
         contents: [
           "import { z } from 'astro/zod';",
           `import { withMetadata, toJsonSchema } from ${JSON.stringify(
-            repoPath('dist/electron/content/schemaTools.mjs'),
+            repoPath('dist/electron/content/workers/schemaTools.mjs'),
           )};`,
           'export const result = toJsonSchema(z.object({ title: z.string().min(3), hero: ' +
             'withMetadata(z.string(), { astroImage: true }), date: z.coerce.date(), flag: ' +

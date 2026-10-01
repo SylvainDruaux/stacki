@@ -6,10 +6,10 @@ import path = require('node:path');
 const root = path.resolve(__dirname, '..', '..');
 // An explicit inventory bounds the copy and excludes signing material.
 const files = [
-  'electron/content/introspect.mjs',
-  'electron/content/schemaTools.mjs',
-  'electron/content/stub-astro-content.mjs',
-  'electron/content/stub-astro-loaders.mjs',
+  'electron/content/workers/introspect.mjs',
+  'electron/content/workers/schemaTools.mjs',
+  'electron/content/workers/stubAstroContent.mjs',
+  'electron/content/workers/stubAstroLoaders.mjs',
   'resources/icon-dock.png',
   'resources/icon.icns',
   'resources/icon.ico',

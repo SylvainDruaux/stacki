@@ -14,8 +14,8 @@
 
 import * as TOML from 'smol-toml';
 
-import { LIMITS } from '../../shared/limits';
-import { toRecord } from '../../shared/record';
+import { LIMITS } from '../../../shared/limits';
+import { toRecord } from '../../../shared/record';
 
 const parseData = (text: string): unknown => TOML.parse(text);
 

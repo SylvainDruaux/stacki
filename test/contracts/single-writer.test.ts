@@ -59,10 +59,10 @@ const ALLOWED: Readonly<Record<string, Readonly<Record<string, Allowed>>>> = {
     renameSync: { count: 1, reason: 'moving a stale lock file aside' },
     linkSync: { count: 1, reason: 'putting back a live lock moved aside by mistake' },
   },
-  'electron/contentConfig.ts': {
+  'electron/content/contentConfig.ts': {
     writeFileSync: { count: 2, reason: 'runner scripts in the app work directory' },
   },
-  'electron/contentRefs.ts': {
+  'electron/content/contentRefs.ts': {
     renameSync: { count: 1, reason: 'moves a content entry; a move writes no bytes' },
   },
   'electron/main.ts': {

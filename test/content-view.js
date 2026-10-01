@@ -19,14 +19,14 @@ const {
   readContentConfig,
   validateEntry,
   stopAllServices,
-} = require('#dist/electron/contentConfig.js');
+} = require('#dist/electron/content/contentConfig.js');
 const {
   listEntries,
   writeEntry,
   countEntries,
   coveredPaths,
-} = require('#dist/electron/contentEntries.js');
-const frontmatter = require('#dist/electron/formats/frontmatter.js');
+} = require('#dist/electron/content/contentEntries.js');
+const frontmatter = require('#dist/electron/content/formats/markdownEntry.js');
 const { repoPath } = require('./helpers/sources.js');
 
 const DEFAULT_FIXTURE = path.join(os.homedir(), 'Downloads', 'awesome-client-main');

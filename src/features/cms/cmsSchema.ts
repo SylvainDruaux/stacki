@@ -44,7 +44,7 @@ const isPlainObject = (value: unknown): value is Record<string, unknown> =>
  * Date().getFullYear() - FOUNDED" }`. Anything in a data file or a page's
  * frontmatter that isn't a literal arrives this way, so it can still be seen
  * and edited — as code — instead of being invisible. Written back verbatim.
- * The same marker is produced and consumed in electron/jsCollections.js.
+ * The same marker is produced and consumed in electron/content/jsCollections.ts.
  */
 export const EXPR_KEY = '__expr';
 export const isExpr = (

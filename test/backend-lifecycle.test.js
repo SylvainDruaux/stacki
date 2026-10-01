@@ -71,8 +71,10 @@ function contentHarness(context) {
       },
     },
   };
-  const source = fs.readFileSync(repoPath('dist/electron/contentConfig.js'), 'utf8');
-  const runtimeRequire = createRequire(repoPath('dist/electron/main.js'));
+  // The module runs as Node would run it: requires and __dirname from its own file.
+  const modulePath = repoPath('dist/electron/content/contentConfig.js');
+  const source = fs.readFileSync(modulePath, 'utf8');
+  const runtimeRequire = createRequire(modulePath);
   const mod = { exports: {} };
   const moduleFactory = vm.runInNewContext(
     '(function(require, module, __dirname, exports) {' + source + '\n})',
@@ -89,7 +91,7 @@ function contentHarness(context) {
   moduleFactory(
     (name) => mocks[name] || runtimeRequire(name),
     mod,
-    repoPath('dist/electron'),
+    path.dirname(modulePath),
     mod.exports,
   );
   context.after(() => {
@@ -513,7 +515,7 @@ test(
       process.platform === 'win32' ? 'junction' : 'dir',
     );
     const staged = path.join(staging, 'schemaTools.mjs');
-    fs.copyFileSync(repoPath('dist/electron/content/schemaTools.mjs'), staged);
+    fs.copyFileSync(repoPath('dist/electron/content/workers/schemaTools.mjs'), staged);
     assert.equal(fs.existsSync(path.join(modules, 'zod-to-json-schema')), false);
     const { toJsonSchema } = await import(require('node:url').pathToFileURL(staged).href);
     assert.deepEqual(toJsonSchema({ source: 'private Astro dependency' }), {

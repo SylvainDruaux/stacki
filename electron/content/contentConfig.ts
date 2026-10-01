@@ -3,9 +3,9 @@ import path from 'path';
 import { createRequire } from 'module';
 import { spawn, type ChildProcess } from 'child_process';
 
-import { toRecord, toArray } from '../shared/record';
-import { MAIN_LIMITS } from './lib/mainLimits';
-import { contentWorkerPath } from './lib/runtimePaths';
+import { toRecord, toArray } from '../../shared/record';
+import { MAIN_LIMITS } from '../lib/mainLimits';
+import { contentWorkerPath } from '../lib/runtimePaths';
 
 // Reads a project's Astro content config — src/content.config.ts — and reports
 // what collections it declares.
@@ -89,8 +89,8 @@ function stageRunner(projectPath: string, configAbs: string): { directory: strin
   const directory = workDirectoryOf(projectPath);
   fs.mkdirSync(directory, { recursive: true });
   for (const name of [
-    'stub-astro-content.mjs',
-    'stub-astro-loaders.mjs',
+    'stubAstroContent.mjs',
+    'stubAstroLoaders.mjs',
     'schemaTools.mjs',
     'introspect.mjs',
   ]) {
@@ -164,8 +164,8 @@ async function bundle(
     // its own code.
     tsconfig,
     alias: {
-      'astro:content': path.join(directory, 'stub-astro-content.mjs'),
-      'astro/loaders': path.join(directory, 'stub-astro-loaders.mjs'),
+      'astro:content': path.join(directory, 'stubAstroContent.mjs'),
+      'astro/loaders': path.join(directory, 'stubAstroLoaders.mjs'),
     },
     // One zod, resolved from the project — the schemas the config builds have
     // to be the same objects our introspection walks.

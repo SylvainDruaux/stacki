@@ -76,7 +76,7 @@ framework choice; pinned to the 18 line.
 
 ### `smol-toml`
 
-**Does:** reads TOML content files (`electron/formats/toml.ts`). **Why not the platform:** no TOML
+**Does:** reads TOML content files (`electron/content/formats/toml.ts`). **Why not the platform:** no TOML
 parser in Node. **Cost:** small, dependency-free.
 
 ### `typescript`

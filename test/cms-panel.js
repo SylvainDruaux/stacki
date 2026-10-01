@@ -13,8 +13,12 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 
-const { readContentConfig, stopAllServices } = require('#dist/electron/contentConfig.js');
-const { listEntries, countEntries, coveredPaths } = require('#dist/electron/contentEntries.js');
+const { readContentConfig, stopAllServices } = require('#dist/electron/content/contentConfig.js');
+const {
+  listEntries,
+  countEntries,
+  coveredPaths,
+} = require('#dist/electron/content/contentEntries.js');
 const { repoPath } = require('./helpers/sources.js');
 
 const DEFAULT_FIXTURE = path.join(os.homedir(), 'Downloads', 'awesome-client-main');

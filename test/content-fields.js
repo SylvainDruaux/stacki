@@ -23,8 +23,8 @@ const {
   readContentConfig,
   stopAllServices,
   validateEntry,
-} = require('#dist/electron/contentConfig.js');
-const { listEntries } = require('#dist/electron/contentEntries.js');
+} = require('#dist/electron/content/contentConfig.js');
+const { listEntries } = require('#dist/electron/content/contentEntries.js');
 
 const DEFAULT_FIXTURE = path.join(os.homedir(), 'Downloads', 'awesome-client-main');
 const source = path.resolve(

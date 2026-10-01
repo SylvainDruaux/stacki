@@ -15,11 +15,15 @@
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
-const { readContentConfig, stopAllServices } = require('#dist/electron/contentConfig.js');
-const { listEntries } = require('#dist/electron/contentEntries.js');
-const { planRename, applyRename, rewriteRelative } = require('#dist/electron/contentRefs.js');
-const frontmatter = require('#dist/electron/formats/frontmatter.js');
-const jsonFormat = require('#dist/electron/formats/json.js');
+const { readContentConfig, stopAllServices } = require('#dist/electron/content/contentConfig.js');
+const { listEntries } = require('#dist/electron/content/contentEntries.js');
+const {
+  planRename,
+  applyRename,
+  rewriteRelative,
+} = require('#dist/electron/content/contentRefs.js');
+const frontmatter = require('#dist/electron/content/formats/markdownEntry.js');
+const jsonFormat = require('#dist/electron/content/formats/json.js');
 
 const DEFAULT_FIXTURE = path.join(os.homedir(), 'Downloads', 'awesome-client-main');
 const source = path.resolve(

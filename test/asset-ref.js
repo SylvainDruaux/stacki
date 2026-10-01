@@ -40,7 +40,7 @@ const check = (what, condition, detail) => {
   }
 };
 
-const jc = require('#dist/electron/jsCollections.js');
+const jc = require('#dist/electron/content/jsCollections.js');
 const ar = require('#dist/electron/assetRefs.js');
 const { repoPath } = require('./helpers/sources.js');
 

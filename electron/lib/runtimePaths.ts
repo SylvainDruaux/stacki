@@ -42,5 +42,5 @@ export function resourcePath(name: string): string {
 
 /** A module the content tooling copies into a project's temporary folder. */
 export function contentWorkerPath(name: string): string {
-  return path.join(distPath('dist/electron/content'), name);
+  return path.join(distPath('dist/electron/content/workers'), name);
 }

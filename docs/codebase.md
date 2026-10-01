@@ -90,7 +90,7 @@ Four cooperating processes, each with one job:
   `assetRefs`, `cssVars`, `gitBranches`, `gitHistory`,
   `projectWatcher`, `terminal` via node-pty, `previewWorktree`,
   `serialQueue`, `windowBounds`, content-collection tooling in
-  `electron/content/`, data-format parsers in `electron/formats/`).
+  `electron/content/workers/`, data-format parsers in `electron/content/formats/`).
 - **Preload** (`electron/preload/preload.ts`): a sandboxed bridge exposing an
   allowlisted `window.avb` API via `contextBridge`. Must stay CommonJS
   (Electron ≥ 33 sandbox requirement).
@@ -305,8 +305,8 @@ batching/queueing write path (already the right shape).
 | Path | What lives there |
 | --- | --- |
 | `electron/` | Main process: IPC registry, parsers, git, watcher, terminal, packaging helpers |
-| `electron/content/` | Astro content-collection introspection + stubs injected into the dev server |
-| `electron/formats/` | Leaf parsers for data files (JSON/YAML/TOML/CSV/NDJSON/frontmatter) |
+| `electron/content/workers/` | Astro content-collection introspection + stubs injected into the dev server |
+| `electron/content/formats/` | Leaf parsers for data files (JSON/YAML/TOML/CSV/NDJSON/frontmatter) |
 | `src/main.tsx` | The renderer's entry: mounts `src/app/App.tsx` |
 | `src/lib/` | Generic utilities that know nothing of pages or features |
 | `src/ipc/` | The typed bridges to main that more than one feature uses |
