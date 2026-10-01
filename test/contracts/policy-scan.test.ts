@@ -44,10 +44,10 @@ test('line width: code and config are held, prose is not', () => {
 });
 
 test('shell scripts are rejected by extension and by shebang', () => {
-  assert.deepEqual(rules('scripts/a.sh', 'echo hi'), ['no-shell-script']);
-  assert.deepEqual(rules('scripts/a.ps1', 'Write-Host hi'), ['no-shell-script']);
-  assert.deepEqual(rules('scripts/tool', '#!/bin/bash\necho hi'), ['no-shell-script']);
-  assert.deepEqual(rules('scripts/tool', '#!/usr/bin/env sh\necho hi'), ['no-shell-script']);
+  assert.deepEqual(rules('tools/a.sh', 'echo hi'), ['no-shell-script']);
+  assert.deepEqual(rules('tools/a.ps1', 'Write-Host hi'), ['no-shell-script']);
+  assert.deepEqual(rules('tools/tool', '#!/bin/bash\necho hi'), ['no-shell-script']);
+  assert.deepEqual(rules('tools/tool', '#!/usr/bin/env sh\necho hi'), ['no-shell-script']);
   // A Node entry point is TypeScript's runtime, not a shell.
   assert.deepEqual(rules('.githooks/pre-commit', '#!/usr/bin/env node\nrequire("x");'), []);
 });
@@ -133,8 +133,10 @@ test('layout names: camelCase folders and modules, PascalCase components', () =>
     'electron/content/workers/stubAstroContent.mjs',
     'electron/terminal/nodePty.d.ts',
     'electron/tsconfig.preload.json',
-    // Outside the layout roots the rule does not apply yet.
-    'scripts/policy/commit-message.mts',
+    'scripts/policy/commitMessage.mts',
+    'scripts/move/moveSources.json',
+    // Outside the layout roots the rule does not apply.
+    'test/contracts/policy-scan.test.ts',
   ]) {
     assert.deepEqual(rules(file, header), [], file);
   }
@@ -146,6 +148,7 @@ test('layout names: camelCase folders and modules, PascalCase components', () =>
     'src/features/props/PropsPanel.ts',
     'electron/content/workers/stub-astro-content.mjs',
     'electron/app/main.types.ts',
+    'scripts/policy/sample-check.mts',
   ]) {
     assert.deepEqual(rules(file, header), ['layout-name'], file);
   }

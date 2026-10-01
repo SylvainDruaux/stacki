@@ -26,7 +26,7 @@ import {
   readStopState,
   reportDigest,
   writeStopState,
-} from './stop-state.mts';
+} from './stopState.mts';
 
 export type Harness = 'claude' | 'codex';
 const EVENTS = ['pre-tool', 'post-tool', 'stop'] as const;

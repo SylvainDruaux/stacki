@@ -1,5 +1,5 @@
 // Goal: pin the behavior of every rule in the local ESLint plugin
-// (scripts/eslint-plugin/), which turns AGENTS.md rules into lint errors.
+// (scripts/eslintPlugin/), which turns AGENTS.md rules into lint errors.
 // Method: typescript-eslint's RuleTester, run under node:test, feeds each rule source
 // snippets parsed as TypeScript. Every rule gets the positive space it must
 // accept — including each documented exemption — and the negative space it
@@ -8,7 +8,7 @@
 import path from 'node:path';
 import { after, describe, it } from 'node:test';
 import { RuleTester } from '@typescript-eslint/rule-tester';
-import { rules } from '../../scripts/eslint-plugin/index.mts';
+import { rules } from '../../scripts/eslintPlugin/index.mts';
 
 // RuleTester registers through void-returning functions. node:test's return a promise the
 // runner itself awaits and reports on, so the adapters leave it to the runner.

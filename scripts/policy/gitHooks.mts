@@ -13,7 +13,7 @@ import fs from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import { assert } from './assert.mts';
 import { checkFiles, repositoryRoot, runEslint, runTypeCheck, stagedFiles } from './checks.mts';
-import { commitMessageProblems, describeCommitMessageProblem } from './commit-message.mts';
+import { commitMessageProblems, describeCommitMessageProblem } from './commitMessage.mts';
 import { formatViolations, repositoryFiles, repositoryViolations, scanPaths } from './scan.mts';
 
 const HOOKS = ['pre-commit', 'commit-msg', 'pre-push'] as const;

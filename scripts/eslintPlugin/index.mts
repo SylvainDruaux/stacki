@@ -4,11 +4,11 @@
 // eslint.config.mjs under Node's type stripping (Node >= 22.18), so there is
 // no build step between editing a rule and running it.
 
-import { boundedRecursion } from './bounded-recursion.mts';
+import { boundedRecursion } from './boundedRecursion.mts';
 import { commentSentence, requireDisableReason } from './comments.mts';
 import { naming } from './naming.mts';
-import { noBooleanParameter } from './no-boolean-parameter.mts';
-import { noNull } from './no-null.mts';
+import { noBooleanParameter } from './noBooleanParameter.mts';
+import { noNull } from './noNull.mts';
 import { sourceLayers } from './sourceLayers.mts';
 import {
   callbackLast,

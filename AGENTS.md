@@ -64,7 +64,7 @@ It holds, at minimum: `no-explicit-any`, the `no-unsafe-*` family, a ban on
 type-assertion syntax outside validated constructors, `prefer-readonly`,
 `switch-exhaustiveness-check`, `curly: all`, and `max-lines-per-function: 70`.
 The rules below that stock ESLint cannot express live in the local plugin,
-`scripts/eslint-plugin/`.
+`scripts/eslintPlugin/`.
 
 Formatting: Prettier with `printWidth: 100`. **100 columns is a hard limit,
 without exception** — nothing may hide behind a horizontal scrollbar. Use the
@@ -84,7 +84,7 @@ the rules that remain for review.
 - Git hooks check staged files, commit messages, and pushes. Never skip them
   (`--no-verify`); the agent hooks refuse it, and CI runs the same checks.
 - The files that define the gates (this file, lint and compiler configs,
-  `scripts/{eslint-plugin,policy,agent}/`, hook configs, `shared/core/limits.ts`)
+  `scripts/{eslintPlugin,policy,agent}/`, hook configs, `shared/core/limits.ts`)
   change only with a human's approval.
 
 ---

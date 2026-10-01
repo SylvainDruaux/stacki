@@ -3,7 +3,7 @@
   // verbatimModuleSyntax, without emitting. scripts/tsconfig.build.json emits
   // CommonJS for Electron Builder, and verbatimModuleSyntax cannot hold under a
   // CommonJS emit; module "preserve" accepts both import-assignment and ESM
-  // imports, so the same sources pass here. The policy tooling (eslint-plugin,
+  // imports, so the same sources pass here. The policy tooling (eslintPlugin,
   // policy, agent) runs directly under Node type stripping and is checked here.
   "compilerOptions": {
     "target": "ES2022",

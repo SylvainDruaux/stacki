@@ -1,5 +1,5 @@
 // Goal: pin the policy every agent harness enforces (scripts/agent/) and the
-// commit-message rule the git hook enforces (scripts/policy/commit-message.mts).
+// commit-message rule the git hook enforces (scripts/policy/commitMessage.mts).
 // Method: the verdicts are pure functions of a command or a path, so each is
 // fed the positive space it must allow and the negative space it must refuse,
 // including the spellings an agent could reach for to get around a rule —
@@ -20,8 +20,8 @@ import {
   tokenize,
 } from '../../scripts/agent/core.mts';
 import { parseHookPayload } from '../../scripts/agent/payload.mts';
-import { decideStop, parseStopState, reportDigest } from '../../scripts/agent/stop-state.mts';
-import { commitMessageProblems } from '../../scripts/policy/commit-message.mts';
+import { decideStop, parseStopState, reportDigest } from '../../scripts/agent/stopState.mts';
+import { commitMessageProblems } from '../../scripts/policy/commitMessage.mts';
 
 const ROOT = path.resolve(import.meta.dirname, '..', '..');
 
@@ -91,7 +91,7 @@ test('edits to the files that define the gates ask a human', () => {
     'eslint.config.mjs',
     'tsconfig.json',
     'electron/tsconfig.preload.json',
-    'scripts/eslint-plugin/naming.mts',
+    'scripts/eslintPlugin/naming.mts',
     'scripts/policy/limits.mts',
     'scripts/agent/core.mts',
     '.githooks/pre-commit',

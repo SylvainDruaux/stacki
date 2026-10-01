@@ -106,7 +106,7 @@ types. **Cost:** none at runtime.
 
 ### `@typescript-eslint/eslint-plugin`, `@typescript-eslint/parser`, `@typescript-eslint/utils`
 
-**Does:** type-aware lint rules and the TypeScript parser for ESLint; `scripts/eslint-plugin/`
+**Does:** type-aware lint rules and the TypeScript parser for ESLint; `scripts/eslintPlugin/`
 builds on the AST and rule types from `utils` (type-only imports, same release line as the
 parser, so the node shapes the rules see are the ones they were written against). **Why not the platform:** `tsc` has no policy rules (no-unsafe-*,
 exhaustiveness). **Cost:** lint time; about 80 s for a full run.

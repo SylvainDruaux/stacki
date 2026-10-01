@@ -18,7 +18,7 @@ a person, for Claude Code, for Codex, and for Pi, because every gate calls the s
 
 The adapters are thin: `.claude/settings.json` and `.codex/hooks.json` call
 `scripts/agent/{claude,codex}.mts`; `.pi/extensions/stacki-policy/` imports the same modules. Git
-hooks live in `.githooks/` and are installed by `npm install` (`scripts/policy/install-git-hooks.mts`).
+hooks live in `.githooks/` and are installed by `npm install` (`scripts/policy/installGitHooks.mts`).
 
 Commands for people and agents:
 
@@ -30,7 +30,7 @@ Commands for people and agents:
 ### The gate files
 
 Some files define the gates themselves: `AGENTS.md`, `CLAUDE.md`, `eslint.config.mjs`, the
-Prettier config, every `tsconfig*.json`, `scripts/{eslint-plugin,policy,agent}/`, `.githooks/`,
+Prettier config, every `tsconfig*.json`, `scripts/{eslintPlugin,policy,agent}/`, `.githooks/`,
 the agent configs, `.github/workflows/`, `shared/core/limits.ts`, and this page. An agent that edits one
 — with an edit tool, or with a shell command that writes it — is stopped for a human decision:
 Claude Code asks; Codex and Pi refuse and tell the agent to ask. A human who starts an agent with
@@ -43,7 +43,7 @@ the agent hooks are guard rails, not a sandbox. CI is the gate that cannot be ar
 ## Rule map
 
 **Mechanism:** `tsc` = compiler flag; `lint` = ESLint (`stacki/…` rules live in
-`scripts/eslint-plugin/`); `scan` = `scripts/policy/scan.mts`; `hook` = agent or git hook;
+`scripts/eslintPlugin/`); `scan` = `scripts/policy/scan.mts`; `hook` = agent or git hook;
 `review` = people, because no deterministic check exists.
 
 ### Non-negotiables

@@ -327,7 +327,10 @@ batching/queueing write path (already the right shape).
 | `shared/engine/` | The edit engine: intents, the planner, splices, rebase, diffs, patches |
 | `shared/properties/` | Component-property and prop-schema contracts, the project scan |
 | `shared/ipc/` | The IPC contract: channels, payload parsers, results, the preload API |
-| `scripts/` | Dev/CI tooling (test runner, policy tooling, agent and git hooks, packaging) |
+| `scripts/build/`, `install/`, `release/` | Build, install-time repairs, packaging and release |
+| `scripts/gate/`, `reports/` | The test runner and its pool, the adapter check; reports and fixtures |
+| `scripts/policy/`, `agent/`, `eslintPlugin/` | The gates: policy scan and git hooks, agent hooks, lint rules |
+| `scripts/lib/`, `move/` | Script helpers; the move tool for the layout restructure |
 | `test/` | Suites (round-trip, canvas-stub, contract, packaging); harnesses in `test/helpers/` |
 | `docs/` | This file, the contracts, the enforcement map, the editor-core plan |
 
@@ -350,7 +353,7 @@ the style panel's editors, component properties use the props panel's
 fields, and history draws with git's widgets. The lint rule
 `stacki/source-layers` holds the order; the policy scan holds the names —
 camelCase folders and modules, PascalCase components, every name unique
-under `src/`, under `electron/` and under `shared/`.
+under each of `src/`, `electron/`, `shared/` and `scripts/`.
 
 ## Standing rules
 

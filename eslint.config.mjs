@@ -6,17 +6,17 @@
 //
 // docs/enforcement.md maps every AGENTS.md rule to the check that holds it;
 // the rules AGENTS.md states that stock ESLint cannot express live in the
-// local plugin, scripts/eslint-plugin/, loaded here without a build step.
+// local plugin, scripts/eslintPlugin/, loaded here without a build step.
 //
 // Every rule is an error, and every run uses --max-warnings 0: a finding either
 // blocks the change or carries a stated reason in an eslint-disable comment.
 import tsParser from '@typescript-eslint/parser';
 import tsPlugin from '@typescript-eslint/eslint-plugin';
 import reactHooks from 'eslint-plugin-react-hooks';
-import stacki from './scripts/eslint-plugin/index.mts';
+import stacki from './scripts/eslintPlugin/index.mts';
 
 // AGENTS.md §12: no abbreviations. Word → what to write instead. Checked word
-// by word on every declared name (scripts/eslint-plugin/naming.mts). Loop
+// by word on every declared name (scripts/eslintPlugin/naming.mts). Loop
 // counters i, j, k are the stated exception; x, y, z are coordinates, not
 // abbreviations. `attr` and `env` are left alone: they are the platform's own
 // vocabulary (the DOM's Attr, process.env).

@@ -33,7 +33,7 @@ const POLICY_PATTERNS: readonly RegExp[] = [
   /^\.prettierrc\.json$/,
   /^\.prettierignore$/,
   /(?:^|\/)tsconfig[^/]*\.json$/,
-  /^scripts\/(?:eslint-plugin|policy|agent)\//,
+  /^scripts\/(?:eslintPlugin|policy|agent)\//,
   /^\.githooks\//,
   /^\.claude\/settings\.json$/,
   /^\.codex\//,
