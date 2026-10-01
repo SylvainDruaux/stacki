@@ -41,7 +41,7 @@ export type PreviewMessage =
   | { readonly kind: 'preview-reload'; readonly reason: PreviewReloadReason }
   | { readonly kind: 'query-result'; readonly input: unknown };
 
-/** Why the canvas patcher reloaded (electron/morphClient.ts): past one of its
+/** Why the canvas patcher reloaded (electron/previewClient/morphClient.ts): past one of its
  * caps, or for the reasons a patch was never possible. */
 export const PREVIEW_RELOAD_REASONS = [
   'markers-over-cap',
@@ -70,7 +70,7 @@ export function describePreviewReload(reason: PreviewReloadReason): string | und
 }
 
 /** A shortcut the canvas frame forwards while it holds keyboard focus
- * (electron/preload.ts): the app replays it as its own key event. */
+ * (electron/preload/preload.ts): the app replays it as its own key event. */
 export type ShortcutMessage =
   | { readonly name: 'insert' }
   | { readonly name: 'arrow'; readonly key: string }

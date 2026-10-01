@@ -91,7 +91,7 @@ Four cooperating processes, each with one job:
   `projectWatcher`, `terminal` via node-pty, `previewWorktree`,
   `serialQueue`, `windowBounds`, content-collection tooling in
   `electron/content/`, data-format parsers in `electron/formats/`).
-- **Preload** (`electron/preload.js`): a sandboxed bridge exposing an
+- **Preload** (`electron/preload/preload.ts`): a sandboxed bridge exposing an
   allowlisted `window.avb` API via `contextBridge`. Must stay CommonJS
   (Electron ≥ 33 sandbox requirement).
 - **Renderer** (`src/`, React 19 + Vite, ESM): layered folders under one
@@ -103,7 +103,7 @@ Four cooperating processes, each with one job:
 - **Astro dev server**: the _user's project's own_ dev server. Stacki renders
   the canvas by embedding it, so the preview is always exactly what Astro
   produces — no re-implementation of Astro semantics. A small injected client
-  script (`electron/morphClient.js` and friends) maps DOM ↔ source nodes for
+  script (`electron/previewClient/morphClient.ts` and friends) maps DOM ↔ source nodes for
   hover/selection and morphs the DOM on edits.
 
 ## The rendering pipeline

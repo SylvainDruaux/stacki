@@ -33,7 +33,7 @@ const check = (what, condition, detail) => {
   }
 };
 
-const PRELOAD = repoPath('dist/electron/preload.js');
+const PRELOAD = repoPath('dist/electron/preload/preload.js');
 const SCOPE = 'src/components/Button.astro|';
 const ROOT_PATH = `${SCOPE}0.0.0`;
 

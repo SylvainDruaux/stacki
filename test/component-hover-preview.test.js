@@ -12,7 +12,7 @@ const {
   componentPreviewPath,
   componentPreviewPlugin,
   renderComponentPreviewPage,
-} = require('#dist/electron/componentPreview.js');
+} = require('#dist/electron/previewServer/componentPreview.js');
 
 // Null as a boundary receives it, parsed from JSON: inputs may hold it; our values never do.
 const jsonNull = JSON.parse('null');

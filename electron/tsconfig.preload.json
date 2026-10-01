@@ -22,5 +22,5 @@
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true
   },
-  "files": ["preload.ts", "preload-process.d.ts"]
+  "files": ["preload/preload.ts", "preload/preloadProcess.d.ts"]
 }

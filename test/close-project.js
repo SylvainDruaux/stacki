@@ -240,7 +240,7 @@ const settle = (ms = 30) => new Promise((resolve) => setTimeout(resolve, ms));
     'the next window comes back holding the last project',
   );
 
-  const preload = fs.readFileSync(repoPath('dist/electron/preload.js'), 'utf8');
+  const preload = fs.readFileSync(repoPath('dist/electron/preload/preload.js'), 'utf8');
   check(
     'the app can ask for both',
     /closeProject: invoke\('project:close'\)/.test(preload) &&

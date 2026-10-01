@@ -4,7 +4,7 @@
 //
 // A rendering is the page plus every file that rendered into it — layouts and
 // components. The dev plugin marks each .astro file in memory as it loads it
-// (electron/previewMarkers.ts), and every file it marks also carries one stamp
+// (electron/previewServer/previewMarkers.ts), and every file it marks also carries one stamp
 // comment, `<!--avb-d:<checksum>:<file>-->`, the SHA-256 of the exact bytes it
 // marked and its project-relative path. A file's stamp is part of that file's
 // own compiled module, so it changes exactly when the dev server re-loads the
@@ -163,7 +163,7 @@ export function manifestOf(
 }
 
 /** The text the token digests: one `<checksum> <file>` line per entry, in
- * manifest order. The frame builds the same text (electron/preload.ts); the
+ * manifest order. The frame builds the same text (electron/preload/preload.ts); the
  * contract test pins the two to each other. */
 export function canonicalManifest(stamps: readonly PreviewStamp[]): string {
   assert(manifestSorted(stamps), 'A canonical manifest is sorted with one entry per file');

@@ -273,8 +273,7 @@
     ],
     "asarUnpack": [
       "dist/electron/parse/**",
-      "dist/electron/componentPreview.js",
-      "dist/electron/previewMarkers.js",
+      "dist/electron/previewServer/**",
       "dist/electron/frontmatter.js",
       "dist/shared/**",
       "**/node_modules/node-pty/**"

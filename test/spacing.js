@@ -737,7 +737,7 @@ const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
 
   // --- the canvas draws what it is told ---------------------------------------
   {
-    const frame = fs.readFileSync(repoPath('dist/electron/preload.js'), 'utf8');
+    const frame = fs.readFileSync(repoPath('dist/electron/preload/preload.js'), 'utf8');
     check(
       'the page forwards the modifiers it hears',
       /type: 'avb:modifiers'/.test(frame),
@@ -764,7 +764,7 @@ const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
         /spacingHover=\{(app\.)?spacingHover\}/.test(app),
       'the style panel reports a hover nothing is listening to',
     );
-    const preload = fs.readFileSync(repoPath('dist/electron/preload.js'), 'utf8');
+    const preload = fs.readFileSync(repoPath('dist/electron/preload/preload.js'), 'utf8');
     check(
       'and the page reports its spacing',
       /spacing\[nodePath\] = spacingForPath\(nodePath\)/.test(preload),

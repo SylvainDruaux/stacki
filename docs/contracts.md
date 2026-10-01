@@ -322,7 +322,7 @@ typing there can change structure, so they always reparse.
 
 The canvas is the project's own dev server in an iframe. Its source markers
 exist only in memory: the generated preview config's Vite plugin hands Astro
-`electron/previewMarkers.ts`'s marked copy of each `.astro` file under `src`,
+`electron/previewServer/previewMarkers.ts`'s marked copy of each `.astro` file under `src`,
 and that module reads and returns strings — it writes nothing, and no app
 module imports it (`test/contracts/preview-bridge.test.ts` holds both, and runs
 the real generated plugin over a project whose bytes it compares before and
@@ -350,7 +350,7 @@ after). The generated config itself lives in `node_modules/.avb`.
   Markdown and MDX pages carry no stamp: their markers come from the Markdown
   processor's tree, which never sees the file's bytes (carried at step 10);
   their layouts' stamps are still checked, and every edit is checked by main.
-- The canvas patch (`electron/morphClient.ts`) is bounded by
+- The canvas patch (`electron/previewClient/morphClient.ts`) is bounded by
   `previewMarkersMax` markers per rendering and `previewMorphWorkMax`
   child-list matrix cells per patch; main prepends `AVB_PREVIEW_LIMITS` from
   `shared/limits.ts` to the source it serves. Past either the page reloads and

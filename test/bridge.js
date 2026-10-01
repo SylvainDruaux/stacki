@@ -11,7 +11,7 @@
 // panel did nothing for exactly that reason — `onAddClass` was on <AssetsPanel>.
 //
 // The renderer reaches the main process through one object — `window.avb`,
-// assembled in electron/preload.ts — and a call to something that is not on it
+// assembled in electron/preload/preload.ts — and a call to something that is not on it
 // fails the way a missing feature does: an async handler throws into nothing,
 // the button does nothing, and no error appears anywhere. The same shape of
 // silence covers a typo, a rename, and a method whose IPC handler was never
@@ -74,7 +74,7 @@ for (const file of sources) {
 }
 
 // --- what the preload exposes -----------------------------------------------
-const preload = fs.readFileSync(repoPath('dist/electron/preload.js'), 'utf8');
+const preload = fs.readFileSync(repoPath('dist/electron/preload/preload.js'), 'utf8');
 const exposed = new Set();
 const bridgeStart = preload.indexOf('contextBridge.exposeInMainWorld');
 const bridgeText = preload.slice(bridgeStart);
@@ -118,7 +118,7 @@ for (const [method, files] of [...used].sort()) {
   check(
     `window.avb.${method} exists on the bridge`,
     exposed.has(method),
-    `called from ${files.join(', ')} — add it to electron/preload.ts`,
+    `called from ${files.join(', ')} — add it to electron/preload/preload.ts`,
   );
 }
 
@@ -126,7 +126,7 @@ for (const [method, channel] of [...channels].sort()) {
   check(
     `${method} has a handler for ${channel}`,
     handled.has(channel),
-    `electron/preload.ts invokes '${channel}', which no ipcMain.handle registers`,
+    `electron/preload/preload.ts invokes '${channel}', which no ipcMain.handle registers`,
   );
 }
 

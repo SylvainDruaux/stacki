@@ -324,7 +324,7 @@ async function inElectron() {
       const renderer = new BrowserWindow({
         show: false,
         webPreferences: {
-          preload: repoPath('dist/electron/preload.js'),
+          preload: repoPath('dist/electron/preload/preload.js'),
           contextIsolation: true,
           nodeIntegration: false,
         },

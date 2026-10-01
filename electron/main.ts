@@ -6,7 +6,7 @@ import {
   updateComponentProperties,
   type FileChange,
 } from './componentProperties';
-import { renderComponentPreviewPage } from './componentPreview';
+import { renderComponentPreviewPage } from './previewServer/componentPreview';
 import { createIpcRegistrar } from './lib/ipcRegistrar';
 import { RUNTIME_PATHS, resourcePath } from './lib/runtimePaths';
 import { MAIN_LIMITS, readSource, directoryBudget } from './lib/mainLimits';
@@ -5293,7 +5293,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
   `
 
 const require = createRequire(import.meta.url);
-// Marking happens in electron/previewMarkers.js, in memory: it reads project
+// Marking happens in electron/previewServer/previewMarkers.ts, in memory: it reads project
 // files and returns strings, and nothing it returns is ever written back.
 const { markSourceFile, markChunkFile } = require(`,
   `);

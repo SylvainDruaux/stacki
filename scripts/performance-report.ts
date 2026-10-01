@@ -14,7 +14,7 @@ interface DiffImplementation {
 }
 
 const root = path.join(__dirname, '..', '..');
-const sourcePath = 'electron/morphClient.js';
+const sourcePath = 'electron/previewClient/morphClient.ts';
 
 function load(source: string): DiffImplementation {
   let allocatedBytes = 0;

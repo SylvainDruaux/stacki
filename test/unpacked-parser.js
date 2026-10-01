@@ -40,8 +40,8 @@ const check = (what, condition, detail) => {
 
 const ENTRIES = [
   'dist/electron/parse/astroParser.js',
-  'dist/electron/componentPreview.js',
-  'dist/electron/previewMarkers.js',
+  'dist/electron/previewServer/componentPreview.js',
+  'dist/electron/previewServer/previewMarkers.js',
 ];
 
 // Every local file the entry pulls in, transitively. Only relative requires:

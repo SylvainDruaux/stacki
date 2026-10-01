@@ -101,7 +101,7 @@ export const LIMITS = {
    * of a component stamps once), and the morph reloads past it (step 7). */
   previewMarkersMax: 20_000,
   /** Work one canvas patch may spend lining up the old and new renderings: one
-   * unit per cell of the child-list matrices it builds (electron/morphClient.ts)
+   * unit per cell of the child-list matrices it builds (electron/previewClient/morphClient.ts)
    * — a list of 2 000 children changed in the middle is 4·10⁶ cells, 16 MB of
    * Int32. Past it the canvas reloads, and says why, instead of freezing the
    * editor on a page too big to diff (step 7). */

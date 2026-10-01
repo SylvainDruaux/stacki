@@ -36,7 +36,7 @@ const check = (what, condition, detail) => {
   }
 };
 
-const PRELOAD = repoPath('dist/electron/preload.js');
+const PRELOAD = repoPath('dist/electron/preload/preload.js');
 const { JSDOM } = require('jsdom');
 
 const SELECT = 'src/components/FormSelect.astro|';

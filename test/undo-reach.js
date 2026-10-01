@@ -37,7 +37,7 @@ const check = (what, condition, detail) => {
 
 const read = (file) => fs.readFileSync(repoPath(file), 'utf8');
 const app = read('src/app/App.tsx');
-const preload = read('dist/electron/preload.js');
+const preload = read('dist/electron/preload/preload.js');
 const main = read('dist/electron/main.js');
 
 // The handler, from the line that registers it to the one that registers redo.

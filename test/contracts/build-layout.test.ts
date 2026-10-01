@@ -34,7 +34,7 @@ test('package entry and sandboxed preload use the built runtime', () => {
   assert.ok(existsSync(resolve(root, main)));
   const exports = record(manifest['exports']);
   assert.equal(exports['./frontmatter'], './dist/electron/frontmatter.js');
-  const preload = readFileSync(resolve(root, 'dist/electron/preload.js'), 'utf8');
+  const preload = readFileSync(resolve(root, 'dist/electron/preload/preload.js'), 'utf8');
   const imports = [...preload.matchAll(/require\(["']([^"']+)["']\)/g)];
   assert.ok(imports.length > 0);
   assert.ok(imports.length < 10);

@@ -2,7 +2,7 @@
 //
 //   node test/morph.js
 //
-// The canvas patches the page instead of reloading it (electron/morphClient.ts).
+// The canvas patches the page instead of reloading it (electron/previewClient/morphClient.ts).
 // The patch is a diff between the server's PREVIOUS rendering and its new one,
 // applied to the live document — three trees, and the live one is written only
 // where the other two disagree. Finding the live node that stands for a server
@@ -41,7 +41,7 @@ global.document = dom.window.document;
 
 // morphClient is an ES module the dev server serves to the page; the patching
 // half is lifted out rather than imported, as in test/comment-region.js.
-const source = fs.readFileSync(repoPath('dist/electron/morphClient.js'), 'utf8');
+const source = fs.readFileSync(repoPath('dist/electron/previewClient/morphClient.js'), 'utf8');
 const start = source.indexOf('const isAnchor =');
 const end = source.indexOf('// A script that CHANGED, or one that is GONE');
 // Main prepends the patcher's bounds from shared/limits.ts (step 7); the lifted

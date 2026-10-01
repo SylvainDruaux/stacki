@@ -68,7 +68,7 @@ async function frame(html) {
     return id === 'electron' ? electron : realRequire.apply(this, arguments);
   };
   process.isMainFrame = false;
-  const entry = repoPath('dist/electron/preload.js');
+  const entry = repoPath('dist/electron/preload/preload.js');
   delete require.cache[entry];
   try {
     require(entry);

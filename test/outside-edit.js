@@ -45,7 +45,7 @@ const settle = (ms = 20) => new Promise((resolve) => setTimeout(resolve, ms));
   // The real client, in a real document, told by a message rather than by HMR.
   const bundle = path.join(buildDirectory, 'morph-client.bundle.js');
   await esbuild.build({
-    entryPoints: [repoPath('dist/electron/morphClient.js')],
+    entryPoints: [repoPath('dist/electron/previewClient/morphClient.js')],
     outfile: bundle,
     bundle: true,
     format: 'cjs',
@@ -179,7 +179,7 @@ const settle = (ms = 20) => new Promise((resolve) => setTimeout(resolve, ms));
     containsCode(app, "if (event.external) { tellCanvas({ type: 'avb:patch-now' }); }"),
     'nothing reaches the canvas when the socket is quiet',
   );
-  const morph = fs.readFileSync(repoPath('dist/electron/morphClient.js'), 'utf8');
+  const morph = fs.readFileSync(repoPath('dist/electron/previewClient/morphClient.js'), 'utf8');
   check(
     'and the client still listens to the socket as well',
     /import\.meta\.hot\.on\('avb:page-changed', \(\) => \{[\s\S]{0,200}?void update\(\);/.test(

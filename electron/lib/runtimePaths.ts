@@ -2,7 +2,7 @@
 // the icons, the scripts served to the preview, and the files the project's
 // own dev server loads. This is the one module that reads __dirname for them.
 //
-// Each path is written as the build output it is, `dist/electron/preload.js`,
+// Each path is written as the build output it is, `dist/electron/preload/preload.js`,
 // and resolved against dist/ from here (dist/electron/lib), inside app.asar or
 // out of it. Written whole, a path is what scripts/move/moveSources.mts
 // rewrites when its source moves; built from pieces, it would silently go
@@ -28,11 +28,11 @@ function unpackedPath(file: string): string {
 }
 
 export const RUNTIME_PATHS = {
-  preload: distPath('dist/electron/preload.js'),
+  preload: distPath('dist/electron/preload/preload.js'),
   rendererIndex: distPath('dist/renderer/index.html'),
-  morphClient: distPath('dist/electron/morphClient.js'),
-  previewMarkers: unpackedPath('dist/electron/previewMarkers.js'),
-  componentPreview: unpackedPath('dist/electron/componentPreview.js'),
+  morphClient: distPath('dist/electron/previewClient/morphClient.js'),
+  previewMarkers: unpackedPath('dist/electron/previewServer/previewMarkers.js'),
+  componentPreview: unpackedPath('dist/electron/previewServer/componentPreview.js'),
 } as const;
 
 /** An icon or other file the build copies to dist/resources/. */

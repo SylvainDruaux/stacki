@@ -114,7 +114,7 @@ const check = (what, condition, detail) => {
   // one `<Button/>` written three times gives each its own path, so the opened
   // one has a single run, and requiring two meant no narrowing: three outlines
   // at once, and a scroll-to that went to whichever came first in the document.
-  const preload = fs.readFileSync(repoPath('dist/electron/preload.js'), 'utf8');
+  const preload = fs.readFileSync(repoPath('dist/electron/preload/preload.js'), 'utf8');
   check(
     'one run is enough to narrow to the instance',
     /if \(runs\.length\) \{[\s\S]*?focusCache = \{ roots: runs\[focusOcc\]/.test(preload),

@@ -21,5 +21,5 @@
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true
   },
-  "files": ["morphClient.ts"]
+  "files": ["previewClient/morphClient.ts"]
 }

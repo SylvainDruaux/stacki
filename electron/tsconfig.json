@@ -24,5 +24,5 @@
   // client compile on their own (tsconfig.preload.json, tsconfig.morph.json):
   // one needs DOM types, the other browser ESM.
   "include": ["**/*.ts"],
-  "exclude": ["preload.ts", "preload/**", "morphClient.ts", "previewClient/**"]
+  "exclude": ["preload/**", "previewClient/**"]
 }

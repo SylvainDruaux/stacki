@@ -278,7 +278,7 @@ const marked = (
 
   // --- the canvas still reads what it is served ------------------------------------
   {
-    const preload = fs.readFileSync(repoPath('dist/electron/preload.js'), 'utf8');
+    const preload = fs.readFileSync(repoPath('dist/electron/preload/preload.js'), 'utf8');
     check(
       'a comment is a marker',
       /if \(isComment\(node\)\) \{[\s\S]*?avb-\$\{kind\}:/.test(preload),

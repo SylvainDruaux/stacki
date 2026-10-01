@@ -1,4 +1,4 @@
-// Goal: the canvas morph (electron/morphClient.ts) patches large pages within a
+// Goal: the canvas morph (electron/previewClient/morphClient.ts) patches large pages within a
 // linear budget and never lets identity collide — a missing id, a comment
 // standing in for text, or a script whose source contains separators.
 // Method: the morph's own functions are cut out of the built client and run
@@ -12,7 +12,7 @@ const path = require('node:path');
 const { JSDOM } = require('jsdom');
 const { repoPath } = require('./helpers/sources.js');
 
-const source = fs.readFileSync(repoPath('dist/electron/morphClient.js'), 'utf8');
+const source = fs.readFileSync(repoPath('dist/electron/previewClient/morphClient.js'), 'utf8');
 const dom = new JSDOM('<!doctype html><html><head></head><body></body></html>');
 const document = dom.window.document;
 // Main prepends the patcher's bounds from shared/limits.ts (step 7).

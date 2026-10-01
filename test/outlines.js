@@ -294,7 +294,7 @@ const stacked = (layers, opacity = 0.14) => 1 - (1 - opacity) ** layers;
     return id === 'electron' ? electron : realRequire.apply(this, arguments);
   };
   process.isMainFrame = false; // the preview frame, not the app's own window
-  require(repoPath('dist/electron/preload.js'));
+  require(repoPath('dist/electron/preload/preload.js'));
   Module.prototype.require = realRequire;
   // The markers are walked when the document is done parsing, which for jsdom
   // is a turn or two after it is handed over.

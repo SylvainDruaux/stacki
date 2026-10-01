@@ -34,7 +34,7 @@ const check = (what, condition, detail) => {
 // and evaluated — which keeps this honest: an edit to preload changes what
 // runs here.
 function loadGapBandsFor(window) {
-  const source = fs.readFileSync(repoPath('dist/electron/preload.js'), 'utf8');
+  const source = fs.readFileSync(repoPath('dist/electron/preload/preload.js'), 'utf8');
   // gapBandsFor and the helpers it calls, which sit just above it.
   const start = source.indexOf('  const gapChildRects = (element) => {');
   const at = source.indexOf('  const gapBandsFor = (element, cs) => {');
