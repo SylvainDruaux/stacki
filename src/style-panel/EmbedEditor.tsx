@@ -5506,6 +5506,10 @@ function useSelectionState() {
   // raw all-classes default to the strongest selector actually STYLED in the current
   // context (cleared as soon as it's applied, or when the user picks something).
   const pendingDefaultRef = useRef(false);
+  // A class typed into the selector box, on its way onto the element: when the
+  // element's tokens next change to include it, that change is the user's own
+  // edit landing, not a different element, so the typed pick stands.
+  const typedClassRef = useRef<string | undefined>(undefined);
   // The token names the default effect just picked (its raw default) — read by the
   // smart-default effect to check if that default is styled (can't read state there:
   // it hasn't re-rendered yet in the same commit).
@@ -5536,6 +5540,7 @@ function useSelectionState() {
     stateKey,
     stickyContextRef,
     tokenIdentityRef,
+    typedClassRef,
   };
 }
 
@@ -6960,6 +6965,7 @@ function useTokenDefault(
     setSelectedTokens,
     setStateKey,
     tokenIdentityRef,
+    typedClassRef,
   } = selectionState;
   const { tokens } = elementTokens;
 
@@ -6981,6 +6987,15 @@ function useTokenDefault(
       return;
     }
     tokenIdentityRef.current = identity;
+    const typedClass = typedClassRef.current;
+    if (typedClass !== undefined) {
+      if (tokens.some((token) => token.name === `class:${typedClass}`)) {
+        // The class the user typed reached the element: the same element, with
+        // the selector they chose already active.
+        typedClassRef.current = undefined;
+        return;
+      }
+    }
     const next = defaultSelectorTokens(tokens);
     setSelectedTokens(next);
     setSelectedSelectorText(undefined);
@@ -7003,6 +7018,7 @@ function useTokenDefault(
     setSelectedTokens,
     setStateKey,
     tokenIdentityRef,
+    typedClassRef,
   ]);
 
   // The element's identity (tag + classes + attrs) as a stable key — drives the
@@ -7253,8 +7269,13 @@ function useTypedSelector(
   selectorPick: ReturnType<typeof useSelectorPick>,
 ) {
   const { primedRef } = editorRefs;
-  const { pendingDefaultRef, setSelectedSelectorText, setSelectedTokens, setStateKey } =
-    selectionState;
+  const {
+    pendingDefaultRef,
+    setSelectedSelectorText,
+    setSelectedTokens,
+    setStateKey,
+    typedClassRef,
+  } = selectionState;
   const { classGatesRef } = applyEditHook;
   const { selectActiveSelector, selectNested } = selectorPick;
 
@@ -7273,6 +7294,7 @@ function useTypedSelector(
       }
       const loneClass = loneTypedClass(trimmed);
       if (loneClass !== undefined) {
+        typedClassRef.current = loneClass;
         const gate = getHost().addClass?.(loneClass);
         // The rule this selector will get depends on the page edit: its first
         // write waits for that edit's outcome (step 6, plan §3.3).
@@ -7285,7 +7307,7 @@ function useTypedSelector(
       }
       selectActiveSelector(trimmed);
     },
-    [selectActiveSelector, selectNested, classGatesRef, primedRef],
+    [selectActiveSelector, selectNested, classGatesRef, primedRef, typedClassRef],
   );
   // Deselect (click the active chip again): no selector is picked, so the panel
   // shows every property's cascade winner read-only. The first edit re-picks a

@@ -566,10 +566,40 @@ export function listAtRuleBlocks(region: StyleRegion): AtRuleBlock[] {
 // newline in that case. Non-empty roots already infer a `\n` before from siblings.
 function appendTopLevel(root: Root, node: ChildNode): void {
   const wasEmpty = !root.nodes || root.nodes.length === 0;
+  const previous = blockRaws(root.last);
   root.append(node);
   if (wasEmpty) {
     node.assign({ raws: { ...node.raws, before: '\n' } });
+    return;
   }
+  // PostCSS indents a new rule's opening line and closing brace by nesting
+  // depth, and a top-level rule has none, so in an indented <style> block a
+  // new rule landed at column 0. The rule before it shows how this block lays
+  // out its rules; a new one follows it.
+  if (previous === undefined) {
+    return;
+  }
+  if (node.type === 'rule' || node.type === 'atrule') {
+    node.assign({ raws: { ...node.raws, before: previous.before, after: previous.after } });
+  }
+}
+
+// The whitespace around a block (before its selector, before its closing brace),
+// when the node is a block that has both.
+function blockRaws(
+  node: ChildNode | undefined,
+): { readonly before: string; readonly after: string } | undefined {
+  if (node === undefined) {
+    return undefined;
+  }
+  if (node.type !== 'rule' && node.type !== 'atrule') {
+    return undefined;
+  }
+  const { before, after } = node.raws;
+  if (before === undefined || after === undefined) {
+    return undefined;
+  }
+  return { before, after };
 }
 
 /** Create `selector { prop: value }` inside an at-rule block. Returns false on empty input. */

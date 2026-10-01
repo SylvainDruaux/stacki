@@ -36,13 +36,24 @@ export function snapshotTokens(snapshot: ElementSnapshot | undefined): ClassToke
     tokens.push({ name: `class:${compiled}`, label: compiled, kind: 'class' });
   });
 
-  // Then data attributes, sorted for stability.
+  // Then data attributes, sorted for stability. Attributes Astro stamps on the
+  // rendered page are not the author's: `data-astro-cid-*` is on every element
+  // of a file with scoped styles, so a rule on it restyles the whole page.
   Object.keys(snapshot.attributes)
     .filter((key) => key.startsWith('data-'))
+    .filter((key) => !isAstroGeneratedAttribute(key))
     .sort()
     .forEach((key) => tokens.push({ name: `attr:${key}`, label: key, kind: 'attribute' }));
 
   return tokens;
+}
+
+// Attributes the Astro compiler and dev server add to rendered markup: scoped
+// style ids, the dev toolbar's source locations, and view-transition scopes.
+const ASTRO_GENERATED_ATTRIBUTE = /^data-astro-(?:cid-|source-|transition-scope$)/;
+
+export function isAstroGeneratedAttribute(name: string): boolean {
+  return ASTRO_GENERATED_ATTRIBUTE.test(name);
 }
 
 /**

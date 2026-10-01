@@ -711,6 +711,33 @@ function restatedText(
   }
 }
 
+// The text a node's field states, as restatedText writes it back: undefined
+// for a node no text field states.
+function statedText(node: EditorNode): string | undefined {
+  switch (node.kind) {
+    case 'map':
+      return node.head;
+    case 'cond':
+      return node.test;
+    case 'raw':
+      return node.inner;
+    case 'text':
+    case 'expr':
+    case 'comment':
+      return node.value;
+    case 'element':
+    case 'component':
+    case 'branch':
+    case 'raw-line':
+    case 'chunk-group':
+      return undefined;
+    default: {
+      const exhaustive: never = node;
+      return exhaustive;
+    }
+  }
+}
+
 // An undo step with nothing of its own to undo.
 function voided(outcome: EditsRecord['outcome']): boolean {
   switch (outcome.tag) {
@@ -6926,7 +6953,7 @@ function useNodeText(
   history: ReturnType<typeof useHistory>,
 ) {
   const { pageStateRef } = coreState;
-  const { commitEdit } = history;
+  const { commitEdit, scheduleSave } = history;
 
   // `renames` (loop editor only) carries the variable names this edit is
   // changing, so references below the node follow along. A rename touches
@@ -6961,6 +6988,16 @@ function useNodeText(
       }
       // Step 9: everything else the field says is the node restated.
       const node = state?.editable ? findNodeById(state.model.nodes, nodeId) : undefined;
+      if (node !== undefined && !renaming && statedText(node) === value) {
+        // Already what the node holds: the style panel committing the CSS its
+        // live writes already put there, or a field left as it was. A request
+        // that changes nothing is refused by the planner, and its notice would
+        // report a failure after a success. A commit still saves at once.
+        if (immediate === true) {
+          scheduleSave(true);
+        }
+        return;
+      }
       const next = node ? restatedText(node, value, renames) : undefined;
       if (!next) {
         return;
@@ -6968,7 +7005,7 @@ function useNodeText(
       const coalesceKey = renaming ? undefined : `text:${nodeId}`;
       commitEdit(nodeGesture(nodeId, next, { coalesceKey, urgency: renaming || immediate }));
     },
-    [commitEdit, pageStateRef],
+    [commitEdit, pageStateRef, scheduleSave],
   );
 
   // The code editor and file writer share the same frontmatter model, so

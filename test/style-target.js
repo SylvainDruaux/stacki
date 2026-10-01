@@ -39,7 +39,11 @@ const check = (what, condition, detail) => {
         export { resolveTarget, scanPage } from './lib/webflow'
         export { setHost, onHostChange, getHost } from './lib/host'
         export { matchSelectorList } from './lib/selectors'
-        export { defaultSelectorTokens, tokensToSelector } from './lib/element-tokens'
+        export {
+          defaultSelectorTokens,
+          tokensToSelector,
+          snapshotTokens,
+        } from './lib/element-tokens'
       `,
       resolveDir: path.join(__dirname, '..', 'src', 'style-panel'),
       loader: 'ts',
@@ -66,6 +70,7 @@ const check = (what, condition, detail) => {
     matchSelectorList,
     defaultSelectorTokens,
     tokensToSelector,
+    snapshotTokens,
   } = require(bundlePath);
   setHost({ nodes: [], projectPath: '/project', files: [], astroFiles: [] });
 
@@ -294,6 +299,40 @@ const check = (what, condition, detail) => {
     check(
       'and the upgrade still searches every class',
       /const primaryStyled = tokens[\s\S]{0,120}kind === 'class'/.test(editor),
+    );
+  }
+
+  // Astro stamps `data-astro-cid-*` on every element of a file with scoped
+  // styles. A selector on it is a rule for the whole page, so an element with
+  // no class of its own falls back to its tag chip, never to Astro's attribute;
+  // the author's own data attributes still count.
+  {
+    const unclassed = {
+      tag: 'p',
+      classes: [],
+      attributes: {
+        'data-astro-cid-j7pv25f6': '',
+        'data-astro-source-file': '/project/src/pages/index.astro',
+        'data-astro-source-loc': '9:5',
+      },
+    };
+    const tokens = snapshotTokens(unclassed);
+    check(
+      "Astro's generated attributes are not selector tokens",
+      tokens.every((token) => !token.name.startsWith('attr:data-astro-')),
+      JSON.stringify(tokens.map((token) => token.name)),
+    );
+    const picked = tokensToSelector(defaultSelectorTokens(tokens), tokens);
+    check('an unclassed element defaults to its tag', picked === 'p', picked);
+    const authored = snapshotTokens({
+      ...unclassed,
+      attributes: { ...unclassed.attributes, 'data-variant': 'lead' },
+    });
+    const authoredPick = tokensToSelector(defaultSelectorTokens(authored), authored);
+    check(
+      "the author's own data attribute still counts",
+      authoredPick === '[data-variant]',
+      authoredPick,
     );
   }
 
