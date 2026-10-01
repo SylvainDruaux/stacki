@@ -319,7 +319,7 @@ const SCREENS = [
         fs.mkdirSync(directory, { recursive: true });
         const out = path.join(directory, 'cms-schema.cjs');
         esbuild.buildSync({
-          entryPoints: [repoPath('src/cmsSchema.ts')],
+          entryPoints: [repoPath('src/features/cms/cmsSchema.ts')],
           outfile: out,
           bundle: true,
           format: 'cjs',
@@ -346,8 +346,8 @@ const SCREENS = [
   );
 }
 {
-  const view = fs.readFileSync(repoPath('src/panels/CmsView.tsx'), 'utf8');
-  const field = fs.readFileSync(repoPath('src/panels/CmsField.tsx'), 'utf8');
+  const view = fs.readFileSync(repoPath('src/features/cms/CmsView.tsx'), 'utf8');
+  const field = fs.readFileSync(repoPath('src/features/cms/CmsField.tsx'), 'utf8');
   check(
     'the image field shows the file the name is bound to',
     /srcRel=\{reference\}/.test(field),

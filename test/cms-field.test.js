@@ -13,7 +13,7 @@ const output = repoPath('node_modules/.stacki-test/cms-field.cjs');
 fs.mkdirSync(path.dirname(output), { recursive: true });
 buildSync({
   stdin: {
-    contents: `export {default as Field} from './src/panels/CmsField';
+    contents: `export {default as Field} from './src/features/cms/CmsField';
       export {getPendingAsset} from './src/ui/assetPick';`,
     resolveDir: ROOT,
     loader: 'ts',

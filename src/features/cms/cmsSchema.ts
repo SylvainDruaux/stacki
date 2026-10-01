@@ -1,6 +1,6 @@
-import { assert } from '../shared/assert';
-import { BOUNDARY_LIMITS, data as parseData } from '../shared/boundary';
-import { toArray, toRecord } from '../shared/record';
+import { assert } from '../../../shared/assert';
+import { BOUNDARY_LIMITS, data as parseData } from '../../../shared/boundary';
+import { toArray, toRecord } from '../../../shared/record';
 export interface CmsFile {
   readonly rel: string;
   readonly name: string;

@@ -1,9 +1,9 @@
-import type { Collection } from '../cmsSchema';
-import { reassemble } from '../cmsSchema';
-import { writeCms } from '../cmsBridge';
-import { assert } from '../../shared/assert';
-import { BOUNDARY_LIMITS } from '../../shared/boundary';
-import { createCoalescedRun } from '../lib/coalescedRun';
+import type { Collection } from './cmsSchema';
+import { reassemble } from './cmsSchema';
+import { writeCms } from './cmsBridge';
+import { assert } from '../../../shared/assert';
+import { BOUNDARY_LIMITS } from '../../../shared/boundary';
+import { createCoalescedRun } from '../../lib/coalescedRun';
 
 export interface CmsUndo {
   readonly label: string;

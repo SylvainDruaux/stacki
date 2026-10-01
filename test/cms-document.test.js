@@ -7,9 +7,9 @@ const load = require('./helpers/rendererModule');
 
 // Null as a boundary receives it, parsed from JSON: inputs may hold it; our values never do.
 const jsonNull = JSON.parse('null');
-const { createCmsWriter } = load('src/panels/cmsWriter.ts');
-const { createCmsReader, cmsCollection } = load('src/panels/cmsReader.ts');
-const { createCmsSchemaOperations } = load('src/panels/cmsOperations.ts');
+const { createCmsWriter } = load('src/features/cms/cmsWriter.ts');
+const { createCmsReader, cmsCollection } = load('src/features/cms/cmsReader.ts');
+const { createCmsSchemaOperations } = load('src/features/cms/cmsOperations.ts');
 const tick = () => new Promise((resolve) => setImmediate(resolve));
 const original = [{ title: 'Original' }];
 function fixture(rel = 'data.json') {

@@ -12,7 +12,7 @@ const output = repoPath('node_modules/.stacki-test/cms-settings.cjs');
 fs.mkdirSync(path.dirname(output), { recursive: true });
 buildSync({
   stdin: {
-    contents: `export {default as Settings} from './src/panels/CmsSettings';
+    contents: `export {default as Settings} from './src/features/cms/CmsSettings';
       export {ConfirmHost} from './src/ui/ConfirmDialog';`,
     resolveDir: ROOT,
     loader: 'ts',

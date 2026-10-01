@@ -1,16 +1,16 @@
 import React, { useEffect, useRef, useState } from 'react';
-import type { Result } from '../../shared/result';
-import type { FieldType } from '../cmsSchema';
-import type { PickedAsset } from '../ui/AssetField';
-import { assert } from '../../shared/assert';
-import { BOUNDARY_LIMITS } from '../../shared/boundary';
-import { toArray, toRecord } from '../../shared/record';
-import { blankItem, fieldsOf, isExpr, titleOf, EXPR_KEY } from '../cmsSchema';
-import { ChevronRightIcon, CloseIcon, DragIcon, PlusIcon, TrashIcon } from '../ui/Icons';
-import AssetField from '../ui/AssetField';
-import AutoTextarea from '../ui/AutoTextarea';
-import ExprInput from '../ui/ExprInput';
-import useListReorder from '../ui/useListReorder';
+import type { Result } from '../../../shared/result';
+import type { FieldType } from './cmsSchema';
+import type { PickedAsset } from '../../ui/AssetField';
+import { assert } from '../../../shared/assert';
+import { BOUNDARY_LIMITS } from '../../../shared/boundary';
+import { toArray, toRecord } from '../../../shared/record';
+import { blankItem, fieldsOf, isExpr, titleOf, EXPR_KEY } from './cmsSchema';
+import { ChevronRightIcon, CloseIcon, DragIcon, PlusIcon, TrashIcon } from '../../ui/Icons';
+import AssetField from '../../ui/AssetField';
+import AutoTextarea from '../../ui/AutoTextarea';
+import ExprInput from '../../ui/ExprInput';
+import useListReorder from '../../ui/useListReorder';
 
 export interface CmsFieldContext {
   readonly projectPath: string;

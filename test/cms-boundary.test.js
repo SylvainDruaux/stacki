@@ -8,8 +8,8 @@ const { BOUNDARY_LIMITS } = require('#dist/shared/boundary.js');
 
 // Null as a boundary receives it, parsed from JSON: inputs may hold it; our values never do.
 const jsonNull = JSON.parse('null');
-const bridge = load('src/cmsBridge.ts');
-const types = load('src/panels/cmsTypes.ts');
+const bridge = load('src/features/cms/cmsBridge.ts');
+const types = load('src/features/cms/cmsTypes.ts');
 const entries = [
   { title: 'Entry', image: { __expr: 'hero', __asset: 'src/assets/hero.png' }, tags: ['one'] },
 ];

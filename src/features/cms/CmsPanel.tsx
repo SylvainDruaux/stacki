@@ -1,8 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { Collection } from '../cmsSchema';
-import type { CmsPanelContent, CmsPanelContentCollection, CmsPanelFile } from '../cmsPanelBridge';
-import { collectionOf, labelize } from '../cmsSchema';
-import { createCmsCollection, readCmsFiles, readContentCollections } from '../cmsPanelBridge';
+import type { Collection } from './cmsSchema';
+import type { CmsPanelContent, CmsPanelContentCollection, CmsPanelFile } from './cmsPanelBridge';
+import { collectionOf, labelize } from './cmsSchema';
+import { createCmsCollection, readCmsFiles, readContentCollections } from './cmsPanelBridge';
 import {
   ChevronLeftIcon,
   ChevronRightIcon,
@@ -12,7 +12,7 @@ import {
   GearIcon,
   HideIcon,
   PlusIcon,
-} from '../ui/Icons';
+} from '../../ui/Icons';
 
 const CONTENT_KEY = '\u0000content';
 

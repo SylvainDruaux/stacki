@@ -8,9 +8,9 @@ import {
   renameKey,
   dropKey,
   orderKeys,
-} from '../cmsSchema';
-import { assert } from '../../shared/assert';
-import { BOUNDARY_LIMITS } from '../../shared/boundary';
+} from './cmsSchema';
+import { assert } from '../../../shared/assert';
+import { BOUNDARY_LIMITS } from '../../../shared/boundary';
 
 interface OperationOptions {
   readonly items: readonly unknown[];

@@ -11,7 +11,7 @@ const { repoPath } = require('./helpers/sources.js');
 const output = repoPath('node_modules/.stacki-test/cms-view.cjs');
 fs.mkdirSync(path.dirname(output), { recursive: true });
 buildSync({
-  entryPoints: [repoPath('src/panels/CmsView.tsx')],
+  entryPoints: [repoPath('src/features/cms/CmsView.tsx')],
   outfile: output,
   bundle: true,
   platform: 'node',

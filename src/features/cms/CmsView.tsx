@@ -1,13 +1,13 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import type { PickedAsset } from '../ui/AssetField';
+import type { PickedAsset } from '../../ui/AssetField';
 import type { CmsUndo } from './cmsWriter';
 import type { CmsSnapshot } from './cmsReader';
 import type { DeclaredTypes } from './cmsTypes';
-import { assert } from '../../shared/assert';
-import { BOUNDARY_LIMITS } from '../../shared/boundary';
-import { toRecord } from '../../shared/record';
-import { importCmsAsset, writeCmsMeta } from '../cmsBridge';
-import { confirmDialog } from '../ui/ConfirmDialog';
+import { assert } from '../../../shared/assert';
+import { BOUNDARY_LIMITS } from '../../../shared/boundary';
+import { toRecord } from '../../../shared/record';
+import { importCmsAsset, writeCmsMeta } from './cmsBridge';
+import { confirmDialog } from '../../ui/ConfirmDialog';
 import {
   PlusIcon,
   CloseIcon,
@@ -16,16 +16,9 @@ import {
   TrashIcon,
   DragIcon,
   CheckIcon,
-} from '../ui/Icons';
-import useListReorder from '../ui/useListReorder';
-import {
-  fieldsOf,
-  titleOf,
-  blankItem,
-  duplicateItem,
-  inferType,
-  isPlainObject,
-} from '../cmsSchema';
+} from '../../ui/Icons';
+import useListReorder from '../../ui/useListReorder';
+import { fieldsOf, titleOf, blankItem, duplicateItem, inferType, isPlainObject } from './cmsSchema';
 import CmsSettings from './CmsSettings';
 import FieldRow from './CmsField';
 import { bestType, withDeclaredTypes } from './cmsTypes';

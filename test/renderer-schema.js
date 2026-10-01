@@ -10,7 +10,7 @@ const { BOUNDARY_LIMITS } = require('#dist/shared/boundary.js');
 // code never writes a null.
 const PLATFORM_NULL = JSON.parse('null');
 const schema = loadRenderer('src/contentSchema.ts');
-const cms = loadRenderer('src/cmsSchema.ts');
+const cms = loadRenderer('src/features/cms/cmsSchema.ts');
 const { parseContentSchema } = loadRenderer('src/contentSchemaBoundary.ts');
 const fixture = {
   type: 'object',

@@ -1,14 +1,14 @@
 import React, { useState } from 'react';
-import type { Collection, CmsField, FieldType } from '../cmsSchema';
+import type { Collection, CmsField, FieldType } from './cmsSchema';
 import type { DeclaredTypes } from './cmsTypes';
-import { BOUNDARY_LIMITS } from '../../shared/boundary';
-import { assert } from '../../shared/assert';
-import { fieldsAt, keyFor } from '../cmsSchema';
+import { BOUNDARY_LIMITS } from '../../../shared/boundary';
+import { assert } from '../../../shared/assert';
+import { fieldsAt, keyFor } from './cmsSchema';
 import { withDeclaredTypes } from './cmsTypes';
-import { readCmsUsage, deleteCms } from '../cmsBridge';
-import { cleanError } from '../lib/cleanError';
-import { confirmDialog } from '../ui/ConfirmDialog';
-import useListReorder from '../ui/useListReorder';
+import { readCmsUsage, deleteCms } from './cmsBridge';
+import { cleanError } from '../../lib/cleanError';
+import { confirmDialog } from '../../ui/ConfirmDialog';
+import useListReorder from '../../ui/useListReorder';
 import { useCmsDialog } from './CmsField';
 import {
   PlusIcon,
@@ -32,7 +32,7 @@ import {
   BracesIcon,
   RepeatIcon,
   CodeIcon,
-} from '../ui/Icons';
+} from '../../ui/Icons';
 
 export interface SchemaOperations {
   readonly onAddField: (path: readonly string[], key: string, type: FieldType) => void;

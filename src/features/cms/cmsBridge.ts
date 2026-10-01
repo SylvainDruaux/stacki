@@ -1,6 +1,6 @@
-import type { Result } from '../shared/result';
-import type { Parser } from '../shared/boundary';
-import type { DeclaredTypes } from './panels/cmsTypes';
+import type { Result } from '../../../shared/result';
+import type { Parser } from '../../../shared/boundary';
+import type { DeclaredTypes } from './cmsTypes';
 import {
   boolean,
   data,
@@ -10,10 +10,10 @@ import {
   pathText,
   record,
   text,
-} from '../shared/boundary';
-import { parseIpcPayload } from '../shared/ipc-payloads';
-import { cleanError } from './lib/cleanError';
-import { parseDeclaredTypes } from './panels/cmsTypes';
+} from '../../../shared/boundary';
+import { parseIpcPayload } from '../../../shared/ipc-payloads';
+import { cleanError } from '../../lib/cleanError';
+import { parseDeclaredTypes } from './cmsTypes';
 
 export function parseCmsRead(input: unknown) {
   const value = record(input);
