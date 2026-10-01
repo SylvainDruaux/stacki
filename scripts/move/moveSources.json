@@ -9,6 +9,446 @@
         ["test/contracts/main-harness.ts", "test/helpers/mainHarness.ts"],
         ["test/contracts/markdown-corpus.ts", "test/helpers/markdownCorpus.ts"]
       ]
+    },
+    {
+      "step": "renderer-lib",
+      "moves": [
+        ["src/cleanError.ts", "src/lib/cleanError.ts"],
+        ["src/coalescedRun.ts", "src/lib/coalescedRun.ts"],
+        ["src/shortcutLabel.ts", "src/lib/shortcutLabel.ts"],
+        ["src/projectPath.ts", "src/lib/projectPath.ts"]
+      ]
+    },
+    {
+      "step": "renderer-ipc",
+      "moves": [
+        ["src/bridge.ts", "src/ipc/bridge.ts"],
+        ["src/appBridge.ts", "src/ipc/appBridge.ts"],
+        ["src/assetBridge.ts", "src/ipc/assetBridge.ts"],
+        ["src/panels/variableEdits.ts", "src/ipc/variableEditBridge.ts"]
+      ]
+    },
+    {
+      "step": "renderer-editor",
+      "moves": [
+        ["src/pageEdits.ts", "src/editor/pageEdits.ts"],
+        ["src/pagePersistence.ts", "src/editor/pagePersistence.ts"],
+        ["src/pageSender.ts", "src/editor/pageSender.ts"],
+        ["src/codeEdits.ts", "src/editor/codeEdits.ts"],
+        ["src/saveState.ts", "src/editor/saveState.ts"],
+        ["src/nodeHandles.ts", "src/editor/nodeHandles.ts"],
+        ["src/pageView.ts", "src/editor/pageView.ts"],
+        ["src/editGestures.ts", "src/editor/editGestures.ts"],
+        ["src/attrOrder.ts", "src/editor/attrOrder.ts"],
+        ["src/loopBindings.ts", "src/editor/loopBindings.ts"],
+        ["src/slotAttr.ts", "src/editor/slotAttr.ts"],
+        ["src/classAttr.ts", "src/editor/classAttr.ts"],
+        ["src/frontmatterMove.ts", "src/editor/frontmatterMove.ts"],
+        ["src/extractProps.ts", "src/editor/extractProps.ts"],
+        ["src/instanceProps.ts", "src/editor/instanceProps.ts"],
+        ["src/liveClasses.ts", "src/editor/liveClasses.ts"],
+        ["src/editorTree.ts", "src/editor/editorTree.ts"],
+        ["src/insertTarget.ts", "src/editor/insertTarget.ts"],
+        ["src/treeView.ts", "src/editor/treeView.ts"],
+        ["src/treeSelection.ts", "src/editor/treeSelection.ts"],
+        ["src/branches.ts", "src/editor/branches.ts"],
+        ["src/classNames.ts", "src/editor/classNames.ts"],
+        ["src/nodeCapability.ts", "src/editor/nodeCapability.ts"],
+        ["src/elementSchemas.ts", "src/editor/elementSchemas.ts"],
+        ["src/bindings.ts", "src/editor/bindings.ts"],
+        ["src/dataSuggest.ts", "src/editor/dataSuggest.ts"],
+        ["src/canvasClick.ts", "src/editor/canvasClick.ts"],
+        ["src/canvasQuery.ts", "src/editor/canvasQuery.ts"],
+        ["src/canvasReply.ts", "src/editor/canvasReply.ts"],
+        ["src/dragState.ts", "src/editor/dragState.ts"],
+        ["src/pageState.ts", "src/editor/pageState.ts"],
+        ["src/heldModifiers.ts", "src/editor/heldModifiers.ts"]
+      ]
+    },
+    {
+      "step": "renderer-ui",
+      "moves": [
+        ["src/assetPath.ts", "src/ui/assetPath.ts"],
+        ["src/assetPick.ts", "src/ui/assetPick.ts"]
+      ]
+    },
+    {
+      "step": "renderer-welcome",
+      "moves": [
+        ["src/panels/WelcomeScreen.tsx", "src/features/welcome/WelcomeScreen.tsx"],
+        ["src/panels/WelcomeWizards.tsx", "src/features/welcome/WelcomeWizards.tsx"],
+        ["src/welcomeBridge.ts", "src/features/welcome/welcomeBridge.ts"],
+        ["src/ui/StackiLogo.tsx", "src/features/welcome/StackiLogo.tsx"],
+        ["src/ui/WelcomeBackground.tsx", "src/features/welcome/WelcomeBackground.tsx"]
+      ]
+    },
+    {
+      "step": "renderer-terminal",
+      "moves": [
+        ["src/panels/TerminalDock.tsx", "src/features/terminal/TerminalDock.tsx"],
+        ["src/panels/TerminalPane.tsx", "src/features/terminal/TerminalPane.tsx"],
+        ["src/panels/terminalRuntime.ts", "src/features/terminal/terminalRuntime.ts"],
+        ["src/panels/terminalInteractions.ts", "src/features/terminal/terminalInteractions.ts"],
+        ["src/terminalBridge.ts", "src/features/terminal/terminalBridge.ts"],
+        ["src/terminalPaste.ts", "src/features/terminal/terminalPaste.ts"]
+      ]
+    },
+    {
+      "step": "renderer-git",
+      "moves": [
+        ["src/panels/GitChip.tsx", "src/features/git/GitChip.tsx"],
+        ["src/panels/GitChipView.tsx", "src/features/git/GitChipView.tsx"],
+        ["src/panels/MergeConflictModal.tsx", "src/features/git/MergeConflictModal.tsx"],
+        ["src/panels/PublishModal.tsx", "src/features/git/PublishModal.tsx"],
+        ["src/panels/SwitchBranchModal.tsx", "src/features/git/SwitchBranchModal.tsx"],
+        ["src/panels/gitConflictModel.ts", "src/features/git/gitConflictModel.ts"],
+        ["src/panels/gitPublish.ts", "src/features/git/gitPublish.ts"],
+        ["src/panels/gitPublishWorkflow.ts", "src/features/git/gitPublishWorkflow.ts"],
+        ["src/gitActions.ts", "src/features/git/gitActions.ts"],
+        ["src/gitBridge.ts", "src/features/git/gitBridge.ts"],
+        ["src/gitChipBridge.ts", "src/features/git/gitChipBridge.ts"],
+        ["src/branchName.ts", "src/features/git/branchName.ts"],
+        ["src/ui/Code.tsx", "src/features/git/Code.tsx"],
+        ["src/ui/BranchActions.tsx", "src/features/git/BranchActions.tsx"],
+        ["src/ui/FileBrowser.tsx", "src/features/git/FileBrowser.tsx"],
+        ["src/ui/FileStatus.tsx", "src/features/git/FileStatus.tsx"]
+      ]
+    },
+    {
+      "step": "renderer-history",
+      "moves": [
+        ["src/panels/HistoryPanel.tsx", "src/features/history/HistoryPanel.tsx"],
+        ["src/panels/HistorySections.tsx", "src/features/history/HistorySections.tsx"],
+        ["src/panels/HistoryTimeline.tsx", "src/features/history/HistoryTimeline.tsx"],
+        ["src/panels/historyPanelTypes.ts", "src/features/history/historyPanelTypes.ts"],
+        ["src/historyBridge.ts", "src/features/history/historyBridge.ts"],
+        ["src/historyModel.ts", "src/features/history/historyModel.ts"]
+      ]
+    },
+    {
+      "step": "renderer-pages",
+      "moves": [
+        ["src/panels/PagesPanel.tsx", "src/features/pages/PagesPanel.tsx"],
+        ["src/panels/PageTreeView.tsx", "src/features/pages/PageTreeView.tsx"],
+        ["src/panels/PageDialogs.tsx", "src/features/pages/PageDialogs.tsx"],
+        ["src/pageOrder.ts", "src/features/pages/pageOrder.ts"],
+        ["src/pageTree.ts", "src/features/pages/pageTree.ts"],
+        ["src/ui/PageSwitcher.tsx", "src/features/pages/PageSwitcher.tsx"]
+      ]
+    },
+    {
+      "step": "renderer-palette",
+      "moves": [
+        ["src/panels/PalettePanel.tsx", "src/features/palette/PalettePanel.tsx"],
+        ["src/panels/PaletteDialogs.tsx", "src/features/palette/PaletteDialogs.tsx"],
+        ["src/paletteModel.ts", "src/features/palette/paletteModel.ts"],
+        ["src/insertRank.ts", "src/features/palette/insertRank.ts"],
+        ["src/componentName.ts", "src/features/palette/componentName.ts"],
+        ["src/astroAssets.ts", "src/features/palette/astroAssets.ts"],
+        ["src/ui/InsertSearch.tsx", "src/features/palette/InsertSearch.tsx"]
+      ]
+    },
+    {
+      "step": "renderer-code",
+      "moves": [
+        ["src/panels/CodePanel.tsx", "src/features/code/CodePanel.tsx"],
+        ["src/ui/CodeWindow.tsx", "src/features/code/CodeWindow.tsx"],
+        ["src/codePanelModel.ts", "src/features/code/codePanelModel.ts"],
+        ["src/codeWindowTarget.ts", "src/features/code/codeWindowTarget.ts"]
+      ]
+    },
+    {
+      "step": "renderer-assets",
+      "moves": [
+        ["src/panels/AssetsPanel.tsx", "src/features/assets/AssetsPanel.tsx"],
+        ["src/assetPanelBridge.ts", "src/features/assets/assetPanelBridge.ts"]
+      ]
+    },
+    {
+      "step": "renderer-cms",
+      "moves": [
+        ["src/panels/CmsPanel.tsx", "src/features/cms/CmsPanel.tsx"],
+        ["src/panels/CmsView.tsx", "src/features/cms/CmsView.tsx"],
+        ["src/panels/CmsSettings.tsx", "src/features/cms/CmsSettings.tsx"],
+        ["src/panels/CmsField.tsx", "src/features/cms/CmsField.tsx"],
+        ["src/panels/cmsOperations.ts", "src/features/cms/cmsOperations.ts"],
+        ["src/panels/cmsReader.ts", "src/features/cms/cmsReader.ts"],
+        ["src/panels/cmsWriter.ts", "src/features/cms/cmsWriter.ts"],
+        ["src/panels/cmsTypes.ts", "src/features/cms/cmsTypes.ts"],
+        ["src/cmsBridge.ts", "src/features/cms/cmsBridge.ts"],
+        ["src/cmsPanelBridge.ts", "src/features/cms/cmsPanelBridge.ts"],
+        ["src/cmsSchema.ts", "src/features/cms/cmsSchema.ts"]
+      ]
+    },
+    {
+      "step": "renderer-content",
+      "moves": [
+        ["src/panels/ContentView.tsx", "src/features/content/ContentView.tsx"],
+        ["src/panels/ContentFields.tsx", "src/features/content/ContentFields.tsx"],
+        ["src/contentSchema.ts", "src/features/content/contentSchema.ts"],
+        ["src/contentSchemaBoundary.ts", "src/features/content/contentSchemaBoundary.ts"],
+        ["src/contentViewBridge.ts", "src/features/content/contentViewBridge.ts"],
+        ["src/contentSchema.types.ts", "src/features/content/contentSchemaTypes.ts"]
+      ]
+    },
+    {
+      "step": "renderer-style",
+      "moves": [
+        ["src/style-panel/AlignControl.tsx", "src/features/style/AlignControl.tsx"],
+        ["src/style-panel/BackgroundSection.tsx", "src/features/style/BackgroundSection.tsx"],
+        ["src/style-panel/BordersSection.tsx", "src/features/style/BordersSection.tsx"],
+        ["src/style-panel/DirectionControl.tsx", "src/features/style/DirectionControl.tsx"],
+        ["src/style-panel/DisplayControl.tsx", "src/features/style/DisplayControl.tsx"],
+        ["src/style-panel/EasingEditor.tsx", "src/features/style/EasingEditor.tsx"],
+        ["src/style-panel/EffectsSection.tsx", "src/features/style/EffectsSection.tsx"],
+        ["src/style-panel/ElementTokenPicker.tsx", "src/features/style/ElementTokenPicker.tsx"],
+        ["src/style-panel/EmbedEditor.tsx", "src/features/style/EmbedEditor.tsx"],
+        ["src/style-panel/FilterFields.tsx", "src/features/style/FilterFields.tsx"],
+        ["src/style-panel/FlexChildSection.tsx", "src/features/style/FlexChildSection.tsx"],
+        ["src/style-panel/GapControl.tsx", "src/features/style/GapControl.tsx"],
+        ["src/style-panel/GradientEditor.tsx", "src/features/style/GradientEditor.tsx"],
+        ["src/style-panel/GridControls.tsx", "src/features/style/GridControls.tsx"],
+        ["src/style-panel/GridSettings.tsx", "src/features/style/GridSettings.tsx"],
+        ["src/style-panel/LayerList.tsx", "src/features/style/LayerList.tsx"],
+        ["src/style-panel/LayerPopover.tsx", "src/features/style/LayerPopover.tsx"],
+        ["src/style-panel/PositionSection.tsx", "src/features/style/PositionSection.tsx"],
+        ["src/style-panel/ProvenanceList.tsx", "src/features/style/ProvenanceList.tsx"],
+        ["src/style-panel/SegmentedField.tsx", "src/features/style/SegmentedField.tsx"],
+        ["src/style-panel/ShadowFields.tsx", "src/features/style/ShadowFields.tsx"],
+        ["src/style-panel/SizeSection.tsx", "src/features/style/SizeSection.tsx"],
+        ["src/style-panel/SpacingBox.tsx", "src/features/style/SpacingBox.tsx"],
+        ["src/style-panel/SpacingSection.tsx", "src/features/style/SpacingSection.tsx"],
+        ["src/style-panel/TransformSettings.tsx", "src/features/style/TransformSettings.tsx"],
+        ["src/style-panel/TypographySection.tsx", "src/features/style/TypographySection.tsx"],
+        ["src/style-panel/VariableConnect.tsx", "src/features/style/VariableConnect.tsx"],
+        ["src/style-panel/clip-path/ClipPath.tsx", "src/features/style/clipPath/ClipPath.tsx"],
+        ["src/style-panel/clip-path/clip-path.css", "src/features/style/clipPath/ClipPath.css"],
+        [
+          "src/style-panel/clip-path/webflow-designer.d.ts",
+          "src/features/style/clipPath/webflowDesigner.d.ts"
+        ],
+        [
+          "src/style-panel/components/ClassPicker.css",
+          "src/features/style/components/ClassPicker.css"
+        ],
+        [
+          "src/style-panel/components/ClassPicker.tsx",
+          "src/features/style/components/ClassPicker.tsx"
+        ],
+        [
+          "src/style-panel/components/CodeEditor.css",
+          "src/features/style/components/CssCodeEditor.css"
+        ],
+        [
+          "src/style-panel/components/CodeEditor.tsx",
+          "src/features/style/components/CssCodeEditor.tsx"
+        ],
+        [
+          "src/style-panel/components/ColorPicker.tsx",
+          "src/features/style/components/ColorPicker.tsx"
+        ],
+        [
+          "src/style-panel/components/ColorSwatch.tsx",
+          "src/features/style/components/ColorSwatch.tsx"
+        ],
+        [
+          "src/style-panel/components/DragSlider.tsx",
+          "src/features/style/components/DragSlider.tsx"
+        ],
+        [
+          "src/style-panel/components/FieldLabel.tsx",
+          "src/features/style/components/FieldLabel.tsx"
+        ],
+        ["src/style-panel/components/LiveInput.tsx", "src/features/style/components/LiveInput.tsx"],
+        [
+          "src/style-panel/components/PositionGrid.tsx",
+          "src/features/style/components/PositionGrid.tsx"
+        ],
+        [
+          "src/style-panel/components/PropTip.tsx",
+          "src/features/style/components/CssPropertyTip.tsx"
+        ],
+        [
+          "src/style-panel/components/SegmentPill.tsx",
+          "src/features/style/components/SegmentPill.tsx"
+        ],
+        [
+          "src/style-panel/components/SegmentedControl.tsx",
+          "src/features/style/components/SegmentedControl.tsx"
+        ],
+        ["src/style-panel/components/Select.tsx", "src/features/style/components/Select.tsx"],
+        ["src/style-panel/components/useScrub.ts", "src/features/style/components/useScrub.ts"],
+        ["src/style-panel/cursor-icons.tsx", "src/features/style/cursorIcons.tsx"],
+        ["src/style-panel/embed-editor.css", "src/features/style/embedEditor.css"],
+        ["src/style-panel/lib/background.ts", "src/features/style/model/background.ts"],
+        ["src/style-panel/lib/box-shadow.ts", "src/features/style/model/boxShadow.ts"],
+        ["src/style-panel/lib/caret-at-x.ts", "src/features/style/model/caretAtX.ts"],
+        ["src/style-panel/lib/cascade.ts", "src/features/style/model/cascade.ts"],
+        ["src/style-panel/lib/color.ts", "src/features/style/model/colorWrite.ts"],
+        ["src/style-panel/lib/commit-in-place.ts", "src/features/style/model/commitInPlace.ts"],
+        ["src/style-panel/lib/computed-color.ts", "src/features/style/model/computedColor.ts"],
+        ["src/style-panel/lib/computed-style.ts", "src/features/style/model/computedStyle.ts"],
+        ["src/style-panel/lib/css-code.ts", "src/features/style/model/cssCode.ts"],
+        ["src/style-panel/lib/css-properties.ts", "src/features/style/model/cssProperties.ts"],
+        ["src/style-panel/lib/css-rule-view.ts", "src/features/style/model/cssRuleView.ts"],
+        ["src/style-panel/lib/css.ts", "src/features/style/model/css.ts"],
+        ["src/style-panel/lib/dom.ts", "src/features/style/model/dom.ts"],
+        ["src/style-panel/lib/element-tokens.ts", "src/features/style/model/elementTokens.ts"],
+        ["src/style-panel/lib/field-draft.ts", "src/features/style/model/fieldDraft.ts"],
+        ["src/style-panel/lib/filter.ts", "src/features/style/model/filter.ts"],
+        ["src/style-panel/lib/gap-hover.ts", "src/features/style/model/gapHover.ts"],
+        ["src/style-panel/lib/gradient.ts", "src/features/style/model/gradient.ts"],
+        ["src/style-panel/lib/grid-template.ts", "src/features/style/model/gridTemplate.ts"],
+        ["src/style-panel/lib/hideable.ts", "src/features/style/model/hideable.ts"],
+        ["src/style-panel/lib/host.ts", "src/features/style/model/host.ts"],
+        ["src/style-panel/lib/insert-binding.ts", "src/features/style/model/insertBinding.ts"],
+        ["src/style-panel/lib/live-color.ts", "src/features/style/model/liveColor.ts"],
+        ["src/style-panel/lib/native-styles.ts", "src/features/style/model/nativeStyles.ts"],
+        ["src/style-panel/lib/number-step.ts", "src/features/style/model/numberStep.ts"],
+        ["src/style-panel/lib/panel-box.ts", "src/features/style/model/panelBox.ts"],
+        ["src/style-panel/lib/popup-layer.ts", "src/features/style/model/popupLayer.ts"],
+        ["src/style-panel/lib/query-cache.ts", "src/features/style/model/queryCache.ts"],
+        ["src/style-panel/lib/resolved.ts", "src/features/style/model/resolved.ts"],
+        ["src/style-panel/lib/sections.ts", "src/features/style/model/sections.ts"],
+        ["src/style-panel/lib/selectors.ts", "src/features/style/model/selectors.ts"],
+        ["src/style-panel/lib/text-shadow.ts", "src/features/style/model/textShadow.ts"],
+        [
+          "src/style-panel/lib/transform-settings.ts",
+          "src/features/style/model/transformSettings.ts"
+        ],
+        ["src/style-panel/lib/transform.ts", "src/features/style/model/transform.ts"],
+        ["src/style-panel/lib/transition.ts", "src/features/style/model/transition.ts"],
+        ["src/style-panel/lib/types.ts", "src/features/style/model/styleTypes.ts"],
+        ["src/style-panel/lib/webflow.ts", "src/features/style/model/webflow.ts"],
+        ["src/style-panel/shared/color.ts", "src/features/style/model/colorSpace.ts"],
+        ["src/style-panel/shared/tool-prefs.ts", "src/features/style/model/toolPreferences.ts"],
+        ["src/style-panel/tokens.css", "src/features/style/tokens.css"],
+        ["src/style-panel/transform-icons.tsx", "src/features/style/transformIcons.tsx"],
+        ["src/style-panel/utilities.css", "src/features/style/utilities.css"],
+        ["src/panels/StylePanel.tsx", "src/features/style/StylePanel.tsx"],
+        ["src/stylePanelBridge.ts", "src/features/style/stylePanelBridge.ts"],
+        ["src/ui/usePopupOpen.ts", "src/features/style/usePopupOpen.ts"],
+        ["src/ui/CustomValueEditor.tsx", "src/features/style/CustomValueEditor.tsx"]
+      ]
+    },
+    {
+      "step": "renderer-componentProperties",
+      "moves": [
+        [
+          "src/panels/ComponentPropertiesPanel.tsx",
+          "src/features/componentProperties/ComponentPropertiesPanel.tsx"
+        ],
+        [
+          "src/panels/PropertyDeclarationInfo.tsx",
+          "src/features/componentProperties/PropertyDeclarationInfo.tsx"
+        ],
+        ["src/panels/PropertyDefault.tsx", "src/features/componentProperties/PropertyDefault.tsx"],
+        ["src/panels/PropertyEditor.tsx", "src/features/componentProperties/PropertyEditor.tsx"],
+        ["src/panels/PropertyOptions.tsx", "src/features/componentProperties/PropertyOptions.tsx"],
+        [
+          "src/panels/PropertyReadOnlyFields.tsx",
+          "src/features/componentProperties/PropertyReadOnlyFields.tsx"
+        ],
+        ["src/panels/PropertyReorder.tsx", "src/features/componentProperties/PropertyReorder.tsx"],
+        ["src/panels/PropertyType.tsx", "src/features/componentProperties/PropertyType.tsx"],
+        [
+          "src/panels/useComponentProperties.ts",
+          "src/features/componentProperties/useComponentProperties.ts"
+        ],
+        [
+          "src/panels/componentProperties.css",
+          "src/features/componentProperties/componentProperties.css"
+        ],
+        [
+          "src/componentPropertiesBridge.ts",
+          "src/features/componentProperties/componentPropertiesBridge.ts"
+        ],
+        ["src/ui/PropertiesIcon.tsx", "src/features/componentProperties/PropertiesIcon.tsx"]
+      ]
+    },
+    {
+      "step": "renderer-props",
+      "moves": [
+        ["src/panels/PropsPanel.tsx", "src/features/props/PropsPanel.tsx"],
+        ["src/panels/PropField.tsx", "src/features/props/PropField.tsx"],
+        ["src/panels/ObjectField.tsx", "src/features/props/ObjectField.tsx"],
+        ["src/panels/ListField.tsx", "src/features/props/ListField.tsx"],
+        ["src/panels/propAttributes.tsx", "src/features/props/propAttributes.tsx"],
+        ["src/panels/propBindings.tsx", "src/features/props/propBindings.tsx"],
+        ["src/panels/propNodeEditors.tsx", "src/features/props/propNodeEditors.tsx"],
+        ["src/panels/propRules.ts", "src/features/props/propRules.ts"],
+        ["src/arrayValue.ts", "src/features/props/arrayValue.ts"],
+        ["src/jsCheck.ts", "src/features/props/jsCheck.ts"],
+        ["src/ui/BindInput.tsx", "src/features/props/BindInput.tsx"],
+        ["src/ui/ClassInput.tsx", "src/features/props/ClassInput.tsx"],
+        ["src/ui/PropTip.tsx", "src/features/props/PropTip.tsx"],
+        ["src/ui/LinkField.tsx", "src/features/props/LinkField.tsx"],
+        ["src/ui/SegSwitch.tsx", "src/features/props/SegSwitch.tsx"],
+        ["src/ui/StyleEditor.tsx", "src/features/props/StyleEditor.tsx"],
+        ["src/ui/DataPicker.tsx", "src/features/props/DataPicker.tsx"],
+        ["src/ui/RichContent.tsx", "src/features/props/RichContent.tsx"],
+        ["src/ui/richContentModel.ts", "src/features/props/richContentModel.ts"],
+        ["src/ui/chipKeys.ts", "src/features/props/chipKeys.ts"]
+      ]
+    },
+    {
+      "step": "renderer-structure",
+      "moves": [
+        ["src/panels/StructurePanel.tsx", "src/features/structure/StructurePanel.tsx"],
+        ["src/panels/StructureTree.tsx", "src/features/structure/StructureTree.tsx"],
+        ["src/panels/navigatorDrop.ts", "src/features/structure/navigatorDrop.ts"],
+        ["src/panels/structureModel.ts", "src/features/structure/structureModel.ts"]
+      ]
+    },
+    {
+      "step": "renderer-preview",
+      "moves": [
+        ["src/panels/PreviewPane.tsx", "src/features/preview/PreviewPane.tsx"],
+        ["src/panels/CanvasView.tsx", "src/features/preview/CanvasView.tsx"],
+        ["src/panels/PreviewOverlays.tsx", "src/features/preview/PreviewOverlays.tsx"],
+        ["src/panels/PreviewToolbar.tsx", "src/features/preview/PreviewToolbar.tsx"],
+        ["src/panels/PreviewSizeControls.tsx", "src/features/preview/PreviewSizeControls.tsx"],
+        ["src/panels/DevOffline.tsx", "src/features/preview/DevOffline.tsx"],
+        ["src/panels/previewRuntime.ts", "src/features/preview/previewRuntime.ts"],
+        ["src/panels/previewViewport.ts", "src/features/preview/previewViewport.ts"],
+        ["src/panels/previewViewport.css", "src/features/preview/previewViewport.css"],
+        ["src/previewGate.ts", "src/features/preview/previewGate.ts"],
+        ["src/previewMessages.ts", "src/features/preview/previewMessages.ts"],
+        ["src/previewRecovery.ts", "src/features/preview/previewRecovery.ts"],
+        ["src/outlineBoxes.ts", "src/features/preview/outlineBoxes.ts"],
+        ["src/spacingBands.ts", "src/features/preview/spacingBands.ts"]
+      ]
+    },
+    {
+      "step": "renderer-variables",
+      "moves": [
+        ["src/panels/VariablesPanel.tsx", "src/features/variables/VariablesPanel.tsx"],
+        ["src/panels/VariablesView.tsx", "src/features/variables/VariablesView.tsx"],
+        ["src/panels/VariableTable.tsx", "src/features/variables/VariableTable.tsx"],
+        ["src/panels/VariableCell.tsx", "src/features/variables/VariableCell.tsx"],
+        ["src/panels/variableHistory.ts", "src/features/variables/variableHistory.ts"],
+        ["src/panels/variableRefresh.ts", "src/features/variables/variableRefresh.ts"],
+        ["src/panels/variableRows.ts", "src/features/variables/variableRows.ts"],
+        ["src/panels/variableScroll.ts", "src/features/variables/variableScroll.ts"],
+        ["src/variablesBridge.ts", "src/features/variables/variablesBridge.ts"],
+        ["src/fluid.ts", "src/features/variables/fluid.ts"],
+        ["src/ui/FluidBadge.tsx", "src/features/variables/FluidBadge.tsx"],
+        ["src/ui/VariableTypeIcon.tsx", "src/features/variables/VariableTypeIcon.tsx"]
+      ]
+    },
+    {
+      "step": "renderer-app",
+      "moves": [
+        ["src/App.tsx", "src/app/App.tsx"],
+        ["src/styles.css", "src/app/styles.css"],
+        ["src/appTypes.ts", "src/app/appTypes.ts"],
+        ["src/usePropertySaveGuard.ts", "src/app/usePropertySaveGuard.ts"],
+        ["src/ui/lazyPanel.tsx", "src/app/lazyPanel.tsx"],
+        ["src/ui/LeftRail.tsx", "src/app/LeftRail.tsx"],
+        ["src/ui/DynamicPicker.tsx", "src/app/DynamicPicker.tsx"],
+        ["src/panels/CapabilityNotice.tsx", "src/app/CapabilityNotice.tsx"],
+        ["src/panels/SaveConflictNotice.tsx", "src/app/SaveConflictNotice.tsx"]
+      ]
     }
   ]
 }
