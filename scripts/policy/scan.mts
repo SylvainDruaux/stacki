@@ -60,10 +60,12 @@ const NO_CHECK_DIRECTIVE = '@ts-' + 'nocheck';
 // roots folders are camelCase, TypeScript modules camelCase and components
 // PascalCase, so a name says what a file holds and a root spells names one
 // way. Each phase of the layout restructure adds its root here.
-const LAYOUT_ROOTS = ['src/', 'electron/', 'shared/', 'scripts/'];
+const LAYOUT_ROOTS = ['src/', 'electron/', 'shared/', 'scripts/', 'test/'];
 const LAYOUT_FOLDER = /^[a-z][A-Za-z0-9]*$/;
 const LAYOUT_NAMES = [
   /^[a-z][A-Za-z0-9]*(?:\.d)?\.ts$/, // A module, or a declaration file.
+  /^[a-z][A-Za-z0-9]*(?:\.(?:test|bench|entry))?\.(?:js|ts)$/, // A suite, a bench, a helper.
+  /^README\.md$/, // A folder's guide.
   /^[a-z][A-Za-z0-9]*\.m[jt]s$/, // A module Node runs as written (a worker, a script).
   /^[a-z][A-Za-z0-9]*\.json$/, // Data a script reads (the move manifest).
   /^tsconfig(?:\.[a-z]+)?\.json$/, // A TypeScript project: the compiler's own name.
@@ -85,6 +87,7 @@ export function scanFile(file: string, text: string): readonly Violation[] {
     found.push(...lineWidthViolations(file, lines));
   }
   found.push(...layoutNameViolations(file));
+  found.push(...testPlacementViolations(file));
   if (CODE_EXTENSIONS.has(extension)) {
     const index = lines.findIndex((line) => line.includes(NO_CHECK_DIRECTIVE));
     if (index >= 0) {
@@ -139,13 +142,97 @@ export function layoutNameViolations(file: string): readonly Violation[] {
   return found;
 }
 
+// test/ mirrors the source (docs/codebase.md): suites for a source folder sit
+// in test/<root>/<area>/, and only suites do; helpers have their own folder.
+const TEST_FOLDERS = new Set([
+  'corpus',
+  'electron',
+  'fixtures',
+  'helpers',
+  'integration',
+  'renderer',
+  'scripts',
+  'shared',
+  'simulator',
+]);
+const TEST_MIRRORS = new Set(['electron', 'renderer', 'scripts', 'shared']);
+const SUITE = /\.test\.(?:js|ts)$/;
+
+export function testPlacementViolations(file: string): readonly Violation[] {
+  const parts = file.split('/');
+  if (parts[0] !== 'test') {
+    return [];
+  }
+  const top = parts[1];
+  assert(top !== undefined, 'testPlacementViolations: a test path has a part below test/');
+  if (parts.length === 2) {
+    return top === 'README.md' ? [] : [placement(file, 'test/ holds folders and its README only.')];
+  }
+  if (!TEST_FOLDERS.has(top)) {
+    const known = [...TEST_FOLDERS].join(', ');
+    return [placement(file, `test/${top}/ is not a test folder (${known}).`)];
+  }
+  if (!TEST_MIRRORS.has(top) || !CODE_EXTENSIONS.has(path.posix.extname(file))) {
+    return [];
+  }
+  if (parts.length < 4) {
+    return [placement(file, `A suite sits in the area it tests: test/${top}/<area>/.`)];
+  }
+  if (!SUITE.test(file)) {
+    return [
+      placement(file, 'A mirror folder holds suites only (*.test.*); helpers go in test/helpers/.'),
+    ];
+  }
+  return [];
+}
+
+function placement(file: string, message: string): Violation {
+  return { file, line: 1, rule: 'test-layout', message };
+}
+
+// Each mirror area names a source folder that exists: test/electron/parse/ is
+// the suites of electron/parse/, test/renderer/style/ of src/features/style/.
+export function testMirrorViolations(files: readonly string[]): readonly Violation[] {
+  const folders = new Set(files.map((file) => path.posix.dirname(file)).flatMap(ancestors));
+  const found: Violation[] = [];
+  const reported = new Set<string>();
+  for (const file of files) {
+    const [first, mirror, area] = file.split('/');
+    if (
+      first !== 'test' ||
+      mirror === undefined ||
+      area === undefined ||
+      !TEST_MIRRORS.has(mirror)
+    ) {
+      continue;
+    }
+    if (file.split('/').length < 4 || reported.has(`${mirror}/${area}`)) {
+      continue;
+    }
+    const sources =
+      mirror === 'renderer' ? [`src/${area}`, `src/features/${area}`] : [`${mirror}/${area}`];
+    if (!sources.some((source) => folders.has(source))) {
+      reported.add(`${mirror}/${area}`);
+      const message = `test/${mirror}/${area}/ mirrors no source folder (${sources.join(' or ')}).`;
+      found.push({ file, line: 1, rule: 'test-mirror', message });
+    }
+  }
+  return found;
+}
+
+function ancestors(folder: string): readonly string[] {
+  const parts = folder.split('/');
+  return parts.map((_, index) => parts.slice(0, index + 1).join('/'));
+}
+
 // Names are unique within a layout root, ignoring case, so a file named in a
 // test, a lint list or a conversation is one file.
 export function layoutUniquenessViolations(files: readonly string[]): readonly Violation[] {
   const found: Violation[] = [];
   for (const root of LAYOUT_ROOTS) {
     const seen = new Map<string, string>();
-    for (const file of files.filter((candidate) => candidate.startsWith(root))) {
+    const named = files.filter((candidate) => candidate.startsWith(root) && !isExempt(candidate));
+    for (const file of named) {
       const name = path.posix.basename(file).toLowerCase();
       const first = seen.get(name);
       if (first === undefined) {
@@ -254,6 +341,7 @@ export function repositoryViolations(root: string, files: readonly string[]): re
     found.push({ file: 'CLAUDE.md', line: 1, rule: 'agent-instructions', message });
   }
   found.push(...layoutUniquenessViolations(files));
+  found.push(...testMirrorViolations(files));
   const density = sharedAssertionDensity(root, files);
   if (density.perFunction < POLICY_LIMITS.sharedAssertionsPerFunctionMin) {
     const measured = density.perFunction.toFixed(2);

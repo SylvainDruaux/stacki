@@ -13,6 +13,7 @@ import {
   dependencyViolations,
   isExempt,
   layoutUniquenessViolations,
+  testMirrorViolations,
   normalizePath,
   scanFile,
 } from '../../../scripts/policy/scan.mts';
@@ -66,11 +67,11 @@ test('blanket lint suppressions are rejected; named ones pass', () => {
 });
 
 test('test files open with a comment', () => {
-  assert.deepEqual(rules('test/a.test.ts', '// Goal: …\nimport x from "y";'), []);
-  assert.deepEqual(rules('test/a.js', '#!/usr/bin/env node\n/* Goal */\nx();'), []);
-  assert.deepEqual(rules('test/a.js', '\n\n// Goal\nx();'), []);
-  assert.deepEqual(rules('test/a.test.ts', 'import x from "y";'), ['test-header']);
-  assert.deepEqual(rules('test/a.test.ts', ''), ['test-header']);
+  assert.deepEqual(rules('test/helpers/a.test.ts', '// Goal: …\nimport x from "y";'), []);
+  assert.deepEqual(rules('test/helpers/a.js', '#!/usr/bin/env node\n/* Goal */\nx();'), []);
+  assert.deepEqual(rules('test/helpers/a.js', '\n\n// Goal\nx();'), []);
+  assert.deepEqual(rules('test/shared/core/a.test.ts', 'import x from "y";'), ['test-header']);
+  assert.deepEqual(rules('test/shared/core/a.test.ts', ''), ['test-header']);
   // Outside test/, no header is required.
   assert.deepEqual(rules('src/a.ts', 'import x from "y";'), []);
 });
@@ -165,4 +166,44 @@ test('layout names are unique within a root, ignoring case', () => {
   );
   // Outside the layout roots, names may repeat (every tsconfig.json, for one).
   assert.deepEqual(layoutUniquenessViolations(['shared/a.ts', 'electron/a.ts']), []);
+});
+
+test('test/ mirrors the source: suites in their area, helpers apart', () => {
+  const header = '// Header.\n';
+  for (const file of [
+    'test/README.md',
+    'test/renderer/style/selectorWell.test.js',
+    'test/electron/parse/roundtripCorpus.test.js',
+    'test/shared/core/span.test.ts',
+    'test/helpers/sources.js',
+    'test/simulator/world.ts',
+    'test/simulator/spike.bench.ts',
+  ]) {
+    assert.deepEqual(rules(file, header), [], file);
+  }
+  for (const file of [
+    'test/hoverCost.test.js',
+    'test/misc/sample.test.js',
+    'test/renderer/sample.test.js',
+    'test/renderer/style/harness.js',
+  ]) {
+    assert.deepEqual(rules(file, header), ['test-layout'], file);
+  }
+});
+
+test('each mirror area names a source folder that exists', () => {
+  const files = [
+    'src/features/style/EmbedEditor.tsx',
+    'src/editor/pageEdits.ts',
+    'electron/parse/astroParser.ts',
+    'test/renderer/style/a.test.js',
+    'test/renderer/editor/b.test.js',
+    'test/electron/parse/c.test.js',
+  ];
+  assert.deepEqual(testMirrorViolations(files), []);
+  const stale = testMirrorViolations([...files, 'test/electron/gone/d.test.js']);
+  assert.deepEqual(
+    stale.map((violation) => [violation.file, violation.rule]),
+    [['test/electron/gone/d.test.js', 'test-mirror']],
+  );
 });

@@ -17,7 +17,10 @@ The gate runs every file named `*.test.js` or `*.test.ts` under `test/`
 outside `fixtures/`, `corpus/`, `helpers/` and `integration/`. A new test is in
 the gate the moment it exists; there is no list to add it to. The few suites
 that need a different runner, Node flags or to run alone say so in
-`scripts/gate/testSuites.ts`, keyed by path. Harnesses live in `helpers/`, and
+`scripts/gate/testSuites.ts`, keyed by path. Suites mirror the source: the
+suites for `src/features/style/` are in `renderer/style/`, for
+`electron/parse/` in `electron/parse/`, and so on (the policy scan holds the
+mirror, and that only suites sit in it). Harnesses live in `helpers/`, and
 `helpers/sources.js` is how a test names a repository file (see
 `sourcePaths.test.js`).
 
