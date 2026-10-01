@@ -3,3 +3,6 @@
 
 # style: format the tree with Prettier
 59cd752b01fb227626f7461ffb0e2a3280a97a1d
+
+# refactor: relative imports carry no extension in compiled code
+0988df65b21ae49bda854d9933845dd4bd106c03
