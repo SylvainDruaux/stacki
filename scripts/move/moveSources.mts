@@ -1,7 +1,9 @@
 #!/usr/bin/env node
-// Moves source files and rewrites every reference to them, one step of the
-// layout restructure at a time (docs/codebase.md, "Directory map"). The moves
-// live in scripts/move/moveSources.json; the rewriting is scripts/move/moveSourcesPlan.mts.
+// Moves source files and rewrites every reference to them, one reviewed step
+// at a time (docs/codebase.md, "Directory map"). A step is a list of moves in
+// scripts/move/moveSources.json; the rewriting is
+// scripts/move/moveSourcesPlan.mts. The manifest is empty between moves: write
+// a step, run it, commit, and clear it (the commit records its table).
 //
 //   node scripts/move/moveSources.mts --step <name> [--dry-run] [--accept-reports]
 //   node scripts/move/moveSources.mts --normalize-only [--dry-run]

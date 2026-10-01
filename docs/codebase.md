@@ -334,7 +334,7 @@ batching/queueing write path (already the right shape).
 | `scripts/build/`, `install/`, `release/` | Build, install-time repairs, packaging and release |
 | `scripts/gate/`, `reports/` | The test runner and its pool, the adapter check; reports and fixtures |
 | `scripts/policy/`, `agent/`, `eslintPlugin/` | The gates: policy scan and git hooks, agent hooks, lint rules |
-| `scripts/lib/`, `move/` | Script helpers; the move tool for the layout restructure |
+| `scripts/lib/`, `move/` | Script helpers; the move tool (`move/moveSources.mts`), which moves files and rewrites every reference to them |
 | `test/` | Suites (round-trip, canvas-stub, contract, packaging); harnesses in `test/helpers/` |
 | `docs/` | This file, the contracts, the enforcement map, the editor-core plan; `archive/` for finished plans |
 

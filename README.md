@@ -100,6 +100,14 @@ as clean `.astro` source. Pages containing arbitrary HTML, expressions, or
 nested children fall back to the built-in code editor — nothing is ever
 rewritten destructively.
 
+## Repository layout
+
+`src/` is the renderer: layers (`lib`, `ipc`, `editor`, `ui`, `app`) and one
+folder per feature in `src/features/`. `electron/` is the main process in
+areas (`parse`, `documents`, `content`, …), `shared/` the contracts between
+them, `scripts/` the tooling, and `test/` mirrors all four. The map and the
+rules that hold it are in `docs/codebase.md` ("Directory map").
+
 ## Build output
 
 `npm run build` starts from a clean `dist/` directory and writes the Electron
