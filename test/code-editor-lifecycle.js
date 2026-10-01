@@ -147,7 +147,14 @@ const { ROOT } = require('./helpers/sources.js');
     );
     const astroSource = '<Heading tag="h1" maxWidth={17}>Find hope.</Heading>';
     await render(astroSource, { revealLine: undefined, ranges: false, language: 'astro' });
-    await React.act(() => new Promise((resolve) => setTimeout(resolve, 500)));
+    // The grammar highlights in the background, later under load: wait for its
+    // last token (the number in the expression), bounded at five seconds.
+    const HIGHLIGHT_WAIT_MS_MAX = 5_000;
+    const highlighted = () =>
+      [...document.querySelectorAll('.cm-astro-token')].some((token) => token.textContent === '17');
+    for (let waitedMs = 0; waitedMs < HIGHLIGHT_WAIT_MS_MAX && !highlighted(); waitedMs += 100) {
+      await React.act(() => new Promise((resolve) => setTimeout(resolve, 100)));
+    }
     const astroTokens = [...document.querySelectorAll('.cm-astro-token')];
     const punctuation = astroTokens.find((token) => token.textContent === '<');
     const component = astroTokens.find((token) => token.textContent === 'Heading');
