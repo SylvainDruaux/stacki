@@ -1,5 +1,5 @@
 // Goal: shared/page-node.ts is the trust boundary for the page tree — anything
-// electron/astroParser or a future producer emits must survive it, and
+// electron/parse/astroParser or a future producer emits must survive it, and
 // everything malformed must die here with a useful message.
 //
 // Methodology: known-good per kind passes; each known-bad shape fails and the

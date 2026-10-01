@@ -10,7 +10,7 @@ const esbuild = require('esbuild');
 const { createHash } = require('node:crypto');
 // Disk replies carry the SHA-256 of the bytes, as main's do.
 const sha256 = (text) => createHash('sha256').update(text).digest('hex');
-const { parsePage } = require('#dist/electron/astroParser.js');
+const { parsePage } = require('#dist/electron/parse/astroParser.js');
 const { NODE_PROJECTOR } = require('#dist/electron/documentDisk.js');
 const { buildEditIntent } = require('#dist/electron/editRequests.js');
 const { toIntent } = require('#dist/shared/intent.js');

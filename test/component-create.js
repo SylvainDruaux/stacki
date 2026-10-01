@@ -366,7 +366,7 @@ const check = (what, condition, detail) => {
   check(
     'and the props panel can read them back',
     (() => {
-      const { parsePropSchema } = require(repoPath('dist/electron/astroParser.js'));
+      const { parsePropSchema } = require(repoPath('dist/electron/parse/astroParser.js'));
       const schema = parsePropSchema(withProps.text);
       return (
         schema.some((field) => field.name === 'title') &&
@@ -454,7 +454,7 @@ const check = (what, condition, detail) => {
   // ── It round-trips ────────────────────────────────────────────────────────
   // The file it writes is a file the app can open again: parsed back, it is the
   // same element it was cut from.
-  const { parsePage } = require(repoPath('dist/electron/astroParser.js'));
+  const { parsePage } = require(repoPath('dist/electron/parse/astroParser.js'));
   const reparsed = parsePage(fs.readFileSync(made.path, 'utf8'));
   const root = reparsed.model.nodes.find((node) => node.kind === 'element');
   check('the written file parses back', !!root, JSON.stringify(reparsed.model.nodes));

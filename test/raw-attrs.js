@@ -37,7 +37,7 @@ const check = (what, condition, detail) => {
 (async () => {
   // --- The file keeps them ---------------------------------------------------
   {
-    const { parsePage, serializePage } = require('#dist/electron/astroParser.js');
+    const { parsePage, serializePage } = require('#dist/electron/parse/astroParser.js');
     const { LIMITS } = require('#dist/shared/limits.js');
     const findRaw = (nodes, depth = 0) => {
       assert.ok(depth <= LIMITS.treeDepthMax, 'findRaw: depth limit');

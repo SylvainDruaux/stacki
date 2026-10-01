@@ -42,7 +42,7 @@ import {
   toByteSpan,
   toByteString,
 } from '../shared/span';
-import { parsePage, serializeNodes, serializePage } from './astroParser';
+import { parsePage, serializeNodes, serializePage } from './parse/astroParser';
 import {
   frontmatterSlot,
   pageFormat,

@@ -5,7 +5,7 @@
 const assert = require('node:assert/strict');
 const path = require('node:path');
 const esbuild = require('esbuild');
-const { parsePage } = require('#dist/electron/astroParser.js');
+const { parsePage } = require('#dist/electron/parse/astroParser.js');
 const { repoPath } = require('./helpers/sources.js');
 
 const output = repoPath('node_modules/.stacki-test/code-panel-model.cjs');

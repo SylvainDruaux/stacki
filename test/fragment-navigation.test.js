@@ -11,7 +11,7 @@ const { LIMITS } = require('#dist/shared/limits.js');
 const fs = require('node:fs');
 const path = require('node:path');
 const esbuild = require('esbuild');
-const { parsePage } = require('#dist/electron/astroParser.js');
+const { parsePage } = require('#dist/electron/parse/astroParser.js');
 const { ROOT, repoPath } = require('./helpers/sources.js');
 
 // The shape that made the real SermonSearch subtree disappear into one opaque

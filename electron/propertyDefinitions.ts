@@ -2,7 +2,7 @@ import { readPropertyOrigins } from './propertyOrigins';
 import { readPropertyContracts } from './propertyContracts';
 import type { PropertyContracts } from './propertyContracts';
 import type { PropertyOrigins } from './propertyOrigins';
-import type { SchemaField } from './astroParser.types';
+import type { SchemaField } from './parse/astroParserTypes';
 import { createPropertyTypeReader } from './propertyTypes';
 import { bindComponentDefault } from './propertyRename';
 import ts from 'typescript';
@@ -15,7 +15,7 @@ import type {
 } from '../shared/component-properties';
 import { PROPERTY_LIMITS } from '../shared/component-properties';
 import { err, ok, type Result } from '../shared/result';
-import { parsePropSchema } from './astroParser';
+import { parsePropSchema } from './parse/astroParser';
 import {
   applySourceEdits,
   defaultExpression,

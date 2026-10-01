@@ -31,7 +31,7 @@ const check = (what, condition, detail) => {
 };
 
 const { decodeEntities, encodeText } = require('#dist/shared/htmlText.js');
-const { parsePage, serializePage } = require('#dist/electron/astroParser.js');
+const { parsePage, serializePage } = require('#dist/electron/parse/astroParser.js');
 
 // ── Reading ─────────────────────────────────────────────────────────────────
 const reads = (raw, want) =>

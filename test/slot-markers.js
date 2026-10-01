@@ -39,7 +39,7 @@ const check = (what, condition, detail) => {
 };
 const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
 
-const { parsePage, serializePageMarked } = require('#dist/electron/astroParser.js');
+const { parsePage, serializePageMarked } = require('#dist/electron/parse/astroParser.js');
 const { repoPath } = require('./helpers/sources.js');
 
 // ── What the serializer writes ──────────────────────────────────────────────

@@ -17,7 +17,7 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { writeVerified } from './verified-write.entry.ts';
-import { parsePage, serializePage } from '#dist/electron/astroParser.js';
+import { parsePage, serializePage } from '#dist/electron/parse/astroParser.js';
 import { LIMITS } from '#dist/shared/limits.js';
 
 const NAMES = ['nodes-25', 'nodes-50', 'nodes-100', 'bytes-25', 'bytes-50', 'bytes-100'] as const;

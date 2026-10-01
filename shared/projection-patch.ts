@@ -9,7 +9,7 @@
 // unchanged. A host whose ancestors are all markup (element or component) uses
 // MARKUP_VALUE_BYTES; one inside a condition or a loop (cond, branch, map, with
 // markup between) uses EXPRESSION_VALUE_BYTES; any other ancestor is refused.
-// Why, from electron/astroParser.ts, first for markup:
+// Why, from electron/parse/astroParser.ts, first for markup:
 //
 //   - The tag is read by TAG_RE and its attributes by ATTR_PATTERN; both take
 //     a quoted value as `"[^"]*"` or `'[^']*'`, so any byte but the quote is

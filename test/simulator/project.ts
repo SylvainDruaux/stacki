@@ -4,8 +4,8 @@
 // every other file is an opaque document addressed only whole. Invalid UTF-8
 // is a parse-error projection, never a lossy decode (plan §3.2).
 import { createHash } from 'node:crypto';
-import { parsePage } from '#dist/electron/astroParser.js';
-import { parseMarkdownPage } from '#dist/electron/markdownParser.js';
+import { parsePage } from '#dist/electron/parse/astroParser.js';
+import { parseMarkdownPage } from '#dist/electron/parse/markdownParser.js';
 import { assert } from '#dist/shared/assert.js';
 import { toDigest, type Digest, type FilePath } from '#dist/shared/brand.js';
 import { parsePageResult } from '#dist/shared/page-node.js';

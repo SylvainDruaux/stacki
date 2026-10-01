@@ -216,7 +216,7 @@ const check = (what, condition, detail) => {
   // destructuring, where there is no type to read, and came back as `other`:
   // no expression, no list control, a page of JSON in a text box.
   {
-    const { parsePropSchema } = require(repoPath('dist/electron/astroParser.js'));
+    const { parsePropSchema } = require(repoPath('dist/electron/parse/astroParser.js'));
     const withType = (decl) => {
       const source =
         `---\ninterface Props {\n  ${decl}\n}\n` + `const { items } = Astro.props;\n---\n<div/>\n`;
@@ -269,7 +269,7 @@ const check = (what, condition, detail) => {
   // a branch offers. A member it cannot read is a prop that branch does not
   // know it has.
   {
-    const { parsePropSchema } = require(repoPath('dist/electron/astroParser.js'));
+    const { parsePropSchema } = require(repoPath('dist/electron/parse/astroParser.js'));
     const source =
       `---\ntype Props =\n  | { variant: "list"; items: { title: string; text: string }[] }\n` +
       `  | { variant: "plain"; text: string };\nconst { variant } = Astro.props as Props;\n` +

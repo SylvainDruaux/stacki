@@ -8,8 +8,8 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { test } from 'node:test';
-import { parsePage } from '#dist/electron/astroParser.js';
-import { parseMarkdownPage } from '#dist/electron/markdownParser.js';
+import { parsePage } from '#dist/electron/parse/astroParser.js';
+import { parseMarkdownPage } from '#dist/electron/parse/markdownParser.js';
 import { toDigest, toFilePath } from '#dist/shared/brand.js';
 import {
   CAPABILITIES,

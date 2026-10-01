@@ -57,7 +57,7 @@ const check = (what, condition, detail) => {
   }
 };
 
-const { parsePage, serializePageMarked } = require('#dist/electron/astroParser.js');
+const { parsePage, serializePageMarked } = require('#dist/electron/parse/astroParser.js');
 const { repoPath } = require('./helpers/sources.js');
 
 const marked = (

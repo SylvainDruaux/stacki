@@ -16,7 +16,7 @@
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const { parsePage, serializePage } = require('#dist/electron/astroParser.js');
+const { parsePage, serializePage } = require('#dist/electron/parse/astroParser.js');
 const { repoPath } = require('./helpers/sources.js');
 
 const failures = [];

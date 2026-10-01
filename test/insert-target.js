@@ -45,7 +45,7 @@ const check = (what, condition, detail) => {
     logLevel: 'silent',
   });
   const { insertTargetFor, acceptsChildren, tagOfComponent } = require(bundle);
-  const { parseSlots, rootTag } = require('#dist/electron/astroParser.js');
+  const { parseSlots, rootTag } = require('#dist/electron/parse/astroParser.js');
 
   // The page from the report: a <Section> with children, inside a layout.
   const model = {

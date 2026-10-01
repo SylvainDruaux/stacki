@@ -1,4 +1,4 @@
-// The page tree every process agrees on. Produced by electron/astroParser.js
+// The page tree every process agrees on. Produced by electron/parse/astroParser.ts
 // (kinds and field names mirror it exactly), consumed by the renderer's
 // editorTree and the IPC bridge. parsePageNode validates what that producer
 // emits and rejects everything else — the boundary is where malformed data

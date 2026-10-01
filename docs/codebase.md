@@ -45,7 +45,7 @@ Stacki solves this the way editors with faithful round trips always do: a
 structured tree for the parts the UI edits, plus **raw-text anchors for
 everything else**. Concretely:
 
-- `electron/astroParser.ts` (emits `astroParser.js`) parses an `.astro` file into a
+- `electron/parse/astroParser.ts` (emits `astroParser.js`) parses an `.astro` file into a
   `PageNode` tree. Nodes carry their **source ranges** (`.at` offsets), and
   anything not modeled (attributes in unusual order, raw `<script>`, unknown
   constructs) is kept verbatim and re-emitted on write.

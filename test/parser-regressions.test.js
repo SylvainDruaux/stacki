@@ -6,7 +6,7 @@
 
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { parsePage, serializePage, parseAttrs } = require('#dist/electron/astroParser.js');
+const { parsePage, serializePage, parseAttrs } = require('#dist/electron/parse/astroParser.js');
 const { decodeEntities, encodeText } = require('#dist/shared/htmlText.js');
 const { packageOf } = require('#dist/electron/injectedRoutes.js');
 

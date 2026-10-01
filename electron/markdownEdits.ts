@@ -45,7 +45,7 @@ import {
   printMarkdownItem,
   printMarkdownNode,
   type MarkdownLayout,
-} from './markdownParser';
+} from './parse/markdownParser';
 
 type Drafted = Result<IntentDraft, RejectionReason> | undefined;
 

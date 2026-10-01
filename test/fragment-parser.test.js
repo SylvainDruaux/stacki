@@ -7,7 +7,11 @@
 
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { parsePage, serializePage, serializePageMarked } = require('#dist/electron/astroParser.js');
+const {
+  parsePage,
+  serializePage,
+  serializePageMarked,
+} = require('#dist/electron/parse/astroParser.js');
 
 function parsed(source, options) {
   const result = parsePage(source, options);

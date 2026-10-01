@@ -39,7 +39,7 @@ const check = (what, condition, detail) => {
 };
 
 const ENTRIES = [
-  'dist/electron/astroParser.js',
+  'dist/electron/parse/astroParser.js',
   'dist/electron/componentPreview.js',
   'dist/electron/previewMarkers.js',
 ];

@@ -188,14 +188,14 @@ const NO_WHOLE_FILE_REGENERATION = [...NO_ASTRO_PRINTING, ...NO_MARKDOWN_PRINTIN
 // made from a piece of a page, a new page); the nodes and the frontmatter block
 // an edit adds, printed alone (editRequests.ts); and Markdown's HTML blocks.
 const ASTRO_PRINTER_BOUNDARY = [
-  'electron/astroParser.ts',
+  'electron/parse/astroParser.ts',
   'electron/componentFile.ts',
   'electron/editRequests.ts',
 ];
 // Markdown's parser module holds the page printer — the round-trip oracle the
 // tests hold it to, never a write path (step 10: a Markdown page reaches disk
 // only as splices) — and prints its HTML blocks with the .astro printer.
-const PRINTER_BOUNDARY = ['electron/markdownParser.ts'];
+const PRINTER_BOUNDARY = ['electron/parse/markdownParser.ts'];
 
 // Determinism is structural (plan §10): the simulator and the engine contracts
 // run on no clock, no timer, no promise and no OS. A real timer sneaking in is

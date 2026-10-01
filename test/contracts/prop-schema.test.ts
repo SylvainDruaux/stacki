@@ -8,7 +8,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { parseField, parsePropSchema } from '#dist/shared/prop-schema.js';
-import { parsePropSchema as parseAstroSchema } from '#dist/electron/astroParser.js';
+import { parsePropSchema as parseAstroSchema } from '#dist/electron/parse/astroParser.js';
 import { parseScanResult } from '#dist/shared/scan.js';
 import { LIMITS } from '#dist/shared/limits.js';
 

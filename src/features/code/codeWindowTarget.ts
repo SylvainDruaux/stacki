@@ -41,7 +41,7 @@ export function codeWindowFor(subject: CodeSubject): CodeWindowState | undefined
 }
 
 // The parser keeps exactly these elements raw (`RAW_ELEMENTS` in
-// electron/astroParser.ts), so they are the only ones with a code language.
+// electron/parse/astroParser.ts), so they are the only ones with a code language.
 const RAW_CODE_LANGUAGES: Readonly<Record<string, string>> = {
   script: 'javascript',
   style: 'css',

@@ -32,7 +32,7 @@ import type {
   ReplaceError,
 } from '../shared/documentActor';
 import { parsePageResult } from '../shared/page-node';
-import { parseMarkdownPage } from './markdownParser';
+import { parseMarkdownPage } from './parse/markdownParser';
 import type { Plan } from '../shared/planner';
 import { projectValueSplice } from '../shared/projection-patch';
 import { toRecord } from '../shared/record';
@@ -40,7 +40,7 @@ import { err, ok, type Result } from '../shared/result';
 import { createLazySnapshot, createSnapshot, type Snapshot } from '../shared/snapshot';
 import { projectOpaqueDocument, projectPage, type Projection } from '../shared/source-projection';
 import { decodeUtf8, toByteString, type ByteString } from '../shared/span';
-import { parsePage } from './astroParser';
+import { parsePage } from './parse/astroParser';
 import {
   createFileExclusive,
   digestOf,

@@ -21,7 +21,7 @@ import fs from 'fs';
 import path from 'path';
 
 import { assert } from '../shared/assert';
-import { serializePage, serializeNodes } from './astroParser';
+import { serializePage, serializeNodes } from './parse/astroParser';
 
 const toPosix = (filePath: string): string => filePath.split(path.sep).join('/');
 

@@ -182,7 +182,7 @@ const check = (what, condition, detail) => {
   // The file this was written for, if it's on this machine.
   const REAL = '/Users/timothyricks/Documents/Projects/remarkable-agency/src/pages/index.astro';
   if (fs.existsSync(REAL)) {
-    const { parsePage } = require(repoPath('dist/electron/astroParser.js'));
+    const { parsePage } = require(repoPath('dist/electron/parse/astroParser.js'));
     const page = parsePage(fs.readFileSync(REAL, 'utf8'));
     const found = [];
     const walk = (list, chain) => {

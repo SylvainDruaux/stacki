@@ -42,7 +42,11 @@ const check = (what, condition, detail) => {
   }
 };
 
-const { parsePage, serializePage, serializePageMarked } = require('#dist/electron/astroParser.js');
+const {
+  parsePage,
+  serializePage,
+  serializePageMarked,
+} = require('#dist/electron/parse/astroParser.js');
 
 const page = (body) => `---\n---\n<div>\n${body}\n</div>\n`;
 const first = (source) =>

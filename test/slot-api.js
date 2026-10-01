@@ -32,7 +32,7 @@ const check = (what, condition, detail) => {
   }
 };
 
-const { parseSlots, defaultSlotInline } = require('#dist/electron/astroParser.js');
+const { parseSlots, defaultSlotInline } = require('#dist/electron/parse/astroParser.js');
 const { repoPath } = require('./helpers/sources.js');
 
 // The DOM answers "none" with null. The fakes below that stand in for DOM APIs

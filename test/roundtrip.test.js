@@ -27,7 +27,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { repoPath } = require('./helpers/sources.js');
 
-const { parsePage, serializePage } = require('#dist/electron/astroParser.js');
+const { parsePage, serializePage } = require('#dist/electron/parse/astroParser.js');
 const { LIMITS } = require('#dist/shared/limits.js');
 
 const CORPUS_DIRECTORY = path.join(__dirname, 'corpus');

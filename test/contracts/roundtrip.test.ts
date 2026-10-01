@@ -26,7 +26,7 @@ const require = createRequire(import.meta.url);
 const astroParser: {
   parsePage: (source: string) => unknown;
   serializeNodes: (nodes: readonly unknown[]) => string;
-} = require('#dist/electron/astroParser.js');
+} = require('#dist/electron/parse/astroParser.js');
 const { parsePage, serializeNodes } = astroParser;
 
 // mulberry32 — deterministic, so a failure replays exactly.

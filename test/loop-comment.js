@@ -36,7 +36,11 @@ const check = (what, condition, detail) => {
   }
 };
 
-const { parsePage, serializePage, locateSelection } = require('#dist/electron/astroParser.js');
+const {
+  parsePage,
+  serializePage,
+  locateSelection,
+} = require('#dist/electron/parse/astroParser.js');
 const { LIMITS } = require('#dist/shared/limits.js');
 const assert = require('node:assert/strict');
 

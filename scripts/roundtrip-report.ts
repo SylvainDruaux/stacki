@@ -33,7 +33,7 @@ function record(input: unknown, where: string): Record<string, unknown> {
 }
 
 function parserAPI(): ParserAPI {
-  const input: unknown = require('../electron/astroParser.js');
+  const input: unknown = require('../electron/parse/astroParser.js');
   const value = record(input, 'astroParser');
   const parsePage = value['parsePage'];
   const serializePage = value['serializePage'];

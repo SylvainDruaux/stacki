@@ -272,8 +272,7 @@
       "node_modules/node-pty/**/*"
     ],
     "asarUnpack": [
-      "dist/electron/astroParser.js",
-      "dist/electron/astroParser.validation.js",
+      "dist/electron/parse/**",
       "dist/electron/componentPreview.js",
       "dist/electron/previewMarkers.js",
       "dist/electron/frontmatter.js",

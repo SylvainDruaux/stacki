@@ -37,7 +37,7 @@ const {
   serializePage,
   parseTemplate,
   serializeNodes,
-} = require('#dist/electron/astroParser.js');
+} = require('#dist/electron/parse/astroParser.js');
 
 // `src/editor/attrOrder.ts` is the renderer's module, so it comes in the way the app
 // gets it rather than as a copy of its rules.
@@ -278,7 +278,7 @@ const INPUT = '<Input variant="first-name" required />';
 // where it goes; it keeps the place the canvas writer gives it, which is after
 // what the tag already had.
 {
-  const { serializePageMarked } = require('#dist/electron/astroParser.js');
+  const { serializePageMarked } = require('#dist/electron/parse/astroParser.js');
   const marks = (body) => {
     const parsed = parsePage(page(body));
     return serializePageMarked(parsed.model, 'src/pages/index.astro');

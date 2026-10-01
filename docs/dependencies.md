@@ -13,7 +13,7 @@ Each entry answers three questions: **Does** (what it does for Stacki), **Why no
 
 ### `@astrojs/compiler`
 
-**Does:** parses `.astro` files into the AST the page tree is built from (`electron/astroParser.ts`).
+**Does:** parses `.astro` files into the AST the page tree is built from (`electron/parse/astroParser.ts`).
 **Why not the platform:** Astro's grammar (frontmatter, expressions, components) has no platform
 parser; this is the reference implementation. **Cost:** WASM payload; its AST shape is a contract we
 pin with round-trip tests.

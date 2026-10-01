@@ -27,7 +27,7 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { writeVerified } from './verified-write.entry.ts';
-import { parsePage } from '#dist/electron/astroParser.js';
+import { parsePage } from '#dist/electron/parse/astroParser.js';
 import { toFilePath, toIntentId } from '#dist/shared/brand.js';
 import { capabilityAcceptsVisualIntent } from '#dist/shared/capability.js';
 import { toIntent, type Intent } from '#dist/shared/intent.js';

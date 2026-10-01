@@ -50,7 +50,7 @@ import { decodeUtf8, encodeUtf8 } from '../shared/span';
 import type { Digest } from '../shared/brand';
 import { LIMITS } from '../shared/limits';
 import { ok } from '../shared/result';
-import type { SchemaField } from './astroParser.types';
+import type { SchemaField } from './parse/astroParserTypes';
 import {
   parseData,
   parseRecord,
@@ -108,8 +108,8 @@ import {
   parseSlots,
   defaultSlotInline,
   rootTag,
-} from './astroParser';
-import { parseMarkdownPage } from './markdownParser';
+} from './parse/astroParser';
+import { parseMarkdownPage } from './parse/markdownParser';
 import * as scaffoldModule from './scaffold';
 const { scaffoldProject } = scaffoldModule;
 import * as jsCollectionsModule from './jsCollections';

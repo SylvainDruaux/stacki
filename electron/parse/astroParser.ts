@@ -14,16 +14,16 @@
 // reported as not editable so the UI falls back to code view.
 
 import fs from 'node:fs';
-import { parseSerializeNodes, parseSerializePage } from './astroParser.validation';
+import { parseSerializeNodes, parseSerializePage } from './astroParserValidation';
 import path from 'node:path';
-import { collapseText, encodeText, textValue } from '../shared/htmlText';
-import { readFrontmatter, writeFrontmatter } from './frontmatter';
-import type { FrontmatterModel, ImportMember } from './frontmatter';
-import { assertTreeInvariants } from '../shared/page-node';
-import type { Attr, AttrSpan } from '../shared/page-node';
-import { toUtf16Span } from '../shared/span';
-import { assert } from '../shared/assert';
-import { LIMITS } from '../shared/limits';
+import { collapseText, encodeText, textValue } from '../../shared/htmlText';
+import { readFrontmatter, writeFrontmatter } from '../frontmatter';
+import type { FrontmatterModel, ImportMember } from '../frontmatter';
+import { assertTreeInvariants } from '../../shared/page-node';
+import type { Attr, AttrSpan } from '../../shared/page-node';
+import { toUtf16Span } from '../../shared/span';
+import { assert } from '../../shared/assert';
+import { LIMITS } from '../../shared/limits';
 import type {
   ParserNode,
   MapNode,
@@ -42,7 +42,7 @@ import type {
   SchemaField,
   RenderTag,
   SourceLocation,
-} from './astroParser.types';
+} from './astroParserTypes';
 
 export {
   parsePage,

@@ -486,7 +486,8 @@ function sources(directory: string): readonly string[] {
 test('only the marking module makes markers, and nothing imports it', () => {
   const all = [...sources('electron'), ...sources('src'), ...sources('shared')];
   const importers = all.filter((file) =>
-    /from\s+['"][./]+previewMarkers(\.js)?['"]/.test(fs.readFileSync(file, 'utf8')),
+    // Any specifier ending in the module's name, from any folder.
+    /from\s+['"][^'"]*\/previewMarkers(\.js)?['"]/.test(fs.readFileSync(file, 'utf8')),
   );
   assert.deepEqual(importers, [], 'the dev plugin requires it by path; no app module imports it');
   const callers = all.filter((file) => {
@@ -497,7 +498,7 @@ test('only the marking module makes markers, and nothing imports it', () => {
   });
   assert.deepEqual(
     callers.map((file) => file.split(path.sep).join('/')).sort(),
-    ['electron/astroParser.ts', 'electron/previewMarkers.ts'],
+    ['electron/parse/astroParser.ts', 'electron/previewMarkers.ts'],
     'the marked serializers are defined in the parser and called only by the marking module',
   );
   const marking = fs.readFileSync('electron/previewMarkers.ts', 'utf8');

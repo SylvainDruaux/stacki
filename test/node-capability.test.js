@@ -27,8 +27,8 @@ esbuild.buildSync({
 const { nodeCapability, capabilityNeedsNotice } = require(
   path.join(buildDirectory, 'nodeCapability.js'),
 );
-const { parsePage } = require('#dist/electron/astroParser.js');
-const { parseMarkdownPage } = require('#dist/electron/markdownParser.js');
+const { parsePage } = require('#dist/electron/parse/astroParser.js');
+const { parseMarkdownPage } = require('#dist/electron/parse/markdownParser.js');
 const { projectPage } = require('#dist/shared/source-projection.js');
 const { CAPABILITIES } = require('#dist/shared/capability.js');
 

@@ -19,7 +19,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const { parsePage, locateSelection } = require('#dist/electron/astroParser.js');
+const { parsePage, locateSelection } = require('#dist/electron/parse/astroParser.js');
 const { LIMITS } = require('#dist/shared/limits.js');
 
 const CORPUS_DIRECTORY = path.join(__dirname, 'corpus');

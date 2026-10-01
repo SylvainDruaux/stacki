@@ -17,7 +17,7 @@ import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { test } from 'node:test';
-import { parsePage } from '#dist/electron/astroParser.js';
+import { parsePage } from '#dist/electron/parse/astroParser.js';
 import { toFilePath } from '#dist/shared/brand.js';
 import { LIMITS } from '#dist/shared/limits.js';
 import type { Splice } from '#dist/shared/planner.js';

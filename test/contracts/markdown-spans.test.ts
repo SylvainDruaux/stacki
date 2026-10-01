@@ -25,7 +25,7 @@ import {
   printMarkdownItem,
   printMarkdownNode,
   serializeMarkdownPage,
-} from '#dist/electron/markdownParser.js';
+} from '#dist/electron/parse/markdownParser.js';
 import { LIMITS } from '#dist/shared/limits.js';
 import { markdownPrefix } from '#dist/shared/markdownLayout.js';
 import { parsePageResult, type PageModel, type PageNode } from '#dist/shared/page-node.js';

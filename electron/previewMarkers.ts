@@ -19,7 +19,7 @@ import { assert } from '../shared/assert';
 import { toDigest } from '../shared/brand';
 import { LIMITS } from '../shared/limits';
 import { stampComment, stampPathProblem } from '../shared/preview-token';
-import { markChunkHtml, parsePage, resolveChunks, serializePageMarked } from './astroParser';
+import { markChunkHtml, parsePage, resolveChunks, serializePageMarked } from './parse/astroParser';
 
 export interface MarkedSource {
   /** The marked template Vite compiles in place of the file. */
