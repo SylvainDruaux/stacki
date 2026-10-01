@@ -57,7 +57,7 @@ import AssetsPanel from './panels/AssetsPanel';
 import { getElementSchema, GLOBAL_ATTRS, HTML_TAGS, VOID_TAGS } from './editor/elementSchemas';
 import { insertTargetFor as placeInsert } from './editor/insertTarget';
 import { isInlineOnly } from './ui/RichContent';
-import { onAssetRequest, clearAssetRequest } from './assetPick';
+import { onAssetRequest, clearAssetRequest } from './ui/assetPick';
 import { isDataBound } from './editor/bindings';
 import { thenBranch } from './editor/branches';
 import { keepsSlot as keepsSlotAttribute } from './editor/slotAttr';

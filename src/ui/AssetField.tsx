@@ -2,11 +2,11 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { ElementImageIcon } from './Icons';
 import { listAssetEntries, onAssetEntriesChanged } from '../ipc/assetBridge';
 import type { WireAssetEntry } from '../../shared/ipc-results';
-import type { AssetRequest } from '../assetPick';
+import type { AssetRequest } from './assetPick';
 import type { AssetDimensions } from './AssetThumb';
 import AssetThumb from './AssetThumb';
-import { requestAsset } from '../assetPick';
-import { assetRelCandidates, assetValueFor, isExternalAsset } from '../assetPath';
+import { requestAsset } from './assetPick';
+import { assetRelCandidates, assetValueFor, isExternalAsset } from './assetPath';
 
 const kindLabel = { image: 'Image', video: 'Video', audio: 'Audio', asset: 'Asset' };
 // Refreshes one read may chain while watcher events keep arriving. Each is a

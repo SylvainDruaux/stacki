@@ -4,7 +4,7 @@ import type { CSSProperties } from 'react';
 import type { Data } from '../shared/boundary';
 import type { IpcResults, WireGitInfo, WireInjectedRoute } from '../shared/ipc-results';
 import type { ScanResult } from '../shared/scan';
-import type { AssetRequest } from './assetPick';
+import type { AssetRequest } from './ui/assetPick';
 import type { CoalescedRun } from './lib/coalescedRun';
 import type { EditsRecord } from './editor/pageEdits';
 import type { EditorNode } from './editor/pageView';

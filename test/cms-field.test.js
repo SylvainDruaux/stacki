@@ -14,7 +14,7 @@ fs.mkdirSync(path.dirname(output), { recursive: true });
 buildSync({
   stdin: {
     contents: `export {default as Field} from './src/panels/CmsField';
-      export {getPendingAsset} from './src/assetPick';`,
+      export {getPendingAsset} from './src/ui/assetPick';`,
     resolveDir: ROOT,
     loader: 'ts',
   },

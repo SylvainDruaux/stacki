@@ -26,7 +26,7 @@ const load = (file) => {
 
 try {
   const { requestAsset, onAssetRequest, clearAssetRequest, getPendingAsset } =
-    load('src/assetPick.ts');
+    load('src/ui/assetPick.ts');
   const first = [];
   const second = [];
   const unsubscribe = onAssetRequest((request) => first.push(request));

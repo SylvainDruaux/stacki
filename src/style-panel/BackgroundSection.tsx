@@ -30,8 +30,8 @@ import {
   serializeGradient,
   type GradientType,
 } from './lib/gradient';
-import { requestAsset } from '../assetPick';
-import { assetValueFor } from '../assetPath';
+import { requestAsset } from '../ui/assetPick';
+import { assetValueFor } from '../ui/assetPath';
 import { sourceCandidates } from '../ui/AssetThumb';
 import { getHost } from './lib/host';
 import GradientEditor from './GradientEditor';
