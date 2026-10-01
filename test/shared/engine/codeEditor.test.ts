@@ -17,7 +17,7 @@ import { createHash } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { mainHarness } from '../helpers/mainHarness.ts';
+import { mainHarness } from '../../helpers/mainHarness.ts';
 import { diffCodePatch, type CodeHunk } from '#dist/shared/engine/codePatch.js';
 import { parseEditRequest, type Edit } from '#dist/shared/engine/editRequest.js';
 import { LIMITS } from '#dist/shared/core/limits.js';

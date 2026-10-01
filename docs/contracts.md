@@ -197,7 +197,7 @@ The parser (`parsePage(text, { locs: true })`) reports `start`/`end` on every
 node — branches and inline-run gap spaces included — and `attrSpans` on every
 tag: the whole attribute, its name and its value, in UTF-16 offsets.
 `parsePageNode` validates them against the node's range and its props record.
-The span-integrity suite (`test/contracts/span-integrity.test.ts`) slices every
+The span-integrity suite (`test/shared/core/spanIntegrity.test.ts`) slices every
 node and attribute of every corpus, round-trip, editor-core and large fixture
 and requires the reported text back, in UTF-16 and in bytes. The Markdown
 parser (step 10) reports the same for `.md` and `.mdx`: every node's range,

@@ -23,7 +23,8 @@ import { parseHookPayload } from '../../scripts/agent/payload.mts';
 import { decideStop, parseStopState, reportDigest } from '../../scripts/agent/stopState.mts';
 import { commitMessageProblems } from '../../scripts/policy/commitMessage.mts';
 
-const ROOT = path.resolve(import.meta.dirname, '..', '..');
+// The runner starts every suite at the repository root.
+const ROOT = process.cwd();
 
 function verdictOf(command: string): string {
   return commandVerdict(command, ROOT).kind;

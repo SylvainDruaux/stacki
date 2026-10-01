@@ -7,7 +7,8 @@ import { resolve } from 'node:path';
 import { test } from 'node:test';
 import { record, text } from '#dist/shared/core/boundary.js';
 
-const root = resolve(import.meta.dirname, '../..');
+// The runner starts every suite at the repository root.
+const root = process.cwd();
 const filesMax = 1000;
 
 test('all compiler output lives under dist', () => {

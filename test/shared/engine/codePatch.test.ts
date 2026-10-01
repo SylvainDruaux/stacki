@@ -25,8 +25,12 @@ import { LIMITS } from '#dist/shared/core/limits.js';
 import { shiftUntouched } from '#dist/shared/engine/rebase.js';
 import { encodeUtf8, toByteSpan } from '#dist/shared/core/span.js';
 
-const ROOT = path.join(import.meta.dirname, '..');
-const FIXTURE_DIRECTORIES = ['corpus', 'fixtures/editor-core', 'fixtures/round-trip'];
+// Repository paths: the runner starts every suite at the repository root.
+const FIXTURE_DIRECTORIES = [
+  'test/corpus',
+  'test/fixtures/editor-core',
+  'test/fixtures/round-trip',
+];
 
 function fixtures(): readonly {
   readonly name: string;
@@ -34,11 +38,11 @@ function fixtures(): readonly {
 }[] {
   return FIXTURE_DIRECTORIES.flatMap((directory) =>
     fs
-      .readdirSync(path.join(ROOT, directory))
+      .readdirSync(path.resolve(directory))
       .filter((name) => /\.(astro|mdx?|css)$/.test(name))
       .map((name) => ({
         name,
-        text: fs.readFileSync(path.join(ROOT, directory, name), 'utf8'),
+        text: fs.readFileSync(path.resolve(directory, name), 'utf8'),
       })),
   );
 }

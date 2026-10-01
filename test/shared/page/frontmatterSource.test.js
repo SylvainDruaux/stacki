@@ -14,7 +14,7 @@ const {
   serializePage,
   serializePageMarked,
 } = require('#dist/electron/parse/astroParser.js');
-const { repoPath } = require('./helpers/sources.js');
+const { repoPath } = require('../../helpers/sources.js');
 
 const SOURCE = `---
 

@@ -35,6 +35,10 @@ const RULES = [
     message: 'a #dist import names its file with the extension: #dist/…/x.js',
   },
   {
+    pattern: /import\.meta\.dirname,\s*'\.\./,
+    message: 'the repository root from import.meta.dirname: use the working directory',
+  },
+  {
     pattern: /__dirname,\s*'\.\./,
     message: 'the repository root from __dirname: use ROOT or repoPath',
   },
