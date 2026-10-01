@@ -130,6 +130,9 @@ test('layout names: camelCase folders and modules, PascalCase components', () =>
     'src/features/style/embedEditor.css',
     'src/features/style/components/ClassPicker.css',
     'src/main.tsx',
+    'electron/content/workers/stubAstroContent.mjs',
+    'electron/terminal/nodePty.d.ts',
+    'electron/tsconfig.preload.json',
     // Outside the layout roots the rule does not apply yet.
     'scripts/policy/commit-message.mts',
   ]) {
@@ -141,6 +144,8 @@ test('layout names: camelCase folders and modules, PascalCase components', () =>
     'src/features/content/contentSchema.types.ts',
     'src/features/props/Props_Panel.tsx',
     'src/features/props/PropsPanel.ts',
+    'electron/content/workers/stub-astro-content.mjs',
+    'electron/app/main.types.ts',
   ]) {
     assert.deepEqual(rules(file, header), ['layout-name'], file);
   }

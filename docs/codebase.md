@@ -86,11 +86,11 @@ Four cooperating processes, each with one job:
 
 - **Main** (`electron/`, Node.js, CommonJS): owns everything that touches the
   OS. `main.ts` (emits `main.js`, 113 invoke channels) is a registry of
-  capabilities; leaf modules do the work (`astroParser`, `frontmatter`,
-  `assetRefs`, `cssVars`, `gitBranches`, `gitHistory`,
-  `projectWatcher`, `terminal` via node-pty, `previewWorktree`,
-  `serialQueue`, `windowBounds`, content-collection tooling in
-  `electron/content/workers/`, data-format parsers in `electron/content/formats/`).
+  capabilities; the area folders do the work — the parsers in `parse/`, the
+  write path in `documents/`, content collections in `content/`, component
+  properties in `properties/`, project services in `project/`, and git, the
+  dev-server preview and the terminal (node-pty) in their own folders. See
+  the directory map below.
 - **Preload** (`electron/preload/preload.ts`): a sandboxed bridge exposing an
   allowlisted `window.avb` API via `contextBridge`. Must stay CommonJS
   (Electron ≥ 33 sandbox requirement).
@@ -304,9 +304,17 @@ batching/queueing write path (already the right shape).
 
 | Path | What lives there |
 | --- | --- |
-| `electron/` | Main process: IPC registry, parsers, git, watcher, terminal, packaging helpers |
-| `electron/content/workers/` | Astro content-collection introspection + stubs injected into the dev server |
-| `electron/content/formats/` | Leaf parsers for data files (JSON/YAML/TOML/CSV/NDJSON/frontmatter) |
+| `electron/main.ts` | The main process's entry: the IPC registry and window |
+| `electron/lib/` | Bounds, platform facts, the serial queue, the IPC registrar, runtime paths |
+| `electron/parse/` | The Astro and Markdown parsers (unpacked: the dev server loads them) |
+| `electron/documents/` | The write path: document actors, edit requests, atomic writes |
+| `electron/content/` | Content collections and CMS references; `formats/` parsers, `workers/` |
+| `electron/properties/` | Component properties: definitions, consumers, renames |
+| `electron/project/` | Scaffolding, the watcher, thumbnails, assets, CSS variables |
+| `electron/git/`, `preview/`, `terminal/` | Git; the dev server and preview worktree; the terminal |
+| `electron/previewServer/` | Modules the project's own dev server runs (unpacked) |
+| `electron/previewClient/`, `preload/` | The preview's browser script; the sandboxed bridge |
+| `electron/app/` | main.ts's own types, payload validation and window bounds |
 | `src/main.tsx` | The renderer's entry: mounts `src/app/App.tsx` |
 | `src/lib/` | Generic utilities that know nothing of pages or features |
 | `src/ipc/` | The typed bridges to main that more than one feature uses |
@@ -319,6 +327,12 @@ batching/queueing write path (already the right shape).
 | `test/` | Suites (round-trip, canvas-stub, contract, packaging); harnesses in `test/helpers/` |
 | `docs/` | This file, the contracts, the enforcement map, the editor-core plan |
 
+The main process's folders are areas, each importing only the areas listed
+for it in `eslint.config.mjs` (`ELECTRON_AREAS`): `lib` is the floor, the
+parsers sit on it, the write path on the parsers, and content, project,
+git and properties on the write path. The preview server imports only the
+parser, and the preview client and the preload nothing of main's.
+
 The renderer's folders are layers, lowest first: `lib` → `ipc` → `editor` →
 `ui` → `features` → `app`. A module imports only the layers below its own,
 and a feature imports another feature only along the edges listed in
@@ -327,7 +341,7 @@ the style panel's editors, component properties use the props panel's
 fields, and history draws with git's widgets. The lint rule
 `stacki/source-layers` holds the order; the policy scan holds the names —
 camelCase folders and modules, PascalCase components, every name unique
-under `src/`.
+under `src/` and under `electron/`.
 
 ## Standing rules
 

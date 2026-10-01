@@ -410,3 +410,53 @@ tester.run('source-layers', rules['source-layers'], {
     },
   ],
 });
+
+// The area shape (the main process): each area imports only those listed.
+const AREA_OPTIONS: [
+  {
+    readonly repository: string;
+    readonly root: string;
+    readonly outside: readonly string[];
+    readonly areas: Readonly<Record<string, readonly string[]>>;
+  },
+] = [
+  {
+    repository: process.cwd(),
+    root: 'electron',
+    outside: ['shared'],
+    areas: { main: ['*'], lib: [], parse: ['lib'], documents: ['lib', 'parse'] },
+  },
+];
+const areaCase = (file: string, code: string) => ({
+  code,
+  filename: path.join(process.cwd(), file),
+  options: AREA_OPTIONS,
+});
+
+tester.run('source-layers (areas)', rules['source-layers'], {
+  valid: [
+    areaCase('electron/documents/sample.ts', "import { a } from '../parse/sample';"),
+    areaCase('electron/documents/sample.ts', "import { a } from './other';"),
+    areaCase('electron/main.ts', "import { a } from './documents/sample';"),
+    areaCase('electron/lib/sample.ts', "import { a } from '../../shared/sample';"),
+  ],
+  invalid: [
+    {
+      ...areaCase('electron/parse/sample.ts', "import { a } from '../documents/sample';"),
+      errors: [{ messageId: 'areaEdge' }],
+    },
+    {
+      ...areaCase('electron/lib/sample.ts', "import { a } from '../parse/sample';"),
+      errors: [{ messageId: 'areaEdge' }],
+    },
+    {
+      // An area the config does not list imports nothing outside itself.
+      ...areaCase('electron/unlisted/sample.ts', "import { a } from '../lib/sample';"),
+      errors: [{ messageId: 'areaEdge' }],
+    },
+    {
+      ...areaCase('electron/lib/sample.ts', "import { a } from '../../src/sample';"),
+      errors: [{ messageId: 'outsideRoot' }],
+    },
+  ],
+});

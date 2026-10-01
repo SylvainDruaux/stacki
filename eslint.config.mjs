@@ -319,6 +319,36 @@ const SOURCE_LAYERS = {
   outsideEdges: { 'app/App': ['electron/frontmatter'] },
 };
 
+// The main process's areas (docs/codebase.md, "Directory map"): each folder
+// imports only the areas listed for it, so the write path cannot come to
+// depend on what is built on it. lib is the floor. The three folders that do
+// not run in the main process import nothing of main's but what they run:
+// the preview server only the parser (it is unpacked from the asar, and its
+// closure stays small), the preview client and the preload nothing at all.
+const ELECTRON_AREAS = {
+  repository: import.meta.dirname,
+  root: 'electron',
+  outside: ['shared'],
+  areas: {
+    main: ['*'],
+    lib: [],
+    // frontmatter.ts is a root file until it moves into shared/.
+    frontmatter: [],
+    parse: ['lib', 'frontmatter'],
+    documents: ['lib', 'parse'],
+    content: ['lib', 'documents'],
+    project: ['lib', 'documents'],
+    git: ['lib', 'documents'],
+    terminal: ['lib'],
+    properties: ['lib', 'parse', 'documents', 'content'],
+    preview: ['lib', 'git'],
+    app: ['lib', 'content'],
+    previewServer: ['parse'],
+    previewClient: [],
+    preload: [],
+  },
+};
+
 export default [
   {
     ignores: ['node_modules/**', 'dist/**', 'release/**', 'coverage/**', '**/generated/**'],
@@ -434,6 +464,10 @@ export default [
   {
     files: ['src/**/*.{ts,tsx}'],
     rules: { 'stacki/source-layers': ['error', SOURCE_LAYERS] },
+  },
+  {
+    files: ['electron/**/*.ts'],
+    rules: { 'stacki/source-layers': ['error', ELECTRON_AREAS] },
   },
   {
     // These adapters validate values from PostCSS, DOM storage, and the host
