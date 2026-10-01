@@ -15,7 +15,7 @@ interface TipSurfaceProps {
   readonly hide: () => void;
 }
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { HelpCircleIcon } from './Icons.jsx';
+import { HelpCircleIcon } from './Icons';
 
 const DELAY = 120;
 const MARGIN = 8; // keep the bubble this far from the window's edges

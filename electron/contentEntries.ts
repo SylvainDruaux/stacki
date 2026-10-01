@@ -1,16 +1,16 @@
 import fs from 'fs';
 import path from 'path';
 
-import { LIMITS } from '../shared/limits.js';
-import { toRecord, toArray } from '../shared/record.js';
-import { MAIN_LIMITS } from './main.bounds.js';
-import { writeProjectText } from './documentWrites.js';
-import * as frontmatter from './formats/frontmatter.js';
-import * as jsonFormat from './formats/json.js';
-import * as yamlFormat from './formats/yaml.js';
-import * as tomlFormat from './formats/toml.js';
-import * as csvFormat from './formats/csv.js';
-import * as ndjsonFormat from './formats/ndjson.js';
+import { LIMITS } from '../shared/limits';
+import { toRecord, toArray } from '../shared/record';
+import { MAIN_LIMITS } from './main.bounds';
+import { writeProjectText } from './documentWrites';
+import * as frontmatter from './formats/frontmatter';
+import * as jsonFormat from './formats/json';
+import * as yamlFormat from './formats/yaml';
+import * as tomlFormat from './formats/toml';
+import * as csvFormat from './formats/csv';
+import * as ndjsonFormat from './formats/ndjson';
 
 // Finding, reading and writing the entries of a content collection.
 //

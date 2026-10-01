@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import type { PointerEvent } from 'react';
-import CodeEditor from './CodeEditor.jsx';
+import CodeEditor from './CodeEditor';
 import type { CodeEditorProps } from './CodeEditor';
-import { CloseIcon, CodeIcon } from './Icons.jsx';
+import { CloseIcon, CodeIcon } from './Icons';
 import { usePointerDrag } from './usePointerDrag';
 
 const clamp = (value: number, minimum: number, maximum: number): number =>

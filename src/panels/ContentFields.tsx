@@ -6,11 +6,11 @@ import { assert } from '../../shared/assert';
 import { labelize, memberFor, fieldIssue, hintFor } from '../contentSchema';
 import type { FieldDescriptor } from '../contentSchema';
 import { readContentTargets } from '../contentViewBridge';
-import AssetField from '../ui/AssetField.jsx';
-import AutoTextarea from '../ui/AutoTextarea.jsx';
-import ExprInput from '../ui/ExprInput.jsx';
-import { ChevronRightIcon, CloseIcon, DragIcon, PlusIcon, TrashIcon } from '../ui/Icons.jsx';
-import useListReorder from '../ui/useListReorder.js';
+import AssetField from '../ui/AssetField';
+import AutoTextarea from '../ui/AutoTextarea';
+import ExprInput from '../ui/ExprInput';
+import { ChevronRightIcon, CloseIcon, DragIcon, PlusIcon, TrashIcon } from '../ui/Icons';
+import useListReorder from '../ui/useListReorder';
 
 const TARGET_CACHE_MAX = 128;
 type Target = { readonly id: string; readonly title: string };

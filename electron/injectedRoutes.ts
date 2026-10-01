@@ -17,7 +17,7 @@
 import fs from 'fs';
 import path from 'path';
 
-import { toRecord, toArray } from '../shared/record.js';
+import { toRecord, toArray } from '../shared/record';
 
 /** The package an entrypoint belongs to, when it is inside one. */
 function packageOf(entrypoint: unknown): string | undefined {

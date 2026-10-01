@@ -6,7 +6,7 @@
 // business, and all of it is preserved by only ever replacing the frontmatter
 // span — or, when the body itself is edited, only the body span.
 
-import * as yaml from './yaml.js';
+import * as yaml from './yaml';
 
 const FRONTMATTER = /^(---)([ \t]*\r?\n)([\s\S]*?)(\r?\n)(---)([ \t]*)(\r?\n?)/;
 

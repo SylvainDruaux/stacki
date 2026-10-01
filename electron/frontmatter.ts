@@ -2,10 +2,10 @@
 // editable records; their slots retain the code and whitespace between them.
 // No renderer or Node dependencies: this module is also loaded by Astro.
 
-import { assert } from '../shared/assert.js';
+import { assert } from '../shared/assert';
 
-import type { ImportMember, ImportSlot, FrontmatterLayout } from '../shared/frontmatter.js';
-export type { ImportMember, ImportSlot, FrontmatterLayout } from '../shared/frontmatter.js';
+import type { ImportMember, ImportSlot, FrontmatterLayout } from '../shared/frontmatter';
+export type { ImportMember, ImportSlot, FrontmatterLayout } from '../shared/frontmatter';
 
 type SerializableImport = Omit<ImportMember, 'at'> & { readonly at?: number };
 

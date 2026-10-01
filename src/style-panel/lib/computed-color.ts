@@ -13,7 +13,7 @@
 // colour, which is what the swatch paints.
 
 import { useEffect, useState } from 'react';
-import { hasCanvas, queryCanvas } from '../../canvasQuery.js';
+import { hasCanvas, queryCanvas } from '../../canvasQuery';
 import { getHost, onHostChange } from './host';
 import { createQueryCache } from './query-cache';
 

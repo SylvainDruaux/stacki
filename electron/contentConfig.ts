@@ -3,8 +3,8 @@ import path from 'path';
 import { createRequire } from 'module';
 import { spawn, type ChildProcess } from 'child_process';
 
-import { toRecord, toArray } from '../shared/record.js';
-import { MAIN_LIMITS } from './main.bounds.js';
+import { toRecord, toArray } from '../shared/record';
+import { MAIN_LIMITS } from './main.bounds';
 
 // Reads a project's Astro content config — src/content.config.ts — and reports
 // what collections it declares.

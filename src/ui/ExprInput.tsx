@@ -18,7 +18,7 @@ import { EditorState, StateEffect, StateField } from '@codemirror/state';
 import { javascript } from '@codemirror/lang-javascript';
 import { history, historyKeymap, defaultKeymap } from '@codemirror/commands';
 import { autocompletion, completionKeymap } from '@codemirror/autocomplete';
-import { appTheme, appHighlight } from './CodeEditor.jsx';
+import { appTheme, appHighlight } from './CodeEditor';
 
 // The data inside an expression, drawn as chips. They are marks, not widgets:
 // the text underneath stays text, so the value is always exactly what is typed

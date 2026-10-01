@@ -17,7 +17,7 @@ export interface InsertTarget {
   readonly parentId: string | undefined;
   readonly index: number;
 }
-import { canContainTag, VOID_TAGS } from './elementSchemas.js';
+import { canContainTag, VOID_TAGS } from './elementSchemas';
 
 // Where a new node goes: inside the selection when it accepts children,
 // otherwise right after it; with no selection, at the end of the page.

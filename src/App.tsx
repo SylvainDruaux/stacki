@@ -19,12 +19,12 @@ import {
   noteText,
   noteValue,
   selectionAfterDelete,
-} from './treeSelection.js';
-import { canvasClickAction } from './canvasClick.js';
-import { liveClassesById as classesByNodeId, rendersOwnElement } from './liveClasses.js';
-import { setSoundEnabled } from './ui/sound.js';
-import { createPreviewWatch } from './previewRecovery.js';
-import { tellCanvas } from './canvasQuery.js';
+} from './treeSelection';
+import { canvasClickAction } from './canvasClick';
+import { liveClassesById as classesByNodeId, rendersOwnElement } from './liveClasses';
+import { setSoundEnabled } from './ui/sound';
+import { createPreviewWatch } from './previewRecovery';
+import { tellCanvas } from './canvasQuery';
 import { parsePageSource as parseSourcePage, readPage, readSymbol, scanProject } from './bridge';
 import { checkoutGitBranch, readGitInfo } from './gitChipBridge';
 import { LIMITS } from '../shared/limits';
@@ -33,7 +33,7 @@ import PreviewPane from './panels/PreviewPane';
 import GitChip from './panels/GitChip';
 import HistoryPanel, { relativeTime } from './panels/HistoryPanel';
 import { ConfirmHost, confirmDialog } from './ui/ConfirmDialog';
-import { mergeBranchAction, deleteBranchAction } from './gitActions.js';
+import { mergeBranchAction, deleteBranchAction } from './gitActions';
 import LeftRail from './ui/LeftRail';
 import { lazyPanel } from './ui/lazyPanel';
 import PageSwitcher from './ui/PageSwitcher';
@@ -43,22 +43,22 @@ import {
   ASTRO_ASSETS_MODULE,
   PLACEHOLDER_PROPS,
   astroAsset as astroAssetDef,
-} from './astroAssets.js';
+} from './astroAssets';
 import InsertSearch from './ui/InsertSearch';
 import AssetsPanel from './panels/AssetsPanel';
-import { getElementSchema, GLOBAL_ATTRS, HTML_TAGS, VOID_TAGS } from './elementSchemas.js';
-import { insertTargetFor as placeInsert } from './insertTarget.js';
+import { getElementSchema, GLOBAL_ATTRS, HTML_TAGS, VOID_TAGS } from './elementSchemas';
+import { insertTargetFor as placeInsert } from './insertTarget';
 import { isInlineOnly } from './ui/RichContent';
-import { onAssetRequest, clearAssetRequest } from './assetPick.js';
-import { isDataBound } from './bindings.js';
-import { thenBranch } from './branches.js';
-import { keepsSlot as keepsSlotAttribute } from './slotAttr.js';
+import { onAssetRequest, clearAssetRequest } from './assetPick';
+import { isDataBound } from './bindings';
+import { thenBranch } from './branches';
+import { keepsSlot as keepsSlotAttribute } from './slotAttr';
 import {
   createFileSaver,
   createPageSaver,
   scanContainsFile,
   type PageSaver,
-} from './pagePersistence.js';
+} from './pagePersistence';
 import { createEntrySender, previewGestures } from './pageSender';
 import { createCoalescedRun } from './coalescedRun';
 import { carryHandles, seedOf } from './nodeHandles';
@@ -90,18 +90,13 @@ import {
   withChildren,
   wrapGesture,
 } from './editGestures';
-import {
-  saveStateAccepted,
-  saveStateBase,
-  saveStateEdited,
-  saveStateRefused,
-} from './saveState.js';
+import { saveStateAccepted, saveStateBase, saveStateEdited, saveStateRefused } from './saveState';
 import SaveConflictNotice from './panels/SaveConflictNotice';
 import CapabilityNotice from './panels/CapabilityNotice';
 import { nodeCapability } from './nodeCapability';
 import type { PageEdited } from '../shared/page-save';
 import type { Digest, NodeId } from '../shared/brand';
-import { ancestorChain, createTreeIndex, nodeAtPath, pathOfNode } from './editorTree.js';
+import { ancestorChain, createTreeIndex, nodeAtPath, pathOfNode } from './editorTree';
 import { readFrontmatter, writeFrontmatter } from '../electron/frontmatter';
 import {
   renamedLoopVar,
@@ -109,21 +104,21 @@ import {
   disconnectedLoops,
   loopVarsAt,
   strippedBindings,
-} from './loopBindings.js';
+} from './loopBindings';
 import {
   namesUsedIn,
   neededFrontmatter,
   unusedDeclarations,
   withStatements,
   withoutDeclarations,
-} from './frontmatterMove.js';
-import { hasClass, namesIn, withClass } from './classAttr.js';
-import { toComponentName } from './componentName.js';
-import { resolveInstanceProps } from './instanceProps.js';
-import { propsForExtraction } from './extractProps.js';
+} from './frontmatterMove';
+import { hasClass, namesIn, withClass } from './classAttr';
+import { toComponentName } from './componentName';
+import { resolveInstanceProps } from './instanceProps';
+import { propsForExtraction } from './extractProps';
 import TerminalDock from './panels/TerminalDock';
-import { cleanError, stripAnsi } from './cleanError.js';
-import { elementLabel } from './classNames.js';
+import { cleanError, stripAnsi } from './cleanError';
+import { elementLabel } from './classNames';
 import {
   autoQueryName,
   collectionsInScope,
@@ -134,7 +129,7 @@ import {
   QUERY_MARK,
   referencesInScope,
   removeMarkedQuery,
-} from './dataSuggest.js';
+} from './dataSuggest';
 import {
   PreviewIcon,
   RefreshIcon,
@@ -159,9 +154,9 @@ import type { VariableSelection } from './variablesBridge';
 import type { InsertTarget } from './insertTarget';
 import type { InsertItem } from './ui/InsertSearch';
 import { toRecord } from '../shared/record';
-import { projectRelativePath } from './projectPath.js';
-import { currentDesktopPlatform, shortcutLabel } from './shortcutLabel.js';
-import { sourceNodeAtOffset } from './codePanelModel.js';
+import { projectRelativePath } from './projectPath';
+import { currentDesktopPlatform, shortcutLabel } from './shortcutLabel';
+import { sourceNodeAtOffset } from './codePanelModel';
 import {
   codeWindowFor,
   FRONTMATTER_SUBJECT,

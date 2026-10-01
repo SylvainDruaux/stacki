@@ -6,22 +6,22 @@ import {
   updateComponentProperties,
   type FileChange,
 } from './componentProperties';
-import { renderComponentPreviewPage } from './componentPreview.js';
-import { createIpcRegistrar } from './ipc.js';
-import { MAIN_LIMITS, readSource, directoryBudget } from './main.bounds.js';
-import { isAtomicTemporary } from './atomicWrite.js';
-import { createNodeDocumentActors, type EditReport, type WriteReport } from './documentActors.js';
-import { buildEdit } from './editRequests.js';
-import { previewEdit } from './editPreview.js';
+import { renderComponentPreviewPage } from './componentPreview';
+import { createIpcRegistrar } from './ipc';
+import { MAIN_LIMITS, readSource, directoryBudget } from './main.bounds';
+import { isAtomicTemporary } from './atomicWrite';
+import { createNodeDocumentActors, type EditReport, type WriteReport } from './documentActors';
+import { buildEdit } from './editRequests';
+import { previewEdit } from './editPreview';
 import {
   createProjectText,
   describeWriteReport,
   documentHost,
   installDocumentHost,
   writeProjectText,
-} from './documentWrites.js';
-import { definedFields } from '../shared/boundary.js';
-import { gitErrorDetail } from './git.js';
+} from './documentWrites';
+import { definedFields } from '../shared/boundary';
+import { gitErrorDetail } from './git';
 import {
   commandNeedsShell,
   isPathDescendant,
@@ -31,7 +31,7 @@ import {
   sameFilesystemPath,
   setPathEnvironment,
   staticToolPathGuesses,
-} from './platform.js';
+} from './platform';
 import { userInfo } from 'os';
 import type {
   BrowserWindow as Window,
@@ -40,16 +40,16 @@ import type {
   OpenDialogOptions,
 } from 'electron';
 import type { ChildProcess, ExecFileOptions } from 'child_process';
-import { toRecord, toArray } from '../shared/record.js';
-import { assert } from '../shared/assert.js';
-import type { IpcPayloads } from '../shared/ipc-payloads.js';
-import type { IpcResults, WirePageEditError, WirePageWriteFailure } from '../shared/ipc-results.js';
-import { describeRejection, type RejectionReason } from '../shared/intent.js';
-import { decodeUtf8, encodeUtf8 } from '../shared/span.js';
-import type { Digest } from '../shared/brand.js';
-import { LIMITS } from '../shared/limits.js';
-import { ok } from '../shared/result.js';
-import type { SchemaField } from './astroParser.types.js';
+import { toRecord, toArray } from '../shared/record';
+import { assert } from '../shared/assert';
+import type { IpcPayloads } from '../shared/ipc-payloads';
+import type { IpcResults, WirePageEditError, WirePageWriteFailure } from '../shared/ipc-results';
+import { describeRejection, type RejectionReason } from '../shared/intent';
+import { decodeUtf8, encodeUtf8 } from '../shared/span';
+import type { Digest } from '../shared/brand';
+import { LIMITS } from '../shared/limits';
+import { ok } from '../shared/result';
+import type { SchemaField } from './astroParser.types';
 import {
   parseData,
   parseRecord,
@@ -62,7 +62,7 @@ import {
   parseDynamicPaths,
   parseSampleEntry,
   parseAstroLock,
-} from './main.validation.js';
+} from './main.validation';
 import type {
   RecentProject,
   AssetEntry,
@@ -71,7 +71,7 @@ import type {
   GitInfo,
   DevServer,
   PreviewServer,
-} from './main.types.js';
+} from './main.types';
 
 import * as electronModule from 'electron';
 const {
@@ -114,7 +114,7 @@ const { scaffoldProject } = scaffoldModule;
 import * as jsCollectionsModule from './jsCollections';
 const { findCollections, replaceCollection, readGeneral, writeGeneral, GENERAL } =
   jsCollectionsModule;
-import * as assetRefsModule from './assetRefs.js';
+import * as assetRefsModule from './assetRefs';
 const { defaultImports, addImport, importName, importSpecFor, withAssets } = assetRefsModule;
 import * as cmsRefsModule from './cmsRefs';
 const { aliasMap, importersOf, resolveImport } = cmsRefsModule;
@@ -122,7 +122,7 @@ import * as contentConfigModule from './contentConfig';
 const { readContentConfig, validateEntry, stopAllServices } = contentConfigModule;
 import * as thumbs from './thumbs';
 import * as cssVars from './cssVars';
-import * as injectedRoutesModule from './injectedRoutes.js';
+import * as injectedRoutesModule from './injectedRoutes';
 const { readInjectedRoutes } = injectedRoutesModule;
 import * as starterModule from './starter';
 const { createStarter } = starterModule;

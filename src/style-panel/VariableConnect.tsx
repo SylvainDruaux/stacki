@@ -12,7 +12,7 @@ import { createPortal, flushSync } from 'react-dom';
 import { streamProjectVariables, type ProjectVariable } from './lib/webflow';
 import { panelBox, panelSpan } from './lib/panel-box';
 import { caretOffset, highlightCss, setCaretOffset, stepNumberAt, stepSize } from './lib/css-code';
-import CustomValue, { doesNotFit } from '../ui/CustomValueEditor.jsx';
+import CustomValue, { doesNotFit } from '../ui/CustomValueEditor';
 import { insertBinding } from './lib/insert-binding';
 import { isHTMLElementInDocument, isNodeInDocument } from './lib/dom';
 import { registerPopupLayer } from './lib/popup-layer';

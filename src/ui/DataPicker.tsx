@@ -8,7 +8,7 @@ import {
   CodeIcon,
   SearchIcon,
   PencilIcon,
-} from './Icons.jsx';
+} from './Icons';
 
 // The data behind the page, as something you can look through rather than
 // something you have to already know. Every row is a value that is in scope

@@ -44,7 +44,7 @@ interface NeededFrontmatter {
 // in the code counts — and deleting is refused for anything it cannot be sure
 // about.
 
-import { findDeclaration, findImportOf, parseDeclarations } from './dataSuggest.js';
+import { findDeclaration, findImportOf, parseDeclarations } from './dataSuggest';
 
 // Words that are the language rather than something the page declared.
 const KEYWORDS = new Set([

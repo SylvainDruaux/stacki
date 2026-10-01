@@ -10,7 +10,7 @@ import {
   VariableIcon,
   CodeIcon,
   HistoryIcon,
-} from './Icons.jsx';
+} from './Icons';
 
 const TABS = [
   { id: 'pages', title: 'Pages', shortcut: 'P', Icon: PagePanelIcon },

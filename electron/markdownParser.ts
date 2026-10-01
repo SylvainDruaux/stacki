@@ -42,7 +42,7 @@ import { assert } from '../shared/assert';
 import { LIMITS } from '../shared/limits';
 import type { Attr, AttrSpan } from '../shared/page-node';
 import { toUtf16Span } from '../shared/span';
-import { parseTemplate, serializeNodes } from './astroParser.js';
+import { parseTemplate, serializeNodes } from './astroParser';
 
 /** A line as one container sees it: its text with the container's own syntax
  * taken off the front (a quote's `>`, an item's indentation), and where that

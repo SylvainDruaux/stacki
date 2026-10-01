@@ -13,7 +13,7 @@ import { StreamLanguage } from '@codemirror/language';
 import type { StringStream } from '@codemirror/language';
 import { history, historyKeymap, defaultKeymap } from '@codemirror/commands';
 import { tags as t } from '@lezer/highlight';
-import { appTheme, appHighlight } from './CodeEditor.jsx';
+import { appTheme, appHighlight } from './CodeEditor';
 
 // A `style` attribute holds a declaration list, not a stylesheet — no
 // selector, no braces. @codemirror/lang-css can't read that: it parses

@@ -2,8 +2,8 @@
 // for large sites while making a pathological project fail near its cause.
 import * as fs from 'fs';
 import * as path from 'path';
-import { assert } from '../shared/assert.js';
-import { LIMITS } from '../shared/limits.js';
+import { assert } from '../shared/assert';
+import { LIMITS } from '../shared/limits';
 
 // The source-file bound lives in shared/limits.ts (plan §8), because the actor,
 // the renderer and these readers must all refuse the same file.

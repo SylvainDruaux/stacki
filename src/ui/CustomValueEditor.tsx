@@ -3,7 +3,7 @@ import type { CSSProperties, RefObject } from 'react';
 import { createPortal } from 'react-dom';
 import VariableConnect from '../style-panel/VariableConnect';
 import { registerPopupLayer } from '../style-panel/lib/popup-layer';
-import { popupBox } from './Dropdown.jsx';
+import { popupBox } from './Dropdown';
 
 // The whole value, in a box big enough to read it.
 //

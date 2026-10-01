@@ -1,10 +1,10 @@
 import fs from 'fs';
 import path from 'path';
 
-import { LIMITS } from '../shared/limits.js';
-import { toRecord, toArray } from '../shared/record.js';
-import { listEntries, writeEntry } from './contentEntries.js';
-import type { Entry as ListedEntry } from './contentEntries.js';
+import { LIMITS } from '../shared/limits';
+import { toRecord, toArray } from '../shared/record';
+import { listEntries, writeEntry } from './contentEntries';
+import type { Entry as ListedEntry } from './contentEntries';
 
 // Renaming an entry, and everything that points at it.
 //

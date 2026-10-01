@@ -3,9 +3,9 @@ import type { CSSProperties, RefObject } from 'react';
 import { assert } from '../../shared/assert';
 import { LIMITS } from '../../shared/limits';
 import { createPortal } from 'react-dom';
-import { MoreIcon } from './Icons.jsx';
-import useDismiss from './useDismiss.js';
-import { popupBox } from './Dropdown.jsx';
+import { MoreIcon } from './Icons';
+import useDismiss from './useDismiss';
+import { popupBox } from './Dropdown';
 
 // The `⋯` that opens a short menu of things to do to the thing beside it.
 //

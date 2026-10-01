@@ -153,8 +153,8 @@ function importSpecFor({
   return relative;
 }
 
-import { LIMITS } from '../shared/limits.js';
-import { toRecord } from '../shared/record.js';
+import { LIMITS } from '../shared/limits';
+import { toRecord } from '../shared/record';
 
 // A value the CMS carries as source — `{ __expr: "dailyDevotionals" }` — with
 // the file that name is bound to written beside it, so the field can show the

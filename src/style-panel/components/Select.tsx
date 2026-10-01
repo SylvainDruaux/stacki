@@ -2,7 +2,7 @@ import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useSta
 import type { KeyboardEvent, ReactNode, RefObject } from 'react';
 import { panelBounds } from '../lib/panel-box';
 import { isHTMLElementInDocument, isNodeInDocument } from '../lib/dom';
-import { endDragNotes, hoverNote } from '../../ui/sound.js';
+import { endDragNotes, hoverNote } from '../../ui/sound';
 
 export type SelectOption<T extends string> = {
   value: T;

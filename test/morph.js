@@ -548,8 +548,8 @@ const LIVE_TABS = (labels, active) =>
   check(
     'main prepends the patcher its bounds from LIMITS',
     /const AVB_PREVIEW_LIMITS = Object\.freeze\(\$\{JSON\.stringify\(bounds\)\}\)/.test(main) &&
-      /previewMarkersMax: (limits_js_1\.)?LIMITS\.previewMarkersMax/.test(main) &&
-      /previewMorphWorkMax: (limits_js_1\.)?LIMITS\.previewMorphWorkMax/.test(main),
+      /previewMarkersMax: (\w+_1\.)?LIMITS\.previewMarkersMax/.test(main) &&
+      /previewMorphWorkMax: (\w+_1\.)?LIMITS\.previewMorphWorkMax/.test(main),
   );
   check(
     'the patcher declares the bounds, never defines its own',

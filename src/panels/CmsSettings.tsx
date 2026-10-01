@@ -32,7 +32,7 @@ import {
   BracesIcon,
   RepeatIcon,
   CodeIcon,
-} from '../ui/Icons.jsx';
+} from '../ui/Icons';
 
 export interface SchemaOperations {
   readonly onAddField: (path: readonly string[], key: string, type: FieldType) => void;

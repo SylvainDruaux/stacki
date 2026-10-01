@@ -17,8 +17,8 @@ import type { DataContext, TreeNode } from './dataSuggest';
 // showing, and anything this can't work out is left out rather than guessed —
 // a wrong value is worse than none, because it reads as fact.
 
-import { dataTree } from './dataSuggest.js';
-import { partsFromValue } from './bindings.js';
+import { dataTree } from './dataSuggest';
+import { partsFromValue } from './bindings';
 
 // Every path the page's data tree knows a value for, flattened. Sample nodes
 // carry the value itself; a literal node carries what the source said.

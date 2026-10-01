@@ -6,8 +6,8 @@ import {
   sourceNodeAtOffset,
   sourceRangeForSelection,
 } from '../codePanelModel';
-import CodeEditor from '../ui/CodeEditor.jsx';
-import { CodeIcon } from '../ui/Icons.jsx';
+import CodeEditor from '../ui/CodeEditor';
+import { CodeIcon } from '../ui/Icons';
 
 interface CodePanelProps {
   readonly source: string;

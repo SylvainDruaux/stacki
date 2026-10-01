@@ -13,7 +13,7 @@
 // resolved model's call (the label is dim either way).
 
 import { useEffect, useRef, useState } from 'react';
-import { hasCanvas, queryCanvas } from '../../canvasQuery.js';
+import { hasCanvas, queryCanvas } from '../../canvasQuery';
 import { findNode, getHost, onHostChange } from './host';
 import { createQueryCache } from './query-cache';
 

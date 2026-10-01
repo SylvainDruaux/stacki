@@ -12,11 +12,11 @@ import {
   pathText,
   record,
   text,
-} from '../shared/boundary.js';
-import { toRecord } from '../shared/record.js';
-import type { Data } from '../shared/boundary.js';
-import type { ContentCollection } from './contentEntries.js';
-import type { DynamicEntry } from './main.types.js';
+} from '../shared/boundary';
+import { toRecord } from '../shared/record';
+import type { Data } from '../shared/boundary';
+import type { ContentCollection } from './contentEntries';
+import type { DynamicEntry } from './main.types';
 
 export { data as parseData, record as parseRecord, text as parseString };
 export const parseOptionalString = optional(text);

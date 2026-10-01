@@ -6,7 +6,7 @@ import '../style-panel/tokens.css';
 import '../style-panel/utilities.css';
 import '../style-panel/embed-editor.css';
 import { readAstroStyleFiles, readStyleFiles } from '../stylePanelBridge';
-import { clickNote } from '../ui/sound.js';
+import { clickNote } from '../ui/sound';
 import { SoundHere } from '../ui/soundScope';
 import usePopupOpen from '../ui/usePopupOpen';
 

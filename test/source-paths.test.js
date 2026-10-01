@@ -47,8 +47,13 @@ const STALE_NAME = new RegExp(
   `(?<![\\w./#$-])(?:#|\\./)?((?:${ROOTS})/[\\w./-]+)\\.(js|jsx)\\b`,
   'g',
 );
-// Files that hold these spellings as data: the tool's own test, and this one.
-const EXEMPT = new Set(['test/contracts/move-sources.test.ts', 'test/source-paths.test.js']);
+// Files that hold these spellings as data (the tool's own test, and this
+// one), and the helper that is the one place the root is found from __dirname.
+const EXEMPT = new Set([
+  'test/contracts/move-sources.test.ts',
+  'test/helpers/sources.js',
+  'test/source-paths.test.js',
+]);
 
 function testFiles() {
   const listing = execFileSync('git', ['ls-files', '-z', 'test'], { cwd: ROOT, encoding: 'utf8' });

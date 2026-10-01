@@ -2,8 +2,8 @@ import fs from 'fs';
 import path from 'path';
 import { spawn } from 'child_process';
 
-import { toRecord } from '../shared/record.js';
-import { commandNeedsShell } from './platform.js';
+import { toRecord } from '../shared/record';
+import { commandNeedsShell } from './platform';
 
 // Starting a site from a starter.
 //

@@ -15,11 +15,11 @@
 // modules that are.
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
-import { assert } from '../shared/assert.js';
-import { toDigest } from '../shared/brand.js';
-import { LIMITS } from '../shared/limits.js';
-import { stampComment, stampPathProblem } from '../shared/preview-token.js';
-import { markChunkHtml, parsePage, resolveChunks, serializePageMarked } from './astroParser.js';
+import { assert } from '../shared/assert';
+import { toDigest } from '../shared/brand';
+import { LIMITS } from '../shared/limits';
+import { stampComment, stampPathProblem } from '../shared/preview-token';
+import { markChunkHtml, parsePage, resolveChunks, serializePageMarked } from './astroParser';
 
 export interface MarkedSource {
   /** The marked template Vite compiles in place of the file. */

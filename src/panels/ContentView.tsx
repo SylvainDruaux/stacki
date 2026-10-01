@@ -11,8 +11,8 @@ import {
   writeContentEntry,
 } from '../contentViewBridge';
 import type { ContentEntries, ContentEntry } from '../contentViewBridge';
-import CodeEditor from '../ui/CodeEditor.jsx';
-import { CheckIcon, ChevronRightIcon, CloseIcon, HelpCircleIcon, HideIcon } from '../ui/Icons.jsx';
+import CodeEditor from '../ui/CodeEditor';
+import { CheckIcon, ChevronRightIcon, CloseIcon, HelpCircleIcon, HideIcon } from '../ui/Icons';
 import { FieldRow, UnionField, isPlainObject, issueMessageAt, omitField } from './ContentFields';
 import type { FieldContext } from './ContentFields';
 

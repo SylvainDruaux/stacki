@@ -16,15 +16,15 @@ import { isFragmentNode } from './structureModel';
 import { assert } from '../../shared/assert';
 import { LIMITS } from '../../shared/limits';
 import React, { useEffect, useRef, useState } from 'react';
-import { VOID_TAGS } from '../elementSchemas.js';
-import { elementIcon } from '../ui/Icons.jsx';
-import AutoTextarea from '../ui/AutoTextarea.jsx';
-import { clickNote } from '../ui/sound.js';
-import { SoundHere } from '../ui/soundScope.jsx';
-import ExprInput from '../ui/ExprInput.jsx';
-import RichContent, { isInlineOnly } from '../ui/RichContent.jsx';
-import { scopeChips, scopeCompletions } from '../dataSuggest.js';
-import LinkField from '../ui/LinkField.jsx';
+import { VOID_TAGS } from '../elementSchemas';
+import { elementIcon } from '../ui/Icons';
+import AutoTextarea from '../ui/AutoTextarea';
+import { clickNote } from '../ui/sound';
+import { SoundHere } from '../ui/soundScope';
+import ExprInput from '../ui/ExprInput';
+import RichContent, { isInlineOnly } from '../ui/RichContent';
+import { scopeChips, scopeCompletions } from '../dataSuggest';
+import LinkField from '../ui/LinkField';
 import {
   VariableTextSizeIcon,
   CustomElementIcon,
@@ -35,7 +35,7 @@ import {
   ChevronRightIcon,
   BranchIcon,
   CornerIcon,
-} from '../ui/Icons.jsx';
+} from '../ui/Icons';
 
 type SelectedNode = PageNode | { readonly kind: 'frontmatter'; readonly id: string };
 type ElementNode = (PairedNode | ChunkGroupNode) & { readonly props?: PropValues };

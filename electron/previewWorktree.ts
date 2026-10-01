@@ -37,7 +37,7 @@
 
 import fs from 'fs';
 import path from 'path';
-import type { Git } from './git.js';
+import type { Git } from './git';
 
 /** Where the preview checkout lives, and the directory git must not see. */
 const PREVIEW_DIRECTORY = path.join('.stacki', 'preview');

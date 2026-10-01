@@ -18,7 +18,7 @@ import {
   navigatorChildren,
   structureProjection,
 } from './structureModel';
-import CodeEditor from '../ui/CodeEditor.jsx';
+import CodeEditor from '../ui/CodeEditor';
 import { ContextMenu, NodeList } from './StructureTree';
 import { parseNavigatorDrop } from './navigatorDrop';
 

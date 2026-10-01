@@ -6,7 +6,7 @@ import { html } from '@codemirror/lang-html';
 import { javascript } from '@codemirror/lang-javascript';
 import { markdown, markdownLanguage } from '@codemirror/lang-markdown';
 import { LanguageDescription } from '@codemirror/language';
-import { appTheme, appHighlight } from './CodeEditor.jsx';
+import { appTheme, appHighlight } from './CodeEditor';
 
 // Code, shown rather than edited.
 //

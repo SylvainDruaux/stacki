@@ -16,7 +16,7 @@ import { treeBudget, type TreeView } from './treeView';
 // it's a value the page has. And names bound INSIDE the piece are its own: a
 // `.map()` that moves across takes its item with it.
 
-import { parseDeclarations, scopeChips } from './dataSuggest.js';
+import { parseDeclarations, scopeChips } from './dataSuggest';
 
 // `data.map((item, index) => (` → its parts. Kept here rather than imported so
 // this module stands alone; a loop head the app can't model contributes no

@@ -12,7 +12,7 @@ import {
   type HSVA,
   type RGBA,
 } from '../shared/color';
-import { dragNote, endDragNotes } from '../../ui/sound.js';
+import { dragNote, endDragNotes } from '../../ui/sound';
 import { registerPopupLayer } from '../lib/popup-layer';
 import type { CSSProperties, RefObject } from 'react';
 

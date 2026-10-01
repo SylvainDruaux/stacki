@@ -2,9 +2,9 @@ import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { Attr } from '../../shared/page-node';
 import { assert } from '../../shared/assert';
 import { LIMITS } from '../../shared/limits';
-import Dropdown from './Dropdown.jsx';
-import AssetField from './AssetField.jsx';
-import { ElementLinkIcon, FileIcon, PhoneIcon, ElementImageIcon } from './Icons.jsx';
+import Dropdown from './Dropdown';
+import AssetField from './AssetField';
+import { ElementLinkIcon, FileIcon, PhoneIcon, ElementImageIcon } from './Icons';
 
 // Webflow-style link settings for href props: a Type segmented control
 // (URL / Page / Section / Email / Phone / Asset) whose fields all compile

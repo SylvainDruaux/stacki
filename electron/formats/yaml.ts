@@ -17,8 +17,8 @@
 
 import * as YAML from 'yaml';
 
-import { toRecord, toArray } from '../../shared/record.js';
-import { transplant } from './transplant.js';
+import { toRecord, toArray } from '../../shared/record';
+import { transplant } from './transplant';
 
 const PARSE_OPTIONS = { keepSourceTokens: true };
 // Long strings are not re-wrapped and flow lists keep their spacing, which is

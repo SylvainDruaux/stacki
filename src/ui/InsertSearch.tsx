@@ -1,9 +1,9 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { assert } from '../../shared/assert';
 import { LIMITS } from '../../shared/limits';
-import { HTML_TAGS } from '../elementSchemas.js';
-import { rankInsertItems } from '../insertRank.js';
-import { ASTRO_ASSETS } from '../astroAssets.js';
+import { HTML_TAGS } from '../elementSchemas';
+import { rankInsertItems } from '../insertRank';
+import { ASTRO_ASSETS } from '../astroAssets';
 import {
   elementIcon,
   ElementComponentIcon,
@@ -15,7 +15,7 @@ import {
   CodeIcon,
   SearchIcon,
   astroAssetIcon,
-} from './Icons.jsx';
+} from './Icons';
 
 const TABS = [
   { key: 'all', label: 'All results' },

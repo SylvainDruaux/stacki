@@ -6,8 +6,8 @@
 // Never pretty-printed: a record spread over several lines is several broken
 // records.
 
-import { LIMITS } from '../../shared/limits.js';
-import { toRecord, toArray } from '../../shared/record.js';
+import { LIMITS } from '../../shared/limits';
+import { toRecord, toArray } from '../../shared/record';
 
 interface LineInfo {
   readonly index: number;

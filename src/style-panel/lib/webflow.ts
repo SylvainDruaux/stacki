@@ -33,7 +33,7 @@ import type {
   StyleRegion,
 } from './types';
 import type { MatchTarget, TreeView } from './selectors';
-import { hasCanvas, queryCanvas } from '../../canvasQuery.js';
+import { hasCanvas, queryCanvas } from '../../canvasQuery';
 import { listAssetEntries } from '../../assetBridge';
 import { readAstroStyleFiles, readStyleFiles } from '../../stylePanelBridge';
 import { variableEdit } from '../../panels/variableEdits';

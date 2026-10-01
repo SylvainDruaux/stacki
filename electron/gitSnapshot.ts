@@ -13,7 +13,7 @@
 // the work is recoverable even though the tree no longer shows it. Neither
 // rewrites history — going back is itself something you can come back from.
 
-import type { Git } from './git.js';
+import type { Git } from './git';
 
 /**
  * Save a version.

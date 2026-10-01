@@ -1,7 +1,7 @@
 import React, { useRef, useState } from 'react';
 import { assert } from '../../shared/assert';
 import { BOUNDARY_LIMITS } from '../../shared/boundary';
-import { FileIcon, CodeIcon } from './Icons.jsx';
+import { FileIcon, CodeIcon } from './Icons';
 
 export const IMAGE_EXT = /\.(png|jpe?g|gif|webp|avif|svg|ico|bmp)$/i;
 export const VIDEO_EXT = /\.(mp4|webm|mov|m4v|ogv)$/i;
