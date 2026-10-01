@@ -64,6 +64,10 @@ const HISTORICAL = new Set([
   'docs/ts-migration-plan.md',
   'package-lock.json',
   MANIFEST,
+  // The tool and its test hold paths as data, not as references.
+  'scripts/move/moveSources.mts',
+  'scripts/move/moveSourcesPlan.mts',
+  'test/contracts/move-sources.test.ts',
 ]);
 const UNTOUCHED_PREFIXES = ['docs/archive/', 'test/fixtures/', 'test/corpus/'];
 
