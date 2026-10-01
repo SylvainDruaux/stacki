@@ -46,7 +46,7 @@ const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
   fs.mkdirSync(buildDirectory, { recursive: true });
   const bundlePath = path.join(buildDirectory, 'vars-panel.bundle.js');
   await esbuild.build({
-    entryPoints: [repoPath('src/panels/VariablesPanel.tsx')],
+    entryPoints: [repoPath('src/features/variables/VariablesPanel.tsx')],
     outfile: bundlePath,
     bundle: true,
     format: 'cjs',

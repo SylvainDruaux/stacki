@@ -2,8 +2,8 @@
 // frame queue checks scroll echoes, cleanup, and registration/collection limits.
 const assert = require('node:assert/strict');
 const load = require('./helpers/rendererModule');
-const rows = load('src/panels/variableRows.ts');
-const { createScrollSync } = load('src/panels/variableScroll.ts');
+const rows = load('src/features/variables/variableRows.ts');
+const { createScrollSync } = load('src/features/variables/variableScroll.ts');
 const cell = (name) => ({
   name,
   file: 'tokens.css',

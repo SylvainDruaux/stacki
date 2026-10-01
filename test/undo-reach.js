@@ -99,7 +99,9 @@ check(
 // inverse; nothing else can work it out afterwards. These are the ones that do,
 // and the check is that they still do — the variables panel had three edits
 // that wrote and said nothing, which is what "undo doesn't work here" was.
-const vars = read('src/panels/VariablesView.tsx') + read('src/panels/variableHistory.ts');
+const vars =
+  read('src/features/variables/VariablesView.tsx') +
+  read('src/features/variables/variableHistory.ts');
 for (const [what, near] of [
   ['a value', 'const save = useCallback'],
   ['a new variable', 'const add = useCallback'],

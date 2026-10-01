@@ -1,13 +1,13 @@
 import React, { useEffect, useRef, useState } from 'react';
-import type { VariableCell } from '../variablesBridge';
-import { VARIABLES_LIMITS } from '../variablesBridge';
-import { assert } from '../../shared/assert';
-import ColorSwatch from '../features/style/components/ColorSwatch';
-import VariableConnect, { connectCustomField } from '../features/style/VariableConnect';
-import EasingEditor, { MiniCurve } from '../features/style/EasingEditor';
-import { easingToBezier, isEasing } from '../features/style/model/transition';
-import FluidBadge from '../ui/FluidBadge';
-import CustomValue, { doesNotFit, isLong, withBinding } from '../features/style/CustomValueEditor';
+import type { VariableCell } from './variablesBridge';
+import { VARIABLES_LIMITS } from './variablesBridge';
+import { assert } from '../../../shared/assert';
+import ColorSwatch from '../style/components/ColorSwatch';
+import VariableConnect, { connectCustomField } from '../style/VariableConnect';
+import EasingEditor, { MiniCurve } from '../style/EasingEditor';
+import { easingToBezier, isEasing } from '../style/model/transition';
+import FluidBadge from './FluidBadge';
+import CustomValue, { doesNotFit, isLong, withBinding } from '../style/CustomValueEditor';
 
 type CellValue = VariableCell & {
   readonly fluid?: React.ComponentProps<typeof FluidBadge>['fluid'];

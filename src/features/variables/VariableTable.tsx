@@ -1,17 +1,17 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import type { VariableBlock, VariableGroup } from '../variablesBridge';
-import type { WireColumn } from '../../shared/ipc-results';
+import type { VariableBlock, VariableGroup } from './variablesBridge';
+import type { WireColumn } from '../../../shared/ipc-results';
 import type { VariableCellProps } from './VariableCell';
 import type { VariableSlot, VariableRename, SlotOffset } from './variableRows';
-import { assert } from '../../shared/assert';
-import { LIMITS } from '../../shared/limits';
+import { assert } from '../../../shared/assert';
+import { LIMITS } from '../../../shared/limits';
 import { buildSheetSlots, stemOf, sectionPrefix, rowRenames } from './variableRows';
 import { createScrollSync } from './variableScroll';
 import Cell from './VariableCell';
-import useListReorder from '../ui/useListReorder';
-import MoreMenu from '../ui/MoreMenu';
-import VariableTypeIcon from '../ui/VariableTypeIcon';
-import { PencilIcon, CopyIcon, TrashIcon, DragIcon, PlusIcon } from '../ui/Icons';
+import useListReorder from '../../ui/useListReorder';
+import MoreMenu from '../../ui/MoreMenu';
+import VariableTypeIcon from './VariableTypeIcon';
+import { PencilIcon, CopyIcon, TrashIcon, DragIcon, PlusIcon } from '../../ui/Icons';
 
 type EditName = (name: string) => boolean | void | Promise<boolean | void>;
 type AddVariable = (

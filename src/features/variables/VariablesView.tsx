@@ -4,24 +4,24 @@ import type {
   VariableCell,
   VariableFile,
   VariableSelection,
-} from '../variablesBridge';
-import type { WireColumn } from '../../shared/ipc-results';
+} from './variablesBridge';
+import type { WireColumn } from '../../../shared/ipc-results';
 import type { VariableSlot, VariableRename } from './variableRows';
-import { assert } from '../../shared/assert';
-import { LIMITS } from '../../shared/limits';
-import { definedFields } from '../../shared/boundary';
-import { variableEdit as bridge } from '../ipc/variableEditBridge';
+import { assert } from '../../../shared/assert';
+import { LIMITS } from '../../../shared/limits';
+import { definedFields } from '../../../shared/boundary';
+import { variableEdit as bridge } from '../../ipc/variableEditBridge';
 import { createVariableHistory, type VariableUndo } from './variableHistory';
 import { createVariableRefresh } from './variableRefresh';
 import { dropPlan, stemOf } from './variableRows';
-import { fluidCheck, resolveValue } from '../fluid';
-import { getHost, setHost } from '../features/style/model/host';
-import { CloseIcon, CheckIcon } from '../ui/Icons';
+import { fluidCheck, resolveValue } from './fluid';
+import { getHost, setHost } from '../style/model/host';
+import { CloseIcon, CheckIcon } from '../../ui/Icons';
 import Sheet from './VariableTable';
-import '../features/style/utilities.css';
+import '../style/utilities.css';
 export { dropPlan, movesForDrop } from './variableRows';
 export { createScrollSync } from './variableScroll';
-export { friendlyError } from '../ipc/variableEditBridge';
+export { friendlyError } from '../../ipc/variableEditBridge';
 
 export interface VariablesViewProps {
   readonly project: { readonly path: string };

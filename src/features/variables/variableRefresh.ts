@@ -1,8 +1,8 @@
-import type { Result } from '../../shared/result';
-import type { VariablesSnapshot } from '../variablesBridge';
-import { assert } from '../../shared/assert';
-import { createCoalescedRun } from '../lib/coalescedRun';
-import { readCSSVariables } from '../variablesBridge';
+import type { Result } from '../../../shared/result';
+import type { VariablesSnapshot } from './variablesBridge';
+import { assert } from '../../../shared/assert';
+import { createCoalescedRun } from '../../lib/coalescedRun';
+import { readCSSVariables } from './variablesBridge';
 
 type RefreshState = { readonly kind: 'open' | 'disposed' };
 

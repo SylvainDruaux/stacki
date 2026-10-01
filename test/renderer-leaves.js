@@ -103,7 +103,7 @@ try {
   assert.throws(() => liveClassesById({}, [cycle]), /Tree traversal exceeds depth limit/);
   const { propsForExtraction } = load('src/editor/extractProps.ts');
   assert.throws(() => propsForExtraction(cycle, ['title']), /Tree traversal exceeds depth limit/);
-  const { evaluate } = load('src/fluid.ts');
+  const { evaluate } = load('src/features/variables/fluid.ts');
   assert.equal(evaluate('(2rem + 16px) * 2', 0), 6);
   assert.equal(evaluate('('.repeat(66) + '1' + ')'.repeat(66), 0), undefined);
   assert.equal(evaluate('1'.repeat(1_000_001), 0), undefined);

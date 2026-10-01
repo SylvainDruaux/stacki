@@ -12,7 +12,7 @@ test('variables refresh coalesces watcher bursts and ignores obsolete projects',
   const output = repoPath('node_modules/.stacki-test/variables-refresh.cjs');
   fs.mkdirSync(path.dirname(output), { recursive: true });
   buildSync({
-    entryPoints: [repoPath('src/panels/VariablesPanel.tsx')],
+    entryPoints: [repoPath('src/features/variables/VariablesPanel.tsx')],
     outfile: output,
     bundle: true,
     platform: 'node',

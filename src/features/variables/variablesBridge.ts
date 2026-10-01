@@ -1,6 +1,6 @@
-import type { Parser } from '../shared/boundary';
-import type { Result } from '../shared/result';
-import type { WireCell, WireColumn } from '../shared/ipc-results';
+import type { Parser } from '../../../shared/boundary';
+import type { Result } from '../../../shared/result';
+import type { WireCell, WireColumn } from '../../../shared/ipc-results';
 import {
   boolean,
   count,
@@ -10,9 +10,9 @@ import {
   pathText,
   record,
   text,
-} from '../shared/boundary';
-import { toArray } from '../shared/record';
-import { toProjectPath } from '../shared/brand';
+} from '../../../shared/boundary';
+import { toArray } from '../../../shared/record';
+import { toProjectPath } from '../../../shared/brand';
 
 export interface VariableSelection {
   readonly file: string;

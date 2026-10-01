@@ -1,6 +1,6 @@
-import type { VariableBlock, VariableCell, VariableRow } from '../variablesBridge';
-import { assert } from '../../shared/assert';
-import { LIMITS } from '../../shared/limits';
+import type { VariableBlock, VariableCell, VariableRow } from './variablesBridge';
+import { assert } from '../../../shared/assert';
+import { LIMITS } from '../../../shared/limits';
 
 interface SlotBase {
   readonly block: VariableBlock;

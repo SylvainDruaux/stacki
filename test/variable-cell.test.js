@@ -12,7 +12,7 @@ test('variable cells keep hook order across sparse matrix updates', async () => 
   const output = repoPath('node_modules/.stacki-test/variable-cell.cjs');
   fs.mkdirSync(path.dirname(output), { recursive: true });
   buildSync({
-    entryPoints: [repoPath('src/panels/VariableCell.tsx')],
+    entryPoints: [repoPath('src/features/variables/VariableCell.tsx')],
     outfile: output,
     bundle: true,
     platform: 'node',

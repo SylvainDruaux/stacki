@@ -167,7 +167,7 @@ import type { ComponentCreationSource } from './features/palette/PaletteDialogs'
 import type { DevDiagnosis } from './features/preview/DevOffline';
 import type { PreviewDevice } from './features/preview/PreviewToolbar';
 import type { SpacingHover } from './features/preview/PreviewOverlays';
-import type { VariableSelection } from './variablesBridge';
+import type { VariableSelection } from './features/variables/variablesBridge';
 import type { InsertTarget } from './editor/insertTarget';
 import type { InsertItem } from './features/palette/InsertSearch';
 import { toRecord } from '../shared/record';
@@ -285,8 +285,8 @@ const CodeWindow = lazyPanel(() => import('./features/code/CodeWindow'));
 const CmsPanel = lazyPanel(() => import('./features/cms/CmsPanel'));
 const CmsView = lazyPanel(() => import('./features/cms/CmsView'));
 const ContentView = lazyPanel(() => import('./features/content/ContentView'));
-const VariablesPanel = lazyPanel(() => import('./panels/VariablesPanel'));
-const VariablesView = lazyPanel(() => import('./panels/VariablesView'));
+const VariablesPanel = lazyPanel(() => import('./features/variables/VariablesPanel'));
+const VariablesView = lazyPanel(() => import('./features/variables/VariablesView'));
 const CodePanel = lazyPanel(() => import('./features/code/CodePanel'));
 
 // A node a gesture creates has no parse yet to name it: its handle is random,

@@ -11,8 +11,8 @@ const { BOUNDARY_LIMITS } = require('#dist/shared/boundary.js');
 // code never writes a null.
 const PLATFORM_NULL = JSON.parse('null');
 const { variableEdit, friendlyError } = load('src/ipc/variableEditBridge.ts');
-const { createVariableHistory } = load('src/panels/variableHistory.ts');
-const { createVariableRefresh } = load('src/panels/variableRefresh.ts');
+const { createVariableHistory } = load('src/features/variables/variableHistory.ts');
+const { createVariableRefresh } = load('src/features/variables/variableRefresh.ts');
 const base = { projectPath: '/project', file: 'a.css' };
 const range = { ...base, start: 0, end: 10, expect: 'Colors' };
 const calls = {

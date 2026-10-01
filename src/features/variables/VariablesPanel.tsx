@@ -1,13 +1,13 @@
 import React, { useEffect, useState } from 'react';
-import type { Result } from '../../shared/result';
+import type { Result } from '../../../shared/result';
 import type {
   VariableFile,
   VariableGroup,
   VariableSelection,
   VariablesSnapshot,
-} from '../variablesBridge';
-import { readCSSVariables } from '../variablesBridge';
-import { ChevronLeftIcon, ChevronRightIcon, VariableIcon, FileIcon } from '../ui/Icons';
+} from './variablesBridge';
+import { readCSSVariables } from './variablesBridge';
+import { ChevronLeftIcon, ChevronRightIcon, VariableIcon, FileIcon } from '../../ui/Icons';
 
 export interface VariablesPanelProps {
   readonly project: { readonly path: string };

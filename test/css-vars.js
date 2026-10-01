@@ -435,7 +435,7 @@ if (!fs.existsSync(path.join(source, 'src', 'styles'))) {
   );
 
   // The panel resolves values against this map as they are typed (see
-  // src/fluid.ts), so it has to carry everything a value can reference.
+  // src/features/variables/fluid.ts), so it has to carry everything a value can reference.
   const { values } = readVariables(source);
   check(
     'every variable is in the resolution map',

@@ -23,7 +23,7 @@ const check = (what, condition, detail) => {
 };
 
 (async () => {
-  const { fluidCheck, resolveValue } = loadRenderer('src/fluid.ts');
+  const { fluidCheck, resolveValue } = loadRenderer('src/features/variables/fluid.ts');
 
   // The shape the framework writes: sizes in px, divided by 16 into rem, scaled
   // between two viewport widths.

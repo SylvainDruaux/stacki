@@ -45,7 +45,7 @@ const check = (what, condition, detail) => {
     stdin: {
       contents:
         `export { movesForDrop, dropPlan, friendlyError } ` +
-        `from './src/panels/VariablesView.tsx'`,
+        `from './src/features/variables/VariablesView.tsx'`,
       resolveDir: ROOT,
       loader: 'js',
     },

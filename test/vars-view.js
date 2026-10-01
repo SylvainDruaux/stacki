@@ -93,7 +93,7 @@ const STYLESHEET = `/* =========================================================
   fs.mkdirSync(buildDirectory, { recursive: true });
   const bundlePath = path.join(buildDirectory, 'vars-view.bundle.js');
   await esbuild.build({
-    entryPoints: [repoPath('src/panels/VariablesView.tsx')],
+    entryPoints: [repoPath('src/features/variables/VariablesView.tsx')],
     outfile: bundlePath,
     bundle: true,
     format: 'cjs',

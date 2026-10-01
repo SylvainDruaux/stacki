@@ -11,7 +11,7 @@ const { readVariables } = require('#dist/electron/cssVars.js');
 // code never writes a null.
 const PLATFORM_NULL = JSON.parse('null');
 const { parseCSSVariables, readCSSVariables, VARIABLES_LIMITS } =
-  require('./helpers/rendererModule')('src/variablesBridge.ts');
+  require('./helpers/rendererModule')('src/features/variables/variablesBridge.ts');
 const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'stacki-variable-boundary-'));
 let wire;
 try {
