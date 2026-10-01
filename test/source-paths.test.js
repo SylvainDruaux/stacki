@@ -89,9 +89,9 @@ test('tests name repository files by one whole path', () => {
 
 test('the rules catch each spelling they name', () => {
   const samples = [
-    "path.join(__dirname, '..', 'src', 'App.tsx')",
+    "path.join(__dirname, '..', 'src', 'Sample.tsx')",
     "require('../dist/electron/main.js')",
-    "path.join(__dirname, '../src/App.tsx')",
+    "path.join(__dirname, '../src/Sample.tsx')",
     "require('#dist/electron/serialQueue')",
     'build.onLoad({ filter: /\\/src\\/panels\\/[^/]+$/ })',
   ];
@@ -99,11 +99,15 @@ test('the rules catch each spelling they name', () => {
     const caught = RULES.some((rule) => rule.pattern.test(sample) && !rule.unless?.test(sample));
     assert.ok(caught, `no rule catches ${sample}`);
   }
-  const allowed = ["repoPath('src/App.tsx')", "import { a } from '../../scripts/policy/scan.mts';"];
+  const allowed = [
+    "repoPath('src/Sample.tsx')",
+    "import { a } from '../../scripts/policy/scan.mts';",
+  ];
   for (const sample of allowed) {
     const caught = RULES.some((rule) => rule.pattern.test(sample) && !rule.unless?.test(sample));
     assert.ok(!caught, `a rule rejects ${sample}`);
   }
-  const stale = [..."load('src/pageEdits.js')".matchAll(STALE_NAME)].map((match) => match[1]);
-  assert.deepEqual(stale, ['src/pageEdits']);
+  // Samples name no real file, so the move tool never rewrites them.
+  const stale = [..."load('src/sample.js')".matchAll(STALE_NAME)].map((match) => match[1]);
+  assert.deepEqual(stale, ['src/sample']);
 });

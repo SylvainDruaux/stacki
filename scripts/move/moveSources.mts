@@ -68,6 +68,7 @@ const HISTORICAL = new Set([
   'scripts/move/moveSources.mts',
   'scripts/move/moveSourcesPlan.mts',
   'test/contracts/move-sources.test.ts',
+  'test/source-paths.test.js',
 ]);
 const UNTOUCHED_PREFIXES = ['docs/archive/', 'test/fixtures/', 'test/corpus/'];
 
