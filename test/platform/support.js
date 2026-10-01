@@ -10,7 +10,7 @@ const path = require('node:path');
 const { DocumentActors } = require('#dist/electron/documents/documentActors.js');
 const { NODE_PROJECTOR, NodeDocumentDisk } = require('#dist/electron/documents/documentDisk.js');
 const { createDocumentTelemetry } = require('#dist/electron/documents/documentTelemetry.js');
-const { planIntent } = require('#dist/shared/planner.js');
+const { planIntent } = require('#dist/shared/engine/planner.js');
 
 const sha256 = (bytes) => createHash('sha256').update(bytes).digest('hex');
 

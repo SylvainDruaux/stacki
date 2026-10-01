@@ -15,9 +15,13 @@
 // save never takes the merged edit back out.
 import { assert } from '../../shared/core/assert';
 import type { Digest } from '../../shared/core/brand';
-import { diffCodePatch, mergeTyping } from '../../shared/code-patch';
-import type { EditRequest } from '../../shared/edit-request';
-import { describeRejection, type RejectionReason, type SourceEdit } from '../../shared/intent';
+import { diffCodePatch, mergeTyping } from '../../shared/engine/codePatch';
+import type { EditRequest } from '../../shared/engine/editRequest';
+import {
+  describeRejection,
+  type RejectionReason,
+  type SourceEdit,
+} from '../../shared/engine/intent';
 import type { PageDiskRead, PageEditError, PageEdited } from '../../shared/page-save';
 import type { Result } from '../../shared/core/result';
 import type { CodeBaseline, EditDrafts } from './pageEdits';

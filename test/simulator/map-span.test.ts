@@ -1,4 +1,4 @@
-// Goal: shared/mapSpan.ts resolves a span only where every minimum edit script
+// Goal: shared/engine/mapSpan.ts resolves a span only where every minimum edit script
 // agrees, and says `gone` or `ambiguous` everywhere else — never a guess, never
 // "the third matching node" (plan §4). Wrong-site mapping is the target, so the
 // pinned cases assert the exact resolved byte range, not just the outcome
@@ -15,8 +15,8 @@
 // precondition breach asserts with a pinned message.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { diffBytes, DIFF_BUDGET } from '#dist/shared/diff.js';
-import { mapSpan, mapSpanThroughDiff, type SpanMapping } from '#dist/shared/mapSpan.js';
+import { diffBytes, DIFF_BUDGET } from '#dist/shared/engine/diff.js';
+import { mapSpan, mapSpanThroughDiff, type SpanMapping } from '#dist/shared/engine/mapSpan.js';
 import {
   encodeUtf8,
   toByteSpan,

@@ -18,12 +18,12 @@ import * as path from 'node:path';
 import { toFilePath } from '#dist/shared/core/brand.js';
 import { capabilityAcceptsVisualIntent } from '#dist/shared/page/capability.js';
 import { LIMITS } from '#dist/shared/core/limits.js';
-import type { Splice } from '#dist/shared/planner.js';
+import type { Splice } from '#dist/shared/engine/planner.js';
 import {
   hostContext,
   projectValueSplice,
   valueBytesNeutral,
-} from '#dist/shared/projection-patch.js';
+} from '#dist/shared/engine/projectionPatch.js';
 import type { Projection } from '#dist/shared/page/sourceProjection.js';
 import {
   encodeUtf8,
@@ -32,7 +32,7 @@ import {
   type ByteString,
 } from '#dist/shared/core/span.js';
 import { projectBytes } from './project.ts';
-import { applySplices } from '#dist/shared/splice.js';
+import { applySplices } from '#dist/shared/engine/splice.js';
 
 const PAGE = toFilePath('/project/page.astro');
 const FILES_MAX = 10_000;

@@ -1,7 +1,7 @@
 // The notice for a refused save (plan §7, rejection UX contract). It never
 // blocks: the page stays editable underneath and keeps every local edit. A
 // refused edit request (step 6) names the actor's reason.
-import { describeRejection, type RejectionReason } from '../../shared/intent';
+import { describeRejection, type RejectionReason } from '../../shared/engine/intent';
 
 // Nothing is discarded and nothing is written over the outside change until the
 // user picks an action — reloading and saving over are deliberate acts.

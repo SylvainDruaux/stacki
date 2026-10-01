@@ -16,7 +16,7 @@ import * as path from 'node:path';
 import { mainHarness } from '../helpers/mainHarness.ts';
 import { IPC_PAYLOADS, parseIpcPayload } from '#dist/shared/ipc-payloads.js';
 import { parsePageDiskRead, parsePageEditResult } from '#dist/shared/page-save.js';
-import { diffCodePatch } from '#dist/shared/code-patch.js';
+import { diffCodePatch } from '#dist/shared/engine/codePatch.js';
 import { toDigest } from '#dist/shared/core/brand.js';
 import type { PageDiskRead } from '#dist/shared/page-save.js';
 import { toRecord } from '#dist/shared/core/record.js';

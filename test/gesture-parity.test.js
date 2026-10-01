@@ -10,7 +10,7 @@
 // the adapter's requests (src/editor/pageEdits.ts, nodeRefIn) through main's
 // translator (electron/documents/editRequests.ts) and the shipping planner, a later
 // request of one gesture rebased through the earlier ones as the host does
-// (shared/rebase.ts). The two results are parsed and compared with layout
+// (shared/engine/rebase.ts). The two results are parsed and compared with layout
 // metadata removed (ids, source ranges, and the fields that only remember
 // how a tag was written); text is compared up to whitespace runs, which the
 // reprint reflows. Gestures whose requests cannot be stated are counted, not
@@ -26,14 +26,14 @@ const esbuild = require('esbuild');
 const { parsePage, serializePage } = require('#dist/electron/parse/astroParser.js');
 const { buildEditIntent } = require('#dist/electron/documents/editRequests.js');
 const { toDigest, toFilePath, toIntentId } = require('#dist/shared/core/brand.js');
-const { toIntent } = require('#dist/shared/intent.js');
+const { toIntent } = require('#dist/shared/engine/intent.js');
 const { parsePageResult } = require('#dist/shared/page/pageNode.js');
-const { planIntent } = require('#dist/shared/planner.js');
-const { rebaseIntent, minimalSplices } = require('#dist/shared/rebase.js');
+const { planIntent } = require('#dist/shared/engine/planner.js');
+const { rebaseIntent, minimalSplices } = require('#dist/shared/engine/rebase.js');
 const { createSnapshot } = require('#dist/shared/page/snapshot.js');
 const { projectPage } = require('#dist/shared/page/sourceProjection.js');
 const { decodeUtf8, encodeUtf8 } = require('#dist/shared/core/span.js');
-const { applySplices } = require('#dist/shared/splice.js');
+const { applySplices } = require('#dist/shared/engine/splice.js');
 const { repoPath } = require('./helpers/sources.js');
 
 const buildDirectory = repoPath('node_modules/.stacki-test/gesture-parity');

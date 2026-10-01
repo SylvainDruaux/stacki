@@ -1,14 +1,14 @@
 // The candidate snapshot of a plan (plan §5.2 step 6), with the step-4 latency
 // experiment wired in: a single value splice takes its projection from the
-// current one (shared/projection-patch.ts) instead of a full reparse, and here,
+// current one (shared/engine/projectionPatch.ts) instead of a full reparse, and here,
 // in the simulator, the full reparse still runs beside it as the brute-force
 // reference (plan §10). A patched projection that differs from the reparse by
 // one byte fails the run at the event.
 import assert from 'node:assert/strict';
 import type { FilePath } from '#dist/shared/core/brand.js';
-import type { Projector } from '#dist/shared/documentActor.js';
-import type { Plan } from '#dist/shared/planner.js';
-import { projectValueSplice } from '#dist/shared/projection-patch.js';
+import type { Projector } from '#dist/shared/engine/documentActor.js';
+import type { Plan } from '#dist/shared/engine/planner.js';
+import { projectValueSplice } from '#dist/shared/engine/projectionPatch.js';
 import { createSnapshot, type Snapshot } from '#dist/shared/page/snapshot.js';
 import type { ByteString } from '#dist/shared/core/span.js';
 import { projectBytes, sha256, snapshotOf } from './project.ts';

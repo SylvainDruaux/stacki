@@ -71,7 +71,7 @@ export type Projection =
       readonly byteLength: number;
       /** UTF-16 code units of the same text. The parser bounds a page in these
        * (`ipcFieldCharsMax`), so a projection derived without reparsing
-       * (projection-patch.ts) carries them to stay inside the parser's bound. */
+       * (projectionPatch.ts) carries them to stay inside the parser's bound. */
       readonly utf16Length: number;
       /** The fenced frontmatter block, `---` to `---` inclusive, when present. */
       readonly frontmatter: ByteSpan | undefined;

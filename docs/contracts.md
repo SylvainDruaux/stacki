@@ -220,7 +220,7 @@ large fixtures (`npm run fixtures:large` writes the files).
 The simulator (`test/simulator/`, `npm run test:simulator`) drives the real
 parser, the planner and a step-wise actor over a fake disk with a seeded PRNG,
 and checks the nine invariants after every event. The actor plans every
-operation with `shared/planner.ts` (mapped through the diff when stale); each
+operation with `shared/engine/planner.ts` (mapped through the diff when stale); each
 queued intent carries the snapshot it was authored against. Every stale
 decision on a tag's name or attributes, and (step 10) every stale Markdown
 block edit, removal, insertion and move, is judged against byte origins the
@@ -248,7 +248,7 @@ legacy tree-mutation surface (method in its header).
 
 ## Visual edits (step 6)
 
-`page:edit` carries an `EditRequest` (`shared/edit-request.ts`): a gesture in
+`page:edit` carries an `EditRequest` (`shared/engine/editRequest.ts`): a gesture in
 the terms of the page the renderer shows — node references are the path, kind
 and UTF-16 range of its parse — against that parse's checksum. Main turns it
 into an intent (`electron/documents/editRequests.ts`: references checked against its own
@@ -258,9 +258,9 @@ splices. The reply (`shared/page-save.ts`, `parsePageEditResult`) is the page
 as written and the inverse hunks Undo sends back as a `revert` request; a
 refusal is `rejected` with the actor's reason and the checksum on disk. An edit
 authored before the actor's own recent commits is rebased exactly
-(`shared/rebase.ts`); one authored before an outside write is mapped through the
+(`shared/engine/rebase.ts`); one authored before an outside write is mapped through the
 diff from a retained snapshot; one whose bytes are gone is refused. Every
-operation is planned (`shared/planner.ts`, `planTree.ts`, `planText.ts`,
+operation is planned (`shared/engine/planner.ts`, `planTree.ts`, `planText.ts`,
 `planSupport.ts`, `loopScope.ts`, `inlineStyle.ts`); `remove-node` and
 `revert-splices` joined the union. `page:read` reads through the page's actor.
 
@@ -278,8 +278,8 @@ Step 6.
 The code editor saves through `page:edit` too: a `code-patch` edit carries the
 byte diff from the text it read (named by `authoredChecksum`) to the text it
 holds, as ascending, disjoint hunks `{ span, expected, text }` of those bytes
-(`shared/code-patch.ts`, `diffCodePatch`; the wire parser in
-`shared/edit-request.ts` checks the shape and bounds). Main checks every hunk
+(`shared/engine/codePatch.ts`, `diffCodePatch`; the wire parser in
+`shared/engine/editRequest.ts` checks the shape and bounds). Main checks every hunk
 against the named bytes — inside them, on code-point boundaries, holding
 `expected` — and submits `apply-code-patch`. The patch may leave the page
 invalid (plan §3.6): the reply is then `editable: false`, and visual edits are
@@ -288,7 +288,7 @@ refused `source-invalid` until a later patch makes it parse. Bytes past
 refuses them first); a stale patch maps through an outside edit with context
 or is refused `merge-conflict`, as is one whose bytes the host no longer holds
 or whose witness does not hold; behind the app's own commits it rebases only
-where no commit touched a hunk (`shared/rebase.ts`, `shiftUntouched`). Code
+where no commit touched a hunk (`shared/engine/rebase.ts`, `shiftUntouched`). Code
 patches apply to `.md` and `.mdx` pages too. The renderer's side
 (`src/editor/codeEdits.ts`, the `code` queue in `src/editor/pageEdits.ts`) is described in
 the tracker, Step 8.
@@ -301,14 +301,14 @@ and nothing prints one whole. Main drafts a Markdown node's intents
 (`electron/documents/markdownEdits.ts`): new content — typed text, a heading level, an
 image's source or alt, a fence's language, a list's first number — is the node
 printed before and after the edit at its place (its containers' line prefix,
-`shared/markdownLayout.ts`, and the file's line breaks), the difference placed
+`shared/engine/markdownLayout.ts`, and the file's line breaks), the difference placed
 on the node's own bytes as `rewrite-node`; new blocks and items are printed
 where they go and inserted beside a neighbour; the YAML frontmatter is the
 slot that differs or, on a page without one, `insert-frontmatter` at its top.
 Markup inside MDX is drafted as on an `.astro` page. `electron/documents/editAnchors.ts`
 holds what both front ends share.
 
-The planner's Markdown rules (`shared/planMarkdown.ts`): a Markdown block is
+The planner's Markdown rules (`shared/engine/planMarkdown.ts`): a Markdown block is
 no tag, so tag and attribute operations refuse it; a list and its first item
 start on one byte and resolve by depth; inline text is never removed, moved or
 stood beside; a new or remaining block is separated as its neighbours are, and

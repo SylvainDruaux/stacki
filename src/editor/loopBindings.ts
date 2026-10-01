@@ -8,7 +8,7 @@
 // Every function here takes nodes and returns new ones: they build a gesture's
 // prediction (src/editor/editGestures.ts) and never touch the model the page shows.
 // The bytes are rewritten by the engine's form of the same rules
-// (shared/loopScope.ts).
+// (shared/engine/loopScope.ts).
 // ---------------------------------------------------------------------------
 
 import { LIMITS } from '../../shared/core/limits';

@@ -79,7 +79,7 @@ import {
   type EditsRecord,
   type QueueEntry,
 } from '../editor/pageEdits';
-import { describeRejection, type RejectionReason } from '../../shared/intent';
+import { describeRejection, type RejectionReason } from '../../shared/engine/intent';
 import {
   type InsertPlace,
   attributeRenameGesture,

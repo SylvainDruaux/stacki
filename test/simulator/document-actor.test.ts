@@ -1,4 +1,4 @@
-// Goal: the shipped document actor (shared/documentActor.ts) reaches exactly one
+// Goal: the shipped document actor (shared/engine/documentActor.ts) reaches exactly one
 // terminal outcome per accepted intent on every path of the §5.2 protocol, and
 // each path is the one the plan names: backpressure at a full queue, the lock
 // held by a cooperating writer, a replace that failed or landed without a
@@ -21,9 +21,9 @@ import {
   type ActorState,
   type ActorStep,
   type DocumentDisk,
-} from '#dist/shared/documentActor.js';
-import { toIntent, type Intent, type Outcome } from '#dist/shared/intent.js';
-import { diffCodePatch } from '#dist/shared/code-patch.js';
+} from '#dist/shared/engine/documentActor.js';
+import { toIntent, type Intent, type Outcome } from '#dist/shared/engine/intent.js';
+import { diffCodePatch } from '#dist/shared/engine/codePatch.js';
 import { createLazySnapshot } from '#dist/shared/page/snapshot.js';
 import { LIMITS } from '#dist/shared/core/limits.js';
 import { err } from '#dist/shared/core/result.js';

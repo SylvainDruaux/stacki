@@ -20,14 +20,14 @@
 // checks every witness against the current bytes, so a rebased set-attribute
 // replaces whatever the actor's own previous commit left there — the user's
 // latest word on that attribute.
-import { assert } from './core/assert';
+import { assert } from '../core/assert';
 import { toIntent, type Intent, type Operation, type RejectionReason } from './intent';
-import { LIMITS } from './core/limits';
+import { LIMITS } from '../core/limits';
 import type { Splice } from './planner';
-import { isNodeKind, toAnchorRef, type AnchorRef } from './page/ref';
-import { err, ok, type Result } from './core/result';
-import type { Snapshot } from './page/snapshot';
-import { toByteSpan, toByteString, type ByteSpan } from './core/span';
+import { isNodeKind, toAnchorRef, type AnchorRef } from '../page/ref';
+import { err, ok, type Result } from '../core/result';
+import type { Snapshot } from '../page/snapshot';
+import { toByteSpan, toByteString, type ByteSpan } from '../core/span';
 import { orderedSplices } from './splice';
 
 /** One commit an actor made: the bytes it started from, the bytes it left,
@@ -178,7 +178,7 @@ interface Images {
 /** The image of `span` after `splices` that changed none of its bytes and
  * none at its edges; undefined when one did. A code patch's hunk replaces the
  * bytes it was authored against: a commit inside it changed those bytes, and
- * one at its edge cannot be ordered against it (shared/code-patch.ts). */
+ * one at its edge cannot be ordered against it (shared/engine/codePatch.ts). */
 export function shiftUntouched(span: ByteSpan, splices: readonly Splice[]): ByteSpan | undefined {
   for (const splice of splices) {
     if (splice.range.start <= span.end) {

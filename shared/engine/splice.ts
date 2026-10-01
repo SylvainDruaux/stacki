@@ -4,9 +4,9 @@
 // actor and the simulator apply splices through one implementation.
 //
 // Pure: bytes in, bytes out. Nothing here touches a disk or a clock.
-import { assert } from './core/assert';
+import { assert } from '../core/assert';
 import type { SourceEdit } from './intent';
-import { LIMITS } from './core/limits';
+import { LIMITS } from '../core/limits';
 import type { Splice } from './planner';
 import {
   byteStringsEqual,
@@ -15,7 +15,7 @@ import {
   toByteString,
   type ByteSpan,
   type ByteString,
-} from './core/span';
+} from '../core/span';
 
 /** Whether every splice's range holds its expected bytes (plan §5.2 step 4). */
 export function witnessesHold(bytes: ByteString, splices: readonly Splice[]): boolean {

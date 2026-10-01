@@ -9,7 +9,7 @@
 import { createHash } from 'node:crypto';
 import { assert } from '../../shared/core/assert';
 import type { FilePath, IntentId } from '../../shared/core/brand';
-import { REJECTION_REASONS, type Outcome, type RejectionReason } from '../../shared/intent';
+import { REJECTION_REASONS, type Outcome, type RejectionReason } from '../../shared/engine/intent';
 
 /** What one line records. (The step-0 save guard's `conflict` went with the
  * last whole-file save at step 10: a stale edit is an outcome, `rejected`.) */

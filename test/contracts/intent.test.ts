@@ -16,7 +16,7 @@ import {
   parseSubmissionResult,
   REJECTION_REASONS,
   type OperationTag,
-} from '#dist/shared/intent.js';
+} from '#dist/shared/engine/intent.js';
 import { LIMITS } from '#dist/shared/core/limits.js';
 import { parseAnchorRef, STRUCTURAL_PATH_STEPS_MAX } from '#dist/shared/page/ref.js';
 

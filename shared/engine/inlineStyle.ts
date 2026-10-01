@@ -7,8 +7,8 @@
 // One implementation for both sides: the planner splices the edits this
 // returns into the file, and the renderer applies the same edits to its model
 // value, so the two cannot disagree about what "set `color`" means.
-import { assert } from './core/assert';
-import { LIMITS } from './core/limits';
+import { assert } from '../core/assert';
+import { LIMITS } from '../core/limits';
 import type { StyleDeclaration } from './intent';
 
 /** A replacement inside the style text, in UTF-16 offsets of that text. */

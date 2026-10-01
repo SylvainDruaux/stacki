@@ -1,4 +1,4 @@
-// Goal: shared/diff.ts computes exact edit distances and a valid minimum edit
+// Goal: shared/engine/diff.ts computes exact edit distances and a valid minimum edit
 // script, and stops with a typed `too-costly` outcome — never a partial or
 // approximate diff — when a budget runs out (plan §10, §14).
 // Method: (1) seeded random byte strings over tiny alphabets, where repeats and
@@ -18,7 +18,7 @@ import {
   DIFF_BUDGET,
   type ByteDiff,
   type DiffBudget,
-} from '#dist/shared/diff.js';
+} from '#dist/shared/engine/diff.js';
 import { LIMITS } from '#dist/shared/core/limits.js';
 import { encodeUtf8, toByteString, type ByteString } from '#dist/shared/core/span.js';
 import { Prng } from './prng.ts';

@@ -13,12 +13,12 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { toFilePath, toIntentId } from '#dist/shared/core/brand.js';
-import { toIntent, type Operation } from '#dist/shared/intent.js';
-import { planIntent } from '#dist/shared/planner.js';
+import { toIntent, type Operation } from '#dist/shared/engine/intent.js';
+import { planIntent } from '#dist/shared/engine/planner.js';
 import type { AnchorRef } from '#dist/shared/page/ref.js';
 import type { Snapshot } from '#dist/shared/page/snapshot.js';
 import { decodeUtf8, encodeUtf8 } from '#dist/shared/core/span.js';
-import { applySplices } from '#dist/shared/splice.js';
+import { applySplices } from '#dist/shared/engine/splice.js';
 import { anchorAt } from './oracle-intent.ts';
 import { snapshotOf } from './project.ts';
 

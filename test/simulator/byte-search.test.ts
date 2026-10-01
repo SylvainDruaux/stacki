@@ -1,4 +1,4 @@
-// Goal: shared/byteSearch.ts counts the occurrences of a byte string exactly,
+// Goal: shared/engine/byteSearch.ts counts the occurrences of a byte string exactly,
 // overlapping ones included, stops at its bound, and asserts its preconditions
 // — the planner's uniqueness rule (plan §4) is only as sound as this count.
 // Method: (1) hand-built cases: absent, once, overlapping, needle longer than
@@ -8,7 +8,7 @@
 // (3) the preconditions assert with pinned messages.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { countOccurrences } from '#dist/shared/byteSearch.js';
+import { countOccurrences } from '#dist/shared/engine/byteSearch.js';
 import { encodeUtf8, toByteString, type ByteString } from '#dist/shared/core/span.js';
 import { Prng } from './prng.ts';
 

@@ -1,4 +1,4 @@
-// Goal: shared/planner.ts plans `set-attribute` at exactly the right bytes when
+// Goal: shared/engine/planner.ts plans `set-attribute` at exactly the right bytes when
 // the file changed after the intent was authored, and rejects with the right
 // reason everywhere it cannot be sure — never re-targeting a sibling with
 // identical bytes (plan §3.4, §4, §5.2).
@@ -21,8 +21,12 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { test } from 'node:test';
 import { toFilePath, toIntentId } from '#dist/shared/core/brand.js';
-import { toIntent, type Intent, type Operation } from '#dist/shared/intent.js';
-import { planIntent, planIntentThroughDiff, type PlanningBase } from '#dist/shared/planner.js';
+import { toIntent, type Intent, type Operation } from '#dist/shared/engine/intent.js';
+import {
+  planIntent,
+  planIntentThroughDiff,
+  type PlanningBase,
+} from '#dist/shared/engine/planner.js';
 import type { AnchorRef } from '#dist/shared/page/ref.js';
 import type { Snapshot } from '#dist/shared/page/snapshot.js';
 import type { ProjectedNode } from '#dist/shared/page/sourceProjection.js';
@@ -32,8 +36,8 @@ import { ORACLE_SCENARIOS } from './oracles.ts';
 import { snapshotOf } from './project.ts';
 import { referenceMapSpan, referenceTables } from './reference-diff.ts';
 import { planByIdentity } from './reference-planner.ts';
-import { applySplices } from '#dist/shared/splice.js';
-import { diffCodePatch } from '#dist/shared/code-patch.js';
+import { applySplices } from '#dist/shared/engine/splice.js';
+import { diffCodePatch } from '#dist/shared/engine/codePatch.js';
 
 const FIXTURES = path.resolve('test/fixtures/editor-core');
 const DIRECTORIES = ['test/corpus', 'test/fixtures/round-trip', 'test/fixtures/editor-core'];

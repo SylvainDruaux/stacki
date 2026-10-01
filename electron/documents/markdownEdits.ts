@@ -12,7 +12,7 @@
 //     are placed through a diff or refused.
 //   - A new block or item is printed at the place it goes and inserted beside
 //     its neighbour; the planner separates it as Markdown does
-//     (shared/planMarkdown.ts).
+//     (shared/engine/planMarkdown.ts).
 //   - The YAML frontmatter is printed from the model and written as the slot
 //     that differs, or — a page without one — inserted at the top.
 //
@@ -20,12 +20,12 @@
 // drafted by editRequests.ts as on an .astro page. So are removals, moves and
 // copies, which the planner places for markup and Markdown alike.
 import { assert } from '../../shared/core/assert';
-import type { Edit, NodeRef } from '../../shared/edit-request';
-import type { AttributeValue, Placement, RejectionReason } from '../../shared/intent';
-import { blankLinePrefix, markdownPrefix } from '../../shared/markdownLayout';
+import type { Edit, NodeRef } from '../../shared/engine/editRequest';
+import type { AttributeValue, Placement, RejectionReason } from '../../shared/engine/intent';
+import { blankLinePrefix, markdownPrefix } from '../../shared/engine/markdownLayout';
 import { parsePageResult, type Attr, type PageNode } from '../../shared/page/pageNode';
-import { markdownBeside } from '../../shared/planMarkdown';
-import { nodeAtPath, parentPath, textOf } from '../../shared/planSupport';
+import { markdownBeside } from '../../shared/engine/planMarkdown';
+import { nodeAtPath, parentPath, textOf } from '../../shared/engine/planSupport';
 import { toAnchorRef } from '../../shared/page/ref';
 import { err, ok, type Result } from '../../shared/core/result';
 import type { ProjectedNode } from '../../shared/page/sourceProjection';

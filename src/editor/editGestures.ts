@@ -8,8 +8,8 @@
 // other way (src/editor/pageSender.ts).
 import { assert } from '../../shared/core/assert';
 import type { EditorModel, EditorNode } from './pageView';
-import type { Edit, NodeRef } from '../../shared/edit-request';
-import { singleDeclarationChange } from '../../shared/inlineStyle';
+import type { Edit, NodeRef } from '../../shared/engine/editRequest';
+import { singleDeclarationChange } from '../../shared/engine/inlineStyle';
 import { LIMITS } from '../../shared/core/limits';
 import type { Attr } from '../../shared/page/pageNode';
 import { renamedAttr } from './attrOrder';
@@ -676,7 +676,7 @@ export interface LoopRename {
 
 /** The loop editor's rename: a new head that renames the loop's parameters and
  * nothing else becomes one rename-binding request per name — main finds every
- * site (shared/loopScope.ts) — and the effect is the legacy one
+ * site (shared/engine/loopScope.ts) — and the effect is the legacy one
  * (renamedLoopVar). A head that also changes its data or its shape has no
  * intent form yet and saves the whole model. */
 export function loopRenameGesture(

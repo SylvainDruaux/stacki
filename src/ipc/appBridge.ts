@@ -19,7 +19,7 @@ import {
 } from '../../shared/core/boundary';
 import { parseIpcPayload } from '../../shared/ipc-payloads';
 import { parseOkResult } from '../../shared/ipc';
-import type { EditRequest } from '../../shared/edit-request';
+import type { EditRequest } from '../../shared/engine/editRequest';
 import { parsePageEditResult, type PageEditError, type PageEdited } from '../../shared/page-save';
 import {
   parsePreviewVerdict,

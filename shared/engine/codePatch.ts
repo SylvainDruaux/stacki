@@ -15,10 +15,10 @@
 // most `splicesPerIntentMax` hunks, and its replacement bytes are at most
 // `intentPayloadBytesMax`: past that it fails with `resource-limit`, never
 // truncated.
-import { assert } from './core/assert';
+import { assert } from '../core/assert';
 import { DIFF_BUDGET, diffBytes, diffHunks, type Hunk } from './diff';
-import { LIMITS } from './core/limits';
-import { err, ok, type Result } from './core/result';
+import { LIMITS } from '../core/limits';
+import { err, ok, type Result } from '../core/result';
 import {
   decodeUtf8,
   encodeUtf8,
@@ -27,7 +27,7 @@ import {
   utf8ByteLength,
   type ByteSpan,
   type ByteString,
-} from './core/span';
+} from '../core/span';
 
 /** Replace the baseline bytes at `span`, which hold `expected`, with `text`. */
 export interface CodeHunk {

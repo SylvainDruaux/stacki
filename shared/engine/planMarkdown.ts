@@ -18,7 +18,7 @@
 // rewritten, a blank line on each side. A removal otherwise takes the block
 // and the gap on the side that keeps a separating one; the only item of a
 // list takes the list with it, since an empty list is no list at all.
-import { assert } from './core/assert';
+import { assert } from '../core/assert';
 import { blankLinePrefix, markdownPrefix } from './markdownLayout';
 import type { Placement } from './intent';
 import {
@@ -29,8 +29,8 @@ import {
   textOf,
   type ValidProjection,
 } from './planSupport';
-import { toByteSpan, type ByteSpan, type ByteString } from './core/span';
-import type { ProjectedNode } from './page/sourceProjection';
+import { toByteSpan, type ByteSpan, type ByteString } from '../core/span';
+import type { ProjectedNode } from '../page/sourceProjection';
 
 const NEWLINE = 0x0a;
 const CARRIAGE = 0x0d;

@@ -21,10 +21,10 @@ const { JSDOM } = require('jsdom');
 const { parsePage } = require('#dist/electron/parse/astroParser.js');
 const { NODE_PROJECTOR } = require('#dist/electron/documents/documentDisk.js');
 const { buildEditIntent } = require('#dist/electron/documents/editRequests.js');
-const { toIntent } = require('#dist/shared/intent.js');
-const { planIntent } = require('#dist/shared/planner.js');
-const { applySplices, inverseEdits } = require('#dist/shared/splice.js');
-const { applyCodePatch } = require('#dist/shared/code-patch.js');
+const { toIntent } = require('#dist/shared/engine/intent.js');
+const { planIntent } = require('#dist/shared/engine/planner.js');
+const { applySplices, inverseEdits } = require('#dist/shared/engine/splice.js');
+const { applyCodePatch } = require('#dist/shared/engine/codePatch.js');
 const { repoPath, stubPanels } = require('./helpers/sources.js');
 
 const tick = () => new Promise((resolve) => setTimeout(resolve, 10));

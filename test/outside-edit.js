@@ -198,7 +198,7 @@ const settle = (ms = 20) => new Promise((resolve) => setTimeout(resolve, ms));
   {
     const os = require('os');
     const { createHash } = require('crypto');
-    const { diffCodePatch } = require('#dist/shared/code-patch.js');
+    const { diffCodePatch } = require('#dist/shared/engine/codePatch.js');
     const { mainHarness } = await import('./helpers/mainHarness.ts');
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'stacki-outside-edit-'));
     fs.mkdirSync(path.join(root, 'src', 'pages'), { recursive: true });

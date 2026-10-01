@@ -9,14 +9,14 @@
 //
 //   - The app's own edit: the reply's inverse hunks say exactly which bytes
 //     changed. A node's span is mapped through those splices as the actor's
-//     rebase maps anchors (shared/rebase.ts): a change inside a node leaves
+//     rebase maps anchors (shared/engine/rebase.ts): a change inside a node leaves
 //     the same node, a change through its edges leaves none. Nodes the edit
 //     itself created (an insertion, a move's new place) are the gesture's own
 //     new nodes, paired in document order inside the edit's own replaced
 //     ranges — nowhere else.
 //   - Anything else (an outside edit, typed code, an edit merged with an
 //     outside one): the span is mapped through the byte diff, which resolves
-//     only what every minimum edit script keeps whole (shared/mapSpan.ts) —
+//     only what every minimum edit script keeps whole (shared/engine/mapSpan.ts) —
 //     ambiguous or gone is a fresh handle, never a guess.
 //
 // A node nothing carries gets a fresh handle named by the snapshot it came
@@ -27,13 +27,13 @@
 // its source range too.
 import { assert } from '../../shared/core/assert';
 import { toNodeId, toUtf16Offset, type Digest } from '../../shared/core/brand';
-import { DIFF_BUDGET, diffBytes } from '../../shared/diff';
-import type { SourceEdit } from '../../shared/intent';
+import { DIFF_BUDGET, diffBytes } from '../../shared/engine/diff';
+import type { SourceEdit } from '../../shared/engine/intent';
 import { LIMITS } from '../../shared/core/limits';
-import { mapSpanThroughDiff } from '../../shared/mapSpan';
+import { mapSpanThroughDiff } from '../../shared/engine/mapSpan';
 import type { PageModel, PageNode } from '../../shared/page/pageNode';
-import type { Splice } from '../../shared/planner';
-import { rebaseSpan } from '../../shared/rebase';
+import type { Splice } from '../../shared/engine/planner';
+import { rebaseSpan } from '../../shared/engine/rebase';
 import {
   byteStringsEqual,
   encodeUtf8,
@@ -43,7 +43,7 @@ import {
   type ByteSpan,
   type ByteString,
 } from '../../shared/core/span';
-import { applySplices, witnessesHold } from '../../shared/splice';
+import { applySplices, witnessesHold } from '../../shared/engine/splice';
 
 /** A parse and the text it is a parse of: node ranges are UTF-16 offsets into it. */
 export interface ParsedText {

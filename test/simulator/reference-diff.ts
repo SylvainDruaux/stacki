@@ -1,4 +1,4 @@
-// The brute-force references for shared/diff.ts and shared/mapSpan.ts (plan §10:
+// The brute-force references for shared/engine/diff.ts and shared/engine/mapSpan.ts (plan §10:
 // every fast path ships beside a slow, obviously correct version). Full edit
 // distance tables — O(N·M) time and memory, so only for small inputs — and a
 // span mapper that checks every column of the span against every target byte,
@@ -7,7 +7,7 @@
 // ambiguous otherwise. The fast mapper decides from two columns and Myers
 // frontiers; the tests assert the two agree on every input they generate.
 import { assert } from '#dist/shared/core/assert.js';
-import type { SpanMapping } from '#dist/shared/mapSpan.js';
+import type { SpanMapping } from '#dist/shared/engine/mapSpan.js';
 import { toByteSpan, type ByteSpan, type ByteString } from '#dist/shared/core/span.js';
 
 /** Largest table the reference builds: 4 M cells, a few MB per table. */

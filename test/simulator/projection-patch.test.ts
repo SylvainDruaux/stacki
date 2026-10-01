@@ -1,4 +1,4 @@
-// Goal: a patched projection (shared/projection-patch.ts) is exactly the one a
+// Goal: a patched projection (shared/engine/projectionPatch.ts) is exactly the one a
 // full reparse produces, wherever the patch accepts a value splice, and the
 // patch refuses every splice outside its stated rule (step-4 latency
 // experiment; plan §10: a fast path is held to its brute-force reference).
@@ -20,12 +20,12 @@ import { test } from 'node:test';
 import { parsePage } from '#dist/electron/parse/astroParser.js';
 import { toFilePath } from '#dist/shared/core/brand.js';
 import { LIMITS } from '#dist/shared/core/limits.js';
-import type { Splice } from '#dist/shared/planner.js';
+import type { Splice } from '#dist/shared/engine/planner.js';
 import {
   hostContext,
   projectValueSplice,
   valueBytesNeutral,
-} from '#dist/shared/projection-patch.js';
+} from '#dist/shared/engine/projectionPatch.js';
 import type { ProjectedNode, Projection } from '#dist/shared/page/sourceProjection.js';
 import {
   decodeUtf8,
@@ -39,7 +39,7 @@ import { patchCounts } from './candidate.ts';
 import { Prng } from './prng.ts';
 import { loadSimulationFixtures } from './fixtures.entry.ts';
 import { projectBytes } from './project.ts';
-import { applySplices } from '#dist/shared/splice.js';
+import { applySplices } from '#dist/shared/engine/splice.js';
 import { runSimulation } from './world.ts';
 
 const DIRECTORIES = ['test/corpus', 'test/fixtures/round-trip', 'test/fixtures/editor-core'];

@@ -27,7 +27,7 @@ import {
   serializeMarkdownPage,
 } from '#dist/electron/parse/markdownParser.js';
 import { LIMITS } from '#dist/shared/core/limits.js';
-import { markdownPrefix } from '#dist/shared/markdownLayout.js';
+import { markdownPrefix } from '#dist/shared/engine/markdownLayout.js';
 import { parsePageResult, type PageModel, type PageNode } from '#dist/shared/page/pageNode.js';
 import { projectPage, type ProjectedNode } from '#dist/shared/page/sourceProjection.js';
 import { encodeUtf8, type ByteString } from '#dist/shared/core/span.js';

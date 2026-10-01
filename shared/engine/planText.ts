@@ -4,9 +4,9 @@
 // text rewrite (step 10). The ranges were authored
 // against the intent's own snapshot; stale ones are mapped through the diff
 // with the region they sit in, and only exactly.
-import { assert } from './core/assert';
+import { assert } from '../core/assert';
 import type { Operation, RejectionReason, SourceEdit } from './intent';
-import { LIMITS } from './core/limits';
+import { LIMITS } from '../core/limits';
 import type { CandidatePolicy, Plan, Splice } from './planner';
 import {
   nodeEditable,
@@ -17,8 +17,8 @@ import {
   validProjections,
   type PlanContext,
 } from './planSupport';
-import type { AnchorRef } from './page/ref';
-import { err, ok, type Result } from './core/result';
+import type { AnchorRef } from '../page/ref';
+import { err, ok, type Result } from '../core/result';
 import {
   byteStringsEqual,
   encodeUtf8,
@@ -26,7 +26,7 @@ import {
   toByteSpan,
   type ByteSpan,
   type ByteString,
-} from './core/span';
+} from '../core/span';
 
 /** Bytes of context each side of a hunk when it is mapped through the diff.
  * A hunk of a few bytes (`Old`, a closing brace) repeats everywhere, and the

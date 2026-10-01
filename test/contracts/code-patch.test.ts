@@ -1,4 +1,4 @@
-// Goal: the code editor's patch (shared/code-patch.ts, step 8) is the byte
+// Goal: the code editor's patch (shared/engine/codePatch.ts, step 8) is the byte
 // diff from its baseline to its text — exact, witnessed, on whole code points,
 // and bounded. Applying it gives back the text for every fixture under seeded
 // edits (Unicode, CRLF, BOM, malformed intermediates included); separate edits
@@ -20,9 +20,9 @@ import {
   diffCodePatch,
   mergeTyping,
   type CodeHunk,
-} from '#dist/shared/code-patch.js';
+} from '#dist/shared/engine/codePatch.js';
 import { LIMITS } from '#dist/shared/core/limits.js';
-import { shiftUntouched } from '#dist/shared/rebase.js';
+import { shiftUntouched } from '#dist/shared/engine/rebase.js';
 import { encodeUtf8, toByteSpan } from '#dist/shared/core/span.js';
 
 const ROOT = path.join(import.meta.dirname, '..');

@@ -11,12 +11,12 @@
 // exact path.
 import { assert } from '../../shared/core/assert';
 import { toFilePath, toIntentId, type Digest } from '../../shared/core/brand';
-import type { Edit } from '../../shared/edit-request';
-import { toIntent, type RejectionReason, type SourceEdit } from '../../shared/intent';
-import { planIntent } from '../../shared/planner';
+import type { Edit } from '../../shared/engine/editRequest';
+import { toIntent, type RejectionReason, type SourceEdit } from '../../shared/engine/intent';
+import { planIntent } from '../../shared/engine/planner';
 import { err, ok, type Result } from '../../shared/core/result';
 import type { ByteString } from '../../shared/core/span';
-import { applySplices, inverseEdits } from '../../shared/splice';
+import { applySplices, inverseEdits } from '../../shared/engine/splice';
 import { NODE_PROJECTOR } from './documentDisk';
 import { buildEditIntent } from './editRequests';
 

@@ -28,7 +28,7 @@ const {
   hashPath,
 } = require('#dist/electron/documents/documentTelemetry.js');
 const { LIMITS } = require('#dist/shared/core/limits.js');
-const { planIntent } = require('#dist/shared/planner.js');
+const { planIntent } = require('#dist/shared/engine/planner.js');
 
 const sha256 = (text) => createHash('sha256').update(text).digest('hex');
 

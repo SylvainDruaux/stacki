@@ -9,12 +9,12 @@
 // not of these bytes, and the edit is refused as moved — never guessed.
 import { assert } from '../../shared/core/assert';
 import { toUtf16Offset } from '../../shared/core/brand';
-import { diffCodePatch } from '../../shared/code-patch';
-import { DIFF_BUDGET, diffBytes, type ByteDiff } from '../../shared/diff';
-import type { NodeRef } from '../../shared/edit-request';
-import type { RejectionReason, SourceEdit } from '../../shared/intent';
-import { mapSpanThroughDiff } from '../../shared/mapSpan';
-import { nodeAtPath, type ValidProjection } from '../../shared/planSupport';
+import { diffCodePatch } from '../../shared/engine/codePatch';
+import { DIFF_BUDGET, diffBytes, type ByteDiff } from '../../shared/engine/diff';
+import type { NodeRef } from '../../shared/engine/editRequest';
+import type { RejectionReason, SourceEdit } from '../../shared/engine/intent';
+import { mapSpanThroughDiff } from '../../shared/engine/mapSpan';
+import { nodeAtPath, type ValidProjection } from '../../shared/engine/planSupport';
 import { toAnchorRef, toChildIndex, type AnchorRef } from '../../shared/page/ref';
 import { err, ok, type Result } from '../../shared/core/result';
 import type { Snapshot } from '../../shared/page/snapshot';

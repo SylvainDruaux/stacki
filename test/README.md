@@ -19,7 +19,7 @@ the Node test runner. Individual `npm run test:...` commands remain available.
 the step-wise actor over a fake disk, checked against the nine invariants of
 plan §10, plus the oracle scenarios over the hostile corpus in
 `fixtures/editor-core/`, and the step-2 suites (`diff`, `map-span`, `planner`)
-that hold `shared/diff.ts`, `shared/mapSpan.ts` and `shared/planner.ts` to the
+that hold `shared/engine/diff.ts`, `shared/engine/mapSpan.ts` and `shared/engine/planner.ts` to the
 brute-force references in `simulator/reference-diff.ts`.
 `STACKI_SIMULATOR_SEEDS=2000 npm run test:simulator` is
 the long run. From step 3 the simulator's actor plans `set-attribute` with the

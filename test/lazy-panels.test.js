@@ -12,12 +12,12 @@ const { createHash } = require('node:crypto');
 const sha256 = (text) => createHash('sha256').update(text).digest('hex');
 const { JSDOM } = require('jsdom');
 const { parsePage } = require('#dist/electron/parse/astroParser.js');
-const { applyCodePatch } = require('#dist/shared/code-patch.js');
+const { applyCodePatch } = require('#dist/shared/engine/codePatch.js');
 const { NODE_PROJECTOR } = require('#dist/electron/documents/documentDisk.js');
 const { buildEditIntent } = require('#dist/electron/documents/editRequests.js');
-const { toIntent } = require('#dist/shared/intent.js');
-const { planIntent } = require('#dist/shared/planner.js');
-const { applySplices, inverseEdits } = require('#dist/shared/splice.js');
+const { toIntent } = require('#dist/shared/engine/intent.js');
+const { planIntent } = require('#dist/shared/engine/planner.js');
+const { applySplices, inverseEdits } = require('#dist/shared/engine/splice.js');
 const { repoPath, stubPanels, stubSources } = require('./helpers/sources.js');
 
 // A visual edit request as main's handler applies it, on the fake's disk: the

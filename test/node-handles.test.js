@@ -18,9 +18,9 @@ const { LIMITS } = require('#dist/shared/core/limits.js');
 const { parsePageResult } = require('#dist/shared/page/pageNode.js');
 const { NODE_PROJECTOR } = require('#dist/electron/documents/documentDisk.js');
 const { buildEditIntent } = require('#dist/electron/documents/editRequests.js');
-const { toIntent } = require('#dist/shared/intent.js');
-const { planIntent } = require('#dist/shared/planner.js');
-const { applySplices, inverseEdits } = require('#dist/shared/splice.js');
+const { toIntent } = require('#dist/shared/engine/intent.js');
+const { planIntent } = require('#dist/shared/engine/planner.js');
+const { applySplices, inverseEdits } = require('#dist/shared/engine/splice.js');
 const { carryHandles } = load('src/editor/nodeHandles.ts');
 
 const sha256 = (text) => createHash('sha256').update(text).digest('hex');

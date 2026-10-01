@@ -1,7 +1,7 @@
 // The step-1 reference planner: identity mapping only. It plans an intent when
 // the file still holds exactly the bytes the intent was authored against, and
 // rejects everything else — it never maps a span through a diff. Step 2's
-// planner (shared/planner.ts) maps set-attribute through the diff; this one
+// planner (shared/engine/planner.ts) maps set-attribute through the diff; this one
 // stays as the reference for the zero-diff case, which the shipping planner
 // must agree with (plan §10), and plans the other operations in the simulator
 // until their steps ship them.
@@ -9,7 +9,7 @@
 // Pure (plan §5.2): snapshot and intent in, Result out. No disk, no clock.
 import { assert } from '#dist/shared/core/assert.js';
 import { capabilityAcceptsVisualIntent } from '#dist/shared/page/capability.js';
-import type { Intent, RejectionReason } from '#dist/shared/intent.js';
+import type { Intent, RejectionReason } from '#dist/shared/engine/intent.js';
 import { LIMITS } from '#dist/shared/core/limits.js';
 import type { AnchorRef, StructuralPath } from '#dist/shared/page/ref.js';
 import { err, ok, type Result } from '#dist/shared/core/result.js';
@@ -22,8 +22,8 @@ import {
   type ByteSpan,
   type ByteString,
 } from '#dist/shared/core/span.js';
-import type { CandidatePolicy, Plan, PostKind } from '#dist/shared/planner.js';
-import type { Splice } from '#dist/shared/planner.js';
+import type { CandidatePolicy, Plan, PostKind } from '#dist/shared/engine/planner.js';
+import type { Splice } from '#dist/shared/engine/planner.js';
 
 const QUOTE_DOUBLE = 0x22;
 const QUOTE_SINGLE = 0x27;

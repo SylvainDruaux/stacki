@@ -5,7 +5,7 @@
 // become byte spans, new nodes and frontmatter are printed by the legacy
 // printer (only what is new — never the file), a node's new text is turned
 // into hunks placed on its own bytes (step 9, `replace-node`), and a loop
-// rename's sites are found (shared/loopScope.ts). Everything else is the
+// rename's sites are found (shared/engine/loopScope.ts). Everything else is the
 // planner's. A Markdown or MDX page's own nodes are drafted by
 // markdownEdits.ts (step 10); its markup, and the operations the planner
 // places alike in both — removals, moves, copies — are drafted here.
@@ -17,11 +17,11 @@
 // nodes by the path, kind and UTF-16 range of the parse it shows, and only main
 // holds the bytes those become, so the translation stays here.
 import { assert } from '../../shared/core/assert';
-import type { Edit, NodeRef } from '../../shared/edit-request';
+import type { Edit, NodeRef } from '../../shared/engine/editRequest';
 import type { BuiltEdit, EditBase, IntentDraft } from './documentActors';
-import { TAG_NAME_RE } from '../../shared/intent';
-import type { Operation, Placement, RejectionReason, SourceEdit } from '../../shared/intent';
-import { renameSites } from '../../shared/loopScope';
+import { TAG_NAME_RE } from '../../shared/engine/intent';
+import type { Operation, Placement, RejectionReason, SourceEdit } from '../../shared/engine/intent';
+import { renameSites } from '../../shared/engine/loopScope';
 import {
   closeTagStart,
   lineIndent,
@@ -29,7 +29,7 @@ import {
   openTagEnd,
   tagNameEnd,
   textOf,
-} from '../../shared/planSupport';
+} from '../../shared/engine/planSupport';
 import { parsePageResult, type PageNode } from '../../shared/page/pageNode';
 import { toAnchorRef, type AnchorRef } from '../../shared/page/ref';
 import { err, ok, type Result } from '../../shared/core/result';

@@ -13,17 +13,17 @@
 //
 // The adapter half in main dies at step 9, when the renderer holds
 // projections and authors intents directly.
-import { assert } from './core/assert';
-import type { Digest } from './core/brand';
-import { digest, pathText } from './core/boundary';
-import type { CodeHunk } from './code-patch';
+import { assert } from '../core/assert';
+import type { Digest } from '../core/brand';
+import { digest, pathText } from '../core/boundary';
+import type { CodeHunk } from './codePatch';
 import type { AttributeValue, Placement, SourceEdit, StyleDeclaration } from './intent';
 import { PLACEMENTS, TAG_NAME_RE } from './intent';
-import { LIMITS } from './core/limits';
-import { parsePageModel, parsePageNode, type PageModel, type PageNode } from './page/pageNode';
-import { toArray, toRecord } from './core/record';
-import { NODE_KINDS, STRUCTURAL_PATH_STEPS_MAX, type NodeKind } from './page/ref';
-import { parseByteSpan, parseUtf16Span, spansAscending, type Utf16Span } from './core/span';
+import { LIMITS } from '../core/limits';
+import { parsePageModel, parsePageNode, type PageModel, type PageNode } from '../page/pageNode';
+import { toArray, toRecord } from '../core/record';
+import { NODE_KINDS, STRUCTURAL_PATH_STEPS_MAX, type NodeKind } from '../page/ref';
+import { parseByteSpan, parseUtf16Span, spansAscending, type Utf16Span } from '../core/span';
 
 /** A node of the parse the request was authored against. */
 export interface NodeRef {
@@ -105,7 +105,7 @@ export type Edit =
    * checksum that reply named. */
   | { readonly tag: 'revert'; readonly hunks: readonly SourceEdit[] }
   /** The code editor (step 8): the byte diff from the text of the named
-   * checksum to the editor's text (shared/code-patch.ts). Each hunk names the
+   * checksum to the editor's text (shared/engine/codePatch.ts). Each hunk names the
    * bytes it replaces, and main checks them against that checksum's bytes.
    * The result may not parse (plan §3.6). */
   | { readonly tag: 'code-patch'; readonly hunks: readonly CodeHunk[] };

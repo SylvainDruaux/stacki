@@ -1,5 +1,5 @@
 import { parsePropertyChange, propertySource } from './component-properties';
-import { parseEdit, parseEditRequest } from './edit-request';
+import { parseEdit, parseEditRequest } from './engine/editRequest';
 import { parsePreviewRender } from './page/previewToken';
 // Complete invoke-channel inventory. Every main-process listener receives the
 // parsed shape below; payload field names retain the existing renderer protocol.

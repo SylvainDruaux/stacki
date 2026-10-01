@@ -14,10 +14,10 @@ import {
   type IntentId,
 } from '#dist/shared/core/brand.js';
 import type { Capability } from '#dist/shared/page/capability.js';
-import type { ByteDiff, DiffOutcome } from '#dist/shared/diff.js';
-import type { Outcome, RejectionReason, SubmissionResult } from '#dist/shared/intent.js';
-import type { SpanMapping } from '#dist/shared/mapSpan.js';
-import type { Plan, PlanningBase } from '#dist/shared/planner.js';
+import type { ByteDiff, DiffOutcome } from '#dist/shared/engine/diff.js';
+import type { Outcome, RejectionReason, SubmissionResult } from '#dist/shared/engine/intent.js';
+import type { SpanMapping } from '#dist/shared/engine/mapSpan.js';
+import type { Plan, PlanningBase } from '#dist/shared/engine/planner.js';
 import type { AnchorRef } from '#dist/shared/page/ref.js';
 import type { Snapshot } from '#dist/shared/page/snapshot.js';
 import type { Projection } from '#dist/shared/page/sourceProjection.js';

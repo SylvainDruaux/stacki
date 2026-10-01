@@ -30,10 +30,10 @@ import { writeVerified } from './verified-write.entry.ts';
 import { parsePage } from '#dist/electron/parse/astroParser.js';
 import { toFilePath, toIntentId } from '#dist/shared/core/brand.js';
 import { capabilityAcceptsVisualIntent } from '#dist/shared/page/capability.js';
-import { toIntent, type Intent } from '#dist/shared/intent.js';
+import { toIntent, type Intent } from '#dist/shared/engine/intent.js';
 import { LIMITS } from '#dist/shared/core/limits.js';
 import { parsePageResult } from '#dist/shared/page/pageNode.js';
-import { planIntent } from '#dist/shared/planner.js';
+import { planIntent } from '#dist/shared/engine/planner.js';
 import { toAnchorRef, toChildIndex } from '#dist/shared/page/ref.js';
 import type { Snapshot } from '#dist/shared/page/snapshot.js';
 import { projectPage, type ProjectedNode } from '#dist/shared/page/sourceProjection.js';
@@ -41,7 +41,7 @@ import { decodeUtf8, encodeUtf8, toByteString, type ByteString } from '#dist/sha
 import { loadSimulationFixtures } from './fixtures.entry.ts';
 import { Prng } from './prng.ts';
 import { sha256, snapshotOf } from './project.ts';
-import { applySplices, witnessesHold } from '#dist/shared/splice.js';
+import { applySplices, witnessesHold } from '#dist/shared/engine/splice.js';
 import { runSimulation } from './world.ts';
 
 const THRESHOLD_INTENT_MS = 50;

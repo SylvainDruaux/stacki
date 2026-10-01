@@ -24,15 +24,15 @@
 // scenario's real bytes (plan §10), and checks that the planner's decision is
 // the one the mapping implies.
 import { assert } from '#dist/shared/core/assert.js';
-import { DIFF_BUDGET } from '#dist/shared/diff.js';
-import type { Intent, RejectionReason } from '#dist/shared/intent.js';
-import { mapSpan, type SpanMapping } from '#dist/shared/mapSpan.js';
-import type { Plan } from '#dist/shared/planner.js';
+import { DIFF_BUDGET } from '#dist/shared/engine/diff.js';
+import type { Intent, RejectionReason } from '#dist/shared/engine/intent.js';
+import { mapSpan, type SpanMapping } from '#dist/shared/engine/mapSpan.js';
+import type { Plan } from '#dist/shared/engine/planner.js';
 import type { Snapshot } from '#dist/shared/page/snapshot.js';
 import type { ProjectedNode, Projection } from '#dist/shared/page/sourceProjection.js';
 import { toByteSpan, type ByteSpan, type ByteString } from '#dist/shared/core/span.js';
-import { applySplices } from '#dist/shared/splice.js';
-import type { Splice } from '#dist/shared/planner.js';
+import { applySplices } from '#dist/shared/engine/splice.js';
+import type { Splice } from '#dist/shared/engine/planner.js';
 import { survivingSpan, type Origins } from './provenance.ts';
 import { referenceMapSpan, referenceTables } from './reference-diff.ts';
 

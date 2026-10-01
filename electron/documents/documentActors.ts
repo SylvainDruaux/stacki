@@ -36,7 +36,7 @@ import {
   type Planner,
   type Projector,
   type Reconciliation,
-} from '../../shared/documentActor';
+} from '../../shared/engine/documentActor';
 import {
   describeRejection,
   intentPayloadBytes,
@@ -45,15 +45,20 @@ import {
   type Outcome,
   type RejectionReason,
   type SourceEdit,
-} from '../../shared/intent';
-import { commitChain, minimalSplices, rebaseIntent, type CommitRecord } from '../../shared/rebase';
+} from '../../shared/engine/intent';
+import {
+  commitChain,
+  minimalSplices,
+  rebaseIntent,
+  type CommitRecord,
+} from '../../shared/engine/rebase';
 import type { Snapshot } from '../../shared/page/snapshot';
-import { inverseEdits } from '../../shared/splice';
+import { inverseEdits } from '../../shared/engine/splice';
 import { LIMITS } from '../../shared/core/limits';
 import { err, ok, type Result } from '../../shared/core/result';
 import { decodeUtf8, encodeUtf8, toByteSpan, type ByteString } from '../../shared/core/span';
-import { diffCodePatch } from '../../shared/code-patch';
-import { planIntent } from '../../shared/planner';
+import { diffCodePatch } from '../../shared/engine/codePatch';
+import { planIntent } from '../../shared/engine/planner';
 import {
   NODE_PROJECTOR,
   NodeDocumentDisk,
@@ -267,7 +272,7 @@ interface Rewrite {
 const UNCHANGED: readonly SourceEdit[] = [{ span: toByteSpan(0, 0), text: '' }];
 
 // The hunks from `bytes` to `text`: the code patch between them (its bounds
-// and its coarsening past the diff budget are shared/code-patch.ts's). No text,
+// and its coarsening past the diff budget are shared/engine/codePatch.ts's). No text,
 // or the bytes' own text, is the bytes themselves: UNCHANGED.
 function rewriteHunks(
   bytes: ByteString,

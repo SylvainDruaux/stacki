@@ -25,14 +25,14 @@
 // The actor never retries and never merges: every accepted intent reaches
 // exactly one terminal outcome (plan §3.5), and a rejected one needs a
 // deliberate resubmission by the persistence layer.
-import { assert } from './core/assert';
-import type { Digest, FilePath } from './core/brand';
+import { assert } from '../core/assert';
+import type { Digest, FilePath } from '../core/brand';
 import type { Intent, Outcome, RejectionReason, SubmissionResult } from './intent';
-import { LIMITS } from './core/limits';
+import { LIMITS } from '../core/limits';
 import type { Plan, PlanningBase } from './planner';
-import { err, ok, type Result } from './core/result';
-import type { Snapshot } from './page/snapshot';
-import type { ByteString } from './core/span';
+import { err, ok, type Result } from '../core/result';
+import type { Snapshot } from '../page/snapshot';
+import type { ByteString } from '../core/span';
 import { applySplices, changedRanges, witnessesHold } from './splice';
 
 // --- Injected dependencies -----------------------------------------------------
@@ -88,7 +88,7 @@ export interface Projector {
   hash(bytes: ByteString): Digest;
   snapshot(path: FilePath, bytes: ByteString): Snapshot;
   /** The candidate after `plan` applied to `base` gives `bytes`. May derive the
-   * projection from the base (shared/projection-patch.ts) instead of parsing. */
+   * projection from the base (shared/engine/projectionPatch.ts) instead of parsing. */
   candidate(path: FilePath, base: Snapshot, plan: Plan, bytes: ByteString): Snapshot;
 }
 

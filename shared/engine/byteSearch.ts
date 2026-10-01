@@ -5,9 +5,9 @@
 // lengths whatever the bytes are — a file of one repeated byte cannot make a
 // naive search quadratic — and the count stops at `countMax`, since the caller
 // only needs to know "one" from "more than one".
-import { assert } from './core/assert';
-import { LIMITS } from './core/limits';
-import type { ByteString } from './core/span';
+import { assert } from '../core/assert';
+import { LIMITS } from '../core/limits';
+import type { ByteString } from '../core/span';
 
 /** How many times `needle` occurs in `haystack`, overlapping occurrences
  * included, counted up to `countMax` and no further. */

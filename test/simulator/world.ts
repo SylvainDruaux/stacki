@@ -32,9 +32,9 @@ import {
   type Outcome,
   type RejectionReason,
   type SourceEdit,
-} from '#dist/shared/intent.js';
-import { changedRanges, inverseEdits, orderedSplices } from '#dist/shared/splice.js';
-import { diffCodePatch } from '#dist/shared/code-patch.js';
+} from '#dist/shared/engine/intent.js';
+import { changedRanges, inverseEdits, orderedSplices } from '#dist/shared/engine/splice.js';
+import { diffCodePatch } from '#dist/shared/engine/codePatch.js';
 import { LIMITS } from '#dist/shared/core/limits.js';
 import { toAnchorRef, toChildIndex } from '#dist/shared/page/ref.js';
 import type { Snapshot } from '#dist/shared/page/snapshot.js';
@@ -60,7 +60,7 @@ import {
   type ActorState,
   type ActorStep,
   type Submission,
-} from '#dist/shared/documentActor.js';
+} from '#dist/shared/engine/documentActor.js';
 import { SIMULATOR_PROJECTOR } from './candidate.ts';
 import { planEngine } from './engine-planner.ts';
 import { FakeDisk } from './fake-disk.ts';
@@ -189,7 +189,7 @@ export function runSimulation(input: SimulationInput): SimulationReport {
 class World {
   private readonly prng: Prng;
   private readonly disk = new FakeDisk();
-  // The shipped actor (shared/documentActor.ts), on the fake disk.
+  // The shipped actor (shared/engine/documentActor.ts), on the fake disk.
   private readonly dependencies: ActorDependencies = {
     disk: this.disk,
     planner: planEngine,
@@ -1283,7 +1283,7 @@ const BYTE_HUNK_OPERATIONS: readonly Operation['tag'][] = ['apply-code-patch', '
 
 // Whether a splice could move one byte along the file and write the same bytes:
 // deleting one of two equal lines, or typing a character beside its twin. A
-// diff places such a change on one copy by convention (shared/code-patch.ts
+// diff places such a change on one copy by convention (shared/engine/codePatch.ts
 // trims the common prefix first, so it takes the last); the user may have
 // meant the other, and no byte rule can tell (planner.test.ts, BYTES CANNOT
 // TELL). Found by the step-8 long run: a deletion placed on the last of two

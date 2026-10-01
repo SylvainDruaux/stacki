@@ -1,4 +1,4 @@
-// Goal: what the projection patch (shared/projection-patch.ts) and the word-wise
+// Goal: what the projection patch (shared/engine/projectionPatch.ts) and the word-wise
 // byteStringsEqual buy on the plan §5.2 pipeline, on the six named large
 // fixtures (step-4 latency experiment). A measurement, not a test.
 // Method: the spike's pipeline (spike.bench.ts runPipeline), with the candidate
@@ -23,16 +23,16 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { writeVerified } from './verified-write.entry.ts';
 import { toFilePath, toIntentId } from '#dist/shared/core/brand.js';
-import { countOccurrences } from '#dist/shared/byteSearch.js';
+import { countOccurrences } from '#dist/shared/engine/byteSearch.js';
 import { capabilityAcceptsVisualIntent } from '#dist/shared/page/capability.js';
-import { toIntent, type Intent } from '#dist/shared/intent.js';
+import { toIntent, type Intent } from '#dist/shared/engine/intent.js';
 import { LIMITS } from '#dist/shared/core/limits.js';
-import { planIntent, type Splice } from '#dist/shared/planner.js';
+import { planIntent, type Splice } from '#dist/shared/engine/planner.js';
 import {
   hostContext,
   projectValueSplice,
   valueBytesNeutral,
-} from '#dist/shared/projection-patch.js';
+} from '#dist/shared/engine/projectionPatch.js';
 import { toAnchorRef, toChildIndex } from '#dist/shared/page/ref.js';
 import { createSnapshot, type Snapshot } from '#dist/shared/page/snapshot.js';
 import type { ProjectedNode } from '#dist/shared/page/sourceProjection.js';
@@ -45,7 +45,7 @@ import {
 } from '#dist/shared/core/span.js';
 import { Prng } from './prng.ts';
 import { projectBytes, sha256, snapshotOf } from './project.ts';
-import { applySplices, witnessesHold } from '#dist/shared/splice.js';
+import { applySplices, witnessesHold } from '#dist/shared/engine/splice.js';
 
 // A fixture with no unique element in this many draws fails the bench loudly.
 const UNIQUE_DRAWS_MAX = 500;

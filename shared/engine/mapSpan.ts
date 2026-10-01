@@ -22,9 +22,9 @@
 // between: any detour costs at least two. Two columns decide the whole span.
 // The brute-force reference checks every column of a full table instead, and
 // the tests assert the two agree (plan §10).
-import { assert } from './core/assert';
+import { assert } from '../core/assert';
 import { diffBytes, type ByteDiff, type DiffBudget } from './diff';
-import { toByteSpan, type ByteSpan, type ByteString } from './core/span';
+import { toByteSpan, type ByteSpan, type ByteString } from '../core/span';
 
 export type SpanMapping =
   | { readonly tag: 'resolved'; readonly span: ByteSpan }

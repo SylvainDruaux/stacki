@@ -1,5 +1,5 @@
 // The document actor's real disk (plan §5.2), and the only module that writes
-// a page, chunk or stylesheet: it implements shared/documentActor.ts's
+// a page, chunk or stylesheet: it implements shared/engine/documentActor.ts's
 // DocumentDisk over node:fs, through the primitives in atomicWrite.ts.
 //
 // - Reads are bounded by LIMITS.sourceBytesMax before and after the read.
@@ -30,11 +30,11 @@ import type {
   LockError,
   Projector,
   ReplaceError,
-} from '../../shared/documentActor';
+} from '../../shared/engine/documentActor';
 import { parsePageResult } from '../../shared/page/pageNode';
 import { parseMarkdownPage } from '../parse/markdownParser';
-import type { Plan } from '../../shared/planner';
-import { projectValueSplice } from '../../shared/projection-patch';
+import type { Plan } from '../../shared/engine/planner';
+import { projectValueSplice } from '../../shared/engine/projectionPatch';
 import { toRecord } from '../../shared/core/record';
 import { err, ok, type Result } from '../../shared/core/result';
 import { createLazySnapshot, createSnapshot, type Snapshot } from '../../shared/page/snapshot';
@@ -293,7 +293,7 @@ const hashBytes = (bytes: ByteString) => digestOf(bytes);
  * first read (shared/page/snapshot.ts, createLazySnapshot), so a save that only
  * replaces the whole file parses nothing it does not use. A single value
  * splice derives its candidate from the base projection
- * (shared/projection-patch.ts); the simulator holds that patch to a full
+ * (shared/engine/projectionPatch.ts); the simulator holds that patch to a full
  * reparse on every candidate (plan §10). */
 export const NODE_PROJECTOR: Projector = {
   hash: hashBytes,

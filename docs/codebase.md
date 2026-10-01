@@ -144,11 +144,11 @@ gesture → edit requests (page:edit) → main: intent → document actor
   shown model; the model is readonly (`src/editor/pageView.ts`), so the prediction
   is a new model. `electron/documents/editRequests.ts` turns a request into an intent
   against main's own snapshot of those bytes; the planner
-  (`shared/planner.ts`) and the page's actor (`electron/documents/documentActors.ts`)
+  (`shared/engine/planner.ts`) and the page's actor (`electron/documents/documentActors.ts`)
   do the rest.
 - `src/editor/pageEdits.ts` holds the open page's queue — gestures on any page
   (`.astro`, `.md`, `.mdx`), or typed code (a byte diff,
-  `shared/code-patch.ts`) — and `src/editor/pagePersistence.ts` sends it one entry
+  `shared/engine/codePatch.ts`) — and `src/editor/pagePersistence.ts` sends it one entry
   at a time; a flush
   sends only the entries present when it starts, so there is no drain loop.
   `src/editor/pageSender.ts` installs each reply: node handles are carried from the

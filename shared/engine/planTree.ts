@@ -8,7 +8,7 @@
 // becomes text, the one kind change a move makes.
 //
 // Every rejection is decided in the three plan functions; the helpers compute.
-import { assert } from './core/assert';
+import { assert } from '../core/assert';
 import type { Operation, Placement, RejectionReason } from './intent';
 import { stripEdits, scopeAt, type SourceReplacement } from './loopScope';
 import type { Plan, PostKind, Splice } from './planner';
@@ -36,8 +36,8 @@ import {
   type Target,
   type ValidProjection,
 } from './planSupport';
-import { toChildIndex, type AnchorRef } from './page/ref';
-import { err, ok, type Result } from './core/result';
+import { toChildIndex, type AnchorRef } from '../page/ref';
+import { err, ok, type Result } from '../core/result';
 import { markdownPrefix } from './markdownLayout';
 import {
   itemMarker,
@@ -47,8 +47,8 @@ import {
   markdownRemoved,
   reprefixed,
 } from './planMarkdown';
-import type { NodeList, ProjectedNode } from './page/sourceProjection';
-import { encodeUtf8, toByteSpan, toByteString, type ByteSpan, type ByteString } from './core/span';
+import type { NodeList, ProjectedNode } from '../page/sourceProjection';
+import { encodeUtf8, toByteSpan, toByteString, type ByteSpan, type ByteString } from '../core/span';
 
 const NEWLINE = 0x0a;
 

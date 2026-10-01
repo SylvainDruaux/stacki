@@ -19,7 +19,7 @@ const os = require('node:os');
 const path = require('node:path');
 const esbuild = require('esbuild');
 const { parsePageDiskRead, parsePageEditResult } = require('#dist/shared/page-save.js');
-const { applyCodePatch } = require('#dist/shared/code-patch.js');
+const { applyCodePatch } = require('#dist/shared/engine/codePatch.js');
 const { LIMITS } = require('#dist/shared/core/limits.js');
 const { repoPath } = require('./helpers/sources.js');
 
@@ -270,7 +270,7 @@ test('typed code reaches the page as patches: invalid, merged, refused, kept', a
     fs.rmSync(root, { recursive: true, force: true });
   });
   const file = path.join(root, 'src/pages/index.astro');
-  // Edits merge when each keeps 64 bytes of untouched context (shared/planText.ts):
+  // Edits merge when each keeps 64 bytes of untouched context (shared/engine/planText.ts):
   // the paragraphs keep the heading, the body and the footer that far apart.
   const filler = Array.from({ length: 6 }, (_, index) => `  <p>Paragraph ${index}</p>\n`).join('');
   const body = `  <p>Body</p>\n${filler}  <footer>End</footer>\n`;

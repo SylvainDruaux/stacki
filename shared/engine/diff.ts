@@ -17,9 +17,9 @@
 // frontier cells; LIMITS.diffDistanceMax caps the frontier memory. Both are
 // checked while the work is done, so a hopeless diff stops near its cause. No
 // recursion; every loop is bounded by the file length or the distance.
-import { assert } from './core/assert';
-import { LIMITS } from './core/limits';
-import { toByteSpan, type ByteSpan, type ByteString } from './core/span';
+import { assert } from '../core/assert';
+import { LIMITS } from '../core/limits';
+import { toByteSpan, type ByteSpan, type ByteString } from '../core/span';
 
 export interface DiffBudget {
   readonly workMax: number;

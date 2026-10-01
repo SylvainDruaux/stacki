@@ -49,7 +49,7 @@ import { toRecord, toArray } from '../shared/core/record';
 import { assert } from '../shared/core/assert';
 import type { IpcPayloads } from '../shared/ipc-payloads';
 import type { IpcResults, WirePageEditError, WirePageWriteFailure } from '../shared/ipc-results';
-import { describeRejection, type RejectionReason } from '../shared/intent';
+import { describeRejection, type RejectionReason } from '../shared/engine/intent';
 import { decodeUtf8, encodeUtf8 } from '../shared/core/span';
 import type { Digest } from '../shared/core/brand';
 import { LIMITS } from '../shared/core/limits';

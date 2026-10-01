@@ -1,5 +1,5 @@
 // Disk I/O behind an interface (plan §10). The document actor reads, locks and
-// atomically replaces files only through DocumentDisk (shared/documentActor.ts);
+// atomically replaces files only through DocumentDisk (shared/engine/documentActor.ts);
 // the simulator hands it this in-memory fake, so no step touches the OS and
 // every interleaving is the scheduler's choice. The fake stamps each write with
 // a global generation, which is how invariant 7 (never commit an older snapshot
@@ -18,7 +18,7 @@ import type {
   DocumentDisk,
   LockError,
   ReplaceError,
-} from '#dist/shared/documentActor.js';
+} from '#dist/shared/engine/documentActor.js';
 import { err, ok, type Result } from '#dist/shared/core/result.js';
 import { toByteString, type ByteString } from '#dist/shared/core/span.js';
 

@@ -53,7 +53,7 @@ export const LIMITS = {
    * A loop rename in a generated page touches hundreds of sites, not millions. */
   splicesPerIntentMax: 4_096,
   /** Work units one diff may spend, and each span mapping through it: one unit
-   * is one byte comparison or one frontier cell (shared/diff.ts). A 10 MB file
+   * is one byte comparison or one frontier cell (shared/engine/diff.ts). A 10 MB file
    * with a small edit costs about 4·10⁷ — both directions scan it once — so the
    * bound admits the largest file and refuses quadratic blow-ups. Exhaustion is
    * a `resource-limit` rejection, never a silent fallback. */
@@ -88,7 +88,7 @@ export const LIMITS = {
   authoredBytesRetainedMax: 16 * 1024 * 1024,
   /** Commits a host remembers per actor — the bytes before, the bytes after,
    * the splices between — so an edit authored before the actor's own recent
-   * writes is rebased exactly, without a diff (shared/rebase.ts). */
+   * writes is rebased exactly, without a diff (shared/engine/rebase.ts). */
   commitLogEntriesMax: 16,
   /** Undo entries one session keeps (the renderer's history; step 6 moves the
    * bound here from a literal in App.tsx, where it was already 100). */
