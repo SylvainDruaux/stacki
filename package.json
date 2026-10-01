@@ -23,7 +23,7 @@
     "roundtrip:report": "npm run build:runtime && node dist/scripts/roundtrip-report.js",
     "fixtures:large": "npm run build:runtime && node dist/scripts/large-fixtures.js --write",
     "spike:editor-core": "npm run build:runtime && node test/simulator/spike.bench.ts",
-    "release": "npm run build:scripts && node dist/scripts/release.js",
+    "release": "npm run build:scripts && node dist/scripts/release/release.js",
     "build:contracts": "tsc -p shared/tsconfig.json",
     "build:electron": "tsc -p electron/tsconfig.json && npm run build:renderer",
     "build:scripts": "tsc -p scripts/tsconfig.build.json",
@@ -184,7 +184,7 @@
     "dist": "npm run build && electron-builder",
     "dist:mac": "npm run build && electron-builder --mac",
     "dist:win": "npm run build && electron-builder --win",
-    "dist:mac:unsigned": "npm run build && node dist/scripts/dist-mac-unsigned.js",
+    "dist:mac:unsigned": "npm run build && node dist/scripts/release/distMacUnsigned.js",
     "test": "npm run build:scripts && node dist/scripts/run-tests.js",
     "test:docdefaults": "node test/doc-defaults.js",
     "test:querycache": "node test/query-cache.js",
@@ -265,7 +265,7 @@
   "build": {
     "appId": "com.stacki.editor",
     "productName": "Stacki",
-    "afterPack": "./dist/scripts/afterPack.js",
+    "afterPack": "./dist/scripts/release/afterPack.js",
     "files": [
       "dist/**/*",
       "package.json",

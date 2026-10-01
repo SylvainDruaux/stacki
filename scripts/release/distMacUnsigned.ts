@@ -5,7 +5,7 @@
 
 import childProcess = require('node:child_process');
 import path = require('node:path');
-import { repositoryRoot } from './lib/repoRoot';
+import { repositoryRoot } from '../lib/repoRoot';
 
 const UNSIGNED_OVERRIDES = [
   '-c.mac.forceCodeSigning=false',

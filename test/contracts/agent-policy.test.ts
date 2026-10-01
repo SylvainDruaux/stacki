@@ -111,7 +111,7 @@ test('edits to the files that define the gates ask a human', () => {
     'shared/page/pageNode.ts',
     'shared/core/limitsOfText.ts',
     'shared/core/deeper/limits.ts',
-    'scripts/release.ts',
+    'scripts/release/release.ts',
     'README.md',
   ];
   for (const file of allowed) {

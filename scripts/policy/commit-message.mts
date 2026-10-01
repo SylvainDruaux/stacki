@@ -4,7 +4,7 @@
 //
 // Messages git or our tooling writes, not people, are recognized and passed:
 // merges, reverts, fixup/squash/amend commits for a later autosquash, and the
-// `vX.Y.Z` release commit that scripts/release.ts creates.
+// `vX.Y.Z` release commit that scripts/release/release.ts creates.
 
 import { POLICY_LIMITS } from './limits.mts';
 import { assert } from './assert.mts';
