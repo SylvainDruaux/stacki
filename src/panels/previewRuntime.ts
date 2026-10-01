@@ -5,9 +5,7 @@ import type { PreviewDevice } from './PreviewToolbar';
 import type { PreviewMessage, PreviewReloadReason } from '../previewMessages';
 import { parsePreviewMessage } from '../previewMessages';
 import { sameCopy } from '../outlineBoxes';
-import { forgetComputedColors } from '../style-panel/lib/computed-color';
-import { forgetComputedStyles } from '../style-panel/lib/computed-style';
-import { setModifiers } from '../style-panel/lib/host';
+import { setModifiers } from '../heldModifiers';
 import { noteCanvasReady, receiveCanvasReply, setCanvasFrame } from '../canvasQuery';
 import type { Digest } from '../../shared/brand';
 import {
@@ -258,8 +256,6 @@ function applyMessage(message: PreviewMessage, refs: RuntimeRefs, setters: Runti
       break;
     case 'canvas-ready':
       noteCanvasReady();
-      forgetComputedColors();
-      forgetComputedStyles();
       break;
     case 'query-result':
       receiveCanvasReply(message.input);

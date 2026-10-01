@@ -43,6 +43,7 @@ const check = (what, condition, detail) => {
   // Stand in for the preview frame, so the round trip can be held open and the
   // answer chosen per case. Everything else is the real panel.
   const stub = `
+    export const onCanvasReady = () => () => {};
     export const hasCanvas = () => !globalThis.__noCanvas;
     export const queryCanvas = (p, a, b, props) => new Promise((resolve) => {
       globalThis.__answer = () => {

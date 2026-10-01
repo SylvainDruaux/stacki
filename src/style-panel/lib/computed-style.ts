@@ -13,7 +13,7 @@
 // resolved model's call (the label is dim either way).
 
 import { useEffect, useRef, useState } from 'react';
-import { hasCanvas, queryCanvas } from '../../canvasQuery';
+import { hasCanvas, onCanvasReady, queryCanvas } from '../../canvasQuery';
 import { findNode, getHost, onHostChange } from './host';
 import { createQueryCache } from './query-cache';
 
@@ -51,6 +51,8 @@ function currentCache() {
 export function forgetComputedStyles(): void {
   cache.clear();
 }
+// A new page's answers are not the old one's.
+onCanvasReady(forgetComputedStyles);
 
 function pathOfSelection(): string | undefined {
   const host = getHost();

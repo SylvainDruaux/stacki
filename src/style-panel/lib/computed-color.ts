@@ -13,7 +13,7 @@
 // colour, which is what the swatch paints.
 
 import { useEffect, useState } from 'react';
-import { hasCanvas, queryCanvas } from '../../canvasQuery';
+import { hasCanvas, onCanvasReady, queryCanvas } from '../../canvasQuery';
 import { getHost, onHostChange } from './host';
 import { createQueryCache } from './query-cache';
 
@@ -50,6 +50,8 @@ const cache = createQueryCache(async (path, values) => {
 export function forgetComputedColors(): void {
   cache.clear();
 }
+// A new page's answers are not the old one's.
+onCanvasReady(forgetComputedColors);
 
 // The element to resolve against: whatever is selected, and the page itself
 // when nothing is — which is where `:root`'s custom properties are declared.

@@ -36,7 +36,8 @@ test(
       plugins: [
         stubSources('canvas-probe', {
           'src/canvasQuery.ts': () => ({
-            contents: `export const hasCanvas = () => true;
+            contents: `export const onCanvasReady = () => () => {};
+    export const hasCanvas = () => true;
           export const queryCanvas = (path, selectors, colors, props = []) =>
             new Promise((resolve) => {
             globalThis.__computedQueries.push({ path, colors, props, resolve });

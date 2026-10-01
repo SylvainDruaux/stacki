@@ -124,10 +124,26 @@ export function queryCanvas(
 // wasn't ready, and any that were in flight when a reload swallowed them. A
 // re-send carries the original id, so a duplicate answer to one already
 // resolved finds no pending entry and is ignored.
+//
+// A ready page is a new page: whatever was cached about the last one is stale.
+// Caches register here (onCanvasReady) rather than being cleared by the
+// preview, which then needs to know no reader of the canvas.
 export function noteCanvasReady(): void {
   for (const entry of pending.values()) {
     send(entry);
   }
+  for (const listener of readyListeners) {
+    listener();
+  }
+}
+
+const readyListeners = new Set<() => void>();
+
+export function onCanvasReady(listener: () => void): () => void {
+  readyListeners.add(listener);
+  return () => {
+    readyListeners.delete(listener);
+  };
 }
 
 // PreviewPane hands replies over; it already owns the message listener and

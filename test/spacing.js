@@ -46,9 +46,10 @@ const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
         repoPath('src/style-panel/lib/sections.ts'),
       )};\n` +
       `export { spacingBands } from ${JSON.stringify(repoPath('src/spacingBands.ts'))};\n` +
-      `export { getHost, setHost, setModifiers } from ${JSON.stringify(
+      `export { getHost, setHost } from ${JSON.stringify(
         repoPath('src/style-panel/lib/host.ts'),
-      )};\n`,
+      )};\n` +
+      `export { setModifiers } from ${JSON.stringify(repoPath('src/heldModifiers.ts'))};\n`,
   );
   const bundlePath = path.join(buildDirectory, 'spacing.bundle.js');
   await esbuild.build({
