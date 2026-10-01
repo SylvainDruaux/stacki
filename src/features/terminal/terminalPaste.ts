@@ -1,5 +1,5 @@
-import { assert } from '../shared/assert';
-import { LIMITS } from '../shared/limits';
+import { assert } from '../../../shared/assert';
+import { LIMITS } from '../../../shared/limits';
 
 // How a pasted path is written so the platform's shells read it as one argument.
 export type PathStyle = 'posix' | 'windows';

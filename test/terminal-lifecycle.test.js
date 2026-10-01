@@ -19,7 +19,7 @@ test(
     );
     global.__terminalTest = { loads: 0, terminals: [], dimensions: { cols: 80, rows: 24 } };
     await require('esbuild').build({
-      entryPoints: [repoPath('src/panels/TerminalDock.tsx')],
+      entryPoints: [repoPath('src/features/terminal/TerminalDock.tsx')],
       outfile: output,
       bundle: true,
       platform: 'node',

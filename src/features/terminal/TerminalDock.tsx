@@ -5,14 +5,14 @@ import type {
   PointerEvent as ReactPointerEvent,
   SetStateAction,
 } from 'react';
-import { assert } from '../../shared/assert';
-import Dropdown from '../ui/Dropdown';
-import type { DropdownOption } from '../ui/Dropdown';
-import { ChevronDownIcon, CloseIcon, PlusIcon } from '../ui/Icons';
-import { usePointerDrag } from '../ui/usePointerDrag';
-import { closeTerminal, onTerminalProcess } from '../terminalBridge';
+import { assert } from '../../../shared/assert';
+import Dropdown from '../../ui/Dropdown';
+import type { DropdownOption } from '../../ui/Dropdown';
+import { ChevronDownIcon, CloseIcon, PlusIcon } from '../../ui/Icons';
+import { usePointerDrag } from '../../ui/usePointerDrag';
+import { closeTerminal, onTerminalProcess } from './terminalBridge';
 import type { TerminalPaneHandle } from './TerminalPane';
-import { currentDesktopPlatform, shortcutLabel } from '../lib/shortcutLabel';
+import { currentDesktopPlatform, shortcutLabel } from '../../lib/shortcutLabel';
 
 const TerminalPane = lazy(() => import('./TerminalPane'));
 

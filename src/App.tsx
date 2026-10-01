@@ -129,7 +129,7 @@ import { hasClass, namesIn, withClass } from './editor/classAttr';
 import { toComponentName } from './componentName';
 import { resolveInstanceProps } from './editor/instanceProps';
 import { propsForExtraction } from './editor/extractProps';
-import TerminalDock from './panels/TerminalDock';
+import TerminalDock from './features/terminal/TerminalDock';
 import { cleanError, stripAnsi } from './lib/cleanError';
 import { elementLabel } from './editor/classNames';
 import {

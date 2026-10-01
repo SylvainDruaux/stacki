@@ -1,6 +1,6 @@
 import { FitAddon } from '@xterm/addon-fit';
 import { Terminal } from '@xterm/xterm';
-import { assert } from '../../shared/assert';
+import { assert } from '../../../shared/assert';
 import {
   acknowledgeTerminalData,
   onTerminalData,
@@ -8,7 +8,7 @@ import {
   resizeTerminal,
   sendTerminalInput,
   startTerminal,
-} from '../terminalBridge';
+} from './terminalBridge';
 import { installTerminalInteractions } from './terminalInteractions';
 
 const SCROLLBACK_LINES_MAX = 10_000;

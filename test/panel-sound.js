@@ -255,7 +255,7 @@ function fakeAudio() {
   const scopes = [
     'src/App.tsx',
     'src/panels/PagesPanel.tsx',
-    'src/panels/TerminalDock.tsx',
+    'src/features/terminal/TerminalDock.tsx',
     'src/features/welcome/WelcomeScreen.tsx',
   ].filter((file) => /<SoundHere>/.test(read(file)));
   check('and nothing else is', scopes.length === 0, scopes.join(', '));

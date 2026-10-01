@@ -84,7 +84,7 @@ try {
     /Class expression exceeds size limit/,
   );
 
-  const { decideTerminalPaste } = load('src/terminalPaste.ts');
+  const { decideTerminalPaste } = load('src/features/terminal/terminalPaste.ts');
   const item = { type: 'text/plain', kind: 'string', getAsFile: () => PLATFORM_NULL };
   assert.deepEqual(decideTerminalPaste([item], 'hello', undefined, 'posix'), { kind: 'text' });
   assert.throws(

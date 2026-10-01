@@ -3,7 +3,7 @@
 // values, and verify transport failures remain explicit Result values.
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const terminal = require('./helpers/rendererModule')('src/terminalBridge.ts');
+const terminal = require('./helpers/rendererModule')('src/features/terminal/terminalBridge.ts');
 
 // A boundary can receive null — JSON, structured clone and postMessage all carry it —
 // so the negative space below includes it. It is read from JSON, because our own

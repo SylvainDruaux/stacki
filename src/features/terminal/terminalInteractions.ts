@@ -1,13 +1,13 @@
 import type { Terminal } from '@xterm/xterm';
-import type { PathStyle } from '../terminalPaste';
-import { decideTerminalPaste, escapePosixPath, quoteWindowsPath } from '../terminalPaste';
+import type { PathStyle } from './terminalPaste';
+import { decideTerminalPaste, escapePosixPath, quoteWindowsPath } from './terminalPaste';
 import {
   requestNativePaste,
   saveTerminalClipboardImage,
   sendTerminalInput,
   terminalFilePath,
   TERMINAL_IMAGE_BYTES_MAX,
-} from '../terminalBridge';
+} from './terminalBridge';
 
 interface InteractionOptions {
   readonly host: HTMLDivElement;

@@ -1,6 +1,6 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import '@xterm/xterm/css/xterm.css';
-import { ArrowDownIcon } from '../ui/Icons';
+import { ArrowDownIcon } from '../../ui/Icons';
 import { TerminalRuntime } from './terminalRuntime';
 
 export interface TerminalPaneHandle {
