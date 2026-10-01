@@ -1,13 +1,13 @@
 import { useMemo } from 'react';
-import type { EditorModel } from '../editor/pageView';
+import type { EditorModel } from '../../editor/pageView';
 import {
   componentSourceRanges,
   sourceLineLabel,
   sourceNodeAtOffset,
   sourceRangeForSelection,
-} from '../codePanelModel';
-import CodeEditor from '../ui/CodeEditor';
-import { CodeIcon } from '../ui/Icons';
+} from './codePanelModel';
+import CodeEditor from '../../ui/CodeEditor';
+import { CodeIcon } from '../../ui/Icons';
 
 interface CodePanelProps {
   readonly source: string;

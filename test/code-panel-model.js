@@ -12,7 +12,7 @@ const output = repoPath('node_modules/.stacki-test/code-panel-model.cjs');
 
 (async () => {
   await esbuild.build({
-    entryPoints: [repoPath('src/codePanelModel.ts')],
+    entryPoints: [repoPath('src/features/code/codePanelModel.ts')],
     outfile: output,
     bundle: true,
     platform: 'node',

@@ -289,7 +289,10 @@ async function buildApp() {
           }, source);
           return { contents, loader: 'tsx' };
         },
-        'src/ui/CodeWindow.tsx': () => ({ contents: panelStub('CodeWindow'), loader: 'tsx' }),
+        'src/features/code/CodeWindow.tsx': () => ({
+          contents: panelStub('CodeWindow'),
+          loader: 'tsx',
+        }),
       }),
       stubPanels('lazy-panel-bodies', (name) =>
         REAL_PREVIEW.has(name) ? undefined : { contents: panelStub(name), loader: 'tsx' },

@@ -158,7 +158,9 @@ async function checkNavigator(StructurePanel) {
 
 (async () => {
   fs.mkdirSync(buildDirectory, { recursive: true });
-  checkCodeWindowRule(await bundle('src/codeWindowTarget.ts', 'code-window-target.cjs'));
+  checkCodeWindowRule(
+    await bundle('src/features/code/codeWindowTarget.ts', 'code-window-target.cjs'),
+  );
   const { default: StructurePanel } = await bundle(
     'src/panels/StructurePanel.tsx',
     'navigator-open-code.cjs',

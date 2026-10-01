@@ -53,7 +53,7 @@ const PANEL_SOURCES = Object.freeze([
   'src/panels/CmsPanel.tsx',
   'src/panels/CmsSettings.tsx',
   'src/panels/CmsView.tsx',
-  'src/panels/CodePanel.tsx',
+  'src/features/code/CodePanel.tsx',
   'src/panels/ComponentPropertiesPanel.tsx',
   'src/panels/ContentFields.tsx',
   'src/panels/ContentView.tsx',

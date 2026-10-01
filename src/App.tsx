@@ -173,14 +173,14 @@ import type { InsertItem } from './features/palette/InsertSearch';
 import { toRecord } from '../shared/record';
 import { projectRelativePath } from './lib/projectPath';
 import { currentDesktopPlatform, shortcutLabel } from './lib/shortcutLabel';
-import { sourceNodeAtOffset } from './codePanelModel';
+import { sourceNodeAtOffset } from './features/code/codePanelModel';
 import {
   codeWindowFor,
   FRONTMATTER_SUBJECT,
   type CodeSubject,
   type CodeWindowState,
   type FrontmatterSubject,
-} from './codeWindowTarget';
+} from './features/code/codeWindowTarget';
 import {
   type AppHistory,
   type AssetPick,
@@ -281,13 +281,13 @@ import {
 // canvas and neighboring panels visible and interactive.
 const PropsPanel = lazyPanel(() => import('./panels/PropsPanel'));
 const StylePanel = lazyPanel(() => import('./panels/StylePanel'));
-const CodeWindow = lazyPanel(() => import('./ui/CodeWindow'));
+const CodeWindow = lazyPanel(() => import('./features/code/CodeWindow'));
 const CmsPanel = lazyPanel(() => import('./panels/CmsPanel'));
 const CmsView = lazyPanel(() => import('./panels/CmsView'));
 const ContentView = lazyPanel(() => import('./panels/ContentView'));
 const VariablesPanel = lazyPanel(() => import('./panels/VariablesPanel'));
 const VariablesView = lazyPanel(() => import('./panels/VariablesView'));
-const CodePanel = lazyPanel(() => import('./panels/CodePanel'));
+const CodePanel = lazyPanel(() => import('./features/code/CodePanel'));
 
 // A node a gesture creates has no parse yet to name it: its handle is random,
 // unique without a counter, and carried onto the reply that first contains it
