@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { PROPERTY_LIMITS } from '../../shared/component-properties';
-import { literalOptions } from '../propertyOptions';
+import { literalOptions } from '../../shared/property-options';
 import Dropdown from '../ui/Dropdown';
 import type { DropdownOption } from '../ui/Dropdown';
 import {

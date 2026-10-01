@@ -89,7 +89,6 @@ const check = (what, condition, detail) => {
       'src/style-panel/tokens.css',
       'src/styles.css',
       'src/style-panel/utilities.css',
-      'src/style-panel/components/IconButton.css',
       'src/style-panel/embed-editor.css',
     ]
       .map((file) => fs.readFileSync(path.join(root, file), 'utf8'))

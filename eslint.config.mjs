@@ -412,7 +412,6 @@ export default [
       'src/style-panel/lib/css.ts',
       'src/style-panel/lib/host.ts',
       'src/style-panel/lib/webflow.ts',
-      'src/style-panel/shared/dom-safety.ts',
     ],
     rules: {
       'no-restricted-syntax': ['error', ...NO_WHOLE_FILE_REGENERATION],

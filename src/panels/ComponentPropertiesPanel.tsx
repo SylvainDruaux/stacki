@@ -7,7 +7,7 @@ import type {
   PropertyChange,
 } from '../../shared/component-properties';
 import useListReorder from '../ui/useListReorder';
-import { literalOptions } from '../propertyOptions';
+import { literalOptions } from '../../shared/property-options';
 import ListFieldRow from '../ui/ListFieldRow';
 import { ComponentPropertiesIcon, FieldNumberIcon, FieldSwitchIcon } from '../ui/Icons';
 import { PropertyGrip, movePropertyItem } from './PropertyReorder';

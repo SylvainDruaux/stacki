@@ -5,7 +5,7 @@ import { PropertyOptions } from './PropertyOptions';
 import type { PropertyOptionChange } from './PropertyOptions';
 import { PropertyType } from './PropertyType';
 import { PropertyDefault, propertyDefaultText } from './PropertyDefault';
-import { literalOptions } from '../propertyOptions';
+import { literalOptions } from '../../shared/property-options';
 export { literalOptions };
 import { useRef, useState } from 'react';
 import useDismiss from '../ui/useDismiss';

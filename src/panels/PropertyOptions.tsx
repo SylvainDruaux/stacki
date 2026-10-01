@@ -3,7 +3,7 @@ import { assert } from '../../shared/assert';
 import { PROPERTY_LIMITS } from '../../shared/component-properties';
 import type { PropertyOptionRename } from '../../shared/component-properties';
 import { arrayItems, arrayText, moveItem } from '../arrayValue';
-import { literalOptions } from '../propertyOptions';
+import { literalOptions } from '../../shared/property-options';
 import ListField from './ListField';
 import type { ListFieldChange } from './ListField';
 
