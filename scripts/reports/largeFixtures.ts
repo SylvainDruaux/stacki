@@ -23,7 +23,7 @@
 import fs = require('node:fs');
 import path = require('node:path');
 import { createHash } from 'node:crypto';
-import { repositoryRoot } from './lib/repoRoot';
+import { repositoryRoot } from '../lib/repoRoot';
 
 export interface FixtureLimits {
   readonly sourceBytesMax: number;
@@ -208,7 +208,7 @@ function fillerText(bytes: number): string {
   return words.join(' ');
 }
 
-// --- CLI: node dist/scripts/large-fixtures.js [--write] ---------------------
+// --- CLI: node dist/scripts/reports/largeFixtures.js [--write] ---------------------
 
 // A built module, named by its repository path (dist/…).
 function loadRecord(modulePath: string): Record<string, unknown> {

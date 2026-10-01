@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Compare the preview diff against a Git checkpoint without changing checkout.
 //
-//   node dist/scripts/performance-report.js [<ref> [<source path at ref>]]
+//   node dist/scripts/reports/performanceReport.js [<ref> [<source path at ref>]]
 //
 // The current diff is read from the build; a reference is read from its
 // source at <ref> (the morph client's source path by default; name the path
@@ -14,7 +14,7 @@ import fs = require('node:fs');
 import path = require('node:path');
 import { performance } from 'node:perf_hooks';
 import ts = require('typescript');
-import { repositoryRoot } from './lib/repoRoot';
+import { repositoryRoot } from '../lib/repoRoot';
 
 interface DiffImplementation {
   readonly diff: (before: readonly string[], after: readonly string[]) => unknown;

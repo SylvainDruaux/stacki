@@ -3,7 +3,7 @@
 ```bash
 npm test                                   # the gate — run this before every commit
 npm run roundtrip:report                   # where the parser stands, and what is left to fix
-node dist/scripts/roundtrip-report.js ~/a-site  # same report against any Astro project
+node dist/scripts/reports/roundtripReport.js ~/a-site  # same report against any Astro project
 STACKI_CORPUS=~/a-site npm test            # crash-sweep a real project as part of the gate
 npm test -- querycache
 npm run performance:report -- d9f9c05      # compare preview diff with the pre-refactor checkpoint

@@ -22,7 +22,7 @@ import {
   generateLargeFixtures,
   manifestEntry,
   parserNodeCounter,
-} from '#dist/scripts/large-fixtures.js';
+} from '#dist/scripts/reports/largeFixtures.js';
 
 const DIRECTORIES = ['test/corpus', 'test/fixtures/round-trip', 'test/fixtures/editor-core'];
 const collapse = (text: string) => text.replace(/\s+/g, ' ').trim();
