@@ -23,7 +23,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { execFile } = require('child_process');
-const history = require('#dist/electron/gitHistory.js');
+const history = require('#dist/electron/git/gitHistory.js');
 
 const failures = [];
 let checked = 0;

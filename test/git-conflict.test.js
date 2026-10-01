@@ -13,7 +13,7 @@ const { parseMergeResult, parseConflictPart } = load('src/features/git/gitBridge
 const { initialConflictPicks, choicesForSend, conflictHunks } = load(
   'src/features/git/gitConflictModel.ts',
 );
-const { parseConflict } = require('#dist/electron/conflicts.js');
+const { parseConflict } = require('#dist/electron/git/conflicts.js');
 const { repoPath } = require('./helpers/sources.js');
 
 // Null as a boundary receives it, parsed from JSON: inputs may hold it; our values never do.

@@ -8,7 +8,7 @@
 // *every* minimum script maps a span the same way, instead of trusting the one
 // script a diff happens to print (mapSpan.ts).
 //
-// Why not the line diff in electron/conflicts.ts (plan §11 step 2): it fills an
+// Why not the line diff in electron/git/conflicts.ts (plan §11 step 2): it fills an
 // n·m table and, past 250 000 cells, silently returns the whole region as one
 // change. Here the cost grows with the edit, not the file, and exhaustion is a
 // typed outcome, never a silent loss of fidelity (plan §14).

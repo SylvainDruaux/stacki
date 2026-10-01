@@ -1,5 +1,5 @@
 import { ipcMain as nativeIpcMain } from 'electron';
-import { createIpcRegistrar } from './lib/ipcRegistrar';
+import { createIpcRegistrar } from '../lib/ipcRegistrar';
 
 import path from 'node:path';
 import os from 'node:os';
@@ -7,17 +7,17 @@ import fs from 'node:fs';
 import { Buffer } from 'node:buffer';
 import type { PseudoTerminal, SpawnOptions } from 'node-pty';
 
-import { parseTerminalAck, parseTerminalInput } from '../shared/ipc-payloads';
-import type { IpcPayloads } from '../shared/ipc-payloads';
-import type { IpcResults } from '../shared/ipc-results';
-import { toRecord } from '../shared/record';
+import { parseTerminalAck, parseTerminalInput } from '../../shared/ipc-payloads';
+import type { IpcPayloads } from '../../shared/ipc-payloads';
+import type { IpcResults } from '../../shared/ipc-results';
+import { toRecord } from '../../shared/record';
 import {
   isPathWithin,
   mergeToolPaths,
   pathEnvironmentValue,
   setPathEnvironment,
   staticToolPathGuesses,
-} from './lib/platform';
+} from '../lib/platform';
 
 // Embedded terminal — a real login shell in the open project, hosted by
 // node-pty and rendered by xterm in the bottom dock.

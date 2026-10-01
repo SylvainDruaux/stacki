@@ -25,7 +25,7 @@ const {
   deleteBranch,
   switchBranch,
   resolveMerge,
-} = require('#dist/electron/gitBranches.js');
+} = require('#dist/electron/git/gitBranches.js');
 
 const failures = [];
 let checked = 0;

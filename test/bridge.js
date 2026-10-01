@@ -87,9 +87,10 @@ const main = fs.readFileSync(repoPath('dist/electron/main.js'), 'utf8');
 const handled = new Set();
 // A handler counts wherever it is registered, as long as the main process
 // loads the module that registers it — the terminal keeps its own (and its
-// pty bookkeeping) in electron/terminal.ts rather than in main.js.
+// pty bookkeeping) in electron/terminal/terminal.ts rather than in main.js.
 const mainSide = [main];
-for (const match of main.matchAll(/require\(\s*['"]\.\/([\w.-]+?)(?:\.js)?['"]\s*\)/g)) {
+// Modules live in area folders (`./terminal/terminal`), so a match spans folders.
+for (const match of main.matchAll(/require\(\s*['"]\.\/([\w./-]+?)(?:\.js)?['"]\s*\)/g)) {
   try {
     mainSide.push(fs.readFileSync(path.join(root, 'dist', 'electron', `${match[1]}.js`), 'utf8'));
   } catch {

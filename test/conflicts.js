@@ -19,7 +19,7 @@ const {
   clashCount,
   threeWay,
   mergeInline,
-} = require('#dist/electron/conflicts.js');
+} = require('#dist/electron/git/conflicts.js');
 
 // Null as a boundary receives it, parsed from JSON: inputs may hold it; our values never do.
 const jsonNull = JSON.parse('null');

@@ -26,7 +26,7 @@ import {
   writeProjectText,
 } from './documents/documentWrites';
 import { definedFields } from '../shared/boundary';
-import { gitErrorDetail } from './git';
+import { gitErrorDetail } from './git/git';
 import {
   commandNeedsShell,
   isPathDescendant,
@@ -127,7 +127,7 @@ import * as contentConfigModule from './content/contentConfig';
 const { readContentConfig, validateEntry, stopAllServices } = contentConfigModule;
 import * as thumbs from './project/thumbs';
 import * as cssVars from './project/cssVars';
-import * as injectedRoutesModule from './injectedRoutes';
+import * as injectedRoutesModule from './preview/injectedRoutes';
 const { readInjectedRoutes } = injectedRoutesModule;
 import * as starterModule from './project/starter';
 const { createStarter } = starterModule;
@@ -141,15 +141,15 @@ import * as contentEntriesModule from './content/contentEntries';
 const { listEntries, writeEntry, countEntries, coveredPaths } = contentEntriesModule;
 import * as contentRefsModule from './content/contentRefs';
 const { planRename, applyRename } = contentRefsModule;
-import * as gitBranchesModule from './gitBranches';
+import * as gitBranchesModule from './git/gitBranches';
 const { mergeBranch, deleteBranch, switchBranch, resolveMerge } = gitBranchesModule;
-import * as devProbeModule from './devProbe';
+import * as devProbeModule from './preview/devProbe';
 const { probeUrl } = devProbeModule;
-import * as gitHistory from './gitHistory';
-import * as gitSnapshot from './gitSnapshot';
-import * as previewWorktree from './previewWorktree';
-import { checkPreviewRender } from './previewCheck';
-import * as terminalModule from './terminal';
+import * as gitHistory from './git/gitHistory';
+import * as gitSnapshot from './git/gitSnapshot';
+import * as previewWorktree from './preview/previewWorktree';
+import { checkPreviewRender } from './preview/previewCheck';
+import * as terminalModule from './terminal/terminal';
 const { registerTerminalHandlers, cleanupTerminals } = terminalModule;
 import * as projectWatcherModule from './project/projectWatcher';
 const { watchProject } = projectWatcherModule;

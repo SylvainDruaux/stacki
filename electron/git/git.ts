@@ -2,7 +2,7 @@
 // app), as the git modules here take it. One home: gitSnapshot, gitBranches,
 // gitHistory, previewWorktree and contentConfig all shell out through it.
 
-import { toRecord } from '../shared/record';
+import { toRecord } from '../../shared/record';
 
 export interface GitResult {
   readonly stdout: string;

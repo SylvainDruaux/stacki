@@ -156,7 +156,7 @@ test('a missing native terminal binding does not prevent app startup', async () 
     }
     return originalLoad.call(this, request, parent, isMain);
   };
-  const terminalPath = require.resolve('#dist/electron/terminal.js');
+  const terminalPath = require.resolve('#dist/electron/terminal/terminal.js');
   delete require.cache[terminalPath];
   try {
     const terminal = require(terminalPath);

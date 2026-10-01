@@ -51,7 +51,7 @@ function fixture() {
 test('the complete channel inventory matches real main and terminal registration', (context) => {
   const harness = fixture();
   context.after(harness.dispose);
-  const terminal = fs.readFileSync(path.resolve('dist/electron/terminal.js'), 'utf8');
+  const terminal = fs.readFileSync(path.resolve('dist/electron/terminal/terminal.js'), 'utf8');
   const terminalChannels = [...terminal.matchAll(/ipcMain\.handle\(['"]([^'"]+)['"]/g)].map(
     (match) => match[1],
   );

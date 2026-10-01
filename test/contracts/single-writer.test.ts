@@ -77,7 +77,7 @@ const ALLOWED: Readonly<Record<string, Readonly<Record<string, Allowed>>>> = {
     cpSync: { count: 1, reason: 'copies an asset in under a fresh unique name; never replaces' },
     renameSync: { count: 3, reason: 'asset and folder moves; a move writes no bytes' },
   },
-  'electron/previewWorktree.ts': {
+  'electron/preview/previewWorktree.ts': {
     appendFileSync: { count: 1, reason: 'git exclude file of the preview worktree' },
   },
   'electron/project/scaffold.ts': {
@@ -86,7 +86,7 @@ const ALLOWED: Readonly<Record<string, Readonly<Record<string, Allowed>>>> = {
   'electron/project/starter.ts': {
     writeFileSync: { count: 1, reason: 'package.json of a new project from a starter' },
   },
-  'electron/terminal.ts': {
+  'electron/terminal/terminal.ts': {
     writeFileSync: { count: 1, reason: 'a pasted clipboard image in the app temp directory' },
   },
   'electron/project/thumbs.ts': {

@@ -27,7 +27,7 @@
 // "Home" needs the project's routing, which lives in main.js — so that
 // translation happens at the IPC edge, and this module stays about git.
 
-import { toRecord } from '../shared/record';
+import { toRecord } from '../../shared/record';
 import { gitErrorDetail } from './git';
 import type { Git } from './git';
 

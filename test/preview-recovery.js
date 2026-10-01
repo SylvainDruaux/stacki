@@ -46,7 +46,7 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 (async () => {
   // --- The probe, against a server that really answers ----------------------
   {
-    const { probeUrl } = require('#dist/electron/devProbe.js');
+    const { probeUrl } = require('#dist/electron/preview/devProbe.js');
 
     // Flips between serving a page and serving an error, like a dev server
     // either side of a compile error.

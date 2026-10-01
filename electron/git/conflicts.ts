@@ -25,7 +25,7 @@
 // three-way merge is git's — with the common ancestor it alone has — and this
 // only has to read the result.
 
-import { assert } from '../shared/assert';
+import { assert } from '../../shared/assert';
 
 // A run of the diff: agreed text, or the two disagreeing versions of it.
 // Runs are built and merged locally here, so their arrays are mutable on

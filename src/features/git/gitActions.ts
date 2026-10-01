@@ -33,7 +33,7 @@ interface DirtyOptions extends TidyOptions {
 // (the chip has a busy state and an error box; the panel does not), so that is
 // the one thing passed in.
 //
-// The refusals these can hit are worded in electron/gitBranches.js. What lives
+// The refusals these can hit are worded in electron/git/gitBranches.ts. What lives
 // here is the asking: which questions get put to the user, in what order, and
 // in what words.
 

@@ -7,15 +7,15 @@
 import { createHash } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { assert } from '../shared/assert';
-import { toDigest, type Digest } from '../shared/brand';
-import { LIMITS } from '../shared/limits';
+import { assert } from '../../shared/assert';
+import { toDigest, type Digest } from '../../shared/brand';
+import { LIMITS } from '../../shared/limits';
 import {
   judgePreviewRender,
   type PreviewRender,
   type PreviewVerdict,
   type StampedFileState,
-} from '../shared/preview-token';
+} from '../../shared/preview-token';
 
 /** Judge `render` against the files under `projectPath` now. */
 export function checkPreviewRender(projectPath: string, render: PreviewRender): PreviewVerdict {

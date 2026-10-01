@@ -339,7 +339,7 @@ after). The generated config itself lives in `node_modules/.avb`.
   forged shapes: page code can write any comment.
 - `preview:check` `{ projectPath, render }` → `PreviewVerdict`: main re-derives
   the token from the manifest, then reads every stamped file from disk
-  (`electron/previewCheck.ts`; a path outside the project is `missing`, a file
+  (`electron/preview/previewCheck.ts`; a path outside the project is `missing`, a file
   past `sourceBytesMax` changed) and answers `current` or `stale` with one of
   `PREVIEW_STALE_REASONS`.
 - The renderer (`src/features/preview/previewGate.ts`) accepts a click or double-click only when
