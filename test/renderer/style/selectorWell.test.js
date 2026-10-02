@@ -18,6 +18,7 @@
 const fs = require('fs');
 const path = require('path');
 const { ROOT, repoPath } = require('../../helpers/sources.js');
+const { readSourceFolder } = require('../../helpers/sourceText.js');
 
 const failures = [];
 let checked = 0;
@@ -653,7 +654,11 @@ const contrastRatio = (first, second) => {
       /min-height: var\(--embed-editor_chip-h\)/.test(loading.slice(0, loading.indexOf('}'))),
       loading.slice(0, loading.indexOf('}')),
     );
-    const source = fs.readFileSync(repoPath('src/features/style/EmbedEditor.tsx'), 'utf8');
+    // The style editor and the modules it was split into (src/features/style/embed).
+    const source = readSourceFolder(
+      'src/features/style/EmbedEditor.tsx',
+      'src/features/style/embed',
+    );
     const check_ = source.slice(source.indexOf('embed-editor_selector-filter'));
     check(
       'the globals checkbox is not conditional on having any',

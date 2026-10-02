@@ -18,6 +18,7 @@ const os = require('os');
 const path = require('path');
 const { parsePage, serializePage } = require('#dist/electron/parse/astroParser.js');
 const { repoPath } = require('../../helpers/sources.js');
+const { readSourceFolder } = require('../../helpers/sourceText.js');
 
 const failures = [];
 let checked = 0;
@@ -191,8 +192,8 @@ const { class: className } = Astro.props;
   // Step 6 (plan §3.3): the class is a page edit, the rule a stylesheet edit
   // that depends on it — written only after the page edit applied, and never
   // submitted when it was refused.
-  const embedFile = repoPath('src/features/style/EmbedEditor.tsx');
-  const embed = fs.readFileSync(embedFile, 'utf8');
+  // The style editor and the modules it was split into (src/features/style/embed).
+  const embed = readSourceFolder('src/features/style/EmbedEditor.tsx', 'src/features/style/embed');
   check(
     "the class answers with the page edit's outcome",
     /await flushSave\(\);\s*return \{ tag: 'applied' \};/.test(app),

@@ -17,7 +17,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { containsCode } = require('../../helpers/sourceText.js');
+const { containsCode, readSourceFolder } = require('../../helpers/sourceText.js');
 const { ROOT, repoPath } = require('../../helpers/sources.js');
 
 const failures = [];
@@ -102,7 +102,8 @@ const check = (what, condition, detail) => {
   );
 
   // --- Enter goes where the rest of the answer is ------------------------------------
-  const source = fs.readFileSync(repoPath('src/features/style/EmbedEditor.tsx'), 'utf8');
+  // The style editor and the modules it was split into (src/features/style/embed).
+  const source = readSourceFolder('src/features/style/EmbedEditor.tsx', 'src/features/style/embed');
   check(
     'Enter on a named property with no value moves to the value field',
     containsCode(

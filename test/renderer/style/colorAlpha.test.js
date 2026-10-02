@@ -16,6 +16,7 @@
 const fs = require('fs');
 const path = require('path');
 const { repoPath } = require('../../helpers/sources.js');
+const { readSourceFolder } = require('../../helpers/sourceText.js');
 
 const failures = [];
 let checked = 0;
@@ -324,14 +325,19 @@ const SIZE = 240;
 
   // The panel writes what was authored, and only converts on the way to a native
   // Webflow style — which is not a thing that exists here.
-  const editor = fs.readFileSync(repoPath('src/features/style/EmbedEditor.tsx'), 'utf8');
-  const setPropAt = editor.indexOf('const setProp = (prop: string');
+  // The style editor and the modules it was split into (src/features/style/embed).
+  // The writers are typed constants now; a search for the old arrow signature
+  // found nothing and checked an empty slice, so both anchors must be found.
+  const editor = readSourceFolder('src/features/style/EmbedEditor.tsx', 'src/features/style/embed');
+  const setPropAt = editor.indexOf('const setProp: SetProp');
+  check('the committed writer is where it is looked for', setPropAt >= 0);
   check(
     'a committed write is not converted on its way out',
     !/hslaToRgba/.test(editor.slice(setPropAt, setPropAt + 700)),
     'setProp still normalizes hsl away',
   );
-  const liveAt = editor.indexOf('const liveSetProp = (prop: string');
+  const liveAt = editor.indexOf('const liveSetProp: LiveSetProp');
+  check('and so is the live one', liveAt >= 0);
   check(
     'nor is a live one',
     !/value = hslaToRgba/.test(editor.slice(liveAt, liveAt + 700)),

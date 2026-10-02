@@ -17,6 +17,7 @@
 const fs = require('fs');
 const path = require('path');
 const { ROOT, repoPath } = require('../../helpers/sources.js');
+const { readSourceFolder } = require('../../helpers/sourceText.js');
 
 const failures = [];
 let checked = 0;
@@ -286,7 +287,11 @@ const check = (what, condition, detail) => {
     );
 
     // …and the panel actually asks.
-    const editor = fs.readFileSync(repoPath('src/features/style/EmbedEditor.tsx'), 'utf8');
+    // The style editor and the modules it was split into (src/features/style/embed).
+    const editor = readSourceFolder(
+      'src/features/style/EmbedEditor.tsx',
+      'src/features/style/embed',
+    );
     check(
       'the panel defaults through it',
       /const next = defaultSelectorTokens\(tokens\)/.test(editor),

@@ -1,0 +1,480 @@
+// Where an edit lands and what it resolves to: the embed and style contexts,
+// the native target, a component's own source, the resolved properties, the
+// selector chips and changing context (EmbedEditor.tsx).
+
+import { useCallback, useEffect, useMemo } from 'react';
+import {
+  resolveStyle,
+  indexContexts,
+  selectorsMatch,
+  type ContextInfo,
+  type ContextKey,
+  type MatchedSelector,
+  type SourceKey,
+  type StyleContext,
+} from '../model/resolved';
+import {
+  breakpointTier,
+  buildStyleContexts,
+  nativeContribsFor,
+  nativeHasValues,
+  selectedNativeIndexFor,
+} from '../model/nativeStyles';
+import { listAtRuleBlocks } from '../model/css';
+import { nativeStylingAvailable } from '../model/webflow';
+import { EMPTY_RULE_MODEL } from './EditorBasics';
+import { chipsFor, styledSelectorsFor } from './editorModel';
+import { isGlobalSelector } from './LayoutRows';
+import {
+  useScanState,
+  useSelectionState,
+  useNativeState,
+  usePendingWrites,
+} from './useEditorFoundation';
+import { useElementTokens } from './useEditorRuleEdits';
+import {
+  useTokenDefault,
+  useActiveSelector,
+  useSelectorPick,
+  useSourceDocument,
+  useContextKeys,
+} from './useEditorElement';
+
+// The queries the source file holds and the ones styling the element.
+export function useEmbedContexts(
+  selectionState: ReturnType<typeof useSelectionState>,
+  elementTokens: ReturnType<typeof useElementTokens>,
+  sourceDocumentHook: ReturnType<typeof useSourceDocument>,
+  contextKeys: ReturnType<typeof useContextKeys>,
+) {
+  const { context } = selectionState;
+  const { model } = elementTokens;
+  const { sourceDocument } = sourceDocumentHook;
+  const { allContextKeys } = contextKeys;
+
+  // Embed queries where THIS element actually has styles — so custom @media /
+  // @container (and up-breakpoints) only appear in the dropdown when used. The
+  // current context is kept so viewing an empty query doesn't hide itself.
+  // The at-contexts the file being written into holds — the component's own
+  // queries, as opposed to ones reaching this element from a page stylesheet.
+  const sourceContexts = useMemo(() => {
+    const set = new Set<string>();
+    if (sourceDocument) {
+      for (const region of sourceDocument.regions) {
+        for (const block of listAtRuleBlocks(region)) {
+          set.add(block.atContext.join(' › '));
+        }
+      }
+    }
+    return set;
+  }, [sourceDocument]);
+  const styledEmbedContexts = useMemo(() => {
+    const set = new Set<string>();
+    if (model) {
+      for (const info of indexContexts(model, allContextKeys)) {
+        if (info.hasStyles) {
+          set.add(info.key);
+        }
+      }
+    }
+    if (context) {
+      set.add(context);
+    }
+    // …plus the queries the file being written into already uses. Those are
+    // offered for any element in it: the dropdown is how you get INTO a query
+    // to write the first rule there, so hiding a query until something is
+    // already in it is a door that only opens from the far side.
+    for (const key of sourceContexts) {
+      set.add(key);
+    }
+    return set;
+  }, [model, allContextKeys, context, sourceContexts]);
+  return { sourceContexts, styledEmbedContexts };
+}
+
+// The unified context list and the current context.
+export function useStyleContexts(
+  selectionState: ReturnType<typeof useSelectionState>,
+  nativeState: ReturnType<typeof useNativeState>,
+  contextKeys: ReturnType<typeof useContextKeys>,
+  embedContexts: ReturnType<typeof useEmbedContexts>,
+) {
+  const { context, stickyContextRef } = selectionState;
+  const { currentBreakpoint, nativeModel } = nativeState;
+  const { allContextKeys } = contextKeys;
+  const { sourceContexts, styledEmbedContexts } = embedContexts;
+
+  // The unified context list: Base + the default Webflow breakpoints (always) +
+  // breakpoints/queries the element uses. Drives the dropdown and which breakpoint
+  // native reads/writes target.
+  const styleContexts = useMemo<StyleContext[]>(() => {
+    const list = buildStyleContexts(
+      allContextKeys,
+      nativeModel,
+      currentBreakpoint,
+      styledEmbedContexts,
+      sourceContexts,
+    );
+    // Keep the manually-selected query available on any element — even one with no
+    // styles there yet — so switching elements stays on it and you can add a style.
+    // Only needed for custom @media/@container (breakpoints are always built).
+    const sticky = stickyContextRef.current;
+    if (
+      context &&
+      sticky &&
+      sticky.key === context &&
+      !list.some((entry) => entry.key === context)
+    ) {
+      list.push(sticky);
+    }
+    return list;
+  }, [
+    allContextKeys,
+    nativeModel,
+    currentBreakpoint,
+    styledEmbedContexts,
+    sourceContexts,
+    context,
+    stickyContextRef,
+  ]);
+  const currentContext = useMemo<StyleContext>(
+    () =>
+      styleContexts.find((entry) => entry.key === context) ??
+      styleContexts[0] ?? { key: '', label: 'Base', breakpoint: 'main', embedAtContext: '' },
+    [styleContexts, context],
+  );
+  // Remember the selected context object so it survives an element switch (the list
+  // rebuilds per element; a custom query the new element lacks gets re-injected above).
+  useEffect(() => {
+    if (currentContext.key === context) {
+      stickyContextRef.current = currentContext;
+    }
+  }, [currentContext, context, stickyContextRef]);
+  return { currentContext, styleContexts };
+}
+
+// Which native class style the pick maps to, and the embeds that could style it.
+export function useNativeTarget(
+  selectionState: ReturnType<typeof useSelectionState>,
+  nativeState: ReturnType<typeof useNativeState>,
+  pendingWrites: ReturnType<typeof usePendingWrites>,
+) {
+  const { selectedTokens } = selectionState;
+  const { nativeModel, sourceSelection } = nativeState;
+  const { documentByKey } = pendingWrites;
+
+  // Which native class style the picked class tokens map to (if any), whether the
+  // Native layer is available, and the layer actually in effect (Native falls back
+  // to Embed for the tag / attributes / complex selectors that have no class Style).
+  const nativeIndex = useMemo(
+    () => selectedNativeIndexFor(nativeModel, selectedTokens),
+    [nativeModel, selectedTokens],
+  );
+  const nativeAvailable = nativeIndex !== undefined;
+  // A single class with no class Style yet (e.g. one that exists only as a combo,
+  // like `is-2`) can still be edited natively — we create its base class on the
+  // first edit. `creatableClass` is that class's display name.
+  const creatableClass = useMemo<string | undefined>(() => {
+    if (nativeIndex !== undefined || selectedTokens.length !== 1) {
+      return undefined;
+    }
+    const token = selectedTokens[0] ?? '';
+    return token.startsWith('class:') ? token.slice('class:'.length) : undefined;
+  }, [nativeIndex, selectedTokens]);
+  // …but only when a native styling system exists. Without one (a plain CSS
+  // project) every property is authored into the stylesheet instead, or the
+  // first edit on an unstyled class would route to a native write that cannot
+  // happen and fail silently.
+  const canNative = nativeStylingAvailable() && (nativeAvailable || creatableClass !== undefined);
+
+  // Every embed that could style this element, in page/cascade order — later embeds
+  // win (their CSS is injected after Webflow's stylesheet and after earlier embeds).
+  const embedList = useMemo(
+    () => [...documentByKey.values()].sort((left, right) => left.source.order - right.source.order),
+    [documentByKey],
+  );
+
+  // The dropdown picks the fallback embed only — Webflow is never a choice. Styles
+  // always try to apply natively first; whatever the class can't take natively
+  // lands in the selected embed. The user's pick (sourceSel) overrides the default
+  // (first embed in page order) and persists across element switches.
+  const sourceKeys = useMemo(
+    () => embedList.map((embedDocument) => embedDocument.source.key),
+    [embedList],
+  );
+  // The source dropdown only picks where NEW styles are created — it does not scope
+  // which existing rule is editable. So it just tracks the user's pick, defaulting to
+  // the first embed in page order.
+  const effectiveSourceSelection =
+    sourceSelection && sourceKeys.includes(sourceSelection)
+      ? sourceSelection
+      : (sourceKeys[0] ?? '');
+  return { canNative, creatableClass, effectiveSourceSelection, embedList, nativeIndex };
+}
+
+// Point the style source at an open component's own embed.
+export function useComponentSource(
+  scanState: ReturnType<typeof useScanState>,
+  nativeState: ReturnType<typeof useNativeState>,
+  nativeTarget: ReturnType<typeof useNativeTarget>,
+) {
+  const { scan } = scanState;
+  const {
+    pageSourceRef,
+    previousInComponentRef,
+    setSourceSelection,
+    sourceSelectionRef,
+    wantCompSourceRef,
+  } = nativeState;
+  const { embedList } = nativeTarget;
+
+  // Open a component → point the source at that component's own embed; close it →
+  // restore the page pick. The switch is in-memory only (persistence stays the page
+  // pick). Component embeds stream in after the page tree, so a pending switch waits
+  // for the component embed to appear rather than firing once on the transition.
+  const inComponentContext = scan?.inComponentContext ?? false;
+  useEffect(() => {
+    const componentSourceKey = embedList.find((embedDocument) => embedDocument.source.fromComponent)
+      ?.source.key;
+    if (inComponentContext !== previousInComponentRef.current) {
+      previousInComponentRef.current = inComponentContext;
+      if (inComponentContext) {
+        // Stash the page pick to restore on exit.
+        pageSourceRef.current = sourceSelectionRef.current;
+        wantCompSourceRef.current = true;
+      } else {
+        wantCompSourceRef.current = false;
+        setSourceSelection(pageSourceRef.current);
+      }
+    }
+    // Fulfill a pending switch once the open component's embed has loaded.
+    if (inComponentContext && wantCompSourceRef.current && componentSourceKey) {
+      wantCompSourceRef.current = false;
+      setSourceSelection(componentSourceKey);
+    }
+  }, [
+    inComponentContext,
+    embedList,
+    pageSourceRef,
+    previousInComponentRef,
+    setSourceSelection,
+    sourceSelectionRef,
+    wantCompSourceRef,
+  ]);
+  return { inComponentContext };
+}
+
+// The layer edits go to, and the resolved style for the pick.
+export function useResolved(
+  selectionState: ReturnType<typeof useSelectionState>,
+  nativeState: ReturnType<typeof useNativeState>,
+  elementTokens: ReturnType<typeof useElementTokens>,
+  tokenDefault: ReturnType<typeof useTokenDefault>,
+  activeSelectorHook: ReturnType<typeof useActiveSelector>,
+  styleContextsHook: ReturnType<typeof useStyleContexts>,
+  nativeTarget: ReturnType<typeof useNativeTarget>,
+  componentSource: ReturnType<typeof useComponentSource>,
+) {
+  const { stateKey } = selectionState;
+  const { nativeModel, setSourceSelection } = nativeState;
+  const { model } = elementTokens;
+  const { elementIdentity } = tokenDefault;
+  const { activeSelector } = activeSelectorHook;
+  const { currentContext } = styleContextsHook;
+  const { canNative, effectiveSourceSelection, nativeIndex } = nativeTarget;
+  const { inComponentContext } = componentSource;
+
+  // Webflow's native style system only supports its own breakpoints (Base/Tablet/…)
+  // and interaction states — NOT a custom `@media`/`@container` the user added (those
+  // have no `breakpoint`). Editing in a custom query must go to the embed, or the
+  // native write silently lands on Base instead of the query.
+  const nativeContextOk = currentContext.breakpoint !== undefined;
+  // Native is the primary layer whenever the selection can carry a class Style AND the
+  // context is native-capable; otherwise (tag / attribute / complex selector, or a
+  // custom query) the embed is the only target.
+  const effectiveSource: SourceKey = canNative && nativeContextOk ? 'native' : 'embed';
+  // The chosen embed: always the fallback target, and the editable layer for props
+  // the native class doesn't set.
+  const selectedEmbedKey = effectiveSourceSelection || undefined;
+  const selectedNativeIndex = canNative && nativeContextOk ? nativeIndex : undefined;
+
+  // Native contributions for the current context + state, folded into the model.
+  const nativeContribs = useMemo(
+    () => nativeContribsFor(nativeModel, currentContext, stateKey),
+    [nativeModel, currentContext, stateKey],
+  );
+
+  const resolved = useMemo(
+    () =>
+      resolveStyle(
+        model ?? EMPTY_RULE_MODEL,
+        currentContext.embedAtContext ?? ' native-only',
+        activeSelector,
+        {
+          source: effectiveSource,
+          contribs: nativeContribs,
+          selectedIndex: selectedNativeIndex,
+          selectedEmbedKey,
+          ...(currentContext.breakpoint
+            ? { currentTier: breakpointTier(currentContext.breakpoint) }
+            : {}),
+        },
+      ),
+    [
+      model,
+      currentContext,
+      activeSelector,
+      effectiveSource,
+      nativeContribs,
+      selectedNativeIndex,
+      selectedEmbedKey,
+    ],
+  );
+
+  // The stylesheet the active selector's rule already lives in. resolveStyle
+  // picks selectedRule by selector identity and explicitly does NOT scope it to
+  // the source dropdown, so reading it here can't feed back into itself.
+  const homeEmbedKey = resolved.selectedRule?.embedKey;
+
+  // Selecting an element points "Add custom styles in" at the file that already
+  // defines its selector, so a new declaration joins the rule that's there
+  // instead of landing in whichever stylesheet happens to be first in page
+  // order. An explicit pick still wins: the effect only re-runs when the element
+  // or the selector's home changes, not on every render. Left alone inside a
+  // component, where the source is pinned to that component's own embed.
+  useEffect(() => {
+    if (!homeEmbedKey || inComponentContext) {
+      return;
+    }
+    setSourceSelection((previous) => (previous === homeEmbedKey ? previous : homeEmbedKey));
+  }, [elementIdentity, activeSelector, homeEmbedKey, inComponentContext, setSourceSelection]);
+  return { effectiveSource, nativeContextOk, resolved, selectedEmbedKey, selectedNativeIndex };
+}
+
+// The chip picker's selectors and the context dropdown's info.
+export function useSelectorChips(
+  scanState: ReturnType<typeof useScanState>,
+  selectionState: ReturnType<typeof useSelectionState>,
+  nativeState: ReturnType<typeof useNativeState>,
+  elementTokens: ReturnType<typeof useElementTokens>,
+  activeSelectorHook: ReturnType<typeof useActiveSelector>,
+  styleContextsHook: ReturnType<typeof useStyleContexts>,
+) {
+  const { removedClasses } = scanState;
+  const { selectedSelectorText } = selectionState;
+  const { nativeModel } = nativeState;
+  const { model, snapshot, tokens } = elementTokens;
+  const { activeSelector } = activeSelectorHook;
+  const { currentContext, styleContexts } = styleContextsHook;
+
+  // Every selector (with styles) that targets this element in the current context —
+  // the element's own classes, stateful, and complex/ancestor selectors — for the
+  // chip picker. Include the active selector even when it has no rule yet (a fresh
+  // pick/typed one) so it shows as selected while you add its first property.
+  const selectorChips = useMemo<MatchedSelector[]>(
+    () =>
+      chipsFor({
+        model,
+        nativeModel,
+        currentContext,
+        activeSelector,
+        selectedSelectorText,
+        tokens,
+        classList: snapshot?.classList ?? [],
+        removedClasses,
+      }),
+    [
+      model,
+      nativeModel,
+      currentContext,
+      activeSelector,
+      selectedSelectorText,
+      tokens,
+      snapshot,
+      removedClasses,
+    ],
+  );
+
+  // Per-context dropdown info: embed hasStyles/combos (for the dot + auto-highlight)
+  // plus whether the breakpoint carries native values.
+  const contextInfos = useMemo<ContextInfo[]>(() => {
+    const projectedModel = model ?? EMPTY_RULE_MODEL;
+    const embedKeys = [
+      ...new Set(
+        styleContexts
+          .map((styleContext) => styleContext.embedAtContext)
+          .filter((atContext): atContext is string => atContext !== undefined),
+      ),
+    ];
+    const embedByKey = new Map(
+      indexContexts(projectedModel, embedKeys).map((info) => [info.key, info]),
+    );
+    return styleContexts.map((sc) => {
+      const embed = sc.embedAtContext !== undefined ? embedByKey.get(sc.embedAtContext) : undefined;
+      const nativeHas = sc.breakpoint ? nativeHasValues(nativeModel, sc.breakpoint) : false;
+      return {
+        key: sc.key,
+        hasStyles: (embed?.hasStyles ?? false) || nativeHas,
+        styledCombos: embed?.styledCombos ?? [],
+        bestTokens: embed?.bestTokens,
+      };
+    });
+  }, [model, styleContexts, nativeModel]);
+  return { contextInfos, selectorChips };
+}
+
+// Switch context, keeping or re-picking a selector styled there.
+export function useContextChange(
+  selectionState: ReturnType<typeof useSelectionState>,
+  nativeState: ReturnType<typeof useNativeState>,
+  elementTokens: ReturnType<typeof useElementTokens>,
+  activeSelectorHook: ReturnType<typeof useActiveSelector>,
+  selectorPick: ReturnType<typeof useSelectorPick>,
+  styleContextsHook: ReturnType<typeof useStyleContexts>,
+) {
+  const { pendingDefaultRef, setContext } = selectionState;
+  const { nativeModel } = nativeState;
+  const { model } = elementTokens;
+  const { activeSelector } = activeSelectorHook;
+  const { selectActiveSelector } = selectorPick;
+  const { styleContexts } = styleContextsHook;
+
+  // Switching context auto-selects a selector that has styles in the new query:
+  // keep the current pick if it's styled there, otherwise jump to the strongest.
+  const onContextChange = useCallback(
+    (next: ContextKey) => {
+      pendingDefaultRef.current = false;
+      setContext(next);
+      const nextContext = styleContexts.find((entry) => entry.key === next);
+      if (!nextContext || !model) {
+        return;
+      }
+      // Only selectors with styles IN this context (drop the dimmed other-context ones).
+      // Never jump to a global selector (`:focus-visible`, `*`): editing one edits
+      // most of the site, and it isn't about this element.
+      const styled = styledSelectorsFor(model, nativeModel, nextContext).filter(
+        (entry) => entry.inContext !== false && !isGlobalSelector(entry.text),
+      );
+      if (!styled.length) {
+        return;
+      }
+      if (activeSelector && styled.some((entry) => selectorsMatch(entry.text, activeSelector))) {
+        return;
+      }
+      const strongest = styled[styled.length - 1];
+      if (strongest !== undefined) {
+        selectActiveSelector(strongest.text);
+      }
+    },
+    [
+      styleContexts,
+      model,
+      nativeModel,
+      activeSelector,
+      selectActiveSelector,
+      pendingDefaultRef,
+      setContext,
+    ],
+  );
+  return { onContextChange };
+}

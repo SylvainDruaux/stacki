@@ -1,0 +1,648 @@
+// The style editor's model, outside React: streaming the documents a page and
+// its components style, the chips a selection shows, where a write lands, the
+// scan's state and signature, and the session caches that keep a scan and a
+// view across remounts (EmbedEditor.tsx).
+
+import { useEffect, useRef, useState } from 'react';
+import { type RuleModel } from '../model/cascade';
+import { snapshotTokens, tokensToSelector } from '../model/elementTokens';
+import {
+  selectorsMatch,
+  stateForSelector,
+  STATES,
+  type MatchedSelector,
+  type StyleContext,
+} from '../model/resolved';
+import type { Declaration } from 'postcss';
+import {
+  directDecls,
+  createRuleAtRoot,
+  createRuleInAtRule,
+  createNestedRule,
+  createRuleInMedia,
+  createRuleInQuery,
+  listAtRuleBlocks,
+  parseNestedInput,
+  type NestStep,
+} from '../model/css';
+import { canonicalCompound, compareSpecificity } from '../model/selectors';
+import { findNode, getHost, onHostChange, propText } from '../model/host';
+import {
+  dedupeByKey,
+  loadEmbedDocs,
+  readNativeStyles,
+  resolveIdentityElement,
+  askCanvasAbout,
+  resolveTarget,
+  scanAllComponents,
+  serializeElementId,
+  writeEmbedDocument,
+  type EmbedDocument,
+  type EmbedScan,
+} from '../model/webflow';
+import type { ElementSnapshot, NativeModel, ParsedRule } from '../model/styleTypes';
+import {
+  type ScanState,
+  type PropWrite,
+  EMPTY_RULE_MODEL,
+  type Placeholder,
+  computePlaceholders,
+} from './EditorBasics';
+import { selectorOrder, styledSelectorsFor } from './editorSignatures';
+export {
+  BG_REFRESH_THROTTLE_MS,
+  sheetSignature,
+  DESIGNER_SYNC_INTERVAL_MS,
+  selectorKeyOf,
+  snapshotSignature,
+  nativeSignature,
+  chainPrefixDepth,
+  selectorOrder,
+  styledSelectorsFor,
+} from './editorSignatures';
+
+// Stream: accumulate docs as each embed is read and render them right away, rather
+// than waiting for the whole batch. Emits are coalesced (≤ ~1/100ms) so the re-resolve
+// per partial can't thrash. Dedupe by key because a page and component scan can
+// surface the same embed. Returns the per-document callback.
+export function streamDocs(
+  pageScan: EmbedScan,
+  onPartial: ((content: Content) => void) | undefined,
+): (embedDocument: EmbedDocument) => void {
+  const streamed: EmbedDocument[] = [];
+  const streamedKeys = new Set<string>();
+  let lastEmitAt = 0;
+  return (embedDocument) => {
+    if (streamedKeys.has(embedDocument.source.key)) {
+      return;
+    }
+    streamedKeys.add(embedDocument.source.key);
+    streamed.push(embedDocument);
+    if (!onPartial) {
+      return;
+    }
+    const now = Date.now();
+    if (now - lastEmitAt < 100) {
+      return;
+    }
+    lastEmitAt = now;
+    onPartial({
+      scan: pageScan,
+      docs: [...streamed],
+      rules: [],
+      errors: [],
+      embedCount: 0,
+      componentEmbedCount: 0,
+      partial: true,
+    });
+  };
+}
+
+// The component embeds. Warm cache (and not a forced rescan): skip the DFS, just
+// re-read the known component embeds' code — that's what catches external edits.
+// Cold / forced: DFS every component for its embeds (streamed) and cache the sources
+// for next time.
+export async function loadComponentDocs(
+  { rescanComponents }: { readonly rescanComponents: boolean },
+  onDocument: (embedDocument: EmbedDocument) => void,
+): Promise<{ docs: EmbedDocument[]; errors: Content['errors'] }> {
+  if (cachedComponentSources && !rescanComponents) {
+    return loadEmbedDocs(cachedComponentSources, onDocument);
+  }
+  const sources: EmbedDocument['source'][] = [];
+  const docs: EmbedDocument[] = [];
+  const errors: Content['errors'] = [];
+  await scanAllComponents(async (embeds) => {
+    sources.push(...embeds);
+    const result = await loadEmbedDocs(embeds, onDocument);
+    docs.push(...result.docs);
+    errors.push(...result.errors);
+  });
+  cachedComponentSources = sources;
+  return { docs, errors };
+}
+
+// The full scan's content: page docs then component docs, each embed once.
+export function mergedContent(
+  pageScan: EmbedScan,
+  results: ReadonlyArray<{ docs: EmbedDocument[]; errors: Content['errors'] }>,
+): Content {
+  const seenDocs = new Set<string>();
+  const docs = results
+    .flatMap((result) => result.docs)
+    .filter((embedDocument) => {
+      if (seenDocs.has(embedDocument.source.key)) {
+        return false;
+      }
+      seenDocs.add(embedDocument.source.key);
+      return true;
+    });
+  const embeds = dedupeByKey(docs.map((embedDocument) => embedDocument.source));
+  return {
+    scan: { ...pageScan, embeds },
+    docs,
+    rules: [],
+    errors: results.flatMap((result) => result.errors),
+    embedCount: 0,
+    componentEmbedCount: 0,
+    partial: false,
+  };
+}
+
+// The query scaffolds for an element's classes — only inside a component, from its own
+// (writable) embeds.
+export function placeholdersFor(content: Content, classList: string[]): Placeholder[] {
+  return content.scan.inComponentContext ? computePlaceholders(content.docs, classList) : [];
+}
+
+// What the Designer says about the selected element now: its match target and
+// snapshot, its native class styles, and the canvas's answer the target came from.
+// Undefined on a transient read failure.
+export async function readDesignerState(element: unknown, content: Content) {
+  try {
+    const asked = await askCanvasAbout(serializeElementId(element), content.rules);
+    const resolved = await resolveTarget(element, content.scan, asked);
+    // Read from the RESOLVED identity element (as refreshNative and the load effect
+    // do), NOT the raw selection — reading the raw element yields a different model
+    // for in-component selections, so its signature would never match the displayed
+    // one and the poll would re-render every tick.
+    const identity = await resolveIdentityElement(element);
+    const native = await readNativeStyles(identity, STATES);
+    return { target: resolved.target, snap: resolved.rootSnapshot, native, asked };
+  } catch {
+    return undefined;
+  }
+}
+
+// A lone class typed into the selector box should also land on the element, the way a
+// class field would. Anything more — a combinator, :is(), a state, a second token — is
+// a selector being authored deliberately, so the element is left alone.
+// canonicalCompound already draws that line. Returns the class name, if it is one.
+export function loneTypedClass(selector: string): string | undefined {
+  const canon = canonicalCompound(selector);
+  if (!canon.simple || !canon.oneCompound || canon.pseudoElement) {
+    return undefined;
+  }
+  if (canon.pseudoClasses.length !== 0 || canon.tokens.length !== 1) {
+    return undefined;
+  }
+  const token = canon.tokens[0] ?? '';
+  return token.startsWith('class:') ? token.slice('class:'.length) : undefined;
+}
+
+export interface ChipInputs {
+  model: RuleModel | undefined;
+  nativeModel: NativeModel | undefined;
+  currentContext: StyleContext;
+  activeSelector: string;
+  selectedSelectorText: string | undefined;
+  tokens: ReturnType<typeof snapshotTokens>;
+  classList: string[];
+  removedClasses: ReadonlySet<string>;
+}
+
+// Every selector (with styles) that targets the element in the current context, for
+// the chip picker, in chip display order.
+export function chipsFor(inputs: ChipInputs): MatchedSelector[] {
+  const { model, nativeModel, currentContext, removedClasses } = inputs;
+  // Show EVERY selector that styles this element in any query. The picker dims the
+  // ones not styled in the current query (inContext === false) rather than hiding
+  // them — so switching queries keeps the full list visible instead of dropping
+  // selectors that only have styles elsewhere.
+  // A chip is a selector that targets THIS element. One that hangs off a class the
+  // element no longer has doesn't any more — drop it now instead of leaving it in
+  // the well until the next resolve. Complex selectors are left to that resolve:
+  // the class may be an ancestor's, which this can't tell apart.
+  const list = styledSelectorsFor(model, nativeModel, currentContext).filter((entry) => {
+    if (!removedClasses.size) {
+      return true;
+    }
+    const canon = canonicalCompound(entry.text);
+    return !(canon.simple && canon.tokens.some((tok) => removedClasses.has(tok)));
+  });
+  const pending = pendingActiveChip(list, inputs);
+  if (pending) {
+    list.push(pending);
+  }
+  // Order for readability: tag → base class + pseudos → applied combo chain + pseudos
+  // → standalone/global classes → data attributes → complex selectors.
+  return inChipOrder(list, inputs.classList, { byOrder: true }).map((selector) =>
+    // In a query context, show the display with an `@` at the query position;
+    // on Base / other contexts show the plain nested display.
+    currentContext.embedAtContext && selector.inContext !== false && selector.queryDisplay
+      ? { ...selector, display: selector.queryDisplay }
+      : selector,
+  );
+}
+
+// Show the active selector as a pending (dashed/outlined) chip while it has no rule
+// yet, so a freshly typed/picked selector stays visible until its first property
+// lands (then it becomes a solid styled chip). We show it for a complex/typed
+// selector always, and for the element's OWN classes only when the user explicitly
+// typed or picked one (`selectedSelectorText` set) — the AUTO-composed default
+// (`.card`, `div`) stays hidden since its token chip already indicates the pick.
+// Switching elements/selectors clears `selectedSelectorText` + the active selector,
+// so the pending chip disappears on its own when you move on without adding styles.
+export function pendingActiveChip(
+  list: MatchedSelector[],
+  inputs: Pick<ChipInputs, 'activeSelector' | 'selectedSelectorText' | 'tokens'>,
+): MatchedSelector | undefined {
+  const { activeSelector } = inputs;
+  if (!activeSelector || list.some((entry) => selectorsMatch(entry.text, activeSelector))) {
+    return undefined;
+  }
+  const ownTokens = new Set(inputs.tokens.map((token) => token.name));
+  const canon = canonicalCompound(activeSelector);
+  const own = canon.simple && canon.tokens.every((tok) => ownTokens.has(tok));
+  if (own && inputs.selectedSelectorText === undefined) {
+    return undefined;
+  }
+  return {
+    text: activeSelector,
+    specificity: [0, 0, 0],
+    state: stateForSelector(activeSelector),
+    simple: canon.simple,
+    key: `active:${activeSelector}`,
+    pending: true,
+    inContext: true,
+    fromComponent: false,
+  };
+}
+
+// Selectors in chip display order (see selectorOrder), then by specificity; with
+// `byOrder`, a selector's own source order breaks the tie before its text does.
+export function inChipOrder(
+  selectors: MatchedSelector[],
+  classList: string[],
+  { byOrder }: { readonly byOrder: boolean },
+): MatchedSelector[] {
+  return selectors
+    .map((entry) => ({ s: entry, rank: selectorOrder(entry.text, classList) }))
+    .sort(
+      (left, right) =>
+        left.rank[0] - right.rank[0] ||
+        left.rank[1] - right.rank[1] ||
+        left.rank[2] - right.rank[2] ||
+        compareSpecificity(left.s.specificity, right.s.specificity) ||
+        (byOrder && left.s.order !== undefined && right.s.order !== undefined
+          ? left.s.order - right.s.order
+          : 0) ||
+        left.s.text.localeCompare(right.s.text),
+    )
+    .map((ranked) => ranked.s);
+}
+
+// The selector a new element's default upgrades to, from the local selectors styled in
+// the current context — or undefined to keep the default, when it is already styled.
+export function upgradedDefault(
+  local: MatchedSelector[],
+  element: {
+    tokens: ReturnType<typeof snapshotTokens>;
+    classList: string[];
+    defaultTokens: string[];
+  },
+): MatchedSelector | undefined {
+  const { tokens, classList } = element;
+  const defaultSelector = tokensToSelector(element.defaultTokens, tokens);
+  if (defaultSelector && local.some((entry) => selectorsMatch(entry.text, defaultSelector))) {
+    return undefined;
+  }
+  // Fall back to the FIRST applied class that has styles (the primary block class in
+  // Lumos) rather than styled[last] — utility classes (u-*) sort last by name and
+  // shouldn't win the default just because their specificity ties the base class.
+  //
+  // Every class, not just the defaulted one: the default is now the first class
+  // alone, and if THAT one has no styles the next one along is still a better
+  // answer than a selector picked by specificity.
+  const primaryStyled = tokens
+    .filter((token) => token.kind === 'class')
+    .map((token) => token.name)
+    .flatMap((tok) => {
+      const found = local.find((entry) =>
+        selectorsMatch(entry.text, tokensToSelector([tok], tokens)),
+      );
+      return found ? [found] : [];
+    })[0];
+  // Otherwise the FIRST selector in chip display order after the tag — the element's
+  // own class/nesting selector (`.hero_component > .hero_paragraph`), not the highest-
+  // specificity one (a foreign `:not(…) > :is(…)` shouldn't win the default).
+  const ordered = inChipOrder([...local], classList, { byOrder: false });
+  const firstAfterTag = ordered.find((entry) => selectorOrder(entry.text, classList)[0] > 0);
+  return primaryStyled ?? firstAfterTag ?? ordered[0] ?? local[local.length - 1];
+}
+
+export type EmbedRegion = EmbedDocument['regions'][number];
+
+// Where a new rule is written: the chosen embed when one is selected, otherwise the
+// embed of a matching rule (in the current context, when `inContext` is given) or the
+// first embed. The region is the anchor rule's block when it lives in the target doc,
+// else that doc's first block. Undefined when there's no embed to write into.
+export function embedWriteTarget(
+  target: {
+    model: RuleModel | undefined;
+    selectedEmbedKey: string | undefined;
+    documentByKey: Map<string, EmbedDocument>;
+  },
+  inContext: ((rule: ParsedRule) => boolean) | undefined,
+): { embedDocument: EmbedDocument; region: EmbedRegion } | undefined {
+  const { model, selectedEmbedKey, documentByKey } = target;
+  const matched = model ? [...model.base, ...model.conditional].map((entry) => entry.rule) : [];
+  const ofSelected = (rule: ParsedRule) => rule.embedKey === selectedEmbedKey;
+  let anchor: ParsedRule | undefined;
+  if (inContext === undefined) {
+    anchor = selectedEmbedKey ? matched.find(ofSelected) : matched[0];
+  } else if (selectedEmbedKey) {
+    anchor =
+      matched.find((rule) => ofSelected(rule) && inContext(rule)) ?? matched.find(ofSelected);
+  } else {
+    anchor = matched.find(inContext) ?? matched[0];
+  }
+  const embedDocument = selectedEmbedKey
+    ? documentByKey.get(selectedEmbedKey)
+    : anchor
+      ? documentByKey.get(anchor.embedKey)
+      : [...documentByKey.values()][0];
+  const region =
+    anchor && embedDocument && anchor.embedKey === embedDocument.source.key
+      ? embedDocument.regions[anchor.regionIndex]
+      : embedDocument?.regions[0];
+  return embedDocument && region ? { embedDocument, region } : undefined;
+}
+
+// Create the rule for a write: typed nested syntax writes real nested source; a
+// Webflow-breakpoint context with no equivalent embed query writes into a synthesized
+// @media block; otherwise the embed's base, or its existing query block (or a new one).
+export function createRuleForWrite(
+  region: EmbedRegion,
+  where: {
+    nested: NestStep[] | undefined;
+    bpMedia: string | undefined;
+    embedContext: string | undefined;
+    selector: string;
+    write: PropWrite;
+  },
+): boolean {
+  const { nested, bpMedia, embedContext, selector } = where;
+  const { prop, value, important } = where.write;
+  if (nested) {
+    return createNestedRule(region, nested, prop, { value, important });
+  }
+  if (bpMedia) {
+    return createRuleInMedia(region, bpMedia, selector, prop, { value, important });
+  }
+  if (!embedContext) {
+    return createRuleAtRoot(region, selector, prop, { value, important });
+  }
+  const block = listAtRuleBlocks(region).find(
+    (entry) => entry.atContext.join(' › ') === embedContext,
+  );
+  return block
+    ? createRuleInAtRule(block.node, selector, prop, { value, important })
+    : createRuleInQuery(region, embedContext, selector, prop, { value, important });
+}
+
+// A rule's own declarations of `prop`, looked up in the live postcss AST.
+export function declsFor(rule: ParsedRule, prop: string): Declaration[] {
+  const key = prop.toLowerCase();
+  return directDecls(rule.node).filter(
+    (declaration) => declaration.prop.trim().toLowerCase() === key,
+  );
+}
+
+// The last of them — the one that applies.
+export function lastDeclFor(rule: ParsedRule, prop: string): Declaration | undefined {
+  const matches = declsFor(rule, prop);
+  return matches[matches.length - 1];
+}
+
+// The scan state with no element selected: the embeds' counts through an empty model.
+export function unselectedScanState(content: Content, rememberedPageEmbedCount: number): ScanState {
+  return {
+    rootSnapshot: undefined,
+    model: EMPTY_RULE_MODEL,
+    placeholders: [],
+    embedCount: content.embedCount,
+    componentEmbedCount: content.componentEmbedCount,
+    rememberedPageEmbedCount: content.scan.inComponentContext ? rememberedPageEmbedCount : 0,
+    errors: content.errors,
+    inComponentContext: content.scan.inComponentContext,
+  };
+}
+
+// The scan state for a resolved element: its snapshot and model, the query scaffolds
+// (inside a component only), and the scan's counts.
+export function scanStateFor(
+  content: Content,
+  resolvedElement: { rootSnapshot: ElementSnapshot; model: RuleModel },
+  rememberedPageEmbedCount: number,
+): ScanState {
+  const { rootSnapshot, model } = resolvedElement;
+  return {
+    rootSnapshot,
+    model,
+    placeholders: content.scan.inComponentContext
+      ? computePlaceholders(content.docs, rootSnapshot.classList)
+      : [],
+    embedCount: content.embedCount,
+    componentEmbedCount: content.componentEmbedCount,
+    rememberedPageEmbedCount: content.scan.inComponentContext ? rememberedPageEmbedCount : 0,
+    errors: content.errors,
+    inComponentContext: content.scan.inComponentContext,
+  };
+}
+
+// The status line after a resolve: the matching-rule count, so far while component
+// embeds are still loading.
+export function resolveStatus(content: Content, model: RuleModel): string {
+  const count = model.matchedRuleCount;
+  if (content.partial) {
+    return count > 0
+      ? `${count} matching rule${count === 1 ? '' : 's'} so far — scanning components…`
+      : 'Scanning component embeds…';
+  }
+  if (count > 0) {
+    return `${count} matching rule${count === 1 ? '' : 's'}.`;
+  }
+  return content.embedCount
+    ? 'No embed styles target this element.'
+    : 'No HTML embeds with <style> blocks found.';
+}
+
+// ─────────────────────────── Main component ───────────────────────────
+
+// One native write attempt: whether it applied (and, creating a class, whether the class
+// was new), and why not.
+export type NativeAttempt = { applied: boolean; created?: boolean; reason: string };
+export type EmbedWriteResult = Awaited<ReturnType<typeof writeEmbedDocument>>;
+export type NestedInput = NonNullable<ReturnType<typeof parseNestedInput>>;
+export type CanvasAnswer = Awaited<ReturnType<typeof askCanvasAbout>>;
+
+// A forced rescan re-walks the component tree for embeds; otherwise the cached
+// component sources are re-read.
+export type RescanOptions = { readonly rescanComponents?: boolean | undefined };
+
+export type Content = {
+  scan: EmbedScan;
+  docs: EmbedDocument[];
+  rules: ParsedRule[];
+  errors: Array<{ label: string; message: string }>;
+  embedCount: number;
+  componentEmbedCount: number;
+  /** True for the page-only snapshot emitted before component embeds finish loading. */
+  partial?: boolean;
+};
+
+// The last completed embed scan, kept at module scope so it survives the tool being
+// closed and reopened (ToolHost unmounts EmbedEditor on close, dropping its refs).
+// Without this, every reopen re-scans every embed and the custom-code selector chips
+// reappear only after that scan finishes. Restored into the refs on mount so those
+// chips render from cache immediately; a background refresh still runs to catch edits,
+// and scanHasElement guards against a stale page/component before reuse.
+export type PersistedScan = {
+  content: Content;
+  docs: EmbedDocument[];
+  pageDocs: EmbedDocument[];
+  inComponent: boolean;
+  scanAt: number;
+};
+
+// The last RESOLVED view (editorSession.view) — the matched model and the
+// element snapshot the selector chips are drawn from. editorSession.scan keeps
+// the parsed stylesheets; this keeps what they resolved to for the selected
+// element. The panel is unmounted whenever the
+// right tab isn't Style — and removing a class happens in Settings, which is exactly
+// that — so without this, coming back blanks the selector well until a full re-resolve
+// (a canvas round trip plus a re-match of every rule) lands. Restored only while the
+// same element is still selected; a background refresh reconciles it either way.
+export type PersistedView = {
+  /** Node id + the file it belongs to: ids are per-page, so the file has to match too. */
+  hostId: string;
+  filePath: string | undefined;
+  elementKey: string;
+  scan: ScanState;
+  quick: ElementSnapshot | undefined;
+};
+
+// What the editor keeps across remounts, in one object every hook shares: an
+// importing module cannot reassign an imported binding, and these are written
+// from the hooks that complete a scan and resolve a view.
+export const editorSession: {
+  /** The last completed embed scan (see PersistedScan). */
+  scan: PersistedScan | undefined;
+  /** The last resolved view (see PersistedView). */
+  view: PersistedView | undefined;
+} = { scan: undefined, view: undefined };
+
+export const viewKeyMatches = (view: PersistedView | undefined) => {
+  const host = getHost();
+  return (
+    !!view &&
+    !!host.selectedId &&
+    view.hostId === host.selectedId &&
+    view.filePath === (host.openFilePath ?? undefined)
+  );
+};
+
+// The selected node's authored classes, straight from the page model. A `class` set by
+// an expression has no literal text to read, and reports none.
+export function authoredClasses(): string[] {
+  const host = getHost();
+  const node = host.selectedId ? findNode(host.nodes, host.selectedId) : undefined;
+  return propText(node, 'class').trim().split(/\s+/).filter(Boolean);
+}
+
+/**
+ * Classes the page model has just lost.
+ *
+ * The panel's snapshot unions the authored classes with the ones the PREVIEW last
+ * reported (so classes added at runtime still show), and the preview goes on
+ * reporting a removed class until the dev server re-renders the page. Left alone, a
+ * class you just deleted sits in the selector well for that whole round trip — and
+ * a re-scan in between puts it back. Anything that drops out of the authored list is
+ * hidden from that moment; it returns if the class does, and is forgotten once the
+ * preview stops reporting it too.
+ */
+export function useRemovedClasses(): ReadonlySet<string> {
+  const [removed, setRemoved] = useState<ReadonlySet<string>>(EMPTY_CLASSES);
+  const previousRef = useRef<string[]>(authoredClasses());
+  const nodeRef = useRef(getHost().selectedId);
+  useEffect(() => {
+    const sync = () => {
+      const host = getHost();
+      const now = authoredClasses();
+      const previous = previousRef.current;
+      previousRef.current = now;
+      // A different element: nothing carries over.
+      if (host.selectedId !== nodeRef.current) {
+        nodeRef.current = host.selectedId;
+        setRemoved((old) => (old.size ? EMPTY_CLASSES : old));
+        return;
+      }
+      setRemoved((old) => {
+        const next = new Set(old);
+        for (const cls of previous) {
+          if (!now.includes(cls)) {
+            next.add(cls);
+          }
+        }
+        for (const cls of now) {
+          next.delete(cls);
+        }
+        // Once the preview has caught up there is nothing left to hide.
+        const rendered = host.renderedClasses || [];
+        for (const cls of [...next]) {
+          if (!rendered.includes(cls)) {
+            next.delete(cls);
+          }
+        }
+        if (next.size === old.size && [...next].every((name) => old.has(name))) {
+          return old;
+        }
+        return next;
+      });
+    };
+    sync();
+    return onHostChange(sync);
+  }, []);
+  return removed;
+}
+
+export const EMPTY_CLASSES: ReadonlySet<string> = new Set();
+
+// The same snapshot without the classes that have just been removed — what the
+// element is now, rather than what the preview last saw.
+export function withoutClasses(
+  snapshot: ElementSnapshot | undefined,
+  hidden: ReadonlySet<string>,
+): ElementSnapshot | undefined {
+  if (!snapshot || !hidden.size) {
+    return snapshot;
+  }
+  const classes = snapshot.classes.filter((name) => !hidden.has(name));
+  const classList = snapshot.classList.filter((name) => !hidden.has(name));
+  if (
+    classes.length === snapshot.classes.length &&
+    classList.length === snapshot.classList.length
+  ) {
+    return snapshot;
+  }
+  return {
+    ...snapshot,
+    classes,
+    classList,
+    attributes: { ...snapshot.attributes, class: classList.join(' ') },
+  };
+}
+
+// Cache the component embed SOURCES (the expensive part: the per-component tree
+// DFS to find embeds) at module scope, reused across page switches and reopens.
+// The CODE is re-read on every build, so external edits to a component embed are
+// picked up (our own edits are saved, so a fresh read reflects them too). A forced
+// Rescan re-DFSes to catch added/removed component embeds.
+export let cachedComponentSources: EmbedDocument['source'][] | undefined = undefined;
+
+// Native class styles are determined by an element's class signature, so cache the
+// read NativeModel by that signature (module scope → survives reopen). A re-selected
+// element serves instantly from here while a background re-read reconciles; cleared
+// on any native edit, since a class change can affect every element that uses it.
+export const nativeModelCache = new Map<string, NativeModel>();

@@ -52,6 +52,22 @@ function readSourceGroup(relativePaths) {
   return relativePaths.map(readSource).join('\n\n');
 }
 
+// A module split into a folder of pieces, read as one: its entry file, then
+// every .ts and .tsx file in the folder in name order. A source check about
+// code that lives somewhere in the module keeps finding it wherever it moved.
+// Bounded by the folder's own listing, not walked: pieces sit one level deep.
+const FOLDER_FILES_MAX = 200;
+function readSourceFolder(entry, relativeFolder) {
+  const names = fs
+    .readdirSync(repoPath(relativeFolder))
+    .filter((name) => /\.tsx?$/.test(name))
+    .sort();
+  if (names.length === 0 || names.length > FOLDER_FILES_MAX) {
+    throw new Error(`source-text: ${relativeFolder} holds ${names.length} source files`);
+  }
+  return readSourceGroup([entry, ...names.map((name) => `${relativeFolder}/${name}`)]);
+}
+
 // The compact form described above.
 function compactSource(text) {
   return text
@@ -101,4 +117,11 @@ function sourceBlock(source, start) {
   return '';
 }
 
-module.exports = { compactSource, containsCode, readSource, readSourceGroup, sourceBlock };
+module.exports = {
+  compactSource,
+  containsCode,
+  readSource,
+  readSourceFolder,
+  readSourceGroup,
+  sourceBlock,
+};
