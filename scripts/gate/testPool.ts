@@ -10,6 +10,7 @@ import {
   type StdioNull,
   type StdioPipe,
 } from 'node:child_process';
+import { performance } from 'node:perf_hooks';
 
 export interface TestCommand {
   readonly name: string;
@@ -84,7 +85,9 @@ export async function runTestPool(
 }
 
 export function runTestCommand(command: TestCommand, options: PoolOptions): Promise<TestOutcome> {
-  const startedMs = Date.now();
+  // A monotonic clock: the wall clock can step backwards (WSL2 resyncs it), and
+  // a duration measured across the step came out negative.
+  const startedMs = performance.now();
   const output = createOutputTail(POOL_LIMITS.outputBytesMax);
   return new Promise((resolve) => {
     const spawnOptions: SpawnOptionsWithStdioTuple<StdioNull, StdioPipe, StdioPipe> = {
@@ -105,7 +108,7 @@ export function runTestCommand(command: TestCommand, options: PoolOptions): Prom
       if (ending.note !== '') {
         output.push(Buffer.from(`\n${ending.note}\n`));
       }
-      const durationMs = Date.now() - startedMs;
+      const durationMs = Math.round(performance.now() - startedMs);
       const passed = ending.passed;
       resolve({ name: command.name, passed, durationMs, output: output.text() });
     };

@@ -1,20 +1,27 @@
 #!/usr/bin/env node
 // The gate: builds, static checks, then every test suite under test/.
 //
-//   npm test                         everything
+//   npm test                         everything: the full gate CI runs
 //   npm test -- hoverCost electron/  suites by name, or every suite under a folder
 //   npm test -- --list               the suites, without running them
 //   npm test -- --jobs=4             at most four suites at once
 //
+// Naming suites builds what they load over the existing tree and skips the
+// clean and the whole-tree static checks (gatePlan.ts says why); the stop hook
+// and `npm run check:changed` check changed files.
+//
 // Suites are found by name (testDiscovery.ts); the few that need a different
-// runner, Node flags or to run alone say so in testSuites.ts. Each runs as a
-// direct spawn with an argument list, never a shell line.
+// runner, Node flags, the renderer bundle or to run alone say so in
+// testSuites.ts. Each runs as a direct spawn with an argument list, never a
+// shell line.
 
-import { spawnSync } from 'node:child_process';
 import os = require('node:os');
 import path = require('node:path');
+import { gatePlanFor, targetedNotice, type BuildStage } from './gatePlan';
 import {
   parseJobs,
+  POOL_LIMITS,
+  runTestCommand,
   runTestPool,
   stopTestPool,
   type TestCommand,
@@ -22,8 +29,6 @@ import {
 } from './testPool';
 import { repositoryRoot } from '../lib/repoRoot';
 import { discoverTestFiles, selectSuites, suitesFor, type Suite } from './testDiscovery';
-
-type GateCommand = readonly [label: string, command: string, argumentsList: readonly string[]];
 
 const root = repositoryRoot();
 const flags = process.argv.slice(2).filter((argument) => argument.startsWith('--'));
@@ -56,26 +61,83 @@ const environment = {
 };
 const node = process.execPath;
 const typeScript = path.join(root, 'node_modules', 'typescript', 'bin', 'tsc');
-const staticGates: readonly GateCommand[] = [
-  // Node >= 22.18 strips types itself (package.json engines).
-  ['build:clean', node, [path.join(root, 'scripts/build/cleanBuild.mts')]],
-  ['build:contracts', node, [typeScript, '-p', path.join('shared', 'tsconfig.json')]],
-  ['build:electron', node, [typeScript, '-p', path.join('electron', 'tsconfig.json')]],
-  ['build:scripts', node, [typeScript, '-p', path.join('scripts', 'tsconfig.build.json')]],
-  ['build:morph', node, [typeScript, '-p', path.join('electron', 'tsconfig.morph.json')]],
-  ['build:preload', node, [typeScript, '-p', path.join('electron', 'tsconfig.preload.json')]],
-  ['stage:runtime', node, [path.join(root, 'dist/scripts/build/stageRuntime.js')]],
-  ['build:web', node, [path.join(root, 'node_modules', 'vite', 'bin', 'vite.js'), 'build']],
-];
+const plan = gatePlanFor({ queries, selected });
+// Node >= 22.18 strips types itself (package.json engines).
+const cleanCommand: TestCommand = {
+  name: 'build:clean',
+  command: node,
+  argumentsList: [path.join(root, 'scripts/build/cleanBuild.mts')],
+};
+const buildArguments: Readonly<Record<BuildStage, readonly string[]>> = {
+  'build:contracts': [typeScript, '-p', path.join('shared', 'tsconfig.json')],
+  'build:electron': [typeScript, '-p', path.join('electron', 'tsconfig.json')],
+  'build:scripts': [typeScript, '-p', path.join('scripts', 'tsconfig.build.json')],
+  'build:morph': [typeScript, '-p', path.join('electron', 'tsconfig.morph.json')],
+  'build:preload': [typeScript, '-p', path.join('electron', 'tsconfig.preload.json')],
+  'stage:runtime': [path.join(root, 'dist/scripts/build/stageRuntime.js')],
+  'build:web': [path.join(root, 'node_modules', 'vite', 'bin', 'vite.js'), 'build'],
+};
+// A targeted run keeps the tree, so its TypeScript emits are incremental. The
+// build info lives inside dist/, beside the outputs it describes: anything
+// that deletes the outputs (build:clean, every packaging path) deletes it too,
+// so tsc can never skip an emit whose output is gone. The full gate starts
+// clean and stays cold, as CI is.
+const INCREMENTAL_STAGES: ReadonlySet<BuildStage> = new Set([
+  'build:contracts',
+  'build:electron',
+  'build:morph',
+  'build:preload',
+]);
+const buildCommand = (stage: BuildStage): TestCommand => {
+  const argumentsList = buildArguments[stage];
+  if (plan.kind === 'targeted' && INCREMENTAL_STAGES.has(stage)) {
+    const buildInfo = path.join(
+      root,
+      'dist',
+      '.tsbuildinfo',
+      `${stage.slice('build:'.length)}.tsbuildinfo`,
+    );
+    const incremental = ['--incremental', '--tsBuildInfoFile', buildInfo];
+    return { name: stage, command: node, argumentsList: [...argumentsList, ...incremental] };
+  }
+  return { name: stage, command: node, argumentsList };
+};
+// The type checks keep what they learned between runs, outside dist/ so a
+// clean keeps it. tsc re-checks every file whose own text or dependencies
+// changed, so a warm run reaches the verdict a cold one does. `tsc --noEmit`
+// shares check:changed's file (scripts/policy/checks.mts): one program, one
+// cache, so each warms the other.
+const typeCheckCache = path.join(root, 'node_modules', '.cache', 'tsc');
+// Prettier formats each file alone, so a file whose content and options are
+// unchanged keeps its verdict. Only the content strategy is safe here: a
+// checkout rewrites modification times without changing a byte.
+const prettierCache = path.join(root, 'node_modules', '.cache', 'prettier', 'gate.json');
 // The checks only read what the builds produced, so they run side by side.
 const staticChecks: readonly TestCommand[] = [
-  { name: 'tsc --noEmit', command: node, argumentsList: [typeScript, '--noEmit'] },
+  {
+    name: 'tsc --noEmit',
+    command: node,
+    argumentsList: [
+      typeScript,
+      '--noEmit',
+      '--incremental',
+      '--tsBuildInfoFile',
+      path.join(typeCheckCache, 'root.tsbuildinfo'),
+    ],
+  },
   {
     // The scripts emit CommonJS, so their build config cannot hold
     // verbatimModuleSyntax; this check-only program holds the full flag set.
     name: 'tsc scripts',
     command: node,
-    argumentsList: [typeScript, '-p', path.join('scripts', 'tsconfig.json')],
+    argumentsList: [
+      typeScript,
+      '-p',
+      path.join('scripts', 'tsconfig.json'),
+      '--incremental',
+      '--tsBuildInfoFile',
+      path.join(typeCheckCache, 'scripts.tsbuildinfo'),
+    ],
   },
   {
     name: 'eslint',
@@ -100,6 +162,11 @@ const staticChecks: readonly TestCommand[] = [
     argumentsList: [
       path.join(root, 'node_modules', 'prettier', 'bin', 'prettier.cjs'),
       '--check',
+      '--cache',
+      '--cache-strategy',
+      'content',
+      '--cache-location',
+      prettierCache,
       '--log-level',
       'warn',
       '.',
@@ -111,24 +178,6 @@ const staticChecks: readonly TestCommand[] = [
     argumentsList: [path.join(root, 'dist/scripts/gate/adapterSurface.js')],
   },
 ];
-
-for (const [label, command, argumentsList] of staticGates) {
-  console.log(`\n[gate] ${label}`);
-  const gateStartedMs = Date.now();
-  const result = spawnSync(command, argumentsList, {
-    cwd: root,
-    env: environment,
-    stdio: 'inherit',
-  });
-  if (result.signal === 'SIGINT' || result.signal === 'SIGTERM') {
-    process.exit(130);
-  }
-  if (result.status !== 0 || result.error) {
-    console.error(`\nStatic gate failed: ${label}`);
-    process.exit(1);
-  }
-  console.log(`[gate] ${label} done in ${((Date.now() - gateStartedMs) / 1000).toFixed(1)}s`);
-}
 
 // Two phases: the shared pool, then the suites that run alone (they measure
 // timing or drive a real window) one at a time with nothing else running.
@@ -179,8 +228,65 @@ async function runStaticChecks(): Promise<void> {
   }
 }
 
+// A build's output is shown when it finishes, so the chain and the builds
+// beside it never interleave on the terminal.
+function reportBuild(outcome: TestOutcome): void {
+  const seconds = (outcome.durationMs / 1000).toFixed(1);
+  console.log(`\n[gate] ${outcome.name} ${outcome.passed ? 'done' : 'FAILED'} in ${seconds}s`);
+  const output = outcome.output.trimEnd();
+  if (output !== '') {
+    console.log(output);
+  }
+}
+
+// The chain stops at its first failure: each stage reads what the one before
+// it wrote.
+async function runChain(stages: readonly BuildStage[]): Promise<readonly TestOutcome[]> {
+  const options = { cwd: root, environment, jobs: 1 };
+  const outcomes: TestOutcome[] = [];
+  for (const stage of stages) {
+    const outcome = await runTestCommand(buildCommand(stage), options);
+    reportBuild(outcome);
+    outcomes.push(outcome);
+    if (!outcome.passed) {
+      break;
+    }
+  }
+  return outcomes;
+}
+
+// Any failed build stops the gate before the checks and the suites.
+async function runBuilds(): Promise<void> {
+  if (plan.kind === 'full') {
+    const clean = await runTestCommand(cleanCommand, { cwd: root, environment, jobs: 1 });
+    reportBuild(clean);
+    if (!clean.passed) {
+      console.error('\nStatic gate failed: build:clean');
+      process.exit(1);
+    }
+  } else {
+    console.log(targetedNotice(plan));
+  }
+  const besideJobs = Math.min(Math.max(plan.beside.length, 1), POOL_LIMITS.jobsMax);
+  const besideOptions = { cwd: root, environment, jobs: besideJobs };
+  const [chain, beside] = await Promise.all([
+    runChain(plan.chain),
+    runTestPool(plan.beside.map(buildCommand), besideOptions, reportBuild),
+  ]);
+  const failures = [...chain, ...beside].filter((outcome) => !outcome.passed);
+  if (failures.length > 0) {
+    console.error(`\nStatic gate failed: ${failures.map((outcome) => outcome.name).join(', ')}`);
+    process.exit(1);
+  }
+}
+
 async function runPhases(): Promise<readonly TestOutcome[]> {
-  await runStaticChecks();
+  const buildsStartedMs = Date.now();
+  await runBuilds();
+  console.log(`\n[gate] builds done in ${((Date.now() - buildsStartedMs) / 1000).toFixed(1)}s`);
+  if (plan.kind === 'full') {
+    await runStaticChecks();
+  }
   testsStartedMs = Date.now();
   console.log(`\n[gate] ${names.length} test suites, ${jobs} at a time`);
   const outcomes: TestOutcome[] = [];

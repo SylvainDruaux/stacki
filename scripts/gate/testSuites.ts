@@ -15,6 +15,9 @@ export interface SuiteOptions {
   readonly runner?: 'electron';
   // Flags for Node before the file.
   readonly nodeArguments?: readonly string[];
+  // `renderer`: reads the renderer bundle (dist/renderer), so a run that names
+  // this suite builds it. The full gate always builds it (gatePlan.ts).
+  readonly build?: 'renderer';
 }
 
 // Node warns when it reads a typeless .ts module as ESM; the suites that load
@@ -35,6 +38,7 @@ export const TEST_SUITES: Readonly<Record<string, SuiteOptions>> = {
   // its timing assumptions hold.
   'test/renderer/style/selectorWell.test.js': { phase: 'alone' },
   'test/electron/project/thumbs.test.js': { phase: 'alone', runner: 'electron' },
+  'test/scripts/build/buildLayout.test.ts': { build: 'renderer' },
   'test/renderer/app/viteModules.test.ts': { nodeArguments: ['--experimental-vm-modules'] },
   'test/renderer/content/contentFields.test.js': { nodeArguments: QUIET_TYPELESS },
   'test/renderer/variables/fluid.test.js': { nodeArguments: QUIET_TYPELESS },

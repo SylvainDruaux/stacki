@@ -26,6 +26,10 @@ Commands for people and agents:
 - `npm run check:policy` — the repository policy scan.
 - `npm run lint`, `npm run typecheck`, `npm run format` — the individual tools.
 - `env -u ELECTRON_RUN_AS_NODE npm test` — the full gate CI runs.
+- `env -u ELECTRON_RUN_AS_NODE npm test -- <suite or folder/>` — only the named suites, for
+  iterating. It builds over the existing tree (incrementally) and skips the clean and the
+  whole-tree static checks, so it is no substitute for `check:changed` or the full gate
+  (`scripts/gate/gatePlan.ts`).
 
 ### The gate files
 
