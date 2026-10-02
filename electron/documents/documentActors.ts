@@ -259,11 +259,10 @@ interface Settled {
 /** Steps one intent can take: idle → planned → written → idle. */
 const STEPS_PER_INTENT = 3;
 
-/** What a program's rewrite writes: the text the file should read, or —
- * `undefined` — its bytes again, unchanged; and the checksum of the bytes it
- * was computed from. */
+/** What a program's rewrite writes: the text the file should read, and the
+ * checksum of the bytes it was computed from. */
 interface Rewrite {
-  readonly text: string | undefined;
+  readonly text: string;
   readonly baseChecksum: Digest;
 }
 
@@ -272,15 +271,12 @@ interface Rewrite {
 const UNCHANGED: readonly SourceEdit[] = [{ span: toByteSpan(0, 0), text: '' }];
 
 // The hunks from `bytes` to `text`: the code patch between them (its bounds
-// and its coarsening past the diff budget are shared/engine/codePatch.ts's). No text,
-// or the bytes' own text, is the bytes themselves: UNCHANGED.
+// and its coarsening past the diff budget are shared/engine/codePatch.ts's). The
+// bytes' own text is the bytes themselves: UNCHANGED.
 function rewriteHunks(
   bytes: ByteString,
-  text: string | undefined,
+  text: string,
 ): Result<readonly SourceEdit[], RejectionReason> {
-  if (text === undefined) {
-    return ok(UNCHANGED);
-  }
   const decoded = decodeUtf8(bytes);
   if (!decoded.ok) {
     return err('write-failed'); // Not text: a writer's text cannot be diffed with it.
@@ -331,22 +327,6 @@ export class DocumentActors {
       };
     }
     return this.#submitRewrite(entry.value, { text, baseChecksum });
-  }
-
-  /** Write the bytes of `checksum` again, unchanged: one empty hunk, so the file
-   * is replaced by itself (main.ts: Astro's dev server serves a `<style>` block
-   * one write behind). Refused when the file holds anything else. */
-  rewriteUnchanged(file: string, checksum: Digest): WriteReport {
-    const entry = this.#entry(file);
-    if (!entry.ok) {
-      return {
-        tag: 'rejected',
-        reason: 'write-failed',
-        message: entry.error,
-        diskChecksum: undefined,
-      };
-    }
-    return this.#submitRewrite(entry.value, { text: undefined, baseChecksum: checksum });
   }
 
   /** A visual edit (step 6): `build` states it as an intent against the

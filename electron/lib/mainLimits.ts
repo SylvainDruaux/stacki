@@ -13,7 +13,6 @@ export const MAIN_LIMITS = {
   portAttemptsMax: 100,
   fileNameAttemptsMax: 10000,
   previewServersMax: 16,
-  styleNudgesMax: 1024,
   logChunkCharsMax: 64000,
   /** One JSON line from the content-config runner. Sized as one IPC field: a
    * reply longer than that could never reach the renderer, so the runner is

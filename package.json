@@ -38,6 +38,7 @@
     "test": "npm run build:scripts && node dist/scripts/gate/runTests.js",
     "performance:report": "npm run build:runtime && node dist/scripts/reports/performanceReport.js",
     "integration:dev": "node test/integration/devLifecycle.js",
+    "integration:style": "node test/integration/styleLatency.js",
     "build:clean": "node scripts/build/cleanBuild.mts",
     "build:renderer": "npm run build:morph && npm run build:preload && npm run build:assets",
     "build:morph": "tsc -p electron/tsconfig.morph.json",

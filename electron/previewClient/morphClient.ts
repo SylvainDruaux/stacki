@@ -814,6 +814,37 @@ function loadStyles(page: Document): void {
   }
 }
 
+// Vite swaps a dev stylesheet itself only when the browser imported its
+// module. A page's own <style> never was — the server inlines it — so an edit
+// to the page reaches the browser as a reload, which this patch replaces, and
+// nothing else would ever bring the page's new CSS: the canvas kept the
+// stylesheet the page loaded with, whatever the style panel wrote. The
+// rendering just fetched holds every dev stylesheet as the server compiled it
+// for this edit, so a live one whose text differs takes the new text. One
+// whose text is the same is left alone: a rewritten stylesheet restarts every
+// animation it defines, on every keystroke of a text edit.
+function refreshDevStyles(page: Document): void {
+  const fresh = new Map<string, string>();
+  const served = page.querySelectorAll('style[data-vite-dev-id]');
+  for (let i = 0; i < served.length; i++) {
+    const id = served[i]?.getAttribute('data-vite-dev-id');
+    if (id !== null && id !== undefined) {
+      fresh.set(id, served[i]?.textContent ?? '');
+    }
+  }
+  const live = document.querySelectorAll('style[data-vite-dev-id]');
+  for (let i = 0; i < live.length; i++) {
+    const style = live[i];
+    const text = fresh.get(style?.getAttribute('data-vite-dev-id') ?? '');
+    if (style === undefined || text === undefined) {
+      continue; // Not in this rendering: Vite's own, or a component that left.
+    }
+    if (style.textContent !== text) {
+      style.textContent = text;
+    }
+  }
+}
+
 interface FetchedDocument {
   readonly withAnchors: Document;
   readonly clean: Document;
@@ -908,6 +939,7 @@ async function update(): Promise<void> {
     // After the patch, so a component that has just appeared is styled by the
     // time anything measures it — and running by the time anything clicks it.
     loadStyles(next.clean);
+    refreshDevStyles(next.clean);
     runScripts(added);
     const liveBody = document.body;
     const serverBody = next.withAnchors.body;

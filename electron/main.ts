@@ -2259,10 +2259,6 @@ function stopWatchingProject() {
   pageChangeExternal = false;
   clearTimeout(thumbTimer);
   thumbTimer = undefined;
-  for (const timer of styleNudges.values()) {
-    clearTimeout(timer);
-  }
-  styleNudges.clear();
   captureEra++;
   documents.clear();
 }
@@ -3117,38 +3113,6 @@ function pageWriteFailure(
   }
 }
 
-// Astro's dev server serves a page's <style> block ONE EDIT BEHIND: after the file
-// changes it re-renders the HTML correctly, but hands the browser the *previous*
-// transform of `…?astro&type=style&…`, and that module overwrites the (correct) CSS
-// inlined in the SSR'd HTML. So a style edit only appeared on the canvas once the NEXT
-// edit pushed the stale transform along — which read as "the panel writes the wrong
-// value". Writing the same bytes a second time flushes it. Plain .css files transform
-// correctly, so this is only for .astro files that carry a <style> block.
-const STYLE_NUDGE_MS = 150;
-const styleNudges = new Map<string, ReturnType<typeof setTimeout>>(); // path -> pending timer
-
-function nudgeStyle(pagePath: string, checksum: Digest): void {
-  if (!styleNudges.has(pagePath)) {
-    if (styleNudges.size >= MAIN_LIMITS.styleNudgesMax) {
-      return; // Past the bound only the dev server's style cache stays one edit behind.
-    }
-  }
-  clearTimeout(styleNudges.get(pagePath)); // a newer edit supersedes this one's nudge
-  styleNudges.set(
-    pagePath,
-    setTimeout(() => {
-      styleNudges.delete(pagePath);
-      // The same bytes again, witnessed by their own checksum: the actor
-      // refuses if anything changed the file since, so the nudge never
-      // resurrects superseded text. A refused or failed nudge leaves the
-      // correct bytes on disk; only the dev server's style cache stays one
-      // edit behind, so there is nothing to report beyond telemetry.
-      noteAppWrite();
-      documents.rewriteUnchanged(pagePath, checksum);
-    }, STYLE_NUDGE_MS),
-  );
-}
-
 // A visual edit (plan §11 step 6): the renderer states it against the page it
 // shows; editRequests.ts makes it an intent against that snapshot, and the
 // page's actor plans and writes it — splices, never a reprint of the file.
@@ -3168,10 +3132,10 @@ ipcMain.handle('page:edit', async (_event, { pagePath, authoredChecksum, edit })
   const decoded = decodeUtf8(report.bytes);
   assert(decoded.ok, 'The actor wrote UTF-8');
   const text = decoded.value;
+  // A <style> edit reaches the canvas fresh on this one write: the preview
+  // config compiles the file before Vite announces the new stylesheet
+  // (avbRecompile in the generated avb-morph plugin).
   noteAppWrite();
-  if (/<style[\s>]/i.test(text)) {
-    nudgeStyle(pagePath, report.checksum);
-  }
   const reply = { ...parsePageSource(pagePath, text), checksum: report.checksum };
   return { ok: true as const, ...reply, inverse: report.inverse };
 });
@@ -5355,6 +5319,64 @@ const avbIsStyleModule = (m) => {
   return u.indexOf('type=style') !== -1 || u.indexOf('lang.css') !== -1 || /\\.css($|\\?)/.test(u);
 };
 
+// Astro hands the browser a component's <style> from the last compile of its
+// file (its load hook for \`?astro&type=style\`), and only a server-side
+// transform of the file compiles it. Vite announces the new stylesheet in the
+// same breath as the page change, so the browser's stylesheet request could
+// reach the server before the page's render did and be answered from the
+// previous edit's compile: the canvas showed every style edit one edit late.
+// Astro's own style-only path compiles first, but it compares the file on disk
+// with the marked copy served below, whose stamp carries the file's checksum,
+// so it never fires here. A real change to a file's <style> blocks is
+// therefore compiled server side before the browser hears of it. Vite has
+// invalidated the file by then and awaits this hook before it sends anything
+// (Vite 6 and 8 alike). A transform that fails or runs long leaves Vite's own
+// order, as before.
+const AVB_RECOMPILE_MS_MAX = 3000;
+const AVB_RECOMPILES_MAX = 256;
+const avbRecompiles = new Map(); // file -> its compile in flight; two edits compile in order
+// The first server environment whose graph holds the file, ssr first: Astro's
+// compile cache is shared by every environment, so one compile serves all.
+// None on Vite 5 (no environments) or for a file nothing has rendered yet.
+const avbServerTransform = (server, file) => {
+  const environments = (server && server.environments) || {};
+  const names = ['ssr', ...Object.keys(environments).filter((name) => name !== 'ssr')];
+  for (const name of names) {
+    const environment = environments[name];
+    if (!environment || !environment.config || environment.config.consumer !== 'server') continue;
+    if (typeof environment.transformRequest !== 'function' || !environment.moduleGraph) continue;
+    for (const m of environment.moduleGraph.getModulesByFile(file) || []) {
+      if (m.url && m.id && m.id.indexOf('?') === -1) {
+        return () => environment.transformRequest(m.url);
+      }
+    }
+  }
+  return undefined;
+};
+// Resolves true once the file is compiled, or when there is nothing to
+// compile; false when the compile failed or outran AVB_RECOMPILE_MS_MAX. The
+// next edit's compile waits for this one's answer, not for its transform: a
+// transform that never settles holds up one edit by the bound, not every
+// edit after it.
+const avbRecompile = (server, file) => {
+  const transform = avbServerTransform(server, file);
+  if (!transform) return Promise.resolve(true);
+  const previous = avbRecompiles.get(file) || Promise.resolve(true);
+  let timer;
+  const late = new Promise((resolve) => {
+    timer = setTimeout(() => resolve(false), AVB_RECOMPILE_MS_MAX);
+  });
+  const compiled = previous.then(transform).then(() => true, () => false);
+  const answered = Promise.race([compiled, late]).finally(() => clearTimeout(timer));
+  if (avbRecompiles.has(file) || avbRecompiles.size < AVB_RECOMPILES_MAX) {
+    avbRecompiles.set(file, answered);
+    answered.then(() => {
+      if (avbRecompiles.get(file) === answered) avbRecompiles.delete(file);
+    });
+  }
+  return answered;
+};
+
 const avbMorph = {
   name: 'avb-morph',
   resolveId(id) {
@@ -5372,13 +5394,21 @@ const avbMorph = {
   // text field, which is exactly the thing this feature exists to stop. When
   // the style blocks in the file are byte for byte what they were, the
   // stylesheet updates are dropped and only the page patch goes out. A real
-  // CSS edit compares differently and takes Vite's own path, untouched.
-  handleHotUpdate(ctx) {
+  // CSS edit compares differently: it is compiled first (avbRecompile), then
+  // takes Vite's own path. A compile that is not confirmed is not trusted:
+  // the file's entry is forgotten, so the next update passes and compiles too.
+  async handleHotUpdate(ctx) {
     if (!/\\.(astro|md|mdx)$/i.test(ctx.file)) return;
     const before = avbStyleText.get(ctx.file);
     const now = avbStyleTextOf(avbReadFile(ctx.file));
     avbStyleText.set(ctx.file, now);
-    if (before === undefined || before !== now) return;
+    if (before === undefined || before !== now) {
+      // Only an .astro file has \`?astro&type=style\` modules to refresh.
+      if (/\\.astro$/i.test(ctx.file) && !(await avbRecompile(ctx.server, ctx.file))) {
+        avbStyleText.delete(ctx.file);
+      }
+      return;
+    }
     const rest = ctx.modules.filter((m) => !avbIsStyleModule(m));
     return rest.length === ctx.modules.length ? undefined : rest;
   },

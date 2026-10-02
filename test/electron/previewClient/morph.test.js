@@ -65,11 +65,12 @@ const { patchChildren, findLive, syncAnchors, syncStamps } = lift({
 // way, from the comment that introduces it to the fetch below it.
 const sigStart = source.indexOf("// A component's <style> is delivered as a MODULE");
 const sigEnd = source.indexOf('function fetchDoc');
-const { scriptSignature, isStyleModule, loadStyles, addedScripts, runScripts } = new Function(
-  'document',
-  `${source.slice(sigStart, sigEnd)}\nreturn { scriptSignature, isStyleModule, loadStyles, ` +
-    `addedScripts, runScripts };`,
-)(dom.window.document);
+const { scriptSignature, isStyleModule, loadStyles, refreshDevStyles, addedScripts, runScripts } =
+  new Function(
+    'document',
+    `${source.slice(sigStart, sigEnd)}\nreturn { scriptSignature, isStyleModule, loadStyles, ` +
+      `refreshDevStyles, addedScripts, runScripts };`,
+  )(dom.window.document);
 
 // Every patch here goes through this: a throw is the failure mode under test
 // (the client turns it into location.reload()), so it is reported as one rather
@@ -559,6 +560,71 @@ const LIVE_TABS = (labels, active) =>
     'and announces a reload before it happens',
     /postMessage\(\{ type: 'avb:preview-reload', reason \}/.test(source),
   );
+}
+
+// --- a page's own stylesheet follows the edit ----------------------------------
+//
+// A page's <style> is inlined by the server, so its module was never imported
+// and Vite answers an edit to the page with a reload, not a stylesheet update.
+// The patch replaces that reload, so it is the only thing that can bring the new
+// CSS: a live dev stylesheet takes the text the server rendered this time. One
+// whose text did not change is not written at all — a rewritten stylesheet
+// restarts every animation it defines — and Vite's own stylesheets, which the
+// server's rendering does not carry, are left to Vite.
+{
+  const head = dom.window.document.head;
+  const devStyle = (id, css) => {
+    const style = dom.window.document.createElement('style');
+    style.setAttribute('data-vite-dev-id', id);
+    style.textContent = css;
+    return style;
+  };
+  const PAGE = '/src/pages/index.astro?astro&type=style&index=0&lang.css';
+  const CARD = '/src/components/Card.astro?astro&type=style&index=0&lang.css';
+  const OWN = '/src/styles/vite-only.css';
+  const page = devStyle(PAGE, '.box { color: red; }');
+  const card = devStyle(CARD, '.card { gap: 1rem; }');
+  const own = devStyle(OWN, '.vite { margin: 0; }');
+  head.append(page, card, own);
+  const served = new dom.window.DOMParser().parseFromString(
+    '<!doctype html><html><head>' +
+      `<style data-vite-dev-id="${PAGE}">.box { color: blue; }</style>` +
+      `<style data-vite-dev-id="${CARD}">.card { gap: 1rem; }</style>` +
+      '</head><body></body></html>',
+    'text/html',
+  );
+  const writes = [];
+  const observer = new dom.window.MutationObserver((records) => writes.push(...records));
+  observer.observe(head, { childList: true, subtree: true, characterData: true });
+  refreshDevStyles(served);
+  writes.push(...observer.takeRecords());
+  observer.disconnect();
+  check(
+    'the page stylesheet takes the CSS the server rendered',
+    page.textContent === '.box { color: blue; }',
+  );
+  check('and stays the same element', head.contains(page));
+  check(
+    'an unchanged stylesheet is not written',
+    writes.every((record) => record.target !== card && record.target.parentNode !== card),
+    String(writes.length),
+  );
+  check(
+    'a stylesheet the rendering does not carry is left to Vite',
+    own.textContent === '.vite { margin: 0; }',
+  );
+  check(
+    'exactly one stylesheet was written',
+    new Set(
+      writes.map((record) =>
+        record.target.nodeType === 3 ? record.target.parentNode : record.target,
+      ),
+    ).size === 1,
+    String(writes.length),
+  );
+  page.remove();
+  card.remove();
+  own.remove();
 }
 
 if (failures.length) {

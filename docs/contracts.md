@@ -366,9 +366,10 @@ installs the process's host and is the only entry point for writing project
 text: `writeProjectText` (witnessed by the bytes on disk now; a missing file is
 created) and `createProjectText` (never overwrites). A program's write is
 `writeText(file, text, base)`: the hunks from the bytes at `base` to `text`,
-submitted as `rewrite-text` (step 10); `rewriteUnchanged` writes a file's
-bytes back unchanged (one empty hunk): Astro's dev server serves a `<style>`
-block one write behind, and a second write flushes it. Each
+submitted as `rewrite-text` (step 10); a text equal to the file's writes its
+bytes back unchanged (one empty hunk). No write is repeated to refresh the
+canvas: the preview config compiles a file whose `<style>` changed before Vite
+announces the new stylesheet (`avbRecompile`, `electron/main.ts`). Each
 chunk file has its own actor; `component:editProperties`
 leases its files' actors in sorted canonical order and witnesses each by its
 `before` checksum, with the checked rollback as intents too.

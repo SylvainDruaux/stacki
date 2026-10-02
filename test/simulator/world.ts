@@ -975,7 +975,7 @@ class World {
   /** A program's text rewrite (`rewrite-text`, step 10): a stylesheet rule, a
    * CMS entry, a property batch — the hunks from the text it read to the text
    * it wants, witnessed by the checksum it was read at. An unchanged text is
-   * the one empty hunk the host writes to touch a file (rewriteUnchanged). */
+   * the one empty hunk the host writes when the text equals the file's. */
   private submitProgramWrite(path: FilePath): void {
     const view = this.clientView(path);
     const decoded = decodeUtf8(view.snapshot.bytes);
