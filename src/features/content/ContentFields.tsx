@@ -1,24 +1,24 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useRef, useState } from 'react';
 import type { Data, DataRecord } from '../../../shared/core/boundary';
 import { data } from '../../../shared/core/boundary';
 import type { WireValidationIssue } from '../../../shared/ipc/ipcResults';
 import { assert } from '../../../shared/core/assert';
 import { labelize, memberFor, fieldIssue, hintFor } from './contentSchema';
 import type { FieldDescriptor } from './contentSchema';
-import { readContentTargets } from './contentViewBridge';
 import AssetField from '../../ui/AssetField';
 import AutoTextarea from '../../ui/AutoTextarea';
 import ExprInput from '../../ui/ExprInput';
 import { ChevronRightIcon, CloseIcon, DragIcon, PlusIcon, TrashIcon } from '../../ui/Icons';
 import useListReorder from '../../ui/useListReorder';
-
-const TARGET_CACHE_MAX = 128;
-type Target = { readonly id: string; readonly title: string };
-const targetCache = new Map<string, readonly Target[]>();
-// A nullable field can hold the data value null: the key stays in the entry's
-// file, with no value. It is the entry's data, not the app's absence.
-// eslint-disable-next-line stacki/no-null -- YAML and JSON null is entry data written to the file.
-const NULL_DATA: Data = null;
+import {
+  NULL_DATA,
+  isPlainObject,
+  fieldKey,
+  blankFor,
+  omitField,
+  useTargets,
+} from './contentFieldData';
+export { isPlainObject, blankFor, omitField } from './contentFieldData';
 
 export interface FieldContext {
   readonly projectPath: string;
@@ -37,115 +37,6 @@ interface FieldProps {
   readonly context: FieldContext;
   readonly path: readonly (string | number)[];
   readonly onChange: (value: Data) => void;
-}
-
-export function isPlainObject(value: unknown): value is DataRecord {
-  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
-}
-
-function fieldKey(field: FieldDescriptor): string {
-  assert(typeof field.key === 'string', 'Nested content field requires a key');
-  assert(field.key.length > 0, 'Nested content field key must not be empty');
-  return field.key;
-}
-
-export function blankFor(field: FieldDescriptor | undefined): Data {
-  if (!field) {
-    return '';
-  }
-  if ('default' in field) {
-    return data(field.default);
-  }
-  switch (field.control) {
-    case 'boolean':
-      return false;
-    case 'number':
-      return field.constraints.min ?? 0;
-    case 'enum':
-      return data(field.options?.[0] ?? '');
-    case 'tags':
-    case 'references':
-    case 'list':
-      return [];
-    case 'record':
-      return {};
-    case 'object':
-      return blankObject(field.fields ?? []);
-    case 'union':
-      return blankUnion(field);
-    case 'unknown':
-    case 'image':
-    case 'reference':
-    case 'date':
-    case 'const':
-    case 'markdown':
-    case 'code':
-    case 'url':
-    case 'email':
-    case 'longtext':
-    case 'text':
-      return '';
-  }
-}
-
-function blankObject(fields: readonly FieldDescriptor[]): DataRecord {
-  return Object.fromEntries(
-    fields.filter((field) => field.required).map((field) => [fieldKey(field), blankFor(field)]),
-  );
-}
-
-function blankUnion(field: FieldDescriptor): DataRecord {
-  const member = field.members?.[0];
-  if (!member) {
-    return {};
-  }
-  const discriminator = field.discriminator;
-  return {
-    ...(discriminator ? { [discriminator]: data(member.value) } : {}),
-    ...blankObject(member.fields),
-  };
-}
-
-export function omitField(object: DataRecord, key: string): DataRecord {
-  return Object.fromEntries(Object.entries(object).filter(([entryKey]) => entryKey !== key));
-}
-
-function cacheTargets(key: string, targets: readonly Target[]): void {
-  if (targetCache.size >= TARGET_CACHE_MAX) {
-    const oldest = targetCache.keys().next().value;
-    if (typeof oldest === 'string') {
-      targetCache.delete(oldest);
-    }
-  }
-  targetCache.set(key, targets);
-}
-
-function useTargets(projectPath: string, name: string | undefined) {
-  const key = name ? `${projectPath}:${name}` : '';
-  const [targets, setTargets] = useState<readonly Target[] | undefined>(() => targetCache.get(key));
-  useEffect(() => {
-    if (!name) {
-      setTargets([]);
-      return;
-    }
-    const cached = targetCache.get(key);
-    if (cached) {
-      setTargets(cached);
-      return;
-    }
-    let active = true;
-    void readContentTargets(projectPath, name).then((result) => {
-      const next = result.ok ? result.value : [];
-      cacheTargets(key, next);
-      if (active) {
-        setTargets(next);
-      }
-    });
-    return () => {
-      active = false;
-    };
-  }, [key, name, projectPath]);
-  return targets;
 }
 
 function ReferenceField({ field, value, context, onChange }: FieldProps) {

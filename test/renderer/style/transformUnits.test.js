@@ -79,10 +79,14 @@ const check = (what, condition, detail) => {
   // --- what the slider re-attaches ---------------------------------------------
   // The slider drives the number and puts the value's own unit back on it; only
   // when the value has none does it fall back to the axis default.
-  const effects = fs.readFileSync(repoPath('src/features/style/EffectsSection.tsx'), 'utf8');
+  // The transforms row, split out of EffectsSection.tsx with its axis inputs.
+  const effects = fs.readFileSync(repoPath('src/features/style/TransformsRow.tsx'), 'utf8');
+  check('the axis config ends where it is read', effects.includes('function parseAxis'));
   const axisConfigSource = effects.slice(
     effects.indexOf('const AXIS_CONFIG'),
-    effects.indexOf('/** Split'),
+    // Up to the function after it: the end marker this once named was renamed
+    // away, and a missing one silently read to the end of the file.
+    effects.indexOf('function parseAxis'),
   );
   check(
     "the move axis's default unit is rem",

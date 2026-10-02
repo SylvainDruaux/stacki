@@ -1,0 +1,95 @@
+// The shapes the binding fields share: where a field is, the data it can
+// read, a value change, the insert api, a picked chip, and each field's props
+// (propBindings.tsx).
+
+import type { MutableRefObject, RefObject } from 'react';
+import type { Completion } from '@codemirror/autocomplete';
+import type { Attr } from '../../../shared/page/pageNode';
+import type { FieldDefinition } from './propRules';
+import type { TemplateHole } from '../../editor/bindings';
+import type { RichContext } from './RichContent';
+import type { ChipsOf } from '../../ui/ExprInput';
+import type { PickerNode } from './DataPicker';
+
+export interface FieldPosition {
+  readonly left: number;
+  readonly top: number;
+  readonly width?: number;
+}
+export interface SourceContext {
+  readonly frontmatter?: string | undefined;
+  readonly imports?: unknown;
+  readonly onSetFrontmatter?: ((source: string) => void) | undefined;
+  readonly onOpenSymbol?: ((name: string) => void) | undefined;
+}
+export type ValueChange = (value: Attr | undefined, immediate?: boolean) => void;
+export interface InsertAPI {
+  readonly insert: (path: string) => void;
+}
+export type Chip = Element | TemplateHole;
+export interface ChipPick {
+  readonly chip: TemplateHole | undefined;
+  readonly pos: FieldPosition;
+}
+export interface BindingContextProps {
+  readonly bindContext?: RichContext | undefined;
+  readonly dataContext?: SourceContext | undefined;
+}
+export interface SourceEditButtonProps {
+  readonly name: string;
+  readonly dataContext?: SourceContext | undefined;
+  readonly anchorRef?: RefObject<HTMLElement>;
+  readonly className?: string;
+}
+export interface ExprValueFieldProps extends BindingContextProps {
+  readonly value: string;
+  readonly placeholder?: string | undefined;
+  readonly onChange: ValueChange;
+}
+export interface ConditionFieldProps extends BindingContextProps {
+  readonly test: string;
+  readonly scope: readonly Completion[];
+  readonly chipsOf: ChipsOf;
+  readonly onSetText: (value: string) => void;
+}
+export interface ExpressionBindingFieldProps extends BindingContextProps {
+  readonly value: string;
+  readonly placeholder?: string;
+  readonly onChange: (value: string) => void;
+}
+export interface BindHandleProps {
+  readonly active: boolean;
+  readonly onOpen: (host: Element | undefined) => void;
+}
+export interface FieldDataPickerProps extends BindingContextProps {
+  readonly pos: FieldPosition;
+  readonly current?: string | undefined;
+  readonly tree?: readonly PickerNode[] | undefined;
+  readonly onPick: (path: string) => void;
+  readonly onWrite?: (() => void) | undefined;
+  readonly onClose: () => void;
+}
+export interface BindFieldProps extends BindingContextProps {
+  readonly value?: Attr | undefined;
+  readonly field?: FieldDefinition;
+  readonly placeholder?: string | undefined;
+  readonly wrapCode?: boolean;
+  readonly apiRef?: MutableRefObject<InsertAPI | undefined>;
+  readonly onChange: ValueChange;
+}
+export interface ValueCodeEditorProps extends BindingContextProps {
+  readonly pos: FieldPosition;
+  readonly name: string;
+  readonly value: string;
+  readonly scope: readonly Completion[];
+  readonly chipsOf: ChipsOf;
+  readonly onChange: (value: string) => void;
+  readonly onClose: () => void;
+}
+export interface VarSourceEditorProps {
+  readonly pos: FieldPosition;
+  readonly name: string;
+  readonly code: string;
+  readonly onChangeCode?: ((source: string) => void) | undefined;
+  readonly onClose: () => void;
+}

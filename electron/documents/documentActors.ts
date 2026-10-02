@@ -33,18 +33,13 @@ import {
   type ActorDependencies,
   type ActorEffect,
   type ActorState,
-  type Planner,
-  type Projector,
-  type Reconciliation,
 } from '../../shared/engine/documentActor';
 import {
   describeRejection,
   intentPayloadBytes,
   toIntent,
   type Intent,
-  type Outcome,
   type RejectionReason,
-  type SourceEdit,
 } from '../../shared/engine/intent';
 import {
   commitChain,
@@ -56,102 +51,46 @@ import type { Snapshot } from '../../shared/page/snapshot';
 import { inverseEdits } from '../../shared/engine/splice';
 import { LIMITS } from '../../shared/core/limits';
 import { err, ok, type Result } from '../../shared/core/result';
-import { decodeUtf8, encodeUtf8, toByteSpan, type ByteString } from '../../shared/core/span';
-import { diffCodePatch } from '../../shared/engine/codePatch';
+import { encodeUtf8, toByteSpan } from '../../shared/core/span';
 import { planIntent } from '../../shared/engine/planner';
+import { NODE_PROJECTOR, NodeDocumentDisk, type CreateError } from './documentDisk';
+import { createDocumentTelemetry } from './documentTelemetry';
 import {
-  NODE_PROJECTOR,
-  NodeDocumentDisk,
-  type CanonicalDocument,
-  type CreateError,
-} from './documentDisk';
-import { createDocumentTelemetry, type DocumentTelemetry } from './documentTelemetry';
+  type WriteReport,
+  type EditReport,
+  type EditBase,
+  type EditStatement,
+  type BuiltEdit,
+  type DocumentActorsOptions,
+  type DiskState,
+  type CurrentError,
+} from './documentReports';
+import {
+  Entry,
+  type Settled,
+  STEPS_PER_INTENT,
+  type Rewrite,
+  UNCHANGED,
+  rewriteHunks,
+  editHistory,
+  entryBytes,
+  compareKeys,
+} from './documentEntry';
+
+export {
+  type WriteReport,
+  type EditReport,
+  type IntentDraft,
+  type EditBase,
+  type EditStatement,
+  type BuiltEdit,
+  type HostDisk,
+  type DocumentActorsOptions,
+  type DiskState,
+  type CurrentError,
+} from './documentReports';
 
 /** What one write came to, for the IPC layer to report. */
-export type WriteReport =
-  /** `inverse` restores what the write replaced, in the bytes it left (Undo of
-   * a Markdown page's whole save, step 9): the replacement's changed region
-   * only. Empty for a file the write created. */
-  | { readonly tag: 'applied'; readonly checksum: Digest; readonly inverse: readonly SourceEdit[] }
-  | {
-      readonly tag: 'rejected';
-      readonly reason: RejectionReason;
-      readonly message: string;
-      /** The bytes on disk now, when the rejection is about them. */
-      readonly diskChecksum: Digest | undefined;
-    }
-  | {
-      readonly tag: 'uncertain';
-      readonly message: string;
-      readonly candidateChecksum: Digest | undefined;
-      /** Reconciled at once by comparing checksums (plan §3.5); undefined when
-       * the file cannot even be read to compare. */
-      readonly reconciliation: Reconciliation | undefined;
-    }
-  | { readonly tag: 'backpressured' };
-
-/** What a visual edit came to (step 6): an applied one hands back the bytes
- * it left and the inverse Undo submits, against the returned checksum. */
-export type EditReport =
-  | {
-      readonly tag: 'applied';
-      readonly checksum: Digest;
-      readonly bytes: ByteString;
-      readonly inverse: readonly SourceEdit[];
-    }
-  | Exclude<WriteReport, { readonly tag: 'applied' }>;
-
-/** The anchor and operation of an intent, built against the snapshot it names;
- * the host adds the id, the file and the checksum. */
-export type IntentDraft = Pick<Intent, 'anchor' | 'operation'>;
-
-/** What an edit is built against (step 6). `history` says what lies between
- * the bytes it was authored against and the bytes on disk now: nothing, only
- * this actor's own commits (which it can rebase through exactly), or a write
- * from outside. */
-export interface EditBase {
-  readonly authored: Snapshot;
-  readonly current: Snapshot;
-  readonly history: 'unchanged' | 'own-commits' | 'outside';
-}
-
-/** What an edit request states besides its content: the checksum it was
- * authored against, and the reason to refuse it with when the host no longer
- * holds those bytes — a node reference can no longer be found (`anchor-moved`),
- * a code patch can no longer be merged (`merge-conflict`). */
-export interface EditStatement {
-  readonly authoredChecksum: Digest;
-  readonly gone: RejectionReason;
-}
-
-/** A built edit, and which of the two snapshots it names. An edit that states
- * a whole region's new content (the frontmatter the model now describes) is
- * built against the current bytes when only the app's own commits came
- * between: the model that stated it already holds what they did. */
-export interface BuiltEdit {
-  readonly draft: IntentDraft;
-  readonly basis: 'authored' | 'current';
-}
-
-export type HostDisk = Pick<
-  NodeDocumentDisk,
-  'read' | 'lock' | 'unlock' | 'replace' | 'create' | 'canonical'
->;
-
-export interface DocumentActorsOptions {
-  readonly disk: HostDisk;
-  readonly projector: Projector;
-  readonly planner: Planner;
-  readonly telemetry: DocumentTelemetry;
-  /** `immediate` in the app: each submission is stepped to its outcome at
-   * once. `deferred` leaves it queued until `drain` — tests use it to fill a
-   * queue and see backpressure. */
-  readonly drain: 'immediate' | 'deferred';
-  /** Runs `task` soon, off the current call: the watcher-tick refresh. */
-  readonly schedule: (task: () => void) => void;
-  /** Observes each lease as it is taken, in order (tests pin the order). */
-  readonly onLease?: (file: string) => void;
-}
 
 /** The app's host: the real disk, the shipping planner, the real parser, and
  * one structured telemetry line per outcome on `log`. */
@@ -167,128 +106,6 @@ export function createNodeDocumentActors(input: {
     drain: 'immediate',
     schedule: input.schedule,
   });
-}
-
-export interface DiskState {
-  readonly checksum: Digest;
-  readonly bytes: ByteString;
-}
-
-export interface CurrentError {
-  readonly code: 'missing' | 'failed';
-  readonly message: string;
-}
-
-// One actor and what the host keeps beside it. Its fields change only through the methods
-// below, so every write to an actor's record is in one place and checks its bound there.
-class Entry {
-  readonly document: CanonicalDocument;
-  #state: ActorState;
-  #used: number;
-  #retained: readonly Snapshot[] = [];
-  #log: readonly CommitRecord[] = [];
-  #written: Digest | undefined = undefined;
-
-  constructor(document: CanonicalDocument, state: ActorState, used: number) {
-    this.document = document;
-    this.#state = state;
-    this.#used = used;
-  }
-
-  get state(): ActorState {
-    return this.#state;
-  }
-
-  /** The host clock when the actor was last used, for least-recently-used eviction. */
-  get used(): number {
-    return this.#used;
-  }
-
-  /** Snapshots the actor held before its current one, newest last, bounded by
-   * LIMITS.authoredSnapshotsMax: the bytes an edit may have been authored
-   * against when an outside write replaced them since (step 6). */
-  get retained(): readonly Snapshot[] {
-    return this.#retained;
-  }
-
-  /** The actor's recent commits, oldest first, bounded by
-   * LIMITS.commitLogEntriesMax: an edit authored before them rebases exactly. */
-  get log(): readonly CommitRecord[] {
-    return this.#log;
-  }
-
-  /** The checksum of the bytes this actor last wrote, created or committed;
-   * undefined until it writes. A watcher tick asks it (plan §11.9). */
-  get written(): Digest | undefined {
-    return this.#written;
-  }
-
-  setState(next: ActorState): void {
-    this.#state = next;
-  }
-
-  touch(clock: number): void {
-    assert(clock >= this.#used, 'The host clock only moves forward');
-    this.#used = clock;
-  }
-
-  setRetained(retained: readonly Snapshot[]): void {
-    assert(retained.length <= LIMITS.authoredSnapshotsMax, 'Retained snapshots are bounded');
-    this.#retained = retained;
-  }
-
-  recordCreate(checksum: Digest): void {
-    this.#written = checksum;
-  }
-
-  recordCommit(record: CommitRecord): void {
-    this.#log = [...this.#log, record].slice(-LIMITS.commitLogEntriesMax);
-    this.#written = record.to;
-    assert(this.#log.length <= LIMITS.commitLogEntriesMax, 'The commit log is bounded');
-  }
-}
-
-/** An outcome with what the host learned beside it. */
-interface Settled {
-  readonly outcome: Outcome;
-  readonly message: string;
-  /** The applied intent's splices, from its commit. */
-  readonly committed: Extract<ActorEffect, { tag: 'committed' }> | undefined;
-}
-
-/** Steps one intent can take: idle → planned → written → idle. */
-const STEPS_PER_INTENT = 3;
-
-/** What a program's rewrite writes: the text the file should read, and the
- * checksum of the bytes it was computed from. */
-interface Rewrite {
-  readonly text: string;
-  readonly baseChecksum: Digest;
-}
-
-// A rewrite that changes nothing: one empty hunk at the top, so the intent
-// names a site (every rewrite does) and the file is written unchanged.
-const UNCHANGED: readonly SourceEdit[] = [{ span: toByteSpan(0, 0), text: '' }];
-
-// The hunks from `bytes` to `text`: the code patch between them (its bounds
-// and its coarsening past the diff budget are shared/engine/codePatch.ts's). The
-// bytes' own text is the bytes themselves: UNCHANGED.
-function rewriteHunks(
-  bytes: ByteString,
-  text: string,
-): Result<readonly SourceEdit[], RejectionReason> {
-  const decoded = decodeUtf8(bytes);
-  if (!decoded.ok) {
-    return err('write-failed'); // Not text: a writer's text cannot be diffed with it.
-  }
-  const patch = diffCodePatch(decoded.value, text);
-  if (!patch.ok) {
-    return err(patch.error);
-  }
-  if (patch.value.length === 0) {
-    return ok(UNCHANGED);
-  }
-  return ok(patch.value.map((hunk) => ({ span: hunk.span, text: hunk.text })));
 }
 
 export class DocumentActors {
@@ -955,31 +772,4 @@ export class DocumentActors {
     }
     this.#dirty.clear();
   }
-}
-
-// What lies between an edit's authored bytes and the bytes on disk now.
-function editHistory(
-  authored: Snapshot,
-  current: Snapshot,
-  chain: readonly CommitRecord[] | undefined,
-): EditBase['history'] {
-  if (authored === current) {
-    return 'unchanged';
-  }
-  return chain === undefined ? 'outside' : 'own-commits';
-}
-
-// Every byte an actor's entry keeps: its snapshot and the retained ones.
-function entryBytes(entry: Entry): number {
-  const current = entry.state.snapshot?.bytes.length ?? 0;
-  return entry.retained.reduce((total, snapshot) => total + snapshot.bytes.length, current);
-}
-
-// Canonical keys compare by UTF-16 code unit: a total order that does not
-// depend on the locale, so every process takes a batch's actors in one order.
-function compareKeys(left: string, right: string): number {
-  if (left < right) {
-    return -1;
-  }
-  return left === right ? 0 : 1;
 }

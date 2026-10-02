@@ -17,6 +17,7 @@
 const fs = require('fs');
 const path = require('path');
 const { repoPath } = require('../../helpers/sources.js');
+const { readSourceGroup } = require('../../helpers/sourceText.js');
 
 const failures = [];
 let checked = 0;
@@ -143,7 +144,12 @@ const check = (what, condition, detail) => {
   });
 
   // --- both fields it serves ----------------------------------------------------
-  const size = fs.readFileSync(repoPath('src/features/style/SizeSection.tsx'), 'utf8');
+  // The section and the two fields it hosts, which live beside it.
+  const size = readSourceGroup([
+    'src/features/style/SizeSection.tsx',
+    'src/features/style/AspectRatioField.tsx',
+    'src/features/style/ObjectFitFields.tsx',
+  ]);
   check(
     'Ratio asks for the caret only when Other was picked',
     /autoFocus=\{askedForOther\.current\}/.test(size),

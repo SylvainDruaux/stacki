@@ -30,6 +30,7 @@ const { sourceChip, withSource, parseMapHead } = require('../../helpers/renderer
 );
 const assert = require('node:assert/strict');
 const { repoPath } = require('../../helpers/sources.js');
+const { readSourceGroup } = require('../../helpers/sourceText.js');
 assert.deepEqual(parseMapHead('posts.map((post, index) => ('), {
   data: 'posts',
   item: 'post',
@@ -48,9 +49,11 @@ assert.throws(() => withSource('posts', 'x'.repeat(1_000_001)), /path limit exce
 
 (async () => {
   // The panel's own copies, so a change there fails here rather than drifting.
-  const source =
-    require('fs').readFileSync(repoPath('src/features/props/propNodeEditors.tsx'), 'utf8') +
-    require('fs').readFileSync(repoPath('src/features/props/propBindings.tsx'), 'utf8');
+  const source = readSourceGroup([
+    'src/features/props/propNodeEditors.tsx',
+    'src/features/props/propBindings.tsx',
+    'src/features/props/BindingEditors.tsx',
+  ]);
   check('the panel still derives the source the same way', source.includes('function sourceChip('));
   check('and still swaps it in place', source.includes('function withSource('));
   check(

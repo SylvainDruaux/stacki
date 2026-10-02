@@ -242,9 +242,12 @@ const SEG = (TRACK - PAD * 2) / 4;
   const bars = [
     'DisplayControl.tsx',
     'DirectionControl.tsx',
-    'SizeSection.tsx',
-    'PositionSection.tsx',
-    'TypographySection.tsx',
+    // The size section's bar lives beside it, shared by overflow and box sizing.
+    'SizeSegmentBar.tsx',
+    // Float and clear, split out of PositionSection.tsx.
+    'PositionSegments.tsx',
+    // The typography section's bar, SegBar, is part of the field kit it shares.
+    'TypographyKit.tsx',
     'FlexChildSection.tsx',
     'BordersSection.tsx',
     'SegmentedField.tsx',

@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { AssetRequest } from '../../ui/assetPick';
 import type { AssetPanelEntry } from './assetPanelBridge';
 import type { Result } from '../../../shared/core/result';
-import { BOUNDARY_LIMITS, pathText } from '../../../shared/core/boundary';
+import { pathText } from '../../../shared/core/boundary';
 import {
   deleteAsset,
   makeAssetDirectory,
@@ -24,14 +24,19 @@ import AssetThumb, { TEXT_EXT } from '../../ui/AssetThumb';
 import MoreMenu from '../../ui/MoreMenu';
 import { confirmDialog } from '../../ui/ConfirmDialog';
 import { allowDragEffect } from '../../editor/dragState';
+import {
+  PICK_HOME,
+  type AssetFile,
+  kindMatches,
+  pickPrompt,
+  buildCrumbs,
+  parentOf,
+  basename,
+  isInPickHome,
+  assetTitle,
+} from './assetPaths';
 
-const PICK_HOME = 'src/assets';
 const FILE_DROP_COUNT_MAX = 1_000;
-const IMAGE_EXT = /\.(png|jpe?g|gif|webp|avif|svg|ico|bmp)$/i;
-const VIDEO_EXT = /\.(mp4|webm|mov|m4v|ogv|ogg)$/i;
-const AUDIO_EXT = /\.(mp3|wav|m4a|aac|flac|oga)$/i;
-
-type AssetFile = Extract<AssetPanelEntry, { readonly isDir: false }>;
 type Toast = (message: string, kind: 'error') => void;
 
 export interface AssetUndo {
@@ -770,60 +775,6 @@ function RenameInput({
   );
 }
 
-function kindMatches(kind: AssetRequest['mediaKind'], name: string): boolean {
-  switch (kind) {
-    case 'image':
-      return IMAGE_EXT.test(name);
-    case 'video':
-      return VIDEO_EXT.test(name);
-    case 'audio':
-      return AUDIO_EXT.test(name);
-    case 'asset':
-      return true;
-  }
-}
-
-function pickPrompt(kind: AssetRequest['mediaKind']): string {
-  switch (kind) {
-    case 'image':
-      return 'Choose an image';
-    case 'video':
-      return 'Choose a video';
-    case 'audio':
-      return 'Choose an audio file';
-    case 'asset':
-      return 'Choose a file';
-  }
-}
-
-function buildCrumbs(cwd: string): readonly { readonly rel: string; readonly label: string }[] {
-  const crumbs = [{ rel: '', label: 'Assets' }];
-  const parts = cwd ? cwd.split('/') : [];
-  if (parts.length > BOUNDARY_LIMITS.depthMax) {
-    throw new Error('Asset breadcrumbs: depth limit exceeded');
-  }
-  for (let index = 0; index < parts.length; index++) {
-    const label = parts[index];
-    if (label !== undefined) {
-      crumbs.push({ rel: parts.slice(0, index + 1).join('/'), label });
-    }
-  }
-  return crumbs;
-}
-
-function parentOf(rel: string): string {
-  const index = rel.lastIndexOf('/');
-  return index < 0 ? '' : rel.slice(0, index);
-}
-
-function basename(rel: string): string {
-  return rel.slice(rel.lastIndexOf('/') + 1);
-}
-
-function isInPickHome(rel: string): boolean {
-  return rel === PICK_HOME || rel.startsWith(`${PICK_HOME}/`);
-}
-
 function startAssetDrag(event: React.DragEvent<HTMLElement>, rel: string): void {
   event.dataTransfer.setData('avb/asset', rel);
   allowDragEffect(event.dataTransfer, 'move');
@@ -842,14 +793,4 @@ function blurRenameInput(event: React.KeyboardEvent<HTMLInputElement>): void {
 // An uncontrolled input's text is the element's own state, cleared in place.
 function clearInput(inputElement: HTMLInputElement): void {
   inputElement.value = '';
-}
-
-function assetTitle(
-  file: AssetFile,
-  mode: { readonly editable: boolean; readonly picking: boolean },
-): string {
-  if (mode.picking) {
-    return `Use /${file.rel}`;
-  }
-  return mode.editable ? `/${file.rel} — click to edit` : `/${file.rel}`;
 }

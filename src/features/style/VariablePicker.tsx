@@ -1,0 +1,433 @@
+// The variable picker: its collections, items and search, where it opens and
+// how it closes, and keeping the panel still while it is open
+// (VariableConnect.tsx).
+
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import type { CSSProperties, RefCallback } from 'react';
+import { createPortal } from 'react-dom';
+import { type ProjectVariable } from './model/webflow';
+import { panelBox, panelSpan } from './model/panelBox';
+import { isNodeInDocument } from './model/dom';
+import { registerPopupLayer } from './model/popupLayer';
+import { CheckIcon, VariableTypeIcon, ChevronRightIcon } from './VariableIcons';
+import { varTypeAllowed, byCollection } from './sharedVars';
+
+// Where the picker sits horizontally.
+//
+// Inside the style panel it spans the panel, flush with both edges — Webflow's shape,
+// and what the panel's own fields are drawn around. It's portaled to <body>, so it has
+// to measure the panel itself (panelSpan, in lib/panel-box).
+//
+// Anywhere else — the Variables view, whose rows are their own panel — there is no such
+// column to span, and panelSpan's last resort is the style panel's published box. That
+// put the menu across the app, on top of a panel the click had nothing to do with. With
+// no panel around the anchor, the picker belongs under the thing that opened it.
+export const FREE_MIN_WIDTH = 280;
+export const FREE_MAX_WIDTH = 420;
+export function pickerSpan(anchor: HTMLElement): { left: number; width: number } {
+  if (panelBox(anchor)) {
+    return panelSpan(anchor);
+  }
+  const margin = 8;
+  const row = (anchor.parentElement ?? anchor).getBoundingClientRect();
+  // At least readable, at most not a curtain — and never wider than the window.
+  const width = Math.min(
+    Math.max(row.width, FREE_MIN_WIDTH),
+    FREE_MAX_WIDTH,
+    window.innerWidth - margin * 2,
+  );
+  // Left-aligned with the row, pushed back in if that would hang off the edge.
+  const left = Math.max(margin, Math.min(row.left, window.innerWidth - width - margin));
+  return { left, width };
+}
+
+// The picker popup: search field + grouped variable list (name + value). Portaled to
+// <body>, anchored to the dot and clamped into the viewport.
+export function VariablePicker({
+  anchor,
+  vars,
+  loading,
+  prop,
+  selectedBinding,
+  onPick,
+  onClose,
+}: {
+  anchor: HTMLElement;
+  vars: ProjectVariable[];
+  loading: boolean;
+  prop?: string;
+  /** The currently-applied binding — highlighted and scrolled into view on open. */
+  selectedBinding?: string;
+  onPick: (binding: string) => void;
+  onClose: () => void;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
+  // This popup belongs to the field it was opened from — see lib/popup-layer. A
+  // layout effect, so it is on the register before the search box takes focus and
+  // blurs that field.
+  useLayoutEffect(() => registerPopupLayer(ref.current ?? undefined, anchor), [anchor]);
+  const [search, setSearch] = useState('');
+  // Held here rather than in the list, which unmounts while a search matches
+  // nothing: what was collapsed, and whether the selection was scrolled to, both
+  // outlive that.
+  const selectedItemRef = useScrollToSelected();
+  const [collapsed, toggleCollapse] = useCollapsedSet();
+  const style = usePickerPosition(ref, anchor);
+  usePickerFocus(searchRef);
+  usePickerDismiss(ref, anchor, onClose);
+  usePanelScrollLock(anchor);
+  const query = search.trim().toLowerCase();
+  const filtered = pickerVariables(vars, prop, query);
+
+  return createPortal(
+    <div
+      ref={ref}
+      className="embed-editor_varpicker"
+      role="dialog"
+      aria-label="Connect to variable"
+      style={style}
+    >
+      <input
+        ref={searchRef}
+        className="u-input embed-editor_varpicker-search"
+        value={search}
+        placeholder="Search variables, functions"
+        spellCheck={false}
+        autoFocus
+        onChange={(event) => setSearch(event.target.value)}
+        aria-label="Search variables"
+      />
+      <div className="embed-editor_varpicker-list">
+        {loading && !vars.length ? (
+          <p className="embed-editor_varpicker-empty">Loading variables…</p>
+        ) : !filtered.length ? (
+          <p className="embed-editor_varpicker-empty">No variables found.</p>
+        ) : (
+          <PickerCollections
+            variables={filtered}
+            query={query}
+            collapsed={collapsed}
+            selectedBinding={selectedBinding}
+            selectedItemRef={selectedItemRef}
+            onToggleCollapse={toggleCollapse}
+            onPick={onPick}
+          />
+        )}
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
+// Which collections are collapsed, and the toggle for one.
+export function useCollapsedSet(): [ReadonlySet<string>, (name: string) => void] {
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  const toggle = (name: string) =>
+    setCollapsed((previous) => {
+      const next = new Set(previous);
+      if (next.has(name)) {
+        next.delete(name);
+      } else {
+        next.add(name);
+      }
+      return next;
+    });
+  return [collapsed, toggle];
+}
+
+// Type-filter for the property being edited, then sort for a stable Collection →
+// Group → name view, then keep what the search matches.
+export function pickerVariables(
+  vars: ProjectVariable[],
+  prop: string | undefined,
+  query: string,
+): ProjectVariable[] {
+  const typed = vars.filter((variable) => varTypeAllowed(prop, variable.type));
+  const sorted = [...typed].sort(
+    (left, right) =>
+      left.collection.localeCompare(right.collection) ||
+      left.group.localeCompare(right.group) ||
+      left.name.localeCompare(right.name),
+  );
+  if (!query) {
+    return sorted;
+  }
+  return sorted.filter((variable) =>
+    `${variable.collection}/${variable.group}/${variable.name} ${variable.value}`
+      .toLowerCase()
+      .includes(query),
+  );
+}
+
+// The list: one collapsible head per collection, its groups beneath.
+export function PickerCollections({
+  variables,
+  query,
+  collapsed,
+  selectedBinding,
+  selectedItemRef,
+  onToggleCollapse,
+  onPick,
+}: {
+  variables: ProjectVariable[];
+  query: string;
+  collapsed: ReadonlySet<string>;
+  selectedBinding: string | undefined;
+  selectedItemRef: RefCallback<HTMLButtonElement>;
+  onToggleCollapse: (name: string) => void;
+  onPick: (binding: string) => void;
+}) {
+  return byCollection(variables).map(({ collection, groups }) => {
+    // A search always expands (so matches aren't hidden behind a collapsed head).
+    const open = !!query || !collapsed.has(collection);
+    return (
+      <div key={collection} className="embed-editor_varpicker-collection">
+        <button
+          type="button"
+          className="embed-editor_varpicker-collection-head"
+          aria-expanded={open}
+          onClick={() => onToggleCollapse(collection)}
+        >
+          <span className="embed-editor_varpicker-collection-name">{collection}</span>
+          <span className={`embed-editor_varpicker-collection-arrow ${open ? 'is-open' : ''}`}>
+            <ChevronRightIcon />
+          </span>
+        </button>
+        {open
+          ? groups.map(({ group, items }) => (
+              <div key={group || '_'} className="embed-editor_varpicker-group">
+                {group ? (
+                  <div className="embed-editor_varpicker-group-name">{group}</div>
+                ) : undefined}
+                {items.map((variable) => (
+                  <PickerItem
+                    key={variable.binding}
+                    variable={variable}
+                    collection={collection}
+                    group={group}
+                    selected={!!selectedBinding && variable.binding === selectedBinding}
+                    selectedItemRef={selectedItemRef}
+                    onPick={onPick}
+                  />
+                ))}
+              </div>
+            ))
+          : undefined}
+      </div>
+    );
+  });
+}
+
+// One variable: its type glyph, name and value, checked when it is the one applied.
+export function PickerItem({
+  variable,
+  collection,
+  group,
+  selected,
+  selectedItemRef,
+  onPick,
+}: {
+  variable: ProjectVariable;
+  collection: string;
+  group: string;
+  selected: boolean;
+  selectedItemRef: RefCallback<HTMLButtonElement>;
+  onPick: (binding: string) => void;
+}) {
+  const selectedClassName = selected ? 'is-selected' : '';
+  const groupPrefix = group ? `${group} / ` : '';
+  const valueSuffix = variable.value ? ` — ${variable.value}` : '';
+  return (
+    <button
+      ref={selected ? selectedItemRef : undefined}
+      type="button"
+      className={`embed-editor_varpicker-item ${selectedClassName}`}
+      aria-current={selected || undefined}
+      onClick={() => onPick(variable.binding)}
+      title={`${collection} / ${groupPrefix}${variable.name}${valueSuffix}`}
+    >
+      <span className="embed-editor_varpicker-item-icon" aria-hidden="true">
+        <VariableTypeIcon type={variable.type} />
+      </span>
+      <span className="embed-editor_varpicker-item-name">{variable.name}</span>
+      <span className="embed-editor_varpicker-item-value">{variable.value}</span>
+      {selected ? (
+        <span className="embed-editor_varpicker-item-check" aria-hidden="true">
+          <CheckIcon />
+        </span>
+      ) : undefined}
+    </button>
+  );
+}
+
+// Scroll the selected item to the middle of the list, once, when it first mounts.
+// A callback ref: React calls it with the element on mount (and `null`, its own
+// protocol, on unmount).
+export function useScrollToSelected(): RefCallback<HTMLButtonElement> {
+  const scrolledToSelected = useRef(false);
+  return (element) => {
+    if (!element || scrolledToSelected.current) {
+      return;
+    }
+    scrolledToSelected.current = true;
+    const list = element.closest<HTMLElement>('.embed-editor_varpicker-list');
+    if (!list) {
+      return;
+    }
+    const listRect = list.getBoundingClientRect();
+    const itemRect = element.getBoundingClientRect();
+    list.scrollTop += itemRect.top - listRect.top - (list.clientHeight - element.clientHeight) / 2;
+  };
+}
+
+// Autofocus the search on open. React's `autoFocus` no-ops because the picker mounts
+// with `visibility: hidden` (a hidden element can't take focus); focus it on the next
+// frame, once the positioning effect has made it visible.
+export function usePickerFocus(searchRef: React.RefObject<HTMLInputElement>): void {
+  useEffect(() => {
+    const id = requestAnimationFrame(() => searchRef.current?.focus());
+    return () => cancelAnimationFrame(id);
+  }, [searchRef]);
+}
+
+// Drops below the row that owns the anchor (the dot's wrapper, or the chip's cell),
+// flipping above only if it would overflow the bottom. Its width and left edge come
+// from pickerSpan: the style panel's span inside the panel, the row's own otherwise.
+export function usePickerPosition(
+  ref: React.RefObject<HTMLDivElement>,
+  anchor: HTMLElement,
+): CSSProperties {
+  // Measure the hidden first pass at the final width, so the height the positioning
+  // effect reads is the height it will actually have.
+  const [style, setStyle] = useState<CSSProperties>(() => ({
+    position: 'fixed',
+    top: 0,
+    ...pickerSpan(anchor),
+    visibility: 'hidden',
+  }));
+  useLayoutEffect(() => {
+    const element = ref.current;
+    if (!element) {
+      return;
+    }
+    const margin = 8;
+    const row = (anchor.parentElement ?? anchor).getBoundingClientRect();
+    const { height } = element.getBoundingClientRect();
+    const { left, width } = pickerSpan(anchor);
+    const below = row.bottom + 4;
+    if (below + height <= window.innerHeight - margin) {
+      // Below the row: its TOP is the edge that must stay put, and it already
+      // does. Filtering shortens it from the bottom, which is where the empty
+      // space belongs.
+      setStyle({
+        position: 'fixed',
+        top: below,
+        left,
+        width,
+        maxHeight: Math.max(0, window.innerHeight - below - margin),
+        visibility: 'visible',
+      });
+      return;
+    }
+    // Flipped above: anchor the BOTTOM to the row rather than working out a top
+    // from the height it happens to have right now.
+    //
+    // A top computed once is a top that stops being right the moment the list
+    // gets shorter — and the list gets shorter on every keystroke. The box then
+    // shrank away from the field it belongs to, leaving a growing gap between
+    // them while its top edge stayed nailed where it opened. Held by the bottom,
+    // it stays against the field and grows upward into the space it has.
+    setStyle({
+      position: 'fixed',
+      bottom: Math.max(margin, window.innerHeight - (row.top - 4)),
+      left,
+      width,
+      maxHeight: Math.max(0, row.top - 4 - margin),
+      visibility: 'visible',
+    });
+  }, [ref, anchor]);
+  return style;
+}
+
+// A press outside the picker (and outside its anchor) or Escape closes it.
+export function usePickerDismiss(
+  ref: React.RefObject<HTMLDivElement>,
+  anchor: HTMLElement,
+  onClose: () => void,
+): void {
+  useEffect(() => {
+    const onDown = (event: PointerEvent) => {
+      const target = event.target;
+      if (!isNodeInDocument(target, anchor.ownerDocument)) {
+        return;
+      }
+      if (ref.current?.contains(target) || anchor.contains(target)) {
+        return;
+      }
+      onClose();
+      swallowNextClick();
+    };
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        onClose();
+      }
+    };
+    document.addEventListener('pointerdown', onDown, true);
+    document.addEventListener('keydown', onKey, true);
+    return () => {
+      document.removeEventListener('pointerdown', onDown, true);
+      document.removeEventListener('keydown', onKey, true);
+      // NOTE: deliberately do NOT remove the swallow-click listener here. Closing the
+      // popup unmounts this picker (running cleanup) BEFORE the pending click fires, so
+      // removing it here would let that click through to the element underneath. It
+      // removes itself once it swallows the click (or via its own 300ms fallback).
+    };
+  }, [ref, anchor, onClose]);
+}
+
+// Consume the dismiss gesture: swallow the click the dismissing pointerdown becomes,
+// so the element under the pointer (e.g. a section's collapse toggle) isn't ALSO
+// activated. It removes itself once it has swallowed that click, or after 300ms for
+// a press that never became one.
+export function swallowNextClick(): void {
+  let armed = true;
+  const click = (event: Event) => {
+    event.stopPropagation();
+    event.preventDefault();
+    document.removeEventListener('click', click, true);
+    armed = false;
+  };
+  document.addEventListener('click', click, true);
+  window.setTimeout(() => {
+    if (armed) {
+      document.removeEventListener('click', click, true);
+      armed = false;
+    }
+  }, 300);
+}
+
+// Lock the panel's scroll while the picker is open — it covers most of the panel, so
+// scrolling the rows behind it is disorienting (and moves the picker's anchor).
+// Hiding overflow removes the scrollbar; if it took up space (a classic, non-overlay
+// scrollbar), reserve that width as padding so the panel content doesn't shift.
+export function usePanelScrollLock(anchor: HTMLElement): void {
+  useEffect(() => {
+    const scroller = panelBox(anchor);
+    if (!scroller) {
+      return;
+    }
+    const barWidth = scroller.offsetWidth - scroller.clientWidth;
+    const previousOverflow = scroller.style.overflow;
+    const previousPadding = scroller.style.paddingRight;
+    scroller.style.overflow = 'hidden';
+    if (barWidth > 0) {
+      const paddingRight = parseFloat(getComputedStyle(scroller).paddingRight);
+      scroller.style.paddingRight = `${paddingRight + barWidth}px`;
+    }
+    return () => {
+      scroller.style.overflow = previousOverflow;
+      scroller.style.paddingRight = previousPadding;
+    };
+  }, [anchor]);
+}

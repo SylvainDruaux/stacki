@@ -95,7 +95,7 @@ const check = (what, condition, detail) => {
   }
   const pickers = {
     'src/features/style/components/ColorPicker.tsx': 'the colour picker',
-    'src/features/style/VariableConnect.tsx': 'the variable picker',
+    'src/features/style/VariablePicker.tsx': 'the variable picker',
   };
   for (const [file, what] of Object.entries(pickers)) {
     const source = fs.readFileSync(repoPath(file), 'utf8');
