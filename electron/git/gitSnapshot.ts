@@ -99,7 +99,7 @@ async function restoreFile(
  * discard every commit made since, and there would be nothing on screen to
  * say it had happened.
  *
- * `park` is passed in (it lives in main.js, over the stash) and is called
+ * `park` is passed in (it lives in gitParking.ts, over the stash) and is called
  * first whenever there is anything to lose. Without that, restoring over
  * uncommitted work would destroy it with no way back.
  */

@@ -13,29 +13,14 @@ import {
   record,
   text,
 } from '../../shared/core/boundary';
-import { toRecord } from '../../shared/core/record';
 import type { Data } from '../../shared/core/boundary';
 import type { ContentCollection } from '../content/contentEntries';
-import type { DynamicEntry } from './mainTypes';
+import type { DynamicEntry } from '../lib/mainTypes';
 
-export { data as parseData, record as parseRecord, text as parseString };
-export const parseOptionalString = optional(text);
+// The generic parsers live in lib, where every area may reach them.
+export { parseData, parseRecord, parseString, parseOptionalString } from '../lib/mainHelpers';
 export const parseSettings = object({ sound: boolean });
 export const parseRecents = list(object({ path: pathText, name: text, openedAt: count }));
-export const parseAstroLock = object({ url: text });
-
-export function parseAliases(input: unknown): readonly (readonly [string, readonly string[]])[] {
-  const paths = toRecord(toRecord(toRecord(input)?.['compilerOptions'])?.['paths']);
-  if (!paths) {
-    return [];
-  }
-  return Object.entries(
-    dictionary((value) => list(text)(typeof value === 'string' ? [value] : value))(paths),
-  ).map(
-    ([key, values]) =>
-      [key.replace(/\*$/, ''), values.map((value) => value.replace(/\*$/, ''))] as const,
-  );
-}
 
 export interface Collection extends ContentCollection {
   readonly loader?: NonNullable<ContentCollection['loader']> & { readonly kind: string };

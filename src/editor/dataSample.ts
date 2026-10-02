@@ -107,7 +107,7 @@ export function referencesInScope(
 // ---------------------------------------------------------------------------
 
 // The markers the dev-server sampler leaves behind for what JSON can't hold.
-// See PATHS_ENDPOINT in electron/main.js.
+// See PATHS_ENDPOINT in electron/preview/markerConfig.ts.
 export const marker = (value: unknown): string | undefined => {
   const tag = toRecord(value)?.['__stacki'];
   return typeof tag === 'string' ? tag : undefined;

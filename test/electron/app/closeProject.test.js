@@ -19,6 +19,7 @@
 const fs = require('fs');
 const path = require('path');
 const { repoPath } = require('../../helpers/sources.js');
+const { readSource } = require('../../helpers/sourceText.js');
 
 const failures = [];
 let checked = 0;
@@ -201,7 +202,7 @@ const settle = (ms = 30) => new Promise((resolve) => setTimeout(resolve, ms));
   );
 
   // --- what main does with it -------------------------------------------------------------
-  const main = fs.readFileSync(repoPath('dist/electron/main.js'), 'utf8');
+  const main = readSource('electron/main.ts');
   check(
     'the File menu offers a way in',
     /label: 'Open Project…'/.test(main),
@@ -212,7 +213,7 @@ const settle = (ms = 30) => new Promise((resolve) => setTimeout(resolve, ms));
     main.indexOf("ipcMain.handle('project:close'"),
     main.indexOf("app.on('window-all-closed'"),
   );
-  check('letting go stops the dev server', /stopDevServer\(\)/.test(close), close.slice(0, 200));
+  check('letting go stops the dev server', /devServers\.stop\(\)/.test(close), close.slice(0, 200));
   check(
     'and the shells, which outlive a window',
     /cleanupTerminals\(\)/.test(close),

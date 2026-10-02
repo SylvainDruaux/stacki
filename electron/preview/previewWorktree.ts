@@ -31,7 +31,7 @@
 //      one is checked out again at each new ref, so the disk cost is one
 //      checkout no matter how much history gets browsed.
 //
-// The dev server that runs against it is spawned by main.js, which owns ports
+// The dev server that runs against it is spawned by handlers/previewHandlers.ts, which owns ports
 // and process handling. Everything here is the filesystem and git side, so it
 // can be tested (test/electron/preview/previewWorktree.test.js) without booting Astro.
 

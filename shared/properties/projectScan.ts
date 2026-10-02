@@ -45,7 +45,7 @@ function fail(where: string, what: string): never {
 }
 
 /** The scan payload carries each component's schema as an ARRAY of fields —
- * the shape main.js assembles and the props panel reads. Validate every field
+ * the shape the project:scan handler assembles and the props panel reads. Validate every field
  * with the same parser the Map shape uses, so both stay in agreement. */
 function parseSchemaArray(input: unknown, where: string): readonly PropField[] {
   if (!Array.isArray(input)) {

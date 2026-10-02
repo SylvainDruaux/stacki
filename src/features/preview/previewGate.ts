@@ -76,7 +76,7 @@ export function judgeLocally(
   }
   if (shown.state.editable && shown.state.model.format !== undefined) {
     // A Markdown or MDX page carries no stamp: its markers come from the
-    // Markdown processor's tree (main.ts, avbSatteriMarkers), which never sees
+    // Markdown processor's tree (markerConfig.ts, avbSatteriMarkers), which never sees
     // the file's bytes, so no marker can name them. Its layout's stamps are
     // still checked on disk, and every edit is stated against the editor's own
     // parse and checked by main (tracker, step 10: carried).

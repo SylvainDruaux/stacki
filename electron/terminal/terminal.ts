@@ -54,7 +54,7 @@ const terminals = new Map<string, TerminalHandle>();
 // (spawned with `-l` below) extend PATH further from .zprofile, .bash_profile
 // or .zshrc — which is where version managers actually put themselves.
 //
-// Note this is a different job from main.js's `ensureToolPath()`: that one
+// Note this is a different job from lib/nodeTools.ts's `ensureToolPath()`: that one
 // probes a shell to fix *this process's* PATH before spawning `astro`/`git`
 // directly. Here the shell we spawn does its own sourcing; we only need to
 // hand it a plausible starting point and get Electron's fingerprints off it.

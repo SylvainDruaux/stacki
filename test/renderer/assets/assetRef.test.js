@@ -43,6 +43,7 @@ const check = (what, condition, detail) => {
 const jc = require('#dist/electron/content/jsCollections.js');
 const ar = require('#dist/electron/project/assetRefs.js');
 const { repoPath } = require('../../helpers/sources.js');
+const { readSourceGroup } = require('../../helpers/sourceText.js');
 
 const SCAN = { requireExport: false, allowPlainLists: true };
 const read = (source) =>
@@ -363,7 +364,10 @@ const SCREENS = [
     /pickAsset: model\.rel\.includes\('#'\) \? model\.pickAsset : undefined/.test(view),
     'a JSON file would be handed an identifier',
   );
-  const main = fs.readFileSync(repoPath('dist/electron/main.js'), 'utf8');
+  const main = readSourceGroup([
+    'electron/handlers/cmsHandlers.ts',
+    'electron/handlers/cmsFiles.ts',
+  ]);
   check(
     'a picked public/ file is a URL, not an import',
     /if \(root === 'public'\) \{\s*return \{ value: '\/' \+/.test(main),

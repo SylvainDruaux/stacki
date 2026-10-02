@@ -339,6 +339,20 @@ const ELECTRON_AREAS = {
     properties: ['lib', 'parse', 'documents', 'content'],
     preview: ['lib', 'git'],
     app: ['lib', 'content'],
+    // The IPC handler modules main.ts registers, and the helpers only they use:
+    // they reach what main.ts itself reaches, so a handler moves out unchanged.
+    handlers: [
+      'lib',
+      'parse',
+      'documents',
+      'content',
+      'project',
+      'git',
+      'properties',
+      'preview',
+      'app',
+      'previewServer',
+    ],
     previewServer: ['parse'],
     previewClient: [],
     preload: [],

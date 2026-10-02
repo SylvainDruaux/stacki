@@ -59,6 +59,7 @@ const check = (what, condition, detail) => {
 
 const { parsePage, serializePageMarked } = require('#dist/electron/parse/astroParser.js');
 const { repoPath } = require('../../helpers/sources.js');
+const { readSource, readSourceGroup } = require('../../helpers/sourceText.js');
 
 const marked = (
   body,
@@ -234,7 +235,7 @@ const marked = (
       'is:inline no longer leaves a tag',
     );
     // And what the dev config now writes.
-    const main = fs.readFileSync(repoPath('dist/electron/main.js'), 'utf8');
+    const main = readSource('electron/handlers/devServers.ts');
     check(
       'the dev config writes the hoistable form',
       new RegExp(
@@ -247,7 +248,13 @@ const marked = (
 
   // --- markdown blocks ------------------------------------------------------------
   {
-    const main = fs.readFileSync(repoPath('dist/electron/main.js'), 'utf8');
+    // Everything that writes the dev config: the config's parts, and the code
+    // that assembles and writes them.
+    const main = readSourceGroup([
+      'electron/preview/markerConfig.ts',
+      'electron/handlers/devServers.ts',
+      'electron/main.ts',
+    ]);
     check(
       'a markdown block is marked with comments',
       /insertBefore\(node, \{ type: 'html', value: '<!--avb-s:' \+ path \+ '-->' \}\)/.test(main),

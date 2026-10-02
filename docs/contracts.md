@@ -369,7 +369,7 @@ created) and `createProjectText` (never overwrites). A program's write is
 submitted as `rewrite-text` (step 10); a text equal to the file's writes its
 bytes back unchanged (one empty hunk). No write is repeated to refresh the
 canvas: the preview config compiles a file whose `<style>` changed before Vite
-announces the new stylesheet (`avbRecompile`, `electron/main.ts`). Each
+announces the new stylesheet (`avbRecompile`, `electron/preview/markerConfig.ts`). Each
 chunk file has its own actor; `component:editProperties`
 leases its files' actors in sorted canonical order and witnesses each by its
 `before` checksum, with the checked rollback as intents too.

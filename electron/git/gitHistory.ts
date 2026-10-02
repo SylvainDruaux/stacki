@@ -7,7 +7,7 @@
 // It is a separate module from gitBranches.js for the same reason that one
 // exists — so it can be tested against real repositories (test/electron/git/gitHistory.test.js)
 // rather than only through the app — and it takes the `git` runner as its
-// first argument for the same reason: main.js runs git through a PATH it has
+// first argument for the same reason: lib/nodeTools.ts runs git through a PATH it has
 // had to repair for the packaged app, and the tests run it plainly.
 //
 // The traps here are all in git's output rather than in its behaviour, and
@@ -24,7 +24,7 @@
 //     record for it has a field the others do not.
 //
 // Paths come back in git's own terms. Turning `src/pages/index.astro` into
-// "Home" needs the project's routing, which lives in main.js — so that
+// "Home" needs the project's routing, which lives in project/ — so that
 // translation happens at the IPC edge, and this module stays about git.
 
 import { toRecord } from '../../shared/core/record';

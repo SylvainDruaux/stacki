@@ -15,6 +15,7 @@ const {
   HEIGHT_PX_MIN,
 } = require('#dist/electron/app/windowBounds.js');
 const { repoPath } = require('../../helpers/sources.js');
+const { readSource } = require('../../helpers/sourceText.js');
 
 const failures = [];
 let checked = 0;
@@ -79,7 +80,7 @@ check(
 );
 
 // --- the app opens with them -------------------------------------------------
-const main = fs.readFileSync(repoPath('dist/electron/main.js'), 'utf8');
+const main = readSource('electron/main.ts');
 check(
   'the window is opened with these bounds',
   /\.\.\.bounds,/.test(main),

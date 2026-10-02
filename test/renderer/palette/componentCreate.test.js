@@ -20,7 +20,7 @@
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const { readAppSource, sourceBlock } = require('../../helpers/sourceText.js');
+const { readAppSource, readSource, sourceBlock } = require('../../helpers/sourceText.js');
 const { repoPath } = require('../../helpers/sources.js');
 
 const failures = [];
@@ -593,7 +593,7 @@ const check = (what, condition, detail) => {
     check(
       'the palette counts with this same function',
       /instancesIn\(text,\s*\{\s*file,\s*targetPath:\s*comp\.path/.test(
-        fs.readFileSync(repoPath('dist/electron/main.js'), 'utf8'),
+        readSource('electron/handlers/projectScanHandlers.ts'),
       ),
       'project:scan counts instances its own way again',
     );

@@ -15,6 +15,7 @@
 const fs = require('fs');
 const path = require('path');
 const { repoPath } = require('../../helpers/sources.js');
+const { readSource } = require('../../helpers/sourceText.js');
 
 const failures = [];
 let checked = 0;
@@ -248,10 +249,10 @@ const check = (what, condition, detail) => {
   );
 
   // --- the file goes somewhere it can be got back from --------------------------------
-  const main = fs.readFileSync(repoPath('dist/electron/main.js'), 'utf8');
-  const handler = main.slice(
-    main.indexOf("ipcMain.handle('assets:delete'"),
-    main.indexOf('// Text assets (css/js'),
+  const handlers = readSource('electron/handlers/assetHandlers.ts');
+  const handler = handlers.slice(
+    handlers.indexOf("ipcMain.handle('assets:delete'"),
+    handlers.indexOf('// Text assets (css/js'),
   );
   check(
     'deleting sends the file to the bin',

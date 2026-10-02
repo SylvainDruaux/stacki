@@ -1,6 +1,6 @@
 // Goal: a style edit reaches the canvas fresh on its own write. Astro serves a
 // component's <style> from the last server-side compile of its file, so the
-// generated preview config (avb-morph in electron/main.ts) compiles a file whose
+// generated preview config (avb-morph in electron/preview/markerConfig.ts) compiles a file whose
 // <style> text changed before Vite announces the new stylesheet — and keeps
 // filtering the stylesheet out of updates whose style text did not change, so
 // typing into a text field never restarts an animation.

@@ -85,8 +85,9 @@ Four cooperating processes, each with one job:
 ```
 
 - **Main** (`electron/`, Node.js, CommonJS): owns everything that touches the
-  OS. `main.ts` (emits `main.js`, 113 invoke channels) is a registry of
-  capabilities; the area folders do the work — the parsers in `parse/`, the
+  OS. `main.ts` (emits `main.js`) owns the window, the menu and the app's
+  lifecycle, and hands the invoke channels to the handler modules in
+  `handlers/`; the area folders do the work — the parsers in `parse/`, the
   write path in `documents/`, content collections in `content/`, component
   properties in `properties/`, project services in `project/`, and git, the
   dev-server preview and the terminal (node-pty) in their own folders. See
@@ -308,8 +309,9 @@ batching/queueing write path (already the right shape).
 
 | Path | What lives there |
 | --- | --- |
-| `electron/main.ts` | The main process's entry: the IPC registry and window |
-| `electron/lib/` | Bounds, platform facts, the serial queue, the IPC registrar, runtime paths |
+| `electron/main.ts` | The main process's entry: the window, the menu, the lifecycle, settings and recents |
+| `electron/handlers/` | The IPC handler modules main.ts registers, the dev server and thumbnails they drive |
+| `electron/lib/` | Bounds, platform facts, the serial queue, the IPC registrar, runtime paths, Node tools |
 | `electron/parse/` | The Astro and Markdown parsers (unpacked: the dev server loads them) |
 | `electron/documents/` | The write path: document actors, edit requests, atomic writes |
 | `electron/content/` | Content collections and CMS references; `formats/` parsers, `workers/` |
@@ -318,7 +320,7 @@ batching/queueing write path (already the right shape).
 | `electron/git/`, `preview/`, `terminal/` | Git; the dev server and preview worktree; the terminal |
 | `electron/previewServer/` | Modules the project's own dev server runs (unpacked) |
 | `electron/previewClient/`, `preload/` | The preview's browser script; the sandboxed bridge |
-| `electron/app/` | main.ts's own types, payload validation and window bounds |
+| `electron/app/` | main.ts's payload validation, window bounds and auto update |
 | `src/main.tsx` | The renderer's entry: mounts `src/app/App.tsx` |
 | `src/lib/` | Generic utilities that know nothing of pages or features |
 | `src/ipc/` | The typed bridges to main that more than one feature uses |
@@ -346,8 +348,11 @@ imports nothing outside itself.
 The main process's folders are areas, each importing only the areas listed
 for it in `eslint.config.mjs` (`ELECTRON_AREAS`): `lib` is the floor, the
 parsers sit on it, the write path on the parsers, and content, project,
-git and properties on the write path. The preview server imports only the
-parser, and the preview client and the preload nothing of main's.
+git and properties on the write path. The handler modules reach what
+main.ts reaches, so a channel moves out of main.ts unchanged; they take
+electron's values from main.ts (`handlers/mainHost.ts`) rather than importing
+them. The preview server imports only the parser, and the preview client and
+the preload nothing of main's.
 
 The renderer's folders are layers, lowest first: `lib` → `ipc` → `editor` →
 `ui` → `features` → `app`. A module imports only the layers below its own,

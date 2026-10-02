@@ -1,4 +1,4 @@
-// The git runner main.js provides (over a PATH it repairs for the packaged
+// The git runner lib/nodeTools.ts provides (over a PATH it repairs for the packaged
 // app), as the git modules here take it. One home: gitSnapshot, gitBranches,
 // gitHistory, previewWorktree and contentConfig all shell out through it.
 

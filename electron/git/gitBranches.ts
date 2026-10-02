@@ -18,10 +18,10 @@ import type { Git } from './git';
 // worth acting on is recognised here and turned into either a sentence that
 // says what to do instead, or a question the UI can ask.
 //
-// Kept out of main.js so the behaviour can be tested against a real repository
+// Kept out of the IPC handlers so the behaviour can be tested against a real repository
 // (test/electron/git/gitBranches.test.js) rather than only through the app.
 //
-// `git` is passed in rather than imported: main.js runs git through a PATH it
+// `git` is passed in rather than imported: lib/nodeTools.ts runs git through a PATH it
 // has had to repair for the packaged app, and the tests run it plainly.
 
 /** Whether the working tree has anything uncommitted in it. — removed during
@@ -369,7 +369,7 @@ export type SwitchOutcome =
  * here, or commit it first — and a rejection crossing IPC arrives as a bare
  * string with no file list in it.
  *
- * `park` and `unpark` are passed in: they live in main.js, over the stash.
+ * `park` and `unpark` are passed in: they live in gitParking.ts, over the stash.
  */
 async function switchBranch(
   git: Git,

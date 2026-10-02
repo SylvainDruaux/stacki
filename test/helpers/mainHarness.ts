@@ -30,8 +30,13 @@ export function mainHarness(
   const helpers: Record<string, unknown> = {};
   vm.runInNewContext(
     source +
-      '\nObject.assign(helpers, { writeMarkerConfig, readSettings, ' +
-      'readRecents, findFreePort, imageSizeOf, satisfiesRange, stopWatchingProject });',
+      // The helpers tests drive by name: main.js's own, plus those it now
+      // imports from area modules, read from the build this main.js belongs to.
+      '\nObject.assign(helpers, { readSettings, readRecents, stopWatchingProject, ' +
+      'writeMarkerConfig: (projectPath) => devServers.writeMarkerConfig(projectPath), ' +
+      "findFreePort: require('./lib/nodeTools.js').findFreePort, " +
+      "imageSizeOf: require('./project/assetFiles.js').imageSizeOf, " +
+      "satisfiesRange: require('./preview/devServerChecks.js').satisfiesRange });",
     {
       require: (name: string): unknown =>
         name === 'electron'

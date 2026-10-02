@@ -65,17 +65,30 @@ const ALLOWED: Readonly<Record<string, Readonly<Record<string, Allowed>>>> = {
   'electron/content/contentRefs.ts': {
     renameSync: { count: 1, reason: 'moves a content entry; a move writes no bytes' },
   },
-  'electron/main.ts': {
-    writeFileSync: {
-      count: 11,
-      reason:
-        'app state in userData (reopen, settings, recents), .stacki/cms.json metadata ' +
-        '(twice), the generated preview harness in node_modules/.avb (four), and two ' +
-        'writes inside the text of a generated Astro integration that runs in the dev server',
-    },
+  'electron/app/autoUpdate.ts': {
     appendFileSync: { count: 1, reason: 'the auto-update log in userData' },
+  },
+  'electron/handlers/assetHandlers.ts': {
     cpSync: { count: 1, reason: 'copies an asset in under a fresh unique name; never replaces' },
-    renameSync: { count: 3, reason: 'asset and folder moves; a move writes no bytes' },
+    renameSync: { count: 2, reason: 'asset and asset folder moves; a move writes no bytes' },
+  },
+  'electron/handlers/cmsHandlers.ts': {
+    writeFileSync: { count: 2, reason: '.stacki/cms.json metadata' },
+  },
+  'electron/handlers/devServers.ts': {
+    writeFileSync: { count: 4, reason: 'the generated preview harness in node_modules/.avb' },
+  },
+  'electron/handlers/pageHandlers.ts': {
+    renameSync: { count: 1, reason: 'a page folder move; a move writes no bytes' },
+  },
+  'electron/main.ts': {
+    writeFileSync: { count: 3, reason: 'app state in userData (reopen, settings, recents)' },
+  },
+  'electron/preview/markerConfig.ts': {
+    writeFileSync: {
+      count: 2,
+      reason: 'writes inside the text of a generated Astro integration that runs in the dev server',
+    },
   },
   'electron/preview/previewWorktree.ts': {
     appendFileSync: { count: 1, reason: 'git exclude file of the preview worktree' },

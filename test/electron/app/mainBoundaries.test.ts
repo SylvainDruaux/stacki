@@ -19,10 +19,10 @@ import {
   parseSampleEntry,
   parseSettings,
   parseRecents,
-  parseAliases,
-  parseAstroLock,
   parseValidationResult,
 } from '#dist/electron/app/mainValidation.js';
+import { parseAliases } from '#dist/electron/properties/importPaths.js';
+import { parseAstroLock } from '#dist/electron/preview/devServerChecks.js';
 import { directoryBudget, MAIN_LIMITS } from '#dist/electron/lib/mainLimits.js';
 import { LIMITS } from '#dist/shared/core/limits.js';
 

@@ -36,6 +36,7 @@ const check = (what, condition, detail) => {
 
 const { JSDOM } = require('jsdom');
 const { repoPath } = require('../../helpers/sources.js');
+const { readSource } = require('../../helpers/sourceText.js');
 const dom = new JSDOM('<!doctype html><body></body>');
 global.document = dom.window.document;
 
@@ -545,7 +546,7 @@ const LIVE_TABS = (labels, active) =>
     reasonOf(() => tiny.patchChildren(...again)) === undefined,
   );
   // The shipped bounds are the ones in shared/core/limits.ts, prepended by main.
-  const main = fs.readFileSync(repoPath('dist/electron/main.js'), 'utf8');
+  const main = readSource('electron/handlers/devServers.ts');
   check(
     'main prepends the patcher its bounds from LIMITS',
     /const AVB_PREVIEW_LIMITS = Object\.freeze\(\$\{JSON\.stringify\(bounds\)\}\)/.test(main) &&

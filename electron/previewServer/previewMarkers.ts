@@ -1,6 +1,6 @@
 // The dev preview's source markers, made in memory (plan §9, step 7).
 //
-// The generated preview config (main.ts, MARKER_CONFIG_PARTS) hands Astro a
+// The generated preview config (preview/markerConfig.ts, MARKER_CONFIG_PARTS) hands Astro a
 // marked copy of every .astro file under src as Vite loads it: each node sits
 // between <!--avb-s:path--> / <!--avb-e:path--> comments, and each file carries
 // one stamp, <!--avb-d:<checksum>:<file>-->, naming the exact bytes it was
