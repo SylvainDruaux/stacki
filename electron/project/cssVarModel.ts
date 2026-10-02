@@ -1,0 +1,388 @@
+// The model the variables editor shows: one group per set of rules, blocks per
+// comment section or prefix, rows and columns of cells (cssVars.ts).
+
+import fs from 'fs';
+import path from 'path';
+import { MAIN_LIMITS } from '../lib/mainLimits';
+import { assert } from '../../shared/core/assert';
+import { toPosix, findStylesheets, type VarEntry, type Rule, readDeclarations } from './cssVarRead';
+import {
+  labelForRule,
+  commonStem,
+  namesOf,
+  groupRules,
+  findFamilies,
+  prefixSections,
+} from './cssVarGroups';
+import { resolveValue, colorOf, isUncomputableColor, kindOf } from './cssVarValues';
+
+export interface Column {
+  readonly id: string;
+  readonly label: string;
+  readonly selector: string;
+  readonly context: readonly string[];
+  readonly line: number;
+}
+
+export interface Cell {
+  readonly name: string;
+  readonly value: string;
+  readonly file: string;
+  readonly selector: string;
+  readonly valueStart: number;
+  readonly valueEnd: number;
+  readonly line: number;
+  readonly column: string;
+}
+
+export interface Row {
+  readonly label: string;
+  readonly name?: string;
+  // Reassigned centrally in readVariables once cells are described.
+  cells: (Cell | undefined)[];
+}
+
+export interface Block {
+  readonly kind: 'rows' | 'matrix';
+  readonly title: string | undefined;
+  readonly titleStart?: number;
+  readonly titleEnd?: number;
+  readonly rows: Row[];
+  readonly columns?: Column[];
+}
+
+export interface Group {
+  readonly kind: 'modes' | 'single';
+  readonly label: string;
+  readonly columns: Column[];
+  readonly blocks: Block[];
+}
+
+export interface FileModel {
+  readonly rel: string;
+  readonly name: string;
+  readonly groups: Group[];
+  readonly error?: string;
+  readonly count?: number;
+  declarations?: Rule[];
+}
+
+// A variable entry with the rule it came from attached, so a move can look the
+// declaration up by selector after the model has travelled to the renderer.
+export interface TaggedVar extends VarEntry {
+  readonly selector: string;
+}
+
+export function buildGroup(members: readonly Rule[], file: string): Group {
+  assert(members.length > 0, 'buildGroup: a group has at least one rule');
+  const columns = members.map((rule, index) => ({
+    id: `${index}`,
+    label: labelForRule(rule),
+    selector: rule.selector,
+    context: rule.context,
+    line: rule.line,
+  }));
+  const byName = members.map((rule): Map<string, TaggedVar> => {
+    const map = new Map<string, TaggedVar>();
+    for (const entry of rule.entries) {
+      if (entry.kind === 'var') {
+        map.set(entry.name, { ...entry, selector: rule.selector });
+      }
+    }
+    return map;
+  });
+
+  if (members.length > 1) {
+    return modesGroup(columns, byName, file);
+  }
+  // One rule: comments are headings, and the names inside each heading may form
+  // tables of their own.
+  const rule = members[0];
+  if (!rule) {
+    return { kind: 'single', label: '', columns, blocks: [] };
+  }
+  const blocks = commentSections(rule).flatMap((section) =>
+    sectionBlocks(section, rule, byName[0], file),
+  );
+  return { kind: 'single', label: labelForRule(rule), columns, blocks };
+}
+
+// Several rules declaring the same names: the columns are the modes, so the names are the rows.
+// Sub-sections come from shared prefixes.
+export function modesGroup(
+  columns: Column[],
+  byName: readonly Map<string, TaggedVar>[],
+  file: string,
+): Group {
+  const cellsFor = (name: string): (Cell | undefined)[] =>
+    byName.map((map, index) => cellFor(map, name, file, columns[index]?.id ?? ''));
+  const names: string[] = [];
+  for (const map of byName) {
+    for (const name of map.keys()) {
+      if (!names.includes(name)) {
+        names.push(name);
+      }
+    }
+  }
+  const blocks: Block[] = [];
+  const { loose, sections } = prefixSections(names);
+  if (loose.length) {
+    blocks.push({
+      kind: 'rows',
+      title: undefined,
+      rows: loose.map((name) => ({ label: shortLabel(name), name, cells: cellsFor(name) })),
+    });
+  }
+  for (const [prefix, group] of sections) {
+    blocks.push({
+      kind: 'rows',
+      title: prefix,
+      rows: group.map((name) => ({
+        label: shortLabel(name, prefix),
+        name,
+        cells: cellsFor(name),
+      })),
+    });
+  }
+  const firstLabel = columns[0]?.label ?? '';
+  return {
+    kind: 'modes',
+    label: commonStem(columns.map((column) => column.label)) || firstLabel,
+    columns,
+    blocks,
+  };
+}
+
+// The names under one comment heading of a rule, with the heading's span in the file.
+export interface CommentSection {
+  title: string | undefined;
+  titleStart?: number;
+  titleEnd?: number;
+  names: string[];
+}
+
+export function commentSections(rule: Rule): CommentSection[] {
+  const sections: CommentSection[] = [];
+  let current: CommentSection = { title: undefined, names: [] };
+  for (const entry of rule.entries) {
+    if (entry.kind === 'comment') {
+      // A heading with nothing under it is kept. It used to be dropped, which
+      // was tidy right up until the panel grew a way to MAKE one: a new group
+      // starts empty, and a group you cannot see is one you cannot fill.
+      // (Untitled runs with no names are still nothing at all.)
+      if (current.names.length || current.title !== undefined) {
+        sections.push(current);
+      }
+      current = {
+        title: entry.text,
+        titleStart: entry.textStart,
+        titleEnd: entry.textEnd,
+        names: [],
+      };
+      continue;
+    }
+    current.names.push(entry.name);
+  }
+  if (current.names.length || current.title !== undefined) {
+    sections.push(current);
+  }
+  return sections;
+}
+
+// One heading's blocks: a matrix per family its names form, then a list of whatever is left.
+export function sectionBlocks(
+  section: CommentSection,
+  rule: Rule,
+  map: Map<string, TaggedVar> | undefined,
+  file: string,
+): Block[] {
+  const blocks: Block[] = [];
+  const { families, used } = findFamilies(section.names);
+  const claimed = new Set<string>();
+  for (const family of families) {
+    const rows: Row[] = [];
+    if (family.self) {
+      rows.push({
+        label: 'value',
+        cells: family.prefixes.map((prefix) => cellFor(map, `--${prefix}`, file, '0')),
+      });
+      for (const prefix of family.prefixes) {
+        claimed.add(`--${prefix}`);
+      }
+    }
+    for (const suffix of family.rows) {
+      rows.push({
+        label: suffix,
+        cells: family.prefixes.map((prefix) => cellFor(map, `--${prefix}-${suffix}`, file, '0')),
+      });
+      for (const prefix of family.prefixes) {
+        claimed.add(`--${prefix}-${suffix}`);
+      }
+    }
+    blocks.push({
+      kind: 'matrix',
+      title: section.title,
+      columns: family.prefixes.map((prefix): Column => ({
+        id: prefix,
+        label: prefix,
+        selector: rule.selector,
+        context: rule.context,
+        line: rule.line,
+      })),
+      rows: rows.filter((row) => row.cells.some(Boolean)),
+      // The inner sections of a one-rule file carry their comment's span so
+      // the heading can be renamed in place; a comment-less section has none.
+      ...(section.titleStart !== undefined
+        ? { titleStart: section.titleStart, titleEnd: section.titleEnd }
+        : {}),
+    });
+  }
+  const leftovers = section.names.filter((name) => !claimed.has(name) && !used.has(name));
+  if (leftovers.length || (!families.length && section.title !== undefined)) {
+    blocks.push({
+      kind: 'rows',
+      title: families.length ? undefined : section.title,
+      rows: leftovers.map((name) => ({
+        label: shortLabel(name),
+        name,
+        cells: [cellFor(map, name, file, '0')],
+      })),
+      ...(families.length ? {} : { titleStart: section.titleStart, titleEnd: section.titleEnd }),
+    });
+  }
+  return blocks;
+}
+
+export function cellFor(
+  map: Map<string, TaggedVar> | undefined,
+  name: string,
+  file: string,
+  column: string,
+): Cell | undefined {
+  const entry = map?.get(name);
+  if (!entry) {
+    return undefined;
+  }
+  return {
+    name,
+    value: entry.value,
+    file,
+    selector: entry.selector,
+    valueStart: entry.valueStart,
+    valueEnd: entry.valueEnd,
+    line: entry.line,
+    column,
+  };
+}
+
+export interface DescribedCell extends Cell {
+  // Absent rather than undefined, so the cell a renderer parses back is the cell sent.
+  readonly ref?: string;
+  readonly resolved?: string;
+  readonly color?: string;
+  readonly unknownColor: boolean;
+  readonly kind: string;
+}
+
+// A cell's value said three ways: what the file holds, what it comes out as,
+// and what colour to draw beside it (if any).
+export function describeCell(
+  cell: Cell | undefined,
+  map: Map<string, string>,
+): DescribedCell | undefined {
+  if (!cell) {
+    return undefined;
+  }
+  const single = String(cell.value)
+    .trim()
+    .match(/^var\(\s*(--[\w-]+)\s*(?:,[^)]*)?\)$/);
+  const resolved = resolveValue(cell.value, map);
+  const ref = single?.[1];
+  const color = colorOf(resolved);
+  return {
+    ...cell,
+    // A value that is nothing but another variable is shown as that variable's
+    // name — which is what the author wrote, and what they would search for.
+    ...(ref === undefined ? {} : { ref }),
+    ...(resolved === cell.value ? {} : { resolved }),
+    ...(color === undefined ? {} : { color }),
+    unknownColor: isUncomputableColor(resolved),
+    kind: kindOf(cell.value, resolved),
+  };
+}
+
+export const shortLabel = (name: string, prefix?: string): string => {
+  const body = name.replace(/^--/, '');
+  return prefix && body.startsWith(`${prefix}-`) ? body.slice(prefix.length + 1) : body;
+};
+
+/**
+ * Every stylesheet in the project that declares custom properties, as groups of
+ * tables. Files with none are left out — a variables panel is a place to find
+ * variables, not a file browser.
+ */
+export function readVariables(projectPath: string): {
+  files: FileModel[];
+  values: Record<string, string>;
+} {
+  const files: FileModel[] = [];
+  for (const abs of findStylesheets(projectPath)) {
+    let text: string;
+    try {
+      if (fs.statSync(abs).size > MAIN_LIMITS.cssVariableFileBytesMax) {
+        continue;
+      }
+      text = fs.readFileSync(abs, 'utf8');
+    } catch {
+      continue;
+    }
+    const rel = toPosix(path.relative(projectPath, abs));
+    let rules: Rule[];
+    try {
+      rules = readDeclarations(text);
+    } catch (error: unknown) {
+      files.push({
+        rel,
+        name: path.basename(abs),
+        error: `Could not parse — ${error instanceof Error ? error.message : String(error)}`,
+        groups: [],
+      });
+      continue;
+    }
+    if (!rules.length) {
+      continue;
+    }
+    const groups = groupRules(rules).map((members) => buildGroup(members, rel));
+    files.push({
+      rel,
+      name: path.basename(abs),
+      groups,
+      declarations: rules,
+      count: rules.reduce((sum, rule) => sum + namesOf(rule).length, 0),
+    });
+  }
+  // Values reference each other across files as freely as within one, so the
+  // map every value is resolved against is the project's, not the file's.
+  const map = new Map<string, string>();
+  for (const file of files) {
+    for (const rule of file.declarations || []) {
+      for (const entry of rule.entries) {
+        if (entry.kind === 'var') {
+          map.set(entry.name, entry.value);
+        }
+      }
+    }
+  }
+  const values = Object.fromEntries(map);
+  for (const file of files) {
+    delete file.declarations;
+    for (const group of file.groups) {
+      for (const block of group.blocks) {
+        for (const row of block.rows) {
+          row.cells = row.cells.map((cell) => describeCell(cell, map));
+        }
+      }
+    }
+  }
+  return { files, values };
+}

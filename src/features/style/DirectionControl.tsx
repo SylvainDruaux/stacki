@@ -1,13 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
-import type { CSSProperties, ReactNode } from 'react';
+import type { ReactNode } from 'react';
 import SegmentPill from './components/SegmentPill';
 import { commitInPlace } from './model/commitInPlace';
-
-function tooltipArrowStyle(
-  arrowRight: number,
-): CSSProperties & { readonly '--tip-arrow-right': string } {
-  return { '--tip-arrow-right': `${arrowRight}px` };
-}
+import { ChevronIcon, tooltipArrowStyle, useMenuDismiss } from './components/MenuParts';
+import { parseImportant } from './model/styleDisplay';
 
 // The flex Direction / flow control — shown only when `display` is flex. Two fixed
 // segments (→ single row, ↓ single column) plus a third slot that shows whichever
@@ -190,20 +186,6 @@ function ColumnReverseWrapReverseIcon() {
     </svg>
   );
 }
-function ChevronIcon() {
-  return (
-    <svg viewBox="0 0 16 16" aria-hidden="true">
-      <path
-        d="M4.2 6.2 8 10l3.8-3.8"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
 
 // ─────────────────────────── Flow model ───────────────────────────
 
@@ -298,13 +280,6 @@ const TOOLTIP_DELAY_MS = 500;
 
 // ─────────────────────────── Custom value helpers ───────────────────────────
 
-function parseImportant(input: string): { value: string; important: boolean } {
-  const match = input.match(/!\s*important\s*$/i);
-  if (match) {
-    return { value: input.slice(0, match.index).trim(), important: true };
-  }
-  return { value: input.trim(), important: false };
-}
 const joinImportant = (parsed: { readonly value: string; readonly important: boolean }) =>
   parsed.important ? `${parsed.value} !important` : parsed.value;
 
@@ -482,39 +457,6 @@ function useFocusOnceReady({
   return () => {
     wantFocus.current = true;
   };
-}
-
-// Closes the open menu on an outside click or Escape.
-function useMenuDismiss({
-  open,
-  rootRef,
-  setOpen,
-}: {
-  open: boolean;
-  rootRef: React.RefObject<HTMLDivElement>;
-  setOpen: (open: boolean) => void;
-}) {
-  useEffect(() => {
-    if (!open) {
-      return;
-    }
-    const onDown = (event: MouseEvent) => {
-      if (!(event.target instanceof Node) || !rootRef.current?.contains(event.target)) {
-        setOpen(false);
-      }
-    };
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        setOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', onDown);
-    document.addEventListener('keydown', onKey);
-    return () => {
-      document.removeEventListener('mousedown', onDown);
-      document.removeEventListener('keydown', onKey);
-    };
-  }, [open, rootRef, setOpen]);
 }
 
 interface ShownTip {

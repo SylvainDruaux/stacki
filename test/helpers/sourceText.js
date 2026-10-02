@@ -41,6 +41,17 @@ function readSource(relativePath) {
   return text.replace(/\r\n/g, '\n');
 }
 
+// Several files read as one, in the order given: the text of a module that was
+// split into pieces is still checked as a whole, and a check about code that
+// moved keeps finding it. Each file is separated by a blank line, so no snippet
+// can match across the seam by accident.
+function readSourceGroup(relativePaths) {
+  if (relativePaths.length === 0) {
+    throw new Error('source-text: a group of no files reads nothing');
+  }
+  return relativePaths.map(readSource).join('\n\n');
+}
+
 // The compact form described above.
 function compactSource(text) {
   return text
@@ -90,4 +101,4 @@ function sourceBlock(source, start) {
   return '';
 }
 
-module.exports = { compactSource, containsCode, readSource, sourceBlock };
+module.exports = { compactSource, containsCode, readSource, readSourceGroup, sourceBlock };

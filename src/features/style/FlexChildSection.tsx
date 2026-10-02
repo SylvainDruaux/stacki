@@ -1,17 +1,18 @@
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import {
   SegBar,
   StackedField,
   LiveInput,
   PropLabel,
   GroupLabel,
-  displayOf,
   type Props,
   type Seg,
 } from './TypographySection';
 import { parseFlexShorthand } from './model/webflow';
 import { splitTopLevelSpaces } from './model/background';
 import SegmentPill from './components/SegmentPill';
+import { useMenuDismiss } from './components/MenuParts';
+import { displayOf } from './model/styleDisplay';
 
 // The Flex Child section — the controls that apply to the selected element when it
 // is a child of a flex (or grid) container: its sizing (the `flex` shorthand), its
@@ -452,39 +453,6 @@ function useFlexSizing({ read, setProp, clearProp }: Props) {
     enterSingleCustom,
     toggleMenu: () => setMenuOpen((value) => !value),
   };
-}
-
-// Closes the open menu on an outside click or Escape.
-function useMenuDismiss({
-  open,
-  rootRef,
-  setOpen,
-}: {
-  open: boolean;
-  rootRef: React.RefObject<HTMLDivElement>;
-  setOpen: (open: boolean) => void;
-}) {
-  useEffect(() => {
-    if (!open) {
-      return;
-    }
-    const onDown = (event: MouseEvent) => {
-      if (!(event.target instanceof Node) || !rootRef.current?.contains(event.target)) {
-        setOpen(false);
-      }
-    };
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        setOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', onDown);
-    document.addEventListener('keydown', onKey);
-    return () => {
-      document.removeEventListener('mousedown', onDown);
-      document.removeEventListener('keydown', onKey);
-    };
-  }, [open, rootRef, setOpen]);
 }
 
 // The three presets and the "…" that opens the Grow / Shrink / Basis inputs.

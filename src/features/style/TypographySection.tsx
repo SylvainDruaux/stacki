@@ -28,6 +28,8 @@ import { splitTopLevelSpaces } from './model/background';
 import { useHighlight } from './model/computedStyle';
 import SegmentPill from './components/SegmentPill';
 import { commitInPlace } from './model/commitInPlace';
+import { ChevronIcon, MenuItem } from './components/MenuParts';
+import { displayOf, parseImportant, type Display } from './model/styleDisplay';
 
 // The Typography section of the style panel. Like the Size section, every control
 // is always rendered and driven by the resolved model: a property is blue when the
@@ -50,45 +52,6 @@ export type Props = {
   onSelectSelector: (selector: string, prop?: string) => void;
 };
 
-type Display = {
-  present: boolean;
-  isSelected: boolean;
-  overridden: boolean;
-  winnerSelector: string;
-  value: string;
-  important: boolean;
-};
-
-export function displayOf(resolved: ResolvedProp | undefined): Display {
-  if (!resolved) {
-    return {
-      present: false,
-      isSelected: false,
-      overridden: false,
-      winnerSelector: '',
-      value: '',
-      important: false,
-    };
-  }
-  const isSelected = resolved.source === 'selected';
-  const source = isSelected && resolved.selectedValue ? resolved.selectedValue : resolved.winner;
-  return {
-    present: true,
-    isSelected,
-    overridden: resolved.overridden,
-    winnerSelector: resolved.winner.selectorText,
-    value: source.value,
-    important: source.important,
-  };
-}
-
-function parseImportant(input: string): { value: string; important: boolean } {
-  const match = input.match(/!\s*important\s*$/i);
-  if (match) {
-    return { value: input.slice(0, match.index).trim(), important: true };
-  }
-  return { value: input.trim(), important: false };
-}
 const joinImportant = ({ value, important }: { value: string; important: boolean }) =>
   important ? `${value} !important` : value;
 
@@ -96,20 +59,6 @@ const CUSTOM = '__custom__';
 
 // ─────────────────────────── Icons ───────────────────────────
 
-function ChevronIcon() {
-  return (
-    <svg viewBox="0 0 16 16" aria-hidden="true">
-      <path
-        d="M4.2 6.2 8 10l3.8-3.8"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
 function AlignLeftIcon() {
   return (
     <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
@@ -1014,28 +963,6 @@ function WeightField(props: Props) {
 // ─────────────────────────── Segmented bar (align / decor) ───────────────────────────
 
 export type Seg = { value: string; icon: ReactNode; label: string };
-
-function MenuItem({
-  label,
-  selected,
-  onClick,
-}: {
-  label: string;
-  selected: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      role="menuitemradio"
-      aria-checked={selected}
-      className={`embed-editor_display-menu-item ${selected ? 'is-selected' : ''}`}
-      onClick={onClick}
-    >
-      {label}
-    </button>
-  );
-}
 
 // A segmented icon bar + a dropdown arrow whose menu offers Custom; a free value
 // (anything outside the segments) shows an editable field. Mirrors the Size

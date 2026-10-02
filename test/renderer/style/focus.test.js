@@ -167,10 +167,10 @@ const check = (what, condition, detail) => {
   // checked across the panel rather than in the one file that broke it.
   const panel = repoPath('src/features/style');
   // A popover is different: it exists only because it was opened, so mounting
-  // IS the request. The spacing box's side editor is one — pressing a side is
+  // IS the request. The spacing box's side editor (SpacingEditor.tsx) is one — pressing a side is
   // what puts it on screen, and it should be ready to type in. The rule is
   // about fields that render as part of a control that was already there.
-  const OPENED_ON_PURPOSE = new Set(['SpacingBox.tsx']);
+  const OPENED_ON_PURPOSE = new Set(['SpacingEditor.tsx']);
   const ungated = [];
   for (const file of fs
     .readdirSync(panel)

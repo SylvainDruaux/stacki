@@ -1,0 +1,74 @@
+// The shapes the settings panel is built from: the selected node, the panel's
+// props, and the props each kind of node's panel takes (PropsPanel.tsx).
+
+import type {
+  PageNode,
+  PairedNode,
+  ChunkGroupNode,
+  Attr,
+  ValueNode,
+} from '../../../shared/page/pageNode';
+import type { FieldDefinition, PropValues } from './propRules';
+import type { SetProp, SetProps } from './propAttributes';
+import type { SetText, TagOption, TagFieldProps } from './propNodeEditors';
+import type { SourceContext } from './propBindings';
+import type { RichContext, InlineNode } from './RichContent';
+import type { AssetDimensions } from '../../ui/AssetThumb';
+import type { PickedAsset } from '../../ui/AssetField';
+import React from 'react';
+import LinkField from './LinkField';
+
+export type SelectedNode = PageNode | { readonly kind: 'frontmatter'; readonly id: string };
+export type ElementNode = (PairedNode | ChunkGroupNode) & { readonly props?: PropValues };
+export interface PropsPanelProps {
+  readonly node?: SelectedNode | undefined;
+  readonly focusClass?: number;
+  readonly focusContent?: number;
+  readonly isLayout?: boolean;
+  readonly layouts?: readonly TagOption[];
+  readonly currentLayoutName?: string;
+  readonly onChangeLayout?: (name: string) => void;
+  readonly schema?: readonly FieldDefinition[];
+  readonly slotOptions?: readonly string[] | undefined;
+  readonly takesSlotText?: boolean;
+  readonly tagOptions?: readonly TagOption[];
+  readonly projectClasses?: readonly string[];
+  readonly allowAttrs?: boolean;
+  readonly comment?: string;
+  readonly onSetComment?: (value: string) => void;
+  readonly loopContext?: RichContext | undefined;
+  readonly bindContext?: RichContext | undefined;
+  readonly linkContext?: React.ComponentProps<typeof LinkField>['context'] | undefined;
+  readonly onSetProp: SetProp;
+  readonly onSetProps?: SetProps;
+  readonly onSetAssetProp?: (nodeId: string, name: string, picked: PickedAsset) => void;
+  readonly onRenameProp: (previous: string, next: string) => void;
+  readonly onChangeTag?: TagFieldProps['onChangeTag'];
+  readonly onSetText: SetText;
+  readonly onSetContent: (text: string) => void;
+  readonly onSetInline: (nodes: readonly InlineNode[]) => void;
+  readonly onOpenCode?: () => void;
+  readonly onSetFrontmatter?: (source: string) => void;
+  readonly frontmatterSource?: string;
+  readonly onOpenSymbol?: (name: string) => void;
+  readonly onToggleElse?: (value: boolean) => void;
+  readonly projectPath?: string | undefined;
+  readonly filePath?: string | undefined;
+}
+export type NodePanelProps<Kind extends SelectedNode['kind']> = Omit<PropsPanelProps, 'node'> & {
+  readonly node:
+    | Extract<SelectedNode, { readonly kind: Kind }>
+    | (Kind extends ValueNode['kind'] ? ValueNode : never);
+};
+export interface ElementPropsPanelProps extends Omit<PropsPanelProps, 'node'> {
+  readonly node: ElementNode;
+  readonly dataContext: SourceContext;
+  readonly stashRef: React.MutableRefObject<Map<string, PropValues>>;
+}
+export interface SourceDimensionsOptions {
+  readonly source: Attr | undefined;
+  readonly projectPath: string | undefined;
+  readonly filePath: string | undefined;
+  readonly imports: unknown;
+  readonly setSourceDimensions: (value: AssetDimensions) => void;
+}

@@ -16,12 +16,7 @@ import {
 import { commitInPlace } from './model/commitInPlace';
 import { PositionGrid, NumberField } from './components/PositionGrid';
 import { assert } from '../../../shared/core/assert';
-
-function tooltipArrowStyle(
-  arrowRight: number,
-): CSSProperties & { readonly '--tip-arrow-right': string } {
-  return { '--tip-arrow-right': `${arrowRight}px` };
-}
+import { tooltipArrowStyle } from './components/MenuParts';
 
 function gradientBarStyle(image: string): CSSProperties & { readonly '--grad-image': string } {
   return { '--grad-image': image };

@@ -1,13 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
-import type { CSSProperties, ReactNode } from 'react';
+import type { ReactNode } from 'react';
 import SegmentPill from './components/SegmentPill';
 import { commitInPlace } from './model/commitInPlace';
-
-function tooltipArrowStyle(
-  arrowRight: number,
-): CSSProperties & { readonly '--tip-arrow-right': string } {
-  return { '--tip-arrow-right': `${arrowRight}px` };
-}
+import { ChevronIcon, MenuItem, tooltipArrowStyle } from './components/MenuParts';
+import { parseImportant } from './model/styleDisplay';
 
 // The value editor for `display`. For values we can represent it shows a
 // segmented bar (Block / Flex / Grid + a 4th slot for the inline set, None and
@@ -110,52 +106,8 @@ export function isDisplayValueSupported(value: string): boolean {
   return SUPPORTED.has(value.trim().toLowerCase());
 }
 
-function parseImportant(input: string): { value: string; important: boolean } {
-  const match = input.match(/!\s*important\s*$/i);
-  if (match) {
-    return { value: input.slice(0, match.index).trim(), important: true };
-  }
-  return { value: input.trim(), important: false };
-}
 const joinImportant = (parsed: { readonly value: string; readonly important: boolean }) =>
   parsed.important ? `${parsed.value} !important` : parsed.value;
-
-function ChevronIcon() {
-  return (
-    <svg viewBox="0 0 16 16" aria-hidden="true">
-      <path
-        d="M4.2 6.2 8 10l3.8-3.8"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
-function MenuItem({
-  label,
-  selected,
-  onClick,
-}: {
-  label: string;
-  selected: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      role="menuitemradio"
-      aria-checked={selected}
-      className={`embed-editor_display-menu-item ${selected ? 'is-selected' : ''}`}
-      onClick={onClick}
-    >
-      {label}
-    </button>
-  );
-}
 
 // Editable text field for a custom display value, shown next to the arrow.
 function CustomValueField({

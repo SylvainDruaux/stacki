@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import type { CSSProperties, KeyboardEvent as ReactKeyboardEvent, ReactNode } from 'react';
+import type { KeyboardEvent as ReactKeyboardEvent, ReactNode } from 'react';
 import FieldLabel from './components/FieldLabel';
 import { PropTip, ProvenanceLabel } from './components/CssPropertyTip';
 import { useHighlight } from './model/computedStyle';
@@ -9,11 +9,6 @@ import Select, { type SelectOption } from './components/Select';
 import useScrub, { type ScrubHandlers } from './components/useScrub';
 import { handleArrowStep } from './model/numberStep';
 
-function tooltipArrowStyle(
-  arrowRight: number,
-): CSSProperties & { readonly '--tip-arrow-right': string } {
-  return { '--tip-arrow-right': `${arrowRight}px` };
-}
 import { useFieldDraft } from './model/fieldDraft';
 import ProvenanceList from './ProvenanceList';
 import VariableConnect from './VariableConnect';
@@ -21,6 +16,9 @@ import type { Contributor, ResolvedProp } from './model/resolved';
 import { splitTopLevelSpaces } from './model/background';
 import SegmentPill from './components/SegmentPill';
 import { commitInPlace } from './model/commitInPlace';
+import { ChevronIcon, MenuItem, tooltipArrowStyle, useMenuDismiss } from './components/MenuParts';
+import { useCustomFocus, useDebouncedLive } from './model/fieldHooks';
+import { displayOf, parseImportant, type Display } from './model/styleDisplay';
 
 // The Size section of the style panel. Every control is always rendered (Webflow
 // parity), driven by the resolved model: a property is blue when the picked
@@ -44,46 +42,6 @@ type Props = {
   /** Switch the panel's pick to the given selector (click the override note tag). */
   onSelectSelector: (selector: string, prop?: string) => void;
 };
-
-type Display = {
-  present: boolean;
-  isSelected: boolean;
-  overridden: boolean;
-  winnerSelector: string;
-  value: string;
-  important: boolean;
-};
-
-function displayOf(resolved: ResolvedProp | undefined): Display {
-  if (!resolved) {
-    return {
-      present: false,
-      isSelected: false,
-      overridden: false,
-      winnerSelector: '',
-      value: '',
-      important: false,
-    };
-  }
-  const isSelected = resolved.source === 'selected';
-  const source = isSelected && resolved.selectedValue ? resolved.selectedValue : resolved.winner;
-  return {
-    present: true,
-    isSelected,
-    overridden: resolved.overridden,
-    winnerSelector: resolved.winner.selectorText,
-    value: source.value,
-    important: source.important,
-  };
-}
-
-function parseImportant(input: string): { value: string; important: boolean } {
-  const match = input.match(/!\s*important\s*$/i);
-  if (match) {
-    return { value: input.slice(0, match.index).trim(), important: true };
-  }
-  return { value: input.trim(), important: false };
-}
 
 // A size control's label: blue (picked selector sets it) → FieldLabel with a
 // clear menu; orange (another selector) → a button opening provenance; unset →
@@ -286,37 +244,6 @@ function useFollowingDraft(value: string) {
   return { draft, setDraft, focused };
 }
 
-// Live writes of typed text, split into value and `!important`. `scheduleLive`
-// debounces typing; `liveNow` is the undelayed write for a scrub, which does its
-// own throttling — a debounce reset by every mouse move would never fire
-// mid-drag. Blank text is never written live.
-function useDebouncedLive(write: (value: string, important: boolean) => void) {
-  const liveTimer = useRef<number | undefined>(undefined);
-  const cancelLive = () => {
-    if (liveTimer.current !== undefined) {
-      window.clearTimeout(liveTimer.current);
-      liveTimer.current = undefined;
-    }
-  };
-  useEffect(() => cancelLive, []);
-  const liveNow = (text: string) => {
-    const trimmed = text.trim();
-    if (!trimmed) {
-      return;
-    }
-    const parsed = parseImportant(trimmed);
-    write(parsed.value, parsed.important);
-  };
-  const scheduleLive = (text: string) => {
-    cancelLive();
-    liveTimer.current = window.setTimeout(() => {
-      liveTimer.current = undefined;
-      liveNow(text);
-    }, 100);
-  };
-  return { cancelLive, liveNow, scheduleLive };
-}
-
 // Enter commits in place; an arrow key steps the number under the caret and
 // writes it straight into the input. Returns the stepped text, if any.
 function stepSizeKey(event: ReactKeyboardEvent<HTMLInputElement>): string | undefined {
@@ -346,20 +273,6 @@ const LENGTH_FIELDS: ReadonlyArray<{ prop: string; label: string; placeholder: s
 
 // ─────────────────────────── Overflow ───────────────────────────
 
-function ChevronIcon() {
-  return (
-    <svg viewBox="0 0 16 16" aria-hidden="true">
-      <path
-        d="M4.2 6.2 8 10l3.8-3.8"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
 const SHOW_ICON_FIRST_PATH =
   'M8 9.5C8.82843 9.5 9.5 8.82843 9.5 8C9.5 7.17157 8.82843 6.5 8 6.5' +
   'C7.17157 6.5 6.5 7.17157 6.5 8C6.5 8.82843 7.17157 9.5 8 9.5Z';
@@ -427,28 +340,6 @@ function ScrollIcon() {
         <path d={SCROLL_ICON_FOURTH_PATH} fill="currentColor" />
       </g>
     </svg>
-  );
-}
-
-function MenuItem({
-  label,
-  selected,
-  onClick,
-}: {
-  label: string;
-  selected: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      role="menuitemradio"
-      aria-checked={selected}
-      className={`embed-editor_display-menu-item ${selected ? 'is-selected' : ''}`}
-      onClick={onClick}
-    >
-      {label}
-    </button>
   );
 }
 
@@ -771,59 +662,6 @@ function SegmentMenu({
       ) : undefined}
     </>
   );
-}
-
-// While the menu is open, a press outside the bar or Escape closes it.
-function useMenuDismiss({
-  open,
-  rootRef,
-  setOpen,
-}: {
-  open: boolean;
-  rootRef: React.RefObject<HTMLDivElement>;
-  setOpen: (open: boolean) => void;
-}): void {
-  useEffect(() => {
-    if (!open) {
-      return;
-    }
-    const onDown = (event: MouseEvent) => {
-      if (!(event.target instanceof Node) || !rootRef.current?.contains(event.target)) {
-        setOpen(false);
-      }
-    };
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        setOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', onDown);
-    document.addEventListener('keydown', onKey);
-    return () => {
-      document.removeEventListener('mousedown', onDown);
-      document.removeEventListener('keydown', onKey);
-    };
-  }, [open, rootRef, setOpen]);
-}
-
-// Focus the custom field after switching to Custom, once its `unset` write
-// settles: the request is remembered until the field exists and is enabled.
-function useCustomFocus({ customMode, busy }: { customMode: boolean; busy: boolean }) {
-  const inputRef = useRef<HTMLInputElement>(null);
-  const wantFocus = useRef(false);
-  useEffect(() => {
-    if (customMode && wantFocus.current && !busy) {
-      wantFocus.current = false;
-      inputRef.current?.focus();
-      inputRef.current?.select();
-    }
-  }, [customMode, busy]);
-  return {
-    inputRef,
-    requestFocus: () => {
-      wantFocus.current = true;
-    },
-  };
 }
 
 // Delayed hover tooltip, right-anchored with a down-arrow to the hovered segment.

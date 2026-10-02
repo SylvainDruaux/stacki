@@ -87,7 +87,7 @@ const check = (what, condition, detail) => {
   // The wiring: the popovers that close on an outside press have to ask.
   const files = {
     'src/features/style/LayerPopover.tsx': 'the layer editor',
-    'src/features/style/SpacingBox.tsx': 'the spacing editor',
+    'src/features/style/SpacingEditor.tsx': 'the spacing editor',
   };
   for (const [file, what] of Object.entries(files)) {
     const source = fs.readFileSync(repoPath(file), 'utf8');

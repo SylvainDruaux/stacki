@@ -63,6 +63,9 @@ import {
 } from './model/filter';
 import FilterEditor from './FilterFields';
 import { commitInPlace } from './model/commitInPlace';
+import { PlusIcon } from './components/MenuParts';
+import { openAfterRemoval, useExternalDraft } from './model/fieldHooks';
+import { displayOf, parseImportant } from './model/styleDisplay';
 
 // The Effects section (Webflow parity): blending, opacity, outline, box shadows,
 // transforms, transitions, filters, backdrop filters, cursor, and pointer-events.
@@ -85,62 +88,9 @@ type Props = {
   onSelectSelector: (selector: string, prop?: string) => void;
 };
 
-type Display = {
-  present: boolean;
-  isSelected: boolean;
-  overridden: boolean;
-  winnerSelector: string;
-  value: string;
-  important: boolean;
-};
-
-function displayOf(resolved: ResolvedProp | undefined): Display {
-  if (!resolved) {
-    return {
-      present: false,
-      isSelected: false,
-      overridden: false,
-      winnerSelector: '',
-      value: '',
-      important: false,
-    };
-  }
-  const isSelected = resolved.source === 'selected';
-  const source = isSelected && resolved.selectedValue ? resolved.selectedValue : resolved.winner;
-  return {
-    present: true,
-    isSelected,
-    overridden: resolved.overridden,
-    winnerSelector: resolved.winner.selectorText,
-    value: source.value,
-    important: source.important,
-  };
-}
-
-function parseImportant(input: string): { value: string; important: boolean } {
-  const match = input.match(/!\s*important\s*$/i);
-  if (match) {
-    return { value: input.slice(0, match.index).trim(), important: true };
-  }
-  return { value: input.trim(), important: false };
-}
-
 // How a write lands: live while typing or dragging, or committed.
 interface WriteOptions {
   readonly live: boolean;
-}
-
-// A field's draft: it mirrors external edits, but never clobbers what the user is
-// typing (while `focused` holds).
-function useExternalDraft(external: string) {
-  const [draft, setDraft] = useState(external);
-  const focused = useRef(false);
-  useEffect(() => {
-    if (!focused.current) {
-      setDraft(external);
-    }
-  }, [external]);
-  return { draft, setDraft, focused };
 }
 
 // Debounces live writes while typing: the text reaches `liveNow` 100ms after the last
@@ -236,18 +186,6 @@ function writeValue(
   } else {
     writers.clearProp(prop);
   }
-}
-
-// The open popover after removing row `removed`: closed if it was that row's, shifted
-// down one if it was a later row's.
-function openAfterRemoval(open: number | undefined, removed: number): number | undefined {
-  if (open === undefined) {
-    return undefined;
-  }
-  if (open === removed) {
-    return undefined;
-  }
-  return open > removed ? open - 1 : open;
 }
 
 // A layered effect's rows (see lib/hideable.ts) and which row's editor popover is open:
@@ -543,12 +481,6 @@ const EVENTS_OPTIONS: readonly SegOption[] = [
   { value: 'auto', label: 'Auto', menuLabel: 'Auto' },
   { value: 'none', label: 'None', menuLabel: 'None' },
 ];
-
-const PlusIcon = () => (
-  <svg viewBox="0 0 16 16" fill="none" aria-hidden="true" className="embed-editor_bg-glyph">
-    <path d="M8 3.5v9M3.5 8h9" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
-  </svg>
-);
 
 // The "Custom…" sentinel + preset value sets (values that ARE listed in the dropdown,
 // so anything else counts as a custom value that opens the input).

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { displayOf, GroupLabel, PropLabel } from './TypographySection';
+import { GroupLabel, PropLabel } from './TypographySection';
+import { displayOf } from './model/styleDisplay';
 import useScrub from './components/useScrub';
 import { handleArrowStep } from './model/numberStep';
 import { isNonNegative } from './model/cssProperties';

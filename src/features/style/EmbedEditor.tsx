@@ -156,6 +156,8 @@ import type {
 } from './model/styleTypes';
 import './embedEditor.css';
 import { splitTopLevelSpaces } from './model/background';
+import { useExternalDraft } from './model/fieldHooks';
+import { parseImportant } from './model/styleDisplay';
 
 type ScanState = {
   rootSnapshot: ElementSnapshot | undefined;
@@ -210,14 +212,6 @@ const EMPTY_RESOLVED: ResolvedStyle = {
 const EMPTY_RULE_MODEL: RuleModel = { base: [], conditional: [], matchedRuleCount: 0 };
 
 // ─────────────────────────── Value helpers ───────────────────────────
-
-function parseImportant(input: string): { value: string; important: boolean } {
-  const match = input.match(/!\s*important\s*$/i);
-  if (match) {
-    return { value: input.slice(0, match.index).trim(), important: true };
-  }
-  return { value: input.trim(), important: false };
-}
 
 // A selector Webflow can represent as one base class without an element carrying it.
 // Interaction states remain native-capable; complex selectors and other pseudos need
@@ -590,19 +584,6 @@ const ValueField = forwardRef<
     />
   );
 });
-
-// A field's draft: it mirrors external edits, but never clobbers what the user is
-// typing (while `focused` holds).
-function useExternalDraft(external: string) {
-  const [draft, setDraft] = useState(external);
-  const focused = useRef(false);
-  useEffect(() => {
-    if (!focused.current) {
-      setDraft(external);
-    }
-  }, [external]);
-  return { draft, setDraft, focused };
-}
 
 // One ref callback that sets both a local ref and whatever ref the caller forwarded.
 function mergedRef<T>(

@@ -492,6 +492,7 @@ export default [
     // permits assertions inside validated constructors and type guards.
     files: [
       'src/features/style/model/css.ts',
+      'src/features/style/model/cssRegions.ts',
       'src/features/style/model/host.ts',
       'src/features/style/model/webflow.ts',
     ],

@@ -20,6 +20,7 @@
 const fs = require('fs');
 const path = require('path');
 const { repoPath } = require('../../helpers/sources.js');
+const { readSourceGroup } = require('../../helpers/sourceText.js');
 
 const failures = [];
 let checked = 0;
@@ -516,7 +517,11 @@ const check = (what, condition, detail) => {
   }
 
   // --- and the field it belongs to ----------------------------------------------------------
-  const panel = fs.readFileSync(repoPath('src/features/props/PropField.tsx'), 'utf8');
+  // The field and its model, which holds what a value means (PropField.tsx).
+  const panel = readSourceGroup([
+    'src/features/props/PropField.tsx',
+    'src/features/props/propFieldModel.ts',
+  ]);
   check(
     'an array prop shows the list rather than a code field',
     /type === 'code' && !showExpr && \(value === undefined \|\| arrayItems\(valueText\)\)\)/.test(

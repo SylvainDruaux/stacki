@@ -13,6 +13,8 @@ import { useHighlight } from './model/computedStyle';
 import SegmentPill from './components/SegmentPill';
 import { commitInPlace } from './model/commitInPlace';
 import SharedLiveInput from './components/LiveInput';
+import { ChevronIcon, MenuItem, useMenuDismiss } from './components/MenuParts';
+import { displayOf, parseImportant, type Display } from './model/styleDisplay';
 
 // The Borders section: a corner-radius control (linked / per-corner) and a border
 // control scoped to a side (all / top / right / bottom / left) with style, width,
@@ -33,46 +35,6 @@ type Props = {
   onProvenance: (prop: string, anchor: DOMRect) => void;
   onSelectSelector: (selector: string, prop?: string) => void;
 };
-
-type Display = {
-  present: boolean;
-  isSelected: boolean;
-  overridden: boolean;
-  winnerSelector: string;
-  value: string;
-  important: boolean;
-};
-
-function displayOf(resolved: ResolvedProp | undefined): Display {
-  if (!resolved) {
-    return {
-      present: false,
-      isSelected: false,
-      overridden: false,
-      winnerSelector: '',
-      value: '',
-      important: false,
-    };
-  }
-  const isSelected = resolved.source === 'selected';
-  const source = isSelected && resolved.selectedValue ? resolved.selectedValue : resolved.winner;
-  return {
-    present: true,
-    isSelected,
-    overridden: resolved.overridden,
-    winnerSelector: resolved.winner.selectorText,
-    value: source.value,
-    important: source.important,
-  };
-}
-
-function parseImportant(input: string): { value: string; important: boolean } {
-  const match = input.match(/!\s*important\s*$/i);
-  if (match) {
-    return { value: input.slice(0, match.index).trim(), important: true };
-  }
-  return { value: input.trim(), important: false };
-}
 
 const stripImportant = (value: string) => value.replace(/\s*!important\s*$/i, '').trim();
 const joinImportant = (parsed: { readonly value: string; readonly important: boolean }) =>
@@ -509,42 +471,6 @@ const STYLE_OPTIONS: ReadonlyArray<SegmentedOption<string>> = [
 ];
 const STYLE_VALUES = new Set(STYLE_OPTIONS.map((option) => option.value));
 
-function ChevronIcon() {
-  return (
-    <svg viewBox="0 0 16 16" aria-hidden="true">
-      <path
-        d="M4.2 6.2 8 10l3.8-3.8"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-function MenuItem({
-  label,
-  selected,
-  onClick,
-}: {
-  label: string;
-  selected: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      role="menuitemradio"
-      aria-checked={selected}
-      className={`embed-editor_display-menu-item ${selected ? 'is-selected' : ''}`}
-      onClick={onClick}
-    >
-      {label}
-    </button>
-  );
-}
-
 // The border-style segmented bar (None / Solid / Dashed / Dotted) + a chevron menu
 // whose Custom item enters a free-value mode (double / groove / var()…) and offers
 // the presets to switch back — mirroring the Display / Float / Clear controls. Writes
@@ -674,39 +600,6 @@ function useFocusOnceReady({
   return () => {
     wantFocus.current = true;
   };
-}
-
-// Closes the open menu on an outside click or Escape.
-function useMenuDismiss({
-  open,
-  rootRef,
-  setOpen,
-}: {
-  open: boolean;
-  rootRef: React.RefObject<HTMLDivElement>;
-  setOpen: (open: boolean) => void;
-}) {
-  useEffect(() => {
-    if (!open) {
-      return;
-    }
-    const onDown = (event: MouseEvent) => {
-      if (!(event.target instanceof Node) || !rootRef.current?.contains(event.target)) {
-        setOpen(false);
-      }
-    };
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        setOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', onDown);
-    document.addEventListener('keydown', onKey);
-    return () => {
-      document.removeEventListener('mousedown', onDown);
-      document.removeEventListener('keydown', onKey);
-    };
-  }, [open, rootRef, setOpen]);
 }
 
 // The free-value field of custom mode: live-writes while typing, commits on blur

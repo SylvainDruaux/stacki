@@ -12,6 +12,9 @@ import { handleArrowStep } from './model/numberStep';
 import type { ResolvedProp } from './model/resolved';
 import SegmentPill from './components/SegmentPill';
 import { commitInPlace } from './model/commitInPlace';
+import { ChevronIcon, MenuItem, useMenuDismiss } from './components/MenuParts';
+import { useCustomFocus } from './model/fieldHooks';
+import { parseImportant } from './model/styleDisplay';
 
 // The Position section: a position-type dropdown (with a Custom escape hatch), an
 // inset box (top/right/bottom/left, like the spacing box), a z-index field, and
@@ -242,30 +245,9 @@ function ClearBothIcon() {
     </svg>
   );
 }
-function ChevronIcon() {
-  return (
-    <svg viewBox="0 0 16 16" aria-hidden="true">
-      <path
-        d="M4.2 6.2 8 10l3.8-3.8"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
 
 // ─────────────────────────── Helpers ───────────────────────────
 
-function parseImportant(input: string): { value: string; important: boolean } {
-  const match = input.match(/!\s*important\s*$/i);
-  if (match) {
-    return { value: input.slice(0, match.index).trim(), important: true };
-  }
-  return { value: input.trim(), important: false };
-}
 const joinImportant = ({ value, important }: { value: string; important: boolean }) =>
   important ? `${value} !important` : value;
 
@@ -758,28 +740,6 @@ function InsetBox(props: Props) {
 
 // ─────────────────────────── Float / Clear segmented controls ───────────────────────────
 
-function MenuItem({
-  label,
-  selected,
-  onClick,
-}: {
-  label: string;
-  selected: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      role="menuitemradio"
-      aria-checked={selected}
-      className={`embed-editor_display-menu-item ${selected ? 'is-selected' : ''}`}
-      onClick={onClick}
-    >
-      {label}
-    </button>
-  );
-}
-
 type Seg = { value: string; icon: ReactNode; label: string };
 
 // An icon segmented bar (Float / Clear) + a chevron menu whose only item enters a
@@ -1013,59 +973,6 @@ function SegmentMenu({
       ) : undefined}
     </>
   );
-}
-
-// Focus the custom field after switching to Custom, once its `unset` write
-// settles: the request is remembered until the field exists and is enabled.
-function useCustomFocus({ customMode, busy }: { customMode: boolean; busy: boolean }) {
-  const inputRef = useRef<HTMLInputElement>(null);
-  const wantFocus = useRef(false);
-  useEffect(() => {
-    if (customMode && wantFocus.current && !busy) {
-      wantFocus.current = false;
-      inputRef.current?.focus();
-      inputRef.current?.select();
-    }
-  }, [customMode, busy]);
-  return {
-    inputRef,
-    requestFocus: () => {
-      wantFocus.current = true;
-    },
-  };
-}
-
-// While the menu is open, a press outside the control or Escape closes it.
-function useMenuDismiss({
-  open,
-  rootRef,
-  setOpen,
-}: {
-  open: boolean;
-  rootRef: React.RefObject<HTMLDivElement>;
-  setOpen: (open: boolean) => void;
-}): void {
-  useEffect(() => {
-    if (!open) {
-      return;
-    }
-    const onDown = (event: MouseEvent) => {
-      if (!(event.target instanceof Node) || !rootRef.current?.contains(event.target)) {
-        setOpen(false);
-      }
-    };
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        setOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', onDown);
-    document.addEventListener('keydown', onKey);
-    return () => {
-      document.removeEventListener('mousedown', onDown);
-      document.removeEventListener('keydown', onKey);
-    };
-  }, [open, rootRef, setOpen]);
 }
 
 const FLOAT_SEGS: readonly Seg[] = [
