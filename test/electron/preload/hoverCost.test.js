@@ -78,6 +78,11 @@ const settle = (ms = 120) => new Promise((resolve) => setTimeout(resolve, ms));
   global.Node = window.Node;
   global.MouseEvent = window.MouseEvent;
   global.requestAnimationFrame = window.requestAnimationFrame.bind(window);
+  // The set-vh case rewrites stylesheets; jsdom has only some CSSOM rule
+  // classes, and a missing one matches nothing.
+  for (const rule of ['CSSGroupingRule', 'CSSMediaRule', 'CSSSupportsRule', 'CSSStyleRule']) {
+    global[rule] = window[rule] ?? class {};
+  }
 
   const sent = [];
   window.parent = { postMessage: (message) => sent.push(message) };
@@ -224,6 +229,73 @@ const settle = (ms = 120) => new Promise((resolve) => setTimeout(resolve, ms));
     'while a change to the page really does walk it',
     forEdit > forTrack,
     `${forEdit} for an edit against ${forTrack} for a re-measure`,
+  );
+
+  // --- the canvas's own writes are not changes to the page ----------------------
+  // The canvas writes to the page too: a probe element the style panel's
+  // colours are computed on, the viewport-height variable, its own classes.
+  // Each one used to walk the whole page — once for every colour the style
+  // panel asked about. They are told apart by what they touched.
+  // What a quiet moment costs: the canvas looks for motion on its own clock,
+  // and a window this long can hold one look.
+  const forIdle = await asksOf(() => settle(200));
+  const forProbe = await asksOf(async () => {
+    post({ type: 'avb:query', id: 7, compute: ['rgb(1, 2, 3)'] });
+    await settle(200);
+  });
+  check(
+    'computing a colour for the style panel walks nothing',
+    forProbe <= forIdle,
+    `${forProbe} document queries after a probe`,
+  );
+  const forViewport = await asksOf(async () => {
+    post({ type: 'avb:set-vh', px: 812 });
+    await settle(200);
+  });
+  check(
+    'freezing the viewport height walks nothing',
+    forViewport <= forIdle,
+    `${forViewport} document queries after set-vh`,
+  );
+  const opened = window.document.querySelector('[data-box="copy"]');
+  const forOwnClass = await asksOf(async () => {
+    opened.classList.add('stacki-opened');
+    await settle(200);
+  });
+  check(
+    'a class of the canvas’s own walks nothing',
+    forOwnClass <= forIdle,
+    `${forOwnClass} document queries after stacki-opened`,
+  );
+  const forMixedClass = await asksOf(async () => {
+    opened.classList.remove('stacki-opened');
+    opened.classList.add('is-mixed');
+    await settle(200);
+  });
+  check(
+    'but the page’s class in the same batch is a change to the page',
+    forMixedClass > forTrack,
+    `${forMixedClass} for a mixed batch against ${forTrack} for a re-measure`,
+  );
+
+  // --- a restyle moves boxes and can hide a node, but renders nothing new --------
+  // An inline style written every frame (an animation library) re-measures the
+  // boxes and re-reads which nodes are hidden — never the structural walk.
+  sent.length = 0;
+  const forRestyle = await asksOf(async () => {
+    window.document.querySelector('[data-box="rest"]').style.display = 'none';
+    await settle(200);
+  });
+  const states = sent.filter((message) => message.type === 'avb:node-states').pop();
+  check(
+    'a restyle reports a node it hid',
+    (states?.hidden ?? []).includes('1'),
+    JSON.stringify(states),
+  );
+  check(
+    'and costs less than a change to the page',
+    forRestyle < forEdit,
+    `${forRestyle} for a restyle against ${forEdit} for an edit`,
   );
 
   if (failures.length) {

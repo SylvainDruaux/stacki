@@ -12,6 +12,7 @@ import type { PreviewVerdict } from '../../../shared/page/previewToken';
 import type { PreviewReloadReason } from './previewMessages';
 import { PREVIEW_WIDTH_LIMITS, previewViewport } from './previewViewport';
 import './previewViewport.css';
+import type { LiveValue } from '../../ui/liveValue';
 
 export { deviceForWidth } from './PreviewToolbar';
 
@@ -19,7 +20,7 @@ interface PreviewPaneProps {
   readonly spacingHover?: SpacingHover | undefined;
   readonly devUrl?: string | undefined;
   readonly devStatus?: string;
-  readonly devLog?: string | undefined;
+  readonly devLog?: LiveValue<string> | undefined;
   readonly devDiag?: DevDiagnosis | undefined;
   readonly pathScope?: string;
   readonly route?: string | undefined;

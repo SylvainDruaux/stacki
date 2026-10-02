@@ -1509,8 +1509,11 @@ if (!process.isMainFrame) {
   // `undefined` until the first track, so the first one always answers.
   let lastQuestion: string | undefined;
   let lastRenderedKey = '';
+  // The nodes the last walk found rendered: what a restyle re-reads states for.
+  let lastRendered: string[] = [];
   const sendRendered = () => {
     const rendered = [];
+    const seen = new Set<string>(); // `rendered`, for lookups: a page holds thousands
     for (const nodePath of regions.keys()) {
       if (!inScope(nodePath)) {
         continue;
@@ -1541,6 +1544,7 @@ if (!process.isMainFrame) {
       }
       if (live) {
         rendered.push(nodePath);
+        seen.add(nodePath);
       }
     }
     // A slotted node is never wrapped in markers — it's addressed by the tag
@@ -1551,11 +1555,13 @@ if (!process.isMainFrame) {
         continue;
       }
       for (const nodePath of pathsOf(element)) {
-        if (inScope(nodePath) && !rendered.includes(nodePath)) {
+        if (inScope(nodePath) && !seen.has(nodePath)) {
           rendered.push(nodePath);
+          seen.add(nodePath);
         }
       }
     }
+    lastRendered = rendered;
     sendStates(rendered);
     const key = rendered.join('\n');
     if (key === lastRenderedKey) {
@@ -1794,6 +1800,124 @@ if (!process.isMainFrame) {
     queueRects(true);
     clearTimeout(settleTimer);
     settleTimer = setTimeout(() => queueRects(true), 120);
+  };
+
+  // A change that only restyles the page — an inline style, a stylesheet the
+  // dev server swapped into <head>, a resize — moves boxes and can hide or
+  // show a node, but cannot change which nodes rendered or what their classes
+  // are: those are structural, and re-deriving them walks every marked node.
+  // So a restyle re-measures the tracked boxes as remeasure does, and re-reads
+  // the hidden and inert states at once — or, when they were read less than
+  // STATES_INTERVAL_MS ago, once that interval is up: an animation restyles
+  // every frame, and each read is a computed style per rendered node.
+  const STATES_INTERVAL_MS = 250;
+  let styleSettleTimer: ReturnType<typeof setTimeout> | undefined;
+  let statesTimer: ReturnType<typeof setTimeout> | undefined;
+  let statesReadMs = Number.NEGATIVE_INFINITY;
+  const readStates = () => {
+    statesReadMs = performance.now();
+    sendStates(lastRendered);
+  };
+  const remeasureStyles = () => {
+    queueRects();
+    clearTimeout(styleSettleTimer);
+    styleSettleTimer = setTimeout(() => queueRects(), 120);
+    clearTimeout(statesTimer);
+    const sinceMs = performance.now() - statesReadMs;
+    statesTimer = setTimeout(readStates, Math.max(0, STATES_INTERVAL_MS - sinceMs));
+  };
+
+  // What a batch of mutations means for the canvas: nothing, a restyle, or a
+  // change to the page's structure. The canvas writes to the page itself —
+  // path tags, marker comments it lifts out, the probe a colour is computed
+  // on, the viewport-height variable and its override sheet, its own classes —
+  // and each of those writes used to start a whole-page walk, including every
+  // colour the style panel asked about. Its own writes are now told apart by
+  // what they touched, never by timing.
+  type MutationKind = 'none' | 'css' | 'page';
+  const PROBE_ATTR = 'data-avb-probe';
+  const ownElement = (node: Node): boolean => {
+    if (!isElement(node)) {
+      return false;
+    }
+    if (node.id === 'avb-design-style' || node.id === 'avb-vh-override') {
+      return true;
+    }
+    return node.hasAttribute(PROBE_ATTR);
+  };
+  const ownNode = (node: Node): boolean => {
+    if (isComment(node)) {
+      return /^avb-[se]:/.test(node.data); // A marker the canvas lifts out.
+    }
+    return ownElement(node);
+  };
+  const classTokens = (value: string | undefined): Set<string> =>
+    new Set((value ?? '').split(/\s+/).filter((token) => token !== ''));
+  // Only the canvas's own classes came or went.
+  const ownClassChange = (record: MutationRecord): boolean => {
+    if (!isElement(record.target)) {
+      return false; // A class record always targets an element; never ours otherwise.
+    }
+    const before = classTokens(record.oldValue ?? undefined);
+    const after = classTokens(record.target.getAttribute('class') ?? undefined);
+    for (const token of [...before, ...after]) {
+      if (before.has(token) !== after.has(token) && !STACKI_CLASSES.has(token)) {
+        return false;
+      }
+    }
+    return true;
+  };
+  const withoutViewportHeight = (style: string | undefined): string =>
+    (style ?? '').replace(/--avb-vh:[^;]*;?\s*/g, '').trim();
+  const ownAttributeChange = (record: MutationRecord): boolean => {
+    const target = record.target;
+    if (ownElement(target) || record.attributeName === PATH_ATTR) {
+      return true;
+    }
+    if (record.attributeName === 'class') {
+      return ownClassChange(record);
+    }
+    if (record.attributeName === 'style' && target === document.documentElement) {
+      const now = withoutViewportHeight(
+        document.documentElement.getAttribute('style') ?? undefined,
+      );
+      return withoutViewportHeight(record.oldValue ?? undefined) === now;
+    }
+    return false;
+  };
+  const insideHead = (node: Node): boolean => !!document.head && document.head.contains(node);
+  const recordKind = (record: MutationRecord): MutationKind => {
+    if (record.type === 'attributes') {
+      if (ownAttributeChange(record)) {
+        return 'none';
+      }
+      return record.attributeName === 'style' || insideHead(record.target) ? 'css' : 'page';
+    }
+    if (record.type === 'characterData') {
+      const parent = record.target.parentNode;
+      if (parent !== null && ownElement(parent)) {
+        return 'none';
+      }
+      return insideHead(record.target) ? 'css' : 'page';
+    }
+    const nodes = [...Array.from(record.addedNodes), ...Array.from(record.removedNodes)];
+    if (ownElement(record.target) || nodes.every(ownNode)) {
+      return 'none';
+    }
+    return insideHead(record.target) ? 'css' : 'page';
+  };
+  const mutationKind = (records: readonly MutationRecord[]): MutationKind => {
+    let kind: MutationKind = 'none';
+    for (const record of records) {
+      const next = recordKind(record);
+      if (next === 'page') {
+        return 'page';
+      }
+      if (next === 'css') {
+        kind = 'css';
+      }
+    }
+    return kind;
   };
 
   // Which rendered copy of a node the target sits in. A node inside a loop
@@ -2081,17 +2205,26 @@ if (!process.isMainFrame) {
     // body alone meant the element moved under an outline that had no idea
     // anything had happened — the outline only caught up when something else
     // (a scroll, an edit to the markup) asked for a fresh measurement.
-    new MutationObserver(remeasure).observe(document.documentElement, {
+    new MutationObserver((records) => {
+      const kind = mutationKind(records);
+      if (kind === 'page') {
+        remeasure();
+      } else if (kind === 'css') {
+        remeasureStyles();
+      }
+    }).observe(document.documentElement, {
       childList: true,
       subtree: true,
       attributes: true,
+      attributeOldValue: true,
       characterData: true,
     });
     // A layout that changed without changing the DOM at all — a rule edited
     // through the CSSOM, a font finishing loading, a container query flipping.
     // Nothing to observe there but the boxes themselves.
     try {
-      const ro = new ResizeObserver(remeasure);
+      // A resize restyles; it cannot change which nodes rendered.
+      const ro = new ResizeObserver(remeasureStyles);
       ro.observe(document.documentElement);
       if (document.body) {
         ro.observe(document.body);
@@ -2340,6 +2473,7 @@ if (!process.isMainFrame) {
   const computeValues = (host: Element, wanted: string[]): Record<string, string | undefined> => {
     const computed: Record<string, string | undefined> = {};
     const probe = document.createElement('span');
+    probe.setAttribute(PROBE_ATTR, ''); // The canvas's own: no page walk (mutationKind).
     probe.setAttribute('style', 'position:absolute;width:0;height:0;visibility:hidden');
     host.appendChild(probe);
     for (const value of wanted) {

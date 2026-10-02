@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import type { IpcResults } from '../../../shared/ipc/ipcResults';
+import { NO_LIVE_TEXT, useLiveValue, type LiveValue } from '../../ui/liveValue';
 
 const NODE_URL = 'https://nodejs.org/en/download';
 export type DevDiagnosis = IpcResults['dev:diagnose'];
@@ -9,11 +10,12 @@ export function DevOffline({
   devDiag,
   onRestart,
 }: {
-  readonly devLog?: string | undefined;
+  readonly devLog?: LiveValue<string> | undefined;
   readonly devDiag?: DevDiagnosis | undefined;
   readonly onRestart?: () => void;
 }) {
   const [showLog, setShowLog] = useState(false);
+  const log = useLiveValue(devLog ?? NO_LIVE_TEXT);
   const message = offlineMessage(devDiag);
   return (
     <>
@@ -28,7 +30,7 @@ export function DevOffline({
           Using Node {devDiag.nodeVersion ?? '?'} — {devDiag.nodePath}
         </div>
       )}
-      {devLog && (
+      {log && (
         <>
           <button
             className="ghost offline-log-toggle"
@@ -36,7 +38,7 @@ export function DevOffline({
           >
             {showLog ? 'Hide log' : 'Show log'}
           </button>
-          {showLog && <pre className="offline-log">{devLog}</pre>}
+          {showLog && <pre className="offline-log">{log}</pre>}
         </>
       )}
     </>

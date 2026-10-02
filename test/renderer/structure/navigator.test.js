@@ -458,7 +458,12 @@ const WORDS = elementNode('words', 'p', [{ id: 'w-text', kind: 'expr', value: '{
           onChangeLayout: () => {},
           onCodeChange: () => {},
           onOpenCodePanel: () => opened.push('code'),
-          devLog: '[astro] Unable to render index.astro',
+          // Live, as the app hands it over (src/ui/liveValue.ts).
+          devLog: {
+            get: () => '[astro] Unable to render index.astro',
+            set: () => {},
+            subscribe: () => () => {},
+          },
           hasClipboard: false,
         }),
       );

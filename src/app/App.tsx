@@ -275,6 +275,7 @@ import {
 } from '../features/preview/previewGate';
 import { describePreviewStale, type PreviewVerdict } from '../../shared/page/previewToken';
 import type { JudgeCanvasEvent } from '../features/preview/previewRuntime';
+import { createLiveValue, useLiveValue } from '../ui/liveValue';
 import {
   describePreviewReload,
   parseShortcutMessage,
@@ -2640,6 +2641,7 @@ function deleteHistoryBranch(app: ShellView, branch: string): Promise<void> {
 }
 
 function CanvasPane({ app }: { readonly app: ShellView }) {
+  const hoverNodeId = useLiveValue(app.hoverNode);
   return (
     <PreviewPane
       spacingHover={app.spacingHover}
@@ -2658,7 +2660,7 @@ function CanvasPane({ app }: { readonly app: ShellView }) {
       }}
       pathScope={app.editedRel ? `${app.editedRel}|` : ''}
       selPath={app.pathFor(app.selectedId)}
-      navHoverPath={app.pathFor(app.hoverNodeId)}
+      navHoverPath={app.pathFor(hoverNodeId)}
       overlayInfo={app.overlayInfo}
       focusPath={app.focusPath}
       focusOcc={app.focusOcc}
@@ -3397,28 +3399,48 @@ function useCanvasReportState() {
   // effect below re-check the moment a report lands rather than on a timer.
   const classesForRef = useRef<string | undefined>(undefined);
   const [classesTick, setClassesTick] = useState(0);
-  const [hoverNodeId, setHoverNodeId] = useState<string | undefined>(undefined);
+  // The navigator row under the pointer: a live value, read by the canvas pane
+  // alone, so crossing rows does not re-render the app (src/ui/liveValue.ts).
+  const [hoverNode] = useState(() => createLiveValue<string | undefined>(undefined));
   // Paths the page reports as having actually rendered something. Null until
   // the page has said anything, which is not the same as "nothing rendered".
-  const [renderedPaths, setRenderedPaths] = useState<readonly string[] | undefined>(undefined);
+  const [renderedPaths, setRenderedPathsState] = useState<readonly string[] | undefined>(undefined);
   // Nodes the page says are there but taking no part: display:none, and
   // pointer-events:none. Marked in the navigator (see StructurePanel).
-  const [nodeStates, setNodeStates] = useState<NodeStates | undefined>(undefined);
+  const [nodeStates, setNodeStatesState] = useState<NodeStates | undefined>(undefined);
   // Path to the classes that node rendered with, for labelling rows whose
   // class is an expression the source can't resolve.
-  const [nodeClasses, setNodeClasses] = useState<
+  const [nodeClasses, setNodeClassesState] = useState<
     Readonly<Record<string, readonly string[]>> | undefined
   >(undefined);
+  // The canvas re-reports after every walk of the page, mostly with what it
+  // said last time. A report equal to the one held keeps the held one, and
+  // React skips the render a new array or object would have cost the app.
+  const setRenderedPaths = useCallback(
+    (next: readonly string[] | undefined) =>
+      setRenderedPathsState((held) => (sameReport(held, next) ? held : next)),
+    [],
+  );
+  const setNodeStates = useCallback(
+    (next: NodeStates | undefined) =>
+      setNodeStatesState((held) => (sameReport(held, next) ? held : next)),
+    [],
+  );
+  const setNodeClasses = useCallback(
+    (next: Readonly<Record<string, readonly string[]>> | undefined) =>
+      setNodeClassesState((held) => (sameReport(held, next) ? held : next)),
+    [],
+  );
   return {
     classesForRef,
     classesTick,
-    hoverNodeId,
+    hoverNode,
     nodeClasses,
     nodeStates,
     renderedPaths,
     selectedClasses,
     setClassesTick,
-    setHoverNodeId,
+    setHoverNodeId: hoverNode.set,
     setNodeClasses,
     setNodeStates,
     setRenderedPaths,
@@ -3426,12 +3448,30 @@ function useCanvasReportState() {
   };
 }
 
+// Two canvas reports say the same thing: the same object, or the same content.
+// Reports are built in a fixed order, so equal content serializes equally; a
+// report that differs only in order reads as changed and costs one render,
+// never a wrong one.
+function sameReport(held: unknown, next: unknown): boolean {
+  if (held === next) {
+    return true;
+  }
+  if (held === undefined || next === undefined) {
+    return false;
+  }
+  return JSON.stringify(held) === JSON.stringify(next);
+}
+
 // The dev server, the busy overlay and the toast.
 function useDevState() {
   const [devUrl, setDevUrl] = useState<string | undefined>(undefined);
   const [trailingSlash, setTrailingSlash] = useState<TrailingSlash>('ignore');
   const [devStatus, setDevStatus] = useState<DevStatus>('off');
-  const [devLog, setDevLog] = useState('');
+  // Dev-server output arrives a chunk at a time and is shown in two corners
+  // (DevOffline, the parse-error view): a live value they read, so a chunk
+  // re-renders them rather than the app (src/ui/liveValue.ts).
+  const [devLog] = useState(() => createLiveValue(''));
+  const setDevLog = devLog.set;
   const [devDiag, setDevDiag] = useState<DevDiagnosis | undefined>(undefined);
   const [busy, setBusy] = useState<string | undefined>(undefined);
   const [toast, setToast] = useState<ToastMessage | undefined>(undefined);

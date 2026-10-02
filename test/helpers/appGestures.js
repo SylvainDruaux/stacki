@@ -30,13 +30,17 @@ function parsed(file, text) {
   return parsePage(text, { locs: true });
 }
 
-// A panel that records its props and renders nothing.
+// A panel that records its props, counts its renders and renders nothing.
 const panelStub = (name) =>
   "export const relativeTime = () => ''; " +
   'export default function Panel(props) { ' +
-  `globalThis.__panels[${JSON.stringify(name)}] = props; return null; }`;
+  `globalThis.__panels[${JSON.stringify(name)}] = props; ` +
+  `globalThis.__renders[${JSON.stringify(name)}] = ` +
+  `(globalThis.__renders[${JSON.stringify(name)}] || 0) + 1; return null; }`;
 
-async function mountApp(root, files, build) {
+// `options.bridge` replaces bridge calls (a bench emitting dev-server output);
+// `options.wrap` wraps the app element (a bench's React Profiler).
+async function mountApp(root, files, build, options = {}) {
   const directory = path.join(repoPath('node_modules/.stacki-test'), build);
   fs.mkdirSync(directory, { recursive: true });
   await esbuild.build({
@@ -85,6 +89,7 @@ async function mountApp(root, files, build) {
   window.ResizeObserver = global.ResizeObserver;
   window.matchMedia = () => ({ matches: false, addEventListener() {}, removeEventListener() {} });
   global.__panels = {};
+  global.__renders = {};
   global.IS_REACT_ACT_ENVIRONMENT = true;
   const documents = createNodeDocumentActors({
     log: () => {},
@@ -130,6 +135,7 @@ async function mountApp(root, files, build) {
       onFsChanged: () => () => {},
       gitInfo: async () => ({ isRepo: false }),
       onCssChanged: () => () => {},
+      ...options.bridge,
     },
     {
       get: (target, key) =>
@@ -148,7 +154,8 @@ async function mountApp(root, files, build) {
   const reactRoot = createRoot(document.getElementById('root'));
   const App = require(path.join(directory, 'app.js')).default;
   await act(async () => {
-    reactRoot.render(React.createElement(App));
+    const element = React.createElement(App);
+    reactRoot.render(options.wrap ? options.wrap(element) : element);
     await tick();
   });
   await act(async () => {

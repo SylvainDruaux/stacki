@@ -21,6 +21,7 @@ import {
 import CodeEditor from '../../ui/CodeEditor';
 import { ContextMenu, NodeList } from './StructureTree';
 import { parseNavigatorDrop } from './navigatorDrop';
+import { NO_LIVE_TEXT, useLiveValue, type LiveValue } from '../../ui/liveValue';
 
 interface StructurePanelProps {
   readonly pageState: StructurePageState | undefined;
@@ -55,8 +56,9 @@ interface StructurePanelProps {
   /** Typed code (step 8): the same handler as the code panel's. */
   readonly onCodeChange: (source: string, position: number) => void;
   readonly onOpenCodePanel: () => void;
-  /** The dev server's recent output: Astro's own account of the page. */
-  readonly devLog?: string | undefined;
+  /** The dev server's recent output: Astro's own account of the page. Live,
+   * so a chunk of output re-renders the view that shows it, not the panel. */
+  readonly devLog?: LiveValue<string> | undefined;
 }
 
 export default function StructurePanel(props: StructurePanelProps) {
@@ -113,6 +115,7 @@ function ParseErrorPage({
   readonly projection: Extract<StructureProjection, { readonly tag: 'parse-error' }>;
 }) {
   const [diagnostic] = projection.diagnostics;
+  const output = useLiveValue(devLog ?? NO_LIVE_TEXT);
   return (
     <div className="panel-section grow">
       <div className="panel-header">
@@ -137,10 +140,10 @@ function ParseErrorPage({
             Open in the code panel
           </button>
         </div>
-        {devLog && (
+        {output && (
           <details className="parse-error-output">
             <summary>Astro’s output</summary>
-            <pre>{devLog}</pre>
+            <pre>{output}</pre>
           </details>
         )}
         <div className="code-panel-editor">
