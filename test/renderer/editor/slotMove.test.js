@@ -16,6 +16,7 @@ const fs = require('fs');
 const path = require('path');
 const { pathToFileURL } = require('url');
 const { repoPath } = require('../../helpers/sources.js');
+const { readAppSource } = require('../../helpers/sourceText.js');
 
 const failures = [];
 let checked = 0;
@@ -103,7 +104,8 @@ const check = (what, condition, detail) => {
   );
 
   // --- the move asks -----------------------------------------------------------------
-  const app = fs.readFileSync(repoPath('src/app/App.tsx'), 'utf8');
+  // The app shell and the modules it was split into (src/app).
+  const app = readAppSource();
   const move = app.slice(
     app.indexOf('const moveNode = useCallback'),
     app.indexOf('const removeNode = useCallback'),

@@ -22,7 +22,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { compactSource } = require('../../helpers/sourceText.js');
+const { compactSource, readAppSource } = require('../../helpers/sourceText.js');
 const { repoPath } = require('../../helpers/sources.js');
 
 const failures = [];
@@ -342,7 +342,8 @@ const { posts = [] } = Astro.props;`;
       /className="dp-item-nav" onClick=\{\(event\) => event\.stopPropagation\(\)\}/.test(picker),
       'stepping would choose the item as the binding',
     );
-    const app = fs.readFileSync(repoPath('src/app/App.tsx'), 'utf8').replace(/\r\n/g, '\n');
+    // The app shell and the modules it was split into (src/app).
+    const app = readAppSource();
     check(
       'the app keeps a place per item name',
       /itemIndex,\n\s*onStepItem:/.test(app),

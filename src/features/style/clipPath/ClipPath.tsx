@@ -75,14 +75,6 @@ import {
 import './ClipPath.css';
 import { ClipPathView } from './ClipPathView';
 
-// A field the user types into: the canvas's keyboard shortcuts leave it alone.
-
-// Reading the Webflow selection.
-
-// Writing the clip-path.
-
-// The editor: the class tags, the preset menu, the canvas, and the code.
-
 function useClipPathEditorPart1(editor: ClipPathProps) {
   const stage1 = Object.assign(editor, useShapeState());
   const stage2 = Object.assign(stage1, useHandleSelectionState());

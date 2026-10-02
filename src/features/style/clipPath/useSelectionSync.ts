@@ -13,6 +13,7 @@ import {
   readSelectedElement,
 } from './clipPathSelectionRead';
 
+// Reading the Webflow selection.
 export function useSelectionSync(editor: EditorAfterWindowKeyListeners) {
   const { selectionReadInProgressRef, selectionReadSeqRef, selectionReadTimerRef } = editor;
   const { activeBreakpointRef, setIsClipPathLabelMenuOpen, refreshSelectedElementRef } = editor;

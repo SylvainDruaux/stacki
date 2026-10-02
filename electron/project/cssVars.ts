@@ -29,22 +29,6 @@ import type { Declaration, Rule as PostcssRule } from 'postcss';
 // property, one column per thing — which is both shorter and the way the
 // author was thinking when they wrote it.
 
-// Folders deeper than the stylesheet bound are not where a project keeps its CSS; the rename walk
-// covers the whole project, where a config or a helper module can sit two levels deeper. A
-// `var()` chain longer than the resolve bound is shown as written rather than followed.
-
-// --- naming ----------------------------------------------------------------
-
-// --- what a value is ---------------------------------------------------------
-//
-// A variable is worth showing as a swatch when it resolves to a colour, and
-// resolving means following `var(--x)` until it stops moving. Two things stop
-// it: a value with no variables left in it, and a value that cannot be worked
-// out at all — `color-mix(in lab, currentcolor 10%, transparent)` depends on
-// what it lands on, and no editor can preview that honestly.
-
-// --- the model -------------------------------------------------------------
-
 interface SetValuePayload {
   readonly file: string;
   readonly valueStart: number;

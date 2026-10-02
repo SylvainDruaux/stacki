@@ -52,6 +52,7 @@ import {
 } from './clipPathStyleWrite';
 import { type EditorAfterWindowKeyListeners } from './clipPathSelectionRead';
 
+// Writing the clip-path.
 export function useClipPathWrite(editor: EditorAfterWindowKeyListeners) {
   const { styleRef, onApplyRef, css, localWritePendingRef, lastWrittenRef, writeTimerRef } = editor;
   // The flush runs after this render is gone; it reads the editor through this ref.

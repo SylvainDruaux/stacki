@@ -23,6 +23,7 @@ const fs = require('fs');
 const path = require('path');
 const { pathToFileURL } = require('url');
 const { repoPath } = require('../../helpers/sources.js');
+const { readAppSource } = require('../../helpers/sourceText.js');
 
 const failures = [];
 let checked = 0;
@@ -280,7 +281,8 @@ const check = (what, condition, detail) => {
   }
 
   // --- the app asks for both ----------------------------------------------------------
-  const app = fs.readFileSync(repoPath('src/app/App.tsx'), 'utf8');
+  // The app shell and the modules it was split into (src/app).
+  const app = readAppSource();
   check(
     'deleting prunes what it made dead',
     /const dead = unusedDeclarations\(next\)/.test(app),

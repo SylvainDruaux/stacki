@@ -23,7 +23,7 @@
 const fs = require('fs');
 const path = require('path');
 const { pathToFileURL } = require('url');
-const { containsCode } = require('../../helpers/sourceText.js');
+const { containsCode, readAppSource } = require('../../helpers/sourceText.js');
 const { repoPath } = require('../../helpers/sources.js');
 
 const failures = [];
@@ -173,7 +173,8 @@ const settle = (ms = 20) => new Promise((resolve) => setTimeout(resolve, ms));
     'an outside edit batched with an app write loses the flag',
   );
 
-  const app = fs.readFileSync(repoPath('src/app/App.tsx'), 'utf8');
+  // The app shell and the modules it was split into (src/app).
+  const app = readAppSource();
   check(
     'the app tells the canvas about an outside edit',
     containsCode(app, "if (event.external) { tellCanvas({ type: 'avb:patch-now' }); }"),

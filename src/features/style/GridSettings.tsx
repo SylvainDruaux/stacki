@@ -37,10 +37,6 @@ import { type TrackSectionProps, AutoSection, Modal } from './GridAutoSection';
 // minmax(min, max) pair) — plus the auto-generated track sizes and (read-only for now)
 // the areas. Resolved-model API; writes an explicit space-separated grid-template.
 
-// Webflow's grid track glyphs: a GEAR for minmax/custom, an "A" for auto/content, and
-// a double-arrow for everything else (fr / lengths). The arrow points along the axis
-// (↔ columns, ↕ rows) and the faint grid lines flank that same axis.
-
 const BRACES_ICON_PATH =
   'M6.4 2.5c-1.2 0-1.7.6-1.7 1.7v1.9c0 1-.3 1.4-1.2 1.4v1c.9 0 1.2.4 1.2 1.4v1.9' +
   'c0 1.1.5 1.7 1.7 1.7M9.6 2.5c1.2 0 1.7.6 1.7 1.7v1.9c0 1 .3 1.4 1.2 1.4v1' +

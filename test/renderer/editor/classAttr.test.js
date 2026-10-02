@@ -18,7 +18,7 @@ const os = require('os');
 const path = require('path');
 const { parsePage, serializePage } = require('#dist/electron/parse/astroParser.js');
 const { repoPath } = require('../../helpers/sources.js');
-const { readSourceFolder } = require('../../helpers/sourceText.js');
+const { readAppSource, readSourceFolder } = require('../../helpers/sourceText.js');
 
 const failures = [];
 let checked = 0;
@@ -176,7 +176,8 @@ const { class: className } = Astro.props;
   check('once', (written.match(/"hero"/g) || []).length === 1, written);
 
   // --- the panel is wired to it ----------------------------------------------
-  const app = fs.readFileSync(repoPath('src/app/App.tsx'), 'utf8');
+  // The app shell and the modules it was split into (src/app).
+  const app = readAppSource();
   check(
     'the style panel is the one given onAddClass',
     /<StylePanel[\s\S]{0,2000}?onAddClass=/.test(app),

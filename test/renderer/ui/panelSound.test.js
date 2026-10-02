@@ -16,6 +16,7 @@
 const fs = require('fs');
 const path = require('path');
 const { repoPath, sourceSpecifier } = require('../../helpers/sources.js');
+const { readAppSource } = require('../../helpers/sourceText.js');
 
 const failures = [];
 let checked = 0;
@@ -252,12 +253,18 @@ function fakeAudio() {
   check('but not on a disabled one', /!button\.disabled/.test(props));
   check('and it is a sound scope', /<SoundHere>/.test(props), 'its dropdowns would be silent');
   check('so is the style panel', /<SoundHere>/.test(style));
-  const scopes = [
-    'src/app/App.tsx',
-    'src/features/pages/PagesPanel.tsx',
-    'src/features/terminal/TerminalDock.tsx',
-    'src/features/welcome/WelcomeScreen.tsx',
-  ].filter((file) => /<SoundHere>/.test(read(file)));
+  const others = {
+    // The app shell and every module it was split into, read as one.
+    'src/app': readAppSource(),
+    ...Object.fromEntries(
+      [
+        'src/features/pages/PagesPanel.tsx',
+        'src/features/terminal/TerminalDock.tsx',
+        'src/features/welcome/WelcomeScreen.tsx',
+      ].map((file) => [file, read(file)]),
+    ),
+  };
+  const scopes = Object.keys(others).filter((file) => /<SoundHere>/.test(others[file]));
   check('and nothing else is', scopes.length === 0, scopes.join(', '));
 
   if (failures.length) {

@@ -68,6 +68,22 @@ function readSourceFolder(entry, relativeFolder) {
   return readSourceGroup([entry, ...names.map((name) => `${relativeFolder}/${name}`)]);
 }
 
+// The app shell's source, read as one: App.tsx, the panels it loads lazily, and
+// the model, state and shell modules it was split into (src/app). A check about
+// the app's wiring finds it in whichever of those files it now lives.
+const APP_FOLDERS = ['src/app/model', 'src/app/state', 'src/app/shell'];
+function readAppSource() {
+  const files = ['src/app/App.tsx', 'src/app/appPanels.ts'];
+  for (const folder of APP_FOLDERS) {
+    const names = fs.readdirSync(repoPath(folder)).filter((name) => /\.tsx?$/.test(name));
+    if (names.length === 0 || names.length > FOLDER_FILES_MAX) {
+      throw new Error(`source-text: ${folder} holds ${names.length} source files`);
+    }
+    files.push(...names.sort().map((name) => `${folder}/${name}`));
+  }
+  return readSourceGroup(files);
+}
+
 // The compact form described above.
 function compactSource(text) {
   return text
@@ -120,6 +136,7 @@ function sourceBlock(source, start) {
 module.exports = {
   compactSource,
   containsCode,
+  readAppSource,
   readSource,
   readSourceFolder,
   readSourceGroup,

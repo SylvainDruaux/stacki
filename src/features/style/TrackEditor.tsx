@@ -12,6 +12,9 @@ import { panelSpan } from './model/panelBox';
 import { parseTrackSize, trackKind, type TrackSize } from './model/gridTemplate';
 import { WarnIcon } from './GridSettingsKit';
 
+// Webflow's grid track glyphs: a GEAR for minmax/custom, an "A" for auto/content, and
+// a double-arrow for everything else (fr / lengths). The arrow points along the axis
+// (↔ columns, ↕ rows) and the faint grid lines flank that same axis.
 export const FAINT_ROW = 'M1 1H15V2H1V1ZM1 14H15V15H1V14Z';
 export const FAINT_COL = 'M1 1V15H2V1H1ZM14 1V15H15V1H14Z';
 export const GEAR_PATH =

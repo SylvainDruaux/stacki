@@ -1,0 +1,475 @@
+// The canvas and the right panel: the canvas pane and its covers, selecting
+// or opening a canvas path, the right tabs with the style tab and the
+// settings handlers, the code window's host, the conflict notice, and the
+// busy overlay and toast (App.tsx).
+
+import type { Attr } from '../../../shared/page/pageNode';
+import { noteText } from '../../editor/treeSelection';
+import { canvasClickAction } from '../../editor/canvasClick';
+import PreviewPane from '../../features/preview/PreviewPane';
+import { relativeTime } from '../../features/history/HistoryPanel';
+import SaveConflictNotice from '../SaveConflictNotice';
+import CapabilityNotice from '../CapabilityNotice';
+import { nodeCapability } from '../../editor/nodeCapability';
+import { nodeAtPath } from '../../editor/editorTree';
+import type { PickedAsset } from '../../ui/AssetField';
+import type { InlineNode } from '../../features/props/RichContent';
+import type { Rename } from '../../features/props/propNodeEditors';
+import type { PropValues } from '../../features/props/propRules';
+import { type ToastMessage } from '../appTypes';
+import { findEditorNodeById as findNodeById } from '../../editor/pageState';
+import { type EditorNode } from '../../editor/pageView';
+import { useLiveValue } from '../../ui/liveValue';
+import {
+  PropsPanel,
+  StylePanel,
+  CodeWindow,
+  CmsView,
+  ContentView,
+  VariablesView,
+} from '../appPanels';
+import { holdsInlineText, commentAbove, trailOf } from '../model/pageGestures';
+import type { ShellView } from '../App';
+
+export function CanvasPane({ app }: { readonly app: ShellView }) {
+  const hoverNodeId = useLiveValue(app.hoverNode);
+  return (
+    <PreviewPane
+      spacingHover={app.spacingHover}
+      devUrl={app.devUrl}
+      devStatus={app.devStatus}
+      devLog={app.devLog}
+      devDiag={app.devDiag}
+      route={app.pageUrlPath}
+      refreshKey={app.refreshKey}
+      crumbs={app.crumbs}
+      onCrumb={(id) => app.setSelectedId(id)}
+      onRefresh={() => app.setRefreshKey((count) => count + 1)}
+      onRestart={() => {
+        // Starting the dev server reports its own failure in the preview area.
+        void app.startPreview(app.project.path);
+      }}
+      pathScope={app.editedRel ? `${app.editedRel}|` : ''}
+      selPath={app.pathFor(app.selectedId)}
+      navHoverPath={app.pathFor(hoverNodeId)}
+      overlayInfo={app.overlayInfo}
+      focusPath={app.focusPath}
+      focusOcc={app.focusOcc}
+      focusWhole={app.focusWhole}
+      device={app.device}
+      onDevice={app.setDevice}
+      judgeEvent={app.judgeEvent}
+      onStaleEvent={app.onStaleEvent}
+      onPreviewReload={app.onPreviewReload}
+      onSelectPath={(path, info) => selectCanvasPath(app, path ?? undefined, info)}
+      onSelectedClasses={app.receiveClasses}
+      onRenderedPaths={app.setRenderedPaths}
+      onNodeStates={app.setNodeStates}
+      onNodeClasses={app.setNodeClasses}
+      onOpenPath={(path, occurrence) => openCanvasPath(app, path ?? undefined, occurrence)}
+    />
+  );
+}
+
+// What a click on the canvas MEANT — see canvasClick.js. The canvas answers with a
+// path or with nothing, and nothing has two causes that want opposite things: a click
+// the open file doesn't own, and a click on something inside it the canvas couldn't
+// name.
+export function selectCanvasPath(
+  app: ShellView,
+  path: string | undefined,
+  info: { readonly outside: boolean } | undefined,
+): void {
+  const reveal = (node: EditorNode | undefined) => {
+    if (!node) {
+      return;
+    }
+    app.setSelectedId(node.id);
+    // Code and canvas are two views of the same selection. Keep
+    // code open when it is already in use; every other panel gives
+    // way to the navigator so the selected row is visible.
+    app.setLeftTab((tab) => (tab === 'code' ? tab : 'navigator'));
+    app.setRevealTick((count) => count + 1);
+  };
+  const { kind } = canvasClickAction({
+    path: path ?? undefined,
+    outside: !!info?.outside,
+    focusPath: app.focusPath,
+    scope: app.editedRel ? `${app.editedRel}|` : '',
+  });
+  if (kind === 'nothing') {
+    return;
+  }
+  if (kind === 'close') {
+    // Opening the parent file reports its own failures.
+    void app.closeComponent();
+    return;
+  }
+  const { model } = app;
+  if (kind === 'layout') {
+    reveal(model && findNodeById(model.nodes, 'layout'));
+    return;
+  }
+  reveal(model && path ? nodeAtPath(model.nodes, trailOf(path)) : undefined);
+}
+
+// Double-clicking a component on the canvas drills into it. With no path the click
+// landed on chrome the layout renders itself (nav, footer) — that markup belongs to
+// the layout, so open the layout, matching what a single click there selects.
+export function openCanvasPath(app: ShellView, path: string | undefined, occurrence: number): void {
+  if (!path) {
+    if (app.layoutNode?.name) {
+      void app.openComponent(app.layoutNode.name, app.pathFor('layout')).catch(app.reportFailure);
+    }
+    return;
+  }
+  const node = app.model && nodeAtPath(app.model.nodes, trailOf(path));
+  if (!node) {
+    return;
+  }
+  // Astro built-ins have no project component file to open.
+  if (node.kind === 'component' && !node.astroAsset && node.name !== 'Fragment') {
+    void app.openComponent(node.name, path, occurrence).catch(app.reportFailure);
+    return;
+  }
+  // Nothing to drill into. But a double-click on a paragraph asks
+  // to edit its words — that's what the gesture means everywhere
+  // else — so it goes where the words are: Settings, caret in
+  // Content. Only where that field exists; on a wrapper full of
+  // elements the double-click has nothing to offer and does
+  // nothing, rather than opening a panel to say so.
+  if (holdsInlineText(node)) {
+    app.setRightTab('settings');
+    app.setContentFocus((count) => count + 1);
+  }
+}
+
+// The CMS edits content, not layout — it covers the canvas rather than replacing it,
+// so the preview keeps its loaded page.
+export function CanvasCovers({ app }: { readonly app: ShellView }) {
+  return (
+    <>
+      {app.varsGroup && app.leftTab === 'variables' && (
+        <VariablesView
+          project={app.project}
+          selected={app.varsGroup}
+          hidden={app.leftTab !== 'variables'}
+          showToast={app.showToast}
+          onRecordUndo={app.pushCommand}
+          onClose={() => app.setVarsGroup(undefined)}
+        />
+      )}
+      {app.contentName && (
+        <ContentView
+          project={app.project}
+          name={app.contentName}
+          hidden={app.leftTab !== 'cms'}
+          showToast={app.showToast}
+          onSaved={() => app.setCmsTick((count) => count + 1)}
+          onClose={() => app.setContentName(undefined)}
+        />
+      )}
+      {app.cmsRel && (
+        <CmsView
+          project={app.project}
+          rel={app.cmsRel}
+          hidden={app.leftTab !== 'cms'}
+          settings={app.cmsSettings}
+          showToast={app.showToast}
+          onRecordUndo={app.pushCommand}
+          onSaved={() => app.setCmsTick((count) => count + 1)}
+          onCloseSettings={() => app.setCmsSettings(false)}
+          onDeleted={() => {
+            app.setCmsRel(undefined);
+            app.setCmsSettings(false);
+          }}
+          onClose={() => app.setCmsRel(undefined)}
+        />
+      )}
+    </>
+  );
+}
+
+// An old version covers the canvas rather than replacing what it points at. The
+// editing canvas draws outlines from the model, and the model is read from the files
+// on disk — which are the CURRENT ones. Pointed at an old server it would draw this
+// version's boxes over that version's page: every outline in the wrong place, and every
+// click editing a file that isn't what's on screen. An overlay cannot do that, because
+// there is nothing to click.
+export function OldVersionCover({ app }: { readonly app: ShellView }) {
+  const { oldVersionUrl, previewInfo } = app;
+  if (!oldVersionUrl || !previewInfo) {
+    return undefined;
+  }
+  return (
+    <div className="preview-mode old-version">
+      <div className="preview-banner">
+        <span className="preview-banner-text">
+          You’re looking at <strong>{previewInfo.subject}</strong> — how the site was{' '}
+          {relativeTime(previewInfo.when ?? '')}. This is a look, not a place to work.
+        </span>
+        <button className="preview-banner-exit" onClick={app.onExitCommitPreview}>
+          Back to now
+        </button>
+      </div>
+      <iframe src={oldVersionUrl} title="An earlier version of the site" />
+    </div>
+  );
+}
+
+export function RightPanel({ app }: { readonly app: ShellView }) {
+  const { model, selectedId } = app;
+  return (
+    <div className="panel right">
+      <RightTabs app={app} />
+      <CapabilityNotice
+        capability={
+          model && selectedId && selectedId !== 'frontmatter'
+            ? nodeCapability(model, selectedId)
+            : undefined
+        }
+      />
+      {app.rightTab === 'style' && <StyleTab app={app} />}
+      <div style={{ display: app.rightTab === 'settings' ? 'contents' : 'none' }}>
+        <PropsPanel {...settingsValues(app)} {...settingsHandlers(app)} />
+      </div>
+    </div>
+  );
+}
+
+export function RightTabs({ app }: { readonly app: ShellView }) {
+  const tabs = [
+    { id: 'style', label: 'Style' },
+    { id: 'settings', label: 'Settings' },
+  ] as const;
+  const { rightTabRefs } = app;
+  return (
+    <div className="right-tabs">
+      {app.rightTabInd && <span className="right-tabs-indicator" style={app.rightTabInd} />}
+      {tabs.map((tab) => (
+        <button
+          key={tab.id}
+          ref={(button) => {
+            // React hands a detached button back as null.
+            rightTabRefs.current[tab.id] = button ?? undefined;
+          }}
+          className={app.rightTab === tab.id ? 'on' : ''}
+          onClick={() => app.setRightTab(tab.id)}
+        >
+          {tab.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+export function StyleTab({ app }: { readonly app: ShellView }) {
+  const { selectedId } = app;
+  return (
+    <StylePanel
+      project={app.project}
+      model={app.model}
+      node={app.selectedNode}
+      device={app.device}
+      onWriteStyleNode={(nodeId, css, immediate) => {
+        // Editing a component: a <style> block of the PAGE is not in
+        // the model this writes into, and mutating nothing would look
+        // like a save. Report it instead — the panel holds the edit
+        // and writes it when the component closes.
+        const state = app.pageStateRef.current.pageState;
+        if (!state?.editable || !findNodeById(state.model.nodes, nodeId)) {
+          return false;
+        }
+        app.setNodeText(nodeId, css, undefined, immediate || 'live');
+        return true;
+      }}
+      onSelectNode={app.setSelectedId}
+      onRecordUndo={app.pushCommand}
+      onAddClass={(name) =>
+        selectedId
+          ? app.addClassToNode(selectedId, name)
+          : Promise.resolve({ tag: 'refused', message: 'no element is selected' })
+      }
+      onSpacingHover={app.setSpacingHover}
+      pathOf={app.pathFor}
+      renderedClasses={app.selectedClasses}
+      projectClasses={app.projectClasses}
+      historyTick={app.historyTick}
+      openFilePath={app.openEditableFile?.path ?? undefined}
+      openFileKind={app.openEditableFile?.kind ?? undefined}
+    />
+  );
+}
+
+// What the Settings tab shows about the selection.
+export function settingsValues(app: ShellView) {
+  const { selectedNode, selectedId } = app;
+  const component =
+    selectedNode?.kind === 'component'
+      ? app.insertables.find((entry) => entry.name === selectedNode.name)
+      : undefined;
+  return {
+    node: selectedNode,
+    focusClass: app.classFocus,
+    focusContent: app.contentFocus,
+    isLayout: selectedId === 'layout',
+    layouts: app.scan.layouts,
+    currentLayoutName: app.currentLayoutName,
+    schema: app.selectedSchema,
+    slotOptions: app.slotOptions,
+    // Whether this component takes default slot content — the same
+    // test used to decide what an insert or paste can go inside.
+    takesSlotText: (component?.slots || []).includes('default'),
+    loopContext: app.loopContext,
+    bindContext: app.bindContext,
+    linkContext: app.linkContext,
+    projectClasses: app.projectClasses,
+    allowAttrs:
+      selectedNode?.kind === 'element' ||
+      // A dynamic tag renders a real element, so it takes attributes
+      // even though it has no component file behind it.
+      (selectedNode !== undefined &&
+        selectedNode.kind !== 'frontmatter' &&
+        !!selectedNode.dynamicTag) ||
+      !!component?.hasRest,
+    comment: noteText(commentAbove(app.model, selectedId)?.value),
+    tagOptions: app.tagOptions,
+    frontmatterSource: app.frontmatterCode,
+    projectPath: app.project.path,
+    filePath: app.editStack[app.editStack.length - 1]?.path || app.currentPage?.path || undefined,
+  };
+}
+
+// What the Settings tab's fields write, each to the selection.
+export function settingsHandlers(app: ShellView) {
+  const { selectedId } = app;
+  return {
+    ...settingsTextHandlers(app),
+    onChangeLayout: app.onChangeLayout,
+    onSetComment: (text: string) => {
+      if (selectedId) {
+        app.setComment(selectedId, text);
+      }
+    },
+    onSetProp: (propName: string, value: Attr | undefined, immediate?: boolean) => {
+      if (selectedId) {
+        app.setProp(selectedId, propName, value, immediate);
+      }
+    },
+    onSetProps: (nodeId: string, patch: PropValues) => app.setProps(nodeId, patch),
+    onSetAssetProp: (nodeId: string, propName: string, picked: PickedAsset) => {
+      void app.setAssetProp(nodeId, propName, picked).catch(app.reportFailure);
+    },
+    onRenameProp: (oldName: string, newName: string) => {
+      if (selectedId) {
+        app.renameProp(selectedId, oldName, newName);
+      }
+    },
+    // A capital is a component name; anything else is a tag. The
+    // component path answers whether the name resolves, so the
+    // field can put the old value back when it doesn't.
+    onChangeTag: (tag: string) => {
+      if (!selectedId) {
+        return undefined;
+      }
+      return /^[A-Z]/.test(tag)
+        ? app.changeNodeKind(selectedId, tag)
+        : app.changeElementTag(selectedId, tag);
+    },
+    onOpenCode: app.openCodeWindow,
+    onSetFrontmatter: app.setExtraFrontmatter,
+    onOpenSymbol: app.onOpenSymbol,
+    onToggleElse: (want: boolean) => {
+      if (selectedId) {
+        app.toggleElseBranch(selectedId, want);
+      }
+    },
+  };
+}
+
+// What the Settings tab's text fields write: the node's text, its content, its words.
+export function settingsTextHandlers(app: ShellView) {
+  const { selectedId } = app;
+  return {
+    onSetText: (value: string, renames?: readonly Rename[]) => {
+      if (selectedId === 'frontmatter') {
+        app.setFrontmatter(value);
+      } else if (selectedId) {
+        app.setNodeText(selectedId, value, renames);
+      }
+    },
+    onSetContent: (value: string) => {
+      if (selectedId) {
+        app.setNodeContent(selectedId, value);
+      }
+    },
+    onSetInline: (kids: readonly InlineNode[]) => {
+      if (selectedId) {
+        app.setNodeInline(selectedId, kids);
+      }
+    },
+  };
+}
+
+// The floating code window: page frontmatter, a raw node's inner content, or a text
+// file.
+export function CodeWindowHost({ app }: { readonly app: ShellView }) {
+  const { codeWin, codeWinValue, isFileWin } = app;
+  if (!codeWin || codeWinValue === undefined) {
+    return undefined;
+  }
+  const targetId = codeWin.targetId;
+  return (
+    <CodeWindow
+      title={codeWin.title}
+      language={codeWin.language}
+      value={codeWinValue}
+      editorKey={isFileWin ? `file:${codeWin.rel}` : targetId}
+      revealLine={codeWin.revealLine}
+      onChange={(value) => {
+        if (isFileWin) {
+          app.setAssetFileText(value);
+        } else if (targetId === 'frontmatter') {
+          app.setFrontmatter(value);
+        } else if (targetId) {
+          app.setNodeText(targetId, value);
+        }
+      }}
+      onClose={() => app.setCodeWin(undefined)}
+    />
+  );
+}
+
+export function ConflictNotice({ app }: { readonly app: ShellView }) {
+  const page = app.currentPage;
+  if (app.pageState?.save.tag !== 'conflicted' || !page?.path) {
+    return undefined;
+  }
+  return (
+    <SaveConflictNotice
+      fileName={page.name}
+      reason={app.conflictReason}
+      reviewing={app.leftTab === 'code'}
+      onReload={() => {
+        void app.reloadFromDisk();
+      }}
+      onReview={() => {
+        void app.reviewConflictInCode();
+      }}
+      onKeep={app.keepLocalVersion}
+    />
+  );
+}
+
+export function BusyOverlay({ message }: { readonly message: string }) {
+  return (
+    <div className="busy-overlay">
+      <div className="spinner" />
+      <div>{message}</div>
+    </div>
+  );
+}
+
+export function Toast({ toast }: { readonly toast: ToastMessage }) {
+  return <div className={`toast ${toast.kind}`}>{toast.msg}</div>;
+}

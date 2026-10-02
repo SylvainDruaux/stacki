@@ -15,6 +15,7 @@
 const fs = require('fs');
 const path = require('path');
 const { repoPath } = require('../../helpers/sources.js');
+const { readAppSource } = require('../../helpers/sourceText.js');
 
 const failures = [];
 let checked = 0;
@@ -757,7 +758,8 @@ const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
     const css = fs.readFileSync(repoPath('src/app/styles.css'), 'utf8');
     check('padding is pink', /\.spacing-band\.is-padding \{\s*--band: #ec4899;\s*\}/.test(css));
     check('and margin is blue', /\.spacing-band\.is-margin \{\s*--band: #3b82f6;\s*\}/.test(css));
-    const app = fs.readFileSync(repoPath('src/app/App.tsx'), 'utf8');
+    // The app shell and the modules it was split into (src/app).
+    const app = readAppSource();
     check(
       'the panel is wired to the canvas',
       /onSpacingHover=\{(app\.)?setSpacingHover\}/.test(app) &&

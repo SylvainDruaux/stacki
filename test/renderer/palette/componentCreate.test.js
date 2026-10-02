@@ -20,7 +20,7 @@
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const { sourceBlock } = require('../../helpers/sourceText.js');
+const { readAppSource, sourceBlock } = require('../../helpers/sourceText.js');
 const { repoPath } = require('../../helpers/sources.js');
 
 const failures = [];
@@ -904,7 +904,8 @@ const check = (what, condition, detail) => {
     );
 
     // The press itself is bound in the app, which this can only read.
-    const appSource = fs.readFileSync(repoPath('src/app/App.tsx'), 'utf8');
+    // The app shell and the modules it was split into (src/app).
+    const appSource = readAppSource();
     // The whole `if` that tests for the key, body included, however it is wrapped.
     const binding = sourceBlock(
       appSource,

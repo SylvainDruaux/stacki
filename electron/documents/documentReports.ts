@@ -14,6 +14,7 @@ import { type ByteString } from '../../shared/core/span';
 import { NodeDocumentDisk } from './documentDisk';
 import { type DocumentTelemetry } from './documentTelemetry';
 
+/** What one write came to, for the IPC layer to report. */
 export type WriteReport =
   /** `inverse` restores what the write replaced, in the bytes it left (Undo of
    * a Markdown page's whole save, step 9): the replacement's changed region

@@ -17,6 +17,7 @@ const fs = require('fs');
 const path = require('path');
 const { pathToFileURL } = require('url');
 const { repoPath } = require('../../helpers/sources.js');
+const { readAppSource } = require('../../helpers/sourceText.js');
 
 const failures = [];
 let checked = 0;
@@ -739,7 +740,8 @@ function fakeAudio() {
   );
   check('but not on a disabled one', /!button\.disabled/.test(panel));
 
-  const app = fs.readFileSync(repoPath('src/app/App.tsx'), 'utf8');
+  // The app shell and the modules it was split into (src/app).
+  const app = readAppSource();
   check('the app reads it on load', /readAppSettings\(\)\s*\.then/.test(app));
   check('and follows the menu after that', /onSoundSettingChanged\(/.test(app));
 

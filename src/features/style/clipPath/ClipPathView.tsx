@@ -19,6 +19,7 @@ import { BreakpointIcon, PresetIcon } from './ClipPathIcons';
 import { type EditorProps } from './clipPathWriteActions';
 import { ShortcutHelpGroups, ClipPathCanvas } from './ClipPathCanvas';
 
+// The editor: the class tags, the preset menu, the canvas, and the code.
 export function ClipPathView({ editor }: EditorProps) {
   const { shortcutHelpPortalTarget, hideClassPicker, codeValue } = editor;
   const { selectedCodeTokenHighlights, onCodeChange, onCodeSelectionChange } = editor;

@@ -26,11 +26,6 @@ import { LayerEditor } from './BackgroundLayerEditor';
 // Deferred (still editable as raw text where relevant): the asset picker for
 // images and a visual gradient editor — a layer's value is edited as its CSS.
 
-// ─────────────────────────── Layer editor ───────────────────────────
-
-// A field bound to one longhand of one layer. Recomputes that longhand's whole
-// comma list from `layers` (with the edit applied) and writes it live / on blur.
-
 // ─────────────────────────── Section ───────────────────────────
 
 export default function BackgroundSection(props: Props) {

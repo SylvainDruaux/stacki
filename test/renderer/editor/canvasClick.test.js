@@ -19,7 +19,7 @@
 const fs = require('fs');
 const path = require('path');
 const { pathToFileURL } = require('url');
-const { containsCode } = require('../../helpers/sourceText.js');
+const { containsCode, readAppSource } = require('../../helpers/sourceText.js');
 const { repoPath } = require('../../helpers/sources.js');
 
 const failures = [];
@@ -106,7 +106,8 @@ const check = (what, condition, detail) => {
   );
 
   // --- the panel asks -----------------------------------------------------------
-  const app = fs.readFileSync(repoPath('src/app/App.tsx'), 'utf8');
+  // The app shell and the modules it was split into (src/app).
+  const app = readAppSource();
   check('the canvas handler goes through it', /canvasClickAction\(\{/.test(app));
   check('and passes what the canvas said about the click', /outside: !!info\?\.outside/.test(app));
 

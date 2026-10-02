@@ -15,6 +15,7 @@
 const fs = require('fs');
 const path = require('path');
 const { repoPath } = require('../../helpers/sources.js');
+const { readAppSource } = require('../../helpers/sourceText.js');
 
 const failures = [];
 let checked = 0;
@@ -355,7 +356,8 @@ const WORDS = elementNode('words', 'p', [{ id: 'w-text', kind: 'expr', value: '{
   // A condition dropped from the palette starts as the one thing it is: a
   // test and what it shows. The else is a switch in the props panel.
   {
-    const app = fs.readFileSync(repoPath('src/app/App.tsx'), 'utf8');
+    // The app shell and the modules it was split into (src/app).
+    const app = readAppSource();
     const insert = app.slice(
       app.indexOf("item.type === 'cond'"),
       app.indexOf("item.type === 'comment'"),

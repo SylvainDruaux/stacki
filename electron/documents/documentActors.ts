@@ -90,8 +90,6 @@ export {
   type CurrentError,
 } from './documentReports';
 
-/** What one write came to, for the IPC layer to report. */
-
 /** The app's host: the real disk, the shipping planner, the real parser, and
  * one structured telemetry line per outcome on `log`. */
 export function createNodeDocumentActors(input: {

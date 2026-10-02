@@ -6,6 +6,9 @@ import path from 'path';
 import postcss from 'postcss';
 import type { Declaration, Rule as PostcssRule } from 'postcss';
 
+// Folders deeper than the stylesheet bound are not where a project keeps its CSS; the rename walk
+// covers the whole project, where a config or a helper module can sit two levels deeper. A
+// `var()` chain longer than the resolve bound is shown as written rather than followed.
 export const CSS_VARIABLE_LIMITS = {
   stylesheetDepthMax: 8,
   renameTargetDepthMax: 10,

@@ -63,6 +63,7 @@ import { parseSvgClipPathShape } from './svgContours';
 import { clipPathShortcutGroups, matchPreset } from './clipPathShortcuts';
 import { resolveCascadeWinnerClipPathStyle } from './clipPathStyleWrite';
 
+// A field the user types into: the canvas's keyboard shortcuts leave it alone.
 export function isEditableTarget(target: HTMLElement | undefined) {
   return Boolean(
     target &&

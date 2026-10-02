@@ -40,8 +40,8 @@ function applyEditRequest(text, edit) {
   return { text: written, inverse: inverseEdits(planned.value.splices) };
 }
 
-// The editors App.tsx loads lazily, by component name. The test reads the
-// lazyPanel(() => import(…)) calls from App.tsx itself, so this list pins which
+// The editors the app loads lazily, by component name. The test reads the
+// lazyPanel(() => import(…)) calls from src/app/appPanels.ts itself, so this list pins which
 // editors are lazy without pinning where their files live.
 const LAZY_PANELS = [
   'PropsPanel',
@@ -276,18 +276,18 @@ async function buildApp() {
     logLevel: 'silent',
     plugins: [
       stubSources('deferred-panel-imports', {
-        'src/app/App.tsx': (filename) => {
+        'src/app/appPanels.ts': (filename) => {
           const source = fs.readFileSync(filename, 'utf8');
           const found = [...source.matchAll(LAZY_IMPORT)].map((match) => match[1]);
           const names = found.map((specifier) => path.basename(specifier));
-          assert.deepEqual(names, LAZY_PANELS, 'App.tsx loads exactly these editors lazily');
+          assert.deepEqual(names, LAZY_PANELS, 'the app loads exactly these editors lazily');
           const contents = found.reduce((code, specifier) => {
             const expression = `import('${specifier}')`;
             const name = path.basename(specifier);
             const deferredImport = `globalThis.__loadTestPanel('${name}', () => ${expression})`;
             return code.replace(expression, deferredImport);
           }, source);
-          return { contents, loader: 'tsx' };
+          return { contents, loader: 'ts' };
         },
         'src/features/code/CodeWindow.tsx': () => ({
           contents: panelStub('CodeWindow'),

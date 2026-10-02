@@ -30,6 +30,10 @@ import {
   stepInPlace,
 } from './BackgroundKit';
 
+// ─────────────────────────── Layer editor ───────────────────────────
+
+// A field bound to one longhand of one layer. Recomputes that longhand's whole
+// comma list from `layers` (with the edit applied) and writes it live / on blur.
 export function LayerLonghandField({
   field,
   prop,
