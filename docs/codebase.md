@@ -94,9 +94,12 @@ Four cooperating processes, each with one job:
   properties in `properties/`, project services in `project/`, and git, the
   dev-server preview and the terminal (node-pty) in their own folders. See
   the directory map below.
-- **Preload** (`electron/preload/preload.ts`): a sandboxed bridge exposing an
-  allowlisted `window.avb` API via `contextBridge`. Must stay CommonJS
-  (Electron ≥ 33 sandbox requirement).
+- **Preload** (`electron/preload/`): in the app's window, a sandboxed bridge
+  exposing an allowlisted `window.avb` API via `contextBridge`
+  (`preloadBridge.ts`); in preview frames, the canvas script (`frame*.ts`).
+  The sandbox's `require` reaches only `electron`, so its modules ship as one
+  CommonJS bundle (`scripts/build/bundleClients.ts`; Electron ≥ 33 sandbox
+  requirement).
 - **Renderer** (`src/`, React 19 + Vite, ESM): layered folders under one
   entry, `src/main.tsx`. `src/app/App.tsx` is the application shell and owns
   the page model; each side view (structure, props, style, pages, assets,
@@ -106,8 +109,9 @@ Four cooperating processes, each with one job:
 - **Astro dev server**: the _user's project's own_ dev server. Stacki renders
   the canvas by embedding it, so the preview is always exactly what Astro
   produces — no re-implementation of Astro semantics. A small injected client
-  script (`electron/previewClient/morphClient.ts` and friends) maps DOM ↔ source nodes for
-  hover/selection and morphs the DOM on edits.
+  script maps DOM ↔ source nodes for hover/selection (the preload's frame
+  half), and the morph client (`electron/previewClient/`, bundled into one
+  module served as `virtual:avb-morph`) morphs the DOM on edits.
 
 ## The rendering pipeline
 
@@ -305,8 +309,9 @@ pain, in priority order:
    (pinned first by a recorded characterization suite), `EmbedEditor` and
    `App` became folders of composers and views, `main.ts` hands its IPC to
    `electron/handlers/`, and `astroParser.ts` is a facade over layered
-   `electron/parse/astro*.ts` modules. Two files stay whole for the runtime:
-   the sandboxed preload and the morph client served to the canvas as text.
+   `electron/parse/astro*.ts` modules. The sandboxed preload and the morph
+   client, which the runtime loads as one file each, are modules bundled
+   back into that file by esbuild (`scripts/build/bundleClients.ts`).
 
 Explicit non-changes: no state library (the WeakMap ack issue is
 identity-vs-version, not missing stores), no `.astro` AST dependency (loses
@@ -327,7 +332,7 @@ batching/queueing write path (already the right shape).
 | `electron/project/` | Scaffolding, the watcher, thumbnails, assets, CSS variables |
 | `electron/git/`, `preview/`, `terminal/` | Git; the dev server and preview worktree; the terminal |
 | `electron/previewServer/` | Modules the project's own dev server runs (unpacked) |
-| `electron/previewClient/`, `preload/` | The preview's browser script; the sandboxed bridge |
+| `electron/previewClient/`, `preload/` | The canvas's morph client; the preload (bridge and frame script), each bundled to one file |
 | `electron/app/` | main.ts's payload validation, window bounds and auto update |
 | `src/main.tsx` | The renderer's entry: mounts `src/app/App.tsx` |
 | `src/lib/` | Generic utilities that know nothing of pages or features |

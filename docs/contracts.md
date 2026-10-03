@@ -351,7 +351,7 @@ after). The generated config itself lives in `node_modules/.avb`.
   Markdown and MDX pages carry no stamp: their markers come from the Markdown
   processor's tree, which never sees the file's bytes (carried at step 10);
   their layouts' stamps are still checked, and every edit is checked by main.
-- The canvas patch (`electron/previewClient/morphClient.ts`) is bounded by
+- The canvas patch (`electron/previewClient/`, the caps in `morphBudget.ts`) is bounded by
   `previewMarkersMax` markers per rendering and `previewMorphWorkMax`
   child-list matrix cells per patch; main prepends `AVB_PREVIEW_LIMITS` from
   `shared/core/limits.ts` to the source it serves. Past either the page reloads and
@@ -408,7 +408,8 @@ build (`test/legacy-parity.bench.js`) was retired at step 10 with the
 ## Required gate
 
 Run `env -u ELECTRON_RUN_AS_NODE npm test` before merging. The gate cleans and
-rebuilds `dist/`, compiles Electron, preload, and shared contracts, builds the
+rebuilds `dist/`, compiles Electron and shared contracts, type-checks and
+bundles the preload and the morph client, builds the
 renderer, runs strict `tsc --noEmit`, ESLint, Prettier, the policy scan and the
 adapter-surface ratchet, and then every test suite: each `*.test.js` and
 `*.test.ts` under `test/`, found by name (`scripts/gate/testDiscovery.ts`).
