@@ -12,20 +12,17 @@ const path = require('node:path');
 const { JSDOM } = require('jsdom');
 const { repoPath } = require('../../helpers/sources.js');
 const { transpileSource } = require('../../helpers/sourceText.js');
+const loadMorphModules = require('../../helpers/morphModules.js');
 
-const source = transpileSource('electron/previewClient/morphClient.ts');
 const dom = new JSDOM('<!doctype html><html><head></head><body></body></html>');
 const document = dom.window.document;
-// Main prepends the patcher's bounds from shared/core/limits.ts (step 7).
+global.document = document;
+// The client's modules, bundled for jsdom; main prepends the patcher's bounds
+// from shared/core/limits.ts (step 7).
 const { LIMITS } = require('#dist/shared/core/limits.js');
-const morph = new Function(
-  'document',
-  'AVB_PREVIEW_LIMITS',
-  `${source.slice(
-    source.indexOf('const isAnchor ='),
-    source.indexOf('function fetchDoc'),
-  )}\nreturn { diffChildren, findLive, patchChildren, addedScripts, runScripts };`,
-)(document, LIMITS);
+const morph = loadMorphModules(LIMITS);
+// The diff alone, with a counting Int32Array, from its own module's source.
+const source = transpileSource('electron/previewClient/morphPatch.ts');
 
 const tree = (html) => {
   const root = document.createElement('div');

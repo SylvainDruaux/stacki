@@ -31,7 +31,7 @@ const fs = require('fs');
 const path = require('path');
 const Module = require('module');
 const { repoPath } = require('../../helpers/sources.js');
-const { transpileSource } = require('../../helpers/sourceText.js');
+const loadMorphModules = require('../../helpers/morphModules.js');
 
 const failures = [];
 let checked = 0;
@@ -62,18 +62,10 @@ const FOOTER = `
     const dom = new JSDOM('<!doctype html><body></body>');
     global.document = dom.window.document;
 
-    // morphClient is an ES module the dev server serves to the page; the one
-    // function under test is lifted out rather than imported.
-    const source = transpileSource('electron/previewClient/morphClient.ts');
-    const start = source.indexOf('const isAnchor =');
-    const end = source.indexOf('// Never looked inside.');
-    // Main prepends the patcher's bounds from shared/core/limits.ts (step 7).
+    // The client's modules, bundled for jsdom; main prepends the patcher's
+    // bounds from shared/core/limits.ts (step 7).
     const { LIMITS } = require('#dist/shared/core/limits.js');
-    const syncAnchors = new Function(
-      'document',
-      'AVB_PREVIEW_LIMITS',
-      `${source.slice(start, end)}\nreturn syncAnchors;`,
-    )(dom.window.document, LIMITS);
+    const { syncAnchors } = loadMorphModules(LIMITS);
 
     const server = dom.window.document.createElement('div');
     server.innerHTML = FOOTER;

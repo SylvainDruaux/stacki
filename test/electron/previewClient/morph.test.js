@@ -36,42 +36,28 @@ const check = (what, condition, detail) => {
 
 const { JSDOM } = require('jsdom');
 const { repoPath } = require('../../helpers/sources.js');
-const { readSource, transpileSource } = require('../../helpers/sourceText.js');
+const { readFolderSource, readSource } = require('../../helpers/sourceText.js');
+const loadMorphModules = require('../../helpers/morphModules.js');
 const dom = new JSDOM('<!doctype html><body></body>');
 global.document = dom.window.document;
 
-// morphClient is an ES module the dev server serves to the page; the patching
-// half is lifted out rather than imported, as in test/electron/previewClient/commentRegion.test.js.
-const source = transpileSource('electron/previewClient/morphClient.ts');
-const start = source.indexOf('const isAnchor =');
-const end = source.indexOf('// A script that CHANGED, or one that is GONE');
-// Main prepends the patcher's bounds from shared/core/limits.ts (step 7); the lifted
-// half takes them as a parameter, so the cap tests below can shrink them.
+// The client's modules, bundled for jsdom (test/helpers/morphModules.js); its
+// whole source, for the checks below that read it as text.
+const source = readFolderSource('electron/previewClient');
+// Main prepends the patcher's bounds from shared/core/limits.ts (step 7); the
+// bundle takes them as a parameter, so the cap tests below can shrink them.
 const { LIMITS } = require('#dist/shared/core/limits.js');
 const assert = require('node:assert/strict');
-const lift = (limits) =>
-  new Function(
-    'document',
-    'AVB_PREVIEW_LIMITS',
-    `${source.slice(start, end)}\n` +
-      'return { patchChildren, findLive, syncAnchors, syncStamps, checkMarkerCap, ' +
-      'refillMorphWork, OverCap };',
-  )(dom.window.document, limits);
-const { patchChildren, findLive, syncAnchors, syncStamps } = lift({
+const lift = (limits) => loadMorphModules(limits);
+const morph = lift({
   previewMarkersMax: LIMITS.previewMarkersMax,
   previewMorphWorkMax: LIMITS.previewMorphWorkMax,
 });
+const { patchChildren, findLive, syncAnchors, syncStamps } = morph;
 
-// The other half of the same decision: whether to patch at all. Lifted the same
-// way, from the comment that introduces it to the fetch below it.
-const sigStart = source.indexOf("// A component's <style> is delivered as a MODULE");
-const sigEnd = source.indexOf('function fetchDoc');
+// The other half of the same decision: whether to patch at all.
 const { scriptSignature, isStyleModule, loadStyles, refreshDevStyles, addedScripts, runScripts } =
-  new Function(
-    'document',
-    `${source.slice(sigStart, sigEnd)}\nreturn { scriptSignature, isStyleModule, loadStyles, ` +
-      `refreshDevStyles, addedScripts, runScripts };`,
-  )(dom.window.document);
+  morph;
 
 // Every patch here goes through this: a throw is the failure mode under test
 // (the client turns it into location.reload()), so it is reported as one rather

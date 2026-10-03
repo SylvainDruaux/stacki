@@ -23,7 +23,10 @@ interface DiffImplementation {
 }
 
 const root = repositoryRoot();
-const SOURCE_PATH = 'electron/previewClient/morphClient.ts';
+const SOURCE_PATH = 'electron/previewClient/morphPatch.ts';
+// Where the diff lived before the client was split into modules, for a
+// reference revision from then.
+const SOURCE_PATH_BEFORE_SPLIT = 'electron/previewClient/morphClient.ts';
 
 function load(source: string): DiffImplementation {
   let allocatedBytes = 0;
@@ -87,16 +90,25 @@ const current = load(
   asJavaScript(fs.readFileSync(path.join(root, SOURCE_PATH), 'utf8'), SOURCE_PATH),
 );
 const reference = process.argv[2];
-const referencePath = process.argv[3] ?? SOURCE_PATH;
-const before = reference ? load(referenceSource(reference, referencePath)) : undefined;
+const before = reference ? load(referenceSource(reference, process.argv[3])) : undefined;
 
-// A revision's source, as JavaScript.
-function referenceSource(revision: string, file: string): string {
-  const source = execFileSync('git', ['show', `${revision}:${file}`], {
-    cwd: root,
-    encoding: 'utf8',
-  });
-  return asJavaScript(source, file);
+// A revision's source, as JavaScript: the named file, or wherever the diff
+// lived in that revision.
+function referenceSource(revision: string, named: string | undefined): string {
+  const candidates = named === undefined ? [SOURCE_PATH, SOURCE_PATH_BEFORE_SPLIT] : [named];
+  for (const file of candidates) {
+    try {
+      const source = execFileSync('git', ['show', `${revision}:${file}`], {
+        cwd: root,
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'ignore'],
+      });
+      return asJavaScript(source, file);
+    } catch {
+      // Not in this revision; try where it lived before.
+    }
+  }
+  throw new Error(`No preview diff source in ${revision}: ${candidates.join(', ')}`);
 }
 
 // A TypeScript file is transpiled, which keeps the comments the diff's own
