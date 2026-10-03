@@ -19,7 +19,7 @@
 const fs = require('fs');
 const path = require('path');
 const { repoPath } = require('../../helpers/sources.js');
-const { transpileSource } = require('../../helpers/sourceText.js');
+const loadRenderer = require('../../helpers/rendererModule.js');
 
 const failures = [];
 let checked = 0;
@@ -30,25 +30,12 @@ const check = (what, condition, detail) => {
   }
 };
 
-// The measuring function, lifted out of preload.js. It is defined inside a
-// closure there and there is no way to import it, so it is read from the file
-// and evaluated — which keeps this honest: an edit to preload changes what
-// runs here.
+// The measuring function, from the module that defines it (the preload's
+// sources are modules; the app ships them as one bundle). It reads the page
+// through the global window, which the test points at its own document.
 function loadGapBandsFor(window) {
-  const source = transpileSource('electron/preload/preload.ts');
-  // gapBandsFor and the helpers it calls, which sit just above it.
-  const start = source.indexOf('  const gapChildRects = (element) => {');
-  const at = source.indexOf('  const gapBandsFor = (element, cs) => {');
-  if (start === -1 || at === -1) {
-    throw new Error('gapBandsFor not found in preload.js — has it been renamed?');
-  }
-  // tsc's emit of preload.ts indents every level with four spaces — the
-  // function's own closing brace sits at that depth. (The shipped preload is a
-  // bundle, whose text is the bundler's; the source is transpiled here.)
-  const end = source.indexOf('\n    };', at);
-  const body = source.slice(start, end + '\n    };'.length);
-
-  return new Function('window', `${body}\nreturn gapBandsFor;`)(window);
+  global.window = window;
+  return loadRenderer('electron/preload/frameMeasure.ts').gapBandsFor;
 }
 
 (async () => {

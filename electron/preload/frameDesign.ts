@@ -1,0 +1,189 @@
+// Which frame this is, and what that changes. A class on <html> says canvas
+// (`stacki-designer`) or interactive preview (`stacki-preview`); a design-mode
+// frame (#avb-design) also gets an editor cursor, inert links and forms, and
+// passes the editor's own shortcuts to the app.
+
+// Marks <html> with the frame's mode, now and at the first two moments a frame
+// that is still being created certainly has one.
+export function markFrameMode(): void {
+  // Which frame the page is in, as a class on <html>, so a project can style
+  // for the editor: `stacki-designer` in the canvas, `stacki-preview` in the
+  // interactive preview. Read from the frame's own URL rather than waited for
+  // over a message — the page paints before the app can say anything, and a
+  // canvas that started out looking like the preview would flash.
+  //
+  // The patcher leaves it alone: it applies the classes the SERVER's two
+  // renderings disagree about, and neither of them has ever heard of these.
+  const stackiMode = location.hash.includes('avb-design') ? 'stacki-designer' : 'stacki-preview';
+  const markMode = () => document.documentElement?.classList.add(stackiMode);
+  // <html> exists by the time a preload runs, but not always in a frame that
+  // is still being created — so try again at the first two moments it
+  // certainly does.
+  markMode();
+  document.addEventListener('readystatechange', markMode);
+  window.addEventListener('DOMContentLoaded', markMode);
+}
+
+// Design-mode frames (canvas + editor preview) are marked with #avb-design.
+// They get an editor cursor (no I-beam over text) and links/forms are
+// inert — navigation only happens in the interactive preview mode.
+export function listenForDesign(): void {
+  if (location.hash.includes('avb-design')) {
+    showDesignCursor();
+    makeNavigationInert();
+    forwardModifiers();
+    window.addEventListener('keydown', forwardShortcut, true);
+  }
+}
+
+function showDesignCursor(): void {
+  const injectDesignStyle = () => {
+    if (document.getElementById('avb-design-style')) {
+      return;
+    }
+    const style = document.createElement('style');
+    style.id = 'avb-design-style';
+    style.textContent = '*, *::before, *::after { cursor: default !important; }';
+    (document.head || document.documentElement)?.appendChild(style);
+  };
+  if (document.readyState === 'loading') {
+    window.addEventListener('DOMContentLoaded', injectDesignStyle);
+  } else {
+    injectDesignStyle();
+  }
+}
+
+function makeNavigationInert(): void {
+  // Block navigation and submits at capture so page handlers never fire.
+  window.addEventListener(
+    'click',
+    (event) => {
+      const anchor = event.target instanceof Element ? event.target.closest('a[href]') : undefined;
+      if (anchor) {
+        event.preventDefault();
+      }
+    },
+    true,
+  );
+  window.addEventListener('submit', (event) => event.preventDefault(), true);
+  // A press on the canvas is a selection, not an interaction — and left to
+  // the browser, a press focuses whatever is under the pointer. Focusing
+  // something REVEALS it: the page scrolls to bring it into view, sideways
+  // as well as down.
+  //
+  // A card in a slider is covered by a full-bleed link and half of them sit
+  // past the right edge, so selecting one scrolled the canvas across. The
+  // page it came from is 3399px wide against a 1280px frame, so there is a
+  // long way to travel and nothing on screen to say what happened: the site
+  // simply looks as though it has slipped off to the left.
+  //
+  // The frame still takes focus itself — that is what carries the modifiers
+  // (forwardModifiers), and what a page's own keyboard handlers listen from. It is the
+  // ELEMENT focus, and the scroll that comes with it, that goes.
+  window.addEventListener(
+    'mousedown',
+    (event) => {
+      if (event.button !== 0) {
+        return;
+      }
+      event.preventDefault();
+      window.focus();
+    },
+    true,
+  );
+}
+
+function forwardModifiers(): void {
+  // Which modifiers are held, forwarded for the same reason as the shortcuts
+  // below: clicking an element on the canvas puts keyboard focus in here, so
+  // every key after that is delivered to this frame and never reaches the
+  // app. The style panel reads Shift and Option to decide how much of the
+  // spacing box a hover or a drag applies to — and from the app's side,
+  // nobody was pressing anything.
+  let held = { shiftKey: false, altKey: false };
+  const tellModifiers = (event: { shiftKey: boolean; altKey: boolean }) => {
+    const next = { shiftKey: !!event.shiftKey, altKey: !!event.altKey };
+    if (next.shiftKey === held.shiftKey && next.altKey === held.altKey) {
+      return;
+    }
+    held = next;
+    try {
+      window.parent.postMessage({ type: 'avb:modifiers', ...held }, '*');
+    } catch {
+      /* no parent to tell */
+    }
+  };
+  // Any key event, not just the modifiers themselves — see the style panel's
+  // hover hook: what matters is the state now, so a keyup missed while this
+  // frame was out of focus is corrected by whatever happens next.
+  window.addEventListener('keydown', tellModifiers, true);
+  window.addEventListener('keyup', tellModifiers, true);
+  // Nothing is held once the page stops receiving keys.
+  window.addEventListener('blur', () => tellModifiers({ shiftKey: false, altKey: false }));
+}
+
+// Forward app shortcuts when the canvas has keyboard focus — otherwise
+// ⌘F/⌘E die inside the iframe and the insert palette never opens.
+function forwardShortcut(event: KeyboardEvent): void {
+  const mod = event.metaKey || event.ctrlKey;
+  if (mod && (event.key.toLowerCase() === 'f' || event.key.toLowerCase() === 'e')) {
+    event.preventDefault();
+    try {
+      window.parent.postMessage({ type: 'avb:shortcut', name: 'insert' }, '*');
+    } catch {
+      /* ignore */
+    }
+    return;
+  }
+  const target = event.target;
+  const typing =
+    target instanceof window.HTMLElement &&
+    (target.tagName === 'INPUT' ||
+      target.tagName === 'TEXTAREA' ||
+      target.tagName === 'SELECT' ||
+      target.isContentEditable);
+  if (typing) {
+    return;
+  }
+
+  // Clicking the canvas puts keyboard focus inside this frame, so the
+  // app's own arrow-key navigation would never see the keys. Forward
+  // them (and swallow them here, so the page doesn't scroll instead).
+  if (
+    !mod &&
+    !event.altKey &&
+    !event.shiftKey &&
+    ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)
+  ) {
+    event.preventDefault();
+    try {
+      window.parent.postMessage({ type: 'avb:shortcut', name: 'arrow', key: event.key }, '*');
+    } catch {
+      /* ignore */
+    }
+    return;
+  }
+
+  // Editing the selected node from the canvas. Undo, copy and paste
+  // already survive an iframe-focused canvas because they're native
+  // menu accelerators, which fire whatever holds focus; delete and
+  // duplicate have no menu item, so without this they only work when
+  // the selection was made in the navigator.
+  const isDelete = !mod && !event.altKey && (event.key === 'Delete' || event.key === 'Backspace');
+  const isDuplicate = mod && !event.altKey && !event.shiftKey && event.key.toLowerCase() === 'd';
+  // ⌘Enter jumps to the class field. The canvas is where the selection is
+  // usually made, so it has to reach the app from in here too.
+  const isClassJump = mod && !event.altKey && !event.shiftKey && event.key === 'Enter';
+  const isProperties = !mod && !event.altKey && !event.shiftKey && event.key.toLowerCase() === 'k';
+  if (isDelete || isDuplicate || isClassJump || isProperties) {
+    event.preventDefault();
+    try {
+      window.parent.postMessage(
+        { type: 'avb:shortcut', name: 'key', key: event.key, meta: mod },
+        '*',
+      );
+    } catch {
+      /* ignore */
+    }
+  }
+}

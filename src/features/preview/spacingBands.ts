@@ -52,7 +52,7 @@ export function spacingBands(
 ): readonly Band[] {
   // Gap is not four numbers on this element — it is the space between its
   // children, and where those children are is a question only the laid-out
-  // page can answer. The canvas measures it (see gapBandsFor in preload.js)
+  // page can answer. The canvas measures it (see gapBandsFor in electron/preload/frameMeasure.ts)
   // and sends the rectangles, so there is nothing to work out here beyond
   // which axis was asked for.
   if (kind === 'gap') {

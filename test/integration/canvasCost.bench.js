@@ -1,4 +1,4 @@
-// Goal: what the canvas script (electron/preload/preload.ts, the half that runs
+// Goal: what the canvas script (electron/preload/frame*.ts, the half that runs
 // inside the preview frame) spends on a large page, per thing that happens to
 // it. A measurement, not a test: it asserts nothing about speed, and prints a
 // table to compare before and after a change.

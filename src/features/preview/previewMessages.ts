@@ -70,7 +70,7 @@ export function describePreviewReload(reason: PreviewReloadReason): string | und
 }
 
 /** A shortcut the canvas frame forwards while it holds keyboard focus
- * (electron/preload/preload.ts): the app replays it as its own key event. */
+ * (electron/preload/frameDesign.ts): the app replays it as its own key event. */
 export type ShortcutMessage =
   | { readonly name: 'insert' }
   | { readonly name: 'arrow'; readonly key: string }

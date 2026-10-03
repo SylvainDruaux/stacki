@@ -57,7 +57,7 @@ export default function useDismiss(
     };
 
     // And the canvas says so itself. Every click in it is posted up to this
-    // window (see electron/preload/preload.ts), which is a signal that does not depend
+    // window (see electron/preload/frameTargets.ts), which is a signal that does not depend
     // on how focus behaves — belt and braces, since the two cost the same and
     // a menu left hanging over the page is the thing being fixed.
     const onMessage = (event: MessageEvent<unknown>): void => {
