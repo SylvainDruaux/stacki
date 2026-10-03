@@ -18,19 +18,7 @@ import fs from 'fs';
 import path from 'path';
 
 import { toRecord, toArray } from '../../shared/core/record';
-
-/** The package an entrypoint belongs to, when it is inside one. */
-function packageOf(entrypoint: unknown): string | undefined {
-  // Resolve the innermost package, including Windows paths and pnpm's
-  // node_modules/.pnpm/.../node_modules/<package> layout.
-  const normalized = '/' + String(entrypoint || '').replace(/\\/g, '/');
-  const at = normalized.lastIndexOf('/node_modules/');
-  if (at === -1) {
-    return undefined;
-  }
-  const match = normalized.slice(at + '/node_modules/'.length).match(/^((?:@[^/]+\/)?[^/]+)/);
-  return match?.[1];
-}
+import { packageOf } from '../lib/installedPackages';
 
 export interface InjectedRoute {
   readonly route: string;
@@ -86,4 +74,4 @@ function readInjectedRoutes(projectPath: string): InjectedRoute[] {
   return injected;
 }
 
-export { readInjectedRoutes, packageOf };
+export { readInjectedRoutes };

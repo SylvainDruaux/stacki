@@ -16,6 +16,12 @@
 //   name with its case swapped and compare identities. Without one (a missing
 //   file, a name without letters) the platform default holds until a probe in
 //   the same directory decides.
+// - Installed code: a file inside node_modules is never locked, replaced or
+//   created (electron/lib/installedPackages.ts). The check is on where the
+//   write would land, folder links and file links resolved, so no spelling of
+//   the path slips past it — pnpm's hard-linked `file:` dependencies live under
+//   the project's own node_modules, and a write there reached the package's
+//   source.
 import { randomUUID } from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -57,6 +63,7 @@ import {
   type AtomicWriteError,
 } from './atomicWrite';
 import { readSourceBytes } from '../lib/mainLimits';
+import { isInstalledFile, packageOf } from '../lib/installedPackages';
 
 /** A lock older than this whose owner cannot be asked is abandoned: no save
  * holds its lock for more than one read, one write and one read-back. */
@@ -99,6 +106,10 @@ export class NodeDocumentDisk implements DocumentDisk {
     if (!target.ok) {
       return err({ code: 'failed', message: target.error.message });
     }
+    const installed = refuseInstalled(target.value);
+    if (!installed.ok) {
+      return installed;
+    }
     const lockFile = lockFileOf(target.value);
     const first = this.#tryLock(file, lockFile);
     if (first.ok || first.error.code === 'failed') {
@@ -132,6 +143,11 @@ export class NodeDocumentDisk implements DocumentDisk {
   }
 
   replace(file: FilePath, bytes: ByteString): Result<void, ReplaceError> {
+    // Checked again under the lock: a folder can become a link in between.
+    const installed = refuseInstalled(file);
+    if (!installed.ok) {
+      return installed;
+    }
     const replaced = replaceFileAtomic(file, bytes);
     if (replaced.ok) {
       return replaced;
@@ -143,6 +159,10 @@ export class NodeDocumentDisk implements DocumentDisk {
    * an intent — there are no authored bytes to witness — so the host calls it
    * directly and the actor adopts the file on its next read. */
   create(file: FilePath, bytes: ByteString): Result<void, CreateError> {
+    const installed = refuseInstalled(file);
+    if (!installed.ok) {
+      return installed;
+    }
     const created = createFileExclusive(file, bytes);
     if (created.ok) {
       return created;
@@ -427,6 +447,40 @@ function swapCase(name: string): string {
       return lower === character ? character.toLocaleUpperCase('en-US') : lower;
     })
     .join('');
+}
+
+/** Refuse a write that would land inside node_modules (see header). */
+function refuseInstalled(
+  file: string,
+): Result<void, { readonly code: 'failed'; readonly message: string }> {
+  const landing = landingOf(file);
+  assert(path.isAbsolute(landing), 'A landing path is absolute');
+  if (isInstalledFile(landing)) {
+    const owner = packageOf(landing);
+    const what =
+      owner === undefined ? 'is inside node_modules' : `belongs to the installed package ${owner}`;
+    return err({
+      code: 'failed',
+      message:
+        `${path.basename(landing)} ${what}, so Stacki will not save it: the next install ` +
+        `would replace the change, and the package may be shared with other projects. ` +
+        `Edit the package's own source instead.`,
+    });
+  }
+  return ok(undefined);
+}
+
+// Where a write to `file` lands: its link followed (atomicWrite.ts), then its
+// folder's links. A dangling link or a missing folder keeps the path as
+// given; the write itself reports those.
+function landingOf(file: string): string {
+  const target = writeTargetOf(file);
+  const resolved = target.ok ? target.value : path.resolve(file);
+  try {
+    return path.join(fs.realpathSync.native(path.dirname(resolved)), path.basename(resolved));
+  } catch {
+    return resolved;
+  }
 }
 
 function replaceError(error: AtomicWriteError): ReplaceError {

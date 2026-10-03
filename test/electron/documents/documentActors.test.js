@@ -3,7 +3,8 @@
 // `rewrite-text` of the diff, since step 10) applies and hands back the
 // checksum the persistence layer adopts (§5.2); a stale
 // base, another writer after the rename, and a missing file are typed
-// rejections, never overwrites; a replace whose folder could not be flushed is
+// rejections, never overwrites; installed code (node_modules), whatever path
+// reaches it, is refused; a replace whose folder could not be flushed is
 // `uncertain` and reconciled at once by comparison (§3.5); a full queue
 // answers `backpressured` (§3.5); a batch leases its actors in sorted canonical
 // order whatever order it names them in (§3.3); two spellings of one file meet
@@ -199,6 +200,51 @@ test('a missing file: writeText refuses, writeCurrent and create make it', () =>
     assert.equal(created.ok, false);
     assert.equal(created.error.code, 'exists');
     assert.equal(fs.readFileSync(file, 'utf8'), '<div/>');
+  });
+});
+
+// The reported case: pnpm installs a `file:` dependency as hard links under the
+// site's own node_modules, so a save through that path reached the package's
+// source, shared by every site that uses it. Installed code is refused before a
+// lock file is made beside it, and every byte stays as it was.
+test('a pnpm-installed file is refused, and so is creating one beside it', () => {
+  directory((root) => {
+    const source = path.join(root, 'engine', 'Hero.astro');
+    const installed = path.join(root, 'site', 'node_modules', '.pnpm', 'engine@file+..+engine');
+    const folder = path.join(installed, 'node_modules', '@scope', 'engine');
+    fs.mkdirSync(path.dirname(source), { recursive: true });
+    fs.mkdirSync(folder, { recursive: true });
+    fs.writeFileSync(source, '<h1>old</h1>\n');
+    const copy = path.join(folder, 'Hero.astro');
+    fs.linkSync(source, copy);
+    const { documents } = host();
+    const refused = documents.writeCurrent(copy, '<h1>new</h1>\n');
+    assert.equal(refused.tag, 'rejected');
+    assert.equal(refused.reason, 'write-failed');
+    assert.match(refused.message, /Hero\.astro belongs to the installed package @scope\/engine/);
+    assert.equal(fs.readFileSync(source, 'utf8'), '<h1>old</h1>\n');
+    assert.equal(fs.statSync(copy).nlink, 2, 'the link is not split');
+    assert.deepEqual(fs.readdirSync(folder), ['Hero.astro'], 'no lock or temporary file');
+    const created = documents.create(path.join(folder, 'New.astro'), '<p/>');
+    assert.equal(created.ok, false);
+    assert.equal(created.error.code, 'failed');
+    assert.deepEqual(fs.readdirSync(folder), ['Hero.astro']);
+  });
+});
+
+test('a project folder linked into node_modules is installed code too', posixOnly, () => {
+  directory((root) => {
+    const folder = path.join(root, 'node_modules', 'cards');
+    fs.mkdirSync(folder, { recursive: true });
+    fs.writeFileSync(path.join(folder, 'Card.astro'), '<p>old</p>\n');
+    fs.mkdirSync(path.join(root, 'src'));
+    fs.symlinkSync(folder, path.join(root, 'src', 'cards'));
+    const { documents } = host();
+    const reached = path.join(root, 'src', 'cards', 'Card.astro');
+    const refused = documents.writeCurrent(reached, '<p>new</p>\n');
+    assert.equal(refused.tag, 'rejected');
+    assert.match(refused.message, /Card\.astro belongs to the installed package cards/);
+    assert.equal(fs.readFileSync(reached, 'utf8'), '<p>old</p>\n');
   });
 });
 

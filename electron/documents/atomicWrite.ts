@@ -28,6 +28,10 @@
 // - Symlinks: a link to a file is written through to the file it names, so the
 //   link survives; a dangling link is refused, because creating its target
 //   would be a guess about where the user meant the file to live.
+// - Hard links: a target with more than one link is refused. The rename gives
+//   the path a new file, so the other links would keep the old bytes — the
+//   save would split one file into two without a word, which is as much a
+//   change nobody asked for as a new owner.
 // - Windows replacement: the rename is MoveFileEx with REPLACE_EXISTING. A
 //   target held open without delete sharing (an antivirus scan, an indexer)
 //   fails the rename with EPERM, EBUSY or EACCES; the target is untouched, the
@@ -114,6 +118,14 @@ export function replaceFileAtomic(file: string, bytes: Uint8Array): Result<void,
     stats = fs.statSync(target.value);
   } catch (error: unknown) {
     return filesystemError(file, error);
+  }
+  if (stats.nlink > 1) {
+    return err({
+      code: 'filesystem',
+      message:
+        `${path.basename(target.value)} is hard-linked to another file, so Stacki will not ` +
+        `save it: saving would leave the other copy with the old text.`,
+    });
   }
   const temporary = path.join(
     path.dirname(target.value),

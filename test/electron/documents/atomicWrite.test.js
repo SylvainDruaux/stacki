@@ -1,8 +1,9 @@
 // Goal: electron/documents/atomicWrite.ts, the primitives under the document actor's
 // disk, replaces a file all at once or not at all, never leaves its temporary
 // file behind, keeps the target's mode, writes through symlinks and refuses a
-// dangling one, creates without ever overwriting, and reports a directory it
-// could not flush as `not-durable` rather than success (plan §5.2). Verifying
+// dangling one, refuses a hard-linked file rather than splitting it, creates
+// without ever overwriting, and reports a directory it could not flush as
+// `not-durable` rather than success (plan §5.2). Verifying
 // the bytes afterwards is the actor's step 9, tested with the host
 // (test/electron/documents/documentActors.test.js); the real-filesystem contract is the platform
 // suite's (test/electron/documents/).
@@ -169,6 +170,28 @@ test('a symlinked page is written through; a dangling link is refused', posixOnl
     assert.match(result.error.message, /symlink to a missing file/);
     assert.equal(fs.lstatSync(dangling).isSymbolicLink(), true, 'the link is left alone');
     assert.equal(fs.existsSync(path.join(root, 'missing.astro')), false);
+  });
+});
+
+// A rename gives the path a new file, so a hard link would be split in two: the
+// other link keeps the old bytes. That is how a save to pnpm's hard-linked copy
+// of a `file:` dependency used to fork the package without a word.
+test('a hard-linked file is refused and every link keeps its bytes', () => {
+  directory((root) => {
+    const source = path.join(root, 'source.astro');
+    const linked = path.join(root, 'linked.astro');
+    fs.writeFileSync(source, 'old\n');
+    fs.linkSync(source, linked);
+    const result = replaceFileAtomic(linked, Buffer.from('new\n'));
+    assert.equal(result.ok, false);
+    assert.equal(result.error.code, 'filesystem');
+    assert.match(result.error.message, /linked\.astro is hard-linked to another file/);
+    assert.equal(fs.readFileSync(source, 'utf8'), 'old\n');
+    assert.equal(fs.readFileSync(linked, 'utf8'), 'old\n');
+    assert.equal(fs.statSync(linked).nlink, 2, 'the link is not split');
+    assert.deepEqual(leftovers(root), []);
+    fs.rmSync(source);
+    assert.equal(replaceFileAtomic(linked, Buffer.from('new\n')).ok, true, 'one link writes');
   });
 });
 

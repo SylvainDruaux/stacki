@@ -54,7 +54,8 @@ const ASTRO_ROUTES = [
   { pattern: '/__avb/paths', origin: 'external', entrypoint: '/tmp/.avb/paths.js', params: [] },
 ];
 
-const { readInjectedRoutes, packageOf } = require('#dist/electron/preview/injectedRoutes.js');
+const { readInjectedRoutes } = require('#dist/electron/preview/injectedRoutes.js');
+const { packageOf } = require('#dist/electron/lib/installedPackages.js');
 
 (async () => {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'stacki-routes-'));
