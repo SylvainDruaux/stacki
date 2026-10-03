@@ -22,6 +22,7 @@ const fs = require('fs');
 const path = require('path');
 const Module = require('module');
 const { repoPath } = require('../../helpers/sources.js');
+const { readFolderSource } = require('../../helpers/sourceText.js');
 
 const failures = [];
 let checked = 0;
@@ -313,7 +314,7 @@ const frame = (url) => {
   );
 
   // --- the source, for the rule that spans both -------------------------------------
-  const source = fs.readFileSync(PRELOAD, 'utf8');
+  const source = readFolderSource('electron/preload');
   check(
     'the classes the canvas adds are named in one place',
     /const STACKI_CLASSES = new Set\(\[/.test(source),
@@ -321,10 +322,16 @@ const frame = (url) => {
   );
   // The one raw read left is the filter's own; anything else is a way for these
   // classes to reach the app.
-  const raw = source.split('\n').filter((line) => /Array\.from\(\w+\.classList\)/.test(line));
+  // The read is the body of ownClasses, which may wrap onto the line after its
+  // name, so a read counts as the filter's when that line or the one above
+  // declares ownClasses.
+  const lines = source.split('\n');
+  const raw = lines.flatMap((line, index) =>
+    /Array\.from\(\w+\.classList\)/.test(line) ? [`${lines[index - 1]}\n${line}`] : [],
+  );
   check(
     'and every reported class list is filtered through it',
-    raw.length === 1 && /ownClasses/.test(raw[0]),
+    raw.length === 1 && /const ownClasses\b/.test(raw[0]),
     raw.join('\n    '),
   );
   // Both halves come from the lists everything else in the canvas already uses,

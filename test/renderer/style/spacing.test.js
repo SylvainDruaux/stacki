@@ -15,7 +15,7 @@
 const fs = require('fs');
 const path = require('path');
 const { repoPath } = require('../../helpers/sources.js');
-const { readAppSource } = require('../../helpers/sourceText.js');
+const { readAppSource, readFolderSource } = require('../../helpers/sourceText.js');
 
 const failures = [];
 let checked = 0;
@@ -738,7 +738,7 @@ const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
 
   // --- the canvas draws what it is told ---------------------------------------
   {
-    const frame = fs.readFileSync(repoPath('dist/electron/preload/preload.js'), 'utf8');
+    const frame = readFolderSource('electron/preload');
     check(
       'the page forwards the modifiers it hears',
       /type: 'avb:modifiers'/.test(frame),
@@ -766,7 +766,7 @@ const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
         /spacingHover=\{(app\.)?spacingHover\}/.test(app),
       'the style panel reports a hover nothing is listening to',
     );
-    const preload = fs.readFileSync(repoPath('dist/electron/preload/preload.js'), 'utf8');
+    const preload = readFolderSource('electron/preload');
     check(
       'and the page reports its spacing',
       /spacing\[nodePath\] = spacingForPath\(nodePath\)/.test(preload),

@@ -19,7 +19,7 @@
 const fs = require('fs');
 const path = require('path');
 const { repoPath } = require('../../helpers/sources.js');
-const { readSource } = require('../../helpers/sourceText.js');
+const { readFolderSource, readSource } = require('../../helpers/sourceText.js');
 
 const failures = [];
 let checked = 0;
@@ -241,7 +241,7 @@ const settle = (ms = 30) => new Promise((resolve) => setTimeout(resolve, ms));
     'the next window comes back holding the last project',
   );
 
-  const preload = fs.readFileSync(repoPath('dist/electron/preload/preload.js'), 'utf8');
+  const preload = readFolderSource('electron/preload');
   check(
     'the app can ask for both',
     /closeProject: invoke\('project:close'\)/.test(preload) &&

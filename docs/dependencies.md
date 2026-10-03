@@ -140,6 +140,16 @@ download; version pins the Chromium and Node the app ships with.
 **Does:** packages, signs, and notarizes releases. **Why not the platform:** Electron ships no
 packager. **Cost:** large tree; release-time only.
 
+### `esbuild`
+
+**Does:** bundles the two runtime scripts that cannot load modules — the sandboxed preload
+(`electron/preload/`, whose `require` reaches only `electron`) and the canvas's morph client
+(`electron/previewClient/`, served as one virtual module's text) — each into one file
+(`scripts/build/bundleClients.ts`); tests bundle source modules with it too. **Why not the
+platform:** `tsc` emits one file per module and does not bundle. **Cost:** none new: it is the
+copy Vite already installs, pinned to that exact version because a bundler upgrade changes what
+ships, which must be a deliberate commit.
+
 ### `eslint`
 
 **Does:** the linter (AGENTS.md §17: one linter). **Why not the platform:** `tsc` checks types, not

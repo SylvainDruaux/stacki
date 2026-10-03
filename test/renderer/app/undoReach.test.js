@@ -25,7 +25,7 @@
 const fs = require('fs');
 const path = require('path');
 const { repoPath } = require('../../helpers/sources.js');
-const { readAppSource } = require('../../helpers/sourceText.js');
+const { readAppSource, readFolderSource } = require('../../helpers/sourceText.js');
 
 const failures = [];
 let checked = 0;
@@ -39,7 +39,7 @@ const check = (what, condition, detail) => {
 const read = (file) => fs.readFileSync(repoPath(file), 'utf8');
 // The app shell and the modules it was split into (src/app).
 const app = readAppSource();
-const preload = read('dist/electron/preload/preload.js');
+const preload = readFolderSource('electron/preload');
 const main = read('dist/electron/main.js');
 
 // The handler, from the line that registers it to the one that registers redo.

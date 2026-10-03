@@ -24,6 +24,7 @@ const fs = require('fs');
 const path = require('path');
 const Module = require('module');
 const { repoPath } = require('../../helpers/sources.js');
+const { readFolderSource } = require('../../helpers/sourceText.js');
 
 const failures = [];
 let checked = 0;
@@ -207,7 +208,7 @@ const press = (window, target, init = {}) => {
     );
   }
 
-  const source = fs.readFileSync(PRELOAD, 'utf8');
+  const source = readFolderSource('electron/preload');
   check(
     'the press is refused where the click already was',
     /addEventListener\(\s*'mousedown'[\s\S]{0,200}preventDefault\(\)/.test(source),

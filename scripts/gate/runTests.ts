@@ -72,8 +72,9 @@ const buildArguments: Readonly<Record<BuildStage, readonly string[]>> = {
   'build:contracts': [typeScript, '-p', path.join('shared', 'tsconfig.json')],
   'build:electron': [typeScript, '-p', path.join('electron', 'tsconfig.json')],
   'build:scripts': [typeScript, '-p', path.join('scripts', 'tsconfig.build.json')],
-  'build:morph': [typeScript, '-p', path.join('electron', 'tsconfig.morph.json')],
-  'build:preload': [typeScript, '-p', path.join('electron', 'tsconfig.preload.json')],
+  // The two runtime scripts are type-checked here and bundled after (BUNDLED).
+  'build:morph': [typeScript, '-p', path.join('electron', 'tsconfig.morph.json'), '--noEmit'],
+  'build:preload': [typeScript, '-p', path.join('electron', 'tsconfig.preload.json'), '--noEmit'],
   'stage:runtime': [path.join(root, 'dist/scripts/build/stageRuntime.js')],
   'build:web': [path.join(root, 'node_modules', 'vite', 'bin', 'vite.js'), 'build'],
 };
@@ -88,6 +89,24 @@ const INCREMENTAL_STAGES: ReadonlySet<BuildStage> = new Set([
   'build:morph',
   'build:preload',
 ]);
+// The stages whose output esbuild writes, each into one file the runtime loads
+// whole (scripts/build/bundleClients.ts), after tsc has type-checked it.
+const BUNDLED: ReadonlyMap<BuildStage, string> = new Map([
+  ['build:morph', 'morph'],
+  ['build:preload', 'preload'],
+]);
+// A stage's commands, run in order; the stage fails at the first that fails.
+const buildCommands = (stage: BuildStage): readonly TestCommand[] => {
+  const client = BUNDLED.get(stage);
+  if (client === undefined) {
+    return [buildCommand(stage)];
+  }
+  const bundler = path.join(root, 'dist/scripts/build/bundleClients.js');
+  return [
+    buildCommand(stage),
+    { name: `${stage} (bundle)`, command: node, argumentsList: [bundler, client] },
+  ];
+};
 const buildCommand = (stage: BuildStage): TestCommand => {
   const argumentsList = buildArguments[stage];
   if (plan.kind === 'targeted' && INCREMENTAL_STAGES.has(stage)) {
@@ -244,8 +263,8 @@ function reportBuild(outcome: TestOutcome): void {
 async function runChain(stages: readonly BuildStage[]): Promise<readonly TestOutcome[]> {
   const options = { cwd: root, environment, jobs: 1 };
   const outcomes: TestOutcome[] = [];
-  for (const stage of stages) {
-    const outcome = await runTestCommand(buildCommand(stage), options);
+  for (const command of stages.flatMap(buildCommands)) {
+    const outcome = await runTestCommand(command, options);
     reportBuild(outcome);
     outcomes.push(outcome);
     if (!outcome.passed) {
@@ -271,7 +290,7 @@ async function runBuilds(): Promise<void> {
   const besideOptions = { cwd: root, environment, jobs: besideJobs };
   const [chain, beside] = await Promise.all([
     runChain(plan.chain),
-    runTestPool(plan.beside.map(buildCommand), besideOptions, reportBuild),
+    runTestPool(plan.beside.flatMap(buildCommands), besideOptions, reportBuild),
   ]);
   const failures = [...chain, ...beside].filter((outcome) => !outcome.passed);
   if (failures.length > 0) {

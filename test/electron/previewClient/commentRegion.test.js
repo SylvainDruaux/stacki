@@ -31,6 +31,7 @@ const fs = require('fs');
 const path = require('path');
 const Module = require('module');
 const { repoPath } = require('../../helpers/sources.js');
+const { transpileSource } = require('../../helpers/sourceText.js');
 
 const failures = [];
 let checked = 0;
@@ -63,7 +64,7 @@ const FOOTER = `
 
     // morphClient is an ES module the dev server serves to the page; the one
     // function under test is lifted out rather than imported.
-    const source = fs.readFileSync(repoPath('dist/electron/previewClient/morphClient.js'), 'utf8');
+    const source = transpileSource('electron/previewClient/morphClient.ts');
     const start = source.indexOf('const isAnchor =');
     const end = source.indexOf('// Never looked inside.');
     // Main prepends the patcher's bounds from shared/core/limits.ts (step 7).

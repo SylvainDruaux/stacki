@@ -36,13 +36,13 @@ const check = (what, condition, detail) => {
 
 const { JSDOM } = require('jsdom');
 const { repoPath } = require('../../helpers/sources.js');
-const { readSource } = require('../../helpers/sourceText.js');
+const { readSource, transpileSource } = require('../../helpers/sourceText.js');
 const dom = new JSDOM('<!doctype html><body></body>');
 global.document = dom.window.document;
 
 // morphClient is an ES module the dev server serves to the page; the patching
 // half is lifted out rather than imported, as in test/electron/previewClient/commentRegion.test.js.
-const source = fs.readFileSync(repoPath('dist/electron/previewClient/morphClient.js'), 'utf8');
+const source = transpileSource('electron/previewClient/morphClient.ts');
 const start = source.indexOf('const isAnchor =');
 const end = source.indexOf('// A script that CHANGED, or one that is GONE');
 // Main prepends the patcher's bounds from shared/core/limits.ts (step 7); the lifted

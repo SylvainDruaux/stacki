@@ -3,13 +3,21 @@
 // worker/icon bytes, and package entry paths after the normal gate builds them.
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { resolve, sep } from 'node:path';
 import { test } from 'node:test';
 import { record, text } from '#dist/shared/core/boundary.js';
 
 // The runner starts every suite at the repository root.
 const root = process.cwd();
 const filesMax = 1000;
+// Folders esbuild bundles into one file the runtime loads whole
+// (scripts/build/bundleClients.ts): only each one's entry has an output.
+const BUNDLED_ENTRIES: ReadonlyMap<string, string> = new Map([
+  ['electron/preload/', 'electron/preload/preload.ts'],
+  ['electron/previewClient/', 'electron/previewClient/morphClient.ts'],
+]);
+const bundledAway = (file: string): boolean =>
+  [...BUNDLED_ENTRIES].some(([folder, entry]) => file.startsWith(folder) && file !== entry);
 
 test('all compiler output lives under dist', () => {
   for (const directory of ['electron', 'shared']) {
@@ -17,7 +25,8 @@ test('all compiler output lives under dist', () => {
     assert.ok(files.length < filesMax, 'Source inventory stays bounded');
     for (const file of files) {
       assert.doesNotMatch(file, /\.jsx?$/, `${directory}/${file} is generated output`);
-      if (file.endsWith('.ts') && !file.endsWith('.d.ts')) {
+      const source = `${directory}/${file.split(sep).join('/')}`;
+      if (file.endsWith('.ts') && !file.endsWith('.d.ts') && !bundledAway(source)) {
         const output = resolve(root, 'dist', directory, file.replace(/\.ts$/, '.js'));
         assert.ok(existsSync(output), `Missing compiler output for ${directory}/${file}`);
       }

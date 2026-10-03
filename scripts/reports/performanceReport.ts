@@ -23,7 +23,6 @@ interface DiffImplementation {
 }
 
 const root = repositoryRoot();
-const BUILT_PATH = 'dist/electron/previewClient/morphClient.js';
 const SOURCE_PATH = 'electron/previewClient/morphClient.ts';
 
 function load(source: string): DiffImplementation {
@@ -82,18 +81,27 @@ function measure(
   };
 }
 
-const current = load(fs.readFileSync(path.join(root, BUILT_PATH), 'utf8'));
+// The working tree's source rather than the build: the shipped client is a
+// bundle, whose text keeps none of the comments the diff is found by.
+const current = load(
+  asJavaScript(fs.readFileSync(path.join(root, SOURCE_PATH), 'utf8'), SOURCE_PATH),
+);
 const reference = process.argv[2];
 const referencePath = process.argv[3] ?? SOURCE_PATH;
 const before = reference ? load(referenceSource(reference, referencePath)) : undefined;
 
-// A revision's source, as JavaScript: a TypeScript file is transpiled, which
-// keeps the comments the diff's own markers are found by.
+// A revision's source, as JavaScript.
 function referenceSource(revision: string, file: string): string {
   const source = execFileSync('git', ['show', `${revision}:${file}`], {
     cwd: root,
     encoding: 'utf8',
   });
+  return asJavaScript(source, file);
+}
+
+// A TypeScript file is transpiled, which keeps the comments the diff's own
+// markers are found by; JavaScript is taken as it is.
+function asJavaScript(source: string, file: string): string {
   if (!file.endsWith('.ts')) {
     return source;
   }

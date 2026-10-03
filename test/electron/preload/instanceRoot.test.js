@@ -26,6 +26,7 @@ const fs = require('fs');
 const path = require('path');
 const Module = require('module');
 const { repoPath } = require('../../helpers/sources.js');
+const { readFolderSource } = require('../../helpers/sourceText.js');
 
 const failures = [];
 let checked = 0;
@@ -282,7 +283,7 @@ const BUTTON = 'src/components/Button.astro|';
   }
 
   // --- said once ---------------------------------------------------------------------
-  const source = fs.readFileSync(PRELOAD, 'utf8');
+  const source = readFolderSource('electron/preload');
   check(
     'the rule lives in one place',
     /const promoteInstanceTags = \(\) => \{/.test(source),

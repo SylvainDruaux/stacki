@@ -13,6 +13,7 @@
 const fs = require('fs');
 const path = require('path');
 const { ROOT, repoPath } = require('../../helpers/sources.js');
+const { readFolderSource } = require('../../helpers/sourceText.js');
 
 const failures = [];
 let checked = 0;
@@ -65,7 +66,7 @@ const check = (what, condition, detail) => {
   // when there is no selection to ask about — which is the variables panel's
   // whole situation.
   {
-    const preload = fs.readFileSync(repoPath('dist/electron/preload/preload.js'), 'utf8');
+    const preload = readFolderSource('electron/preload');
     check(
       'with no element named, the page answers about itself',
       /const host = els\[0\] \|\| document\.documentElement;/.test(preload),

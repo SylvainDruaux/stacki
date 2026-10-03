@@ -19,6 +19,7 @@
 const fs = require('fs');
 const path = require('path');
 const { repoPath } = require('../../helpers/sources.js');
+const { transpileSource } = require('../../helpers/sourceText.js');
 
 const failures = [];
 let checked = 0;
@@ -34,15 +35,16 @@ const check = (what, condition, detail) => {
 // and evaluated — which keeps this honest: an edit to preload changes what
 // runs here.
 function loadGapBandsFor(window) {
-  const source = fs.readFileSync(repoPath('dist/electron/preload/preload.js'), 'utf8');
+  const source = transpileSource('electron/preload/preload.ts');
   // gapBandsFor and the helpers it calls, which sit just above it.
   const start = source.indexOf('  const gapChildRects = (element) => {');
   const at = source.indexOf('  const gapBandsFor = (element, cs) => {');
   if (start === -1 || at === -1) {
     throw new Error('gapBandsFor not found in preload.js — has it been renamed?');
   }
-  // The file is now the tsc emit of preload.ts, which indents every level
-  // with four spaces — the function's own closing brace sits at that depth.
+  // tsc's emit of preload.ts indents every level with four spaces — the
+  // function's own closing brace sits at that depth. (The shipped preload is a
+  // bundle, whose text is the bundler's; the source is transpiled here.)
   const end = source.indexOf('\n    };', at);
   const body = source.slice(start, end + '\n    };'.length);
 

@@ -59,7 +59,7 @@ const check = (what, condition, detail) => {
 
 const { parsePage, serializePageMarked } = require('#dist/electron/parse/astroParser.js');
 const { repoPath } = require('../../helpers/sources.js');
-const { readSource, readSourceGroup } = require('../../helpers/sourceText.js');
+const { readFolderSource, readSource, readSourceGroup } = require('../../helpers/sourceText.js');
 
 const marked = (
   body,
@@ -285,7 +285,7 @@ const marked = (
 
   // --- the canvas still reads what it is served ------------------------------------
   {
-    const preload = fs.readFileSync(repoPath('dist/electron/preload/preload.js'), 'utf8');
+    const preload = readFolderSource('electron/preload');
     check(
       'a comment is a marker',
       /if \(isComment\(node\)\) \{[\s\S]*?avb-\$\{kind\}:/.test(preload),

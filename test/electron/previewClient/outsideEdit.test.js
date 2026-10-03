@@ -23,7 +23,7 @@
 const fs = require('fs');
 const path = require('path');
 const { pathToFileURL } = require('url');
-const { containsCode, readAppSource } = require('../../helpers/sourceText.js');
+const { containsCode, readAppSource, readSource } = require('../../helpers/sourceText.js');
 const { repoPath } = require('../../helpers/sources.js');
 
 const failures = [];
@@ -180,7 +180,7 @@ const settle = (ms = 20) => new Promise((resolve) => setTimeout(resolve, ms));
     containsCode(app, "if (event.external) { tellCanvas({ type: 'avb:patch-now' }); }"),
     'nothing reaches the canvas when the socket is quiet',
   );
-  const morph = fs.readFileSync(repoPath('dist/electron/previewClient/morphClient.js'), 'utf8');
+  const morph = readSource('electron/previewClient/morphClient.ts');
   check(
     'and the client still listens to the socket as well',
     /import\.meta\.hot\.on\('avb:page-changed', \(\) => \{[\s\S]{0,200}?void update\(\);/.test(

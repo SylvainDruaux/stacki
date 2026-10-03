@@ -68,6 +68,35 @@ function readSourceFolder(entry, relativeFolder) {
   return readSourceGroup([entry, ...names.map((name) => `${relativeFolder}/${name}`)]);
 }
 
+// A folder's modules read as one, each once, in name order: for code the
+// runtime ships as one bundle (the preload, the morph client), whose shipped
+// text is the bundler's, not the author's. Declaration files are left out.
+function readFolderSource(relativeFolder) {
+  const names = fs
+    .readdirSync(repoPath(relativeFolder))
+    .filter((name) => /\.tsx?$/.test(name) && !name.endsWith('.d.ts'))
+    .sort();
+  if (names.length === 0 || names.length > FOLDER_FILES_MAX) {
+    throw new Error(`source-text: ${relativeFolder} holds ${names.length} source files`);
+  }
+  return readSourceGroup(names.map((name) => `${relativeFolder}/${name}`));
+}
+
+// A TypeScript source as the JavaScript tsc would emit for it, comments kept:
+// for tests that lift a function out of code the runtime ships as a bundle,
+// by the comments that mark it. The bundle drops comments; the source has them.
+function transpileSource(relativePath) {
+  const ts = require('typescript');
+  const options = {
+    compilerOptions: {
+      target: ts.ScriptTarget.ES2022,
+      module: ts.ModuleKind.ESNext,
+      removeComments: false,
+    },
+  };
+  return ts.transpileModule(readSource(relativePath), options).outputText;
+}
+
 // The app shell's source, read as one: App.tsx, the panels it loads lazily, and
 // the model, state and shell modules it was split into (src/app). A check about
 // the app's wiring finds it in whichever of those files it now lives.
@@ -137,8 +166,10 @@ module.exports = {
   compactSource,
   containsCode,
   readAppSource,
+  readFolderSource,
   readSource,
   readSourceFolder,
   readSourceGroup,
   sourceBlock,
+  transpileSource,
 };

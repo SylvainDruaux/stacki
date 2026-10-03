@@ -11,8 +11,9 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { JSDOM } = require('jsdom');
 const { repoPath } = require('../../helpers/sources.js');
+const { transpileSource } = require('../../helpers/sourceText.js');
 
-const source = fs.readFileSync(repoPath('dist/electron/previewClient/morphClient.js'), 'utf8');
+const source = transpileSource('electron/previewClient/morphClient.ts');
 const dom = new JSDOM('<!doctype html><html><head></head><body></body></html>');
 const document = dom.window.document;
 // Main prepends the patcher's bounds from shared/core/limits.ts (step 7).
