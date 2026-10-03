@@ -108,7 +108,25 @@ async function orchestrateVersion(version) {
       child.on('exit', (code) => resolve(code ?? 1));
     });
   } finally {
+    stopDaemon(project, env);
     fs.rmSync(directory, { recursive: true, force: true });
+  }
+}
+
+// Astro 7 runs its dev server as a daemon that outlives the process that
+// started it. The app asks it to stop when the project closes, but the run
+// exits before that request has landed, and every run left one serving a
+// deleted folder. Stopped here, from the fixture's own CLI, before the folder
+// goes; a version without the subcommand just says so.
+function stopDaemon(project, env) {
+  const cli = path.join(project, 'node_modules', 'astro', 'bin', 'astro.mjs');
+  if (fs.existsSync(cli)) {
+    childProcess.spawnSync(process.execPath, [cli, 'dev', 'stop'], {
+      cwd: project,
+      env,
+      stdio: 'ignore',
+      timeout: 20000,
+    });
   }
 }
 
