@@ -73,7 +73,7 @@ export type EmbedSource = {
    *  component file whose `<style is:global>` blocks are edited in place. */
   origin:
     | { kind: 'file'; path: string }
-    | { kind: 'node'; nodeId: string }
+    | { kind: 'node'; nodeId: string; filePath: string | undefined }
     | { kind: 'astro'; path: string };
 };
 
@@ -211,15 +211,18 @@ function styleSources(): EmbedSource[] {
       return;
     }
     const isGlobal = !!node.props?.['is:global'];
+    // Node ids are tree paths, so the page's first <style> and a component's
+    // first <style> share one. The file is part of the key and of the origin:
+    // a write meant for one block must never land in the other's.
     out.push({
-      key: `node:${node.id}`,
+      key: `node:${host.openFilePath ?? ''}:${node.id}`,
       label: isGlobal ? '<style is:global>' : '<style>',
       classNames: [],
       fromComponent: host.openFileKind === 'component',
       componentName: openComponentName,
       order: order++,
       element: node.id,
-      origin: { kind: 'node', nodeId: node.id },
+      origin: { kind: 'node', nodeId: node.id, filePath: host.openFilePath },
     });
   });
 
@@ -388,7 +391,8 @@ export async function writeEmbedDocument(
       // is no such node in the model being edited. The write used to find
       // nothing and quietly do nothing, leaving the panel to report a save the
       // canvas would never show.
-      if (write(embedDocument.source.origin.nodeId, code, !live) === false) {
+      const { nodeId, filePath } = embedDocument.source.origin;
+      if (write({ nodeId, filePath }, code, !live) === false) {
         return { ok: false, error: "Couldn't find that <style> block in the open file." };
       }
     }

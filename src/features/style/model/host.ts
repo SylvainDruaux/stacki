@@ -33,6 +33,13 @@ export type SpacingHover = {
 };
 
 /** What became of a class added to the page, for the rule that depends on it. */
+/** A `<style>` node, named by the file it belongs to as well as its id: ids are
+ * tree paths, so two files' blocks can share one. */
+export type StyleNodeTarget = {
+  readonly nodeId: string;
+  readonly filePath: string | undefined;
+};
+
 export type ClassOutcome =
   { readonly tag: 'applied' } | { readonly tag: 'refused'; readonly message: string };
 
@@ -80,7 +87,7 @@ export type HostState = {
    *  is being edited) — the panel then keeps the edit and flushes it on exit
    *  rather than reporting a save that never happened. */
   writeStyleNode:
-    ((nodeId: string, css: string, immediate?: boolean) => boolean | void) | undefined;
+    ((target: StyleNodeTarget, css: string, immediate?: boolean) => boolean | void) | undefined;
   /** Select a node in the app (used when navigating from a provenance chip). */
   selectNode: ((nodeId: string) => void) | undefined;
   /** Put a class on the selected element. Typing a bare class in the selector

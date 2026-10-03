@@ -271,11 +271,16 @@ export function StyleTab({ app }: { readonly app: ShellView }) {
       model={app.model}
       node={app.selectedNode}
       device={app.device}
-      onWriteStyleNode={(nodeId, css, immediate) => {
+      onWriteStyleNode={({ nodeId, filePath }, css, immediate) => {
         // Editing a component: a <style> block of the PAGE is not in
         // the model this writes into, and mutating nothing would look
         // like a save. Report it instead — the panel holds the edit
-        // and writes it when the component closes.
+        // and writes it when the component closes. The file is checked
+        // before the node: ids are tree paths, so the page's block and
+        // the component's block can share one.
+        if (filePath !== app.openEditableFile?.path) {
+          return false;
+        }
         const state = app.pageStateRef.current.pageState;
         if (!state?.editable || !findNodeById(state.model.nodes, nodeId)) {
           return false;
