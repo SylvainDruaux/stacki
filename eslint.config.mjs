@@ -473,6 +473,29 @@ export default [
     },
   },
   {
+    // A source file fits in one reading: past 800 lines a module is several
+    // modules, and splitting it by responsibility is cheaper now than later.
+    // Tests are left out — a suite reads best as one file of cases.
+    files: [
+      'src/**/*.{ts,tsx}',
+      'electron/**/*.{ts,mts}',
+      'shared/**/*.ts',
+      'scripts/**/*.{ts,mts}',
+    ],
+    rules: {
+      'max-lines': ['error', { max: 800, skipBlankLines: true, skipComments: true }],
+    },
+  },
+  {
+    // Exempt for the runtime, not for taste. The preload is sandboxed and
+    // compiled without a bundler, so it may require nothing but electron
+    // (buildLayout.test.ts), and it runs per pointer move. The morph client is
+    // served to the canvas as one module's source text, so it can import
+    // nothing, and tests slice it by its marker comments.
+    files: ['electron/preload/preload.ts', 'electron/previewClient/morphClient.ts'],
+    rules: { 'max-lines': 'off' },
+  },
+  {
     // The Result constructor pair is the canonical `ok`/`err` of AGENTS.md §3;
     // `err` means exactly that and nothing else anywhere in the tree.
     files: ['shared/core/result.ts'],

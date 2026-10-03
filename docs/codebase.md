@@ -299,8 +299,14 @@ pain, in priority order:
    component into hooks, `ClipPath`'s path readers into classes that own their
    state — each proven with the full suite, and `ClipPath` (which has no suite)
    with HEAD-versus-working-copy interaction harnesses and differential
-   fuzzing. The files themselves are still large; splitting them into modules
-   by tool is the remaining, now low-risk, step.
+   fuzzing. *Closed 2026-10-02:* the files followed. Every source file in
+   `src/`, `electron/`, `shared/` and `scripts/` is within 800 lines,
+   enforced by `max-lines`. `ClipPath` became a folder of pure modules
+   (pinned first by a recorded characterization suite), `EmbedEditor` and
+   `App` became folders of composers and views, `main.ts` hands its IPC to
+   `electron/handlers/`, and `astroParser.ts` is a facade over layered
+   `electron/parse/astro*.ts` modules. Two files stay whole for the runtime:
+   the sandboxed preload and the morph client served to the canvas as text.
 
 Explicit non-changes: no state library (the WeakMap ack issue is
 identity-vs-version, not missing stores), no `.astro` AST dependency (loses
