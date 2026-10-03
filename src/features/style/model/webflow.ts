@@ -353,6 +353,17 @@ export async function loadEmbedDocs(
   return { docs, errors };
 }
 
+// Counts the panel's writes. A stylesheet read that started before a write can
+// finish after it, holding the file as it was: whoever stores a read compares
+// this before and after, and reads again rather than putting the old CSS back.
+let embedWriteCount = 0;
+
+/** How many writes the panel has started — compare across a read to know
+ *  whether one landed while it was in flight. */
+export function embedWritesStarted(): number {
+  return embedWriteCount;
+}
+
 export async function writeEmbedDocument(
   embedDocument: EmbedDocument,
   /** A live (scrubbing / mid-typing) write — for a <style> node it coalesces with the
@@ -360,6 +371,7 @@ export async function writeEmbedDocument(
    *  so the canvas doesn't wait out a typing debounce for a single click. */
   live = false,
 ): Promise<{ ok: true; code: string } | { ok: false; error: string }> {
+  embedWriteCount += 1;
   const code = serializeDocument(embedDocument);
   // What the file held before this write — the undo target, captured before
   // doc.code is advanced below.
@@ -421,6 +433,7 @@ async function writeStyleFileAndReload(
   path: string,
   text: string,
 ): Promise<void> {
+  embedWriteCount += 1;
   await window.avb.writeStyleFile({ filePath: path, css: text });
   // Re-derive the doc from what the file now holds, the same way it was first
   // read — for a component file that means re-splitting its markup, not

@@ -7,6 +7,7 @@ import { saveEmbedSource } from '../model/toolPreferences';
 import { hslaToRgba } from '../model/colorWrite';
 import { clampNonNegative } from '../model/cssProperties';
 import { contextKeyOf } from '../model/resolved';
+import type { ParsedRule } from '../model/styleTypes';
 import { optionsFor } from '../model/nativeStyles';
 import { embedSourceClassSuffix, type EmbedDocument } from '../model/webflow';
 import {
@@ -138,7 +139,7 @@ export function useClearProp(
   const { currentContext } = styleContextsHook;
   const { selectedNativeIndex } = resolvedHook;
   const { nativeClearAt } = nativeOps;
-  const { selectedRule } = writeNewRuleHook;
+  const { ruleFor, rulesSetting } = writeNewRuleHook;
   const { propLayer } = addQuery;
 
   const clearProp = (prop: string | string[]) => {
@@ -149,17 +150,26 @@ export function useClearProp(
     if (nativeProps.length && selectedNativeIndex !== undefined) {
       void nativeClearAt(selectedNativeIndex, nativeProps, optionsFor(currentContext, stateKey));
     }
-    if (embedProps.length && selectedRule) {
-      onClearProp(selectedRule, embedProps);
+    // Each rule of the pick loses the properties it sets: clearing only the rule
+    // whose value shows would surface the same property from an earlier rule.
+    const byRule = new Map<string, { rule: ParsedRule; props: string[] }>();
+    for (const embedProp of embedProps) {
+      for (const rule of rulesSetting(embedProp)) {
+        const entry = byRule.get(rule.ruleId) ?? { rule, props: [] };
+        entry.props.push(embedProp);
+        byRule.set(rule.ruleId, entry);
+      }
     }
+    byRule.forEach(({ rule, props: ruleProps }) => onClearProp(rule, ruleProps));
   };
   // Abandon the live writes for `prop` and put back what they overwrote — the dropdown
   // hover-scrub's counterpart to liveSetProp (closing the list without picking).
   const revertProp = (prop: string) => {
-    if (propLayer(prop) === 'native' || !selectedRule) {
+    const rule = ruleFor(prop);
+    if (propLayer(prop) === 'native' || !rule) {
       return;
     }
-    onRevertProp(selectedRule, prop);
+    onRevertProp(rule, prop);
   };
   return { clearProp, revertProp };
 }
@@ -183,7 +193,7 @@ export function useLiveSetProp(
   const { activeSelector } = activeSelectorHook;
   const { currentContext } = styleContextsHook;
   const { nativeLiveSet } = nativeOps;
-  const { selectedRule } = writeNewRuleHook;
+  const { ruleFor } = writeNewRuleHook;
   const { nativeHandle, propLayer } = addQuery;
   const { autoSelectForEdit } = autoSelect;
   const { revertProp } = clearPropHook;
@@ -222,8 +232,9 @@ export function useLiveSetProp(
         return;
       }
     }
-    if (selectedRule) {
-      onLiveSetProp(selectedRule, prop, value, important);
+    const rule = ruleFor(prop);
+    if (rule) {
+      onLiveSetProp(rule, prop, value, important);
     }
   };
   return { liveSetProp };

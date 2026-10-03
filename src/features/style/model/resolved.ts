@@ -134,8 +134,11 @@ export type ResolvedProp = {
 
 export type ResolvedStyle = {
   props: Map<string, ResolvedProp>;
-  /** The selected selector's rule in this context/state, or undefined (create on edit). */
+  /** The selected selector's last rule in this context/state, or undefined (create on
+   *  edit). Use editableRuleFor to find where one property's edit goes. */
   selectedRule: ParsedRule | undefined;
+  /** Every rule of the selected selector in this context/state, by rule id. */
+  selectedRules: ReadonlyMap<string, ParsedRule>;
   /** Distinct contexts present for this element (Base first) — drives the switcher. */
   contexts: ContextKey[];
   states: readonly StateKey[];
@@ -428,14 +431,22 @@ export function resolveStyle(
   };
 
   const byProp = new Map<string, Contributor[]>();
+  // Every rule of the picked selector here, by id: a property is edited in the
+  // rule its shown value comes from. A property none of them sets goes to the
+  // LAST of them — a later rule wins a tie, so an earlier one (a grouped
+  // `.a, .b {}` above `.a {}`) would take the value and show none of it.
+  const selectedRules = new Map<string, ParsedRule>();
   let selectedRule: ParsedRule | undefined;
   for (const matched of all) {
     const folded = foldEmbedRule(matched, view);
     if (folded === undefined) {
       continue;
     }
-    if (folded.isSelected && !selectedRule) {
-      selectedRule = matched.rule;
+    if (folded.isSelected) {
+      selectedRules.set(matched.rule.ruleId, matched.rule);
+      if (selectedRule === undefined || matched.rule.order > selectedRule.order) {
+        selectedRule = matched.rule;
+      }
     }
     for (const contributor of folded.contributors) {
       const list = byProp.get(contributor.prop) ?? [];
@@ -460,7 +471,45 @@ export function resolveStyle(
     props.set(prop, resolveProp(prop, list, native));
   });
   assert(props.size === byProp.size, 'resolveStyle: one resolved entry per property');
-  return { props, selectedRule, contexts: contextsOf(all), states: STATES };
+  assert(
+    selectedRule === undefined || selectedRules.has(selectedRule.ruleId),
+    'resolveStyle: the selected rule is one of the picked selector’s rules',
+  );
+  return { props, selectedRule, selectedRules, contexts: contextsOf(all), states: STATES };
+}
+
+/** Every rule of the picked selector that sets `prop` here — what clearing it
+ *  removes it from, so a value it also sets in an earlier rule doesn't surface. */
+export function selectedRulesSetting(resolved: ResolvedStyle, prop: string): ParsedRule[] {
+  const contributors = resolved.props.get(prop)?.contributors ?? [];
+  const rules = contributors.flatMap((contributor) => {
+    if (contributor.origin !== 'embed' || !contributor.isSelected) {
+      return [];
+    }
+    const rule = resolved.selectedRules.get(contributor.ruleId);
+    assert(rule !== undefined, 'selectedRulesSetting: a selected value comes from a picked rule');
+    return [rule];
+  });
+  assert(rules.length <= resolved.selectedRules.size, 'selectedRulesSetting: rules are picked');
+  return rules;
+}
+
+/** The rule an edit of `prop` goes to: the picked selector's rule that sets the
+ *  value the panel shows, else the picked selector's last rule (undefined when
+ *  it has none here — the edit creates one). Writing anywhere else puts the value
+ *  where the cascade ignores it, and the panel keeps showing the old one. */
+export function editableRuleFor(resolved: ResolvedStyle, prop: string): ParsedRule | undefined {
+  const shown = resolved.props.get(prop);
+  const setHere = shown?.contributors.find(
+    (contributor) => contributor.origin === 'embed' && contributor.editing === true,
+  );
+  if (setHere === undefined) {
+    return resolved.selectedRule;
+  }
+  const rule = resolved.selectedRules.get(setHere.ruleId);
+  assert(rule !== undefined, 'editableRuleFor: the edited value comes from a picked rule');
+  assert(rule.ruleId === setHere.ruleId, 'editableRuleFor: the rule is the one named');
+  return rule;
 }
 
 /** What resolveStyle is looking at: the context, the active selector, and its view. */

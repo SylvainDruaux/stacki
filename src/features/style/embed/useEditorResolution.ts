@@ -3,7 +3,12 @@
 
 import { useEffect } from 'react';
 import { hslaToRgba } from '../model/colorWrite';
-import { contextKeyOf, type SourceKey } from '../model/resolved';
+import {
+  contextKeyOf,
+  editableRuleFor,
+  selectedRulesSetting,
+  type SourceKey,
+} from '../model/resolved';
 import { mediaParamsForBreakpoint, optionsFor } from '../model/nativeStyles';
 import { ensureNestPath, ensureQueryBlock, parseNestedInput, type NestStep } from '../model/css';
 import {
@@ -210,6 +215,10 @@ export function useWriteNewRule(
   // Writes target the picked selector's rule in the current context/state, and
   // create that rule on the first edit when it doesn't exist yet.
   const selectedRule = resolved?.selectedRule ?? undefined;
+  // Where one property's edit goes: the rule its shown value comes from.
+  const ruleFor = (prop: string) => (resolved ? editableRuleFor(resolved, prop) : undefined);
+  // Every rule of the pick that sets a property — what clearing it empties.
+  const rulesSetting = (prop: string) => (resolved ? selectedRulesSetting(resolved, prop) : []);
   // Create the picked selector's rule in the target embed, write the embed, and
   // refresh the panel's model.
   const writeNewRule = async (
@@ -258,7 +267,7 @@ export function useWriteNewRule(
       setBusyBoth(false);
     }
   };
-  return { selectedRule, writeNewRule };
+  return { selectedRule, ruleFor, rulesSetting, writeNewRule };
 }
 
 // Create a rule for the pick in the current context.
@@ -390,7 +399,7 @@ export function useAddQuery(
   const { addTypedSelector } = typedSelector;
   const { canNative } = nativeTarget;
   const { nativeContextOk, resolved, selectedNativeIndex } = resolvedHook;
-  const { selectedRule } = writeNewRuleHook;
+  const { ruleFor } = writeNewRuleHook;
   const { createSelectedRule } = createRule;
   const { writeEmptyContext } = emptyContext;
 
@@ -425,11 +434,10 @@ export function useAddQuery(
   // Write a property to the embed for the picked selector — its existing rule, or a
   // new one. Also the fallback target when a native value won't apply.
   const writeEmbedProp = (write: PropWrite) => {
-    if (selectedRule) {
-      onSetProp(selectedRule, write.prop, write.value, write.important);
-    } else {
-      createSelectedRule(write);
-    }
+    const rule = ruleFor(write.prop);
+    return rule
+      ? onSetProp(rule, write.prop, write.value, write.important)
+      : createSelectedRule(write);
   };
 
   // Native edits go to the picked class style. Webflow accepts nearly any

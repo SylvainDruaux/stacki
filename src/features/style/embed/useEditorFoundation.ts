@@ -4,6 +4,7 @@
 // composes the hook groups in order; each later group takes the earlier
 // groups' results.
 
+import { assert } from '../../../../shared/core/assert';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { loadEmbedSource } from '../model/toolPreferences';
 import { computeRuleModel } from '../model/cascade';
@@ -13,6 +14,7 @@ import {
   loadEmbedDocs,
   rebuildRules,
   askCanvasAbout,
+  embedWritesStarted,
   primeDomMatches,
   resolveTarget,
   scanPage,
@@ -481,6 +483,31 @@ export function useContentStore(
   return { storeContent };
 }
 
+// How many times a read is redone because the panel wrote while it ran. Each
+// redo is a full re-read of every stylesheet, so it is capped: a slider drag
+// writes on every tick, and chasing it would read for as long as it lasts.
+const REBUILD_AFTER_WRITE_ATTEMPTS_MAX = 3;
+
+// The panel wrote while a read was in flight, so the read may hold a file from
+// before the write: read again, since storing it would roll the panel back and
+// the next edit would write the old CSS over the new. Undefined when writes
+// kept landing past the cap.
+async function rereadPastWrites(
+  first: { readonly content: Content; readonly writes: number },
+  read: () => Promise<Content>,
+): Promise<Content | undefined> {
+  let { content, writes } = first;
+  for (let attempt = 0; writes !== embedWritesStarted(); attempt++) {
+    if (attempt >= REBUILD_AFTER_WRITE_ATTEMPTS_MAX) {
+      return undefined;
+    }
+    writes = embedWritesStarted();
+    content = await read();
+  }
+  assert(writes <= embedWritesStarted(), 'rereadPastWrites: the write count only grows');
+  return content;
+}
+
 // Rebuild and store content, flushing deferred page-embed edits first.
 export function useContentRebuild(
   editorRefs: ReturnType<typeof useEditorRefs>,
@@ -489,7 +516,7 @@ export function useContentRebuild(
   contentBuild: ReturnType<typeof useContentBuild>,
   contentStore: ReturnType<typeof useContentStore>,
 ) {
-  const { inComponentRef, pageDocsRef, pendingKeysRef } = editorRefs;
+  const { contentRef, inComponentRef, pageDocsRef, pendingKeysRef } = editorRefs;
   const { setStatus } = scanState;
   const { setPendingKeys } = nativeState;
   const { buildContent } = contentBuild;
@@ -535,17 +562,31 @@ export function useContentRebuild(
       onPartial?: (content: Content) => void,
     ): Promise<Content> => {
       const wasInComponent = inComponentRef.current;
+      let writes = embedWritesStarted();
+      // A partial is shown only while no write has landed since the read began:
+      // it would put the CSS from before that write back on screen.
       const emitPartial = onPartial
-        ? (partial: Content) => onPartial(storeContent(partial))
+        ? (partial: Content) => {
+            if (writes === embedWritesStarted()) {
+              onPartial(storeContent(partial));
+            }
+          }
         : undefined;
       let content = await buildContent(rescan, emitPartial);
       if (wasInComponent && !content.scan.inComponentContext && pendingKeysRef.current.size) {
         await flushPending();
+        writes = embedWritesStarted();
         content = await buildContent(rescan);
       }
-      return storeContent(content);
+      const fresh = await rereadPastWrites({ content, writes }, () => buildContent(rescan));
+      // Writes keep landing (a drag): keep what the panel holds — its docs
+      // already carry every write — and let the next refresh catch up.
+      if (fresh === undefined && contentRef.current !== undefined) {
+        return contentRef.current;
+      }
+      return storeContent(fresh ?? content);
     },
-    [buildContent, flushPending, storeContent, inComponentRef, pendingKeysRef],
+    [buildContent, flushPending, storeContent, contentRef, inComponentRef, pendingKeysRef],
   );
   return { rebuildAndStore };
 }

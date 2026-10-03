@@ -58,6 +58,7 @@ export function isBreakpointId(value: unknown): value is BreakpointId {
 export const EMPTY_RESOLVED: ResolvedStyle = {
   props: new Map(),
   selectedRule: undefined,
+  selectedRules: new Map(),
   contexts: [],
   states: STATES,
 };
