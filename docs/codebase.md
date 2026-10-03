@@ -48,7 +48,9 @@ everything else**. Concretely:
 - `electron/parse/astroParser.ts` (emits `astroParser.js`) parses an `.astro` file into a
   `PageNode` tree. Nodes carry their **source ranges** (`.at` offsets), and
   anything not modeled (attributes in unusual order, raw `<script>`, unknown
-  constructs) is kept verbatim and re-emitted on write.
+  constructs) is kept verbatim and re-emitted on write. It is the parser's
+  facade: the scanner, the template parser, the printers, the prop-schema
+  reader and the chunk handling live beside it as `electron/parse/astro*.ts`.
 - Frontmatter (`shared/page/frontmatterSource.ts`) is _not_ treated as a code blob:
   imports become editable records whose **slots** retain the exact source,
   whitespace, and position between them. Edits to the declarations field are

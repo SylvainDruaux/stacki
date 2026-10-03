@@ -233,7 +233,8 @@ brute-force references and to hand-derived byte ranges.
 
 Lint fences (`eslint.config.mjs`): an existing file changes only by splices,
 so the printers are fenced. `serializePage` and `serializeNodes` may be
-imported or called only in `electron/parse/astroParser.ts`, `componentFile.ts` (new
+imported or called only in `electron/parse/astroParser.ts` (which re-exports
+`serializeNodes` from `astroSerialize.ts`, where it is defined), `componentFile.ts` (new
 files: a component made from a piece of a page, a new page),
 `editRequests.ts` (only the nodes and frontmatter block an edit adds) and
 `markdownParser.ts`; `serializeMarkdownPage` only in `markdownParser.ts`,

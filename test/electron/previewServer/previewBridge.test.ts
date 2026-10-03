@@ -498,8 +498,13 @@ test('only the marking module makes markers, and nothing imports it', () => {
   });
   assert.deepEqual(
     callers.map((file) => file.split(path.sep).join('/')).sort(),
-    ['electron/parse/astroParser.ts', 'electron/previewServer/previewMarkers.ts'],
-    'the marked serializers are defined in the parser and called only by the marking module',
+    [
+      'electron/parse/astroChunks.ts',
+      'electron/parse/astroParser.ts',
+      'electron/previewServer/previewMarkers.ts',
+    ],
+    'the marked serializers are defined in the parser (markChunkHtml in its chunks module) ' +
+      'and called only by the marking module',
   );
   const marking = fs.readFileSync('electron/previewServer/previewMarkers.ts', 'utf8');
   assert.doesNotMatch(
