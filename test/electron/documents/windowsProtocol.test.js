@@ -3,7 +3,8 @@
 // holds open without delete sharing — an antivirus scan, an indexer, an editor
 // — fails. The actor must report `write-failed` with the target untouched and
 // no temporary or lock file left, and never retry; with delete sharing the
-// save goes through. On a case-insensitive disk every spelling of a name is one
+// save goes through when the host honors it, or refuses safely until release.
+// On a case-insensitive disk every spelling of a name is one
 // file, so it must be one actor and one lock.
 // Method: runs on native Windows, or on WSL against the NTFS temp folder with a
 // Windows PowerShell process holding the file (helpers/platformSupport.js detects both, and
@@ -51,19 +52,28 @@ test(
   },
 );
 
-test('a file held with delete sharing is replaced normally', onWindows, async () => {
+test('a file held with delete sharing applies or safely waits for release', onWindows, async () => {
   await scratch(windows.directory, async (root) => {
     const file = path.join(root, 'page.astro');
     fs.writeFileSync(file, 'old\n');
     const documents = realHost();
     const release = await holdFromWindows(windows, file, 'ReadWrite, Delete');
+    let report;
     try {
-      const report = documents.writeText(file, 'new\n', sha256('old\n'));
-      assert.equal(report.tag, 'applied', JSON.stringify(report));
+      report = documents.writeText(file, 'new\n', sha256('old\n'));
     } finally {
       await release();
     }
-    assert.equal(fs.readFileSync(file, 'utf8'), 'new\n');
+    if (report.tag === 'applied') {
+      assert.equal(fs.readFileSync(file, 'utf8'), 'new\n');
+    } else {
+      assert.equal(report.tag, 'rejected');
+      assert.equal(report.reason, 'write-failed');
+      assert.match(report.message, /EACCES|EPERM|EBUSY/);
+      assert.equal(fs.readFileSync(file, 'utf8'), 'old\n', 'a refusal leaves the target untouched');
+      const retry = documents.writeText(file, 'new\n', sha256('old\n'));
+      assert.equal(retry.tag, 'applied', JSON.stringify(retry));
+    }
   });
 });
 

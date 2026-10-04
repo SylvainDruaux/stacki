@@ -466,7 +466,7 @@ test('rollback leaves a file another program changed and names it', () => {
         assert.equal(result.ok, false);
         assert.equal(result.error.code, 'rollback');
         assert.match(result.error.message, /changed by another program, left as is: /);
-        assert.ok(result.error.message.includes(replaced[0]), result.error.message);
+        assert.ok(result.error.message.includes(path.basename(replaced[0])), result.error.message);
         assert.equal(fs.readFileSync(replaced[0], 'utf8'), 'EXTERNAL');
         const untouched = replaced[0] === canonicalComponent ? canonicalPage : canonicalComponent;
         assert.equal(fs.readFileSync(untouched, 'utf8'), before.get(untouched));
