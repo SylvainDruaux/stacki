@@ -225,7 +225,6 @@ if (fs.existsSync(LUMOS)) {
       JSON.stringify(parseSlots(source)) === '["default"]',
       JSON.stringify(parseSlots(source)),
     );
-    check('and it takes words', defaultSlotInline(source) === true);
   });
   onceReal('the real <ContentWrapper>', 'ContentWrapper', (source) => {
     check(

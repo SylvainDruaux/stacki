@@ -448,9 +448,11 @@ test('failed writes restore all files already written', () => {
 // middle of the batch, then the next write fails.
 test('rollback leaves a file another program changed and names it', () => {
   project(({ root, component, page }) => {
+    const canonicalComponent = fs.realpathSync(component);
+    const canonicalPage = fs.realpathSync(page);
     const before = new Map([
-      [component, source],
-      [page, fs.readFileSync(page, 'utf8')],
+      [canonicalComponent, source],
+      [canonicalPage, fs.readFileSync(page, 'utf8')],
     ]);
     const external = (targets) => fs.writeFileSync(targets[0], 'EXTERNAL');
     failNthReplace(
@@ -466,7 +468,7 @@ test('rollback leaves a file another program changed and names it', () => {
         assert.match(result.error.message, /changed by another program, left as is: /);
         assert.ok(result.error.message.includes(replaced[0]), result.error.message);
         assert.equal(fs.readFileSync(replaced[0], 'utf8'), 'EXTERNAL');
-        const untouched = replaced[0] === component ? page : component;
+        const untouched = replaced[0] === canonicalComponent ? canonicalPage : canonicalComponent;
         assert.equal(fs.readFileSync(untouched, 'utf8'), before.get(untouched));
       },
       external,
@@ -476,9 +478,11 @@ test('rollback leaves a file another program changed and names it', () => {
 
 test('a read-back mismatch is a write-race that rolls back instead of asserting', () => {
   project(({ root, component, page }) => {
+    const canonicalComponent = fs.realpathSync(component);
+    const canonicalPage = fs.realpathSync(page);
     const before = new Map([
-      [component, source],
-      [page, fs.readFileSync(page, 'utf8')],
+      [canonicalComponent, source],
+      [canonicalPage, fs.readFileSync(page, 'utf8')],
     ]);
     const rename = fs.renameSync;
     const replaced = [];
