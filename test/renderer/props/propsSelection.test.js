@@ -75,6 +75,13 @@ const nodes = [
   { id: 'frontmatter', kind: 'frontmatter' },
   { id: 'loop', kind: 'map', head: 'items.map((item) => (', children: [] },
 ];
+const fragment = {
+  id: 'fragment',
+  kind: 'component',
+  name: 'Fragment',
+  props: { 'set:html': { type: 'expr', value: 'content' } },
+  children: [],
+};
 (async () => {
   for (let pass = 0; pass < 2; pass++) {
     for (const node of nodes) {
@@ -97,6 +104,14 @@ const nodes = [
   assert.equal(
     document.querySelector('.props-group [aria-expanded]').getAttribute('aria-expanded'),
     'true',
+  );
+  await act(async () =>
+    root.render(React.createElement(PropsPanel, { ...props, allowAttrs: false, node: fragment })),
+  );
+  assert.equal(
+    document.querySelector('.attr-name')?.textContent,
+    'set:html',
+    'Fragment directives appear in Attributes without a component rest prop',
   );
   await act(async () => root.unmount());
   assert.throws(

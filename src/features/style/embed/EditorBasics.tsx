@@ -38,7 +38,11 @@ export interface PropWrite {
 
 // A live write previews a value without committing it; `undefined` drops the preview
 // and puts back what the live writes overwrote.
-export type LiveSetProp = (prop: string, value: string | undefined, important: boolean) => void;
+export type LiveSetProp = (
+  prop: string | readonly string[],
+  value: string | undefined,
+  important: boolean,
+) => void;
 
 export function isBreakpointId(value: unknown): value is BreakpointId {
   return (

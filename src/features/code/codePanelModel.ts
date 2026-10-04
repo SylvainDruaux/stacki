@@ -1,5 +1,6 @@
 import { LIMITS } from '../../../shared/core/limits';
 import type { EditorModel, EditorNode } from '../../editor/pageView';
+import { rendersOwnElement } from '../../editor/liveClasses';
 
 export interface SourceRange {
   readonly from: number;
@@ -37,32 +38,54 @@ export function sourceNodeAtOffset(
   if (!Number.isSafeInteger(offset) || offset < 0) {
     return undefined;
   }
-  const pending = [...nodes];
+  const pending: { readonly node: EditorNode; readonly parent: EditorNode | undefined }[] =
+    nodes.map((node) => ({ node, parent: undefined }));
   let best: EditorNode | undefined = undefined;
   let bestWidth = Number.POSITIVE_INFINITY;
   for (let index = 0; index < pending.length; index += 1) {
     if (index >= LIMITS.treeNodesMax) {
       throw new Error('Code source lookup exceeds the node limit');
     }
-    const node = pending[index];
-    if (!node) {
+    const entry = pending[index];
+    if (!entry) {
       continue;
     }
-    const start = node.start;
-    const end = node.end;
+    const { node, parent } = entry;
+    const candidate = sourceSelectableNode(node, parent);
+    const start = candidate.start;
+    const end = candidate.end;
     if (typeof start === 'number' && typeof end === 'number') {
       const contains = start <= offset && offset <= end;
       const width = end - start;
-      if (contains && width <= bestWidth) {
-        best = node;
-        bestWidth = width;
+      if (contains) {
+        if (width <= bestWidth) {
+          best = candidate;
+          bestWidth = width;
+        }
       }
     }
     if (node.children !== undefined) {
-      pending.push(...node.children);
+      pending.push(...node.children.map((child) => ({ node: child, parent: node })));
     }
   }
   return best;
+}
+
+function sourceSelectableNode(node: EditorNode, parent: EditorNode | undefined): EditorNode {
+  if (node.kind !== 'text') {
+    return node;
+  }
+  if (parent === undefined) {
+    return node;
+  }
+  // Text has no box of its own in the preview. Its containing tag does.
+  if (parent.kind === 'element') {
+    return rendersOwnElement(parent) ? parent : node;
+  }
+  if (parent.kind === 'component') {
+    return rendersOwnElement(parent) ? parent : node;
+  }
+  return node;
 }
 
 export function componentSourceRanges(

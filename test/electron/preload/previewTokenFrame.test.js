@@ -19,6 +19,7 @@ const { repoPath } = require('../../helpers/sources.js');
 const {
   canonicalManifest,
   manifestOf,
+  stampData,
   stampComment,
   parsePreviewRender,
 } = require('#dist/shared/page/previewToken.js');
@@ -27,7 +28,7 @@ const settle = (ms = 80) => new Promise((resolve) => setTimeout(resolve, ms));
 const FIRST_CHECKSUM = 'a'.repeat(64);
 const SECOND_CHECKSUM = 'b'.repeat(64);
 const page = { file: 'src/pages/index.astro', checksum: FIRST_CHECKSUM };
-const card = { file: 'src/components/Card.astro', checksum: SECOND_CHECKSUM };
+const card = { file: 'src/components/Hero Card.astro', checksum: SECOND_CHECKSUM };
 const head = { file: 'src/components/Seo.astro', checksum: FIRST_CHECKSUM };
 
 async function frame(html) {
@@ -96,8 +97,10 @@ function expectedToken(stamps) {
 test('the frame announces the token shared computes; events carry it', async () => {
   const { window, sent } = await frame(
     `${stampComment(page)}<!doctype html><html><head>${stampComment(head)}</head><body>
-      <!--avb-s:0--><section id="s">${stampComment(card)}<p>One</p></section><!--avb-e:0-->
-      <!--avb-s:1--><section>${stampComment(card)}<p>Two</p></section><!--avb-e:1-->
+      <!--avb-s:0--><section id="s" data-avb-d="${stampData(card)}">
+        <p>One</p></section><!--avb-e:0-->
+      <!--avb-s:1--><section data-avb-d="${stampData(card)}">
+        <p>Two</p></section><!--avb-e:1-->
       <!-- a comment of the page's own -->
     </body></html>`,
   );

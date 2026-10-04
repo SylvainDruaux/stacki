@@ -30,6 +30,7 @@ import { serializeNodeMarked } from './astroSerializeMarked';
 import { resolveChunks, chunkImportMarks, markChunkHtml } from './astroChunks';
 import { parsePropSchema } from './astroPropSchema';
 import { parseSlots, rootTag, defaultSlotInline, parseExtendsTag } from './astroComponentApi';
+import type { PreviewStamp } from '../../shared/page/previewToken';
 
 export {
   parsePage,
@@ -221,7 +222,11 @@ function serializePage(input: unknown): string {
 // with the page’s. A page marks as "0.1"; src/components/Card.astro marks as
 // "src/components/Card.astro|0.1", and the app asks for that namespace while
 // that component is the file being edited.
-function serializePageMarked(input: unknown, prefix = ''): string {
+function serializePageMarked(
+  input: unknown,
+  prefix = '',
+  stamp: PreviewStamp | undefined = undefined,
+): string {
   const model = parseSerializePage(input);
   const marks = chunkImportMarks(model);
   const lines = ['---'];
@@ -242,6 +247,7 @@ function serializePageMarked(input: unknown, prefix = ''): string {
       inSlot: false,
       atRoot: true,
       depth: 0,
+      stamp,
     }),
   );
   return lines.join('\n') + '\n';

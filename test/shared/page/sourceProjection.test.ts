@@ -99,6 +99,15 @@ test(
   },
 );
 
+test('a Fragment with set:html is markup and exposes the directive as an attribute', () => {
+  const [fragment] = valid('<Fragment set:html={content} />\n');
+  assert.equal(fragment?.capability, 'editable');
+  assert.deepEqual(
+    fragment?.attributes.map((attribute) => [attribute.name, attribute.capability]),
+    [['set:html', 'editable']],
+  );
+});
+
 test('spans are bytes: paths are preorder, and attribute parts are exact', () => {
   const text = '---\nconst a = "é";\n---\n<p title="Zoë 🎉" hidden>x</p>\n';
   const projection = project(text);

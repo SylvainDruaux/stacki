@@ -4047,6 +4047,9 @@ textarea.embed-editor_value-input.is-expanded {
   text-overflow: ellipsis;
   white-space: nowrap;
   max-width: 96px;
+  /* Clip the path from its start so the filename remains identifiable. */
+  direction: rtl;
+  text-align: left;
 }
 
 /* Orange property label — set through a selector other than the picked one.

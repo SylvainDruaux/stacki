@@ -189,7 +189,7 @@ export function useLiveSetProp(
 ) {
   const { stateKey } = selectionState;
   const { nativeModelRef } = nativeState;
-  const { onLiveSetProp } = liveEdits;
+  const { onLiveSetProps } = liveEdits;
   const { activeSelector } = activeSelectorHook;
   const { currentContext } = styleContextsHook;
   const { nativeLiveSet } = nativeOps;
@@ -198,19 +198,13 @@ export function useLiveSetProp(
   const { autoSelectForEdit } = autoSelect;
   const { revertProp } = clearPropHook;
 
-  const liveSetProp: LiveSetProp = (prop, typed, important) => {
+  const liveSetProp: LiveSetProp = (propOrProps, typed, important) => {
+    const props = typeof propOrProps === 'string' ? [propOrProps] : propOrProps;
     // `undefined` = abandon this property's live writes and put back what they
     // overwrote — the hover-scrub's counterpart (a dropdown closed without picking, a
     // field's edit cancelled). Nothing to undo if no live write happened.
     if (typed === undefined) {
-      revertProp(prop);
-      return;
-    }
-    const value = clampNonNegative(prop, typed);
-    // Don't push half-typed / invalid values live: Webflow's native API errors on
-    // them and gets stuck. Keep the last valid value applied until a complete valid
-    // one is typed; the blur commit still runs authoritatively.
-    if (!isSupportedCssValue(prop, value)) {
+      props.forEach(revertProp);
       return;
     }
     if (!activeSelector) {
@@ -220,22 +214,41 @@ export function useLiveSetProp(
       if (route && 'native' in route) {
         const handle = nativeModelRef.current?.styles[route.native]?.style;
         if (handle) {
-          nativeLiveSet(handle, prop, hslaToRgba(value), optionsFor(currentContext, stateKey));
+          for (const prop of props) {
+            const value = clampNonNegative(prop, typed);
+            if (isSupportedCssValue(prop, value)) {
+              nativeLiveSet(handle, prop, hslaToRgba(value), optionsFor(currentContext, stateKey));
+            }
+          }
         }
       }
       return;
     }
-    if (propLayer(prop) === 'native') {
-      const handle = nativeHandle();
-      if (handle) {
-        nativeLiveSet(handle, prop, hslaToRgba(value), optionsFor(currentContext, stateKey));
-        return;
+    const embedWrites: Array<{
+      readonly rule: ParsedRule;
+      readonly prop: string;
+      readonly value: string;
+      readonly important: boolean;
+    }> = [];
+    for (const prop of props) {
+      const value = clampNonNegative(prop, typed);
+      // Don't push half-typed / invalid values live: the native API can get stuck.
+      if (!isSupportedCssValue(prop, value)) {
+        continue;
+      }
+      if (propLayer(prop) === 'native') {
+        const handle = nativeHandle();
+        if (handle) {
+          nativeLiveSet(handle, prop, hslaToRgba(value), optionsFor(currentContext, stateKey));
+          continue;
+        }
+      }
+      const rule = ruleFor(prop);
+      if (rule) {
+        embedWrites.push({ rule, prop, value, important });
       }
     }
-    const rule = ruleFor(prop);
-    if (rule) {
-      onLiveSetProp(rule, prop, value, important);
-    }
+    onLiveSetProps(embedWrites);
   };
   return { liveSetProp };
 }

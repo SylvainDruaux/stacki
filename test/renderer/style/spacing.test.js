@@ -112,8 +112,13 @@ const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
 
   let committed = [];
   let liveWrites = [];
+  let liveCalls = [];
   const setProp = (prop, value) => committed.push([prop, value]);
-  const liveSetProp = (prop, value) => liveWrites.push([prop, value]);
+  const liveSetProp = (propOrProps, value) => {
+    const props = Array.isArray(propOrProps) ? propOrProps : [propOrProps];
+    liveCalls.push([props, value]);
+    props.forEach((prop) => liveWrites.push([prop, value]));
+  };
 
   // What the canvas is told to light up.
   const hovers = [];
@@ -170,6 +175,7 @@ const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
   const dragOn = async (element, { dx = 0, dy = 0, ...mods }) => {
     committed = [];
     liveWrites = [];
+    liveCalls = [];
     const send = (type, x, y) =>
       act(async () => {
         element.dispatchEvent(
@@ -217,6 +223,11 @@ const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
     'to the same value',
     new Set(out.map(([, value]) => value)).size === 1,
     JSON.stringify(out),
+  );
+  check(
+    'and previews linked sides in one batched write',
+    liveCalls.length === 1 && liveCalls[0]?.[0]?.length === 4,
+    JSON.stringify(liveCalls),
   );
 
   out = await dragOn(band('top'), { dy: -40, altKey: true });

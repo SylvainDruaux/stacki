@@ -329,9 +329,11 @@ module imports it (`test/electron/previewServer/previewBridge.test.ts` holds bot
 the real generated plugin over a project whose bytes it compares before and
 after). The generated config itself lives in `node_modules/.avb`.
 
-- `previewToken.ts` — every marked file also carries one stamp,
-  `<!--avb-d:<sha256>:<project-relative path>-->`, for the exact bytes it was
-  marked from. The frame collects a rendering's stamps into a manifest (sorted
+- `previewToken.ts` — every marked file also carries one stamp for the exact
+  bytes it was marked from. It is written as
+  `<!--avb-d:<sha256>:<project-relative path>-->` and carried on the file's
+  root markup as `data-avb-d`; the attribute survives components that render a
+  slot to a string and strip comments. The frame collects both forms into a manifest (sorted
   by path, one entry per file, at most `previewManifestFilesMax`; one file with
   two checksums is no manifest) and its token is the SHA-256 of
   `canonicalManifest`. The frame announces `avb:render` `{ token, stamps }`;

@@ -5,7 +5,11 @@ import { selectorsMatch, type ResolvedProp } from './model/resolved';
 
 export type SetProp = (prop: string, value: string, important: boolean) => void;
 export type ClearProp = (prop: string | string[]) => void;
-export type LiveSetProp = (prop: string, value: string | undefined, important: boolean) => void;
+export type LiveSetProp = (
+  prop: string | readonly string[],
+  value: string | undefined,
+  important: boolean,
+) => void;
 export type Read = (prop: string) => ResolvedProp | undefined;
 export type SelectSelector = (selector: string, prop?: string) => void;
 

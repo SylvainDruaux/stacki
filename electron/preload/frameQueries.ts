@@ -6,6 +6,7 @@ import { isElement } from './frameBasics';
 import { freezeViewportHeight, report } from './frameViewport';
 import {
   PATH_ATTR,
+  STAMP_ATTRIBUTE,
   activeScope,
   elementsWithPath,
   focusOcc,
@@ -98,7 +99,7 @@ const identityOf = (element: Element) => ({
   classes: ownClasses(element),
   attributes: Object.fromEntries(
     Array.from(element.attributes)
-      .filter((attribute) => attribute.name !== PATH_ATTR)
+      .filter((attribute) => attribute.name !== PATH_ATTR && attribute.name !== STAMP_ATTRIBUTE)
       .map((attribute) => [attribute.name, attribute.value]),
   ),
 });

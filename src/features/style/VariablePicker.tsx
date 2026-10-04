@@ -76,7 +76,6 @@ export function VariablePicker({
   const style = usePickerPosition(ref, anchor);
   usePickerFocus(searchRef);
   usePickerDismiss(ref, anchor, onClose);
-  usePanelScrollLock(anchor);
   const query = search.trim().toLowerCase();
   const filtered = pickerVariables(vars, prop, query);
 
@@ -405,29 +404,4 @@ export function swallowNextClick(): void {
       armed = false;
     }
   }, 300);
-}
-
-// Lock the panel's scroll while the picker is open — it covers most of the panel, so
-// scrolling the rows behind it is disorienting (and moves the picker's anchor).
-// Hiding overflow removes the scrollbar; if it took up space (a classic, non-overlay
-// scrollbar), reserve that width as padding so the panel content doesn't shift.
-export function usePanelScrollLock(anchor: HTMLElement): void {
-  useEffect(() => {
-    const scroller = panelBox(anchor);
-    if (!scroller) {
-      return;
-    }
-    const barWidth = scroller.offsetWidth - scroller.clientWidth;
-    const previousOverflow = scroller.style.overflow;
-    const previousPadding = scroller.style.paddingRight;
-    scroller.style.overflow = 'hidden';
-    if (barWidth > 0) {
-      const paddingRight = parseFloat(getComputedStyle(scroller).paddingRight);
-      scroller.style.paddingRight = `${paddingRight + barWidth}px`;
-    }
-    return () => {
-      scroller.style.overflow = previousOverflow;
-      scroller.style.paddingRight = previousPadding;
-    };
-  }, [anchor]);
 }

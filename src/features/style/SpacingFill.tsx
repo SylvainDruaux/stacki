@@ -207,7 +207,7 @@ export function useSideDrag({
 }: SideDragOptions) {
   const dragRef = useRef<SideDrag | undefined>(undefined);
   const dragged = useRef(false);
-  const frame = useLiveFrame(dragRef, liveSetProp);
+  const frame = useLiveFrame(dragRef, liveSetProp, onLive);
 
   const apply = useDragApply({
     dragRef,
@@ -215,7 +215,6 @@ export function useSideDrag({
     propFor,
     inward,
     liveSetProp,
-    onLive,
     frame,
   });
   useDragModifiers(dragRef, apply);
@@ -276,7 +275,6 @@ export function useDragApply({
   propFor,
   inward,
   liveSetProp,
-  onLive,
   frame,
 }: {
   dragRef: React.MutableRefObject<SideDrag | undefined>;
@@ -284,7 +282,6 @@ export function useDragApply({
   propFor: (side: Side) => string;
   inward: boolean;
   liveSetProp: LiveSetProp;
-  onLive: (props: string[], display: string) => void;
   frame: { queue: (value: string) => void };
 }) {
   return () => {
@@ -308,8 +305,8 @@ export function useDragApply({
       drag.written.add(prop);
     }
     const value = dragValue(drag, { inward });
-    // Update the labels every time (cheap setState); throttle the canvas write to rAF.
-    onLive(drag.props, drag.important ? `${value} !important` : value);
+    // Labels and the canvas share one frame. Pointer events can arrive faster
+    // than paint, and rendering the panel between those paints only adds lag.
     frame.queue(value);
   };
 }
@@ -423,6 +420,7 @@ export function followPointer(
 export function useLiveFrame(
   dragRef: React.MutableRefObject<SideDrag | undefined>,
   liveSetProp: LiveSetProp,
+  onLive: (props: string[], display: string) => void,
 ) {
   const raf = useRef<number | undefined>(undefined);
   const pending = useRef<string | undefined>(undefined);
@@ -439,7 +437,10 @@ export function useLiveFrame(
     const drag = dragRef.current;
     const value = pending.current;
     if (drag && value !== undefined) {
-      drag.props.forEach((prop) => liveSetProp(prop, value, drag.important));
+      onLive(drag.props, drag.important ? `${value} !important` : value);
+      // Linked sides are one visual edit. Sending them together lets the style
+      // writer serialize the shared stylesheet once instead of once per side.
+      liveSetProp(drag.props, value, drag.important);
     }
   };
   const queue = (value: string) => {

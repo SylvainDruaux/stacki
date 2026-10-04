@@ -45,6 +45,7 @@ const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
   global.window = dom.window;
   global.document = dom.window.document;
   global.navigator = dom.window.navigator;
+  global.Node = dom.window.Node;
   global.IS_REACT_ACT_ENVIRONMENT = true;
   // `jsdom` has no layout, so it has no scrollIntoView; the popup calls it to
   // keep the highlighted option visible.
@@ -296,6 +297,51 @@ const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
       await settle(20);
     });
     check('a pick nobody hovered is applied', applied.join() === 'play,pause', applied.join());
+
+    // The canvas is an iframe, so clicking it blurs the parent window without
+    // delivering a mousedown to the dropdown's document listener.
+    const previewChanges = [];
+    function ControlledDropdown() {
+      const [value, setValue] = React.useState('main');
+      return React.createElement(Dropdown, {
+        value,
+        options: OPTIONS,
+        onChange: (next) => {
+          previewChanges.push(next);
+          setValue(next);
+        },
+      });
+    }
+    await act(async () => {
+      root2.render(React.createElement(ControlledDropdown));
+      await settle(20);
+    });
+    await act(async () => {
+      find('.dd-trigger').click();
+      await settle(20);
+    });
+    await hover('play');
+    check('hover temporarily shows the preview', find('.dd-label')?.textContent === 'play');
+    check('the original option stays committed', !!find('.dd-option.selected .dd-check svg'));
+    await act(async () => {
+      dom.window.dispatchEvent(new dom.window.Event('blur'));
+      await settle(20);
+    });
+    check('canvas focus closes the popup', !find('.dd-popup'));
+    check('canvas focus restores the committed option', find('.dd-label')?.textContent === 'main');
+    check('the preview is reverted once', previewChanges.join() === 'play,main');
+
+    await act(async () => {
+      find('.dd-trigger').click();
+      await settle(20);
+    });
+    await hover('pause');
+    await act(async () => {
+      body.dispatchEvent(new dom.window.MouseEvent('mousedown', { bubbles: true }));
+      await settle(20);
+    });
+    check('outside click restores the committed option', find('.dd-label')?.textContent === 'main');
+    check('outside click reverts once', previewChanges.join() === 'play,main,pause,main');
     await act(async () => root2.unmount());
   }
 

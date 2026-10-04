@@ -97,12 +97,13 @@ test('instrumentation remains only in the Stacki design frame', () => {
 
   const page = new JSDOM(
     '<!doctype html><!--avb-d:stamp--><!--avb-s:0-->' +
-      '<html data-avb-p="src/layouts/Base.astro|0"><head data-avb-p="0.0"></head>' +
+      '<html data-avb-p="src/layouts/Base.astro|0" data-avb-d="avb-d:stamp">' +
+      '<head data-avb-p="0.0"></head>' +
       '<body><!--avb-s:0.1--><main data-avb-p="0.1">Site</main><!--avb-e:0.1--></body>' +
       '</html><!--avb-e:0-->',
   );
   morph.stripPreviewInstrumentation(page.window.document);
-  assert.doesNotMatch(page.serialize(), /avb-[sed]:|data-avb-p/);
+  assert.doesNotMatch(page.serialize(), /avb-[sed]:|data-avb-[pd]/);
   assert.equal(page.window.document.querySelector('main')?.textContent, 'Site');
 });
 

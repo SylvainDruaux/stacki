@@ -19,7 +19,7 @@ import path from 'node:path';
 import { assert } from '../../shared/core/assert';
 import { toDigest } from '../../shared/core/brand';
 import { LIMITS } from '../../shared/core/limits';
-import { stampComment, stampPathProblem } from '../../shared/page/previewToken';
+import { stampComment, stampPathProblem, type PreviewStamp } from '../../shared/page/previewToken';
 import { markChunkHtml, parsePage, resolveChunks, serializePageMarked } from '../parse/astroParser';
 
 export interface MarkedSource {
@@ -62,17 +62,21 @@ export function markSourceFile(
     return undefined;
   }
   resolveChunks(parsed.model, file);
-  const rel = projectFile.relative;
-  assert(stampPathProblem(rel) === undefined, 'A file under src has a project-relative path');
-  const page = rel.startsWith('src/pages/');
+  const relativePath = projectFile.relative;
+  assert(
+    stampPathProblem(relativePath) === undefined,
+    'A file under src has a project-relative path',
+  );
+  const page = relativePath.startsWith('src/pages/');
+  const checksum = toDigest(createHash('sha256').update(bytes).digest('hex'));
+  const stamp: PreviewStamp = { file: relativePath, checksum };
   const marked = page
-    ? serializePageMarked(parsed.model)
-    : serializePageMarked(parsed.model, `${rel}|`);
+    ? serializePageMarked(parsed.model, '', stamp)
+    : serializePageMarked(parsed.model, `${relativePath}|`, stamp);
   assert(marked.endsWith('\n'), 'The marked serializer ends on a line of its own');
   // Last, at the top level of the file's template, where the compiler keeps a
   // plain comment: after `</html>` for a page, which leaves the doctype alone.
-  const checksum = toDigest(createHash('sha256').update(bytes).digest('hex'));
-  return { code: `${marked}${stampComment({ file: rel, checksum })}\n`, source, page };
+  return { code: `${marked}${stampComment(stamp)}\n`, source, page };
 }
 
 /** The marked copy of a chunk imported as `?raw` (see serializePageMarked's

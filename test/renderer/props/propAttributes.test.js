@@ -156,6 +156,19 @@ const paste = async (text) => {
       .querySelector('.attr-row')
       .dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true })),
   );
+  const activeRow = document.querySelector('.attr-row');
+  await act(async () => {
+    activeRow.dispatchEvent(new dom.window.MouseEvent('mousedown', { bubbles: true }));
+    activeRow.dispatchEvent(new dom.window.MouseEvent('mouseup', { bubbles: true }));
+    activeRow.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }));
+  });
+  assert.ok(
+    document.querySelector('.attr-editor') === null,
+    'clicking the active attribute row closes its editor without reopening it',
+  );
+  await act(async () =>
+    activeRow.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true })),
+  );
   const valueField = document.querySelector('.attr-value-field');
   assert.ok(valueField);
   valueField.getBoundingClientRect = () => new dom.window.DOMRect(600, 300, 280, 40);

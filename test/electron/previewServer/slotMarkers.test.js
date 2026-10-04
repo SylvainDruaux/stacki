@@ -114,17 +114,30 @@ const { repoPath } = require('../../helpers/sources.js');
   //
   // So a root says both names: its own, and whatever the caller called it.
   {
+    const stamp = {
+      file: 'src/components/Slider.astro',
+      checksum: 'a'.repeat(64),
+    };
     const noSpread = serializePageMarked(
       parsePage(
         '---\nconst { slides } = Astro.props;\n---\n<div class="slider">{slides.length}</div>\n',
       ).model,
       'src/components/Slider.astro|',
+      stamp,
     );
     check(
       'a root that never asked for rest props still carries the caller’s name',
       /data-avb-p=\{\["src\/components\/Slider\.astro\|0", Astro\.props\["data-avb-p"\]\]/.test(
         noSpread,
       ),
+      noSpread,
+    );
+    check(
+      'the root also carries its file stamp through comment-stripping slots',
+      new RegExp(
+        /data-avb-d=\{\["avb-d:a{64}:src\/components\/Slider\.astro", /.source +
+          /Astro\.props\["data-avb-d"\]\]/.source,
+      ).test(noSpread) && noSpread.includes('.filter(Boolean).join("\\n")'),
       noSpread,
     );
 
@@ -136,6 +149,7 @@ const { repoPath } = require('../../helpers/sources.js');
           '{\n  render && slides.length > 0 && (\n    <div class="slider">x</div>\n  )\n}\n',
       ).model,
       'src/components/Slider.astro|',
+      stamp,
     );
     check(
       'a root written as a condition carries it too',

@@ -432,6 +432,12 @@ export function classifyNode(
   switch (node.kind) {
     case 'component':
     case 'element':
+      // Astro's built-in Fragment is authored markup even when `set:html`
+      // supplies its transparent contents. Its directive belongs in the
+      // Attributes editor; classifying the whole wrapper as code hides it.
+      if (node.name === 'Fragment') {
+        return 'editable';
+      }
       return writesChildrenAtRuntime(node.props) ? 'read-only-opaque' : 'editable';
     case 'raw':
       // A page's own <style> is same-file styles (plan §6: visually editable):

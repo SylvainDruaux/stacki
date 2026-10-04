@@ -44,7 +44,9 @@ const check = (what, condition, detail) => {
     platform: 'node',
     logLevel: 'silent',
   });
-  const { canvasClickAction } = await import(`${pathToFileURL(out).href}?v=${Date.now()}`);
+  const { canvasClickAction, canvasEventSelectsSource } = await import(
+    `${pathToFileURL(out).href}?v=${Date.now()}`
+  );
 
   // Editing Button.astro, opened from the second instance on the page.
   const COMPONENT = 'src/components/Button.astro|';
@@ -93,6 +95,23 @@ const check = (what, condition, detail) => {
   check('a click elsewhere on the page leaves', act('0.4') === 'close', act('0.4'));
   check('including another instance of the same component', act('0.3.2') === 'close');
   check('and a node above it', act('0') === 'close');
+
+  // Closing changes which file is open but does not use the event's source path
+  // as a selection. The preview gate must not demand a source stamp for that
+  // no-selection action; doing so rejected gray-area clicks before they closed.
+  check(
+    'leaving does not claim to select component source',
+    canvasEventSelectsSource({ kind: 'click', path: undefined, outside: true }, inside) === false,
+  );
+  check(
+    'an inner click still claims the component source',
+    canvasEventSelectsSource({ kind: 'click', path: `${COMPONENT}0`, outside: false }, inside) ===
+      true,
+  );
+  check(
+    'opening still claims the source being opened',
+    canvasEventSelectsSource({ kind: 'open' }, inside) === true,
+  );
 
   // --- not in a component -------------------------------------------------------
   const page = { focusPath: undefined, scope: '' };

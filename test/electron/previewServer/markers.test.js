@@ -91,6 +91,10 @@ function markersIn(text) {
 
 const failures = [];
 let checked = 0;
+const TEST_STAMP = {
+  file: 'src/components/Test.astro',
+  checksum: 'a'.repeat(64),
+};
 
 function fail(label, message) {
   failures.push(`  ${label}\n${message}`);
@@ -119,7 +123,7 @@ async function check(compilers, label, source) {
     if (!parsed.editable) {
       return { skipped: true };
     }
-    marked = serializePageMarked(parsed.model);
+    marked = serializePageMarked(parsed.model, '', TEST_STAMP);
   } catch (error) {
     fail(label, `    serializePageMarked threw: ${error.message}`);
     return {};

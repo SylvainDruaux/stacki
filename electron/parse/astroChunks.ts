@@ -154,6 +154,7 @@ export function markChunkHtml(
       inSlot: false,
       atRoot: false,
       depth: 0,
+      stamp: undefined,
     }),
   );
   if (group) {

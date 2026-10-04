@@ -40,9 +40,10 @@ export function stripAnchors(root: ParentNode): void {
 // not a body child and removing these markers cannot change layout or structural selectors.
 export function stripPreviewInstrumentation(root: ParentNode): void {
   stripAnchors(root);
-  const marked = root.querySelectorAll('[data-avb-p]');
+  const marked = root.querySelectorAll('[data-avb-p],[data-avb-d]');
   for (let index = 0; index < marked.length; index += 1) {
     marked[index]?.removeAttribute('data-avb-p');
+    marked[index]?.removeAttribute('data-avb-d');
   }
 }
 

@@ -2055,7 +2055,7 @@ html[data-platform='win32'] .titlebar {
   overflow: auto;
 }
 .code-panel-editor .cm-code-muted {
-  opacity: 0.24;
+  opacity: 0.5;
 }
 .code-panel-editor .cm-component-link {
   transition: color 0.1s ease;

@@ -71,6 +71,9 @@ export function elementFieldLayout(props: ElementPropsPanelProps) {
   const { node, schema = [], slotOptions, takesSlotText, allowAttrs } = props;
   assert((node.children?.length ?? 0) <= LIMITS.treeNodesMax, 'PropsPanel: child limit exceeded');
   const schemaNames = new Set(schema.map((entry) => entry.name));
+  // Fragment is Astro's transparent markup wrapper, not a user component with
+  // a closed prop schema. Directives such as `set:html` are its attributes.
+  const allowsFreeformAttrs = allowAttrs || node.name === 'Fragment';
 
   // The slot field renders in one stable spot whether or not the attribute
   // is currently set — hover-previewing a value must not remount the field
@@ -85,7 +88,7 @@ export function elementFieldLayout(props: ElementPropsPanelProps) {
   // With a free-form Attributes section, unknown attrs live there instead of
   // as individual fields — except class and style, which keep dedicated ones.
   let attrNames: string[] = [];
-  if (allowAttrs) {
+  if (allowsFreeformAttrs) {
     attrNames = extraProps.filter((key) => key !== 'class' && key !== 'style' && key !== 'slot');
     // `slot` is sorted last so a hand-written one lands where the picker's
     // does — directly above the comment — instead of in among the props.
@@ -124,6 +127,7 @@ export function elementFieldLayout(props: ElementPropsPanelProps) {
   // back — lets an expression field edit the declaration behind it.
 
   return {
+    allowAttrs: allowsFreeformAttrs,
     showSlotField,
     extraProps,
     attrNames,

@@ -173,7 +173,7 @@ export default function CodeEditor(props: CodeEditorProps) {
   // These values change without replacing the editor, preserving history and selection.
   const latest = useRef(props);
   latest.current = props;
-  useEffect(() => {
+  useLayoutEffect(() => {
     const parent = hostRef.current;
     assert(parent !== null, 'CodeEditor: mounted host exists');
     assert(viewRef.current === undefined, 'CodeEditor: only one editor owns the host');
@@ -260,6 +260,7 @@ function useCodeDecorations(
   activeRange: CodeEditorRange | undefined,
   componentRanges: readonly CodeEditorComponentRange[] | undefined,
 ): void {
+  const initialSelectionPending = useRef(true);
   useEffect(() => {
     const view = viewRef.current;
     if (!view) {
@@ -271,12 +272,52 @@ function useCodeDecorations(
         components: componentRanges ?? [],
       }),
     });
-    if (activeRange) {
-      view.dispatch({
-        effects: EditorView.scrollIntoView(activeRange.from, { y: 'nearest' }),
-      });
-    }
   }, [activeRange, componentRanges, viewRef]);
+  useLayoutEffect(() => {
+    const view = viewRef.current;
+    const range = codeEditorRangeWithin(activeRange, view?.state.doc.length ?? 0);
+    if (!view || !range) {
+      return;
+    }
+    if (!initialSelectionPending.current) {
+      view.dispatch({ effects: EditorView.scrollIntoView(range.from, { y: 'nearest' }) });
+      return;
+    }
+    initialSelectionPending.current = false;
+    view.requestMeasure({
+      read: (editor) => {
+        const start = editor.lineBlockAt(range.from);
+        const end = editor.lineBlockAt(Math.max(range.from, range.to - 1));
+        return selectedCodeScrollTop(
+          start.top,
+          end.top + end.height,
+          editor.scrollDOM.clientHeight,
+        );
+      },
+      write: (top, editor) => {
+        if (top !== undefined) {
+          const scrollContainer = editor.scrollDOM;
+          scrollContainer.scrollTop = top;
+        }
+      },
+    });
+  }, [activeRange, viewRef]);
+}
+
+export function selectedCodeScrollTop(
+  startTop: number,
+  endBottom: number,
+  viewportHeight: number,
+): number | undefined {
+  if (viewportHeight <= 0 || !Number.isFinite(viewportHeight)) {
+    return undefined;
+  }
+  assert(Number.isFinite(startTop), 'Selected code start is finite');
+  assert(Number.isFinite(endBottom), 'Selected code end is finite');
+  assert(endBottom >= startTop, 'Selected code range keeps its order');
+  // Center the first line only when the rest of the block still fits below it.
+  const offset = endBottom - startTop <= viewportHeight / 2 ? viewportHeight / 2 : 0;
+  return Math.max(0, startTop - offset);
 }
 
 function codeEditorCreate(

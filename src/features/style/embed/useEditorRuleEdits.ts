@@ -17,7 +17,7 @@ import {
 } from '../model/css';
 import { canonicalCompound, parseSelectorList } from '../model/selectors';
 import { getHost, type ClassOutcome } from '../model/host';
-import { navigateToEmbed, writeEmbedDocument } from '../model/webflow';
+import { type EmbedDocument, navigateToEmbed, writeEmbedDocument } from '../model/webflow';
 import type { ParsedDeclaration, ParsedRule } from '../model/styleTypes';
 import { declsFor, lastDeclFor, editorSession, withoutClasses } from './editorModel';
 import { type SelectorSuggestion } from './LayoutRows';
@@ -262,39 +262,52 @@ export function useLiveEdits(
   // Live set while typing: mutate (or append) the AST node and write straight to
   // the embed so the canvas updates in real time — no busy flag, no model rebuild
   // (blur runs the authoritative onSetProp). Mirrors onLiveCommitValue.
-  const onLiveSetProp = useCallback(
-    (rule: ParsedRule, prop: string, value: string, important: boolean) => {
-      // Defer grouped-splittable edits to the blur commit (onSetProp splits first).
-      if (isGroupedSplittable(rule)) {
-        return;
-      }
-      const embedDocument = documentByKey.get(rule.embedKey);
-      if (!embedDocument) {
-        return;
-      }
-      const matches = declsFor(rule, prop);
-      const target = matches[matches.length - 1];
-      if (!liveOriginRef.current.has(prop)) {
-        liveOriginRef.current.set(
-          prop,
-          target ? { value: target.value, important: !!target.important } : undefined,
-        );
-      }
-      if (target) {
-        target.value = value;
-        target.important = important;
-      } else {
-        appendDecl(rule.node, prop, { value, important });
-      }
-      void writeEmbedDocument(embedDocument, true).then((result) => {
-        if (!result.ok && inComponentRef.current && !embedDocument.source.fromComponent) {
-          markPending(embedDocument.source.key);
+  const onLiveSetProps = useCallback(
+    (
+      writes: readonly {
+        readonly rule: ParsedRule;
+        readonly prop: string;
+        readonly value: string;
+        readonly important: boolean;
+      }[],
+    ) => {
+      const documents = new Set<EmbedDocument>();
+      for (const { rule, prop, value, important } of writes) {
+        // Defer grouped-splittable edits to the blur commit (onSetProp splits first).
+        if (isGroupedSplittable(rule)) {
+          continue;
         }
-      });
+        const embedDocument = documentByKey.get(rule.embedKey);
+        if (!embedDocument) {
+          continue;
+        }
+        const matches = declsFor(rule, prop);
+        const target = matches[matches.length - 1];
+        if (!liveOriginRef.current.has(prop)) {
+          liveOriginRef.current.set(
+            prop,
+            target ? { value: target.value, important: !!target.important } : undefined,
+          );
+        }
+        if (target) {
+          target.value = value;
+          target.important = important;
+        } else {
+          appendDecl(rule.node, prop, { value, important });
+        }
+        documents.add(embedDocument);
+      }
+      for (const embedDocument of documents) {
+        void writeEmbedDocument(embedDocument, true).then((result) => {
+          if (!result.ok && inComponentRef.current && !embedDocument.source.fromComponent) {
+            markPending(embedDocument.source.key);
+          }
+        });
+      }
     },
     [documentByKey, markPending, isGroupedSplittable, inComponentRef],
   );
-  return { liveOriginRef, onLiveSetProp };
+  return { liveOriginRef, onLiveSetProps };
 }
 
 // Revert live writes, remove a rule, and save a rule's CSS.

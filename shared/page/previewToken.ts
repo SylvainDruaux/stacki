@@ -28,6 +28,7 @@ import { err, ok, type Result } from '../core/result';
 
 /** Comment data that opens a stamp. The node markers are `avb-s:` and `avb-e:`. */
 export const PREVIEW_STAMP_PREFIX = 'avb-d:';
+export const PREVIEW_STAMP_ATTRIBUTE = 'data-avb-d';
 
 export interface PreviewStamp {
   /** Project-relative, `/`-separated: `src/components/Card.astro`. */
@@ -100,10 +101,14 @@ export function stampPathProblem(file: string): string | undefined {
 }
 
 /** The comment the dev plugin writes for one marked file. */
-export function stampComment(stamp: PreviewStamp): string {
+export function stampData(stamp: PreviewStamp): string {
   const problem = stampPathProblem(stamp.file);
   assert(problem === undefined, `A stamped path is a project-relative path (${problem})`);
-  return `<!--${PREVIEW_STAMP_PREFIX}${stamp.checksum}:${stamp.file}-->`;
+  return `${PREVIEW_STAMP_PREFIX}${stamp.checksum}:${stamp.file}`;
+}
+
+export function stampComment(stamp: PreviewStamp): string {
+  return `<!--${stampData(stamp)}-->`;
 }
 
 /** The stamp a comment's data holds, or undefined when it is not one. Comments

@@ -6,6 +6,7 @@ import React, { useCallback, useEffect, useLayoutEffect, useState } from 'react'
 import { isFragmentNode, liveClassesById as classesByNodeId } from '../../editor/liveClasses';
 import { isDataBound } from '../../editor/bindings';
 import { thenBranch } from '../../editor/branches';
+import { canvasEventSelectsSource, type CanvasEventRequest } from '../../editor/canvasClick';
 import { nodeAtPath } from '../../editor/editorTree';
 import { elementLabel } from '../../editor/classNames';
 import type { OverlayInfo } from '../../features/preview/PreviewOverlays';
@@ -78,15 +79,19 @@ export function useCanvasGate(
   // canvas's rendering is the bytes the editor shows and the disk still holds
   // every file it came from. Read through refs at decision time, not captured.
   const judgeEvent = useCallback<JudgeCanvasEvent>(
-    (token, render) => {
+    (token, render, request) => {
       const shown = (): ShownFile | undefined => {
         const { currentPage: open, pageState: state } = pageStateRef.current;
         const projectPath = projectRef.current?.path;
         if (!isOpenFile(open) || !state || !projectPath) {
           return undefined;
         }
+        const file = projectRelativePath(projectPath, open.path, window.avb.platform);
+        if (!eventSelectsShownFile(request, open, file)) {
+          return undefined;
+        }
         return {
-          file: projectRelativePath(projectPath, open.path, window.avb.platform),
+          file,
           state,
         };
       };
@@ -100,6 +105,18 @@ export function useCanvasGate(
     [pageStateRef, projectRef],
   );
   return { judgeEvent, setAssetFileText };
+}
+
+function eventSelectsShownFile(
+  request: CanvasEventRequest,
+  open: { readonly kind: 'page' | 'component'; readonly focusPath?: string | undefined },
+  file: string,
+): boolean {
+  const component = open.kind === 'component';
+  return canvasEventSelectsSource(request, {
+    focusPath: component ? (open.focusPath ?? undefined) : undefined,
+    scope: component ? `${file}|` : '',
+  });
 }
 
 // Canvas notices, and the classes the page rendered with.

@@ -251,10 +251,13 @@ function useDropdownDismiss<T>(state: Selection<T>, close: () => void): void {
     document.addEventListener('mousedown', down);
     window.addEventListener('scroll', scroll, true);
     window.addEventListener('resize', close);
+    // A click inside the canvas iframe blurs this window without a document mousedown.
+    window.addEventListener('blur', close);
     return () => {
       document.removeEventListener('mousedown', down);
       window.removeEventListener('scroll', scroll, true);
       window.removeEventListener('resize', close);
+      window.removeEventListener('blur', close);
     };
   }, [open, popupRef, triggerRef, close]);
 }

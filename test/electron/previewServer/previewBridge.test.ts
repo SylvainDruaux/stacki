@@ -369,12 +369,17 @@ test('markers live in memory only; the token follows the rendering chain', async
     assert.deepEqual(stampsIn(card), [
       { file: 'src/components/Card.astro', checksum: sha256(CARD) },
     ]);
+    assert.match(
+      card,
+      /data-avb-d=\{\["avb-d:[0-9a-f]{64}:src\/components\/Card\.astro",/,
+      'the stamp also rides on root markup when project code strips comments',
+    );
     // No marker reached the project: every byte of it is what it was, and the
     // files on disk carry no marker at all.
     assert.deepEqual(snapshot(root), before, 'marking wrote nothing into the project');
     for (const rel of before.keys()) {
       const text = fs.readFileSync(path.join(root, rel), 'utf8');
-      assert.doesNotMatch(text, /avb-[sed]:|data-avb-p/, `${rel} holds no preview marker`);
+      assert.doesNotMatch(text, /avb-[sed]:|data-avb-[pd]/, `${rel} holds no preview marker`);
     }
 
     // The rendering the frame would announce: the page and two copies of the card.

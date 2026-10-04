@@ -13,12 +13,14 @@ import {
   type PreviewRender,
   type PreviewVerdict,
 } from '../../../shared/page/previewToken';
+import type { CanvasEventRequest } from '../../editor/canvasClick';
 
 /** Whether a click or double-click on the canvas may select what it names
  * (src/features/preview/previewGate.ts). Hover needs only the token to be the latest. */
 export type JudgeCanvasEvent = (
   token: Digest | undefined,
   render: PreviewRender | undefined,
+  request: CanvasEventRequest,
 ) => Promise<PreviewVerdict>;
 
 export interface PreviewRuntimeProps {
@@ -245,7 +247,12 @@ function applyMessage(message: PreviewMessage, refs: RuntimeRefs, setters: Runti
       }
       break;
     case 'click-node':
-      gateEvent(message.token, refs, () => applyClick(message, refs, setters));
+      gateEvent(
+        message.token,
+        refs,
+        { kind: 'click', path: message.path, outside: message.outside },
+        () => applyClick(message, refs, setters),
+      );
       break;
     case 'render':
       announceRender(refs.render, message.render);
@@ -261,7 +268,7 @@ function applyMessage(message: PreviewMessage, refs: RuntimeRefs, setters: Runti
       receiveCanvasReply(message.input);
       break;
     case 'open-node':
-      gateEvent(message.token, refs, () =>
+      gateEvent(message.token, refs, { kind: 'open' }, () =>
         refs.props.current.onOpenPath?.(message.path ?? undefined, message.occurrence),
       );
       break;
@@ -277,9 +284,14 @@ function announceRender(
 
 // The gate answers after main has read the stamped files; the rendering judged
 // is the one the event named, and `apply` runs only on `current`.
-function gateEvent(token: Digest | undefined, refs: RuntimeRefs, apply: () => void): void {
+function gateEvent(
+  token: Digest | undefined,
+  refs: RuntimeRefs,
+  request: CanvasEventRequest,
+  apply: () => void,
+): void {
   const render = refs.render.current;
-  refs.props.current.judgeEvent(token, render).then(
+  refs.props.current.judgeEvent(token, render, request).then(
     (verdict) => {
       if (verdict.tag === 'current') {
         apply();

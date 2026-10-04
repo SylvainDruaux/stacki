@@ -5,6 +5,11 @@
 import type { Attr } from '../../shared/page/pageNode';
 import { assert } from '../../shared/core/assert';
 import { LIMITS } from '../../shared/core/limits';
+import {
+  PREVIEW_STAMP_ATTRIBUTE,
+  stampData,
+  type PreviewStamp,
+} from '../../shared/page/previewToken';
 import type { ParserNode, MapNode, CondNode } from './astroParserTypes';
 import { serializeAttrs } from './astroAttrs';
 import { blockHead } from './astroScan';
@@ -18,6 +23,7 @@ interface MarkedPlace {
   readonly inSlot: boolean;
   readonly atRoot: boolean;
   readonly depth: number;
+  readonly stamp: PreviewStamp | undefined;
 }
 
 // A marker that survives wherever it's put.
@@ -95,7 +101,7 @@ export function serializeNodeMarked(
   lines: string[],
   place: MarkedPlace,
 ): void {
-  const { path, inSlot, atRoot, depth } = place;
+  const { path, inSlot, atRoot, depth, stamp } = place;
   assert(depth <= LIMITS.treeDepthMax, 'serializeNodeMarked: depth limit');
   if (node.kind === 'chunk-group') {
     return;
@@ -160,6 +166,7 @@ export function serializeNodeMarked(
         inSlot: node.kind === 'component',
         atRoot: node.name === 'Fragment' && atRoot,
         depth: depth + 1,
+        stamp,
       }),
     );
     if (markWithin) {
@@ -181,6 +188,7 @@ export function serializeNodeMarked(
         inSlot,
         atRoot,
         depth: depth + 1,
+        stamp,
       }),
     );
   } else {
@@ -196,7 +204,7 @@ function serializeNodeMarkedMap(
   node: MapNode,
   indent: string,
   lines: string[],
-  { path, atRoot, depth }: MarkedPlace,
+  { path, atRoot, depth, stamp }: MarkedPlace,
 ): 'complete' | 'continue' {
   // Loop children render once per item, so their marker pairs repeat in
   // the DOM — the collector unions every instance into one region.
@@ -221,6 +229,7 @@ function serializeNodeMarkedMap(
         inSlot: true,
         atRoot,
         depth: depth + 1,
+        stamp,
       }),
     );
     lines.push(bodyIndent + '</Fragment>');
@@ -249,7 +258,7 @@ function serializeNodeMarkedCond(
   node: CondNode,
   indent: string,
   lines: string[],
-  { path, atRoot, depth }: MarkedPlace,
+  { path, atRoot, depth, stamp }: MarkedPlace,
 ): void {
   // Both branches keep their parens here whether or not they hold anything:
   // the branch's own marker templates are inside them, so they're never the
@@ -277,6 +286,7 @@ function serializeNodeMarkedCond(
         inSlot: true,
         atRoot,
         depth: depth + 1,
+        stamp,
       });
     }
     lines.push(inner + '</Fragment>');
@@ -294,7 +304,7 @@ function serializeNodeMarkedCond(
   lines.push(indent + '}');
 }
 
-function serializeNodeMarkedRoute(node: ParserNode, { path, atRoot, depth }: MarkedPlace) {
+function serializeNodeMarkedRoute(node: ParserNode, { path, atRoot, depth, stamp }: MarkedPlace) {
   const slotValue = node.props?.['slot'];
   const slotted = slotValue && slotValue.type === 'string' && !!slotValue.value;
   const tagInPlace = slotted && node.kind === 'element';
@@ -337,19 +347,33 @@ function serializeNodeMarkedRoute(node: ParserNode, { path, atRoot, depth }: Mar
         value: `[${JSON.stringify(path)}, Astro.props["data-avb-p"]].filter(Boolean).join(" ")`,
       }
     : { type: 'string', value: path };
+  const carriesStamp = carryPath && atRoot && stamp !== undefined;
+  const stampProp: Attr | undefined = carriesStamp
+    ? {
+        type: 'expr',
+        value:
+          `[${JSON.stringify(stampData(stamp))}, ` +
+          `Astro.props[${JSON.stringify(PREVIEW_STAMP_ATTRIBUTE)}]]` +
+          '.filter(Boolean).join("\\n")',
+      }
+    : undefined;
+  const markerNames = carriesStamp ? ['data-avb-p', PREVIEW_STAMP_ATTRIBUTE] : ['data-avb-p'];
+  const markerProps = stampProp
+    ? { 'data-avb-p': pathProp, [PREVIEW_STAMP_ATTRIBUTE]: stampProp }
+    : { 'data-avb-p': pathProp };
   // The path attribute is put where this function decided to put it, not where
   // the file's order would have it — it was never in the file.
   const attrOrder =
     !carryPath || !node.attrOrder
       ? node.attrOrder
       : forwards && node.kind === 'element'
-        ? ['data-avb-p', ...node.attrOrder]
-        : [...node.attrOrder, 'data-avb-p'];
+        ? [...markerNames, ...node.attrOrder]
+        : [...node.attrOrder, ...markerNames];
   const markedProps = !carryPath
     ? node.props
     : forwards && node.kind === 'element'
-      ? { 'data-avb-p': pathProp, ...node.props }
-      : { ...node.props, 'data-avb-p': pathProp };
+      ? { ...markerProps, ...node.props }
+      : { ...node.props, ...markerProps };
   return {
     tagInPlace,
     markWithin,

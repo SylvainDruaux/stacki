@@ -54,6 +54,8 @@ type ScrubOptions = {
   /** The field's current text. The scrub rewrites exactly this string. */
   value: string;
   disabled?: boolean;
+  /** Multiplies the shared whole/fine/ten steps for normalized fields such as opacity. */
+  stepScale?: number;
   /** Every frame of the drag — for the field's own text only, never a write. */
   onPreview?: (text: string) => void;
   /** Throttled during the drag: the live (preview-only) CSS write. Omit it on a field
@@ -112,7 +114,7 @@ function useDragFrames(dragRef: DragRef, latest: LatestOptions) {
     }
     state.raf = undefined;
     const steps = Math.round((state.latestX - state.startX) / PX_PER_STEP);
-    const text = scrubNumber(state.base, state.run, steps, state.mode);
+    const text = scrubNumber(state.base, state.run, steps, state.mode, latest.current.stepScale);
     if (text === state.text) {
       return;
     }

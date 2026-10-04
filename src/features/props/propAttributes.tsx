@@ -49,6 +49,7 @@ interface AttributesSectionProps extends ContextProps {
 }
 interface AttrEditorProps extends ContextProps {
   readonly pos: FieldPosition;
+  readonly triggerRootRef: RefObject<HTMLElement>;
   readonly name: string;
   readonly value: string;
   readonly syntax: 'pair' | 'spread';
@@ -80,7 +81,12 @@ export function AttributesSection(props: AttributesSectionProps) {
           <BracesIcon size={12} className="prop-label-icon" />
           Attributes
         </span>
-        <button className="ghost" title="Add attribute" onClick={() => openEditor(undefined)}>
+        <button
+          className="ghost"
+          title="Add attribute"
+          data-attribute-editor-trigger
+          onClick={() => openEditor(undefined)}
+        >
           <PlusIcon size={12} />
         </button>
       </div>
@@ -94,6 +100,7 @@ export function AttributesSection(props: AttributesSectionProps) {
               <div
                 key={name}
                 className={`attr-row ${syntax} ${editor?.attr === name ? 'editing' : ''}`}
+                data-attribute-editor-trigger
                 onClick={() => openEditor(name)}
               >
                 <span className="attr-name">{attributeDisplayName(name, value)}</span>
@@ -135,12 +142,16 @@ function useAttributesSection(props: AttributesSectionProps) {
 
   const openEditor = (attr: string | undefined) => {
     const rect = listRef.current?.getBoundingClientRect();
-    setEditor({
-      attr,
-      top: Math.min((rect?.bottom ?? 200) + 6, window.innerHeight - 150),
-      left: rect?.left ?? 0,
-      width: rect?.width ?? 240,
-    });
+    setEditor((current) =>
+      current !== undefined && current.attr === attr
+        ? undefined
+        : {
+            attr,
+            top: Math.min((rect?.bottom ?? 200) + 6, window.innerHeight - 150),
+            left: rect?.left ?? 0,
+            width: rect?.width ?? 240,
+          },
+    );
   };
 
   return { ...props, editor, setEditor, listRef, openEditor };
@@ -157,6 +168,7 @@ function AttributesSectionPopup({ state }: { readonly state: AttributesState }) 
     <AttrEditor
       key={editor.attr ?? '__new'}
       pos={editor}
+      triggerRootRef={state.listRef}
       projectPath={projectPath ?? undefined}
       bindContext={bindContext}
       dataContext={bindContext}
@@ -261,7 +273,7 @@ function AttrEditor(props: AttrEditorProps) {
 }
 
 function useAttrEditor(props: AttrEditorProps) {
-  const { name, value, syntax, isNew, bindContext, onCommitName, onClose } = props;
+  const { name, value, syntax, isNew, bindContext, onCommitName, onClose, triggerRootRef } = props;
   const [draftName, setDraftName] = useState(name);
   const [draftValue, setDraftValue] = useState(value);
   const ref = useRef<HTMLDivElement>(null);
@@ -306,7 +318,7 @@ function useAttrEditor(props: AttrEditorProps) {
     }
   };
 
-  useAttrEditorDismiss(ref, onClose);
+  useAttrEditorDismiss(ref, triggerRootRef, onClose);
   return {
     ...props,
     draftName,
@@ -329,15 +341,28 @@ function useAttrEditor(props: AttrEditorProps) {
   };
 }
 type AttributeState = ReturnType<typeof useAttrEditor>;
-function useAttrEditorDismiss(ref: RefObject<HTMLElement>, onClose: () => void) {
+function useAttrEditorDismiss(
+  ref: RefObject<HTMLElement>,
+  triggerRootRef: RefObject<HTMLElement>,
+  onClose: () => void,
+) {
   useEffect(() => {
     const onDown = (event: MouseEvent) => {
-      if (
-        ref.current &&
-        !(event.target instanceof window.Node && ref.current.contains(event.target))
-      ) {
-        onClose();
+      const target = event.target;
+      if (!(target instanceof window.Node)) {
+        return;
       }
+      if (ref.current?.contains(target)) {
+        return;
+      }
+      const trigger =
+        target instanceof window.Element
+          ? target.closest('[data-attribute-editor-trigger]')
+          : undefined;
+      if (trigger && triggerRootRef.current?.contains(trigger)) {
+        return;
+      }
+      onClose();
     };
     const onKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
@@ -350,7 +375,7 @@ function useAttrEditorDismiss(ref: RefObject<HTMLElement>, onClose: () => void) 
       document.removeEventListener('mousedown', onDown);
       document.removeEventListener('keydown', onKey);
     };
-  }, [onClose, ref]);
+  }, [onClose, ref, triggerRootRef]);
 }
 function AttributeName({ state }: { readonly state: AttributeState }) {
   const {
@@ -599,7 +624,12 @@ export function ObjectAttrsField(props: ObjectAttrsFieldProps) {
     <div className="props-field" ref={listRef}>
       <div className="props-label-row">
         {pill}
-        <button className="ghost" title="Add attribute" onClick={() => openEditor(undefined)}>
+        <button
+          className="ghost"
+          title="Add attribute"
+          data-attribute-editor-trigger
+          onClick={() => openEditor(undefined)}
+        >
           <PlusIcon size={12} />
         </button>
         {menu}
@@ -611,6 +641,7 @@ export function ObjectAttrsField(props: ObjectAttrsFieldProps) {
             <div
               key={`${en.key}-${i}`}
               className={`attr-row ${editor?.index === i ? 'editing' : ''}`}
+              data-attribute-editor-trigger
               onClick={() => openEditor(i)}
             >
               <span className="attr-name">{en.key}</span>
@@ -647,12 +678,16 @@ function useObjectAttrsField(props: ObjectAttrsFieldProps) {
 
   const openEditor = (index: number | undefined) => {
     const rect = listRef.current?.getBoundingClientRect();
-    setEditor({
-      index,
-      top: Math.min((rect?.bottom ?? 200) + 6, window.innerHeight - 150),
-      left: rect?.left ?? 0,
-      width: rect?.width ?? 240,
-    });
+    setEditor((current) =>
+      current !== undefined && current.index === index
+        ? undefined
+        : {
+            index,
+            top: Math.min((rect?.bottom ?? 200) + 6, window.innerHeight - 150),
+            left: rect?.left ?? 0,
+            width: rect?.width ?? 240,
+          },
+    );
   };
 
   return { ...props, editor, setEditor, listRef, openEditor };
@@ -667,6 +702,7 @@ function ObjectAttrsFieldPopup({ state }: { readonly state: ObjectAttributesStat
     <AttrEditor
       key={editor.index ?? '__new'}
       pos={editor}
+      triggerRootRef={state.listRef}
       projectPath={projectPath ?? undefined}
       bindContext={bindContext}
       dataContext={bindContext}

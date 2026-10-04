@@ -18,6 +18,46 @@
 // files and the selection is lost — so it takes a click the canvas could map
 // somewhere else. An unmappable one changes nothing.
 
+export type CanvasEventRequest =
+  | {
+      readonly kind: 'click';
+      readonly path: string | undefined;
+      readonly outside: boolean;
+    }
+  | { readonly kind: 'open' };
+
+export interface CanvasEventContext {
+  readonly focusPath: string | undefined;
+  readonly scope: string;
+}
+
+/** Whether an event will select or open source in the file currently being
+ * edited. Leaving a component only changes navigation, so requiring that
+ * component to be stamped in the page render would reject the very click that
+ * is meant to close it. */
+export function canvasEventSelectsSource(
+  request: CanvasEventRequest,
+  context: CanvasEventContext,
+): boolean {
+  switch (request.kind) {
+    case 'open':
+      return true;
+    case 'click':
+      return (
+        canvasClickAction({
+          path: request.path,
+          outside: request.outside,
+          focusPath: context.focusPath,
+          scope: context.scope,
+        }).kind !== 'close'
+      );
+    default: {
+      const exhaustive: never = request;
+      return exhaustive;
+    }
+  }
+}
+
 /**
  * @param {object} click
  * @param {string|undefined} click.path   what the canvas mapped, or undefined

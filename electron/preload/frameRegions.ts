@@ -162,6 +162,7 @@ export const announceMapped = () => {
 // other. The patcher gathers the stamps at the document's end after each
 // patch; the page arrives with them wherever each file rendered.
 const STAMP_PREFIX = 'avb-d:';
+export const STAMP_ATTRIBUTE = 'data-avb-d';
 const STAMPS_MAX = 20000; // LIMITS.previewMarkersMax
 const MANIFEST_FILES_MAX = 512; // LIMITS.previewManifestFilesMax
 export let renderToken: string | undefined = undefined;
@@ -171,6 +172,27 @@ let renderSeq = 0;
 const readManifest = (): { file: string; checksum: string }[] | undefined => {
   const byFile = new Map<string, string>();
   let stamps = 0;
+  const record = (data: string): boolean => {
+    stamps += 1;
+    if (stamps > STAMPS_MAX) {
+      return false;
+    }
+    if (!data.startsWith(STAMP_PREFIX)) {
+      return true;
+    }
+    const rest = data.slice(STAMP_PREFIX.length);
+    const checksum = rest.slice(0, 64);
+    const file = rest.slice(65);
+    if (!/^[0-9a-f]{64}$/.test(checksum) || rest[64] !== ':' || !file) {
+      return true;
+    }
+    const seen = byFile.get(file);
+    if (seen !== undefined && seen !== checksum) {
+      return false;
+    }
+    byFile.set(file, checksum);
+    return true;
+  };
   const stack: Node[] = [document];
   while (stack.length) {
     const parent = stack.pop();
@@ -179,27 +201,33 @@ const readManifest = (): { file: string; checksum: string }[] | undefined => {
     }
     for (let node = parent.firstChild; node; node = node.nextSibling) {
       if (isElement(node)) {
+        const carried = node.getAttribute(STAMP_ATTRIBUTE);
+        if (carried !== null) {
+          if (STAMPS_MAX * (65 + 1_024) < carried.length) {
+            return undefined;
+          }
+          // Newlines cannot occur in a stamped path, unlike spaces, so a file
+          // such as `Hero Card.astro` remains one token while inherited stamps
+          // can still travel together through component props.
+          const tokens = carried.split('\n').filter(Boolean);
+          if (STAMPS_MAX < tokens.length) {
+            return undefined;
+          }
+          for (const token of tokens) {
+            if (!record(token)) {
+              return undefined;
+            }
+          }
+        }
         stack.push(node);
         continue;
       }
       if (!isComment(node) || !node.data.startsWith(STAMP_PREFIX)) {
         continue;
       }
-      stamps += 1;
-      if (stamps > STAMPS_MAX) {
+      if (!record(node.data)) {
         return undefined;
       }
-      const rest = node.data.slice(STAMP_PREFIX.length);
-      const checksum = rest.slice(0, 64);
-      const file = rest.slice(65);
-      if (!/^[0-9a-f]{64}$/.test(checksum) || rest[64] !== ':' || !file) {
-        continue;
-      }
-      const seen = byFile.get(file);
-      if (seen !== undefined && seen !== checksum) {
-        return undefined;
-      }
-      byFile.set(file, checksum);
     }
   }
   if (byFile.size > MANIFEST_FILES_MAX) {

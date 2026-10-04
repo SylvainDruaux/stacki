@@ -6,6 +6,7 @@ import type {
   PointerEvent as ReactPointerEvent,
   RefObject,
 } from 'react';
+import { assert } from '../../../../shared/core/assert';
 
 function sliderStyle(percent: number): CSSProperties & { readonly '--pct': string } {
   return { '--pct': `${percent}%` };
@@ -23,6 +24,7 @@ export default function DragSlider({
   value,
   min,
   max,
+  step = 1,
   disabled = false,
   ariaLabel,
   className,
@@ -33,6 +35,7 @@ export default function DragSlider({
   value: number;
   min: number;
   max: number;
+  step?: number;
   disabled?: boolean;
   ariaLabel?: string;
   className?: string;
@@ -58,6 +61,7 @@ export default function DragSlider({
     setLocal,
     min,
     max,
+    step,
     disabled,
     onPreview,
     onInput,
@@ -96,7 +100,7 @@ function sliderKeyHandler(drag: SliderDrag) {
     if (drag.disabled) {
       return;
     }
-    const next = keyedValue(event, drag.local, drag.min, drag.max);
+    const next = keyedValue(event, drag.local, drag.min, drag.max, drag.step);
     if (next === undefined) {
       return;
     }
@@ -107,20 +111,22 @@ function sliderKeyHandler(drag: SliderDrag) {
   };
 }
 
-// The value a key asks for: arrows step by one (Shift = ×10), Home/End jump to the
-// ends. Undefined for any other key.
+// The value a key asks for: arrows use the caller's step (Shift = ×10), while
+// Home/End jump to the ends. Undefined for any other key.
 function keyedValue(
   event: ReactKeyboardEvent<HTMLDivElement>,
   local: number,
   min: number,
   max: number,
+  step: number,
 ): number | undefined {
-  const step = event.shiftKey ? 10 : 1;
+  assert(step > 0, 'DragSlider: keyboard step is positive');
+  const delta = event.shiftKey ? step * 10 : step;
   if (event.key === 'ArrowLeft' || event.key === 'ArrowDown') {
-    return local - step;
+    return local - delta;
   }
   if (event.key === 'ArrowRight' || event.key === 'ArrowUp') {
-    return local + step;
+    return local + delta;
   }
   if (event.key === 'Home') {
     return min;
@@ -136,8 +142,14 @@ function keyedValue(
 function valueAtX(
   track: HTMLDivElement | undefined,
   clientX: number,
-  range: { readonly min: number; readonly max: number; readonly fallback: number },
+  range: {
+    readonly min: number;
+    readonly max: number;
+    readonly step: number;
+    readonly fallback: number;
+  },
 ): number {
+  assert(range.step > 0, 'DragSlider: pointer step is positive');
   if (!track) {
     return range.fallback;
   }
@@ -146,7 +158,10 @@ function valueAtX(
     return range.fallback;
   }
   const ratio = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width));
-  return Math.round(range.min + ratio * (range.max - range.min));
+  const continuous = range.min + ratio * (range.max - range.min);
+  const stepped = range.min + Math.round((continuous - range.min) / range.step) * range.step;
+  const rounded = Math.round(stepped * 1e8) / 1e8;
+  return Math.min(range.max, Math.max(range.min, rounded));
 }
 
 type SliderDrag = {
@@ -156,6 +171,7 @@ type SliderDrag = {
   readonly setLocal: (value: number) => void;
   readonly min: number;
   readonly max: number;
+  readonly step: number;
   readonly disabled: boolean;
   readonly onPreview: ((n: number) => void) | undefined;
   readonly onInput: (n: number) => void;
@@ -169,7 +185,7 @@ type SliderDrag = {
 // fast enough to feel live, slow enough never to queue. The final position always
 // commits on release, so no move is lost.
 function useSliderDrag(drag: SliderDrag) {
-  const { trackRef, dragging, local, setLocal, min, max, disabled } = drag;
+  const { trackRef, dragging, local, setLocal, min, max, step, disabled } = drag;
   const WRITE_MS = 50;
   const rafId = useRef<number | undefined>(undefined);
   const latestX = useRef(0);
@@ -182,8 +198,8 @@ function useSliderDrag(drag: SliderDrag) {
     },
     [],
   );
-  const valueAt = (clientX: number) =>
-    valueAtX(trackRef.current ?? undefined, clientX, { min, max, fallback: local });
+  const range = { min, max, step, fallback: local };
+  const valueAt = (clientX: number) => valueAtX(trackRef.current ?? undefined, clientX, range);
 
   const frame = () => {
     rafId.current = undefined;

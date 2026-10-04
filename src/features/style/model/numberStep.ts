@@ -35,18 +35,18 @@ const ROOT_PX = 16;
 // two groups so the caret can sit anywhere in the number OR the unit to step it.
 const NUMBER_UNIT_RE = /([-+]?(?:\d+\.?\d*|\.\d+))([a-zA-Z%]*)/g;
 
-function stepSizeFor(mode: StepMode, unit: string): number {
+function stepSizeFor(mode: StepMode, unit: string, scale: number): number {
   if (mode === 'ten') {
-    return 10;
+    return 10 * scale;
   }
   if (mode === 'whole') {
-    return 1;
+    return scale;
   }
   // Fine step (Alt): rem keeps a 1px-equivalent nudge; every other unit steps 0.1.
   if (unit === 'rem') {
-    return 1 / ROOT_PX;
+    return scale / ROOT_PX;
   }
-  return 0.1;
+  return 0.1 * scale;
 }
 
 // Next multiple of `step` strictly past `value` in the given direction.
@@ -87,6 +87,7 @@ export function stepNumberAtCaret(
   direction: 1 | -1,
   mode: StepMode,
   min?: number,
+  scale = 1,
 ): { text: string; caret: number } | undefined {
   const hit = numberRuns(text).find((run) => caret >= run.start && caret <= run.end);
   if (!hit) {
@@ -96,7 +97,7 @@ export function stepNumberAtCaret(
   if (!Number.isFinite(parsed)) {
     return undefined;
   }
-  const stepped = snapStep(parsed, stepSizeFor(mode, hit.unit.toLowerCase()), direction);
+  const stepped = snapStep(parsed, stepSizeFor(mode, hit.unit.toLowerCase(), scale), direction);
   const nextText = String(min !== undefined && stepped < min ? min : stepped);
   // Keep the caret where it was: end of the new number if it was in the number,
   // else shift it along with the unit by the number's length change.
@@ -209,12 +210,19 @@ export function hasScrubTarget(text: string): boolean {
  * changing the modifier mid-drag rescales from the same base rather than from wherever
  * the previous mode happened to leave it.
  */
-export function scrubNumber(text: string, run: NumberRun, steps: number, mode: StepMode): string {
+export function scrubNumber(
+  text: string,
+  run: NumberRun,
+  steps: number,
+  mode: StepMode,
+  scale = 1,
+): string {
   const base = Number.parseFloat(run.raw);
   if (!Number.isFinite(base)) {
     return text;
   }
-  const next = Math.round((base + steps * stepSizeFor(mode, run.unit.toLowerCase())) * 1e5) / 1e5;
+  const next =
+    Math.round((base + steps * stepSizeFor(mode, run.unit.toLowerCase(), scale)) * 1e5) / 1e5;
   return text.slice(0, run.start) + String(next) + text.slice(run.numEnd);
 }
 
@@ -231,6 +239,7 @@ export function stepModeOf(event: { shiftKey: boolean; altKey: boolean }): StepM
 export function handleArrowStep(
   event: KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>,
   min?: number,
+  scale = 1,
 ): { text: string; caret: number } | undefined {
   if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') {
     return undefined;
@@ -242,5 +251,6 @@ export function handleArrowStep(
     event.key === 'ArrowUp' ? 1 : -1,
     stepModeOf(event),
     min,
+    scale,
   );
 }

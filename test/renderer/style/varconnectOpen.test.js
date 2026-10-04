@@ -117,6 +117,7 @@ const check = (what, condition, detail) => {
 
   const mount = async (value, options = {}) => {
     const host = document.createElement('div');
+    host.className = 'embed-editor_root';
     document.body.appendChild(host);
     const root = createRoot(host);
     const picked = [];
@@ -328,6 +329,11 @@ const check = (what, condition, detail) => {
     // Whatever the picker does with focus, picking now has to land at `at`.
     const picker = document.querySelector('.embed-editor_varpicker');
     check('the picker opened', !!picker);
+    check(
+      'opening the picker does not resize its panel with inline scroll styles',
+      host.style.overflow === '' && host.style.paddingRight === '',
+      host.getAttribute('style') || 'no inline style',
+    );
 
     // Press a variable in it. The value that comes out is the whole point:
     // the variable has to land at the caret, with the calc intact around it.

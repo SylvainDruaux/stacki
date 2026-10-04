@@ -1,6 +1,6 @@
 // Goal: the shared CodeEditor reveals the requested line, marks component
-// links, reports clicks, and emits each user edit exactly once — never echoing
-// an external reload or an app undo back as a new edit.
+// links, positions selected code on opening, reports clicks, and emits each
+// user edit exactly once — never echoing an external reload or an app undo.
 // Method: the component is bundled with esbuild, mounted into jsdom through
 // React, and driven through its CodeMirror view; assertions read the editor
 // state and the callbacks it fired.
@@ -14,8 +14,8 @@ const { ROOT, repoPath } = require('../../helpers/sources.js');
   await require('esbuild').build({
     stdin: {
       contents:
-        `export { default as CodeEditor } from './src/ui/CodeEditor.tsx'; export { EditorView ` +
-        `} from '@codemirror/view';`,
+        `export { default as CodeEditor, selectedCodeScrollTop } ` +
+        `from './src/ui/CodeEditor.tsx'; export { EditorView } from '@codemirror/view';`,
       resolveDir: ROOT,
       loader: 'jsx',
     },
@@ -63,7 +63,13 @@ const { ROOT, repoPath } = require('../../helpers/sources.js');
   });
   const React = require('react');
   const { createRoot } = require('react-dom/client');
-  const { CodeEditor, EditorView } = require(outfile);
+  const { CodeEditor, EditorView, selectedCodeScrollTop } = require(outfile);
+  assert.equal(selectedCodeScrollTop(600, 820, 500), 350, 'short blocks center their start');
+  assert.equal(selectedCodeScrollTop(600, 850, 500), 350, 'a block fitting exactly stays centered');
+  assert.equal(selectedCodeScrollTop(600, 851, 500), 600, 'overflowing blocks start at the top');
+  assert.equal(selectedCodeScrollTop(100, 120, 500), 0, 'the first lines do not scroll above zero');
+  assert.equal(selectedCodeScrollTop(600, 820, 0), undefined, 'an unmeasured editor waits');
+  assert.throws(() => selectedCodeScrollTop(600, 599, 500), /Selected code range keeps its order/);
   const root = createRoot(document.getElementById('root'));
   const changes = [];
   const positions = [];
