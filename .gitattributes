@@ -1,3 +1,7 @@
-# Round-trip fixtures are byte-exact on purpose (line endings, BOM): never
-# normalize them on checkout or commit.
-test/fixtures/round-trip/** -text
+# Source is formatted once on every platform; explicit LF prevents Windows
+# checkout conversion from making the complete tree fail Prettier.
+* text=auto eol=lf
+
+# Fixtures are byte-exact on purpose (line endings, BOM): never normalize
+# them on checkout or commit.
+test/fixtures/** -text
