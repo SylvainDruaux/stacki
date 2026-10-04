@@ -67,7 +67,9 @@ const settle = (ms = 20) => new Promise((resolve) => setTimeout(resolve, ms));
   const PAGE = (word) =>
     `<!doctype html><html><head><title>t</title></head><body>` +
     `<h1 id="probe">probe ${word}</h1></body></html>`;
-  const dom = new JSDOM(PAGE('one'), { url: 'http://localhost:4321/probe' });
+  const dom = new JSDOM(PAGE('one'), {
+    url: 'http://localhost:4321/probe#avb-design',
+  });
   const { window } = dom;
   let served = PAGE('one');
   let fetches = 0;

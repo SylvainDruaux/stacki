@@ -44,6 +44,7 @@ export default function Select<T extends string>(props: Props<T>) {
           onListKeyDown={keys.onListKeyDown}
           onSearchKeyDown={keys.onSearchKeyDown}
           onActivate={select.setActiveIndex}
+          onLeave={select.pausePreview}
           onChoose={select.choose}
           onCancel={select.cancelMenu}
         />
@@ -60,42 +61,46 @@ function useSelectState<T extends string>(props: Props<T>) {
   const refs = useSelectRefs();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
+  const optionsState = useSelectOptions({ options, value, query, searchable });
+  const { selectedOption, displayed, firstSelectable, lastSelectable, selectedIndex } =
+    optionsState;
+  const highlight = usePreviewHighlight(selectedIndex);
+  const { activeIndex, activity: previewActivity, activateIndex } = highlight;
 
-  // The trigger always reflects the real selected value, independent of any filter.
-  const selectedOption = useMemo(
-    () =>
-      options.find((option) => !option.heading && option.value === value) ??
-      options.find((option) => !option.heading),
-    [options, value],
-  );
-  const displayed = useMemo(
-    () => filterOptions(options, query, { searchable }),
-    [options, query, searchable],
-  );
-  const { firstSelectable, lastSelectable } = selectableBounds(displayed);
-  const found = displayed.findIndex((option) => !option.heading && option.value === value);
-  const selectedIndex = found >= 0 ? found : firstSelectable;
-  const [activeIndex, setActiveIndex] = useState(selectedIndex);
-
-  const preview = useHoverPreview({ open, activeIndex, displayed, value, props });
+  const preview = useHoverPreview({
+    open,
+    activity: previewActivity,
+    activeIndex,
+    displayed,
+    value,
+    props,
+  });
   // Close without picking — Escape, Tab, click-outside, or toggling the trigger — puts
   // the original value back.
   const { cancelPreview } = preview;
-  const cancelMenu = useCallback(() => {
-    setOpen(false);
-    cancelPreview();
-  }, [cancelPreview]);
+  const { cancelMenu, pausePreview } = usePreviewDismiss({
+    setOpen,
+    pausePreviewActivity: highlight.pause,
+    cancelPreview,
+  });
   useHighlightSound({ open, activeIndex, displayed });
-  const menu = useMenuActions({ props, refs, displayed, selectedIndex, setActiveIndex, setOpen });
+  const menu = useMenuActions({
+    props,
+    refs,
+    displayed,
+    selectedIndex,
+    setActiveIndex: activateIndex,
+    setOpen,
+  });
   const choose = (index: number) => menu.choose(index, preview.commit);
-  const runTypeahead = useTypeahead(activeIndex, displayed, setActiveIndex);
+  const runTypeahead = useTypeahead(activeIndex, displayed, activateIndex);
   useMenuResets({
     open,
     query,
     searchable,
     selectedIndex,
     firstSelectable,
-    setActiveIndex,
+    setActiveIndex: activateIndex,
     setQuery,
   });
   useDismissOutside({ open, rootRef: refs.root, cancelMenu });
@@ -111,16 +116,78 @@ function useSelectState<T extends string>(props: Props<T>) {
     firstSelectable,
     lastSelectable,
     activeIndex,
-    setActiveIndex,
+    setActiveIndex: activateIndex,
     query,
     setQuery,
     dropUp,
     choose,
     cancelMenu,
+    pausePreview,
     openMenu: menu.openMenu,
     move: menu.move,
     runTypeahead,
   };
+}
+
+type PreviewActivity = 'active' | 'paused';
+
+function usePreviewDismiss({
+  setOpen,
+  pausePreviewActivity,
+  cancelPreview,
+}: {
+  readonly setOpen: (open: boolean) => void;
+  readonly pausePreviewActivity: () => void;
+  readonly cancelPreview: () => void;
+}) {
+  const cancelMenu = useCallback(() => {
+    setOpen(false);
+    cancelPreview();
+  }, [cancelPreview, setOpen]);
+  const pausePreview = useCallback(() => {
+    pausePreviewActivity();
+    cancelPreview();
+  }, [cancelPreview, pausePreviewActivity]);
+  return { cancelMenu, pausePreview };
+}
+
+function usePreviewHighlight(selectedIndex: number) {
+  const [activeIndex, setActiveIndex] = useState(selectedIndex);
+  const [activity, setActivity] = useState<PreviewActivity>('active');
+  const activateIndex = useCallback((index: number) => {
+    setActivity('active');
+    setActiveIndex(index);
+  }, []);
+  const pause = useCallback(() => setActivity('paused'), []);
+  return { activeIndex, activity, activateIndex, pause };
+}
+
+function useSelectOptions<T extends string>({
+  options,
+  value,
+  query,
+  searchable,
+}: {
+  readonly options: SelectOption<T>[];
+  readonly value: T;
+  readonly query: string;
+  readonly searchable: boolean;
+}) {
+  // The trigger always reflects the real selected value, independent of any filter.
+  const selectedOption = useMemo(
+    () =>
+      options.find((option) => !option.heading && option.value === value) ??
+      options.find((option) => !option.heading),
+    [options, value],
+  );
+  const displayed = useMemo(
+    () => filterOptions(options, query, { searchable }),
+    [options, query, searchable],
+  );
+  const { firstSelectable, lastSelectable } = selectableBounds(displayed);
+  const found = displayed.findIndex((option) => !option.heading && option.value === value);
+  const selectedIndex = found >= 0 ? found : firstSelectable;
+  return { selectedOption, displayed, firstSelectable, lastSelectable, selectedIndex };
 }
 
 function useSelectRefs(): SelectRefs {
@@ -209,12 +276,14 @@ function selectableBounds<T extends string>(displayed: SelectOption<T>[]) {
 // ── Hover preview ──────────────────────────────────────────────────────────
 function useHoverPreview<T extends string>({
   open,
+  activity,
   activeIndex,
   displayed,
   value,
   props,
 }: {
   open: boolean;
+  activity: PreviewActivity;
   activeIndex: number;
   displayed: SelectOption<T>[];
   value: T;
@@ -251,7 +320,7 @@ function useHoverPreview<T extends string>({
   // is a real option; re-emitting the committed value is exactly how scrubbing back to
   // the selected row undoes the preview.
   useEffect(() => {
-    if (!open || !onPreviewRef.current) {
+    if (!open || activity === 'paused' || !onPreviewRef.current) {
       return;
     }
     const option = displayed[activeIndex];
@@ -267,7 +336,7 @@ function useHoverPreview<T extends string>({
     shownRef.current = option.value;
     emittedRef.current = true;
     onPreviewRef.current(option.value);
-  }, [open, activeIndex, displayed, value]);
+  }, [open, activity, activeIndex, displayed, value]);
 
   // A preview must never outlive the menu: revert if this control unmounts (the section
   // collapsed, the selection changed) while one is showing.

@@ -3557,6 +3557,12 @@ textarea.embed-editor_value-input.is-expanded {
   flex: none;
   display: inline-flex;
   align-items: center;
+  justify-content: center;
+  /* The save indicator portals in after the first paint. Reserve its final box
+     immediately so the selector text and every row below stay put when the
+     spinner/check arrives. */
+  width: 18px;
+  height: 18px;
 }
 
 /* The element's identity as a plain CSS selector string (e.g.

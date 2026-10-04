@@ -654,6 +654,13 @@ const contrastRatio = (first, second) => {
       /min-height: var\(--embed-editor_chip-h\)/.test(loading.slice(0, loading.indexOf('}'))),
       loading.slice(0, loading.indexOf('}')),
     );
+    const saveSlot = css.slice(css.indexOf('.embed-editor_selector-save {'));
+    const saveSlotRule = saveSlot.slice(0, saveSlot.indexOf('}'));
+    check(
+      'the save slot holds its final size before the check arrives',
+      /width:\s*18px/.test(saveSlotRule) && /height:\s*18px/.test(saveSlotRule),
+      saveSlotRule,
+    );
     // The style editor and the modules it was split into (src/features/style/embed).
     const source = readSourceFolder(
       'src/features/style/EmbedEditor.tsx',

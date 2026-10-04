@@ -167,11 +167,12 @@ const PROJECT_DIRS = `,
 // node that could hold no attribute, a <Fragment slot="…">, carries its markers
 // inside itself, where they travel into the slot with its own contents.
 //
-// The comments stay. They are the one thing on the page that says which node is
-// which: the patcher that replaces a full reload matches the server's new
-// rendering against the live document through them, and without them it would
-// be guessing from tag names. A comment in devtools is a small price for not
-// rebuilding an element that was only meant to change its text.
+// The comments stay in Stacki's #avb-design iframe. They are the one thing on the
+// page that says which node is which: the patcher that replaces a full reload
+// matches the server's new rendering against the live document through them, and
+// without them it would be guessing from tag names. The same marked module graph
+// also serves ordinary localhost tabs, so the client removes Stacki's comments and
+// data attributes there after parsing and restores a normal full reload on edits.
 //
 // There used to be a script here that removed the <template> markers this
 // served. Nothing writes one now, so there is nothing to remove — and one fewer

@@ -24,7 +24,13 @@
 
 import { stripTemplateMarkers, asDocument } from './morphNodes';
 import { type ReloadReason, OverCap, refillMorphWork, checkMarkerCap } from './morphBudget';
-import { stripAnchors, syncAnchors, syncStamps } from './morphAnchors';
+import {
+  previewHost,
+  stripAnchors,
+  stripPreviewInstrumentation,
+  syncAnchors,
+  syncStamps,
+} from './morphAnchors';
 import { patchAttrs, patchChildren } from './morphPatch';
 import {
   addedScripts,
@@ -47,6 +53,11 @@ declare global {
 interface FetchedDocument {
   readonly withAnchors: Document;
   readonly clean: Document;
+}
+
+const host = previewHost(location.hash);
+if (host === 'browser') {
+  stripPreviewInstrumentation(document);
 }
 
 function fetchDocument(): Promise<FetchedDocument> {
@@ -77,16 +88,19 @@ function fetchDocument(): Promise<FetchedDocument> {
 // parse has already run by the time this module does, and mistaking its work
 // for server output would delete it on the first patch.
 let previousDocument: Document | undefined = undefined;
-const ready = fetchDocument().then(
-  (fetched) => {
-    previousDocument = fetched.clean;
-    noteStyles(fetched.clean);
-    noteScripts(fetched.clean);
-  },
-  () => {
-    previousDocument = undefined;
-  },
-);
+const ready =
+  host === 'stacki'
+    ? fetchDocument().then(
+        (fetched) => {
+          previousDocument = fetched.clean;
+          noteStyles(fetched.clean);
+          noteScripts(fetched.clean);
+        },
+        () => {
+          previousDocument = undefined;
+        },
+      )
+    : Promise.resolve();
 
 // A reload is honest: the app hears why before the page goes, and shows it when
 // a cap was the reason — the canvas lost its running state on purpose, not by
@@ -182,11 +196,20 @@ async function update(): Promise<void> {
 // Patching twice for one edit costs a fetch and a diff that finds nothing.
 if (import.meta.hot) {
   import.meta.hot.on('avb:page-changed', () => {
-    // update() reports its own failures and reloads; nothing is left to catch.
-    void update();
+    if (host === 'stacki') {
+      // update() reports its own failures and reloads; nothing is left to catch.
+      void update();
+    } else {
+      // The dev plugin turns Astro's broadcast full reload into this event for every
+      // client. A normal browser wants Astro's normal behavior, not Stacki's DOM patch.
+      location.reload();
+    }
   });
 }
 window.addEventListener('message', (event: MessageEvent) => {
+  if (host === 'browser') {
+    return;
+  }
   const data: unknown = event.data;
   if (
     typeof data === 'object' &&

@@ -90,6 +90,22 @@ test('script identity cannot collide with separators inside source text', () => 
   assert.equal(morph.addedScripts(before, after), undefined);
 });
 
+test('instrumentation remains only in the Stacki design frame', () => {
+  assert.equal(morph.previewHost('#avb-design'), 'stacki');
+  assert.equal(morph.previewHost(''), 'browser');
+  assert.equal(morph.previewHost('#features'), 'browser');
+
+  const page = new JSDOM(
+    '<!doctype html><!--avb-d:stamp--><!--avb-s:0-->' +
+      '<html data-avb-p="src/layouts/Base.astro|0"><head data-avb-p="0.0"></head>' +
+      '<body><!--avb-s:0.1--><main data-avb-p="0.1">Site</main><!--avb-e:0.1--></body>' +
+      '</html><!--avb-e:0-->',
+  );
+  morph.stripPreviewInstrumentation(page.window.document);
+  assert.doesNotMatch(page.serialize(), /avb-[sed]:|data-avb-p/);
+  assert.equal(page.window.document.querySelector('main')?.textContent, 'Site');
+});
+
 test('scripts retain ordering, multiplicity, and loading attributes', () => {
   const first = '<script type="module" src="/first.js"></script>';
   const second = '<script type="module" src="/second.js"></script>';

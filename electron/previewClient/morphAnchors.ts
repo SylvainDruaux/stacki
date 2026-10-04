@@ -3,6 +3,12 @@
 
 import { isAnchor, MORPH_LIMITS, isStamp, asElement, asText, asComment } from './morphNodes';
 
+export type PreviewHost = 'stacki' | 'browser';
+
+export function previewHost(hash: string): PreviewHost {
+  return hash === '#avb-design' ? 'stacki' : 'browser';
+}
+
 // Markers take no part in the comparison. Their path is an index, so removing
 // one node renumbers every marker after it, and a diff that reads them as
 // content sees the whole rest of the page change. They are stripped from both
@@ -24,6 +30,19 @@ export function stripAnchors(root: ParentNode): void {
   walk(root, 0);
   for (const node of gone) {
     node.remove();
+  }
+}
+
+// The marked module graph is shared by every request to Stacki's dev server, including a
+// normal browser tab. The app's iframe identifies itself with #avb-design; everywhere else,
+// remove Stacki's in-memory addressing once parsing finishes so the ordinary localhost page
+// has the DOM the project authored. The module script itself is hoisted into <head>, so it is
+// not a body child and removing these markers cannot change layout or structural selectors.
+export function stripPreviewInstrumentation(root: ParentNode): void {
+  stripAnchors(root);
+  const marked = root.querySelectorAll('[data-avb-p]');
+  for (let index = 0; index < marked.length; index += 1) {
+    marked[index]?.removeAttribute('data-avb-p');
   }
 }
 

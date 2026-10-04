@@ -56,6 +56,7 @@ const check = (what, condition, detail) => {
   const entry = path.join(buildDirectory, 'computed-hold.entry.jsx');
   const reexports = [
     ['{ default as EffectsSection }', 'src/features/style/EffectsSection.tsx'],
+    ['{ LayoutModeSections }', 'src/features/style/embed/LayoutRows.tsx'],
     ['{ setHost }', 'src/features/style/model/host.ts'],
     ['{ forgetComputedStyles }', 'src/features/style/model/computedStyle.ts'],
   ];
@@ -120,7 +121,7 @@ const check = (what, condition, detail) => {
   const React = require('react');
   const { createRoot } = require('react-dom/client');
   const { act } = React;
-  const { EffectsSection, setHost, forgetComputedStyles } = require(bundlePath);
+  const { EffectsSection, LayoutModeSections, setHost, forgetComputedStyles } = require(bundlePath);
 
   // A selected element, so there is something to ask the page about.
   setHost({
@@ -275,6 +276,60 @@ const check = (what, condition, detail) => {
     );
     await mounted.done();
     globalThis.__noCanvas = false;
+  }
+
+  // --- A resolving display does not collapse its controls ---------------------
+  // The resolver replaces the old model in two steps. During the gap `display`
+  // is absent, but that is not a new block display; it is no answer yet. Keep the
+  // disclosure and Align Y row in place until resolution settles.
+  {
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    const rootElement = createRoot(host);
+    let display = 'inline-block';
+    let resolving = false;
+    const render = async () => {
+      const read = (property) =>
+        property === 'display' && display
+          ? {
+              source: 'selected',
+              overridden: false,
+              contributors: [],
+              winner: { selectorText: '.x', value: display, important: false },
+              selectedValue: { value: display, important: false },
+            }
+          : undefined;
+      await act(async () => {
+        rootElement.render(
+          React.createElement(LayoutModeSections, {
+            read,
+            resolving,
+            busy: false,
+            setProp: () => {},
+            clearProp: () => {},
+            liveSetProp: () => {},
+            onProvenance: () => {},
+            onSelectSelector: () => {},
+            activeSelector: '.x',
+          }),
+        );
+      });
+    };
+    const hasAlignY = () => host.querySelector('button[aria-label="Align Y"]') !== null;
+    await render();
+    check('an inline display shows Align Y', hasAlignY());
+    display = '';
+    resolving = true;
+    await render();
+    check('the resolving gap keeps Align Y in place', hasAlignY());
+    resolving = false;
+    await render();
+    check('a settled non-inline display closes Align Y', !hasAlignY());
+    display = 'inline-block';
+    await render();
+    check('returning to inline restores Align Y', hasAlignY());
+    await act(async () => rootElement.unmount());
+    host.remove();
   }
 
   if (failures.length) {

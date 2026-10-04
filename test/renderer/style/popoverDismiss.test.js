@@ -32,7 +32,9 @@ const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
   const bundlePath = path.join(buildDirectory, 'popover.bundle.js');
   await esbuild.build({
     stdin: {
-      contents: `export { default as LayerPopover } from './src/features/style/LayerPopover'`,
+      contents:
+        `export { default as LayerPopover } from './src/features/style/LayerPopover';` +
+        `export { registerPopupLayer } from './src/features/style/model/popupLayer';`,
       resolveDir: ROOT,
       loader: 'tsx',
     },
@@ -71,7 +73,7 @@ const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
   const React = require('react');
   const { createRoot } = require('react-dom/client');
   const { act } = require('react');
-  const { LayerPopover } = require(bundlePath);
+  const { LayerPopover, registerPopupLayer } = require(bundlePath);
 
   // The panel behind it: the row the editor belongs to, and an unrelated control
   // — the "Events: Auto" of the report.
@@ -176,6 +178,29 @@ const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
     await settle(0);
   });
   check('a press inside the editor leaves it open', closes === 0, `${closes} closes`);
+
+  // --- a nested popup scrolling is still inside --------------------------------
+  // A variable picker is portaled to <body>. When opened from an existing chip,
+  // it scrolls the selected variable into view immediately; that scroll belongs
+  // to the editor even though DOM containment alone cannot see the relationship.
+  const picker = dom.window.document.createElement('div');
+  const pickerList = dom.window.document.createElement('div');
+  picker.appendChild(pickerList);
+  dom.window.document.body.appendChild(picker);
+  const unregisterPicker = registerPopupLayer(picker, inside);
+  await act(async () => {
+    pickerList.dispatchEvent(new dom.window.Event('scroll'));
+    await settle(0);
+  });
+  check('scrolling an owned popup leaves the editor open', closes === 0, `${closes} closes`);
+  unregisterPicker();
+  picker.remove();
+
+  await act(async () => {
+    events.dispatchEvent(new dom.window.Event('scroll'));
+    await settle(0);
+  });
+  check('scrolling outside still closes the editor', closes === 1, `${closes} closes`);
 
   // --- a press that never becomes a click --------------------------------------
   // Dragging away from a press, or a context menu: the swallow must not be left

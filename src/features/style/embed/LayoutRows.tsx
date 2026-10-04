@@ -1,7 +1,7 @@
 // The layout section's rows: which properties each section owns, direction
 // and alignment, and the sections a display mode brings (EmbedEditor.tsx).
 
-import { useEffect, useState } from 'react';
+import { useEffect, useLayoutEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import FieldLabel from '../components/FieldLabel';
 import { PropTip } from '../components/CssPropertyTip';
@@ -210,15 +210,17 @@ export interface LayoutRowProps {
 export function LayoutModeSections({
   liveSetProp,
   activeSelector,
+  resolving,
   ...rowProps
 }: LayoutRowProps & {
   liveSetProp: LiveSetProp;
   activeSelector: string;
+  resolving: boolean;
 }) {
   const { read, busy, setProp, clearProp, onProvenance, onSelectSelector } = rowProps;
   const display = effectiveValue(read('display'));
   const mode = layoutMode(display);
-  const [open, toggle] = useLayoutModeOpen(mode);
+  const [open, toggle] = useLayoutModeOpen(mode, { resolving });
   // A gap set in ANY spelling keeps the Gap row visible (it reads all of them).
   const hasGridGap = ['row-gap', 'column-gap', 'grid-row-gap', 'grid-column-gap', 'gap'].some(
     (prop) => read(prop) !== undefined,
@@ -263,15 +265,25 @@ export function LayoutModeSections({
 
 // Which disclosures are open. Changing Display's mode opens the matching one and
 // closes the others; hand-toggles persist between changes.
-export function useLayoutModeOpen(mode: ReturnType<typeof layoutMode>) {
+export function useLayoutModeOpen(
+  mode: ReturnType<typeof layoutMode>,
+  options: { readonly resolving: boolean },
+) {
+  const { resolving } = options;
   const [open, setOpen] = useState({
     flex: mode === 'flex',
     grid: mode === 'grid',
     inline: mode === 'inline',
   });
-  useEffect(() => {
+  useLayoutEffect(() => {
+    // Resolution briefly removes `display` from the model. Keep the disclosure
+    // that was already open through that gap; closing it would remove controls
+    // for one paint, only to insert them again when the same display returns.
+    if (resolving && mode === undefined) {
+      return;
+    }
     setOpen({ flex: mode === 'flex', grid: mode === 'grid', inline: mode === 'inline' });
-  }, [mode]);
+  }, [mode, resolving]);
   const toggle = (key: 'flex' | 'grid' | 'inline') =>
     setOpen((previous) => ({ ...previous, [key]: !previous[key] }));
   return [open, toggle] as const;

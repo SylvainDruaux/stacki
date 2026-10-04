@@ -89,6 +89,7 @@ export type SelectListProps<T extends string> = {
   onListKeyDown: (event: KeyboardEvent<HTMLDivElement>) => void;
   onSearchKeyDown: (event: KeyboardEvent<HTMLInputElement>) => void;
   onActivate: (index: number) => void;
+  onLeave: () => void;
   onChoose: (index: number) => void;
   onCancel: () => void;
 };
@@ -108,6 +109,7 @@ export function SelectList<T extends string>(list: SelectListProps<T>) {
       aria-labelledby={labelId}
       aria-activedescendant={optionId(list.baseId, list.activeIndex)}
       onKeyDown={searchable ? undefined : list.onListKeyDown}
+      onMouseLeave={list.onLeave}
     >
       {searchable ? (
         <div className="u-select-search">

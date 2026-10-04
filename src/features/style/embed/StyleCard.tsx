@@ -349,7 +349,13 @@ export function sourceSelectOption(option: SourceOption) {
 // What every section's controls are handed.
 export type SectionCard = Pick<
   StyleCardProps,
-  'busy' | 'setProp' | 'clearProp' | 'liveSetProp' | 'onSelectSelector' | 'activeSelector'
+  | 'busy'
+  | 'resolving'
+  | 'setProp'
+  | 'clearProp'
+  | 'liveSetProp'
+  | 'onSelectSelector'
+  | 'activeSelector'
 > & {
   read: (prop: string) => ResolvedProp | undefined;
   onProvenance: (prop: string, anchor: DOMRect) => void;
@@ -373,6 +379,7 @@ export function StyleSections({
   const section: SectionCard = {
     read,
     busy: card.busy,
+    resolving: card.resolving,
     setProp: card.setProp,
     clearProp: card.clearProp,
     liveSetProp: card.liveSetProp,
@@ -551,6 +558,7 @@ export const SECTION_CONTROLS: Readonly<Record<string, (section: SectionCard) =>
       <LayoutModeSections
         read={section.read}
         busy={section.busy}
+        resolving={section.resolving}
         setProp={section.setProp}
         clearProp={section.clearProp}
         liveSetProp={section.liveSetProp}

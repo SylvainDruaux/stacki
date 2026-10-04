@@ -126,8 +126,11 @@ function usePopoverDismiss(
     // one control most of these editors lead with.
     const onScroll = (event: Event) => {
       const target = event.target;
-      if (target instanceof Node && ref.current?.contains(target)) {
-        return;
+      if (target instanceof Node) {
+        const root = ref.current ?? undefined;
+        if (ref.current?.contains(target) || inOwnedPopup(target, root)) {
+          return;
+        }
       }
       onClose();
     };
