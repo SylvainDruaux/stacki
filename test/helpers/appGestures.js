@@ -129,7 +129,8 @@ async function mountApp(root, files, build, options = {}) {
         return { ok: true, ...read(pagePath), inverse: report.inverse };
       },
       importPathFor: async ({ targetPath }) => ({
-        relative: `../${path.relative(path.join(root, 'src'), targetPath)}`,
+        relative:
+          '../' + path.relative(path.join(root, 'src'), targetPath).split(path.sep).join('/'),
         srcRelative: undefined,
       }),
       onFsChanged: () => () => {},

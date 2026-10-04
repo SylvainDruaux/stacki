@@ -90,7 +90,7 @@ test('a replace applies, returns the new checksum, and the actor holds it', () =
     assert.equal(lines.length, 1, 'one telemetry line per outcome');
     const line = JSON.parse(lines[0]);
     assert.deepEqual(Object.keys(line).sort(), ['count', 'event', 'file', 'intent', 'outcome']);
-    assert.equal(line.file, hashPath(fs.realpathSync(file)));
+    assert.equal(line.file, hashPath(fs.realpathSync.native(file)));
     assert.equal(lines[0].includes(root), false, 'no raw path');
     assert.equal(lines[0].includes('New'), false, 'no source bytes');
     assert.equal(fs.readdirSync(root).length, 1, 'no temporary or lock file is left');

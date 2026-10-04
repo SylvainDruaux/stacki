@@ -448,8 +448,8 @@ test('failed writes restore all files already written', () => {
 // middle of the batch, then the next write fails.
 test('rollback leaves a file another program changed and names it', () => {
   project(({ root, component, page }) => {
-    const canonicalComponent = fs.realpathSync(component);
-    const canonicalPage = fs.realpathSync(page);
+    const canonicalComponent = fs.realpathSync.native(component);
+    const canonicalPage = fs.realpathSync.native(page);
     const before = new Map([
       [canonicalComponent, source],
       [canonicalPage, fs.readFileSync(page, 'utf8')],
@@ -478,8 +478,8 @@ test('rollback leaves a file another program changed and names it', () => {
 
 test('a read-back mismatch is a write-race that rolls back instead of asserting', () => {
   project(({ root, component, page }) => {
-    const canonicalComponent = fs.realpathSync(component);
-    const canonicalPage = fs.realpathSync(page);
+    const canonicalComponent = fs.realpathSync.native(component);
+    const canonicalPage = fs.realpathSync.native(page);
     const before = new Map([
       [canonicalComponent, source],
       [canonicalPage, fs.readFileSync(page, 'utf8')],

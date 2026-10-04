@@ -45,7 +45,8 @@ test(
       assert.equal(fs.readFileSync(file, 'utf8'), 'old\n', 'the target is untouched');
       assert.deepEqual(protocolLeftovers(root), [], 'no temporary or lock file is left');
       // Released: the same save, resubmitted deliberately, goes through.
-      assert.equal(documents.writeText(file, 'new\n', sha256('old\n')).tag, 'applied');
+      const retry = documents.writeText(file, 'new\n', sha256('old\n'));
+      assert.equal(retry.tag, 'applied', JSON.stringify(retry));
     });
   },
 );
@@ -57,7 +58,8 @@ test('a file held with delete sharing is replaced normally', onWindows, async ()
     const documents = realHost();
     const release = await holdFromWindows(windows, file, 'ReadWrite, Delete');
     try {
-      assert.equal(documents.writeText(file, 'new\n', sha256('old\n')).tag, 'applied');
+      const report = documents.writeText(file, 'new\n', sha256('old\n'));
+      assert.equal(report.tag, 'applied', JSON.stringify(report));
     } finally {
       await release();
     }

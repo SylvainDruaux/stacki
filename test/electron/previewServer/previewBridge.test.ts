@@ -356,7 +356,7 @@ test('markers live in memory only; the token follows the rendering chain', async
       'the served patcher opens with the bounds from shared/core/limits.ts',
     );
     const load = (rel: string): string => {
-      const code = plugin.load(`${root}/${rel}`);
+      const code = plugin.load(path.join(root, ...rel.split('/')));
       assert.equal(typeof code, 'string', `${rel} is marked`);
       assert.ok(typeof code === 'string');
       return code;

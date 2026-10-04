@@ -99,7 +99,7 @@ const SHELL_WRITE = new RegExp(
     '\\bgit\\s+(?:checkout|restore|apply|am)\\b',
   ].join('|'),
 );
-const PATH_LIKE = /[\w@.~/-]+/g;
+const PATH_LIKE = /[\w@.:~\\/-]+/g;
 
 function shellWriteVerdict(command: string, root: string): Verdict {
   if (!SHELL_WRITE.test(command)) {
@@ -107,7 +107,7 @@ function shellWriteVerdict(command: string, root: string): Verdict {
   }
   const prefix = `${root.split(path.sep).join('/')}/`;
   for (const match of command.matchAll(PATH_LIKE)) {
-    const candidate = match[0].replace(/^\.\//, '');
+    const candidate = match[0].split('\\').join('/').replace(/^\.\//, '');
     const file = candidate.startsWith(prefix) ? candidate.slice(prefix.length) : candidate;
     if (POLICY_PATTERNS.some((pattern) => pattern.test(file))) {
       const reason = `This command may write ${file}. ${POLICY_EDIT_REASON}`;

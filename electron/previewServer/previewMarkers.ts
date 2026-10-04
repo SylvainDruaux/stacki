@@ -15,6 +15,7 @@
 // modules that are.
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
+import path from 'node:path';
 import { assert } from '../../shared/core/assert';
 import { toDigest } from '../../shared/core/brand';
 import { LIMITS } from '../../shared/core/limits';
@@ -42,8 +43,13 @@ export function markSourceFile(
   }
   // Pages mark with bare paths; every other .astro under src — components and
   // layouts — with its own namespace, so selecting inside one outlines too.
-  const projectDirectory = projectDirectories.find((root) => file.startsWith(`${root}/src/`));
-  if (projectDirectory === undefined) {
+  const projectFile = projectDirectories
+    .map((directory) => ({
+      directory,
+      relative: path.relative(directory, file).split(path.sep).join('/'),
+    }))
+    .find(({ relative }) => relative.startsWith('src/'));
+  if (projectFile === undefined) {
     return undefined;
   }
   const bytes = readFileSync(file);
@@ -56,9 +62,9 @@ export function markSourceFile(
     return undefined;
   }
   resolveChunks(parsed.model, file);
-  const rel = file.slice(projectDirectory.length + 1);
+  const rel = projectFile.relative;
   assert(stampPathProblem(rel) === undefined, 'A file under src has a project-relative path');
-  const page = file.startsWith(`${projectDirectory}/src/pages/`);
+  const page = rel.startsWith('src/pages/');
   const marked = page
     ? serializePageMarked(parsed.model)
     : serializePageMarked(parsed.model, `${rel}|`);
