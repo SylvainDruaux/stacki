@@ -3,11 +3,7 @@
 // pins the UTC boundary used for the local once-per-day guard.
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
-const {
-  sendUsageCount,
-  shouldCountUsage,
-  usageDay,
-} = require('../../../dist/electron/app/usageCounts.js');
+const { sendUsageCount, shouldCountUsage, usageDay } = require('#dist/electron/app/usageCounts.js');
 
 test('a usage count sends only an empty POST to the first-party endpoint', async () => {
   const controller = new AbortController();
