@@ -49,7 +49,18 @@ const stacked = (layers, opacity = 0.14) => 1 - (1 - opacity) ** layers;
     platform: 'node',
     logLevel: 'silent',
   });
-  const { onePerPlace } = require(bundlePath);
+  const { onePerPlace, outlineBoxPath } = require(bundlePath);
+
+  check('a map uses its parent outline box', outlineBoxPath('0.2.1', 'map') === '0.2');
+  check(
+    'a component map stays in its namespace',
+    outlineBoxPath('src/Card.astro|0.2.1', 'map') === 'src/Card.astro|0.2',
+  );
+  check(
+    'a root map keeps its own box',
+    outlineBoxPath('src/Card.astro|0', 'map') === 'src/Card.astro|0',
+  );
+  check('ordinary elements keep their box', outlineBoxPath('0.2.1', 'element') === '0.2.1');
 
   // --- one box per place -----------------------------------------------------
   const hero = box(0, 100, 1200, 800);

@@ -167,6 +167,72 @@ test('wide preview keeps outline labels outside the scaled frame', async () => {
   }
 });
 
+test('hovering or selecting a map outlines its parent box', async () => {
+  const dom = installHoverDOM();
+  const React = require('react');
+  const { createRoot } = require('react-dom/client');
+  const { PreviewPane } = require(path.join(directory, 'preview.js'));
+  const root = createRoot(document.getElementById('root'));
+  const props = {
+    ...hoverPreviewProps(),
+    selPath: '0.1',
+    navHoverPath: undefined,
+    focusPath: undefined,
+    overlayInfo: (nodePath) => ({
+      label: nodePath,
+      kind: 'map',
+      tag: undefined,
+      nodeKind: 'map',
+      astroAsset: false,
+      dynamicTag: false,
+      isLayout: false,
+      bound: false,
+    }),
+  };
+  const act = (action) =>
+    React.act(async () => {
+      await action();
+      await settle();
+    });
+  try {
+    await act(() => root.render(React.createElement(PreviewPane, props)));
+    const frame = document.querySelector('iframe').contentWindow;
+    const tracked = [];
+    frame.postMessage = (message) => {
+      if (message.type === 'avb:track') {
+        tracked.push(message.paths);
+      }
+    };
+    props.navHoverPath = '0.2';
+    await act(() => root.render(React.createElement(PreviewPane, props)));
+    assert.deepEqual(tracked.at(-1), ['0.1', '0.2', '0']);
+    const send = (data) =>
+      act(() => window.dispatchEvent(new window.MessageEvent('message', { source: frame, data })));
+    await send({ type: 'avb:render', token: 'a'.repeat(64), stamps: [] });
+    await send({
+      type: 'avb:rects',
+      classes: {},
+      spacing: {},
+      rects: {
+        0: [{ x: 10, y: 20, w: 400, h: 300 }],
+        0.1: [{ x: 40, y: 50, w: 80, h: 60 }],
+        0.2: [{ x: 200, y: 150, w: 80, h: 60 }],
+      },
+    });
+    for (const kind of ['sel', 'hover']) {
+      const outline = document.querySelector(`.node-outline.${kind}`);
+      assert.ok(outline);
+      assert.deepEqual(
+        [outline.style.left, outline.style.top, outline.style.width, outline.style.height],
+        ['10px', '20px', '400px', '300px'],
+      );
+    }
+  } finally {
+    await act(() => root.unmount());
+    dom.window.close();
+  }
+});
+
 function installHoverDOM() {
   const dom = new JSDOM('<!doctype html><div id="root"></div>', {
     url: 'http://localhost/',

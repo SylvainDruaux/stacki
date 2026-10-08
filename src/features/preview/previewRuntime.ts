@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type React from 'react';
-import type { RectMap, SpacingMap } from './PreviewOverlays';
+import type { OverlayInfo, RectMap, SpacingMap } from './PreviewOverlays';
 import type { PreviewDevice } from './PreviewToolbar';
 import type { PreviewMessage, PreviewReloadReason } from './previewMessages';
 import { parsePreviewMessage } from './previewMessages';
-import { sameCopy } from './outlineBoxes';
+import { outlineBoxPath, sameCopy } from './outlineBoxes';
 import { setModifiers } from '../../editor/heldModifiers';
 import { noteCanvasReady, receiveCanvasReply, setCanvasFrame } from '../../editor/canvasQuery';
 import type { Digest } from '../../../shared/core/brand';
@@ -26,6 +26,7 @@ export type JudgeCanvasEvent = (
 export interface PreviewRuntimeProps {
   readonly selPath: string | undefined;
   readonly navHoverPath?: string | undefined;
+  readonly overlayInfo?: ((path: string) => OverlayInfo | undefined) | undefined;
   readonly focusPath?: string | undefined;
   readonly focusOcc?: number | undefined;
   readonly pathScope?: string;
@@ -70,6 +71,12 @@ export function usePreviewRuntime(
   const [selectedOccurrence, setSelectedOccurrence] = useState<number | undefined>(undefined);
   const [hoverOcc, setHoverOcc] = useState(0);
   const hoverPath = props.navHoverPath ?? canvasHover;
+  const selectedBoxPath = props.selPath
+    ? outlineBoxPath(props.selPath, props.overlayInfo?.(props.selPath)?.nodeKind)
+    : undefined;
+  const hoverBoxPath = hoverPath
+    ? outlineBoxPath(hoverPath, props.overlayInfo?.(hoverPath)?.nodeKind)
+    : undefined;
   const refs = useRuntimeRefs(props, selectedOccurrence);
   const setters = useMemo(
     () => ({
@@ -86,8 +93,8 @@ export function usePreviewRuntime(
   // The frame measures only tracked paths, so both hover sources must use
   // the same active path for measurement requests and outline rendering.
   const trackPaths = useMemo(
-    () => trackedPaths(props.selPath, hoverPath, props.focusPath),
-    [props.focusPath, hoverPath, props.selPath],
+    () => trackedPaths(props.selPath, hoverPath, props.focusPath, selectedBoxPath, hoverBoxPath),
+    [props.focusPath, hoverPath, hoverBoxPath, props.selPath, selectedBoxPath],
   );
   const registerFrame = useCallback((): void => {
     setCanvasFrame(iframeRef.current?.contentWindow ?? undefined);

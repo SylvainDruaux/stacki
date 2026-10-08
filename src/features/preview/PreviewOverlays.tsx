@@ -1,7 +1,7 @@
 import React from 'react';
 import type { Box } from './outlineBoxes';
 import type { PreviewMessage } from './previewMessages';
-import { hoverIsSelection, onePerPlace } from './outlineBoxes';
+import { hoverIsSelection, onePerPlace, outlineBoxPath } from './outlineBoxes';
 import { spacingBands } from './spacingBands';
 import {
   BranchIcon,
@@ -110,8 +110,9 @@ function SpacingOverlays(props: PreviewOverlaysProps) {
 function NodeOutlines(props: PreviewOverlaysProps) {
   const outlines = outlineTargets(props);
   return outlines.flatMap((outline) => {
-    const all = props.rects[outline.path];
     const info = props.overlayInfo?.(outline.path);
+    const geometryPath = outlineBoxPath(outline.path, info?.nodeKind);
+    const all = props.rects[geometryPath] ?? props.rects[outline.path];
     if (!all || !info) {
       return [];
     }

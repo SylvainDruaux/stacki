@@ -56,6 +56,17 @@ export function onePerPlace<T extends Box>(boxes: readonly T[] | undefined): rea
   return list.filter((box) => kept.includes(box));
 }
 
+/** A map renders through its children, but its outline should sit on the
+ * containing node's box. Preserve the namespace when a component is open. */
+export function outlineBoxPath(path: string, nodeKind: string | undefined): string {
+  if (nodeKind !== 'map') {
+    return path;
+  }
+  const namespaceEnd = path.lastIndexOf('|');
+  const parentEnd = path.lastIndexOf('.');
+  return parentEnd > namespaceEnd ? path.slice(0, parentEnd) : path;
+}
+
 /**
  * Whether a hover is on the thing already outlined as selected — in which case
  * there is no second outline to draw.
