@@ -131,14 +131,14 @@ const stacked = (layers, opacity = 0.14) => 1 - (1 - opacity) ** layers;
     'the first copy is the one a selection with no occurrence means',
     hoverIsSelection(at('0.1', 0), { path: '0.1' }),
   );
-  // The navigator points at the NODE — every copy — so it is about the
-  // selection whichever copy is selected.
+  // A path without an occurrence still suppresses a matching hover. Navigator
+  // hover now supplies occurrence zero, leaving a different clicked copy visible.
   check(
-    'a navigator hover on the selected node draws nothing extra',
+    'a hover without an occurrence on the selected node draws nothing extra',
     hoverIsSelection({ path: '0.1', occ: undefined }, at('0.1', 2)),
   );
   check(
-    'a navigator hover on another node still draws',
+    'a hover without an occurrence on another node still draws',
     !hoverIsSelection({ path: '0.1', occ: undefined }, at('0.2', 0)),
   );
   check('nothing hovered is not the selection', !hoverIsSelection(undefined, at('0.1', 0)));
@@ -147,9 +147,8 @@ const stacked = (layers, opacity = 0.14) => 1 - (1 - opacity) ** layers;
   // --- stepping within the copy you are looking at ---------------------------
   // Which copy of a looped node is selected rides beside the path, because the
   // path is identical for every copy. A canvas click says which one it means;
-  // anything else meant "the node" and went back to the first — including ↑,
-  // which selects the parent of the copy you are looking at. Pressing it from
-  // the second link in a list threw the outline to the top of the list.
+  // non-navigator selection nearby can keep that copy. Navigator clicks and
+  // arrow keys explicitly reset to the first occurrence in previewRuntime.
   const { sameCopy } = require(bundlePath);
   check('↑ to the parent stays in the copy', sameCopy('0.1.2.0', '0.1.2'));
   check('↓ into a child does too', sameCopy('0.1.2', '0.1.2.0'));
@@ -182,9 +181,9 @@ const stacked = (layers, opacity = 0.14) => 1 - (1 - opacity) ** layers;
     'the hover outline is back to comparing paths, which a loop breaks',
   );
   check(
-    'a step within a copy keeps it',
+    'a non-navigator step within a copy keeps it',
     /if \(sameCopy\(previous, selectedPath\)\) \{[\s\S]{0,30}return;/.test(runtime),
-    'every selection outside the canvas is back to meaning the first copy',
+    'nearby code-panel selection should preserve the clicked copy',
   );
   check(
     'and so does the dimming around a component being edited',

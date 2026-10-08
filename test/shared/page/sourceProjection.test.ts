@@ -13,6 +13,7 @@ import { parseMarkdownPage } from '#dist/electron/parse/markdownParser.js';
 import { toDigest, toFilePath } from '#dist/shared/core/brand.js';
 import {
   CAPABILITIES,
+  capabilityAcceptsNodeRewrite,
   capabilityAcceptsVisualIntent,
   describeCapability,
   parseCapability,
@@ -48,6 +49,11 @@ test('capabilities are a closed set with a visual-edit answer and notice for eac
   ]);
   assert.deepEqual(CAPABILITIES.filter(capabilityAcceptsVisualIntent), [
     'editable',
+    'repeated-source-node',
+  ]);
+  assert.deepEqual(CAPABILITIES.filter(capabilityAcceptsNodeRewrite), [
+    'editable',
+    'read-only-opaque',
     'repeated-source-node',
   ]);
   assert.equal(new Set(CAPABILITIES.map(describeCapability)).size, CAPABILITIES.length);

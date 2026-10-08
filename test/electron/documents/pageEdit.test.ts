@@ -102,6 +102,17 @@ const title = (target: NodeRef, value: string): Edit => ({
   value: { type: 'string', value },
 });
 
+const EMPTY_MODEL = {
+  imports: [],
+  frontmatterLead: '',
+  extraFrontmatter: '',
+  extraFrontmatterSpaced: false,
+  frontmatterLayout: { extra: '', slots: [] },
+  hadFrontmatter: false,
+  trailingBlank: 0,
+  nodes: [],
+};
+
 // --- Wire ---------------------------------------------------------------------------
 
 test('parseEditRequest takes every edit and refuses each malformed shape', () => {
@@ -173,6 +184,16 @@ test('parseEditRequest takes every edit and refuses each malformed shape', () =>
   assert.throws(() =>
     parseEditRequest({ pagePath: '/p.astro', authoredChecksum: 'x', edit: good[0] }),
   );
+});
+
+test('parseEditRequest validates visual page fallback models', () => {
+  const request = (model: unknown) => ({
+    pagePath: '/p.astro',
+    authoredChecksum: DIGEST,
+    edit: { tag: 'replace-page', model },
+  });
+  assert.doesNotThrow(() => parseEditRequest(request(EMPTY_MODEL)));
+  assert.throws(() => parseEditRequest(request({ ...EMPTY_MODEL, nodes: 'no' })), /tree/);
 });
 
 test('parsePageEditResult: an applied edit carries its inverse; a refusal is a rejection', () => {
@@ -676,7 +697,7 @@ const STYLED = [
   '',
 ].join('\n');
 
-test("a page's <style> block is rewritten in place; a <script> is not", async (context) => {
+test("a page's opaque code stays intact around visual raw-node edits", async (context) => {
   const harness = fixture();
   context.after(harness.dispose);
   const file = path.join(harness.root, 'src/pages/index.astro');
@@ -700,14 +721,15 @@ test("a page's <style> block is rewritten in place; a <script> is not", async (c
   const current = await read(harness, file);
   const script = nodeAt(current, [2]);
   assert.ok(script.kind === 'raw' && script.name === 'script', 'the third node is the <script>');
-  const refused = await edit(harness, file, current.checksum, {
+  const rescripted = await edit(harness, file, current.checksum, {
     tag: 'replace-node',
     target: refAt(current, [2]),
     node: { ...script, inner: script.inner.replace('1', '2') },
   });
-  assert.ok(!refused.ok, 'a <script> body stays code-only');
-  if (!refused.ok) {
-    assert.equal(refused.error.code, 'rejected');
-  }
-  assert.equal(fs.readFileSync(file, 'utf8'), STYLED.replace('48px', '30px'), 'nothing else moved');
+  assert.ok(rescripted.ok, 'an explicit visual raw-node edit applies through a bounded rewrite');
+  assert.equal(
+    fs.readFileSync(file, 'utf8'),
+    STYLED.replace('48px', '30px').replace('let count = 1', 'let count = 2'),
+    'only the explicitly changed code value moved',
+  );
 });

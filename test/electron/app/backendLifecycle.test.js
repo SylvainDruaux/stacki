@@ -307,6 +307,14 @@ test(
     assert.deepEqual(events.find((event) => event.channel === 'fs:changed').payload.files, [
       path.join(projectPath, 'src', 'page.astro'),
     ]);
+    emit(undefined);
+    await sleep(250);
+    assert.equal(events.length, 8, 'an unnamed source edit refreshes all four panel channels');
+    assert.deepEqual(
+      events.filter((event) => event.channel === 'fs:changed').at(-1).payload.files,
+      [],
+      'the unnamed event carries no invented path',
+    );
     for (const name of ['next.astro', 'next.json', 'next.png', 'next.css']) {
       emit(name);
     }
@@ -315,7 +323,7 @@ test(
     emit('late.astro');
     emit('late.png', 'public');
     await sleep(250);
-    assert.equal(events.length, 4, 'the next project receives no old notifications');
+    assert.equal(events.length, 8, 'the next project receives no old notifications');
     assert.equal(closed.length, 2, 'both watched directories close together');
   },
 );

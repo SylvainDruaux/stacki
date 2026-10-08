@@ -3,16 +3,16 @@
 // snapshot it was authored against. Here the renderer's node references are
 // checked against main's own projection of the same bytes, UTF-16 ranges
 // become byte spans, new nodes and frontmatter are printed by the legacy
-// printer (only what is new — never the file), a node's new text is turned
-// into hunks placed on its own bytes (step 9, `replace-node`), and a loop
-// rename's sites are found (shared/engine/loopScope.ts). Everything else is the
+// printer, a node's new text is turned into hunks placed on its own bytes
+// (step 9, `replace-node`), a visual fallback maps model-diff hunks onto the
+// authored file (`replace-page`), and a loop rename's sites are found. Everything else is the
 // planner's. A Markdown or MDX page's own nodes are drafted by
 // markdownEdits.ts (step 10); its markup, and the operations the planner
 // places alike in both — removals, moves, copies — are drafted here.
 //
-// On the .astro printer boundary (eslint.config.mjs) because it prints only
-// what an edit adds: new nodes with serializeNodes, and the frontmatter block
-// with serializePage over a model without nodes — never an existing file. It
+// On the .astro printer boundary (eslint.config.mjs) because it prints new
+// nodes, frontmatter, and the before/after witnesses used to place fallback
+// hunks on existing bytes. It
 // outlived the compat adapter at step 9 (tracker, Step 9): the renderer names
 // nodes by the path, kind and UTF-16 range of the parse it shows, and only main
 // holds the bytes those become, so the translation stays here.
@@ -88,6 +88,11 @@ export function buildEditIntent(
   }
   const format = pageFormat(snapshot.path);
   const authored: Authored = { snapshot, text: decoded.value, projection, format };
+  if (edit.tag === 'replace-page') {
+    return format === 'astro'
+      ? replacePageDraft(authored, edit.model)
+      : err('unsupported-operation');
+  }
   if (format !== 'astro') {
     // Markdown's own drafts first (markdownEdits.ts); what it leaves — markup
     // inside MDX, and the operations the planner places alike — is stated
@@ -147,11 +152,38 @@ function nodeEditDraft(
       return ok(appendDraft(authored, edit.nodes));
     case 'set-frontmatter':
       return frontmatterDraft(authored, edit.model);
+    case 'replace-page':
+      return replacePageDraft(authored, edit.model);
     default: {
       const exhaustive: never = edit;
       return exhaustive;
     }
   }
+}
+
+// The last-resort visual edit is still a bounded hunk edit, not a regenerated
+// file. The old printed model identifies semantic changes; placedHunks maps
+// only those ranges onto the authored formatting and refuses ambiguous ones.
+function replacePageDraft(
+  authored: Authored,
+  next: Extract<Edit, { tag: 'replace-page' }>['model'],
+): Result<IntentDraft, RejectionReason> {
+  const parsed = parsePageResult(parsePage(authored.text, { locs: true }));
+  if (!parsed.editable) {
+    return err('source-invalid');
+  }
+  const before = serializePage(parsed.model);
+  const after = serializePage(next);
+  const hunks = placedHunks(before, after, authored.text);
+  if (!hunks.ok) {
+    return hunks;
+  }
+  const anchor = toAnchorRef({
+    span: toByteSpan(0, authored.snapshot.bytes.length),
+    path: [],
+    expectedKind: 'document',
+  });
+  return ok({ anchor, operation: { tag: 'rewrite-text', hunks: hunks.value } });
 }
 
 // The body's first nodes, printed as a new node is; the planner refuses them

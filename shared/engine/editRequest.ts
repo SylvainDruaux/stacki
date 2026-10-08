@@ -101,6 +101,10 @@ export type Edit =
   /** The frontmatter the page model now describes; main prints it and writes
    * only the slot that differs (an edit-frontmatter-slot intent). */
   | { readonly tag: 'set-frontmatter'; readonly model: PageModel }
+  /** A visual gesture whose specialized syntax is unavailable. Main compares
+   * the old and new printed models, maps only their semantic hunks onto the
+   * authored bytes, and never replaces formatting-only regions. */
+  | { readonly tag: 'replace-page'; readonly model: PageModel }
   /** Undo and redo: byte hunks a previous reply handed back, against the
    * checksum that reply named. */
   | { readonly tag: 'revert'; readonly hunks: readonly SourceEdit[] }
@@ -166,6 +170,7 @@ export function parseEdit(input: unknown): Edit {
       return { tag, nodes: content.nodes };
     }
     case 'set-frontmatter':
+    case 'replace-page':
       return { tag, model: parsePageModel(record['model']) };
     case 'revert':
       return { tag, hunks: parseHunks(record['hunks']) };

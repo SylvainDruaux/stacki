@@ -3,9 +3,9 @@
 // and its effect on the shown model — the prediction the page shows until the
 // reply lands, and whose new nodes pair with the reply's (src/editor/nodeHandles.ts).
 // The effect builds a new model and never edits one in place (the model is
-// readonly, src/editor/pageView.ts). A gesture with no request against the origin is
-// refused up front or, once sent, taken back with a notice — never saved some
-// other way (src/editor/pageSender.ts).
+// readonly, src/editor/pageView.ts). When specialized syntax has no request,
+// the sender derives a minimal node rewrite from the effect instead
+// (src/editor/pageEdits.ts).
 import { assert } from '../../shared/core/assert';
 import type { EditorModel, EditorNode } from './pageView';
 import type { Edit, NodeRef } from '../../shared/engine/editRequest';
@@ -44,7 +44,7 @@ export type PropPatch = Readonly<Record<string, Attr | undefined>>;
 
 /** Set or remove attributes and props of one node: string values and
  * removals (the attribute step), expressions and bare props (the prop step).
- * A spread is code of its own and still saves the whole model. */
+ * A spread is rewritten through the gesture's minimal-node fallback. */
 export function propsGesture(
   nodeId: string,
   patch: PropPatch,

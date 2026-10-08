@@ -39,7 +39,17 @@ function watchProject({
     const sourceDirectory = path.join(projectPath, 'src');
     watchers.push(
       watch(sourceDirectory, { recursive: true }, (_event, filename) => {
-        if (notifier.isClosed() || !filename) {
+        if (notifier.isClosed()) {
+          return;
+        }
+        if (!filename) {
+          // macOS can coalesce a directory change without naming the file.
+          // Refresh every source-backed panel rather than losing the edit.
+          notePageMayHaveChanged(true);
+          notifier.debounce('fs:changed', 150);
+          notifier.debounce('css:changed');
+          notifier.debounce('cms:changed');
+          notifier.debounce('assets:changed');
           return;
         }
         const name = filename.toString();

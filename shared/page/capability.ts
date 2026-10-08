@@ -53,6 +53,26 @@ export function capabilityAcceptsVisualIntent(capability: Capability): boolean {
   }
 }
 
+/** Whether a visual gesture may rewrite changed ranges inside one source node.
+ * Opaque nodes keep expressions and runtime-provided children verbatim during
+ * specialized edits, but a replacement is still safe: its diff is placed only
+ * within that node and the unchanged source bytes remain untouched. */
+export function capabilityAcceptsNodeRewrite(capability: Capability): boolean {
+  switch (capability) {
+    case 'editable':
+    case 'read-only-opaque':
+    case 'repeated-source-node':
+      return true;
+    case 'runtime-aggregate':
+    case 'unsupported':
+      return false;
+    default: {
+      const exhaustive: never = capability;
+      return exhaustive;
+    }
+  }
+}
+
 /** The visible reason shown beside a node the editor will not change. */
 export function describeCapability(capability: Capability): string {
   switch (capability) {

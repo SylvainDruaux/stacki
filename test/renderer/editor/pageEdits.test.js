@@ -3,8 +3,9 @@
 // coalesce within one stream of one undo step while unsent; typing drops the
 // gestures its text does not hold; the queue is bounded, and a gesture past it
 // is refused, never queued; a gesture is stated when it is sent, and one that
-// cannot be stated is refused — nothing is ever saved as a whole model; a
-// transient failure sends it again, a write that may have landed never blind;
+// cannot be stated falls back to the smallest stable node rewrite — nothing is
+// ever saved as a whole model; a transient failure sends it again, a write that
+// may have landed never blind;
 // and every applied write leaves its undo step the inverse that restores the
 // file (several steps in one write: the newest, the rest folded).
 // Method: the real modules, bundled with esbuild, driven directly; the send
@@ -190,6 +191,107 @@ test('sending a gesture: every outcome, and what the answers mean', async () => 
   assert.equal(maybe.outcome.replies.length, 1);
 });
 
+test('an unstated or unsupported visual edit falls back to its smallest changed node', async () => {
+  const child = {
+    id: 'child',
+    kind: 'element',
+    name: 'span',
+    start: 5,
+    end: 18,
+    props: { title: { type: 'string', value: 'Old' } },
+    children: [],
+  };
+  const root = {
+    id: 'root',
+    kind: 'element',
+    name: 'div',
+    start: 0,
+    end: 24,
+    props: {},
+    children: [child],
+  };
+  const origin = { checksum: sum(1), source: '', model: { imports: [], nodes: [root] } };
+  const changed = { ...child, props: { title: { type: 'string', value: 'New' } } };
+  const visualOnly = {
+    coalesceKey: undefined,
+    urgency: false,
+    stream: 'attribute:child:title',
+    request: () => undefined,
+    apply: (model) => ({ ...model, nodes: [{ ...root, children: [changed] }] }),
+  };
+  const requests = [];
+  const step = record();
+  step.outcome = { tag: 'pending', waiting: 1, applied: [] };
+  const applied = await edits.sendGesture({
+    path: '/p',
+    origin,
+    gesture: visualOnly,
+    record: step,
+    send: async (request) => {
+      requests.push(request);
+      return PAGE_OK(sum(2));
+    },
+  });
+  assert.equal(applied.tag, 'applied');
+  assert.equal(requests.length, 1);
+  assert.equal(requests[0].edit.tag, 'replace-node');
+  assert.deepEqual(requests[0].edit.target.path, [0, 0], 'the changed child, not its parent');
+  assert.equal(requests[0].edit.node.props.title.value, 'New');
+
+  const retried = [];
+  const granular = {
+    ...visualOnly,
+    request: () => [
+      {
+        tag: 'set-attribute',
+        target: { path: [0, 0], kind: 'element', span: { start: 5, end: 18 } },
+        name: 'title',
+        value: { type: 'string', value: 'New' },
+      },
+    ],
+  };
+  const retryStep = record();
+  retryStep.outcome = { tag: 'pending', waiting: 1, applied: [] };
+  const retryOutcome = await edits.sendGesture({
+    path: '/p',
+    origin,
+    gesture: granular,
+    record: retryStep,
+    send: async (request) => {
+      retried.push(request.edit.tag);
+      return retried.length === 1 ? refusal('unsupported-operation', sum(1)) : PAGE_OK(sum(3));
+    },
+  });
+  assert.equal(retryOutcome.tag, 'applied');
+  assert.deepEqual(retried, ['set-attribute', 'replace-node']);
+});
+
+test('a refusal caused by changed source is never hidden by the visual fallback', async () => {
+  const node = { id: 'a', kind: 'element', name: 'div', start: 0, end: 11, children: [] };
+  const origin = { checksum: sum(1), source: '', model: { imports: [], nodes: [node] } };
+  const made = {
+    coalesceKey: undefined,
+    urgency: false,
+    stream: undefined,
+    request: () => [{ tag: 'remove-node', target: REF }],
+    apply: (model) => ({ ...model, nodes: [] }),
+  };
+  let calls = 0;
+  const outcome = await edits.sendGesture({
+    path: '/p',
+    origin,
+    gesture: made,
+    record: record(),
+    send: async () => {
+      calls++;
+      return refusal('region-externally-modified', sum(9));
+    },
+  });
+  assert.equal(outcome.tag, 'refused');
+  assert.equal(outcome.reason, 'region-externally-modified');
+  assert.equal(calls, 1, 'a source conflict is not retried as a different edit');
+});
+
 test('nodeRefIn names nodes of the origin by path, kind and range, and nothing else', () => {
   const model = {
     imports: [],
@@ -342,6 +444,91 @@ test('requests reach the page as splices; the undo step restores every byte', as
 });
 
 test(
+  'visual attributes stay editable on ' + 'markup with runtime-provided children',
+  async (context) => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'stacki-opaque-visual-edit-'));
+    fs.mkdirSync(path.join(root, 'src/pages'), { recursive: true });
+    fs.mkdirSync(path.join(root, 'user'));
+    fs.writeFileSync(path.join(root, 'package.json'), '{"dependencies":{"astro":"*"}}');
+    const { mainHarness } = await import('../../helpers/mainHarness.ts');
+    const harness = mainHarness(path.join(root, 'user'));
+    context.after(() => {
+      harness.dispose();
+      fs.rmSync(root, { recursive: true, force: true });
+    });
+    const file = path.join(root, 'src/pages/index.astro');
+    const text =
+      '---\nconst content = "<strong>Hello</strong>";\n---\n<div set:html={content} />\n';
+    fs.writeFileSync(file, text);
+    const read = parsePageDiskRead(await harness.invoke('page:read', file));
+    assert.ok(read.editable);
+    const element = read.model.nodes[0];
+    assert.equal(element?.kind, 'element');
+    const made = gestures.propsGesture(
+      element.id,
+      { class: { type: 'string', value: 'card' } },
+      { coalesceKey: undefined, urgency: true },
+    );
+    const step = record();
+    step.outcome = { tag: 'pending', waiting: 1, applied: [] };
+    const send = async (request) => parsePageEditResult(await harness.invoke('page:edit', request));
+    const outcome = await edits.sendGesture({
+      path: file,
+      origin: { checksum: read.checksum, source: read.source, model: read.model },
+      gesture: made,
+      record: step,
+      send,
+    });
+    assert.equal(outcome.tag, 'applied');
+    assert.equal(
+      fs.readFileSync(file, 'utf8'),
+      '---\nconst content = "<strong>Hello</strong>";\n---\n' +
+        '<div set:html={content} class="card" />\n',
+      'the opaque expression stays byte-for-byte while the visual attribute changes',
+    );
+  },
+);
+
+test('a structural fallback can edit page roots as semantic hunks', async (context) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'stacki-page-visual-fallback-'));
+  fs.mkdirSync(path.join(root, 'src/pages'), { recursive: true });
+  fs.mkdirSync(path.join(root, 'user'));
+  fs.writeFileSync(path.join(root, 'package.json'), '{"dependencies":{"astro":"*"}}');
+  const { mainHarness } = await import('../../helpers/mainHarness.ts');
+  const harness = mainHarness(path.join(root, 'user'));
+  context.after(() => {
+    harness.dispose();
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+  const file = path.join(root, 'src/pages/index.astro');
+  const text = '<main>Remove me</main>\n';
+  fs.writeFileSync(file, text);
+  const read = parsePageDiskRead(await harness.invoke('page:read', file));
+  assert.ok(read.editable);
+  const removed = read.model.nodes.at(-1);
+  assert.equal(removed?.kind, 'element');
+  const made = {
+    coalesceKey: undefined,
+    urgency: true,
+    stream: undefined,
+    request: () => undefined,
+    apply: (model) => ({ ...model, nodes: model.nodes.filter((node) => node.id !== removed.id) }),
+  };
+  const step = record();
+  step.outcome = { tag: 'pending', waiting: 1, applied: [] };
+  const send = async (request) => parsePageEditResult(await harness.invoke('page:edit', request));
+  const outcome = await edits.sendGesture({
+    path: file,
+    origin: { checksum: read.checksum, source: read.source, model: read.model },
+    gesture: made,
+    record: step,
+    send,
+  });
+  assert.equal(outcome.tag, 'applied');
+  assert.equal(fs.readFileSync(file, 'utf8'), '\n');
+});
+
+test(
   'insertGesture stands the new node beside the ' + 'one at its place, or inside an empty parent',
   () => {
     const refOf = (id) => ({ path: [id.length], kind: 'element', span: { start: 0, end: 1 } });
@@ -387,6 +574,22 @@ test(
       'inside an empty parent',
     );
     assert.deepEqual(placed({ parentId: 'bb', index: 1 }), ['after', 3]);
+    const loop = {
+      imports: [],
+      nodes: [
+        {
+          id: 'loop',
+          kind: 'map',
+          head: 'items.map((item) => (',
+          children: [{ id: 'inside', kind: 'element', name: 'li', props: {}, children: [] }],
+        },
+      ],
+    };
+    const [inLoop] =
+      gestures.insertGesture(loop, node, { parentId: 'loop', index: 1 }, options).request(refOf) ??
+      [];
+    assert.equal(inLoop?.placement, 'last-child', 'a loop owns the insertion point');
+    assert.equal(inLoop?.target.path[0], 4, 'the loop, not its repeated child, is the anchor');
     assert.deepEqual(
       gestures.insertGesture({ imports: [], nodes: [] }, node, undefined, options).request(refOf),
       [{ tag: 'append-body', nodes: [node] }],

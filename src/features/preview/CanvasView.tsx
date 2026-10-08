@@ -26,13 +26,14 @@ interface ViewState {
 interface CanvasViewProps {
   readonly url: string;
   readonly refreshKey: string | number;
+  readonly onPreviewLoaded?: () => void;
 }
 
 function clamp(value: number, minimum: number, maximum: number): number {
   return Math.min(Math.max(value, minimum), maximum);
 }
 
-export default function CanvasView({ url, refreshKey }: CanvasViewProps) {
+export default function CanvasView({ url, refreshKey, onPreviewLoaded }: CanvasViewProps) {
   const startDrag = usePointerDrag();
   const wrapRef = React.useRef<HTMLDivElement>(null);
   const iframesRef = React.useRef<FrameElements>({});
@@ -74,6 +75,7 @@ export default function CanvasView({ url, refreshKey }: CanvasViewProps) {
           url={url}
           refreshKey={refreshKey}
           iframesRef={iframesRef}
+          {...(onPreviewLoaded === undefined ? {} : { onPreviewLoaded })}
         />
       )}
       {view && (
@@ -304,12 +306,14 @@ function CanvasFrames({
   url,
   refreshKey,
   iframesRef,
+  onPreviewLoaded,
 }: {
   readonly frames: Frames;
   readonly view: ViewState;
   readonly url: string;
   readonly refreshKey: string | number;
   readonly iframesRef: React.MutableRefObject<FrameElements>;
+  readonly onPreviewLoaded?: () => void;
 }) {
   return (
     <div
@@ -339,12 +343,13 @@ function CanvasFrames({
             }}
             src={`${url}#avb-design`}
             title={`${frame.label} preview`}
-            onLoad={(event) =>
+            onLoad={(event) => {
               event.currentTarget.contentWindow?.postMessage(
                 { type: 'avb:set-vh', px: frame.viewportHeight },
                 '*',
-              )
-            }
+              );
+              onPreviewLoaded?.();
+            }}
           />
           <div className="canvas-frame-cover" />
         </div>

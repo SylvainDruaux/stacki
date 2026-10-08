@@ -40,7 +40,7 @@ import {
 export function useLifecycle(coreState: ReturnType<typeof useCoreState>) {
   const assetPickScope = useAssetPick(coreState);
   const toasts = useToasts(coreState);
-  useDevEvents(coreState, assetPickScope);
+  const devEvents = useDevEvents(coreState, assetPickScope);
   const scans = useScans(coreState);
   const previewStart = usePreviewStart(coreState, toasts, assetPickScope);
   const savers = useSavers(toasts, coreState);
@@ -49,6 +49,7 @@ export function useLifecycle(coreState: ReturnType<typeof useCoreState>) {
   return {
     ...assetPickScope,
     ...toasts,
+    ...devEvents,
     ...scans,
     ...previewStart,
     ...savers,
@@ -101,7 +102,15 @@ export function useSelectPage(
       }
       // startPreview reports its own failure in the preview area.
       void startPreview(projectPath);
-      void watchProject(projectPath).catch(() => {});
+      void watchProject(projectPath)
+        .then((started) => {
+          if (!started) {
+            showToast('Couldn’t watch project files. External edits may need a refresh.', 'error');
+          }
+        })
+        .catch((error: unknown) => {
+          showToast(`Couldn’t watch project files: ${cleanError(error)}`, 'error');
+        });
 
       const first =
         result.pages.find((page) => page.name === 'index.astro') || result.pages[0] || undefined;

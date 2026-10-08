@@ -10,7 +10,7 @@ import * as net from 'node:net';
 import { createHash } from 'node:crypto';
 import { mainHarness } from '../../helpers/mainHarness.ts';
 import { IPC_PAYLOADS } from '#dist/shared/ipc/ipcPayloads.js';
-import { toRecord } from '#dist/shared/core/record.js';
+import { toArray, toRecord } from '#dist/shared/core/record.js';
 import { parseMarkdownPage } from '#dist/electron/parse/markdownParser.js';
 import { parsePageModel } from '#dist/shared/page/pageNode.js';
 import {
@@ -24,6 +24,7 @@ import {
 import { parseAliases } from '#dist/electron/properties/importPaths.js';
 import { parseAstroLock } from '#dist/electron/preview/devServerChecks.js';
 import { directoryBudget, MAIN_LIMITS } from '#dist/electron/lib/mainLimits.js';
+import { coveredPaths } from '#dist/electron/content/contentEntries.js';
 import { LIMITS } from '#dist/shared/core/limits.js';
 
 // Null as a boundary receives it, parsed from JSON: inputs may hold it; our values never do.
@@ -175,6 +176,54 @@ test('content validation replies keep their issues and refuse corrupt or oversiz
   for (const input of bad) {
     assert.throws(() => parseValidationResult(input));
   }
+});
+
+test('CMS discovers data modules outside a content glob', async (context) => {
+  const harness = fixture();
+  context.after(harness.dispose);
+  fs.mkdirSync(path.join(harness.root, 'src/data/posts'), { recursive: true });
+  fs.mkdirSync(path.join(harness.root, 'src/lib'), { recursive: true });
+  fs.writeFileSync(
+    path.join(harness.root, 'src/data/site.ts'),
+    [
+      'export const site = { title: "Stacki", launched: 2026 };',
+      'export const tagline = "Design in the browser";',
+      '',
+    ].join('\n'),
+  );
+  fs.writeFileSync(
+    path.join(harness.root, 'src/data/team.ts'),
+    'export const team = [{ name: "Ada", role: "Engineer" }];\n',
+  );
+  fs.writeFileSync(
+    path.join(harness.root, 'src/lib/constants.ts'),
+    'export const internalLabel = "Not CMS content";\n',
+  );
+  fs.writeFileSync(path.join(harness.root, 'src/data/posts/first.md'), '# First\n');
+
+  const listed = toArray(toRecord(await harness.invoke('cms:list', harness.root))?.['files']);
+  assert.ok(listed);
+  const relativePaths = listed.map((file) => toRecord(file)?.['rel']);
+  assert.ok(relativePaths.includes('data/site.ts#*general'));
+  assert.ok(relativePaths.includes('data/team.ts#team'));
+  assert.ok(!relativePaths.includes('lib/constants.ts#*general'));
+
+  const read = toRecord(
+    await harness.invoke('cms:read', {
+      projectPath: harness.root,
+      rel: 'data/site.ts#*general',
+    }),
+  );
+  assert.deepEqual(toRecord(read?.['data'])?.['site'], { title: 'Stacki', launched: 2026 });
+
+  const covered = coveredPaths(harness.root, [
+    {
+      name: 'posts',
+      loader: { kind: 'glob', base: 'src/data', pattern: '**/*.md' },
+    },
+  ]);
+  assert.deepEqual(covered, { files: ['src/data/posts/first.md'], dirs: [] });
+  assert.ok(!covered.files.includes('src/data/site.ts'));
 });
 
 test('dev-server parsers support current and legacy responses', () => {

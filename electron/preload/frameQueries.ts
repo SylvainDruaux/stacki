@@ -3,11 +3,13 @@
 // starting the frame once the document is ready.
 
 import { isElement } from './frameBasics';
+import { list, pathText, text } from '../../shared/core/boundary';
 import { freezeViewportHeight, report } from './frameViewport';
 import {
   PATH_ATTR,
   STAMP_ATTRIBUTE,
   activeScope,
+  allElementsWithPath,
   elementsWithPath,
   focusOcc,
   focusPath,
@@ -123,6 +125,10 @@ export function listenForQueries(): void {
       answerQuery(data, data['id']);
       return;
     }
+    if (data['type'] === 'avb:class-patch') {
+      applyClassPatch(data);
+      return;
+    }
     if (data['type'] === 'avb:track' && Array.isArray(data['paths'])) {
       track(data, data['paths']);
     }
@@ -133,6 +139,42 @@ export function listenForQueries(): void {
       freezeViewportHeight(data['px']);
     }
   });
+}
+
+const CLASS_PATCH_NAMES_MAX = 64;
+const CLASS_PATCH_OCCURRENCES_MAX = 1024;
+
+function applyClassPatch(data: Record<string, unknown>): void {
+  let path: string;
+  let add: string[];
+  let remove: string[];
+  try {
+    path = pathText(data['path']);
+    add = list(text)(data['add']);
+    remove = list(text)(data['remove']);
+  } catch {
+    return;
+  }
+  if (add.length + remove.length > CLASS_PATCH_NAMES_MAX) {
+    return;
+  }
+  if ([...add, ...remove].some((name) => !name || name.length > 256 || /\s/.test(name))) {
+    return;
+  }
+  const elements = allElementsWithPath(path, CLASS_PATCH_OCCURRENCES_MAX);
+  if (!elements) {
+    return;
+  }
+  for (const element of elements) {
+    for (const name of remove) {
+      element.classList.remove(name);
+    }
+    for (const name of add) {
+      element.classList.add(name);
+    }
+  }
+  sendClasses();
+  sendRects();
 }
 
 const answerQuery = (data: Record<string, unknown>, id: number) => {

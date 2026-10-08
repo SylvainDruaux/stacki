@@ -5,6 +5,7 @@ import type {
   PropertyChange,
 } from '../../../shared/properties/propertyEditing';
 import { onFilesChanged } from '../../ipc/appBridge';
+import { onWindowReturn } from '../../lib/windowReturn';
 import { editComponentProperties, readComponentProperties } from './propertiesBridge';
 
 export interface ComponentPropertiesPanelProps {
@@ -157,15 +158,17 @@ function usePropertyWatcher(
     activeRef.current = true;
     // This event excludes self writes in projectWatcher, before IPC dispatch.
     const off = onFilesChanged(({ files }) => {
-      if (files.includes(props.file)) {
+      if (files.length === 0 || files.includes(props.file)) {
         void reload('external');
       }
     });
+    const offFocus = onWindowReturn(() => void reload('external'));
     void reload('initial');
     return () => {
       activeRef.current = false;
       invalidateReads();
       off();
+      offFocus();
     };
   }, [props.file, props.projectPath, reload, invalidateReads, activeRef]);
 }

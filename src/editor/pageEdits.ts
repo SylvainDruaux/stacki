@@ -9,8 +9,8 @@
 //     created a moment ago is already there to name. A request names nodes by
 //     the facts of that parse (path, kind, source range), and main checks them
 //     against its own projection of the same bytes. Nothing is saved as a
-//     whole model: a gesture that cannot be stated — its node is gone, or
-//     lives in another file — is refused.
+//     whole model: when specialized syntax cannot state a gesture, the
+//     smallest stable node changed by its model effect is rewritten instead.
 //   - typed code (step 8): the page's text, saved as one patch from the
 //     baseline the typing descends from (src/editor/codeEdits.ts). At most one, and
 //     first: typing replaces the unsent gestures, which the text it was typed
@@ -71,8 +71,9 @@ export interface EditsRecord {
 
 /** A gesture as edit requests, stated against a parse (`refOf` names the parse's
  * nodes), and its effect on the shown model. The effect is a pure function —
- * a new model, the old one untouched. `request` is undefined when a node it
- * names has no place in the parse: gone, or in another file. */
+ * a new model, the old one untouched. `request` may be undefined when the
+ * specialized edit cannot express the syntax; sending then derives a safe,
+ * minimal node rewrite from `apply`. */
 export interface EditGesture {
   readonly request: (refOf: (nodeId: string) => NodeRef | undefined) => readonly Edit[] | undefined;
   readonly apply: (model: EditorModel) => EditorModel;
@@ -415,24 +416,61 @@ export type GestureSent =
 /** State a gesture against `origin` and send its requests one at a time, in
  * order, each authored against the origin's checksum: main rebases the later
  * ones through the earlier ones' commits exactly. */
-export async function sendGesture(input: {
+interface GestureSendInput {
   readonly path: string;
   readonly origin: PageOrigin;
   readonly gesture: EditGesture;
   readonly record: EditsRecord;
   readonly send: (request: EditRequest) => Promise<Result<PageEdited, PageEditError>>;
-}): Promise<GestureSent> {
+}
+
+export async function sendGesture(input: GestureSendInput): Promise<GestureSent> {
   const { origin } = input;
-  const requests = input.gesture.request((nodeId) => nodeRefIn(origin, nodeId));
-  if (requests === undefined || requests.length === 0) {
-    // A node it names is not in the page the app last read: another file's,
-    // or gone. Never saved some other way.
-    const reason = 'unsupported-operation';
-    return { tag: 'refused', reason, diskChecksum: origin.checksum, replies: [] };
+  const refOf = (nodeId: string): NodeRef | undefined => nodeRefIn(origin, nodeId);
+  const specialized = input.gesture.request(refOf);
+  if (specialized === undefined || specialized.length === 0) {
+    return sendReplacement(input, refOf);
   }
+  const sent = await sendRequests(input, specialized);
+  if (sent.tag !== 'refused' || sent.reason !== 'unsupported-operation') {
+    return sent;
+  }
+  if (sent.replies.length > 0 || specialized.every((edit) => edit.tag === 'replace-node')) {
+    return sent;
+  }
+  return sendReplacement(input, refOf);
+}
+
+async function sendReplacement(
+  input: GestureSendInput,
+  refOf: (nodeId: string) => NodeRef | undefined,
+): Promise<GestureSent> {
+  const predicted = input.gesture.apply(input.origin.model);
+  const replacements = replacementEdits(input.origin, predicted, refOf);
+  if (replacements !== undefined && replacements.length > 0) {
+    const sent = await sendRequests(input, replacements);
+    if (sent.tag !== 'refused' || sent.reason !== 'unsupported-operation') {
+      return sent;
+    }
+    if (sent.replies.length > 0) {
+      return sent;
+    }
+  }
+  if (predicted === input.origin.model) {
+    const reason = 'unsupported-operation';
+    return { tag: 'refused', reason, diskChecksum: input.origin.checksum, replies: [] };
+  }
+  const page: Edit = { tag: 'replace-page', model: replacementModel(predicted) };
+  return sendRequests(input, [page]);
+}
+
+async function sendRequests(
+  input: GestureSendInput,
+  requests: readonly Edit[],
+): Promise<GestureSent> {
   const replies: PageEdited[] = [];
   for (const edit of requests) {
-    const request = { pagePath: input.path, authoredChecksum: origin.checksum, edit };
+    const request = { pagePath: input.path, authoredChecksum: input.origin.checksum, edit };
     const answer = await input.send(request);
     if (answer.ok) {
       const { checksum, inverse } = answer.value;
@@ -440,10 +478,125 @@ export async function sendGesture(input: {
       replies.push(answer.value);
       continue;
     }
-    return stopped(answer.error, origin.checksum, replies);
+    return stopped(answer.error, input.origin.checksum, replies);
   }
   assert(replies.length === requests.length, 'Every request applied');
   return { tag: 'applied', replies };
+}
+
+/** The smallest stable changed nodes. A changed child suppresses its changed
+ * parent, while a structural change (insert, remove, reorder, or move) selects
+ * the parent whose child list changed. Main turns each replacement into hunks
+ * inside that node, preserving every untouched byte around and within it. */
+function replacementEdits(
+  origin: PageOrigin,
+  predicted: EditorModel,
+  refOf: (nodeId: string) => NodeRef | undefined,
+): readonly Edit[] | undefined {
+  const afterById = nodesById(predicted.nodes);
+  const pending: PageNode[] = [...origin.model.nodes];
+  const edits: Edit[] = [];
+  for (let visited = 0; visited < pending.length; visited++) {
+    assert(visited < LIMITS.treeNodesMax, 'A replacement search stays inside the tree bound');
+    const before = pending[visited];
+    assert(before !== undefined, 'A replacement search visits an existing node');
+    const after = afterById.get(before.id);
+    if (after !== undefined && before !== after && !hasChangedDirectChild(before, after)) {
+      const target = refOf(before.id);
+      if (target === undefined) {
+        return undefined;
+      }
+      edits.push({ tag: 'replace-node', target, node: withoutStaleAttributeSpans(after) });
+    }
+    pending.push(...childNodes(before));
+  }
+  assert(edits.length <= LIMITS.treeNodesMax, 'A replacement search yields at most one per node');
+  return edits;
+}
+
+function replacementModel(model: EditorModel): PageModel {
+  return { ...model, nodes: model.nodes.map((node) => replacementNode(node, 0)) };
+}
+
+function replacementNode(node: PageNode, depth: number): PageNode {
+  assert(depth <= LIMITS.treeDepthMax, 'A replacement model stays inside the tree depth bound');
+  const replacement = withoutStaleAttributeSpans(node);
+  switch (replacement.kind) {
+    case 'component':
+    case 'element':
+      return replacement.children === undefined
+        ? replacement
+        : {
+            ...replacement,
+            children: replacement.children.map((child) => replacementNode(child, depth + 1)),
+          };
+    case 'map':
+    case 'branch':
+    case 'chunk-group':
+      return {
+        ...replacement,
+        children: replacement.children.map((child) => replacementNode(child, depth + 1)),
+      };
+    case 'cond':
+      return {
+        ...replacement,
+        children: replacement.children.map((branch) => {
+          const child = replacementNode(branch, depth + 1);
+          assert(child.kind === 'branch', 'A conditional keeps branch children');
+          return child;
+        }),
+      };
+    case 'comment':
+    case 'expr':
+    case 'raw':
+    case 'raw-line':
+    case 'text':
+      return replacement;
+    default: {
+      const exhaustive: never = replacement;
+      return exhaustive;
+    }
+  }
+}
+
+// Attribute spans describe the old bytes. A visual prop edit can add or remove
+// names, so the replacement payload must not claim those old spans describe
+// its new props; main only needs the target reference's source range.
+function withoutStaleAttributeSpans(node: PageNode): PageNode {
+  const { attrSpans: staleAttributeSpans, ...replacement } = node;
+  void staleAttributeSpans;
+  return replacement;
+}
+
+function nodesById(roots: readonly PageNode[]): ReadonlyMap<string, PageNode> {
+  const found = new Map<string, PageNode>();
+  const pending: PageNode[] = [...roots];
+  for (let visited = 0; visited < pending.length; visited++) {
+    assert(visited < LIMITS.treeNodesMax, 'A node index stays inside the tree bound');
+    const node = pending[visited];
+    assert(node !== undefined, 'A node index visits an existing node');
+    found.set(node.id, node);
+    pending.push(...childNodes(node));
+  }
+  return found;
+}
+
+function hasChangedDirectChild(before: PageNode, after: PageNode): boolean {
+  const beforeChildren = childNodes(before);
+  const afterChildren = childNodes(after);
+  const directAfter = new Map(afterChildren.map((child) => [child.id, child]));
+  return beforeChildren.some((child) => {
+    const next = directAfter.get(child.id);
+    return next !== undefined && child !== next;
+  });
+}
+
+function childNodes(node: PageNode): readonly PageNode[] {
+  if ('children' in node && Array.isArray(node.children)) {
+    const children: readonly PageNode[] = node.children;
+    return children;
+  }
+  return [];
 }
 
 // A request did not apply: refused over changed bytes, or not written.

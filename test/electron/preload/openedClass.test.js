@@ -127,13 +127,20 @@ const frame = (url) => {
     Object.defineProperty(event, 'source', { value: window.parent });
     window.dispatchEvent(event);
   };
+  const patchClasses = (data) => {
+    const event = new window.MessageEvent('message', {
+      data: { type: 'avb:class-patch', ...data },
+    });
+    Object.defineProperty(event, 'source', { value: window.parent });
+    window.dispatchEvent(event);
+  };
   const opened = () =>
     [...window.document.querySelectorAll('.stacki-opened')].map((element) => element.textContent);
   // Read the moment the script has run, before any event has had a chance to
   // fire: the page paints before DOMContentLoaded, and a canvas that spent that
   // time looking like the preview would flash.
   const markedOnLoad = window.document.documentElement.className;
-  return { window, sent, track, opened, markedOnLoad, doc: window.document };
+  return { window, sent, track, patchClasses, opened, markedOnLoad, doc: window.document };
 };
 
 (async () => {
@@ -180,6 +187,22 @@ const frame = (url) => {
     canvas.opened().join() === 'three',
     canvas.opened().join(),
   );
+
+  // A class edit is shown in the DOM before the source write and HMR finish.
+  // All copies of the edited source node change, even when the outline is
+  // focused on only the third copy. Bad boundary data must change none.
+  canvas.patchClasses({ path: '0.1', add: ['fresh'], remove: ['card'] });
+  const cards = [...canvas.doc.querySelectorAll('article')];
+  check(
+    'a class edit updates every repeated copy immediately',
+    cards.every((card) => card.classList.contains('fresh') && !card.classList.contains('card')),
+  );
+  canvas.patchClasses({ path: '0.1', add: ['bad class'], remove: ['fresh'] });
+  check(
+    'an invalid class patch changes no element',
+    cards.every((card) => card.classList.contains('fresh')),
+  );
+  canvas.patchClasses({ path: '0.1', add: ['card'], remove: ['fresh'] });
 
   // A component that renders two siblings has no single root, so both are it.
   canvas.track('0.3', 0);

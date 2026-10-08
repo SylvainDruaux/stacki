@@ -48,7 +48,7 @@ function registerContentConfigHandlers({
     }));
     return {
       collections,
-      covered: coveredPaths(config.collections || []),
+      covered: coveredPaths(projectPath, config.collections || []),
       configPath: config.configPath,
     };
   });

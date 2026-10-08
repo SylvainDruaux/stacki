@@ -116,7 +116,7 @@ function listCms(root) {
       error: collection.error || undefined,
       count: countEntries(source, collection),
     })),
-    covered: coveredPaths(config.collections),
+    covered: coveredPaths(source, config.collections),
     configPath: config.configPath,
   });
 

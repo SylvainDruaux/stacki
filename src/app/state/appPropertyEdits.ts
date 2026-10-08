@@ -22,6 +22,7 @@ import {
 } from '../../editor/editGestures';
 import { readFrontmatter } from '../../../shared/page/frontmatterSource';
 import { hasClass, withClass } from '../../editor/classAttr';
+import { previewAddedClass, previewClassProps } from '../../editor/previewClassPatch';
 import { cleanError } from '../../lib/cleanError';
 import type { PickedAsset } from '../../ui/AssetField';
 import type { InlineNode } from '../../features/props/RichContent';
@@ -108,9 +109,61 @@ export function useClassEdits(
   history: ReturnType<typeof useHistory>,
 ) {
   const { pageStateRef } = coreState;
+  const { commitEdit } = history;
+  const addClassToNode = useAddClassToNode(coreState, lifecycle, history);
+
+  // Step 6, attribute: set or remove one prop, as an edit request when it has
+  // an intent form (editGestures.ts), else as a whole-model save.
+  const setProp = useCallback(
+    (
+      nodeId: string,
+      propName: string,
+      value: Attr | undefined,
+      immediate = false,
+      previewPath?: string,
+    ) => {
+      const coalesceKey = `prop:${nodeId}:${propName}`;
+      const options = { coalesceKey, urgency: immediate };
+      const state = pageStateRef.current.pageState;
+      const node = state?.editable ? findNodeById(state.model.nodes, nodeId) : undefined;
+      const previous = propName === 'style' ? node?.props?.['style'] : undefined;
+      if (previous?.type === 'string' && value?.type === 'string') {
+        // Step 6, inline CSS: one declaration changed is one declaration edited.
+        const styles = { before: previous.value, after: value.value };
+        commitEdit(inlineStyleGesture(nodeId, styles, options));
+        return;
+      }
+      if (commitEdit(propsGesture(nodeId, { [propName]: value }, options))) {
+        previewClassProps(previewPath, node, { [propName]: value });
+      }
+    },
+    [commitEdit, pageStateRef],
+  );
+
+  // Several props in one edit, so picking an image and getting its width and
+  // height back is a single undo rather than three.
+  const setProps = useCallback(
+    (nodeId: string, patch: PropValues, immediate = true, previewPath?: string) => {
+      const coalesceKey = `props:${nodeId}:${Object.keys(patch).join(',')}`;
+      const state = pageStateRef.current.pageState;
+      const node = state?.editable ? findNodeById(state.model.nodes, nodeId) : undefined;
+      if (commitEdit(propsGesture(nodeId, patch, { coalesceKey, urgency: immediate }))) {
+        previewClassProps(previewPath, node, patch);
+      }
+    },
+    [commitEdit, pageStateRef],
+  );
+  return { addClassToNode, setProp, setProps };
+}
+
+function useAddClassToNode(
+  coreState: ReturnType<typeof useCoreState>,
+  lifecycle: ReturnType<typeof useLifecycle>,
+  history: ReturnType<typeof useHistory>,
+) {
+  const { pageStateRef } = coreState;
   const { flushSave, showToast } = lifecycle;
   const { commitEdit } = history;
-
   // Typing a bare class in the style panel's selector box puts it on the
   // element too — a rule for a class the element doesn't carry would never
   // apply. Where it goes depends on how the element's classes are written: a
@@ -120,8 +173,8 @@ export function useClassEdits(
   // Resolves with the page edit's outcome, once it reached disk or was
   // refused: the style panel writes the class's rule only after it applied
   // (step 6, plan §3.3 — outcome-gated, never a fabricated atomicity).
-  const addClassToNode = useCallback(
-    async (nodeId: string, className: string): Promise<ClassOutcome> => {
+  return useCallback(
+    async (nodeId: string, className: string, previewPath?: string): Promise<ClassOutcome> => {
       const clean = String(className || '').trim();
       const state = pageStateRef.current.pageState;
       if (!nodeId || !clean || !state?.editable) {
@@ -144,7 +197,10 @@ export function useClassEdits(
       }
       // Step 6, attribute: the class attribute, as its own edit request.
       const patch = { [edit.key]: edit.value };
-      commitEdit(propsGesture(nodeId, patch, { coalesceKey: undefined, urgency: true }));
+      if (!commitEdit(propsGesture(nodeId, patch, { coalesceKey: undefined, urgency: true }))) {
+        return { tag: 'refused', message: 'the edit could not be queued' };
+      }
+      previewAddedClass(previewPath, clean);
       try {
         await flushSave();
         return { tag: 'applied' };
@@ -154,37 +210,6 @@ export function useClassEdits(
     },
     [commitEdit, flushSave, showToast, pageStateRef],
   );
-
-  // Step 6, attribute: set or remove one prop, as an edit request when it has
-  // an intent form (editGestures.ts), else as a whole-model save.
-  const setProp = useCallback(
-    (nodeId: string, propName: string, value: Attr | undefined, immediate = false) => {
-      const coalesceKey = `prop:${nodeId}:${propName}`;
-      const options = { coalesceKey, urgency: immediate };
-      const state = pageStateRef.current.pageState;
-      const node = state?.editable ? findNodeById(state.model.nodes, nodeId) : undefined;
-      const previous = propName === 'style' ? node?.props?.['style'] : undefined;
-      if (previous?.type === 'string' && value?.type === 'string') {
-        // Step 6, inline CSS: one declaration changed is one declaration edited.
-        const styles = { before: previous.value, after: value.value };
-        commitEdit(inlineStyleGesture(nodeId, styles, options));
-        return;
-      }
-      commitEdit(propsGesture(nodeId, { [propName]: value }, options));
-    },
-    [commitEdit, pageStateRef],
-  );
-
-  // Several props in one edit, so picking an image and getting its width and
-  // height back is a single undo rather than three.
-  const setProps = useCallback(
-    (nodeId: string, patch: PropValues, immediate = true) => {
-      const coalesceKey = `props:${nodeId}:${Object.keys(patch).join(',')}`;
-      commitEdit(propsGesture(nodeId, patch, { coalesceKey, urgency: immediate }));
-    },
-    [commitEdit],
-  );
-  return { addClassToNode, setProp, setProps };
 }
 
 // Writing an asset pick into a prop.

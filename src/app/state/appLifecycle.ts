@@ -166,9 +166,9 @@ export function useDevEvents(
   coreState: ReturnType<typeof useCoreState>,
   assetPickScope: ReturnType<typeof useAssetPick>,
 ) {
-  const { devLogRef, devUrl, livePathRef, setBusy, setDevLog, setDevStatus, setDevUrl } = coreState;
-  const { setRefreshKey } = coreState;
+  const { devLogRef, setBusy, setDevLog, setDevStatus, setDevUrl } = coreState;
   const { diagnose } = assetPickScope;
+  const recovery = usePreviewRecovery(coreState);
 
   useEffect(() => {
     const offProgress = onAppProgress((message) => setBusy(message));
@@ -191,14 +191,25 @@ export function useDevEvents(
       offLog();
     };
   }, [diagnose, devLogRef, setBusy, setDevLog, setDevStatus, setDevUrl]);
+  return recovery;
+}
 
-  // ----------------------------------------------------------------
-  // Recovering the preview after a compile error
-  // ----------------------------------------------------------------
-  //
+// Recovering the preview after a compile error. The frame load seeds a check,
+// so startup and navigation errors recover even when no file watcher fires.
+function usePreviewRecovery(coreState: ReturnType<typeof useCoreState>) {
+  const { devUrl, livePathRef, setRefreshKey } = coreState;
+  const previewWatchRef = useRef<ReturnType<typeof createPreviewWatch> | undefined>(undefined);
+  const previewLoadPendingRef = useRef(false);
+  const previewLoaded = useCallback((): void => {
+    const watch = previewWatchRef.current;
+    if (watch === undefined) {
+      previewLoadPendingRef.current = true;
+      return;
+    }
+    watch.poke();
+  }, []);
   // See src/features/preview/previewRecovery.ts for what this is for and why it asks the server
   // rather than reading the error screen or the log.
-  //
   // The route is read through `livePathRef` rather than named as a dependency:
   // it is assigned far below this hook, so a dep array mentioning it reads it
   // before its declaration and the whole app throws (see test/renderer/app/appRenders.test.js,
@@ -223,6 +234,11 @@ export function useDevEvents(
       probe: () => probeProjectPreview(devUrl + (livePathRef.current || '/')),
       onRecover: () => setRefreshKey((count) => count + 1),
     });
+    previewWatchRef.current = watch;
+    if (previewLoadPendingRef.current) {
+      previewLoadPendingRef.current = false;
+      watch.poke();
+    }
     // Every write the app makes, plus every change made outside it.
     const offWrite = onPageMaybeChanged((event) => {
       watch.poke();
@@ -239,8 +255,12 @@ export function useDevEvents(
     return () => {
       offWrite();
       watch.stop();
+      if (previewWatchRef.current === watch) {
+        previewWatchRef.current = undefined;
+      }
     };
   }, [devUrl, livePathRef, setRefreshKey]);
+  return { previewLoaded };
 }
 
 // Project scans: one in flight, at most one waiting.

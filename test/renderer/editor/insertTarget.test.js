@@ -139,6 +139,25 @@ const check = (what, condition, detail) => {
     JSON.stringify(at('frontmatter')) === JSON.stringify({ parentId: undefined, index: 4 }),
   );
 
+  const condition = {
+    id: 'condition',
+    kind: 'cond',
+    children: [
+      {
+        id: 'then',
+        kind: 'branch',
+        name: 'then',
+        children: [{ id: 'conditional-child', kind: 'element', name: 'p', children: [] }],
+      },
+    ],
+  };
+  const conditionTarget = insertTargetFor({ nodes: [condition] }, 'condition', DIV, insertables);
+  check(
+    'an element inserted with an if selected goes inside its visible branch',
+    JSON.stringify(conditionTarget) === JSON.stringify({ parentId: 'then', index: 1 }),
+    JSON.stringify(conditionTarget),
+  );
+
   // ── The components this came from ─────────────────────────────────────────
   // The table above is only right if the scan really reports that, which is
   // the half that broke.

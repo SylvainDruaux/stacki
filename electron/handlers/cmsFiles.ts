@@ -114,7 +114,7 @@ export const collectionOf = async (projectPath: string, name: string) => {
 export function readCmsSource(
   full: string,
   entryRel: string,
-  options: { readonly page: boolean },
+  options: { readonly page: boolean; readonly includeGeneralOnly?: boolean },
 ): CmsFile[] {
   let source: string;
   try {
@@ -131,10 +131,19 @@ export function readCmsSource(
       return [];
     }
     source = body;
-  } else if (!/export\s+const\s+[A-Za-z_$][\w$]*\s*(?::[^=]+)?=\s*\[/.test(source)) {
-    return [];
   }
   const scan = options.page ? PAGE_SCAN : undefined;
+  const collections = findCollections(source, scan);
+  // Source files outside src/data still need an exported record list before
+  // they count as CMS content. Otherwise every constants module in the project
+  // would appear as a content file merely because it exports a string.
+  if (!options.page) {
+    if (!options.includeGeneralOnly) {
+      if (collections.length === 0) {
+        return [];
+      }
+    }
+  }
   const metadata = {
     dir: entryRel,
     abs: full,
@@ -145,7 +154,7 @@ export function readCmsSource(
   const files: CmsFile[] = general
     ? [{ ...metadata, rel: `${entryRel}#${GENERAL}`, name: 'General', data: general }]
     : [];
-  for (const collection of findCollections(source, scan)) {
+  for (const collection of collections) {
     if (collection.data) {
       files.push({
         ...metadata,

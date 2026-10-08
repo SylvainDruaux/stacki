@@ -10,7 +10,7 @@
 // repeat in the file is ambiguous (planner.ts, uniqueOrAmbiguous), so a
 // resolved node is the node the intent was authored against, moved whole.
 import { assert } from '../core/assert';
-import { capabilityAcceptsVisualIntent } from '../page/capability';
+import { capabilityAcceptsNodeRewrite, capabilityAcceptsVisualIntent } from '../page/capability';
 import { LIMITS } from '../core/limits';
 import type { SpanMapping } from './mapSpan';
 import type { AnchorRef, NodeKind, StructuralPath } from '../page/ref';
@@ -481,4 +481,10 @@ export function nodePlaceable(node: ProjectedNode): boolean {
  * one out of its loop (planTree.ts); nothing is placed beside it. */
 export function nodeEditable(node: ProjectedNode): boolean {
   return capabilityAcceptsVisualIntent(node.capability);
+}
+
+/** A replacement changes only hunks proven to belong to one source node, so
+ * it can safely carry visual edits through syntax whose contents stay opaque. */
+export function nodeRewriteable(node: ProjectedNode): boolean {
+  return capabilityAcceptsNodeRewrite(node.capability);
 }

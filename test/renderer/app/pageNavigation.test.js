@@ -310,6 +310,12 @@ test('out-of-order page reads and external reads cannot replace the current edit
   });
   assert.equal(shown(), 'latest-disk');
   assert.equal(__panels.PropsPanel.node.props.title.value, 'keep this');
+  await act(async () => {
+    window.dispatchEvent(new window.Event('focus'));
+    await tick();
+  });
+  assert.equal(reads.length, 6, 'returning during a draft does not re-read over the edit');
+  assert.equal(__panels.SaveConflictNotice, undefined, 'focus alone is not an outside conflict');
   await wait(350);
   assert.equal(edits.at(-1).pagePath, pages[2].path);
   assert.equal(edits.at(-1).edit.tag, 'set-attribute', 'saved as a request, never a whole model');
@@ -527,6 +533,28 @@ test('out-of-order page reads and external reads cannot replace the current edit
   assert.equal(shown(), 'outside-again');
   await wait(350);
   assert.equal(edits.length, saved, 'reloading writes nothing');
+  const beforeReturn = reads.length;
+  await act(async () => {
+    window.dispatchEvent(new window.Event('focus'));
+    await tick();
+  });
+  assert.equal(reads.length, beforeReturn + 1, 'returning to Stacki rechecks the open file');
+  await act(async () => {
+    answer(beforeReturn, 'changed-while-away');
+    await tick();
+  });
+  assert.equal(shown(), 'changed-while-away');
+  const beforeUnnamed = reads.length;
+  await act(async () => {
+    onFsChanged({ files: [] });
+    await tick();
+  });
+  assert.equal(reads.length, beforeUnnamed + 1, 'an unnamed edit still rechecks the open file');
+  await act(async () => {
+    answer(beforeUnnamed, 'unnamed-change');
+    await tick();
+  });
+  assert.equal(shown(), 'unnamed-change');
   await act(async () => root.unmount());
   dom.window.close();
 });

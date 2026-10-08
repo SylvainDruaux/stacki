@@ -50,9 +50,9 @@ export function registerCmsHandlers(host: Pick<MainHost, 'ipcMain' | 'send' | 's
 }
 
 function registerCmsListHandler({ ipcMain }: Pick<MainHost, 'ipcMain'>): void {
-  // Every .json under src/, with its parsed contents. Files are small enough
-  // that parsing them all up front is cheaper than a round trip per collection,
-  // and it lets the panel show item counts without opening anything.
+  // Data modules under src/data may hold one record of settings rather than a
+  // repeating array. Source files elsewhere retain the stricter collection
+  // rule, so ordinary application constants do not become CMS entries.
   ipcMain.handle('cms:list', async (_event, projectPath) => {
     const root = path.join(projectPath, 'src');
     const files: CmsFile[] = [];
@@ -77,8 +77,15 @@ function registerCmsListHandler({ ipcMain }: Pick<MainHost, 'ipcMain'>): void {
         const entryRel = rel ? `${rel}/${entry.name}` : entry.name;
         if (entry.isDirectory()) {
           walk(full, entryRel, depth + 1);
-        } else if (/\.(ts|js|mjs|mts)$/i.test(entry.name) && !/\.d\.ts$/i.test(entry.name)) {
-          files.push(...readCmsSource(full, entryRel, { page: false }));
+        } else if (/\.(cjs|cts|js|jsx|mjs|mts|ts|tsx)$/i.test(entry.name)) {
+          if (!/\.d\.[cm]?ts$/i.test(entry.name)) {
+            files.push(
+              ...readCmsSource(full, entryRel, {
+                page: false,
+                includeGeneralOnly: /^data\//i.test(entryRel),
+              }),
+            );
+          }
         } else if (/\.astro$/i.test(entry.name)) {
           files.push(...readCmsSource(full, entryRel, { page: true }));
         } else if (/\.json$/i.test(entry.name) && !CMS_SKIP.test(entry.name)) {

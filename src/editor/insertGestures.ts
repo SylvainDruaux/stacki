@@ -280,6 +280,17 @@ export function besidePlace(
     parent === undefined && parentId !== undefined
       ? list.length
       : Math.min(place?.index ?? list.length, list.length);
+  // A loop body and a conditional branch are code-owned lists. Their child
+  // nodes cannot safely serve as sibling anchors, because they are repeated
+  // source nodes or sit inside a JavaScript expression. Address the list's
+  // structural owner at either edge instead.
+  const structuralEdge = index === 0 || index === list.length;
+  if (structuralEdge && (parent?.kind === 'map' || parent?.kind === 'branch')) {
+    return {
+      anchorId: parent.id,
+      placement: index === 0 ? 'first-child' : 'last-child',
+    };
+  }
   // Neither a separator nor what is moving is a neighbour to stand beside.
   const standing = (node: EditorNode) => !blank(node) && !moving.has(node.id);
   const at = list.slice(index).find(standing);

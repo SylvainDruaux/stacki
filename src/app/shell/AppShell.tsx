@@ -382,6 +382,10 @@ export function PagesTab({ app }: { readonly app: ShellView }) {
 
 export function NavigatorTab({ app }: { readonly app: ShellView }) {
   const page = app.currentPage;
+  const selectNavigatorNode = (id: string | undefined): void => {
+    app.setNavigatorSelectionTick((tick) => tick + 1);
+    app.setSelectedId(id);
+  };
   return (
     <StructurePanel
       pageState={app.pageState}
@@ -394,7 +398,7 @@ export function NavigatorTab({ app }: { readonly app: ShellView }) {
       inertNodeIds={app.stateIds.inert}
       liveClassesById={app.liveClassesById ?? new Map<string, readonly string[]>()}
       revealTick={app.revealTick}
-      onSelect={app.setSelectedId}
+      onSelect={selectNavigatorNode}
       onHoverNode={app.setHoverNodeId}
       onOpenComponent={(name, id) => {
         void app.openComponent(name, app.pathFor(id)).catch(app.reportFailure);

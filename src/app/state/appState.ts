@@ -90,6 +90,9 @@ export function useCanvasReportState() {
   // `class={x}`) has no readable text in the source, so this is what lets the
   // style panel show the classes this instance resolved to.
   const [selectedClasses, setSelectedClasses] = useState<readonly string[]>([]);
+  // Navigator selection is an action even when the row is already selected:
+  // it resets a canvas-picked loop occurrence to the first rendered copy.
+  const [navigatorSelectionTick, setNavigatorSelectionTick] = useState(0);
   // Which selection the classes above describe, and a counter that lets the
   // effect below re-check the moment a report lands rather than on a timer.
   const classesForRef = useRef<string | undefined>(undefined);
@@ -130,6 +133,7 @@ export function useCanvasReportState() {
     classesForRef,
     classesTick,
     hoverNode,
+    navigatorSelectionTick,
     nodeClasses,
     nodeStates,
     renderedPaths,
@@ -138,6 +142,7 @@ export function useCanvasReportState() {
     setHoverNodeId: hoverNode.set,
     setNodeClasses,
     setNodeStates,
+    setNavigatorSelectionTick,
     setRenderedPaths,
     setSelectedClasses,
   };

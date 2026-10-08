@@ -28,8 +28,10 @@ interface PreviewPaneProps {
   readonly crumbs?: readonly PreviewCrumb[];
   readonly onCrumb?: (id: string | undefined) => void;
   readonly onRefresh?: () => void;
+  readonly onPreviewLoaded?: () => void;
   readonly onRestart?: () => void;
   readonly selPath?: string | undefined;
+  readonly navigatorSelectionTick?: number;
   readonly navHoverPath?: string | undefined;
   readonly overlayInfo?: (path: string) => OverlayInfo | undefined;
   readonly onSelectPath?: (path: string | undefined, info: { readonly outside: boolean }) => void;
@@ -95,7 +97,13 @@ function PreviewContent({
   readonly sizing: Sizing;
 }) {
   if (url && props.device === 'canvas') {
-    return <CanvasView url={url} refreshKey={props.refreshKey ?? 0} />;
+    return (
+      <CanvasView
+        url={url}
+        refreshKey={props.refreshKey ?? 0}
+        {...(props.onPreviewLoaded === undefined ? {} : { onPreviewLoaded: props.onPreviewLoaded })}
+      />
+    );
   }
   if (url) {
     return <DesignPreview props={props} url={url} runtime={runtime} sizing={sizing} />;
@@ -137,6 +145,7 @@ function DesignPreview({
             onLoad={() => {
               runtime.registerFrame();
               runtime.sendTrack();
+              props.onPreviewLoaded?.();
             }}
           />
         </div>

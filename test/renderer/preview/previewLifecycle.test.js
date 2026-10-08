@@ -90,7 +90,8 @@ test('canvas hover measures and outlines the active copy, then clears on leave',
     await render();
     assert.deepEqual(tracked.at(-1), ['0', '3', '2']);
     await measure();
-    assert.equal(document.querySelectorAll('.node-outline.hover').length, 2);
+    assert.equal(document.querySelectorAll('.node-outline.hover').length, 1);
+    assert.equal(document.querySelector('.node-outline.hover').style.top, '30px');
     props.navHoverPath = undefined;
     await render();
     assert.deepEqual(tracked.at(-1), ['0', '1', '2'], 'Canvas hover resumes after navigator hover');
@@ -103,6 +104,104 @@ test('canvas hover measures and outlines the active copy, then clears on leave',
     assert.equal(document.querySelectorAll('.node-outline.sel').length, 2);
   } finally {
     await act(() => root.unmount());
+    dom.window.close();
+  }
+});
+
+test('navigator selection uses the first loop item; canvas clicks keep their item', async () => {
+  const dom = installHoverDOM();
+  const React = require('react');
+  const { createRoot } = require('react-dom/client');
+  const { PreviewPane } = require(path.join(directory, 'preview.js'));
+  const root = createRoot(document.getElementById('root'));
+  const props = {
+    ...hoverPreviewProps(),
+    selPath: '0.1',
+    focusPath: undefined,
+    navigatorSelectionTick: 0,
+    onSelectPath() {},
+  };
+  const act = (action) =>
+    React.act(async () => {
+      await action();
+      await settle();
+    });
+  const render = () => act(() => root.render(React.createElement(PreviewPane, props)));
+  try {
+    await render();
+    const frame = document.querySelector('iframe').contentWindow;
+    const posted = [];
+    frame.postMessage = (message) => posted.push(message);
+    const send = (data) =>
+      act(() => window.dispatchEvent(new window.MessageEvent('message', { source: frame, data })));
+    const token = 'a'.repeat(64);
+    await send({ type: 'avb:render', token, stamps: [] });
+    await send({
+      type: 'avb:rects',
+      classes: {},
+      spacing: {},
+      rects: {
+        0.1: [
+          { x: 10, y: 30, w: 80, h: 40 },
+          { x: 10, y: 90, w: 80, h: 40 },
+        ],
+        0.2: [
+          { x: 20, y: 40, w: 80, h: 40 },
+          { x: 20, y: 100, w: 80, h: 40 },
+        ],
+      },
+    });
+    await send({ type: 'avb:click-node', path: '0.1', occurrence: 1, outside: false, token });
+    assert.equal(document.querySelector('.node-outline.sel').style.top, '90px');
+    props.navigatorSelectionTick += 1;
+    await render();
+    assert.equal(document.querySelectorAll('.node-outline.sel').length, 1);
+    assert.equal(document.querySelector('.node-outline.sel').style.top, '30px');
+    assert.equal(posted.filter((message) => message.type === 'avb:scroll-to').at(-1)?.occ, 0);
+    await send({ type: 'avb:click-node', path: '0.1', occurrence: 1, outside: false, token });
+    assert.equal(document.querySelector('.node-outline.sel').style.top, '90px');
+    props.selPath = '0.2';
+    props.navigatorSelectionTick += 1;
+    await render();
+    assert.equal(document.querySelector('.node-outline.sel').style.top, '40px');
+  } finally {
+    await act(() => root.unmount());
+    dom.window.close();
+  }
+});
+
+test('a loaded preview frame announces that recovery should be checked', async () => {
+  const dom = installHoverDOM();
+  const React = require('react');
+  const { createRoot } = require('react-dom/client');
+  const { PreviewPane } = require(path.join(directory, 'preview.js'));
+  const root = createRoot(document.getElementById('root'));
+  let loaded = 0;
+  const props = {
+    ...hoverPreviewProps(),
+    onPreviewLoaded: () => {
+      loaded++;
+    },
+  };
+  try {
+    await React.act(async () => {
+      root.render(React.createElement(PreviewPane, props));
+      await settle();
+    });
+    const designFrame = document.querySelector('iframe');
+    designFrame.dispatchEvent(new window.Event('load'));
+    assert.equal(loaded, 1, 'the design frame starts a recovery check');
+
+    props.device = 'canvas';
+    await React.act(async () => {
+      root.render(React.createElement(PreviewPane, props));
+      await settle();
+    });
+    const canvasFrame = document.querySelector('iframe');
+    canvasFrame.dispatchEvent(new window.Event('load'));
+    assert.equal(loaded, 2, 'a canvas overview frame starts the same recovery check');
+  } finally {
+    await React.act(async () => root.unmount());
     dom.window.close();
   }
 });

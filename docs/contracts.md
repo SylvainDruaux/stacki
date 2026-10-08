@@ -274,6 +274,16 @@ The renderer's half (`src/editor/pageEdits.ts`, `src/editor/editGestures.ts`) an
 parity suite (`test/renderer/editor/gestureParity.test.js`) are described in the tracker,
 Step 6.
 
+When a specialized visual request cannot represent valid source syntax, the
+renderer first derives `replace-node` requests for the smallest stable changed
+nodes. If no stable node contains the structural change, `replace-page` carries
+the predicted model to main. Main prints the authored and predicted models only
+as semantic witnesses, diffs those witnesses, and maps each changed hunk onto
+the authored bytes; formatting-only regions are never replaced. Ambiguous
+placement is rejected. Both fallbacks therefore remain ordinary bounded
+`rewrite-node` or `rewrite-text` intents, with the same checksum, conflict,
+undo, and parse guarantees as specialized edits.
+
 ## Code editor (step 8)
 
 The code editor saves through `page:edit` too: a `code-patch` edit carries the

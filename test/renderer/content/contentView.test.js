@@ -125,7 +125,7 @@ const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
         editable: collection.editable,
         count: countEntries(root, collection),
       })),
-      covered: coveredPaths(config.collections),
+      covered: coveredPaths(root, config.collections),
     }),
     writeContentEntry: async ({ entry, edits, body }) => writeEntry(root, entry, edits, { body }),
     validateContentEntry: async ({ collection, data }) =>

@@ -28,6 +28,7 @@ import {
   siblingsOf,
   slice,
   startsWith,
+  tagNameEnd,
   textOf,
   validProjections,
   whitespaceAfter,
@@ -572,9 +573,10 @@ function listAt(
   return first === undefined ? 'inline' : first.list;
 }
 
-// Inside a tag: beside its first or last child, or, when it has none, right
-// after its opening tag — on a line of its own, one level in, when the tag's
-// closing sits on a later line. A self-closing tag has no inside to write to.
+// Inside a tag, loop, or condition branch: beside its first or last child. An
+// empty tag writes after its opening tag; an empty branch replaces its `null`
+// placeholder. A self-closing component becomes a paired component because a
+// component with a default slot can start empty and gain its first child.
 function insertionInside(
   bytes: ByteString,
   projection: ValidProjection,
@@ -582,10 +584,10 @@ function insertionInside(
   placement: Placement,
   text: string,
 ): Result<Insertion, RejectionReason> {
-  if (parent.kind !== 'element') {
-    if (parent.kind !== 'component') {
-      return err('unsupported-operation');
-    }
+  const tag = parent.kind === 'element' || parent.kind === 'component';
+  const structure = parent.kind === 'map' || parent.kind === 'branch';
+  if (!tag && !structure) {
+    return err('unsupported-operation');
   }
   const children = childrenOf(projection, parent);
   const first = children[0];
@@ -595,15 +597,30 @@ function insertionInside(
       const beside = placement === 'first-child' ? first : last;
       const separator = separatorBefore(bytes, projection, beside);
       const anchorPath = parent.path;
+      const preserved = branchChildAsMarkup(bytes, parent, beside);
+      if (preserved !== undefined) {
+        if (placement !== 'first-child') {
+          return err('unsupported-operation');
+        }
+        return ok({ range: beside.span, text: `${text}${separator}${preserved}`, anchorPath });
+      }
       if (placement === 'first-child') {
         return ok({ range: point(first.span.start), text: `${text}${separator}`, anchorPath });
       }
       return ok({ range: point(last.span.end), text: `${separator}${text}`, anchorPath });
     }
   }
+  if (parent.kind === 'branch') {
+    return ok({ range: parent.span, text, anchorPath: parent.path });
+  }
+  if (!tag) {
+    return err('unsupported-operation');
+  }
   const open = openTagEnd(bytes, parent);
   if (open.selfClosing) {
-    return err('unsupported-operation');
+    return parent.kind === 'component'
+      ? ok(insertionIntoSelfClosingComponent(bytes, parent, open.end, text))
+      : err('unsupported-operation');
   }
   const close = closeTagStart(bytes, parent, open.end);
   if (close === undefined) {
@@ -612,6 +629,61 @@ function insertionInside(
   const lined = containsNewline(bytes, toByteSpan(open.end, close));
   const lead = lined ? `\n${lineIndent(bytes, parent.span.start)}  ` : '';
   return ok({ range: point(open.end), text: `${lead}${text}`, anchorPath: parent.path });
+}
+
+function insertionIntoSelfClosingComponent(
+  bytes: ByteString,
+  parent: ProjectedNode,
+  openEnd: number,
+  text: string,
+): Insertion {
+  assert(parent.kind === 'component', 'A paired conversion starts from a component');
+  const slash = openEnd - 2;
+  assert(bytes[slash] === 0x2f, 'A self-closing component ends in a slash');
+  const nameSpan = toByteSpan(parent.span.start + 1, tagNameEnd(bytes, parent));
+  const name = textOf(bytes, nameSpan);
+  assert(name.length > 0, 'A component has a written tag name');
+  const range = toByteSpan(selfClosingTailStart(bytes, slash), openEnd);
+  return {
+    range,
+    text: `>${text}</${name}>`,
+    anchorPath: parent.path,
+  };
+}
+
+// On one line, remove the cosmetic space before `/>`; on a line of its own,
+// preserve indentation so the closing bracket stays aligned with the tag.
+function selfClosingTailStart(bytes: ByteString, slash: number): number {
+  let start = slash;
+  while (start > 0) {
+    const previous = bytes[start - 1];
+    assert(previous !== undefined, 'The self-closing tail lies inside the bytes');
+    if (previous !== 0x20 && previous !== 0x09) {
+      break;
+    }
+    start--;
+  }
+  return bytes[start - 1] === NEWLINE ? slash : start;
+}
+
+// A value or nested condition is code while it is the branch's only child.
+// Once markup stands beside it, braces are what keep that code an Astro
+// expression instead of turning its tokens into text nodes.
+function branchChildAsMarkup(
+  bytes: ByteString,
+  parent: ProjectedNode,
+  child: ProjectedNode,
+): string | undefined {
+  if (parent.kind !== 'branch') {
+    return undefined;
+  }
+  if (child.kind !== 'cond' && child.kind !== 'expr') {
+    return undefined;
+  }
+  assert(parent.span.start <= child.span.start, 'A branch child starts inside its branch');
+  assert(child.span.end <= parent.span.end, 'A branch child ends inside its branch');
+  const source = textOf(bytes, child.span);
+  return source.startsWith('{') ? source : `{${source}}`;
 }
 
 // How the node is set apart from what precedes it: the whitespace run between

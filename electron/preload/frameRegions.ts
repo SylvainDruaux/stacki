@@ -444,6 +444,29 @@ export const elementsWithPath = (nodePath: string): Element[] => {
   );
 };
 
+// A source class edit changes every rendering of that node, including loop
+// copies outside the focused instance. Measurement still uses the focused set.
+export const allElementsWithPath = (nodePath: string, countMax: number): Element[] | undefined => {
+  const all: Element[] = [];
+  const tagged = document.querySelectorAll(`[${PATH_ATTR}]`);
+  for (let index = 0; index < tagged.length; index += 1) {
+    const element = tagged.item(index);
+    if (!element) {
+      continue;
+    }
+    if (!pathsOf(element).includes(nodePath)) {
+      continue;
+    }
+    all.push(element);
+    if (all.length > countMax) {
+      return undefined;
+    }
+  }
+  return all.filter(
+    (element) => !all.some((other) => other !== element && other.contains(element)),
+  );
+};
+
 // The path a node marks, or undefined when it isn't a marker. `kind` is 's'/'e'.
 const markerPath = (node: Node, kind: 's' | 'e'): string | undefined => {
   if (isComment(node)) {

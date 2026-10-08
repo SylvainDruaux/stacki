@@ -500,7 +500,10 @@ function countEntries(projectPath: string, collection: ContentCollection): numbe
  * schema, not as loose JSON, so the file-based editor leaves them alone rather
  * than offering a second way in with different rules.
  */
-function coveredPaths(collections: readonly ContentCollection[]): {
+function coveredPaths(
+  projectPath: string,
+  collections: readonly ContentCollection[],
+): {
   files: string[];
   dirs: string[];
 } {
@@ -512,10 +515,35 @@ function coveredPaths(collections: readonly ContentCollection[]): {
       files.push(toPosix(loader.file).replace(/^\.\//, ''));
     }
     if (loader.kind === 'glob' && loader.base) {
-      directories.push(toPosix(loader.base).replace(/^\.\//, '').replace(/\/$/, ''));
+      const base = toPosix(loader.base).replace(/^\.\//, '').replace(/\/$/, '');
+      // src/data commonly mixes content-collection entries with imported TS
+      // modules and loose data files. Only the files matching this collection's
+      // pattern are owned by it; hiding the whole directory made every sibling
+      // disappear from the file-based CMS.
+      if (isDataDirectory(base)) {
+        const root = path.resolve(projectPath, base);
+        const matchers = patternsOf(loader.pattern);
+        for (const relative of walkFiles(root)) {
+          if (matchers.some((matcher) => matcher.test(relative))) {
+            files.push(toPosix(path.relative(projectPath, path.join(root, relative))));
+          }
+        }
+      } else {
+        directories.push(base);
+      }
     }
   }
-  return { files, dirs: directories };
+  return {
+    files: [...new Set(files)].sort(),
+    dirs: [...new Set(directories)].sort(),
+  };
+}
+
+function isDataDirectory(directory: string): boolean {
+  if (directory === 'src/data') {
+    return true;
+  }
+  return directory.startsWith('src/data/');
 }
 
 export {

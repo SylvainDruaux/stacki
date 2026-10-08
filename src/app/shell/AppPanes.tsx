@@ -43,12 +43,14 @@ export function CanvasPane({ app }: { readonly app: ShellView }) {
       crumbs={app.crumbs}
       onCrumb={(id) => app.setSelectedId(id)}
       onRefresh={() => app.setRefreshKey((count) => count + 1)}
+      onPreviewLoaded={app.previewLoaded}
       onRestart={() => {
         // Starting the dev server reports its own failure in the preview area.
         void app.startPreview(app.project.path);
       }}
       pathScope={app.editedRel ? `${app.editedRel}|` : ''}
       selPath={app.pathFor(app.selectedId)}
+      navigatorSelectionTick={app.navigatorSelectionTick}
       navHoverPath={app.pathFor(hoverNodeId)}
       overlayInfo={app.overlayInfo}
       focusPath={app.focusPath}
@@ -282,7 +284,7 @@ export function StyleTab({ app }: { readonly app: ShellView }) {
       onRecordUndo={app.pushCommand}
       onAddClass={(name) =>
         selectedId
-          ? app.addClassToNode(selectedId, name)
+          ? app.addClassToNode(selectedId, name, app.pathFor(selectedId))
           : Promise.resolve({ tag: 'refused', message: 'no element is selected' })
       }
       onSpacingHover={app.setSpacingHover}
@@ -348,10 +350,11 @@ export function settingsHandlers(app: ShellView) {
     },
     onSetProp: (propName: string, value: Attr | undefined, immediate?: boolean) => {
       if (selectedId) {
-        app.setProp(selectedId, propName, value, immediate);
+        app.setProp(selectedId, propName, value, immediate, app.pathFor(selectedId));
       }
     },
-    onSetProps: (nodeId: string, patch: PropValues) => app.setProps(nodeId, patch),
+    onSetProps: (nodeId: string, patch: PropValues) =>
+      app.setProps(nodeId, patch, true, app.pathFor(nodeId)),
     onSetAssetProp: (nodeId: string, propName: string, picked: PickedAsset) => {
       void app.setAssetProp(nodeId, propName, picked).catch(app.reportFailure);
     },

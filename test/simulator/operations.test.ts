@@ -240,16 +240,75 @@ test('insert-node beside a node copies its separator; inside, it fills an empty 
     insert('last-child', [0]),
     '<ul>\n  <li>a</li>\n  <li>b</li>\n  <li>n</li>\n</ul>\n',
   );
-  const empty = snapshotText('<div>\n</div>\n<aside></aside>\n<hr />\n');
+  const empty = snapshotText('<div>\n</div>\n<aside></aside>\n<hr />\n<Wrapper />\n');
   const into = (at: readonly number[]) =>
     run(
       empty,
       { tag: 'insert-node', placement: 'first-child', source: '<p>x</p>' },
       anchorAt(empty, at),
     );
-  assert.equal(into([0]), '<div>\n  <p>x</p>\n</div>\n<aside></aside>\n<hr />\n');
-  assert.equal(into([1]), '<div>\n</div>\n<aside><p>x</p></aside>\n<hr />\n');
+  assert.equal(into([0]), '<div>\n  <p>x</p>\n</div>\n<aside></aside>\n<hr />\n<Wrapper />\n');
+  assert.equal(into([1]), '<div>\n</div>\n<aside><p>x</p></aside>\n<hr />\n<Wrapper />\n');
   assert.equal(into([2]), 'rejected: unsupported-operation', 'a self-closing tag has no inside');
+  assert.equal(
+    into([3]),
+    '<div>\n</div>\n<aside></aside>\n<hr />\n<Wrapper><p>x</p></Wrapper>\n',
+    'a self-closing component opens when it gains its first child',
+  );
+});
+
+test('insert-node adds children inside loops and conditional branches', () => {
+  const loop = snapshotText('{items.map((item) => (\n  <p>{item}</p>\n))}\n');
+  assert.equal(
+    run(
+      loop,
+      { tag: 'insert-node', placement: 'last-child', source: '<div>new</div>' },
+      anchorAt(loop, [0]),
+    ),
+    '{items.map((item) => (\n  <p>{item}</p>\n  <div>new</div>\n))}\n',
+  );
+
+  const bareLoop = snapshotText('{items.map((item) => <p>{item}</p>)}\n');
+  assert.equal(
+    run(
+      bareLoop,
+      { tag: 'insert-node', placement: 'last-child', source: '<div>new</div>' },
+      anchorAt(bareLoop, [0]),
+    ),
+    '{items.map((item) => <p>{item}</p> <div>new</div>)}\n',
+  );
+
+  const condition = snapshotText('{ready && (\n  <p>one</p>\n)}\n');
+  assert.equal(
+    run(
+      condition,
+      { tag: 'insert-node', placement: 'last-child', source: '<div>new</div>' },
+      anchorAt(condition, [0, 0]),
+    ),
+    '{ready && (\n  <p>one</p>\n  <div>new</div>\n)}\n',
+  );
+
+  const nested = snapshotText(
+    '{outer ? <em>yes</em> : inner ? <strong>maybe</strong> : <span>no</span>}\n',
+  );
+  assert.equal(
+    run(
+      nested,
+      { tag: 'insert-node', placement: 'first-child', source: '<p>new</p>' },
+      anchorAt(nested, [0, 1]),
+    ),
+    '{outer ? <em>yes</em> : <p>new</p>{inner ? <strong>maybe</strong> : ' + '<span>no</span>}}\n',
+  );
+
+  const value = snapshotText('{outer ? <em>yes</em> : label}\n');
+  assert.equal(
+    run(
+      value,
+      { tag: 'insert-node', placement: 'first-child', source: '<p>new</p>' },
+      anchorAt(value, [0, 1]),
+    ),
+    '{outer ? <em>yes</em> : <p>new</p>{label}}\n',
+  );
 });
 
 test('move-node relocates the original bytes; into itself is refused', () => {
@@ -273,6 +332,21 @@ test('move-node relocates the original bytes; into itself is refused', () => {
     '<ul>\n  <li>b</li>\n</ul>\n<ol><li class="a">a</li></ol>\n',
   );
   assert.equal(move([0], [0, 0], 'after'), 'rejected: unsupported-operation');
+
+  const selfClosing = snapshotText('<Button />\n<ButtonWrapper />\n');
+  assert.equal(
+    run(
+      selfClosing,
+      {
+        tag: 'move-node',
+        destination: anchorAt(selfClosing, [1]),
+        placement: 'first-child',
+      },
+      anchorAt(selfClosing, [0]),
+    ),
+    '<ButtonWrapper><Button /></ButtonWrapper>\n',
+    'a child can move into a self-closing component instance',
+  );
 });
 
 test('attribute operations keep every byte they do not own', () => {

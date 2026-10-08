@@ -10,7 +10,7 @@ import { LIMITS } from '../../../shared/core/limits';
 import { assert } from '../../../shared/core/assert';
 import { scanContainsFile } from '../../editor/pagePersistence';
 import { createCoalescedRun } from '../../lib/coalescedRun';
-import { nodeRefIn, type EditGesture, type EditsRecord } from '../../editor/pageEdits';
+import { type EditGesture, type EditsRecord } from '../../editor/pageEdits';
 import {
   saveStateAccepted,
   saveStateBase,
@@ -29,6 +29,8 @@ import {
 } from '../../editor/pageState';
 import { type EditorModel } from '../../editor/pageView';
 import { onFilesChanged } from '../../ipc/appBridge';
+import { tellCanvas } from '../../editor/canvasQuery';
+import { onWindowReturn } from '../../lib/windowReturn';
 import { reviewedSource, saveDelay } from '../model/nodeFactory';
 import { effective } from '../model/pageGestures';
 import { revertedSteps, reloadChangedPage } from '../model/appKeys';
@@ -509,34 +511,32 @@ export function useCommitEdit(
   // A gesture (step 9: every gesture has an intent form, editGestures.ts): its
   // effect shows at once, and it is queued to go to disk as edit requests,
   // stated when sent against the page the app's last reply left — so a node a
-  // gesture just created is there to name. A Markdown or MDX page saves its
-  // whole model until step 10. Past the queue's bound a gesture is refused,
-  // never queued (plan §8); one the engine cannot reach at all (a node another
-  // file holds) is refused before it shows.
+  // gesture just created is there to name. A request the specialized editor
+  // cannot state still queues: pageEdits derives a minimal node rewrite from
+  // the gesture's model effect. Past the queue's bound a gesture is refused,
+  // never queued (plan §8).
   const commitEdit = useCallback(
-    (gesture: EditGesture) => {
+    (gesture: EditGesture): boolean => {
       if (propertySave.saving.current) {
-        return;
+        return false;
       }
       const { currentPage, pageState: state } = pageStateRef.current;
       const path = currentPage?.path;
       if (!path || !state?.editable || typedCodeUnparsed()) {
-        return;
+        return false;
       }
       // Every page's gestures are edit requests (step 10: Markdown and MDX
       // too). Without an origin — typed code made the page parse and is not
       // saved yet — no node can be named until that save replies.
       const origin = state.origin;
-      const unreachable =
-        origin === undefined || gesture.request((id) => nodeRefIn(origin, id)) === undefined;
-      if (editDrafts.empty(path) && unreachable) {
-        // Nothing queued could have made its node: it is out of reach.
-        showToast('That edit can’t be made visually here — edit it in the code panel.', 'error');
-        return;
+      if (editDrafts.empty(path) && origin === undefined) {
+        // Typed code has not established source references for visual edits yet.
+        showToast('Wait for the current code change to finish saving, then try again.', 'info');
+        return false;
       }
       if (editDrafts.entries(path).length >= LIMITS.intentsPendingMax) {
         showToast('Too many edits are waiting to be saved — try again in a moment.', 'error');
-        return;
+        return false;
       }
       const record = pushEditHistory(gesture.coalesceKey);
       const queued = editDrafts.addGesture(path, gesture, record);
@@ -547,6 +547,7 @@ export function useCommitEdit(
           : current,
       );
       scheduleSave(gesture.urgency);
+      return true;
     },
     [
       scheduleSave,
@@ -719,33 +720,32 @@ export function useFileEvents(
       // Chunk .html files feed the open page's Fragment subtrees — treat a
       // change to any of them like a change to the page itself.
       const chunk = [...files].some((file) => file.toLowerCase().endsWith('.html'));
-      if (!files.has(page.path) && !chunk) {
+      if (!files.has(page.path) && !chunk && files.size > 0) {
         return;
       }
       // Current page deleted externally.
       if (!scanContainsFile(scanResult, page.path)) {
-        pageLoadRef.current = {};
-        setCurrentPage(undefined);
-        setPageState(undefined);
-        setSelectedId(undefined);
+        clearDeletedOpenPage({ pageLoadRef, setCurrentPage, setPageState, setSelectedId });
         return;
       }
-      if (!state) {
+      if (!state || (files.size === 0 && state.save.tag !== 'clean')) {
         return;
       }
       const reload = { pageStateRef, surfaceOutsideEdit, setPageState, dropPageHistory };
       await reloadChangedPage(reload, { path: page.path, state, chunk }, () => closed);
     });
-    const off = onFilesChanged(({ files }) => {
-      for (const file of files) {
-        pendingFiles.add(file);
-      }
-      // A reconcile gives up quietly on a read that fails; the next event retries it.
-      void reconcile.request();
-    });
+    const off = onFilesChanged(({ files }) =>
+      queueExternalFiles(files, pendingFiles, reconcile.request),
+    );
+    const offFocus = watchExternalFilesOnReturn(
+      { projectRef, pageStateRef },
+      pendingFiles,
+      reconcile.request,
+    );
     return () => {
       closed = true;
       off();
+      offFocus();
     };
   }, [
     rescan,
@@ -758,4 +758,46 @@ export function useFileEvents(
     setPageState,
     setSelectedId,
   ]);
+}
+
+function watchExternalFilesOnReturn(
+  state: Pick<ReturnType<typeof useCoreState>, 'projectRef' | 'pageStateRef'>,
+  pendingFiles: Set<string>,
+  request: () => Promise<void>,
+): () => void {
+  return onWindowReturn(() => {
+    if (!state.projectRef.current) {
+      return;
+    }
+    // A missed filesystem event must not leave the app stale after returning
+    // from an editor. The checksum check keeps unchanged pages intact.
+    const snapshot = state.pageStateRef.current;
+    if (snapshot.pageState?.save.tag === 'clean' && snapshot.currentPage?.path) {
+      pendingFiles.add(snapshot.currentPage.path);
+      void request();
+    }
+    tellCanvas({ type: 'avb:patch-now' });
+  });
+}
+
+function queueExternalFiles(
+  files: readonly string[],
+  pendingFiles: Set<string>,
+  request: () => Promise<void>,
+): void {
+  for (const file of files) {
+    pendingFiles.add(file);
+  }
+  // A reconcile gives up quietly on a failed read; the next event retries it.
+  void request();
+}
+
+function clearDeletedOpenPage(
+  context: Pick<ReturnType<typeof useLifecycle>, 'pageLoadRef'> &
+    Pick<ReturnType<typeof useCoreState>, 'setCurrentPage' | 'setPageState' | 'setSelectedId'>,
+): void {
+  context.pageLoadRef.current = {};
+  context.setCurrentPage(undefined);
+  context.setPageState(undefined);
+  context.setSelectedId(undefined);
 }

@@ -10,6 +10,7 @@ import { LIMITS } from '../core/limits';
 import type { CandidatePolicy, Plan, Splice } from './planner';
 import {
   nodeEditable,
+  nodeRewriteable,
   nodeUnchanged,
   resolveTarget,
   sameSpan,
@@ -83,7 +84,7 @@ export function planRewriteNode(
     return resolved;
   }
   const target = resolved.value;
-  if (!nodeEditable(target.current)) {
+  if (!nodeRewriteable(target.current)) {
     return err('unsupported-operation');
   }
   if (!nodeUnchanged(context, target)) {

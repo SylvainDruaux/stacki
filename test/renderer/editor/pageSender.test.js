@@ -176,8 +176,8 @@ test('a gesture the engine cannot plan is taken back and said, never saved other
     coalesceKey: undefined,
     urgency: true,
     stream: undefined,
-    request: () => undefined, // Its node is another file's: nothing to state.
-    apply: (model) => ({ ...model, nodes: [] }),
+    request: () => undefined, // No request and no model change: nothing to state.
+    apply: (model) => model,
   };
   queue.addGesture(PATH, unplannable, record);
   box.state = { ...box.state, model: unplannable.apply(box.state.model) };

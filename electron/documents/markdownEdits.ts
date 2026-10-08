@@ -82,6 +82,8 @@ export function markdownEditDraft(edit: Edit, authored: Authored): Drafted {
       return appendDraft(authored, edit.nodes);
     case 'set-frontmatter':
       return frontmatterDraft(authored, edit.model.extraFrontmatter);
+    case 'replace-page':
+      return undefined; // Astro's full-model fallback does not serialize Markdown syntax.
     case 'remove-node':
     case 'move-node':
     case 'rename-binding':

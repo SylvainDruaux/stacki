@@ -1,6 +1,7 @@
 import { findWithParent } from './treeSelection';
 import type { TreeView } from './treeView';
 import { LIMITS } from '../../shared/core/limits';
+import { thenBranch } from './branches';
 interface Insertable {
   readonly name: string;
   readonly slots?: readonly string[];
@@ -79,7 +80,8 @@ export function acceptsChildren(
     // insert alongside instead of inside.
     return childTag ? canContainTag(tag, childTag) : true;
   }
-  // A condition holds nothing itself — its branches do.
+  // A condition holds nothing itself — insertTargetFor resolves it to the
+  // branch its row displays.
   if (node.kind === 'map' || node.kind === 'chunk-group' || node.kind === 'branch') {
     return true;
   }
@@ -115,8 +117,9 @@ export function insertTargetFor(
   const accepts = (node: TreeView) => acceptsChildren(node, childTag, insertables);
   if (selectedId && selectedId !== 'frontmatter') {
     const selected = findNode(model.nodes, selectedId);
-    if (selected && accepts(selected)) {
-      return { parentId: selected.id, index: selected.children?.length ?? 0 };
+    const host = selected?.kind === 'cond' ? thenBranch(selected) : selected;
+    if (host && accepts(host)) {
+      return { parentId: host.id, index: host.children?.length ?? 0 };
     }
     // Otherwise drop in as a sibling — climbing out of any ancestor that
     // can't legally hold it either (a <div> next to a <span> inside a <p>

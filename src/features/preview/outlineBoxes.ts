@@ -76,10 +76,9 @@ export function outlineBoxPath(path: string, nodeKind: string | undefined): stri
  * alone made every other card in the loop unhoverable. It takes the same copy
  * of it too.
  *
- * No occurrence on either side means the node rather than one copy of it, and
- * the node is every copy: a hover from the navigator is about the selection
- * whichever copy is selected, and a selection from the navigator — which
- * outlines all of them — already covers whichever copy is hovered.
+ * No occurrence on either side means the node rather than one copy of it.
+ * Navigator hover and selection supply occurrence zero; this fallback still
+ * handles a selection before a particular occurrence is known.
  */
 export function hoverIsSelection(
   hover: Occurrence | undefined,
@@ -106,15 +105,12 @@ export function hoverIsSelection(
  *
  * A loop renders one path many times, and which copy you are looking at is
  * carried beside the path as an occurrence — the path itself is identical for
- * every copy. A selection made from the canvas says which copy it means; any
- * other route means "the node", which is every copy of it.
+ * every copy. A selection made from the canvas says which copy it means.
+ * Navigator selection explicitly resets to the first copy.
  *
- * That is right for a jump across the tree and wrong for a step within it.
- * Pressing ↑ from the second link in a list selects its parent — and the parent
- * of the SECOND one, which is the copy the reader is looking at. Stepping down
- * into a child, or across to a sibling, is the same move. So a step to an
- * ancestor, a descendant or a sibling keeps the copy; anything further away
- * starts again at the first.
+ * A nearby selection from another surface (for example, the code panel) keeps
+ * the clicked copy across an ancestor, descendant, or sibling. A farther jump
+ * starts again at the first. Navigator actions override this proximity rule.
  *
  * Paths are index trails, so all three are answered by comparing them. A path
  * carrying a file namespace (`src/Card.astro|0.1`) belongs to that file: a step
