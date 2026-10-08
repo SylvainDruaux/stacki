@@ -192,6 +192,12 @@ export function SelectRow<T extends string>({
       aria-selected={selected}
       data-active={active || undefined}
       onMouseEnter={onActivate}
+      onPointerDown={(event) => {
+        if (event.pointerType === 'mouse' && event.button === 0) {
+          event.preventDefault();
+          onChoose();
+        }
+      }}
       onClick={onChoose}
     >
       <span className="u-select-check" aria-hidden="true">
@@ -234,6 +240,7 @@ export function RowAction({
       // pointer (and by name from a screen reader), not by tabbing
       // out of the list mid-navigation.
       tabIndex={-1}
+      onPointerDown={(event) => event.stopPropagation()}
       // The menu closes on an outside pointerdown and picks on click;
       // this row is inside it, so only the click needs stopping — and
       // it has to stop before `choose` runs, or acting on an option

@@ -601,19 +601,27 @@ export function useApplyResolve(
 
   // The cheap part — resolve the selected element against cached content.
   const applyResolve = useCallback(
-    async (element: unknown, content: Content, seq: number, silent = false) => {
-      // Ask the rendered page first — it knows what components render and what
-      // classes ran at runtime; the source tree can't see either. One question
-      // covers both halves (identity + which selectors match), so the chips wait
-      // out a single round trip rather than two back to back.
-      const asked = await askCanvasAbout(serializeElementId(element), content.rules);
+    async (
+      element: unknown,
+      content: Content,
+      seq: number,
+      options: { readonly silent?: boolean; readonly sourceOnly?: boolean } = {},
+    ) => {
+      // Source-known selectors show first when a cached scan is available.
+      // The rendered page then supplies component markup, runtime classes and
+      // exact DOM matches in one round trip rather than two back to back.
+      const asked = options.sourceOnly
+        ? ({ kind: 'unasked' } as const)
+        : await askCanvasAbout(serializeElementId(element), content.rules);
       const { target, rootSnapshot } = await resolveTarget(element, content.scan, asked);
       if (seq !== seqRef.current) {
         return;
       }
       targetRef.current = target;
       await primeDomMatches(target, content.rules, asked);
-      primedRef.current = { target, key: selectorKeyOf(content.rules) };
+      if (!options.sourceOnly) {
+        primedRef.current = { target, key: selectorKeyOf(content.rules) };
+      }
       const model = await computeRuleModel(content.rules, target);
       if (seq !== seqRef.current) {
         return;
@@ -632,7 +640,7 @@ export function useApplyResolve(
       setScan(scanStateFor(content, { rootSnapshot, model }, pageDocsRef.current.length));
       setPhase('ready');
       setScanningMore(!!content.partial);
-      if (!silent) {
+      if (!options.silent) {
         setStatus(resolveStatus(content, model));
       }
     },

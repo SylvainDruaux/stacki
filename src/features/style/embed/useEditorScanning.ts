@@ -17,6 +17,7 @@ import {
   primeDomMatches,
   scanHasElement,
   serializeElementId,
+  scanPage,
   webflowApi,
 } from '../model/webflow';
 import type { ElementSnapshot } from '../model/styleTypes';
@@ -34,6 +35,7 @@ import {
   snapshotSignature,
   nativeSignature,
   authoredClasses,
+  contentForCurrentTree,
 } from './editorModel';
 import {
   useEditorRefs,
@@ -75,7 +77,7 @@ export function useBackgroundRefresh(
         const content = await rebuildAndStore();
         const element = selectedRef.current;
         if (element && scanHasElement(content.scan, element)) {
-          await applyResolve(element, content, seqRef.current, true);
+          await applyResolve(element, content, seqRef.current, { silent: true });
         }
       } catch {
         // Background failures are non-fatal — the cached view stays usable.
@@ -245,7 +247,9 @@ export function useElementReset(
       // scan takes. Blank them now: an empty well for a moment is honest,
       // another element's selectors are not. A cached native model comes
       // straight back in the identity effect, so that case barely blinks.
-      setScan((previous) => (previous ? { ...previous, model: EMPTY_RULE_MODEL } : previous));
+      setScan((previous) =>
+        previous ? { ...previous, rootSnapshot: undefined, model: EMPTY_RULE_MODEL } : previous,
+      );
       setNativeModel(undefined);
       nativeModelRef.current = undefined;
       nativeIdentityRef.current = '';
@@ -347,21 +351,25 @@ export function useScanSelection(
     async (element: unknown, seq: number, options: { force?: boolean }) => {
       // Read a fast snapshot (tag + classes) straight off the element so the chips
       // render right away, before the (slower) embed scan produces the full model.
-      void buildSnapshot(element)
-        .then((snap) => {
-          if (seq === seqRef.current) {
-            setQuickSnapshot(snap);
-          }
-        })
-        .catch(() => {});
+      showSourceSnapshot(element, seq, seqRef, setQuickSnapshot);
 
       const cached = contentRef.current;
-      const canReuse =
-        !options.force && cached !== undefined && scanHasElement(cached.scan, element);
+      const reusable = await reuseSelectedContent(cached, element, options);
+      if (seq !== seqRef.current) {
+        return;
+      }
+      if (reusable && reusable !== cached) {
+        contentRef.current = reusable;
+      }
 
-      if (canReuse && cached) {
-        // Instant: re-match against cached content, then refresh in the background.
-        await applyResolve(element, cached, seq);
+      if (reusable) {
+        // Source-known selectors can show before the new node exists in the
+        // canvas. The later DOM answer corrects dynamic classes and selectors.
+        await applyResolve(element, reusable, seq, { sourceOnly: true });
+        if (seq !== seqRef.current) {
+          return;
+        }
+        await applyResolve(element, reusable, seq);
         void backgroundRefresh();
         return;
       }
@@ -402,6 +410,37 @@ export function useScanSelection(
     ],
   );
   return { scanSelection };
+}
+
+function showSourceSnapshot(
+  element: unknown,
+  seq: number,
+  seqRef: { readonly current: number },
+  publish: (snapshot: ElementSnapshot) => void,
+): void {
+  void buildSnapshot(element)
+    .then((snapshot) => {
+      if (seq === seqRef.current) {
+        publish(snapshot);
+      }
+    })
+    .catch(() => {});
+}
+
+async function reuseSelectedContent(
+  cached: Content | undefined,
+  element: unknown,
+  options: { readonly force?: boolean },
+): Promise<Content | undefined> {
+  if (!cached || options.force) {
+    return undefined;
+  }
+  if (cached.scan.elementByKey.get(serializeElementId(element)) === element) {
+    return cached;
+  }
+  // A new sibling does not change the CSS, but it does need fresh ancestry
+  // before the source matcher can find the rules that already style it.
+  return contentForCurrentTree(cached, await scanPage(), element);
 }
 
 // Resolve a selection, counting the passes still in flight.

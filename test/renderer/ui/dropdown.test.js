@@ -265,7 +265,7 @@ const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
             relatedTarget: dom.window.document.body,
           }),
         );
-        await settle(20);
+        await settle(120);
       });
 
     await hover('play');
@@ -297,6 +297,29 @@ const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
       await settle(20);
     });
     check('a pick nobody hovered is applied', applied.join() === 'play,pause', applied.join());
+
+    // Pointer entry and press can happen before the hover preview starts. The
+    // press must commit once, and the canceled preview must not write afterward.
+    await show('main');
+    await act(async () => {
+      find('.dd-trigger').click();
+      await settle(20);
+    });
+    await act(async () => {
+      const row = option('play');
+      row.dispatchEvent(
+        new dom.window.MouseEvent('mouseover', {
+          bubbles: true,
+          relatedTarget: dom.window.document.body,
+        }),
+      );
+      const down = new dom.window.MouseEvent('pointerdown', { bubbles: true, button: 0 });
+      Object.defineProperty(down, 'pointerType', { value: 'mouse' });
+      row.dispatchEvent(down);
+      await settle(150);
+    });
+    check('a quick press commits the option', applied.join() === 'play,pause,play');
+    check('and the quick press closes the popup', !find('.dd-popup'));
 
     // The canvas is an iframe, so clicking it blurs the parent window without
     // delivering a mousedown to the dropdown's document listener.

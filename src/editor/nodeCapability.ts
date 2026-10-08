@@ -2,8 +2,7 @@
 // step 7). The engine classifies projected nodes (shared/page/sourceProjection.ts);
 // the renderer holds the same parse as a page tree, so it asks the same
 // function the same question — one classification, not a second opinion. A node
-// the engine would refuse says so beside its panels instead of looking
-// editable and saving some other way.
+// the engine would refuse is classified the same way in either view.
 import { assert } from '../../shared/core/assert';
 import type { Capability } from '../../shared/page/capability';
 import type { EditorModel, EditorNode } from './pageView';
@@ -32,24 +31,6 @@ export function nodeCapability(model: EditorModel, nodeId: string): Capability |
     'A node inside a loop classifies as repeated',
   );
   return capability;
-}
-
-/** Whether the panels should show the capability beside the selection: every
- * capability but plain `editable` changes what an edit means or where it goes. */
-export function capabilityNeedsNotice(capability: Capability): boolean {
-  switch (capability) {
-    case 'editable':
-      return false;
-    case 'repeated-source-node':
-    case 'read-only-opaque':
-    case 'runtime-aggregate':
-    case 'unsupported':
-      return true;
-    default: {
-      const exhaustive: never = capability;
-      return exhaustive;
-    }
-  }
 }
 
 interface Found {

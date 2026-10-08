@@ -120,6 +120,37 @@ test('an applied gesture: the page is the reply, clean, with every handle carrie
   assert.equal(record.outcome.tag, 'applied');
 });
 
+test('a confirmed discrete edit cues the canvas after disk changes', async () => {
+  const seen = [];
+  const { disk, box, queue, send } = harness(PAGE, {
+    onAppliedUrgentEdit: () => seen.push(disk.text),
+  });
+  const heading = box.state.model.nodes[0].children[0];
+  const clone = { ...heading, id: `g${'a'.repeat(32)}` };
+  const duplicate = editGestures.duplicateGesture(heading.id, clone, { urgency: true });
+  queue.addGesture(PATH, duplicate, step());
+  box.state = { ...box.state, model: duplicate.apply(box.state.model) };
+  assert.deepEqual(await send(PATH, queue.shift(PATH)), { tag: 'sent' });
+  assert.equal(seen.length, 1);
+  assert.match(seen[0], /<h1 class="t">Title<\/h1>[\s\S]*<h1 class="t">Title<\/h1>/);
+
+  const remove = editGestures.removalGesture([clone.id], { urgency: true });
+  queue.addGesture(PATH, remove, step());
+  box.state = { ...box.state, model: remove.apply(box.state.model) };
+  assert.deepEqual(await send(PATH, queue.shift(PATH)), { tag: 'sent' });
+  assert.equal(seen.length, 2);
+  assert.equal(disk.text, PAGE);
+
+  const retitle = editGestures.propsGesture(heading.id, titled('later'), {
+    coalesceKey: undefined,
+    urgency: false,
+  });
+  queue.addGesture(PATH, retitle, step());
+  box.state = { ...box.state, model: retitle.apply(box.state.model) };
+  assert.deepEqual(await send(PATH, queue.shift(PATH)), { tag: 'sent' });
+  assert.equal(seen.length, 2, 'batched typing still relies on HMR');
+});
+
 test('with more queued, only the origin moves on; the model shows the newer edit', async () => {
   const { disk, box, queue, send } = harness(PAGE);
   const [heading, paragraph] = box.state.model.nodes[0].children;
@@ -159,7 +190,12 @@ test('a gesture the engine cannot plan is taken back and said, never saved other
 });
 
 test('refused over changed bytes: the conflict notice with the reason', async () => {
-  const { disk, box, queue, send } = harness(PAGE);
+  let previewCues = 0;
+  const { disk, box, queue, send } = harness(PAGE, {
+    onAppliedUrgentEdit: () => {
+      previewCues += 1;
+    },
+  });
   const heading = box.state.model.nodes[0].children[0];
   const options = { coalesceKey: undefined, urgency: true };
   const untitle = editGestures.propsGesture(heading.id, { title: undefined }, options);
@@ -169,6 +205,7 @@ test('refused over changed bytes: the conflict notice with the reason', async ()
   assert.deepEqual(box.conflicts, ['region-externally-modified']);
   assert.equal(box.state.save.tag, 'conflicted');
   assert.equal(box.state.save.diskChecksum, sha256(disk.text));
+  assert.equal(previewCues, 0, 'a refused edit cannot announce a new preview');
 });
 
 test('a write that may have landed is never sent again blind: the disk decides', async () => {

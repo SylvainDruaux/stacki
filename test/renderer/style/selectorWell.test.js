@@ -488,10 +488,9 @@ const contrastRatio = (first, second) => {
 
   // --- and on the next element, with the stylesheets already read -----------
   //
-  // The other wait: picking another element re-uses the scanned stylesheets, so
-  // nothing is re-read and the panel never re-enters its scanning phase. What it
-  // waits on is the canvas answering what the element really renders as. A frame
-  // that never answers stands in for a busy one (the ask gives up after ~1.5s).
+  // Source-known classes can show from the scanned CSS while the canvas is
+  // still answering what the element actually renders as. A frame that never
+  // answers stands in for a busy one (the ask gives up after ~1.5s).
   setCanvasFrame({ postMessage() {} });
   setHost({ selectedId: 'n2' }); // same nodes — only the selection moves, as in the app
   await wait(120);
@@ -500,11 +499,11 @@ const contrastRatio = (first, second) => {
     cssCodeToggle()?.getAttribute('aria-expanded') === 'true',
   );
   check(
-    'picking another element empties the well',
-    panelChips().length === 0,
+    'source-known selectors show before the canvas answers',
+    panelChips().some((chip) => chip.textContent === '.card'),
     `${panelChips().length} chips`,
   );
-  check('and it spins while the canvas is asked', panelSpinner() !== null);
+  check('the selected identity shows its class', panel.textContent.includes('div.card'));
 
   await wait(2000);
   check(
@@ -598,6 +597,24 @@ const contrastRatio = (first, second) => {
     'hiding global selectors also removes their code',
     codeText().includes('.card {') && !codeText().includes('div {'),
     codeText(),
+  );
+
+  // A just-created duplicate is absent from the cached tree and old canvas.
+  // The parsed CSS should resolve against its fresh ancestry before either a
+  // stylesheet read or the canvas query's timeout can finish.
+  const clone = { ...NODES[1], id: `g${'a'.repeat(32)}` };
+  setHost({ nodes: [...NODES, clone], selectedId: clone.id });
+  await wait(120);
+  check(
+    'a fresh duplicate has its class in the identity immediately',
+    panel.textContent.includes('div.card'),
+  );
+  check(
+    'a fresh duplicate has its styled class before the canvas answers',
+    panelChips().some((chip) => chip.textContent === '.card'),
+    panelChips()
+      .map((chip) => chip.textContent)
+      .join(','),
   );
 
   // --- the well doesn't rearrange itself when the scan lands ------------------

@@ -53,6 +53,9 @@ export interface SenderDeps {
   readonly conflict: (reason: RejectionReason | undefined) => void;
   /** An edit that cannot reach disk visually, taken back: say why. */
   readonly notice: (message: string) => void;
+  /** Prompt the canvas after a discrete edit is confirmed on disk. HMR can
+   * arrive later; the canvas serializes overlapping patch requests. */
+  readonly onAppliedUrgentEdit?: () => void;
   readonly edit: (request: EditRequest) => Promise<Result<PageEdited, PageEditError>>;
   readonly read: (path: string) => Promise<PageDiskRead>;
 }
@@ -103,6 +106,9 @@ async function sendGestureEntry(
   switch (sent.tag) {
     case 'applied':
       settle(deps, path, advanced(origin, sent.replies, entry.gesture));
+      if (entry.gesture.urgency === true && sent.replies.length > 0) {
+        deps.onAppliedUrgentEdit?.();
+      }
       return { tag: 'sent' };
     case 'refused': {
       const now = advanced(origin, sent.replies, entry.gesture);

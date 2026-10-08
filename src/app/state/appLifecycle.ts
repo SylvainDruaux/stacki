@@ -399,6 +399,9 @@ export function useSavers(
         update: updatePage,
         conflict: (reason) => setConflictReason(reason),
         notice: (message) => showToast(message, 'error'),
+        onAppliedUrgentEdit: () => {
+          tellCanvas({ type: 'avb:patch-now' });
+        },
         edit: editProjectPage,
         read: readPage,
       }),

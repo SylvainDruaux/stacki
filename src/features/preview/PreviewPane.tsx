@@ -115,31 +115,45 @@ function DesignPreview({
   readonly sizing: Sizing;
 }) {
   const width = sizing.width;
+  const scale = sizing.viewport.scale;
   return (
-    <div
-      ref={sizing.frameRef}
-      className={`frame-sized ${width ? '' : 'full'} ${sizing.resizing ? 'resizing' : ''}`}
-      style={{
-        width: sizing.viewport.width,
-        height: sizing.viewport.height,
-        bottom: 'auto',
-        transform: `translateX(-50%) scale(${sizing.viewport.scale})`,
-      }}
-    >
-      <div className="frame-clip">
-        <iframe
-          key={`${url}-${props.refreshKey ?? ''}`}
-          ref={runtime.iframeRef}
-          src={`${url}#avb-design`}
-          title="Site preview"
-          onLoad={() => {
-            runtime.registerFrame();
-            runtime.sendTrack();
-          }}
-        />
+    <>
+      <div
+        ref={sizing.frameRef}
+        className={`frame-sized ${width ? '' : 'full'} ${sizing.resizing ? 'resizing' : ''}`}
+        style={{
+          width: sizing.viewport.width,
+          height: sizing.viewport.height,
+          bottom: 'auto',
+          transform: `translateX(-50%) scale(${scale})`,
+        }}
+      >
+        <div className="frame-clip">
+          <iframe
+            key={`${url}-${props.refreshKey ?? ''}`}
+            ref={runtime.iframeRef}
+            src={`${url}#avb-design`}
+            title="Site preview"
+            onLoad={() => {
+              runtime.registerFrame();
+              runtime.sendTrack();
+            }}
+          />
+        </div>
+        <ResizeHandles sizing={sizing} />
+      </div>
+      <div
+        className={`preview-overlay-layer ${width ? '' : 'full'}`}
+        style={{
+          width: sizing.viewport.width * scale,
+          height: sizing.viewport.height * scale,
+          borderRadius: width ? 10 * scale : 0,
+        }}
+      >
         <PreviewOverlays
           rects={runtime.rects}
           spacing={runtime.spacing}
+          scale={scale}
           {...(props.spacingHover === undefined ? {} : { spacingHover: props.spacingHover })}
           selPath={props.selPath}
           selOcc={runtime.selOcc}
@@ -150,8 +164,7 @@ function DesignPreview({
           {...(props.overlayInfo === undefined ? {} : { overlayInfo: props.overlayInfo })}
         />
       </div>
-      <ResizeHandles sizing={sizing} />
-    </div>
+    </>
   );
 }
 

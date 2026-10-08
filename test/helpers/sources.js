@@ -48,7 +48,6 @@ function stubSources(name, stubs) {
 const PANEL_SOURCES = Object.freeze([
   'src/features/assets/AssetsPanel.tsx',
   'src/features/preview/CanvasView.tsx',
-  'src/app/CapabilityNotice.tsx',
   'src/features/cms/CmsField.tsx',
   'src/features/cms/CmsPanel.tsx',
   'src/features/cms/CmsSettings.tsx',

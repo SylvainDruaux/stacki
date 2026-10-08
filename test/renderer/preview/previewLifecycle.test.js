@@ -107,6 +107,66 @@ test('canvas hover measures and outlines the active copy, then clears on leave',
   }
 });
 
+test('wide preview keeps outline labels outside the scaled frame', async () => {
+  const dom = installHoverDOM();
+  Object.defineProperties(dom.window.HTMLElement.prototype, {
+    clientWidth: {
+      configurable: true,
+      get() {
+        return this.classList.contains('preview-frame-wrap') ? 400 : 0;
+      },
+    },
+    clientHeight: {
+      configurable: true,
+      get() {
+        return this.classList.contains('preview-frame-wrap') ? 600 : 0;
+      },
+    },
+  });
+  const React = require('react');
+  const { createRoot } = require('react-dom/client');
+  const { PreviewPane } = require(path.join(directory, 'preview.js'));
+  const root = createRoot(document.getElementById('root'));
+  const props = { ...hoverPreviewProps(), device: 'tablet', focusPath: undefined };
+  const act = (action) =>
+    React.act(async () => {
+      await action();
+      await settle();
+    });
+  try {
+    await act(() => root.render(React.createElement(PreviewPane, props)));
+    const iframe = document.querySelector('iframe');
+    const frame = document.querySelector('.frame-sized');
+    const layer = document.querySelector('.preview-overlay-layer');
+    assert.equal(frame.parentElement, layer.parentElement);
+    assert.match(frame.style.transform, /scale\(0\.48958/);
+    assert.equal(layer.style.width, '376px');
+    const send = (data) =>
+      act(() =>
+        window.dispatchEvent(
+          new window.MessageEvent('message', { source: iframe.contentWindow, data }),
+        ),
+      );
+    await send({ type: 'avb:render', token: 'a'.repeat(64), stamps: [] });
+    await send({
+      type: 'avb:rects',
+      classes: {},
+      spacing: {},
+      rects: { 0: [{ x: 100, y: 40, w: 300, h: 80 }] },
+    });
+    const outline = layer.querySelector('.node-outline.sel');
+    assert.ok(outline);
+    assert.ok(Math.abs(Number.parseFloat(outline.style.left) - 48.958) < 0.01);
+    assert.ok(Math.abs(Number.parseFloat(outline.style.top) - 19.583) < 0.01);
+    assert.ok(Math.abs(Number.parseFloat(outline.style.width) - 146.875) < 0.01);
+    assert.ok(layer.contains(outline.querySelector('.node-outline-tag')));
+    assert.equal(frame.contains(outline), false);
+  } finally {
+    await act(() => root.unmount());
+    dom.window.close();
+  }
+});
+
 function installHoverDOM() {
   const dom = new JSDOM('<!doctype html><div id="root"></div>', {
     url: 'http://localhost/',

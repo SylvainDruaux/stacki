@@ -41,6 +41,7 @@ const check = (what, condition, detail) => {
         export { resolveTarget, scanPage } from './src/features/style/model/webflow'
         export { setHost, onHostChange, getHost } from './src/features/style/model/host'
         export { matchSelectorList } from './src/features/style/model/selectors'
+        export { contentForCurrentTree } from './src/features/style/embed/editorModel'
         export {
           defaultSelectorTokens,
           tokensToSelector,
@@ -70,11 +71,47 @@ const check = (what, condition, detail) => {
     onHostChange,
     getHost,
     matchSelectorList,
+    contentForCurrentTree,
     defaultSelectorTokens,
     tokensToSelector,
     snapshotTokens,
   } = require(bundlePath);
   setHost({ nodes: [], projectPath: '/project', files: [], astroFiles: [] });
+
+  {
+    const original = { id: 'original', kind: 'element', name: 'div', props: {} };
+    const style = { id: 'styles', kind: 'raw', name: 'style', inner: '.card { color: green }' };
+    setHost({ nodes: [original, style], openFilePath: '/project/src/pages/index.astro' });
+    const before = await scanPage();
+    const cached = {
+      scan: { ...before, embeds: before.pageEmbeds },
+      docs: [],
+      rules: [],
+      errors: [],
+      embedCount: 0,
+      componentEmbedCount: 0,
+    };
+    const clone = { ...original, id: 'clone' };
+    setHost({ nodes: [original, clone, style] });
+    const current = await scanPage();
+    const reused = contentForCurrentTree(cached, current, clone);
+    check(
+      'a duplicate reuses CSS with fresh ancestry',
+      reused?.scan.elementByKey.get('clone') === clone,
+    );
+
+    setHost({ nodes: [{ ...original }, { ...clone }, { ...style }] });
+    check(
+      'another page with matching ids cannot reuse the old CSS scan',
+      contentForCurrentTree(cached, await scanPage(), clone) === undefined,
+    );
+    setHost({ nodes: [original, clone, { ...style, inner: '.card { color: blue }' }] });
+    check(
+      'an edited style block forces fresh CSS',
+      contentForCurrentTree(cached, await scanPage(), clone) === undefined,
+    );
+    setHost({ nodes: [], openFilePath: undefined });
+  }
 
   {
     const styleNode = {

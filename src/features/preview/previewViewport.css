@@ -48,9 +48,21 @@
   font-size: inherit;
 }
 
-/* The iframe and overlays share a top-aligned scale; width must change atomically
-   with that scale so the page never animates through the wrong breakpoint. */
+/* Only the iframe frame scales. The sibling overlay uses screen coordinates so
+   outlines retain their stroke width and labels retain their readable size. */
 .preview-frame-wrap > .frame-sized {
   transform-origin: top center;
-  transition-property: top, bottom, border-radius;
+  /* The frame and overlay must move in the same paint when changing devices. */
+  transition: none;
+}
+.preview-overlay-layer {
+  position: absolute;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  overflow: hidden;
+  pointer-events: none;
+}
+.preview-overlay-layer.full {
+  top: 0;
 }

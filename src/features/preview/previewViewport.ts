@@ -24,8 +24,8 @@ export function previewViewport(
   const viewportWidth = fixed ? width : Math.max(1, available.width);
   assert(viewportWidth > 0, 'Preview width must be positive');
   const scale = fixed ? Math.min(1, Math.max(1, available.width - 24) / viewportWidth) : 1;
-  // Scale the frame and its overlays together, retaining the requested CSS viewport
-  // so media queries and viewport units use the simulated screen size.
+  // Keep the requested CSS viewport for media queries and viewport units. The
+  // iframe scales to fit; overlay geometry scales separately so its labels do not.
   const viewportHeight = height ?? Math.max(1, available.height - (fixed ? 32 : 0)) / scale;
   return { width: viewportWidth, height: viewportHeight, scale };
 }

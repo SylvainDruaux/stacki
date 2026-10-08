@@ -39,6 +39,7 @@ import {
   writeEmbedDocument,
   type EmbedDocument,
   type EmbedScan,
+  type PageScan,
 } from '../model/webflow';
 import type { ElementSnapshot, NativeModel, ParsedRule } from '../model/styleTypes';
 import {
@@ -491,6 +492,48 @@ export type Content = {
   /** True for the page-only snapshot emitted before component embeds finish loading. */
   partial?: boolean;
 };
+
+/** Reuse parsed CSS when a page gesture changes only the tree. A fresh scan
+ * gives new nodes their ancestry without waiting to re-read every stylesheet. */
+export function contentForCurrentTree(
+  cached: Content,
+  current: PageScan,
+  selected: unknown,
+): Content | undefined {
+  const selectedId = serializeElementId(selected);
+  if (!current.elementByKey.has(selectedId)) {
+    return undefined;
+  }
+  const samePage = [...cached.scan.elementByKey].some(
+    ([id, node]) => current.elementByKey.get(id) === node,
+  );
+  if (!samePage || cached.scan.embeds.length !== current.pageEmbeds.length) {
+    return undefined;
+  }
+  const sameSources = current.pageEmbeds.every((source, index) => {
+    const old = cached.scan.embeds[index];
+    if (old?.key !== source.key) {
+      return false;
+    }
+    if (source.origin.kind !== 'node') {
+      return true;
+    }
+    const id = source.origin.nodeId;
+    return current.elementByKey.get(id) === cached.scan.elementByKey.get(id);
+  });
+  if (!sameSources) {
+    return undefined;
+  }
+  return {
+    ...cached,
+    scan: {
+      ...cached.scan,
+      parentByKey: current.parentByKey,
+      childrenByKey: current.childrenByKey,
+      elementByKey: current.elementByKey,
+    },
+  };
+}
 
 // The last completed embed scan, kept at module scope so it survives the tool being
 // closed and reopened (ToolHost unmounts EmbedEditor on close, dropping its refs).

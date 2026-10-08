@@ -4714,20 +4714,6 @@ body > .embed-editor_provenance {
   color: var(--green);
 }
 
-/* The selection's capability (plan §6): why an edit here means more, or goes
-   elsewhere. Informational, so it sits in the panel flow rather than over it. */
-.capability-notice {
-  margin: 8px 12px 0;
-  padding: 6px 10px;
-  border: 1px solid var(--border-strong);
-  border-left: 3px solid var(--amber);
-  border-radius: 6px;
-  background: var(--bg-panel-2);
-  color: var(--text-dim);
-  font-size: 11.5px;
-  line-height: 1.4;
-}
-
 /* A refused save (plan §7): above the toast, never modal, never auto-hiding. */
 .save-conflict {
   position: fixed;

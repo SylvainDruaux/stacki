@@ -9,8 +9,6 @@ import { canvasClickAction } from '../../editor/canvasClick';
 import PreviewPane from '../../features/preview/PreviewPane';
 import { relativeTime } from '../../features/history/HistoryPanel';
 import SaveConflictNotice from '../SaveConflictNotice';
-import CapabilityNotice from '../CapabilityNotice';
-import { nodeCapability } from '../../editor/nodeCapability';
 import { nodeAtPath } from '../../editor/editorTree';
 import type { PickedAsset } from '../../ui/AssetField';
 import type { InlineNode } from '../../features/props/RichContent';
@@ -218,17 +216,9 @@ export function OldVersionCover({ app }: { readonly app: ShellView }) {
 }
 
 export function RightPanel({ app }: { readonly app: ShellView }) {
-  const { model, selectedId } = app;
   return (
     <div className="panel right">
       <RightTabs app={app} />
-      <CapabilityNotice
-        capability={
-          model && selectedId && selectedId !== 'frontmatter'
-            ? nodeCapability(model, selectedId)
-            : undefined
-        }
-      />
       {app.rightTab === 'style' && <StyleTab app={app} />}
       <div style={{ display: app.rightTab === 'settings' ? 'contents' : 'none' }}>
         <PropsPanel {...settingsValues(app)} {...settingsHandlers(app)} />
@@ -297,7 +287,7 @@ export function StyleTab({ app }: { readonly app: ShellView }) {
       }
       onSpacingHover={app.setSpacingHover}
       pathOf={app.pathFor}
-      renderedClasses={app.selectedClasses}
+      renderedClasses={app.classesForRef.current === selectedId ? app.selectedClasses : []}
       projectClasses={app.projectClasses}
       historyTick={app.historyTick}
       openFilePath={app.openEditableFile?.path ?? undefined}

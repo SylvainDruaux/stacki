@@ -1,7 +1,7 @@
 // Goal: the renderer shows the engine's capability for the node it selects
 // (plan §6, step 7) — the same classification the projection makes, so a node
-// the engine treats as repeated, opaque or unsupported says so beside its
-// panels instead of looking plainly editable.
+// the engine treats as repeated, opaque or unsupported keeps the same
+// classification in both views.
 // Method: parse corpus pages with the real parser, bundle src/editor/nodeCapability.ts,
 // and compare its answer for every node with the projection's capability at the
 // same path (shared/page/sourceProjection.ts run on the same bytes), for .astro
@@ -24,13 +24,10 @@ esbuild.buildSync({
   platform: 'node',
   logLevel: 'silent',
 });
-const { nodeCapability, capabilityNeedsNotice } = require(
-  path.join(buildDirectory, 'nodeCapability.js'),
-);
+const { nodeCapability } = require(path.join(buildDirectory, 'nodeCapability.js'));
 const { parsePage } = require('#dist/electron/parse/astroParser.js');
 const { parseMarkdownPage } = require('#dist/electron/parse/markdownParser.js');
 const { projectPage } = require('#dist/shared/page/sourceProjection.js');
-const { CAPABILITIES } = require('#dist/shared/page/capability.js');
 
 const corpus = repoPath('test/corpus');
 
@@ -71,7 +68,7 @@ test('every node of every corpus page gets the projection capability', () => {
   assert.ok(compared > 200, `compared ${compared} nodes`);
 });
 
-test('a node a loop repeats is repeated-source-node and says so', () => {
+test('a node a loop repeats is repeated-source-node', () => {
   const text = fs.readFileSync(path.join(corpus, 'map-loop.astro'), 'utf8');
   const parsed = parsePage(text);
   assert.ok(parsed.editable);
@@ -82,15 +79,6 @@ test('a node a loop repeats is repeated-source-node and says so', () => {
   assert.equal(nodeCapability(parsed.model, loop.id), 'editable', 'the loop itself is one node');
   assert.equal(nodeCapability(parsed.model, item.id), 'repeated-source-node');
   assert.equal(nodeCapability(parsed.model, item.children[0].id), 'repeated-source-node');
-  assert.equal(capabilityNeedsNotice('repeated-source-node'), true);
-  assert.equal(capabilityNeedsNotice('editable'), false);
-});
-
-test('only plain editable nodes go without a notice', () => {
-  assert.deepEqual(
-    CAPABILITIES.filter((capability) => !capabilityNeedsNotice(capability)),
-    ['editable'],
-  );
 });
 
 test('a Markdown page gets its projection capability; an absent node has none', () => {

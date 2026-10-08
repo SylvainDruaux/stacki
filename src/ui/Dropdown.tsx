@@ -12,6 +12,7 @@ const POPUP_MIN = 120;
 const POPUP_PADDING_HEIGHT = 8;
 const OPTION_HEIGHT = 26;
 const SEARCH_HEIGHT = 36;
+const HOVER_PREVIEW_DELAY_MS = 100;
 export function popupBox(
   rectangle: Pick<DOMRect, 'top' | 'bottom'>,
   wanted: number,
@@ -66,6 +67,7 @@ interface Actions<T> {
   readonly openPopup: () => void;
   readonly close: () => void;
   readonly preview: (index: number) => void;
+  readonly hover: (index: number) => void;
   readonly pick: (option: DropdownOption<T>) => void;
 }
 type Controller<T> = Selection<T> & Actions<T>;
@@ -148,16 +150,36 @@ function useDropdownSelection<T>(props: DropdownProps<T>): Selection<T> {
 function useDropdownActions<T>(props: DropdownProps<T>, state: Selection<T>): Actions<T> {
   const { setOpen, setHighlight, setQuery, committed, previewed, triggerRef, visible } = state;
   const { value, options, onChange, livePreview = true } = props;
+  const hoverTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const cancelHover = useCallback((): void => {
+    if (hoverTimer.current !== undefined) {
+      clearTimeout(hoverTimer.current);
+      hoverTimer.current = undefined;
+    }
+  }, []);
+  useEffect(() => () => cancelHover(), [cancelHover]);
+  const previewOption = (option: DropdownOption<T>): void => {
+    if (!livePreview) {
+      return;
+    }
+    const applied = previewed.current?.value ?? committed.current;
+    if (option.value !== applied) {
+      previewed.current = { value: option.value };
+      onChange(option.value);
+    }
+  };
   const close = useCallback(() => {
+    cancelHover();
     setOpen(false);
     if (previewed.current !== undefined && previewed.current.value !== committed.current) {
       onChange(committed.current);
     }
     previewed.current = undefined;
-  }, [setOpen, previewed, committed, onChange]);
+  }, [setOpen, previewed, committed, onChange, cancelHover]);
   return {
     close,
     openPopup: () => {
+      cancelHover();
       committed.current = value;
       previewed.current = undefined;
       setQuery('');
@@ -165,18 +187,25 @@ function useDropdownActions<T>(props: DropdownProps<T>, state: Selection<T>): Ac
       setOpen(true);
     },
     preview: (index) => {
+      cancelHover();
       setHighlight(index);
       const option = visible[index];
-      if (!option || !livePreview) {
-        return;
+      if (option) {
+        previewOption(option);
       }
-      const applied = previewed.current?.value ?? committed.current;
-      if (option.value !== applied) {
-        previewed.current = { value: option.value };
-        onChange(option.value);
+    },
+    hover: (index) => {
+      cancelHover();
+      setHighlight(index);
+      const option = visible[index];
+      if (option && livePreview) {
+        // A press that follows pointer entry should commit before a preview write
+        // can rerender the panel and remove the row beneath the pointer.
+        hoverTimer.current = setTimeout(() => previewOption(option), HOVER_PREVIEW_DELAY_MS);
       }
     },
     pick: (option) => {
+      cancelHover();
       const applied = previewed.current?.value ?? committed.current;
       committed.current = option.value;
       previewed.current = undefined;
@@ -411,7 +440,13 @@ function DropdownRow<T>({
   return (
     <div
       className={`dd-option ${highlight} ${selected} ${option.dim ? 'dim' : ''}`}
-      onMouseEnter={() => control.preview(index)}
+      onMouseEnter={() => control.hover(index)}
+      onPointerDown={(event) => {
+        if (event.pointerType === 'mouse' && event.button === 0) {
+          event.preventDefault();
+          control.pick(option);
+        }
+      }}
       onMouseDown={(event) => event.preventDefault()}
       onClick={() => control.pick(option)}
     >

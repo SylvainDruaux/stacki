@@ -205,6 +205,12 @@ function PageRow({
         current ? 'current' : ''
       }`}
       onMouseEnter={onHover}
+      onPointerDown={(event) => {
+        if (event.pointerType === 'mouse' && event.button === 0) {
+          event.preventDefault();
+          onPick();
+        }
+      }}
       onClick={onPick}
     >
       <PageGlyph page={page} size={12} />

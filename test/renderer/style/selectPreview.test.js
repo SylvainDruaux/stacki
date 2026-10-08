@@ -108,6 +108,17 @@ const settle = (milliseconds = 0) =>
   });
   assert.deepEqual(previews, ['relative', undefined, 'relative']);
 
+  // Commit on press: a live preview can rerender the row before mouseup/click.
+  await act(async () => {
+    const down = new dom.window.MouseEvent('pointerdown', { bubbles: true, button: 0 });
+    Object.defineProperty(down, 'pointerType', { value: 'mouse' });
+    document.querySelector('.u-select-option.is-active').dispatchEvent(down);
+    await settle();
+  });
+  assert.equal(document.querySelector('.u-select-list') ?? undefined, undefined);
+  assert.match(document.querySelector('.u-select-button').textContent, /Relative/);
+  assert.deepEqual(previews, ['relative', undefined, 'relative']);
+
   await act(async () => root.unmount());
   dom.window.close();
   console.log('select-preview: passed');
