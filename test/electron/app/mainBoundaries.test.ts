@@ -139,8 +139,31 @@ test('the Markdown wire model keeps source metadata and rejects corrupted fields
 });
 
 test('disk parsers validate known shapes and fail on corrupt data', () => {
-  assert.deepEqual(parseSettings({ sound: true }), { sound: true });
+  assert.deepEqual(parseSettings({ sound: true }), {
+    sound: true,
+    usageCountsEnabled: true,
+    usageNoticeVersion: 0,
+  });
   assert.throws(() => parseSettings({ sound: 'yes' }), /boolean/);
+  assert.deepEqual(
+    parseSettings({
+      sound: false,
+      usageCountsEnabled: false,
+      usageNoticeVersion: 1,
+      usageLastAttemptDay: '2026-10-08',
+    }),
+    {
+      sound: false,
+      usageCountsEnabled: false,
+      usageNoticeVersion: 1,
+      usageLastAttemptDay: '2026-10-08',
+    },
+  );
+  assert.throws(() => parseSettings({ sound: false, usageCountsEnabled: 'no' }), /boolean/);
+  assert.throws(
+    () => parseSettings({ sound: false, usageLastAttemptDay: 'yesterday' }),
+    /usage day/,
+  );
   const recent = { path: '/site', name: 'Site', openedAt: 1000 };
   assert.deepEqual(parseRecents([recent]), [recent]);
   assert.throws(() => parseRecents([{ ...recent, openedAt: -1 }]), /nonnegative/);

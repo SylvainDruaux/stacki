@@ -1,4 +1,5 @@
 import type { Attr } from '../../shared/page/pageNode';
+import { TYPE_OPERATORS } from './dataScope';
 // Whether a node renders data rather than fixed markup — an expression prop
 // (`href={service.link}`), an `{expr}` child, or text with an interpolation
 // in it. Only the node's own props and its direct children count: a section
@@ -188,6 +189,11 @@ export function codeParts(source: unknown): Part[] | undefined {
     // The dot goes INSIDE that chip, so the text still reads as it was written.
     const from = optional ? i - 1 : i;
     const name = text.slice(from, j);
+    // The rest of an `as` or `satisfies` clause names a type, not a value to
+    // bind. Keep it as code so type names cannot become clickable data chips.
+    if (TYPE_OPERATORS.has(name)) {
+      break;
+    }
     if (!CODE_WORDS.has(name.replace(/^\./, '').split('.')[0] ?? '')) {
       if (from > last) {
         out.push({ text: text.slice(last, from) });

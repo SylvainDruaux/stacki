@@ -19,7 +19,38 @@ import type { DynamicEntry } from '../lib/mainTypes';
 
 // The generic parsers live in lib, where every area may reach them.
 export { parseData, parseRecord, parseString, parseOptionalString } from '../lib/mainHelpers';
-export const parseSettings = object({ sound: boolean });
+export interface AppSettings {
+  readonly sound: boolean;
+  readonly usageCountsEnabled: boolean;
+  readonly usageNoticeVersion: number;
+  readonly usageLastAttemptDay?: string;
+}
+
+export function parseSettings(input: unknown): AppSettings {
+  const value = object({
+    sound: boolean,
+    usageCountsEnabled: optional(boolean),
+    usageNoticeVersion: optional(count),
+    usageLastAttemptDay: optional(text),
+  })(input);
+  if (value.usageNoticeVersion !== undefined && value.usageNoticeVersion > 10) {
+    throw new Error('Settings: invalid usage notice version');
+  }
+  if (
+    value.usageLastAttemptDay !== undefined &&
+    !/^\d{4}-\d{2}-\d{2}$/.test(value.usageLastAttemptDay)
+  ) {
+    throw new Error('Settings: invalid usage day');
+  }
+  return {
+    sound: value.sound,
+    usageCountsEnabled: value.usageCountsEnabled ?? true,
+    usageNoticeVersion: value.usageNoticeVersion ?? 0,
+    ...(value.usageLastAttemptDay === undefined
+      ? {}
+      : { usageLastAttemptDay: value.usageLastAttemptDay }),
+  };
+}
 export const parseRecents = list(object({ path: pathText, name: text, openedAt: count }));
 
 export interface Collection extends ContentCollection {

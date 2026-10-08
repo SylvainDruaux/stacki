@@ -13,6 +13,13 @@ import type {
 } from 'electron';
 import { toRecord } from '../shared/core/record';
 import { parseOptionalString, parseRecents, parseSettings } from './app/mainValidation';
+import type { AppSettings } from './app/mainValidation';
+import {
+  sendUsageCount,
+  shouldCountUsage,
+  usageDay,
+  USAGE_NOTICE_VERSION,
+} from './app/usageCounts';
 import type { RecentProject } from './lib/mainTypes';
 import {
   app,
@@ -315,6 +322,16 @@ function buildMenu() {
             send('menu:sound', item.checked);
           },
         },
+        {
+          label: 'Anonymous Usage Counts',
+          type: 'checkbox',
+          checked: settings.usageCountsEnabled,
+          click: (item) => setUsageCountsEnabled(item.checked),
+        },
+        {
+          label: 'About Usage Counts…',
+          click: () => void showUsageExplanation(),
+        },
         { type: 'separator' },
         // Until now the only way out of a project was to close the app, and on
         // macOS closing the app is not what people think it is: the window goes
@@ -448,6 +465,12 @@ app.whenReady().then(
     buildMenu();
     createWindow();
     autoUpdates.start();
+    void showUsageNotice();
+    app.on('browser-window-focus', () => {
+      if (watcher) {
+        noteUsageActivity();
+      }
+    });
     // Terminals open in the project the app has open — same reach as the asset
     // protocol, which is what `openProjectRoot` already scopes.
     registerTerminalHandlers({ send, projectRoot: () => openProjectRoot });
@@ -541,30 +564,142 @@ function showOpenDialog(options: OpenDialogOptions) {
 
 // Sound is off. An editor that makes a noise the first time somebody touches it
 // is an editor they turn off, so it is asked for rather than opted out of.
-const SETTINGS_DEFAULTS = { sound: false };
-let settings = { ...SETTINGS_DEFAULTS };
+const SETTINGS_DEFAULTS: AppSettings = {
+  sound: false,
+  usageCountsEnabled: true,
+  usageNoticeVersion: 0,
+};
+let settings: AppSettings = { ...SETTINGS_DEFAULTS };
+let usageCountInFlight: AbortController | undefined;
 
 const settingsFile = () => path.join(app.getPath('userData'), 'settings.json');
 
 function readSettings() {
+  if (!fs.existsSync(settingsFile())) {
+    return { ...SETTINGS_DEFAULTS };
+  }
   try {
     const input: unknown = JSON.parse(readSource(settingsFile()));
     return parseSettings(input);
   } catch {
-    return { ...SETTINGS_DEFAULTS };
+    // A damaged preference file must never silently re-enable usage counts.
+    return { ...SETTINGS_DEFAULTS, usageCountsEnabled: false };
   }
 }
 
-function writeSettings() {
+function writeSettings(): boolean {
   try {
     fs.writeFileSync(settingsFile(), JSON.stringify(settings, null, 2), 'utf8');
+    return true;
   } catch {
-    /* non-fatal — the setting still holds for this run */
+    return false;
   }
 }
 
 // The renderer asks once on load; the menu pushes every change after that.
-ipcMain.handle('settings:get', () => settings);
+ipcMain.handle('settings:get', () => ({ sound: settings.sound }));
+
+function setUsageCountsEnabled(enabled: boolean): void {
+  if (!enabled) {
+    usageCountInFlight?.abort();
+  }
+  settings = { ...settings, usageCountsEnabled: enabled };
+  if (!writeSettings()) {
+    void showMessageBox(mainWindow, {
+      type: 'warning',
+      title: 'Privacy Setting Not Saved',
+      message: 'Stacki could not save your usage-count preference.',
+      detail: 'The change applies for this session. Check available disk space and try again.',
+    });
+  }
+  if (enabled && watcher) {
+    noteUsageActivity();
+  }
+}
+
+function noteUsageActivity(): void {
+  const day = usageDay(new Date());
+  if (
+    !shouldCountUsage(
+      {
+        packaged: app.isPackaged,
+        enabled: settings.usageCountsEnabled,
+        noticeVersion: settings.usageNoticeVersion,
+        lastAttemptDay: settings.usageLastAttemptDay,
+      },
+      day,
+    )
+  ) {
+    return;
+  }
+  if (usageCountInFlight) {
+    return;
+  }
+  const controller = new AbortController();
+  usageCountInFlight = controller;
+  // Save the attempt before sending so reopening projects cannot produce
+  // duplicate counts if the server accepted a request but its reply was lost.
+  settings = { ...settings, usageLastAttemptDay: day };
+  if (!writeSettings()) {
+    usageCountInFlight = undefined;
+    return;
+  }
+  void sendUsageCount({ signal: controller.signal }, fetch).finally(() => {
+    if (usageCountInFlight === controller) {
+      usageCountInFlight = undefined;
+    }
+  });
+}
+
+function usageNoticeOptions(): MessageBoxOptions {
+  return {
+    type: 'info',
+    title: 'Anonymous Usage Counts',
+    message: 'Help us understand how many Stacki installations are active.',
+    detail:
+      'Stacki sends one count on days you open a project. It sends no project names, ' +
+      'file contents, device identifier, or activity history. Daily totals are kept ' +
+      'on Cloudflare for up to 366 days; its network sees the connection IP, but the ' +
+      'usage database does not store it. Turn this off any time in File → Anonymous ' +
+      'Usage Counts.',
+    buttons: ['Continue'],
+    checkboxLabel: 'Turn off anonymous usage counts',
+    checkboxChecked: !settings.usageCountsEnabled,
+  };
+}
+
+async function showUsageNotice(): Promise<void> {
+  if (!app.isPackaged || settings.usageNoticeVersion >= USAGE_NOTICE_VERSION) {
+    return;
+  }
+  try {
+    const answer = await showMessageBox(mainWindow, usageNoticeOptions());
+    settings = {
+      ...settings,
+      usageCountsEnabled: !answer.checkboxChecked,
+      usageNoticeVersion: USAGE_NOTICE_VERSION,
+    };
+    writeSettings();
+    buildMenu();
+    if (watcher) {
+      noteUsageActivity();
+    }
+  } catch (error: unknown) {
+    // If the notice could not be shown, the version stays old and no count is sent.
+    console.warn('Could not show usage notice:', error);
+  }
+}
+
+async function showUsageExplanation(): Promise<void> {
+  const notice = usageNoticeOptions();
+  await showMessageBox(mainWindow, {
+    type: 'info',
+    title: 'Anonymous Usage Counts',
+    message: notice.message,
+    ...(notice.detail === undefined ? {} : { detail: notice.detail }),
+    buttons: ['Close'],
+  });
+}
 
 // ---------------------------------------------------------------------------
 // Recent projects (their pictures: handlers/thumbnails.ts)
@@ -711,6 +846,7 @@ ipcMain.handle('watch:start', async (_event, projectPath) => {
     scheduleThumb: (projectPath, delayMs) => thumbnails.schedule(projectPath, delayMs),
     mediaPattern: MEDIA_EXT,
   });
+  noteUsageActivity();
   return { ok: true as const };
 });
 

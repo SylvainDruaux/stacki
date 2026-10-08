@@ -173,6 +173,23 @@ const check = (what, condition, detail) => {
     'keywords are not data',
     J(partsFromValue(expr('a.b ?? null'))) === J([{ expr: 'a.b' }, { text: ' ?? null' }]),
   );
+  for (const source of ['src as string', 'src satisfies ImageSource']) {
+    const operator = source.includes(' satisfies ') ? 'satisfies' : 'as';
+    check(
+      `${operator} keeps its type clause as code`,
+      J(partsFromValue(expr(source))) ===
+        J([{ expr: 'src' }, { text: source.slice('src'.length) }]),
+    );
+    check(
+      `${operator} round trips without changing the expression`,
+      J(valueFromParts(partsFromValue(expr(source)), { mode: 'code' })) === J(expr(source)),
+    );
+  }
+  check(
+    'a property named as remains part of its binding',
+    J(partsFromValue(expr('source.as ?? fallback'))) ===
+      J([{ expr: 'source.as' }, { text: ' ?? ' }, { expr: 'fallback' }]),
+  );
 
   // Code that stays code still has data in it, and the data is still drawn as
   // chips — inside the editor, over the text, so the program reads as written.
