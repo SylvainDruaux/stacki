@@ -220,7 +220,14 @@ function blockAsWritten(node: ParserNode, indent: string, depth: number): string
   const rebuilt: string[] = [];
   serializeNode(probe, '', rebuilt, depth);
   const flat = (text: string) => text.replace(/[\s(){}]+/g, '').trim();
-  if (flat(rebuilt.join('\n')) !== flat(node.source)) {
+  // A trailing callback comma belongs to `.map(...)`, not to the returned
+  // conditional. The rebuilt form may omit that optional separator while the
+  // untouched source must retain its original spelling.
+  const comparedSource =
+    node.kind === 'map' && node.children.length === 1 && node.children[0]?.kind === 'cond'
+      ? node.source.replace(/,(\s*\)\s*\})$/, '$1')
+      : node.source;
+  if (flat(rebuilt.join('\n')) !== flat(comparedSource)) {
     return undefined;
   }
   const sourceLines = node.source.split('\n');
@@ -406,6 +413,16 @@ function serializeNodeMap(node: MapNode, indent: string, lines: string[], depth:
     }
     lines.push(indent + '    );');
     lines.push(indent + '  })');
+    lines.push(indent + '}');
+    return;
+  }
+  // A callback returning a ternary is one JavaScript expression. Writing the
+  // conditional as a template `{...}` here would turn it into a block instead.
+  const conditional = node.children.length === 1 ? node.children[0] : undefined;
+  if (conditional?.kind === 'cond') {
+    lines.push(indent + '  ' + node.head);
+    serializeCondBody(conditional, indent + '    ', lines, depth + 1);
+    lines.push(indent + '  ))');
     lines.push(indent + '}');
     return;
   }

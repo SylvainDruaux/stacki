@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { Collection } from './cmsSchema';
 import type { CmsPanelContent, CmsPanelContentCollection, CmsPanelFile } from './cmsPanelBridge';
-import { collectionOf, labelize } from './cmsSchema';
+import { collectionHasContent, collectionOf, labelize } from './cmsSchema';
 import { createCmsCollection, readCmsFiles, readContentCollections } from './cmsPanelBridge';
 import {
   ChevronLeftIcon,
@@ -172,7 +172,8 @@ function visibleCollections(
 ): readonly Collection[] {
   return files
     .filter((file) => !ownedByContent(file.rel.split('#')[0] ?? '', content.covered))
-    .map(collectionOf);
+    .map(collectionOf)
+    .filter(collectionHasContent);
 }
 
 function ownedByContent(rel: string, covered: CmsPanelContent['covered']): boolean {

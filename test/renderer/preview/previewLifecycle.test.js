@@ -32,6 +32,33 @@ esbuild.buildSync({
 
 const settle = () => new Promise((resolve) => setTimeout(resolve, 20));
 
+test('iframe load requests the verified render again after listeners mount', async () => {
+  const dom = installHoverDOM();
+  const React = require('react');
+  const { createRoot } = require('react-dom/client');
+  const { PreviewPane } = require(path.join(directory, 'preview.js'));
+  const root = createRoot(document.getElementById('root'));
+  try {
+    await React.act(async () => {
+      root.render(React.createElement(PreviewPane, hoverPreviewProps()));
+      await settle();
+    });
+    const iframe = document.querySelector('iframe');
+    assert.ok(iframe);
+    const sent = [];
+    iframe.contentWindow.postMessage = (message) => sent.push(message);
+    await React.act(async () => {
+      iframe.dispatchEvent(new dom.window.Event('load'));
+      await settle();
+    });
+    assert.ok(sent.some((message) => message.type === 'avb:request-render'));
+    assert.ok(sent.some((message) => message.type === 'avb:track'));
+  } finally {
+    await React.act(async () => root.unmount());
+    dom.window.close();
+  }
+});
+
 test('canvas hover measures and outlines the active copy, then clears on leave', async () => {
   const dom = installHoverDOM();
   const React = require('react');

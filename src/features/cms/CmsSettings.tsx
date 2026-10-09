@@ -3,7 +3,7 @@ import type { Collection, CmsField, FieldType } from './cmsSchema';
 import type { DeclaredTypes } from './cmsTypes';
 import { BOUNDARY_LIMITS } from '../../../shared/core/boundary';
 import { assert } from '../../../shared/core/assert';
-import { fieldsAt, keyFor } from './cmsSchema';
+import { contentFieldsAt, fieldsAt, keyFor } from './cmsSchema';
 import { withDeclaredTypes } from './cmsTypes';
 import { readCmsUsage, deleteCms } from './cmsBridge';
 import { cleanError } from '../../lib/cleanError';
@@ -207,7 +207,7 @@ async function deleteCollection(
 
 function FieldSchema({ items, declared, path, ...operations }: SchemaProps) {
   assert(path.length <= BOUNDARY_LIMITS.depthMax, 'CMS schema: nesting limit exceeded');
-  const fields = withDeclaredTypes(fieldsAt(items, path), declared, path);
+  const fields = withDeclaredTypes(contentFieldsAt(items, path), declared, path);
   const move = (from: number, to: number) => {
     if (from === to) {
       return;
@@ -218,7 +218,18 @@ function FieldSchema({ items, declared, path, ...operations }: SchemaProps) {
     assert(to >= 0, 'CMS schema: target must be nonnegative');
     assert(to <= fields.length, 'CMS schema: target exceeds field count');
     keys.splice(to > from ? to - 1 : to, 0, moved);
-    operations.onReorderFields(path, keys);
+    const visible = new Set(keys);
+    let next = 0;
+    const allKeys = fieldsAt(items, path).map((field) => {
+      if (!visible.has(field.key)) {
+        return field.key;
+      }
+      const key = keys[next];
+      assert(key !== undefined, 'Visible CMS field order must be complete');
+      next += 1;
+      return key;
+    });
+    operations.onReorderFields(path, allKeys);
   };
   const reorder = useListReorder({ count: fields.length, onMove: move });
   return (

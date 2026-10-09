@@ -18,7 +18,14 @@ import {
   CheckIcon,
 } from '../../ui/Icons';
 import useListReorder from '../../ui/useListReorder';
-import { fieldsOf, titleOf, blankItem, duplicateItem, inferType, isPlainObject } from './cmsSchema';
+import {
+  contentFieldsOf,
+  titleOf,
+  blankItem,
+  duplicateItem,
+  inferType,
+  isPlainObject,
+} from './cmsSchema';
 import CmsSettings from './CmsSettings';
 import FieldRow from './CmsField';
 import { bestType, withDeclaredTypes } from './cmsTypes';
@@ -385,7 +392,7 @@ function CmsDetailHead({ model, snapshot, actions }: ItemProps) {
 function CmsDetailBody({ model, snapshot }: ContentProps) {
   const { collection, items, declared } = snapshot;
   const item = items[model.selection];
-  const fields = withDeclaredTypes(fieldsOf(items), declared, []);
+  const fields = withDeclaredTypes(contentFieldsOf(items), declared, []);
   const context = {
     projectPath: model.project.path,
     baseDir: `src/${model.rel}`.replace(/\/[^/]*$/, ''),

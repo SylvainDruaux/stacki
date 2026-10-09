@@ -15,6 +15,7 @@ import {
   focusPath,
   mapped,
   pathsOf,
+  reportRender,
   resetFocusCache,
   runsOf,
   setTracking,
@@ -127,6 +128,10 @@ export function listenForQueries(): void {
     }
     if (data['type'] === 'avb:class-patch') {
       applyClassPatch(data);
+      return;
+    }
+    if (data['type'] === 'avb:request-render') {
+      reportRender();
       return;
     }
     if (data['type'] === 'avb:track' && Array.isArray(data['paths'])) {

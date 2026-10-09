@@ -5,7 +5,7 @@ import type { PickedAsset } from '../../ui/AssetField';
 import { assert } from '../../../shared/core/assert';
 import { BOUNDARY_LIMITS } from '../../../shared/core/boundary';
 import { toArray, toRecord } from '../../../shared/core/record';
-import { blankItem, fieldsOf, isExpr, titleOf, EXPR_KEY } from './cmsSchema';
+import { blankItem, contentFieldsOf, isExpr, titleOf, EXPR_KEY } from './cmsSchema';
 import { ChevronRightIcon, CloseIcon, DragIcon, PlusIcon, TrashIcon } from '../../ui/Icons';
 import AssetField from '../../ui/AssetField';
 import AutoTextarea from '../../ui/AutoTextarea';
@@ -308,7 +308,7 @@ function ListEditor({ value, onChange }: ListProps) {
   );
 }
 function GroupEditor({ value, onChange, ...context }: GroupProps) {
-  const fields = fieldsOf([value]);
+  const fields = contentFieldsOf([value]);
   return (
     <div className="cms-group-box">
       {fields.map((field) => (
@@ -441,7 +441,7 @@ export function useCmsDialog(onClose: () => void) {
 function NestedItemDialog({ entry, title, onChange, onDelete, onClose, ...context }: DialogProps) {
   const overlayRef = useCmsDialog(onClose);
   const value = toRecord(entry) ?? {};
-  const fields = fieldsOf([entry]);
+  const fields = contentFieldsOf([entry]);
   return (
     <div
       ref={overlayRef}
@@ -477,7 +477,7 @@ function NestedItemDialog({ entry, title, onChange, onDelete, onClose, ...contex
           )}
         </div>
         <div className="modal-footer cms-modal-footer">
-          <button className="ghost danger" onClick={onDelete}>
+          <button className="ghost danger cms-delete-action" onClick={onDelete}>
             <TrashIcon size={12} /> Delete
           </button>
           <button className="primary" onClick={onClose}>

@@ -93,6 +93,11 @@ test(
     try {
       await act(async () => render());
       await click(document.querySelector('.cms-repeat-row'));
+      assert.match(
+        document.querySelector('.cms-delete-action').textContent,
+        /Delete/,
+        'the item dialog uses the quieter destructive action',
+      );
       await click(document.querySelector('.cms-modal .cms-repeat-row'));
       assert.equal(document.querySelectorAll('.cms-modal-overlay').length, 2);
       await click(document.querySelectorAll('.cms-modal .af-choose')[0]);

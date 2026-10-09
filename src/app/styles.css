@@ -5490,12 +5490,32 @@ body > .embed-editor_provenance {
 .cms-modal-footer {
   justify-content: space-between;
 }
-.cms-modal-footer .ghost.danger {
-  color: var(--text-dim);
+.cms-modal-footer button.ghost.cms-delete-action {
+  min-height: 34px;
+  padding: 7px 11px;
+  border: 1px solid rgba(255, 69, 58, 0.24);
+  border-radius: 8px;
+  background: rgba(255, 69, 58, 0.07);
+  color: #ff938d;
+  transition:
+    color 0.12s,
+    border-color 0.12s,
+    background-color 0.12s;
 }
-.cms-modal-footer .ghost.danger:hover {
-  color: var(--red);
-  background: rgba(255, 69, 58, 0.12);
+.cms-modal-footer button.ghost.cms-delete-action:hover:not(:disabled) {
+  border-color: rgba(255, 69, 58, 0.48);
+  background: rgba(255, 69, 58, 0.14);
+  color: #ffb0ab;
+}
+.cms-modal-footer button.ghost.cms-delete-action:active:not(:disabled) {
+  background: rgba(255, 69, 58, 0.2);
+}
+.cms-modal-footer button.ghost.cms-delete-action:focus-visible {
+  outline: 2px solid rgba(255, 105, 97, 0.7);
+  outline-offset: 2px;
+}
+.cms-modal-footer .cms-delete-action svg {
+  opacity: 0.85;
 }
 
 .cms-empty-inline {

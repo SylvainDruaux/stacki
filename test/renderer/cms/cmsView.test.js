@@ -108,6 +108,29 @@ test('switching CMS files flushes the old edit to the old file', async () => {
   }
 });
 
+test('the content form hides helpers and preserves them when saving copy', async () => {
+  const state = fixture();
+  const helper = { __expr: '(entry) => entry.summary || entry.subtitle' };
+  try {
+    await state.show('data/site.ts#*general');
+    await act(async () =>
+      state.reads[0].resolve({ data: { title: 'Retreats', description: helper } }),
+    );
+    assert.equal(document.querySelectorAll('.cms-field').length, 1);
+    assert.match(document.querySelector('.cms-field').textContent, /Title/);
+    assert.doesNotMatch(document.querySelector('.cms-detail-body').textContent, /Description/);
+    await type(document.querySelector('.cms-field input'), 'New retreats');
+    await act(async () => state.root.unmount());
+    assert.deepEqual(state.writes[0].payload.data, {
+      title: 'New retreats',
+      description: helper,
+    });
+    await act(async () => state.writes[0].resolve({ ok: true }));
+  } finally {
+    await act(async () => state.root.unmount());
+  }
+});
+
 test(
   'obsolete reads cannot replace the selected ' +
     'collection and unreadable files cannot be edited',

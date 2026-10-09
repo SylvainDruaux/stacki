@@ -98,7 +98,11 @@ export function usePreviewRuntime(
     [props.focusPath, hoverPath, hoverBoxPath, props.selPath, selectedBoxPath],
   );
   const registerFrame = useCallback((): void => {
-    setCanvasFrame(iframeRef.current?.contentWindow ?? undefined);
+    const frame = iframeRef.current?.contentWindow;
+    setCanvasFrame(frame ?? undefined);
+    // The frame may have announced its rendering before this listener mounted.
+    // The load handler repeats this handshake after the preload is ready.
+    frame?.postMessage({ type: 'avb:request-render' }, '*');
   }, []);
   const sendTrack = useCallback((): void => {
     iframeRef.current?.contentWindow?.postMessage(

@@ -121,6 +121,29 @@ test('the frame announces the token shared computes; events carry it', async () 
   assert.equal(click.token, announced.token, 'the click names the rendering it landed on');
 });
 
+test('late editor registration recovers the current render', async () => {
+  const { window, sent } = await frame(
+    '<!doctype html><html><body><!--avb-s:0--><p>Ready</p><!--avb-e:0-->' +
+      `${stampComment(page)}</body></html>`,
+  );
+  const first = sent.find((message) => message.type === 'avb:render');
+  assert.ok(first, 'the frame announced its initial rendering');
+  sent.length = 0; // The editor missed the announcement while its listener mounted.
+  const request = new window.MessageEvent('message', { data: { type: 'avb:request-render' } });
+  Object.defineProperty(request, 'source', { value: window.parent });
+  window.dispatchEvent(request);
+  const recovered = sent.filter((message) => message.type === 'avb:render');
+  assert.deepEqual(recovered, [first], 'registration gets the exact current manifest');
+  window.document
+    .querySelector('p')
+    .dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+  assert.equal(
+    sent.find((message) => message.type === 'avb:click-node')?.token,
+    first.token,
+    'the recovered rendering still names subsequent clicks',
+  );
+});
+
 test('a patched page announces again; a forged second version, never', async () => {
   const { window, sent } = await frame(
     '<!doctype html><html><body><!--avb-s:0--><p>x</p><!--avb-e:0-->' +
@@ -155,6 +178,14 @@ test('a patched page announces again; a forged second version, never', async () 
   window.document.dispatchEvent(new window.CustomEvent('avb:morphed'));
   await settle();
   assert.equal(sent.filter((message) => message.type === 'avb:render').length, 2);
+  const request = new window.MessageEvent('message', { data: { type: 'avb:request-render' } });
+  Object.defineProperty(request, 'source', { value: window.parent });
+  window.dispatchEvent(request);
+  assert.equal(
+    sent.filter((message) => message.type === 'avb:render').length,
+    2,
+    'registration cannot replay a token from before an invalid patch',
+  );
   window.document
     .querySelector('p')
     .dispatchEvent(new window.MouseEvent('click', { bubbles: true, cancelable: true }));

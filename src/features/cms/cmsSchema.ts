@@ -226,6 +226,51 @@ export function fieldsOf(items: readonly unknown[]): readonly CmsField[] {
   });
 }
 
+// The CMS edits content, while expression markers retain project code for
+// round-tripping. Keep those values in the data model but leave them out of
+// content forms; imported image references are still content.
+export function contentFieldsOf(items: readonly unknown[]): readonly CmsField[] {
+  return fieldsOf(items).filter(
+    (field) =>
+      field.type !== 'code' &&
+      items.some((item) => {
+        if (isExpr(item)) {
+          return false;
+        }
+        const record = toRecord(item);
+        return record !== undefined && contentValue(record[field.key], 0);
+      }),
+  );
+}
+
+export function collectionHasContent(collection: Collection): boolean {
+  if (collection.error !== undefined || collection.items.length === 0) {
+    return true;
+  }
+  const fields = fieldsOf(collection.items);
+  if (fields.length > 0) {
+    return contentFieldsOf(collection.items).length > 0;
+  }
+  return collection.items.some((item) => contentValue(item, 0));
+}
+
+function contentValue(value: unknown, depth: number): boolean {
+  assert(depth <= BOUNDARY_LIMITS.depthMax, 'CMS content value exceeds depth limit');
+  if (isExpr(value)) {
+    return inferType(value) === 'image';
+  }
+  const record = toRecord(value);
+  if (record !== undefined) {
+    const values = Object.values(record);
+    return values.length === 0 || values.some((child) => contentValue(child, depth + 1));
+  }
+  const list = toArray(value);
+  if (list !== undefined) {
+    return list.length === 0 || list.some((child) => contentValue(child, depth + 1));
+  }
+  return true;
+}
+
 const TITLE_KEYS = [
   'name',
   'title',
@@ -278,8 +323,8 @@ export function blankLike(value: unknown, depth = 0): unknown {
   }
   if (type === 'object' && isPlainObject(value)) {
     const out: Record<string, unknown> = {};
-    for (const [key, child] of Object.entries(value)) {
-      out[key] = blankLike(child, depth + 1);
+    for (const field of contentFieldsOf([value])) {
+      out[field.key] = blankLike(value[field.key], depth + 1);
     }
     return out;
   }
@@ -295,7 +340,7 @@ export function blankItem(items: readonly unknown[]): unknown {
     return sample === undefined ? {} : blankLike(sample);
   }
   const out: Record<string, unknown> = {};
-  for (const field of fieldsOf(items)) {
+  for (const field of contentFieldsOf(items)) {
     const sample = items.find((i) => isPlainObject(i) && i[field.key] !== undefined);
     out[field.key] = blankLike(isPlainObject(sample) ? sample[field.key] : '');
   }
@@ -394,6 +439,9 @@ export function objectsAt(
 
 export const fieldsAt = (items: readonly unknown[], path: readonly string[]) =>
   fieldsOf(objectsAt(items, path));
+
+export const contentFieldsAt = (items: readonly unknown[], path: readonly string[]) =>
+  contentFieldsOf(objectsAt(items, path));
 
 function transformAt(
   value: unknown,

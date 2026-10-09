@@ -48,10 +48,74 @@ function tryParseMap(exprText: string, base: number | undefined = undefined): Ma
   // this is a block-bodied or paren-less loop.
   const inBase = base === undefined ? undefined : base + 1;
   return (
+    tryParseConditionalMap(inner, inBase) ||
     tryParseConciseMap(inner, inBase) ||
     tryParseBareMap(inner, inBase) ||
     tryParseBlockMap(inner, inBase)
   );
+}
+
+// A map callback can return a conditional directly, with or without parens
+// around the ternary. Parse the conditional before treating its JSX branches
+// as unrelated template text, so both rendered alternatives remain editable.
+function tryParseConditionalMap(
+  inner: string,
+  base: number | undefined = undefined,
+): MapNode | undefined {
+  const arrow = inner.match(/^([\s\S]*?\.map\(\s*(?:\([^)]*\)|[A-Za-z_$][\w$]*)\s*=>\s*)/);
+  if (!arrow) {
+    return undefined;
+  }
+  const headRaw = required(arrow[1], 'Conditional loop header capture');
+  const mapOpen = headRaw.lastIndexOf('.map(') + '.map'.length;
+  const mapClose = findMatchingParen(inner, mapOpen);
+  if (mapClose === -1 || inner.slice(mapClose + 1).trim()) {
+    return undefined;
+  }
+  // A comma after the callback is a legal trailing argument separator, not
+  // part of the conditional expression returned by the callback.
+  const body = inner.slice(headRaw.length, mapClose).replace(/,\s*$/, '');
+  const child = conditionalMapBody(body, base === undefined ? undefined : base + headRaw.length);
+  if (!child) {
+    return undefined;
+  }
+  return {
+    id: makeId(),
+    kind: 'map',
+    head: normalizeHead(headRaw + '('),
+    children: [child],
+  };
+}
+
+function conditionalMapBody(raw: string, base: number | undefined): CondNode | undefined {
+  let text = raw.trim();
+  let at = base === undefined ? undefined : base + (raw.length - raw.trimStart().length);
+  while (text.startsWith('(') && findMatchingParen(text, 0) === text.length - 1) {
+    const inner = text.slice(1, -1);
+    const trimmed = inner.trimStart();
+    if (at !== undefined) {
+      at += 1 + (inner.length - trimmed.length);
+    }
+    text = trimmed.trimEnd();
+  }
+  // Ordinary JSX callbacks belong to the existing concise-map parser. Avoid
+  // parsing them speculatively, which would count their nodes twice.
+  if (text.startsWith('<')) {
+    return undefined;
+  }
+  const count = parseState.nodes;
+  const previousBail = parseState.lastBail;
+  const child = parseCondSource(text, at);
+  if (!child) {
+    parseState.nodes = count;
+    parseState.lastBail = previousBail;
+    return undefined;
+  }
+  if (at !== undefined) {
+    child.start = at;
+    child.end = at + text.length;
+  }
+  return child;
 }
 
 function tryParseConciseMap(

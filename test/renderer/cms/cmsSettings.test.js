@@ -126,6 +126,29 @@ test('nested schema editing preserves paths and the new field name', async () =>
   }
 });
 
+test('collection settings omit code helpers while retaining content fields', async () => {
+  const helper = { __expr: '(entry) => entry.summary || entry.subtitle' };
+  const state = fixture({
+    items: [
+      {
+        title: 'Retreats',
+        description: helper,
+        landingImages: { cover: 'hero.avif', selectImage: helper },
+      },
+    ],
+  });
+  try {
+    await state.mount();
+    const labels = () =>
+      [...document.querySelectorAll('.cms-schema-name')].map((input) => input.value);
+    assert.deepEqual(labels(), ['Title', 'Landing images']);
+    await click(document.querySelector('[title="Show its fields"]'));
+    assert.deepEqual(labels(), ['Title', 'Landing images', 'Cover']);
+  } finally {
+    await act(async () => state.root.unmount());
+  }
+});
+
 test('collection deletion handles usage and write failures before reporting success', async () => {
   let removed = 0;
   let writes = 0;

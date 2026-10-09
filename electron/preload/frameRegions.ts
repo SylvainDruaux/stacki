@@ -166,6 +166,7 @@ export const STAMP_ATTRIBUTE = 'data-avb-d';
 const STAMPS_MAX = 20000; // LIMITS.previewMarkersMax
 const MANIFEST_FILES_MAX = 512; // LIMITS.previewManifestFilesMax
 export let renderToken: string | undefined = undefined;
+let renderStamps: { readonly file: string; readonly checksum: string }[] | undefined;
 let renderSeq = 0;
 // Undefined when the page's stamps cannot form one manifest: too many, or
 // one file stamped with two checksums (a rendering mixing versions of it).
@@ -241,6 +242,7 @@ const announceRender = () => {
   renderSeq += 1;
   const seq = renderSeq;
   renderToken = undefined; // Until this rendering's digest is known, events carry none.
+  renderStamps = undefined;
   const stamps = readManifest();
   const subtle = globalThis.crypto?.subtle;
   if (!stamps || !subtle) {
@@ -254,17 +256,31 @@ const announceRender = () => {
       } // A newer rendering has announced itself.
       const bytes = Array.from(new Uint8Array(digest));
       renderToken = bytes.map((byte) => byte.toString(16).padStart(2, '0')).join('');
-      try {
-        window.parent.postMessage({ type: 'avb:render', token: renderToken, stamps }, '*');
-      } catch {
-        /* no parent to tell */
-      }
+      renderStamps = stamps;
+      reportRender();
     },
     () => {
       /* no digest, no token: the app refuses this rendering's events */
     },
   );
 };
+
+// The first announcement can precede the editor's message listener on a fast
+// iframe load. Re-send the verified rendering when the editor registers the
+// frame, without rehashing or briefly clearing its token.
+export function reportRender(): void {
+  if (renderToken === undefined || renderStamps === undefined) {
+    return;
+  }
+  try {
+    window.parent.postMessage(
+      { type: 'avb:render', token: renderToken, stamps: renderStamps },
+      '*',
+    );
+  } catch {
+    /* no parent to tell */
+  }
+}
 
 // Element nodes also carry their path as an attribute, because the node
 // references above go stale: the page's own scripts are free to rebuild
