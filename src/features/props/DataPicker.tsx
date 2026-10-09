@@ -1,6 +1,7 @@
 import React, { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { assert } from '../../../shared/core/assert';
 import { LIMITS } from '../../../shared/core/limits';
+import type { LoopSourceInspection } from './loopSourceInspection';
 import {
   ChevronRightIcon,
   ChevronLeftIcon,
@@ -142,6 +143,8 @@ export interface PickerNode {
 export interface DataPickerProps {
   readonly tree?: readonly PickerNode[] | undefined;
   readonly current?: string | undefined;
+  readonly sourceInspection?: LoopSourceInspection | undefined;
+  readonly onEditSource?: (() => void) | undefined;
   readonly entries?: Entries | undefined;
   readonly onStepItem?: (path: string, step: -1 | 1, count: number) => void;
   readonly onPick: (path: string, query: PickerNode['query'] | undefined) => void;
@@ -153,9 +156,19 @@ export interface DataPickerProps {
 }
 
 export default function DataPicker(props: DataPickerProps) {
-  const { entries, onStepItem, onPick, onWrite, onEdit, editLabel = 'Edit', footer = true } = props;
+  const {
+    entries,
+    onStepItem,
+    onPick,
+    onWrite,
+    onEdit,
+    editLabel = 'Edit',
+    footer = true,
+    sourceInspection,
+    onEditSource,
+  } = props;
   const state = useDataPicker(props);
-  const { query, setQuery, searchRef, listRef, matches, tree } = state;
+  const { query, setQuery, searchRef, listRef } = state;
   return (
     <div className="data-picker">
       {/* Which entry the values below are FROM. A dynamic route stands for
@@ -163,6 +176,7 @@ export default function DataPicker(props: DataPickerProps) {
           stepping through them previews the page against other content and
           re-reads this list against it at the same time. */}
       {entries && entries.count > 1 && <EntryNavigation entries={entries} />}
+      {sourceInspection && <LoopSourceSummary source={sourceInspection} onEdit={onEditSource} />}
       <div className="dp-search">
         <SearchIcon size={12} />
         <input
@@ -174,33 +188,7 @@ export default function DataPicker(props: DataPickerProps) {
           onChange={(event) => setQuery(event.target.value)}
         />
       </div>
-      <div className="dp-list" ref={listRef}>
-        {/* A search flattens the tree: what you want is the row, not where it
-            sits, and full paths say where that is anyway. */}
-        {matches ? (
-          matches.map((node) => (
-            <DataRow
-              key={node.path}
-              node={node}
-              depth={0}
-              showPath
-              root={undefined}
-              state={state}
-              onPick={onPick}
-              onStepItem={onStepItem}
-            />
-          ))
-        ) : (
-          <DataRoots nodes={tree} state={state} onPick={onPick} onStepItem={onStepItem} />
-        )}
-        {((matches && !matches.length) || (!matches && !(tree || []).length)) && (
-          <div className="dp-empty">
-            {matches
-              ? 'Nothing matches'
-              : 'No data in scope here — add a prop to this file, or a const to its frontmatter.'}
-          </div>
-        )}
-      </div>
+      <DataPickerResults state={state} onPick={onPick} onStepItem={onStepItem} listRef={listRef} />
       {/* Above "Write an expression…", because it is about the thing already
           bound rather than about replacing it. Only ever rendered for a picker
           opened on a specific chip — the field's own handle opens this on
@@ -216,6 +204,91 @@ export default function DataPicker(props: DataPickerProps) {
           <CodeIcon size={11} />
           Write an expression…
         </div>
+      )}
+    </div>
+  );
+}
+
+function DataPickerResults({
+  state,
+  onPick,
+  onStepItem,
+  listRef,
+}: {
+  readonly state: PickerState;
+  readonly onPick: DataPickerProps['onPick'];
+  readonly onStepItem: DataPickerProps['onStepItem'];
+  readonly listRef: React.RefObject<HTMLDivElement>;
+}) {
+  const { matches, tree } = state;
+  return (
+    <div className="dp-list" ref={listRef}>
+      {/* Search uses full paths because the flattened rows lose their parents. */}
+      {matches ? (
+        matches.map((node) => (
+          <DataRow
+            key={node.path}
+            node={node}
+            depth={0}
+            showPath
+            root={undefined}
+            state={state}
+            onPick={onPick}
+            onStepItem={onStepItem}
+          />
+        ))
+      ) : (
+        <DataRoots nodes={tree} state={state} onPick={onPick} onStepItem={onStepItem} />
+      )}
+      {((matches && !matches.length) || (!matches && !tree.length)) && (
+        <div className="dp-empty">
+          {matches
+            ? 'Nothing matches'
+            : 'No data in scope here — add a prop to this file, or a const to its frontmatter.'}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function LoopSourceSummary({
+  source,
+  onEdit,
+}: {
+  readonly source: LoopSourceInspection;
+  readonly onEdit: (() => void) | undefined;
+}) {
+  return (
+    <div className="dp-source-summary">
+      <div className="dp-source-heading">Looping over</div>
+      <div className="dp-source-path" title={source.path}>
+        {source.path}
+      </div>
+      <div className="dp-source-origin" title={source.origin}>
+        {source.count === undefined
+          ? 'Source'
+          : `${source.count} ${source.count === 1 ? 'item' : 'items'}`}
+        {' · '}
+        {source.origin}
+      </div>
+      {source.items.length > 0 && (
+        <div className="dp-source-items">
+          {source.items.map((item, index) => (
+            <div className="dp-source-item" key={index} title={item}>
+              <span>{index + 1}</span>
+              {item}
+            </div>
+          ))}
+          {source.count !== undefined && source.count > source.items.length && (
+            <div className="dp-source-more">+{source.count - source.items.length} more items</div>
+          )}
+        </div>
+      )}
+      {source.note && <div className="dp-source-note">{source.note}</div>}
+      {onEdit && (
+        <button type="button" className="dp-source-edit" onClick={onEdit}>
+          <PencilIcon size={11} /> Open source to edit
+        </button>
       )}
     </div>
   );

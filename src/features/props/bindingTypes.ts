@@ -10,6 +10,7 @@ import type { TemplateHole } from '../../editor/bindings';
 import type { RichContext } from './RichContent';
 import type { ChipsOf } from '../../ui/ExprInput';
 import type { PickerNode } from './DataPicker';
+import type { LoopSourceInspection } from './loopSourceInspection';
 
 export interface FieldPosition {
   readonly left: number;
@@ -19,6 +20,8 @@ export interface FieldPosition {
 export interface SourceContext {
   readonly frontmatter?: string | undefined;
   readonly imports?: unknown;
+  readonly projectPath?: string | undefined;
+  readonly filePath?: string | undefined;
   readonly onSetFrontmatter?: ((source: string) => void) | undefined;
   readonly onOpenSymbol?: ((name: string) => void) | undefined;
 }
@@ -65,6 +68,8 @@ export interface FieldDataPickerProps extends BindingContextProps {
   readonly pos: FieldPosition;
   readonly current?: string | undefined;
   readonly tree?: readonly PickerNode[] | undefined;
+  readonly sourceInspection?: LoopSourceInspection | undefined;
+  readonly onEditSource?: (() => void) | undefined;
   readonly onPick: (path: string) => void;
   readonly onWrite?: (() => void) | undefined;
   readonly onClose: () => void;

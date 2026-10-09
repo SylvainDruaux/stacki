@@ -9,6 +9,8 @@ import { HTML_TAGS } from '../../editor/elementSchemas';
 import { dataTree, listsOnly } from '../../editor/dataSuggest';
 import ExprInput from '../../ui/ExprInput';
 import { BindHandle, FieldDataPicker, SourceEditButton, referencedName } from './propBindings';
+import { VarSourceEditor } from './BindingEditors';
+import { useLoopSourceInspection } from './useLoopSourceInspection';
 import {
   elementIcon,
   astroAssetIcon,
@@ -223,7 +225,7 @@ function useMapEditor(props: MapEditorProps) {
     }
     setSourceMenu({
       left: rect.left,
-      top: Math.min(rect.bottom + 4, Math.max(60, window.innerHeight - 340)),
+      top: Math.min(rect.bottom + 4, Math.max(60, window.innerHeight - 564)),
       width: Math.max(rect.width, 240),
     });
   };
@@ -538,7 +540,7 @@ function MapSourcePicker({ state }: { readonly state: ReturnType<typeof useMapEd
   const {
     loopContext,
     bindContext,
-
+    dataContext,
     fields,
     update,
 
@@ -549,13 +551,31 @@ function MapSourcePicker({ state }: { readonly state: ReturnType<typeof useMapEd
 
     isNoSource,
   } = state;
+  const path = isNoSource ? '' : sourceChip(fields.data);
+  const source = useLoopSourceInspection(dataContext, path, { open: sourceMenu !== undefined });
+  const [sourceEditor, setSourceEditor] = useState<FieldPosition | undefined>(undefined);
+  const tree = dataTree(bindContext || loopContext || {}).map((node) =>
+    node.path === source.root && source.inspection?.tree
+      ? { ...source.inspection.tree, ...(node.section ? { section: node.section } : {}) }
+      : node,
+  );
+  const editSource = () => {
+    if (source.local && sourceMenu) {
+      setSourceEditor(sourceMenu);
+    } else if (source.imported) {
+      dataContext?.onOpenSymbol?.(source.root);
+    }
+    setSourceMenu(undefined);
+  };
   return (
     <>
       {sourceMenu && (
         <FieldDataPicker
           pos={sourceMenu}
           bindContext={bindContext || loopContext}
-          tree={listsOnly(dataTree(bindContext || loopContext || {}))}
+          tree={listsOnly(tree)}
+          sourceInspection={source.inspection}
+          onEditSource={source.local || source.imported ? editSource : undefined}
           current={isNoSource ? undefined : sourceChip(fields.data) || fields.data.trim()}
           onPick={(path) => {
             setSourceMenu(undefined);
@@ -570,6 +590,15 @@ function MapSourcePicker({ state }: { readonly state: ReturnType<typeof useMapEd
             }
           }}
           onClose={() => setSourceMenu(undefined)}
+        />
+      )}
+      {sourceEditor && (
+        <VarSourceEditor
+          pos={sourceEditor}
+          name={source.root}
+          code={dataContext?.frontmatter ?? ''}
+          onChangeCode={dataContext?.onSetFrontmatter}
+          onClose={() => setSourceEditor(undefined)}
         />
       )}
     </>

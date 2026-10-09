@@ -44,6 +44,8 @@ export function panelDataContext(props: PropsPanelProps): SourceContext {
   return {
     frontmatter: props.loopContext?.frontmatter || '',
     imports: props.frontmatterSource || '',
+    projectPath: props.projectPath,
+    filePath: props.filePath,
     onSetFrontmatter: props.onSetFrontmatter,
     onOpenSymbol: props.onOpenSymbol,
   };

@@ -283,6 +283,8 @@ export function FieldDataPicker({
   bindContext,
   current,
   tree,
+  sourceInspection,
+  onEditSource,
   onPick,
   onWrite,
   onClose,
@@ -328,11 +330,13 @@ export function FieldDataPicker({
 
   return (
     <div
-      className="dd-popup bind-menu"
+      className={`dd-popup bind-menu${sourceInspection ? ' loop-source-menu' : ''}`}
       style={{ left: position.left, top: position.top, width: position.width }}
     >
       <DataPicker
         tree={tree || dataTree(bindContext || {})}
+        sourceInspection={sourceInspection}
+        onEditSource={onEditSource}
         current={current ?? undefined}
         entries={bindContext?.entryNav ?? undefined}
         {...definedFields({ onStepItem: bindContext?.onStepItem })}
