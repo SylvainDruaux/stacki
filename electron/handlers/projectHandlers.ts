@@ -6,9 +6,14 @@ import { toRecord } from '../../shared/core/record';
 import { assert } from '../../shared/core/assert';
 import * as path from 'path';
 import * as fs from 'fs';
-import { spawn } from 'child_process';
-import { createStarter, newSiteDirectory } from '../project/starter';
-import { isWin, errorMessage } from '../lib/mainHelpers';
+import {
+  createStarter,
+  newSiteDirectory,
+  runCreateCommand,
+  startSiteHistory,
+  STARTERS,
+} from '../project/starter';
+import { isWin } from '../lib/mainHelpers';
 import { ensureToolPath, run } from '../lib/nodeTools';
 import { isAstroProject } from '../project/projectFiles';
 import { detectPackageManager, installArguments } from '../project/packageManager';
@@ -78,8 +83,8 @@ function registerProjectCreateAstroHandlers({
       '--',
       '--template',
       template,
-      install ? '--install' : '--no-install',
-      git ? '--git' : '--no-git',
+      '--no-install', // Stacki installs, then makes the first commit (finishNewSite).
+      '--no-git',
       ...(ai ? [] : ['--no-ai']),
       '--skip-houston',
       '--yes', // accept defaults for anything not covered above
@@ -87,6 +92,7 @@ function registerProjectCreateAstroHandlers({
 
     send('create:log', `> npm ${args.join(' ')}\n\n`);
     await runCreateAstroInNewFolder({ send }, directory, args);
+    await finishNewSite({ send }, directory, { install, history: git, label: 'Astro' });
     return { ok: true as const, installed: install, projectPath: directory };
   });
 
@@ -116,9 +122,8 @@ function registerProjectCreateAstroHandlers({
         name,
         onLog: (text) => send('create:log', text),
       });
-      send('create:log', '\n> installing dependencies\n');
-      await installDependencies({ send }, result.projectPath);
-      send('progress', PROGRESS_CLEARED);
+      const label = STARTERS[starter]?.label ?? starter;
+      await finishNewSite({ send }, result.projectPath, { install: true, history: true, label });
       return result;
     },
   );
@@ -141,6 +146,27 @@ export async function installDependencies({ send }: Pick<MainHost, 'send'>, dire
     }
     throw new Error(`${pm} install failed: ${gitErrorDetail(error).slice(-400)}`);
   }
+}
+
+// The install comes first, so the site's first commit includes the lockfile. The site gets
+// its history even when the install fails; the install error still reaches the wizard.
+async function finishNewSite(
+  { send }: Pick<MainHost, 'send'>,
+  directory: string,
+  options: { readonly install: boolean; readonly history: boolean; readonly label: string },
+): Promise<void> {
+  const onLog = (text: string): void => send('create:log', text);
+  try {
+    if (options.install) {
+      onLog('\n> installing dependencies\n');
+      await installDependencies({ send }, directory);
+    }
+  } finally {
+    if (options.history) {
+      await startSiteHistory(directory, options.label, onLog);
+    }
+  }
+  send('progress', PROGRESS_CLEARED);
 }
 
 // Clears the progress line: no message (src/ipc/appBridge.ts, onAppProgress). IPC is
@@ -167,57 +193,14 @@ async function runCreateAstroInNewFolder(
 
 // The create-astro run itself, its output streamed to the wizard's log. It
 // settles once the CLI exits and a package.json has landed in `directory`.
-function runCreateAstro(
+async function runCreateAstro(
   { send }: Pick<MainHost, 'send'>,
   directory: string,
   args: readonly string[],
 ): Promise<void> {
-  return new Promise((resolve, reject) => {
-    let proc;
-    try {
-      proc = spawn(isWin ? 'npm.cmd' : 'npm', [...args], {
-        cwd: directory,
-        shell: isWin,
-        env: { ...process.env, FORCE_COLOR: '0', NO_COLOR: '1', CI: '1' },
-      });
-    } catch (error: unknown) {
-      reject(new Error(`Could not run npm: ${errorMessage(error)}`));
-      return;
-    }
-
-    let tail = '';
-    const onOut = (chunk: Buffer) => {
-      // create-astro animates with cursor moves and line clears; strip the
-      // escape codes so the log pane reads as plain text.
-      const text = chunk
-        .toString()
-        .replace(/\x1b\[[0-9;?]*[A-Za-z]/g, '')
-        .replace(/\r/g, '\n');
-      tail = (tail + text).slice(-4000);
-      send('create:log', text);
-    };
-    proc.stdout.on('data', onOut);
-    proc.stderr.on('data', onOut);
-    proc.on('error', (error) => {
-      reject(
-        new Error(
-          toRecord(error)?.['code'] === 'ENOENT'
-            ? 'npm could not be found. Install Node.js (which includes npm) and try again.'
-            : `Could not run npm: ${errorMessage(error)}`,
-        ),
-      );
-    });
-    proc.on('exit', (code) => {
-      if (code === 0) {
-        // Sanity-check that a project actually landed.
-        if (!fs.existsSync(path.join(directory, 'package.json'))) {
-          reject(new Error(`create-astro finished but no package.json appeared.\n\n${tail}`));
-          return;
-        }
-        resolve();
-      } else {
-        reject(new Error(`create-astro exited with code ${code}.\n\n${tail}`));
-      }
-    });
-  });
+  const npm = isWin ? 'npm.cmd' : 'npm';
+  await runCreateCommand(npm, args, directory, (text) => send('create:log', text));
+  if (!fs.existsSync(path.join(directory, 'package.json'))) {
+    throw new Error('create-astro finished but no package.json appeared.');
+  }
 }

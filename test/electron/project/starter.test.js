@@ -18,7 +18,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { execFileSync } = require('child_process');
-const { createStarter, STARTERS } = require('#dist/electron/project/starter.js');
+const { createStarter, startSiteHistory, STARTERS } = require('#dist/electron/project/starter.js');
 
 const failures = [];
 let checked = 0;
@@ -142,7 +142,9 @@ console.log('Ready.');
   check('the package takes the site name', pkg.name === 'my-site', pkg.name);
   check('and keeps everything else', pkg.dependencies?.astro === '^7.1.4');
 
-  // The history is theirs.
+  // The history is theirs, started by the caller once the install is done.
+  check('creating leaves the history to the caller', !fs.existsSync(path.join(directory, '.git')));
+  await startSiteHistory(directory, 'Lumos', (text) => log.push(text));
   check('it is a git repository', fs.existsSync(path.join(directory, '.git')));
   const commits = git(directory, ['rev-list', '--count', 'HEAD']).trim();
   check('starting at one commit', commits === '1', `${commits} commits`);
@@ -238,6 +240,7 @@ g('-c', 'user.email=t@t', '-c', 'user.name=T',
 `,
     );
     const own = await createStarter({ npm: withGit, parentPath: parent, name: 'has-history' });
+    await startSiteHistory(own.projectPath, 'Lumos');
     check(
       "the scaffolder's own first commit is left alone",
       /Initial commit from the scaffolder/.test(git(own.projectPath, ['log', '-1', '--pretty=%s'])),

@@ -4,6 +4,7 @@ import { spawn } from 'child_process';
 
 import { toRecord } from '../../shared/core/record';
 import { commandNeedsShell } from '../lib/platform';
+import { stopProcessTree } from '../lib/nodeTools';
 
 // Starting a site from a starter.
 //
@@ -39,6 +40,10 @@ const NAME_RE = /^[A-Za-z0-9._-]+$/;
 
 type OnLog = (text: string) => void;
 
+// A scaffolder only downloads a template, so a run this long has stalled, and the wizard
+// cannot be closed while it waits.
+const RUN_TIMEOUT_MS = 5 * 60 * 1000;
+
 const run = (cmd: string, args: readonly string[], cwd: string, onLog?: OnLog): Promise<string> =>
   new Promise((resolve, reject) => {
     let proc;
@@ -47,6 +52,8 @@ const run = (cmd: string, args: readonly string[], cwd: string, onLog?: OnLog): 
         cwd,
         // On Windows npm is a .cmd shim, which needs a shell to be found.
         shell: commandNeedsShell(cmd),
+        // Its own process group, so a stalled run is stopped with what it started.
+        detached: !isWin,
         env: {
           ...process.env,
           GIT_TERMINAL_PROMPT: '0',
@@ -63,6 +70,13 @@ const run = (cmd: string, args: readonly string[], cwd: string, onLog?: OnLog): 
       );
       return;
     }
+    const child = proc;
+    const timer = setTimeout(() => {
+      stopProcessTree(child);
+      reject(
+        new Error(`${path.basename(cmd)} ${args[0] ?? ''} took over 5 minutes and was stopped.`),
+      );
+    }, RUN_TIMEOUT_MS);
     let tail = '';
     const onOut = (chunk: { toString(): string }): void => {
       // Progress spinners are drawn with cursor moves and line clears; strip
@@ -77,6 +91,7 @@ const run = (cmd: string, args: readonly string[], cwd: string, onLog?: OnLog): 
     proc.stdout.on('data', onOut);
     proc.stderr.on('data', onOut);
     proc.on('error', (error: Error) => {
+      clearTimeout(timer);
       const code = toRecord(error)?.['code'];
       reject(
         new Error(
@@ -88,11 +103,14 @@ const run = (cmd: string, args: readonly string[], cwd: string, onLog?: OnLog): 
         ),
       );
     });
-    proc.on('exit', (code) =>
-      code === 0
-        ? resolve(tail)
-        : reject(new Error(`${cmd} ${args[0] ?? ''} exited with code ${code}.\n\n${tail}`)),
-    );
+    proc.on('exit', (code) => {
+      clearTimeout(timer);
+      if (code === 0) {
+        resolve(tail);
+      } else {
+        reject(new Error(`${cmd} ${args[0] ?? ''} exited with code ${code}.\n\n${tail}`));
+      }
+    });
   });
 
 interface CreateStarterOptions {
@@ -105,8 +123,8 @@ interface CreateStarterOptions {
 }
 
 /**
- * Runs a starter's scaffolder in `parentPath` to make `parentPath/name`, then
- * gives the site a history of its own. Installing what it needs is the
+ * Runs a starter's scaffolder in `parentPath` to make `parentPath/name`.
+ * Installing what it needs and its first commit (`startSiteHistory`) are the
  * caller's — this is the part that has to be right before anything is
  * installed into it.
  */
@@ -149,37 +167,44 @@ async function createStarter({
     /* an unusual package.json is not worth failing the site over */
   }
 
+  return { ok: true, projectPath: directory };
+}
+
+/**
+ * Gives a new site a history of its own: one commit of the site as it stands.
+ * The caller runs it after the install, so the lockfile is part of that commit.
+ */
+async function startSiteHistory(directory: string, label: string, onLog?: OnLog): Promise<void> {
   // A scaffolder that started a history of its own has already done this, and
   // its first commit is the one to keep.
-  if (!fs.existsSync(path.join(directory, '.git'))) {
-    onLog?.('\n> starting a history for this site\n');
-    try {
-      await run('git', ['init', '-b', 'main'], directory);
-      await run('git', ['add', '-A'], directory);
-      // A first-time Git installation has no author configured yet. Give only
-      // this generated commit a neutral identity; do not change the user's
-      // repository or global configuration behind their back.
-      await run(
-        'git',
-        [
-          '-c',
-          'user.name=Stacki',
-          '-c',
-          'user.email=stacki@local.invalid',
-          'commit',
-          '-m',
-          `Start ${folder} from ${template.label}`,
-        ],
-        directory,
-      );
-    } catch (error: unknown) {
-      // A site with no git still runs; say so rather than throwing it away.
-      const reason = error instanceof Error ? error.message : String(error);
-      onLog?.(`\n(could not start a git history: ${reason})\n`);
-    }
+  if (fs.existsSync(path.join(directory, '.git'))) {
+    return;
   }
-
-  return { ok: true, projectPath: directory };
+  onLog?.('\n> starting a history for this site\n');
+  try {
+    await run('git', ['init', '-b', 'main'], directory);
+    await run('git', ['add', '-A'], directory);
+    // A first-time Git installation has no author configured yet. Give only
+    // this generated commit a neutral identity; do not change the user's
+    // repository or global configuration behind their back.
+    await run(
+      'git',
+      [
+        '-c',
+        'user.name=Stacki',
+        '-c',
+        'user.email=stacki@local.invalid',
+        'commit',
+        '-m',
+        `Start ${path.basename(directory)} from ${label}`,
+      ],
+      directory,
+    );
+  } catch (error: unknown) {
+    // A site with no git still runs; say so rather than throwing it away.
+    const reason = error instanceof Error ? error.message : String(error);
+    onLog?.(`\n(could not start a git history: ${reason})\n`);
+  }
 }
 
 /**
@@ -205,4 +230,4 @@ function newSiteDirectory(parentPath: string | undefined, name: string | undefin
   return directory;
 }
 
-export { createStarter, newSiteDirectory, STARTERS };
+export { createStarter, newSiteDirectory, run as runCreateCommand, startSiteHistory, STARTERS };
