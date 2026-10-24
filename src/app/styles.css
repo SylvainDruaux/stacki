@@ -8207,11 +8207,15 @@ textarea::selection {
 /* Start from a template: a name, where it goes, and what that means. */
 /* Beats `.modal-body label { display: block }`, which would drop the gap and leave the
    field's name jammed against its input. The gap matches the template question's 6px. */
-.modal-body label.starter-field {
+.modal-body .starter-field {
   display: flex;
   flex-direction: column;
   gap: 6px;
   margin-bottom: 0;
+}
+/* Picking an option refocuses the dropdown; only keyboard focus needs the accent border. */
+.starter-field .dd-trigger:focus:not(:focus-visible) {
+  border-color: transparent;
 }
 .starter-field > span {
   font-size: 11.5px;

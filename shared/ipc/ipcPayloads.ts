@@ -5,6 +5,7 @@ import { parseCanvasCreate, defaultsCanvasFile } from '../properties/defaultsCan
 import { parseDiscoveryRequest } from '../properties/publishDiscovery';
 import { parsePublishCommitMessage, parsePublishTarget } from '../properties/publishConfig';
 import { metadataKind, parseMetadataWrite } from '../properties/projectMetadata';
+import { parseCreatePackageManager } from '../properties/packageManager';
 import { parseImageFormat, parseImagePath } from './assetConversion';
 import { parseGitHubRepository } from './githubRepository';
 import { parseCommitDiffRequest } from './gitCommitDiff';
@@ -270,8 +271,14 @@ export const IPC_PAYLOADS = {
     install: maybeFlag,
     git: maybeFlag,
     ai: maybeFlag,
+    packageManager: optional(parseCreatePackageManager),
   }),
-  'project:createStarter': object({ starter: optional(text), parentPath: pathText, name: text }),
+  'project:createStarter': object({
+    starter: optional(text),
+    parentPath: pathText,
+    name: text,
+    packageManager: optional(parseCreatePackageManager),
+  }),
   'project:injectedRoutes': object({ ...project }),
   'project:openDialog': nothing,
   'project:parentDialog': nothing,

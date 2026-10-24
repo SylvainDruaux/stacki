@@ -11,6 +11,7 @@ import {
 } from '../../../shared/core/boundary';
 import { parseIpcPayload } from '../../../shared/ipc/ipcPayloads';
 import type { Result } from '../../../shared/core/result';
+import type { CreatePackageManager } from '../../../shared/properties/packageManager';
 import { cleanError } from '../../lib/cleanError';
 
 export type RecentProject = IpcResults['recents:list'][number];
@@ -26,6 +27,7 @@ export interface AstroProjectOptions {
   readonly install: boolean;
   readonly git: boolean;
   readonly ai: boolean;
+  readonly packageManager: CreatePackageManager;
 }
 
 export function parseRecentProjects(input: unknown): readonly RecentProject[] {
@@ -93,11 +95,16 @@ export function chooseStarterParent() {
   return welcomeRequest(parseParentDialog, () => window.avb.parentDialog(payload));
 }
 
-export function createStarterProject(parentPath: string, name: string) {
+export function createStarterProject(
+  parentPath: string,
+  name: string,
+  packageManager: CreatePackageManager,
+) {
   const payload = parseIpcPayload('project:createStarter', {
     starter: 'lumos',
     parentPath,
     name,
+    packageManager,
   });
   return welcomeRequest(parseStarterResult, () => window.avb.createStarter(payload));
 }
@@ -110,6 +117,7 @@ export function createAstroProject(options: AstroProjectOptions) {
     install: options.install,
     git: options.git,
     ai: options.ai,
+    packageManager: options.packageManager,
   });
   return welcomeRequest(parseAstroResult, () => window.avb.createAstroProject(payload));
 }

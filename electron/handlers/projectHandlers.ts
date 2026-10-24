@@ -6,6 +6,7 @@ import { toRecord } from '../../shared/core/record';
 import { assert } from '../../shared/core/assert';
 import * as path from 'path';
 import * as fs from 'fs';
+import * as os from 'os';
 import {
   createStarter,
   newSiteDirectory,
@@ -17,6 +18,7 @@ import { isWin } from '../lib/mainHelpers';
 import { ensureToolPath, run } from '../lib/nodeTools';
 import { isAstroProject } from '../project/projectFiles';
 import { detectPackageManager, installArguments } from '../project/packageManager';
+import { packageManagerLabel, type PackageManager } from '../../shared/properties/packageManager';
 import type { MainHost } from './mainHost';
 
 export function registerProjectHandlers(
@@ -24,6 +26,7 @@ export function registerProjectHandlers(
 ): void {
   registerProjectOpenDialogHandlers(host);
   registerProjectCreateAstroHandlers(host);
+  registerProjectCreateStarterHandlers(host);
 }
 
 function registerProjectOpenDialogHandlers({
@@ -71,9 +74,13 @@ function registerProjectCreateAstroHandlers({
       install = true,
       git = true,
       ai = false,
+      packageManager = 'npm',
     } = options || {};
     const directory = newSiteDirectory(parentPath, name);
     ensureToolPath(); // npm is a Node shim — same PATH problem as astro
+    if (install) {
+      await requirePackageManager(packageManager);
+    }
     fs.mkdirSync(directory);
 
     const args = [
@@ -92,7 +99,12 @@ function registerProjectCreateAstroHandlers({
 
     send('create:log', `> npm ${args.join(' ')}\n\n`);
     await runCreateAstroInNewFolder({ send }, directory, args);
-    await finishNewSite({ send }, directory, { install, history: git, label: 'Astro' });
+    await finishNewSite({ send }, directory, {
+      install,
+      manager: packageManager,
+      history: git,
+      label: 'Astro',
+    });
     return { ok: true as const, installed: install, projectPath: directory };
   });
 
@@ -108,14 +120,20 @@ function registerProjectCreateAstroHandlers({
     }
     return { canceled: false as const, parentPath: result.filePaths[0] };
   });
+}
 
+function registerProjectCreateStarterHandlers({
+  ipcMain,
+  send,
+}: Pick<MainHost, 'ipcMain' | 'send'>): void {
   // Starting from a starter. The scaffolder, the first commit and the package's
   // name are in ./starter.js; what is here is the install that follows and the
   // log the wizard reads.
   ipcMain.handle(
     'project:createStarter',
-    async (_event, { starter = 'lumos', parentPath, name }) => {
+    async (_event, { starter = 'lumos', parentPath, name, packageManager = 'npm' }) => {
       ensureToolPath(); // npm and git are both on the PATH the Dock does not have
+      await requirePackageManager(packageManager);
       const result = await createStarter({
         starter,
         parentPath,
@@ -123,15 +141,23 @@ function registerProjectCreateAstroHandlers({
         onLog: (text) => send('create:log', text),
       });
       const label = STARTERS[starter]?.label ?? starter;
-      await finishNewSite({ send }, result.projectPath, { install: true, history: true, label });
+      await finishNewSite({ send }, result.projectPath, {
+        install: true,
+        manager: packageManager,
+        history: true,
+        label,
+      });
       return result;
     },
   );
 }
 
-export async function installDependencies({ send }: Pick<MainHost, 'send'>, directory: string) {
+export async function installDependencies(
+  { send }: Pick<MainHost, 'send'>,
+  directory: string,
+  pm: PackageManager = detectPackageManager(directory),
+) {
   ensureToolPath(); // npm/pnpm/yarn are Node shims — same PATH problem as astro
-  const pm = detectPackageManager(directory);
   send('progress', { message: `Installing dependencies (${pm} install)…` });
   try {
     await run(isWin ? `${pm}.cmd` : pm, [...installArguments(pm)], directory, {
@@ -148,18 +174,37 @@ export async function installDependencies({ send }: Pick<MainHost, 'send'>, dire
   }
 }
 
+// A new site is only started when its manager can install it, so a missing one fails before
+// any folder exists. On Windows a missing command fails without ENOENT, so any failure counts.
+async function requirePackageManager(manager: PackageManager): Promise<void> {
+  try {
+    await run(isWin ? `${manager}.cmd` : manager, ['--version'], os.homedir());
+  } catch {
+    throw new Error(`${packageManagerLabel(manager)} is not installed. Install it or choose npm.`);
+  }
+}
+
 // The install comes first, so the site's first commit includes the lockfile. The site gets
 // its history even when the install fails; the install error still reaches the wizard.
 async function finishNewSite(
   { send }: Pick<MainHost, 'send'>,
   directory: string,
-  options: { readonly install: boolean; readonly history: boolean; readonly label: string },
+  options: {
+    readonly install: boolean;
+    readonly manager: PackageManager;
+    readonly history: boolean;
+    readonly label: string;
+  },
 ): Promise<void> {
   const onLog = (text: string): void => send('create:log', text);
   try {
     if (options.install) {
-      onLog('\n> installing dependencies\n');
-      await installDependencies({ send }, directory);
+      // A starter's npm lockfile would sit beside the chosen manager's own and misname it.
+      if (options.manager !== 'npm') {
+        fs.rmSync(path.join(directory, 'package-lock.json'), { force: true });
+      }
+      onLog(`\n> installing dependencies with ${packageManagerLabel(options.manager)}\n`);
+      await installDependencies({ send }, directory, options.manager);
     }
   } finally {
     if (options.history) {

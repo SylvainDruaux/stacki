@@ -4,7 +4,20 @@
 export const PACKAGE_MANAGERS = ['npm', 'pnpm', 'yarn', 'bun'] as const;
 export type PackageManager = (typeof PACKAGE_MANAGERS)[number];
 
+// The managers a new site can be created with: those tested end to end so far. Yarn's newer
+// versions skip node_modules by default, which the preview has not been checked against.
+export const CREATE_PACKAGE_MANAGERS = ['npm', 'pnpm'] as const satisfies readonly PackageManager[];
+export type CreatePackageManager = (typeof CREATE_PACKAGE_MANAGERS)[number];
+
 const FIELD_CHARS_MAX = 256;
+
+export function parseCreatePackageManager(input: unknown): CreatePackageManager {
+  const manager = CREATE_PACKAGE_MANAGERS.find((candidate) => candidate === input);
+  if (manager === undefined) {
+    throw new Error(`Package manager: expected ${CREATE_PACKAGE_MANAGERS.join(' or ')}`);
+  }
+  return manager;
+}
 
 // The name people know each manager by, for messages.
 export function packageManagerLabel(manager: PackageManager): string {
