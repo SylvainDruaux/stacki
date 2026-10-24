@@ -277,7 +277,6 @@ export const IPC_PAYLOADS = {
   'project:parentDialog': nothing,
   'project:pending': nothing,
   'project:resolveImport': object({ ...source }),
-  'project:scaffold': object({ dir: pathText, name: text }),
   'project:scan': pathText,
   'recents:add': pathText,
   'recents:list': nothing,

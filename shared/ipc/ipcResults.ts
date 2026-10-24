@@ -597,9 +597,6 @@ export interface IpcResults {
   readonly 'project:resolveImport': {
     readonly path: undefined | string;
   };
-  readonly 'project:scaffold': {
-    readonly ok: true;
-  };
   readonly 'project:scan': {
     readonly pages: ReadonlyArray<{
       readonly path: string;

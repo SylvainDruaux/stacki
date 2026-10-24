@@ -1,5 +1,5 @@
 // The project IPC: opening and creating projects (from a dialog, the Astro
-// template, a starter or a scaffold), and installing their dependencies.
+// template or a starter), and installing their dependencies.
 
 import { gitErrorDetail } from '../git/git';
 import { toRecord } from '../../shared/core/record';
@@ -7,7 +7,6 @@ import { assert } from '../../shared/core/assert';
 import * as path from 'path';
 import * as fs from 'fs';
 import { spawn } from 'child_process';
-import { scaffoldProject } from '../project/scaffold';
 import { createStarter, newSiteDirectory } from '../project/starter';
 import { isWin, errorMessage } from '../lib/mainHelpers';
 import { ensureToolPath, run } from '../lib/nodeTools';
@@ -123,12 +122,6 @@ function registerProjectCreateAstroHandlers({
       return result;
     },
   );
-
-  ipcMain.handle('project:scaffold', async (_event, { dir: directory, name }) => {
-    scaffoldProject(directory, name);
-    await installDependencies({ send }, directory);
-    return { ok: true as const };
-  });
 }
 
 export async function installDependencies({ send }: Pick<MainHost, 'send'>, directory: string) {

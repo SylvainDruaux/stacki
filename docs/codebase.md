@@ -27,7 +27,7 @@ lets you edit its pages visually:
   assistant so it knows exactly which markup is meant. Making the project
   legible to AI tools is a first-class goal of the design.
 - Pages too complex for the visual model fall back to a code editor with live
-  preview; "New Project…" scaffolds a minimal Astro starter.
+  preview; "Start from Lumos" and "Start from Astro" create a new site.
 
 The product constraint that shapes everything below: Stacki edits files that
 are _also_ edited by hand and by AI assistants in real editors. The source of

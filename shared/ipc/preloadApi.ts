@@ -10,7 +10,6 @@ interface InvokeChannels {
   readonly studioStatus: 'studio:status';
   readonly installStudio: 'studio:install';
   readonly openProjectDialog: 'project:openDialog';
-  readonly scaffoldProject: 'project:scaffold';
   readonly createAstroProject: 'project:createAstro';
   readonly parentDialog: 'project:parentDialog';
   readonly createStarter: 'project:createStarter';

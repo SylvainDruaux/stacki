@@ -48,7 +48,6 @@ function projectBridge() {
 
     // Project:
     openProjectDialog: invoke('project:openDialog'),
-    scaffoldProject: invoke('project:scaffold'),
     createAstroProject: invoke('project:createAstro'),
     parentDialog: invoke('project:parentDialog'),
     createStarter: invoke('project:createStarter'),

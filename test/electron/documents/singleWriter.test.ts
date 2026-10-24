@@ -99,9 +99,6 @@ const ALLOWED: Readonly<Record<string, Readonly<Record<string, Allowed>>>> = {
       reason: 'generated Studio dev config in node_modules and session metadata ignore rules',
     },
   },
-  'electron/project/scaffold.ts': {
-    writeFileSync: { count: 1, reason: 'a new project, scaffolded before it is opened' },
-  },
   'electron/project/publishReceipt.ts': {
     writeFile: {
       count: 1,
