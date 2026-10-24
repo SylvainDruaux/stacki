@@ -292,9 +292,13 @@ const PIXEL =
   {
     dom.window.avb.parentDialog = async () => ({ canceled: false, parentPath: '/tmp/sites' });
     const created = [];
-    dom.window.avb.createAstroProject = async (payload) => {
+    let finish = () => {};
+    // Held open until `finish`, so the test can look at the wizard while it runs.
+    dom.window.avb.createAstroProject = (payload) => {
       created.push(payload);
-      return { ok: true, installed: true, projectPath: '/tmp/sites/blog-site' };
+      return new Promise((resolve) => {
+        finish = () => resolve({ ok: true, installed: true, projectPath: '/tmp/sites/blog-site' });
+      });
     };
     await act(async () => all('.actions button')[3].click());
     await act(async () => {
@@ -331,6 +335,15 @@ const PIXEL =
     });
     await act(async () => {
       create().click();
+      await settle(30);
+    });
+    check(
+      'while it runs, dots animate after the last line of the log',
+      !!wizard.querySelector('.create-log .create-log-dots'),
+      wizard.querySelector('.create-log')?.outerHTML,
+    );
+    await act(async () => {
+      finish();
       await settle(30);
     });
     check(

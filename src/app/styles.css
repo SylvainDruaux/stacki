@@ -4628,6 +4628,20 @@ body > .embed-editor_provenance {
   margin: 0;
   flex-shrink: 0;
 }
+/* Dots after the log's last line: none, one, two, three, as a terminal shows work. */
+.create-log-dots::after {
+  content: '...';
+  display: inline-block;
+  width: 0;
+  overflow: hidden;
+  vertical-align: bottom;
+  animation: create-log-dots 1.2s steps(4) infinite;
+}
+@keyframes create-log-dots {
+  to {
+    width: 4ch;
+  }
+}
 .create-log {
   max-height: 260px;
   overflow: auto;

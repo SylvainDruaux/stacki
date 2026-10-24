@@ -82,7 +82,9 @@ export function StarterWizard({
         Runs <code>npm create lumos@latest</code>, then starts a git history of its own — so
         publishing it later publishes your site, not a fork of the starter.
       </div>
-      {(running || log.text) && <CreateLog log={log.text} elementRef={log.elementRef} />}
+      {(running || log.text) && (
+        <CreateLog log={log.text} running={running} elementRef={log.elementRef} />
+      )}
       {state.kind === 'error' && <ErrorToast message={state.message} />}
     </WizardFrame>
   );
@@ -149,7 +151,7 @@ export function NewProjectWizard({
         />
       )}
       {state.kind !== 'idle' && (
-        <CreateLog log={log.text || 'Starting…'} elementRef={log.elementRef} />
+        <CreateLog log={log.text || 'Starting…'} running={running} elementRef={log.elementRef} />
       )}
       {state.kind === 'error' && <ErrorToast message={state.message} />}
     </WizardFrame>
@@ -304,16 +306,21 @@ function CheckRow({
   );
 }
 
+// While it runs, dots animate after the last line, as a terminal shows work in progress:
+// installs and downloads can print nothing for a long time.
 function CreateLog({
   log,
+  running,
   elementRef,
 }: {
   readonly log: string;
+  readonly running: boolean;
   readonly elementRef: React.RefObject<HTMLPreElement>;
 }) {
   return (
     <pre className="create-log" ref={elementRef}>
-      {log}
+      {running ? log.trimEnd() : log}
+      {running && <span className="create-log-dots" aria-label="Working" />}
     </pre>
   );
 }
