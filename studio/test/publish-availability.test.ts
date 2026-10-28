@@ -33,9 +33,15 @@ test('source comparison follows edits, undo, additions, modes, and explicit dele
   assert.equal(await status.differs(remote), true);
   await writeFile(path.join(fixture.root, file), source);
   assert.equal(await status.differs(remote), false);
-  await chmod(path.join(fixture.root, file), 0o755);
-  assert.equal(await status.differs(remote), true);
-  await chmod(path.join(fixture.root, file), 0o644);
+  const executable = new Map([[file, { sha: fixture.entry.sha, mode: '100755' }]]);
+  assert.equal(await status.differs(executable), true, 'Remote executable changes are detected');
+  // Windows chmod cannot change executable bits; exercise real mode changes on POSIX.
+  if (process.platform !== 'win32') {
+    await chmod(path.join(fixture.root, file), 0o755);
+    assert.equal(await status.differs(remote), true);
+    assert.equal(await status.differs(executable), false);
+    await chmod(path.join(fixture.root, file), 0o644);
+  }
   await writeFile(path.join(fixture.root, 'public/new.txt'), 'new');
   assert.equal(await status.differs(remote), true);
   await rm(path.join(fixture.root, 'public/new.txt'));

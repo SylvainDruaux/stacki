@@ -1,3 +1,4 @@
+import { gitWorkspaceTree } from './gitWorkspaceTree';
 import { mkdir, mkdtemp, rm, rename, copyFile, lstat } from 'node:fs/promises';
 import path from 'node:path';
 import { published } from '../publishing/publishFailure';
@@ -9,7 +10,7 @@ import { gitWorkspaceRun } from './gitWorkspaceObjects';
 
 /** Validate and stage every file before changing the visible shared checkout. */
 export async function prepareGitWorkspaceCheckout(git: PublishGit, before: string, target: string) {
-  const previous = published(await publishTreeFiles(git, before, { symbolicLinks: 'skip' }));
+  const previous = await gitWorkspaceTree(gitWorkspaceRun(git), before);
   const files = published(await publishTreeFiles(git, target, { symbolicLinks: 'skip' }));
   const inventory = published(
     await publishInventory(git.root, await sourceRoots(git.root), 8 * 1024 ** 3),

@@ -1,6 +1,5 @@
 import assert from 'node:assert/strict';
-import { published } from '../publishing/publishFailure';
-import { publishTreeFiles } from '../publishing/publishSource';
+import { gitWorkspaceTree } from './gitWorkspaceTree';
 import type { PublishGit } from '../publishing/publishGit';
 import { describeFiles } from '../../../vendor/stacki/electron/git/gitHistory';
 import { gitRevision } from './gitWorkspaceContract';
@@ -37,9 +36,7 @@ export async function gitSelectedTree(
   const run = gitWorkspaceRun(git);
   const changes = await gitWorkspaceChanges(run, head, draft);
   const changed = new Set(changes.map((file) => file.path));
-  const files = new Map(
-    published(await publishTreeFiles(git, draft)).map((file) => [file.path, file]),
-  );
+  const files = new Map((await gitWorkspaceTree(run, draft)).map((file) => [file.path, file]));
   const entries = selection.map((file) => {
     if (!changed.has(file)) {
       throw new Error('A selected file changed. Refresh the file list before committing.');
@@ -49,5 +46,7 @@ export async function gitSelectedTree(
   });
   await run(['read-tree', head]);
   await run(['update-index', '-z', '--index-info'], entries.join(''));
-  return gitRevision(await run(['write-tree']));
+  // Inherited entries already came from a validated Git tree. Requiring their blobs
+  // here would download unchanged files just to report status or stage a selection.
+  return gitRevision(await run(['write-tree', '--missing-ok']));
 }

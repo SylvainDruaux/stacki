@@ -1,6 +1,5 @@
 import type { PublishConnection } from '../../shared/publishConnection';
-import { published } from '../publishing/publishFailure';
-import { publishTreeFiles } from '../publishing/publishSource';
+import { gitWorkspaceTree } from './gitWorkspaceTree';
 import type { PublishStatusSource } from '../publishing/publishStatusSource';
 import { gitWorkspaceBranch, type GitWorkspaceManifest } from './gitWorkspaceContract';
 import { gitWorkspaceContext, gitWorkspaceRun } from './gitWorkspaceObjects';
@@ -13,7 +12,7 @@ export async function gitWorkspaceAvailability(
 ) {
   const git = gitWorkspaceContext(root, connection);
   const head = gitWorkspaceBranch(workspace).head;
-  const files = published(await publishTreeFiles(git, head, { symbolicLinks: 'skip' }));
+  const files = await gitWorkspaceTree(gitWorkspaceRun(git), head);
   const dirty = await source.differs(new Map(files.map((file) => [file.path, file])));
   const remote = workspace.remote.find((entry) => entry.name === workspace.branch);
   const commits = Number(

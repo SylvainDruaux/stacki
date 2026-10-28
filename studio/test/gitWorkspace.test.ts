@@ -11,10 +11,13 @@ import { capturePublishSource } from '../src/features/publishing/publishSource';
 import { published } from '../src/features/publishing/publishFailure';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { writeFile, readFile, rm } from 'node:fs/promises';
+import { writeFile, readFile, rm, rename } from 'node:fs/promises';
 import path from 'node:path';
 import { createGitWorkspaceFixture } from './gitWorkspaceFixture';
-import { readGitWorkspace } from '../src/features/history/gitWorkspaceStorage';
+import {
+  readGitWorkspace,
+  writeLocalGitWorkspace,
+} from '../src/features/history/gitWorkspaceStorage';
 import { gitWorkspaceBranch } from '../src/features/history/gitWorkspaceContract';
 import {
   gitWorkspaceRun,
@@ -233,6 +236,46 @@ test('committed changes are counted once in publishing availability', async () =
     assert.deepEqual(
       await gitWorkspaceAvailability(setup.root, source, setup.connection, state.manifest),
       { changed: true, commits: 2 },
+    );
+  } finally {
+    await rm(setup.parent, { recursive: true, force: true });
+  }
+});
+
+test('Git status reads partial-clone metadata without downloading missing blobs', async () => {
+  const setup = await createGitWorkspaceFixture();
+  try {
+    await writeFile(path.join(setup.remote, 'README.md'), 'Unmanaged repository file');
+    await setup.git('add', '.');
+    await setup.git('commit', '--quiet', '-m', 'Add repository documentation');
+    await setup.git('config', 'uploadpack.allowFilter', 'true');
+    const head = await setup.git('rev-parse', 'HEAD');
+    const blob = await setup.git('rev-parse', 'HEAD:README.md');
+    const state = await setup.workspace.load();
+    await rm(state.git.directory, { recursive: true, force: true });
+    await setup.git(
+      'clone',
+      '--quiet',
+      '--bare',
+      '--no-local',
+      '--filter=blob:none',
+      setup.remote,
+      state.git.directory,
+    );
+    await writeLocalGitWorkspace(setup.root, {
+      ...state.manifest,
+      branches: state.manifest.branches.map((branch) => ({ ...branch, head })),
+      remote: [{ name: 'main', head }],
+    });
+    const run = gitWorkspaceRun(state.git);
+    assert.ok((await run(['rev-list', '--objects', '--missing=print', head])).includes('?' + blob));
+    await rename(setup.remote, setup.remote + '-offline');
+    const info = await setup.workspace.info(await setup.workspace.load());
+    assert.equal(info.dirty, true);
+    assert.equal(info.ahead, 0);
+    assert.ok(
+      (await run(['rev-list', '--objects', '--missing=print', head])).includes('?' + blob),
+      'Status did not hydrate repository content',
     );
   } finally {
     await rm(setup.parent, { recursive: true, force: true });

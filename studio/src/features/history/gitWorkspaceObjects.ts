@@ -1,10 +1,11 @@
+import { gitWorkspaceTree } from './gitWorkspaceTree';
 import { METADATA_FILES } from '../../../vendor/stacki/shared/properties/projectMetadata';
 import assert from 'node:assert/strict';
 import { mkdir, open, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { publishGit, type PublishGit } from '../publishing/publishGit';
 import { published } from '../publishing/publishFailure';
-import { publishTreeFiles, sourceRoots } from '../publishing/publishSource';
+import { sourceRoots } from '../publishing/publishSource';
 import { publishInventory } from '../publishing/publishInventory';
 import { gitBranchName, gitRevision, type GitWorkspaceManifest } from './gitWorkspaceContract';
 import type { PublishConnection } from '../../shared/publishConnection';
@@ -105,7 +106,7 @@ export async function snapshotGitWorkspace(git: PublishGit, head: string): Promi
   const inventory = published(
     await publishInventory(git.root, await sourceRoots(git.root), 8 * 1024 ** 3),
   );
-  const files = published(await publishTreeFiles(git, head, { symbolicLinks: 'skip' }));
+  const files = await gitWorkspaceTree(run, head);
   await run(['read-tree', head]);
   const removed = files.filter((file) => gitWorkspaceFile(file.path));
   await run(
@@ -123,7 +124,9 @@ export async function snapshotGitWorkspace(git: PublishGit, head: string): Promi
       '--pathspec-file-nul',
     ]);
   }
-  return gitRevision(await run(['write-tree']));
+  // Inherited entries already came from a validated Git tree. Requiring their blobs
+  // here would download unchanged files just to report status or stage a selection.
+  return gitRevision(await run(['write-tree', '--missing-ok']));
 }
 export function gitWorkspaceFile(file: string): boolean {
   return (

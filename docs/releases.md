@@ -15,6 +15,23 @@ Use an isolated checkout when other tasks are editing the working directory. Mat
 Studio, Studio release manifest, and npm starter versions. Never move an existing release tag to
 include later changes.
 
+## 0.1.86 release validation
+
+The 0.1.85 Windows gate caught a test that expected `chmod(0755)` to set an executable bit.
+Windows does not expose that POSIX mode change, so the assertion failed even though source
+comparison correctly retained the regular-file mode. The replacement test checks remote mode
+changes on every platform and actual executable-bit changes on POSIX. All other new Git
+workspace tests passed on Windows. A native Windows runner is unavailable locally; the hosted
+Windows gate remains required before publication. The original 0.1.85 tag remains unchanged.
+
+A live rollout check also exposed Git status hydrating partial-clone blobs for file sizes.
+Status now reads only paths, modes and hashes; a real partial-clone test disconnects its remote
+and verifies that status succeeds without downloading the missing repository blobs.
+
+Version 0.1.86 retains the updates below and aligns Desktop, Studio and create-stacki.
+The 0.1.85 npm workflow passed all tests and packaging but npm rejected its publishing
+identity with E404; no 0.1.85 package was published. npm remains a separate authorization step.
+
 ## 0.1.85 updates
 
 - Studio uses Desktop's Git controls for commits, partial commits, pulls, branches and merge
