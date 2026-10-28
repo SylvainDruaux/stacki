@@ -39,6 +39,9 @@ export function historyRoutes(root: string, repository: NativeRepository | undef
           throw new Error('Invalid history scope.');
         }
         response.end(JSON.stringify(await history.read(skip, scope)));
+      } else if (pathname === '/studio/api/history/commit' && request.method === 'GET') {
+        const search = new URL(request.url ?? '/', 'http://studio').searchParams;
+        response.end(JSON.stringify(await history.commit(search.get('hash') ?? '')));
       } else if (pathname === '/studio/api/history/diff' && request.method === 'POST') {
         const input: unknown = JSON.parse(await readBody());
         const data = record(input);

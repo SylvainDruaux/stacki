@@ -9,6 +9,7 @@ import { batchedRead } from '../../shared/batchedRead';
 
 type Rooms = ReturnType<typeof createRooms>;
 export function variableRoutes(root: string, rooms: Rooms) {
+  const read = cachedVariableReader();
   return async (
     request: IncomingMessage,
     response: ServerResponse,
@@ -25,10 +26,7 @@ export function variableRoutes(root: string, rooms: Rooms) {
     const result = await rooms.coordinator.run(async () => {
       const before = await variableSources(root, rooms);
       if (!input) {
-        return withVariableWorkspace(before, () => ({
-          ...readVariables(VARIABLE_ROOT),
-          versions: Object.fromEntries([...before].map(([file, text]) => [file, checksum(text)])),
-        }));
+        return read(before);
       }
       return editVariables(rooms, before, input);
     });
@@ -36,6 +34,27 @@ export function variableRoutes(root: string, rooms: Rooms) {
     response.end(JSON.stringify(result));
     return true;
   };
+}
+function cachedVariableReader() {
+  let cached:
+    | { readonly signature: string; readonly value: ReturnType<typeof readVariableSnapshot> }
+    | undefined;
+  return (sources: Map<string, string>) => {
+    const versions = Object.fromEntries([...sources].map(([file, text]) => [file, checksum(text)]));
+    const signature = JSON.stringify(
+      Object.entries(versions).sort(([left], [right]) => left.localeCompare(right)),
+    );
+    if (cached?.signature !== signature) {
+      cached = { signature, value: readVariableSnapshot(sources, versions) };
+    }
+    return cached.value;
+  };
+}
+function readVariableSnapshot(
+  sources: Map<string, string>,
+  versions: Readonly<Record<string, string>>,
+) {
+  return withVariableWorkspace(sources, () => ({ ...readVariables(VARIABLE_ROOT), versions }));
 }
 async function variableSources(root: string, rooms: Rooms) {
   const paths = [...(await walk(root, 'src')), ...(await walk(root, 'public'))].filter((file) =>

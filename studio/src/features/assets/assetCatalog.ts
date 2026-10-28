@@ -12,7 +12,8 @@ export async function assetCatalog(root: string) {
   );
   const state = await readAssetState(root);
   const directories = new Set<string>(state.directories);
-  for (const rootName of ['public', 'src']) {
+  // Include the default folders even when empty; file discovery cannot infer them.
+  for (const rootName of ['public', 'src', 'src/assets', 'src/assets/images']) {
     try {
       await readdir(path.dirname(await safePath(root, rootName + '/asset-probe')));
       directories.add(rootName);

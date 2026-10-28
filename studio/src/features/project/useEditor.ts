@@ -1,4 +1,5 @@
 import { useLiveNumericStyles } from '../preview/useLiveNumericStyles';
+import { useComponentExit } from './useComponentExit';
 import { useLiveText } from '../preview/useLiveText';
 import { insertTargetFor } from '../../../vendor/stacki/src/editor/insertTarget';
 import { parsePageModel } from '../../../vendor/stacki/shared/page/pageNode';
@@ -32,7 +33,7 @@ export function useEditor(
   canvasKeys = true,
   focus?: ComponentFocus,
 ) {
-  const document = useDocument(file, active);
+  const document = useDocument(file, active, project.workspaceId);
   useDocumentError(document?.error, report);
   usePauseReadiness(document?.status === 'Saved', setCanPause);
   const source = document?.text.toString() ?? '';
@@ -52,6 +53,7 @@ export function useEditor(
       enter('', id === '0' && nodes[0]?.id === 'layout' ? 'layout' : 'n' + id, occurrence),
   );
   useLiveText(file, source, nodes, preview);
+  useComponentExit(file, previewFile, document, preview, open, report);
   useLiveNumericStyles(file, parsed, project, preview);
   useCursorPresence(document, previewFile, preview, session);
   const selection = useEditorSelection(file, previewFile, nodes, document, preview, focus);

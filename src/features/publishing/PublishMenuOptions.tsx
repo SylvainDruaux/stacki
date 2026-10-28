@@ -24,16 +24,8 @@ export function PublishMenuOptions({
   busy,
   provider,
 }: Props) {
-  const githubCurrent = availability.github === 'current';
-  const hostingCurrent = availability.hosting === 'current';
-  const current = githubCurrent && (hostingCurrent || availability.hosting === 'unconfigured');
   return (
     <>
-      {current && (
-        <p className="stacki-publish-current" role="status">
-          All changes are up to date
-        </p>
-      )}
       <GitHubPushOption
         availability={availability}
         repositoryURL={repositoryURL}
@@ -79,7 +71,7 @@ function HostingDeployOption({
   const descriptions = {
     current: 'Up to date',
     pending: 'Changes to deploy',
-    unknown: 'Checking deployment status…',
+    unknown: 'Deployment status unavailable',
     unconfigured: 'Choose a hosting provider',
   } as const;
   return (
@@ -121,7 +113,7 @@ function GitHubPushOption({
   const description = current
     ? 'No changes to push'
     : details === undefined
-      ? 'Checking commit count…'
+      ? 'Commit count unavailable'
       : `${details.commits} commit${details.commits === 1 ? '' : 's'} to push`;
   return (
     <span
@@ -132,9 +124,7 @@ function GitHubPushOption({
         <PublishProviderIcon provider="github" />
         <span>
           Push to GitHub
-          <small className={!current && details === undefined ? 'publish-checking' : undefined}>
-            {description}
-          </small>
+          <small>{description}</small>
         </span>
       </button>
       {repositoryURL !== undefined && (

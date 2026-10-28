@@ -162,7 +162,9 @@ export function PreviewWorkspace({
               title="Site preview (interactive)"
             />
           ) : (
-            <div role="status">Loading preview…</div>
+            <div role="status">
+              <span className="panel-loading-label">Loading preview…</span>
+            </div>
           )}
         </div>
       )}

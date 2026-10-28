@@ -126,8 +126,7 @@ function HostingProject(props: Props & { readonly add: () => void }) {
       value: hostingKey(project.hosting),
       label: project.name,
       group:
-        props.accounts.find((entry) => entry.id === hostingAccount(project.hosting))?.name ??
-        hostingAccount(project.hosting),
+        props.accounts.find((entry) => entry.id === hostingAccount(project.hosting))?.name ?? '',
       description:
         project.hosting.provider === 'cloudflare'
           ? 'Pages'

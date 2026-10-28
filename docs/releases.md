@@ -15,6 +15,20 @@ Use an isolated checkout when other tasks are editing the working directory. Mat
 Studio, Studio release manifest, and npm starter versions. Never move an existing release tag to
 include later changes.
 
+## 0.1.85 updates
+
+- Studio uses Desktop's Git controls for commits, partial commits, pulls, branches and merge
+  review. One container keeps one shared checkout: changing branches affects every editor.
+  Durable Git checkpoints preserve unpublished commits and parked drafts across restarts;
+  replacement document namespaces reject stale edits from an older checkout.
+- Panel loading uses compact skeletons without visible loader labels. Catalogs, Git history,
+  component counts and font thumbnails reuse bounded caches and refresh in the background.
+  Assets initially open images when available, then assets, and retain later navigation.
+- Publishing exposes its progress, favicon activity and published-site link, improves status
+  checks, and protects active operations from idle shutdown. Component focus, collection
+  overlays, active-page styling and preview controls match the shared Desktop behavior.
+- Desktop, the Studio source bundle and the npm installer share version 0.1.85.
+
 ## 0.1.84 release validation
 
 This release retains the application updates below and corrects the Linux installation probe.

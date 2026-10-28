@@ -888,7 +888,7 @@
   justify-content: flex-start;
   background: transparent;
 }
-.studio-page-list .list-item:hover:not(:disabled) {
+.studio-page-list .list-item:hover:not(:disabled):not(.active) {
   background: var(--bg-hover);
 }
 .studio-page-list .list-item.active {

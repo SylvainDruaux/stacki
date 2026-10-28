@@ -1,3 +1,4 @@
+import { gitDraftHeaders } from '../history/gitWorkspaceStorage';
 import { boundedText } from '../updates/catalog';
 import { parsePublishConnection } from '../../shared/publishConnection';
 import type { IncomingChanges } from './github';
@@ -7,6 +8,7 @@ export class RemoteRepository {
   constructor(
     readonly backend: string,
     readonly token: string,
+    readonly root?: string,
   ) {}
   async incoming(base: string): Promise<IncomingChanges> {
     const result = await this.call('/incoming', { base });
@@ -32,7 +34,11 @@ export class RemoteRepository {
   private async call(route: string, body: unknown) {
     const response = await fetch(this.backend + '/studio/internal' + route, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-studio-token': this.token },
+      headers: {
+        ...(this.root ? await gitDraftHeaders(this.root) : {}),
+        'Content-Type': 'application/json',
+        'x-studio-token': this.token,
+      },
       body: JSON.stringify(body),
       signal: AbortSignal.timeout(180_000),
     });

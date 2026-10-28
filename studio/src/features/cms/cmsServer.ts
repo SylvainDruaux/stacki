@@ -5,7 +5,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { createRooms } from '../collaboration/rooms';
 import { record, string } from '../../shared/validation';
 import { cmsHandlers } from './cmsHost';
-import { cmsSources, withCmsSnapshot } from './cmsSnapshot';
+import { cmsSources, withCmsSnapshot, CmsReadWorkspace } from './cmsSnapshot';
 import { cmsVersions, commitCms } from './cmsCommit';
 
 const mutations = new Set([
@@ -19,6 +19,10 @@ const mutations = new Set([
 ]);
 export function cmsRoutes(root: string, rooms: ReturnType<typeof createRooms>) {
   const handlers = cmsHandlers();
+  const reads = new CmsReadWorkspace(root);
+  rooms.sockets.once('close', () => {
+    void reads.close().catch((error: unknown) => console.error('CMS cleanup failed', error));
+  });
   return async (
     request: IncomingMessage,
     response: ServerResponse,
@@ -47,7 +51,7 @@ export function cmsRoutes(root: string, rooms: ReturnType<typeof createRooms>) {
     // Only capture needs a consistent project revision. Inspecting an immutable
     // staging directory must not queue edits and heartbeat replies behind CMS reads.
     const run = async (snapshot: Awaited<ReturnType<typeof cmsSources>>) => {
-      return withCmsSnapshot(root, snapshot, async (stage) => {
+      const execute = async (stage: string) => {
         const payload =
           typeof input['payload'] === 'string'
             ? stage
@@ -72,7 +76,10 @@ export function cmsRoutes(root: string, rooms: ReturnType<typeof createRooms>) {
         const next = withCmsDeletions(snapshot.sources, after.sources);
         await commitCms(root, rooms, snapshot.sources, next, record(input['versions']));
         return { value, versions: cmsVersions(next) };
-      });
+      };
+      return mutations.has(operation)
+        ? withCmsSnapshot(root, snapshot, execute)
+        : reads.read(snapshot, execute);
     };
     const result = mutations.has(operation)
       ? await rooms.coordinator.run(async () => run(await cmsSources(root, rooms)))

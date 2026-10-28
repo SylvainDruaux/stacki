@@ -1,3 +1,4 @@
+import { withGitWorkspaceLease, isGitWorkspaceRead } from '../features/history/gitWorkspaceLease';
 import { createAstroNotifications } from '../features/notifications/astroNotificationServer';
 import { readPackagePreviews } from '../../vendor/stacki/electron/lib/componentSources';
 import { METADATA_FILES } from '../../vendor/stacki/shared/properties/projectMetadata';
@@ -150,6 +151,34 @@ async function handleRequest(
   rooms: ReturnType<typeof createRooms>,
   catalogs: ReturnType<typeof projectCatalogs>,
 ) {
+  if (!authorized(request, options)) {
+    json(response, 403, { error: 'Unauthorized studio request' });
+    return;
+  }
+  const work = () =>
+    handleRequestInWorkspace(request, response, options, features, rooms, catalogs);
+  if (
+    request.method === 'GET' ||
+    request.method === 'HEAD' ||
+    isGitWorkspaceRead(new URL(request.url ?? '/', 'http://studio').pathname)
+  ) {
+    return work();
+  }
+  const expected = request.headers['x-studio-workspace'];
+  return withGitWorkspaceLease(
+    options.root,
+    typeof expected === 'string' ? expected : undefined,
+    work,
+  );
+}
+async function handleRequestInWorkspace(
+  request: IncomingMessage,
+  response: ServerResponse,
+  options: Options,
+  features: ReturnType<typeof featureRoutes>,
+  rooms: ReturnType<typeof createRooms>,
+  catalogs: ReturnType<typeof projectCatalogs>,
+) {
   response.setHeader('Cache-Control', 'no-store');
   response.setHeader('X-Content-Type-Options', 'nosniff');
   if (!authorized(request, options)) {
@@ -288,8 +317,9 @@ function configureStudioServer(
       socket.destroy();
       return;
     }
-    void rooms
-      .get(url.searchParams.get('file') ?? '')
+    void withGitWorkspaceLease(options.root, url.searchParams.get('workspace') ?? undefined, () =>
+      rooms.get(url.searchParams.get('file') ?? ''),
+    )
       .then((room) => {
         rooms.sockets.handleUpgrade(request, socket, head, (client) =>
           room.attach(

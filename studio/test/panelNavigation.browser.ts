@@ -62,9 +62,20 @@ async function checkPanel(
     });
     try {
       await page.getByRole('button', { name: panel.name, exact: true }).click();
+      if (panel.name === 'Collections') {
+        assert.equal(await page.locator('.studio-editor-content > .cms-view').count(), 0);
+        assert.ok(await page.locator('.studio-editor-content iframe').first().isVisible());
+      }
       const rail = page.locator('aside').first();
       if (phase === 'initial') {
-        await rail.getByText(panel.loading, { exact: false }).waitFor();
+        await rail.getByRole('status', { name: panel.loading, exact: false }).waitFor();
+        assert.equal(await rail.locator('.panel-loading').innerText(), '');
+        assert.equal(
+          await rail
+            .locator('.panel-loading')
+            .evaluate((element) => getComputedStyle(element).padding),
+          '0px',
+        );
       } else {
         if (panel.name === 'Collections') {
           // The cached folder list appears before the default single-folder selection.

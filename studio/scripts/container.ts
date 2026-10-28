@@ -1,3 +1,5 @@
+import { restoreGitWorkspace } from '../src/features/history/gitWorkspaceRestore';
+import { gitDraftHeaders } from '../src/features/history/gitWorkspaceStorage';
 import { boundedText } from '../src/features/updates/catalog';
 import { restorePublishRepository } from '../src/features/publishing/publishBootstrap';
 import { published } from '../src/features/publishing/publishFailure';
@@ -18,11 +20,11 @@ const token = process.env['STUDIO_CONTAINER_TOKEN'];
 if (!backend || !token) {
   throw new Error('Container backend configuration is missing');
 }
-const headers = { 'x-studio-token': token };
+const bootstrapHeaders = { 'x-studio-token': token };
 console.log('Restoring repository and shared drafts');
 const bootstrap = await fetch(backend + '/studio/internal/bootstrap', {
   method: 'POST',
-  headers,
+  headers: bootstrapHeaders,
   signal: AbortSignal.timeout(60_000),
 });
 if (!bootstrap.ok) {
@@ -34,6 +36,8 @@ await writeFile(
   path.join(root, '.studio-state/github-base.json'),
   JSON.stringify({ sha: baseline }),
 );
+await restoreGitWorkspace(root, connection, baseline);
+const headers = await gitDraftHeaders(root);
 const filesResponse = await fetch(backend + '/studio/internal/files', { headers });
 if (!filesResponse.ok) {
   throw new Error('Could not restore draft inventory');

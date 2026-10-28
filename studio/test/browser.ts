@@ -3,7 +3,11 @@
 import { chromium } from 'playwright';
 import assert from 'node:assert/strict';
 import { mkdir } from 'node:fs/promises';
-import { checkInteractivePreview, checkPreviewNavigation } from './interactivePreview.browser';
+import {
+  checkInteractivePreview,
+  checkPreviewNavigation,
+  checkPreviewOverflow,
+} from './interactivePreview.browser';
 
 const browser = await chromium.launch({
   executablePath:
@@ -163,6 +167,7 @@ try {
   await phone.goto(url);
   phone.setDefaultTimeout(20000);
   await phone.locator('.save-state').filter({ hasText: 'Saved' }).waitFor({ state: 'attached' });
+  await checkPreviewOverflow(phone);
   await phone.getByRole('button', { name: 'Navigator', exact: true }).click();
   await phone.getByRole('button', { name: 'Expand all', exact: true }).click();
   const from = await phone
@@ -199,7 +204,7 @@ try {
     return labels.indexOf('Heading') > labels.indexOf('Eyebrow');
   });
   await phone.getByRole('button', { name: 'Git', exact: true }).click();
-  await phone.getByRole('button', { name: 'Undo', exact: true }).click();
+  await phone.keyboard.press('ControlOrMeta+z');
   await phone.getByRole('button', { name: 'Navigator', exact: true }).click();
   await phone.getByRole('button', { name: 'Expand all', exact: true }).click();
   await phone.waitForFunction(() => {

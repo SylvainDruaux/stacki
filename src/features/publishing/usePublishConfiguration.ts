@@ -54,7 +54,9 @@ export function configuredPublishAvailability(
     }
   } else if (configuration.kind === 'detected') {
     // A linked destination has no recorded Stacki deployment until its first publish.
-    return { ...availability, hosting: 'pending' };
+    return availability.hosting === 'current'
+      ? availability
+      : { ...availability, hosting: 'pending' };
   } else if (configuration.kind !== 'missing' && availability.hosting === 'unconfigured') {
     return { ...availability, hosting: 'unknown' };
   }

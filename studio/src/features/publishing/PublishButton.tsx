@@ -1,3 +1,5 @@
+import { showPublishingFavicon } from './publishFavicon';
+import { usePublishAvailability } from './usePublishAvailability';
 import { PublishControl } from '../../../vendor/stacki/src/features/publishing/PublishControl';
 import type { PublishTarget } from '../../../vendor/stacki/shared/properties/publishConfig';
 import { useEffect, useRef, useState } from 'react';
@@ -10,7 +12,14 @@ import './publish.css';
 export function PublishButton({ report }: { report: (error: unknown) => void }) {
   const [ownBusy, setBusy] = useState(false);
   const shared = useSharedPublish();
+  const availability = usePublishAvailability(shared);
   const busy = ownBusy || shared.kind === 'building';
+  useEffect(() => {
+    if (busy) {
+      return showPublishingFavicon(document);
+    }
+    return undefined;
+  }, [busy]);
   const [state, setState] = useState<PublishState>();
   const [failed, setFailed] = useState(false);
   const [visible, setVisible] = useState(false);
@@ -29,20 +38,7 @@ export function PublishButton({ report }: { report: (error: unknown) => void }) 
     setVisible(true);
     try {
       const state = await publishProject(controller.signal, target, setState);
-      report(
-        state.kind === 'review-open'
-          ? 'Pull request ready for review.'
-          : state.kind === 'committed'
-            ? (state.deployment === 'live'
-                ? 'Published. Your changes are live.'
-                : state.deployment === 'pending'
-                  ? 'Saved to GitHub. Live deployment is still unconfirmed; check your hosting provider.'
-                  : 'Saved to GitHub. Automatic live deployment is not connected.') +
-              (state.cleanupWarning ? ' ' + state.cleanupWarning : '')
-            : state.kind === 'failed'
-              ? new Error(state.message)
-              : 'Publish started',
-      );
+      report(publishMessage(state));
     } catch (error) {
       if (!controller.signal.aborted) {
         setFailed(true);
@@ -57,7 +53,14 @@ export function PublishButton({ report }: { report: (error: unknown) => void }) 
   }
   return (
     <div className="publish-control">
-      <PublishControl projectPath="" busy={busy} publish={(target) => void publish(target)} />
+      <PublishControl
+        projectPath=""
+        busy={busy}
+        publish={(target) => void publish(target)}
+        availability={availability.availability}
+        refreshAvailability={availability.refresh}
+        settingsClosed={availability.refresh}
+      />
       {visible && (
         <PublishProgress
           state={state}
@@ -92,4 +95,23 @@ function usePublishBroadcast(
       setFailed(shared.kind === 'failed');
     }
   }, [shared, setState, setVisible, setFailed]);
+}
+
+function publishMessage(state: PublishState): string | Error {
+  if (state.kind === 'failed') {
+    return new Error(state.message);
+  }
+  if (state.kind === 'review-open') {
+    return 'Pull request ready for review.';
+  }
+  if (state.kind !== 'committed') {
+    return 'Publish started';
+  }
+  const message =
+    state.deployment === 'live'
+      ? 'Published. Your changes are live.'
+      : state.deployment === 'pending'
+        ? 'Saved to GitHub. Live deployment is still unconfirmed; check your hosting provider.'
+        : 'Saved to GitHub. Automatic live deployment is not connected.';
+  return message + (state.cleanupWarning ? ' ' + state.cleanupWarning : '');
 }

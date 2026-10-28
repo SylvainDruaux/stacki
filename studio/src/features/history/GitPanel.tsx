@@ -1,56 +1,75 @@
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
+import GitChip from '../../../vendor/stacki/src/features/git/GitChip';
+import { readGitInfo } from '../../../vendor/stacki/src/features/git/gitChipBridge';
+import { useGitIncoming } from '../../../vendor/stacki/src/features/git/useGitIncoming';
 import HistoryTimeline from '../../../vendor/stacki/src/features/history/HistoryTimeline';
 import { HistorySection } from '../../../vendor/stacki/src/features/history/HistorySections';
 import { createPanelCache, usePanelData } from '../../../vendor/stacki/src/lib/usePanelData';
 import { PanelReadStatus } from '../../../vendor/stacki/src/ui/PanelReadStatus';
-import { record } from '../../shared/validation';
-import { parseHistoryInfo, type HistoryInfo } from './historyContract';
-import { request } from '../project/projectClient';
-import type { SharedDocument } from '../collaboration/useDocument';
+import type { IpcResults } from '../../../vendor/stacki/shared/ipc/ipcResults';
+import type { Project } from '../project/projectClient';
 
-const cache = createPanelCache<HistoryInfo>();
-const subscribe = () => () => {};
+const cache = createPanelCache<IpcResults['git:info']>();
 const noPreview = () => {};
-
+function subscribe(refresh: () => void) {
+  window.addEventListener('studio:project-changed', refresh);
+  window.addEventListener('studio:source-updated', refresh);
+  return () => {
+    window.removeEventListener('studio:project-changed', refresh);
+    window.removeEventListener('studio:source-updated', refresh);
+  };
+}
 export function GitPanel({
-  document,
+  project,
+  flushSave,
+  refreshProject,
   report,
 }: {
-  readonly document: SharedDocument | undefined;
+  readonly project: Project;
+  readonly flushSave: () => Promise<unknown>;
+  readonly refreshProject: () => Promise<unknown>;
   readonly report: (error: unknown) => void;
 }) {
+  const key = project.workspaceId ?? project.name;
   const [open, setOpen] = useState(true);
-  const { state, refresh } = usePanelData(cache, 'studio', readHistoryInfo, subscribe);
+  const [notice, setNotice] = useState('');
+  const read = useCallback(() => readGitInfo('studio'), []);
+  const { state, refresh } = usePanelData(cache, key, read, subscribe);
+  const info = state.kind === 'ready' ? state.value : undefined;
+  const incoming = useGitIncoming('studio', info);
   return (
     <div className="panel-section grow">
       <div className="panel-header">
         <h2>Git</h2>
       </div>
       <div className="panel-body history-body">
-        <div className="node-actions">
-          <button
-            disabled={!document?.ready}
-            onClick={() => void document?.history.step('undo').catch(report)}
-          >
-            Undo
-          </button>
-          <button
-            disabled={!document?.ready}
-            onClick={() => void document?.history.step('redo').catch(report)}
-          >
-            Redo
-          </button>
-        </div>
-        <PanelReadStatus state={state} label="Git history" retry={refresh} />
-        {state.kind === 'ready' && (
+        <PanelReadStatus state={state} label="Git history" layout="history" retry={refresh} />
+        {info && (
+          <GitChip
+            info={info}
+            refresh={refresh}
+            busy={undefined}
+            project={{ path: 'studio', name: project.name }}
+            incoming={incoming}
+            flushSave={flushSave}
+            onWorktreeChanged={refreshProject}
+            showToast={(message, kind) => (kind === 'error' ? report(message) : setNotice(message))}
+          />
+        )}
+        {notice && (
+          <p role="status" className="history-note">
+            {notice}
+          </p>
+        )}
+        {info?.isRepo && (
           <HistorySection title="Source Control Graph" open={open} onToggle={() => setOpen(!open)}>
             <HistoryTimeline
-              projectPath="studio"
-              branch={state.value.branch}
-              branches={state.value.branches}
-              trunk={state.value.branch}
-              head={state.value.head}
-              userEmail={undefined}
+              projectPath={key}
+              branch={info.branch}
+              branches={info.branches}
+              trunk={info.trunk ?? info.branch}
+              head={info.head}
+              userEmail={info.userEmail}
               previewRef={undefined}
               onExitPreview={noPreview}
             />
@@ -59,16 +78,4 @@ export function GitPanel({
       </div>
     </div>
   );
-}
-
-async function readHistoryInfo() {
-  try {
-    const response = record(await request('/studio/api/history/log?skip=0&scope=all'));
-    return { ok: true, value: parseHistoryInfo(response['info']) } as const;
-  } catch (error: unknown) {
-    return {
-      ok: false,
-      error: error instanceof Error ? error.message : 'Could not read Git.',
-    } as const;
-  }
 }

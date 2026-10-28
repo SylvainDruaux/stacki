@@ -1,3 +1,4 @@
+import { PanelReadStatus } from '../../ui/PanelReadStatus';
 import { ErrorToast } from '../../ui/ErrorToast';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { assert } from '../../../shared/core/assert';
@@ -14,6 +15,17 @@ import HistoryGraphLane, { HISTORY_ROW_HEIGHT, historyGraphWidth } from './Histo
 import { buildHistoryGraph, HISTORY_COMMITS_MAX } from './historyGraph';
 import type { HistoryGraphRow } from './historyGraph';
 import { gitBranchColors, gitBranchColor, gitRefColor } from '../../lib/gitBranchColors';
+import { createPanelCache } from '../../lib/usePanelData';
+import type { HistoryLog } from './historyBridge';
+
+const timelineCache = createPanelCache<HistoryLog>();
+
+function initialTimeline(key: string): TimelineState {
+  const cached = timelineCache.get(key);
+  return cached?.kind === 'ready'
+    ? { kind: 'ready', ...cached.value }
+    : { kind: 'loading', commits: [], atEnd: false };
+}
 
 type TimelineState =
   | {
@@ -68,20 +80,7 @@ export default function HistoryTimeline(props: HistoryTimelineProps) {
   }, [timeline.state.commits]);
   return (
     <>
-      <div className="history-graph-toolbar">
-        <label className="history-graph-filter">
-          <span>Filter commits</span>
-          <select
-            aria-label="Filter commits by branch"
-            value={scope}
-            onChange={(event) => setScope(parseHistoryScope(event.target.value))}
-          >
-            <option value="all">All branches</option>
-            <option value="current">Current branch ({props.branch ?? 'HEAD'})</option>
-          </select>
-        </label>
-      </div>
-      {timeline.state.kind === 'loading' && <p className="history-empty">Reading history…</p>}
+      <HistoryScope scope={scope} branch={props.branch} setScope={setScope} />
       {timeline.state.kind === 'error' && <ErrorToast message={timeline.state.message} />}
       {timeline.state.kind === 'ready' && timeline.state.commits.length === 0 && (
         <p className="history-empty">
@@ -102,12 +101,46 @@ export default function HistoryTimeline(props: HistoryTimelineProps) {
           {...props}
         />
       ))}
+      {timeline.state.kind === 'loading' && (
+        <PanelReadStatus
+          state={timeline.state}
+          label="Git history"
+          layout="history"
+          retry={async () => {}}
+        />
+      )}
       {!timeline.state.atEnd && timeline.state.kind !== 'loading' && (
         <button className="history-more" onClick={timeline.loadOlder}>
           Show older
         </button>
       )}
     </>
+  );
+}
+
+function HistoryScope({
+  scope,
+  branch,
+  setScope,
+}: {
+  readonly scope: 'all' | 'current';
+  readonly branch: string | undefined;
+  readonly setScope: (scope: 'all' | 'current') => void;
+}) {
+  return (
+    <div className="history-graph-toolbar">
+      <label className="history-graph-filter">
+        <span>Filter commits</span>
+        <select
+          aria-label="Filter commits by branch"
+          value={scope}
+          onChange={(event) => setScope(parseHistoryScope(event.target.value))}
+        >
+          <option value="all">All branches</option>
+          <option value="current">Current branch ({branch ?? 'HEAD'})</option>
+        </select>
+      </label>
+    </div>
   );
 }
 
@@ -123,11 +156,12 @@ function useTimeline(
   { projectPath, branch, head }: HistoryTimelineProps,
   reference: string | undefined,
 ) {
-  const [state, setState] = useState<TimelineState>({ kind: 'loading', commits: [], atEnd: false });
+  const key = JSON.stringify([projectPath, branch, head, reference]);
+  const [state, setState] = useState<TimelineState>(() => initialTimeline(key));
   const requestRef = useRef(0);
   useEffect(() => {
     let closed = false;
-    setState({ kind: 'loading', commits: [], atEnd: false });
+    setState(initialTimeline(key));
     const reader = createCoalescedRun(async () => {
       if (closed) {
         return;
@@ -136,6 +170,9 @@ function useTimeline(
       const result = await readHistoryLog(projectPath, 0, reference);
       if (closed || requestRef.current !== request) {
         return;
+      }
+      if (result.ok) {
+        timelineCache.set(key, result.value);
       }
       setState((previous) => {
         if (!result.ok) {
@@ -168,7 +205,7 @@ function useTimeline(
       window.clearInterval(timer);
       offReturn();
     };
-  }, [branch, head, projectPath, reference]);
+  }, [branch, head, projectPath, reference, key]);
   const loadOlder = useCallback(() => {
     if (state.kind === 'loading' || state.commits.length >= HISTORY_COMMITS_MAX) {
       return;

@@ -25,14 +25,7 @@ export function VariablesWorkspace({
     [document],
   );
   if (!props.view.variable) {
-    if (props.view.panel !== 'variables') {
-      return null;
-    }
-    return (
-      <div className="cms-view studio-variables-empty">
-        <p>Select a stylesheet to edit its variables.</p>
-      </div>
-    );
+    return null;
   }
   return (
     <VariablesView

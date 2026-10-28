@@ -1,3 +1,4 @@
+import { PublishIdleGuard } from './publishIdleGuard';
 import { updateRoutes } from './updateRoutes';
 import { isStudioAPI, studioError } from './apiResponse';
 import { canEdit } from '../features/auth/repositoryAccess';
@@ -20,6 +21,7 @@ export class PreviewContainer extends Container<Environment> {
   private readonly loginAttempts = new LoginAttempts((state, expires) =>
     this.ctx.storage.transaction((storage) => claimLoginAttempt(storage, state, expires)),
   );
+  private readonly publishIdle = new PublishIdleGuard();
   override defaultPort = 4350;
   override sleepAfter = '3m';
   // Port probes only need an HTTP response; the protected API rejects this
@@ -38,6 +40,20 @@ export class PreviewContainer extends Container<Environment> {
     }
     return super.fetch(request);
   }
+  override async onActivityExpired(): Promise<void> {
+    await this.publishIdle.expire({
+      read: () =>
+        this.containerFetch(
+          new Request('http://localhost/studio/api/publish', {
+            headers: { 'x-studio-token': this.env.CONTAINER_TOKEN },
+            signal: AbortSignal.timeout(10_000),
+          }),
+          4350,
+        ),
+      renew: () => this.renewActivityTimeout(),
+      stop: () => this.stop(),
+    });
+  }
   override onStart() {
     console.info('Studio container ready');
   }
@@ -51,6 +67,8 @@ export class PreviewContainer extends Container<Environment> {
     STUDIO_PARENT_ORIGIN: this.env.STUDIO_ORIGIN,
     STUDIO_PREVIEW_ORIGIN: this.env.PREVIEW_ORIGIN,
     STUDIO_DEPLOYMENT_URL: this.env.SITE_DEPLOYMENT_URL ?? '',
+    STUDIO_GITHUB_DEPLOY_WORKER: this.env.GITHUB_DEPLOY_WORKER ?? '',
+    STUDIO_GITHUB_DEPLOY_ACCOUNT: this.env.GITHUB_DEPLOY_ACCOUNT ?? '',
     CLOUDFLARE_API_TOKEN: this.env.PUBLISH_CLOUDFLARE_API_TOKEN ?? '',
     VERCEL_TOKEN: this.env.PUBLISH_VERCEL_TOKEN ?? '',
     PORT: '4350',

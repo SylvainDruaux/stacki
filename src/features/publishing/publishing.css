@@ -73,30 +73,7 @@
   font-size: 10px;
   color: var(--text-dim);
 }
-@media (prefers-reduced-motion: no-preference) and (forced-colors: none) {
-  .stacki-publish-option small.publish-checking {
-    /* Clip the highlight to the letters while preserving normal text in accessible modes. */
-    width: fit-content;
-    color: transparent;
-    background: linear-gradient(110deg, var(--text-dim) 35%, var(--text) 50%, var(--text-dim) 65%);
-    background-size: 240% 100%;
-    background-clip: text;
-    animation: publish-checking 2s linear infinite;
-  }
-}
-@keyframes publish-checking {
-  from {
-    background-position: 160% 0;
-  }
-  to {
-    background-position: -60% 0;
-  }
-}
-.stacki-publish-current {
-  margin: 4px 8px 8px;
-  font-size: 11px;
-  color: var(--text-dim);
-}
+
 .stacki-publish-split > .stacki-publish-arrow {
   border-top-left-radius: 0;
   border-bottom-left-radius: 0;

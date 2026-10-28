@@ -1,3 +1,5 @@
+// Goal: publishing survives transient failures and browser suspension without resubmission.
+// Method: inject HTTP responses and clock jumps through the real publish client.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
@@ -81,4 +83,23 @@ test('publish progress follows validated server stages and finishes only after t
     () => parsePublishState({ kind: 'building', id: 'job', stage: 'imaginary' }),
     /Invalid publish stage/,
   );
+});
+
+test('resuming a suspended tab reads the completed publish before applying a deadline', async (t) => {
+  let now = 0;
+  t.mock.method(Date, 'now', () => {
+    now += 3_600_000;
+    return now;
+  });
+  t.mock.method(globalThis, 'fetch', async () =>
+    Response.json({
+      publishing: {
+        kind: 'committed',
+        id: 'job',
+        sha: 'a'.repeat(40),
+        url: 'https://example.test/commit',
+      },
+    }),
+  );
+  assert.equal((await watchPublish('job', new AbortController().signal)).kind, 'committed');
 });

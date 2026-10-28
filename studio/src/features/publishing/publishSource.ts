@@ -126,7 +126,7 @@ export function parsePublishTreeFile(value: string): Result<PublishedFile> {
   return ok({ path: file, sha, mode, size });
 }
 
-async function sourceRoots(root: string): Promise<readonly string[]> {
+export async function sourceRoots(root: string): Promise<readonly string[]> {
   const starts: string[] = [];
   for (const directory of ['src', 'public']) {
     const info = await lstat(path.join(root, directory)).catch((error: unknown) => {

@@ -1,3 +1,4 @@
+import { gitDraftHeaders } from '../history/gitWorkspaceStorage';
 import { createHash } from 'node:crypto';
 import { mkdir, readdir, readFile, writeFile, rename, rm, lstat } from 'node:fs/promises';
 import path from 'node:path';
@@ -107,7 +108,11 @@ export class CleanupStore {
   private async remote(endpoint: string, body?: unknown) {
     const response = await fetch(this.backend + '/studio/internal' + endpoint, {
       method: body === undefined ? 'GET' : 'POST',
-      headers: { 'x-studio-token': this.token ?? '', 'Content-Type': 'application/json' },
+      headers: {
+        ...(await gitDraftHeaders(this.root)),
+        'x-studio-token': this.token ?? '',
+        'Content-Type': 'application/json',
+      },
       ...(body === undefined ? {} : { body: JSON.stringify(body) }),
       signal: AbortSignal.timeout(30_000),
     });

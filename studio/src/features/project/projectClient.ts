@@ -1,3 +1,4 @@
+import { parseWorkspaceId } from '../../shared/workspaceIdentity';
 import { parseNumericBindings, type NumericStyleBinding } from '../preview/numericStyleProtocol';
 import { responseError, StudioRequestError } from './responseError';
 import { parseField, type PropField } from '../../../vendor/stacki/shared/properties/propSchema';
@@ -21,6 +22,7 @@ export interface Component {
   readonly slotText?: boolean;
 }
 export interface Project {
+  readonly workspaceId?: string;
   readonly name: string;
   readonly pages: string[];
   readonly collections: string[];
@@ -28,17 +30,34 @@ export interface Project {
   readonly components: Component[];
   readonly classes: string[];
 }
+let requestWorkspace = '';
+let workspaceRevision = 0;
 export async function request(url: string, options?: RequestInit): Promise<unknown> {
   const finish = beginOperation();
+  const revision = workspaceRevision;
   try {
     const response = await fetch(url, {
       ...options,
+      headers: {
+        ...Object.fromEntries(new Headers(options?.headers)),
+        'x-studio-workspace': requestWorkspace,
+      },
       signal: options?.signal ?? AbortSignal.timeout(240_000),
     });
     if (!response.headers.get('Content-Type')?.includes('application/json')) {
       throw responseError(response);
     }
     const data: unknown = await response.json();
+    if (response.ok && revision === workspaceRevision && url.startsWith('/studio/api/git/')) {
+      const identity = response.headers.get('x-studio-workspace');
+      if (identity) {
+        const parsed = parseWorkspaceId(identity) ?? '';
+        if (parsed !== requestWorkspace) {
+          requestWorkspace = parsed;
+          workspaceRevision++;
+        }
+      }
+    }
     if (!response.ok) {
       throw new StudioRequestError(
         string(record(data)['error'] ?? responseError(response).message),
@@ -68,7 +87,15 @@ function strings(input: unknown): string[] {
   return input.map((item) => string(item));
 }
 export async function loadProject(signal?: AbortSignal): Promise<Project> {
-  return parseProject(await request('/studio/api/project', signal ? { signal } : undefined));
+  const revision = workspaceRevision;
+  const project = parseProject(
+    await request('/studio/api/project', signal ? { signal } : undefined),
+  );
+  if (revision !== workspaceRevision) {
+    throw new StudioRequestError('The shared branch changed while loading. Please retry.', 409);
+  }
+  requestWorkspace = project.workspaceId ?? '';
+  return project;
 }
 
 export function parseProject(input: unknown): Project {
@@ -96,8 +123,10 @@ export function parseProject(input: unknown): Project {
       ...parseRenderTag(item['renderTag']),
     };
   });
+  const workspaceId = parseWorkspaceId(data['workspaceId']);
   return {
     name: string(data['name']),
+    ...(workspaceId === undefined ? {} : { workspaceId }),
     pages: strings(data['pages']),
     collections: strings(data['collections']),
     assets: strings(data['assets']),

@@ -117,7 +117,7 @@ test('Hosting shows pending changes and opens the live site independently', asyn
   assert.match(options()[1].textContent, /Up to date/);
   assert.equal(document.querySelector('[aria-label="Open published site"]'), link);
   await show({ github: 'unknown', hosting: 'unknown' });
-  assert.match(options()[1].textContent, /Checking deployment status/);
+  assert.match(options()[1].textContent, /Deployment status unavailable/);
   assert.equal(document.querySelector('[aria-label="Open published site"]'), link);
   await show({ github: 'current', hosting: 'pending' });
   await act(async () => options()[1].click());
@@ -154,10 +154,7 @@ test('Current actions disable with explanations; settings stay available', async
   assert.equal(settings.disabled, false);
   assert.equal(github.parentElement.title, 'All changes are up to date');
   assert.equal(hosting.parentElement.title, 'All changes are up to date');
-  assert.equal(
-    document.querySelector('.stacki-publish-current').textContent,
-    'All changes are up to date',
-  );
+  assert.equal(document.querySelector('.stacki-publish-current') === null, true);
   await act(async () => {
     main().click();
     github.click();
@@ -217,6 +214,8 @@ test('Push and deployment disable independently', async (context) => {
   assert.equal(options()[0].disabled, false);
   assert.equal(options()[1].disabled, true);
   await show({ github: 'unknown', hosting: 'unknown' });
+  assert.match(options()[1].textContent, /Deployment status unavailable/);
+  assert.equal(document.querySelector('.publish-checking') === null, true);
   assert.equal(main().disabled, false);
   assert.equal(options()[0].disabled, false);
   assert.equal(options()[1].disabled, false);
@@ -241,7 +240,7 @@ test('The repository link survives rechecks without keeping stale counts', async
     await show({ github, hosting: 'unknown' });
     assert.equal(link(), original, 'Rechecking must preserve the entire clickable segment');
     assert.equal(link().href, repositoryUrl);
-    assert.match(options()[0].textContent, /Checking commit count/);
+    assert.match(options()[0].textContent, /Commit count unavailable/);
   }
   await act(async () => arrow().click());
   await act(async () => arrow().click());
@@ -306,7 +305,7 @@ test('GitHub push shows commit counts and keeps its repository link separate', a
   assert.match(options()[0].textContent, /No changes to push/);
   assert.equal(document.querySelector('[aria-label="Open GitHub repository"]').href, repositoryUrl);
   await show({ github: 'unknown', hosting: 'unknown' });
-  assert.match(options()[0].textContent, /Checking commit count/);
+  assert.match(options()[0].textContent, /Commit count unavailable/);
   assert.equal(document.querySelector('[aria-label="Open GitHub repository"]').href, repositoryUrl);
   await show({
     github: 'pending',
@@ -417,7 +416,7 @@ test('Saved hosting takes precedence over stale status', async (context) => {
   const view = fixture(context, { ...DEFAULT_PUBLISH_CONFIG, hosting: workerHosting });
   await view.show({ github: 'current', hosting: 'unconfigured' });
   await act(async () => arrow().click());
-  assert.match(options()[1].textContent, /Checking deployment status/);
+  assert.match(options()[1].textContent, /Deployment status unavailable/);
   assert.equal(options()[1].querySelector('svg').dataset.provider, 'cloudflare-workers');
   assert.equal(main().disabled, false);
   await act(async () => options()[1].click());
@@ -448,7 +447,7 @@ test('Late hosting discovery cannot leak across project switches', async (contex
     });
   await view.show({ github: 'current', hosting: 'unconfigured' });
   await act(async () => arrow().click());
-  assert.match(options()[1].textContent, /Checking deployment status/);
+  assert.match(options()[1].textContent, /Deployment status unavailable/);
   view.configure(DEFAULT_PUBLISH_CONFIG);
   await view.show({ github: 'current', hosting: 'unconfigured' }, '/another-project');
   await act(async () =>
@@ -461,4 +460,18 @@ test('Late hosting discovery cannot leak across project switches', async (contex
   assert.match(options()[1].textContent, /Choose a hosting provider/);
   assert.equal(options()[1].querySelector('[data-provider]') === null, true);
   assert.equal(main().disabled, true);
+});
+
+test('Linked hosting preserves a confirmed live deployment', async (context) => {
+  const view = fixture(context);
+  view.configure(undefined);
+  window.avb.discoverPublishing = async () => ({
+    kind: 'ready',
+    accounts: [],
+    projects: [{ name: 'website', hosting: workerHosting }],
+  });
+  await view.show({ github: 'current', hosting: 'current' });
+  assert.equal(main().disabled, true);
+  await act(async () => arrow().click());
+  assert.match(options()[1].textContent, /Up to date/);
 });

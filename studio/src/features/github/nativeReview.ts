@@ -14,6 +14,7 @@ export async function nativeReview(
   source: PublishSource,
   parent: string,
   connection: PublishConnection,
+  options: { readonly localParent?: string } = {},
 ): Promise<Result<ReviewReceipt>> {
   const git = { ...source.git, authorization: connection.token };
   const remote = `https://github.com/${connection.repository}.git`;
@@ -39,19 +40,24 @@ export async function nativeReview(
       message: 'Sync incoming changes before submitting a review.',
     });
   }
-  const original = await publishGit(git, ['rev-parse', parent + '^{tree}']);
+  const commitParent = options.localParent ?? parent;
+  const ancestor = await publishGit(git, ['merge-base', '--is-ancestor', parent, commitParent]);
+  if (!ancestor.ok) {
+    return err({ code: 'github_changed', message: 'Pull from GitHub before submitting a review.' });
+  }
+  const original = await publishGit(git, ['rev-parse', commitParent + '^{tree}']);
   if (!original.ok) {
     return original;
   }
-  const tree = await overlayPublishSource(git, source, parent);
+  const tree = await overlayPublishSource(git, source, commitParent);
   if (!tree.ok) {
     return tree;
   }
-  if (tree.value === original.value) {
+  if (tree.value === original.value && commitParent === parent) {
     return err({ code: 'review-empty', message: 'There are no changes to submit for review.' });
   }
   const branch = reviewBranch(parent, tree.value);
-  const commit = await nativeReviewCommit(git, remote, branch, tree.value, parent);
+  const commit = await nativeReviewCommit(git, remote, branch, tree.value, commitParent);
   if (!commit.ok) {
     return commit;
   }

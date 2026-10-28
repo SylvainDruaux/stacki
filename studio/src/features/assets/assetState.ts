@@ -1,3 +1,4 @@
+import { gitDraftHeaders } from '../history/gitWorkspaceStorage';
 import { mkdir, readFile, rename, writeFile, rm, rmdir } from 'node:fs/promises';
 import path from 'node:path';
 import { safePath } from '../project/projectServer';
@@ -19,7 +20,7 @@ export async function saveAssetState(root: string, state: AssetState) {
   if (backend) {
     const response = await fetch(backend + '/studio/internal/asset-state', {
       method: 'PUT',
-      headers: { 'x-studio-token': process.env['STUDIO_CONTAINER_TOKEN'] ?? '' },
+      headers: await gitDraftHeaders(root),
       body,
       signal: AbortSignal.timeout(30_000),
     });
@@ -33,7 +34,7 @@ export async function restoreAssetState(root: string) {
   const backend = process.env['STUDIO_BACKEND_URL'];
   if (backend) {
     const response = await fetch(backend + '/studio/internal/asset-state', {
-      headers: { 'x-studio-token': process.env['STUDIO_CONTAINER_TOKEN'] ?? '' },
+      headers: await gitDraftHeaders(root),
       signal: AbortSignal.timeout(30_000),
     });
     if (!response.ok) {

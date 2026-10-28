@@ -1,3 +1,5 @@
+import { gitWorkspaceBusy } from '../history/gitWorkspaceLease';
+import { managedHostingFromEnvironment, managedPublishConfig } from './managedHosting';
 import {
   parsePublishSource,
   type PublishConfig,
@@ -76,6 +78,7 @@ export class Publisher {
       ((sha: string) => Promise<'live' | 'pending'>) | undefined = deploymentFromEnvironment(),
     readonly refresh?: () => Promise<unknown>,
     readonly persistDraft?: () => Promise<void>,
+    readonly managedHosting = managedHostingFromEnvironment(),
   ) {}
   start(target: PublishTarget = 'all'): PublishState {
     if (!this.github && target !== 'hosting') {
@@ -96,6 +99,9 @@ export class Publisher {
     if (!this.github && target !== 'hosting') {
       throw new Error('Configure the GitHub App and repository before publishing.');
     }
+    if (gitWorkspaceBusy(this.root)) {
+      throw new PublishFailure('Wait for the Git operation to finish before publishing.');
+    }
     if (this.running) {
       throw new Error('A publish is already running');
     }
@@ -111,10 +117,15 @@ export class Publisher {
     const snapshot = path.join(temporary, 'site');
     let savedToGitHub = false;
     try {
-      const config = published(
+      const storedConfig = published(
         await readMetadataSource(this.root, 'publish')
           .then((stored) => parsePublishSource(stored.source))
           .then(ok, publishFailure),
+      );
+      const config = managedPublishConfig(
+        storedConfig,
+        target,
+        this.deploy ? this.managedHosting : undefined,
       );
       if (config.githubWorkflow?.kind === 'pull-request') {
         if (target === 'hosting') {
@@ -361,11 +372,11 @@ export async function runBuild(root: string): Promise<void> {
   // A bounded child heap leaves room for the preview and Git on the standard-2 container.
   await runPublishScripts(root, ['build'], { NODE_OPTIONS: '--max-old-space-size=2048' });
 }
-export function githubFromEnvironment() {
+export function githubFromEnvironment(root?: string) {
   const backend = process.env['STUDIO_BACKEND_URL'];
   const token = process.env['STUDIO_CONTAINER_TOKEN'];
   if (backend && token) {
-    return new NativeRepository(new RemoteRepository(backend, token));
+    return new NativeRepository(new RemoteRepository(backend, token, root), root);
   }
   const appId = process.env['GITHUB_APP_ID'];
   const installationId = process.env['GITHUB_INSTALLATION_ID'];
@@ -382,6 +393,7 @@ export function githubFromEnvironment() {
       repository,
       branch: process.env['GITHUB_BRANCH'] ?? 'main',
     }),
+    root,
   );
 }
 

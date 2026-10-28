@@ -62,7 +62,7 @@ export function ComponentPreviewPopup({
       <div className="comp-preview-content">
         {loading && (
           <div className="comp-preview-loading" role="status">
-            Loading preview…
+            <span className="panel-loading-label">Loading preview…</span>
           </div>
         )}
         {frames.map((frame) => (

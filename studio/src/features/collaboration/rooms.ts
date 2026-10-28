@@ -1,3 +1,4 @@
+import { verifyGitWorkspaceLease } from '../history/gitWorkspaceLease';
 import { loadInsertionDefaults } from '../settings/loadDefaults';
 import { assert } from '../../../vendor/stacki/shared/core/assert';
 import { maintainConnection } from './connectionLease';
@@ -48,6 +49,7 @@ export class Room {
   private readonly colors: PresenceColors;
   private queue = Promise.resolve();
   private saved = '';
+  private closed = false;
   private revision = 0;
   private queued = 0;
   readonly durable: BatchedWriter<SourceSnapshot>;
@@ -168,6 +170,9 @@ export class Room {
     this.presence();
   }
   private async handle(socket: WebSocket, message: Record<string, unknown>) {
+    if (this.closed) {
+      throw new Error('The shared branch changed. Reload Studio before editing.');
+    }
     if (message['type'] === 'pong') {
       return;
     }
@@ -375,8 +380,14 @@ export class Room {
     }
   }
   async diskChanged() {
+    if (this.closed) {
+      return;
+    }
     await this.coordinator
       .run(async () => {
+        if (this.closed) {
+          return;
+        }
         const source = await readSource(this.root, this.file);
         if (source !== this.saved) {
           await this.setSource(source);
@@ -511,6 +522,14 @@ export class Room {
       socket.send(JSON.stringify(message));
     }
   }
+  closeWorkspace() {
+    this.closed = true;
+    this.broadcast({ type: 'project-changed' });
+    for (const socket of this.clients.keys()) {
+      socket.close(1000, 'Shared branch changed');
+    }
+    this.document.destroy();
+  }
   broadcast(message: unknown) {
     for (const client of this.clients.keys()) {
       this.send(client, message);
@@ -529,7 +548,7 @@ export function checksum(source: string) {
 }
 
 export function createRooms(root: string) {
-  const coordinator = new SerialQueue();
+  const coordinator = new SerialQueue(() => verifyGitWorkspaceLease(root));
   const rooms = new Map<string, Promise<Room>>();
   const readyRooms = new Set<Room>();
   let publishing: PublishState = { kind: 'idle' };
@@ -575,6 +594,7 @@ export function createRooms(root: string) {
     },
     hasClients: () => [...readyRooms].some((room) => room.clients.size > 0),
     projectChanged: () => broadcast({ type: 'project-changed' }),
+    resetWorkspace: () => resetWorkspaceRooms(rooms, readyRooms),
     coordinator,
     // Call under the coordinator before filesystem snapshots or multi-file writes.
     // Await actual saves, because flushing a failed batch alone does not retry it.
@@ -640,4 +660,13 @@ async function removeRoom(
     room.document.destroy();
     rooms.delete(file);
   }
+}
+
+async function resetWorkspaceRooms(rooms: Map<string, Promise<Room>>, readyRooms: Set<Room>) {
+  for (const pending of rooms.values()) {
+    const room = await pending;
+    room.closeWorkspace();
+  }
+  readyRooms.clear();
+  rooms.clear();
 }

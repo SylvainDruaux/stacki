@@ -92,9 +92,10 @@ export async function watchPublish(
   signal: AbortSignal,
   progress?: (state: PublishState) => void,
 ): Promise<PublishState> {
-  const deadline = Date.now() + 600_000;
+  const deadline = Date.now() + 1_800_000;
   let unavailable = 0;
-  while (Date.now() < deadline) {
+  // A background tab may resume after the deadline: read the final result before timing out.
+  for (let attempt = 0; attempt < 1200; attempt++) {
     await delay(1500, signal);
     try {
       const status = record(
@@ -112,6 +113,9 @@ export async function watchPublish(
       progress?.(state);
       if (state.kind !== 'building') {
         return state;
+      }
+      if (Date.now() >= deadline) {
+        break;
       }
     } catch (error) {
       if (signal.aborted) {

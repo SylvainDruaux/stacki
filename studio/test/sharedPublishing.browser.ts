@@ -18,6 +18,9 @@ try {
   const first = await browser.newPage();
   const second = await browser.newPage();
   const pages = [first, second];
+  await first.route('**/studio/api/publish/site-url', async (route) => {
+    await route.fulfill({ json: { url: 'https://example.com' } });
+  });
   let releaseSettings = () => {};
   const settingsGate = new Promise<void>((resolve) => {
     releaseSettings = resolve;
@@ -42,6 +45,13 @@ try {
   }
   // Explicit settings remains usable while automatic hosting discovery is still pending.
   await first.getByRole('button', { name: 'More publish options', exact: true }).click();
+  await first.getByRole('link', { name: 'Open published site', exact: true }).waitFor();
+  assert.equal(
+    await first
+      .getByRole('link', { name: 'Open published site', exact: true })
+      .getAttribute('href'),
+    'https://example.com',
+  );
   await first.getByRole('button', { name: 'Publish settings…', exact: true }).click();
   await first.getByRole('dialog', { name: 'Publish settings' }).waitFor();
   const loadingPanel = first.locator('.publish-settings[data-popup-phase="open"]');
@@ -50,7 +60,7 @@ try {
     await Promise.all(element.getAnimations().map((animation) => animation.finished));
   });
   const loadingFields = loadingPanel.locator('.publish-fields .dd-trigger');
-  assert.equal(await loadingFields.count(), 4);
+  assert.equal(await loadingFields.count(), 5);
   assert.equal(
     await loadingPanel.getByRole('button', { name: 'Hosting provider', exact: true }).isEnabled(),
     true,
@@ -61,12 +71,12 @@ try {
   );
   assert.equal(
     await loadingFields
-      .first()
+      .nth(1)
       .evaluate((element) => getComputedStyle(element, '::after').animationName),
     'publish-skeleton',
   );
   const loadingBounds = await loadingPanel.boundingBox();
-  const loadingInputBounds = await loadingFields.first().boundingBox();
+  const loadingInputBounds = await loadingFields.nth(1).boundingBox();
   if (process.env['PUBLISH_SCREENSHOT']) {
     await loadingPanel.screenshot({ path: process.env['PUBLISH_SCREENSHOT'] + '.loading.png' });
   }
@@ -246,13 +256,37 @@ try {
     path.join(fixture.root, 'src/pages/broken.astro'),
     '---\nconst = ;\n---\n<h1>Broken</h1>',
   );
+  await first.evaluate(() => {
+    const icon = document.createElement('link');
+    icon.rel = 'icon';
+    icon.href = '/original.png';
+    icon.type = 'image/png';
+    document.head.append(icon);
+  });
   await first.getByRole('button', { name: 'Publish', exact: true }).click();
   for (const page of pages) {
     await page.getByText('Building website', { exact: true }).waitFor();
+    assert.match(
+      decodeURIComponent((await page.locator('link[rel="icon"]').getAttribute('href')) ?? ''),
+      /circle cx="72" cy="386"/,
+    );
+    assert.equal(
+      await page
+        .locator('.studio-publish-track')
+        .evaluate((element) => getComputedStyle(element, '::after').content),
+      'none',
+    );
     assert.equal(
       await page.getByRole('button', { name: 'Publishing…', exact: true }).isDisabled(),
       true,
     );
+  }
+  assert.equal(await first.locator('.studio-publish-track progress').count(), 1);
+  if (process.env['PUBLISH_SCREENSHOT']) {
+    await first.locator('.studio-publish-progress').screenshot({
+      path: process.env['PUBLISH_SCREENSHOT'] + '.progress.png',
+      animations: 'disabled',
+    });
   }
   await second.reload();
   await second.getByText('Building website', { exact: true }).waitFor();
@@ -265,7 +299,13 @@ try {
   assert.equal(fixture.checks(), checks, 'Automatic sync pauses during a publish');
   fixture.release();
   for (const page of pages) {
-    await page.getByText('Publish needs attention', { exact: true }).waitFor();
+    await page.getByRole('button', { name: 'Publish', exact: true }).waitFor();
+    if (page === first) {
+      assert.equal(await page.locator('link[rel="icon"]').getAttribute('href'), '/original.png');
+      assert.equal(await page.locator('link[rel="icon"]').getAttribute('type'), 'image/png');
+    } else {
+      assert.equal(await page.locator('link[rel="icon"]').count(), 0);
+    }
     assert.equal(
       await page.getByRole('button', { name: 'Publish', exact: true }).isEnabled(),
       true,

@@ -1,3 +1,4 @@
+import { gitDraftHeaders } from '../history/gitWorkspaceStorage';
 import { MEDIA_EXT } from '../assets/assetStateTypes';
 import { keepLocalUpload, localUploadPath } from './cleanupStore';
 import { writeFile, rename, stat, rm } from 'node:fs/promises';
@@ -33,7 +34,7 @@ export async function saveAsset(root: string, file: string, bytes: Uint8Array) {
       backend + '/studio/internal/asset?file=' + encodeURIComponent(file),
       {
         method: 'PUT',
-        headers: { 'x-studio-token': process.env['STUDIO_CONTAINER_TOKEN'] ?? '' },
+        headers: await gitDraftHeaders(root),
         body: Buffer.from(bytes),
         signal: AbortSignal.timeout(30_000),
       },
@@ -57,7 +58,7 @@ export async function forgetAsset(root: string, file: string) {
       backend + '/studio/internal/asset?file=' + encodeURIComponent(file),
       {
         method: 'DELETE',
-        headers: { 'x-studio-token': process.env['STUDIO_CONTAINER_TOKEN'] ?? '' },
+        headers: await gitDraftHeaders(root),
         signal: AbortSignal.timeout(30_000),
       },
     );

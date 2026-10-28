@@ -1,3 +1,4 @@
+import { readGitWorkspace } from '../history/gitWorkspaceStorage';
 import { readFile, writeFile, rm, mkdir } from 'node:fs/promises';
 import path from 'node:path';
 import type { RepositoryAccess, IncomingFile } from './github';
@@ -48,6 +49,10 @@ export class RepositorySync {
     preferDraft = false,
   ): Promise<SyncState> {
     if (!this.repository) {
+      return this.state;
+    }
+    if (await readGitWorkspace(this.root)) {
+      // Explicit Git pulls own merging once local commits/branches exist.
       return this.state;
     }
     this.state = { kind: 'checking' };

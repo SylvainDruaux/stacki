@@ -1,3 +1,4 @@
+import { gitWorkspaceBusy, gitWorkspaceNeedsRecovery } from '../history/gitWorkspaceLease';
 import { parsePublishTarget } from '../../../vendor/stacki/shared/properties/publishConfig';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { Publisher } from './publish';
@@ -23,6 +24,11 @@ export function publishRoute(
   response.statusCode = state.kind === 'building' ? 202 : 200;
   response.setHeader('Content-Type', 'application/json');
   response.setHeader('Cache-Control', 'no-store');
-  response.end(JSON.stringify(state));
+  response.end(
+    JSON.stringify({
+      ...state,
+      gitBusy: gitWorkspaceBusy(publisher.root) && !gitWorkspaceNeedsRecovery(publisher.root),
+    }),
+  );
   return true;
 }

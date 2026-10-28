@@ -123,8 +123,8 @@ function toolbarItems(props: PreviewToolbarProps): readonly ToolbarItem[] {
         </div>
       ),
     },
-    devices,
     ...sizing,
+    devices,
     ...inspectorItems(props.inspector),
   ];
 }

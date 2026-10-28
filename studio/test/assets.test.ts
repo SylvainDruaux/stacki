@@ -1,3 +1,5 @@
+// Goal: asset edits and catalog defaults preserve real project files.
+// Method: mutate disposable directories and validate listings through the shared parser.
 import { localUploadPath } from '../src/features/storage/cleanupStore';
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -27,10 +29,14 @@ async function fixture() {
 test('Stacki listing and real folder, upload, rename, move, delete and recovery', async () => {
   const root = await fixture();
   try {
+    await mkdir(path.join(root, 'src/assets/images'));
     await mutateAsset(root, { kind: 'mkdir', rel: 'public', name: 'photos' });
     await saveAsset(root, 'public/photos/first.png', Buffer.from('original bytes'));
     const listing = parseAssetListing(await assetCatalog(root));
     assert.equal(listing.missing, false);
+    for (const directory of ['src/assets', 'src/assets/images']) {
+      assert.ok(listing.entries.some((entry) => entry.rel === directory && entry.isDir));
+    }
     assert.ok(listing.entries.some((entry) => entry.rel === 'public/photos' && entry.isDir));
     await mutateAsset(root, { kind: 'rename', rel: 'public/photos/first.png', name: 'second.png' });
     await mutateAsset(root, {

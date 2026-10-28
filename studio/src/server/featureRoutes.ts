@@ -1,3 +1,6 @@
+import { gitWorkspaceRoutes } from '../features/history/gitWorkspaceRoutes';
+import { availabilityRoutes } from '../features/publishing/availabilityRoutes';
+import { siteRoute } from '../features/publishing/siteRoutes';
 import { historyRoutes } from '../features/history/historyRoutes';
 import { accountRoute } from '../features/publishing/accountRoutes';
 import { repositoryRoute } from '../features/publishing/repositoryRoutes';
@@ -21,11 +24,19 @@ import { RepositorySync } from '../features/github/sync';
 import { record, string } from '../shared/validation';
 
 export function featureRoutes(root: string, rooms: ReturnType<typeof createRooms>) {
-  const history = historyRoutes(root, githubFromEnvironment());
+  const repository = githubFromEnvironment(root);
+  const history = historyRoutes(root, repository);
+  const availability = availabilityRoutes(root, repository);
   const cms = cmsRoutes(root, rooms);
   const variables = variableRoutes(root, rooms);
   const properties = propertyRoutes(root, rooms);
   const { cleanup, publisher, synchronization, proposals } = featureServices(root, rooms);
+  const git = gitWorkspaceRoutes(
+    root,
+    repository,
+    rooms,
+    () => publisher.state.kind === 'building',
+  );
   return async (
     request: IncomingMessage,
     response: ServerResponse,
@@ -33,6 +44,9 @@ export function featureRoutes(root: string, rooms: ReturnType<typeof createRooms
     readBody: () => Promise<string>,
   ): Promise<boolean> => {
     if (
+      (await git(request, response, pathname, readBody)) ||
+      (await siteRoute(root, request, response, pathname)) ||
+      (await availability(request, response, pathname)) ||
       (await history(request, response, pathname, readBody)) ||
       (await defaultsCanvasRoute(root, rooms, request, response, pathname, readBody)) ||
       (await metadataRoute(root, rooms, request, response, pathname, readBody)) ||
@@ -61,17 +75,9 @@ export function featureRoutes(root: string, rooms: ReturnType<typeof createRooms
       respond(response, await saveSource(request, rooms, readBody));
       return true;
     }
-    if (pathname === '/studio/api/status') {
-      respond(response, {
-        publishing: publisher.state,
-        github: !!publisher.github,
-        ai: !!aiConfiguration(),
-        synchronization: synchronization.state,
-      });
-      return true;
-    }
-    if (pathname === '/studio/api/sync' && request.method === 'POST') {
-      respond(response, await syncProject(publisher, synchronization, await readBody()));
+    if (
+      await synchronizationRoute(request, response, pathname, readBody, publisher, synchronization)
+    ) {
       return true;
     }
     if (publishRoute(publisher, request, response, pathname)) {
@@ -90,7 +96,7 @@ function respond(response: ServerResponse, value: unknown) {
 
 function featureServices(root: string, rooms: ReturnType<typeof createRooms>) {
   const cleanup = new StorageCleanup(root, rooms.coordinator);
-  const repository = githubFromEnvironment();
+  const repository = githubFromEnvironment(root);
   const synchronization = new RepositorySync(root, repository, rooms);
   const publisher = publisherFor(root, rooms, cleanup, synchronization);
   const automatic = automaticSync(
@@ -160,3 +166,27 @@ async function syncProject(publisher: Publisher, synchronization: RepositorySync
   );
 }
 import { defaultsCanvasRoute } from '../features/settings/defaultsCanvasServer';
+
+async function synchronizationRoute(
+  request: IncomingMessage,
+  response: ServerResponse,
+  pathname: string,
+  readBody: () => Promise<string>,
+  publisher: Publisher,
+  synchronization: RepositorySync,
+) {
+  if (pathname === '/studio/api/status') {
+    respond(response, {
+      publishing: publisher.state,
+      github: !!publisher.github,
+      ai: !!aiConfiguration(),
+      synchronization: synchronization.state,
+    });
+    return true;
+  }
+  if (pathname === '/studio/api/sync' && request.method === 'POST') {
+    respond(response, await syncProject(publisher, synchronization, await readBody()));
+    return true;
+  }
+  return false;
+}

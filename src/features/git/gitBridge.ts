@@ -1,3 +1,4 @@
+import { gitTransport } from '../../ipc/gitTransport';
 // Renderer Git actions parse invoke results before deciding whether a merge can
 // continue. Payload types share the main-process inventory; responses stay unknown
 // until this boundary because preload does not validate response data.
@@ -101,16 +102,16 @@ export function parseDeleteResult(input: unknown): WireDeleteOutcome {
   throw new Error('Delete result must declare success or unmerged commits');
 }
 export async function gitMerge(payload: IpcPayloads['git:merge']): Promise<WireMergeOutcome> {
-  return parseMergeResult(await window.avb.gitMerge(payload));
+  return parseMergeResult(await gitTransport.gitMerge(payload));
 }
 export async function gitDeleteBranch(
   payload: IpcPayloads['git:deleteBranch'],
 ): Promise<WireDeleteOutcome> {
-  return parseDeleteResult(await window.avb.gitDeleteBranch(payload));
+  return parseDeleteResult(await gitTransport.gitDeleteBranch(payload));
 }
 export async function gitPark(payload: IpcPayloads['git:park']) {
-  return parkResult(await window.avb.gitPark(payload));
+  return parkResult(await gitTransport.gitPark(payload));
 }
 export async function gitUnpark(payload: IpcPayloads['git:unpark']) {
-  return unparkResult(await window.avb.gitUnpark(payload));
+  return unparkResult(await gitTransport.gitUnpark(payload));
 }

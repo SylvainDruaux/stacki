@@ -1,3 +1,9 @@
+import {
+  draftKey,
+  readCloudGitWorkspace,
+  gitWorkspaceRoute,
+  gitBundleRoute,
+} from './gitWorkspaceRoutes';
 import { modelConfiguration } from '../features/ai/chatContracts';
 import { parseAssetState, emptyAssetState } from '../features/assets/assetStateTypes';
 import { authorizeConnection } from '../features/auth/connectionAuthorization';
@@ -31,6 +37,8 @@ const routes: Readonly<
   '/studio/internal/storage': storageInventory,
   '/studio/internal/storage-baseline': storageBaseline,
   '/studio/internal/storage-remove': removeStoredAsset,
+  '/studio/internal/git-workspace': gitWorkspaceRoute,
+  '/studio/internal/git-bundle': gitBundleRoute,
   '/studio/internal/base': internalBase,
   '/studio/internal/incoming': internalIncoming,
   '/studio/internal/chat/completions': internalCompletions,
@@ -55,7 +63,7 @@ async function internalBase(
     if (!/^[a-f0-9]{40}$/.test(sha)) {
       throw new Error('Invalid Git revision');
     }
-    await environment.DRAFTS.put('metadata/base-sha', sha);
+    await environment.DRAFTS.put(draftKey(request, 'metadata/base-sha'), sha);
     return Response.json({ saved: true });
   }
   return new Response('Not found', { status: 404 });
@@ -74,7 +82,7 @@ async function internalIncoming(
         installationId: environment.GITHUB_INSTALLATION_ID,
         privateKey: environment.GITHUB_PRIVATE_KEY,
         repository: environment.GITHUB_REPOSITORY,
-        branch: environment.GITHUB_BRANCH,
+        branch: (await readCloudGitWorkspace(environment))?.branch ?? environment.GITHUB_BRANCH,
       });
       return Response.json(await repository.incoming(string(input['base'], 64)));
     } catch (error) {
@@ -133,11 +141,14 @@ async function internalAssets(
   url: URL,
 ): Promise<Response> {
   if (url.pathname === '/studio/internal/assets') {
-    const objects = await environment.DRAFTS.list({ prefix: 'assets/', limit: 1000 });
+    const prefix = draftKey(request, 'assets/');
+    const objects = await environment.DRAFTS.list({ prefix, limit: 1000 });
     if (objects.truncated) {
       throw new Error('Asset inventory exceeds limit');
     }
-    return Response.json(objects.objects.map((object) => filePath(object.key.slice(7))));
+    return Response.json(
+      objects.objects.map((object) => filePath(object.key.slice(prefix.length))),
+    );
   }
   return new Response('Not found', { status: 404 });
 }
@@ -150,11 +161,11 @@ async function internalAsset(
   if (url.pathname === '/studio/internal/asset') {
     const file = filePath(url.searchParams.get('file'));
     if (request.method === 'DELETE') {
-      await environment.DRAFTS.delete('assets/' + file);
+      await environment.DRAFTS.delete(draftKey(request, 'assets/' + file));
       return new Response(null, { status: 204 });
     }
     if (request.method === 'GET') {
-      const object = await environment.DRAFTS.get('assets/' + file);
+      const object = await environment.DRAFTS.get(draftKey(request, 'assets/' + file));
       return object ? new Response(object.body) : new Response(null, { status: 404 });
     }
     if (request.method === 'PUT') {
@@ -162,7 +173,7 @@ async function internalAsset(
       if (bytes.byteLength > 20_000_000) {
         return new Response('Asset too large', { status: 413 });
       }
-      await environment.DRAFTS.put('assets/' + file, bytes);
+      await environment.DRAFTS.put(draftKey(request, 'assets/' + file), bytes);
       return new Response(null, { status: 204 });
     }
   }
@@ -181,7 +192,7 @@ async function internalPublishConnection(
     installationId: environment.GITHUB_INSTALLATION_ID,
     privateKey: environment.GITHUB_PRIVATE_KEY,
     repository: environment.GITHUB_REPOSITORY,
-    branch: environment.GITHUB_BRANCH,
+    branch: (await readCloudGitWorkspace(environment))?.branch ?? environment.GITHUB_BRANCH,
   });
   const connection =
     new URL(request.url).pathname === '/studio/internal/review-connection'
@@ -199,7 +210,7 @@ async function internalState(
 ): Promise<Response> {
   if (url.pathname === '/studio/internal/state') {
     const file = sourcePath(url.searchParams.get('file'));
-    const key = 'documents/' + file;
+    const key = draftKey(request, 'documents/' + file);
     if (request.method === 'DELETE') {
       await environment.DRAFTS.delete(key);
       return new Response(null, { status: 204 });
@@ -226,12 +237,13 @@ async function internalFiles(
   url: URL,
 ): Promise<Response> {
   if (url.pathname === '/studio/internal/files') {
-    const objects = await environment.DRAFTS.list({ prefix: 'documents/', limit: 1000 });
+    const prefix = draftKey(request, 'documents/');
+    const objects = await environment.DRAFTS.list({ prefix, limit: 1000 });
     if (objects.truncated) {
       throw new Error('Draft file limit exceeded');
     }
     return Response.json(
-      objects.objects.map((object) => sourcePath(object.key.slice('documents/'.length))),
+      objects.objects.map((object) => sourcePath(object.key.slice(prefix.length))),
     );
   }
   return new Response('Not found', { status: 404 });
@@ -246,25 +258,32 @@ async function internalBootstrap(request: Request, environment: Environment): Pr
     installationId: environment.GITHUB_INSTALLATION_ID,
     privateKey: environment.GITHUB_PRIVATE_KEY,
     repository: environment.GITHUB_REPOSITORY,
-    branch: environment.GITHUB_BRANCH,
+    branch: (await readCloudGitWorkspace(environment))?.branch ?? environment.GITHUB_BRANCH,
   });
   const connection = await repository.publishConnection();
   if (!connection.ok) {
     return Response.json({ error: connection.error.message }, { status: 400 });
   }
-  const existing = await environment.DRAFTS.get('metadata/base-sha');
-  const sha = existing ? await existing.text() : await repository.head(connection.value.token);
+  const existing = await environment.DRAFTS.get(draftKey(request, 'metadata/base-sha'));
+  const workspace = await readCloudGitWorkspace(environment);
+  const sha =
+    workspace?.remote.find((entry) => entry.name === workspace.branch)?.head ??
+    workspace?.remote[0]?.head ??
+    (existing ? await existing.text() : await repository.head(connection.value.token));
   if (!/^[a-f0-9]{40}$/.test(sha)) {
     throw new Error('Invalid repository baseline.');
   }
   if (!existing) {
-    await environment.DRAFTS.put('metadata/base-sha', sha);
+    await environment.DRAFTS.put(draftKey(request, 'metadata/base-sha'), sha);
   }
-  return Response.json({ ...connection.value, sha }, { headers: { 'Cache-Control': 'no-store' } });
+  return Response.json(
+    { ...connection.value, sha, workspace },
+    { headers: { 'Cache-Control': 'no-store' } },
+  );
 }
 
 async function internalAssetState(request: Request, environment: Environment): Promise<Response> {
-  const key = 'metadata/asset-state';
+  const key = draftKey(request, 'metadata/asset-state');
   if (request.method === 'GET') {
     const object = await environment.DRAFTS.get(key);
     return Response.json(object ? parseAssetState(await object.json()) : emptyAssetState);

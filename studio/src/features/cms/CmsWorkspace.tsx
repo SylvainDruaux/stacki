@@ -54,11 +54,7 @@ export function CmsWorkspace({
     }
   };
   if (!cms) {
-    return panel === 'collections' ? (
-      <div className="cms-view studio-variables-empty">
-        <p>Select a collection to edit its content.</p>
-      </div>
-    ) : null;
+    return null;
   }
   if (cms.kind === 'content') {
     return (

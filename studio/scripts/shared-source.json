@@ -654,7 +654,35 @@
     "src/features/git/FileStatus.tsx",
     "electron/git/gitHistory.ts",
     "electron/git/git.ts",
-    "electron/git/gitCommitDiff.ts"
+    "electron/git/gitCommitDiff.ts",
+    "src/ipc/publishSiteHost.ts",
+    "electron/project/publishSite.ts",
+    "electron/git/gitBranches.ts",
+    "electron/git/conflicts.ts",
+    "src/features/git/conflictTextChanges.ts",
+    "src/features/git/GitChipView.tsx",
+    "src/features/git/gitActions.ts",
+    "src/features/git/SwitchBranchModal.tsx",
+    "src/features/git/useGitIncoming.ts",
+    "src/features/git/Code.tsx",
+    "src/features/git/BranchActions.tsx",
+    "src/features/git/BranchCreate.tsx",
+    "src/features/git/useMergeConflict.ts",
+    "src/features/git/GitChip.tsx",
+    "src/features/git/branchName.ts",
+    "src/features/git/conflictDraft.ts",
+    "src/features/git/GitPullControl.tsx",
+    "src/features/git/gitBridge.ts",
+    "src/features/git/gitChipBridge.ts",
+    "src/features/git/CommitFilePicker.tsx",
+    "src/features/git/conflictHighlights.ts",
+    "src/features/git/MergeResultEditor.tsx",
+    "src/features/git/MergeConflictModal.tsx",
+    "src/features/git/MergeConflictDetail.tsx",
+    "src/features/git/gitConflictModel.ts",
+    "src/features/git/FileBrowser.tsx",
+    "src/ui/PullIcon.tsx",
+    "src/ipc/gitTransport.ts"
   ],
   "adapters": [
     "electron/content/contentConfig.ts",
@@ -663,7 +691,8 @@
     "src/features/componentProperties/propertiesBridge.ts",
     "src/features/variables/variableHistory.ts",
     "src/ipc/assetBridge.ts",
-    "src/ipc/editorEnvironment.ts"
+    "src/ipc/editorEnvironment.ts",
+    "src/ipc/gitTransport.ts"
   ],
   "imports": {
     "electron/content/contentEntries.ts": {
@@ -677,6 +706,9 @@
     "electron/handlers/contentHandlers.ts": {
       "../documents/documentWrites": "src/features/cms/cmsHost",
       "./mainHost": "src/features/cms/cmsHost"
+    },
+    "electron/git/gitBranches.ts": {
+      "../documents/documentWrites": "src/features/history/gitWorkspaceWrites"
     }
   },
   "modules": {
@@ -686,6 +718,7 @@
     "src/features/componentDefaults/defaultsHost.ts": "src/features/settings/defaultsHost.ts",
     "src/ipc/publishAccountBridge.ts": "src/features/publishing/accountClient.ts",
     "src/ipc/publishDiscoveryBridge.ts": "src/features/publishing/discoveryClient.ts",
-    "src/ipc/publishRepositoryBridge.ts": "src/features/publishing/repositoryClient.ts"
+    "src/ipc/publishRepositoryBridge.ts": "src/features/publishing/repositoryClient.ts",
+    "src/ipc/publishSiteHost.ts": "src/features/publishing/siteClient.ts"
   }
 }

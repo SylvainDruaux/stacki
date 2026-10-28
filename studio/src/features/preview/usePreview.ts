@@ -35,15 +35,9 @@ export function usePreview(
     };
   }, []);
   const reveal = useRef<{ type: string; id: string; occurrence: number }>();
-  const outside = useRef<(() => void) | undefined>(undefined);
-  const subscribeOutside = useCallback((listener: () => void) => {
-    outside.current = listener;
-    return () => {
-      outside.current = undefined;
-    };
-  }, []);
-  const callbacks = useRef({ onSelect, onOpen, report, onOutside: () => outside.current?.() });
-  callbacks.current = { onSelect, onOpen, report, onOutside: () => outside.current?.() };
+  const { subscribeOutside, onOutside } = useOutsideListeners();
+  const callbacks = useRef({ onSelect, onOpen, report, onOutside });
+  callbacks.current = { onSelect, onOpen, report, onOutside };
   const { target, retry } = usePreviewTarget(file, enabled, callbacks);
   const send = (message: unknown) => postToFrame(frame.current, target?.origin, message);
   const source = usePreviewSource(target?.url, send);
@@ -81,6 +75,27 @@ export function usePreview(
     send,
   };
 }
+// Defaults editing and component editing both dismiss through the canvas. Neither
+// subscriber may replace the other when React mounts their effects.
+function useOutsideListeners() {
+  const outside = useRef(new Set<() => void>());
+  const subscribeOutside = useCallback((listener: () => void) => {
+    if (outside.current.size >= 8) {
+      throw new Error('Too many preview dismissal listeners.');
+    }
+    outside.current.add(listener);
+    return () => {
+      outside.current.delete(listener);
+    };
+  }, []);
+  const onOutside = () => {
+    for (const listener of outside.current) {
+      listener();
+    }
+  };
+  return { subscribeOutside, onOutside };
+}
+
 function usePreviewMessages(
   frame: React.RefObject<HTMLIFrameElement>,
   target: { url: string; origin: string } | undefined,

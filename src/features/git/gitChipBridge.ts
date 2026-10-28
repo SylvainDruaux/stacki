@@ -1,3 +1,4 @@
+import { gitTransport } from '../../ipc/gitTransport';
 import type { IpcResults, WireFileKind, WireGitInfo } from '../../../shared/ipc/ipcResults';
 import type { Result } from '../../../shared/core/result';
 import type { Parser } from '../../../shared/core/boundary';
@@ -124,16 +125,16 @@ async function gitRequest<Value>(
 }
 export function readGitInfo(projectPath: string) {
   const payload = parseIpcPayload('git:info', projectPath);
-  return gitRequest(parseGitInfo, () => window.avb.gitInfo(payload));
+  return gitRequest(parseGitInfo, () => gitTransport.gitInfo(payload));
 }
 export function readGitStatus(projectPath: string) {
   const payload = parseIpcPayload('git:status', { projectPath });
-  return gitRequest(parseGitStatus, () => window.avb.gitStatus(payload));
+  return gitRequest(parseGitStatus, () => gitTransport.gitStatus(payload));
 }
 export function commitGitChanges(projectPath: string, message: string, paths?: readonly string[]) {
   const input = paths === undefined ? { projectPath, message } : { projectPath, message, paths };
   const payload = parseIpcPayload('git:commit', input);
-  return gitRequest(parseGitCommit, () => window.avb.gitCommit(payload));
+  return gitRequest(parseGitCommit, () => gitTransport.gitCommit(payload));
 }
 export function createGitHubRepository(
   projectPath: string,
@@ -145,7 +146,7 @@ export function createGitHubRepository(
     repoName,
     isPrivate: options.isPrivate,
   });
-  return gitRequest(parseGitPublish, () => window.avb.gitPublish(payload));
+  return gitRequest(parseGitPublish, () => gitTransport.gitPublish(payload));
 }
 export type CheckoutMode =
   { readonly kind: 'switch' } | { readonly kind: 'create' } | { readonly kind: 'park' };
@@ -157,25 +158,25 @@ export function checkoutGitBranch(projectPath: string, branch: string, mode: Che
         ? { projectPath, branch, parkFirst: true }
         : { projectPath, branch };
   const payload = parseIpcPayload('git:checkout', input);
-  return gitRequest(parseGitCheckout, () => window.avb.gitCheckout(payload));
+  return gitRequest(parseGitCheckout, () => gitTransport.gitCheckout(payload));
 }
 export function initializeGit(projectPath: string) {
   const payload = parseIpcPayload('git:init', projectPath);
-  return gitRequest(parseGitSuccess, () => window.avb.gitInit(payload));
+  return gitRequest(parseGitSuccess, () => gitTransport.gitInit(payload));
 }
 export function pushGitBranch(projectPath: string, branch: string) {
   const payload = parseIpcPayload('git:push', { projectPath, branch });
-  return gitRequest(parseGitSuccess, () => window.avb.gitPush(payload));
+  return gitRequest(parseGitSuccess, () => gitTransport.gitPush(payload));
 }
 export function readIncomingGitCommits(projectPath: string, branch: string) {
   const payload = parseIpcPayload('git:incoming', { projectPath, branch });
-  return gitRequest(count, () => window.avb.gitIncoming(payload));
+  return gitRequest(count, () => gitTransport.gitIncoming(payload));
 }
 export function pullGitBranch(projectPath: string, branch: string) {
   const payload = parseIpcPayload('git:pull', { projectPath, branch });
-  return gitRequest(parseMergeResult, () => window.avb.gitPull(payload));
+  return gitRequest(parseMergeResult, () => gitTransport.gitPull(payload));
 }
 export function resolveGitMerge(projectPath: string, branch: string, choices: unknown) {
   const payload = parseIpcPayload('git:resolveMerge', { projectPath, branch, choices });
-  return gitRequest(parseMergeResult, () => window.avb.gitResolveMerge(payload));
+  return gitRequest(parseMergeResult, () => gitTransport.gitResolveMerge(payload));
 }

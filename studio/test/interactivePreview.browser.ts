@@ -18,6 +18,11 @@ export async function checkInteractivePreview(page: Page) {
   assert.ok((await exit.getAttribute('class'))?.includes('on'));
   const preview = page.frameLocator('iframe[title="Site preview (interactive)"]');
   await preview.locator('h1').waitFor();
+  assert.notEqual(
+    await preview.locator('html').evaluate((node) => getComputedStyle(node).overflowX),
+    'clip',
+    "Interactive preview restores the fixture site's own overflow behavior",
+  );
   assert.equal(
     await preview.locator('h1').evaluate((node) => getComputedStyle(node).cursor),
     'auto',
@@ -45,6 +50,27 @@ export async function checkInteractivePreview(page: Page) {
   await preview.locator('h1').waitFor();
   await exit.click();
   await page.locator('.preview-mode').waitFor({ state: 'detached' });
+}
+
+// Oversized page content must not pan the editing viewport; vertical reading still works.
+export async function checkPreviewOverflow(page: Page) {
+  const preview = page.frameLocator('iframe[title="Site preview"]');
+  await preview.locator('h1').waitFor();
+  const scroll = await preview.locator('body').evaluate(async (body) => {
+    const content = document.createElement('div');
+    content.style.cssText = 'width:4000px;height:4000px;';
+    body.append(content);
+    try {
+      window.scrollTo(100, 100);
+      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+      return { horizontal: window.scrollX, vertical: window.scrollY };
+    } finally {
+      content.remove();
+      window.scrollTo(0, 0);
+    }
+  });
+  assert.equal(scroll.horizontal, 0, 'Editing cannot scroll past the simulated viewport width');
+  assert.equal(scroll.vertical, 100, 'Editing preserves vertical scrolling');
 }
 
 export async function checkPreviewNavigation(page: Page) {

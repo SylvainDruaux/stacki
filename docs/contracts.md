@@ -875,6 +875,12 @@ Studio's published-history view currently provides graph and diff inspection; it
 expose Desktop checkout/restore operations against a shared collaborative draft. Session
 Undo/Redo remains available independently.
 
+Studio graph reads return commit metadata without changed-file lists. Expanding a commit
+loads its files through `/studio/api/history/commit?hash=…`, which validates the full commit
+hash and requires reachability from fetched branches. This keeps rename detection and lazy
+blob downloads off the graph's loading path; file details still use Desktop's classification
+and rename handling. Reopened graphs retain the last successful page while refreshing.
+
 CMS read operations capture their source snapshot under the project mutation coordinator,
 then release it before staging files and executing schema inspection. This keeps a slow
 content config from blocking collaborative saves and heartbeat replies. CMS mutations keep
@@ -904,3 +910,17 @@ Their authoritative renders wait for 300 ms of quiet, capped at two seconds duri
 typing, so full-site execution does not compete with every keystroke. Structural actions and
 other source changes cancel that delay. Queued renders announce their pending state to all
 subscribers so clients do not start duplicate fallback requests during the typing window.
+
+## Studio shared Git workspace
+
+Studio adapts the Desktop Git transport to authenticated HTTP commands parsed by the same
+shared IPC contracts. The single container serializes Git operations with document writes.
+A commit is acknowledged only after its immutable bundle and conditional manifest reach
+storage. Partial commits retain unselected changes; publishing preserves committed ancestry.
+Branch checkout and pull persist a complete replacement draft before changing live files.
+Each activation replaces the document namespace and closes existing rooms, so offline edits
+and queued mutations from the old checkout cannot apply to the new branch. Branch changes
+are shared by all editors. History exposes branch commits but excludes parked draft refs.
+Bundles are bounded at 96 MiB, branch lists at 64, and cloud checkpoints/draft namespaces at
+128. Old unreferenced checkpoints and document namespaces expire after a 30-minute grace
+period. Interrupted checkpoint acknowledgement blocks edits until startup recovers storage.

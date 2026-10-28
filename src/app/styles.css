@@ -3095,6 +3095,8 @@ body > .embed-editor_provenance {
   color: var(--text-dim);
 }
 .palette-instances:disabled {
+  /* Loading and zero counts are information, so retain the normal text contrast. */
+  opacity: 1;
   cursor: default;
 }
 
@@ -4004,25 +4006,31 @@ body > .embed-editor_provenance {
   line-height: 1.5;
 }
 .panel-loading {
-  padding: 20px 16px;
-  color: var(--text-dim);
-  font-size: 11.5px;
+  /* The surrounding panel owns its inset, just as it does for real content. */
+  padding: 0;
 }
 .panel-loading-rows {
   display: grid;
-  gap: 12px;
-  margin-top: 18px;
+  gap: 8px;
 }
 .panel-loading-rows > span {
-  height: 28px;
+  height: 32px;
   border-radius: 6px;
   background: var(--bg-input);
 }
-.panel-loading-rows > span:nth-child(2) {
-  width: 80%;
+.panel-loading-layout-assets > .panel-loading-rows {
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 110px), 1fr));
+  gap: 12px;
 }
-.panel-loading-rows > span:nth-child(3) {
-  width: 60%;
+.panel-loading-layout-assets > .panel-loading-rows > span {
+  height: auto;
+  aspect-ratio: 4 / 3;
+}
+.panel-loading-layout-history > .panel-loading-rows {
+  gap: 12px;
+}
+.panel-loading-layout-history > .panel-loading-rows > span {
+  height: 40px;
 }
 @media (prefers-reduced-motion: no-preference) and (forced-colors: none) {
   .panel-loading-label {

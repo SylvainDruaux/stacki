@@ -19,6 +19,7 @@ interface Props {
   readonly availability?: PublishAvailability;
   readonly publish: (target: PublishTarget) => void;
   readonly settingsClosed?: () => void;
+  readonly refreshAvailability?: () => void;
 }
 type PublishChoice = PublishTarget | 'default';
 
@@ -27,12 +28,14 @@ export function PublishControl({
   busy,
   publish,
   settingsClosed,
+  refreshAvailability,
   availability: checkedAvailability = UNKNOWN_PUBLISH_AVAILABILITY,
 }: Props) {
   const { open, setOpen, settings, checking, run, openSettings, closeSettings } = usePublishMenu(
     projectPath,
     publish,
     settingsClosed,
+    refreshAvailability,
   );
   const configuration = usePublishConfiguration(projectPath, { open, settings, checking });
   const defaultTarget = 'config' in configuration ? configuration.config.defaultTarget : 'all';
@@ -90,8 +93,21 @@ function usePublishMenu(
   projectPath: string,
   publish: Props['publish'],
   settingsClosed: Props['settingsClosed'],
+  refreshAvailability: Props['refreshAvailability'],
 ) {
   const [open, setOpen] = useState(false);
+  useEffect(() => {
+    if (!open || !refreshAvailability) {
+      return undefined;
+    }
+    refreshAvailability();
+    const timer = setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        refreshAvailability();
+      }
+    }, 30_000);
+    return () => clearInterval(timer);
+  }, [open, refreshAvailability]);
   const { settings, setSettings, checking, prepare } = usePublishSetup(projectPath, publish);
   const run = (target: PublishChoice) => {
     setOpen(false);

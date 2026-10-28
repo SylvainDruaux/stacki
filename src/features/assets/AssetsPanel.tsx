@@ -25,7 +25,7 @@ import {
   TrashIcon,
   UploadCloudIcon,
 } from '../../ui/Icons';
-import AssetThumb, { TEXT_EXT } from '../../ui/AssetThumb';
+import AssetThumb, { TEXT_EXT, preloadFontPreviews } from '../../ui/AssetThumb';
 import MoreMenu from '../../ui/MoreMenu';
 import { confirmDialog } from '../../ui/ConfirmDialog';
 import { allowDragEffect } from '../../editor/dragState';
@@ -90,7 +90,7 @@ function ProjectAssets(props: AssetsPanelProps) {
 function useAssetPanelState(props: AssetsPanelProps): AssetPanelState {
   const batch = useAssetBatch(props.project.path, props.showToast);
 
-  // The first listing falls back to the root if the project's asset folder is absent.
+  // Resolve the preferred folder against the first listing, then preserve navigation.
   const [cwd, setCwd] = useState(() => initialAssetDirectory(props.project.path));
   const [renaming, setRenaming] = useState<string | undefined>(undefined);
   const [newFolder, setNewFolder] = useState(false);
@@ -100,6 +100,14 @@ function useAssetPanelState(props: AssetsPanelProps): AssetPanelState {
   const { state: listing, refresh } = useAssetListing(props.project.path, cwdRef, setCwd);
   const entries = listing.kind === 'ready' ? listing.value.entries : EMPTY_ENTRIES;
   const missing = listing.kind === 'ready' && listing.value.missing;
+  useEffect(() => {
+    preloadFontPreviews(entries);
+    if (listing.kind === 'ready') {
+      if (cwd === '' || entries.some((entry) => entry.isDir && entry.rel === cwd)) {
+        assetDirectories.set(props.project.path, cwd);
+      }
+    }
+  }, [entries, listing.kind, cwd, props.project.path]);
   usePickPlacement(props.project.path, props.pick, entries, setCwd);
   return {
     batch,
@@ -123,14 +131,23 @@ const assetCache = createPanelCache<{
   readonly missing: boolean;
 }>();
 const EMPTY_ENTRIES: readonly AssetPanelEntry[] = [];
-function initialAssetDirectory(projectPath: string): string {
-  const cached = assetCache.get(projectPath);
-  if (cached?.kind === 'ready') {
-    return cached.value.entries.some((entry) => entry.isDir && entry.rel === PICK_HOME)
-      ? PICK_HOME
-      : '';
+const assetDirectories = createPanelCache<string>();
+const ASSET_IMAGES = `${PICK_HOME}/images`;
+function defaultAssetDirectory(entries: readonly AssetPanelEntry[]): string {
+  for (const directory of [ASSET_IMAGES, PICK_HOME]) {
+    if (entries.some((entry) => entry.isDir && entry.rel === directory)) {
+      return directory;
+    }
   }
-  return PICK_HOME;
+  return '';
+}
+function initialAssetDirectory(projectPath: string): string {
+  const previous = assetDirectories.get(projectPath);
+  if (previous?.kind === 'ready') {
+    return previous.value;
+  }
+  const cached = assetCache.get(projectPath);
+  return cached?.kind === 'ready' ? defaultAssetDirectory(cached.value.entries) : ASSET_IMAGES;
 }
 function useAssetListing(
   projectPath: string,
@@ -145,7 +162,7 @@ function useAssetListing(
     }
     const cwd = cwdRef.current;
     if (cwd && !listing.state.value.entries.some((entry) => entry.isDir && entry.rel === cwd)) {
-      setCwd('');
+      setCwd(defaultAssetDirectory(listing.state.value.entries));
     }
   }, [listing.state, cwdRef, setCwd]);
   return listing;
@@ -598,7 +615,7 @@ function AssetContents({
           <AssetTile key={file.rel} file={file} props={props} state={state} actions={actions} />
         ))}
       </div>
-      <PanelReadStatus state={state.listing} label="assets" retry={state.refresh} />
+      <PanelReadStatus state={state.listing} label="assets" layout="assets" retry={state.refresh} />
       {state.listing.kind === 'ready' &&
         folders.length === 0 &&
         files.length === 0 &&

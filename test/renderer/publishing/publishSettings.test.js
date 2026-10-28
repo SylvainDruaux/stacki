@@ -438,3 +438,26 @@ test('An unavailable Cloudflare name does not masquerade as an ID', async (conte
   await act(async () => document.querySelector('.modal-footer .primary').click());
   assert.deepEqual(writes[0].hosting, linked.projects[0].hosting);
 });
+
+test('Hosting projects omit unresolved account IDs from dropdown headings', async (context) => {
+  const accountId = '3ce2a94f4915358f35e4ec80d6f0cd77';
+  const hosting = { ...linked.projects[0].hosting, accountId };
+  const { discovery, show } = fixture(
+    context,
+    JSON.stringify({ ...DEFAULT_PUBLISH_CONFIG, hosting }),
+  );
+  await show();
+  await act(async () =>
+    discovery
+      .find((call) => call.request.provider === 'cloudflare')
+      .resolve({
+        kind: 'ready',
+        accounts: [],
+        projects: [{ name: 'website', hosting }],
+      }),
+  );
+  await act(async () => document.querySelector('[aria-label="Hosting project"]').click());
+  const dropdown = document.querySelector('.publish-dropdown');
+  assert.match(dropdown.textContent, /website/);
+  assert.doesNotMatch(dropdown.textContent, new RegExp(accountId));
+});

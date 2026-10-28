@@ -62,7 +62,7 @@ export function PublishProgress({
           </span>
         )}
       </div>
-      {!error && (
+      <div className="studio-publish-track">
         <progress
           max={total}
           value={done}
@@ -71,7 +71,7 @@ export function PublishProgress({
             done === undefined ? label : `${done} of ${total} stages complete. ${label}`
           }
         />
-      )}
+      </div>
       <p>{hint}</p>
     </section>
   );
@@ -107,7 +107,7 @@ function progressView(state: PublishState | undefined, failed: boolean) {
         ? 'Deployment is still unconfirmed. Check your hosting provider before publishing again.'
         : committed
           ? 'Live deployment is not connected in this Studio.'
-          : 'Progress follows completed stages. Some stages take longer.';
+          : publishingHint(state);
   return {
     error,
     done,
@@ -116,4 +116,22 @@ function progressView(state: PublishState | undefined, failed: boolean) {
     title,
     hint,
   };
+}
+
+function publishingHint(state: PublishState | undefined): string {
+  const stage = state?.kind === 'building' ? state.stage : undefined;
+  switch (stage) {
+    case 'preparing':
+      return 'Saving your draft and preparing the files to publish.';
+    case 'building':
+      return 'Generating your website. Publishing continues if you switch tabs.';
+    case 'committing':
+      return 'Uploading your changes to GitHub.';
+    case 'cleanup':
+      return 'Releasing temporary files before the final deployment check.';
+    case 'deploying':
+      return 'Waiting for hosting to serve this update. You can switch tabs.';
+    case undefined:
+      return 'Starting your publish. You can continue working while it runs.';
+  }
 }

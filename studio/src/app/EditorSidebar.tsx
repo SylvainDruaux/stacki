@@ -80,7 +80,7 @@ export function EditorSidebar({
         <ComponentProperties key={file} document={document} refresh={refresh} />
       )}
       {panel === 'variables' && <VariableNavigation view={props.view} />}
-      {panel === 'history' && <GitPanel document={document} report={report} />}
+      {panel === 'history' && <HistorySidebar props={props} model={model} />}
       {panel === 'ai' && <ChatPanel file={file} refresh={refresh} error={report} />}
     </aside>
   );
@@ -138,6 +138,19 @@ function DefaultsNavigator({
       openCodeWindow={model.codeWindow.open}
       openComponent={openComponent}
       report={report}
+    />
+  );
+}
+
+function HistorySidebar({ props, model }: Pick<SidebarProps, 'props' | 'model'>) {
+  return (
+    <GitPanel
+      project={props.project}
+      report={props.report}
+      flushSave={() => model.document?.whenSaved() ?? Promise.resolve()}
+      refreshProject={async () => {
+        await props.refresh();
+      }}
     />
   );
 }

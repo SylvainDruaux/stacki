@@ -1,3 +1,4 @@
+import { readWorkspaceId } from './projectIdentity';
 import path from 'node:path';
 import { ComponentAnalysis } from './componentAnalysis';
 import type { ViteDevServer } from 'vite';
@@ -22,7 +23,14 @@ export function projectCatalogs(server: ViteDevServer, root: string) {
   };
   server.watcher.on('all', changed);
   server.httpServer?.once('close', () => server.watcher.off('all', changed));
-  return { project: project.read, assets: assets.read, invalidate };
+  return {
+    project: async () => {
+      const cached = await project.read();
+      return { ...cached, value: { ...cached.value, workspaceId: await readWorkspaceId(root) } };
+    },
+    assets: assets.read,
+    invalidate,
+  };
 }
 
 function catalogRead<T>(name: string, read: () => Promise<T>) {

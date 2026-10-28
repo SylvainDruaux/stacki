@@ -1,3 +1,4 @@
+import { documentStorageName } from '../../shared/workspaceIdentity';
 import { EditorHistory } from './editorHistory';
 import { SelectionIntent } from './selectionIntent';
 import { watchConnection } from './connectionWatch';
@@ -62,9 +63,12 @@ export class SharedDocument {
   private readonly persistence: IndexeddbPersistence;
   private readonly name =
     sessionStorage.getItem('studio-name') ?? `Editor ${Math.floor(Math.random() * 900 + 100)}`;
-  constructor(readonly file: string) {
+  constructor(
+    readonly file: string,
+    readonly workspaceId?: string,
+  ) {
     this.persistence = new IndexeddbPersistence(
-      'astro-studio:' + location.origin + ':' + file,
+      documentStorageName(location.origin, file, workspaceId),
       this.doc,
     );
     sessionStorage.setItem('studio-name', this.name);
@@ -106,7 +110,7 @@ export class SharedDocument {
       return;
     }
     const socket = new WebSocket(
-      `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/studio/sync?file=${encodeURIComponent(this.file)}&participant=${this.participant}`,
+      `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/studio/sync?file=${encodeURIComponent(this.file)}&participant=${this.participant}&workspace=${encodeURIComponent(this.workspaceId ?? '')}`,
     );
     this.socket = socket;
     this.synchronized = false;
@@ -474,24 +478,24 @@ export class SharedDocument {
     this.doc.destroy();
   }
 }
-export function useDocument(file: string, active = true) {
+export function useDocument(file: string, active = true, workspaceId?: string) {
   const [document, setDocument] = useState<SharedDocument>();
   const [, refresh] = useState(0);
   useEffect(() => {
-    const document = new SharedDocument(file);
+    const document = new SharedDocument(file, workspaceId);
     setDocument(document);
     const unsubscribe = document.subscribe(() => refresh((value) => value + 1));
     return () => {
       unsubscribe();
       document.close();
     };
-  }, [file]);
+  }, [file, workspaceId]);
   useEffect(() => {
     document?.suspend(!active);
   }, [document, active]);
   // File sessions can change while the editor and preview stay mounted.
   // Never pair the previous document's source/actions with the new filename.
-  return document?.file === file ? document : undefined;
+  return document?.file === file && document.workspaceId === workspaceId ? document : undefined;
 }
 function encode(bytes: Uint8Array) {
   let result = '';

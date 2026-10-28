@@ -1,4 +1,4 @@
-// Goal: idle or hidden editors release all sockets without interrupting pending requests.
+// Goal: switching tabs keeps editing connected; genuine inactivity releases saved sessions.
 // Method: run the real draft editor, hold a sync request, and observe socket close events.
 import assert from 'node:assert/strict';
 import { chromium, type Page, type WebSocket } from 'playwright';
@@ -42,23 +42,26 @@ try {
   await visibility(page, 'hidden');
   assert.equal(await page.getByRole('button', { name: 'Resume editing' }).count(), 0);
   assert.ok(sockets.size >= 2, 'pending work keeps the connections available');
+  const synced = page.waitForResponse('**/studio/api/sync');
   release();
-  await page.getByRole('button', { name: 'Resume editing' }).waitFor();
-  await released(page, sockets);
-  await visibility(page, 'visible');
-  await page.getByRole('button', { name: 'Resume editing' }).click();
-  await ready(page);
-  assert.ok(sockets.size >= 2, 'resuming reconnects document and preview');
+  await synced;
+  await page.clock.fastForward('00:10');
+  assert.equal(await page.getByRole('button', { name: 'Resume editing' }).count(), 0);
+  assert.ok(sockets.size >= 2, 'finishing saved work in a background tab does not pause early');
   await visibility(page, 'hidden');
-  await page.getByRole('button', { name: 'Resume editing' }).waitFor();
-  await released(page, sockets);
+  await page.clock.fastForward('04:30');
+  assert.equal(await page.getByRole('button', { name: 'Resume editing' }).count(), 0);
+  assert.ok(sockets.size >= 2, 'switching tabs preserves the connections through the grace period');
   await visibility(page, 'visible');
-  await page.getByRole('button', { name: 'Resume editing' }).click();
-  await ready(page);
+  await page.clock.fastForward('00:20');
+  assert.equal(await page.getByRole('button', { name: 'Resume editing' }).count(), 0);
+  await visibility(page, 'hidden');
   await page.clock.fastForward('05:20');
   await page.getByRole('button', { name: 'Resume editing' }).waitFor();
   await released(page, sockets);
-  console.log('Hidden and idle editors release all sockets, defer for pending work, and resume.');
+  console.log(
+    'Tab switching stays connected; idle saved sessions pause; pending work is protected.',
+  );
 } finally {
   release();
   await browser.close();

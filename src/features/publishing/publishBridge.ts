@@ -7,12 +7,13 @@ import {
 } from '../../../shared/properties/publishState';
 import type { Result } from '../../../shared/core/result';
 import { parsePublishedSiteURL } from '../../../shared/properties/publishSite';
+import { publishedSiteURL } from '../../ipc/publishSiteHost';
 
 export async function readPublishedSiteURL(projectPath: string): Promise<string | undefined> {
   const input = parseIpcPayload('publish:siteURL', projectPath);
   let response: unknown;
   try {
-    response = await window.avb.publishedSiteURL(input);
+    response = await publishedSiteURL(input);
   } catch {
     return undefined;
   }

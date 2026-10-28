@@ -3,6 +3,7 @@ import React, { useRef, useState } from 'react';
 import { assert } from '../../shared/core/assert';
 import { BOUNDARY_LIMITS } from '../../shared/core/boundary';
 import { FileIcon, CodeIcon } from './Icons';
+import type { WireAssetEntry } from '../../shared/ipc/ipcResults';
 
 export const IMAGE_EXT = /\.(png|jpe?g|gif|webp|avif|svg|ico|bmp)$/i;
 export const VIDEO_EXT = /\.(mp4|webm|mov|m4v|ogv)$/i;
@@ -106,7 +107,7 @@ function loadFontPreview(
     fontLoads.set(
       abs,
       (async () => {
-        for (const source of sources) {
+        for (const source of new Set(sources)) {
           try {
             const face = new FontFace(family, `url("${source}")`);
             await face.load();
@@ -123,6 +124,29 @@ function loadFontPreview(
   const result = fontLoads.get(abs);
   assert(result !== undefined, 'AssetThumb: new font load is cached');
   return result;
+}
+
+// Warm a small, fixed budget as soon as the catalog arrives. Fonts otherwise wait
+// for their folder to open, adding a network round trip to every first preview.
+const FONT_PRELOAD_COUNT_MAX = 4;
+const FONT_PRELOAD_BYTES_MAX = 256 * 1024;
+export function preloadFontPreviews(entries: readonly WireAssetEntry[]): void {
+  assert(entries.length <= BOUNDARY_LIMITS.itemsMax, 'Font catalog stays bounded');
+  let count = 0;
+  for (const entry of entries) {
+    if (entry.isDir) {
+      continue;
+    }
+    if (!FONT_EXT.test(entry.name) || entry.size > FONT_PRELOAD_BYTES_MAX) {
+      continue;
+    }
+    void loadFontPreview(entry.abs, sourceCandidates(entry.abs));
+    count++;
+    if (count === FONT_PRELOAD_COUNT_MAX) {
+      break;
+    }
+  }
+  assert(count <= FONT_PRELOAD_COUNT_MAX, 'Font preloads stay within their request budget');
 }
 
 // Thumbnail for one asset: images render directly, videos show their first

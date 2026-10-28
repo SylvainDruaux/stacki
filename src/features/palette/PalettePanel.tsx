@@ -284,9 +284,11 @@ function PaletteItem({
             onDoubleClick={(event) => event.stopPropagation()}
             onDragStart={(event) => event.preventDefault()}
           >
-            {component.instances === undefined
-              ? 'Checking instances...'
-              : `${component.instances} instance${component.instances === 1 ? '' : 's'}`}
+            {component.instances === undefined ? (
+              <span className="panel-loading-label">Checking instances...</span>
+            ) : (
+              `${component.instances} instance${component.instances === 1 ? '' : 's'}`
+            )}
           </button>
         </div>
       </span>

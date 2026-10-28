@@ -126,6 +126,15 @@ Only execute the final deployment after filling the configuration. `--containers
 
 Connect the configured GitHub branch to your normal Cloudflare deployment pipeline. Publish creates a direct GitHub commit after validating a snapshot. Studio tracks preparation, build, commit, cleanup, and live deployment. The public gateway reports its deployed Git revision at `/__studio-deployment` with caching disabled. Set `SITE_DEPLOYMENT_URL` to that endpoint to enable live verification. Studio only reports live success when the deployed revision exactly matches the publish commit; an unconfirmed deployment remains pending after a bounded wait.
 
+When Cloudflare Workers Builds already deploys the connected branch, set
+`GITHUB_DEPLOY_WORKER` to the public site's Worker name and `GITHUB_DEPLOY_ACCOUNT` to its account
+ID, alongside `SITE_DEPLOYMENT_URL`. For that exact hosting destination, Studio commits once and
+waits for the matching live revision. It skips the duplicate container build and direct Wrangler
+upload, so no container publishing token is needed. The saved hosting choice stays intact.
+Use the main Publish action for this workflow; hosting-only cannot publish an uncommitted draft.
+Configure custom build commands and hooks in Workers Builds instead of Studio's local hooks.
+Other hosting destinations continue using their configured local build and deployment commands.
+
 Before inviting clients, verify GitHub login and denied access for an uninvited account; edit with two browsers; interrupt and restart the Container and confirm R2 recovery; upload an image; publish a successful revision; try a failing site build; push a conflicting GitHub edit; and verify both desktop and phone behavior on the actual custom domains.
 
 Do not enable public access to the preview Container directly. The Worker is its authentication and origin boundary. The internal storage/AI/GitHub routes require the Container token.

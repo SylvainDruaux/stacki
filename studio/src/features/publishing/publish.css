@@ -66,3 +66,35 @@
     transition: none;
   }
 }
+
+/* Animate the one completed-stage fill; a second moving fill suggests conflicting progress. */
+.studio-publish-track {
+  overflow: hidden;
+  border-radius: 1rem;
+  margin: 0.75rem 0;
+}
+.studio-publish-track progress {
+  margin: 0;
+}
+.studio-publish-progress[aria-busy='true'] progress::-webkit-progress-value {
+  animation: studio-publish-activity 1.6s ease-in-out infinite alternate;
+}
+.studio-publish-progress[aria-busy='true'] progress::-moz-progress-bar {
+  animation: studio-publish-activity 1.6s ease-in-out infinite alternate;
+}
+@keyframes studio-publish-activity {
+  from {
+    opacity: 0.6;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .studio-publish-progress[aria-busy='true'] progress::-webkit-progress-value {
+    animation: none;
+  }
+  .studio-publish-progress[aria-busy='true'] progress::-moz-progress-bar {
+    animation: none;
+  }
+}

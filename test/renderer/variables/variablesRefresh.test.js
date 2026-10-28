@@ -60,7 +60,11 @@ test('variables refresh coalesces watcher bursts and ignores obsolete projects',
   });
   try {
     await show('/first');
-    assert.match(document.body.textContent, /Loading CSS variables/);
+    assert.equal(
+      document.querySelector('[role="status"]').getAttribute('aria-label'),
+      'Loading CSS variables…',
+    );
+    assert.doesNotMatch(document.body.textContent, /Loading CSS variables/);
     assert.doesNotMatch(document.body.textContent, /No CSS custom properties/);
     assert.equal(reads.length, 1);
     assert.equal(listeners.size, 1);

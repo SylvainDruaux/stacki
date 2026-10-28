@@ -49,7 +49,11 @@ let hovered: OutlineTarget | undefined;
 let scope = '';
 let interactive = !location.hash.includes('avb-design');
 const selectionCursor = new CSSStyleSheet();
-selectionCursor.replaceSync('* { cursor: default !important; }');
+// Safari can scroll the iframe sideways even when the site's body clips overflow.
+// Clip the document root while editing; interactive preview keeps the site's own scrolling.
+selectionCursor.replaceSync(
+  'html { overflow-x: clip !important; } * { cursor: default !important; }',
+);
 selectionCursor.disabled = interactive || window.parent === window;
 document.adoptedStyleSheets = [...document.adoptedStyleSheets, selectionCursor];
 let collaborators: string[] = [];

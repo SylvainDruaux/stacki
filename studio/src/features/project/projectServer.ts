@@ -1,3 +1,4 @@
+import { readWorkspaceId } from './projectIdentity';
 import { ComponentAnalysis } from './componentAnalysis';
 import { batchedRead } from '../../shared/batchedRead';
 import { opendir, readFile, realpath, stat, mkdir, lstat } from 'node:fs/promises';
@@ -140,6 +141,7 @@ export async function scanProject(root: string, analysis = new ComponentAnalysis
     classes.add(name);
   }
   return {
+    workspaceId: await readWorkspaceId(root),
     name: path.basename(root) === 'workspace' ? 'Example site' : path.basename(root),
     pages: files.filter((file) => /^src\/pages\/.+\.(astro|md|mdx)$/.test(file)),
     collections: files.filter(

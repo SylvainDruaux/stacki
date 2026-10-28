@@ -1,3 +1,5 @@
+import { gitWorkspaceHistory } from './gitWorkspaceHistory';
+import { readGitWorkspace } from './gitWorkspaceStorage';
 import assert from 'node:assert/strict';
 import { mkdir, mkdtemp, rm } from 'node:fs/promises';
 import path from 'node:path';
@@ -50,7 +52,9 @@ export class HistoryRepository {
         projectPath: this.root,
         limit: 30,
         skip,
-        withFiles: true,
+        // Rename detection can lazily download blobs from every listed commit.
+        // The graph needs only commit/tree metadata; expand a commit for its files.
+        withFiles: false,
         ...(scope === 'current' ? { ref: 'refs/heads/' + snapshot.info.branch } : {}),
       });
       const commits = result.commits.map((commit) => ({
@@ -61,7 +65,7 @@ export class HistoryRepository {
         email: string(commit.email, 1000),
         subject: string(commit.subject, 10_000),
         when: string(commit.when, 100),
-        files: describeFiles(commit.files),
+        files: undefined,
       }));
       const value = {
         info: snapshot.info,
@@ -77,8 +81,9 @@ export class HistoryRepository {
   diff(request: CommitDiffRequest) {
     return this.queue.run(async () => {
       const snapshot = await this.refresh();
+      const connection = await this.connection();
       // Only objects reachable from fetched branches may be inspected.
-      const git = this.runner(snapshot.directory);
+      const git = this.runner(snapshot.directory, connection.token);
       const reachable = await git(this.root, [
         'branch',
         '--contains',
@@ -92,15 +97,43 @@ export class HistoryRepository {
     });
   }
 
-  private runner(directory: string): Git {
+  commit(hash: string) {
+    const commit = historyHash(hash);
+    return this.queue.run(async () => {
+      const snapshot = await this.refresh();
+      const connection = await this.connection();
+      const git = this.runner(snapshot.directory, connection.token);
+      const reachable = await git(this.root, [
+        'branch',
+        '--contains',
+        commit,
+        '--format=%(refname)',
+      ]);
+      if (!reachable.stdout) {
+        throw new Error('This commit is no longer available in the fetched history.');
+      }
+      const result = await log(git, {
+        projectPath: this.root,
+        ref: commit,
+        limit: 1,
+        skip: 0,
+        withFiles: true,
+      });
+      return {
+        commits: result.commits.map((entry) => ({
+          ...entry,
+          files: describeFiles(entry.files),
+        })),
+        atEnd: true,
+      };
+    });
+  }
+
+  private runner(directory: string, authorization = ''): Git {
     return async (_root, args) => {
-      const grant = await this.connection();
-      const result = await this.execute(
-        { root: this.root, directory, authorization: grant.token },
-        args,
-        '',
-        { output: 'verbatim' },
-      );
+      const result = await this.execute({ root: this.root, directory, authorization }, args, '', {
+        output: 'verbatim',
+      });
       if (!result.ok) {
         throw new Error(result.error.message);
       }
@@ -117,6 +150,21 @@ export class HistoryRepository {
   }
 
   private async refresh(requestedDepth = 31) {
+    const workspace = await readGitWorkspace(this.root);
+    if (workspace) {
+      if (this.snapshot?.remoteHeads === workspace.revision) {
+        return this.snapshot;
+      }
+      const connection = await this.connection();
+      const view = await gitWorkspaceHistory(this.root, connection.token);
+      assert(view !== undefined, 'The workspace history exists after reading its manifest');
+      if (this.snapshot) {
+        await rm(this.snapshot.directory, { recursive: true, force: true });
+      }
+      this.logs.clear();
+      this.snapshot = view;
+      return view;
+    }
     const depth = Math.max(requestedDepth, this.snapshot?.depth ?? 31);
     if (this.snapshot && this.snapshot.depth >= depth && this.now() - this.snapshot.at < 60_000) {
       return this.snapshot;
