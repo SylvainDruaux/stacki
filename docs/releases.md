@@ -15,6 +15,14 @@ Use an isolated checkout when other tasks are editing the working directory. Mat
 Studio, Studio release manifest, and npm starter versions. Never move an existing release tag to
 include later changes.
 
+## 0.1.87 startup correction
+
+The live 0.1.86 cold-start check found that Git restoration checked out the baseline a second
+time, hydrating every blob in its partial clone. Bootstrap now retains the already-restored
+files when the active Git target equals that baseline. Divergent branches and unpublished drafts
+still restore before CRDT updates. A real Git regression checks both paths, including an absent
+object store to prove the identical-baseline path cannot download repository blobs.
+
 ## 0.1.86 release validation
 
 The 0.1.85 Windows gate caught a test that expected `chmod(0755)` to set an executable bit.
