@@ -1,12 +1,16 @@
-// Goal: saved window geometry is safe to restore and optional storage cannot block editing.
+// Goal: saved window geometry and mode are safe to restore; optional storage cannot block editing.
 // Method: round-trip the real storage helpers, reject malformed and oversized inputs,
 // and restore a saved rectangle against smaller viewport and minimum-size bounds.
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const load = require('../../helpers/rendererModule');
-const { parseStoredWindowRectangle, readWindowRectangle, storeWindowRectangle } = load(
-  'src/ui/windowPreferences.ts',
-);
+const {
+  parseStoredWindowRectangle,
+  readWindowRectangle,
+  storeWindowRectangle,
+  readWindowMode,
+  storeWindowMode,
+} = load('src/ui/windowPreferences.ts');
 const viewport = { width: 1440, height: 900 };
 const minimum = { width: 560, height: 280 };
 const rectangle = { x: 80, y: 70, width: 720, height: 500 };
@@ -61,6 +65,48 @@ test('restore keeps saved placement, fits smaller screens, and centers when stor
     };
     assert.deepEqual(readWindowRectangle('variables', viewport, minimum), centered);
     assert.doesNotThrow(() => storeWindowRectangle('variables', rectangle));
+  } finally {
+    if (previous) {
+      Object.defineProperty(global, 'localStorage', previous);
+    } else {
+      delete global.localStorage;
+    }
+  }
+});
+
+test('window mode restores only valid preferences without overwriting geometry', () => {
+  const values = new Map([['variables', JSON.stringify(rectangle)]]);
+  const previous = Object.getOwnPropertyDescriptor(global, 'localStorage');
+  Object.defineProperty(global, 'localStorage', {
+    configurable: true,
+    writable: true,
+    value: {
+      getItem: (key) => values.get(key),
+      setItem: (key, value) => values.set(key, value),
+    },
+  });
+  try {
+    assert.equal(readWindowMode('variables.mode'), 'floating');
+    for (const mode of ['docked', 'floating', 'docked']) {
+      storeWindowMode('variables.mode', mode);
+      assert.equal(readWindowMode('variables.mode'), mode);
+      assert.equal(values.get('variables.mode'), mode);
+      assert.deepEqual(readWindowRectangle('variables', viewport, minimum), rectangle);
+    }
+    for (const invalid of [undefined, 42, '', 'DOCKED', '"docked"', '{}', 'x'.repeat(257)]) {
+      values.set('variables.mode', invalid);
+      assert.equal(readWindowMode('variables.mode'), 'floating');
+    }
+    global.localStorage = {
+      getItem: () => {
+        throw new Error('Storage unavailable');
+      },
+      setItem: () => {
+        throw new Error('Storage unavailable');
+      },
+    };
+    assert.equal(readWindowMode('variables.mode'), 'floating');
+    assert.doesNotThrow(() => storeWindowMode('variables.mode', 'docked'));
   } finally {
     if (previous) {
       Object.defineProperty(global, 'localStorage', previous);

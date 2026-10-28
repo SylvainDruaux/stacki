@@ -74,6 +74,7 @@ const STYLESHEET = `:root {
 (async () => {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'stacki-varsrow-'));
   fs.mkdirSync(path.join(directory, 'src', 'styles'), { recursive: true });
+  fs.mkdirSync(path.join(directory, 'electron-profile'));
   fs.writeFileSync(path.join(directory, 'src', 'styles', 'tokens.css'), STYLESHEET);
 
   const cssVars = require('#dist/electron/project/cssVars.js');
@@ -95,7 +96,7 @@ const STYLESHEET = `:root {
             project={{ path: '/p' }}
             selected={{ file: 'src/styles/tokens.css', index }}
             hidden={false}
-            onClose={() => {}}
+            onClose={() => root.render(undefined)}
             showToast={(m) => { window.__toast = m }}
           />
         )
@@ -157,6 +158,7 @@ const STYLESHEET = `:root {
   fs.writeFileSync(
     scriptPath,
     `const { app, BrowserWindow } = require('electron');
+     app.setPath('userData', ${JSON.stringify(path.join(directory, 'electron-profile'))});
      app.on('window-all-closed', () => app.quit());
      app.whenReady().then(async () => {
        // Native scroll and ResizeObserver delivery need a mapped window on Linux.
@@ -388,6 +390,37 @@ const STYLESHEET = `:root {
        await js("document.querySelector('.vars-view').style.width = '560px'");
        out.scrollNarrow = await waitForScroll(aligned);
 
+       // Closing must actually unmount the view: a mode kept only in React
+       // state survives tab changes but is lost when the X removes the editor.
+       const waitForMode = async (expected) => {
+         let mode;
+         for (let attempt = 0; attempt < 100; attempt++) {
+           mode = await js("document.querySelector('.vars-view')?.dataset.windowMode");
+           if (mode === expected) return mode;
+           await new Promise((resolve) => setTimeout(resolve, 20));
+         }
+         return mode;
+       };
+       await js("document.querySelector('.dockable-window-toggle').click()");
+       await waitForMode('docked');
+       await js("document.querySelector('.vars-view [title=Close]').click()");
+       out.closedDocked = await waitForMode(undefined) === undefined;
+       await js('window.__show(1)');
+       out.reopenedDocked = await waitForMode('docked');
+       await js("document.querySelector('.vars-view[data-window-mode=docked] " +
+         ".dockable-window-toggle')?.click()");
+       await waitForMode('floating');
+       await js("document.querySelector('.dockable-window-header').dispatchEvent(" +
+         "new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }))");
+       await js("document.querySelector('.window-resize-e').dispatchEvent(" +
+         "new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }))");
+       out.floatingPlacement = await js("document.querySelector('.vars-view').style.cssText");
+       await js("document.querySelector('.vars-view [title=Close]').click()");
+       out.closedFloating = await waitForMode(undefined) === undefined;
+       await js('window.__show(1)');
+       out.reopenedFloating = await waitForMode('floating');
+       out.reopenedPlacement = await js("document.querySelector('.vars-view').style.cssText");
+
        // Studio changes column sizes below 700px. The common bar must inherit
        // those sizes too, including the gap between the grip and the name.
        await win.webContents.insertCSS(${JSON.stringify(
@@ -416,6 +449,21 @@ const STYLESHEET = `:root {
     // The run reports through JSON, which spells a value it never found as null;
     // a key it never wrote reads as undefined. Either is "not there".
     const present = (value) => value !== null && value !== undefined;
+    check(
+      'the X unmounts docked and floating editors',
+      out.closedDocked && out.closedFloating,
+      JSON.stringify(out),
+    );
+    check(
+      'closing a docked editor restores the docked mode',
+      out.reopenedDocked === 'docked',
+      String(out.reopenedDocked),
+    );
+    check(
+      'closing a floating editor restores its mode and geometry',
+      out.reopenedFloating === 'floating' && out.floatingPlacement === out.reopenedPlacement,
+      JSON.stringify([out.reopenedFloating, out.floatingPlacement, out.reopenedPlacement]),
+    );
     const start = out.scrollBefore;
     const end = out.scrollEnd;
     for (const [layout, snapshot] of [

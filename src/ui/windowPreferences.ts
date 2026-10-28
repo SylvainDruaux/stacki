@@ -1,3 +1,4 @@
+import type { WindowMode } from './DockableWindow';
 import { toRecord } from '../../shared/core/record';
 import {
   fitWindowRectangle,
@@ -8,6 +9,27 @@ import {
 
 const STORED_VALUE_CHARS_MAX = 256;
 const COORDINATE_PX_MAX = 100_000;
+
+// A separate key preserves compatibility with existing saved window rectangles.
+export function readWindowMode(key: string): WindowMode {
+  try {
+    const value: unknown = localStorage.getItem(key);
+    if (value === 'docked' || value === 'floating') {
+      return value;
+    }
+  } catch {
+    // Storage is optional; a denied read must not prevent opening the editor.
+  }
+  return 'floating';
+}
+
+export function storeWindowMode(key: string, mode: WindowMode): void {
+  try {
+    localStorage.setItem(key, mode);
+  } catch {
+    // Losing an optional preference must not interrupt docking or editing.
+  }
+}
 
 // Stored geometry is only a preference: corrupt or unavailable storage falls back to the center.
 export function readWindowRectangle(

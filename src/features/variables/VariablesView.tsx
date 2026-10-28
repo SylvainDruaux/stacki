@@ -20,10 +20,13 @@ import { getHost, setHost } from '../style/model/host';
 import { CloseIcon, CheckIcon } from '../../ui/Icons';
 import Sheet from './VariableTable';
 import DockableWindow, { type WindowMode } from '../../ui/DockableWindow';
+import { readWindowMode, storeWindowMode } from '../../ui/windowPreferences';
 import '../style/utilities.css';
 export { dropPlan, movesForDrop } from './variableRows';
 export { createScrollSync } from './variableScroll';
 export { friendlyError } from '../../ipc/variableEditBridge';
+
+const WINDOW_MODE_KEY = 'stacki.window.variables.mode';
 
 export interface VariablesViewProps {
   readonly project: { readonly path: string };
@@ -55,9 +58,10 @@ function useVariablesView(props: VariablesViewProps) {
 
 export default function VariablesView(props: VariablesViewProps) {
   const state = useVariablesView(props);
-  const [mode, setMode] = useState<WindowMode>('floating');
+  const [mode, setMode] = useState(() => readWindowMode(WINDOW_MODE_KEY));
   const changeMode = (next: WindowMode): void => {
     setMode(next);
+    storeWindowMode(WINDOW_MODE_KEY, next);
     if (next === 'docked') {
       props.onDock?.();
     }
