@@ -15,7 +15,20 @@ Use an isolated checkout when other tasks are editing the working directory. Mat
 Studio, Studio release manifest, and npm starter versions. Never move an existing release tag to
 include later changes.
 
-## 0.1.93 updates
+## 0.1.94 Windows release corrections
+
+The 0.1.93 release stopped after Windows exposed two failures. A preview-port probe rejected
+Windows-reserved sockets with `EACCES` instead of continuing its bounded search. An inherited
+page-title lookup compared unresolved source spellings with native resolved import paths.
+
+Local regressions reproduced both causes before the fixes: socket-boundary injection replays
+`EACCES`, occupied ports, exhaustion and unrelated errors; equivalent source paths demonstrate
+the missed inherited title. The probe now skips reserved ports, and title lookup normalizes both
+sides without changing page identities. Native Windows verification remains required in CI.
+Version 0.1.93 remains an unpublished draft with its original tag. npm's publishing approval
+expired before completion, so that package was not published. All release versions are 0.1.94.
+
+## 0.1.93 updates (included in 0.1.94)
 
 - Double-click source-matched canvas text to edit it in place. Single-click selects elements.
   Native caret movement preserves typography and authored spans; unsafe runtime markup refuses

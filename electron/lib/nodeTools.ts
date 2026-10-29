@@ -283,10 +283,16 @@ export function findFreePortProbe(port: number): Promise<boolean> {
   return new Promise((resolve, reject) => {
     const server = net.createServer();
     server.once('error', (error: NodeJS.ErrnoException) => {
-      if (error.code === 'EADDRINUSE') {
-        resolve(false);
-      } else {
-        reject(error);
+      switch (error.code) {
+        // Windows reserves port ranges even when no process is listening.
+        // Treat those ports as unavailable within the existing bounded search.
+        case 'EADDRINUSE':
+        case 'EACCES':
+          resolve(false);
+          break;
+        case undefined:
+        default:
+          reject(error);
       }
     });
     server.once('listening', () => server.close(() => resolve(true)));

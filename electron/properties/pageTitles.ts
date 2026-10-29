@@ -5,6 +5,7 @@ import type { ScanPage } from '../../shared/properties/projectScan';
 import { assert } from '../../shared/core/assert';
 import { LIMITS } from '../../shared/core/limits';
 import { resolveSpec, type Alias } from '../content/cmsRefs';
+import path from 'node:path';
 
 export type PageTitleSource = { readonly specifier: string | undefined } & (
   { readonly kind: 'inherit' } | { readonly kind: 'override'; readonly title: string | undefined }
@@ -20,15 +21,18 @@ export function scanPageTitles(
 ): readonly ScanPage[] {
   assert(pages.length <= LIMITS.scanEntriesMax, 'Page titles: page count is bounded');
   assert(sources.length <= LIMITS.scanEntriesMax, 'Page titles: source count is bounded');
-  const sourceByPath = new Map(sources.map(({ file, text }) => [file, text]));
+  // Import resolution produces native absolute paths. Normalize both sides so
+  // Windows separators and equivalent source spellings use the same cache key.
+  const sourceByPath = new Map(sources.map(({ file, text }) => [path.resolve(file), text]));
   // Keep only small title summaries, not every parsed page tree, during a scan.
   const cache = new Map<string, PageTitleSource | undefined>();
   const read = (file: string): PageTitleSource | undefined => {
-    if (!cache.has(file)) {
-      const text = sourceByPath.get(file);
-      cache.set(file, text === undefined ? undefined : scanPageTitleSource(text));
+    const key = path.resolve(file);
+    if (!cache.has(key)) {
+      const text = sourceByPath.get(key);
+      cache.set(key, text === undefined ? undefined : scanPageTitleSource(text));
     }
-    return cache.get(file);
+    return cache.get(key);
   };
   return resolvePageTitles(pages, aliases, read);
 }

@@ -88,3 +88,21 @@ test('missing, cyclic, dynamic and excessively deep wrappers fall back safely', 
   const dynamic = { ...wrapper, text: wrap('title={dynamicTitle}') };
   assert.equal(scanPageTitles([page], [pageSource, dynamic])[0]?.title, undefined);
 });
+
+test('equivalent source paths resolve inherited titles without changing page identity', () => {
+  const source = wrap('').replace('../layouts/Base.astro', '@/components/ResourcesLayout.astro');
+  const scanned = scanPageTitles(
+    [page],
+    [
+      { file: '/site/src/pages/../pages/example.astro', text: source },
+      {
+        file: '/site/src/layouts/../components/ResourcesLayout.astro',
+        text: wrap('title="The Church Resources"'),
+      },
+    ],
+    [{ prefix: '@/', wildcard: true, targets: ['/site/src'] }],
+  )[0];
+  assert.equal(scanned?.title, 'The Church Resources');
+  assert.equal(scanned?.inheritedTitle, 'The Church Resources');
+  assert.equal(scanned?.path, page.path);
+});
