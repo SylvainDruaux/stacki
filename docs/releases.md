@@ -15,6 +15,18 @@ Use an isolated checkout when other tasks are editing the working directory. Mat
 Studio, Studio release manifest, and npm starter versions. Never move an existing release tag to
 include later changes.
 
+## 0.1.92 standalone Studio verification
+
+The 0.1.91 release stopped at Studio verification: the new cross-host metadata test loaded
+Desktop source, but the standalone job installs only Studio dependencies. Its subprocess could
+not resolve TypeScript from the repository root. A fresh local source archive without a root
+install reproduced the failure; normal workspaces had masked it with their root dependencies.
+The test now explicitly resolves shared dependencies from Studio's installation. The same
+isolated test and full Studio verification must pass before publication.
+
+Version 0.1.91 remains an unpublished draft with its original tag. Desktop, Studio and the starter
+are aligned at 0.1.92, retaining the project-settings updates below.
+
 ## 0.1.91 project settings
 
 Opening a project without saved guide preferences now uses in-memory defaults without creating

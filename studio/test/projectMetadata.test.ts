@@ -107,6 +107,9 @@ function desktopPublishMetadata(root: string, input: { readonly source?: string 
     ],
     {
       cwd: path.resolve(import.meta.dirname, '..'),
+      // Standalone Studio verification has no root install. Desktop's source imports
+      // the same shared dependencies, so resolve them from this test host explicitly.
+      env: { ...process.env, NODE_PATH: path.resolve(import.meta.dirname, '../node_modules') },
       encoding: 'utf8',
       timeout: 10000,
       maxBuffer: 65536,
