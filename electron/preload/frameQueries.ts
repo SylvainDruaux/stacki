@@ -1,3 +1,5 @@
+import { parseCanvasInteraction } from '../../shared/properties/canvasInteraction';
+import { setCanvasInteraction } from './frameInteraction';
 // The app asking the frame: a path's elements and computed values, the paths
 // it tracks, scrolling a node into view and the viewport height to freeze; and
 // starting the frame once the document is ready.
@@ -124,6 +126,11 @@ export function listenForQueries(): void {
     }
     const data: unknown = event.data;
     if (!recordPayload(data)) {
+      return;
+    }
+    const interaction = parseCanvasInteraction(data);
+    if (interaction !== undefined) {
+      setCanvasInteraction(interaction);
       return;
     }
     if (data['type'] === 'avb:query' && typeof data['id'] === 'number') {

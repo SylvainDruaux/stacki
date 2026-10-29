@@ -7,8 +7,8 @@ import { realpathSync } from 'node:fs';
 import type { MainHost } from './mainHost';
 import { DesktopPublisher } from '../project/publisher';
 import { readPublishAvailability } from '../project/publishAvailability';
-import { readPublishConfig } from '../project/publishConfig';
-import { publishedSiteURL } from '../project/publishSite';
+import { readProjectMetadata } from '../project/projectMetadata';
+import { publishedProjectSiteURL } from '../project/publishSite';
 
 export function registerPublishHandlers(host: Pick<MainHost, 'ipcMain' | 'assertInProject'>): void {
   const publisher = new DesktopPublisher();
@@ -46,7 +46,10 @@ export function registerPublishHandlers(host: Pick<MainHost, 'ipcMain' | 'assert
     await ensureToolPath();
     // URL discovery is independent of the local status check, which must stay responsive offline.
     try {
-      return await publishedSiteURL(project, readPublishConfig(project).hosting);
+      const metadata = readProjectMetadata(project, 'publish');
+      return metadata.ok
+        ? await publishedProjectSiteURL(project, metadata.value.source)
+        : undefined;
     } catch {
       return undefined;
     }

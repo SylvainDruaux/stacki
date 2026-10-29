@@ -1,3 +1,4 @@
+import { pageRenameRoute } from '../features/pages/pageRenameServer';
 import { gitWorkspaceRoutes } from '../features/history/gitWorkspaceRoutes';
 import { availabilityRoutes } from '../features/publishing/availabilityRoutes';
 import { siteRoute } from '../features/publishing/siteRoutes';
@@ -45,6 +46,7 @@ export function featureRoutes(root: string, rooms: ReturnType<typeof createRooms
   ): Promise<boolean> => {
     if (
       (await git(request, response, pathname, readBody)) ||
+      (await pageRenameRoute(root, rooms, request, response, pathname, readBody)) ||
       (await siteRoute(root, request, response, pathname)) ||
       (await availability(request, response, pathname)) ||
       (await history(request, response, pathname, readBody)) ||

@@ -21,7 +21,7 @@ export function PreviewSizeControls({ width, scale, onWidth, onFit }: PreviewSiz
   };
   return (
     <div className="preview-size-controls">
-      <label className="preview-width-field" title="Canvas width in pixels">
+      <label className="preview-width-field" data-tooltip="Canvas width in pixels">
         <input
           type="text"
           inputMode="numeric"
@@ -44,10 +44,10 @@ export function PreviewSizeControls({ width, scale, onWidth, onFit }: PreviewSiz
         />
         <span>px</span>
       </label>
-      <output aria-label="Canvas scale" title="Preview scaled to fit the available space">
+      <output aria-label="Canvas scale" data-tooltip="Preview scaled to fit the available space">
         {Math.round(scale * 100)}%
       </output>
-      <button type="button" title="Reset canvas to available width" onClick={onFit}>
+      <button type="button" data-tooltip="Reset canvas to available width" onClick={onFit}>
         Fit
       </button>
     </div>

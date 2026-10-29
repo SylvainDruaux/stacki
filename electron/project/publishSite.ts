@@ -1,15 +1,44 @@
 import { boolean, record, text } from '../../shared/core/boundary';
-import type { Hosting } from '../../shared/properties/publishConfig';
+import { parsePublishSource, type Hosting } from '../../shared/properties/publishConfig';
+import { discoverPublishing } from './publishDiscovery';
+import { configuredWorkerSiteURL } from './publishLinkedProject';
 import { discoveryList } from '../../shared/properties/publishDiscovery';
 import { parsePublishedSiteURL } from '../../shared/properties/publishSite';
 import { cloudflareHeaders, cloudflareRequest } from './publishDiscoveryCloudflare';
 import { discoveryCommand } from './publishDiscoveryCommand';
 import { vercelPages } from './publishDiscoveryVercel';
 
+export async function publishedProjectSiteURL(
+  root: string,
+  source: string | undefined,
+): Promise<string | undefined> {
+  const config = parsePublishSource(source);
+  if (source !== undefined) {
+    return publishedSiteURL(root, config.hosting);
+  }
+  // The menu detects existing provider links before settings are saved. URL discovery
+  // must use that same destination without creating settings or guessing between projects.
+  const result = await discoverPublishing(root, { provider: 'linked', account: '' });
+  if (result.kind !== 'ready') {
+    return undefined;
+  }
+  if (result.projects.length !== 1) {
+    return undefined;
+  }
+  const project = result.projects[0];
+  return project === undefined ? undefined : publishedSiteURL(root, project.hosting);
+}
+
 export async function publishedSiteURL(
   root: string,
   hosting: Hosting,
 ): Promise<string | undefined> {
+  if (hosting.provider === 'cloudflare-workers') {
+    const configured = await configuredWorkerSiteURL(root, hosting);
+    if (configured !== undefined) {
+      return configured;
+    }
+  }
   switch (hosting.provider) {
     case 'none':
       return undefined;

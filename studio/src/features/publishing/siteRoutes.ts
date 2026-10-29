@@ -1,5 +1,5 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import { publishedSiteURL } from '../../../vendor/stacki/electron/project/publishSite';
+import { publishedProjectSiteURL } from '../../../vendor/stacki/electron/project/publishSite';
 import {
   parsePublishSource,
   type Hosting,
@@ -22,7 +22,8 @@ export async function siteRoute(
     response.end();
     return true;
   }
-  const config = parsePublishSource((await readMetadataSource(root, 'publish')).source);
+  const metadata = await readMetadataSource(root, 'publish');
+  const config = parsePublishSource(metadata.source);
   const managed = managedSiteURL(
     config.hosting,
     managedHostingFromEnvironment(),
@@ -30,7 +31,8 @@ export async function siteRoute(
   );
   // Managed builds already know the public domain. Discover other destinations
   // with the same provider service as Desktop, without requiring it for this link.
-  const url = managed ?? (await publishedSiteURL(root, config.hosting).catch(() => undefined));
+  const url =
+    managed ?? (await publishedProjectSiteURL(root, metadata.source).catch(() => undefined));
   response.setHeader('Content-Type', 'application/json');
   response.setHeader('Cache-Control', 'no-store');
   response.end(JSON.stringify({ url }));

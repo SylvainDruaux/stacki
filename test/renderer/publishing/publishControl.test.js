@@ -475,3 +475,73 @@ test('Linked hosting preserves a confirmed live deployment', async (context) => 
   await act(async () => arrow().click());
   assert.match(options()[1].textContent, /Up to date/);
 });
+
+test('discovered URLs persist and survive closing the menu while offline', async (context) => {
+  const view = fixture(context, { ...DEFAULT_PUBLISH_CONFIG, hosting: workerHosting });
+  await view.show({ github: 'current', hosting: 'pending' });
+  await act(async () => arrow().click());
+  assert.deepEqual(view.writes.at(-1).publishedSite, {
+    hosting: workerHosting,
+    source: 'discovered',
+    url: 'https://example.com',
+  });
+  await act(async () => arrow().click());
+  window.avb.publishedSiteURL = async () => {
+    throw new Error('Offline');
+  };
+  await act(async () => arrow().click());
+  assert.equal(
+    document.querySelector('[aria-label="Open published site"]').href,
+    'https://example.com/',
+  );
+  assert.equal(view.writes.length, 1);
+});
+
+test('manual URLs override discovery', async (context) => {
+  const view = fixture(context, {
+    ...DEFAULT_PUBLISH_CONFIG,
+    hosting: workerHosting,
+    publishedSite: { hosting: workerHosting, source: 'manual', url: 'https://custom.example.com' },
+  });
+  let requests = 0;
+  window.avb.publishedSiteURL = async () => {
+    requests++;
+    return 'https://wrong.example.com';
+  };
+  await view.show({ github: 'current', hosting: 'pending' });
+  await act(async () => arrow().click());
+  assert.equal(
+    document.querySelector('[aria-label="Open published site"]').href,
+    'https://custom.example.com/',
+  );
+  assert.equal(requests, 0);
+  assert.deepEqual(view.writes, []);
+});
+
+test('a saved URL from another destination stays hidden', async (context) => {
+  const view = fixture(context, {
+    ...DEFAULT_PUBLISH_CONFIG,
+    hosting: { ...workerHosting, project: 'other' },
+    publishedSite: { hosting: workerHosting, source: 'discovered', url: 'https://old.example.com' },
+  });
+  window.avb.publishedSiteURL = async () => undefined;
+  await view.show({ github: 'current', hosting: 'pending' });
+  await act(async () => arrow().click());
+  assert.equal(document.querySelector('[aria-label="Open published site"]') === null, true);
+  assert.deepEqual(view.writes, []);
+});
+
+test('late discovery cannot overwrite a changed destination', async (context) => {
+  const view = fixture(context, { ...DEFAULT_PUBLISH_CONFIG, hosting: workerHosting });
+  let resolve;
+  window.avb.publishedSiteURL = () =>
+    new Promise((done) => {
+      resolve = done;
+    });
+  await view.show({ github: 'current', hosting: 'pending' });
+  await act(async () => arrow().click());
+  view.configure({ ...DEFAULT_PUBLISH_CONFIG, hosting: { ...workerHosting, project: 'other' } });
+  await act(async () => resolve('https://old.example.com'));
+  assert.deepEqual(view.writes, []);
+  assert.equal(document.querySelector('[aria-label="Open published site"]') === null, true);
+});

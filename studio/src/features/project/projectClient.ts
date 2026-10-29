@@ -1,4 +1,9 @@
+import { parseRenameFolders } from '../../../vendor/stacki/shared/properties/pageRenameConflicts';
 import { parseWorkspaceId } from '../../shared/workspaceIdentity';
+import {
+  parseScanPages,
+  type ScanPage,
+} from '../../../vendor/stacki/shared/properties/projectScan';
 import { parseNumericBindings, type NumericStyleBinding } from '../preview/numericStyleProtocol';
 import { responseError, StudioRequestError } from './responseError';
 import { parseField, type PropField } from '../../../vendor/stacki/shared/properties/propSchema';
@@ -25,6 +30,8 @@ export interface Project {
   readonly workspaceId?: string;
   readonly name: string;
   readonly pages: string[];
+  readonly pageFolders?: readonly string[];
+  readonly pageMetadata?: readonly ScanPage[];
   readonly collections: string[];
   readonly assets: string[];
   readonly components: Component[];
@@ -48,7 +55,11 @@ export async function request(url: string, options?: RequestInit): Promise<unkno
       throw responseError(response);
     }
     const data: unknown = await response.json();
-    if (response.ok && revision === workspaceRevision && url.startsWith('/studio/api/git/')) {
+    if (
+      response.ok &&
+      revision === workspaceRevision &&
+      (url.startsWith('/studio/api/git/') || url === '/studio/api/pages/rename')
+    ) {
       const identity = response.headers.get('x-studio-workspace');
       if (identity) {
         const parsed = parseWorkspaceId(identity) ?? '';
@@ -128,6 +139,8 @@ export function parseProject(input: unknown): Project {
     name: string(data['name']),
     ...(workspaceId === undefined ? {} : { workspaceId }),
     pages: strings(data['pages']),
+    pageFolders: parseRenameFolders(data['pageFolders'] ?? []),
+    pageMetadata: parseScanPages(data['pageMetadata'] ?? []),
     collections: strings(data['collections']),
     assets: strings(data['assets']),
     classes: strings(data['classes']),

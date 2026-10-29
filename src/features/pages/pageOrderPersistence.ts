@@ -26,8 +26,10 @@ export function useProjectPageOrder(project: string | undefined) {
     const reload = () => current.reload();
     reload();
     window.addEventListener('focus', reload);
+    window.addEventListener('stacki:pages-renamed', reload);
     return () => {
       window.removeEventListener('focus', reload);
+      window.removeEventListener('stacki:pages-renamed', reload);
       current.close();
       controller.current = undefined;
     };

@@ -79,6 +79,7 @@ export function PublishControl({
           repositoryURL={repositoryURL}
           busy={busy || checking}
           provider={provider}
+          config={'config' in configuration ? configuration.config : undefined}
           openSettings={openSettings}
         />
       </Popup>

@@ -91,8 +91,21 @@ export function pageDisplayName(page: ScanPage): string {
   if (/^index\.(astro|mdx?)$/i.test(page.name)) {
     return 'Home';
   }
+  const parts = pageSegments(page.name);
+  const base = stripPageExtension(parts.at(-1) ?? page.name);
+  if (/^\[(?:\.\.\.)?[^\]]+\]$/.test(base)) {
+    // Template names explain the collection; file and route identities remain untouched.
+    const folder = parts.at(-2) ?? 'Page';
+    return pageFolderDisplayName(folder.replace(/[\[\]]/g, '')) + ' Template';
+  }
   const title = page.title?.trim();
-  return title || stripPageExtension(page.name.split('/').at(-1) ?? page.name);
+  return title || base;
+}
+
+export function pageFolderDisplayName(name: string): string {
+  pathText(name);
+  const words = name.split(/[-\s]+/).filter((word) => word.length > 0);
+  return words.map((word) => word.charAt(0).toUpperCase() + word.slice(1)).join(' ') || name;
 }
 
 export function stripPageExtension(base: string): string {

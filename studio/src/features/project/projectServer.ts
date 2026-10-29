@@ -1,4 +1,6 @@
+import { projectPageFolders } from '../pages/pageFolders';
 import { readWorkspaceId } from './projectIdentity';
+import { projectPageTitles } from './projectPageTitles';
 import { ComponentAnalysis } from './componentAnalysis';
 import { batchedRead } from '../../shared/batchedRead';
 import { opendir, readFile, realpath, stat, mkdir, lstat } from 'node:fs/promises';
@@ -144,6 +146,8 @@ export async function scanProject(root: string, analysis = new ComponentAnalysis
     workspaceId: await readWorkspaceId(root),
     name: path.basename(root) === 'workspace' ? 'Example site' : path.basename(root),
     pages: files.filter((file) => /^src\/pages\/.+\.(astro|md|mdx)$/.test(file)),
+    pageMetadata: await projectPageTitles(root, files),
+    pageFolders: await projectPageFolders(root),
     collections: files.filter(
       (file) =>
         /^src\/(content|data)\/.+\.(json|md|mdx)$/.test(file) &&

@@ -5,18 +5,20 @@ import { comparePageNames, isCollectionRoute } from './pageOrder';
 import { FileIcon, CollectionIcon, ChevronDownIcon, CheckIcon } from '../../ui/Icons';
 import { assert } from '../../../shared/core/assert';
 import { LIMITS } from '../../../shared/core/limits';
+import { pageDisplayName } from './pageTree';
 
 interface Page {
   readonly name: string;
   readonly path: string;
   readonly route: string;
+  readonly title?: string | undefined;
 }
 interface PageSwitcherProps<T extends Page> {
   readonly pages?: readonly T[] | undefined;
   readonly currentPage?: T | undefined;
   readonly onSelect: (page: T) => void;
 }
-const pretty = (page: Page): string => page.name.replace(/\.(astro|mdx?)$/i, '');
+const pretty = pageDisplayName;
 const PageGlyph = ({ page, size }: { readonly page: Page | undefined; readonly size: number }) =>
   isCollectionRoute(page?.name) ? <CollectionIcon size={size} /> : <FileIcon size={size} />;
 
@@ -223,6 +225,7 @@ function pageSwitcherFilter<T extends Page>(pages: readonly T[] | undefined, que
       (page) =>
         !search ||
         page.name.toLowerCase().includes(search) ||
+        pretty(page).toLowerCase().includes(search) ||
         page.route.toLowerCase().includes(search),
     )
     .sort((left, right) => comparePageNames(left.name, right.name));

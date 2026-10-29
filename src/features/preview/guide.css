@@ -45,6 +45,8 @@
   color: var(--text);
   background: var(--bg-input);
 }
+.device-btns.guide-btns button[aria-pressed='true'],
+.device-btns.guide-btns button[aria-pressed='true']:hover:not(:disabled),
 .device-btns.guide-btns button[aria-expanded='true'],
 .device-btns.guide-btns button[aria-expanded='true']:hover:not(:disabled) {
   color: var(--text);

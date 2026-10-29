@@ -693,7 +693,9 @@ test(
       assert.match(sized.style.transform, /scale\(0\.5\)/);
       assert.equal(document.querySelector('[aria-label="Canvas scale"]').textContent, '50%');
       assert.equal(
-        document.querySelector('.device-btns button[aria-pressed="true"]').title,
+        document
+          .querySelector('.device-btns button[aria-pressed="true"]')
+          .getAttribute('aria-label'),
         'Desktop — 1',
       );
       assert.equal(
@@ -731,12 +733,14 @@ test(
         '2400px',
         'Dragging accounts for scale without capping at the panel',
       );
-      await act(() => document.querySelector('[title="Phone (375px) — 3"]').click());
+      await act(() => document.querySelector('[aria-label="Phone (375px) — 3"]').click());
       assert.equal(sized.style.width, '375px');
       assert.match(sized.style.transform, /scale\(1\)/);
       await setWidth('7680');
       assert.equal(sized.style.width, '7680px');
-      await act(() => document.querySelector('[title="Reset canvas to available width"]').click());
+      await act(() =>
+        document.querySelector('[data-tooltip="Reset canvas to available width"]').click(),
+      );
       assert.equal(sized.style.width, '824px');
       assert.equal(sized.style.height, '700px');
       assert.equal(document.querySelector('iframe'), frame);
@@ -1099,6 +1103,93 @@ test('clicks follow handles and cancel when the frame changes during checking', 
     assert.deepEqual(selected, ['0.2'], 'a verdict for a superseded frame cannot select');
   } finally {
     await act(() => root.unmount());
+    dom.window.close();
+  }
+});
+
+test('canvas navigation keeps the editor and interaction mode in sync', async () => {
+  const dom = installHoverDOM();
+  const React = require('react');
+  const { createRoot } = require('react-dom/client');
+  const { PreviewPane } = require(path.join(directory, 'preview.js'));
+  const root = createRoot(document.getElementById('root'));
+  const routes = [];
+  const props = { ...hoverPreviewProps(), onEditRoute: (route) => routes.push(route) };
+  try {
+    await React.act(async () => root.render(React.createElement(PreviewPane, props)));
+    const button = document.querySelector('[aria-label="Interact with canvas"]');
+    const frame = document.querySelector('iframe');
+    const messages = [];
+    frame.contentWindow.postMessage = (message) => messages.push(message);
+    assert.equal(button.getAttribute('aria-pressed'), 'false');
+    await React.act(async () => button.click());
+    assert.equal(button.getAttribute('aria-pressed'), 'true');
+    assert.deepEqual(messages.at(-1), { type: 'avb:interaction', mode: 'interact' });
+    await React.act(async () => frame.dispatchEvent(new dom.window.Event('load')));
+    assert.ok(
+      messages.some((message) => message.type === 'avb:interaction' && message.mode === 'interact'),
+    );
+    await React.act(async () => {
+      window.dispatchEvent(
+        new dom.window.MessageEvent('message', {
+          source: frame.contentWindow,
+          origin: 'http://localhost:4321',
+          data: { type: 'avb:navigated', path: '/campuses/' },
+        }),
+      );
+    });
+    assert.deepEqual(routes, ['/campuses']);
+    assert.equal(button.getAttribute('aria-pressed'), 'true');
+    await React.act(async () =>
+      root.render(
+        React.createElement(PreviewPane, {
+          ...props,
+          route: '/campuses/',
+        }),
+      ),
+    );
+    assert.equal(button.getAttribute('aria-pressed'), 'true');
+    await React.act(async () => button.click());
+    assert.equal(button.getAttribute('aria-pressed'), 'false');
+    assert.deepEqual(routes, ['/campuses']);
+  } finally {
+    await React.act(async () => root.unmount());
+    dom.window.close();
+  }
+});
+
+test('toolbar tooltips wait for hover and dismiss without native titles', async () => {
+  const dom = installHoverDOM();
+  const React = require('react');
+  const { createRoot } = require('react-dom/client');
+  const { PreviewPane } = require(path.join(directory, 'preview.js'));
+  const root = createRoot(document.getElementById('root'));
+  try {
+    await React.act(async () => root.render(React.createElement(PreviewPane, hoverPreviewProps())));
+    const button = document.querySelector('[aria-label="Interact with canvas"]');
+    assert.equal(button.hasAttribute('title'), false);
+    await React.act(async () =>
+      button.dispatchEvent(
+        new dom.window.MouseEvent('mouseover', {
+          bubbles: true,
+        }),
+      ),
+    );
+    assert.equal(document.querySelector('[role="tooltip"]') ?? undefined, undefined);
+    await React.act(async () => new Promise((resolve) => setTimeout(resolve, 650)));
+    assert.match(document.querySelector('[role="tooltip"]').textContent, /Interact with canvas/);
+    assert.ok(button.getAttribute('aria-describedby'));
+    await React.act(async () =>
+      button.dispatchEvent(
+        new dom.window.MouseEvent('mouseout', {
+          bubbles: true,
+        }),
+      ),
+    );
+    assert.equal(document.querySelector('[role="tooltip"]') ?? undefined, undefined);
+    assert.equal(button.hasAttribute('aria-describedby'), false);
+  } finally {
+    await React.act(async () => root.unmount());
     dom.window.close();
   }
 });

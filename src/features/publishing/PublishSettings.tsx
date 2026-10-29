@@ -1,4 +1,5 @@
 import { usePublishSettingsConfig } from './usePublishSettingsConfig';
+import { PublishedSiteField } from './PublishedSiteField';
 import { PublishWorkflow } from './PublishWorkflow';
 import { ErrorToast } from '../../ui/ErrorToast';
 import { PublishRepositories } from './PublishRepositories';
@@ -198,6 +199,7 @@ function PublishSettingsForm({
               discoveringHosting={discoveringHosting}
               change={changeHosting}
             />
+            <PublishedSiteField config={config} change={setConfig} />
           </section>
           <AdvancedFields config={config} setConfig={setConfig} />
           {error && <ErrorToast message={error} />}
@@ -561,5 +563,10 @@ function validateSettings(config: PublishConfig): PublishConfig {
   if (config.hosting.provider === 'cloudflare-workers' && !config.hosting.accountId) {
     throw new Error('Choose the Worker under its Cloudflare account before saving.');
   }
-  return parsePublishConfig(config);
+  const saved = config.publishedSite;
+  return parsePublishConfig(
+    saved === undefined
+      ? config
+      : { ...config, publishedSite: { ...saved, url: saved.url.trim().replace(/\/$/, '') } },
+  );
 }

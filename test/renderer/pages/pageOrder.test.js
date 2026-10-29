@@ -168,20 +168,29 @@ const check = (what, condition, detail) => {
       .filter(Boolean);
 
   const order = listed();
+  const aboutFolder = container.querySelector('[data-order-key="about/"]');
+  check(
+    'folder label is human readable',
+    aboutFolder.querySelector('.label').textContent === 'About',
+  );
+  check(
+    'folder slug stays beneath its label',
+    aboutFolder.querySelector('.sub').textContent === '/about',
+  );
   check(
     'the site’s own page is the first thing in the list',
     order[0] === 'Home',
     order.join(' · '),
   );
-  check('above every folder', order.indexOf('Home') < order.indexOf('about/'), order.join(' · '));
+  check('above every folder', order.indexOf('Home') < order.indexOf('About/'), order.join(' · '));
   check(
     'the folders are still together, in order',
-    order.indexOf('about/') < order.indexOf('care/'),
+    order.indexOf('About/') < order.indexOf('Care/'),
     order.join(' · '),
   );
   check(
     'and the other root pages are still below them',
-    order.indexOf('branding') > order.indexOf('care/'),
+    order.indexOf('branding') > order.indexOf('Care/'),
     order.join(' · '),
   );
   check('a numbered page is still last', order[order.length - 1] === '404', order.join(' · '));
@@ -189,7 +198,7 @@ const check = (what, condition, detail) => {
 
   // The same rule one level down: `about/index` is the /about page itself, so
   // it leads what is inside the folder rather than sorting among it.
-  const inFolder = order.slice(order.indexOf('about/') + 1, order.indexOf('care/'));
+  const inFolder = order.slice(order.indexOf('About/') + 1, order.indexOf('Care/'));
   check('a folder’s own page leads what is inside it', inFolder[0] === 'index', order.join(' · '));
   check(
     'with the rest of the folder after it',
@@ -200,8 +209,8 @@ const check = (what, condition, detail) => {
   // The row that leads is the folder's, not something that happens to be
   // called index: collapsing the folder takes it with it.
   await act(async () => {
-    [...container.querySelectorAll('.list-item.folder')]
-      .find((element) => element.textContent.includes('about'))
+    container
+      .querySelector('[data-order-key="about/"]')
       ?.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }));
     await new Promise((resolve) => setTimeout(resolve, 20));
   });
@@ -213,7 +222,7 @@ const check = (what, condition, detail) => {
   );
   check(
     'and the site’s page is still at the top',
-    closed[0] === 'Home' && closed[1] === 'about/',
+    closed[0] === 'Home' && closed[1] === 'About/',
     closed.join(' · '),
   );
 

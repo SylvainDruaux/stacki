@@ -57,6 +57,11 @@ const firstSettings = {
     buildScript: 'build-site',
     beforePublish: ['prepare-site'],
     afterPublish: ['verify-site'],
+    publishedSite: {
+      hosting: { provider: 'cloudflare-workers', accountId: 'account', project: 'website' },
+      source: 'manual',
+      url: 'https://example.com',
+    },
   },
 } satisfies Readonly<Record<MetadataKind, unknown>>;
 

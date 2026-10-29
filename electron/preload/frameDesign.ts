@@ -1,3 +1,4 @@
+import { canvasSelects, trackCanvasGesture } from './frameInteraction';
 // Which frame this is, and what that changes. A class on <html> says canvas
 // (`stacki-designer`) or interactive preview (`stacki-preview`); a design-mode
 // frame (#avb-design) also gets an editor cursor, inert links and forms, and
@@ -28,12 +29,11 @@ export function markFrameMode(): void {
 // They get an editor cursor (no I-beam over text) and links/forms are
 // inert — navigation only happens in the interactive preview mode.
 export function listenForDesign(): void {
-  if (location.hash.includes('avb-design')) {
-    showDesignCursor();
-    makeNavigationInert();
-    forwardModifiers();
-    window.addEventListener('keydown', forwardShortcut, true);
-  }
+  trackCanvasGesture();
+  showDesignCursor();
+  makeNavigationInert();
+  forwardModifiers();
+  window.addEventListener('keydown', forwardShortcut, true);
 }
 
 function showDesignCursor(): void {
@@ -43,6 +43,7 @@ function showDesignCursor(): void {
     }
     const style = document.createElement('style');
     style.id = 'avb-design-style';
+    style.disabled = !canvasSelects();
     style.textContent = '*, *::before, *::after { cursor: default !important; }';
     (document.head || document.documentElement)?.appendChild(style);
   };
@@ -58,6 +59,9 @@ function makeNavigationInert(): void {
   window.addEventListener(
     'click',
     (event) => {
+      if (!canvasSelects()) {
+        return;
+      }
       const anchor = event.target instanceof Element ? event.target.closest('a[href]') : undefined;
       if (anchor) {
         event.preventDefault();
@@ -65,7 +69,16 @@ function makeNavigationInert(): void {
     },
     true,
   );
-  window.addEventListener('submit', (event) => event.preventDefault(), true);
+  window.addEventListener(
+    'submit',
+    (event) => {
+      if (canvasSelects()) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+      }
+    },
+    true,
+  );
   // A press on the canvas is a selection, not an interaction — and left to
   // the browser, a press focuses whatever is under the pointer. Focusing
   // something REVEALS it: the page scrolls to bring it into view, sideways
@@ -83,6 +96,9 @@ function makeNavigationInert(): void {
   window.addEventListener(
     'mousedown',
     (event) => {
+      if (!canvasSelects()) {
+        return;
+      }
       if (event.button !== 0) {
         return;
       }
@@ -125,6 +141,9 @@ function forwardModifiers(): void {
 // Forward app shortcuts when the canvas has keyboard focus — otherwise
 // ⌘F/⌘E die inside the iframe and the insert palette never opens.
 function forwardShortcut(event: KeyboardEvent): void {
+  if (!canvasSelects()) {
+    return;
+  }
   const mod = event.metaKey || event.ctrlKey;
   if (mod && (event.key.toLowerCase() === 'f' || event.key.toLowerCase() === 'e')) {
     event.preventDefault();

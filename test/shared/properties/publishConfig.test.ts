@@ -8,6 +8,7 @@ import {
   parsePublishSource,
   parsePublishTarget,
 } from '#dist/shared/properties/publishConfig.js';
+import { savedPublishedSite } from '#dist/shared/properties/publishSite.js';
 import { hostingCommand, scriptCommand } from '#dist/shared/properties/publishCommands.js';
 import { parseDesktopPublishState } from '#dist/shared/properties/publishState.js';
 import { parseIpcPayload } from '#dist/shared/ipc/ipcPayloads.js';
@@ -189,4 +190,48 @@ test('Workers keep their Wrangler configuration and require an explicit account 
   assert.throws(() =>
     parsePublishConfig({ ...config, hosting: { ...hosting, project: '--help' } }),
   );
+});
+
+test('published site links round-trip with their destination and reject unsafe metadata', () => {
+  const publishedSite = { hosting: cloudflare, source: 'discovered', url: 'https://example.com' };
+  const config = { ...DEFAULT_PUBLISH_CONFIG, hosting: cloudflare, publishedSite };
+  assert.deepEqual(parsePublishSource(JSON.stringify(config)), config);
+  assert.doesNotThrow(() => validateMetadata('publish', JSON.stringify(config)));
+  for (const change of [
+    { url: 'javascript:alert(1)' },
+    { url: 'https://user:password@example.com' },
+    { url: 'https://example.com/path' },
+    { url: 'https://example.com?query=1' },
+    { url: 'https://' + 'x'.repeat(2048) },
+    { source: 'other' },
+    { hosting: { provider: 'none' } },
+    { hosting: { ...cloudflare, accountId: '' } },
+  ]) {
+    assert.throws(() =>
+      parsePublishConfig({ ...config, publishedSite: { ...publishedSite, ...change } }),
+    );
+  }
+});
+
+test('saved links are scoped to the provider account and project', () => {
+  const publishedSite = {
+    hosting: cloudflare,
+    source: 'manual' as const,
+    url: 'https://example.com',
+  };
+  const config = { ...DEFAULT_PUBLISH_CONFIG, hosting: cloudflare, publishedSite };
+  assert.equal(savedPublishedSite(config), publishedSite);
+  assert.equal(savedPublishedSite(DEFAULT_PUBLISH_CONFIG), undefined);
+  for (const hosting of [
+    { ...cloudflare, accountId: 'other' },
+    { ...cloudflare, project: 'other' },
+    {
+      provider: 'cloudflare-workers',
+      accountId: cloudflare.accountId,
+      project: cloudflare.project,
+    },
+    { provider: 'none' },
+  ] as const) {
+    assert.equal(savedPublishedSite({ ...config, hosting }), undefined);
+  }
 });

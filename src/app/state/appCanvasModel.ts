@@ -34,6 +34,7 @@ import { useCoreState } from './appLifecycle';
 import { useLifecycle } from './appNavigation';
 import { useShortcuts } from './appPageOps';
 import type { useCodeWindow, usePageOps } from './appViewModel';
+import { pageDisplayName } from '../../features/pages/pageTree';
 
 // Asset file edits, and the preview-token gate.
 export function useCanvasGate(
@@ -295,9 +296,10 @@ export function useCanvasMarks(
 
   const crumbs: PreviewCrumb[] = [];
   if (currentPage) {
+    const page = coreState.scan.pages.find((entry) => entry.path === currentPage.path);
     crumbs.push({
       id: undefined,
-      label: currentPage.name.replace(/\.(astro|md)$/i, ''),
+      label: page ? pageDisplayName(page) : currentPage.name.replace(/\.(astro|mdx?)$/i, ''),
     });
   }
   if (model && selectedId === 'frontmatter') {

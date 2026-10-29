@@ -396,6 +396,17 @@ export function PagesTab({ app }: { readonly app: ShellView }) {
       onDelete={app.onDeletePage}
       onMovePage={app.onMovePage}
       onCreateFolder={app.createPageFolder}
+      onRename={async (change) => {
+        if (change.kind === 'folder') {
+          await app.renamePageFolder(change.from, change.to);
+        } else {
+          const page = app.scan.pages.find((entry) => entry.name === change.from);
+          if (!page) {
+            throw new Error('This page no longer exists.');
+          }
+          await app.movePageTo(page, change.to);
+        }
+      }}
       onRenameFolder={app.onRenamePageFolder}
       onDeleteFolder={app.onDeletePageFolder}
     />

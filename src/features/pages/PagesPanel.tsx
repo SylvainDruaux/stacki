@@ -1,3 +1,5 @@
+import { PageTreeRenameDialog } from './PageTreeRenameDialog';
+import type { PageRename } from '../../../shared/properties/pageRename';
 import { useTreeDragCleanup } from '../../ui/TreeDragDrop';
 import { useProjectPageOrder } from './pageOrderPersistence';
 import { usePageOrderDrag } from './usePageOrderDrag';
@@ -15,6 +17,7 @@ import {
 import { comparePageNames, isCollectionRoute } from './pageOrder';
 import { CollectionIcon, FileIcon, FolderIcon, FolderPlusIcon, PlusIcon } from '../../ui/Icons';
 import { NewPageModal } from './PageDialogs';
+import { PageSearchPath } from './PageSearchPath';
 import { PageTreeView, type PageEditing, type PageTreeActions } from './PageTreeView';
 
 interface PagesPanelProps {
@@ -28,6 +31,7 @@ interface PagesPanelProps {
   readonly onDelete: (page: ScanPage) => void;
   readonly onMovePage: (page: ScanPage, to: string) => void;
   readonly onCreateFolder: () => Promise<string | undefined>;
+  readonly onRename: (change: PageRename) => Promise<void>;
   readonly onRenameFolder: (from: string, to: string) => void;
   readonly onDeleteFolder: (rel: string, pageCount: number) => void;
 }
@@ -67,6 +71,12 @@ export default function PagesPanel(props: PagesPanelProps) {
           onChange={(event) => setQuery(event.currentTarget.value)}
         />
       </div>
+      <PageTreeRenameDialog
+        editing={editing}
+        scan={props.scan}
+        save={props.onRename}
+        close={() => actions.setEditing({ kind: 'none' })}
+      />
       <PageOrderNotice state={ordering.state} reload={ordering.reload} />
       <PageBody
         order={ordering.state.order}
@@ -303,9 +313,9 @@ function SearchResults({
       <span className="icon">
         {isCollectionRoute(page.name) ? <CollectionIcon size={13} /> : <FileIcon size={13} />}
       </span>
-      <span className="label">
-        {pageDisplayName(page)}
-        <span className="sub">{page.route}</span>
+      <span className="page-list-copy">
+        <span className="label">{pageDisplayName(page)}</span>
+        <PageSearchPath path={page.route} query={query} />
       </span>
     </div>
   ));

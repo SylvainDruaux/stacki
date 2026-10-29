@@ -156,3 +156,18 @@ test('page titles are optional bounded strings, never unchecked display data', (
   }
   assert.throws(() => scan('x'.repeat(LIMITS.ipcFieldCharsMax + 1)), /title: exceeds/);
 });
+
+test('inherited page titles use the same boundary validation as direct titles', () => {
+  const page = {
+    path: '/site/src/pages/resources.astro',
+    name: 'resources.astro',
+    route: '/resources',
+  };
+  const scan = (inheritedTitle: unknown) =>
+    parseScanResult({ ...goodScan, pages: [{ ...page, inheritedTitle }] });
+  assert.equal(scan('Resources').pages[0]?.inheritedTitle, 'Resources');
+  assert.equal(scan(undefined).pages[0]?.inheritedTitle, undefined);
+  for (const value of [jsonNull, 42, {}, [], 'x'.repeat(LIMITS.ipcFieldCharsMax + 1)]) {
+    assert.throws(() => scan(value), /inheritedTitle:/);
+  }
+});

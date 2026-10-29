@@ -462,3 +462,25 @@ test('Hosting projects omit unresolved account IDs from dropdown headings', asyn
   assert.match(dropdown.textContent, /website/);
   assert.doesNotMatch(dropdown.textContent, new RegExp(accountId));
 });
+
+test('an explicit published URL is saved for the selected hosting destination', async (context) => {
+  const hosting = { provider: 'cloudflare-workers', accountId: 'account', project: 'site' };
+  const view = fixture(context, JSON.stringify({ ...DEFAULT_PUBLISH_CONFIG, hosting }));
+  await view.show();
+  const input = document.querySelector('input[type="url"]');
+  assert.ok(input);
+  const { Simulate } = require('react-dom/test-utils');
+  await act(async () => {
+    input.value = 'https://example.com/';
+    Simulate.change(input);
+  });
+  const save = [...document.querySelectorAll('button')].find(
+    (button) => button.textContent === 'Save',
+  );
+  await act(async () => save.click());
+  assert.deepEqual(view.writes[0].publishedSite, {
+    hosting,
+    source: 'manual',
+    url: 'https://example.com',
+  });
+});

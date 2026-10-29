@@ -12,6 +12,8 @@ import type { PreviewDevice } from '../../vendor/stacki/src/features/preview/Pre
 import { StyleSettings } from '../features/settings/StyleSettings';
 import { useIdleSession } from '../features/session/useIdleSession';
 import { useEffect, useState } from 'react';
+import { routeFor } from '../features/project/projectClient';
+import { livePageTitles, projectPageLabel } from '../features/project/pageLabels';
 import type { Project } from '../features/project/projectClient';
 import { useEditor } from '../features/project/useEditor';
 import { EditorHeader } from '../features/project/EditorHeader';
@@ -71,6 +73,7 @@ export function Editor(props: EditorProps) {
   );
   const defaultsCanvas = useStudioDefaultsCanvas(props, model);
   const scopedModel = defaultsSelection(model, defaultsCanvas);
+  const titledProps = editorTitleProps(props, model);
   if (session.paused) {
     return <PausedEditor resume={session.resume} />;
   }
@@ -83,7 +86,7 @@ export function Editor(props: EditorProps) {
         <EditorHeader
           closeDefaults={() => void defaultsCanvas.run('done')}
           defaultsMode={defaultsCanvas.state.kind !== 'idle'}
-          {...props}
+          {...titledProps}
           document={model.document}
           interactivePreview={interactivePreview}
           cursorChat={cursorChatFor(model, props.view.device, interactivePreview)}
@@ -100,9 +103,9 @@ export function Editor(props: EditorProps) {
               setMobileSettings(false);
             }}
           />
-          <Sidebar props={props} model={scopedModel} defaultsCanvas={defaultsCanvas} />
+          <Sidebar props={titledProps} model={scopedModel} defaultsCanvas={defaultsCanvas} />
           <EditorContent
-            props={props}
+            props={titledProps}
             model={scopedModel}
             mobileSettings={mobileSettings}
             setMobileSettings={setMobileSettings}
@@ -112,6 +115,10 @@ export function Editor(props: EditorProps) {
     </CodeAccess.Provider>
   );
 }
+function editorTitleProps(props: EditorProps, model: ReturnType<typeof useEditor>): EditorProps {
+  return { ...props, project: livePageTitles(props.project, props.file, model) };
+}
+
 function cursorChatFor(
   model: ReturnType<typeof useEditor>,
   device: PreviewDevice,
@@ -199,6 +206,8 @@ function EditorContent({
         dimensions={props.view.dimensions}
         file={props.file}
         projectName={props.project.name}
+        pageLabel={projectPageLabel(props.project, props.file)}
+        editRoute={(route) => editCanvasRoute(props, model, route)}
         inspector={
           mobile
             ? {
@@ -354,4 +363,19 @@ function defaultsSelection(
       model.select(id, occurrence);
     },
   };
+}
+
+function editCanvasRoute(
+  props: EditorProps,
+  model: ReturnType<typeof useEditor>,
+  route: string,
+): void {
+  const page = props.project.pages.find(
+    (file) => (routeFor(file).replace(/\/$/, '') || '/') === route,
+  );
+  if (page) {
+    props.open(page);
+  } else {
+    model.preview.retry();
+  }
 }

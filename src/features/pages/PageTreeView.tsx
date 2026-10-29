@@ -1,3 +1,4 @@
+import { PageRenameButton } from './PageRenameButton';
 import { TreeDragRow } from '../../ui/TreeDragDrop';
 import { PageOrderGap } from './PageOrderGap';
 import type { PageOrder } from '../../../shared/properties/pageOrder';
@@ -7,23 +8,8 @@ import React from 'react';
 import type { ScanPage } from '../../../shared/properties/projectScan';
 import type { PageTreeNode, PageTreePage } from './pageTree';
 import { isCollectionRoute } from './pageOrder';
-import {
-  countTreePages,
-  pageDisplayName,
-  pageDirectory,
-  pageExtension,
-  stripPageExtension,
-} from './pageTree';
-import {
-  CloseIcon,
-  CollectionIcon,
-  FileIcon,
-  FolderIcon,
-  FolderOpenIcon,
-  TrashIcon,
-} from '../../ui/Icons';
-import { RenameInput } from './PageDialogs';
-import { pageRenameBase, routeName } from './routeName';
+import { countTreePages, pageDisplayName, pageFolderDisplayName } from './pageTree';
+import { CollectionIcon, FileIcon, FolderIcon, FolderOpenIcon, TrashIcon } from '../../ui/Icons';
 import { allowDragEffect } from '../../editor/dragState';
 
 export type PageEditing =
@@ -129,14 +115,14 @@ function PageRow({
       <span className="icon">
         {collection ? <CollectionIcon size={13} /> : <FileIcon size={13} />}
       </span>
-      {editing ? (
-        <RenameInput
-          initial={stripPageExtension(page.base)}
-          onCommit={(text) => commitPageRename(page, text, props.actions)}
-        />
-      ) : (
+      <span className="page-list-copy">
         <span className="label">{pageDisplayName(page)}</span>
-      )}
+        <span className="sub">{page.route}</span>
+      </span>
+      <PageRenameButton
+        kind="page"
+        rename={() => props.actions.setEditing({ kind: 'page', key: page.path })}
+      />
       <button
         className="row-action"
         title="Delete page"
@@ -145,7 +131,7 @@ function PageRow({
           props.actions.removePage(page);
         }}
       >
-        <CloseIcon size={11} />
+        <TrashIcon size={12} />
       </button>
     </TreeDragRow>
   );
@@ -217,19 +203,19 @@ function FolderRow({
       <span className="icon">
         {collapsed ? <FolderIcon size={13} /> : <FolderOpenIcon size={13} />}
       </span>
-      {editing ? (
-        <RenameInput
-          initial={name}
-          onCommit={(text) => commitFolderRename(rel, text, props.actions)}
-        />
-      ) : (
-        <span className="label">{name}</span>
-      )}
+      <span className="page-list-copy">
+        <span className="label">{pageFolderDisplayName(name)}</span>
+        <span className="sub">/{rel}</span>
+      </span>
       {collapsed && count > 0 && (
         <span className="sub folder-count">
           {count} page{count === 1 ? '' : 's'}
         </span>
       )}
+      <PageRenameButton
+        kind="folder"
+        rename={() => props.actions.setEditing({ kind: 'folder', key: rel })}
+      />
       <button
         className="row-action"
         title="Delete folder"
@@ -247,26 +233,6 @@ function FolderRow({
 function startPageDrag(event: React.DragEvent<HTMLDivElement>, page: PageTreePage): void {
   event.dataTransfer.setData('avb/page', JSON.stringify({ path: page.path, name: page.name }));
   allowDragEffect(event.dataTransfer, 'move');
-}
-
-function commitPageRename(page: PageTreePage, text: string, actions: PageTreeActions): void {
-  actions.setEditing({ kind: 'none' });
-  const base = pageRenameBase(page.base, text);
-  if (!base) {
-    return;
-  }
-  const directory = pageDirectory(page.name);
-  actions.movePage(page, `${directory ? `${directory}/` : ''}${base}${pageExtension(page.base)}`);
-}
-
-function commitFolderRename(rel: string, text: string, actions: PageTreeActions): void {
-  actions.setEditing({ kind: 'none' });
-  const name = routeName(text);
-  const parts = rel.split('/');
-  if (!name || name === parts.at(-1)) {
-    return;
-  }
-  actions.renameFolder(rel, [...parts.slice(0, -1), name].join('/'));
 }
 
 function folderDropBehavior(props: PageTreeViewProps, rel: string) {

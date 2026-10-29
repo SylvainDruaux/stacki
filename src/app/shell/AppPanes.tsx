@@ -47,6 +47,16 @@ export function CanvasPane({ app }: { readonly app: ShellView }) {
         devLog={app.devLog}
         devDiag={app.devDiag}
         route={app.pageUrlPath}
+        onEditRoute={(route) => {
+          const page = app.scan.pages.find(
+            (entry) => (entry.route.replace(/\/$/, '') || '/') === route,
+          );
+          if (page) {
+            app.onSelectPage(page);
+          } else {
+            app.setRefreshKey((count) => count + 1);
+          }
+        }}
         refreshKey={app.refreshKey}
         crumbs={app.crumbs}
         onCrumb={(id) => app.setSelectedId(id)}

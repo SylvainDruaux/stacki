@@ -228,36 +228,34 @@ export function usePageMoves(
   navigation: ReturnType<typeof useNavigation>,
 ) {
   const { pageStateRef, projectRef, scan } = coreState;
-  const { rescan, showToast } = lifecycle;
+  const { rescan, showToast, flushSave } = lifecycle;
   const { selectPage } = navigation;
 
-  // Moves/renames a page (drag between folders, inline rename). `to` is the
+  // Moves/renames a page (drag between folders, rename dialog). `to` is the
   // new path relative to src/pages including the extension.
   const movePageTo = useCallback(
     async (page: ScanPage, to: string) => {
       const projectPath = projectRef.current?.path;
       if (!projectPath) {
-        return;
+        throw new Error('Open a project before renaming.');
       }
-      try {
-        const newPath = await moveProjectPage(projectPath, page.path, to);
-        const result = await rescan(projectPath);
-        if (pageStateRef.current.currentPage?.path === page.path) {
-          const np = result.pages.find((candidate) => candidate.path === newPath);
-          if (np) {
-            // Opening a page reports its own failures.
-            void selectPage(np);
-          }
+      await flushSave();
+      const newPath = await moveProjectPage(projectPath, page.path, to);
+      window.dispatchEvent(new Event('stacki:pages-renamed'));
+      const result = await rescan(projectPath);
+      if (pageStateRef.current.currentPage?.path === page.path) {
+        const np = result.pages.find((candidate) => candidate.path === newPath);
+        if (np) {
+          // Opening a page reports its own failures.
+          void selectPage(np);
         }
-      } catch (error: unknown) {
-        showToast(cleanError(error), 'error');
       }
     },
-    [rescan, selectPage, showToast, pageStateRef, projectRef],
+    [rescan, selectPage, pageStateRef, projectRef, flushSave],
   );
 
-  // Creates an (empty) folder with a placeholder name; the panel opens an
-  // inline rename right after. Returns the created folder's name.
+  // Creates an (empty) folder with a placeholder name; the panel opens a
+  // rename dialog right after. Returns the created folder's name.
   const createPageFolder = useCallback(async () => {
     const existing = new Set(scan.pageFolders || []);
     let name = 'new-folder';
@@ -287,35 +285,33 @@ export function useRenamePageFolder(
   navigation: ReturnType<typeof useNavigation>,
 ) {
   const { pageStateRef, projectRef } = coreState;
-  const { rescan, showToast } = lifecycle;
+  const { rescan, flushSave } = lifecycle;
   const { selectPage } = navigation;
 
   const renamePageFolder = useCallback(
     async (from: string, to: string) => {
       const projectPath = projectRef.current?.path;
       if (!projectPath) {
-        return;
+        throw new Error('Open a project before renaming.');
       }
-      try {
-        await renameProjectPageFolder(projectPath, from, to);
-        const result = await rescan(projectPath);
-        // Re-select the current page if it lived inside the renamed folder.
-        const open = pageStateRef.current.currentPage;
-        if (open && !result.pages.some((candidate) => candidate.path === open.path)) {
-          const newName = open.name.startsWith(from + '/')
-            ? to + open.name.slice(from.length)
-            : undefined;
-          const np = newName && result.pages.find((candidate) => candidate.name === newName);
-          if (np) {
-            // Opening a page reports its own failures.
-            void selectPage(np);
-          }
+      await flushSave();
+      await renameProjectPageFolder(projectPath, from, to);
+      window.dispatchEvent(new Event('stacki:pages-renamed'));
+      const result = await rescan(projectPath);
+      // Re-select the current page if it lived inside the renamed folder.
+      const open = pageStateRef.current.currentPage;
+      if (open && !result.pages.some((candidate) => candidate.path === open.path)) {
+        const newName = open.name.startsWith(from + '/')
+          ? to + open.name.slice(from.length)
+          : undefined;
+        const np = newName && result.pages.find((candidate) => candidate.name === newName);
+        if (np) {
+          // Opening a page reports its own failures.
+          void selectPage(np);
         }
-      } catch (error: unknown) {
-        showToast(cleanError(error), 'error');
       }
     },
-    [rescan, selectPage, showToast, pageStateRef, projectRef],
+    [rescan, selectPage, pageStateRef, projectRef, flushSave],
   );
   return { renamePageFolder };
 }

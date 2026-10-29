@@ -316,3 +316,72 @@ test('a patched page announces again; a forged second version, never', async () 
   assert.ok('token' in lastClick, 'the click states its token');
   assert.ok(lastClick.token === undefined, 'a rendering with no token vouches for no click');
 });
+
+test('canvas interaction toggles clicks without cancelling slider pointer streams', async () => {
+  const { window, sent } = await frame(
+    '<!doctype html><body><!--avb-s:0--><button>Open dialog</button><!--avb-e:0--></body>',
+  );
+  const button = window.document.querySelector('button');
+  let clicked = 0;
+  let moved = 0;
+  window.document.addEventListener(
+    'click',
+    () => {
+      clicked += 1;
+    },
+    true,
+  );
+  button.addEventListener('pointermove', () => {
+    moved += 1;
+  });
+  const fire = (type, x = 0) => {
+    const event = new window.MouseEvent(type, {
+      bubbles: true,
+      cancelable: true,
+      button: 0,
+      clientX: x,
+      clientY: 0,
+    });
+    button.dispatchEvent(event);
+    return event;
+  };
+  const mode = (value, source = window.parent) => {
+    const event = new window.MessageEvent('message', {
+      data: { type: 'avb:interaction', mode: value },
+    });
+    Object.defineProperty(event, 'source', { value: source });
+    window.dispatchEvent(event);
+  };
+  try {
+    assert.equal(fire('click').defaultPrevented, true);
+    assert.equal(clicked, 0);
+    mode('interact', {});
+    assert.equal(fire('click').defaultPrevented, true);
+    mode('invalid');
+    assert.equal(fire('click').defaultPrevented, true);
+    for (const next of ['interact', 'select']) {
+      mode(next);
+      const hoverCount = sent.filter((item) => item.type === 'avb:hover-node').length;
+      window.document.documentElement.dispatchEvent(new window.MouseEvent('mouseleave'));
+      fire('mousemove');
+      assert.ok(sent.filter((item) => item.type === 'avb:hover-node').length > hoverCount);
+      const previousSelections = sent.filter((item) => item.type === 'avb:click-node').length;
+      assert.equal(fire('pointerdown').defaultPrevented, false);
+      assert.equal(fire('pointermove', 30).defaultPrevented, false);
+      fire('pointerup', 30);
+      assert.equal(fire('click', 30).defaultPrevented, next === 'select');
+      assert.equal(
+        sent.filter((item) => item.type === 'avb:click-node').length,
+        previousSelections,
+      );
+    }
+    assert.equal(moved, 2);
+    assert.equal(clicked, 1);
+    fire('pointerdown');
+    fire('pointerup');
+    fire('click');
+    assert.equal(clicked, 1);
+  } finally {
+    window.close();
+  }
+});

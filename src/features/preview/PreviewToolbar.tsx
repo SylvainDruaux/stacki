@@ -66,6 +66,11 @@ interface PreviewToolbarProps {
   readonly onDevice: (device: PreviewDevice) => void;
   readonly sizing?: PreviewSizeControlsProps;
   readonly guide: GuideMenuProps;
+  readonly interaction?: {
+    readonly active: boolean;
+    readonly available: boolean;
+    readonly toggle: () => void;
+  };
   readonly inspector?: PreviewInspectorActions | undefined;
 }
 
@@ -92,7 +97,8 @@ function toolbarItems(props: PreviewToolbarProps): readonly ToolbarItem[] {
         <button
           key={key}
           className="preview-toolbar-action"
-          title={title}
+          data-tooltip={title}
+          aria-label={title}
           aria-pressed={props.activeDevice === key}
           onClick={() => finish(() => props.onDevice(key))}
         >
@@ -123,6 +129,7 @@ function toolbarItems(props: PreviewToolbarProps): readonly ToolbarItem[] {
         </div>
       ),
     },
+    ...interactionItems(props.interaction),
     ...sizing,
     devices,
     ...inspectorItems(props.inspector),
@@ -157,7 +164,8 @@ function DeviceButtons({
             }
           }}
           className={activeDevice === key ? 'on' : ''}
-          title={title}
+          data-tooltip={title}
+          aria-label={title}
           aria-pressed={activeDevice === key}
           onClick={() => onDevice(key)}
         >
@@ -259,4 +267,38 @@ function CrumbTrail({
 
 function foldedTitle(item: FoldedCrumb): string {
   return `Show ${item.hidden.length} more: ${item.hidden.map((crumb) => crumb.label).join(' › ')}`;
+}
+
+function interactionItems(interaction: PreviewToolbarProps['interaction']): readonly ToolbarItem[] {
+  if (!interaction) {
+    return [];
+  }
+  const button = (
+    <div className="device-btns guide-btns">
+      <button
+        type="button"
+        aria-label="Interact with canvas"
+        data-tooltip="Interact with canvas — links, buttons and forms"
+        aria-pressed={interaction.active}
+        className={interaction.active ? 'on' : ''}
+        disabled={!interaction.available}
+        onClick={interaction.toggle}
+      >
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path
+            d={
+              'M9 12V4.5a1.5 1.5 0 0 1 3 0V9a1.5 1.5 0 0 1 3 0v1' +
+              'a1.5 1.5 0 0 1 3 0v1a1.5 1.5 0 0 1 3 0v4c0 4-2 6-6 6h-2' +
+              'c-2 0-3-1-4-2l-5-6a1.5 1.5 0 0 1 2.2-2L9 14zM12 9v3m3-2v3m3-2v3'
+            }
+            stroke="currentColor"
+            strokeWidth="1.7"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+      </button>
+    </div>
+  );
+  return [{ id: 'interaction', priority: 40, content: button, menu: () => button }];
 }

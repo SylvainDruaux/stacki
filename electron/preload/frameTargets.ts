@@ -2,6 +2,7 @@
 // tagged elements and the widened thin targets, and the hover, click and
 // double-click the canvas turns into selection.
 
+import { canvasSelects, canvasDragged, trackCanvas } from './frameInteraction';
 import { isElement } from './frameBasics';
 import {
   PATH_ATTR,
@@ -26,11 +27,9 @@ import {
   watchMotion,
 } from './frameReports';
 
-let designMode = false;
-
 // The app tracks a node, so the frame is the canvas: clicks select.
 export function enterDesignMode(): void {
-  designMode = true;
+  trackCanvas();
 }
 
 // The hover the app was last told about; undefined until it has been told.
@@ -279,14 +278,14 @@ const listenForPointer = () => {
   document.documentElement.addEventListener('mouseleave', startOutlinesClearHover);
   // Double-clicking a component opens it for editing, the way Webflow
   // drills into one.
-  document.addEventListener(
+  window.addEventListener(
     'dblclick',
     (event) => {
-      if (!designMode) {
+      if (!canvasSelects()) {
         return;
       }
       event.preventDefault();
-      event.stopPropagation();
+      event.stopImmediatePropagation();
       // Report even when nothing in scope matched: markup the layout renders
       // itself (nav, footer — anything outside the page's <slot>) has no
       // in-scope marker, and the app opens the layout for those.
@@ -302,14 +301,17 @@ const listenForPointer = () => {
   // selects the node in the app instead of activating links/buttons.
   // Interactive preview frames never receive avb:track, so they keep
   // normal page behavior.
-  document.addEventListener(
+  window.addEventListener(
     'click',
     (event) => {
-      if (!designMode) {
+      if (!canvasSelects()) {
         return;
       }
       event.preventDefault();
-      event.stopPropagation();
+      event.stopImmediatePropagation();
+      if (canvasDragged()) {
+        return;
+      }
       // A click that hits no marked node still reports (no path), with
       // `outside` saying whether it landed on something the open file simply
       // doesn't own — which is what the app backs out of a component on.
@@ -329,11 +331,11 @@ function listenForContextMenu(): void {
   document.addEventListener(
     'contextmenu',
     (event) => {
-      if (!designMode) {
+      if (!canvasSelects()) {
         return;
       }
       event.preventDefault();
-      event.stopPropagation();
+      event.stopImmediatePropagation();
       const { path, occurrence, outside } = nodeAtEvent(event);
       postLocated('avb:context-node', {
         path: path || undefined,

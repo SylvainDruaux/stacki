@@ -1,3 +1,8 @@
+import { parseCanvasInteraction } from '../../../vendor/stacki/shared/properties/canvasInteraction';
+import {
+  canvasDragged,
+  trackCanvasGesture,
+} from '../../../vendor/stacki/electron/preload/frameInteraction';
 import {
   freezeViewportHeight,
   report as reportPageHeight,
@@ -44,6 +49,7 @@ for (const type of ['pointerdown', 'keydown', 'wheel', 'touchstart']) {
     { passive: true },
   );
 }
+trackCanvasGesture();
 let selected: OutlineTarget | undefined;
 let hovered: OutlineTarget | undefined;
 let scope = '';
@@ -72,12 +78,7 @@ document.addEventListener('keydown', (event) => {
 forwardStyleModifiers(post);
 let labels: Record<string, { label: string; component: boolean; nodeKind: string }> = {};
 const paint = createOutlines(post);
-const draw = () =>
-  paint(
-    interactive ? undefined : selected,
-    interactive ? undefined : hovered,
-    interactive ? [] : collaborators,
-  );
+const draw = () => paint(selected, hovered, collaborators);
 function target(id: string, occurrence?: number): OutlineTarget | undefined {
   return id
     ? {
@@ -107,11 +108,7 @@ function pageId(element: Element): string | undefined {
 document.addEventListener(
   'pointermove',
   (event) => {
-    if (
-      interactive ||
-      !(event.target instanceof Element) ||
-      event.target.closest('#studio-live-cursors')
-    ) {
+    if (!(event.target instanceof Element) || event.target.closest('#studio-live-cursors')) {
       return;
     }
     const id = pageId(event.target) ?? '';
@@ -128,7 +125,7 @@ document.addEventListener('pointerleave', () => {
   draw();
 });
 for (const type of ['click', 'dblclick', 'contextmenu']) {
-  document.addEventListener(
+  window.addEventListener(
     type,
     (event) => {
       if (
@@ -141,6 +138,9 @@ for (const type of ['click', 'dblclick', 'contextmenu']) {
       }
       event.preventDefault();
       event.stopImmediatePropagation();
+      if (type === 'click' && canvasDragged()) {
+        return;
+      }
       if (type === 'dblclick') {
         window.getSelection()?.removeAllRanges();
       }
@@ -233,6 +233,11 @@ window.addEventListener('message', (event) => {
     if (data.type === 'studio:hover') {
       hovered = target(data.id, 0);
     }
+  }
+  const interaction = parseCanvasInteraction(data);
+  if (interaction !== undefined) {
+    interactive = interaction === 'interact';
+    selectionCursor.disabled = interactive || window.parent === window;
   }
   if (data.type === 'studio:interactive' && 'enabled' in data) {
     interactive = data.enabled === true;

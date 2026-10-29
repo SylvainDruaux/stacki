@@ -3,8 +3,11 @@ import path from 'node:path';
 import { parse as parseTOML } from 'smol-toml';
 import { parseConfigFileTextToJson } from 'typescript';
 import { record } from '../../shared/core/boundary';
+import type { Hosting } from '../../shared/properties/publishConfig';
+import { parsePublishedSiteURL } from '../../shared/properties/publishSite';
 import {
   discoveryIdentifier,
+  discoveryList,
   type DiscoveryProvider,
   type PublishProject,
 } from '../../shared/properties/publishDiscovery';
@@ -38,32 +41,76 @@ export async function linkedPublishProject(
     ];
   }
   if (provider === 'cloudflare' || provider === 'cloudflare-workers' || provider === 'linked') {
-    for (const filename of ['wrangler.json', 'wrangler.jsonc', 'wrangler.toml']) {
-      const source = await linkedSource(root, filename);
-      if (source !== undefined) {
-        const projects = await linkedCloudflare(root, filename, source);
-        return provider === 'linked' || provider === 'cloudflare'
-          ? projects
-          : projects.filter((project) => project.hosting.provider === provider);
-      }
+    const value = await linkedWranglerConfig(root);
+    if (value !== undefined) {
+      const projects = await linkedCloudflare(root, value);
+      return provider === 'linked' || provider === 'cloudflare'
+        ? projects
+        : projects.filter((project) => project.hosting.provider === provider);
     }
   }
   return [];
 }
 
+// Explicit custom domains are usable without provider API credentials. Match the complete
+// destination so a saved hosting change cannot open an unrelated Wrangler project's site.
+export async function configuredWorkerSiteURL(
+  root: string,
+  hosting: Extract<Hosting, { readonly provider: 'cloudflare-workers' }>,
+): Promise<string | undefined> {
+  const value = await linkedWranglerConfig(root);
+  if (value === undefined) {
+    return undefined;
+  }
+  if (value['name'] !== hosting.project) {
+    return undefined;
+  }
+  if (value['account_id'] !== hosting.accountId) {
+    return undefined;
+  }
+  const routes = value['routes'] ?? (value['route'] === undefined ? [] : [value['route']]);
+  const domains = discoveryList(routes).flatMap((route) => {
+    if (typeof route === 'string') {
+      return [];
+    }
+    const entry = record(route);
+    if (entry['custom_domain'] !== true) {
+      return [];
+    }
+    if (typeof entry['pattern'] !== 'string') {
+      return [];
+    }
+    // Route patterns and paths are not origins; only literal custom domains qualify.
+    try {
+      return [parsePublishedSiteURL(`https://${entry['pattern'].toLowerCase()}`)];
+    } catch {
+      return [];
+    }
+  });
+  return domains.sort()[0];
+}
+
+async function linkedWranglerConfig(root: string): Promise<Record<string, unknown> | undefined> {
+  for (const filename of ['wrangler.json', 'wrangler.jsonc', 'wrangler.toml']) {
+    const source = await linkedSource(root, filename);
+    if (source !== undefined) {
+      // Parse data only: discovering a link must never execute project code.
+      const parsed = filename.endsWith('.toml')
+        ? { config: parseTOML(source), error: undefined }
+        : parseConfigFileTextToJson(filename, source);
+      if (parsed.error) {
+        throw new Error('Cannot read existing Wrangler configuration.');
+      }
+      return record(parsed.config);
+    }
+  }
+  return undefined;
+}
+
 async function linkedCloudflare(
   root: string,
-  filename: string,
-  source: string,
+  value: Readonly<Record<string, unknown>>,
 ): Promise<readonly PublishProject[]> {
-  // TypeScript is already a runtime dependency and parses JSONC without executing project code.
-  const parsed = filename.endsWith('.toml')
-    ? { config: parseTOML(source), error: undefined }
-    : parseConfigFileTextToJson(filename, source);
-  if (parsed.error) {
-    throw new Error('Cannot read existing Wrangler configuration.');
-  }
-  const value = record(parsed.config);
   if (!value['name']) {
     return [];
   }

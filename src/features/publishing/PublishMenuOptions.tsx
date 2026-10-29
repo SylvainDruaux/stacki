@@ -1,9 +1,12 @@
-import { useEffect, useState } from 'react';
-import type { Hosting, PublishTarget } from '../../../shared/properties/publishConfig';
+import type {
+  Hosting,
+  PublishConfig,
+  PublishTarget,
+} from '../../../shared/properties/publishConfig';
 import { ExternalIcon, GearIcon, UploadCloudIcon } from '../../ui/Icons';
 import { PublishProviderIcon } from './PublishProviderIcon';
 import type { PublishAvailability } from '../../../shared/properties/publishState';
-import { readPublishedSiteURL } from './publishBridge';
+import { usePublishedSiteURL } from './usePublishedSiteURL';
 
 interface Props {
   readonly projectPath: string;
@@ -13,6 +16,7 @@ interface Props {
   readonly repositoryURL: string | undefined;
   readonly busy: boolean;
   readonly provider: Hosting['provider'];
+  readonly config: PublishConfig | undefined;
 }
 
 export function PublishMenuOptions({
@@ -23,6 +27,7 @@ export function PublishMenuOptions({
   repositoryURL,
   busy,
   provider,
+  config,
 }: Props) {
   return (
     <>
@@ -35,6 +40,7 @@ export function PublishMenuOptions({
       <HostingDeployOption
         projectPath={projectPath}
         provider={provider}
+        config={config}
         availability={availability}
         busy={busy}
         publish={publish}
@@ -54,20 +60,10 @@ function HostingDeployOption({
   busy,
   publish,
   provider,
-}: Pick<Props, 'projectPath' | 'availability' | 'busy' | 'publish' | 'provider'>) {
-  const [url, setURL] = useState<string>();
+  config,
+}: Pick<Props, 'projectPath' | 'availability' | 'busy' | 'publish' | 'provider' | 'config'>) {
+  const url = usePublishedSiteURL(projectPath, config);
   const current = availability.hosting === 'current';
-  useEffect(() => {
-    let active = true;
-    void readPublishedSiteURL(projectPath).then((next) => {
-      if (active) {
-        setURL(next);
-      }
-    });
-    return () => {
-      active = false;
-    };
-  }, [projectPath]);
   const descriptions = {
     current: 'Up to date',
     pending: 'Changes to deploy',

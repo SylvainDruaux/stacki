@@ -1,4 +1,5 @@
 import { list, record, text } from '../core/boundary';
+import { parsePublishedSiteURL } from './publishSite';
 import { parseGitHubWorkflow, type GitHubWorkflow } from './publishReview';
 
 export type PublishTarget = 'all' | 'github' | 'hosting';
@@ -22,6 +23,7 @@ export type Hosting =
       readonly projectId: string;
     };
 export interface PublishConfig {
+  readonly publishedSite?: PublishedSite;
   readonly githubWorkflow?: GitHubWorkflow;
   readonly version: 1;
   readonly defaultTarget: PublishTarget;
@@ -30,6 +32,11 @@ export interface PublishConfig {
   readonly buildScript: string;
   readonly beforePublish: readonly string[];
   readonly afterPublish: readonly string[];
+}
+export interface PublishedSite {
+  readonly hosting: Exclude<Hosting, { readonly provider: 'none' }>;
+  readonly url: string;
+  readonly source: 'manual' | 'discovered';
 }
 export const DEFAULT_PUBLISH_CONFIG: PublishConfig = {
   version: 1,
@@ -79,6 +86,9 @@ export function parsePublishConfig(input: unknown): PublishConfig {
   }
   return {
     version: 1,
+    ...(value['publishedSite'] === undefined
+      ? {}
+      : { publishedSite: parsePublishedSite(value['publishedSite']) }),
     ...(value['githubWorkflow'] === undefined
       ? {}
       : {
@@ -92,6 +102,21 @@ export function parsePublishConfig(input: unknown): PublishConfig {
     beforePublish: scripts(value['beforePublish']),
     afterPublish: scripts(value['afterPublish']),
   };
+}
+
+function parsePublishedSite(input: unknown): PublishedSite {
+  const value = record(input);
+  const hosting = parseHosting(value['hosting']);
+  if (hosting.provider === 'none') {
+    throw new Error('Published site must belong to a hosting destination.');
+  }
+  const source = value['source'];
+  if (source !== 'manual') {
+    if (source !== 'discovered') {
+      throw new Error('Invalid published site source.');
+    }
+  }
+  return { hosting, source, url: parsePublishedSiteURL(value['url']) };
 }
 
 export function parsePublishSource(source: string | undefined): PublishConfig {

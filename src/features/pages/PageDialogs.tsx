@@ -1,41 +1,7 @@
 import Popup from '../../ui/Popup';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useState } from 'react';
 import type { ScanComponent } from '../../../shared/properties/projectScan';
 import Dropdown from '../../ui/Dropdown';
-
-export function RenameInput({
-  initial,
-  onCommit,
-}: {
-  readonly initial: string;
-  readonly onCommit: (text: string) => void;
-}) {
-  const [text, setText] = useState(initial);
-  const inputRef = useRef<HTMLInputElement>(null);
-  useEffect(() => {
-    inputRef.current?.focus();
-    inputRef.current?.select();
-  }, []);
-  return (
-    <input
-      ref={inputRef}
-      className="rename-input"
-      value={text}
-      spellCheck={false}
-      onClick={(event) => event.stopPropagation()}
-      onDoubleClick={(event) => event.stopPropagation()}
-      onChange={(event) => setText(event.currentTarget.value)}
-      onBlur={() => onCommit(text)}
-      onKeyDown={(event) => {
-        if (event.key === 'Enter') {
-          onCommit(text);
-        } else if (event.key === 'Escape') {
-          onCommit(initial);
-        }
-      }}
-    />
-  );
-}
 
 export function NewPageModal({
   layouts,

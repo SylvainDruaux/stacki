@@ -54,6 +54,7 @@ export function EditorSidebar({
       {panel === 'collections' && <CmsNavigation props={props} />}
       {panel === 'pages' && (
         <PagesPanel
+          flushSave={() => document?.whenSaved() ?? Promise.resolve()}
           project={project}
           peers={document?.peers ?? []}
           file={file}

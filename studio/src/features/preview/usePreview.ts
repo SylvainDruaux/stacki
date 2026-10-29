@@ -56,8 +56,10 @@ export function usePreview(
       reveal.current = { type: 'studio:reveal', id, occurrence };
       postToFrame(frame.current, target?.origin, reveal.current);
     },
-    loaded: () => {
-      source.loaded();
+    loaded: (options: { readonly preserveNavigation?: boolean } = {}) => {
+      if (!options.preserveNavigation) {
+        source.loaded();
+      }
       setCanvasFrame({
         postMessage: (message: unknown) => postToFrame(frame.current, target?.origin, message),
       });
@@ -66,7 +68,7 @@ export function usePreview(
       for (const listener of loadListeners.current) {
         listener();
       }
-      if (reveal.current) {
+      if (reveal.current && !options.preserveNavigation) {
         postToFrame(frame.current, target?.origin, reveal.current);
       }
     },

@@ -1,4 +1,5 @@
 import React from 'react';
+import { useCanvasInteraction } from './useCanvasInteraction';
 import { usePreviewSource } from './usePreviewSource';
 import { PreviewFrame } from './PreviewFrame';
 import { usePreviewDimensions, usePreviewSizing } from './usePreviewSizing';
@@ -34,6 +35,7 @@ interface PreviewPaneProps {
   readonly route?: string | undefined;
   readonly refreshKey?: string | number;
   readonly crumbs?: readonly PreviewCrumb[];
+  readonly onEditRoute: (route: string) => void;
   readonly onCrumb?: (id: string | undefined) => void;
   readonly onRefresh?: () => void;
   readonly onPreviewLoaded?: () => void;
@@ -67,6 +69,15 @@ interface PreviewPaneProps {
 export default function PreviewPane(props: PreviewPaneProps) {
   const url = props.devUrl && props.route ? props.devUrl + props.route : undefined;
   const runtime = usePreviewRuntime({ ...props, selPath: props.selPath }, url);
+  const interaction = useCanvasInteraction({
+    projectKey: props.projectPath,
+    url,
+    available: props.device !== 'canvas',
+    frame: runtime.iframeRef,
+    post: runtime.post,
+    subscribeLoad: runtime.subscribeLoad,
+    editRoute: props.onEditRoute,
+  });
   const source = usePreviewSource(url, runtime.post);
   const dimensions = usePreviewDimensions();
   const sizing = usePreviewSizing(props.device, dimensions, props.onDevice);
@@ -94,8 +105,13 @@ export default function PreviewPane(props: PreviewPaneProps) {
               },
             })}
         guide={columnGuide.menu}
+        interaction={interaction}
       />
-      <div className="preview-frame-wrap" ref={sizing.wrapRef}>
+      <div
+        className="preview-frame-wrap"
+        data-canvas-interactive={interaction.active}
+        ref={sizing.wrapRef}
+      >
         <PreviewContent
           props={props}
           url={props.device === 'canvas' ? url : source.url}
@@ -103,7 +119,9 @@ export default function PreviewPane(props: PreviewPaneProps) {
             ...runtime,
             registerFrame: () => {
               runtime.registerFrame();
-              source.loaded();
+              if (!interaction.active) {
+                source.loaded();
+              }
             },
           }}
           sizing={sizing}

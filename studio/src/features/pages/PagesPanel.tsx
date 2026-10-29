@@ -1,3 +1,5 @@
+import { RenamePageDialog } from './RenamePageDialog';
+import { usePageRename } from './usePageRename';
 import { useProjectPageOrder } from '../../../vendor/stacki/src/features/pages/pageOrderPersistence';
 import { usePageOrderDrag } from '../../../vendor/stacki/src/features/pages/usePageOrderDrag';
 import { PageOrderNotice } from '../../../vendor/stacki/src/features/pages/PageOrderNotice';
@@ -10,6 +12,7 @@ import { request, type Project } from '../project/projectClient';
 import { record, string } from '../../shared/validation';
 
 interface Props {
+  readonly flushSave?: (() => Promise<void>) | undefined;
   readonly project: Project;
   readonly peers: readonly Peer[];
   readonly file: string;
@@ -20,6 +23,7 @@ interface Props {
 }
 export function PagesPanel({
   project,
+  flushSave,
   peers,
   file,
   open,
@@ -27,6 +31,7 @@ export function PagesPanel({
   error,
   collection = false,
 }: Props) {
+  const renaming = usePageRename({ file, open, refresh, flushSave });
   const ordering = useProjectPageOrder(collection ? undefined : project.name);
   const reorder = usePageOrderDrag({
     order: ordering.state.order,
@@ -45,6 +50,7 @@ export function PagesPanel({
       <div className="panel-search">
         <input
           aria-label="Search files"
+          maxLength={512}
           placeholder={collection ? 'Search collections…' : 'Search pages…'}
           value={query}
           onChange={(event) => setQuery(event.target.value)}
@@ -59,11 +65,15 @@ export function PagesPanel({
           close={() => setCreating(false)}
         />
       )}
+      <ProjectRenameDialog renaming={renaming} project={project} />
       <PageOrderNotice state={ordering.state} reload={ordering.reload} />
       <PageFileList
+        rename={renaming.rename}
         order={ordering.state.order}
         reorder={reorder}
         items={items}
+        folders={project.pageFolders}
+        pageMetadata={project.pageMetadata}
         query={query}
         file={file}
         peers={peers}
@@ -177,5 +187,29 @@ function PagesHeader({
         </button>
       </div>
     </div>
+  );
+}
+
+function ProjectRenameDialog({
+  renaming,
+  project,
+}: {
+  readonly renaming: ReturnType<typeof usePageRename>;
+  readonly project: Project;
+}) {
+  if (!renaming.item) {
+    return undefined;
+  }
+  return (
+    <RenamePageDialog
+      key={renaming.item.kind + ':' + renaming.item.from}
+      item={renaming.item}
+      inventory={{
+        pages: project.pages.map((page) => page.slice(10)),
+        folders: project.pageFolders ?? [],
+      }}
+      save={renaming.save}
+      close={renaming.close}
+    />
   );
 }

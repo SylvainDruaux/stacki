@@ -1,11 +1,15 @@
+import { projectAliases } from '../properties/importPaths';
+import { desktopRenameWriter } from '../project/pageRenameDesktop';
+import { parsePageRename } from '../../shared/properties/pageRename';
+import { planPageRename } from '../project/pageRenamePlan';
+import { applyPageRename } from '../project/pageRenameWrite';
 // The page IPC: reading, parsing and editing a page through its document
 // actor, and creating, moving and deleting pages, folders and dynamic routes.
 
-import { readSource } from '../lib/mainLimits';
 import { buildEdit } from '../documents/editRequests';
 import { previewEdit } from '../documents/editPreview';
 import { createProjectText } from '../documents/documentWrites';
-import { isPathDescendant, sameFilesystemPath } from '../lib/platform';
+import { sameFilesystemPath } from '../lib/platform';
 import { assert } from '../../shared/core/assert';
 import { describeRejection, type RejectionReason } from '../../shared/engine/intent';
 import { decodeUtf8, encodeUtf8 } from '../../shared/core/span';
@@ -142,38 +146,14 @@ function registerPageMoveHandlers({
   // in the file's frontmatter are rewritten so they keep resolving.
   ipcMain.handle('page:move', async (_event, { projectPath, from, to }) => {
     const pagesDirectory = path.join(projectPath, 'src', 'pages');
-    const target = path.resolve(pagesDirectory, to);
-    if (!isPathDescendant(pagesDirectory, target)) {
-      throw new Error('Invalid destination.');
-    }
-    if (sameFilesystemPath(from, target)) {
-      return { newPath: target };
-    }
-    if (fs.existsSync(target)) {
-      throw new Error('A page with that name already exists there.');
-    }
-    fs.mkdirSync(path.dirname(target), { recursive: true });
-
-    let source = readSource(from);
-    const fromDirectory = path.dirname(from);
-    const toDirectory = path.dirname(target);
-    if (!sameFilesystemPath(fromDirectory, toDirectory)) {
-      source = source.replace(
-        /(import\s[^'"]*?from\s*['"])(\.\.?\/[^'"]+)(['"])/g,
-        (_match: string, pre: string, spec: string, post: string) => {
-          const abs = path.resolve(fromDirectory, spec);
-          let rel = toPosix(path.relative(toDirectory, abs));
-          if (!rel.startsWith('.')) {
-            rel = './' + rel;
-          }
-          return pre + rel + post;
-        },
-      );
-    }
+    const change = parsePageRename({
+      kind: 'page',
+      from: toPosix(path.relative(pagesDirectory, from)),
+      to,
+    });
+    renameProjectPages(projectPath, change);
     noteAppWrite();
-    createProjectText(target, source);
-    fs.rmSync(from);
-    return { newPath: target };
+    return { newPath: path.join(pagesDirectory, change.to) };
   });
 
   ipcMain.handle('pagefolder:create', async (_event, { projectPath, dir: directory }) => {
@@ -182,12 +162,8 @@ function registerPageMoveHandlers({
   });
 
   ipcMain.handle('pagefolder:rename', async (_event, { projectPath, from, to }) => {
-    const fromPath = resolvePagesDirectory(projectPath, from);
-    const toPath = resolvePagesDirectory(projectPath, to);
-    if (fs.existsSync(toPath)) {
-      throw new Error('A folder with that name already exists.');
-    }
-    fs.renameSync(fromPath, toPath);
+    renameProjectPages(projectPath, parsePageRename({ kind: 'folder', from, to }));
+    noteAppWrite();
     return { ok: true as const };
   });
 
@@ -260,4 +236,15 @@ function readThroughActor(
     throw new Error(`${path.basename(pagePath)} is not valid UTF-8`);
   }
   return { text: decoded.value, checksum: current.value.checksum };
+}
+
+function renameProjectPages(projectPath: string, change: ReturnType<typeof parsePageRename>): void {
+  const planned = planPageRename(projectPath, change, projectAliases(projectPath));
+  if (!planned.ok) {
+    throw new Error(planned.error.message);
+  }
+  const saved = applyPageRename(planned.value, desktopRenameWriter());
+  if (!saved.ok) {
+    throw new Error(saved.error.message);
+  }
 }

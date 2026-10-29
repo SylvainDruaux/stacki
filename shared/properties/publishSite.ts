@@ -1,5 +1,27 @@
 import { assert } from '../core/assert';
 import { text } from '../core/boundary';
+import type { Hosting, PublishConfig, PublishedSite } from './publishConfig';
+
+/** A remembered domain belongs to one provider account and project, never its replacement. */
+export function hostingSiteKey(hosting: Hosting): string {
+  switch (hosting.provider) {
+    case 'none':
+      return 'none';
+    case 'cloudflare':
+    case 'cloudflare-workers':
+      return JSON.stringify([hosting.provider, hosting.accountId, hosting.project]);
+    case 'vercel':
+      return JSON.stringify([hosting.provider, hosting.organizationId, hosting.projectId]);
+  }
+}
+
+export function savedPublishedSite(config: PublishConfig): PublishedSite | undefined {
+  const saved = config.publishedSite;
+  if (saved === undefined) {
+    return undefined;
+  }
+  return hostingSiteKey(saved.hosting) === hostingSiteKey(config.hosting) ? saved : undefined;
+}
 
 /** Publishing links are HTTPS origins, never executable URLs or credential-bearing links. */
 export function parsePublishedSiteURL(input: unknown): string {

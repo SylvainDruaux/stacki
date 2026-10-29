@@ -1,3 +1,4 @@
+import { ToolbarTooltip } from './ToolbarTooltip';
 import {
   useEffect,
   useLayoutEffect,
@@ -29,14 +30,11 @@ export function ToolbarOverflow({
   const more = useRef<HTMLButtonElement>(null);
   const [open, setOpen] = useState(false);
   const hidden = useToolbarOverflow(toolbar, more, items);
-  useEffect(() => {
-    if (hidden.length === 0) {
-      setOpen(false);
-    }
-  }, [hidden.length]);
+  useCloseEmptyOverflow(hidden.length, setOpen);
   return (
     <div className="preview-toolbar" ref={toolbar}>
       {children}
+      <ToolbarTooltip container={toolbar} />
       {items.map((item) => (
         <div
           key={item.id}
@@ -52,6 +50,7 @@ export function ToolbarOverflow({
         className={`preview-toolbar-more ${hidden.length ? '' : 'is-overflow'}`}
         aria-hidden={!hidden.length || undefined}
         aria-label="More preview actions"
+        data-tooltip="More preview actions"
         aria-haspopup="dialog"
         aria-expanded={open && hidden.length > 0}
         onClick={() => setOpen(!open)}
@@ -142,4 +141,12 @@ function menuPosition(anchor: HTMLElement) {
     width,
     maxHeight: Math.max(80, window.innerHeight - rect.bottom - 14),
   };
+}
+
+function useCloseEmptyOverflow(count: number, setOpen: (open: boolean) => void): void {
+  useEffect(() => {
+    if (count === 0) {
+      setOpen(false);
+    }
+  }, [count, setOpen]);
 }

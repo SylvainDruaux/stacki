@@ -1,8 +1,11 @@
+import { PageRenameButton } from '../../../vendor/stacki/src/features/pages/PageRenameButton';
 import { PageOrderGap } from '../../../vendor/stacki/src/features/pages/PageOrderGap';
+import { PageSearchPath } from '../../../vendor/stacki/src/features/pages/PageSearchPath';
 import { Fragment, useMemo, useState } from 'react';
 import {
   buildPageTree,
   pageDisplayName,
+  pageFolderDisplayName,
   stripPageExtension,
   type PageTreeNode,
 } from '../../../vendor/stacki/src/features/pages/pageTree';
@@ -25,7 +28,10 @@ import { routeFor } from '../project/projectClient';
 import { PagePresence } from './PagePresence';
 
 interface Props {
+  readonly rename?: (kind: 'page' | 'folder', from: string) => void;
+  readonly folders?: readonly string[] | undefined;
   readonly items: readonly string[];
+  readonly pageMetadata?: readonly ScanPage[] | undefined;
   readonly query: string;
   readonly file: string;
   readonly peers: readonly Peer[];
@@ -35,16 +41,16 @@ interface Props {
   readonly reorder: PageOrderDrag;
 }
 export function PageFileList(props: Props) {
-  const pages = useMemo(
-    () =>
-      props.items.map((path) => ({
-        path,
-        name: path.replace(/^src\/(pages|content|data)\//, ''),
-        route: routeFor(path),
-      })),
-    [props.items],
-  );
-  const tree = useMemo(() => buildPageTree(pages, []), [pages]);
+  const pages = useMemo(() => {
+    const metadata = new Map(props.pageMetadata?.map((page) => [page.path, page]));
+    return props.items.map((path) => ({
+      ...metadata.get(path),
+      path,
+      name: path.replace(/^src\/(pages|content|data)\//, ''),
+      route: routeFor(path),
+    }));
+  }, [props.items, props.pageMetadata]);
+  const tree = useMemo(() => buildPageTree(pages, props.folders ?? []), [pages, props.folders]);
   const query = props.query.trim().toLowerCase();
   const results = pages
     .filter((page) =>
@@ -136,7 +142,14 @@ function FolderBranch({
   const key = relative + '/';
   return (
     <>
-      <button
+      <div
+        role="button"
+        tabIndex={0}
+        onKeyDown={(event) => {
+          if (event.target === event.currentTarget && event.key === 'Enter') {
+            setCollapsed(!collapsed);
+          }
+        }}
         className="list-item folder"
         aria-expanded={!collapsed}
         data-order-key={key}
@@ -149,8 +162,14 @@ function FolderBranch({
         <span className="icon">
           {collapsed ? <FolderIcon size={13} /> : <FolderOpenIcon size={13} />}
         </span>
-        <span className="label">{name}</span>
-      </button>
+        <span className="page-list-copy">
+          <span className="label">{pageFolderDisplayName(name)}</span>
+          <span className="sub">/{relative}</span>
+        </span>
+        {!props.collection && props.rename && (
+          <PageRenameButton kind="folder" rename={() => props.rename?.('folder', relative)} />
+        )}
+      </div>
       {!collapsed && <PageBranch tree={tree} relative={relative} depth={depth + 1} props={props} />}
     </>
   );
@@ -170,7 +189,14 @@ function FileRow({
   const collection = props.collection || isCollectionRoute(page.path);
   const reorder = props.reorder;
   return (
-    <button
+    <div
+      role="button"
+      tabIndex={0}
+      onKeyDown={(event) => {
+        if (event.target === event.currentTarget && event.key === 'Enter') {
+          props.open(page.path);
+        }
+      }}
       data-file={page.path}
       data-order-key={page.name}
       aria-label={page.name}
@@ -186,12 +212,18 @@ function FileRow({
       <span className="icon">
         {collection ? <CollectionIcon size={13} /> : <FileIcon size={13} />}
       </span>
-      <span className="label file-row-name">
-        {props.collection
-          ? stripPageExtension(page.name.split('/').at(-1) ?? page.name)
-          : pageDisplayName(page)}
+      <span className="page-list-copy">
+        <span className="label file-row-name">
+          {props.collection
+            ? stripPageExtension(page.name.split('/').at(-1) ?? page.name)
+            : pageDisplayName(page)}
+        </span>
+        {!props.collection && <PageSearchPath path={page.route} query={props.query} />}
       </span>
       {!props.collection && <PagePresence peers={props.peers} page={page.path} />}
-    </button>
+      {!props.collection && props.rename && (
+        <PageRenameButton kind="page" rename={() => props.rename?.('page', page.name)} />
+      )}
+    </div>
   );
 }

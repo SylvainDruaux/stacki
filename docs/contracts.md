@@ -57,10 +57,21 @@ effect builds a new model, and the file changes only through intents (step 9;
 ## Page display names
 
 Project scan pages may carry a bounded `title` read from the literal `title` attribute
-of the parsed layout wrapper. The Pages panel and its search show that label, falling
+of the parsed layout wrapper, including imported wrapper chains up to 32 levels.
+Relative imports and project aliases use the same resolver in Desktop and Studio.
+Cycles, missing wrappers and runtime expressions fall back safely without executing site code.
+The optional bounded `inheritedTitle` preserves the wrapper fallback when live overrides are removed;
+blank or expression-based overrides suppress inheritance. Studio carries the same parsed scan-page
+metadata in `pageMetadata`. The Pages panel, switcher and breadcrumbs show that label, falling
 back to the filename for missing, blank, expression-based, or unreadable titles.
 The root `index.astro`, `index.md`, or `index.mdx` page always displays as `Home`;
 nested index pages use the normal title/filename rule.
+Dynamic template basenames such as `[slug].astro` display the parent folder in title case,
+with dashes replaced by spaces and `Template` appended. A root-level template displays as
+`Page Template`. Their filename and URL patterns remain unchanged.
+Folder rows use the same title-case display formatting. Page and folder rows show the original
+URL path beneath the label, with centered icons; search highlights literal path matches.
+Ordering, dragging and renaming continue to use source paths, including `.stacki/pages.json` keys.
 The `name`, `path`, and `route` fields retain their file identities for sorting, folders,
 renames, and drag operations. Open-page edits update the label from the live model;
 external changes update it through the normal project rescan. Scanning never executes
@@ -176,7 +187,19 @@ Desktop's `publish:siteURL` independently discovers the selected hosting project
 domain without blocking local deployment-status checks. Its optional string reply passes
 `parsePublishedSiteURL`: a bounded HTTPS origin without credentials, ports, paths, queries,
 or fragments. Provider credentials stay in the main process. Missing access or an unavailable
-provider omits the link; it never changes the deployment receipt or publishes the project.
+provider omits the link unless a configured or saved URL is available; discovery never changes
+the deployment receipt or publishes the project. Literal Wrangler custom domains are read without
+Cloudflare credentials when the configured account and Worker match the selected destination.
+Wildcard routes, paths and environment-specific overrides are not treated as public origins.
+
+When publish settings are absent, URL discovery resolves the same single existing provider link
+as the menu; explicit saved destinations, including None, take precedence. The shared menu retains
+successful discoveries in an existing `.stacki/publish.json` as `publishedSite`, with its provider,
+account/project, canonical HTTPS origin and `manual` or `discovered` source. Inspecting an unsaved
+project never creates settings. Writes reread the current configuration and use its witnessed base,
+so a late discovery cannot overwrite a new destination or manual URL. A saved link appears before
+network discovery and survives unavailable provider access. Manual URLs from Publish settings
+override discovery. Links from a different account, project or provider are never displayed.
 
 ## Page saves
 
@@ -929,3 +952,45 @@ are shared by all editors. History exposes branch commits but excludes parked dr
 Bundles are bounded at 96 MiB, branch lists at 64, and cloud checkpoints/draft namespaces at
 128. Old unreferenced checkpoints and document namespaces expire after a 30-minute grace
 period. Interrupted checkpoint acknowledgement blocks edits until startup recovers storage.
+
+## Canvas interaction mode
+
+The canvas cursor toggle starts in selection mode for each project session. The parent sends
+`avb:interaction` with `select` or `interact`; both frame clients validate the mode and accept it
+only from their parent. Desktop and Studio replay it after each frame load. In interaction mode,
+the page owns clicks, forms, focus, keyboard input and pointer feedback; selection and hover outlines remain.
+In selection mode, capture listeners stop click actions before page handlers run. Pointer streams
+remain available to slider libraries, and a drag of at least six pixels does not select a node on
+release. Libraries that require an uncancelled mouse-focus default may still need interaction mode.
+Navigation reports are bounded local paths from the current frame and preview origin. Each
+navigation immediately opens the matching project page while preserving interaction mode; a route
+without editable source restores the editor preview. Mode is session UI state and is not written into project settings.
+
+### Page and folder rename
+
+`shared/properties/pageRename.ts` validates page-relative identities at both host boundaries.
+Desktop's `page:move` and `pagefolder:rename`, and Studio's `POST /studio/api/pages/rename`, use
+one planner. It rejects occupied paths and equivalent page URLs (including `index` routes,
+case-folded names and dynamic parameter aliases). Dynamic parameters keep their names so a
+rename cannot silently invalidate `getStaticPaths`.
+
+The planner inventories authored UTF-8 files, updates literal internal links and configured-site
+absolute URLs, rebases relative/aliased imports, and remaps `.stacki/pages.json` order keys.
+It preserves URL query strings and fragments. External sites, generated output, dependencies,
+lockfiles and binary assets are excluded. Runtime-computed URLs are not evaluated. The scan is
+bounded to 10,000 entries, 32 directory levels, 5 MB per text file and 100 MB total text;
+symlinks are refused rather than traversed. Desktop additionally bounds its write batch to
+its existing document-actor limit.
+
+Hosts flush pending editor saves before planning. Text witnesses are rechecked before writes;
+failed batches restore only bytes still owned by that batch, preserving outside edits.
+Studio serializes the operation with collaboration edits and checkpoints the renamed draft
+and a new CRDT namespace together before acknowledging cloud saves. This preserves deleted
+source paths after container recovery and prevents old rooms from recreating moved files.
+Renaming changes source URLs, not inherited layout titles. Display labels remain a projection.
+
+The rename popup is shared by Desktop and Studio. It validates names on every input change
+using the same shared URL-conflict rules as the host and requires an explicit Apply; Cancel,
+Escape and blur never rename anything. Errors appear below the field, including save-time
+conflicts from outside edits. Studio project scans include bounded `pageFolders` entries so
+empty folders reserve destinations during live validation as well as during the final write.

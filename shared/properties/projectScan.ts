@@ -13,6 +13,8 @@ export interface ScanPage {
   readonly route: string;
   /** Literal layout title for display; name remains the route file identity. */
   readonly title?: string | undefined;
+  /** Wrapper's literal title, used when a live page removes its own override. */
+  readonly inheritedTitle?: string | undefined;
 }
 
 export interface RenderTag {
@@ -99,6 +101,9 @@ function parsePage(input: unknown, where: string): ScanPage {
     ...(record['title'] === undefined
       ? {}
       : { title: asString(record['title'], `${where}.title`) }),
+    ...(record['inheritedTitle'] === undefined
+      ? {}
+      : { inheritedTitle: asString(record['inheritedTitle'], `${where}.inheritedTitle`) }),
   };
 }
 
@@ -165,9 +170,7 @@ function parseComponent(input: unknown, where: string): ScanComponent {
 export function parseScanResult(input: unknown): ScanResult {
   const record = asRecord(input, 'root');
   const result: Record<string, unknown> = {
-    pages: asArray(record['pages'], 'pages', LIMITS.scanEntriesMax).map((entry, index) =>
-      parsePage(entry, `pages[${index}]`),
-    ),
+    pages: parseScanPages(record['pages']),
     pageFolders: asArray(record['pageFolders'], 'pageFolders', LIMITS.scanFoldersMax).map(
       (folder, index) => asString(folder, `pageFolders[${index}]`),
     ),
@@ -182,4 +185,10 @@ export function parseScanResult(input: unknown): ScanResult {
     result['trailingSlash'] = asString(record['trailingSlash'], 'trailingSlash');
   }
   return result as unknown as ScanResult;
+}
+
+export function parseScanPages(input: unknown): readonly ScanPage[] {
+  return asArray(input, 'pages', LIMITS.scanEntriesMax).map((entry, index) =>
+    parsePage(entry, `pages[${index}]`),
+  );
 }

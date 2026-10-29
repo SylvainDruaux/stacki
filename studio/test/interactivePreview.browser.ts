@@ -97,5 +97,5 @@ export async function checkPreviewNavigation(page: Page) {
   await destination.waitFor();
   await destination.click();
   await page.keyboard.press('Escape');
-  await page.locator('.page-switch-label').filter({ hasText: 'index' }).waitFor();
+  await page.locator('.page-switch-label').filter({ hasText: 'Home' }).waitFor();
 }

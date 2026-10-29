@@ -1,3 +1,4 @@
+import { useCanvasInteraction } from '../../../vendor/stacki/src/features/preview/useCanvasInteraction';
 import './previewToolbar.css';
 import { PreviewLoading, usePreviewLoading } from './PreviewLoading';
 import { CollaboratorOutlines } from '../collaboration/CollaboratorOutlines';
@@ -32,6 +33,8 @@ interface Props {
   readonly file: string;
   /** The folder name identifies this project's legacy local guide settings for migration. */
   readonly projectName: string;
+  readonly pageLabel?: string | undefined;
+  readonly editRoute: (route: string) => void;
   readonly collaborators: readonly Peer[];
   readonly collection: boolean;
   readonly document: SharedDocument | undefined;
@@ -45,6 +48,15 @@ interface Props {
   readonly inspector: PreviewInspectorActions | undefined;
 }
 export function PreviewCanvas(props: Props) {
+  const interaction = useCanvasInteraction({
+    projectKey: props.projectName,
+    url: props.preview.url,
+    available: props.device !== 'canvas' && !props.collection,
+    frame: props.preview.frame,
+    post: props.preview.send,
+    subscribeLoad: props.preview.subscribeLoad,
+    editRoute: props.editRoute,
+  });
   const sizing = usePreviewSizing(props.device, props.dimensions, props.onDevice);
   useCursorScale(props.preview, sizing.viewport.scale);
   useCursorChatShortcut({
@@ -59,10 +71,13 @@ export function PreviewCanvas(props: Props) {
     frame: { post: props.preview.send, subscribeLoad: props.preview.subscribeLoad },
   });
   return (
-    <main className="studio-center">
+    <main className="studio-center" data-canvas-interactive={interaction.active}>
       <div className="studio-preview-toolbar">
         <PreviewToolbar
-          crumbs={crumbsFor(props.nodes, props.selected)}
+          crumbs={[
+            ...(props.pageLabel ? [{ id: undefined, label: props.pageLabel }] : []),
+            ...crumbsFor(props.nodes, props.selected),
+          ]}
           onCrumb={(id) => props.select(id ?? 'layout')}
           activeDevice={sizing.activeDevice}
           onDevice={props.onDevice}
@@ -77,18 +92,25 @@ export function PreviewCanvas(props: Props) {
                 },
               })}
           guide={columnGuide.menu}
+          interaction={interaction}
           inspector={props.collection ? undefined : props.inspector}
         />
       </div>
       {props.collection && props.document ? (
         <CollectionEditor document={props.document} />
       ) : (
-        <PreviewSurface props={props} sizing={sizing} shownGuide={columnGuide.shown} />
+        <PreviewSurface
+          interactive={interaction.active}
+          props={props}
+          sizing={sizing}
+          shownGuide={columnGuide.shown}
+        />
       )}
     </main>
   );
 }
 function PreviewSurface({
+  interactive,
   props,
   sizing,
   shownGuide,
@@ -96,6 +118,7 @@ function PreviewSurface({
   readonly props: Props;
   readonly sizing: ReturnType<typeof usePreviewSizing>;
   readonly shownGuide: ShownGuide | undefined;
+  readonly interactive?: boolean;
 }) {
   const loading = usePreviewLoading(
     props.preview.url,
@@ -120,6 +143,7 @@ function PreviewSurface({
         ) : (
           <DesignFrame
             key={loading.attempt}
+            interactive={interactive ?? false}
             props={props}
             sizing={sizing}
             shownGuide={shownGuide}
@@ -130,6 +154,7 @@ function PreviewSurface({
   );
 }
 function DesignFrame({
+  interactive,
   props,
   sizing,
   shownGuide,
@@ -137,6 +162,7 @@ function DesignFrame({
   readonly props: Props;
   readonly sizing: ReturnType<typeof usePreviewSizing>;
   readonly shownGuide: ShownGuide | undefined;
+  readonly interactive?: boolean;
 }) {
   return (
     <>
@@ -156,9 +182,10 @@ function DesignFrame({
             title="Site preview"
             src={props.preview.url}
             onLoad={() => {
-              props.preview.loaded();
-              props.restoreSelection();
-              props.preview.send({ type: 'studio:interactive', enabled: false });
+              props.preview.loaded({ preserveNavigation: interactive ?? false });
+              if (!interactive) {
+                props.restoreSelection();
+              }
               // The render subscription catches edits made during navigation. A load-time
               // pull races that render and repeats work for every page switch.
             }}

@@ -78,8 +78,8 @@ const ALLOWED: Readonly<Record<string, Readonly<Record<string, Allowed>>>> = {
   'electron/handlers/devServers.ts': {
     writeFileSync: { count: 4, reason: 'the generated preview harness in node_modules/.avb' },
   },
-  'electron/handlers/pageHandlers.ts': {
-    renameSync: { count: 1, reason: 'a page folder move; a move writes no bytes' },
+  'electron/project/pageRenameWrite.ts': {
+    renameSync: { count: 1, reason: 'a page or folder move; text changes use the host writer' },
   },
   'electron/main.ts': {
     writeFileSync: { count: 3, reason: 'app state in userData (reopen, settings, recents)' },

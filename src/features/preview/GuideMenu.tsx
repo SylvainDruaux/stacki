@@ -63,7 +63,7 @@ export function GuideMenu(props: GuideMenuProps) {
         ref={buttonRef}
         type="button"
         className={props.settings.visible && props.available ? 'on' : ''}
-        title={title}
+        data-tooltip={title}
         aria-label="Column guide"
         aria-haspopup="dialog"
         aria-expanded={anchor !== undefined}

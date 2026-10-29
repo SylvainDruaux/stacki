@@ -103,7 +103,7 @@ function registerProjectScanHandler({
     }
 
     return {
-      pages: scanPageTitles(pages, allSources),
+      pages: scanPageTitles(pages, allSources, importAliases),
       layouts,
       components,
       pageFolders,

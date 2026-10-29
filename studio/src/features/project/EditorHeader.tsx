@@ -9,9 +9,9 @@ import type { SharedDocument } from '../collaboration/useDocument';
 import { presenceUsers } from '../collaboration/presenceUsers';
 import { presenceColor } from '../collaboration/presenceColors';
 import PageSwitcher from '../../../vendor/stacki/src/features/pages/PageSwitcher';
-import { routeFor } from './projectClient';
 import { useComponentBack } from './useComponentBack';
 import { useEditorRole } from '../roles/useEditorRole';
+import { projectPages } from './pageLabels';
 import { PreviewButton, type InteractivePreviewState } from '../preview/InteractivePreview';
 interface HeaderProps {
   readonly cursorChat: (() => void) | undefined;
@@ -44,7 +44,7 @@ export function EditorHeader({
 }: HeaderProps) {
   const role = useEditorRole();
   const direct = session?.kind === 'local' && session.editing === 'source';
-  const pages = headerPages(project);
+  const pages = projectPages(project);
   const componentOpen = !isCanvasPage(file) && file.endsWith('.astro');
   const back = defaultsMode
     ? closeDefaults
@@ -104,14 +104,6 @@ function headerBack({
     .whenSaved()
     .then(() => open(previewFile))
     .catch(report);
-}
-
-function headerPages(project: Project) {
-  return project.pages.map((path) => ({
-    path,
-    name: path.replace(/^src\/pages\//, ''),
-    route: routeFor(path),
-  }));
 }
 
 function Collaborators({
