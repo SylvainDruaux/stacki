@@ -15,7 +15,19 @@ Use an isolated checkout when other tasks are editing the working directory. Mat
 Studio, Studio release manifest, and npm starter versions. Never move an existing release tag to
 include later changes.
 
-## 0.1.88: separate Mac architectures
+## 0.1.89 release validation
+
+The 0.1.88 Windows gate caught a watcher test that assumed creating a file only emits `add`.
+Windows also emitted `change` before the file was removed. Replaying the recorded event trace
+reproduced the assertion locally. The test now accepts creation writes only between the new
+route's add and unlink events; fixtures reject missing, reordered, unrelated and staging events.
+The real-watcher test still requires one atomic-save event and preserves project ignore rules.
+
+A native Windows runner is unavailable locally; the hosted Windows gate remains required.
+Release 0.1.88 stays an unpublished draft with its original tag. Version 0.1.89 aligns Desktop,
+Studio and the starter and includes the Mac packaging changes below.
+
+## Separate Mac architectures
 
 Mac releases produce `Stacki-VERSION-arm64.dmg` and `Stacki-VERSION-x64.dmg`, plus
 matching `.zip` archives and blockmaps. Architecture-specific Electron binaries avoid the
