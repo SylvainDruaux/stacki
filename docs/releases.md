@@ -15,6 +15,16 @@ Use an isolated checkout when other tasks are editing the working directory. Mat
 Studio, Studio release manifest, and npm starter versions. Never move an existing release tag to
 include later changes.
 
+## 0.1.90 release validation
+
+At the user's request, remove the variables-panel layout probe because its visible Electron
+window interrupts local work every time the full regression gate runs. Other variables-panel
+unit and integration tests remain. The removed probe's row-alignment, scroll and hit-testing
+measurements are no longer covered by that browser test; application behavior is unchanged.
+
+The 0.1.89 release run was canceled before publication to include this removal. Its tag remains
+unchanged. Desktop, Studio and the starter are aligned at 0.1.90.
+
 ## 0.1.89 release validation
 
 The 0.1.88 Windows gate caught a watcher test that assumed creating a file only emits `add`.
