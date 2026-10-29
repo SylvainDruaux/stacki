@@ -18,6 +18,7 @@ export interface InlineCandidate {
 export interface InlineExpression {
   readonly kind: 'expr';
   readonly value: string;
+  readonly preview?: string;
 }
 export type InlineNode =
   | { readonly kind: 'text'; readonly value: string }
@@ -159,7 +160,7 @@ function richSerialize(
       if (chippable(inner)) {
         out += `<span class="expr-chip" contenteditable="false" data-expr="${esc(
           node.value,
-        ).replace(/"/g, '&quot;')}">${esc(inner)}</span>`;
+        ).replace(/"/g, '&quot;')}">${esc(node.preview ?? inner)}</span>`;
       } else {
         out += esc(node.value); // shown as literal {expr} text
       }

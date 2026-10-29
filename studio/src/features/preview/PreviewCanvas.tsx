@@ -1,3 +1,5 @@
+import { useCanvasText } from '../../../vendor/stacki/src/features/preview/useCanvasText';
+import { studioCanvasText } from './studioCanvasText';
 import { useCanvasInteraction } from '../../../vendor/stacki/src/features/preview/useCanvasInteraction';
 import './previewToolbar.css';
 import { PreviewLoading, usePreviewLoading } from './PreviewLoading';
@@ -48,6 +50,13 @@ interface Props {
   readonly inspector: PreviewInspectorActions | undefined;
 }
 export function PreviewCanvas(props: Props) {
+  useCanvasText({
+    document: studioCanvasText(props.file, props.document, props.nodes),
+    frame: props.preview.frame,
+    url: props.preview.url,
+    post: props.preview.send,
+    subscribeLoad: props.preview.subscribeLoad,
+  });
   const interaction = useCanvasInteraction({
     projectKey: props.projectName,
     url: props.preview.url,

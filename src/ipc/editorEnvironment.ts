@@ -10,8 +10,9 @@ export { onFilesChanged as onPropertyFilesChanged } from '../ipc/appBridge';
 export const cmsTransport = {
   writeContentEntry: (
     payload: Parameters<PreloadBridge['writeContentEntry']>[0],
-    _expected?: unknown,
-  ) => window.avb.writeContentEntry(payload),
+    expected?: unknown,
+  ) =>
+    window.avb.writeContentEntry(parseIpcPayload('content:writeEntry', { ...payload, expected })),
   writeCms: (payload: Parameters<PreloadBridge['writeCms']>[0], _expected?: unknown) =>
     window.avb.writeCms(payload),
   renameContentEntry: (payload: Parameters<PreloadBridge['renameContentEntry']>[0]) =>

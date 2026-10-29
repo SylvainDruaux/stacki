@@ -11,7 +11,11 @@ import { writeStudioConfig } from '../scripts/workspace';
 
 const execute = promisify(execFile);
 export async function startStyleFixture(
-  sources: { readonly page?: string; readonly component?: string } = {},
+  sources: {
+    readonly page?: string;
+    readonly component?: string;
+    readonly prepare?: (root: string) => Promise<void>;
+  } = {},
 ) {
   await mkdir('.studio', { recursive: true });
   const root = await mkdtemp(path.resolve('.studio/style-parity-'));
@@ -35,6 +39,7 @@ export async function startStyleFixture(
     path.join(root, 'public/pattern.svg'),
     '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32"><rect width="32" height="32" fill="green"/></svg>',
   );
+  await sources.prepare?.(root);
   await writeStudioConfig(root, path.resolve('.'), port);
   try {
     await execute(

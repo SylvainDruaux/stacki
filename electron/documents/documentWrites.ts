@@ -1,3 +1,4 @@
+import { digestOf } from './atomicWrite';
 // The one document host of the main process, and the entry points every module
 // uses to write project text (plan §3.3, §5.2: one writer per file). main.ts
 // installs the host at startup with its telemetry log and the note that the app
@@ -42,10 +43,13 @@ export function documentHost(): DocumentHost {
  * diff from the file as it is now, witnessed by those bytes (never the whole
  * file); a missing file is created, and anything but `applied` throws like the
  * `fs.writeFileSync` it replaces did. */
-export function writeProjectText(file: string, text: string): Digest {
+export function writeProjectText(file: string, text: string, expectedSource?: string): Digest {
   const host = documentHost();
   host.noteWrite(file);
-  const report = host.documents.writeCurrent(file, text);
+  const report =
+    expectedSource === undefined
+      ? host.documents.writeCurrent(file, text)
+      : host.documents.writeText(file, text, digestOf(expectedSource));
   if (report.tag === 'applied') {
     return report.checksum;
   }

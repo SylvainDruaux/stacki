@@ -31,7 +31,9 @@ export function forwardPreviewKeys(post: (message: unknown) => void, interactive
       event.altKey ||
       (!insert &&
         event.target instanceof Element &&
-        event.target.closest('input, textarea, select, [contenteditable=true]'))
+        event.target.closest(
+          'input, textarea, select, [contenteditable=true], [contenteditable=plaintext-only]',
+        ))
     ) {
       return;
     }

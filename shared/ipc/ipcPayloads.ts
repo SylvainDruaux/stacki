@@ -163,7 +163,13 @@ export const IPC_PAYLOADS = {
   'content:sampleEntry': object({ devUrl: maybeText, name: text, id: maybeText }),
   'content:targets': object({ ...named }),
   'content:validate': object({ ...project, collection: text, data }),
-  'content:writeEntry': object({ ...project, entry, edits: optional(edits), body: optional(text) }),
+  'content:writeEntry': object({
+    ...project,
+    entry,
+    edits: optional(edits),
+    body: optional(text),
+    expected: optional(object({ data, body: optional(text) })),
+  }),
   'css:addSection': object({
     ...project,
     ...cssFile,

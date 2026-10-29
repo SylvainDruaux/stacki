@@ -168,6 +168,9 @@ const MANIFEST_FILES_MAX = 512; // LIMITS.previewManifestFilesMax
 export let renderToken: string | undefined = undefined;
 let renderStamps: { readonly file: string; readonly checksum: string }[] | undefined;
 let renderSeq = 0;
+export function canvasTextSourceMatches(file: string, checksum: string): boolean {
+  return renderStamps?.some((stamp) => stamp.file === file && stamp.checksum === checksum) ?? false;
+}
 // Undefined when the page's stamps cannot form one manifest: too many, or
 // one file stamped with two checksums (a rendering mixing versions of it).
 const readManifest = (): { file: string; checksum: string }[] | undefined => {

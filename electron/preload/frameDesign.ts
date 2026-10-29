@@ -1,3 +1,4 @@
+import { isCanvasTextEditing } from './frameTextNative';
 import { canvasSelects, trackCanvasGesture } from './frameInteraction';
 // Which frame this is, and what that changes. A class on <html> says canvas
 // (`stacki-designer`) or interactive preview (`stacki-preview`); a design-mode
@@ -97,6 +98,9 @@ function makeNavigationInert(): void {
     'mousedown',
     (event) => {
       if (!canvasSelects()) {
+        return;
+      }
+      if (isCanvasTextEditing(event.target)) {
         return;
       }
       if (event.button !== 0) {

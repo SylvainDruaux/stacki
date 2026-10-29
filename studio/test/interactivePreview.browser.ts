@@ -88,7 +88,8 @@ export async function checkPreviewNavigation(page: Page) {
   await preview.getByRole('link', { name: 'Preview navigation check' }).click();
   await preview.getByRole('link', { name: 'Back to home', exact: true }).waitFor();
   await page.getByRole('button', { name: 'Exit preview (Esc)', exact: true }).click();
-  await page.locator('.page-switch-label').filter({ hasText: '404' }).waitFor();
+  // Navigation uses the page's authored title in the editor, rather than its filename.
+  await page.locator('.page-switch-label').filter({ hasText: 'Page not found' }).waitFor();
   await page.getByRole('button', { name: 'Preview the site', exact: true }).click();
   await preview.getByRole('link', { name: 'Back to home', exact: true }).click();
   // Astro keeps the outgoing heading visible during navigation. Waiting for any

@@ -80,6 +80,7 @@ async function frame(hash) {
   global.MutationObserver = window.MutationObserver;
   global.Element = window.Element;
   global.Node = window.Node;
+  global.getComputedStyle = window.getComputedStyle.bind(window);
   global.MouseEvent = window.MouseEvent;
   global.requestAnimationFrame = window.requestAnimationFrame.bind(window);
   const sent = [];
@@ -124,6 +125,17 @@ const press = (window, target, init = {}) => {
     );
     const onNothing = press(window, window.document.querySelector('[data-box="hero"]'));
     check('and so is one on anything else', onNothing.defaultPrevented, 'only links were covered');
+    // Editing fields now live in the host; a page cannot opt out by copying their ID.
+    const editor = window.document.createElement('div');
+    editor.id = 'stacki-canvas-text-editor';
+    const input = window.document.createElement('textarea');
+    editor.append(input);
+    window.document.body.append(editor);
+    check('a page field cannot impersonate the host editor', press(window, input).defaultPrevented);
+    window.document.body.append(input);
+    check('an ordinary page field remains inert', press(window, input).defaultPrevented);
+    input.remove();
+    editor.remove();
     // A right-click is the context menu's, not ours.
     const right = press(window, link, { button: 2 });
     check(
@@ -209,11 +221,6 @@ const press = (window, target, init = {}) => {
   }
 
   const source = readFolderSource('electron/preload');
-  check(
-    'the press is refused where the click already was',
-    /addEventListener\(\s*'mousedown'[\s\S]{0,200}preventDefault\(\)/.test(source),
-    'nothing stops the focus that comes with a press',
-  );
   check(
     'and the frame still takes focus itself, so the modifiers keep arriving',
     /preventDefault\(\);\s*\n\s*window\.focus\(\);/.test(source),

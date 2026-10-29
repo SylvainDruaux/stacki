@@ -1,0 +1,103 @@
+// Only bounded text values cross the frame boundary. Source ranges stay in the editor.
+import { digest, list, pathText, record, text } from '../core/boundary';
+
+export interface CanvasTextTarget {
+  readonly kind: 'element' | 'component';
+  readonly key: string;
+  readonly path: string;
+  readonly parent: string;
+  readonly value: string;
+  readonly label: string;
+  readonly nested: boolean;
+  readonly tag: string;
+  readonly siblings: readonly string[];
+}
+
+export interface CanvasTextCatalog {
+  readonly type: 'avb:text-catalog';
+  readonly session: string;
+  readonly file: string;
+  readonly checksum: string;
+  readonly targets: readonly CanvasTextTarget[];
+}
+
+export type CanvasTextEvent =
+  | {
+      readonly type: 'avb:text-save' | 'avb:text-draft';
+      readonly session: string;
+      readonly key: string;
+      readonly value: string;
+    }
+  | { readonly type: 'avb:text-refused'; readonly message: string };
+
+export const CANVAS_TEXT_LIMIT = 10_000;
+export const CANVAS_TARGET_LIMIT = 2_000;
+
+export function canvasTextValue(input: unknown): string {
+  const value = text(input);
+  if (value.length > CANVAS_TEXT_LIMIT) {
+    throw new Error('Canvas text exceeds limit');
+  }
+  return value;
+}
+
+export function parseCanvasTextCatalog(input: unknown): CanvasTextCatalog {
+  const data = record(input);
+  if (data['type'] !== 'avb:text-catalog') {
+    throw new Error('Expected canvas text catalog');
+  }
+  const targets = list(parseTarget)(data['targets']);
+  if (targets.length > CANVAS_TARGET_LIMIT) {
+    throw new Error('Too many canvas text targets');
+  }
+  return {
+    type: 'avb:text-catalog',
+    session: pathText(data['session']),
+    file: pathText(data['file']),
+    checksum: digest(data['checksum']),
+    targets,
+  };
+}
+
+function parseTarget(input: unknown): CanvasTextTarget {
+  const data = record(input);
+  if (data['kind'] !== 'element' && data['kind'] !== 'component') {
+    throw new Error('Expected text container kind');
+  }
+  if (typeof data['nested'] !== 'boolean') {
+    throw new Error('Expected nested text flag');
+  }
+  const siblings = list(pathText)(data['siblings']);
+  if (siblings.length > 100) {
+    throw new Error('Too many protected text siblings');
+  }
+  return {
+    kind: data['kind'],
+    tag: pathText(data['tag']),
+    siblings,
+    key: pathText(data['key']),
+    path: pathText(data['path']),
+    parent: pathText(data['parent']),
+    value: canvasTextValue(data['value']),
+    label: pathText(data['label']),
+    nested: data['nested'],
+  };
+}
+
+export function parseCanvasTextEvent(input: unknown): CanvasTextEvent | undefined {
+  const data = record(input);
+  switch (data['type']) {
+    case 'avb:text-save':
+    case 'avb:text-draft':
+      return {
+        type: data['type'],
+        session: pathText(data['session']),
+        key: pathText(data['key']),
+        value: canvasTextValue(data['value']),
+      };
+    case 'avb:text-refused':
+      return { type: 'avb:text-refused', message: pathText(data['message']) };
+    default:
+      return undefined;
+  }
+}

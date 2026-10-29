@@ -1,3 +1,4 @@
+import { installCanvasText } from '../../../vendor/stacki/electron/preload/frameText';
 import { parseCanvasInteraction } from '../../../vendor/stacki/shared/properties/canvasInteraction';
 import {
   canvasDragged,
@@ -54,6 +55,15 @@ let selected: OutlineTarget | undefined;
 let hovered: OutlineTarget | undefined;
 let scope = '';
 let interactive = !location.hash.includes('avb-design');
+installCanvasText(
+  post,
+  () => !interactive && window.parent !== window,
+  (target, element) => {
+    const id = target.parent.slice(scope.length);
+    const box = element.getBoundingClientRect();
+    post({ type: 'studio:select', id, occurrence: occurrenceAt(id, box.x, box.y) });
+  },
+);
 const selectionCursor = new CSSStyleSheet();
 // Safari can scroll the iframe sideways even when the site's body clips overflow.
 // Clip the document root while editing; interactive preview keeps the site's own scrolling.

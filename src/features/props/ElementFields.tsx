@@ -15,8 +15,11 @@ import RichContent, { isInlineOnly } from './RichContent';
 import { VariableTextSizeIcon, ChevronRightIcon } from '../../ui/Icons';
 import { noLabelActivation, CommentField } from './SourcePanels';
 import { type ElementState } from './elementState';
+import { canvasDraftValue, useCanvasTextDraft } from '../../ui/canvasTextDraft';
+import { canvasDraftInline } from './canvasDraftInline';
 
 export function ElementContent({ state }: { readonly state: ElementState }) {
+  const draft = useCanvasTextDraft(state);
   const {
     node,
     loopContext,
@@ -50,7 +53,7 @@ export function ElementContent({ state }: { readonly state: ElementState }) {
           </label>
           <RichContent
             key={node.id}
-            nodes={isInlineOnly(node.children) ? node.children : []}
+            nodes={canvasDraftInline(isInlineOnly(node.children) ? node.children : [], draft)}
             {...richContextProp(bindContext || loopContext)}
             insertRef={contentInsertRef}
             onChange={onSetInline}
@@ -134,6 +137,7 @@ export function richContextProp(context: RichContext | undefined): {
 }
 
 export function ElementLooseText({ state }: { readonly state: ElementState }) {
+  const draft = useCanvasTextDraft(state);
   const { node, onSetContent, showLooseTextField, looseText } = state;
   return (
     <>
@@ -145,7 +149,7 @@ export function ElementLooseText({ state }: { readonly state: ElementState }) {
           <AutoTextarea
             key={node.id}
             minRows={2}
-            value={looseText ? looseText.value : ''}
+            value={looseText ? canvasDraftValue(looseText, draft) : ''}
             placeholder="Text alongside the children below"
             onChange={(event) => onSetContent(event.target.value)}
           />

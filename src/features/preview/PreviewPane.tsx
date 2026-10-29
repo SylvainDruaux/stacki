@@ -1,3 +1,4 @@
+import { useCanvasText, type CanvasTextDocument } from './useCanvasText';
 import React from 'react';
 import { useCanvasInteraction } from './useCanvasInteraction';
 import { usePreviewSource } from './usePreviewSource';
@@ -25,6 +26,7 @@ import { useColumnGuide, type ShownGuide } from './guideSettings';
 export { deviceForWidth } from './PreviewToolbar';
 
 interface PreviewPaneProps {
+  readonly textDocument?: CanvasTextDocument | undefined;
   readonly spacingHover?: SpacingHover | undefined;
   readonly devUrl?: string | undefined;
   readonly devStatus?: string;
@@ -69,6 +71,7 @@ interface PreviewPaneProps {
 export default function PreviewPane(props: PreviewPaneProps) {
   const url = props.devUrl && props.route ? props.devUrl + props.route : undefined;
   const runtime = usePreviewRuntime({ ...props, selPath: props.selPath }, url);
+  useCanvasText({ document: props.textDocument, frame: runtime.iframeRef, url, ...runtime });
   const interaction = useCanvasInteraction({
     projectKey: props.projectPath,
     url,

@@ -1,3 +1,4 @@
+import { desktopCanvasText } from './desktopCanvasText';
 import { useEffect, useState } from 'react';
 import { ResizablePanel } from './ResizablePanel';
 import { ElementContextMenu } from '../../features/structure/ElementContextMenu';
@@ -40,6 +41,7 @@ export function CanvasPane({ app }: { readonly app: ShellView }) {
   return (
     <>
       <PreviewPane
+        textDocument={desktopCanvasText(app)}
         spacingHover={app.spacingHover}
         devUrl={app.devUrl}
         devStatus={app.devStatus}

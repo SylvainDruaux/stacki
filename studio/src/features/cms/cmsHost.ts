@@ -1,4 +1,4 @@
-import { writeFileSync, mkdirSync, rmSync } from 'node:fs';
+import { writeFileSync, mkdirSync, rmSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import type { IpcChannel, IpcPayloads } from '../../../vendor/stacki/shared/ipc/ipcPayloads';
 import { parseIpcPayload } from '../../../vendor/stacki/shared/ipc/ipcPayloads';
@@ -39,7 +39,10 @@ export function cmsHandlers() {
   return handlers;
 }
 // Only imported by the upstream engine running in an isolated staging directory.
-export function writeProjectText(file: string, text: string) {
+export function writeProjectText(file: string, text: string, expectedSource?: string) {
+  if (expectedSource !== undefined && readFileSync(file, 'utf8') !== expectedSource) {
+    throw new Error('Content changed before it could be saved');
+  }
   writeFileSync(file, string(text), 'utf8');
 }
 export function createProjectText(file: string, text: string) {

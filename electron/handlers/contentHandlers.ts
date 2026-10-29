@@ -60,12 +60,15 @@ function registerContentConfigHandlers({
 
   // A save is a list of edits against one entry, not a new copy of the file: see
   // contentEntries.js and ./formats for what that protects.
-  ipcMain.handle('content:writeEntry', async (_event, { projectPath, entry, edits, body }) => {
-    const result = writeEntry(projectPath, entry, edits || [], definedFields({ body }));
-    noteAppWrite();
-    send('cms:changed', {});
-    return result;
-  });
+  ipcMain.handle(
+    'content:writeEntry',
+    async (_event, { projectPath, entry, edits, body, expected }) => {
+      const result = writeEntry(projectPath, entry, edits || [], definedFields({ body, expected }));
+      noteAppWrite();
+      send('cms:changed', {});
+      return result;
+    },
+  );
 
   ipcMain.handle('content:validate', async (_event, { projectPath, collection, data }) =>
     parseValidationResult(await validateEntry(projectPath, { collection, data })),

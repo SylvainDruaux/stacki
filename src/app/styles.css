@@ -5331,6 +5331,21 @@ body > .embed-editor_provenance {
 .node-outline.sel {
   outline-width: 2px;
 }
+/* Text editing reuses the selection outline; no second field border covers the page. */
+body:has(#stacki-canvas-text-editor[data-shared]) .node-outline.sel {
+  outline-color: #8b5cf6;
+}
+body:has(#stacki-canvas-text-editor[data-shared]) .node-outline.sel .node-outline-tag {
+  background: #8b5cf6;
+}
+body:has(#stacki-canvas-text-editor[data-shared='cms']) .node-outline.sel .node-outline-tag::after {
+  content: 'Shared CMS content · changes other uses too';
+}
+body:has(#stacki-canvas-text-editor[data-shared='variable'])
+  .node-outline.sel
+  .node-outline-tag::after {
+  content: 'Shared variable · changes other uses too';
+}
 /* Hover: bare colored label above (no chip). Only components get a
    translucent fill — plain elements stay clear so their content reads, and a
    loop covers so much of the page that tinting it washes out everything

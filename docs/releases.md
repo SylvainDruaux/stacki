@@ -15,6 +15,19 @@ Use an isolated checkout when other tasks are editing the working directory. Mat
 Studio, Studio release manifest, and npm starter versions. Never move an existing release tag to
 include later changes.
 
+## 0.1.93 updates
+
+- Double-click source-matched canvas text to edit it in place. Single-click selects elements.
+  Native caret movement preserves typography and authored spans; unsafe runtime markup refuses
+  editing. Content fields mirror typing and undo immediately. Leaving editing clears its text
+  highlight. Supported variable and CMS edits retain their bindings and identify shared content.
+- Desktop and Studio share canvas interaction mode, delayed toolbar tooltips, readable page and
+  template labels, searchable URL paths and safe page/folder renaming with conflict validation
+  and project link updates. Shared page order remains in `.stacki` metadata.
+- Published-site links resolve existing hosting destinations. Desktop includes PR #70's window
+  navigation, external-link and sensitive-permission restrictions.
+- Desktop, the Studio source bundle and `create-stacki` are aligned at 0.1.93.
+
 ## 0.1.92 standalone Studio verification
 
 The 0.1.91 release stopped at Studio verification: the new cross-host metadata test loaded

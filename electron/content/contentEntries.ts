@@ -6,6 +6,7 @@ import { LIMITS } from '../../shared/core/limits';
 import { toRecord, toArray } from '../../shared/core/record';
 import { MAIN_LIMITS } from '../lib/mainLimits';
 import { writeProjectText } from '../documents/documentWrites';
+import { assertContentWitness } from './contentWitness';
 import * as frontmatter from './formats/markdownEntry';
 import * as jsonFormat from './formats/json';
 import * as yamlFormat from './formats/yaml';
@@ -438,7 +439,13 @@ function writeEntry(
   projectPath: string,
   entry: { readonly file: string; readonly locator?: readonly (string | number)[] },
   edits: readonly EntryEdit[],
-  { body }: { readonly body?: string } = {},
+  {
+    body,
+    expected,
+  }: {
+    readonly body?: string;
+    readonly expected?: { readonly data?: unknown; readonly body?: string | undefined };
+  } = {},
 ): { ok: true; changed: boolean } {
   const abs = cmsSourcePath(projectPath, entry.file);
   const format = formatFor(entry.file);
@@ -452,6 +459,12 @@ function writeEntry(
   const text = fs.readFileSync(abs, 'utf8');
 
   const locator = entry.locator ?? [];
+  if (expected) {
+    assertContentWitness(format.parseData(text), locator, expected.data);
+    if (expected.body !== undefined && frontmatter.parse(text).body !== expected.body) {
+      throw new Error('Content changed. Reopen the text before saving.');
+    }
+  }
   const prefixed: FormatEdit[] = edits.map((edit) =>
     // A rename names a key rather than setting a value, so it carries no value
     // at all — and must not be read as one being cleared.
@@ -470,7 +483,7 @@ function writeEntry(
   if (next === text) {
     return { ok: true, changed: false };
   }
-  writeProjectText(abs, next);
+  writeProjectText(abs, next, text);
   return { ok: true, changed: true };
 }
 

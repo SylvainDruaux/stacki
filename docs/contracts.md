@@ -994,3 +994,58 @@ using the same shared URL-conflict rules as the host and requires an explicit Ap
 Escape and blur never rename anything. Errors appear below the field, including save-time
 conflicts from outside edits. Studio project scans include bounded `pageFolders` entries so
 empty folders reserve destinations during live validation as well as during the final write.
+
+### On-canvas text editing
+
+Desktop and Studio share the canvas text catalog and native text editor. In selection mode,
+single-click selects an element; double-clicking source-matched text temporarily sets
+`contenteditable="true"` on its existing
+text container, preserving its authored whitespace behavior. The browser owns caret placement,
+pointer selection, and arrow navigation.
+No input overlay, substitute glyphs, wrappers, or changes to typography are introduced. The
+original editing attributes are restored on exit. Clicking another element applies changed
+text and selects that element; Enter applies and Escape cancels. Unchanged text never writes.
+
+Native `beforeinput` target ranges must stay within the source-owned text segment. Plain text
+operations update only its existing Text nodes, so selecting across a protected child cannot
+replace or erase that child. Select All is confined to that segment. Single-click selects an
+inline child; Delete removes it through structural editing; double-click edits its own text.
+Plain-text paste and cut use the same range check. Undo/redo retains at most 64 bounded text
+snapshots per editing session. Native composition is accepted only while node structure and
+non-owned text remain intact; invalid native changes are restored before cancelling.
+Interaction mode retains the page's normal click behavior. Component slots use the same guards.
+
+A catalog names the open file, its SHA-256 source witness, and bounded text targets. The frame
+requires the corresponding render stamp before editing. Source offsets never cross into the
+frame. The host accepts only current-session target keys and rechecks source before applying
+an edit through Desktop's history/save pipeline or Studio's shared document. Catalogs contain
+at most 2,000 targets; text values are limited to 10,000 characters. Structure guards inspect at
+most 1,000 nodes. Editing state crosses to the host only to annotate its existing selection
+outline for shared content; the host may cancel editing when the source or CMS witness changes.
+
+Validated `avb:text-draft` messages mirror typing, composition and local undo/redo in the
+Settings Content field before saving. One transient draft is scoped to the current session,
+project, file and source node; it does not modify source, history or the preview DOM. Nested
+inline markup survives the projection, and expression chips retain their original binding
+while displaying the draft value. Cancellation and source changes discard the mirror. A save
+precedes the inactive message so the mirror remains until the source acknowledges the edit.
+Leaving native editing clears its text selection without clearing another element's selection.
+
+Exact marked text runs take precedence. A bounded fallback can combine unmarked span/div
+animation wrappers when their text matches one unique source segment and every authored child
+boundary survives. Changed words, ambiguous duplicates, missing authored spans, and stale
+renderings refuse editing. Runtime HTML is never serialized back into Astro.
+Component-owned wrappers may be traversed when locating slot text, including slots rendered
+through `set:html` with their comments removed. Caller-authored children remain boundaries.
+
+Simple local constant string bindings edit their original declaration, retaining the expression.
+Explicit `getEntry` imports from `astro:content` with literal collection and entry IDs can edit
+string fields through the existing writable collection adapter and schema validation. Their
+purple editing outline identifies shared content and warns that other uses also change.
+Read-only remote loaders, computed expressions, unknown record identities and shadowed loop
+bindings remain protected; the editor never guesses a record from its displayed text.
+
+`content:writeEntry` may carry an expected data/body snapshot. Desktop checks that snapshot
+before applying a source-preserving, actor-witnessed write. Studio uses its coordinated CMS
+transaction and source versions. A stale snapshot fails without replacing a newer field value.
+CMS notifications refresh the catalog, allowing subsequent edits to use the newly saved data.

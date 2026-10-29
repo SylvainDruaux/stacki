@@ -14,7 +14,6 @@ import { freezeViewportHeight, report } from './frameViewport';
 import { startGuide, type GuideFrame } from './frameGuide';
 import {
   PATH_ATTR,
-  STAMP_ATTRIBUTE,
   activeScope,
   allElementsWithPath,
   elementsWithPath,
@@ -108,7 +107,7 @@ const identityOf = (element: Element) => ({
   classes: ownClasses(element),
   attributes: Object.fromEntries(
     Array.from(element.attributes)
-      .filter((attribute) => attribute.name !== PATH_ATTR && attribute.name !== STAMP_ATTRIBUTE)
+      .filter((attribute) => !attribute.name.startsWith('data-avb-'))
       .map((attribute) => [attribute.name, attribute.value]),
   ),
 });
