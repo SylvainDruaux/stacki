@@ -15,6 +15,28 @@ Use an isolated checkout when other tasks are editing the working directory. Mat
 Studio, Studio release manifest, and npm starter versions. Never move an existing release tag to
 include later changes.
 
+## 0.1.88: separate Mac architectures
+
+Mac releases produce `Stacki-VERSION-arm64.dmg` and `Stacki-VERSION-x64.dmg`, plus
+matching `.zip` archives and blockmaps. Architecture-specific Electron binaries avoid the
+compressed universal binary's mid-file signature changes; download savings must be measured
+between consecutive signed builds with the same Electron version, not promised in advance.
+
+Keep the app ID, signing identity and GitHub feed unchanged. One `latest-mac.yml` lists both
+architectures; the metadata step rejects a missing ZIP or DMG before the draft can publish.
+The existing updater selects ARM on Apple Silicon (including Rosetta) and x64 on Intel.
+The migration may fall back to a full download if the old archive or blockmap cannot be reused.
+
+Local regressions exercise the installed updater's architecture filter, per-target terminal
+binaries, and dual-architecture metadata. Before publishing the first split release, verify
+signed universal-to-native installation on Intel and Apple Silicon, including a Rosetta launch.
+Unsigned packaging cannot verify Squirrel.Mac signature acceptance or notarization.
+
+The marketing site's `/download/mac` selects ARM and `/download/mac-intel` selects Intel.
+Both can use an older universal DMG until split assets are published. Browser CPU hints select
+the button automatically; browsers without them show a choice because `MacIntel` and Intel UA
+strings also occur on Apple Silicon. The website never substitutes the opposite-CPU installer.
+
 ## 0.1.87 startup correction
 
 The live 0.1.86 cold-start check found that Git restoration checked out the baseline a second
